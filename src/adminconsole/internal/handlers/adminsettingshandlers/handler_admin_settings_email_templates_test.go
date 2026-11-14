@@ -34,6 +34,39 @@ type fakeEmailTemplatesAPI struct {
 	resetLang   string
 	resetCalled int
 	savedCalled int
+
+	// The preview and the test send: what each answers, and what each was sent.
+	brands         []api.BrandResponse
+	preview        *api.PreviewEmailTemplateResponse
+	sendTestAnswer *api.SendTestEmailResponse
+	previewed      *api.PreviewEmailTemplateRequest
+	previewedEmail string
+	previewedLang  string
+	sentTest       *api.SendTestEmailTemplateRequest
+	sentTestEmail  string
+	sentTestLang   string
+}
+
+func (f *fakeEmailTemplatesAPI) GetAllBrands(context.Context, string) ([]api.BrandResponse, error) {
+	return f.brands, nil
+}
+
+func (f *fakeEmailTemplatesAPI) PreviewEmailTemplate(_ context.Context, _ string, email, language string,
+	request *api.PreviewEmailTemplateRequest) (*api.PreviewEmailTemplateResponse, error) {
+	f.previewedEmail, f.previewedLang, f.previewed = email, language, request
+	if f.writeErr != nil {
+		return nil, f.writeErr
+	}
+	return f.preview, nil
+}
+
+func (f *fakeEmailTemplatesAPI) SendTestEmailTemplate(_ context.Context, _ string, email, language string,
+	request *api.SendTestEmailTemplateRequest) (*api.SendTestEmailResponse, error) {
+	f.sentTestEmail, f.sentTestLang, f.sentTest = email, language, request
+	if f.writeErr != nil {
+		return nil, f.writeErr
+	}
+	return f.sendTestAnswer, nil
 }
 
 func (f *fakeEmailTemplatesAPI) GetEmailTemplate(_ context.Context, _ string, email string) (*api.EmailTemplateResponse, error) {

@@ -254,9 +254,10 @@ func editorText(text api.EmailTemplateTextResponse) EmailTemplateText {
 
 // renderEmailTemplate draws the editor of lang with form in its fields and extra beside them, the
 // notices or the refusal. The editor's text as saved goes with it, which leaving the page would
-// discard the form for.
-func renderEmailTemplate(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, email *api.EmailTemplateResponse,
-	lang *api.EmailTemplateLanguageResponse, form EmailTemplateText, extra map[string]interface{}) {
+// discard the form for, and what the preview and Send test email are drawn from.
+func renderEmailTemplate(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, apiClient emailTemplateEditorReader,
+	token string, email *api.EmailTemplateResponse, lang *api.EmailTemplateLanguageResponse, form EmailTemplateText,
+	extra map[string]interface{}) {
 
 	languages := make([]EmailTemplateLanguage, 0, len(email.Languages))
 	for _, l := range email.Languages {
@@ -295,6 +296,9 @@ func renderEmailTemplate(httpHelper HttpHelper, w http.ResponseWriter, r *http.R
 	for k, v := range extra {
 		bind[k] = v
 	}
+	if !bindEmailTemplatePreview(httpHelper, w, r, apiClient, token, bind) {
+		return
+	}
 	if err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_settings_email_template.html", bind); err != nil {
 		httpHelper.InternalServerError(w, r, err)
 	}
@@ -303,7 +307,7 @@ func renderEmailTemplate(httpHelper HttpHelper, w http.ResponseWriter, r *http.R
 // HandleEmailTemplateGet draws the editor of one email in one language, with the editor's text in
 // the form, which for an invalid edit is the edit as stored, beside a warning saying what is wrong
 // and that the built-in text is being sent.
-func HandleEmailTemplateGet(httpHelper HttpHelper, httpSession sessionstore.Store, apiClient emailTemplateReader) http.HandlerFunc {
+func HandleEmailTemplateGet(httpHelper HttpHelper, httpSession sessionstore.Store, apiClient emailTemplateEditorReader) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		token, ok := emailTemplateAccessToken(httpHelper, w, r)
 		if !ok {
@@ -328,14 +332,15 @@ func HandleEmailTemplateGet(httpHelper HttpHelper, httpSession sessionstore.Stor
 			}
 		}
 
-		renderEmailTemplate(httpHelper, w, r, email, lang, editorText(lang.EditorText),
+		renderEmailTemplate(httpHelper, w, r, apiClient, token, email, lang, editorText(lang.EditorText),
 			map[string]interface{}{"savedNotice": saved, "resetNotice": reset})
 	}
 }
 
-// emailTemplateSaver is what a save needs: the email, which a refusal is drawn with, and the write.
+// emailTemplateSaver is what a save needs: the email and the brands, which a refusal is drawn with,
+// and the write.
 type emailTemplateSaver interface {
-	emailTemplateReader
+	emailTemplateEditorReader
 	SaveEmailTemplate(ctx context.Context, accessToken string, email, language string,
 		request *api.SaveEmailTemplateRequest) (*api.EmailTemplateLanguageResponse, error)
 }
@@ -383,7 +388,7 @@ func HandleEmailTemplatePost(httpHelper HttpHelper, httpSession sessionstore.Sto
 		})
 		if err != nil {
 			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
-				renderEmailTemplate(httpHelper, w, r, email, lang, form, map[string]interface{}{
+				renderEmailTemplate(httpHelper, w, r, apiClient, token, email, lang, form, map[string]interface{}{
 					"error":      message,
 					"errorField": emailTemplateErrorField(err),
 				})
@@ -399,10 +404,10 @@ func HandleEmailTemplatePost(httpHelper HttpHelper, httpSession sessionstore.Sto
 	}
 }
 
-// emailTemplateResetter is what a reset needs: the email, which a refusal is drawn with, and the
-// write.
+// emailTemplateResetter is what a reset needs: the email and the brands, which a refusal is drawn
+// with, and the write.
 type emailTemplateResetter interface {
-	emailTemplateReader
+	emailTemplateEditorReader
 	ResetEmailTemplate(ctx context.Context, accessToken string, email, language string) error
 }
 
@@ -422,7 +427,7 @@ func HandleEmailTemplateResetPost(httpHelper HttpHelper, httpSession sessionstor
 
 		if err := apiClient.ResetEmailTemplate(r.Context(), token, email.Id, lang.Language); err != nil {
 			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
-				renderEmailTemplate(httpHelper, w, r, email, lang, editorText(lang.EditorText), map[string]interface{}{
+				renderEmailTemplate(httpHelper, w, r, apiClient, token, email, lang, editorText(lang.EditorText), map[string]interface{}{
 					"error": message,
 				})
 			})

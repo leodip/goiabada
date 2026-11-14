@@ -72,3 +72,32 @@ func (c *AuthServerClient) ResetEmailTemplate(ctx context.Context, accessToken s
 	})
 	return err
 }
+
+// PreviewEmailTemplate answers the email one language's text draws, saved or not, with the sample
+// values and in the brand the request chooses: its subject, its HTML and its plain-text part. It
+// stores and sends nothing, and refuses a text a save would refuse, as the save does.
+func (c *AuthServerClient) PreviewEmailTemplate(ctx context.Context, accessToken string, email, language string,
+	request *api.PreviewEmailTemplateRequest) (*api.PreviewEmailTemplateResponse, error) {
+	return execute[api.PreviewEmailTemplateResponse](ctx, c, accessToken, apiRequest{
+		method:        "POST",
+		url:           c.emailTemplateURL(email, language) + "/preview",
+		jsonBody:      request,
+		contentType:   contentTypeJSON,
+		successStatus: http.StatusOK,
+	})
+}
+
+// SendTestEmailTemplate sends one language's text, saved or not, to the address the request types,
+// as a recipient would get it, with the preview's sample values, and answers whether it went over
+// TLS. It waits as long as the SMTP test does.
+func (c *AuthServerClient) SendTestEmailTemplate(ctx context.Context, accessToken string, email, language string,
+	request *api.SendTestEmailTemplateRequest) (*api.SendTestEmailResponse, error) {
+	return execute[api.SendTestEmailResponse](ctx, c, accessToken, apiRequest{
+		method:        "POST",
+		url:           c.emailTemplateURL(email, language) + "/send-test",
+		jsonBody:      request,
+		contentType:   contentTypeJSON,
+		successStatus: http.StatusOK,
+		sendsMail:     true,
+	})
+}

@@ -248,7 +248,8 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   forgot-password and registration forms carry its widget, and each response drawing one of them
   through `turnstile.WithWidget` adds the constant `https://challenges.cloudflare.com` to
   `script-src` (`core/httpmw.SetContentSecurityPolicy`). Every other page, those three with the
-  challenge off, and an error page replacing one of them, keep the policy above. Page
+  challenge off, and an error page replacing one of them, keep the policy above, as does every
+  console response but the email template preview's frame (Email templates, below). Page
   behaviour lives in static files, `static/utils.js`, the console's `static/shell.js` and
   `static/pages/<page>.js`, attached with `addEventListener`. A template hands a script data in a
   JSON data block, `<script type="application/json" id="…">{{ . }}</script>`, or in `data-`
@@ -365,7 +366,18 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   opened from the list in the built-in language matching the console's catalog, and it is the
   console's one page that asks before discarding text not saved (`email-template-editor.js`):
   another language asks in its `discardChanges` dialog, and leaving any other way lets the browser
-  ask, unless a save or a confirmed Reset is what leaves.
+  ask, unless a save or a confirmed Reset is what leaves. Beside the form, `email-template-preview.js`
+  asks the console's JSON preview for the subject and the plain-text part as the text changes,
+  saying a refusal where the preview is and keeping the last good preview; only after an answer
+  does it load the email into a sandboxed frame through a hidden form posting the same text to
+  `…/preview-frame`. That route is the console's one framed answer (#818 decision 11): it draws
+  the email from the text through the admin API, never from markup the browser sends, and
+  replaces the console's headers with `X-Frame-Options: SAMEORIGIN` and
+  `default-src 'none'; style-src-attr 'unsafe-inline'; img-src <auth server origin>; base-uri
+  'none'; form-action 'none'; frame-ancestors 'self'; sandbox`, and puts `<base target="_blank">`
+  in the email's head, so its links open a window the sandbox refuses. Send test email posts the
+  same text, the brand chosen for the preview and the typed address to `…/send-test`, from the
+  page's script, its button disabled while SMTP is off.
 - **Accessibility**: WCAG 2.2 AA on every page, in every state, appearance and theme. An error is a
   `notice-danger` with `role="alert"`, a success a `notice-positive` with `role="status"`; a table
   wider than its place scrolls inside `table-scroll`, a labelled region with `tabindex="0"`; an icon

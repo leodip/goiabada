@@ -11,13 +11,16 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/adminsettingshandlers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
+	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
 	web "github.com/leodip/goiabada/adminconsole/web"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/sessionstore/sessiontest"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -48,6 +51,10 @@ func (a *emailTemplatesAPI) SaveEmailTemplate(context.Context, string, string, s
 
 func (a *emailTemplatesAPI) ResetEmailTemplate(context.Context, string, string, string) error {
 	return a.refusal
+}
+
+func (a *emailTemplatesAPI) GetAllBrands(context.Context, string) ([]api.BrandResponse, error) {
+	return []api.BrandResponse{{Id: 1, Name: "Goiabada", IsDefault: true}, {Id: 4, Name: "Acme <Corp>"}}, nil
 }
 
 func emailTemplatesStore(t *testing.T) sessionstore.Store {
@@ -172,11 +179,25 @@ func emailTemplate() *api.EmailTemplateResponse {
 
 func strPtr(s string) *string { return &s }
 
-func serveEditor(t *testing.T, apiClient *emailTemplatesAPI, language string) string {
+func serveEditor(t *testing.T, apiClient *emailTemplatesAPI, language string, options ...handlertest.Option) string {
 	t.Helper()
+	options = append([]handlertest.Option{handlertest.WithPathValue("email", apiClient.email.Id),
+		handlertest.WithPathValue("language", language)}, options...)
 	return servePage(t, adminsettingshandlers.HandleEmailTemplateGet(render.New(web.TemplateFS(), web.StaticFS()),
 		emailTemplatesStore(t), apiClient), http.MethodGet, "/admin/settings/email/templates/"+apiClient.email.Id+"/"+language,
-		handlertest.WithPathValue("email", apiClient.email.Id), handlertest.WithPathValue("language", language))
+		options...)
+}
+
+// signedInWithSMTP is a request from an administrator signed in as admin@example.com, to an auth
+// server with SMTP on.
+func signedInWithSMTP() []handlertest.Option {
+	return []handlertest.Option{
+		handlertest.WithJwtInfo(oauthclient.JwtInfo{
+			TokenResponse: oauth.TokenResponse{AccessToken: handlertest.AccessToken},
+			IdToken:       &oauth.JwtToken{Claims: jwt.MapClaims{"email": "admin@example.com"}},
+		}),
+		handlertest.WithSettings(&api.PublicSettingsResponse{AppName: "Test", SMTPEnabled: true}),
+	}
 }
 
 // The editor of one language: the email's name and when it is sent, the six languages with the
@@ -284,4 +305,51 @@ func TestRender_AdminSettingsBranding_LinksToTheEmailTemplates(t *testing.T) {
 
 	assert.Contains(t, out, "Os e-mails também são exibidos nestas marcas")
 	assert.Contains(t, out, `<a class="text-link" href="/admin/settings/email/templates">Ir para Modelos de e-mail</a>`)
+}
+
+// Beside the form, the preview: its brand selector, the default brand first and each brand by name,
+// the subject above the email, the email in a sandboxed frame, which the hidden form loads with the
+// text in the form, and the plain-text part under it, all filled by email-template-preview.js. Under
+// it Send test email, its address filled in with the administrator's own.
+func TestRender_AdminSettingsEmailTemplate_ThePreviewAndTheTestSend(t *testing.T) {
+	out := serveEditor(t, &emailTemplatesAPI{email: emailTemplate()}, "fr", signedInWithSMTP()...)
+
+	assert.Contains(t, out, `src="/static/pages/email-template-preview.js`)
+	preview := regexp.MustCompile(`(?s)<section class="panel" id="emailTemplatePreviewPanel".*?</section>`).FindString(out)
+	require.NotEmpty(t, preview, "the preview is drawn")
+	assert.Contains(t, preview, `<h2 class="panel-title" id="previewTitle">Pré-visualização</h2>`)
+	assert.Contains(t, preview, `data-preview-url="/admin/settings/email/templates/password_reset_link/fr/preview"`)
+	assert.Regexp(t, `<select class="control" id="previewBrand" name="brandId"[^>]*>\s*<option value="" selected>Marca padrão \(Goiabada\)</option>\s*<option value="1">Goiabada</option>\s*<option value="4">Acme &lt;Corp&gt;</option>\s*</select>`, preview)
+	assert.Contains(t, preview, `<div class="not-empty:block hidden" id="previewStatus" role="status"></div>`)
+	assert.Contains(t, preview, `id="previewSubject"`)
+	assert.Regexp(t, `<iframe [^>]*name="emailTemplatePreviewFrame"[^>]*sandbox=""[^>]*title="O e-mail com valores de exemplo"`, preview,
+		"the frame runs no script and opens nothing")
+	assert.Contains(t, preview, `id="previewText"`)
+
+	frameForm := regexp.MustCompile(`(?s)<form id="previewFrameForm".*?</form>`).FindString(out)
+	require.NotEmpty(t, frameForm, "the hidden form that loads the frame is drawn")
+	assert.Contains(t, frameForm, `method="post" action="/admin/settings/email/templates/password_reset_link/fr/preview-frame" target="emailTemplatePreviewFrame" hidden`)
+	for _, name := range []string{"subject", "buttonLabel", "body", "brandId"} {
+		assert.Contains(t, frameForm, `<input type="hidden" name="`+name+`">`)
+	}
+
+	send := regexp.MustCompile(`(?s)<form class="panel" id="sendTestForm".*?</form>`).FindString(out)
+	require.NotEmpty(t, send, "Send test email is drawn")
+	assert.Contains(t, send, `action="/admin/settings/email/templates/password_reset_link/fr/send-test"`)
+	assert.Regexp(t, `<input class="control" id="testAddress" type="email"[^>]*name="to" value="admin@example.com"`, send)
+	assert.Regexp(t, `<button id="btnSendTest" class="button" type="submit">Enviar e-mail de teste</button>`, send)
+	assert.Contains(t, send, `<div class="not-empty:block hidden" id="sendTestStatus" role="status"></div>`)
+	assert.NotContains(t, send, "disabled")
+}
+
+// With SMTP off, Send test email's button is disabled, with a note pointing to the email settings.
+func TestRender_AdminSettingsEmailTemplate_SMTPOffDisablesTheTestSend(t *testing.T) {
+	out := serveEditor(t, &emailTemplatesAPI{email: emailTemplate()}, "fr")
+
+	send := regexp.MustCompile(`(?s)<form class="panel" id="sendTestForm".*?</form>`).FindString(out)
+	require.NotEmpty(t, send, "Send test email is drawn")
+	assert.Regexp(t, `<button id="btnSendTest" class="button" type="submit" disabled aria-describedby="sendTestOff">`, send)
+	assert.Contains(t, send, `id="sendTestOff"`)
+	assert.Contains(t, send, "O e-mail está desligado. Ligue-o e configure o servidor SMTP para enviar um e-mail de teste:")
+	assert.Contains(t, send, `<a class="text-link" href="/admin/settings/email">Configuração</a>`)
 }

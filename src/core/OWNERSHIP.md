@@ -209,8 +209,8 @@ command itself and fails on a tree it changed.
 | `core/api` | `PermissionResponse` | both-apps | — |
 | `core/api` | `PhoneCountryResponse` | contract | The element of `GET /api/v1/admin/phone-countries`, a published admin API route that stays when the admin console stops calling it, because its pages build the list from `core/phonecountries` (#563 decisions 1 and 2). The auth server writes it and no admin console file reads it. |
 | `core/api` | `PostLogoutRedirectURIResponse` | reachable | — |
-| `core/api` | `PreviewEmailTemplateRequest` | contract | Admin API request DTO of an email template's preview (#818 decision 11), which is what `core/api` is for. The auth server reads it and no admin console file sends it until the console's framed preview does; #385 exempts this package by name. |
-| `core/api` | `PreviewEmailTemplateResponse` | contract | Admin API response DTO of an email template's preview (#818 decision 11), which is what `core/api` is for. The auth server writes it and no admin console file reads it until the console's framed preview does; #385 exempts this package by name. |
+| `core/api` | `PreviewEmailTemplateRequest` | both-apps | — |
+| `core/api` | `PreviewEmailTemplateResponse` | both-apps | — |
 | `core/api` | `PreviewLegalDocumentRequest` | both-apps | Admin API DTO of the legal documents routes, which is what `core/api` is for (#622). The auth server reads or writes it and no admin console file names it until the console's Legal documents section does; #385 exempts this package by name. |
 | `core/api` | `PreviewLegalDocumentResponse` | both-apps | Admin API DTO of the legal documents routes, which is what `core/api` is for (#622). The auth server reads or writes it and no admin console file names it until the console's Legal documents section does; #385 exempts this package by name. |
 | `core/api` | `ProfilePictureInfoResponse` | both-apps | — |
@@ -228,7 +228,7 @@ command itself and fails on a tree it changed.
 | `core/api` | `SearchUsersWithPermissionAnnotationResponse` | both-apps | — |
 | `core/api` | `SendTestEmailRequest` | both-apps | — |
 | `core/api` | `SendTestEmailResponse` | both-apps | — |
-| `core/api` | `SendTestEmailTemplateRequest` | contract | Admin API request DTO of an email template's test send (#818 decision 12), which is what `core/api` is for. The auth server reads it and no admin console file sends it until the console's Send test email does; #385 exempts this package by name. |
+| `core/api` | `SendTestEmailTemplateRequest` | both-apps | — |
 | `core/api` | `SessionClientResponse` | both-apps | — |
 | `core/api` | `SessionLoadRequest` | both-apps | — |
 | `core/api` | `SessionLoadResponse` | both-apps | — |
