@@ -142,19 +142,19 @@ command itself and fails on a tree it changed.
 | `core/api` | `CreateUserAttributeResponse` | both-apps | — |
 | `core/api` | `CreateUserResponse` | both-apps | — |
 | `core/api` | `DeleteAccountRequest` | both-apps | — |
-| `core/api` | `EmailTemplateFieldBody` | contract | A value the email templates' admin API answers (#818 decisions 8 and 10), a stable identifier a caller compares against. The auth server writes it and no admin console file reads it until the console's Email templates tab does. |
-| `core/api` | `EmailTemplateFieldButtonLabel` | contract | A value the email templates' admin API answers (#818 decisions 8 and 10), a stable identifier a caller compares against. The auth server writes it and no admin console file reads it until the console's Email templates tab does. |
-| `core/api` | `EmailTemplateFieldSubject` | contract | A value the email templates' admin API answers (#818 decisions 8 and 10), a stable identifier a caller compares against. The auth server writes it and no admin console file reads it until the console's Email templates tab does. |
-| `core/api` | `EmailTemplateLanguageResponse` | contract | Admin API response DTO of the email templates (#818 decision 10), which is what `core/api` is for. The auth server writes it and no admin console file reads it until the console's Email templates tab does; #385 exempts this package by name. |
-| `core/api` | `EmailTemplateLanguageStatusResponse` | contract | Admin API response DTO of the email templates (#818 decision 10), which is what `core/api` is for. The auth server writes it and no admin console file reads it until the console's Email templates tab does; #385 exempts this package by name. |
-| `core/api` | `EmailTemplatePlaceholderResponse` | contract | Admin API response DTO of the email templates (#818 decision 10), which is what `core/api` is for. The auth server writes it and no admin console file reads it until the console's Email templates tab does; #385 exempts this package by name. |
-| `core/api` | `EmailTemplateProblemResponse` | contract | Admin API response DTO of the email templates (#818 decision 10), which is what `core/api` is for. The auth server writes it and no admin console file reads it until the console's Email templates tab does; #385 exempts this package by name. |
-| `core/api` | `EmailTemplateResponse` | contract | Admin API response DTO of the email templates (#818 decision 10), which is what `core/api` is for. The auth server writes it and no admin console file reads it until the console's Email templates tab does; #385 exempts this package by name. |
-| `core/api` | `EmailTemplateStatusDefault` | contract | A value the email templates' admin API answers (#818 decisions 8 and 10), a stable identifier a caller compares against. The auth server writes it and no admin console file reads it until the console's Email templates tab does. |
-| `core/api` | `EmailTemplateStatusEdited` | contract | A value the email templates' admin API answers (#818 decisions 8 and 10), a stable identifier a caller compares against. The auth server writes it and no admin console file reads it until the console's Email templates tab does. |
-| `core/api` | `EmailTemplateStatusInvalid` | contract | A value the email templates' admin API answers (#818 decisions 8 and 10), a stable identifier a caller compares against. The auth server writes it and no admin console file reads it until the console's Email templates tab does. |
-| `core/api` | `EmailTemplateSummaryResponse` | contract | Admin API response DTO of the email templates (#818 decision 10), which is what `core/api` is for. The auth server writes it and no admin console file reads it until the console's Email templates tab does; #385 exempts this package by name. |
-| `core/api` | `EmailTemplateTextResponse` | contract | Admin API response DTO of the email templates (#818 decision 10), which is what `core/api` is for. The auth server writes it and no admin console file reads it until the console's Email templates tab does; #385 exempts this package by name. |
+| `core/api` | `EmailTemplateFieldBody` | both-apps | — |
+| `core/api` | `EmailTemplateFieldButtonLabel` | both-apps | — |
+| `core/api` | `EmailTemplateFieldSubject` | both-apps | — |
+| `core/api` | `EmailTemplateLanguageResponse` | both-apps | — |
+| `core/api` | `EmailTemplateLanguageStatusResponse` | reachable | — |
+| `core/api` | `EmailTemplatePlaceholderResponse` | reachable | — |
+| `core/api` | `EmailTemplateProblemResponse` | reachable | — |
+| `core/api` | `EmailTemplateResponse` | both-apps | — |
+| `core/api` | `EmailTemplateStatusDefault` | both-apps | — |
+| `core/api` | `EmailTemplateStatusEdited` | both-apps | — |
+| `core/api` | `EmailTemplateStatusInvalid` | both-apps | — |
+| `core/api` | `EmailTemplateSummaryResponse` | both-apps | — |
+| `core/api` | `EmailTemplateTextResponse` | both-apps | — |
 | `core/api` | `ErrorResponse` | both-apps | — |
 | `core/api` | `GenerateUserEmailVerificationCodeResponse` | contract | Admin API response DTO, which is what `core/api` is for. The auth server writes it and no admin console file reads it yet; #385 exempts this package by name. |
 | `core/api` | `GetAuditEventTypesResponse` | both-apps | — |
@@ -170,8 +170,8 @@ command itself and fails on a tree it changed.
 | `core/api` | `GetClientSecretResponse` | both-apps | — |
 | `core/api` | `GetClientSessionsResponse` | both-apps | — |
 | `core/api` | `GetClientsResponse` | both-apps | — |
-| `core/api` | `GetEmailTemplateResponse` | contract | Admin API response DTO of the email templates (#818 decision 10), which is what `core/api` is for. The auth server writes it and no admin console file reads it until the console's Email templates tab does; #385 exempts this package by name. |
-| `core/api` | `GetEmailTemplatesResponse` | contract | Admin API response DTO of the email templates (#818 decision 10), which is what `core/api` is for. The auth server writes it and no admin console file reads it until the console's Email templates tab does; #385 exempts this package by name. |
+| `core/api` | `GetEmailTemplateResponse` | both-apps | — |
+| `core/api` | `GetEmailTemplatesResponse` | both-apps | — |
 | `core/api` | `GetGroupAttributeResponse` | both-apps | — |
 | `core/api` | `GetGroupAttributesResponse` | both-apps | — |
 | `core/api` | `GetGroupMembersResponse` | both-apps | — |
@@ -220,7 +220,7 @@ command itself and fails on a tree it changed.
 | `core/api` | `RedirectURIResponse` | reachable | — |
 | `core/api` | `ResourcePermissionUpsert` | both-apps | — |
 | `core/api` | `ResourceResponse` | both-apps | — |
-| `core/api` | `SaveEmailTemplateRequest` | contract | Admin API request DTO of an email template's save (#818 decision 10), which is what `core/api` is for. The auth server reads it and no admin console file sends it until the console's Email templates tab does; #385 exempts this package by name. |
+| `core/api` | `SaveEmailTemplateRequest` | both-apps | — |
 | `core/api` | `SaveLegalDocumentDraftRequest` | both-apps | Admin API DTO of the legal documents routes, which is what `core/api` is for (#622). The auth server reads or writes it and no admin console file names it until the console's Legal documents section does; #385 exempts this package by name. |
 | `core/api` | `SearchGroupsWithPermissionAnnotationResponse` | both-apps | — |
 | `core/api` | `SearchUsersResponse` | both-apps | — |

@@ -358,7 +358,14 @@ regenerate both `main.css`. Every class a page names has a rule in the served `m
   every built-in text to its email's rules in the six languages, and
   `TestEmails_EveryDefinedEmailIsDrawnInlineAlone` to the inline rules above. A change to the
   placeholders an email offers or requires can make an administrator's edit of it invalid, so it
-  needs a release-notes line.
+  needs a release-notes line. The console's Email templates tab, under Admin, Email, lists the
+  emails in its own groups, with their names and when each is sent in its catalogs under
+  `adminconsole.email_templates.email.<identifier>`, so an email added to the auth server needs
+  its row in `emailTemplateGroups` and its two messages. Its editor is one language of one email,
+  opened from the list in the built-in language matching the console's catalog, and it is the
+  console's one page that asks before discarding text not saved (`email-template-editor.js`):
+  another language asks in its `discardChanges` dialog, and leaving any other way lets the browser
+  ask, unless a save or a confirmed Reset is what leaves.
 - **Accessibility**: WCAG 2.2 AA on every page, in every state, appearance and theme. An error is a
   `notice-danger` with `role="alert"`, a success a `notice-positive` with `role="status"`; a table
   wider than its place scrolls inside `table-scroll`, a labelled region with `tabindex="0"`; an icon

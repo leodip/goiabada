@@ -14,6 +14,9 @@
   </div>
 </div>
 
+{{/* Emails are drawn in a brand too; what they say is the email templates' (#818 decision 14). */}}
+<p class="mb-6" id="brandingEmailsNote">{{ T $.ctx "adminconsole.admin_branding.list.emails_note" }} <a class="text-link" href="/admin/settings/email/templates">{{ T $.ctx "adminconsole.admin_branding.list.emails_link" }}</a></p>
+
 {{/* The default brand is marked, and is the one brand with no Delete: the auth server refuses
      deleting it. A brand with contrast pairs below their minimum is marked with how many (#815
      decision 9). The Theme column draws each brand's light and dark colors, as the admin API answers

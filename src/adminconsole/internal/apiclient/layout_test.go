@@ -40,6 +40,7 @@ func TestPackageFiles_OneFilePerResource(t *testing.T) {
 		"client_introspection_resources.go",
 		"client_permissions.go",
 		"clients.go",
+		"email_templates.go",
 		"executor.go",
 		"group_attributes.go",
 		"group_permissions.go",

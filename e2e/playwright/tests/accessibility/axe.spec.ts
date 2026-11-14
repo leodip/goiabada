@@ -1419,6 +1419,10 @@ test("the settings pages and the audit log", async ({ page }) => {
       await page.locator("#destinationEmail").fill("not-an-address");
       await page.locator("#btnSend").click();
     }),
+    // The Email templates tab (#818 decision 14): the list, and an email's editor, its button label,
+    // placeholder buttons and language selector drawn. Nothing is saved.
+    at(page, "email templates", settings("email/templates")),
+    at(page, "an email template", settings("email/templates/password_reset_link/en")),
     at(page, "audit logging settings", settings("audit-logs")),
     at(page, "the audit log", settings("audit-log-viewer")),
     {

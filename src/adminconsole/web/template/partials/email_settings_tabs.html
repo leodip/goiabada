@@ -4,5 +4,6 @@
 <nav class="tab-bar" aria-label="{{ T $ctx "adminconsole.tabs.label" }}">
   <a class="tab-item" href="/admin/settings/email"{{ if eq $type "configuration" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.email_tabs.configuration" }}</a>
   <a class="tab-item" href="/admin/settings/email/send-test-email"{{ if eq $type "send-test-email" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.email_tabs.send_test" }}</a>
+  <a class="tab-item" href="/admin/settings/email/templates"{{ if eq $type "templates" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.email_tabs.templates" }}</a>
 </nav>
 {{end}}
