@@ -1,6 +1,6 @@
 package apihandlers
 
-// The email templates as Customize and translate the pages describes them, held to the code (#818).
+// The email templates as Customize the pages and emails describes them, held to the code (#818).
 //
 // The guide is where an administrator learns, before rewording an email, where the editor is, the
 // format a body is written in, which placeholders each email offers and which its body cannot do
@@ -9,7 +9,7 @@ package apihandlers
 // limits the record's, and the labels the console's English catalog: a guide offering a placeholder
 // an email refuses, or leaving out one it requires, sends the reader to a refusal with nothing
 // going red. The glossary names the term, and the pages that once sent a reader to the guide's
-// "Email bodies" section, or said a mounted email template could load an image, must not again.
+// "Email bodies" section, or said an email template could load an image, must not again.
 //
 // It reads files, the built-in email definitions and the English catalog, and nothing else.
 
@@ -31,7 +31,7 @@ const (
 	// emailTemplatesHead is the customize guide's section on email templates, and emailTemplatesLink
 	// the anchor the guide's other sections and the glossary link to.
 	emailTemplatesHead = "## Email templates"
-	emailTemplatesLink = "/guides/customize-and-translate-the-pages/#email-templates"
+	emailTemplatesLink = "/guides/customize-the-pages-and-emails/#email-templates"
 
 	emailFormatHead          = "### The body's format"
 	placeholdersHead         = "### Placeholders"
@@ -56,8 +56,7 @@ func written(name string) string {
 // The section's steps name the editor where the console puts it, Admin, Email, its tab, by the
 // console's labels, and each field, the placeholder buttons, the preview, the test send, the save
 // and the reset by theirs (#818 decision 14). It says the six languages are edited one at a time,
-// that a field left alone follows later releases (decision 7), that edits are not per brand, that a
-// language an operator added gets English, and that the mounted templates change only the frame.
+// that a field left alone follows later releases (decision 7), and that edits are not per brand.
 func TestEmailTemplateDocs_TheGuideSaysWhereTheEditorIsAndWhatItDoes(t *testing.T) {
 	guard.AssertSectionSays(t, filepath.Dir(guard.SourceRoot(t)), customizeGuidePage, emailTemplatesHead,
 		[]string{
@@ -75,10 +74,7 @@ func TestEmailTemplateDocs_TheGuideSaysWhereTheEditorIsAndWhatItDoes(t *testing.
 			"six built-in languages",
 			"follows the built-in text when you upgrade",
 			"every brand",
-			"in English",
-			"`layouts/email_layout.html`",
 			"#branded-emails",
-			"#change-the-templates",
 		}, nil)
 }
 
@@ -283,18 +279,16 @@ func TestEmailTemplateDocs_TheAPISectionNamesEachOperationAndItsScopes(t *testin
 	}
 }
 
-// The guide's sections that meet emails link the new section, and none links the section it
-// replaced; the glossary defines the term and links it; the personal data page does not say an
-// email template can load an image, which the format refuses (#818 decision 2).
+// The guide's first steps link the section, and no section links the one it replaced; the glossary
+// defines the term and links it; the personal data page does not say an email template can load an
+// image, which the format refuses (#818 decision 2).
 func TestEmailTemplateDocs_TheOtherSectionsAndTheGlossaryLinkIt(t *testing.T) {
 	root := filepath.Dir(guard.SourceRoot(t))
-	for _, heading := range []string{"## Add a language", "## Change a few words", "## Catalogs"} {
-		guard.AssertSectionSays(t, root, customizeGuidePage, heading, []string{"(#email-templates)"}, nil)
-	}
+	guard.AssertSectionSays(t, root, customizeGuidePage, "## Brand the pages", []string{"(#email-templates)"}, nil)
 	guard.AssertSectionSays(t, root, customizeGuidePage, "", nil, []string{"## Email bodies", "#email-bodies"})
 	guard.AssertSectionSays(t, root, glossaryPage, emailTemplateGlossary,
 		[]string{"subject", "body", "button label", "six built-in languages", "**Admin**, **Email**", emailTemplatesLink}, nil)
-	guard.AssertSectionSays(t, root, personalDataPage, "", []string{"email layout"}, []string{"An email template can embed"})
+	guard.AssertSectionSays(t, root, personalDataPage, "", nil, []string{"An email template can embed"})
 }
 
 // placeholderColumn answers the cells of column in the one table under heading.

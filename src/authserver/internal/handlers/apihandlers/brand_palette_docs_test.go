@@ -31,7 +31,7 @@ const (
 	// customPalettesHead is its subsection on custom palettes, and customPalettesAnchor the link to it.
 	customPalettesHead   = "### Custom palettes"
 	customPalettesAnchor = "#custom-palettes"
-	customPalettesLink   = "/guides/customize-and-translate-the-pages/" + customPalettesAnchor
+	customPalettesLink   = "/guides/customize-the-pages-and-emails/" + customPalettesAnchor
 	// contrastWarningsHead is the subsection saying what a warning means.
 	contrastWarningsHead = "### Contrast warnings"
 	// paletteAPIHead is the subsection on a palette through the admin API.
@@ -213,17 +213,10 @@ func TestBrandPaletteDocs_TheBrandsParagraphNamesTheNewMembers(t *testing.T) {
 	}
 }
 
-// The two places that sent an administrator to regenerate the CSS for their own colors send them to
-// custom palettes instead (Assumed: "Regenerate the CSS" stays): step 2 of Brand the pages, and the
-// colors paragraph of Regenerate the CSS.
-func TestBrandPaletteDocs_TheOwnColorsPointersLeadToCustomPalettes(t *testing.T) {
-	root := filepath.Dir(guard.SourceRoot(t))
-	guard.AssertSectionSays(t, root, customizeGuidePage, "## Brand the pages",
-		[]string{"[custom palette](" + customPalettesAnchor + ")"},
-		[]string{"[Regenerate the CSS](#regenerate-the-css) to use your own colors"})
-	guard.AssertSectionSays(t, root, customizeGuidePage, "## Regenerate the CSS",
-		[]string{"[custom palette](" + customPalettesAnchor + ")"},
-		[]string{"Change them there and regenerate"})
+// Step 2 of Brand the pages sends an administrator who wants their own colors to custom palettes.
+func TestBrandPaletteDocs_TheOwnColorsPointerLeadsToCustomPalettes(t *testing.T) {
+	guard.AssertSectionSays(t, filepath.Dir(guard.SourceRoot(t)), customizeGuidePage, "## Brand the pages",
+		[]string{"[custom palette](" + customPalettesAnchor + ")"}, nil)
 }
 
 // The glossary's brand has a theme that is a built-in one or a custom palette, and points at the

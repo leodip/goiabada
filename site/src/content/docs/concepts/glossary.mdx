@@ -64,7 +64,7 @@ An address on your app's server where the auth server tells your app that a user
 
 ### Brand
 
-The look the sign-in pages and the admin console are drawn in: a name, an appearance (automatic, light or dark), a theme, which is one of eight built-in palettes or a [custom palette](/guides/customize-and-translate-the-pages/#custom-palettes) of your own colors, and a kit of a logo, a favicon, a background image, a font and corners. It can also hold footer links and a support contact, drawn under the card. A client's pages are drawn in the brand chosen for it, or in the default brand when none is, and the admin console in the brand of the admin console's own client, whose admin pages take only its colors and logo. Every email is drawn in the brand of the page it was sent from. See [Clients](/concepts/clients/#brand), [Brands and themes](/guides/customize-and-translate-the-pages/#brands-and-themes), [Footer links and support contact](/guides/customize-and-translate-the-pages/#footer-links-and-support-contact) and [Branded emails](/guides/customize-and-translate-the-pages/#branded-emails).
+The look the sign-in pages and the admin console are drawn in: a name, an appearance (automatic, light or dark), a theme, which is one of eight built-in palettes or a [custom palette](/guides/customize-the-pages-and-emails/#custom-palettes) of your own colors, and a kit of a logo, a favicon, a background image, a font and corners. It can also hold footer links and a support contact, drawn under the card. A client's pages are drawn in the brand chosen for it, or in the default brand when none is, and the admin console in the brand of the admin console's own client, whose admin pages take only its colors and logo. Every email is drawn in the brand of the page it was sent from. See [Clients](/concepts/clients/#brand), [Brands and themes](/guides/customize-the-pages-and-emails/#brands-and-themes), [Footer links and support contact](/guides/customize-the-pages-and-emails/#footer-links-and-support-contact) and [Branded emails](/guides/customize-the-pages-and-emails/#branded-emails).
 
 ### Claim
 
@@ -91,7 +91,7 @@ A way for a client to register itself, by calling `/connect/register`, instead o
 
 ### Email template
 
-What one of the auth server's emails says: its subject, its body and, for an email with a button, its button label, in each of the six built-in languages. You edit it under **Admin**, **Email**, on the **Email templates** tab, in a small set of Markdown with placeholders such as `{{name}}`, and the email is drawn around it in its brand. See [Email templates](/guides/customize-and-translate-the-pages/#email-templates).
+What one of the auth server's emails says: its subject, its body and, for an email with a button, its button label, in each of the six built-in languages. You edit it under **Admin**, **Email**, on the **Email templates** tab, in a small set of Markdown with placeholders such as `{{name}}`, and the email is drawn around it in its brand. See [Email templates](/guides/customize-the-pages-and-emails/#email-templates).
 
 ### Grant
 
@@ -155,7 +155,7 @@ A deprecated flow, also called the password grant, in which a client sends a use
 
 ### Safe mode
 
-Drawing the pages without what can make a brand unusable: its custom CSS, a custom palette, replaced by the built-in Blueberry colors, and an uploaded font, replaced by System UI. Nothing saved changes. It's turned on for one sign-in with `goiabada_safe_mode=true`, for the admin console until you sign out with the same parameter on its address, or for every page with `GOIABADA_AUTHSERVER_BRAND_SAFE_MODE`. See [Safe mode](/guides/customize-and-translate-the-pages/#safe-mode).
+Drawing the pages without what can make a brand unusable: its custom CSS, a custom palette, replaced by the built-in Blueberry colors, and an uploaded font, replaced by System UI. Nothing saved changes. It's turned on for one sign-in with `goiabada_safe_mode=true`, for the admin console until you sign out with the same parameter on its address, or for every page with `GOIABADA_AUTHSERVER_BRAND_SAFE_MODE`. See [Safe mode](/guides/customize-the-pages-and-emails/#safe-mode).
 
 ### Scope
 
