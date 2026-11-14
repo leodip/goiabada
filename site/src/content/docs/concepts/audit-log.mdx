@@ -143,7 +143,9 @@ No entry records a user's email address. An entry about one records `email_diges
 | `custom_css_bytes` | The size of a brand's custom CSS after the save, in bytes, left out when the brand has none. The CSS itself is not recorded. |
 | `dark_logo_asset_id` | The row id of the brand asset in a brand's dark logo slot after the save, left out when the slot is empty. |
 | `dpop_bound_access_tokens` | Whether the client now requires DPoP for its token requests. |
+| `edited_fields` | Which fields of an email template the edit holds after the save, each of `subject`, `button_label` and `body` it changed from the built-in text. The text itself is not recorded. |
 | `email_digest` | The SHA-256 hex digest of the email address the entry is about, in lowercase and, except on a forgot-password request, trimmed: one typed into a form or named by a password grant, an account's, or a test email's recipient. |
+| `email_template` | The identifier of an email template, such as `password_reset_link`. |
 | `favicon_asset_id` | The row id of the brand asset in a brand's favicon slot after the save, left out when the slot is empty. |
 | `first_refresh_token_jti` | The `jti` of the first refresh token in a replayed token's family. |
 | `flow` | How a refresh token's family began: `auth_code` or `ropc`. |
@@ -168,6 +170,7 @@ No entry records a user's email address. An entry about one records `email_diges
 | `jti` | The `jti` of an access token a client revoked, or of a logout token the auth server sent. |
 | `keep_signed_in` | Under `old` and `new`: whether users stay signed in after the browser closes, `always`, `ask` (each user chooses) or `never`. |
 | `key_id` | The key id (`kid`) of a deleted signing key. |
+| `language` | The language of an email template: `en`, `de`, `es`, `fr`, `it` or `pt-BR`. |
 | `kind` | A legal document's kind: `must_accept` for terms users must accept, `for_information` for a privacy notice. On `uploaded_brand_asset`, the asset's kind: `logo`, `favicon`, `background` or `font`. |
 | `legal_document_id` | The legal document's row id. |
 | `limiter` | The name of the rate limiter that refused. |
@@ -449,6 +452,13 @@ These come from the Account API, which users reach through the admin console's a
 | `deleted_brand` | An administrator deleted a brand. The entry says how many clients moved to the default brand. |
 | `updated_default_brand` | An administrator made another brand the default. The entry names the new and the old default. |
 | `uploaded_brand_asset` | An administrator uploaded a file for a brand's logo, favicon, background or font. No brand uses it until one is saved naming it. |
+
+### Email templates
+
+| Event | Meaning |
+|---|---|
+| `updated_email_template` | An administrator saved an email template in one language, and an edit is stored. The entry names the fields the edit holds, never the text. |
+| `reset_email_template` | An administrator reset an email template in one language to the built-in text, or saved the built-in text, which removes the edit. A reset with no edit to remove records nothing. |
 
 ### Settings and keys
 

@@ -1203,6 +1203,12 @@ func statusesWrittenIn(t *testing.T, path string, fset *token.FileSet, fn *ast.F
 				case "writeBrandNotFound":
 					out[404] = true
 				}
+				// The email template handlers' readers of the path answer 404 for an email or a
+				// language there is none of (#818 decision 10), through writeEmailTemplateNotFound.
+				switch f.Name {
+				case "emailTemplateFromPath", "emailTemplateLanguageFromPath", "writeEmailTemplateNotFound":
+					out[404] = true
+				}
 			case *ast.SelectorExpr:
 				switch f.Sel.Name {
 				case "InternalServerError", "JSONError":

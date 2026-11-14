@@ -98,6 +98,8 @@ tags:
     description: Privacy notices and terms of use (Admin API, settings domain)
   - name: Brands
     description: The looks the pages are drawn in (Admin API, settings domain)
+  - name: Email Templates
+    description: The subject, button label and body of each email, in each built-in language (Admin API, settings domain)
   - name: Clients
     description: OAuth client management (Admin API)
   - name: Audit Logs
@@ -2796,6 +2798,132 @@ paths:
   # =============================================================================
   # ADMIN API - CLIENTS
   # =============================================================================
+  /api/v1/admin/email-templates:
+    get:
+      tags: [Email Templates]
+      summary: List email templates
+      description: |
+        The 19 emails, each with the status of its six languages: `default` with no edit,
+        `edited` when its edit is sent, and `invalid` when its edit breaks a rule of the running
+        release, so the email is sent with the built-in text of that language.
+      operationId: getEmailTemplates
+      responses:
+        '200':
+          description: Every email template
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetEmailTemplatesResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/admin/email-templates/{email}:
+    get:
+      tags: [Email Templates]
+      summary: Get email template
+      description: |
+        One email: the placeholders it offers, whether it has a button, and for each language the
+        built-in text, the editor's text, the fields its edit holds, its status and an invalid
+        edit's problems. The editor's text is the edit laid over the built-in text, as last
+        saved, also when it is invalid. The email is sent with the editor's text unless the
+        status is `invalid`, when it is sent with the built-in text.
+      operationId: getEmailTemplate
+      parameters:
+        - $ref: '#/components/parameters/EmailTemplateIdParam'
+      responses:
+        '200':
+          description: Email template details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetEmailTemplateResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/admin/email-templates/{email}/{language}:
+    put:
+      tags: [Email Templates]
+      summary: Save email template
+      description: |
+        Save the whole text of one language: the subject, the button label for an email with a
+        button, and the body. The change applies to the next email sent. Only the fields that
+        differ from the built-in text are stored, so a field left as the built-in text follows
+        later releases, and a text identical to the built-in one removes the edit, as a reset
+        does.
+
+        A text that breaks a rule is refused with 400, `error_field` naming `/subject`,
+        `/buttonLabel` or `/body`, and an `error_code` under `handler.email_template.` naming the
+        rule: a placeholder the email doesn't offer, a required placeholder missing from the
+        body, `{{link}}` or `{{button}}` in the subject, `{{button}}` not alone on its line, a
+        placeholder in a link's address other than `{{link}}` as the whole of it, a body with
+        nothing to read besides the button, a button label for an email without a button, and
+        each field's length. The subject is at most 200 characters on one line, the button
+        label at most 60, and the body at most 20,000.
+
+        A save needs `authserver:manage`: what an email says is reserved as where it goes is, so
+        `authserver:manage-settings` reads the templates but is refused a save with 403
+        MANAGE_SCOPE_REQUIRED. A save that leaves an edit stored is audited as
+        `updated_email_template`; one that removes an edit, as `reset_email_template`.
+      operationId: saveEmailTemplate
+      parameters:
+        - $ref: '#/components/parameters/EmailTemplateIdParam'
+        - $ref: '#/components/parameters/EmailTemplateLanguageParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveEmailTemplateRequest'
+      responses:
+        '200':
+          description: The language as saved, as the read of one email gives it
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmailTemplateLanguageResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      tags: [Email Templates]
+      summary: Reset email template
+      description: |
+        Reset one language to the built-in text, removing its edit. Answered 204 also when there
+        was no edit. A reset needs `authserver:manage`, as a save does. One that removes an edit
+        is audited as `reset_email_template`.
+      operationId: resetEmailTemplate
+      parameters:
+        - $ref: '#/components/parameters/EmailTemplateIdParam'
+        - $ref: '#/components/parameters/EmailTemplateLanguageParam'
+      responses:
+        '204':
+          description: The language is the built-in text
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /api/v1/admin/clients:
     get:
       tags: [Clients]
@@ -5822,6 +5950,41 @@ components:
       schema:
         type: integer
         format: int64
+    EmailTemplateIdParam:
+      name: email
+      in: path
+      required: true
+      description: The email's identifier
+      schema:
+        type: string
+        enum:
+          - password_reset_link
+          - activation_link
+          - welcome
+          - registration_existing_account
+          - new_user_setup
+          - verification_code
+          - test
+          - email_address_changed
+          - password_changed
+          - password_changed_by_administrator
+          - password_reset
+          - otp_enabled
+          - otp_disabled
+          - otp_disabled_by_administrator
+          - otp_lockout
+          - recovery_code_used
+          - recovery_codes_replaced
+          - account_deleted
+          - account_deleted_by_administrator
+    EmailTemplateLanguageParam:
+      name: language
+      in: path
+      required: true
+      description: One of the six built-in languages, written exactly so
+      schema:
+        type: string
+        enum: [en, de, es, fr, it, pt-BR]
     ResourceIdParam:
       name: id
       in: path
@@ -9103,6 +9266,184 @@ components:
         - userSessionMaxLifetimeInSeconds
         - maxUserSessionsPerUser
         - keepSignedIn
+
+    GetEmailTemplatesResponse:
+      type: object
+      properties:
+        emailTemplates:
+          type: array
+          items:
+            $ref: '#/components/schemas/EmailTemplateSummaryResponse'
+      required:
+        - emailTemplates
+
+    EmailTemplateSummaryResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          description: The email's identifier, such as `password_reset_link`.
+        languages:
+          type: array
+          description: The six built-in languages, English first.
+          items:
+            $ref: '#/components/schemas/EmailTemplateLanguageStatusResponse'
+      required:
+        - id
+        - languages
+
+    EmailTemplateLanguageStatusResponse:
+      type: object
+      properties:
+        language:
+          type: string
+          enum: [en, de, es, fr, it, pt-BR]
+        status:
+          type: string
+          enum: [default, edited, invalid]
+      required:
+        - language
+        - status
+
+    GetEmailTemplateResponse:
+      type: object
+      properties:
+        emailTemplate:
+          $ref: '#/components/schemas/EmailTemplateResponse'
+      required:
+        - emailTemplate
+
+    EmailTemplateResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          description: The email's identifier, such as `password_reset_link`.
+        hasButton:
+          type: boolean
+          description: Whether the email offers `{{button}}`, and so has a button label.
+        placeholders:
+          type: array
+          items:
+            $ref: '#/components/schemas/EmailTemplatePlaceholderResponse'
+        languages:
+          type: array
+          description: The six built-in languages, English first.
+          items:
+            $ref: '#/components/schemas/EmailTemplateLanguageResponse'
+      required:
+        - id
+        - hasButton
+        - placeholders
+        - languages
+
+    EmailTemplatePlaceholderResponse:
+      type: object
+      properties:
+        name:
+          type: string
+          description: The name written between double braces, such as `name` for `{{name}}`.
+        required:
+          type: boolean
+          description: Whether the body must use it.
+        inSubject:
+          type: boolean
+          description: Whether the subject may use it. `link` and `button` are for the body only.
+      required:
+        - name
+        - required
+        - inSubject
+
+    EmailTemplateLanguageResponse:
+      type: object
+      properties:
+        language:
+          type: string
+          enum: [en, de, es, fr, it, pt-BR]
+        status:
+          type: string
+          enum: [default, edited, invalid]
+          description: |
+            `default` with no edit, `edited` when the edit is sent, and `invalid` when the edit
+            breaks a rule of the running release, so the built-in text is sent instead.
+        builtInText:
+          $ref: '#/components/schemas/EmailTemplateTextResponse'
+        editorText:
+          $ref: '#/components/schemas/EmailTemplateTextResponse'
+        editedFields:
+          type: array
+          description: The fields the edit holds, empty with no edit.
+          items:
+            type: string
+            enum: [subject, buttonLabel, body]
+        problems:
+          type: array
+          description: The rules an invalid edit breaks, empty otherwise.
+          items:
+            $ref: '#/components/schemas/EmailTemplateProblemResponse'
+      required:
+        - language
+        - status
+        - builtInText
+        - editorText
+        - editedFields
+        - problems
+
+    EmailTemplateTextResponse:
+      type: object
+      properties:
+        subject:
+          type: string
+        buttonLabel:
+          type: string
+          description: Present for an email with a button.
+        body:
+          type: string
+      required:
+        - subject
+        - body
+
+    EmailTemplateProblemResponse:
+      type: object
+      properties:
+        field:
+          type: string
+          enum: [subject, buttonLabel, body]
+        rule:
+          type: string
+          description: |
+            The rule broken: `unknown_placeholder`, `required_placeholder_missing`,
+            `placeholder_not_in_subject`, `button_not_alone`, `placeholder_in_link_destination`,
+            `nothing_to_read`, `empty`, `too_long`, `not_one_line` or `no_button`.
+        placeholder:
+          type: string
+          description: The placeholder the rule is about, as written between the braces.
+        message:
+          type: string
+          description: The sentence a save refuses the text with, in the request's language.
+      required:
+        - field
+        - rule
+        - message
+
+    SaveEmailTemplateRequest:
+      type: object
+      properties:
+        subject:
+          type: string
+          maxLength: 200
+          description: One line, not blank. It takes the placeholders the email offers, except `{{link}}` and `{{button}}`.
+        buttonLabel:
+          type: string
+          maxLength: 60
+          description: Plain text, not blank, for an email with a button. Leave it out or empty for one without.
+        body:
+          type: string
+          maxLength: 20000
+          description: Markdown with placeholders, such as `{{name}}`, each one the email offers.
+      required:
+        - subject
+        - body
 
     BrandResponse:
       type: object

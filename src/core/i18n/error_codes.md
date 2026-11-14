@@ -352,6 +352,19 @@ cause, each a whole sentence.
 | `handler.brand.custom_css_url` | `line` (int) | Line {{.line}} of the custom CSS has a URL that is not a data: image. Custom CSS can hold no other URL. |
 | `handler.brand.custom_css_function` | `line` (int) | Line {{.line}} of the custom CSS uses src(), image() or image-set(). Write a data: image in url() instead. |
 | `handler.brand.custom_css_malformed` | `line` (int) | Line {{.line}} of the custom CSS cannot be read as CSS: a comment, a string or a url() is not closed or is written wrongly. |
+| `handler.email_template.subject_required` | (none) | Subject is required. |
+| `handler.email_template.subject_too_long` | `max` (int) | The subject cannot exceed {{.max}} characters. |
+| `handler.email_template.subject_not_one_line` | (none) | The subject must be on one line. |
+| `handler.email_template.button_label_required` | (none) | Button label is required. |
+| `handler.email_template.button_label_too_long` | `max` (int) | The button label cannot exceed {{.max}} characters. |
+| `handler.email_template.no_button` | (none) | This email has no button, so it takes no button label. |
+| `handler.email_template.body_too_long` | `max` (int) | The body cannot exceed {{.max}} characters. |
+| `handler.email_template.unknown_placeholder` | `placeholder` (string), `offered` (string) | This email does not offer {{.placeholder}}. It offers {{.offered}}. |
+| `handler.email_template.required_placeholder_missing` | `placeholder` (string), `offered` (string) | The body must use {{.placeholder}}, which this email cannot do without. It offers {{.offered}}. |
+| `handler.email_template.placeholder_not_in_subject` | `placeholder` (string), `offered` (string) | The subject cannot use {{.placeholder}}. In the subject, this email offers {{.offered}}. |
+| `handler.email_template.button_not_alone` | `placeholder` (string) | Put {{.placeholder}} on a line of its own. |
+| `handler.email_template.placeholder_in_link_destination` | `placeholder` (string), `link` (string) | A link's address can hold a placeholder only as {{.link}} on its own, the whole address. This one holds {{.placeholder}}. |
+| `handler.email_template.nothing_to_read` | (none) | The body needs something to read besides the button. |
 | `handler.legal_document.applies_to_invalid` | (none) | Choose whether the document applies to all apps or to selected apps. |
 | `handler.legal_document.apps_with_all_apps` | (none) | A document that applies to all apps lists no apps. Choose selected apps to list them. |
 | `handler.legal_document.admin_console_client` | (none) | The admin console cannot be chosen: users are never asked to accept a legal document when they sign in to it. |

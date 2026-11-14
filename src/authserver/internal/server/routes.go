@@ -464,6 +464,14 @@ func (s *Server) initRoutes(branches appBranches) {
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Put("/settings/email", apihandlers.HandleSettingsEmailPut(s.database, emailValidator, auditLogger, s.dataCipher))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Post("/settings/email/send-test", apihandlers.HandleSettingsEmailSendTestPost(emailValidator, emailSender, httpHelper, auditLogger))
 
+		// Email templates (#818 decisions 9 and 10): reading takes any scope that reads settings;
+		// saving and resetting change what users' mail says, which the handlers reserve to
+		// authserver:manage under the settings ceiling.
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/email-templates", apihandlers.HandleEmailTemplatesGet(s.database))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/email-templates/{email}", apihandlers.HandleEmailTemplateGet(s.database))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Put("/email-templates/{email}/{language}", apihandlers.HandleEmailTemplatePut(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Delete("/email-templates/{email}/{language}", apihandlers.HandleEmailTemplateDelete(s.database, auditLogger))
+
 		// Settings - Turnstile
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/settings/turnstile", apihandlers.HandleSettingsTurnstileGet())
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesSettings)).Put("/settings/turnstile", apihandlers.HandleSettingsTurnstilePut(s.database, auditLogger, s.dataCipher, s.secretKeyChecker))

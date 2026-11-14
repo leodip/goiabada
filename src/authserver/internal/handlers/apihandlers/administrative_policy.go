@@ -51,9 +51,9 @@ const manageScopeRequiredDescription = "Only a token with the authserver:manage 
 // group, and listing the authserver resource on a client's introspection resources; the target
 // ceiling is any other write on an administrator, switching a client's allowance to request the
 // administrative scopes, and changing the description of an administrative permission; the settings
-// ceiling is changing the email or the audit-log settings; the back-channel logout URI ceiling is
-// setting or changing a client's back-channel logout URI (#402 decisions 1, 5 and 7, #499 decision
-// 4, #676 decision 14, #784 decision 15).
+// ceiling is changing the email or the audit-log settings, or saving or resetting an email template;
+// the back-channel logout URI ceiling is setting or changing a client's back-channel logout URI (#402
+// decisions 1, 5 and 7, #499 decision 4, #676 decision 14, #784 decision 15, #818 decision 9).
 const (
 	ceilingGrant                = "grant"
 	ceilingTarget               = "target"
@@ -466,9 +466,11 @@ func groupDeletionCeilingAllows(w http.ResponseWriter, r *http.Request, database
 // settings. The email settings decide where every reset link and verification code goes, so a
 // token that may point SMTP at a server it controls may sign in as any administrator; the audit-log
 // settings can switch off the record every other refusal rests on, for every token and not only the
-// caller's. Both are reserved to authserver:manage. It reports whether the write may go on, and when
-// it may not it has answered the request. The ceiling reads nothing: the route is the whole of what
-// it judges (#402 decision 7).
+// caller's. Both are reserved to authserver:manage, and so is saving or resetting an email template:
+// whoever writes the password reset email can put a second link in the mail every administrator
+// receives from the server they trust, so what mail says is reserved as where it goes is (#818
+// decision 9). It reports whether the write may go on, and when it may not it has answered the
+// request. The ceiling reads nothing: the route is the whole of what it judges (#402 decision 7).
 func settingsCeilingAllows(w http.ResponseWriter, r *http.Request, auditLogger AuditLogger) bool {
 	if callerHoldsManage(r) {
 		return true

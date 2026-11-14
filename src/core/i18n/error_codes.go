@@ -231,6 +231,24 @@ const (
 	ErrCodeBrandCustomCSSFunction  = "handler.brand.custom_css_function"  // Args: {"line": int}
 	ErrCodeBrandCustomCSSMalformed = "handler.brand.custom_css_malformed" // Args: {"line": int}
 
+	// An email template's text (#818 decisions 3, 5, 7 and 17), refused by a save. Each refusal points
+	// at subject, buttonLabel or body in the error answer's error_field. placeholder is the one the
+	// refusal is about, written with its braces, such as {{full_name}}; offered lists what the email
+	// offers, or for the subject what the subject may use, each with its braces; link is {{link}}.
+	ErrCodeEmailTemplateSubjectRequired              = "handler.email_template.subject_required"
+	ErrCodeEmailTemplateSubjectTooLong               = "handler.email_template.subject_too_long" // Args: {"max": int}
+	ErrCodeEmailTemplateSubjectNotOneLine            = "handler.email_template.subject_not_one_line"
+	ErrCodeEmailTemplateButtonLabelRequired          = "handler.email_template.button_label_required"
+	ErrCodeEmailTemplateButtonLabelTooLong           = "handler.email_template.button_label_too_long" // Args: {"max": int}
+	ErrCodeEmailTemplateNoButton                     = "handler.email_template.no_button"
+	ErrCodeEmailTemplateBodyTooLong                  = "handler.email_template.body_too_long"                   // Args: {"max": int}
+	ErrCodeEmailTemplateUnknownPlaceholder           = "handler.email_template.unknown_placeholder"             // Args: {"placeholder": string, "offered": string}
+	ErrCodeEmailTemplateRequiredPlaceholderMissing   = "handler.email_template.required_placeholder_missing"    // Args: {"placeholder": string, "offered": string}
+	ErrCodeEmailTemplatePlaceholderNotInSubject      = "handler.email_template.placeholder_not_in_subject"      // Args: {"placeholder": string, "offered": string}
+	ErrCodeEmailTemplateButtonNotAlone               = "handler.email_template.button_not_alone"                // Args: {"placeholder": string}
+	ErrCodeEmailTemplatePlaceholderInLinkDestination = "handler.email_template.placeholder_in_link_destination" // Args: {"placeholder": string, "link": string}
+	ErrCodeEmailTemplateNothingToRead                = "handler.email_template.nothing_to_read"
+
 	// A resource's permissions. The description bound is the console's own
 	// handler.admin_resource_permissions.description_too_long, which says the same sentence.
 	ErrCodePermissionDuplicateIds       = "handler.permission.duplicate_ids"
