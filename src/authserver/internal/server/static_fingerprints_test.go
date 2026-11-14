@@ -13,6 +13,7 @@ import (
 	"sync/atomic"
 	"testing"
 	"testing/fstest"
+	"time"
 
 	datamocks "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/stretchr/testify/assert"
@@ -128,4 +129,57 @@ func TestServeStaticFiles_ConcurrentRequestsForAFileEachEarnTheYear(t *testing.T
 		})
 	}
 	wg.Wait()
+}
+
+// pausedReadFS is a set of static files whose ReadFile, the read for a fingerprint, counts each
+// call and waits for release, so a second first use can arrive while the first is still reading.
+type pausedReadFS struct {
+	fs.FS
+	reads   atomic.Int64
+	started chan struct{}
+	release chan struct{}
+}
+
+func (f *pausedReadFS) ReadFile(name string) ([]byte, error) {
+	f.reads.Add(1)
+	f.started <- struct{}{}
+	<-f.release
+	return fs.ReadFile(f.FS, name)
+}
+
+// Two requests that both arrive before a file's fingerprint is known read the file once for it
+// between them: the second waits for the first's fingerprint rather than computing it again, and
+// each is answered with the file and the year.
+func TestServeStaticFiles_ConcurrentFirstRequestsReadAFileOnceForItsFingerprint(t *testing.T) {
+	content := []byte("body { color: blue; }")
+	fsys := &pausedReadFS{
+		FS:      fstest.MapFS{"probe.css": {Data: content}},
+		started: make(chan struct{}, 2),
+		release: make(chan struct{}),
+	}
+	s := newStaticFileTestServer(t, fsys)
+	target := "/static/probe.css?v=" + staticFingerprint(content)
+
+	var wg sync.WaitGroup
+	request := func() {
+		rr := serveStaticRequest(s, target, nil)
+		assert.Equal(t, http.StatusOK, rr.Code)
+		assert.Equal(t, string(content), rr.Body.String())
+		assert.Equal(t, staticLongCache, rr.Header().Get("Cache-Control"))
+	}
+	wg.Go(request)
+	select {
+	case <-fsys.started:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the first request did not read the file for its fingerprint")
+	}
+	wg.Go(request)
+	select {
+	case <-fsys.started:
+	case <-time.After(time.Second):
+	}
+	close(fsys.release)
+	wg.Wait()
+
+	assert.Equal(t, int64(1), fsys.reads.Load(), "the file is read once for its fingerprint")
 }

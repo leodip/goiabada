@@ -59,10 +59,11 @@ func (a *assetFingerprints) fingerprint(path string) (string, error) {
 	if !ok || a.fsys == nil {
 		return "", errs.Errorf("asset %q is not a static file this server serves", path)
 	}
+	// The lock is held through the read, so a page that links a file while it is first read waits
+	// for its fingerprint instead of reading the file again.
 	a.mu.Lock()
-	sum, ok := a.known[name]
-	a.mu.Unlock()
-	if ok {
+	defer a.mu.Unlock()
+	if sum, ok := a.known[name]; ok {
 		return sum, nil
 	}
 
@@ -70,10 +71,7 @@ func (a *assetFingerprints) fingerprint(path string) (string, error) {
 	if err != nil {
 		return "", errs.Wrapf(err, "unable to read static file %q", path)
 	}
-	sum = AssetFingerprint(content)
-
-	a.mu.Lock()
+	sum := AssetFingerprint(content)
 	a.known[name] = sum
-	a.mu.Unlock()
 	return sum, nil
 }

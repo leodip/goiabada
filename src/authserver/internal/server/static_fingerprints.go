@@ -32,19 +32,18 @@ func (s *staticFingerprints) fingerprint(urlPath string) (string, bool) {
 	if !fs.ValidPath(name) || name == "." {
 		return "", false
 	}
+	// The lock is held through the read, so a request that arrives while a file is first read
+	// waits for its fingerprint instead of reading the file again.
 	s.mu.Lock()
-	sum, ok := s.known[name]
-	s.mu.Unlock()
-	if ok {
+	defer s.mu.Unlock()
+	if sum, ok := s.known[name]; ok {
 		return sum, true
 	}
 	content, err := fs.ReadFile(s.fsys, name)
 	if err != nil {
 		return "", false
 	}
-	sum = render.AssetFingerprint(content)
-	s.mu.Lock()
+	sum := render.AssetFingerprint(content)
 	s.known[name] = sum
-	s.mu.Unlock()
 	return sum, true
 }

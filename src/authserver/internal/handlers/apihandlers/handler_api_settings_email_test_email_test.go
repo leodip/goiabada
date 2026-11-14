@@ -110,8 +110,8 @@ func TestHandleSettingsEmailSendTestPost_TheTestEmailIsDrawnInTheDefaultBrandInT
 	}
 }
 
-// A test email that cannot be drawn, as from a templates directory that has no email layout, is a
-// fault of the server: nothing is sent, and no test email is audited.
+// A test email that cannot be drawn, here because its templates have no email layout, is a fault
+// of the server: nothing is sent, and no test email is audited.
 func TestHandleSettingsEmailSendTestPost_ATestEmailThatCannotBeDrawnIsNotSent(t *testing.T) {
 	noLayout := fstest.MapFS{"layouts/auth_layout.html": {Data: []byte("a page layout")}}
 

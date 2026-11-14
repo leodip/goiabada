@@ -2,9 +2,11 @@ package render
 
 import (
 	"io/fs"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"testing/fstest"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -66,4 +68,54 @@ func TestAssetFingerprint_IsTheFingerprintAPageLinksTheseContentsBy(t *testing.T
 	linked, err := newAssetFingerprints(fsys).url("/static/main.css")
 	require.NoError(t, err)
 	assert.Equal(t, "/static/main.css?v=15c42ab7768d", linked)
+}
+
+// pausedReadFS is a set of static files whose ReadFile, the read for a fingerprint, counts each
+// call and waits for release, so a second first link can arrive while the first is still reading.
+type pausedReadFS struct {
+	fs.FS
+	reads   atomic.Int64
+	started chan struct{}
+	release chan struct{}
+}
+
+func (f *pausedReadFS) ReadFile(name string) ([]byte, error) {
+	f.reads.Add(1)
+	f.started <- struct{}{}
+	<-f.release
+	return fs.ReadFile(f.FS, name)
+}
+
+// Two pages that both link a file before its fingerprint is known read it once between them: the
+// second waits for the first's fingerprint rather than computing it again, and both link the file
+// by it.
+func TestAssetFingerprints_ConcurrentFirstLinksReadAFileOnce(t *testing.T) {
+	fsys := &pausedReadFS{
+		FS:      fstest.MapFS{"main.css": {Data: []byte("body{color:red}")}},
+		started: make(chan struct{}, 2),
+		release: make(chan struct{}),
+	}
+	assets := newAssetFingerprints(fsys)
+
+	var wg sync.WaitGroup
+	link := func() {
+		got, err := assets.url("/static/main.css")
+		assert.NoError(t, err)
+		assert.Equal(t, "/static/main.css?v=15c42ab7768d", got)
+	}
+	wg.Go(link)
+	select {
+	case <-fsys.started:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the first link did not read the file for its fingerprint")
+	}
+	wg.Go(link)
+	select {
+	case <-fsys.started:
+	case <-time.After(time.Second):
+	}
+	close(fsys.release)
+	wg.Wait()
+
+	assert.Equal(t, int64(1), fsys.reads.Load(), "the file is read once for its fingerprint")
 }

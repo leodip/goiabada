@@ -204,8 +204,7 @@ Need help? help@acme.example · +442079460958 · Support page <https://acme.exam
 `, textOf(t, html))
 }
 
-// Each rule on its own, in a body with no frame, which is what a templates directory copied from
-// an older release sends: its body is read whole.
+// Each rule on its own, in a body with no frame: a body with no frame is read whole.
 func TestSendEmail_TheTextOfEachPartOfABody(t *testing.T) {
 	for _, tc := range []struct {
 		name, html, want string
