@@ -868,7 +868,9 @@ func HandleClientAuthenticationPut(
 				// SetClientPublic turned Remember consent off if it made the client public, and
 				// left it as it was otherwise; UpdateClient never writes it. The answer reads it
 				// from the row under the lock rather than from the copy loaded at the top of the
-				// request, which may predate another save's switch (#711 decision 5).
+				// request, which may predate another save's switch (#711 decision 5). The same holds
+				// for the token_endpoint_auth_method a self-registered client is held to, which
+				// SetClientPublic cleared and UpdateClient never writes (#708 decision 5).
 				current, readErr := database.GetClientById(r.Context(), tx, client.Id)
 				if readErr != nil {
 					return false, readErr
@@ -877,6 +879,7 @@ func HandleClientAuthenticationPut(
 					return false, errs.New("client no longer exists")
 				}
 				client.RememberConsent = current.RememberConsent
+				client.TokenEndpointAuthMethod = current.TokenEndpointAuthMethod
 				return becamePublic, nil
 			})
 			if err != nil {

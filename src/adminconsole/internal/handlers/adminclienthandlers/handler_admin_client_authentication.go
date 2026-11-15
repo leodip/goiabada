@@ -34,17 +34,23 @@ type ClientAuthentication struct {
 	IsPublic            bool
 	ClientSecret        string
 	IsSystemLevelClient bool
+	// TokenEndpointAuthMethod is the method a self-registered confidential client is held to,
+	// client_secret_basic or client_secret_post, which the tab names with the other one refused,
+	// and empty for a client not held to one, for which it shows nothing (#708 decision 5). The
+	// tab only shows it: nothing the tab saves sets it.
+	TokenEndpointAuthMethod string
 }
 
 // clientAuthenticationFrom draws the Authentication tab from the client and its secret as the auth
 // server answers them.
 func clientAuthenticationFrom(c *api.ClientResponse, clientSecret string) ClientAuthentication {
 	return ClientAuthentication{
-		ClientId:            c.Id,
-		ClientIdentifier:    c.ClientIdentifier,
-		IsPublic:            c.IsPublic,
-		ClientSecret:        clientSecret,
-		IsSystemLevelClient: c.IsSystemLevelClient,
+		ClientId:                c.Id,
+		ClientIdentifier:        c.ClientIdentifier,
+		IsPublic:                c.IsPublic,
+		ClientSecret:            clientSecret,
+		IsSystemLevelClient:     c.IsSystemLevelClient,
+		TokenEndpointAuthMethod: c.TokenEndpointAuthMethod,
 	}
 }
 

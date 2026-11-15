@@ -81,6 +81,24 @@ func TestHandleAuthenticationGet_APublicClientReadsNoSecret(t *testing.T) {
 	assert.Empty(t, apiClient.secretReadFor)
 }
 
+// The tab is drawn with the method the auth server holds the client to, each of the two, and with
+// none for a client not held to one (#708 decision 5).
+func TestHandleAuthenticationGet_DrawsTheMethodTheClientIsHeldTo(t *testing.T) {
+	for _, held := range []string{"client_secret_basic", "client_secret_post", ""} {
+		t.Run("held to "+held, func(t *testing.T) {
+			apiClient := &stubAuthenticationApiClient{
+				client: &api.ClientResponse{Id: 7, ClientIdentifier: "dcr_a3f9", CreatedViaDCR: true,
+					TokenEndpointAuthMethod: held},
+				secret: "the-secret",
+			}
+
+			bound := authenticationTabBind(t, apiClient)
+
+			assert.Equal(t, held, bound.FieldByName("TokenEndpointAuthMethod").String())
+		})
+	}
+}
+
 // A hand-made save with no valid client type is answered with the tab again and a page-level
 // refusal, rather than the 500 page (#632 decision 6). The tab is drawn as stored, the secret typed
 // beside the bad type included, since there is no type to draw a submission under; no field is
@@ -123,6 +141,28 @@ func TestHandleAuthenticationPost_RefusesAClientTypeThatIsNeither(t *testing.T) 
 			assert.Empty(t, apiClient.updates, "nothing is saved")
 		})
 	}
+}
+
+// A refused save draws the tab again with the method the stored client is held to, which the tab
+// names from the client as stored (#708 decision 5).
+func TestHandleAuthenticationPost_ARefusedSaveStillDrawsTheMethodTheClientIsHeldTo(t *testing.T) {
+	apiClient := &stubAuthenticationApiClient{
+		client: &api.ClientResponse{Id: 7, ClientIdentifier: "dcr_a3f9", CreatedViaDCR: true,
+			TokenEndpointAuthMethod: "client_secret_post"},
+		secret: "the-stored-secret",
+	}
+	httpHelper := &stubHttpHelper{}
+	req := handlertest.Request(http.MethodPost, "/admin/clients/7/authentication",
+		handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "7"),
+		handlertest.WithForm(url.Values{"publicConfidential": {"neither"}}))
+
+	HandleAuthenticationPost(httpHelper, newTestSessionStore(), apiClient, consoleBaseURL).
+		ServeHTTP(httptest.NewRecorder(), req)
+
+	require.NoError(t, httpHelper.err)
+	require.NotNil(t, httpHelper.bind, "the handler rendered nothing")
+	stored := reflect.ValueOf(httpHelper.bind["storedClient"])
+	assert.Equal(t, "client_secret_post", stored.FieldByName("TokenEndpointAuthMethod").String())
 }
 
 // A public client holds no secret, so its refused tab reads none, as its first draw reads none.

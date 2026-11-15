@@ -1003,6 +1003,20 @@ func TestToClientResponse_CreatedViaDCRIsCopiedNotAssumed(t *testing.T) {
 	assert.False(t, resp.CreatedViaDCR)
 }
 
+// TestToClientResponse_TokenEndpointAuthMethodIsTheStoredOne pins the read-only method to the
+// client's stored one: a self-registered confidential client's registered method, each of the two,
+// and the empty string for a client not held to one method, so the console shows the method the
+// auth server enforces and nothing for any other client (#708 decision 5).
+func TestToClientResponse_TokenEndpointAuthMethodIsTheStoredOne(t *testing.T) {
+	for _, stored := range []string{"client_secret_basic", "client_secret_post", ""} {
+		t.Run("stored "+stored, func(t *testing.T) {
+			resp := ToClientResponse(&record.Client{ClientIdentifier: "dcr_a3f9", CreatedViaDCR: true,
+				TokenEndpointAuthMethod: stored})
+			assert.Equal(t, stored, resp.TokenEndpointAuthMethod)
+		})
+	}
+}
+
 // TestToClientResponse_AdministrativeScopesAllowedIsWhatTheServerApplies pins the allowance the
 // client response carries to the rule the authorization and token endpoints apply: the admin
 // console's client, whatever its row holds, or the stored yes. So what the API answers and the

@@ -85,12 +85,18 @@ type ClientResponse struct {
 	// BrandId is the brand the client's pages are drawn in, or null when it has no brand of its
 	// own and follows whichever brand is the default. It changes only through
 	// UpdateClientBrandRequest (#812 decisions 1 and 2).
-	BrandId                  *int64 `json:"brandId"`
-	ShowLogo                 bool   `json:"showLogo"`
-	ShowDisplayName          bool   `json:"showDisplayName"`
-	ShowDescription          bool   `json:"showDescription"`
-	ShowWebsiteURL           bool   `json:"showWebsiteUrl"`
-	IsPublic                 bool   `json:"isPublic"`
+	BrandId         *int64 `json:"brandId"`
+	ShowLogo        bool   `json:"showLogo"`
+	ShowDisplayName bool   `json:"showDisplayName"`
+	ShowDescription bool   `json:"showDescription"`
+	ShowWebsiteURL  bool   `json:"showWebsiteUrl"`
+	IsPublic        bool   `json:"isPublic"`
+	// TokenEndpointAuthMethod is read-only: the token_endpoint_auth_method a confidential client
+	// registered through /connect/register, client_secret_basic or client_secret_post, which it must
+	// authenticate with, the other being refused; empty for a client not held to one method, which
+	// accepts both. Neither the API nor the console sets it, and the switch to public clears it
+	// (#708 decision 5).
+	TokenEndpointAuthMethod  string `json:"tokenEndpointAuthMethod"`
 	IsSystemLevelClient      bool   `json:"isSystemLevelClient"`
 	AuthorizationCodeEnabled bool   `json:"authorizationCodeEnabled"`
 	ClientCredentialsEnabled bool   `json:"clientCredentialsEnabled"`

@@ -533,6 +533,45 @@ func TestHandleClientAuthenticationPut_SwitchToPublicAnswersRememberConsentFromT
 	assert.False(t, answeredRememberConsent(t, rr))
 }
 
+// TestHandleClientAuthenticationPut_SwitchToPublicAnswersTheMethodTheWriteLeft: the switch to
+// public clears a self-registered client's token_endpoint_auth_method, and the switch's answer
+// carries the empty method the write left in the row, never the method of the copy loaded at the
+// top of the request (#708 decision 5).
+func TestHandleClientAuthenticationPut_SwitchToPublicAnswersTheMethodTheWriteLeft(t *testing.T) {
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
+
+	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
+		Return(&record.Client{Id: 7, IsPublic: false, ClientSecretEncrypted: []byte("secret"), RememberConsent: true,
+			CreatedViaDCR: true, TokenEndpointAuthMethod: "client_secret_post"}, nil).Once()
+	datamocks.ExpectRunInTransaction(database, clientUpdateTx)
+	database.On("SetClientPublic", mock.Anything, clientUpdateTx, int64(7)).Return(true, nil).Once()
+	database.On("DeleteClientIntrospectionResourcesByClientId", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
+	database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
+	database.On("GetClientById", mock.Anything, clientUpdateTx, int64(7)).
+		Return(&record.Client{Id: 7, IsPublic: true, RememberConsent: false, CreatedViaDCR: true,
+			TokenEndpointAuthMethod: ""}, nil).Once()
+	database.On("RevokeCodesByClientId", mock.Anything, clientUpdateTx, int64(7)).Return(int64(0), nil).Once()
+	database.On("GetRefreshTokensByClientId", mock.Anything, clientUpdateTx, int64(7)).
+		Return([]*record.RefreshToken{}, nil).Once()
+	stubClientResponseLoads(database)
+	auditLogger.On("Log", mock.Anything, audit.EventRevokedClientGrants, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, audit.EventUpdatedClientAuthentication, mock.Anything).Return().Once()
+
+	rr := httptest.NewRecorder()
+	handler := HandleClientAuthenticationPut(database, auditLogger, testDataCipher)
+	handler.ServeHTTP(rr, authenticationPutRequest(t, "7", api.UpdateClientAuthenticationRequest{IsPublic: true}))
+
+	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+	var decoded struct {
+		Client map[string]any `json:"client"`
+	}
+	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &decoded))
+	method, present := decoded.Client["tokenEndpointAuthMethod"]
+	require.True(t, present, "the client response must carry tokenEndpointAuthMethod")
+	assert.Empty(t, method)
+}
+
 // assertNotAttemptedOnClientDatabase fails naming the method, where the strict mock alone would
 // fail naming an unexpected call.
 //
