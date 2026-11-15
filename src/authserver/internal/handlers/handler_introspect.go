@@ -122,7 +122,7 @@ func (e introspectionEndpoint) serve(w http.ResponseWriter, r *http.Request) {
 		e.refuse(w, r, err)
 		return
 	}
-	clientIdentifier, clientSecret, err := extractClientCredentials(r)
+	clientIdentifier, clientSecret, method, err := extractClientCredentials(r)
 	if err != nil {
 		// Basic credentials that cannot be read or name no client are an invalid_client naming no
 		// client, logged as every one is.
@@ -131,7 +131,7 @@ func (e introspectionEndpoint) serve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client, err := e.clients.AuthenticateConfidential(ctx, clientIdentifier, clientSecret)
+	client, err := e.clients.AuthenticateConfidential(ctx, clientIdentifier, clientSecret, method)
 	if err != nil {
 		var refusal *oauth.ErrorDetail
 		if !errors.As(err, &refusal) {

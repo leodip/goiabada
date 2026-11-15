@@ -70,7 +70,7 @@ func HandleTokenPost(
 			}
 			// The client the request names, for the record of a refused proof alone: credentials that
 			// cannot be read name none here, and are refused below as they are without a proof.
-			namedClient, _, _ := extractClientCredentials(r)
+			namedClient, _, _, _ := extractClientCredentials(r)
 			var err error
 			proof, err = proofs.checkTokenProof(r, proofValues, namedClient)
 			if err != nil {
@@ -166,7 +166,7 @@ func parseTokenRequest(r *http.Request) (*protocolvalidation.ValidateTokenReques
 	}
 
 	// Extract client credentials - supports both client_secret_basic and client_secret_post
-	clientId, clientSecret, err := extractClientCredentials(r)
+	clientId, clientSecret, method, err := extractClientCredentials(r)
 	if err != nil {
 		// Basic credentials that cannot be read or name no client are an invalid_client naming no
 		// client, logged as every one is.
@@ -218,14 +218,15 @@ func parseTokenRequest(r *http.Request) (*protocolvalidation.ValidateTokenReques
 	normalizedScope := oidc.NormalizeScope(rawScope)
 
 	return &protocolvalidation.ValidateTokenRequestInput{
-		GrantType:    grantType,
-		Code:         r.PostForm.Get("code"),
-		RedirectURI:  r.PostForm.Get("redirect_uri"),
-		CodeVerifier: r.PostForm.Get("code_verifier"),
-		ClientId:     clientId,
-		ClientSecret: clientSecret,
-		Scope:        normalizedScope,
-		RefreshToken: r.PostForm.Get("refresh_token"),
+		GrantType:        grantType,
+		Code:             r.PostForm.Get("code"),
+		RedirectURI:      r.PostForm.Get("redirect_uri"),
+		CodeVerifier:     r.PostForm.Get("code_verifier"),
+		ClientId:         clientId,
+		ClientSecret:     clientSecret,
+		ClientAuthMethod: method,
+		Scope:            normalizedScope,
+		RefreshToken:     r.PostForm.Get("refresh_token"),
 		// ROPC parameters (RFC 6749 Section 4.3)
 		Username: r.PostForm.Get("username"),
 		Password: r.PostForm.Get("password"),

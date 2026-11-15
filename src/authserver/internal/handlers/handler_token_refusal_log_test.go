@@ -33,6 +33,11 @@ func TestHandleTokenPost_ClientAuthenticationRefusalIsLogged(t *testing.T) {
 	require.NoError(t, err)
 	confidential := &record.Client{Id: 7, ClientIdentifier: "my-service", Enabled: true,
 		ClientCredentialsEnabled: true, ClientSecretEncrypted: secretEncrypted}
+	// Clients that registered themselves, each held to the method it registered (#708).
+	heldToBasic := *confidential
+	heldToBasic.TokenEndpointAuthMethod = "client_secret_basic"
+	heldToPost := *confidential
+	heldToPost.TokenEndpointAuthMethod = "client_secret_post"
 
 	cases := []struct {
 		name       string
@@ -52,6 +57,10 @@ func TestHandleTokenPost_ClientAuthenticationRefusalIsLogged(t *testing.T) {
 		{"a confidential client with no secret", "my-service", confidential, "", "",
 			"This client is configured as confidential (not public), which means a client_secret is required for authentication. Please provide a valid client_secret to proceed.",
 			"none"},
+		{"a client held to client_secret_basic, its right secret in the body", "my-service", &heldToBasic, "", "the-right-secret",
+			"Client authentication failed: this client is registered for client_secret_basic. Send the client_secret in the Authorization header.", "client_secret_post"},
+		{"a client held to client_secret_post, its right secret in the header", "my-service", &heldToPost, "Basic", "the-right-secret",
+			"Client authentication failed: this client is registered for client_secret_post. Send the client_secret in the request body.", "client_secret_basic"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

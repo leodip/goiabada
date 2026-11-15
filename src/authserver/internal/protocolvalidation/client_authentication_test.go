@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/leodip/goiabada/authserver/internal/clientauth"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation/mocks"
@@ -25,9 +26,10 @@ import (
 // refusal that comes next.
 //
 // Every grant answers a wrong secret with the one text, and every invalid_client carries
-// BasicChallenge. How the secret arrived, the Authorization header or the form body, no longer
-// reaches the validator, so it is not a column here; the handler's and the integration tier's
-// cases cover both transports (#437).
+// BasicChallenge. How the secret arrived reaches the validator as the method the handler read, so a
+// client that registered itself is held to its registered method at every grant (#708): the method
+// and the registered method are columns. The handler's and the integration tier's cases cover the
+// transports themselves.
 func TestValidateTokenRequest_ClientAuthentication(t *testing.T) {
 	const theSecret = "the_client_secret"
 
@@ -137,6 +139,10 @@ func TestValidateTokenRequest_ClientAuthentication(t *testing.T) {
 		name     string
 		isPublic bool
 		secret   string
+		// method is how the request sent the secret; registered is the client's stored method,
+		// empty for a client not held to one.
+		method     clientauth.Method
+		registered string
 		// want is the refusal authentication gives; nil means it lets the request through.
 		want *refusal
 	}
@@ -151,15 +157,30 @@ func TestValidateTokenRequest_ClientAuthentication(t *testing.T) {
 	superfluous := &refusal{"invalid_request", "This client is configured as public, which means a client_secret is not required. To proceed, please remove the client_secret from your request.",
 		http.StatusBadRequest, ""}
 
+	// A client held to one method, refused the other before its secret is compared (#708 decision 2).
+	registeredForBasic := &refusal{"invalid_client",
+		"Client authentication failed: this client is registered for client_secret_basic. Send the client_secret in the Authorization header.",
+		http.StatusUnauthorized, `Basic realm="goiabada"`}
+	registeredForPost := &refusal{"invalid_client",
+		"Client authentication failed: this client is registered for client_secret_post. Send the client_secret in the request body.",
+		http.StatusUnauthorized, `Basic realm="goiabada"`}
+
+	post, basic, none := clientauth.ClientSecretPost, clientauth.ClientSecretBasic, clientauth.MethodNone
 	rows := []row{
-		{"confidential, no secret", false, "", required},
-		{"confidential, wrong secret", false, "not_the_secret", wrong},
+		{"confidential, no secret", false, "", none, "", required},
+		{"confidential, wrong secret", false, "not_the_secret", post, "", wrong},
 		// One byte short and one byte over: the comparison is of the whole value.
-		{"confidential, secret missing its last byte", false, theSecret[:len(theSecret)-1], wrong},
-		{"confidential, secret with a byte appended", false, theSecret + "x", wrong},
-		{"confidential, right secret", false, theSecret, nil},
-		{"public, superfluous secret", true, "any_secret", superfluous},
-		{"public, no secret", true, "", nil},
+		{"confidential, secret missing its last byte", false, theSecret[:len(theSecret)-1], post, "", wrong},
+		{"confidential, secret with a byte appended", false, theSecret + "x", post, "", wrong},
+		{"confidential, right secret", false, theSecret, post, "", nil},
+		{"confidential, right secret by basic", false, theSecret, basic, "", nil},
+		{"held to basic, right secret by basic", false, theSecret, basic, "client_secret_basic", nil},
+		{"held to basic, right secret by post", false, theSecret, post, "client_secret_basic", registeredForBasic},
+		{"held to post, right secret by post", false, theSecret, post, "client_secret_post", nil},
+		{"held to post, right secret by basic", false, theSecret, basic, "client_secret_post", registeredForPost},
+		{"held to post, no secret", false, "", none, "client_secret_post", required},
+		{"public, superfluous secret", true, "any_secret", post, "", superfluous},
+		{"public, no secret", true, "", none, "", nil},
 	}
 
 	for _, f := range fixtures {
@@ -172,16 +193,18 @@ func TestValidateTokenRequest_ClientAuthentication(t *testing.T) {
 				encryptedSecret, err := testDataCipher.Encrypt(theSecret)
 				require.NoError(t, err)
 				client := &record.Client{
-					Id:                    7,
-					ClientIdentifier:      "the_client",
-					Enabled:               true,
-					IsPublic:              r.isPublic,
-					ClientSecretEncrypted: encryptedSecret,
+					Id:                      7,
+					ClientIdentifier:        "the_client",
+					Enabled:                 true,
+					IsPublic:                r.isPublic,
+					ClientSecretEncrypted:   encryptedSecret,
+					TokenEndpointAuthMethod: r.registered,
 				}
 				input := &ValidateTokenRequestInput{
-					GrantType:    f.grant,
-					ClientId:     "the_client",
-					ClientSecret: r.secret,
+					GrantType:        f.grant,
+					ClientId:         "the_client",
+					ClientSecret:     r.secret,
+					ClientAuthMethod: r.method,
 				}
 				settings := &record.Settings{ResourceOwnerPasswordCredentialsEnabled: true}
 

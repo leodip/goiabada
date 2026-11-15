@@ -666,6 +666,17 @@ func TestHandleIntrospectPost_ClientAuthenticationRefusal(t *testing.T) {
 			caller.Enabled = false
 			e.callerFound(caller)
 		}, apiForm(), "", "Client is disabled.", "client_secret_post"},
+		// Clients that registered themselves, held to the method they registered (#708).
+		{"a client held to client_secret_basic, its right secret in the body", func(e *introspectEndpoint) {
+			caller := introspectingCaller(t)
+			caller.TokenEndpointAuthMethod = "client_secret_basic"
+			e.callerFound(caller)
+		}, apiForm(), "", "Client authentication failed: this client is registered for client_secret_basic. Send the client_secret in the Authorization header.", "client_secret_post"},
+		{"a client held to client_secret_post, its right secret in the header", func(e *introspectEndpoint) {
+			caller := introspectingCaller(t)
+			caller.TokenEndpointAuthMethod = "client_secret_post"
+			e.callerFound(caller)
+		}, url.Values{"token": {introspectTokenString}}, introspectCallerName + ":api-secret", "Client authentication failed: this client is registered for client_secret_post. Send the client_secret in the request body.", "client_secret_basic"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

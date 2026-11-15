@@ -116,7 +116,7 @@ func (e revocationEndpoint) serve(w http.ResponseWriter, r *http.Request) {
 		e.refuse(w, r, err)
 		return
 	}
-	clientIdentifier, clientSecret, err := extractClientCredentials(r)
+	clientIdentifier, clientSecret, method, err := extractClientCredentials(r)
 	if err != nil {
 		// Basic credentials that cannot be read or name no client are an invalid_client naming no
 		// client, logged as every one is.
@@ -127,7 +127,7 @@ func (e revocationEndpoint) serve(w http.ResponseWriter, r *http.Request) {
 
 	// RFC 7009 section 2.1: the client authenticates as at the token endpoint, and a public client
 	// by its client_id alone (section 5).
-	client, err := e.clients.Authenticate(ctx, clientIdentifier, clientSecret)
+	client, err := e.clients.Authenticate(ctx, clientIdentifier, clientSecret, method)
 	if err != nil {
 		var refusal *oauth.ErrorDetail
 		if !errors.As(err, &refusal) {
