@@ -84,8 +84,11 @@ type ValidateTokenRequestInput struct {
 	CodeVerifier string
 	ClientId     string
 	ClientSecret string
-	Scope        string
-	RefreshToken string
+	// ClientAuthMethod is how the request presented ClientSecret, which a client that registered
+	// itself is held to (#708).
+	ClientAuthMethod clientauth.Method
+	Scope            string
+	RefreshToken     string
 	// Username and Password are used for ROPC grant (RFC 6749 Section 4.3)
 	Username string
 	Password string

@@ -570,6 +570,7 @@ func TestWireJSON_ClientFamily(t *testing.T) {
 		BackchannelLogoutURI:                    "http://app.internal:3000/backchannel-logout?tenant=a",
 		BackchannelLogoutSessionRequired:        true,
 		DPoPBoundAccessTokens:                   true,
+		TokenEndpointAuthMethod:                 "client_secret_post",
 		BrandId:                                 sql.NullInt64{Int64: 7, Valid: true},
 		ShowLogo:                                true,
 		ShowDisplayName:                         true,
@@ -622,7 +623,8 @@ func TestWireJSON_ClientFamily(t *testing.T) {
 			`"backchannelLogoutUri":"http://app.internal:3000/backchannel-logout?tenant=a",` +
 			`"backchannelLogoutSessionRequired":true,"dpopBoundAccessTokens":true,"createdViaDcr":false,"administrativeScopesAllowed":` + flag +
 			`,"brandId":` + brandId + `,"showLogo":true,"showDisplayName":true,` +
-			`"showDescription":false,"showWebsiteUrl":true,"isPublic":false,"isSystemLevelClient":` + flag +
+			`"showDescription":false,"showWebsiteUrl":true,"isPublic":false,` +
+			`"tokenEndpointAuthMethod":"client_secret_post","isSystemLevelClient":` + flag +
 			`,"authorizationCodeEnabled":true,"clientCredentialsEnabled":false,` +
 			`"pkceRequired":true,"implicitGrantEnabled":null,` +
 			`"resourceOwnerPasswordCredentialsEnabled":false,"tokenExpirationInSeconds":300,` +

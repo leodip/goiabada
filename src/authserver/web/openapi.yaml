@@ -8410,6 +8410,15 @@ components:
           description: When true, the client website URL is displayed on sign-in and consent screens
         isPublic:
           type: boolean
+        tokenEndpointAuthMethod:
+          type: string
+          description: >-
+            Read-only. The token_endpoint_auth_method a confidential client registered through
+            /connect/register, client_secret_basic or client_secret_post. The client authenticates
+            at the token, revocation and introspection endpoints with that method only, and a
+            secret sent the other way is refused with invalid_client. Empty for a client not held
+            to one method, which accepts both. Switching the client to public through PUT
+            /api/v1/admin/clients/{id}/authentication clears it
         isSystemLevelClient:
           type: boolean
         authorizationCodeEnabled:
@@ -8492,6 +8501,7 @@ components:
         - showDescription
         - showWebsiteUrl
         - isPublic
+        - tokenEndpointAuthMethod
         - isSystemLevelClient
         - authorizationCodeEnabled
         - clientCredentialsEnabled

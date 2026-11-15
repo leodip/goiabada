@@ -56,11 +56,31 @@ const unreadableBasicCredentialsErrorMsg = "Client authentication failed: the Ba
 // BasicCredentialsNamingNoClient's description.
 const basicCredentialsNamingNoClientErrorMsg = "Client authentication failed: the Basic credentials in the Authorization header name no client."
 
+// The refusals of a client held to the method it registered (#708 decision 2), keyed by that
+// method: each names it and where the secret goes.
+var registeredMethodErrorMsgs = map[string]string{
+	string(ClientSecretBasic): "Client authentication failed: this client is registered for client_secret_basic. Send the client_secret in the Authorization header.",
+	string(ClientSecretPost):  "Client authentication failed: this client is registered for client_secret_post. Send the client_secret in the request body.",
+}
+
 // FindClient's refusals.
 const (
 	clientIdMissingErrorMsg    = "Missing required client_id parameter."
 	clientDoesNotExistErrorMsg = "Client does not exist."
 	clientDisabledErrorMsg     = "Client is disabled."
+)
+
+// Method is how a request presented its client secret, named as discovery's
+// token_endpoint_auth_methods_supported and RFC 7591 section 2 name them.
+type Method string
+
+const (
+	// ClientSecretBasic is the secret in the Authorization header's Basic credentials.
+	ClientSecretBasic Method = "client_secret_basic"
+	// ClientSecretPost is the secret in the request body's client_secret.
+	ClientSecretPost Method = "client_secret_post"
+	// MethodNone is a request that presented no secret.
+	MethodNone Method = "none"
 )
 
 // Database is what client authentication reads: the client the request names.
@@ -79,16 +99,16 @@ func NewAuthenticator(database Database, dataCipher *encryption.DataCipher) *Aut
 	return &Authenticator{database: database, dataCipher: dataCipher}
 }
 
-// Authenticate returns the client clientIdentifier names once presentedSecret authenticates it, or
-// the refusal: FindClient's, then VerifySecret's. A public client is authenticated by its
+// Authenticate returns the client clientIdentifier names once presentedSecret, presented by method,
+// authenticates it, or the refusal: FindClient's, then VerifySecret's. A public client is authenticated by its
 // identifier alone. A refusal is an *oauth.ErrorDetail; any other error is a fault, the database's
 // or the cipher's, and says nothing about the client.
-func (a *Authenticator) Authenticate(ctx context.Context, clientIdentifier, presentedSecret string) (*record.Client, error) {
+func (a *Authenticator) Authenticate(ctx context.Context, clientIdentifier, presentedSecret string, method Method) (*record.Client, error) {
 	client, err := a.FindClient(ctx, clientIdentifier)
 	if err != nil {
 		return nil, err
 	}
-	if err := a.VerifySecret(client, presentedSecret); err != nil {
+	if err := a.VerifySecret(client, presentedSecret, method); err != nil {
 		return nil, err
 	}
 	return client, nil
@@ -98,7 +118,7 @@ func (a *Authenticator) Authenticate(ctx context.Context, clientIdentifier, pres
 // introspection endpoint (RFC 7662 section 4, #676 decision 9). A public client holds nothing to
 // authenticate with, so it is refused as a client that failed to authenticate, invalid_client, before
 // its secret is looked at: whether it sent one or not, it gets the one answer.
-func (a *Authenticator) AuthenticateConfidential(ctx context.Context, clientIdentifier, presentedSecret string) (*record.Client, error) {
+func (a *Authenticator) AuthenticateConfidential(ctx context.Context, clientIdentifier, presentedSecret string, method Method) (*record.Client, error) {
 	client, err := a.FindClient(ctx, clientIdentifier)
 	if err != nil {
 		return nil, err
@@ -106,7 +126,7 @@ func (a *Authenticator) AuthenticateConfidential(ctx context.Context, clientIden
 	if client.IsPublic {
 		return nil, invalidClientError(publicClientCannotIntrospectErrorMsg)
 	}
-	if err := a.VerifySecret(client, presentedSecret); err != nil {
+	if err := a.VerifySecret(client, presentedSecret, method); err != nil {
 		return nil, err
 	}
 	return client, nil
@@ -136,17 +156,27 @@ func (a *Authenticator) FindClient(ctx context.Context, clientIdentifier string)
 	return client, nil
 }
 
-// VerifySecret checks the secret a request presented for client, which FindClient found.
+// VerifySecret checks the secret a request presented for client, which FindClient found, by method,
+// how the request presented it.
 //
 // A confidential client must present its secret (RFC 6749 section 3.2.1); a missing or wrong one
 // is invalid_client. The comparison is constant-time.
+//
+// A confidential client that registered itself is held to the method it registered (#708 decisions 1
+// and 2): a secret presented by the other is refused invalid_client before it is compared, so the
+// answer is the same whether it is right or wrong, and does not confirm a secret sent by a method the
+// client never registered. OpenID Connect Core 1.0 section 12.1 has the client authenticate by its
+// registered method, and RFC 6749 section 5.2 names an unsupported authentication method under
+// invalid_client. A request that presents no secret is answered the missing secret, as before: it
+// used no method to refuse. A client whose stored method is empty, every client not held to one,
+// accepts both.
 //
 // A public client that presents a secret is refused invalid_request. That is symmetry, not a
 // defect fix (#245 decision 11): no specification requires refusing a superfluous secret and
 // nothing was exposed by ignoring one; what it buys is that one request gets one answer whichever
 // grant carries it. The client credentials grant never reaches that branch, because it refuses a
 // public client before authenticating.
-func (a *Authenticator) VerifySecret(client *record.Client, presentedSecret string) error {
+func (a *Authenticator) VerifySecret(client *record.Client, presentedSecret string, method Method) error {
 	if client.IsPublic {
 		if len(presentedSecret) > 0 {
 			return oauth.NewErrorDetailWithHTTPStatus("invalid_request",
@@ -155,6 +185,10 @@ func (a *Authenticator) VerifySecret(client *record.Client, presentedSecret stri
 		return nil
 	}
 
+	if description, held := registeredMethodErrorMsgs[client.TokenEndpointAuthMethod]; held &&
+		method != MethodNone && string(method) != client.TokenEndpointAuthMethod {
+		return invalidClientError(description)
+	}
 	if len(presentedSecret) == 0 {
 		return invalidClientError(clientSecretRequiredErrorMsg)
 	}
@@ -188,7 +222,7 @@ func BasicCredentialsNamingNoClient() *oauth.ErrorDetail {
 }
 
 // invalidClientError is every invalid_client: an unknown client, a disabled one, a missing or
-// wrong secret, and Basic credentials that cannot be read or name no client. Always 401 with
+// wrong secret, a secret presented by a method the client is not registered for, and Basic credentials that cannot be read or name no client. Always 401 with
 // BasicChallenge, whether the client used the Authorization header or the form body (#437).
 //
 // RFC 6749 section 5.2 makes 401 a MAY in general and a MUST, with a challenge, only for a client

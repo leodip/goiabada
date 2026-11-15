@@ -1038,6 +1038,8 @@
 "adminconsole.admin_clients.authentication.confidential_hint" = "S’exécute sur un serveur, par exemple une application web côté serveur ou un service backend, et prouve son identité avec un secret de client."
 "adminconsole.admin_clients.authentication.field.client_secret" = "Secret du client"
 "adminconsole.admin_clients.authentication.client_secret_tooltip" = "Tout ce qui se connecte avec ce client l’envoie pour prouver son identité. Conservez-le sur un serveur, jamais dans un navigateur ni dans une application mobile."
+"adminconsole.admin_clients.authentication.registered_method.client_secret_basic" = "Ce client s’est enregistré lui-même avec client_secret_basic et doit donc envoyer son secret de client dans l’en-tête Authorization. Un secret envoyé dans le corps de la requête est refusé."
+"adminconsole.admin_clients.authentication.registered_method.client_secret_post" = "Ce client s’est enregistré lui-même avec client_secret_post et doit donc envoyer son secret de client dans le corps de la requête. Un secret envoyé dans l’en-tête Authorization est refusé."
 "adminconsole.admin_clients.authentication.generate_link" = "Générer un nouveau secret"
 "adminconsole.admin_clients.authentication.reveal_link" = "Afficher"
 "adminconsole.admin_clients.authentication.hide_link" = "Masquer"

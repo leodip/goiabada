@@ -61,6 +61,14 @@ type Client struct {
 	// writes it: the other client saves read the row earlier in their request, and would write back a
 	// setting switched since. CreateClient and SetClientDPoPBoundAccessTokens write it.
 	DPoPBoundAccessTokens bool `db:"dpop_bound_access_tokens" fieldtag:"dont-update"`
+	// TokenEndpointAuthMethod is the token_endpoint_auth_method a confidential client registered
+	// through dynamic client registration, client_secret_basic or client_secret_post, and empty for
+	// every client not held to one method: public clients, clients an administrator created, the
+	// admin console's client, and every client registered before the column existed (#708 decision
+	// 3). Tagged dont-update, so the whole-row UpdateClient never writes it: a save made from a copy
+	// read earlier would write back a method cleared since. CreateClient writes it, and
+	// SetClientPublic's transition clears it.
+	TokenEndpointAuthMethod string `db:"token_endpoint_auth_method" fieldtag:"dont-update"`
 	// BrandId is the brand this client's pages are drawn in, or NULL to follow the default brand,
 	// whichever it is at the time (#812 decision 1). Tagged dont-update, so the whole-row
 	// UpdateClient never writes it: a save made from a copy read earlier would write back a brand

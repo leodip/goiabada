@@ -79,11 +79,12 @@ func clientAuthMethod(r *http.Request) string {
 	return "none"
 }
 
-// extractClientCredentials extracts client_id and client_secret from the request.
-// It supports both client_secret_basic (Authorization header) and client_secret_post (form body).
+// extractClientCredentials extracts client_id and client_secret from the request, and the method
+// that presented the secret: client_secret_basic for the Authorization header, even with an empty
+// secret in it, client_secret_post for a client_secret in the body, and none for neither. A client
+// that registered itself is held to its registered method (#708). Every invalid_client carries the
+// same challenge whichever was used (#437).
 // Per RFC 6749 clients MUST NOT use more than one authentication method per request.
-// Which of the two was used is not returned: every invalid_client carries the same challenge
-// whichever it was (#437).
 //
 // The header is read strictly (#707 decisions 9 and 12). A request with two or more Authorization
 // fields is refused invalid_request before any of them is read, whether they agree or not:
@@ -93,16 +94,16 @@ func clientAuthMethod(r *http.Request) string {
 // credentials cannot be read, or name no client, is refused invalid_client, and the body is not
 // read in its place.
 // A header of another scheme, such as Bearer, is ignored.
-func extractClientCredentials(r *http.Request) (clientId, clientSecret string, err error) {
+func extractClientCredentials(r *http.Request) (clientId, clientSecret string, method clientauth.Method, err error) {
 	if len(r.Header.Values("Authorization")) > 1 {
-		return "", "", oauth.NewErrorDetailWithHTTPStatus("invalid_request",
+		return "", "", "", oauth.NewErrorDetailWithHTTPStatus("invalid_request",
 			"The request included more than one Authorization header. Send one.", http.StatusBadRequest)
 	}
 
 	// Check for Basic auth in Authorization header
 	basicClientId, basicClientSecret, hasBasicAuth, err := parseBasicAuth(r.Header.Get("Authorization"))
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 
 	// Get credentials from POST body
@@ -112,7 +113,7 @@ func extractClientCredentials(r *http.Request) (clientId, clientSecret string, e
 
 	// RFC 6749 clients MUST NOT use more than one authentication method
 	if hasBasicAuth && hasPostAuth {
-		return "", "", oauth.NewErrorDetailWithHTTPStatus("invalid_request",
+		return "", "", "", oauth.NewErrorDetailWithHTTPStatus("invalid_request",
 			"Client authentication failed: multiple authentication methods provided. "+
 				"Use either HTTP Basic authentication OR client_secret in the request body, but not both.",
 			http.StatusBadRequest)
@@ -120,11 +121,14 @@ func extractClientCredentials(r *http.Request) (clientId, clientSecret string, e
 
 	// Use Basic auth if present
 	if hasBasicAuth {
-		return basicClientId, basicClientSecret, nil
+		return basicClientId, basicClientSecret, clientauth.ClientSecretBasic, nil
 	}
 
 	// Fall back to POST body credentials
-	return postClientId, postClientSecret, nil
+	if hasPostAuth {
+		return postClientId, postClientSecret, clientauth.ClientSecretPost, nil
+	}
+	return postClientId, "", clientauth.MethodNone, nil
 }
 
 // basicCredentials returns what follows the Basic scheme and the spaces after it in an Authorization

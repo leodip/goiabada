@@ -77,6 +77,7 @@ If you're writing the tool, this is what it does the first time it runs.
      "redirect_uris": ["http://127.0.0.1/callback"],
      "token_endpoint_auth_method": "none",
      "grant_types": ["authorization_code", "refresh_token"],
+     "response_types": ["code"],
      "client_name": "Report builder",
      "dpop_bound_access_tokens": false
    }
@@ -104,7 +105,7 @@ Sign-out, unlike sign-in, compares a loopback port. So if your app listens on a 
 
 </Steps>
 
-Every registration leaves a `dynamic_client_registration` entry in the [audit log](/concepts/audit-log/), with the new client, its grant types, whether it's public, and the IP address it came from.
+Every registration leaves a `dynamic_client_registration` entry in the [audit log](/concepts/audit-log/), with the new client, its grant types, whether it's public, the `token_endpoint_auth_method` it registered, and the IP address it came from.
 
 ## What a registration may ask for
 
@@ -112,7 +113,7 @@ A registration can't ask for the [legacy flows](/legacy-flows/implicit/), and a 
 
 ## What a self-registered client gets
 
-It's enabled straight away, with an identifier made up of `dcr_` and a UUID that can't be changed later. Consent is on, its ACR level is `urn:goiabada:level2_optional`, and a public one always uses PKCE and has [**Remember consent**](/concepts/clients/#consent-required) off, so its users see the consent screen on every sign-in. A confidential one gets a secret, which the answer carries once, and which an administrator can read later on the client's **Authentication** tab. The implicit flow and ROPC are off on the client itself, so turning either on globally doesn't reach it. Its token lifetimes are copied from the server's settings when it registers. Apart from its identifier, an administrator can change any of it like any other client's. See [Self-registered clients](/concepts/clients/#self-registered-clients).
+It's enabled straight away, with an identifier made up of `dcr_` and a UUID that can't be changed later. Consent is on, its ACR level is `urn:goiabada:level2_optional`, and a public one always uses PKCE and has [**Remember consent**](/concepts/clients/#consent-required) off, so its users see the consent screen on every sign-in. A confidential one gets a secret, which the answer carries once, and which an administrator can read later on the client's **Authentication** tab. It's held to the `token_endpoint_auth_method` it registered, `client_secret_basic` by default: see [Client authentication](/reference/endpoints/token/#client-authentication). The implicit flow and ROPC are off on the client itself, so turning either on globally doesn't reach it. Its token lifetimes are copied from the server's settings when it registers. An administrator can change the rest like any other client's, except its identifier and the method it registered. See [Self-registered clients](/concepts/clients/#self-registered-clients).
 
 ## Turning it off
 

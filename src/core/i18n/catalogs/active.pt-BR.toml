@@ -990,6 +990,8 @@
 "adminconsole.admin_clients.authentication.confidential_hint" = "Roda em um servidor, como um app web no servidor ou um serviço de backend, e prova quem é com um segredo do cliente."
 "adminconsole.admin_clients.authentication.field.client_secret" = "Segredo do cliente"
 "adminconsole.admin_clients.authentication.client_secret_tooltip" = "Tudo o que entra com este cliente o envia para provar que é este cliente. Mantenha-o em um servidor, nunca em um navegador ou app móvel."
+"adminconsole.admin_clients.authentication.registered_method.client_secret_basic" = "Este cliente se registrou sozinho com client_secret_basic, então precisa enviar o segredo do cliente no cabeçalho Authorization. Um segredo enviado no corpo da requisição é recusado."
+"adminconsole.admin_clients.authentication.registered_method.client_secret_post" = "Este cliente se registrou sozinho com client_secret_post, então precisa enviar o segredo do cliente no corpo da requisição. Um segredo enviado no cabeçalho Authorization é recusado."
 "adminconsole.admin_clients.authentication.generate_link" = "Gerar novo segredo"
 "adminconsole.admin_clients.authentication.reveal_link" = "Mostrar"
 "adminconsole.admin_clients.authentication.hide_link" = "Ocultar"

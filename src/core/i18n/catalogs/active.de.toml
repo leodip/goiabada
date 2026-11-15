@@ -1039,6 +1039,8 @@
 "adminconsole.admin_clients.authentication.confidential_hint" = "Läuft auf einem Server, zum Beispiel als serverseitige Web-App oder Backend-Dienst, und weist seine Identität mit einem Client-Secret nach."
 "adminconsole.admin_clients.authentication.field.client_secret" = "Client-Secret"
 "adminconsole.admin_clients.authentication.client_secret_tooltip" = "Alles, was sich mit diesem Client anmeldet, sendet es als Identitätsnachweis. Bewahren Sie es auf einem Server auf, niemals im Browser oder in einer mobilen App."
+"adminconsole.admin_clients.authentication.registered_method.client_secret_basic" = "Dieser Client hat sich selbst für client_secret_basic registriert und muss sein Client-Secret daher im Authorization-Header senden. Ein im Anfragetext gesendetes Secret wird abgelehnt."
+"adminconsole.admin_clients.authentication.registered_method.client_secret_post" = "Dieser Client hat sich selbst für client_secret_post registriert und muss sein Client-Secret daher im Anfragetext senden. Ein im Authorization-Header gesendetes Secret wird abgelehnt."
 "adminconsole.admin_clients.authentication.generate_link" = "Neues Secret generieren"
 "adminconsole.admin_clients.authentication.reveal_link" = "Anzeigen"
 "adminconsole.admin_clients.authentication.hide_link" = "Ausblenden"

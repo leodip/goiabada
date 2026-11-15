@@ -515,6 +515,7 @@ func ToClientResponse(client *record.Client) *api.ClientResponse {
 		ShowDescription:                         client.ShowDescription,
 		ShowWebsiteURL:                          client.ShowWebsiteURL,
 		IsPublic:                                client.IsPublic,
+		TokenEndpointAuthMethod:                 client.TokenEndpointAuthMethod,
 		IsSystemLevelClient:                     client.IsSystemLevelClient(),
 		AuthorizationCodeEnabled:                client.AuthorizationCodeEnabled,
 		ClientCredentialsEnabled:                client.ClientCredentialsEnabled,

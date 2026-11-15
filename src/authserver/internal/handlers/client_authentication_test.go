@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/leodip/goiabada/authserver/internal/clientauth"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/oauth"
 )
@@ -202,7 +203,8 @@ func TestExtractClientCredentials(t *testing.T) {
 		req.Header.Set("Authorization", "Basic "+encoded)
 		_ = req.ParseForm()
 
-		clientId, clientSecret, err := extractClientCredentials(req)
+		clientId, clientSecret, method, err := extractClientCredentials(req)
+		assert.Equal(t, clientauth.ClientSecretBasic, method)
 		require.NoError(t, err)
 		assert.Equal(t, "basic-client", clientId)
 		assert.Equal(t, "basic-secret", clientSecret)
@@ -215,7 +217,8 @@ func TestExtractClientCredentials(t *testing.T) {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		_ = req.ParseForm()
 
-		clientId, clientSecret, err := extractClientCredentials(req)
+		clientId, clientSecret, method, err := extractClientCredentials(req)
+		assert.Equal(t, clientauth.ClientSecretPost, method)
 		require.NoError(t, err)
 		assert.Equal(t, "post-client", clientId)
 		assert.Equal(t, "post-secret", clientSecret)
@@ -230,7 +233,8 @@ func TestExtractClientCredentials(t *testing.T) {
 		req.Header.Set("Authorization", "Basic "+encoded)
 		_ = req.ParseForm()
 
-		clientId, clientSecret, err := extractClientCredentials(req)
+		clientId, clientSecret, method, err := extractClientCredentials(req)
+		assert.Equal(t, clientauth.Method(""), method)
 		require.Error(t, err)
 		assert.Empty(t, clientId)
 		assert.Empty(t, clientSecret)
@@ -249,7 +253,8 @@ func TestExtractClientCredentials(t *testing.T) {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		_ = req.ParseForm()
 
-		clientId, clientSecret, err := extractClientCredentials(req)
+		clientId, clientSecret, method, err := extractClientCredentials(req)
+		assert.Equal(t, clientauth.MethodNone, method)
 		require.NoError(t, err)
 		assert.Empty(t, clientId)
 		assert.Empty(t, clientSecret)
@@ -265,7 +270,8 @@ func TestExtractClientCredentials(t *testing.T) {
 		req.Header.Set("Authorization", "Basic "+encoded)
 		_ = req.ParseForm()
 
-		clientId, clientSecret, err := extractClientCredentials(req)
+		clientId, clientSecret, method, err := extractClientCredentials(req)
+		assert.Equal(t, clientauth.ClientSecretBasic, method)
 		require.NoError(t, err)
 		assert.Equal(t, "basic-client", clientId)
 		assert.Equal(t, "basic-secret", clientSecret)
@@ -280,7 +286,8 @@ func TestExtractClientCredentials(t *testing.T) {
 		req.Header.Set("Authorization", "Basic invalid-base64!")
 		_ = req.ParseForm()
 
-		clientId, clientSecret, err := extractClientCredentials(req)
+		clientId, clientSecret, method, err := extractClientCredentials(req)
+		assert.Equal(t, clientauth.Method(""), method)
 		assert.Empty(t, clientId)
 		assert.Empty(t, clientSecret)
 		var errDetail *oauth.ErrorDetail
@@ -297,7 +304,8 @@ func TestExtractClientCredentials(t *testing.T) {
 		req.Header.Set("Authorization", "Bearer some-access-token")
 		_ = req.ParseForm()
 
-		clientId, clientSecret, err := extractClientCredentials(req)
+		clientId, clientSecret, method, err := extractClientCredentials(req)
+		assert.Equal(t, clientauth.ClientSecretPost, method)
 		require.NoError(t, err)
 		assert.Equal(t, "post-client", clientId)
 		assert.Equal(t, "post-secret", clientSecret)
@@ -313,7 +321,8 @@ func TestExtractClientCredentials(t *testing.T) {
 		req.Header.Set("Authorization", "Basic "+encoded)
 		_ = req.ParseForm()
 
-		clientId, clientSecret, err := extractClientCredentials(req)
+		clientId, clientSecret, method, err := extractClientCredentials(req)
+		assert.Equal(t, clientauth.ClientSecretBasic, method)
 		require.NoError(t, err)
 		assert.Equal(t, "basic-client", clientId)
 		assert.Equal(t, "basic-secret", clientSecret)
@@ -326,9 +335,26 @@ func TestExtractClientCredentials(t *testing.T) {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		_ = req.ParseForm()
 
-		clientId, clientSecret, err := extractClientCredentials(req)
+		clientId, clientSecret, method, err := extractClientCredentials(req)
+		assert.Equal(t, clientauth.MethodNone, method)
 		require.NoError(t, err)
 		assert.Equal(t, "public-client", clientId)
 		assert.Empty(t, clientSecret)
+	})
+
+	// #708: a Basic header is the header method even when its secret is empty, so a client held to
+	// client_secret_post that sends one is refused for the method, not for a missing secret.
+	t.Run("Basic auth with an empty secret is the header method", func(t *testing.T) {
+		encoded := base64.StdEncoding.EncodeToString([]byte("basic-client:"))
+		req, _ := http.NewRequest("POST", "/token", strings.NewReader("grant_type=client_credentials"))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("Authorization", "Basic "+encoded)
+		_ = req.ParseForm()
+
+		clientId, clientSecret, method, err := extractClientCredentials(req)
+		require.NoError(t, err)
+		assert.Equal(t, "basic-client", clientId)
+		assert.Empty(t, clientSecret)
+		assert.Equal(t, clientauth.ClientSecretBasic, method)
 	})
 }

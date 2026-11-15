@@ -37,7 +37,7 @@ func (val *TokenValidator) validateClientCredentialsGrant(ctx context.Context, c
 			http.StatusBadRequest)
 	}
 
-	err := val.clients.VerifySecret(client, input.ClientSecret)
+	err := val.clients.VerifySecret(client, input.ClientSecret, input.ClientAuthMethod)
 	if err != nil {
 		return nil, err
 	}

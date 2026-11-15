@@ -75,7 +75,8 @@ func TestDCR_PublicClient_MCP_UseCase_Success(t *testing.T) {
 	assert.Equal(t, int64(0), response.ClientSecretExpiresAt, "Secret never expires")
 	assert.Equal(t, reqBody.RedirectURIs, response.RedirectURIs)
 	assert.Equal(t, "none", response.TokenEndpointAuthMethod)
-	assert.Equal(t, reqBody.GrantTypes, response.GrantTypes)
+	assert.Equal(t, []string{"authorization_code", "refresh_token"}, response.GrantTypes)
+	assert.Equal(t, []string{"code"}, response.ResponseTypes)
 	assert.Equal(t, "MCP Remote Client", response.ClientName)
 
 	// Verify database state
@@ -122,6 +123,9 @@ func TestDCR_ConfidentialClient_Success(t *testing.T) {
 	assert.NotEmpty(t, response.ClientSecret)
 	assert.Greater(t, len(response.ClientSecret), 30, "Secret should be sufficiently long")
 	assert.Equal(t, "client_secret_post", response.TokenEndpointAuthMethod)
+	// The stored client's grants, in the discovery document's order, not the request's.
+	assert.Equal(t, []string{"authorization_code", "refresh_token", "client_credentials"}, response.GrantTypes)
+	assert.Equal(t, []string{"code"}, response.ResponseTypes)
 
 	// Verify database state
 	client, err := database.GetClientByClientIdentifier(context.Background(), nil, response.ClientID)
@@ -158,7 +162,9 @@ func TestDCR_DefaultValues_Applied(t *testing.T) {
 
 	// Verify defaults (RFC 7591 §2)
 	assert.Equal(t, "client_secret_basic", response.TokenEndpointAuthMethod, "Default auth method")
-	assert.Equal(t, []string{"authorization_code"}, response.GrantTypes, "Default grant type")
+	assert.Equal(t, []string{"authorization_code", "refresh_token"}, response.GrantTypes,
+		"the default grant type, with the refresh token every redeemed code comes with")
+	assert.Equal(t, []string{"code"}, response.ResponseTypes)
 	assert.NotEmpty(t, response.ClientSecret, "Confidential client receives secret")
 
 	// Verify database
@@ -382,6 +388,99 @@ func TestDCR_GrantType_Validation(t *testing.T) {
 			}
 		})
 	}
+}
+
+// The registration answer describes the client the server stored, as it behaves (RFC 7591 section
+// 3.2.1, #708): grant_types is authorization_code with refresh_token for a client with the
+// authorization code flow and client_credentials for one with that grant, whatever the request
+// named, and response_types is always present, code or empty. The body is read as raw JSON, so an
+// absent response_types is not mistaken for an empty one.
+func TestDCR_TheAnswerDescribesTheStoredClient(t *testing.T) {
+	enableDCR(t)
+
+	testCases := []struct {
+		name              string
+		authMethod        string
+		redirectURIs      []string
+		grantTypes        []string
+		wantGrantTypes    string
+		wantResponseTypes string
+	}{
+		{
+			name:              "authorization_code alone",
+			redirectURIs:      []string{"https://app.example.com/callback"},
+			grantTypes:        []string{"authorization_code"},
+			wantGrantTypes:    `["authorization_code","refresh_token"]`,
+			wantResponseTypes: `["code"]`,
+		},
+		{
+			name:              "a public client's default",
+			authMethod:        "none",
+			redirectURIs:      []string{"http://127.0.0.1:8765/callback"},
+			wantGrantTypes:    `["authorization_code","refresh_token"]`,
+			wantResponseTypes: `["code"]`,
+		},
+		{
+			name:              "client_credentials alone",
+			grantTypes:        []string{"client_credentials"},
+			wantGrantTypes:    `["client_credentials"]`,
+			wantResponseTypes: `[]`,
+		},
+		{
+			name:              "client_credentials and refresh_token",
+			grantTypes:        []string{"client_credentials", "refresh_token"},
+			wantGrantTypes:    `["client_credentials"]`,
+			wantResponseTypes: `[]`,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			resp := makeDCRRequest(t, oidc.DynamicClientRegistrationRequest{
+				RedirectURIs:            tc.redirectURIs,
+				TokenEndpointAuthMethod: tc.authMethod,
+				GrantTypes:              tc.grantTypes,
+				ClientName:              tc.name,
+			})
+			defer func() { _ = resp.Body.Close() }()
+			require.Equal(t, http.StatusCreated, resp.StatusCode)
+
+			var raw map[string]json.RawMessage
+			require.NoError(t, json.NewDecoder(resp.Body).Decode(&raw))
+			assert.JSONEq(t, tc.wantGrantTypes, string(raw["grant_types"]))
+			require.Contains(t, raw, "response_types", "response_types is always present")
+			assert.JSONEq(t, tc.wantResponseTypes, string(raw["response_types"]))
+		})
+	}
+}
+
+// A registration naming refresh_token alone would create a client with no flow, which could never
+// get a token, so it is refused invalid_client_metadata and nothing is created (RFC 7591 section
+// 2.1, #708 decision 4).
+func TestDCR_ARegistrationThatEnablesNoFlowIsRefused(t *testing.T) {
+	enableDCR(t)
+
+	before, err := database.GetAllClients(context.Background(), nil)
+	require.NoError(t, err)
+
+	resp := makeDCRRequest(t, oidc.DynamicClientRegistrationRequest{
+		RedirectURIs: []string{"https://app.example.com/callback"},
+		GrantTypes:   []string{"refresh_token"},
+		ClientName:   "Refresh token alone",
+	})
+	defer func() { _ = resp.Body.Close() }()
+
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	var errorResp oidc.DynamicClientRegistrationError
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&errorResp))
+	assert.Equal(t, "invalid_client_metadata", errorResp.Error)
+	assert.Equal(t,
+		"grant_types enables no flow: refresh_token alone cannot get a token. Include authorization_code or client_credentials",
+		errorResp.ErrorDescription)
+
+	after, err := database.GetAllClients(context.Background(), nil)
+	require.NoError(t, err)
+	assert.Len(t, after, len(before), "a refused registration creates no client")
 }
 
 // TestDCR_TokenEndpointAuthMethod_Validation tests auth method validation

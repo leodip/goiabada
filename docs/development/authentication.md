@@ -43,6 +43,15 @@ Every endpoint that authenticates its calling client (RFC 6749 section 2.3) does
   nothing before the colon is `clientauth.BasicCredentialsNamingNoClient`: both 401 `invalid_client`
   with the challenge, and the body is not read in their place (RFC 6749 section 5.2). Another
   scheme, such as Bearer, is ignored (#707)
+- Registered method: `extractClientCredentials` also reports the `clientauth.Method` a request
+  used, `client_secret_basic` for a Basic header (even with an empty secret), `client_secret_post`
+  for a secret in the body, or `none`. `VerifySecret` refuses a confidential client whose
+  `TokenEndpointAuthMethod` names the other method, 401 `invalid_client` with the challenge, before
+  the secret is decrypted or compared, so a right and a wrong secret get the one answer. No secret
+  at all keeps the missing-secret refusal, and an empty stored method accepts both. The token
+  validator carries the method in `ValidateTokenRequestInput.ClientAuthMethod` to each grant's
+  `VerifySecret`; revocation and introspection pass it to `Authenticate` and
+  `AuthenticateConfidential` (#708)
 - Decision: `clientauth` takes the identifier and the secret as plain values and owns the
   refusals: an unknown or disabled client, or a confidential client's missing or wrong secret, is
   401 `invalid_client` with the Basic challenge; a public client that presents a secret is 400
@@ -376,6 +385,15 @@ Programmatic client registration for MCP clients, native apps, etc.
 - Disabled by default. Enable via `Settings.DynamicClientRegistrationEnabled`
 - Creates public or confidential clients based on `token_endpoint_auth_method`
 - Rate limited. Returns client_id and client_secret (if confidential)
+- The answer's `grant_types` and `response_types` are built from the stored client, not the
+  request (`registeredGrantTypes`, `registeredResponseTypes`), and the audit entry records the same
+  grant list. A registration naming neither `authorization_code` nor `client_credentials` is
+  refused `invalid_client_metadata` (#708)
+- A confidential registration stores its method in `clients.token_endpoint_auth_method`
+  (`client_secret_basic` or `client_secret_post`); every other client holds the empty string. The
+  whole-row `UpdateClient` never writes it, and `SetClientPublic`'s transition clears it. Client
+  authentication holds the client to it (above). The audit entry records the answer's method,
+  `none` for a public client (#708)
 - Implementation: `handler_dynamic_client_registration.go`
 
 ## Authentication Flow (Authorization Code)

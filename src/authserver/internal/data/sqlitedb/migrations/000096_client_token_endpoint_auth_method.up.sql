@@ -1,0 +1,13 @@
+-- The token_endpoint_auth_method a client registered through dynamic client registration (#708
+-- decision 3).
+--
+-- clients.token_endpoint_auth_method is client_secret_basic or client_secret_post for a
+-- confidential client that registered itself, the method it authenticates with, and the empty
+-- string for every client not held to one method: public clients, clients an administrator
+-- created, the admin console's client. Registration writes it, the switch to public clears it, and
+-- no whole-row client save writes it.
+--
+-- Every existing client starts empty through the column's default and keeps authenticating with
+-- either method: what a client registered before this migration was never stored, so there is
+-- nothing to backfill. The down migration drops the column, and every method stored since with it.
+ALTER TABLE clients ADD COLUMN token_endpoint_auth_method TEXT NOT NULL DEFAULT '';

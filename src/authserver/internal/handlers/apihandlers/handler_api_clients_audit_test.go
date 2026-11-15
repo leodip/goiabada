@@ -74,6 +74,8 @@ var committedClientWrites = []committedClientWrite{
 			datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 			database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
 			database.On("SetClientRememberConsent", mock.Anything, clientUpdateTx, targetClientId, true).Return(nil).Once()
+			database.On("GetClientById", mock.Anything, clientUpdateTx, targetClientId).
+				Return(&record.Client{Id: targetClientId, ClientIdentifier: "target-client"}, nil).Once()
 		},
 		expectFailingWrite: failingWrite("RunInTransaction", mock.Anything, mock.Anything),
 	},

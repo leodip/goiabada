@@ -78,6 +78,15 @@ func confidentialClient(t *testing.T) *record.Client {
 	return &record.Client{Id: 7, ClientIdentifier: "the_client", Enabled: true, ClientSecretEncrypted: encrypted}
 }
 
+// inTheBody is the method of a request that sends secret in its body: client_secret_post, or none
+// for no secret, as the handlers' credential reader reports them.
+func inTheBody(secret string) clientauth.Method {
+	if secret == "" {
+		return clientauth.MethodNone
+	}
+	return clientauth.ClientSecretPost
+}
+
 func publicClient() *record.Client {
 	return &record.Client{Id: 8, ClientIdentifier: "the_client", Enabled: true, IsPublic: true}
 }
@@ -170,7 +179,7 @@ func TestVerifySecret(t *testing.T) {
 			}
 			// No expectation is set: checking a secret reads nothing.
 			err := clientauth.NewAuthenticator(datamocks.NewDatabase(t), testDataCipher).
-				VerifySecret(client, row.secret)
+				VerifySecret(client, row.secret, inTheBody(row.secret))
 
 			if row.want == nil {
 				assert.NoError(t, err)
@@ -183,7 +192,7 @@ func TestVerifySecret(t *testing.T) {
 	t.Run("a secret that cannot be decrypted is a fault, not a refusal", func(t *testing.T) {
 		otherCipher := newCipher(t, "fedcba9876543210fedcba9876543210")
 		err := clientauth.NewAuthenticator(datamocks.NewDatabase(t), otherCipher).
-			VerifySecret(confidentialClient(t), theSecret)
+			VerifySecret(confidentialClient(t), theSecret, clientauth.ClientSecretPost)
 
 		require.Error(t, err)
 		var detail *oauth.ErrorDetail
@@ -227,7 +236,7 @@ func TestAuthenticate(t *testing.T) {
 			}
 
 			client, err := clientauth.NewAuthenticator(database, testDataCipher).
-				Authenticate(context.Background(), row.identifier, row.secret)
+				Authenticate(context.Background(), row.identifier, row.secret, inTheBody(row.secret))
 
 			if row.want == nil {
 				require.NoError(t, err)
@@ -279,7 +288,7 @@ func TestAuthenticateConfidential(t *testing.T) {
 			}
 
 			client, err := clientauth.NewAuthenticator(database, testDataCipher).
-				AuthenticateConfidential(context.Background(), row.identifier, row.secret)
+				AuthenticateConfidential(context.Background(), row.identifier, row.secret, inTheBody(row.secret))
 
 			if row.want == nil {
 				require.NoError(t, err)
@@ -288,6 +297,119 @@ func TestAuthenticateConfidential(t *testing.T) {
 			}
 			assert.Nil(t, client)
 			refusedWith(t, err, *row.want)
+		})
+	}
+}
+
+// The refusals of a client held to the method it registered (#708 decision 2), as the agreement
+// words them.
+var (
+	registeredForBasic = refusal{"invalid_client",
+		"Client authentication failed: this client is registered for client_secret_basic. Send the client_secret in the Authorization header.",
+		http.StatusUnauthorized, `Basic realm="goiabada"`}
+	registeredForPost = refusal{"invalid_client",
+		"Client authentication failed: this client is registered for client_secret_post. Send the client_secret in the request body.",
+		http.StatusUnauthorized, `Basic realm="goiabada"`}
+)
+
+// TestVerifySecret_RegisteredMethod is a confidential client that registered itself through dynamic
+// client registration: it authenticates by the method it registered only, and a secret sent the
+// other way is refused before it is compared, right or wrong (#708 decisions 1 and 2). A client not
+// held to one method, its stored method empty, accepts both. A request that sends no secret at all
+// is answered as before, whatever the client registered.
+func TestVerifySecret_RegisteredMethod(t *testing.T) {
+	rows := []struct {
+		name       string
+		registered string
+		secret     string
+		method     clientauth.Method
+		want       *refusal
+	}{
+		{"held to basic, by basic", "client_secret_basic", theSecret, clientauth.ClientSecretBasic, nil},
+		{"held to basic, by post", "client_secret_basic", theSecret, clientauth.ClientSecretPost, &registeredForBasic},
+		{"held to basic, a wrong secret by post", "client_secret_basic", "not_the_secret", clientauth.ClientSecretPost, &registeredForBasic},
+		{"held to basic, a wrong secret by basic", "client_secret_basic", "not_the_secret", clientauth.ClientSecretBasic, &wrongSecret},
+		{"held to basic, no secret", "client_secret_basic", "", clientauth.MethodNone, &secretRequired},
+		{"held to basic, an empty secret by basic", "client_secret_basic", "", clientauth.ClientSecretBasic, &secretRequired},
+		{"held to post, by post", "client_secret_post", theSecret, clientauth.ClientSecretPost, nil},
+		{"held to post, by basic", "client_secret_post", theSecret, clientauth.ClientSecretBasic, &registeredForPost},
+		{"held to post, a wrong secret by basic", "client_secret_post", "not_the_secret", clientauth.ClientSecretBasic, &registeredForPost},
+		// A Basic header counts as the header method even when its secret is empty.
+		{"held to post, an empty secret by basic", "client_secret_post", "", clientauth.ClientSecretBasic, &registeredForPost},
+		{"held to post, a wrong secret by post", "client_secret_post", "not_the_secret", clientauth.ClientSecretPost, &wrongSecret},
+		{"held to post, no secret", "client_secret_post", "", clientauth.MethodNone, &secretRequired},
+		{"not held, by basic", "", theSecret, clientauth.ClientSecretBasic, nil},
+		{"not held, by post", "", theSecret, clientauth.ClientSecretPost, nil},
+		{"not held, a wrong secret by basic", "", "not_the_secret", clientauth.ClientSecretBasic, &wrongSecret},
+	}
+	for _, row := range rows {
+		t.Run(row.name, func(t *testing.T) {
+			client := confidentialClient(t)
+			client.TokenEndpointAuthMethod = row.registered
+			err := clientauth.NewAuthenticator(datamocks.NewDatabase(t), testDataCipher).
+				VerifySecret(client, row.secret, row.method)
+			if row.want == nil {
+				assert.NoError(t, err)
+				return
+			}
+			refusedWith(t, err, *row.want)
+		})
+	}
+
+	// The secret is never opened for a request by the other method: with a cipher that cannot open
+	// it, comparing would be a fault, and the answer is the method refusal instead.
+	t.Run("the other method is refused before the secret is opened", func(t *testing.T) {
+		otherCipher := newCipher(t, "fedcba9876543210fedcba9876543210")
+		for registered, want := range map[string]refusal{
+			"client_secret_basic": registeredForBasic,
+			"client_secret_post":  registeredForPost,
+		} {
+			client := confidentialClient(t)
+			client.TokenEndpointAuthMethod = registered
+			other := clientauth.ClientSecretPost
+			if registered == "client_secret_post" {
+				other = clientauth.ClientSecretBasic
+			}
+			err := clientauth.NewAuthenticator(datamocks.NewDatabase(t), otherCipher).
+				VerifySecret(client, theSecret, other)
+			refusedWith(t, err, want)
+		}
+	})
+}
+
+// Authenticate and AuthenticateConfidential hold a client to its registered method as VerifySecret
+// does, after it is found: the revocation and introspection endpoints' calls.
+func TestAuthenticate_RegisteredMethod(t *testing.T) {
+	heldToBasic := func(t *testing.T) *record.Client {
+		client := confidentialClient(t)
+		client.TokenEndpointAuthMethod = "client_secret_basic"
+		return client
+	}
+	authenticators := map[string]func(a *clientauth.Authenticator, method clientauth.Method) (*record.Client, error){
+		"Authenticate": func(a *clientauth.Authenticator, method clientauth.Method) (*record.Client, error) {
+			return a.Authenticate(context.Background(), "the_client", theSecret, method)
+		},
+		"AuthenticateConfidential": func(a *clientauth.Authenticator, method clientauth.Method) (*record.Client, error) {
+			return a.AuthenticateConfidential(context.Background(), "the_client", theSecret, method)
+		},
+	}
+	for name, authenticate := range authenticators {
+		t.Run(name+" refuses the other method", func(t *testing.T) {
+			database := datamocks.NewDatabase(t)
+			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "the_client").
+				Return(heldToBasic(t), nil).Once()
+			client, err := authenticate(clientauth.NewAuthenticator(database, testDataCipher), clientauth.ClientSecretPost)
+			assert.Nil(t, client)
+			refusedWith(t, err, registeredForBasic)
+		})
+		t.Run(name+" accepts the registered method", func(t *testing.T) {
+			stored := heldToBasic(t)
+			database := datamocks.NewDatabase(t)
+			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "the_client").
+				Return(stored, nil).Once()
+			client, err := authenticate(clientauth.NewAuthenticator(database, testDataCipher), clientauth.ClientSecretBasic)
+			require.NoError(t, err)
+			assert.Same(t, stored, client)
 		})
 	}
 }

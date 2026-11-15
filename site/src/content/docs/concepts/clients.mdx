@@ -317,13 +317,14 @@ curl -X POST https://auth.example.com/connect/register \
   }'
 ```
 
-It answers 201 with the new `client_id` and, for a confidential client, its `client_secret`. Every field it reads, its answer and its errors are on [Dynamic client registration](/reference/endpoints/dynamic-client-registration/).
+It answers 201 with the new `client_id`, the grant types the client can use, here `authorization_code` and `refresh_token`, and, for a confidential client, its `client_secret`. Every field it reads, its answer and its errors are on [Dynamic client registration](/reference/endpoints/dynamic-client-registration/).
 
 Because nobody has reviewed them, self-registered clients are treated more carefully:
 
 - **They're marked.** The list of clients shows a **Self-registered** badge on each one.
 - **Their identifier can't be changed.** It's generated, `dcr_` followed by a UUID.
 - **They start with consent on.** The consent screen shows the name the client gave itself, with a note that it registered itself and hasn't been verified. Give it a display name and turn on **Display name** under **Sign-in and consent pages** to replace both. A public one also starts with [**Remember consent**](#consent-required) off, so its users see the screen on every sign-in.
+- **A confidential one is held to the method it registered.** Its **Authentication** tab says which, `client_secret_basic` or `client_secret_post`, and that a secret sent the other way is refused. [`GET /api/v1/admin/clients/{id}`](/reference/api/admin/operations/getclient/) answers it as `tokenEndpointAuthMethod`, empty for a client that may use either. You can't set it. What it means, and what releases a client from it, is on [Client authentication](/reference/endpoints/token/#client-authentication).
 - **They're never sent an error.** An error response is a redirect to the client, and anyone can point a self-registered client anywhere. So when the user declines or the auth server refuses the request, the user sees a page naming the app and the address it asked for, and the request stops there. `prompt=none` included.
 - **Their back-channel logout URI reaches only public addresses.** Otherwise anyone could register a client that has the auth server send requests into your network, to a cloud metadata service for one. This holds whoever set the URI, and after you've reviewed the client too. For an app on your own network, create the client in the admin console instead. See [Where the auth server connects](/reference/endpoints/back-channel-logout/#where-the-auth-server-connects).
 - **A sign-out without a hint doesn't send the user back to them.** Their sign-out redirect URIs prove nothing about where the user should go, so a [sign-out](/reference/endpoints/logout/#where-the-user-lands) with no `id_token_hint` ends on the auth server's "Signed out" page. One with a hint the auth server confirms still goes back to one of the client's sign-out redirect URIs.

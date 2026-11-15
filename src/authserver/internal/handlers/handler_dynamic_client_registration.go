@@ -153,7 +153,11 @@ func HandleDynamicClientRegistrationPost(
 			// written here, at creation; SetClientDPoPBoundAccessTokens is its only other writer.
 			DPoPBoundAccessTokens: bool(req.DPoPBoundAccessTokens),
 			IsPublic:              isPublic,
-			Enabled:               true,
+			// The method a confidential client registered, which it is held to; empty for a public
+			// client, which sends no secret (#708 decision 3). Written here, at creation; the
+			// switch to public is its only other writer, and clears it.
+			TokenEndpointAuthMethod: registeredTokenEndpointAuthMethod(req.TokenEndpointAuthMethod),
+			Enabled:                 true,
 			// A self-registered client is one nobody here has vetted, and RFC 7591 section 5
 			// requires all of its metadata be treated as self-asserted. Consent is the only
 			// control that binds such a client's identity to the user's authority, so it is on
@@ -237,13 +241,19 @@ func HandleDynamicClientRegistrationPost(
 			return
 		}
 
+		// What the stored client can do, which the answer and the audit entry both report.
+		grantTypes := registeredGrantTypes(client)
+
 		// 11. Audit log, after the commit, so an event never records a client that does not exist
 		auditLogger.Log(r.Context(), audit.EventDynamicClientRegistration, map[string]interface{}{
 			"client_id":         client.Id,
 			"client_identifier": client.ClientIdentifier,
-			"grant_types":       req.GrantTypes,
+			"grant_types":       grantTypes,
 			"is_public":         isPublic,
-			"ip":                middleware.ClientIP(r),
+			// The answer's method, none for a public client: the audit log keeps what a client
+			// registered as after a switch to public clears it from the client (#708 decision 7).
+			"token_endpoint_auth_method": req.TokenEndpointAuthMethod,
+			"ip":                         middleware.ClientIP(r),
 		})
 
 		// 12. Build response (RFC 7591 §3.2.1)
@@ -254,8 +264,10 @@ func HandleDynamicClientRegistrationPost(
 			RedirectURIs:            req.RedirectURIs,
 			PostLogoutRedirectURIs:  req.PostLogoutRedirectURIs,
 			TokenEndpointAuthMethod: req.TokenEndpointAuthMethod,
-			GrantTypes:              req.GrantTypes,
-			ClientName:              req.ClientName,
+			// The stored client's, not the request's (RFC 7591 section 3.2.1, #708 decisions 4 and 6).
+			GrantTypes:    grantTypes,
+			ResponseTypes: registeredResponseTypes(client),
+			ClientName:    req.ClientName,
 			// What was stored, so a dropped value is absent (RFC 7591 section 3.2.1).
 			PolicyURI: policyURI,
 			TOSURI:    tosURI,
@@ -319,6 +331,16 @@ func validateDCRRequest(req *oidc.DynamicClientRegistrationRequest) error {
 	// (#428).
 	if req.TokenEndpointAuthMethod == "none" && containsGrantType(req.GrantTypes, oidc.GrantTypeClientCredentials) {
 		return errs.Errorf("a public client (token_endpoint_auth_method none) cannot use the client_credentials grant")
+	}
+
+	// RFC 7591 section 2.1: the server SHOULD keep a client from registering into an inconsistent
+	// state. Only authorization_code and client_credentials enable a flow, so a registration naming
+	// neither, refresh_token alone, would create a client that could never get a token. Refused
+	// rather than answered with an empty list, which would be a 201 for a client that can do
+	// nothing (#708 decision 4).
+	if !containsGrantType(req.GrantTypes, oidc.GrantTypeAuthorizationCode) &&
+		!containsGrantType(req.GrantTypes, oidc.GrantTypeClientCredentials) {
+		return errs.Errorf("grant_types enables no flow: refresh_token alone cannot get a token. Include authorization_code or client_credentials")
 	}
 
 	// client_name is written to clients.description, so it takes the bound every description
@@ -605,6 +627,48 @@ func validateRedirectURI(uri string, isPublic bool, field dcrURIField) error {
 // the human reading them, which is the only thing the prefix is for (#108, decision 16).
 func generateDCRClientIdentifier() string {
 	return "dcr_" + uuid.New()
+}
+
+// registeredTokenEndpointAuthMethod is the token_endpoint_auth_method a registration stores: the
+// method a confidential client registered, and the empty string for a public one, the value of a
+// client not held to one method, since is_public already says it sends no secret (#708 decision 3).
+func registeredTokenEndpointAuthMethod(method string) string {
+	if method == "none" {
+		return ""
+	}
+	return method
+}
+
+// registeredGrantTypes is the registration answer's grant_types: what the stored client can do, in
+// the order the discovery document lists grant types (RFC 7591 section 3.2.1, #708). A client with
+// the authorization code flow is issued a refresh token with every code it redeems, so it lists
+// refresh_token beside authorization_code whatever the request named; the client credentials grant
+// issues none, so a client with only that grant does not.
+func registeredGrantTypes(client *record.Client) []string {
+	enabled := map[string]bool{
+		oidc.GrantTypeAuthorizationCode.String(): client.AuthorizationCodeEnabled,
+		oidc.GrantTypeRefreshToken.String():      client.AuthorizationCodeEnabled,
+		oidc.GrantTypeClientCredentials.String(): client.ClientCredentialsEnabled,
+	}
+	grantTypes := []string{}
+	for _, grantType := range oidc.GrantTypesSupported() {
+		if enabled[grantType] {
+			grantTypes = append(grantTypes, grantType)
+		}
+	}
+	return grantTypes
+}
+
+// registeredResponseTypes is the registration answer's response_types, always present: code for a
+// client with the authorization code flow, the only response type a self-registered client can use
+// since its implicit flow is off, and none for one without it (RFC 7591 section 2.1, #708 decision
+// 6). The request's response_types is not read, so a registrant that asked for another value reads
+// the replacement here.
+func registeredResponseTypes(client *record.Client) []string {
+	if client.AuthorizationCodeEnabled {
+		return []string{"code"}
+	}
+	return []string{}
 }
 
 // containsGrantType checks if grant type is in the list
