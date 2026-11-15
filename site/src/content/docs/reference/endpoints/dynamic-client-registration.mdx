@@ -99,7 +99,7 @@ The new client is enabled straight away, and:
 
 - **Its identifier is generated,** `dcr_` followed by a UUID, and can't be changed later.
 - **A confidential client gets a secret** of 60 characters, which the answer carries once. A public client gets none.
-- **A confidential client is held to the method it registered** at the token, revocation and introspection endpoints, and refused with `invalid_client` the other way. Once an administrator switches it to public, it isn't: switched back to confidential, it may use either.
+- **A confidential client is held to the method it registered,** as [Client authentication](/reference/endpoints/token/#client-authentication) describes.
 - **Consent is on,** so users see what it asks for before it gets a token.
 - **A public client has [Remember consent](/concepts/clients/#consent-required) off,** so users see the consent screen on every sign-in, even after they've approved it. A confidential client remembers it.
 - **Its sign-in level is `urn:goiabada:level2_optional`,** so a user with two-factor authentication set up is asked for their code. See [ACR and AMR](/concepts/acr-and-amr/).
