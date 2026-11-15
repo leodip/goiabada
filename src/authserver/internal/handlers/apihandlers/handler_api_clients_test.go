@@ -21,6 +21,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/urlmatch"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/inputvalidation"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -493,6 +494,8 @@ func TestHandleClientAuthenticationPut_SwitchToConfidentialTurnsRememberConsentO
 	datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 	database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
 	database.On("SetClientRememberConsent", mock.Anything, clientUpdateTx, int64(7), true).Return(nil).Once()
+	database.On("GetClientById", mock.Anything, clientUpdateTx, int64(7)).
+		Return(&record.Client{Id: 7, IsPublic: false, RememberConsent: true}, nil).Once()
 	stubClientResponseLoads(database)
 	auditLogger.On("Log", mock.Anything, audit.EventUpdatedClientAuthentication, mock.Anything).Return().Once()
 
@@ -572,6 +575,76 @@ func TestHandleClientAuthenticationPut_SwitchToPublicAnswersTheMethodTheWriteLef
 	assert.Empty(t, method)
 }
 
+// TestHandleClientAuthenticationPut_ConfidentialSaveAnswersTheMethodTheRowHolds: a secret save
+// that loaded a self-registered confidential client before another request made it public writes
+// the client confidential again, and UpdateClient leaves the method the switch cleared alone. The
+// answer carries the row's empty method, read under the save's own transaction after its writes,
+// never the method of the copy loaded at the top of the request (#708 decision 5).
+func TestHandleClientAuthenticationPut_ConfidentialSaveAnswersTheMethodTheRowHolds(t *testing.T) {
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
+
+	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
+		Return(&record.Client{Id: 7, IsPublic: false, ClientSecretEncrypted: []byte("secret"), RememberConsent: true,
+			CreatedViaDCR: true, TokenEndpointAuthMethod: "client_secret_post"}, nil).Once()
+	datamocks.ExpectRunInTransaction(database, clientUpdateTx)
+	database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
+	database.On("SetClientRememberConsent", mock.Anything, clientUpdateTx, int64(7), true).Return(nil).Once()
+	database.On("GetClientById", mock.Anything, clientUpdateTx, int64(7)).
+		Return(&record.Client{Id: 7, IsPublic: false, RememberConsent: true, CreatedViaDCR: true,
+			TokenEndpointAuthMethod: ""}, nil).Once()
+	stubClientResponseLoads(database)
+	auditLogger.On("Log", mock.Anything, audit.EventUpdatedClientAuthentication, mock.Anything).Return().Once()
+
+	rr := httptest.NewRecorder()
+	handler := HandleClientAuthenticationPut(database, auditLogger, testDataCipher)
+	handler.ServeHTTP(rr, authenticationPutRequest(t, "7", api.UpdateClientAuthenticationRequest{
+		IsPublic: false, ClientSecret: strings.Repeat("Ab3", 20),
+	}))
+
+	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+	var response api.UpdateClientResponse
+	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &response))
+	assert.Empty(t, response.Client.TokenEndpointAuthMethod)
+	// Read after the writes, under the row they hold, so no switch can commit between the read
+	// and the answer's write.
+	assert.Less(t, callIndex(t, database, "SetClientRememberConsent"), lastCallIndex(t, database, "GetClientById"))
+}
+
+// TestHandleClientUpdatePut_AnswersTheMethodTheLockedRowHolds: a settings save that loaded a
+// self-registered confidential client before another request made it public answers the public
+// client with the row's empty method, as it answers the row's mode, never the method of the copy
+// it loaded (#708 decision 5). The OAuth2-flow and token-settings saves share the helper.
+func TestHandleClientUpdatePut_AnswersTheMethodTheLockedRowHolds(t *testing.T) {
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
+
+	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
+		Return(&record.Client{Id: 7, ClientIdentifier: "target-client", CreatedViaDCR: true,
+			TokenEndpointAuthMethod: "client_secret_post"}, nil).Once()
+	datamocks.ExpectRunInTransaction(database, clientUpdateTx)
+	database.On("AcquireClientRow", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
+	database.On("GetClientById", mock.Anything, clientUpdateTx, int64(7)).
+		Return(&record.Client{Id: 7, ClientIdentifier: "target-client", IsPublic: true, CreatedViaDCR: true,
+			TokenEndpointAuthMethod: ""}, nil).Once()
+	database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
+	stubClientResponseLoads(database)
+	auditLogger.On("Log", mock.Anything, audit.EventUpdatedClientSettings, mock.Anything).Return().Once()
+
+	r := httptest.NewRequest(http.MethodPut, "/api/v1/admin/clients/7",
+		strings.NewReader(`{"clientIdentifier":"target-client","description":"changed","enabled":true}`))
+	r = setTokenContextWithClaims(r, map[string]interface{}{"scope": "authserver:manage"})
+	r = withPathValue(r, "id", "7")
+	rr := httptest.NewRecorder()
+	HandleClientUpdatePut(database, inputvalidation.NewIdentifierValidator(), auditLogger).ServeHTTP(rr, r)
+
+	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+	var response api.UpdateClientResponse
+	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &response))
+	assert.True(t, response.Client.IsPublic)
+	assert.Empty(t, response.Client.TokenEndpointAuthMethod)
+}
+
 // assertNotAttemptedOnClientDatabase fails naming the method, where the strict mock alone would
 // fail naming an unexpected call.
 //
@@ -598,6 +671,18 @@ func callIndex(t *testing.T, database *datamocks.Database, method string) int {
 	t.Helper()
 	for i, call := range database.Calls {
 		if call.Method == method {
+			return i
+		}
+	}
+	t.Fatalf("%s was never called", method)
+	return -1
+}
+
+// lastCallIndex reports the position of the last call to method in the mock's recorded order.
+func lastCallIndex(t *testing.T, database *datamocks.Database, method string) int {
+	t.Helper()
+	for i := len(database.Calls) - 1; i >= 0; i-- {
+		if database.Calls[i].Method == method {
 			return i
 		}
 	}

@@ -138,6 +138,10 @@ func updateClientNotOwningAuthenticationMode(ctx context.Context, database clien
 		// while the client was confidential cannot answer on for a client made public since
 		// (#711 decision 5).
 		client.RememberConsent = current.RememberConsent
+		// UpdateClient never writes the token_endpoint_auth_method a self-registered client is
+		// held to either, and a switch to public committed since the load cleared it: the answer
+		// takes the row's value, as it does the mode (#708 decision 5).
+		client.TokenEndpointAuthMethod = current.TokenEndpointAuthMethod
 
 		client.ApplyPublicClientInvariants()
 
@@ -897,12 +901,28 @@ func HandleClientAuthenticationPut(
 			// a confidential save, writes Remember consent on. In the transaction that writes the
 			// mode, because UpdateClient leaves the column out: written apart, a switch to public
 			// committed between the two would be left with Remember consent on (#711 decision 4).
-			// Safe to rerun after a deadlock: both writes set fixed values.
+			// Safe to rerun after a deadlock: both writes set fixed values, and the read after them
+			// is taken again under the attempt's own row lock.
 			err := database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
 				if err := database.UpdateClient(r.Context(), tx, client); err != nil {
 					return err
 				}
-				return database.SetClientRememberConsent(r.Context(), tx, client.Id, true)
+				if err := database.SetClientRememberConsent(r.Context(), tx, client.Id, true); err != nil {
+					return err
+				}
+				// UpdateClient never writes the token_endpoint_auth_method a self-registered client
+				// is held to, and a switch to public committed after the load at the top of the
+				// request cleared it. The answer reads it from the row the writes above hold rather
+				// than from that copy (#708 decision 5).
+				current, err := database.GetClientById(r.Context(), tx, client.Id)
+				if err != nil {
+					return err
+				}
+				if current == nil {
+					return errs.New("client no longer exists")
+				}
+				client.TokenEndpointAuthMethod = current.TokenEndpointAuthMethod
+				return nil
 			})
 			if err != nil {
 				writeInternalServerError(w, r, errs.Wrap(err, "database error updating client authentication"), "client_id", client.Id)
