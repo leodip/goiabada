@@ -317,7 +317,7 @@ curl -X POST https://auth.example.com/connect/register \
   }'
 ```
 
-It answers 201 with the new `client_id` and, for a confidential client, its `client_secret`. Every field it reads, its answer and its errors are on [Dynamic client registration](/reference/endpoints/dynamic-client-registration/).
+It answers 201 with the new `client_id`, the grant types the client can use, here `authorization_code` and `refresh_token`, and, for a confidential client, its `client_secret`. Every field it reads, its answer and its errors are on [Dynamic client registration](/reference/endpoints/dynamic-client-registration/).
 
 Because nobody has reviewed them, self-registered clients are treated more carefully:
 

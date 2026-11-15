@@ -5,7 +5,9 @@
 // or tos_uri is kept only on a redirect URI's scheme and host, and the answer carries what was kept. OpenID Connect Back-Channel
 // Logout 1.0 section 2.2: a backchannel_logout_uri and its session-required flag are stored and echoed, and a self-registered
 // client's http URI is refused with invalid_client_metadata (#784 decision 10). RFC 9449 section 5.2: dpop_bound_access_tokens
-// is stored and echoed, false when left out, and a value that is not a boolean is refused. Clients made in the admin console are
+// is stored and echoed, false when left out, and a value that is not a boolean is refused. RFC 7591 sections 2.1 and 3.2.1: the
+// answer's grant_types and response_types describe the stored client, whatever the request named, and a registration that would
+// enable no flow, refresh_token alone, is refused with invalid_client_metadata (#708). Clients made in the admin console are
 // covered by ../admin-console/clients/: a duplicate identifier, a new secret, a switch to public.
 import { clientIdFromList, clientUrl, deleteClient } from "../../lib/admin-console";
 import { env } from "../../lib/environment";
@@ -180,6 +182,51 @@ test("dpop_bound_access_tokens is stored and echoed, false when left out, and a 
           expect(notABoolean.body.client_id).toBeUndefined();
         });
       }
+    });
+  } finally {
+    for (const identifier of registered) await deleteClient(page, await clientIdFromList(page, identifier));
+  }
+});
+
+test("the answer's grant_types and response_types describe the client it registered, and refresh_token alone is refused", async ({
+  page,
+  request,
+}) => {
+  const register = async (metadata: Record<string, unknown>) =>
+    readAnswer(
+      await request.post(`${env.authUrl}/connect/register`, {
+        data: { client_name: "e2e grant types", ...metadata },
+        failOnStatusCode: false,
+      }),
+    );
+  const registered: string[] = [];
+  try {
+    await withSettingsRestored(page, "/admin/settings/general", async () => {
+      await fillSettingsForm(page, { dynamicClientRegistrationEnabled: true });
+      await saveSettings(page);
+
+      // The default grant type, whose every redeemed code comes with a refresh token, and a response
+      // type the client cannot use, replaced by the one it can.
+      const byDefault = await register({ redirect_uris: ["https://app.example.com/callback"], response_types: ["token"] });
+      expect(byDefault.status, byDefault.text).toBe(201);
+      registered.push(byDefault.body.client_id as string);
+      expect(byDefault.body.grant_types).toEqual(["authorization_code", "refresh_token"]);
+      expect(byDefault.body.response_types).toEqual(["code"]);
+
+      // The client credentials grant issues no refresh token, and the client has no response type.
+      const machine = await register({ grant_types: ["client_credentials", "refresh_token"] });
+      expect(machine.status, machine.text).toBe(201);
+      registered.push(machine.body.client_id as string);
+      expect(machine.body.grant_types).toEqual(["client_credentials"]);
+      expect(machine.body.response_types).toEqual([]);
+
+      const noFlow = await register({ redirect_uris: ["https://app.example.com/callback"], grant_types: ["refresh_token"] });
+      expect(noFlow.status, noFlow.text).toBe(400);
+      expect(noFlow.body.error).toBe("invalid_client_metadata");
+      expect(noFlow.body.error_description).toBe(
+        "grant_types enables no flow: refresh_token alone cannot get a token. Include authorization_code or client_credentials",
+      );
+      expect(noFlow.body.client_id).toBeUndefined();
     });
   } finally {
     for (const identifier of registered) await deleteClient(page, await clientIdFromList(page, identifier));

@@ -116,7 +116,11 @@ type DynamicClientRegistrationResponse struct {
 	PostLogoutRedirectURIs  []string `json:"post_logout_redirect_uris,omitempty"`
 	TokenEndpointAuthMethod string   `json:"token_endpoint_auth_method"`
 	GrantTypes              []string `json:"grant_types"`
-	ClientName              string   `json:"client_name,omitempty"`
+	// ResponseTypes is always present, empty for a client without the authorization code flow:
+	// left out, it would mean RFC 7591 section 2's default, code, which such a client cannot use
+	// (#708 decision 6).
+	ResponseTypes []string `json:"response_types"`
+	ClientName    string   `json:"client_name,omitempty"`
 	// PolicyURI and TOSURI are what was stored, so a value that was dropped is absent (RFC 7591
 	// section 3.2.1 lets the server reject or replace a requested value).
 	PolicyURI string `json:"policy_uri,omitempty"`

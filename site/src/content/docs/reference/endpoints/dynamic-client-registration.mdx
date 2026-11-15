@@ -41,7 +41,8 @@ That's dynamic client registration (DCR), `POST /connect/register`, as [RFC 7591
      "client_secret_expires_at": 0,
      "redirect_uris": ["http://127.0.0.1/callback"],
      "token_endpoint_auth_method": "none",
-     "grant_types": ["authorization_code"],
+     "grant_types": ["authorization_code", "refresh_token"],
+     "response_types": ["code"],
      "client_name": "My CLI tool"
    }
    ```
@@ -61,7 +62,7 @@ The body is a JSON object. The auth server reads ten fields and ignores every ot
 | `redirect_uris` | Where the auth server may send the browser back. Required when the client uses the authorization code flow. See [redirect URIs](#redirect-uris) below. |
 | `post_logout_redirect_uris` | Where the auth server may send the browser back after a [sign-out](/reference/endpoints/logout/): the client's [sign-out redirect URIs](/concepts/clients/#sign-out-redirect-uris). Optional. They follow the same rules as `redirect_uris`, below. |
 | `token_endpoint_auth_method` | `none` makes a public client, with no secret. `client_secret_basic`, the default, or `client_secret_post` makes a confidential one, with a secret. |
-| `grant_types` | Any of `authorization_code`, the default, `refresh_token` and `client_credentials`. A public client can't ask for `client_credentials`, and the [legacy flows](/legacy-flows/implicit/) can't be asked for at all: the client is registered with both off, whatever the global settings under **Admin**, **General**. |
+| `grant_types` | Any of `authorization_code`, the default, `refresh_token` and `client_credentials`, with at least one of `authorization_code` and `client_credentials`. A public client can't ask for `client_credentials`, and the [legacy flows](/legacy-flows/implicit/) can't be asked for at all: the client is registered with both off, whatever the global settings under **Admin**, **General**. |
 | `client_name` | The name the consent screen shows, up to 100 characters, the bound of the client's description it's stored as, with no `<` or `>`. |
 | `policy_uri` | The app's privacy policy, which the consent screen links. Kept only on one of the client's hosts: see [Privacy policy and terms of service](#privacy-policy-and-terms-of-service) below. |
 | `tos_uri` | The app's terms of service, which the consent screen links. Kept only on one of the client's hosts, as `policy_uri` is. |
@@ -69,7 +70,7 @@ The body is a JSON object. The auth server reads ten fields and ignores every ot
 | `backchannel_logout_session_required` | `true` when the app needs the session identifier, `sid`, in every logout token it's sent. Optional, `false` by default, and stored only with a `backchannel_logout_uri`. |
 | `dpop_bound_access_tokens` | `true` when the app always uses [DPoP](/concepts/dpop/): the client is registered to [require DPoP for token requests](/concepts/clients/#require-dpop-for-token-requests), so a token request without a proof is refused. Optional, `false` by default. |
 
-`refresh_token` is accepted and sets nothing of its own: a client that may use the authorization code flow can redeem the refresh tokens it gets.
+`refresh_token` sets nothing of its own: a client with the authorization code flow gets a refresh token with every code it redeems, whether it asked for `refresh_token` or not. On its own, `refresh_token` enables no flow, so a registration asking for nothing else is refused.
 
 A body larger than 64 KiB is refused as one that can't be read.
 
@@ -123,7 +124,8 @@ A registration is answered `201 Created`, with `Cache-Control: no-store`, and th
 | `redirect_uris` | The redirect URIs, as registered |
 | `post_logout_redirect_uris` | The sign-out redirect URIs, as registered, when any were sent |
 | `token_endpoint_auth_method` | The method, with the default filled in |
-| `grant_types` | The grant types, with the default filled in |
+| `grant_types` | The grant types the client can use, whatever the request listed: `authorization_code` and `refresh_token` for a client with the authorization code flow, and `client_credentials` for one with that grant |
+| `response_types` | Always sent: `["code"]` for a client with the authorization code flow, and `[]` for one without it, whatever the request listed |
 | `client_name` | The name, when one was sent |
 | `policy_uri` | The privacy policy URL, when one was sent and [kept](#privacy-policy-and-terms-of-service) |
 | `tos_uri` | The terms of service URL, when one was sent and [kept](#privacy-policy-and-terms-of-service) |
@@ -149,7 +151,7 @@ Cache-Control: no-store
 | `error` | Status | Why |
 |---|---|---|
 | `access_denied` | 403 | DCR is off: "Dynamic client registration is not enabled" |
-| `invalid_client_metadata` | 400 | The body isn't JSON or is too large, or a field holds a value the auth server doesn't take: an unknown `token_endpoint_auth_method`, a grant type it doesn't take, `implicit` and `password` included, `client_credentials` on a public client, a `client_name` too long or holding `<` or `>`, a sign-out redirect URI that's malformed, refused for this kind of client, too long, listed twice, or one too many, a [back-channel logout URI](#back-channel-logout) the auth server can't use, or a `backchannel_logout_session_required` or `dpop_bound_access_tokens` that isn't `true` or `false` |
+| `invalid_client_metadata` | 400 | The body isn't JSON or is too large, or a field holds a value the auth server doesn't take: an unknown `token_endpoint_auth_method`, a grant type it doesn't take, `implicit` and `password` included, `client_credentials` on a public client, `grant_types` with neither `authorization_code` nor `client_credentials`, a `client_name` too long or holding `<` or `>`, a sign-out redirect URI that's malformed, refused for this kind of client, too long, listed twice, or one too many, a [back-channel logout URI](#back-channel-logout) the auth server can't use, or a `backchannel_logout_session_required` or `dpop_bound_access_tokens` that isn't `true` or `false` |
 | `invalid_redirect_uri` | 400 | A redirect URI is missing, malformed, refused for this kind of client, too long, listed twice, or one too many |
 | `server_error` | 500 | The auth server couldn't save the client. Nothing was registered. |
 

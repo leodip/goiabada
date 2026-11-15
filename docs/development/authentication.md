@@ -376,6 +376,10 @@ Programmatic client registration for MCP clients, native apps, etc.
 - Disabled by default. Enable via `Settings.DynamicClientRegistrationEnabled`
 - Creates public or confidential clients based on `token_endpoint_auth_method`
 - Rate limited. Returns client_id and client_secret (if confidential)
+- The answer's `grant_types` and `response_types` are built from the stored client, not the
+  request (`registeredGrantTypes`, `registeredResponseTypes`), and the audit entry records the same
+  grant list. A registration naming neither `authorization_code` nor `client_credentials` is
+  refused `invalid_client_metadata` (#708)
 - Implementation: `handler_dynamic_client_registration.go`
 
 ## Authentication Flow (Authorization Code)

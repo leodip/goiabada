@@ -71,6 +71,7 @@ func TestDCRWireTypes_JSONRepresentation(t *testing.T) {
 				PostLogoutRedirectURIs:           []string{"https://client.example.org/signed-out"},
 				TokenEndpointAuthMethod:          "client_secret_basic",
 				GrantTypes:                       []string{"authorization_code", "refresh_token"},
+				ResponseTypes:                    []string{"code"},
 				ClientName:                       "Example Client",
 				PolicyURI:                        "https://client.example.org/privacy",
 				TOSURI:                           "https://client.example.org/terms",
@@ -87,6 +88,7 @@ func TestDCRWireTypes_JSONRepresentation(t *testing.T) {
 				`"post_logout_redirect_uris":["https://client.example.org/signed-out"],` +
 				`"token_endpoint_auth_method":"client_secret_basic",` +
 				`"grant_types":["authorization_code","refresh_token"],` +
+				`"response_types":["code"],` +
 				`"client_name":"Example Client",` +
 				`"policy_uri":"https://client.example.org/privacy",` +
 				`"tos_uri":"https://client.example.org/terms",` +
@@ -108,7 +110,24 @@ func TestDCRWireTypes_JSONRepresentation(t *testing.T) {
 			newValue: func() any { return &DynamicClientRegistrationResponse{} },
 			literal: `{"client_id":"public-client-id","client_id_issued_at":0,` +
 				`"client_secret_expires_at":0,"token_endpoint_auth_method":"","grant_types":null,` +
-				`"dpop_bound_access_tokens":false}`,
+				`"response_types":null,"dpop_bound_access_tokens":false}`,
+		},
+		{
+			// response_types is present even when empty: left out, it would mean RFC 7591 section
+			// 2's default, code, which a client credentials client cannot use (#708 decision 6).
+			name: "DynamicClientRegistrationResponse, client credentials client",
+			want: &DynamicClientRegistrationResponse{
+				ClientID:                "cc-client-id",
+				ClientSecret:            "cc-client-secret",
+				TokenEndpointAuthMethod: "client_secret_basic",
+				GrantTypes:              []string{"client_credentials"},
+				ResponseTypes:           []string{},
+			},
+			newValue: func() any { return &DynamicClientRegistrationResponse{} },
+			literal: `{"client_id":"cc-client-id","client_secret":"cc-client-secret",` +
+				`"client_id_issued_at":0,"client_secret_expires_at":0,` +
+				`"token_endpoint_auth_method":"client_secret_basic","grant_types":["client_credentials"],` +
+				`"response_types":[],"dpop_bound_access_tokens":false}`,
 		},
 		{
 			// RFC 7591 section 3.2.2: error is REQUIRED, error_description OPTIONAL.
