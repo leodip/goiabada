@@ -153,7 +153,11 @@ func HandleDynamicClientRegistrationPost(
 			// written here, at creation; SetClientDPoPBoundAccessTokens is its only other writer.
 			DPoPBoundAccessTokens: bool(req.DPoPBoundAccessTokens),
 			IsPublic:              isPublic,
-			Enabled:               true,
+			// The method a confidential client registered, which it is held to; empty for a public
+			// client, which sends no secret (#708 decision 3). Written here, at creation; the
+			// switch to public is its only other writer, and clears it.
+			TokenEndpointAuthMethod: registeredTokenEndpointAuthMethod(req.TokenEndpointAuthMethod),
+			Enabled:                 true,
 			// A self-registered client is one nobody here has vetted, and RFC 7591 section 5
 			// requires all of its metadata be treated as self-asserted. Consent is the only
 			// control that binds such a client's identity to the user's authority, so it is on
@@ -246,7 +250,10 @@ func HandleDynamicClientRegistrationPost(
 			"client_identifier": client.ClientIdentifier,
 			"grant_types":       grantTypes,
 			"is_public":         isPublic,
-			"ip":                middleware.ClientIP(r),
+			// The answer's method, none for a public client: the audit log keeps what a client
+			// registered as after a switch to public clears it from the client (#708 decision 7).
+			"token_endpoint_auth_method": req.TokenEndpointAuthMethod,
+			"ip":                         middleware.ClientIP(r),
 		})
 
 		// 12. Build response (RFC 7591 §3.2.1)
@@ -620,6 +627,16 @@ func validateRedirectURI(uri string, isPublic bool, field dcrURIField) error {
 // the human reading them, which is the only thing the prefix is for (#108, decision 16).
 func generateDCRClientIdentifier() string {
 	return "dcr_" + uuid.New()
+}
+
+// registeredTokenEndpointAuthMethod is the token_endpoint_auth_method a registration stores: the
+// method a confidential client registered, and the empty string for a public one, the value of a
+// client not held to one method, since is_public already says it sends no secret (#708 decision 3).
+func registeredTokenEndpointAuthMethod(method string) string {
+	if method == "none" {
+		return ""
+	}
+	return method
 }
 
 // registeredGrantTypes is the registration answer's grant_types: what the stored client can do, in

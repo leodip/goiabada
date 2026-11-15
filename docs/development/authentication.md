@@ -380,6 +380,10 @@ Programmatic client registration for MCP clients, native apps, etc.
   request (`registeredGrantTypes`, `registeredResponseTypes`), and the audit entry records the same
   grant list. A registration naming neither `authorization_code` nor `client_credentials` is
   refused `invalid_client_metadata` (#708)
+- A confidential registration stores its method in `clients.token_endpoint_auth_method`
+  (`client_secret_basic` or `client_secret_post`); every other client holds the empty string. The
+  whole-row `UpdateClient` never writes it, and `SetClientPublic`'s transition clears it. The audit
+  entry records the answer's method, `none` for a public client (#708)
 - Implementation: `handler_dynamic_client_registration.go`
 
 ## Authentication Flow (Authorization Code)

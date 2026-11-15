@@ -154,3 +154,75 @@ func TestHandleDynamicClientRegistrationPost_RefusesARegistrationThatEnablesNoFl
 		})
 	}
 }
+
+// A confidential registration stores the token_endpoint_auth_method it registered, the default
+// client_secret_basic when it named none, and a public one stores the empty string, the value of a
+// client not held to one method (#708 decision 3). The audit entry records the answer's method,
+// none for a public client (#708 decision 7). Every expected value is a literal.
+func TestHandleDynamicClientRegistrationPost_StoresTheRegisteredMethod(t *testing.T) {
+	tests := []struct {
+		name        string
+		body        string
+		wantStored  string
+		wantAudited string
+	}{
+		{
+			name:        "no method named",
+			body:        `{"redirect_uris":["https://client.example.com/cb"]}`,
+			wantStored:  "client_secret_basic",
+			wantAudited: "client_secret_basic",
+		},
+		{
+			name:        "client_secret_basic",
+			body:        `{"redirect_uris":["https://client.example.com/cb"],"token_endpoint_auth_method":"client_secret_basic"}`,
+			wantStored:  "client_secret_basic",
+			wantAudited: "client_secret_basic",
+		},
+		{
+			name:        "client_secret_post",
+			body:        `{"redirect_uris":["https://client.example.com/cb"],"token_endpoint_auth_method":"client_secret_post"}`,
+			wantStored:  "client_secret_post",
+			wantAudited: "client_secret_post",
+		},
+		{
+			name:        "client_secret_post with client_credentials",
+			body:        `{"grant_types":["client_credentials"],"token_endpoint_auth_method":"client_secret_post"}`,
+			wantStored:  "client_secret_post",
+			wantAudited: "client_secret_post",
+		},
+		{
+			name:        "none",
+			body:        `{"redirect_uris":["http://127.0.0.1:8765/cb"],"token_endpoint_auth_method":"none"}`,
+			wantStored:  "",
+			wantAudited: "none",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+
+			var stored *record.Client
+			var details map[string]interface{}
+			datamocks.ExpectRunInTransaction(database, dcrTx)
+			database.On("CreateClient", mock.Anything, dcrTx, mock.Anything).
+				Run(func(args mock.Arguments) { stored = args.Get(2).(*record.Client) }).Return(nil).Once()
+			database.On("CreateRedirectURI", mock.Anything, dcrTx, mock.Anything).Return(nil).Maybe()
+			auditLogger.On("Log", mock.Anything, audit.EventDynamicClientRegistration, mock.Anything).
+				Run(func(args mock.Arguments) { details = args.Get(2).(map[string]interface{}) }).Return().Once()
+
+			req := httptest.NewRequest(http.MethodPost, "/connect/register", bytes.NewReader([]byte(tc.body)))
+			req.Header.Set("Content-Type", "application/json")
+			req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{Id: 1, DynamicClientRegistrationEnabled: true}))
+			rr := httptest.NewRecorder()
+			HandleDynamicClientRegistrationPost(database, auditLogger, testDataCipher).ServeHTTP(rr, req)
+
+			require.Equal(t, http.StatusCreated, rr.Code, rr.Body.String())
+			require.NotNil(t, stored)
+			assert.Equal(t, tc.wantStored, stored.TokenEndpointAuthMethod, "the record passed to the client insert")
+			assert.Equal(t, tc.wantAudited, details["token_endpoint_auth_method"], "the audit entry records the answer's method")
+			assert.Equal(t, tc.wantAudited, decodeDCRResponse(t, rr).TokenEndpointAuthMethod)
+		})
+	}
+}

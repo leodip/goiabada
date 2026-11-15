@@ -54,15 +54,15 @@ func TestMigration000090_ClientBrand(t *testing.T) {
 	require.NoErrorf(t, h.Migrator.Migrate(ctx, clientBrand000090), "apply 000090 on %s", dbType())
 	assertClientBrandShape000090(t, h, before, "after apply")
 
-	// 2.
+	// 2. The data layer's client and brand reads name the columns of later migrations, so these are
+	// read at head.
+	if upErr := h.Migrator.Up(ctx); upErr != nil && !errors.Is(upErr, migrator.ErrNoChange) {
+		require.NoErrorf(t, upErr, "migrate to head on %s", dbType())
+	}
 	predating, err := h.DB.GetClientByClientIdentifier(ctx, nil, existing)
 	require.NoError(t, err)
 	require.NotNil(t, predating)
 	assert.Equalf(t, sql.NullInt64{}, predating.BrandId, "2. a client that predates 000090 has no brand of its own on %s", dbType())
-	// The data layer's brand reads name the columns of later migrations, so this one is read at head.
-	if upErr := h.Migrator.Up(ctx); upErr != nil && !errors.Is(upErr, migrator.ErrNoChange) {
-		require.NoErrorf(t, upErr, "migrate to head on %s", dbType())
-	}
 	drawnIn, err := h.DB.GetClientPageBrand(ctx, nil, existing)
 	require.NoError(t, err)
 	require.NotNilf(t, drawnIn, "2. a client that predates 000090 is drawn in the default on %s", dbType())
