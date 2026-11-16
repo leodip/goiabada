@@ -275,12 +275,12 @@ The logo is public, at `GET /client/logo/{clientIdentifier}`, with no sign-in, e
 The client's brand draws:
 
 - every page of a sign-in to it, the form_post page that hands your app the answer, and the error pages the auth server shows once it knows the client;
-- registration, forgot password, password reset and activation, when the user reached them from the client's sign-in page and is still in the same browser;
+- registration, forgot password, password reset, activation and the legal documents the sign-in links, when the user reached them from the client's sign-in and is still in the same browser;
 - a [sign-out](/reference/endpoints/logout/) that names the client, with an `id_token_hint` the auth server confirms or, without one, with `client_id`.
 
 On these pages the brand draws its whole [kit](/guides/customize-the-pages-and-emails/#the-brand-kit): its logo above the client's own, its favicon, background image, font and corners.
 
-Every other page is drawn in the default brand: a link from an email opened in another browser, an error shown before the auth server knows the client, a legal document, and any page that belongs to no sign-in or sign-out. A client that [registers itself](#self-registered-clients) starts on the default brand, and its registration can't choose one. Deleting a brand moves the clients that use it to the default brand.
+Every other page is drawn in the default brand: a link from an email opened in another browser, an error shown before the auth server knows the client, a legal document opened from anywhere else, and any page that belongs to no sign-in or sign-out. A client that [registers itself](#self-registered-clients) starts on the default brand, and its registration can't choose one. Deleting a brand moves the clients that use it to the default brand.
 
 Through the Admin API, set it with [`PUT /api/v1/admin/clients/{id}/brand`](/reference/api/admin/operations/updateclientbrand/) and `brandId`, a brand's id or `null` for the default brand. Each change leaves an `updated_client_brand` entry in the [audit log](/concepts/audit-log/).
 

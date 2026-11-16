@@ -89,7 +89,9 @@ test("the step lists what is owed; an unticked box is refused; Accept goes on, a
   await expect(box).toHaveCount(1);
   await expect(box).not.toBeChecked();
   const docLink = own.locator("form").getByRole("link", { name: `${doc.title} (opens in a new tab)`, exact: true });
-  await expect(docLink).toHaveAttribute("href", `/legal/${doc.shortName}`);
+  // The link names the sign-in, so the document is drawn in the app's brand (#812).
+  const ceremony = await own.locator('form input[name="ceremonyId"]').inputValue();
+  await expect(docLink).toHaveAttribute("href", `/legal/${doc.shortName}?${new URLSearchParams({ ceremony })}`);
   await expect(docLink).toHaveAttribute("target", "_blank");
 
   await accept(own);

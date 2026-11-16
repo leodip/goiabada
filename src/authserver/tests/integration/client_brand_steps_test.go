@@ -6,10 +6,12 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"strconv"
 	"testing"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/otp/otptest"
@@ -48,6 +50,57 @@ func TestSignInPages_TheLegalAcceptanceStepIsDrawnInTheClientsBrand(t *testing.T
 			defer func() { _ = again.Body.Close() }()
 			require.Equal(t, http.StatusOK, again.StatusCode, "the step is shown again")
 			assertDrawnInBrand(t, again, tc.brand, tc.dataTheme)
+		})
+	}
+}
+
+// A legal document the acceptance step links, opened in the browser holding the sign-in, is drawn in
+// the brand of the client the sign-in is for, and so is each version its page links, whose links name
+// the sign-in too. The same link in another browser, a sign-in the browser does not hold, an id of
+// the wrong shape, or none draws it in the default brand, and is never an error (#812 decision 4).
+func TestLegalDocumentPages_KeepTheClientsBrandWhileTheBrowserHoldsTheSignIn(t *testing.T) {
+	defaultBrand := makeDefaultBrand(t, record.BrandAppearanceDark, "plum")
+	branded := newLegalAcceptanceFixture(t)
+	clientBrand := giveClientBrand(t, branded.client, record.BrandAppearanceLight, "avocado")
+	_, shortName := branded.mustAcceptFor(t, "brand", "Brand terms")
+	browser := createHttpClient(t)
+
+	step, _ := toStep(t, browser, branded.signInToCompleted(t, browser))
+	ceremonyId := getCeremonyIdFromPage(t, step)
+	_, documents := readStep(t, step)
+	_ = step.Body.Close()
+	named := "?" + url.Values{ceremony.QueryParameter: {ceremonyId}}.Encode()
+	documentPath := "/legal/" + shortName
+	versionPath := documentPath + "/versions/1"
+	require.Len(t, documents, 1)
+	require.Equal(t, documentPath+named, documents[0].href, "the step's link names the sign-in")
+
+	for _, tc := range []struct {
+		name      string
+		browser   *http.Client
+		target    string
+		brand     *record.Brand
+		dataTheme string
+		version   string
+	}{
+		{"the document, in the browser holding the sign-in", browser, documentPath + named, clientBrand, "light", versionPath + named},
+		{"a version it links", browser, versionPath + named, clientBrand, "light", versionPath + named},
+		{"the same link in another browser, which still names the sign-in", createHttpClient(t), documentPath + named,
+			defaultBrand, "dark", versionPath + named},
+		{"a sign-in the browser does not hold", browser, withCeremonyParameter(t, documentPath, ceremony.NewId()), defaultBrand, "dark", ""},
+		{"an id of the wrong shape, not echoed", browser, documentPath + named + "x", defaultBrand, "dark", versionPath},
+		{"no sign-in named", browser, documentPath, defaultBrand, "dark", versionPath},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			page := loadPage(t, tc.browser, appConfig.AuthServer.BaseURL+tc.target)
+			defer func() { _ = page.Body.Close() }()
+			require.Equal(t, http.StatusOK, page.StatusCode)
+			doc := parseHTMLResponse(t, page)
+			assertDrawnInBrand(t, page, tc.brand, tc.dataTheme)
+			if tc.version != "" {
+				assert.Equal(t, map[string]string{tc.version: "Version 1"}, linksIn(doc, "#legal-document-versions"),
+					"the link to its version")
+			}
 		})
 	}
 }

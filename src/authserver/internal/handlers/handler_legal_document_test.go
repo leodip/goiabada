@@ -6,9 +6,11 @@ import (
 	"html/template"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	datamocks "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	handlersmocks "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -49,6 +51,12 @@ func legalDocumentRequest(shortName, version string) *http.Request {
 // servedBind serves the page over the document and versions given and answers what it rendered.
 func servedBind(t *testing.T, doc *record.LegalDocument, versions []record.LegalDocumentVersion, version string) map[string]interface{} {
 	t.Helper()
+	return servedBindFor(t, doc, versions, legalDocumentRequest(doc.ShortName, version))
+}
+
+// servedBindFor serves req over the document and versions given and answers what it rendered.
+func servedBindFor(t *testing.T, doc *record.LegalDocument, versions []record.LegalDocumentVersion, req *http.Request) map[string]interface{} {
+	t.Helper()
 	database := datamocks.NewDatabase(t)
 	database.EXPECT().GetLegalDocumentByShortName(mock.Anything, (*sql.Tx)(nil), doc.ShortName).Return(doc, nil)
 	database.EXPECT().GetLegalDocumentVersionsByLegalDocumentId(mock.Anything, (*sql.Tx)(nil), doc.Id).Return(versions, nil)
@@ -57,7 +65,7 @@ func servedBind(t *testing.T, doc *record.LegalDocument, versions []record.Legal
 	pageRenderer.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/no_menu_layout.html", "/legal_document.html", mock.Anything).
 		Run(func(args mock.Arguments) { bind = args.Get(4).(map[string]interface{}) }).Return(nil).Once()
 
-	HandleLegalDocumentGet(pageRenderer, database).ServeHTTP(httptest.NewRecorder(), legalDocumentRequest(doc.ShortName, version))
+	HandleLegalDocumentGet(pageRenderer, database).ServeHTTP(httptest.NewRecorder(), req)
 	require.NotNil(t, bind)
 	return bind
 }
@@ -74,6 +82,34 @@ func TestHandleLegalDocumentGet_TheCurrentVersion(t *testing.T) {
 	assert.Equal(t, []legalDocumentVersionLink{{Number: 1}, {Number: 2}}, bind["versions"])
 	assert.Equal(t, "privacy", bind["shortName"])
 	assert.Equal(t, true, bind["layoutWide"])
+	assert.Contains(t, bind, "ceremonyId")
+	assert.Empty(t, bind["ceremonyId"], "a page naming no sign-in")
+}
+
+// A page reached from a sign-in names it in its URL, and its links to the document's versions name it
+// too, so each is drawn in the brand LinkedSignInPageClient draws the page in (#812). An id of the
+// wrong shape is not echoed, and a page naming none binds none.
+func TestHandleLegalDocumentGet_TheSignInItsURLNamesIsCarriedOnItsLinks(t *testing.T) {
+	signIn := ceremony.NewId()
+	for _, tc := range []struct {
+		name  string
+		query string
+		want  string
+	}{
+		{"a well-formed id", "?ceremony=" + signIn, signIn},
+		{"an id of the wrong shape", "?ceremony=" + signIn + "x", ""},
+		{"a script", "?ceremony=%3Cscript%3E", ""},
+		{"the form field's name is not the parameter", "?ceremonyId=" + signIn, ""},
+		{"none", "", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			doc, versions := privacyNotice()
+			req := legalDocumentRequest(doc.ShortName, "1")
+			req.URL.RawQuery = strings.TrimPrefix(tc.query, "?")
+			bind := servedBindFor(t, doc, versions, req)
+			assert.Equal(t, tc.want, bind["ceremonyId"])
+		})
+	}
 }
 
 func TestHandleLegalDocumentGet_AnEarlierVersion(t *testing.T) {

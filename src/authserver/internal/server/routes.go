@@ -121,16 +121,16 @@ func (s *Server) initRoutes(branches appBranches) {
 
 	pages.NotFound(handlers.HandleNotFoundGet(httpHelper))
 	pages.Get("/", handlers.HandleIndexGet(adminConsoleBaseURL))
+	// The pages a sign-in links to, forgot password, registration, activation, password reset and
+	// the legal documents, are drawn in the brand of the client of the sign-in their URL names, while
+	// the browser holds it, from ahead of every guard and limiter on them, so a refusal those write is
+	// drawn in it too (#812 decisions 4 and 9).
+	linkedSignInPageClient := middleware.LinkedSignInPageClient(ceremonyStore)
 	// A legal document's public pages, which need no sign-in: its current version, and each
 	// version by number (#622 decision 5).
 	legalDocumentPage := handlers.HandleLegalDocumentGet(httpHelper, s.database)
-	pages.Get("/legal/{shortName}", legalDocumentPage)
-	pages.Get("/legal/{shortName}/versions/{version}", legalDocumentPage)
-	// The pages a sign-in links to, forgot password, registration, activation and password reset, are
-	// drawn in the brand of the client of the sign-in their URL names, while the browser holds it, from
-	// ahead of every guard and limiter on them, so a refusal those write is drawn in it too (#812
-	// decisions 4 and 9).
-	linkedSignInPageClient := middleware.LinkedSignInPageClient(ceremonyStore)
+	pages.With(linkedSignInPageClient).Get("/legal/{shortName}", legalDocumentPage)
+	pages.With(linkedSignInPageClient).Get("/legal/{shortName}/versions/{version}", legalDocumentPage)
 	// The email check runs ahead of the limiter, so a request refused for email being off spends
 	// no budget and is never answered 429 (#542).
 	pages.With(linkedSignInPageClient, accounthandlers.ForgotPasswordRequiresEmail(httpHelper)).Get(emaillinks.ForgotPasswordPath, accounthandlers.HandleForgotPasswordGet(httpHelper, adminConsoleBaseURL))

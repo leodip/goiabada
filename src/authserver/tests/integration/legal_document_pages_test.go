@@ -199,25 +199,28 @@ func TestLegalDocumentLinks_TheRegistrationFormLinksTheDocumentsWhereItCollectsT
 	ceremonyId := resp.Request.URL.Query().Get(ceremony.QueryParameter)
 	_ = resp.Body.Close()
 	require.NotEmpty(t, ceremonyId)
-	registerURL := appConfig.AuthServer.BaseURL + "/account/register?" + url.Values{ceremony.QueryParameter: {ceremonyId}}.Encode()
+	named := "?" + url.Values{ceremony.QueryParameter: {ceremonyId}}.Encode()
+	registerURL := appConfig.AuthServer.BaseURL + "/account/register" + named
 
 	resp = loadPage(t, browser, registerURL)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	page := parseHTMLResponse(t, resp)
 	_ = resp.Body.Close()
 	assert.Equal(t, map[string]string{
-		"/legal/" + allApps: "Everyone's terms",
-		"/legal/" + own:     "The app's privacy notice",
-	}, linksIn(page, "form #legal-documents"), "inside the form, the all-apps documents and the app's own, not another app's")
+		"/legal/" + allApps + named: "Everyone's terms",
+		"/legal/" + own + named:     "The app's privacy notice",
+	}, linksIn(page, "form #legal-documents"), "inside the form, the all-apps documents and the app's own, not another "+
+		"app's, each naming the sign-in so its page is drawn in the app's brand (#812)")
 
-	// The same link in a browser that does not hold that sign-in names no app.
+	// The same link in a browser that does not hold that sign-in names no app. Its links still name
+	// the sign-in, which the page echoes without reading it.
 	resp = loadPage(t, createHttpClient(t), registerURL)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	page = parseHTMLResponse(t, resp)
 	_ = resp.Body.Close()
 	formLinks := linksIn(page, "form #legal-documents")
-	assert.Contains(t, formLinks, "/legal/"+allApps)
-	assert.NotContains(t, formLinks, "/legal/"+own, "a sign-in the browser does not hold")
+	assert.Contains(t, formLinks, "/legal/"+allApps+named)
+	assert.NotContains(t, formLinks, "/legal/"+own+named, "a sign-in the browser does not hold")
 
 	// Registration reached from anywhere else links the all-apps documents.
 	resp = loadPage(t, createHttpClient(t), appConfig.AuthServer.BaseURL+"/account/register")

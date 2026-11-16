@@ -34,15 +34,18 @@ test("the registration form links the documents for all apps, and the app's own 
     await expect(user).toHaveTitle(/^Create an account – /);
     const linked = user.locator("form #legal-documents");
     await expect(linked).toContainText("Before you create your account, read:");
-    await expect(linked.getByRole("link", { name: everyone.title })).toHaveAttribute("href", `/legal/${everyone.shortName}`);
-    await expect(linked.getByRole("link", { name: own.title })).toHaveAttribute("href", `/legal/${own.shortName}`);
+    // Each link names the sign-in, so the document is drawn in the app's brand (#812).
+    const named = `?${new URLSearchParams({ ceremony: new URL(user.url()).searchParams.get("ceremony") ?? "" })}`;
+    expect(named, "the page names the sign-in").not.toBe("?ceremony=");
+    await expect(linked.getByRole("link", { name: everyone.title })).toHaveAttribute("href", `/legal/${everyone.shortName}${named}`);
+    await expect(linked.getByRole("link", { name: own.title })).toHaveAttribute("href", `/legal/${own.shortName}${named}`);
     await context.close();
 
     // Reached from anywhere else, it names no app.
     const { context: other, page: visitor } = await userBrowser(browser);
     await visitor.goto(registerUrl);
     const elsewhere = visitor.locator("form #legal-documents");
-    await expect(elsewhere.getByRole("link", { name: everyone.title })).toBeVisible();
+    await expect(elsewhere.getByRole("link", { name: everyone.title })).toHaveAttribute("href", `/legal/${everyone.shortName}`);
     await expect(elsewhere.getByRole("link", { name: own.title })).toHaveCount(0);
     await other.close();
   });
