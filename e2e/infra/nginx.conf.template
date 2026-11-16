@@ -8,6 +8,8 @@ server {
     http2 on;
     listen [::]:443 ssl;
     server_name __AUTH_HOST__;
+    # The largest upload the servers take, a profile picture of 3 MiB, over Nginx's default of 1 MiB.
+    client_max_body_size 4m;
 
     ssl_certificate /etc/letsencrypt/live/__CERT_NAME__/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/__CERT_NAME__/privkey.pem;
@@ -33,6 +35,8 @@ server {
     http2 on;
     listen [::]:443 ssl;
     server_name __ADMIN_HOST__;
+    # The largest upload the servers take, a profile picture of 3 MiB, over Nginx's default of 1 MiB.
+    client_max_body_size 4m;
 
     ssl_certificate /etc/letsencrypt/live/__CERT_NAME__/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/__CERT_NAME__/privkey.pem;
