@@ -8,12 +8,13 @@
 // alone, since the default brand and the console's own client's brand are what every page is drawn
 // in, and puts back what it found. The console's own client given a brand with a background image and
 // custom CSS draws both on each of the console's card pages, home, sign-out, the page refusing a user
-// who is no administrator and not found, and the background on no Account page; making a brand the
+// who is no administrator, not found and the page saying an account is deleted, whose notice is drawn
+// in the brand too, and the background on no Account page; making a brand the
 // default leaves an audit event naming both brands; and the default brand renamed is named so
 // wherever the console offers it.
 import type { Browser, Page } from "@playwright/test";
 import { expect, test } from "../../../lib/fixtures";
-import { clientBrandChoice, clientIdFromList, expectRefusal, setClientBrand } from "../../../lib/admin-console";
+import { clientBrandChoice, clientIdFromList, confirmDialog, expectRefusal, setClientBrand } from "../../../lib/admin-console";
 import {
   brandClientCounts,
   brandUrl,
@@ -28,6 +29,7 @@ import {
   fillBrandForm,
   kitFiles,
   listBrands,
+  mailLook,
   makeBrandDefault,
   pageBackgrounds as backgrounds,
   pageBrandStylesheets,
@@ -47,6 +49,7 @@ import { openSignIn } from "../../../lib/browser-sign-in";
 import { env } from "../../../lib/environment";
 import { signInToConsole } from "../../../lib/console-user";
 import { emailTemplateUrl } from "../../../lib/email-templates";
+import { waitForMail } from "../../../lib/mailpit";
 import { expectNewestAuditEvent } from "../../../lib/sessions";
 import { browserSignInClient } from "../../../lib/test-clients";
 import { uniqueIdentifier } from "../../../lib/unique";
@@ -376,10 +379,11 @@ async function consoleCardLook(page: Page) {
 test("the admin console's own client given a brand with a background and custom CSS draws both on each of the console's card pages, and no background on its Account pages", async ({
   page,
   browser,
+  request,
   users,
 }) => {
   const consoleClient = await clientIdFromList(page, "admin-console-client");
-  const user = await users.create();
+  const user = await users.create({ emailVerified: true });
   const outlined = "rgb(18, 52, 86)";
 
   await withBrand(page, { appearance: "light", theme: "plum" }, async (brand) => {
@@ -411,6 +415,19 @@ test("the admin console's own client given a brand with a background and custom 
         await own.goto(`${env.adminUrl}/auth/logout`);
         await expect(own.getByRole("button", { name: "Sign out", exact: true })).toBeVisible();
         expect(await consoleCardLook(own), "sign out").toEqual(want("console-sign-out"));
+
+        // The user deletes their account: the page saying so is a card page too, and the notice the
+        // deletion sends, through the Account API, is drawn in the brand.
+        await own.goto(`${env.adminUrl}/account/delete`);
+        await own.getByLabel("Password", { exact: true }).fill(user.password);
+        await own.getByRole("button", { name: "Delete my account" }).click();
+        await confirmDialog(own, "This can't be undone.");
+        user.markDeleted();
+        await expect(own).toHaveURL(`${env.adminUrl}/account/deleted`);
+        expect(await consoleCardLook(own), "account deleted").toEqual(want("account-deleted"));
+        const notice = await waitForMail(request, user.email);
+        expect(notice.subject).toBe("Your account was deleted");
+        expect(mailLook(notice.html), "the console's own client's brand, Plum light").toMatchObject({ canvas: "#f6f4f7", colorScheme: "light" });
       } finally {
         await context.close();
       }

@@ -7,7 +7,7 @@
 // which changes every console page, is brand.system.ts's. Pages that belong to no client are drawn in
 // the default brand in a browser holding the client's sign-in, and a legal document its acceptance
 // step links is drawn in its brand.
-import type { Browser } from "@playwright/test";
+import type { Browser, Page } from "@playwright/test";
 import { clientBrandChoice, clientBrandSelect, setClientBrand } from "../../../lib/admin-console";
 import {
   brandRow,
@@ -15,8 +15,10 @@ import {
   brandingUrl,
   defaultBrand,
   deleteBrand,
+  drawnFooter,
   expectDrawnInPlumDark,
   expectDrawnInSeededDefault,
+  fillBrandFooter,
   goiabadaIcons,
   listBrands,
   pageBrandStylesheets,
@@ -230,12 +232,19 @@ test("a legal document opened from a client's acceptance step is drawn in its br
   const doc = await legalDocuments.create({ kind: "must_accept", markdown: "Be nice to each other.", apps: [client.identifier], publish: true });
 
   await withBrand(page, { appearance: "dark", theme: "plum" }, async (brand) => {
+    await page.goto(brandUrl(brand.id, "edit"));
+    await fillBrandFooter(page, { footerLinks: [{ label: "Help", url: "https://example.com/help" }] });
+    await page.locator("#btnSave").click();
+    await expect(page.getByText("Brand saved.", { exact: true })).toBeVisible();
     await setClientBrand(page, client.id, brand);
+    const footerLinks = async (on: Page) => (await drawnFooter(on))?.links.map((link) => link.href) ?? [];
     const signIn = await openPasswordStep(browser, client);
     try {
       await submitPassword(signIn.page, user.email, user.password);
       await expect(signIn.page).toHaveURL(/\/auth\/legal-acceptance/);
       await expectDrawnInPlumDark(signIn.page, brand.id);
+      // The brand's footer under the step's card, beside the document's link inside it.
+      expect(await footerLinks(signIn.page), "the acceptance step's footer").toEqual(["https://example.com/help"]);
 
       // The link opens a tab of the same browser, which holds the sign-in.
       const link = signIn.page.locator("form").getByRole("link", { name: `${doc.title} (opens in a new tab)`, exact: true });
@@ -244,6 +253,7 @@ test("a legal document opened from a client's acceptance step is drawn in its br
       await expect(reading.getByRole("heading", { level: 1, name: `${doc.title}` })).toBeVisible();
       await expect(reading.locator("body")).toHaveAttribute("data-page", "legal-document");
       await expectDrawnInPlumDark(reading, brand.id);
+      expect(await footerLinks(reading), "the document's footer").toEqual(["https://example.com/help"]);
       const linked = reading.url();
       expect(new URL(linked).searchParams.get("ceremony"), "the link names the sign-in").toBeTruthy();
 
