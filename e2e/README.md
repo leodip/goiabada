@@ -74,8 +74,8 @@ and others). Install them once, before the first run, from `e2e/playwright/`:
 `npx` installed by nvm. Without them the WebKit project's tests fail to launch.
 
 They wrap the scripts in `infra/`, which can also be run on their own: `prepare.sh <tag | --source>`,
-`verify.sh [tag]` (check the environment again at any time), `rate-limiter.sh on | off | reset` and
-`teardown.sh [--all]`.
+`verify.sh [tag]` (check the environment again at any time), `rate-limiter.sh on | off | reset`,
+`safe-mode.sh on | off` and `teardown.sh [--all]`.
 
 `prepare.sh`:
 
@@ -119,6 +119,15 @@ run ends, pass or fail. Before each test, `lib/rate-limits.ts` restarts the auth
 with whole budgets: what another test or an earlier run spent weighs on none of them, and no test waits
 for a window to pass. Run it before a release.
 
+### Safe mode
+
+The auth server's brand safe mode switch, `GOIABADA_AUTHSERVER_BRAND_SAFE_MODE`, is off in the
+environment. `infra/safe-mode.sh` sets it in `safemode.yml` beside the wizard's Compose files and
+recreates the auth server, as `rate-limiter.sh` does for its switch. The one test that turns it on,
+`tests/admin-console/branding/safe-mode-switch.system.ts`, runs alone with the system tests and turns
+it off again, pass or fail; `test.sh` switches it off before each run too, in case a run was killed
+while it was on.
+
 ## Browser tests
 
 `playwright/` holds both suites, which share `lib/`. They read the URLs and the admin password
@@ -140,10 +149,11 @@ itself where no page reaches it (`oauth/`), the Turnstile challenge on the auth 
 Cloudflare's test keys (`turnstile/`), and accessibility (`accessibility/`: axe over every page and
 state of both applications in the light and the dark scheme, the layout at phone and tablet widths,
 the main journeys by keyboard, and the focused field kept clear of the console's header). Every spec
-runs in Chromium; `tests/accessibility/focus-not-obscured.spec.ts` and
-`tests/admin-console/branding/preview.spec.ts` run in Firefox and WebKit too, as the `firefox` and
-`webkit` projects, since how a browser scrolls a focused field into view, and how it restores a form
-after Back, is its engine's own code. They run eight at a time against an
+runs in Chromium; `tests/accessibility/focus-not-obscured.spec.ts`,
+`tests/admin-console/branding/preview.spec.ts` and `tests/admin-console/branding/font-and-logo.spec.ts`
+run in Firefox and WebKit too, as the `firefox` and `webkit` projects, since how a browser scrolls a
+focused field into view, how it restores a form after Back, and how it reads a font and picks a
+picture's source, is its engine's own code. They run eight at a time against an
 environment that stays up between runs, so every test keeps to these rules, which is what lets the
 suite run again and again without a reset:
 
@@ -172,7 +182,7 @@ suite run again and again without a reset:
   worker's session. A run signs the administrator in about sixteen times, and the rate-limits suite
   once, under the seeded cap of 20 sessions per user, and the sessions the cap ends are the least
   recently used, those earlier runs left. The Firefox and WebKit projects add a worker each, since
-  each runs its two specs on one worker (`playwright.config.ts`). A test that signs the administrator
+  each runs its specs on one worker (`playwright.config.ts`). A test that signs the administrator
   in again for a browser of its own, as the safe mode tests do (`signInAsAdminInSafeMode`), signs out
   before it ends (`signOutOfConsole`), so it adds no session to that count.
 - **It imports `test` from `lib/fixtures.ts`**, whose watcher fails a test in which a page of the auth
