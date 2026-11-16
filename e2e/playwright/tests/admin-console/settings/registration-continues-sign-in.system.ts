@@ -3,15 +3,16 @@
 // taken on into the app, through the acceptance step, without typing the password again. With email
 // verification, the mailed link does the same when it is opened in the same browser; opened in
 // another, it activates the account and the page sends the person back to the app. The app has a
-// brand of its own (#812): the registration and activation pages reached from its sign-in are drawn in
-// it, and the activation pages opened in another browser, which holds no sign-in, in the default.
+// brand of its own (#812): the registration and activation pages reached from its sign-in, and the
+// activation email (#817), are drawn in it, and the activation pages opened in another browser, which
+// holds no sign-in, in the default.
 //
 // Registration is a setting, so this runs alone, as a system test, and puts the settings back. The
 // app is a client of the test's own, with a must-accept document for it alone, which the fixture
 // retires, and a brand of the test's own, deleted when the test ends; so are the accounts registered.
 import type { Browser, Page } from "@playwright/test";
 import { deleteUser, idFromListLink, publishLegalDocument, setClientBrand, setLegalDocumentApps } from "../../../lib/admin-console";
-import { defaultBrand, expectDrawnInPlumDark, expectDrawnInSeededDefault, withBrand } from "../../../lib/brands";
+import { defaultBrand, expectDrawnInPlumDark, expectDrawnInSeededDefault, mailLook, plumDarkMail, withBrand } from "../../../lib/brands";
 import { openSignIn, redirectParams, testRedirectUri } from "../../../lib/browser-sign-in";
 import { env } from "../../../lib/environment";
 import { expect, type TestClient, test } from "../../../lib/fixtures";
@@ -115,7 +116,11 @@ test("with email verification, the mailed link carries on the sign-in in the sam
       await own.page.getByRole("button", { name: "Create account", exact: true }).click();
       await expect(own.page.getByRole("heading", { name: "Check your email" })).toBeVisible();
       await expectDrawnInPlumDark(own.page, brand.id);
-      const link = linksIn(await waitForMail(request, sameBrowser)).find((l) => l.includes("/account/activate"))!;
+      // The activation email is drawn in the app's brand too, a Dark brand's in its dark palette (#817).
+      const activation = await waitForMail(request, sameBrowser);
+      expect(activation.subject).toBe("Activate your account");
+      expect(mailLook(activation.html)).toMatchObject({ canvas: plumDarkMail.canvas, colorScheme: "dark" });
+      const link = linksIn(activation).find((l) => l.includes("/account/activate"))!;
       await own.page.goto(link);
       await expect(own.page.getByRole("heading", { name: "Choose your password" })).toBeVisible();
       await expectDrawnInPlumDark(own.page, brand.id);

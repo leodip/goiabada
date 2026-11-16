@@ -4,7 +4,9 @@
 // The brand is not the default and the clients are the test's own, so no other page changes. The
 // console's own pages, in the brand it is drawn in as the run finds it, link the brand's colors-only
 // stylesheet on its admin pages and the full one on its end-user pages (#813); the kit drawn on them,
-// which changes every console page, is brand.system.ts's.
+// which changes every console page, is brand.system.ts's. Pages that belong to no client are drawn in
+// the default brand in a browser holding the client's sign-in, and a legal document its acceptance
+// step links is drawn in its brand.
 import type { Browser } from "@playwright/test";
 import { clientBrandChoice, clientBrandSelect, setClientBrand } from "../../../lib/admin-console";
 import {
@@ -21,9 +23,10 @@ import {
   pageIcons,
   withBrand,
 } from "../../../lib/brands";
-import { openSignIn } from "../../../lib/browser-sign-in";
+import { openSignIn, submitPassword } from "../../../lib/browser-sign-in";
 import { env } from "../../../lib/environment";
 import { expect, type TestClient, test } from "../../../lib/fixtures";
+import { authorizeEndpoint, codeRequest } from "../../../lib/rfc6749";
 import { browserSignInClient } from "../../../lib/test-clients";
 import { uniqueIdentifier } from "../../../lib/unique";
 
@@ -172,4 +175,96 @@ test("the console's admin pages link its brand's colors-only stylesheet and Goia
   await expect(page.locator(".auth-card")).toBeVisible();
   expect(await pageBrandStylesheets(page), "an error page at an admin URL").toEqual([{ brandId: seeded.id, kind: "full" }]);
   expect(await pageIcons(page), "an error page at an admin URL").toEqual(consoleIcons);
+});
+
+// Pages that belong to no client are drawn in the default brand, even in a browser holding a branded
+// client's sign-in (#812 decision 2): an authorization request naming no client the auth server
+// knows, the not found page, and a step the sign-in's URL does not name, which says the request is no
+// longer active.
+test("pages that belong to no client are drawn in the default brand, in a browser holding a branded client's sign-in", async ({
+  page,
+  browser,
+  clients,
+}) => {
+  const { client } = await browserSignInClient(page, clients);
+  const seeded = await defaultBrand(page);
+  await withBrand(page, { appearance: "dark", theme: "plum" }, async (brand) => {
+    await setClientBrand(page, client.id, brand);
+    const signIn = await openPasswordStep(browser, client);
+    try {
+      await expectDrawnInPlumDark(signIn.page, brand.id);
+      const tab = await signIn.context.newPage();
+
+      const { params } = codeRequest("e2e-no-such-client");
+      await tab.goto(`${authorizeEndpoint}?${new URLSearchParams(params)}`);
+      await expect(tab.getByText(/The application does not exist/)).toBeVisible();
+      await expectDrawnInSeededDefault(tab, seeded.id);
+
+      const missing = await tab.goto(`${env.authUrl}/no-such-page`);
+      expect(missing?.status()).toBe(404);
+      await expect(tab.getByRole("heading", { name: "Page not found" })).toBeVisible();
+      await expectDrawnInSeededDefault(tab, seeded.id);
+
+      await tab.goto(`${env.authUrl}/auth/pwd`);
+      await expect(tab.getByRole("heading", { name: "This request is no longer active" })).toBeVisible();
+      await expectDrawnInSeededDefault(tab, seeded.id);
+    } finally {
+      await signIn.context.close();
+    }
+  });
+});
+
+// A legal document the acceptance step links is drawn in the client's brand in the browser holding
+// the sign-in, and so is each version its page links; the same link anywhere else, or the document's
+// own address, is drawn in the default brand (#812 decision 4).
+test("a legal document opened from a client's acceptance step is drawn in its brand, and anywhere else in the default", async ({
+  page,
+  browser,
+  clients,
+  users,
+  legalDocuments,
+}) => {
+  const user = await users.create();
+  const { client } = await browserSignInClient(page, clients);
+  const seeded = await defaultBrand(page);
+  const doc = await legalDocuments.create({ kind: "must_accept", markdown: "Be nice to each other.", apps: [client.identifier], publish: true });
+
+  await withBrand(page, { appearance: "dark", theme: "plum" }, async (brand) => {
+    await setClientBrand(page, client.id, brand);
+    const signIn = await openPasswordStep(browser, client);
+    try {
+      await submitPassword(signIn.page, user.email, user.password);
+      await expect(signIn.page).toHaveURL(/\/auth\/legal-acceptance/);
+      await expectDrawnInPlumDark(signIn.page, brand.id);
+
+      // The link opens a tab of the same browser, which holds the sign-in.
+      const link = signIn.page.locator("form").getByRole("link", { name: `${doc.title} (opens in a new tab)`, exact: true });
+      const [reading] = await Promise.all([signIn.context.waitForEvent("page"), link.click()]);
+      await reading.waitForLoadState();
+      await expect(reading.getByRole("heading", { level: 1, name: `${doc.title}` })).toBeVisible();
+      await expect(reading.locator("body")).toHaveAttribute("data-page", "legal-document");
+      await expectDrawnInPlumDark(reading, brand.id);
+      const linked = reading.url();
+      expect(new URL(linked).searchParams.get("ceremony"), "the link names the sign-in").toBeTruthy();
+
+      // Its version's link names the sign-in too, and the version's page keeps the brand.
+      await reading.locator("#legal-document-versions").getByRole("link", { name: "Version 1", exact: true }).click();
+      await expect(reading).toHaveURL(/\/versions\/1\?ceremony=/);
+      await expectDrawnInPlumDark(reading, brand.id);
+
+      // The document's own address, naming no sign-in, in the same browser.
+      await reading.goto(`${env.authUrl}/legal/${doc.shortName}`);
+      await expectDrawnInSeededDefault(reading, seeded.id);
+
+      // The same link in another browser, which holds no sign-in.
+      const elsewhere = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+      const other = await elsewhere.newPage();
+      await other.goto(linked);
+      await expect(other.getByRole("heading", { level: 1, name: `${doc.title}` })).toBeVisible();
+      await expectDrawnInSeededDefault(other, seeded.id);
+      await elsewhere.close();
+    } finally {
+      await signIn.context.close();
+    }
+  });
 });
