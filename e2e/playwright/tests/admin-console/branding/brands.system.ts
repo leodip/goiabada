@@ -6,7 +6,11 @@
 // it draws its admin pages, its Account pages and its sign-in in the palette's colors; given a brand
 // with custom CSS (#816), it draws the CSS on its Account pages and never on its admin pages. Runs
 // alone, since the default brand and the console's own client's brand are what every page is drawn
-// in, and puts back what it found.
+// in, and puts back what it found. The console's own client given a brand with a background image and
+// custom CSS draws both on each of the console's card pages, home, sign-out, the page refusing a user
+// who is no administrator and not found, and the background on no Account page; making a brand the
+// default leaves an audit event naming both brands; and the default brand renamed is named so
+// wherever the console offers it.
 import type { Browser, Page } from "@playwright/test";
 import { expect, test } from "../../../lib/fixtures";
 import { clientBrandChoice, clientIdFromList, expectRefusal, setClientBrand } from "../../../lib/admin-console";
@@ -15,12 +19,14 @@ import {
   brandUrl,
   brandingUrl,
   createBrand,
+  customCssField,
   defaultBrand,
   deleteBrand,
   expectDrawnInPalette,
   expectDrawnInPlumDark,
   expectDrawnInSeededDefault,
   fillBrandForm,
+  kitFiles,
   listBrands,
   makeBrandDefault,
   pageBackgrounds as backgrounds,
@@ -30,6 +36,7 @@ import {
   saveBrand,
   saveCustomCss,
   submitNewBrand,
+  uploadInEditor,
   warmBasicPalette,
   withBrand,
   withCustomBrand,
@@ -38,6 +45,9 @@ import {
 } from "../../../lib/brands";
 import { openSignIn } from "../../../lib/browser-sign-in";
 import { env } from "../../../lib/environment";
+import { signInToConsole } from "../../../lib/console-user";
+import { emailTemplateUrl } from "../../../lib/email-templates";
+import { expectNewestAuditEvent } from "../../../lib/sessions";
 import { browserSignInClient } from "../../../lib/test-clients";
 import { uniqueIdentifier } from "../../../lib/unique";
 
@@ -175,6 +185,12 @@ test("another brand made the default draws the console and the sign-in pages in 
 
       await makeBrandDefault(page, id);
       await expect(page.locator("#btnMakeDefault")).toHaveCount(0);
+      await expectNewestAuditEvent(page, "updated_default_brand", {
+        brand_id: String(id),
+        brand_name: name,
+        old_brand_id: String(previous.id),
+        old_brand_name: previous.name,
+      });
       const brands = await listBrands(page);
       expect(brands.filter((brand) => brand.isDefault).map((brand) => brand.id)).toEqual([id]);
       // The brand that was the default can now be deleted, and the new default cannot.
@@ -343,5 +359,85 @@ test("the admin console's own client given a brand with custom CSS draws it on a
     await page.goto(`${env.adminUrl}/account/profile`);
     await expectDrawnInSeededDefault(page, seeded.id);
     expect(await titleDecoration()).toBe("none");
+  });
+});
+
+// The console's card pages, which link the brand's full stylesheet, as the console's own client's
+// brand draws them: the page's name, the background behind the card, and the outline the brand's
+// custom CSS draws on the card.
+async function consoleCardLook(page: Page) {
+  return page.evaluate(() => ({
+    dataPage: document.body.dataset.page,
+    background: getComputedStyle(document.querySelector(".auth-page")!).backgroundImage,
+    outline: getComputedStyle(document.querySelector(".auth-card")!).outlineColor,
+  }));
+}
+
+test("the admin console's own client given a brand with a background and custom CSS draws both on each of the console's card pages, and no background on its Account pages", async ({
+  page,
+  browser,
+  users,
+}) => {
+  const consoleClient = await clientIdFromList(page, "admin-console-client");
+  const user = await users.create();
+  const outlined = "rgb(18, 52, 86)";
+
+  await withBrand(page, { appearance: "light", theme: "plum" }, async (brand) => {
+    await page.goto(brandUrl(brand.id, "edit"));
+    const background = await uploadInEditor(page, "background", kitFiles.background);
+    await customCssField(page).fill(`.auth-card {\n  outline: 5px solid ${outlined};\n}\n`);
+    await page.locator("#btnSave").click();
+    await expect(page.getByText("Brand saved.", { exact: true })).toBeVisible();
+    try {
+      await setClientBrand(page, consoleClient, brand);
+      const want = (dataPage: string) => ({ dataPage, background: `url("${background}")`, outline: outlined });
+
+      // A user who is no administrator, signed in to the console in a browser of their own.
+      const { context, page: own } = await signInToConsole(browser, user);
+      try {
+        // An Account page has no card and no background.
+        await expect(own.locator("body")).toHaveAttribute("data-page", "account-profile");
+        await expect(own.locator(".auth-page")).toHaveCount(0);
+        expect(await own.evaluate(() => getComputedStyle(document.body).backgroundImage), "no background behind an Account page").toBe("none");
+
+        await own.goto(`${env.adminUrl}/`);
+        expect(await consoleCardLook(own), "home").toEqual(want("console-home"));
+        await own.goto(`${env.adminUrl}/admin/clients`);
+        await expect(own).toHaveURL(`${env.adminUrl}/unauthorized`);
+        expect(await consoleCardLook(own), "administrators only").toEqual(want("console-unauthorized"));
+        const missing = await own.goto(`${env.adminUrl}/no-such-page-e2e`);
+        expect(missing?.status()).toBe(404);
+        expect(await consoleCardLook(own), "not found").toEqual(want("console-not-found"));
+        await own.goto(`${env.adminUrl}/auth/logout`);
+        await expect(own.getByRole("button", { name: "Sign out", exact: true })).toBeVisible();
+        expect(await consoleCardLook(own), "sign out").toEqual(want("console-sign-out"));
+      } finally {
+        await context.close();
+      }
+    } finally {
+      await setClientBrand(page, consoleClient, "default");
+    }
+  });
+});
+
+test("the default brand renamed is named so wherever the console offers it", async ({ page, clients }) => {
+  const client = await clients.create();
+  const renamed = uniqueIdentifier("brand");
+  await withDefaultBrandRestored(page, async () => {
+    const seeded = await defaultBrand(page);
+    await saveBrand(page, seeded.id, { name: renamed });
+    expect((await defaultBrand(page)).name).toBe(renamed);
+
+    // A client's Brand select, and the email editor's preview, name it as the default brand.
+    expect(await clientBrandChoice(page, client.id)).toBe(`Default brand (${renamed})`);
+    await page.goto(emailTemplateUrl("password_reset_link", "en"));
+    await expect(page.locator("#previewBrand option").first()).toHaveText(`Default brand (${renamed})`);
+
+    // Another brand's delete page names it as where its clients would go.
+    await withBrand(page, { appearance: "light", theme: "avocado" }, async (brand) => {
+      await setClientBrand(page, client.id, brand);
+      await page.goto(brandUrl(brand.id, "delete"));
+      await expect(page.locator(".page-lead")).toHaveText(`The brand will be deleted. 1 client uses it. It will move to the default brand, ${renamed}.`);
+    });
   });
 });
