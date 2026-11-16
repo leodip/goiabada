@@ -11,6 +11,7 @@
 import type { Browser, Page } from "@playwright/test";
 import { setClientBrand, signInAsAdmin } from "../../../lib/admin-console";
 import {
+  animatedWebpFile,
   brandFaviconIcons,
   brandIdFromList,
   brandUrl,
@@ -34,6 +35,7 @@ import {
 import { openSignIn } from "../../../lib/browser-sign-in";
 import { env } from "../../../lib/environment";
 import { expect, type TestClient, test } from "../../../lib/fixtures";
+import { animatedPng, damagedPng, jpegStart, noisePng } from "../../../lib/images";
 import { browserSignInClient } from "../../../lib/test-clients";
 import { uniqueIdentifier } from "../../../lib/unique";
 
@@ -175,6 +177,73 @@ test("a file the kit's rules refuse is said at its field, and the slot keeps wha
   const held = await slotHolds(page, "logo");
   expect(await pickInEditor(page, "logo", pngFile("tiny.png", 5, 5, [0, 0, 0]))).toBe("The image must be at least 10x10 pixels.");
   expect(await slotHolds(page, "logo"), "the uploaded logo is kept").toEqual(held);
+});
+
+// The rest of each kind's rules, each said at its field with the slot left as it was: a logo larger
+// than 512 pixels a side, a favicon smaller than 48 or not a PNG, a background larger than 3840, an
+// animated image and a damaged one, an empty file, and a font over its byte limit, refused before
+// it is sent. Each kind has its own byte limit: a background of 1.4 MB is taken where a logo of the
+// same file is refused (#813 decision 3).
+test("each kind's own limits, an animated or damaged image and an empty file are said at the field, and a background takes a file a logo refuses", async ({
+  page,
+}) => {
+  await page.goto(newBrandUrl);
+  const sent: string[] = [];
+  page.on("request", (request) => {
+    if (request.method() === "POST") sent.push(new URL(request.url()).pathname);
+  });
+  const file = (name: string, mimeType: string, buffer: Buffer) => ({ name, mimeType, buffer });
+
+  const large = file("large.png", "image/png", noisePng(700, 700));
+  expect(large.buffer.length, "a file over a logo's limit and under a background's").toBeGreaterThan(1024 * 1024);
+  expect(await pickInEditor(page, "logo", large)).toBe("The image can be at most 1048576 bytes.");
+  expect(sent, "a file over the limit is not sent").toEqual([]);
+  expect(await pickInEditor(page, "background", large)).toBe(uploadSays.uploaded);
+
+  for (const [slot, picked, says] of [
+    ["logo", pngFile("wide.png", 600, 100, [1, 2, 3]), "The image can be at most 512x512 pixels."],
+    ["darkLogo", file("animated.png", "image/png", animatedPng(64, 64)), "Animated images are not allowed. Upload a still image."],
+    ["favicon", pngFile("small.png", 32, 32, [1, 2, 3]), "The image must be at least 48x48 pixels."],
+    ["favicon", file("favicon.jpg", "image/jpeg", jpegStart()), "The image type is not supported. The only allowed type is PNG."],
+    ["logo", file("damaged.png", "image/png", damagedPng()), "The image could not be read. The file may be damaged."],
+    ["logo", file("empty.png", "image/png", Buffer.alloc(0)), "The image file is empty."],
+  ] as const) {
+    expect(await pickInEditor(page, slot, picked), `${slot}: ${picked.name}`).toBe(says);
+    expect(await slotHolds(page, slot), `the ${slot} is still empty`).toEqual({ id: "", url: "" });
+  }
+
+  // The background keeps the file it took through each of its own refusals.
+  const held = await slotHolds(page, "background");
+  expect(await pickInEditor(page, "background", pngFile("long.png", 4000, 10, [1, 2, 3]))).toBe("The image can be at most 3840x3840 pixels.");
+  expect(await pickInEditor(page, "background", animatedWebpFile("animated.webp", 64, 64))).toBe(
+    "Animated images are not allowed. Upload a still image.",
+  );
+  expect(await slotHolds(page, "background")).toEqual(held);
+
+  const before = sent.length;
+  const hugeFont = { name: "huge.woff2", mimeType: "font/woff2", buffer: Buffer.concat([Buffer.from("wOF2", "ascii"), Buffer.alloc(2 * 1024 * 1024)]) };
+  expect(await pickInEditor(page, "regularFont", hugeFont)).toBe("The font can be at most 2097152 bytes.");
+  expect(sent.length, "a font over the limit is not sent").toBe(before);
+});
+
+// A bold font file without a regular one is refused when the brand is saved, at the regular font's
+// field, whose Upload takes the focus, while the family is a system one: the uploaded font itself
+// would be refused first for its missing regular file.
+test("a bold font without a regular one is refused at the regular font's field, and the form keeps the bold file", async ({ page }) => {
+  const name = uniqueIdentifier("brand");
+  await page.goto(newBrandUrl);
+  await fillBrandForm(page, { name, font: "serif" });
+  const urls = await uploadKit(page, ["boldFont"]);
+  await page.locator("#btnCreate").click();
+
+  await expect(page).toHaveURL(newBrandUrl);
+  await expect(page.locator("#brand-error")).toHaveText("Upload a regular font file to use a bold one.");
+  await expect(page.locator("#regularFontUpload")).toBeFocused();
+  expect((await slotHolds(page, "boldFont")).url).toBe(urls.boldFont);
+  await expect(page.locator("#font")).toHaveValue("serif");
+
+  await page.goto(brandingUrl);
+  await expect(page.locator("#brandsTable").getByText(name, { exact: true })).toHaveCount(0);
 });
 
 // A dark logo without a logo is refused when the brand is saved, at the logo's field, whose Upload

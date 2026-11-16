@@ -613,6 +613,19 @@ export function webpFile(name: string, width: number, height: number): PickedFil
   };
 }
 
+// An animated WebP made on the spot: webpFile's header with the VP8X animation flag set (bit 1), then
+// an ANIM chunk, as an animated WebP carries (RFC 9649 sections 2.7 and 2.7.1.1).
+export function animatedWebpFile(name: string, width: number, height: number): PickedFile {
+  const still = webpFile(name, width, height).buffer;
+  const vp8xFlags = 20;
+  const animated = Buffer.from(still);
+  animated[vp8xFlags] |= 0x02;
+  const anim = Buffer.concat([Buffer.from("ANIM", "ascii"), Buffer.from([6, 0, 0, 0]), Buffer.alloc(6)]);
+  const riffSize = Buffer.alloc(4);
+  riffSize.writeUInt32LE(animated.length - 8 + anim.length);
+  return { name, mimeType: "image/webp", buffer: Buffer.concat([animated.subarray(0, 4), riffSize, animated.subarray(8), anim]) };
+}
+
 // A file the auth server takes as a WOFF2 font, which it tells by the signature its first four bytes
 // hold. No browser draws it, and no spec needs one to: they check the family a page asks for, not how
 // its letters look.
@@ -977,3 +990,25 @@ export async function saveCustomCss(page: Page, id: number, css: string) {
   await page.locator("#btnSave").click();
   await expect(page.getByText("Brand saved.", { exact: true })).toBeVisible();
 }
+
+// What an email's layout writes inline of its brand (#817): the color of the area behind its card, the
+// scheme it declares, and the logo it draws, if any, with its alt. An email follows no device, so a
+// Dark brand's is drawn in its dark palette and every other brand's in its light one.
+export interface MailLook {
+  canvas: string | null;
+  colorScheme: string | null;
+  logo: { src: string; alt: string } | null;
+}
+
+export function mailLook(html: string): MailLook {
+  const logo = html.match(/<img src="([^"]+)" alt="([^"]*)"/);
+  return {
+    canvas: html.match(/<body style="[^"]*background-color: (#[0-9a-f]{6});/)?.[1] ?? null,
+    colorScheme: html.match(/<meta name="color-scheme" content="([^"]+)">/)?.[1] ?? null,
+    logo: logo ? { src: logo[1], alt: logo[2] } : null,
+  };
+}
+
+// Plum's dark palette's canvas and brand color, and Blueberry's light ones, as an email writes them.
+export const plumDarkMail = { canvas: "#120f15", brand: "#cda4f0" } as const;
+export const blueberryLightMail = { canvas: "#f4f5f7", brand: "#2456c4" } as const;
