@@ -55,6 +55,8 @@ cp e2e/.env.example e2e/.env    # once: set E2E_VPS_HOST
 
 e2e/run.sh [tag | --source]     # reset, then the e2e suite
 e2e/reset.sh [tag | --source]   # wipe the environment and build it again from a release, or this checkout
+e2e/deploy.sh [tag | --source]  # the same, to try it by hand: ends with the addresses and the admin's password
+e2e/deploy.sh --show            # those addresses and the password again, for the environment as it is
 e2e/test.sh [playwright args]   # run the e2e suite against the current environment
 e2e/test-rate-limits.sh [args]  # run the rate-limits suite against the current environment
 e2e/wipe.sh [--all] [-y]        # remove the environment (asks first)
