@@ -222,8 +222,8 @@ process.stdin.on("end", function () {
     look("shown false", field, button, row);
   }
 
-  // The client secret's tab, as the template draws it, with Generate answered at once by a new
-  // secret.
+  // The client secret's tab, as the template draws it, with Generate's request held until the test
+  // answers it: once with a new secret, once failed, with no answer at all.
   {
     const doc = new FakeDocument();
     const field = el(doc, "input", { id: "clientSecret", type: "password", name: "clientSecret", readonly: "" });
@@ -241,12 +241,14 @@ process.stdin.on("end", function () {
     ]);
     const confidential = el(doc, "input", { type: "radio", id: "confidentialClientRadio", name: "publicConfidential", value: "confidential" });
     confidential.checked = true;
+    const save = el(doc, "button", { class: "button button-primary", type: "submit", id: "btnSave" }, "Save");
     const form = el(doc, "form", { method: "post" }, "", [
-      el(doc, "input", { type: "radio", id: "publicClientRadio", name: "publicConfidential", value: "public" }), confidential, panel,
+      el(doc, "input", { type: "radio", id: "publicClientRadio", name: "publicConfidential", value: "public" }), confidential, panel, save,
     ]);
     doc.body.append(form);
     const p = page(doc, request.utils);
-    p.context.sendAjaxRequest = function (props) { props.callback({ NewSecret: "a-new-secret" }); props.finished(); };
+    let pending;
+    p.context.sendAjaxRequest = function (props) { pending = props; };
     p.context.showNotice = function (region, tone, text) { region.textContent = text; };
     p.setUp();
     vm.runInContext(request.page, p.context, { filename: "admin-clients-authentication.js" });
@@ -258,8 +260,18 @@ process.stdin.on("end", function () {
     button.fire("click");
     look(step + ", pressed twice", field, button, row);
     generate.fire("click");
+    seen[step + ", generating: generate disabled"] = generate.disabled;
+    seen[step + ", generating: save disabled"] = save.disabled;
+    pending.callback({ NewSecret: "a-new-secret" });
+    pending.finished();
     look(step + ", generated", field, button, row);
     seen[step + ", generated: value"] = field.value;
+    seen[step + ", generated: save disabled"] = save.disabled;
+    generate.fire("click");
+    pending.finished();
+    seen[step + ", failed: value"] = field.value;
+    seen[step + ", failed: generate disabled"] = generate.disabled;
+    seen[step + ", failed: save disabled"] = save.disabled;
   }
   process.stdout.write(JSON.stringify(seen));
 });
@@ -331,12 +343,21 @@ var passwordToggleSeen = map[string]any{
 	"client secret, generated: button name":     "Hide client secret",
 	"client secret, generated: status":          "Shown",
 	"client secret, generated: value":           "a-new-secret",
+
+	// Save waits while a secret is on its way, so a save never sends the field before it arrives,
+	// and comes back however the request ends.
+	"client secret, generating: generate disabled": true,
+	"client secret, generating: save disabled":     true,
+	"client secret, generated: save disabled":      false,
+	"client secret, failed: value":                 "a-new-secret",
+	"client secret, failed: generate disabled":     false,
+	"client secret, failed: save disabled":         false,
 }
 
 // A password field's show/hide button, wired by utils.js, shows the password as text and back, its
 // visible word, its name and the status region saying each state; keeps the focus where it was and
 // the field's caret; puts the field back to dots when its form is sent and when the browser brings
-// the page back; and works on the client secret, Generate included.
+// the page back; and works on the client secret, Generate included, Save waiting while it runs.
 func TestUtilsJS_PasswordToggles(t *testing.T) {
 	node, err := exec.LookPath("node")
 	if err != nil {

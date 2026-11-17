@@ -5,6 +5,13 @@ import { clientCredentialsToken } from "../../../lib/oauth";
 
 const saved = "Authentication saved.";
 
+// A promise the test resolves when it chooses.
+function newGate() {
+  let open = () => {};
+  const opened = new Promise<void>((resolve) => (open = resolve));
+  return { opened, open };
+}
+
 test("a confidential client's secret is hidden until shown", async ({ page, clients }) => {
   const client = await clients.create();
   await page.goto(clientUrl(client.id, "authentication"));
@@ -99,6 +106,43 @@ test("a client switched to public loses its secret, and switched back gets a new
 
   const restored = await readClientSecret(page, client.id);
   expect(restored).not.toBe(original);
+});
+
+test("Save waits while a secret is on its way, and comes back when the secret cannot be had", async ({ page, clients }) => {
+  const client = await clients.create();
+  await page.goto(clientUrl(client.id, "authentication"));
+  await page.getByRole("radio", { name: "Public", exact: true }).check();
+  await page.locator("#btnSave").click();
+  await confirmDialog(page, "You're making the client public");
+  await expect(page.getByText(saved)).toBeVisible();
+
+  // The secret held behind a gate until the test opens it, failing the first time and answered the
+  // second. Each gate is made before its request, so opening it first lets the request straight on.
+  const save = page.locator("#btnSave");
+  const secret = page.locator("#clientSecret");
+  let gate = newGate();
+  let answers = 0;
+  await page.route("**/admin/clients/generate-new-secret*", async (route) => {
+    await gate.opened;
+    if (answers++ === 0) await route.abort();
+    else await route.continue();
+  });
+
+  await page.getByRole("radio", { name: "Confidential", exact: true }).check();
+  await expect(save).toBeDisabled();
+  gate.open();
+  await expect(save).toBeEnabled();
+  await expect(secret).toHaveValue("");
+
+  gate = newGate();
+  await page.getByRole("button", { name: "Generate a new secret" }).click();
+  await expect(save).toBeDisabled();
+  gate.open();
+  await expect(secret).not.toHaveValue("");
+  await expect(save).toBeEnabled();
+  await save.click();
+  await confirmDialog(page, "You're making the client confidential");
+  await expect(page.getByText(saved)).toBeVisible();
 });
 
 test("making a client public asks first, and Cancel keeps it confidential with its secret", async ({ page, clients }) => {

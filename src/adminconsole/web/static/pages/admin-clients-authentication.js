@@ -4,12 +4,14 @@
 // controller for the Show button, reached here by id, shows a generated secret. Generate asks the
 // console for a new one, which the field then shows, saying so in the tab's status region, as it
 // says a failure. A type the browser restores, as on Back, is shown as chosen. The save, which asks
-// first about a change of type and about a new secret, is shell.js's.
+// first about a change of type and about a new secret, is shell.js's; Save is disabled while a secret
+// is on its way, so a save never sends the field before the secret it is waiting for.
 
 const secretPanel = document.getElementById("confidentialClientPanel");
 const secretField = document.getElementById("clientSecret");
 const showButton = document.getElementById("showSecretBtn");
 const generateButton = document.getElementById("generateSecretBtn");
+const saveButton = document.getElementById("btnSave");
 const secretStatus = document.getElementById("secret-status");
 const confidentialRadio = document.getElementById("confidentialClientRadio");
 const secretToggle = passwordToggle(showButton);
@@ -25,6 +27,7 @@ function generateSecret() {
   }
   generating = true;
   generateButton.disabled = true;
+  saveButton.disabled = true;
   sendAjaxRequest({
     url: "/admin/clients/generate-new-secret",
     method: "GET",
@@ -33,6 +36,7 @@ function generateSecret() {
     finished: function () {
       generating = false;
       generateButton.disabled = false;
+      saveButton.disabled = false;
     },
     callback: function (result) {
       const hadSecret = secretField.value !== "";
