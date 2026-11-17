@@ -10,7 +10,11 @@ import { defineConfig, devices } from "@playwright/test";
 // the suite runs again and again without e2e/reset.sh.
 
 // The specs the Firefox and WebKit projects run.
-const inEveryEngine = [/accessibility\/focus-not-obscured\.spec\.ts$/, /admin-console\/branding\/preview\.spec\.ts$/];
+const inEveryEngine = [
+  /accessibility\/focus-not-obscured\.spec\.ts$/,
+  /admin-console\/branding\/preview\.spec\.ts$/,
+  /admin-console\/branding\/font-and-logo\.spec\.ts$/,
+];
 
 export default defineConfig({
   testDir: "./tests",
@@ -31,11 +35,13 @@ export default defineConfig({
     { name: "setup", testMatch: /.*\.setup\.ts/, teardown: "system" },
     // Each worker signs the administrator in for itself (lib/fixtures.ts).
     { name: "chromium", use: { ...devices["Desktop Chrome"] }, dependencies: ["setup"] },
-    // How a browser scrolls a focused field into view, and how it restores a form after Back, is its
-    // engine's own code, so the spec that keeps the focus clear of the console's header (#722 decision
-    // 12) and the brand editor's preview (#811 decision 5) run in Firefox and WebKit too. Every other
-    // spec runs in Chromium alone. Each of the two runs on one worker, since every worker signs the
-    // administrator in, under the seeded cap of sessions per user (e2e/README.md).
+    // How a browser scrolls a focused field into view, how it restores a form after Back, and how it
+    // reads a font and picks a picture's source, is its engine's own code, so the spec that keeps the
+    // focus clear of the console's header (#722 decision 12), the brand editor's preview (#811
+    // decision 5) and the brand's uploaded font and logos (#813) run in Firefox and WebKit too. Every
+    // other spec runs in Chromium alone. The Firefox and the WebKit project each run on one worker,
+    // since every worker signs the administrator in, under the seeded cap of sessions per user
+    // (e2e/README.md).
     { name: "firefox", testMatch: inEveryEngine, use: { ...devices["Desktop Firefox"] }, workers: 1, dependencies: ["setup"] },
     { name: "webkit", testMatch: inEveryEngine, use: { ...devices["Desktop Safari"] }, workers: 1, dependencies: ["setup"] },
     // Changes to what the whole instance shares: the settings, the signing keys, and the guards around

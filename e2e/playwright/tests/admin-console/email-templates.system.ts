@@ -3,12 +3,20 @@
 // shows in the editor's preview, reaches a test email sent from the editor before it is saved, and
 // once saved reaches the reset a user asks for; Reset to default brings the built-in text back to
 // the next one. A text breaking a rule is refused naming the placeholder, in the preview and on
-// save, and nothing is saved. An edit is global, so this runs alone, and resets what it saved.
+// save, and nothing is saved; each other rule is refused at the field it is about. An edit in German
+// reaches a user who reads German, and every other language keeps the built-in text; an edited
+// email is still drawn in its brand (#817); and the audit log lists each save, reset and test email.
+// An edit is global, so this runs alone, and resets what it saved.
 import type { Browser, Page } from "@playwright/test";
+import { setClientBrand, userUrl } from "../../lib/admin-console";
+import { mailLook, plumDarkMail, withBrand } from "../../lib/brands";
+import { openSignIn } from "../../lib/browser-sign-in";
 import { emailTemplatesPath, emailTemplateUrl, resetEmailTemplate } from "../../lib/email-templates";
 import { env } from "../../lib/environment";
 import { expect, test } from "../../lib/fixtures";
 import { linksIn, type Mail, waitForMail } from "../../lib/mailpit";
+import { expectNewestAuditEvent } from "../../lib/sessions";
+import { browserSignInClient } from "../../lib/test-clients";
 import { uniqueIdentifier } from "../../lib/unique";
 
 const listUrl = `${env.adminUrl}${emailTemplatesPath}`;
@@ -188,4 +196,155 @@ test("a text breaking a rule is refused naming the placeholder, in the preview a
   await expect(page.locator("#emailTemplate-error")).toHaveText(missingRefusal);
   await expect(page.locator("#body")).toHaveValue(missing);
   await expect(page.locator("#btnReset")).toHaveCount(0);
+});
+
+// Each other rule of the editor, one at a time, refused at the field it is about, which is marked and
+// takes the focus, the form keeping what was typed and nothing saved.
+const fieldRefusals: { name: string; email: string; field: "subject" | "buttonLabel" | "body"; value: string; says: string | RegExp }[] = [
+  { name: "an empty subject", email: "password_reset_link", field: "subject", value: "", says: "Subject is required." },
+  {
+    name: "the button in the subject",
+    email: "password_reset_link",
+    field: "subject",
+    value: "Press {{button}}",
+    says: /^The subject cannot use \{\{button\}\}\. In the subject, this email offers /,
+  },
+  { name: "an empty button label", email: "password_reset_link", field: "buttonLabel", value: "", says: "Button label is required." },
+  {
+    name: "the button inside a sentence",
+    email: "password_reset_link",
+    field: "body",
+    value: "Hello {{name}}, press {{button}} now.\n\n{{link}}",
+    says: "Put {{button}} on a line of its own.",
+  },
+  {
+    name: "a placeholder inside a link's address",
+    email: "password_reset_link",
+    field: "body",
+    value: "Read [this](https://example.com/{{name}}).\n\n{{link}}",
+    says: "A link's address can hold a placeholder only as {{link}} on its own, the whole address. This one holds {{name}}.",
+  },
+  { name: "a body with nothing to read but the button", email: "welcome", field: "body", value: "{{button}}", says: "The body needs something to read besides the button." },
+  {
+    name: "the verification code left out",
+    email: "verification_code",
+    field: "body",
+    value: "Hello {{name}}, here is no code.",
+    says: /^The body must use \{\{code\}\}, which this email cannot do without\. It offers /,
+  },
+];
+
+test("each other rule is refused at the field it is about, and nothing is saved", async ({ page }) => {
+  leaveWithoutAsking(page);
+  for (const refusal of fieldRefusals) {
+    await test.step(refusal.name, async () => {
+      await page.goto(emailTemplateUrl(refusal.email, "en"));
+      const field = page.locator(`#${refusal.field}`);
+      await field.fill(refusal.value);
+      await page.locator("#btnSave").click();
+      await expect(page.locator("#emailTemplate-error")).toHaveText(refusal.says);
+      await expect(field).toHaveAttribute("aria-invalid", "true");
+      await expect(field).toHaveAttribute("aria-describedby", /^emailTemplate-error /);
+      await expect(field).toBeFocused();
+      await expect(field).toHaveValue(refusal.value);
+      await expect(page.locator("#btnReset"), "nothing was saved").toHaveCount(0);
+    });
+  }
+});
+
+// Sets a user's Page language on their Profile tab, the language their emails are written in.
+async function setPageLanguage(page: Page, userId: number, language: string) {
+  await page.goto(userUrl(userId, "profile"));
+  await page.getByLabel("Page language", { exact: true }).selectOption(language);
+  await page.locator("#btnSave").click();
+  await expect(page.getByText("Profile saved.")).toBeVisible();
+}
+
+test("an edit in German reaches a user who reads German, and a user who reads English still gets the built-in text", async ({
+  page,
+  browser,
+  request,
+  users,
+}) => {
+  const mark = uniqueIdentifier("mark");
+  const german = await users.create({ emailVerified: true });
+  const english = await users.create({ emailVerified: true });
+  await setPageLanguage(page, german.id, "de");
+
+  try {
+    await page.goto(emailTemplateUrl("password_reset_link", "de"));
+    await page.locator("#subject").fill(`Passwort zurücksetzen ${mark}`);
+    await page.locator("#body").fill(`Hallo {{name}}, ${mark}.\n\n{{button}}\n\n{{link}}`);
+    await page.locator("#btnSave").click();
+    await expect(page.locator("#subject")).toHaveValue(`Passwort zurücksetzen ${mark}`);
+    await expect(page.locator("#emailTemplateLanguages").locator('a[href$="/password_reset_link/de"]')).toContainText("Edited");
+    await expect(page.locator("#emailTemplateLanguages").locator('a[href$="/password_reset_link/en"] .tag')).toHaveCount(0);
+
+    await askForReset(browser, german.email);
+    const inGerman = await waitForMail(request, german.email);
+    expect(inGerman.subject).toBe(`Passwort zurücksetzen ${mark}`);
+    expect(inGerman.html).toContain(`<html lang="de">`);
+    expect(inGerman.text).toContain(`Hallo Playwright Tester, ${mark}.`);
+
+    await askForReset(browser, english.email);
+    const inEnglish = await waitForMail(request, english.email);
+    expect(inEnglish.subject).toBe("Password reset");
+    expect(inEnglish.text).toContain("You can reset your password by clicking the link below:");
+    expect(inEnglish.text).not.toContain(mark);
+  } finally {
+    await resetEmailTemplate(page, "password_reset_link", "de");
+  }
+});
+
+test("an edited email is still drawn in the brand of the sign-in it was asked from", async ({ page, browser, request, clients, users }) => {
+  const mark = uniqueIdentifier("mark");
+  const { client } = await browserSignInClient(page, clients);
+  const user = await users.create({ emailVerified: true });
+
+  await withBrand(page, { appearance: "dark", theme: "plum" }, async (brand) => {
+    await setClientBrand(page, client.id, brand);
+    try {
+      await page.goto(emailTemplateUrl("password_reset_link", "en"));
+      await page.locator("#body").fill(`Hi {{name}}, **${mark}**.\n\n{{button}}\n\n{{link}}`);
+      await page.locator("#btnSave").click();
+      await expect(page.getByText("Saved. This email is sent in this language with the text below.", { exact: true })).toBeVisible();
+
+      const signIn = await openSignIn(browser, { clientId: client.identifier, scope: "openid" });
+      await expect(signIn.page).toHaveURL(/\/auth\/pwd/);
+      await signIn.page.getByRole("link", { name: "Forgot your password?" }).click();
+      await signIn.page.locator("#email").fill(user.email);
+      await signIn.page.getByRole("button", { name: "Send reset link", exact: true }).click();
+      await expect(signIn.page.getByRole("heading", { name: "Check your email" })).toBeVisible();
+      await signIn.context.close();
+
+      const mail = await waitForMail(request, user.email);
+      expect(mail.html).toMatch(new RegExp(`<strong[^>]*>${mark}</strong>`));
+      expect(mailLook(mail.html)).toMatchObject({ canvas: plumDarkMail.canvas, colorScheme: "dark" });
+      expect(mail.html).toMatch(new RegExp(`data-email-button[^>]*>\\s*<tr>\\s*<td align="center" bgcolor="${plumDarkMail.brand}"`));
+    } finally {
+      await resetEmailTemplate(page, "password_reset_link", "en");
+    }
+  });
+});
+
+test("a saved edit, its reset and a test email are each listed in the audit log", async ({ page }) => {
+  leaveWithoutAsking(page);
+  const to = `${uniqueIdentifier("t")}@example.com`;
+  const named = { email_template: "account_deleted", language: "it" };
+  try {
+    await page.goto(emailTemplateUrl("account_deleted", "it"));
+    await page.locator("#subject").fill(`Account eliminato ${uniqueIdentifier("mark")}`);
+    await page.locator("#btnSave").click();
+    await expect(page.locator("#btnReset")).toBeVisible();
+    await expectNewestAuditEvent(page, "updated_email_template", named);
+
+    await page.goto(emailTemplateUrl("account_deleted", "it"));
+    await page.locator("#testAddress").fill(to);
+    await page.locator("#btnSendTest").click();
+    await expect(page.locator("#sendTestStatus")).toContainText(to);
+    await expectNewestAuditEvent(page, "sent_test_email", named);
+  } finally {
+    await resetEmailTemplate(page, "account_deleted", "it");
+  }
+  await expectNewestAuditEvent(page, "reset_email_template", named);
 });

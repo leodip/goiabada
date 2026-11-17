@@ -85,7 +85,9 @@ test("custom CSS saved in the editor is drawn on the client's sign-in page, and 
 });
 
 // Each refusal, with the line it names: an @import, and a URL to another site, which a browser would
-// fetch, sending the visitor's address with it.
+// fetch, sending the visitor's address with it; a URL of the auth server's own, an escape that a
+// browser reads as either, image-set(), which takes a plain string as a URL, a comment left open,
+// and CSS over the 64 KiB cap.
 const refusals = [
   {
     name: "an @import",
@@ -96,6 +98,44 @@ const refusals = [
     name: "a URL to another site",
     css: '.auth-card {\n  background-image: url("https://cdn.example.com/card.png");\n}\n',
     says: "Line 2 of the custom CSS has a URL that is not a data: image. Custom CSS can hold no other URL.",
+  },
+  // A URL of the auth server's own is refused too, unquoted or not: only a data: image is taken.
+  {
+    name: "a URL of the auth server's own",
+    css: '.auth-card {\n  background-image: url("/static/favicon/favicon-32x32.png");\n}\n',
+    says: "Line 2 of the custom CSS has a URL that is not a data: image. Custom CSS can hold no other URL.",
+  },
+  {
+    name: "an unquoted URL",
+    css: ".auth-card {\n  background-image: url(https://cdn.example.com/card.png);\n}\n",
+    says: "Line 2 of the custom CSS has a URL that is not a data: image. Custom CSS can hold no other URL.",
+  },
+  // Written with an escape, an @import and a url() are still what a browser reads.
+  {
+    name: "an @import written with an escape",
+    css: '.auth-card {\n  color: rgb(18, 52, 86);\n}\n@\\69mport "https://cdn.example.com/theme.css";\n',
+    says: "Line 4 of the custom CSS has an @import. Custom CSS cannot load another stylesheet.",
+  },
+  {
+    name: "a url() written with an escape",
+    css: '.auth-card {\n  background-image: \\75rl("https://cdn.example.com/card.png");\n}\n',
+    says: "Line 2 of the custom CSS has a URL that is not a data: image. Custom CSS can hold no other URL.",
+  },
+  {
+    name: "image-set()",
+    css: `.auth-card {\n  background-image: image-set("${pixel}" 1x);\n}\n`,
+    says: "Line 2 of the custom CSS uses src(), image() or image-set(). Write a data: image in url() instead.",
+  },
+  {
+    name: "a comment left open",
+    css: ".auth-card {\n  color: red;\n}\n/* not closed\n.auth-title { color: blue; }\n",
+    says: "Line 4 of the custom CSS cannot be read as CSS: a comment, a string or a url() is not closed or is written wrongly.",
+  },
+  // One byte over 64 KiB, in rules a browser would read.
+  {
+    name: "more than 65536 bytes",
+    css: `${".auth-card { color: rgb(18, 52, 86); }\n".repeat(1640)}`.padEnd(65537, " "),
+    says: "The custom CSS cannot exceed 65536 bytes.",
   },
 ];
 

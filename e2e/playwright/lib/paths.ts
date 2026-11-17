@@ -15,3 +15,7 @@ export const testappEnvFile = path.resolve(here, "../../.state/testapp.env");
 // Switches the auth server's rate limiter, and restarts the auth server for the rate-limits suite
 // (lib/rate-limits.ts).
 export const rateLimiterScript = path.resolve(here, "../../infra/rate-limiter.sh");
+
+// Switches the auth server's brand safe mode, GOIABADA_AUTHSERVER_BRAND_SAFE_MODE, for the system test
+// of the switch (tests/admin-console/branding/safe-mode-switch.system.ts).
+export const safeModeScript = path.resolve(here, "../../infra/safe-mode.sh");

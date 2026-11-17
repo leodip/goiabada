@@ -65,3 +65,16 @@ export function auditRows(page: Page, details: Record<string, string>) {
 function exactly(text: string): RegExp {
   return new RegExp(`^${text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`);
 }
+
+// Expects the newest event of this kind in the audit log viewer to hold these values. Only a test
+// that runs alone, a system test, can rely on the newest being its own action's: every other test
+// looks its event up by what only it names.
+export async function expectNewestAuditEvent(page: Page, event: string, details: Record<string, string>) {
+  await page.goto(`${env.adminUrl}/admin/settings/audit-log-viewer?${new URLSearchParams({ auditEvent: event })}`);
+  const newest = page.locator("#auditLogsTable tbody tr").first();
+  await expect(newest.locator("td:nth-child(2) > span:first-child")).toHaveText(event);
+  for (const [key, value] of Object.entries(details)) {
+    const pair = newest.locator("dl > div").filter({ has: page.locator("dt", { hasText: exactly(key) }) });
+    await expect(pair.locator("dd"), `${event}: ${key}`).toHaveText(value);
+  }
+}

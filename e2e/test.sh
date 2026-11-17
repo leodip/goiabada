@@ -38,6 +38,8 @@ curl -fsS -o /dev/null --max-time 10 "$auth_url/health" ||
 require_vps
 # Off already, unless a run of the rate-limits suite was killed before it could switch it back.
 "$E2E_DIR/infra/rate-limiter.sh" off
+# Off already, unless a run was killed while the system test of the safe mode switch had it on.
+"$E2E_DIR/infra/safe-mode.sh" off
 turnstile_off
 
 # Mailpit's API listens on the VPS's loopback only; the tests read the mail through this tunnel, on a

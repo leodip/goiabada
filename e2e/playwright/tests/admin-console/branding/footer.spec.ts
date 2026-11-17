@@ -1,7 +1,8 @@
 // A brand's footer links and support contact set in the brand editor (#814), then seen where they are
-// drawn: a client's sign-in page in English and in German, the error page a request through the client
-// is refused with, and the same over a background image, where the footer sits on a panel. Each
-// refusal is said at the input it is about, which takes the focus, and the form keeps what was typed.
+// drawn: a client's sign-in page in English, in German and in each other built-in language, the error
+// page a request through the client is refused with, and the same over a background image, where the
+// footer sits on a panel. Each refusal is said at the input it is about, which takes the focus, and
+// the form keeps what was typed.
 //
 // The brand is the test's own, given to a client of the test's own, so no other page changes, and
 // this is an ordinary parallel spec. The console's own pages, which every console page shares, are
@@ -244,5 +245,53 @@ test("each footer refusal is said at its input, which takes the focus, and the f
       await page.goto(brandingUrl);
       await expect(page.locator("#brandsTable").getByText(name, { exact: true }), "nothing was created").toHaveCount(0);
     });
+  }
+});
+
+// A link's label in each built-in language, drawn on a page in that language, the new-tab notice in it
+// too; a language with no label of its own takes the fallback (#814 decision 4). English and German
+// are the first test's.
+const otherLanguages = [
+  { tag: "pt-BR", label: "Privacidade", notice: "(abre em uma nova aba)" },
+  { tag: "es", label: "Privacidad", notice: "(se abre en una pestaña nueva)" },
+  { tag: "fr", label: "Confidentialité", notice: "(s’ouvre dans un nouvel onglet)" },
+  { tag: "it", label: "Riservatezza", notice: "(si apre in una nuova scheda)" },
+];
+
+test("a footer link's label in each other built-in language is drawn on a page in that language, and the fallback where it has none", async ({
+  page,
+  browser,
+  clients,
+}) => {
+  const { client } = await browserSignInClient(page, clients);
+  const name = uniqueIdentifier("brand");
+  await page.goto(newBrandUrl);
+  await fillBrandForm(page, { name, appearance: "light", theme: "plum" });
+  await fillBrandFooter(page, {
+    footerLinks: [
+      { label: "Privacy", url: "https://example.com/privacy", labels: Object.fromEntries(otherLanguages.map((language) => [language.tag, language.label])) },
+      { label: "Status", url: "https://status.example.com/" },
+    ],
+  });
+  await page.locator("#btnCreate").click();
+  await expect(page).toHaveURL(brandingUrl);
+  const id = await brandIdFromList(page, name);
+  try {
+    await setClientBrand(page, client.id, { name });
+    for (const language of otherLanguages) {
+      await test.step(language.tag, async () => {
+        const signIn = await openOwnSignIn(browser, client, { ui_locales: language.tag });
+        try {
+          await expect(signIn.page).toHaveURL(/\/auth\/pwd/);
+          await expect(signIn.page.locator("html")).toHaveAttribute("lang", language.tag);
+          const footer = await footerOf(signIn.page);
+          expect(footer.links.map((link) => link.text)).toEqual([`${language.label} ${language.notice}`, `Status ${language.notice}`]);
+        } finally {
+          await signIn.context.close();
+        }
+      });
+    }
+  } finally {
+    if ((await listBrands(page)).some((brand) => brand.id === id)) await deleteBrand(page, id);
   }
 });

@@ -7,12 +7,16 @@
 // (#814): under the card on home and an error page, after the content on an Account page, each
 // label in the page's language. Its admin pages draw none. The console's own client's brand is what
 // every console page is drawn in, so this runs alone, and puts the client back on the default brand.
+// A client that registers itself (RFC 7591) starts on the default brand, whatever its registration
+// names: dynamic registration is a global switch, put back afterwards.
 import type { Browser, Locator, Page } from "@playwright/test";
-import { clientIdFromList, setClientBrand } from "../../../lib/admin-console";
+import { clientBrandChoice, clientIdFromList, deleteClient, setClientBrand } from "../../../lib/admin-console";
 import {
   brandFaviconIcons,
   brandKitToken,
   brandingUrl,
+  defaultBrand,
+  expectDrawnInSeededDefault,
   goiabadaIcons,
   pageBrandStylesheets,
   pageIcons,
@@ -22,9 +26,12 @@ import {
   uploadBrandAsset,
   withBrand,
 } from "../../../lib/brands";
+import { openSignIn, testRedirectUri } from "../../../lib/browser-sign-in";
 import { env } from "../../../lib/environment";
 import { expect, test } from "../../../lib/fixtures";
 import { solidPng } from "../../../lib/images";
+import { readAnswer } from "../../../lib/rfc6749";
+import { fillSettingsForm, saveSettings, withSettingsRestored } from "../../../lib/settings";
 
 // A logo draws the light image under a device asking for light and the dark one under a device
 // asking for dark, as the browser picks the source of its picture.
@@ -218,5 +225,48 @@ test("the console's own client given a brand with footer links and a support con
     await page.goto(`${env.adminUrl}/`);
     expect((await pageBrandStylesheets(page))[0]?.brandId).not.toBe(brand.id);
     await expect(page.locator("footer")).toHaveCount(0);
+  });
+});
+
+// A brand named in a registration request, as the Admin API names one or in RFC 7591's snake case, is
+// metadata the auth server does not understand, which RFC 7591 section 2 says it MUST ignore: the
+// client is on the default brand, on its Settings tab and on its sign-in (#812).
+test("a client that registers itself starts on the default brand, whatever its registration names", async ({ page, browser, request }) => {
+  const seeded = await defaultBrand(page);
+  let registered: string | undefined;
+  await withBrand(page, { appearance: "dark", theme: "plum" }, async (brand) => {
+    try {
+      await withSettingsRestored(page, "/admin/settings/general", async () => {
+        await fillSettingsForm(page, { dynamicClientRegistrationEnabled: true });
+        await saveSettings(page);
+        const answer = await readAnswer(
+          await request.post(`${env.authUrl}/connect/register`, {
+            data: {
+              client_name: "e2e self-registered brand",
+              redirect_uris: [testRedirectUri],
+              token_endpoint_auth_method: "none",
+              brandId: brand.id,
+              brand_id: brand.id,
+              brand: brand.name,
+            },
+            failOnStatusCode: false,
+          }),
+        );
+        expect(answer.status, answer.text).toBe(201);
+        registered = answer.body.client_id as string;
+      });
+
+      const id = await clientIdFromList(page, registered!);
+      expect(await clientBrandChoice(page, id), "the client's Settings tab").toBe(`Default brand (${seeded.name})`);
+      const signIn = await openSignIn(browser, { clientId: registered!, scope: "openid" });
+      try {
+        await expect(signIn.page).toHaveURL(/\/auth\/pwd/);
+        await expectDrawnInSeededDefault(signIn.page, seeded.id);
+      } finally {
+        await signIn.context.close();
+      }
+    } finally {
+      if (registered) await deleteClient(page, await clientIdFromList(page, registered));
+    }
   });
 });

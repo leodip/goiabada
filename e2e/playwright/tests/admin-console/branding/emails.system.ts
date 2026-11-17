@@ -4,11 +4,16 @@
 // its absolute URL, its card and button in Avocado's colors, its footer, and a plain-text part that
 // holds the reset link once and the footer written out. One asked for from the forgot password
 // page naming no sign-in arrives in the default brand, the seeded Blueberry, which is given a
-// support contact of its own for the run so the email shows it is the default's. Runs alone, since
-// the default brand's footer is under every page that has no brand of its own, and puts it back.
+// support contact of its own for the run so the email shows it is the default's. An email an Account
+// page sends is drawn in the brand of the admin console's own client, and one an administrator's
+// action sends in the default brand, whatever the console is drawn in. Runs alone, since the default
+// brand's footer is under every page that has no brand of its own, and the console's own client's
+// brand under every console page, and puts both back.
 import type { APIRequestContext, Page } from "@playwright/test";
-import { setClientBrand } from "../../../lib/admin-console";
+import { clientIdFromList, confirmDialog, setClientBrand, userUrl } from "../../../lib/admin-console";
 import {
+  blueberryLightMail,
+  mailLook,
   type BrandFooter,
   brandKitToken,
   defaultBrand,
@@ -22,6 +27,7 @@ import { env } from "../../../lib/environment";
 import { expect, test } from "../../../lib/fixtures";
 import { solidPng } from "../../../lib/images";
 import { linksIn, type Mail, waitForMail } from "../../../lib/mailpit";
+import { turnOnTwoFactor } from "../../../lib/console-user";
 import { browserSignInClient } from "../../../lib/test-clients";
 import { uniqueIdentifier } from "../../../lib/unique";
 
@@ -173,6 +179,45 @@ test("a password reset is drawn in the brand of the sign-in it was asked from, w
       expect(textWithLink(unbranded, unbrandedLink)).toMatch(new RegExp(`\\n\\nNeed help\\? ${defaultSupport.replace(/\./g, "\\.")}$`));
     } finally {
       await setBrandFooter(request, token, seeded.id, seededFooter);
+    }
+  });
+});
+
+// Two-factor authentication turned on from an Account page goes through the Account API with the
+// console's token, so its notice is drawn in the console's own client's brand; turned off by an
+// administrator, the notice is drawn in the default brand, which an administrator's action always is
+// (#817 decision 1), though the console itself is drawn in another.
+const avocadoLightCanvas = "#f3f6f4";
+
+test("an email an Account page sends is drawn in the console's own client's brand, and one an administrator's action sends in the default brand", async ({
+  page,
+  browser,
+  request,
+  users,
+}) => {
+  const consoleClient = await clientIdFromList(page, "admin-console-client");
+  const user = await users.create({ emailVerified: true });
+
+  await withBrand(page, { appearance: "light", theme: "avocado" }, async (brand) => {
+    try {
+      await setClientBrand(page, consoleClient, brand);
+
+      await turnOnTwoFactor(browser, user);
+      const setUp = await waitForMail(request, user.email);
+      expect(setUp.subject).toBe("Two-factor authentication was set up");
+      expect(mailLook(setUp.html), "the console's own client's brand").toMatchObject({ canvas: avocadoLightCanvas, colorScheme: "light" });
+
+      await page.goto(userUrl(user.id, "authentication"));
+      await page.locator("#otpEnabled").uncheck();
+      await page.locator("#btnSave").click();
+      await confirmDialog(page, "You're turning off the user's two-factor authentication");
+      await expect(page.getByText("Changes saved.")).toBeVisible();
+      const off = await waitForMail(request, user.email, 2);
+      expect(off.subject).toBe("An administrator turned off your two-factor authentication");
+      expect(mailLook(off.html), "the default brand, the seeded Blueberry").toMatchObject({ canvas: blueberryLightMail.canvas, colorScheme: "light" });
+      expect(off.html).not.toContain(avocadoLightCanvas);
+    } finally {
+      await setClientBrand(page, consoleClient, "default");
     }
   });
 });

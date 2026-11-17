@@ -49,13 +49,14 @@
   {{ end }}
 
   {{/* The legal documents in effect for the registration, linked where the data is collected:
-       those for all apps, plus the app's own when registration came from its sign-in (#622). */}}
+       those for all apps, plus the app's own when registration came from its sign-in (#622). Each
+       link names that sign-in, so the document is drawn in the app's brand (#812). */}}
   {{ if .legalDocuments }}
   <div class="field" id="legal-documents">
     <p class="field-hint">{{ T $.ctx "account.register.legal_documents" }}</p>
     <ul class="legal-links">
       {{ range .legalDocuments }}
-      <li><a class="text-link" href="/legal/{{ .ShortName }}">{{ .Title }}</a></li>
+      <li><a class="text-link" href="/legal/{{ .ShortName }}{{ if $.ceremonyId }}?ceremony={{ $.ceremonyId }}{{ end }}">{{ .Title }}</a></li>
       {{ end }}
     </ul>
   </div>

@@ -14,6 +14,7 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -346,8 +347,10 @@ func TestLegalAcceptance_ASignInWithADocumentOwedLandsOnTheStepAndAcceptRecordsT
 	page, stepURL := toStep(t, browser, f.signInToCompleted(t, browser))
 	_, documents := readStep(t, page)
 	version1 := strconv.FormatInt(versionId(t, termsId, 1), 10)
-	assert.Equal(t, []stepDocument{{title: "Shop terms", href: "/legal/" + terms, version: version1}}, documents,
-		"the step lists the one must-accept document, unticked, linking its public page")
+	publicPage := "/legal/" + terms + "?" + url.Values{ceremony.QueryParameter: {getCeremonyIdFromPage(t, page)}}.Encode()
+	assert.Equal(t, []stepDocument{{title: "Shop terms", href: publicPage, version: version1}}, documents,
+		"the step lists the one must-accept document, unticked, linking its public page, which names the sign-in "+
+			"so the page is drawn in the app's brand (#812)")
 	assert.Empty(t, acceptedVersionIds(t, f.user.Id), "showing the step records nothing")
 
 	started := time.Now().UTC().Add(-time.Second)
@@ -663,8 +666,9 @@ func TestLegalAcceptance_TheAdminConsolesOwnSignInIsNeverAsked(t *testing.T) {
 	page, _ := toStep(t, browser, app.ssoToCompleted(t, browser))
 	_, documents := readStep(t, page)
 	_ = page.Body.Close()
-	assert.True(t, slices.ContainsFunc(documents, func(d stepDocument) bool { return d.href == "/legal/"+shortName }),
-		"another app's sign-in owes the all-apps document")
+	assert.True(t, slices.ContainsFunc(documents, func(d stepDocument) bool {
+		return strings.HasPrefix(d.href, "/legal/"+shortName+"?")
+	}), "another app's sign-in owes the all-apps document")
 }
 
 func TestLegalAcceptance_ARetiredDocumentIsAskedOfNobodyUntilItIsRestored(t *testing.T) {

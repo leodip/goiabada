@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/legalmarkdown"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/errs"
@@ -30,6 +31,11 @@ type legalDocumentVersionLink struct {
 // one, and a version the document does not have, all answer the not-found page, as an unknown short
 // name does. A version is written in its canonical decimal form: versions/01 names no page, so a
 // version has one address.
+//
+// A page linked from a sign-in, its acceptance step or its registration page, names that sign-in in
+// its URL, which LinkedSignInPageClient draws it in the brand of (#812 decision 4). Its links to the
+// document's other versions name it too, so every version reached from there is drawn in that brand.
+// An id of the wrong shape is not echoed.
 func HandleLegalDocumentGet(pageRenderer PageRenderer, database legalDocumentPageDatabase) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		doc, err := database.GetLegalDocumentByShortName(r.Context(), nil, r.PathValue("shortName"))
@@ -79,7 +85,13 @@ func HandleLegalDocumentGet(pageRenderer PageRenderer, database legalDocumentPag
 			links[i] = legalDocumentVersionLink{Number: v.VersionNumber}
 		}
 
+		ceremonyId := r.URL.Query().Get(ceremony.QueryParameter)
+		if !ceremony.IsWellFormedId(ceremonyId) {
+			ceremonyId = ""
+		}
+
 		bind := map[string]interface{}{
+			"ceremonyId":           ceremonyId,
 			"shortName":            doc.ShortName,
 			"documentTitle":        shown.Title,
 			"documentHTML":         documentHTML,
