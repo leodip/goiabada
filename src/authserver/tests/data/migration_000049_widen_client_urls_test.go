@@ -25,6 +25,8 @@ var tables000049 = []string{"redirect_uris", "codes", "web_origins"}
 // On its own isolated database, as TestMigration000040_UpRollsBackALateFailure is, because its
 // first attempt ends dirty.
 func TestMigration000049_UpRollsBackALateFailure(t *testing.T) {
+	t.Parallel()
+
 	if dbType() != data.MSSQL {
 		t.Skipf("%s has no transactional 000049 up file to roll back", dbType())
 	}

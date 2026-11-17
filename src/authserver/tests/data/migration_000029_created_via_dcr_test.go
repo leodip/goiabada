@@ -52,6 +52,8 @@ import (
 //
 //	--run TestMigration000029_CreatedViaDCR
 func TestMigration000029_CreatedViaDCR(t *testing.T) {
+	t.Parallel()
+
 	h := newIsolatedDB(t)
 
 	require.NoError(t, h.Migrator.Migrate(context.Background(), 28), "migrate to 000028")

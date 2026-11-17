@@ -32,6 +32,8 @@ import (
 //
 //	--run TestMigration000068_RevokedAccessTokens
 func TestMigration000068_RevokedAccessTokens(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	h := newIsolatedDB(t)
 

@@ -43,6 +43,8 @@ import (
 //
 //	--run TestMigration000046_UserSessionsUserAgent
 func TestMigration000046_UserSessionsUserAgent(t *testing.T) {
+	t.Parallel()
+
 	h := newIsolatedDB(t)
 
 	require.NoError(t, h.Migrator.Migrate(context.Background(), 45), "migrate to 000045")

@@ -43,6 +43,8 @@ var columns000078 = []string{"privacy_policy_url", "terms_of_service_url"}
 //
 //	--run TestMigration000078_ClientPrivacyAndTermsURLs
 func TestMigration000078_ClientPrivacyAndTermsURLs(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	h := newIsolatedDB(t)
 

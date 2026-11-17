@@ -27,6 +27,8 @@ import (
 //
 //	--run TestMigration000053_AuthorizeRequests
 func TestMigration000053_AuthorizeRequests(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	h := newIsolatedDB(t)
 

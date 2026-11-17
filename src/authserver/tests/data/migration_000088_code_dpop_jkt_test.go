@@ -36,6 +36,8 @@ const (
 //
 //	--run TestMigration000088_CodeDPoPJkt
 func TestMigration000088_CodeDPoPJkt(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	h := newIsolatedDB(t)
 

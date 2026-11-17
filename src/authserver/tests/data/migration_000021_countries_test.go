@@ -31,6 +31,8 @@ import (
 //
 //	--run TestMigration000021_CountryData
 func TestMigration000021_CountryData(t *testing.T) {
+	t.Parallel()
+
 	h := newIsolatedDB(t)
 
 	// Bring the schema up to 000058, then move only the version MARKER back to

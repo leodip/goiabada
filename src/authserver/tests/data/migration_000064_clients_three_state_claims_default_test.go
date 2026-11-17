@@ -37,6 +37,8 @@ const (
 //
 //	--run TestMigration000064_ClientsThreeStateClaimsDefault
 func TestMigration000064_ClientsThreeStateClaimsDefault(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	h := newIsolatedDB(t)
 

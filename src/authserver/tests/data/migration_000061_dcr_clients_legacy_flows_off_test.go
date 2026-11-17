@@ -39,6 +39,8 @@ const (
 //
 //	--run TestMigration000061_DCRClientsLegacyFlowsOff
 func TestMigration000061_DCRClientsLegacyFlowsOff(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	h := newIsolatedDB(t)
 

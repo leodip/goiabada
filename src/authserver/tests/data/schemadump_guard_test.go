@@ -19,6 +19,8 @@ import (
 //
 //	--run TestSchemaDump_RefusesWhatItCannotRead
 func TestSchemaDump_RefusesWhatItCannotRead(t *testing.T) {
+	t.Parallel()
+
 	h := newIsolatedDB(t)
 	require.NoError(t, h.Migrator.Migrate(context.Background(), 35), "migrate to 000035")
 
@@ -49,6 +51,8 @@ func TestSchemaDump_RefusesWhatItCannotRead(t *testing.T) {
 // schema_migrations is dropped to get there, which is safe because the isolated database is
 // thrown away at the end of this test and has never been migrated past version 0.
 func TestSchemaDump_RefusesAnEmptyTableList(t *testing.T) {
+	t.Parallel()
+
 	h := newIsolatedDB(t)
 
 	// NewMigrator's driver creates schema_migrations at construction, so an isolated
@@ -88,6 +92,8 @@ type guardCase struct {
 //
 //	--run TestSchemaDump_RefusesUnrepresentableConstructs
 func TestSchemaDump_RefusesUnrepresentableConstructs(t *testing.T) {
+	t.Parallel()
+
 	h := newIsolatedDB(t)
 	d := dbType()
 

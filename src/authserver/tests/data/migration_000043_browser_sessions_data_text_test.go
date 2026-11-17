@@ -43,6 +43,8 @@ func columnNamesOf000043(s tableShape) []string {
 //
 //	--run TestMigration000043_BrowserSessionsDataText
 func TestMigration000043_BrowserSessionsDataText(t *testing.T) {
+	t.Parallel()
+
 	h := newIsolatedDB(t)
 
 	if !isSQLite000041() {

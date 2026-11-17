@@ -186,6 +186,8 @@ func assertFinalShape000039(t *testing.T, phase string, codes, rt tableShape) {
 //
 //	--run TestMigration000039_RowValuesSurviveTheRebuild
 func TestMigration000039_RowValuesSurviveTheRebuild(t *testing.T) {
+	t.Parallel()
+
 	h := newIsolatedDB(t)
 
 	pred := predecessor000039()
@@ -246,6 +248,8 @@ func TestMigration000039_RowValuesSurviveTheRebuild(t *testing.T) {
 //
 //	--run TestMigration000039_ChallengelessCodeIsStorable
 func TestMigration000039_ChallengelessCodeIsStorable(t *testing.T) {
+	t.Parallel()
+
 	h := newIsolatedDB(t)
 
 	pred := predecessor000039()
@@ -310,6 +314,8 @@ func TestMigration000039_ChallengelessCodeIsStorable(t *testing.T) {
 //
 //	--run TestMigration000039_RopcTokenBlocksUserDelete
 func TestMigration000039_RopcTokenBlocksUserDelete(t *testing.T) {
+	t.Parallel()
+
 	h := newIsolatedDB(t)
 
 	pred := predecessor000039()

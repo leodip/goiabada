@@ -17,6 +17,8 @@ import (
 // empty value. On isolated databases, so the raw reads and writes reach only this test's rows.
 
 func TestUpdateSettings_LeavesUIThemeAsStored(t *testing.T) {
+	t.Parallel()
+
 	h := migratedIsolatedDB(t)
 	ctx := context.Background()
 
@@ -40,6 +42,8 @@ func TestUpdateSettings_LeavesUIThemeAsStored(t *testing.T) {
 }
 
 func TestCreateSettings_FillsUIThemeWithTheEmptyValue(t *testing.T) {
+	t.Parallel()
+
 	h := migratedIsolatedDB(t)
 	ctx := context.Background()
 

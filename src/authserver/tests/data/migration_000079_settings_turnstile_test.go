@@ -37,6 +37,8 @@ const (
 //
 //	--run TestMigration000079_SettingsTurnstile
 func TestMigration000079_SettingsTurnstile(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	h := newIsolatedDB(t)
 

@@ -33,6 +33,8 @@ import (
 //
 //	--run TestDumpTable_ReadsTheCatalog
 func TestDumpTable_ReadsTheCatalog(t *testing.T) {
+	t.Parallel()
+
 	h := newIsolatedDB(t)
 
 	require.NoError(t, h.Migrator.Migrate(context.Background(), 35), "migrate to 000035")

@@ -237,6 +237,8 @@ func TestIsEmpty_RefusesAnAlreadyCancelledContext(t *testing.T) {
 // added to satisfy a guard and then not used is exactly the shape that guard cannot see. This
 // is what says the seven calls it threads a context through actually issue with it.
 func TestSchemadumpTables_RefusesAnAlreadyCancelledContext(t *testing.T) {
+	t.Parallel()
+
 	h := newIsolatedDB(t)
 	require.NoError(t, h.Migrator.Up(context.Background()), "migrate to head")
 

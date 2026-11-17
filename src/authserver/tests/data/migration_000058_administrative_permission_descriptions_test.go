@@ -135,6 +135,8 @@ func (f *descriptionsFixture000058) descriptions(t *testing.T, resource *record.
 //
 //	--run TestMigration000058
 func TestMigration000058_RewritesTheSeededDescriptions(t *testing.T) {
+	t.Parallel()
+
 	h := newIsolatedDB(t)
 	ctx := context.Background()
 	f := seedDescriptionsFixture000058(t, h, seededDescriptions000058)
@@ -162,6 +164,8 @@ func TestMigration000058_RewritesTheSeededDescriptions(t *testing.T) {
 // trailing word), so a predicate that matched on the identifier alone, or loosely on the text, is
 // seen on every row it would rewrite.
 func TestMigration000058_KeepsAnOperatorsOwnWording(t *testing.T) {
+	t.Parallel()
+
 	h := newIsolatedDB(t)
 	ctx := context.Background()
 
@@ -199,6 +203,8 @@ func TestMigration000058_KeepsAnOperatorsOwnWording(t *testing.T) {
 // resource, which is every fresh installation before the seed runs: neither has a row to rewrite,
 // and neither may fail.
 func TestMigration000058_AnEmptyDatabase(t *testing.T) {
+	t.Parallel()
+
 	h := newIsolatedDB(t)
 	ctx := context.Background()
 

@@ -90,6 +90,8 @@ type repair000034 struct {
 //
 //	--run TestMigration000034_CanonicalizeWebOrigins
 func TestMigration000034_CanonicalizeWebOrigins(t *testing.T) {
+	t.Parallel()
+
 	h := newIsolatedDB(t)
 
 	// Seeded at 000033 after a round trip to head, on

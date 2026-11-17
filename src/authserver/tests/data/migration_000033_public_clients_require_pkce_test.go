@@ -65,6 +65,8 @@ import (
 //
 //	--run TestMigration000033_PublicClientsRequirePKCE
 func TestMigration000033_PublicClientsRequirePKCE(t *testing.T) {
+	t.Parallel()
+
 	h := newIsolatedDB(t)
 
 	// ErrNoChange is tolerated because 000033 is currently head, so Up() may have nothing to

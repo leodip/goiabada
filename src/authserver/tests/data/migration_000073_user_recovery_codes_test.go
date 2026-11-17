@@ -27,6 +27,8 @@ import (
 //
 //	--run TestMigration000073_UserRecoveryCodes
 func TestMigration000073_UserRecoveryCodes(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	h := newIsolatedDB(t)
 

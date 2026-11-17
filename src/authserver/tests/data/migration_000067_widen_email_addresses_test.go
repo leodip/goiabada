@@ -156,6 +156,8 @@ func settingsRow000067() *record.Settings {
 //
 // Skipped on SQLite, which has no 000067.
 func TestMigration000067_WidensTheFourColumnsAndNothingElse(t *testing.T) {
+	t.Parallel()
+
 	skipWithout000067(t)
 	ctx := context.Background()
 	h := newIsolatedDB(t)
@@ -275,6 +277,8 @@ func refusal000067(c column000067) string {
 //
 // Skipped on SQLite, which has no 000067.
 func TestMigration000067_DownRefusesAnAddressThatNoLongerFits(t *testing.T) {
+	t.Parallel()
+
 	skipWithout000067(t)
 	ctx := context.Background()
 	h := newIsolatedDB(t)
@@ -333,6 +337,8 @@ func TestMigration000067_DownRefusesAnAddressThatNoLongerFits(t *testing.T) {
 //
 // On its own isolated database, as 000049's is, because its first attempt ends dirty.
 func TestMigration000067_UpRollsBackALateFailure(t *testing.T) {
+	t.Parallel()
+
 	if dbType() != data.MSSQL {
 		t.Skipf("%s has no transactional 000067 up file to roll back", dbType())
 	}

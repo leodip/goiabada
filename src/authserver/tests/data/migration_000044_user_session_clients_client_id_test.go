@@ -37,6 +37,8 @@ const innodbForeignKeyIndex000044 = "fk_user_session_clients_client"
 //
 //	--run TestMigration000044_UserSessionClientsClientIdIndex
 func TestMigration000044_UserSessionClientsClientIdIndex(t *testing.T) {
+	t.Parallel()
+
 	h := newIsolatedDB(t)
 
 	// The version immediately below 000044 differs per engine, because migrations land on the

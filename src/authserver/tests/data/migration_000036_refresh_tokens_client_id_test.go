@@ -41,6 +41,8 @@ const refreshTokensClientIdIndex000036 = "idx_refresh_tokens_client_id"
 //
 //	--run TestMigration000036_RefreshTokensClientIdIndex
 func TestMigration000036_RefreshTokensClientIdIndex(t *testing.T) {
+	t.Parallel()
+
 	h := newIsolatedDB(t)
 
 	require.NoError(t, h.Migrator.Migrate(context.Background(), 35), "migrate to 000035")

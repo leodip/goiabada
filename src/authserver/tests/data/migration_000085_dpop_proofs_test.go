@@ -33,6 +33,8 @@ const (
 //
 //	--run TestMigration000085_DPoPProofs
 func TestMigration000085_DPoPProofs(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	h := newIsolatedDB(t)
 

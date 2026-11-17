@@ -46,6 +46,8 @@ const (
 //
 //	--run TestMigration000060_AdministrativeScopesAllowed
 func TestMigration000060_AdministrativeScopesAllowed(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	h := newIsolatedDB(t)
 

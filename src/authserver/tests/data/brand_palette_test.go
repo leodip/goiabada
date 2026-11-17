@@ -144,6 +144,8 @@ func TestBrand_TheDefaultAndAClientsPageBrandReadThePalette(t *testing.T) {
 // A brand with no palette stores NULL, the value migration 000093 gives every existing brand, and
 // not some other spelling of nothing.
 func TestBrand_NoPaletteIsStoredAsNull(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	h := migratedIsolatedDB(t)
 

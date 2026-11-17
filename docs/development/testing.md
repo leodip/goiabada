@@ -70,6 +70,13 @@ every other name, so the server or the data tier recreates and migrates it and t
 server seeds it. The drop itself is each engine package's `DropDatabase`, the one spelling
 `schemadump` and the data tier's fixtures use too (#433).
 
+**Parallel data tests**: a data test whose every database is its own, from `newIsolatedDB` or a
+helper over it, calls `t.Parallel()`, since the database's name is the test's and each engine names
+its migration lock after the database. A data test that also reaches the shared database, captures
+the global logger, holds a lock or package fixture another test takes, or asserts how long
+something took stays serial; Go runs every serial test before the parallel ones resume, so the two
+never overlap.
+
 **Dev stack secrets**: the dev stack's data key and its MySQL, PostgreSQL and SQL Server passwords
 come from `src/.devcontainer/.env`, which `src/.devcontainer/generate-env.sh` writes with fresh
 values (and fills in when one is missing) and `.gitignore` keeps out of git; Compose hands them to

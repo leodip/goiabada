@@ -36,6 +36,8 @@ const (
 //
 //	--run TestMigration000094_BrandCustomCSS
 func TestMigration000094_BrandCustomCSS(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	h := migratedIsolatedDB(t)
 

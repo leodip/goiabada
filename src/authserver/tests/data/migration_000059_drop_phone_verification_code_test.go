@@ -57,6 +57,8 @@ var phoneVerificationCodeColumns000059 = []string{
 //
 //	--run TestMigration000059_DropPhoneVerificationCode
 func TestMigration000059_DropPhoneVerificationCode(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	h := newIsolatedDB(t)
 

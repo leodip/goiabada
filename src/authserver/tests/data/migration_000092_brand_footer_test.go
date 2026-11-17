@@ -42,6 +42,8 @@ var brandFooterColumns000092 = []string{"support_email", "support_url", "support
 //
 //	--run TestMigration000092_BrandFooter
 func TestMigration000092_BrandFooter(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	h := migratedIsolatedDB(t)
 

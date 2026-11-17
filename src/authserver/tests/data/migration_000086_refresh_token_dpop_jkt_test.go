@@ -36,6 +36,8 @@ const (
 //
 //	--run TestMigration000086_RefreshTokenDPoPJkt
 func TestMigration000086_RefreshTokenDPoPJkt(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	h := newIsolatedDB(t)
 

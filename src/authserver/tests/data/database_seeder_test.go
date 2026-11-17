@@ -57,6 +57,8 @@ func migratedIsolatedDB(t *testing.T) *isolatedDB {
 //
 //	--run TestSeederLowercasesAdminEmail
 func TestSeederLowercasesAdminEmail(t *testing.T) {
+	t.Parallel()
+
 	h := migratedIsolatedDB(t)
 
 	const givenEmail = "Admin@Example.com"
@@ -81,6 +83,8 @@ func TestSeederLowercasesAdminEmail(t *testing.T) {
 // resource's permissions save demands every built-in by its row, so a built-in the seed does not
 // write answers every save of that resource with a 500. userinfo is in neither since #449.
 func TestSeed_TheAuthServerPermissionsAreTheBuiltIns(t *testing.T) {
+	t.Parallel()
+
 	h := migratedIsolatedDB(t)
 	ctx := context.Background()
 
@@ -109,6 +113,8 @@ func TestSeed_TheAuthServerPermissionsAreTheBuiltIns(t *testing.T) {
 // 000058 writes the same wording on an installation seeded before it, and the two must not drift,
 // which is why the expected map is the migration test's own.
 func TestSeed_TheAdministrativeDescriptionsStateTheBoundary(t *testing.T) {
+	t.Parallel()
+
 	h := migratedIsolatedDB(t)
 	ctx := context.Background()
 
@@ -240,6 +246,8 @@ func TestSeed_AFailedFirstSeedLeavesNothingAndTheNextSeeds(t *testing.T) {
 // themselves, a start arriving after the winner's commit would read the database as seeded and
 // carry on without racing at all, and the test would pass with the race unhandled.
 func TestSeed_SeveralStartsOnOneEmptyDatabaseAllCarryOn(t *testing.T) {
+	t.Parallel()
+
 	h := migratedIsolatedDB(t)
 	const starts = 3
 
@@ -295,6 +303,8 @@ func (c *checkEmptinessTogether) IsEmpty(ctx context.Context) (bool, error) {
 // own tests are where that is proved deterministically. This is the composition, on the engines that
 // have replicas.
 func TestFirstStart_SeveralReplicasOnOneEmptyDatabaseAllComeUp(t *testing.T) {
+	t.Parallel()
+
 	if dbType() == data.SQLite {
 		t.Skip("a SQLite database belongs to one process; replicas need a server engine")
 	}

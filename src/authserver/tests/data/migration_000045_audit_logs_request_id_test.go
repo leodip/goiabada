@@ -36,6 +36,8 @@ import (
 //
 //	--run TestMigration000045_AuditLogsRequestId
 func TestMigration000045_AuditLogsRequestId(t *testing.T) {
+	t.Parallel()
+
 	h := newIsolatedDB(t)
 
 	require.NoError(t, h.Migrator.Migrate(context.Background(), 44), "migrate to 000044")

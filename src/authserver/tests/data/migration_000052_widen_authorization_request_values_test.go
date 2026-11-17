@@ -87,6 +87,8 @@ func widened000052(t *testing.T, before map[string]tableShape) map[string]tableS
 //
 // Skipped on SQLite, which has no 000052.
 func TestMigration000052_WidensTheFiveColumnsAndNothingElse(t *testing.T) {
+	t.Parallel()
+
 	skipWithout000052(t)
 	ctx := context.Background()
 	h := newIsolatedDB(t)
@@ -137,6 +139,8 @@ func TestMigration000052_WidensTheFiveColumnsAndNothingElse(t *testing.T) {
 //
 // On its own isolated database, as 000049's is, because its first attempt ends dirty.
 func TestMigration000052_UpRollsBackALateFailure(t *testing.T) {
+	t.Parallel()
+
 	if dbType() != data.MSSQL {
 		t.Skipf("%s has no transactional 000052 up file to roll back", dbType())
 	}

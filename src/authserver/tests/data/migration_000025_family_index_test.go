@@ -40,6 +40,8 @@ const familyIndexName000025 = "idx_refresh_tokens_first_refresh_token_jti"
 //
 //	--run TestMigration000025_RefreshTokenFamilyIndex
 func TestMigration000025_RefreshTokenFamilyIndex(t *testing.T) {
+	t.Parallel()
+
 	h := newIsolatedDB(t)
 
 	require.NoError(t, h.Migrator.Migrate(context.Background(), 24), "migrate to 000024")

@@ -72,6 +72,8 @@ func TestBrand_CustomCSSReadsBackWhatWasWritten(t *testing.T) {
 // A brand with no custom CSS stores ”, the value migration 000094 gives every existing brand, and
 // not NULL.
 func TestBrand_NoCustomCSSIsStoredAsEmpty(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	h := migratedIsolatedDB(t)
 

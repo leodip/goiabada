@@ -35,6 +35,8 @@ const (
 //
 //	--run TestMigration000095_EmailTemplates
 func TestMigration000095_EmailTemplates(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	h := newIsolatedDB(t)
 

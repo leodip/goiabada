@@ -38,6 +38,8 @@ const (
 //
 //	--run TestMigration000081_SettingsKeepSignedIn
 func TestMigration000081_SettingsKeepSignedIn(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	h := newIsolatedDB(t)
 

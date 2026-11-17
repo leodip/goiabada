@@ -47,6 +47,8 @@ const (
 //
 //	--run TestMigration000056_DropPreRegistrationPasswordHash
 func TestMigration000056_DropPreRegistrationPasswordHash(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	h := newIsolatedDB(t)
 
