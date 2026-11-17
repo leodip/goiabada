@@ -1,3 +1,5 @@
+//go:build !race
+
 package data
 
 // The one place the repository is held to "an id-list lookup reads its ids in the batches one

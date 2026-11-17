@@ -1,3 +1,5 @@
+//go:build !race
+
 package data
 
 // The one place the repository is held to "no production code saves a user by writing back the

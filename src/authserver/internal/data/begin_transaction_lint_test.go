@@ -1,3 +1,5 @@
+//go:build !race
+
 package data
 
 // The one place the repository is held to "every transaction is opened through

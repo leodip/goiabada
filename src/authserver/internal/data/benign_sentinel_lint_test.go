@@ -1,3 +1,5 @@
+//go:build !race
+
 package data
 
 // The one place the repository is held to "a benign migrator sentinel is matched by identity,

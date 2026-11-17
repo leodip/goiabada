@@ -1,3 +1,5 @@
+//go:build !race
+
 package audit
 
 // The one place the audit event names are held to "every declared event is in the catalog, and

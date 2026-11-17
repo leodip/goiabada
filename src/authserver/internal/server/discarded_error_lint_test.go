@@ -1,3 +1,5 @@
+//go:build !race
+
 package server
 
 // The one place the auth server is held to "a hash, an encryption or a key generation that failed

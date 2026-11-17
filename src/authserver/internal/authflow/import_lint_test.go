@@ -1,3 +1,5 @@
+//go:build !race
+
 package authflow
 
 // The one place authflow is held to "an operation cannot reach HTTP". Its operations decide a

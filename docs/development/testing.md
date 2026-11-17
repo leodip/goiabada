@@ -95,6 +95,12 @@ whose failures-only limiter holds the in-flight count since #439, the concurrent
 of #301) is covered there and nowhere else; the setup tier also accepts `--race`; the data and
 integration tiers do not run under it.
 
+A `*_lint_test.go` file checks source text: it parses files and runs none of the code it reads, so a
+race the detector could find there would be in the guard or its harness, never in the code under
+check. Every one starts with `//go:build !race` and runs once, in the plain tier.
+What another test file uses, a finder its rule tests drive over fixtures or a reader of the served
+scripts, lives in a file of its own beside it, which both builds read.
+
 ## Browser e2e tests
 
 The Playwright suites in `e2e/` need the maintainer's VPS and SSH access, which external

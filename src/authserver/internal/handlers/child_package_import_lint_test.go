@@ -1,3 +1,5 @@
+//go:build !race
+
 package handlers
 
 // The one place the auth server's two child handler packages are held to "a child does not import

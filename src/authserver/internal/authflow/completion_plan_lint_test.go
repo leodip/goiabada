@@ -1,3 +1,5 @@
+//go:build !race
+
 package authflow
 
 // The one place a completion plan mode is held to "built only by its constructor". A mode written as

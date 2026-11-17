@@ -1,3 +1,5 @@
+//go:build !race
+
 package guard
 
 // Seam 2: the rule table AssertNoLegacyErrors enforces, over fixture source text written into a
