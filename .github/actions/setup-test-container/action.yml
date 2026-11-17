@@ -15,6 +15,10 @@ inputs:
   node:
     description: Node.js version, from versions.yaml
     required: true
+  save-cache:
+    description: Save the Go cache at the end of the job when its key is new ('true' in one job only)
+    required: false
+    default: 'false'
 
 runs:
   using: composite
@@ -57,8 +61,24 @@ runs:
         node --version
 
     # GOPATH and GOCACHE inside the official golang image, which runs as root.
+    #
+    # Every job restores the cache and one saves it: the job that passes save-cache, Unit /
+    # authserver, whose modules include every module the core and console tiers download. A
+    # key is new after every go.sum change, and when every job saved, each one compressed the
+    # whole cache at its end, about a minute, for all but the first to be refused the key.
     - name: Cache Go modules and build output
+      if: inputs.save-cache == 'true'
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: |
+          /go/pkg/mod
+          /root/.cache/go-build
+        key: ${{ runner.os }}-gomod-${{ hashFiles('src/**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-gomod-
+    - name: Restore Go modules and build output
+      if: inputs.save-cache != 'true'
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: |
           /go/pkg/mod

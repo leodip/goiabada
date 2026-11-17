@@ -469,6 +469,7 @@ jobs:
         with:
           tailwind: ${{ needs.versions.outputs.tailwind }}
           node: ${{ needs.versions.outputs.node }}
+          save-cache: 'true'
       - name: Authserver internal tests
         working-directory: src/authserver
         run: ./run-tests.sh --type internal --no-build
@@ -651,38 +652,49 @@ jobs:
           path: site/playwright-report/
           retention-days: 7
 
-  # The four database jobs are written out rather than expressed as a matrix.
-  # `matrix` IS available to `services`, so a matrix is possible -- this is a
-  # readability choice. Each database needs its own env block, health command
-  # and port, and expressing that through per-key conditional expressions trades
-  # obvious duplication for expressions that are harder to debug when a health
-  # check misbehaves. A naive matrix would also boot all three databases for
-  # every leg, and GitHub waits for every service health check before running
+  # The four database jobs are written out rather than expressed as a matrix over
+  # the database. `matrix` IS available to `services`, so a matrix is possible --
+  # this is a readability choice. Each database needs its own env block, health
+  # command and port, and expressing that through per-key conditional expressions
+  # trades obvious duplication for expressions that are harder to debug when a
+  # health check misbehaves. A naive matrix would also boot all three databases
+  # for every leg, and GitHub waits for every service health check before running
   # any step, so the sqlite leg would block on an MSSQL container it never uses.
   #
-  # All four skip while the pull request is a draft, and all four run when it is
-  # taken out of draft. They are 23 of the 36 runner-minutes a run costs and they
-  # set its wall clock -- 6.9 minutes for mssql against 5.1 for the slowest job
-  # left -- and a gbd-drive run pays that on every stage it commits, half a dozen
-  # times before anybody reads the branch. What the draft loses by skipping them
-  # is narrower than it looks: every stage already runs the data and integration
-  # tiers on sqlite locally, in the dev container, before it commits. What these
-  # jobs add is cross-engine parity, the migration sqlite accepts and MSSQL does
-  # not, and that answer is wanted before a human reads the pull request rather
-  # than between two stages of one.
+  # Each of the four is a matrix over the tier instead: a Data leg and an
+  # Integration leg, each with its own database server, so a run waits for the
+  # slower of the two tiers rather than for both in turn. The legs share nothing
+  # but the job's definition. Only the integration leg builds, because only its
+  # server runs the binary; the data tier compiles what it tests itself.
+  #
+  # All of them skip while the pull request is a draft, and all of them run when
+  # it is taken out of draft. They set the run's wall clock, and a gbd-drive run
+  # pays that on every stage it commits, half a dozen times before anybody reads
+  # the branch. What the draft loses by skipping them is narrower than it looks:
+  # every stage already runs the data and integration tiers on sqlite locally, in
+  # the dev container, before it commits. What these jobs add is cross-engine
+  # parity, the migration sqlite accepts and MSSQL does not, and that answer is
+  # wanted before a human reads the pull request rather than between two stages
+  # of one.
   #
   # `github.event_name != 'pull_request'` is what keeps a push to main and
-  # release.yml's workflow_call running all four: neither has a draft flag, and
-  # `github.event.pull_request.draft` is null in both.
+  # release.yml's workflow_call running all of them: neither has a draft flag,
+  # and `github.event.pull_request.draft` is null in both.
   #
   # A skipped job is not a hole in the gate. GitHub reports it as `skipped`, and
   # where.sh ci -- which is what gbd-drive and the run roles ask -- counts
   # skipped as passing, so a draft's suite concludes green on the fast half.
 
   tests-sqlite:
-    name: Tests / sqlite
+    name: ${{ matrix.title }} / sqlite
     needs: versions
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { tier: data, title: Data }
+          - { tier: integration, title: Integration }
     runs-on: ubuntu-latest
     container:
       image: golang:${{ needs.versions.outputs.go }}-bookworm
@@ -702,19 +714,23 @@ jobs:
           tailwind: ${{ needs.versions.outputs.tailwind }}
           node: ${{ needs.versions.outputs.node }}
       - name: Build
+        if: matrix.tier == 'integration'
         working-directory: src/authserver
         run: ./build.sh
-      - name: Data tests
+      - name: ${{ matrix.title }} tests
         working-directory: src/authserver
-        run: ./run-tests.sh --type data --db sqlite --no-build
-      - name: Integration tests
-        working-directory: src/authserver
-        run: ./run-tests.sh --type integration --db sqlite --no-build
+        run: ./run-tests.sh --type ${{ matrix.tier }} --db sqlite --no-build
 
   tests-mysql:
-    name: Tests / mysql
+    name: ${{ matrix.title }} / mysql
     needs: versions
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { tier: data, title: Data }
+          - { tier: integration, title: Integration }
     runs-on: ubuntu-latest
     env:
       MYSQL_ROOT_PASSWORD: ${{ needs.versions.outputs.mysql-password }}
@@ -766,19 +782,23 @@ jobs:
           engine: mysql
           container: ${{ job.services.mysql-server.id }}
       - name: Build
+        if: matrix.tier == 'integration'
         working-directory: src/authserver
         run: ./build.sh
-      - name: Data tests
+      - name: ${{ matrix.title }} tests
         working-directory: src/authserver
-        run: ./run-tests.sh --type data --db mysql --no-build
-      - name: Integration tests
-        working-directory: src/authserver
-        run: ./run-tests.sh --type integration --db mysql --no-build
+        run: ./run-tests.sh --type ${{ matrix.tier }} --db mysql --no-build
 
   tests-postgres:
-    name: Tests / postgres
+    name: ${{ matrix.title }} / postgres
     needs: versions
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { tier: data, title: Data }
+          - { tier: integration, title: Integration }
     runs-on: ubuntu-latest
     env:
       POSTGRES_PASSWORD: ${{ needs.versions.outputs.postgres-password }}
@@ -824,19 +844,23 @@ jobs:
           engine: postgres
           container: ${{ job.services.postgres-server.id }}
       - name: Build
+        if: matrix.tier == 'integration'
         working-directory: src/authserver
         run: ./build.sh
-      - name: Data tests
+      - name: ${{ matrix.title }} tests
         working-directory: src/authserver
-        run: ./run-tests.sh --type data --db postgres --no-build
-      - name: Integration tests
-        working-directory: src/authserver
-        run: ./run-tests.sh --type integration --db postgres --no-build
+        run: ./run-tests.sh --type ${{ matrix.tier }} --db postgres --no-build
 
   tests-mssql:
-    name: Tests / mssql
+    name: ${{ matrix.title }} / mssql
     needs: versions
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { tier: data, title: Data }
+          - { tier: integration, title: Integration }
     runs-on: ubuntu-latest
     env:
       MSSQL_SA_PASSWORD: ${{ needs.versions.outputs.mssql-password }}
@@ -888,14 +912,12 @@ jobs:
           engine: mssql
           container: ${{ job.services.mssql-server.id }}
       - name: Build
+        if: matrix.tier == 'integration'
         working-directory: src/authserver
         run: ./build.sh
-      - name: Data tests
+      - name: ${{ matrix.title }} tests
         working-directory: src/authserver
-        run: ./run-tests.sh --type data --db mssql --no-build
-      - name: Integration tests
-        working-directory: src/authserver
-        run: ./run-tests.sh --type integration --db mssql --no-build
+        run: ./run-tests.sh --type ${{ matrix.tier }} --db mssql --no-build
 
   # Moves discovery of a broken Dockerfile or cross-compile from "when I tag a
   # release" to "right after the merge", without making every PR pay for it.
