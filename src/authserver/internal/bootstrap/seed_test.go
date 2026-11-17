@@ -11,8 +11,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/data/sqlitedb/sqlitedbtest"
+
 	"github.com/leodip/goiabada/authserver/internal/data"
-	"github.com/leodip/goiabada/authserver/internal/data/migrator"
 	"github.com/leodip/goiabada/authserver/internal/data/sqlitedb"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -46,16 +47,7 @@ type seedDB struct {
 
 func newSeedDB(t *testing.T) *seedDB {
 	t.Helper()
-	db, err := sqlitedb.New(context.Background(), "file:"+filepath.Join(t.TempDir(), "bootstrap_test.db"), false)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = db.DB.Close() })
-
-	m, err := db.NewMigrator(context.Background(), nil)
-	require.NoError(t, err)
-	if err := m.Up(context.Background()); err != nil && !errors.Is(err, migrator.ErrNoChange) {
-		require.NoError(t, err, "migrate to head before seeding")
-	}
-	return &seedDB{db}
+	return &seedDB{sqlitedbtest.NewMigrated(t)}
 }
 
 // counts answers the row count of every seeded table, which a failed seed must leave where it

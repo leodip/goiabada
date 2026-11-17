@@ -476,7 +476,8 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   `core/builtin` and `core/errs` (#359, #387, #442)
 - `internal/data/` - The composition-only `Database` interface, `commondb/`, the four engine
   adapters, and the generated `Database` mock that every narrow port is tested through (#354, #359,
-  #386)
+  #386). `sqlitedb/sqlitedbtest` gives unit tests SQLite databases already at the migration head,
+  each a copy of one database its test binary migrated once
 - `internal/data/datafactory/` - Database composition: engine selection, config mapping, the
   email-case pre-flight, which the migrator runs under its lock on its own connection (#542), the
   startup data tasks, which refuse a start whose data key opens none of the stored data (#353, #438,

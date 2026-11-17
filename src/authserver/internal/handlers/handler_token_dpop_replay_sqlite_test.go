@@ -2,20 +2,19 @@ package handlers
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/data/sqlitedb/sqlitedbtest"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/leodip/goiabada/authserver/internal/data/migrator"
 	datamocks "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/data/sqlitedb"
 	"github.com/leodip/goiabada/authserver/internal/dpop"
@@ -38,16 +37,7 @@ import (
 
 func newReplaySQLiteDB(t *testing.T) *sqlitedb.Database {
 	t.Helper()
-	db, err := sqlitedb.New(context.Background(), "file:"+filepath.Join(t.TempDir(), "dpop_replay_test.db"), false)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = db.DB.Close() })
-
-	m, err := db.NewMigrator(context.Background(), nil)
-	require.NoError(t, err)
-	if err := m.Up(context.Background()); err != nil && !errors.Is(err, migrator.ErrNoChange) {
-		require.NoError(t, err, "migrate to head")
-	}
-	return db
+	return sqlitedbtest.NewMigrated(t)
 }
 
 // newDPoPTokenInstance is one auth server instance's token endpoint, under dpopSessionKey, storing

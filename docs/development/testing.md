@@ -41,6 +41,14 @@ is that refused code, and `PreviousStepCode` the oldest accepted one, which a te
 the current step's code unspent for a second sign-in. Both wait out the last two seconds of a step,
 so the step cannot turn before the server checks the code.
 
+A unit test that needs a real SQLite database at the head of the migration set takes one from
+`authserver/internal/data/sqlitedb/sqlitedbtest`, test support like `otptest`: `NewMigrated` opens a
+copy of its own in the test's temporary directory, and `WriteMigrated` writes one at a path the test
+hands to the code it runs. Each test binary migrates one database the first time a test asks and
+copies its bytes for every test after it, because migrating every test's database from empty cost
+seconds per test under the race detector. A test whose subject is a migration, or a start that
+migrates, still builds its database from empty.
+
 A test that sends a DPoP proof builds it with `authserver/internal/dpop/dpoptest`, test support like
 `otptest`: ES256 over RFC 7517's and RFC 7515's published P-256 keys, signed with the standard
 library and importing nothing from `dpop`, each key's `Thumbprint` a literal worked out apart from

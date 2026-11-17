@@ -4,16 +4,16 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"path/filepath"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/leodip/goiabada/authserver/internal/data/sqlitedb/sqlitedbtest"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/leodip/goiabada/authserver/internal/data/migrator"
 	"github.com/leodip/goiabada/authserver/internal/data/sqlitedb"
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -59,14 +59,7 @@ func newBindingFixture(t *testing.T, shape familyShape, public bool) *bindingFix
 	t.Helper()
 	ctx := context.Background()
 
-	db, err := sqlitedb.New(ctx, "file:"+filepath.Join(t.TempDir(), "refresh_binding_test.db"), false)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = db.DB.Close() })
-	m, err := db.NewMigrator(ctx, nil)
-	require.NoError(t, err)
-	if upErr := m.Up(ctx); upErr != nil && !errors.Is(upErr, migrator.ErrNoChange) {
-		require.NoError(t, upErr, "migrate to head")
-	}
+	db := sqlitedbtest.NewMigrated(t)
 
 	keyPair, err := signingkeys.NewKeyPair(testDataCipher, record.KeyStateCurrent, 2048)
 	require.NoError(t, err)
