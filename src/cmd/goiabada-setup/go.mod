@@ -4,11 +4,11 @@ go 1.27.4
 
 require (
 	github.com/go-sql-driver/mysql v1.10.1
-	github.com/jackc/pgx/v5 v5.12.0
+	github.com/jackc/pgx/v5 v5.13.0
 	github.com/leodip/goiabada/core v0.0.0
 	github.com/microsoft/go-mssqldb v1.11.2
 	go.yaml.in/yaml/v3 v3.0.6
-	golang.org/x/term v0.47.0
+	golang.org/x/term v0.48.0
 	sigs.k8s.io/kustomize/api v0.21.3
 	sigs.k8s.io/kustomize/kyaml v0.21.3
 )
@@ -32,10 +32,10 @@ require (
 	github.com/shopspring/decimal v1.6.0 // indirect
 	github.com/xlab/treeprint v1.2.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
-	golang.org/x/crypto v0.58.0 // indirect
+	golang.org/x/crypto v0.59.0 // indirect
 	golang.org/x/sync v0.25.0 // indirect
 	golang.org/x/sys v0.50.0 // indirect
-	golang.org/x/text v0.43.0 // indirect
+	golang.org/x/text v0.44.0 // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	k8s.io/kube-openapi v0.0.0-20261001230523-97fa35140926 // indirect
