@@ -8,14 +8,15 @@
 set -euo pipefail
 # shellcheck source=lib.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
-require_vps
 
 all=false
 case "${1:-}" in
+  -h | --help) sed -n '2,7s/^# \{0,1\}//p' "$0"; exit 0 ;;
   "") ;;
   --all) all=true ;;
   *) die "usage: $0 [--all]" ;;
 esac
+require_vps
 
 dir="$(printf %q "$E2E_REMOTE_DIR")"
 project="$(basename "$E2E_REMOTE_DIR")"

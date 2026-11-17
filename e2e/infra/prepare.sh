@@ -12,14 +12,15 @@
 set -euo pipefail
 # shellcheck source=lib.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
-require_vps
 
 source_build=false
 case "${1:-}" in
+  -h | --help) sed -n '2,11s/^# \{0,1\}//p' "$0"; exit 0 ;;
   --source) source_build=true ;;
   v[0-9]*.[0-9]*.[0-9]*) ;;
   *) die "usage: $0 <release tag, of a release after v1.7.0> | --source" ;;
 esac
+require_vps
 
 step "Checking prerequisites"
 for cmd in ssh scp curl openssl python3 tar npm git; do

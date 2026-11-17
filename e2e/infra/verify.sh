@@ -9,6 +9,9 @@
 set -uo pipefail
 # shellcheck source=lib.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+case "${1:-}" in
+  -h | --help) sed -n '2,8s/^# \{0,1\}//p' "$0"; exit 0 ;;
+esac
 require_vps
 
 tag="${1:-}"
