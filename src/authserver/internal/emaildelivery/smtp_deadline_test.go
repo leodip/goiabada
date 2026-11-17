@@ -72,16 +72,17 @@ func TestSendEmail_AStalledWriteEndsAtTheCommandLimit(t *testing.T) {
 	port := f.start(t)
 
 	// The budget is far beyond the limit because the elapsed time below also counts building and
-	// writing the large body, which under the race detector on a two-core CI runner took 3.7s.
-	sender := &Sender{dataCipher: testDataCipher, commandTimeout: 300 * time.Millisecond, sendTimeout: 30 * time.Second}
+	// writing the body, which the race detector slows several times over.
+	sender := &Sender{dataCipher: testDataCipher, dialContext: smallSendBufferDial,
+		commandTimeout: 300 * time.Millisecond, sendTimeout: 30 * time.Second}
 
 	started := time.Now()
 	_, err := sender.SendEmail(context.Background(), relayConfig(t, "127.0.0.1", port, "none", "", "", "Goiabada"), &SendEmailInput{
 		To:      fixtureRecipient,
 		Subject: "Test email",
-		// About 20 MB, several times what the socket buffers between the two ends can hold: the dev
-		// container's send buffer grows to at most 4 MiB, and the fake's receive buffer is minimal.
-		HtmlBody: strings.Repeat("<p>hello, this line pads the body!</p>\n", 1<<19),
+		// About 1 MiB, many times what the socket buffers between the two ends can hold: the
+		// sender's is fixed at testSocketBuffer, doubled, and the fake's receive buffer is minimal.
+		HtmlBody: strings.Repeat("<p>hello, this line pads the body!</p>\n", 1<<15),
 	})
 	elapsed := time.Since(started)
 
@@ -116,17 +117,18 @@ func TestSendEmail_SteadyProgressIsNotCutByTheCommandLimit(t *testing.T) {
 
 // A large body the relay takes slowly but steadily is not cut off by the per-command limit, which
 // each write renews: once the socket buffers fill, every write of the body waits on the relay, and
-// the transfer as a whole outlasts the limit. The relay takes the first 24 MiB at 128 KiB per 10 ms
-// pause, about 1.9 seconds, three times the 600 ms limit. Linux wakes a writer blocked on a full send
-// buffer only once about a third of the buffer has drained, about 1.3 MiB of the dev container's
-// 4 MiB, so each write waits about 150 ms, a quarter of the limit. The relay takes the body's last
-// 8 MiB, more than the buffers hold, as fast as it arrives, so the reply to the data waits on no
-// paced drain. The SSL/TLS row writes its body as TLS records through the same deadlines.
+// the transfer as a whole outlasts the limit. The relay takes the first 3 MiB at 16 KiB per 10 ms
+// pause, about 1.9 seconds, three times the 600 ms limit. Both ends fix their buffers at
+// testSocketBuffer, which Linux doubles to 64 KiB, and Linux wakes a writer blocked on a full send
+// buffer once about a third of it has drained, so each write waits a pause or two, far inside the
+// limit. The relay takes the body's last 1 MiB, more than the buffers hold, as fast as it arrives, so
+// the reply to the data waits on no paced drain. The SSL/TLS row writes its body as TLS records
+// through the same deadlines.
 func TestSendEmail_ASlowButSteadyBodyIsNotCutByTheCommandLimit(t *testing.T) {
 
 	cert := newFakeCert(t)
 	const line = "<p>hello, this line pads the body!</p>\n"
-	body := strings.Repeat(line, (32<<20)/len(line))
+	body := strings.Repeat(line, (4<<20)/len(line))
 
 	for _, mode := range []string{"none", "ssltls"} {
 		t.Run(mode, func(t *testing.T) {
@@ -136,11 +138,12 @@ func TestSendEmail_ASlowButSteadyBodyIsNotCutByTheCommandLimit(t *testing.T) {
 				tlsFromStart:  mode == "ssltls",
 				cert:          cert,
 				paceData:      dribble / 5,
-				paceDataBytes: 24 << 20,
+				paceDataBytes: 3 << 20,
 			}
 			port := f.start(t)
 
-			sender := &Sender{dataCipher: testDataCipher, rootCAs: cert.pool, commandTimeout: 12 * dribble, sendTimeout: time.Minute}
+			sender := &Sender{dataCipher: testDataCipher, rootCAs: cert.pool, dialContext: smallSendBufferDial,
+				commandTimeout: 12 * dribble, sendTimeout: time.Minute}
 
 			started := time.Now()
 			result, err := sender.SendEmail(context.Background(), relayConfig(t, "127.0.0.1", port, mode, "", "", "Goiabada"), &SendEmailInput{
@@ -159,7 +162,7 @@ func TestSendEmail_ASlowButSteadyBodyIsNotCutByTheCommandLimit(t *testing.T) {
 			_, parts := alternativeParts(t, parseMessage(t, f.data()))
 			require.Len(t, parts, 2, "the text and the HTML")
 			decoded := parts[1].decoded
-			// Compared by digest, since a diff of 32 MB would bury the failure.
+			// Compared by digest, since a diff of 4 MiB would bury the failure.
 			assert.Equal(t, sha256.Sum256([]byte(body)), sha256.Sum256([]byte(decoded)),
 				"the body arrived altered: %d bytes decoded of %d", len(decoded), len(body))
 		})
