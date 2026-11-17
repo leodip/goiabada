@@ -207,7 +207,7 @@ const fieldRefusals: { name: string; email: string; field: "subject" | "buttonLa
     email: "password_reset_link",
     field: "subject",
     value: "Press {{button}}",
-    says: /^The subject cannot use \{\{button\}\}\. In the subject, this email offers /,
+    says: /^\s*The subject cannot use \{\{button\}\}\. In the subject, this email offers /,
   },
   { name: "an empty button label", email: "password_reset_link", field: "buttonLabel", value: "", says: "Button label is required." },
   {
@@ -230,7 +230,7 @@ const fieldRefusals: { name: string; email: string; field: "subject" | "buttonLa
     email: "verification_code",
     field: "body",
     value: "Hello {{name}}, here is no code.",
-    says: /^The body must use \{\{code\}\}, which this email cannot do without\. It offers /,
+    says: /^\s*The body must use \{\{code\}\}, which this email cannot do without\. It offers /,
   },
 ];
 

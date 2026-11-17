@@ -244,7 +244,6 @@ test("a client that registers itself starts on the default brand, whatever its r
             data: {
               client_name: "e2e self-registered brand",
               redirect_uris: [testRedirectUri],
-              token_endpoint_auth_method: "none",
               brandId: brand.id,
               brand_id: brand.id,
               brand: brand.name,

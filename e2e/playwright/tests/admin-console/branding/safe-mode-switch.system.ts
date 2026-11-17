@@ -21,17 +21,21 @@ import { browserSignInClient } from "../../../lib/test-clients";
 
 const run = promisify(execFile);
 
-// Switches safe mode on or off, the auth server restarted with it, and waits for the console to know:
-// it reads the switch from the auth server's public settings, which it keeps half a minute.
+// How long one switch may take: the script, which restarts the auth server over SSH, and then the
+// console, which keeps the auth server's public settings half a minute.
+const scriptTimeout = 180_000;
+const consoleTimeout = 60_000;
+
+// Switches safe mode on or off, the auth server restarted with it, and waits for the console to know.
 async function switchSafeMode(page: Page, to: "on" | "off") {
-  await run(safeModeScript, [to], { timeout: 180_000 });
+  await run(safeModeScript, [to], { timeout: scriptTimeout });
   await expect
     .poll(
       async () => {
         await page.goto(`${env.adminUrl}/admin/clients`);
         return (await safeModeNotice(page).count()) > 0 && (await safeModeNotice(page).innerText()).trim() === safeModeSwitchNotice;
       },
-      { message: `the console says the switch is ${to}`, timeout: 60_000, intervals: [2_000] },
+      { message: `the console says the switch is ${to}`, timeout: consoleTimeout, intervals: [2_000] },
     )
     .toBe(to === "on");
 }
@@ -78,6 +82,9 @@ test("GOIABADA_AUTHSERVER_BRAND_SAFE_MODE draws every page and email without the
   clients,
   users,
 }) => {
+  // Two switches, each allowed its own waits, and a minute for the rest, so the test's timeout never
+  // cuts a wait short and a slow switch fails at the wait that ran out.
+  test.setTimeout(2 * (scriptTimeout + consoleTimeout) + 60_000);
   const { client } = await browserSignInClient(page, clients);
   const consoleClient = await clientIdFromList(page, "admin-console-client");
   const user = await users.create({ emailVerified: true });

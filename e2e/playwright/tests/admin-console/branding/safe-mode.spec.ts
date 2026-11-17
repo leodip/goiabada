@@ -23,9 +23,9 @@ import {
   warmBasicPalette,
   withCustomBrand,
 } from "../../../lib/brands";
-import { openSignIn, testRedirectUri } from "../../../lib/browser-sign-in";
+import { openSignIn, signInThroughClient } from "../../../lib/browser-sign-in";
 import { expect, test } from "../../../lib/fixtures";
-import { authorizeEndpoint, codeRequest, expectAuthorizeError } from "../../../lib/rfc6749";
+import { authorizeEndpoint, codeRequest, expectAuthorizeError, followAuthorize } from "../../../lib/rfc6749";
 import { browserSignInClient } from "../../../lib/test-clients";
 
 const outlined = "rgb(18, 52, 86)";
@@ -117,8 +117,9 @@ test("safe mode reaches the pages a sign-in links to and its refusal page, and k
   });
 });
 
-test("goiabada_safe_mode asks for safe mode with true alone, and is refused when sent twice", async ({ page, browser, clients }) => {
+test("goiabada_safe_mode asks for safe mode with true alone, and is refused when sent twice", async ({ page, browser, clients, users }) => {
   const { client } = await browserSignInClient(page, clients);
+  const user = await users.create();
   await withCustomBrand(page, "light", warmBasicPalette, async (brand) => {
     await setClientBrand(page, client.id, brand);
 
@@ -136,17 +137,21 @@ test("goiabada_safe_mode asks for safe mode with true alone, and is refused when
       });
     }
 
-    // Twice: an invalid request, answered at the redirect URI (RFC 6749 section 3.1).
-    const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+    // Twice: an invalid request, answered at the redirect URI (RFC 6749 section 3.1). Sent by a
+    // browser holding a session, since one without is asked to sign in before any redirect (RFC 9700
+    // section 4.11.2).
+    const signIn = await signInThroughClient(browser, { clientId: client.identifier, email: user.email, password: user.password, scope: "openid" });
     try {
-      const tab = await context.newPage();
       const { params } = codeRequest(client.identifier);
-      const pairs = [...Object.entries(params), ["goiabada_safe_mode", "true"], ["goiabada_safe_mode", "true"]];
-      await tab.goto(`${authorizeEndpoint}?${new URLSearchParams(pairs)}`);
-      await tab.waitForURL((url) => url.href.startsWith(testRedirectUri));
-      expectAuthorizeError(new URL(tab.url()), "invalid_request", params.state);
+      const { redirect } = await followAuthorize(signIn.context.request, [
+        ...Object.entries(params),
+        ["goiabada_safe_mode", "true"],
+        ["goiabada_safe_mode", "true"],
+      ]);
+      expect(redirect, "answered at the redirect URI").toBeDefined();
+      expectAuthorizeError(redirect!, "invalid_request", params.state);
     } finally {
-      await context.close();
+      await signIn.context.close();
     }
   });
 });
