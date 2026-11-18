@@ -133,6 +133,14 @@ func TestLegalDocumentPages_TheCurrentVersionAndEveryEarlierOne(t *testing.T) {
 	current, ok := page.Find("#legal-document-superseded a").Attr("href")
 	require.True(t, ok, "an earlier version links to the current one")
 	assert.Equal(t, "/legal/"+shortName, current)
+	// Opened from a sign-in, the link to the current version names it too, so that version is drawn
+	// in the sign-in's brand as well.
+	signIn := ceremony.NewId()
+	status, page = getPublicPage(t, withCeremonyParameter(t, "/legal/"+shortName+"/versions/1", signIn))
+	require.Equal(t, http.StatusOK, status)
+	current, ok = page.Find("#legal-document-superseded a").Attr("href")
+	require.True(t, ok, "an earlier version opened from a sign-in links to the current one")
+	assert.Equal(t, "/legal/"+shortName+"?ceremony="+signIn, current)
 
 	status, page = getPublicPage(t, "/legal/"+shortName+"/versions/2")
 	require.Equal(t, http.StatusOK, status)
