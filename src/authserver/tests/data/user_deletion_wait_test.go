@@ -57,6 +57,19 @@ func (s *recordedLogoutTokens) toldClientIds() map[int64]bool {
 	return told
 }
 
+// toldAbout reports whether a recorded delivery goes to the app clientId and names the user subject
+// as its sub, the user whose sessions the app ends.
+func (s *recordedLogoutTokens) toldAbout(clientId int64, subject string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, delivery := range s.deliveries {
+		if delivery.ClientId == clientId && delivery.Subject == subject {
+			return true
+		}
+	}
+	return false
+}
+
 // userRowTakenAtTheWrite has the holder take the user's row as the write's transaction comes to take
 // it: after every read the handler makes before its transaction has answered, and after the
 // administrators' lock. A wait before the transaction would prove nothing, since on SQL Server the
@@ -98,16 +111,17 @@ func (d *userRowTakenAtTheWrite) takeOnce(tx *sql.Tx) error {
 	return err
 }
 
-// serveUserWrite serves one request of a write that ends a user's sessions through handler, with the settings's session lifetimes
+// serveUserWrite serves one request of a write that ends a user's sessions through handler, under
+// ctx so the test's deadline bounds the handler's queries, with the settings's session lifetimes
 // positive, as a deployment's are, and a validated token with sub and scope.
-func serveUserWrite(handler http.HandlerFunc, method, target string, params map[string]string, body []byte,
-	sub, scope string) *httptest.ResponseRecorder {
-	req := httptest.NewRequest(method, target, bytes.NewReader(body))
+func serveUserWrite(ctx context.Context, handler http.HandlerFunc, method, target string, params map[string]string,
+	body []byte, sub, scope string) *httptest.ResponseRecorder {
+	req := httptest.NewRequestWithContext(ctx, method, target, bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	for key, value := range params {
 		req.SetPathValue(key, value)
 	}
-	ctx := reqctx.WithSettings(req.Context(), &record.Settings{Id: 1, AccountDeletionEnabled: true,
+	ctx = reqctx.WithSettings(req.Context(), &record.Settings{Id: 1, AccountDeletionEnabled: true,
 		UserSessionIdleTimeoutInSeconds: 3600, UserSessionMaxLifetimeInSeconds: 86400})
 	ctx = reqctx.WithValidatedToken(ctx, oauth.JwtToken{Claims: map[string]interface{}{
 		"sub": sub, "scope": scope, "auth_time": float64(1),
@@ -179,11 +193,11 @@ func TestUserDeletion_TellsTheAppOfStateCommittedWhileItWaitedForTheUsersRow(t *
 				party := goBlocked(t, deletion, holder, func(reached func()) *httptest.ResponseRecorder {
 					db.reached = reached
 					if deletion == "the administrator's deletion" {
-						return serveUserWrite(apihandlers.HandleUserDelete(db, &countingAuditLogger{}, noNotices{}, sender),
+						return serveUserWrite(ctx, apihandlers.HandleUserDelete(db, &countingAuditLogger{}, noNotices{}, sender),
 							http.MethodDelete, "/api/v1/admin/users/"+id, map[string]string{"id": id}, nil,
 							"deletion-wait-test", manageScope)
 					}
-					return serveUserWrite(apihandlers.HandleAccountDeletionPost(db, &countingAuditLogger{}, uncountedFailures{}, dataCipher, noNotices{}, sender),
+					return serveUserWrite(ctx, apihandlers.HandleAccountDeletionPost(db, &countingAuditLogger{}, uncountedFailures{}, dataCipher, noNotices{}, sender),
 						http.MethodPost, "/api/v1/account/deletion", nil, body, user.Subject, "authserver:manage-account")
 				})
 				party.requireBlocked(t)
@@ -196,8 +210,8 @@ func TestUserDeletion_TellsTheAppOfStateCommittedWhileItWaitedForTheUsersRow(t *
 				gone, err := database.GetUserById(ctx, nil, user.Id)
 				require.NoError(t, err)
 				assert.Nil(t, gone, "the user is deleted")
-				assert.True(t, sender.toldClientIds()[app.Id],
-					"the app of %s the sign-in committed while the deletion waited is among the logout-token deliveries", state)
+				assert.True(t, sender.toldAbout(app.Id, user.Subject),
+					"the app of %s the sign-in committed while the deletion waited is told the deleted user's subject", state)
 			})
 		}
 	}
@@ -268,7 +282,7 @@ func TestUserDisable_EndsAndTellsStateCommittedWhileItWaitedForTheUsersRow(t *te
 			id := strconv.FormatInt(user.Id, 10)
 			party := goBlocked(t, "the disable", holder, func(reached func()) *httptest.ResponseRecorder {
 				db.reached = reached
-				return serveUserWrite(apihandlers.HandleUserEnabledPut(db, recorder, sender),
+				return serveUserWrite(ctx, apihandlers.HandleUserEnabledPut(db, recorder, sender),
 					http.MethodPut, "/api/v1/admin/users/"+id+"/enabled", map[string]string{"id": id},
 					[]byte(`{"enabled":false}`), "disable-wait-test", manageScope)
 			})
@@ -295,8 +309,8 @@ func TestUserDisable_EndsAndTellsStateCommittedWhileItWaitedForTheUsersRow(t *te
 				assertTokenRevoked(t, grant.Id, true, "the refresh token issued while the disable waited")
 				assert.Equal(t, []string{grant.RefreshTokenJti}, revoked["revoked_refresh_token_jtis"])
 			}
-			assert.True(t, sender.toldClientIds()[app.Id],
-				"the app of %s the sign-in committed while the disable waited is among the logout-token deliveries", state)
+			assert.True(t, sender.toldAbout(app.Id, user.Subject),
+				"the app of %s the sign-in committed while the disable waited is told the disabled user's subject", state)
 		})
 	}
 }

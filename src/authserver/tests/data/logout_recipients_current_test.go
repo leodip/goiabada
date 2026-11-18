@@ -143,7 +143,7 @@ func TestLogoutRecipients_AUserDeletionTellsAnAppThatJoinedBeforeTheSessionLock(
 
 	sender := &recordedLogoutTokens{}
 	id := strconv.FormatInt(race.user.Id, 10)
-	rr := serveUserWrite(apihandlers.HandleUserDelete(race.db, &countingAuditLogger{}, noNotices{}, sender),
+	rr := serveUserWrite(ctx, apihandlers.HandleUserDelete(race.db, &countingAuditLogger{}, noNotices{}, sender),
 		http.MethodDelete, "/api/v1/admin/users/"+id, map[string]string{"id": id}, nil,
 		"logout-recipients-test", builtin.AuthServerResourceIdentifier+":"+builtin.ManagePermissionIdentifier)
 
@@ -193,8 +193,7 @@ func TestLogoutRecipients_ADisableAndASessionBindResolveTheirPostgreSQLDeadlock(
 	if dbType() != data.Postgres {
 		t.Skip("only PostgreSQL checks the session's user foreign key when the bind writes the row back")
 	}
-	deadline := time.Now().Add(30 * time.Second)
-	ctx, cancel := context.WithDeadline(context.Background(), deadline)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	managePermissionRow(t)
 	race := newRecipientsRace(t, ctx, true)
@@ -240,12 +239,8 @@ func TestLogoutRecipients_ADisableAndASessionBindResolveTheirPostgreSQLDeadlock(
 
 	sender := &recordedLogoutTokens{}
 	id := strconv.FormatInt(race.user.Id, 10)
-	disable := apihandlers.HandleUserEnabledPut(disableDB, &countingAuditLogger{}, sender)
-	rr := serveUserWrite(func(w http.ResponseWriter, r *http.Request) {
-		bounded, cancel := context.WithDeadline(r.Context(), deadline)
-		defer cancel()
-		disable.ServeHTTP(w, r.WithContext(bounded))
-	}, http.MethodPut, "/api/v1/admin/users/"+id+"/enabled", map[string]string{"id": id},
+	rr := serveUserWrite(ctx, apihandlers.HandleUserEnabledPut(disableDB, &countingAuditLogger{}, sender),
+		http.MethodPut, "/api/v1/admin/users/"+id+"/enabled", map[string]string{"id": id},
 		[]byte(`{"enabled":false}`), "disable-bind-deadlock-test",
 		builtin.AuthServerResourceIdentifier+":"+builtin.ManagePermissionIdentifier)
 	var bindErr error
