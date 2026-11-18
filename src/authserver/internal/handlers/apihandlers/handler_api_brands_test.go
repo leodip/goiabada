@@ -477,6 +477,35 @@ func TestBrandUpdate_AnUnknownBrandIsNotFound(t *testing.T) {
 	database.AssertNotCalled(t, "UpdateBrand", mock.Anything, mock.Anything, mock.Anything)
 }
 
+// A body that does not decode is refused whole: none of its other fields is saved.
+func TestBrandUpdate_AnUnreadableBodyIsRefused(t *testing.T) {
+	mistyped := validBrandBody()
+	mistyped["hideAppName"] = "yes"
+	for _, c := range []struct {
+		name string
+		body any
+	}{
+		{"an empty body", nil},
+		{"a field of the wrong type", mistyped},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			database := datamocks.NewDatabase(t)
+			database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(3)).
+				Return(storedBrand(3, "Acme", record.BrandAppearanceDark, "plum"), nil).Once()
+			req := brandRequest(t, http.MethodPut, c.body, "id", "3")
+			if c.body == nil {
+				req.Body = http.NoBody
+			}
+
+			status, answer := serveBrand(HandleBrandUpdatePut(database, handlersmocks.NewAuditLogger(t), brandBaseURL), req)
+
+			assert.Equal(t, http.StatusBadRequest, status)
+			assert.Equal(t, "INVALID_REQUEST_BODY", errorCode(answer))
+			database.AssertNotCalled(t, "UpdateBrand", mock.Anything, mock.Anything, mock.Anything)
+		})
+	}
+}
+
 func TestBrandUpdate_ANameAnotherBrandHoldsIsRefused(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(3)).
