@@ -788,16 +788,21 @@ func (d *Database) GetAllClients(ctx context.Context, tx *sql.Tx) ([]record.Clie
 // In the same transaction, last, it records the deleted identifier with the moment of the
 // deletion, which the access-token liveness check reads so that a new client taking the
 // identifier does not revive the deleted one's access tokens (#676 decision 6). The identifier
-// is read first, by the client's id; a client that is not there records nothing.
+// is the one the row holds as it is deleted (#710 decision 11): it is read by a locking read of
+// the clients row just before the DELETE, which takes that row at the point the DELETE would
+// take it anyway, so the order above is unchanged, and a rename committed meanwhile is waited
+// for and read rather than missed by a read that does not wait for a writer, which would record
+// the identifier the client had before and leave the one it gave up unrecorded. A client that is
+// not there records nothing.
 func (d *Database) DeleteClient(ctx context.Context, tx *sql.Tx, clientId int64) error {
 
 	return d.inTransaction(ctx, tx, func(tx *sql.Tx) error {
-		client, err := d.GetClientById(ctx, tx, clientId)
+		err := d.deleteRefreshTokensByColumn(ctx, tx, "client_id", clientId)
 		if err != nil {
 			return err
 		}
 
-		err = d.deleteRefreshTokensByColumn(ctx, tx, "client_id", clientId)
+		client, err := d.GetClientByIdForUpdate(ctx, tx, clientId)
 		if err != nil {
 			return err
 		}
