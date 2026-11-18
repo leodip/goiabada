@@ -120,7 +120,7 @@ func TestMintCodeRefreshTokens(t *testing.T) {
 	assert.Equal(t, settings.Issuer, idClaims["iss"])
 	assert.Equal(t, user.Subject, idClaims["sub"])
 	assert.Equal(t, client.ClientIdentifier, idClaims["aud"])
-	assert.Equal(t, code.Nonce, idClaims["nonce"])
+	assert.NotContains(t, idClaims, "nonce", "a refreshed ID token has no nonce (OpenID Connect Core 1.0 section 12.2)")
 	assert.Equal(t, code.AcrLevel.String(), idClaims["acr"])
 	assert.ElementsMatch(t, strings.Fields(code.AuthMethods), idClaims["amr"])
 	assert.Equal(t, sessionIdentifier, idClaims["sid"])
@@ -143,7 +143,7 @@ func TestMintCodeRefreshTokens(t *testing.T) {
 	assert.Equal(t, settings.Issuer, accessClaims["iss"])
 	assert.Equal(t, user.Subject, accessClaims["sub"])
 	assert.ElementsMatch(t, []string{builtin.AuthServerResourceIdentifier, "resource1"}, accessClaims["aud"])
-	assert.Equal(t, code.Nonce, accessClaims["nonce"])
+	assert.NotContains(t, accessClaims, "nonce", "no access token carries the sign-in's nonce")
 	assert.Equal(t, code.AcrLevel.String(), accessClaims["acr"])
 	assert.ElementsMatch(t, strings.Fields(code.AuthMethods), accessClaims["amr"])
 	assert.Equal(t, sessionIdentifier, accessClaims["sid"])
@@ -308,7 +308,7 @@ func TestMintCodeRefreshTokens_Offline_NoIdToken(t *testing.T) {
 	assert.Equal(t, user.Subject, accessClaims["sub"])
 	// offline_access names authserver (#676 decision 3).
 	assert.Equal(t, []interface{}{"resource1", "authserver"}, accessClaims["aud"])
-	assert.Equal(t, code.Nonce, accessClaims["nonce"])
+	assert.NotContains(t, accessClaims, "nonce", "no access token carries the sign-in's nonce")
 	assert.Equal(t, code.AcrLevel.String(), accessClaims["acr"])
 	assert.ElementsMatch(t, strings.Fields(code.AuthMethods), accessClaims["amr"])
 	// Reversed: the parent is genuinely Offline now, so no sid. An offline grant outlives

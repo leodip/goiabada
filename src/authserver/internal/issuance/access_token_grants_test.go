@@ -100,7 +100,6 @@ func TestAccessToken_AuthorizationCodeGrant(t *testing.T) {
 		"aud":                   []interface{}{"authserver", "product-api"},
 		"typ":                   "Bearer",
 		"scope":                 "openid email product-api:read",
-		"nonce":                 "n-0S6_WzA2Mj",
 		"email":                 "ana@example.com",
 		"email_verified":        true,
 	})
@@ -147,7 +146,6 @@ func TestAccessToken_RefreshOfACodeGrant(t *testing.T) {
 		"aud":                   []interface{}{"authserver", "product-api"},
 		"typ":                   "Bearer",
 		"scope":                 "openid product-api:read",
-		"nonce":                 "n-0S6_WzA2Mj",
 	})
 }
 
@@ -326,6 +324,5 @@ func TestAccessToken_ImplicitFlow(t *testing.T) {
 		"aud":                   "authserver",
 		"typ":                   "Bearer",
 		"scope":                 "openid",
-		"nonce":                 "n-0S6_WzA2Mj",
 	})
 }

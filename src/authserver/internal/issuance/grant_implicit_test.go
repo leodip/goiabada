@@ -89,7 +89,7 @@ func TestIssueImplicitTx_AccessTokenOnly(t *testing.T) {
 	assert.Equal(t, input.AcrLevel.String(), accessClaims["acr"])
 	assert.ElementsMatch(t, strings.Fields(input.AuthMethods), accessClaims["amr"])
 	assert.Equal(t, sessionIdentifier, accessClaims["sid"])
-	assert.Equal(t, "test-nonce-123", accessClaims["nonce"])
+	assert.NotContains(t, accessClaims, "nonce", "no access token carries the sign-in's nonce")
 	assert.Equal(t, "Bearer", accessClaims["typ"])
 
 	mockDB.AssertExpectations(t)

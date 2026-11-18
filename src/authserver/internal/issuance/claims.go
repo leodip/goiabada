@@ -36,8 +36,12 @@ type tokenGenerationInput struct {
 
 	// Optional claims
 	SessionIdentifier string // Empty means don't include "sid" claim
-	Nonce             string // Empty means don't include "nonce" claim
-	AccessToken       string // For id_token: if non-empty, include "at_hash" claim (implicit flow)
+	// Nonce is the authorization request's nonce, written to the ID token of a sign-in and to no
+	// other token: not to any access token, which nothing reads it from, and not to a refreshed ID
+	// token, which OpenID Connect Core 1.0 section 12.2 says SHOULD NOT have one (#710 decision 6).
+	// Empty means the ID token has none.
+	Nonce       string
+	AccessToken string // For id_token: if non-empty, include "at_hash" claim (implicit flow)
 
 	// AuthStateGeneration is the generation of the credential that authorized THIS
 	// issuance, never the user's current value. Callers set it explicitly, because the
@@ -97,11 +101,17 @@ func (t *TokenIssuer) generateAccessToken(ctx context.Context, tx *sql.Tx, setti
 	return t.generateAccessTokenCore(ctx, tx, settings, input, now, signingKey, keyIdentifier)
 }
 
+// generateIdToken builds an ID token for the authorization code flow. parentRefreshToken is nil on
+// the code exchange, the sign-in, whose ID token carries the code's nonce, and set when refreshing,
+// whose ID token has none (OpenID Connect Core 1.0 section 12.2, #710 decision 6).
 func (t *TokenIssuer) generateIdToken(ctx context.Context, tx *sql.Tx, settings *record.Settings, code *record.Code, scope string,
-	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string) (string, error) {
+	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string, parentRefreshToken *record.RefreshToken) (string, error) {
 
 	input := t.createTokenInputFromCode(code)
 	input.Scope = scope // Use the provided scope (may differ from code.Scope for refresh)
+	if parentRefreshToken != nil {
+		input.Nonce = ""
+	}
 	return t.generateIdTokenCore(ctx, tx, settings, input, now, signingKey, keyIdentifier)
 }
 
@@ -204,10 +214,7 @@ func (t *TokenIssuer) generateAccessTokenCore(ctx context.Context, tx *sql.Tx, s
 		claims["aud"] = audCollection
 	}
 
-	// Optional nonce claim
-	if len(input.Nonce) > 0 {
-		claims["nonce"] = input.Nonce
-	}
+	// No nonce: it belongs to the ID token of a sign-in alone (see tokenGenerationInput.Nonce).
 
 	// OpenID Connect claims in access token (if enabled)
 	includeOpenIDConnectClaimsInAccessToken := settings.IncludeOpenIDConnectClaimsInAccessToken
@@ -305,7 +312,7 @@ func (t *TokenIssuer) generateIdTokenCore(ctx context.Context, tx *sql.Tx, setti
 
 	claims["exp"] = now.Add(time.Second * time.Duration(tokenExpirationInSeconds)).Unix()
 
-	// Optional nonce claim
+	// The sign-in's nonce, which a caller leaves empty for a refreshed ID token.
 	if len(input.Nonce) > 0 {
 		claims["nonce"] = input.Nonce
 	}
