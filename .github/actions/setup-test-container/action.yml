@@ -60,30 +60,40 @@ runs:
           tar -xz -C /usr/local --strip-components=1 --no-same-owner "node-v${{ inputs.node }}-linux-x64/bin/node"
         node --version
 
-    # GOPATH and GOCACHE inside the official golang image, which runs as root.
-    #
+    # Where Go keeps its modules and its build output, asked of go itself. The build cache is
+    # under HOME, which GitHub sets to /github/home in a container job, not root's home. The Go
+    # version is part of the key, since one toolchain's build output is no use to another.
+    - name: Locate the Go caches
+      shell: bash
+      run: |
+        {
+          echo "GO_MODULES_DIR=$(go env GOMODCACHE)"
+          echo "GO_BUILD_OUTPUT_DIR=$(go env GOCACHE)"
+          echo "GO_TOOLCHAIN_VERSION=$(go env GOVERSION)"
+        } >> "$GITHUB_ENV"
+
     # Every job restores the cache and one saves it: the job that passes save-cache, Unit /
     # authserver. Its modules include every module the core and console tiers download, and it
     # compiles what the database jobs compile too, so they restore the auth server's build
     # rather than compile it. A key is new after every go.sum change, and saving one compresses
-    # the whole cache, about a minute, which one job pays rather than every job.
+    # the whole cache, which one job pays rather than every job.
     - name: Cache Go modules and build output
       if: inputs.save-cache == 'true'
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: |
-          /go/pkg/mod
-          /root/.cache/go-build
-        key: ${{ runner.os }}-go-${{ hashFiles('src/**/go.sum') }}
+          ${{ env.GO_MODULES_DIR }}
+          ${{ env.GO_BUILD_OUTPUT_DIR }}
+        key: ${{ runner.os }}-${{ env.GO_TOOLCHAIN_VERSION }}-${{ hashFiles('src/**/go.sum') }}
         restore-keys: |
-          ${{ runner.os }}-go-
+          ${{ runner.os }}-${{ env.GO_TOOLCHAIN_VERSION }}-
     - name: Restore Go modules and build output
       if: inputs.save-cache != 'true'
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: |
-          /go/pkg/mod
-          /root/.cache/go-build
-        key: ${{ runner.os }}-go-${{ hashFiles('src/**/go.sum') }}
+          ${{ env.GO_MODULES_DIR }}
+          ${{ env.GO_BUILD_OUTPUT_DIR }}
+        key: ${{ runner.os }}-${{ env.GO_TOOLCHAIN_VERSION }}-${{ hashFiles('src/**/go.sum') }}
         restore-keys: |
-          ${{ runner.os }}-go-
+          ${{ runner.os }}-${{ env.GO_TOOLCHAIN_VERSION }}-
