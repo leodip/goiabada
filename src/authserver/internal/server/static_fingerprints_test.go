@@ -183,3 +183,21 @@ func TestServeStaticFiles_ConcurrentFirstRequestsReadAFileOnceForItsFingerprint(
 
 	assert.Equal(t, int64(1), fsys.reads.Load(), "the file is read once for its fingerprint")
 }
+
+// The fingerprints keep one entry for each file read, under its one name, so no spelling of a
+// file and no name that is not one, both of which anyone can request, grows them past the files.
+func TestStaticFingerprints_KeepsOneEntryPerFile(t *testing.T) {
+	content := []byte("body { color: blue; }")
+	fingerprints := newStaticFingerprints(fstest.MapFS{"probe.css": {Data: content}})
+
+	for i := range 100 {
+		_, ok := fingerprints.fingerprint("/static/missing-" + strconv.Itoa(i) + ".css")
+		assert.False(t, ok, "a name that is not a file has no fingerprint")
+	}
+	for _, urlPath := range []string{"/static/probe.css", "/static//probe.css", "/static/./probe.css", "/static/x/../probe.css"} {
+		sum, ok := fingerprints.fingerprint(urlPath)
+		require.True(t, ok, urlPath)
+		assert.Equal(t, staticFingerprint(content), sum, urlPath)
+	}
+	assert.Len(t, fingerprints.known, 1, "one entry, for the one file read")
+}
