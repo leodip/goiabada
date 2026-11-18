@@ -430,6 +430,32 @@ func TestRegisterRoutes_ADirectoryUnderStaticIsThe404Page(t *testing.T) {
 	assert.Empty(t, body, "a HEAD has no content")
 }
 
+// A directory is the 404 page however its path is spelled, over a real connection, on GET and on
+// HEAD: an escaped prefix the router matches by its decoded path is a directory first, and only a
+// file is held to its escaped prefix, which the file server's prefix removal reads (#825 decision 3).
+func TestRegisterRoutes_ADirectoryUnderAnEscapedStaticIsThe404Page(t *testing.T) {
+	s := newRoutingTestServer(t, newRoutingDatabase(t))
+	base := routingListener(t, s)
+
+	for _, target := range []string{"/static/favicon", "/st%61tic/favicon", "/st%61tic/favicon/", "/st%61tic/"} {
+		for _, method := range []string{http.MethodGet, http.MethodHead} {
+			t.Run(method+" "+target, func(t *testing.T) {
+				resp, body := sendRouting(t, method, base+target)
+
+				require.Equal(t, http.StatusNotFound, resp.StatusCode)
+				assert.Equal(t, "text/html; charset=UTF-8", resp.Header.Get("Content-Type"), "the 404 page, not the static files' plain-text 404")
+				assert.Equal(t, "no-store", resp.Header.Get("Cache-Control"))
+				assert.Empty(t, resp.Header.Values("Expires"))
+				if method == http.MethodGet {
+					assert.Contains(t, body, notFoundPage)
+				} else {
+					assert.Empty(t, body, "a HEAD has no content")
+				}
+			})
+		}
+	}
+}
+
 // mintedRequestId is the request id requestid.Middleware mints when a request carries none, the shape
 // #462 decision 6 keeps: the host name, ten base62 characters, and a counter of at least six
 // digits. A host whose name cannot be read is localhost.

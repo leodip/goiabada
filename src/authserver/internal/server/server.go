@@ -1018,16 +1018,18 @@ func (s *Server) serveStaticFiles() {
 	}
 
 	getAndHead(s.router, staticPrefix+"/*", func(w http.ResponseWriter, r *http.Request) {
-		file, ok := withoutStaticPrefix(r)
-		if !ok {
-			handlers.ResourceNotFound(w, r)
-			return
-		}
+		// A directory is the 404 page whichever way its path is spelled, so it is told apart by the
+		// decoded path the router matched, before the escaped prefix a file is held to.
 		switch s.staticEntryOf(r.URL.Path) {
 		case staticDirectory:
 			directory.ServeHTTP(w, r)
 			return
 		case staticMissing:
+			handlers.ResourceNotFound(w, r)
+			return
+		}
+		file, ok := withoutStaticPrefix(r)
+		if !ok {
 			handlers.ResourceNotFound(w, r)
 			return
 		}
@@ -1050,8 +1052,9 @@ func (s *Server) serveStaticFiles() {
 // the decoded path and from the escaped one, when the request has one. It reports false where
 // http.StripPrefix answers its own 404, a path whose escaped form does not begin with /static, such
 // as /st%61tic/main.css, which the router matches by the decoded /static/main.css. Such a request
-// is a file that is not found, so it is told apart before the file's lifetime is set and answered
-// the static files' no-store 404 (#825 decision 3).
+// for a file is a file that is not found, so it is told apart before the file's lifetime is set and
+// answered the static files' no-store 404 (#825 decision 3). A directory is told apart before it,
+// by its decoded path, and stays the 404 page however its prefix is spelled.
 func withoutStaticPrefix(r *http.Request) (*http.Request, bool) {
 	p := strings.TrimPrefix(r.URL.Path, staticPrefix)
 	rp := strings.TrimPrefix(r.URL.RawPath, staticPrefix)
