@@ -75,6 +75,16 @@ func TestClientRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), identifier).Return(holder, nil).Once()
 		}
 	}
+	// renameChecked registers the settings save's transaction up to its checks of a changed
+	// identifier, which it makes under the client's row, on that transaction (#710 decision 4).
+	renameChecked := func(lookups func(database *datamocks.Database)) func(database *datamocks.Database) {
+		return func(database *datamocks.Database) {
+			datamocks.ExpectRunInTransaction(database, clientUpdateTx)
+			database.On("AcquireClientRow", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
+			database.On("GetClientById", mock.Anything, clientUpdateTx, int64(7)).Return(stored(), nil).Once()
+			lookups(database)
+		}
+	}
 	long := func(n int) string { return strings.Repeat("a", n) }
 
 	assertRefusalLanguages(t, []refusalCase{
@@ -157,8 +167,10 @@ func TestClientRefusals_AreInTheRequestsLanguage(t *testing.T) {
 		},
 		{
 			name: "update onto another client's identifier",
-			serve: update(stored(), `{"clientIdentifier":"other-client"}`,
-				identifierHeldBy("other-client", &record.Client{Id: 8, ClientIdentifier: "other-client"})),
+			serve: update(stored(), `{"clientIdentifier":"other-client"}`, renameChecked(func(database *datamocks.Database) {
+				database.On("GetClientByClientIdentifier", mock.Anything, clientUpdateTx, "other-client").
+					Return(&record.Client{Id: 8, ClientIdentifier: "other-client"}, nil).Once()
+			})),
 			status:     http.StatusBadRequest,
 			code:       "handler.client.identifier_in_use",
 			english:    "The client identifier is already in use.",
@@ -166,10 +178,10 @@ func TestClientRefusals_AreInTheRequestsLanguage(t *testing.T) {
 		},
 		{
 			name: "update onto a resource's identifier",
-			serve: update(stored(), `{"clientIdentifier":"named-like-a-resource"}`, func(database *datamocks.Database) {
-				database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "named-like-a-resource").Return(nil, nil).Once()
-				database.On("GetResourceByResourceIdentifier", mock.Anything, (*sql.Tx)(nil), "named-like-a-resource").Return(&record.Resource{Id: 9, ResourceIdentifier: "named-like-a-resource"}, nil).Once()
-			}),
+			serve: update(stored(), `{"clientIdentifier":"named-like-a-resource"}`, renameChecked(func(database *datamocks.Database) {
+				database.On("GetClientByClientIdentifier", mock.Anything, clientUpdateTx, "named-like-a-resource").Return(nil, nil).Once()
+				database.On("GetResourceByResourceIdentifier", mock.Anything, clientUpdateTx, "named-like-a-resource").Return(&record.Resource{Id: 9, ResourceIdentifier: "named-like-a-resource"}, nil).Once()
+			})),
 			status:     http.StatusBadRequest,
 			code:       "handler.client.identifier_names_resource",
 			english:    "The client identifier is already in use by a resource.",

@@ -68,6 +68,12 @@ type Database interface {
 
 	CreateClient(ctx context.Context, tx *sql.Tx, client *record.Client) error
 	UpdateClient(ctx context.Context, tx *sql.Tx, client *record.Client) error
+	// SetClientIdentifier gives a client a new identifier, and nothing else but updated_at. It takes
+	// the client's row, writes only when the identifier given differs byte for byte from the one the
+	// row holds, and reports whether it did: false for the row's own identifier and for a client
+	// that is not there. It is the column's one writer after creation: UpdateClient never writes it
+	// (#710 decision 4). A transaction is required, as for AcquireClientRow.
+	SetClientIdentifier(ctx context.Context, tx *sql.Tx, clientId int64, clientIdentifier string) (changed bool, err error)
 	// SetClientPublic makes one client public and reports whether THIS call performed
 	// the confidential-to-public transition, which is the write that removes the
 	// client's obligation to authenticate and so the one that must revoke its

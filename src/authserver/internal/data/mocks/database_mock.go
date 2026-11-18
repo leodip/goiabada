@@ -17866,6 +17866,84 @@ func (_c *Database_SetClientDPoPBoundAccessTokens_Call) RunAndReturn(run func(ct
 	return _c
 }
 
+// SetClientIdentifier provides a mock function for the type Database
+func (_mock *Database) SetClientIdentifier(ctx context.Context, tx *sql.Tx, clientId int64, clientIdentifier string) (bool, error) {
+	ret := _mock.Called(ctx, tx, clientId, clientIdentifier)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetClientIdentifier")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64, string) (bool, error)); ok {
+		return returnFunc(ctx, tx, clientId, clientIdentifier)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64, string) bool); ok {
+		r0 = returnFunc(ctx, tx, clientId, clientIdentifier)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, int64, string) error); ok {
+		r1 = returnFunc(ctx, tx, clientId, clientIdentifier)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_SetClientIdentifier_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetClientIdentifier'
+type Database_SetClientIdentifier_Call struct {
+	*mock.Call
+}
+
+// SetClientIdentifier is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - clientId int64
+//   - clientIdentifier string
+func (_e *Database_Expecter) SetClientIdentifier(ctx any, tx any, clientId any, clientIdentifier any) *Database_SetClientIdentifier_Call {
+	return &Database_SetClientIdentifier_Call{Call: _e.mock.On("SetClientIdentifier", ctx, tx, clientId, clientIdentifier)}
+}
+
+func (_c *Database_SetClientIdentifier_Call) Run(run func(ctx context.Context, tx *sql.Tx, clientId int64, clientIdentifier string)) *Database_SetClientIdentifier_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
+		}
+		var arg3 string
+		if args[3] != nil {
+			arg3 = args[3].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_SetClientIdentifier_Call) Return(changed bool, err error) *Database_SetClientIdentifier_Call {
+	_c.Call.Return(changed, err)
+	return _c
+}
+
+func (_c *Database_SetClientIdentifier_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, clientId int64, clientIdentifier string) (bool, error)) *Database_SetClientIdentifier_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // SetClientPublic provides a mock function for the type Database
 func (_mock *Database) SetClientPublic(ctx context.Context, tx *sql.Tx, clientId int64) (bool, error) {
 	ret := _mock.Called(ctx, tx, clientId)

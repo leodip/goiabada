@@ -161,17 +161,18 @@ var insertClient = statement{
 		"@p21, @p22, @p23, @p24, @p25, @p26, @p27, @p28, @p29, @p30, @p31, @p32, @p33, @p34, @p35)",
 }
 
-// updateClient writes the whole row but created_at, administrative_scopes_allowed,
-// remember_consent, the two back-channel logout columns, dpop_bound_access_tokens, brand_id and
-// token_endpoint_auth_method, which are dont-update: the allowance has one writer,
+// updateClient writes the whole row but created_at, client_identifier,
+// administrative_scopes_allowed, remember_consent, the two back-channel logout columns,
+// dpop_bound_access_tokens, brand_id and token_endpoint_auth_method, which are dont-update: the
+// identifier is written after creation only by SetClientIdentifier, the allowance has one writer,
 // SetClientAdministrativeScopesAllowed, Remember consent is written only by CreateClient,
 // SetClientRememberConsent and SetClientPublic's transition, the back-channel logout columns only
 // by CreateClient and SetClientBackchannelLogout, "Require DPoP for token requests" only by
 // CreateClient and SetClientDPoPBoundAccessTokens, a client's brand only by CreateClient,
 // SetClientBrand and a brand's deletion, and the registered method only by CreateClient and
-// SetClientPublic's transition (#499, #711, #784, #42, #812, #708).
+// SetClientPublic's transition (#710, #499, #711, #784, #42, #812, #708).
 var updateClient = statement{
-	sqlite: "UPDATE clients SET updated_at = ?, client_identifier = ?, client_secret_encrypted = ?, " +
+	sqlite: "UPDATE clients SET updated_at = ?, client_secret_encrypted = ?, " +
 		"description = ?, website_url = ?, privacy_policy_url = ?, terms_of_service_url = ?, " +
 		"display_name = ?, enabled = ?, consent_required = ?, " +
 		"created_via_dcr = ?, show_logo = ?, show_display_name = ?, show_description = ?, " +
@@ -182,7 +183,7 @@ var updateClient = statement{
 		"refresh_token_offline_max_lifetime_in_seconds = ?, " +
 		"include_open_id_connect_claims_in_access_token = ?, " +
 		"include_open_id_connect_claims_in_id_token = ?, default_acr_level = ? WHERE id = ?",
-	mysql: "UPDATE clients SET updated_at = ?, client_identifier = ?, client_secret_encrypted = ?, " +
+	mysql: "UPDATE clients SET updated_at = ?, client_secret_encrypted = ?, " +
 		"description = ?, website_url = ?, privacy_policy_url = ?, terms_of_service_url = ?, " +
 		"display_name = ?, enabled = ?, consent_required = ?, " +
 		"created_via_dcr = ?, show_logo = ?, show_display_name = ?, show_description = ?, " +
@@ -193,31 +194,39 @@ var updateClient = statement{
 		"refresh_token_offline_max_lifetime_in_seconds = ?, " +
 		"include_open_id_connect_claims_in_access_token = ?, " +
 		"include_open_id_connect_claims_in_id_token = ?, default_acr_level = ? WHERE id = ?",
-	postgres: "UPDATE clients SET updated_at = $1, client_identifier = $2, " +
-		"client_secret_encrypted = $3, description = $4, website_url = $5, " +
-		"privacy_policy_url = $6, terms_of_service_url = $7, display_name = $8, " +
-		"enabled = $9, consent_required = $10, created_via_dcr = $11, show_logo = $12, " +
-		"show_display_name = $13, show_description = $14, show_website_url = $15, " +
-		"is_public = $16, authorization_code_enabled = $17, client_credentials_enabled = $18, " +
-		"pkce_required = $19, implicit_grant_enabled = $20, " +
-		"resource_owner_password_credentials_enabled = $21, token_expiration_in_seconds = $22, " +
-		"refresh_token_offline_idle_timeout_in_seconds = $23, " +
-		"refresh_token_offline_max_lifetime_in_seconds = $24, " +
-		"include_open_id_connect_claims_in_access_token = $25, " +
-		"include_open_id_connect_claims_in_id_token = $26, default_acr_level = $27 WHERE id = $28",
-	mssql: "UPDATE clients SET updated_at = @p1, client_identifier = @p2, " +
-		"client_secret_encrypted = @p3, description = @p4, website_url = @p5, " +
-		"privacy_policy_url = @p6, terms_of_service_url = @p7, " +
-		"display_name = @p8, enabled = @p9, consent_required = @p10, created_via_dcr = @p11, " +
-		"show_logo = @p12, show_display_name = @p13, show_description = @p14, " +
-		"show_website_url = @p15, is_public = @p16, authorization_code_enabled = @p17, " +
-		"client_credentials_enabled = @p18, pkce_required = @p19, implicit_grant_enabled = @p20, " +
-		"resource_owner_password_credentials_enabled = @p21, token_expiration_in_seconds = @p22, " +
-		"refresh_token_offline_idle_timeout_in_seconds = @p23, " +
-		"refresh_token_offline_max_lifetime_in_seconds = @p24, " +
-		"include_open_id_connect_claims_in_access_token = @p25, " +
-		"include_open_id_connect_claims_in_id_token = @p26, " +
-		"default_acr_level = @p27 WHERE id = @p28",
+	postgres: "UPDATE clients SET updated_at = $1, " +
+		"client_secret_encrypted = $2, description = $3, website_url = $4, " +
+		"privacy_policy_url = $5, terms_of_service_url = $6, display_name = $7, " +
+		"enabled = $8, consent_required = $9, created_via_dcr = $10, show_logo = $11, " +
+		"show_display_name = $12, show_description = $13, show_website_url = $14, " +
+		"is_public = $15, authorization_code_enabled = $16, client_credentials_enabled = $17, " +
+		"pkce_required = $18, implicit_grant_enabled = $19, " +
+		"resource_owner_password_credentials_enabled = $20, token_expiration_in_seconds = $21, " +
+		"refresh_token_offline_idle_timeout_in_seconds = $22, " +
+		"refresh_token_offline_max_lifetime_in_seconds = $23, " +
+		"include_open_id_connect_claims_in_access_token = $24, " +
+		"include_open_id_connect_claims_in_id_token = $25, default_acr_level = $26 WHERE id = $27",
+	mssql: "UPDATE clients SET updated_at = @p1, " +
+		"client_secret_encrypted = @p2, description = @p3, website_url = @p4, " +
+		"privacy_policy_url = @p5, terms_of_service_url = @p6, " +
+		"display_name = @p7, enabled = @p8, consent_required = @p9, created_via_dcr = @p10, " +
+		"show_logo = @p11, show_display_name = @p12, show_description = @p13, " +
+		"show_website_url = @p14, is_public = @p15, authorization_code_enabled = @p16, " +
+		"client_credentials_enabled = @p17, pkce_required = @p18, implicit_grant_enabled = @p19, " +
+		"resource_owner_password_credentials_enabled = @p20, token_expiration_in_seconds = @p21, " +
+		"refresh_token_offline_idle_timeout_in_seconds = @p22, " +
+		"refresh_token_offline_max_lifetime_in_seconds = @p23, " +
+		"include_open_id_connect_claims_in_access_token = @p24, " +
+		"include_open_id_connect_claims_in_id_token = @p25, " +
+		"default_acr_level = @p26 WHERE id = @p27",
+}
+
+// setClientIdentifier writes a client's identifier; see SetClientIdentifier.
+var setClientIdentifier = statement{
+	sqlite:   "UPDATE clients SET client_identifier = ?, updated_at = ? WHERE id = ?",
+	mysql:    "UPDATE clients SET client_identifier = ?, updated_at = ? WHERE id = ?",
+	postgres: "UPDATE clients SET client_identifier = $1, updated_at = $2 WHERE id = $3",
+	mssql:    "UPDATE clients SET client_identifier = @p1, updated_at = @p2 WHERE id = @p3",
 }
 
 var setClientRememberConsent = statement{
@@ -346,7 +355,7 @@ func (d *Database) UpdateClient(ctx context.Context, tx *sql.Tx, client *record.
 	client.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
 	_, err := d.ExecSQL(ctx, tx, updateClient.text(d.Dialect),
-		client.UpdatedAt, client.ClientIdentifier, client.ClientSecretEncrypted, client.Description,
+		client.UpdatedAt, client.ClientSecretEncrypted, client.Description,
 		client.WebsiteURL, client.PrivacyPolicyURL, client.TermsOfServiceURL, client.DisplayName,
 		client.Enabled, client.ConsentRequired, client.CreatedViaDCR,
 		client.ShowLogo, client.ShowDisplayName, client.ShowDescription, client.ShowWebsiteURL,
@@ -362,6 +371,53 @@ func (d *Database) UpdateClient(ctx context.Context, tx *sql.Tx, client *record.
 	}
 
 	return nil
+}
+
+// SetClientIdentifier gives a client a new identifier and reports whether it did. It is the
+// column's one writer after creation, and the settings save its one caller: UpdateClient leaves
+// the column out (dont-update), so the OAuth2 flows, tokens and authentication saves, which write
+// from a copy loaded earlier in their request, cannot write back an identifier renamed since
+// (#710 decision 4).
+//
+// It takes the client's row with AcquireClientRow, reads the identifier the row holds and writes
+// only when the one given differs, compared byte for byte in Go rather than by the engine, whose
+// collation may fold case: RFC 6749 section 1.9 makes client_id case sensitive. The answer is
+// decided against the row read under that lock, never against a copy read before it, because a
+// rename committed in between would make a stale copy report a change the row does not make, or
+// miss one it does, and the answer is what decides whether the client's grants are revoked. True
+// means this call wrote a different identifier; false means the row already held it, or there is
+// no such client, which the caller's own read under the lock answers.
+//
+// A transaction is required, for the reason AcquireClientRow gives.
+func (d *Database) SetClientIdentifier(ctx context.Context, tx *sql.Tx, clientId int64, clientIdentifier string) (bool, error) {
+
+	if tx == nil {
+		return false, errs.New("setting a client's identifier requires a transaction: the row must be held between reading the identifier and writing it")
+	}
+	if clientId == 0 {
+		return false, errs.New("can't set the identifier of a client with an id of 0")
+	}
+	if clientIdentifier == "" {
+		return false, errs.New("can't set a client's identifier to an empty value")
+	}
+
+	if err := d.AcquireClientRow(ctx, tx, clientId); err != nil {
+		return false, err
+	}
+
+	current, err := d.GetClientById(ctx, tx, clientId)
+	if err != nil {
+		return false, err
+	}
+	if current == nil || current.ClientIdentifier == clientIdentifier {
+		return false, nil
+	}
+
+	if _, err := d.ExecSQL(ctx, tx, setClientIdentifier.text(d.Dialect),
+		clientIdentifier, time.Now().UTC(), clientId); err != nil {
+		return false, errs.Wrap(err, "unable to set the client's identifier")
+	}
+	return true, nil
 }
 
 // SetClientAdministrativeScopesAllowed writes a client's allowance to request the administrative

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -59,7 +60,22 @@ type clientsDatabase interface {
 	SetClientRememberConsent(ctx context.Context, tx *sql.Tx, clientId int64, remember bool) error
 	SetClientBackchannelLogout(ctx context.Context, tx *sql.Tx, clientId int64, uri string, sessionRequired bool) error
 	SetClientDPoPBoundAccessTokens(ctx context.Context, tx *sql.Tx, clientId int64, required bool) error
+	SetClientIdentifier(ctx context.Context, tx *sql.Tx, clientId int64, clientIdentifier string) (bool, error)
 	UpdateClient(ctx context.Context, tx *sql.Tx, client *record.Client) error
+}
+
+// clientSettingsSave is what the settings save writes beside the whole row, under the row's lock.
+//
+// identifier is the client identifier as submitted. Its one writer after creation is
+// SetClientIdentifier, and this save is its one caller, so the other saves, which write from a copy
+// loaded earlier in their request, cannot write back an identifier renamed since (#710 decision 4).
+// identifierValidator holds a different identifier to the identifier format.
+//
+// rememberConsent is the save's optional Remember consent, nil to leave the stored value alone.
+type clientSettingsSave struct {
+	identifier          string
+	identifierValidator *inputvalidation.IdentifierValidator
+	rememberConsent     *bool
 }
 
 // updateClientNotOwningAuthenticationMode writes a client through an endpoint that changes some
@@ -103,22 +119,32 @@ type clientsDatabase interface {
 // of the same section still last-write-wins, which is how every entity in this codebase behaves
 // and is a separate, wider question.
 //
-// rememberConsent is the settings save's optional Remember consent, nil for every other caller and
-// for a settings save without it, which leaves the stored value alone. A value is decided here,
+// settings is the settings save's own writes, nil for every other caller. Its identifier is decided
+// here, against the row re-read under the lock, and never against the copy the request loaded,
+// which a rename committed since makes stale (#710 decision 4). One that differs from the row's is
+// held to the format, uniqueness and resource-name checks on this transaction, and refused, with
+// nothing written, when one fails; one that equals the row's, compared byte for byte with the value
+// as submitted, is not checked, which is what keeps a self-registered client's 40-character
+// identifier editable elsewhere on the form (#108 decision 17), and a row that holds an identifier
+// naming a resource from before #151. Then SetClientIdentifier writes it only when it differs, and
+// every caller answers with the identifier the row holds.
+//
+// The settings save's Remember consent is nil for a save without it, which leaves the stored value
+// alone. A value is decided here,
 // against the row re-read under the lock, because it depends on the mode as the property above
 // does (#711 decisions 4 and 5): a confidential client is stored on whatever was sent; a public one
 // takes the value only when the request also loaded it public. A save that loaded the client while
 // it was confidential chose its value for a client that needed no vouching, so it never applies to
 // one made public since, which the switch left off.
-func updateClientNotOwningAuthenticationMode(ctx context.Context, database clientsDatabase, client *record.Client, rememberConsent *bool) error {
+func updateClientNotOwningAuthenticationMode(ctx context.Context, database clientsDatabase, client *record.Client, settings *clientSettingsSave) error {
 	// Taken before the transaction: the body overwrites client.IsPublic with the row's mode, and a
 	// rerun after a deadlock must still decide against the mode the request loaded.
 	loadedPublic := client.IsPublic
 
 	// Opened through RunInTransaction, so a deadlock reruns the acquisition, the re-read and the
 	// write together (#301). Safe to rerun: the two columns are copied from the row re-read under
-	// this attempt's own lock, ApplyPublicClientInvariants is idempotent on the result, and Remember
-	// consent is decided again from that row and written as a fixed value.
+	// this attempt's own lock, ApplyPublicClientInvariants is idempotent on the result, and the
+	// identifier and Remember consent are decided again from that row and written as fixed values.
 	return database.RunInTransaction(ctx, func(tx *sql.Tx) error {
 		if err := database.AcquireClientRow(ctx, tx, client.Id); err != nil {
 			return err
@@ -131,6 +157,16 @@ func updateClientNotOwningAuthenticationMode(ctx context.Context, database clien
 		if current == nil {
 			return errs.New("client no longer exists")
 		}
+
+		if settings != nil && settings.identifier != current.ClientIdentifier {
+			if err := checkClientIdentifierChange(ctx, database, tx, settings.identifierValidator, settings.identifier, client.Id); err != nil {
+				return err
+			}
+		}
+
+		// UpdateClient never writes the identifier, and the answer takes the row's, as it does the
+		// mode: a rename committed since the load is what the client is now called (#710 decision 4).
+		client.ClientIdentifier = current.ClientIdentifier
 		client.IsPublic = current.IsPublic
 		client.ClientSecretEncrypted = current.ClientSecretEncrypted
 		// UpdateClient never writes Remember consent, so none of these saves can write back the
@@ -149,7 +185,18 @@ func updateClientNotOwningAuthenticationMode(ctx context.Context, database clien
 			return err
 		}
 
-		if rememberConsent == nil {
+		if settings == nil {
+			return nil
+		}
+
+		// The write decides, under the row's lock, whether the identifier changes; either way the
+		// row now holds the one submitted.
+		if _, err := database.SetClientIdentifier(ctx, tx, client.Id, settings.identifier); err != nil {
+			return err
+		}
+		client.ClientIdentifier = settings.identifier
+
+		if settings.rememberConsent == nil {
 			return nil
 		}
 		var remember bool
@@ -157,7 +204,7 @@ func updateClientNotOwningAuthenticationMode(ctx context.Context, database clien
 		case !current.IsPublic:
 			remember = true
 		case loadedPublic:
-			remember = *rememberConsent
+			remember = *settings.rememberConsent
 		default:
 			return nil
 		}
@@ -167,6 +214,35 @@ func updateClientNotOwningAuthenticationMode(ctx context.Context, database clien
 		client.RememberConsent = remember
 		return nil
 	})
+}
+
+// checkClientIdentifierChange holds an identifier the client is being renamed to to the identifier
+// format, refuses one another client holds, and one a resource holds (#151), reading on tx. A
+// refusal is the *i18n.LocalizedError the save answers; a failed lookup is an error, never read as
+// "no clash".
+func checkClientIdentifierChange(ctx context.Context, database clientsDatabase, tx *sql.Tx,
+	validator *inputvalidation.IdentifierValidator, identifier string, clientId int64) error {
+
+	if err := validator.Validate(identifier, true); err != nil {
+		return err
+	}
+
+	existingClient, err := database.GetClientByClientIdentifier(ctx, tx, identifier)
+	if err != nil {
+		return errs.Wrap(err, "database error checking client existence by identifier for update")
+	}
+	if existingClient != nil && existingClient.Id != clientId {
+		return i18n.NewLocalizedError(i18n.ErrCodeClientIdentifierInUse, nil)
+	}
+
+	clashingResource, err := database.GetResourceByResourceIdentifier(ctx, tx, identifier)
+	if err != nil {
+		return errs.Wrap(err, "database error checking resource by client identifier for update")
+	}
+	if clashingResource != nil {
+		return i18n.NewLocalizedError(i18n.ErrCodeClientIdentifierNamesResource, nil)
+	}
+	return nil
 }
 
 // HandleClientsGet - GET /api/v1/admin/clients
@@ -615,54 +691,26 @@ func HandleClientUpdatePut(
 			return
 		}
 
-		// The identifier is checked only when the request actually submits a different one, and
-		// that is load bearing rather than an optimisation. A client that registered itself is
-		// given "dcr_" plus a UUID, which is 40 characters, and IdentifierValidator.Validate caps an
-		// identifier at 38: re-checking an unchanged value therefore rejected every update to every
-		// self-registered client, whatever the request was trying to change. That made the escape
-		// hatch this change depends on unusable, since turning consent off for one reviewed client
-		// is done on the same form (#108, decision 17).
+		// The identifier's format, uniqueness and resource-name checks are not made here, against the
+		// copy just loaded, but in the save's transaction, against the row as read under its lock,
+		// and only when the identifier submitted differs from the row's: see
+		// updateClientNotOwningAuthenticationMode (#710 decision 4).
+		//
+		// Skipping them for an unchanged identifier is load bearing rather than an optimisation. A
+		// client that registered itself is given "dcr_" plus a UUID, which is 40 characters, and
+		// IdentifierValidator.Validate caps an identifier at 38: re-checking an unchanged value
+		// therefore rejected every update to every self-registered client, whatever the request was
+		// trying to change. That made the escape hatch this change depends on unusable, since
+		// turning consent off for one reviewed client is done on the same form (#108, decision 17).
 		//
 		// Compared byte for byte against what is stored, deliberately, rather than against the
-		// raw submitted value. "  same-identifier  " has always been refused as an invalid format
-		// and still is; only a request submitting exactly what is already there skips the check.
-		// That also makes the skip provably safe: an identifier that is already stored passed this
-		// same validator, and the assignment below writes back the bytes that are already in the
-		// row.
-		//
-		// Skipping the uniqueness query alongside it changes nothing either: it excludes the
-		// current client, so an unchanged identifier can only ever match the row being updated.
-		if updateReq.ClientIdentifier != client.ClientIdentifier {
-			// Validate identifier format
-			if err := identifierValidator.Validate(updateReq.ClientIdentifier, true); err != nil {
-				writeValidationError(w, r, err)
-				return
-			}
-
-			// Check uniqueness excluding current client
-			existingClient, err := database.GetClientByClientIdentifier(r.Context(), nil, updateReq.ClientIdentifier)
-			if err != nil {
-				writeInternalServerError(w, r, errs.Wrap(err, "database error checking client existence by identifier for update"), "client_identifier", updateReq.ClientIdentifier, "client_id", client.Id)
-				return
-			}
-			if existingClient != nil && existingClient.Id != client.Id {
-				writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientIdentifierInUse, nil))
-				return
-			}
-
-			// The identifier may not name a resource either (#151). Sitting inside the
-			// only-when-changed guard above keeps a row that already holds a collision, from
-			// before this check existed, editable everywhere else on this form.
-			clashingResource, err := database.GetResourceByResourceIdentifier(r.Context(), nil, updateReq.ClientIdentifier)
-			if err != nil {
-				writeInternalServerError(w, r, errs.Wrap(err, "database error checking resource by client identifier for update"), "client_identifier", updateReq.ClientIdentifier, "client_id", client.Id)
-				return
-			}
-			if clashingResource != nil {
-				writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientIdentifierNamesResource, nil))
-				return
-			}
-		}
+		// trimmed value. "  same-identifier  " has always been refused as an invalid format and
+		// still is; only a request submitting exactly what is already there skips the checks, which
+		// makes the skip provably safe: an identifier that is already stored passed the same checks,
+		// and the write leaves the bytes that are already in the row. The uniqueness query excludes
+		// the client itself, so an unchanged identifier could only ever match its own row; and the
+		// resource-name check, skipped with it, keeps a row that already holds a collision, from
+		// before that check existed, editable everywhere else on this form (#151).
 
 		// ACR level validation depending on AuthorizationCodeEnabled
 		if !client.AuthorizationCodeEnabled && strings.TrimSpace(updateReq.DefaultAcrLevel) != "" {
@@ -690,7 +738,6 @@ func HandleClientUpdatePut(
 			return
 		}
 
-		client.ClientIdentifier = trimmedClientIdentifier
 		client.Description = strings.TrimSpace(updateReq.Description)
 		client.WebsiteURL = websiteURL
 		client.PrivacyPolicyURL = privacyPolicyURL
@@ -730,7 +777,17 @@ func HandleClientUpdatePut(
 			return
 		}
 
-		if err := updateClientNotOwningAuthenticationMode(r.Context(), database, client, updateReq.RememberConsent); err != nil {
+		settings := &clientSettingsSave{
+			identifier:          updateReq.ClientIdentifier,
+			identifierValidator: identifierValidator,
+			rememberConsent:     updateReq.RememberConsent,
+		}
+		if err := updateClientNotOwningAuthenticationMode(r.Context(), database, client, settings); err != nil {
+			var refusal *i18n.LocalizedError
+			if errors.As(err, &refusal) {
+				writeValidationError(w, r, refusal)
+				return
+			}
 			writeInternalServerError(w, r, errs.Wrap(err, "database error updating client"), "client_id", client.Id, "client_identifier", client.ClientIdentifier)
 			return
 		}

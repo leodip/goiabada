@@ -97,7 +97,12 @@ unique-key race answers the same 409, through the one failure writer `writeListS
 save locks its list: overlapping saves merge item by item, and the data tier's `list_save_test.go`
 shows it on MySQL, PostgreSQL and SQL Server. A row lock is for one row read, decided on and written
 back with a security consequence, which today means #245's public/confidential switch
-(`AcquireClientRow`), #139's issuance (`AcquireUserSessionRow`), #131's refresh rotation
+(`AcquireClientRow`), #710's change of a client's identifier (`AcquireClientRow`):
+`SetClientIdentifier`, the column's one writer after creation, reads the identifier under it and
+writes only one that differs byte for byte, reporting whether it did, and the settings save decides
+the identifier checks it owes against the row it read under it; `UpdateClient` leaves the column
+alone (`dont-update`), and `client_identifier_test.go` shows two renames meeting on every engine,
+#139's issuance (`AcquireUserSessionRow`), #131's refresh rotation
 (`AcquireUserRow`), #542's session writes (`AcquireUserSessionRow`) and one-time code claims
 (`AcquireUserRow`), #407's settings section saves (`AcquireSettingsRow`), each of which reads
 the settings row again under it and writes its own section onto what it read, through
