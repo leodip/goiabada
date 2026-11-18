@@ -117,8 +117,9 @@ func scaffoldHeadUsersColumns(t *testing.T, h *isolatedDB) {
 // Its name is the run's own, and each engine names its migration lock after the database, so a
 // test whose every database is one of these shares nothing with another test and calls
 // t.Parallel. A test that also touches the shared database, captures the global logger, holds a
-// lock or a package fixture another test takes, or asserts how long something took stays serial,
-// and Go never runs a serial test beside a parallel one.
+// lock or a package fixture another test takes, or asserts how long something took, in its own
+// body or in any subtest, stays serial: Go never runs a serial top-level test beside a parallel
+// one, but a parallel test's subtests run beside the other parallel tests.
 func newIsolatedDB(t *testing.T) *isolatedDB {
 	t.Helper()
 	cfg := &appConfig.Database
