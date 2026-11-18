@@ -408,9 +408,16 @@
   /* The brand editor's Colors section (#815): a row per color, its label beside a Light and a Dark
      cell, each a color well and a #rrggbb field. Where the form is narrow, a phone among them, the
      label takes its own line and the two cells stay side by side under it. A column the appearance
-     hides leaves its track empty. */
-  .palette-grid {
+     hides leaves its track empty.
+
+     The section's fieldset is the size container the rows are laid out by, not an element inside
+     it: in Chromium, a size container inside a fieldset loses its rows' boxes when the live check's
+     answer is drawn after Advanced is picked, until Basic or Advanced is picked again. */
+  .palette-section {
     container-type: inline-size;
+  }
+
+  .palette-grid {
     display: grid;
     gap: 0.75rem;
     min-width: 0;

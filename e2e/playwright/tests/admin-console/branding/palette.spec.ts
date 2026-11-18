@@ -6,9 +6,10 @@
 // brand lists its failing pairs on the page the save returns to, which the saved notice links to, and
 // one created is marked on the brand list it lands on (decision 9). While the colors are edited, the
 // list is the console's live check of them, and changes as a color is typed; Advanced then holds the
-// colors a basic palette works out; and when the check cannot be reached, the list says the colors
-// could not be checked (decision 6). A save refused for another field lists the pairs the save then
-// answers, after an edit the check could not reach too.
+// colors a basic palette works out, and keeps all 23 rows drawn when the check answers only after it
+// is picked; and when the check cannot be reached, the list says the colors could not be checked
+// (decision 6). A save refused for another field lists the pairs the save then answers, after an edit
+// the check could not reach too.
 //
 // The brands are the test's own, given to clients of the test's own, so no other page changes, and
 // this is an ordinary parallel spec. The console drawn in a custom palette is brands.system.ts's.
@@ -315,6 +316,24 @@ test("the list of failing pairs changes as a color is typed, and Advanced holds 
   await expect(paletteWarningItems(page).filter({ hasText: "Light: Brand color on Background," })).toHaveText(
     "Light: Brand color on Background, 4.1:1. Minimum 4.5:1.",
   );
+});
+
+// On a slow connection, the check asked for as Custom is picked answers only after Advanced is, and
+// fills Advanced's rows with the colors it works out. Every check is held until Advanced is picked.
+test("Advanced picked before the colors are checked keeps all 23 rows drawn once the check answers", async ({ page }) => {
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route("**/admin/settings/branding/palette-check*", async (route) => {
+    await held;
+    await route.continue();
+  });
+  await page.goto(newBrandUrl);
+  await page.locator("#theme-custom").check();
+  await page.locator("#paletteMode-advanced").check();
+  release();
+
+  await expect(paletteWarningsCount(page)).toHaveText("Every pair meets its minimum.");
+  await expect(page.locator("[data-palette-row]:visible")).toHaveCount(23);
 });
 
 test("a save refused for its name lists the failing pairs of the colors the form keeps", async ({ page }) => {
