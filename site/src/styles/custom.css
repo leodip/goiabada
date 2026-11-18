@@ -27,3 +27,25 @@
 .sl-markdown-content .cookie-settings-link:hover {
 	color: var(--sl-color-white);
 }
+
+/* The front page's Docs for AI agents section, set off in a box right under the hero, where
+   the hero's button for it lands. */
+.sl-markdown-content .ai-docs {
+	padding: 1rem 1.25rem 1.25rem;
+	border-inline-start: 4px solid var(--sl-color-accent);
+	background-color: color-mix(in oklab, var(--sl-color-accent-low) 45%, var(--sl-color-bg));
+}
+.sl-markdown-content .ai-docs h2 {
+	margin-top: 0;
+	font-size: var(--sl-text-h3);
+}
+/* On a phone the box runs to the screen's edges, with less padding and smaller code, so each
+   address stays on one line beside its code block's copy button. */
+@media (max-width: 30rem) {
+	.sl-markdown-content .ai-docs {
+		margin-inline: calc(-1 * var(--sl-content-pad-x));
+		padding-inline: 0.75rem;
+		--ec-codePadInl: 0.75rem;
+		--ec-codeFontSize: var(--sl-text-xs);
+	}
+}

@@ -19,10 +19,34 @@ hero:
       link: https://github.com/leodip/goiabada
       icon: external
       variant: minimal
+    - text: Docs for AI agents
+      link: '#docs-for-ai-agents'
+      icon: down-arrow
+      variant: minimal
 ---
 
 import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
 import ImageZoom from '../../components/ImageZoom.astro';
+
+<div class="ai-docs">
+
+## Docs for AI agents
+
+These docs are also published as plain text, for AI agents and tools that read documentation. Give your agent either address.
+
+Every page in full, as Markdown, in one file:
+
+```text
+https://goiabada.dev/llms-full.txt
+```
+
+An index of every page, with its title, address and a one-line description:
+
+```text
+https://goiabada.dev/llms.txt
+```
+
+</div>
 
 Goiabada signs your users in, so your apps don't have to. It's an **OAuth2** and **OpenID Connect** server: your apps send users to it, and get back tokens that say who each user is and what they can do.
 
@@ -88,13 +112,6 @@ Goiabada signs your users in, so your apps don't have to. It's an **OAuth2** and
 ![The admin console's list of users](../../assets/screenshot3.png)
 
 <ImageZoom />
-
-## Docs for AI agents
-
-These docs are also published as plain text, for AI agents and tools that read documentation:
-
-- [`/llms.txt`](/llms.txt) lists every page, with its title, URL and a one-line description.
-- [`/llms-full.txt`](/llms-full.txt) holds every page in full, as Markdown, in one file.
 
 ## Start here
 
