@@ -1,3 +1,5 @@
+//go:build !race
+
 package ceremony
 
 // The one place the auth server is held to "a request field is written at /auth/authorize and

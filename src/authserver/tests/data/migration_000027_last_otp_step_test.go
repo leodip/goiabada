@@ -37,6 +37,8 @@ import (
 //
 //	--run TestMigration000027_LastOTPStep
 func TestMigration000027_LastOTPStep(t *testing.T) {
+	t.Parallel()
+
 	h := newIsolatedDB(t)
 
 	require.NoError(t, h.Migrator.Migrate(context.Background(), 26), "migrate to 000026")

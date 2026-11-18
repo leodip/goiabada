@@ -33,6 +33,8 @@ import (
 //
 //	--run TestMigration000032_OTPEnrollment
 func TestMigration000032_OTPEnrollment(t *testing.T) {
+	t.Parallel()
+
 	h := newIsolatedDB(t)
 
 	require.NoError(t, h.Migrator.Migrate(context.Background(), 31), "migrate to 000031")

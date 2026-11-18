@@ -51,6 +51,8 @@ var brandKitSlots000091 = []string{
 //
 //	--run TestMigration000091_BrandKit
 func TestMigration000091_BrandKit(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	h := migratedIsolatedDB(t)
 

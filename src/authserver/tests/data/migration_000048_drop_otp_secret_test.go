@@ -49,6 +49,8 @@ const (
 //
 //	--run TestMigration000048_DropOtpSecret
 func TestMigration000048_DropOtpSecret(t *testing.T) {
+	t.Parallel()
+
 	h := newIsolatedDB(t)
 
 	// FORWARD to 000047 from an empty database, never down to it. 000047's own test reaches its

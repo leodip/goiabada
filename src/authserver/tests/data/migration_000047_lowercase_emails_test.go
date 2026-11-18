@@ -98,6 +98,8 @@ func lowercaseCases000047() []lowercaseCase000047 {
 //
 //	--run TestMigration000047_LowercaseEmails
 func TestMigration000047_LowercaseEmails(t *testing.T) {
+	t.Parallel()
+
 	h := newIsolatedDB(t)
 	engine := dbType()
 
@@ -208,6 +210,8 @@ func TestMigration000047_LowercaseEmails(t *testing.T) {
 // SQLite and PostgreSQL, which is #351 decision 15's finding; the refusal costs nothing either
 // way and this is the cheapest place to show the failure it prevents.
 func TestMigration000047_ACollisionWouldFailTheMigration(t *testing.T) {
+	t.Parallel()
+
 	h := newIsolatedDB(t)
 
 	if err := h.Migrator.Up(context.Background()); err != nil && !errors.Is(err, migrator.ErrNoChange) {

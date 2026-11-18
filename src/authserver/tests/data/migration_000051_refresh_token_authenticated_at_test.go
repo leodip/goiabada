@@ -30,6 +30,8 @@ import (
 //
 //	--run TestMigration000051_RefreshTokenAuthenticatedAt
 func TestMigration000051_RefreshTokenAuthenticatedAt(t *testing.T) {
+	t.Parallel()
+
 	h := newIsolatedDB(t)
 	ctx := context.Background()
 

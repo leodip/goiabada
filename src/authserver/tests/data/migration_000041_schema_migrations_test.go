@@ -46,6 +46,8 @@ const sqliteVersionBefore000041 = 39
 //
 //	--run TestSchemaMigrations_PinnedShapeAfterConstruction
 func TestSchemaMigrations_PinnedShapeAfterConstruction(t *testing.T) {
+	t.Parallel()
+
 	h := newIsolatedDB(t)
 
 	// Deliberately at version 0. newIsolatedDB constructs the migrator and nothing else,

@@ -3,22 +3,21 @@ package accounthandlers
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/leodip/goiabada/authserver/internal/data/sqlitedb/sqlitedbtest"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/data/migrator"
 	"github.com/leodip/goiabada/authserver/internal/data/sqlitedb"
-	"github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
-	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	accounthandlersmocks "github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
+	handlersmocks "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/usercreation"
 	"github.com/leodip/goiabada/core/builtin"
@@ -33,16 +32,7 @@ import (
 
 func newActivationSQLiteDB(t *testing.T) *sqlitedb.Database {
 	t.Helper()
-	db, err := sqlitedb.New(context.Background(), "file:"+filepath.Join(t.TempDir(), "activation_test.db"), false)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = db.DB.Close() })
-
-	m, err := db.NewMigrator(context.Background(), nil)
-	require.NoError(t, err)
-	if err := m.Up(context.Background()); err != nil && !errors.Is(err, migrator.ErrNoChange) {
-		require.NoError(t, err, "migrate to head")
-	}
-	return db
+	return sqlitedbtest.NewMigrated(t)
 }
 
 // replacingDB is the real database with one interleaving forced into it: the first lookup of a

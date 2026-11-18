@@ -37,6 +37,8 @@ const (
 //
 //	--run TestMigration000083_SettingsAccountDeletion
 func TestMigration000083_SettingsAccountDeletion(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	h := newIsolatedDB(t)
 

@@ -84,6 +84,8 @@ func TestCreateInitialSettings_AfterARolledBackInsertDrewAnId(t *testing.T) {
 }
 
 func TestCreateInitialSettings_RefusesANilTransaction(t *testing.T) {
+	t.Parallel()
+
 	h := migratedIsolatedDB(t)
 	ctx := context.Background()
 	settings := initialSettings("Initial")

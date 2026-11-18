@@ -41,6 +41,8 @@ import (
 //
 //	--run TestMigration000028_CodeHashColumns
 func TestMigration000028_CodeHashColumns(t *testing.T) {
+	t.Parallel()
+
 	h := newIsolatedDB(t)
 
 	require.NoError(t, h.Migrator.Migrate(context.Background(), 27), "migrate to 000027")

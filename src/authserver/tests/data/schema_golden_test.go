@@ -25,6 +25,8 @@ import (
 // purpose: the committed bytes are what a reviewer reads in the pull request, so the thing
 // asserted equal is the thing they are looking at.
 func TestSchemaGolden_MatchesTheCommittedFile(t *testing.T) {
+	t.Parallel()
+
 	h := newIsolatedDB(t)
 	require.NoError(t, h.Migrator.Up(context.Background()), "migrate the isolated database to head on %s", dbType())
 
@@ -60,6 +62,8 @@ func TestSchemaGolden_MatchesTheCommittedFile(t *testing.T) {
 // that quietly stopped including it would still compare equal to a golden file generated
 // from the same mistake.
 func TestSchemaGolden_CommittedFileParses(t *testing.T) {
+	t.Parallel()
+
 	path, err := schemadump.GoldenPath(dbType())
 	require.NoErrorf(t, err, "locate the %s golden file", dbType())
 	committed, err := os.ReadFile(path)

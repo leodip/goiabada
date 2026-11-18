@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/data/sqlitedb/sqlitedbtest"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -90,20 +92,6 @@ func runMainProcessFeeding(t *testing.T, decoy string, env []string, stdin strin
 	}
 }
 
-// migratedToHead creates a SQLite file at path and migrates it to the head, closing it again so
-// the child is the only process holding it.
-func migratedToHead(t *testing.T, path string) {
-	t.Helper()
-
-	db, err := sqlitedb.New(context.Background(), "file:"+path, false)
-	require.NoError(t, err)
-	defer func() { _ = db.DB.Close() }()
-
-	m, err := db.NewMigrator(context.Background(), nil)
-	require.NoError(t, err)
-	require.NoError(t, m.Up(context.Background()))
-}
-
 // recordedVersion reads back the schema version the SQLite file at path records.
 func recordedVersion(t *testing.T, path string) int {
 	t.Helper()
@@ -147,7 +135,7 @@ func TestMain_MigrateFindsItsFlagsWhereverTheyAre(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
 			target, decoy := filepath.Join(dir, "f.db"), filepath.Join(dir, "d.db")
-			migratedToHead(t, target)
+			sqlitedbtest.WriteMigrated(t, target)
 
 			code, stderr := runMainProcess(t, decoy, tc.args(target, decoy)...)
 

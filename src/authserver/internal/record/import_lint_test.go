@@ -1,3 +1,5 @@
+//go:build !race
+
 package record
 
 // The one place this package is held to "a persistence record imports nothing that does anything".

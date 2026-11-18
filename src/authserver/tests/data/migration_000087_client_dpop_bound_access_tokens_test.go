@@ -42,6 +42,8 @@ const (
 //
 //	--run TestMigration000087_ClientDPoPBoundAccessTokens
 func TestMigration000087_ClientDPoPBoundAccessTokens(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	h := newIsolatedDB(t)
 

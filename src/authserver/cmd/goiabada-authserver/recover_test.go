@@ -14,6 +14,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/data/sqlitedb/sqlitedbtest"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -63,13 +65,10 @@ func newRecoverDatabase(t *testing.T) (*sqlitedb.Database, *record.Permission) {
 func newRecoverDatabaseAt(t *testing.T, path string) (*sqlitedb.Database, *record.Permission) {
 	t.Helper()
 
+	sqlitedbtest.WriteMigrated(t, path)
 	db, err := sqlitedb.New(context.Background(), "file:"+path, false)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.DB.Close() })
-
-	m, err := db.NewMigrator(context.Background(), nil)
-	require.NoError(t, err)
-	require.NoError(t, m.Up(context.Background()))
 
 	ctx := context.Background()
 	settings := &record.Settings{

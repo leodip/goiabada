@@ -62,6 +62,8 @@ var uiThemes000065 = []struct{ stored, want string }{
 //
 //	--run TestMigration000065_UIThemeLightOrDark
 func TestMigration000065_UIThemeLightOrDark(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	h := newIsolatedDB(t)
 
@@ -109,6 +111,8 @@ func TestMigration000065_UIThemeLightOrDark(t *testing.T) {
 // empty value, on every engine: the seed runs after every migration, 000065 included, so nothing
 // maps its empty value to dark (#617).
 func TestSeed_ANewInstallationFollowsTheDevice(t *testing.T) {
+	t.Parallel()
+
 	h := migratedIsolatedDB(t)
 	ctx := context.Background()
 

@@ -123,6 +123,8 @@ func TestBrand_TheContactAndFooterLinksReadBackWhatWasWritten(t *testing.T) {
 // A brand written with no links stores the empty list, the value migration 000092 gives every
 // existing brand, and not some other spelling of nothing.
 func TestBrand_NoLinksAreStoredAsTheEmptyList(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	h := migratedIsolatedDB(t)
 

@@ -58,6 +58,8 @@ import (
 //
 //	--run TestMigration000031_OTPConfigGeneration
 func TestMigration000031_OTPConfigGeneration(t *testing.T) {
+	t.Parallel()
+
 	h := newIsolatedDB(t)
 
 	require.NoError(t, h.Migrator.Migrate(context.Background(), 30), "migrate to 000030")

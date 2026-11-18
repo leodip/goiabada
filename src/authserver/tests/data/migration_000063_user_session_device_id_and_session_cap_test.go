@@ -48,6 +48,8 @@ const deviceId000063 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b
 //
 //	--run TestMigration000063_UserSessionDeviceIdAndSessionCap
 func TestMigration000063_UserSessionDeviceIdAndSessionCap(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	h := newIsolatedDB(t)
 

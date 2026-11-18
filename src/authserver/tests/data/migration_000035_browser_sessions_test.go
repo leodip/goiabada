@@ -38,6 +38,8 @@ import (
 //
 //	--run TestMigration000035_BrowserSessions
 func TestMigration000035_BrowserSessions(t *testing.T) {
+	t.Parallel()
+
 	h := newIsolatedDB(t)
 
 	require.NoError(t, h.Migrator.Migrate(context.Background(), 34), "migrate to 000034")
@@ -74,6 +76,8 @@ func TestMigration000035_BrowserSessions(t *testing.T) {
 // none, so a second grant would land silently and be listed twice in the admin console
 // for as long as anyone left it there.
 func TestMigration000035_GuardedInsertsAreIdempotent(t *testing.T) {
+	t.Parallel()
+
 	h := newIsolatedDB(t)
 
 	require.NoError(t, h.Migrator.Migrate(context.Background(), 34), "migrate to 000034")
@@ -121,6 +125,8 @@ func TestMigration000035_GuardedInsertsAreIdempotent(t *testing.T) {
 //
 //	--run TestMigration000035_StripsWiderGrantsFromTheAdminConsoleClient
 func TestMigration000035_StripsWiderGrantsFromTheAdminConsoleClient(t *testing.T) {
+	t.Parallel()
+
 	h := newIsolatedDB(t)
 
 	require.NoError(t, h.Migrator.Migrate(context.Background(), 34), "migrate to 000034")
@@ -188,6 +194,8 @@ func TestMigration000035_StripsWiderGrantsFromTheAdminConsoleClient(t *testing.T
 //
 //	--run TestMigration000035_StripsBrowserSessionsGrantsFromEveryOtherPrincipal
 func TestMigration000035_StripsBrowserSessionsGrantsFromEveryOtherPrincipal(t *testing.T) {
+	t.Parallel()
+
 	h := newIsolatedDB(t)
 
 	require.NoError(t, h.Migrator.Migrate(context.Background(), 34), "migrate to 000034")

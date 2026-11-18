@@ -37,6 +37,8 @@ const (
 //
 //	--run TestMigration000093_BrandPalette
 func TestMigration000093_BrandPalette(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	h := migratedIsolatedDB(t)
 

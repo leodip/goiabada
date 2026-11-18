@@ -44,6 +44,8 @@ var columns000084 = []string{"backchannel_logout_uri", "backchannel_logout_sessi
 //
 //	--run TestMigration000084_ClientBackchannelLogout
 func TestMigration000084_ClientBackchannelLogout(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	h := newIsolatedDB(t)
 

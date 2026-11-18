@@ -103,6 +103,8 @@ var renamedDefaults000040 = map[string]string{
 //
 // Run via: ./run-tests.sh --type data --db mssql --run TestMigration000040
 func TestMigration000040_CollationParity(t *testing.T) {
+	t.Parallel()
+
 	if !engineMoves000040() {
 		t.Skipf("%s already compares strings exactly, so it has no 000040 file", dbType())
 	}
@@ -159,6 +161,8 @@ func TestMigration000040_CollationParity(t *testing.T) {
 // It runs on its own fixture because it deliberately ends with a dirty migration state, which
 // nothing after it in the same database could survive.
 func TestMigration000040_DownRefusesACaseVariantPair(t *testing.T) {
+	t.Parallel()
+
 	if !engineMoves000040() {
 		t.Skipf("%s already compares strings exactly, so it has no 000040 file", dbType())
 	}
@@ -247,6 +251,8 @@ func TestMigration000040_DownRefusesACaseVariantPair(t *testing.T) {
 //
 // Run via: ./run-tests.sh --type data --db mssql --run TestMigration000040_UpRollsBack
 func TestMigration000040_UpRollsBackALateFailure(t *testing.T) {
+	t.Parallel()
+
 	if dbType() != data.MSSQL {
 		t.Skipf("%s has no transactional 000040 up file to roll back", dbType())
 	}

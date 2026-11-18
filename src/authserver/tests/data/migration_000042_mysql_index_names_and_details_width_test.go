@@ -61,6 +61,8 @@ const mysqlVersionBefore000042 = 40
 //
 //	--run TestMigration000042_MySQLIndexNamesAndDetailsWidth
 func TestMigration000042_MySQLIndexNamesAndDetailsWidth(t *testing.T) {
+	t.Parallel()
+
 	h := newIsolatedDB(t)
 
 	if !isMySQL000042() {

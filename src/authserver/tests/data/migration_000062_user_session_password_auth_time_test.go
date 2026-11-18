@@ -42,6 +42,8 @@ const (
 //
 //	--run TestMigration000062_UserSessionPasswordAuthTime
 func TestMigration000062_UserSessionPasswordAuthTime(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	h := newIsolatedDB(t)
 

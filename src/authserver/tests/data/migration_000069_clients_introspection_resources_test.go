@@ -28,6 +28,8 @@ import (
 //
 //	--run TestMigration000069_ClientsIntrospectionResources
 func TestMigration000069_ClientsIntrospectionResources(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	h := newIsolatedDB(t)
 

@@ -47,6 +47,8 @@ const keyPairsStateIndex000030 = "idx_key_pairs_state"
 //
 //	--run TestMigration000030_KeyPairsStateUnique
 func TestMigration000030_KeyPairsStateUnique(t *testing.T) {
+	t.Parallel()
+
 	h := newIsolatedDB(t)
 
 	require.NoError(t, h.Migrator.Migrate(context.Background(), 29), "migrate to 000029")

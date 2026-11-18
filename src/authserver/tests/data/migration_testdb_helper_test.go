@@ -113,6 +113,13 @@ func scaffoldHeadUsersColumns(t *testing.T, h *isolatedDB) {
 
 // newIsolatedDB creates a fresh, empty database of the configured dialect and a
 // migrator bound to it (at version 0). Cleanup (close + drop) is registered on t.
+//
+// Its name is the run's own, and each engine names its migration lock after the database, so a
+// test whose every database is one of these shares nothing with another test and calls
+// t.Parallel. A test that also touches the shared database, captures the global logger, holds a
+// lock or a package fixture another test takes, or asserts how long something took, in its own
+// body or in any subtest, stays serial: Go never runs a serial top-level test beside a parallel
+// one, but a parallel test's subtests run beside the other parallel tests.
 func newIsolatedDB(t *testing.T) *isolatedDB {
 	t.Helper()
 	cfg := &appConfig.Database

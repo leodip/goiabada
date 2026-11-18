@@ -284,6 +284,8 @@ func TestBrands_TheDefaultPointer(t *testing.T) {
 // A database with no settings row has no default brand: a page drawn before the first start's seed
 // commits is drawn without one.
 func TestGetDefaultBrand_NoSettingsRowIsNil(t *testing.T) {
+	t.Parallel()
+
 	h := migratedIsolatedDB(t)
 	def, err := h.DB.GetDefaultBrand(context.Background(), nil)
 	require.NoError(t, err)
@@ -380,6 +382,8 @@ func TestBrands_ADeletionRacingAChangeOfDefault(t *testing.T) {
 // the seed writes a brand named Default, automatic, on Blueberry, and points the settings row at
 // it in the same transaction.
 func TestSeed_ANewInstallationHasADefaultBrand(t *testing.T) {
+	t.Parallel()
+
 	h := migratedIsolatedDB(t)
 	ctx := context.Background()
 

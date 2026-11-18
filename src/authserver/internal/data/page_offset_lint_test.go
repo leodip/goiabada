@@ -1,3 +1,5 @@
+//go:build !race
+
 package data
 
 // The one place the data layer is held to "every SQL offset is computed by

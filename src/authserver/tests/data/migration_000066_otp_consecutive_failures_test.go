@@ -35,6 +35,8 @@ import (
 //
 //	--run TestMigration000066_OtpConsecutiveFailures
 func TestMigration000066_OtpConsecutiveFailures(t *testing.T) {
+	t.Parallel()
+
 	h := newIsolatedDB(t)
 
 	require.NoError(t, h.Migrator.Migrate(context.Background(), 65), "migrate to 000065")

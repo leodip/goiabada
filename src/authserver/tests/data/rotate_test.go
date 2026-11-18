@@ -49,6 +49,8 @@ func rekeyKeyPair(pem []byte) *record.KeyPair {
 // Whether to re-key at all is not asked here. That is the canary decision, which #438 decision 8
 // moved to datafactory's startup task, where its unit table covers every branch.
 func TestReencryptToKey(t *testing.T) {
+	t.Parallel()
+
 	h := migratedIsolatedDB(t)
 	db := h.DB
 	ctx := context.Background()
@@ -154,6 +156,8 @@ func TestReencryptToKey(t *testing.T) {
 // encrypt every secret under a key the configuration could never supply again, and a short old
 // key reads nothing, so each is refused before the transaction opens and nothing is rewritten.
 func TestReencryptToKey_RefusesShortKeys(t *testing.T) {
+	t.Parallel()
+
 	h := migratedIsolatedDB(t)
 	ctx := context.Background()
 
@@ -193,6 +197,8 @@ func TestReencryptToKey_RefusesShortKeys(t *testing.T) {
 // What a failure must leave is the database as it was: the client secret still under keyA, not
 // under keyB beside a private key nobody re-keyed. Half a re-key is a database no single key opens.
 func TestReencryptToKey_AFailureLeavesEverythingUnderTheOldKey(t *testing.T) {
+	t.Parallel()
+
 	h := migratedIsolatedDB(t)
 	ctx := context.Background()
 

@@ -1,3 +1,5 @@
+//go:build !race
+
 package data_test
 
 // The one place the four committed migration directories are judged.

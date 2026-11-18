@@ -54,6 +54,8 @@ const (
 //
 //	--run TestMigration000055_OneRowPerConsentAndSessionClient
 func TestMigration000055_OneRowPerConsentAndSessionClient(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	h := newIsolatedDB(t)
 

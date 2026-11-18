@@ -40,6 +40,8 @@ import (
 //
 //	--run TestMigrationChain_EveryDownRestoresTheCatalog
 func TestMigrationChain_EveryDownRestoresTheCatalog(t *testing.T) {
+	t.Parallel()
+
 	h := newIsolatedDB(t)
 
 	// The engine's own carried versions, ascending. Plan answers exactly the versions a

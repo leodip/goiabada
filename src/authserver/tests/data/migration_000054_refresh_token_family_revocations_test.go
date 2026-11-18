@@ -31,6 +31,8 @@ import (
 //
 //	--run TestMigration000054_RefreshTokenFamilyRevocations
 func TestMigration000054_RefreshTokenFamilyRevocations(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	h := newIsolatedDB(t)
 

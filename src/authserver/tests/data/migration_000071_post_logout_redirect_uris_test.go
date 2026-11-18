@@ -29,6 +29,8 @@ import (
 //
 //	--run TestMigration000071_PostLogoutRedirectURIs
 func TestMigration000071_PostLogoutRedirectURIs(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	h := newIsolatedDB(t)
 

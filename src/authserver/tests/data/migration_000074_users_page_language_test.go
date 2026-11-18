@@ -29,6 +29,8 @@ import (
 //
 //	--run TestMigration000074_UsersPageLanguage
 func TestMigration000074_UsersPageLanguage(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	h := newIsolatedDB(t)
 

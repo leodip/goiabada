@@ -41,6 +41,14 @@ is that refused code, and `PreviousStepCode` the oldest accepted one, which a te
 the current step's code unspent for a second sign-in. Both wait out the last two seconds of a step,
 so the step cannot turn before the server checks the code.
 
+A unit test that needs a real SQLite database at the head of the migration set takes one from
+`authserver/internal/data/sqlitedb/sqlitedbtest`, test support like `otptest`: `NewMigrated` opens a
+copy of its own in the test's temporary directory, and `WriteMigrated` writes one at a path the test
+hands to the code it runs. Each test binary migrates one database the first time a test asks and
+copies its bytes for every test after it, because migrating every test's database from empty cost
+seconds per test under the race detector. A test whose subject is a migration, or a start that
+migrates, still builds its database from empty.
+
 A test that sends a DPoP proof builds it with `authserver/internal/dpop/dpoptest`, test support like
 `otptest`: ES256 over RFC 7517's and RFC 7515's published P-256 keys, signed with the standard
 library and importing nothing from `dpop`, each key's `Thumbprint` a literal worked out apart from
@@ -55,12 +63,26 @@ before its first change; each registers a `t.Cleanup` that writes the whole row 
 run with the row at its start and fails the tier naming each changed field, so a test that forgets
 fails the run instead of the tests after it (#433).
 
+**Integration halves**: CI runs the integration tier in two halves, each against a server and
+database of its own. `run-tests.sh --shard 1/2` runs every other top-level test in name order and
+`--shard 2/2` the rest, which also takes in any test the dealing missed. So an integration test sets
+up every record it relies on rather than finding one an earlier test left, which may have run in the
+other half. Either flag reproduces its half locally.
+
 **Fresh test databases**: every data and integration run starts from an empty database, as CI's
 fresh service containers always did. `run-tests.sh` removes the SQLite files, and on mysql, postgres
 and mssql it drops `goiabada_data` or `goiabada_integration` through `cmd/droptestdb`, which refuses
 every other name, so the server or the data tier recreates and migrates it and the integration
 server seeds it. The drop itself is each engine package's `DropDatabase`, the one spelling
 `schemadump` and the data tier's fixtures use too (#433).
+
+**Parallel data tests**: a data test whose every database is its own, from `newIsolatedDB` or a
+helper over it, calls `t.Parallel()`, since the database's name is the test's and each engine names
+its migration lock after the database. A data test that also reaches the shared database, captures
+the global logger, holds a lock or package fixture another test takes, or asserts how long
+something took stays serial, whether it does so in its own body or in a subtest. Go runs every
+serial top-level test before the parallel ones resume, so the two never overlap, but a parallel
+test's subtests run beside the other parallel tests.
 
 **Dev stack secrets**: the dev stack's data key and its MySQL, PostgreSQL and SQL Server passwords
 come from `src/.devcontainer/.env`, which `src/.devcontainer/generate-env.sh` writes with fresh
@@ -94,6 +116,12 @@ it to 1 for itself. Code whose correctness is a locking argument (`authserver/in
 whose failures-only limiter holds the in-flight count since #439, the concurrent transactions
 of #301) is covered there and nowhere else; the setup tier also accepts `--race`; the data and
 integration tiers do not run under it.
+
+A `*_lint_test.go` file checks source text: it parses files and runs none of the code it reads, so a
+race the detector could find there would be in the guard or its harness, never in the code under
+check. Every one starts with `//go:build !race` and runs once, in the plain tier.
+What another test file uses, a finder its rule tests drive over fixtures or a reader of the served
+scripts, lives in a file of its own beside it, which both builds read.
 
 ## Browser e2e tests
 

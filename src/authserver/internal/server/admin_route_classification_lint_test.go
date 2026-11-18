@@ -1,3 +1,5 @@
+//go:build !race
+
 package server
 
 // The one place the administrative policy is held to covering the whole admin API.

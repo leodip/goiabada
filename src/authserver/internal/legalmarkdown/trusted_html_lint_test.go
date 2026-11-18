@@ -1,3 +1,5 @@
+//go:build !race
+
 package legalmarkdown
 
 // The one place the auth server is held to "markup built from data comes from a guarded renderer".

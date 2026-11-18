@@ -67,6 +67,8 @@ var nvarcharColumns000038 = []struct {
 //
 // Run via: ./run-tests.sh --type data --db mssql --run TestMigration000038_NvarcharColumns
 func TestMigration000038_NvarcharColumns(t *testing.T) {
+	t.Parallel()
+
 	if dbType() != data.MSSQL {
 		t.Skipf("SQL Server only: %s has no non-Unicode string type to migrate away from, so it has no 000038 file", dbType())
 	}

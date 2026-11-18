@@ -1,3 +1,5 @@
+//go:build !race
+
 package server
 
 // openapi.yaml's error envelope, held to what the auth server's writers send (#522 decision 3).

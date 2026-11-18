@@ -39,6 +39,8 @@ import (
 //
 //	--run TestMigration000024_AuthStateGeneration
 func TestMigration000024_AuthStateGeneration(t *testing.T) {
+	t.Parallel()
+
 	h := newIsolatedDB(t)
 
 	require.NoError(t, h.Migrator.Migrate(context.Background(), 23), "migrate to 000023")

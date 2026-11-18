@@ -9,6 +9,7 @@ package emaildelivery
 import (
 	"bufio"
 	"cmp"
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/hmac"
@@ -57,7 +58,8 @@ type fakeSMTP struct {
 	// slow but steadily taking a large body, so once the socket buffers fill, the client's writes
 	// block and each completes as the relay frees room. The unpaced rest drains the buffers quickly
 	// once the client has written everything, so the wait for the reply to the data is no test of
-	// the pace.
+	// the pace. A paced connection's receive buffer is fixed at testSocketBuffer, so the system
+	// cannot grow it to hold the body.
 	paceData      time.Duration
 	paceDataBytes int
 	// handshakeDelay is a pause before the implicit-TLS handshake, which is part of the connect: a
@@ -470,7 +472,26 @@ func (f *fakeSMTP) serve(session int, conn net.Conn) {
 }
 
 // paceChunk is how much a pacedReader takes between two of its pauses.
-const paceChunk = 128 << 10
+const paceChunk = 16 << 10
+
+// testSocketBuffer is the size the deadline rows fix a socket buffer at, on the sender's end through
+// smallSendBufferDial and on a paced fake's, so a body of a few MiB fills the buffers between them.
+// Linux doubles the value it is given and stops growing a buffer set this way.
+const testSocketBuffer = 32 << 10
+
+// smallSendBufferDial dials as the sender does and fixes the connection's send buffer at
+// testSocketBuffer.
+func smallSendBufferDial(ctx context.Context, network, address string) (net.Conn, error) {
+	conn, err := (&net.Dialer{}).DialContext(ctx, network, address)
+	if err != nil {
+		return nil, err
+	}
+	if err := conn.(*net.TCPConn).SetWriteBuffer(testSocketBuffer); err != nil {
+		_ = conn.Close()
+		return nil, err
+	}
+	return conn, nil
+}
 
 // pacedReader reads from r as it arrives and, until it has taken limit bytes, pauses each time
 // another paceChunk bytes have been taken, so those arrive at a steady rate of about paceChunk per
@@ -550,9 +571,12 @@ func (f *fakeSMTP) start(t *testing.T) int {
 			if err != nil {
 				return
 			}
-			if f.stopReadingAtData {
+			switch {
+			case f.stopReadingAtData:
 				// The smallest receive window, so the body cannot hide in this side's buffer.
 				_ = conn.(*net.TCPConn).SetReadBuffer(1)
+			case f.paceData > 0:
+				_ = conn.(*net.TCPConn).SetReadBuffer(testSocketBuffer)
 			}
 			f.mu.Lock()
 			session := len(f.conns)

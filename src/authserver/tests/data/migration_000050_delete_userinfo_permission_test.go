@@ -173,6 +173,8 @@ func (f *userinfoFixture000050) identifiers(t *testing.T) map[string]string {
 //
 //	--run TestMigration000050
 func TestMigration000050_DeletesTheUserinfoPermissionAndItsGrants(t *testing.T) {
+	t.Parallel()
+
 	h := newIsolatedDB(t)
 	ctx := context.Background()
 	before := beforeDeleteUserinfoPermission000050()
@@ -217,6 +219,8 @@ func TestMigration000050_DeletesTheUserinfoPermissionAndItsGrants(t *testing.T) 
 //
 // Run via: ./run-tests.sh --type data --db sqlite --run TestMigration000050
 func TestMigration000050_SQLiteWithForeignKeysOff(t *testing.T) {
+	t.Parallel()
+
 	if dbType() != data.SQLite {
 		t.Skipf("SQLite only: %s enforces the link tables' cascade on every connection", dbType())
 	}
@@ -265,6 +269,8 @@ func TestMigration000050_SQLiteWithForeignKeysOff(t *testing.T) {
 // resource, which is every fresh installation before the seed runs: up has nothing to delete and
 // down has nowhere to insert the row, and neither may fail or invent one.
 func TestMigration000050_AnEmptyDatabase(t *testing.T) {
+	t.Parallel()
+
 	h := newIsolatedDB(t)
 	ctx := context.Background()
 

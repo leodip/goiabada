@@ -107,6 +107,8 @@ func TestAcquireManagePermissionRow(t *testing.T) {
 // the guard behind it count without serializing anything. It is refused instead, on a database that
 // has no authserver resource at all and on one whose authserver resource has no manage permission.
 func TestAcquireManagePermissionRow_RefusesWhereThereIsNoManagePermission(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	h := migratedIsolatedDB(t)
 

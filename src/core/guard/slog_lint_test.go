@@ -1,3 +1,5 @@
+//go:build !race
+
 package guard
 
 // The rule table AssertSlogConvention enforces, over fixture source text written into a temp tree

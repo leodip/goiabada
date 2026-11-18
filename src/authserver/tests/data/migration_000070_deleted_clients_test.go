@@ -29,6 +29,8 @@ import (
 //
 //	--run TestMigration000070_DeletedClients
 func TestMigration000070_DeletedClients(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	h := newIsolatedDB(t)
 

@@ -78,6 +78,10 @@ type Sender struct {
 	// refuses EHLO. Empty, each connection uses the address of its own end, written as an address
 	// literal (#718 decision 9).
 	ehloName string
+	// dialContext is nil in production, meaning a plain net.Dialer. The in-package tests hand one
+	// that gives the connection a small fixed send buffer, so a body of a few MiB fills the socket
+	// buffers where the system's own sizing would hold tens of them.
+	dialContext func(ctx context.Context, network, address string) (net.Conn, error)
 }
 
 // NewSender builds the sender. ehloName is GOIABADA_AUTHSERVER_SMTP_EHLO_NAME as the configuration
@@ -359,7 +363,11 @@ func (e *Sender) connect(ctx context.Context, dial relayDial) (*smtp.Client, fun
 	}
 	dialCtx, cancelDial := context.WithDeadline(ctx, dialDeadline)
 	defer cancelDial()
-	conn, err := (&net.Dialer{}).DialContext(dialCtx, "tcp", dial.addr)
+	dialContext := e.dialContext
+	if dialContext == nil {
+		dialContext = (&net.Dialer{}).DialContext
+	}
+	conn, err := dialContext(dialCtx, "tcp", dial.addr)
 	if err != nil {
 		return nil, nil, labelled(SendFailureConnection, errs.Wrap(err, "unable to connect to SMTP server"))
 	}

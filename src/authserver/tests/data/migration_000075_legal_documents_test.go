@@ -25,6 +25,8 @@ import (
 //
 //	--run TestMigration000075_LegalDocuments
 func TestMigration000075_LegalDocuments(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	h := newIsolatedDB(t)
 

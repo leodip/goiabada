@@ -33,6 +33,8 @@ const (
 //
 //	--run TestMigration000072_AdminConsoleSignOutRedirectURI
 func TestMigration000072_AdminConsoleSignOutRedirectURI(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	h := newIsolatedDB(t)
 
