@@ -30,11 +30,14 @@ import (
 // so the database mock needs no expectations and this test does not break when a handler changes.
 //
 // WHAT THIS DOES NOT OWN, and must not be described as owning (decision 16). It builds initRoutes
-// alone, so it cannot observe any response the four middleware mounted in initMiddleware produce
-// without calling next: a CORS preflight, which middleware.CORS answers 200 itself; a settings
-// lookup failure's 500; httpmw.CookieReset's redirect on a cookie it cannot decode; and
-// middleware.SessionIdentifier's return on a session-store error. Those four ship with neither
-// header field. None of them carries a credential, so RFC 6749 section 5.1 does not reach them.
+// alone, so it cannot observe any response the middleware mounted in initMiddleware produce
+// without calling next, ahead of the groups: a CORS preflight, which middleware.CORS answers 200
+// itself, and the API branch's JSON 500 for a settings lookup that fails. Those two ship with
+// neither header field. None of them carries a credential, so RFC 6749 section 5.1 does not reach
+// them. The API branch reads no browser session since #825, so no cookie reset or session
+// identifier answers there; the bearer token's liveness check, which reads the user session the
+// token names, is RequireValidSession inside each group, behind NoStore, so its refusals and its
+// fault carry both.
 // This test is exhaustive over the routes the router registers, and it is not exhaustive over the
 // API's whole response surface.
 func TestInitRoutes_EveryApiRouteRefusesToBeStored(t *testing.T) {

@@ -643,8 +643,9 @@ When user has valid session (`UserSession` in DB + session cookie):
   `ui_locales`, then `Accept-Language`, then English, never a sign-in in progress. What a route
   reads for its own credentials stays its own: the user session a bearer token or an authorization
   code names, and the session store API the admin console keeps its sessions through. A brand's
-  stylesheets and assets, public and kept for a year, are registered on the root as the static
-  files are, and read neither the settings nor the session (#810)
+  stylesheets and assets, public, and kept for a year when asked by their current fingerprint and
+  five minutes otherwise, are registered on the root as the static files are, and read neither the
+  settings nor the session (#810)
 - Whether a signed-in cookie outlives the browser is the store's `KeepSignedIn` rule
   (`sessionbackend.NewKeepSignedIn`), asked per cookie write. Under Let each user choose it reads the
   password page's Keep me signed in answer from the browser session (`sessionkeys.KeepSignedIn`, a

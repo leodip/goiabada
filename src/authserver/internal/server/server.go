@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"net"
 	"net/http"
+	"net/url"
 	"path"
 	"strings"
 	"sync"
@@ -803,9 +804,10 @@ type appBranches struct {
 	// out the browser session, so no cookie rides on an answer a shared cache may keep (#825), and the
 	// page language, which only a drawn page uses, so an image costs no read of its user (#631).
 	files *routing.Router
-	// public carries what is answered alike to every visitor and kept by shared caches for a year:
-	// the brand stylesheets and assets. It is the root itself, as the static files are, with neither
-	// the settings read nor the browser session (#810).
+	// public carries what is answered alike to every visitor and kept by shared caches: the brand
+	// stylesheets and assets, for a year when a request names their current fingerprint and five
+	// minutes otherwise. It is the root itself, as the static files are, with neither the settings
+	// read nor the browser session (#810).
 	public *routing.Router
 	// protocol carries the endpoints that answer RFC 6749 section 5.2's {error, error_description}:
 	// token, userinfo, JWKS, discovery and dynamic client registration.
@@ -1006,7 +1008,7 @@ const (
 // /static. The 404 page is drawn behind the page branch's chain, which it reads its settings and
 // language from, so a directory costs what an unmatched path costs; a file still costs neither.
 func (s *Server) serveStaticFiles() {
-	files := http.StripPrefix(staticPrefix, http.FileServer(http.FS(s.staticFS)))
+	files := http.FileServer(http.FS(s.staticFS))
 	fingerprints := newStaticFingerprints(s.staticFS)
 	notFound := handlers.HandleNotFoundGet(render.New(s.templateFS, s.staticFS, s.database))
 	directory := http.Handler(notFound)
@@ -1016,6 +1018,11 @@ func (s *Server) serveStaticFiles() {
 	}
 
 	getAndHead(s.router, staticPrefix+"/*", func(w http.ResponseWriter, r *http.Request) {
+		file, ok := withoutStaticPrefix(r)
+		if !ok {
+			handlers.ResourceNotFound(w, r)
+			return
+		}
 		switch s.staticEntryOf(r.URL.Path) {
 		case staticDirectory:
 			directory.ServeHTTP(w, r)
@@ -1035,8 +1042,29 @@ func (s *Server) serveStaticFiles() {
 		w.Header().Set("Expires", time.Now().UTC().Add(lifetime).Format(http.TimeFormat))
 		w.Header().Set("Vary", "Accept-Encoding")
 
-		files.ServeHTTP(w, r)
+		files.ServeHTTP(w, file)
 	})
+}
+
+// withoutStaticPrefix is r with /static removed from its path, as http.StripPrefix removes it: from
+// the decoded path and from the escaped one, when the request has one. It reports false where
+// http.StripPrefix answers its own 404, a path whose escaped form does not begin with /static, such
+// as /st%61tic/main.css, which the router matches by the decoded /static/main.css. Such a request
+// is a file that is not found, so it is told apart before the file's lifetime is set and answered
+// the static files' no-store 404 (#825 decision 3).
+func withoutStaticPrefix(r *http.Request) (*http.Request, bool) {
+	p := strings.TrimPrefix(r.URL.Path, staticPrefix)
+	rp := strings.TrimPrefix(r.URL.RawPath, staticPrefix)
+	if len(p) == len(r.URL.Path) || (r.URL.RawPath != "" && len(rp) == len(r.URL.RawPath)) {
+		return nil, false
+	}
+	stripped := new(http.Request)
+	*stripped = *r
+	stripped.URL = new(url.URL)
+	*stripped.URL = *r.URL
+	stripped.URL.Path = p
+	stripped.URL.RawPath = rp
+	return stripped, true
 }
 
 // staticEntry is what a path under /static names among the static files.

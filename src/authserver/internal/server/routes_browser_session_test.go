@@ -10,15 +10,21 @@ import (
 	"reflect"
 	"runtime"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
+	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
+	"github.com/leodip/goiabada/core/builtin"
+	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/routing"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/sessionstore/sessiontest"
@@ -67,8 +73,10 @@ func (b *loadCountingBackend) loadsOf(id string) int {
 }
 
 // newBrowserSessionTestServer is the server main builds, with every route registered as Start
-// registers them, over database, and its browser sessions on a backend the test reads.
-func newBrowserSessionTestServer(t *testing.T, database *datamocks.Database) (*Server, *loadCountingBackend) {
+// registers them, over database, and its browser sessions on a backend the test reads. Each of
+// outermost runs on the root ahead of the server's own middleware.
+func newBrowserSessionTestServer(t *testing.T, database *datamocks.Database,
+	outermost ...func(http.Handler) http.Handler) (*Server, *loadCountingBackend) {
 	t.Helper()
 
 	database.On("PoolStats").Return(testPoolStats).Maybe()
@@ -77,7 +85,9 @@ func newBrowserSessionTestServer(t *testing.T, database *datamocks.Database) (*S
 	cfg := &config.Config{}
 	cfg.AuthServer.ProfilePictureMaxSizeBytes = testProfilePictureMaxSizeBytes
 
-	s := NewServer(routing.New(), database, newTestSessionStoreOver(backend), nil, nil, cfg, testTokenProofs(t))
+	router := routing.New()
+	router.Use(outermost...)
+	s := NewServer(router, database, newTestSessionStoreOver(backend), nil, nil, cfg, testTokenProofs(t))
 	s.registerRoutes()
 	return s, backend
 }
@@ -162,8 +172,9 @@ func TestRegisterRoutes_TheListedRoutesCarryNoBrowserSession(t *testing.T) {
 			s.router.ServeHTTP(rr, request)
 
 			require.Equal(t, route.status, rr.Code, rr.Body.String())
-			assert.Equal(t, route.cacheControl, rr.Header().Get("Cache-Control"), "the resource keeps its lifetime")
-			assert.Empty(t, rr.Header().Values("Set-Cookie"), "a publicly cacheable answer sets no cookie")
+			sent := rr.Result().Header
+			assert.Equal(t, route.cacheControl, sent.Get("Cache-Control"), "the resource keeps its lifetime")
+			assert.Empty(t, sent.Values("Set-Cookie"), "a publicly cacheable answer sets no cookie")
 			assert.Zero(t, backend.loadsOf(id), "the browser session the cookie names is not loaded")
 			database.AssertNotCalled(t, "GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything)
 		})
@@ -212,7 +223,37 @@ func runsThePageChain(chain []string, pageChain []string) bool {
 // the 404 page, a page answer.
 const guardStaticFile = "/static/favicon/favicon.ico"
 
+// guardBearerToken is the decoded bearer token the guard's API requests carry, so each passes its
+// group's authentication and reaches its route: a user's token from the guard's issuer, holding the
+// account API's scope and the session API's, of the client and user armGuardBearerToken has the
+// database find. It holds no administrative scope, so an admin route refuses it behind the route
+// itself, which the guard does not ask past.
+func guardBearerToken() oauth.JwtToken {
+	return routesTestAccessToken(jwt.MapClaims{
+		"iss": guardIssuer,
+		"sub": routesTestSubject,
+		"scope": builtin.AuthServerResourceIdentifier + ":" + builtin.ManageAccountPermissionIdentifier + " " +
+			builtin.AuthServerResourceIdentifier + ":" + builtin.BrowserSessionsPermissionIdentifier,
+		"auth_time": float64(time.Now().Add(-time.Minute).Unix()),
+	})
+}
+
+// guardIssuer is the issuer the guard's settings name, and its bearer token.
+const guardIssuer = "https://issuer.example"
+
+// armGuardBearerToken has the liveness check find guardBearerToken live: its client enabled and its
+// user enabled, at the generation the token, carrying none, names. Registered ahead of
+// answerEveryOtherCallWithNothing, whose nothing would refuse it.
+func armGuardBearerToken(database *datamocks.Database) {
+	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, routesTestAPIClientId).
+		Return(&record.Client{Id: 3, ClientIdentifier: routesTestAPIClientId, Enabled: true}, nil).Maybe()
+	database.On("GetUserBySubject", mock.Anything, mock.Anything, routesTestSubject).
+		Return(&record.User{Id: 7, Subject: routesTestSubject, Enabled: true}, nil).Maybe()
+}
+
 // guardRequest is the request the guard sends a route, by the method and the name the walk gives it.
+// One to the API carries guardBearerToken where JwtAuthorizationHeaderToContext leaves a token it
+// has verified, since the signature is not what the guard claims.
 func guardRequest(method, route string) *http.Request {
 	if method == "*" {
 		method = http.MethodDelete
@@ -221,7 +262,34 @@ func guardRequest(method, route string) *http.Request {
 	if route == staticPrefix+"/*" {
 		target = guardStaticFile
 	}
-	return httptest.NewRequest(method, target, nil)
+	request := httptest.NewRequest(method, target, nil)
+	if strings.HasPrefix(route, "/api/v1/") {
+		request = request.WithContext(reqctx.WithBearerToken(request.Context(), guardBearerToken()))
+	}
+	return request
+}
+
+// routeReached records the route each request reached, read after the router answered it: the route
+// is named once the request passes its group's middleware, so a request a group refused names none.
+type routeReached struct {
+	mu   sync.Mutex
+	name string
+}
+
+func (rr *routeReached) middleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		next.ServeHTTP(w, r)
+		rr.mu.Lock()
+		rr.name = routing.RouteName(r)
+		rr.mu.Unlock()
+	})
+}
+
+// last is the route the last request reached, or "" for none.
+func (rr *routeReached) last() string {
+	rr.mu.Lock()
+	defer rr.mu.Unlock()
+	return rr.name
 }
 
 // No route outside the page branch answers with a Set-Cookie, sent the cookie of a browser session
@@ -231,13 +299,18 @@ func guardRequest(method, route string) *http.Request {
 // route is told by the chain it is registered with, the page branch's, and is the page branch's to
 // answer; so is a static directory, the 404 page drawn behind that chain, and a method a path under
 // a page group does not serve, which TestRegisterRoutes_APageRequestStillClearsTheDanglingPointer
-// holds to the page branch's answer.
+// holds to the page branch's answer. Each request is checked to have reached its route, past its
+// group's middleware, once the router has answered it: a group that refused it would have answered
+// before the route's own chain ran. The API's requests carry a live bearer token for that, and the
+// static files' a file that exists.
 func TestRegisterRoutes_NoRouteOutsideThePageBranchSendsACookie(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).
-		Return(&record.Settings{Id: 1, AppName: "Goiabada", Issuer: "https://issuer.example"}, nil).Maybe()
+		Return(&record.Settings{Id: 1, AppName: "Goiabada", Issuer: guardIssuer}, nil).Maybe()
+	armGuardBearerToken(database)
 	answerEveryOtherCallWithNothing(database)
-	s, backend := newBrowserSessionTestServer(t, database)
+	reached := &routeReached{}
+	s, backend := newBrowserSessionTestServer(t, database, reached.middleware)
 	pageChain := middlewareNames(s.pageChain())
 
 	var pages, others []string
@@ -251,12 +324,15 @@ func TestRegisterRoutes_NoRouteOutsideThePageBranchSendsACookie(t *testing.T) {
 		t.Run(key, func(t *testing.T) {
 			cookies, id := danglingPointerCookies(t, s)
 			request := withCookies(guardRequest(method, route), cookies)
-			require.Equal(t, route, s.router.RouteFor(request), "the request reaches the route it was built for")
 
 			rr := httptest.NewRecorder()
 			s.router.ServeHTTP(rr, request)
 
-			assert.Empty(t, rr.Header().Values("Set-Cookie"), "answered %d", rr.Code)
+			require.Equal(t, route, reached.last(), "the request reaches the route it was built for: answered %d %s", rr.Code, rr.Body.String())
+			if route == staticPrefix+"/*" {
+				require.Equal(t, http.StatusOK, rr.Code, "the static files serve the file asked for")
+			}
+			assert.Empty(t, rr.Result().Header.Values("Set-Cookie"), "answered %d", rr.Code)
 			assert.Zero(t, backend.loadsOf(id), "the browser session the cookie names is not loaded")
 		})
 		return nil
@@ -274,7 +350,7 @@ func TestRegisterRoutes_NoRouteOutsideThePageBranchSendsACookie(t *testing.T) {
 	directory := httptest.NewRecorder()
 	s.router.ServeHTTP(directory, httptest.NewRequest(http.MethodGet, "/static/favicon", nil))
 	assert.Equal(t, http.StatusNotFound, directory.Code)
-	assert.Equal(t, "no-store", directory.Header().Get("Cache-Control"), "a static directory is a page answer")
+	assert.Equal(t, "no-store", directory.Result().Header.Get("Cache-Control"), "a static directory is a page answer")
 }
 
 // A page request with the same cookies still clears the dangling pointer, as before #825: the
@@ -300,8 +376,8 @@ func TestRegisterRoutes_APageRequestStillClearsTheDanglingPointer(t *testing.T) 
 			s.router.ServeHTTP(rr, withCookies(httptest.NewRequest(request.method, request.target, nil), cookies))
 
 			require.Equal(t, request.status, rr.Code, rr.Body.String())
-			assert.Equal(t, "no-store", rr.Header().Get("Cache-Control"))
-			assert.Equal(t, "no-cache", rr.Header().Get("Pragma"))
+			assert.Equal(t, "no-store", rr.Result().Header.Get("Cache-Control"))
+			assert.Equal(t, "no-cache", rr.Result().Header.Get("Pragma"))
 			assert.Positive(t, backend.loadsOf(id), "the page branch loads the browser session")
 			database.AssertCalled(t, "GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, endedUserSession)
 
@@ -311,7 +387,7 @@ func TestRegisterRoutes_APageRequestStillClearsTheDanglingPointer(t *testing.T) 
 					deleted = true
 				}
 			}
-			assert.True(t, deleted, "the chunked cookie store's leftover is deleted: %q", rr.Header().Values("Set-Cookie"))
+			assert.True(t, deleted, "the chunked cookie store's leftover is deleted: %q", rr.Result().Header.Values("Set-Cookie"))
 
 			after := withCookies(httptest.NewRequest(http.MethodGet, "/", nil), cookies[:1])
 			session, err := s.sessionStore.Get(after, sessionkeys.AuthServerSessionName)

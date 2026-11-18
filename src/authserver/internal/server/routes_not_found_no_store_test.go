@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
@@ -13,12 +14,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// assertNoStore asserts the pair the server's no-store answers send, and no Expires beside it.
-func assertNoStore(t *testing.T, rr interface{ Header() http.Header }) {
+// assertNoStore asserts the pair the server's no-store answers send, and no Expires beside it, on
+// the header fields the answer was sent with: the recorder's snapshot taken when the status was
+// written, not its live map, which a field set after the status still reaches.
+func assertNoStore(t *testing.T, rr *httptest.ResponseRecorder) {
 	t.Helper()
-	assert.Equal(t, []string{"no-store"}, rr.Header().Values("Cache-Control"))
-	assert.Equal(t, []string{"no-cache"}, rr.Header().Values("Pragma"))
-	assert.Empty(t, rr.Header().Values("Expires"))
+	sent := rr.Result().Header
+	assert.Equal(t, []string{"no-store"}, sent.Values("Cache-Control"))
+	assert.Equal(t, []string{"no-cache"}, sent.Values("Pragma"))
+	assert.Empty(t, sent.Values("Expires"))
 }
 
 // Every "not found" a public resource outside the page branch answers is no-store, on GET and on
@@ -68,6 +72,10 @@ func TestRegisterRoutes_APublicResourceNotFoundIsNoStore(t *testing.T) {
 		{"a static file that does not exist", "/static/no-such-file.css", nothing},
 		{"a static file that does not exist, asked by a fingerprint", "/static/no-such-file.css?v=0123456789ab", nothing},
 		{"a static file below a file", "/static/main.css/inside", nothing},
+		// The router matches the decoded /static/main.css, a file, but the escaped path does not
+		// begin with /static, which the file server's prefix removal refuses.
+		{"a static file whose prefix is escaped", "/st%61tic/main.css", nothing},
+		{"a static file whose prefix is escaped, asked by a fingerprint", "/st%61tic/main.css?v=0123456789ab", nothing},
 	}
 	for _, stylesheet := range []string{"stylesheet.css", "colors.css", "safe-stylesheet.css", "safe-colors.css"} {
 		cases = append(cases,
@@ -87,8 +95,29 @@ func TestRegisterRoutes_APublicResourceNotFoundIsNoStore(t *testing.T) {
 				rr := serveRouting(s, method, answer.target, nil)
 
 				require.Equal(t, http.StatusNotFound, rr.Code)
-				assert.Equal(t, "text/plain; charset=utf-8", rr.Header().Get("Content-Type"), "the resource's own 404, not the 404 page")
+				assert.Equal(t, "text/plain; charset=utf-8", rr.Result().Header.Get("Content-Type"), "the resource's own 404, not the 404 page")
 				assertNoStore(t, rr)
+			})
+		}
+	}
+}
+
+// The same "not found" answers, over a real connection: the header fields a client receives are the
+// pair, with no Expires, on GET and on HEAD. The escaped prefix is sent as written, which the router
+// matches by its decoded path.
+func TestRegisterRoutes_APublicResourceNotFoundIsNoStoreOnTheWire(t *testing.T) {
+	s := newRoutingTestServer(t, newRoutingDatabase(t))
+	base := routingListener(t, s)
+
+	for _, target := range []string{"/static/no-such-file.css", "/st%61tic/main.css", "/brand-assets/logo"} {
+		for _, method := range []string{http.MethodGet, http.MethodHead} {
+			t.Run(method+" "+target, func(t *testing.T) {
+				resp, _ := sendRouting(t, method, base+target)
+
+				require.Equal(t, http.StatusNotFound, resp.StatusCode)
+				assert.Equal(t, []string{"no-store"}, resp.Header.Values("Cache-Control"))
+				assert.Equal(t, []string{"no-cache"}, resp.Header.Values("Pragma"))
+				assert.Empty(t, resp.Header.Values("Expires"))
 			})
 		}
 	}
@@ -113,8 +142,8 @@ func TestRegisterRoutes_AProfilePictureKeepsItsOwnCachePolicy(t *testing.T) {
 			rr := serveRouting(s, method, "/userinfo/picture/pictured-user", nil)
 
 			require.Equal(t, http.StatusOK, rr.Code)
-			assert.Equal(t, "no-store, no-cache, must-revalidate", rr.Header().Get("Cache-Control"))
-			assert.Equal(t, "image/png", rr.Header().Get("Content-Type"))
+			assert.Equal(t, "no-store, no-cache, must-revalidate", rr.Result().Header.Get("Cache-Control"))
+			assert.Equal(t, "image/png", rr.Result().Header.Get("Content-Type"))
 		})
 	}
 }
@@ -182,8 +211,9 @@ func TestRegisterRoutes_ThePublicSettingsAreNoStore(t *testing.T) {
 		rr := serveRouting(s, http.MethodPost, "/api/public/settings", nil)
 
 		require.Equal(t, http.StatusMethodNotAllowed, rr.Code)
-		assert.Equal(t, "GET", rr.Header().Get("Allow"))
-		assert.Empty(t, rr.Header().Values("Cache-Control"))
-		assert.Empty(t, rr.Header().Values("Pragma"))
+		sent := rr.Result().Header
+		assert.Equal(t, "GET", sent.Get("Allow"))
+		assert.Empty(t, sent.Values("Cache-Control"))
+		assert.Empty(t, sent.Values("Pragma"))
 	})
 }

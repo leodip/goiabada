@@ -175,10 +175,10 @@ func TestInitRoutes_ThePageLanguageRunsOnPagesOnly(t *testing.T) {
 // Only the page routes of the real registrations run the browser session's steps: the refresh, the
 // cookie reset and the session identifier, each of which can send the session cookie, or a deletion
 // of the old chunked cookie store's, on its answer. The files, the protocol endpoints and the APIs
-// load no browser session. The client logos, the profile pictures and the OpenAPI document are
-// answered cacheable, and so are discovery and JWKS, so a cookie sent there could be stored by a
-// shared cache and replayed to other visitors; every page is no-store (#743 decision 9, #825
-// decision 1).
+// load no browser session. The client logos and the OpenAPI document are answered cacheable, and so
+// are discovery and JWKS, so a cookie sent there could be stored by a shared cache and replayed to
+// other visitors; a profile picture is no-store, as every page is (#743 decision 9, #825 decision
+// 1).
 func TestInitRoutes_OnlyPagesRunTheBrowserSessionSteps(t *testing.T) {
 	s := newFaultsTestServer(datamocks.NewDatabase(t))
 	steps := []string{

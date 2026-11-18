@@ -54,9 +54,10 @@ info:
     cached copy safe: a private cache may still store a response it authenticated.
 
     A few responses under these paths are answered before an operation is selected and
-    carry neither header: a CORS preflight, and the errors returned when the server cannot
-    read its own settings or the caller's session. None of them carries a credential, and
-    none of them is described by this document.
+    carry neither header: a CORS preflight, and the error returned when the server cannot
+    read its own settings. None of them carries a credential, and none of them is described
+    by this document. An error returned while the server checks the bearer token and the
+    session it names carries both headers, as the token refusals do.
 
     The headers are not declared per operation, since every operation sends them.
   version: 1.0.0
