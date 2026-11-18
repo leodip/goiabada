@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -14,6 +15,8 @@ var builtInLanguages = []string{"en", "de", "es", "fr", "it", "pt-BR"}
 
 func TestLanguages_AreTheSixBuiltInOnes(t *testing.T) {
 	assert.Equal(t, builtInLanguages, Languages)
+	// A catalog built in without email text would leave its readers on English emails.
+	assert.Equal(t, i18n.CatalogTags(), Languages, "the email languages are the built-in catalogs")
 }
 
 // Every built-in email holds its text in the six languages, passes its own rules in each (#818
@@ -135,6 +138,10 @@ func TestLanguage_MatchesTheRecipientsLanguage(t *testing.T) {
 	for locale, want := range map[string]string{
 		"en": "en", "en-GB": "en", "de": "de", "de-AT": "de", "es-MX": "es", "fr-CA": "fr", "fr-CH": "fr",
 		"it-CH": "it", "pt-BR": "pt-BR", "pt": "pt-BR", "nl": "en", "sv-SE": "en", "": "en", "not a tag!": "en",
+		"pt-PT": "pt-BR",
+		// A language with no text reads English, never a neighbour the matcher rates close: Galician
+		// and Basque would otherwise read Spanish.
+		"gl": "en", "eu": "en",
 	} {
 		t.Run(locale, func(t *testing.T) {
 			assert.Equal(t, want, Language(locale))
