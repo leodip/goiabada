@@ -183,13 +183,32 @@ func passwordGrant() *StoredRefreshToken {
 	}
 }
 
+// sessionBoundClaims is a session-bound token issued under the configured issuer, which the
+// server writes as both its iss and its aud.
 func sessionBoundClaims() map[string]interface{} {
-	return map[string]interface{}{"jti": "jti-1", "typ": "Refresh"}
+	return map[string]interface{}{"jti": "jti-1", "typ": "Refresh", "iss": testIssuer, "aud": testIssuer}
 }
 
-// offlineClaims is an offline token whose maximum lifetime ends at maxLifetime.
+// offlineClaims is an offline token issued under the configured issuer, whose maximum lifetime ends
+// at maxLifetime.
 func offlineClaims(maxLifetime time.Time) map[string]interface{} {
-	return map[string]interface{}{"jti": "jti-1", "typ": "Offline", "offline_access_max_lifetime": float64(maxLifetime.Unix())}
+	return map[string]interface{}{"jti": "jti-1", "typ": "Offline", "iss": testIssuer, "aud": testIssuer,
+		"offline_access_max_lifetime": float64(maxLifetime.Unix())}
+}
+
+// earlierIssuer is an issuer the server published before the configured one.
+const earlierIssuer = "https://auth.example.org"
+
+// withClaims answers claims with each of changes set, and a nil value removing that claim.
+func withClaims(claims map[string]interface{}, changes map[string]interface{}) map[string]interface{} {
+	for name, value := range changes {
+		if value == nil {
+			delete(claims, name)
+			continue
+		}
+		claims[name] = value
+	}
+	return claims
 }
 
 func TestRefreshToken(t *testing.T) {
@@ -483,6 +502,115 @@ func TestRefreshToken(t *testing.T) {
 			claims: sessionBoundClaims(),
 			want:   RefreshUserDisabled,
 		},
+
+		// A live token is the current issuer's only when its iss and its aud are each exactly that
+		// string. Its claims refuse it first, before anything else is read (#710 decisions 1 to 3).
+		{
+			label:  "a live token of an earlier issuer",
+			stored: codeDescended, claims: withClaims(sessionBoundClaims(), map[string]interface{}{"iss": earlierIssuer, "aud": earlierIssuer}),
+			want: RefreshForeignIssuer,
+		},
+		{
+			label:  "a live offline token of an earlier issuer",
+			stored: codeDescended, claims: withClaims(offlineClaims(inAnHour), map[string]interface{}{"iss": earlierIssuer, "aud": earlierIssuer}),
+			want: RefreshForeignIssuer,
+		},
+		{
+			label:  "a live password grant token of an earlier issuer",
+			stored: passwordGrant, claims: withClaims(offlineClaims(inAnHour), map[string]interface{}{"iss": earlierIssuer, "aud": earlierIssuer}),
+			want: RefreshForeignIssuer,
+		},
+		{
+			label:  "the current issuer, and an aud of an earlier one",
+			stored: codeDescended, claims: withClaims(sessionBoundClaims(), map[string]interface{}{"aud": earlierIssuer}),
+			want: RefreshForeignIssuer,
+		},
+		{
+			label:  "an earlier issuer, and an aud of the current one",
+			stored: codeDescended, claims: withClaims(sessionBoundClaims(), map[string]interface{}{"iss": earlierIssuer}),
+			want: RefreshForeignIssuer,
+		},
+		{
+			label:  "an aud that is an array holding the issuer",
+			stored: codeDescended, claims: withClaims(sessionBoundClaims(), map[string]interface{}{"aud": []interface{}{testIssuer}}),
+			want: RefreshForeignIssuer,
+		},
+		{
+			label:  "the issuer with a trailing slash",
+			stored: codeDescended, claims: withClaims(sessionBoundClaims(), map[string]interface{}{"iss": testIssuer + "/", "aud": testIssuer + "/"}),
+			want: RefreshForeignIssuer,
+		},
+		{
+			label:  "the issuer in another case",
+			stored: codeDescended, claims: withClaims(sessionBoundClaims(), map[string]interface{}{"iss": "https://AUTH.example.com", "aud": "https://AUTH.example.com"}),
+			want: RefreshForeignIssuer,
+		},
+		{
+			label:  "no iss",
+			stored: codeDescended, claims: withClaims(sessionBoundClaims(), map[string]interface{}{"iss": nil}),
+			want: RefreshForeignIssuer,
+		},
+		{
+			label:  "no aud",
+			stored: codeDescended, claims: withClaims(sessionBoundClaims(), map[string]interface{}{"aud": nil}),
+			want: RefreshForeignIssuer,
+		},
+		{
+			label: "a disabled user's live token of an earlier issuer",
+			stored: func() *StoredRefreshToken {
+				s := codeDescended()
+				s.User.Enabled = false
+				return s
+			},
+			claims: withClaims(sessionBoundClaims(), map[string]interface{}{"iss": earlierIssuer, "aud": earlierIssuer}),
+			want:   RefreshForeignIssuer,
+		},
+
+		// A token of an earlier issuer whose own row is revoked is a replay, judged by the other
+		// checks as any rotated token is, so the refresh grant can contain its family.
+		{
+			label: "a revoked token of an earlier issuer, of an intact grant",
+			stored: func() *StoredRefreshToken {
+				s := codeDescended()
+				s.Row.Revoked = true
+				return s
+			},
+			claims:       withClaims(sessionBoundClaims(), map[string]interface{}{"iss": earlierIssuer, "aud": earlierIssuer}),
+			readsSession: sid, session: liveSession(2),
+			want: RefreshTokenRevoked,
+		},
+		{
+			label: "a revoked password grant token of an earlier issuer",
+			stored: func() *StoredRefreshToken {
+				s := passwordGrant()
+				s.Row.Revoked = true
+				return s
+			},
+			claims: withClaims(offlineClaims(inAnHour), map[string]interface{}{"iss": earlierIssuer, "aud": earlierIssuer}),
+			want:   RefreshTokenRevoked,
+		},
+		{
+			label: "a revoked token of an earlier issuer and a disabled user",
+			stored: func() *StoredRefreshToken {
+				s := codeDescended()
+				s.Row.Revoked = true
+				s.User.Enabled = false
+				return s
+			},
+			claims: withClaims(sessionBoundClaims(), map[string]interface{}{"iss": earlierIssuer, "aud": earlierIssuer}),
+			want:   RefreshUserDisabled,
+		},
+		{
+			label: "a revoked token of an earlier issuer whose session is gone",
+			stored: func() *StoredRefreshToken {
+				s := codeDescended()
+				s.Row.Revoked = true
+				return s
+			},
+			claims:       withClaims(sessionBoundClaims(), map[string]interface{}{"iss": earlierIssuer, "aud": earlierIssuer}),
+			readsSession: sid,
+			want:         RefreshSessionNotFound,
+		},
 	}
 
 	for _, tc := range tests {
@@ -552,7 +680,7 @@ func TestRefreshToken_Faults(t *testing.T) {
 		database.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, familyJti).Return(false, nil)
 
 		refusal, err := RefreshToken(context.Background(), database, codeDescended(),
-			oauth.JwtToken{Claims: map[string]interface{}{"jti": "jti-1", "typ": "Offline"}}, settings, checkedAt)
+			oauth.JwtToken{Claims: map[string]interface{}{"jti": "jti-1", "typ": "Offline", "iss": testIssuer, "aud": testIssuer}}, settings, checkedAt)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "does not contain an offline_access_max_lifetime claim")
@@ -560,7 +688,7 @@ func TestRefreshToken_Faults(t *testing.T) {
 	})
 
 	for _, typ := range []interface{}{nil, "", "Bearer", "ID", "refresh"} {
-		claims := map[string]interface{}{"jti": "jti-1"}
+		claims := map[string]interface{}{"jti": "jti-1", "iss": testIssuer, "aud": testIssuer}
 		if typ != nil {
 			claims["typ"] = typ
 		}
@@ -577,27 +705,42 @@ func TestRefreshToken_Faults(t *testing.T) {
 		})
 	}
 
+	// A revoked token's issuer is not compared, so the settings are first needed for its session.
 	t.Run("no settings to measure the session against", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
-		database.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, familyJti).Return(false, nil)
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sid).Return(liveSession(2), nil)
+		stored := codeDescended()
+		stored.Row.Revoked = true
 
-		refusal, err := RefreshToken(context.Background(), database, codeDescended(),
+		refusal, err := RefreshToken(context.Background(), database, stored,
 			oauth.JwtToken{Claims: sessionBoundClaims()}, nil, checkedAt)
 
 		require.ErrorIs(t, err, ErrNoSettings)
 		assert.NotEqual(t, RefreshLive, refusal)
 	})
 
-	// Settings are needed only for a session's bounds.
-	t.Run("an offline token needs no settings", func(t *testing.T) {
+	// A live token's issuer is read from the settings, so an offline one needs them too, and the
+	// fault comes before anything is read.
+	t.Run("no settings to compare a live token's issuer with", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
-		database.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, familyJti).Return(false, nil)
 
 		refusal, err := RefreshToken(context.Background(), database, passwordGrant(),
 			oauth.JwtToken{Claims: offlineClaims(inAnHour)}, nil, checkedAt)
 
+		require.ErrorIs(t, err, ErrNoSettings)
+		assert.NotEqual(t, RefreshLive, refusal)
+	})
+
+	// A revoked token's issuer is not compared, so an offline one is judged without settings.
+	t.Run("a revoked offline token needs no settings", func(t *testing.T) {
+		database := datamocks.NewDatabase(t)
+		stored := passwordGrant()
+		stored.Row.Revoked = true
+
+		refusal, err := RefreshToken(context.Background(), database, stored,
+			oauth.JwtToken{Claims: offlineClaims(inAnHour)}, nil, checkedAt)
+
 		require.NoError(t, err)
-		assert.Equal(t, RefreshLive, refusal)
+		assert.Equal(t, RefreshTokenRevoked, refusal)
 	})
 }

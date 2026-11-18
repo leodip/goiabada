@@ -167,7 +167,7 @@ func offlineRefreshToken() *oauth.JwtToken {
 		TokenBase64: revokeTokenString,
 		Header:      map[string]interface{}{"alg": "RS256", "typ": "JWT"},
 		Claims: map[string]interface{}{
-			"iss": revokeIssuer, "sub": "the-subject", "jti": revokeRefreshJti, "typ": "Offline",
+			"iss": revokeIssuer, "aud": revokeIssuer, "sub": "the-subject", "jti": revokeRefreshJti, "typ": "Offline",
 			"offline_access_max_lifetime": float64(time.Now().Add(time.Hour).Unix()),
 		},
 	}
@@ -535,6 +535,20 @@ func TestHandleRevokePost_AnInvalidTokenIsAnsweredOK(t *testing.T) {
 			row := &record.RefreshToken{Id: 9, RefreshTokenJti: revokeRefreshJti, FirstRefreshTokenJti: revokeGrantId,
 				UserId: sql.NullInt64{Int64: revokeUserId, Valid: true}, ClientId: sql.NullInt64{Int64: revokeCallerId, Valid: true},
 				AuthenticatedAt: sql.NullTime{Time: time.Now(), Valid: true}, Revoked: true}
+			e.database.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, revokeRefreshJti).Return(row, nil).Once()
+			e.database.On("RefreshTokenLoadUser", mock.Anything, mock.Anything, row).Run(func(args mock.Arguments) {
+				args.Get(2).(*record.RefreshToken).User = record.User{Id: revokeUserId, Enabled: true}
+			}).Return(nil).Once()
+			e.database.On("RefreshTokenLoadClient", mock.Anything, mock.Anything, row).Return(nil).Once()
+		}},
+		{"a live refresh token of an earlier issuer", func(e *revokeEndpoint) {
+			token := offlineRefreshToken()
+			token.Claims["iss"] = "https://other.example.com"
+			token.Claims["aud"] = "https://other.example.com"
+			e.parses(token)
+			row := &record.RefreshToken{Id: 9, RefreshTokenJti: revokeRefreshJti, FirstRefreshTokenJti: revokeGrantId,
+				UserId: sql.NullInt64{Int64: revokeUserId, Valid: true}, ClientId: sql.NullInt64{Int64: revokeCallerId, Valid: true},
+				AuthenticatedAt: sql.NullTime{Time: time.Now(), Valid: true}}
 			e.database.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, revokeRefreshJti).Return(row, nil).Once()
 			e.database.On("RefreshTokenLoadUser", mock.Anything, mock.Anything, row).Run(func(args mock.Arguments) {
 				args.Get(2).(*record.RefreshToken).User = record.User{Id: revokeUserId, Enabled: true}

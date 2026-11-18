@@ -1735,7 +1735,7 @@
 "adminconsole.admin_settings.general.app_name_tooltip" = "Affiché dans les titres des pages et les e-mails du serveur d’authentification."
 "adminconsole.admin_settings.general.field.issuer" = "Émetteur"
 "adminconsole.admin_settings.general.issuer_tooltip" = "Le claim iss de chaque jeton et l’émetteur du document de découverte : une URL https sans paramètres de requête, fragment ni informations utilisateur, ou l’URL de base du serveur d’authentification."
-"adminconsole.admin_settings.general.issuer_change_warning" = "Vous modifiez l’émetteur. Les clients et les API qui le vérifient devront être mis à jour. Les jetons déjà émis conserveront l’ancien émetteur, et vous serez déconnecté."
+"adminconsole.admin_settings.general.issuer_change_warning" = "Vous modifiez l’émetteur. Les clients et les API qui le vérifient devront être mis à jour. Les jetons de rafraîchissement déjà émis cesseront de fonctionner, les utilisateurs de tous les clients devront donc se reconnecter, et vous serez déconnecté."
 "adminconsole.admin_settings.general.field.password_policy" = "Politique de mots de passe"
 "adminconsole.admin_settings.general.password_policy_tooltip" = "S’applique à chaque définition ou modification d’un mot de passe. Les mots de passe existants ne sont pas revérifiés."
 # The nist policy's card, first among the five, and the line each older card gains (#550 decision 3).

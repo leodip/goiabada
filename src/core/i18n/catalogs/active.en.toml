@@ -1733,7 +1733,7 @@
 "adminconsole.admin_settings.general.app_name_tooltip" = "Shown in page titles and in the emails the auth server sends."
 "adminconsole.admin_settings.general.field.issuer" = "Issuer"
 "adminconsole.admin_settings.general.issuer_tooltip" = "The iss claim of every token and the issuer in the discovery document: an https URL with no query, fragment or user info, or the auth server's base URL."
-"adminconsole.admin_settings.general.issuer_change_warning" = "You're changing the issuer. Clients and APIs that check it will have to be updated to the new one, tokens issued before will keep the old one, and you'll be signed out."
+"adminconsole.admin_settings.general.issuer_change_warning" = "You're changing the issuer. Clients and APIs that check it will have to be updated to the new one. Refresh tokens issued before will stop working, so users of every client will have to sign in again, and you'll be signed out."
 "adminconsole.admin_settings.general.field.password_policy" = "Password policy"
 "adminconsole.admin_settings.general.password_policy_tooltip" = "Applies whenever a password is set or changed. Passwords already set aren't checked again."
 # The nist policy's card, first among the five, and the line each older card gains (#550 decision 3).

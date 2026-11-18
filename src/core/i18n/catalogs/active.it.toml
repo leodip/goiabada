@@ -1740,7 +1740,7 @@
 "adminconsole.admin_settings.general.app_name_tooltip" = "Mostrato nei titoli delle pagine e nelle email inviate dal server di autenticazione."
 "adminconsole.admin_settings.general.field.issuer" = "Issuer"
 "adminconsole.admin_settings.general.issuer_tooltip" = "Il claim iss di ogni token e l'issuer nel documento di discovery: un URL https senza query, frammento o informazioni utente, oppure l'URL di base del server di autenticazione."
-"adminconsole.admin_settings.general.issuer_change_warning" = "Stai cambiando l'issuer. Dovrai aggiornare i client e le API che lo verificano; i token già emessi manterranno quello precedente e verrai disconnesso."
+"adminconsole.admin_settings.general.issuer_change_warning" = "Stai cambiando l'issuer. Dovrai aggiornare i client e le API che lo verificano. I refresh token già emessi smetteranno di funzionare, quindi gli utenti di tutti i client dovranno accedere di nuovo, e verrai disconnesso."
 "adminconsole.admin_settings.general.field.password_policy" = "Criteri delle password"
 "adminconsole.admin_settings.general.password_policy_tooltip" = "Si applicano quando una password viene impostata o cambiata. Le password già impostate non vengono ricontrollate."
 # The nist policy's card, first among the five, and the line each older card gains (#550 decision 3).

@@ -19,6 +19,9 @@ const (
 	// The zero RefreshRefusal comes with a fault: the check could not decide, so it is never live.
 	_ RefreshRefusal = iota
 	RefreshLive
+	// RefreshForeignIssuer is a token whose own row is live and whose iss or aud is not exactly the
+	// configured issuer: one issued before the issuer changed (#710).
+	RefreshForeignIssuer
 	// RefreshUserDisabled is a token whose user is disabled, or gone, which loads as the zero user
 	// (#137).
 	RefreshUserDisabled
@@ -142,6 +145,8 @@ func FindRefreshToken(ctx context.Context, database RefreshDatabase, token oauth
 // The checks run in this order, and the first that refuses is the answer, nothing below it being
 // read:
 //
+//  0. A token whose own row is live is the current issuer's: its iss and its aud are each exactly
+//     the configured issuer, read from its claims alone (#710 decisions 1 and 2).
 //  1. Read off what was loaded with the row, and reading nothing more: the user is enabled, the
 //     row is on the user's generation, a password grant token records its authentication instant,
 //     and a code-descended token's code is not revoked.
@@ -156,13 +161,35 @@ func FindRefreshToken(ctx context.Context, database RefreshDatabase, token oauth
 // That is why the row's revocation is decided last: every other refusal precedes it, so a replayed
 // token of a grant something else ended is refused as that grant, as it always was.
 //
-// settings bound the session, and only a session-bound token that gets as far as its bounds needs
-// them: a nil settings is ErrNoSettings there. Any error is a fault, never a refusal: the token's
-// state could not be read, and a caller must not answer it as a dead token.
+// settings carry the issuer and bound the session, so a token whose row is live needs them, and a
+// revoked one only once it gets as far as its session's bounds: a nil settings is ErrNoSettings.
+// Any error is a fault, never a refusal: the token's state could not be read, and a caller must not
+// answer it as a dead token.
 func RefreshToken(ctx context.Context, database RefreshDatabase, stored *StoredRefreshToken, token oauth.JwtToken,
 	settings *record.Settings, now time.Time) (RefreshRefusal, error) {
 
 	row := stored.Row
+
+	// The issuer boundary (#710). A refreshed ID token names the issuer of the original sign-in
+	// (OpenID Connect Core 1.0 section 12.2), and every token is minted under the current issuer, so
+	// only a refresh token of the current issuer may refresh. Compared exactly, as the access-token
+	// check compares iss (RFC 7519 section 4.1.1), and aud as one string: the server gives a refresh
+	// token the issuer as its sole audience, so an array, or any other value, is not one it issued
+	// under this issuer. Nothing is stored, so changing the issuer back makes the token live again.
+	//
+	// Only for a token whose own row is live. One already rotated is a replay, judged by the checks
+	// below as any rotated token is, so the refresh grant contains its family: a family rotated
+	// across an issuer change before this check existed has a rotated token naming the earlier
+	// issuer and a live one naming the current, and refusing the rotated one here would leave the
+	// live one refreshing (decision 3).
+	if !row.Revoked {
+		if settings == nil {
+			return 0, ErrNoSettings
+		}
+		if token.StringClaim("iss") != settings.Issuer || token.StringClaim("aud") != settings.Issuer {
+			return RefreshForeignIssuer, nil
+		}
+	}
 
 	if !stored.User.Enabled {
 		return RefreshUserDisabled, nil

@@ -223,12 +223,18 @@ Exchange refresh token for new access/refresh tokens. Works with auth code and R
 - Offline tokens: Configurable idle timeout and max lifetime per client/globally
 - Revocation: Old refresh token revoked on use, new one issued
 - Liveness: `liveness.FindRefreshToken` reads the row with its code, user and client, and
-  `liveness.RefreshToken` judges it: user enabled, the row's generation current, a password grant
-  token's authentication instant, the code not revoked, no family revocation record, then the
-  session (session-bound) or the maximum lifetime and the code's session owner (offline), and last
-  the row's own revocation. The validator matches the client to the token between the two calls and
-  keeps PKCE, which it answers before the family and session refusals, and the scope checks. A token
-  refused only for its own revoked row goes on to the redemption, which contains its family (#676)
+  `liveness.RefreshToken` judges it: for a row not revoked, its `iss` and `aud` each exactly the
+  current issuer, read from the claims alone and storing nothing, so an issuer change refuses every
+  earlier refresh token and changing it back restores them (#710); then user enabled, the row's
+  generation current, a password grant token's authentication instant, the code not revoked, no
+  family revocation record, then the session (session-bound) or the maximum lifetime and the code's
+  session owner (offline), and last the row's own revocation. A rotated token of an earlier issuer
+  skips the issuer comparison and is judged as any rotated token, so its replay still contains the
+  family. The validator matches the client to the token and the DPoP key between the two calls,
+  answers the issuer refusal with "The refresh token is invalid." and a Warn record naming both
+  issuers, keeps PKCE, which it answers before the family and session refusals, and the scope
+  checks. A token refused only for its own revoked row goes on to the redemption, which contains its
+  family (#676)
 - Implementation: `handler_token_refresh_token.go`,
   `protocolvalidation/token_grant_refresh_token.go`, `liveness/refresh.go`,
   `issuance/grant_refresh_token.go`

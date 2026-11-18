@@ -482,6 +482,13 @@ func TestHandleIntrospectPost_ATokenThatIsNotLiveIsInactive(t *testing.T) {
 			e.refreshTokenRow(introspectCallerId)
 			e.database.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, introspectGrantId).Return(true, nil).Once()
 		}},
+		{"a live refresh token of an earlier issuer", func(e *introspectEndpoint) {
+			token := callerRefreshToken()
+			token.Claims["iss"] = "https://other.example.com"
+			token.Claims["aud"] = "https://other.example.com"
+			e.parses(token)
+			e.refreshTokenRow(introspectCallerId)
+		}},
 		{"a refresh token rotated out", func(e *introspectEndpoint) {
 			e.parses(callerRefreshToken())
 			row := e.refreshTokenRow(introspectCallerId)
