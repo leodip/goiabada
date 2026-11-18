@@ -473,6 +473,16 @@ jobs:
       - name: Authserver internal tests
         working-directory: src/authserver
         run: ./run-tests.sh --type internal --no-build
+      # The Go cache this job saves is the one the database jobs restore, so it
+      # also compiles what they compile beyond these tests: the server build.sh
+      # makes, droptestdb, and the data and integration test binaries. After the
+      # tests, so a failure here is not taken for theirs.
+      - name: Compile what the database jobs run
+        working-directory: src/authserver
+        run: |
+          go build -buildvcs=false -o "$RUNNER_TEMP/goiabada-authserver" ./cmd/goiabada-authserver
+          go build -o "$RUNNER_TEMP/droptestdb" ./cmd/droptestdb
+          go test -c -o "$RUNNER_TEMP/" ./tests/data ./tests/integration
 
   # No services: verified by running this tier with every service unreachable.
   unit-adminconsole:

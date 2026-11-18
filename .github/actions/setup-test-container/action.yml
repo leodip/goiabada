@@ -63,9 +63,10 @@ runs:
     # GOPATH and GOCACHE inside the official golang image, which runs as root.
     #
     # Every job restores the cache and one saves it: the job that passes save-cache, Unit /
-    # authserver, whose modules include every module the core and console tiers download. A
-    # key is new after every go.sum change, and when every job saved, each one compressed the
-    # whole cache at its end, about a minute, for all but the first to be refused the key.
+    # authserver. Its modules include every module the core and console tiers download, and it
+    # compiles what the database jobs compile too, so they restore the auth server's build
+    # rather than compile it. A key is new after every go.sum change, and saving one compresses
+    # the whole cache, about a minute, which one job pays rather than every job.
     - name: Cache Go modules and build output
       if: inputs.save-cache == 'true'
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -73,9 +74,9 @@ runs:
         path: |
           /go/pkg/mod
           /root/.cache/go-build
-        key: ${{ runner.os }}-gomod-${{ hashFiles('src/**/go.sum') }}
+        key: ${{ runner.os }}-go-${{ hashFiles('src/**/go.sum') }}
         restore-keys: |
-          ${{ runner.os }}-gomod-
+          ${{ runner.os }}-go-
     - name: Restore Go modules and build output
       if: inputs.save-cache != 'true'
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -83,6 +84,6 @@ runs:
         path: |
           /go/pkg/mod
           /root/.cache/go-build
-        key: ${{ runner.os }}-gomod-${{ hashFiles('src/**/go.sum') }}
+        key: ${{ runner.os }}-go-${{ hashFiles('src/**/go.sum') }}
         restore-keys: |
-          ${{ runner.os }}-gomod-
+          ${{ runner.os }}-go-
