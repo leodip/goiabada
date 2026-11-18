@@ -936,7 +936,11 @@ if should_run_internal; then
     # they were passing without being run. The adminconsole never had either gap because its leg
     # runs ./... . Only ./tests/data and ./tests/integration stay out on purpose: they have their
     # own tiers and need a database.
-    if ! "${module_go_test[@]}" "./internal/..." "./web" "./cmd/..." 2>&1 | tee "$log"; then
+    #
+    # ./cmd/... goes first because go test starts the packages in the order it is given them,
+    # and cmd/goiabada-authserver's tests, which start the server, take the longest of any. Last,
+    # they ran alone after every other package had finished.
+    if ! "${module_go_test[@]}" "./cmd/..." "./internal/..." "./web" 2>&1 | tee "$log"; then
         gha_summary_row "Internal$race_label" "-" "FAIL" "$(fmt_duration $((SECONDS - start)))"
         fail_with "Authserver internal tests" "$log"
     fi
