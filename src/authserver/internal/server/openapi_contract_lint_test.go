@@ -1312,6 +1312,11 @@ func statusesWrittenIn(t *testing.T, path string, fset *token.FileSet, fn *ast.F
 				case "emailTemplateFromPath", "emailTemplateLanguageFromPath", "writeEmailTemplateNotFound":
 					out[404] = true
 				}
+				// ResourceNotFound is net/http's 404 with no-store, which a public resource answers
+				// when it is not found (#825 decision 3).
+				if f.Name == "ResourceNotFound" {
+					out[404] = true
+				}
 			case *ast.SelectorExpr:
 				switch f.Sel.Name {
 				case "InternalServerError", "JSONError":

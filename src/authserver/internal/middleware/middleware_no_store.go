@@ -52,6 +52,9 @@ import "net/http"
 // It heads both /userinfo chains for the same reason: the endpoint answers a user's claims, and its
 // bare 401 to a request with no token is written by a guard (#714).
 //
+// It heads the public settings' chain, ahead of the settings read, so the JSON 500 that read or a
+// panic answers is no-store as well as the handler's own answers (#825 decision 3).
+//
 // It also heads the page branch's chain, ahead of the browser session's
 // refresh, which can send the session cookie again on any answer there: a
 // rendered page, a redirect, or the router's 405, so none of them can be

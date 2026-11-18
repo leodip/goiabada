@@ -39,6 +39,19 @@ out of core it refuses the read coming back rather than holding a site. Only `st
 well as POST; `code` is not, being an authorization *response* value the client returns in the
 request entity-body (RFC 6749 4.1.2, 4.1.3) (#202, #333)
 
+## Response caching
+
+Outside the page branch only a resource itself may be cached, with the lifetime its handler sets:
+a client logo, a brand stylesheet or asset, a static file, the OpenAPI document, discovery and the
+key set. A public resource that is not found answers through `handlers.ResourceNotFound`,
+net/http's plain-text 404 with `Cache-Control: no-store` and `Pragma: no-cache`, the pair every
+other no-store answer sends. A 404 is heuristically cacheable (RFC 9110 15.5.5) and a cache may keep
+one with no directive as long as it chooses (RFC 9111 4.2.2), so a bare `http.NotFound` there could
+go on answering "not found" after the resource is uploaded. The public settings are no-store too,
+behind `middleware.NoStore` at the head of their chain so that a fault in front of the handler is
+covered; the admin console keeps its own copy. Every page answer is no-store, written by
+`middleware.NoStore` at the head of the page chain (#825).
+
 ## Error handling
 
 Every error this tree constructs goes through `core/errs` (`New`, `Errorf`, `Wrap`, `Wrapf`,

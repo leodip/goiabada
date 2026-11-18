@@ -45,8 +45,8 @@ const accountExportMaxAge = 300 * time.Second
 // its handler answers a fault in, so the protocol endpoints and the APIs answer a settings
 // failure, or a panic, as JSON (see appBranches, #435).
 func (s *Server) initRoutes(branches appBranches) {
-	pages, files, protocol, api, token, revoke, introspect, public := branches.pages, branches.files, branches.protocol, branches.api,
-		branches.token, branches.revoke, branches.introspect, branches.public
+	pages, files, protocol, api, publicAPI, token, revoke, introspect, public := branches.pages, branches.files, branches.protocol,
+		branches.api, branches.publicAPI, branches.token, branches.revoke, branches.introspect, branches.public
 
 	auditLogger := audit.NewLogger(s.database, middleware.NewAuditSwitches(s.database), middleware.ActingUser{})
 	authorizeValidator := protocolvalidation.NewAuthorizeValidator(s.database)
@@ -181,7 +181,7 @@ func (s *Server) initRoutes(branches appBranches) {
 		handlers.HandleDynamicClientRegistrationPost(s.database, auditLogger, s.dataCipher))
 
 	// Public API endpoints (no authentication required)
-	api.Get("/api/public/settings", handlers.HandlePublicSettingsGet(s.database, baseURL))
+	publicAPI.Get("/api/public/settings", handlers.HandlePublicSettingsGet(s.database, baseURL))
 
 	// One route boundary and one client-error responder, shared by every ceremony route: the
 	// ceremony load, its id check, the state gate, the step redirects and the error responses to a

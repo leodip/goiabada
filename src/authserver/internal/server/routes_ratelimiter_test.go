@@ -266,7 +266,7 @@ func newRoutesTestServerDrawnIn(t *testing.T, configure func(*config.Config), se
 	t.Cleanup(func() { s.jobs.Wait(10 * time.Second) })
 	// Every branch is the bare router: these tests drive the registrations rather than the
 	// application chain, and put the settings on each request's context themselves.
-	s.initRoutes(appBranches{pages: s.router, files: s.router, protocol: s.router, api: s.router, token: s.router, revoke: s.router, introspect: s.router, public: s.router})
+	s.initRoutes(appBranches{pages: s.router, files: s.router, protocol: s.router, api: s.router, publicAPI: s.router, token: s.router, revoke: s.router, introspect: s.router, public: s.router})
 	return s
 }
 

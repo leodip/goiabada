@@ -706,6 +706,7 @@ func (s *Server) initMiddleware() appBranches {
 		revoke:     s.router.With(s.applicationChain(middleware.ProtocolFaults(handlers.RevocationFaults(render.New(s.templateFS, s.staticFS, s.database), s.revocationMetrics)))...),
 		introspect: s.router.With(s.applicationChain(middleware.ProtocolFaults(handlers.IntrospectionFaults(render.New(s.templateFS, s.staticFS, s.database), s.introspectionMetrics)))...),
 		api:        s.router.With(s.applicationChain(middleware.APIFaults())...),
+		publicAPI:  s.router.With(append([]func(http.Handler) http.Handler{middleware.NoStore()}, s.applicationChain(middleware.APIFaults())...)...),
 		public:     s.router,
 	}
 
@@ -809,9 +810,15 @@ type appBranches struct {
 	// protocol carries the endpoints that answer RFC 6749 section 5.2's {error, error_description}:
 	// token, userinfo, JWKS, discovery and dynamic client registration.
 	protocol *routing.Router
-	// api carries the admin, account and session APIs and the public settings, which answer the
-	// {error_code, error_description} envelope.
+	// api carries the admin, account and session APIs, which answer the {error_code,
+	// error_description} envelope.
 	api *routing.Router
+	// publicAPI carries the public settings, which answer as api does with no token, behind NoStore
+	// ahead of the same chain, so every answer is no-store whichever exit writes it: the handler's,
+	// or the JSON 500 of a settings read or a panic in front of it. The admin console, their reader,
+	// keeps its own copy for a time of its own (#825 decision 3). The router's 405 for another method
+	// is the root's, outside every branch.
+	publicAPI *routing.Router
 	// token carries the token endpoint alone. It answers as protocol does, and counts each fault it
 	// answers as a token request refused, which the protocol branch cannot, since its faults are
 	// every protocol endpoint's (#400 decision 5).
@@ -991,8 +998,10 @@ const (
 // immutable; any other request, the favicons' among them, for five minutes. A file's fingerprint
 // is read once and kept (staticFingerprints), and every request is answered from the static files.
 //
-// A directory is the 404 page, /static/ itself included, where Go's file server answered one with
-// a listing of its files (#462 decision 7). /static has no route, so it is the router's 404 page
+// A file that does not exist is net/http's plain-text 404 with no-store, and without the lifetime a
+// file is kept for, so a cache does not go on answering "not found" for a file a newer instance
+// serves (#825 decision 3). A directory is the 404 page, /static/ itself included, where Go's file
+// server answered one with a listing of its files (#462 decision 7). /static has no route, so it is the router's 404 page
 // too: it redirected to /static/, which looped for ever once its trailing slash was stripped back to
 // /static. The 404 page is drawn behind the page branch's chain, which it reads its settings and
 // language from, so a directory costs what an unmatched path costs; a file still costs neither.
@@ -1007,8 +1016,12 @@ func (s *Server) serveStaticFiles() {
 	}
 
 	getAndHead(s.router, staticPrefix+"/*", func(w http.ResponseWriter, r *http.Request) {
-		if s.isStaticDirectory(r.URL.Path) {
+		switch s.staticEntryOf(r.URL.Path) {
+		case staticDirectory:
 			directory.ServeHTTP(w, r)
+			return
+		case staticMissing:
+			handlers.ResourceNotFound(w, r)
 			return
 		}
 
@@ -1026,16 +1039,32 @@ func (s *Server) serveStaticFiles() {
 	})
 }
 
-// isStaticDirectory reports whether urlPath, under /static, names a directory of the static files,
-// the root among them. The name is read as http.FileServer reads it, so the two agree on what is
-// opened; a name that is not there is no directory, and the file server answers its 404.
-func (s *Server) isStaticDirectory(urlPath string) bool {
+// staticEntry is what a path under /static names among the static files.
+type staticEntry int
+
+const (
+	staticFile staticEntry = iota
+	staticDirectory
+	staticMissing
+)
+
+// staticEntryOf is what urlPath, under /static, names among the static files: a directory, the root
+// among them, nothing, or a file, which the file server answers. The name is read as http.FileServer
+// reads it, so the two agree on what is opened. A name that cannot be read for another reason is
+// left to the file server, which answers it as it answers its own failure to open it.
+func (s *Server) staticEntryOf(urlPath string) staticEntry {
 	name := strings.TrimPrefix(path.Clean("/"+strings.TrimPrefix(urlPath, staticPrefix)), "/")
 	if name == "" {
-		return true
+		return staticDirectory
 	}
 	info, err := fs.Stat(s.staticFS, name)
-	return err == nil && info.IsDir()
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+		return staticMissing
+	case err == nil && info.IsDir():
+		return staticDirectory
+	}
+	return staticFile
 }
 
 // logPlainHTTP reports a deployment listening on HTTP with no HTTPS listener. Behind a proxy
