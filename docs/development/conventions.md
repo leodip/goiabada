@@ -47,10 +47,11 @@ key set. A public resource that is not found answers through `handlers.ResourceN
 net/http's plain-text 404 with `Cache-Control: no-store` and `Pragma: no-cache`, the pair every
 other no-store answer sends. A 404 is heuristically cacheable (RFC 9110 15.5.5) and a cache may keep
 one with no directive as long as it chooses (RFC 9111 4.2.2), so a bare `http.NotFound` there could
-go on answering "not found" after the resource is uploaded. The public settings are no-store too,
-behind `middleware.NoStore` at the head of their chain so that a fault in front of the handler is
-covered; the admin console keeps its own copy. Every page answer is no-store, written by
-`middleware.NoStore` at the head of the page chain (#825).
+go on answering "not found" after the resource is uploaded. Every answer on the API branch, the
+admin, account and session APIs and the public settings, is no-store, behind `middleware.NoStore` at
+the head of the branch so that a group's guard and a fault in front of the groups are covered; the
+admin console keeps its own copy of the public settings. Every page answer is no-store, written by
+`middleware.NoStore` at the head of the page chain (#247, #825).
 
 ## Error handling
 

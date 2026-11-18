@@ -45,8 +45,8 @@ const accountExportMaxAge = 300 * time.Second
 // its handler answers a fault in, so the protocol endpoints and the APIs answer a settings
 // failure, or a panic, as JSON (see appBranches, #435).
 func (s *Server) initRoutes(branches appBranches) {
-	pages, files, protocol, api, publicAPI, token, revoke, introspect, public := branches.pages, branches.files, branches.protocol,
-		branches.api, branches.publicAPI, branches.token, branches.revoke, branches.introspect, branches.public
+	pages, files, protocol, api, token, revoke, introspect, public := branches.pages, branches.files, branches.protocol,
+		branches.api, branches.token, branches.revoke, branches.introspect, branches.public
 
 	auditLogger := audit.NewLogger(s.database, middleware.NewAuditSwitches(s.database), middleware.ActingUser{})
 	authorizeValidator := protocolvalidation.NewAuthorizeValidator(s.database)
@@ -183,7 +183,7 @@ func (s *Server) initRoutes(branches appBranches) {
 		handlers.HandleDynamicClientRegistrationPost(s.database, auditLogger, s.dataCipher))
 
 	// Public API endpoints (no authentication required)
-	publicAPI.Get("/api/public/settings", handlers.HandlePublicSettingsGet(s.database, baseURL))
+	api.Get("/api/public/settings", handlers.HandlePublicSettingsGet(s.database, baseURL))
 
 	// One route boundary and one client-error responder, shared by every ceremony route: the
 	// ceremony load, its id check, the state gate, the step redirects and the error responses to a
@@ -265,12 +265,6 @@ func (s *Server) initRoutes(branches appBranches) {
 
 	// Admin API routes
 	api.Route("/api/v1/admin", func(r *routing.Router) {
-		// FIRST in the group, ahead of the debug middleware and every guard. GET
-		// /api/v1/admin/clients/{id}/secret returns a decrypted client secret, so RFC 6749
-		// section 5.1's MUST reaches this group, and the 401 and 403 refusals below
-		// commit their status themselves: anything mounted behind the guards would
-		// never write the pair on a refusal (#247).
-		r.Use(middleware.NoStore())
 		r.Use(middleware.APIDebug(authServerConfig.DebugAPIRequests))
 		r.Use(apiBearer.JwtAuthorizationHeaderToContext())
 		r.Use(apiBearer.RequireValidSession(s.database))
@@ -531,9 +525,6 @@ func (s *Server) initRoutes(branches appBranches) {
 
 	// Account API routes (self-service)
 	api.Route("/api/v1/account", func(r *routing.Router) {
-		// FIRST in the group, for the same reason as the admin group above. GET
-		// /api/v1/account/otp/enrollment serves a TOTP enrolment seed (#247).
-		r.Use(middleware.NoStore())
 		r.Use(middleware.APIDebug(authServerConfig.DebugAPIRequests))
 		r.Use(apiBearer.JwtAuthorizationHeaderToContext())
 		r.Use(apiBearer.RequireBearerTokenScope(builtin.AuthServerResourceIdentifier + ":" + builtin.ManageAccountPermissionIdentifier))
@@ -624,10 +615,6 @@ func (s *Server) initRoutes(branches appBranches) {
 	// line: a handle in a path lands in this server's access log and in every proxy in
 	// front of it.
 	api.Route("/api/v1/sessions", func(r *routing.Router) {
-		// FIRST in the group, for the same reason as the two groups above: every 200
-		// here carries session ciphertext, and RFC 6749 section 5.1's MUST covers "any
-		// response containing tokens, credentials, or other sensitive information".
-		r.Use(middleware.NoStore())
 		// No middleware.APIDebug here, and it is the only /api/v1 group without it. That
 		// middleware logs whole request and response bodies, redacting by field name, and
 		// this group's fields are called "id" and "data": neither matches its key set nor

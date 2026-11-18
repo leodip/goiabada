@@ -706,8 +706,7 @@ func (s *Server) initMiddleware() appBranches {
 		token:      s.router.With(s.applicationChain(middleware.ProtocolFaults(s.tokenMetrics.Refusals(render.New(s.templateFS, s.staticFS, s.database))))...),
 		revoke:     s.router.With(s.applicationChain(middleware.ProtocolFaults(handlers.RevocationFaults(render.New(s.templateFS, s.staticFS, s.database), s.revocationMetrics)))...),
 		introspect: s.router.With(s.applicationChain(middleware.ProtocolFaults(handlers.IntrospectionFaults(render.New(s.templateFS, s.staticFS, s.database), s.introspectionMetrics)))...),
-		api:        s.router.With(s.applicationChain(middleware.APIFaults())...),
-		publicAPI:  s.router.With(append([]func(http.Handler) http.Handler{middleware.NoStore()}, s.applicationChain(middleware.APIFaults())...)...),
+		api:        s.router.With(append([]func(http.Handler) http.Handler{middleware.NoStore()}, s.applicationChain(middleware.APIFaults())...)...),
 		public:     s.router,
 	}
 
@@ -812,15 +811,14 @@ type appBranches struct {
 	// protocol carries the endpoints that answer RFC 6749 section 5.2's {error, error_description}:
 	// token, userinfo, JWKS, discovery and dynamic client registration.
 	protocol *routing.Router
-	// api carries the admin, account and session APIs, which answer the {error_code,
-	// error_description} envelope.
+	// api carries the admin, account and session APIs and the public settings, which answer the
+	// {error_code, error_description} envelope. NoStore goes ahead of the branch's chain, so every
+	// answer is no-store whichever exit writes it: a handler, a group's guard, or the JSON 500 of a
+	// settings read or a panic in front of the groups (#247, #825 decision 3). The admin console,
+	// the public settings' reader, keeps its own copy for a time of its own. The router's 405 for
+	// another method on a route outside every group, such as POST /api/public/settings, is the
+	// root's, outside every branch.
 	api *routing.Router
-	// publicAPI carries the public settings, which answer as api does with no token, behind NoStore
-	// ahead of the same chain, so every answer is no-store whichever exit writes it: the handler's,
-	// or the JSON 500 of a settings read or a panic in front of it. The admin console, their reader,
-	// keeps its own copy for a time of its own (#825 decision 3). The router's 405 for another method
-	// is the root's, outside every branch.
-	publicAPI *routing.Router
 	// token carries the token endpoint alone. It answers as protocol does, and counts each fault it
 	// answers as a token request refused, which the protocol branch cannot, since its faults are
 	// every protocol endpoint's (#400 decision 5).

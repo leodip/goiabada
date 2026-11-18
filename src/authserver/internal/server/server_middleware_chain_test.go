@@ -29,7 +29,6 @@ func TestInitMiddleware_TheWholeChainInOrder(t *testing.T) {
 	branches.protocol.Get("/certs", probe)
 	branches.token.Post("/auth/token", probe)
 	branches.api.Get("/api/v1/admin/probe", probe)
-	branches.publicAPI.Get("/api/public/settings", probe)
 
 	// A route registered for more than one method, such as GET and HEAD, is walked once per
 	// method. Its chain is recorded once, and every other method of it must have the same one.
@@ -108,17 +107,17 @@ func TestInitMiddleware_TheWholeChainInOrder(t *testing.T) {
 	assert.Equal(t, wantRoot, chains["/static/*"])
 	require.Contains(t, chains, "/auth/authorize", "the page route must have been walked")
 	assert.Equal(t, wantPages, chains["/auth/authorize"])
-	for _, route := range []string{"/openapi.yaml", "/certs", "/auth/token", "/api/v1/admin/probe"} {
+	for _, route := range []string{"/openapi.yaml", "/certs", "/auth/token"} {
 		require.Contains(t, chains, route, "the application route must have been walked")
 		assert.Equal(t, wantApp, chains[route], route)
 	}
-	// The public settings run the API branch's chain behind NoStore, so the JSON 500 a step in it
-	// answers is no-store as well as the handler's own answers (#825 decision 3).
-	wantPublicAPI := append(append(append([]string{}, wantRoot...),
+	// The API branch runs the same chain behind NoStore, so the JSON 500 a step in it answers is
+	// no-store as well as the groups' and the handlers' answers (#247, #825 decision 3).
+	wantAPI := append(append(append([]string{}, wantRoot...),
 		"github.com/leodip/goiabada/authserver/internal/middleware.NoStore.func1"),
 		wantApp[len(wantRoot):]...)
-	require.Contains(t, chains, "/api/public/settings", "the public API route must have been walked")
-	assert.Equal(t, wantPublicAPI, chains["/api/public/settings"])
+	require.Contains(t, chains, "/api/v1/admin/probe", "the API route must have been walked")
+	assert.Equal(t, wantAPI, chains["/api/v1/admin/probe"])
 }
 
 // fileRoutes are the page-format routes that draw no page: the images, the brands' stylesheets and

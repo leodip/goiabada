@@ -8,10 +8,10 @@ import "net/http"
 //	Cache-Control: no-store
 //	Pragma: no-cache
 //
-// It is mounted on the /api/v1/admin and /api/v1/account groups, where two
-// responses carry a credential outright: GET /api/v1/account/otp/enrollment
-// serves a TOTP enrolment seed, and GET /api/v1/admin/clients/{id} returns a
-// client secret decrypted. RFC 6749 section 5.1's MUST covers "any response
+// It heads the API branch, which carries the admin, account and session APIs
+// and the public settings. Two responses there carry a credential outright:
+// GET /api/v1/account/otp/enrollment serves a TOTP enrolment seed, and
+// GET /api/v1/admin/clients/{id} returns a client secret decrypted. RFC 6749 section 5.1's MUST covers "any response
 // containing tokens, credentials, or other sensitive information" and is not
 // qualified by endpoint, so it reaches both. Without a directive a 200 is
 // heuristically cacheable and RFC 9111 section 3 permits a cache to store it;
@@ -39,21 +39,20 @@ import "net/http"
 //     be lost in those 47 places while every test still passed. Running before
 //     the handler is what makes this immune.
 //
-// Mount it FIRST in each group, ahead of the debug middleware and every auth
-// guard. That is a requirement rather than a preference: the 401 and 403
-// refusals are written by the guard set's refusal writer, which sets its own Content-Type and
-// calls WriteHeader, so anything mounted behind the guards would never write
-// the pair on a refusal, and a refusal body is within RFC 6749 section 5.1's
-// "other sensitive information" too.
+// Mount it FIRST on the branch, ahead of the settings read and of every group's
+// debug middleware and auth guards. That is a requirement rather than a
+// preference: the 401 and 403 refusals are written by the guard set's refusal
+// writer, which sets its own Content-Type and calls WriteHeader, and so is the
+// JSON 500 of a settings read that fails or a panic in front of the groups, so
+// anything mounted behind them would never write the pair on those answers. A
+// refusal body is within RFC 6749 section 5.1's "other sensitive information"
+// too (#825 decision 3).
 //
 // Handlers that set their own Cache-Control still win, since Header().Set
-// replaces. Nothing under /api/v1 sets one.
+// replaces. Nothing under /api/ sets one.
 //
 // It heads both /userinfo chains for the same reason: the endpoint answers a user's claims, and its
 // bare 401 to a request with no token is written by a guard (#714).
-//
-// It heads the public settings' chain, ahead of the settings read, so the JSON 500 that read or a
-// panic answers is no-store as well as the handler's own answers (#825 decision 3).
 //
 // It also heads the page branch's chain, ahead of the browser session's
 // refresh, which can send the session cookie again on any answer there: a
