@@ -70,6 +70,8 @@ kubectl get ingress goiabada-authserver -n goiabada \
   -o jsonpath='{.status.loadBalancer.ingress[0].ip}{.status.loadBalancer.ingress[0].hostname}'
 ```
 
+F5 NGINX refuses a request body over 1 MiB unless you raise its limit, which fails the larger uploads: a profile picture or client logo of up to 3 MiB, and a brand's background image or font of up to 2 MiB. Raise it with the annotation `nginx.org/client-max-body-size: 4m`, which the setup wizard's `--annotations` adds to every object, the Ingresses included.
+
 No Ingress field asks for a redirect from HTTP to HTTPS: it's the controller's own setting, and some serve an Ingress with TLS on plain HTTP as well. **Never** leave it that way: the sign-in form would accept passwords over plain HTTP. Traefik does this until its `web` entry point redirects to `websecure`. On K3s, whose Traefik is set by a HelmChartConfig, this turns the redirect on:
 
 ```yaml

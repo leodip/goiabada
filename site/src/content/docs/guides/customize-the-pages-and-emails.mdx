@@ -101,7 +101,7 @@ Only the modes the brand's appearance draws are checked: both under **Automatic*
 Passing every pair doesn't make your pages meet WCAG 2.2 AA. That's a claim about whole pages, against every one of its criteria, and your logo and background image aren't checked.
 
 <Aside type="caution">
-The admin console and its sign-in page are drawn in [the admin console's client's](/concepts/clients/#the-admin-consoles-client) brand. If that brand's colors make text unreadable, the console's text is unreadable too, the brand editor included. Check the preview before you save it. To get back, send the `brand` that [`GET /api/v1/admin/brands/{id}`](/reference/api/admin/operations/getbrand/) answers to [`PUT /api/v1/admin/brands/{id}`](/reference/api/admin/operations/updatebrand/), with a built-in `theme` and `palette` set to `null`.
+The admin console and its sign-in page are drawn in [the admin console's client's](/concepts/clients/#the-admin-consoles-client) brand. If that brand's colors make text unreadable, the console's text is unreadable too, the brand editor included. Check the preview before you save it. If it happens, open the console in [safe mode](#safe-mode), which draws it in Blueberry's colors, and fix the palette.
 </Aside>
 
 ### Custom palettes through the Admin API
@@ -133,7 +133,7 @@ curl -X PUT https://auth.example.com/api/v1/admin/brands/3 \
 
 A brand's kit puts your logo, favicon, background image, font and corners on its pages. Each is optional: a brand you haven't changed is drawn in Goiabada's own look.
 
-The auth server's pages and the admin console's **Account** pages, home and its other card pages are drawn with the whole kit. The admin console's admin pages take only its colors and logo, as [the admin console's client](/concepts/clients/#the-admin-consoles-client) explains.
+The auth server's pages and the admin console's home and its other card pages are drawn with the whole kit, and its **Account** pages with all of it but the background image. The admin console's admin pages take only its colors and logo, as [the admin console's client](/concepts/clients/#the-admin-consoles-client) explains.
 
 ### Logo and app name
 
@@ -182,7 +182,7 @@ Animated images are refused, since a looping animation on or behind the sign-in 
 
 A file no brand uses is deleted once it's a day old, so save the brand the same day you upload it.
 
-A brand's files are public, as the pages that draw them are: anyone can download them from `/brand-assets/{id}` on the auth server.
+Every file you upload is public, whether a brand uses it or not: anyone can download it from `/brand-assets/{id}` on the auth server, and the ids are sequential. Don't upload a file you aren't ready to publish.
 
 ### The kit through the Admin API
 
@@ -337,17 +337,17 @@ curl -X PUT https://auth.example.com/api/v1/admin/brands/3 \
   }'
 ```
 
-An answer always carries `customCss` as it was saved, each line ending a line feed, or `""` for a brand with none. A refusal of the CSS carries `error_field` set to `/customCss`.
+An answer carries `customCss` as it was saved, with each line break turned into a line feed, or `""` for a brand with none, blank CSS included.
 
 ## Branded emails
 
-Every email the auth server sends is drawn in a brand, the brand of the page it was sent from, so a password reset looks like the sign-in it came from.
+Every email the auth server sends is drawn in a brand, so a password reset looks like the sign-in it came from.
 
 ### What an email takes from its brand
 
 An email is a card on the brand's background color, with the brand's **Logo** above the app name, as on the [sign-in card](#logo-and-app-name). **Hide the app name** hides the name there too, and the logo then carries the app name as its alternative text, which a mail client that blocks images shows in its place. The card takes the brand's colors, its **Corners** and its **Font**. An **Uploaded font** is drawn in **System UI**, since an email can't load a font file.
 
-The password reset, the activation link, a new user's setup email and the welcome email each have a button in the brand's color above their link, and every other link is in the brand's color too. The brand's [footer links and support contact](#footer-links-and-support-contact) are drawn under the card. The background image, the favicon and the custom CSS never reach an email.
+The password reset link, the activation link, a new user's setup email and the welcome email can each show a button in the brand's color, where their body holds `{{button}}`, and every other link is in the brand's color too. The brand's [footer links and support contact](#footer-links-and-support-contact) are drawn under the card. The background image, the favicon and the custom CSS never reach an email.
 
 An email doesn't follow the reader's light or dark mode, since many mail clients ignore it. A brand whose **Appearance** is **Dark** is drawn in its dark colors, with its **Dark logo** if it has one. **Light** and **Automatic** brands are drawn in their light colors.
 
@@ -357,7 +357,7 @@ Every email is sent as plain text too, for mail clients that show no HTML: its t
 
 ### Which brand an email takes
 
-An email takes the brand of the page it was sent from:
+Where an email is sent from decides its brand:
 
 | Sent from | Drawn in | Emails |
 |---|---|---|
@@ -365,7 +365,7 @@ An email takes the brand of the page it was sent from:
 | The **Account** pages, or the Account API | The brand of the client the access token was issued to, which for the admin console's **Account** pages is the admin console's own client's brand | The verification code. The notices that the email address or the password was changed, that two-factor authentication was set up or turned off, that the recovery codes were replaced, that the account was deleted, and that the authenticator was disabled after too many wrong codes while confirming a deletion. |
 | An administrator's action | The default brand | A new user's setup email. The notices that an administrator changed the password, turned off two-factor authentication or deleted the account. The test email from **Send test email**. |
 
-A client with no brand of its own gives the default brand, as its pages do: see [Clients](/concepts/clients/#brand). So does the forgot password page opened on its own, outside a sign-in.
+A client with no brand of its own gives the default brand, as its pages do: see [Clients](/concepts/clients/#brand). So does the forgot password page opened on its own, outside a sign-in, and a reset link opened in another browser or after the sign-in ended: the notice that the password was reset is then in the default brand too.
 
 ## Safe mode
 

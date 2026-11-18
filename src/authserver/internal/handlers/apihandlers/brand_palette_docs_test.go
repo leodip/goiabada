@@ -151,7 +151,7 @@ func TestBrandPaletteDocs_TheGuideSaysWhatAWarningMeans(t *testing.T) {
 // the console's brand, and names the way back (decision 12).
 func TestBrandPaletteDocs_TheGuideWarnsAboutAnUnreadableConsole(t *testing.T) {
 	guard.AssertSectionSays(t, filepath.Dir(guard.SourceRoot(t)), customizeGuidePage, contrastWarningsHead,
-		[]string{"brand editor included", "(/reference/api/admin/operations/updatebrand/)", "/concepts/clients/#the-admin-consoles-client"}, nil)
+		[]string{"brand editor included", "(#safe-mode)", "/concepts/clients/#the-admin-consoles-client"}, nil)
 }
 
 // The admin API subsection names the members decisions 2 and 5 add, the theme custom and palette

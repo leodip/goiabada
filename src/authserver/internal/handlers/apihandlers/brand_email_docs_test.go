@@ -51,7 +51,7 @@ func TestBrandEmailDocs_TheGuideSaysWhatAnEmailTakesFromItsBrand(t *testing.T) {
 		[]string{"WebP", "prefers-color-scheme"})
 }
 
-// The section says an email takes the brand of the page it was sent from, and which brand each
+// The section says an email looks like the sign-in it came from, and which brand each
 // origin gives (#817 decision 1): a sign-in's client's, the access token's client's for the
 // Account pages and the Account API, the admin console's own client's among them, and the default
 // brand for an administrator's action, a client with none, and the forgot password page opened
@@ -59,7 +59,7 @@ func TestBrandEmailDocs_TheGuideSaysWhatAnEmailTakesFromItsBrand(t *testing.T) {
 func TestBrandEmailDocs_TheGuideSaysWhichBrandAnEmailTakes(t *testing.T) {
 	guard.AssertSectionSays(t, filepath.Dir(guard.SourceRoot(t)), customizeGuidePage, brandedEmailsHead,
 		[]string{
-			"the brand of the page it was sent from",
+			"looks like the sign-in it came from",
 			"The pages of a sign-in to your app",
 			"The client's brand",
 			"The **" + english("adminconsole.menu.account") + "** pages, or the Account API",

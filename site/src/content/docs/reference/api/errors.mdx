@@ -7,7 +7,7 @@ import { CardGrid, LinkCard } from '@astrojs/starlight/components';
 
 This page helps you handle the errors the Admin API and the Account API answer.
 
-Every error comes back as a JSON body with the same two fields:
+Every error comes back as a JSON body with `error_code` and `error_description`:
 
 ```json
 {
@@ -22,6 +22,7 @@ Decide what to do from the HTTP status first: a `4xx` is something your request 
 
 - **`error_code`** is a stable identifier for the failure, and it's never translated. It's either an `UPPER_SNAKE` code from the table below, or the key of the refusal's sentence in the auth server's text catalogs, in dotted lowercase, such as `validator.email.invalid_format`. The operations on clients, users, groups, resources, legal documents and settings answer a refused value with its key, such as `handler.client.identifier_in_use` or `handler.settings_general.issuer_uri_invalid`, so you can tell which field to fix. A few refusals keep a code of their own from the table, such as `EMAIL_TOO_LONG`, `VALUE_TOO_LONG` and `EMAIL_ALREADY_EXISTS`.
 - **`error_description`** is a sentence for people. Don't match on it: the wording and the language can change, the code won't.
+- **`error_field`**, on a refusal of one member of the request body, is a JSON Pointer to it, such as `/palette/light/brand` or `/footerLinks/1/url`, for a brand or an email template. Its index counts from 0, while the sentence counts from 1. It's left out otherwise.
 
 A refusal of a value you sent, a `400` or `409` such as `VALIDATION_ERROR`, comes in the request's language: the `ui_locales` query parameter, or else the `Accept-Language` header, when the auth server has the sentence in that language. The rest are in English: a refused access token, a body that doesn't parse, a malformed id, and every other status. The refusal at the top of this page, sent with `Accept-Language: pt-BR`:
 
@@ -45,7 +46,7 @@ This is every `UPPER_SNAKE` code the two APIs answer.
 | `INVALID_REQUEST` | `400` | The `Authorization` header or the `access_token` parameter was sent twice, the token was sent two ways at once, or a form body doesn't parse. |
 | `EMAIL_TOO_LONG` | `400` | The new user's email address is longer than 254 characters. |
 | `VALUE_TOO_LONG` | `400` | A user attribute's value is longer than 250 characters. |
-| `FILE_TOO_LARGE` | `400` | The uploaded profile picture or client logo is over the size limit, or the form of an upload, a brand's file included, doesn't parse. |
+| `FILE_TOO_LARGE` | `400` | The profile picture or client logo is over the size limit, or an upload's body isn't a multipart form. A brand's file over its limit answers `validator.image.too_large` or `validator.font.too_large`. |
 | `NO_FILE` | `400` | A profile picture or client logo upload has no `picture` field, or a brand's file upload has no `file` field. |
 | `AUTHENTICATION_FAILED` | `400` | The password sent to confirm a password change, an email change, turning two-factor authentication on or off, a new set of recovery codes, or deleting the account is wrong. For two-factor authentication, a new set of recovery codes and deleting the account, a missing password answers it too. |
 | `OTP_CODE_REQUIRED` | `400` | Two-factor authentication was turned on without a code, or an account with two-factor authentication on was deleted without an authenticator code or a recovery code. |

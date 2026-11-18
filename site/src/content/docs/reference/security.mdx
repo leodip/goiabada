@@ -115,6 +115,8 @@ The admin console's policy also admits the auth server's origin, from `GOIABADA_
 
 While the [Turnstile challenge](/guides/require-a-turnstile-challenge/) is on, the sign-in, forgot-password and registration forms add `https://challenges.cloudflare.com` to `script-src`, for the widget's script. Every other page keeps the policy above.
 
+One admin console answer differs: the email template preview, which the editor shows in a frame, is sent `X-Frame-Options: SAMEORIGIN` and a policy of its own, so only the console can frame it, and nothing in it runs. A proxy that sets these headers must leave `/admin/settings/email/templates/{email}/{language}/preview-frame` alone.
+
 <Aside type="caution">
 **Never** replace `Referrer-Policy` with `no-referrer` at a proxy. A browser then sends `Origin: null` on form posts, and the cross-site check refuses every form on a browser that sends no `Sec-Fetch-Site`.
 </Aside>

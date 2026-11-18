@@ -359,7 +359,6 @@ func TestBrandDocs_TheCustomCSSSectionStatesTheFieldAndTheRules(t *testing.T) {
 			"(/reference/api/admin/operations/createbrand/)",
 			"(/reference/api/admin/operations/updatebrand/)",
 			"`customCss`",
-			"`/customCss`",
 			"never on the console's admin pages",
 		}, nil)
 	if customcss.MaxBytes != 64<<10 {

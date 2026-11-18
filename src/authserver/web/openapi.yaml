@@ -2454,8 +2454,7 @@ paths:
         support contact, palette and custom CSS. Every field is written: a choice left out is
         refused, hideAppName left out is false, a slot left out or null is emptied, footer links,
         a contact value or the custom CSS left out or null are removed, and a built-in theme
-        drops the palette. A brand read and sent back is unchanged. A change to the default
-        brand restyles every page at once.
+        drops the palette. A brand read and sent back is unchanged.
       operationId: updateBrand
       parameters:
         - $ref: '#/components/parameters/BrandIdParam'
@@ -2526,8 +2525,9 @@ paths:
       tags: [Brands]
       summary: Make brand the default
       description: |
-        Make a brand the default, which restyles at once the pages of every client with no brand
-        of its own. A brand that already is the default is answered unchanged.
+        Make a brand the default. The pages of every client with no brand of its own, and the
+        pages that belong to no client, are then drawn in it. A brand that already is the default
+        is answered unchanged.
       operationId: makeBrandDefault
       parameters:
         - $ref: '#/components/parameters/BrandIdParam'
@@ -3777,12 +3777,10 @@ paths:
         made the default. A brand given explicitly stays given, also the default brand. A new
         client starts with none.
 
-        `brandId` is required: a body without it is refused rather than read as `null`. A brand
-        given to clients can still be deleted; its clients then move to the default brand.
+        `brandId` is required: a body without it is refused rather than read as `null`.
 
         The route admits `authserver:manage-clients` and `authserver:manage`; on an
         administrator client, only `authserver:manage`. The answer is the client as it now is.
-        No other operation sets or clears `brandId`.
       operationId: updateClientBrand
       parameters:
         - $ref: '#/components/parameters/ClientIdParam'
@@ -4018,13 +4016,13 @@ paths:
       tags: [Brands]
       summary: Get a brand's full stylesheet
       description: |
-        Serve a brand's full stylesheet: its theme's colors, corners, font and background, which
-        the auth server's pages and the admin console's end-user pages link after main.css. This
-        is a public endpoint that does not require authentication.
+        Serve a brand's full stylesheet: its colors, corners, font, background and custom CSS.
+        This is a public endpoint that does not require authentication.
 
-        Linked by the URL a brand's answer carries, with the stylesheet's fingerprint in `v`.
-        Asked for by that fingerprint, the answer may be kept a year; asked for by any other
-        fingerprint, or none, it is the current stylesheet, kept five minutes.
+        The auth server's pages link it with the stylesheet's fingerprint in `v`, as
+        getPublicSettings' `brand.stylesheetUrl` does. Asked for by that fingerprint, the answer
+        may be kept a year; asked for by any other fingerprint, or none, it is the current
+        stylesheet, kept five minutes.
       operationId: getBrandStylesheet
       security: []
       parameters:
@@ -4037,7 +4035,7 @@ paths:
             format: int64
         - name: v
           in: query
-          description: The stylesheet's fingerprint, as the URL a brand's answer carries names it.
+          description: The stylesheet's fingerprint.
           schema:
             type: string
       responses:
@@ -4070,12 +4068,12 @@ paths:
       tags: [Brands]
       summary: Get a brand's colors stylesheet
       description: |
-        Serve the stylesheet that sets a brand's colors alone, which the admin console's admin
-        pages link after main.css. This is a public endpoint that does not require authentication.
+        Serve the stylesheet that sets a brand's colors alone. This is a public endpoint that does
+        not require authentication.
 
-        Linked by the URL a brand's answer carries, with the stylesheet's fingerprint in `v`.
-        Asked for by that fingerprint, the answer may be kept a year; asked for by any other
-        fingerprint, or none, it is the current stylesheet, kept five minutes.
+        getPublicSettings' `brand.colorsStylesheetUrl` links it with the stylesheet's fingerprint
+        in `v`. Asked for by that fingerprint, the answer may be kept a year; asked for by any
+        other fingerprint, or none, it is the current stylesheet, kept five minutes.
       operationId: getBrandColorsStylesheet
       security: []
       parameters:
@@ -4088,7 +4086,7 @@ paths:
             format: int64
         - name: v
           in: query
-          description: The stylesheet's fingerprint, as the URL a brand's answer carries names it.
+          description: The stylesheet's fingerprint.
           schema:
             type: string
       responses:
@@ -6377,8 +6375,8 @@ components:
           description: |
             A JSON Pointer (RFC 6901) to the member of the request body the refusal is about,
             such as `/footerLinks/1/url`, `/footerLinks/0/labels/pt-BR` or `/palette/light/brand`.
-            Left out when the refusal names no member. Only the refusals of a brand's footer links
-            and of its palette set it.
+            Left out when the refusal names no member. It's set by the refusals of a brand's footer
+            links, palette and custom CSS, and of an email template's text and `brandId`.
       required:
         - error_description
 
