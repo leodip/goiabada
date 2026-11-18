@@ -63,6 +63,12 @@ before its first change; each registers a `t.Cleanup` that writes the whole row 
 run with the row at its start and fails the tier naming each changed field, so a test that forgets
 fails the run instead of the tests after it (#433).
 
+**Integration halves**: CI runs the integration tier in two halves, each against a server and
+database of its own. `run-tests.sh --shard 1/2` runs every other top-level test in name order and
+`--shard 2/2` the rest, which also takes in any test the dealing missed. So an integration test sets
+up every record it relies on rather than finding one an earlier test left, which may have run in the
+other half. Either flag reproduces its half locally.
+
 **Fresh test databases**: every data and integration run starts from an empty database, as CI's
 fresh service containers always did. `run-tests.sh` removes the SQLite files, and on mysql, postgres
 and mssql it drops `goiabada_data` or `goiabada_integration` through `cmd/droptestdb`, which refuses

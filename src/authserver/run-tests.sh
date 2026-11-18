@@ -39,6 +39,14 @@
 #                           gcc for this, and CI's golang image has it. Refused
 #                           together with --type data or --type integration, which
 #                           the flag does not cover (see Notes).
+#   -s, --shard  <i>/<n>    Run part i of n of the data or integration tier, so n
+#                           jobs can share one tier: CI runs the integration tier
+#                           as --shard 1/2 and --shard 2/2. The tier's top-level
+#                           tests, read from its source in name order, are dealt
+#                           out in turn, and part n runs every test the other parts
+#                           were not dealt, so a test the reading misses still runs.
+#                           1/1, the default, is the whole tier. Refused with --run
+#                           and with any other --type.
 #   -h, --help              Show this help and exit.
 #
 # Examples:
@@ -54,6 +62,9 @@
 #
 #   # Run a name pattern across every DB
 #   ./run-tests.sh --type integration --run 'TestToken_AuthCode_CodeReuse_'
+#
+#   # The first of the two integration halves CI runs, on sqlite
+#   ./run-tests.sh --type integration --db sqlite --shard 1/2
 #
 #   # Just the internal authserver unit tests
 #   ./run-tests.sh --type internal
@@ -113,6 +124,7 @@ DB="all"
 RUN_PATTERN=""
 BUILD=true
 RACE=false
+SHARD="1/1"
 
 # Print the header comment block by deriving its extent, rather than with a
 # hardcoded line range. The previous '2,46p' had already gone stale: adding
@@ -144,6 +156,8 @@ while [ $# -gt 0 ]; do
             BUILD=false; shift ;;
         -R|--race)
             RACE=true; shift ;;
+        -s|--shard)
+            need_value "$@"; SHARD="$2"; shift 2 ;;
         -h|--help)
             print_help; exit 0 ;;
         *)
@@ -178,6 +192,31 @@ if [ "$RACE" = true ]; then
             echo "--race covers the module tiers only; it does nothing for --type '$TYPE'."
             exit 2 ;;
     esac
+fi
+
+# --shard i/n: part i of n of the data or integration tier.
+if [[ ! "$SHARD" =~ ^([1-9][0-9]*)/([1-9][0-9]*)$ ]]; then
+    echo "Invalid --shard '$SHARD': give part/parts, such as 1/2. Run './run-tests.sh --help'."
+    exit 2
+fi
+SHARD_PART=${BASH_REMATCH[1]}
+SHARD_PARTS=${BASH_REMATCH[2]}
+if [ "$SHARD_PART" -gt "$SHARD_PARTS" ]; then
+    echo "Invalid --shard '$SHARD': there is no part $SHARD_PART of $SHARD_PARTS."
+    exit 2
+fi
+if [ "$SHARD" != "1/1" ]; then
+    case "$TYPE" in
+        data|integration) ;;
+        *)
+            echo "--shard splits the data or the integration tier; it does nothing for --type '$TYPE'."
+            exit 2 ;;
+    esac
+    # A part is a list of names, and --run would cut across it: a part could run nothing at all.
+    if [ -n "$RUN_PATTERN" ]; then
+        echo "--shard splits the whole tier, so it is refused with --run."
+        exit 2
+    fi
 fi
 
 # The go test invocation the three module legs and the setup leg share. Under
@@ -456,8 +495,24 @@ if should_run_data || should_run_integration; then
     trap cleanup EXIT
 fi
 
+# shard_tests prints, joined by |, the tier's top-level tests that --shard's part decides on: for
+# a part before the last its own tests, and for the last part those dealt to every other part,
+# which it skips. The tests are every func TestXxx(t *testing.T) in the tier's _test.go files,
+# which gofmt keeps on one line, sorted bytewise and dealt to the parts in turn. Reading them
+# from the source rather than with go test -list keeps TestMain from running: -list starts the
+# test binary, and the integration TestMain writes the settings row before it lists anything.
+shard_tests() {
+    local test_type=$1
+    grep -hoE '^func Test[A-Z0-9_][A-Za-z0-9_]*\(\w+ \*testing\.T\) \{' "./tests/$test_type/"*_test.go |
+        sed -E 's/^func (\w+)\(.*/\1/' | LC_ALL=C sort |
+        awk -v part="$SHARD_PART" -v parts="$SHARD_PARTS" '
+            { dealt = (NR - 1) % parts + 1 }
+            (part < parts && dealt == part) || (part == parts && dealt != parts)' |
+        paste -sd'|'
+}
+
 # Run go test for the given test sub-directory (data|integration).
-# Honors $RUN_PATTERN when set so you can target a single test by name.
+# Honors $RUN_PATTERN when set so you can target a single test by name, and --shard's part.
 #
 # -timeout is 30m rather than go test's default 10m: the MySQL data tier alone
 # takes about ten minutes, and passed the default on a slower machine with every
@@ -465,9 +520,26 @@ fi
 run_tests() {
     local test_type=$1
     local args=(-v -count=1 -p 1 -timeout 30m)
+    local part=""
     if [ -n "$RUN_PATTERN" ]; then
         args+=(-run "$RUN_PATTERN")
         echo "Running $test_type tests (filter: -run '$RUN_PATTERN')..."
+    elif [ "$SHARD_PARTS" -gt 1 ]; then
+        part=" $SHARD"
+        local dealt
+        dealt=$(shard_tests "$test_type")
+        # Every part before the last runs the tests it was dealt, so an empty deal would pass
+        # having run nothing while the last part ran them all.
+        if [ -z "$dealt" ]; then
+            echo "run-tests.sh: found no tests in ./tests/$test_type to deal into $SHARD_PARTS parts." >&2
+            exit 1
+        fi
+        if [ "$SHARD_PART" -lt "$SHARD_PARTS" ]; then
+            args+=(-run "^($dealt)\$")
+        else
+            args+=(-skip "^($dealt)\$")
+        fi
+        echo "Running $test_type tests, part $SHARD..."
     else
         echo "Running $test_type tests..."
     fi
@@ -483,14 +555,14 @@ run_tests() {
         *)           tier="$test_type" ;;
     esac
     local start=$SECONDS
-    gha_group "$tier tests ($db)"
+    gha_group "$tier$part tests ($db)"
     if ! go test "${args[@]}" "./tests/$test_type/..." 2>&1 | tee "$log"; then
-        gha_summary_row "$tier" "$db" "FAIL" "$(fmt_duration $((SECONDS - start)))"
-        fail_with "$test_type tests ($db)" "$log"
+        gha_summary_row "$tier$part" "$db" "FAIL" "$(fmt_duration $((SECONDS - start)))"
+        fail_with "$test_type$part tests ($db)" "$log"
     fi
     count_tests "$log"
     gha_endgroup
-    gha_summary_row "$tier" "$db" "pass" "$(fmt_duration $((SECONDS - start)))"
+    gha_summary_row "$tier$part" "$db" "pass" "$(fmt_duration $((SECONDS - start)))"
 }
 
 # Function to start server and wait for it to be ready

@@ -2,10 +2,10 @@
 # legacy run-tests.yml it ran beside has been retired, having agreed with this
 # workflow on every pull request from the day it was introduced.
 #
-# The point of the job split is visibility: GitHub renders two levels, jobs in
-# the sidebar and steps within a job, so the database goes on the job axis and
-# the test tier on the step axis. A red run then names the database without a
-# click and the tier with one.
+# The job split serves visibility as well as time: GitHub renders two levels,
+# jobs in the sidebar and steps within a job, and a database job's name carries
+# both its tier and its database, Data / mssql. A red run names them without a
+# click.
 #
 # `main` is deliberately left unprotected. The consequence that matters --
 # shipping something broken -- is already prevented downstream: release.yml
@@ -661,11 +661,17 @@ jobs:
   # for every leg, and GitHub waits for every service health check before running
   # any step, so the sqlite leg would block on an MSSQL container it never uses.
   #
-  # Each of the four is a matrix over the tier instead: a Data leg and an
-  # Integration leg, each with its own database server, so a run waits for the
-  # slower of the two tiers rather than for both in turn. The legs share nothing
-  # but the job's definition. Only the integration leg builds, because only its
+  # Each of the four is a matrix over the tier instead: a Data leg and two
+  # Integration legs, each with its own database server, so a run waits for the
+  # slowest leg rather than for the tiers in turn. The integration tier runs its
+  # tests one at a time against one server and is the longer of the two, so it
+  # is dealt into halves by run-tests.sh's --shard, each half with a server of
+  # its own; --shard 1/1 is the whole tier. The legs share nothing but the
+  # job's definition. Only the integration legs build, because only their
   # server runs the binary; the data tier compiles what it tests itself.
+  #
+  # That makes 24 jobs a run, past the 20 an account on GitHub's Free plan runs
+  # at once, so the last few to be scheduled wait for the quickest jobs to end.
   #
   # All of them skip while the pull request is a draft, and all of them run when
   # it is taken out of draft. They set the run's wall clock, and a gbd-drive run
@@ -693,8 +699,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { tier: data, title: Data }
-          - { tier: integration, title: Integration }
+          - { tier: data, shard: 1/1, title: Data }
+          - { tier: integration, shard: 1/2, title: Integration (1/2) }
+          - { tier: integration, shard: 2/2, title: Integration (2/2) }
     runs-on: ubuntu-latest
     container:
       image: golang:${{ needs.versions.outputs.go }}-bookworm
@@ -719,7 +726,7 @@ jobs:
         run: ./build.sh
       - name: ${{ matrix.title }} tests
         working-directory: src/authserver
-        run: ./run-tests.sh --type ${{ matrix.tier }} --db sqlite --no-build
+        run: ./run-tests.sh --type ${{ matrix.tier }} --db sqlite --no-build --shard ${{ matrix.shard }}
 
   tests-mysql:
     name: ${{ matrix.title }} / mysql
@@ -729,8 +736,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { tier: data, title: Data }
-          - { tier: integration, title: Integration }
+          - { tier: data, shard: 1/1, title: Data }
+          - { tier: integration, shard: 1/2, title: Integration (1/2) }
+          - { tier: integration, shard: 2/2, title: Integration (2/2) }
     runs-on: ubuntu-latest
     env:
       MYSQL_ROOT_PASSWORD: ${{ needs.versions.outputs.mysql-password }}
@@ -787,7 +795,7 @@ jobs:
         run: ./build.sh
       - name: ${{ matrix.title }} tests
         working-directory: src/authserver
-        run: ./run-tests.sh --type ${{ matrix.tier }} --db mysql --no-build
+        run: ./run-tests.sh --type ${{ matrix.tier }} --db mysql --no-build --shard ${{ matrix.shard }}
 
   tests-postgres:
     name: ${{ matrix.title }} / postgres
@@ -797,8 +805,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { tier: data, title: Data }
-          - { tier: integration, title: Integration }
+          - { tier: data, shard: 1/1, title: Data }
+          - { tier: integration, shard: 1/2, title: Integration (1/2) }
+          - { tier: integration, shard: 2/2, title: Integration (2/2) }
     runs-on: ubuntu-latest
     env:
       POSTGRES_PASSWORD: ${{ needs.versions.outputs.postgres-password }}
@@ -849,7 +858,7 @@ jobs:
         run: ./build.sh
       - name: ${{ matrix.title }} tests
         working-directory: src/authserver
-        run: ./run-tests.sh --type ${{ matrix.tier }} --db postgres --no-build
+        run: ./run-tests.sh --type ${{ matrix.tier }} --db postgres --no-build --shard ${{ matrix.shard }}
 
   tests-mssql:
     name: ${{ matrix.title }} / mssql
@@ -859,8 +868,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { tier: data, title: Data }
-          - { tier: integration, title: Integration }
+          - { tier: data, shard: 1/1, title: Data }
+          - { tier: integration, shard: 1/2, title: Integration (1/2) }
+          - { tier: integration, shard: 2/2, title: Integration (2/2) }
     runs-on: ubuntu-latest
     env:
       MSSQL_SA_PASSWORD: ${{ needs.versions.outputs.mssql-password }}
@@ -917,7 +927,7 @@ jobs:
         run: ./build.sh
       - name: ${{ matrix.title }} tests
         working-directory: src/authserver
-        run: ./run-tests.sh --type ${{ matrix.tier }} --db mssql --no-build
+        run: ./run-tests.sh --type ${{ matrix.tier }} --db mssql --no-build --shard ${{ matrix.shard }}
 
   # Moves discovery of a broken Dockerfile or cross-compile from "when I tag a
   # release" to "right after the merge", without making every PR pay for it.
