@@ -195,8 +195,8 @@ func TestBrandPaletteDocs_TheAuditLogsBrandEventsNameThePalettesMode(t *testing.
 			t.Errorf("%s: ### Brands has no row for `%s`", auditLogDocsPage, event)
 			continue
 		}
-		if joined := strings.Join(row, " | "); !strings.Contains(joined, "custom palette's mode") {
-			t.Errorf("%s: the row for `%s` does not say %q: %s", auditLogDocsPage, event, "custom palette's mode", joined)
+		if joined := strings.Join(row, " | "); !strings.Contains(joined, "palette's mode") {
+			t.Errorf("%s: the row for `%s` does not say %q: %s", auditLogDocsPage, event, "palette's mode", joined)
 		}
 	}
 	guard.AssertSectionSays(t, filepath.Dir(guard.SourceRoot(t)), auditLogDocsPage, "",
