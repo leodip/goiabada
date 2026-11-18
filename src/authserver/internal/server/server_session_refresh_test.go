@@ -10,6 +10,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/sessionstore/sessiontest"
@@ -19,14 +20,18 @@ import (
 )
 
 // staleBackend is the in-memory backend with every row read back a minute past its last access, so
-// every request finds the session past the touch threshold, and its touches counted.
+// every request finds the session past the touch threshold, and its loads and touches counted.
 type staleBackend struct {
 	*sessiontest.MemoryBackend
 	mu      sync.Mutex
+	loads   int
 	touches int
 }
 
 func (b *staleBackend) Load(ctx context.Context, id string) (*sessionstore.Record, error) {
+	b.mu.Lock()
+	b.loads++
+	b.mu.Unlock()
 	record, err := b.MemoryBackend.Load(ctx, id)
 	if err != nil {
 		return nil, err
@@ -43,9 +48,9 @@ func (b *staleBackend) Touch(ctx context.Context, id string, authenticated bool)
 }
 
 // A request on the page branch that finds a signed-in session stale touches it and sends its cookie
-// again with the row's new expiry; the same request on the files, protocol and API branches reads
-// the session, as the session identifier on the context shows, and neither touches it nor sends a
-// cookie (#743 decisions 8 and 9).
+// again with the row's new expiry (#743 decisions 8 and 9); the same request on the files, protocol,
+// token, revocation, introspection and API branches loads no browser session, so it has no session
+// identifier on its context, touches nothing and sends no cookie (#825 decision 1).
 func TestInitMiddleware_OnlyThePageBranchRefreshesTheSessionAndSendsItsCookie(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	// A page reads the default brand; none leaves it automatic, in the built-in colors.
@@ -62,12 +67,7 @@ func TestInitMiddleware_OnlyThePageBranchRefreshesTheSessionAndSendsItsCookie(t 
 
 	signedInSessionIdentifier := ""
 	probe := func(w http.ResponseWriter, r *http.Request) {
-		session, err := s.sessionStore.Get(r, sessionkeys.AuthServerSessionName)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		signedInSessionIdentifier, _ = session.Values[sessionkeys.SessionIdentifier].(string)
+		signedInSessionIdentifier, _ = reqctx.SessionIdentifierFrom(r.Context())
 		w.WriteHeader(http.StatusOK)
 	}
 	branches.pages.Get("/probe/page", probe)
@@ -91,31 +91,33 @@ func TestInitMiddleware_OnlyThePageBranchRefreshesTheSessionAndSendsItsCookie(t 
 	id, err := s.sessionStore.OpenCookie(sessionkeys.AuthServerSessionName, sessionCookie.Value)
 	require.NoError(t, err)
 
-	serve := func(target string) []*http.Cookie {
+	serve := func(target string) *httptest.ResponseRecorder {
 		req := httptest.NewRequest(http.MethodGet, target, nil)
 		req.AddCookie(sessionCookie)
 		rec := httptest.NewRecorder()
 		signedInSessionIdentifier = ""
 		s.router.ServeHTTP(rec, req)
 		require.Equal(t, http.StatusOK, rec.Code, target)
-		assert.Equal(t, "the-user-session", signedInSessionIdentifier, "%s reads the session", target)
-		var cookies []*http.Cookie
-		for _, cookie := range rec.Result().Cookies() {
-			if cookie.Name == sessionCookie.Name {
-				cookies = append(cookies, cookie)
-			}
-		}
-		return cookies
+		return rec
 	}
 
 	for _, target := range []string{"/probe/file", "/probe/protocol", "/probe/token", "/probe/revoke",
 		"/probe/introspect", "/api/probe"} {
-		cookies := serve(target)
-		assert.Empty(t, cookies, "%s sends no session cookie", target)
+		rec := serve(target)
+		assert.Empty(t, signedInSessionIdentifier, "%s has no session identifier", target)
+		assert.Empty(t, rec.Header().Values("Set-Cookie"), "%s sends no cookie", target)
+		assert.Zero(t, backend.loads, "%s loads no browser session", target)
 		assert.Zero(t, backend.touches, "%s does not touch the session", target)
 	}
 
-	cookies := serve("/probe/page")
+	rec := serve("/probe/page")
+	assert.Equal(t, "the-user-session", signedInSessionIdentifier, "the page request reads the session")
+	var cookies []*http.Cookie
+	for _, cookie := range rec.Result().Cookies() {
+		if cookie.Name == sessionCookie.Name {
+			cookies = append(cookies, cookie)
+		}
+	}
 	assert.Equal(t, 1, backend.touches, "the page request touches the stale session")
 	require.Len(t, cookies, 1, "and sends its cookie again")
 	reissuedId, err := s.sessionStore.OpenCookie(sessionkeys.AuthServerSessionName, cookies[0].Value)

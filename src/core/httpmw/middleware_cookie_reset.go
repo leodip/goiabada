@@ -30,6 +30,12 @@ type cookieNamer interface {
 // is the entire point of the change. This is the response-capable layer, so the deletion
 // happens here, on first contact with a browser still carrying them (#266).
 //
+// Both halves belong on answers no shared cache stores: the deletion is a Set-Cookie on the
+// answer, and a load of a session can lead the middleware behind it to send that session's
+// cookie again. The auth server runs it on its page branch alone, whose answers are no-store,
+// so neither rides on a client logo, discovery or the key set, which a cache may keep and
+// replay to other visitors (#825).
+//
 // The Get is kept although nothing here reads its result, and it is not a leftover: it is
 // the first Get on the request, so it is what installs the per-request session cache that
 // every later middleware and handler is answered from. Removing it would not change any

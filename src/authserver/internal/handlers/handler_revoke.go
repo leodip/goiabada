@@ -344,8 +344,8 @@ func answerRevocationFault(w http.ResponseWriter, r *http.Request, jsonWriter JS
 }
 
 // RevocationFaultWriter is the revocation endpoint's error writer for the faults met before its
-// handler runs, the settings or the session failing to load or a panic, on the branch the endpoint
-// alone is registered on: each is answered as the handler answers its own.
+// handler runs, the settings failing to load or a panic, on the branch the endpoint alone is
+// registered on: each is answered as the handler answers its own.
 type RevocationFaultWriter struct {
 	jsonWriter JSONWriter
 	metrics    *revocationmetrics.Recorder

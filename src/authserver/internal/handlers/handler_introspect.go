@@ -395,8 +395,8 @@ func answerIntrospectionFault(w http.ResponseWriter, r *http.Request, jsonWriter
 }
 
 // IntrospectionFaultWriter is the introspection endpoint's error writer for the faults met before its
-// handler runs, the settings or the session failing to load or a panic, on the branch the endpoint
-// alone is registered on: each is answered and counted as the handler answers its own.
+// handler runs, the settings failing to load or a panic, on the branch the endpoint alone is
+// registered on: each is answered and counted as the handler answers its own.
 type IntrospectionFaultWriter struct {
 	jsonWriter JSONWriter
 	metrics    *introspectionmetrics.Recorder

@@ -182,32 +182,26 @@ func TestInitRoutes_ASettingsFaultIsAnsweredInEachRoutesFormat(t *testing.T) {
 	}
 }
 
-// TestInitRoutes_ASessionFaultIsAnsweredInEachRoutesFormat: with a session cookie naming a row that
-// cannot be read, every application route answers 500 before its handler, in its handler's format.
-// The cookie is what reaches the session middleware's database read, so the fault needs a browser
-// that has signed in, which a client calling the token endpoint from the same origin can be.
-func TestInitRoutes_ASessionFaultIsAnsweredInEachRoutesFormat(t *testing.T) {
+// TestInitRoutes_AFaultInTheCookiesUserSessionLookupStopsPagesOnly: with a session cookie naming a
+// user session whose row cannot be read, every page route answers 500 before its handler, in the
+// page format. The cookie is what reaches the session identifier's database read, which runs on the
+// page branch alone, so the same cookie reaches no such read on the other branches: their requests
+// go on to their handlers (#825 decision 1).
+func TestInitRoutes_AFaultInTheCookiesUserSessionLookupStopsPagesOnly(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	// A page reads the default brand; none leaves it automatic, in the built-in colors.
 	database.On("GetDefaultBrand", mock.Anything, mock.Anything).Return(nil, nil).Maybe()
 	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(&record.Settings{Id: 1}, nil)
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "sid-1").Return(nil, errors.New("the database is down"))
 	s := newFaultsTestServer(database)
+	cookies := sessionCookieNaming(t, s, "sid-1")
 
-	// A real session cookie naming sid-1, minted by the store the server runs.
-	mint := httptest.NewRequest(http.MethodGet, "/", nil)
-	minted := httptest.NewRecorder()
-	session, err := s.sessionStore.Get(mint, sessionkeys.AuthServerSessionName)
-	require.NoError(t, err)
-	session.Values[sessionkeys.SessionIdentifier] = "sid-1"
-	require.NoError(t, s.sessionStore.Save(mint, minted, session))
-	cookies := minted.Result().Cookies()
-	require.NotEmpty(t, cookies, "the store must have set the session cookie")
-
-	routes := applicationRoutes(t, registeredRoutes(t, s))
-	requireEveryFormatReached(t, routes)
-
-	for _, route := range routes {
+	pageRoutes := 0
+	for _, route := range applicationRoutes(t, registeredRoutes(t, s)) {
+		if routeFormat(route) != "page" || slices.Contains(fileRoutes, route) {
+			continue
+		}
+		pageRoutes++
 		t.Run(route, func(t *testing.T) {
 			method, pattern, _ := strings.Cut(route, " ")
 			req := httptest.NewRequest(method, routeTestTarget(pattern), nil)
@@ -216,9 +210,60 @@ func TestInitRoutes_ASessionFaultIsAnsweredInEachRoutesFormat(t *testing.T) {
 			}
 			rr := httptest.NewRecorder()
 			s.router.ServeHTTP(rr, req)
-			assertFaultFormat(t, routeFormat(route), "fatal failure in session middleware.", rr)
+			assertFaultFormat(t, "page", "fatal failure in session middleware.", rr)
 		})
 	}
+	require.Positive(t, pageRoutes, "page routes are registered")
+
+	// The other branches, each with a route that answers 200 once reached.
+	probes := newStaticBranchTestServer(database)
+	probes.sessionStore = s.sessionStore
+	branches := probes.initMiddleware()
+	reached := func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }
+	branches.files.Get("/probe/file", reached)
+	branches.protocol.Get("/probe/protocol", reached)
+	branches.token.Get("/probe/token", reached)
+	branches.revoke.Get("/probe/revoke", reached)
+	branches.introspect.Get("/probe/introspect", reached)
+	branches.api.Get("/api/probe", reached)
+	branches.pages.Get("/probe/page", reached)
+
+	for _, target := range []string{"/probe/file", "/probe/protocol", "/probe/token", "/probe/revoke",
+		"/probe/introspect", "/api/probe"} {
+		t.Run(target, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, target, nil)
+			for _, cookie := range cookies {
+				req.AddCookie(cookie)
+			}
+			rr := httptest.NewRecorder()
+			probes.router.ServeHTTP(rr, req)
+			assert.Equal(t, http.StatusOK, rr.Code, "the request reaches its handler: %s", rr.Body.String())
+		})
+	}
+
+	// And the page probe, beside them, is stopped.
+	req := httptest.NewRequest(http.MethodGet, "/probe/page", nil)
+	for _, cookie := range cookies {
+		req.AddCookie(cookie)
+	}
+	rr := httptest.NewRecorder()
+	probes.router.ServeHTTP(rr, req)
+	assertFaultFormat(t, "page", "fatal failure in session middleware.", rr)
+}
+
+// sessionCookieNaming mints a real session cookie whose browser session points at the user session
+// sessionIdentifier, through the store the server runs.
+func sessionCookieNaming(t *testing.T, s *Server, sessionIdentifier string) []*http.Cookie {
+	t.Helper()
+	mint := httptest.NewRequest(http.MethodGet, "/", nil)
+	minted := httptest.NewRecorder()
+	session, err := s.sessionStore.Get(mint, sessionkeys.AuthServerSessionName)
+	require.NoError(t, err)
+	session.Values[sessionkeys.SessionIdentifier] = sessionIdentifier
+	require.NoError(t, s.sessionStore.Save(mint, minted, session))
+	cookies := minted.Result().Cookies()
+	require.NotEmpty(t, cookies, "the store must have set the session cookie")
+	return cookies
 }
 
 // The token endpoint left the /auth group, which is mounted on the page branch whole, for the

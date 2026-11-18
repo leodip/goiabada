@@ -631,11 +631,20 @@ When user has valid session (`UserSession` in DB + session cookie):
   the read found: another request of the browser that rotated, ended or rewrote the session and
   answered first would otherwise be undone by a cookie naming the removed row or built from the
   older contents, such as a Keep me signed in answer just replaced. Every answer on that branch is
-  `no-store`, the router's 405 under a page group included, and the files, protocol and API branches
-  read the session without touching it, so no reissued cookie rides on a cacheable answer (#743).
-  A brand's stylesheet, public and kept for a year, is registered on the root as the static files
-  are and reads no session at all: clearing a dangling user-session pointer reissues the cookie
-  (#810)
+  `no-store`, the router's 405 under a page group included (#743)
+- Only the page branch reads the browser session at all (#825). The cookie reset
+  (`httpmw.CookieReset`), which deletes what the old chunked cookie store left, and the session
+  identifier (`middleware.SessionIdentifier`), which removes a pointer to an ended user session and
+  sends the cookie again, run in `pageChain` alone. The files, protocol, token, revocation,
+  introspection and API branches (`applicationChain`) load no browser session, look up no user
+  session from the cookie and send no cookie, so none rides on the OpenAPI document, a client logo,
+  discovery or the key set, which shared caches may keep. A fault in that user-session lookup stops
+  page requests only. Their answers written in a language take it from the request alone:
+  `ui_locales`, then `Accept-Language`, then English, never a sign-in in progress. What a route
+  reads for its own credentials stays its own: the user session a bearer token or an authorization
+  code names, and the session store API the admin console keeps its sessions through. A brand's
+  stylesheets and assets, public and kept for a year, are registered on the root as the static
+  files are, and read neither the settings nor the session (#810)
 - Whether a signed-in cookie outlives the browser is the store's `KeepSignedIn` rule
   (`sessionbackend.NewKeepSignedIn`), asked per cookie write. Under Let each user choose it reads the
   password page's Keep me signed in answer from the browser session (`sessionkeys.KeepSignedIn`, a

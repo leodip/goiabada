@@ -9,8 +9,8 @@ import (
 )
 
 // ServerFaults is how one application branch answers a fault that stops a request before its
-// handler can answer it: the settings row or the session could not be read, or something on the
-// branch panicked. Each branch answers in the format its handlers answer every other fault in, so a
+// handler can answer it: the settings row could not be read, on the page branch the session too,
+// or something on the branch panicked. Each branch answers in the format its handlers answer every other fault in, so a
 // client parsing the protocol endpoints or the APIs as JSON gets JSON on these paths too, where it
 // used to get text/plain from the settings and session middleware and an empty body from a panic.
 // server.go builds one branch per format and routes.go registers each route on the branch of its

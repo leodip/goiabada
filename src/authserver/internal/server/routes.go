@@ -39,11 +39,11 @@ import (
 const accountExportMaxAge = 300 * time.Second
 
 // initRoutes registers the application's routes on the branches initMiddleware returns
-// rather than on s.router itself: the settings read, the session load and the locale
-// resolution belong to these routes and not to the static file server registered beside them
-// (#266). Each route goes on the branch of the format its handler answers a fault in, so the
-// protocol endpoints and the APIs answer a settings or session failure, or a panic, as JSON
-// (see appBranches, #435).
+// rather than on s.router itself: the settings read and the locale resolution belong to these
+// routes and not to the static file server registered beside them (#266), and the browser
+// session's load to the page routes alone (#825). Each route goes on the branch of the format
+// its handler answers a fault in, so the protocol endpoints and the APIs answer a settings
+// failure, or a panic, as JSON (see appBranches, #435).
 func (s *Server) initRoutes(branches appBranches) {
 	pages, files, protocol, api, token, revoke, introspect, public := branches.pages, branches.files, branches.protocol, branches.api,
 		branches.token, branches.revoke, branches.introspect, branches.public

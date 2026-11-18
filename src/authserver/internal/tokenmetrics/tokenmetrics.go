@@ -85,9 +85,8 @@ type ErrorWriter interface {
 }
 
 // RefusalWriter is the token endpoint's error writer for the refusals written before its handler
-// runs: the faults of the branch it is registered on, a settings or session read that failed or a
-// panic, and LimitROPC's own, a body that does not parse or a credential count that could not be
-// read. Each is counted as Refused counts the handler's, so the client's 400 or 500 is counted
+// runs: the faults of the branch it is registered on, a settings read that failed or a panic, and
+// LimitROPC's own, a body that does not parse or a credential count that could not be read. Each is counted as Refused counts the handler's, so the client's 400 or 500 is counted
 // whichever of the two answered it, and once, since a request either stops before the handler or
 // reaches it. A 429 is not written through it: it is the rate limiter's refusal, counted under its
 // limiter.
@@ -103,7 +102,7 @@ func (r *Recorder) Refusals(next ErrorWriter) RefusalWriter {
 
 // JSONError counts the refusal under the grant the request's body names, then writes it.
 //
-// A fault met before anything parsed the body, the settings or the session failing, parses it here,
+// A fault met before anything parsed the body, the settings failing, parses it here,
 // so it too is counted under the grant it asked for. Nothing reads the body after a refusal, and it
 // was bounded at the root by BodyLimit. A body that does not parse keeps the pairs that parsed
 // before the malformed one, as the handler reads them.
