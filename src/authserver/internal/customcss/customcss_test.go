@@ -91,6 +91,8 @@ func TestCheck_Import(t *testing.T) {
 		{"@import through an escape", "/* fine */\n@\\69mport 'a.css';", refused(customcss.RuleImport, 2)},
 		{"@import through an escape with its whitespace", "@\\000069 mport 'a.css';", refused(customcss.RuleImport, 1)},
 		{"@import through an escaped letter", "@im\\port 'a.css';", refused(customcss.RuleImport, 1)},
+		{"@import through a hex escape with a letter", "@i\\6dport 'a.css';", refused(customcss.RuleImport, 1)},
+		{"@import through an upper-case hex escape", "@i\\6Dport 'a.css';", refused(customcss.RuleImport, 1)},
 		{"@import after a comment on its line", "/* a */ @import 'a.css';", refused(customcss.RuleImport, 1)},
 		{"@import after a string holding @import", ".x::before { content: \"@import\"; }\n@import 'a.css';", refused(customcss.RuleImport, 2)},
 	})
@@ -115,6 +117,8 @@ func TestCheck_URL(t *testing.T) {
 		{"a url() through an escape", "\n.x { background: \\75rl(https://example.com/a.png); }", refused(customcss.RuleURL, 2)},
 		{"a url() through an escape, quoted", ".x { background: \\75 rl('/a.png'); }", refused(customcss.RuleURL, 1)},
 		{"a url() through an escaped letter", ".x { background: u\\rl(/a.png); }", refused(customcss.RuleURL, 1)},
+		{"a url() through a hex escape with a letter", ".x { background: ur\\6c(https://example.com/a.png); }", refused(customcss.RuleURL, 1)},
+		{"a url() through an upper-case hex escape", ".x { background: ur\\6C(https://example.com/a.png); }", refused(customcss.RuleURL, 1)},
 		{"a url() whose value is escaped", ".x { background: url(\\68ttps://example.com/a.png); }", refused(customcss.RuleURL, 1)},
 		{"a url() whose value spells data through an escape", ".x { background: url(\\64 ata:image/png,AAAA); }", nil},
 		{"a url() in a custom property", ":root {\n  --picture: url(https://example.com/a.png);\n}", refused(customcss.RuleURL, 2)},

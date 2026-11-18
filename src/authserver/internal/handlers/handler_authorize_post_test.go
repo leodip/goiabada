@@ -262,6 +262,37 @@ func TestHandleAuthorizePost_TheRefusalPageHonoursUILocalesFromTheBody(t *testin
 	e.post("", validAuthorizeQuery+"&response_mode=web_message&ui_locales=pt-BR")
 }
 
+// A POST asking for safe mode in its body has its refusal page drawn safe, as the GET's is (#816
+// decision 3).
+func TestHandleAuthorizePost_TheRefusalPageIsDrawnInSafeModeFromTheBody(t *testing.T) {
+	for _, tc := range []struct {
+		name, body string
+		want       bool
+	}{
+		{"asked for", "&goiabada_safe_mode=true", true},
+		{"not asked for", "", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			e := newAuthorizePostEndpoint(t)
+			e.passesTheGate()
+			var drawnSafe bool
+			e.pageRenderer.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/no_menu_layout.html", "/auth_error.html", mock.Anything).
+				Run(func(args mock.Arguments) {
+					drawnSafe = reqctx.PageSafeMode(args.Get(1).(*http.Request).Context())
+				}).Return(nil).Once()
+
+			req := httptest.NewRequest(http.MethodPost, "/auth/authorize",
+				strings.NewReader(validAuthorizeQuery+"&response_mode=web_message"+tc.body))
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			ctx := reqctx.WithSettings(req.Context(), &record.Settings{})
+			req = req.WithContext(reqctx.WithPageClient(ctx, &reqctx.PageClient{}))
+			e.handler.ServeHTTP(httptest.NewRecorder(), req)
+
+			assert.Equal(t, tc.want, drawnSafe)
+		})
+	}
+}
+
 // consumes registers the transaction, the read and the claim of the handle every case below holds.
 func (e *authorizeEndpoint) consumes(handle string, form url.Values, claimed bool) {
 	tx := &sql.Tx{}
