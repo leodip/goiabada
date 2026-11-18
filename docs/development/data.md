@@ -56,10 +56,11 @@ Preserve the row locks that make security decisions atomic:
   transaction's first read, without the app that sign-in added.
   A credential change and a user's deletion that tell apps take each of the user's session rows
   this way, in id order, after the user's row: the deletion takes it with `GetUserByIdForUpdate`.
-- Both deletions of a user, the administrator's and the account's own, and the administrator's
-  disable make no ordinary read before they hold the user's row. Under InnoDB's REPEATABLE READ a
-  transaction's first ordinary read fixes the snapshot every later one answers, and the sessions and
-  refresh tokens they read after the wait must include what a sign-in committed during it (#796).
+- On MySQL, both deletions of a user, the administrator's and the account's own, and the
+  administrator's disable make no ordinary read before they hold the user's row. Under InnoDB's
+  REPEATABLE READ a transaction's first ordinary read fixes the snapshot every later one answers,
+  and the sessions and refresh tokens they read after the wait must include what a sign-in
+  committed during it (#796).
   They open with the administrators' lock, `AcquireManagePermissionRow`, whose read of its row is
   `FOR SHARE` on MySQL for this reason, then take the user's row with `GetUserByIdForUpdate` before
   reading the user's grants. The rule is MySQL's; the other engines' ordinary reads fix no snapshot.

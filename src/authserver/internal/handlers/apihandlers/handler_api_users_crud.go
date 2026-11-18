@@ -705,11 +705,11 @@ func HandleUserEnabledPut(
 			// session of the user, so every app that knew the user is told (#784 decision 3).
 			//
 			// The user's row is read under its lock right after the administrators' lock, the
-			// order both deletions take them in, and before any ordinary read: on MySQL the first
-			// ordinary read fixes the snapshot every later one answers, so the sessions and
-			// refresh tokens the sweep reads include what a sign-in committed while this waited
-			// for the row (#796 decision 1). A user deleted before the write is answered 404 with
-			// nothing written (#796 decision 3).
+			// order both deletions take them in, and on MySQL before any ordinary read: at
+			// MySQL's REPEATABLE READ the first ordinary read fixes the snapshot every later one
+			// answers, so the sessions and refresh tokens the sweep reads include what a sign-in
+			// committed while this waited for the row (#796 decision 1). A user deleted before the
+			// write is answered 404 with nothing written (#796 decision 3).
 			notice := userWideNotice(settings, user)
 			result, txErr := revocation.RevokeUserAuthStateTx(r.Context(), database, userId, "", notice, func(tx *sql.Tx) error {
 				administrators, lockErr := lockAdministrators(r.Context(), database, tx)

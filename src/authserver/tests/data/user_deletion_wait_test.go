@@ -253,11 +253,18 @@ func TestUserDisable_EndsAndTellsStateCommittedWhileItWaitedForTheUsersRow(t *te
 				require.NoError(t, database.CreateRefreshToken(ctx, holder, grant))
 			}
 
+			take := func() error { return database.AcquireUserRow(ctx, holder, user.Id) }
+			if state == "a new session with an app" && dbType() == data.Postgres {
+				// On PostgreSQL a password-only sign-in holds the user's row through its session
+				// insert alone: the insert's user_id foreign-key check takes FOR KEY SHARE on it.
+				// The holder takes nothing more, so the disable's lookup is measured waiting for
+				// that lock, which FOR UPDATE conflicts with and FOR NO KEY UPDATE does not (#796
+				// decision 1).
+				take = func() error { return nil }
+			}
 			sender := &recordedLogoutTokens{}
 			recorder := &recoveryAuditRecorder{}
-			db := &userRowTakenAtTheWrite{Database: other, take: func() error {
-				return database.AcquireUserRow(ctx, holder, user.Id)
-			}}
+			db := &userRowTakenAtTheWrite{Database: other, take: take}
 			id := strconv.FormatInt(user.Id, 10)
 			party := goBlocked(t, "the disable", holder, func(reached func()) *httptest.ResponseRecorder {
 				db.reached = reached
