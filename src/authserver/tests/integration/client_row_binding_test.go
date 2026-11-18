@@ -38,7 +38,9 @@ func assertNamesClientRow(t *testing.T, accessToken string, client *record.Clien
 	t.Helper()
 	claims := decodeJWTPayload(t, accessToken)
 	require.Equal(t, client.ClientIdentifier, claims["client_id"])
-	require.Equal(t, float64(client.Id), claims["client_internal_id"], "the token names its client's row")
+	clientInternalID, ok := claims["client_internal_id"].(float64)
+	require.True(t, ok, "the token carries client_internal_id as a number")
+	require.Equal(t, client.Id, int64(clientInternalID), "the token names its client's row")
 }
 
 func TestClientRowBinding_AClientCredentialsTokenIsRefusedOnceAnOlderClientTakesItsIdentifier(t *testing.T) {

@@ -113,16 +113,16 @@ func TestDeleteClient_OverlappingARenameRecordsTheIdentifierTheRowHeld(t *testin
 	go func() { done <- database.DeleteClient(ctx, nil, client.Id) }()
 
 	select {
-	case err := <-done:
-		t.Fatalf("DeleteClient returned (%v) while a rename held the client's row uncommitted", err)
+	case deleteErr := <-done:
+		t.Fatalf("DeleteClient returned (%v) while a rename held the client's row uncommitted", deleteErr)
 	case <-time.After(500 * time.Millisecond):
 	}
 
 	require.NoError(t, database.CommitTransaction(ctx, rename))
 
 	select {
-	case err := <-done:
-		require.NoError(t, err)
+	case deleteErr := <-done:
+		require.NoError(t, deleteErr)
 	case <-time.After(30 * time.Second):
 		t.Fatalf("DeleteClient never returned after the rename committed")
 	}
