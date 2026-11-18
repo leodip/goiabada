@@ -181,16 +181,18 @@ func assertLogoutToken(t *testing.T, got logoutPost, clientIdentifier, subject, 
 }
 
 // sentLogoutTokenRow waits for the sent_logout_token row the request requestId left, which is
-// written once its delivery has finished, and answers its details.
+// written once its delivery has finished, and answers its details. It waits for the page itself to
+// list the row: GetAuditLogsPaginated reads the page and its count in two statements, so a row
+// written between them is counted before it is listed.
 func sentLogoutTokenRow(t *testing.T, requestId string, timeout time.Duration) (record.AuditLog, map[string]interface{}) {
 	t.Helper()
 	deadline := time.Now().Add(timeout)
 	for {
-		rows, total, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 10,
+		rows, _, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 10,
 			record.AuditLogFilter{AuditEvent: "sent_logout_token", RequestId: requestId})
 		require.NoError(t, err)
-		if total > 0 || time.Now().After(deadline) {
-			require.Equal(t, 1, total, "one sent_logout_token row for request %s", requestId)
+		if len(rows) > 0 || time.Now().After(deadline) {
+			require.Len(t, rows, 1, "one sent_logout_token row for request %s", requestId)
 			var details map[string]interface{}
 			require.NoError(t, json.Unmarshal([]byte(rows[0].Details), &details))
 			return rows[0], details
