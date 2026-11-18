@@ -237,7 +237,7 @@ func TestRegisterRoutes_AKnownPathByAnotherMethodIs405WithNoContent(t *testing.T
 		{http.MethodPut, "/auth/token", "POST"},
 		{http.MethodGet, "/auth/token", "POST"},
 		{http.MethodPost, "/api/public/settings", "GET"},
-		{http.MethodDelete, "/openapi.yaml", "GET"},
+		{http.MethodDelete, "/openapi.yaml", "GET, HEAD"},
 		{http.MethodPut, "/auth/authorize", "GET, POST"},
 		{http.MethodHead, "/auth/authorize", "GET, POST"},
 		{http.MethodDelete, "/certs", "GET, HEAD"},
@@ -270,7 +270,7 @@ func TestRegisterRoutes_HeadIsAnsweredAsGetOnlyWhereItIsRegistered(t *testing.T)
 	base := routingListener(t, s)
 
 	for _, target := range []string{"/health", "/favicon.ico", "/static/main.css", "/static/favicon/favicon.ico",
-		"/.well-known/openid-configuration", "/.well-known/oauth-authorization-server"} {
+		"/.well-known/openid-configuration", "/.well-known/oauth-authorization-server", "/openapi.yaml"} {
 		t.Run("HEAD "+target, func(t *testing.T) {
 			get, getBody := sendRouting(t, http.MethodGet, base+target)
 			head, headBody := sendRouting(t, http.MethodHead, base+target)
@@ -290,7 +290,6 @@ func TestRegisterRoutes_HeadIsAnsweredAsGetOnlyWhereItIsRegistered(t *testing.T)
 		{"/auth/pwd", "GET, POST"},
 		{"/auth/logout", "GET, POST"},
 		{"/userinfo", "GET, POST"},
-		{"/openapi.yaml", "GET"},
 	} {
 		t.Run("HEAD "+request.target, func(t *testing.T) {
 			head, body := sendRouting(t, http.MethodHead, base+request.target)

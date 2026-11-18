@@ -37,8 +37,9 @@ func requestWithoutRedirects(t *testing.T, method, url string) headAnswer {
 // TestHead_TheReadOnlyResourcesAnswerAsGetDoes: RFC 9110 section 9.1 has a general-purpose server
 // support GET and HEAD, and section 9.3.2 has a HEAD answered as the GET would be, with the same
 // header fields and no content. The static files, the favicon, /health, discovery, JWKS, a client's
-// logo and a user's picture answered HEAD with 405 until #542's live check, so a cache revalidating
-// with HEAD, a monitor or a link checker got an error for a resource that was there.
+// logo and a user's picture answered HEAD with 405 until #542's live check, and the OpenAPI document
+// until #825, so a cache revalidating with HEAD, a monitor or a link checker got an error for a
+// resource that was there.
 func TestHead_TheReadOnlyResourcesAnswerAsGetDoes(t *testing.T) {
 	ctx := context.Background()
 	client := createTestClient(t, "head-check-"+fake.LetterN(8))
@@ -73,6 +74,7 @@ func TestHead_TheReadOnlyResourcesAnswerAsGetDoes(t *testing.T) {
 		"/client/logo/" + client.ClientIdentifier,
 		"/client/logo/no-such-client-" + fake.LetterN(8),
 		"/userinfo/picture/" + user.Subject,
+		"/openapi.yaml",
 	} {
 		t.Run(path, func(t *testing.T) {
 			url := appConfig.AuthServer.BaseURL + path

@@ -126,6 +126,7 @@ func TestRegisterRoutes_TheListedRoutesCarryNoBrowserSession(t *testing.T) {
 		cacheControl         string
 	}{
 		{"the OpenAPI document", http.MethodGet, "/openapi.yaml", nil, http.StatusOK, "public, max-age=3600"},
+		{"the OpenAPI document", http.MethodHead, "/openapi.yaml", nil, http.StatusOK, "public, max-age=3600"},
 		{"a client logo", http.MethodGet, "/client/logo/shop", nil, http.StatusOK, "public, max-age=300, must-revalidate"},
 		{"a client logo", http.MethodHead, "/client/logo/shop", nil, http.StatusOK, "public, max-age=300, must-revalidate"},
 		{"a client logo not modified", http.MethodGet, "/client/logo/shop", http.Header{"If-None-Match": {entityTag}},
@@ -264,7 +265,7 @@ func TestRegisterRoutes_NoRouteOutsideThePageBranchSendsACookie(t *testing.T) {
 
 	assert.Contains(t, pages, "GET /auth/authorize", "a page route is told by its chain")
 	for _, route := range []string{"GET /static/*", "HEAD /static/*", "GET /favicon.ico", "GET /health",
-		"GET /openapi.yaml", "GET /client/logo/{clientIdentifier}", "GET /certs", "POST /auth/token",
+		"GET /openapi.yaml", "HEAD /openapi.yaml", "GET /client/logo/{clientIdentifier}", "GET /certs", "POST /auth/token",
 		"POST /auth/revoke", "POST /auth/introspect", "GET /api/public/settings", "GET /brand-assets/{id}"} {
 		assert.Contains(t, others, route, "the guard reaches every branch outside the page branch")
 	}

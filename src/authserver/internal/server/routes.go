@@ -160,7 +160,9 @@ func (s *Server) initRoutes(branches appBranches) {
 	// the claims and every refusal, the bare 401 included, are stored by no cache (#714).
 	protocol.With(middleware.NoStore(), userinfoBearer.JwtAuthorizationHeaderToContext(), userinfoBearer.RequireBearerTokenScope("openid"), userinfoBearer.RequireUserBoundToken(), userinfoBearer.RequireValidSession(s.database)).Get("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger, baseURL, adminConsoleBaseURL))
 	protocol.With(middleware.NoStore(), userinfoBearer.JwtAuthorizationHeaderToContext(), userinfoBearer.RequireBearerTokenScope("openid"), userinfoBearer.RequireUserBoundToken(), userinfoBearer.RequireValidSession(s.database)).Post("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger, baseURL, adminConsoleBaseURL))
-	files.Get("/openapi.yaml", handlers.HandleOpenAPIGet())
+	// The OpenAPI document is a read-only file, so it answers HEAD as GET, as every other one does
+	// (#825 decision 4).
+	getAndHead(files, "/openapi.yaml", handlers.HandleOpenAPIGet())
 	getAndHead(files, "/userinfo/picture/{subject}", handlers.HandleProfilePictureGet(httpHelper, s.database))
 	getAndHead(files, "/client/logo/{clientIdentifier}", handlers.HandleClientLogoGet(httpHelper, s.database))
 	// A brand's four stylesheets, its own two and the two safe mode links (#816 decision 3), are

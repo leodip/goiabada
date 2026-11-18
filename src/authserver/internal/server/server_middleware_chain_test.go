@@ -125,6 +125,7 @@ func TestInitMiddleware_TheWholeChainInOrder(t *testing.T) {
 // assets, and the OpenAPI document.
 var fileRoutes = []string{
 	"GET /openapi.yaml",
+	"HEAD /openapi.yaml",
 	"GET /userinfo/picture/{subject}",
 	"HEAD /userinfo/picture/{subject}",
 	"GET /client/logo/{clientIdentifier}",
