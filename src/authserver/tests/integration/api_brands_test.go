@@ -435,8 +435,13 @@ func TestAPIBrands_TheSettingsDomainsScopes(t *testing.T) {
 	manageToken, _ := createAdminClientWithToken(t)
 	_, created := keepDefaultBrand(t)
 	id := createBrandOverAPI(t, manageToken, created, brandName("Scopes"), "auto", "plum")
+	resp, _ := uploadBrandAsset(t, manageToken, "favicon", createTestPNGImage(48, 48))
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+	asset := decodeBrandAsset(t, resp)
 
-	reads := []string{brandsPath, brandPath(id, ""), brandThemesPath}
+	reads := []string{brandsPath, brandPath(id, ""), brandThemesPath, brandAssetsPath + strconv.FormatInt(asset.Id, 10)}
+	// An upload with no file reaches its handler only past the scope check, so each of the four
+	// stores nothing whichever token sends it.
 	writes := []struct {
 		method, path string
 		body         any
@@ -445,6 +450,10 @@ func TestAPIBrands_TheSettingsDomainsScopes(t *testing.T) {
 		{http.MethodPut, brandPath(id, ""), map[string]any{"name": "", "appearance": "auto", "theme": "plum"}},
 		{http.MethodPost, brandPath(999999999, "/make-default"), nil},
 		{http.MethodDelete, brandPath(999999999, ""), nil},
+		{http.MethodPost, brandAssetsPath + "logo", nil},
+		{http.MethodPost, brandAssetsPath + "favicon", nil},
+		{http.MethodPost, brandAssetsPath + "background", nil},
+		{http.MethodPost, brandAssetsPath + "font", nil},
 	}
 
 	for _, c := range []struct {

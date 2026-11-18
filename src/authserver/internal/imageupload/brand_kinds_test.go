@@ -196,6 +196,10 @@ func TestBrandKinds_Refuse(t *testing.T) {
 		// The flag alone is enough: a WebP that says it animates is refused before any frame is read.
 		{"background/a WebP flagged as animated", BrandBackground(), webpOfSizeWithFlags(100, 100, 0x02),
 			i18n.ErrCodeImageAnimated, nil, animatedSentence},
+		// And so is a frame: a WebP carrying an ANMF chunk animates whatever its flag says.
+		{"background/a WebP carrying a frame without the animation flag", BrandBackground(),
+			webpOfSizeWithFlags(100, 100, 0, append([]byte("ANMF\x10\x00\x00\x00"), make([]byte, 16)...)),
+			i18n.ErrCodeImageAnimated, nil, animatedSentence},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

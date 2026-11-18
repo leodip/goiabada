@@ -464,41 +464,55 @@ func TestHandleBrandNewPost_ASlotHoldingNoNumberIsSentForTheAPIToRefuse(t *testi
 // A refused form is drawn again with the files it held, each read by its id, so an upload not yet
 // saved is still drawn and sent with the next Save (#813 decision 10). One the admin API no longer
 // holds, swept or never stored, is drawn empty, for the refusal at its field to be answered with a new
-// upload.
+// upload. Each file is drawn in the slot it was sent in.
 func TestHandleBrandWrite_ARefusedFormKeepsItsUploads(t *testing.T) {
-	form := withValues(slotsForm("21", "22", "", "24", "99", "26"), url.Values{
-		"name": {"Spring"}, "appearance": {"auto"}, "theme": {"plum"},
-		"corners": {"rounded"}, "font": {"uploaded"}, "backgroundFit": {"tile"}})
+	look := url.Values{"name": {"Spring"}, "appearance": {"auto"}, "theme": {"plum"},
+		"corners": {"rounded"}, "font": {"uploaded"}, "backgroundFit": {"tile"}}
 	want := BrandForm{Name: "Spring", Appearance: "auto", Theme: "plum", Corners: "rounded", Font: "uploaded",
 		BackgroundFit: "tile", Logo: &uploadedLogo, DarkLogo: &uploadedDarkLogo, Background: &uploadedBackground,
 		BoldFont: &uploadedBoldFont}
+	wantAllSix := want
+	wantAllSix.Favicon, wantAllSix.RegularFont = &uploadedFavicon, &uploadedRegularFont
 
-	draw := map[string]func(httpHelper *handlersmocks.HttpHelper, apiClient *brandingAPI){
-		"new form": func(httpHelper *handlersmocks.HttpHelper, apiClient *brandingAPI) {
-			HandleBrandNewPost(httpHelper, apiClient, &invalidationRecorder{}, consoleBaseURL).ServeHTTP(httptest.NewRecorder(),
-				handlertest.Request(http.MethodPost, "/admin/settings/branding/new", handlertest.WithAccessToken(),
-					handlertest.WithForm(form)))
-		},
-		"brand's form": func(httpHelper *handlersmocks.HttpHelper, apiClient *brandingAPI) {
-			HandleBrandPost(httpHelper, newSettingsTestStore(), apiClient, &invalidationRecorder{}, consoleBaseURL).ServeHTTP(
-				httptest.NewRecorder(), handlertest.Request(http.MethodPost, "/admin/settings/branding/4/edit",
-					handlertest.WithAccessToken(), handlertest.WithPathValue("brandId", "4"), handlertest.WithForm(form)))
-		},
-	}
-	for name, drawPage := range draw {
-		t.Run(name, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
-			handlertest.RefuseInternalServerError(t, httpHelper)
-			handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_branding_brand.html").Once()
-			apiClient := newBrandingAPI()
-			apiClient.writeErr = refusal("handler.brand.regular_font_asset_invalid", "Upload it again.")
+	for _, c := range []struct {
+		name       string
+		form       url.Values
+		refusal    error
+		errorField string
+		want       BrandForm
+	}{
+		{"a file no longer held", withValues(slotsForm("21", "22", "", "24", "99", "26"), look),
+			refusal("handler.brand.regular_font_asset_invalid", "Upload it again."), "regularFont", want},
+		{"every slot filled", withValues(slotsForm("21", "22", "23", "24", "25", "26"), look),
+			refusal("handler.brand.name_required", "Not that."), "name", wantAllSix},
+	} {
+		draw := map[string]func(httpHelper *handlersmocks.HttpHelper, apiClient *brandingAPI){
+			"new form": func(httpHelper *handlersmocks.HttpHelper, apiClient *brandingAPI) {
+				HandleBrandNewPost(httpHelper, apiClient, &invalidationRecorder{}, consoleBaseURL).ServeHTTP(httptest.NewRecorder(),
+					handlertest.Request(http.MethodPost, "/admin/settings/branding/new", handlertest.WithAccessToken(),
+						handlertest.WithForm(c.form)))
+			},
+			"brand's form": func(httpHelper *handlersmocks.HttpHelper, apiClient *brandingAPI) {
+				HandleBrandPost(httpHelper, newSettingsTestStore(), apiClient, &invalidationRecorder{}, consoleBaseURL).ServeHTTP(
+					httptest.NewRecorder(), handlertest.Request(http.MethodPost, "/admin/settings/branding/4/edit",
+						handlertest.WithAccessToken(), handlertest.WithPathValue("brandId", "4"), handlertest.WithForm(c.form)))
+			},
+		}
+		for name, drawPage := range draw {
+			t.Run(c.name+"/"+name, func(t *testing.T) {
+				httpHelper := handlersmocks.NewHttpHelper(t)
+				handlertest.RefuseInternalServerError(t, httpHelper)
+				handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_branding_brand.html").Once()
+				apiClient := newBrandingAPI()
+				apiClient.writeErr = c.refusal
 
-			drawPage(httpHelper, apiClient)
+				drawPage(httpHelper, apiClient)
 
-			bind := handlertest.Bind(t, httpHelper)
-			assert.Equal(t, "regularFont", bind["errorField"])
-			assert.Equal(t, want, bind["brand"])
-		})
+				bind := handlertest.Bind(t, httpHelper)
+				assert.Equal(t, c.errorField, bind["errorField"])
+				assert.Equal(t, c.want, bind["brand"])
+			})
+		}
 	}
 }
 
