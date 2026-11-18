@@ -87,13 +87,20 @@ var acquireManagePermission = statement{
 		"AND EXISTS (SELECT 1 FROM resources WHERE resources.id = permissions.resource_id AND resources.resource_identifier = @p2)",
 }
 
+// selectManagePermission reads the row acquireManagePermission took. On MySQL it is a locking read,
+// FOR SHARE: at REPEATABLE READ a transaction's first ordinary read fixes the snapshot every later
+// ordinary read answers from, and a locking read fixes none. The writes that take a user's row
+// after this lock read the user's sessions and refresh tokens after that wait, and must see what a
+// sign-in committed during it (#796). The acquisition already holds the permission's row and the
+// resource's row the read joins, so the read takes no lock beside them. The other engines keep an
+// ordinary read: theirs fixes no snapshot the later reads answer from.
 var selectManagePermission = statement{
 	sqlite: "SELECT permissions.id, permissions.permission_identifier, resources.resource_identifier FROM permissions " +
 		"INNER JOIN resources ON resources.id = permissions.resource_id " +
 		"WHERE permissions.permission_identifier = ? AND resources.resource_identifier = ?",
 	mysql: "SELECT permissions.id, permissions.permission_identifier, resources.resource_identifier FROM permissions " +
 		"INNER JOIN resources ON resources.id = permissions.resource_id " +
-		"WHERE permissions.permission_identifier = ? AND resources.resource_identifier = ?",
+		"WHERE permissions.permission_identifier = ? AND resources.resource_identifier = ? FOR SHARE",
 	postgres: "SELECT permissions.id, permissions.permission_identifier, resources.resource_identifier FROM permissions " +
 		"INNER JOIN resources ON resources.id = permissions.resource_id " +
 		"WHERE permissions.permission_identifier = $1 AND resources.resource_identifier = $2",

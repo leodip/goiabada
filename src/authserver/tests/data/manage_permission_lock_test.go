@@ -211,3 +211,28 @@ func TestAcquireManagePermissionRow_AReadAfterTheWaitSeesWhatTheHolderCommitted(
 	require.NoError(t, result.err)
 	assert.True(t, result.holdsManage, "the grant the holder committed during the wait is visible to the read after it")
 }
+
+// The transaction's first ordinary read after the lock answers what another connection committed
+// after the lock returned. At MySQL's REPEATABLE READ a transaction's first ordinary read fixes the
+// snapshot every later one answers from, so the lock reads its row with a locking read there, which
+// fixes none. The disable and the two deletions take the user's row after this lock, and their
+// lists of sessions and refresh tokens are read after that wait: they must include what a sign-in
+// committed while they waited (#796).
+func TestAcquireManagePermissionRow_TheFirstOrdinaryReadAfterItSeesWhatCommittedSince(t *testing.T) {
+	skipWhereRemovalsCannotOverlap(t)
+	ctx := context.Background()
+	other := secondDatabase(t)
+	managePermissionRow(t)
+	user := createTestUser(t)
+
+	tx := beginTx(t)
+	_, err := database.AcquireManagePermissionRow(ctx, tx)
+	require.NoError(t, err)
+
+	committed := createTestUserSessionOn(t, other, user.Id)
+
+	sessions, err := database.GetUserSessionsByUserId(ctx, tx, user.Id)
+	require.NoError(t, err)
+	require.Len(t, sessions, 1, "the session another connection committed after the lock returned")
+	assert.Equal(t, committed.Id, sessions[0].Id)
+}
