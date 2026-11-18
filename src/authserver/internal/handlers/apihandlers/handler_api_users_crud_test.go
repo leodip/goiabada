@@ -381,6 +381,70 @@ func TestHandleUserPasswordPut_RevokesEverything(t *testing.T) {
 	assert.Empty(t, value)
 }
 
+// TestHandleUserPasswordPut_AUserDeletedMeanwhile: another administrator deletes the user after the
+// endpoint first read them, as TestHandleUserEnabledPut_AUserDeletedMeanwhile does to the enabled
+// endpoint (#796 decision 3). Deleted before the write, the request answers 404 and writes nothing,
+// audits nothing, sends no logout token and tells nobody. Deleted after the write committed, it
+// answers 404 too, and what the committed write did stands: its two audit events and its notice. SMTP
+// is on and the address verified in both, so a notice could have been sent.
+func TestHandleUserPasswordPut_AUserDeletedMeanwhile(t *testing.T) {
+	const userId = adminPasswordNoticeUserId
+
+	t.Run("a user deleted before the write", func(t *testing.T) {
+		database := datamocks.NewDatabase(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		logoutTokens := &recordingLogoutTokens{}
+		jobs := &heldJobs{}
+
+		database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), userId).Return(adminPasswordNoticeRow("the-old-hash"), nil).Once()
+		stub := datamocks.ExpectRunInTransaction(database, apiRevokeTx)
+		database.On("GetUserByIdForUpdate", mock.Anything, apiRevokeTx, userId).Return((*record.User)(nil), nil).Once()
+
+		rr := httptest.NewRecorder()
+		HandleUserPasswordPut(database, accountvalidation.NewPasswordValidator(), auditLogger, heldNotifier(t, jobs), logoutTokens).
+			ServeHTTP(rr, adminPasswordNoticeRequest(t, passwordNoticeSettings(), adminPasswordNoticeNew))
+
+		require.Equal(t, http.StatusNotFound, rr.Code, rr.Body.String())
+		code, description := decodeErrorEnvelope(t, rr)
+		assert.Equal(t, "NOT_FOUND", code)
+		assert.Equal(t, "User not found", description)
+		require.ErrorIs(t, stub.BodyErr, errAccountGone, "the body finds no row, so the helper rolls back")
+		database.AssertExpectations(t)
+		database.AssertNotCalled(t, "SetUserPasswordHash", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		database.AssertNotCalled(t, "IncrementUserAuthStateGeneration", mock.Anything, mock.Anything, mock.Anything)
+		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+		assert.Empty(t, logoutTokens.sent, "no logout token")
+		assert.Empty(t, jobs.jobs, "no notice is handed off")
+	})
+
+	t.Run("a user deleted after the write committed", func(t *testing.T) {
+		database := datamocks.NewDatabase(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		jobs := &heldJobs{}
+
+		database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), userId).Return(adminPasswordNoticeRow("the-old-hash"), nil).Once()
+		database.On("GetUserByIdForUpdate", mock.Anything, apiRevokeTx, userId).Return(adminPasswordNoticeRow("the-old-hash"), nil).Once()
+		database.On("SetUserPasswordHash", mock.Anything, apiRevokeTx, userId, mock.Anything).Return(nil).Once()
+		stubSweep(database, userId, 5)
+		auditLogger.On("Log", mock.Anything, audit.EventUpdatedUserAuthentication, mock.Anything).Return().Once()
+		auditLogger.On("Log", mock.Anything, audit.EventRevokedUserAuthState, mock.Anything).Return().Once()
+		// The response's read of the user finds them gone.
+		database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), userId).Return((*record.User)(nil), nil).Once()
+
+		rr := httptest.NewRecorder()
+		HandleUserPasswordPut(database, accountvalidation.NewPasswordValidator(), auditLogger, heldNotifier(t, jobs), &recordingLogoutTokens{}).
+			ServeHTTP(rr, adminPasswordNoticeRequest(t, passwordNoticeSettings(), adminPasswordNoticeNew))
+
+		require.Equal(t, http.StatusNotFound, rr.Code, rr.Body.String())
+		code, description := decodeErrorEnvelope(t, rr)
+		assert.Equal(t, "NOT_FOUND", code)
+		assert.Equal(t, "User not found", description)
+		database.AssertExpectations(t)
+		auditLogger.AssertExpectations(t)
+		assert.Len(t, jobs.jobs, 1, "the committed change's notice stands")
+	})
+}
+
 // TestHandleUserOTPPut_DisableCommitsBothWritesAtomically is the admin half of #111 decision 13.
 // Decision 4 names two disable sites and this is the second: they share otpcredential.Remove, and this case
 // is what pins that this handler goes through it rather than keeping two unbound writes of its own.
@@ -502,6 +566,79 @@ func TestHandleUserOTPPut_ALostCompareAndSetIsAnsweredFromARead(t *testing.T) {
 			database.AssertNotCalled(t, "IncrementUserOtpConfigGeneration", mock.Anything, mock.Anything, mock.Anything)
 		})
 	}
+}
+
+// TestHandleUserOTPPut_AUserDeletedMeanwhile: another administrator deletes the user after the
+// endpoint first read them (#796 decision 3). Deleted before the removal, whose compare-and-set
+// then matches no row, the request answers 404 and removes nothing, audits nothing and tells
+// nobody. Deleted after the removal committed, it answers 404 too, and what the removal did
+// stands: its audit event and its notice. SMTP is on and the address verified in both, so a notice
+// could have been sent.
+func TestHandleUserOTPPut_AUserDeletedMeanwhile(t *testing.T) {
+	enrolled := func(t *testing.T) *record.User {
+		user := otpNoticeUser(t)
+		user.OTPEnabled = true
+		return user
+	}
+
+	t.Run("a user deleted before the removal", func(t *testing.T) {
+		database := datamocks.NewDatabase(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		jobs := &heldJobs{}
+		user := enrolled(t)
+
+		database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), user.Id).Return(user, nil).Once()
+		datamocks.ExpectRunInTransaction(database, otpDisableTx)
+		database.On("TryRemoveUserOTP", mock.Anything, otpDisableTx, user.Id, user.OtpConfigGeneration).Return(false, nil).Once()
+		// The lost compare-and-set's re-read finds the user gone.
+		database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), user.Id).Return((*record.User)(nil), nil).Once()
+
+		rr := httptest.NewRecorder()
+		HandleUserOTPPut(database, auditLogger, heldNotifier(t, jobs)).
+			ServeHTTP(rr, adminOTPNoticeRequest(t, passwordNoticeSettings(), user.Id))
+
+		require.Equal(t, http.StatusNotFound, rr.Code, rr.Body.String())
+		code, description := decodeErrorEnvelope(t, rr)
+		assert.Equal(t, "NOT_FOUND", code)
+		assert.Equal(t, "User not found", description)
+		database.AssertExpectations(t)
+		database.AssertNotCalled(t, "ResetUserOTPStep", mock.Anything, mock.Anything, mock.Anything)
+		database.AssertNotCalled(t, "IncrementUserOtpConfigGeneration", mock.Anything, mock.Anything, mock.Anything)
+		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+		assert.Empty(t, jobs.jobs, "no notice is handed off")
+	})
+
+	t.Run("a user deleted after the removal committed", func(t *testing.T) {
+		database := datamocks.NewDatabase(t)
+		auditLogger := handlersmocks.NewAuditLogger(t)
+		jobs := &heldJobs{}
+		user := enrolled(t)
+
+		database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), user.Id).Return(user, nil).Once()
+		stub := datamocks.ExpectRunInTransaction(database, otpDisableTx)
+		database.On("TryRemoveUserOTP", mock.Anything, otpDisableTx, user.Id, user.OtpConfigGeneration).Return(true, nil).Once()
+		database.On("ResetUserOTPStep", mock.Anything, otpDisableTx, user.Id).Return(nil).Once()
+		database.On("DeleteUserRecoveryCodes", mock.Anything, otpDisableTx, user.Id).Return(nil).Once()
+		database.On("IncrementUserOtpConfigGeneration", mock.Anything, otpDisableTx, user.Id).Return(int64(1), nil).Once()
+		database.On("GetUserByIdForUpdate", mock.Anything, otpDisableTx, user.Id).Return(user, nil).Once()
+		database.On("LowerUserSessionsToPassword", mock.Anything, otpDisableTx, user.Id, "pwd").Return(nil).Once()
+		auditLogger.On("Log", mock.Anything, audit.EventDisabledOTP, mock.Anything).Return().Once()
+		// The response's read of the user finds them gone.
+		database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), user.Id).Return((*record.User)(nil), nil).Once()
+
+		rr := httptest.NewRecorder()
+		HandleUserOTPPut(database, auditLogger, heldNotifier(t, jobs)).
+			ServeHTTP(rr, adminOTPNoticeRequest(t, passwordNoticeSettings(), user.Id))
+
+		require.Equal(t, http.StatusNotFound, rr.Code, rr.Body.String())
+		code, description := decodeErrorEnvelope(t, rr)
+		assert.Equal(t, "NOT_FOUND", code)
+		assert.Equal(t, "User not found", description)
+		require.NoError(t, stub.BodyErr, "the removal committed")
+		database.AssertExpectations(t)
+		auditLogger.AssertExpectations(t)
+		assert.Len(t, jobs.jobs, 1, "the committed removal's notice stands")
+	})
 }
 
 // TestHandleUserCreatePost_InsertsTheUserHoldingItsResetCode covers the admin user-create path,

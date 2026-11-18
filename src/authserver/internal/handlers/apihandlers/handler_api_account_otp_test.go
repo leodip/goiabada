@@ -945,7 +945,8 @@ func TestHandleAccountOTPPut_Enable_BlankCodeIsRefusedByName(t *testing.T) {
 // handler reads the row again: OTP now on means the request wanted what is already there, and gets
 // the 400 a request arriving a moment later would have got; OTP still off means an enable and a
 // disable landed in between, and the request is told the account changed under it, with nothing
-// stored. Either way nothing is audited as an enable, the generation does not advance and the
+// stored; the account gone is the 404 a request arriving a moment later would have got too (#796
+// decision 3). Either way nothing is audited as an enable, the generation does not advance and the
 // pending enrolment is not cleared.
 func TestHandleAccountOTPPut_Enable_ALostCompareAndSetIsAnsweredFromARead(t *testing.T) {
 	testCases := []struct {
@@ -969,8 +970,8 @@ func TestHandleAccountOTPPut_Enable_ALostCompareAndSetIsAnsweredFromARead(t *tes
 		{
 			name:       "the account is gone",
 			reread:     nil,
-			wantStatus: http.StatusConflict,
-			wantCode:   "CONCURRENT_UPDATE",
+			wantStatus: http.StatusNotFound,
+			wantCode:   "NOT_FOUND",
 		},
 	}
 
@@ -1006,9 +1007,9 @@ func TestHandleAccountOTPPut_Enable_ALostCompareAndSetIsAnsweredFromARead(t *tes
 	}
 }
 
-// The disable's twin: OTP now off is the 400 a request a moment later would have got; OTP still on
-// at another generation means the authenticator was replaced under the request, and the
-// replacement is not removed.
+// The disable's twin: OTP now off is the 400 a request a moment later would have got, and the
+// account gone its 404; OTP still on at another generation means the authenticator was replaced
+// under the request, and the replacement is not removed.
 func TestHandleAccountOTPPut_Disable_ALostCompareAndSetIsAnsweredFromARead(t *testing.T) {
 	testCases := []struct {
 		name       string
@@ -1027,6 +1028,12 @@ func TestHandleAccountOTPPut_Disable_ALostCompareAndSetIsAnsweredFromARead(t *te
 			reread:     &record.User{Id: 77, Enabled: true, OTPEnabled: true, OtpConfigGeneration: 4},
 			wantStatus: http.StatusConflict,
 			wantCode:   "CONCURRENT_UPDATE",
+		},
+		{
+			name:       "the account is gone",
+			reread:     nil,
+			wantStatus: http.StatusNotFound,
+			wantCode:   "NOT_FOUND",
 		},
 	}
 

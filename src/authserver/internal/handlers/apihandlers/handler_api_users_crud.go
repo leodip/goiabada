@@ -183,7 +183,8 @@ func HandleUserPasswordPut(
 		// The row the write replaces is read first, under its lock, for the notice below: whether
 		// the account had a password is decided from it, so a setup link completed while this
 		// request waited can't leave the answer stale (#724 decision 6). Assigned on every
-		// attempt, since a deadlock reruns the body.
+		// attempt, since a deadlock reruns the body. A user deleted before the write is answered
+		// 404 with nothing written, as the enabled endpoint answers one (#796 decision 3).
 		//
 		// Every session of the user ends and none is kept, so every app that knew the user is told
 		// (#784 decision 3).
@@ -195,8 +196,16 @@ func HandleUserPasswordPut(
 				return readErr
 			}
 			replaced = current
+			if current == nil {
+				return errAccountGone
+			}
 			return database.SetUserPasswordHash(r.Context(), tx, user.Id, passwordHash)
 		})
+		if errors.Is(err, errAccountGone) {
+			// Another request deleted the user after this one read them: this one wrote nothing.
+			writeJSONError(w, "User not found", "NOT_FOUND", http.StatusNotFound)
+			return
+		}
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -232,6 +241,12 @@ func HandleUserPasswordPut(
 		updatedUser, err := database.GetUserById(r.Context(), nil, userId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
+			return
+		}
+		if updatedUser == nil {
+			// Deleted after the write committed: what the write did stands, its events, logout
+			// tokens and notice above, and there is no user left to answer with (#796 decision 3).
+			writeJSONError(w, "User not found", "NOT_FOUND", http.StatusNotFound)
 			return
 		}
 
@@ -311,8 +326,8 @@ func HandleUserOTPPut(
 			return
 		}
 		if !removed {
-			// The authenticator is no longer as this request read it: answered from a re-read,
-			// with nothing written and nothing audited (#471 decision 2).
+			// The authenticator is no longer as this request read it, or the user is gone: answered
+			// from a re-read, with nothing written and nothing audited (#471 decision 2).
 			writeLostOTPChange(w, r, database, user.Id, false)
 			return
 		}
@@ -334,6 +349,12 @@ func HandleUserOTPPut(
 		updatedUser, err := database.GetUserById(r.Context(), nil, userId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
+			return
+		}
+		if updatedUser == nil {
+			// Deleted after the removal committed: what the removal did stands, its event and
+			// notice above, and there is no user left to answer with (#796 decision 3).
+			writeJSONError(w, "User not found", "NOT_FOUND", http.StatusNotFound)
 			return
 		}
 
