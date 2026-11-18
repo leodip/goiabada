@@ -148,7 +148,7 @@ Each server can serve Prometheus metrics on a listener of its own, which answers
 
 | Variable | What it does |
 |---|---|
-| `GOIABADA_AUTHSERVER_BRAND_SAFE_MODE`<br/>Flag: `--authserver-brand-safe-mode`<br/>Default: `false`<br/>Read by: auth server | Draw every page in safe mode, on both servers: without any brand's custom CSS, in the built-in Blueberry colors in place of a custom palette, and in System UI in place of an uploaded font. Nothing stored changes, so you can fix the brand in the admin console. Turn it on when a brand has made the pages unusable, the sign-in page included, and once the brand is fixed, unset it and restart the auth server. To draw one sign-in in safe mode instead, send [`goiabada_safe_mode=true`](/reference/endpoints/authorize/#parameters). |
+| `GOIABADA_AUTHSERVER_BRAND_SAFE_MODE`<br/>Flag: `--authserver-brand-safe-mode`<br/>Default: `false`<br/>Read by: auth server | Draw every page of both servers in [safe mode](/guides/customize-the-pages-and-emails/#safe-mode), for everyone, until you unset it and restart the auth server. |
 | `GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES`<br/>Flag: none<br/>Default: `3145728`<br/>Read by: auth server | The largest profile picture or client logo the API accepts, in bytes. The default is 3 MiB. The admin console's upload form stops at 3 MiB, whatever this says. |
 
 ### Rate limiting

@@ -71,7 +71,7 @@ The body is a JSON object. The auth server reads ten fields and ignores every ot
 | `backchannel_logout_session_required` | `true` when the app needs the session identifier, `sid`, in every logout token it's sent. Optional, `false` by default, and stored only with a `backchannel_logout_uri`. |
 | `dpop_bound_access_tokens` | `true` when the app always uses [DPoP](/concepts/dpop/): the client is registered to [require DPoP for token requests](/concepts/clients/#require-dpop-for-token-requests), so a token request without a proof is refused. Optional, `false` by default. |
 
-`refresh_token` sets nothing of its own: a client with the authorization code flow gets a refresh token with every code it redeems, whether it asked for `refresh_token` or not. On its own, `refresh_token` enables no flow, so a registration asking for nothing else is refused.
+`refresh_token` sets nothing of its own: a client with the authorization code flow gets a refresh token with every code it redeems, whether it asked for `refresh_token` or not.
 
 A body larger than 64 KiB is refused as one that can't be read.
 
@@ -111,7 +111,7 @@ It starts with no permissions, and isn't allowed to request the administrative s
 
 There's no endpoint to read, update or delete a registration afterwards, so the answer carries no `registration_access_token`. To change a self-registered client, an administrator does it in the admin console.
 
-Each registration leaves a `dynamic_client_registration` entry in the [audit log](/concepts/audit-log/), which records the `token_endpoint_auth_method` it registered.
+Each registration leaves a `dynamic_client_registration` entry in the [audit log](/concepts/audit-log/).
 
 ## The answer
 

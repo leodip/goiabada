@@ -13,13 +13,15 @@ This guide makes the pages your users see, and the emails they get, look and rea
 
 1. In the admin console, open **Admin**, **General** and set **App name**, up to 30 characters. It's shown at the top of the sign-in pages and ends their titles, as in "Sign in – Acme". It also signs every email, and it's the name authenticator apps list your users' accounts under.
 
-2. Open **Admin**, **Branding**. A client's pages are drawn in the default brand, the one marked **Default**, until you give it one of its own. Open it, choose its **Appearance** and its **Theme**, add your logo, favicon, background image, font and corners if you like, and click **Save**. See [Brands and themes](#brands-and-themes) and [The brand kit](#the-brand-kit) for the choices, and a [custom palette](#custom-palettes) to use your own colors. Add [footer links and a support contact](#footer-links-and-support-contact) there too, to show them under the card, and [custom CSS](#custom-css) for anything the other choices don't cover. The emails your users get are drawn in the brand too: see [Branded emails](#branded-emails). To change what they say, see [Email templates](#email-templates).
+2. Open **Admin**, **Branding**, and open the brand marked **Default**. Choose its **Appearance** and its **Theme**, add your logo, favicon, background image, font and corners if you like, and click **Save**.
 
 3. To give one client a look of its own, click **New brand** and create one, then choose it under **Brand** on the client's **Settings** tab. See [Clients](/concepts/clients/#brand) for the pages it draws.
 
 4. Give each client a display name and a logo, so users see which app they're signing in to. See [Clients](/concepts/clients/#display-name-description-and-logo).
 
 </Steps>
+
+The sections below cover [brands and themes](#brands-and-themes), [the brand kit](#the-brand-kit), a [custom palette](#custom-palettes), [footer links and a support contact](#footer-links-and-support-contact), [custom CSS](#custom-css), and the emails' [look](#branded-emails) and [words](#email-templates).
 
 ## Brands and themes
 
@@ -29,11 +31,11 @@ The appearance is **Automatic**, **Light** or **Dark**. Automatic draws the page
 
 The theme is one of eight built-in themes: **Blueberry**, **Blackberry**, **Avocado**, **Plum**, **Tangerine**, **Guava**, **Coconut** and **High contrast**. Each has a light and a dark palette whose text and borders meet WCAG 2.2 AA contrast. High contrast's text meets 7:1. Or choose **Custom**, after them, to draw the brand in a [custom palette](#custom-palettes) of your own colors.
 
-**New brand** adds a brand. Choose it for a client, or open it and click **Make default** to switch to it, in one step, every client with no brand of its own and every page that belongs to no client. The **Clients** column says how many clients use each brand.
+To change the default, open a brand and click **Make default**.
 
-Deleting a brand moves the clients that use it to the default brand. The default brand can't be deleted, so make another one the default first.
+The default brand can't be deleted, so make another one the default first.
 
-The Admin API manages the same brands, from [`GET /api/v1/admin/brands`](/reference/api/admin/operations/getbrands/), and [`GET /api/v1/admin/brand-themes`](/reference/api/admin/operations/getbrandthemes/) lists each built-in theme's colors. Every brand it answers carries `colors`, the colors the brand is drawn in, and `contrastWarnings`, its [failing pairs](#contrast-warnings). See [Custom palettes through the Admin API](#custom-palettes-through-the-admin-api) to write a palette.
+The Admin API manages the same brands, from [`GET /api/v1/admin/brands`](/reference/api/admin/operations/getbrands/), and [`GET /api/v1/admin/brand-themes`](/reference/api/admin/operations/getbrandthemes/) lists each built-in theme's colors. [`PUT /api/v1/admin/brands/{id}`](/reference/api/admin/operations/updatebrand/) replaces the whole brand, so a member you leave out is emptied. To change one thing, send back the `brand` that [`GET /api/v1/admin/brands/{id}`](/reference/api/admin/operations/getbrand/) answers, with that change.
 
 ### Custom palettes
 
@@ -53,15 +55,9 @@ A custom palette draws a brand's pages in colors you choose, light and dark.
 
 </Steps>
 
-Each color has a **Light** field and a **Dark** field, side by side. Under the **Automatic** appearance both are drawn. Under **Light**, only the light colors are, so the Dark column is hidden and its colors are kept, unused. **Dark** does the reverse. Every field still needs a color for the brand to save, so a hidden column shows again while one of its fields holds something else.
+In **Basic**, the other 19 colors are worked out from your four when you save. The status colors, for danger, positive, caution and note messages, are Blueberry's. To choose your own, use **Advanced**.
 
-In **Basic**, Goiabada works out the other 19 colors from your four when you save, and stores them with the brand. It moves the colors it picks for text, borders and the focus ring until their contrast passes, where it can, and never changes your four. The status colors, for danger, positive, caution and note messages, are Blueberry's: its light ones for a mode whose text is darker than its card, and its dark ones otherwise. So a warning in Basic is nearly always about a color you entered or a status color, which you can set in Advanced.
-
-Switching to **Advanced** fills the other 19 fields with the worked-out colors, ready to adjust. Switching back to **Basic** keeps your four, and the other 19, the status colors included, are worked out again when you save.
-
-**Copy colors from** puts a built-in theme's colors in every field, light and dark. Choosing a built-in theme hides the **Colors** section and keeps what you typed until you save. Saving a brand on a built-in theme deletes its custom palette.
-
-The preview beside the form has two views: **Sign-in**, and **Messages**, which draws notices, a hovered row, a selected item, a focused field and buttons. Between them they show all 23 colors.
+Saving a brand on a built-in theme deletes its custom palette.
 
 **Advanced** shows the colors in four groups, **Page**, **Text**, **Brand** and **Status**, with each one's token name, which the Admin API uses:
 
@@ -98,7 +94,7 @@ Goiabada checks a brand's colors against the pairs its pages draw text, boundari
 - 4.5:1 for text, from [1.4.3 Contrast (Minimum)](https://www.w3.org/TR/WCAG22/#contrast-minimum).
 - 3:1 for a boundary or a focus ring, from [1.4.11 Non-text Contrast](https://www.w3.org/TR/WCAG22/#non-text-contrast).
 
-Every built-in theme meets them. A pair below its minimum never stops a save. The editor lists each one at the foot of the **Colors** section, with its ratio, while you edit and again after you save, and the brand list marks a brand that has any. Text drawn in a failing pair doesn't meet WCAG 2.2 level AA contrast, and some of your users will find it hard to read.
+Every built-in theme meets them. A pair below its minimum never stops a save.
 
 Only the modes the brand's appearance draws are checked: both under **Automatic**, the light colors alone under **Light**, and the dark ones alone under **Dark**.
 
@@ -110,7 +106,7 @@ The admin console and its sign-in page are drawn in [the admin console's client'
 
 ### Custom palettes through the Admin API
 
-A custom palette is the theme `custom` with a `palette` member, in [`POST /api/v1/admin/brands`](/reference/api/admin/operations/createbrand/) and [`PUT /api/v1/admin/brands/{id}`](/reference/api/admin/operations/updatebrand/). An update replaces the whole brand, so a member you leave out, such as a [kit](#the-brand-kit) slot or a [footer](#footer-links-and-support-contact) member, is emptied. `palette` holds `mode`, `basic` or `advanced`, and `light` and `dark`, each a map from a color's [token](#custom-palettes) to its value:
+A custom palette is the theme `custom` with a `palette` member, in [`POST /api/v1/admin/brands`](/reference/api/admin/operations/createbrand/) and [`PUT /api/v1/admin/brands/{id}`](/reference/api/admin/operations/updatebrand/). `palette` holds `mode`, `basic` or `advanced`, and `light` and `dark`, each a map from a color's [token](#custom-palettes) to its value:
 
 ```bash
 curl -X PUT https://auth.example.com/api/v1/admin/brands/3 \
@@ -131,20 +127,7 @@ curl -X PUT https://auth.example.com/api/v1/admin/brands/3 \
   }'
 ```
 
-- In basic mode, each of `light` and `dark` holds exactly `canvas`, `surface`, `ink` and `brand`. In advanced mode, each holds all 23 tokens.
-- Send both modes, whatever the brand's appearance.
-- A color is `#` and six hexadecimal digits, in either case, and is answered in lower case.
-- `palette` is required with `custom`. With a built-in theme, leave it out or send `null`.
-- `custom` is reserved: [`GET /api/v1/admin/brand-themes`](/reference/api/admin/operations/getbrandthemes/) lists the built-in themes alone.
-
-A brand answers `palette` as it was written, and as `null` on a built-in theme, so a brand you read and send back is saved unchanged. A basic palette is worked out again from its four colors each time it's saved.
-
-Every brand answer also carries two read-only members, which a write ignores:
-
-- `colors` holds `light` and `dark`, each with all 23 colors the brand is drawn in: a custom palette's stored colors, or a built-in theme's own.
-- `contrastWarnings` lists each [failing pair](#contrast-warnings) of the modes the appearance draws, light before dark, and is `[]` when none fails. An item holds `mode`, `foreground` and `background`, which are token names, `ratio` and `minimum`. The ratio is cut to two decimals and never rounded up, so a pair at 4.496:1 reads `4.49`.
-
-A refusal about the palette carries `error_field`, a JSON Pointer to the member it's about, such as `/palette/light/brand`.
+[`PUT /api/v1/admin/brands/{id}`](/reference/api/admin/operations/updatebrand/) gives each member's rules. A basic palette is worked out again from its four colors each time it's saved.
 
 ## The brand kit
 
@@ -154,9 +137,9 @@ The auth server's pages and the admin console's **Account** pages, home and its 
 
 ### Logo and app name
 
-**Logo** is drawn above the app name on the sign-in card, and before the app name in the admin console's header and sidebar. **Dark logo** takes its place in dark mode. Without one, the logo is drawn in both modes. A dark logo needs a logo.
+**Logo** is drawn above the app name on the sign-in card, and before the app name in the admin console's header and sidebar. **Dark logo** takes its place in dark mode. Without one, the logo is drawn in both modes.
 
-Turn on **Hide the app name** for a logo that already shows the name. The logo then stands for the name, and screen readers announce it as the app name. A brand without a logo always shows the name. Page titles keep the app name either way.
+Turn on **Hide the app name** for a logo that already shows the name. The logo then stands for the name, and screen readers announce it as the app name. Page titles keep the app name either way.
 
 A client's own [logo](/concepts/clients/#display-name-description-and-logo) still shows on its screens, below the brand's.
 
@@ -197,15 +180,13 @@ Choosing another family keeps the files, so you can switch back without uploadin
 
 Animated images are refused, since a looping animation on or behind the sign-in card has no way to pause it. GIF and SVG are refused too.
 
-**Upload** sends a file as soon as you pick it, and the preview draws it at once. Nothing reaches a real page until you click **Save**, and **Remove** empties the field. A file no brand uses is deleted once it's a day old, so save the brand the same day you upload it.
+A file no brand uses is deleted once it's a day old, so save the brand the same day you upload it.
 
 A brand's files are public, as the pages that draw them are: anyone can download them from `/brand-assets/{id}` on the auth server.
 
 ### The kit through the Admin API
 
-The Admin API sets the kit in two steps. Each upload leaves an `uploaded_brand_asset` entry in the [audit log](/concepts/audit-log/).
-
-An update replaces the whole brand. `corners`, `font` and `backgroundFit` are required, `hideAppName` is false when you leave it out, and a slot you leave out or set to `null` is emptied. A `brand` you read with [`GET /api/v1/admin/brands/{id}`](/reference/api/admin/operations/getbrand/) and send back as it came is saved unchanged.
+The Admin API sets the kit in two steps.
 
 <Steps>
 
@@ -246,7 +227,7 @@ A brand can show up to three links under the card, such as your privacy policy, 
 
 1. Open **Admin**, **Branding**, and open the brand.
 
-2. Under **Footer links**, give **Link 1** a **Label** and a **URL**, and fill in **Link 2** and **Link 3** if you want more. A row left empty is no link.
+2. Under **Footer links**, give **Link 1** a **Label** and a **URL**, and fill in **Link 2** and **Link 3** if you want more.
 
 3. Open **Label in each language** under a link to give it a label in each language your users read.
 
@@ -255,8 +236,6 @@ A brand can show up to three links under the card, such as your privacy policy, 
 5. Click **Save**.
 
 </Steps>
-
-The preview beside the form draws the footer as you type.
 
 The footer is drawn under the card on every page of the auth server, and on the admin console's home and its other card pages. On the console's **Account** pages it follows the page's content. The console's admin pages draw no footer. It's small text on the page's background color, and on a brand with a [background image](#background-image) it sits on a panel in the card's color, so it stays readable whatever the image.
 
@@ -284,7 +263,7 @@ The footer's contact line reads "Need help?", followed by each value you set: th
 
 ### The footer through the Admin API
 
-A brand carries the footer in four members, in [`POST /api/v1/admin/brands`](/reference/api/admin/operations/createbrand/), [`PUT /api/v1/admin/brands/{id}`](/reference/api/admin/operations/updatebrand/) and every brand they answer: `footerLinks`, the links in the order they're drawn, and `supportEmail`, `supportUrl` and `supportPhone`. As with the kit, an update replaces the whole brand, so a member you leave out or set to `null` is emptied. A link is an object with `url`, `label` and, optionally, `labels`, a label for each language by its tag, such as `"pt-BR"`:
+A brand carries the footer in four members, in [`POST /api/v1/admin/brands`](/reference/api/admin/operations/createbrand/), [`PUT /api/v1/admin/brands/{id}`](/reference/api/admin/operations/updatebrand/) and every brand they answer: `footerLinks`, the links in the order they're drawn, and `supportEmail`, `supportUrl` and `supportPhone`. A link is an object with `url`, `label` and, optionally, `labels`, a label for each language by its tag, such as `"pt-BR"`:
 
 ```bash
 curl -X PUT https://auth.example.com/api/v1/admin/brands/3 \
@@ -307,10 +286,6 @@ curl -X PUT https://auth.example.com/api/v1/admin/brands/3 \
   }'
 ```
 
-An answer always carries all four: `[]` for no links, `""` for a value not set, and `{}` as the `labels` of a link with none. A blank language label is dropped.
-
-A refusal about a footer link carries `error_field`, a JSON Pointer to the member it's about, such as `/footerLinks/1/url` for the second link's URL. The pointer's index is counted from 0, while the message counts links from 1.
-
 ## Custom CSS
 
 A brand's custom CSS restyles its pages beyond what its other choices do, such as a page's layout, a heading's size or a card's border.
@@ -323,7 +298,7 @@ A brand's custom CSS restyles its pages beyond what its other choices do, such a
 
 3. Click **Save**.
 
-4. Open a page in the brand to see your rules. The preview beside the form doesn't draw custom CSS, so try new rules on a brand you've given to a test client, and sign in to that client. If a page becomes unusable, [safe mode](#safe-mode) draws it without your CSS.
+4. Open a page in the brand to see your rules. If a page becomes unusable, [safe mode](#safe-mode) draws it without your CSS.
 
 </Steps>
 
@@ -341,15 +316,11 @@ Custom CSS can't make a browser load anything, so it can't send a visitor's data
 
 - It's up to 64 KB.
 - It can't hold `@import`.
-- It can't hold a URL, except a `data:` image in `url()`, such as `url("data:image/svg+xml,…")`. A URL to another site or to the auth server itself is refused. Upload a background, a logo or a font in the brand's [kit](#the-brand-kit) instead.
-- It can't use `src()`, `image()` or `image-set()`, with or without a vendor prefix such as `-webkit-`. Write a `data:` image in `url()` instead.
-- Every comment, string and `url()` must be closed.
-
-The rules apply however you write a name: in capitals, or with a CSS escape such as `\69mport`.
+- It can't hold a URL, except a `data:` image in `url()`, such as `url("data:image/svg+xml,…")`. Upload a background, a logo or a font in the brand's [kit](#the-brand-kit) instead.
 
 ### Custom CSS through the Admin API
 
-A brand carries its custom CSS as one string, `customCss`, in [`POST /api/v1/admin/brands`](/reference/api/admin/operations/createbrand/), [`PUT /api/v1/admin/brands/{id}`](/reference/api/admin/operations/updatebrand/) and every brand they answer. As with the kit, an update replaces the whole brand, so leaving `customCss` out, or setting it to `null` or `""`, removes the brand's CSS:
+A brand carries its custom CSS as one string, `customCss`, in [`POST /api/v1/admin/brands`](/reference/api/admin/operations/createbrand/), [`PUT /api/v1/admin/brands/{id}`](/reference/api/admin/operations/updatebrand/) and every brand they answer:
 
 ```bash
 curl -X PUT https://auth.example.com/api/v1/admin/brands/3 \
@@ -398,7 +369,7 @@ A client with no brand of its own gives the default brand, as its pages do: see 
 
 ## Safe mode
 
-Safe mode draws the pages without what can make a brand unusable: its custom CSS, a custom palette and an uploaded font. Use it to sign in and fix a brand whose pages you can't read or use.
+Safe mode draws the pages without a brand's custom CSS, in the built-in Blueberry colors in place of a custom palette, and in System UI in place of an uploaded font. Nothing saved changes. Use it to sign in and fix a brand whose pages you can't read or use.
 
 <Steps>
 
@@ -412,14 +383,10 @@ Safe mode draws the pages without what can make a brand unusable: its custom CSS
 
 </Steps>
 
-A page in safe mode shows the built-in Blueberry colors in place of a custom palette, and System UI in place of an uploaded font. A built-in theme's colors, the corners, a system font family, the background image, the logo, the favicon and the footer stay. Nothing saved changes, so the brand editor still shows and saves the CSS, the palette and the font.
-
 You can also turn it on:
 
 - **For one sign-in to your app**, with `goiabada_safe_mode=true` on the [authorization request](/reference/endpoints/authorize/#parameters). Every page of that sign-in is drawn in safe mode.
 - **For every page of both servers**, for everyone, with [`GOIABADA_AUTHSERVER_BRAND_SAFE_MODE`](/reference/environment-variables/#customization) set to `true` on the auth server. It lasts until you unset it and restart the auth server, and signing out doesn't end it.
-
-An email follows safe mode too: one sent from the pages of a sign-in in safe mode, and every email while `GOIABADA_AUTHSERVER_BRAND_SAFE_MODE` is on, shows the Blueberry colors in place of its [brand's](#branded-emails) custom palette. The admin console's safe mode doesn't change the emails its **Account** pages send.
 
 ## How the language is chosen
 
@@ -439,8 +406,6 @@ A user on **Automatic**, where everyone starts, skips the first. So does a page 
 
 The auth server reads the page language each time it draws a page, so a change shows on its next page. The admin console reads it when the user signs in to it. A change they save there shows on their next page, and one made elsewhere, such as by an administrator, reaches them when they next sign in or open their profile.
 
-The **Page language** list holds those six languages.
-
 For `ui_locales` and `Accept-Language`, the first of their languages Goiabada has text for wins, or English when it has none of them: `ui_locales=sv fr` shows French, and `ui_locales=sv` alone shows English. A regional tag reads its language, so `fr-CA` shows French.
 
 An email to a user is written in their page language. On **Automatic**, it's the **Language and region** on their profile, or English when they haven't picked one. A regional language reads its language's email, so `fr-CA` gets the French one, and a language with no built-in emails gets the English one. The activation link and the welcome email a user gets when they register are written in the language of the page they registered on, since their account has no language yet.
@@ -455,23 +420,21 @@ An email template is what one of the auth server's 19 emails says: its subject, 
 
 2. Open an email. It opens in the language you read the admin console in, or in English. Choose another language above the form.
 
-3. Edit **Subject**, **Button label** and **Body**. The buttons under **Placeholders** insert one where the cursor is, and the body must hold the ones marked **required**.
+3. Edit **Subject**, **Button label** and **Body**. The body must hold the placeholders marked **required**.
 
-4. Check the **Preview** beside the form. It draws the email as it's sent, with sample values, and follows what you type. Choose a **Brand** to see it in another one.
+4. Check the **Preview** beside the form. Choose a **Brand** to see it in another one.
 
-5. To see it in a mail client, type an address under **Send test email** and send it. It sends the text in the form, saved or not, and needs email to be set up under **Configuration**.
+5. To see it in a mail client, type an address under **Send test email** and send it.
 
 6. Click **Save**. The next email sent in that language uses it.
 
 </Steps>
 
-**Reset to default** deletes your edit of the language you're on, after asking, and the email goes back to Goiabada's text. Each language is saved and reset on its own.
+Each language is saved, and reset with **Reset to default**, on its own.
 
 Only the fields you change are kept. A field you leave as it was follows the built-in text when you upgrade, so a release that rewords a body still reaches your users when you've changed only the subject.
 
 An edit applies to every brand and every client.
-
-The test email from the **Send test email** tab under **Admin**, **Email** is the **Test email** template, in the language you read the admin console in, drawn in the default brand.
 
 ### The body's format
 
@@ -500,15 +463,6 @@ A placeholder is a name between double braces, such as `{{name}}`, and the email
 | `{{expiry}}` | How long the link or the code lasts, in the email's language, such as "5 minutes". |
 | `{{codes_left}}` | How many unused recovery codes are left, as a number. |
 
-A save is refused when the text breaks one of these rules:
-
-- An email takes only the placeholders it offers, listed below.
-- `{{link}}` and `{{button}}` go in the body only.
-- `{{link}}` can't be part of a longer address, which would hand the link to another site, and no other placeholder can be in a link's address.
-- The body must hold something to read besides the button.
-
-The plain-text part of an email leaves the button out, and some mail clients don't draw it. So `{{button}}` doesn't count as `{{link}}` in an email that requires the link.
-
 ### Each email's placeholders
 
 | Email | Identifier | Placeholders | Required |
@@ -533,16 +487,6 @@ The plain-text part of an email leaves the button out, and some mail clients don
 | Account deleted | `account_deleted` | `{{app_name}}`, `{{name}}` | None |
 | Account deleted by an administrator | `account_deleted_by_administrator` | `{{app_name}}`, `{{name}}` | None |
 
-The **Email address changed** notice goes to the account's previous address, so its `{{name}}`, for a user with no name, is that address, never the new one.
-
-### When an upgrade breaks an edit
-
-A release can change what an email offers or requires, so an edit you saved can break a rule of a later one. Such an edit is never deleted, but while it's broken, the email is sent in that language with the built-in text, all of it, even when only one field breaks a rule.
-
-The **Email templates** list marks that language as needing attention, and its tab in the editor reads **Needs attention**. The editor opens with your edit in the form, a warning saying what's wrong, and that the built-in text is being sent. Correct it and click **Save**, or click **Reset to default**.
-
-The auth server also logs a warning for each broken edit when it starts, and each time it sends the built-in text in its place, naming the email and the language. After an upgrade, check the list or the log.
-
 ### Email templates through the Admin API
 
 | Operation | Route | Scope |
@@ -554,7 +498,7 @@ The auth server also logs a warning for each broken edit when it starts, and eac
 | Preview a text, saved or not, with sample values | [`POST /api/v1/admin/email-templates/{email}/{language}/preview`](/reference/api/admin/operations/previewemailtemplate/) | `authserver:admin-read`, `authserver:manage-settings` or `authserver:manage` |
 | Send a test of a text, saved or not | [`POST /api/v1/admin/email-templates/{email}/{language}/send-test`](/reference/api/admin/operations/sendemailtemplatetest/) | `authserver:manage` |
 
-`{email}` is the email's [identifier](#each-emails-placeholders), and `{language}` one of `en`, `de`, `es`, `fr`, `it` and `pt-BR`. Saving, resetting and sending a test need `authserver:manage`, since whoever writes an email can put a link of their own in the mail your administrators trust.
+`{email}` is the email's [identifier](#each-emails-placeholders), and `{language}` one of `en`, `de`, `es`, `fr`, `it` and `pt-BR`.
 
 A save sends the whole text of the language, with `buttonLabel` only for an email with a button:
 
@@ -569,7 +513,7 @@ curl -X PUT https://auth.example.com/api/v1/admin/email-templates/password_reset
   }'
 ```
 
-Each language has a status: `default` with no edit, `edited` when its edit is sent, and `invalid` when its edit [breaks a rule](#when-an-upgrade-breaks-an-edit) and the built-in text is sent instead, with the problems listed. A save that leaves an edit is recorded in the [audit log](/concepts/audit-log/) as `updated_email_template`, a reset or a save of the built-in text as `reset_email_template`, and a test as `sent_test_email`.
+Each language has a status: `default` with no edit, `edited` when its edit is sent, and `invalid` when its edit breaks a rule and the built-in text is sent instead, with the problems listed. Saves, resets and test sends leave entries in the [audit log](/concepts/audit-log/#email-templates).
 
 ## Next steps
 

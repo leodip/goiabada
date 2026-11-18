@@ -2630,8 +2630,7 @@ paths:
 
         Send it as `multipart/form-data` in the field `file`. A favicon: a still, square PNG
         image from 48x48 to 512x512 pixels, of at most 1 MiB (1048576 bytes). An animated image
-        is refused. A page whose brand has a favicon links it as its icon and its Apple touch
-        icon, in place of the built-in icons and web manifest.
+        is refused.
       operationId: uploadBrandFavicon
       requestBody:
         required: true
@@ -2724,8 +2723,7 @@ paths:
         deleted once it is a day old.
 
         Send it as `multipart/form-data` in the field `file`. A regular or bold font: a WOFF2
-        file, told by its signature, of at most 2 MiB (2097152 bytes). Its answer at the asset's
-        URL grants the admin console's origin, so the console's pages can draw it.
+        file, told by its signature, of at most 2 MiB (2097152 bytes).
       operationId: uploadBrandFont
       requestBody:
         required: true
@@ -4060,8 +4058,8 @@ paths:
           description: No brand has this ID, or the ID is not a positive integer
         '500':
           description: |
-            The request failed inside the server. The body is the server's HTML error page,
-            because this handler renders the shared error template.
+            The request failed inside the server. The body is an HTML error page, not the JSON
+            error envelope.
           content:
             text/html:
               schema:
@@ -4111,8 +4109,8 @@ paths:
           description: No brand has this ID, or the ID is not a positive integer
         '500':
           description: |
-            The request failed inside the server. The body is the server's HTML error page,
-            because this handler renders the shared error template.
+            The request failed inside the server. The body is an HTML error page, not the JSON
+            error envelope.
           content:
             text/html:
               schema:
@@ -4184,8 +4182,8 @@ paths:
           description: No asset has this ID, or the ID is not a positive integer
         '500':
           description: |
-            The request failed inside the server. The body is the server's HTML error page,
-            because this handler renders the shared error template.
+            The request failed inside the server. The body is an HTML error page, not the JSON
+            error envelope.
           content:
             text/html:
               schema:
@@ -8928,8 +8926,7 @@ components:
       description: >-
         The brand the admin console is drawn in: the brand of the admin console's own client, or
         the default brand when that client has none of its own. Absent from the public settings
-        when the auth server cannot read it; the console's pages are then drawn automatic, in the
-        built-in colors.
+        when the auth server cannot read it.
       properties:
         appearance:
           type: string
@@ -8992,8 +8989,7 @@ components:
         hasBackground:
           type: boolean
           description: >-
-            Whether the brand has a background image, whatever its fit. The full stylesheet draws
-            the image; a page draws its footer on a panel over it.
+            Whether the brand has a background image, whatever its fit.
         footerLinks:
           type: array
           maxItems: 3

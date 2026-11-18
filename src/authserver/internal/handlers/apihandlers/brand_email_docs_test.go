@@ -74,20 +74,6 @@ func TestBrandEmailDocs_TheGuideSaysWhichBrandAnEmailTakes(t *testing.T) {
 		}, nil)
 }
 
-// Safe mode says it reaches emails (#817 decision 6): one sent from a sign-in in safe mode, and
-// every email while the operator's switch is on, with the console's own safe mode leaving the
-// emails of its Account pages alone, since the Account API follows the switch alone.
-func TestBrandEmailDocs_SafeModeSaysItReachesEmails(t *testing.T) {
-	guard.AssertSectionSays(t, filepath.Dir(guard.SourceRoot(t)), customizeGuidePage, "## Safe mode",
-		[]string{
-			"An email follows safe mode too",
-			"sent from the pages of a sign-in in safe mode",
-			"every email while `GOIABADA_AUTHSERVER_BRAND_SAFE_MODE` is on",
-			"The admin console's safe mode doesn't change the emails its **" + english("adminconsole.menu.account") + "** pages send",
-			brandedEmailsLink[len("/guides/customize-the-pages-and-emails/"):],
-		}, nil)
-}
-
 // The guide's first steps and the glossary's brand point at the section, so an administrator
 // setting up a brand learns its emails are drawn in it.
 func TestBrandEmailDocs_TheStepsAndTheGlossaryLinkTheSection(t *testing.T) {

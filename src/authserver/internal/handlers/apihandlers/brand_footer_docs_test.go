@@ -110,10 +110,6 @@ func TestBrandFooterDocs_TheGuideGivesTheAPIsMembers(t *testing.T) {
 			"`labels`",
 			`"pt-BR"`,
 			"(/reference/api/admin/operations/updatebrand/)",
-			"`null`",
-			"`error_field`",
-			"`/footerLinks/1/url`",
-			"counted from 0",
 		}, nil)
 }
 

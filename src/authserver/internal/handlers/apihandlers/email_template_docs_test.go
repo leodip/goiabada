@@ -20,7 +20,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/emailtemplate"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/docsreader"
@@ -36,7 +35,6 @@ const (
 	emailFormatHead          = "### The body's format"
 	placeholdersHead         = "### Placeholders"
 	emailPlaceholdersHead    = "### Each email's placeholders"
-	invalidEditHead          = "### When an upgrade breaks an edit"
 	emailTemplatesAPIHead    = "### Email templates through the Admin API"
 	personalDataPage         = "site/src/content/docs/deploy/personal-data.mdx"
 	emailTemplateGlossary    = "### Email template"
@@ -110,7 +108,7 @@ func TestEmailTemplateDocs_TheFormatSaysWhatABodyTakesAndTheLimits(t *testing.T)
 }
 
 // Placeholders lists every placeholder some email offers, once, each with what it writes, and says
-// how one is written and escaped and the rules a save holds a text to (#818 decisions 3, 15 and 17).
+// how one is written and escaped (#818 decisions 3 and 15).
 func TestEmailTemplateDocs_PlaceholdersDescribesEachPlaceholderAndItsRules(t *testing.T) {
 	root := filepath.Dir(guard.SourceRoot(t))
 	guard.AssertSectionSays(t, root, customizeGuidePage, placeholdersHead,
@@ -121,8 +119,6 @@ func TestEmailTemplateDocs_PlaceholdersDescribesEachPlaceholderAndItsRules(t *te
 			"the address the email is sent to",
 			"`[Reset your password]({{link}})`",
 			"a line of its own",
-			"in the body only",
-			"something to read besides the button",
 			"**" + english("adminconsole.admin_settings.general.field.app_name") + "**",
 		}, nil)
 
@@ -196,24 +192,9 @@ func TestEmailTemplateDocs_EachEmailsRowListsItsPlaceholders(t *testing.T) {
 	}
 }
 
-// An edit a release makes invalid is kept, its email sent in that language with the whole built-in
-// text, the console marks it by its labels, and the server logs it (#818 decision 8).
-func TestEmailTemplateDocs_TheGuideSaysWhatBecomesOfAnInvalidEdit(t *testing.T) {
-	guard.AssertSectionSays(t, filepath.Dir(guard.SourceRoot(t)), customizeGuidePage, invalidEditHead,
-		[]string{
-			editorLabel("needs_attention"),
-			"never deleted",
-			"built-in text",
-			"all of it",
-			editorLabel("reset_button"),
-			"logs a warning",
-			"when it starts",
-		}, nil)
-}
-
 // The Admin API's section names each operation by its route, linked to its reference page, the
 // languages a path takes, a language's three statuses, the scopes each operation takes (#818
-// decisions 9 and 10), and the audit events the writes leave (decision 13).
+// decisions 9 and 10), and a link to the audit log's entries for them (decision 13).
 func TestEmailTemplateDocs_TheAPISectionNamesEachOperationAndItsScopes(t *testing.T) {
 	present := []string{
 		"[`GET /api/v1/admin/email-templates`](/reference/api/admin/operations/getemailtemplates/)",
@@ -224,9 +205,6 @@ func TestEmailTemplateDocs_TheAPISectionNamesEachOperationAndItsScopes(t *testin
 		"[`POST /api/v1/admin/email-templates/{email}/{language}/send-test`](/reference/api/admin/operations/sendemailtemplatetest/)",
 		"`default`", "`edited`", "`invalid`",
 		"`authserver:admin-read`", "`authserver:manage-settings`", "`authserver:manage`",
-		"`" + audit.EventUpdatedEmailTemplate + "`",
-		"`" + audit.EventResetEmailTemplate + "`",
-		"`" + audit.EventSentTestEmail + "`",
 		"/concepts/audit-log/",
 		"`buttonLabel`",
 	}

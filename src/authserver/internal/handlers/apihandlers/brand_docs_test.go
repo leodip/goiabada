@@ -121,9 +121,7 @@ func TestBrandDocs_TheThemesAppearancesAndSeededBrandAreTheCodes(t *testing.T) {
 			"one brand, **" + record.SeededBrandName + "**, on **" +
 				english("adminconsole.admin_branding.appearance."+string(record.BrandAppearanceAuto)) + "** and **" +
 				themeName(record.BrandThemeBlueberry) + "**",
-			"**" + english("adminconsole.admin_branding.list.new_button") + "**",
 			"**" + english("adminconsole.admin_branding.brand.make_default_button") + "**",
-			"**" + english("adminconsole.admin_branding.list.col_clients") + "**",
 			clientBrandLink,
 		},
 		[]string{
@@ -202,8 +200,7 @@ func brandLabel(key string) string {
 }
 
 // The kit's section names every field and choice of the editor by the label the editor gives it, the
-// six system families and the uploaded font in the editor's order, and the buttons an upload field
-// has (#813). A guide naming a field the editor does not have, or a family it does not offer,
+// six system families and the uploaded font in the editor's order (#813). A guide naming a field the editor does not have, or a family it does not offer,
 // misleads an administrator looking for it.
 func TestBrandDocs_TheKitNamesTheEditorsFieldsAndChoices(t *testing.T) {
 	var families []string
@@ -227,8 +224,6 @@ func TestBrandDocs_TheKitNamesTheEditorsFieldsAndChoices(t *testing.T) {
 			brandLabel("brand.field.bold_font"),
 			brandLabel("brand.field.corners"),
 			brandLabel("corners.square") + ", " + brandLabel("corners.rounded") + " or " + brandLabel("corners.pill"),
-			brandLabel("asset.upload"),
-			brandLabel("asset.remove"),
 		}, nil)
 }
 
@@ -327,7 +322,6 @@ func TestBrandDocs_TheKitSaysTheAPIsTwoStepsAndWhereItIsDrawn(t *testing.T) {
 			"up to 500",
 			"Windows and Android",
 			"/concepts/clients/#the-admin-consoles-client",
-			"`" + audit.EventUploadedBrandAsset + "`",
 		}, nil)
 }
 
@@ -361,9 +355,6 @@ func TestBrandDocs_TheCustomCSSSectionStatesTheFieldAndTheRules(t *testing.T) {
 			"up to 64 KB",
 			"`@import`",
 			"a `data:` image in `url()`",
-			"`src()`, `image()` or `image-set()`",
-			"`-webkit-`",
-			"`\\69mport`",
 			"/reference/styling-contract/",
 			"(/reference/api/admin/operations/createbrand/)",
 			"(/reference/api/admin/operations/updatebrand/)",

@@ -55,7 +55,7 @@ func TestBrandPaletteDocs_TheThemesSentenceOffersCustom(t *testing.T) {
 }
 
 // The custom palettes subsection names the Colors section, its two modes, the four colors basic mode
-// is entered with, the columns and Copy colors from by the editor's labels, and says what basic mode
+// is entered with by the editor's labels, and says what basic mode
 // works out: the other 19 colors at the save, and Blueberry's status colors (decisions 4, 7 and 13).
 func TestBrandPaletteDocs_TheGuideNamesTheColorsSection(t *testing.T) {
 	var basic []string
@@ -68,10 +68,6 @@ func TestBrandPaletteDocs_TheGuideNamesTheColorsSection(t *testing.T) {
 			brandLabel("palette.title"),
 			brandLabel("palette.mode.basic"),
 			brandLabel("palette.mode.advanced"),
-			brandLabel("palette.copy_label"),
-			brandLabel("appearance.light"),
-			brandLabel("appearance.dark"),
-			brandLabel("appearance.auto"),
 			"four colors for each mode: " + boldList(basic) + ".",
 			"other 19",
 			"all 23",
@@ -126,7 +122,7 @@ func TestBrandPaletteDocs_TheGuideTablesEveryColorByLabelAndToken(t *testing.T) 
 
 // The contrast warnings subsection says what the check establishes and nothing more (decision 11):
 // the 35 pairs of each mode, the two minimums and the WCAG 2.2 success criteria they come from, that every built-in theme meets
-// them, that a failing pair never stops a save, where the warnings are listed, which modes are
+// them, that a failing pair never stops a save, which modes are
 // checked (decision 8), and that passing is no claim that the pages meet WCAG.
 func TestBrandPaletteDocs_TheGuideSaysWhatAWarningMeans(t *testing.T) {
 	guard.AssertSectionSays(t, filepath.Dir(guard.SourceRoot(t)), customizeGuidePage, contrastWarningsHead,
@@ -138,8 +134,6 @@ func TestBrandPaletteDocs_TheGuideSaysWhatAWarningMeans(t *testing.T) {
 			"[1.4.11 Non-text Contrast](https://www.w3.org/TR/WCAG22/#non-text-contrast)",
 			"Every built-in theme meets them",
 			"never stops a save",
-			"brand list",
-			"doesn't meet WCAG 2.2 level AA contrast",
 			"Only the modes the brand's appearance draws are checked",
 			"doesn't make your pages meet WCAG 2.2 AA",
 		},
@@ -160,15 +154,10 @@ func TestBrandPaletteDocs_TheGuideWarnsAboutAnUnreadableConsole(t *testing.T) {
 		[]string{"brand editor included", "(/reference/api/admin/operations/updatebrand/)", "/concepts/clients/#the-admin-consoles-client"}, nil)
 }
 
-// The admin API subsection names the members decisions 2 and 5 add: the theme custom and palette
-// with its mode and its two modes' maps, the four names basic mode takes, a color's one form, the
-// read-only colors and contrastWarnings with an item's members, a ratio cut and never rounded up,
-// and a refusal's error_field pointer.
+// The admin API subsection names the members decisions 2 and 5 add, the theme custom and palette
+// with its mode and its two modes' maps, and links the update, whose reference gives each member's
+// rules.
 func TestBrandPaletteDocs_TheGuideGivesTheAPIsMembers(t *testing.T) {
-	basic := palette.BasicTokens()
-	for i, token := range basic {
-		basic[i] = "`" + token + "`"
-	}
 	guard.AssertSectionSays(t, filepath.Dir(guard.SourceRoot(t)), customizeGuidePage, paletteAPIHead,
 		[]string{
 			"`" + record.BrandThemeCustom + "`",
@@ -178,39 +167,9 @@ func TestBrandPaletteDocs_TheGuideGivesTheAPIsMembers(t *testing.T) {
 			"`" + string(record.BrandPaletteModeAdvanced) + "`",
 			"`light`",
 			"`dark`",
-			"exactly " + strings.Join(basic[:3], ", ") + " and " + basic[3] + ".",
-			"`#` and six hexadecimal digits",
-			"lower case",
-			"`colors`",
-			"`contrastWarnings`",
-			"`foreground`",
-			"`background`",
-			"`ratio`",
-			"`minimum`",
-			"`[]`",
-			"`null`",
-			"never rounded up",
-			"`error_field`",
-			"`/palette/light/brand`",
-			"(/reference/api/admin/operations/getbrandthemes/)",
 			"(/reference/api/admin/operations/updatebrand/)",
 			`"theme": "custom"`,
 		}, nil)
-}
-
-// The brands paragraph's admin API sentence says every brand answer carries colors and
-// contrastWarnings, and points at the subsection for writing a palette.
-func TestBrandPaletteDocs_TheBrandsParagraphNamesTheNewMembers(t *testing.T) {
-	text, err := docsreader.Section(filepath.Dir(guard.SourceRoot(t)), customizeGuidePage, brandThemesHead)
-	if err != nil {
-		t.Fatal(err)
-	}
-	intro, _, _ := strings.Cut(text, "\n### ")
-	for _, want := range []string{"`colors`", "`contrastWarnings`", "#custom-palettes-through-the-admin-api"} {
-		if !strings.Contains(intro, want) {
-			t.Errorf("%s: %s's paragraphs before its subsections do not say %q", customizeGuidePage, brandThemesHead, want)
-		}
-	}
 }
 
 // Step 2 of Brand the pages sends an administrator who wants their own colors to custom palettes.
