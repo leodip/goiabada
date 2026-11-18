@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"sort"
+	"sync"
 
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/core/errs"
@@ -76,16 +77,33 @@ func Dump(ctx context.Context, db *sql.DB, d data.Dialect) (Schema, error) {
 		return nil, err
 	}
 
-	schema := make(Schema, 0, len(names))
-	for _, name := range names {
-		shape, err := DumpTable(ctx, db, d, name)
+	// The tables are read dumpConcurrency at a time: each is several catalog round trips, and the
+	// data tier's migration chain dumps the whole schema three times per migration. Each table
+	// lands at its own index, so the schema keeps the sorted order, and the error returned is
+	// the first failing table's in that order.
+	schema := make(Schema, len(names))
+	failures := make([]error, len(names))
+	slots := make(chan struct{}, dumpConcurrency)
+	var wg sync.WaitGroup
+	for i, name := range names {
+		wg.Go(func() {
+			slots <- struct{}{}
+			defer func() { <-slots }()
+			shape, err := DumpTable(ctx, db, d, name)
+			schema[i], failures[i] = TableEntry{Name: name, Table: shape}, err
+		})
+	}
+	wg.Wait()
+	for _, err := range failures {
 		if err != nil {
 			return nil, err
 		}
-		schema = append(schema, TableEntry{Name: name, Table: shape})
 	}
 	return schema, nil
 }
+
+// dumpConcurrency is how many tables Dump reads at once.
+const dumpConcurrency = 4
 
 // DumpTable reads one table's columns, indexes and foreign keys out of the engine's
 // catalog, so a migration that rebuilds a table can be checked by comparing the dump before
