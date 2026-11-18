@@ -804,3 +804,75 @@ func TestAccessToken_DeletedClientFault(t *testing.T) {
 	assert.False(t, verdict.Live())
 	assert.NotEqual(t, ClientNotFound, verdict.Refusal, "a fault is not a deleted client")
 }
+
+// Every access token names the client row it was issued to in client_internal_id, and is refused,
+// as a token whose client is not found, once the client its client_id names is another row (#710
+// decision 9). That is what refuses an earlier client's token after a rename gave its identifier to
+// another client, which a client created before the token passes the creation-time rule as. A
+// token without the claim, issued before the claim existed, is judged by the creation-time rule
+// alone, whose tests above stay; one whose claim is not a whole number is one the auth server never
+// signs, and is refused before anything is read.
+func TestAccessToken_ClientRow(t *testing.T) {
+	created := time.Date(2026, 10, 1, 9, 0, 0, 0, time.UTC)
+	issuedAt := float64(checkedAt.Add(-5 * time.Minute).Unix())
+	// The client holding the identifier now: row 8, created long before every token here, so the
+	// creation-time rule never refuses a token of this test that the row binding does not.
+	holder := &record.Client{Id: 8, ClientIdentifier: clientIdentifier, Enabled: true,
+		CreatedAt: sql.NullTime{Time: created, Valid: true}}
+
+	tests := []struct {
+		label       string
+		claim       interface{}
+		omitClaim   bool
+		iat         float64
+		wantRead    bool
+		wantRefusal Refusal
+	}{
+		{label: "issued to the row that holds the identifier", claim: float64(8), iat: issuedAt,
+			wantRead: true, wantRefusal: Live},
+		// A client renamed away from the identifier and back is still row 8: its own tokens work.
+		{label: "issued to the holder before it was renamed away and back", claim: float64(8),
+			iat: float64(created.Add(time.Hour).Unix()), wantRead: true, wantRefusal: Live},
+		// What an issuance overlapping the handover signs: the earlier holder's row, under the
+		// identifier the later holder has taken, at a moment after that holder's creation.
+		{label: "issued to another row, the identifier's earlier holder", claim: float64(7), iat: issuedAt,
+			wantRead: true, wantRefusal: ClientNotFound},
+		{label: "issued to a row created after the holder", claim: float64(9), iat: issuedAt,
+			wantRead: true, wantRefusal: ClientNotFound},
+		{label: "issued before the claim existed", omitClaim: true, iat: issuedAt,
+			wantRead: true, wantRefusal: Live},
+		// The creation-time rule still holds for a token carrying the claim.
+		{label: "the holder's row, issued before the holder was created", claim: float64(8),
+			iat: float64(created.Add(-time.Second).Unix()), wantRead: true, wantRefusal: ClientNotFound},
+		{label: "a claim that is a string", claim: "8", iat: issuedAt, wantRefusal: ClientNotFound},
+		{label: "a claim that is not integral", claim: 8.5, iat: issuedAt, wantRefusal: ClientNotFound},
+		{label: "a claim that is negative", claim: float64(-8), iat: issuedAt, wantRefusal: ClientNotFound},
+		{label: "a claim that is null", claim: nil, iat: issuedAt, wantRefusal: ClientNotFound},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.label, func(t *testing.T) {
+			database := datamocks.NewDatabase(t)
+			if tc.wantRead {
+				database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), clientIdentifier).Return(holder, nil).Once()
+			}
+			if tc.wantRefusal == Live {
+				database.On("IsAccessTokenRevoked", mock.Anything, (*sql.Tx)(nil), testJti).Return(false, nil).Once()
+			}
+			claims := map[string]interface{}{"sub": clientIdentifier, "iat": tc.iat}
+			if !tc.omitClaim {
+				claims["client_internal_id"] = tc.claim
+			}
+
+			verdict, err := AccessToken(context.Background(), database, accessToken(claims), settings, checkedAt)
+
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantRefusal, verdict.Refusal, "refusal")
+			if tc.wantRefusal == ClientNotFound {
+				assert.Nil(t, verdict.Client, "the client found is not the token's")
+			} else {
+				assert.Same(t, holder, verdict.Client, "the client the token was issued to")
+			}
+		})
+	}
+}

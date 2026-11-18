@@ -186,7 +186,13 @@ One check decides whether an access token is one under RFC 9068 and still stands
 - `liveness.AccessToken` checks the token first: its header `typ` is `at+jwt` (or
   `application/at+jwt`, without regard to case) and its `iss` is exactly the configured issuer, as
   RFC 9068 section 4 requires of a resource server. Then the client its `client_id` names exists, is
-  the one the token was issued to, and is enabled. A new client may take a deleted client's
+  the one the token was issued to, and is enabled. A rename can give the identifier to another
+  client, so every access token carries `client_internal_id`, the internal id of its client's row
+  (written by `finishAccessToken`), and is refused when it is not the id of the client `client_id`
+  names; internal ids are never reused, and no stored time is involved, so a token signed while the
+  identifier changed hands is refused too. A claim that is not a whole number is refused before the
+  client is read. A token without it was issued before #710 and is judged by the creation-time rule
+  alone, which still applies to every token: a new client may take a deleted client's
   identifier, so a token whose `iat` second is before the client's `created_at` second is refused,
   and one issued in that very second reads `deleted_clients` (written by `DeleteClient` in its
   transaction) and is refused when the identifier was deleted in or after that second, failing
@@ -882,8 +888,8 @@ Goiabada departs from two of RFC 9068's SHOULDs, and the tokens page documents e
 whose scopes name several resources gets one token naming them all in `aud` (section 3, since there
 is no RFC 8707 `resource` parameter; each scope still belongs to one resource in `aud`), and
 `groups` is an array of group identifiers rather than SCIM objects (section 2.2.3.1). The private
-claims `attributes`, `auth_state_generation`, `grant_id` and the `typ` claim have plain names,
-which section 2.2.2 allows.
+claims `attributes`, `auth_state_generation`, `client_internal_id`, `grant_id` and the `typ` claim
+have plain names, which section 2.2.2 allows.
 
 ## API Routes
 

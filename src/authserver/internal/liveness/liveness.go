@@ -59,7 +59,9 @@ const (
 	ForeignIssuer
 	// ClientNotFound is a token whose client_id names no client, or that carries none, or names a
 	// client created after the token was issued: the client it was issued to was deleted, and a new
-	// one took its identifier (#676 decision 6).
+	// one took its identifier (#676 decision 6). It is also a token whose client_internal_id is not
+	// the row of the client its client_id names, or is not a whole number: the client it was issued
+	// to was renamed, and another took its identifier (#710 decision 9).
 	ClientNotFound
 	// ClientDisabled is a token whose client is disabled (#676 decision 6).
 	ClientDisabled
@@ -119,8 +121,9 @@ func Subject(token oauth.JwtToken) (string, bool) {
 // Then its client (decision 6): the client its client_id names exists, is the one the token was
 // issued to, and is enabled, for a client's token as for a user's. A token from a disabled client is
 // refused while the client stays disabled, and works again if it is re-enabled before the token
-// expires; one from a deleted client never does, a new client taking its identifier included. See
-// issuedToClient.
+// expires; one from a deleted client never does, a new client taking its identifier included; nor
+// does one from a renamed client once another client holds the identifier it names. See
+// tokenClientRow and issuedToClient.
 //
 // Last, once everything below has passed, its grant (decision 1): a token carrying grant_id is live
 // only while its grant is, and a token without one only while its jti is not stored as revoked. See
@@ -181,11 +184,18 @@ func AccessToken(ctx context.Context, database Database, token oauth.JwtToken, s
 	if clientIdentifier == "" {
 		return Verdict{Refusal: ClientNotFound}, nil
 	}
+	clientRow, namesClientRow, wellFormed := tokenClientRow(token)
+	if !wellFormed {
+		return Verdict{Refusal: ClientNotFound}, nil
+	}
 	client, err := database.GetClientByClientIdentifier(ctx, nil, clientIdentifier)
 	if err != nil {
 		return Verdict{}, errs.Wrap(err, "failed to look up client for bearer token validation")
 	}
 	if client == nil {
+		return Verdict{Refusal: ClientNotFound}, nil
+	}
+	if namesClientRow && clientRow != client.Id {
 		return Verdict{Refusal: ClientNotFound}, nil
 	}
 	issued, err := issuedToClient(ctx, database, token, client)
@@ -205,6 +215,26 @@ func AccessToken(ctx context.Context, database Database, token oauth.JwtToken, s
 		return verdict, err
 	}
 	return grantAccessToken(ctx, database, token, verdict)
+}
+
+// tokenClientRow reads the client row an access token names in client_internal_id (#710 decision 9):
+// the internal id of the client it was issued to, whether it names one, and whether the claim is
+// well formed. client_id names the client only by identifier, which a rename can give to another
+// client, and a client renamed to it that was created before the token passes issuedToClient, so
+// the row is what tells the client holding the identifier now from the one the token was issued
+// to. Internal ids are never reused, and the comparison does not depend on time, so a token signed
+// while the identifier changed hands, from a request that loaded the earlier holder, names the
+// earlier holder's row and is refused.
+//
+// A token without the claim was issued before it existed, and is judged by issuedToClient alone,
+// as it was then. A claim that is present and not a whole number, null included, is one the auth
+// server never signs: (0, true, false), and the caller refuses it before reading anything.
+func tokenClientRow(token oauth.JwtToken) (int64, bool, bool) {
+	if _, present := token.Claims["client_internal_id"]; !present {
+		return 0, false, true
+	}
+	clientRow, ok := token.IntClaim("client_internal_id")
+	return clientRow, true, ok
 }
 
 // issuedToClient reports whether the token was issued to this client and not to a deleted client

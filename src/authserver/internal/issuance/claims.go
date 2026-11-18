@@ -245,7 +245,10 @@ func (t *TokenIssuer) generateAccessTokenCore(ctx context.Context, tx *sql.Tx, s
 //
 // client_id is REQUIRED by RFC 9068 section 2.2, though a client credentials token's sub names the
 // client too. The auth server's own access-token check reads the client from it and refuses the
-// token once that client is disabled or gone (#676 decision 6). The typ claim is TokenTypeBearer on
+// token once that client is disabled or gone (#676 decision 6). client_internal_id is the internal
+// id of the client's row, reserved for that check: a rename can give the identifier client_id names
+// to another client, and the check refuses the token once the client holding it is not this row
+// (#710 decision 9). The typ claim is TokenTypeBearer on
 // every access token, and the header's typ is AccessTokenHeaderType (RFC 9068 section 2.1).
 //
 // A token issued for a request with a valid DPoP proof is bound to the proof's key: dpopThumbprint
@@ -257,6 +260,7 @@ func finishAccessToken(claims jwt.MapClaims, settings *record.Settings, client *
 
 	claims["iss"] = settings.Issuer
 	claims["client_id"] = client.ClientIdentifier
+	claims["client_internal_id"] = client.Id
 	claims["iat"] = now.Unix()
 	claims["nbf"] = now.Unix()
 	claims["jti"] = uuid.New()

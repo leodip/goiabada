@@ -64,6 +64,8 @@ func TestAccessToken_AuthorizationCodeGrant(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 	code := sessionBoundCode(testStart)
+	code.ClientId = 7
+	code.Client.Id = 7
 	code.Scope = "openid email product-api:read"
 	code.Nonce = "n-0S6_WzA2Mj"
 	code.AuthStateGeneration = 4
@@ -91,6 +93,7 @@ func TestAccessToken_AuthorizationCodeGrant(t *testing.T) {
 		"iss":                   "https://test-issuer.com",
 		"sub":                   code.User.Subject,
 		"client_id":             "web-app",
+		"client_internal_id":    float64(7),
 		"grant_id":              row.FirstRefreshTokenJti,
 		"auth_time":             float64(testStart.Add(-5 * time.Minute).Unix()),
 		"acr":                   "urn:goiabada:level2_optional",
@@ -110,6 +113,8 @@ func TestAccessToken_RefreshOfACodeGrant(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 	code := sessionBoundCode(testStart)
+	code.ClientId = 7
+	code.Client.Id = 7
 	code.Nonce = "n-0S6_WzA2Mj"
 	code.AuthStateGeneration = 4
 	parent := &record.RefreshToken{
@@ -137,6 +142,7 @@ func TestAccessToken_RefreshOfACodeGrant(t *testing.T) {
 		"iss":                   "https://test-issuer.com",
 		"sub":                   code.User.Subject,
 		"client_id":             "web-app",
+		"client_internal_id":    float64(7),
 		"grant_id":              "family-jti",
 		"auth_time":             float64(testStart.Add(-5 * time.Minute).Unix()),
 		"acr":                   "urn:goiabada:level1",
@@ -170,10 +176,11 @@ func TestAccessToken_PasswordGrant(t *testing.T) {
 	require.NotEmpty(t, row.FirstRefreshTokenJti)
 	claims := verifyAndDecodeToken(t, response.AccessToken, getTestPublicKey(t))
 	assertWholeAccessToken(t, response.AccessToken, testStart, 900, map[string]interface{}{
-		"iss":       "https://test-issuer.com",
-		"sub":       user.Subject,
-		"client_id": "legacy-app",
-		"grant_id":  row.FirstRefreshTokenJti,
+		"iss":                "https://test-issuer.com",
+		"sub":                user.Subject,
+		"client_id":          "legacy-app",
+		"client_internal_id": float64(3),
+		"grant_id":           row.FirstRefreshTokenJti,
 		// The password was checked for this request, so it was checked when the token was issued.
 		"auth_time":             claims["iat"],
 		"acr":                   "urn:goiabada:level1",
@@ -216,6 +223,7 @@ func TestAccessToken_RefreshOfAPasswordGrant(t *testing.T) {
 		"iss":                   "https://test-issuer.com",
 		"sub":                   parent.User.Subject,
 		"client_id":             "legacy-app",
+		"client_internal_id":    float64(3),
 		"grant_id":              "family-jti",
 		"auth_time":             float64(authenticatedAt.Unix()),
 		"acr":                   "urn:goiabada:level1",
@@ -271,12 +279,13 @@ func TestAccessToken_ClientCredentialsGrant(t *testing.T) {
 			assert.Empty(t, response.IdToken)
 			assert.Empty(t, response.RefreshToken)
 			assertWholeAccessToken(t, response.AccessToken, testStart, tc.lifetime, map[string]interface{}{
-				"iss":       "https://test-issuer.com",
-				"sub":       "billing-service",
-				"client_id": "billing-service",
-				"aud":       tc.wantAud,
-				"typ":       "Bearer",
-				"scope":     tc.scope,
+				"iss":                "https://test-issuer.com",
+				"sub":                "billing-service",
+				"client_id":          "billing-service",
+				"client_internal_id": float64(4),
+				"aud":                tc.wantAud,
+				"typ":                "Bearer",
+				"scope":              tc.scope,
 			})
 		})
 	}
@@ -317,6 +326,7 @@ func TestAccessToken_ImplicitFlow(t *testing.T) {
 		"iss":                   "https://test-issuer.com",
 		"sub":                   user.Subject,
 		"client_id":             "old-spa",
+		"client_internal_id":    float64(5),
 		"auth_time":             float64(authenticatedAt.Unix()),
 		"acr":                   "urn:goiabada:level2_mandatory",
 		"amr":                   []interface{}{"pwd", "otp"},
