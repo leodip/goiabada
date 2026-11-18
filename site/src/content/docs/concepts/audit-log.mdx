@@ -406,7 +406,7 @@ These come from the Account API, which users reach through the admin console's a
 | `dynamic_client_registration` | A client registered itself through dynamic client registration. |
 | `updated_client_settings` | An administrator saved a client's settings: identifier, description, display options, enabled, consent required or default ACR level. |
 | `updated_client_authentication` | An administrator saved a client's authentication: made it public, or made it confidential with a new or the same secret. |
-| `revoked_client_grants` | An administrator made a confidential client public, so its authorization codes and refresh tokens were revoked. |
+| `revoked_client_grants` | An administrator made a confidential client public, or changed a client's identifier, so its authorization codes and refresh tokens were revoked. Its `reason` says which: `client_became_public` or `client_identifier_changed`. |
 | `viewed_client_secret` | Someone read a client's secret. |
 | `updated_client_oauth2_flows` | An administrator saved which flows a client may use, and whether it needs PKCE. |
 | `updated_redirect_uris` | An administrator saved a client's redirect URIs. |

@@ -100,8 +100,12 @@ back with a security consequence, which today means #245's public/confidential s
 (`AcquireClientRow`), #710's change of a client's identifier (`AcquireClientRow`):
 `SetClientIdentifier`, the column's one writer after creation, reads the identifier under it and
 writes only one that differs byte for byte, reporting whether it did, and the settings save decides
-the identifier checks it owes against the row it read under it; `UpdateClient` leaves the column
-alone (`dont-update`), and `client_identifier_test.go` shows two renames meeting on every engine,
+the identifier checks it owes against the row it read under it, and on that answer revokes the
+client's grants in the same transaction, through `revocation.RevokeClientGrantsTx`; `UpdateClient`
+leaves the column alone (`dont-update`), and `client_identifier_test.go` shows two renames meeting
+on every engine. The initial password grant reads the client with `GetClientByIdForUpdate`, a
+locking read that writes nothing, before it inserts its first refresh token, so it and a rename
+serialize on the row (`password_grant_rename_ordering_test.go`),
 #139's issuance (`AcquireUserSessionRow`), #131's refresh rotation
 (`AcquireUserRow`), #542's session writes (`AcquireUserSessionRow`) and one-time code claims
 (`AcquireUserRow`), #407's settings section saves (`AcquireSettingsRow`), each of which reads

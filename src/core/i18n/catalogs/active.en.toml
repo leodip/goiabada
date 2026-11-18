@@ -994,7 +994,7 @@
 "adminconsole.admin_clients.settings.field.brand_hint" = "The brand the client's sign-in and sign-out pages are drawn in. On Default brand, they follow the default when it changes."
 "adminconsole.admin_clients.settings.access_title" = "Access"
 "adminconsole.admin_clients.settings.saved_successfully" = "Settings saved."
-"adminconsole.admin_clients.settings.modal.identifier_change" = "You're changing the client identifier, so anything that signs in with this client will have to send the new one."
+"adminconsole.admin_clients.settings.modal.identifier_change" = "You're changing the client identifier, so anything that signs in with this client will have to send the new one. Its refresh tokens will stop working, so its users will have to sign in again."
 "adminconsole.admin_clients.settings.modal.disabled_warning" = "You're disabling the client, so nothing will be able to sign in with it or get tokens through it until it's enabled again."
 "adminconsole.admin_clients.settings.modal.administrative_scopes_warning" = "You're allowing the client to request the administrative scopes. It will be able to get a token carrying a signed-in administrator's authority, and it will become an administrator client."
 "adminconsole.admin_clients.settings.modal.remember_consent_warning" = "You're letting an earlier approval skip the consent screen for this public client. Another app that uses its client ID and receives its redirects would get tokens for any user who approved this app before, without asking them."

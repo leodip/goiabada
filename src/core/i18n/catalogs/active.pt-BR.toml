@@ -952,7 +952,7 @@
 "adminconsole.admin_clients.settings.field.brand_hint" = "A marca em que as páginas de entrada e de saída do cliente são exibidas. Na Marca padrão, elas acompanham a padrão quando ela muda."
 "adminconsole.admin_clients.settings.access_title" = "Acesso"
 "adminconsole.admin_clients.settings.saved_successfully" = "Configurações salvas."
-"adminconsole.admin_clients.settings.modal.identifier_change" = "Você está alterando o identificador do cliente, então tudo o que entra com este cliente terá de enviar o novo."
+"adminconsole.admin_clients.settings.modal.identifier_change" = "Você está alterando o identificador do cliente, então tudo o que entra com este cliente terá de enviar o novo. Os refresh tokens dele vão parar de funcionar, então os usuários dele terão de entrar de novo."
 "adminconsole.admin_clients.settings.modal.disabled_warning" = "Você está desabilitando o cliente, então nada poderá entrar com ele ou obter tokens por meio dele até que seja habilitado novamente."
 "adminconsole.admin_clients.settings.modal.administrative_scopes_warning" = "Você está permitindo que o cliente solicite os escopos administrativos. Ele poderá obter um token com a autoridade de um administrador autenticado, e passará a ser um cliente administrador."
 "adminconsole.admin_clients.settings.modal.remember_consent_warning" = "Você está deixando uma aprovação anterior pular a tela de consentimento deste cliente público. Outro app que use o identificador do cliente e receba os redirecionamentos dele obteria tokens de qualquer usuário que já aprovou este app, sem perguntar a ele."

@@ -1001,7 +1001,7 @@
 "adminconsole.admin_clients.settings.field.brand_hint" = "Il marchio in cui sono mostrate le pagine di accesso e di uscita del client. Con Marchio predefinito, seguono il predefinito quando cambia."
 "adminconsole.admin_clients.settings.access_title" = "Accesso"
 "adminconsole.admin_clients.settings.saved_successfully" = "Impostazioni salvate."
-"adminconsole.admin_clients.settings.modal.identifier_change" = "Stai cambiando l'identificatore del client: qualsiasi software che accede con questo client dovrà inviare quello nuovo."
+"adminconsole.admin_clients.settings.modal.identifier_change" = "Stai cambiando l'identificatore del client: qualsiasi software che accede con questo client dovrà inviare quello nuovo. I suoi refresh token smetteranno di funzionare, quindi i suoi utenti dovranno accedere di nuovo."
 "adminconsole.admin_clients.settings.modal.disabled_warning" = "Stai disabilitando il client: non sarà possibile accedere con esso né ottenere token tramite esso finché non verrà riabilitato."
 "adminconsole.admin_clients.settings.modal.administrative_scopes_warning" = "Stai autorizzando il client a richiedere scope amministrativi. Potrà ottenere un token con i poteri di un amministratore connesso e diventerà un client amministratore."
 "adminconsole.admin_clients.settings.modal.remember_consent_warning" = "Stai permettendo a un'approvazione precedente di saltare la pagina di consenso per questo client pubblico. Un'altra app che usa il suo identificatore client e riceve i suoi reindirizzamenti otterrebbe token per qualsiasi utente che abbia già approvato questa app, senza chiederglielo."

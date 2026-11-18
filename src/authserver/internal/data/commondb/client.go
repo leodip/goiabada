@@ -285,6 +285,15 @@ var selectClientById = statement{
 	mssql:    "SELECT " + clientColumns.mssql + " FROM clients WHERE id = @p1",
 }
 
+// selectClientByIdForUpdate is the locking read GetClientByIdForUpdate runs, the lock in each
+// engine's own grammar, as selectUserByIdForUpdate spells it.
+var selectClientByIdForUpdate = statement{
+	sqlite:   "SELECT " + clientColumns.sqlite + " FROM clients WHERE id = ?",
+	mysql:    "SELECT " + clientColumns.mysql + " FROM clients WHERE id = ? FOR UPDATE",
+	postgres: "SELECT " + clientColumns.postgres + " FROM clients WHERE id = $1 FOR UPDATE",
+	mssql:    "SELECT " + clientColumns.mssql + " FROM clients WITH (UPDLOCK, ROWLOCK) WHERE id = @p1",
+}
+
 var selectClientByClientIdentifier = statement{
 	sqlite:   "SELECT " + clientColumns.sqlite + " FROM clients WHERE client_identifier = ?",
 	mysql:    "SELECT " + clientColumns.mysql + " FROM clients WHERE client_identifier = ?",
@@ -628,6 +637,29 @@ func (d *Database) SetClientPublic(ctx context.Context, tx *sql.Tx, clientId int
 
 func (d *Database) GetClientById(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error) {
 	return queryOne(ctx, d, tx, selectClientById.text(d.Dialect), []any{clientId}, scanClient, "client")
+}
+
+// GetClientByIdForUpdate reads the client as last committed and takes its row for the rest of the
+// caller's transaction, without writing it: a locking read, as GetUserByIdForUpdate is a user's. A
+// writer of the row, AcquireClientRow and so SetClientIdentifier among them, waits for this
+// transaction to end, and this read waits for a writer's transaction to end and answers what it
+// committed.
+//
+// The initial password grant reads its client this way before it writes its first refresh token,
+// so a rename of the client is ordered against it: either the grant commits first and the rename's
+// sweep finds its token, or the rename commits first and the grant reads the identifier it gave the
+// client (#710 decision 5). It writes nothing, so a password grant does not move the client's
+// updated_at, which the admin console shows.
+//
+// tx is required: without one the statement autocommits and the row is released before the caller
+// can decide on what it read.
+func (d *Database) GetClientByIdForUpdate(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error) {
+
+	if tx == nil {
+		return nil, errs.New("a locking read of a client requires a transaction: an autocommitted statement releases the row before the caller can decide on it")
+	}
+
+	return queryOne(ctx, d, tx, selectClientByIdForUpdate.text(d.Dialect), []any{clientId}, scanClient, "client")
 }
 
 func (d *Database) GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error) {

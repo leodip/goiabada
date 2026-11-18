@@ -30,8 +30,8 @@ import (
 // transaction that changes them together.
 //
 // It embeds the revocation port because making a confidential client public revokes the grants it
-// held while it still had to authenticate, and what the administrative policy reads to judge whether
-// the client is an administrator.
+// held while it still had to authenticate, and a change of its identifier revokes them too, and
+// what the administrative policy reads to judge whether the client is an administrator.
 type clientsDatabase interface {
 	revocation.Database
 	clientTargetPolicyDatabase
@@ -127,7 +127,8 @@ type clientSettingsSave struct {
 // as submitted, is not checked, which is what keeps a self-registered client's 40-character
 // identifier editable elsewhere on the form (#108 decision 17), and a row that holds an identifier
 // naming a resource from before #151. Then SetClientIdentifier writes it only when it differs, and
-// every caller answers with the identifier the row holds.
+// every caller answers with the identifier the row holds. A write that changed the identifier
+// revokes the client's grants in the same transaction: see saveClientNotOwningAuthenticationMode.
 //
 // The settings save's Remember consent is nil for a save without it, which leaves the stored value
 // alone. A value is decided here,
@@ -137,6 +138,31 @@ type clientSettingsSave struct {
 // it was confidential chose its value for a client that needed no vouching, so it never applies to
 // one made public since, which the switch left off.
 func updateClientNotOwningAuthenticationMode(ctx context.Context, database clientsDatabase, client *record.Client, settings *clientSettingsSave) error {
+	_, err := saveClientNotOwningAuthenticationMode(ctx, database, client, settings)
+	return err
+}
+
+// clientRename is what a settings save's identifier write came to: whether it changed the
+// identifier, and so revoked the client's grants, and what that revocation revoked, which the save
+// records after the commit.
+type clientRename struct {
+	renamed bool
+	result  revocation.ClientGrantResult
+}
+
+// saveClientNotOwningAuthenticationMode is updateClientNotOwningAuthenticationMode answering what
+// the identifier's write came to, for the settings save, which records the rename's revocation.
+//
+// A change of the identifier revokes the client's grants, in the transaction that writes it, by the
+// sweep the switch to public uses, under ReasonClientIdentifierChanged (#710 decision 5). A refresh
+// token names its client by row, so no check of the token can tell its client was renamed: a grant
+// refreshed afterwards would be given an ID token whose aud is not the one its sign-in got, which
+// OpenID Connect Core 1.0 section 12.2 forbids. What decides it is SetClientIdentifier's answer under
+// the row's lock, never a comparison with the copy the request loaded, as the switch to public is
+// decided by SetClientPublic's (#245): a rename another save committed meanwhile leaves this save's
+// identifier already in the row, which is no change and revokes nothing. revocation.RevokeClientGrantsTx
+// opens the transaction, so the rename and its sweep commit together or not at all.
+func saveClientNotOwningAuthenticationMode(ctx context.Context, database clientsDatabase, client *record.Client, settings *clientSettingsSave) (clientRename, error) {
 	// Taken before the transaction: the body overwrites client.IsPublic with the row's mode, and a
 	// rerun after a deadlock must still decide against the mode the request loaded.
 	loadedPublic := client.IsPublic
@@ -145,75 +171,104 @@ func updateClientNotOwningAuthenticationMode(ctx context.Context, database clien
 	// write together (#301). Safe to rerun: the two columns are copied from the row re-read under
 	// this attempt's own lock, ApplyPublicClientInvariants is idempotent on the result, and the
 	// identifier and Remember consent are decided again from that row and written as fixed values.
-	return database.RunInTransaction(ctx, func(tx *sql.Tx) error {
-		if err := database.AcquireClientRow(ctx, tx, client.Id); err != nil {
+	// The settings save's transaction is opened through revocation.RevokeClientGrantsTx, which also
+	// reruns it once after a unique violation: a family record lost to a containment, or an
+	// identifier another client took between this save's check and its write, which the rerun's
+	// check then refuses as in use.
+	if settings == nil {
+		return clientRename{}, database.RunInTransaction(ctx, func(tx *sql.Tx) error {
+			_, err := writeClientNotOwningAuthenticationMode(ctx, database, tx, client, nil, loadedPublic)
 			return err
-		}
+		})
+	}
 
-		current, err := database.GetClientById(ctx, tx, client.Id)
-		if err != nil {
-			return err
-		}
-		if current == nil {
-			return errs.New("client no longer exists")
-		}
+	var rename clientRename
+	result, err := revocation.RevokeClientGrantsTx(ctx, database, client.Id, revocation.ReasonClientIdentifierChanged,
+		func(tx *sql.Tx) (bool, error) {
+			renamed, err := writeClientNotOwningAuthenticationMode(ctx, database, tx, client, settings, loadedPublic)
+			rename.renamed = renamed
+			return renamed, err
+		})
+	if err != nil {
+		return clientRename{}, err
+	}
+	rename.result = result
+	return rename, nil
+}
 
-		if settings != nil && settings.identifier != current.ClientIdentifier {
-			if err := checkClientIdentifierChange(ctx, database, tx, settings.identifierValidator, settings.identifier, client.Id); err != nil {
-				return err
-			}
-		}
+// writeClientNotOwningAuthenticationMode is the body of updateClientNotOwningAuthenticationMode's
+// transaction, on tx. It answers whether the settings save's identifier write changed the
+// identifier, false for every other save.
+func writeClientNotOwningAuthenticationMode(ctx context.Context, database clientsDatabase, tx *sql.Tx,
+	client *record.Client, settings *clientSettingsSave, loadedPublic bool) (bool, error) {
+	if err := database.AcquireClientRow(ctx, tx, client.Id); err != nil {
+		return false, err
+	}
 
-		// UpdateClient never writes the identifier, and the answer takes the row's, as it does the
-		// mode: a rename committed since the load is what the client is now called (#710 decision 4).
-		client.ClientIdentifier = current.ClientIdentifier
-		client.IsPublic = current.IsPublic
-		client.ClientSecretEncrypted = current.ClientSecretEncrypted
-		// UpdateClient never writes Remember consent, so none of these saves can write back the
-		// value it loaded. The copy it answers with takes the row's value too, so a save loaded
-		// while the client was confidential cannot answer on for a client made public since
-		// (#711 decision 5).
-		client.RememberConsent = current.RememberConsent
-		// UpdateClient never writes the token_endpoint_auth_method a self-registered client is
-		// held to either, and a switch to public committed since the load cleared it: the answer
-		// takes the row's value, as it does the mode (#708 decision 5).
-		client.TokenEndpointAuthMethod = current.TokenEndpointAuthMethod
+	current, err := database.GetClientById(ctx, tx, client.Id)
+	if err != nil {
+		return false, err
+	}
+	if current == nil {
+		return false, errs.New("client no longer exists")
+	}
 
-		client.ApplyPublicClientInvariants()
+	if settings != nil && settings.identifier != current.ClientIdentifier {
+		if err = checkClientIdentifierChange(ctx, database, tx, settings.identifierValidator, settings.identifier, client.Id); err != nil {
+			return false, err
+		}
+	}
 
-		if err := database.UpdateClient(ctx, tx, client); err != nil {
-			return err
-		}
+	// UpdateClient never writes the identifier, and the answer takes the row's, as it does the
+	// mode: a rename committed since the load is what the client is now called (#710 decision 4).
+	client.ClientIdentifier = current.ClientIdentifier
+	client.IsPublic = current.IsPublic
+	client.ClientSecretEncrypted = current.ClientSecretEncrypted
+	// UpdateClient never writes Remember consent, so none of these saves can write back the
+	// value it loaded. The copy it answers with takes the row's value too, so a save loaded
+	// while the client was confidential cannot answer on for a client made public since
+	// (#711 decision 5).
+	client.RememberConsent = current.RememberConsent
+	// UpdateClient never writes the token_endpoint_auth_method a self-registered client is
+	// held to either, and a switch to public committed since the load cleared it: the answer
+	// takes the row's value, as it does the mode (#708 decision 5).
+	client.TokenEndpointAuthMethod = current.TokenEndpointAuthMethod
 
-		if settings == nil {
-			return nil
-		}
+	client.ApplyPublicClientInvariants()
 
-		// The write decides, under the row's lock, whether the identifier changes; either way the
-		// row now holds the one submitted.
-		if _, err := database.SetClientIdentifier(ctx, tx, client.Id, settings.identifier); err != nil {
-			return err
-		}
-		client.ClientIdentifier = settings.identifier
+	if err = database.UpdateClient(ctx, tx, client); err != nil {
+		return false, err
+	}
 
-		if settings.rememberConsent == nil {
-			return nil
-		}
-		var remember bool
-		switch {
-		case !current.IsPublic:
-			remember = true
-		case loadedPublic:
-			remember = *settings.rememberConsent
-		default:
-			return nil
-		}
-		if err := database.SetClientRememberConsent(ctx, tx, client.Id, remember); err != nil {
-			return err
-		}
-		client.RememberConsent = remember
-		return nil
-	})
+	if settings == nil {
+		return false, nil
+	}
+
+	// The write decides, under the row's lock, whether the identifier changes, and so whether
+	// the client's grants are revoked; either way the row now holds the one submitted.
+	renamed, err := database.SetClientIdentifier(ctx, tx, client.Id, settings.identifier)
+	if err != nil {
+		return false, err
+	}
+	client.ClientIdentifier = settings.identifier
+
+	if settings.rememberConsent == nil {
+		return renamed, nil
+	}
+	var remember bool
+	switch {
+	case !current.IsPublic:
+		remember = true
+	case loadedPublic:
+		remember = *settings.rememberConsent
+	default:
+		return renamed, nil
+	}
+	if err = database.SetClientRememberConsent(ctx, tx, client.Id, remember); err != nil {
+		return false, err
+	}
+	client.RememberConsent = remember
+	return renamed, nil
 }
 
 // checkClientIdentifierChange holds an identifier the client is being renamed to to the identifier
@@ -782,18 +837,25 @@ func HandleClientUpdatePut(
 			identifierValidator: identifierValidator,
 			rememberConsent:     updateReq.RememberConsent,
 		}
-		if err := updateClientNotOwningAuthenticationMode(r.Context(), database, client, settings); err != nil {
+		rename, saveErr := saveClientNotOwningAuthenticationMode(r.Context(), database, client, settings)
+		if saveErr != nil {
 			var refusal *i18n.LocalizedError
-			if errors.As(err, &refusal) {
+			if errors.As(saveErr, &refusal) {
 				writeValidationError(w, r, refusal)
 				return
 			}
-			writeInternalServerError(w, r, errs.Wrap(err, "database error updating client"), "client_id", client.Id, "client_identifier", client.ClientIdentifier)
+			writeInternalServerError(w, r, errs.Wrap(saveErr, "database error updating client"), "client_id", client.Id, "client_identifier", client.ClientIdentifier)
 			return
 		}
 
 		// The write's transaction has committed: it is recorded now, before the reads building the
-		// answer, whose failure answers 500 but does not undo the change.
+		// answer, whose failure answers 500 but does not undo the change. A rename revoked the
+		// client's grants in that transaction, and is recorded so for every rename, also one that
+		// found nothing to revoke (#710 decision 5).
+		if rename.renamed {
+			revocation.LogRevokedClientGrants(r.Context(), auditLogger, client.Id,
+				revocation.ReasonClientIdentifierChanged, callerSubject(r), rename.result)
+		}
 		auditLogger.Log(r.Context(), audit.EventUpdatedClientSettings, map[string]interface{}{
 			"client_id":      client.Id,
 			"logged_in_user": callerSubject(r),
@@ -909,7 +971,7 @@ func HandleClientAuthenticationPut(
 		// review finding 1, decision 17).
 		if req.IsPublic {
 			var becamePublic bool
-			result, err := revocation.RevokeClientGrantsTx(r.Context(), database, client.Id, func(tx *sql.Tx) (bool, error) {
+			result, err := revocation.RevokeClientGrantsTx(r.Context(), database, client.Id, revocation.ReasonClientBecamePublic, func(tx *sql.Tx) (bool, error) {
 				var err error
 				becamePublic, err = database.SetClientPublic(r.Context(), tx, client.Id)
 				if err != nil {

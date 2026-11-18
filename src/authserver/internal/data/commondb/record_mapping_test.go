@@ -151,6 +151,14 @@ func clientMapping() mappingCase {
 			"GetClientById": func(ctx context.Context, d *Database) (any, error) {
 				return d.GetClientById(ctx, nil, 1)
 			},
+			"GetClientByIdForUpdate": func(ctx context.Context, d *Database) (any, error) {
+				tx, err := d.BeginTransaction(ctx)
+				if err != nil {
+					return nil, err
+				}
+				defer func() { _ = tx.Rollback() }()
+				return d.GetClientByIdForUpdate(ctx, tx, 1)
+			},
 			"GetClientByClientIdentifier": func(ctx context.Context, d *Database) (any, error) {
 				// The distinct value the row carries, so the exact-match check keeps it.
 				return d.GetClientByClientIdentifier(ctx, nil, distinctString("client_identifier"))

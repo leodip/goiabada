@@ -72,7 +72,12 @@ func TestHandleClientUpdatePut_ARenameIsCheckedThenWrittenByTheNarrowWrite(t *te
 			written = &c
 		}).Return(nil).Once()
 	database.On("SetClientIdentifier", mock.Anything, clientUpdateTx, int64(7), "new-name").Return(true, nil).Once()
+	// The rename revokes the client's grants: here it has none (#710 decision 5).
+	database.On("RevokeCodesByClientId", mock.Anything, clientUpdateTx, int64(7)).Return(int64(0), nil).Once()
+	database.On("GetRefreshTokensByClientId", mock.Anything, clientUpdateTx, int64(7)).
+		Return([]*record.RefreshToken{}, nil).Once()
 	stubClientResponseLoads(database)
+	auditLogger.On("Log", mock.Anything, audit.EventRevokedClientGrants, mock.Anything).Return().Once()
 	auditLogger.On("Log", mock.Anything, audit.EventUpdatedClientSettings, mock.Anything).Return().Once()
 
 	rr := serveSettingsPut(database, auditLogger, `{"clientIdentifier":"new-name","description":"d","enabled":true}`)

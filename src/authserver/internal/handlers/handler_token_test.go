@@ -285,6 +285,35 @@ func TestHandleTokenPost(t *testing.T) {
 		endpoint.auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 	})
 
+	// A rename that committed before the grant wrote its first refresh token leaves the request
+	// naming an identifier the client no longer holds, which is answered as an identifier no client
+	// holds is: invalid_client, "Client does not exist.", 401 with the Basic challenge (#710
+	// decision 5).
+	t.Run("Password: a client renamed before the grant is answered invalid_client", func(t *testing.T) {
+		endpoint := newTokenEndpoint(t)
+		grant := &protocolvalidation.PasswordGrant{
+			Client: &record.Client{Id: 1, ClientIdentifier: "test_client"},
+			User:   &record.User{Id: 42},
+			Scope:  "openid",
+		}
+		endpoint.validates(grant)
+
+		endpoint.issuer.On("IssuePasswordGrant", mock.Anything, mock.Anything, mock.Anything).
+			Return(nil, errs.WithStack(issuance.ErrPasswordGrantClientRenamed)).Once()
+		endpoint.jsonWriter.On("JSONError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
+			var detail *oauth.ErrorDetail
+			return errors.As(err, &detail) && detail.Code() == "invalid_client" &&
+				detail.Description() == "Client does not exist." &&
+				detail.HTTPStatus() == http.StatusUnauthorized &&
+				detail.WWWAuthenticate() == `Basic realm="goiabada"`
+		})).Return().Once()
+
+		endpoint.post(t, "grant_type=password&client_id=test_client&username=u&password=p&scope=openid")
+
+		endpoint.assertExpectations(t)
+		endpoint.auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+	})
+
 	t.Run("Password successful flow", func(t *testing.T) {
 		endpoint := newTokenEndpoint(t)
 		grant := &protocolvalidation.PasswordGrant{

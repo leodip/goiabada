@@ -112,6 +112,7 @@ func TestBoundAccessToken_PasswordGrant(t *testing.T) {
 	expectSigningKeyAndUserLoads(t, mockDB)
 	captureRefreshTokenRow(mockDB)
 
+	expectPasswordGrantClientRow(mockDB, 3, &record.Client{Id: 3, ClientIdentifier: "legacy-app"})
 	response, err := tokenIssuer.IssuePasswordGrant(context.Background(), rfc9068Settings(), &ROPCGrantInput{
 		Client:         &record.Client{Id: 3, ClientIdentifier: "legacy-app"},
 		User:           &record.User{Id: 1, Subject: fake.UUID()},

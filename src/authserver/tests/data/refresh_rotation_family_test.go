@@ -380,7 +380,7 @@ func TestRefreshRotation_AClientMadePublicBetweenTheClaimAndTheInsertLeavesAChil
 
 			flip := goBlocked(t, "the client's revocation", tx, func(reached func()) error {
 				reached()
-				_, err := revocation.RevokeClientGrantsTx(ctx, other, f.client.Id, func(*sql.Tx) (bool, error) { return true, nil })
+				_, err := revocation.RevokeClientGrantsTx(ctx, other, f.client.Id, revocation.ReasonClientBecamePublic, func(*sql.Tx) (bool, error) { return true, nil })
 				return err
 			})
 			flip.requireBlocked(t)

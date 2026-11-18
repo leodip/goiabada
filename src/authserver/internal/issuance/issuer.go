@@ -20,6 +20,7 @@ type tokenIssuerDatabase interface {
 	CodeLoadClient(ctx context.Context, tx *sql.Tx, code *record.Code) error
 	CodeLoadUser(ctx context.Context, tx *sql.Tx, code *record.Code) error
 	CreateRefreshToken(ctx context.Context, tx *sql.Tx, refreshToken *record.RefreshToken) error
+	GetClientByIdForUpdate(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error)
 	GetCurrentSigningKey(ctx context.Context, tx *sql.Tx) (*record.KeyPair, error)
 	GetRefreshTokenById(ctx context.Context, tx *sql.Tx, refreshTokenId int64) (*record.RefreshToken, error)
 	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)

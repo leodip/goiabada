@@ -157,6 +157,7 @@ func TestAccessToken_PasswordGrant(t *testing.T) {
 	row := captureRefreshTokenRow(mockDB)
 	user := &record.User{Id: 1, Subject: fake.UUID(), AuthStateGeneration: 2}
 
+	expectPasswordGrantClientRow(mockDB, 3, &record.Client{Id: 3, ClientIdentifier: "legacy-app"})
 	response, err := tokenIssuer.IssuePasswordGrant(context.Background(), rfc9068Settings(), &ROPCGrantInput{
 		Client: &record.Client{Id: 3, ClientIdentifier: "legacy-app", TokenExpirationInSeconds: 900},
 		User:   user,

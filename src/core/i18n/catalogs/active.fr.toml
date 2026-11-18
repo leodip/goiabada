@@ -996,7 +996,7 @@
 "adminconsole.admin_clients.settings.field.brand_hint" = "La marque dans laquelle les pages de connexion et de déconnexion du client sont affichées. Avec Marque par défaut, elles suivent la marque par défaut quand elle change."
 "adminconsole.admin_clients.settings.access_title" = "Accès"
 "adminconsole.admin_clients.settings.saved_successfully" = "Paramètres enregistrés."
-"adminconsole.admin_clients.settings.modal.identifier_change" = "Vous modifiez l’identifiant du client. Tout ce qui utilise ce client pour se connecter devra envoyer le nouvel identifiant."
+"adminconsole.admin_clients.settings.modal.identifier_change" = "Vous modifiez l’identifiant du client. Tout ce qui utilise ce client pour se connecter devra envoyer le nouvel identifiant. Ses jetons de rafraîchissement cesseront de fonctionner, ses utilisateurs devront donc se reconnecter."
 "adminconsole.admin_clients.settings.modal.disabled_warning" = "Vous désactivez le client. Plus aucune connexion ni obtention de jetons ne sera possible avec lui tant qu’il ne sera pas réactivé."
 "adminconsole.admin_clients.settings.modal.administrative_scopes_warning" = "Vous autorisez le client à demander les scopes d’administration. Il pourra obtenir un jeton portant les droits d’un administrateur connecté et deviendra un client d’administration."
 "adminconsole.admin_clients.settings.modal.remember_consent_warning" = "Vous permettez à une approbation antérieure d’éviter l’écran de consentement pour ce client public. Une autre application qui utilise son identifiant client et reçoit ses redirections obtiendrait des jetons pour tout utilisateur ayant déjà approuvé cette application, sans le lui demander."

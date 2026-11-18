@@ -997,7 +997,7 @@
 "adminconsole.admin_clients.settings.field.brand_hint" = "Die Marke, in der die Anmelde- und Abmeldeseiten des Clients dargestellt werden. Mit Standardmarke folgen sie der Standardmarke, wenn sie sich ändert."
 "adminconsole.admin_clients.settings.access_title" = "Zugriff"
 "adminconsole.admin_clients.settings.saved_successfully" = "Einstellungen gespeichert."
-"adminconsole.admin_clients.settings.modal.identifier_change" = "Sie ändern die Client-Kennung. Alles, was sich mit diesem Client anmeldet, muss danach die neue Kennung senden."
+"adminconsole.admin_clients.settings.modal.identifier_change" = "Sie ändern die Client-Kennung. Alles, was sich mit diesem Client anmeldet, muss danach die neue Kennung senden. Seine Refresh Tokens funktionieren nicht mehr, daher müssen sich seine Benutzer erneut anmelden."
 "adminconsole.admin_clients.settings.modal.disabled_warning" = "Sie deaktivieren den Client. Bis er wieder aktiviert wird, sind damit keine Anmeldungen und kein Abruf von Tokens möglich."
 "adminconsole.admin_clients.settings.modal.administrative_scopes_warning" = "Sie erlauben dem Client, administrative Scopes anzufordern. Er kann dann Tokens mit den Befugnissen eines angemeldeten Administrationskontos erhalten und wird zu einem administrativen Client."
 "adminconsole.admin_clients.settings.modal.remember_consent_warning" = "Sie lassen eine frühere Zustimmung die Zustimmungsseite für diesen öffentlichen Client überspringen. Eine andere App, die seine Client-Kennung verwendet und seine Weiterleitungen empfängt, würde Tokens für alle erhalten, die dieser App früher zugestimmt haben, ohne sie zu fragen."

@@ -125,6 +125,11 @@ type Database interface {
 	// released before the read even runs.
 	AcquireClientRow(ctx context.Context, tx *sql.Tx, clientId int64) error
 	GetClientById(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error)
+	// GetClientByIdForUpdate reads the client as last committed and takes its row until the
+	// transaction ends, writing nothing: a writer of the row, a rename among them, waits for that
+	// transaction, and this read waits for a writer's. The initial password grant reads its client
+	// so before it writes its first refresh token (#710 decision 5). A transaction is required.
+	GetClientByIdForUpdate(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error)
 	GetClientsByIds(ctx context.Context, tx *sql.Tx, clientIds []int64) ([]record.Client, error)
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
 	GetAllClients(ctx context.Context, tx *sql.Tx) ([]record.Client, error)

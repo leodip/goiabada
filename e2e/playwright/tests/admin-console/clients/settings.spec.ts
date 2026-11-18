@@ -3,7 +3,9 @@ import { cancelDialog, clientIdFromList, clientRow, clientUrl, confirmDialog, sa
 import { openSignIn, submitPassword } from "../../../lib/browser-sign-in";
 import { env } from "../../../lib/environment";
 import { expect, test } from "../../../lib/fixtures";
-import { browserSignInClient, publicSignInClient } from "../../../lib/test-clients";
+import { refreshToken, userTokens } from "../../../lib/oauth";
+import { auditRows } from "../../../lib/sessions";
+import { browserSignInClient, passwordGrantClient, publicSignInClient } from "../../../lib/test-clients";
 
 const saved = "Settings saved.";
 
@@ -136,6 +138,32 @@ test("renaming a client asks first, and the new identifier is what the list show
   await page.goto(`${env.adminUrl}/admin/clients`);
   await expect(clientRow(page, renamed)).toHaveCount(1);
   await expect(clientRow(page, client.identifier)).toHaveCount(0);
+});
+
+// A rename ends the client's grants: the dialog says its refresh tokens will stop working, a refresh
+// token issued before is refused under the new identifier, and the audit log says why (#710).
+test("renaming a client says its refresh tokens stop working, and revokes them", async ({ page, clients, users, request }) => {
+  const user = await users.create();
+  const app = await passwordGrantClient(page, clients);
+  const tokens = await userTokens(request, app.client.identifier, app.secret, user, "openid offline_access");
+  const issued = tokens.body.refresh_token as string;
+  expect(issued).toBeTruthy();
+
+  const renamed = `${app.client.identifier}-r`;
+  await page.goto(clientUrl(app.client.id, "settings"));
+  await page.locator('input[name="clientIdentifier"]').fill(renamed);
+  await page.locator("#btnSave").click();
+  const dialog = page.locator("dialog[open]");
+  await expect(dialog).toContainText("Its refresh tokens will stop working, so its users will have to sign in again.");
+  await confirmDialog(page, "You're changing the client identifier");
+  await expect(page.getByText(saved)).toBeVisible();
+
+  const refused = await refreshToken(request, renamed, app.secret, issued);
+  expect(refused.status, JSON.stringify(refused.body)).toBe(400);
+  expect(refused.body.error).toBe("invalid_grant");
+
+  await page.goto(`${env.adminUrl}/admin/settings/audit-log-viewer?${new URLSearchParams({ auditEvent: "revoked_client_grants" })}`);
+  await expect(auditRows(page, { client_id: String(app.client.id), reason: "client_identifier_changed" })).toHaveCount(1);
 });
 
 // Every consequence of one save is asked in one question, one sentence each.

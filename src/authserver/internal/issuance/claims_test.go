@@ -953,6 +953,7 @@ func TestAMR_IsArrayType_InGeneratedTokens(t *testing.T) {
 			Scope:  "openid",
 		}
 
+		expectPasswordGrantClientRow(mockDB, input.Client.Id, input.Client)
 		response, err := tokenIssuer.IssuePasswordGrant(ctx, settings, input)
 		require.NoError(t, err)
 
@@ -2304,6 +2305,7 @@ func issueForScopeIsTheGrant(t *testing.T, flow string, grant string, storedRefr
 		issued.reportedScope, issued.accessToken, issued.idToken = response.Scope, response.AccessToken, response.IdToken
 	case "ROPC":
 		captureRefresh()
+		expectPasswordGrantClientRow(mockDB, client.Id, &client)
 		response, err := tokenIssuer.IssuePasswordGrant(ctx, settings, &ROPCGrantInput{Client: &client, User: &user, Scope: grant})
 		require.NoError(t, err)
 		issued.reportedScope, issued.accessToken, issued.idToken, issued.refreshToken =

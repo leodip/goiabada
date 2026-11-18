@@ -198,7 +198,7 @@ One check decides whether an access token is one under RFC 9068 and still stands
 - Last, a token carrying `grant_id` is live only while its grant is: `IsRefreshTokenFamilyLive`
   answers whether the family has no revocation record and still has a member that is not revoked,
   in one indexed read. Every revocation that ends a grant writes the record in its transaction, for
-  every family it reads: consent withdrawal, a client made public, a session's termination,
+  every family it reads: consent withdrawal, a client made public or renamed, a session's termination,
   authorization-code reuse containment, replay containment and `/auth/revoke`. A sweep alone misses
   the child of a rotation that claimed its parent before the sweep read the rows, so the record is
   what refuses that child's access token at once. A credential change ends access tokens through
@@ -382,6 +382,14 @@ exposure.
 - Disabled by default. Enable via `Settings.ResourceOwnerPasswordCredentialsEnabled` or per-client
 - Rate limited. Blocks users with 2FA enabled, and users who owe the acceptance step a legal
   document for the client (`invalid_grant`, #622). Logs `audit.EventROPCAuthFailed` on failure
+- A change of a client's identifier revokes the client's grants in the rename's transaction
+  (`revocation.RevokeClientGrantsTx` under `ReasonClientIdentifierChanged`, #710 decision 5), and a
+  password grant has no code to mark, so the initial grant writes its first refresh token in a
+  transaction that first reads the client with `GetClientByIdForUpdate`, a locking read that writes
+  nothing. Either it commits first and the rename's sweep finds the token, or it reads the identifier
+  the rename gave and is refused with `ErrPasswordGrantClientRenamed`, answered `invalid_client`
+  ("Client does not exist."), nothing issued. `password_grant_rename_ordering_test.go` shows both
+  orders on every engine
 - Implementation: `handler_token_password.go`, `protocolvalidation/token_grant_password.go`,
   `issuance/grant_password.go`
 
