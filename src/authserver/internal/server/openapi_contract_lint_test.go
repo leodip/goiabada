@@ -627,6 +627,107 @@ func TestPathParameterNames_AJoinThatMatchedNoRouteStops(t *testing.T) {
 	}
 }
 
+// TestOpenAPI_GivesEachOperationItsOwnId holds each operationId to one operation, as OpenAPI 3.0.3
+// section 4.7.10 requires ("The id MUST be unique among all operations described in the API"). The
+// API reference gives each operation a page under its id, and a client generator names a method
+// after it, so two operations sharing one leave one of them without a page and collide in a
+// generated client.
+func TestOpenAPI_GivesEachOperationItsOwnId(t *testing.T) {
+	assertOperationIdsUnique(t, parseSpec(t))
+}
+
+// assertOperationIdsUnique is the reporting half: one failure per finding of operationIdFindings,
+// and a stop for a spec holding no operation, since a check of nothing proves nothing.
+func assertOperationIdsUnique(r guard.Reporter, spec map[string]specOperation) {
+	r.Helper()
+	if len(spec) == 0 {
+		r.Fatalf("read no operation out of openapi.yaml; the check is no longer reaching the spec")
+		return
+	}
+	for _, finding := range operationIdFindings(spec) {
+		r.Errorf("%s", finding)
+	}
+}
+
+// operationIdFindings returns one finding per operationId that more than one operation carries,
+// naming each of those operations, and one per operation that has none.
+func operationIdFindings(spec map[string]specOperation) []string {
+	carriers := map[string][]string{}
+	var findings []string
+	for key, op := range spec {
+		verb, _, _ := strings.Cut(key, " ")
+		operation := strings.ToUpper(verb) + " " + op.path
+		if op.operationId == "" {
+			findings = append(findings, fmt.Sprintf("openapi.yaml: %s has no operationId", operation))
+			continue
+		}
+		carriers[op.operationId] = append(carriers[op.operationId], operation)
+	}
+	for id, operations := range carriers {
+		if len(operations) > 1 {
+			sort.Strings(operations)
+			findings = append(findings, fmt.Sprintf("openapi.yaml: operationId %s names %d operations, %s: "+
+				"give each its own", id, len(operations), strings.Join(operations, " and ")))
+		}
+	}
+	sort.Strings(findings)
+	return findings
+}
+
+// operationIdsFixture is a spec whose three operations each carry an id of their own.
+func operationIdsFixture() map[string]specOperation {
+	spec := map[string]specOperation{}
+	for _, op := range []struct{ method, path, operationId string }{
+		{"get", "/api/v1/admin/brand-assets/{id}", "getBrandAsset"},
+		{"get", "/brand-assets/{id}", "getBrandAssetFile"},
+		{"get", "/client/logo/{clientIdentifier}", "getClientLogoImage"},
+	} {
+		spec[routeKey(op.method, op.path)] = specOperation{operationId: op.operationId, path: op.path}
+	}
+	return spec
+}
+
+func TestOperationIds_AnIdTwoOperationsCarryFails(t *testing.T) {
+	spec := operationIdsFixture()
+	spec[routeKey("get", "/brand-assets/{id}")] = specOperation{operationId: "getBrandAsset", path: "/brand-assets/{id}"}
+	spec[routeKey("get", "/client/logo/{clientIdentifier}")] = specOperation{path: "/client/logo/{clientIdentifier}"}
+
+	report := guard.Run(func(r guard.Reporter) {
+		assertOperationIdsUnique(r, spec)
+	})
+
+	if report.Stopped {
+		t.Fatalf("the check stopped rather than reporting: %s", report.Fatal)
+	}
+	want := []string{
+		"openapi.yaml: GET /client/logo/{clientIdentifier} has no operationId",
+		"openapi.yaml: operationId getBrandAsset names 2 operations, GET /api/v1/admin/brand-assets/{id} and GET /brand-assets/{id}: give each its own",
+	}
+	if got := report.Errors; !slices.Equal(got, want) {
+		t.Errorf("failures\n%q\nwant\n%q", got, want)
+	}
+}
+
+func TestOperationIds_EachOperationWithItsOwnIdPasses(t *testing.T) {
+	report := guard.Run(func(r guard.Reporter) {
+		assertOperationIdsUnique(r, operationIdsFixture())
+	})
+
+	if report.Failed() {
+		t.Errorf("a spec giving each operation its own id failed: %+v", report)
+	}
+}
+
+func TestOperationIds_ASpecWithNoOperationStops(t *testing.T) {
+	report := guard.Run(func(r guard.Reporter) {
+		assertOperationIdsUnique(r, map[string]specOperation{})
+	})
+
+	if !report.Stopped || !strings.Contains(report.Fatal, "read no operation") {
+		t.Errorf("a spec with no operation did not stop the check: %+v", report)
+	}
+}
+
 // TestAPIHandlers_WriteStatusesAsConstants is what lets the three tests above be lexical.
 // Every writeJSONError and writeLocalizedError call passes an http.Status constant, so reading
 // the constants out of a handler reads its whole failure surface. A status computed at run

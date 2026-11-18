@@ -19,7 +19,7 @@ info:
     ```
     `getClientLogoImage`, at `/client/logo/{clientIdentifier}`, `getPublicSettings`, at
     `/api/public/settings`, and a brand's stylesheets and assets, `getBrandStylesheet`,
-    `getBrandColorsStylesheet` and `getBrandAsset`, are outside `/api/v1`: they are public and
+    `getBrandColorsStylesheet` and `getBrandAssetFile`, are outside `/api/v1`: they are public and
     marked `security: []`.
 
     ## API Groups
@@ -4130,7 +4130,7 @@ paths:
         fingerprint, the answer may be kept a year; asked for by any other fingerprint, or none,
         it is kept five minutes. A font is answered with `Access-Control-Allow-Origin` naming
         the admin console's origin, so the console's pages may draw it, and no other site's.
-      operationId: getBrandAsset
+      operationId: getBrandAssetFile
       security: []
       parameters:
         - name: id
