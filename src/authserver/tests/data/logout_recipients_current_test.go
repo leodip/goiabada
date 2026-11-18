@@ -138,7 +138,7 @@ func TestLogoutRecipients_AUserDeletionTellsAnAppThatJoinedBeforeTheSessionLock(
 
 	sender := &recordedLogoutTokens{}
 	id := strconv.FormatInt(race.user.Id, 10)
-	rr := serveDeletion(apihandlers.HandleUserDelete(race.db, &countingAuditLogger{}, noNotices{}, sender),
+	rr := serveUserWrite(apihandlers.HandleUserDelete(race.db, &countingAuditLogger{}, noNotices{}, sender),
 		http.MethodDelete, "/api/v1/admin/users/"+id, map[string]string{"id": id}, nil,
 		"logout-recipients-test", builtin.AuthServerResourceIdentifier+":"+builtin.ManagePermissionIdentifier)
 

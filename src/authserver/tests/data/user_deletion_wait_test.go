@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/backchannel"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/fake"
@@ -25,12 +26,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Both deletions of a user, the administrator's and the user's own, tell every app the existing
-// rules owe a logout token, including an app whose session or refresh token a sign-in committed
-// while the deletion waited for the user's row (#796). Each deletion takes the administrators' lock
-// and then the user's row; on MySQL an ordinary read in the lock fixed the snapshot before that
-// wait, so the deletion's lists of sessions and refresh tokens missed what committed during it, and
-// those apps were never told.
+// Both deletions of a user, the administrator's and the user's own, and the administrator's
+// disable tell every app the existing rules owe a logout token, including an app whose session or
+// refresh token a sign-in committed while the write waited for the user's row (#796). Each write
+// takes the administrators' lock and then the user's row; on MySQL an ordinary read before that
+// wait fixed the snapshot, so the write's lists of sessions and refresh tokens missed what committed
+// during it, and those apps were never told. The disable also left that session and token in place.
 //
 // SQLite's one connection cannot overlap two transactions, so these run on the three other engines.
 
@@ -69,20 +70,37 @@ type userRowTakenAtTheWrite struct {
 }
 
 func (d *userRowTakenAtTheWrite) GetUserByIdForUpdate(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error) {
-	if tx != nil && !d.taken {
-		d.taken = true
-		if err := d.take(); err != nil {
-			d.reached()
-			return nil, err
-		}
-		d.reached()
+	if err := d.takeOnce(tx); err != nil {
+		return nil, err
 	}
 	return d.Database.GetUserByIdForUpdate(ctx, tx, userId)
 }
 
-// serveDeletion serves one deletion request through handler, with the settings's session lifetimes
+// TrySetUserEnabled is where a disable that writes before it reads the user's row under its lock
+// acquires that row. The holder takes it there then, so such a disable is still measured waiting
+// inside its transaction, rather than never reaching the wait.
+func (d *userRowTakenAtTheWrite) TrySetUserEnabled(ctx context.Context, tx *sql.Tx, userId int64, expected, desired bool) (bool, error) {
+	if err := d.takeOnce(tx); err != nil {
+		return false, err
+	}
+	return d.Database.TrySetUserEnabled(ctx, tx, userId, expected, desired)
+}
+
+// takeOnce has the holder take the user's row at the transaction's first acquisition of it, and
+// signals the harness on the line before that acquisition.
+func (d *userRowTakenAtTheWrite) takeOnce(tx *sql.Tx) error {
+	if tx == nil || d.taken {
+		return nil
+	}
+	d.taken = true
+	err := d.take()
+	d.reached()
+	return err
+}
+
+// serveUserWrite serves one request of a write that ends a user's sessions through handler, with the settings's session lifetimes
 // positive, as a deployment's are, and a validated token with sub and scope.
-func serveDeletion(handler http.HandlerFunc, method, target string, params map[string]string, body []byte,
+func serveUserWrite(handler http.HandlerFunc, method, target string, params map[string]string, body []byte,
 	sub, scope string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(method, target, bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
@@ -161,11 +179,11 @@ func TestUserDeletion_TellsTheAppOfStateCommittedWhileItWaitedForTheUsersRow(t *
 				party := goBlocked(t, deletion, holder, func(reached func()) *httptest.ResponseRecorder {
 					db.reached = reached
 					if deletion == "the administrator's deletion" {
-						return serveDeletion(apihandlers.HandleUserDelete(db, &countingAuditLogger{}, noNotices{}, sender),
+						return serveUserWrite(apihandlers.HandleUserDelete(db, &countingAuditLogger{}, noNotices{}, sender),
 							http.MethodDelete, "/api/v1/admin/users/"+id, map[string]string{"id": id}, nil,
 							"deletion-wait-test", manageScope)
 					}
-					return serveDeletion(apihandlers.HandleAccountDeletionPost(db, &countingAuditLogger{}, uncountedFailures{}, dataCipher, noNotices{}, sender),
+					return serveUserWrite(apihandlers.HandleAccountDeletionPost(db, &countingAuditLogger{}, uncountedFailures{}, dataCipher, noNotices{}, sender),
 						http.MethodPost, "/api/v1/account/deletion", nil, body, user.Subject, "authserver:manage-account")
 				})
 				party.requireBlocked(t)
@@ -182,5 +200,96 @@ func TestUserDeletion_TellsTheAppOfStateCommittedWhileItWaitedForTheUsersRow(t *
 					"the app of %s the sign-in committed while the deletion waited is among the logout-token deliveries", state)
 			})
 		}
+	}
+}
+
+// The administrator's disable ends the session and revokes the refresh token a sign-in committed
+// while it waited for the user's row, lists them in its audit event, and tells their apps (#796
+// decisions 1 and 2).
+func TestUserDisable_EndsAndTellsStateCommittedWhileItWaitedForTheUsersRow(t *testing.T) {
+	skipWhereTransactionsCannotOverlap(t)
+	manageScope := builtin.AuthServerResourceIdentifier + ":" + builtin.ManagePermissionIdentifier
+
+	for _, state := range []string{"a new session with an app", "a refresh token for an app on no session"} {
+		t.Run(state, func(t *testing.T) {
+			ctx := context.Background()
+			other := secondDatabase(t)
+			managePermissionRow(t)
+
+			user := newHolder(t, database, true)
+
+			// The existing rules owe this app a token: it has a back-channel logout URI and
+			// doesn't require a session identifier.
+			app := createTestClient(t)
+			require.NoError(t, database.SetClientBackchannelLogout(ctx, nil, app.Id, "https://app.example/backchannel", false))
+
+			// The sign-in's writes, uncommitted.
+			holder := beginTx(t)
+			now := time.Now().UTC().Truncate(time.Microsecond)
+			var session *record.UserSession
+			var grant *record.RefreshToken
+			if state == "a new session with an app" {
+				session = &record.UserSession{
+					SessionIdentifier: fake.UUID(), Started: now, LastAccessed: now, AuthMethods: "pwd",
+					AcrLevel: record.AcrLevel1, AuthTime: now, PasswordAuthTime: now, IpAddress: "127.0.0.1",
+					DeviceName: "disable-wait", DeviceType: "desktop", DeviceOS: "Linux", UserAgent: testUserAgent,
+					DeviceId: testDeviceId, UserId: user.Id, AuthStateGeneration: user.AuthStateGeneration,
+				}
+				require.NoError(t, database.CreateUserSession(ctx, holder, session))
+				require.NoError(t, database.CreateUserSessionClient(ctx, holder, &record.UserSessionClient{
+					UserSessionId: session.Id, ClientId: app.Id, Started: now, LastAccessed: now,
+				}))
+			} else {
+				grant = &record.RefreshToken{
+					UserId:          sql.NullInt64{Int64: user.Id, Valid: true},
+					ClientId:        sql.NullInt64{Int64: app.Id, Valid: true},
+					RefreshTokenJti: fake.UUID(), RefreshTokenType: "Offline", Scope: "openid offline_access",
+					IssuedAt:            sql.NullTime{Time: now, Valid: true},
+					ExpiresAt:           sql.NullTime{Time: now.Add(time.Hour), Valid: true},
+					MaxLifetime:         sql.NullTime{Time: now.Add(24 * time.Hour), Valid: true},
+					AuthStateGeneration: user.AuthStateGeneration,
+				}
+				grant.FirstRefreshTokenJti = grant.RefreshTokenJti
+				require.NoError(t, database.CreateRefreshToken(ctx, holder, grant))
+			}
+
+			sender := &recordedLogoutTokens{}
+			recorder := &recoveryAuditRecorder{}
+			db := &userRowTakenAtTheWrite{Database: other, take: func() error {
+				return database.AcquireUserRow(ctx, holder, user.Id)
+			}}
+			id := strconv.FormatInt(user.Id, 10)
+			party := goBlocked(t, "the disable", holder, func(reached func()) *httptest.ResponseRecorder {
+				db.reached = reached
+				return serveUserWrite(apihandlers.HandleUserEnabledPut(db, recorder, sender),
+					http.MethodPut, "/api/v1/admin/users/"+id+"/enabled", map[string]string{"id": id},
+					[]byte(`{"enabled":false}`), "disable-wait-test", manageScope)
+			})
+			party.requireBlocked(t)
+			party.requireStillWaiting(t)
+			require.True(t, db.taken, "the disable waits at its transaction's acquisition of the user's row")
+			require.NoError(t, database.CommitTransaction(ctx, holder))
+			rr := party.await(t)
+			require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+
+			disabled, err := database.GetUserById(ctx, nil, user.Id)
+			require.NoError(t, err)
+			require.NotNil(t, disabled)
+			assert.False(t, disabled.Enabled, "the user is disabled")
+
+			require.Equal(t, []string{audit.EventUpdatedUserDetails, audit.EventRevokedUserAuthState}, recorder.events)
+			revoked := recorder.details[1]
+			if state == "a new session with an app" {
+				left, err := database.GetUserSessionById(ctx, nil, session.Id)
+				require.NoError(t, err)
+				assert.Nil(t, left, "the session started while the disable waited is ended")
+				assert.Equal(t, []string{session.SessionIdentifier}, revoked["terminated_session_identifiers"])
+			} else {
+				assertTokenRevoked(t, grant.Id, true, "the refresh token issued while the disable waited")
+				assert.Equal(t, []string{grant.RefreshTokenJti}, revoked["revoked_refresh_token_jtis"])
+			}
+			assert.True(t, sender.toldClientIds()[app.Id],
+				"the app of %s the sign-in committed while the disable waited is among the logout-token deliveries", state)
+		})
 	}
 }

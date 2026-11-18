@@ -328,11 +328,13 @@ client's back-channel logout URI (#784).
   code take that session's row first and hold no users row: the subject is read before the
   transaction. A sign-in takes each session it removes after its own writes, and after the user's
   row when it rechecks an OTP claim. A user-wide end and a credential change take the
-  user's row first (the generation increment, or `GetUserByIdForUpdate` for a deletion), then each
-  of the user's sessions in id order, as the [data guide](data.md#transactions) sets out. A
-  deletion makes no ordinary read before the user's row, its administrators' lock reading `FOR
-  SHARE` on MySQL, so the sessions and refresh tokens a sign-in committed while it waited for that
-  row are among those it tells: on MySQL an earlier ordinary read fixes the snapshot (#796). The hinted
+  user's row first (the generation increment, or `GetUserByIdForUpdate` for a deletion and the
+  administrator's disable), then each of the user's sessions in id order, as the
+  [data guide](data.md#transactions) sets out. A deletion and the disable make no ordinary read
+  before the user's row, their administrators' lock reading `FOR SHARE` on MySQL, so the sessions
+  and refresh tokens a sign-in committed while they waited for that row are among those they tell,
+  and the disable ends and revokes them: on MySQL an earlier ordinary read fixes the snapshot
+  (#796). The hinted
   sign-out (`revocation.EndClientPartTx`) deletes the hinting app's row, and the session when that
   app is its last as read under the row, so an app a sign-in added after the sign-out first read the
   session keeps it; it tells the hinting app after the commit. Each caller hands its deliveries to

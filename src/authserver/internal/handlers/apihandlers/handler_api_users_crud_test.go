@@ -13,6 +13,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/backchannel"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
@@ -108,17 +109,18 @@ func TestHandleUserEnabledPut_RevocationConditionality(t *testing.T) {
 			database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), userId).
 				Return(&record.User{Id: userId}, nil).Once()
 
-			// Set on the disabling rows, which are the ones that open a transaction.
-			var stub *datamocks.RunInTransactionStub
+			stub := datamocks.ExpectRunInTransaction(database, apiRevokeTx)
 			if tc.requestedEnabled {
-				// Enabling: the compare-and-set runs outside a transaction, since there is no
-				// sweep to be atomic with. Both directions go through it, so neither stays on
-				// the full-row UpdateUser that decision 14 rules out.
-				database.On("TrySetUserEnabled", mock.Anything, (*sql.Tx)(nil), userId, false, true).
+				// Enabling: the compare-and-set runs under the user's row, which tells a user
+				// already enabled from one who is gone (#796 decision 3), with no sweep after it.
+				// Both directions go through it, so neither stays on the full-row UpdateUser that
+				// decision 14 rules out.
+				expectUserRowTaken(database, apiRevokeTx, &record.User{Id: userId, Enabled: !tc.transitioned})
+				database.On("TrySetUserEnabled", mock.Anything, apiRevokeTx, userId, false, true).
 					Return(tc.transitioned, nil).Once()
 			} else {
-				stub = datamocks.ExpectRunInTransaction(database, apiRevokeTx)
 				expectGuardOfOrdinaryUser(database, apiRevokeTx, userId)
+				expectUserRowTaken(database, apiRevokeTx, &record.User{Id: userId, Enabled: tc.transitioned})
 				database.On("TrySetUserEnabled", mock.Anything, apiRevokeTx, userId, true, false).
 					Return(tc.transitioned, nil).Once()
 				if tc.transitioned {
@@ -152,12 +154,11 @@ func TestHandleUserEnabledPut_RevocationConditionality(t *testing.T) {
 			handler.ServeHTTP(rr, enabledRequest(t, "42", tc.requestedEnabled))
 
 			assert.Equal(t, http.StatusOK, rr.Code)
-			if stub != nil && !tc.transitioned {
+			if !tc.requestedEnabled && !tc.transitioned {
 				// Already disabled: the body leaves the helper on the sentinel, so the empty
 				// transaction rolls back rather than commits, and the caller still answers 200.
 				require.ErrorIs(t, stub.BodyErr, errUserAlreadyDisabled)
-			}
-			if stub != nil && tc.transitioned {
+			} else {
 				require.NoError(t, stub.BodyErr)
 			}
 			database.AssertExpectations(t)
@@ -197,6 +198,7 @@ func TestHandleUserEnabledPut_SweepFailureRollsBack(t *testing.T) {
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), userId).Return(&record.User{Id: userId}, nil).Once()
 	stub := datamocks.ExpectRunInTransaction(database, apiRevokeTx)
 	expectGuardOfOrdinaryUser(database, apiRevokeTx, userId)
+	expectUserRowTaken(database, apiRevokeTx, &record.User{Id: userId, Enabled: true})
 	database.On("TrySetUserEnabled", mock.Anything, apiRevokeTx, userId, true, false).Return(true, nil).Once()
 	database.On("IncrementUserAuthStateGeneration", mock.Anything, apiRevokeTx, userId).
 		Return(int64(0), assert.AnError).Once()
@@ -211,6 +213,109 @@ func TestHandleUserEnabledPut_SweepFailureRollsBack(t *testing.T) {
 	// Not even the pre-existing event: the disable did not happen, so recording it as a user
 	// detail update would be false.
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+}
+
+// expectUserRowTaken registers the enabled endpoint's read of the user under its lock on tx, which
+// answers user, or nil for a user deleted before the write.
+func expectUserRowTaken(database *datamocks.Database, tx *sql.Tx, user *record.User) {
+	database.On("GetUserByIdForUpdate", mock.Anything, tx, int64(42)).Return(user, nil).Once()
+}
+
+// TestHandleUserEnabledPut_AUserDeletedMeanwhile: another administrator deletes the user after
+// the endpoint first read them (#796 decision 3). Deleted before the write, the request answers
+// 404 and writes nothing, logs no audit event and sends no logout token. Deleted after the write
+// committed, it answers 404 too, and what the committed write did stands: its audit events, and a
+// disable's logout tokens. A request that changes nothing on a user who is there keeps its 200 and
+// its event: TestHandleUserEnabledPut_RevocationConditionality's rows for an account already in
+// the requested state.
+func TestHandleUserEnabledPut_AUserDeletedMeanwhile(t *testing.T) {
+	const userId = int64(42)
+	app := record.Client{Id: 7, ClientIdentifier: "app-holding-a-grant",
+		BackchannelLogoutURI: "https://app.example/backchannel"}
+
+	for _, enabled := range []bool{false, true} {
+		direction := "disabling"
+		if enabled {
+			direction = "enabling"
+		}
+		// The user as the endpoint first reads them: in the state the request changes.
+		user := &record.User{Id: userId, Subject: "sub-42", Enabled: !enabled}
+
+		t.Run(direction+" a user deleted before the write", func(t *testing.T) {
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+			logoutTokens := &recordingLogoutTokens{}
+
+			database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), userId).Return(user, nil).Once()
+			stub := datamocks.ExpectRunInTransaction(database, apiRevokeTx)
+			if !enabled {
+				expectAdministratorsLock(database, apiRevokeTx)
+			}
+			expectUserRowTaken(database, apiRevokeTx, nil)
+
+			rr := httptest.NewRecorder()
+			HandleUserEnabledPut(database, auditLogger, logoutTokens).ServeHTTP(rr, enabledRequest(t, "42", enabled))
+
+			require.Equal(t, http.StatusNotFound, rr.Code, rr.Body.String())
+			code, description := decodeErrorEnvelope(t, rr)
+			assert.Equal(t, "NOT_FOUND", code)
+			assert.Equal(t, "User not found", description)
+			require.ErrorIs(t, stub.BodyErr, errAccountGone, "the body finds no row, so the helper rolls back")
+			database.AssertExpectations(t)
+			database.AssertNotCalled(t, "TrySetUserEnabled", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+			auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+			assert.Empty(t, logoutTokens.sent, "no logout token")
+		})
+
+		t.Run(direction+" a user deleted after the write committed", func(t *testing.T) {
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+			logoutTokens := &recordingLogoutTokens{}
+
+			database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), userId).Return(user, nil).Once()
+			stub := datamocks.ExpectRunInTransaction(database, apiRevokeTx)
+			if enabled {
+				expectUserRowTaken(database, apiRevokeTx, user)
+				database.On("TrySetUserEnabled", mock.Anything, apiRevokeTx, userId, false, true).Return(true, nil).Once()
+			} else {
+				expectGuardOfOrdinaryUser(database, apiRevokeTx, userId)
+				expectUserRowTaken(database, apiRevokeTx, user)
+				database.On("TrySetUserEnabled", mock.Anything, apiRevokeTx, userId, true, false).Return(true, nil).Once()
+				database.On("IncrementUserAuthStateGeneration", mock.Anything, apiRevokeTx, userId).Return(int64(4), nil).Once()
+				database.On("GetUserSessionsByUserId", mock.Anything, apiRevokeTx, userId).Return([]record.UserSession{}, nil).Once()
+				// An app on none of the user's sessions holds a grant, so the disable owes it a
+				// logout token naming the user alone (#784 decision 3).
+				database.On("GetUsableRefreshTokenClientIdsByUserId", mock.Anything, apiRevokeTx, userId, mock.Anything).
+					Return([]int64{app.Id}, nil).Once()
+				database.On("GetClientsByIds", mock.Anything, apiRevokeTx, []int64{app.Id}).Return([]record.Client{app}, nil).Once()
+				database.On("GetRefreshTokensByUserId", mock.Anything, apiRevokeTx, userId).Return([]*record.RefreshToken{}, nil).Once()
+				database.On("PromoteRefreshTokenGenerations", mock.Anything, apiRevokeTx, []int64{}, int64(4)).Return(nil).Once()
+				auditLogger.On("Log", mock.Anything, audit.EventRevokedUserAuthState, mock.Anything).Return().Once()
+			}
+			auditLogger.On("Log", mock.Anything, audit.EventUpdatedUserDetails, mock.Anything).Return().Once()
+			// The response's read of the user finds them gone.
+			database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), userId).Return((*record.User)(nil), nil).Once()
+
+			rr := httptest.NewRecorder()
+			HandleUserEnabledPut(database, auditLogger, logoutTokens).ServeHTTP(rr, enabledRequest(t, "42", enabled))
+
+			require.Equal(t, http.StatusNotFound, rr.Code, rr.Body.String())
+			code, description := decodeErrorEnvelope(t, rr)
+			assert.Equal(t, "NOT_FOUND", code)
+			assert.Equal(t, "User not found", description)
+			require.NoError(t, stub.BodyErr, "the write committed")
+			database.AssertExpectations(t)
+			auditLogger.AssertExpectations(t)
+			if enabled {
+				assert.Empty(t, logoutTokens.sent, "an enable tells no app")
+			} else {
+				assert.Equal(t, [][]backchannel.Delivery{{{
+					ClientId: 7, ClientIdentifier: "app-holding-a-grant", URI: "https://app.example/backchannel",
+					UserId: userId, Subject: "sub-42",
+				}}}, logoutTokens.sent, "the committed disable's logout token stands")
+			}
+		})
+	}
 }
 
 // TestHandleUserPasswordPut_RevokesEverything covers the fourth site, the one the issue never

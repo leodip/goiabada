@@ -56,12 +56,15 @@ Preserve the row locks that make security decisions atomic:
   transaction's first read, without the app that sign-in added.
   A credential change and a user's deletion that tell apps take each of the user's session rows
   this way, in id order, after the user's row: the deletion takes it with `GetUserByIdForUpdate`.
-- Both deletions of a user, the administrator's and the account's own, make no ordinary read before
-  they hold the user's row. Under InnoDB's REPEATABLE READ a transaction's first ordinary read fixes
-  the snapshot every later one answers, and the sessions and refresh tokens they read after the wait
-  must include what a sign-in committed during it (#796). They open with the administrators' lock,
-  `AcquireManagePermissionRow`, whose read of its row is `FOR SHARE` on MySQL for this reason, then
-  take the user's row. The rule is MySQL's; the other engines' ordinary reads fix no snapshot.
+- Both deletions of a user, the administrator's and the account's own, and the administrator's
+  disable make no ordinary read before they hold the user's row. Under InnoDB's REPEATABLE READ a
+  transaction's first ordinary read fixes the snapshot every later one answers, and the sessions and
+  refresh tokens they read after the wait must include what a sign-in committed during it (#796).
+  They open with the administrators' lock, `AcquireManagePermissionRow`, whose read of its row is
+  `FOR SHARE` on MySQL for this reason, then take the user's row with `GetUserByIdForUpdate` before
+  reading the user's grants. The rule is MySQL's; the other engines' ordinary reads fix no snapshot.
+  On PostgreSQL the disable's lookup also makes it wait for a sign-in inserting a session, which
+  holds a key-share lock on the user's row, so it ends that session too.
 - Refresh rotation takes the user's row first (`AcquireUserRow`), as credential changes do through
   their write and generation increment. A rotation cannot stamp a child from a token a revocation
   already moved past, and the revocation's sweep cannot miss that child (#131).

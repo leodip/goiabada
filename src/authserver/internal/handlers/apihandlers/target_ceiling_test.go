@@ -197,11 +197,9 @@ var userTargetWrites = []targetWrite{
 			HandleUserEnabledPut(database, auditLogger, &recordingLogoutTokens{}).ServeHTTP(rr, withSessionSettings(r))
 			return rr
 		},
-		expectReads: func(database *datamocks.Database, _ bool) { expectTargetUser(database, nil) },
-		writes:      []string{"RunInTransaction", "TrySetUserEnabled"},
-		expectFirstWrite: func(database *datamocks.Database) {
-			database.On("TrySetUserEnabled", mock.Anything, (*sql.Tx)(nil), targetUserId, false, true).Return(false, errFirstWriteFails).Once()
-		},
+		expectReads:      func(database *datamocks.Database, _ bool) { expectTargetUser(database, nil) },
+		writes:           []string{"RunInTransaction", "TrySetUserEnabled"},
+		expectFirstWrite: failingWrite("RunInTransaction", mock.Anything, mock.Anything),
 	},
 	{
 		name: "PUT /users/{id}/profile",
