@@ -110,15 +110,15 @@ nothing, before it inserts its first refresh token, so it and a rename serialize
 (`password_grant_rename_ordering_test.go`). Code issuance reads its client's row again with
 `GetClientByIdForShare` before inserting the code, a shared lock that a rename or a deletion waits
 for and that waits for theirs, and refuses when the identifier is no longer the one it looked up
-(`code_issuance_rename_ordering_test.go`); on MySQL, PostgreSQL and SQL Server, sign-ins to one
-client do not wait for each other, and on SQLite the read is plain, its one connection running one
-transaction at a time. A client's deletion (`DeleteClient`) takes no row ahead of its statements
-(#301), and reads the identifier it records in `deleted_clients` with `GetClientByIdForUpdate` just
-before its DELETE, which takes that row anyway: a rename committed meanwhile is waited for, and the
-deletion records the identifier the row held when it was deleted, not one it gave up. Holding the
-row, it sweeps the client's refresh tokens again, since an initial password grant it waited for has
-committed a token its first sweep could not see (`deleted_client_test.go` shows both orders against
-a rename, and
+(`code_issuance_rename_ordering_test.go`); on MySQL, PostgreSQL and SQL Server two issuances' reads
+of one client's row do not wait for each other, and on SQLite the read is plain, its one connection
+running one transaction at a time. A client's deletion (`DeleteClient`) takes no row ahead of its
+statements (#301), and reads the identifier it records in `deleted_clients` with
+`GetClientByIdForUpdate` just before its DELETE, which takes that row anyway: a rename committed
+meanwhile is waited for, and the deletion records the identifier the row held when it was deleted,
+not one it gave up. Holding the row, it sweeps the client's refresh tokens again, since an initial
+password grant it waited for has committed a token its first sweep could not see
+(`deleted_client_test.go` shows both orders against a rename, and
 `password_grant_rename_ordering_test.go`'s `TestDeleteClientOrdering_AgainstInitialPasswordGrant`
 both orders against a password grant, on MySQL, PostgreSQL and SQL Server, and again with
 READ_COMMITTED_SNAPSHOT on),

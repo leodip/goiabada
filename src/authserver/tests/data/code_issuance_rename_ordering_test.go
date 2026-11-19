@@ -54,8 +54,9 @@ func TestGetClientByIdForShare(t *testing.T) {
 }
 
 // Two transactions holding the shared lock on one client's row do not wait for each other, so
-// sign-ins to one client are not queued behind one another. The second read is bounded: a read
-// that waited for the first transaction would reach the deadline instead of answering.
+// sign-ins to one client in different sessions are not queued behind one another on its row. The
+// second read is bounded: a read that waited for the first transaction would reach the deadline
+// instead of answering.
 func TestGetClientByIdForShare_TwoHoldersDoNotWaitForEachOther(t *testing.T) {
 	skipWhereTransactionsCannotOverlap(t)
 	ctx := context.Background()
