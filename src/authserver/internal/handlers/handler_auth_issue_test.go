@@ -1056,7 +1056,7 @@ func TestHandleIssueGet_AnswersEachIssuanceOutcome(t *testing.T) {
 			assert.Equal(t, []string{"issued", "save"}, order)
 
 			if refusal.warns {
-				warning, ok := warningSaying(t, logs, "the client this ceremony is issuing for no longer exists")
+				warning, ok := warningSaying(t, logs, "the client this ceremony is issuing for no longer exists under the identifier it named")
 				if ok {
 					assert.Equal(t, "test-client", warning.Attrs["client_identifier"])
 					assert.Equal(t, liveSessionIdentifier, warning.Attrs["session_identifier"])

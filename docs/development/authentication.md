@@ -19,6 +19,14 @@ tokens.
 - PKCE: always required for a public client; otherwise configurable globally
   (`Settings.PKCERequired`) or per-client (`Client.PKCERequired`)
 - Supports `response_type=code` with optional `code_challenge` + `code_challenge_method`
+- A change of a client's identifier revokes its unredeemed codes in the rename's transaction (#710
+  decision 5). Issuance looks the client up by the identifier the ceremony named with a plain read,
+  then reads its row again with `GetClientByIdForShare`, a shared lock held to the end of the
+  issuance transaction, before inserting the code: either the code commits first and the rename's
+  sweep revokes it, or the rename commits first and issuance, finding the identifier changed,
+  refuses with `ErrIssuingClientGone`, which `/auth/issue` answers as a client that is gone (#866).
+  Sign-ins to one client do not wait for each other. `code_issuance_rename_ordering_test.go` shows
+  both orders on MySQL, PostgreSQL and SQL Server, and again with READ_COMMITTED_SNAPSHOT on
 - Implementation: `handler_authorize.go`, `authflow/authorization.go`, `issuance/code_issuer.go`;
   redeemed by `handler_token_authorization_code.go`,
   `protocolvalidation/token_grant_authorization_code.go`, `issuance/grant_authorization_code.go`

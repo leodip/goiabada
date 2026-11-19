@@ -294,6 +294,19 @@ var selectClientByIdForUpdate = statement{
 	mssql:    "SELECT " + clientColumns.mssql + " FROM clients WITH (UPDLOCK, ROWLOCK) WHERE id = @p1",
 }
 
+// selectClientByIdForShare is the shared locking read GetClientByIdForShare runs. PostgreSQL's is
+// FOR KEY SHARE, the lock the codes table's foreign key takes on the row at the insert anyway: a
+// rename's and a deletion's FOR UPDATE conflict with it, a save that changes none of the row's
+// keys does not. SQL Server's REPEATABLEREAD hint holds the shared lock to the end of the
+// transaction, where READ COMMITTED would release it at the end of the statement, and reads by
+// locking even with READ_COMMITTED_SNAPSHOT on.
+var selectClientByIdForShare = statement{
+	sqlite:   "SELECT " + clientColumns.sqlite + " FROM clients WHERE id = ?",
+	mysql:    "SELECT " + clientColumns.mysql + " FROM clients WHERE id = ? FOR SHARE",
+	postgres: "SELECT " + clientColumns.postgres + " FROM clients WHERE id = $1 FOR KEY SHARE",
+	mssql:    "SELECT " + clientColumns.mssql + " FROM clients WITH (REPEATABLEREAD, ROWLOCK) WHERE id = @p1",
+}
+
 var selectClientByClientIdentifier = statement{
 	sqlite:   "SELECT " + clientColumns.sqlite + " FROM clients WHERE client_identifier = ?",
 	mysql:    "SELECT " + clientColumns.mysql + " FROM clients WHERE client_identifier = ?",
@@ -658,6 +671,26 @@ func (d *Database) GetClientByIdForUpdate(ctx context.Context, tx *sql.Tx, clien
 	}
 
 	return queryOne(ctx, d, tx, selectClientByIdForUpdate.text(d.Dialect), []any{clientId}, scanClient, "client")
+}
+
+// GetClientByIdForShare reads the client as last committed and holds a shared lock on its row for
+// the rest of the caller's transaction, without writing it. A rename (SetClientIdentifier) and a
+// deletion (DeleteClient), which take the row exclusively to change it, wait for this transaction
+// to end, and this read waits for theirs and answers what they committed. Two shared reads of the
+// row do not wait for each other.
+//
+// Code issuance reads its client this way before it inserts the code, so a rename is ordered
+// against it: either the code commits first and the rename's sweep revokes it, or the rename
+// commits first and issuance reads the identifier it gave the client and issues nothing (#866).
+//
+// tx is required, for the reason GetClientByIdForUpdate gives.
+func (d *Database) GetClientByIdForShare(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error) {
+
+	if tx == nil {
+		return nil, errs.New("a shared locking read of a client requires a transaction: an autocommitted statement releases the row before the caller can decide on it")
+	}
+
+	return queryOne(ctx, d, tx, selectClientByIdForShare.text(d.Dialect), []any{clientId}, scanClient, "client")
 }
 
 func (d *Database) GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error) {

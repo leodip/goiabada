@@ -18,9 +18,11 @@ import (
 )
 
 // ErrIssuingClientGone is returned by IssueAuthCode when the client the ceremony is issuing for
-// no longer has a row. It is a sentinel rather than a wrapped message because /auth/issue branches
-// on it: the condition is the client's registration disappearing mid-ceremony, which is answered
-// by restarting the browser at level 1 (or login_required for a silent request), not by a 500.
+// no longer has a row, or no longer has the identifier the ceremony named, a rename having
+// committed while it issued (#866). It is a sentinel rather than a wrapped message because
+// /auth/issue branches on it: the condition is the client's registration disappearing
+// mid-ceremony, which is answered by restarting the browser at level 1 (or login_required for a
+// silent request), not by a 500.
 //
 // Stdlib errors.New and not errs.New, which is the rule for every package-level sentinel in
 // this tree: errs.New captures a stack where it is called, and a package-level var is called
@@ -28,7 +30,7 @@ import (
 // errs.WithStack is the identity on an error whose tree already carries a stack, so the
 // WithStack below would silently record nothing. Matched with errors.Is, so it loses no
 // diagnosis by having no frames of its own (#279 decision 5).
-var ErrIssuingClientGone = errors.New("the client this ceremony is issuing for no longer exists")
+var ErrIssuingClientGone = errors.New("the client this ceremony is issuing for no longer exists under the identifier it named")
 
 // ErrIssuingSessionGone is returned by IssueAuthCode, and by IssueImplicit for the tokens it signs,
 // when the session the ceremony binds its grant to no longer has a row. /auth/issue answers it as
@@ -40,12 +42,14 @@ var ErrIssuingClientGone = errors.New("the client this ceremony is issuing for n
 var ErrIssuingSessionGone = errors.New("the session this ceremony is issuing for no longer exists")
 
 // codeIssuerDatabase is what the code issuer needs: the session row it takes, the client it issues
-// for, the code row it writes, and the transaction the three share.
+// for and the shared lock it holds on that client's row, the code row it writes, and the
+// transaction they share.
 type codeIssuerDatabase interface {
 	AcquireUserRow(ctx context.Context, tx *sql.Tx, userId int64) error
 	AcquireUserSessionRow(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (bool, error)
 	CreateCode(ctx context.Context, tx *sql.Tx, code *record.Code) error
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
+	GetClientByIdForShare(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error)
 	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 }
@@ -213,6 +217,22 @@ func (ci *CodeIssuer) createAuthCode(ctx context.Context, tx *sql.Tx, input *Cre
 	// the condition is answered as an error and the caller answers it the way it answers a session
 	// that has gone (#248 part 5).
 	if client == nil {
+		return nil, errs.WithStack(ErrIssuingClientGone)
+	}
+
+	// A rename of the client revokes its codes in the rename's transaction (#710 decision 5), and
+	// the lookup above is a plain read, which on PostgreSQL and MySQL, and on SQL Server with
+	// READ_COMMITTED_SNAPSHOT on, answers the identifier as last committed without waiting for a
+	// rename that holds the row. A code inserted after that rename's sweep would then be left live,
+	// redeemable under the identifier the rename gave. So the row is read again under a shared lock
+	// held to the end of this transaction: either this code commits before the rename can change the
+	// row and the rename's sweep finds it, or the rename commits first, this read waits for it, and
+	// the identifier is no longer the one the ceremony named, so nothing is issued (#866).
+	held, err := ci.database.GetClientByIdForShare(ctx, tx, client.Id)
+	if err != nil {
+		return nil, err
+	}
+	if held == nil || held.ClientIdentifier != client.ClientIdentifier {
 		return nil, errs.WithStack(ErrIssuingClientGone)
 	}
 

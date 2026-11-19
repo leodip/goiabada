@@ -131,6 +131,12 @@ type Database interface {
 	// transaction, and this read waits for a writer's. The initial password grant reads its client
 	// so before it writes its first refresh token (#710 decision 5). A transaction is required.
 	GetClientByIdForUpdate(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error)
+	// GetClientByIdForShare reads the client as last committed and holds a shared lock on its row
+	// until the transaction ends, writing nothing: a rename or a deletion of the client waits for
+	// that transaction, and this read waits for theirs, but two such readers do not wait for each
+	// other. Code issuance reads its client so before it inserts the code (#866). A transaction is
+	// required.
+	GetClientByIdForShare(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error)
 	GetClientsByIds(ctx context.Context, tx *sql.Tx, clientIds []int64) ([]record.Client, error)
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
 	GetAllClients(ctx context.Context, tx *sql.Tx) ([]record.Client, error)

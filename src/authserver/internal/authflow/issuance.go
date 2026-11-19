@@ -470,7 +470,7 @@ func (o *Issuance) issueCode(ctx context.Context, browser issuanceBrowser, authC
 			sessionIdentifier), nil
 	}
 	if errors.Is(err, issuance.ErrIssuingClientGone) {
-		slog.WarnContext(ctx, "the client this ceremony is issuing for no longer exists, refusing to issue a code",
+		slog.WarnContext(ctx, "the client this ceremony is issuing for no longer exists under the identifier it named, refusing to issue a code",
 			"client_identifier", authContext.ClientId,
 			"session_identifier", sessionIdentifier)
 	}
