@@ -887,8 +887,9 @@ func csrfPolicy() httpmw.CSRFPolicy {
 		// Whole subtrees where prefix inheritance is intentional, unlike the exact paths above.
 		Prefixes: []string{
 			// Bearer-token REST API surface, and the public settings, which take no credential.
-			// No route here reads the session cookie: the APIs authenticate via the Authorization
-			// header, so new endpoints added under this prefix SHOULD inherit the exemption.
+			// No route here reads the session cookie: the APIs authenticate with a bearer token,
+			// in the Authorization header or a POST's access_token form parameter, so new
+			// endpoints added under this prefix SHOULD inherit the exemption.
 			// Cookie-authenticated routes must never be mounted here.
 			"/api/",
 
