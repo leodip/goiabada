@@ -139,10 +139,8 @@ func (a *userWideApps) assertToldEverywhere(t *testing.T, requestId string) {
 	if requestId == "" {
 		return
 	}
-	rows, total, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 20,
-		record.AuditLogFilter{AuditEvent: "sent_logout_token", RequestId: requestId})
-	require.NoError(t, err)
-	require.Equal(t, 4, total, "one sent_logout_token row per delivery")
+	// One sent_logout_token row per delivery.
+	rows := sentLogoutTokenRows(t, requestId, 4, 10*time.Second)
 	sids := map[string]int{}
 	for _, row := range rows {
 		assert.Equal(t, a.user.Id, row.UserId.Int64)

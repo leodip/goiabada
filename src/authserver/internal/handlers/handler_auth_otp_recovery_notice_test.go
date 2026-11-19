@@ -371,6 +371,73 @@ func TestHandleAuthOtpPost_TellsTheUserTheRefusalThatDisabledTheirAuthenticator(
 	}
 }
 
+// A replayed code whose count disabled the authenticator counted against the user's row, so the user
+// was there when the code was claimed: a replay, whose committed lockout is audited and told whatever
+// a read of the user now would say, gone or failing (#796 decision 3, #724 decision 7).
+func TestHandleAuthOtpPost_TellsTheLockoutOfAReplayWithoutReadingTheUserAgain(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		reread  *record.User
+		readErr error
+	}{
+		{name: "the user deleted since", reread: nil},
+		{name: "the user unreadable", readErr: assert.AnError},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			pageRenderer := handlersmocks.NewPageRenderer(t)
+			ceremonyStore := handlersmocks.NewCeremonyStore(t)
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+			emailSender := accounthandlersmocks.NewEmailSender(t)
+			jobs := &signInNoticeJobs{}
+
+			handler := buildAuthOtpPost(authOtpPostDeps{
+				pageRenderer:  pageRenderer,
+				ceremonyStore: ceremonyStore,
+				database:      database,
+				auditLogger:   auditLogger,
+				notifier:      accountnotice.New(pageRenderer, emailSender, jobs),
+			})
+
+			user := enrolledNoticeUser(t, "en")
+			user.OtpConsecutiveFailures = record.OtpConsecutiveFailureLimit - 1
+			secret := otpTestMintedSecret(t)
+			user.OTPSecretEncrypted = encryptOTPForTest(t, secret)
+			req := otpCodeNoticeRequest(t, otptest.Code(t, secret, time.Now()))
+			rr := httptest.NewRecorder()
+			ceremonyStore.On("GetAuthContext", mock.Anything).Return(otpNoticeCeremony(), nil)
+			database.On("GetUserById", mock.Anything, mock.Anything, user.Id).Return(user, nil).Once()
+			database.On("TryConsumeEnrolledUserOTPStep", mock.Anything, mock.Anything, user.Id, mock.Anything,
+				user.OtpConfigGeneration).Return(false, nil).Once()
+			expectOTPWriteTransactions(database)
+			expectUserRowLocked(database, user)
+			database.On("IncrementUserOtpConsecutiveFailures", mock.Anything, mock.Anything, user.Id,
+				user.OtpConfigGeneration).Return(true, nil).Once()
+			database.On("GetUserById", mock.Anything, mock.Anything, user.Id).Return(tc.reread, tc.readErr).Maybe()
+			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
+				Return(&record.Client{ClientIdentifier: "test-client"}, nil).Once()
+			var events []string
+			logged := func(args mock.Arguments) { events = append(events, args.String(1)) }
+			for _, event := range []string{audit.EventOTPCodeReplayDetected, audit.EventAuthFailedOtp,
+				audit.EventOTPAuthenticatorDisabled} {
+				auditLogger.On("Log", mock.Anything, event, mock.Anything).Return().Run(logged).Once()
+			}
+			pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_otp.html", mock.Anything).
+				Return(nil).Once()
+
+			handler.ServeHTTP(rr, req)
+
+			assert.Equal(t, []string{audit.EventOTPCodeReplayDetected, audit.EventAuthFailedOtp,
+				audit.EventOTPAuthenticatorDisabled}, events)
+			require.Len(t, jobs.jobs, 1, "the lockout is handed off")
+			captured := expectSignInNotice(pageRenderer, emailSender, emailtemplate.OTPLockout)
+			jobs.jobs[0](jobs.ctxs[0])
+			require.NotNil(t, captured.sent)
+			assert.Equal(t, signInNoticeAddress, captured.sent.To)
+		})
+	}
+}
+
 // The lockout is told once: a refusal that leaves the count under the limit tells nobody, and
 // neither does one against an authenticator already disabled, which moves no count. With SMTP off
 // or an unverified address the disabling refusal tells nobody either.

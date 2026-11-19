@@ -3,14 +3,20 @@ package datatests
 import (
 	"context"
 	"database/sql"
+	"net/http"
+	"strconv"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/backchannel"
 	"github.com/leodip/goiabada/authserver/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/handlers/apihandlers"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/revocation"
 	"github.com/leodip/goiabada/authserver/internal/usersession"
+	"github.com/leodip/goiabada/core/builtin"
 	"github.com/stretchr/testify/require"
 )
 
@@ -116,28 +122,155 @@ func TestLogoutRecipients_ASessionSpecificRevocationTellsAnAppThatJoinedBeforeTh
 	race.requireBothTold(t, result.LogoutDeliveries, race.session.SessionIdentifier)
 }
 
+// The administrator's deletion, through its handler: the administrators' lock, the user's row, the
+// deliveries, then the deletion.
 func TestLogoutRecipients_AUserDeletionTellsAnAppThatJoinedBeforeTheSessionLock(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
+	if dbType() == data.Postgres {
+		// The deletion holds the user's row FOR UPDATE. The bind writes the session's row back after
+		// taking it, and PostgreSQL checks that row's user_id foreign key because its own transaction
+		// wrote the row, taking FOR KEY SHARE on the user's row: the bind waits for the deletion, so it
+		// cannot commit inside it here. Outside a test the two meet in a deadlock, and PostgreSQL may
+		// abort either. A bind chosen as the victim reruns and finds the session gone, so no app joins
+		// one the deletion ends; a deletion chosen reruns after the bind committed and tells the app
+		// that joined. TestLogoutRecipients_ADisableAndASessionBindResolveTheirPostgreSQLDeadlock
+		// forces that cycle with the disable, which takes the user's row the same way.
+		t.Skip("PostgreSQL's bind waits for the deletion's lock on the user's row")
+	}
 	race := newRecipientsRace(t, ctx, true)
+	managePermissionRow(t)
 
-	// The administrator's deletion: the user's row, then the deliveries, then the deletion.
-	var deliveries []backchannel.Delivery
-	err := database.RunInTransaction(ctx, func(tx *sql.Tx) error {
-		if err := database.AcquireUserRow(ctx, tx, race.user.Id); err != nil {
-			return err
-		}
-		var err error
-		deliveries, err = revocation.UserWideDeliveries(ctx, race.db, tx, race.user.Id, race.user.Subject,
-			revocation.LiveUnder(3600, 86400))
-		if err != nil {
-			return err
-		}
-		return database.DeleteUser(ctx, tx, race.user.Id)
+	sender := &recordedLogoutTokens{}
+	id := strconv.FormatInt(race.user.Id, 10)
+	rr := serveUserWrite(ctx, apihandlers.HandleUserDelete(race.db, &countingAuditLogger{}, noNotices{}, sender),
+		http.MethodDelete, "/api/v1/admin/users/"+id, map[string]string{"id": id}, nil,
+		"logout-recipients-test", builtin.AuthServerResourceIdentifier+":"+builtin.ManagePermissionIdentifier)
+
+	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+	race.requireBothTold(t, sender.deliveries, race.session.SessionIdentifier)
+}
+
+// attemptCountingDatabase counts its transactions' attempts, a deadlock's rerun included, and can
+// run a hook as the transaction takes a session's row and as it writes the session back.
+type attemptCountingDatabase struct {
+	data.Database
+	attempts          atomic.Int32
+	beforeSessionLock func()
+	beforeSessionSave func(context.Context) error
+}
+
+func (d *attemptCountingDatabase) RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error {
+	return d.Database.RunInTransaction(ctx, func(tx *sql.Tx) error {
+		d.attempts.Add(1)
+		return fn(tx)
 	})
+}
 
+func (d *attemptCountingDatabase) AcquireUserSessionRow(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (bool, error) {
+	if d.beforeSessionLock != nil {
+		d.beforeSessionLock()
+	}
+	return d.Database.AcquireUserSessionRow(ctx, tx, sessionIdentifier)
+}
+
+func (d *attemptCountingDatabase) UpdateUserSession(ctx context.Context, tx *sql.Tx, session *record.UserSession) error {
+	if d.beforeSessionSave != nil {
+		if err := d.beforeSessionSave(ctx); err != nil {
+			return err
+		}
+	}
+	return d.Database.UpdateUserSession(ctx, tx, session)
+}
+
+// On PostgreSQL the administrator's disable, which holds the user's row FOR UPDATE before it takes
+// each session's row (#796 decision 1), and a sign-in binding an app to one of those sessions, which
+// holds the session's row and then needs FOR KEY SHARE on the user's for the foreign-key check of
+// the row it writes back, wait for each other. The engine aborts one with a deadlock and the
+// transaction retry reruns it. Either way the disable ends the session, and an app whose bind
+// committed is among those it tells; a bind that lost finds the session gone.
+func TestLogoutRecipients_ADisableAndASessionBindResolveTheirPostgreSQLDeadlock(t *testing.T) {
+	if dbType() != data.Postgres {
+		t.Skip("only PostgreSQL checks the session's user foreign key when the bind writes the row back")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	managePermissionRow(t)
+	race := newRecipientsRace(t, ctx, true)
+	if !race.user.Enabled {
+		enabled, err := database.TrySetUserEnabled(ctx, nil, race.user.Id, false, true)
+		require.NoError(t, err)
+		require.True(t, enabled)
+	}
+	require.NoError(t, database.SetClientBackchannelLogout(ctx, nil, race.joined.Id, "https://joined.example/backchannel", true))
+
+	// The bind holds the session's row and waits, before writing it back, until the disable holds
+	// the user's row and comes to take the session's.
+	bindHoldsTheSession := make(chan struct{})
+	disableHoldsTheUser := make(chan struct{})
+	disableDB := &attemptCountingDatabase{Database: database,
+		beforeSessionLock: sync.OnceFunc(func() { close(disableHoldsTheUser) })}
+	bindDB := &attemptCountingDatabase{Database: secondDatabase(t),
+		beforeSessionSave: func(ctx context.Context) error {
+			select {
+			case <-bindHoldsTheSession:
+			default:
+				close(bindHoldsTheSession)
+			}
+			select {
+			case <-disableHoldsTheUser:
+				return nil
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}}
+	bindDone := make(chan error, 1)
+	go func() {
+		_, err := usersession.NewManager(bindDB).BumpUserSession(ctx, race.session.SessionIdentifier, race.joined.Id, "", "", "")
+		bindDone <- err
+	}()
+	select {
+	case <-bindHoldsTheSession:
+	case err := <-bindDone:
+		t.Fatalf("the bind returned before it came to write the session back: %v", err)
+	case <-ctx.Done():
+		t.Fatal("the bind never came to write the session back")
+	}
+
+	sender := &recordedLogoutTokens{}
+	id := strconv.FormatInt(race.user.Id, 10)
+	rr := serveUserWrite(ctx, apihandlers.HandleUserEnabledPut(disableDB, &countingAuditLogger{}, sender),
+		http.MethodPut, "/api/v1/admin/users/"+id+"/enabled", map[string]string{"id": id},
+		[]byte(`{"enabled":false}`), "disable-bind-deadlock-test",
+		builtin.AuthServerResourceIdentifier+":"+builtin.ManagePermissionIdentifier)
+	var bindErr error
+	select {
+	case bindErr = <-bindDone:
+	case <-ctx.Done():
+		t.Fatal("the bind never finished")
+	}
+
+	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+	require.Equal(t, int32(3), disableDB.attempts.Load()+bindDB.attempts.Load(),
+		"the deadlock's victim ran a second attempt, and each transaction otherwise one (disable %d, bind %d)",
+		disableDB.attempts.Load(), bindDB.attempts.Load())
+	disabled, err := database.GetUserById(ctx, nil, race.user.Id)
 	require.NoError(t, err)
-	race.requireBothTold(t, deliveries, race.session.SessionIdentifier)
+	require.NotNil(t, disabled)
+	require.False(t, disabled.Enabled, "the user is disabled")
+	left, err := database.GetUserSessionById(ctx, nil, race.session.Id)
+	require.NoError(t, err)
+	require.Nil(t, left, "the disable ended the session")
+
+	told := sender.toldClientIds()
+	require.True(t, told[race.first.Id], "the app already on the session is told")
+	if bindDB.attempts.Load() == 1 {
+		require.NoError(t, bindErr, "the disable was the victim, and the bind committed")
+		require.True(t, told[race.joined.Id], "the app whose bind committed before the disable's rerun is told")
+	} else {
+		require.ErrorContains(t, bindErr, "user session is nil", "the bind was the victim, and its rerun finds the session gone")
+		require.False(t, told[race.joined.Id], "the bind never committed, so its app is not on the session")
+	}
 }
 
 func TestLogoutRecipients_ASignInRemovalTellsAnAppThatJoinedBeforeTheSessionLock(t *testing.T) {

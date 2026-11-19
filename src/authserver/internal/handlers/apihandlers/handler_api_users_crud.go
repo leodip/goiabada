@@ -183,7 +183,8 @@ func HandleUserPasswordPut(
 		// The row the write replaces is read first, under its lock, for the notice below: whether
 		// the account had a password is decided from it, so a setup link completed while this
 		// request waited can't leave the answer stale (#724 decision 6). Assigned on every
-		// attempt, since a deadlock reruns the body.
+		// attempt, since a deadlock reruns the body. A user deleted before the write is answered
+		// 404 with nothing written, as the enabled endpoint answers one (#796 decision 3).
 		//
 		// Every session of the user ends and none is kept, so every app that knew the user is told
 		// (#784 decision 3).
@@ -195,8 +196,16 @@ func HandleUserPasswordPut(
 				return readErr
 			}
 			replaced = current
+			if current == nil {
+				return errAccountGone
+			}
 			return database.SetUserPasswordHash(r.Context(), tx, user.Id, passwordHash)
 		})
+		if errors.Is(err, errAccountGone) {
+			// Another request deleted the user after this one read them: this one wrote nothing.
+			writeJSONError(w, "User not found", "NOT_FOUND", http.StatusNotFound)
+			return
+		}
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -232,6 +241,12 @@ func HandleUserPasswordPut(
 		updatedUser, err := database.GetUserById(r.Context(), nil, userId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
+			return
+		}
+		if updatedUser == nil {
+			// Deleted after the write committed: what the write did stands, its events, logout
+			// tokens and notice above, and there is no user left to answer with (#796 decision 3).
+			writeJSONError(w, "User not found", "NOT_FOUND", http.StatusNotFound)
 			return
 		}
 
@@ -311,8 +326,8 @@ func HandleUserOTPPut(
 			return
 		}
 		if !removed {
-			// The authenticator is no longer as this request read it: answered from a re-read,
-			// with nothing written and nothing audited (#471 decision 2).
+			// The authenticator is no longer as this request read it, or the user is gone: answered
+			// from a re-read, with nothing written and nothing audited (#471 decision 2).
 			writeLostOTPChange(w, r, database, user.Id, false)
 			return
 		}
@@ -334,6 +349,12 @@ func HandleUserOTPPut(
 		updatedUser, err := database.GetUserById(r.Context(), nil, userId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
+			return
+		}
+		if updatedUser == nil {
+			// Deleted after the removal committed: what the removal did stands, its event and
+			// notice above, and there is no user left to answer with (#796 decision 3).
+			writeJSONError(w, "User not found", "NOT_FOUND", http.StatusNotFound)
 			return
 		}
 
@@ -703,11 +724,25 @@ func HandleUserEnabledPut(
 			// user's grants as read under it, and is rolled back, sweep and all, when it would
 			// leave no enabled user holding manage (#402 decisions 10 and 11). A disable ends every
 			// session of the user, so every app that knew the user is told (#784 decision 3).
+			//
+			// The user's row is read under its lock right after the administrators' lock, the
+			// order both deletions take them in, and on MySQL before any ordinary read: at
+			// MySQL's REPEATABLE READ the first ordinary read fixes the snapshot every later one
+			// answers, so the sessions and refresh tokens the sweep reads include what a sign-in
+			// committed while this waited for the row (#796 decision 1). A user deleted before the
+			// write is answered 404 with nothing written (#796 decision 3).
 			notice := userWideNotice(settings, user)
 			result, txErr := revocation.RevokeUserAuthStateTx(r.Context(), database, userId, "", notice, func(tx *sql.Tx) error {
 				administrators, lockErr := lockAdministrators(r.Context(), database, tx)
 				if lockErr != nil {
 					return lockErr
+				}
+				locked, lockedErr := database.GetUserByIdForUpdate(r.Context(), tx, userId)
+				if lockedErr != nil {
+					return errs.Wrap(lockedErr, "unable to read the user under its lock")
+				}
+				if locked == nil {
+					return errAccountGone
 				}
 				holdsManage, readErr := administrators.userHoldsManage(r.Context(), database, userId)
 				if readErr != nil {
@@ -742,21 +777,36 @@ func HandleUserEnabledPut(
 
 		if req.Enabled {
 			// Enabling. Narrow write, no revocation, no new event. Uses the same
-			// compare-and-set so this direction does not stay on the full-row UpdateUser.
-			if _, err = database.TrySetUserEnabled(r.Context(), nil, userId, false, true); err != nil {
-				writeInternalServerError(w, r, err)
-				return
-			}
+			// compare-and-set so this direction does not stay on the full-row UpdateUser. It runs
+			// under the user's row, so a user deleted before the write is told from one already
+			// enabled, whose request keeps its answer and event (#796 decision 3). Safe to rerun:
+			// the compare-and-set asks the row again.
+			err = database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
+				locked, lockedErr := database.GetUserByIdForUpdate(r.Context(), tx, userId)
+				if lockedErr != nil {
+					return errs.Wrap(lockedErr, "unable to read the user under its lock")
+				}
+				if locked == nil {
+					return errAccountGone
+				}
+				_, setErr := database.TrySetUserEnabled(r.Context(), tx, userId, false, true)
+				return setErr
+			})
 		} else {
 			result, transitioned, err = disableWithRevocation()
-			if errors.Is(err, errLastAdministrator) {
-				writeLastAdministrator(w, r)
-				return
-			}
-			if err != nil {
-				writeInternalServerError(w, r, err)
-				return
-			}
+		}
+		if errors.Is(err, errLastAdministrator) {
+			writeLastAdministrator(w, r)
+			return
+		}
+		if errors.Is(err, errAccountGone) {
+			// Another request deleted the user after this one read them: this one wrote nothing.
+			writeJSONError(w, "User not found", "NOT_FOUND", http.StatusNotFound)
+			return
+		}
+		if err != nil {
+			writeInternalServerError(w, r, err)
+			return
 		}
 
 		// Unchanged in both directions, per decision 7: the endpoint's existing event still
@@ -777,6 +827,13 @@ func HandleUserEnabledPut(
 		updatedUser, err := database.GetUserById(r.Context(), nil, userId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
+			return
+		}
+		if updatedUser == nil {
+			// Deleted after the write committed: what the write did stands, its events above
+			// and a disable's logout tokens, and there is no user left to answer with (#796
+			// decision 3).
+			writeJSONError(w, "User not found", "NOT_FOUND", http.StatusNotFound)
 			return
 		}
 

@@ -140,6 +140,8 @@ func TestHandleAccountOTPPut_Enable_ReplayIsRefused(t *testing.T) {
 			claimedStep = args.Get(3).(int64)
 		}).
 		Return(false, nil).Once()
+	// The refused claim's re-read finds the account still there, so the refusal is a replay.
+	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), user.Id).Return(user, nil).Once()
 
 	// Registering only this event is itself the assertion that EventAuthFailedOtp is not emitted: the
 	// mock fails an unexpected Log call, so adding the browser sites' failure event here would break
@@ -175,6 +177,34 @@ func TestHandleAccountOTPPut_Enable_ReplayIsRefused(t *testing.T) {
 	database.AssertNotCalled(t, "TryEstablishUserOTP",
 		mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	assert.False(t, user.OTPEnabled)
+}
+
+// TestHandleAccountOTPPut_Enable_AClaimOnAnAccountDeletedMeanwhile: the account is deleted after
+// this request read it and before its code claims a step, so the claim matches no row, as a replay's
+// does. The re-read finds no account: the request answers 404, as one arriving a moment later would,
+// and audits no replay that never happened (#796 decision 3).
+func TestHandleAccountOTPPut_Enable_AClaimOnAnAccountDeletedMeanwhile(t *testing.T) {
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
+
+	const subject = "the-subject"
+	const password = "P4ss!word"
+	user := otpTestUser(t, password)
+
+	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).Return(user, nil).Once()
+	database.On("TryConsumeUserOTPStep", mock.Anything, (*sql.Tx)(nil), user.Id, mock.Anything).Return(false, nil).Once()
+	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), user.Id).Return((*record.User)(nil), nil).Once()
+
+	rr := httptest.NewRecorder()
+	HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher, heldNotifier(t, &heldJobs{})).
+		ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, currentOtpCode(t)))
+
+	require.Equal(t, http.StatusNotFound, rr.Code, rr.Body.String())
+	assert.Equal(t, "NOT_FOUND", errorCodeOf(t, rr))
+	assert.Equal(t, "User not found", descriptionOf(t, rr))
+	database.AssertExpectations(t)
+	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+	database.AssertNotCalled(t, "TryEstablishUserOTP", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 }
 
 // TestHandleAccountOTPPut_Enable_ClaimErrorIs500 pins fail-closed. A database fault must not be
@@ -945,7 +975,8 @@ func TestHandleAccountOTPPut_Enable_BlankCodeIsRefusedByName(t *testing.T) {
 // handler reads the row again: OTP now on means the request wanted what is already there, and gets
 // the 400 a request arriving a moment later would have got; OTP still off means an enable and a
 // disable landed in between, and the request is told the account changed under it, with nothing
-// stored. Either way nothing is audited as an enable, the generation does not advance and the
+// stored; the account gone is the 404 a request arriving a moment later would have got too (#796
+// decision 3). Either way nothing is audited as an enable, the generation does not advance and the
 // pending enrolment is not cleared.
 func TestHandleAccountOTPPut_Enable_ALostCompareAndSetIsAnsweredFromARead(t *testing.T) {
 	testCases := []struct {
@@ -969,8 +1000,8 @@ func TestHandleAccountOTPPut_Enable_ALostCompareAndSetIsAnsweredFromARead(t *tes
 		{
 			name:       "the account is gone",
 			reread:     nil,
-			wantStatus: http.StatusConflict,
-			wantCode:   "CONCURRENT_UPDATE",
+			wantStatus: http.StatusNotFound,
+			wantCode:   "NOT_FOUND",
 		},
 	}
 
@@ -1006,9 +1037,9 @@ func TestHandleAccountOTPPut_Enable_ALostCompareAndSetIsAnsweredFromARead(t *tes
 	}
 }
 
-// The disable's twin: OTP now off is the 400 a request a moment later would have got; OTP still on
-// at another generation means the authenticator was replaced under the request, and the
-// replacement is not removed.
+// The disable's twin: OTP now off is the 400 a request a moment later would have got, and the
+// account gone its 404; OTP still on at another generation means the authenticator was replaced
+// under the request, and the replacement is not removed.
 func TestHandleAccountOTPPut_Disable_ALostCompareAndSetIsAnsweredFromARead(t *testing.T) {
 	testCases := []struct {
 		name       string
@@ -1027,6 +1058,12 @@ func TestHandleAccountOTPPut_Disable_ALostCompareAndSetIsAnsweredFromARead(t *te
 			reread:     &record.User{Id: 77, Enabled: true, OTPEnabled: true, OtpConfigGeneration: 4},
 			wantStatus: http.StatusConflict,
 			wantCode:   "CONCURRENT_UPDATE",
+		},
+		{
+			name:       "the account is gone",
+			reread:     nil,
+			wantStatus: http.StatusNotFound,
+			wantCode:   "NOT_FOUND",
 		},
 	}
 
@@ -1056,6 +1093,59 @@ func TestHandleAccountOTPPut_Disable_ALostCompareAndSetIsAnsweredFromARead(t *te
 			database.AssertNotCalled(t, "ResetUserOTPStep", mock.Anything, mock.Anything, mock.Anything)
 			database.AssertNotCalled(t, "IncrementUserOtpConfigGeneration", mock.Anything, mock.Anything, mock.Anything)
 			database.AssertNotCalled(t, "UpdateUser", mock.Anything, mock.Anything, mock.Anything)
+		})
+	}
+}
+
+// TestHandleAccountOTPPut_AnAccountDeletedAfterTheChangeCommitted: the account is deleted, by an
+// administrator or from another of its own sessions, after this request's enable or disable
+// committed and before the read its response is built from. The request answers 404, as one
+// arriving a moment later would, and what the committed change did stands: its audit events and
+// its notice (#796 decision 3). SMTP is on and the address verified, so a notice could have gone.
+func TestHandleAccountOTPPut_AnAccountDeletedAfterTheChangeCommitted(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		arrange func(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, user *record.User)
+		request func(t *testing.T) *http.Request
+	}{
+		{
+			name: "an enable",
+			arrange: func(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, user *record.User) {
+				stubOTPEnableAnswering(database, auditLogger, user, nil)
+			},
+			request: func(t *testing.T) *http.Request {
+				return accountOTPEnableRequest(t, otpNoticeSubject, otpNoticePassword, currentOtpCode(t))
+			},
+		},
+		{
+			name: "a disable",
+			arrange: func(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, user *record.User) {
+				user.OTPEnabled = true
+				stubOTPRemoveAnswering(database, auditLogger, user, "GetUserBySubject", otpNoticeSubject, nil)
+			},
+			request: func(t *testing.T) *http.Request {
+				return accountOTPDisableRequest(t, otpNoticeSubject, otpNoticePassword)
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+			jobs := &heldJobs{}
+			user := otpNoticeUser(t)
+			tc.arrange(database, auditLogger, user)
+
+			rr := httptest.NewRecorder()
+			HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher, heldNotifier(t, jobs)).
+				ServeHTTP(rr, withNoticeContext(tc.request(t), passwordNoticeSettings()))
+
+			require.Equal(t, http.StatusNotFound, rr.Code, rr.Body.String())
+			code, description := decodeErrorEnvelope(t, rr)
+			assert.Equal(t, "NOT_FOUND", code)
+			assert.Equal(t, "User not found", description)
+			database.AssertExpectations(t)
+			auditLogger.AssertExpectations(t)
+			assert.Len(t, jobs.jobs, 1, "the committed change's notice stands")
 		})
 	}
 }

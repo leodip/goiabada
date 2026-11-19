@@ -144,7 +144,11 @@ var lastAdministratorRemovals = []lastAdministratorRemoval{
 			database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), adminHoldingManageId).
 				Return(&record.User{Id: adminHoldingManageId, Enabled: true}, nil).Once()
 		},
-		expectDecision: expectUserHoldsManageDirectly(apiRevokeTx),
+		expectDecision: func(database *datamocks.Database) {
+			database.On("GetUserByIdForUpdate", mock.Anything, apiRevokeTx, adminHoldingManageId).
+				Return(&record.User{Id: adminHoldingManageId, Enabled: true}, nil).Once()
+			expectUserHoldsManageDirectly(apiRevokeTx)(database)
+		},
 		expectWrite: func(database *datamocks.Database) {
 			database.On("TrySetUserEnabled", mock.Anything, apiRevokeTx, adminHoldingManageId, true, false).Return(true, nil).Once()
 		},

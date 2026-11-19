@@ -68,6 +68,13 @@ func withNoticeContext(req *http.Request, settings *record.Settings) *http.Reque
 // the two audit events and the read the response is built from. The audit events are the logger's
 // only expectations, so a notice that wrote an audit entry of its own would fail the case.
 func stubOTPEnable(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, user *record.User) {
+	stubOTPEnableAnswering(database, auditLogger, user, user)
+}
+
+// stubOTPEnableAnswering is stubOTPEnable whose read for the response finds answered: nil for an
+// account deleted after the enable committed.
+func stubOTPEnableAnswering(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, user *record.User,
+	answered *record.User) {
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), otpNoticeSubject).Return(user, nil).Once()
 	database.On("TryConsumeUserOTPStep", mock.Anything, (*sql.Tx)(nil), user.Id, mock.Anything).Return(true, nil).Once()
 	datamocks.ExpectRunInTransaction(database, otpDisableTx)
@@ -78,7 +85,7 @@ func stubOTPEnable(database *datamocks.Database, auditLogger *handlersmocks.Audi
 	database.On("ClearUserOtpConsecutiveFailures", mock.Anything, otpDisableTx, user.Id).Return(nil).Once()
 	database.On("GetUserByIdForUpdate", mock.Anything, otpDisableTx, user.Id).Return(user, nil).Once()
 	database.On("ReplaceUserRecoveryCodes", mock.Anything, otpDisableTx, user.Id, mock.Anything).Return(nil).Once()
-	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), user.Id).Return(user, nil).Once()
+	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), user.Id).Return(answered, nil).Once()
 	auditLogger.On("Log", mock.Anything, audit.EventEnabledOTP, mock.Anything).Return().Once()
 	auditLogger.On("Log", mock.Anything, audit.EventRecoveryCodesCreated, mock.Anything).Return().Once()
 }
@@ -87,6 +94,13 @@ func stubOTPEnable(database *datamocks.Database, auditLogger *handlersmocks.Audi
 // readKey: the removal transaction, the audit event and the read the response is built from.
 func stubOTPRemove(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, user *record.User,
 	readMethod string, readKey interface{}) {
+	stubOTPRemoveAnswering(database, auditLogger, user, readMethod, readKey, user)
+}
+
+// stubOTPRemoveAnswering is stubOTPRemove whose read for the response finds answered: nil for an
+// account deleted after the removal committed.
+func stubOTPRemoveAnswering(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, user *record.User,
+	readMethod string, readKey interface{}, answered *record.User) {
 	database.On(readMethod, mock.Anything, (*sql.Tx)(nil), readKey).Return(user, nil).Once()
 	datamocks.ExpectRunInTransaction(database, otpDisableTx)
 	database.On("TryRemoveUserOTP", mock.Anything, otpDisableTx, user.Id, user.OtpConfigGeneration).Return(true, nil).Once()
@@ -95,7 +109,7 @@ func stubOTPRemove(database *datamocks.Database, auditLogger *handlersmocks.Audi
 	database.On("IncrementUserOtpConfigGeneration", mock.Anything, otpDisableTx, user.Id).Return(int64(1), nil).Once()
 	database.On("GetUserByIdForUpdate", mock.Anything, otpDisableTx, user.Id).Return(user, nil).Once()
 	database.On("LowerUserSessionsToPassword", mock.Anything, otpDisableTx, user.Id, "pwd").Return(nil).Once()
-	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), user.Id).Return(user, nil).Once()
+	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), user.Id).Return(answered, nil).Once()
 	auditLogger.On("Log", mock.Anything, audit.EventDisabledOTP, mock.Anything).Return().Once()
 }
 

@@ -280,14 +280,17 @@ type OTPSubmissionResult struct {
 //     (otpcredential.VerifyStored), an enrolling user's against the enrolment key
 //     (otpcredential.VerifySupplied). Either claims the code's time step, so a code is accepted once
 //     (#111). A failed verification is returned as an error.
-//  7. A replayed code: charges it to the rate limiter, audits EventOTPCodeReplayDetected and
-//     EventAuthFailedOtp, and answers OTPRefused. A wrong code: charges it, audits
-//     EventAuthFailedOtp, and answers OTPRefused. Every wrong code is a guess the OTP budget bounds
-//     (#219). The refusal that disabled the authenticator also audits EventOTPAuthenticatorDisabled,
-//     after the others (#489), and reports OTPNoticeAuthenticatorLockedOut for the handler to send
-//     (#724 decision 7). A code from the next step: audits EventAuthFailedOtp with the reason
-//     clock_ahead and answers OTPClockAhead, charging nothing, since only the authenticator can
-//     produce it (#142).
+//  7. A replayed code: reads the user again, since a claim on a user deleted since step 2 matches no
+//     row either, and returns a user gone as step 2 does, charging and auditing nothing (#796
+//     decision 3). Not when the refusal disabled the authenticator: its count moved the user's row,
+//     so the user was there for the claim. A replay by a user still there: charges it to the rate
+//     limiter, audits EventOTPCodeReplayDetected and EventAuthFailedOtp, and answers OTPRefused. A
+//     wrong code: charges it, audits EventAuthFailedOtp, and answers OTPRefused. Every wrong code is
+//     a guess the OTP budget bounds (#219). The refusal that disabled the authenticator also audits
+//     EventOTPAuthenticatorDisabled, after the others (#489), and reports
+//     OTPNoticeAuthenticatorLockedOut for the handler to send (#724 decision 7). A code from the next
+//     step: audits EventAuthFailedOtp with the reason clock_ahead and answers OTPClockAhead, charging
+//     nothing, since only the authenticator can produce it (#142).
 //  8. An enrolling user: stores the key as the user's authenticator (otpcredential.Establish), which
 //     lands only while the user's OTP configuration generation is still the one read in step 2. A
 //     failed write is returned as an error; a write that did not land ends the lost enrolment
@@ -360,6 +363,14 @@ func (o *OTPSubmission) Run(ctx context.Context, browser otpSubmissionBrowser,
 
 	switch verified.Outcome {
 	case otpcredential.OutcomeReplayed:
+		// No replay when the user is gone: the claim matched no row because there is none. A
+		// refusal that disabled the authenticator counted against the user's row, so the user was
+		// there for the claim, and its committed lockout is reported whatever a read now would say.
+		if !verified.Disabled {
+			if _, err := loadOTPUser(ctx, o.database, authContext); err != nil {
+				return OTPSubmissionResult{}, err
+			}
+		}
 		browser.RecordCredentialFailure()
 		o.auditLogger.Log(ctx, audit.EventOTPCodeReplayDetected, map[string]interface{}{
 			"user_id": user.Id,

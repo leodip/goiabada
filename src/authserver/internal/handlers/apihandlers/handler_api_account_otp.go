@@ -71,9 +71,11 @@ func livePendingEnrollmentKeyURL(dataCipher *encryption.DataCipher, user *record
 // writeLostOTPChange answers an enable or a disable whose compare-and-set matched nothing, from what
 // the user's row shows now (#471 decision 2). The authenticator was no longer as the request read
 // it, so nothing was written. OTP now in the state the request wanted is the 400 a request arriving
-// a moment later would have got, OTP_ALREADY_ENABLED or OTP_NOT_ENABLED; anything else, an enable
-// and a disable landing in between, an authenticator replaced under a disable, or the account gone,
-// is 409 CONCURRENT_UPDATE. Nothing is audited: no enable or disable happened.
+// a moment later would have got, OTP_ALREADY_ENABLED or OTP_NOT_ENABLED. The account gone is the 404
+// NOT_FOUND such a request would have got too: each of the three endpoints answers it for a user
+// missing when it starts (#796 decision 3). Anything else, an enable and a disable landing in
+// between or an authenticator replaced under a disable, is 409 CONCURRENT_UPDATE. Nothing is
+// audited: no enable or disable happened.
 //
 // Shared by the account API's two branches and the administrator's disable, which is why it takes
 // the narrow reader rather than either handler's port.
@@ -85,7 +87,11 @@ func writeLostOTPChange(w http.ResponseWriter, r *http.Request, database userByI
 		writeInternalServerError(w, r, err)
 		return
 	}
-	if current != nil && current.OTPEnabled == wantEnabled {
+	if current == nil {
+		writeJSONError(w, "User not found", "NOT_FOUND", http.StatusNotFound)
+		return
+	}
+	if current.OTPEnabled == wantEnabled {
 		if wantEnabled {
 			writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.AccountOTPAlreadyEnabled, nil), "OTP_ALREADY_ENABLED", http.StatusBadRequest)
 		} else {
@@ -418,6 +424,19 @@ func HandleAccountOTPPut(
 			}
 			switch verified.Outcome {
 			case otpcredential.OutcomeReplayed:
+				// The claim matches no row for an account deleted after this request read it, too.
+				// That is no replay: the account gone is the 404 a request arriving a moment later
+				// would get, with nothing audited (#796 decision 3). A replay on an account still
+				// there is answered as a wrong code, as below.
+				current, readErr := database.GetUserById(r.Context(), nil, user.Id)
+				if readErr != nil {
+					writeInternalServerError(w, r, readErr)
+					return
+				}
+				if current == nil {
+					writeJSONError(w, "User not found", "NOT_FOUND", http.StatusNotFound)
+					return
+				}
 				// No EventAuthFailedOtp beside it, unlike the browser sites: this endpoint
 				// emits nothing when a code is simply wrong, and enabling OTP is not an
 				// authentication ceremony. Decision 5 puts the replay event alongside the
@@ -518,6 +537,12 @@ func HandleAccountOTPPut(
 		updated, err := database.GetUserById(r.Context(), nil, user.Id)
 		if err != nil {
 			writeInternalServerError(w, r, err)
+			return
+		}
+		if updated == nil {
+			// Deleted after the change committed: what the change did stands, its events and
+			// notice above, and there is no account left to answer with (#796 decision 3).
+			writeJSONError(w, "User not found", "NOT_FOUND", http.StatusNotFound)
 			return
 		}
 
