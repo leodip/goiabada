@@ -64,7 +64,8 @@ func sendBearerRequestAs(t *testing.T, method, path string, authorizations []str
 const bearerRFC6750AdminRoute = "/api/v1/admin/settings/general"
 
 // RFC 6750 section 3.1: a request lacking any authentication information SHOULD NOT be told an
-// error code; section 3's one required auth-param is the realm.
+// error code; the realm is then the Bearer challenge's one auth-param, of the one or more section 3
+// requires.
 func TestBearerRFC6750_NoCredentialIsChallengedWithNoError(t *testing.T) {
 	for _, method := range []string{"GET", "POST"} {
 		userinfo := sendBearerRequest(t, method, "/userinfo", "", "")

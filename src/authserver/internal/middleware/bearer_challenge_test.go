@@ -17,8 +17,8 @@ func TestBearerChallenge(t *testing.T) {
 		description string
 		want        string
 	}{
-		// RFC 6750 section 3.1: no credential, no error information; the realm is section 3's
-		// one required auth-param.
+		// RFC 6750 section 3.1: no credential, no error information; the realm is then the one
+		// auth-param of the one or more section 3 requires.
 		{name: "no error is the realm alone", want: `Bearer realm="goiabada"`},
 		{name: "a description without an error is dropped with it", description: "ignored",
 			want: `Bearer realm="goiabada"`},
