@@ -106,12 +106,11 @@ func TestRegisterRoutes_EveryApiRouteRefusesToBeStored(t *testing.T) {
 			// FIRST beneath the root's, not merely present, and this is the only assertion that
 			// says so.
 			//
-			// The sweep above sends no credentials, so it only ever reaches a refusal
-			// written by a guard. A guard ahead of that can write a response of its own:
-			// RequireValidSession rejects a token that parses but names no subject or whose
-			// session was terminated, and the settings read and a panic in front of the groups
-			// answer a 500. Moving the mount behind those leaves the whole sweep green, because
-			// no unauthenticated request reaches them. This assertion is what catches it.
+			// The two sweeps observe only the answers they drive: this one, over a settings read
+			// that succeeds, a guard's refusal of a caller with no token, and the fault sweep below
+			// the 500 of a settings read that fails or panics. A middleware added ahead of NoStore
+			// that answers on a condition of its own would send neither header field, and neither
+			// sweep would notice. This assertion is what catches it.
 			//
 			// Matched on the runtime function name rather than the function pointer:
 			// every call to middleware.NoStore returns a fresh closure with its own
