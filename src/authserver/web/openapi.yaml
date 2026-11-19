@@ -5253,8 +5253,8 @@ paths:
         The change lands only while the authenticator is still as this request read it. When
         another request changed it in between, the answer is read from the account as it is now:
         400 (`OTP_ALREADY_ENABLED` or `OTP_NOT_ENABLED`) when OTP is already in the state asked
-        for, otherwise 409 (`CONCURRENT_UPDATE`) with nothing saved. The code submitted with an
-        enable is spent either way.
+        for, 404 (`NOT_FOUND`) when the account was deleted, otherwise 409 (`CONCURRENT_UPDATE`)
+        with nothing saved. The code submitted with an enable is spent either way.
 
         An enable answers with `recoveryCodes`: the ten recovery codes created with the new
         authenticator, each of which signs the user in once in place of an authenticator code.
