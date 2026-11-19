@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/fake"
@@ -121,7 +122,7 @@ func TestCodeIssuanceOrdering_AgainstRename_RCSI(t *testing.T) {
 // distinct pools.
 func runCodeIssuanceOrderingAgainstRename(t *testing.T, db data.Database, other data.Database) {
 	t.Run("issuance goes first and the rename waits", func(t *testing.T) {
-		ctx := context.Background()
+		ctx, cancel := context.WithCancel(context.Background())
 		client := createTestClientOn(t, db)
 		user := createTestUserOn(t, db)
 		session := createTestUserSessionOn(t, db, user.Id)
@@ -132,7 +133,10 @@ func runCodeIssuanceOrderingAgainstRename(t *testing.T, db data.Database, other 
 		// commit in between and the code land after its sweep.
 		tx, err := db.BeginTransaction(ctx)
 		require.NoError(t, err, "opening the ceremony's transaction")
-		defer func() { _ = db.RollbackTransaction(ctx, tx) }()
+		defer func() { _ = db.RollbackTransaction(context.Background(), tx) }()
+		// Deferred after the rollback so it runs first: a failure below cancels any statement still
+		// in flight on the ceremony's transaction or the rename's, so the rollback does not wait on it.
+		defer cancel()
 		pause := newPausingCodeInserts(t, db)
 		issued := make(chan issuanceOutcome, 1)
 		go func() {
@@ -144,6 +148,8 @@ func runCodeIssuanceOrderingAgainstRename(t *testing.T, db data.Database, other 
 		case <-pause.paused:
 		case o := <-issued:
 			t.Fatalf("the ceremony finished before it inserted its code: %v", o.err)
+		case <-time.After(blockedCeiling):
+			t.Fatal("the ceremony never reached its insert")
 		}
 
 		type renameOutcome struct {
@@ -160,7 +166,12 @@ func runCodeIssuanceOrderingAgainstRename(t *testing.T, db data.Database, other 
 		rename.requireStillWaiting(t)
 		pause.proceed()
 
-		outcome := <-issued
+		var outcome issuanceOutcome
+		select {
+		case outcome = <-issued:
+		case <-time.After(lockWaitCeiling):
+			t.Fatal("the ceremony never finished its insert once released")
+		}
 		require.NoError(t, outcome.err, "the ceremony held the client's row first, and inserts its code")
 		require.NotNil(t, outcome.code)
 		code := outcome.code
