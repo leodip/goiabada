@@ -80,6 +80,8 @@ A normal refresh token follows the session it's tied to instead: it stops workin
 A refresh is refused with `invalid_grant` when the token can't be used any more:
 
 - it expired, or the offline grant reached its maximum lifetime;
+- the auth server's [issuer](/reference/endpoints/discovery-and-jwks/#the-discovery-document) changed after the token was issued;
+- an administrator changed your app's [client identifier](/concepts/clients/#client-identifier) after the token was issued;
 - a normal refresh token's session ended or expired;
 - the user was disabled, or their password changed or was reset, apart from the tokens of the session a user changed their own password in;
 - the user no longer holds a permission the token carries;

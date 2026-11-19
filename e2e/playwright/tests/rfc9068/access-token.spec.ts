@@ -2,7 +2,8 @@
 // at+jwt (2.1) and the client_id of its client (2.2); those of a grant that issues a refresh token
 // carry its grant_id, the same through every refresh; offline_access names the auth server in aud
 // (2.2.3). The auth server checks its own access tokens as section 4 asks of a resource server, and
-// also refuses one whose client is disabled. The test app's API, which requires at+jwt, is in
+// also refuses one whose client is disabled, or whose identifier another client has taken since a
+// rename gave it up. The test app's API, which requires at+jwt, is in
 // ../testapp/protect-an-api.spec.ts.
 import type { Page } from "@playwright/test";
 import { clientUrl, confirmDialog, grantClientPermission, grantUserPermission, readClientSecret } from "../../lib/admin-console";
@@ -15,6 +16,14 @@ import { passwordGrantClient } from "../../lib/test-clients";
 // The JOSE header of a JWT, unverified.
 function jwtHeader(token: string): Record<string, unknown> {
   return JSON.parse(Buffer.from(token.split(".")[0], "base64url").toString("utf8"));
+}
+
+async function renameClient(page: Page, id: number, identifier: string) {
+  await page.goto(clientUrl(id, "settings"));
+  await page.locator('input[name="clientIdentifier"]').fill(identifier);
+  await page.locator("#btnSave").click();
+  await confirmDialog(page, "You're changing the client identifier");
+  await expect(page.getByText("Settings saved.")).toBeVisible();
 }
 
 async function setClientEnabled(page: Page, id: number, enabled: boolean) {
@@ -77,6 +86,7 @@ test("a client credentials token is an at+jwt naming its client and no grant", a
   expect(jwtHeader(accessToken).typ).toBe("at+jwt");
   const claims = jwtClaims(accessToken);
   expect(claims.client_id).toBe(client.identifier);
+  expect(claims.client_internal_id, "the client's row").toBe(client.id);
   expect(claims.sub).toBe(client.identifier);
   expect(claims).not.toHaveProperty("grant_id");
 });
@@ -123,6 +133,34 @@ test("the auth server refuses a client's access token at the admin API while the
   expect((await enabled.json()).error_code).toBe("INSUFFICIENT_SCOPE");
 
   await setClientEnabled(page, client.id, false);
+  const refused = await listResources();
+  expect(refused.status()).toBe(401);
+  expect(await refused.json()).toEqual({ error_code: "INVALID_TOKEN", error_description: "The access token is invalid." });
+});
+
+// An access token names its client's row as well as its identifier, so an older client renamed to
+// the identifier another client gave up does not take that client's tokens over (#710). The admin
+// API checks a token before its scope: refused for its scope before, refused as a token after.
+test("the auth server refuses a client's access token once another client takes the identifier a rename gave up", async ({
+  page,
+  clients,
+  request,
+}) => {
+  const older = await clients.create();
+  const client = await clients.create({ authorizationCode: false, clientCredentials: true });
+  await grantClientPermission(page, client.id, "authserver", "manage-account");
+  const answer = await clientCredentialsToken(request, client.identifier, await readClientSecret(page, client.id), "authserver:manage-account");
+  expect(answer.status, JSON.stringify(answer.body)).toBe(200);
+  const accessToken = answer.body.access_token as string;
+  const listResources = () =>
+    request.get(`${env.authUrl}/api/v1/admin/resources`, { headers: { Authorization: `Bearer ${accessToken}` }, failOnStatusCode: false });
+  const before = await listResources();
+  expect(before.status()).toBe(403);
+  expect((await before.json()).error_code).toBe("INSUFFICIENT_SCOPE");
+
+  await renameClient(page, client.id, `${client.identifier}-r`);
+  await renameClient(page, older.id, client.identifier);
+
   const refused = await listResources();
   expect(refused.status()).toBe(401);
   expect(await refused.json()).toEqual({ error_code: "INVALID_TOKEN", error_description: "The access token is invalid." });

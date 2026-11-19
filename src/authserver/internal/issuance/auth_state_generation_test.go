@@ -299,6 +299,8 @@ func TestPersistedGeneration_Stamping(t *testing.T) {
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
 			Return(&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
+		mockDB.On("GetClientByIdForShare", mock.Anything, mock.Anything, int64(1)).
+			Return(&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
 
 		var captured *record.Code
 		mockDB.On("CreateCode", mock.Anything, mock.Anything, mock.Anything).

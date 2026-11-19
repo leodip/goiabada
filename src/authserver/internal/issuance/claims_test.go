@@ -84,7 +84,7 @@ func TestGenerateAccessToken(t *testing.T) {
 	assert.Equal(t, settings.Issuer, claims["iss"])
 	assert.Equal(t, user.Subject, claims["sub"])
 	assert.Equal(t, builtin.AuthServerResourceIdentifier, claims["aud"])
-	assert.Equal(t, code.Nonce, claims["nonce"])
+	assert.NotContains(t, claims, "nonce", "no access token carries the sign-in's nonce")
 	assert.Equal(t, code.AcrLevel.String(), claims["acr"])
 	assert.ElementsMatch(t, strings.Fields(code.AuthMethods), claims["amr"])
 	assert.Equal(t, sessionIdentifier, claims["sid"])
@@ -163,7 +163,7 @@ func TestGenerateAccessToken_CustomScope(t *testing.T) {
 	assert.Equal(t, settings.Issuer, claims["iss"])
 	assert.Equal(t, user.Subject, claims["sub"])
 	assert.Equal(t, []interface{}{"resource1", "resource2"}, claims["aud"])
-	assert.Equal(t, code.Nonce, claims["nonce"])
+	assert.NotContains(t, claims, "nonce", "no access token carries the sign-in's nonce")
 	assert.Equal(t, code.AcrLevel.String(), claims["acr"])
 	assert.ElementsMatch(t, strings.Fields(code.AuthMethods), claims["amr"])
 	assert.Equal(t, sessionIdentifier, claims["sid"])
@@ -258,7 +258,7 @@ func TestGenerateAccessToken_WithGroupsAndAttributes(t *testing.T) {
 	assert.Equal(t, settings.Issuer, claims["iss"])
 	assert.Equal(t, user.Subject, claims["sub"])
 	assert.Equal(t, builtin.AuthServerResourceIdentifier, claims["aud"])
-	assert.Equal(t, code.Nonce, claims["nonce"])
+	assert.NotContains(t, claims, "nonce", "no access token carries the sign-in's nonce")
 	assert.Equal(t, code.AcrLevel.String(), claims["acr"])
 	assert.ElementsMatch(t, strings.Fields(code.AuthMethods), claims["amr"])
 	assert.Equal(t, sessionIdentifier, claims["sid"])
@@ -422,7 +422,7 @@ func TestGenerateIdToken_FullScope(t *testing.T) {
 
 	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.Id).Return(false, nil)
 
-	idToken, err := tokenIssuer.generateIdToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id")
+	idToken, err := tokenIssuer.generateIdToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id", nil)
 	require.NoError(t, err)
 	assert.NotEmpty(t, idToken)
 
@@ -522,7 +522,7 @@ func TestGenerateIdToken_MinimalScope(t *testing.T) {
 	code.Client = *client
 	code.User = *user
 
-	idToken, err := tokenIssuer.generateIdToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id")
+	idToken, err := tokenIssuer.generateIdToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id", nil)
 	require.NoError(t, err)
 	assert.NotEmpty(t, idToken)
 
@@ -605,7 +605,7 @@ func TestGenerateIdToken_ClientOverride(t *testing.T) {
 
 	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.Id).Return(false, nil)
 
-	idToken, err := tokenIssuer.generateIdToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id")
+	idToken, err := tokenIssuer.generateIdToken(context.Background(), nil, settings, code, code.Scope, now, privKey, "test-key-id", nil)
 	require.NoError(t, err)
 	assert.NotEmpty(t, idToken)
 
@@ -953,6 +953,7 @@ func TestAMR_IsArrayType_InGeneratedTokens(t *testing.T) {
 			Scope:  "openid",
 		}
 
+		expectPasswordGrantClientRow(mockDB, input.Client.Id, input.Client)
 		response, err := tokenIssuer.IssuePasswordGrant(ctx, settings, input)
 		require.NoError(t, err)
 
@@ -1465,7 +1466,7 @@ func TestGenerateAccessTokenCore_OptionalClaims(t *testing.T) {
 	now := time.Now().UTC()
 	userSubject := fake.UUID()
 
-	t.Run("With nonce and sid", func(t *testing.T) {
+	t.Run("With a nonce in the input and sid", func(t *testing.T) {
 		input := &tokenGenerationInput{
 			User: &record.User{
 				Subject: userSubject,
@@ -1485,7 +1486,7 @@ func TestGenerateAccessTokenCore_OptionalClaims(t *testing.T) {
 		require.NoError(t, err)
 
 		claims := verifyAndDecodeToken(t, token, publicKeyBytes)
-		assert.Equal(t, "test-nonce", claims["nonce"])
+		assert.NotContains(t, claims, "nonce", "no access token carries the sign-in's nonce, even when the input has one")
 		assert.Equal(t, "test-session", claims["sid"])
 	})
 
@@ -2304,6 +2305,7 @@ func issueForScopeIsTheGrant(t *testing.T, flow string, grant string, storedRefr
 		issued.reportedScope, issued.accessToken, issued.idToken = response.Scope, response.AccessToken, response.IdToken
 	case "ROPC":
 		captureRefresh()
+		expectPasswordGrantClientRow(mockDB, client.Id, &client)
 		response, err := tokenIssuer.IssuePasswordGrant(ctx, settings, &ROPCGrantInput{Client: &client, User: &user, Scope: grant})
 		require.NoError(t, err)
 		issued.reportedScope, issued.accessToken, issued.idToken, issued.refreshToken =

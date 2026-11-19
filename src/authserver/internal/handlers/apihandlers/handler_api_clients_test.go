@@ -261,8 +261,9 @@ func TestUpdateClientNotOwningAuthenticationMode_RememberConsent(t *testing.T) {
 			datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 			database.On("AcquireClientRow", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
 			database.On("GetClientById", mock.Anything, clientUpdateTx, int64(7)).
-				Return(&record.Client{Id: 7, IsPublic: tc.rowPublic, RememberConsent: tc.rowRemember}, nil).Once()
+				Return(&record.Client{Id: 7, ClientIdentifier: "a-client", IsPublic: tc.rowPublic, RememberConsent: tc.rowRemember}, nil).Once()
 			database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
+			database.On("SetClientIdentifier", mock.Anything, clientUpdateTx, int64(7), "a-client").Return(false, nil).Once()
 			if tc.wantWrite != nil {
 				database.On("SetClientRememberConsent", mock.Anything, clientUpdateTx, int64(7), *tc.wantWrite).
 					Return(nil).Once()
@@ -270,8 +271,9 @@ func TestUpdateClientNotOwningAuthenticationMode_RememberConsent(t *testing.T) {
 
 			// The copy the request loaded: Remember consent as it read it, opposite to the row, so an
 			// answer taken from the stale copy shows.
-			client := &record.Client{Id: 7, IsPublic: tc.loadedPublic, RememberConsent: !tc.rowRemember}
-			require.NoError(t, updateClientNotOwningAuthenticationMode(context.Background(), database, client, tc.sent))
+			client := &record.Client{Id: 7, ClientIdentifier: "a-client", IsPublic: tc.loadedPublic, RememberConsent: !tc.rowRemember}
+			settings := &clientSettingsSave{identifier: "a-client", rememberConsent: tc.sent}
+			require.NoError(t, updateClientNotOwningAuthenticationMode(context.Background(), database, client, settings))
 
 			assert.Equal(t, tc.wantAnswer, client.RememberConsent, "the value the save answers with")
 			if tc.wantWrite == nil {
@@ -628,6 +630,7 @@ func TestHandleClientUpdatePut_AnswersTheMethodTheLockedRowHolds(t *testing.T) {
 		Return(&record.Client{Id: 7, ClientIdentifier: "target-client", IsPublic: true, CreatedViaDCR: true,
 			TokenEndpointAuthMethod: ""}, nil).Once()
 	database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
+	database.On("SetClientIdentifier", mock.Anything, clientUpdateTx, int64(7), "target-client").Return(false, nil).Once()
 	stubClientResponseLoads(database)
 	auditLogger.On("Log", mock.Anything, audit.EventUpdatedClientSettings, mock.Anything).Return().Once()
 

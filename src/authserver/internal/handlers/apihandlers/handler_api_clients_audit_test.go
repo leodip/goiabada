@@ -46,6 +46,13 @@ func expectUpdateNotOwningAuthenticationMode(database *datamocks.Database) {
 	database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
 }
 
+// expectClientSettingsSave registers the settings save's transaction, committing: the helper's, and
+// the identifier's write, which finds the row's own identifier.
+func expectClientSettingsSave(database *datamocks.Database) {
+	expectUpdateNotOwningAuthenticationMode(database)
+	database.On("SetClientIdentifier", mock.Anything, clientUpdateTx, targetClientId, "target-client").Return(false, nil).Once()
+}
+
 var committedClientWrites = []committedClientWrite{
 	{
 		name:  "PUT /clients/{id}",
@@ -57,7 +64,7 @@ var committedClientWrites = []committedClientWrite{
 			HandleClientUpdatePut(database, inputvalidation.NewIdentifierValidator(), auditLogger).ServeHTTP(rr, r)
 			return rr
 		},
-		expectWrite:        expectUpdateNotOwningAuthenticationMode,
+		expectWrite:        expectClientSettingsSave,
 		expectFailingWrite: failingWrite("RunInTransaction", mock.Anything, mock.Anything),
 	},
 	{

@@ -3099,7 +3099,14 @@ paths:
     put:
       tags: [Clients]
       summary: Update client settings
-      description: Update client general settings
+      description: |
+        Update client general settings.
+
+        Changing the client identifier also revokes every authorization code and refresh token
+        the client holds, as part of the same save, so its users sign in again. A save whose
+        identifier is the one the client already holds revokes nothing. The revocation is
+        recorded as the `revoked_client_grants` audit event with the reason
+        `client_identifier_changed`.
       operationId: updateClientSettings
       parameters:
         - $ref: '#/components/parameters/ClientIdParam'

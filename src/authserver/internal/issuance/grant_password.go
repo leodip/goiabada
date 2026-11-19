@@ -2,14 +2,24 @@ package issuance
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"slices"
 	"strings"
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/uuid"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 )
+
+// ErrPasswordGrantClientRenamed is returned by IssuePasswordGrant when the client the request named
+// no longer holds that identifier by the time the grant writes its first refresh token: a rename
+// committed in between, or a deletion. Nothing is issued. The token endpoint answers it as it
+// answers a request naming an identifier no client holds, invalid_client (#710 decision 5). A
+// package-level sentinel on stdlib errors.New, for the reason ErrIssuingClientGone states.
+var ErrPasswordGrantClientRenamed = errors.New("the client the password grant named no longer holds that identifier")
 
 // ROPCGrantInput contains the parameters needed to generate tokens for ROPC flow.
 // RFC 6749 Section 4.3 - Resource Owner Password Credentials Grant
@@ -112,8 +122,37 @@ func (t *TokenIssuer) IssuePasswordGrant(ctx context.Context, settings *record.S
 		response.IdToken = idTokenStr
 	}
 
-	// Generate refresh token with direct UserId/ClientId (no Code entity needed)
-	refreshToken, refreshExpiresIn, err := t.generateRefreshTokenForROPC(ctx, nil, settings, input, input.Scope, now, privKey, keyIdentifier, nil, grantId)
+	// The first refresh token, with direct UserId/ClientId (no Code entity needed), written in a
+	// transaction that first takes the client's row with a locking read, which writes nothing, and
+	// reads the identifier again. A rename of the client revokes its grants in the rename's
+	// transaction, and a password grant has no code for that sweep to mark and, until this row is
+	// written, no family to record, so the row is what orders the two (#710 decision 5): either this
+	// commits first and the rename's sweep finds the token, or the rename commits first and this
+	// reads the identifier it gave the client. Then the request named an identifier the client no
+	// longer holds, and the grant is refused with nothing issued: the access and ID tokens signed
+	// above are never handed out. A client deleted meanwhile is refused the same way.
+	//
+	// Compared byte for byte with the copy the token endpoint loaded by the identifier the request
+	// named, which is the row's own spelling, so an engine's case-folding lookup cannot make an
+	// unchanged client look renamed, and a rename that changed only the case is one.
+	//
+	// Opened through RunInTransaction, so a deadlock reruns the read and the insert together (#301).
+	// Safe to rerun: the body reads the row afresh and writes one fixed row, and the token it signs is
+	// the committing attempt's.
+	var refreshToken string
+	var refreshExpiresIn int64
+	err = t.database.RunInTransaction(ctx, func(tx *sql.Tx) error {
+		current, readErr := t.database.GetClientByIdForUpdate(ctx, tx, input.Client.Id)
+		if readErr != nil {
+			return readErr
+		}
+		if current == nil || current.ClientIdentifier != input.Client.ClientIdentifier {
+			return errs.WithStack(ErrPasswordGrantClientRenamed)
+		}
+		var writeErr error
+		refreshToken, refreshExpiresIn, writeErr = t.generateRefreshTokenForROPC(ctx, tx, settings, input, input.Scope, now, privKey, keyIdentifier, nil, grantId)
+		return writeErr
+	})
 	if err != nil {
 		return nil, err
 	}

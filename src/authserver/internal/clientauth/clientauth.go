@@ -148,7 +148,7 @@ func (a *Authenticator) FindClient(ctx context.Context, clientIdentifier string)
 		return nil, err
 	}
 	if client == nil {
-		return nil, invalidClientError(clientDoesNotExistErrorMsg)
+		return nil, ClientDoesNotExist()
 	}
 	if !client.Enabled {
 		return nil, invalidClientError(clientDisabledErrorMsg)
@@ -209,6 +209,14 @@ func (a *Authenticator) VerifySecret(client *record.Client, presentedSecret stri
 // and the body is not read in its place (#707 decision 12). No client was identified.
 func UnreadableBasicCredentials() *oauth.ErrorDetail {
 	return invalidClientError(unreadableBasicCredentialsErrorMsg)
+}
+
+// ClientDoesNotExist is the refusal of a request naming an identifier no client holds, FindClient's.
+// The password grant answers it too when the client it named was renamed before its first refresh
+// token was written, so the request named an identifier the client no longer holds (#710
+// decision 5).
+func ClientDoesNotExist() *oauth.ErrorDetail {
+	return invalidClientError(clientDoesNotExistErrorMsg)
 }
 
 // BasicCredentialsNamingNoClient is the refusal of Basic credentials that can be read but name no

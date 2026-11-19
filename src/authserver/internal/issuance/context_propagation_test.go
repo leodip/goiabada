@@ -51,8 +51,8 @@ func propagationCodeInput() *CreateCodeInput {
 	}
 }
 
-// The accept arm: the acquisition and the insert carry the caller's own context, and the caller's
-// own transaction with it. The matchers are assertions rather than stubs -- a mock.Anything in
+// The accept arm: the acquisition, the client's shared lock and the insert carry the caller's own
+// context, and the caller's own transaction with it. The matchers are assertions rather than stubs -- a mock.Anything in
 // either position would pass on an issuer that opened its own.
 func TestIssueAuthCode_IssuesUnderTheCallersContext(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
@@ -61,6 +61,8 @@ func TestIssueAuthCode_IssuesUnderTheCallersContext(t *testing.T) {
 	mockDB.On("AcquireUserSessionRow", theIssuersCallersContext(), issuanceTx, "session-propagation").
 		Return(true, nil).Once()
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, issuanceTx, "test-client").
+		Return(&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil).Once()
+	mockDB.On("GetClientByIdForShare", theIssuersCallersContext(), issuanceTx, int64(1)).
 		Return(&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil).Once()
 	mockDB.On("CreateCode", theIssuersCallersContext(), issuanceTx, mock.AnythingOfType("*record.Code")).
 		Return(nil).Once()

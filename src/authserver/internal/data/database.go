@@ -68,6 +68,13 @@ type Database interface {
 
 	CreateClient(ctx context.Context, tx *sql.Tx, client *record.Client) error
 	UpdateClient(ctx context.Context, tx *sql.Tx, client *record.Client) error
+	// SetClientIdentifier gives a client a new identifier, and nothing else but updated_at. It takes
+	// the client's row with a locking read, writes only when the identifier given differs byte for
+	// byte from the one the row holds, and reports whether it did: false for the row's own
+	// identifier, which leaves the row untouched, and for a client that is not there. It is the
+	// column's one writer after creation: UpdateClient never writes it (#710 decision 4). A
+	// transaction is required, as for GetClientByIdForUpdate.
+	SetClientIdentifier(ctx context.Context, tx *sql.Tx, clientId int64, clientIdentifier string) (changed bool, err error)
 	// SetClientPublic makes one client public and reports whether THIS call performed
 	// the confidential-to-public transition, which is the write that removes the
 	// client's obligation to authenticate and so the one that must revoke its
@@ -119,6 +126,18 @@ type Database interface {
 	// released before the read even runs.
 	AcquireClientRow(ctx context.Context, tx *sql.Tx, clientId int64) error
 	GetClientById(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error)
+	// GetClientByIdForUpdate reads the client as last committed and takes its row until the
+	// transaction ends, writing nothing: a writer of the row, a rename among them, waits for that
+	// transaction, and this read waits for a writer's. The initial password grant reads its client
+	// so before it writes its first refresh token (#710 decision 5). A transaction is required.
+	GetClientByIdForUpdate(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error)
+	// GetClientByIdForShare reads the client as last committed and holds a shared lock on its row
+	// until the transaction ends, writing nothing: a rename or a deletion of the client waits for
+	// that transaction, and this read waits for theirs. On MySQL, PostgreSQL and SQL Server two such
+	// readers do not wait for each other; SQLite's is a plain read, its pool's one connection running
+	// one transaction at a time. Code issuance reads its client so before it inserts the code (#866).
+	// A transaction is required.
+	GetClientByIdForShare(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error)
 	GetClientsByIds(ctx context.Context, tx *sql.Tx, clientIds []int64) ([]record.Client, error)
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
 	GetAllClients(ctx context.Context, tx *sql.Tx) ([]record.Client, error)

@@ -19,6 +19,16 @@ tokens.
 - PKCE: always required for a public client; otherwise configurable globally
   (`Settings.PKCERequired`) or per-client (`Client.PKCERequired`)
 - Supports `response_type=code` with optional `code_challenge` + `code_challenge_method`
+- A change of a client's identifier revokes its unredeemed codes in the rename's transaction (#710
+  decision 5). Issuance looks the client up by the identifier the ceremony named with a plain read,
+  then, before inserting the code, reads its row again with `GetClientByIdForShare`: a shared lock
+  held to the end of the issuance transaction on MySQL, PostgreSQL and SQL Server, and a plain read
+  on SQLite, whose one connection runs one transaction at a time. Either the code commits first and
+  the rename's sweep revokes it, or the rename commits first and issuance, finding the identifier
+  changed, refuses with `ErrIssuingClientGone`, which `/auth/issue` answers as a client that is gone
+  (#866). Two issuances' shared reads of one client's row do not wait for each other.
+  `code_issuance_rename_ordering_test.go` shows both orders on MySQL, PostgreSQL and SQL Server, and
+  again with READ_COMMITTED_SNAPSHOT on
 - Implementation: `handler_authorize.go`, `authflow/authorization.go`, `issuance/code_issuer.go`;
   redeemed by `handler_token_authorization_code.go`,
   `protocolvalidation/token_grant_authorization_code.go`, `issuance/grant_authorization_code.go`
@@ -186,7 +196,13 @@ One check decides whether an access token is one under RFC 9068 and still stands
 - `liveness.AccessToken` checks the token first: its header `typ` is `at+jwt` (or
   `application/at+jwt`, without regard to case) and its `iss` is exactly the configured issuer, as
   RFC 9068 section 4 requires of a resource server. Then the client its `client_id` names exists, is
-  the one the token was issued to, and is enabled. A new client may take a deleted client's
+  the one the token was issued to, and is enabled. A rename can give the identifier to another
+  client, so every access token carries `client_internal_id`, the internal id of its client's row
+  (written by `finishAccessToken`), and is refused when it is not the id of the client `client_id`
+  names; internal ids are never reused, and no stored time is involved, so a token signed while the
+  identifier changed hands is refused too. A claim that is not a whole number is refused before the
+  client is read. A token without it was issued before #710 and is judged by the creation-time rule
+  alone, which still applies to every token: a new client may take a deleted client's
   identifier, so a token whose `iat` second is before the client's `created_at` second is refused,
   and one issued in that very second reads `deleted_clients` (written by `DeleteClient` in its
   transaction) and is refused when the identifier was deleted in or after that second, failing
@@ -198,7 +214,7 @@ One check decides whether an access token is one under RFC 9068 and still stands
 - Last, a token carrying `grant_id` is live only while its grant is: `IsRefreshTokenFamilyLive`
   answers whether the family has no revocation record and still has a member that is not revoked,
   in one indexed read. Every revocation that ends a grant writes the record in its transaction, for
-  every family it reads: consent withdrawal, a client made public, a session's termination,
+  every family it reads: consent withdrawal, a client made public or renamed, a session's termination,
   authorization-code reuse containment, replay containment and `/auth/revoke`. A sweep alone misses
   the child of a rotation that claimed its parent before the sweep read the rows, so the record is
   what refuses that child's access token at once. A credential change ends access tokens through
@@ -223,12 +239,18 @@ Exchange refresh token for new access/refresh tokens. Works with auth code and R
 - Offline tokens: Configurable idle timeout and max lifetime per client/globally
 - Revocation: Old refresh token revoked on use, new one issued
 - Liveness: `liveness.FindRefreshToken` reads the row with its code, user and client, and
-  `liveness.RefreshToken` judges it: user enabled, the row's generation current, a password grant
-  token's authentication instant, the code not revoked, no family revocation record, then the
-  session (session-bound) or the maximum lifetime and the code's session owner (offline), and last
-  the row's own revocation. The validator matches the client to the token between the two calls and
-  keeps PKCE, which it answers before the family and session refusals, and the scope checks. A token
-  refused only for its own revoked row goes on to the redemption, which contains its family (#676)
+  `liveness.RefreshToken` judges it: for a row not revoked, its `iss` and `aud` each exactly the
+  current issuer, read from the claims alone and storing nothing, so an issuer change refuses every
+  earlier refresh token and changing it back restores them (#710); then user enabled, the row's
+  generation current, a password grant token's authentication instant, the code not revoked, no
+  family revocation record, then the session (session-bound) or the maximum lifetime and the code's
+  session owner (offline), and last the row's own revocation. A rotated token of an earlier issuer
+  skips the issuer comparison and is judged as any rotated token, so its replay still contains the
+  family. The validator matches the client to the token and the DPoP key between the two calls,
+  answers the issuer refusal with "The refresh token is invalid." and a Warn record naming both
+  issuers, keeps PKCE, which it answers before the family and session refusals, and the scope
+  checks. A token refused only for its own revoked row goes on to the redemption, which contains its
+  family (#676)
 - Implementation: `handler_token_refresh_token.go`,
   `protocolvalidation/token_grant_refresh_token.go`, `liveness/refresh.go`,
   `issuance/grant_refresh_token.go`
@@ -381,6 +403,14 @@ exposure.
 - Disabled by default. Enable via `Settings.ResourceOwnerPasswordCredentialsEnabled` or per-client
 - Rate limited. Blocks users with 2FA enabled, and users who owe the acceptance step a legal
   document for the client (`invalid_grant`, #622). Logs `audit.EventROPCAuthFailed` on failure
+- A change of a client's identifier revokes the client's grants in the rename's transaction
+  (`revocation.RevokeClientGrantsTx` under `ReasonClientIdentifierChanged`, #710 decision 5), and a
+  password grant has no code to mark, so the initial grant writes its first refresh token in a
+  transaction that first reads the client with `GetClientByIdForUpdate`, a locking read that writes
+  nothing. Either it commits first and the rename's sweep finds the token, or it reads the identifier
+  the rename gave and is refused with `ErrPasswordGrantClientRenamed`, answered `invalid_client`
+  ("Client does not exist."), nothing issued. `password_grant_rename_ordering_test.go` shows both
+  orders on every engine
 - Implementation: `handler_token_password.go`, `protocolvalidation/token_grant_password.go`,
   `issuance/grant_password.go`
 
@@ -883,8 +913,8 @@ Goiabada departs from two of RFC 9068's SHOULDs, and the tokens page documents e
 whose scopes name several resources gets one token naming them all in `aud` (section 3, since there
 is no RFC 8707 `resource` parameter; each scope still belongs to one resource in `aud`), and
 `groups` is an array of group identifiers rather than SCIM objects (section 2.2.3.1). The private
-claims `attributes`, `auth_state_generation`, `grant_id` and the `typ` claim have plain names,
-which section 2.2.2 allows.
+claims `attributes`, `auth_state_generation`, `client_internal_id`, `grant_id` and the `typ` claim
+have plain names, which section 2.2.2 allows.
 
 ## API Routes
 

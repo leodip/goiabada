@@ -30,7 +30,7 @@ Your API checks every access token it's sent, and your app checks the ID token b
 4. Check `aud`. An ID token's is your client identifier. An access token's names the resource of each permission it carries, such as `product-api`, so your API checks its own resource identifier is there.
 
 5. Check what the token is for:
-   - An ID token's `nonce` is the one your app sent in the authorization request.
+   - An ID token from a sign-in whose authorization request sent a `nonce` carries that `nonce`. A refreshed ID token has none, so don't refuse one for that.
    - An access token's `scope` holds the permission the operation needs, such as `product-api:read`.
 
 </Steps>
@@ -53,6 +53,7 @@ And its claims like this:
   "sub": "c5b9b6a2-4b39-4b8e-9a8e-6f7f2b3a1d10",
   "aud": ["authserver", "product-api"],
   "client_id": "my-web-app",
+  "client_internal_id": 12,
   "scope": "openid profile product-api:read",
   "typ": "Bearer",
   "iat": 1760000000,
@@ -92,6 +93,7 @@ An authorization code works once, for 60 seconds. [Refresh tokens](/concepts/ref
 | `sub` | The user's [subject](/concepts/glossary/#subject). In a token from the client credentials flow, the client identifier |
 | `aud` | The resource of each permission scope, and `authserver` when the scope has an OpenID Connect scope or `offline_access`. A string when there's one, an array when there are more |
 | `client_id` | The client identifier of the client the token was issued to |
+| `client_internal_id` | Reserved. See below |
 | `scope` | The scopes the token carries |
 | `typ` | `Bearer`, on every access token, a DPoP-bound one included. It labels the token as an access token, not how it's sent |
 | `cnf` | Only on a [DPoP](/concepts/dpop/)-bound token: `{"jkt": "..."}`, the thumbprint of the key your app signed its proof with. `cnf.jkt` is what says a token is bound, so an API that sees it accepts the token only with a proof signed by that key |
@@ -101,15 +103,16 @@ An authorization code works once, for 60 seconds. [Refresh tokens](/concepts/ref
 | `sid` | The session the token came from, when there is one. See below |
 | `grant_id` | The grant the token belongs to: one sign-in, or one password grant, and every refresh after it. See below |
 | `auth_state_generation` | Reserved. See below |
-| `nonce` | The `nonce` of the authorization request, when it had one |
 
-User claims, `groups` and `attributes` come on top, as [Scopes](/concepts/scopes/#where-the-claims-go) describes. A token from the client credentials flow names no user, so it carries none of `auth_time`, `acr`, `amr`, `sid`, `grant_id`, `auth_state_generation` or `nonce`.
+User claims, `groups` and `attributes` come on top, as [Scopes](/concepts/scopes/#where-the-claims-go) describes. A token from the client credentials flow names no user, so it carries none of `auth_time`, `acr`, `amr`, `sid`, `grant_id` or `auth_state_generation`.
 
 **`sid` isn't always there.** It's in an access token only when the grant it came from is tied to a session. A token from an `offline_access` grant has none, nor does one from the [password grant](/legacy-flows/ropc/): those grants are meant to outlive the browser session that started them. Don't treat a missing `sid` as an invalid token.
 
 **`grant_id` is there only when a refresh token is.** Every access token a sign-in issues carries the same `grant_id`, through every refresh, and so does every one a password grant issues. A token from the client credentials flow or the [implicit flow](/legacy-flows/implicit/) has none, since neither issues a refresh token.
 
 **`auth_state_generation` is reserved.** It's how the auth server tells a token issued before the user's credentials last changed from one issued after. Don't parse it, compare it between tokens or build anything on it: its meaning can change.
+
+**`client_internal_id` is reserved.** It's how the auth server tells the client a token was issued to from another client that later took its client identifier. Don't parse it or build anything on it: its meaning can change.
 
 ## Where tokens depart from RFC 9068
 
@@ -130,7 +133,7 @@ Access tokens follow [RFC 9068](https://www.rfc-editor.org/rfc/rfc9068), the JWT
 | `auth_time` | When the user last entered a credential, a password or a one-time code |
 | `acr`, `amr` | How the user signed in. See [ACR and AMR](/concepts/acr-and-amr/) |
 | `sid` | The session the user signed in with, when there is one. [`/auth/logout`](/reference/endpoints/logout/) matches on it |
-| `nonce` | The `nonce` of the authorization request, when it had one |
+| `nonce` | The `nonce` of the authorization request, when it had one. A refreshed ID token has none |
 | `at_hash` | A hash of the access token issued beside it, in the [implicit flow](/legacy-flows/implicit/) only |
 
 User claims, `groups` and `attributes` come on top, as [Scopes](/concepts/scopes/#where-the-claims-go) describes. `auth_time` is never simply when the token was issued: a sign-in that reused a session, [`prompt=none`](/concepts/prompt/) included, keeps the time the user last signed in, which is what `max_age` is measured against.

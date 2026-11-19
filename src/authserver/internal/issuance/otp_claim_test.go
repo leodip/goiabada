@@ -34,6 +34,8 @@ func TestIssueAuthCodeTx_ChecksTheOTPClaimUnderTheUserRowFirst(t *testing.T) {
 	mockDB.On("AcquireUserSessionRow", mock.Anything, issueTx, issueSid).Run(note("session row")).Return(true, nil).Once()
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, issueTx, "test-client").Run(note("client")).
 		Return(&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil).Once()
+	mockDB.On("GetClientByIdForShare", mock.Anything, issueTx, int64(1)).Run(note("client lock")).
+		Return(&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil).Once()
 	mockDB.On("CreateCode", mock.Anything, issueTx, mock.AnythingOfType("*record.Code")).Run(note("insert")).
 		Return(nil).Once()
 
@@ -41,7 +43,7 @@ func TestIssueAuthCodeTx_ChecksTheOTPClaimUnderTheUserRowFirst(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, "pwd otp", code.AuthMethods)
-	assert.Equal(t, []string{"begin", "user row", "user", "session row", "client", "insert", "commit"}, order)
+	assert.Equal(t, []string{"begin", "user row", "user", "session row", "client", "client lock", "insert", "commit"}, order)
 }
 
 // A code from an authenticator removed, or removed and replaced, since /auth/issue checked it writes

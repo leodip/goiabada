@@ -51,6 +51,8 @@ It's case-sensitive: `my-app` and `My-App` are two different clients, and a requ
 
 It can't be a [resource's identifier](/concepts/resources-and-permissions/#identifiers) either.
 
+Changing a client's identifier ends its grants: its authorization codes and [refresh tokens](/concepts/refresh-tokens/) stop working, so its users have to sign in again. Your app has to send the new identifier from then on. A save that keeps the identifier ends nothing.
+
 ## Settings a new client starts with
 
 A client you create in the admin console starts:

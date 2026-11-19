@@ -7,13 +7,17 @@ import (
 )
 
 type Client struct {
-	Id                    int64        `db:"id" fieldtag:"pk"`
-	CreatedAt             sql.NullTime `db:"created_at" fieldtag:"dont-update"`
-	UpdatedAt             sql.NullTime `db:"updated_at"`
-	ClientIdentifier      string       `db:"client_identifier"`
-	ClientSecretEncrypted []byte       `db:"client_secret_encrypted"`
-	Description           string       `db:"description"`
-	WebsiteURL            string       `db:"website_url"`
+	Id        int64        `db:"id" fieldtag:"pk"`
+	CreatedAt sql.NullTime `db:"created_at" fieldtag:"dont-update"`
+	UpdatedAt sql.NullTime `db:"updated_at"`
+	// ClientIdentifier is the client_id the client sends. Tagged dont-update, so the whole-row
+	// UpdateClient never writes it: the other client saves read the row earlier in their request,
+	// and would write back an identifier renamed since. CreateClient writes it, and after that only
+	// SetClientIdentifier, which the settings save uses (#710 decision 4).
+	ClientIdentifier      string `db:"client_identifier" fieldtag:"dont-update"`
+	ClientSecretEncrypted []byte `db:"client_secret_encrypted"`
+	Description           string `db:"description"`
+	WebsiteURL            string `db:"website_url"`
 	// PrivacyPolicyURL and TermsOfServiceURL are the app's own privacy policy and terms of service,
 	// which the consent screen links whenever they are set (RFC 7591 section 2, #622 decision 12).
 	// Goiabada neither hosts them nor asks for their acceptance. An administrator sets them; dynamic

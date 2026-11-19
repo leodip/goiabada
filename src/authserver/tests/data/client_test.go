@@ -145,9 +145,10 @@ func TestUpdateClient(t *testing.T) {
 		t.Fatalf("Failed to retrieve updated client: %v", err)
 	}
 
-	// Check all properties
-	if retrievedClient.ClientIdentifier != updatedClient.ClientIdentifier {
-		t.Errorf("Expected ClientIdentifier '%s', got '%s'", updatedClient.ClientIdentifier, retrievedClient.ClientIdentifier)
+	// Check all properties. The identifier is the one property the whole-row save does not write:
+	// SetClientIdentifier is its one writer after creation (#710 decision 4).
+	if retrievedClient.ClientIdentifier != originalClient.ClientIdentifier {
+		t.Errorf("Expected ClientIdentifier '%s', got '%s'", originalClient.ClientIdentifier, retrievedClient.ClientIdentifier)
 	}
 	if string(retrievedClient.ClientSecretEncrypted) != string(updatedClient.ClientSecretEncrypted) {
 		t.Errorf("ClientSecretEncrypted does not match")

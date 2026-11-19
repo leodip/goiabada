@@ -362,10 +362,11 @@ const (
 	// EventRevokedClientGrants records that a client-scoped security action cut off every grant
 	// one client holds: its not-yet-revoked authorization codes are marked revoked and its
 	// refresh tokens, through both linkage shapes, are revoked. Emitted by the
-	// confidential-to-public flip AFTER its transaction commits, on success only, and emitted
-	// even when nothing was found to revoke, so the event attests that the action happened
-	// rather than that something was there to sweep (#245 decision 4). Its `reason` field
-	// distinguishes future sites; today the only value is client_became_public.
+	// confidential-to-public flip and by a settings save that changed the client's identifier,
+	// each AFTER its transaction commits, on success only, and emitted even when nothing was found
+	// to revoke, so the event attests that the action happened rather than that something was
+	// there to sweep (#245 decision 4, #710 decision 5). Its `reason` field says which:
+	// client_became_public or client_identifier_changed.
 	//
 	// Deliberately NOT EventRevokedUserAuthState, whose payload asserts a generation bracket and
 	// a list of terminated sessions. This action advances no generation and ends no session: it

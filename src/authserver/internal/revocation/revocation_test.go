@@ -856,7 +856,7 @@ func TestRevokeClientGrants_MarksTheCodesThenSweepsTheTokens(t *testing.T) {
 	db.On("UpdateRefreshToken", mock.Anything, revokeTx, tokens[1]).Return(nil).Once()
 	db.On("UpdateRefreshToken", mock.Anything, revokeTx, tokens[2]).Return(nil).Once()
 
-	result, err := RevokeClientGrants(context.Background(), db, revokeTx, revokeClientId)
+	result, err := RevokeClientGrants(context.Background(), db, revokeTx, revokeClientId, ReasonClientBecamePublic)
 	require.NoError(t, err)
 
 	// The marker's own count, reported as-is: it is what the audit event carries, and stage 3's
@@ -909,7 +909,7 @@ func TestRevokeClientGrants_NothingToRevoke(t *testing.T) {
 	db.On("GetRefreshTokensByClientId", mock.Anything, revokeTx, revokeClientId).
 		Return([]*record.RefreshToken{}, nil).Once()
 
-	result, err := RevokeClientGrants(context.Background(), db, revokeTx, revokeClientId)
+	result, err := RevokeClientGrants(context.Background(), db, revokeTx, revokeClientId, ReasonClientBecamePublic)
 	require.NoError(t, err)
 
 	assert.Equal(t, int64(0), result.RevokedCodeCount)
@@ -925,7 +925,7 @@ func TestRevokeClientGrants_NothingToRevoke(t *testing.T) {
 func TestRevokeClientGrants_RequiresATransaction(t *testing.T) {
 	db := datamocks.NewDatabase(t)
 
-	result, err := RevokeClientGrants(context.Background(), db, nil, revokeClientId)
+	result, err := RevokeClientGrants(context.Background(), db, nil, revokeClientId, ReasonClientBecamePublic)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "requires a transaction")
@@ -948,7 +948,7 @@ func TestRevokeClientGrantsTx_WritesAndRevokesInOneTransaction(t *testing.T) {
 		Return([]*record.RefreshToken{}, nil).Once()
 
 	var wroteWith *sql.Tx
-	result, err := RevokeClientGrantsTx(context.Background(), db, revokeClientId, func(tx *sql.Tx) (bool, error) {
+	result, err := RevokeClientGrantsTx(context.Background(), db, revokeClientId, ReasonClientBecamePublic, func(tx *sql.Tx) (bool, error) {
 		wroteWith = tx
 		return true, nil
 	})
@@ -983,7 +983,7 @@ func TestRevokeClientGrantsTx_AWriteThatIsNotATransitionCommitsAndRevokesNothing
 	datamocks.ExpectRunInTransaction(db, revokeTx)
 
 	wrote := false
-	result, err := RevokeClientGrantsTx(context.Background(), db, revokeClientId, func(tx *sql.Tx) (bool, error) {
+	result, err := RevokeClientGrantsTx(context.Background(), db, revokeClientId, ReasonClientBecamePublic, func(tx *sql.Tx) (bool, error) {
 		wrote = true
 		return false, nil
 	})
@@ -1098,7 +1098,7 @@ func TestRevokeClientGrantsTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 				write = func(tx *sql.Tx) (bool, error) { return true, nil }
 			}
 
-			result, err := RevokeClientGrantsTx(context.Background(), db, revokeClientId, write)
+			result, err := RevokeClientGrantsTx(context.Background(), db, revokeClientId, ReasonClientBecamePublic, write)
 
 			require.ErrorIs(t, err, boom)
 			assert.Equal(t, ClientGrantResult{}, result,
@@ -1493,9 +1493,9 @@ func TestLogRevokedUserAuthStateByCommand_Payload(t *testing.T) {
 	}, recorder.details)
 }
 
-// TestReasons_AreStoredData holds the seven reason spellings. The first six are written into the
-// reason of an audit record, ReasonClientBecamePublic also into a rotation family's revocation
-// record, and ReasonConsentWithdrawn into that family record alone, so a spelling changed here
+// TestReasons_AreStoredData holds the reason spellings. The first seven are written into the
+// reason of an audit record, ReasonClientBecamePublic and ReasonClientIdentifierChanged also into a
+// rotation family's revocation record, and ReasonConsentWithdrawn into that family record alone, so a spelling changed here
 // leaves every row already stored unmatched by a consumer filtering on the new one. Only the Go
 // names are free to change.
 func TestReasons_AreStoredData(t *testing.T) {
@@ -1505,5 +1505,6 @@ func TestReasons_AreStoredData(t *testing.T) {
 	assert.Equal(t, "recovery_command", ReasonRecoveryCommand)
 	assert.Equal(t, "account_disabled", ReasonAccountDisabled)
 	assert.Equal(t, "client_became_public", ReasonClientBecamePublic)
+	assert.Equal(t, "client_identifier_changed", ReasonClientIdentifierChanged)
 	assert.Equal(t, "consent_withdrawn", ReasonConsentWithdrawn)
 }

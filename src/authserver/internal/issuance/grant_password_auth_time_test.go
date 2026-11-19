@@ -51,6 +51,8 @@ func newROPCGrantFixture(t *testing.T) ropcGrantFixture {
 		Run(func(args mock.Arguments) { written = args.Get(2).(*record.RefreshToken) }).
 		Return(nil)
 
+	expectPasswordGrantClientRow(mockDB, client.Id, client)
+
 	return ropcGrantFixture{
 		issuer: NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil),
 		settings: &record.Settings{

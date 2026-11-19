@@ -37,7 +37,13 @@ func newTestGroup() *record.Group {
 // explicitly without leaking one on an early t.Fatal.
 func beginTx(t *testing.T) *sql.Tx {
 	t.Helper()
-	tx, err := database.BeginTransaction(context.Background())
+	return beginTxOn(t, database)
+}
+
+// beginTxOn is beginTx over the handle it is given.
+func beginTxOn(t *testing.T, db data.Database) *sql.Tx {
+	t.Helper()
+	tx, err := db.BeginTransaction(context.Background())
 	require.NoError(t, err, "BeginTransaction")
 	require.NotNil(t, tx, "BeginTransaction returned a nil transaction")
 	t.Cleanup(func() { _ = tx.Rollback() })

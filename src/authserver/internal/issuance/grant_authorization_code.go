@@ -120,7 +120,7 @@ func (t *TokenIssuer) mintAuthorizationCodeTokens(ctx context.Context, settings 
 
 	scopes := strings.Split(code.Scope, " ")
 	if slices.Contains(scopes, "openid") {
-		idTokenStr, idTokenErr := t.generateIdToken(ctx, nil, settings, code, code.Scope, now, privKey, keyIdentifier)
+		idTokenStr, idTokenErr := t.generateIdToken(ctx, nil, settings, code, code.Scope, now, privKey, keyIdentifier, nil)
 		if idTokenErr != nil {
 			return nil, idTokenErr
 		}

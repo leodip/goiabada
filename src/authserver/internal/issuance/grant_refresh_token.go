@@ -404,7 +404,7 @@ func (t *TokenIssuer) mintCodeRefreshTokens(ctx context.Context, tx *sql.Tx, set
 
 	scopes := strings.Split(scopeToUse, " ")
 	if slices.Contains(scopes, "openid") {
-		idTokenStr, idTokenErr := t.generateIdToken(ctx, tx, settings, code, scopeToUse, now, privKey, keyIdentifier)
+		idTokenStr, idTokenErr := t.generateIdToken(ctx, tx, settings, code, scopeToUse, now, privKey, keyIdentifier, parent)
 		if idTokenErr != nil {
 			return nil, idTokenErr
 		}

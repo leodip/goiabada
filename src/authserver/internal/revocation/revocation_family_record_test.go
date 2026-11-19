@@ -48,12 +48,57 @@ func TestRevokeClientGrants_RecordsEachFamilyOnceWhateverItsMembersState(t *test
 	db.On("UpdateRefreshToken", mock.Anything, revokeTx, tokens[2]).Return(nil).Once()
 	db.On("UpdateRefreshToken", mock.Anything, revokeTx, tokens[3]).Return(nil).Once()
 
-	result, err := RevokeClientGrants(context.Background(), db, revokeTx, revokeClientId)
+	result, err := RevokeClientGrants(context.Background(), db, revokeTx, revokeClientId, ReasonClientBecamePublic)
 
 	require.NoError(t, err)
 	assert.Equal(t, []string{"b-1", "no-family"}, result.RevokedRefreshTokenJtis,
 		"the record changes what is swept by nothing: only the live tokens are revoked and reported")
 	db.AssertNumberOfCalls(t, "RecordRefreshTokenFamilyRevoked", 2)
+}
+
+// The sweep stores the reason its caller gives on each family it records, so a rename's families say
+// client_identifier_changed and a switch to public's say client_became_public (#710 decision 5).
+func TestRevokeClientGrants_RecordsTheFamiliesUnderTheCallersReason(t *testing.T) {
+	for _, reason := range []string{"client_identifier_changed", "client_became_public"} {
+		t.Run(reason, func(t *testing.T) {
+			db := datamocks.NewDatabase(t)
+			tokens := []*record.RefreshToken{
+				{Id: 1, RefreshTokenJti: "a-1", FirstRefreshTokenJti: "fam-a"},
+				{Id: 2, RefreshTokenJti: "b-1", FirstRefreshTokenJti: "fam-b"},
+			}
+			db.On("RevokeCodesByClientId", mock.Anything, revokeTx, revokeClientId).Return(int64(0), nil).Once()
+			db.On("GetRefreshTokensByClientId", mock.Anything, revokeTx, revokeClientId).Return(tokens, nil).Once()
+			db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, "fam-a", reason).Return(true, nil).Once()
+			db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, "fam-b", reason).Return(true, nil).Once()
+			db.On("UpdateRefreshToken", mock.Anything, revokeTx, tokens[0]).Return(nil).Once()
+			db.On("UpdateRefreshToken", mock.Anything, revokeTx, tokens[1]).Return(nil).Once()
+
+			result, err := RevokeClientGrants(context.Background(), db, revokeTx, revokeClientId, reason)
+
+			require.NoError(t, err)
+			assert.Equal(t, []string{"a-1", "b-1"}, result.RevokedRefreshTokenJtis)
+		})
+	}
+}
+
+// RevokeClientGrantsTx hands its caller's reason to the sweep.
+func TestRevokeClientGrantsTx_RecordsTheFamiliesUnderTheCallersReason(t *testing.T) {
+	db := datamocks.NewDatabase(t)
+	datamocks.ExpectRunInTransaction(db, revokeTx)
+	token := &record.RefreshToken{Id: 1, RefreshTokenJti: "rt-1", FirstRefreshTokenJti: "fam-1"}
+	db.On("RevokeCodesByClientId", mock.Anything, revokeTx, revokeClientId).Return(int64(2), nil).Once()
+	db.On("GetRefreshTokensByClientId", mock.Anything, revokeTx, revokeClientId).
+		Return([]*record.RefreshToken{token}, nil).Once()
+	db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, "fam-1", "client_identifier_changed").
+		Return(true, nil).Once()
+	db.On("UpdateRefreshToken", mock.Anything, revokeTx, token).Return(nil).Once()
+
+	result, err := RevokeClientGrantsTx(context.Background(), db, revokeClientId, ReasonClientIdentifierChanged,
+		func(tx *sql.Tx) (bool, error) { return true, nil })
+
+	require.NoError(t, err)
+	assert.Equal(t, int64(2), result.RevokedCodeCount)
+	assert.Equal(t, []string{"rt-1"}, result.RevokedRefreshTokenJtis)
 }
 
 // A record that cannot be written leaves the revocation as an error, with no token swept: the
@@ -67,7 +112,7 @@ func TestRevokeClientGrants_AFailedRecordSweepsNothing(t *testing.T) {
 	db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, "fam-session", ReasonClientBecamePublic).
 		Return(false, boom).Once()
 
-	result, err := RevokeClientGrants(context.Background(), db, revokeTx, revokeClientId)
+	result, err := RevokeClientGrants(context.Background(), db, revokeTx, revokeClientId, ReasonClientBecamePublic)
 
 	require.ErrorIs(t, err, boom)
 	assert.Equal(t, ClientGrantResult{}, result)
@@ -96,7 +141,7 @@ func TestRevokeClientGrantsTx_ALostKeyRunsTheRevocationOnceMore(t *testing.T) {
 		db.On("UpdateRefreshToken", mock.Anything, revokeTx, token).Return(nil).Once()
 
 		writes := 0
-		result, err := RevokeClientGrantsTx(context.Background(), db, revokeClientId, func(tx *sql.Tx) (bool, error) {
+		result, err := RevokeClientGrantsTx(context.Background(), db, revokeClientId, ReasonClientBecamePublic, func(tx *sql.Tx) (bool, error) {
 			writes++
 			return true, nil
 		})
@@ -119,7 +164,7 @@ func TestRevokeClientGrantsTx_ALostKeyRunsTheRevocationOnceMore(t *testing.T) {
 		db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, "fam-1", ReasonClientBecamePublic).
 			Return(false, lostTheKey).Twice()
 
-		result, err := RevokeClientGrantsTx(context.Background(), db, revokeClientId, func(tx *sql.Tx) (bool, error) {
+		result, err := RevokeClientGrantsTx(context.Background(), db, revokeClientId, ReasonClientBecamePublic, func(tx *sql.Tx) (bool, error) {
 			return true, nil
 		})
 

@@ -31,8 +31,9 @@ const invalidGenerationMessage = "The refresh token is invalid because it was su
 
 // invalidRefreshTokenMessage is the refusal that says nothing about why: a validly signed token
 // with no row, an ROPC token issued before its grant's authentication instant was recorded, a
-// token whose user is disabled, and a token the parser refuses for anything but its expiry, such as
-// a malformed one or one no stored key verifies (#128, #125, #137, #680). None of these is something
+// token whose user is disabled, a live token of an earlier issuer, and a token the parser refuses
+// for anything but its expiry, such as a malformed one or one no stored key verifies (#128, #125,
+// #137, #710, #680). None of these is something
 // a client acts on differently, naming the first would confirm which JTIs were ever issued, naming
 // the last would tell whoever holds a stolen token what became of the account, and naming the
 // parser's check would tell a forger which one failed.
@@ -203,11 +204,21 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 	// presenter that the session exists and belongs to someone else.
 	const invalidTokenMessage = "The refresh token is invalid because the associated session has expired or been terminated."
 
-	// The refusals the check reads off what was loaded with the row answer first, in its order: a
-	// disabled user's token gets the wording that says nothing about why (#137), and
-	// UserDisabledError is what still tells the handler to write EventUserDisabled. A revoked code's
-	// marker refuses a flipped client's code-descended children before PKCE does.
+	// The refusals the check reads off the token's claims and what was loaded with the row answer
+	// first, in its order. A live token of an earlier issuer gets the wording that says nothing
+	// about why, before anything is rotated, and the Warn record is what tells the operator (#710).
+	// A disabled user's token gets the same wording (#137), and UserDisabledError is what still tells
+	// the handler to write EventUserDisabled. A revoked code's marker refuses a flipped client's
+	// code-descended children before PKCE does.
 	switch refusal {
+	case liveness.RefreshForeignIssuer:
+		slog.WarnContext(ctx, "refresh token refused for its issuer",
+			"token_issuer", refreshTokenInfo.StringClaim("iss"),
+			"issuer", settings.Issuer,
+			"client_identifier", client.ClientIdentifier,
+			"refresh_token_id", refreshToken.Id)
+		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
+			invalidRefreshTokenMessage, http.StatusBadRequest)
 	case liveness.RefreshUserDisabled:
 		return nil, userDisabled(invalidRefreshTokenMessage, stored.User.Id)
 	case liveness.RefreshGenerationSuperseded:

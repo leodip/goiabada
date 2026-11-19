@@ -67,6 +67,7 @@ func TestBoundAccessToken_AuthorizationCodeGrant(t *testing.T) {
 		"iss":                   "https://test-issuer.com",
 		"sub":                   code.User.Subject,
 		"client_id":             "web-app",
+		"client_internal_id":    float64(1),
 		"grant_id":              row.FirstRefreshTokenJti,
 		"auth_time":             float64(testStart.Add(-5 * time.Minute).Unix()),
 		"acr":                   "urn:goiabada:level1",
@@ -112,6 +113,7 @@ func TestBoundAccessToken_PasswordGrant(t *testing.T) {
 	expectSigningKeyAndUserLoads(t, mockDB)
 	captureRefreshTokenRow(mockDB)
 
+	expectPasswordGrantClientRow(mockDB, 3, &record.Client{Id: 3, ClientIdentifier: "legacy-app"})
 	response, err := tokenIssuer.IssuePasswordGrant(context.Background(), rfc9068Settings(), &ROPCGrantInput{
 		Client:         &record.Client{Id: 3, ClientIdentifier: "legacy-app"},
 		User:           &record.User{Id: 1, Subject: fake.UUID()},
@@ -166,12 +168,13 @@ func TestBoundAccessToken_ClientCredentialsGrant(t *testing.T) {
 
 	assertBoundTokenResponse(t, response)
 	assertWholeAccessToken(t, response.AccessToken, testStart, 600, map[string]interface{}{
-		"iss":       "https://test-issuer.com",
-		"sub":       "billing-service",
-		"client_id": "billing-service",
-		"aud":       "product-api",
-		"typ":       "Bearer",
-		"scope":     "product-api:read",
-		"cnf":       map[string]interface{}{"jkt": boundThumbprint},
+		"iss":                "https://test-issuer.com",
+		"sub":                "billing-service",
+		"client_id":          "billing-service",
+		"client_internal_id": float64(4),
+		"aud":                "product-api",
+		"typ":                "Bearer",
+		"scope":              "product-api:read",
+		"cnf":                map[string]interface{}{"jkt": boundThumbprint},
 	})
 }

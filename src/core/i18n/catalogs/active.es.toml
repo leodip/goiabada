@@ -999,7 +999,7 @@
 "adminconsole.admin_clients.settings.field.brand_hint" = "La marca con la que se muestran las páginas de inicio y cierre de sesión del cliente. Con Marca predeterminada, siguen a la predeterminada cuando cambia."
 "adminconsole.admin_clients.settings.access_title" = "Acceso"
 "adminconsole.admin_clients.settings.saved_successfully" = "Configuración guardada."
-"adminconsole.admin_clients.settings.modal.identifier_change" = "Vas a cambiar el identificador del cliente. Todo lo que inicie sesión con él tendrá que enviar el nuevo identificador."
+"adminconsole.admin_clients.settings.modal.identifier_change" = "Vas a cambiar el identificador del cliente. Todo lo que inicie sesión con él tendrá que enviar el nuevo identificador. Sus refresh tokens dejarán de funcionar, así que sus usuarios tendrán que volver a iniciar sesión."
 "adminconsole.admin_clients.settings.modal.disabled_warning" = "Vas a desactivar el cliente. Nadie podrá iniciar sesión con él ni obtener tokens a través de él hasta que lo actives de nuevo."
 "adminconsole.admin_clients.settings.modal.administrative_scopes_warning" = "Vas a permitir que el cliente solicite scopes administrativos. Podrá obtener un token con la autoridad de un administrador con sesión iniciada y se convertirá en un cliente administrador."
 "adminconsole.admin_clients.settings.modal.remember_consent_warning" = "Vas a permitir que una aprobación anterior omita la pantalla de consentimiento de este cliente público. Otra aplicación que use su identificador de cliente y reciba sus redirecciones obtendría tokens de cualquier usuario que haya aprobado esta aplicación antes, sin preguntarle."
@@ -1738,7 +1738,7 @@
 "adminconsole.admin_settings.general.app_name_tooltip" = "Se muestra en los títulos de las páginas y en los correos que envía el servidor de autenticación."
 "adminconsole.admin_settings.general.field.issuer" = "Emisor"
 "adminconsole.admin_settings.general.issuer_tooltip" = "El claim iss de cada token y el issuer del documento de descubrimiento: una URL https sin parámetros de consulta, fragmento ni datos de usuario, o la URL base del servidor de autenticación."
-"adminconsole.admin_settings.general.issuer_change_warning" = "Vas a cambiar el emisor. Habrá que actualizar los clientes y las API que lo comprueben; los tokens ya emitidos conservarán el anterior y se cerrará tu sesión."
+"adminconsole.admin_settings.general.issuer_change_warning" = "Vas a cambiar el emisor. Habrá que actualizar los clientes y las API que lo comprueben. Los refresh tokens ya emitidos dejarán de funcionar, así que los usuarios de todos los clientes tendrán que volver a iniciar sesión, y se cerrará tu sesión."
 "adminconsole.admin_settings.general.field.password_policy" = "Política de contraseñas"
 "adminconsole.admin_settings.general.password_policy_tooltip" = "Se aplica al establecer o cambiar una contraseña. Las contraseñas existentes no se vuelven a comprobar."
 # The nist policy's card, first among the five, and the line each older card gains (#550 decision 3).

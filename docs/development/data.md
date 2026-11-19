@@ -107,7 +107,32 @@ unique-key race answers the same 409, through the one failure writer `writeListS
 save locks its list: overlapping saves merge item by item, and the data tier's `list_save_test.go`
 shows it on MySQL, PostgreSQL and SQL Server. A row lock is for one row read, decided on and written
 back with a security consequence, which today means #245's public/confidential switch
-(`AcquireClientRow`), #139's issuance (`AcquireUserSessionRow`), #131's refresh rotation
+(`AcquireClientRow`), #710's change of a client's identifier (`AcquireClientRow`):
+`SetClientIdentifier`, the column's one writer after creation, reads the identifier with
+`GetClientByIdForUpdate` and writes only one that differs byte for byte, reporting whether it did,
+so an unchanged identifier leaves the row and its `updated_at` alone, and the settings save decides
+the identifier checks it owes against the row it read under it, and on that answer revokes the
+client's grants in the same transaction, through `revocation.RevokeClientGrantsTx`; `UpdateClient`
+leaves the column alone (`dont-update`), and `client_identifier_test.go` shows two renames meeting
+on every engine and on SQL Server with READ_COMMITTED_SNAPSHOT on (`rcsi_test.go`'s fixture). The
+initial password grant reads the client with `GetClientByIdForUpdate`, a locking read that writes
+nothing, before it inserts its first refresh token, so it and a rename serialize on the row
+(`password_grant_rename_ordering_test.go`). Code issuance reads its client's row again with
+`GetClientByIdForShare` before inserting the code, a shared lock that a rename or a deletion waits
+for and that waits for theirs, and refuses when the identifier is no longer the one it looked up
+(`code_issuance_rename_ordering_test.go`); on MySQL, PostgreSQL and SQL Server two issuances' reads
+of one client's row do not wait for each other, and on SQLite the read is plain, its one connection
+running one transaction at a time. A client's deletion (`DeleteClient`) takes no row ahead of its
+statements (#301), and reads the identifier it records in `deleted_clients` with
+`GetClientByIdForUpdate` just before its DELETE, which takes that row anyway: a rename committed
+meanwhile is waited for, and the deletion records the identifier the row held when it was deleted,
+not one it gave up. Holding the row, it sweeps the client's refresh tokens again, since an initial
+password grant it waited for has committed a token its first sweep could not see
+(`deleted_client_test.go` shows both orders against a rename, and
+`password_grant_rename_ordering_test.go`'s `TestDeleteClientOrdering_AgainstInitialPasswordGrant`
+both orders against a password grant, on MySQL, PostgreSQL and SQL Server, and again with
+READ_COMMITTED_SNAPSHOT on),
+#139's issuance (`AcquireUserSessionRow`), #131's refresh rotation
 (`AcquireUserRow`), #542's session writes (`AcquireUserSessionRow`) and one-time code claims
 (`AcquireUserRow`), #407's settings section saves (`AcquireSettingsRow`), each of which reads
 the settings row again under it and writes its own section onto what it read, through

@@ -326,8 +326,9 @@ func RevokeUserAuthState(ctx context.Context, db Database, tx *sql.Tx, userId in
 // Reasons a revocation records. The first five are recorded on EventRevokedUserAuthState, one
 // per credential site (#106 decision 7), the fourth naming the recovery command that holds the
 // database credentials rather than a signed-in administrator (#498). ReasonClientBecamePublic
-// is recorded on EventRevokedClientGrants, and is also the reason a family's revocation record
-// carries when RevokeClientGrants wrote it (#245, #259). ReasonConsentWithdrawn is the reason a
+// and ReasonClientIdentifierChanged are recorded on EventRevokedClientGrants, one per cause of a
+// client's revocation, and each is also the reason a family's revocation record carries when
+// RevokeClientGrants wrote it for that cause (#245, #259, #710). ReasonConsentWithdrawn is the reason a
 // family's revocation record carries when a consent withdrawal's sweep wrote it (#622),
 // ReasonClientRevoked the one it carries when a client revoked the grant at /auth/revoke (#676),
 // and ReasonSessionTerminated and ReasonAuthCodeReuse the ones it carries when a session's
@@ -342,16 +343,17 @@ func RevokeUserAuthState(ctx context.Context, db Database, tx *sql.Tx, userId in
 // with migration 000047 and a pre-flight that refuses to migrate a colliding database instead of
 // disabling an account, so nothing in core revokes anything any more.
 const (
-	ReasonPasswordReset      = "password_reset"
-	ReasonPasswordChange     = "password_change"
-	ReasonAdminPasswordSet   = "admin_password_set"
-	ReasonRecoveryCommand    = "recovery_command"
-	ReasonAccountDisabled    = "account_disabled"
-	ReasonClientBecamePublic = "client_became_public"
-	ReasonConsentWithdrawn   = "consent_withdrawn"
-	ReasonClientRevoked      = "client_revoked"
-	ReasonSessionTerminated  = "session_terminated"
-	ReasonAuthCodeReuse      = "auth_code_reuse"
+	ReasonPasswordReset           = "password_reset"
+	ReasonPasswordChange          = "password_change"
+	ReasonAdminPasswordSet        = "admin_password_set"
+	ReasonRecoveryCommand         = "recovery_command"
+	ReasonAccountDisabled         = "account_disabled"
+	ReasonClientBecamePublic      = "client_became_public"
+	ReasonClientIdentifierChanged = "client_identifier_changed"
+	ReasonConsentWithdrawn        = "consent_withdrawn"
+	ReasonClientRevoked           = "client_revoked"
+	ReasonSessionTerminated       = "session_terminated"
+	ReasonAuthCodeReuse           = "auth_code_reuse"
 )
 
 // RevokeUserAuthStateTx runs a narrow credential write and the revocation sweep inside ONE
@@ -1148,13 +1150,17 @@ type ClientGrantResult struct {
 
 // RevokeClientGrants cuts off every grant one client holds: it writes the durable fact that the
 // client's authorization codes are revoked, then sweeps the refresh tokens those codes and the
-// client's ROPC grants issued (#245 decision 16).
+// client's ROPC grants issued (#245 decision 16). reason is its caller's, the cause the families it
+// records carry and the audit event names.
 //
-// It exists for one caller, the confidential-to-public flip, and the rule that caller's comment
-// carries is the rule for any future one: revoke when the change REMOVES the requirement for the
-// client to authenticate, not when it adds or replaces one. Public to confidential closes a window
-// rather than opening one, and rotating a confidential client's secret leaves the requirement in
-// place; either would sign real users out to protect against nothing.
+// It has two callers. The confidential-to-public flip revokes, under ReasonClientBecamePublic, when
+// the change REMOVES the requirement for the client to authenticate, not when it adds or replaces
+// one: public to confidential closes a window rather than opening one, and rotating a confidential
+// client's secret leaves the requirement in place; either would sign real users out to protect
+// against nothing. A change of the client's identifier revokes, under ReasonClientIdentifierChanged,
+// because a refresh token names its client by row, so a grant refreshed after a rename would get an
+// ID token whose aud is not the one its sign-in got (OpenID Connect Core 1.0 section 12.2, #710
+// decision 5).
 //
 // The two writes, in this order:
 //
@@ -1188,7 +1194,7 @@ type ClientGrantResult struct {
 // RevokeUserAuthState states about its own: the contract is atomicity across a marker and a
 // multi-row sweep, so the transaction is a precondition of the whole operation rather than an
 // argument one nested call happens to care about.
-func RevokeClientGrants(ctx context.Context, db Database, tx *sql.Tx, clientId int64) (ClientGrantResult, error) {
+func RevokeClientGrants(ctx context.Context, db Database, tx *sql.Tx, clientId int64, reason string) (ClientGrantResult, error) {
 	result := ClientGrantResult{RevokedRefreshTokenJtis: []string{}}
 
 	if tx == nil {
@@ -1212,7 +1218,7 @@ func RevokeClientGrants(ctx context.Context, db Database, tx *sql.Tx, clientId i
 	// outlives the sweep, the validator refuses a token whose family has one, and the rotation checks
 	// it again inside its own transaction, so the child is refused at the next refresh or never
 	// inserted. A revoked member counts too: its sibling may be the one mid-rotation.
-	err = recordFamilies(ctx, db, tx, tokens, ReasonClientBecamePublic)
+	err = recordFamilies(ctx, db, tx, tokens, reason)
 	if err != nil {
 		return ClientGrantResult{}, err
 	}
@@ -1259,7 +1265,8 @@ func recordFamilies(ctx context.Context, db Database, tx *sql.Tx, tokens []*reco
 // The properties it owns, and what each one prevents:
 //
 //   - the client write and the revocation are in the same transaction, so a client can never end
-//     up public with its secret deleted while the grants that secret was protecting survive;
+//     up public with its secret deleted while the grants that secret was protecting survive, nor
+//     renamed while the grants issued under its earlier identifier survive;
 //   - the write DECIDES, inside that transaction, whether the grants must go, and reports it in
 //     its bool return. Classifying outside cannot establish the guarantee above: a caller
 //     comparing against a client it loaded before the transaction opened is comparing against a
@@ -1285,13 +1292,13 @@ func recordFamilies(ctx context.Context, db Database, tx *sql.Tx, tokens []*reco
 // caller here must not be read as "nothing happened"; the durable outcome of a reported commit
 // failure is indeterminate, and the bounded consequence is a client left flipped and revoked with
 // no audit record of it, which is fail-closed on the security side and a gap on the forensic side.
-func RevokeClientGrantsTx(ctx context.Context, db Database, clientId int64,
+func RevokeClientGrantsTx(ctx context.Context, db Database, clientId int64, reason string,
 	write func(tx *sql.Tx) (bool, error)) (ClientGrantResult, error) {
 
 	// The write and the conditional sweep in one transaction opened through RunInTransaction, so
-	// a deadlock reruns both together (#301). Safe to rerun: the write is the compare-and-set
-	// SetClientPublic followed by an idempotent UpdateClient, its answer is asked again on every
-	// attempt, and result is the committing attempt's.
+	// a deadlock reruns both together (#301). Safe to rerun: each caller's write is a
+	// compare-and-set, SetClientPublic or SetClientIdentifier, beside writes of fixed values, its
+	// answer is asked again on every attempt, and result is the committing attempt's.
 	//
 	// A family's record is written by a read-then-insert, so a containment of the same family that
 	// overlaps this transaction can win the key first. The helper reruns the body once, which then
@@ -1305,7 +1312,7 @@ func RevokeClientGrantsTx(ctx context.Context, db Database, clientId int64,
 
 		result = ClientGrantResult{RevokedRefreshTokenJtis: []string{}}
 		if revoke {
-			result, err = RevokeClientGrants(ctx, db, tx, clientId)
+			result, err = RevokeClientGrants(ctx, db, tx, clientId, reason)
 			if err != nil {
 				return err
 			}

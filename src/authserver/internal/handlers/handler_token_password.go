@@ -1,9 +1,12 @@
 package handlers
 
 import (
+	"errors"
+	"log/slog"
 	"net/http"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/clientauth"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
@@ -28,6 +31,16 @@ func (tr tokenResponder) respondPassword(w http.ResponseWriter, r *http.Request,
 		Scope:          grant.Scope,
 		DPoPThumbprint: dpopThumbprint,
 	})
+	if errors.Is(err, issuance.ErrPasswordGrantClientRenamed) {
+		// The client was renamed, or deleted, after the request named it, and before the grant wrote
+		// its first refresh token: the request named an identifier no client holds now, and is
+		// answered as such a request is (#710 decision 5). The answer says nothing of the rename, so
+		// the record says it.
+		slog.WarnContext(r.Context(), "password grant refused: the client no longer holds the identifier the request named",
+			"client_id", grant.Client.Id)
+		tr.refuse(w, r, oidc.GrantTypePassword, clientauth.ClientDoesNotExist())
+		return
+	}
 	if err != nil {
 		tr.refuse(w, r, oidc.GrantTypePassword, err)
 		return

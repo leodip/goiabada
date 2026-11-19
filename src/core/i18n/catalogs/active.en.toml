@@ -994,7 +994,7 @@
 "adminconsole.admin_clients.settings.field.brand_hint" = "The brand the client's sign-in and sign-out pages are drawn in. On Default brand, they follow the default when it changes."
 "adminconsole.admin_clients.settings.access_title" = "Access"
 "adminconsole.admin_clients.settings.saved_successfully" = "Settings saved."
-"adminconsole.admin_clients.settings.modal.identifier_change" = "You're changing the client identifier, so anything that signs in with this client will have to send the new one."
+"adminconsole.admin_clients.settings.modal.identifier_change" = "You're changing the client identifier, so anything that signs in with this client will have to send the new one. Its refresh tokens will stop working, so its users will have to sign in again."
 "adminconsole.admin_clients.settings.modal.disabled_warning" = "You're disabling the client, so nothing will be able to sign in with it or get tokens through it until it's enabled again."
 "adminconsole.admin_clients.settings.modal.administrative_scopes_warning" = "You're allowing the client to request the administrative scopes. It will be able to get a token carrying a signed-in administrator's authority, and it will become an administrator client."
 "adminconsole.admin_clients.settings.modal.remember_consent_warning" = "You're letting an earlier approval skip the consent screen for this public client. Another app that uses its client ID and receives its redirects would get tokens for any user who approved this app before, without asking them."
@@ -1733,7 +1733,7 @@
 "adminconsole.admin_settings.general.app_name_tooltip" = "Shown in page titles and in the emails the auth server sends."
 "adminconsole.admin_settings.general.field.issuer" = "Issuer"
 "adminconsole.admin_settings.general.issuer_tooltip" = "The iss claim of every token and the issuer in the discovery document: an https URL with no query, fragment or user info, or the auth server's base URL."
-"adminconsole.admin_settings.general.issuer_change_warning" = "You're changing the issuer. Clients and APIs that check it will have to be updated to the new one, tokens issued before will keep the old one, and you'll be signed out."
+"adminconsole.admin_settings.general.issuer_change_warning" = "You're changing the issuer. Clients and APIs that check it will have to be updated to the new one. Refresh tokens issued before will stop working, so users of every client will have to sign in again, and you'll be signed out."
 "adminconsole.admin_settings.general.field.password_policy" = "Password policy"
 "adminconsole.admin_settings.general.password_policy_tooltip" = "Applies whenever a password is set or changed. Passwords already set aren't checked again."
 # The nist policy's card, first among the five, and the line each older card gains (#550 decision 3).

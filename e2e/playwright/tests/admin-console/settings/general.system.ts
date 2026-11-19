@@ -69,12 +69,16 @@ for (const { name, values, field, message } of [
   });
 }
 
-test("changing the issuer asks first, and Cancel changes nothing", async ({ page }) => {
+test("changing the issuer asks first, saying refresh tokens stop working, and Cancel changes nothing", async ({ page }) => {
   await page.goto(`${env.adminUrl}${general}`);
   const issuer = await page.locator("#issuer").inputValue();
   await page.locator("#issuer").fill(`${issuer}/changed`);
   await page.locator("#btnSave").click();
   await expect(page.locator("dialog[open]")).toContainText("Save these changes?");
+  // Refresh tokens issued under the earlier issuer are refused once it changes (#710).
+  await expect(page.locator("dialog[open]")).toContainText(
+    "Refresh tokens issued before will stop working, so users of every client will have to sign in again",
+  );
   await cancelDialog(page, issuerChange);
   await expect(page.getByText("Settings saved.", { exact: true })).toHaveCount(0);
   await page.goto(`${env.adminUrl}${general}`);

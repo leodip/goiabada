@@ -161,17 +161,18 @@ var insertClient = statement{
 		"@p21, @p22, @p23, @p24, @p25, @p26, @p27, @p28, @p29, @p30, @p31, @p32, @p33, @p34, @p35)",
 }
 
-// updateClient writes the whole row but created_at, administrative_scopes_allowed,
-// remember_consent, the two back-channel logout columns, dpop_bound_access_tokens, brand_id and
-// token_endpoint_auth_method, which are dont-update: the allowance has one writer,
+// updateClient writes the whole row but created_at, client_identifier,
+// administrative_scopes_allowed, remember_consent, the two back-channel logout columns,
+// dpop_bound_access_tokens, brand_id and token_endpoint_auth_method, which are dont-update: the
+// identifier is written after creation only by SetClientIdentifier, the allowance has one writer,
 // SetClientAdministrativeScopesAllowed, Remember consent is written only by CreateClient,
 // SetClientRememberConsent and SetClientPublic's transition, the back-channel logout columns only
 // by CreateClient and SetClientBackchannelLogout, "Require DPoP for token requests" only by
 // CreateClient and SetClientDPoPBoundAccessTokens, a client's brand only by CreateClient,
 // SetClientBrand and a brand's deletion, and the registered method only by CreateClient and
-// SetClientPublic's transition (#499, #711, #784, #42, #812, #708).
+// SetClientPublic's transition (#710, #499, #711, #784, #42, #812, #708).
 var updateClient = statement{
-	sqlite: "UPDATE clients SET updated_at = ?, client_identifier = ?, client_secret_encrypted = ?, " +
+	sqlite: "UPDATE clients SET updated_at = ?, client_secret_encrypted = ?, " +
 		"description = ?, website_url = ?, privacy_policy_url = ?, terms_of_service_url = ?, " +
 		"display_name = ?, enabled = ?, consent_required = ?, " +
 		"created_via_dcr = ?, show_logo = ?, show_display_name = ?, show_description = ?, " +
@@ -182,7 +183,7 @@ var updateClient = statement{
 		"refresh_token_offline_max_lifetime_in_seconds = ?, " +
 		"include_open_id_connect_claims_in_access_token = ?, " +
 		"include_open_id_connect_claims_in_id_token = ?, default_acr_level = ? WHERE id = ?",
-	mysql: "UPDATE clients SET updated_at = ?, client_identifier = ?, client_secret_encrypted = ?, " +
+	mysql: "UPDATE clients SET updated_at = ?, client_secret_encrypted = ?, " +
 		"description = ?, website_url = ?, privacy_policy_url = ?, terms_of_service_url = ?, " +
 		"display_name = ?, enabled = ?, consent_required = ?, " +
 		"created_via_dcr = ?, show_logo = ?, show_display_name = ?, show_description = ?, " +
@@ -193,31 +194,39 @@ var updateClient = statement{
 		"refresh_token_offline_max_lifetime_in_seconds = ?, " +
 		"include_open_id_connect_claims_in_access_token = ?, " +
 		"include_open_id_connect_claims_in_id_token = ?, default_acr_level = ? WHERE id = ?",
-	postgres: "UPDATE clients SET updated_at = $1, client_identifier = $2, " +
-		"client_secret_encrypted = $3, description = $4, website_url = $5, " +
-		"privacy_policy_url = $6, terms_of_service_url = $7, display_name = $8, " +
-		"enabled = $9, consent_required = $10, created_via_dcr = $11, show_logo = $12, " +
-		"show_display_name = $13, show_description = $14, show_website_url = $15, " +
-		"is_public = $16, authorization_code_enabled = $17, client_credentials_enabled = $18, " +
-		"pkce_required = $19, implicit_grant_enabled = $20, " +
-		"resource_owner_password_credentials_enabled = $21, token_expiration_in_seconds = $22, " +
-		"refresh_token_offline_idle_timeout_in_seconds = $23, " +
-		"refresh_token_offline_max_lifetime_in_seconds = $24, " +
-		"include_open_id_connect_claims_in_access_token = $25, " +
-		"include_open_id_connect_claims_in_id_token = $26, default_acr_level = $27 WHERE id = $28",
-	mssql: "UPDATE clients SET updated_at = @p1, client_identifier = @p2, " +
-		"client_secret_encrypted = @p3, description = @p4, website_url = @p5, " +
-		"privacy_policy_url = @p6, terms_of_service_url = @p7, " +
-		"display_name = @p8, enabled = @p9, consent_required = @p10, created_via_dcr = @p11, " +
-		"show_logo = @p12, show_display_name = @p13, show_description = @p14, " +
-		"show_website_url = @p15, is_public = @p16, authorization_code_enabled = @p17, " +
-		"client_credentials_enabled = @p18, pkce_required = @p19, implicit_grant_enabled = @p20, " +
-		"resource_owner_password_credentials_enabled = @p21, token_expiration_in_seconds = @p22, " +
-		"refresh_token_offline_idle_timeout_in_seconds = @p23, " +
-		"refresh_token_offline_max_lifetime_in_seconds = @p24, " +
-		"include_open_id_connect_claims_in_access_token = @p25, " +
-		"include_open_id_connect_claims_in_id_token = @p26, " +
-		"default_acr_level = @p27 WHERE id = @p28",
+	postgres: "UPDATE clients SET updated_at = $1, " +
+		"client_secret_encrypted = $2, description = $3, website_url = $4, " +
+		"privacy_policy_url = $5, terms_of_service_url = $6, display_name = $7, " +
+		"enabled = $8, consent_required = $9, created_via_dcr = $10, show_logo = $11, " +
+		"show_display_name = $12, show_description = $13, show_website_url = $14, " +
+		"is_public = $15, authorization_code_enabled = $16, client_credentials_enabled = $17, " +
+		"pkce_required = $18, implicit_grant_enabled = $19, " +
+		"resource_owner_password_credentials_enabled = $20, token_expiration_in_seconds = $21, " +
+		"refresh_token_offline_idle_timeout_in_seconds = $22, " +
+		"refresh_token_offline_max_lifetime_in_seconds = $23, " +
+		"include_open_id_connect_claims_in_access_token = $24, " +
+		"include_open_id_connect_claims_in_id_token = $25, default_acr_level = $26 WHERE id = $27",
+	mssql: "UPDATE clients SET updated_at = @p1, " +
+		"client_secret_encrypted = @p2, description = @p3, website_url = @p4, " +
+		"privacy_policy_url = @p5, terms_of_service_url = @p6, " +
+		"display_name = @p7, enabled = @p8, consent_required = @p9, created_via_dcr = @p10, " +
+		"show_logo = @p11, show_display_name = @p12, show_description = @p13, " +
+		"show_website_url = @p14, is_public = @p15, authorization_code_enabled = @p16, " +
+		"client_credentials_enabled = @p17, pkce_required = @p18, implicit_grant_enabled = @p19, " +
+		"resource_owner_password_credentials_enabled = @p20, token_expiration_in_seconds = @p21, " +
+		"refresh_token_offline_idle_timeout_in_seconds = @p22, " +
+		"refresh_token_offline_max_lifetime_in_seconds = @p23, " +
+		"include_open_id_connect_claims_in_access_token = @p24, " +
+		"include_open_id_connect_claims_in_id_token = @p25, " +
+		"default_acr_level = @p26 WHERE id = @p27",
+}
+
+// setClientIdentifier writes a client's identifier; see SetClientIdentifier.
+var setClientIdentifier = statement{
+	sqlite:   "UPDATE clients SET client_identifier = ?, updated_at = ? WHERE id = ?",
+	mysql:    "UPDATE clients SET client_identifier = ?, updated_at = ? WHERE id = ?",
+	postgres: "UPDATE clients SET client_identifier = $1, updated_at = $2 WHERE id = $3",
+	mssql:    "UPDATE clients SET client_identifier = @p1, updated_at = @p2 WHERE id = @p3",
 }
 
 var setClientRememberConsent = statement{
@@ -274,6 +283,29 @@ var selectClientById = statement{
 	mysql:    "SELECT " + clientColumns.mysql + " FROM clients WHERE id = ?",
 	postgres: "SELECT " + clientColumns.postgres + " FROM clients WHERE id = $1",
 	mssql:    "SELECT " + clientColumns.mssql + " FROM clients WHERE id = @p1",
+}
+
+// selectClientByIdForUpdate is the locking read GetClientByIdForUpdate runs, the lock in each
+// engine's own grammar, as selectUserByIdForUpdate spells it.
+var selectClientByIdForUpdate = statement{
+	sqlite:   "SELECT " + clientColumns.sqlite + " FROM clients WHERE id = ?",
+	mysql:    "SELECT " + clientColumns.mysql + " FROM clients WHERE id = ? FOR UPDATE",
+	postgres: "SELECT " + clientColumns.postgres + " FROM clients WHERE id = $1 FOR UPDATE",
+	mssql:    "SELECT " + clientColumns.mssql + " FROM clients WITH (UPDLOCK, ROWLOCK) WHERE id = @p1",
+}
+
+// selectClientByIdForShare is the shared locking read GetClientByIdForShare runs. PostgreSQL's is
+// FOR KEY SHARE, the lock the codes table's foreign key takes on the row at the insert anyway: a
+// rename's and a deletion's FOR UPDATE conflict with it, a save that changes none of the row's
+// keys does not. SQL Server's REPEATABLEREAD hint holds the shared lock to the end of the
+// transaction, where READ COMMITTED would release it at the end of the statement, and reads by
+// locking even with READ_COMMITTED_SNAPSHOT on. SQLite's is a plain read: its pool has one
+// connection, so no other transaction runs while the reader's is open.
+var selectClientByIdForShare = statement{
+	sqlite:   "SELECT " + clientColumns.sqlite + " FROM clients WHERE id = ?",
+	mysql:    "SELECT " + clientColumns.mysql + " FROM clients WHERE id = ? FOR SHARE",
+	postgres: "SELECT " + clientColumns.postgres + " FROM clients WHERE id = $1 FOR KEY SHARE",
+	mssql:    "SELECT " + clientColumns.mssql + " FROM clients WITH (REPEATABLEREAD, ROWLOCK) WHERE id = @p1",
 }
 
 var selectClientByClientIdentifier = statement{
@@ -346,7 +378,7 @@ func (d *Database) UpdateClient(ctx context.Context, tx *sql.Tx, client *record.
 	client.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
 	_, err := d.ExecSQL(ctx, tx, updateClient.text(d.Dialect),
-		client.UpdatedAt, client.ClientIdentifier, client.ClientSecretEncrypted, client.Description,
+		client.UpdatedAt, client.ClientSecretEncrypted, client.Description,
 		client.WebsiteURL, client.PrivacyPolicyURL, client.TermsOfServiceURL, client.DisplayName,
 		client.Enabled, client.ConsentRequired, client.CreatedViaDCR,
 		client.ShowLogo, client.ShowDisplayName, client.ShowDescription, client.ShowWebsiteURL,
@@ -362,6 +394,51 @@ func (d *Database) UpdateClient(ctx context.Context, tx *sql.Tx, client *record.
 	}
 
 	return nil
+}
+
+// SetClientIdentifier gives a client a new identifier and reports whether it did. It is the
+// column's one writer after creation, and the settings save its one caller: UpdateClient leaves
+// the column out (dont-update), so the OAuth2 flows, tokens and authentication saves, which write
+// from a copy loaded earlier in their request, cannot write back an identifier renamed since
+// (#710 decision 4).
+//
+// It takes the client's row with a locking read, GetClientByIdForUpdate, which waits out a
+// writer in flight and writes nothing, so an identifier the row already holds leaves the row
+// untouched, updated_at included. It writes only when the one given differs, compared byte for
+// byte in Go rather than by the engine, whose collation may fold case: RFC 6749 section 1.9 makes
+// client_id case sensitive. The answer is
+// decided against the row read under that lock, never against a copy read before it, because a
+// rename committed in between would make a stale copy report a change the row does not make, or
+// miss one it does, and the answer is what decides whether the client's grants are revoked. True
+// means this call wrote a different identifier; false means the row already held it, or there is
+// no such client, which the caller's own read under the lock answers.
+//
+// A transaction is required, for the reason GetClientByIdForUpdate gives.
+func (d *Database) SetClientIdentifier(ctx context.Context, tx *sql.Tx, clientId int64, clientIdentifier string) (bool, error) {
+
+	if tx == nil {
+		return false, errs.New("setting a client's identifier requires a transaction: the row must be held between reading the identifier and writing it")
+	}
+	if clientId == 0 {
+		return false, errs.New("can't set the identifier of a client with an id of 0")
+	}
+	if clientIdentifier == "" {
+		return false, errs.New("can't set a client's identifier to an empty value")
+	}
+
+	current, err := d.GetClientByIdForUpdate(ctx, tx, clientId)
+	if err != nil {
+		return false, err
+	}
+	if current == nil || current.ClientIdentifier == clientIdentifier {
+		return false, nil
+	}
+
+	if _, err := d.ExecSQL(ctx, tx, setClientIdentifier.text(d.Dialect),
+		clientIdentifier, time.Now().UTC(), clientId); err != nil {
+		return false, errs.Wrap(err, "unable to set the client's identifier")
+	}
+	return true, nil
 }
 
 // SetClientAdministrativeScopesAllowed writes a client's allowance to request the administrative
@@ -574,6 +651,50 @@ func (d *Database) GetClientById(ctx context.Context, tx *sql.Tx, clientId int64
 	return queryOne(ctx, d, tx, selectClientById.text(d.Dialect), []any{clientId}, scanClient, "client")
 }
 
+// GetClientByIdForUpdate reads the client as last committed and takes its row for the rest of the
+// caller's transaction, without writing it: a locking read, as GetUserByIdForUpdate is a user's. A
+// writer of the row, AcquireClientRow among them, and another locking read, SetClientIdentifier's
+// among them, wait for this transaction to end, and this read waits for a writer's transaction to
+// end and answers what it committed.
+//
+// The initial password grant reads its client this way before it writes its first refresh token,
+// so a rename of the client is ordered against it: either the grant commits first and the rename's
+// sweep finds its token, or the rename commits first and the grant reads the identifier it gave the
+// client (#710 decision 5). It writes nothing, so a password grant does not move the client's
+// updated_at, which the admin console shows.
+//
+// tx is required: without one the statement autocommits and the row is released before the caller
+// can decide on what it read.
+func (d *Database) GetClientByIdForUpdate(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error) {
+
+	if tx == nil {
+		return nil, errs.New("a locking read of a client requires a transaction: an autocommitted statement releases the row before the caller can decide on it")
+	}
+
+	return queryOne(ctx, d, tx, selectClientByIdForUpdate.text(d.Dialect), []any{clientId}, scanClient, "client")
+}
+
+// GetClientByIdForShare reads the client as last committed and holds a shared lock on its row for
+// the rest of the caller's transaction, without writing it. A rename (SetClientIdentifier) and a
+// deletion (DeleteClient), which take the row exclusively to change it, wait for this transaction
+// to end, and this read waits for theirs and answers what they committed. On MySQL, PostgreSQL and
+// SQL Server two shared reads of the row do not wait for each other; on SQLite, whose statement is
+// a plain read, the pool's one connection runs one transaction at a time.
+//
+// Code issuance reads its client this way before it inserts the code, so a rename is ordered
+// against it: either the code commits first and the rename's sweep revokes it, or the rename
+// commits first and issuance reads the identifier it gave the client and issues nothing (#866).
+//
+// tx is required, for the reason GetClientByIdForUpdate gives.
+func (d *Database) GetClientByIdForShare(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error) {
+
+	if tx == nil {
+		return nil, errs.New("a shared locking read of a client requires a transaction: an autocommitted statement releases the row before the caller can decide on it")
+	}
+
+	return queryOne(ctx, d, tx, selectClientByIdForShare.text(d.Dialect), []any{clientId}, scanClient, "client")
+}
+
 func (d *Database) GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error) {
 
 	client, err := queryOne(ctx, d, tx, selectClientByClientIdentifier.text(d.Dialect), []any{clientIdentifier},
@@ -692,23 +813,40 @@ func (d *Database) GetAllClients(ctx context.Context, tx *sql.Tx) ([]record.Clie
 // only refresh_tokens.code_id is CASCADE, so that statement really does take a client's
 // ROPC-issued tokens before the cascade runs.
 //
-// No row is acquired ahead of these two statements. The final DELETE takes the clients row
-// itself, and a transaction of this shape racing an authorization ceremony for the same
-// client, or a termination of a session that holds this client's tokens, is answered by
-// RunInTransaction rerunning whichever of the two the engine aborts (#301).
+// No row is acquired ahead of the first sweep. The final DELETE takes the clients row itself,
+// and a transaction of this shape racing an authorization ceremony for the same client, or a
+// termination of a session that holds this client's tokens, is answered by RunInTransaction
+// rerunning whichever of the two the engine aborts (#301).
+//
+// The sweep runs again once the locking read below holds the clients row, for the initial
+// password grant, which writes its first refresh token under that row (#710 decision 5): one
+// that wrote it while the first sweep ran has committed by then, and that second sweep takes its
+// token, which would otherwise refuse the DELETE by the NO ACTION key.
 //
 // In the same transaction, last, it records the deleted identifier with the moment of the
 // deletion, which the access-token liveness check reads so that a new client taking the
 // identifier does not revive the deleted one's access tokens (#676 decision 6). The identifier
-// is read first, by the client's id; a client that is not there records nothing.
+// is the one the row holds as it is deleted (#710 decision 11): it is read by a locking read of
+// the clients row just before the DELETE, which takes that row at the point the DELETE would
+// take it anyway, so the order above is unchanged, and a rename committed meanwhile is waited
+// for and read rather than missed by a read that does not wait for a writer, which would record
+// the identifier the client had before and leave the one it gave up unrecorded. A client that is
+// not there records nothing.
 func (d *Database) DeleteClient(ctx context.Context, tx *sql.Tx, clientId int64) error {
 
 	return d.inTransaction(ctx, tx, func(tx *sql.Tx) error {
-		client, err := d.GetClientById(ctx, tx, clientId)
+		err := d.deleteRefreshTokensByColumn(ctx, tx, "client_id", clientId)
 		if err != nil {
 			return err
 		}
 
+		client, err := d.GetClientByIdForUpdate(ctx, tx, clientId)
+		if err != nil {
+			return err
+		}
+
+		// Again, now that the row is held: an initial password grant the read above waited for
+		// has committed its first refresh token, which the first sweep could not see.
 		err = d.deleteRefreshTokensByColumn(ctx, tx, "client_id", clientId)
 		if err != nil {
 			return err

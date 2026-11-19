@@ -77,6 +77,7 @@ func TestIssuePasswordGrant_BasicOpenIDScope(t *testing.T) {
 		Scope:  "openid",
 	}
 
+	expectPasswordGrantClientRow(mockDB, input.Client.Id, input.Client)
 	response, err := tokenIssuer.IssuePasswordGrant(ctx, settings, input)
 
 	require.NoError(t, err)
@@ -176,6 +177,7 @@ func TestIssuePasswordGrant_WithOfflineAccess(t *testing.T) {
 		Scope:  "openid offline_access",
 	}
 
+	expectPasswordGrantClientRow(mockDB, input.Client.Id, input.Client)
 	response, err := tokenIssuer.IssuePasswordGrant(ctx, settings, input)
 
 	require.NoError(t, err)
@@ -258,6 +260,7 @@ func TestIssuePasswordGrant_WithProfileScope(t *testing.T) {
 		Scope:  "openid profile",
 	}
 
+	expectPasswordGrantClientRow(mockDB, input.Client.Id, input.Client)
 	response, err := tokenIssuer.IssuePasswordGrant(ctx, settings, input)
 
 	require.NoError(t, err)
@@ -335,6 +338,7 @@ func TestIssuePasswordGrant_WithEmailScope(t *testing.T) {
 		Scope:  "openid email",
 	}
 
+	expectPasswordGrantClientRow(mockDB, input.Client.Id, input.Client)
 	response, err := tokenIssuer.IssuePasswordGrant(ctx, settings, input)
 
 	require.NoError(t, err)
@@ -409,6 +413,7 @@ func TestIssuePasswordGrant_WithResourcePermissions(t *testing.T) {
 		Scope:  "openid myapi:read myapi:write",
 	}
 
+	expectPasswordGrantClientRow(mockDB, input.Client.Id, input.Client)
 	response, err := tokenIssuer.IssuePasswordGrant(ctx, settings, input)
 
 	require.NoError(t, err)
@@ -495,6 +500,7 @@ func TestIssuePasswordGrant_WithGroups(t *testing.T) {
 		Scope:  "openid groups",
 	}
 
+	expectPasswordGrantClientRow(mockDB, input.Client.Id, input.Client)
 	response, err := tokenIssuer.IssuePasswordGrant(ctx, settings, input)
 
 	require.NoError(t, err)
@@ -576,6 +582,7 @@ func TestIssuePasswordGrant_WithoutOpenID(t *testing.T) {
 		Scope:  "myapi:read",
 	}
 
+	expectPasswordGrantClientRow(mockDB, input.Client.Id, input.Client)
 	response, err := tokenIssuer.IssuePasswordGrant(ctx, settings, input)
 
 	require.NoError(t, err)
@@ -690,6 +697,7 @@ func TestIssuePasswordGrant_DatabaseError_CreateRefreshToken(t *testing.T) {
 		Scope:  "openid",
 	}
 
+	expectPasswordGrantClientRow(mockDB, input.Client.Id, input.Client)
 	response, err := tokenIssuer.IssuePasswordGrant(ctx, settings, input)
 
 	require.Error(t, err)
@@ -760,6 +768,7 @@ func TestIssuePasswordGrant_ClientTokenExpiration(t *testing.T) {
 		Scope:  "openid",
 	}
 
+	expectPasswordGrantClientRow(mockDB, input.Client.Id, input.Client)
 	response, err := tokenIssuer.IssuePasswordGrant(ctx, settings, input)
 
 	require.NoError(t, err)
@@ -830,6 +839,7 @@ func TestIssuePasswordGrant_GlobalTokenExpiration(t *testing.T) {
 		Scope:  "openid",
 	}
 
+	expectPasswordGrantClientRow(mockDB, input.Client.Id, input.Client)
 	response, err := tokenIssuer.IssuePasswordGrant(ctx, settings, input)
 
 	require.NoError(t, err)

@@ -9,9 +9,14 @@
 package liveness
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
+	"math"
+	"strconv"
 	"strings"
 	"time"
 
@@ -59,7 +64,9 @@ const (
 	ForeignIssuer
 	// ClientNotFound is a token whose client_id names no client, or that carries none, or names a
 	// client created after the token was issued: the client it was issued to was deleted, and a new
-	// one took its identifier (#676 decision 6).
+	// one took its identifier (#676 decision 6). It is also a token whose client_internal_id is not
+	// the row of the client its client_id names, or is not a whole number: the client it was issued
+	// to was renamed, and another took its identifier (#710 decision 9).
 	ClientNotFound
 	// ClientDisabled is a token whose client is disabled (#676 decision 6).
 	ClientDisabled
@@ -119,8 +126,9 @@ func Subject(token oauth.JwtToken) (string, bool) {
 // Then its client (decision 6): the client its client_id names exists, is the one the token was
 // issued to, and is enabled, for a client's token as for a user's. A token from a disabled client is
 // refused while the client stays disabled, and works again if it is re-enabled before the token
-// expires; one from a deleted client never does, a new client taking its identifier included. See
-// issuedToClient.
+// expires; one from a deleted client never does, a new client taking its identifier included; nor
+// does one from a renamed client once another client holds the identifier it names. See
+// tokenClientRow and issuedToClient.
 //
 // Last, once everything below has passed, its grant (decision 1): a token carrying grant_id is live
 // only while its grant is, and a token without one only while its jti is not stored as revoked. See
@@ -181,11 +189,18 @@ func AccessToken(ctx context.Context, database Database, token oauth.JwtToken, s
 	if clientIdentifier == "" {
 		return Verdict{Refusal: ClientNotFound}, nil
 	}
+	clientRow, namesClientRow, wellFormed := tokenClientRow(token)
+	if !wellFormed {
+		return Verdict{Refusal: ClientNotFound}, nil
+	}
 	client, err := database.GetClientByClientIdentifier(ctx, nil, clientIdentifier)
 	if err != nil {
 		return Verdict{}, errs.Wrap(err, "failed to look up client for bearer token validation")
 	}
 	if client == nil {
+		return Verdict{Refusal: ClientNotFound}, nil
+	}
+	if namesClientRow && clientRow != client.Id {
 		return Verdict{Refusal: ClientNotFound}, nil
 	}
 	issued, err := issuedToClient(ctx, database, token, client)
@@ -205,6 +220,72 @@ func AccessToken(ctx context.Context, database Database, token oauth.JwtToken, s
 		return verdict, err
 	}
 	return grantAccessToken(ctx, database, token, verdict)
+}
+
+// tokenClientRow reads the client row an access token names in client_internal_id (#710 decision 9):
+// the internal id of the client it was issued to, whether it names one, and whether the claim is
+// well formed. client_id names the client only by identifier, which a rename can give to another
+// client, and a client renamed to it that was created before the token passes issuedToClient, so
+// the row is what tells the client holding the identifier now from the one the token was issued
+// to. Internal ids are never reused, and the comparison does not depend on time, so a token signed
+// while the identifier changed hands, from a request that loaded the earlier holder, names the
+// earlier holder's row and is refused.
+//
+// A token without the claim was issued before it existed, and is judged by issuedToClient alone,
+// as it was then. A claim that is present and not a whole number, null included, is one the auth
+// server never signs: (0, true, false), and the caller refuses it before reading anything.
+//
+// The comparison is exact over the whole range of an internal id, an int64. The parser decodes
+// every JSON number to a float64, which holds every integer up to 2^53-1 and not every one above,
+// where two neighbouring ids decode to the same float64. A claim the float64 holds exactly is read
+// from it; a larger one is read as the payload the token's signature covers spells it.
+func tokenClientRow(token oauth.JwtToken) (int64, bool, bool) {
+	if _, present := token.Claims["client_internal_id"]; !present {
+		return 0, false, true
+	}
+	if clientRow, ok := token.IntClaim("client_internal_id"); ok {
+		return clientRow, true, true
+	}
+	if decoded, isFloat := token.Claims["client_internal_id"].(float64); !isFloat ||
+		decoded != math.Trunc(decoded) || decoded < 0 {
+		return 0, true, false
+	}
+	clientRow, ok := signedClientRow(token.TokenBase64)
+	return clientRow, true, ok
+}
+
+// signedClientRow reads client_internal_id from a compact JWS's payload as written, a whole number
+// that fits an int64, and reports whether it is one. A token without its compact serialization
+// cannot be read this way and reports false, failing closed.
+//
+// The payload is decoded into a map, as the token parser decodes it, and the member is looked up
+// by its exact name: RFC 7519 section 7.3 compares member names as JSON strings, and a tagged
+// struct field would also take a member whose name differs only in case, so the two reads could
+// pick different members. Only a JSON number is read; a string spelling one is not.
+func signedClientRow(compact string) (int64, bool) {
+	segments := strings.Split(compact, ".")
+	if len(segments) != 3 {
+		return 0, false
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(segments[1])
+	if err != nil {
+		return 0, false
+	}
+	decoder := json.NewDecoder(bytes.NewReader(payload))
+	decoder.UseNumber()
+	var claims map[string]interface{}
+	if err = decoder.Decode(&claims); err != nil {
+		return 0, false
+	}
+	written, isNumber := claims["client_internal_id"].(json.Number)
+	if !isNumber {
+		return 0, false
+	}
+	clientRow, err := strconv.ParseInt(written.String(), 10, 64)
+	if err != nil || clientRow < 0 {
+		return 0, false
+	}
+	return clientRow, true
 }
 
 // issuedToClient reports whether the token was issued to this client and not to a deleted client
