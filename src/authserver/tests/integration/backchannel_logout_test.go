@@ -193,16 +193,18 @@ func sentLogoutTokenRow(t *testing.T, requestId string, timeout time.Duration) (
 // sentLogoutTokenRows waits for the want sent_logout_token rows the request requestId left, each
 // written once its delivery has finished, and answers them. It waits for the page itself to list
 // them: GetAuditLogsPaginated reads the page and its count in two statements, so a row written
-// between them is counted before it is listed.
+// between them is counted before it is listed. Once the page lists them, a count above want is a
+// row too many, not one still being written.
 func sentLogoutTokenRows(t *testing.T, requestId string, want int, timeout time.Duration) []record.AuditLog {
 	t.Helper()
 	deadline := time.Now().Add(timeout)
 	for {
-		rows, _, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 20,
+		rows, total, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 20,
 			record.AuditLogFilter{AuditEvent: "sent_logout_token", RequestId: requestId})
 		require.NoError(t, err)
 		if len(rows) >= want || time.Now().After(deadline) {
 			require.Len(t, rows, want, "sent_logout_token rows for request %s", requestId)
+			require.Equal(t, want, total, "sent_logout_token rows counted for request %s", requestId)
 			return rows
 		}
 		time.Sleep(100 * time.Millisecond)
