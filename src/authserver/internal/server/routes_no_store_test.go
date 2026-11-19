@@ -87,8 +87,8 @@ func TestRegisterRoutes_EveryApiRouteRefusesToBeStored(t *testing.T) {
 			defer func() { _ = result.Body.Close() }()
 
 			// The status says a guard refused the request rather than a handler answering it:
-			// 401, the realm-only challenge every guard on these routes answers a request with no
-			// bearer token, before it looks at a scope (RFC 6750 section 3.1). On the admin group,
+			// 401, which the scope guard answers a request with no bearer token before it looks at
+			// a scope; the guards ahead of it let such a request through. On the admin group,
 			// whose guards let a caller with no token through to its routes, it also catches a
 			// botched parameter substitution: the group's 404 would still carry the header,
 			// because the branch's middleware runs ahead of the subrouter's NotFound handler. The
