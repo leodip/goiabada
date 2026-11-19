@@ -56,10 +56,14 @@ BASE_DIR=$(cd "${SCRIPT_DIR}/../.." && pwd)
 VERSIONS_FILE="${SCRIPT_DIR}/versions.yaml"
 
 # Mailpit's image on Docker Hub, whose tags are its GitHub repository's releases, of the same
-# name. update writes it at tools.mailpit into MAILPIT_FILES, relative to the repository root:
-# the dev container's Compose file and the e2e server's default. CI reads the pin itself.
+# name. update writes it at tools.mailpit into MAILPIT_FILES, each a path relative to the
+# repository root and the image the file names, after a |: the dev container's Compose file runs
+# Docker Hub's, and the e2e server's default CI's mirror of it (#867). CI reads the pin itself.
 MAILPIT_REPOSITORY="axllent/mailpit"
-MAILPIT_FILES=("src/.devcontainer/docker-compose.yml" "e2e/infra/lib.sh")
+MAILPIT_FILES=(
+    "src/.devcontainer/docker-compose.yml|${MAILPIT_REPOSITORY}"
+    "e2e/infra/lib.sh|ghcr.io/leodip/goiabada-ci/mailpit"
+)
 
 # =============================================================================
 # Color Codes for Output
@@ -595,20 +599,21 @@ update_file() {
 }
 
 # update_mailpit writes Mailpit's image at VERSION, tagged vVERSION as upstream tags it, into each
-# of MAILPIT_FILES, replacing whatever tag it had, or none. A file that names the image nowhere
-# fails the step, so a moved line is reported rather than left on another Mailpit; the other
-# files are still written.
+# of MAILPIT_FILES, as the image that file names, replacing whatever tag it had, or none. A file
+# that names its image nowhere fails the step, so a moved line is reported rather than left on
+# another Mailpit; the other files are still written.
 # Usage: update_mailpit VERSION
 update_mailpit() {
-    local version="$1" file failed=0
-    for file in "${MAILPIT_FILES[@]}"; do
-        if ! grep -q "${MAILPIT_REPOSITORY}" "$BASE_DIR/$file" 2>/dev/null; then
-            print_error "$file names no ${MAILPIT_REPOSITORY} image to pin"
+    local version="$1" entry file image failed=0
+    for entry in "${MAILPIT_FILES[@]}"; do
+        file="${entry%%|*}" image="${entry#*|}"
+        if ! grep -qF "${image}" "$BASE_DIR/$file" 2>/dev/null; then
+            print_error "$file names no ${image} image to pin"
             failed=1
             continue
         fi
         update_file "$BASE_DIR/$file" \
-            "s|${MAILPIT_REPOSITORY}\(:[^[:space:]\"'}]*\)\{0,1\}|${MAILPIT_REPOSITORY}:v${version}|g" \
+            "s|${image//./\\.}\(:[^[:space:]\"'}]*\)\{0,1\}|${image}:v${version}|g" \
             "Mailpit image" || failed=1
     done
     return "$failed"
@@ -1189,8 +1194,11 @@ cmd_update() {
     # -------------------------------------------------------------------------
     echo -e "\n${BOLD}Production Dockerfiles${NC}"
 
+    # The e2e server's build of the setup wizard writes its Dockerfile in remote-prepare.sh, on the
+    # release Dockerfiles' Go.
     for dockerfile in "$BASE_DIR/src/build/Dockerfile-adminconsole" \
-                      "$BASE_DIR/src/build/Dockerfile-authserver"; do
+                      "$BASE_DIR/src/build/Dockerfile-authserver" \
+                      "$BASE_DIR/e2e/infra/remote-prepare.sh"; do
         if [ -f "$dockerfile" ]; then
             # Go base image: golang:X.Y.Z-alpine
             if update_file "$dockerfile" \

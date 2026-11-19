@@ -28,8 +28,8 @@ E2E_REMOTE_DIR="${E2E_REMOTE_DIR:-/root/goiabada-e2e}"
 E2E_CERT_NAME="${E2E_CERT_NAME:-e2e.goiabada.dev}"
 # Mailpit catches the mail the auth server sends. Its web UI and API listen on the VPS's loopback only;
 # e2e/test.sh reaches them through an SSH tunnel. Its default is tools.mailpit in src/authserver/versions.yaml,
-# written here by ./version-manager.sh update.
-E2E_MAILPIT_IMAGE="${E2E_MAILPIT_IMAGE:-axllent/mailpit:v1.33.1}"
+# at CI's mirror of Docker Hub's image (#867), written here by ./version-manager.sh update.
+E2E_MAILPIT_IMAGE="${E2E_MAILPIT_IMAGE:-ghcr.io/leodip/goiabada-ci/mailpit:v1.33.1}"
 E2E_MAILPIT_PORT="${E2E_MAILPIT_PORT:-18025}"
 # The test app (e2e/testapp), built on the VPS into this image and run twice, one container per test
 # app host, on 127.0.0.1:9092 and 9093.

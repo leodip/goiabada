@@ -494,16 +494,33 @@ func TestCheckWorkflow_DocsJobFindings(t *testing.T) {
 }
 
 // update writes the Go and Node pins into the FROM lines of the three Dockerfiles as they are
-// committed, under ${baseRegistry}, and changes no other line of them. Its other steps are replaced:
-// the pins come from the test rather than versions.yaml, and nothing is fetched.
+// committed, under ${baseRegistry}, and changes no other line of them.
 func TestVersionManagerUpdate_WritesThePinsIntoTheBaseRegistryFromLines(t *testing.T) {
+	assertUpdateWritesFromLines(t, map[string][]string{
+		"src/build/Dockerfile-authserver": {
+			"FROM --platform=$BUILDPLATFORM ${baseRegistry}/golang:1.28.0-alpine AS build",
+			"FROM --platform=$BUILDPLATFORM ${baseRegistry}/golang:1.28.0-alpine AS certs",
+		},
+		"src/build/Dockerfile-adminconsole": {
+			"FROM --platform=$BUILDPLATFORM ${baseRegistry}/golang:1.28.0-alpine AS build",
+			"FROM --platform=$BUILDPLATFORM ${baseRegistry}/golang:1.28.0-alpine AS certs",
+		},
+		"site/Dockerfile": {"FROM ${baseRegistry}/node:27.0.1-alpine AS sources", "FROM sources AS builder", "FROM ${baseRegistry}/nginx:alpine"},
+	})
+}
+
+// assertUpdateWritesFromLines copies each file of want, relative to the repository root, as it is
+// committed, into an empty tree, runs update there with tools.go at 1.28.0 and tools.node at
+// 27.0.1, and holds each file's lines that begin FROM, but FROM scratch, to want's, and every other
+// line to what it was. Each file declares ARG baseRegistry=docker.io/library. update's other steps
+// are replaced: the pins come from the test rather than versions.yaml, and nothing is fetched.
+func assertUpdateWritesFromLines(t *testing.T, want map[string][]string) {
+	t.Helper()
 	files := map[string]string{}
-	for _, rel := range baseRegistryDockerfiles {
-		files[rel] = repositoryFiles(t, []string{rel})[rel]
-	}
 	base := t.TempDir()
-	for rel, content := range files {
-		writeFixture(t, base, rel, content)
+	for rel := range want {
+		files[rel] = repositoryFiles(t, []string{rel})[rel]
+		writeFixture(t, base, rel, files[rel])
 	}
 	script := filepath.Join(SourceRoot(t), "authserver", "version-manager.sh")
 	out, err := exec.Command("bash", "-c", `. "$1" || exit 1; BASE_DIR="$2"
@@ -514,17 +531,6 @@ func TestVersionManagerUpdate_WritesThePinsIntoTheBaseRegistryFromLines(t *testi
 		cmd_update`, "bash", script, base).CombinedOutput()
 	require.NoError(t, err, "%s", out)
 
-	want := map[string][]string{
-		"src/build/Dockerfile-authserver": {
-			"FROM --platform=$BUILDPLATFORM ${baseRegistry}/golang:1.28.0-alpine AS build",
-			"FROM --platform=$BUILDPLATFORM ${baseRegistry}/golang:1.28.0-alpine AS certs",
-		},
-		"src/build/Dockerfile-adminconsole": {
-			"FROM --platform=$BUILDPLATFORM ${baseRegistry}/golang:1.28.0-alpine AS build",
-			"FROM --platform=$BUILDPLATFORM ${baseRegistry}/golang:1.28.0-alpine AS certs",
-		},
-		"site/Dockerfile": {"FROM ${baseRegistry}/node:27.0.1-alpine AS sources", "FROM sources AS builder", "FROM ${baseRegistry}/nginx:alpine"},
-	}
 	for rel, before := range files {
 		content, err := os.ReadFile(filepath.Join(base, filepath.FromSlash(rel)))
 		require.NoError(t, err)

@@ -20,8 +20,10 @@ rm -rf testapp-src
 mkdir testapp-src
 tar -xzf "$stage/testapp.tar.gz" -C testapp-src
 # The label marks the images this script built, so the one the new build replaces can be removed
-# without touching anyone else's.
-if ! docker build --label goiabada-e2e=testapp -t "$E2E_TESTAPP_IMAGE" testapp-src >testapp-build.log 2>&1; then
+# without touching anyone else's. It builds on CI's mirror of its base, rather than asking Docker Hub
+# for it (#867).
+if ! docker build --label goiabada-e2e=testapp --build-arg baseRegistry=ghcr.io/leodip/goiabada-ci \
+  -t "$E2E_TESTAPP_IMAGE" testapp-src >testapp-build.log 2>&1; then
   tail -40 testapp-build.log >&2
   fail "the test app's image did not build"
 fi
