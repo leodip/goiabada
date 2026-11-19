@@ -111,8 +111,9 @@ func TestRegisterRoutes_EveryApiRouteRefusesToBeStored(t *testing.T) {
 			// The two sweeps observe only the answers they drive: this one, over a settings read
 			// that succeeds, a guard's refusal of a caller with no token, and the fault sweep below
 			// the 500 of a settings read that fails or panics. A middleware added ahead of NoStore
-			// that answers on a condition of its own would send neither header field, and neither
-			// sweep would notice. This assertion is what catches it.
+			// that answers on a condition those requests do not meet would send neither header
+			// field, and neither sweep would see it. This assertion catches the placement itself,
+			// whichever requests trigger the answer.
 			//
 			// Matched on the runtime function name rather than the function pointer:
 			// every call to middleware.NoStore returns a fresh closure with its own
