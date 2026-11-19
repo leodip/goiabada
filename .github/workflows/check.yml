@@ -140,6 +140,7 @@ jobs:
       unparam: ${{ steps.read.outputs.unparam }}
       govulncheck: ${{ steps.read.outputs.govulncheck }}
       mockery: ${{ steps.read.outputs.mockery }}
+      mailpit: ${{ steps.read.outputs.mailpit }}
       mysql-password: ${{ steps.passwords.outputs.mysql }}
       postgres-password: ${{ steps.passwords.outputs.postgres }}
       mssql-password: ${{ steps.passwords.outputs.mssql }}
@@ -163,7 +164,7 @@ jobs:
         run: |
           set -euo pipefail
           f=src/authserver/versions.yaml
-          for k in go tailwind node unparam govulncheck mockery; do
+          for k in go tailwind node unparam govulncheck mockery mailpit; do
             v=$(yq -r ".tools.$k" "$f")
             [ -n "$v" ] && [ "$v" != "null" ] || { echo "::error::tools.$k missing from $f"; exit 1; }
             echo "$k=$v" >> "$GITHUB_OUTPUT"
@@ -461,7 +462,7 @@ jobs:
       # emaildelivery's TestSendEmail talks to a real SMTP server. Verified by
       # running the tier without it, where that is the only test that fails.
       mailpit:
-        image: axllent/mailpit
+        image: axllent/mailpit:v${{ needs.versions.outputs.mailpit }}
         credentials: ${{ secrets.DOCKERHUB_USERNAME != '' && fromJSON(format('{{"username":{0},"password":{1}}}', toJSON(secrets.DOCKERHUB_USERNAME), toJSON(secrets.DOCKERHUB_TOKEN))) || fromJSON('{}') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -553,7 +554,7 @@ jobs:
       credentials: ${{ secrets.DOCKERHUB_USERNAME != '' && fromJSON(format('{{"username":{0},"password":{1}}}', toJSON(secrets.DOCKERHUB_USERNAME), toJSON(secrets.DOCKERHUB_TOKEN))) || fromJSON('{}') }}
     services:
       mailpit:
-        image: axllent/mailpit
+        image: axllent/mailpit:v${{ needs.versions.outputs.mailpit }}
         credentials: ${{ secrets.DOCKERHUB_USERNAME != '' && fromJSON(format('{{"username":{0},"password":{1}}}', toJSON(secrets.DOCKERHUB_USERNAME), toJSON(secrets.DOCKERHUB_TOKEN))) || fromJSON('{}') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -717,8 +718,10 @@ jobs:
       image: golang:${{ needs.versions.outputs.go }}-bookworm
       credentials: ${{ secrets.DOCKERHUB_USERNAME != '' && fromJSON(format('{{"username":{0},"password":{1}}}', toJSON(secrets.DOCKERHUB_USERNAME), toJSON(secrets.DOCKERHUB_TOKEN))) || fromJSON('{}') }}
     services:
+      # Only for the integration entries: the data tier sends no mail, and a service whose image
+      # is empty is not started.
       mailpit:
-        image: axllent/mailpit
+        image: ${{ matrix.tier == 'integration' && format('axllent/mailpit:v{0}', needs.versions.outputs.mailpit) || '' }}
         credentials: ${{ secrets.DOCKERHUB_USERNAME != '' && fromJSON(format('{{"username":{0},"password":{1}}}', toJSON(secrets.DOCKERHUB_USERNAME), toJSON(secrets.DOCKERHUB_TOKEN))) || fromJSON('{}') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -782,8 +785,10 @@ jobs:
           --tmpfs /var/lib/mysql
           --health-cmd "mysqladmin ping -uroot -p$MYSQL_ROOT_PASSWORD --port=13306 --protocol=tcp"
           --health-interval 3s --health-timeout 3s --health-retries 30
+      # Only for the integration entries: the data tier sends no mail, and a service whose image
+      # is empty is not started.
       mailpit:
-        image: axllent/mailpit
+        image: ${{ matrix.tier == 'integration' && format('axllent/mailpit:v{0}', needs.versions.outputs.mailpit) || '' }}
         credentials: ${{ secrets.DOCKERHUB_USERNAME != '' && fromJSON(format('{{"username":{0},"password":{1}}}', toJSON(secrets.DOCKERHUB_USERNAME), toJSON(secrets.DOCKERHUB_TOKEN))) || fromJSON('{}') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -845,8 +850,10 @@ jobs:
           --tmpfs /var/lib/postgresql
           --health-cmd "pg_isready -h localhost -U postgres -p 15432"
           --health-interval 3s --health-timeout 3s --health-retries 30
+      # Only for the integration entries: the data tier sends no mail, and a service whose image
+      # is empty is not started.
       mailpit:
-        image: axllent/mailpit
+        image: ${{ matrix.tier == 'integration' && format('axllent/mailpit:v{0}', needs.versions.outputs.mailpit) || '' }}
         credentials: ${{ secrets.DOCKERHUB_USERNAME != '' && fromJSON(format('{{"username":{0},"password":{1}}}', toJSON(secrets.DOCKERHUB_USERNAME), toJSON(secrets.DOCKERHUB_TOKEN))) || fromJSON('{}') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -914,8 +921,10 @@ jobs:
           --tmpfs /var/opt/mssql/log:uid=10001,gid=0
           --health-cmd "/opt/mssql-tools18/bin/sqlcmd -C -S localhost,11433 -U sa -P $MSSQL_SA_PASSWORD -Q 'SELECT 1'"
           --health-interval 5s --health-timeout 5s --health-retries 40
+      # Only for the integration entries: the data tier sends no mail, and a service whose image
+      # is empty is not started.
       mailpit:
-        image: axllent/mailpit
+        image: ${{ matrix.tier == 'integration' && format('axllent/mailpit:v{0}', needs.versions.outputs.mailpit) || '' }}
         credentials: ${{ secrets.DOCKERHUB_USERNAME != '' && fromJSON(format('{{"username":{0},"password":{1}}}', toJSON(secrets.DOCKERHUB_USERNAME), toJSON(secrets.DOCKERHUB_TOKEN))) || fromJSON('{}') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

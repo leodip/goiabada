@@ -35,6 +35,9 @@
 #                 published images, beside Trivy
 # npm-check-updates: Upgrades the npm projects' dependencies (version-manager.sh
 #                 deps) and reports them (check), run through npx at this pin
+# mailpit:        Mailpit, the SMTP server the email tests send to: CI's Mailpit services,
+#                 read by the Versions job, and the image the dev container's Compose file
+#                 and the e2e server run, which update writes; tagged vX.Y.Z upstream
 #
 # staticcheck, unparam and govulncheck are pinned because they gate CI. An
 # unpinned tool can turn every open PR red on an upstream release, with no
@@ -62,6 +65,9 @@
 # system package, and Build validation gates on govulncheck's scan of their
 # binaries (#808).
 #
+# mailpit is suggested under the same 3 days, from its GitHub releases, so a new
+# Mailpit reaches the tests only through a reviewed change (#867).
+#
 # npm-check-updates, cropperjs and acorn are suggested under the same 3 days,
 # counted from when the npm registry records the release published, and deps
 # upgrades the npm projects' dependencies only to releases that old.
@@ -77,6 +83,7 @@ tools:
   trivy: "0.76.2"
   grype: "0.121.3"
   npm-check-updates: "23.1.1"
+  mailpit: "1.33.1"
 
 # -----------------------------------------------------------------------------
 # Vendored dependencies

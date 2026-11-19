@@ -18,7 +18,7 @@
 #
 # Scope: this script manages TOOLCHAIN and CDN pins (Go, Tailwind, Node.js,
 # golangci-lint, mockery, staticcheck, unparam, govulncheck, Trivy, Grype,
-# npm-check-updates, cropperjs, acorn), and
+# npm-check-updates, Mailpit, cropperjs, acorn), and
 # the dependencies of the Go modules and of the npm projects in NPM_PROJECTS.
 # check also reports when the pinned sources of generate's data have moved.
 # It does NOT manage the product version.
@@ -54,6 +54,12 @@
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 BASE_DIR=$(cd "${SCRIPT_DIR}/../.." && pwd)
 VERSIONS_FILE="${SCRIPT_DIR}/versions.yaml"
+
+# Mailpit's image on Docker Hub, whose tags are its GitHub repository's releases, of the same
+# name. update writes it at tools.mailpit into MAILPIT_FILES, relative to the repository root:
+# the dev container's Compose file and the e2e server's default. CI reads the pin itself.
+MAILPIT_REPOSITORY="axllent/mailpit"
+MAILPIT_FILES=("src/.devcontainer/docker-compose.yml" "e2e/infra/lib.sh")
 
 # =============================================================================
 # Color Codes for Output
@@ -189,6 +195,7 @@ get_all_versions() {
         echo "tools.trivy=$(get_version 'tools.trivy')"
         echo "tools.grype=$(get_version 'tools.grype')"
         echo "tools.npm-check-updates=$(get_version 'tools."npm-check-updates"')"
+        echo "tools.mailpit=$(get_version 'tools.mailpit')"
         echo "vendored.cropperjs=$(get_version 'vendored.cropperjs')"
         echo "vendored.acorn=$(get_version 'vendored.acorn')"
     }
@@ -587,6 +594,26 @@ update_file() {
     fi
 }
 
+# update_mailpit writes Mailpit's image at VERSION, tagged vVERSION as upstream tags it, into each
+# of MAILPIT_FILES, replacing whatever tag it had, or none. A file that names the image nowhere
+# fails the step, so a moved line is reported rather than left on another Mailpit; the other
+# files are still written.
+# Usage: update_mailpit VERSION
+update_mailpit() {
+    local version="$1" file failed=0
+    for file in "${MAILPIT_FILES[@]}"; do
+        if ! grep -q "${MAILPIT_REPOSITORY}" "$BASE_DIR/$file" 2>/dev/null; then
+            print_error "$file names no ${MAILPIT_REPOSITORY} image to pin"
+            failed=1
+            continue
+        fi
+        update_file "$BASE_DIR/$file" \
+            "s|${MAILPIT_REPOSITORY}\(:[^[:space:]\"'}]*\)\{0,1\}|${MAILPIT_REPOSITORY}:v${version}|g" \
+            "Mailpit image" || failed=1
+    done
+    return "$failed"
+}
+
 # =============================================================================
 # Command: show
 # =============================================================================
@@ -619,6 +646,7 @@ cmd_show() {
     printf "  %-23s ${GREEN}%s${NC}\n" "trivy" "$(get_version 'tools.trivy')"
     printf "  %-23s ${GREEN}%s${NC}\n" "grype" "$(get_version 'tools.grype')"
     printf "  %-23s ${GREEN}%s${NC}\n" "npm-check-updates" "$(get_version 'tools."npm-check-updates"')"
+    printf "  %-23s ${GREEN}%s${NC}\n" "mailpit" "$(get_version 'tools.mailpit')"
 
     # Vendored dependencies
     echo -e "\n${BOLD}Vendored dependencies:${NC}"
@@ -844,6 +872,24 @@ cmd_check() {
         print_warning "Check failed"
     fi
 
+    # --- Mailpit ---
+    # The SMTP server the email tests send to, suggested under the same
+    # RELEASE_MIN_AGE_DAYS as Trivy, so a new release reaches the tests only
+    # through a reviewed change (#867).
+    echo -n "Checking Mailpit... "
+    local current_mailpit=$(get_version 'tools.mailpit')
+    local latest_mailpit=$(get_github_settled "$MAILPIT_REPOSITORY")
+    if [ -n "$latest_mailpit" ]; then
+        if version_lt "$current_mailpit" "$latest_mailpit"; then
+            echo -e "${YELLOW}UPDATE AVAILABLE${NC}"
+            updates_available+=("Mailpit|$current_mailpit|$latest_mailpit|https://github.com/${MAILPIT_REPOSITORY}/releases")
+        else
+            print_success "Up to date ($current_mailpit)"
+        fi
+    else
+        print_warning "Check failed"
+    fi
+
     # --- cropperjs ---
     echo -n "Checking cropperjs... "
     local current_cropper=$(get_version 'vendored.cropperjs')
@@ -1011,6 +1057,7 @@ cmd_update() {
     local STATICCHECK_VERSION=$(get_version 'tools.staticcheck')
     local UNPARAM_VERSION=$(get_version 'tools.unparam')
     local GOVULNCHECK_VERSION=$(get_version 'tools.govulncheck')
+    local MAILPIT_VERSION=$(get_version 'tools.mailpit')
     local CROPPER_VERSION=$(get_version 'vendored.cropperjs')
     local ACORN_VERSION=$(get_version 'vendored.acorn')
 
@@ -1176,6 +1223,17 @@ cmd_update() {
             fi
         fi
     done
+
+    # -------------------------------------------------------------------------
+    # Mailpit
+    # -------------------------------------------------------------------------
+    # The dev container and the e2e server run the Mailpit CI's services run.
+    echo -e "\n${BOLD}Mailpit${NC}"
+    if update_mailpit "$MAILPIT_VERSION"; then
+        ((success_count++))
+    else
+        ((fail_count++))
+    fi
 
     # -------------------------------------------------------------------------
     # Go Module Files
