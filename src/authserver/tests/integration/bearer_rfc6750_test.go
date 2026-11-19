@@ -65,7 +65,7 @@ const bearerRFC6750AdminRoute = "/api/v1/admin/settings/general"
 
 // RFC 6750 section 3.1: a request lacking any authentication information SHOULD NOT be told an
 // error code; section 3's one required auth-param is the realm.
-func TestBearerRFC6750_NoCredentialIsTheRealmAlone(t *testing.T) {
+func TestBearerRFC6750_NoCredentialIsChallengedWithNoError(t *testing.T) {
 	for _, method := range []string{"GET", "POST"} {
 		userinfo := sendBearerRequest(t, method, "/userinfo", "", "")
 		assert.Equal(t, http.StatusUnauthorized, userinfo.status, "%s /userinfo: %s", method, userinfo.body)
