@@ -82,8 +82,9 @@ func schemesOf(ctx context.Context) schemes {
 
 // unauthorizedChallenges is the WWW-Authenticate value of a 401: a Bearer challenge, then a DPoP
 // challenge, in one field line, the error in the challenge of each scheme used (RFC 9449 section
-// 7.2, #42 decision 10). With no error, as for a request carrying no credential, both name the
-// realm alone (RFC 6750 section 3.1). The resource accepts both schemes, so every 401 says so.
+// 7.2, #42 decision 10). With no error, as RFC 6750 section 3.1 asks for a request carrying no
+// credential, the Bearer challenge names the realm alone and the DPoP challenge the realm and its
+// algs. The resource accepts both schemes, so every 401 says so.
 func unauthorizedChallenges(used schemes, errorCode, description string) string {
 	bearerCode, bearerDescription, dpopCode, dpopDescription := "", "", "", ""
 	if used&schemeBearer != 0 {

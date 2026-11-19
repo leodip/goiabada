@@ -22,7 +22,7 @@ func (m *BearerToken) RequireBearerTokenScope(requiredScope string) func(http.Ha
 //
 // No token in the context is a request that presented no bearer credential, since
 // JwtAuthorizationHeaderToContext has already refused every presented token it did not store. It
-// is answered 401 with the realm-only challenge: RFC 6750 section 3.1, a request lacking any
+// is answered 401 with challenges that carry no error: RFC 6750 section 3.1, a request lacking any
 // authentication information SHOULD NOT be told an error code (#435).
 func (m *BearerToken) RequireBearerTokenScopeAnyOf(requiredScopes []string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
@@ -294,7 +294,7 @@ func (m *BearerToken) RequireAdminConsoleClient() func(http.Handler) http.Handle
 // user's audit events, which belong to the settings domain, so it takes admin-read, manage, or
 // manage-users together with manage-settings (#781 decision 1). A token reaching no set is refused
 // as a token with none of a route's scopes is, 403 INSUFFICIENT_SCOPE, and a request with no token
-// is the same realm-only 401.
+// is the same 401 with no error in its challenges.
 //
 // An empty set, or none at all, would admit every token, so building the guard with one panics:
 // it is a wiring fault in routes.go, found when the server starts.

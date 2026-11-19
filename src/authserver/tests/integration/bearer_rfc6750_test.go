@@ -13,7 +13,7 @@ import (
 
 // The bearer guards answer RFC 6750 on both surfaces they guard, each in its own body (#435). The
 // middleware's own table owns every row; this tier shows the few that prove routes.go hands each
-// surface the right guard set: /userinfo and one admin route each, the realm-only challenge with no
+// surface the right guard set: /userinfo and one admin route each, challenges with no error for no
 // credential, a lowercase scheme admitted, a token sent twice refused, a form labelled in capitals
 // read as a form, a repeated Authorization header refused, and a form body that does not parse
 // refused beside a valid header. It is deliberately thin.
