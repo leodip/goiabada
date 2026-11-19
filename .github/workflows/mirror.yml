@@ -1,0 +1,75 @@
+# Copies the images CI pulls from Docker Hub into public packages under ghcr.io/leodip/goiabada-ci/,
+# so CI can pull them without drawing on Docker Hub's allowance of 200 pulls per 6 hours, which a
+# few Check runs in one hour used up (#867). .github/mirror/images lists the tags, their versions
+# read from src/authserver/versions.yaml, and .github/mirror/mirror.sh does the work; it says how.
+#
+# It runs on a push to any branch of this repository that changes what it mirrors, so a version
+# bump is copied by the push that makes it, on any branch, before or beside that push's own Check
+# run; weekly, from main, to follow the tags upstream moves, such as nginx:alpine; and by hand.
+# It never runs on a pull request, so no fork's code runs beside its token or Docker Hub's. A tag
+# whose digest at the mirror is already upstream's is not copied, so a refresh pulls from Docker
+# Hub only what upstream moved. Old tags stay, so a branch on an older pin keeps working.
+#
+# A new GHCR package starts private, and GitHub has no API to change that. The Public job pulls
+# every tag anonymously, as CI does, and fails naming each package that is not public and where to
+# make it public; its first run on a new package fails so, until the maintainer has.
+
+name: Mirror
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - .github/mirror/images
+      - .github/mirror/mirror.sh
+      - .github/workflows/mirror.yml
+      - src/authserver/versions.yaml
+      - src/build/Dockerfile-authserver
+      - src/build/Dockerfile-adminconsole
+      - site/Dockerfile
+      - e2e/testapp/Dockerfile
+  schedule:
+    - cron: "23 4 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One run per branch at a time. Runs of two branches may copy the same tag at once, which writes
+# the same digest twice.
+concurrency:
+  group: mirror-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  copy:
+    name: Copy
+    # skopeo, which copies every platform and keeps the digests, ships in this runner image.
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Docker Hub is read logged in with the read-only token the Image scan uses, so the pulls
+      # draw on the account's allowance rather than the one GitHub's runners share by address.
+      - name: Copy the tags whose digest differs from upstream's
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          GHCR_USERNAME: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: .github/mirror/mirror.sh copy
+
+  public:
+    name: Public
+    needs: copy
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Pull every image anonymously
+        run: .github/mirror/mirror.sh public
