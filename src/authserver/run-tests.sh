@@ -36,7 +36,7 @@
 #                           and the setup tier under Go's race detector. Needs
 #                           a C toolchain, since `go test -race` requires cgo:
 #                           the dev container ships
-#                           gcc for this, and CI's golang image has it. Refused
+#                           gcc for this, and CI's runner has it. Refused
 #                           together with --type data or --type integration, which
 #                           the flag does not cover (see Notes).
 #   -s, --shard  <i>/<n>    Run part i of n of the data or integration tier, so n

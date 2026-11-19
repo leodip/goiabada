@@ -431,6 +431,11 @@ jobs:
           done
           exit $rc
 
+  # The unit and race jobs run on the runner, as Lint and Vulnerabilities do, and need no job
+  # container: none of them reaches a database. A job keeps a container when it needs the database
+  # network, as the data and integration jobs below do (#867). setup-test-runner sets Go and Node.js
+  # up at their pins and installs the Tailwind CLI, which run-tests.sh's module tiers use.
+  #
   # No services: TestSendEmail left with core/communication in #346, and it was
   # the only test here that reached one -- no mailpit helper in core/guard
   # has a caller inside core any more.
@@ -438,13 +443,11 @@ jobs:
     name: Unit / core
     needs: versions
     runs-on: ubuntu-latest
-    container:
-      image: golang:${{ needs.versions.outputs.go }}-bookworm
-      credentials: ${{ secrets.DOCKERHUB_USERNAME != '' && fromJSON(format('{{"username":{0},"password":{1}}}', toJSON(secrets.DOCKERHUB_USERNAME), toJSON(secrets.DOCKERHUB_TOKEN))) || fromJSON('{}') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: ./.github/actions/setup-test-container
+      - uses: ./.github/actions/setup-test-runner
         with:
+          go: ${{ needs.versions.outputs.go }}
           tailwind: ${{ needs.versions.outputs.tailwind }}
           node: ${{ needs.versions.outputs.node }}
       - name: Core module tests
@@ -455,48 +458,42 @@ jobs:
     name: Unit / authserver
     needs: versions
     runs-on: ubuntu-latest
-    container:
-      image: golang:${{ needs.versions.outputs.go }}-bookworm
-      credentials: ${{ secrets.DOCKERHUB_USERNAME != '' && fromJSON(format('{{"username":{0},"password":{1}}}', toJSON(secrets.DOCKERHUB_USERNAME), toJSON(secrets.DOCKERHUB_TOKEN))) || fromJSON('{}') }}
     services:
       # emaildelivery's TestSendEmail talks to a real SMTP server. Verified by
       # running the tier without it, where that is the only test that fails.
+      # It sends to mailpit:1025 and reads mailpit:8025, the dev container's
+      # names. On the runner a service is reached through the ports it maps to
+      # the runner's own, and the name through the hosts line the first step adds.
       mailpit:
         image: axllent/mailpit:v${{ needs.versions.outputs.mailpit }}
         credentials: ${{ secrets.DOCKERHUB_USERNAME != '' && fromJSON(format('{{"username":{0},"password":{1}}}', toJSON(secrets.DOCKERHUB_USERNAME), toJSON(secrets.DOCKERHUB_TOKEN))) || fromJSON('{}') }}
+        ports:
+          - 1025:1025
+          - 8025:8025
     steps:
+      - name: Reach Mailpit by the dev container's name
+        run: echo "127.0.0.1 mailpit" | sudo tee -a /etc/hosts
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: ./.github/actions/setup-test-container
+      - uses: ./.github/actions/setup-test-runner
         with:
+          go: ${{ needs.versions.outputs.go }}
           tailwind: ${{ needs.versions.outputs.tailwind }}
           node: ${{ needs.versions.outputs.node }}
           save-cache: 'true'
       - name: Authserver internal tests
         working-directory: src/authserver
         run: ./run-tests.sh --type internal --no-build
-      # The Go cache this job saves is the one the database jobs restore, so it
-      # also compiles what they compile beyond these tests: the server build.sh
-      # makes, droptestdb, and the data and integration test binaries. After the
-      # tests, so a failure here is not taken for theirs.
-      - name: Compile what the database jobs run
-        working-directory: src/authserver
-        run: |
-          go build -buildvcs=false -o "$RUNNER_TEMP/goiabada-authserver" ./cmd/goiabada-authserver
-          go build -o "$RUNNER_TEMP/droptestdb" ./cmd/droptestdb
-          go test -c -o "$RUNNER_TEMP/" ./tests/data ./tests/integration
 
   # No services: verified by running this tier with every service unreachable.
   unit-adminconsole:
     name: Unit / adminconsole
     needs: versions
     runs-on: ubuntu-latest
-    container:
-      image: golang:${{ needs.versions.outputs.go }}-bookworm
-      credentials: ${{ secrets.DOCKERHUB_USERNAME != '' && fromJSON(format('{{"username":{0},"password":{1}}}', toJSON(secrets.DOCKERHUB_USERNAME), toJSON(secrets.DOCKERHUB_TOKEN))) || fromJSON('{}') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: ./.github/actions/setup-test-container
+      - uses: ./.github/actions/setup-test-runner
         with:
+          go: ${{ needs.versions.outputs.go }}
           tailwind: ${{ needs.versions.outputs.tailwind }}
           node: ${{ needs.versions.outputs.node }}
       - name: Admin console module tests
@@ -509,21 +506,22 @@ jobs:
   # repository reading it (#285). The tier calls none of the tree-wide guards;
   # the other three module tiers do, over the whole source root (#430).
   #
-  # No setup-test-container: this module has four external dependencies plus
-  # core, which is a local replace and fetches nothing, and no templates and no
-  # CSS, so it needs neither the Tailwind CLI nor the OS packages the other
-  # tiers do, and fetching them would cost more than the run. The setup tier
-  # never builds and needs only bash, coreutils and go from this image; the
-  # script's cleanup trap sends a missing netstat to /dev/null.
+  # Go alone, not setup-test-runner: this module has four external dependencies
+  # plus core, which is a local replace and fetches nothing, and no templates and
+  # no CSS, so it needs neither the Tailwind CLI nor Node.js, and fetching them
+  # would cost more than the run. No cache either, as before: its modules are
+  # quicker to download than a cache is to restore. The setup tier never builds
+  # and needs only bash, coreutils and go.
   unit-setup:
     name: Unit / setup
     needs: versions
     runs-on: ubuntu-latest
-    container:
-      image: golang:${{ needs.versions.outputs.go }}-bookworm
-      credentials: ${{ secrets.DOCKERHUB_USERNAME != '' && fromJSON(format('{{"username":{0},"password":{1}}}', toJSON(secrets.DOCKERHUB_USERNAME), toJSON(secrets.DOCKERHUB_TOKEN))) || fromJSON('{}') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ needs.versions.outputs.go }}
+          cache: false
       - name: Setup wizard tests
         working-directory: src/authserver
         run: ./run-tests.sh --type setup --no-build
@@ -533,33 +531,36 @@ jobs:
   # 12 to 18 minutes, and a red run was a 15-minute wait for the next signal (#691).
   # The plain unit jobs above stay: the detector slows a run several times over and
   # changes its timing, so it complements the plain run rather than replacing it.
-  # Each job repeats the cache restore and container start, about 20 to 45s of
-  # runner time a public repository is not charged for, with the tier on the job
-  # axis where a red run still names it in one click.
+  # Each job repeats the setup and the cache restore, runner time a public
+  # repository is not charged for, with the tier on the job axis where a red run
+  # still names it in one click.
   #
-  # `go test -race` needs cgo, and cgo needs a C compiler. The golang image
-  # ships gcc, and CGO_ENABLED defaults to 1 wherever a compiler is found, so
-  # nothing is installed for it; run-tests.sh sets CGO_ENABLED=1 for the leg
-  # regardless, so the same flag works in the dev container, which pins it to
-  # 0 for ordinary builds. Mailpit rides with the internal tier for the same
-  # reason as in Unit / authserver. The data and integration tiers do not run
+  # `go test -race` needs cgo, and cgo needs a C compiler. The runner ships gcc,
+  # and CGO_ENABLED defaults to 1 wherever a compiler is found, so nothing is
+  # installed for it; run-tests.sh sets CGO_ENABLED=1 for the leg regardless, so
+  # the same flag works in the dev container, which pins it to 0 for ordinary
+  # builds. Mailpit rides with the internal tier, mapped and named as in Unit /
+  # authserver, for the same reason. The data and integration tiers do not run
   # under the detector (#276, section 9 of the closing log).
   unit-race-internal:
     name: Unit / race (internal)
     needs: versions
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
-    container:
-      image: golang:${{ needs.versions.outputs.go }}-bookworm
-      credentials: ${{ secrets.DOCKERHUB_USERNAME != '' && fromJSON(format('{{"username":{0},"password":{1}}}', toJSON(secrets.DOCKERHUB_USERNAME), toJSON(secrets.DOCKERHUB_TOKEN))) || fromJSON('{}') }}
     services:
       mailpit:
         image: axllent/mailpit:v${{ needs.versions.outputs.mailpit }}
         credentials: ${{ secrets.DOCKERHUB_USERNAME != '' && fromJSON(format('{{"username":{0},"password":{1}}}', toJSON(secrets.DOCKERHUB_USERNAME), toJSON(secrets.DOCKERHUB_TOKEN))) || fromJSON('{}') }}
+        ports:
+          - 1025:1025
+          - 8025:8025
     steps:
+      - name: Reach Mailpit by the dev container's name
+        run: echo "127.0.0.1 mailpit" | sudo tee -a /etc/hosts
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: ./.github/actions/setup-test-container
+      - uses: ./.github/actions/setup-test-runner
         with:
+          go: ${{ needs.versions.outputs.go }}
           tailwind: ${{ needs.versions.outputs.tailwind }}
           node: ${{ needs.versions.outputs.node }}
       - name: Authserver internal tests
@@ -571,13 +572,11 @@ jobs:
     needs: versions
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
-    container:
-      image: golang:${{ needs.versions.outputs.go }}-bookworm
-      credentials: ${{ secrets.DOCKERHUB_USERNAME != '' && fromJSON(format('{{"username":{0},"password":{1}}}', toJSON(secrets.DOCKERHUB_USERNAME), toJSON(secrets.DOCKERHUB_TOKEN))) || fromJSON('{}') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: ./.github/actions/setup-test-container
+      - uses: ./.github/actions/setup-test-runner
         with:
+          go: ${{ needs.versions.outputs.go }}
           tailwind: ${{ needs.versions.outputs.tailwind }}
           node: ${{ needs.versions.outputs.node }}
       - name: Core module tests
@@ -589,13 +588,11 @@ jobs:
     needs: versions
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
-    container:
-      image: golang:${{ needs.versions.outputs.go }}-bookworm
-      credentials: ${{ secrets.DOCKERHUB_USERNAME != '' && fromJSON(format('{{"username":{0},"password":{1}}}', toJSON(secrets.DOCKERHUB_USERNAME), toJSON(secrets.DOCKERHUB_TOKEN))) || fromJSON('{}') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: ./.github/actions/setup-test-container
+      - uses: ./.github/actions/setup-test-runner
         with:
+          go: ${{ needs.versions.outputs.go }}
           tailwind: ${{ needs.versions.outputs.tailwind }}
           node: ${{ needs.versions.outputs.node }}
       - name: Admin console module tests
@@ -729,10 +726,12 @@ jobs:
         # Fresh for every job rather than written in this file (#501).
         run: echo "GOIABADA_AES_ENCRYPTION_KEY=$(od -An -tx1 -N32 /dev/urandom | tr -d ' \n')" >> "$GITHUB_ENV"
       - uses: ./.github/actions/runner-specs
+      # Data / sqlite saves the container's Go cache, which the other database jobs restore.
       - uses: ./.github/actions/setup-test-container
         with:
           tailwind: ${{ needs.versions.outputs.tailwind }}
           node: ${{ needs.versions.outputs.node }}
+          save-cache: ${{ matrix.tier == 'data' && 'true' || 'false' }}
       - name: Build
         if: matrix.tier == 'integration'
         working-directory: src/authserver
@@ -740,6 +739,17 @@ jobs:
       - name: ${{ matrix.title }} tests
         working-directory: src/authserver
         run: ./run-tests.sh --type ${{ matrix.tier }} --db sqlite --no-build --shard ${{ matrix.shard }}
+      # The Go cache this job saves is the one the other database jobs restore, so
+      # it also compiles what they compile beyond its own tests: the server build.sh
+      # makes, droptestdb, and the data and integration test binaries. After the
+      # tests, so a failure here is not taken for theirs.
+      - name: Compile what the database jobs run
+        if: matrix.tier == 'data'
+        working-directory: src/authserver
+        run: |
+          go build -buildvcs=false -o "$RUNNER_TEMP/goiabada-authserver" ./cmd/goiabada-authserver
+          go build -o "$RUNNER_TEMP/droptestdb" ./cmd/droptestdb
+          go test -c -o "$RUNNER_TEMP/" ./tests/data ./tests/integration
 
   tests-mysql:
     name: ${{ matrix.title }} / mysql
