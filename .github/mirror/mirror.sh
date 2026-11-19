@@ -13,19 +13,20 @@
 #                      nothing else, and the mirror written with GHCR_USERNAME and GHCR_TOKEN.
 #   mirror.sh missing  Asks the mirror anonymously for every tag and names each one it lacks, or
 #                      holds in a package that is not public, and what to do.
-#   mirror.sh public   Pulls every tag anonymously and names each package that refuses the pull,
-#                      so is not public, with where to make it public: a new GHCR package starts
-#                      private, and GitHub has no API to change that. A pull that fails for another
-#                      reason is reported with Docker's error, as no answer on the package.
+#   mirror.sh public   Pulls every tag anonymously and names each package whose registry refuses
+#                      the pull, so is not public, with where to make it public: a new GHCR package
+#                      starts private, and GitHub has no API to change that. A pull that fails for
+#                      another reason, Docker's own on the runner among them, is reported with
+#                      Docker's error, as no answer on the package.
 #
 # Docker Hub counts a pull per manifest GET, once per platform for a multi-platform image, and none
 # for a HEAD, which answers a tag's digest in its Docker-Content-Digest header. So copy asks both
 # registries for each tag's digest with a HEAD, and pulls only the tags whose digests differ: the
 # first fill costs a pull per platform of every tag, a version bump the new tag's, and a refresh
-# what upstream moved. The copy names upstream's image by the digest it compared, so what lands in
-# the mirror is that digest even when upstream moves meanwhile, and both digests are asked again
-# after it: a tag is copied again while they differ, so the last of two overlapping runs leaves the
-# mirror at upstream's digest.
+# what upstream moved. The Mirror workflow runs one copy at a time, across branches, so each compares
+# against what the one before it wrote. The copy names upstream's image by the digest it compared,
+# so what lands in the mirror is that digest even when upstream moves meanwhile, and both digests
+# are asked again after it: a tag is copied again while they differ.
 #
 # Every tag is handled even after one fails, so one run names every failure. Messages are GitHub
 # error annotations. Exits 0 when every tag passes, 1 when any fails, and 2 on a usage error.
@@ -159,10 +160,8 @@ registry_digest() {
 }
 
 # copy_tag copies one tag from upstream to mirror until the mirror holds the digest upstream holds
-# when it is asked again after the copy. Two Mirror runs, of two branches, can copy one tag at once,
-# and the one that read upstream first can land the older digest last: asking both registries again
-# after each copy, and copying again while they differ, leaves the last run to finish at upstream's.
-# Returns 1, after an error, when it cannot.
+# when it is asked again after the copy: upstream can move while a copy runs, and the copy lands the
+# digest it compared. Returns 1, after an error, when it cannot.
 copy_tag() {
     local upstream=$1 mirror=$2 netrc=$3 authfile=$4 want have status copies=0
     while :; do
@@ -251,9 +250,20 @@ mirror_missing() {
     return $missing
 }
 
-# A pull refused for want of access, as GHCR refuses one of a package that is not public, rather than
-# failed for another reason, such as a registry error or a tag the mirror lacks.
-REFUSED_PULL='denied|unauthorized|forbidden|\b40[13]\b'
+# pull_refused succeeds when docker's error says the registry refused the pull for want of access,
+# as GHCR refuses an anonymous one of a package that is not public. Docker relays a registry's answer
+# after "Error response from daemon:"; an error of Docker's own on the runner, such as "permission
+# denied" on its socket or its disk, or a registry error, such as a 503, says nothing of the package.
+pull_refused() {
+    local line
+    while IFS= read -r line; do
+        line=${line,,}
+        [[ $line == "error response from daemon:"* ]] || continue
+        line=${line//permission denied/}
+        [[ $line =~ denied|unauthorized|forbidden|(^|[^0-9])40[13]([^0-9]|$) ]] && return 0
+    done <<< "$1"
+    return 1
+}
 
 mirror_public() {
     local list upstream mirror package anonymous out failed=0
@@ -269,7 +279,7 @@ mirror_public() {
             continue
         fi
         echo "$out"
-        if ! grep -qiE "$REFUSED_PULL" <<< "$out"; then
+        if ! pull_refused "$out"; then
             error "the anonymous pull of $mirror failed, and not for want of access, so this says nothing of whether its package is public: $(tail -n 1 <<< "$out"). Re-run this job; if it fails again, see the error above."
             failed=1
             continue

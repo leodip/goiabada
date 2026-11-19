@@ -15,6 +15,7 @@ package guard
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -79,10 +80,10 @@ func upstreamDigests() map[string]string {
 // request answered is refused, and one for a repository named under <stub>/stall answers nothing
 // until curl's --max-time, an hour without one. skopeo refuses a copy into a package named under
 // <stub>/copy-fails, and a copy into a package named under <stub>/moves lands, then moves upstream
-// to what that file holds, "<upstream address> <digest>", as another run's copy of a newer digest
-// would have just before it; with STUB_KEEP_MOVING set it moves so after every copy. docker answers a pull of a repository named under <stub>/pull-fails
-// with a registry error. Each logs its arguments, one line per call, curl the headers it read on
-// its standard input after " stdin=".
+// to what that file holds, "<upstream address> <digest>", as upstream moving while the copy ran;
+// with STUB_KEEP_MOVING set it moves so after every copy. docker answers a pull of a repository
+// named under <stub>/pull-error with the error that file holds. Each logs its arguments, one line
+// per call, curl the headers it read on its standard input after " stdin=".
 const (
 	stubMirrorCurl = `#!/bin/bash
 url=${!#}
@@ -160,8 +161,8 @@ if [ -n "${DOCKER_CONFIG:-}" ] && [ -z "$(ls -A "$DOCKER_CONFIG" 2>/dev/null)" ]
     echo "Error response from daemon: Head \"https://ghcr.io/v2/$repo/manifests/${ref##*:}\": denied" >&2
     exit 1
 fi
-if [ -e "$STUB/pull-fails/$repo" ]; then
-    echo "Error response from daemon: received unexpected HTTP status: 503 Service Unavailable" >&2
+if [ -f "$STUB/pull-error/$repo" ]; then
+    cat "$STUB/pull-error/$repo" >&2
     exit 1
 fi
 [ -f "$STUB/registry/${ref%:*}/${ref##*:}" ] || { echo "Error response from daemon: manifest unknown" >&2; exit 1; }
@@ -172,15 +173,15 @@ echo "$ref"
 // mirrorRegistry is what the stubbed registries hold: each tag's digest, by its address, the
 // repositories whose package is not public, the mirror packages a copy into is refused, the
 // repositories whose manifest requests stall, the mirror packages whose copy upstream moves past,
-// to an upstream address and its new digest, and the repositories an anonymous pull of fails with a
-// registry error.
+// to an upstream address and its new digest, and the repositories an anonymous pull of fails, with
+// the error docker prints.
 type mirrorRegistry struct {
 	digests    map[string]string
 	private    []string
 	refuseCopy []string
 	stall      []string
 	moves      map[string][2]string
-	pullFails  []string
+	pullErrors map[string]string
 }
 
 // mirrorRun is a run of mirror.sh: whether it succeeded, what it printed, each stub call it made,
@@ -194,9 +195,17 @@ type mirrorRun struct {
 }
 
 // runMirror runs mirror.sh command with the stubs over registry, versions.yaml being versions, and
-// env added to the environment. HOME holds a Docker configuration logged in to ghcr.io, as a runner
-// may, so a request made anonymously is one the script made so on purpose.
+// env added to the environment.
 func runMirror(t *testing.T, command, versions string, registry mirrorRegistry, env ...string) mirrorRun {
+	t.Helper()
+	return runMirrorOn(t, newMirrorStub(t, versions, registry), command, env...)
+}
+
+// newMirrorStub writes the stubs and registry to a directory of their own, versions.yaml being
+// versions, and returns it, for one run or several over the same registry. HOME holds a Docker
+// configuration logged in to ghcr.io, as a runner may, so a request made anonymously is one the
+// script made so on purpose.
+func newMirrorStub(t *testing.T, versions string, registry mirrorRegistry) string {
 	t.Helper()
 	stub := t.TempDir()
 	bin := filepath.Join(stub, "bin")
@@ -218,8 +227,10 @@ func runMirror(t *testing.T, command, versions string, registry mirrorRegistry, 
 	for _, repo := range registry.stall {
 		require.NoError(t, os.MkdirAll(filepath.Join(stub, "stall", repo), 0o755))
 	}
-	for _, repo := range registry.pullFails {
-		require.NoError(t, os.MkdirAll(filepath.Join(stub, "pull-fails", repo), 0o755))
+	for repo, message := range registry.pullErrors {
+		f := filepath.Join(stub, "pull-error", repo)
+		require.NoError(t, os.MkdirAll(filepath.Dir(f), 0o755))
+		require.NoError(t, os.WriteFile(f, []byte(message+"\n"), 0o600))
 	}
 	for pkg, move := range registry.moves {
 		require.NoError(t, os.MkdirAll(filepath.Join(stub, "moves"), 0o755))
@@ -228,8 +239,17 @@ func runMirror(t *testing.T, command, versions string, registry mirrorRegistry, 
 	require.NoError(t, os.MkdirAll(filepath.Join(stub, ".docker"), 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(stub, ".docker", "config.json"),
 		[]byte(`{"auths":{"ghcr.io":{"auth":"c3R1YjpzdHVi"}}}`), 0o600))
-	versionsFile := filepath.Join(stub, "versions.yaml")
-	require.NoError(t, os.WriteFile(versionsFile, []byte(versions), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(stub, "versions.yaml"), []byte(versions), 0o600))
+	return stub
+}
+
+// runMirrorOn runs mirror.sh command over the stub newMirrorStub wrote, with env added to the
+// environment. The run's calls are the ones it logged, not an earlier run's over the same stub.
+func runMirrorOn(t *testing.T, stub, command string, env ...string) mirrorRun {
+	t.Helper()
+	bin := filepath.Join(stub, "bin")
+	logFile := filepath.Join(stub, "log")
+	require.NoError(t, os.RemoveAll(logFile))
 
 	// A run that waits on a stalled request ends here rather than at the test binary's timeout.
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
@@ -238,12 +258,12 @@ func runMirror(t *testing.T, command, versions string, registry mirrorRegistry, 
 	cmd.WaitDelay = time.Second
 	cmd.Env = append([]string{
 		"PATH=" + bin + ":" + os.Getenv("PATH"), "STUB=" + stub, "HOME=" + stub, "TMPDIR=" + t.TempDir(),
-		"MIRROR_VERSIONS=" + versionsFile,
+		"MIRROR_VERSIONS=" + filepath.Join(stub, "versions.yaml"),
 	}, env...)
 	start := time.Now()
 	out, err := cmd.CombinedOutput()
 	run := mirrorRun{ok: err == nil, out: string(out), stub: stub, elapsed: time.Since(start)}
-	if log, err := os.ReadFile(filepath.Join(stub, "log")); err == nil {
+	if log, err := os.ReadFile(logFile); err == nil {
 		run.calls = strings.Split(strings.TrimRight(string(log), "\n"), "\n")
 	}
 	return run
@@ -451,11 +471,10 @@ func TestMirrorCopy_TheTokensAreOnNoCommandLine(t *testing.T) {
 	}
 }
 
-// Two refreshes of two branches can copy one tag at once. The one that read upstream first, at
-// digest A, lands A after the other has copied upstream's newer B and checked it: asking both
-// registries again after its copy, it finds upstream at B and the mirror at A, and copies B, so the
-// mirror is left at upstream's digest whichever finishes last.
-func TestMirrorCopy_ACopyOverlappingANewerOneLeavesUpstreamsDigest(t *testing.T) {
+// Upstream can move while a copy runs. The copy lands digest A, which it compared, after upstream
+// moved to B: asking both registries again after its copy, it finds upstream at B and the mirror at
+// A, and copies B, so the mirror is left at upstream's digest.
+func TestMirrorCopy_UpstreamMovingDuringACopyLeavesUpstreamsDigest(t *testing.T) {
 	digests := upstreamDigests()
 	for _, tag := range mirrorTags {
 		digests[tag[1]] = digests[tag[0]]
@@ -469,11 +488,42 @@ func TestMirrorCopy_ACopyOverlappingANewerOneLeavesUpstreamsDigest(t *testing.T)
 		moves:   map[string][2]string{"nginx": {nginx[0], newer}},
 	}, mirrorCredentials...)
 	require.True(t, run.ok, "copy failed:\n%s", run.out)
-	assert.Equal(t, newer, run.digest(t, nginx[1]), "the mirror is left at the older digest the overlapping copy landed")
+	assert.Equal(t, newer, run.digest(t, nginx[1]), "the mirror is left at the older digest the copy landed")
 	assert.Equal(t, []string{
 		"docker://docker.io/library/nginx@" + older + " docker://" + nginx[1],
 		"docker://docker.io/library/nginx@" + newer + " docker://" + nginx[1],
 	}, copiedRefs(run))
+}
+
+// The Mirror workflow's copies run one at a time, across branches (mirrorConcurrencyFindings), so
+// each refresh asks both registries after the one before it has written. A refresh after one that
+// copied upstream's digest copies nothing, and one after upstream moved copies the newer digest:
+// the mirror ends at upstream's, and no digest is copied twice.
+func TestMirrorCopy_RefreshesOneAfterAnotherCopyEachDigestOnce(t *testing.T) {
+	nginx := mirrorTags[3]
+	older, newer := mirrorDigest('1'), mirrorDigest('2')
+	digests := upstreamDigests()
+	for _, tag := range mirrorTags {
+		digests[tag[1]] = digests[tag[0]]
+	}
+	digests[nginx[0]] = older
+	delete(digests, nginx[1])
+	stub := newMirrorStub(t, mirrorVersions, mirrorRegistry{digests: digests})
+	upstream := filepath.Join(stub, "registry", "docker.io", "library", "nginx", "alpine")
+
+	first := runMirrorOn(t, stub, "copy", mirrorCredentials...)
+	require.True(t, first.ok, "the first refresh failed:\n%s", first.out)
+	assert.Equal(t, []string{"docker://docker.io/library/nginx@" + older + " docker://" + nginx[1]}, copiedRefs(first))
+
+	second := runMirrorOn(t, stub, "copy", mirrorCredentials...)
+	require.True(t, second.ok, "the second refresh failed:\n%s", second.out)
+	assert.Empty(t, second.copies(), "a refresh after the one that copied upstream's digest copied it again")
+
+	require.NoError(t, os.WriteFile(upstream, []byte(newer+"\n"), 0o600))
+	third := runMirrorOn(t, stub, "copy", mirrorCredentials...)
+	require.True(t, third.ok, "the refresh after upstream moved failed:\n%s", third.out)
+	assert.Equal(t, []string{"docker://docker.io/library/nginx@" + newer + " docker://" + nginx[1]}, copiedRefs(third))
+	assert.Equal(t, newer, third.digest(t, nginx[1]))
 }
 
 // A mirror that is still not upstream's after three copies fails its tag rather than copying on.
@@ -494,7 +544,7 @@ func TestMirrorCopy_AMirrorThatNeverHoldsUpstreamsDigestFailsAfterThreeCopies(t 
 }
 
 // runMirrorMoving runs copy over registry with upstream's digest of ref moving after every copy into
-// pkg, as it would were another run's copy landing behind each of this run's.
+// pkg, as it would were upstream moving during each copy.
 func runMirrorMoving(t *testing.T, registry mirrorRegistry, pkg, ref string) mirrorRun {
 	t.Helper()
 	registry.moves = map[string][2]string{pkg: {ref, mirrorDigest('2')}}
@@ -651,7 +701,8 @@ func TestMirrorPublic_ARegistryErrorIsNotTakenForAPackageNotPublic(t *testing.T)
 		digests[tag[1]] = mirrorDigest('a')
 	}
 	run := runMirror(t, "public", mirrorVersions, mirrorRegistry{
-		digests: digests, private: []string{"leodip/goiabada-ci/golang"}, pullFails: []string{"leodip/goiabada-ci/nginx"},
+		digests: digests, private: []string{"leodip/goiabada-ci/golang"},
+		pullErrors: map[string]string{"leodip/goiabada-ci/nginx": "Error response from daemon: received unexpected HTTP status: 503 Service Unavailable"},
 	})
 	assert.False(t, run.ok, "public passed with a pull failed:\n%s", run.out)
 	errs := run.errors()
@@ -662,6 +713,50 @@ func TestMirrorPublic_ARegistryErrorIsNotTakenForAPackageNotPublic(t *testing.T)
 	assert.Contains(t, errs[1], "ghcr.io/leodip/goiabada-ci/golang ")
 	assert.Contains(t, errs[1], "https://github.com/users/leodip/packages/container/goiabada-ci%2Fgolang/settings")
 	assertAnonymousPulls(t, run)
+}
+
+// A pull is taken for a package that is not public only when the registry refused it, as the
+// daemon relays: Docker failing on the runner, even with "permission denied", says nothing of the
+// package, and is reported with Docker's error and no settings to change.
+func TestMirrorPublic_OnlyARegistryRefusalIsTakenForAPackageNotPublic(t *testing.T) {
+	nginx := "ghcr.io/leodip/goiabada-ci/nginx:alpine"
+	for _, c := range []struct {
+		name, err string
+		refused   bool
+	}{
+		{"denied", `Error response from daemon: Head "https://ghcr.io/v2/leodip/goiabada-ci/nginx/manifests/alpine": denied`, true},
+		{"unauthorized", `Error response from daemon: Head "https://ghcr.io/v2/leodip/goiabada-ci/nginx/manifests/alpine": unauthorized`, true},
+		{"denied by the registry", "Error response from daemon: error from registry: denied\ndenied", true},
+		{"token forbidden", `Error response from daemon: failed to resolve reference "` + nginx + `": failed to authorize: failed to fetch anonymous token: unexpected status from GET request to https://ghcr.io/token?scope=repository%3Aleodip%2Fgoiabada-ci%2Fnginx%3Apull&service=ghcr.io: 403 Forbidden`, true},
+		{"the daemon's socket", `permission denied while trying to connect to the Docker daemon socket at unix:///var/run/docker.sock: Head "http://%2Fvar%2Frun%2Fdocker.sock/_ping": dial unix /var/run/docker.sock: connect: permission denied`, false},
+		{"the daemon's disk", "Error response from daemon: mkdir /var/lib/docker/tmp/docker-pull-1234: permission denied", false},
+		{"no daemon", "Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?", false},
+		{"a registry error", "Error response from daemon: received unexpected HTTP status: 503 Service Unavailable", false},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			digests := map[string]string{}
+			for _, tag := range mirrorTags {
+				digests[tag[1]] = mirrorDigest('a')
+			}
+			run := runMirror(t, "public", mirrorVersions, mirrorRegistry{
+				digests: digests, pullErrors: map[string]string{"leodip/goiabada-ci/nginx": c.err},
+			})
+			assert.False(t, run.ok, "public passed with a pull failed:\n%s", run.out)
+			errs := run.errors()
+			require.Len(t, errs, 1, "%s", run.out)
+			if c.refused {
+				assert.Contains(t, errs[0], "ghcr.io/leodip/goiabada-ci/nginx refused an anonymous pull")
+				assert.Contains(t, errs[0], "https://github.com/users/leodip/packages/container/goiabada-ci%2Fnginx/settings")
+			} else {
+				assert.Contains(t, errs[0], "the anonymous pull of "+nginx+" failed")
+				lines := strings.Split(c.err, "\n")
+				assert.Contains(t, errs[0], lines[len(lines)-1], "the message should keep Docker's error")
+				assert.NotContains(t, errs[0], "settings", "a failure on the runner sent the maintainer to the package's visibility")
+			}
+			assert.Contains(t, run.out, c.err, "Docker's whole error should be printed")
+			assertAnonymousPulls(t, run)
+		})
+	}
 }
 
 // assertAnonymousPulls holds run to pulling every tag of the list once, each with a Docker
@@ -738,6 +833,117 @@ func TestMirrorWorkflow_TriggersAndPermissions(t *testing.T) {
 	assert.NotContains(t, body, "secrets.", "%s: the anonymous pull should hold no secret", mirrorWorkflow)
 	assert.Regexp(t, `(?m)^    needs: \[?`+regexp.QuoteMeta(firstKey(holders))+`\]?$`, body,
 		"%s: the anonymous pull should run after the copy", mirrorWorkflow)
+}
+
+// mirrorConcurrencyFindings holds the Mirror workflow's copying job, the one that runs mirror.sh
+// copy, to one concurrency group shared by every branch and run, a name with no expression in it,
+// that queues every pending run (queue: max) and cancels none in progress. Two copies that overlap
+// each compare a tag's digests before the other writes, so the one that read upstream first can
+// land the older digest last, and both can pull the same digest. A group per branch lets runs of
+// two branches overlap so, and a shared group that queues one pending run cancels another branch's
+// waiting refresh, which holds its new tags. Any other concurrency block of the workflow queues
+// every pending run too, so none cancels a branch's refresh.
+func mirrorConcurrencyFindings(file, text string) []string {
+	lines := workflowLines(text)
+	var findings []string
+	add := func(n int, format string, args ...any) {
+		findings = append(findings, fmt.Sprintf("%s:%d ", file, n)+fmt.Sprintf(format, args...))
+	}
+	// blocks maps the line, from 1, of each concurrency: key to the keys and values beneath it.
+	type block struct {
+		line   int
+		indent int
+		keys   map[string]string
+	}
+	var blocks []block
+	for i, line := range lines {
+		trimmed := strings.TrimLeft(line, " ")
+		if strings.TrimSpace(trimmed) != "concurrency:" {
+			continue
+		}
+		b := block{line: i + 1, indent: len(line) - len(trimmed), keys: map[string]string{}}
+		for _, next := range lines[i+1:] {
+			nt := strings.TrimLeft(next, " ")
+			if strings.TrimSpace(nt) == "" || strings.HasPrefix(nt, "#") {
+				continue
+			}
+			if len(next)-len(nt) <= b.indent {
+				break
+			}
+			if k, v, ok := strings.Cut(nt, ":"); ok {
+				v, _, _ = strings.Cut(v, " #")
+				b.keys[strings.TrimSpace(k)] = yamlLineScalar(strings.TrimSpace(v))
+			}
+		}
+		blocks = append(blocks, b)
+	}
+	copyJob := ""
+	jobs := workflowJobs(lines)
+	for name, numbers := range jobs {
+		if strings.Contains(mirrorJobText(lines, numbers), mirrorScript+" copy") {
+			copyJob = name
+		}
+	}
+	if copyJob == "" {
+		return append(findings, file+" has no job that runs "+mirrorScript+" copy")
+	}
+	copyGroup := false
+	for _, b := range blocks {
+		if b.keys["queue"] != "max" {
+			add(b.line, "a concurrency group without queue: max keeps one pending run and cancels the others, a branch's refresh among them: add queue: max")
+		}
+		if b.keys["cancel-in-progress"] != "" && b.keys["cancel-in-progress"] != "false" {
+			add(b.line, "a concurrency group that cancels a copy in progress can leave a tag half refreshed: remove cancel-in-progress")
+		}
+		if !slices.Contains(jobs[copyJob], b.line) {
+			continue
+		}
+		copyGroup = true
+		if group := b.keys["group"]; group == "" || strings.Contains(group, "${{") {
+			add(b.line, "the %s job's concurrency group should be one name shared by every branch and run, not %q: copies that overlap can land an older digest last", copyJob, group)
+		}
+	}
+	if !copyGroup {
+		add(jobs[copyJob][0], "the %s job should run in one concurrency group shared by every branch, with queue: max, so copies run one at a time and each compares against the last one's result", copyJob)
+	}
+	return findings
+}
+
+func TestMirrorWorkflow_CopiesRunOneAtATimeAcrossBranches(t *testing.T) {
+	text := repositoryFiles(t, []string{mirrorWorkflow})[mirrorWorkflow]
+	assert.Empty(t, mirrorConcurrencyFindings(mirrorWorkflow, text))
+}
+
+func TestMirrorWorkflow_ConcurrencyFindings(t *testing.T) {
+	workflow := func(top, job string) string {
+		return "name: Mirror\n" + top + "jobs:\n  copy:\n    name: Copy\n    runs-on: ubuntu-24.04\n" + job +
+			"    steps:\n      - run: " + mirrorScript + " copy\n  public:\n    needs: copy\n    steps:\n      - run: " + mirrorScript + " public\n"
+	}
+	shared := "    concurrency:\n      group: mirror-copy\n      queue: max\n"
+	for _, c := range []struct {
+		name, top, job, want string
+	}{
+		{"one queued group", "", shared, ""},
+		{"one queued group, not cancelled", "", shared + "      cancel-in-progress: false\n", ""},
+		{"a group per branch", "", "    concurrency:\n      group: mirror-${{ github.ref }}\n      queue: max\n", "not \"mirror-${{ github.ref }}\""},
+		{"one pending run", "", "    concurrency:\n      group: mirror-copy\n", "without queue: max"},
+		{"cancelled in progress", "", "    concurrency:\n      group: mirror-copy\n      queue: max\n      cancel-in-progress: true\n", "remove cancel-in-progress"},
+		{"no group", "", "", "should run in one concurrency group"},
+		{"the workflow's group per branch", "concurrency:\n  group: mirror-${{ github.ref }}\n", shared, "mirror.yml:2 a concurrency group without queue: max"},
+		{"the workflow's group alone", "concurrency:\n  group: mirror\n  queue: max\n", "", "should run in one concurrency group"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			findings := mirrorConcurrencyFindings("mirror.yml", workflow(c.top, c.job))
+			if c.want == "" {
+				assert.Empty(t, findings)
+				return
+			}
+			require.Len(t, findings, 1, "%v", findings)
+			assert.Contains(t, findings[0], c.want)
+		})
+	}
+	assert.Equal(t, []string{"mirror.yml has no job that runs " + mirrorScript + " copy"},
+		mirrorConcurrencyFindings("mirror.yml", "name: Mirror\njobs:\n  public:\n    steps:\n      - run: true\n"))
 }
 
 // mirrorJobText is the text of a job's lines, by their numbers from 1.

@@ -35,16 +35,6 @@ on:
 permissions:
   contents: read
 
-# One run per branch at a time, a newer push's waiting in place of an older one's. Runs of two
-# branches can still overlap, and each keeps a waiting run of its own: one group for every branch
-# would keep a single waiting run, cancelling another branch's, which holds that branch's new tags.
-# An overlap can copy a tag twice, and the run that read upstream first can land the older digest
-# last; mirror.sh asks both registries again after every copy and copies again while they differ,
-# so the last run to finish leaves the mirror at upstream's digest.
-concurrency:
-  group: mirror-${{ github.ref }}
-  cancel-in-progress: false
-
 jobs:
   copy:
     name: Copy
@@ -53,6 +43,15 @@ jobs:
     permissions:
       contents: read
       packages: write
+    # One copy at a time, of every branch and run, each waiting its turn: a copy compares each tag's
+    # digests before it writes, so two at once can both pull one digest, and the one that read
+    # upstream first can land the older digest last. queue: max keeps up to 100 waiting, so another
+    # branch's refresh, which holds its new tags, is never cancelled for a newer one; a group per
+    # branch would let two branches' copies overlap. The Public job only reads, and runs beside.
+    concurrency:
+      group: mirror-copy
+      queue: max
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
