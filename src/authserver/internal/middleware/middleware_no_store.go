@@ -42,11 +42,11 @@ import "net/http"
 // Mount it FIRST on the branch, ahead of the settings read and of every group's
 // debug middleware and auth guards. That is a requirement rather than a
 // preference: the 401 and 403 refusals are written by the guard set's refusal
-// writer, which sets its own Content-Type and calls WriteHeader, and so is the
-// JSON 500 of a settings read that fails or a panic in front of the groups, so
-// anything mounted behind them would never write the pair on those answers. A
-// refusal body is within RFC 6749 section 5.1's "other sensitive information"
-// too (#825 decision 3).
+// writer, and the JSON 500 of a settings read that fails or a panic in front of
+// the groups by the API's fault writer. Each sets its own Content-Type and calls
+// WriteHeader, so anything mounted behind them would never write the pair on
+// those answers. A refusal body is within RFC 6749 section 5.1's "other
+// sensitive information" too (#825 decision 3).
 //
 // Handlers that set their own Cache-Control still win, since Header().Set
 // replaces. Nothing under /api/ sets one.
