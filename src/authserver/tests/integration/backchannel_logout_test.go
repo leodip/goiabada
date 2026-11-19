@@ -181,21 +181,29 @@ func assertLogoutToken(t *testing.T, got logoutPost, clientIdentifier, subject, 
 }
 
 // sentLogoutTokenRow waits for the sent_logout_token row the request requestId left, which is
-// written once its delivery has finished, and answers its details. It waits for the page itself to
-// list the row: GetAuditLogsPaginated reads the page and its count in two statements, so a row
-// written between them is counted before it is listed.
+// written once its delivery has finished, and answers its details.
 func sentLogoutTokenRow(t *testing.T, requestId string, timeout time.Duration) (record.AuditLog, map[string]interface{}) {
+	t.Helper()
+	rows := sentLogoutTokenRows(t, requestId, 1, timeout)
+	var details map[string]interface{}
+	require.NoError(t, json.Unmarshal([]byte(rows[0].Details), &details))
+	return rows[0], details
+}
+
+// sentLogoutTokenRows waits for the want sent_logout_token rows the request requestId left, each
+// written once its delivery has finished, and answers them. It waits for the page itself to list
+// them: GetAuditLogsPaginated reads the page and its count in two statements, so a row written
+// between them is counted before it is listed.
+func sentLogoutTokenRows(t *testing.T, requestId string, want int, timeout time.Duration) []record.AuditLog {
 	t.Helper()
 	deadline := time.Now().Add(timeout)
 	for {
-		rows, _, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 10,
+		rows, _, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 20,
 			record.AuditLogFilter{AuditEvent: "sent_logout_token", RequestId: requestId})
 		require.NoError(t, err)
-		if len(rows) > 0 || time.Now().After(deadline) {
-			require.Len(t, rows, 1, "one sent_logout_token row for request %s", requestId)
-			var details map[string]interface{}
-			require.NoError(t, json.Unmarshal([]byte(rows[0].Details), &details))
-			return rows[0], details
+		if len(rows) >= want || time.Now().After(deadline) {
+			require.Len(t, rows, want, "sent_logout_token rows for request %s", requestId)
+			return rows
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
