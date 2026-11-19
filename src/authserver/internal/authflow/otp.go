@@ -280,8 +280,10 @@ type OTPSubmissionResult struct {
 //     (otpcredential.VerifyStored), an enrolling user's against the enrolment key
 //     (otpcredential.VerifySupplied). Either claims the code's time step, so a code is accepted once
 //     (#111). A failed verification is returned as an error.
-//  7. A replayed code: charges it to the rate limiter, audits EventOTPCodeReplayDetected and
-//     EventAuthFailedOtp, and answers OTPRefused. A wrong code: charges it, audits
+//  7. A replayed code: reads the user again, since a claim on a user deleted since step 2 matches no
+//     row either, and returns a user gone as step 2 does, charging and auditing nothing (#796
+//     decision 3). A replay by a user still there: charges it to the rate limiter, audits
+//     EventOTPCodeReplayDetected and EventAuthFailedOtp, and answers OTPRefused. A wrong code: charges it, audits
 //     EventAuthFailedOtp, and answers OTPRefused. Every wrong code is a guess the OTP budget bounds
 //     (#219). The refusal that disabled the authenticator also audits EventOTPAuthenticatorDisabled,
 //     after the others (#489), and reports OTPNoticeAuthenticatorLockedOut for the handler to send
@@ -360,6 +362,10 @@ func (o *OTPSubmission) Run(ctx context.Context, browser otpSubmissionBrowser,
 
 	switch verified.Outcome {
 	case otpcredential.OutcomeReplayed:
+		// No replay when the user is gone: the claim matched no row because there is none.
+		if _, err := loadOTPUser(ctx, o.database, authContext); err != nil {
+			return OTPSubmissionResult{}, err
+		}
 		browser.RecordCredentialFailure()
 		o.auditLogger.Log(ctx, audit.EventOTPCodeReplayDetected, map[string]interface{}{
 			"user_id": user.Id,

@@ -7,11 +7,13 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	datamocks "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	handlersmocks "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/otp/otptest"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/logging/logtest"
@@ -400,6 +402,37 @@ func TestHandleAuthOtpPost_AClientReadFailingOnARefusalAnswers500AfterTheCodeIsC
 	handler.ServeHTTP(rr, req)
 
 	assert.Len(t, failures.requests, 1, "the refused code is charged before the client is read")
+	m.assertNothingSaved(t)
+}
+
+// A right code whose claim matches no row because the user was deleted after the step read them is
+// no replay: the step answers as it does a user missing when it starts, the 500 page carrying "user
+// not found", and charges and audits nothing (#796 decision 3).
+func TestHandleAuthOtpPost_AClaimOnAUserDeletedMeanwhileAnswersAsAMissingUser(t *testing.T) {
+	m := newOtpStepMocks(t)
+	failures := &credentialFailureSpy{}
+	handler := buildAuthOtpPost(authOtpPostDeps{pageRenderer: m.pageRenderer, ceremonyStore: m.ceremonyStore,
+		database: m.database, auditLogger: m.auditLogger, credentialFailures: failures})
+	secret := otpTestMintedSecret(t)
+	req := otpPostRequest(otptest.Code(t, secret, time.Now()))
+	rr := httptest.NewRecorder()
+	m.armOtpCeremony("")
+	m.armUser(&record.User{Id: 1, Enabled: true, OTPEnabled: true, OTPSecretEncrypted: encryptOTPForTest(t, secret),
+		OtpConfigGeneration: 3})
+	m.database.On("TryConsumeEnrolledUserOTPStep", mock.Anything, mock.Anything, int64(1), mock.Anything, int64(3)).
+		Return(false, nil).Once()
+	// The refused claim advances the consecutive count, which moves no row of a user who is gone.
+	expectOTPWriteTransactions(m.database)
+	m.database.On("IncrementUserOtpConsecutiveFailures", mock.Anything, mock.Anything, int64(1), int64(3)).
+		Return(false, nil).Once()
+	m.database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(nil, nil).Once()
+	m.pageRenderer.On("InternalServerError", rr, req, isTheMessage("user not found")).Return().Once()
+
+	handler.ServeHTTP(rr, req)
+
+	m.auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+	assert.Empty(t, failures.requests, "no guess was made, so nothing is charged")
+	m.database.AssertNotCalled(t, "GetClientByClientIdentifier", mock.Anything, mock.Anything, mock.Anything)
 	m.assertNothingSaved(t)
 }
 

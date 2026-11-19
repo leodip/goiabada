@@ -342,6 +342,19 @@ func verifyDeletionOTPCode(w http.ResponseWriter, r *http.Request, database acco
 	case otpcredential.OutcomeMatched:
 		return true
 	case otpcredential.OutcomeReplayed:
+		// The claim matches no row for an account deleted after this request read it, too. That is
+		// no replay: the account gone is the 404 a request arriving a moment later would get, with
+		// nothing spent or audited (#796 decision 3). A replay on an account still there is
+		// answered as a wrong code, as below.
+		current, readErr := database.GetUserById(r.Context(), nil, user.Id)
+		if readErr != nil {
+			writeInternalServerError(w, r, readErr)
+			return false
+		}
+		if current == nil {
+			writeJSONError(w, "User not found", "NOT_FOUND", http.StatusNotFound)
+			return false
+		}
 		credentialFailures.RecordCredentialFailure(r)
 		auditLogger.Log(r.Context(), audit.EventOTPCodeReplayDetected, map[string]interface{}{
 			"user_id":        user.Id,
