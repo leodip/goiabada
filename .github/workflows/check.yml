@@ -33,11 +33,6 @@ on:
         description: Run the jobs that are otherwise push-only (release.yml passes true)
         type: boolean
         default: false
-    secrets:
-      DOCKERHUB_USERNAME:
-        required: false
-      DOCKERHUB_TOKEN:
-        required: false
 
 concurrency:
   group: check-${{ github.ref }}
@@ -55,27 +50,24 @@ concurrency:
 permissions:
   contents: read
 
-# Every image this workflow pulls from Docker Hub is pulled logged in: the golang job containers,
-# the mailpit, MySQL and PostgreSQL services, the node and nginx bases of the docs build, and the
-# release images' bases and Buildx's own images in Build validation.
-# Anonymous pulls count against an allowance per IP address that GitHub's hosted runners share
-# with every other job, and a refusal ("429 Too Many Requests", "toomanyrequests") fails a job
-# before anything in it runs. DOCKERHUB_USERNAME and DOCKERHUB_TOKEN are repository secrets
-# holding a Docker Hub access token that can read public images and nothing else. The token that
-# pushes the images is another one, DOCKER_PASSWORD, held only by the prod environment, which
-# admits main and v* tags alone: this workflow runs a pull request's code, and a credential it
-# holds is one that code can read. Where the secrets are absent, as on a pull request from a fork,
-# the runner pulls anonymously, as it did before, and the login steps are skipped.
-# That is why every container's and service's credentials are one expression rather than a
-# username and a password: GitHub refuses a credentials mapping whose username or password is
-# empty, and fails every job of a fork's pull request at "Set up job" (#572). Without the secrets
-# the expression yields an empty mapping, which the runner takes as no login.
+# Every image this workflow pulls from Docker Hub's catalogue comes from CI's mirror, public
+# packages under ghcr.io/leodip/goiabada-ci/ that pull with no login (#867): the golang job
+# containers, the Mailpit, MySQL and PostgreSQL services, the node and nginx bases of the docs
+# build, the release images' bases in Build validation, and the BuildKit image Buildx starts from.
+# Docker Hub allows an account 200 pulls in 6 hours and GitHub's runners a share by address, and
+# a few runs in one hour used that up, failing jobs at "Set up job" with "429 Too Many Requests".
+# The Mirror workflow copies the tags .github/mirror/images lists, their versions pinned in
+# src/authserver/versions.yaml, and the Versions job fails the run at once, naming each tag the
+# mirror lacks and what to do. SQL Server's image comes from Microsoft's registry, which needs no
+# login either. So this workflow logs in to no registry and takes no secret: a fork's run,
+# Dependabot's and the maintainer's pull the same way. src/core/guard/check_mirror_test.go holds
+# every image here to the mirror's list.
 
 # Test-only values.
 # These are fixed test credentials, not secrets: keeping them literal is what
 # lets a developer reproduce a CI failure locally. Declared once at workflow
-# level because GitHub does not support YAML anchors in workflow files, and
-# every container job needs the same block.
+# level, where every job reads it: a YAML anchor would still put an alias in
+# each container job that needs the block, and this needs none.
 #
 # The data key and the database passwords are deliberately absent (#501): no
 # runnable file supplies either by literal, so each run draws its own. The
@@ -172,6 +164,13 @@ jobs:
           v=$(yq -r '.tools."golangci-lint"' "$f")
           [ -n "$v" ] && [ "$v" != "null" ] || { echo "::error::tools.golangci-lint missing from $f"; exit 1; }
           echo "golangci=$v" >> "$GITHUB_OUTPUT"
+      # Every job that pulls an image waits for this one, so a tag the mirror lacks fails the run
+      # here, in seconds, naming the tag and what to do, rather than at a job's pull. It asks for
+      # all eight tags of the branch's list on every run, whichever of them this run's jobs pull,
+      # anonymously, as the jobs pull. After a version bump, a run that starts before the Mirror
+      # run of the same push has copied the new tag fails here; a re-run passes.
+      - name: The mirror holds every tag
+        run: .github/mirror/mirror.sh missing
 
   lint:
     name: Lint
@@ -465,8 +464,7 @@ jobs:
       # names. On the runner a service is reached through the ports it maps to
       # the runner's own, and the name through the hosts line the first step adds.
       mailpit:
-        image: axllent/mailpit:v${{ needs.versions.outputs.mailpit }}
-        credentials: ${{ secrets.DOCKERHUB_USERNAME != '' && fromJSON(format('{{"username":{0},"password":{1}}}', toJSON(secrets.DOCKERHUB_USERNAME), toJSON(secrets.DOCKERHUB_TOKEN))) || fromJSON('{}') }}
+        image: ghcr.io/leodip/goiabada-ci/mailpit:v${{ needs.versions.outputs.mailpit }}
         ports:
           - 1025:1025
           - 8025:8025
@@ -549,8 +547,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       mailpit:
-        image: axllent/mailpit:v${{ needs.versions.outputs.mailpit }}
-        credentials: ${{ secrets.DOCKERHUB_USERNAME != '' && fromJSON(format('{{"username":{0},"password":{1}}}', toJSON(secrets.DOCKERHUB_USERNAME), toJSON(secrets.DOCKERHUB_TOKEN))) || fromJSON('{}') }}
+        image: ghcr.io/leodip/goiabada-ci/mailpit:v${{ needs.versions.outputs.mailpit }}
         ports:
           - 1025:1025
           - 8025:8025
@@ -619,19 +616,8 @@ jobs:
     name: Docs
     needs: versions
     runs-on: ubuntu-latest
-    env:
-      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      # The builds below take node and nginx from CI's mirror, which needs no login. The login
-      # is skipped where the secrets are absent, as on a pull request from a fork. See the note
-      # above permissions.
-      - name: Log in to Docker Hub
-        if: env.DOCKERHUB_USERNAME != ''
-        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Site check tests
         run: |
           set -euo pipefail
@@ -718,14 +704,12 @@ jobs:
           - { tier: integration, shard: 2/2, title: Integration (2/2) }
     runs-on: ubuntu-latest
     container:
-      image: golang:${{ needs.versions.outputs.go }}-bookworm
-      credentials: ${{ secrets.DOCKERHUB_USERNAME != '' && fromJSON(format('{{"username":{0},"password":{1}}}', toJSON(secrets.DOCKERHUB_USERNAME), toJSON(secrets.DOCKERHUB_TOKEN))) || fromJSON('{}') }}
+      image: ghcr.io/leodip/goiabada-ci/golang:${{ needs.versions.outputs.go }}-bookworm
     services:
       # Only for the integration entries: the data tier sends no mail, and a service whose image
       # is empty is not started.
       mailpit:
-        image: ${{ matrix.tier == 'integration' && format('axllent/mailpit:v{0}', needs.versions.outputs.mailpit) || '' }}
-        credentials: ${{ secrets.DOCKERHUB_USERNAME != '' && fromJSON(format('{{"username":{0},"password":{1}}}', toJSON(secrets.DOCKERHUB_USERNAME), toJSON(secrets.DOCKERHUB_TOKEN))) || fromJSON('{}') }}
+        image: ${{ matrix.tier == 'integration' && format('ghcr.io/leodip/goiabada-ci/mailpit:v{0}', needs.versions.outputs.mailpit) || '' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Draw this run's data key
@@ -772,8 +756,7 @@ jobs:
     env:
       MYSQL_ROOT_PASSWORD: ${{ needs.versions.outputs.mysql-password }}
     container:
-      image: golang:${{ needs.versions.outputs.go }}-bookworm
-      credentials: ${{ secrets.DOCKERHUB_USERNAME != '' && fromJSON(format('{{"username":{0},"password":{1}}}', toJSON(secrets.DOCKERHUB_USERNAME), toJSON(secrets.DOCKERHUB_TOKEN))) || fromJSON('{}') }}
+      image: ghcr.io/leodip/goiabada-ci/golang:${{ needs.versions.outputs.go }}-bookworm
       # The test authority the database serves TLS from, which serve-db-tls generates here and
       # the database service reads from the same volume (#502).
       volumes:
@@ -790,8 +773,7 @@ jobs:
       # The image the generated deployments run, which the setup wizard's
       # TestDevelopmentStacks_RunTheGeneratedDatabaseImages holds this to.
       mysql-server:
-        image: mysql:26
-        credentials: ${{ secrets.DOCKERHUB_USERNAME != '' && fromJSON(format('{{"username":{0},"password":{1}}}', toJSON(secrets.DOCKERHUB_USERNAME), toJSON(secrets.DOCKERHUB_TOKEN))) || fromJSON('{}') }}
+        image: ghcr.io/leodip/goiabada-ci/mysql:26
         env:
           MYSQL_ROOT_PASSWORD: ${{ needs.versions.outputs.mysql-password }}
           MYSQL_TCP_PORT: 13306
@@ -804,8 +786,7 @@ jobs:
       # Only for the integration entries: the data tier sends no mail, and a service whose image
       # is empty is not started.
       mailpit:
-        image: ${{ matrix.tier == 'integration' && format('axllent/mailpit:v{0}', needs.versions.outputs.mailpit) || '' }}
-        credentials: ${{ secrets.DOCKERHUB_USERNAME != '' && fromJSON(format('{{"username":{0},"password":{1}}}', toJSON(secrets.DOCKERHUB_USERNAME), toJSON(secrets.DOCKERHUB_TOKEN))) || fromJSON('{}') }}
+        image: ${{ matrix.tier == 'integration' && format('ghcr.io/leodip/goiabada-ci/mailpit:v{0}', needs.versions.outputs.mailpit) || '' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Draw this run's data key
@@ -843,16 +824,14 @@ jobs:
     env:
       POSTGRES_PASSWORD: ${{ needs.versions.outputs.postgres-password }}
     container:
-      image: golang:${{ needs.versions.outputs.go }}-bookworm
-      credentials: ${{ secrets.DOCKERHUB_USERNAME != '' && fromJSON(format('{{"username":{0},"password":{1}}}', toJSON(secrets.DOCKERHUB_USERNAME), toJSON(secrets.DOCKERHUB_TOKEN))) || fromJSON('{}') }}
+      image: ghcr.io/leodip/goiabada-ci/golang:${{ needs.versions.outputs.go }}-bookworm
       # The test authority the database serves TLS from, which serve-db-tls generates here and
       # the database service reads from the same volume (#502).
       volumes:
         - db-tls:/db-tls
     services:
       postgres-server:
-        image: postgres:18
-        credentials: ${{ secrets.DOCKERHUB_USERNAME != '' && fromJSON(format('{{"username":{0},"password":{1}}}', toJSON(secrets.DOCKERHUB_USERNAME), toJSON(secrets.DOCKERHUB_TOKEN))) || fromJSON('{}') }}
+        image: ghcr.io/leodip/goiabada-ci/postgres:18
         env:
           POSTGRES_PASSWORD: ${{ needs.versions.outputs.postgres-password }}
           POSTGRES_DB: goiabada
@@ -869,8 +848,7 @@ jobs:
       # Only for the integration entries: the data tier sends no mail, and a service whose image
       # is empty is not started.
       mailpit:
-        image: ${{ matrix.tier == 'integration' && format('axllent/mailpit:v{0}', needs.versions.outputs.mailpit) || '' }}
-        credentials: ${{ secrets.DOCKERHUB_USERNAME != '' && fromJSON(format('{{"username":{0},"password":{1}}}', toJSON(secrets.DOCKERHUB_USERNAME), toJSON(secrets.DOCKERHUB_TOKEN))) || fromJSON('{}') }}
+        image: ${{ matrix.tier == 'integration' && format('ghcr.io/leodip/goiabada-ci/mailpit:v{0}', needs.versions.outputs.mailpit) || '' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Draw this run's data key
@@ -908,8 +886,7 @@ jobs:
     env:
       MSSQL_SA_PASSWORD: ${{ needs.versions.outputs.mssql-password }}
     container:
-      image: golang:${{ needs.versions.outputs.go }}-bookworm
-      credentials: ${{ secrets.DOCKERHUB_USERNAME != '' && fromJSON(format('{{"username":{0},"password":{1}}}', toJSON(secrets.DOCKERHUB_USERNAME), toJSON(secrets.DOCKERHUB_TOKEN))) || fromJSON('{}') }}
+      image: ghcr.io/leodip/goiabada-ci/golang:${{ needs.versions.outputs.go }}-bookworm
       # The test authority the database serves TLS from, which serve-db-tls generates here and
       # the database service reads from the same volume (#502).
       volumes:
@@ -940,8 +917,7 @@ jobs:
       # Only for the integration entries: the data tier sends no mail, and a service whose image
       # is empty is not started.
       mailpit:
-        image: ${{ matrix.tier == 'integration' && format('axllent/mailpit:v{0}', needs.versions.outputs.mailpit) || '' }}
-        credentials: ${{ secrets.DOCKERHUB_USERNAME != '' && fromJSON(format('{{"username":{0},"password":{1}}}', toJSON(secrets.DOCKERHUB_USERNAME), toJSON(secrets.DOCKERHUB_TOKEN))) || fromJSON('{}') }}
+        image: ${{ matrix.tier == 'integration' && format('ghcr.io/leodip/goiabada-ci/mailpit:v{0}', needs.versions.outputs.mailpit) || '' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Draw this run's data key
@@ -966,29 +942,24 @@ jobs:
 
   # Moves discovery of a broken Dockerfile or cross-compile from "when I tag a
   # release" to "right after the merge", without making every PR pay for it.
-  # No registry credentials: --load, never --push.
+  # No registry credentials: it pulls from CI's mirror, and loads, never pushes.
   build-validation:
     name: Build validation
     needs: versions
     if: github.event_name == 'push' || inputs.full
     runs-on: ubuntu-latest
-    env:
-      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ needs.versions.outputs.go }}
           cache-dependency-path: src/**/go.sum
-      # Before Buildx, whose setup pulls its own image from Docker Hub; the two release builds
-      # take their golang base from CI's mirror. See the note above permissions.
-      - name: Log in to Docker Hub
-        if: env.DOCKERHUB_USERNAME != ''
-        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      # Buildx starts its builder from the BuildKit image it names by default, moby/buildkit at
+      # buildx-stable-1, on Docker Hub; this is the mirror's copy of that tag. See the note above
+      # permissions.
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        with:
+          driver-opts: image=ghcr.io/leodip/goiabada-ci/buildkit:buildx-stable-1
       - name: Install Tailwind
         uses: ./.github/actions/install-tailwind
         with:
