@@ -86,15 +86,15 @@ func TestRegisterRoutes_EveryApiRouteRefusesToBeStored(t *testing.T) {
 			result := recorder.Result()
 			defer func() { _ = result.Body.Close() }()
 
-			// The status says a guard refused the request rather than a handler answering it.
-			// 401 is the unauthenticated refusal; 403 is what an insufficient scope produces on
-			// the routes that check scope before token presence. On the admin group, whose
-			// guards let a caller with no token through to its routes, it also catches a botched
-			// parameter substitution: the group's 404 would still carry the header, because the
-			// branch's middleware runs ahead of the subrouter's NotFound handler. The account and
-			// session groups refuse any path under them 401, a made-up one included
+			// The status says a guard refused the request rather than a handler answering it:
+			// 401, the realm-only challenge every guard on these routes answers a request with no
+			// bearer token, before it looks at a scope (RFC 6750 section 3.1). On the admin group,
+			// whose guards let a caller with no token through to its routes, it also catches a
+			// botched parameter substitution: the group's 404 would still carry the header,
+			// because the branch's middleware runs ahead of the subrouter's NotFound handler. The
+			// account and session groups refuse any path under them 401, a made-up one included
 			// (TestRegisterRoutes_AnUnmatchedPathUnderAnAPIGroupMeetsItsGuardsFirst).
-			assert.Contains(t, []int{http.StatusUnauthorized, http.StatusForbidden}, result.StatusCode,
+			assert.Equal(t, http.StatusUnauthorized, result.StatusCode,
 				"an unauthenticated request must be refused by a guard, not answered or lost")
 
 			// Result().Header, never recorder.Header(): the refusals commit their status
