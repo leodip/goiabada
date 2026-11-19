@@ -75,10 +75,16 @@ func TestSetClientIdentifier_ChangesADifferentIdentifierAndReportsIt(t *testing.
 }
 
 // TestSetClientIdentifier_TheRowsOwnIdentifierIsNoChange: the identifier the row already holds is
-// reported as no change and leaves the row's identifier as it is.
+// reported as no change and leaves the row as it is, updated_at included: the settings save answers
+// with the updated_at of its whole-row write, and a write that changed nothing must not move it.
 func TestSetClientIdentifier_TheRowsOwnIdentifierIsNoChange(t *testing.T) {
 	ctx := context.Background()
 	client := createIdentifierTestClient(t)
+	before, err := database.GetClientById(ctx, nil, client.Id)
+	require.NoError(t, err)
+	require.NotNil(t, before)
+	// Long enough that a write of updated_at would show.
+	time.Sleep(timestampTick)
 
 	tx := beginTx(t)
 	changed, err := database.SetClientIdentifier(ctx, tx, client.Id, client.ClientIdentifier)
@@ -90,6 +96,7 @@ func TestSetClientIdentifier_TheRowsOwnIdentifierIsNoChange(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, got)
 	assert.Equal(t, client.ClientIdentifier, got.ClientIdentifier)
+	assert.Equal(t, before.UpdatedAt, got.UpdatedAt, "a write that changed nothing leaves updated_at alone")
 }
 
 // TestSetClientIdentifier_ComparesByteForByte: an identifier that differs from the row's only in
@@ -181,26 +188,17 @@ func TestSetClientIdentifier_DecidesAgainstARenameCommittedMeanwhile(t *testing.
 		changed bool
 		err     error
 	}
-	done := make(chan outcome, 1)
-	go func() {
+	secondWrite := goBlocked(t, "the second save's write", first, func(reached func()) outcome {
+		reached()
 		secondChanged, secondErr := database.SetClientIdentifier(ctx, second, client.Id, renamed)
-		done <- outcome{secondChanged, secondErr}
-	}()
+		return outcome{secondChanged, secondErr}
+	})
 
-	select {
-	case o := <-done:
-		t.Fatalf("SetClientIdentifier answered %v while another transaction held the row uncommitted", o.changed)
-	case <-time.After(500 * time.Millisecond):
-	}
-
+	secondWrite.requireBlocked(t)
+	secondWrite.requireStillWaiting(t)
 	require.NoError(t, database.CommitTransaction(ctx, first))
 
-	var o outcome
-	select {
-	case o = <-done:
-	case <-time.After(30 * time.Second):
-		t.Fatalf("SetClientIdentifier never returned after the concurrent transaction committed")
-	}
+	o := secondWrite.await(t)
 	require.NoError(t, o.err)
 	assert.False(t, o.changed, "the row already holds the identifier, as committed by the other save")
 	require.NoError(t, database.CommitTransaction(ctx, second))
@@ -234,26 +232,17 @@ func TestSetClientIdentifier_ASecondRenameMeanwhileIsAChange(t *testing.T) {
 		changed bool
 		err     error
 	}
-	done := make(chan outcome, 1)
-	go func() {
+	secondWrite := goBlocked(t, "the second save's write", first, func(reached func()) outcome {
+		reached()
 		secondChanged, secondErr := database.SetClientIdentifier(ctx, second, client.Id, original)
-		done <- outcome{secondChanged, secondErr}
-	}()
+		return outcome{secondChanged, secondErr}
+	})
 
-	select {
-	case o := <-done:
-		t.Fatalf("SetClientIdentifier answered %v while another transaction held the row uncommitted", o.changed)
-	case <-time.After(500 * time.Millisecond):
-	}
-
+	secondWrite.requireBlocked(t)
+	secondWrite.requireStillWaiting(t)
 	require.NoError(t, database.CommitTransaction(ctx, first))
 
-	var o outcome
-	select {
-	case o = <-done:
-	case <-time.After(30 * time.Second):
-		t.Fatalf("SetClientIdentifier never returned after the concurrent transaction committed")
-	}
+	o := secondWrite.await(t)
 	require.NoError(t, o.err)
 	assert.True(t, o.changed, "the row holds the other save's identifier, so writing the original back is a change")
 	require.NoError(t, database.CommitTransaction(ctx, second))

@@ -230,3 +230,114 @@ func runPasswordGrantOrderingAgainstRename(t *testing.T, db data.Database, other
 		assert.Empty(t, refreshTokensOfClientOn(t, db, client.Id), "no refresh token is written")
 	})
 }
+
+// TestDeleteClientOrdering_AgainstInitialPasswordGrant is a client's deletion meeting the initial
+// password grant on the client's row, both ways round. The grant writes its first refresh token
+// under a locking read of that row, and refresh_tokens.client_id is NO ACTION, so a deletion that
+// swept the client's refresh tokens only before it took the row would meet a token the grant
+// committed while it waited, and fail on the key with the client left in place. Either way round,
+// the deletion succeeds, the client is gone, and no refresh token of it is left.
+func TestDeleteClientOrdering_AgainstInitialPasswordGrant(t *testing.T) {
+	skipWhereTransactionsCannotOverlap(t)
+	runDeleteClientOrderingAgainstPasswordGrant(t, database, secondDatabase(t))
+}
+
+// TestDeleteClientOrdering_AgainstInitialPasswordGrant_RCSI is the same pair on a SQL Server
+// database with READ_COMMITTED_SNAPSHOT on. It skips on the other three engines.
+func TestDeleteClientOrdering_AgainstInitialPasswordGrant_RCSI(t *testing.T) {
+	f := rcsiDatabase(t)
+	runDeleteClientOrderingAgainstPasswordGrant(t, f.primary, f.secondary)
+}
+
+func runDeleteClientOrderingAgainstPasswordGrant(t *testing.T, db data.Database, other data.Database) {
+	type grantOutcome struct {
+		response *oauth.TokenResponse
+		err      error
+	}
+
+	t.Run("the grant goes first and the deletion waits", func(t *testing.T) {
+		ctx := context.Background()
+		withRealSigningKeyOn(t, db)
+		client := createTestClientOn(t, db)
+		user := createTestUserOn(t, db)
+
+		// The real grant, held at its refresh token's insert: it has read the client's row with its
+		// lock and not yet written or committed.
+		pause := newPausingInserts(db)
+		granted := make(chan grantOutcome, 1)
+		go func() {
+			response, err := passwordGrantIssuerOn(pause).IssuePasswordGrant(ctx, rotationSettings(), passwordGrantInput(client, user))
+			granted <- grantOutcome{response, err}
+		}()
+		var grantTx *sql.Tx
+		select {
+		case grantTx = <-pause.paused:
+		case o := <-granted:
+			t.Fatalf("the grant finished before it wrote its refresh token: %v", o.err)
+		}
+		require.NotNil(t, grantTx, "the grant writes its first refresh token in a transaction")
+
+		deletion := goBlocked(t, "the deletion", grantTx, func(reached func()) error {
+			reached()
+			return other.DeleteClient(ctx, nil, client.Id)
+		})
+
+		deletion.requireBlocked(t)
+		deletion.requireStillWaiting(t)
+		close(pause.release)
+
+		grant := <-granted
+		require.NoError(t, deletion.await(t),
+			"the deletion waits for the grant, and then deletes the client and the token the grant committed")
+
+		// The grant held the row first and commits, unless the engine answered the two with a
+		// deadlock and reran the grant, which then waits for the deletion and finds no client.
+		if grant.err == nil {
+			require.NotNil(t, grant.response)
+			jti := claimsOf(t, grant.response.RefreshToken)["jti"].(string)
+			row, err := db.GetRefreshTokenByJti(ctx, nil, jti)
+			require.NoError(t, err)
+			assert.Nil(t, row, "the grant's refresh token went with its client")
+		} else {
+			require.ErrorIs(t, grant.err, issuance.ErrPasswordGrantClientRenamed)
+		}
+
+		gone, err := db.GetClientById(ctx, nil, client.Id)
+		require.NoError(t, err)
+		assert.Nil(t, gone, "the client is deleted")
+		assert.Empty(t, refreshTokensOfClientOn(t, db, client.Id), "no refresh token of the client is left")
+	})
+
+	t.Run("the deletion goes first and the grant waits", func(t *testing.T) {
+		ctx := context.Background()
+		withRealSigningKeyOn(t, db)
+		client := createTestClientOn(t, db)
+		user := createTestUserOn(t, db)
+		input := passwordGrantInput(client, user)
+
+		tx, err := db.BeginTransaction(ctx)
+		require.NoError(t, err)
+		defer func() { _ = db.RollbackTransaction(ctx, tx) }()
+		require.NoError(t, db.DeleteClient(ctx, tx, client.Id))
+
+		grant := goBlocked(t, "the grant", tx, func(reached func()) grantOutcome {
+			reached()
+			response, grantErr := passwordGrantIssuerOn(other).IssuePasswordGrant(ctx, rotationSettings(), input)
+			return grantOutcome{response, grantErr}
+		})
+
+		grant.requireBlocked(t)
+		grant.requireStillWaiting(t)
+		require.NoError(t, db.CommitTransaction(ctx, tx), "committing the deletion")
+
+		outcome := grant.await(t)
+		require.ErrorIs(t, outcome.err, issuance.ErrPasswordGrantClientRenamed,
+			"the grant waits for the deletion, then finds no client and refuses")
+		assert.Nil(t, outcome.response)
+
+		gone, err := db.GetClientById(ctx, nil, client.Id)
+		require.NoError(t, err)
+		assert.Nil(t, gone, "the client is deleted")
+		assert.Empty(t, refreshTokensOfClientOn(t, db, client.Id), "no refresh token is written")
+	})
+}

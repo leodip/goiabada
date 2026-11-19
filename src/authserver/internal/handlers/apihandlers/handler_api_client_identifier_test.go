@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	datamocks "github.com/leodip/goiabada/authserver/internal/data/mocks"
@@ -216,7 +217,7 @@ func TestHandleClientUpdatePut_AFailedIdentifierLookupIsAFiveHundredAndWritesNot
 }
 
 // TestHandleClientUpdatePut_AFailedNarrowWriteIsAFiveHundred: the write's error rolls the save back
-// and is not recorded as a settings change.
+// before the whole-row save, and is not recorded as a settings change.
 func TestHandleClientUpdatePut_AFailedNarrowWriteIsAFiveHundred(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
@@ -224,7 +225,6 @@ func TestHandleClientUpdatePut_AFailedNarrowWriteIsAFiveHundred(t *testing.T) {
 	stub := expectSettingsSaveRow(database,
 		&record.Client{Id: 7, ClientIdentifier: "same-name"},
 		&record.Client{Id: 7, ClientIdentifier: "same-name"})
-	database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
 	database.On("SetClientIdentifier", mock.Anything, clientUpdateTx, int64(7), "same-name").
 		Return(false, errors.New("deadlock")).Once()
 
@@ -232,6 +232,7 @@ func TestHandleClientUpdatePut_AFailedNarrowWriteIsAFiveHundred(t *testing.T) {
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code, rr.Body.String())
 	require.Error(t, stub.BodyErr)
+	assertNotAttemptedOnClientDatabase(t, database, "UpdateClient")
 }
 
 // TestUpdateClientNotOwningAuthenticationMode_TheOtherSavesNeverWriteTheIdentifier: the OAuth2
@@ -252,4 +253,104 @@ func TestUpdateClientNotOwningAuthenticationMode_TheOtherSavesNeverWriteTheIdent
 
 	assert.Equal(t, "renamed-meanwhile", stale.ClientIdentifier, "the answer takes the row's identifier")
 	assertNotAttemptedOnClientDatabase(t, database, "SetClientIdentifier", "GetClientByClientIdentifier")
+}
+
+// TestHandleClientAuthenticationPut_AnswersTheIdentifierTheRowHolds: the authentication save does
+// not write the identifier, and a rename committed after the request loaded the client is what the
+// client is now called. Both branches read the row in their transaction, and the answer takes the
+// identifier from that read, not from the copy loaded at the top of the request (#710 decision 4).
+func TestHandleClientAuthenticationPut_AnswersTheIdentifierTheRowHolds(t *testing.T) {
+	cases := []struct {
+		name    string
+		request api.UpdateClientAuthenticationRequest
+		loaded  *record.Client
+		expect  func(database *datamocks.Database)
+	}{
+		{
+			name:    "a save to public",
+			request: api.UpdateClientAuthenticationRequest{IsPublic: true},
+			loaded:  &record.Client{Id: 7, ClientIdentifier: "old-name", IsPublic: true},
+			expect: func(database *datamocks.Database) {
+				database.On("SetClientPublic", mock.Anything, clientUpdateTx, int64(7)).Return(false, nil).Once()
+				database.On("DeleteClientIntrospectionResourcesByClientId", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
+				database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
+			},
+		},
+		{
+			name:    "a confidential save",
+			request: api.UpdateClientAuthenticationRequest{IsPublic: false, ClientSecret: strings.Repeat("Ab3", 20)},
+			loaded:  &record.Client{Id: 7, ClientIdentifier: "old-name", ClientSecretEncrypted: []byte("secret")},
+			expect: func(database *datamocks.Database) {
+				database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
+				database.On("SetClientRememberConsent", mock.Anything, clientUpdateTx, int64(7), true).Return(nil).Once()
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+
+			database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(tc.loaded, nil).Once()
+			datamocks.ExpectRunInTransaction(database, clientUpdateTx)
+			tc.expect(database)
+			// The row as the save's transaction reads it: renamed since the request loaded it.
+			database.On("GetClientById", mock.Anything, clientUpdateTx, int64(7)).
+				Return(&record.Client{Id: 7, ClientIdentifier: "new-name", IsPublic: tc.request.IsPublic}, nil).Once()
+			stubClientResponseLoads(database)
+			auditLogger.On("Log", mock.Anything, audit.EventUpdatedClientAuthentication, mock.Anything).Return().Once()
+
+			rr := httptest.NewRecorder()
+			HandleClientAuthenticationPut(database, auditLogger, testDataCipher).
+				ServeHTTP(rr, authenticationPutRequest(t, "7", tc.request))
+
+			require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+			var response api.UpdateClientResponse
+			require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &response))
+			assert.Equal(t, "new-name", response.Client.ClientIdentifier,
+				"the answer names the client by the identifier its row holds")
+		})
+	}
+}
+
+// TestHandleClientUpdatePut_AnswersTheTimestampOfItsLastWrite: the settings save's narrow writes,
+// the identifier's and Remember consent's, each set updated_at, so they run before the whole-row
+// save, whose updated_at is the one the answer carries. The row then holds the timestamp the save
+// answers, a rename included.
+func TestHandleClientUpdatePut_AnswersTheTimestampOfItsLastWrite(t *testing.T) {
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
+
+	expectSettingsSaveRow(database,
+		&record.Client{Id: 7, ClientIdentifier: "old-name"},
+		&record.Client{Id: 7, ClientIdentifier: "old-name"})
+	database.On("GetClientByClientIdentifier", mock.Anything, clientUpdateTx, "new-name").Return(nil, nil).Once()
+	database.On("GetResourceByResourceIdentifier", mock.Anything, clientUpdateTx, "new-name").Return(nil, nil).Once()
+	database.On("SetClientIdentifier", mock.Anything, clientUpdateTx, int64(7), "new-name").Return(true, nil).Once()
+	database.On("SetClientRememberConsent", mock.Anything, clientUpdateTx, int64(7), true).Return(nil).Once()
+	written := time.Date(2026, 11, 18, 12, 0, 0, 0, time.UTC)
+	database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).
+		Run(func(args mock.Arguments) {
+			args.Get(2).(*record.Client).UpdatedAt = sql.NullTime{Time: written, Valid: true}
+		}).Return(nil).Once()
+	database.On("RevokeCodesByClientId", mock.Anything, clientUpdateTx, int64(7)).Return(int64(0), nil).Once()
+	database.On("GetRefreshTokensByClientId", mock.Anything, clientUpdateTx, int64(7)).
+		Return([]*record.RefreshToken{}, nil).Once()
+	stubClientResponseLoads(database)
+	auditLogger.On("Log", mock.Anything, audit.EventRevokedClientGrants, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, audit.EventUpdatedClientSettings, mock.Anything).Return().Once()
+
+	rr := serveSettingsPut(database, auditLogger,
+		`{"clientIdentifier":"new-name","description":"d","enabled":true,"rememberConsent":true}`)
+
+	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+	var response api.UpdateClientResponse
+	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &response))
+	require.NotNil(t, response.Client.UpdatedAt)
+	assert.True(t, written.Equal(*response.Client.UpdatedAt), "the answer carries the whole-row save's updated_at")
+
+	// That save is the last to set updated_at, so the row holds what the answer carries.
+	assert.Less(t, callIndex(t, database, "SetClientIdentifier"), callIndex(t, database, "UpdateClient"))
+	assert.Less(t, callIndex(t, database, "SetClientRememberConsent"), callIndex(t, database, "UpdateClient"))
 }

@@ -109,23 +109,16 @@ func TestDeleteClient_OverlappingARenameRecordsTheIdentifierTheRowHeld(t *testin
 	require.NoError(t, err)
 	require.True(t, changed)
 
-	done := make(chan error, 1)
-	go func() { done <- database.DeleteClient(ctx, nil, client.Id) }()
+	deletion := goBlocked(t, "the deletion", rename, func(reached func()) error {
+		reached()
+		return database.DeleteClient(ctx, nil, client.Id)
+	})
 
-	select {
-	case deleteErr := <-done:
-		t.Fatalf("DeleteClient returned (%v) while a rename held the client's row uncommitted", deleteErr)
-	case <-time.After(500 * time.Millisecond):
-	}
-
+	deletion.requireBlocked(t)
+	deletion.requireStillWaiting(t)
 	require.NoError(t, database.CommitTransaction(ctx, rename))
 
-	select {
-	case deleteErr := <-done:
-		require.NoError(t, deleteErr)
-	case <-time.After(30 * time.Second):
-		t.Fatalf("DeleteClient never returned after the rename committed")
-	}
+	require.NoError(t, deletion.await(t))
 
 	gone, err := database.GetClientById(ctx, nil, client.Id)
 	require.NoError(t, err)
@@ -159,26 +152,17 @@ func TestDeleteClient_ARenameOverlappingTheDeletionFindsNoClient(t *testing.T) {
 		changed bool
 		err     error
 	}
-	done := make(chan outcome, 1)
-	go func() {
+	renaming := goBlocked(t, "the rename", deletion, func(reached func()) outcome {
+		reached()
 		renameChanged, renameErr := database.SetClientIdentifier(ctx, rename, client.Id, renamed)
-		done <- outcome{renameChanged, renameErr}
-	}()
+		return outcome{renameChanged, renameErr}
+	})
 
-	select {
-	case o := <-done:
-		t.Fatalf("SetClientIdentifier answered %v while a deletion held the client's row uncommitted", o.changed)
-	case <-time.After(500 * time.Millisecond):
-	}
-
+	renaming.requireBlocked(t)
+	renaming.requireStillWaiting(t)
 	require.NoError(t, database.CommitTransaction(ctx, deletion))
 
-	var o outcome
-	select {
-	case o = <-done:
-	case <-time.After(30 * time.Second):
-		t.Fatalf("SetClientIdentifier never returned after the deletion committed")
-	}
+	o := renaming.await(t)
 	require.NoError(t, o.err)
 	assert.False(t, o.changed, "there is no client left to rename")
 	require.NoError(t, database.CommitTransaction(ctx, rename))

@@ -388,16 +388,18 @@ func (d *Database) UpdateClient(ctx context.Context, tx *sql.Tx, client *record.
 // from a copy loaded earlier in their request, cannot write back an identifier renamed since
 // (#710 decision 4).
 //
-// It takes the client's row with AcquireClientRow, reads the identifier the row holds and writes
-// only when the one given differs, compared byte for byte in Go rather than by the engine, whose
-// collation may fold case: RFC 6749 section 1.9 makes client_id case sensitive. The answer is
+// It takes the client's row with a locking read, GetClientByIdForUpdate, which waits out a
+// writer in flight and writes nothing, so an identifier the row already holds leaves the row
+// untouched, updated_at included. It writes only when the one given differs, compared byte for
+// byte in Go rather than by the engine, whose collation may fold case: RFC 6749 section 1.9 makes
+// client_id case sensitive. The answer is
 // decided against the row read under that lock, never against a copy read before it, because a
 // rename committed in between would make a stale copy report a change the row does not make, or
 // miss one it does, and the answer is what decides whether the client's grants are revoked. True
 // means this call wrote a different identifier; false means the row already held it, or there is
 // no such client, which the caller's own read under the lock answers.
 //
-// A transaction is required, for the reason AcquireClientRow gives.
+// A transaction is required, for the reason GetClientByIdForUpdate gives.
 func (d *Database) SetClientIdentifier(ctx context.Context, tx *sql.Tx, clientId int64, clientIdentifier string) (bool, error) {
 
 	if tx == nil {
@@ -410,11 +412,7 @@ func (d *Database) SetClientIdentifier(ctx context.Context, tx *sql.Tx, clientId
 		return false, errs.New("can't set a client's identifier to an empty value")
 	}
 
-	if err := d.AcquireClientRow(ctx, tx, clientId); err != nil {
-		return false, err
-	}
-
-	current, err := d.GetClientById(ctx, tx, clientId)
+	current, err := d.GetClientByIdForUpdate(ctx, tx, clientId)
 	if err != nil {
 		return false, err
 	}
@@ -641,9 +639,9 @@ func (d *Database) GetClientById(ctx context.Context, tx *sql.Tx, clientId int64
 
 // GetClientByIdForUpdate reads the client as last committed and takes its row for the rest of the
 // caller's transaction, without writing it: a locking read, as GetUserByIdForUpdate is a user's. A
-// writer of the row, AcquireClientRow and so SetClientIdentifier among them, waits for this
-// transaction to end, and this read waits for a writer's transaction to end and answers what it
-// committed.
+// writer of the row, AcquireClientRow among them, and another locking read, SetClientIdentifier's
+// among them, wait for this transaction to end, and this read waits for a writer's transaction to
+// end and answers what it committed.
 //
 // The initial password grant reads its client this way before it writes its first refresh token,
 // so a rename of the client is ordered against it: either the grant commits first and the rename's
@@ -780,10 +778,15 @@ func (d *Database) GetAllClients(ctx context.Context, tx *sql.Tx) ([]record.Clie
 // only refresh_tokens.code_id is CASCADE, so that statement really does take a client's
 // ROPC-issued tokens before the cascade runs.
 //
-// No row is acquired ahead of these two statements. The final DELETE takes the clients row
-// itself, and a transaction of this shape racing an authorization ceremony for the same
-// client, or a termination of a session that holds this client's tokens, is answered by
-// RunInTransaction rerunning whichever of the two the engine aborts (#301).
+// No row is acquired ahead of the first sweep. The final DELETE takes the clients row itself,
+// and a transaction of this shape racing an authorization ceremony for the same client, or a
+// termination of a session that holds this client's tokens, is answered by RunInTransaction
+// rerunning whichever of the two the engine aborts (#301).
+//
+// The sweep runs again once the locking read below holds the clients row, for the initial
+// password grant, which writes its first refresh token under that row (#710 decision 5): one
+// that wrote it while the first sweep ran has committed by then, and that second sweep takes its
+// token, which would otherwise refuse the DELETE by the NO ACTION key.
 //
 // In the same transaction, last, it records the deleted identifier with the moment of the
 // deletion, which the access-token liveness check reads so that a new client taking the
@@ -803,6 +806,13 @@ func (d *Database) DeleteClient(ctx context.Context, tx *sql.Tx, clientId int64)
 		}
 
 		client, err := d.GetClientByIdForUpdate(ctx, tx, clientId)
+		if err != nil {
+			return err
+		}
+
+		// Again, now that the row is held: an initial password grant the read above waited for
+		// has committed its first refresh token, which the first sweep could not see.
+		err = d.deleteRefreshTokensByColumn(ctx, tx, "client_id", clientId)
 		if err != nil {
 			return err
 		}

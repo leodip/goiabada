@@ -11,7 +11,11 @@ package liveness
 import (
 	"context"
 	"database/sql"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
+	"math"
+	"strconv"
 	"strings"
 	"time"
 
@@ -229,12 +233,49 @@ func AccessToken(ctx context.Context, database Database, token oauth.JwtToken, s
 // A token without the claim was issued before it existed, and is judged by issuedToClient alone,
 // as it was then. A claim that is present and not a whole number, null included, is one the auth
 // server never signs: (0, true, false), and the caller refuses it before reading anything.
+//
+// The comparison is exact over the whole range of an internal id, an int64. The parser decodes
+// every JSON number to a float64, which holds every integer up to 2^53-1 and not every one above,
+// where two neighbouring ids decode to the same float64. A claim the float64 holds exactly is read
+// from it; a larger one is read as the payload the token's signature covers spells it.
 func tokenClientRow(token oauth.JwtToken) (int64, bool, bool) {
 	if _, present := token.Claims["client_internal_id"]; !present {
 		return 0, false, true
 	}
-	clientRow, ok := token.IntClaim("client_internal_id")
+	if clientRow, ok := token.IntClaim("client_internal_id"); ok {
+		return clientRow, true, true
+	}
+	if decoded, isFloat := token.Claims["client_internal_id"].(float64); !isFloat ||
+		decoded != math.Trunc(decoded) || decoded < 0 {
+		return 0, true, false
+	}
+	clientRow, ok := signedClientRow(token.TokenBase64)
 	return clientRow, true, ok
+}
+
+// signedClientRow reads client_internal_id from a compact JWS's payload as written, a whole number
+// that fits an int64, and reports whether it is one. A token without its compact serialization
+// cannot be read this way and reports false, failing closed.
+func signedClientRow(compact string) (int64, bool) {
+	segments := strings.Split(compact, ".")
+	if len(segments) != 3 {
+		return 0, false
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(segments[1])
+	if err != nil {
+		return 0, false
+	}
+	var claims struct {
+		ClientInternalID json.Number `json:"client_internal_id"`
+	}
+	if err = json.Unmarshal(payload, &claims); err != nil {
+		return 0, false
+	}
+	clientRow, err := strconv.ParseInt(claims.ClientInternalID.String(), 10, 64)
+	if err != nil || clientRow < 0 {
+		return 0, false
+	}
+	return clientRow, true
 }
 
 // issuedToClient reports whether the token was issued to this client and not to a deleted client

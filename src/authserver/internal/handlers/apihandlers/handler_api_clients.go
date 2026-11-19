@@ -236,39 +236,52 @@ func writeClientNotOwningAuthenticationMode(ctx context.Context, database client
 
 	client.ApplyPublicClientInvariants()
 
+	// The settings save's narrow writes go ahead of the whole-row save. Each sets updated_at, and
+	// the whole-row save's is the one the answer carries, so it is the last to set it and the row
+	// holds the timestamp the save answers.
+	renamed := false
+	if settings != nil {
+		// The write decides, under the row's lock, whether the identifier changes, and so whether
+		// the client's grants are revoked; either way the row now holds the one submitted.
+		renamed, err = database.SetClientIdentifier(ctx, tx, client.Id, settings.identifier)
+		if err != nil {
+			return false, err
+		}
+		client.ClientIdentifier = settings.identifier
+
+		if err = writeSettingsRememberConsent(ctx, database, tx, client, settings, current.IsPublic, loadedPublic); err != nil {
+			return false, err
+		}
+	}
+
 	if err = database.UpdateClient(ctx, tx, client); err != nil {
 		return false, err
 	}
+	return renamed, nil
+}
 
-	if settings == nil {
-		return false, nil
-	}
-
-	// The write decides, under the row's lock, whether the identifier changes, and so whether
-	// the client's grants are revoked; either way the row now holds the one submitted.
-	renamed, err := database.SetClientIdentifier(ctx, tx, client.Id, settings.identifier)
-	if err != nil {
-		return false, err
-	}
-	client.ClientIdentifier = settings.identifier
-
+// writeSettingsRememberConsent writes the settings save's Remember consent, decided against the
+// mode the row holds under the lock and the mode the request loaded, and leaves it alone for a save
+// without it.
+func writeSettingsRememberConsent(ctx context.Context, database clientsDatabase, tx *sql.Tx,
+	client *record.Client, settings *clientSettingsSave, rowPublic, loadedPublic bool) error {
 	if settings.rememberConsent == nil {
-		return renamed, nil
+		return nil
 	}
 	var remember bool
 	switch {
-	case !current.IsPublic:
+	case !rowPublic:
 		remember = true
 	case loadedPublic:
 		remember = *settings.rememberConsent
 	default:
-		return renamed, nil
+		return nil
 	}
-	if err = database.SetClientRememberConsent(ctx, tx, client.Id, remember); err != nil {
-		return false, err
+	if err := database.SetClientRememberConsent(ctx, tx, client.Id, remember); err != nil {
+		return err
 	}
 	client.RememberConsent = remember
-	return renamed, nil
+	return nil
 }
 
 // checkClientIdentifierChange holds an identifier the client is being renamed to to the identifier
@@ -1003,6 +1016,9 @@ func HandleClientAuthenticationPut(
 				}
 				client.RememberConsent = current.RememberConsent
 				client.TokenEndpointAuthMethod = current.TokenEndpointAuthMethod
+				// This save never writes the identifier, and a rename committed since the load is
+				// what the client is now called (#710 decision 4).
+				client.ClientIdentifier = current.ClientIdentifier
 				return becamePublic, nil
 			})
 			if err != nil {
@@ -1041,6 +1057,8 @@ func HandleClientAuthenticationPut(
 					return errs.New("client no longer exists")
 				}
 				client.TokenEndpointAuthMethod = current.TokenEndpointAuthMethod
+				// Nor does it write the identifier: the answer takes the row's (#710 decision 4).
+				client.ClientIdentifier = current.ClientIdentifier
 				return nil
 			})
 			if err != nil {
