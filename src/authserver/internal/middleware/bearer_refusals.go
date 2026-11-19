@@ -62,8 +62,8 @@ const invalidDPoPProofDescription = "The DPoP proof is invalid."
 // is also the challenge's, which RFC 6750 section 3 holds to ASCII, but for the 401 missing writes
 // to a request with no credential, whose challenge carries none (section 3.1) and whose body stays
 // in English with the rest. TestBearerRefusals_EnglishOnly holds every sentence to
-// bearerEnglishRefusals, and has each writer here write its method's description parameter, a
-// sentence from that table, or an empty challenge description.
+// bearerEnglishRefusals, and has each writer here write an identifier named description (the
+// method's parameter), a sentence from that table, or an empty challenge description.
 type apiBearerRefusals struct{}
 
 func (apiBearerRefusals) missing(w http.ResponseWriter, _ *http.Request) {
