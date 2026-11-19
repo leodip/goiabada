@@ -1,13 +1,14 @@
 package guard
 
 // The Check workflow pulls nothing from Docker Hub and logs in to no registry (#867 decision 5).
-// Every image it names, a job's container, a service, the BuildKit image Buildx starts from, comes
-// from CI's mirror, ghcr.io/leodip/goiabada-ci, whose public packages need no login, with the
+// Every image it names, a job's container, a service, the BuildKit image Buildx starts from, an
+// image a run step pulls with docker pull, comes from CI's mirror, ghcr.io/leodip/goiabada-ci, whose public packages need no login, with the
 // registry and the repository written out and a pin only in the tag; SQL Server's image, on
 // Microsoft's registry, which needs no login either, is the one it names outside the mirror. Each
 // mirror address is one the mirror's list holds, .github/mirror/images as mirror.sh list reads it,
 // so the Mirror workflow copies it. Check names no registry credentials, logs in nowhere and takes
-// no Docker Hub secret, so a fork's run, Dependabot's and the maintainer's pull the same way.
+// no Docker Hub secret, so a fork's run, Dependabot's and the maintainer's pull the same way: no
+// login step, and no registry login in a run step.
 //
 // The Versions job, which every job that pulls an image waits for, runs mirror.sh missing on every
 // run, so a mirror that lacks a tag the branch's list names fails the run at once, saying which and
@@ -19,6 +20,7 @@ package guard
 
 import (
 	"fmt"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -207,9 +209,47 @@ func stepUses(lines []string, step []int) string {
 	return ""
 }
 
+// registryClients are the commands that log in to a registry with a login subcommand: docker login,
+// skopeo login, helm registry login, and the like.
+var registryClients = map[string]bool{"docker": true, "podman": true, "skopeo": true, "buildah": true, "crane": true, "oras": true, "regctl": true, "helm": true}
+
+// runStepRegistryUse reads one command of a run step and returns the image it pulls, as a shell word,
+// docker pull's or podman pull's, and whether it logs in to a registry.
+func runStepRegistryUse(c shellCommand) (image *shellWord, login bool) {
+	w := c.words
+	if len(w) < 2 || !registryClients[w[0].value] {
+		return nil, false
+	}
+	for _, word := range w[1:min(len(w), 3)] {
+		if word.value == "login" {
+			return nil, true
+		}
+	}
+	if w[0].value != "docker" && w[0].value != "podman" {
+		return nil, false
+	}
+	args := w[1:]
+	if len(args) >= 2 && args[0].value == "image" {
+		args = args[1:]
+	}
+	if args[0].value != "pull" {
+		return nil, false
+	}
+	for i := 1; i < len(args); i++ {
+		switch {
+		case args[i].value == "--platform":
+			i++
+		case strings.HasPrefix(args[i].value, "-"):
+		default:
+			return &args[i], false
+		}
+	}
+	return nil, false
+}
+
 // checkRegistryFindings reads the Check workflow and returns every image it pulls from outside the
-// mirror or names in a way this check cannot read, every credential, login and Docker Hub secret
-// it names, a Buildx started from Docker Hub's BuildKit image, a job that pulls without waiting for
+// mirror or names in a way this check cannot read, a job's container, a service, a docker:// step
+// or a docker pull in a run step, every credential, login and Docker Hub secret it names, a Buildx started from Docker Hub's BuildKit image, a job that pulls without waiting for
 // the Versions job, and a Versions job that does not check the mirror on every run. pins are the
 // Versions job's outputs, by name, and mirrored the mirror addresses the list holds at those pins.
 func checkRegistryFindings(file, text string, pins map[string]string, mirrored map[string]bool) []string {
@@ -267,6 +307,27 @@ func checkRegistryFindings(file, text string, pins map[string]string, mirrored m
 		}
 		if strings.Contains(line, "docker build") || strings.Contains(line, "docker buildx build") {
 			pulls[jobOf[n]] = true
+		}
+	}
+	for _, run := range workflowRuns(lines) {
+		for _, c := range readShell(run.script.text).commands {
+			n := run.script.offset + c.line
+			image, login := runStepRegistryUse(c)
+			switch {
+			case login:
+				add(n, "%s logs in to a registry with %s: Check pulls anonymously from the public mirror and logs in nowhere, so remove it", at(n), c.words[0].value)
+			case image == nil:
+			case image.expands:
+				images++
+				pulls[jobOf[n]] = true
+				add(n, "%s pulls the image %s, which a shell expansion gives, so this check cannot tell where from: write it out, %s/<image>:<tag>", at(n), image.raw, ciMirror)
+			default:
+				images++
+				pulls[jobOf[n]] = true
+				for _, f := range checkImageFinding(at(n), image.value, pins, mirrored) {
+					add(n, "%s", f)
+				}
+			}
 		}
 	}
 
@@ -431,15 +492,95 @@ func mirroredAddresses(t *testing.T, versions string) map[string]bool {
 	return mirrored
 }
 
+// assertCheckRegistries is the reporting half of the Check workflow's registry guard, over the
+// workflow under repoRoot: each finding of checkRegistryFindings an error, and a workflow that
+// cannot be read, or no mirror address to hold its images to, fatal.
+func assertCheckRegistries(r Reporter, repoRoot string, pins map[string]string, mirrored map[string]bool) {
+	r.Helper()
+	if len(mirrored) == 0 {
+		r.Fatalf("check mirror: the mirror's list gave no address, so this check has nothing to hold Check's images to")
+	}
+	assertWorkflowFindings(r, "check mirror", repoRoot, checkWorkflow, func(file, text string) []string {
+		return checkRegistryFindings(file, text, pins, mirrored)
+	})
+}
+
 // Check's images are read with the Versions job's pins at mirrorVersions', none of the committed
 // ones, so a pin written into Check rather than taken from the Versions job is told apart.
 func TestCheckWorkflow_PullsOnlyFromTheMirrorAndLogsInNowhere(t *testing.T) {
-	text := repositoryFiles(t, []string{checkWorkflow})[checkWorkflow]
-	assert.Empty(t, checkRegistryFindings(checkWorkflow, text, versionsPins(mirrorVersions), mirroredAddresses(t, mirrorVersions)))
+	assertCheckRegistries(t, filepath.Dir(SourceRoot(t)), versionsPins(mirrorVersions), mirroredAddresses(t, mirrorVersions))
 }
 
 func TestReleaseWorkflow_PassesCheckNoSecretAndLogsInBeforeBuildx(t *testing.T) {
-	assert.Empty(t, releaseRegistryFindings(releaseWorkflow, repositoryFiles(t, []string{releaseWorkflow})[releaseWorkflow]))
+	assertWorkflowFindings(t, "check mirror", filepath.Dir(SourceRoot(t)), releaseWorkflow, releaseRegistryFindings)
+}
+
+// The reporting halves of the guards that read one workflow pass the workflow as it is committed,
+// report a workflow that breaks their rule, and are fatal on a tree without it.
+func TestWorkflowGuards_Reporting(t *testing.T) {
+	pins, mirrored := versionsPins(mirrorVersions), mirroredAddresses(t, mirrorVersions)
+	guards := []struct {
+		name   string
+		file   string
+		assert func(r Reporter, root string)
+		edit   [2]string
+		want   string
+	}{
+		{
+			"Check's registries", checkWorkflow,
+			func(r Reporter, root string) { assertCheckRegistries(r, root, pins, mirrored) },
+			[2]string{"          docker run --rm goiabada-docs-sources:ci npm test\n", "          docker run --rm goiabada-docs-sources:ci npm test\n          docker pull docker.io/library/hello-world:latest\n"},
+			"(docs) names docker.io/library/hello-world:latest, from Docker Hub",
+		},
+		{
+			"the Release workflow's registries", releaseWorkflow,
+			func(r Reporter, root string) {
+				assertWorkflowFindings(r, "check mirror", root, releaseWorkflow, releaseRegistryFindings)
+			},
+			[2]string{"    uses: ./.github/workflows/check.yml\n", "    uses: ./.github/workflows/check.yml\n    secrets: inherit\n"},
+			"passes Check secrets",
+		},
+		{
+			"the docs job", checkWorkflow,
+			func(r Reporter, root string) {
+				assertWorkflowFindings(r, "base registry", root, checkWorkflow, docsJobFindings)
+			},
+			[2]string{"node-version: ${{ needs.versions.outputs.node }}", "node-version: '24'"},
+			"runs the docs browser test on Node 24",
+		},
+		{
+			"the module tiers on the runner", checkWorkflow,
+			func(r Reporter, root string) {
+				assertWorkflowFindings(r, "runner jobs", root, checkWorkflow, runnerJobFindings)
+			},
+			[2]string{"    needs: versions\n    runs-on: ubuntu-latest\n    services:\n      # emaildelivery's TestSendEmail", "    needs: versions\n    runs-on: ubuntu-latest\n    container: ghcr.io/leodip/goiabada-ci/golang:1.28.0-bookworm\n    services:\n      # emaildelivery's TestSendEmail"},
+			"(unit-authserver) runs the internal tier in a job container",
+		},
+	}
+	for _, g := range guards {
+		t.Run(g.name, func(t *testing.T) {
+			pass := Run(func(r Reporter) { g.assert(r, repositoryTree(t, []string{g.file}, nil)) })
+			assert.False(t, pass.Failed(), "the committed workflow failed: %s", pass.Text())
+
+			fail := Run(func(r Reporter) {
+				g.assert(r, repositoryTree(t, []string{g.file}, map[string][2]string{g.file: g.edit}))
+			})
+			assert.False(t, fail.Stopped, "a finding is an error, not a fatal: %s", fail.Text())
+			require.NotEmpty(t, fail.Errors, "a workflow breaking the rule passed")
+			assert.Contains(t, fail.Text(), g.want)
+
+			empty := Run(func(r Reporter) { g.assert(r, t.TempDir()) })
+			require.True(t, empty.Stopped, "a tree without the workflow passed: %s", empty.Text())
+			assert.Contains(t, empty.Fatal, g.file+" cannot be read, so this check read nothing")
+		})
+	}
+	t.Run("Check's registries with a list that gave no address", func(t *testing.T) {
+		report := Run(func(r Reporter) {
+			assertCheckRegistries(r, repositoryTree(t, []string{checkWorkflow}, nil), pins, map[string]bool{})
+		})
+		require.True(t, report.Stopped, "%s", report.Text())
+		assert.Contains(t, report.Fatal, "the mirror's list gave no address")
+	})
 }
 
 func TestCheckWorkflow_RegistryFindings(t *testing.T) {
@@ -595,6 +736,33 @@ func TestCheckWorkflow_RegistryFindings(t *testing.T) {
 		src := edit(t, "  versions:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@0000000000000000000000000000000000000000 # v7\n      - name: The mirror holds every tag\n        run: .github/mirror/mirror.sh missing\n", "")
 		got := findings(src)
 		assert.Contains(t, strings.Join(got, "\n"), "check mirror: check.yml has no versions job")
+	})
+	t.Run("a docker pull from the mirror in a run step passes", func(t *testing.T) {
+		assertFindings(t, findings(edit(t, "      - run: ./run-tests.sh\n", "      - run: |\n          ./run-tests.sh\n          docker pull --quiet ghcr.io/leodip/goiabada-ci/mysql:26\n")))
+	})
+	t.Run("a docker pull from Docker Hub in a run step", func(t *testing.T) {
+		assertFindings(t, findings(edit(t, "      - run: ./run-tests.sh\n", "      - run: |\n          ./run-tests.sh\n          docker pull docker.io/library/hello-world:latest\n")),
+			"check mirror: check.yml:32 (tests) names docker.io/library/hello-world:latest, from Docker Hub, which Check pulls nothing from")
+	})
+	t.Run("a docker image pull with a platform, of an image the list does not hold", func(t *testing.T) {
+		assertFindings(t, findings(edit(t, "      - run: ./run-tests.sh\n", "      - run: docker image pull --platform linux/arm64 ghcr.io/leodip/goiabada-ci/mysql:27\n")),
+			"check mirror: check.yml:30 (tests) names ghcr.io/leodip/goiabada-ci/mysql:27, which .github/mirror/images does not hold")
+	})
+	t.Run("a docker pull of an image a shell expansion gives", func(t *testing.T) {
+		assertFindings(t, findings(edit(t, "      - run: ./run-tests.sh\n", "      - run: docker pull \"$IMAGE\"\n")),
+			"check mirror: check.yml:30 (tests) pulls the image \"$IMAGE\", which a shell expansion gives")
+	})
+	t.Run("a docker pull in a job that does not wait for Versions", func(t *testing.T) {
+		assertFindings(t, findings(edit(t, "      - run: go vet ./...\n", "      - run: go vet ./... && docker pull ghcr.io/leodip/goiabada-ci/mysql:26\n")),
+			"check mirror: check.yml:39 (lint) pulls an image and does not need versions")
+	})
+	t.Run("a registry login in a run step", func(t *testing.T) {
+		assertFindings(t, findings(edit(t, "      - run: ./run-tests.sh\n", "      - run: |\n          echo \"$TOKEN\" | docker login ghcr.io -u me --password-stdin\n          ./run-tests.sh\n")),
+			"check mirror: check.yml:31 (tests) logs in to a registry with docker: Check pulls anonymously from the public mirror and logs in nowhere")
+	})
+	t.Run("a skopeo login in a run step", func(t *testing.T) {
+		assertFindings(t, findings(edit(t, "      - run: go vet ./...\n", "      - run: skopeo login --username me docker.io\n")),
+			"check mirror: check.yml:41 (lint) logs in to a registry with skopeo")
 	})
 	t.Run("a workflow naming no image read nothing", func(t *testing.T) {
 		assertFindings(t, findings("jobs:\n  versions:\n    steps:\n      - run: .github/mirror/mirror.sh missing\n"),

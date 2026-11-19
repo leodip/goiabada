@@ -103,8 +103,8 @@ func baseRegistryDockerfileFindings(rel, src string) []string {
 			}
 			external := image != "scratch" && !stages[strings.ToLower(image)]
 			if external && !strings.HasPrefix(image, "${"+baseRegistryArg+"}/") && !strings.HasPrefix(image, "$"+baseRegistryArg+"/") {
-				findings = append(findings, fmt.Sprintf("%s builds on %s, whose registry is not ${%s}, so Check's build of it pulls from Docker Hub: write FROM ${%s}/<image>",
-					at, image, baseRegistryArg, baseRegistryArg))
+				findings = append(findings, fmt.Sprintf("%s builds on %s, which bypasses ${%s}, so a build passing %s pulls it from %s all the same: write FROM ${%s}/%s",
+					at, image, baseRegistryArg, baseRegistryArg, imageRegistry(image), baseRegistryArg, image[strings.LastIndex(image, "/")+1:]))
 			}
 			if name != "" {
 				stages[name] = true
@@ -211,16 +211,28 @@ func baseRegistryBuildFindings(b baseRegistryBuilder, scripts []shellSource) []s
 }
 
 // checkBaseRegistries reads each Dockerfile and builder under the repository root and returns their
-// findings.
-func checkBaseRegistries(repoRoot string, dockerfiles []string, builders []baseRegistryBuilder) []string {
+// findings and how many of the files it read. A Dockerfile a builder builds from the mirror is also
+// held to bases the mirror holds, mirrored being the mirror addresses the list holds.
+func checkBaseRegistries(repoRoot string, dockerfiles []string, builders []baseRegistryBuilder, mirrored map[string]bool) ([]string, int) {
 	var findings []string
+	read := 0
+	fromMirror := map[string]bool{}
+	for _, b := range builders {
+		for _, d := range b.dockerfiles {
+			fromMirror[d] = fromMirror[d] || b.mirror
+		}
+	}
 	for _, rel := range dockerfiles {
 		content, err := os.ReadFile(filepath.Join(repoRoot, filepath.FromSlash(rel)))
 		if err != nil {
 			findings = append(findings, fmt.Sprintf("base registry: %s cannot be read: %v", rel, err))
 			continue
 		}
+		read++
 		findings = append(findings, baseRegistryDockerfileFindings(rel, string(content))...)
+		if fromMirror[rel] {
+			findings = append(findings, mirrorBaseFindings("base registry", rel, string(content), mirrored)...)
+		}
 	}
 	for _, b := range builders {
 		content, err := os.ReadFile(filepath.Join(repoRoot, filepath.FromSlash(b.file)))
@@ -228,17 +240,118 @@ func checkBaseRegistries(repoRoot string, dockerfiles []string, builders []baseR
 			findings = append(findings, fmt.Sprintf("base registry: %s cannot be read: %v", b.file, err))
 			continue
 		}
+		read++
 		scripts := []shellSource{{text: string(content)}}
 		if strings.HasSuffix(b.file, ".yml") || strings.HasSuffix(b.file, ".yaml") {
 			scripts = workflowRunScripts(string(content))
 		}
 		findings = append(findings, baseRegistryBuildFindings(b, scripts)...)
 	}
-	return findings
+	return findings, read
+}
+
+// assertBaseRegistries is the base registry guard's reporting half: each finding of
+// checkBaseRegistries an error, and a check that read none of its files under repoRoot, or has no
+// mirror address to hold Check's bases to, fatal.
+func assertBaseRegistries(r Reporter, repoRoot string, dockerfiles []string, builders []baseRegistryBuilder, mirrored map[string]bool) {
+	r.Helper()
+	if len(mirrored) == 0 {
+		r.Fatalf("base registry: the mirror's list gave no address, so this check has nothing to hold Check's bases to")
+	}
+	findings, read := checkBaseRegistries(repoRoot, dockerfiles, builders, mirrored)
+	reportBuildFileFindings(r, "base registry", repoRoot, read, findings)
+}
+
+// reportBuildFileFindings is the reporting half the guards of #867 that read the repository's
+// build files share: a check that read none of its files under root would pass on any tree, so it
+// is fatal, and each finding is an error.
+func reportBuildFileFindings(r Reporter, guard, root string, read int, findings []string) {
+	r.Helper()
+	if read == 0 {
+		r.Fatalf("%s: read none of its files under %s, so this check read nothing", guard, root)
+	}
+	for _, f := range findings {
+		r.Errorf("%s", f)
+	}
+}
+
+// assertWorkflowFindings is the reporting half of a guard that reads one workflow under root: what
+// finder finds in it, each an error, and a workflow that cannot be read, fatal.
+func assertWorkflowFindings(r Reporter, guard, root, file string, finder func(file, text string) []string) {
+	r.Helper()
+	content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(file)))
+	if err != nil {
+		r.Fatalf("%s: %s cannot be read, so this check read nothing: %v", guard, file, err)
+	}
+	reportBuildFileFindings(r, guard, root, 1, finder(file, string(content)))
+}
+
+// repositoryTree copies files, relative to the repository root, as they are committed into an
+// empty tree, with each of edits, a file's text and its replacement, applied once, and returns it.
+func repositoryTree(t *testing.T, files []string, edits map[string][2]string) string {
+	t.Helper()
+	root := t.TempDir()
+	for name, content := range repositoryFiles(t, files) {
+		if e, ok := edits[name]; ok {
+			require.Equal(t, 1, strings.Count(content, e[0]), "%s: %s", name, e[0])
+			content = strings.Replace(content, e[0], e[1], 1)
+		}
+		writeFixture(t, root, name, content)
+	}
+	return root
+}
+
+// committedMirrored are the mirror addresses the list holds at the committed pins.
+func committedMirrored(t *testing.T) map[string]bool {
+	t.Helper()
+	return mirroredAddresses(t, repositoryFiles(t, []string{"src/authserver/versions.yaml"})["src/authserver/versions.yaml"])
+}
+
+// baseRegistryFiles are the files the base registry guard reads.
+func baseRegistryFiles() []string {
+	files := slices.Clone(baseRegistryDockerfiles)
+	for _, b := range baseRegistryBuilders {
+		files = append(files, b.file)
+	}
+	return files
 }
 
 func TestBaseRegistry_TheDockerfilesDefaultToDockerHubAndOnlyChecksBuildsPassTheMirror(t *testing.T) {
-	assert.Empty(t, checkBaseRegistries(filepath.Dir(SourceRoot(t)), baseRegistryDockerfiles, baseRegistryBuilders))
+	assertBaseRegistries(t, filepath.Dir(SourceRoot(t)), baseRegistryDockerfiles, baseRegistryBuilders, committedMirrored(t))
+}
+
+// The reporting half passes the files as they are committed, reports a docs image built on a tag
+// the mirror lacks, which Check's docs build would ask the mirror for, and is fatal on a tree it
+// read nothing of and on a list that gave no address.
+func TestBaseRegistry_Reporting(t *testing.T) {
+	mirrored := committedMirrored(t)
+	assertTree := func(root string, m map[string]bool) Report {
+		return Run(func(r Reporter) { assertBaseRegistries(r, root, baseRegistryDockerfiles, baseRegistryBuilders, m) })
+	}
+	t.Run("the committed files pass", func(t *testing.T) {
+		report := assertTree(repositoryTree(t, baseRegistryFiles(), nil), mirrored)
+		assert.False(t, report.Failed(), "%s", report.Text())
+	})
+	t.Run("a docs image on a tag the mirror lacks fails", func(t *testing.T) {
+		root := repositoryTree(t, baseRegistryFiles(), map[string][2]string{
+			"site/Dockerfile": {"FROM ${baseRegistry}/nginx:alpine", "FROM ${baseRegistry}/nginx:latest"},
+		})
+		report := assertTree(root, mirrored)
+		assert.False(t, report.Stopped, "a finding is an error, not a fatal: %s", report.Text())
+		require.Len(t, report.Errors, 1, "%s", report.Text())
+		assert.Contains(t, report.Errors[0], "base registry: site/Dockerfile:")
+		assert.Contains(t, report.Errors[0], "builds on ${baseRegistry}/nginx:latest, which a build passing the mirror pulls as ghcr.io/leodip/goiabada-ci/nginx:latest, and .github/mirror/images does not hold it")
+	})
+	t.Run("a tree holding none of the files is fatal", func(t *testing.T) {
+		report := assertTree(t.TempDir(), mirrored)
+		require.True(t, report.Stopped, "an empty walk passed: %s", report.Text())
+		assert.Contains(t, report.Fatal, "base registry: read none of its files under")
+	})
+	t.Run("a list that gave no address is fatal", func(t *testing.T) {
+		report := assertTree(repositoryTree(t, baseRegistryFiles(), nil), map[string]bool{})
+		require.True(t, report.Stopped, "%s", report.Text())
+		assert.Contains(t, report.Fatal, "the mirror's list gave no address")
+	})
 }
 
 func TestBaseRegistry_DockerfileFindings(t *testing.T) {
@@ -265,17 +378,17 @@ func TestBaseRegistry_DockerfileFindings(t *testing.T) {
 		{
 			"a base written with Docker Hub's name",
 			edit("${baseRegistry}/golang:1.28.0-alpine", "golang:1.28.0-alpine"),
-			[]string{"base registry: build/Dockerfile-one:3 builds on golang:1.28.0-alpine, whose registry is not ${baseRegistry}, so Check's build of it pulls from Docker Hub: write FROM ${baseRegistry}/<image>"},
+			[]string{"base registry: build/Dockerfile-one:3 builds on golang:1.28.0-alpine, which bypasses ${baseRegistry}, so a build passing baseRegistry pulls it from docker.io all the same: write FROM ${baseRegistry}/golang:1.28.0-alpine"},
 		},
 		{
 			"a base written with another registry",
 			edit("$baseRegistry/nginx:alpine", "ghcr.io/leodip/goiabada-ci/nginx:alpine"),
-			[]string{"base registry: build/Dockerfile-one:7 builds on ghcr.io/leodip/goiabada-ci/nginx:alpine, whose registry is not ${baseRegistry}"},
+			[]string{"base registry: build/Dockerfile-one:7 builds on ghcr.io/leodip/goiabada-ci/nginx:alpine, which bypasses ${baseRegistry}, so a build passing baseRegistry pulls it from ghcr.io all the same: write FROM ${baseRegistry}/nginx:alpine"},
 		},
 		{
 			"a stage named only later is an image when an earlier FROM names it",
 			edit("FROM build AS tested", "FROM tested AS build2"),
-			[]string{"base registry: build/Dockerfile-one:6 builds on tested, whose registry is not ${baseRegistry}"},
+			[]string{"base registry: build/Dockerfile-one:6 builds on tested, which bypasses ${baseRegistry}"},
 		},
 		{
 			"no default leaves the bases' registry empty",
@@ -385,7 +498,9 @@ func TestBaseRegistry_BuildFindings(t *testing.T) {
 		assert.Contains(t, strings.Join(got, "\n"), "base registry: build.sh:6 opens a \" that never closes")
 	})
 	t.Run("a file that cannot be read", func(t *testing.T) {
-		assertFindings(t, checkBaseRegistries(t.TempDir(), []string{"site/Dockerfile"}, []baseRegistryBuilder{check}),
+		got, read := checkBaseRegistries(t.TempDir(), []string{"site/Dockerfile"}, []baseRegistryBuilder{check}, fixtureMirrored())
+		assert.Zero(t, read)
+		assertFindings(t, got,
 			"base registry: site/Dockerfile cannot be read",
 			"base registry: check.yml cannot be read")
 	})
@@ -448,7 +563,7 @@ func docsJobFindings(file, text string) []string {
 
 func TestCheckWorkflow_TheDocsJobWaitsForVersionsAndRunsTheDocsImagesNode(t *testing.T) {
 	files := repositoryFiles(t, []string{checkWorkflow, "site/Dockerfile"})
-	assert.Empty(t, docsJobFindings(checkWorkflow, files[checkWorkflow]))
+	assertWorkflowFindings(t, "base registry", filepath.Dir(SourceRoot(t)), checkWorkflow, docsJobFindings)
 	assert.Contains(t, files["site/Dockerfile"], "${baseRegistry}/node:"+nodePin(t)+"-alpine AS sources",
 		"site/Dockerfile does not build on Node at tools.node, the Node the docs job's browser test runs on; run ./version-manager.sh update")
 }

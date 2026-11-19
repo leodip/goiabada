@@ -73,6 +73,69 @@ func TestMailpitCheck_TheNewestReleaseIsSuggestedOnlyOnceThreeDaysOld(t *testing
 	assert.Equal(t, "1.34.0", mailpitCheckSuggests(t, "2026-11-20T06:57:50Z"), "exactly three days")
 }
 
+// mailpitVersions writes the committed versions.yaml with tools.mailpit at pin into a directory of
+// its own, and returns its path.
+func mailpitVersions(t *testing.T, pin string) string {
+	t.Helper()
+	committed := repositoryFiles(t, []string{"src/authserver/versions.yaml"})["src/authserver/versions.yaml"]
+	pinLine := regexp.MustCompile(`(?m)^  mailpit: "[^"]*"$`)
+	require.Len(t, pinLine.FindAllString(committed, -1), 1, "versions.yaml holds no one tools.mailpit line")
+	file := filepath.Join(t.TempDir(), "versions.yaml")
+	require.NoError(t, os.WriteFile(file, []byte(pinLine.ReplaceAllString(committed, `  mailpit: "`+pin+`"`)), 0o600))
+	return file
+}
+
+// ansiColor is a terminal color code, which version-manager.sh writes around its words.
+var ansiColor = regexp.MustCompile(`\x1b\[[0-9;]*m`)
+
+// mailpitCheckCommand runs version-manager.sh check, the whole command, with the clock at now and
+// tools.mailpit at pin, and returns what it printed, its colors removed. GitHub answers the
+// fixture for Mailpit's releases and every other source answers nothing, so each other dependency
+// reads as a failed check and no test reaches a network.
+func mailpitCheckCommand(t *testing.T, now, pin string) string {
+	t.Helper()
+	fixture, err := filepath.Abs(mailpitReleasesFixture)
+	require.NoError(t, err)
+	out := versionManager(t, `
+		now="$1" answer="$2" VERSIONS_FILE="$3"
+		check_internet() { return 0; }
+		curl() {
+			case "$*" in
+				*"https://api.github.com/repos/axllent/mailpit/releases?per_page=10"*) cat "$answer" ;;
+				*) return 7 ;;
+			esac
+		}
+		date() { if [ "$*" = "-u +%s" ]; then echo "$now"; else command date "$@"; fi; }
+		npm() { return 1; }
+		npx() { return 1; }
+		node() { return 1; }
+		cmd_check`,
+		unix(t, now), fixture, mailpitVersions(t, pin))
+	return ansiColor.ReplaceAllString(out, "")
+}
+
+// mailpitSummaryRow is check's row for Mailpit under "Updates Available", from CURRENT to LATEST.
+func mailpitSummaryRow(current, latest string) *regexp.Regexp {
+	return regexp.MustCompile(`(?m)^Mailpit +` + regexp.QuoteMeta(current) + ` +` + regexp.QuoteMeta(latest) +
+		` +https://github\.com/axllent/mailpit/releases$`)
+}
+
+// check, run whole, reports Mailpit up to date while its newest release is under three days old,
+// and lists it among the updates available once it is three days old.
+func TestMailpitCheck_TheCommandReportsANewerReleaseOnlyOnceThreeDaysOld(t *testing.T) {
+	young := mailpitCheckCommand(t, "2026-11-20T06:57:49Z", "1.33.1")
+	assert.Contains(t, young, "Checking Mailpit... ✓ Up to date (1.33.1)", "a second short of three days:\n%s", young)
+	assert.NotRegexp(t, `(?m)^Mailpit `, young, "a second short of three days, check lists Mailpit:\n%s", young)
+
+	settled := mailpitCheckCommand(t, "2026-11-20T06:57:50Z", "1.33.1")
+	assert.Contains(t, settled, "Checking Mailpit... UPDATE AVAILABLE", "exactly three days:\n%s", settled)
+	assert.Regexp(t, mailpitSummaryRow("1.33.1", "1.34.0"), settled, "exactly three days, check lists no Mailpit update:\n%s", settled)
+
+	current := mailpitCheckCommand(t, "2026-11-20T06:57:50Z", "1.34.0")
+	assert.Contains(t, current, "Checking Mailpit... ✓ Up to date (1.34.0)", "%s", current)
+	assert.NotRegexp(t, `(?m)^Mailpit `, current, "check lists the pin itself as an update:\n%s", current)
+}
+
 // mailpitUpdate copies files, each a path relative to the repository root and its content, into an
 // empty tree and runs update's Mailpit step there with tools.mailpit at version. It returns the
 // tree, whether the step succeeded, and what it printed.
@@ -129,6 +192,26 @@ func TestMailpitUpdate_WritesThePinIntoTheComposeFileAndTheE2EDefault(t *testing
 	files := repositoryFiles(t, mailpitPinnedFiles)
 	base, ok, out := mailpitUpdate(t, "1.40.2", files)
 	assert.True(t, ok, "update's Mailpit step failed:\n%s", out)
+	assertOnlyLineChanged(t, base, "src/.devcontainer/docker-compose.yml", files["src/.devcontainer/docker-compose.yml"],
+		"    image: axllent/mailpit:v1.40.2")
+	assertOnlyLineChanged(t, base, "e2e/infra/lib.sh", files["e2e/infra/lib.sh"],
+		`E2E_MAILPIT_IMAGE="${E2E_MAILPIT_IMAGE:-ghcr.io/leodip/goiabada-ci/mailpit:v1.40.2}"`)
+}
+
+// update, run whole over a tree holding the two files as they are committed and a versions.yaml
+// whose tools.mailpit is a new pin, moves each to it: the dev container's on Docker Hub, the e2e
+// server's at the mirror.
+func TestMailpitUpdate_TheCommandWritesANewPinIntoBothFiles(t *testing.T) {
+	files := repositoryFiles(t, mailpitPinnedFiles)
+	base := t.TempDir()
+	for name, content := range files {
+		writeFixture(t, base, name, content)
+	}
+	script := filepath.Join(SourceRoot(t), "authserver", "version-manager.sh")
+	out, err := exec.Command("bash", "-c", `. "$1" || exit 1; BASE_DIR="$2" VERSIONS_FILE="$3"
+		vendor_fetch() { :; }
+		cmd_update`, "bash", script, base, mailpitVersions(t, "1.40.2")).CombinedOutput()
+	require.NoError(t, err, "%s", out)
 	assertOnlyLineChanged(t, base, "src/.devcontainer/docker-compose.yml", files["src/.devcontainer/docker-compose.yml"],
 		"    image: axllent/mailpit:v1.40.2")
 	assertOnlyLineChanged(t, base, "e2e/infra/lib.sh", files["e2e/infra/lib.sh"],

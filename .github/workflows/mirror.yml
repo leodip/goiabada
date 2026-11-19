@@ -35,8 +35,12 @@ on:
 permissions:
   contents: read
 
-# One run per branch at a time. Runs of two branches may copy the same tag at once, which writes
-# the same digest twice.
+# One run per branch at a time, a newer push's waiting in place of an older one's. Runs of two
+# branches can still overlap, and each keeps a waiting run of its own: one group for every branch
+# would keep a single waiting run, cancelling another branch's, which holds that branch's new tags.
+# An overlap can copy a tag twice, and the run that read upstream first can land the older digest
+# last; mirror.sh asks both registries again after every copy and copies again while they differ,
+# so the last run to finish leaves the mirror at upstream's digest.
 concurrency:
   group: mirror-${{ github.ref }}
   cancel-in-progress: false

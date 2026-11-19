@@ -13,17 +13,19 @@
 #                      nothing else, and the mirror written with GHCR_USERNAME and GHCR_TOKEN.
 #   mirror.sh missing  Asks the mirror anonymously for every tag and names each one it lacks, or
 #                      holds in a package that is not public, and what to do.
-#   mirror.sh public   Pulls every tag anonymously and names each package that is not public, with
-#                      where to make it public: a new GHCR package starts private, and GitHub has
-#                      no API to change that.
+#   mirror.sh public   Pulls every tag anonymously and names each package that refuses the pull,
+#                      so is not public, with where to make it public: a new GHCR package starts
+#                      private, and GitHub has no API to change that. A pull that fails for another
+#                      reason is reported with Docker's error, as no answer on the package.
 #
 # Docker Hub counts a pull per manifest GET, once per platform for a multi-platform image, and none
 # for a HEAD, which answers a tag's digest in its Docker-Content-Digest header. So copy asks both
 # registries for each tag's digest with a HEAD, and pulls only the tags whose digests differ: the
 # first fill costs a pull per platform of every tag, a version bump the new tag's, and a refresh
 # what upstream moved. The copy names upstream's image by the digest it compared, so what lands in
-# the mirror is that digest even when upstream moves meanwhile, and the mirror's digest is asked
-# again after it.
+# the mirror is that digest even when upstream moves meanwhile, and both digests are asked again
+# after it: a tag is copied again while they differ, so the last of two overlapping runs leaves the
+# mirror at upstream's digest.
 #
 # Every tag is handled even after one fails, so one run names every failure. Messages are GitHub
 # error annotations. Exits 0 when every tag passes, 1 when any fails, and 2 on a usage error.
@@ -36,6 +38,15 @@ MIRROR_OWNER=leodip
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 IMAGES=${MIRROR_IMAGES:-$here/images}
 VERSIONS=${MIRROR_VERSIONS:-$here/../../src/authserver/versions.yaml}
+
+# Every registry request gives up after MIRROR_REQUEST_SECONDS, connecting within 5, so a registry
+# that stalls fails its tag in seconds and the other tags are still asked: the Versions job, which
+# every pulling job of Check waits for, asks the mirror for every tag on every run.
+REQUEST_SECONDS=${MIRROR_REQUEST_SECONDS:-20}
+CURL_LIMITS=(--connect-timeout 5 --max-time "$REQUEST_SECONDS")
+
+# How many times copy copies one tag before it gives up on a mirror that is still not upstream's.
+COPY_ATTEMPTS=3
 
 # The manifest types a HEAD accepts: a multi-platform index or list first, so its digest is the one
 # answered, and a single platform's manifest for an image that has no index.
@@ -108,7 +119,7 @@ registry_token() {
         ghcr.io) url="https://ghcr.io/token?service=ghcr.io&scope=repository:$repository:pull" ;;
         *) echo "mirror.sh: no token service known for $registry" >&2; return 2 ;;
     esac
-    answer=$(curl --silent --show-error --include ${netrc:+--netrc-file "$netrc"} "$url") || return 2
+    answer=$(curl --silent --show-error --include "${CURL_LIMITS[@]}" ${netrc:+--netrc-file "$netrc"} "$url") || return 2
     status=$(http_status "$answer")
     case $status in
         200) ;;
@@ -122,7 +133,8 @@ registry_token() {
 
 # registry_digest <address> [netrc] prints the digest a registry holds for an image's tag, asked
 # with a HEAD, which Docker Hub does not count as a pull. Returns 1 when the registry holds no such
-# tag for the asker, and 2 when it cannot be asked.
+# tag for the asker, and 2 when it cannot be asked. The token reaches curl on its standard input,
+# as a header, never on its command line, which any process on the runner can read.
 registry_digest() {
     local ref=$1 netrc=${2:-} registry rest repository tag host token answer status digest
     registry=${ref%%/*}
@@ -132,8 +144,8 @@ registry_digest() {
     host=$registry
     [ "$registry" != docker.io ] || host=registry-1.docker.io
     token=$(registry_token "$registry" "$repository" "$netrc") || return
-    answer=$(curl --silent --show-error --head \
-        --header "Authorization: Bearer $token" --header "Accept: $MANIFEST_TYPES" \
+    answer=$(printf 'Authorization: Bearer %s\n' "$token" | curl --silent --show-error --head "${CURL_LIMITS[@]}" \
+        --header @- --header "Accept: $MANIFEST_TYPES" \
         "https://$host/v2/$repository/manifests/$tag") || return 2
     status=$(http_status "$answer")
     case $status in
@@ -146,8 +158,48 @@ registry_digest() {
     echo "$digest"
 }
 
+# copy_tag copies one tag from upstream to mirror until the mirror holds the digest upstream holds
+# when it is asked again after the copy. Two Mirror runs, of two branches, can copy one tag at once,
+# and the one that read upstream first can land the older digest last: asking both registries again
+# after each copy, and copying again while they differ, leaves the last run to finish at upstream's.
+# Returns 1, after an error, when it cannot.
+copy_tag() {
+    local upstream=$1 mirror=$2 netrc=$3 authfile=$4 want have status copies=0
+    while :; do
+        if ! want=$(registry_digest "$upstream" "$netrc"); then
+            error "cannot read the digest of $upstream from Docker Hub"
+            return 1
+        fi
+        have=$(registry_digest "$mirror" "$netrc") && status=0 || status=$?
+        if [ "$status" = 2 ]; then
+            error "cannot read the digest of $mirror"
+            return 1
+        fi
+        [ "$status" = 0 ] || have=""
+        if [ "$have" = "$want" ]; then
+            if [ "$copies" = 0 ]; then
+                echo "$mirror is $want, as upstream: not copied"
+            else
+                echo "$mirror is $want, as upstream"
+            fi
+            return 0
+        fi
+        if [ "$copies" = "$COPY_ATTEMPTS" ]; then
+            error "$mirror is ${have:-absent} after $copies copies, not upstream's $want; re-run this job"
+            return 1
+        fi
+        echo "copying $upstream ($want) to $mirror, which is ${have:-absent}"
+        if ! skopeo copy --authfile "$authfile" --retry-times 3 --all --preserve-digests \
+            "docker://${upstream%:*}@$want" "docker://$mirror"; then
+            error "cannot copy $upstream ($want) to $mirror"
+            return 1
+        fi
+        copies=$((copies + 1))
+    done
+}
+
 mirror_copy() {
-    local list secrets upstream mirror want have status failed=0 v
+    local list secrets upstream mirror failed=0 v
     for v in DOCKERHUB_USERNAME DOCKERHUB_TOKEN GHCR_USERNAME GHCR_TOKEN; do
         if [ -z "${!v:-}" ]; then
             error "$v is empty. The Mirror workflow reads Docker Hub logged in, with the repository secrets DOCKERHUB_USERNAME and DOCKERHUB_TOKEN, a Docker Hub user and an access token that can read public images, and writes the mirror with the job's GITHUB_TOKEN as GHCR_USERNAME and GHCR_TOKEN"
@@ -172,33 +224,7 @@ mirror_copy() {
         --username "$GHCR_USERNAME" --password-stdin ghcr.io >/dev/null || { error "cannot log in to ghcr.io as $GHCR_USERNAME"; return 1; }
 
     while read -r upstream mirror <&3; do
-        if ! want=$(registry_digest "$upstream" "$secrets/netrc"); then
-            error "cannot read the digest of $upstream from Docker Hub"
-            failed=1
-            continue
-        fi
-        have=$(registry_digest "$mirror" "$secrets/netrc") && status=0 || status=$?
-        if [ "$status" = 2 ]; then
-            error "cannot read the digest of $mirror"
-            failed=1
-            continue
-        fi
-        if [ "$status" = 0 ] && [ "$have" = "$want" ]; then
-            echo "$mirror is $want, as upstream: not copied"
-            continue
-        fi
-        echo "copying $upstream ($want) to $mirror, which is ${have:-absent}"
-        if ! skopeo copy --authfile "$secrets/auth.json" --retry-times 3 --all --preserve-digests \
-            "docker://${upstream%:*}@$want" "docker://$mirror"; then
-            error "cannot copy $upstream ($want) to $mirror"
-            failed=1
-            continue
-        fi
-        have=$(registry_digest "$mirror" "$secrets/netrc") || have=""
-        if [ "$have" != "$want" ]; then
-            error "$mirror is ${have:-absent} after the copy, not upstream's $want"
-            failed=1
-        fi
+        copy_tag "$upstream" "$mirror" "$secrets/netrc" "$secrets/auth.json" || failed=1
     done 3<<< "$list"
     return $failed
 }
@@ -225,8 +251,12 @@ mirror_missing() {
     return $missing
 }
 
+# A pull refused for want of access, as GHCR refuses one of a package that is not public, rather than
+# failed for another reason, such as a registry error or a tag the mirror lacks.
+REFUSED_PULL='denied|unauthorized|forbidden|\b40[13]\b'
+
 mirror_public() {
-    local list upstream mirror package anonymous out
+    local list upstream mirror package anonymous out failed=0
     local -a order=()
     local -A refused=()
     list=$(mirror_list) || { echo "$list"; return 1; }
@@ -239,15 +269,20 @@ mirror_public() {
             continue
         fi
         echo "$out"
+        if ! grep -qiE "$REFUSED_PULL" <<< "$out"; then
+            error "the anonymous pull of $mirror failed, and not for want of access, so this says nothing of whether its package is public: $(tail -n 1 <<< "$out"). Re-run this job; if it fails again, see the error above."
+            failed=1
+            continue
+        fi
         package=${mirror%:*}
         [ -n "${refused[$package]:-}" ] || order+=("$package")
         refused[$package]+=" ${mirror##*:}"
     done 3<<< "$list"
     for package in "${order[@]}"; do
         local name=${package#ghcr.io/"$MIRROR_OWNER"/}
-        error "$package could not be pulled anonymously (tags:${refused[$package]}), so the package is not public: a new GHCR package starts private. Make it public at https://github.com/users/$MIRROR_OWNER/packages/container/${name//\//%2F}/settings, under Danger Zone, Change visibility, then re-run this job."
+        error "$package refused an anonymous pull (tags:${refused[$package]}), so the package is not public: a new GHCR package starts private. Make it public at https://github.com/users/$MIRROR_OWNER/packages/container/${name//\//%2F}/settings, under Danger Zone, Change visibility, then re-run this job."
     done
-    [ "${#order[@]}" = 0 ]
+    [ "${#order[@]}" = 0 ] && [ "$failed" = 0 ]
 }
 
 [ $# -eq 1 ] || usage

@@ -20,6 +20,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -135,10 +136,10 @@ func passedBaseRegistries(args []shellWord) []string {
 }
 
 // mirrorBaseFindings holds each base a Dockerfile builds on to one the mirror holds, when it is
-// built with baseRegistry set to the mirror: a base under ${baseRegistry}/ is read at the mirror,
-// and must be an address of mirrored. A base written otherwise is baseRegistryDockerfileFindings'
-// to report.
-func mirrorBaseFindings(rel, src string, mirrored map[string]bool) []string {
+// built with baseRegistry set to the mirror, as Check and the e2e server build: a base under
+// ${baseRegistry}/ is read at the mirror, and must be an address of mirrored. A base written
+// otherwise is baseRegistryDockerfileFindings' to report. guard begins each finding.
+func mirrorBaseFindings(guard, rel, src string, mirrored map[string]bool) []string {
 	instructions, unparseable := dockerInstructions(src)
 	if unparseable != "" {
 		return nil
@@ -158,14 +159,14 @@ func mirrorBaseFindings(rel, src string, mirrored map[string]bool) []string {
 		if !external || !under {
 			continue
 		}
-		at := fmt.Sprintf("e2e mirror: %s:%d", rel, st.from.line)
+		at := fmt.Sprintf("%s: %s:%d", guard, rel, st.from.line)
 		resolved := ciMirror + "/" + rest
 		switch {
 		case strings.Contains(rest, "$"):
 			findings = append(findings, fmt.Sprintf("%s builds on %s, whose tag comes from a variable, so this check cannot tell whether the mirror holds it: write the tag out, as version-manager.sh update writes it",
 				at, image))
 		case !mirrored[resolved]:
-			findings = append(findings, fmt.Sprintf("%s builds on %s, which the e2e server pulls as %s, and %s does not hold it at versions.yaml's pins: build on the pinned tag (run ./version-manager.sh update), or add the image to %s",
+			findings = append(findings, fmt.Sprintf("%s builds on %s, which a build passing the mirror pulls as %s, and %s does not hold it at versions.yaml's pins: build on the pinned tag (run ./version-manager.sh update), or add the image to %s",
 				at, image, resolved, mirrorList, mirrorList))
 		}
 	}
@@ -221,7 +222,7 @@ func e2eScriptFindings(file, src string, mirrored map[string]bool) []string {
 			// The body at its own lines, so a finding names the script's line.
 			dockerfile := strings.Repeat("\n", heredocs[h].line-1) + heredocs[h].body
 			findings = append(findings, baseRegistryDockerfileFindings(file, dockerfile)...)
-			findings = append(findings, mirrorBaseFindings(file, dockerfile, mirrored)...)
+			findings = append(findings, mirrorBaseFindings("e2e mirror", file, dockerfile, mirrored)...)
 		}
 	}
 	if builds == 0 {
@@ -248,16 +249,22 @@ func e2eMailpitFindings(file, src string, mirrored map[string]bool) []string {
 	return nil
 }
 
+// e2eFiles are the files the e2e server's guard reads, relative to the repository root.
+var e2eFiles = append(append([]string{e2eLib}, e2eBuildScripts...), e2eDockerfiles...)
+
 // checkE2EMirror reads the e2e server's scripts and Dockerfiles under the repository root and
-// returns their findings, mirrored being the mirror addresses the list holds.
-func checkE2EMirror(repoRoot string, mirrored map[string]bool) []string {
+// returns their findings and how many of them it read, mirrored being the mirror addresses the list
+// holds.
+func checkE2EMirror(repoRoot string, mirrored map[string]bool) ([]string, int) {
 	var findings []string
+	files := 0
 	read := func(rel string) (string, bool) {
 		content, err := os.ReadFile(filepath.Join(repoRoot, filepath.FromSlash(rel)))
 		if err != nil {
 			findings = append(findings, fmt.Sprintf("e2e mirror: %s cannot be read: %v", rel, err))
 			return "", false
 		}
+		files++
 		return string(content), true
 	}
 	if src, ok := read(e2eLib); ok {
@@ -271,16 +278,58 @@ func checkE2EMirror(repoRoot string, mirrored map[string]bool) []string {
 	for _, rel := range e2eDockerfiles {
 		if src, ok := read(rel); ok {
 			findings = append(findings, baseRegistryDockerfileFindings(rel, src)...)
-			findings = append(findings, mirrorBaseFindings(rel, src, mirrored)...)
+			findings = append(findings, mirrorBaseFindings("e2e mirror", rel, src, mirrored)...)
 		}
 	}
-	return findings
+	return findings, files
+}
+
+// assertE2EMirror is the e2e server's guard's reporting half: each finding of checkE2EMirror an
+// error, and a check that read none of its files under repoRoot, or has no mirror address to hold
+// them to, fatal.
+func assertE2EMirror(r Reporter, repoRoot string, mirrored map[string]bool) {
+	r.Helper()
+	if len(mirrored) == 0 {
+		r.Fatalf("e2e mirror: the mirror's list gave no address, so this check has nothing to hold the e2e server's images to")
+	}
+	findings, read := checkE2EMirror(repoRoot, mirrored)
+	reportBuildFileFindings(r, "e2e mirror", repoRoot, read, findings)
 }
 
 // The e2e server's addresses are read at the committed pins: its files write them out.
 func TestE2EServer_BuildsFromTheMirrorAndPullsMailpitFromIt(t *testing.T) {
-	versions := repositoryFiles(t, []string{"src/authserver/versions.yaml"})["src/authserver/versions.yaml"]
-	assert.Empty(t, checkE2EMirror(filepath.Dir(SourceRoot(t)), mirroredAddresses(t, versions)))
+	assertE2EMirror(t, filepath.Dir(SourceRoot(t)), committedMirrored(t))
+}
+
+// The reporting half passes the files as they are committed, reports Mailpit pulled from Docker
+// Hub, and is fatal on a tree it read nothing of and on a list that gave no address.
+func TestE2EServer_Reporting(t *testing.T) {
+	mirrored := committedMirrored(t)
+	assertTree := func(root string, m map[string]bool) Report {
+		return Run(func(r Reporter) { assertE2EMirror(r, root, m) })
+	}
+	t.Run("the committed files pass", func(t *testing.T) {
+		report := assertTree(repositoryTree(t, e2eFiles, nil), mirrored)
+		assert.False(t, report.Failed(), "%s", report.Text())
+	})
+	t.Run("Mailpit from Docker Hub fails", func(t *testing.T) {
+		root := repositoryTree(t, e2eFiles, map[string][2]string{e2eLib: {ciMirror + "/mailpit:", "axllent/mailpit:"}})
+		report := assertTree(root, mirrored)
+		assert.False(t, report.Stopped, "a finding is an error, not a fatal: %s", report.Text())
+		require.Len(t, report.Errors, 1, "%s", report.Text())
+		assert.Contains(t, report.Errors[0], "e2e mirror: "+e2eLib+":")
+		assert.Contains(t, report.Errors[0], "runs Mailpit from docker.io")
+	})
+	t.Run("a tree holding none of the files is fatal", func(t *testing.T) {
+		report := assertTree(t.TempDir(), mirrored)
+		require.True(t, report.Stopped, "an empty walk passed: %s", report.Text())
+		assert.Contains(t, report.Fatal, "e2e mirror: read none of its files under")
+	})
+	t.Run("a list that gave no address is fatal", func(t *testing.T) {
+		report := assertTree(repositoryTree(t, e2eFiles, nil), map[string]bool{})
+		require.True(t, report.Stopped, "%s", report.Text())
+		assert.Contains(t, report.Fatal, "the mirror's list gave no address")
+	})
 }
 
 // update writes tools.go into the FROM line of the wizard's Dockerfile in remote-prepare.sh, and
@@ -375,7 +424,7 @@ func TestE2EServer_ScriptFindings(t *testing.T) {
 	})
 	t.Run("the wizard's Dockerfile naming its Go image without baseRegistry", func(t *testing.T) {
 		assertFindings(t, findings("prepare.sh", edit(t, prepare, "FROM \\${baseRegistry}/golang:", "FROM golang:")),
-			"base registry: prepare.sh:13 builds on golang:1.28.0-alpine, whose registry is not ${baseRegistry}")
+			"base registry: prepare.sh:13 builds on golang:1.28.0-alpine, which bypasses ${baseRegistry}, so a build passing baseRegistry pulls it from docker.io all the same: write FROM ${baseRegistry}/golang:1.28.0-alpine")
 	})
 	t.Run("the wizard's Dockerfile with no baseRegistry declared", func(t *testing.T) {
 		assertFindings(t, findings("prepare.sh", edit(t, prepare, "ARG baseRegistry=docker.io/library\n", "")),
@@ -383,7 +432,7 @@ func TestE2EServer_ScriptFindings(t *testing.T) {
 	})
 	t.Run("the wizard's Go image at a tag the mirror lacks", func(t *testing.T) {
 		assertFindings(t, findings("prepare.sh", edit(t, prepare, "golang:1.28.0-alpine", "golang:1.27.4-alpine")),
-			"e2e mirror: prepare.sh:13 builds on ${baseRegistry}/golang:1.27.4-alpine, which the e2e server pulls as ghcr.io/leodip/goiabada-ci/golang:1.27.4-alpine, and .github/mirror/images does not hold it at versions.yaml's pins")
+			"e2e mirror: prepare.sh:13 builds on ${baseRegistry}/golang:1.27.4-alpine, which a build passing the mirror pulls as ghcr.io/leodip/goiabada-ci/golang:1.27.4-alpine, and .github/mirror/images does not hold it at versions.yaml's pins")
 	})
 	t.Run("the wizard's Go image tagged through a variable", func(t *testing.T) {
 		assertFindings(t, findings("prepare.sh", edit(t, prepare, "golang:1.28.0-alpine", "golang:\\${goVersion}-alpine")),
@@ -412,7 +461,7 @@ func TestE2EServer_DockerfileAndMailpitFindings(t *testing.T) {
 		"E2E_MAILPIT_IMAGE=\"${E2E_MAILPIT_IMAGE:-ghcr.io/leodip/goiabada-ci/mailpit:v1.40.2}\"\n" + // 3
 		"E2E_MAILPIT_PORT=\"${E2E_MAILPIT_PORT:-18025}\"\n" // 4
 	dockerfileFindings := func(src string) []string {
-		return append(baseRegistryDockerfileFindings("testapp/Dockerfile", src), mirrorBaseFindings("testapp/Dockerfile", src, mirrored)...)
+		return append(baseRegistryDockerfileFindings("testapp/Dockerfile", src), mirrorBaseFindings("e2e mirror", "testapp/Dockerfile", src, mirrored)...)
 	}
 	edit := func(t *testing.T, src, old, with string) string {
 		t.Helper()
@@ -425,12 +474,12 @@ func TestE2EServer_DockerfileAndMailpitFindings(t *testing.T) {
 	})
 	t.Run("a test app on Node the mirror lacks", func(t *testing.T) {
 		assertFindings(t, dockerfileFindings(strings.Replace(dockerfile, "27.0.1", "26.13.1", 2)),
-			"e2e mirror: testapp/Dockerfile:3 builds on ${baseRegistry}/node:26.13.1-alpine, which the e2e server pulls as ghcr.io/leodip/goiabada-ci/node:26.13.1-alpine",
+			"e2e mirror: testapp/Dockerfile:3 builds on ${baseRegistry}/node:26.13.1-alpine, which a build passing the mirror pulls as ghcr.io/leodip/goiabada-ci/node:26.13.1-alpine",
 			"e2e mirror: testapp/Dockerfile:5 builds on ${baseRegistry}/node:26.13.1-alpine")
 	})
 	t.Run("a test app on Docker Hub's Node", func(t *testing.T) {
 		assertFindings(t, dockerfileFindings(edit(t, dockerfile, "FROM ${baseRegistry}/node:27.0.1-alpine\n", "FROM node:27.0.1-alpine\n")),
-			"base registry: testapp/Dockerfile:5 builds on node:27.0.1-alpine, whose registry is not ${baseRegistry}")
+			"base registry: testapp/Dockerfile:5 builds on node:27.0.1-alpine, which bypasses ${baseRegistry}")
 	})
 	t.Run("a test app that declares no baseRegistry", func(t *testing.T) {
 		assertFindings(t, dockerfileFindings(edit(t, dockerfile, "ARG baseRegistry=docker.io/library\n", "")),
@@ -453,9 +502,10 @@ func TestE2EServer_DockerfileAndMailpitFindings(t *testing.T) {
 			"e2e mirror: lib.sh sets no E2E_MAILPIT_IMAGE default this check can read")
 	})
 	t.Run("files that cannot be read", func(t *testing.T) {
-		got := checkE2EMirror(t.TempDir(), mirrored)
+		got, read := checkE2EMirror(t.TempDir(), mirrored)
+		assert.Zero(t, read)
 		sort.Strings(got)
-		want := append([]string{e2eLib}, append(e2eBuildScripts, e2eDockerfiles...)...)
+		want := slices.Clone(e2eFiles)
 		sort.Strings(want)
 		require.Len(t, got, len(want), "findings:\n\t%s", strings.Join(got, "\n\t"))
 		for i, rel := range want {

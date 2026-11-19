@@ -248,7 +248,7 @@ func runnerJobFindings(file, text string) []string {
 func TestCheckWorkflow_TheModuleTiersRunOnTheRunner(t *testing.T) {
 	file := checkWorkflow
 	text := repositoryFiles(t, []string{file})[file]
-	assert.Empty(t, runnerJobFindings(filepath.Base(file), text))
+	assertWorkflowFindings(t, "runner jobs", filepath.Dir(SourceRoot(t)), file, runnerJobFindings)
 
 	// The seven jobs the decision names, so a job renamed or folded into another is noticed here
 	// rather than by the benchmark.
