@@ -19,11 +19,11 @@ Then the refresh token your app got from its previous refresh fails too, with th
 
 Or every refresh token the user holds with your app fails at once, on every device, and the audit log may hold a `revoked_consent_grants` event naming the user and your client: the user's consent was withdrawn. See [A withdrawn consent](#a-withdrawn-consent).
 
-Or every refresh token your app got from the password grant fails at once, for every user, and the audit log holds a `revoked_client_grants` event for your client with the reason `client_identifier_changed`: an administrator changed your app's client identifier. See [A changed client identifier](#a-changed-client-identifier).
+Or every refresh token your app got from the password grant fails at once, for every user: an administrator changed your app's client identifier or made it public. If audit logging is on, look in the [audit log](/concepts/audit-log/) for a `revoked_client_grants` event for your client, with the reason `client_identifier_changed` or `client_became_public`. See [A changed client identifier](#a-changed-client-identifier) and [A client made public](#a-client-made-public).
 
 ## Why it happens
 
-There are four causes: a refresh token that came back after it was rotated, which is the usual one, a consent withdrawn, a changed client identifier, and your app revoking the grant.
+There are five causes: a refresh token that came back after it was rotated, which is the usual one, a consent withdrawn, a changed client identifier, a client made public, and your app revoking the grant.
 
 A refresh token is good for one refresh. Each refresh returns a new one and retires the old one, and that's called rotation.
 
@@ -44,9 +44,15 @@ There's nothing to fix in your app beyond signing the user in again. If your app
 
 ### A changed client identifier
 
-When an administrator changes your app's [client identifier](/concepts/clients/#client-identifier), every refresh token of your app is revoked, for every user. A refresh token from the password grant then answers "This refresh token has been revoked." One from a sign-in answers that its session has expired or been terminated instead (see [Other reasons a refresh fails](#other-reasons-a-refresh-fails)). The audit log holds a `revoked_client_grants` event for your client with the reason `client_identifier_changed`.
+When an administrator changes your app's [client identifier](/concepts/clients/#client-identifier), every refresh token of your app is revoked, for every user. A refresh token from the password grant then answers "This refresh token has been revoked." One from a sign-in answers that its session has expired or been terminated instead (see [Other reasons a refresh fails](#other-reasons-a-refresh-fails)). If audit logging is on, the audit log records it as a `revoked_client_grants` event for your client with the reason `client_identifier_changed`.
 
 Update your app to send the new client identifier, then sign its users in again.
+
+### A client made public
+
+When an administrator switches your app from confidential to [public](/concepts/clients/#public-and-confidential-clients), every refresh token of your app is revoked, for every user, as for a changed client identifier: one from the password grant answers "This refresh token has been revoked.", and one from a sign-in answers that its session has expired or been terminated. If audit logging is on, the audit log records it as a `revoked_client_grants` event for your client with the reason `client_became_public`.
+
+Sign your app's users in again.
 
 ### A grant your app revoked
 

@@ -106,6 +106,52 @@ func TestTokenClientRow_AboveTheFloat64SafeRange(t *testing.T) {
 	assert.Equal(t, int64(9007199254740993), clientRow)
 }
 
+// The payload read for a large id is matched by member name exactly, as the token parser matched
+// the claim it decoded (RFC 7519 section 7.3): a member whose name differs only in case is another
+// member, wherever it sits in the object, and the whole int64 range is read.
+func TestSignedClientRow_ExactMemberName(t *testing.T) {
+	for _, tc := range []struct {
+		label   string
+		payload string
+		wantRow int64
+		wantOK  bool
+	}{
+		{label: "a case variant after the claim",
+			payload: `{"client_internal_id":9007199254740993,"Client_Internal_Id":9007199254740995}`,
+			wantRow: 9007199254740993, wantOK: true},
+		{label: "a case variant before the claim",
+			payload: `{"CLIENT_INTERNAL_ID":9007199254740995,"client_internal_id":9007199254740993}`,
+			wantRow: 9007199254740993, wantOK: true},
+		{label: "only a case variant",
+			payload: `{"Client_Internal_Id":9007199254740993}`,
+			wantOK:  false},
+		{label: "the largest int64",
+			payload: `{"client_internal_id":9223372036854775807}`,
+			wantRow: math.MaxInt64, wantOK: true},
+		{label: "a string",
+			payload: `{"client_internal_id":"9007199254740993"}`,
+			wantOK:  false},
+	} {
+		t.Run(tc.label, func(t *testing.T) {
+			clientRow, ok := signedClientRow(compactWithPayload(tc.payload))
+			assert.Equal(t, tc.wantOK, ok)
+			if tc.wantOK {
+				assert.Equal(t, tc.wantRow, clientRow)
+			}
+		})
+	}
+
+	// Through tokenClientRow, the claim the parser decoded and the member read from the payload are
+	// the same one, and a case variant beside it changes nothing.
+	token := accessToken(map[string]interface{}{"client_internal_id": float64(int64(1)<<53 + 1)})
+	token.TokenBase64 = compactWithPayload(
+		`{"client_internal_id":9007199254740993,"Client_Internal_Id":9007199254740992}`)
+	clientRow, present, wellFormed := tokenClientRow(token)
+	assert.True(t, present)
+	assert.True(t, wellFormed)
+	assert.Equal(t, int64(9007199254740993), clientRow)
+}
+
 // compactWithPayload is a compact JWS around this payload, signature and header aside.
 func compactWithPayload(payload string) string {
 	return "e30." + base64.RawURLEncoding.EncodeToString([]byte(payload)) + ".c2ln"

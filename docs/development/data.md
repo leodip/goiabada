@@ -112,8 +112,9 @@ serialize on the row (`password_grant_rename_ordering_test.go`). A client's dele
 anyway: a rename committed meanwhile is waited for, and the deletion records the identifier the row
 held when it was deleted, not one it gave up. Holding the row, it sweeps the client's refresh tokens
 again, since an initial password grant it waited for has committed a token its first sweep could
-not see (`deleted_client_test.go` shows both orders against a rename and against a password grant
-on MySQL, PostgreSQL and SQL Server),
+not see (`deleted_client_test.go` shows both orders against a rename, and
+`password_grant_rename_ordering_test.go`'s `TestDeleteClientOrdering_AgainstInitialPasswordGrant`
+both orders against a password grant, on MySQL, PostgreSQL and SQL Server),
 #139's issuance (`AcquireUserSessionRow`), #131's refresh rotation
 (`AcquireUserRow`), #542's session writes (`AcquireUserSessionRow`) and one-time code claims
 (`AcquireUserRow`), #407's settings section saves (`AcquireSettingsRow`), each of which reads

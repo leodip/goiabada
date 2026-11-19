@@ -9,6 +9,7 @@
 package liveness
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/base64"
@@ -256,6 +257,11 @@ func tokenClientRow(token oauth.JwtToken) (int64, bool, bool) {
 // signedClientRow reads client_internal_id from a compact JWS's payload as written, a whole number
 // that fits an int64, and reports whether it is one. A token without its compact serialization
 // cannot be read this way and reports false, failing closed.
+//
+// The payload is decoded into a map, as the token parser decodes it, and the member is looked up
+// by its exact name: RFC 7519 section 7.3 compares member names as JSON strings, and a tagged
+// struct field would also take a member whose name differs only in case, so the two reads could
+// pick different members. Only a JSON number is read; a string spelling one is not.
 func signedClientRow(compact string) (int64, bool) {
 	segments := strings.Split(compact, ".")
 	if len(segments) != 3 {
@@ -265,13 +271,17 @@ func signedClientRow(compact string) (int64, bool) {
 	if err != nil {
 		return 0, false
 	}
-	var claims struct {
-		ClientInternalID json.Number `json:"client_internal_id"`
-	}
-	if err = json.Unmarshal(payload, &claims); err != nil {
+	decoder := json.NewDecoder(bytes.NewReader(payload))
+	decoder.UseNumber()
+	var claims map[string]interface{}
+	if err = decoder.Decode(&claims); err != nil {
 		return 0, false
 	}
-	clientRow, err := strconv.ParseInt(claims.ClientInternalID.String(), 10, 64)
+	written, isNumber := claims["client_internal_id"].(json.Number)
+	if !isNumber {
+		return 0, false
+	}
+	clientRow, err := strconv.ParseInt(written.String(), 10, 64)
 	if err != nil || clientRow < 0 {
 		return 0, false
 	}
