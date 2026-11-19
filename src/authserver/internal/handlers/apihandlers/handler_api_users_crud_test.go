@@ -385,10 +385,12 @@ func TestHandleUserPasswordPut_RevokesEverything(t *testing.T) {
 // endpoint first read them, as TestHandleUserEnabledPut_AUserDeletedMeanwhile does to the enabled
 // endpoint (#796 decision 3). Deleted before the write, the request answers 404 and writes nothing,
 // audits nothing, sends no logout token and tells nobody. Deleted after the write committed, it
-// answers 404 too, and what the committed write did stands: its two audit events and its notice. SMTP
-// is on and the address verified in both, so a notice could have been sent.
+// answers 404 too, and what the committed write did stands: its two audit events, its logout token
+// and its notice. SMTP is on and the address verified in both, so a notice could have been sent.
 func TestHandleUserPasswordPut_AUserDeletedMeanwhile(t *testing.T) {
 	const userId = adminPasswordNoticeUserId
+	app := record.Client{Id: 7, ClientIdentifier: "app-holding-a-grant",
+		BackchannelLogoutURI: "https://app.example/backchannel"}
 
 	t.Run("a user deleted before the write", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
@@ -420,27 +422,42 @@ func TestHandleUserPasswordPut_AUserDeletedMeanwhile(t *testing.T) {
 	t.Run("a user deleted after the write committed", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
+		logoutTokens := &recordingLogoutTokens{}
 		jobs := &heldJobs{}
 
 		database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), userId).Return(adminPasswordNoticeRow("the-old-hash"), nil).Once()
+		stub := datamocks.ExpectRunInTransaction(database, apiRevokeTx)
 		database.On("GetUserByIdForUpdate", mock.Anything, apiRevokeTx, userId).Return(adminPasswordNoticeRow("the-old-hash"), nil).Once()
 		database.On("SetUserPasswordHash", mock.Anything, apiRevokeTx, userId, mock.Anything).Return(nil).Once()
-		stubSweep(database, userId, 5)
+		database.On("IncrementUserAuthStateGeneration", mock.Anything, apiRevokeTx, userId).Return(int64(5), nil).Once()
+		database.On("GetUserSessionsByUserId", mock.Anything, apiRevokeTx, userId).Return([]record.UserSession{}, nil).Once()
+		// An app on none of the user's sessions holds a grant, so the password set owes it a
+		// logout token naming the user alone (#784 decision 3).
+		database.On("GetUsableRefreshTokenClientIdsByUserId", mock.Anything, apiRevokeTx, userId, mock.Anything).
+			Return([]int64{app.Id}, nil).Once()
+		database.On("GetClientsByIds", mock.Anything, apiRevokeTx, []int64{app.Id}).Return([]record.Client{app}, nil).Once()
+		database.On("GetRefreshTokensByUserId", mock.Anything, apiRevokeTx, userId).Return([]*record.RefreshToken{}, nil).Once()
+		database.On("PromoteRefreshTokenGenerations", mock.Anything, apiRevokeTx, []int64{}, int64(5)).Return(nil).Once()
 		auditLogger.On("Log", mock.Anything, audit.EventUpdatedUserAuthentication, mock.Anything).Return().Once()
 		auditLogger.On("Log", mock.Anything, audit.EventRevokedUserAuthState, mock.Anything).Return().Once()
 		// The response's read of the user finds them gone.
 		database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), userId).Return((*record.User)(nil), nil).Once()
 
 		rr := httptest.NewRecorder()
-		HandleUserPasswordPut(database, accountvalidation.NewPasswordValidator(), auditLogger, heldNotifier(t, jobs), &recordingLogoutTokens{}).
+		HandleUserPasswordPut(database, accountvalidation.NewPasswordValidator(), auditLogger, heldNotifier(t, jobs), logoutTokens).
 			ServeHTTP(rr, adminPasswordNoticeRequest(t, passwordNoticeSettings(), adminPasswordNoticeNew))
 
 		require.Equal(t, http.StatusNotFound, rr.Code, rr.Body.String())
 		code, description := decodeErrorEnvelope(t, rr)
 		assert.Equal(t, "NOT_FOUND", code)
 		assert.Equal(t, "User not found", description)
+		require.NoError(t, stub.BodyErr, "the write committed")
 		database.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
+		assert.Equal(t, [][]backchannel.Delivery{{{
+			ClientId: 7, ClientIdentifier: "app-holding-a-grant", URI: "https://app.example/backchannel",
+			UserId: userId, Subject: "the-target",
+		}}}, logoutTokens.sent, "the committed change's logout token stands")
 		assert.Len(t, jobs.jobs, 1, "the committed change's notice stands")
 	})
 }
