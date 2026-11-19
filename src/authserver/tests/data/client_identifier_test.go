@@ -174,36 +174,47 @@ func TestSetClientIdentifier_DecidesAgainstARenameCommittedMeanwhile(t *testing.
 		t.Skip("sqlite is limited to one connection (SetMaxOpenConns(1)), so a second write " +
 			"transaction queues behind the first instead of overlapping it")
 	}
+	runRenameDecidesAgainstARenameCommittedMeanwhile(t, database)
+}
+
+// TestSetClientIdentifier_DecidesAgainstARenameCommittedMeanwhile_RCSI is the same race on a SQL Server database with
+// READ_COMMITTED_SNAPSHOT on, where a plain read no longer waits for the first rename, so only the
+// identifier's locking read orders the two. It skips on the other three engines.
+func TestSetClientIdentifier_DecidesAgainstARenameCommittedMeanwhile_RCSI(t *testing.T) {
+	runRenameDecidesAgainstARenameCommittedMeanwhile(t, rcsiDatabase(t).primary)
+}
+
+func runRenameDecidesAgainstARenameCommittedMeanwhile(t *testing.T, db data.Database) {
 	ctx := context.Background()
-	client := createIdentifierTestClient(t)
+	client := createIdentifierTestClientOn(t, db)
 	renamed := "renamed_" + fake.LetterN(8)
 
-	first := beginTx(t)
-	changed, err := database.SetClientIdentifier(ctx, first, client.Id, renamed)
+	first := beginTxOn(t, db)
+	changed, err := db.SetClientIdentifier(ctx, first, client.Id, renamed)
 	require.NoError(t, err)
 	require.True(t, changed)
 
-	second := beginTx(t)
+	second := beginTxOn(t, db)
 	type outcome struct {
 		changed bool
 		err     error
 	}
 	secondWrite := goBlocked(t, "the second save's write", first, func(reached func()) outcome {
 		reached()
-		secondChanged, secondErr := database.SetClientIdentifier(ctx, second, client.Id, renamed)
+		secondChanged, secondErr := db.SetClientIdentifier(ctx, second, client.Id, renamed)
 		return outcome{secondChanged, secondErr}
 	})
 
 	secondWrite.requireBlocked(t)
 	secondWrite.requireStillWaiting(t)
-	require.NoError(t, database.CommitTransaction(ctx, first))
+	require.NoError(t, db.CommitTransaction(ctx, first))
 
 	o := secondWrite.await(t)
 	require.NoError(t, o.err)
 	assert.False(t, o.changed, "the row already holds the identifier, as committed by the other save")
-	require.NoError(t, database.CommitTransaction(ctx, second))
+	require.NoError(t, db.CommitTransaction(ctx, second))
 
-	got, err := database.GetClientById(ctx, nil, client.Id)
+	got, err := db.GetClientById(ctx, nil, client.Id)
 	require.NoError(t, err)
 	require.NotNil(t, got)
 	assert.Equal(t, renamed, got.ClientIdentifier)
@@ -217,37 +228,48 @@ func TestSetClientIdentifier_ASecondRenameMeanwhileIsAChange(t *testing.T) {
 		t.Skip("sqlite is limited to one connection (SetMaxOpenConns(1)), so a second write " +
 			"transaction queues behind the first instead of overlapping it")
 	}
+	runASecondRenameMeanwhileIsAChange(t, database)
+}
+
+// TestSetClientIdentifier_ASecondRenameMeanwhileIsAChange_RCSI is the same race on a SQL Server database with
+// READ_COMMITTED_SNAPSHOT on, where a plain read no longer waits for the first rename, so only the
+// identifier's locking read orders the two. It skips on the other three engines.
+func TestSetClientIdentifier_ASecondRenameMeanwhileIsAChange_RCSI(t *testing.T) {
+	runASecondRenameMeanwhileIsAChange(t, rcsiDatabase(t).primary)
+}
+
+func runASecondRenameMeanwhileIsAChange(t *testing.T, db data.Database) {
 	ctx := context.Background()
-	client := createIdentifierTestClient(t)
+	client := createIdentifierTestClientOn(t, db)
 	original := client.ClientIdentifier
 	renamed := "renamed_" + fake.LetterN(8)
 
-	first := beginTx(t)
-	changed, err := database.SetClientIdentifier(ctx, first, client.Id, renamed)
+	first := beginTxOn(t, db)
+	changed, err := db.SetClientIdentifier(ctx, first, client.Id, renamed)
 	require.NoError(t, err)
 	require.True(t, changed)
 
-	second := beginTx(t)
+	second := beginTxOn(t, db)
 	type outcome struct {
 		changed bool
 		err     error
 	}
 	secondWrite := goBlocked(t, "the second save's write", first, func(reached func()) outcome {
 		reached()
-		secondChanged, secondErr := database.SetClientIdentifier(ctx, second, client.Id, original)
+		secondChanged, secondErr := db.SetClientIdentifier(ctx, second, client.Id, original)
 		return outcome{secondChanged, secondErr}
 	})
 
 	secondWrite.requireBlocked(t)
 	secondWrite.requireStillWaiting(t)
-	require.NoError(t, database.CommitTransaction(ctx, first))
+	require.NoError(t, db.CommitTransaction(ctx, first))
 
 	o := secondWrite.await(t)
 	require.NoError(t, o.err)
 	assert.True(t, o.changed, "the row holds the other save's identifier, so writing the original back is a change")
-	require.NoError(t, database.CommitTransaction(ctx, second))
+	require.NoError(t, db.CommitTransaction(ctx, second))
 
-	got, err := database.GetClientById(ctx, nil, client.Id)
+	got, err := db.GetClientById(ctx, nil, client.Id)
 	require.NoError(t, err)
 	require.NotNil(t, got)
 	assert.Equal(t, original, got.ClientIdentifier)
@@ -255,11 +277,16 @@ func TestSetClientIdentifier_ASecondRenameMeanwhileIsAChange(t *testing.T) {
 
 func createIdentifierTestClient(t *testing.T) *record.Client {
 	t.Helper()
+	return createIdentifierTestClientOn(t, database)
+}
+
+func createIdentifierTestClientOn(t *testing.T, db data.Database) *record.Client {
+	t.Helper()
 	client := &record.Client{
 		ClientIdentifier: "identifier_" + fake.LetterN(8),
 		Description:      "Identifier test client " + fake.LetterN(6),
 		Enabled:          true,
 	}
-	require.NoError(t, database.CreateClient(context.Background(), nil, client))
+	require.NoError(t, db.CreateClient(context.Background(), nil, client))
 	return client
 }

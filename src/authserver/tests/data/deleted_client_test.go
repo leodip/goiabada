@@ -19,7 +19,12 @@ import (
 
 func deletedClient(t *testing.T, identifier string) *record.DeletedClient {
 	t.Helper()
-	deleted, err := database.GetDeletedClientByClientIdentifier(context.Background(), nil, identifier)
+	return deletedClientOn(t, database, identifier)
+}
+
+func deletedClientOn(t *testing.T, db data.Database, identifier string) *record.DeletedClient {
+	t.Helper()
+	deleted, err := db.GetDeletedClientByClientIdentifier(context.Background(), nil, identifier)
 	require.NoError(t, err)
 	return deleted
 }
@@ -99,35 +104,47 @@ func TestDeleteClient_OverlappingARenameRecordsTheIdentifierTheRowHeld(t *testin
 		t.Skip("sqlite is limited to one connection (SetMaxOpenConns(1)), so the deletion " +
 			"queues behind the rename instead of overlapping it")
 	}
+	runDeleteClientOverlappingARename(t, database)
+}
+
+// TestDeleteClient_OverlappingARenameRecordsTheIdentifierTheRowHeld_RCSI is the same overlap on a
+// SQL Server database with READ_COMMITTED_SNAPSHOT on, where a plain read of the identifier would
+// not wait for the rename, so only the deletion's locking read records the one the row held. It
+// skips on the other three engines.
+func TestDeleteClient_OverlappingARenameRecordsTheIdentifierTheRowHeld_RCSI(t *testing.T) {
+	runDeleteClientOverlappingARename(t, rcsiDatabase(t).primary)
+}
+
+func runDeleteClientOverlappingARename(t *testing.T, db data.Database) {
 	ctx := context.Background()
-	client := createIdentifierTestClient(t)
+	client := createIdentifierTestClientOn(t, db)
 	original := client.ClientIdentifier
 	renamed := "renamed_" + fake.LetterN(8)
 
-	rename := beginTx(t)
-	changed, err := database.SetClientIdentifier(ctx, rename, client.Id, renamed)
+	rename := beginTxOn(t, db)
+	changed, err := db.SetClientIdentifier(ctx, rename, client.Id, renamed)
 	require.NoError(t, err)
 	require.True(t, changed)
 
 	deletion := goBlocked(t, "the deletion", rename, func(reached func()) error {
 		reached()
-		return database.DeleteClient(ctx, nil, client.Id)
+		return db.DeleteClient(ctx, nil, client.Id)
 	})
 
 	deletion.requireBlocked(t)
 	deletion.requireStillWaiting(t)
-	require.NoError(t, database.CommitTransaction(ctx, rename))
+	require.NoError(t, db.CommitTransaction(ctx, rename))
 
 	require.NoError(t, deletion.await(t))
 
-	gone, err := database.GetClientById(ctx, nil, client.Id)
+	gone, err := db.GetClientById(ctx, nil, client.Id)
 	require.NoError(t, err)
 	assert.Nil(t, gone, "the client is deleted")
 
-	deleted := deletedClient(t, renamed)
+	deleted := deletedClientOn(t, db, renamed)
 	require.NotNil(t, deleted, "the deletion records the identifier the row held when it was deleted")
 	assert.Equal(t, renamed, deleted.ClientIdentifier)
-	assert.Nil(t, deletedClient(t, original),
+	assert.Nil(t, deletedClientOn(t, db, original),
 		"the identifier the rename gave up was not the deleted client's, and is not recorded")
 }
 
@@ -139,39 +156,51 @@ func TestDeleteClient_ARenameOverlappingTheDeletionFindsNoClient(t *testing.T) {
 		t.Skip("sqlite is limited to one connection (SetMaxOpenConns(1)), so the rename " +
 			"queues behind the deletion instead of overlapping it")
 	}
+	runARenameOverlappingTheDeletion(t, database)
+}
+
+// TestDeleteClient_ARenameOverlappingTheDeletionFindsNoClient_RCSI is the same order on a SQL
+// Server database with READ_COMMITTED_SNAPSHOT on, where a plain read would still find the client
+// the deletion has not committed, so only the rename's locking read finds it gone. It skips on the
+// other three engines.
+func TestDeleteClient_ARenameOverlappingTheDeletionFindsNoClient_RCSI(t *testing.T) {
+	runARenameOverlappingTheDeletion(t, rcsiDatabase(t).primary)
+}
+
+func runARenameOverlappingTheDeletion(t *testing.T, db data.Database) {
 	ctx := context.Background()
-	client := createIdentifierTestClient(t)
+	client := createIdentifierTestClientOn(t, db)
 	original := client.ClientIdentifier
 	renamed := "renamed_" + fake.LetterN(8)
 
-	deletion := beginTx(t)
-	require.NoError(t, database.DeleteClient(ctx, deletion, client.Id))
+	deletion := beginTxOn(t, db)
+	require.NoError(t, db.DeleteClient(ctx, deletion, client.Id))
 
-	rename := beginTx(t)
+	rename := beginTxOn(t, db)
 	type outcome struct {
 		changed bool
 		err     error
 	}
 	renaming := goBlocked(t, "the rename", deletion, func(reached func()) outcome {
 		reached()
-		renameChanged, renameErr := database.SetClientIdentifier(ctx, rename, client.Id, renamed)
+		renameChanged, renameErr := db.SetClientIdentifier(ctx, rename, client.Id, renamed)
 		return outcome{renameChanged, renameErr}
 	})
 
 	renaming.requireBlocked(t)
 	renaming.requireStillWaiting(t)
-	require.NoError(t, database.CommitTransaction(ctx, deletion))
+	require.NoError(t, db.CommitTransaction(ctx, deletion))
 
 	o := renaming.await(t)
 	require.NoError(t, o.err)
 	assert.False(t, o.changed, "there is no client left to rename")
-	require.NoError(t, database.CommitTransaction(ctx, rename))
+	require.NoError(t, db.CommitTransaction(ctx, rename))
 
-	deleted := deletedClient(t, original)
+	deleted := deletedClientOn(t, db, original)
 	require.NotNil(t, deleted, "the deletion records the identifier the client had")
 	assert.Equal(t, original, deleted.ClientIdentifier)
-	assert.Nil(t, deletedClient(t, renamed), "the rename never took effect")
-	holder, err := database.GetClientByClientIdentifier(ctx, nil, renamed)
+	assert.Nil(t, deletedClientOn(t, db, renamed), "the rename never took effect")
+	holder, err := db.GetClientByClientIdentifier(ctx, nil, renamed)
 	require.NoError(t, err)
 	assert.Nil(t, holder, "no client holds the identifier the rename submitted")
 }

@@ -104,17 +104,19 @@ so an unchanged identifier leaves the row and its `updated_at` alone, and the se
 the identifier checks it owes against the row it read under it, and on that answer revokes the
 client's grants in the same transaction, through `revocation.RevokeClientGrantsTx`; `UpdateClient`
 leaves the column alone (`dont-update`), and `client_identifier_test.go` shows two renames meeting
-on every engine. The initial password grant reads the client with `GetClientByIdForUpdate`, a
-locking read that writes nothing, before it inserts its first refresh token, so it and a rename
-serialize on the row (`password_grant_rename_ordering_test.go`). A client's deletion
-(`DeleteClient`) takes no row ahead of its statements (#301), and reads the identifier it records in
+on every engine and on SQL Server with READ_COMMITTED_SNAPSHOT on (`rcsi_test.go`'s fixture). The
+initial password grant reads the client with `GetClientByIdForUpdate`, a locking read that writes
+nothing, before it inserts its first refresh token, so it and a rename serialize on the row
+(`password_grant_rename_ordering_test.go`). A client's deletion (`DeleteClient`) takes no row
+ahead of its statements (#301), and reads the identifier it records in
 `deleted_clients` with `GetClientByIdForUpdate` just before its DELETE, which takes that row
 anyway: a rename committed meanwhile is waited for, and the deletion records the identifier the row
 held when it was deleted, not one it gave up. Holding the row, it sweeps the client's refresh tokens
 again, since an initial password grant it waited for has committed a token its first sweep could
 not see (`deleted_client_test.go` shows both orders against a rename, and
 `password_grant_rename_ordering_test.go`'s `TestDeleteClientOrdering_AgainstInitialPasswordGrant`
-both orders against a password grant, on MySQL, PostgreSQL and SQL Server),
+both orders against a password grant, on MySQL, PostgreSQL and SQL Server, and again with
+READ_COMMITTED_SNAPSHOT on),
 #139's issuance (`AcquireUserSessionRow`), #131's refresh rotation
 (`AcquireUserRow`), #542's session writes (`AcquireUserSessionRow`) and one-time code claims
 (`AcquireUserRow`), #407's settings section saves (`AcquireSettingsRow`), each of which reads
