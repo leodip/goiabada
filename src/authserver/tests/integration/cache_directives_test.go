@@ -91,9 +91,9 @@ func TestCacheDirectives_TheOtpEnrolmentPageIsNotStorable(t *testing.T) {
 // cache to store it, and an integrator's own client caching GETs is under no such rule at all.
 //
 // Over real HTTP because a router-level test cannot make this claim: the sweep in
-// internal/server/routes_no_store_test.go builds initRoutes by hand, so it says nothing about
-// whether the globally mounted chain in initMiddleware, or anything else the response passes on its
-// way out of the process, overwrites the header first.
+// internal/server/routes_no_store_test.go calls each route without credentials, so it never
+// reaches this handler, and it says nothing about anything the response passes on its way out of
+// the process.
 func TestCacheDirectives_TheEnrolmentJsonIsNotStorable(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope(t)
 
@@ -113,7 +113,7 @@ func TestCacheDirectives_TheEnrolmentJsonIsNotStorable(t *testing.T) {
 }
 
 // TestCacheDirectives_AnApiRefusalIsNotStorable is the mount position proven end to end. It is the
-// property the sweep asserts on a hand-built router, checked here on the real one: the pair is
+// property the sweep asserts on the router in process, checked here over real HTTP: the pair is
 // written ahead of the guards, so a refusal carries it too.
 //
 // That the refusal is covered at all is not incidental. RFC 6749 section 5.1 scopes its MUST to any

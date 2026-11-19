@@ -81,14 +81,16 @@ func HandleBrandSafeColorsStylesheetGet(pageRenderer PageRenderer, database bran
 }
 
 // serveBrandStylesheet answers the stylesheet stylesheetOf builds for the brand the path names,
-// kept for a year when the request names its current fingerprint and five minutes otherwise.
+// kept for a year when the request names its current fingerprint and five minutes otherwise. An id
+// that is not one, or a brand that does not exist, is not found, and that answer is no-store
+// (ResourceNotFound).
 func serveBrandStylesheet(pageRenderer PageRenderer, database brandStylesheetDatabase,
 	stylesheetOf func(*http.Request, *record.Brand) (brandthemes.Stylesheet, error)) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		brandId, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 		if err != nil || brandId <= 0 {
-			http.NotFound(w, r)
+			ResourceNotFound(w, r)
 			return
 		}
 
@@ -98,7 +100,7 @@ func serveBrandStylesheet(pageRenderer PageRenderer, database brandStylesheetDat
 			return
 		}
 		if brand == nil {
-			http.NotFound(w, r)
+			ResourceNotFound(w, r)
 			return
 		}
 

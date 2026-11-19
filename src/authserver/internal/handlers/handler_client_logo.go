@@ -18,6 +18,9 @@ type clientLogoDatabase interface {
 	GetClientLogoByClientId(ctx context.Context, tx *sql.Tx, clientId int64) (*record.ClientLogo, error)
 }
 
+// HandleClientLogoGet answers a client's logo, to anyone, kept five minutes and revalidated by its
+// ETag. A client that does not exist, or one with no logo, is not found, and that answer is no-store
+// (ResourceNotFound).
 func HandleClientLogoGet(
 	pageRenderer PageRenderer,
 	database clientLogoDatabase,
@@ -26,7 +29,7 @@ func HandleClientLogoGet(
 	return func(w http.ResponseWriter, r *http.Request) {
 		clientIdentifier := r.PathValue("clientIdentifier")
 		if len(clientIdentifier) == 0 {
-			http.NotFound(w, r)
+			ResourceNotFound(w, r)
 			return
 		}
 
@@ -37,7 +40,7 @@ func HandleClientLogoGet(
 		}
 
 		if client == nil {
-			http.NotFound(w, r)
+			ResourceNotFound(w, r)
 			return
 		}
 
@@ -48,7 +51,7 @@ func HandleClientLogoGet(
 		}
 
 		if clientLogo == nil {
-			http.NotFound(w, r)
+			ResourceNotFound(w, r)
 			return
 		}
 

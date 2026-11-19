@@ -53,10 +53,10 @@ info:
     a new authenticator's setup key. The bearer token on the request does not make a
     cached copy safe: a private cache may still store a response it authenticated.
 
-    A few responses under these paths are answered before an operation is selected and
-    carry neither header: a CORS preflight, and the errors returned when the server cannot
-    read its own settings or the caller's session. None of them carries a credential, and
-    none of them is described by this document.
+    A CORS preflight to these paths is answered before an operation is selected and carries
+    neither header. It carries no credential, and this document does not describe it. An
+    error returned while the server reads its own settings, or checks the bearer token and the
+    session it names, carries both headers, as the token refusals do.
 
     The headers are not declared per operation, since every operation sends them.
   version: 1.0.0
@@ -4002,6 +4002,15 @@ paths:
                 type: string
         '404':
           description: Client or logo not found
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: no-store
+            Pragma:
+              schema:
+                type: string
+              description: no-cache
         '500':
           description: |
             The request failed inside the server. Unlike every other failure on
@@ -4056,6 +4065,15 @@ paths:
                 type: string
         '404':
           description: No brand has this ID, or the ID is not a positive integer
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: no-store
+            Pragma:
+              schema:
+                type: string
+              description: no-cache
         '500':
           description: |
             The request failed inside the server. The body is an HTML error page, not the JSON
@@ -4107,6 +4125,15 @@ paths:
                 type: string
         '404':
           description: No brand has this ID, or the ID is not a positive integer
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: no-store
+            Pragma:
+              schema:
+                type: string
+              description: no-cache
         '500':
           description: |
             The request failed inside the server. The body is an HTML error page, not the JSON
@@ -4180,6 +4207,15 @@ paths:
                 format: binary
         '404':
           description: No asset has this ID, or the ID is not a positive integer
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: no-store
+            Pragma:
+              schema:
+                type: string
+              description: no-cache
         '500':
           description: |
             The request failed inside the server. The body is an HTML error page, not the JSON
@@ -4253,12 +4289,37 @@ paths:
       responses:
         '200':
           description: Public settings
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: no-store
+            Pragma:
+              schema:
+                type: string
+              description: no-cache
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/PublicSettingsResponse'
         '500':
-          $ref: '#/components/responses/InternalServerError'
+          description: |
+            The request failed inside the server, most often because the settings could not be
+            read. error_code is INTERNAL_SERVER_ERROR: no detail about the failure, only the
+            request id an operator can find the log line by, and retrying is reasonable.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: no-store
+            Pragma:
+              schema:
+                type: string
+              description: no-cache
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/v1/admin/settings/email:
     get:
       tags: [Settings]

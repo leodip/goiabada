@@ -27,7 +27,8 @@ type publicSettingsDatabase interface {
 // is configured, the issuer, the brand the console draws its pages in, the stored password policy's
 // rules and whether users may delete their own account, as JSON, or the API's JSON 500 when the
 // settings row cannot be read (#279 decision 17). openapi.yaml describes it as getPublicSettings
-// (#783).
+// (#783). Every answer is no-store, which the branch it is registered on writes ahead of its chain
+// (#825 decision 3).
 //
 // The brand is the admin console's own client's, or the default brand when that client has none of
 // its own (#812 decision 7): the one the auth server draws that client's sign-in pages in, read

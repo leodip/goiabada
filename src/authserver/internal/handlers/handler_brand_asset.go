@@ -17,7 +17,8 @@ type brandAssetDatabase interface {
 // HandleBrandAssetGet answers a brand asset's bytes, at brandasset.Route, to anyone, as a static
 // file is answered (#813 decision 2): under the type its upload was validated as, with nosniff,
 // kept for a year when the request names its current fingerprint and five minutes otherwise, as a
-// brand's stylesheet is. An asset that does not exist is not found. Whether a brand uses the
+// brand's stylesheet is. An asset that does not exist is not found, and that answer is no-store
+// (ResourceNotFound). Whether a brand uses the
 // asset is not asked: its URL is only ever published by a brand or by the upload's own answer.
 //
 // A font is answered with Access-Control-Allow-Origin naming fontOrigin, the admin console's
@@ -29,7 +30,7 @@ func HandleBrandAssetGet(pageRenderer PageRenderer, database brandAssetDatabase,
 	return func(w http.ResponseWriter, r *http.Request) {
 		assetId, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 		if err != nil || assetId <= 0 {
-			http.NotFound(w, r)
+			ResourceNotFound(w, r)
 			return
 		}
 
@@ -39,7 +40,7 @@ func HandleBrandAssetGet(pageRenderer PageRenderer, database brandAssetDatabase,
 			return
 		}
 		if asset == nil {
-			http.NotFound(w, r)
+			ResourceNotFound(w, r)
 			return
 		}
 

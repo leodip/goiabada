@@ -82,8 +82,9 @@ func TestNoStore(t *testing.T) {
 // Only an authenticated success response can observe it, so the two API responses that carry a
 // credential each assert the pair on their own success in the authserver's integration tier:
 // tests/integration/cache_directives_test.go for GET /api/v1/account/otp/enrollment, and
-// tests/integration/api_clients_detail_secret_test.go for GET /api/v1/admin/clients/{id}, which is
-// where the decrypted client secret goes out. That same mutation fails there (#247).
+// tests/integration/api_clients_detail_secret_test.go for GET /api/v1/admin/clients/{id}/secret,
+// which is where the decrypted client secret goes out. The same mutation on either of their
+// handlers fails there (#247).
 func TestNoStore_HandlerCanOverrideCacheControl(t *testing.T) {
 	handler := NoStore()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "public, max-age=300")

@@ -24,11 +24,11 @@ import (
 //
 // On a request it does not wrap, such a store reads the session without moving its idle deadline:
 // a touch there would either leave the cookie expiring before its row, or send the cookie on an
-// answer that may be cacheable. The auth server mounts it on its page branch alone, whose answers
-// are no-store, so a reissued cookie never rides on a client logo, a profile picture, the OpenAPI
-// document, discovery or JWKS, which a shared cache could store and replay to other visitors (#743
-// decisions 8 and 9). The admin console's store, whose cookie ends with the browser, touches on
-// every read as before and mounts nothing.
+// answer that may be cacheable. The auth server mounts it on its page branch, whose answers are
+// no-store, and the only branch that reads the browser session at all, so no cookie rides on a
+// client logo, the OpenAPI document, discovery or JWKS, which a shared cache could store and replay
+// to other visitors (#743 decisions 8 and 9, #825). The admin console's
+// store, whose cookie ends with the browser, touches on every read as before and mounts nothing.
 //
 // It must run before anything reads the session on the request: Get memoises its answer, so a
 // session read before it is not read again.

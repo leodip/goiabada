@@ -288,8 +288,9 @@ func collectBearerRefusals(fset *token.FileSet, f *ast.File, rel string, consts 
 				problem(text, bearerAPIWriterType+"."+fn.Name.Name+" writes "+name+" something other "+
 					"than its description parameter")
 			case sentence == "" && name != "WriteError":
-				// A challenge naming the realm alone, which is what RFC 6750 section 3.1 asks of a
-				// request carrying no credential.
+				// A challenge with no description, which writes no error_description, such as the
+				// challenge with no error RFC 6750 section 3.1 asks of a request carrying no
+				// credential.
 			default:
 				record(text, sentence)
 			}

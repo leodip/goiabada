@@ -211,7 +211,7 @@ func TestRegisterRoutes_AnUnmatchedPathUnderAnAPIGroupMeetsItsGuardsFirst(t *tes
 			var body map[string]string
 			require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &body), rr.Body.String())
 			assert.Equal(t, "ACCESS_TOKEN_REQUIRED", body["error_code"])
-			assert.Equal(t, "no-store", rr.Header().Get("Cache-Control"), "the group's first middleware ran")
+			assert.Equal(t, "no-store", rr.Header().Get("Cache-Control"), "the API branch's NoStore ran")
 		})
 	}
 
@@ -219,7 +219,7 @@ func TestRegisterRoutes_AnUnmatchedPathUnderAnAPIGroupMeetsItsGuardsFirst(t *tes
 	assert.Equal(t, http.StatusNotFound, rr.Code)
 	assert.Equal(t, "text/plain; charset=utf-8", rr.Header().Get("Content-Type"))
 	assert.Equal(t, "404 page not found\n", rr.Body.String())
-	assert.Equal(t, "no-store", rr.Header().Get("Cache-Control"), "the group's first middleware ran")
+	assert.Equal(t, "no-store", rr.Header().Get("Cache-Control"), "the API branch's NoStore ran")
 }
 
 // A path that exists, by a method it does not take, is 405 with no content and no Content-Type, on
@@ -237,7 +237,7 @@ func TestRegisterRoutes_AKnownPathByAnotherMethodIs405WithNoContent(t *testing.T
 		{http.MethodPut, "/auth/token", "POST"},
 		{http.MethodGet, "/auth/token", "POST"},
 		{http.MethodPost, "/api/public/settings", "GET"},
-		{http.MethodDelete, "/openapi.yaml", "GET"},
+		{http.MethodDelete, "/openapi.yaml", "GET, HEAD"},
 		{http.MethodPut, "/auth/authorize", "GET, POST"},
 		{http.MethodHead, "/auth/authorize", "GET, POST"},
 		{http.MethodDelete, "/certs", "GET, HEAD"},
@@ -257,6 +257,11 @@ func TestRegisterRoutes_AKnownPathByAnotherMethodIs405WithNoContent(t *testing.T
 			assert.Empty(t, rr.Body.String())
 			assert.Empty(t, rr.Header().Get("Content-Type"))
 			assert.Equal(t, []string{request.allow}, rr.Header().Values("Allow"))
+			// A 405 under an API group is the group's subrouter answering, beneath the API
+			// branch's NoStore, so it is no-store as every other answer there is (#825).
+			if strings.HasPrefix(request.target, "/api/v1/") {
+				assertNoStore(t, rr)
+			}
 		})
 	}
 }
@@ -270,7 +275,7 @@ func TestRegisterRoutes_HeadIsAnsweredAsGetOnlyWhereItIsRegistered(t *testing.T)
 	base := routingListener(t, s)
 
 	for _, target := range []string{"/health", "/favicon.ico", "/static/main.css", "/static/favicon/favicon.ico",
-		"/.well-known/openid-configuration", "/.well-known/oauth-authorization-server"} {
+		"/.well-known/openid-configuration", "/.well-known/oauth-authorization-server", "/openapi.yaml"} {
 		t.Run("HEAD "+target, func(t *testing.T) {
 			get, getBody := sendRouting(t, http.MethodGet, base+target)
 			head, headBody := sendRouting(t, http.MethodHead, base+target)
@@ -290,7 +295,6 @@ func TestRegisterRoutes_HeadIsAnsweredAsGetOnlyWhereItIsRegistered(t *testing.T)
 		{"/auth/pwd", "GET, POST"},
 		{"/auth/logout", "GET, POST"},
 		{"/userinfo", "GET, POST"},
-		{"/openapi.yaml", "GET"},
 	} {
 		t.Run("HEAD "+request.target, func(t *testing.T) {
 			head, body := sendRouting(t, http.MethodHead, base+request.target)
@@ -429,6 +433,32 @@ func TestRegisterRoutes_ADirectoryUnderStaticIsThe404Page(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, head.StatusCode)
 	assert.Empty(t, head.Header.Get("Location"))
 	assert.Empty(t, body, "a HEAD has no content")
+}
+
+// A directory is the 404 page however its path is spelled, over a real connection, on GET and on
+// HEAD: an escaped prefix the router matches by its decoded path is a directory first, and only a
+// file is held to its escaped prefix, which the file server's prefix removal reads (#825 decision 3).
+func TestRegisterRoutes_ADirectoryUnderAnEscapedStaticIsThe404Page(t *testing.T) {
+	s := newRoutingTestServer(t, newRoutingDatabase(t))
+	base := routingListener(t, s)
+
+	for _, target := range []string{"/static/favicon", "/st%61tic/favicon", "/st%61tic/favicon/", "/st%61tic/"} {
+		for _, method := range []string{http.MethodGet, http.MethodHead} {
+			t.Run(method+" "+target, func(t *testing.T) {
+				resp, body := sendRouting(t, method, base+target)
+
+				require.Equal(t, http.StatusNotFound, resp.StatusCode)
+				assert.Equal(t, "text/html; charset=UTF-8", resp.Header.Get("Content-Type"), "the 404 page, not the static files' plain-text 404")
+				assert.Equal(t, "no-store", resp.Header.Get("Cache-Control"))
+				assert.Empty(t, resp.Header.Values("Expires"))
+				if method == http.MethodGet {
+					assert.Contains(t, body, notFoundPage)
+				} else {
+					assert.Empty(t, body, "a HEAD has no content")
+				}
+			})
+		}
+	}
 }
 
 // mintedRequestId is the request id requestid.Middleware mints when a request carries none, the shape

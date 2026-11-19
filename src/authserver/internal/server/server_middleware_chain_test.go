@@ -28,7 +28,7 @@ func TestInitMiddleware_TheWholeChainInOrder(t *testing.T) {
 	branches.files.Get("/openapi.yaml", probe)
 	branches.protocol.Get("/certs", probe)
 	branches.token.Post("/auth/token", probe)
-	branches.api.Get("/api/public/settings", probe)
+	branches.api.Get("/api/v1/admin/probe", probe)
 
 	// A route registered for more than one method, such as GET and HEAD, is walked once per
 	// method. Its chain is recorded once, and every other method of it must have the same one.
@@ -74,28 +74,32 @@ func TestInitMiddleware_TheWholeChainInOrder(t *testing.T) {
 		"github.com/leodip/goiabada/core/httpmw.SkipCSRF.func1",
 		"github.com/leodip/goiabada/core/httpmw.CSRF.func1",
 	}
-	// The same chain on all the branches, which differ only in how its faults are answered.
+	// The same chain on the branches outside the page branch, which differ only in how its faults
+	// are answered: the settings and the language the request asks for, and no browser session
+	// (#825 decision 1).
 	wantApp := append(append([]string{}, wantRoot...),
+		"github.com/leodip/goiabada/authserver/internal/middleware.ServerFaults.Recoverer-fm",
+		"github.com/leodip/goiabada/authserver/internal/middleware.Settings.func1",
+		"github.com/leodip/goiabada/core/i18n.Locale.func1",
+	)
+
+	// The page branch alone carries the client a page is drawn for, which starts as none (#812). It
+	// alone refreshes the browser session, ahead of the first read of it, so the touch can send the
+	// session cookie again (#743 decisions 8 and 9), behind NoStore, so every answer that can carry
+	// that cookie is no-store, the router's 405 included. It alone resets the cookie and reads the
+	// session identifier, which can send the cookie again too, to clear a pointer to an ended user
+	// session (#825 decision 1). It then applies a known user's page language, over what the locale
+	// middleware resolved; the protocol endpoints and the APIs answer in the language asked for (#631
+	// decision 5). The files branch answers faults as the page branch does, and draws no page.
+	wantPages := append(append([]string{}, wantRoot...),
+		"github.com/leodip/goiabada/authserver/internal/middleware.NoStore.func1",
+		"github.com/leodip/goiabada/authserver/internal/middleware.PageClient.func1",
+		"github.com/leodip/goiabada/core/sessionstore.Refreshing",
 		"github.com/leodip/goiabada/authserver/internal/middleware.ServerFaults.Recoverer-fm",
 		"github.com/leodip/goiabada/authserver/internal/middleware.Settings.func1",
 		"github.com/leodip/goiabada/core/httpmw.CookieReset.func1",
 		"github.com/leodip/goiabada/authserver/internal/middleware.SessionIdentifier.func1",
 		"github.com/leodip/goiabada/core/i18n.Locale.func1",
-	)
-
-	// The page branch alone carries the client a page is drawn for, which starts as none (#812). It
-	// alone refreshes the browser session, ahead of the first read of it, so the
-	// touch can send the session cookie again (#743 decisions 8 and 9), behind NoStore, so every
-	// answer that can carry that cookie is no-store, the router's 405 included. It then applies a
-	// known user's page language, over what the locale middleware resolved; the protocol endpoints
-	// and the APIs answer in the language asked for (#631 decision 5). The files branch answers
-	// faults as the page branch does, and draws no page.
-	wantPages := append(append(append([]string{}, wantRoot...),
-		"github.com/leodip/goiabada/authserver/internal/middleware.NoStore.func1",
-		"github.com/leodip/goiabada/authserver/internal/middleware.PageClient.func1",
-		"github.com/leodip/goiabada/core/sessionstore.Refreshing"),
-		wantApp[len(wantRoot):]...)
-	wantPages = append(wantPages,
 		"github.com/leodip/goiabada/authserver/internal/middleware.PageLanguage.func1",
 	)
 
@@ -103,16 +107,24 @@ func TestInitMiddleware_TheWholeChainInOrder(t *testing.T) {
 	assert.Equal(t, wantRoot, chains["/static/*"])
 	require.Contains(t, chains, "/auth/authorize", "the page route must have been walked")
 	assert.Equal(t, wantPages, chains["/auth/authorize"])
-	for _, route := range []string{"/openapi.yaml", "/certs", "/auth/token", "/api/public/settings"} {
+	for _, route := range []string{"/openapi.yaml", "/certs", "/auth/token"} {
 		require.Contains(t, chains, route, "the application route must have been walked")
 		assert.Equal(t, wantApp, chains[route], route)
 	}
+	// The API branch runs the same chain behind NoStore, so the JSON 500 a step in it answers is
+	// no-store as well as the groups' and the handlers' answers (#247, #825 decision 3).
+	wantAPI := append(append(append([]string{}, wantRoot...),
+		"github.com/leodip/goiabada/authserver/internal/middleware.NoStore.func1"),
+		wantApp[len(wantRoot):]...)
+	require.Contains(t, chains, "/api/v1/admin/probe", "the API route must have been walked")
+	assert.Equal(t, wantAPI, chains["/api/v1/admin/probe"])
 }
 
 // fileRoutes are the page-format routes that draw no page: the images, the brands' stylesheets and
 // assets, and the OpenAPI document.
 var fileRoutes = []string{
 	"GET /openapi.yaml",
+	"HEAD /openapi.yaml",
 	"GET /userinfo/picture/{subject}",
 	"HEAD /userinfo/picture/{subject}",
 	"GET /client/logo/{clientIdentifier}",
@@ -159,14 +171,20 @@ func TestInitRoutes_ThePageLanguageRunsOnPagesOnly(t *testing.T) {
 	assert.Equal(t, len(fileRoutes), seen, "every file route is registered")
 }
 
-// Only the page routes of the real registrations refresh the browser session; the files, the
-// protocol endpoints and the APIs read it without moving its idle deadline. The client logos, the
-// profile pictures and the OpenAPI document are answered cacheable, and discovery and JWKS carry no
-// directive at all, so a session cookie sent again there could be stored by a shared cache and
-// replayed to other visitors; every page is no-store (#743 decision 9).
-func TestInitRoutes_OnlyPagesRefreshTheBrowserSession(t *testing.T) {
+// Only the page routes of the real registrations run the browser session's steps: the refresh, the
+// cookie reset and the session identifier, each of which can send the session cookie, or a deletion
+// of the old chunked cookie store's, on its answer. The files, the protocol endpoints and the APIs
+// load no browser session. The client logos and the OpenAPI document are answered cacheable, and so
+// are discovery and JWKS, so a cookie sent there could be stored by a shared cache and replayed to
+// other visitors; a profile picture is no-store, as every page is (#743 decision 9, #825 decision
+// 1).
+func TestInitRoutes_OnlyPagesRunTheBrowserSessionSteps(t *testing.T) {
 	s := newFaultsTestServer(datamocks.NewDatabase(t))
-	const refreshing = "github.com/leodip/goiabada/core/sessionstore.Refreshing"
+	steps := []string{
+		"github.com/leodip/goiabada/core/sessionstore.Refreshing",
+		"github.com/leodip/goiabada/core/httpmw.CookieReset.func1",
+		"github.com/leodip/goiabada/authserver/internal/middleware.SessionIdentifier.func1",
+	}
 
 	pages, others := 0, 0
 	err := s.router.Walk(func(method string, route string, _ http.Handler, middlewares ...func(http.Handler) http.Handler) error {
@@ -174,19 +192,16 @@ func TestInitRoutes_OnlyPagesRefreshTheBrowserSession(t *testing.T) {
 		if route == "/static/*" {
 			return nil
 		}
-		refreshes := false
-		for _, mounted := range middlewares {
-			if runtime.FuncForPC(reflect.ValueOf(mounted).Pointer()).Name() == refreshing {
-				refreshes = true
-			}
-		}
+		names := middlewareNames(middlewares)
 		isPage := routeFormat(key) == "page" && !slices.Contains(fileRoutes, key)
 		if isPage {
 			pages++
 		} else {
 			others++
 		}
-		assert.Equal(t, isPage, refreshes, "%s refreshes the browser session", key)
+		for _, step := range steps {
+			assert.Equal(t, isPage, slices.Contains(names, step), "%s runs %s", key, step)
+		}
 		return nil
 	})
 	require.NoError(t, err)

@@ -22,8 +22,8 @@ import (
 // section 7.2, #42 decision 10). They share one WWW-Authenticate field line, as RFC 9449's figures
 // write them, so a client reading the header's first line reads both.
 type bearerRefusals interface {
-	// missing answers a request carrying no bearer credential: 401 with both challenges naming the
-	// realm alone, per RFC 6750 section 3.1 and RFC 9449 section 7.2.
+	// missing answers a request carrying no bearer credential: 401 with both challenges and no
+	// error in either, per RFC 6750 section 3.1 and RFC 9449 section 7.2.
 	missing(w http.ResponseWriter, r *http.Request)
 	// invalidRequest answers a malformed bearer request, a token sent by two methods or an
 	// access_token parameter sent twice: 400 invalid_request, per RFC 6750 section 3.1, the error in
@@ -59,8 +59,11 @@ const invalidDPoPProofDescription = "The DPoP proof is invalid."
 // API handler uses.
 //
 // i18n surface: B — machine. Bearer-token failures on /api/v1/* do not localize: each description
-// is also the challenge's, which RFC 6750 section 3 holds to ASCII. TestBearerRefusals_EnglishOnly
-// holds every sentence to bearerEnglishRefusals and the body to the challenge's string.
+// is also the challenge's, which RFC 6750 section 3 holds to ASCII, but for the 401 missing writes
+// to a request with no credential, whose challenge carries none (section 3.1) and whose body stays
+// in English with the rest. TestBearerRefusals_EnglishOnly holds every sentence to
+// bearerEnglishRefusals, and has each writer here write an identifier named description (the
+// method's parameter), a sentence from that table, or an empty challenge description.
 type apiBearerRefusals struct{}
 
 func (apiBearerRefusals) missing(w http.ResponseWriter, _ *http.Request) {

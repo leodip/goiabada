@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"net"
 	"net/http"
+	"net/url"
 	"path"
 	"strings"
 	"sync"
@@ -592,19 +593,15 @@ const (
 // applies to every request this server answers, a stylesheet included: the CORS answer,
 // the request id, the security headers, the real client IP, the panic recovery, the
 // request log, the slash strip and the CSRF origin check. What the returned branches add
-// is the part a file server has no use for and cannot use: the settings read, the cookie
-// reset, the session load and the locale resolution. There are three of them, one per
-// format a route answers a fault in (see appBranches, #435).
+// is the part a file server has no use for and cannot use: the settings read and the
+// locale resolution, and on the page branch alone the cookie reset and the session load
+// (#825). There is one branch per format a route answers a fault in (see appBranches, #435).
 //
 // The cost that split removes is not hypothetical. An auth page references seven
 // same-origin assets, and middleware.Settings reads settings from the database uncached on
 // every request, so a single page view already cost seven database reads for files that
 // could not use the result. Once the session moved out of the cookie and into a row, each
 // of those would have cost a session read as well.
-//
-// It is a correctness fix too. httpmw.CookieReset answers a cookie it cannot decode
-// with a 302 back to the request target, which is not a sensible answer to a request for
-// a stylesheet.
 //
 // The router refuses Use after a route has been registered on the same router, and With
 // freezes the parent's chain, so this is a restructure rather than a reorder: every root Use
@@ -709,7 +706,7 @@ func (s *Server) initMiddleware() appBranches {
 		token:      s.router.With(s.applicationChain(middleware.ProtocolFaults(s.tokenMetrics.Refusals(render.New(s.templateFS, s.staticFS, s.database))))...),
 		revoke:     s.router.With(s.applicationChain(middleware.ProtocolFaults(handlers.RevocationFaults(render.New(s.templateFS, s.staticFS, s.database), s.revocationMetrics)))...),
 		introspect: s.router.With(s.applicationChain(middleware.ProtocolFaults(handlers.IntrospectionFaults(render.New(s.templateFS, s.staticFS, s.database), s.introspectionMetrics)))...),
-		api:        s.router.With(s.applicationChain(middleware.APIFaults())...),
+		api:        s.router.With(append([]func(http.Handler) http.Handler{middleware.NoStore()}, s.applicationChain(middleware.APIFaults())...)...),
 		public:     s.router,
 	}
 
@@ -718,84 +715,110 @@ func (s *Server) initMiddleware() appBranches {
 	return branches
 }
 
-// applicationChain is the application branch's own middleware, beneath the root's, answering what
-// stops a request before its handler through faults. The branches initMiddleware builds run this
-// same middleware in the same order and differ only in faults: the settings or the session could not
-// be read, or something panicked. The static branch puts the page branch's in front of the 404 page
-// it answers a directory with, the one request there that needs it.
+// applicationChain is the middleware of the branches outside the page branch, beneath the root's,
+// answering what stops a request before its handler through faults: the files, protocol, token,
+// revocation, introspection and API branches run this same middleware in the same order, with only
+// their faults differing: the settings could not be read, or something panicked. The API branch puts
+// NoStore ahead of it, so its faults are no-store as well (appBranches).
+//
+// None of it reads the browser session. The cookie reset and the session identifier run on the page
+// branch alone (pageChain): they load the browser session the request's cookie names and look up
+// the user session its pointer names, and clearing a pointer to an ended user session sends the
+// browser-session cookie again. Nothing here uses what they read, and the files, discovery and the
+// key set are answered publicly cacheable, so the cookie would ride on an answer a shared cache may
+// store and replay to other visitors (#825 decision 1). What a route reads for its own credentials
+// or operation stays its own: the user session a bearer token or an authorization code names, and
+// the session store API the admin console keeps its sessions through.
 func (s *Server) applicationChain(faults middleware.ServerFaults) []func(http.Handler) http.Handler {
-	// Global locale middleware: resolves a tentative localizer from
-	// ?ui_locales, UI locales from an in-flight authorize flow,
-	// Accept-Language, or English. Must run AFTER middleware.SessionIdentifier
-	// so the session is decoded — the reader gets UI locales from session-backed
-	// authorize state. A known user's page language goes over it on the page
-	// branch alone (pageChain).
-	i18nCeremonyStore := ceremony.NewStore(s.sessionStore, sessionkeys.AuthServerSessionName)
-
 	return []func(http.Handler) http.Handler{
-		// Answers a panic on the branch in the branch's format; on the page branch it is a
-		// pass-through and the root Recoverer answers
+		// Answers a panic on the branch in the branch's format
 		faults.Recoverer,
 
 		// Adds settings to the request context
 		middleware.Settings(s.database, faults),
 
-		// Clear the session cookie and redirect if unable to decode it, and delete
-		// whatever the chunked cookie store left in this browser
+		// Resolves a tentative localizer from the request alone: ?ui_locales, Accept-Language, or
+		// English. Not the ui_locales of a sign-in in progress, which the browser session holds.
+		i18n.Locale(nil),
+	}
+}
+
+// pageChain is the page branch's middleware: the client a page is drawn for, which starts as none
+// (#812), the refresh of the browser session, the panic answer and the settings as on the other
+// branches, the cookie reset, the session identifier, the locale, then the page language of the
+// user a page is drawn for, over what the locale middleware resolved (#631 decision 5).
+//
+// It alone reads the browser session. The cookie reset deletes what the chunked cookie store left in
+// the browser, and the session identifier removes a pointer to a user session that has ended; both
+// write a cookie on the answer, and so does the refresh. Every answer on the branch is no-store, so
+// none of those cookies rides on an answer a shared cache may store and replay to other visitors
+// (#743 decision 9, #825 decision 1). The refresh goes ahead of the cookie reset's first read of the
+// session, and NoStore goes ahead of the refresh, so every answer on the branch is no-store whichever
+// exit writes it: a rendered page, a redirect, or the router's 405 for a path under a page group,
+// which no renderer draws and RFC 9110 section 15.5.6 makes heuristically cacheable.
+//
+// The locale reads the ui_locales of a sign-in in progress, from the browser session, after the
+// session identifier has read the session. The other branches answer protocol clients and the APIs,
+// whose refusals keep the language the request asks for.
+func (s *Server) pageChain() []func(http.Handler) http.Handler {
+	faults := middleware.PageFaults()
+	ceremonyStore := ceremony.NewStore(s.sessionStore, sessionkeys.AuthServerSessionName)
+
+	return []func(http.Handler) http.Handler{
+		middleware.NoStore(),
+		middleware.PageClient(),
+		sessionstore.Refreshing,
+
+		// A pass-through on the page branch: the root Recoverer answers a panic
+		faults.Recoverer,
+
+		middleware.Settings(s.database, faults),
+
+		// Deletes whatever the chunked cookie store left in this browser, and loads the browser
+		// session once for the rest of the chain
 		httpmw.CookieReset(s.sessionStore, sessionkeys.AuthServerSessionName),
 
 		// Adds the session identifier (if available) to the request context
 		middleware.SessionIdentifier(s.sessionStore, s.database, faults),
 
-		i18n.Locale(i18nCeremonyStore),
+		// ?ui_locales, the UI locales of a sign-in in progress, Accept-Language, or English
+		i18n.Locale(ceremonyStore),
+
+		middleware.PageLanguage(ceremonyStore, s.database),
 	}
 }
 
-// pageChain is the page branch's middleware: the client a page is drawn for, which starts as none
-// (#812), the refresh of the browser session, the application chain, then the page language of the
-// user a page is drawn for, over what the locale middleware resolved (#631 decision 5). The other branches answer protocol clients and the APIs, whose
-// refusals keep the language the request asks for.
-//
-// Only a page request refreshes the browser session, and the refresh sends the session cookie
-// again; on every other branch the session is read without moving its idle deadline. The files are
-// answered cacheable and discovery and JWKS carry no directive, so a reissued cookie never rides on
-// an answer a shared cache may store and replay to other visitors (#743 decision 9). The refresh goes
-// ahead of the cookie reset's first read of the session, and NoStore goes ahead of the refresh, so
-// every answer on the branch is no-store whichever exit writes it: a rendered page, a redirect, or
-// the router's 405 for a path under a page group, which no renderer draws and RFC 9110 section
-// 15.5.6 makes heuristically cacheable.
-func (s *Server) pageChain() []func(http.Handler) http.Handler {
-	return append(append([]func(http.Handler) http.Handler{middleware.NoStore(), middleware.PageClient(), sessionstore.Refreshing},
-		s.applicationChain(middleware.PageFaults())...),
-		middleware.PageLanguage(ceremony.NewStore(s.sessionStore, sessionkeys.AuthServerSessionName), s.database))
-}
-
 // appBranches is the application branch in its answering formats, and on pages with and without
-// the page language, which initMiddleware returns and initRoutes registers every application route
-// on. A route goes on the branch of the format its
+// the browser session and the page language, which initMiddleware returns and initRoutes registers
+// every application route on. A route goes on the branch of the format its
 // handler answers every other fault in, so a client parsing a protocol endpoint or an API as JSON is
-// not handed text/plain when the settings or the session cannot be read, or an empty body when
+// not handed text/plain when the settings cannot be read, or an empty body when
 // something panics. The format is chosen by where routes.go registers a route and never read off the
 // request path, as the bearer guards' refusals are (#435).
 type appBranches struct {
 	// pages carries everything that answers a page, text or a redirect, and answers such a fault in
-	// text/plain, as every route did before #435.
+	// text/plain, as every route did before #435. It is the one branch that reads the browser session
+	// (pageChain), and the one whose answers can carry its cookie.
 	pages *routing.Router
 	// files carries the images and the OpenAPI document. It answers a fault as pages does, and leaves
-	// out the page language, which only a drawn page uses, so an image costs no read of its user
-	// (#631).
+	// out the browser session, so no cookie rides on an answer a shared cache may keep (#825), and the
+	// page language, which only a drawn page uses, so an image costs no read of its user (#631).
 	files *routing.Router
-	// public carries what is answered alike to every visitor and kept by shared caches for a year:
-	// the brand stylesheets. It is the root itself, as the static files are, with none of the
-	// application chain: a session read there can reissue the browser-session cookie, to clear a
-	// pointer to a user session that has ended, and that cookie would ride on an answer any cache
-	// may store and replay to other visitors (#810).
+	// public carries what is answered alike to every visitor and kept by shared caches: the brand
+	// stylesheets and assets, for a year when a request names their current fingerprint and five
+	// minutes otherwise. It is the root itself, as the static files are, with neither the settings
+	// read nor the browser session (#810).
 	public *routing.Router
 	// protocol carries the endpoints that answer RFC 6749 section 5.2's {error, error_description}:
 	// token, userinfo, JWKS, discovery and dynamic client registration.
 	protocol *routing.Router
 	// api carries the admin, account and session APIs and the public settings, which answer the
-	// {error_code, error_description} envelope.
+	// {error_code, error_description} envelope. NoStore goes ahead of the branch's chain, so every
+	// answer is no-store whichever exit writes it: a handler, a group's guard, or the JSON 500 of a
+	// settings read or a panic in front of the groups (#247, #825 decision 3). The admin console,
+	// the public settings' reader, keeps its own copy for a time of its own. The router's 405 for
+	// another method on a route outside every group, such as POST /api/public/settings, is the
+	// root's, outside every branch.
 	api *routing.Router
 	// token carries the token endpoint alone. It answers as protocol does, and counts each fault it
 	// answers as a token request refused, which the protocol branch cannot, since its faults are
@@ -863,9 +886,11 @@ func csrfPolicy() httpmw.CSRFPolicy {
 
 		// Whole subtrees where prefix inheritance is intentional, unlike the exact paths above.
 		Prefixes: []string{
-			// Bearer-token REST API surface. Every route authenticates via the Authorization
-			// header, never the session cookie, so new endpoints added under this prefix SHOULD
-			// inherit the exemption. Cookie-authenticated routes must never be mounted here.
+			// Bearer-token REST API surface, and the public settings, which take no credential.
+			// No route here reads the session cookie: the APIs authenticate with a bearer token,
+			// in the Authorization header or a POST's access_token form parameter, so new
+			// endpoints added under this prefix SHOULD inherit the exemption.
+			// Cookie-authenticated routes must never be mounted here.
 			"/api/",
 
 			// Static assets, served with safe methods (GET/HEAD) only, which the origin check
@@ -976,13 +1001,15 @@ const (
 // immutable; any other request, the favicons' among them, for five minutes. A file's fingerprint
 // is read once and kept (staticFingerprints), and every request is answered from the static files.
 //
-// A directory is the 404 page, /static/ itself included, where Go's file server answered one with
-// a listing of its files (#462 decision 7). /static has no route, so it is the router's 404 page
+// A file that does not exist is net/http's plain-text 404 with no-store, and without the lifetime a
+// file is kept for, so a cache does not go on answering "not found" for a file a newer instance
+// serves (#825 decision 3). A directory is the 404 page, /static/ itself included, where Go's file
+// server answered one with a listing of its files (#462 decision 7). /static has no route, so it is the router's 404 page
 // too: it redirected to /static/, which looped for ever once its trailing slash was stripped back to
 // /static. The 404 page is drawn behind the page branch's chain, which it reads its settings and
 // language from, so a directory costs what an unmatched path costs; a file still costs neither.
 func (s *Server) serveStaticFiles() {
-	files := http.StripPrefix(staticPrefix, http.FileServer(http.FS(s.staticFS)))
+	files := http.FileServer(http.FS(s.staticFS))
 	fingerprints := newStaticFingerprints(s.staticFS)
 	notFound := handlers.HandleNotFoundGet(render.New(s.templateFS, s.staticFS, s.database))
 	directory := http.Handler(notFound)
@@ -992,8 +1019,19 @@ func (s *Server) serveStaticFiles() {
 	}
 
 	getAndHead(s.router, staticPrefix+"/*", func(w http.ResponseWriter, r *http.Request) {
-		if s.isStaticDirectory(r.URL.Path) {
+		// A directory is the 404 page whichever way its path is spelled, so it is told apart by the
+		// decoded path the router matched, before the escaped prefix a file is held to.
+		switch s.staticEntryOf(r.URL.Path) {
+		case staticDirectory:
 			directory.ServeHTTP(w, r)
+			return
+		case staticMissing:
+			handlers.ResourceNotFound(w, r)
+			return
+		}
+		file, ok := withoutStaticPrefix(r)
+		if !ok {
+			handlers.ResourceNotFound(w, r)
 			return
 		}
 
@@ -1007,20 +1045,58 @@ func (s *Server) serveStaticFiles() {
 		w.Header().Set("Expires", time.Now().UTC().Add(lifetime).Format(http.TimeFormat))
 		w.Header().Set("Vary", "Accept-Encoding")
 
-		files.ServeHTTP(w, r)
+		files.ServeHTTP(w, file)
 	})
 }
 
-// isStaticDirectory reports whether urlPath, under /static, names a directory of the static files,
-// the root among them. The name is read as http.FileServer reads it, so the two agree on what is
-// opened; a name that is not there is no directory, and the file server answers its 404.
-func (s *Server) isStaticDirectory(urlPath string) bool {
+// withoutStaticPrefix is r with /static removed from its path, as http.StripPrefix removes it: from
+// the decoded path and from the escaped one, when the request has one. It reports false where
+// http.StripPrefix answers its own 404, a path whose escaped form does not begin with /static, such
+// as /st%61tic/main.css, which the router matches by the decoded /static/main.css. Such a request
+// for a file is a file that is not found, so it is told apart before the file's lifetime is set and
+// answered the static files' no-store 404 (#825 decision 3). A directory is told apart before it,
+// by its decoded path, and stays the 404 page however its prefix is spelled.
+func withoutStaticPrefix(r *http.Request) (*http.Request, bool) {
+	p := strings.TrimPrefix(r.URL.Path, staticPrefix)
+	rp := strings.TrimPrefix(r.URL.RawPath, staticPrefix)
+	if len(p) == len(r.URL.Path) || (r.URL.RawPath != "" && len(rp) == len(r.URL.RawPath)) {
+		return nil, false
+	}
+	stripped := new(http.Request)
+	*stripped = *r
+	stripped.URL = new(url.URL)
+	*stripped.URL = *r.URL
+	stripped.URL.Path = p
+	stripped.URL.RawPath = rp
+	return stripped, true
+}
+
+// staticEntry is what a path under /static names among the static files.
+type staticEntry int
+
+const (
+	staticFile staticEntry = iota
+	staticDirectory
+	staticMissing
+)
+
+// staticEntryOf is what urlPath, under /static, names among the static files: a directory, the root
+// among them, nothing, or a file, which the file server answers. The name is read as http.FileServer
+// reads it, so the two agree on what is opened. A name that cannot be read for another reason is
+// left to the file server, which answers it as it answers its own failure to open it.
+func (s *Server) staticEntryOf(urlPath string) staticEntry {
 	name := strings.TrimPrefix(path.Clean("/"+strings.TrimPrefix(urlPath, staticPrefix)), "/")
 	if name == "" {
-		return true
+		return staticDirectory
 	}
 	info, err := fs.Stat(s.staticFS, name)
-	return err == nil && info.IsDir()
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+		return staticMissing
+	case err == nil && info.IsDir():
+		return staticDirectory
+	}
+	return staticFile
 }
 
 // logPlainHTTP reports a deployment listening on HTTP with no HTTPS listener. Behind a proxy

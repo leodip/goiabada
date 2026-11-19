@@ -13,7 +13,7 @@ import (
 
 // The bearer guards answer RFC 6750 on both surfaces they guard, each in its own body (#435). The
 // middleware's own table owns every row; this tier shows the few that prove routes.go hands each
-// surface the right guard set: /userinfo and one admin route each, the realm-only challenge with no
+// surface the right guard set: /userinfo and one admin route each, challenges with no error for no
 // credential, a lowercase scheme admitted, a token sent twice refused, a form labelled in capitals
 // read as a form, a repeated Authorization header refused, and a form body that does not parse
 // refused beside a valid header. It is deliberately thin.
@@ -64,8 +64,9 @@ func sendBearerRequestAs(t *testing.T, method, path string, authorizations []str
 const bearerRFC6750AdminRoute = "/api/v1/admin/settings/general"
 
 // RFC 6750 section 3.1: a request lacking any authentication information SHOULD NOT be told an
-// error code; section 3's one required auth-param is the realm.
-func TestBearerRFC6750_NoCredentialIsTheRealmAlone(t *testing.T) {
+// error code; the realm is then the Bearer challenge's one auth-param, of the one or more section 3
+// requires.
+func TestBearerRFC6750_NoCredentialIsChallengedWithNoError(t *testing.T) {
 	for _, method := range []string{"GET", "POST"} {
 		userinfo := sendBearerRequest(t, method, "/userinfo", "", "")
 		assert.Equal(t, http.StatusUnauthorized, userinfo.status, "%s /userinfo: %s", method, userinfo.body)

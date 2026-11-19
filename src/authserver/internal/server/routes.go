@@ -39,14 +39,14 @@ import (
 const accountExportMaxAge = 300 * time.Second
 
 // initRoutes registers the application's routes on the branches initMiddleware returns
-// rather than on s.router itself: the settings read, the session load and the locale
-// resolution belong to these routes and not to the static file server registered beside them
-// (#266). Each route goes on the branch of the format its handler answers a fault in, so the
-// protocol endpoints and the APIs answer a settings or session failure, or a panic, as JSON
-// (see appBranches, #435).
+// rather than on s.router itself: the settings read and the locale resolution belong to these
+// routes and not to the static file server registered beside them (#266), and the browser
+// session's load to the page routes alone (#825). Each route goes on the branch of the format
+// its handler answers a fault in, so the protocol endpoints and the APIs answer a settings
+// failure, or a panic, as JSON (see appBranches, #435).
 func (s *Server) initRoutes(branches appBranches) {
-	pages, files, protocol, api, token, revoke, introspect, public := branches.pages, branches.files, branches.protocol, branches.api,
-		branches.token, branches.revoke, branches.introspect, branches.public
+	pages, files, protocol, api, token, revoke, introspect, public := branches.pages, branches.files, branches.protocol,
+		branches.api, branches.token, branches.revoke, branches.introspect, branches.public
 
 	auditLogger := audit.NewLogger(s.database, middleware.NewAuditSwitches(s.database), middleware.ActingUser{})
 	authorizeValidator := protocolvalidation.NewAuthorizeValidator(s.database)
@@ -160,7 +160,9 @@ func (s *Server) initRoutes(branches appBranches) {
 	// the claims and every refusal, the bare 401 included, are stored by no cache (#714).
 	protocol.With(middleware.NoStore(), userinfoBearer.JwtAuthorizationHeaderToContext(), userinfoBearer.RequireBearerTokenScope("openid"), userinfoBearer.RequireUserBoundToken(), userinfoBearer.RequireValidSession(s.database)).Get("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger, baseURL, adminConsoleBaseURL))
 	protocol.With(middleware.NoStore(), userinfoBearer.JwtAuthorizationHeaderToContext(), userinfoBearer.RequireBearerTokenScope("openid"), userinfoBearer.RequireUserBoundToken(), userinfoBearer.RequireValidSession(s.database)).Post("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger, baseURL, adminConsoleBaseURL))
-	files.Get("/openapi.yaml", handlers.HandleOpenAPIGet())
+	// The OpenAPI document is a read-only file, so it answers HEAD as GET, as every other one does
+	// (#825 decision 4).
+	getAndHead(files, "/openapi.yaml", handlers.HandleOpenAPIGet())
 	getAndHead(files, "/userinfo/picture/{subject}", handlers.HandleProfilePictureGet(httpHelper, s.database))
 	getAndHead(files, "/client/logo/{clientIdentifier}", handlers.HandleClientLogoGet(httpHelper, s.database))
 	// A brand's four stylesheets, its own two and the two safe mode links (#816 decision 3), are
@@ -263,12 +265,6 @@ func (s *Server) initRoutes(branches appBranches) {
 
 	// Admin API routes
 	api.Route("/api/v1/admin", func(r *routing.Router) {
-		// FIRST in the group, ahead of the debug middleware and every guard. GET
-		// /api/v1/admin/clients/{id}/secret returns a decrypted client secret, so RFC 6749
-		// section 5.1's MUST reaches this group, and the 401 and 403 refusals below
-		// commit their status themselves: anything mounted behind the guards would
-		// never write the pair on a refusal (#247).
-		r.Use(middleware.NoStore())
 		r.Use(middleware.APIDebug(authServerConfig.DebugAPIRequests))
 		r.Use(apiBearer.JwtAuthorizationHeaderToContext())
 		r.Use(apiBearer.RequireValidSession(s.database))
@@ -529,9 +525,6 @@ func (s *Server) initRoutes(branches appBranches) {
 
 	// Account API routes (self-service)
 	api.Route("/api/v1/account", func(r *routing.Router) {
-		// FIRST in the group, for the same reason as the admin group above. GET
-		// /api/v1/account/otp/enrollment serves a TOTP enrolment seed (#247).
-		r.Use(middleware.NoStore())
 		r.Use(middleware.APIDebug(authServerConfig.DebugAPIRequests))
 		r.Use(apiBearer.JwtAuthorizationHeaderToContext())
 		r.Use(apiBearer.RequireBearerTokenScope(builtin.AuthServerResourceIdentifier + ":" + builtin.ManageAccountPermissionIdentifier))
@@ -622,10 +615,6 @@ func (s *Server) initRoutes(branches appBranches) {
 	// line: a handle in a path lands in this server's access log and in every proxy in
 	// front of it.
 	api.Route("/api/v1/sessions", func(r *routing.Router) {
-		// FIRST in the group, for the same reason as the two groups above: every 200
-		// here carries session ciphertext, and RFC 6749 section 5.1's MUST covers "any
-		// response containing tokens, credentials, or other sensitive information".
-		r.Use(middleware.NoStore())
 		// No middleware.APIDebug here, and it is the only /api/v1 group without it. That
 		// middleware logs whole request and response bodies, redacting by field name, and
 		// this group's fields are called "id" and "data": neither matches its key set nor

@@ -65,7 +65,8 @@ func TestRequireBearerTokenScopeSetAnyOf_TheUserExportsSets(t *testing.T) {
 	}
 }
 
-// A request that presented no token is the realm-only 401, as on every other scope guard.
+// A request that presented no token is the 401 with no error in its challenges, as on every other
+// scope guard.
 func TestRequireBearerTokenScopeSetAnyOf_NoTokenIsTheBareChallenge(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/users/42/export", nil)
 	rr := httptest.NewRecorder()

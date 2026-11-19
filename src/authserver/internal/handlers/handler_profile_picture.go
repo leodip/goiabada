@@ -16,6 +16,9 @@ type profilePictureDatabase interface {
 	GetUserProfilePictureByUserId(ctx context.Context, tx *sql.Tx, userId int64) (*record.UserProfilePicture, error)
 }
 
+// HandleProfilePictureGet answers a user's profile picture, to anyone, and no cache may store it. A
+// user that does not exist, or one with no picture, is not found, and that answer is no-store as
+// well (ResourceNotFound).
 func HandleProfilePictureGet(
 	pageRenderer PageRenderer,
 	database profilePictureDatabase,
@@ -24,7 +27,7 @@ func HandleProfilePictureGet(
 	return func(w http.ResponseWriter, r *http.Request) {
 		subject := r.PathValue("subject")
 		if len(subject) == 0 {
-			http.NotFound(w, r)
+			ResourceNotFound(w, r)
 			return
 		}
 
@@ -35,7 +38,7 @@ func HandleProfilePictureGet(
 		}
 
 		if user == nil {
-			http.NotFound(w, r)
+			ResourceNotFound(w, r)
 			return
 		}
 
@@ -46,7 +49,7 @@ func HandleProfilePictureGet(
 		}
 
 		if profilePicture == nil {
-			http.NotFound(w, r)
+			ResourceNotFound(w, r)
 			return
 		}
 

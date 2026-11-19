@@ -532,9 +532,10 @@ const (
 // ten calls across the wire and a database read at the other end of each, on the module that
 // was kept database-free precisely so it would stay light.
 //
-// It is a correctness fix too. httpmw.CookieReset answers a cookie it cannot decode with
-// a 302 back to the request target, which is not a sensible answer to a request for a
-// stylesheet.
+// It keeps cookies off cached answers too. httpmw.CookieReset deletes what the chunked cookie
+// store left in the browser with a Set-Cookie on the answer, and a static file is answered with
+// a lifetime a shared cache may keep (serveStaticFiles), so mounted on the root, the deletion
+// could ride on a stylesheet a cache keeps and replays to other visitors.
 //
 // The router refuses Use after a route has been registered on the same router, and With freezes
 // the parent's chain, so this is a restructure rather than a reorder: every root Use happens
@@ -658,8 +659,8 @@ func (s *Server) applicationChain() []func(http.Handler) http.Handler {
 		// Adds settings to the request context (fetched from cache, not database)
 		middleware.SettingsCache(s.settingsCache, render.New(s.templateFS, s.staticFS)),
 
-		// Clear the session cookie and redirect if unable to decode it, and delete
-		// whatever the chunked cookie store left in this browser
+		// Deletes whatever the chunked cookie store left in this browser, and loads the browser
+		// session once for the rest of the chain
 		httpmw.CookieReset(s.sessionStore, builtin.AdminConsoleSessionName),
 	}
 }
