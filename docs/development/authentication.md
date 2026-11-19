@@ -25,7 +25,8 @@ tokens.
   issuance transaction, before inserting the code: either the code commits first and the rename's
   sweep revokes it, or the rename commits first and issuance, finding the identifier changed,
   refuses with `ErrIssuingClientGone`, which `/auth/issue` answers as a client that is gone (#866).
-  Sign-ins to one client do not wait for each other. `code_issuance_rename_ordering_test.go` shows
+  On MySQL, PostgreSQL and SQL Server, sign-ins to one client do not wait for each other; SQLite's
+  one connection runs one transaction at a time. `code_issuance_rename_ordering_test.go` shows
   both orders on MySQL, PostgreSQL and SQL Server, and again with READ_COMMITTED_SNAPSHOT on
 - Implementation: `handler_authorize.go`, `authflow/authorization.go`, `issuance/code_issuer.go`;
   redeemed by `handler_token_authorization_code.go`,

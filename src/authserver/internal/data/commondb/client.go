@@ -299,7 +299,8 @@ var selectClientByIdForUpdate = statement{
 // rename's and a deletion's FOR UPDATE conflict with it, a save that changes none of the row's
 // keys does not. SQL Server's REPEATABLEREAD hint holds the shared lock to the end of the
 // transaction, where READ COMMITTED would release it at the end of the statement, and reads by
-// locking even with READ_COMMITTED_SNAPSHOT on.
+// locking even with READ_COMMITTED_SNAPSHOT on. SQLite's is a plain read: its pool has one
+// connection, so no other transaction runs while the reader's is open.
 var selectClientByIdForShare = statement{
 	sqlite:   "SELECT " + clientColumns.sqlite + " FROM clients WHERE id = ?",
 	mysql:    "SELECT " + clientColumns.mysql + " FROM clients WHERE id = ? FOR SHARE",
@@ -676,8 +677,9 @@ func (d *Database) GetClientByIdForUpdate(ctx context.Context, tx *sql.Tx, clien
 // GetClientByIdForShare reads the client as last committed and holds a shared lock on its row for
 // the rest of the caller's transaction, without writing it. A rename (SetClientIdentifier) and a
 // deletion (DeleteClient), which take the row exclusively to change it, wait for this transaction
-// to end, and this read waits for theirs and answers what they committed. Two shared reads of the
-// row do not wait for each other.
+// to end, and this read waits for theirs and answers what they committed. On MySQL, PostgreSQL and
+// SQL Server two shared reads of the row do not wait for each other; on SQLite, whose statement is
+// a plain read, the pool's one connection runs one transaction at a time.
 //
 // Code issuance reads its client this way before it inserts the code, so a rename is ordered
 // against it: either the code commits first and the rename's sweep revokes it, or the rename

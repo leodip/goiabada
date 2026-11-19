@@ -133,9 +133,10 @@ type Database interface {
 	GetClientByIdForUpdate(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error)
 	// GetClientByIdForShare reads the client as last committed and holds a shared lock on its row
 	// until the transaction ends, writing nothing: a rename or a deletion of the client waits for
-	// that transaction, and this read waits for theirs, but two such readers do not wait for each
-	// other. Code issuance reads its client so before it inserts the code (#866). A transaction is
-	// required.
+	// that transaction, and this read waits for theirs. On MySQL, PostgreSQL and SQL Server two such
+	// readers do not wait for each other; SQLite's is a plain read, its pool's one connection running
+	// one transaction at a time. Code issuance reads its client so before it inserts the code (#866).
+	// A transaction is required.
 	GetClientByIdForShare(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error)
 	GetClientsByIds(ctx context.Context, tx *sql.Tx, clientIds []int64) ([]record.Client, error)
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
