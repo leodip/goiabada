@@ -86,12 +86,14 @@ func TestRegisterRoutes_EveryApiRouteRefusesToBeStored(t *testing.T) {
 			result := recorder.Result()
 			defer func() { _ = result.Body.Close() }()
 
-			// The status says the request reached the group's guards rather than falling
-			// out of the router: a 404 from a botched parameter substitution would still
-			// carry the header, because the branch's middleware runs ahead of the
-			// subrouter's NotFound handler, and the header assertion alone would not
-			// notice. 401 is the unauthenticated refusal; 403 is what an insufficient
-			// scope produces on the routes that check scope before token presence.
+			// The status says a guard refused the request rather than a handler answering it.
+			// 401 is the unauthenticated refusal; 403 is what an insufficient scope produces on
+			// the routes that check scope before token presence. On the admin group, whose
+			// guards let a caller with no token through to its routes, it also catches a botched
+			// parameter substitution: the group's 404 would still carry the header, because the
+			// branch's middleware runs ahead of the subrouter's NotFound handler. The account and
+			// session groups refuse any path under them 401, a made-up one included
+			// (TestRegisterRoutes_AnUnmatchedPathUnderAnAPIGroupMeetsItsGuardsFirst).
 			assert.Contains(t, []int{http.StatusUnauthorized, http.StatusForbidden}, result.StatusCode,
 				"an unauthenticated request must be refused by a guard, not answered or lost")
 
@@ -178,9 +180,9 @@ var routeTestPathParam = regexp.MustCompile(`\{[^}]+\}`)
 
 // routeTestTarget turns a route into a request target by substituting each path parameter. The
 // value is a plain "1": every parameter this API declares is either a numeric id or a free
-// identifier. A substitution that
-// fails to match produces a 404, which the status assertion above turns into a failure rather than
-// letting it pass on the header alone.
+// identifier. On the admin group, a substitution that fails to match falls to the group's 404,
+// which the sweep's status assertion turns into a failure rather than letting it pass on the header
+// alone.
 func routeTestTarget(pattern string) string {
 	target := routeTestPathParam.ReplaceAllString(pattern, "1")
 	return strings.TrimSuffix(target, "/*")

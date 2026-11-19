@@ -11,9 +11,10 @@ import "net/http"
 // It heads the API branch, which carries the admin, account and session APIs
 // and the public settings. Two responses there carry a credential outright:
 // GET /api/v1/account/otp/enrollment serves a TOTP enrolment seed, and
-// GET /api/v1/admin/clients/{id} returns a client secret decrypted. RFC 6749 section 5.1's MUST covers "any response
-// containing tokens, credentials, or other sensitive information" and is not
-// qualified by endpoint, so it reaches both. Without a directive a 200 is
+// GET /api/v1/admin/clients/{id}/secret returns a client secret decrypted.
+// RFC 6749 section 5.1's MUST covers "any response containing tokens,
+// credentials, or other sensitive information" and is not qualified by
+// endpoint, so it reaches both. Without a directive a 200 is
 // heuristically cacheable and RFC 9111 section 3 permits a cache to store it;
 // RFC 9111 section 4.2.2 says an origin server that wants to prevent that has
 // to say so explicitly.
