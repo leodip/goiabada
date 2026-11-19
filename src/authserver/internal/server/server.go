@@ -717,8 +717,9 @@ func (s *Server) initMiddleware() appBranches {
 
 // applicationChain is the middleware of the branches outside the page branch, beneath the root's,
 // answering what stops a request before its handler through faults: the files, protocol, token,
-// revocation, introspection and API branches run this same middleware in the same order and differ
-// only in faults: the settings could not be read, or something panicked.
+// revocation, introspection and API branches run this same middleware in the same order, with only
+// their faults differing: the settings could not be read, or something panicked. The API branch puts
+// NoStore ahead of it, so its faults are no-store as well (appBranches).
 //
 // None of it reads the browser session. The cookie reset and the session identifier run on the page
 // branch alone (pageChain): they load the browser session the request's cookie names and look up
