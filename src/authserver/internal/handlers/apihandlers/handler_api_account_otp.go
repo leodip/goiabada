@@ -526,6 +526,12 @@ func HandleAccountOTPPut(
 			writeInternalServerError(w, r, err)
 			return
 		}
+		if updated == nil {
+			// Deleted after the change committed: what the change did stands, its events and
+			// notice above, and there is no account left to answer with (#796 decision 3).
+			writeJSONError(w, "User not found", "NOT_FOUND", http.StatusNotFound)
+			return
+		}
 
 		resp := api.UpdateAccountOTPResponse{User: *apimapping.ToUserResponse(updated), RecoveryCodes: recoveryCodes}
 		writeJSON(w, r, http.StatusOK, resp)

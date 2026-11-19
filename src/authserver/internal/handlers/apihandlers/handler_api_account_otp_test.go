@@ -1067,6 +1067,59 @@ func TestHandleAccountOTPPut_Disable_ALostCompareAndSetIsAnsweredFromARead(t *te
 	}
 }
 
+// TestHandleAccountOTPPut_AnAccountDeletedAfterTheChangeCommitted: the account is deleted, by an
+// administrator or from another of its own sessions, after this request's enable or disable
+// committed and before the read its response is built from. The request answers 404, as one
+// arriving a moment later would, and what the committed change did stands: its audit events and
+// its notice (#796 decision 3). SMTP is on and the address verified, so a notice could have gone.
+func TestHandleAccountOTPPut_AnAccountDeletedAfterTheChangeCommitted(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		arrange func(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, user *record.User)
+		request func(t *testing.T) *http.Request
+	}{
+		{
+			name: "an enable",
+			arrange: func(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, user *record.User) {
+				stubOTPEnableAnswering(database, auditLogger, user, nil)
+			},
+			request: func(t *testing.T) *http.Request {
+				return accountOTPEnableRequest(t, otpNoticeSubject, otpNoticePassword, currentOtpCode(t))
+			},
+		},
+		{
+			name: "a disable",
+			arrange: func(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, user *record.User) {
+				user.OTPEnabled = true
+				stubOTPRemoveAnswering(database, auditLogger, user, "GetUserBySubject", otpNoticeSubject, nil)
+			},
+			request: func(t *testing.T) *http.Request {
+				return accountOTPDisableRequest(t, otpNoticeSubject, otpNoticePassword)
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			database := datamocks.NewDatabase(t)
+			auditLogger := handlersmocks.NewAuditLogger(t)
+			jobs := &heldJobs{}
+			user := otpNoticeUser(t)
+			tc.arrange(database, auditLogger, user)
+
+			rr := httptest.NewRecorder()
+			HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher, heldNotifier(t, jobs)).
+				ServeHTTP(rr, withNoticeContext(tc.request(t), passwordNoticeSettings()))
+
+			require.Equal(t, http.StatusNotFound, rr.Code, rr.Body.String())
+			code, description := decodeErrorEnvelope(t, rr)
+			assert.Equal(t, "NOT_FOUND", code)
+			assert.Equal(t, "User not found", description)
+			database.AssertExpectations(t)
+			auditLogger.AssertExpectations(t)
+			assert.Len(t, jobs.jobs, 1, "the committed change's notice stands")
+		})
+	}
+}
+
 // The enable answers with the set of recovery codes created with the authenticator, beside the user,
 // for the console to show once (#257 decisions 1 and 8); the set is audited after the enable,
 // naming the user and the caller and nothing of the codes (decision 10).
