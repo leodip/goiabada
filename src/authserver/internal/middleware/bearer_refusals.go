@@ -59,8 +59,10 @@ const invalidDPoPProofDescription = "The DPoP proof is invalid."
 // API handler uses.
 //
 // i18n surface: B — machine. Bearer-token failures on /api/v1/* do not localize: each description
-// is also the challenge's, which RFC 6750 section 3 holds to ASCII. TestBearerRefusals_EnglishOnly
-// holds every sentence to bearerEnglishRefusals and the body to the challenge's string.
+// is also the challenge's, which RFC 6750 section 3 holds to ASCII, but for a request with no
+// credential, whose challenge carries none (section 3.1) and whose body stays in English with the
+// rest. TestBearerRefusals_EnglishOnly holds every sentence to bearerEnglishRefusals and the body
+// to the challenge's string.
 type apiBearerRefusals struct{}
 
 func (apiBearerRefusals) missing(w http.ResponseWriter, _ *http.Request) {
