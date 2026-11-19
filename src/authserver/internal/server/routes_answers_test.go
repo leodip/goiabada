@@ -257,6 +257,11 @@ func TestRegisterRoutes_AKnownPathByAnotherMethodIs405WithNoContent(t *testing.T
 			assert.Empty(t, rr.Body.String())
 			assert.Empty(t, rr.Header().Get("Content-Type"))
 			assert.Equal(t, []string{request.allow}, rr.Header().Values("Allow"))
+			// A 405 under an API group is the group's subrouter answering, beneath the API
+			// branch's NoStore, so it is no-store as every other answer there is (#825).
+			if strings.HasPrefix(request.target, "/api/v1/") {
+				assertNoStore(t, rr)
+			}
 		})
 	}
 }
