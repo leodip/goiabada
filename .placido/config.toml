@@ -76,10 +76,14 @@ last  = ["e2e"]   # after the review, before the push: the browser suite against
 [pr]
 host_paths = [".placido", ".claude", ".codex", ".mcp.json", "src/.devcontainer", "e2e"]
 
-# CodeRabbit reviews every pull request, and its check is one of the pull request's,
-# so its review is in once CI concludes. Placido then answers its comments, fixes what
-# holds in the pull request, and drafts the rest as follow-ups; what its comments look
-# like is in .placido/notes/review-comments.md.
+# Two bots review every pull request. CodeRabbit's check is one of the pull request's,
+# so its review is in once CI concludes. Codex's security review reports no check and
+# runs only when the pull request opens: it took 7.5 minutes on #868, against CI's 10,
+# so placido waits until the pull request is 30 minutes old and reads a last time.
+# Placido answers their comments, fixes what holds in the pull request, and drafts the
+# rest as follow-ups; what their comments look like is in
+# .placido/notes/review-comments.md.
 [review_comments]
-accounts = ["coderabbitai[bot]"]
-passes   = 2   # its first review, then its review of placido's fixes
+accounts = ["coderabbitai[bot]", "chatgpt-codex-connector[bot]"]
+passes   = 2       # their first reviews, then CodeRabbit's review of placido's fixes
+wait     = "30m"   # for Codex, which may comment after CI concludes
