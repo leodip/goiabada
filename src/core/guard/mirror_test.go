@@ -716,7 +716,8 @@ func TestMirrorPublic_ARegistryErrorIsNotTakenForAPackageNotPublic(t *testing.T)
 }
 
 // A pull is taken for a package that is not public only when the registry refused it, as the
-// daemon relays: Docker failing on the runner, even with "permission denied", says nothing of the
+// daemon relays, in words or with a 401 or 403 status: Docker failing on the runner, even with
+// "permission denied", or a registry error whose URL holds 401 or 403, says nothing of the
 // package, and is reported with Docker's error and no settings to change.
 func TestMirrorPublic_OnlyARegistryRefusalIsTakenForAPackageNotPublic(t *testing.T) {
 	nginx := "ghcr.io/leodip/goiabada-ci/nginx:alpine"
@@ -732,6 +733,8 @@ func TestMirrorPublic_OnlyARegistryRefusalIsTakenForAPackageNotPublic(t *testing
 		{"the daemon's disk", "Error response from daemon: mkdir /var/lib/docker/tmp/docker-pull-1234: permission denied", false},
 		{"no daemon", "Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?", false},
 		{"a registry error", "Error response from daemon: received unexpected HTTP status: 503 Service Unavailable", false},
+		{"a bare refusal status", "Error response from daemon: received unexpected HTTP status: 403", true},
+		{"a registry error naming 401 and 403", `Error response from daemon: failed to copy: httpReadSeeker: failed open: unexpected status code https://ghcr.io/v2/leodip/goiabada-ci/nginx/blobs/sha256:a403b40140340100000000000000000000000000000000000000000000c401: 503 Service Unavailable`, false},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			digests := map[string]string{}

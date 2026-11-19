@@ -252,15 +252,17 @@ mirror_missing() {
 
 # pull_refused succeeds when docker's error says the registry refused the pull for want of access,
 # as GHCR refuses an anonymous one of a package that is not public. Docker relays a registry's answer
-# after "Error response from daemon:"; an error of Docker's own on the runner, such as "permission
-# denied" on its socket or its disk, or a registry error, such as a 503, says nothing of the package.
+# after "Error response from daemon:", in words or as an HTTP status, "...: 403 Forbidden", whose code
+# stands after a space: a 401 or 403 inside a URL, such as a digest's, is no status. An error of
+# Docker's own on the runner, such as "permission denied" on its socket or its disk, or a registry
+# error, such as a 503, says nothing of the package.
 pull_refused() {
     local line
     while IFS= read -r line; do
         line=${line,,}
         [[ $line == "error response from daemon:"* ]] || continue
         line=${line//permission denied/}
-        [[ $line =~ denied|unauthorized|forbidden|(^|[^0-9])40[13]([^0-9]|$) ]] && return 0
+        [[ $line =~ denied|unauthorized|forbidden|(^|[[:space:]])40[13]([^[:alnum:]]|$) ]] && return 0
     done <<< "$1"
     return 1
 }
