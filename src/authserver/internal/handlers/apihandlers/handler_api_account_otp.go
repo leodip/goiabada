@@ -424,6 +424,19 @@ func HandleAccountOTPPut(
 			}
 			switch verified.Outcome {
 			case otpcredential.OutcomeReplayed:
+				// The claim matches no row for an account deleted after this request read it, too.
+				// That is no replay: the account gone is the 404 a request arriving a moment later
+				// would get, with nothing audited (#796 decision 3). A replay on an account still
+				// there is answered as a wrong code, as below.
+				current, readErr := database.GetUserById(r.Context(), nil, user.Id)
+				if readErr != nil {
+					writeInternalServerError(w, r, readErr)
+					return
+				}
+				if current == nil {
+					writeJSONError(w, "User not found", "NOT_FOUND", http.StatusNotFound)
+					return
+				}
 				// No EventAuthFailedOtp beside it, unlike the browser sites: this endpoint
 				// emits nothing when a code is simply wrong, and enabling OTP is not an
 				// authentication ceremony. Decision 5 puts the replay event alongside the

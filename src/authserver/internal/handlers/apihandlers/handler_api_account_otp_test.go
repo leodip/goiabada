@@ -140,6 +140,8 @@ func TestHandleAccountOTPPut_Enable_ReplayIsRefused(t *testing.T) {
 			claimedStep = args.Get(3).(int64)
 		}).
 		Return(false, nil).Once()
+	// The refused claim's re-read finds the account still there, so the refusal is a replay.
+	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), user.Id).Return(user, nil).Once()
 
 	// Registering only this event is itself the assertion that EventAuthFailedOtp is not emitted: the
 	// mock fails an unexpected Log call, so adding the browser sites' failure event here would break
@@ -175,6 +177,34 @@ func TestHandleAccountOTPPut_Enable_ReplayIsRefused(t *testing.T) {
 	database.AssertNotCalled(t, "TryEstablishUserOTP",
 		mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	assert.False(t, user.OTPEnabled)
+}
+
+// TestHandleAccountOTPPut_Enable_AClaimOnAnAccountDeletedMeanwhile: the account is deleted after
+// this request read it and before its code claims a step, so the claim matches no row, as a replay's
+// does. The re-read finds no account: the request answers 404, as one arriving a moment later would,
+// and audits no replay that never happened (#796 decision 3).
+func TestHandleAccountOTPPut_Enable_AClaimOnAnAccountDeletedMeanwhile(t *testing.T) {
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
+
+	const subject = "the-subject"
+	const password = "P4ss!word"
+	user := otpTestUser(t, password)
+
+	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).Return(user, nil).Once()
+	database.On("TryConsumeUserOTPStep", mock.Anything, (*sql.Tx)(nil), user.Id, mock.Anything).Return(false, nil).Once()
+	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), user.Id).Return((*record.User)(nil), nil).Once()
+
+	rr := httptest.NewRecorder()
+	HandleAccountOTPPut(database, auditLogger, unlimitedCredentials{}, testDataCipher, heldNotifier(t, &heldJobs{})).
+		ServeHTTP(rr, accountOTPEnableRequest(t, subject, password, currentOtpCode(t)))
+
+	require.Equal(t, http.StatusNotFound, rr.Code, rr.Body.String())
+	assert.Equal(t, "NOT_FOUND", errorCodeOf(t, rr))
+	assert.Equal(t, "User not found", descriptionOf(t, rr))
+	database.AssertExpectations(t)
+	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+	database.AssertNotCalled(t, "TryEstablishUserOTP", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 }
 
 // TestHandleAccountOTPPut_Enable_ClaimErrorIs500 pins fail-closed. A database fault must not be
