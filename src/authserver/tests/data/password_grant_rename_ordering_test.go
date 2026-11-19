@@ -140,7 +140,7 @@ func runPasswordGrantOrderingAgainstRename(t *testing.T, db data.Database, other
 
 		// The real grant, held at its refresh token's insert: it has read the client's row with its
 		// lock and not yet written or committed.
-		pause := newPausingInserts(db)
+		pause := newPausingInserts(t, db)
 		type grantOutcome struct {
 			response *oauth.TokenResponse
 			err      error
@@ -170,7 +170,7 @@ func runPasswordGrantOrderingAgainstRename(t *testing.T, db data.Database, other
 
 		rename.requireBlocked(t)
 		rename.requireStillWaiting(t)
-		close(pause.release)
+		pause.proceed()
 
 		grant := <-granted
 		require.NoError(t, grant.err, "the grant held the client's row first, and commits")
@@ -263,7 +263,7 @@ func runDeleteClientOrderingAgainstPasswordGrant(t *testing.T, db data.Database,
 
 		// The real grant, held at its refresh token's insert: it has read the client's row with its
 		// lock and not yet written or committed.
-		pause := newPausingInserts(db)
+		pause := newPausingInserts(t, db)
 		granted := make(chan grantOutcome, 1)
 		go func() {
 			response, err := passwordGrantIssuerOn(pause).IssuePasswordGrant(ctx, rotationSettings(), passwordGrantInput(client, user))
@@ -284,7 +284,7 @@ func runDeleteClientOrderingAgainstPasswordGrant(t *testing.T, db data.Database,
 
 		deletion.requireBlocked(t)
 		deletion.requireStillWaiting(t)
-		close(pause.release)
+		pause.proceed()
 
 		grant := <-granted
 		require.NoError(t, deletion.await(t),

@@ -302,7 +302,7 @@ func TestRefreshRotation_ACredentialChangeArrivingWhileARotationHoldsTheRow(t *t
 
 			f := newFamilyOfShape(t, database, shape)
 			before := userGenerationOn(t, database, f.user.Id)
-			pause := newPausingInserts(database)
+			pause := newPausingInserts(t, database)
 			tx, rotation := startRotation(t, ctx, f, pause)
 
 			change := goBlocked(t, "the credential change", tx, func(reached func()) error {
@@ -312,7 +312,7 @@ func TestRefreshRotation_ACredentialChangeArrivingWhileARotationHoldsTheRow(t *t
 			change.requireBlocked(t)
 			change.requireStillWaiting(t)
 
-			close(pause.release)
+			pause.proceed()
 			result := <-rotation
 			require.NoError(t, change.await(t), "the change commits once the rotation has")
 

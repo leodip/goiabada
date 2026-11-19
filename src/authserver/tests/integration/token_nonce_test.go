@@ -52,11 +52,10 @@ func TestToken_Nonce_OnlyInTheIDTokenOfTheCodeExchange(t *testing.T) {
 // The implicit flow's ID token carries the request's nonce, and its access token none (#710
 // decision 6).
 func TestImplicitFlow_NonceOnlyInTheIDToken(t *testing.T) {
-	tokens, _ := implicitTokenResponse(t, "id_token token", "openid")
+	tokens, _, nonce := implicitTokenResponse(t, "id_token token", "openid")
 
 	require.NotEmpty(t, tokens["id_token"], "the implicit flow issues an ID token")
-	nonce, ok := decodeJWTPayload(t, tokens["id_token"])["nonce"].(string)
-	assert.True(t, ok && len(nonce) == 16, "the ID token carries the request's 16-letter nonce, got %q", nonce)
+	assert.Equal(t, nonce, decodeJWTPayload(t, tokens["id_token"])["nonce"], "the ID token carries the request's nonce")
 	require.NotEmpty(t, tokens["access_token"], "the implicit flow issues an access token")
 	assert.NotContains(t, decodeJWTPayload(t, tokens["access_token"]), "nonce", "the implicit flow's access token has no nonce")
 }

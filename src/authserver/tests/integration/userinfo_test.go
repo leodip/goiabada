@@ -125,7 +125,7 @@ func TestUserinfo_UserTokensWithOpenidAreAdmitted(t *testing.T) {
 
 	t.Run("implicit token", func(t *testing.T) {
 		const grant = "openid profile"
-		tokens, user := implicitTokenResponse(t, "token", grant)
+		tokens, user, _ := implicitTokenResponse(t, "token", grant)
 
 		assert.Equal(t, grant, tokens["scope"])
 		assert.Equal(t, grant, decodeJWTPayload(t, tokens["access_token"])["scope"])
@@ -134,7 +134,7 @@ func TestUserinfo_UserTokensWithOpenidAreAdmitted(t *testing.T) {
 
 	t.Run("implicit id_token token", func(t *testing.T) {
 		const grant = "openid email"
-		tokens, user := implicitTokenResponse(t, "id_token token", grant)
+		tokens, user, _ := implicitTokenResponse(t, "id_token token", grant)
 
 		assert.NotEmpty(t, tokens["id_token"])
 		assert.Equal(t, grant, tokens["scope"])

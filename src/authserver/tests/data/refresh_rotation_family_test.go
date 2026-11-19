@@ -41,16 +41,24 @@ func (noBumps) BumpUserSession(context.Context, string, int64, string, record.Ac
 
 // pausingInserts holds a rotation at the moment it inserts its child, handing the test the
 // transaction it is in. Only the first insert pauses: a deadlock's rerun reaches it again and must
-// not wait for a release that has already come.
+// not wait for a release that has already come. proceed lets it go, and the test's cleanup calls it
+// too, so a failing assertion never leaves the transaction parked with its locks held.
 type pausingInserts struct {
 	data.Database
-	paused  chan *sql.Tx
-	release chan struct{}
-	once    sync.Once
+	paused      chan *sql.Tx
+	release     chan struct{}
+	once        sync.Once
+	releaseOnce sync.Once
 }
 
-func newPausingInserts(db data.Database) *pausingInserts {
-	return &pausingInserts{Database: db, paused: make(chan *sql.Tx, 1), release: make(chan struct{})}
+func newPausingInserts(t *testing.T, db data.Database) *pausingInserts {
+	p := &pausingInserts{Database: db, paused: make(chan *sql.Tx, 1), release: make(chan struct{})}
+	t.Cleanup(p.proceed)
+	return p
+}
+
+func (p *pausingInserts) proceed() {
+	p.releaseOnce.Do(func() { close(p.release) })
 }
 
 func (p *pausingInserts) CreateRefreshToken(ctx context.Context, tx *sql.Tx, refreshToken *record.RefreshToken) error {
@@ -328,7 +336,7 @@ func TestRefreshRotation_AContainmentBetweenTheClaimAndTheInsertLeavesAChildThat
 			// Read before the rotation holds anything: a read on the package's handle while the
 			// rotation's transaction holds SQLite's one write lock is not what this case measures.
 			replayInput := f.presenting(t, database, f.replayed.RefreshTokenJti)
-			pause := newPausingInserts(database)
+			pause := newPausingInserts(t, database)
 			tx, rotation := startRotation(t, ctx, f, pause)
 
 			// The replay of the earlier, revoked member, arriving on the other handle.
@@ -340,7 +348,7 @@ func TestRefreshRotation_AContainmentBetweenTheClaimAndTheInsertLeavesAChildThat
 			containment.requireBlocked(t)
 			containment.requireStillWaiting(t)
 
-			close(pause.release)
+			pause.proceed()
 			result := <-rotation
 
 			var replayed *issuance.RefreshTokenReplayedError
@@ -375,7 +383,7 @@ func TestRefreshRotation_AClientMadePublicBetweenTheClaimAndTheInsertLeavesAChil
 			defer cancel()
 
 			f := newFamily(t, database, ropc)
-			pause := newPausingInserts(database)
+			pause := newPausingInserts(t, database)
 			tx, rotation := startRotation(t, ctx, f, pause)
 
 			flip := goBlocked(t, "the client's revocation", tx, func(reached func()) error {
@@ -386,7 +394,7 @@ func TestRefreshRotation_AClientMadePublicBetweenTheClaimAndTheInsertLeavesAChil
 			flip.requireBlocked(t)
 			flip.requireStillWaiting(t)
 
-			close(pause.release)
+			pause.proceed()
 			result := <-rotation
 			require.NoError(t, flip.await(t), "the revocation commits, rerun once if the engine chose it as a deadlock victim")
 
@@ -438,7 +446,7 @@ func TestRefreshRotation_ASessionRevocationBetweenTheClaimAndTheInsertEndsTheNew
 			require.NoError(t, err)
 			require.NotNil(t, session)
 
-			pause := newPausingInserts(database)
+			pause := newPausingInserts(t, database)
 			tx, rotation := startRotation(t, ctx, f, pause)
 
 			revoking := goBlocked(t, rv.name, tx, func(reached func()) error {
@@ -448,7 +456,7 @@ func TestRefreshRotation_ASessionRevocationBetweenTheClaimAndTheInsertEndsTheNew
 			revoking.requireBlocked(t)
 			revoking.requireStillWaiting(t)
 
-			close(pause.release)
+			pause.proceed()
 			result := <-rotation
 			require.NoError(t, revoking.await(t), "the revocation commits, rerun once if the engine chose it as a deadlock victim")
 

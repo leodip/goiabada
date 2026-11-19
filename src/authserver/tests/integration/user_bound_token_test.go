@@ -460,7 +460,7 @@ func userAccessTokenViaImplicit(t *testing.T) string {
 
 	// Just "openid": it is what lets this token reach /userinfo, and it is not a permission, so
 	// the user needs no grant here (#449).
-	tokens, _ := implicitTokenResponse(t, "token", "openid")
+	tokens, _, _ := implicitTokenResponse(t, "token", "openid")
 	accessToken := tokens["access_token"]
 	require.NotEmpty(t, accessToken, "implicit flow should yield an access token")
 
@@ -470,21 +470,22 @@ func userAccessTokenViaImplicit(t *testing.T) string {
 // implicitTokenResponse is userAccessTokenViaImplicit for a caller that needs the whole fragment
 // and chooses the response type and scope. It turns the implicit flow on for the test and runs the
 // ceremony for a fresh user, with a nonce, which OIDC Core 1.0 section 3.2.2.1 requires whenever
-// an ID token is asked for.
-func implicitTokenResponse(t *testing.T, responseType string, scope string) (map[string]string, *record.User) {
+// an ID token is asked for. It answers the fragment's tokens, the user and the nonce it sent.
+func implicitTokenResponse(t *testing.T, responseType string, scope string) (map[string]string, *record.User, string) {
 	t.Helper()
 
 	changeSettings(t, func(settings *record.Settings) { settings.ImplicitFlowEnabled = true })
 
 	client, redirectUri := createImplicitFlowClient(t, nil)
 	user, password := createTestUserForImplicit(t)
+	nonce := fake.LetterN(16)
 
 	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=" + url.QueryEscape(responseType) +
 		"&scope=" + url.QueryEscape(scope) +
 		"&state=" + fake.LetterN(16) +
-		"&nonce=" + fake.LetterN(16)
+		"&nonce=" + nonce
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Get(destUrl)
@@ -514,5 +515,5 @@ func implicitTokenResponse(t *testing.T, responseType string, scope string) (map
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	return getTokensFromFragment(t, resp), user
+	return getTokensFromFragment(t, resp), user, nonce
 }
