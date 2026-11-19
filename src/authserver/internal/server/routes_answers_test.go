@@ -211,7 +211,7 @@ func TestRegisterRoutes_AnUnmatchedPathUnderAnAPIGroupMeetsItsGuardsFirst(t *tes
 			var body map[string]string
 			require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &body), rr.Body.String())
 			assert.Equal(t, "ACCESS_TOKEN_REQUIRED", body["error_code"])
-			assert.Equal(t, "no-store", rr.Header().Get("Cache-Control"), "the group's first middleware ran")
+			assert.Equal(t, "no-store", rr.Header().Get("Cache-Control"), "the API branch's NoStore ran")
 		})
 	}
 
@@ -219,7 +219,7 @@ func TestRegisterRoutes_AnUnmatchedPathUnderAnAPIGroupMeetsItsGuardsFirst(t *tes
 	assert.Equal(t, http.StatusNotFound, rr.Code)
 	assert.Equal(t, "text/plain; charset=utf-8", rr.Header().Get("Content-Type"))
 	assert.Equal(t, "404 page not found\n", rr.Body.String())
-	assert.Equal(t, "no-store", rr.Header().Get("Cache-Control"), "the group's first middleware ran")
+	assert.Equal(t, "no-store", rr.Header().Get("Cache-Control"), "the API branch's NoStore ran")
 }
 
 // A path that exists, by a method it does not take, is 405 with no content and no Content-Type, on
