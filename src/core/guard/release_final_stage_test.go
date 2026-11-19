@@ -442,12 +442,12 @@ func TestFinalStageFindings(t *testing.T) {
 		smokeList:  "ONE_CONTENTS",
 		contents:   []string{"drwxr-xr-x 0/0 app/", "-rwxr-xr-x 0/0 app/goiabada-one", "drwxrwxrwt 0/0 tmp/"},
 	}
-	const dockerfile = "FROM --platform=$BUILDPLATFORM golang:1.27.3-alpine AS build\n" +
+	const dockerfile = "FROM --platform=$BUILDPLATFORM ${baseRegistry}/golang:1.27.3-alpine AS build\n" +
 		"RUN mkdir -p /app/rootfs/tmp \\\n" +
 		"    && chmod 1777 /app/rootfs/tmp\n" +
 		"RUN CGO_ENABLED=0 go build -o /app/bin/goiabada-one ./cmd/one\n" +
 		"\n" +
-		"FROM --platform=$BUILDPLATFORM golang:1.27.3-alpine AS certs\n" +
+		"FROM --platform=$BUILDPLATFORM ${baseRegistry}/golang:1.27.3-alpine AS certs\n" +
 		"RUN apk upgrade --no-cache ca-certificates-bundle\n" +
 		"\n" +
 		"FROM scratch AS final\n" +
@@ -489,7 +489,7 @@ func TestFinalStageFindings(t *testing.T) {
 			strings.ReplaceAll(strings.NewReplacer(
 				"FROM scratch AS final", "from scratch as final",
 				"USER 10001:10001", "user   10001:10001",
-				"FROM --platform=$BUILDPLATFORM golang:1.27.3-alpine AS certs", "from --platform=$BUILDPLATFORM golang:1.27.3-alpine as certs",
+				"FROM --platform=$BUILDPLATFORM ${baseRegistry}/golang:1.27.3-alpine AS certs", "from --platform=$BUILDPLATFORM ${baseRegistry}/golang:1.27.3-alpine as certs",
 			).Replace(dockerfile), "\n", "\r\n"),
 			strings.ReplaceAll(smoke, "\n", "\r\n"),
 			nil,
@@ -595,25 +595,31 @@ func TestFinalStageFindings(t *testing.T) {
 		},
 		{
 			"no certificate refresh stage",
-			strings.Replace(edit("FROM --platform=$BUILDPLATFORM golang:1.27.3-alpine AS certs\nRUN apk upgrade --no-cache ca-certificates-bundle\n", ""),
+			strings.Replace(edit("FROM --platform=$BUILDPLATFORM ${baseRegistry}/golang:1.27.3-alpine AS certs\nRUN apk upgrade --no-cache ca-certificates-bundle\n", ""),
 				"COPY --from=certs", "COPY --from=build", 1),
 			smoke,
 			[]string{
 				"build/Dockerfile-one:9 copies the CA bundle with COPY --from=build",
-				"build/Dockerfile-one has no certificate refresh stage, FROM --platform=$BUILDPLATFORM golang:1.27.3-alpine AS certs then RUN apk upgrade --no-cache ca-certificates-bundle",
+				"build/Dockerfile-one has no certificate refresh stage, FROM --platform=$BUILDPLATFORM ${baseRegistry}/golang:1.27.3-alpine AS certs then RUN apk upgrade --no-cache ca-certificates-bundle",
 			},
 		},
 		{
 			"a refresh stage under the target's emulation",
-			edit("FROM --platform=$BUILDPLATFORM golang:1.27.3-alpine AS certs", "FROM golang:1.27.3-alpine AS certs"),
+			edit("FROM --platform=$BUILDPLATFORM ${baseRegistry}/golang:1.27.3-alpine AS certs", "FROM ${baseRegistry}/golang:1.27.3-alpine AS certs"),
 			smoke,
-			[]string{"build/Dockerfile-one:6 opens its refresh stage with FROM golang:1.27.3-alpine AS certs, where it must be FROM --platform=$BUILDPLATFORM golang:1.27.3-alpine AS certs"},
+			[]string{"build/Dockerfile-one:6 opens its refresh stage with FROM ${baseRegistry}/golang:1.27.3-alpine AS certs, where it must be FROM --platform=$BUILDPLATFORM ${baseRegistry}/golang:1.27.3-alpine AS certs"},
 		},
 		{
 			"a refresh stage from another image than the build stage's",
-			edit("FROM --platform=$BUILDPLATFORM golang:1.27.3-alpine AS certs", "FROM --platform=$BUILDPLATFORM alpine:3.24 AS certs"),
+			edit("FROM --platform=$BUILDPLATFORM ${baseRegistry}/golang:1.27.3-alpine AS certs", "FROM --platform=$BUILDPLATFORM alpine:3.24 AS certs"),
 			smoke,
 			[]string{"build/Dockerfile-one:6 opens its refresh stage with FROM --platform=$BUILDPLATFORM alpine:3.24 AS certs, where it must be"},
+		},
+		{
+			"a refresh stage from Docker Hub's Go image while the build stage takes baseRegistry",
+			edit("FROM --platform=$BUILDPLATFORM ${baseRegistry}/golang:1.27.3-alpine AS certs", "FROM --platform=$BUILDPLATFORM golang:1.27.3-alpine AS certs"),
+			smoke,
+			[]string{"build/Dockerfile-one:6 opens its refresh stage with FROM --platform=$BUILDPLATFORM golang:1.27.3-alpine AS certs, where it must be FROM --platform=$BUILDPLATFORM ${baseRegistry}/golang:1.27.3-alpine AS certs"},
 		},
 		{
 			"a refresh that does not upgrade the bundle",

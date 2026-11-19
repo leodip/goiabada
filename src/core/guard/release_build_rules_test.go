@@ -1729,6 +1729,11 @@ func TestReleaseBuilds_CrossCompile(t *testing.T) {
 			nil,
 		},
 		{
+			"the bases' registry argument, declared before the first FROM and read by it, is in no stage",
+			"ARG baseRegistry=docker.io/library\n" + strings.Replace(crossCompiledDockerfile, " golang AS build", " ${baseRegistry}/golang AS build", 1),
+			nil,
+		},
+		{
 			"a build stage of the target's platform compiles under emulation",
 			edit("FROM --platform=$BUILDPLATFORM golang AS build", "FROM golang AS build"),
 			[]string{"cross-compile: build/Dockerfile-one:6 runs go build in a stage not FROM --platform=$BUILDPLATFORM, so each platform's image compiles it under that platform's emulation"},

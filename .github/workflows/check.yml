@@ -610,15 +610,22 @@ jobs:
   # opens its pages in a real browser, under their Content-Security-Policy, and
   # checks that nothing reaches Google before the visitor accepts Analytics. Both
   # show only in a running image.
+  #
+  # Both builds pass baseRegistry, so the image's node and nginx bases come from
+  # CI's mirror and not from Docker Hub (#867); the Docs workflow's build, which
+  # ships, passes nothing and builds on Docker Hub's. The job waits for Versions,
+  # which reads the Node pin its browser test runs on.
   docs:
     name: Docs
+    needs: versions
     runs-on: ubuntu-latest
     env:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      # The builds below pull node and nginx from Docker Hub; the login is skipped where the
-      # secrets are absent, as on a pull request from a fork. See the note above permissions.
+      # The builds below take node and nginx from CI's mirror, which needs no login. The login
+      # is skipped where the secrets are absent, as on a pull request from a fork. See the note
+      # above permissions.
       - name: Log in to Docker Hub
         if: env.DOCKERHUB_USERNAME != ''
         uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
@@ -628,21 +635,20 @@ jobs:
       - name: Site check tests
         run: |
           set -euo pipefail
-          docker build --target sources -f site/Dockerfile -t goiabada-docs-sources:ci .
+          docker build --build-arg baseRegistry=ghcr.io/leodip/goiabada-ci --target sources -f site/Dockerfile -t goiabada-docs-sources:ci .
           docker run --rm goiabada-docs-sources:ci npm test
       - name: Build the site and the docs image
-        run: docker build -f site/Dockerfile -t goiabada-docs:ci .
+        run: docker build --build-arg baseRegistry=ghcr.io/leodip/goiabada-ci -f site/Dockerfile -t goiabada-docs:ci .
       - name: Docs server answers
         run: site/checks/docs-image.sh goiabada-docs:ci
       # Playwright runs on the runner, which the docs image's Alpine Node can't host, with the
-      # Node version that image is built with. The browser is the one the site's pinned
-      # @playwright/test names, so a Dependabot bump of it brings its browser along.
-      - name: Node version of the docs build
-        id: node
-        run: echo "version=$(sed -n 's/^FROM node:\([0-9.]*\)-alpine.*/\1/p' site/Dockerfile)" >> "$GITHUB_OUTPUT"
+      # Node version that image is built with: tools.node, which version-manager.sh update
+      # writes into site/Dockerfile's FROM line and Lint's "versions.yaml is applied" holds
+      # there. The browser is the one the site's pinned @playwright/test names, so a
+      # Dependabot bump of it brings its browser along.
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: ${{ steps.node.outputs.version }}
+          node-version: ${{ needs.versions.outputs.node }}
       - name: Install Playwright's Chromium
         working-directory: site
         run: |
@@ -974,8 +980,8 @@ jobs:
         with:
           go-version: ${{ needs.versions.outputs.go }}
           cache-dependency-path: src/**/go.sum
-      # Before Buildx, whose setup pulls its own image from Docker Hub, and the two release
-      # builds, whose golang base comes from there. See the note above permissions.
+      # Before Buildx, whose setup pulls its own image from Docker Hub; the two release builds
+      # take their golang base from CI's mirror. See the note above permissions.
       - name: Log in to Docker Hub
         if: env.DOCKERHUB_USERNAME != ''
         uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
@@ -1000,7 +1006,8 @@ jobs:
       # with the cache filter a release passes, which reruns the Dockerfiles' certificate refresh
       # and ships the CA bundle it fetched; src/core/guard/release_cache_filter_test.go holds
       # every build to it, and src/core/guard/release_binary_scan_test.go holds the job to
-      # building and scanning each image on both platforms.
+      # building and scanning each image on both platforms. Their bases come from CI's mirror,
+      # baseRegistry, as no build a release ships does: see the note on the docs job.
       - name: Build both images, for both platforms
         working-directory: src/build
         env:
@@ -1012,10 +1019,10 @@ jobs:
             --build-arg "buildDate=$(date +%Y-%m-%d)"
             --build-arg "gitCommit=$(git rev-parse --short HEAD)"
           )
-          docker buildx build --load "${args[@]}" --no-cache-filter certs --no-cache-filter final --platform linux/amd64 -f Dockerfile-authserver   -t goiabada-authserver:ci-amd64   ..
-          docker buildx build --load "${args[@]}" --no-cache-filter certs --no-cache-filter final --platform linux/arm64 -f Dockerfile-authserver   -t goiabada-authserver:ci-arm64   ..
-          docker buildx build --load "${args[@]}" --no-cache-filter certs --no-cache-filter final --platform linux/amd64 -f Dockerfile-adminconsole -t goiabada-adminconsole:ci-amd64 ..
-          docker buildx build --load "${args[@]}" --no-cache-filter certs --no-cache-filter final --platform linux/arm64 -f Dockerfile-adminconsole -t goiabada-adminconsole:ci-arm64 ..
+          docker buildx build --load "${args[@]}" --build-arg baseRegistry=ghcr.io/leodip/goiabada-ci --no-cache-filter certs --no-cache-filter final --platform linux/amd64 -f Dockerfile-authserver   -t goiabada-authserver:ci-amd64   ..
+          docker buildx build --load "${args[@]}" --build-arg baseRegistry=ghcr.io/leodip/goiabada-ci --no-cache-filter certs --no-cache-filter final --platform linux/arm64 -f Dockerfile-authserver   -t goiabada-authserver:ci-arm64   ..
+          docker buildx build --load "${args[@]}" --build-arg baseRegistry=ghcr.io/leodip/goiabada-ci --no-cache-filter certs --no-cache-filter final --platform linux/amd64 -f Dockerfile-adminconsole -t goiabada-adminconsole:ci-amd64 ..
+          docker buildx build --load "${args[@]}" --build-arg baseRegistry=ghcr.io/leodip/goiabada-ci --no-cache-filter certs --no-cache-filter final --platform linux/arm64 -f Dockerfile-adminconsole -t goiabada-adminconsole:ci-arm64 ..
       # Built from source at the pin by the install step the weekly Image scan shares.
       - name: Install govulncheck
         uses: ./.github/actions/install-scanner
