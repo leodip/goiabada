@@ -768,6 +768,51 @@ func TestHandleAccountDeletionPost_TheCodeThatDisablesTheAuthenticatorIsTold(t *
 	assert.Equal(t, deletionAddress, captured.sent.To)
 }
 
+// A replayed code whose count disabled the authenticator counted against the account's row, so the
+// account was there when the code was claimed: a replay, whose committed lockout is audited and
+// told whatever a read of the account now would say, gone or failing (#796 decision 3, #724
+// decision 7).
+func TestHandleAccountDeletionPost_TheReplayThatDisablesTheAuthenticatorIsTold(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		reread  *record.User
+		readErr error
+	}{
+		{name: "the account deleted since", reread: nil},
+		{name: "the account unreadable", readErr: assert.AnError},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newDeletionFixture(t)
+			user := enrolledDeletionUser(t)
+			f.expectCaller(user)
+			f.expectEarlyCheck(false, 0)
+			f.database.On("TryConsumeEnrolledUserOTPStep", mock.Anything, (*sql.Tx)(nil), deletionUserId,
+				mock.Anything, user.OtpConfigGeneration).Return(false, nil).Once()
+			countTx := &sql.Tx{}
+			datamocks.ExpectRunInTransaction(f.database, countTx)
+			f.database.On("IncrementUserOtpConsecutiveFailures", mock.Anything, countTx, deletionUserId,
+				user.OtpConfigGeneration).Return(true, nil).Once()
+			f.database.On("GetUserByIdForUpdate", mock.Anything, countTx, deletionUserId).Return(user, nil).Once()
+			f.database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), deletionUserId).
+				Return(tc.reread, tc.readErr).Maybe()
+			f.auditLogger.On("Log", mock.Anything, audit.EventOTPCodeReplayDetected, mock.Anything).Return().Once()
+			f.auditLogger.On("Log", mock.Anything, audit.EventOTPAuthenticatorDisabled, map[string]interface{}{
+				"user_id": deletionUserId, "logged_in_user": deletionSubject,
+			}).Return().Once()
+
+			rr := f.serve(deletionRequest(t, deletionSettings(), map[string]string{
+				"password": deletionPassword, "otpCode": currentOtpCode(t)}))
+
+			require.Equal(t, http.StatusBadRequest, rr.Code, rr.Body.String())
+			assert.Equal(t, "INVALID_OTP_CODE", errorCodeOf(t, rr))
+			assert.Equal(t, 1, f.credentials.failures)
+			captured := expectNotice(f.pageRenderer, f.emailSender, emailtemplate.OTPLockout)
+			f.jobs.runAll(t, afterresponse.ClassSecurityNotice)
+			assert.Equal(t, deletionAddress, captured.sent.To)
+		})
+	}
+}
+
 // A password changed after the request checked it, committed before the deletion locks the row: the
 // password the deletion was asked with is no longer the account's, so it is refused as a wrong one
 // and rolled back. It was right when checked, so it spends nothing.
