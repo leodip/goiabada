@@ -169,12 +169,13 @@ func (m *JWT) SessionHandler() func(http.Handler) http.Handler {
 				next.ServeHTTP(w, r)
 				return
 			}
-			tokenResponse, ok := sess.Values[sessionkeys.JWT].(oauth.TokenResponse)
+			storedTokenResponse, ok := sess.Values[sessionkeys.JWT].(sessionkeys.StoredTokenResponse)
 			if !ok {
 				m.errorRenderer.InternalServerError(w, r,
 					errs.New("unable to cast the session value to TokenResponse"))
 				return
 			}
+			tokenResponse := storedTokenResponse.TokenResponse()
 
 			// Step 2. The expiry is a plain int64 beside the token response rather than a field of
 			// a new persisted type, so a session written before it existed still decodes and is
@@ -383,7 +384,8 @@ func (m *JWT) refreshToken(
 	if err != nil {
 		return nil, nil, err, nil
 	}
-	stored, hasStored := current.Values[sessionkeys.JWT].(oauth.TokenResponse)
+	storedTokenResponse, hasStored := current.Values[sessionkeys.JWT].(sessionkeys.StoredTokenResponse)
+	stored := storedTokenResponse.TokenResponse()
 	expiresAt, hasExpiry := current.Values[sessionkeys.JWTExpiresAt].(int64)
 	if !hasStored || !hasExpiry || stored.IdToken == "" {
 		// Another request ended this session while this one waited for the lock; this
@@ -460,7 +462,7 @@ func (m *JWT) refreshToken(
 	// here is what the rest of the request reads and any later save writes.
 	detachedReq := r.WithContext(ctx)
 
-	sess.Values[sessionkeys.JWT] = accepted.TokenResponse
+	sess.Values[sessionkeys.JWT] = sessionkeys.StoreTokenResponse(accepted.TokenResponse)
 	sess.Values[sessionkeys.JWTExpiresAt] = oauthclient.ExpiresAt(&accepted.TokenResponse, time.Now())
 	err = m.sessionStore.Save(detachedReq, w, sess)
 	if err != nil {
@@ -473,7 +475,7 @@ func (m *JWT) refreshToken(
 // carry writes a token set another request stored, and its expiry, into the request's own
 // session, without saving it: see refreshToken.
 func carry(sess *sessionstore.Session, stored oauth.TokenResponse, expiresAt int64) {
-	sess.Values[sessionkeys.JWT] = stored
+	sess.Values[sessionkeys.JWT] = sessionkeys.StoreTokenResponse(stored)
 	sess.Values[sessionkeys.JWTExpiresAt] = expiresAt
 }
 
@@ -517,7 +519,8 @@ func (m *JWT) supersedingTokens(r *http.Request, presented oauth.TokenResponse, 
 	if err != nil {
 		return nil, 0, err
 	}
-	stored, hasStored := current.Values[sessionkeys.JWT].(oauth.TokenResponse)
+	storedTokenResponse, hasStored := current.Values[sessionkeys.JWT].(sessionkeys.StoredTokenResponse)
+	stored := storedTokenResponse.TokenResponse()
 	storedExpiresAt, hasExpiry := current.Values[sessionkeys.JWTExpiresAt].(int64)
 	if !hasStored || !hasExpiry || stored == presented {
 		return nil, 0, nil

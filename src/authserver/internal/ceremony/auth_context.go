@@ -31,28 +31,32 @@ const (
 	AuthStateReadyToIssueCode        AuthState = "ready_to_issue_code"
 )
 
+// AuthContext is a sign-in in progress, stored in the browser session as JSON by Store. Every field
+// declares its key with a json tag, and the keys are the stored format: a ceremony in flight across
+// a deploy is decoded under them, so a field is respelled without touching its tag, and a field
+// added takes a key of its own (#482 decision 5).
 type AuthContext struct {
-	ClientId                      string
-	RedirectURI                   string
-	ResponseType                  string
-	CodeChallengeMethod           string
-	CodeChallenge                 string
-	ResponseMode                  string
-	Scope                         string
-	ConsentedScope                string
-	MaxAge                        string
-	AcrValuesFromAuthorizeRequest string
-	State                         string
-	Nonce                         string
-	UserAgent                     string
-	IpAddress                     string
-	AcrLevel                      record.AcrLevel
-	AuthMethods                   string
-	UserId                        int64
-	AuthState                     AuthState
-	Prompt                        string     // Normalized prompt values (space-delimited, deduplicated)
-	AuthenticatedAt               *time.Time // auth_time of what is issued: set by /auth/completed or prompt=none; issuance refuses nil
-	IdTokenHintSub                string     // sub claim from id_token_hint (empty if no hint provided)
+	ClientId                      string          `json:"ClientId"`
+	RedirectURI                   string          `json:"RedirectURI"`
+	ResponseType                  string          `json:"ResponseType"`
+	CodeChallengeMethod           string          `json:"CodeChallengeMethod"`
+	CodeChallenge                 string          `json:"CodeChallenge"`
+	ResponseMode                  string          `json:"ResponseMode"`
+	Scope                         string          `json:"Scope"`
+	ConsentedScope                string          `json:"ConsentedScope"`
+	MaxAge                        string          `json:"MaxAge"`
+	AcrValuesFromAuthorizeRequest string          `json:"AcrValuesFromAuthorizeRequest"`
+	State                         string          `json:"State"`
+	Nonce                         string          `json:"Nonce"`
+	UserAgent                     string          `json:"UserAgent"`
+	IpAddress                     string          `json:"IpAddress"`
+	AcrLevel                      record.AcrLevel `json:"AcrLevel"`
+	AuthMethods                   string          `json:"AuthMethods"`
+	UserId                        int64           `json:"UserId"`
+	AuthState                     AuthState       `json:"AuthState"`
+	Prompt                        string          `json:"Prompt"`          // Normalized prompt values (space-delimited, deduplicated)
+	AuthenticatedAt               *time.Time      `json:"AuthenticatedAt"` // auth_time of what is issued: set by /auth/completed or prompt=none; issuance refuses nil
+	IdTokenHintSub                string          `json:"IdTokenHintSub"`  // sub claim from id_token_hint (empty if no hint provided)
 	// Level1AuthCompleted records that level 1 authentication happened in THIS ceremony,
 	// as opposed to being inherited from a session the ceremony reused. It is written only
 	// where level 1 is performed, today only authflow.PasswordSubmission, and read by
@@ -65,13 +69,13 @@ type AuthContext struct {
 	// must set this, or a ceremony using it is sent back to /auth/level1 when its session
 	// is gone. Absent from an older cookie it unmarshals as false, which is the safe
 	// direction.
-	Level1AuthCompleted bool
+	Level1AuthCompleted bool `json:"Level1AuthCompleted"`
 	// AuthStateGeneration is the user's authentication generation as it stood when this
 	// ceremony authenticated. Captured from the user at password verification, or
 	// inherited from the reused session on the SSO path, and NEVER read from the current
 	// user mid-ceremony: doing that would launder a ceremony that began before a
 	// credential change into the generation that change established (#106 decision 11).
-	AuthStateGeneration int64
+	AuthStateGeneration int64 `json:"AuthStateGeneration"`
 	// OtpConfigGeneration is the user's otp_config_generation as this ceremony observed it
 	// when it answered the level 2 question, and it is what /auth/completed promotes onto
 	// the session this ceremony binds to. Captured at password verification and again on
@@ -91,7 +95,7 @@ type AuthContext struct {
 	// "this ceremony observed nothing, promote nothing" and leaves the session owing its
 	// re-prompt. That is the fail-closed direction, exactly as Level1AuthCompleted,
 	// CeremonyId and DeferredErrorCode each document for their own fields.
-	OtpConfigGeneration *int64
+	OtpConfigGeneration *int64 `json:"OtpConfigGeneration"`
 	// OTPKeyURL holds the otpauth:// URL of the TOTP key this ceremony's user is enrolling:
 	// written by authflow.OTPPrompt when it generates it, read by authflow.OTPSubmission to
 	// verify the code the user types.
@@ -126,7 +130,7 @@ type AuthContext struct {
 	// value that will not parse, for the same reason. A user mid enrolment across a deploy is
 	// shown a new QR code and scans it again, which is the safe direction: no code from the
 	// seed they can no longer prove they were shown is accepted.
-	OTPKeyURL string
+	OTPKeyURL string `json:"OTPKeyURL"`
 	// CeremonyId names this authorization ceremony, so a form this ceremony rendered, or a step
 	// it redirected to, can say which ceremony it belongs to, and is read as that ceremony and no
 	// other of the ones the browser holds.
@@ -147,11 +151,11 @@ type AuthContext struct {
 	// idMatches refuses rather than matching against an empty submission: a user mid-flow
 	// across a deploy is refused once and restarts the authorization, bounded by the session
 	// cookie's life. That is the fail-closed direction.
-	CeremonyId string
+	CeremonyId string `json:"CeremonyId"`
 	// UILocales carries the OIDC ui_locales hint as captured on /auth/authorize,
 	// preserving the RP's stated preference across the multi-step auth flow.
 	// Sanitized before storage (BCP 47 shape filter, capped at 10 tags / 256 bytes).
-	UILocales []string
+	UILocales []string `json:"UILocales"`
 	// DeferredErrorCode and DeferredErrorDescription park an authorization error that the
 	// server refused to deliver until somebody had authenticated. RFC 9700 4.11.2 requires
 	// that the user be authenticated before the server redirects them, so a validation
@@ -169,8 +173,8 @@ type AuthContext struct {
 	// Absent from a context written by an older binary they unmarshal as "", which reads as
 	// "no parked error" and is the safe direction, exactly as Level1AuthCompleted and
 	// CeremonyId document for their own fields.
-	DeferredErrorCode        string
-	DeferredErrorDescription string
+	DeferredErrorCode        string `json:"DeferredErrorCode"`
+	DeferredErrorDescription string `json:"DeferredErrorDescription"`
 	// TargetAcrLevel is the authentication level this ceremony must reach, snapshotted at
 	// /auth/authorize when the request was accepted and never recomputed afterwards.
 	//
@@ -189,7 +193,7 @@ type AuthContext struct {
 	// existed and is never below what the request asked for, so a ceremony in flight across a
 	// deploy finishes at that answer rather than at a 500 and the window closes as the session
 	// cookies age out (#240).
-	TargetAcrLevel string
+	TargetAcrLevel string `json:"TargetAcrLevel"`
 	// RequestedScope is the scope as SetScope normalized it when /auth/authorize accepted the
 	// request, and it is never narrowed. Scope is the working copy: /auth/completed and /auth/issue
 	// narrow it in place to what the authenticated user holds, so after a restart it describes the
@@ -200,7 +204,7 @@ type AuthContext struct {
 	// context ends with an empty scope, which /auth/completed answers access_denied. There is no
 	// fallback to the narrowed Scope: keeping it is the defect this field exists to remove, and the
 	// window is one ceremony per browser across the deploy.
-	RequestedScope string
+	RequestedScope string `json:"RequestedScope"`
 	// PasswordVerifiedAt is when this ceremony verified the password, written only by
 	// RecordPasswordVerified. AuthenticatedAt cannot carry it: a code entered after the password
 	// moves that to the code's instant, which is the session's auth_time. /auth/completed writes it
@@ -209,7 +213,7 @@ type AuthContext struct {
 	//
 	// Absent from a context written by an older binary it unmarshals as nil, and /auth/completed
 	// refuses to bind a ceremony that verified the password without it rather than invent one.
-	PasswordVerifiedAt *time.Time
+	PasswordVerifiedAt *time.Time `json:"PasswordVerifiedAt"`
 	// OtpClaimGeneration is the otp_config_generation of the authenticator the one-time code in
 	// AuthMethods came from: the session's when the ceremony adopted it, the one the code was
 	// checked against or enrolled at when the ceremony entered it. A claim stands only while the
@@ -219,7 +223,7 @@ type AuthContext struct {
 	//
 	// Absent from a context written by an older binary it unmarshals as nil, and a claim with no
 	// generation never stands: the ceremony starts over from the password.
-	OtpClaimGeneration *int64
+	OtpClaimGeneration *int64 `json:"OtpClaimGeneration"`
 	// AdoptedSessionAuthTime is the auth_time the session held when this ceremony adopted it
 	// (AdoptSession), zero for a legacy row that never carried one, and nil when the ceremony adopted
 	// no session. The reuse bind compares it with the session's current auth_time under the
@@ -231,7 +235,7 @@ type AuthContext struct {
 	//
 	// Absent from a context written by an older binary it unmarshals as nil, and the comparison does
 	// not run: a ceremony in flight across the deploy binds as it did before #538.
-	AdoptedSessionAuthTime *time.Time
+	AdoptedSessionAuthTime *time.Time `json:"AdoptedSessionAuthTime"`
 	// RecoveryCodes is the set of recovery codes the authenticator this ceremony set up came with,
 	// as shown, held only until the page that shows them first renders: written by
 	// authflow.OTPSubmission when it stores the authenticator, and cleared by
@@ -242,7 +246,7 @@ type AuthContext struct {
 	//
 	// Absent from a context written by an older binary it unmarshals as nil, which reads as "the
 	// codes were already shown", the page a reload draws.
-	RecoveryCodes []string
+	RecoveryCodes []string `json:"RecoveryCodes"`
 	// KeepSignedIn is the answer the user gave the password page's Keep me signed in box when this
 	// ceremony verified the password: true ticked, false unticked, and nil when the page showed no
 	// box, under Always or Never, or when the password was proven elsewhere (registration,
@@ -254,20 +258,20 @@ type AuthContext struct {
 	//
 	// Absent from a context written by an older binary it unmarshals as nil: no answer, the
 	// unticked direction.
-	KeepSignedIn *bool
+	KeepSignedIn *bool `json:"KeepSignedIn"`
 	// DPoPJkt is the authorization request's dpop_jkt: the RFC 7638 thumbprint of the DPoP key the
 	// code this ceremony issues is bound to, empty for none (RFC 9449 section 10, #42 decision 14).
 	// A request field, written at /auth/authorize and kept by Restart, so it reaches the code
 	// whatever steps the sign-in takes. Absent from a context written by an older binary it
 	// unmarshals as "", a code bound to no key, which is what that ceremony asked for.
-	DPoPJkt string
+	DPoPJkt string `json:"DPoPJkt"`
 	// SafeMode is whether the authorization request asked for safe mode, goiabada_safe_mode=true
 	// (#816 decision 3): every page of this sign-in is then drawn without what an administrator
 	// authors freely. A request field, written at /auth/authorize and kept by Restart.
 	//
 	// Absent from a context written by an older binary it unmarshals as false, a sign-in drawn as
 	// usual.
-	SafeMode bool
+	SafeMode bool `json:"SafeMode"`
 }
 
 func (ac *AuthContext) SetScope(scope string) {

@@ -12,7 +12,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/x509"
-	"encoding/gob"
 	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
@@ -327,16 +326,16 @@ func TestMain_HandsTheInternalRootsToTheServer(t *testing.T) {
 	require.NoError(t, err)
 	claims := oauthclienttest.ValidClaims()
 	claims["aud"] = builtin.AdminConsoleClientIdentifier
-	gob.Register(oauth.TokenResponse{})
+	sessionkeys.RegisterStoredTokenResponse()
 	seed := httptest.NewRequest(http.MethodGet, "/", nil)
 	session, err := store.Get(seed, builtin.AdminConsoleSessionName)
 	require.NoError(t, err)
-	session.Values[sessionkeys.JWT] = oauth.TokenResponse{
+	session.Values[sessionkeys.JWT] = sessionkeys.StoreTokenResponse(oauth.TokenResponse{
 		AccessToken: "an-access-token",
 		IdToken:     oauthclienttest.SignRS256(t, signing, "key-1", claims),
 		TokenType:   "Bearer",
 		Scope:       "openid authserver:manage-account",
-	}
+	})
 	session.Values[sessionkeys.JWTExpiresAt] = time.Now().Add(time.Hour).Unix()
 	saved := httptest.NewRecorder()
 	require.NoError(t, store.Save(seed, saved, session))

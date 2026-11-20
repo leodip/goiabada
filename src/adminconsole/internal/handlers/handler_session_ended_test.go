@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"encoding/gob"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -43,7 +42,7 @@ const indexAuthServerBaseURL = "https://auth.example.test"
 // newMemoryStore is the production store over an in-memory backend.
 func newMemoryStore(t *testing.T) *sessionstore.ServerSideStore {
 	t.Helper()
-	gob.Register(oauth.TokenResponse{})
+	sessionkeys.RegisterStoredTokenResponse()
 	store, err := sessionstore.NewServerSideStore(sessiontest.NewMemoryBackend(), sessionkeys.JWT, false, sessionstore.BrowserSessionCookie,
 		sessionstore.KeyPair{
 			AuthenticationKey: []byte("12345678901234567890123456789012"),
@@ -119,7 +118,7 @@ func withCookies(req *http.Request, cookies []*http.Cookie) *http.Request {
 // how the tests tell "the tokens were cleared" from "the session was destroyed".
 func signedInValues() map[string]any {
 	return map[string]any{
-		sessionkeys.JWT:          oauth.TokenResponse{AccessToken: "the-access-token", IdToken: "the-id-token"},
+		sessionkeys.JWT:          sessionkeys.StoreTokenResponse(oauth.TokenResponse{AccessToken: "the-access-token", IdToken: "the-id-token"}),
 		sessionkeys.JWTExpiresAt: int64(1_900_000_000),
 		"somethingElse":          "kept",
 	}

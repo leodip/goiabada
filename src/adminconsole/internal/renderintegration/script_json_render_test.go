@@ -50,6 +50,12 @@ func TestRender_AdminSettingsKeysWritesTheKeyListAsEscapedJSON(t *testing.T) {
 	// Escaped once and no more: the list the script reads decodes back to exactly what was bound.
 	m := regexp.MustCompile(`<script type="application/json" id="signing-keys">(\[.*?\])</script>`).FindStringSubmatch(out)
 	require.Len(t, m, 2, "the key list is not in the page's signing-keys data block")
+	// The whole block, every key included, as the page wrote it before #482 respelled the Go
+	// names: the keys are what the page's script reads, so they do not follow a field's Go name
+	// (#482 decision 7).
+	assert.Equal(t, `[{"Id":1,"CreatedAt":"2026-09-16T12:00:00Z","State":"current","KeyIdentifier":`+hostileScriptJSON+
+		`,"Type":"RSA","Algorithm":"RS256","PublicKeyASN1DER":"MIIBIjAN\u0026\u003c\u003e","PublicKeyPEM":`+hostileScriptJSON+
+		`,"PublicKeyJWK":"{\"kid\":\"\u003c/script\u003e\"}"}]`, m[1])
 	var decoded []adminsettingshandlers.SettingsKey
 	require.NoError(t, json.Unmarshal([]byte(m[1]), &decoded))
 	require.Len(t, decoded, 1)

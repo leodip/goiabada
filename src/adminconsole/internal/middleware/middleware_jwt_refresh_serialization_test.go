@@ -155,7 +155,7 @@ func invalidGrant() error {
 func (h *sessionHarness) assertHolds(cookies []*http.Cookie, set oauth.TokenResponse, expiresAt int64) {
 	h.t.Helper()
 	sess := h.readBack(cookies)
-	assert.Equal(h.t, set, sess.Values[sessionkeys.JWT], "the session holds the token set")
+	assert.Equal(h.t, sessionkeys.StoreTokenResponse(set), sess.Values[sessionkeys.JWT], "the session holds the token set")
 	assert.Equal(h.t, expiresAt, sess.Values[sessionkeys.JWTExpiresAt], "with its expiry")
 	assert.Equal(h.t, "kept", sess.Values["unrelated"], "the session itself survives")
 }
@@ -191,7 +191,7 @@ func TestSessionHandler_ARefusedGrantDoesNotClearATokenSetNewerThanTheOnePresent
 	winner, winnerExpiresAt := winnerSet(), notDue()
 	h.refresher.during = func() {
 		h.writeAsAnotherRequest(cookies, func(values map[string]any) {
-			values[sessionkeys.JWT] = winner
+			values[sessionkeys.JWT] = sessionkeys.StoreTokenResponse(winner)
 			values[sessionkeys.JWTExpiresAt] = winnerExpiresAt
 		})
 	}
@@ -226,7 +226,7 @@ func TestSessionHandler_ARefusedGrantCarriesNoNewerSetWhoseIDTokenDoesNotVerify(
 	h.refresher.err = invalidGrant()
 	h.refresher.during = func() {
 		h.writeAsAnotherRequest(cookies, func(values map[string]any) {
-			values[sessionkeys.JWT] = winnerSet()
+			values[sessionkeys.JWT] = sessionkeys.StoreTokenResponse(winnerSet())
 			values[sessionkeys.JWTExpiresAt] = notDue()
 		})
 	}
@@ -258,7 +258,7 @@ func TestSessionHandler_ConcurrentRequestsShareOneRefreshGrant(t *testing.T) {
 	response := storedResponse()
 	response.IdToken = stored
 	cookies := h.seed(map[string]any{
-		sessionkeys.JWT:          response,
+		sessionkeys.JWT:          sessionkeys.StoreTokenResponse(response),
 		sessionkeys.JWTExpiresAt: due(),
 		"unrelated":              "kept",
 	})
@@ -305,9 +305,9 @@ func TestSessionHandler_ConcurrentRequestsShareOneRefreshGrant(t *testing.T) {
 	}
 
 	sess := h.readBack(cookies)
-	storedWinner, ok := sess.Values[sessionkeys.JWT].(oauth.TokenResponse)
+	storedWinner, ok := sess.Values[sessionkeys.JWT].(sessionkeys.StoredTokenResponse)
 	require.True(t, ok, "the session holds the winner's token set")
-	assert.Equal(t, winner, storedWinner)
+	assert.Equal(t, winner, storedWinner.TokenResponse())
 	assert.Equal(t, "kept", sess.Values["unrelated"], "the session itself survives")
 	assert.Empty(t, h.logs.Records(), h.logs.Text())
 }
@@ -333,7 +333,7 @@ func TestSessionHandler_AWaiterCarriesTheStoredSetIntoItsOwnSession(t *testing.T
 	awaitQueued(t, queued)
 	winner, winnerExpiresAt := winnerSet(), notDue()
 	h.writeAsAnotherRequest(cookies, func(values map[string]any) {
-		values[sessionkeys.JWT] = winner
+		values[sessionkeys.JWT] = sessionkeys.StoreTokenResponse(winner)
 		values[sessionkeys.JWTExpiresAt] = winnerExpiresAt
 	})
 	holder()
@@ -516,7 +516,7 @@ func TestSessionHandler_AReReadThatFailsRefusesTheRequestAndClearsNothing(t *tes
 		winner, winnerExpiresAt := winnerSet(), notDue()
 		h.refresher.during = func() {
 			h.writeAsAnotherRequest(cookies, func(values map[string]any) {
-				values[sessionkeys.JWT] = winner
+				values[sessionkeys.JWT] = sessionkeys.StoreTokenResponse(winner)
 				values[sessionkeys.JWTExpiresAt] = winnerExpiresAt
 			})
 			h.forgetWrites()
@@ -633,7 +633,7 @@ func TestSessionHandler_AWaitForTheRefreshLockEndsAtItsBound(t *testing.T) {
 	holder := awaitServed(t, holderDone)
 	require.NotNil(t, holder.jwtInfo, "the holder is signed in")
 	sess := h.readBack(cookies)
-	assert.Equal(t, winner, sess.Values[sessionkeys.JWT], "the holder's answer is stored")
+	assert.Equal(t, sessionkeys.StoreTokenResponse(winner), sess.Values[sessionkeys.JWT], "the holder's answer is stored")
 	assert.Equal(t, "kept", sess.Values["unrelated"], "the session itself survives")
 
 	h.assertTheNextRequestSendsNoGrant(cookies, winner)
@@ -694,7 +694,7 @@ func TestSessionHandler_AShortLivedAnswerIsCarriedNotRotatedAgain(t *testing.T) 
 	}
 
 	sess := h.readBack(cookies)
-	assert.Equal(t, answer, sess.Values[sessionkeys.JWT], "the session still holds the set granted")
+	assert.Equal(t, sessionkeys.StoreTokenResponse(answer), sess.Values[sessionkeys.JWT], "the session still holds the set granted")
 	_, flashed := sess.TakeFlash(flashPage, flashKey)
 	assert.True(t, flashed, "after the first request's late save")
 

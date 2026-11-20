@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"context"
-	"encoding/gob"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -20,7 +19,6 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
 	sessionstoremocks "github.com/leodip/goiabada/core/sessionstore/mocks"
 	"github.com/leodip/goiabada/core/sessionstore/sessiontest"
@@ -46,7 +44,7 @@ func (c *createCountingBackend) Create(ctx context.Context, id string, data []by
 // sign-in and set the handshake cookie, and not one of them creates a row. The cookie opens to the
 // handshake the redirect sent.
 func TestRequiresScope_AnAnonymousRequestWritesNoRow(t *testing.T) {
-	gob.Register(oauth.TokenResponse{})
+	sessionkeys.RegisterStoredTokenResponse()
 	backend := &createCountingBackend{MemoryBackend: sessiontest.NewMemoryBackend()}
 	store, err := sessionstore.NewServerSideStore(backend, sessionkeys.JWT, true, sessionstore.BrowserSessionCookie,
 		sessionstore.KeyPair{
@@ -165,7 +163,7 @@ func TestRequiresScope_BoundsTheReturnTargetItStoresForTheSignIn(t *testing.T) {
 // which is what the callback then redirects to. Each answers the redirect with a handshake cookie
 // that opens (#620).
 func TestRequiresScope_ATargetWithinTheBoundAlwaysSeals(t *testing.T) {
-	gob.Register(oauth.TokenResponse{})
+	sessionkeys.RegisterStoredTokenResponse()
 	store, err := sessionstore.NewServerSideStore(sessiontest.NewMemoryBackend(), sessionkeys.JWT, true,
 		sessionstore.BrowserSessionCookie, sessionstore.KeyPair{
 			AuthenticationKey: []byte("12345678901234567890123456789012"),

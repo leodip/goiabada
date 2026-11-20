@@ -1,67 +1,12 @@
 package oauth
 
 import (
-	"bytes"
-	"encoding/gob"
 	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-// legacyTokenResponseGobName is the name gob writes into the stream for a TokenResponse
-// stored in an interface value, and it is derived from this package's import path rather
-// than from the type name alone.
-//
-// The admin console keeps a TokenResponse in its session (handler_auth_callback.go writes
-// it, adminconsole/internal/middleware reads it back), and session.Values is a
-// map[interface{}]interface{},
-// so every session in flight carries this string. Declaring the type at another import
-// path changes it, and the decode of an existing session then fails with "name not
-// registered for interface": the store answers that with a fresh session rather than a
-// 500, so the administrator is signed out and sent back through /auth/authorize. Moving
-// TokenResponse therefore costs a permanent gob.RegisterName under the name below, and
-// this test is what makes that cost visible at the moment somebody tries (#338).
-const legacyTokenResponseGobName = "github.com/leodip/goiabada/core/oauth.TokenResponse"
-
-func TestTokenResponse_GobSessionIdentity(t *testing.T) {
-	// Both binaries already register this type at startup. Registering the same type
-	// under the same name again is a no-op, so the test is free to stand alone.
-	gob.Register(TokenResponse{})
-
-	want := TokenResponse{
-		AccessToken:      "access-token",
-		IdToken:          "id-token",
-		TokenType:        "Bearer",
-		ExpiresIn:        3600,
-		RefreshToken:     "refresh-token",
-		RefreshExpiresIn: 7200,
-		Scope:            "openid profile",
-	}
-
-	// The shape the session store encodes: the value arrives at the encoder through an
-	// interface, which is what makes gob write the concrete type's name into the stream.
-	// The key is written out because adminconsole/internal/sessionkeys declares it and core
-	// may not import a process module; what this test is about is the encoded value, not
-	// the key it sits under (#385).
-	values := map[interface{}]interface{}{
-		"Jwt": want,
-	}
-
-	var encoded bytes.Buffer
-	require.NoError(t, gob.NewEncoder(&encoded).Encode(values))
-
-	assert.Contains(t, encoded.String(), legacyTokenResponseGobName,
-		"the encoded session must carry the registered name a deployed session was written with")
-
-	decoded := map[interface{}]interface{}{}
-	require.NoError(t, gob.NewDecoder(bytes.NewReader(encoded.Bytes())).Decode(&decoded))
-
-	got, ok := decoded["Jwt"].(TokenResponse)
-	require.True(t, ok, "the session value must decode back to oauth.TokenResponse")
-	assert.Equal(t, want, got)
-}
 
 func TestOAuthWireTypes_JSONRepresentation(t *testing.T) {
 	tests := []struct {

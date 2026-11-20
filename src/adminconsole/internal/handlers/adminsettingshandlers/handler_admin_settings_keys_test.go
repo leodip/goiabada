@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strconv"
 	"testing"
 
@@ -220,4 +221,21 @@ func statesOrNil(values []string) []string {
 		return nil
 	}
 	return values
+}
+
+// TestSettingsKey_EveryFieldDeclaresItsKey holds each field of the key list the signing-keys page
+// writes into its data block to an explicit json tag with the key the page's script reads, so the
+// key no longer rests on the Go name (#482 decision 7). The render test of that block pins the
+// bytes.
+func TestSettingsKey_EveryFieldDeclaresItsKey(t *testing.T) {
+	keyType := reflect.TypeOf(SettingsKey{})
+	tags := make([]string, 0, keyType.NumField())
+	for i := range keyType.NumField() {
+		field := keyType.Field(i)
+		tag, ok := field.Tag.Lookup("json")
+		assert.True(t, ok, "SettingsKey.%s declares no json tag, so its Go name is the key sent", field.Name)
+		tags = append(tags, tag)
+	}
+	assert.Equal(t, []string{"Id", "CreatedAt", "State", "KeyIdentifier", "Type", "Algorithm",
+		"PublicKeyASN1DER", "PublicKeyPEM", "PublicKeyJWK"}, tags)
 }

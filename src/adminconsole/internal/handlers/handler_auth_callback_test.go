@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"crypto/sha256"
-	"encoding/gob"
 	"encoding/hex"
 	"fmt"
 	"log/slog"
@@ -134,7 +133,7 @@ type callbackHarness struct {
 
 func newCallbackHarness(t *testing.T) *callbackHarness {
 	t.Helper()
-	gob.Register(oauth.TokenResponse{})
+	sessionkeys.RegisterStoredTokenResponse()
 
 	backend := &armableBackend{MemoryBackend: sessiontest.NewMemoryBackend()}
 	store, err := sessionstore.NewServerSideStore(backend, sessionkeys.JWT, false, sessionstore.BrowserSessionCookie,
@@ -651,9 +650,9 @@ func assertSignedInWithPageLanguage(t *testing.T, sess *sessionstore.Session, wa
 	before, after time.Time, wantPageLanguage string) {
 	t.Helper()
 	require.False(t, sess.IsNew, "a session is stored")
-	stored, ok := sess.Values[sessionkeys.JWT].(oauth.TokenResponse)
+	stored, ok := sess.Values[sessionkeys.JWT].(sessionkeys.StoredTokenResponse)
 	require.True(t, ok, "the token response is stored")
-	assert.Equal(t, want, stored)
+	assert.Equal(t, want, stored.TokenResponse())
 
 	expiresAt, ok := sess.Values[sessionkeys.JWTExpiresAt].(int64)
 	require.True(t, ok, "the expiry is stored as int64 Unix seconds")

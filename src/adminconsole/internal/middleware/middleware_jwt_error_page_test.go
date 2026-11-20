@@ -99,7 +99,7 @@ func TestJWT_ServerErrorsRenderThePageAndKeepTheCauseOutOfTheResponse(t *testing
 				// signs it out without consulting the parser.
 				store.On("Get", mock.Anything, sessionName).Return(&sessionstore.Session{
 					Values: map[string]any{
-						sessionkeys.JWT: oauth.TokenResponse{AccessToken: "a", IdToken: "i"},
+						sessionkeys.JWT: sessionkeys.StoreTokenResponse(oauth.TokenResponse{AccessToken: "a", IdToken: "i"}),
 					},
 				}, nil)
 				store.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(assert.AnError)
@@ -116,7 +116,7 @@ func TestJWT_ServerErrorsRenderThePageAndKeepTheCauseOutOfTheResponse(t *testing
 				store := new(sessionstoremocks.Store)
 				store.On("Get", mock.Anything, sessionName).Return(&sessionstore.Session{
 					Values: map[string]any{
-						sessionkeys.JWT:          oauth.TokenResponse{AccessToken: "a", IdToken: "foreign"},
+						sessionkeys.JWT:          sessionkeys.StoreTokenResponse(oauth.TokenResponse{AccessToken: "a", IdToken: "foreign"}),
 						sessionkeys.JWTExpiresAt: int64(0),
 					},
 				}, nil)

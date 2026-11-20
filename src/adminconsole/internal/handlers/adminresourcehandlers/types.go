@@ -54,15 +54,17 @@ type ValidatePermissionResult struct {
 	Field string
 }
 
+// UserResult is one user the user search found, as the grant-permission script reads it. Each field
+// declares the key the script reads, so a field is respelled without moving its key (#482 decision 7).
 type UserResult struct {
-	Id            int64
-	Subject       string
-	Username      string
-	Email         string
-	GivenName     string
-	MiddleName    string
-	FamilyName    string
-	HasPermission bool
+	Id            int64  `json:"Id"`
+	Subject       string `json:"Subject"`
+	Username      string `json:"Username"`
+	Email         string `json:"Email"`
+	GivenName     string `json:"GivenName"`
+	MiddleName    string `json:"MiddleName"`
+	FamilyName    string `json:"FamilyName"`
+	HasPermission bool   `json:"HasPermission"`
 }
 
 type SearchResult struct {

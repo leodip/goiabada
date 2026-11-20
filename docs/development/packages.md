@@ -544,7 +544,10 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   fails the sign-ins in flight at the deploy. The six stay declared because they key the sealed map
   and the callback deletes the stale copies a session written before #620 can hold. `SafeMode` is
   in both: the handshake of a sign-in started in safe mode carries it, and the callback writes it
-  into the signed-in session (#816). It was
+  into the signed-in session (#816). `StoredTokenResponse` is the value stored under the token
+  set's key, registered under the gob name and with the field names sessions carry, which are
+  stored data too: the callback and the JWT middleware convert to and from `oauth.TokenResponse`
+  where they write and read it (#482). It was
   `internal/constants` until the context keys left for `reqctx` (#440, #620)
 - `internal/render/` - The console's page renderer. Every page is drawn in the brand
   `/api/public/settings` answers (`PageBrand`): an admin page, one whose `menu` template calls

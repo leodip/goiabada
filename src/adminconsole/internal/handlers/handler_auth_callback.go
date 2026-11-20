@@ -220,7 +220,7 @@ func HandleAuthCallbackPost(
 		// into a clock time on receipt (#427 decisions 12, 15 and 16).
 		stored := jwtInfo.TokenResponse
 		stored.Scope = oauthclient.EffectiveScope(stored.Scope, handshake[sessionkeys.RequestedScope])
-		sess.Values[sessionkeys.JWT] = stored
+		sess.Values[sessionkeys.JWT] = sessionkeys.StoreTokenResponse(stored)
 		sess.Values[sessionkeys.JWTExpiresAt] = oauthclient.ExpiresAt(&stored, time.Now())
 		// A session written before #620 can still hold a handshake of its own, which nothing
 		// reads any more and which is not carried into the signed-in session.

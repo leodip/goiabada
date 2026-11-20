@@ -5,15 +5,17 @@ import (
 	"github.com/leodip/goiabada/core/i18n"
 )
 
+// UserResult is one user the member search found, as the add-members script reads it. Each field
+// declares the key the script reads, so a field is respelled without moving its key (#482 decision 7).
 type UserResult struct {
-	Id           int64
-	Subject      string
-	Username     string
-	Email        string
-	GivenName    string
-	MiddleName   string
-	FamilyName   string
-	AddedToGroup bool
+	Id           int64  `json:"Id"`
+	Subject      string `json:"Subject"`
+	Username     string `json:"Username"`
+	Email        string `json:"Email"`
+	GivenName    string `json:"GivenName"`
+	MiddleName   string `json:"MiddleName"`
+	FamilyName   string `json:"FamilyName"`
+	AddedToGroup bool   `json:"AddedToGroup"`
 }
 
 type SearchResult struct {
