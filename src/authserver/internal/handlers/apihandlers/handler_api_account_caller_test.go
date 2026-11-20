@@ -30,7 +30,7 @@ func TestAccountHandlers_ACallerWithoutATokenOrSubjectIsAWiringFault(t *testing.
 			return HandleAccountConsentsGet(datamocks.NewDatabase(t))
 		},
 		"HandleAccountConsentDelete": func(t *testing.T) http.HandlerFunc {
-			return HandleAccountConsentDelete(datamocks.NewDatabase(t), handlersmocks.NewAuditLogger(t))
+			return HandleAccountConsentDelete(datamocks.NewDatabase(t), handlersmocks.NewAuditLogger(t), &recordingLogoutTokens{})
 		},
 		"HandleAccountEmailPut": func(t *testing.T) http.HandlerFunc {
 			return HandleAccountEmailPut(datamocks.NewDatabase(t), nil, handlersmocks.NewAuditLogger(t), nil, nil)

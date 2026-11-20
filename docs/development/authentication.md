@@ -304,6 +304,9 @@ A user, or an administrator acting for them, ends everything the user holds with
   answers 404 `NOT_FOUND` and writes no audit entry. Otherwise `disconnected_client` is written
   after the commit, with `deleted_own_user_consent` or `deleted_user_consent` beside it only when
   this call deleted the consent (#135 decisions 2 and 6)
+- Telling the client: the transaction reads its logout tokens first, before any write
+  (`disconnectDeliveries`), and `DisconnectResult.LogoutDeliveries` carries them only when the call
+  changed something; the caller sends them after the commit. See Back-channel logout below
 - Gap: a code exchange that claimed its code before the commit and writes its first refresh token
   after it finishes, and its grant is live (#135 decision 11)
 - Implementation: `handler_api_account_consents.go`, `handler_api_user_consents.go`,
@@ -351,6 +354,13 @@ client's back-channel logout URI (#784).
     deletion of a user, through `revocation.UserWideDeliveries` inside the deletion's transaction,
     under `GetUserByIdForUpdate` and before `DeleteUser` cascades the sessions and grants away. Every
     deletion of a user must call it there
+  - a disconnect, which ends no session (#135 decision 3): the client alone, with a `sub`-only
+    token, or, when it has `backchannel_logout_session_required`, a `sub`+`sid` token per valid
+    session of the user it is on and nothing when it is on none. `revocation.DisconnectClientTx`
+    reads the client, the user and, for `sid`, the sessions and their apps with ordinary reads before
+    its first write and takes no session row: it deletes nothing to hold them for, and a read made
+    after the sweep could wait, on SQL Server, for a termination that waits for the tokens the sweep
+    holds. The client's row on each session stays
 - Two shapes (decision 3). A user-wide end (`LogoutNotice.UserWide`: disabling or deleting the
   user, a password reset, an administrator setting the password) sends one `sub`-only token to each
   app with a URI on any stored session of the user, valid or not, or holding an unrevoked, unexpired
@@ -407,7 +417,8 @@ client's back-channel logout URI (#784).
 - Implementation: `backchannel`, `revocation/revocation.go`, `authflow/completion.go`,
   `usersession/usersession_manager.go`, `handler_logout.go`, `handler_token.go`,
   `handler_api_account_sessions.go`, `handler_api_users_sessions.go`, `handler_api_users_crud.go`,
-  `handler_api_account_password.go`, `accounthandlers/handler_reset_password.go`
+  `handler_api_account_password.go`, `accounthandlers/handler_reset_password.go`,
+  `handler_api_account_consents.go`, `handler_api_user_consents.go`
 
 ### Implicit Flow (Deprecated)
 Legacy flow returning tokens directly in redirect URI fragment. **Deprecated in OAuth 2.1.**

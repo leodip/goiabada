@@ -184,6 +184,7 @@ func TestDisconnectClientTx_ALostKeyRunsTheDisconnectOnceMore(t *testing.T) {
 		db := datamocks.NewDatabase(t)
 		first := datamocks.ExpectRunInTransaction(db, revokeTx)
 		second := datamocks.ExpectRunInTransaction(db, revokeTx)
+		expectClientWithoutLogoutURI(db)
 		token := &record.RefreshToken{Id: 1, RefreshTokenJti: "rt-1", FirstRefreshTokenJti: "fam-1"}
 		// The first attempt's mark rolled back with it, so the second makes it again and reports it.
 		db.On("RevokeUnusedCodesByUserIdAndClientId", mock.Anything, revokeTx, disconnectUserId, disconnectClientId).
@@ -197,7 +198,7 @@ func TestDisconnectClientTx_ALostKeyRunsTheDisconnectOnceMore(t *testing.T) {
 		db.On("UpdateRefreshToken", mock.Anything, revokeTx, token).Return(nil).Once()
 
 		deletions := 0
-		result, err := DisconnectClientTx(context.Background(), db, disconnectUserId, disconnectClientId,
+		result, err := DisconnectClientTx(context.Background(), db, disconnectUserId, disconnectClientId, nil,
 			func(tx *sql.Tx) (bool, error) {
 				deletions++
 				return true, nil
@@ -218,6 +219,7 @@ func TestDisconnectClientTx_ALostKeyRunsTheDisconnectOnceMore(t *testing.T) {
 		db := datamocks.NewDatabase(t)
 		datamocks.ExpectRunInTransaction(db, revokeTx)
 		datamocks.ExpectRunInTransaction(db, revokeTx)
+		expectClientWithoutLogoutURI(db)
 		db.On("RevokeUnusedCodesByUserIdAndClientId", mock.Anything, revokeTx, disconnectUserId, disconnectClientId).
 			Return(int64(1), nil).Twice()
 		db.On("GetRefreshTokensByUserIdAndClientId", mock.Anything, revokeTx, disconnectUserId, disconnectClientId).
@@ -225,7 +227,7 @@ func TestDisconnectClientTx_ALostKeyRunsTheDisconnectOnceMore(t *testing.T) {
 		db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, "fam-1", ReasonClientDisconnected).
 			Return(false, lostTheKey).Twice()
 
-		result, err := DisconnectClientTx(context.Background(), db, disconnectUserId, disconnectClientId,
+		result, err := DisconnectClientTx(context.Background(), db, disconnectUserId, disconnectClientId, nil,
 			deletesTheConsent)
 
 		require.ErrorIs(t, err, data.ErrUniqueViolation)

@@ -1051,13 +1051,13 @@ func TestDisconnectClientTx_RecordsFamiliesWithNoLiveMember(t *testing.T) {
 		RefreshTokenType: "Refresh", FirstRefreshTokenJti: otherClientFamily, Revoked: true,
 	})
 
-	result, err := revocation.DisconnectClientTx(ctx, database, user.Id, client.Id, nil)
+	result, err := revocation.DisconnectClientTx(ctx, database, user.Id, client.Id, nil, nil)
 	require.NoError(t, err, "DisconnectClientTx")
 	assert.Empty(t, result.RevokedRefreshTokenJtis, "every member was revoked already, so the sweep flips none")
 	assert.Equal(t, 2, result.RecordedFamilyCount, "the call newly recorded both families with this client")
 	assert.True(t, result.Changed())
 
-	again, err := revocation.DisconnectClientTx(ctx, database, user.Id, client.Id, nil)
+	again, err := revocation.DisconnectClientTx(ctx, database, user.Id, client.Id, nil, nil)
 	require.NoError(t, err, "DisconnectClientTx again")
 	assert.Equal(t, 0, again.RecordedFamilyCount, "both families were recorded by the first call")
 	assert.False(t, again.Changed(), "the second call changed nothing: %+v", again)

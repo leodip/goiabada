@@ -9,6 +9,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/revocation"
 	"github.com/leodip/goiabada/core/api"
 )
@@ -66,6 +67,7 @@ func HandleAccountConsentsGet(
 func HandleAccountConsentDelete(
 	database accountConsentsDatabase,
 	auditLogger AuditLogger,
+	logoutTokens logoutTokenSender,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		_, subject, ok := accountCaller(w, r)
@@ -110,14 +112,20 @@ func HandleAccountConsentDelete(
 			return
 		}
 
+		settings, ok := reqctx.SettingsFrom(r.Context())
+		if !ok {
+			writeInternalServerError(w, r, reqctx.ErrNoSettings)
+			return
+		}
+
 		// Withdrawing a consent disconnects its client: the same transaction deletes the consent,
 		// revokes the codes this user has not yet redeemed with that client and the refresh
 		// tokens this user holds with it (#622, #135 decision 1). The refresh arm consults a
 		// stored consent only when the client has Consent required on or the grant is an
 		// offline one, so deleting the row alone would leave a once-consented client's grant
-		// standing.
+		// standing. It also collects the logout tokens that tell the client (#135 decision 3).
 		result, err := revocation.DisconnectClientTx(r.Context(), database, consent.UserId, consent.ClientId,
-			func(tx *sql.Tx) (bool, error) {
+			sessionLive(settings), func(tx *sql.Tx) (bool, error) {
 				return database.DeleteUserConsent(r.Context(), tx, consentId)
 			})
 		if err != nil {
@@ -144,6 +152,7 @@ func HandleAccountConsentDelete(
 		// TerminateUserSessionTx's callers record EventTerminatedUserSession (#135 decision 6).
 		revocation.LogDisconnectedClient(r.Context(), auditLogger, consent.UserId, consent.ClientId,
 			subject, result)
+		logoutTokens.Send(r.Context(), settings.Issuer, result.LogoutDeliveries)
 
 		resp := api.SuccessResponse{Success: true}
 		writeJSON(w, r, http.StatusOK, resp)

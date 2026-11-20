@@ -36,6 +36,7 @@ type Database interface {
 	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
 	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
 	GetUserSessionsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserSession, error)
+	GetUserSessionClientsByUserSessionIds(ctx context.Context, tx *sql.Tx, userSessionIds []int64) ([]record.UserSessionClient, error)
 	GetUsableRefreshTokenClientIdsByUserId(ctx context.Context, tx *sql.Tx, userId int64, now time.Time) ([]int64, error)
 	GetClientsByIds(ctx context.Context, tx *sql.Tx, clientIds []int64) ([]record.Client, error)
 	IncrementUserAuthStateGeneration(ctx context.Context, tx *sql.Tx, userId int64) (int64, error)
@@ -1061,8 +1062,15 @@ func RevokeOnAuthCodeReuseTx(ctx context.Context, db Database, code *record.Code
 // It deliberately does NOT advance the user's authentication generation and does NOT
 // touch any session: both are user-scoped, for the reason RevokeClientGrants states about
 // its own sweep, and the user disconnecting one app is signed in with a session that may be
-// serving every other app. A later authorization to the same client succeeds: a disconnect
-// is not a ban.
+// serving every other app. The client's row on each session stays too, so the Sessions pages
+// list it until that session ends. A later authorization to the same client succeeds: a
+// disconnect is not a ban.
+//
+// It tells the client (#135 decision 3): before those writes the transaction reads the logout
+// tokens disconnectDeliveries describes, live judging which of the user's sessions are still
+// valid for a client that requires sid, and the result carries them when the call changed
+// something. They are the CALLER's to send after the commit, as the audit events are; delivery
+// is attempted and can fail.
 //
 // The access tokens those grants issued are refused at once, exactly as under
 // RevokeClientGrants: each names its grant, and liveness.AccessToken, which the bearer guard
@@ -1089,16 +1097,23 @@ func RevokeOnAuthCodeReuseTx(ctx context.Context, db Database, code *record.Code
 // EventTerminatedUserSession beside EventDeletedUserSession, one a lifecycle fact and one the
 // security action. On any error the result is the zero value, so a caller cannot audit a
 // rolled-back revocation.
-func DisconnectClientTx(ctx context.Context, db Database, userId int64, clientId int64,
+func DisconnectClientTx(ctx context.Context, db Database, userId int64, clientId int64, live SessionLive,
 	deleteConsent func(tx *sql.Tx) (bool, error)) (DisconnectResult, error) {
 
 	var result DisconnectResult
 	err := data.RunInTransactionRetryingConflict(ctx, db, func(tx *sql.Tx) error {
+		// The logout tokens, read before any write, so these reads wait for nothing while this
+		// transaction holds a row another transaction wants (see disconnectDeliveries).
+		deliveries, err := disconnectDeliveries(ctx, db, tx, userId, clientId, live)
+		if err != nil {
+			return err
+		}
+
 		consentDeleted := false
 		if deleteConsent != nil {
-			deleted, err := deleteConsent(tx)
-			if err != nil {
-				return err
+			deleted, deleteErr := deleteConsent(tx)
+			if deleteErr != nil {
+				return deleteErr
 			}
 			consentDeleted = deleted
 		}
@@ -1128,6 +1143,10 @@ func DisconnectClientTx(ctx context.Context, db Database, userId int64, clientId
 			RevokedRefreshTokenJtis: revokedJtis,
 			RecordedFamilyCount:     recordedFamilyCount,
 		}
+		// A call that changed nothing had nothing to end, and tells nobody (#135 decision 2).
+		if result.Changed() {
+			result.LogoutDeliveries = deliveries
+		}
 		return nil
 	})
 	if err != nil {
@@ -1155,6 +1174,98 @@ type DisconnectResult struct {
 	// family whose members were all revoked already and that had no record yet counts: the record
 	// is what refuses a child that a rotation in flight inserts after the commit (#259).
 	RecordedFamilyCount int
+	// LogoutDeliveries is the logout tokens that tell the client, collected inside the transaction
+	// (#135 decision 3, see disconnectDeliveries); nil when there is nobody to tell, and when the
+	// call changed nothing. The caller hands it to the back-channel sender after the commit, beside
+	// the audit events. It is no part of the audit payload and does not decide Changed.
+	LogoutDeliveries []backchannel.Delivery
+}
+
+// disconnectDeliveries is the logout tokens a disconnect of the client clientId from the user
+// userId sends, read on the disconnect's own transaction (#135 decision 3). A client with a
+// back-channel logout URI is sent one token naming the user alone, which asks it to end every
+// session it has for the user (Back-Channel Logout 1.0 section 2.4). A client that registered
+// backchannel_logout_session_required is instead sent a sub+sid token for each of the user's
+// sessions it is on that live judges still valid, and nothing when it is on none: the rule of a
+// user-wide end (LogoutNotice), narrowed to one client. A client without a URI, a client or a
+// user already gone, is sent nothing. nil live judges no session valid.
+//
+// It runs before the disconnect's first write and takes no row: the sessions and their apps stay
+// as they are, so there is nothing to hold them for, and a read made before the transaction holds
+// any row can wait for another transaction but never complete a cycle with it. On SQL Server a
+// read of a session row that a termination holds, made after the sweep, would wait for the
+// termination while the termination waits for the refresh tokens the sweep holds. A sign-in that
+// adds the client to a session meanwhile is a grant the sweep may not reach either, the code
+// exchange already under way of decision 11.
+func disconnectDeliveries(ctx context.Context, db Database, tx *sql.Tx, userId int64, clientId int64,
+	live SessionLive) ([]backchannel.Delivery, error) {
+
+	clients, err := db.GetClientsByIds(ctx, tx, []int64{clientId})
+	if err != nil {
+		return nil, err
+	}
+	if len(clients) == 0 || clients[0].BackchannelLogoutURI == "" {
+		return nil, nil
+	}
+	client := &clients[0]
+
+	// The user's sub, which every logout token names. A user being deleted tells their apps itself.
+	user, err := db.GetUserById(ctx, tx, userId)
+	if err != nil || user == nil {
+		return nil, err
+	}
+
+	if !client.BackchannelLogoutSessionRequired {
+		return []backchannel.Delivery{{
+			ClientId:         client.Id,
+			ClientIdentifier: client.ClientIdentifier,
+			URI:              client.BackchannelLogoutURI,
+			IsPublic:         client.IsPublic,
+			CreatedViaDCR:    client.CreatedViaDCR,
+			UserId:           userId,
+			Subject:          user.Subject,
+		}}, nil
+	}
+
+	if live == nil {
+		return nil, nil
+	}
+	sessions, err := db.GetUserSessionsByUserId(ctx, tx, userId)
+	if err != nil {
+		return nil, err
+	}
+	sort.Slice(sessions, func(i, j int) bool { return sessions[i].Id < sessions[j].Id })
+	liveSessionIds := make([]int64, 0, len(sessions))
+	for i := range sessions {
+		if live(&sessions[i]) {
+			liveSessionIds = append(liveSessionIds, sessions[i].Id)
+		}
+	}
+	if len(liveSessionIds) == 0 {
+		return nil, nil
+	}
+	sessionClients, err := db.GetUserSessionClientsByUserSessionIds(ctx, tx, liveSessionIds)
+	if err != nil {
+		return nil, err
+	}
+	onSession := map[int64]bool{}
+	for _, sessionClient := range sessionClients {
+		if sessionClient.ClientId == clientId {
+			onSession[sessionClient.UserSessionId] = true
+		}
+	}
+
+	var deliveries []backchannel.Delivery
+	for i := range sessions {
+		session := &sessions[i]
+		if !onSession[session.Id] {
+			continue
+		}
+		if delivery, tells := backchannel.SessionClientDelivery(client, session, user.Subject); tells {
+			deliveries = append(deliveries, delivery)
+		}
+	}
+	return deliveries, nil
 }
 
 // Changed reports whether the disconnect's transaction changed anything: deleted the consent,

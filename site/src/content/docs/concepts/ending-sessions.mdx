@@ -49,6 +49,8 @@ Ending a session also tells the apps the session was signed in to. Each one with
 
 A session that has expired tells nobody, whatever removes it. Disabling or deleting a user, a password reset, an administrator setting the password and the `recover` command tell every app that knew the user instead, expired sessions or not: see [Credential changes](#credential-changes).
 
+Withdrawing a user's consent to a client tells that client too, though no session ends. It's sent one logout token naming the user and no session, which asks it to end every session it has for that user. A client that [requires the session identifier](/concepts/clients/#back-channel-logout) is sent one naming the session instead, for each of the user's sessions it's on that's still valid, and nothing when it's on none. The user stays signed in, their other apps are told nothing, and the client stays listed on their sessions until each one ends.
+
 [Back-channel logout](/reference/endpoints/back-channel-logout/) gives the request, the token, its retries, what your app answers, and [what happens when a delivery is lost](/reference/endpoints/back-channel-logout/#when-a-delivery-is-lost).
 
 ## A session that has expired

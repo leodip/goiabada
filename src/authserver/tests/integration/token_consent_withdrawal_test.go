@@ -64,7 +64,7 @@ func TestToken_Refresh_ConsentRemovedFromAConsentNotRequiredClient(t *testing.T)
 	// user page both route the deletion through revocation.DisconnectClientTx; calling it
 	// here runs the identical transaction those handlers do, without minting the Account
 	// API token the endpoint itself would ask for.
-	result, err := revocation.DisconnectClientTx(context.Background(), database, consent.UserId, consent.ClientId,
+	result, err := revocation.DisconnectClientTx(context.Background(), database, consent.UserId, consent.ClientId, nil,
 		func(tx *sql.Tx) (bool, error) {
 			return database.DeleteUserConsent(context.Background(), tx, consent.Id)
 		})
@@ -74,7 +74,7 @@ func TestToken_Refresh_ConsentRemovedFromAConsentNotRequiredClient(t *testing.T)
 	assert.Equal(t, 1, result.RecordedFamilyCount, "the grant's one family is newly recorded")
 
 	// The same disconnect again finds nothing left to end, and says so.
-	again, err := revocation.DisconnectClientTx(context.Background(), database, consent.UserId, consent.ClientId,
+	again, err := revocation.DisconnectClientTx(context.Background(), database, consent.UserId, consent.ClientId, nil,
 		func(tx *sql.Tx) (bool, error) {
 			return database.DeleteUserConsent(context.Background(), tx, consent.Id)
 		})

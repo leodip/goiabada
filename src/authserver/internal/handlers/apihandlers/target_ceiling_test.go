@@ -423,7 +423,7 @@ var userTargetWrites = []targetWrite{
 		serve: func(t *testing.T, database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, scope string) *httptest.ResponseRecorder {
 			r := targetRequest(http.MethodDelete, "/api/v1/admin/user-consents/92", "", scope, map[string]string{"id": "92"})
 			rr := httptest.NewRecorder()
-			HandleUserConsentDelete(database, auditLogger).ServeHTTP(rr, r)
+			HandleUserConsentDelete(database, auditLogger, &recordingLogoutTokens{}).ServeHTTP(rr, withSessionSettings(r))
 			return rr
 		},
 		expectReads: func(database *datamocks.Database, _ bool) {
