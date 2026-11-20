@@ -53,7 +53,8 @@ import (
 // conservative direction as an unreachable branch.
 //
 // A route's statuses are its handler's and those of the middleware routes.go mounts in front of
-// it, through its groups' r.Use and its own r.With, each read from its source as a handler is
+// it, through its groups' r.Use, the r.With of the router each group hangs off, and its own
+// r.With, each read from its source as a handler is
 // (routeChains says how a method value, a call to another method and a refusal written through
 // an interface field are followed). Both directions hold for every status alike: a failure the
 // chain can write must be declared, and a declared failure must be one the handler or the chain
@@ -103,17 +104,28 @@ type routeRegistration struct {
 	path    string // as written, with routes.go's own parameter names
 	key     string // method + path with parameter names erased, the join key with the spec
 	handler string // package-qualified, apihandlers.HandleUserGet
-	// uses are the arguments of the r.Use calls of every r.Route group the route sits in, outer
-	// group first, which is how the Account group mounts its guards once for all its routes.
-	uses []ast.Expr
+	// groups are the r.Route groups the route sits in, outer group first: what each hangs off and
+	// the arguments of its r.Use calls, which is how the Account group mounts its guards once for
+	// all its routes.
+	groups []routeGroup
 	// receiver is what the registration hangs off: r, r.With(...), a router variable routes.go
 	// assigned from a With call, or getAndHead's router. Its With arguments are the middleware
 	// mounted on this route alone, which is how the Admin group mounts its scope guards.
 	receiver ast.Expr
-	// chain is what readRouteChains fills: each failure status the route's middleware can write,
-	// with the middleware that writes it.
+	// chain is what readRouteChains fills: each status the route's middleware can write, with the
+	// middleware that writes it.
 	chain map[int][]string
 	line  int
+}
+
+// routeGroup is one r.Route group. The router collects the With arguments of the router a group
+// hangs off into the group's own chain, so api.With(guard).Route(...) runs guard in front of every
+// route in the group as the group's r.Use calls do (core/routing's Router.Route).
+type routeGroup struct {
+	// receiver is what the Route call hangs off: r, r.With(...) or a router variable routes.go
+	// assigned from a With call.
+	receiver ast.Expr
+	uses     []ast.Expr
 }
 
 // pathParam erases the name of a path parameter, so a route joins the spec by the URL a caller
@@ -138,13 +150,7 @@ func routeKey(method, path string) string {
 // stood in for reading the middleware (#261). Middleware statuses are not less part of the
 // contract for being written earlier, and a generated client has no branch for one either way.
 func TestOpenAPI_DeclaresEveryStatusTheHandlersEmit(t *testing.T) {
-	routes := parseRouteChains(t)
-	statuses := parseHandlerStatuses(t)
-	spec := parseSpec(t)
-
-	for _, finding := range undeclaredStatusFindings(routes, statuses, spec) {
-		t.Errorf("%s", finding)
-	}
+	assertDeclaresEveryStatus(t, parseRouteChains(t), parseHandlerStatuses(t), parseSpec(t))
 }
 
 // TestOpenAPI_DeclaresNoStatusTheHandlersCannotEmit is the reverse: a documented failure
@@ -162,27 +168,57 @@ func TestOpenAPI_DeclaresEveryStatusTheHandlersEmit(t *testing.T) {
 // writes one, so a handler's 401 INVALID_SESSION stays valid on a route with no bearer
 // middleware, and a 401 declared where neither writes one fails as a 404 would.
 func TestOpenAPI_DeclaresNoStatusTheHandlersCannotEmit(t *testing.T) {
-	routes := parseRouteChains(t)
-	statuses := parseHandlerStatuses(t)
-	spec := parseSpec(t)
+	assertDeclaresNoUndeliverableStatus(t, parseRouteChains(t), parseHandlerStatuses(t), parseSpec(t))
+}
 
-	for _, finding := range undeliverableStatusFindings(routes, statuses, spec) {
-		t.Errorf("%s", finding)
+// assertDeclaresEveryStatus is the forward test's reporting half: one failure per finding of
+// undeclaredStatusFindings, and a stop for a join that matched no route to the spec, since a
+// comparison of nothing proves nothing.
+func assertDeclaresEveryStatus(r guard.Reporter, routes []routeRegistration,
+	handlers map[string]map[int]bool, spec map[string]specOperation) {
+
+	r.Helper()
+	findings, joined := undeclaredStatusFindings(routes, handlers, spec)
+	reportStatusFindings(r, findings, joined, len(routes), len(spec))
+}
+
+// assertDeclaresNoUndeliverableStatus is the reverse test's reporting half, as
+// assertDeclaresEveryStatus is the forward one's.
+func assertDeclaresNoUndeliverableStatus(r guard.Reporter, routes []routeRegistration,
+	handlers map[string]map[int]bool, spec map[string]specOperation) {
+
+	r.Helper()
+	findings, joined := undeliverableStatusFindings(routes, handlers, spec)
+	reportStatusFindings(r, findings, joined, len(routes), len(spec))
+}
+
+func reportStatusFindings(r guard.Reporter, findings []string, joined, routes, operations int) {
+	r.Helper()
+	if joined == 0 {
+		r.Fatalf("joined none of %d routes to the %d operations of openapi.yaml; the status "+
+			"comparison is no longer reaching the spec", routes, operations)
+		return
+	}
+	for _, finding := range findings {
+		r.Errorf("%s", finding)
 	}
 }
 
 // undeclaredStatusFindings returns one finding per status a documented route can write that its
-// operation does not declare: each status its handler writes, and each failure its chain writes,
-// naming the middleware. It also reports a route whose handler no source declares.
+// operation does not declare: each status its handler writes, and each status its chain writes,
+// naming the middleware. It also reports a route whose handler no source declares, and returns
+// how many routes it joined to the spec.
 func undeclaredStatusFindings(routes []routeRegistration, handlers map[string]map[int]bool,
-	spec map[string]specOperation) []string {
+	spec map[string]specOperation) ([]string, int) {
 
 	var findings []string
+	joined := 0
 	for _, r := range routes {
 		op, documented := spec[r.key]
 		if !documented {
 			continue // TestOpenAPI_DescribesEveryAPIRoute owns this case
 		}
+		joined++
 		emitted, known := handlers[r.handler]
 		if !known {
 			findings = append(findings, fmt.Sprintf("routes.go:%d: %s %s lands in %s, which no "+
@@ -205,20 +241,23 @@ func undeclaredStatusFindings(routes []routeRegistration, handlers map[string]ma
 				r.path, code, strings.Join(r.chain[code], " and "), r.line, r.handler))
 		}
 	}
-	return findings
+	return findings, joined
 }
 
 // undeliverableStatusFindings returns one finding per failure a documented route's operation
-// declares that neither its handler nor its chain writes.
+// declares that neither its handler nor its chain writes, and how many routes it joined to the
+// spec.
 func undeliverableStatusFindings(routes []routeRegistration, handlers map[string]map[int]bool,
-	spec map[string]specOperation) []string {
+	spec map[string]specOperation) ([]string, int) {
 
 	var findings []string
+	joined := 0
 	for _, r := range routes {
 		op, documented := spec[r.key]
 		if !documented {
 			continue
 		}
+		joined++
 		emitted := handlers[r.handler]
 		for _, code := range sortedCodes(op.responses) {
 			if code < 400 || emitted[code] || len(r.chain[code]) > 0 {
@@ -229,7 +268,7 @@ func undeliverableStatusFindings(routes []routeRegistration, handlers map[string
 				"that cannot arrive", op.operationId, strings.ToUpper(r.method), r.path, code, r.handler, r.line))
 		}
 	}
-	return findings
+	return findings, joined
 }
 
 func sortedKeysInt[V any](m map[int]V) []int {
@@ -1085,9 +1124,12 @@ func TestHandlerStatuses_AResolverThatFollowedNoCallStops(t *testing.T) {
 // an interface field its constructor fills, built once for the API and once for the pages with
 // another implementation in the field; a rate limiter mounted as a method value, reaching its
 // writer through two more methods and a plain function, beside a limiter method nothing mounts;
-// and a recorder that names 200 as the status of a handler that never writes one. The API group
-// mounts the recorder and the guard with r.Use, the create route adds the limiter with r.With, and
-// the page route hangs off a router variable assigned from a With call.
+// a recorder that names 200 as the status of a handler that never writes one; and a middleware
+// that redirects with 307. The API group mounts the recorder and the guard with r.Use, the create
+// route adds the limiter with r.With, and the page route hangs off a router variable assigned from
+// a With call. Two more groups take their middleware from the router they hang off: the bolts
+// group the API guard through api.With(...).Route, and the cogs group the redirect through a
+// router variable assigned from a With call.
 func routeChainsFixture(t *testing.T, root string, extraRoutes string) {
 	t.Helper()
 	writeDocFixture(t, root, "internal/server/routes.go", `package server
@@ -1113,6 +1155,13 @@ func (s *Server) initRoutes(api, pages *routing.Router) {
 	api.Get("/api/public/sprockets", apihandlers.HandleSprocketsGet())
 	guarded := pages.With(pageGuards.RequireToken())
 	guarded.Get("/widgets/{id}", apihandlers.HandleWidgetPageGet())
+	api.With(apiGuards.RequireToken()).Route("/api/v1/bolts", func(r *routing.Router) {
+		r.Get("/{id}", apihandlers.HandleBoltGet())
+	})
+	relocated := api.With(middleware.Relocate())
+	relocated.Route("/api/v1/cogs", func(r *routing.Router) {
+		r.Get("/{id}", apihandlers.HandleCogGet())
+	})
 `+extraRoutes+`}
 `)
 	writeDocFixture(t, root, "internal/middleware/guards.go", `package middleware
@@ -1231,6 +1280,18 @@ func Debug() func(http.Handler) http.Handler {
 	}
 }
 `)
+	writeDocFixture(t, root, "internal/middleware/relocate.go", `package middleware
+
+import "net/http"
+
+func Relocate() func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/elsewhere"+r.URL.Path, http.StatusTemporaryRedirect)
+		})
+	}
+}
+`)
 	writeDocFixture(t, root, "internal/handlers/apihandlers/handler_widget.go", `package apihandlers
 
 import "net/http"
@@ -1272,6 +1333,18 @@ func HandleWidgetPageGet() http.HandlerFunc {
 		w.WriteHeader(http.StatusOK)
 	}
 }
+
+func HandleBoltGet() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}
+}
+
+func HandleCogGet() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}
+}
 `)
 }
 
@@ -1295,8 +1368,8 @@ func fixtureRouteChains(t *testing.T, root string, middleware, calls int) ([]rou
 }
 
 // routeChainsFixtureSpec declares every status each fixture route can write, and no other: the
-// handler's, and the failures of its chain, with no 200 on the create route, whose handler
-// answers 201 behind the recorder that names 200.
+// handler's, and its chain's, with no 200 on the create route, whose handler answers 201 behind
+// the recorder that names 200.
 func routeChainsFixtureSpec() map[string]specOperation {
 	op := func(id string, codes ...int) specOperation {
 		responses := map[int]bool{}
@@ -1311,6 +1384,8 @@ func routeChainsFixtureSpec() map[string]specOperation {
 		"get /api/public/gadgets":     op("getGadgets", 200, 401),
 		"get /api/public/sprockets":   op("getSprockets", 200),
 		"get /widgets/{}":             op("getWidgetPage", 200, 403, 422),
+		"get /api/v1/bolts/{}":        op("getBolt", 200, 400, 401),
+		"get /api/v1/cogs/{}":         op("getCog", 200, 307),
 	}
 }
 
@@ -1329,6 +1404,8 @@ func TestRouteChains_EachMiddlewaresStatusesAreReadThroughItsCalls(t *testing.T)
 		"get /api/public/gadgets":     {},
 		"get /api/public/sprockets":   {},
 		"get /widgets/{}":             {403, 422},
+		"get /api/v1/bolts/{}":        {400, 401},
+		"get /api/v1/cogs/{}":         {307},
 	}
 	got := map[string][]int{}
 	for _, r := range routes {
@@ -1350,12 +1427,47 @@ func TestRouteStatuses_AStatusTheChainWritesThatTheSpecLacksFails(t *testing.T) 
 	delete(spec["get /api/v1/widgets/{}"].responses, 400)
 	delete(spec["post /api/v1/widgets/create"].responses, 429)
 
-	findings := undeclaredStatusFindings(routes, handlers, spec)
+	report = guard.Run(func(r guard.Reporter) {
+		assertDeclaresEveryStatus(r, routes, handlers, spec)
+	})
 
-	if len(findings) != 2 ||
-		!strings.Contains(findings[0], "getWidget (GET /api/v1/widgets/{id}) can answer 400 from apiGuards.RequireToken") ||
-		!strings.Contains(findings[1], "createWidget (POST /api/v1/widgets/create) can answer 429 from limiter.LimitWidgets") {
-		t.Errorf("want the undeclared 400 and 429, got %q", findings)
+	if report.Stopped || len(report.Errors) != 2 ||
+		!strings.Contains(report.Errors[0], "getWidget (GET /api/v1/widgets/{id}) can answer 400 from apiGuards.RequireToken") ||
+		!strings.Contains(report.Errors[1], "createWidget (POST /api/v1/widgets/create) can answer 429 from limiter.LimitWidgets") {
+		t.Errorf("want failures for the undeclared 400 and 429, got %+v", report)
+	}
+}
+
+// A group's middleware includes the With arguments of the router it hangs off, and a redirect a
+// middleware writes is a status the route can answer, where a recorder's starting 200 is not.
+func TestRouteStatuses_AStatusAGroupsRouterOrARedirectWritesThatTheSpecLacksFails(t *testing.T) {
+	root := t.TempDir()
+	routeChainsFixture(t, root, "")
+	routes, handlers, report := fixtureRouteChains(t, root, 1, 1)
+	if report.Failed() {
+		t.Fatalf("reading the fixture failed: %+v", report)
+	}
+	spec := routeChainsFixtureSpec()
+	delete(spec["get /api/v1/bolts/{}"].responses, 400)
+	delete(spec["get /api/v1/bolts/{}"].responses, 401)
+	delete(spec["get /api/v1/cogs/{}"].responses, 307)
+
+	report = guard.Run(func(r guard.Reporter) {
+		assertDeclaresEveryStatus(r, routes, handlers, spec)
+	})
+
+	want := []string{
+		"getBolt (GET /api/v1/bolts/{id}) can answer 400 from apiGuards.RequireToken",
+		"getBolt (GET /api/v1/bolts/{id}) can answer 401 from apiGuards.RequireToken",
+		"getCog (GET /api/v1/cogs/{id}) can answer 307 from middleware.Relocate",
+	}
+	if report.Stopped || len(report.Errors) != len(want) {
+		t.Fatalf("want %d failures, got %+v", len(want), report)
+	}
+	for i, prefix := range want {
+		if !strings.HasPrefix(report.Errors[i], prefix) {
+			t.Errorf("failure %d is %q, want it to start %q", i, report.Errors[i], prefix)
+		}
 	}
 }
 
@@ -1368,11 +1480,34 @@ func TestRouteStatuses_ASpecDeclaringEveryStatusTheRoutesWritePasses(t *testing.
 	}
 	spec := routeChainsFixtureSpec()
 
-	if findings := undeclaredStatusFindings(routes, handlers, spec); len(findings) != 0 {
-		t.Errorf("forward findings on a complete spec: %q", findings)
+	report = guard.Run(func(r guard.Reporter) {
+		assertDeclaresEveryStatus(r, routes, handlers, spec)
+		assertDeclaresNoUndeliverableStatus(r, routes, handlers, spec)
+	})
+
+	if report.Failed() {
+		t.Errorf("a complete spec failed: %+v", report)
 	}
-	if findings := undeliverableStatusFindings(routes, handlers, spec); len(findings) != 0 {
-		t.Errorf("reverse findings on a complete spec: %q", findings)
+}
+
+func TestRouteStatuses_AJoinThatMatchedNoRouteStops(t *testing.T) {
+	root := t.TempDir()
+	routeChainsFixture(t, root, "")
+	routes, handlers, report := fixtureRouteChains(t, root, 1, 1)
+	if report.Failed() {
+		t.Fatalf("reading the fixture failed: %+v", report)
+	}
+
+	for name, assert := range map[string]func(guard.Reporter, []routeRegistration, map[string]map[int]bool, map[string]specOperation){
+		"forward": assertDeclaresEveryStatus,
+		"reverse": assertDeclaresNoUndeliverableStatus,
+	} {
+		report := guard.Run(func(r guard.Reporter) {
+			assert(r, routes, handlers, map[string]specOperation{})
+		})
+		if !report.Stopped || !strings.Contains(report.Fatal, "joined none of 7 routes") {
+			t.Errorf("the %s check did not stop on a join that matched no route: %+v", name, report)
+		}
 	}
 }
 
@@ -1390,12 +1525,14 @@ func TestRouteStatuses_ADeclared401NeitherTheHandlerNorTheChainWritesFails(t *te
 	spec["get /api/public/sprockets"].responses[401] = true
 	spec["get /widgets/{}"].responses[401] = true
 
-	findings := undeliverableStatusFindings(routes, handlers, spec)
+	report = guard.Run(func(r guard.Reporter) {
+		assertDeclaresNoUndeliverableStatus(r, routes, handlers, spec)
+	})
 
-	if len(findings) != 2 ||
-		!strings.Contains(findings[0], "getSprockets (GET /api/public/sprockets) declares 401") ||
-		!strings.Contains(findings[1], "getWidgetPage (GET /widgets/{id}) declares 401") {
-		t.Errorf("want the two undeliverable 401s, got %q", findings)
+	if report.Stopped || len(report.Errors) != 2 ||
+		!strings.Contains(report.Errors[0], "getSprockets (GET /api/public/sprockets) declares 401") ||
+		!strings.Contains(report.Errors[1], "getWidgetPage (GET /widgets/{id}) declares 401") {
+		t.Errorf("want failures for the two undeliverable 401s, got %+v", report)
 	}
 }
 
@@ -1500,9 +1637,9 @@ var specVerbs = func() map[string]bool {
 }()
 
 // collectRoutes appends each route registration under node to out, with prefix the path of the
-// r.Route groups it sits in and uses the middleware their r.Use calls mount.
+// r.Route groups it sits in and groups those groups.
 func collectRoutes(fset *token.FileSet, node ast.Node, prefix string,
-	uses []ast.Expr, out *[]routeRegistration) {
+	groups []routeGroup, out *[]routeRegistration) {
 
 	ast.Inspect(node, func(n ast.Node) bool {
 		call, ok := n.(*ast.CallExpr)
@@ -1523,7 +1660,7 @@ func collectRoutes(fset *token.FileSet, node ast.Node, prefix string,
 						path:     full,
 						key:      routeKey(verb, full),
 						handler:  handler,
-						uses:     uses,
+						groups:   groups,
 						receiver: call.Args[0],
 						line:     fset.Position(call.Pos()).Line,
 					})
@@ -1543,10 +1680,11 @@ func collectRoutes(fset *token.FileSet, node ast.Node, prefix string,
 			sub, subOK := routePath(call.Args[0])
 			body, bodyOK := call.Args[1].(*ast.FuncLit)
 			if subOK && bodyOK {
-				// A middleware mounted with r.Use here covers every route in the body, and a
-				// group nested inside another keeps the outer group's.
+				// The middleware of the router the group hangs off and those mounted with r.Use
+				// here cover every route in the body, and a group nested inside another keeps the
+				// outer group's.
 				collectRoutes(fset, body, prefix+sub,
-					append(slices.Clone(uses), groupUses(body)...), out)
+					append(slices.Clone(groups), routeGroup{receiver: sel.X, uses: groupUses(body)}), out)
 				return false
 			}
 		}
@@ -1566,7 +1704,7 @@ func collectRoutes(fset *token.FileSet, node ast.Node, prefix string,
 			path:     full,
 			key:      routeKey(verb, full),
 			handler:  handler,
-			uses:     uses,
+			groups:   groups,
 			receiver: sel.X,
 			line:     fset.Position(call.Pos()).Line,
 		})
@@ -1943,13 +2081,14 @@ func readRouteChains(r guard.Reporter, routesPath, internalRoot string, routes [
 	return out
 }
 
-// routeChains returns routes with each one's chain filled: every failure status the middleware
-// routes.go mounts in front of it can write, with the middleware that writes it. It also returns
+// routeChains returns routes with each one's chain filled: every status the middleware routes.go
+// mounts in front of it can write, with the middleware that writes it. It also returns
 // how many distinct middleware it read, how many calls it followed, and one finding per
 // middleware it cannot read and per status constant it does not know.
 //
-// A route's chain is the r.Use arguments of its groups, then the r.With arguments it hangs off,
-// a router variable assigned from a With call included. Each one is read as a handler is, through
+// A route's chain is, for each group it sits in, outer group first, the r.With arguments of the
+// router the group hangs off and then the group's r.Use arguments, and last the r.With arguments
+// the route itself hangs off, a router variable assigned from a With call included. Each one is read as a handler is, through
 // ownStatuses and the plain functions of its package it reaches, from one of three shapes:
 // pkg.F(...), a function of a package routes.go imports; v.M(...) or the method value v.M, a
 // method of the type the constructor assigned to v returns, as apiBearer and rateLimiter are; or
@@ -1962,10 +2101,10 @@ func readRouteChains(r guard.Reporter, routesPath, internalRoot string, routes [
 // parameter, and any call into another package, is not followed: ownStatuses names the shared
 // writers there.
 //
-// Only failures join the chain. A middleware passes a request on to the handler or refuses it, so
-// the success a route answers is its handler's, and a success status a middleware names, such
-// as APIDebug's recorder starting at 200 for a handler that never calls WriteHeader, is not one
-// it writes.
+// A failure joins the chain wherever the middleware names it, as a handler's does. A success or a
+// redirect joins it only where the middleware writes it, such as the 307 it hands http.Redirect,
+// and not where it only names one, such as APIDebug's recorder starting at 200 for a handler that
+// never calls WriteHeader: chainStatuses says which mentions those are.
 func routeChains(routesPath, internalRoot string, routes []routeRegistration) ([]routeRegistration, int, int, []string, error) {
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, routesPath, nil, parser.SkipObjectResolution)
@@ -1996,7 +2135,12 @@ func routeChains(routesPath, internalRoot string, routes []routeRegistration) ([
 	out := slices.Clone(routes)
 	for i, rt := range out {
 		chain := map[int][]string{}
-		for _, e := range append(slices.Clone(rt.uses), c.withArgs(rt.receiver, 0)...) {
+		var mounted []ast.Expr
+		for _, g := range rt.groups {
+			mounted = append(mounted, c.withArgs(g.receiver, 0)...)
+			mounted = append(mounted, g.uses...)
+		}
+		for _, e := range append(mounted, c.withArgs(rt.receiver, 0)...) {
 			label := middlewareLabel(e)
 			statuses, ok := c.statuses(e)
 			if c.err != nil {
@@ -2010,7 +2154,7 @@ func routeChains(routesPath, internalRoot string, routes []routeRegistration) ([
 				continue
 			}
 			for code := range statuses {
-				if code >= 400 && !slices.Contains(chain[code], label) {
+				if !slices.Contains(chain[code], label) {
 					chain[code] = append(chain[code], label)
 				}
 			}
@@ -2311,7 +2455,7 @@ func (c *chainResolver) walk(p *goPackage, start chainWalk) map[int]bool {
 			decls = p.methods[next.key]
 		}
 		for _, src := range decls {
-			own, unknown := ownStatuses(src.path, src.fset, src.decl)
+			own, unknown := chainStatuses(src.path, src.fset, src.decl)
 			maps.Copy(out, own)
 			for _, finding := range unknown {
 				c.unknown[finding] = true
@@ -2327,6 +2471,63 @@ func (c *chainResolver) walk(p *goPackage, start chainWalk) map[int]bool {
 		}
 	}
 	return out
+}
+
+// chainStatuses is ownStatuses for a function of a middleware's walk: every failure its body names,
+// and every success or redirect it names other than as a composite literal's element, an operand
+// of a comparison or a switch case. Those three name a status without writing it: a recorder that
+// starts at 200, a check of what the handler answered. Any other mention, such as an argument of
+// w.WriteHeader or http.Redirect, or a value a helper returns, is read as written, the
+// conservative direction, as an unreachable branch is.
+func chainStatuses(path string, fset *token.FileSet, fn *ast.FuncDecl) (map[int]bool, []string) {
+	named, findings := ownStatuses(path, fset, fn)
+	notWritten := map[*ast.SelectorExpr]bool{}
+	mark := func(e ast.Expr) {
+		if sel, ok := ast.Unparen(e).(*ast.SelectorExpr); ok {
+			notWritten[sel] = true
+		}
+	}
+	ast.Inspect(fn.Body, func(n ast.Node) bool {
+		switch x := n.(type) {
+		case *ast.CompositeLit:
+			for _, elt := range x.Elts {
+				if kv, ok := elt.(*ast.KeyValueExpr); ok {
+					elt = kv.Value
+				}
+				mark(elt)
+			}
+		case *ast.BinaryExpr:
+			switch x.Op {
+			case token.EQL, token.NEQ, token.LSS, token.GTR, token.LEQ, token.GEQ:
+				mark(x.X)
+				mark(x.Y)
+			}
+		case *ast.CaseClause:
+			for _, e := range x.List {
+				mark(e)
+			}
+		}
+		return true
+	})
+	out := map[int]bool{}
+	for code := range named {
+		if code >= 400 {
+			out[code] = true
+		}
+	}
+	ast.Inspect(fn.Body, func(n ast.Node) bool {
+		sel, ok := n.(*ast.SelectorExpr)
+		if !ok || notWritten[sel] {
+			return true
+		}
+		if pkg, ok := sel.X.(*ast.Ident); ok && pkg.Name == "http" {
+			if code, known := httpStatusConstants[sel.Sel.Name]; known && code < 400 {
+				out[code] = true
+			}
+		}
+		return true
+	})
+	return out, findings
 }
 
 // receiverCalls is every method of the package a method's body reaches through its receiver:
