@@ -2,10 +2,10 @@ package datatests
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"slices"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -112,26 +112,25 @@ func TestMigration000097_LowerUnearnedAcrLevel(t *testing.T) {
 	ctx := context.Background()
 	h := newIsolatedDB(t)
 
-	// Seeded through the ORM at 000096 itself, so no down migration runs before the baselines are
-	// read. The ORM writes every column the record carries, which is head's schema; 000097 changes
-	// data only, so 000096's schema is head's.
+	// Seeded at 000096 itself, so no down migration runs before the baselines are read, and in SQL
+	// naming the columns 000096 carries, so a column a later migration adds to one of these tables
+	// cannot break the seed (migration_seed_sql_test.go).
 	require.NoErrorf(t, h.Migrator.Migrate(ctx, beforeLowerUnearnedLevel000097), "migrate to 000096 on %s", dbType())
-	user := &record.User{Subject: fake.UUID(), Email: fake.Email(), Enabled: true}
-	require.NoError(t, h.DB.CreateUser(ctx, nil, user))
-	client := &record.Client{ClientIdentifier: "m97_" + fake.LetterN(6), Description: "Migration 000097 test client"}
-	require.NoError(t, h.DB.CreateClient(ctx, nil, client))
+	userId := seedUser(t, h, userSeed{Enabled: true})
+	// Enabled, as seedClient leaves it, so the grant below is one its client can still refresh.
+	clientId := seedClient(t, h, "m97_"+fake.LetterN(6))
 
 	shapes := signInShapes000097()
 	ids := make([]int64, len(shapes))
 	for i, s := range shapes {
-		ids[i] = createSignIn000097(t, h, client.Id, user.Id, s.level, s.methods)
+		ids[i] = createSignIn000097(t, h, clientId, userId, s.level, s.methods)
 	}
 	// 4. The first shape is the one the migration exists for: a password alone at the highest
 	// level. Its grant's live offline refresh token, and a live browser session of the user stored
 	// at that same unearned pair.
 	require.Equal(t, "pwd", shapes[0].methods, "the first shape is the password-only sign-in at the highest level")
 	refreshTokenId := createOfflineRefreshToken000097(t, h, ids[0])
-	sessionId := createBrowserSession000097(t, h, user.Id)
+	sessionId := createBrowserSession000097(t, h, userId)
 
 	before := make([]map[string]string, len(shapes))
 	for i := range shapes {
@@ -141,6 +140,11 @@ func TestMigration000097_LowerUnearnedAcrLevel(t *testing.T) {
 	}
 	refreshTokenBefore := row000097(t, h, "refresh_tokens", refreshTokenId)
 	require.Equalf(t, ids[0], mustInt000097(t, refreshTokenBefore["code_id"]), "the refresh token belongs to the lowered sign-in")
+	// The stored shape of an offline grant, as the issuer writes it: no session identifier, which
+	// stays on the sign-in, and a maximum lifetime instead.
+	require.Empty(t, refreshTokenBefore["session_identifier"], "an offline refresh token stores no session identifier")
+	require.NotEqual(t, "<NULL>", refreshTokenBefore["max_lifetime"], "an offline refresh token stores its maximum lifetime")
+	require.NotEmpty(t, before[0]["session_identifier"], "the lowered sign-in keeps its session identifier")
 	sessionBefore := row000097(t, h, "user_sessions", sessionId)
 
 	// 2, first half: what the release-note query lists before the upgrade.
@@ -207,47 +211,55 @@ func assertGrantAndSessionKept000097(t *testing.T, h *isolatedDB, step string,
 		"4. on %s %s leaves the browser session as it was: nobody is signed out", dbType(), step)
 }
 
-// createOfflineRefreshToken000097 stores a live offline refresh token of the sign-in codeId, bound
-// to its session, and returns its id.
+// createOfflineRefreshToken000097 stores a live offline refresh token of the sign-in codeId in the
+// shape the token issuer writes one (issuance.TokenIssuer, refresh_token_row.go): the family's
+// first token, with no session identifier and a maximum lifetime, and returns its id. The columns
+// are 000096's; auth_state_generation and dpop_jkt are left to their default and NULL, as for the
+// unbound token of a sign-in at the default generation.
 func createOfflineRefreshToken000097(t *testing.T, h *isolatedDB, codeId int64) int64 {
 	t.Helper()
-	code := codeRow000097(t, h, codeId)
 	now := time.Now().UTC().Truncate(time.Second)
 	jti := "m97jti_" + fake.LetterN(8)
-	refreshToken := &record.RefreshToken{
-		CodeId:               sql.NullInt64{Int64: codeId, Valid: true},
-		RefreshTokenJti:      jti,
-		FirstRefreshTokenJti: jti,
-		SessionIdentifier:    code["session_identifier"],
-		RefreshTokenType:     "Offline",
-		Scope:                "openid offline_access",
-		IssuedAt:             sql.NullTime{Time: now, Valid: true},
-		ExpiresAt:            sql.NullTime{Time: now.Add(30 * 24 * time.Hour), Valid: true},
-		MaxLifetime:          sql.NullTime{Time: now.Add(365 * 24 * time.Hour), Valid: true},
-		Revoked:              false,
-	}
-	require.NoErrorf(t, h.DB.CreateRefreshToken(context.Background(), nil, refreshToken), "store the offline refresh token on %s", dbType())
-	return refreshToken.Id
+	return seedRow000097(t, h, "refresh_tokens", "refresh_token_jti", jti, map[string]any{
+		"created_at":                 now,
+		"updated_at":                 now,
+		"code_id":                    codeId,
+		"refresh_token_jti":          jti,
+		"previous_refresh_token_jti": "",
+		"first_refresh_token_jti":    jti,
+		"session_identifier":         "",
+		"refresh_token_type":         "Offline",
+		"scope":                      "openid offline_access",
+		"issued_at":                  now,
+		"expires_at":                 now.Add(30 * 24 * time.Hour),
+		"max_lifetime":               now.Add(365 * 24 * time.Hour),
+		"revoked":                    false,
+	})
 }
 
 // createBrowserSession000097 stores a live browser session of userId at the highest level with a
 // password alone, the pair the migration lowers in codes and leaves in sessions, and returns its id.
+// The columns are 000096's; the ones with a default are left to it.
 func createBrowserSession000097(t *testing.T, h *isolatedDB, userId int64) int64 {
 	t.Helper()
 	now := time.Now().UTC().Truncate(time.Second)
-	session := &record.UserSession{
-		SessionIdentifier: "m97session_" + fake.LetterN(8),
-		Started:           now,
-		LastAccessed:      now,
-		AuthTime:          now,
-		PasswordAuthTime:  now,
-		AuthMethods:       "pwd",
-		AcrLevel:          record.AcrLevel2Mandatory,
-		IpAddress:         "192.0.2.1",
-		UserId:            userId,
-	}
-	require.NoErrorf(t, h.DB.CreateUserSession(context.Background(), nil, session), "store the browser session on %s", dbType())
-	return session.Id
+	sessionIdentifier := "m97session_" + fake.LetterN(8)
+	return seedRow000097(t, h, "user_sessions", "session_identifier", sessionIdentifier, map[string]any{
+		"created_at":         now,
+		"updated_at":         now,
+		"session_identifier": sessionIdentifier,
+		"started":            now,
+		"last_accessed":      now,
+		"auth_time":          now,
+		"password_auth_time": now,
+		"auth_methods":       "pwd",
+		"acr_level":          string(record.AcrLevel2Mandatory),
+		"ip_address":         "192.0.2.1",
+		"device_name":        "",
+		"device_type":        "",
+		"device_os":          "",
+		"user_id":            userId,
+	})
 }
 
 // boolText000097 reads a boolean column as row000097 renders it on any engine: SQLite, SQL Server
@@ -270,31 +282,56 @@ func mustInt000097(t *testing.T, value string) int64 {
 	return id
 }
 
-// createSignIn000097 stores one sign-in of client and user at level with methods, and returns its
-// id.
+// createSignIn000097 stores one sign-in of client and user at level with methods, in 000096's
+// columns, and returns its id. revoked and auth_state_generation are left to their defaults.
 func createSignIn000097(t *testing.T, h *isolatedDB, clientId, userId int64, level, methods string) int64 {
 	t.Helper()
 	random := fake.LetterN(8)
-	code := &record.Code{
-		ClientId:          clientId,
-		UserId:            userId,
-		Code:              "m97code_" + random,
-		CodeHash:          "m97hash_" + random,
-		RedirectURI:       "https://example.com/callback",
-		Scope:             "openid offline_access",
-		State:             "m97state_" + random,
-		Nonce:             "m97nonce_" + random,
-		IpAddress:         "192.0.2.1",
-		UserAgent:         "migration 000097 test",
-		ResponseMode:      "query",
-		AuthenticatedAt:   time.Now().UTC().Truncate(time.Second),
-		SessionIdentifier: "m97session_" + random,
-		AcrLevel:          record.AcrLevel(level),
-		AuthMethods:       methods,
-		Used:              true,
+	now := time.Now().UTC().Truncate(time.Second)
+	codeHash := "m97hash_" + random
+	return seedRow000097(t, h, "codes", "code_hash", codeHash, map[string]any{
+		"created_at":         now,
+		"updated_at":         now,
+		"client_id":          clientId,
+		"user_id":            userId,
+		"code_hash":          codeHash,
+		"redirect_uri":       "https://example.com/callback",
+		"scope":              "openid offline_access",
+		"state":              "m97state_" + random,
+		"nonce":              "m97nonce_" + random,
+		"ip_address":         "192.0.2.1",
+		"user_agent":         "migration 000097 test",
+		"response_mode":      "query",
+		"authenticated_at":   now,
+		"session_identifier": "m97session_" + random,
+		"acr_level":          level,
+		"auth_methods":       methods,
+		"used":               true,
+	})
+}
+
+// seedRow000097 inserts one row of table with exactly the columns values names, bound through the
+// engine's placeholders, and reads its id back by the unique value key holds in column keyColumn.
+func seedRow000097(t *testing.T, h *isolatedDB, table, keyColumn, key string, values map[string]any) int64 {
+	t.Helper()
+	columns := make([]string, 0, len(values))
+	for column := range values {
+		columns = append(columns, column)
 	}
-	require.NoErrorf(t, h.DB.CreateCode(context.Background(), nil, code), "store the sign-in at %s with methods %q", level, methods)
-	return code.Id
+	slices.Sort(columns)
+	args := make([]any, len(columns))
+	for i, column := range columns {
+		args[i] = values[column]
+	}
+	insert := "INSERT INTO " + table + " (" + strings.Join(columns, ", ") + ") VALUES (" + seedBinds(len(args)) + ")"
+	_, err := h.SQL.ExecContext(context.Background(), insert, args...)
+	require.NoErrorf(t, err, "seed %s on %s", table, dbType())
+
+	var id int64
+	require.NoErrorf(t, h.SQL.QueryRowContext(context.Background(),
+		"SELECT id FROM "+table+" WHERE "+keyColumn+" = "+seedBindAt(1), key).Scan(&id),
+		"read back the seeded %s id on %s", table, dbType())
+	return id
 }
 
 // codeRow000097 reads every column of one codes row in SQL, as text, so a column the migration
