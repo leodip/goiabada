@@ -164,6 +164,8 @@ curl https://auth.example.com/openapi.yaml
 
 This reference is generated from it, so the two always say the same thing. Import it into Postman or Swagger UI, or generate a client from it.
 
+To generate a Go client with [oapi-codegen](https://github.com/oapi-codegen/oapi-codegen), set `response-type-suffix: Result` under `output-options` in its configuration. With its default suffix, the type it wraps an operation's answer in can share a name with one of the document's schemas, and the client doesn't compile.
+
 ## Next steps
 
 <CardGrid>

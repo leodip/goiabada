@@ -17,8 +17,9 @@
 #   all     - Run all commands in sequence (check → update → deps)
 #
 # Scope: this script manages TOOLCHAIN and CDN pins (Go, Tailwind, Node.js,
-# golangci-lint, mockery, staticcheck, unparam, govulncheck, Trivy, Grype,
-# npm-check-updates, Mailpit, cropperjs, acorn), and
+# golangci-lint, mockery, oapi-codegen and its runtime library, staticcheck,
+# unparam, govulncheck, Trivy, Grype, npm-check-updates, Mailpit, cropperjs,
+# acorn), and
 # the dependencies of the Go modules and of the npm projects in NPM_PROJECTS.
 # check also reports when the pinned sources of generate's data have moved.
 # It does NOT manage the product version.
@@ -193,6 +194,8 @@ get_all_versions() {
         echo "tools.node=$(get_version 'tools.node')"
         echo "tools.golangci-lint=$(get_version 'tools."golangci-lint"')"
         echo "tools.mockery=$(get_version 'tools.mockery')"
+        echo "tools.oapi-codegen=$(get_version 'tools."oapi-codegen"')"
+        echo "tools.oapi-codegen-runtime=$(get_version 'tools."oapi-codegen-runtime"')"
         echo "tools.staticcheck=$(get_version 'tools.staticcheck')"
         echo "tools.unparam=$(get_version 'tools.unparam')"
         echo "tools.govulncheck=$(get_version 'tools.govulncheck')"
@@ -645,6 +648,8 @@ cmd_show() {
     printf "  %-23s ${GREEN}%s${NC}\n" "node" "$(get_version 'tools.node')"
     printf "  %-23s ${GREEN}%s${NC}\n" "golangci-lint" "$(get_version 'tools."golangci-lint"')"
     printf "  %-23s ${GREEN}%s${NC}\n" "mockery" "$(get_version 'tools.mockery')"
+    printf "  %-23s ${GREEN}%s${NC}\n" "oapi-codegen" "$(get_version 'tools."oapi-codegen"')"
+    printf "  %-23s ${GREEN}%s${NC}\n" "oapi-codegen-runtime" "$(get_version 'tools."oapi-codegen-runtime"')"
     printf "  %-23s ${GREEN}%s${NC}\n" "staticcheck" "$(get_version 'tools.staticcheck')"
     printf "  %-23s ${GREEN}%s${NC}\n" "unparam" "$(get_version 'tools.unparam')"
     printf "  %-23s ${GREEN}%s${NC}\n" "govulncheck" "$(get_version 'tools.govulncheck')"
@@ -761,6 +766,38 @@ cmd_check() {
     else
         print_warning "Check failed"
     fi
+
+    # --- oapi-codegen and its runtime library ---
+    # check-openapi-client.sh fetches both at their pins through the Go module
+    # proxy, so the proxy is what is asked here, as for staticcheck below.
+    local oapi_name oapi_key oapi_module oapi_url
+    for oapi_name in oapi-codegen oapi-codegen-runtime; do
+        case "$oapi_name" in
+            oapi-codegen)
+                oapi_module="github.com/oapi-codegen/oapi-codegen/v2"
+                oapi_url="https://github.com/oapi-codegen/oapi-codegen/releases" ;;
+            oapi-codegen-runtime)
+                oapi_module="github.com/oapi-codegen/runtime"
+                oapi_url="https://github.com/oapi-codegen/runtime/releases" ;;
+        esac
+        oapi_key="tools.\"$oapi_name\""
+        echo -n "Checking $oapi_name... "
+        local current_oapi latest_oapi published_oapi
+        current_oapi=$(get_version "$oapi_key")
+        read -r latest_oapi published_oapi <<< "$(get_goproxy_latest "$oapi_module")"
+        if [ -n "$latest_oapi" ]; then
+            if version_lt "$current_oapi" "$latest_oapi" && released_too_recently "$published_oapi"; then
+                held_back "$current_oapi" "$latest_oapi" "$published_oapi"
+            elif version_lt "$current_oapi" "$latest_oapi"; then
+                echo -e "${YELLOW}UPDATE AVAILABLE${NC}"
+                updates_available+=("$oapi_name|$current_oapi|$latest_oapi|$oapi_url")
+            else
+                print_success "Up to date ($current_oapi)"
+            fi
+        else
+            print_warning "Check failed"
+        fi
+    done
 
     # --- staticcheck ---
     # Queried via the Go module proxy, not GitHub releases: the release tag is

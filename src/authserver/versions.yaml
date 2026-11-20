@@ -24,6 +24,11 @@
 #                 and run on it (site/Dockerfile, e2e/testapp/Dockerfile)
 # golangci-lint:  Go linter version (devcontainer)
 # mockery:        Mock generator version (devcontainer)
+# oapi-codegen:   Go client generator that check-openapi-client.sh runs over the OpenAPI
+#                 document, fetched and built at this pin when it runs (CI's Lint job, the
+#                 lint tier)
+# oapi-codegen-runtime: The library the generated client imports, required at this pin by
+#                 the same script
 # staticcheck:    Static analyzer (devcontainer, make check)
 # unparam:        Unused-parameter analyzer (devcontainer, make check)
 # govulncheck:    Vulnerability scanner (devcontainer, CI's Vulnerabilities job over the
@@ -39,12 +44,12 @@
 #                 read by the Versions job, and the image the dev container's Compose file
 #                 and the e2e server run, which update writes; tagged vX.Y.Z upstream
 #
-# staticcheck, unparam and govulncheck are pinned because they gate CI. An
-# unpinned tool can turn every open PR red on an upstream release, with no
-# change on our side. Note that upstream version schemes differ from their
+# staticcheck, unparam, govulncheck, oapi-codegen and oapi-codegen-runtime are
+# pinned because they gate CI. An unpinned tool can turn every open PR red on
+# an upstream release, with no change on our side. Note that upstream version schemes differ from their
 # GitHub release tags: staticcheck's module version is 0.7.0 while its release
 # tag is 2026.1, and golang/vuln's releases page trails its module tags. The
-# Go module proxy is the source of truth for all three, which is what
+# Go module proxy is the source of truth for all of them, which is what
 # `./version-manager.sh check` queries. unparam publishes no tags at all, so it
 # is pinned to a pseudo-version and every upstream commit will show up as an
 # available update.
@@ -77,6 +82,8 @@ tools:
   node: "26.13.1"
   golangci-lint: "2.15.0"
   mockery: "3.9.1"
+  oapi-codegen: "2.8.2"
+  oapi-codegen-runtime: "1.9.0"
   staticcheck: "0.8.2"
   unparam: "0.0.0-20261102141913-394cd0a56cd5"
   govulncheck: "1.9.0"
