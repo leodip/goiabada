@@ -2856,6 +2856,89 @@ func (l *Logged) Check() func(http.Handler) http.Handler {
 	}
 }
 
+// A field a constructor fills with a local that a call the lint cannot read assigned, a call to a
+// local function or to a function literal returning a type of the package, may hold a writer of
+// the package, so it is reported where the walk reaches through it, whether a literal or a later
+// field write fills the field. The same call shape returning a type of another package, such as a
+// function literal returning a logger, holds nothing the walk follows.
+func TestRouteChains_AFieldALocalFactoryFillsIsReported(t *testing.T) {
+	root := t.TempDir()
+	routeShapesFixture(t, root, "\tnamed := middleware.NewFactoryNamed()\n"+
+		"\tpages.With(named.Check()).Get(\"/factory-named\", apihandlers.HandleOkGet())\n"+
+		"\tinvoked := middleware.NewFactoryInvoked()\n"+
+		"\tpages.With(invoked.Check()).Get(\"/factory-invoked\", apihandlers.HandleOkGet())\n"+
+		"\tlogged := middleware.NewFactoryLogged()\n"+
+		"\tpages.With(logged.Check()).Get(\"/factory-logged\", apihandlers.HandleOkGet())\n")
+	writeDocFixture(t, root, "internal/middleware/factory.go", `package middleware
+
+import (
+	"log/slog"
+	"net/http"
+)
+
+func NewFactoryNamed() *Probed {
+	makeWriter := func() writer { return unprocessable{} }
+	refusals := makeWriter()
+	return &Probed{refusals: refusals}
+}
+
+func NewFactoryInvoked() *Probed {
+	p := &Probed{}
+	refusals := func() writer { return unprocessable{} }()
+	p.refusals = refusals
+	return p
+}
+
+type FactoryLogged struct {
+	logger   *slog.Logger
+	refusals writer
+}
+
+func NewFactoryLogged() *FactoryLogged {
+	logger := func() *slog.Logger { return slog.Default() }()
+	return &FactoryLogged{logger: logger, refusals: unprocessable{}}
+}
+
+func (l *FactoryLogged) Check() func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			l.logger.DebugContext(r.Context(), "refusing")
+			l.refusals.refuse(w)
+		})
+	}
+}
+`)
+	routes, handlers, report := fixtureRouteChains(t, root, 1, 1)
+
+	if report.Stopped || len(report.Errors) != 2 ||
+		!strings.Contains(strings.Join(report.Errors, "\n"), "GET /factory-named mounts named.Check, which the status lint cannot read") ||
+		!strings.Contains(strings.Join(report.Errors, "\n"), "GET /factory-invoked mounts invoked.Check, which the status lint cannot read") {
+		t.Fatalf("a field filled from a local function or an invoked function literal did not fail the check "+
+			"once each: %+v", report)
+	}
+	chains := map[string][]int{}
+	for _, r := range routes {
+		chains[r.key] = sortedKeysInt(r.chain)
+	}
+	assertChains(t, chains, map[string][]int{"get /factory-logged": {422}})
+
+	ids := map[string]string{"get /factory-logged": "getFactoryLogged"}
+	report = guard.Run(func(r guard.Reporter) {
+		assertDeclaresEveryStatus(r, routes, handlers, declaringEach(ids, 200))
+	})
+	if report.Stopped || len(report.Errors) != 1 ||
+		!strings.Contains(report.Errors[0], "getFactoryLogged (GET /factory-logged) can answer 422 from logged.Check") {
+		t.Errorf("a spec omitting the 422 of a writer beside an invoked logger factory did not fail once: %+v", report)
+	}
+	report = guard.Run(func(r guard.Reporter) {
+		assertDeclaresEveryStatus(r, routes, handlers, declaringEach(ids, 200, 422))
+		assertDeclaresNoUndeliverableStatus(r, routes, handlers, declaringEach(ids, 200, 422))
+	})
+	if report.Failed() {
+		t.Errorf("a spec declaring the 422 of a writer beside an invoked logger factory failed: %+v", report)
+	}
+}
+
 // A method reached through a field of a field of the receiver is read with the binding at the end
 // of that path, and one reached through a field an unread helper filled, at any depth, is reported.
 func TestRouteChains_AMethodReachedThroughANestedFieldIsRead(t *testing.T) {
@@ -4628,12 +4711,14 @@ func (f fieldFiller) localHolds(assigned ast.Expr) (fieldBinding, bool) {
 }
 
 // outside reports whether e, a value value leaves unbound, is one no walk of the package can reach
-// through: a parameter, a predeclared name such as nil, a literal, a call value reads as holding
-// nothing, such as a builtin's, a function literal's or one returning a predeclared type, and a call
-// whose function a package the constructor's package imports names, pkg.F(...), or a method on
-// what such a call returns, pkg.F(...).M(...). Anything else, such as a field of another value,
-// v.field, a method called on one, v.M(), or a variable of the package, may hold a writer of the
-// package.
+// through: a parameter, a predeclared name such as nil, a literal, a call whose callee or result
+// shows it returns nothing of the package, and a call whose function a package the constructor's
+// package imports names, pkg.F(...), or a method on what such a call returns, pkg.F(...).M(...).
+// The first is a call to a parameter, a predeclared type's conversion, a builtin other than new,
+// or a function of p or function literal returning nothing or a type resultOutside reads as
+// outside p. Anything else, such as a field of another value, v.field, a method called on one,
+// v.M(), a variable of the package, a call to a local function, or a function literal returning a
+// type of p, may hold a writer of the package.
 func (f fieldFiller) outside(e ast.Expr) bool {
 	e = ast.Unparen(e)
 	if addr, isAddr := e.(*ast.UnaryExpr); isAddr && addr.Op == token.AND {
@@ -4645,13 +4730,27 @@ func (f fieldFiller) outside(e ast.Expr) bool {
 	case *ast.BasicLit, *ast.CompositeLit, *ast.FuncLit:
 		return true
 	case *ast.CallExpr:
+		switch callee := ast.Unparen(x.Fun).(type) {
+		case *ast.Ident:
+			switch {
+			case f.localAt(callee):
+				return false
+			case f.params[callee.Name]:
+				return true
+			case f.p.plain[callee.Name]:
+				decls := f.p.funcs[callee.Name]
+				return len(decls) == 1 && f.resultOutside(decls[0].decl.Type.Results)
+			}
+			universe := types.Universe.Lookup(callee.Name)
+			_, isType := universe.(*types.TypeName)
+			_, isBuiltin := universe.(*types.Builtin)
+			return isType || isBuiltin && callee.Name != "new"
+		case *ast.FuncLit:
+			return f.resultOutside(callee.Type.Results)
+		}
 		fun := ast.Unparen(x.Fun)
 		for {
 			switch y := fun.(type) {
-			case *ast.Ident:
-				return true // value read it as a call to a function of p, or as one outside p
-			case *ast.FuncLit:
-				return true
 			case *ast.SelectorExpr:
 				root, isIdent := ast.Unparen(y.X).(*ast.Ident)
 				if isIdent {
@@ -4666,6 +4765,28 @@ func (f fieldFiller) outside(e ast.Expr) bool {
 				return false
 			}
 		}
+	}
+	return false
+}
+
+// resultOutside reports whether a function with results returns nothing a walk of the package can
+// reach through: no result, or a first result of a predeclared type, such as string or error, or of
+// a type a package the constructor's package imports names, such as *slog.Logger. A result of a
+// type of p, or of one spelled inline, such as an interface, may be a writer of the package.
+func (f fieldFiller) resultOutside(results *ast.FieldList) bool {
+	if results == nil || len(results.List) == 0 {
+		return true
+	}
+	typ := ast.Unparen(results.List[0].Type)
+	if star, isStar := typ.(*ast.StarExpr); isStar {
+		typ = ast.Unparen(star.X)
+	}
+	switch t := typ.(type) {
+	case *ast.Ident:
+		return types.Universe.Lookup(t.Name) != nil
+	case *ast.SelectorExpr:
+		root, isIdent := ast.Unparen(t.X).(*ast.Ident)
+		return isIdent && f.p.imports[root.Name]
 	}
 	return false
 }
