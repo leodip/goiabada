@@ -467,7 +467,7 @@ ceremony's path depends on the target ACR, the session, and `prompt`.
 |---|---|---|
 | `requires_level_1` | `authflow.Authorization` | four conditions: a deferred error is parked; `prompt=login`; `id_token_hint` names another user; no valid session |
 | | `authflow.Completion` | no reusable session and `!Level1AuthCompleted`, or the user's authentication generation moved on since the ceremony authenticated, or the ceremony's methods name `otp` from an authenticator the user no longer has, checked before any session is bound and again by the session write (restart route 1, through `Restart()`) |
-| | `authflow.Issuance` | bound session gone, expired or foreign, or the user's authentication generation moved on since the ceremony authenticated, or the ceremony's methods name `otp` from an authenticator the user no longer has, checked again by the issuer, and not `prompt=none` (restart route 2, through `Restart()`) |
+| | `authflow.Issuance` | bound session gone, expired or foreign, or the user's authentication generation moved on since the ceremony authenticated, or the ceremony's methods name `otp` from an authenticator the user no longer has, checked again by the issuer, or the ceremony's level claims a second factor its methods do not name (#199), and not `prompt=none` (restart route 2, through `Restart()`) |
 | `level1_password` | `authflow.SelectLevel1Method` | unconditional |
 | `level1_password_completed` | `authflow.PasswordProof` | a password proven: verified at `/auth/pwd` with the user enabled (`authflow.PasswordSubmission`), or just chosen at registration without verification, at activation or at a password reset, carrying on the sign-in the Create an account or Forgot password? link named while the browser holds it at `level1_password` (`accounthandlers.carryOnSignIn`, #622, #812) |
 | `level1_existing_session` | `authflow.Authorization` | valid session, hint matches, user enabled. The SSO shortcut: password entry is skipped and `/auth/level1completed` accepts this state directly |
@@ -537,7 +537,7 @@ state it finds through `requireAuthState`, which answers 400 when it is not one 
 | `/auth/completed` | `handler_auth_completed.go`, `authflow/completion.go` | Final auth check (a user who is not the id_token_hint's refused, a disabled user refused, a moved-on generation restarted, all before any session is bound), session bump/create, scope filtering, consent check. The plan is one of three modes (`authflow/completion_decide.go`): reuse, which rotates the browser session's identifier before the bind when it raises the session; create, which confirms the ceremony, starts the session (`StartNewUserSession`, which writes nothing to the browser), then rotates and binds it to the browser session (`RegenerateSessionAndBind`), deletes it when that fails, and writes the device cookie only after; and restart |
 | `/auth/legal-acceptance` | `handler_legal_acceptance.go`, `authflow/legal_acceptance.go` | The acceptance step (#622): lists the must-accept legal documents the user owes for the client, each unticked. Accept records the versions shown (`legaldocuments.RecordAcceptances`), shows the step again for an unticked box or a version published meanwhile, and goes on to consent or issuance; Decline answers `access_denied` and keeps the session. `prompt=none` answers `interaction_required` for what is owed, the password grant `invalid_grant`, and refresh is not checked |
 | `/auth/consent` | `handler_consent.go`, `authflow/consent.go` | User consent screen (if required), and the submission weighed against the permissions the user holds now, recorded through `userconsent` |
-| `/auth/issue` | `handler_auth_issue.go`, `authflow/issuance.go` | Final re-checks (redirect URI, client, flow, hint, session, user, scope), then issues the authorization code or the implicit tokens, redirects to client |
+| `/auth/issue` | `handler_auth_issue.go`, `authflow/issuance.go` | Final re-checks (redirect URI, client, flow, hint, session, user, level, scope), then issues the authorization code or the implicit tokens, redirects to client |
 
 ### AuthContext field rule
 Every field on `AuthContext` is either request or attempt. The request is what `/auth/authorize`
@@ -550,7 +550,8 @@ reusable and level 1 was never completed, or when the user's generation has move
 ceremony names `otp` from an authenticator the user no longer has (#542), decided before it binds a
 session (#522), and `authflow.Issuance` at `/auth/issue` when the bound session is gone, expired or
 foreign, or the user's generation has moved on, or the ceremony names `otp` from an authenticator
-the user no longer has, and the request is not `prompt=none`. The split is held by
+the user no longer has, or its level claims a second factor its methods do not name (#199), and the
+request is not `prompt=none`. The split is held by
 `TestAuthContextFields_EveryFieldIsClassifiedOnce` in `ceremony`, which fails on a field in neither
 list. Request fields are written only in `authflow.Authorization.Run`, which
 `TestRequestFields_WrittenOnlyAtAuthorize` in `ceremony` holds with `go/types`. A bind that finds a
@@ -747,6 +748,24 @@ level2_mandatory=3).
 Token ACR = `max(targetACR, sessionACR)`, against the session the ceremony bound to. SSO reuse never
 downgrades within a session. A ceremony that authenticated afresh has just written its target onto
 that session, so its token ACR is the target (#537).
+
+A stored sign-in (`codes`) keeps its level and methods, and every refresh of its grant copies them
+into the new tokens. A level never claims a second factor its methods do not name: `level2_mandatory`
+needs `otp` or `recovery_code` in the methods, whole, case-exact names in the list split on single
+spaces, the boundaries migration 000097 matches; a tab separates nothing there, though
+`AuthContext.ClaimsOTP`, which triggers the authenticator checks, splits on any whitespace.
+`ceremony.LevelClaimsUnnamedFactor` is the rule's one statement (#199). Releases before 1.7.0
+broke it through three bugs, since fixed: the cross-user bind (#133), a user's own expired session
+lending its level to a fresh password sign-in, and `prompt=login` over a level 3 session (#537).
+Migration 000097 lowered every stored sign-in breaking it to `level1`, and changed nothing else; its
+down migration does nothing, since the earlier level is recorded nowhere. From then on
+`authflow.Issuance` refuses to issue a code or implicit tokens for a ceremony breaking it, the
+unearned-level shape of `refuseUnusableSession`: the ceremony restarts at level 1, or `prompt=none`
+is answered `login_required` in the request's response mode, with a Warn record naming the user and
+no audit event. A refresh is not checked, since no stored sign-in breaks the rule after the
+migration. The ownership comparisons of #133, at code redemption and on both refresh arms, guard the
+rule that a grant's session belongs to its user; they are not what corrected the level, and on an
+offline grant they reach only a session row that still exists.
 
 ### Re-authentication over a session (#537)
 A ceremony that verified the password itself is a **new authentication**, not an extension of the

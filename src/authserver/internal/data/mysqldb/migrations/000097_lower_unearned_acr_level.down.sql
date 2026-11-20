@@ -1,0 +1,5 @@
+-- Migration 000097 down: intentional no-op.
+--
+-- The lowering is one-way: the level a lowered sign-in was stored with is recorded nowhere, so
+-- setting one back would invent a claim rather than restore one. Going back means restoring the
+-- backup taken before the upgrade.

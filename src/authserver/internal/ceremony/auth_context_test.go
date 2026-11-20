@@ -792,11 +792,56 @@ func TestClaimsOTP(t *testing.T) {
 		{"pwd recovery_code", true},
 		{"recovery_code", true},
 		{"pwd recovery_codex", false},
+		// Any whitespace separates here, so the authenticator checks this claim guards still fire on
+		// a list naming a code across a tab, which LevelClaimsUnnamedFactor reads as one name (#199).
+		{"pwd\totp", true},
+		{"pwd\trecovery_code", true},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.methods, func(t *testing.T) {
 			assert.Equal(t, tc.want, (&AuthContext{AuthMethods: tc.methods}).ClaimsOTP())
+		})
+	}
+}
+
+// LevelClaimsUnnamedFactor reads the list on migration 000097's boundaries: split on single
+// spaces, whole names, case included, so issuance accepts no list the migration lowers (#199
+// decisions 3 and 6). The expected answers are written out, one for each shape the data tier's
+// migration test stores.
+func TestLevelClaimsUnnamedFactor(t *testing.T) {
+	testCases := []struct {
+		level   record.AcrLevel
+		methods string
+		want    bool
+	}{
+		{record.AcrLevel2Mandatory, "pwd", true},
+		{record.AcrLevel2Mandatory, "", true},
+		{record.AcrLevel2Mandatory, "pwd otp", false},
+		{record.AcrLevel2Mandatory, "pwd recovery_code", false},
+		{record.AcrLevel2Mandatory, "otp pwd", false},
+		{record.AcrLevel2Mandatory, "recovery_code pwd", false},
+		{record.AcrLevel2Mandatory, "otp", false},
+		{record.AcrLevel2Mandatory, "pwd xotp", true},
+		{record.AcrLevel2Mandatory, "pwd otpx", true},
+		{record.AcrLevel2Mandatory, "pwd recoveryXcode", true},
+		{record.AcrLevel2Mandatory, "pwd recovery_codes", true},
+		{record.AcrLevel2Mandatory, "pwd OTP", true},
+		{record.AcrLevel2Mandatory, "pwd Recovery_Code", true},
+		{record.AcrLevel2Mandatory, "pwd\totp", true},
+		{record.AcrLevel2Mandatory, "pwd\trecovery_code", true},
+		{record.AcrLevel2Mandatory, "otp\tpwd", true},
+		{record.AcrLevel2Mandatory, "pwd\notp", true},
+		{record.AcrLevel2Mandatory, "pwd  otp", false},
+		{record.AcrLevel2Mandatory, " otp ", false},
+		{record.AcrLevel1, "pwd", false},
+		{record.AcrLevel2Optional, "pwd", false},
+		{record.AcrLevel2Optional, "pwd\totp", false},
+	}
+
+	for _, tc := range testCases {
+		t.Run(string(tc.level)+"/"+tc.methods, func(t *testing.T) {
+			assert.Equal(t, tc.want, LevelClaimsUnnamedFactor(tc.level, tc.methods))
 		})
 	}
 }

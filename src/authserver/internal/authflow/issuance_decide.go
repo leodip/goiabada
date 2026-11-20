@@ -1,6 +1,7 @@
 package authflow
 
 import (
+	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/otpcredential"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -103,6 +104,10 @@ type issuanceFacts struct {
 	otpClaim otpcredential.OTPClaim
 	// sessionIdentifierPresent says the request resolved a session identifier.
 	sessionIdentifierPresent bool
+	// acrLevel and authMethods are the level the ceremony would issue and the methods it names, the
+	// space-separated amr list, as its context holds them.
+	acrLevel    record.AcrLevel
+	authMethods string
 
 	registrationLoaded     bool
 	registeredRedirectURIs []string
@@ -167,7 +172,10 @@ type issuanceFacts struct {
 //     ceremony authenticated with is still current: the user's authentication generation is the
 //     ceremony's, the comparison the token endpoint makes at redemption (#197, #106). A ceremony
 //     whose methods name a one-time code needs the authenticator it came from to still be the user's
-//     (#542 decision 1). A moved generation or a removed authenticator is an unusable session.
+//     (#542 decision 1). And the ceremony's level claims no second factor its methods do not name
+//     (ceremony.LevelClaimsUnnamedFactor): such a level was never earned, whatever wrote it, and the
+//     sign-in that starts over owes every factor its level needs (#199 decisions 6 and 7). A moved
+//     generation, a removed authenticator or an unearned level is an unusable session.
 //  6. The user holds at least one of the scopes to be issued, filtered against the live permissions
 //     just before anything is minted (#241). The authorization_code grant never consults the
 //     permission checker, so this is the last live check a code gets. It comes after the binding
@@ -253,6 +261,9 @@ func decideIssuance(f issuanceFacts) (issuanceAnswer, issuanceFact) {
 	if !f.otpClaim.StandsFor(f.user) {
 		return issuanceAnswer{outcome: issuanceRefuseUnusableSession, sessionShape: sessionAuthenticatorRemoved}, issuanceFactNone
 	}
+	if ceremony.LevelClaimsUnnamedFactor(f.acrLevel, f.authMethods) {
+		return issuanceAnswer{outcome: issuanceRefuseUnusableSession, sessionShape: sessionLevelUnearned}, issuanceFactNone
+	}
 
 	if f.effectiveScope == nil {
 		return issuanceAnswer{}, issuanceFactEffectiveScope
@@ -267,10 +278,10 @@ func decideIssuance(f issuanceFacts) (issuanceAnswer, issuanceFact) {
 	return decided(issuanceIssueCode)
 }
 
-// sessionRefusalShape names which of the five conditions refuseUnusableSession answers: three on the
-// session backing a ceremony and two on the credentials it authenticated with. The three session
-// conditions are mutually exclusive by construction; the other two are reached only after the
-// session has passed all three.
+// sessionRefusalShape names which of the six conditions refuseUnusableSession answers: three on the
+// session backing a ceremony and three on what it authenticated with. The three session conditions
+// are mutually exclusive by construction; the other three are reached only after the session has
+// passed all three.
 type sessionRefusalShape int
 
 const (
@@ -291,4 +302,8 @@ const (
 	// authenticator the user no longer has. A removal lowers the user's sessions, and a code issued
 	// here would carry the removed authenticator past that lowering (#542 decision 1).
 	sessionAuthenticatorRemoved
+	// sessionLevelUnearned is a ceremony whose level claims a second factor its methods do not name
+	// (ceremony.LevelClaimsUnnamedFactor). No release since 1.7.0 is known to write one; a code
+	// issued here would carry the false level into a grant, and every refresh would copy it (#199).
+	sessionLevelUnearned
 )
