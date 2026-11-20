@@ -11,14 +11,21 @@ package guard
 // `127.0.0.1 mailpit` in the runner's hosts file, so a job on the runner with a Mailpit service
 // has both, the hosts line added on every run in a step before the internal tier's.
 //
+// Each module tier runs after the step that sets Go up at the pin, and the internal tier's first
+// call after the hosts line, so no call runs on the runner's own Go or before mailpit resolves.
+//
 // The Go cache splits with the environments, which keep it under different paths: one runner job,
-// Unit / authserver, saves the runner's, and one container job, Data / sqlite, saves the
+// Unit / authserver, saves the runner's, and one container job's entry, Data / sqlite, saves the
 // container's and compiles what the other database jobs run, so they restore its build rather
 // than compile it. Two savers of one cache race for its key; none leaves every job compiling, as
-// does a saver's setup step skipped by an if:.
+// does a saver's setup step skipped by an if:. The two setup actions save when save-cache is
+// 'true', so the guard reads it for each matrix entry of the job: 'true' in every entry, or
+// ${{ <condition> && 'true' || 'false' }} in the entries the condition holds for, a condition being
+// comparisons of matrix values joined by &&, as the compile step's if: is read too.
 
 import (
 	"fmt"
+	"maps"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -39,18 +46,43 @@ var moduleTiers = []string{"internal", "core", "adminconsole", "setup"}
 // mailpitPorts are the SMTP and API ports TestSendEmail reaches Mailpit on.
 var mailpitPorts = []string{"1025", "8025"}
 
+// tierCall is one run-tests.sh call of a module tier: its line, and the place of its step among the
+// job's steps.
+type tierCall struct {
+	line, step int
+}
+
+// cacheSave is a setup step's save-cache input: its line, its value, and the line of an if: that
+// skips the step on some runs, or 0.
+type cacheSave struct {
+	line   int
+	value  string
+	ifLine int
+}
+
+// compileStep is a step that compiles the data and integration test binaries: its line and its if:,
+// "" when it has none.
+type compileStep struct {
+	line      int
+	condition string
+}
+
 // checkJob is what runnerJobFindings reads of one job, each line numbered from 1.
 type checkJob struct {
 	name string
 	// container is the line of the job's container: key, or 0 when it runs on the runner.
 	container int
-	// tiers maps each module tier the job runs to the line of its run-tests.sh call, and tierSteps
-	// to the place of that call's step among the job's steps.
-	tiers     map[string]int
-	tierSteps map[string]int
-	// setupGo is whether the job sets Go up with actions/setup-go, itself or through the runner's
-	// test setup.
-	setupGo bool
+	// tiers maps each module tier the job runs to its run-tests.sh calls, in the order they run.
+	tiers map[string][]tierCall
+	// setupGoStep is the place of the first step that sets Go up with actions/setup-go, itself or
+	// through the runner's test setup, or -1, and setupGoLine its line.
+	setupGoStep, setupGoLine int
+	// entries are the job's matrix entries, one without values when it has no matrix, and
+	// matrixProblem why the guard cannot list them, or "".
+	entries       []map[string]string
+	matrixProblem string
+	// dbTiers are the tiers its run-tests.sh calls name, as written: data, or ${{ matrix.tier }}.
+	dbTiers []string
 	// mailpit is the line of the job's Mailpit service, or 0, and mapped the ports it maps as
 	// host:container.
 	mailpit int
@@ -59,13 +91,141 @@ type checkJob struct {
 	// the job reaches it, or -1, and hostsLine its line; hostsIf is the line of the if: of one that
 	// adds it only under a condition, or 0.
 	hostsStep, hostsLine, hostsIf int
-	// savesRunnerCache and savesContainerCache are the lines where the job's test setup is asked to
-	// save the Go cache, or 0, and runnerSaveIf and containerSaveIf the lines of an if: that skips
-	// that setup step on some runs, or 0.
-	savesRunnerCache, savesContainerCache int
-	runnerSaveIf, containerSaveIf         int
-	// compiles is whether a step compiles the data and integration test binaries.
-	compiles bool
+	// runnerSaves and containerSaves are the save-cache inputs of the job's two kinds of test setup.
+	runnerSaves, containerSaves []cacheSave
+	// compiles are the steps that compile the data and integration test binaries.
+	compiles []compileStep
+}
+
+// saver is one matrix entry of a job that saves a cache, from the save-cache input on line.
+type saver struct {
+	job   checkJob
+	entry map[string]string
+	line  int
+}
+
+// describe is the saver's job, with its matrix entry's values when it has some.
+func (s saver) describe() string {
+	if len(s.entry) == 0 {
+		return s.job.name
+	}
+	return s.job.name + " " + describeEntry(s.entry)
+}
+
+// describeEntry is a matrix entry's values, by key: (shard: 1/1, tier: data).
+func describeEntry(entry map[string]string) string {
+	keys := slices.Sorted(maps.Keys(entry))
+	var parts []string
+	for _, k := range keys {
+		parts = append(parts, k+": "+entry[k])
+	}
+	return "(" + strings.Join(parts, ", ") + ")"
+}
+
+var (
+	matrixComparison = regexp.MustCompile(`^matrix\.([A-Za-z0-9_-]+)\s*(==|!=)\s*'((?:[^']|'')*)'$`)
+	matrixValue      = regexp.MustCompile(`^\$\{\{\s*matrix\.([A-Za-z0-9_-]+)\s*\}\}$`)
+	runTestsAnyTier  = regexp.MustCompile(`run-tests\.sh\b[^\n]*--type\s+(\$\{\{[^}]*\}\}|[A-Za-z]+)`)
+)
+
+// matrixCondition is whether a condition holds for a matrix entry: no condition, or comparisons
+// matrix.<key> == '<value>' or != joined by &&, compared as Actions compares text, ignoring case,
+// in ${{ }} or not. ok is false for any other form.
+func matrixCondition(condition string, entry map[string]string) (holds, ok bool) {
+	condition = strings.TrimSpace(condition)
+	if whole := wholeExpression.FindStringSubmatch(condition); whole != nil {
+		condition = whole[1]
+	}
+	if condition == "" {
+		return true, true
+	}
+	holds = true
+	for part := range strings.SplitSeq(condition, "&&") {
+		m := matrixComparison.FindStringSubmatch(strings.TrimSpace(part))
+		if m == nil {
+			return false, false
+		}
+		equal := strings.EqualFold(entry[m[1]], strings.ReplaceAll(m[3], "''", "'"))
+		holds = holds && equal == (m[2] == "==")
+	}
+	return holds, true
+}
+
+// savesCache is whether a setup action saves the cache in a matrix entry, given its save-cache: when
+// the input is 'true', or ${{ <condition> && '<a>' || '<b>' }} gives 'true'. ok is false for any
+// other expression.
+func savesCache(value string, entry map[string]string) (saves, ok bool) {
+	whole := wholeExpression.FindStringSubmatch(strings.TrimSpace(value))
+	if whole == nil {
+		return strings.EqualFold(strings.TrimSpace(value), "true"), true
+	}
+	choice := choiceExpression.FindStringSubmatch(whole[1])
+	if choice == nil {
+		return false, false
+	}
+	holds, ok := matrixCondition(choice[1], entry)
+	a, b := quotedExpression.FindStringSubmatch(strings.TrimSpace(choice[2])), quotedExpression.FindStringSubmatch(strings.TrimSpace(choice[3]))
+	if !ok || a == nil || b == nil {
+		return false, false
+	}
+	if holds {
+		return strings.EqualFold(a[1], "true"), true
+	}
+	return strings.EqualFold(b[1], "true"), true
+}
+
+// matrixEntries lists a job's matrix entries: one without values when it has no matrix, its include
+// entries, or the combinations of its lists. A matrix holding both, an exclude or an expression is
+// one this guard does not list, and problem says so.
+func matrixEntries(job workflowJob) (entries []map[string]string, problem string) {
+	_, strategy := job.field("strategy")
+	_, matrix := yamlField(strategy, "matrix")
+	if matrix == nil {
+		return []map[string]string{{}}, ""
+	}
+	if matrix.Kind != yaml.MappingNode {
+		return nil, "its matrix is not a mapping of lists or include entries"
+	}
+	combinations := []map[string]string{{}}
+	lists := false
+	for i := 0; i+1 < len(matrix.Content); i += 2 {
+		key, value := matrix.Content[i].Value, yamlResolved(matrix.Content[i+1])
+		switch {
+		case key == "include" && value.Kind == yaml.SequenceNode:
+			for _, item := range value.Content {
+				item = yamlResolved(item)
+				if item.Kind != yaml.MappingNode {
+					return nil, "an include entry is not a mapping"
+				}
+				entry := map[string]string{}
+				for j := 0; j+1 < len(item.Content); j += 2 {
+					entry[item.Content[j].Value], _ = yamlScalar(yamlResolved(item.Content[j+1]))
+				}
+				entries = append(entries, entry)
+			}
+		case key != "include" && key != "exclude" && value.Kind == yaml.SequenceNode:
+			lists = true
+			var next []map[string]string
+			for _, combination := range combinations {
+				for _, item := range value.Content {
+					v, _ := yamlScalar(yamlResolved(item))
+					entry := maps.Clone(combination)
+					entry[key] = v
+					next = append(next, entry)
+				}
+			}
+			combinations = next
+		default:
+			return nil, "its matrix holds " + key + ", which this guard does not read"
+		}
+	}
+	switch {
+	case lists && entries != nil:
+		return nil, "its matrix holds both lists and include entries"
+	case lists:
+		return combinations, ""
+	}
+	return entries, ""
 }
 
 const (
@@ -86,7 +246,8 @@ func readCheckJobs(text string) ([]checkJob, error) {
 	}
 	var jobs []checkJob
 	for _, w := range read {
-		job := checkJob{name: w.name, tiers: map[string]int{}, tierSteps: map[string]int{}, hostsStep: -1}
+		job := checkJob{name: w.name, tiers: map[string][]tierCall{}, setupGoStep: -1, hostsStep: -1}
+		job.entries, job.matrixProblem = matrixEntries(w)
 		job.container, _ = w.field("container")
 		_, services := w.field("services")
 		if key, mailpit := yamlField(services, "mailpit"); key != nil {
@@ -102,15 +263,16 @@ func readCheckJobs(text string) ([]checkJob, error) {
 
 		for _, step := range w.steps {
 			uses, _ := step.uses()
-			if strings.HasPrefix(uses, "actions/setup-go@") || uses == setupTestRunner {
-				job.setupGo = true
+			if (strings.HasPrefix(uses, "actions/setup-go@") || uses == setupTestRunner) && job.setupGoStep < 0 {
+				job.setupGoStep, job.setupGoLine = step.index, step.line
 			}
-			if value, node := step.input("save-cache"); node != nil && strings.TrimSpace(value) != "false" {
+			if value, node := step.input("save-cache"); node != nil {
+				save := cacheSave{line: node.Line, value: value, ifLine: step.conditional()}
 				switch uses {
 				case setupTestRunner:
-					job.savesRunnerCache, job.runnerSaveIf = node.Line, step.conditional()
+					job.runnerSaves = append(job.runnerSaves, save)
 				case setupTestContainer:
-					job.savesContainerCache, job.containerSaveIf = node.Line, step.conditional()
+					job.containerSaves = append(job.containerSaves, save)
 				}
 			}
 
@@ -120,8 +282,10 @@ func readCheckJobs(text string) ([]checkJob, error) {
 			}
 			for i, scriptLine := range strings.Split(src.text, "\n") {
 				if m := runTestsTier.FindStringSubmatch(scriptLine); m != nil && slices.Contains(moduleTiers, m[1]) {
-					job.tiers[m[1]] = src.offset + i + 1
-					job.tierSteps[m[1]] = step.index
+					job.tiers[m[1]] = append(job.tiers[m[1]], tierCall{line: src.offset + i + 1, step: step.index})
+				}
+				if m := runTestsAnyTier.FindStringSubmatch(scriptLine); m != nil {
+					job.dbTiers = append(job.dbTiers, m[1])
 				}
 			}
 			if strings.Contains(src.text, "127.0.0.1 mailpit") && strings.Contains(src.text, "/etc/hosts") {
@@ -132,8 +296,11 @@ func readCheckJobs(text string) ([]checkJob, error) {
 					job.hostsStep, job.hostsLine = step.index, step.line
 				}
 			}
-			job.compiles = job.compiles || (strings.Contains(src.text, "go test -c") &&
-				strings.Contains(src.text, "./tests/data") && strings.Contains(src.text, "./tests/integration"))
+			if strings.Contains(src.text, "go test -c") && strings.Contains(src.text, "./tests/data") && strings.Contains(src.text, "./tests/integration") {
+				_, condition := step.field("if")
+				text, _ := yamlScalar(condition)
+				job.compiles = append(job.compiles, compileStep{line: step.line, condition: text})
+			}
 		}
 		jobs = append(jobs, job)
 	}
@@ -156,25 +323,30 @@ func runnerJobFindings(file, text string) []string {
 		return []string{fmt.Sprintf("runner jobs: %s cannot be read as YAML, so this guard read nothing: %v", file, err)}
 	}
 	reached := false
-	var runnerSavers, containerSavers []checkJob
+	var runnerSavers, containerSavers []saver
 	for _, job := range jobs {
 		for _, tier := range moduleTiers {
-			line, ok := job.tiers[tier]
-			if !ok {
+			calls := job.tiers[tier]
+			if len(calls) == 0 {
 				continue
 			}
 			reached = true
-			if job.container != 0 {
+			early := slices.IndexFunc(calls, func(c tierCall) bool { return c.step < job.setupGoStep })
+			switch {
+			case job.container != 0:
 				findings = append(findings, fmt.Sprintf("runner jobs: %s runs the %s tier in a job container; "+
 					"run it on the runner with actions/setup-go, as Lint does, so the job pulls no image", at(job, job.container), tier))
-			} else if !job.setupGo {
+			case job.setupGoStep < 0:
 				findings = append(findings, fmt.Sprintf("runner jobs: %s runs the %s tier on the runner without actions/setup-go; "+
-					"set Go up at the pin with it, or with ./.github/actions/setup-test-runner", at(job, line), tier))
+					"set Go up at the pin with it, or with ./.github/actions/setup-test-runner", at(job, calls[0].line), tier))
+			case early >= 0:
+				findings = append(findings, fmt.Sprintf("runner jobs: %s runs the %s tier before the step at line %d sets Go up, so it runs on the runner's own Go: "+
+					"set Go up in a step before the tests", at(job, calls[early].line), tier, job.setupGoLine))
 			}
 		}
-		if line, ok := job.tiers["internal"]; ok && job.mailpit == 0 {
+		if calls := job.tiers["internal"]; len(calls) > 0 && job.mailpit == 0 {
 			findings = append(findings, fmt.Sprintf("runner jobs: %s runs the internal tier, whose TestSendEmail sends through Mailpit, "+
-				"with no mailpit service", at(job, line)))
+				"with no mailpit service", at(job, calls[0].line)))
 		}
 		if job.mailpit != 0 && job.container == 0 {
 			for _, port := range mailpitPorts {
@@ -191,35 +363,53 @@ func runnerJobFindings(file, text string) []string {
 				findings = append(findings, fmt.Sprintf("runner jobs: %s adds no `127.0.0.1 mailpit` to /etc/hosts; on the runner "+
 					"the name mailpit resolves only through that line", at(job, job.mailpit)))
 			default:
-				if step, ok := job.tierSteps["internal"]; ok && step < job.hostsStep {
+				if calls := job.tiers["internal"]; len(calls) > 0 && calls[0].step < job.hostsStep {
 					findings = append(findings, fmt.Sprintf("runner jobs: %s runs the internal tier before the step at line %d adds `127.0.0.1 mailpit` to /etc/hosts, "+
-						"so TestSendEmail cannot resolve mailpit: add the line in a step before the tests", at(job, job.tiers["internal"]), job.hostsLine))
+						"so TestSendEmail cannot resolve mailpit: add the line in a step before the tests", at(job, calls[0].line), job.hostsLine))
 				}
 			}
 		}
-		if job.runnerSaveIf != 0 {
-			findings = append(findings, fmt.Sprintf("runner jobs: %s saves the runner's Go cache from a step under a condition, so a run that skips it "+
-				"saves none: save it from a setup step with no if:", at(job, job.runnerSaveIf)))
+		savers := func(saves []cacheSave, cache, advice string) []saver {
+			var out []saver
+			for _, save := range saves {
+				var entries []map[string]string
+				for _, entry := range job.entries {
+					saves, ok := savesCache(save.value, entry)
+					if !ok {
+						findings = append(findings, fmt.Sprintf("runner jobs: %s gives save-cache %s, which this guard cannot read: write 'true', "+
+							"or ${{ matrix.<key> == '<value>' && 'true' || 'false' }} to choose the matrix entry", at(job, save.line), save.value))
+						entries = nil
+						break
+					}
+					if saves {
+						entries = append(entries, entry)
+					}
+				}
+				if job.matrixProblem != "" && strings.TrimSpace(save.value) != "" && !strings.EqualFold(strings.TrimSpace(save.value), "false") {
+					findings = append(findings, fmt.Sprintf("runner jobs: %s gives save-cache in a job whose matrix entries this guard cannot list: %s",
+						at(job, save.line), job.matrixProblem))
+				}
+				if len(entries) > 0 && save.ifLine != 0 {
+					findings = append(findings, fmt.Sprintf("runner jobs: %s saves the %s Go cache from a step under a condition, so a run that skips it "+
+						"saves none: save it from a setup step with no if:%s", at(job, save.ifLine), cache, advice))
+				}
+				for _, entry := range entries {
+					out = append(out, saver{job: job, entry: entry, line: save.line})
+				}
+			}
+			return out
 		}
-		if job.containerSaveIf != 0 {
-			findings = append(findings, fmt.Sprintf("runner jobs: %s saves the container's Go cache from a step under a condition, so a run that skips it "+
-				"saves none: save it from a setup step with no if:, choosing the matrix entry in save-cache", at(job, job.containerSaveIf)))
-		}
-		if job.savesRunnerCache != 0 {
-			runnerSavers = append(runnerSavers, job)
-		}
-		if job.savesContainerCache != 0 {
-			containerSavers = append(containerSavers, job)
-		}
+		runnerSavers = append(runnerSavers, savers(job.runnerSaves, "runner's", "")...)
+		containerSavers = append(containerSavers, savers(job.containerSaves, "container's", ", choosing the matrix entry in save-cache")...)
 	}
 	if !reached {
 		return []string{fmt.Sprintf("runner jobs: %s runs no module tier with run-tests.sh, so this guard read nothing", file)}
 	}
 
-	names := func(jobs []checkJob) string {
+	names := func(savers []saver) string {
 		var out []string
-		for _, job := range jobs {
-			out = append(out, job.name)
+		for _, s := range savers {
+			out = append(out, s.describe())
 		}
 		return strings.Join(out, ", ")
 	}
@@ -228,12 +418,12 @@ func runnerJobFindings(file, text string) []string {
 		findings = append(findings, fmt.Sprintf("runner jobs: %s saves the runner's Go cache in no job; "+
 			"pass save-cache: 'true' to ./.github/actions/setup-test-runner in Unit / authserver", file))
 	case 1:
-		if _, ok := runnerSavers[0].tiers["internal"]; !ok {
+		if s := runnerSavers[0]; len(s.job.tiers["internal"]) == 0 {
 			findings = append(findings, fmt.Sprintf("runner jobs: %s saves the runner's Go cache from a job that does not run "+
-				"the internal tier, whose modules hold the other tiers'; save it from Unit / authserver", at(runnerSavers[0], runnerSavers[0].savesRunnerCache)))
+				"the internal tier, whose modules hold the other tiers'; save it from Unit / authserver", at(s.job, s.line)))
 		}
 	default:
-		findings = append(findings, fmt.Sprintf("runner jobs: %s saves the runner's Go cache in %d jobs (%s), which race for one key; "+
+		findings = append(findings, fmt.Sprintf("runner jobs: %s saves the runner's Go cache in %d jobs or matrix entries (%s), which race for one key; "+
 			"save it from Unit / authserver alone", file, len(runnerSavers), names(runnerSavers)))
 	}
 	switch len(containerSavers) {
@@ -241,13 +431,51 @@ func runnerJobFindings(file, text string) []string {
 		findings = append(findings, fmt.Sprintf("runner jobs: %s saves the container's Go cache in no job; "+
 			"pass save-cache to ./.github/actions/setup-test-container for Data / sqlite", file))
 	case 1:
-		if !containerSavers[0].compiles {
-			findings = append(findings, fmt.Sprintf("runner jobs: %s saves the container's Go cache without compiling what the database "+
-				"jobs run; build the server and droptestdb and go test -c ./tests/data ./tests/integration in it", at(containerSavers[0], containerSavers[0].savesContainerCache)))
-		}
+		findings = append(findings, containerSaverFindings(containerSavers[0], at)...)
 	default:
-		findings = append(findings, fmt.Sprintf("runner jobs: %s saves the container's Go cache in %d jobs (%s), which race for one key; "+
+		findings = append(findings, fmt.Sprintf("runner jobs: %s saves the container's Go cache in %d jobs or matrix entries (%s), which race for one key; "+
 			"save it from Data / sqlite alone", file, len(containerSavers), names(containerSavers)))
+	}
+	return findings
+}
+
+// containerSaverFindings holds the one entry that saves the container's Go cache to running the data
+// tier and to compiling, in that entry, what the database jobs run.
+func containerSaverFindings(s saver, at func(checkJob, int) string) []string {
+	var findings []string
+	where := "in its job"
+	if len(s.entry) > 0 {
+		where = "from the entry " + describeEntry(s.entry)
+		data := slices.ContainsFunc(s.job.dbTiers, func(tier string) bool {
+			if m := matrixValue.FindStringSubmatch(tier); m != nil {
+				tier = s.entry[m[1]]
+			}
+			return tier == "data"
+		})
+		if !data {
+			findings = append(findings, fmt.Sprintf("runner jobs: %s saves the container's Go cache %s, which runs no data tier; "+
+				"save it from Data / sqlite, choosing its entry in save-cache", at(s.job, s.line), where))
+		}
+	}
+	compiled, unread := false, 0
+	for _, c := range s.job.compiles {
+		holds, ok := matrixCondition(c.condition, s.entry)
+		if !ok {
+			unread = c.line
+		}
+		compiled = compiled || (ok && holds)
+	}
+	switch {
+	case compiled:
+	case unread != 0:
+		findings = append(findings, fmt.Sprintf("runner jobs: %s compiles what the database jobs run under an if: this guard cannot read; "+
+			"write no if:, or comparisons of matrix values joined by &&", at(s.job, unread)))
+	case len(s.job.compiles) == 0:
+		findings = append(findings, fmt.Sprintf("runner jobs: %s saves the container's Go cache without compiling what the database "+
+			"jobs run; build the server and droptestdb and go test -c ./tests/data ./tests/integration in it", at(s.job, s.line)))
+	default:
+		findings = append(findings, fmt.Sprintf("runner jobs: %s saves the container's Go cache %s, where no step compiles what the database jobs run; "+
+			"run the compile step in that entry, with no if: or under the condition that chooses it", at(s.job, s.line), where))
 	}
 	return findings
 }
@@ -298,23 +526,29 @@ func TestCheckWorkflow_RunnerJobFindings(t *testing.T) {
 		"          cache: false\n" + // 22
 		"      - run: ./run-tests.sh --type setup --no-build\n" + // 23
 		"  tests-sqlite:\n" + // 24
-		"    container:\n" + // 25
-		"      image: golang:1-bookworm\n" + // 26
-		"    steps:\n" + // 27
-		"      - uses: ./.github/actions/setup-test-container\n" + // 28
-		"        with:\n" + // 29
-		"          save-cache: ${{ matrix.tier == 'data' && 'true' || 'false' }}\n" + // 30
-		"      - run: ./run-tests.sh --type ${{ matrix.tier }} --db sqlite --no-build\n" + // 31
-		"      - if: matrix.tier == 'data'\n" + // 32
-		"        run: |\n" + // 33
-		"          go build -o \"$RUNNER_TEMP/droptestdb\" ./cmd/droptestdb\n" + // 34
-		"          go test -c -o \"$RUNNER_TEMP/\" ./tests/data ./tests/integration\n" + // 35
-		"  tests-mysql:\n" + // 36
-		"    container:\n" + // 37
-		"      image: golang:1-bookworm\n" + // 38
-		"    steps:\n" + // 39
-		"      - uses: ./.github/actions/setup-test-container\n" + // 40
-		"      - run: ./run-tests.sh --type ${{ matrix.tier }} --db mysql --no-build\n" // 41
+		"    strategy:\n" + // 25
+		"      matrix:\n" + // 26
+		"        include:\n" + // 27
+		"          - { tier: data, shard: 1/1 }\n" + // 28
+		"          - { tier: integration, shard: 1/2 }\n" + // 29
+		"          - { tier: integration, shard: 2/2 }\n" + // 30
+		"    container:\n" + // 31
+		"      image: golang:1-bookworm\n" + // 32
+		"    steps:\n" + // 33
+		"      - uses: ./.github/actions/setup-test-container\n" + // 34
+		"        with:\n" + // 35
+		"          save-cache: ${{ matrix.tier == 'data' && 'true' || 'false' }}\n" + // 36
+		"      - run: ./run-tests.sh --type ${{ matrix.tier }} --db sqlite --no-build\n" + // 37
+		"      - if: matrix.tier == 'data'\n" + // 38
+		"        run: |\n" + // 39
+		"          go build -o \"$RUNNER_TEMP/droptestdb\" ./cmd/droptestdb\n" + // 40
+		"          go test -c -o \"$RUNNER_TEMP/\" ./tests/data ./tests/integration\n" + // 41
+		"  tests-mysql:\n" + // 42
+		"    container:\n" + // 43
+		"      image: golang:1-bookworm\n" + // 44
+		"    steps:\n" + // 45
+		"      - uses: ./.github/actions/setup-test-container\n" + // 46
+		"      - run: ./run-tests.sh --type ${{ matrix.tier }} --db mysql --no-build\n" // 47
 	findings := func(src string) []string { return runnerJobFindings("check.yml", src) }
 	replace := func(t *testing.T, src, old, with string) string {
 		t.Helper()
@@ -364,7 +598,7 @@ func TestCheckWorkflow_RunnerJobFindings(t *testing.T) {
 	t.Run("two jobs save the runner's cache", func(t *testing.T) {
 		assertFindings(t, findings(replace(t, workflow, "      - uses: actions/setup-go@0123 # v7\n        with:\n          cache: false\n",
 			"      - uses: ./.github/actions/setup-test-runner\n        with:\n          save-cache: true\n")),
-			"runner jobs: check.yml saves the runner's Go cache in 2 jobs (unit-authserver, unit-setup)")
+			"runner jobs: check.yml saves the runner's Go cache in 2 jobs or matrix entries (unit-authserver, unit-setup)")
 	})
 	t.Run("the runner's cache saved by a job that runs another tier", func(t *testing.T) {
 		src := replace(t, workflow, "          save-cache: 'true'\n", "")
@@ -381,11 +615,11 @@ func TestCheckWorkflow_RunnerJobFindings(t *testing.T) {
 		assertFindings(t, findings(replace(t, workflow,
 			"      - uses: ./.github/actions/setup-test-container\n      - run: ./run-tests.sh --type ${{ matrix.tier }} --db mysql",
 			"      - uses: ./.github/actions/setup-test-container\n        with:\n          save-cache: 'true'\n      - run: ./run-tests.sh --type ${{ matrix.tier }} --db mysql")),
-			"runner jobs: check.yml saves the container's Go cache in 2 jobs (tests-mysql, tests-sqlite)")
+			"runner jobs: check.yml saves the container's Go cache in 2 jobs or matrix entries (tests-mysql, tests-sqlite (shard: 1/1, tier: data))")
 	})
 	t.Run("the container's cache saved without compiling what the database jobs run", func(t *testing.T) {
 		assertFindings(t, findings(replace(t, workflow, " ./tests/data ./tests/integration\n", " ./tests/data\n")),
-			"runner jobs: check.yml:30 (tests-sqlite) saves the container's Go cache without compiling what the database jobs run")
+			"runner jobs: check.yml:36 (tests-sqlite) saves the container's Go cache without compiling what the database jobs run")
 	})
 	t.Run("the runner's cache saved from a step its condition skips", func(t *testing.T) {
 		assertFindings(t, findings(replace(t, workflow, "      - uses: ./.github/actions/setup-test-runner\n        with:\n",
@@ -395,7 +629,7 @@ func TestCheckWorkflow_RunnerJobFindings(t *testing.T) {
 	t.Run("the container's cache saved from a step its condition skips", func(t *testing.T) {
 		assertFindings(t, findings(replace(t, workflow, "      - uses: ./.github/actions/setup-test-container\n        with:\n",
 			"      - uses: ./.github/actions/setup-test-container\n        if: matrix.tier == 'data'\n        with:\n")),
-			"runner jobs: check.yml:29 (tests-sqlite) saves the container's Go cache from a step under a condition")
+			"runner jobs: check.yml:35 (tests-sqlite) saves the container's Go cache from a step under a condition")
 	})
 	t.Run("the hosts line added after the internal tier runs", func(t *testing.T) {
 		hosts := "      - name: Reach Mailpit by its name\n        run: echo '127.0.0.1 mailpit' | sudo tee -a /etc/hosts\n"
@@ -407,6 +641,51 @@ func TestCheckWorkflow_RunnerJobFindings(t *testing.T) {
 		assertFindings(t, findings(replace(t, workflow, "      - name: Reach Mailpit by its name\n",
 			"      - name: Reach Mailpit by its name\n        if: github.event_name == 'push'\n")),
 			"runner jobs: check.yml:15 (unit-authserver) adds `127.0.0.1 mailpit` to /etc/hosts only under a condition")
+	})
+	t.Run("a module tier run before Go is set up", func(t *testing.T) {
+		setup := "      - uses: actions/setup-go@0123 # v7\n        with:\n          cache: false\n"
+		tests := "      - run: ./run-tests.sh --type setup --no-build\n"
+		assertFindings(t, findings(replace(t, workflow, setup+tests, tests+setup)),
+			"runner jobs: check.yml:20 (unit-setup) runs the setup tier before the step at line 21 sets Go up")
+	})
+	t.Run("an internal tier call before the hosts line, and another after it", func(t *testing.T) {
+		assertFindings(t, findings(replace(t, workflow, "      - name: Reach Mailpit by its name\n",
+			"      - run: ./run-tests.sh --type internal --run TestSendEmail\n      - name: Reach Mailpit by its name\n")),
+			"runner jobs: check.yml:14 (unit-authserver) runs the internal tier before the step at line 15 adds `127.0.0.1 mailpit` to /etc/hosts")
+	})
+	t.Run("an empty save-cache saves no runner cache", func(t *testing.T) {
+		assertFindings(t, findings(replace(t, workflow, "          save-cache: 'true'\n", "          save-cache: ''\n")),
+			"runner jobs: check.yml saves the runner's Go cache in no job")
+	})
+	t.Run("an empty save-cache saves no container cache", func(t *testing.T) {
+		assertFindings(t, findings(replace(t, workflow, "          save-cache: ${{ matrix.tier == 'data' && 'true' || 'false' }}\n", "          save-cache:\n")),
+			"runner jobs: check.yml saves the container's Go cache in no job")
+	})
+	t.Run("a selector that saves the container's cache from both integration entries", func(t *testing.T) {
+		assertFindings(t, findings(replace(t, workflow, "matrix.tier == 'data' && 'true'", "matrix.tier == 'integration' && 'true'")),
+			"runner jobs: check.yml saves the container's Go cache in 2 jobs or matrix entries (tests-sqlite (shard: 1/2, tier: integration), tests-sqlite (shard: 2/2, tier: integration))")
+	})
+	t.Run("a selector that saves the container's cache from one integration entry", func(t *testing.T) {
+		assertFindings(t, findings(replace(t, workflow, "matrix.tier == 'data' && 'true'", "matrix.shard == '1/2' && 'true'")),
+			"runner jobs: check.yml:36 (tests-sqlite) saves the container's Go cache from the entry (shard: 1/2, tier: integration), which runs no data tier",
+			"runner jobs: check.yml:36 (tests-sqlite) saves the container's Go cache from the entry (shard: 1/2, tier: integration), where no step compiles what the database jobs run")
+	})
+	t.Run("the compile step restricted to the entries that restore the cache", func(t *testing.T) {
+		assertFindings(t, findings(replace(t, workflow, "      - if: matrix.tier == 'data'\n", "      - if: matrix.tier == 'integration'\n")),
+			"runner jobs: check.yml:36 (tests-sqlite) saves the container's Go cache from the entry (shard: 1/1, tier: data), where no step compiles what the database jobs run")
+	})
+	t.Run("the compile step under an expression selecting the saving entry passes", func(t *testing.T) {
+		assertFindings(t, findings(replace(t, workflow, "      - if: matrix.tier == 'data'\n", "      - if: ${{ matrix.tier == 'data' && matrix.shard == '1/1' }}\n")))
+	})
+	t.Run("a matrix written as lists, one entry saving and compiling, passes", func(t *testing.T) {
+		assertFindings(t, findings(replace(t, workflow,
+			"        include:\n          - { tier: data, shard: 1/1 }\n          - { tier: integration, shard: 1/2 }\n          - { tier: integration, shard: 2/2 }\n",
+			"        tier: [data, integration]\n        engine: [sqlite]\n")))
+	})
+	t.Run("a save-cache this guard cannot read", func(t *testing.T) {
+		assertFindings(t, findings(replace(t, workflow, "matrix.tier == 'data' && 'true'", "inputs.full && 'true'")),
+			"runner jobs: check.yml:36 (tests-sqlite) gives save-cache ${{ inputs.full && 'true' || 'false' }}, which this guard cannot read",
+			"runner jobs: check.yml saves the container's Go cache in no job")
 	})
 	t.Run("Mailpit's ports in a flow sequence pass", func(t *testing.T) {
 		assertFindings(t, findings(replace(t, workflow, "        ports:\n          - 1025:1025\n          - '8025:8025'\n",
