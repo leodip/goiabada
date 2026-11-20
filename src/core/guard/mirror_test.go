@@ -6,12 +6,13 @@ package guard
 // .github/mirror/mirror.sh is what reads it: list prints each tag with its mirror address, copy
 // (the Mirror workflow's) copies from Docker Hub, logged in, every tag whose digest at the mirror
 // is not upstream's, missing asks the mirror anonymously for every tag and names each one it lacks,
-// and public pulls every tag anonymously and names each package that is not public.
+// and public reads every tag anonymously, as a pull on the runner does but without downloading its
+// layers, and names each package that is not public.
 //
-// The script runs here with curl, skopeo and docker replaced by stubs that answer as the registries
-// do, from a registry the test writes, so no test reaches a network. Docker Hub counts a manifest
-// GET as a pull and a HEAD as none, so the stubs log every request and the tests hold Docker Hub to
-// HEADs; skopeo copy, the one pull, is held to every platform and upstream's digest.
+// The script runs here with curl and skopeo replaced by stubs that answer as the registries do, from
+// a registry the test writes, so no test reaches a network. Docker Hub counts a manifest GET as a
+// pull and a HEAD as none, so the stubs log every request and the tests hold Docker Hub to HEADs;
+// skopeo copy, the one pull, is held to every platform and upstream's digest.
 
 import (
 	"context"
@@ -76,30 +77,38 @@ func upstreamDigests() map[string]string {
 
 // The stubs keep the registry as a file per tag, <stub>/registry/<registry>/<repository>/<tag>,
 // holding its digest, and a repository named under <stub>/private as a package that is not public:
-// a request for it without credentials is refused. A manifest request without the token the token
-// request answered is refused, and one for a repository named under <stub>/stall answers nothing
-// until curl's --max-time, an hour without one. skopeo refuses a copy into a package named under
+// a request for it without credentials is refused. A manifest or blob request without the token the
+// token request answered is refused, and a manifest request for a repository named under
+// <stub>/stall answers nothing until curl's --max-time, an hour without one. A GET of a tag's
+// manifest answers a multi-platform index, or the image's manifest for a repository named under
+// <stub>/single; each platform's manifest names its config and two layers, whose digests tell the
+// platforms apart. A file <stub>/status/<repository>/<token, manifest or blob> holds a status that
+// request is answered with instead. skopeo refuses a copy into a package named under
 // <stub>/copy-fails, and a copy into a package named under <stub>/moves lands, then moves upstream
 // to what that file holds, "<upstream address> <digest>", as upstream moving while the copy ran;
-// with STUB_KEEP_MOVING set it moves so after every copy. docker answers a pull of a repository
-// named under <stub>/pull-error with the error that file holds. Each logs its arguments, one line
-// per call, curl the headers it read on its standard input after " stdin=".
+// with STUB_KEEP_MOVING set it moves so after every copy. Each logs its arguments, one line per
+// call, curl the headers it read on its standard input after " stdin=".
 const (
 	stubMirrorCurl = `#!/bin/bash
 url=${!#}
-netrc=0 maxtime="" headers="" stdin="" prev=""
+netrc=0 head=0 maxtime="" headers="" stdin="" prev=""
 for a in "$@"; do
     case "$prev" in
         --max-time) maxtime=$a ;;
         --header) if [ "$a" = @- ]; then stdin=$(cat); headers+="$stdin"$'\n'; else headers+="$a"$'\n'; fi ;;
     esac
     [ "$a" = --netrc-file ] && netrc=1
+    [ "$a" = --head ] && head=1
     prev=$a
 done
 { printf 'curl'; printf ' %s' "$@"; [ -z "$stdin" ] || printf ' stdin=%s' "$(tr '\n' ';' <<< "$stdin")"; echo; } >> "$STUB/log"
 case "$url" in
     https://auth.docker.io/token\?*|https://ghcr.io/token\?*)
         repo=${url#*scope=repository:}; repo=${repo%:pull*}
+        if [ -f "$STUB/status/$repo/token" ]; then
+            printf 'HTTP/2 %s \r\ncontent-type: application/json\r\n\r\n' "$(cat "$STUB/status/$repo/token")"
+            exit 0
+        fi
         if [ $netrc = 0 ] && [ -e "$STUB/private/$repo" ]; then
             printf 'HTTP/2 403 \r\ncontent-type: application/json\r\n\r\n{"errors":[{"code":"DENIED","message":"requested access to the resource is denied"}]}\n'
             exit 0
@@ -115,13 +124,40 @@ case "$url" in
             echo "curl: (28) Operation timed out after ${maxtime:-3600}000 milliseconds with 0 bytes received" >&2
             exit 28
         fi
-        f="$STUB/registry/$host/${path%/manifests/*}/${path##*/manifests/}"
-        if ! grep -qx 'Authorization: Bearer stub-token' <<< "$headers"; then
+        repo=${path%/manifests/*}; ref=${path##*/manifests/}
+        f="$STUB/registry/$host/$repo/$ref"
+        if [ -f "$STUB/status/$repo/manifest" ]; then
+            printf 'HTTP/2 %s \r\ncontent-type: application/json\r\n\r\n' "$(cat "$STUB/status/$repo/manifest")"
+        elif ! grep -qx 'Authorization: Bearer stub-token' <<< "$headers"; then
             printf 'HTTP/2 401 \r\ncontent-type: application/json\r\n\r\n'
-        elif [ -f "$f" ]; then
-            printf 'HTTP/2 200 \r\ncontent-type: application/vnd.oci.image.index.v1+json\r\ndocker-content-digest: %s\r\n\r\n' "$(cat "$f")"
-        else
+        elif [[ $ref == sha256:* ]]; then
+            # A platform's manifest, by the digest the index gave: amd64's blobs are c, 1 and 2.
+            blobs='"config":{"digest":"sha256:9999999999999999999999999999999999999999999999999999999999999999"},"layers":[{"digest":"sha256:8888888888888888888888888888888888888888888888888888888888888888"}]'
+            [ "$ref" != sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd ] ||
+                blobs='"config":{"digest":"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"},"layers":[{"digest":"sha256:1111111111111111111111111111111111111111111111111111111111111111"},{"digest":"sha256:2222222222222222222222222222222222222222222222222222222222222222"}]'
+            printf 'HTTP/2 200 \r\ncontent-type: application/vnd.oci.image.manifest.v1+json\r\n\r\n{"schemaVersion":2,"mediaType":"application/vnd.oci.image.manifest.v1+json",%s}\n' "$blobs"
+        elif [ ! -f "$f" ]; then
             printf 'HTTP/2 404 \r\ncontent-type: application/json\r\n\r\n'
+        elif [ $head = 1 ]; then
+            printf 'HTTP/2 200 \r\ncontent-type: application/vnd.oci.image.index.v1+json\r\ndocker-content-digest: %s\r\n\r\n' "$(cat "$f")"
+        elif [ -e "$STUB/single/$repo" ]; then
+            printf 'HTTP/2 200 \r\ncontent-type: application/vnd.docker.distribution.manifest.v2+json\r\n\r\n{"schemaVersion":2,"mediaType":"application/vnd.docker.distribution.manifest.v2+json","config":{"digest":"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"},"layers":[{"digest":"sha256:1111111111111111111111111111111111111111111111111111111111111111"},{"digest":"sha256:2222222222222222222222222222222222222222222222222222222222222222"}]}\n'
+        else
+            # The amd64 image between an arm64 one and an attestation, as Buildx writes an index.
+            printf 'HTTP/2 200 \r\ncontent-type: application/vnd.oci.image.index.v1+json\r\n\r\n{"schemaVersion":2,"mediaType":"application/vnd.oci.image.index.v1+json","manifests":[%s,%s,%s]}\n' \
+                '{"digest":"sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","platform":{"architecture":"arm64","os":"linux","variant":"v8"}}' \
+                '{"digest":"sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","platform":{"architecture":"amd64","os":"linux"}}' \
+                '{"digest":"sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff","platform":{"architecture":"unknown","os":"unknown"}}'
+        fi
+        ;;
+    https://ghcr.io/v2/*/blobs/*)
+        path=${url#https://ghcr.io/v2/}; repo=${path%/blobs/*}
+        if [ -f "$STUB/status/$repo/blob" ]; then
+            printf 'HTTP/2 %s \r\ncontent-type: application/json\r\n\r\n' "$(cat "$STUB/status/$repo/blob")"
+        elif ! grep -qx 'Authorization: Bearer stub-token' <<< "$headers"; then
+            printf 'HTTP/2 401 \r\ncontent-type: application/json\r\n\r\n'
+        else
+            printf 'HTTP/2 200 \r\ncontent-type: application/octet-stream\r\ncontent-length: 1048576\r\n\r\n'
         fi
         ;;
     *) echo "stub curl: unexpected $*" >&2; exit 7 ;;
@@ -153,35 +189,22 @@ case "$1" in
     *) { printf 'skopeo'; printf ' %s' "$@"; echo; } >> "$STUB/log"; echo "stub skopeo: unexpected $*" >&2; exit 64 ;;
 esac
 `
-	stubMirrorDocker = `#!/bin/bash
-{ printf 'docker'; printf ' %s' "$@"; printf ' DOCKER_CONFIG=%s holding=[%s]\n' "${DOCKER_CONFIG:-}" "$(ls -A "${DOCKER_CONFIG:-$HOME/.docker}" 2>/dev/null | tr '\n' ' ')"; } >> "$STUB/log"
-[ "$1 $2" = "pull --quiet" ] && [ $# = 3 ] || { echo "stub docker: unexpected $*" >&2; exit 64; }
-ref=$3; repo=${ref#*/}; repo=${repo%:*}
-if [ -n "${DOCKER_CONFIG:-}" ] && [ -z "$(ls -A "$DOCKER_CONFIG" 2>/dev/null)" ] && [ -e "$STUB/private/$repo" ]; then
-    echo "Error response from daemon: Head \"https://ghcr.io/v2/$repo/manifests/${ref##*:}\": denied" >&2
-    exit 1
-fi
-if [ -f "$STUB/pull-error/$repo" ]; then
-    cat "$STUB/pull-error/$repo" >&2
-    exit 1
-fi
-[ -f "$STUB/registry/${ref%:*}/${ref##*:}" ] || { echo "Error response from daemon: manifest unknown" >&2; exit 1; }
-echo "$ref"
-`
 )
 
 // mirrorRegistry is what the stubbed registries hold: each tag's digest, by its address, the
 // repositories whose package is not public, the mirror packages a copy into is refused, the
 // repositories whose manifest requests stall, the mirror packages whose copy upstream moves past,
-// to an upstream address and its new digest, and the repositories an anonymous pull of fails, with
-// the error docker prints.
+// to an upstream address and its new digest, the repositories whose tags are single-platform images
+// rather than indexes, and the statuses a repository's requests are answered with, by repository
+// and then by request: token, manifest or blob.
 type mirrorRegistry struct {
 	digests    map[string]string
 	private    []string
 	refuseCopy []string
 	stall      []string
 	moves      map[string][2]string
-	pullErrors map[string]string
+	single     []string
+	statuses   map[string]map[string]string
 }
 
 // mirrorRun is a run of mirror.sh: whether it succeeded, what it printed, each stub call it made,
@@ -210,7 +233,7 @@ func newMirrorStub(t *testing.T, versions string, registry mirrorRegistry) strin
 	stub := t.TempDir()
 	bin := filepath.Join(stub, "bin")
 	require.NoError(t, os.MkdirAll(bin, 0o755))
-	for name, body := range map[string]string{"curl": stubMirrorCurl, "skopeo": stubMirrorSkopeo, "docker": stubMirrorDocker} {
+	for name, body := range map[string]string{"curl": stubMirrorCurl, "skopeo": stubMirrorSkopeo} {
 		require.NoError(t, os.WriteFile(filepath.Join(bin, name), []byte(body), 0o755))
 	}
 	for ref, digest := range registry.digests {
@@ -227,10 +250,15 @@ func newMirrorStub(t *testing.T, versions string, registry mirrorRegistry) strin
 	for _, repo := range registry.stall {
 		require.NoError(t, os.MkdirAll(filepath.Join(stub, "stall", repo), 0o755))
 	}
-	for repo, message := range registry.pullErrors {
-		f := filepath.Join(stub, "pull-error", repo)
-		require.NoError(t, os.MkdirAll(filepath.Dir(f), 0o755))
-		require.NoError(t, os.WriteFile(f, []byte(message+"\n"), 0o600))
+	for _, repo := range registry.single {
+		require.NoError(t, os.MkdirAll(filepath.Join(stub, "single", repo), 0o755))
+	}
+	for repo, statuses := range registry.statuses {
+		for request, status := range statuses {
+			f := filepath.Join(stub, "status", repo, request)
+			require.NoError(t, os.MkdirAll(filepath.Dir(f), 0o755))
+			require.NoError(t, os.WriteFile(f, []byte(status+"\n"), 0o600))
+		}
 	}
 	for pkg, move := range registry.moves {
 		require.NoError(t, os.MkdirAll(filepath.Join(stub, "moves"), 0o755))
@@ -659,132 +687,144 @@ func assertAnonymousMirrorRequests(t *testing.T, run mirrorRun) {
 
 // ---- public ----------------------------------------------------------------------------------
 
-func TestMirrorPublic_EveryTagPulledAnonymouslyPasses(t *testing.T) {
+// publicRegistry holds every tag of the list at the mirror, each package public.
+func publicRegistry() mirrorRegistry {
 	digests := map[string]string{}
 	for _, tag := range mirrorTags {
 		digests[tag[1]] = mirrorDigest('a')
 	}
-	run := runMirror(t, "public", mirrorVersions, mirrorRegistry{digests: digests})
+	return mirrorRegistry{digests: digests}
+}
+
+func TestMirrorPublic_EveryTagReadAnonymouslyPasses(t *testing.T) {
+	run := runMirror(t, "public", mirrorVersions, publicRegistry())
 	assert.True(t, run.ok, "public failed with every package public:\n%s", run.out)
 	assert.Empty(t, run.errors())
-	assertAnonymousPulls(t, run)
+	assertAnonymousReads(t, run, nil)
+}
+
+// A tag that is one platform's image rather than an index is read through its own manifest.
+func TestMirrorPublic_ASinglePlatformImageIsReadThroughItsManifest(t *testing.T) {
+	registry := publicRegistry()
+	registry.single = []string{"leodip/goiabada-ci/mailpit"}
+	run := runMirror(t, "public", mirrorVersions, registry)
+	assert.True(t, run.ok, "public failed with every package public:\n%s", run.out)
+	assertAnonymousReads(t, run, nil)
 }
 
 // A package that is not public is named once, however many of its tags were refused, with where to
 // make it public.
 func TestMirrorPublic_APackageNotPublicIsNamedOnceWithHowToMakeItPublic(t *testing.T) {
-	digests := map[string]string{}
-	for _, tag := range mirrorTags {
-		digests[tag[1]] = mirrorDigest('a')
-	}
-	run := runMirror(t, "public", mirrorVersions, mirrorRegistry{
-		digests: digests, private: []string{"leodip/goiabada-ci/golang", "leodip/goiabada-ci/buildkit"},
-	})
+	registry := publicRegistry()
+	registry.private = []string{"leodip/goiabada-ci/golang", "leodip/goiabada-ci/buildkit"}
+	run := runMirror(t, "public", mirrorVersions, registry)
 	assert.False(t, run.ok, "public passed with two packages private:\n%s", run.out)
 	errs := run.errors()
 	require.Len(t, errs, 2, "%s", run.out)
-	assert.Contains(t, errs[0], "ghcr.io/leodip/goiabada-ci/golang ")
+	assert.Contains(t, errs[0], "ghcr.io/leodip/goiabada-ci/golang refused an anonymous read (tags: 1.28.0-bookworm 1.28.0-alpine)")
 	assert.Contains(t, errs[0], "https://github.com/users/leodip/packages/container/goiabada-ci%2Fgolang/settings")
-	assert.Contains(t, errs[1], "ghcr.io/leodip/goiabada-ci/buildkit ")
+	assert.Contains(t, errs[1], "ghcr.io/leodip/goiabada-ci/buildkit refused an anonymous read")
 	assert.Contains(t, errs[1], "https://github.com/users/leodip/packages/container/goiabada-ci%2Fbuildkit/settings")
-	for _, e := range errs {
-		assert.Contains(t, e, "public", "%s", e)
-	}
-	assertAnonymousPulls(t, run)
+	assertAnonymousReads(t, run, []string{"leodip/goiabada-ci/golang", "leodip/goiabada-ci/buildkit"})
 }
 
-// A pull that fails for another reason than access, here a registry error, says nothing of the
-// package's visibility: it is reported with Docker's error, not as a package to make public.
-func TestMirrorPublic_ARegistryErrorIsNotTakenForAPackageNotPublic(t *testing.T) {
-	digests := map[string]string{}
-	for _, tag := range mirrorTags {
-		digests[tag[1]] = mirrorDigest('a')
-	}
-	run := runMirror(t, "public", mirrorVersions, mirrorRegistry{
-		digests: digests, private: []string{"leodip/goiabada-ci/golang"},
-		pullErrors: map[string]string{"leodip/goiabada-ci/nginx": "Error response from daemon: received unexpected HTTP status: 503 Service Unavailable"},
-	})
-	assert.False(t, run.ok, "public passed with a pull failed:\n%s", run.out)
-	errs := run.errors()
-	require.Len(t, errs, 2, "%s", run.out)
-	assert.Contains(t, errs[0], "the anonymous pull of ghcr.io/leodip/goiabada-ci/nginx:alpine failed")
-	assert.Contains(t, errs[0], "503 Service Unavailable", "the message should keep Docker's error")
-	assert.NotContains(t, errs[0], "settings", "a registry error sent the maintainer to the package's visibility")
-	assert.Contains(t, errs[1], "ghcr.io/leodip/goiabada-ci/golang ")
-	assert.Contains(t, errs[1], "https://github.com/users/leodip/packages/container/goiabada-ci%2Fgolang/settings")
-	assertAnonymousPulls(t, run)
-}
-
-// A pull is taken for a package that is not public only when the registry refused it, as the
-// daemon relays, in words or with a 401 or 403 status: Docker failing on the runner, even with
-// "permission denied", or a registry error whose URL holds 401 or 403, says nothing of the
-// package, and is reported with Docker's error and no settings to change.
-func TestMirrorPublic_OnlyARegistryRefusalIsTakenForAPackageNotPublic(t *testing.T) {
-	nginx := "ghcr.io/leodip/goiabada-ci/nginx:alpine"
+// A request is taken for a package that is not public only when the registry refused it for want of
+// access, at the token, the manifest or a layer, which a pull reads with the same anonymous token:
+// any other answer says nothing of the package, and is reported with what the registry answered and
+// no settings to change.
+func TestMirrorPublic_OnlyARefusalIsTakenForAPackageNotPublic(t *testing.T) {
 	for _, c := range []struct {
-		name, err string
-		refused   bool
+		request, status string
+		refused         bool
 	}{
-		{"denied", `Error response from daemon: Head "https://ghcr.io/v2/leodip/goiabada-ci/nginx/manifests/alpine": denied`, true},
-		{"unauthorized", `Error response from daemon: Head "https://ghcr.io/v2/leodip/goiabada-ci/nginx/manifests/alpine": unauthorized`, true},
-		{"denied by the registry", "Error response from daemon: error from registry: denied\ndenied", true},
-		{"token forbidden", `Error response from daemon: failed to resolve reference "` + nginx + `": failed to authorize: failed to fetch anonymous token: unexpected status from GET request to https://ghcr.io/token?scope=repository%3Aleodip%2Fgoiabada-ci%2Fnginx%3Apull&service=ghcr.io: 403 Forbidden`, true},
-		{"the daemon's socket", `permission denied while trying to connect to the Docker daemon socket at unix:///var/run/docker.sock: Head "http://%2Fvar%2Frun%2Fdocker.sock/_ping": dial unix /var/run/docker.sock: connect: permission denied`, false},
-		{"the daemon's disk", "Error response from daemon: mkdir /var/lib/docker/tmp/docker-pull-1234: permission denied", false},
-		{"no daemon", "Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?", false},
-		{"a registry error", "Error response from daemon: received unexpected HTTP status: 503 Service Unavailable", false},
-		{"a bare refusal status", "Error response from daemon: received unexpected HTTP status: 403", true},
-		{"a registry error naming 401 and 403", `Error response from daemon: failed to copy: httpReadSeeker: failed open: unexpected status code https://ghcr.io/v2/leodip/goiabada-ci/nginx/blobs/sha256:a403b40140340100000000000000000000000000000000000000000000c401: 503 Service Unavailable`, false},
+		{"token", "403", true},
+		{"token", "401", true},
+		{"manifest", "403", true},
+		{"manifest", "401", true},
+		{"blob", "403", true},
+		{"blob", "401", true},
+		{"token", "503", false},
+		{"manifest", "404", false},
+		{"manifest", "503", false},
+		{"blob", "404", false},
+		{"blob", "500", false},
 	} {
-		t.Run(c.name, func(t *testing.T) {
-			digests := map[string]string{}
-			for _, tag := range mirrorTags {
-				digests[tag[1]] = mirrorDigest('a')
-			}
-			run := runMirror(t, "public", mirrorVersions, mirrorRegistry{
-				digests: digests, pullErrors: map[string]string{"leodip/goiabada-ci/nginx": c.err},
-			})
-			assert.False(t, run.ok, "public passed with a pull failed:\n%s", run.out)
+		t.Run(c.request+" "+c.status, func(t *testing.T) {
+			registry := publicRegistry()
+			registry.statuses = map[string]map[string]string{"leodip/goiabada-ci/nginx": {c.request: c.status}}
+			run := runMirror(t, "public", mirrorVersions, registry)
+			assert.False(t, run.ok, "public passed with a request answered %s:\n%s", c.status, run.out)
 			errs := run.errors()
 			require.Len(t, errs, 1, "%s", run.out)
 			if c.refused {
-				assert.Contains(t, errs[0], "ghcr.io/leodip/goiabada-ci/nginx refused an anonymous pull")
+				assert.Contains(t, errs[0], "ghcr.io/leodip/goiabada-ci/nginx refused an anonymous read (tags: alpine)")
 				assert.Contains(t, errs[0], "https://github.com/users/leodip/packages/container/goiabada-ci%2Fnginx/settings")
 			} else {
-				assert.Contains(t, errs[0], "the anonymous pull of "+nginx+" failed")
-				lines := strings.Split(c.err, "\n")
-				assert.Contains(t, errs[0], lines[len(lines)-1], "the message should keep Docker's error")
-				assert.NotContains(t, errs[0], "settings", "a failure on the runner sent the maintainer to the package's visibility")
+				assert.Contains(t, errs[0], "the anonymous read of ghcr.io/leodip/goiabada-ci/nginx:alpine failed, and not for want of access")
+				assert.Contains(t, errs[0], c.status, "the message should keep what the registry answered")
+				assert.NotContains(t, errs[0], "settings", "a registry error sent the maintainer to the package's visibility")
 			}
-			assert.Contains(t, run.out, c.err, "Docker's whole error should be printed")
-			assertAnonymousPulls(t, run)
 		})
 	}
 }
 
-// assertAnonymousPulls holds run to pulling every tag of the list once, each with a Docker
-// configuration that holds no login.
-func assertAnonymousPulls(t *testing.T, run mirrorRun) {
+// A request that stalls fails its tag in seconds, and the other tags are still read.
+func TestMirrorPublic_AStalledRequestFailsItsTagAndTheOthersAreStillRead(t *testing.T) {
+	registry := publicRegistry()
+	registry.stall = []string{"leodip/goiabada-ci/node"}
+	run := runMirror(t, "public", mirrorVersions, registry, "MIRROR_REQUEST_SECONDS=1")
+	assert.False(t, run.ok, "public passed with a request stalled:\n%s", run.out)
+	errs := run.errors()
+	require.Len(t, errs, 1, "%s", run.out)
+	assert.Contains(t, errs[0], "the anonymous read of ghcr.io/leodip/goiabada-ci/node:27.0.1-alpine failed, and not for want of access")
+	assert.Less(t, run.elapsed, 30*time.Second)
+	assert.Contains(t, run.out, "read ghcr.io/leodip/goiabada-ci/buildkit:buildx-stable-1 anonymously")
+}
+
+// assertAnonymousReads holds run to reading every tag of the list anonymously, as a pull on the
+// runner does but without downloading a layer: no login, each tag's token, its manifest, and for a
+// package outside refused a HEAD of the linux/amd64 image's config and each of its layers, and no
+// other platform's.
+func assertAnonymousReads(t *testing.T, run mirrorRun, refused []string) {
 	t.Helper()
-	var pulled []string
+	blobs := map[string][]string{}
+	tokens := map[string]bool{}
 	for _, c := range run.calls {
-		require.True(t, strings.HasPrefix(c, "docker pull --quiet "), "public ran %s", c)
-		fields := strings.Fields(c)
-		pulled = append(pulled, fields[3])
-		assert.Regexp(t, `DOCKER_CONFIG=\S+ holding=\[\]$`, c, "a pull that may be logged in: %s", c)
+		require.True(t, strings.HasPrefix(c, "curl "), "public ran %s", c)
+		assert.NotContains(t, c, "--netrc", "a request that may be logged in: %s", c)
+		url := strings.Fields(strings.Split(c, " stdin=")[0])
+		target := url[len(url)-1]
+		switch {
+		case strings.HasPrefix(target, "https://ghcr.io/token?"):
+			repo := strings.TrimSuffix(strings.SplitN(target, "scope=repository:", 2)[1], ":pull")
+			tokens[repo] = true
+		case strings.Contains(target, "/blobs/"):
+			assert.Contains(t, c, " --head ", "a blob read whole: %s", c)
+			repo := strings.SplitN(strings.TrimPrefix(target, "https://ghcr.io/v2/"), "/blobs/", 2)
+			blobs[repo[0]] = append(blobs[repo[0]], repo[1])
+		case strings.Contains(target, "/manifests/"):
+		default:
+			t.Errorf("public asked %s", target)
+		}
 	}
-	var want []string
+	amd64 := []string{mirrorDigest('c'), mirrorDigest('1'), mirrorDigest('2')}
 	for _, tag := range mirrorTags {
-		want = append(want, tag[1])
+		repo := strings.TrimPrefix(tag[1][:strings.LastIndex(tag[1], ":")], "ghcr.io/")
+		assert.True(t, tokens[repo], "public asked no token for %s", repo)
+		if slices.Contains(refused, repo) {
+			assert.Empty(t, blobs[repo], "public read the blobs of %s, which refused its token", repo)
+			continue
+		}
+		read := slices.Compact(slices.Sorted(slices.Values(blobs[repo])))
+		assert.Equal(t, slices.Sorted(slices.Values(amd64)), read, "the blobs of %s read", repo)
 	}
-	assert.Equal(t, want, pulled)
 }
 
 // ---- the workflow ----------------------------------------------------------------------------
 
 // The Mirror workflow runs on a push to any branch that changes what it mirrors, weekly and by
 // hand, and never on a pull request: its copying job holds packages: write and Docker Hub's token,
-// the one job that does, and the pull that proves the packages public runs after it.
+// the one job that does, and the anonymous read that proves the packages public runs after it.
 func TestMirrorWorkflow_TriggersAndPermissions(t *testing.T) {
 	lines := workflowLines(repositoryFiles(t, []string{mirrorWorkflow})[mirrorWorkflow])
 	text := strings.Join(lines, "\n")
@@ -831,11 +871,11 @@ func TestMirrorWorkflow_TriggersAndPermissions(t *testing.T) {
 			public = name
 		}
 	}
-	require.NotEmpty(t, public, "%s should end by pulling every image anonymously, %s public", mirrorWorkflow, mirrorScript)
+	require.NotEmpty(t, public, "%s should end by reading every image anonymously, %s public", mirrorWorkflow, mirrorScript)
 	body := mirrorJobText(lines, jobs[public])
-	assert.NotContains(t, body, "secrets.", "%s: the anonymous pull should hold no secret", mirrorWorkflow)
+	assert.NotContains(t, body, "secrets.", "%s: the anonymous read should hold no secret", mirrorWorkflow)
 	assert.Regexp(t, `(?m)^    needs: \[?`+regexp.QuoteMeta(firstKey(holders))+`\]?$`, body,
-		"%s: the anonymous pull should run after the copy", mirrorWorkflow)
+		"%s: the anonymous read should run after the copy", mirrorWorkflow)
 }
 
 // mirrorConcurrencyFindings holds the Mirror workflow's copying job, the one that runs mirror.sh

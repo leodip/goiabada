@@ -13,11 +13,11 @@
 #                      nothing else, and the mirror written with GHCR_USERNAME and GHCR_TOKEN.
 #   mirror.sh missing  Asks the mirror anonymously for every tag and names each one it lacks, or
 #                      holds in a package that is not public, and what to do.
-#   mirror.sh public   Pulls every tag anonymously and names each package whose registry refuses
-#                      the pull, so is not public, with where to make it public: a new GHCR package
-#                      starts private, and GitHub has no API to change that. A pull that fails for
-#                      another reason, Docker's own on the runner among them, is reported with
-#                      Docker's error, as no answer on the package.
+#   mirror.sh public   Reads every tag anonymously, as a pull on the runner does, and names each
+#                      package whose registry refuses a read, so is not public, with where to make it
+#                      public: a new GHCR package starts private, and GitHub has no API to change
+#                      that. A read the registry answers otherwise, an error or a stall, is reported
+#                      with that answer, as no answer on the package.
 #
 # Docker Hub counts a pull per manifest GET, once per platform for a multi-platform image, and none
 # for a HEAD, which answers a tag's digest in its Docker-Content-Digest header. So copy asks both
@@ -48,6 +48,10 @@ CURL_LIMITS=(--connect-timeout 5 --max-time "$REQUEST_SECONDS")
 
 # How many times copy copies one tag before it gives up on a mirror that is still not upstream's.
 COPY_ATTEMPTS=3
+
+# The platform of the runners Check pulls on, whose image of a multi-platform tag public reads.
+RUNNER_OS=linux
+RUNNER_ARCH=amd64
 
 # The manifest types a HEAD accepts: a multi-platform index or list first, so its digest is the one
 # answered, and a single platform's manifest for an image that has no index.
@@ -250,49 +254,91 @@ mirror_missing() {
     return $missing
 }
 
-# pull_refused succeeds when docker's error says the registry refused the pull for want of access,
-# as GHCR refuses an anonymous one of a package that is not public. Docker relays a registry's answer
-# after "Error response from daemon:", in words or as an HTTP status, "...: 403 Forbidden", whose code
-# stands after a space: a 401 or 403 inside a URL, such as a digest's, is no status. An error of
-# Docker's own on the runner, such as "permission denied" on its socket or its disk, or a registry
-# error, such as a 503, says nothing of the package.
-pull_refused() {
-    local line
-    while IFS= read -r line; do
-        line=${line,,}
-        [[ $line == "error response from daemon:"* ]] || continue
-        line=${line//permission denied/}
-        [[ $line =~ denied|unauthorized|forbidden|(^|[[:space:]])40[13]([^[:alnum:]]|$) ]] && return 0
-    done <<< "$1"
-    return 1
+# registry_answer <token> <url> [curl options] prints the registry's answer to a request made with
+# the token, its status line and headers, then its body. Returns 2 when the registry cannot be asked.
+registry_answer() {
+    local token=$1 url=$2
+    shift 2
+    printf 'Authorization: Bearer %s\n' "$token" | curl --silent --show-error --include "${CURL_LIMITS[@]}" \
+        --header @- "$@" "$url" || return 2
+}
+
+# anonymous_read <address> reads a tag anonymously as a pull on the runner does, without downloading
+# a layer: a token with no login, the tag's manifest, the runner's platform's image's manifest when
+# the tag is a multi-platform index, then a HEAD of that image's config and of each of its layers,
+# which answers each blob's headers alone, with the access its download would get. Prints how many
+# blobs it read, or what failed. Returns 1 when the registry refuses a request for want of access,
+# 401 or 403, or the token, and 2 when it cannot be asked or answers anything else.
+anonymous_read() {
+    local ref=$1 registry rest repository tag token answer status body digest blob n=0
+    registry=${ref%%/*}
+    rest=${ref#*/}
+    repository=${rest%:*}
+    tag=${rest##*:}
+    token=$(registry_token "$registry" "$repository" 2>&1) && status=0 || status=$?
+    case $status in
+        0) ;;
+        1) echo "$registry refused an anonymous token"; return 1 ;;
+        *) echo "$token"; return 2 ;;
+    esac
+    digest=$tag
+    while :; do
+        answer=$(registry_answer "$token" "https://$registry/v2/$repository/manifests/$digest" --header "Accept: $MANIFEST_TYPES") ||
+            { echo "cannot ask $registry for the manifest of $ref"; return 2; }
+        status=$(http_status "$answer")
+        case $status in
+            200) ;;
+            401 | 403) echo "$registry answered $status to the manifest request"; return 1 ;;
+            *) echo "$registry answered ${status:-no status} to the manifest request"; return 2 ;;
+        esac
+        body=$(printf '%s\n' "$answer" | tr -d '\r' | sed '1,/^$/d')
+        [ "$(yq -p json -r 'has("manifests")' <<< "$body" 2>/dev/null)" = true ] || break
+        [ "$digest" = "$tag" ] || { echo "$registry answered an index for the image $digest"; return 2; }
+        digest=$(yq -p json -r "[.manifests[] | select(.platform.os == \"$RUNNER_OS\" and .platform.architecture == \"$RUNNER_ARCH\")][0].digest // \"\"" <<< "$body" 2>/dev/null) || digest=""
+        [[ $digest =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "$registry holds no $RUNNER_OS/$RUNNER_ARCH image for $ref"; return 2; }
+    done
+    for blob in $(yq -p json -r '.config.digest, .layers[].digest' <<< "$body" 2>/dev/null); do
+        [[ $blob =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "$registry answered a manifest naming $blob as a blob"; return 2; }
+        answer=$(registry_answer "$token" "https://$registry/v2/$repository/blobs/$blob" --head) ||
+            { echo "cannot ask $registry for the blob $blob"; return 2; }
+        status=$(http_status "$answer")
+        case $status in
+            2?? | 3??) ;;
+            401 | 403) echo "$registry answered $status to the request for the blob $blob"; return 1 ;;
+            *) echo "$registry answered ${status:-no status} to the request for the blob $blob"; return 2 ;;
+        esac
+        n=$((n + 1))
+    done
+    [ "$n" -gt 0 ] || { echo "$registry answered a manifest naming no blob"; return 2; }
+    echo "$n"
 }
 
 mirror_public() {
-    local list upstream mirror package anonymous out failed=0
+    local list upstream mirror package out status failed=0
     local -a order=()
     local -A refused=()
     list=$(mirror_list) || { echo "$list"; return 1; }
-    # An empty Docker configuration, so each pull is anonymous whatever the runner is logged in to.
-    anonymous=$(mktemp -d)
-    trap "rm -rf '$anonymous'" EXIT
     while read -r upstream mirror <&3; do
-        if out=$(DOCKER_CONFIG="$anonymous" docker pull --quiet "$mirror" 2>&1); then
-            echo "pulled $mirror anonymously"
-            continue
-        fi
-        echo "$out"
-        if ! pull_refused "$out"; then
-            error "the anonymous pull of $mirror failed, and not for want of access, so this says nothing of whether its package is public: $(tail -n 1 <<< "$out"). Re-run this job; if it fails again, see the error above."
-            failed=1
-            continue
-        fi
+        out=$(anonymous_read "$mirror") && status=0 || status=$?
+        case $status in
+            0)
+                echo "read $mirror anonymously: its manifest and $out blobs, $RUNNER_OS/$RUNNER_ARCH, none downloaded"
+                continue
+                ;;
+            1) echo "$mirror: $out" ;;
+            *)
+                error "the anonymous read of $mirror failed, and not for want of access, so this says nothing of whether its package is public: $out. Re-run this job."
+                failed=1
+                continue
+                ;;
+        esac
         package=${mirror%:*}
         [ -n "${refused[$package]:-}" ] || order+=("$package")
         refused[$package]+=" ${mirror##*:}"
     done 3<<< "$list"
     for package in "${order[@]}"; do
         local name=${package#ghcr.io/"$MIRROR_OWNER"/}
-        error "$package refused an anonymous pull (tags:${refused[$package]}), so the package is not public: a new GHCR package starts private. Make it public at https://github.com/users/$MIRROR_OWNER/packages/container/${name//\//%2F}/settings, under Danger Zone, Change visibility, then re-run this job."
+        error "$package refused an anonymous read (tags:${refused[$package]}), so the package is not public: a new GHCR package starts private. Make it public at https://github.com/users/$MIRROR_OWNER/packages/container/${name//\//%2F}/settings, under Danger Zone, Change visibility, then re-run this job."
     done
     [ "${#order[@]}" = 0 ] && [ "$failed" = 0 ]
 }
