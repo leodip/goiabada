@@ -59,8 +59,10 @@ const (
 )
 
 var (
-	wholeExpression  = regexp.MustCompile(`^\$\{\{\s*(.+?)\s*\}\}$`)
-	choiceExpression = regexp.MustCompile(`^(.+?)\s*&&\s*(.+?)\s*\|\|\s*(.+)$`)
+	wholeExpression = regexp.MustCompile(`^\$\{\{\s*(.+?)\s*\}\}$`)
+	// choiceExpression is cond && A || B, split at the last && before the first || after it, so a
+	// condition can itself join comparisons with &&.
+	choiceExpression = regexp.MustCompile(`^(.+)\s*&&\s*(.+?)\s*\|\|\s*(.+)$`)
 	formatExpression = regexp.MustCompile(`^format\(\s*'((?:[^']|'')*)'\s*((?:,\s*[A-Za-z0-9_.-]+\s*)*)\)$`)
 	quotedExpression = regexp.MustCompile(`^'((?:[^']|'')*)'$`)
 	pinExpression    = regexp.MustCompile(`\$\{\{\s*needs\.versions\.outputs\.([A-Za-z0-9_-]+)\s*\}\}`)

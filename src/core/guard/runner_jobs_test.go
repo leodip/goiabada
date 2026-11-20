@@ -11,8 +11,9 @@ package guard
 // `127.0.0.1 mailpit` in the runner's hosts file, so a job on the runner with a Mailpit service
 // has both, the hosts line added on every run in a step before the internal tier's.
 //
-// Each module tier runs after the step that sets Go up at the pin, and the internal tier's first
-// call after the hosts line, so no call runs on the runner's own Go or before mailpit resolves.
+// Each module tier runs after the step that sets Go up at the pin, which has no if:, and the
+// internal tier's first call after the hosts line, so no call runs on the runner's own Go or
+// before mailpit resolves.
 //
 // The Go cache splits with the environments, which keep it under different paths: one runner job,
 // Unit / authserver, saves the runner's, and one container job's entry, Data / sqlite, saves the
@@ -76,8 +77,9 @@ type checkJob struct {
 	// tiers maps each module tier the job runs to its run-tests.sh calls, in the order they run.
 	tiers map[string][]tierCall
 	// setupGoStep is the place of the first step that sets Go up with actions/setup-go, itself or
-	// through the runner's test setup, or -1, and setupGoLine its line.
-	setupGoStep, setupGoLine int
+	// through the runner's test setup, whenever the job reaches it, or -1, and setupGoLine its line;
+	// setupGoIf is the line of the if: of one that sets it up only under a condition, or 0.
+	setupGoStep, setupGoLine, setupGoIf int
 	// entries are the job's matrix entries, one without values when it has no matrix, and
 	// matrixProblem why the guard cannot list them, or "".
 	entries       []map[string]string
@@ -268,8 +270,13 @@ func readCheckJobs(text string) ([]checkJob, error) {
 
 		for _, step := range w.steps {
 			uses, _ := step.uses()
-			if (strings.HasPrefix(uses, "actions/setup-go@") || uses == setupTestRunner) && job.setupGoStep < 0 {
-				job.setupGoStep, job.setupGoLine = step.index, step.line
+			if strings.HasPrefix(uses, "actions/setup-go@") || uses == setupTestRunner {
+				switch n := step.conditional(); {
+				case n != 0:
+					job.setupGoIf = n
+				case job.setupGoStep < 0:
+					job.setupGoStep, job.setupGoLine = step.index, step.line
+				}
 			}
 			if value, node := step.input("save-cache"); node != nil {
 				save := cacheSave{line: node.Line, value: value, ifLine: step.conditional()}
@@ -341,6 +348,9 @@ func runnerJobFindings(file, text string) []string {
 			case job.container != 0:
 				findings = append(findings, fmt.Sprintf("runner jobs: %s runs the %s tier in a job container; "+
 					"run it on the runner with actions/setup-go, as Lint does, so the job pulls no image", at(job, job.container), tier))
+			case job.setupGoStep < 0 && job.setupGoIf != 0:
+				findings = append(findings, fmt.Sprintf("runner jobs: %s sets Go up only under a condition, so a run that skips the step runs the %s tier "+
+					"on the runner's own Go: set it up in a step with no if:", at(job, job.setupGoIf), tier))
 			case job.setupGoStep < 0:
 				findings = append(findings, fmt.Sprintf("runner jobs: %s runs the %s tier on the runner without actions/setup-go; "+
 					"set Go up at the pin with it, or with ./.github/actions/setup-test-runner", at(job, calls[0].line), tier))
@@ -629,6 +639,7 @@ func TestCheckWorkflow_RunnerJobFindings(t *testing.T) {
 	t.Run("the runner's cache saved from a step its condition skips", func(t *testing.T) {
 		assertFindings(t, findings(replace(t, workflow, "      - uses: ./.github/actions/setup-test-runner\n        with:\n",
 			"      - uses: ./.github/actions/setup-test-runner\n        if: ${{ false }}\n        with:\n")),
+			"runner jobs: check.yml:12 (unit-authserver) sets Go up only under a condition",
 			"runner jobs: check.yml:12 (unit-authserver) saves the runner's Go cache from a step under a condition")
 	})
 	t.Run("the container's cache saved from a step its condition skips", func(t *testing.T) {
@@ -646,6 +657,11 @@ func TestCheckWorkflow_RunnerJobFindings(t *testing.T) {
 		assertFindings(t, findings(replace(t, workflow, "      - name: Reach Mailpit by its name\n",
 			"      - name: Reach Mailpit by its name\n        if: github.event_name == 'push'\n")),
 			"runner jobs: check.yml:15 (unit-authserver) adds `127.0.0.1 mailpit` to /etc/hosts only under a condition")
+	})
+	t.Run("a module tier after a setup-go step its condition skips", func(t *testing.T) {
+		assertFindings(t, findings(replace(t, workflow, "      - uses: actions/setup-go@0123 # v7\n",
+			"      - uses: actions/setup-go@0123 # v7\n        if: ${{ false }}\n")),
+			"runner jobs: check.yml:21 (unit-setup) sets Go up only under a condition")
 	})
 	t.Run("a module tier run before Go is set up", func(t *testing.T) {
 		setup := "      - uses: actions/setup-go@0123 # v7\n        with:\n          cache: false\n"
@@ -677,6 +693,9 @@ func TestCheckWorkflow_RunnerJobFindings(t *testing.T) {
 		assertFindings(t, findings(replace(t, workflow, "matrix.tier == 'data' && 'true' || 'false'", "matrix.tier != 'data' && '' || 'true'")),
 			"runner jobs: check.yml saves the container's Go cache in 3 jobs or matrix entries (tests-sqlite (shard: 1/1, tier: data), "+
 				"tests-sqlite (shard: 1/2, tier: integration), tests-sqlite (shard: 2/2, tier: integration))")
+	})
+	t.Run("a selector whose condition joins comparisons with && passes", func(t *testing.T) {
+		assertFindings(t, findings(replace(t, workflow, "matrix.tier == 'data' && 'true'", "matrix.tier == 'data' && matrix.shard == '1/1' && 'true'")))
 	})
 	t.Run("a selector that chooses 'false' outside the data entry passes", func(t *testing.T) {
 		assertFindings(t, findings(replace(t, workflow, "matrix.tier == 'data' && 'true' || 'false'", "matrix.tier != 'data' && 'false' || 'true'")))
