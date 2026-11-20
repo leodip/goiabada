@@ -211,9 +211,15 @@ The Compose project runs Mailpit beside the two servers (`mailpit.yml`, which th
 adds to the wizard's files through `COMPOSE_FILE`, so the wizard's own files stay as it wrote them).
 The auth server sends to it as `mailpit:1025`, which the setup step configures under Settings - Email
 as part of the baseline every run starts from. Its web UI and API listen on the VPS's loopback, port
-18025, and nowhere else: `e2e/test.sh` opens an SSH tunnel to it for the run and passes its address to
-the tests in `E2E_MAILPIT_URL` (`lib/mailpit.ts`). To look at the mail yourself:
-`ssh -L 8025:127.0.0.1:18025 root@<vps>` and open http://localhost:8025.
+18025, and nowhere else: `e2e/test.sh` opens an SSH tunnel to it for the run, opens it again on the
+same port if it drops, and passes its address to the tests in `E2E_MAILPIT_URL` (`lib/mailpit.ts`).
+Wait for mail with `waitForMail` or `waitForSubject` there rather than polling `mailTo` in a test: they
+read again when Mailpit does not answer, and say so when the wait ends on such a read.
+`tests/mailpit.spec.ts` checks them against a Mailpit of its own and needs no environment:
+`npx playwright test tests/mailpit.spec.ts --project chromium --no-deps`. To look at the mail
+yourself: `ssh -o ServerAliveInterval=15 -L 8025:127.0.0.1:18025 root@<vps>` and open
+http://localhost:8025. The keepalive stops a network that drops idle connections from cutting the
+tunnel off while you read.
 
 ## Test app
 

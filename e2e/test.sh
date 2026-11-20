@@ -43,10 +43,10 @@ require_vps
 turnstile_off
 
 # Mailpit's API listens on the VPS's loopback only; the tests read the mail through this tunnel, on a
-# free local port, closed when the run ends.
+# free local port, kept open for the run (opened again on the same port if it drops) and closed when
+# the run ends.
 tunnel_port="$(python3 -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')"
-ssh "${SSH_OPTS[@]}" -o ExitOnForwardFailure=yes -N -L "127.0.0.1:$tunnel_port:127.0.0.1:$E2E_MAILPIT_PORT" \
-  "$E2E_VPS_USER@$E2E_VPS_HOST" &
+keep_tunnel "$tunnel_port" "$E2E_MAILPIT_PORT" &
 tunnel_pid=$!
 trap 'kill "$tunnel_pid" 2>/dev/null' EXIT
 for _ in $(seq 1 20); do
