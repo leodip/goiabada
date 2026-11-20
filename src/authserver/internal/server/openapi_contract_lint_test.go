@@ -3224,6 +3224,123 @@ func (c *Clocked) Check() func(http.Handler) http.Handler {
 	}
 }
 
+// A field its struct declares with a type outside the package, such as a *slog.Logger or a pointer
+// to a struct of the core module, holds no writer of the package whatever filled it, so a walk that
+// reaches through it is read, and the writer beside it answers 422: an optional logger parameter one
+// branch replaces, a value a function of the core module returns, a method called on what an
+// internal helper returns, and a function literal called in place. A field of an interface type a
+// parameter fills the same way, which may hold a writer of the package, is still reported.
+func TestRouteChains_AFieldOfATypeOutsideThePackageIsReadWhateverFilledIt(t *testing.T) {
+	root := t.TempDir()
+	routeShapesFixture(t, root, "\toptional := middleware.NewOptionalLogger(nil)\n"+
+		"\tpages.With(optional.Check()).Get(\"/optional-logger\", apihandlers.HandleOkGet())\n"+
+		"\tvalidated := middleware.NewCoreValidated()\n"+
+		"\tpages.With(validated.Check()).Get(\"/core-validator\", apihandlers.HandleOkGet())\n"+
+		"\thelped := middleware.NewHelperLogger()\n"+
+		"\tpages.With(helped.Check()).Get(\"/helper-logger\", apihandlers.HandleOkGet())\n"+
+		"\tinPlace := middleware.NewLoggerInPlace(nil)\n"+
+		"\tpages.With(inPlace.Check()).Get(\"/logger-in-place\", apihandlers.HandleOkGet())\n"+
+		"\tswapped := middleware.NewSwappedWriter(nil)\n"+
+		"\tpages.With(swapped.Check()).Get(\"/swapped-writer\", apihandlers.HandleOkGet())\n")
+	writeDocFixture(t, root, "internal/helper/logger.go", `package helper
+
+import "log/slog"
+
+func NewLogger() *slog.Logger {
+	return slog.Default()
+}
+`)
+	writeDocFixture(t, root, "internal/middleware/typed.go", `package middleware
+
+import (
+	"log/slog"
+	"net/http"
+
+	"github.com/leodip/goiabada/authserver/internal/helper"
+	"github.com/leodip/goiabada/core/inputvalidation"
+)
+
+type Typed struct {
+	logger    *slog.Logger
+	validator *inputvalidation.IdentifierValidator
+	refusals  writer
+}
+
+func NewOptionalLogger(logger *slog.Logger) *Typed {
+	if logger == nil {
+		logger = slog.Default()
+	}
+	return &Typed{logger: logger, refusals: unprocessable{}}
+}
+
+func NewCoreValidated() *Typed {
+	validator := inputvalidation.NewIdentifierValidator()
+	return &Typed{validator: validator, refusals: unprocessable{}}
+}
+
+func NewHelperLogger() *Typed {
+	return &Typed{logger: helper.NewLogger().With("component", "typed"), refusals: unprocessable{}}
+}
+
+func NewLoggerInPlace(logger *slog.Logger) *Typed {
+	scoped := func() *slog.Logger {
+		if logger == nil {
+			return slog.Default()
+		}
+		return logger.With("component", "typed")
+	}()
+	return &Typed{logger: scoped, refusals: unprocessable{}}
+}
+
+func NewSwappedWriter(refusals writer) *Typed {
+	if refusals == nil {
+		refusals = unprocessable{}
+	}
+	return &Typed{refusals: refusals}
+}
+
+func (m *Typed) Check() func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if err := m.validator.Validate(r.PathValue("id"), true); err != nil {
+				m.logger.InfoContext(r.Context(), "refused")
+				m.refusals.refuse(w)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+`)
+	routes, handlers, report := fixtureRouteChains(t, root, 1, 1)
+
+	if report.Stopped || len(report.Errors) != 1 ||
+		!strings.Contains(report.Errors[0], "GET /swapped-writer mounts swapped.Check, which the status lint cannot read") {
+		t.Fatalf("only the writer field a reassigned parameter fills should fail the check: %+v", report)
+	}
+	chains := map[string][]int{}
+	for _, r := range routes {
+		chains[r.key] = sortedKeysInt(r.chain)
+	}
+	assertChains(t, chains, map[string][]int{"get /optional-logger": {422}, "get /core-validator": {422},
+		"get /helper-logger": {422}, "get /logger-in-place": {422}, "get /swapped-writer": {}})
+
+	ids := map[string]string{"get /optional-logger": "getOptionalLogger", "get /core-validator": "getCoreValidator",
+		"get /helper-logger": "getHelperLogger", "get /logger-in-place": "getLoggerInPlace"}
+	report = guard.Run(func(r guard.Reporter) {
+		assertDeclaresEveryStatus(r, routes, handlers, declaringEach(ids, 200))
+	})
+	joined := strings.Join(report.Errors, "\n")
+	if report.Stopped || len(report.Errors) != 4 ||
+		!strings.Contains(joined, "getOptionalLogger (GET /optional-logger) can answer 422 from optional.Check") ||
+		!strings.Contains(joined, "getCoreValidator (GET /core-validator) can answer 422 from validated.Check") ||
+		!strings.Contains(joined, "getHelperLogger (GET /helper-logger) can answer 422 from helped.Check") ||
+		!strings.Contains(joined, "getLoggerInPlace (GET /logger-in-place) can answer 422 from inPlace.Check") {
+		t.Errorf("a spec omitting the 422 of a writer beside a field of a type outside the package did not "+
+			"fail once per route: %+v", report)
+	}
+}
+
 // Each Go file has its own imports, so a name is read as the package the file it stands in imports
 // under it, whichever order a package's files sort in. Here the middleware's file and the helper's
 // file declaring Recorder import log/slog as logging, while a sibling file of each, sorting before
@@ -4400,6 +4517,13 @@ const (
 // package routes.go imports under it lives in the directory of the same relative path.
 const authserverInternalImport = "github.com/leodip/goiabada/authserver/internal/"
 
+// coreImport is the import path prefix of the core module's packages, which the chain resolver
+// reads from coreRoot, the module's directory as seen from this package's, as a call's result type
+// is read. The fixtures read the real core module too: they write no package of their own there.
+const coreImport = "github.com/leodip/goiabada/core/"
+
+var coreRoot = filepath.Join("..", "..", "..", "core")
+
 // readRouteChains is the reporting half of routeChains: one failure per finding, and a stop for a
 // walk that could not be read, read fewer distinct middleware than middleware, or followed fewer
 // calls than calls.
@@ -4450,7 +4574,10 @@ func readRouteChains(r guard.Reporter, routesPath, internalRoot string, routes [
 // middleware unreadable where a method reaches through it, and nowhere else, and so does one a
 // call into another package fills whose declared result may be a writer of the package, such as
 // a generic function's type parameter: that result is read from the source of a package under
-// internal and from the compiled standard library's signature otherwise (fieldFiller.outside).
+// internal or of the core module, and from the compiled standard library's signature otherwise
+// (fieldFiller.outside). Neither makes the middleware unreadable when the struct declares the field
+// with a type outside the package, such as a *slog.Logger, which holds no writer of the package
+// whatever filled it (chainResolver.fieldOutside).
 // Every name of a constructor or a method is read as the declaration it refers to where it
 // stands, so a local that shadows another, or the receiver, is its own variable.
 //
@@ -5402,10 +5529,11 @@ func (f fieldFiller) localHolds(assigned ast.Expr) (fieldBinding, bool) {
 // of p or function literal returning nothing or a type typeOutside reads as outside p, and a call
 // to a function of an imported package, pkg.F(...), or a method on what such a call returns,
 // pkg.F(...).M(...), whose declared result is such a type, read from the source of a package under
-// internal and from the compiled standard library otherwise. Anything else may hold a writer of the
-// package: a field of another value, v.field, a method called on one, v.M(), a variable of the
-// package, a call to a local function, a result of an interface type such as any, or a result of a
-// type parameter, which is whatever the call was handed, such as a generic identity function's.
+// internal or of the core module and from the compiled standard library otherwise. Anything else
+// may hold a writer of the package: a field of another value, v.field, a method called on one,
+// v.M(), a variable of the package, a call to a local function, a result of an interface type such
+// as any, or a result of a type parameter, which is whatever the call was handed, such as a generic
+// identity function's.
 func (f fieldFiller) outside(e ast.Expr) bool {
 	e = ast.Unparen(e)
 	if addr, isAddr := e.(*ast.UnaryExpr); isAddr && addr.Op == token.AND {
@@ -5477,10 +5605,10 @@ func typeParamNames(list *ast.FieldList) map[string]bool {
 // interface, which may hold a writer of p, nor a type parameter, which is whatever its caller
 // chose, nor a type of p. A predeclared type such as string, a struct, map, slice, function or
 // channel type spelled in place, a pointer to one, and a named type of another package whose
-// definition is one of those, are outside. A named type of a package under internal is read from
-// its source, in the file declaring it, and one of another package from the compiled standard
-// library, so an interface such as any or error, or a type the lint cannot find, is not outside.
-// seen names the types of q being read, so a recursive one is read once.
+// definition is one of those, are outside. A named type of a package under internal or of the core
+// module is read from its source, in the file declaring it, and one of another package from the
+// compiled standard library, so an interface such as any or error, or a type the lint cannot find,
+// is not outside. seen names the types of q being read, so a recursive one is read once.
 func (c *chainResolver) typeOutside(p, q *goPackage, imports fileImports, t ast.Expr, typeParams, seen map[string]bool) bool {
 	switch x := ast.Unparen(t).(type) {
 	case *ast.StarExpr:
@@ -5510,7 +5638,7 @@ func (c *chainResolver) typeOutside(p, q *goPackage, imports fileImports, t ast.
 		if !imported {
 			return false
 		}
-		if r, ok := c.internalPkg(path); ok {
+		if r, ok := c.sourcePkg(path); ok {
 			return c.typeOutside(p, r, nil, ast.NewIdent(x.Sel.Name), nil, map[string]bool{})
 		}
 		pkg, ok := c.stdPackage(path)
@@ -5550,9 +5678,10 @@ func sourceResult(q *goPackage, src funcSource) declaredType {
 
 // callResult is the declared first result of call, which stands in a file with the imports imports:
 // a call of a function of a package the file imports, pkg.F(...), or of a method on what such a call
-// returns, pkg.F(...).M(...), at any depth. A package under internal is read from its source, and
-// any other from the compiled standard library. It is false for any other call, and for one whose
-// function or method the lint cannot find, such as a method a type gains by embedding.
+// returns, pkg.F(...).M(...), at any depth. A package under internal or of the core module is read
+// from its source, and any other from the compiled standard library. It is false for any other
+// call, and for one whose function or method the lint cannot find, such as a method a type gains by
+// embedding.
 func (c *chainResolver) callResult(imports fileImports, call *ast.CallExpr, scopes scopeIndex) (declaredType, bool) {
 	sel, ok := ast.Unparen(call.Fun).(*ast.SelectorExpr)
 	if !ok {
@@ -5563,7 +5692,7 @@ func (c *chainResolver) callResult(imports fileImports, call *ast.CallExpr, scop
 		if !imported || scopes.at(root) != nil {
 			return declaredType{}, false
 		}
-		if q, internal := c.internalPkg(path); internal {
+		if q, fromSource := c.sourcePkg(path); fromSource {
 			decls := q.funcs[sel.Sel.Name]
 			if len(decls) != 1 {
 				return declaredType{}, false
@@ -5658,14 +5787,18 @@ func stdTypeOutside(t types.Type) bool {
 	return !types.IsInterface(t)
 }
 
-// internalPkg is the package under internal at the import path path, read from its source, or false
-// for a path elsewhere or a directory the tree does not hold.
-func (c *chainResolver) internalPkg(path string) (*goPackage, bool) {
-	rel, internal := strings.CutPrefix(path, authserverInternalImport)
-	if !internal {
+// sourcePkg is the package at the import path path read from its source: one under internal, or
+// one of the core module, which imports none of the applications and so declares no type of
+// theirs. It is false for a path elsewhere or a directory the tree does not hold.
+func (c *chainResolver) sourcePkg(path string) (*goPackage, bool) {
+	var dir string
+	if rel, internal := strings.CutPrefix(path, authserverInternalImport); internal {
+		dir = filepath.Join(c.internalRoot, filepath.FromSlash(rel))
+	} else if rel, core := strings.CutPrefix(path, coreImport); core {
+		dir = filepath.Join(coreRoot, filepath.FromSlash(rel))
+	} else {
 		return nil, false
 	}
-	dir := filepath.Join(c.internalRoot, filepath.FromSlash(rel))
 	if info, err := os.Stat(dir); err != nil || !info.IsDir() {
 		return nil, false
 	}
@@ -5713,7 +5846,7 @@ func (c *chainResolver) walk(p *goPackage, start chainWalk) (map[int]bool, bool)
 			var resolved map[*ast.SelectorExpr]bool
 			if next.method {
 				var unread bool
-				calls, resolved, unread = receiverCalls(src.decl, next.binding, p)
+				calls, resolved, unread = c.receiverCalls(src.decl, next.binding, p)
 				if unread {
 					return nil, false
 				}
@@ -5807,8 +5940,10 @@ func chainStatuses(path string, fset *token.FileSet, fn *ast.FuncDecl,
 // shadows it is not read with the receiver's binding. It also returns the selectors it resolved,
 // which name a method of the package rather than a port, and whether the body reaches through a
 // field an unread helper filled, at any depth, recv.field.X, whose type it cannot tell, or names a
-// method of the package through a shadowing local, whose value it does not read.
-func receiverCalls(fn *ast.FuncDecl, binding fieldBinding, p *goPackage) ([]chainWalk, map[*ast.SelectorExpr]bool, bool) {
+// method of the package through a shadowing local, whose value it does not read. A field its struct
+// declares with a type outside the package, as fieldOutside reads it, such as a *slog.Logger, holds
+// nothing of the package whatever filled it, so the walk passes it by rather than stopping there.
+func (c *chainResolver) receiverCalls(fn *ast.FuncDecl, binding fieldBinding, p *goPackage) ([]chainWalk, map[*ast.SelectorExpr]bool, bool) {
 	if len(fn.Recv.List[0].Names) == 0 {
 		return nil, nil, false
 	}
@@ -5843,7 +5978,7 @@ func receiverCalls(fn *ast.FuncDecl, binding fieldBinding, p *goPackage) ([]chai
 		for _, name := range path {
 			field, filled := at.fields[name]
 			if field.unread {
-				unread = true
+				unread = unread || !c.fieldOutside(p, at.typ, name)
 				return true
 			}
 			if !filled {
@@ -5859,6 +5994,30 @@ func receiverCalls(fn *ast.FuncDecl, binding fieldBinding, p *goPackage) ([]chai
 		return true
 	})
 	return out, resolved, unread
+}
+
+// fieldOutside reports whether the struct type typ of package p declares its field name with a
+// type typeOutside reads as outside p, such as a *slog.Logger or a pointer to a struct of the core
+// module. A value of that type holds nothing a walk of p can reach through, whichever value filled
+// the field, a parameter reassigned on one branch or a helper's result alike. A field of an
+// interface type, which may hold a writer of p, or of a type the lint cannot find, is not outside.
+func (c *chainResolver) fieldOutside(p *goPackage, typ, name string) bool {
+	declared, isDeclared := p.types[typ]
+	if !isDeclared {
+		return false
+	}
+	st, isStruct := declared.spec.Type.(*ast.StructType)
+	if !isStruct {
+		return false
+	}
+	for _, field := range st.Fields.List {
+		for _, id := range field.Names {
+			if id.Name == name {
+				return c.typeOutside(p, p, declared.imports, field.Type, typeParamNames(declared.spec.TypeParams), map[string]bool{})
+			}
+		}
+	}
+	return false
 }
 
 // specOperation is the part of an operation these tests read.
