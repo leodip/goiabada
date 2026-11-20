@@ -84,6 +84,8 @@ tags:
     description: User session management (Admin API)
   - name: User Consents
     description: OAuth consent management (Admin API)
+  - name: User Connected Clients
+    description: A user's connected clients and their disconnect (Admin API)
   - name: Groups
     description: Group management (Admin API)
   - name: Group Members
@@ -1102,9 +1104,13 @@ paths:
       tags: [User Consents]
       summary: Revoke consent
       description: >-
-        Revoke an OAuth consent. The refresh tokens the user holds with that client are revoked
-        too, offline ones included, and so are the user's authorization codes with that client
-        not yet redeemed.
+        Revoke an OAuth consent. This disconnects the consent's client from its user, exactly as
+        `DELETE /api/v1/admin/users/{id}/connected-clients/{clientId}` does: the refresh tokens
+        the user holds with that client are revoked too, offline ones included, and so are the
+        user's authorization codes with that client not yet redeemed, and the auth server tries
+        to tell the client with a logout token. Only `authserver:manage` revokes a consent of an
+        administrator. Answers 404 when the consent does not exist, or another request deleted it
+        first and left nothing to end.
       operationId: deleteUserConsent
       parameters:
         - name: id
@@ -1117,6 +1123,105 @@ paths:
       responses:
         '200':
           description: Consent revoked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  # =============================================================================
+  # ADMIN API - USER CONNECTED CLIENTS
+  # =============================================================================
+  /api/v1/admin/users/{id}/connected-clients:
+    get:
+      tags: [User Connected Clients]
+      summary: List a user's connected clients
+      description: |
+        Every client the user is connected to, in client id order: each client the user holds a
+        stored consent with, or a live refresh token with, from any session or device, and from
+        the password grant. A refresh token is live when it is not revoked and has not expired. A
+        client that is only on one of the user's sessions is not listed. `clients` is `[]` when
+        there are none, never null.
+
+        `consent` is the stored consent, null when there is none. `grantScope` is the scopes the
+        user's live refresh tokens with the client record, merged, empty when there are none. It is
+        what those tokens record, not what a refresh would issue now: the token endpoint checks
+        consent and permissions again at each refresh. The two can differ. `isCurrent` marks the
+        client the calling token was issued to, on the caller's own user only: it is false on
+        every row of another user, and on every row for a client credentials token.
+
+        A client holding only an authorization code not yet redeemed is not listed, but
+        disconnecting it still revokes the code.
+
+        The route admits `authserver:admin-read`, `authserver:manage-users` and
+        `authserver:manage`.
+      operationId: getUserConnectedClients
+      parameters:
+        - $ref: '#/components/parameters/UserIdParam'
+      responses:
+        '200':
+          description: The user's connected clients
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetConnectedClientsResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/admin/users/{id}/connected-clients/{clientId}:
+    delete:
+      tags: [User Connected Clients]
+      summary: Disconnect a client from a user
+      description: |
+        Disconnect one client from the user, whether or not the user gave it a consent: revoke the
+        user's authorization codes with it not yet redeemed and every refresh token the user holds
+        with it, offline and password-grant ones included, on every session and device, and delete
+        the stored consent when there is one. Access tokens of those grants are refused at once at
+        `/userinfo`, introspection and this API. The user's sessions and their other clients are
+        untouched, and the client can ask to sign the user in again: a disconnect is not a ban.
+        Access tokens from the implicit flow are not reached, and a code exchange already under
+        way when the disconnect commits may still complete.
+
+        The auth server tries to tell the client with a logout token at its back-channel logout
+        URI, naming the user alone; a client that requires `sid` is sent one for each of the user's
+        still-valid sessions it is on, and nothing when it is on none.
+
+        The route admits `authserver:manage-users` and `authserver:manage`. Only
+        `authserver:manage` disconnects a client from an administrator: `authserver:manage-users`
+        is refused with 403 MANAGE_SCOPE_REQUIRED.
+
+        Answers 404 when the user or the client does not exist, or when the user held nothing with
+        the client to end; such a call changes nothing and tells nobody.
+      operationId: deleteUserConnectedClient
+      parameters:
+        - $ref: '#/components/parameters/UserIdParam'
+        - name: clientId
+          in: path
+          required: true
+          description: Client ID, the numeric id `clientId` in the list
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Client disconnected
           content:
             application/json:
               schema:
@@ -7397,7 +7502,9 @@ components:
             space-delimited value, empty when there are none.
           type: string
         isCurrent:
-          description: Whether this is the client the calling token was issued to, for the calling user.
+          description: |
+            Whether this is the client the calling token was issued to, and the listed user is the
+            caller.
           type: boolean
       required:
         - clientId

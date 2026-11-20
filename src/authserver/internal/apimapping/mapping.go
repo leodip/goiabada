@@ -312,6 +312,17 @@ func ToAccountConnectedClientResponse(client *record.Client, consent *record.Use
 	return resp
 }
 
+// ToUserConnectedClientResponse maps one of a user's connected clients for the admin endpoint
+// (#135 decision 4): as ToAccountConnectedClientResponse, with the client described as
+// ToUserConsentResponse describes it, its stored description in full.
+func ToUserConnectedClientResponse(client *record.Client, consent *record.UserConsent, grantScope string,
+	isCurrent bool) api.ConnectedClientResponse {
+
+	resp := ToAccountConnectedClientResponse(client, consent, grantScope, isCurrent)
+	resp.ClientDescription = client.Description
+	return resp
+}
+
 func ToGroupResponse(group *record.Group, memberCount int) *api.GroupResponse {
 	if group == nil {
 		return nil

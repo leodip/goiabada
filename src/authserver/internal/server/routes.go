@@ -361,6 +361,10 @@ func (s *Server) initRoutes(branches appBranches) {
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/users/{id}/consents", apihandlers.HandleUserConsentsGet(s.database))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Delete("/user-consents/{id}", apihandlers.HandleUserConsentDelete(s.database, auditLogger, logoutTokens))
 
+		// A user's connected clients: consents and live grants, and their disconnect (#135 decision 2).
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/users/{id}/connected-clients", apihandlers.HandleUserConnectedClientsGet(s.database))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Delete("/users/{id}/connected-clients/{clientId}", apihandlers.HandleUserConnectedClientDelete(s.database, auditLogger, logoutTokens))
+
 		// The legal document versions the user accepted, read as part of the user (#622 decision 6).
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/users/{id}/legal-document-acceptances", apihandlers.HandleUserLegalDocumentAcceptancesGet(s.database, baseURL))
 

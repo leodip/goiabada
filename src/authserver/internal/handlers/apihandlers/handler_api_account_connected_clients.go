@@ -18,11 +18,11 @@ import (
 	"github.com/leodip/goiabada/core/api"
 )
 
-// accountConnectedClientsDatabase is what the account's connected clients need: the caller, their
+// connectedClientsDatabase is what a user's connected clients need on either API: the user's
 // consents and live grants and the clients those name, for the list; and, for the disconnect, the
 // client and the consent it deletes, beside what revocation.Database revokes (#135 decisions 1, 2
 // and 4).
-type accountConnectedClientsDatabase interface {
+type connectedClientsDatabase interface {
 	revocation.Database
 
 	DeleteUserConsent(ctx context.Context, tx *sql.Tx, userConsentId int64) (bool, error)
@@ -30,6 +30,13 @@ type accountConnectedClientsDatabase interface {
 	GetConsentByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (*record.UserConsent, error)
 	GetConsentsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserConsent, error)
 	GetLiveGrantsByUserId(ctx context.Context, tx *sql.Tx, userId int64, now time.Time) ([]record.LiveGrant, error)
+}
+
+// accountConnectedClientsDatabase is what the account's connected clients need: the caller, beside
+// what any user's connected clients need.
+type accountConnectedClientsDatabase interface {
+	connectedClientsDatabase
+
 	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error)
 }
 
@@ -46,7 +53,7 @@ type connectedClient struct {
 // that is only on one of the user's sessions is not one, since a disconnect leaves those rows. Each
 // client's grant scope is the scopes its live refresh tokens record, in the order they first appear
 // across the tokens taken oldest first, each once.
-func connectedClientsOf(ctx context.Context, database accountConnectedClientsDatabase, userId int64,
+func connectedClientsOf(ctx context.Context, database connectedClientsDatabase, userId int64,
 	now time.Time) ([]connectedClient, error) {
 
 	consents, err := database.GetConsentsByUserId(ctx, nil, userId)
@@ -112,6 +119,33 @@ func connectedClientsOf(ctx context.Context, database accountConnectedClientsDat
 		})
 	}
 	return connected, nil
+}
+
+// disconnectClient disconnects the client from the user: revocation.DisconnectClientTx, the
+// operation a consent withdrawal runs, deleting the user's consent to the client when there is one
+// (#135 decisions 1 and 2). It answers what the transaction changed and the id of the consent it
+// deleted, zero when it deleted none.
+func disconnectClient(ctx context.Context, database connectedClientsDatabase, userId int64, clientId int64,
+	settings *record.Settings) (revocation.DisconnectResult, int64, error) {
+
+	// The consent is read inside the transaction, as its first step, so a consent given between
+	// the request's reads and its sweep is deleted with the rest. The body can run again after a
+	// deadlock, so the id is set afresh on each attempt.
+	var consentId int64
+	result, err := revocation.DisconnectClientTx(ctx, database, userId, clientId,
+		sessionLive(settings), func(tx *sql.Tx) (bool, error) {
+			consentId = 0
+			consent, getErr := database.GetConsentByUserIdAndClientId(ctx, tx, userId, clientId)
+			if getErr != nil || consent == nil {
+				return false, getErr
+			}
+			consentId = consent.Id
+			return database.DeleteUserConsent(ctx, tx, consent.Id)
+		})
+	if err != nil || !result.ConsentDeleted {
+		consentId = 0
+	}
+	return result, consentId, err
 }
 
 // GET /api/v1/account/connected-clients
@@ -209,20 +243,7 @@ func HandleAccountConnectedClientDelete(
 			return
 		}
 
-		// The consent is read inside the transaction, as its first step, so a consent given
-		// between this request's reads and its sweep is deleted with the rest. The body can run
-		// again after a deadlock, so the id is set afresh on each attempt.
-		var consentId int64
-		result, err := revocation.DisconnectClientTx(r.Context(), database, user.Id, client.Id,
-			sessionLive(settings), func(tx *sql.Tx) (bool, error) {
-				consentId = 0
-				consent, getErr := database.GetConsentByUserIdAndClientId(r.Context(), tx, user.Id, client.Id)
-				if getErr != nil || consent == nil {
-					return false, getErr
-				}
-				consentId = consent.Id
-				return database.DeleteUserConsent(r.Context(), tx, consent.Id)
-			})
+		result, consentId, err := disconnectClient(r.Context(), database, user.Id, client.Id, settings)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
