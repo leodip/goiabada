@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -15,11 +17,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/data/sqlitedb"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/recovery"
 	"github.com/leodip/goiabada/authserver/internal/signingkeys"
+	"github.com/leodip/goiabada/core/logging/logtest"
 )
 
 // The recover command tells the recovered user's apps that the user was signed out, after its
@@ -365,4 +369,94 @@ func TestRecover_AnUnusableDataKeyLeavesTheRecoveryAndSaysTheAppsWereNotTold(t *
 		"signed without the data encryption key: GOIABADA_AES_ENCRYPTION_KEY is required\n", errOut.String())
 	assert.Empty(t, rc.all())
 	assert.Equal(t, int64(1), recoverUser(t, db).AuthStateGeneration, "the recovery committed")
+}
+
+// recoverTestDataKeyHex is the key the test databases' signing key is sealed under, as an operator
+// sets it in GOIABADA_AES_ENCRYPTION_KEY or GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS.
+var recoverTestDataKeyHex = hex.EncodeToString([]byte("recover-test-data-key-0123456789"))
+
+// recoverRotationDataKey is the data key the command reads from a configuration holding both keys,
+// through the reader main uses.
+func recoverRotationDataKey(t *testing.T, current, previous string) recoverDataKey {
+	t.Helper()
+	dataKey := readRecoverDataKey(&config.Config{AESEncryptionKey: current, AESEncryptionKeyPrevious: previous})
+	require.NoError(t, dataKey.err)
+	return dataKey
+}
+
+// storedSigningKey answers the signing key's sealed private key as the database holds it.
+func storedSigningKey(t *testing.T, db *sqlitedb.Database) []byte {
+	t.Helper()
+	keyPair, err := db.GetCurrentSigningKey(context.Background(), nil)
+	require.NoError(t, err)
+	require.NotNil(t, keyPair)
+	return keyPair.PrivateKeyPEM
+}
+
+// TestRecover_SignsWithASigningKeySealedUnderThePreviousKey is #794: an operator who set a new
+// GOIABADA_AES_ENCRYPTION_KEY and kept the old one as GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS runs
+// recover while the signing key is still sealed under the old one. The command opens it with the
+// previous key, as the server does (#492 decision 7), so the app is told and the token verifies
+// against the signing key; and it re-encrypts nothing, leaving the stored key byte for byte.
+func TestRecover_SignsWithASigningKeySealedUnderThePreviousKey(t *testing.T) {
+	db, _ := newRecoverDatabase(t)
+	user := recoverUser(t, db)
+	rc := newLogoutReceiver(t, db, user.Id, nil)
+	app := seedLogoutClient(t, db, "app-sub-only", rc.server.URL+"/sub-only", false)
+	seedLogoutSession(t, db, user.Id, "sid-valid", time.Minute, app)
+	before := storedSigningKey(t, db)
+
+	m, err := db.NewMigrator(context.Background(), nil)
+	require.NoError(t, err)
+	var out, errOut strings.Builder
+	code := runRecover(context.Background(), db, m, &recoverAuditRecorder{},
+		recoverInvocation{email: "admin@example.com", grantManage: true},
+		recoverRotationDataKey(t, strings.Repeat("ab", 32), recoverTestDataKeyHex), &out, &errOut)
+
+	assert.Equal(t, migrateExitOK, code, errOut.String())
+	assert.Empty(t, errOut.String())
+	posts := rc.received("/sub-only")
+	require.Len(t, posts, 1, "the app is sent its token\n%s", out.String())
+	assert.Equal(t, "recover-subject", posts[0].claims["sub"])
+	lines := outputLines(out.String())
+	assert.Contains(t, lines, "  app-sub-only: delivered")
+	assert.Equal(t, "apps told: 1, not told: 0", lines[len(lines)-1])
+	assert.Equal(t, before, storedSigningKey(t, db), "the command re-encrypts nothing")
+}
+
+// TestRecover_NamesTheCauseWhenNeitherKeyOpensTheSigningKey: with two keys configured and the
+// signing key sealed under a third, no token can be signed. The recovery stands, the app is
+// reported as not told, nothing is sent, and the record the delivery writes says that neither data
+// key opens the value, which is what the operator has to put right.
+func TestRecover_NamesTheCauseWhenNeitherKeyOpensTheSigningKey(t *testing.T) {
+	db, _ := newRecoverDatabase(t)
+	user := recoverUser(t, db)
+	rc := newLogoutReceiver(t, db, user.Id, nil)
+	app := seedLogoutClient(t, db, "app-sub-only", rc.server.URL+"/sub-only", false)
+	seedLogoutSession(t, db, user.Id, "sid-valid", time.Minute, app)
+	logs := logtest.CaptureSlog(t)
+
+	m, err := db.NewMigrator(context.Background(), nil)
+	require.NoError(t, err)
+	var out, errOut strings.Builder
+	code := runRecover(context.Background(), db, m, &recoverAuditRecorder{},
+		recoverInvocation{email: "admin@example.com", grantManage: true},
+		recoverRotationDataKey(t, strings.Repeat("ab", 32), strings.Repeat("cd", 32)), &out, &errOut)
+
+	assert.Equal(t, migrateExitOK, code, "an app not told does not fail the recovery: %s", errOut.String())
+	assert.Equal(t, int64(1), recoverUser(t, db).AuthStateGeneration, "the recovery committed")
+	assert.Empty(t, rc.all(), "no token was signed, so none was sent")
+	lines := outputLines(out.String())
+	assert.Contains(t, lines, "  app-sub-only: failed")
+	assert.Equal(t, "apps told: 0, not told: 1", lines[len(lines)-1])
+
+	var causes []string
+	for _, r := range logs.Records() {
+		if r.Message == "a logout token was not delivered" {
+			causes = append(causes, fmt.Sprint(r.Attrs["error"]))
+		}
+	}
+	require.Len(t, causes, 1, logs.Text())
+	assert.Contains(t, causes[0],
+		"the value decrypts under neither the current data encryption key nor the previous one")
 }

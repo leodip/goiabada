@@ -3,6 +3,7 @@ package encryption
 import (
 	"bytes"
 	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -185,5 +186,169 @@ func TestDataCipher_OpensWhatEncryptTextSealed(t *testing.T) {
 	}
 	if pt, err := DecryptText(sealed, []byte(testDataKey)); err != nil || pt != "sealed-by-the-cipher" {
 		t.Errorf("DecryptText of a cipher value = %q, %v", pt, err)
+	}
+}
+
+// thirdDataKey is a key neither of a rotation's two keys is.
+const thirdDataKey = "0011223344556677001122334455667f"
+
+func newRotatingTestCipher(t *testing.T, current, previous string) *DataCipher {
+	t.Helper()
+	c, err := NewDataCipherWithPrevious([]byte(current), []byte(previous))
+	if err != nil {
+		t.Fatalf("NewDataCipherWithPrevious: %v", err)
+	}
+	return c
+}
+
+// TestDataCipherWithPrevious_OpensUnderEitherKey is the rotation's reading half (#492 decision 2):
+// a value sealed under the current key and one sealed under the previous key both open, each to its
+// own plaintext. The values are sealed by ciphers holding one key each, independently of the
+// cipher under test.
+func TestDataCipherWithPrevious_OpensUnderEitherKey(t *testing.T) {
+	c := newRotatingTestCipher(t, otherDataKey, testDataKey)
+
+	underPrevious, err := EncryptText("sealed-under-the-previous-key", []byte(testDataKey))
+	if err != nil {
+		t.Fatalf("EncryptText: %v", err)
+	}
+	underCurrent, err := EncryptText("sealed-under-the-current-key", []byte(otherDataKey))
+	if err != nil {
+		t.Fatalf("EncryptText: %v", err)
+	}
+
+	if pt, err := c.Decrypt(underPrevious); err != nil || pt != "sealed-under-the-previous-key" {
+		t.Errorf("a value under the previous key opens as %q, %v", pt, err)
+	}
+	if pt, err := c.Decrypt(underCurrent); err != nil || pt != "sealed-under-the-current-key" {
+		t.Errorf("a value under the current key opens as %q, %v", pt, err)
+	}
+}
+
+// TestDataCipherWithPrevious_SealsUnderTheCurrentKey is the rotation's writing half: what the
+// cipher seals opens under the current key alone and not under the previous key alone, so nothing
+// it writes stays on the key the database is leaving.
+func TestDataCipherWithPrevious_SealsUnderTheCurrentKey(t *testing.T) {
+	c := newRotatingTestCipher(t, otherDataKey, testDataKey)
+
+	sealed, err := c.Encrypt("a-secret-value")
+	if err != nil {
+		t.Fatalf("Encrypt: %v", err)
+	}
+	if pt, err := DecryptText(sealed, []byte(otherDataKey)); err != nil || pt != "a-secret-value" {
+		t.Errorf("under the current key alone the sealed value opens as %q, %v", pt, err)
+	}
+	if _, err := DecryptText(sealed, []byte(testDataKey)); err == nil {
+		t.Error("the previous key alone opened what the cipher sealed")
+	}
+}
+
+// TestDataCipherWithPrevious_NamesNeitherKey: a value under a third key opens under neither, and
+// the error says so, since that is what a caller logs and an operator reads.
+func TestDataCipherWithPrevious_NamesNeitherKey(t *testing.T) {
+	c := newRotatingTestCipher(t, otherDataKey, testDataKey)
+
+	elsewhere, err := EncryptText("sealed-under-a-third-key", []byte(thirdDataKey))
+	if err != nil {
+		t.Fatalf("EncryptText: %v", err)
+	}
+	pt, err := c.Decrypt(elsewhere)
+	if err == nil {
+		t.Fatalf("a value under a third key opened as %q", pt)
+	}
+	const want = "the value decrypts under neither the current data encryption key nor the previous one"
+	if !strings.Contains(err.Error(), want) {
+		t.Errorf("error = %q, want it to contain %q", err.Error(), want)
+	}
+	if pt != "" {
+		t.Errorf("a plaintext came back beside the error: %q", pt)
+	}
+}
+
+// TestDataCipherWithPrevious_RefusesATamperedCiphertext holds the two-key cipher to the one-key
+// cipher's refusal: a value under the previous key with one byte altered opens under neither.
+func TestDataCipherWithPrevious_RefusesATamperedCiphertext(t *testing.T) {
+	c := newRotatingTestCipher(t, otherDataKey, testDataKey)
+	ct, err := EncryptText("a-secret-value", []byte(testDataKey))
+	if err != nil {
+		t.Fatalf("EncryptText: %v", err)
+	}
+	tampered := append([]byte(nil), ct...)
+	tampered[len(tampered)-1] ^= 0x01
+	if _, err := c.Decrypt(tampered); err == nil {
+		t.Error("a tampered value under the previous key was opened")
+	}
+}
+
+// TestDataCipherWithPrevious_APreviousKeyThatTakesNoPart: a previous key that is absent, or equal
+// to the current one, takes no part. The cipher is then the one-key cipher: it opens the current
+// key's values, refuses another key's, and answers that key's own error rather than one naming a
+// previous key.
+func TestDataCipherWithPrevious_APreviousKeyThatTakesNoPart(t *testing.T) {
+	for name, previous := range map[string][]byte{"absent": nil, "empty": {}, "equal": []byte(testDataKey)} {
+		c, err := NewDataCipherWithPrevious([]byte(testDataKey), previous)
+		if err != nil {
+			t.Fatalf("%s: NewDataCipherWithPrevious: %v", name, err)
+		}
+		mine, err := EncryptText("mine", []byte(testDataKey))
+		if err != nil {
+			t.Fatalf("EncryptText: %v", err)
+		}
+		if pt, err := c.Decrypt(mine); err != nil || pt != "mine" {
+			t.Errorf("%s: the current key's value opens as %q, %v", name, pt, err)
+		}
+		other, err := EncryptText("other", []byte(otherDataKey))
+		if err != nil {
+			t.Fatalf("EncryptText: %v", err)
+		}
+		_, err = c.Decrypt(other)
+		if err == nil {
+			t.Errorf("%s: another key's value was opened", name)
+			continue
+		}
+		if strings.Contains(err.Error(), "previous") {
+			t.Errorf("%s: with no previous key the error names one: %q", name, err.Error())
+		}
+	}
+}
+
+// TestNewDataCipherWithPrevious_KeyLengths: either key at the wrong length is refused, with no
+// cipher beside the error, so no caller goes on with half a validated pair.
+func TestNewDataCipherWithPrevious_KeyLengths(t *testing.T) {
+	good := []byte(testDataKey)
+	for _, n := range []int{1, 31, 33} {
+		short := bytes.Repeat([]byte{'k'}, n)
+
+		c, err := NewDataCipherWithPrevious(good, short)
+		want := "previous data encryption key must be 32 bytes, but it has " + strconv.Itoa(n) + " bytes"
+		if err == nil || err.Error() != want || c != nil {
+			t.Errorf("a %d-byte previous key: got %v, %v; want nil, %q", n, c, err, want)
+		}
+
+		c, err = NewDataCipherWithPrevious(short, good)
+		want = "data encryption key must be 32 bytes, but it has " + strconv.Itoa(n) + " bytes"
+		if err == nil || err.Error() != want || c != nil {
+			t.Errorf("a %d-byte current key: got %v, %v; want nil, %q", n, c, err, want)
+		}
+	}
+}
+
+// TestNewDataCipherWithPrevious_CopiesThePreviousKey: the caller zeroing its previous key after
+// construction leaves the cipher opening what that key sealed.
+func TestNewDataCipherWithPrevious_CopiesThePreviousKey(t *testing.T) {
+	previous := []byte(testDataKey)
+	c, err := NewDataCipherWithPrevious([]byte(otherDataKey), previous)
+	if err != nil {
+		t.Fatalf("NewDataCipherWithPrevious: %v", err)
+	}
+	for i := range previous {
+		previous[i] = 0
+	}
+	stored, err := EncryptText("sealed-under-the-previous-key", []byte(testDataKey))
+	if err != nil {
+		t.Fatalf("EncryptText: %v", err)
+	}
+	if pt, err := c.Decrypt(stored); err != nil || pt != "sealed-under-the-previous-key" {
+		t.Errorf("after the caller zeroed its previous key, Decrypt = %q, %v", pt, err)
 	}
 }

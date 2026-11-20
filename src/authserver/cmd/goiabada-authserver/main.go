@@ -192,8 +192,10 @@ func run() int {
 		return 1
 	}
 	// One cipher for the process, built here and handed to every consumer rather than set as a
-	// package-wide key each of them reads (#434).
-	dataCipher, dataCipherErr := encryption.NewDataCipher(currentDataKey)
+	// package-wide key each of them reads (#434). It holds the previous key too, when one is set,
+	// so a server opens a secret sealed under either key and seals under the current one (#492
+	// decision 2).
+	dataCipher, dataCipherErr := encryption.NewDataCipherWithPrevious(currentDataKey, previousDataKey)
 	if dataCipherErr != nil {
 		slog.Error("unable to initialize the data cipher", "error", dataCipherErr)
 		return 1

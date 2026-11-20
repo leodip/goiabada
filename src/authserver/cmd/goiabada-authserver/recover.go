@@ -128,15 +128,17 @@ type recoverDataKey struct {
 	err    error
 }
 
-// readRecoverDataKey builds the recover command's data cipher from the configured data key, as the
-// server's start builds its own. An unusable key is no refusal: the recovery needs no key, and only
-// its logout tokens go unsent (see tellRecoveredUsersApps).
+// readRecoverDataKey builds the recover command's data cipher from the configured data keys, the
+// current one and the previous one when it is set, as the server's start builds its own: a signing
+// key still sealed under the previous key signs the logout tokens, and nothing is re-encrypted
+// (#794, #492 decision 7). An unusable key is no refusal: the recovery needs no key, and only its
+// logout tokens go unsent (see tellRecoveredUsersApps).
 func readRecoverDataKey(cfg *config.Config) recoverDataKey {
-	current, _, err := cfg.DataKeys()
+	current, previous, err := cfg.DataKeys()
 	if err != nil {
 		return recoverDataKey{err: err}
 	}
-	cipher, err := encryption.NewDataCipher(current)
+	cipher, err := encryption.NewDataCipherWithPrevious(current, previous)
 	return recoverDataKey{cipher: cipher, err: err}
 }
 
