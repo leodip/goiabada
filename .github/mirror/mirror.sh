@@ -266,9 +266,10 @@ registry_answer() {
 # anonymous_read <address> reads a tag anonymously as a pull on the runner does, without downloading
 # a layer: a token with no login, the tag's manifest, the runner's platform's image's manifest when
 # the tag is a multi-platform index, then a HEAD of that image's config and of each of its layers,
-# which answers each blob's headers alone, with the access its download would get. Prints how many
-# blobs it read, or what failed. Returns 1 when the registry refuses a request for want of access,
-# 401 or 403, or the token, and 2 when it cannot be asked or answers anything else.
+# which answers each blob's headers alone, with the access its download would get: GHCR answers 200,
+# and a redirect, which would leave the blob unread, is no answer. Prints how many blobs it read, or
+# what failed. Returns 1 when the registry refuses a request for want of access, 401 or 403, or the
+# token, and 2 when it cannot be asked or answers anything else.
 anonymous_read() {
     local ref=$1 registry rest repository tag token answer status body digest blob n=0
     registry=${ref%%/*}
@@ -303,7 +304,7 @@ anonymous_read() {
             { echo "cannot ask $registry for the blob $blob"; return 2; }
         status=$(http_status "$answer")
         case $status in
-            2?? | 3??) ;;
+            200) ;;
             401 | 403) echo "$registry answered $status to the request for the blob $blob"; return 1 ;;
             *) echo "$registry answered ${status:-no status} to the request for the blob $blob"; return 2 ;;
         esac

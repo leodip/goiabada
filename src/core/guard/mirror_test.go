@@ -747,6 +747,7 @@ func TestMirrorPublic_OnlyARefusalIsTakenForAPackageNotPublic(t *testing.T) {
 		{"manifest", "404", false},
 		{"manifest", "503", false},
 		{"blob", "404", false},
+		{"blob", "307", false},
 		{"blob", "500", false},
 	} {
 		t.Run(c.request+" "+c.status, func(t *testing.T) {
