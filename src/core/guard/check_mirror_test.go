@@ -12,16 +12,21 @@ package guard
 //
 // The Versions job, which every job that pulls an image waits for, runs mirror.sh missing on every
 // run, so a mirror that lacks a tag the branch's list names fails the run at once, saying which and
-// what to do, rather than at a job's first pull with Docker's message (decision 4).
+// what to do, rather than at a job's first pull with Docker's message (decision 4). It runs it in a
+// step of its own, with no if: and no continue-on-error, so the check's failure is the job's.
 //
-// The Release workflow passes Check no secret, and its Images job logs in to Docker Hub before it
-// starts Buildx, so the BuildKit image Buildx pulls there counts against the account's allowance
-// rather than the one the runners share by address.
+// The Release workflow passes Check no secret, and its Images job logs in to Docker Hub, in a step
+// that runs unconditionally, before it starts Buildx, so the BuildKit image Buildx pulls there
+// counts against the account's allowance rather than the one the runners share by address.
+//
+// Jobs' needs and steps' fields are read as YAML reads them (workflow_yaml_test.go), and a run
+// step's commands with the shell reader, sudo before one included.
 
 import (
 	"fmt"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -46,7 +51,6 @@ var (
 	formatExpression = regexp.MustCompile(`^format\(\s*'((?:[^']|'')*)'\s*((?:,\s*[A-Za-z0-9_.-]+\s*)*)\)$`)
 	quotedExpression = regexp.MustCompile(`^'((?:[^']|'')*)'$`)
 	pinExpression    = regexp.MustCompile(`\$\{\{\s*needs\.versions\.outputs\.([A-Za-z0-9_-]+)\s*\}\}`)
-	buildkitImage    = regexp.MustCompile(`(?:^|[\s,])image=(\S+)`)
 	containerValue   = regexp.MustCompile(`^    container:\s*(\S.*)$`)
 )
 
@@ -163,60 +167,38 @@ func stepKeyValue(line string) (key, value string) {
 	return strings.TrimSpace(key), strings.TrimSpace(value)
 }
 
-// jobNeeds is whether a job's needs: names job, read from its lines.
-func jobNeeds(lines []string, numbers []int, job string) bool {
-	for _, n := range numbers {
-		if v, ok := strings.CutPrefix(lines[n-1], "    needs:"); ok {
-			for _, name := range strings.FieldsFunc(v, func(r rune) bool { return r == '[' || r == ']' || r == ',' || r == ' ' }) {
-				if name == job {
-					return true
-				}
-			}
-		}
-	}
-	return false
-}
-
-// jobSteps splits a job's lines into its steps, each the numbers of its lines, a step beginning at
-// a line "      - ".
-func jobSteps(lines []string, numbers []int) [][]int {
-	var steps [][]int
-	open := false
-	for _, n := range numbers {
-		line := lines[n-1]
-		if indent := len(line) - len(strings.TrimLeft(line, " ")); strings.TrimSpace(line) != "" && indent <= 4 {
-			open = false
-			continue
-		}
-		if strings.HasPrefix(line, "      - ") {
-			steps = append(steps, nil)
-			open = true
-		}
-		if open {
-			steps[len(steps)-1] = append(steps[len(steps)-1], n)
-		}
-	}
-	return steps
-}
-
-// stepUses is the action a step uses, or "".
-func stepUses(lines []string, step []int) string {
-	for _, n := range step {
-		if m := workflowUses.FindStringSubmatch(lines[n-1]); m != nil {
-			return m[1]
-		}
-	}
-	return ""
-}
-
 // registryClients are the commands that log in to a registry with a login subcommand: docker login,
 // skopeo login, helm registry login, and the like.
 var registryClients = map[string]bool{"docker": true, "podman": true, "skopeo": true, "buildah": true, "crane": true, "oras": true, "regctl": true, "helm": true}
 
+// sudoValueOptions are sudo's options that take the next word as their value, as -u root does.
+var sudoValueOptions = wordSet("-u", "--user", "-g", "--group", "-C", "--close-from", "-D", "--chdir", "-h", "--host",
+	"-p", "--prompt", "-R", "--chroot", "-T", "--command-timeout", "-U", "--other-user")
+
+// withoutSudo is a command's words with a sudo before them taken off, with its options, so sudo
+// docker pull is read as the docker pull it runs.
+func withoutSudo(w []shellWord) []shellWord {
+	if len(w) == 0 || w[0].value != "sudo" {
+		return w
+	}
+	w = w[1:]
+	for len(w) > 0 && strings.HasPrefix(w[0].value, "-") {
+		option := w[0].value
+		w = w[1:]
+		if option == "--" {
+			break
+		}
+		if sudoValueOptions[option] && len(w) > 0 {
+			w = w[1:]
+		}
+	}
+	return w
+}
+
 // runStepRegistryUse reads one command of a run step and returns the image it pulls, as a shell word,
-// docker pull's or podman pull's, and whether it logs in to a registry.
+// docker pull's or podman pull's, and whether it logs in to a registry, sudo before it or not.
 func runStepRegistryUse(c shellCommand) (image *shellWord, login bool) {
-	w := c.words
+	w := withoutSudo(c.words)
 	if len(w) < 2 || !registryClients[w[0].value] {
 		return nil, false
 	}
@@ -247,12 +229,39 @@ func runStepRegistryUse(c shellCommand) (image *shellWord, login bool) {
 	return nil, false
 }
 
+// isMirrorCheck is whether a command runs the mirror's check, mirror.sh missing.
+func isMirrorCheck(c shellCommand) bool {
+	w := c.words
+	return len(w) >= 2 && (w[0].value == mirrorScript || w[0].value == "./"+mirrorScript) && w[1].value == "missing"
+}
+
+// buildkitImages are the images driver-opts gives Buildx's container driver, image=<ref> among its
+// comma-separated options on each line, with the line each is on, the option's text beginning on
+// first.
+func buildkitImages(opts string, first int) (images []string, lines []int) {
+	for i, line := range strings.Split(opts, "\n") {
+		for option := range strings.SplitSeq(line, ",") {
+			option = strings.Trim(strings.TrimSpace(option), `"`)
+			if image, ok := strings.CutPrefix(option, "image="); ok {
+				images, lines = append(images, image), append(lines, first+i)
+			}
+		}
+	}
+	return images, lines
+}
+
 // checkRegistryFindings reads the Check workflow and returns every image it pulls from outside the
 // mirror or names in a way this check cannot read, a job's container, a service, a docker:// step
-// or a docker pull in a run step, every credential, login and Docker Hub secret it names, a Buildx started from Docker Hub's BuildKit image, a job that pulls without waiting for
-// the Versions job, and a Versions job that does not check the mirror on every run. pins are the
-// Versions job's outputs, by name, and mirrored the mirror addresses the list holds at those pins.
+// or a docker pull in a run step, every credential, login and Docker Hub secret it names, a Buildx
+// whose with: driver-opts gives no BuildKit image of the mirror, a job that pulls without needing
+// the Versions job, and a Versions job that does not check the mirror on every run, in a step of
+// its own whose failure fails the job. pins are the Versions job's outputs, by name, and mirrored
+// the mirror addresses the list holds at those pins.
 func checkRegistryFindings(file, text string, pins map[string]string, mirrored map[string]bool) []string {
+	read, err := readWorkflowJobs(text)
+	if err != nil {
+		return []string{fmt.Sprintf("check mirror: %s cannot be read as YAML, so this check cannot tell what it pulls: %v", file, err)}
+	}
 	lines := workflowLines(text)
 	jobs := workflowJobs(lines)
 	jobOf := map[int]string{}
@@ -287,8 +296,6 @@ func checkRegistryFindings(file, text string, pins map[string]string, mirrored m
 			image = yamlLineScalar(value)
 		case containerValue.MatchString(line):
 			image = yamlLineScalar(containerValue.FindStringSubmatch(line)[1])
-		case key == "uses" && strings.HasPrefix(value, "docker://"):
-			image = strings.TrimPrefix(value, "docker://")
 		}
 		if image != "" {
 			images++
@@ -300,8 +307,6 @@ func checkRegistryFindings(file, text string, pins map[string]string, mirrored m
 		switch {
 		case key == "credentials":
 			add(n, "%s gives registry credentials: Check pulls anonymously from the public mirror, so remove them", at(n))
-		case key == "uses" && strings.HasPrefix(value, "docker/login-action@"):
-			add(n, "%s logs in to a registry: Check pulls anonymously from the public mirror and logs in nowhere, so remove the step", at(n))
 		case strings.Contains(line, "DOCKERHUB"):
 			add(n, "%s names a Docker Hub secret: Check takes none, so a fork's run, Dependabot's and the maintainer's pull the same way; remove it", at(n))
 		}
@@ -315,7 +320,7 @@ func checkRegistryFindings(file, text string, pins map[string]string, mirrored m
 			image, login := runStepRegistryUse(c)
 			switch {
 			case login:
-				add(n, "%s logs in to a registry with %s: Check pulls anonymously from the public mirror and logs in nowhere, so remove it", at(n), c.words[0].value)
+				add(n, "%s logs in to a registry with %s: Check pulls anonymously from the public mirror and logs in nowhere, so remove it", at(n), withoutSudo(c.words)[0].value)
 			case image == nil:
 			case image.expands:
 				images++
@@ -331,70 +336,80 @@ func checkRegistryFindings(file, text string, pins map[string]string, mirrored m
 		}
 	}
 
-	names := make([]string, 0, len(jobs))
-	for job := range jobs {
-		names = append(names, job)
-	}
-	sort.Slice(names, func(a, b int) bool { return jobs[names[a]][0] < jobs[names[b]][0] })
-	for _, job := range names {
-		numbers := jobs[job]
-		for _, step := range jobSteps(lines, numbers) {
-			if !strings.HasPrefix(stepUses(lines, step), "docker/setup-buildx-action@") {
-				continue
-			}
-			pulls[job] = true
-			buildkit := 0
-			for _, n := range step {
-				if m := buildkitImage.FindStringSubmatch(lines[n-1]); m != nil && !strings.HasPrefix(strings.TrimSpace(lines[n-1]), "#") {
-					buildkit = n
+	var versions *workflowJob
+	for i, job := range read {
+		if job.name == "versions" {
+			versions = &read[i]
+		}
+		for _, step := range job.steps {
+			uses, n := step.uses()
+			switch {
+			case strings.HasPrefix(uses, "docker://"):
+				images++
+				pulls[job.name] = true
+				for _, f := range checkImageFinding(at(n), strings.TrimPrefix(uses, "docker://"), pins, mirrored) {
+					add(n, "%s", f)
+				}
+			case strings.HasPrefix(uses, "docker/login-action@"):
+				add(n, "%s logs in to a registry: Check pulls anonymously from the public mirror and logs in nowhere, so remove the step", at(n))
+			case strings.HasPrefix(uses, "docker/setup-buildx-action@"):
+				pulls[job.name] = true
+				opts, node := step.input("driver-opts")
+				var buildkit []string
+				var imageLines []int
+				if node != nil {
+					buildkit, imageLines = buildkitImages(opts, yamlContentLine(node))
+				}
+				for i, image := range buildkit {
 					images++
-					for _, f := range checkImageFinding(at(n), m[1], pins, mirrored) {
-						add(n, "%s", f)
+					for _, f := range checkImageFinding(at(imageLines[i]), image, pins, mirrored) {
+						add(imageLines[i], "%s", f)
 					}
 				}
-			}
-			if buildkit == 0 {
-				add(step[0], "%s starts Buildx from its default BuildKit image, which it pulls from Docker Hub: give the step driver-opts: image=%s/buildkit:<tag>, a tag %s holds",
-					at(step[0]), ciMirror, mirrorList)
+				if len(buildkit) == 0 {
+					add(step.line, "%s starts Buildx from its default BuildKit image, which it pulls from Docker Hub: give the step with: driver-opts: image=%s/buildkit:<tag>, a tag %s holds",
+						at(step.line), ciMirror, mirrorList)
+				}
 			}
 		}
-		if job != "versions" && pulls[job] && !jobNeeds(lines, numbers, "versions") {
-			add(numbers[0], "%s pulls an image and does not need versions, so it can pull before the Versions job has checked that the mirror holds every tag", at(numbers[0]))
+		if job.name != "versions" && pulls[job.name] && !job.needs("versions") {
+			add(job.line, "%s pulls an image and does not need versions, so it can pull before the Versions job has checked that the mirror holds every tag", at(job.line))
 		}
 	}
 
-	versions, ok := jobs["versions"]
-	switch {
-	case !ok:
+	if versions == nil {
 		add(len(lines), "check mirror: %s has no versions job, which checks that the mirror holds every tag before a job pulls one", file)
-	default:
-		checked := 0
-		for _, step := range jobSteps(lines, versions) {
-			runs, conditional := false, 0
-			for _, n := range step {
-				if strings.Contains(lines[n-1], missingCheck) {
-					runs = true
-				}
-				if key, _ := stepKeyValue(lines[n-1]); key == "if" {
-					conditional = n
-				}
-			}
-			if !runs {
+	} else {
+		checked := false
+		for _, step := range versions.steps {
+			src, ok := step.run()
+			if !ok {
 				continue
 			}
-			checked = step[0]
-			if conditional != 0 {
-				add(conditional, "%s runs %s under a condition: it checks the mirror on every run, whichever tags the run's jobs pull", at(conditional), missingCheck)
+			script := readShell(src.text)
+			if !slices.ContainsFunc(script.commands, isMirrorCheck) {
+				continue
+			}
+			checked = true
+			if n := step.conditional(); n != 0 {
+				add(n, "%s runs %s under a condition: it checks the mirror on every run, whichever tags the run's jobs pull", at(n), missingCheck)
+			}
+			if n := toleratesFailure(step.field("continue-on-error")); n != 0 {
+				add(n, "%s lets the Versions job go on when %s fails, so a tag the mirror lacks fails the run at a job's pull: remove continue-on-error", at(n), missingCheck)
+			}
+			if len(script.commands) != 1 {
+				add(step.line, "%s runs %s beside other commands, which can hide its failure: give it a step whose run is %s alone", at(step.line), missingCheck, missingCheck)
 			}
 		}
-		for _, n := range versions {
-			if strings.HasPrefix(lines[n-1], "    if:") {
-				add(n, "%s runs under a condition: it checks the mirror on every run, and a job skipped because it did not run counts as passing", at(n))
-			}
+		if n, _ := versions.field("if"); n != 0 {
+			add(n, "%s runs under a condition: it checks the mirror on every run, and a job skipped because it did not run counts as passing", at(n))
 		}
-		if checked == 0 {
-			add(versions[0], "%s does not run %s, so a run whose mirror lacks a tag fails at its first pull with Docker's message rather than at once with what to do",
-				at(versions[0]), missingCheck)
+		if n := toleratesFailure(versions.field("continue-on-error")); n != 0 {
+			add(n, "%s lets the run go on when the Versions job fails, so a tag the mirror lacks fails the run at a job's pull: remove continue-on-error", at(n))
+		}
+		if !checked {
+			add(versions.line, "%s does not run %s, so a run whose mirror lacks a tag fails at its first pull with Docker's message rather than at once with what to do",
+				at(versions.line), missingCheck)
 		}
 	}
 
@@ -410,51 +425,38 @@ func checkRegistryFindings(file, text string, pins map[string]string, mirrored m
 }
 
 // releaseRegistryFindings reads the Release workflow and returns a call of Check that passes it
-// secrets, and a job that starts Buildx before it logs in to Docker Hub, a docker/login-action step
-// that names no registry. It reports a file holding neither a call of Check nor a Buildx, since a
-// check that read nothing would pass on any file.
+// secrets, and a job that starts Buildx before it logs in to Docker Hub: in a docker/login-action
+// step that names no registry and runs unconditionally, with no if: and no continue-on-error. It
+// reports a file holding neither a call of Check nor a Buildx, since a check that read nothing
+// would pass on any file.
 func releaseRegistryFindings(file, text string) []string {
-	lines := workflowLines(text)
-	jobs := workflowJobs(lines)
-	names := make([]string, 0, len(jobs))
-	for job := range jobs {
-		names = append(names, job)
+	jobs, err := readWorkflowJobs(text)
+	if err != nil {
+		return []string{fmt.Sprintf("check mirror: %s cannot be read as YAML, so this check read nothing: %v", file, err)}
 	}
-	sort.Slice(names, func(a, b int) bool { return jobs[names[a]][0] < jobs[names[b]][0] })
-
 	var findings []string
 	calls, buildx := 0, 0
-	for _, job := range names {
-		numbers := jobs[job]
-		callsCheck := false
-		for _, n := range numbers {
-			if v, ok := strings.CutPrefix(lines[n-1], "    uses:"); ok && strings.TrimSpace(v) == "./"+checkWorkflow {
-				callsCheck = true
-				calls++
-			}
-		}
-		for _, n := range numbers {
-			if callsCheck && strings.HasPrefix(lines[n-1], "    secrets:") {
-				findings = append(findings, fmt.Sprintf("check mirror: %s:%d (%s) passes Check secrets, which takes none: remove secrets:", file, n, job))
+	for _, job := range jobs {
+		_, called := job.field("uses")
+		if uses, _ := yamlScalar(called); uses == "./"+checkWorkflow {
+			calls++
+			if n, _ := job.field("secrets"); n != 0 {
+				findings = append(findings, fmt.Sprintf("check mirror: %s:%d (%s) passes Check secrets, which takes none: remove secrets:", file, n, job.name))
 			}
 		}
 		loggedIn := false
-		for _, step := range jobSteps(lines, numbers) {
-			uses := stepUses(lines, step)
+		for _, step := range job.steps {
+			uses, _ := step.uses()
 			if strings.HasPrefix(uses, "docker/login-action@") {
-				registry := false
-				for _, n := range step {
-					if key, _ := stepKeyValue(lines[n-1]); key == "registry" {
-						registry = true
-					}
-				}
-				loggedIn = loggedIn || !registry
+				_, registry := step.input("registry")
+				unconditional := step.conditional() == 0 && toleratesFailure(step.field("continue-on-error")) == 0
+				loggedIn = loggedIn || (registry == nil && unconditional)
 			}
 			if strings.HasPrefix(uses, "docker/setup-buildx-action@") {
 				buildx++
 				if !loggedIn {
-					findings = append(findings, fmt.Sprintf("check mirror: %s:%d (%s) starts Buildx before it logs in to Docker Hub, so Buildx pulls its BuildKit image anonymously, against the allowance GitHub's runners share by address: log in first",
-						file, step[0], job))
+					findings = append(findings, fmt.Sprintf("check mirror: %s:%d (%s) starts Buildx before it logs in to Docker Hub, so Buildx pulls its BuildKit image anonymously, against the allowance GitHub's runners share by address: log in first, in a step with no if: or continue-on-error",
+						file, step.line, job.name))
 				}
 			}
 		}
@@ -710,7 +712,7 @@ func TestCheckWorkflow_RegistryFindings(t *testing.T) {
 	})
 	t.Run("a Buildx started from its default image", func(t *testing.T) {
 		assertFindings(t, findings(edit(t, "        with:\n          driver-opts: image=ghcr.io/leodip/goiabada-ci/buildkit:buildx-stable-1\n", "")),
-			"check mirror: check.yml:35 (build) starts Buildx from its default BuildKit image, which it pulls from Docker Hub: give the step driver-opts: image=ghcr.io/leodip/goiabada-ci/buildkit:<tag>")
+			"check mirror: check.yml:35 (build) starts Buildx from its default BuildKit image, which it pulls from Docker Hub: give the step with: driver-opts: image=ghcr.io/leodip/goiabada-ci/buildkit:<tag>")
 	})
 	t.Run("a Buildx started from Docker Hub's BuildKit image", func(t *testing.T) {
 		assertFindings(t, findings(edit(t, "image=ghcr.io/leodip/goiabada-ci/buildkit:", "image=moby/buildkit:")),
@@ -767,6 +769,73 @@ func TestCheckWorkflow_RegistryFindings(t *testing.T) {
 	t.Run("a workflow naming no image read nothing", func(t *testing.T) {
 		assertFindings(t, findings("jobs:\n  versions:\n    steps:\n      - run: .github/mirror/mirror.sh missing\n"),
 			"check mirror: check.yml names no image, so this check read nothing")
+	})
+	t.Run("a workflow YAML cannot read", func(t *testing.T) {
+		assertFindings(t, findings(workflow+"  broken: [\n"), "check mirror: check.yml cannot be read as YAML")
+	})
+
+	// The same rules, read as YAML reads the workflow rather than line by line.
+	t.Run("needs written as a block sequence passes", func(t *testing.T) {
+		assertFindings(t, findings(edit(t, "    needs: [lint, versions]\n", "    needs:\n      - lint\n      - versions\n")))
+	})
+	t.Run("a docker pull from Docker Hub through sudo", func(t *testing.T) {
+		assertFindings(t, findings(edit(t, "      - run: ./run-tests.sh\n", "      - run: |\n          ./run-tests.sh\n          sudo docker pull docker.io/library/hello-world:latest\n")),
+			"check mirror: check.yml:32 (tests) names docker.io/library/hello-world:latest, from Docker Hub, which Check pulls nothing from")
+	})
+	t.Run("a docker pull from Docker Hub through sudo with options", func(t *testing.T) {
+		assertFindings(t, findings(edit(t, "      - run: ./run-tests.sh\n", "      - run: sudo -E -u root docker pull hello-world\n")),
+			"check mirror: check.yml:30 (tests) names hello-world, from Docker Hub")
+	})
+	t.Run("a registry login through sudo", func(t *testing.T) {
+		assertFindings(t, findings(edit(t, "      - run: go vet ./...\n", "      - run: sudo docker login ghcr.io\n")),
+			"check mirror: check.yml:41 (lint) logs in to a registry with docker")
+	})
+	for _, quoted := range []string{"'docker://alpine:3.24'", `"docker://alpine:3.24"`} {
+		t.Run("a step running a Docker Hub image, its uses quoted "+quoted[:1], func(t *testing.T) {
+			assertFindings(t, findings(edit(t, "      - run: ./run-tests.sh\n", "      - uses: "+quoted+" # a comment\n")),
+				"check mirror: check.yml:30 (tests) names alpine:3.24, from Docker Hub")
+		})
+	}
+	t.Run("a login step whose uses is quoted", func(t *testing.T) {
+		assertFindings(t, findings(edit(t, "      - run: go vet ./...\n", "      - uses: 'docker/login-action@0000000000000000000000000000000000000000'\n")),
+			"check mirror: check.yml:41 (lint) logs in to a registry")
+	})
+	t.Run("a step written in flow style running a Docker Hub image", func(t *testing.T) {
+		assertFindings(t, findings(edit(t, "      - run: ./run-tests.sh\n", "      - {name: Probe, uses: docker://alpine:3.24}\n")),
+			"check mirror: check.yml:30 (tests) names alpine:3.24, from Docker Hub")
+	})
+	t.Run("the mirror's BuildKit image written in env rather than driver-opts", func(t *testing.T) {
+		assertFindings(t, findings(edit(t, "        with:\n          driver-opts: image=", "        env:\n          OPTS: image=")),
+			"check mirror: check.yml:35 (build) starts Buildx from its default BuildKit image")
+	})
+	t.Run("driver-opts as a block, the mirror's image among its options, passes", func(t *testing.T) {
+		assertFindings(t, findings(edit(t, "          driver-opts: image=ghcr.io/leodip/goiabada-ci/buildkit:buildx-stable-1\n",
+			"          driver-opts: |\n            network=host\n            image=ghcr.io/leodip/goiabada-ci/buildkit:buildx-stable-1\n")))
+	})
+	t.Run("driver-opts as a block giving Docker Hub's BuildKit image", func(t *testing.T) {
+		assertFindings(t, findings(edit(t, "          driver-opts: image=ghcr.io/leodip/goiabada-ci/buildkit:buildx-stable-1\n",
+			"          driver-opts: |\n            network=host\n            image=moby/buildkit:buildx-stable-1\n")),
+			"check mirror: check.yml:39 (build) names moby/buildkit:buildx-stable-1, from Docker Hub")
+	})
+	t.Run("the mirror's check written in a step's name but not run", func(t *testing.T) {
+		assertFindings(t, findings(edit(t, "      - name: The mirror holds every tag\n        run: .github/mirror/mirror.sh missing\n",
+			"      - name: .github/mirror/mirror.sh missing\n        run: 'true'\n")),
+			"check mirror: check.yml:7 (versions) does not run .github/mirror/mirror.sh missing")
+	})
+	t.Run("the mirror's check whose failure the step tolerates", func(t *testing.T) {
+		assertFindings(t, findings(edit(t, "        run: .github/mirror/mirror.sh missing\n", "        run: .github/mirror/mirror.sh missing\n        continue-on-error: true\n")),
+			"check mirror: check.yml:13 (versions) lets the Versions job go on when .github/mirror/mirror.sh missing fails")
+	})
+	t.Run("the mirror's check with continue-on-error false passes", func(t *testing.T) {
+		assertFindings(t, findings(edit(t, "        run: .github/mirror/mirror.sh missing\n", "        run: .github/mirror/mirror.sh missing\n        continue-on-error: false\n")))
+	})
+	t.Run("a Versions job whose failure the run tolerates", func(t *testing.T) {
+		assertFindings(t, findings(edit(t, "  versions:\n    runs-on: ubuntu-latest\n", "  versions:\n    continue-on-error: true\n    runs-on: ubuntu-latest\n")),
+			"check mirror: check.yml:8 (versions) lets the run go on when the Versions job fails")
+	})
+	t.Run("the mirror's check beside a command that hides its failure", func(t *testing.T) {
+		assertFindings(t, findings(edit(t, "        run: .github/mirror/mirror.sh missing\n", "        run: .github/mirror/mirror.sh missing || true\n")),
+			"check mirror: check.yml:11 (versions) runs .github/mirror/mirror.sh missing beside other commands")
 	})
 }
 
@@ -828,6 +897,21 @@ func TestReleaseWorkflow_RegistryFindings(t *testing.T) {
 			dockerHubLogin // 10
 		assertFindings(t, releaseRegistryFindings("release.yml", src),
 			"check mirror: release.yml:9 (images) starts Buildx before it logs in to Docker Hub")
+	})
+	t.Run("a Docker Hub login skipped by its condition", func(t *testing.T) {
+		src := edit(t, workflow, dockerHubLogin, strings.Replace(dockerHubLogin, " # v4\n", " # v4\n        if: ${{ false }}\n", 1))
+		assertFindings(t, releaseRegistryFindings("release.yml", src),
+			"check mirror: release.yml:16 (images) starts Buildx before it logs in to Docker Hub")
+	})
+	t.Run("a Docker Hub login whose failure the job tolerates", func(t *testing.T) {
+		src := edit(t, workflow, dockerHubLogin, dockerHubLogin+"        continue-on-error: true\n")
+		assertFindings(t, releaseRegistryFindings("release.yml", src),
+			"check mirror: release.yml:16 (images) starts Buildx before it logs in to Docker Hub")
+	})
+	t.Run("a Check call and a login written with quotes pass", func(t *testing.T) {
+		src := edit(t, workflow, "    uses: ./.github/workflows/check.yml\n", "    uses: './.github/workflows/check.yml'\n")
+		src = edit(t, src, dockerHubLogin, strings.Replace(dockerHubLogin, "uses: docker/login-action@0000000000000000000000000000000000000000 # v4", `uses: "docker/login-action@0000000000000000000000000000000000000000"`, 1))
+		assertFindings(t, releaseRegistryFindings("release.yml", src))
 	})
 	t.Run("a workflow with neither read nothing", func(t *testing.T) {
 		assertFindings(t, releaseRegistryFindings("release.yml", "jobs:\n  verify:\n    steps:\n      - run: true\n"),

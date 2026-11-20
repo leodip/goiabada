@@ -218,6 +218,25 @@ func TestMailpitUpdate_TheCommandWritesANewPinIntoBothFiles(t *testing.T) {
 		`E2E_MAILPIT_IMAGE="${E2E_MAILPIT_IMAGE:-ghcr.io/leodip/goiabada-ci/mailpit:v1.40.2}"`)
 }
 
+// update, run whole over a tree whose e2e default names no Mailpit image, still moves the dev
+// container to the new pin, reports the failure and exits nonzero, so CI's "versions.yaml is
+// applied" step, under set -e, stops rather than taking an incomplete update.
+func TestMailpitUpdate_TheCommandFailsWhenAFileCannotTakeThePin(t *testing.T) {
+	files := repositoryFiles(t, mailpitPinnedFiles)
+	base := t.TempDir()
+	writeFixture(t, base, mailpitPinnedFiles[0], files[mailpitPinnedFiles[0]])
+	writeFixture(t, base, mailpitPinnedFiles[1], "E2E_MAILPIT_PORT=\"${E2E_MAILPIT_PORT:-18025}\"\n")
+	script := filepath.Join(SourceRoot(t), "authserver", "version-manager.sh")
+	out, err := exec.Command("bash", "-c", `. "$1" || exit 1; BASE_DIR="$2" VERSIONS_FILE="$3"
+		vendor_fetch() { :; }
+		cmd_update`, "bash", script, base, mailpitVersions(t, "1.40.2")).CombinedOutput()
+	var exit *exec.ExitError
+	require.ErrorAs(t, err, &exit, "update took a file it could not pin and exited 0:\n%s", out)
+	assert.Contains(t, ansiColor.ReplaceAllString(string(out), ""), "Failed updates: 1", "%s", out)
+	assertOnlyLineChanged(t, base, mailpitPinnedFiles[0], files[mailpitPinnedFiles[0]],
+		"    image: axllent/mailpit:v1.40.2")
+}
+
 // The dev container ran Mailpit untagged, which is latest, before the pin; another tag is replaced
 // whole rather than suffixed.
 func TestMailpitUpdate_AnUntaggedOrOtherTagIsPinned(t *testing.T) {

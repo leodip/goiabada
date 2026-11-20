@@ -1048,6 +1048,10 @@ cmd_check() {
 # Command: update
 # =============================================================================
 # Update version strings in all project files based on versions.yaml
+#
+# Exit status: every target is attempted, and the command returns non-zero
+# when any of them failed, so CI's "versions.yaml is applied" step stops
+# rather than taking an incomplete update.
 
 cmd_update() {
     require_yq
@@ -1309,6 +1313,8 @@ cmd_update() {
     echo "     the header above is written here, but only the generator carries it into the mocks"
     echo "  3. Run tests: make test-ci"
     echo "  4. Commit changes"
+
+    [ "$fail_count" -eq 0 ]
 }
 
 # settled_go_version reads candidate versions of a module, newest first, each

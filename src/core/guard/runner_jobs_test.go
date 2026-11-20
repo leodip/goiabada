@@ -9,12 +9,13 @@ package guard
 // mailpit:1025 and mailpit:8025 (decision 2). In a container job the service is reached by that
 // name; on the runner it is reached only through its ports mapped to the runner's and a line
 // `127.0.0.1 mailpit` in the runner's hosts file, so a job on the runner with a Mailpit service
-// has both.
+// has both, the hosts line added on every run in a step before the internal tier's.
 //
 // The Go cache splits with the environments, which keep it under different paths: one runner job,
 // Unit / authserver, saves the runner's, and one container job, Data / sqlite, saves the
 // container's and compiles what the other database jobs run, so they restore its build rather
-// than compile it. Two savers of one cache race for its key; none leaves every job compiling.
+// than compile it. Two savers of one cache race for its key; none leaves every job compiling, as
+// does a saver's setup step skipped by an if:.
 
 import (
 	"fmt"
@@ -27,6 +28,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.yaml.in/yaml/v3"
 )
 
 const checkWorkflow = ".github/workflows/check.yml"
@@ -42,8 +44,10 @@ type checkJob struct {
 	name string
 	// container is the line of the job's container: key, or 0 when it runs on the runner.
 	container int
-	// tiers maps each module tier the job runs to the line of its run-tests.sh call.
-	tiers map[string]int
+	// tiers maps each module tier the job runs to the line of its run-tests.sh call, and tierSteps
+	// to the place of that call's step among the job's steps.
+	tiers     map[string]int
+	tierSteps map[string]int
 	// setupGo is whether the job sets Go up with actions/setup-go, itself or through the runner's
 	// test setup.
 	setupGo bool
@@ -51,107 +55,90 @@ type checkJob struct {
 	// host:container.
 	mailpit int
 	mapped  []string
-	// hosts is whether a step adds 127.0.0.1 mailpit to /etc/hosts.
-	hosts bool
+	// hostsStep is the place of the first step that adds 127.0.0.1 mailpit to /etc/hosts whenever
+	// the job reaches it, or -1, and hostsLine its line; hostsIf is the line of the if: of one that
+	// adds it only under a condition, or 0.
+	hostsStep, hostsLine, hostsIf int
 	// savesRunnerCache and savesContainerCache are the lines where the job's test setup is asked to
-	// save the Go cache, or 0.
+	// save the Go cache, or 0, and runnerSaveIf and containerSaveIf the lines of an if: that skips
+	// that setup step on some runs, or 0.
 	savesRunnerCache, savesContainerCache int
+	runnerSaveIf, containerSaveIf         int
 	// compiles is whether a step compiles the data and integration test binaries.
 	compiles bool
 }
 
-var (
-	runTestsTier   = regexp.MustCompile(`run-tests\.sh\b[^\n]*--type\s+([A-Za-z]+)`)
-	workflowUses   = regexp.MustCompile(`^\s*(?:- )?uses:\s*(\S+)`)
-	serviceKey     = regexp.MustCompile(`^      ([A-Za-z0-9_-]+):\s*$`)
-	portMapping    = regexp.MustCompile(`^\s*-\s*["']?([0-9]+:[0-9]+)["']?\s*$`)
-	saveCacheInput = regexp.MustCompile(`^\s*save-cache:\s*(.+?)\s*$`)
+const (
+	setupTestRunner    = "./.github/actions/setup-test-runner"
+	setupTestContainer = "./.github/actions/setup-test-container"
 )
 
-// readCheckJobs reads each job of a workflow.
-func readCheckJobs(text string) []checkJob {
-	lines := workflowLines(text)
-	numbers := workflowJobs(lines)
-	runs := workflowRuns(lines)
+var (
+	runTestsTier = regexp.MustCompile(`run-tests\.sh\b[^\n]*--type\s+([A-Za-z]+)`)
+	workflowUses = regexp.MustCompile(`^\s*(?:- )?uses:\s*(\S+)`)
+)
 
+// readCheckJobs reads each job of a workflow, its steps in the order they run.
+func readCheckJobs(text string) ([]checkJob, error) {
+	read, err := readWorkflowJobs(text)
+	if err != nil {
+		return nil, err
+	}
 	var jobs []checkJob
-	for name, numbered := range numbers {
-		job := checkJob{name: name, tiers: map[string]int{}}
-		inJob := map[int]bool{}
-		for _, n := range numbered {
-			inJob[n] = true
-		}
-
-		service, uses := "", ""
-		inServices, inPorts := false, false
-		for _, n := range numbered {
-			line := lines[n-1]
-			if strings.TrimSpace(line) == "" || strings.HasPrefix(strings.TrimSpace(line), "#") {
-				continue
-			}
-			indent := len(line) - len(strings.TrimLeft(line, " "))
-			if indent <= 4 {
-				inServices, inPorts, service = false, false, ""
-			}
-			switch {
-			case line == "    container:" || strings.HasPrefix(line, "    container: "):
-				job.container = n
-			case line == "    services:":
-				inServices = true
-			case inServices && serviceKey.MatchString(line):
-				service, inPorts = serviceKey.FindStringSubmatch(line)[1], false
-				if service == "mailpit" {
-					job.mailpit = n
-				}
-			case inServices && service == "mailpit" && strings.TrimSpace(line) == "ports:":
-				inPorts = true
-			case inPorts && portMapping.MatchString(line):
-				job.mapped = append(job.mapped, portMapping.FindStringSubmatch(line)[1])
-			}
-			if inPorts && !portMapping.MatchString(line) && strings.TrimSpace(line) != "ports:" {
-				inPorts = false
-			}
-
-			if strings.HasPrefix(line, "      - ") {
-				uses = ""
-			}
-			if m := workflowUses.FindStringSubmatch(line); m != nil {
-				uses = m[1]
-				if strings.HasPrefix(uses, "actions/setup-go@") || uses == "./.github/actions/setup-test-runner" {
-					job.setupGo = true
-				}
-			}
-			if m := saveCacheInput.FindStringSubmatch(line); m != nil {
-				value := yamlLineScalar(m[1])
-				if value != "false" {
-					switch uses {
-					case "./.github/actions/setup-test-runner":
-						job.savesRunnerCache = n
-					case "./.github/actions/setup-test-container":
-						job.savesContainerCache = n
+	for _, w := range read {
+		job := checkJob{name: w.name, tiers: map[string]int{}, tierSteps: map[string]int{}, hostsStep: -1}
+		job.container, _ = w.field("container")
+		_, services := w.field("services")
+		if key, mailpit := yamlField(services, "mailpit"); key != nil {
+			job.mailpit = key.Line
+			if _, ports := yamlField(mailpit, "ports"); ports != nil && ports.Kind == yaml.SequenceNode {
+				for _, port := range ports.Content {
+					if value, ok := yamlScalar(yamlResolved(port)); ok {
+						job.mapped = append(job.mapped, strings.TrimSpace(value))
 					}
 				}
 			}
 		}
 
-		for _, run := range runs {
-			if !inJob[run.line+1] {
-				continue
+		for _, step := range w.steps {
+			uses, _ := step.uses()
+			if strings.HasPrefix(uses, "actions/setup-go@") || uses == setupTestRunner {
+				job.setupGo = true
 			}
-			script := run.script.text
-			for i, scriptLine := range strings.Split(script, "\n") {
-				if m := runTestsTier.FindStringSubmatch(scriptLine); m != nil && slices.Contains(moduleTiers, m[1]) {
-					job.tiers[m[1]] = run.script.offset + i + 1
+			if value, node := step.input("save-cache"); node != nil && strings.TrimSpace(value) != "false" {
+				switch uses {
+				case setupTestRunner:
+					job.savesRunnerCache, job.runnerSaveIf = node.Line, step.conditional()
+				case setupTestContainer:
+					job.savesContainerCache, job.containerSaveIf = node.Line, step.conditional()
 				}
 			}
-			job.hosts = job.hosts || (strings.Contains(script, "127.0.0.1 mailpit") && strings.Contains(script, "/etc/hosts"))
-			job.compiles = job.compiles || (strings.Contains(script, "go test -c") &&
-				strings.Contains(script, "./tests/data") && strings.Contains(script, "./tests/integration"))
+
+			src, ok := step.run()
+			if !ok {
+				continue
+			}
+			for i, scriptLine := range strings.Split(src.text, "\n") {
+				if m := runTestsTier.FindStringSubmatch(scriptLine); m != nil && slices.Contains(moduleTiers, m[1]) {
+					job.tiers[m[1]] = src.offset + i + 1
+					job.tierSteps[m[1]] = step.index
+				}
+			}
+			if strings.Contains(src.text, "127.0.0.1 mailpit") && strings.Contains(src.text, "/etc/hosts") {
+				switch n := step.conditional(); {
+				case n != 0:
+					job.hostsIf = n
+				case job.hostsStep < 0:
+					job.hostsStep, job.hostsLine = step.index, step.line
+				}
+			}
+			job.compiles = job.compiles || (strings.Contains(src.text, "go test -c") &&
+				strings.Contains(src.text, "./tests/data") && strings.Contains(src.text, "./tests/integration"))
 		}
 		jobs = append(jobs, job)
 	}
 	sort.Slice(jobs, func(i, j int) bool { return jobs[i].name < jobs[j].name })
-	return jobs
+	return jobs, nil
 }
 
 // runnerJobFindings holds the jobs of a workflow to the rules above.
@@ -164,7 +151,10 @@ func runnerJobFindings(file, text string) []string {
 		return fmt.Sprintf("%s:%d (%s)", file, line, job.name)
 	}
 
-	jobs := readCheckJobs(text)
+	jobs, err := readCheckJobs(text)
+	if err != nil {
+		return []string{fmt.Sprintf("runner jobs: %s cannot be read as YAML, so this guard read nothing: %v", file, err)}
+	}
 	reached := false
 	var runnerSavers, containerSavers []checkJob
 	for _, job := range jobs {
@@ -193,10 +183,27 @@ func runnerJobFindings(file, text string) []string {
 						"TestSendEmail reaches mailpit:%s only through the port mapped to the runner's own", at(job, job.mailpit), port, port, port))
 				}
 			}
-			if !job.hosts {
+			switch {
+			case job.hostsStep < 0 && job.hostsIf != 0:
+				findings = append(findings, fmt.Sprintf("runner jobs: %s adds `127.0.0.1 mailpit` to /etc/hosts only under a condition; on the runner "+
+					"the name mailpit resolves only through that line, so add it on every run", at(job, job.hostsIf)))
+			case job.hostsStep < 0:
 				findings = append(findings, fmt.Sprintf("runner jobs: %s adds no `127.0.0.1 mailpit` to /etc/hosts; on the runner "+
 					"the name mailpit resolves only through that line", at(job, job.mailpit)))
+			default:
+				if step, ok := job.tierSteps["internal"]; ok && step < job.hostsStep {
+					findings = append(findings, fmt.Sprintf("runner jobs: %s runs the internal tier before the step at line %d adds `127.0.0.1 mailpit` to /etc/hosts, "+
+						"so TestSendEmail cannot resolve mailpit: add the line in a step before the tests", at(job, job.tiers["internal"]), job.hostsLine))
+				}
 			}
+		}
+		if job.runnerSaveIf != 0 {
+			findings = append(findings, fmt.Sprintf("runner jobs: %s saves the runner's Go cache from a step under a condition, so a run that skips it "+
+				"saves none: save it from a setup step with no if:", at(job, job.runnerSaveIf)))
+		}
+		if job.containerSaveIf != 0 {
+			findings = append(findings, fmt.Sprintf("runner jobs: %s saves the container's Go cache from a step under a condition, so a run that skips it "+
+				"saves none: save it from a setup step with no if:, choosing the matrix entry in save-cache", at(job, job.containerSaveIf)))
 		}
 		if job.savesRunnerCache != 0 {
 			runnerSavers = append(runnerSavers, job)
@@ -253,7 +260,9 @@ func TestCheckWorkflow_TheModuleTiersRunOnTheRunner(t *testing.T) {
 	// The seven jobs the decision names, so a job renamed or folded into another is noticed here
 	// rather than by the benchmark.
 	onRunner := map[string]bool{}
-	for _, job := range readCheckJobs(text) {
+	jobs, err := readCheckJobs(text)
+	require.NoError(t, err)
+	for _, job := range jobs {
 		if len(job.tiers) > 0 && job.container == 0 {
 			onRunner[job.name] = true
 		}
@@ -377,6 +386,34 @@ func TestCheckWorkflow_RunnerJobFindings(t *testing.T) {
 	t.Run("the container's cache saved without compiling what the database jobs run", func(t *testing.T) {
 		assertFindings(t, findings(replace(t, workflow, " ./tests/data ./tests/integration\n", " ./tests/data\n")),
 			"runner jobs: check.yml:30 (tests-sqlite) saves the container's Go cache without compiling what the database jobs run")
+	})
+	t.Run("the runner's cache saved from a step its condition skips", func(t *testing.T) {
+		assertFindings(t, findings(replace(t, workflow, "      - uses: ./.github/actions/setup-test-runner\n        with:\n",
+			"      - uses: ./.github/actions/setup-test-runner\n        if: ${{ false }}\n        with:\n")),
+			"runner jobs: check.yml:12 (unit-authserver) saves the runner's Go cache from a step under a condition")
+	})
+	t.Run("the container's cache saved from a step its condition skips", func(t *testing.T) {
+		assertFindings(t, findings(replace(t, workflow, "      - uses: ./.github/actions/setup-test-container\n        with:\n",
+			"      - uses: ./.github/actions/setup-test-container\n        if: matrix.tier == 'data'\n        with:\n")),
+			"runner jobs: check.yml:29 (tests-sqlite) saves the container's Go cache from a step under a condition")
+	})
+	t.Run("the hosts line added after the internal tier runs", func(t *testing.T) {
+		hosts := "      - name: Reach Mailpit by its name\n        run: echo '127.0.0.1 mailpit' | sudo tee -a /etc/hosts\n"
+		tests := "      - run: ./run-tests.sh --type internal --no-build\n"
+		assertFindings(t, findings(replace(t, workflow, hosts+tests, tests+hosts)),
+			"runner jobs: check.yml:14 (unit-authserver) runs the internal tier before the step at line 15 adds `127.0.0.1 mailpit` to /etc/hosts")
+	})
+	t.Run("the hosts line added only under a condition", func(t *testing.T) {
+		assertFindings(t, findings(replace(t, workflow, "      - name: Reach Mailpit by its name\n",
+			"      - name: Reach Mailpit by its name\n        if: github.event_name == 'push'\n")),
+			"runner jobs: check.yml:15 (unit-authserver) adds `127.0.0.1 mailpit` to /etc/hosts only under a condition")
+	})
+	t.Run("Mailpit's ports in a flow sequence pass", func(t *testing.T) {
+		assertFindings(t, findings(replace(t, workflow, "        ports:\n          - 1025:1025\n          - '8025:8025'\n",
+			"        ports: ['1025:1025', \"8025:8025\"]\n")))
+	})
+	t.Run("a workflow YAML cannot read", func(t *testing.T) {
+		assertFindings(t, findings(workflow+"  broken: [\n"), "runner jobs: check.yml cannot be read as YAML")
 	})
 	t.Run("a workflow that runs no module tier", func(t *testing.T) {
 		assertFindings(t, findings("jobs:\n  lint:\n    steps:\n      - run: ./run-tests.sh --type lint\n"),
