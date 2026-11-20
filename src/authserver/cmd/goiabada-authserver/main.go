@@ -5,10 +5,12 @@
 //	goiabada-authserver [flags] migrate [--db-* flags] to <version> step the schema to <version>
 //	goiabada-authserver [flags] recover [--db-* flags] --email <address> [flags]
 //	                                                       restore sign-in for one user (#498)
+//	goiabada-authserver [flags] reencrypt [--db-* flags]   move every stored secret to the current
+//	                                                       data key (#492)
 //	goiabada-authserver healthcheck                        check the running server's /health (#808)
 //
 // Flags before `migrate` are the server's, and only the --db-* ones among them reach `migrate`;
-// after it, only the --db-* flags are accepted, and one given there overrides the same flag given
+// after it, only the --db-* flags are accepted, as after `reencrypt`, and one given there overrides the same flag given
 // before. `healthcheck` takes no flags or arguments, and reads its listener from the environment.
 // Any other first argument is refused.
 package main
@@ -110,7 +112,7 @@ func run() int {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		return migrateExitUsage
 	}
-	// `migrate` and `recover` read their own arguments here, for the same reason: what they
+	// `migrate`, `recover` and `reencrypt` read their own arguments here, for the same reason: what they
 	// refuse, their --db-* flags and the TLS settings checked against them, is the operator's
 	// to retype, and goes to stderr with nothing before it (#502).
 	var migration migrateInvocation
@@ -127,6 +129,13 @@ func run() int {
 			return migrateExitUsage
 		}
 	}
+	var reencryption reencryptInvocation
+	if command == "reencrypt" {
+		var ok bool
+		if reencryption, ok = readReencryptCommand(commandArgs, cfg.Database, os.Stderr); !ok {
+			return migrateExitUsage
+		}
+	}
 
 	slog.Info("auth server started")
 	slog.Info("build information",
@@ -135,7 +144,7 @@ func run() int {
 		"git_commit", buildinfo.GitCommit)
 	slog.Info("config loaded")
 
-	// The two subcommands run here: after the configuration is loaded, because they need
+	// `migrate` and `recover` run here: after the configuration is loaded, because they need
 	// GOIABADA_DB_* and the --db-* flags given before them, and before the data-encryption key
 	// is validated, because a schema migration touches no encrypted value and neither does a
 	// recovery, which writes a password hash, clears an OTP seed and grants a permission and
@@ -152,6 +161,12 @@ func run() int {
 	}
 	if command == "recover" {
 		return runRecoverCommand(recovery, datafactory.OpenDatabase, readRecoverDataKey(cfg), os.Stdout, os.Stderr)
+	}
+	// `reencrypt` is the one subcommand that needs the data keys, both of them, read from the two
+	// variables the server reads; it refuses a key a start would refuse before it opens anything
+	// (#492 decision 3).
+	if command == "reencrypt" {
+		return runReencryptCommand(reencryption, datafactory.OpenDatabase, readReencryptDataKeys(cfg), os.Stdout, os.Stderr)
 	}
 
 	// The process owns the signals, from here to its exit, so a stop arriving while the server is
@@ -502,7 +517,8 @@ var healthcheckListeners = healthcheck.Listeners{
 
 // dispatch chooses the command from the positional arguments the flag parse left: none serves,
 // a first `migrate` hands the rest to the schema subcommand, a first `recover` to the one that
-// restores sign-in for a user (#498), and anything else is refused, before a database is opened.
+// restores sign-in for a user (#498), a first `reencrypt` to the one that moves every stored secret
+// to the current data key (#492), and anything else is refused, before a database is opened.
 // A typo such as `migrat to 44` used to start the server and migrate the database up, the
 // opposite of what was asked (#424). `healthcheck` runs before the parse when it is the first
 // argument, so it arrives here only behind a flag or `--`, and is refused for taking none (#808).
@@ -515,6 +531,8 @@ func dispatch(args []string) (rest []string, command string, err error) {
 		return args[1:], "migrate", nil
 	case "recover":
 		return args[1:], "recover", nil
+	case "reencrypt":
+		return args[1:], "reencrypt", nil
 	case "healthcheck":
 		return nil, "", healthcheck.ArgumentsRefused("goiabada-authserver")
 	}
@@ -522,7 +540,8 @@ func dispatch(args []string) (rest []string, command string, err error) {
 		"command to start the server, goiabada-authserver [flags] migrate version, or "+
 		"goiabada-authserver [flags] migrate to <version>, to manage the schema, "+
 		"goiabada-authserver [flags] recover --email <address> [flags], to restore sign-in for "+
-		"one user, or goiabada-authserver healthcheck, alone, to check the running server's "+
+		"one user, goiabada-authserver [flags] reencrypt, to move every stored secret to the "+
+		"current data key, or goiabada-authserver healthcheck, alone, to check the running server's "+
 		"health; the server's flags go before the command", args[0])
 }
 

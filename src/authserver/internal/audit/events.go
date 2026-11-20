@@ -169,6 +169,14 @@ const (
 
 	EventRotatedKeys = "rotated_keys"
 	EventRevokedKey  = "revoked_key"
+	// EventReencryptedStoredSecrets records a run of `goiabada-authserver reencrypt` that
+	// re-encrypted at least one stored secret to the current data key, written as the run ends,
+	// whether or not it ended cleanly (#492 decision 8).
+	//
+	// Payload: command (the command, as recover names itself); reencrypted, how many values it
+	// re-encrypted; unreadable, how many neither data key opened. Never a key, a fingerprint or a
+	// value.
+	EventReencryptedStoredSecrets = "reencrypted_stored_secrets"
 	// EventDeletedUserSession records that a session row is gone: replaced or swept by a sign-in,
 	// ended by a handover to another user, by signing out, or by its user or an administrator.
 	//
@@ -821,6 +829,7 @@ var auditEventTypes = []string{
 	EventRecoveryCodeReplayDetected,
 	EventRecoveryCodesCreated,
 	EventRedemptionRefusedRedirectURI,
+	EventReencryptedStoredSecrets,
 	EventRefreshTokenReplayDetected,
 	EventRequestedPasswordReset,
 	EventRequestedRegistration,

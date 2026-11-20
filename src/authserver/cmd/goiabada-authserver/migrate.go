@@ -507,6 +507,25 @@ var migrateStopSignals = []os.Signal{os.Interrupt, syscall.SIGTERM, syscall.SIGH
 // whole process group, Go's default for that write is to end the process at once, mid-file. With
 // SIGPIPE ignored the write fails instead, which outf discards.
 func answerSignals(parent context.Context, out io.Writer) (ctx context.Context, stopAnswering func()) {
+	return answerSignalsWith(parent, out, migrateStopAnswers)
+}
+
+// stopAnswers are the two lines a subcommand following the stop rule answers signals with: the
+// acknowledgement of the first, and the reminder every further one meets.
+type stopAnswers struct {
+	first   string
+	further string
+}
+
+// migrateStopAnswers are `migrate to`'s answers: a running migration file finishes first.
+var migrateStopAnswers = stopAnswers{
+	first:   "stopping: no further migration will start, and one already running finishes first",
+	further: "still stopping: a migration already running finishes first, and a further Ctrl-C changes nothing",
+}
+
+// answerSignalsWith is answerSignals for a subcommand of its own answers, which `reencrypt` follows
+// the same stop rule with (#492).
+func answerSignalsWith(parent context.Context, out io.Writer, answers stopAnswers) (ctx context.Context, stopAnswering func()) {
 	ctx, stop := context.WithCancel(parent)
 	signal.Ignore(syscall.SIGPIPE)
 	// Two slots, so a Ctrl-C pressed twice in a burst is taken twice rather than arriving over a
@@ -514,7 +533,7 @@ func answerSignals(parent context.Context, out io.Writer) (ctx context.Context, 
 	further := make(chan os.Signal, 2)
 	signal.Notify(further, migrateStopSignals...)
 	done := make(chan struct{})
-	go answerEachSignal(further, done, out, stop)
+	go answerEachSignalWith(further, done, out, stop, answers)
 	return ctx, func() {
 		signal.Stop(further)
 		signal.Reset(syscall.SIGPIPE)
@@ -527,17 +546,22 @@ func answerSignals(parent context.Context, out io.Writer) (ctx context.Context, 
 // acknowledgement, after which it calls stop, and every one after it the reminder, which is all a
 // further signal changes.
 func answerEachSignal(further <-chan os.Signal, done <-chan struct{}, out io.Writer, stop func()) {
+	answerEachSignalWith(further, done, out, stop, migrateStopAnswers)
+}
+
+// answerEachSignalWith is answerEachSignal with the answers given.
+func answerEachSignalWith(further <-chan os.Signal, done <-chan struct{}, out io.Writer, stop func(), answers stopAnswers) {
 	n := 0
 	for {
 		select {
 		case <-further:
 			n++
 			if n == 1 {
-				outf(out, "stopping: no further migration will start, and one already running finishes first\n")
+				outf(out, "%s\n", answers.first)
 				stop()
 				continue
 			}
-			outf(out, "still stopping: a migration already running finishes first, and a further Ctrl-C changes nothing\n")
+			outf(out, "%s\n", answers.further)
 		case <-done:
 			return
 		}

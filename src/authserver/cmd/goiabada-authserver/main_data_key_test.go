@@ -9,6 +9,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// publishedSampleDataKey is the data key the Compose samples published (#501), which a start and
+// the reencrypt command refuse as the current key. This file is one of those the literal stack
+// secret guard lets name it, so the other command tests take it from here.
+const publishedSampleDataKey = "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff"
+
 // TestMain_AKeyThatDoesNotOpenTheStoredDataStopsTheStart is the data key check at the process
 // (#542). A start under a key the database wasn't set up with used to go on and answer 500 from the
 // first token request, "cipher: message authentication failed", while /health answered 200: on
@@ -48,7 +53,7 @@ func TestMain_ThePublishedSampleKeyStopsTheStartBeforeTheDatabase(t *testing.T) 
 	path := filepath.Join(t.TempDir(), "k.db")
 
 	published := append(append([]string{}, singleStepEnv...),
-		"GOIABADA_AES_ENCRYPTION_KEY=00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff")
+		"GOIABADA_AES_ENCRYPTION_KEY="+publishedSampleDataKey)
 	code, records := runMainSignalledAtWith(t, path, "", published)
 
 	require.Equalf(t, 1, code, "the published key stops the start\n%s", dump(records))

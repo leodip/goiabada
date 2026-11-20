@@ -469,11 +469,32 @@ func (l commandAuditLogger) Log(ctx context.Context, auditEvent string, details 
 // checkRecoverSchema answers why the recovery must not write to this database, or "" when the
 // database records this binary's head, clean.
 func checkRecoverSchema(ctx context.Context, m schemaVersionReader) string {
+	return checkCommandSchema(ctx, m, recoverSchemaWords)
+}
+
+// recoverSchemaWords is how a schema refusal speaks of the recovery.
+var recoverSchemaWords = schemaWords{
+	neverMigrated: "so it holds no user to recover",
+	again:         "run the recovery again",
+	newerRelease:  "Run the recover command of that release",
+}
+
+// schemaWords are the parts of a schema refusal that name the command refused: why a database
+// never migrated has nothing for it, how to run it again once the schema is repaired, and what to
+// run instead on a schema a newer release migrated.
+type schemaWords struct {
+	neverMigrated string
+	again         string
+	newerRelease  string
+}
+
+// checkCommandSchema answers why a subcommand that writes, `recover` or `reencrypt`, must not write
+// to this database, or "" when the database records this binary's head, clean.
+func checkCommandSchema(ctx context.Context, m schemaVersionReader, words schemaWords) string {
 	version, dirty, err := m.Version(ctx)
 	switch {
 	case migrator.IsNilVersion(err):
-		return "the database records no schema version: it has never been migrated, so it holds " +
-			"no user to recover"
+		return "the database records no schema version: it has never been migrated, " + words.neverMigrated
 	case err != nil:
 		return "unable to read the database's schema version: " + err.Error()
 	// Each case names the step that gets past it: `migrate to` refuses a dirty schema as the
@@ -482,15 +503,14 @@ func checkRecoverSchema(ctx context.Context, m schemaVersionReader) string {
 		return fmt.Sprintf("the database records schema version %06d, DIRTY: a migration did "+
 			"not finish. Repair the schema by hand as "+
 			"https://goiabada.dev/troubleshooting/waiting-for-the-migration-lock-or-marked-dirty/ "+
-			"describes, then run the recovery again", version)
+			"describes, then %s", version, words.again)
 	case version > m.Head():
 		return fmt.Sprintf("the database records schema version %06d and this binary carries "+
-			"%06d: a newer release migrated it. Run the recover command of that release",
-			version, m.Head())
+			"%06d: a newer release migrated it. %s", version, m.Head(), words.newerRelease)
 	case version != m.Head():
 		return fmt.Sprintf("the database records schema version %06d and this binary carries "+
 			"%06d: it is behind this release. Run `goiabada-authserver migrate to %d`, or start "+
-			"this release's auth server once, then run the recovery again", version, m.Head(), m.Head())
+			"this release's auth server once, then %s", version, m.Head(), m.Head(), words.again)
 	}
 	return ""
 }
