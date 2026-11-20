@@ -283,19 +283,23 @@ func RefreshToken(ctx context.Context, database RefreshDatabase, stored *StoredR
 			return RefreshOfflineExpired, nil
 		}
 
-		// The ownership boundary (#133), the half the session-bound branch cannot reach. An offline
-		// grant is meant to outlive its session, which is why this branch otherwise never looks at
-		// one, and that deliberate silence is what a grant cross-bound before the fix slips through:
-		// it keeps rotating for the offline maximum lifetime, seeded at a year, re-copying the code's
-		// acr each time.
+		// The ownership boundary (#133), the half the session-bound branch cannot reach: an offline
+		// grant's session, while it lasts, belongs to the grant's user. An offline grant is meant to
+		// outlive its session, which is why this branch otherwise never looks at one. A ceremony can
+		// no longer bind a grant to another user's session, so this holds the rule itself, a second
+		// line that refuses a future violation whatever produced it, for one indexed read.
+		//
+		// It is not what corrects the level a grant cross-bound before the fix claimed. Such a grant
+		// carried the other user's session level, a second factor its own sign-in never performed,
+		// and its session row is long gone. Migration 000097 lowered every stored sign-in whose level
+		// claims a second factor its methods do not name, so a refresh reads the lowered level, and
+		// /auth/issue refuses to issue such a level (ceremony.LevelClaimsUnnamedFactor, #199).
 		//
 		// Read from the CODE, not from the token row. Only a session-bound token stores a session
 		// identifier of its own, so the grant's session is the one its code was stamped with.
 		//
 		// Refuses only while the row is still there and its owner differs: absence is the ordinary
-		// state of a healthy offline grant, so absence must not refuse. That is also the precise
-		// limit of what this reaches, since the session sweep removes the evidence long before the
-		// grant expires.
+		// state of a healthy offline grant, so absence must not refuse.
 		//
 		// Placed after the max-lifetime check so an already-expired token is refused without a
 		// lookup, and a password grant token excluded because there was never a session to own it.

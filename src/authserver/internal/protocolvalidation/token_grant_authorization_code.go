@@ -225,27 +225,25 @@ func (val *TokenValidator) validateAuthorizationCodeGrant(ctx context.Context, c
 			"Code is invalid.", http.StatusBadRequest)
 	}
 
-	// The ownership boundary (#133). A ceremony can no longer bind a code to a session
-	// belonging to somebody else, so nothing minted after that fix can reach this. What it
-	// catches is a code minted before it, in the window between an account switch and the
-	// upgrade: the browser held A's session, B authenticated, and the code carries B as its
-	// user with A's session identifier stamped on it.
+	// The ownership boundary (#133): a code's session belongs to its user. A ceremony can no
+	// longer bind a code to a session belonging to somebody else, so nothing minted since that
+	// fix reaches this; it holds the rule itself, and refuses a future violation whatever
+	// produced it.
 	//
-	// Redeeming one yields tokens that name B correctly, and only one claim on them is
-	// wrong. amr and auth_time came from B's own ceremony: the password handler set
-	// AuthenticatedAt, and BumpUserSession overwrote the session's methods with B's.
-	// acr is the inherited one, because SetAcrLevel took the maximum of the target and
-	// A's session level, so the grant can claim a second factor B never presented.
-	// createTokenInputFromCode re-copies the code's acr on every rotation, so that one
-	// false claim persists for the life of the grant rather than decaying.
+	// What such a bind cost was one claim. Before the fix the browser could hold A's session
+	// while B authenticated, and the code carried B as its user, A's session identifier, and
+	// A's session level, since SetAcrLevel took the maximum of the target and the session's: an
+	// acr claiming a second factor B never presented, beside B's own amr. Every refresh copies
+	// the code's acr, so the claim lasted as long as the grant. Migration 000097 lowered every
+	// stored sign-in whose level claims a second factor its methods do not name, these among
+	// them, and /auth/issue refuses to issue such a level (ceremony.LevelClaimsUnnamedFactor,
+	// #199), so the level is not left to this comparison.
 	//
 	// Three conditions, and the last two are what stop this refusing anything legitimate:
 	// the code names a session at all, that row still exists, and it belongs to someone
 	// else. A missing row is accepted DELIBERATELY. Sessions are swept once they idle out
 	// or reach their maximum lifetime, so "gone" is the ordinary state of the session
-	// behind an older grant, and refusing on absence would break every one of them. The
-	// cost of that choice is stated: this reaches a pre-fix grant only while its session
-	// row survives, which by default is two hours of idling or twenty-four of lifetime.
+	// behind an older grant, and refusing on absence would break every one of them.
 	//
 	// Both columns compared are NOT NULL, so the zero-equals-zero vacuity that an
 	// incomplete test fixture can produce cannot arise against a real database.

@@ -142,6 +142,8 @@ func (o *Issuance) Run(ctx context.Context, browser issuanceBrowser, settings *r
 		authStateGeneration:      authContext.AuthStateGeneration,
 		otpClaim:                 otpClaimOf(authContext),
 		sessionIdentifierPresent: sessionIdentifier != "",
+		acrLevel:                 authContext.AcrLevel,
+		authMethods:              authContext.AuthMethods,
 	}
 
 	var (
@@ -418,6 +420,11 @@ func (o *Issuance) refuseUnusableSession(ctx context.Context, browser issuanceBr
 		case sessionAuthenticatorRemoved:
 			slog.WarnContext(ctx, "this silent ceremony names a one-time code and the user no longer has an authenticator, returning login_required instead of issuing anything",
 				"ceremony_user_id", authContext.UserId)
+		case sessionLevelUnearned:
+			slog.WarnContext(ctx, "this silent ceremony's level claims a second factor its methods do not name, returning login_required instead of issuing anything",
+				"ceremony_user_id", authContext.UserId,
+				"acr_level", authContext.AcrLevel.String(),
+				"auth_methods", authContext.AuthMethods)
 		default:
 			slog.WarnContext(ctx, "the session backing this silent ceremony is gone, returning login_required instead of issuing a code",
 				"session_identifier", sessionIdentifier)
@@ -441,6 +448,11 @@ func (o *Issuance) refuseUnusableSession(ctx context.Context, browser issuanceBr
 	case sessionAuthenticatorRemoved:
 		slog.WarnContext(ctx, "this ceremony names a one-time code and the user no longer has an authenticator, restarting level 1 instead of issuing anything",
 			"ceremony_user_id", authContext.UserId)
+	case sessionLevelUnearned:
+		slog.WarnContext(ctx, "this ceremony's level claims a second factor its methods do not name, restarting level 1 instead of issuing anything",
+			"ceremony_user_id", authContext.UserId,
+			"acr_level", authContext.AcrLevel.String(),
+			"auth_methods", authContext.AuthMethods)
 	default:
 		slog.WarnContext(ctx, "the session backing this ceremony is gone, restarting level 1 instead of issuing a code",
 			"session_identifier", sessionIdentifier)

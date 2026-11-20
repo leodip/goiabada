@@ -458,9 +458,29 @@ func (ac *AuthContext) AddAuthMethod(method oidc.AuthMethod) {
 // set came with the authenticator and is counted as a code is wherever the claim is checked (#257
 // decisions 4 and 5).
 func (ac *AuthContext) ClaimsOTP() bool {
-	methods := strings.Fields(ac.AuthMethods)
+	return namesSecondFactor(ac.AuthMethods)
+}
+
+// namesSecondFactor reports whether authMethods, a space-separated amr list, names otp or
+// recovery_code: whole names, case included.
+func namesSecondFactor(authMethods string) bool {
+	methods := strings.Fields(authMethods)
 	return slices.Contains(methods, oidc.AuthMethodOTP.String()) ||
 		slices.Contains(methods, oidc.AuthMethodRecoveryCode.String())
+}
+
+// LevelClaimsUnnamedFactor reports whether acrLevel claims a second factor that authMethods, the
+// space-separated amr list, does not name. It is the one statement of the rule a sign-in's level
+// keeps: urn:goiabada:level2_mandatory is earned only by methods naming otp or recovery_code, read
+// as ClaimsOTP reads them, and the two lower levels claim no second factor. #828, which makes each
+// level's methods configurable, replaces this definition.
+//
+// Releases before 1.7.0 stored sign-ins breaking it, through three bugs since fixed (#133, #537),
+// and migration 000097 lowered every one of them to level 1. /auth/issue refuses to issue a code or
+// implicit tokens for a ceremony breaking it, so a bug that writes the pair again is refused there
+// rather than carried into a grant (#199).
+func LevelClaimsUnnamedFactor(acrLevel record.AcrLevel, authMethods string) bool {
+	return acrLevel == record.AcrLevel2Mandatory && !namesSecondFactor(authMethods)
 }
 
 // RequestedMaxAge is the client's max_age as every hop after /auth/authorize reads it: nil when

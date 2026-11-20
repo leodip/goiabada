@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -19,6 +20,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
+	"github.com/leodip/goiabada/authserver/web"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/logging/logtest"
@@ -53,14 +55,16 @@ type recheckFixture struct {
 	authContext    *ceremony.AuthContext
 	req            *http.Request
 	rr             *httptest.ResponseRecorder
-	serve          func()
+	// templateFS is the form_post page's templates, none unless a case renders the page.
+	templateFS fs.FS
+	serve      func()
 }
 
 // newRecheckFixture is a ceremony that passes every check: an enabled client allowed both flows, an
 // enabled user at the generation the ceremony authenticated at, and a live, owned, valid session.
 // Every read is Maybe(), because a case refused early reaches none of the later ones; a case that
-// must not reach one says so with AssertNotCalled. A case edits f.client, f.user or f.settings
-// before f.serve(): the mocks hand out those pointers.
+// must not reach one says so with AssertNotCalled. A case edits f.client, f.user, f.settings or
+// f.templateFS before f.serve(): the mocks hand out those pointers, and the handler is built there.
 func newRecheckFixture(t *testing.T, responseType string, prompt string) *recheckFixture {
 	t.Helper()
 	return newRecheckFixtureFor(t, responseType, prompt, liveSessionIdentifier)
@@ -137,18 +141,20 @@ func newRecheckFixtureFor(t *testing.T, responseType string, prompt string, sess
 	permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, mock.Anything, mock.Anything).
 		Return(func(_ context.Context, scope string, _ *record.User) string { return scope }, nil).Maybe()
 
-	handler := buildIssueGet(issueGetDeps{
-		pageRenderer:        f.pageRenderer,
-		ceremonyStore:       f.ceremonyStore,
-		templateFS:          fstest.MapFS{},
-		codeIssuer:          f.codeIssuer,
-		implicitTokenIssuer: f.implicitIssuer,
-		database:            f.database,
-		auditLogger:         f.auditLogger,
-		userSessionManager:  userSessionManager,
-		permissionChecker:   permissionChecker,
-	})
-	f.serve = func() { handler.ServeHTTP(f.rr, f.req) }
+	f.templateFS = fstest.MapFS{}
+	f.serve = func() {
+		buildIssueGet(issueGetDeps{
+			pageRenderer:        f.pageRenderer,
+			ceremonyStore:       f.ceremonyStore,
+			templateFS:          f.templateFS,
+			codeIssuer:          f.codeIssuer,
+			implicitTokenIssuer: f.implicitIssuer,
+			database:            f.database,
+			auditLogger:         f.auditLogger,
+			userSessionManager:  userSessionManager,
+			permissionChecker:   permissionChecker,
+		}).ServeHTTP(f.rr, f.req)
+	}
 	return f
 }
 
@@ -572,6 +578,144 @@ func TestHandleIssueGet_ARemovedAuthenticatorRestartsTheCeremony(t *testing.T) {
 			f.assertNothingIssued(t)
 			f.ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
 		})
+	}
+}
+
+// A ceremony at urn:goiabada:level2_mandatory whose methods name neither otp nor recovery_code is not
+// issued: its level claims a second factor nobody presented. It is answered as every ceremony whose
+// claim no longer stands is, restarted at level 1 with a Warn record naming the user and no audit
+// event, or answered login_required, in the response mode the request asked for, when it forbids UI
+// (#199 decisions 6 and 7).
+func TestHandleIssueGet_AnUnearnedLevelRestartsTheCeremony(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		responseType string
+		inFragment   bool
+	}{
+		{"code", "code", false},
+		{"implicit", "id_token token", true},
+	} {
+		t.Run(tc.name+", interactive, restarts at level 1 and writes nothing to the client", func(t *testing.T) {
+			f := newRecheckFixture(t, tc.responseType, "")
+			f.authContext.AcrLevel = record.AcrLevel2Mandatory
+			f.authContext.AuthMethods = "pwd"
+			logs := logtest.CaptureSlog(t)
+
+			var saved *ceremony.AuthContext
+			f.ceremonyStore.On("SaveAuthContext", f.rr, f.req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+				return ac.AuthState == ceremony.AuthStateRequiresLevel1
+			})).Run(func(args mock.Arguments) { saved = args.Get(2).(*ceremony.AuthContext) }).Return(nil).Once()
+
+			f.serve()
+
+			require.Equal(t, http.StatusFound, f.rr.Code)
+			assert.Equal(t, testCeremonyId, assertStepLocation(t, f.rr.Header().Get("Location"), "/auth/level1"))
+			require.NotNil(t, saved)
+			assert.Empty(t, saved.AcrLevel, "the attempt, and the level it claimed, are discarded with the restart")
+			assert.Empty(t, saved.AuthMethods, "the sign-in that starts over earns its own methods")
+			assert.Zero(t, saved.UserId, "whoever signs in next is not assumed to be this user")
+			assert.Equal(t, "openid", saved.Scope, "the request survives the restart")
+			f.assertNothingIssued(t)
+			f.auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+			f.ceremonyStore.AssertNotCalled(t, "ClearAuthContext", mock.Anything, mock.Anything, mock.Anything)
+
+			warning, ok := warningSaying(t, logs, "claims a second factor its methods do not name")
+			if ok {
+				assert.EqualValues(t, 123, warning.Attrs["ceremony_user_id"])
+				assert.Contains(t, warning.Message, "restarting level 1")
+			}
+		})
+
+		t.Run(tc.name+", silent, is answered login_required", func(t *testing.T) {
+			f := newRecheckFixture(t, tc.responseType, "none")
+			f.authContext.AcrLevel = record.AcrLevel2Mandatory
+			f.authContext.AuthMethods = "pwd"
+			logs := logtest.CaptureSlog(t)
+
+			f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).Return(nil).Once()
+
+			f.serve()
+
+			require.Equal(t, http.StatusFound, f.rr.Code)
+			params := answerParams(t, f.rr.Header().Get("Location"), tc.inFragment)
+			assert.Equal(t, "login_required", params.Get("error"))
+			assert.Equal(t, "User authentication is required", params.Get("error_description"))
+			assert.Equal(t, "test-state", params.Get("state"))
+			assert.Empty(t, params.Get("code"), "no code")
+			assert.Empty(t, params.Get("access_token"), "no access token")
+			assert.Empty(t, params.Get("id_token"), "no ID token")
+			f.assertNothingIssued(t)
+			f.auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+			f.ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
+			f.ceremonyStore.AssertExpectations(t)
+
+			warning, ok := warningSaying(t, logs, "claims a second factor its methods do not name")
+			if ok {
+				assert.EqualValues(t, 123, warning.Attrs["ceremony_user_id"])
+				assert.Contains(t, warning.Message, "returning login_required")
+			}
+		})
+	}
+
+	// The response mode the request asked for carries the answer: form_post renders the page that
+	// posts it, and the client reads login_required from its fields.
+	t.Run("code, silent, form_post, is answered login_required in the posted form", func(t *testing.T) {
+		f := newRecheckFixture(t, "code", "none")
+		f.authContext.AcrLevel = record.AcrLevel2Mandatory
+		f.authContext.AuthMethods = ""
+		f.authContext.ResponseMode = "form_post"
+		f.templateFS = web.TemplateFS()
+
+		f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).Return(nil).Once()
+
+		f.serve()
+
+		require.Equal(t, http.StatusOK, f.rr.Code, "form_post answers with the page that posts the response")
+		assert.Empty(t, f.rr.Header().Get("Location"))
+		fields := map[string]string{}
+		for _, field := range formPostFields(f.rr.Body.String()) {
+			fields[field[0]] = field[1]
+		}
+		assert.Equal(t, "login_required", fields["error"])
+		assert.Equal(t, "test-state", fields["state"])
+		assert.NotContains(t, fields, "code", "no code")
+		f.assertNothingIssued(t)
+	})
+
+	// The two second factors earn the level, for both flows: the check refuses only what no sign-in
+	// could have performed.
+	for _, methods := range []string{"pwd otp", "pwd recovery_code"} {
+		for _, responseType := range []string{"code", "id_token token"} {
+			t.Run(responseType+" at level 3 naming "+methods+" is issued", func(t *testing.T) {
+				f := newRecheckFixture(t, responseType, "")
+				f.authContext.AcrLevel = record.AcrLevel2Mandatory
+				f.authContext.AuthMethods = methods
+				generation := int64(2)
+				f.authContext.OtpClaimGeneration = &generation
+				f.user.OTPEnabled = true
+				f.user.OtpConfigGeneration = generation
+
+				if responseType == "code" {
+					f.codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.MatchedBy(func(input *issuance.CreateCodeInput) bool {
+						return input.AcrLevel == record.AcrLevel2Mandatory && input.AuthMethods == methods
+					})).Return(&record.Code{Id: 9, Code: "c0de", ClientId: 1, RedirectURI: "https://example.com/callback",
+						State: "test-state"}, nil).Once()
+				} else {
+					f.implicitIssuer.On("IssueImplicitTx", mock.Anything, mock.Anything, mock.MatchedBy(func(input *issuance.ImplicitGrantInput) bool {
+						return input.AcrLevel == record.AcrLevel2Mandatory && input.AuthMethods == methods
+					}), true, true).Return(&issuance.ImplicitGrantResponse{AccessToken: "access", IdToken: "id"}, nil).Once()
+				}
+				f.auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
+				f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).Return(nil).Once()
+
+				f.serve()
+
+				require.Equal(t, http.StatusFound, f.rr.Code)
+				params := answerParams(t, f.rr.Header().Get("Location"), responseType != "code")
+				assert.Empty(t, params.Get("error"), "a level its methods earn is issued")
+				f.ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
+			})
+		}
 	}
 }
 
