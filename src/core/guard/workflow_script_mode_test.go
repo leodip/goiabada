@@ -133,12 +133,12 @@ func executedPath(c shellCommand) (string, bool) {
 }
 
 // gitModes maps each file git's index holds under root, relative to it, to the mode git records
-// for it: 100755 for an executable file, 100644 for another. The parent of root is the ceiling, so a
-// tree that is no repository of its own is never read as part of an enclosing one, and is an error.
+// for it: 100755 for an executable file, 100644 for another. git runs with gitEnvironment, so a tree
+// that is no repository of its own is an error.
 func gitModes(ctx context.Context, root string) (map[string]string, error) {
 	cmd := exec.CommandContext(ctx, "git", "ls-files", "--stage", "-z")
 	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "GIT_CEILING_DIRECTORIES="+filepath.Dir(root))
+	cmd.Env = gitEnvironment(root)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -279,12 +279,12 @@ func TestWorkflowScripts_TheRealRunStepsRunExecutableFiles(t *testing.T) {
 		"the walk reaches build validation's binary scan, which reached main without its execute bit")
 }
 
-// scriptModeGit runs git in root, which is never read as part of a repository enclosing it.
+// scriptModeGit runs git in root, a repository of its own, with gitEnvironment.
 func scriptModeGit(t *testing.T, root string, args ...string) {
 	t.Helper()
 	cmd := exec.CommandContext(t.Context(), "git", args...)
 	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "GIT_CEILING_DIRECTORIES="+filepath.Dir(root))
+	cmd.Env = gitEnvironment(root)
 	out, err := cmd.CombinedOutput()
 	require.NoError(t, err, "git %s: %s", strings.Join(args, " "), out)
 }
@@ -399,6 +399,19 @@ func TestWorkflowScripts_Findings(t *testing.T) {
 		findings, _ := scriptModeFindings(root, []string{".github/workflows/w.yml"}, modes)
 		require.NotEmpty(t, findings)
 		assert.Contains(t, findings[0], "w.yml:7 runs ./scan.sh, but src/build/scan.sh has mode 0644, with no execute bit")
+	})
+
+	t.Run("the caller's git environment reaches neither a fixture nor its modes", func(t *testing.T) {
+		// As a pre-commit hook runs these tests, with GIT_INDEX_FILE naming its repository's index.
+		callers := filepath.Join(t.TempDir(), "index")
+		t.Setenv("GIT_INDEX_FILE", callers)
+		root := scriptModeTree(t, workflow, scripts)
+		scriptModeGit(t, root, "init", "--quiet")
+		scriptModeGit(t, root, "add", ".")
+		modes, err := gitModes(t.Context(), root)
+		require.NoError(t, err)
+		assert.Equal(t, "100755", modes["src/build/scan.sh"])
+		assert.NoFileExists(t, callers, "the fixture wrote the caller's index")
 	})
 
 	t.Run("a tree that is no repository has no git modes", func(t *testing.T) {

@@ -10,6 +10,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -189,15 +190,23 @@ var (
 	markdownFence   = regexp.MustCompile("^\\s*(```|~~~)")
 )
 
-// trackedFiles lists the files git tracks under root, as paths relative to it. The parent of root
-// is the ceiling, so a tree that is no repository of its own is never read as part of an enclosing
-// one.
+// gitEnvironment is the environment a guard runs git in root with: the process's own without the
+// variables that name a repository, its index or its configuration, such as the GIT_DIR and
+// GIT_INDEX_FILE a hook runs with, so git reads root's own repository, and with root's parent as
+// the ceiling, so a tree that is no repository of its own is never read as part of an enclosing one.
+func gitEnvironment(root string) []string {
+	env := slices.DeleteFunc(os.Environ(), func(v string) bool { return strings.HasPrefix(v, "GIT_") })
+	return append(env, "GIT_CEILING_DIRECTORIES="+filepath.Dir(root))
+}
+
+// trackedFiles lists the files git tracks under root, as paths relative to it, git run with
+// gitEnvironment.
 //
 // The context is Background because the reporting half holds none, as in goListDeps.
 func trackedFiles(root string) (map[string]bool, error) {
 	cmd := exec.CommandContext(context.Background(), "git", "ls-files", "-z")
 	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "GIT_CEILING_DIRECTORIES="+filepath.Dir(root))
+	cmd.Env = gitEnvironment(root)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
