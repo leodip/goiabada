@@ -93,8 +93,8 @@ Where a firewall or an egress policy limits what the auth server reaches, allow 
 A delivery that gets no answer after its last attempt is given up. So is one still running when the auth server stops, and one dropped because too many were already running: deliveries are kept in memory only. Nothing sends it later, so your app has to find out on its own, and that isn't always possible:
 
 - **Ending a session, a different user signing in on the browser, a reused authorization code, a credential change, and disabling or deleting the user** revoke the session's refresh tokens. **Disconnecting your app** from the user revokes your app's. Your app learns at its next refresh, which fails.
-- **Your app [signing the user out](/concepts/ending-sessions/#signing-out) with an `id_token_hint`** revokes its refresh tokens tied to that session, so it learns at its next refresh too. Its offline refresh tokens keep working.
-- **A sign-out without an `id_token_hint` and a sign-in ending an older session** revoke nothing. An offline refresh token from that session keeps working, so an app holding one stays signed in.
+- **Your app [signing the user out](/concepts/ending-sessions/#signing-out) with an `id_token_hint` the auth server confirmed** revokes its refresh tokens tied to that session, so it learns at its next refresh too. Its offline refresh tokens keep working.
+- **A sign-out without a confirmed `id_token_hint` and a sign-in ending an older session** revoke nothing. An offline refresh token from that session keeps working, so an app holding one stays signed in.
 
 <Aside type="caution">
 An app that must stop when the user's session does shouldn't ask for `offline_access`. A normal refresh token stops working with the session, however the session ends, whether or not the logout token arrived.
