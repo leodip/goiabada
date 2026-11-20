@@ -2,8 +2,15 @@
 // and the difference between ending the app's session and ending the auth server's. The app revokes
 // its refresh token at /auth/revoke before it signs out, and answers "Sign-out failed" when the
 // revocation is refused, so each "Signed out" below is a revocation that succeeded too (RFC 7009).
+// The last test signs in through two clients of its own instead, to show what the sign-out itself
+// revokes when no revocation comes before it.
+import { createHash, randomBytes } from "node:crypto";
+import type { BrowserContext } from "@playwright/test";
+import { signInThroughClient, testRedirectUri } from "../../lib/browser-sign-in";
 import { env } from "../../lib/environment";
 import { expect, test } from "../../lib/fixtures";
+import { codeToken, jwtClaims, refreshToken, userinfo } from "../../lib/oauth";
+import { browserSignInClient } from "../../lib/test-clients";
 import { expectResult, resultBody, signInToWebApp, testapp, userBrowser } from "../../lib/testapp";
 
 test("signing out with the ID token returns to the app with its state, and the next sign-in asks for the password", async ({ browser, users }) => {
@@ -162,4 +169,64 @@ test("signing out to a redirect URI that isn't a sign-out redirect URI signs out
 
   expect((await signInToWebApp(app, testapp.web, user)).askedForPassword).toBe(true);
   await context.close();
+});
+
+// Signs in through the client on the browser's session, which asks for nothing, and returns the code
+// and its verifier.
+async function codeOnTheSession(context: BrowserContext, clientId: string) {
+  const page = await context.newPage();
+  const codeVerifier = randomBytes(32).toString("base64url");
+  await page.goto(`${env.authUrl}/auth/authorize?${new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: testRedirectUri,
+    response_type: "code",
+    scope: "openid",
+    state: randomBytes(8).toString("hex"),
+    code_challenge: createHash("sha256").update(codeVerifier).digest("base64url"),
+    code_challenge_method: "S256",
+  })}`);
+  await page.waitForURL((url) => url.href.startsWith(testRedirectUri));
+  const code = new URL(page.url()).searchParams.get("code");
+  if (!code) throw new Error(`no code in ${page.url()}`);
+  await page.close();
+  return { code, codeVerifier };
+}
+
+// Ending sessions, "Signing out": a sign-out with the ID token revokes the departing app's refresh
+// token tied to the session, even while another app keeps the session. The app keeps its refresh
+// token and doesn't revoke it at /auth/revoke first, unlike the test app's own Sign out button, so
+// only the sign-out can have ended it. The other app's token on the same session still refreshes.
+test("signing out with the ID token revokes the app's refresh token from the session, and leaves another app's working", async ({ page, browser, request, clients, users }) => {
+  const user = await users.create();
+  const departing = await browserSignInClient(page, clients);
+  const staying = await browserSignInClient(page, clients);
+
+  const signIn = await signInThroughClient(browser, {
+    clientId: departing.client.identifier, email: user.email, password: user.password, scope: "openid",
+  });
+  const departingTokens = await codeToken(request, departing.client.identifier, departing.secret, signIn.code,
+    signIn.codeVerifier, testRedirectUri);
+  expect(departingTokens.status, JSON.stringify(departingTokens.body)).toBe(200);
+  const kept = departingTokens.body.refresh_token as string;
+  expect(jwtClaims(kept).typ).toBe("Refresh");
+
+  const second = await codeOnTheSession(signIn.context, staying.client.identifier);
+  const stayingTokens = await codeToken(request, staying.client.identifier, staying.secret, second.code,
+    second.codeVerifier, testRedirectUri);
+  expect(stayingTokens.status, JSON.stringify(stayingTokens.body)).toBe(200);
+  expect(jwtClaims(stayingTokens.body.access_token as string).sid).toBe(jwtClaims(departingTokens.body.id_token as string).sid);
+
+  const signOut = await signIn.context.newPage();
+  await signOut.goto(`${env.authUrl}/auth/logout?${new URLSearchParams({ id_token_hint: departingTokens.body.id_token as string })}`);
+  await expect(signOut.getByRole("heading", { name: "Signed out" })).toBeVisible();
+  await signIn.context.close();
+
+  const refused = await refreshToken(request, departing.client.identifier, departing.secret, kept);
+  expect(refused.status).toBe(400);
+  expect(refused.body).toMatchObject({ error: "invalid_grant", error_description: "This refresh token has been revoked." });
+  expect((await userinfo(request, departingTokens.body.access_token as string)).status).toBe(401);
+
+  const refreshed = await refreshToken(request, staying.client.identifier, staying.secret,
+    stayingTokens.body.refresh_token as string);
+  expect(refreshed.status, JSON.stringify(refreshed.body)).toBe(200);
 });

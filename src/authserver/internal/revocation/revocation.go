@@ -62,7 +62,7 @@ type Database interface {
 //
 // The caller owns the transaction. Passing a nil tx is permitted and means no transaction,
 // following the data layer's convention, but every caller here supplies one.
-func RevokeRefreshTokens(ctx context.Context, db Database, tx *sql.Tx, tokens []*record.RefreshToken) ([]string, error) {
+func RevokeRefreshTokens(ctx context.Context, db refreshTokenWriter, tx *sql.Tx, tokens []*record.RefreshToken) ([]string, error) {
 	revokedJtis := make([]string, 0, len(tokens))
 	for _, rt := range tokens {
 		if rt.Revoked {
@@ -75,6 +75,17 @@ func RevokeRefreshTokens(ctx context.Context, db Database, tx *sql.Tx, tokens []
 		revokedJtis = append(revokedJtis, rt.RefreshTokenJti)
 	}
 	return revokedJtis, nil
+}
+
+// refreshTokenWriter is the one write RevokeRefreshTokens makes, so a port narrower than Database,
+// EndClientPartTx's, can sweep with it.
+type refreshTokenWriter interface {
+	UpdateRefreshToken(ctx context.Context, tx *sql.Tx, refreshToken *record.RefreshToken) error
+}
+
+// familyRecorder is the one write recordFamilies makes, for the reason refreshTokenWriter is apart.
+type familyRecorder interface {
+	RecordRefreshTokenFamilyRevoked(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string, reason string) (bool, error)
 }
 
 // UserAuthStateResult reports what revoking a user's authentication state actually did. Its
@@ -336,6 +347,8 @@ func RevokeUserAuthState(ctx context.Context, db Database, tx *sql.Tx, userId in
 // ReasonClientRevoked the one it carries when a client revoked the grant at /auth/revoke (#676),
 // and ReasonSessionTerminated and ReasonAuthCodeReuse the ones it carries when a session's
 // termination or the response to a reused authorization code wrote it (#676).
+// ReasonClientSignedOut is the one it carries when a sign-out with a confirmed id_token_hint revoked
+// the departing client's session-bound grants (#135 decision 9).
 // Constants rather than inline strings so the sites cannot drift and a log consumer has
 // something to match against, and one block so the next site's reason has one place to go.
 // Every value is stored data: renaming a constant is free, changing its string is not.
@@ -356,6 +369,7 @@ const (
 	ReasonClientDisconnected      = "client_disconnected"
 	ReasonClientRevoked           = "client_revoked"
 	ReasonSessionTerminated       = "session_terminated"
+	ReasonClientSignedOut         = "client_signed_out"
 	ReasonAuthCodeReuse           = "auth_code_reuse"
 )
 
@@ -745,13 +759,21 @@ func TerminateUserSessionTx(ctx context.Context, db Database, userSession *recor
 	return result, nil
 }
 
-// ClientPartDatabase is what EndClientPartTx reads and writes.
+// ClientPartDatabase is what EndClientPartTx reads and writes: the session's row and its apps, and
+// the departing app's session-bound grants it revokes (#135 decision 9).
 type ClientPartDatabase interface {
+	familyRecorder
+	refreshTokenWriter
+
 	AcquireUserSessionRow(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (bool, error)
 	DeleteUserSession(ctx context.Context, tx *sql.Tx, userSessionId int64) error
 	DeleteUserSessionClient(ctx context.Context, tx *sql.Tx, userSessionClientId int64) error
 	GetCommittedUserSessionClients(ctx context.Context, tx *sql.Tx, userSessionId int64) ([]record.UserSessionClient, error)
+	GetSessionBoundRefreshTokensBySessionIdentifierAndClientId(ctx context.Context, tx *sql.Tx, sessionIdentifier string,
+		clientId int64) ([]*record.RefreshToken, error)
 	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
+	RevokeUnusedCodesBySessionIdentifierAndClientId(ctx context.Context, tx *sql.Tx, sessionIdentifier string,
+		clientId int64) (int64, error)
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 }
 
@@ -765,6 +787,13 @@ type ClientPartEnd struct {
 	Ended *record.UserSessionClient
 	// SessionDeleted is true when that app was the session's last, so the session went with it.
 	SessionDeleted bool
+	// RevokedCodeCount is how many of the app's codes from the session not yet redeemed this call
+	// TRANSITIONED from live to revoked (#135 decision 9).
+	RevokedCodeCount int64
+	// RevokedRefreshTokenJtis lists the app's session-bound refresh tokens from the session this
+	// call transitioned, per RevokeRefreshTokens. Non-nil when the app's part ended, so a JSON audit
+	// payload carries [] rather than null.
+	RevokedRefreshTokenJtis []string
 }
 
 // EndClientPartTx ends one app's part of a session, the teardown a confirmed id_token_hint earns at
@@ -778,7 +807,21 @@ type ClientPartEnd struct {
 // seen here and keeps the session: its part did not end, and deleting the session would take its row
 // with it untold. A session ended meanwhile is held by nothing: that end told its apps.
 //
-// The audit events and the app's logout token are the caller's, after the commit.
+// In the same transaction, once the app's row is gone, it revokes the app's session-bound grants from
+// the session (#135 decision 9): it marks the app's codes from the session not yet redeemed revoked,
+// records the rotation family of each session-bound refresh token the app holds from the session
+// under ReasonClientSignedOut, and revokes those tokens. It does so whether or not other apps share
+// the session, so a client's sign-out no longer leaves its token working only while another client
+// is on the session. Their access tokens are refused at once, since each names its grant and the
+// family is recorded (#676 decision 1). The app's offline tokens, which Back-Channel Logout 1.0
+// section 2.7 says "normally SHOULD NOT be" revoked, its grants from other sessions and every other
+// app's grants are untouched. The sweep follows the session's row and its deletion, the order
+// TerminateUserSessionTx writes in: a ceremony minting a code for the session takes that row first,
+// so its code is either marked here or never written. A code already being exchanged when this
+// commits may still yield its grant (#135 decision 11).
+//
+// The audit events and the app's logout token are the caller's, after the commit. On any error the
+// result is the zero value, so a caller cannot audit a sign-out that rolled back.
 func EndClientPartTx(ctx context.Context, db ClientPartDatabase, sessionIdentifier string,
 	clientIdentifier string) (ClientPartEnd, error) {
 
@@ -790,10 +833,16 @@ func EndClientPartTx(ctx context.Context, db ClientPartDatabase, sessionIdentifi
 		return ClientPartEnd{}, nil
 	}
 
+	// Opened through RunInTransactionRetryingConflict, so a family record lost to a containment of
+	// the same family that overlaps this transaction runs the body again, as RevokeClientGrantsTx
+	// states. The body is safe to rerun: it reads what it ends afresh on each attempt and resets what
+	// it reports, so the result is the committing attempt's.
 	var ended *record.UserSessionClient
 	sessionDeleted := false
-	err = db.RunInTransaction(ctx, func(tx *sql.Tx) error {
-		ended, sessionDeleted = nil, false
+	var revokedCodeCount int64
+	var revokedJtis []string
+	err = data.RunInTransactionRetryingConflict(ctx, db, func(tx *sql.Tx) error {
+		ended, sessionDeleted, revokedCodeCount, revokedJtis = nil, false, 0, nil
 		held, acquireErr := db.AcquireUserSessionRow(ctx, tx, sessionIdentifier)
 		if acquireErr != nil {
 			return acquireErr
@@ -819,6 +868,12 @@ func EndClientPartTx(ctx context.Context, db ClientPartDatabase, sessionIdentifi
 				sessionDeleted = true
 			}
 			found := sessionClients[i]
+
+			var sweepErr error
+			revokedCodeCount, revokedJtis, sweepErr = revokeSignOutGrants(ctx, db, tx, sessionIdentifier, found.Client.Id)
+			if sweepErr != nil {
+				return sweepErr
+			}
 			ended = &found
 			return nil
 		}
@@ -827,7 +882,34 @@ func EndClientPartTx(ctx context.Context, db ClientPartDatabase, sessionIdentifi
 	if err != nil {
 		return ClientPartEnd{}, err
 	}
-	return ClientPartEnd{Session: session, Ended: ended, SessionDeleted: sessionDeleted}, nil
+	return ClientPartEnd{Session: session, Ended: ended, SessionDeleted: sessionDeleted,
+		RevokedCodeCount: revokedCodeCount, RevokedRefreshTokenJtis: revokedJtis}, nil
+}
+
+// revokeSignOutGrants is EndClientPartTx's sweep of the client clientId's session-bound grants from
+// the session sessionIdentifier, on the sign-out's transaction. The code mark comes first, as in
+// every other sweep, and each family is recorded before its tokens are flipped (#259). It answers
+// the codes it marked and the tokens it moved from live to revoked, never a nil list.
+func revokeSignOutGrants(ctx context.Context, db ClientPartDatabase, tx *sql.Tx, sessionIdentifier string,
+	clientId int64) (int64, []string, error) {
+
+	revokedCodeCount, err := db.RevokeUnusedCodesBySessionIdentifierAndClientId(ctx, tx, sessionIdentifier, clientId)
+	if err != nil {
+		return 0, nil, err
+	}
+	tokens, err := db.GetSessionBoundRefreshTokensBySessionIdentifierAndClientId(ctx, tx, sessionIdentifier, clientId)
+	if err != nil {
+		return 0, nil, err
+	}
+	err = recordFamilies(ctx, db, tx, tokens, ReasonClientSignedOut)
+	if err != nil {
+		return 0, nil, err
+	}
+	revokedJtis, err := RevokeRefreshTokens(ctx, db, tx, tokens)
+	if err != nil {
+		return 0, nil, err
+	}
+	return revokedCodeCount, revokedJtis, nil
 }
 
 // AuthCodeReuseResult reports what the response to a reused authorization code actually did. It
@@ -1385,7 +1467,7 @@ func RevokeClientGrants(ctx context.Context, db Database, tx *sql.Tx, clientId i
 // given refresh tokens, each once, under the reason this sweep revokes them for. A token
 // with no family identifier carries no family to record: no issuer writes one, and
 // RecordRefreshTokenFamilyRevoked refuses an empty jti as a caller bug.
-func recordFamilies(ctx context.Context, db Database, tx *sql.Tx, tokens []*record.RefreshToken, reason string) error {
+func recordFamilies(ctx context.Context, db familyRecorder, tx *sql.Tx, tokens []*record.RefreshToken, reason string) error {
 	_, err := recordNewFamilies(ctx, db, tx, tokens, reason)
 	return err
 }
@@ -1393,7 +1475,7 @@ func recordFamilies(ctx context.Context, db Database, tx *sql.Tx, tokens []*reco
 // recordNewFamilies is recordFamilies reporting how many of the records THIS call wrote, as
 // RecordRefreshTokenFamilyRevoked reports each: a family already recorded, by an earlier
 // revocation or by a containment that committed first, is not counted.
-func recordNewFamilies(ctx context.Context, db Database, tx *sql.Tx, tokens []*record.RefreshToken,
+func recordNewFamilies(ctx context.Context, db familyRecorder, tx *sql.Tx, tokens []*record.RefreshToken,
 	reason string) (int, error) {
 
 	recorded := 0
@@ -1617,6 +1699,29 @@ func LogDisconnectedClient(ctx context.Context, auditLogger AuditLogger, userId 
 		// What this call TRANSITIONED, not what the user held. Always a list rather than null:
 		// the success path fills it from RevokeRefreshTokens.
 		"revoked_refresh_token_jtis": result.RevokedRefreshTokenJtis,
+	})
+}
+
+// LogRevokedSignOutGrants emits EventRevokedSignOutGrants, the security record of what a sign-out
+// with a confirmed id_token_hint revoked (#135 decision 9). One function beside the operation,
+// following the other Log* helpers: the payload has one place to be asserted field by field.
+//
+// Call this only after EndClientPartTx returned without error and ended the client's part, beside
+// EventDeletedUserSessionClient. logged_in_user is "": no bearer token reaches /auth/logout, and the
+// actor is the event's own user_id, as on the sign-out's other entries (#385).
+//
+// ctx is the request's, for the reason LogRevokedClientGrants states (#328).
+func LogRevokedSignOutGrants(ctx context.Context, auditLogger AuditLogger, end ClientPartEnd) {
+	auditLogger.Log(ctx, audit.EventRevokedSignOutGrants, map[string]interface{}{
+		"user_id":            end.Session.UserId,
+		"client_id":          end.Ended.Client.Id,
+		"user_session_id":    end.Session.Id,
+		"session_identifier": end.Session.SessionIdentifier,
+		"logged_in_user":     "",
+		// What this call TRANSITIONED, for the reason LogRevokedClientGrants gives.
+		"revoked_code_count": end.RevokedCodeCount,
+		// Always a list rather than null: EndClientPartTx fills it from RevokeRefreshTokens.
+		"revoked_refresh_token_jtis": end.RevokedRefreshTokenJtis,
 	})
 }
 

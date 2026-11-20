@@ -12702,6 +12702,86 @@ func (_c *Database_GetResourcesByIds_Call) RunAndReturn(run func(ctx context.Con
 	return _c
 }
 
+// GetSessionBoundRefreshTokensBySessionIdentifierAndClientId provides a mock function for the type Database
+func (_mock *Database) GetSessionBoundRefreshTokensBySessionIdentifierAndClientId(ctx context.Context, tx *sql.Tx, sessionIdentifier string, clientId int64) ([]*record.RefreshToken, error) {
+	ret := _mock.Called(ctx, tx, sessionIdentifier, clientId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetSessionBoundRefreshTokensBySessionIdentifierAndClientId")
+	}
+
+	var r0 []*record.RefreshToken
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string, int64) ([]*record.RefreshToken, error)); ok {
+		return returnFunc(ctx, tx, sessionIdentifier, clientId)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string, int64) []*record.RefreshToken); ok {
+		r0 = returnFunc(ctx, tx, sessionIdentifier, clientId)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*record.RefreshToken)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, string, int64) error); ok {
+		r1 = returnFunc(ctx, tx, sessionIdentifier, clientId)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_GetSessionBoundRefreshTokensBySessionIdentifierAndClientId_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetSessionBoundRefreshTokensBySessionIdentifierAndClientId'
+type Database_GetSessionBoundRefreshTokensBySessionIdentifierAndClientId_Call struct {
+	*mock.Call
+}
+
+// GetSessionBoundRefreshTokensBySessionIdentifierAndClientId is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - sessionIdentifier string
+//   - clientId int64
+func (_e *Database_Expecter) GetSessionBoundRefreshTokensBySessionIdentifierAndClientId(ctx any, tx any, sessionIdentifier any, clientId any) *Database_GetSessionBoundRefreshTokensBySessionIdentifierAndClientId_Call {
+	return &Database_GetSessionBoundRefreshTokensBySessionIdentifierAndClientId_Call{Call: _e.mock.On("GetSessionBoundRefreshTokensBySessionIdentifierAndClientId", ctx, tx, sessionIdentifier, clientId)}
+}
+
+func (_c *Database_GetSessionBoundRefreshTokensBySessionIdentifierAndClientId_Call) Run(run func(ctx context.Context, tx *sql.Tx, sessionIdentifier string, clientId int64)) *Database_GetSessionBoundRefreshTokensBySessionIdentifierAndClientId_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 int64
+		if args[3] != nil {
+			arg3 = args[3].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_GetSessionBoundRefreshTokensBySessionIdentifierAndClientId_Call) Return(refreshTokens []*record.RefreshToken, err error) *Database_GetSessionBoundRefreshTokensBySessionIdentifierAndClientId_Call {
+	_c.Call.Return(refreshTokens, err)
+	return _c
+}
+
+func (_c *Database_GetSessionBoundRefreshTokensBySessionIdentifierAndClientId_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, sessionIdentifier string, clientId int64) ([]*record.RefreshToken, error)) *Database_GetSessionBoundRefreshTokensBySessionIdentifierAndClientId_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetSettingsById provides a mock function for the type Database
 func (_mock *Database) GetSettingsById(ctx context.Context, tx *sql.Tx, settingsId int64) (*record.Settings, error) {
 	ret := _mock.Called(ctx, tx, settingsId)
@@ -17399,6 +17479,84 @@ func (_c *Database_RevokeRefreshTokenFamily_Call) Return(n int64, err error) *Da
 }
 
 func (_c *Database_RevokeRefreshTokenFamily_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string) (int64, error)) *Database_RevokeRefreshTokenFamily_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// RevokeUnusedCodesBySessionIdentifierAndClientId provides a mock function for the type Database
+func (_mock *Database) RevokeUnusedCodesBySessionIdentifierAndClientId(ctx context.Context, tx *sql.Tx, sessionIdentifier string, clientId int64) (int64, error) {
+	ret := _mock.Called(ctx, tx, sessionIdentifier, clientId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RevokeUnusedCodesBySessionIdentifierAndClientId")
+	}
+
+	var r0 int64
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string, int64) (int64, error)); ok {
+		return returnFunc(ctx, tx, sessionIdentifier, clientId)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string, int64) int64); ok {
+		r0 = returnFunc(ctx, tx, sessionIdentifier, clientId)
+	} else {
+		r0 = ret.Get(0).(int64)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, string, int64) error); ok {
+		r1 = returnFunc(ctx, tx, sessionIdentifier, clientId)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_RevokeUnusedCodesBySessionIdentifierAndClientId_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RevokeUnusedCodesBySessionIdentifierAndClientId'
+type Database_RevokeUnusedCodesBySessionIdentifierAndClientId_Call struct {
+	*mock.Call
+}
+
+// RevokeUnusedCodesBySessionIdentifierAndClientId is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - sessionIdentifier string
+//   - clientId int64
+func (_e *Database_Expecter) RevokeUnusedCodesBySessionIdentifierAndClientId(ctx any, tx any, sessionIdentifier any, clientId any) *Database_RevokeUnusedCodesBySessionIdentifierAndClientId_Call {
+	return &Database_RevokeUnusedCodesBySessionIdentifierAndClientId_Call{Call: _e.mock.On("RevokeUnusedCodesBySessionIdentifierAndClientId", ctx, tx, sessionIdentifier, clientId)}
+}
+
+func (_c *Database_RevokeUnusedCodesBySessionIdentifierAndClientId_Call) Run(run func(ctx context.Context, tx *sql.Tx, sessionIdentifier string, clientId int64)) *Database_RevokeUnusedCodesBySessionIdentifierAndClientId_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 int64
+		if args[3] != nil {
+			arg3 = args[3].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_RevokeUnusedCodesBySessionIdentifierAndClientId_Call) Return(n int64, err error) *Database_RevokeUnusedCodesBySessionIdentifierAndClientId_Call {
+	_c.Call.Return(n, err)
+	return _c
+}
+
+func (_c *Database_RevokeUnusedCodesBySessionIdentifierAndClientId_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, sessionIdentifier string, clientId int64) (int64, error)) *Database_RevokeUnusedCodesBySessionIdentifierAndClientId_Call {
 	_c.Call.Return(run)
 	return _c
 }

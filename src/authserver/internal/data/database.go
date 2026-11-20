@@ -421,6 +421,13 @@ type Database interface {
 	// it for a grant the withdrawal's sweep never saw. Used codes are left alone: their
 	// grants are the refresh tokens the same withdrawal sweeps (see #622).
 	RevokeUnusedCodesByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (int64, error)
+	// RevokeUnusedCodesBySessionIdentifierAndClientId marks every unused, not-yet-revoked code
+	// one client holds from one session revoked and reports how many rows it transitioned. A
+	// sign-out with a confirmed id_token_hint marks the departing client's, so a code issued
+	// before it cannot start a grant on the session after it. Used codes are left alone: their
+	// grants are the refresh tokens the same sign-out sweeps, and an offline one among them must
+	// survive (see #135 decision 9).
+	RevokeUnusedCodesBySessionIdentifierAndClientId(ctx context.Context, tx *sql.Tx, sessionIdentifier string, clientId int64) (int64, error)
 	GetCodeById(ctx context.Context, tx *sql.Tx, codeId int64) (*record.Code, error)
 	GetCodeByCodeHash(ctx context.Context, tx *sql.Tx, codeHash string, used bool) (*record.Code, error)
 	DeleteCode(ctx context.Context, tx *sql.Tx, codeId int64) error
@@ -981,6 +988,12 @@ type Database interface {
 	GetRefreshTokensByFirstRefreshTokenJti(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string) ([]*record.RefreshToken, error)
 	GetRefreshTokensByCodeId(ctx context.Context, tx *sql.Tx, codeId int64) ([]*record.RefreshToken, error)
 	GetRefreshTokensBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) ([]*record.RefreshToken, error)
+	// GetSessionBoundRefreshTokensBySessionIdentifierAndClientId returns the session-bound
+	// refresh tokens one client holds from one session, revoked ones included: the tokens of the
+	// client's codes on the session whose own session identifier is the session's, which an
+	// offline token's is not. A sign-out with a confirmed id_token_hint revokes them and records
+	// their families (see #135 decision 9).
+	GetSessionBoundRefreshTokensBySessionIdentifierAndClientId(ctx context.Context, tx *sql.Tx, sessionIdentifier string, clientId int64) ([]*record.RefreshToken, error)
 	// GetRefreshTokensByUserId returns every refresh token belonging to a user,
 	// through either linkage shape: codes.user_id for the authorization code flow and
 	// refresh_tokens.user_id for ROPC. GetRefreshTokensBySessionIdentifier cannot

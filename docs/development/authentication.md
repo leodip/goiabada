@@ -312,6 +312,24 @@ A user, or an administrator acting for them, ends everything the user holds with
 - Implementation: `handler_api_account_consents.go`, `handler_api_user_consents.go`,
   `revocation/revocation.go`
 
+### Hinted sign-out
+A sign-out at `/auth/logout` with a confirmed `id_token_hint` ends the hint's client's part of the
+session and revokes that client's session-bound grants from it (#135 decision 9).
+- Operation: `revocation.EndClientPartTx`, in one transaction under the session's row: the client's
+  row deleted, the session too when the client was its last, then
+  `RevokeUnusedCodesBySessionIdentifierAndClientId` and the client's session-bound tokens from the
+  session (`GetSessionBoundRefreshTokensBySessionIdentifierAndClientId`, the tokens whose own
+  `session_identifier` is the session's), each family recorded under `client_signed_out` before the
+  live ones are revoked. Whether other clients share the session decides only whether it is deleted
+- Untouched: the client's offline tokens (Back-Channel Logout 1.0 section 2.7: they "normally SHOULD
+  NOT be" revoked), its used codes, its grants from other sessions, every other client's grants, and
+  everything a hintless sign-out ends
+- Audit: `revoked_sign_out_grants` after the commit, beside `deleted_user_session_client`, whenever
+  the client's part ended, with the tokens it moved from live to revoked and the codes it marked
+- Gap: a code exchange already under way when it commits may finish, as for a disconnect (#135
+  decision 11)
+- Implementation: `handler_logout.go`, `revocation/revocation.go`
+
 ### Token introspection (RFC 7662)
 An API, calling as a confidential client, asks whether a token is active.
 - Endpoint: `POST /auth/introspect`, form-encoded, CSRF-exempt, no CORS; every other method is
@@ -390,7 +408,8 @@ client's back-channel logout URI (#784).
   among those they tell, and the disable ends and revokes them (#796). The hinted
   sign-out (`revocation.EndClientPartTx`) deletes the hinting app's row, and the session when that
   app is its last as read under the row, so an app a sign-in added after the sign-out first read the
-  session keeps it; it tells the hinting app after the commit. Each caller hands its deliveries to
+  session keeps it, and revokes the app's session-bound grants (see Hinted sign-out above); it tells
+  the hinting app after the commit. Each caller hands its deliveries to
   `backchannel.Sender.Send` after the commit, beside its audit events
 - The token: `typ: logout+jwt`, RS256 under the current signing key's `kid`; `iss`, `aud` (the
   client identifier), `iat`, `exp` 120 seconds on, `jti`, the back-channel logout event with `{}`,

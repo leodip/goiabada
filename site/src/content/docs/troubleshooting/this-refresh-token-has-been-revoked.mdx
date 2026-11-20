@@ -23,7 +23,7 @@ Or every refresh token your app got from the password grant fails at once, for e
 
 ## Why it happens
 
-There are five causes: a refresh token that came back after it was rotated, which is the usual one, a consent withdrawn, a changed client identifier, a client made public, and your app revoking the grant.
+There are six causes: a refresh token that came back after it was rotated, which is the usual one, a consent withdrawn, a changed client identifier, a client made public, your app revoking the grant, and your app signing the user out.
 
 A refresh token is good for one refresh. Each refresh returns a new one and retires the old one, and that's called rotation.
 
@@ -57,6 +57,10 @@ Sign your app's users in again.
 ### A grant your app revoked
 
 When your app sends one of a grant's tokens to [`/auth/revoke`](/reference/endpoints/revoke/), at sign-out for example, the grant's refresh tokens are refused from then on, usually with "This refresh token has been revoked." The audit log holds a `revoked_grant` event for your client, and no `refresh_token_replay_detected`. Look for a sign-out in one tab or instance while another was refreshing. Sign the user in again.
+
+### A sign-out with your app's ID token
+
+When your app signs the user out at [`/auth/logout`](/reference/endpoints/logout/) with its ID token as the `id_token_hint`, its normal refresh tokens from that session are revoked, even while other apps keep the session. The audit log holds a `revoked_sign_out_grants` event for your client. A refresh token your app needs after the user signs out has to be an offline one, from the `offline_access` scope. See [Signing out](/concepts/ending-sessions/#signing-out).
 
 ## Fix it
 

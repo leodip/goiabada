@@ -85,6 +85,10 @@ func TestEventTypes_ContainsCriticalEvents(t *testing.T) {
 		// deleted_own_user_consent name no client and are not written when no consent was
 		// deleted, so without it the revocation would leave no trace.
 		EventDisconnectedClient,
+		// Records that a hinted sign-out revoked the departing client's session-bound grants from
+		// the session (#135 decision 9). Same class: deleted_user_session_client says the client
+		// left the session, and names nothing it revoked.
+		EventRevokedSignOutGrants,
 	}
 
 	for _, critical := range criticalEvents {
@@ -155,6 +159,7 @@ func TestEventTypes_CriticalEventValuesAreWireValues(t *testing.T) {
 		{"EventTerminatedUserSession", EventTerminatedUserSession, "terminated_user_session"},
 		{"EventRevokedClientGrants", EventRevokedClientGrants, "revoked_client_grants"},
 		{"EventDisconnectedClient", EventDisconnectedClient, "disconnected_client"},
+		{"EventRevokedSignOutGrants", EventRevokedSignOutGrants, "revoked_sign_out_grants"},
 		{"EventRotatedKeys", EventRotatedKeys, "rotated_keys"},
 		{"EventRevokedKey", EventRevokedKey, "revoked_key"},
 		{"EventAuthCodeReuseDetected", EventAuthCodeReuseDetected, "auth_code_reuse_detected"},

@@ -148,6 +148,19 @@ var revokeUnusedCodesByUserIdAndClientId = statement{
 		"WHERE user_id = @p3 AND client_id = @p4 AND used = @p5 AND revoked = @p6",
 }
 
+// revokeUnusedCodesBySessionIdentifierAndClientId binds revoked, updated_at, the session identifier,
+// the client id, then used and revoked as the row must still hold them.
+var revokeUnusedCodesBySessionIdentifierAndClientId = statement{
+	sqlite: "UPDATE codes SET revoked = ?, updated_at = ? " +
+		"WHERE session_identifier = ? AND client_id = ? AND used = ? AND revoked = ?",
+	mysql: "UPDATE codes SET revoked = ?, updated_at = ? " +
+		"WHERE session_identifier = ? AND client_id = ? AND used = ? AND revoked = ?",
+	postgres: "UPDATE codes SET revoked = $1, updated_at = $2 " +
+		"WHERE session_identifier = $3 AND client_id = $4 AND used = $5 AND revoked = $6",
+	mssql: "UPDATE codes SET revoked = @p1, updated_at = @p2 " +
+		"WHERE session_identifier = @p3 AND client_id = @p4 AND used = @p5 AND revoked = @p6",
+}
+
 var deleteCode = statement{
 	sqlite:   "DELETE FROM codes WHERE id = ?",
 	mysql:    "DELETE FROM codes WHERE id = ?",
@@ -357,6 +370,41 @@ func (d *Database) RevokeUnusedCodesByUserIdAndClientId(ctx context.Context, tx 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
 		return 0, errs.Wrap(err, "unable to get rows affected when revoking unused codes by user id and client id")
+	}
+
+	return rowsAffected, nil
+}
+
+// RevokeUnusedCodesBySessionIdentifierAndClientId marks every code one client holds from one session
+// that is neither used nor revoked yet revoked, and reports how many rows this call transitioned. It
+// is the code half of a sign-out with a confirmed id_token_hint (#135 decision 9): a code the
+// departing client was issued on the session before it signed out could otherwise still start a
+// grant on the session after it.
+//
+// Unused codes only, as RevokeUnusedCodesByUserIdAndClientId marks them: a used code's grant is its
+// refresh tokens, which the same sign-out sweeps when they are session-bound, and an offline token
+// descended from a marked code would be refused with it, where the sign-out must leave it working.
+//
+// The `revoked = false` term makes the count mean "rows this call transitioned", for the reason
+// RevokeCodesBySessionIdentifier gives. An empty session identifier or a zero client id is rejected
+// rather than used as a filter, for the reasons RevokeCodesBySessionIdentifier and
+// RevokeCodesByClientId give.
+func (d *Database) RevokeUnusedCodesBySessionIdentifierAndClientId(ctx context.Context, tx *sql.Tx,
+	sessionIdentifier string, clientId int64) (int64, error) {
+
+	if sessionIdentifier == "" || clientId == 0 {
+		return 0, errs.New("can't revoke codes with an empty session identifier or a client id of 0")
+	}
+
+	result, err := d.ExecSQL(ctx, tx, revokeUnusedCodesBySessionIdentifierAndClientId.text(d.Dialect),
+		true, time.Now().UTC(), sessionIdentifier, clientId, false, false)
+	if err != nil {
+		return 0, errs.Wrap(err, "unable to revoke unused codes by session identifier and client id")
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return 0, errs.Wrap(err, "unable to get rows affected when revoking unused codes by session identifier and client id")
 	}
 
 	return rowsAffected, nil

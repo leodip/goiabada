@@ -30,19 +30,17 @@ import (
 // must notify, the deletes that end it, and the client's sign-out redirect URIs a target is
 // matched against. Its redirect URIs are read only to describe a refused target (#147 decision 9).
 // The session's row, its apps and its user are read for the logout tokens a sign-out sends (#784).
+// The departing client's session-bound grants are revoked through revocation.ClientPartDatabase
+// (#135 decision 9).
 type logoutDatabase interface {
 	backchannel.SessionDatabase
+	revocation.ClientPartDatabase
 
-	AcquireUserSessionRow(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (bool, error)
 	ClientLoadPostLogoutRedirectURIs(ctx context.Context, tx *sql.Tx, client *record.Client) error
 	ClientLoadRedirectURIs(ctx context.Context, tx *sql.Tx, client *record.Client) error
-	DeleteUserSession(ctx context.Context, tx *sql.Tx, userSessionId int64) error
-	DeleteUserSessionClient(ctx context.Context, tx *sql.Tx, userSessionClientId int64) error
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
 	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
 	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error)
-	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
-	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 }
 
 // logoutTokenSender tells the apps whose part of a session ended, with the logout tokens the end
@@ -571,11 +569,13 @@ func classifyIdTokenHint(
 
 // handleExistingSessionOnLogout performs the per-client teardown a CONFIRMED id_token_hint earns:
 // delete this client's row on the session, and the session row itself when that client was the last
-// one on it.
+// one on it, and revoke this client's session-bound grants from the session, its refresh tokens and
+// its codes not yet redeemed, whether or not other clients share it (#135 decision 9). The sign-out's
+// existing entries are written as before, and revoked_sign_out_grants beside them.
 //
-// Per-client rather than whole-session, unchanged by this rewrite, because #129 decided that logging
-// one client out must not stop the session-bound tokens of the other clients sharing that session.
-// Two of its integration tests exist so that widening this has to be deliberate (#109 decision 3).
+// Per-client rather than whole-session, because #129 decided that logging one client out must not
+// stop the session-bound tokens of the other clients sharing that session, and #135 kept that: the
+// client's offline grants and every other client's grants are untouched.
 //
 // The sid guard this used to open with is gone. Whether the hint names the browser's session is part
 // of whether the hint can be confirmed at all, and classifyIdTokenHint decides that before anything
@@ -618,6 +618,7 @@ func handleExistingSessionOnLogout(
 		"client_id":       sessionClient.Client.Id,
 		"logged_in_user":  "",
 	})
+	revocation.LogRevokedSignOutGrants(r.Context(), auditLogger, end)
 
 	if end.SessionDeleted {
 		// "" for the reason given above: no bearer token reaches /auth/logout, and the actor is this

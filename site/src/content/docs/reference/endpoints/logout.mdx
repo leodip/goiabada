@@ -7,7 +7,7 @@ import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components'
 
 This page helps you sign a user out of the auth server from your app, with the logout endpoint, `/auth/logout`.
 
-It's OpenID Connect's [RP-Initiated Logout 1.0](https://openid.net/specs/openid-connect-rpinitiated-1_0.html) endpoint, the `end_session_endpoint` in the [discovery document](/reference/endpoints/discovery-and-jwks/). What a sign-out ends, and what it leaves alone, is on [Ending sessions](/concepts/ending-sessions/#signing-out). Signing out revokes none of your app's tokens: revoke them first at [`/auth/revoke`](/reference/endpoints/revoke/), as [Sign users out](/guides/sign-users-out/) shows.
+It's OpenID Connect's [RP-Initiated Logout 1.0](https://openid.net/specs/openid-connect-rpinitiated-1_0.html) endpoint, the `end_session_endpoint` in the [discovery document](/reference/endpoints/discovery-and-jwks/). What a sign-out ends, and what it leaves alone, is on [Ending sessions](/concepts/ending-sessions/#signing-out). A sign-out with a hint revokes your app's refresh tokens tied to the session, and not its offline ones: revoke those first at [`/auth/revoke`](/reference/endpoints/revoke/), as [Sign users out](/guides/sign-users-out/) shows.
 
 ## Sign a user out
 
@@ -84,7 +84,7 @@ The ID token from a user's sign-in to your app passes all of these while the bro
 
 ## What it ends
 
-**With a confirmed hint,** the auth server removes your app from the session the hint's `sid` names. The session ends when your app was the last client on it, so the user stays signed in to the other apps sharing it. **Without one,** once the user clicks **Sign out**, the browser's whole session ends.
+**With a confirmed hint,** the auth server removes your app from the session the hint's `sid` names, and revokes your app's refresh tokens tied to that session and its authorization codes from it that weren't redeemed yet. Their access tokens are refused at once at `/userinfo` and the auth server's APIs. The session ends when your app was the last client on it, so the user stays signed in to the other apps sharing it, and their tokens keep working. Your app's offline refresh tokens keep working too. **Without one,** once the user clicks **Sign out**, the browser's whole session ends, and it revokes nothing.
 
 Either way, the browser's session cookie is cleared, so its next sign-in starts with the password.
 
@@ -129,7 +129,7 @@ JavaScript can call `/auth/logout` across origins when its origin is registered 
 
 ## The audit log
 
-A sign-out with a confirmed hint leaves `deleted_user_session_client` in the [audit log](/concepts/audit-log/), for your app leaving the session. When yours was the session's last client, the session ends too, and it also leaves `deleted_user_session`, with the reason `signed_out`, and `logout`. One without a hint leaves `logout`, even when there was no session, and `deleted_user_session` when there was one. Each app told leaves `sent_logout_token`.
+A sign-out with a confirmed hint leaves `deleted_user_session_client` in the [audit log](/concepts/audit-log/), for your app leaving the session, and `revoked_sign_out_grants`, naming the refresh tokens it revoked and how many codes. When yours was the session's last client, the session ends too, and it also leaves `deleted_user_session`, with the reason `signed_out`, and `logout`. One without a hint leaves `logout`, even when there was no session, and `deleted_user_session` when there was one. Each app told leaves `sent_logout_token`.
 
 ## Next steps
 

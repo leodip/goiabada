@@ -67,12 +67,14 @@ A [silent request](/concepts/glossary/#silent-request) can't show a page, so it 
 
 ## Signing out
 
-Your app signs a user out by sending them to [`/auth/logout`](/reference/endpoints/logout/). Signing out revokes nothing: no refresh token and no authorization code is revoked. What it ends depends on what the request carries:
+Your app signs a user out by sending them to [`/auth/logout`](/reference/endpoints/logout/). What it ends depends on what the request carries:
 
-- **With an `id_token_hint`**, the auth server removes your app from the session the hint names. The session itself ends only when no other client is using it, so the user stays signed in to the others.
-- **Without one**, once the user confirms on the sign-out page, the whole session ends.
+- **With an `id_token_hint`**, the auth server removes your app from the session the hint names, and revokes what your app was given from that session: its refresh tokens tied to the session, and its authorization codes from it that weren't redeemed yet. The session itself ends only when no other client is using it, so the user stays signed in to the others. The other clients' tokens keep working, and so do your app's offline refresh tokens.
+- **Without one**, once the user confirms on the sign-out page, the whole session ends. Nothing is revoked, but every normal refresh token from the session stops working with it.
 
-Either way the browser's cookie is cleared, so its next sign-in starts from the password. A normal refresh token stops working once the session behind it has ended. Offline refresh tokens aren't tied to a session and keep working.
+Either way the browser's cookie is cleared, so its next sign-in starts from the password. Offline refresh tokens, from the `offline_access` scope, aren't tied to a session and keep working. An app that has to go on working after the user signs out of it needs one.
+
+A code your app is exchanging at the very moment it signs out can still give it a working refresh token. Revoke that token at [`/auth/revoke`](/reference/endpoints/revoke/) if it matters.
 
 A sign-out's audit log entries are on [Logout](/reference/endpoints/logout/#the-audit-log).
 
@@ -132,7 +134,7 @@ When the **same** user signs in again, none of this applies. Their session is re
 
 An access token is a signed JWT, and nothing on this page changes a token already issued. What happens to it depends on who checks it:
 
-- **The auth server's own endpoints**, [`/userinfo`](/reference/endpoints/userinfo/) and the Admin and Account APIs, refuse an access token on the very next request once its session has ended or expired, its user was disabled or changed their credentials, or its grant was revoked. [Ending a session](#end-a-session) from the admin console or the API revokes the grants it handed out, offline ones included, so this reaches an offline grant's access tokens too. Withdrawing the user's consent to the client and making the client public revoke the grant as well, and disabling the client refuses its tokens while it stays disabled. Signing out revokes nothing.
+- **The auth server's own endpoints**, [`/userinfo`](/reference/endpoints/userinfo/) and the Admin and Account APIs, refuse an access token on the very next request once its session has ended or expired, its user was disabled or changed their credentials, or its grant was revoked. [Ending a session](#end-a-session) from the admin console or the API revokes the grants it handed out, offline ones included, so this reaches an offline grant's access tokens too. Withdrawing the user's consent to the client and making the client public revoke the grant as well, and so does your app signing the user out with an `id_token_hint`, for its grants tied to that session. Disabling the client refuses its tokens while it stays disabled.
 - **An API that introspects the token**, asking the [introspection endpoint](/reference/endpoints/introspect/), gets `{"active": false}` from the same moment, for every one of these.
 - **An API checking the signature alone** accepts the token until it expires.
 

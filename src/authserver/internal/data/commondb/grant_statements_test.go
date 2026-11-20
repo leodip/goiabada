@@ -86,6 +86,20 @@ func grantStatements() []narrowWrite {
 			},
 		},
 		{
+			// A hinted sign-out's code mark: the departing client's codes from the session not yet
+			// redeemed (#135 decision 9).
+			name:  "RevokeUnusedCodesBySessionIdentifierAndClientId",
+			execs: []*scriptedExec{{rowsAffected: 2}},
+			run: func(ctx context.Context, d *Database) (any, error) {
+				return d.RevokeUnusedCodesBySessionIdentifierAndClientId(ctx, nil, grantSessionId, grantClientId)
+			},
+			answer: int64(2),
+			statements: []string{
+				"UPDATE codes SET revoked = true, updated_at = <now> " +
+					"WHERE session_identifier = 'sid-1' AND client_id = 3 AND used = false AND revoked = false",
+			},
+		},
+		{
 			name: "GetCodeById",
 			run: func(ctx context.Context, d *Database) (any, error) {
 				_, err := d.GetCodeById(ctx, nil, grantCodeId)
@@ -196,6 +210,21 @@ func grantStatements() []narrowWrite {
 			statements: []string{
 				"SELECT <columns> FROM refresh_tokens INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
 					"WHERE codes.session_identifier = 'sid-1'",
+			},
+		},
+		{
+			// A hinted sign-out's sweep: the departing client's tokens through codes on the session,
+			// the token's own session identifier the session's, which is what an offline token's lacks
+			// (#135 decision 9).
+			name: "GetSessionBoundRefreshTokensBySessionIdentifierAndClientId",
+			run: func(ctx context.Context, d *Database) (any, error) {
+				_, err := d.GetSessionBoundRefreshTokensBySessionIdentifierAndClientId(ctx, nil, grantSessionId, grantClientId)
+				return nil, err
+			},
+			statements: []string{
+				"SELECT <columns> FROM refresh_tokens INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
+					"WHERE codes.session_identifier = 'sid-1' AND codes.client_id = 3 " +
+					"AND refresh_tokens.session_identifier = 'sid-1'",
 			},
 		},
 		{

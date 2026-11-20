@@ -169,6 +169,19 @@ var selectRefreshTokensBySessionIdentifier = statement{
 		"WHERE codes.session_identifier = @p1",
 }
 
+// selectSessionBoundRefreshTokensBySessionIdentifierAndClientId binds the session identifier, the
+// client id, then the session identifier again for the token's own column.
+var selectSessionBoundRefreshTokensBySessionIdentifierAndClientId = statement{
+	sqlite: "SELECT " + refreshTokenColumns.sqlite + " FROM refresh_tokens INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
+		"WHERE codes.session_identifier = ? AND codes.client_id = ? AND refresh_tokens.session_identifier = ?",
+	mysql: "SELECT " + refreshTokenColumns.mysql + " FROM refresh_tokens INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
+		"WHERE codes.session_identifier = ? AND codes.client_id = ? AND refresh_tokens.session_identifier = ?",
+	postgres: "SELECT " + refreshTokenColumns.postgres + " FROM refresh_tokens INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
+		"WHERE codes.session_identifier = $1 AND codes.client_id = $2 AND refresh_tokens.session_identifier = $3",
+	mssql: "SELECT " + refreshTokenColumns.mssql + " FROM refresh_tokens INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
+		"WHERE codes.session_identifier = @p1 AND codes.client_id = @p2 AND refresh_tokens.session_identifier = @p3",
+}
+
 // selectRefreshTokensByUserId binds the user id once per branch: the code's user, then the token's.
 var selectRefreshTokensByUserId = statement{
 	sqlite: "SELECT " + refreshTokenColumns.sqlite + " FROM refresh_tokens INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
@@ -609,6 +622,35 @@ func (d *Database) GetRefreshTokensBySessionIdentifier(ctx context.Context, tx *
 
 	return queryRefreshTokens(ctx, d, tx, selectRefreshTokensBySessionIdentifier.text(d.Dialect),
 		[]any{sessionIdentifier})
+}
+
+// GetSessionBoundRefreshTokensBySessionIdentifierAndClientId returns the session-bound refresh tokens
+// one client holds from one session: the tokens descended from the client's codes on the session
+// whose own session_identifier is the session's. That last term is what leaves out the client's
+// offline tokens from the same session, whose own session_identifier is empty and whose code carries
+// the sid, the shape GetRefreshTokensBySessionIdentifier reaches on purpose and this must not. A
+// password grant token has no code and no session, so it is never one of them.
+//
+// It exists for the sign-out with a confirmed id_token_hint (#135 decision 9), which revokes these
+// and leaves the client's offline grants working (Back-Channel Logout 1.0 section 2.7). Revoked rows
+// are returned beside the live ones, for the reason GetRefreshTokensByUserIdAndClientId gives: the
+// sign-out records the family of every row it reads, and a family whose stored members are all
+// revoked can still have a child mid-rotation that only that record refuses (#259).
+//
+// The session is matched on codes.session_identifier, which idx_codes_session_identifier serves, as
+// well as on the token's own. An empty session identifier or a zero client id names no grant and
+// returns an empty slice with no error, following GetRefreshTokensBySessionIdentifier: the join
+// would otherwise match every code with an empty session_identifier.
+func (d *Database) GetSessionBoundRefreshTokensBySessionIdentifierAndClientId(ctx context.Context, tx *sql.Tx,
+	sessionIdentifier string, clientId int64) ([]*record.RefreshToken, error) {
+
+	if sessionIdentifier == "" || clientId == 0 {
+		return nil, nil
+	}
+
+	return queryRefreshTokens(ctx, d, tx,
+		selectSessionBoundRefreshTokensBySessionIdentifierAndClientId.text(d.Dialect),
+		[]any{sessionIdentifier, clientId, sessionIdentifier})
 }
 
 func (d *Database) DeleteRefreshToken(ctx context.Context, tx *sql.Tx, refreshTokenId int64) error {

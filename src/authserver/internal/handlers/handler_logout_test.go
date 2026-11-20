@@ -18,6 +18,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
+	"github.com/leodip/goiabada/authserver/internal/revocation"
 	"github.com/leodip/goiabada/core/sessionstore/mocks"
 
 	"github.com/leodip/goiabada/authserver/internal/idtokenhint"
@@ -849,6 +850,22 @@ func expectClientPartEnd(database *datamocks.Database, sessionIdentifier string,
 	database.On("GetCommittedUserSessionClients", mock.Anything, clientPartTx, userSession.Id).Return(committed, nil)
 }
 
+// expectSignOutSweep stubs the revocation a hinted sign-out makes on the same transaction once the
+// app's part ended (#135 decision 9): the app's codes from the session not yet redeemed, and its
+// session-bound refresh tokens from it, each family recorded before its tokens are flipped.
+func expectSignOutSweep(database *datamocks.Database, sessionIdentifier string, clientId int64, codes int64,
+	tokens ...*record.RefreshToken) {
+	database.On("RevokeUnusedCodesBySessionIdentifierAndClientId", mock.Anything, clientPartTx, sessionIdentifier, clientId).
+		Return(codes, nil).Once()
+	database.On("GetSessionBoundRefreshTokensBySessionIdentifierAndClientId", mock.Anything, clientPartTx,
+		sessionIdentifier, clientId).Return(tokens, nil).Once()
+	for _, rt := range tokens {
+		database.On("RecordRefreshTokenFamilyRevoked", mock.Anything, clientPartTx, rt.FirstRefreshTokenJti,
+			revocation.ReasonClientSignedOut).Return(true, nil).Once()
+		database.On("UpdateRefreshToken", mock.Anything, clientPartTx, rt).Return(nil).Once()
+	}
+}
+
 func TestHandleExistingSessionOnLogout(t *testing.T) {
 
 	// Item 4. A database error and a session that is simply not there used to be one branch returning
@@ -884,9 +901,9 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 	})
 
-	// Decision 3's first half: another client on the session means the row survives, so that client's
-	// session-bound tokens keep working. #129 wrote two integration tests so this cannot change by
-	// accident, and this is the unit-tier statement of the same rule.
+	// Another client on the session means the row survives, for the other client. The departing
+	// client's session-bound grants from the session are revoked all the same, and recorded beside
+	// its removal (#135 decision 9, which changed what #129 pinned).
 	t.Run("Delete user session client", func(t *testing.T) {
 		r := &http.Request{}
 		sessionIdentifier := "test-session"
@@ -897,12 +914,14 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
 		userSession := &record.UserSession{
-			Id:     1,
-			UserId: 123,
+			Id:                1,
+			UserId:            123,
+			SessionIdentifier: sessionIdentifier,
 			Clients: []record.UserSessionClient{
 				{
 					Id: 1,
 					Client: record.Client{
+						Id:               41,
 						ClientIdentifier: "test-client",
 					},
 				},
@@ -919,8 +938,19 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 		expectClientPartEnd(database, sessionIdentifier, userSession, userSession.Clients)
 		database.On("DeleteUserSessionClient", mock.Anything, clientPartTx, int64(1)).Return(nil)
 		// We don't expect DeleteUserSession to be called in this case
+		expectSignOutSweep(database, sessionIdentifier, 41, 1,
+			&record.RefreshToken{Id: 9, RefreshTokenJti: "rt-session-bound", FirstRefreshTokenJti: "fam-1"})
 
 		auditLogger.On("Log", mock.Anything, audit.EventDeletedUserSessionClient, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, audit.EventRevokedSignOutGrants, map[string]interface{}{
+			"user_id":                    int64(123),
+			"client_id":                  int64(41),
+			"user_session_id":            int64(1),
+			"session_identifier":         sessionIdentifier,
+			"logged_in_user":             "",
+			"revoked_code_count":         int64(1),
+			"revoked_refresh_token_jtis": []string{"rt-session-bound"},
+		}).Return().Once()
 
 		err := handleExistingSessionOnLogout(r, logoutTestSettings, hintClassification{sessionIdentifier: sessionIdentifier, client: client}, database, auditLogger, &recordingLogoutTokens{})
 
@@ -959,8 +989,10 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 		expectClientPartEnd(database, sessionIdentifier, userSession, userSession.Clients)
 		database.On("DeleteUserSessionClient", mock.Anything, clientPartTx, int64(1)).Return(nil)
 		database.On("DeleteUserSession", mock.Anything, clientPartTx, int64(1)).Return(nil)
+		expectSignOutSweep(database, sessionIdentifier, 0, 0)
 
 		auditLogger.On("Log", mock.Anything, audit.EventDeletedUserSessionClient, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, audit.EventRevokedSignOutGrants, mock.Anything).Return().Once()
 		auditLogger.On("Log", mock.Anything, audit.EventDeletedUserSession, map[string]interface{}{
 			"user_session_id": int64(1),
 			"user_id":         int64(123),
@@ -1024,7 +1056,9 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session").Return(readBefore, nil)
 		expectClientPartEnd(database, "test-session", readBefore, []record.UserSessionClient{hinted, joined})
 		database.On("DeleteUserSessionClient", mock.Anything, clientPartTx, int64(1)).Return(nil)
+		expectSignOutSweep(database, "test-session", 41, 0)
 		auditLogger.On("Log", mock.Anything, audit.EventDeletedUserSessionClient, mock.Anything).Return().Once()
+		auditLogger.On("Log", mock.Anything, audit.EventRevokedSignOutGrants, mock.Anything).Return().Once()
 
 		err := handleExistingSessionOnLogout(&http.Request{}, logoutTestSettings, hintClassification{
 			sessionIdentifier: "test-session",
@@ -1117,7 +1151,9 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session").Return(tc.session, nil)
 			expectClientPartEnd(database, "test-session", tc.session, tc.session.Clients)
 			database.On("DeleteUserSessionClient", mock.Anything, clientPartTx, int64(1)).Return(nil)
+			expectSignOutSweep(database, "test-session", 41, 0)
 			auditLogger.On("Log", mock.Anything, audit.EventDeletedUserSessionClient, mock.Anything).Return()
+			auditLogger.On("Log", mock.Anything, audit.EventRevokedSignOutGrants, mock.Anything).Return()
 
 			err := handleExistingSessionOnLogout(&http.Request{}, logoutTestSettings, hintClassification{
 				sessionIdentifier: "test-session",
@@ -1275,8 +1311,10 @@ func stubPerClientTeardown(
 	expectClientPartEnd(database, sessionIdentifier, userSession, userSession.Clients)
 	database.On("DeleteUserSessionClient", mock.Anything, clientPartTx, int64(7)).Return(nil)
 	database.On("DeleteUserSession", mock.Anything, clientPartTx, int64(42)).Return(nil)
+	expectSignOutSweep(database, sessionIdentifier, client.Id, 0)
 
 	auditLogger.On("Log", mock.Anything, audit.EventDeletedUserSessionClient, mock.Anything).Return()
+	auditLogger.On("Log", mock.Anything, audit.EventRevokedSignOutGrants, mock.Anything).Return()
 	auditLogger.On("Log", mock.Anything, audit.EventDeletedUserSession, map[string]interface{}{
 		"user_session_id": int64(42),
 		"user_id":         hintedUserId,

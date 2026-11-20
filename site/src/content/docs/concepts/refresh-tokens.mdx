@@ -72,6 +72,7 @@ A normal refresh token follows the session it's tied to instead: it stops workin
 | Your app gets it | Without `offline_access` | With `offline_access`, and always from the [password grant](/legacy-flows/ropc/), which has no session |
 | When the session expires | It stops working | It keeps working |
 | When someone [ends the session](/concepts/ending-sessions/#end-a-session) | It's revoked | It's revoked |
+| When your app [signs the user out](/concepts/ending-sessions/#signing-out) with an `id_token_hint` | It's revoked, if it's tied to that session | It keeps working |
 | When the user's [credentials change](/concepts/ending-sessions/#credential-changes) | It's revoked, unless it belongs to the session the user changed their own password in | It's revoked, with the same exception |
 | When your app [revokes](#revoking-a-grant) it or an access token of its grant | It's revoked | It's revoked |
 
@@ -86,7 +87,7 @@ A refresh is refused with `invalid_grant` when the token can't be used any more:
 - the user was disabled, or their password changed or was reset, apart from the tokens of the session a user changed their own password in;
 - the user no longer holds a permission the token carries;
 - the user withdrew their consent to your app, or an administrator revoked it. That revokes your app's refresh tokens for the user at once, whatever **Ask users for consent** says;
-- your app revoked the grant at `/auth/revoke`;
+- your app revoked the grant at `/auth/revoke`, or signed the user out of the token's session with an `id_token_hint`;
 - your app's **Ask users for consent** was turned on after the user signed in, and they haven't approved it since. A token from the [password grant](/legacy-flows/ropc/) isn't checked for this;
 - the user hasn't approved `authserver:manage-account` for your app, or withdrew it, when the refresh renews that scope from a sign-in, whatever **Ask users for consent** says. The admin console's own client is the one exception.
 

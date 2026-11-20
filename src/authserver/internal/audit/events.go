@@ -400,6 +400,21 @@ const (
 	// Its payload carries user_id, client_id, revoked_code_count and revoked_refresh_token_jtis,
 	// plus logged_in_user.
 	EventDisconnectedClient = "disconnected_client"
+	// EventRevokedSignOutGrants records that a sign-out with a confirmed id_token_hint revoked the
+	// departing client's session-bound grants from the session it signed out of (#135 decision 9):
+	// it marked that client's codes from the session not yet redeemed revoked, revoked the
+	// session-bound refresh tokens the client holds from it and recorded their rotation families
+	// revoked, whether or not other clients share the session. Offline refresh tokens and the other
+	// clients' grants are untouched. Emitted AFTER the sign-out's transaction commits, beside
+	// EventDeletedUserSessionClient, whenever the sign-out took the client off the session, and also
+	// when it found nothing to revoke, so the event attests that the sign-out revoked what it could.
+	// The access tokens of the revoked grants are refused at once at the auth server's own endpoints
+	// and at introspection, since each names its grant (#676 decision 1).
+	//
+	// Its payload carries user_id, client_id, user_session_id, session_identifier,
+	// revoked_refresh_token_jtis and revoked_code_count, plus logged_in_user, which is empty: no
+	// bearer token reaches /auth/logout.
+	EventRevokedSignOutGrants = "revoked_sign_out_grants"
 	// EventRevokedGrant records that a client ended one of its grants at the revocation endpoint
 	// (RFC 7009, #676), by sending the grant's refresh token or an access token carrying its
 	// grant_id: the grant's refresh token family was recorded revoked under client_revoked and every
@@ -816,6 +831,7 @@ var auditEventTypes = []string{
 	EventRevokedClientGrants,
 	EventRevokedGrant,
 	EventRevokedKey,
+	EventRevokedSignOutGrants,
 	EventRevokedUserAuthState,
 	EventROPCAuthFailed,
 	EventRotatedKeys,

@@ -702,6 +702,10 @@ func refreshTokenMapping() mappingCase {
 			"GetRefreshTokensBySessionIdentifier": func(ctx context.Context, d *Database) (any, error) {
 				return firstPointerOf(d.GetRefreshTokensBySessionIdentifier(ctx, nil, distinctString("session_identifier")))
 			},
+			"GetSessionBoundRefreshTokensBySessionIdentifierAndClientId": func(ctx context.Context, d *Database) (any, error) {
+				return firstPointerOf(d.GetSessionBoundRefreshTokensBySessionIdentifierAndClientId(ctx, nil,
+					distinctString("session_identifier"), 2))
+			},
 			"GetRefreshTokensByUserId": func(ctx context.Context, d *Database) (any, error) {
 				return firstPointerOf(d.GetRefreshTokensByUserId(ctx, nil, 1))
 			},
