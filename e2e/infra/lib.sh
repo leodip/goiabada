@@ -37,10 +37,45 @@ E2E_TESTAPP_IMAGE="${E2E_TESTAPP_IMAGE:-goiabada-e2e-testapp:local}"
 
 E2E_ALL_HOSTS=("$E2E_AUTH_HOST" "$E2E_ADMIN_HOST" "$E2E_WEBTEST1_HOST" "$E2E_WEBTEST2_HOST")
 
-SSH_OPTS=(-o BatchMode=yes -o ConnectTimeout=15)
+# A network between this machine and the VPS can drop a connection that has carried nothing for a few
+# minutes without telling either end, and from then on the connection hangs. The suite's tunnel to
+# Mailpit sits idle between the tests that read mail, and on one such network it was dropped after
+# between 210 and 270 seconds. A keepalive every 15 seconds keeps every connection the scripts open in
+# use, and when four in a row go unanswered ssh ends the connection, within about a minute and a
+# quarter, rather than leaving it to hang.
+SSH_OPTS=(-o BatchMode=yes -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=4)
 # shellcheck disable=SC2029 # the remote command is built on this side on purpose
 ssh_vps() { ssh "${SSH_OPTS[@]}" "$E2E_VPS_USER@$E2E_VPS_HOST" "$@"; }
 scp_vps() { scp -q "${SSH_OPTS[@]}" "$@"; }
+
+# Keeps a tunnel from 127.0.0.1:<local port> here to 127.0.0.1:<remote port> on the VPS open until it is
+# stopped. Whenever its ssh exits, because the keepalives found the connection dead or because it could
+# not connect, the tunnel is opened again on the same port, so an address handed to the tests stays
+# right. The wait before each try doubles while tries fail at once, up to 30 seconds, and each
+# reopening is reported on standard error with the time. Run it in the background and stop it with
+# kill, which ends its ssh too: keep_tunnel exits once its ssh has.
+keep_tunnel() { # local_port remote_port
+  local ssh_pid="" pause_pid="" status started delay=1
+  trap 'kill $ssh_pid $pause_pid 2>/dev/null; wait $ssh_pid $pause_pid 2>/dev/null; exit 0' TERM
+  while :; do
+    started=$SECONDS
+    ssh "${SSH_OPTS[@]}" -o ExitOnForwardFailure=yes -N -L "127.0.0.1:$1:127.0.0.1:$2" \
+      "$E2E_VPS_USER@$E2E_VPS_HOST" &
+    ssh_pid=$!
+    wait "$ssh_pid"
+    status=$?
+    ssh_pid=""
+    # A tunnel that stayed up for a minute was a working one: the next try comes after a second.
+    if ((SECONDS - started >= 60)); then delay=1; fi
+    warn "$(date +%T) the SSH tunnel to port $2 on the VPS closed (ssh exited with $status): opening it again in ${delay}s"
+    # In the background, so that a kill ends the wait at once rather than after the sleep.
+    sleep "$delay" &
+    pause_pid=$!
+    wait "$pause_pid"
+    pause_pid=""
+    delay=$((delay * 2 > 30 ? 30 : delay * 2))
+  done
+}
 
 # The records a public resolver answers for a name, one per line, through Cloudflare's DNS over
 # HTTPS so no local resolver or dig is needed.

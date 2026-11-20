@@ -51,7 +51,7 @@ cat <<EOF
   Administrator   $(setting E2E_ADMIN_EMAIL)
   Password        $(cat "$STATE_DIR/admin-password")
 
-  Mail            ssh -N -L 8025:127.0.0.1:$E2E_MAILPIT_PORT $E2E_VPS_USER@${E2E_VPS_HOST:-<the VPS>}
+  Mail            ssh -o ServerAliveInterval=15 -N -L 8025:127.0.0.1:$E2E_MAILPIT_PORT $E2E_VPS_USER@${E2E_VPS_HOST:-<the VPS>}
                   then open http://localhost:8025: Mailpit holds every email the auth server sends.
 
   The environment rests with the rate limiter and the Turnstile challenge off. To call the test app's

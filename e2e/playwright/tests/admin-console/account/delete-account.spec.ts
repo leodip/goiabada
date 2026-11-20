@@ -8,7 +8,7 @@ import { submitPassword } from "../../../lib/browser-sign-in";
 import { signInToConsole, turnOnTwoFactor, type ConsoleUser } from "../../../lib/console-user";
 import { env } from "../../../lib/environment";
 import { expect, test } from "../../../lib/fixtures";
-import { mailTo } from "../../../lib/mailpit";
+import { mailTo, waitForSubject } from "../../../lib/mailpit";
 import { freshTotp } from "../../../lib/totp";
 
 // Presses Delete my account and answers the dialog, which asks first.
@@ -30,12 +30,7 @@ async function expectDeleted(page: Page) {
 
 // The deletion notice, in Mailpit, sent after the response.
 async function expectDeletionNotice(request: APIRequestContext, address: string) {
-  await expect
-    .poll(async () => (await mailTo(request, address)).map((message) => message.Subject), {
-      message: `the deletion notice to ${address}`,
-      timeout: 30_000,
-    })
-    .toContain("Your account was deleted");
+  await waitForSubject(request, address, "Your account was deleted");
 }
 
 // Nothing is left to sign in with: the password page refuses the address and password.
