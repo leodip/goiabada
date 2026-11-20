@@ -43,7 +43,7 @@ for (const theme of ["light", "dark"] as const) {
       ...(["settings", "logo", "tokens", "authentication", "oauth2-flows", "redirect-uris", "sign-out-redirect-uris", "backchannel-logout", "web-origins", "user-sessions", "permissions", "introspection", "delete"] as const).map((tab) => clientUrl(client.id, tab)),
       ...(["settings", "attributes", "members", "permissions", "delete"] as const).map((tab) => groupUrl(group.id, tab)),
       `${groupUrl(group.id, "attributes")}/add`, `${groupUrl(group.id, "members")}/add`, new URL(groupEdit!, env.adminUrl).href,
-      ...(["details", "profile", "picture", "email", "phone", "address", "authentication", "consents", "legal-documents", "sessions", "attributes", "permissions", "groups", "delete"] as const).map((tab) => userUrl(user.id, tab)),
+      ...(["details", "profile", "picture", "email", "phone", "address", "authentication", "connected-clients", "legal-documents", "sessions", "attributes", "permissions", "groups", "delete"] as const).map((tab) => userUrl(user.id, tab)),
       `${userUrl(user.id, "attributes")}/add`, new URL(userEdit!, env.adminUrl).href,
       ...(["settings", "permissions", "users-with-permission", "groups-with-permission", "delete"] as const).map((tab) => resourceUrl(resource.id, tab)),
       new URL(grant!, env.adminUrl).href,

@@ -1,6 +1,6 @@
 // Package adminuserhandlers serves the admin pages for users, under /admin/users: the list, a new
 // user, and each user's details, profile, email, phone, address, picture, authentication,
-// attributes, groups, permissions, consents, sessions and deletion. Every page reads and writes
+// attributes, groups, permissions, connected clients, sessions and deletion. Every page reads and writes
 // through the auth server's admin API with the administrator's token, which carries the
 // authserver:manage permission the routes require.
 //

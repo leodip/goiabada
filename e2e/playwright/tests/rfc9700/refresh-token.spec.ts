@@ -89,11 +89,12 @@ test("a refresh token ends when the user's consent to the client, or the user's 
     // Refreshes while the consent stands; the token it issues is the live one.
     const refreshed = await consentToken({ grant_type: "refresh_token", refresh_token: tokens.refresh_token as string });
     expectTokenResponse(refreshed);
-    await page.goto(userUrl(user.id, "consents"));
+    // The user's Connected clients tab disconnects the client, which withdraws its consent (#135).
+    await page.goto(userUrl(user.id, "connected-clients"));
     const row = rowWithCell(page, consentClient.client.identifier);
-    await row.getByRole("button", { name: `Revoke ${consentClient.client.identifier}`, exact: true }).click();
-    await confirmDialog(page, `Revoke the consent the user gave ${consentClient.client.identifier}?`);
-    await expect(row.getByText("Revoked", { exact: true })).toBeVisible();
+    await row.getByRole("button", { name: `Disconnect ${consentClient.client.identifier}`, exact: true }).click();
+    await confirmDialog(page, `Disconnect ${consentClient.client.identifier}?`);
+    await expect(row.getByText("Disconnected", { exact: true })).toBeVisible();
     const refused = await consentToken({ grant_type: "refresh_token", refresh_token: refreshed.body.refresh_token as string });
     expectTokenError(refused, "invalid_grant");
     expect(refused.body.error_description).toBe("This refresh token has been revoked.");

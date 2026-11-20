@@ -56,20 +56,21 @@ func TestPackageFiles_OneFilePerResource(t *testing.T) {
 		"settings_tokens.go",
 		"settings_turnstile.go",
 		"user_attributes.go",
-		"user_consents.go",
+		"user_connected_clients.go",
 		"users.go",
 	}, files)
 }
 
-// TestPackageFiles_MethodsSitWithTheirResource pins the four methods #441 found in another
-// resource's file: a user's phone update beside the phone countries, a user's consents among the
-// sessions, and the resource list among the permissions.
+// TestPackageFiles_MethodsSitWithTheirResource pins the methods #441 found in another resource's
+// file: a user's phone update beside the phone countries, a user's consents among the sessions
+// (now the user's connected clients, which replaced them, #135), and the resource list among the
+// permissions.
 func TestPackageFiles_MethodsSitWithTheirResource(t *testing.T) {
 	declaredIn := methodFiles(t)
 
 	assert.Equal(t, "users.go", declaredIn["UpdateUserPhone"])
-	assert.Equal(t, "user_consents.go", declaredIn["GetUserConsents"])
-	assert.Equal(t, "user_consents.go", declaredIn["DeleteUserConsent"])
+	assert.Equal(t, "user_connected_clients.go", declaredIn["GetUserConnectedClients"])
+	assert.Equal(t, "user_connected_clients.go", declaredIn["DisconnectUserClient"])
 	assert.Equal(t, "resources.go", declaredIn["GetAllResources"])
 }
 

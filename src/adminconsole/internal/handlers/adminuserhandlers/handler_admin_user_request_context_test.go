@@ -103,10 +103,6 @@ func (s *ctxRecordingApiClient) DeleteUserAttribute(ctx context.Context, _ strin
 	return s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) DeleteUserConsent(ctx context.Context, _ string, _ int64) error {
-	return s.record(ctx)
-}
-
 func (s *ctxRecordingApiClient) DeleteUserSessionById(ctx context.Context, _ string, _ int64) error {
 	return s.record(ctx)
 }
@@ -127,8 +123,12 @@ func (s *ctxRecordingApiClient) GetUserAttributesByUserId(ctx context.Context, _
 	return nil, s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) GetUserConsents(ctx context.Context, _ string, _ int64) ([]api.UserConsentResponse, error) {
+func (s *ctxRecordingApiClient) GetUserConnectedClients(ctx context.Context, _ string, _ int64) ([]api.ConnectedClientResponse, error) {
 	return nil, s.record(ctx)
+}
+
+func (s *ctxRecordingApiClient) DisconnectUserClient(ctx context.Context, _ string, _, _ int64) error {
+	return s.record(ctx)
 }
 
 func (s *ctxRecordingApiClient) GetUserProfilePicture(ctx context.Context, _ string, _ int64) (*api.ProfilePictureInfoResponse, error) {
@@ -375,21 +375,21 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 				handlertest.WithForm(url.Values{"attributeKey": {"k"}, "attributeValue": {"v"}})),
 		},
 		{
-			name: "HandleConsentsGet",
+			name: "HandleConnectedClientsGet",
 			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-				return HandleConsentsGet(h, c)
+				return HandleConnectedClientsGet(h, c)
 			},
-			request: handlertest.Request(http.MethodGet, "/admin/users/42/consents",
+			request: handlertest.Request(http.MethodGet, "/admin/users/42/connected-clients",
 				handlertest.WithAccessToken(), handlertest.WithPathValue("userId", userId)),
 		},
 		{
-			name: "HandleConsentsPost",
+			name: "HandleConnectedClientsDisconnectPost",
 			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-				return HandleConsentsPost(h, c)
+				return HandleConnectedClientsDisconnectPost(h, c)
 			},
-			request: handlertest.Request(http.MethodPost, "/admin/users/42/consents",
+			request: handlertest.Request(http.MethodPost, "/admin/users/42/connected-clients",
 				handlertest.WithAccessToken(), handlertest.WithPathValue("userId", userId),
-				handlertest.WithBody(strings.NewReader(`{"consentId":13}`)),
+				handlertest.WithBody(strings.NewReader(`{"clientId":13}`)),
 				handlertest.WithContentType("application/json")),
 		},
 		{

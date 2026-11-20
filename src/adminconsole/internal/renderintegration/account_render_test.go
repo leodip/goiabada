@@ -546,11 +546,11 @@ func TestRender_SessionListsAskWithTheirOwnSentence(t *testing.T) {
 		"the session is ended through the route the page names")
 }
 
-// The account Applications page's Disconnect buttons and the admin consent page's Revoke buttons,
-// held as the sessions pages' are: the sentence, the client's name in it escaped, rides in
+// The account Applications page's and the user's Connected clients tab's Disconnect buttons, held
+// as the sessions pages' are: the sentence, the client's name in it escaped, rides in
 // data-confirm, and row-actions.js shows it as the dialog's plain message, then posts the body the
 // button names to the route it names.
-func TestRender_ApplicationsAndConsentPagesAskWithTheirOwnSentence(t *testing.T) {
+func TestRender_ConnectedClientPagesAskWithTheirOwnSentence(t *testing.T) {
 	const markup = `<b>web-app</b>`
 	for _, tc := range []struct {
 		name   string
@@ -570,15 +570,15 @@ func TestRender_ApplicationsAndConsentPagesAskWithTheirOwnSentence(t *testing.T)
 		},
 		{
 			name: "admin user",
-			page: "/admin_users_consents.html",
+			page: "/admin_users_connected_clients.html",
 			bind: map[string]interface{}{
-				"user":     &api.UserResponse{Id: 7, Email: "someone@example.com"},
-				"consents": []render.ConsentInfo{{ConsentId: 4, Client: markup, Scope: "openid"}},
-				"page":     "1",
-				"query":    "",
+				"user":    &api.UserResponse{Id: 7, Email: "someone@example.com"},
+				"clients": []render.ConnectedClientInfo{{ClientId: 4, Client: markup, GrantScope: "openid"}},
+				"page":    "1",
+				"query":   "",
 			},
-			action: `data-action-url="/admin/users/7/consents" data-action-body="{&#34;consentId&#34;:4}"`,
-			dialog: "revokeConsent",
+			action: `data-action-url="/admin/users/7/connected-clients" data-action-body="{&#34;clientId&#34;:4}"`,
+			dialog: "disconnectClient",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -599,8 +599,8 @@ func TestRender_ApplicationsAndConsentPagesAskWithTheirOwnSentence(t *testing.T)
 	assert.Contains(t, string(script), `bodyData: button.dataset.actionBody || null,`)
 }
 
-// The account Applications page and the admin consent page, which are two of decision 8's seven
-// other dates (#373), the first as the account consents page it replaced (#135 decision 7). Each rendered
+// The account Applications page and the user's Connected clients tab, which are two of decision
+// 8's seven other dates (#373), as the two consent pages they replaced (#135 decision 7). Each rendered
 // GrantedAt as an English RFC1123 string its handler had already formatted -- "Wed, 16 Sep 2026
 // 12:00:00 UTC" beside Portuguese column headings -- and each now binds the instant and lets the
 // page format it. They are one case because they are one edit made twice, in two packages, and a
@@ -627,13 +627,13 @@ func TestRender_ConsentPagesLocalizeTheGrantedAtCell(t *testing.T) {
 		},
 		{
 			name: "admin user",
-			page: "/admin_users_consents.html",
-			cell: `<td class="sm:whitespace-nowrap" data-label="Dado em">16/09/2026 12:00</td>`,
+			page: "/admin_users_connected_clients.html",
+			cell: `<td class="sm:whitespace-nowrap" data-label="Consentimento">16/09/2026 12:00</td>`,
 			bind: map[string]interface{}{
 				"user": &api.UserResponse{Id: 7, Email: "someone@example.com"},
-				"consents": []render.ConsentInfo{{
-					ConsentId: 1, Client: "web-app", ClientDescription: "The web app",
-					GrantedAt: &granted, Scope: "openid profile",
+				"clients": []render.ConnectedClientInfo{{
+					ClientId: 1, Client: "web-app", ClientDescription: "The web app",
+					HasConsent: true, GrantedAt: &granted, ConsentScope: "openid profile",
 				}},
 				"page":              "1",
 				"query":             "",

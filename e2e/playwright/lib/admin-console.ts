@@ -257,7 +257,7 @@ export type UserTab =
   | "address"
   | "authentication"
   | "attributes"
-  | "consents"
+  | "connected-clients"
   | "legal-documents"
   | "sessions"
   | "groups"

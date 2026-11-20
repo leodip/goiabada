@@ -852,7 +852,7 @@ test("the clients' pages", async ({ page, clients, resources }) => {
   ]));
 });
 
-test("a signed-in user's sessions and consent, as the administrator sees them", async ({ page, browser, clients, users }) => {
+test("a signed-in user's sessions and connected client, as the administrator sees them", async ({ page, browser, clients, users }) => {
   const { client } = await browserSignInClient(page, clients, { consentRequired: true });
   const user = await users.create();
   const signIn = await signInThroughClient(browser, { clientId: client.identifier, email: user.email, password: user.password, scope: "openid" });
@@ -862,8 +862,8 @@ test("a signed-in user's sessions and consent, as the administrator sees them", 
     asks(page, "a client's session, ending it asking first", () => page.locator("button[data-end-session]").click()),
     at(page, "a user's sessions", userUrl(user.id, "sessions")),
     asks(page, "a user's session, ending it asking first", () => page.locator("button[data-end-session]").click()),
-    at(page, "a user's consents", userUrl(user.id, "consents")),
-    asks(page, "a user's consent, revoking it asking first", () => page.locator("button[data-action-url]").click()),
+    at(page, "a user's connected clients", userUrl(user.id, "connected-clients")),
+    asks(page, "a user's connected client, disconnecting it asking first", () => page.locator("button[data-action-url]").click()),
   ]);
   await signIn.context.close();
 });
@@ -1173,7 +1173,7 @@ test("the users' list, new and delete pages, and a user's details, profile and c
   ]);
 });
 
-test("a user's attributes, groups, permissions, sessions, consents and legal documents, empty and full", async ({
+test("a user's attributes, groups, permissions, sessions, connected clients and legal documents, empty and full", async ({
   page,
   browser,
   clients,
@@ -1219,7 +1219,7 @@ test("a user's attributes, groups, permissions, sessions, consents and legal doc
       await page.locator("#attributesTable button[data-action-url]").click();
     }),
     at(page, "a user's sessions, none yet", tab("sessions")),
-    at(page, "a user's consents, none yet", tab("consents")),
+    at(page, "a user's connected clients, none yet", tab("connected-clients")),
     at(page, "a user's legal documents, none yet", tab("legal-documents")),
     {
       name: "a user's legal documents, one in effect and one retired",

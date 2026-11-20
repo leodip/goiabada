@@ -92,39 +92,6 @@ func TestSessionInfos_NoSessionsIsAnEmptyList(t *testing.T) {
 	assert.Empty(t, got)
 }
 
-// The account consents page and the admin user consents page render the same row. The order is
-// the API's: neither page has ever sorted it.
-func TestConsentInfos_CarriesEveryFieldTheRowRendersInTheAPIsOrder(t *testing.T) {
-	grantedAt := time.Date(2026, 8, 2, 10, 30, 0, 0, time.UTC)
-
-	got := ConsentInfos([]api.UserConsentResponse{
-		{
-			Id:                9,
-			ClientId:          100,
-			UserId:            4,
-			Scope:             "openid profile",
-			GrantedAt:         &grantedAt,
-			ClientIdentifier:  "billing",
-			ClientName:        "Billing",
-			ClientDescription: "The billing app",
-		},
-		// grantedAt is nullable on the wire: the row is shown undated rather than dropped.
-		{Id: 2, Scope: "openid", ClientIdentifier: "dcr_a3f9", ClientName: "Reports", ClientNameUnverified: true},
-	})
-
-	assert.Equal(t, []ConsentInfo{
-		{ConsentId: 9, Client: "billing", ClientName: "Billing", ClientDescription: "The billing app", GrantedAt: &grantedAt,
-			Scope: "openid profile"},
-		{ConsentId: 2, Client: "dcr_a3f9", ClientName: "Reports", ClientNameUnverified: true, Scope: "openid"},
-	}, got)
-}
-
-func TestConsentInfos_NoConsentsIsAnEmptyList(t *testing.T) {
-	got := ConsentInfos(nil)
-	require.NotNil(t, got)
-	assert.Empty(t, got)
-}
-
 // The account Applications page renders one row per connected client, in the API's order: a
 // client with a consent carries the consent's scopes and date beside the scopes its live grants
 // hold, and a client with none carries no consent at all, rather than an empty one (#135

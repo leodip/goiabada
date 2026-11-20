@@ -1466,26 +1466,28 @@ func wireCharacterization() []wireCase {
 			successStatus: 200, reply: `{}`,
 		},
 
-		// --- user_consents.go -------------------------------------------------------------
+		// --- user_connected_clients.go ---------------------------------------------------
 		{
-			name: "GetUserConsents",
+			name: "GetUserConnectedClients",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.GetUserConsents(ctx, charAccessToken, 42)
+				got, err := c.GetUserConnectedClients(ctx, charAccessToken, 42)
 				if err != nil {
 					return nil, err
 				}
-				return got[0].Scope, nil
+				return got[0].Consent.Scope + " / " + got[0].GrantScope, nil
 			},
-			verb: "GET", path: "/api/v1/admin/users/42/consents", contentType: charJSON,
-			successStatus: 200, reply: `{"consents":[{"scope":"openid profile"}]}`, want: "openid profile",
+			verb: "GET", path: "/api/v1/admin/users/42/connected-clients", contentType: charJSON,
+			successStatus: 200,
+			reply:         `{"clients":[{"clientId":13,"consent":{"id":4,"scope":"openid profile"},"grantScope":"openid"}]}`,
+			want:          "openid profile / openid",
 		},
 		{
-			name: "DeleteUserConsent",
+			name: "DisconnectUserClient",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				return nil, c.DeleteUserConsent(ctx, charAccessToken, 13)
+				return nil, c.DisconnectUserClient(ctx, charAccessToken, 42, 13)
 			},
-			verb: "DELETE", path: "/api/v1/admin/user-consents/13", contentType: charJSON,
-			successStatus: 200, reply: `{}`,
+			verb: "DELETE", path: "/api/v1/admin/users/42/connected-clients/13", contentType: charJSON,
+			successStatus: 200, reply: `{"success":true}`,
 		},
 
 		// --- users.go ---------------------------------------------------------------------
