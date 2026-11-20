@@ -114,6 +114,10 @@ type routeRegistration struct {
 	// unresolved says why collectRoutes cannot tell which middleware the route runs behind, such as
 	// a router variable assigned inside a branch; empty when mounted is the whole chain.
 	unresolved string
+	// pathUnresolved says why collectRoutes cannot tell the prefix of the router the route is
+	// registered through, such as a router assigned inside a branch from one under another prefix;
+	// path is then the route's own pattern.
+	pathUnresolved string
 	// chain is what readRouteChains fills: each status the route's middleware can write, with the
 	// middleware that writes it.
 	chain map[int][]string
@@ -292,6 +296,9 @@ func TestOpenAPI_DescribesEveryAPIRoute(t *testing.T) {
 	routed := map[string]bool{}
 	for _, r := range routes {
 		routed[r.key] = true
+		if r.pathUnresolved != "" {
+			continue // TestOpenAPI_ReadsEveryRoutePath reports a route whose path cannot be told
+		}
 		public := r.method == "get" && slices.Contains(documentedPublicRoutes, r.path)
 		if !strings.HasPrefix(r.path, "/api/v1/") && !public {
 			continue
@@ -393,8 +400,9 @@ func TestOpenAPI_ReadsEveryRoutePath(t *testing.T) {
 // assertRoutePathsReadable reports each route registration in file whose path routePath cannot
 // read, which is anything but a string literal or a constant routeConstants holds: a constant of
 // the file's own, one of a package the table does not hold, a variable. It also reports a table
-// entry no registration uses, and stops on a file with no registration at all, a walk that no
-// longer matches how routes are registered.
+// entry no registration uses, a route registered through a router whose path prefix collectRoutes
+// cannot tell, and stops on a file with no registration at all, a walk that no longer matches how
+// routes are registered.
 func assertRoutePathsReadable(r guard.Reporter, fset *token.FileSet, file *ast.File) {
 	r.Helper()
 	registrations := 0
@@ -432,6 +440,13 @@ func assertRoutePathsReadable(r guard.Reporter, fset *token.FileSet, file *ast.F
 	for _, name := range names {
 		if !used[name] {
 			r.Errorf("routeConstants holds %s, which no registration in routes.go uses: remove it", name)
+		}
+	}
+	for _, route := range collectRoutes(fset, file) {
+		if route.pathUnresolved != "" {
+			r.Errorf("routes.go:%d registers %s %s through a router whose path prefix the OpenAPI contract "+
+				"tests cannot tell: %s. Assign each router once, at the top level of its function",
+				route.line, strings.ToUpper(route.method), route.path, route.pathUnresolved)
 		}
 	}
 }
@@ -536,6 +551,33 @@ func TestRoutePaths_ReadablePathsPass(t *testing.T) {
 
 	if report.Stopped || len(report.Errors) > 0 {
 		t.Errorf("stopped %v (%s), failures %q", report.Stopped, report.Fatal, report.Errors)
+	}
+}
+
+// A route registered through a router assigned inside a block from a router under another prefix
+// has a path that depends on the branch taken, which every check keyed by path would read under a
+// prefix it guessed, so it fails here. One assigned from a router under the same prefix does not.
+func TestRoutePaths_ARouterWhosePrefixDependsOnTheBranchFails(t *testing.T) {
+	src := routePathsFixture("" +
+		"\tadmin := api.Route(\"/api/v1/admin\", func(r *routing.Router) {})\n" +
+		"\tif s != nil {\n" +
+		"\t\tadmin = admin.With(guard)\n" +
+		"\t}\n" +
+		"\tadmin.Post(\"/jobs\", apihandlers.HandleJobsPost(db))\n" +
+		"\tother := api.Route(\"/api/v1/other\", func(r *routing.Router) {})\n" +
+		"\tif s != nil {\n" +
+		"\t\tother = api\n" +
+		"\t}\n" +
+		"\tother.Post(\"/jobs\", apihandlers.HandleJobsPost(db))\n")
+
+	report := runRoutePathsGuard(t, src)
+
+	line := 4 + len(routeConstants) + 9
+	want := []string{fmt.Sprintf("routes.go:%d registers POST /jobs through a router whose path prefix "+
+		"the OpenAPI contract tests cannot tell: other is assigned inside a block at routes.go:%d, so which path prefix it "+
+		"holds depends on the branch taken. Assign each router once, at the top level of its function", line, line-2)}
+	if report.Stopped || !slices.Equal(report.Errors, want) {
+		t.Errorf("stopped %v (%s), failures\n%q\nwant\n%q", report.Stopped, report.Fatal, report.Errors, want)
 	}
 }
 
@@ -2446,6 +2488,296 @@ func (c *Consulted) Check() func(http.Handler) http.Handler {
 	}
 }
 
+// declaringEach is a spec giving each route key of ids the operation id it names and the statuses
+// codes lists.
+func declaringEach(ids map[string]string, codes ...int) map[string]specOperation {
+	responses := map[int]bool{}
+	for _, code := range codes {
+		responses[code] = true
+	}
+	out := map[string]specOperation{}
+	for key, id := range ids {
+		out[key] = specOperation{operationId: id, responses: responses}
+	}
+	return out
+}
+
+// A router assigned inside a block from a router under the same prefix as the one it held keeps
+// that prefix, so its route lands where both routers register it, while its middleware, which
+// depends on the branch taken, is still reported.
+func TestRouteChains_ARouterAssignedInsideABlockKeepsThePrefixBothValuesShare(t *testing.T) {
+	chains, report := routeShapeChainsWith(t, "\tadmin := api.Route(\"/api/v1/admin\", func(r *routing.Router) {})\n"+
+		"\tif s != nil {\n"+
+		"\t\tadmin = admin.With(middleware.Refuse())\n"+
+		"\t}\n"+
+		"\tadmin.Post(\"/jobs\", apihandlers.HandleOkGet())\n", nil)
+
+	if report.Stopped || len(report.Errors) != 1 ||
+		!strings.Contains(report.Errors[0], "cannot tell which middleware POST /api/v1/admin/jobs runs behind: admin is assigned inside a block") {
+		t.Errorf("a route through a router wrapped in a branch did not fail the check once, under its prefix: %+v", report)
+	}
+	if _, registered := chains["post /api/v1/admin/jobs"]; !registered {
+		t.Errorf("POST /api/v1/admin/jobs is not read under the prefix both routers share: %v", slices.Sorted(maps.Keys(chains)))
+	}
+	if _, stray := chains["post /jobs"]; stray {
+		t.Errorf("POST /jobs is read under the prefix of the function it is called in, not of its router")
+	}
+}
+
+// A group's own "/" route is named by the group's prefix, as the router names it, for a direct
+// registration and a getAndHead alike, and the root's own "/" is "/".
+func TestRouteChains_AGroupsRootRouteIsNamedByItsPrefix(t *testing.T) {
+	chains, report := routeShapeChainsWith(t, "\tjobs := api.Route(\"/api/v1/jobs\", func(r *routing.Router) {})\n"+
+		"\tjobs.Get(\"/\", apihandlers.HandleOkGet())\n"+
+		"\tapi.Route(\"/api/v1/tasks\", func(r *routing.Router) {\n"+
+		"\t\tgetAndHead(r, \"/\", apihandlers.HandleOkGet())\n"+
+		"\t})\n"+
+		"\tpages.Get(\"/\", apihandlers.HandleOkGet())\n", nil)
+
+	if report.Failed() {
+		t.Fatalf("reading the fixture chains failed: %+v", report)
+	}
+	assertChains(t, chains, map[string][]int{
+		"get /api/v1/jobs":   {403},
+		"get /api/v1/tasks":  {403},
+		"head /api/v1/tasks": {403},
+		"get /":              {},
+	})
+	for _, stray := range []string{"get /api/v1/jobs/", "get /api/v1/tasks/", "head /api/v1/tasks/"} {
+		if _, registered := chains[stray]; registered {
+			t.Errorf("%s carries a trailing slash the router's name for it does not", stray)
+		}
+	}
+}
+
+// A Use inside a block covers its router's routes only on the branch that ran it, so a route of
+// that router registered after it is reported as one whose chain the lint cannot tell, rather than
+// read as behind it, and the reverse guard refuses the status that Use would write. A Use outside
+// any block still covers the routes after it.
+func TestRouteChains_AUseInsideABlockLeavesTheRoutesAfterItUnread(t *testing.T) {
+	root := t.TempDir()
+	routeShapesFixture(t, root, "\tif s != nil {\n"+
+		"\t\tfresh.Use(middleware.Refuse())\n"+
+		"\t} else {\n"+
+		"\t\tfresh.Get(\"/api/v1/open\", apihandlers.HandleOkGet())\n"+
+		"\t}\n"+
+		"\tsteady.Use(middleware.Refuse())\n"+
+		"\tsteady.Get(\"/api/v1/steady\", apihandlers.HandleOkGet())\n")
+
+	routes, handlers, report := fixtureRouteChains(t, root, 1, 1)
+
+	if report.Stopped || len(report.Errors) != 1 ||
+		!strings.Contains(report.Errors[0], "cannot tell which middleware GET /api/v1/open runs behind: routes.go:") ||
+		!strings.Contains(report.Errors[0], "calls Use on fresh inside a block") {
+		t.Fatalf("a route after a Use in another branch did not fail the check once: %+v", report)
+	}
+	chains := map[string][]int{}
+	for _, r := range routes {
+		chains[r.key] = sortedKeysInt(r.chain)
+	}
+	assertChains(t, chains, map[string][]int{"get /api/v1/open": {}, "get /api/v1/steady": {403}})
+
+	report = guard.Run(func(r guard.Reporter) {
+		assertDeclaresNoUndeliverableStatus(r, routes, handlers,
+			declaringEach(map[string]string{"get /api/v1/open": "getOpen"}, 200, 403))
+	})
+	if report.Stopped || len(report.Errors) != 1 ||
+		!strings.Contains(report.Errors[0], "getOpen (GET /api/v1/open) declares 403") {
+		t.Errorf("a spec declaring the 403 of a Use in another branch did not fail once: %+v", report)
+	}
+}
+
+// A local of a constructor hides a helper of its package only inside the block that declares it,
+// so a call to the helper after that block fills the field with what the helper returns, and a
+// call the local hides is not read as the helper's.
+func TestRouteChains_ALocalHidesAHelperOnlyWithinItsScope(t *testing.T) {
+	root := t.TempDir()
+	routeShapesFixture(t, root, "\tafter := middleware.NewHelperAfterABlock()\n"+
+		"\tpages.With(after.Check()).Get(\"/after-block\", apihandlers.HandleOkGet())\n"+
+		"\thidden := middleware.NewHelperHidden()\n"+
+		"\tpages.With(hidden.Check()).Get(\"/hidden\", apihandlers.HandleOkGet())\n")
+	writeDocFixture(t, root, "internal/middleware/scoped.go", `package middleware
+
+import "net/http"
+
+type scopedRefusal struct {
+	detail string
+}
+
+func (s scopedRefusal) refuse(w http.ResponseWriter) {
+	http.Error(w, s.detail, http.StatusForbidden)
+}
+
+func newScopedRefusal(detail string) scopedRefusal {
+	return scopedRefusal{detail: detail}
+}
+
+func NewHelperAfterABlock() *Probed {
+	{
+		newScopedRefusal := func(string) writer { return unprocessable{} }
+		_ = newScopedRefusal("unused")
+	}
+	return &Probed{refusals: newScopedRefusal("no")}
+}
+
+func NewHelperHidden() *Probed {
+	newScopedRefusal := func(string) writer { return unprocessable{} }
+	return &Probed{refusals: newScopedRefusal("no")}
+}
+`)
+	routes, handlers, report := fixtureRouteChains(t, root, 1, 1)
+
+	if report.Failed() {
+		t.Fatalf("reading the fixture chains failed: %+v", report)
+	}
+	chains := map[string][]int{}
+	for _, r := range routes {
+		chains[r.key] = sortedKeysInt(r.chain)
+	}
+	assertChains(t, chains, map[string][]int{"get /after-block": {403}, "get /hidden": {}})
+
+	ids := map[string]string{"get /after-block": "getAfterBlock"}
+	report = guard.Run(func(r guard.Reporter) {
+		assertDeclaresEveryStatus(r, routes, handlers, declaringEach(ids, 200))
+	})
+	if report.Stopped || len(report.Errors) != 1 ||
+		!strings.Contains(report.Errors[0], "getAfterBlock (GET /after-block) can answer 403 from after.Check") {
+		t.Errorf("a spec omitting the 403 of a helper called after a block hiding it did not fail once: %+v", report)
+	}
+}
+
+// A field a constructor's literal fills with a local holds the one value that local was assigned,
+// as a field the body assigns from it does, and one filled with a local the lint cannot read is
+// reported where the walk reaches through it.
+func TestRouteChains_AFieldALiteralFillsWithALocalIsReadAsThatLocal(t *testing.T) {
+	root := t.TempDir()
+	routeShapesFixture(t, root, "\tliteral := middleware.NewLiteralLocal()\n"+
+		"\tpages.With(literal.Check()).Get(\"/literal\", apihandlers.HandleOkGet())\n"+
+		"\ttwice := middleware.NewLiteralTwice(false)\n"+
+		"\tpages.With(twice.Check()).Get(\"/twice\", apihandlers.HandleOkGet())\n")
+	writeDocFixture(t, root, "internal/middleware/literal.go", `package middleware
+
+func NewLiteralLocal() *Probed {
+	refusals := unprocessable{}
+	return &Probed{refusals: refusals}
+}
+
+func NewLiteralTwice(swap bool) *Probed {
+	var refusals writer = forbid{}
+	if swap {
+		refusals = unprocessable{}
+	}
+	return &Probed{refusals: refusals}
+}
+`)
+	routes, handlers, report := fixtureRouteChains(t, root, 1, 1)
+
+	if report.Stopped || len(report.Errors) != 1 ||
+		!strings.Contains(report.Errors[0], "GET /twice mounts twice.Check, which the status lint cannot read") {
+		t.Fatalf("a field filled with a local assigned twice did not fail the check once: %+v", report)
+	}
+	chains := map[string][]int{}
+	for _, r := range routes {
+		chains[r.key] = sortedKeysInt(r.chain)
+	}
+	assertChains(t, chains, map[string][]int{"get /literal": {422}})
+
+	ids := map[string]string{"get /literal": "getLiteral"}
+	report = guard.Run(func(r guard.Reporter) {
+		assertDeclaresEveryStatus(r, routes, handlers, declaringEach(ids, 200))
+	})
+	if report.Stopped || len(report.Errors) != 1 ||
+		!strings.Contains(report.Errors[0], "getLiteral (GET /literal) can answer 422 from literal.Check") {
+		t.Errorf("a spec omitting the 422 of a local a literal fills a field with did not fail once: %+v", report)
+	}
+}
+
+// A method reached through a field of a field of the receiver is read with the binding at the end
+// of that path, and one reached through a field an unread helper filled, at any depth, is reported.
+func TestRouteChains_AMethodReachedThroughANestedFieldIsRead(t *testing.T) {
+	root := t.TempDir()
+	routeShapesFixture(t, root, "\tnested := middleware.NewNested()\n"+
+		"\tpages.With(nested.Check()).Get(\"/nested\", apihandlers.HandleOkGet())\n"+
+		"\tcounsel := middleware.NewCounsel()\n"+
+		"\tpages.With(counsel.Check()).Get(\"/counsel\", apihandlers.HandleOkGet())\n")
+	writeDocFixture(t, root, "internal/middleware/nested.go", `package middleware
+
+import "net/http"
+
+type Nested struct {
+	first  *Guard
+	second *Guard
+}
+
+func NewNested() *Nested {
+	return &Nested{first: &Guard{refusals: forbid{}}, second: &Guard{refusals: unprocessable{}}}
+}
+
+func (n *Nested) Check() func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL == nil {
+				n.first.refusals.refuse(w)
+				return
+			}
+			n.second.refusals.refuse(w)
+		})
+	}
+}
+
+type advice struct{}
+
+func (advice) consult(w http.ResponseWriter) {
+	w.WriteHeader(http.StatusConflict)
+}
+
+func defaultAdvice() advice {
+	var a advice
+	return a
+}
+
+type counselInner struct {
+	advice advice
+}
+
+type Counsel struct {
+	inner *counselInner
+}
+
+func NewCounsel() *Counsel {
+	return &Counsel{inner: &counselInner{advice: defaultAdvice()}}
+}
+
+func (c *Counsel) Check() func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			c.inner.advice.consult(w)
+		})
+	}
+}
+`)
+	routes, handlers, report := fixtureRouteChains(t, root, 1, 1)
+
+	if report.Stopped || len(report.Errors) != 1 ||
+		!strings.Contains(report.Errors[0], "GET /counsel mounts counsel.Check, which the status lint cannot read") {
+		t.Fatalf("a method reached through a nested field an unread helper filled did not fail the check once: %+v", report)
+	}
+	chains := map[string][]int{}
+	for _, r := range routes {
+		chains[r.key] = sortedKeysInt(r.chain)
+	}
+	assertChains(t, chains, map[string][]int{"get /nested": {403, 422}})
+
+	ids := map[string]string{"get /nested": "getNested"}
+	report = guard.Run(func(r guard.Reporter) {
+		assertDeclaresEveryStatus(r, routes, handlers, declaringEach(ids, 200, 403))
+	})
+	if report.Stopped || len(report.Errors) != 1 ||
+		!strings.Contains(report.Errors[0], "getNested (GET /nested) can answer 422 from nested.Check") {
+		t.Errorf("a spec omitting the 422 written through a nested field did not fail once: %+v", report)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // The three parsers.
 // ---------------------------------------------------------------------------
@@ -2503,7 +2835,8 @@ var specVerbs = func() map[string]bool {
 // (Router.Route). A Use is credited to the scope of the router it is called on, so a Use on another
 // router credits none of this group's routes, and a router reassigned between two registrations is
 // read with the value each one sees. A route's path is the prefix of the router it is registered
-// through, which is the group's for a router an r.Route call returns, joined to its own.
+// through, which is the group's for a router an r.Route call returns, joined to its own pattern as
+// the router names it (routing.spell): a group's own "/" is the group's prefix.
 //
 // Names are read lexically, as Go scopes them: each top-level function, with the group callbacks
 // inside it, has its own names, and a block, such as an if's, its own, so a name a block declares
@@ -2512,14 +2845,19 @@ var specVerbs = func() map[string]bool {
 // middleware mounted there is out of this lint's reach. A router name declared outside a block
 // and assigned inside it has a value that depends on the branch taken, and a registration through
 // it, or after a Use on it in the same function, is marked unresolved rather than read with either
-// value. Each middleware a route mounts is kept with the declarations its names referred to where
-// it was mounted, which routeChains reads.
+// value. Its path prefix is kept apart: one the router held before the block and the router
+// assigned share is the route's, and otherwise the route is recorded at its own pattern with
+// pathUnresolved saying why, which TestOpenAPI_ReadsEveryRoutePath and the administrative route
+// classification report. A Use inside a block, on a router whose routes are registered outside it,
+// covers them only on the branch that ran it, so every route of that router registered after it
+// is marked unresolved too. Each middleware a route mounts is kept with the declarations its names
+// referred to where it was mounted, which routeChains reads.
 func collectRoutes(fset *token.FileSet, file *ast.File) []routeRegistration {
 	w := &routeWalk{fset: fset}
 	for _, decl := range file.Decls {
 		if fn, ok := decl.(*ast.FuncDecl); ok && fn.Body != nil {
 			w.poison = "" // an unresolved Use in another function wraps none of this one's routes
-			w.body(fn.Body, &routerEnv{names: map[string]routerValue{}, decls: map[string]*localDecl{}}, "")
+			w.body(fn.Body, &routerEnv{names: map[string]routerValue{}, decls: map[string]*localDecl{}})
 		}
 	}
 	return w.out
@@ -2529,14 +2867,21 @@ func collectRoutes(fset *token.FileSet, file *ast.File) []routeRegistration {
 // runs behind, ahead of the With arguments of the router the route is registered through.
 type routeScope struct {
 	// prefix is the path every route registered in the scope starts with: empty at a root, and for
-	// a group, its parent router's prefix and the group's pattern.
-	prefix string
+	// a group, its parent router's prefix and the group's pattern. pathUnresolved says why the
+	// parent's prefix cannot be told, for a group created from a router whose prefix depends on
+	// the branch taken.
+	prefix         string
+	pathUnresolved string
 	// base is, for a group, its enclosing scope's chain and the With arguments of the router it
 	// hangs off; nil at a root.
 	base []mountedEntry
 	uses []mountedEntry
-	// unresolved is set on a group created from a router collectRoutes cannot tell.
+	// unresolved is set on a group created from a router collectRoutes cannot tell, and on a scope
+	// a Use inside a block covers on one branch only.
 	unresolved string
+	// env is the names of the code the scope was created in: a Use from inside a block below it
+	// may not run.
+	env *routerEnv
 }
 
 func (s *routeScope) chain() []mountedEntry {
@@ -2568,11 +2913,15 @@ type localDecl struct {
 }
 
 // routerValue is what a router name or expression of routes.go holds at one point of the walk:
-// its scope and the With arguments added since, or why it cannot be told.
+// its scope and the With arguments added since, or why it cannot be told. A value that cannot be
+// told still has a path prefix, the one every router it may hold shares, or pathUnresolved says
+// why they share none.
 type routerValue struct {
-	scope      *routeScope
-	with       []mountedEntry
-	unresolved string
+	scope          *routeScope
+	with           []mountedEntry
+	unresolved     string
+	prefix         string
+	pathUnresolved string
 }
 
 // routerEnv is the names of one scope of routes.go: a function's, a group callback's, or a
@@ -2603,9 +2952,21 @@ func (e *routerEnv) lookup(name string) routerValue {
 			return v
 		}
 	}
-	v := routerValue{scope: &routeScope{}}
-	e.outermost().names[name] = v
+	outermost := e.outermost()
+	v := routerValue{scope: &routeScope{env: outermost}}
+	outermost.names[name] = v
 	return v
+}
+
+// inBlockBelow reports whether code run in e may not run each time code run in owner does: whether
+// reaching owner from e leaves a block.
+func (e *routerEnv) inBlockBelow(owner *routerEnv) bool {
+	for env := e; env != nil && env != owner; env = env.parent {
+		if env.block {
+			return true
+		}
+	}
+	return false
 }
 
 // target is the scope an assignment to name binds it in: this one for a :=, and for an = the one
@@ -2695,9 +3056,9 @@ type routeWalk struct {
 	out    []routeRegistration
 }
 
-func (w *routeWalk) body(body *ast.BlockStmt, env *routerEnv, prefix string) {
+func (w *routeWalk) body(body *ast.BlockStmt, env *routerEnv) {
 	for _, stmt := range body.List {
-		w.node(stmt, env, prefix)
+		w.node(stmt, env)
 	}
 }
 
@@ -2712,19 +3073,19 @@ func opensScope(n ast.Node) bool {
 	return false
 }
 
-func (w *routeWalk) node(n ast.Node, env *routerEnv, prefix string) {
+func (w *routeWalk) node(n ast.Node, env *routerEnv) {
 	if opensScope(n) {
 		env = env.child(true)
 	}
 	root := n
 	ast.Inspect(n, func(n ast.Node) bool {
 		if n != root && opensScope(n) {
-			w.node(n, env, prefix)
+			w.node(n, env)
 			return false
 		}
 		switch x := n.(type) {
 		case *ast.AssignStmt:
-			w.assign(x.Lhs, x.Rhs, x.Tok == token.DEFINE, x.Pos(), env, prefix)
+			w.assign(x.Lhs, x.Rhs, x.Tok == token.DEFINE, x.Pos(), env)
 			return false
 		case *ast.DeclStmt:
 			gen, ok := x.Decl.(*ast.GenDecl)
@@ -2740,11 +3101,11 @@ func (w *routeWalk) node(n ast.Node, env *routerEnv, prefix string) {
 				for i, name := range vs.Names {
 					lhs[i] = name
 				}
-				w.assign(lhs, vs.Values, true, x.Pos(), env, prefix)
+				w.assign(lhs, vs.Values, true, x.Pos(), env)
 			}
 			return false
 		case *ast.CallExpr:
-			return w.call(x, env, prefix)
+			return w.call(x, env)
 		}
 		return true
 	})
@@ -2754,12 +3115,12 @@ func (w *routeWalk) node(n ast.Node, env *routerEnv, prefix string) {
 // outside a block and assigned inside it becomes unresolved, since whether the block ran is not
 // known here.
 func (w *routeWalk) assign(lhs, rhs []ast.Expr, define bool, pos token.Pos,
-	env *routerEnv, prefix string) {
+	env *routerEnv) {
 
 	values := make([]routerValue, len(rhs))
 	written := make([]mountedEntry, len(rhs))
 	for i, e := range rhs {
-		values[i] = w.value(e, env, prefix)
+		values[i] = w.value(e, env)
 		written[i] = env.bound(e)
 	}
 	for i, e := range lhs {
@@ -2767,26 +3128,49 @@ func (w *routeWalk) assign(lhs, rhs []ast.Expr, define bool, pos token.Pos,
 		if !ok || id.Name == "_" {
 			continue
 		}
-		v := routerValue{scope: &routeScope{}} // one of several results of a call: no router of routes.go's
+		target, branched := env.target(id.Name, define)
+		v := routerValue{scope: &routeScope{env: target}} // one of several results of a call: no router of routes.go's
 		var entry mountedEntry
 		if len(rhs) == len(lhs) {
 			v = values[i]
 			entry = written[i]
 		}
-		target, branched := env.target(id.Name, define)
 		if branched {
-			v = routerValue{unresolved: fmt.Sprintf("%s is assigned inside a block at routes.go:%d, so "+
-				"which router it holds depends on the branch taken", id.Name, w.fset.Position(pos).Line)}
+			before, held := target.names[id.Name]
+			if !held {
+				before = routerValue{scope: &routeScope{env: target}} // a router built outside routes.go
+			}
+			v = branchedValue(fmt.Sprintf("%s is assigned inside a block at routes.go:%d", id.Name,
+				w.fset.Position(pos).Line), before, v)
 		}
 		target.names[id.Name] = v
 		env.write(id.Name, entry, define)
 	}
 }
 
+// branchedValue is what a name holds after a block that may have assigned it assigned: either the
+// router it held before or the one assigned, so no chain, and the path prefix both share.
+func branchedValue(assigned string, before, after routerValue) routerValue {
+	v := routerValue{unresolved: assigned + ", so which router it holds depends on the branch taken"}
+	beforePrefix, beforeUnknown := before.routePrefix()
+	afterPrefix, afterUnknown := after.routePrefix()
+	switch {
+	case beforeUnknown != "":
+		v.pathUnresolved = beforeUnknown
+	case afterUnknown != "":
+		v.pathUnresolved = afterUnknown
+	case beforePrefix != afterPrefix:
+		v.pathUnresolved = assigned + ", so which path prefix it holds depends on the branch taken"
+	default:
+		v.prefix = beforePrefix
+	}
+	return v
+}
+
 // value is what a router expression holds: a name, a With call on a router, or an r.Route call,
 // which returns the group's router. Anything else is a router of its own, after the walk reads
 // the registrations inside it, such as a function literal's.
-func (w *routeWalk) value(e ast.Expr, env *routerEnv, prefix string) routerValue {
+func (w *routeWalk) value(e ast.Expr, env *routerEnv) routerValue {
 	switch x := ast.Unparen(e).(type) {
 	case *ast.Ident:
 		return env.lookup(x.Name)
@@ -2794,33 +3178,45 @@ func (w *routeWalk) value(e ast.Expr, env *routerEnv, prefix string) routerValue
 		if sel, ok := x.Fun.(*ast.SelectorExpr); ok {
 			switch sel.Sel.Name {
 			case "With":
-				v := w.value(sel.X, env, prefix)
+				v := w.value(sel.X, env)
 				v.with = append(slices.Clip(v.with), env.mounted(x.Args)...)
 				return v
 			case "Route":
-				if group, ok := w.route(x, sel, env, prefix); ok {
+				if group, ok := w.route(x, sel, env); ok {
 					return group
 				}
 			}
 		}
 	}
-	w.node(e, env, prefix)
-	return routerValue{scope: &routeScope{}}
+	w.node(e, env)
+	return routerValue{scope: &routeScope{env: env}}
 }
 
-// routePrefix is the prefix of the router v holds, or fallback, the prefix of the group the walk
-// is in, for one it cannot tell, whose routes are reported as unresolved.
-func (v routerValue) routePrefix(fallback string) string {
-	if v.unresolved != "" || v.scope == nil {
-		return fallback
+// routePrefix is the path prefix of the router v holds, or why it cannot be told, with an empty
+// prefix: a route through it is recorded at its own pattern rather than under a prefix guessed.
+func (v routerValue) routePrefix() (prefix, unresolved string) {
+	switch {
+	case v.unresolved != "":
+		return v.prefix, v.pathUnresolved
+	case v.scope == nil:
+		return "", ""
 	}
-	return v.scope.prefix
+	return v.scope.prefix, v.scope.pathUnresolved
+}
+
+// routeName is a route's path as the router names it (routing.spell): a group's own "/" is the
+// group's prefix, and the root's is "/".
+func routeName(prefix, pattern string) string {
+	if pattern == "/" && prefix != "" {
+		return prefix
+	}
+	return prefix + pattern
 }
 
 // route reads r.Route("/api/v1/admin", func(r *routing.Router) { ... }): the body under the
 // router's prefix and the group's, with its parameter naming the group's router, and returns that
 // router.
-func (w *routeWalk) route(call *ast.CallExpr, sel *ast.SelectorExpr, env *routerEnv, prefix string) (routerValue, bool) {
+func (w *routeWalk) route(call *ast.CallExpr, sel *ast.SelectorExpr, env *routerEnv) (routerValue, bool) {
 	if len(call.Args) != 2 {
 		return routerValue{}, false
 	}
@@ -2829,8 +3225,9 @@ func (w *routeWalk) route(call *ast.CallExpr, sel *ast.SelectorExpr, env *router
 	if !subOK || !bodyOK {
 		return routerValue{}, false
 	}
-	parent := w.value(sel.X, env, prefix)
-	scope := &routeScope{prefix: parent.routePrefix(prefix) + sub, unresolved: parent.unresolved}
+	parent := w.value(sel.X, env)
+	parentPrefix, pathUnresolved := parent.routePrefix()
+	scope := &routeScope{prefix: parentPrefix + sub, pathUnresolved: pathUnresolved, unresolved: parent.unresolved, env: env}
 	if parent.scope != nil {
 		scope.base = append(parent.scope.chain(), parent.with...)
 		if parent.scope.unresolved != "" {
@@ -2842,7 +3239,7 @@ func (w *routeWalk) route(call *ast.CallExpr, sel *ast.SelectorExpr, env *router
 	if params := body.Type.Params.List; len(params) == 1 && len(params[0].Names) == 1 {
 		inner.names[params[0].Names[0].Name] = group
 	}
-	w.body(body.Body, inner, scope.prefix)
+	w.body(body.Body, inner)
 	return group, true
 }
 
@@ -2850,16 +3247,16 @@ func (w *routeWalk) route(call *ast.CallExpr, sel *ast.SelectorExpr, env *router
 // or getAndHead(r, path, pkg.HandleX(...)), which registers the handler for GET and for HEAD on r
 // (server.go). It reports whether the walk goes on into the call's operands, which it does not
 // where it read them itself.
-func (w *routeWalk) call(call *ast.CallExpr, env *routerEnv, prefix string) bool {
+func (w *routeWalk) call(call *ast.CallExpr, env *routerEnv) bool {
 	if fn, isIdent := call.Fun.(*ast.Ident); isIdent && fn.Name == "getAndHead" && len(call.Args) == 3 {
 		path, pathOK := routePath(call.Args[1])
 		handler, handlerOK := handlerConstructor(call.Args[2])
 		if !pathOK || !handlerOK {
 			return true
 		}
-		via := w.value(call.Args[0], env, prefix)
+		via := w.value(call.Args[0], env)
 		for _, verb := range []string{"get", "head"} {
-			w.register(verb, via.routePrefix(prefix)+path, handler, via, call)
+			w.register(verb, path, handler, via, call)
 		}
 		return false
 	}
@@ -2869,16 +3266,22 @@ func (w *routeWalk) call(call *ast.CallExpr, env *routerEnv, prefix string) bool
 	}
 	switch sel.Sel.Name {
 	case "Route":
-		if _, ok := w.route(call, sel, env, prefix); ok {
+		if _, ok := w.route(call, sel, env); ok {
 			return false
 		}
 		return true
 	case "Use":
-		v := w.value(sel.X, env, prefix)
+		v := w.value(sel.X, env)
 		switch {
 		case v.unresolved != "":
 			w.poison = fmt.Sprintf("routes.go:%d calls Use on %s, and %s", w.fset.Position(call.Pos()).Line,
 				types.ExprString(sel.X), v.unresolved)
+		case v.scope != nil && env.inBlockBelow(v.scope.env):
+			if v.scope.unresolved == "" {
+				v.scope.unresolved = fmt.Sprintf("routes.go:%d calls Use on %s inside a block, so whether "+
+					"its routes run behind it depends on the branch taken", w.fset.Position(call.Pos()).Line,
+					types.ExprString(sel.X))
+			}
 		case v.scope != nil:
 			v.scope.uses = append(v.scope.uses, env.mounted(call.Args)...)
 		}
@@ -2893,18 +3296,22 @@ func (w *routeWalk) call(call *ast.CallExpr, env *routerEnv, prefix string) bool
 	if !pathOK || !handlerOK {
 		return true
 	}
-	via := w.value(sel.X, env, prefix)
-	w.register(verb, via.routePrefix(prefix)+path, handler, via, call)
+	via := w.value(sel.X, env)
+	w.register(verb, path, handler, via, call)
 	return false
 }
 
-func (w *routeWalk) register(verb, path, handler string, via routerValue, call *ast.CallExpr) {
+// register records a route of pattern registered through via, at the path the router names it.
+func (w *routeWalk) register(verb, pattern, handler string, via routerValue, call *ast.CallExpr) {
+	prefix, pathUnresolved := via.routePrefix()
+	path := routeName(prefix, pattern)
 	r := routeRegistration{
-		method:  verb,
-		path:    path,
-		key:     routeKey(verb, path),
-		handler: handler,
-		line:    w.fset.Position(call.Pos()).Line,
+		method:         verb,
+		path:           path,
+		key:            routeKey(verb, path),
+		handler:        handler,
+		line:           w.fset.Position(call.Pos()).Line,
+		pathUnresolved: pathUnresolved,
 	}
 	switch {
 	case via.unresolved != "":
@@ -3288,9 +3695,9 @@ func readRouteChains(r guard.Reporter, routesPath, internalRoot string, routes [
 // method of the type the constructor assigned to v returns, as apiBearer and rateLimiter are; or
 // v, a local assigned from either. A local is read as the declaration the mount refers to, as
 // collectRoutes kept it, and only when that declaration is written once. A method's walk follows the calls it makes on its receiver,
-// m.other(...), as a rate limiter reaches its 429, and the calls through a field of the receiver
-// the constructor filled with a value of a type of the package, m.field.M(...), as the bearer
-// guards write every refusal. The field is read as that constructor filled it, so the guards
+// m.other(...), as a rate limiter reaches its 429, and the calls through a field of the receiver,
+// at any depth, the constructor filled with a value of a type of the package, m.field.M(...) or
+// m.a.b.M(...), as the bearer guards write every refusal. The field is read as that constructor filled it, so the guards
 // routes.go builds for the API are read with the API's refusal writers and not with the
 // /userinfo ones beside them, which no API route runs. A field filled with a constructor's
 // parameter, and any call into another package, is not followed: ownStatuses names the shared
@@ -3618,17 +4025,15 @@ func constructed(ctor *ast.FuncDecl, p *goPackage, visiting map[string]bool) (fi
 	if len(returns) == 0 {
 		return fieldBinding{}, false
 	}
-	fill := fieldFiller{p: p, shadowed: map[string]bool{}, visiting: visiting}
-	for name := range locals {
-		fill.shadowed[name] = true
-	}
+	fill := fieldFiller{p: p, params: map[string]bool{}, scopes: localScopes(ctor.Body), locals: locals,
+		writes: writes, branched: branched, visiting: visiting}
 	for _, list := range []*ast.FieldList{ctor.Recv, ctor.Type.Params, ctor.Type.Results} {
 		if list == nil {
 			continue
 		}
 		for _, field := range list.List {
 			for _, name := range field.Names {
-				fill.shadowed[name.Name] = true
+				fill.params[name.Name] = true
 			}
 		}
 	}
@@ -3819,8 +4224,92 @@ func (b fieldBinding) key() string {
 // with.
 type fieldFiller struct {
 	p        *goPackage
-	shadowed map[string]bool // the constructor's receiver, parameters, results and locals, which hide a function of p
+	params   map[string]bool         // the constructor's receiver, parameters and results, which hide a function of p
+	scopes   map[string][]localScope // the locals of its body, which hide a function of p within their scope
+	locals   map[string][]ast.Expr   // each local of its body with every value assigned to it, as constructed reads them
+	writes   []fieldWrite
+	branched map[string]bool
 	visiting map[string]bool // the constructors whose reading led here, so one that reaches itself is not read
+}
+
+// localAt reports whether id names a local of the constructor's body where it stands.
+func (f fieldFiller) localAt(id *ast.Ident) bool {
+	for _, s := range f.scopes[id.Name] {
+		if s.from <= id.Pos() && id.Pos() < s.to {
+			return true
+		}
+	}
+	return false
+}
+
+// localScope is the span of a function's source in which one local it declares hides what its
+// name refers to outside: from the end of its declaration to the end of the innermost block, or
+// if, for, switch, select, case or function literal, declaring it.
+type localScope struct {
+	from, to token.Pos
+}
+
+// localScopes is the scope of each local body declares, by name: one a := or a var declares, a
+// range's key and value, and a function literal's parameters and results.
+func localScopes(body *ast.BlockStmt) map[string][]localScope {
+	out := map[string][]localScope{}
+	var stack []ast.Node
+	declare := func(id *ast.Ident, from, to token.Pos) {
+		if id.Name != "_" {
+			out[id.Name] = append(out[id.Name], localScope{from: from, to: to})
+		}
+	}
+	// enclosing is the end of the innermost node below the top of the stack that opens a scope.
+	enclosing := func() token.Pos {
+		for i := len(stack) - 2; i >= 0; i-- {
+			if _, lit := stack[i].(*ast.FuncLit); lit || opensScope(stack[i]) {
+				return stack[i].End()
+			}
+		}
+		return body.End()
+	}
+	ast.Inspect(body, func(n ast.Node) bool {
+		if n == nil {
+			stack = stack[:len(stack)-1]
+			return true
+		}
+		stack = append(stack, n)
+		switch x := n.(type) {
+		case *ast.AssignStmt:
+			if x.Tok == token.DEFINE {
+				for _, lhs := range x.Lhs {
+					if id, ok := lhs.(*ast.Ident); ok {
+						declare(id, x.End(), enclosing())
+					}
+				}
+			}
+		case *ast.ValueSpec:
+			for _, name := range x.Names {
+				declare(name, x.End(), enclosing())
+			}
+		case *ast.RangeStmt:
+			if x.Tok == token.DEFINE {
+				for _, e := range []ast.Expr{x.Key, x.Value} {
+					if id, ok := e.(*ast.Ident); ok {
+						declare(id, x.Body.Pos(), x.End())
+					}
+				}
+			}
+		case *ast.FuncLit:
+			for _, list := range []*ast.FieldList{x.Type.Params, x.Type.Results} {
+				if list == nil {
+					continue
+				}
+				for _, field := range list.List {
+					for _, name := range field.Names {
+						declare(name, x.Body.Pos(), x.End())
+					}
+				}
+			}
+		}
+		return true
+	})
+	return out
 }
 
 // literal is a composite literal's type and, for each field it fills, the value it holds, as
@@ -3845,13 +4334,15 @@ func (f fieldFiller) literal(lit *ast.CompositeLit) fieldBinding {
 }
 
 // value is what a field filled with e holds. A composite literal of a named type, or its address,
-// is read as literal reads it. A call to a function of p returning a type of p, such as a helper
-// building a refusal writer, holds what that function returns, read as constructed reads a
-// constructor. One it cannot read, or one already being read, such as a helper returning a named
-// string for a refusal's text, holds an unread binding rather than nothing, so a walk that reaches
-// through the field is not read, and one that never does is read as if it held nothing. Anything
-// else, such as a parameter, a call to another package or to a function literal, or a function
-// returning a predeclared type, leaves the field unbound, holding nothing the walk follows.
+// is read as literal reads it. A local of the constructor holds the one value it was assigned, read
+// as localValue reads it. A call to a function of p that no local or parameter hides where it is
+// called, returning a type of p, such as a helper building a refusal writer, holds what that
+// function returns, read as constructed reads a constructor. A local or a call it cannot read, or
+// a call already being read, such as a helper returning a named string for a refusal's text, holds
+// an unread binding rather than nothing, so a walk that reaches through the field is not read, and
+// one that never does is read as if it held nothing. Anything else, such as a parameter, a call to
+// another package or to a function literal, or a function returning a predeclared type, leaves
+// the field unbound, holding nothing the walk follows.
 func (f fieldFiller) value(e ast.Expr) (binding fieldBinding, bound bool) {
 	e = ast.Unparen(e)
 	if addr, isAddr := e.(*ast.UnaryExpr); isAddr && addr.Op == token.AND {
@@ -3862,9 +4353,21 @@ func (f fieldFiller) value(e ast.Expr) (binding fieldBinding, bound bool) {
 		if _, named := typeName(x.Type); named {
 			return f.literal(x), true
 		}
+	case *ast.Ident:
+		if !f.localAt(x) {
+			break // a parameter, or a name of another scope
+		}
+		if _, assigned := f.locals[x.Name]; !assigned {
+			return fieldBinding{unread: true}, true // a range's or a function literal's
+		}
+		value, ok := localValue(x, f.locals, f.writes, f.branched)
+		if !ok {
+			return fieldBinding{unread: true}, true
+		}
+		return f.value(value)
 	case *ast.CallExpr:
 		id, isIdent := ast.Unparen(x.Fun).(*ast.Ident)
-		if !isIdent || f.shadowed[id.Name] || !f.p.plain[id.Name] {
+		if !isIdent || f.params[id.Name] || f.localAt(id) || !f.p.plain[id.Name] {
 			break
 		}
 		decls := f.p.funcs[id.Name]
@@ -4005,10 +4508,11 @@ func chainStatuses(path string, fset *token.FileSet, fn *ast.FuncDecl,
 }
 
 // receiverCalls is every method of the package a method's body reaches through its receiver:
-// recv.M, another method of the receiver's type, and recv.field.M, a method of the type the
-// constructor filled field with. It also returns the selectors it resolved, recv.M and
-// recv.field.M, which name a method of the package rather than a port, and whether the body
-// reaches through a field an unread helper filled, recv.field.X, whose type it cannot tell.
+// recv.M, another method of the receiver's type, and recv.field.M or recv.a.b.M, a method of the
+// type the constructor filled the field at the end of that path with. It also returns the
+// selectors it resolved, which name a method of the package rather than a port, and whether the
+// body reaches through a field an unread helper filled, at any depth, recv.field.X, whose type it
+// cannot tell.
 func receiverCalls(fn *ast.FuncDecl, binding fieldBinding, p *goPackage) ([]chainWalk, map[*ast.SelectorExpr]bool, bool) {
 	if len(fn.Recv.List[0].Names) == 0 {
 		return nil, nil, false
@@ -4022,28 +4526,29 @@ func receiverCalls(fn *ast.FuncDecl, binding fieldBinding, p *goPackage) ([]chai
 		if !ok {
 			return true
 		}
-		switch x := sel.X.(type) {
-		case *ast.Ident:
-			key := binding.typ + "." + sel.Sel.Name
-			if x.Name == recv && len(p.methods[key]) > 0 {
-				out = append(out, chainWalk{key: key, method: true, binding: binding})
-				resolved[sel] = true
-			}
-		case *ast.SelectorExpr:
-			id, ok := x.X.(*ast.Ident)
-			if !ok || id.Name != recv {
-				break
-			}
-			field, filled := binding.fields[x.Sel.Name]
+		local, path, isPath := fieldPath(sel.X)
+		if id, isIdent := ast.Unparen(sel.X).(*ast.Ident); isIdent {
+			local, isPath = id.Name, true
+		}
+		if !isPath || local != recv {
+			return true
+		}
+		at := binding
+		for _, name := range path {
+			field, filled := at.fields[name]
 			if field.unread {
 				unread = true
-				break
+				return true
 			}
-			key := field.typ + "." + sel.Sel.Name
-			if filled && len(p.methods[key]) > 0 {
-				out = append(out, chainWalk{key: key, method: true, binding: field})
-				resolved[sel] = true
+			if !filled {
+				return true
 			}
+			at = field
+		}
+		key := at.typ + "." + sel.Sel.Name
+		if len(p.methods[key]) > 0 {
+			out = append(out, chainWalk{key: key, method: true, binding: at})
+			resolved[sel] = true
 		}
 		return true
 	})

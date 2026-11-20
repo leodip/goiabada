@@ -242,7 +242,9 @@ type adminRouteFinding struct {
 // admin route the classification does not hold: a write route, or a route whose handler applies a
 // ceiling, with no row; a row naming no admin route; a row naming other ceilings than its handler
 // applies, or malformed; an admin route whose handler is not a function the handler package
-// declares; and a function answering a refusal that adminPolicyCeilings does not list. It also
+// declares; a route registered through a router whose path prefix collectRoutes cannot tell, which
+// may be an admin route; and a function answering a refusal that adminPolicyCeilings does not
+// list. It also
 // returns how many admin routes and handler files it read, so the reporting half can tell "nothing
 // to report" from "nothing was read".
 func findAdminRouteClassificationGaps(
@@ -268,6 +270,12 @@ func findAdminRouteClassificationGaps(
 
 	seen := map[string]bool{}
 	for _, registration := range registered {
+		if registration.pathUnresolved != "" {
+			found = append(found, adminRouteFinding{route: strings.ToUpper(registration.method) + " " + registration.path,
+				reason: "registered through a router whose path prefix the classification cannot tell, so it may be " +
+					"an admin route: " + registration.pathUnresolved})
+			continue
+		}
 		if !strings.HasPrefix(registration.path, adminRoutePrefix) {
 			continue
 		}
@@ -1074,6 +1082,42 @@ func TestAdminRouteClassification_Guard_FailsOnAnUnclassifiedWriteThroughAReturn
 	require.Len(t, report.Errors, 1)
 	assert.Contains(t, report.Errors[0], "1 admin route(s)")
 	assert.Contains(t, report.Errors[0], "POST /api/v1/admin/jobs: a write route the policy does not classify; its handler applies no ceiling")
+}
+
+// A write registered through a group router a branch wraps in more middleware is an admin route
+// under the group's prefix on either branch, and is classified as one.
+func TestAdminRouteClassification_Guard_FailsOnAnUnclassifiedWriteThroughAGroupRouterABranchWraps(t *testing.T) {
+	root := writeAdminRouteFixture(t, adminRouteFixtureHandlers)
+	routes := strings.Replace(adminRouteFixtureRoutes, "\tapi.Route(\"/api/v1/admin\"", "\tadmin := api.Route(\"/api/v1/admin\"", 1)
+	routes = strings.Replace(routes, "\tapi.Route(\"/api/v1/account\"",
+		"\tif s.refuseJobs {\n\t\tadmin = admin.With(middleware.Refuse())\n\t}\n"+
+			"\tadmin.Post(\"/jobs\", apihandlers.HandleUserCreatePost(s.database, auditLogger))\n\tapi.Route(\"/api/v1/account\"", 1)
+	require.NotEqual(t, adminRouteFixtureRoutes, routes)
+	require.NoError(t, os.WriteFile(filepath.Join(root, filepath.FromSlash(adminRoutesFile)), []byte(routes), 0o600))
+
+	report := runAdminRouteGuard(root, adminRouteFixtureClassification(), adminRouteFixtureCeilings)
+
+	require.Len(t, report.Errors, 1)
+	assert.Contains(t, report.Errors[0], "1 admin route(s)")
+	assert.Contains(t, report.Errors[0], "POST /api/v1/admin/jobs: a write route the policy does not classify; its handler applies no ceiling")
+}
+
+// A route registered through a router whose prefix depends on the branch taken may be an admin
+// route, so the guard reports it rather than reading it under a prefix it guessed.
+func TestAdminRouteClassification_Guard_FailsOnARouteWhosePrefixDependsOnTheBranch(t *testing.T) {
+	root := writeAdminRouteFixture(t, adminRouteFixtureHandlers)
+	routes := strings.Replace(adminRouteFixtureRoutes, "\tapi.Route(\"/api/v1/account\"",
+		"\tjobs := api\n\tif s.adminJobs {\n\t\tjobs = api.Route(\"/api/v1/admin/jobs\", func(r *routing.Router) {})\n\t}\n"+
+			"\tjobs.Post(\"/run\", apihandlers.HandleUserCreatePost(s.database, auditLogger))\n\tapi.Route(\"/api/v1/account\"", 1)
+	require.NotEqual(t, adminRouteFixtureRoutes, routes)
+	require.NoError(t, os.WriteFile(filepath.Join(root, filepath.FromSlash(adminRoutesFile)), []byte(routes), 0o600))
+
+	report := runAdminRouteGuard(root, adminRouteFixtureClassification(), adminRouteFixtureCeilings)
+
+	require.Len(t, report.Errors, 1)
+	assert.Contains(t, report.Errors[0], "1 admin route(s)")
+	assert.Contains(t, report.Errors[0], "POST /run: registered through a router whose path prefix the "+
+		"classification cannot tell, so it may be an admin route: jobs is assigned inside a block")
 }
 
 func TestAdminRouteClassification_Guard_FailsOnAnUnclassifiedReadApplyingACeiling(t *testing.T) {
