@@ -19,9 +19,10 @@ package guard
 // container's and compiles what the other database jobs run, so they restore its build rather
 // than compile it. Two savers of one cache race for its key; none leaves every job compiling, as
 // does a saver's setup step skipped by an if:. The two setup actions save when save-cache is
-// 'true', so the guard reads it for each matrix entry of the job: 'true' in every entry, or
-// ${{ <condition> && 'true' || 'false' }} in the entries the condition holds for, a condition being
-// comparisons of matrix values joined by &&, as the compile step's if: is read too.
+// 'true', compared as Actions compares it, ignoring case and keeping spaces, so the guard reads it
+// for each matrix entry of the job: 'true' in every entry, or ${{ <condition> && '<a>' || '<b>' }}
+// giving 'true' in the entries it does, <b> wherever the condition fails or <a> is empty, a
+// condition being comparisons of matrix values joined by &&, as the compile step's if: is read too.
 
 import (
 	"fmt"
@@ -152,12 +153,15 @@ func matrixCondition(condition string, entry map[string]string) (holds, ok bool)
 }
 
 // savesCache is whether a setup action saves the cache in a matrix entry, given its save-cache: when
-// the input is 'true', or ${{ <condition> && '<a>' || '<b>' }} gives 'true'. ok is false for any
-// other expression.
+// the input is 'true', or ${{ <condition> && '<a>' || '<b>' }} gives 'true'. Actions passes the
+// input on with its spaces and compares it to 'true' ignoring case alone, so ' true ' saves nothing.
+// The expression gives <a> when the condition holds and <a> is not empty, and <b> otherwise, since
+// && gives a false condition or <a>, and || passes over either when it is false or empty. ok is false
+// for any other expression.
 func savesCache(value string, entry map[string]string) (saves, ok bool) {
-	whole := wholeExpression.FindStringSubmatch(strings.TrimSpace(value))
+	whole := wholeExpression.FindStringSubmatch(value)
 	if whole == nil {
-		return strings.EqualFold(strings.TrimSpace(value), "true"), true
+		return strings.EqualFold(value, "true"), true
 	}
 	choice := choiceExpression.FindStringSubmatch(whole[1])
 	if choice == nil {
@@ -168,10 +172,11 @@ func savesCache(value string, entry map[string]string) (saves, ok bool) {
 	if !ok || a == nil || b == nil {
 		return false, false
 	}
-	if holds {
-		return strings.EqualFold(a[1], "true"), true
+	result := b[1]
+	if holds && a[1] != "" {
+		result = a[1]
 	}
-	return strings.EqualFold(b[1], "true"), true
+	return strings.EqualFold(strings.ReplaceAll(result, "''", "'"), "true"), true
 }
 
 // matrixEntries lists a job's matrix entries: one without values when it has no matrix, its include
@@ -660,6 +665,21 @@ func TestCheckWorkflow_RunnerJobFindings(t *testing.T) {
 	t.Run("an empty save-cache saves no container cache", func(t *testing.T) {
 		assertFindings(t, findings(replace(t, workflow, "          save-cache: ${{ matrix.tier == 'data' && 'true' || 'false' }}\n", "          save-cache:\n")),
 			"runner jobs: check.yml saves the container's Go cache in no job")
+	})
+	t.Run("a save-cache 'true' within spaces saves no runner cache", func(t *testing.T) {
+		assertFindings(t, findings(replace(t, workflow, "          save-cache: 'true'\n", "          save-cache: ' true '\n")),
+			"runner jobs: check.yml saves the runner's Go cache in no job")
+	})
+	t.Run("a save-cache 'true' in another case passes", func(t *testing.T) {
+		assertFindings(t, findings(replace(t, workflow, "          save-cache: 'true'\n", "          save-cache: 'TrUe'\n")))
+	})
+	t.Run("a selector whose empty choice falls through to 'true' saves the container's cache from every entry", func(t *testing.T) {
+		assertFindings(t, findings(replace(t, workflow, "matrix.tier == 'data' && 'true' || 'false'", "matrix.tier != 'data' && '' || 'true'")),
+			"runner jobs: check.yml saves the container's Go cache in 3 jobs or matrix entries (tests-sqlite (shard: 1/1, tier: data), "+
+				"tests-sqlite (shard: 1/2, tier: integration), tests-sqlite (shard: 2/2, tier: integration))")
+	})
+	t.Run("a selector that chooses 'false' outside the data entry passes", func(t *testing.T) {
+		assertFindings(t, findings(replace(t, workflow, "matrix.tier == 'data' && 'true' || 'false'", "matrix.tier != 'data' && 'false' || 'true'")))
 	})
 	t.Run("a selector that saves the container's cache from both integration entries", func(t *testing.T) {
 		assertFindings(t, findings(replace(t, workflow, "matrix.tier == 'data' && 'true'", "matrix.tier == 'integration' && 'true'")),
