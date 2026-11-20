@@ -219,7 +219,13 @@ func TestAccountEmailAndPasswordRefusals_AreInTheRequestsLanguage(t *testing.T) 
 		{
 			name: "a right verification code replaced before it was spent",
 			serve: verify(smtpOn, verificationCode, func(database *datamocks.Database) {
-				database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), accountRefusalSubject).Return(pendingCode(t), nil).Twice()
+				database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), accountRefusalSubject).Return(pendingCode(t), nil).Once()
+				// The row read again holds another code, which a new send put there.
+				replaced := pendingCode(t)
+				anotherCode, err := testDataCipher.Encrypt("WXYZ5678")
+				require.NoError(t, err)
+				replaced.EmailVerificationCodeEncrypted = anotherCode
+				database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), accountRefusalSubject).Return(replaced, nil).Once()
 				database.On("TryVerifyUserEmail", mock.Anything, (*sql.Tx)(nil), int64(7), "someone@example.com", mock.Anything).
 					Return(false, nil).Once()
 			}),

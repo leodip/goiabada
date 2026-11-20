@@ -154,8 +154,11 @@ func HandleSettingsTurnstilePut(
 		// The secret key written is decided here, against the row the site key check above read: a
 		// kept secret key is that row's, the one the check found entered for this site key. Keeping
 		// the one the save reads under its lock instead could pair this save's site key with another
-		// widget's secret key, saved meanwhile, as the email save's password rule explains.
-		secretKeyEncrypted := currentSettings.TurnstileSecretKeyEncrypted
+		// widget's secret key, saved meanwhile, as the email save's password rule explains. A kept
+		// secret key is sealed again under the current data key rather than written back as the
+		// request read it: a re-encryption committed since, while Cloudflare was asked, moved the
+		// row to the current key, and the bytes read before it would undo that (#492 decision 10).
+		var secretKeyEncrypted []byte
 		switch {
 		case req.ClearTurnstileSecretKey:
 			secretKeyEncrypted = nil
@@ -166,6 +169,14 @@ func HandleSettingsTurnstilePut(
 				return
 			}
 			secretKeyEncrypted = encrypted
+		case storedSecretKey:
+			kept, keepErr := sealKeptSecretAgain(r.Context(), dataCipher, currentSettings.TurnstileSecretKeyEncrypted,
+				"turnstile_secret_key")
+			if keepErr != nil {
+				writeInternalServerError(w, r, keepErr)
+				return
+			}
+			secretKeyEncrypted = kept
 		}
 
 		var oldVals map[string]interface{}

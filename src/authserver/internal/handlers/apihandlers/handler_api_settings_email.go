@@ -1,6 +1,7 @@
 package apihandlers
 
 import (
+	"context"
 	"encoding/json"
 	"log/slog"
 	"net"
@@ -18,6 +19,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/hostport"
 	"github.com/leodip/goiabada/core/i18n"
@@ -234,7 +236,11 @@ func HandleSettingsEmailPut(
 		// password the save reads under its lock instead would let a save of another host and
 		// password, committed meanwhile, have its password sent to this save's host (#410
 		// decision 2). Two saves of the email settings are still last-writer-wins between them.
-		smtpPasswordEncrypted := currentSettings.SMTPPasswordEncrypted
+		//
+		// A kept password is sealed again under the current data key rather than written back as
+		// the request read it: a re-encryption committed since, during the dial above, moved the row
+		// to the current key, and the bytes read before it would undo that (#492 decision 10).
+		var smtpPasswordEncrypted []byte
 		switch {
 		case req.ClearSMTPPassword:
 			smtpPasswordEncrypted = nil
@@ -245,6 +251,13 @@ func HandleSettingsEmailPut(
 				return
 			}
 			smtpPasswordEncrypted = encrypted
+		case len(currentSettings.SMTPPasswordEncrypted) > 0:
+			kept, keepErr := sealKeptSecretAgain(r.Context(), dataCipher, currentSettings.SMTPPasswordEncrypted, "smtp_password")
+			if keepErr != nil {
+				writeInternalServerError(w, r, keepErr)
+				return
+			}
+			smtpPasswordEncrypted = kept
 		}
 
 		// Apply updates, onto the row as stored when the save runs (#407)
@@ -272,6 +285,29 @@ func HandleSettingsEmailPut(
 
 		writeJSON(w, r, http.StatusOK, settingsEmailResponse(saved))
 	}
+}
+
+// sealKeptSecretAgain is what a settings save writes for a stored secret it keeps, the SMTP
+// password or the Turnstile secret key: the secret its request read, opened with the data cipher
+// and sealed anew under the current data key, so a re-encryption committed since the request read
+// it is not undone (#492 decision 10). A secret neither data key opens cannot be sealed again; it is
+// written back as read, as before, with a Warn record naming it, so the save of the rest of the
+// section, and turning the Turnstile challenge off, still go through. A re-encryption could not
+// have moved it either, since it opens under neither key.
+func sealKeptSecretAgain(ctx context.Context, dataCipher *encryption.DataCipher, ciphertext []byte,
+	secret string) ([]byte, error) {
+
+	plaintext, err := dataCipher.Decrypt(ciphertext)
+	if err != nil {
+		slog.WarnContext(ctx, "the kept stored secret opens under neither data encryption key, so it is written back as stored",
+			"secret", secret, "error", err)
+		return ciphertext, nil
+	}
+	resealed, err := dataCipher.Encrypt(plaintext)
+	if err != nil {
+		return nil, errs.Wrap(err, "unable to seal the kept stored secret again")
+	}
+	return resealed, nil
 }
 
 // senderAddressForStorage is the sender address as stored: the part before the @ as typed, since

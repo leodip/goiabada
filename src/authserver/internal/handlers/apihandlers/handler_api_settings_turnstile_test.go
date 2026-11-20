@@ -3,7 +3,10 @@ package apihandlers
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
+	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -11,10 +14,12 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	datamocks "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/encryption"
 	handlersmocks "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/turnstile"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -93,10 +98,30 @@ func serveTurnstileSave(t *testing.T, settings *record.Settings, body string) tu
 // serveTurnstileSaveCheckedBy is serveTurnstileSave with checker answering for Cloudflare.
 func serveTurnstileSaveCheckedBy(t *testing.T, settings *record.Settings, body string, checker *fakeSecretKeyChecker) turnstileSave {
 	t.Helper()
+	return serveTurnstileSaveUnder(t, testDataCipher, settings, nil, body, checker)
+}
+
+// serveTurnstileSaveUnder is serveTurnstileSaveCheckedBy by a server holding dataCipher, whose save
+// reads locked under its row lock, or the row the request loaded when locked is nil.
+func serveTurnstileSaveUnder(t *testing.T, dataCipher *encryption.DataCipher, settings, locked *record.Settings,
+	body string, checker *fakeSecretKeyChecker) turnstileSave {
+	t.Helper()
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 	var result turnstileSave
-	allowSettingsSave(database)
+	if locked == nil {
+		allowSettingsSave(database)
+	} else {
+		database.EXPECT().RunInTransaction(mock.Anything, mock.Anything).
+			RunAndReturn(func(_ context.Context, fn func(tx *sql.Tx) error) error { return fn(settingsSaveTx) }).Maybe()
+		database.EXPECT().AcquireSettingsRow(mock.Anything, settingsSaveTx, mock.Anything).Return(nil).Maybe()
+		database.EXPECT().GetSettingsById(mock.Anything, settingsSaveTx, mock.Anything).
+			RunAndReturn(func(context.Context, *sql.Tx, int64) (*record.Settings, error) {
+				stored := *locked
+				stored.TurnstileSecretKeyEncrypted = bytes.Clone(locked.TurnstileSecretKeyEncrypted)
+				return &stored, nil
+			}).Maybe()
+	}
 	database.On("UpdateSettings", mock.Anything, settingsSaveTx, mock.AnythingOfType("*record.Settings")).
 		Run(func(args mock.Arguments) {
 			saved := *args.Get(2).(*record.Settings)
@@ -110,7 +135,7 @@ func serveTurnstileSaveCheckedBy(t *testing.T, settings *record.Settings, body s
 	r = r.WithContext(reqctx.WithSettings(r.Context(), settings))
 	r = setTokenContextWithClaims(r, map[string]interface{}{"scope": "authserver:manage-settings", "sub": grantCaller})
 	result.rr = httptest.NewRecorder()
-	HandleSettingsTurnstilePut(database, auditLogger, testDataCipher, checker).ServeHTTP(result.rr, r)
+	HandleSettingsTurnstilePut(database, auditLogger, dataCipher, checker).ServeHTTP(result.rr, r)
 
 	if result.rr.Code != http.StatusOK {
 		database.AssertNotCalled(t, "UpdateSettings", mock.Anything, mock.Anything, mock.Anything)
@@ -211,9 +236,10 @@ func TestHandleSettingsTurnstilePut_TurningTheChallengeOnStoresTheKeys(t *testin
 	}, save.audited)
 }
 
-// An absent or empty secret key keeps the stored one, byte for byte: the API never answers it, so a
-// client sending the form back as it read it has nothing to put there. That holds turning the
-// challenge on, keeping it on, and turning it off.
+// An absent or empty secret key keeps the stored one: the API never answers it, so a client sending
+// the form back as it read it has nothing to put there. That holds turning the challenge on, keeping
+// it on, and turning it off. The secret key kept is sealed anew, so the row's bytes change while the
+// secret key does not (#492 decision 10).
 func TestHandleSettingsTurnstilePut_AnAbsentOrEmptySecretKeyKeepsTheStoredOne(t *testing.T) {
 	cases := []struct {
 		name            string
@@ -239,11 +265,115 @@ func TestHandleSettingsTurnstilePut_AnAbsentOrEmptySecretKeyKeepsTheStoredOne(t 
 			require.NotNil(t, save.written)
 			assert.Equal(t, c.enabled, save.written.TurnstileEnabled)
 			assert.Equal(t, turnstileTestSiteKey, save.written.TurnstileSiteKey, "the site key is kept")
-			assert.Equal(t, stored, save.written.TurnstileSecretKeyEncrypted, "the stored ciphertext, byte for byte")
+			assertKeptSecretKeySealedAnew(t, testDataCipher, stored, save.written.TurnstileSecretKeyEncrypted)
 			_, _, hasSecretKey := turnstileAnswer(t, save.rr)
 			assert.True(t, hasSecretKey)
 		})
 	}
+}
+
+// assertKeptSecretKeySealedAnew holds written to turnstileStoredSecretKey sealed anew: other bytes
+// than the stored ones, which opener opens to the stored secret key.
+func assertKeptSecretKeySealedAnew(t *testing.T, opener *encryption.DataCipher, stored, written []byte) {
+	t.Helper()
+	assert.NotEqual(t, stored, written, "the kept secret key is sealed anew, not written back as read")
+	plaintext, err := opener.Decrypt(written)
+	require.NoError(t, err)
+	assert.Equal(t, turnstileStoredSecretKey, plaintext)
+}
+
+// A kept secret key is sealed again under the server's current data key before the save writes it.
+// It is the secret key the request's site key check read, sealed under the previous key, and a
+// re-encryption committed during the save, while Cloudflare was asked about the key, moved the row
+// to the current key: writing back what the request read would undo that. It is still the checked
+// row's secret key, even when another widget's site key and secret key were saved meanwhile (#492
+// decision 10). That holds turning the challenge on, keeping it on, and turning it off.
+func TestHandleSettingsTurnstilePut_AKeptSecretKeyIsSealedAgainUnderTheCurrentKey(t *testing.T) {
+	switches := []struct {
+		name          string
+		storedEnabled bool
+		enabled       bool
+	}{
+		{name: "challenge kept on", storedEnabled: true, enabled: true},
+		{name: "challenge turned on", storedEnabled: false, enabled: true},
+		{name: "challenge turned off", storedEnabled: true, enabled: false},
+	}
+	meanwhile := []struct {
+		name            string
+		lockedSiteKey   string
+		lockedSecretKey string
+	}{
+		{name: "the row re-encrypted meanwhile", lockedSiteKey: turnstileTestSiteKey, lockedSecretKey: turnstileStoredSecretKey},
+		{name: "another widget saved meanwhile", lockedSiteKey: turnstileOtherSiteKey, lockedSecretKey: "another-widget-secret"},
+	}
+	for _, sw := range switches {
+		for _, m := range meanwhile {
+			t.Run(sw.name+", "+m.name, func(t *testing.T) {
+				settings := turnstileSaveSettings(t, sw.storedEnabled, true) // sealed under the previous key
+				locked := *settings
+				locked.TurnstileSiteKey = m.lockedSiteKey
+				resealed, err := currentKeyOnlyCipher.Encrypt(m.lockedSecretKey)
+				require.NoError(t, err)
+				locked.TurnstileSecretKeyEncrypted = resealed
+
+				save := serveTurnstileSaveUnder(t, rotatingDataCipher, settings, &locked,
+					turnstileSaveBody(t, sw.enabled, turnstileTestSiteKey, nil), acceptingSecretKeyChecker())
+
+				require.Equal(t, http.StatusOK, save.rr.Code, save.rr.Body.String())
+				require.NotNil(t, save.written)
+				assert.Equal(t, sw.enabled, save.written.TurnstileEnabled)
+				assert.Equal(t, turnstileTestSiteKey, save.written.TurnstileSiteKey)
+				assertKeptSecretKeySealedAnew(t, currentKeyOnlyCipher, settings.TurnstileSecretKeyEncrypted,
+					save.written.TurnstileSecretKeyEncrypted)
+			})
+		}
+	}
+}
+
+// A kept secret key neither data key opens cannot be sealed again: keeping the challenge on, or
+// turning it off, writes it back as stored, byte for byte, and names it in a Warn record, so a
+// challenge can still be turned off. A re-encryption could not have moved it either (#492 decision
+// 10). Turning the challenge on with it still answers 500, as Cloudflare cannot be asked about it.
+func TestHandleSettingsTurnstilePut_AKeptSecretKeyNeitherKeyOpensIsWrittenBackAsStored(t *testing.T) {
+	strangerCipher, err := encryption.NewDataCipher([]byte("ffffffffffffffffffffffffffffffff"))
+	require.NoError(t, err)
+	unreadable, err := strangerCipher.Encrypt(turnstileStoredSecretKey)
+	require.NoError(t, err)
+
+	for _, enabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("challenge on: %v", enabled), func(t *testing.T) {
+			settings := turnstileSaveSettings(t, true, false)
+			settings.TurnstileSecretKeyEncrypted = bytes.Clone(unreadable)
+			capture := logtest.CaptureSlog(t)
+
+			save := serveTurnstileSaveUnder(t, rotatingDataCipher, settings, nil,
+				turnstileSaveBody(t, enabled, turnstileTestSiteKey, nil), acceptingSecretKeyChecker())
+
+			require.Equal(t, http.StatusOK, save.rr.Code, save.rr.Body.String())
+			require.NotNil(t, save.written)
+			assert.Equal(t, enabled, save.written.TurnstileEnabled)
+			assert.Equal(t, unreadable, save.written.TurnstileSecretKeyEncrypted, "the stored ciphertext, byte for byte")
+			records := capture.Records()
+			require.Len(t, records, 1)
+			assert.Equal(t, slog.LevelWarn, records[0].Level)
+			assert.Equal(t, "the kept stored secret opens under neither data encryption key, so it is written back as stored",
+				records[0].Message)
+			assert.Equal(t, "turnstile_secret_key", records[0].Attrs["secret"])
+		})
+	}
+
+	t.Run("challenge turned on", func(t *testing.T) {
+		settings := turnstileSaveSettings(t, false, false)
+		settings.TurnstileSecretKeyEncrypted = bytes.Clone(unreadable)
+		checker := acceptingSecretKeyChecker()
+
+		save := serveTurnstileSaveUnder(t, rotatingDataCipher, settings, nil,
+			turnstileSaveBody(t, true, turnstileTestSiteKey, nil), checker)
+
+		assert.Equal(t, http.StatusInternalServerError, save.rr.Code, save.rr.Body.String())
+		assert.Nil(t, save.written)
+		assert.Empty(t, checker.checked)
+	})
 }
 
 // A non-empty secret key replaces the stored one, whether or not one was stored and whether or not
@@ -309,7 +439,7 @@ func TestHandleSettingsTurnstilePut_TheSiteKeyIsTrimmed(t *testing.T) {
 	require.Equal(t, http.StatusOK, save.rr.Code, save.rr.Body.String())
 	require.NotNil(t, save.written)
 	assert.Equal(t, turnstileTestSiteKey, save.written.TurnstileSiteKey)
-	assert.Equal(t, stored, save.written.TurnstileSecretKeyEncrypted)
+	assertKeptSecretKeySealedAnew(t, testDataCipher, stored, save.written.TurnstileSecretKeyEncrypted)
 }
 
 // Each refusal of #642 decision 11 that needs no call to Cloudflare answers 400 with its catalog key
