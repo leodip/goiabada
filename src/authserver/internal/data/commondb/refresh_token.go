@@ -236,6 +236,44 @@ var selectUsableRefreshTokenClientIds = statement{
 		"AND refresh_tokens.client_id IS NOT NULL",
 }
 
+// liveGrantFamilyUnrecorded is the condition both branches of selectLiveGrantsByUserId end with:
+// the token's rotation family has no revocation record.
+const liveGrantFamilyUnrecorded = "AND NOT EXISTS (SELECT 1 FROM refresh_token_family_revocations " +
+	"WHERE refresh_token_family_revocations.first_refresh_token_jti = refresh_tokens.first_refresh_token_jti)"
+
+// selectLiveGrantsByUserId binds the user id, false for revoked and the instant once per branch:
+// the code's user, then the token's. UNION ALL, since the two shapes are mutually exclusive.
+var selectLiveGrantsByUserId = statement{
+	sqlite: "SELECT refresh_tokens.id, codes.client_id, refresh_tokens.scope FROM refresh_tokens " +
+		"INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
+		"WHERE codes.user_id = ? AND refresh_tokens.revoked = ? AND refresh_tokens.expires_at > ? " +
+		liveGrantFamilyUnrecorded + " " +
+		"UNION ALL SELECT refresh_tokens.id, refresh_tokens.client_id, refresh_tokens.scope FROM refresh_tokens " +
+		"WHERE refresh_tokens.user_id = ? AND refresh_tokens.revoked = ? AND refresh_tokens.expires_at > ? " +
+		"AND refresh_tokens.client_id IS NOT NULL " + liveGrantFamilyUnrecorded,
+	mysql: "SELECT refresh_tokens.id, codes.client_id, refresh_tokens.scope FROM refresh_tokens " +
+		"INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
+		"WHERE codes.user_id = ? AND refresh_tokens.revoked = ? AND refresh_tokens.expires_at > ? " +
+		liveGrantFamilyUnrecorded + " " +
+		"UNION ALL SELECT refresh_tokens.id, refresh_tokens.client_id, refresh_tokens.scope FROM refresh_tokens " +
+		"WHERE refresh_tokens.user_id = ? AND refresh_tokens.revoked = ? AND refresh_tokens.expires_at > ? " +
+		"AND refresh_tokens.client_id IS NOT NULL " + liveGrantFamilyUnrecorded,
+	postgres: "SELECT refresh_tokens.id, codes.client_id, refresh_tokens.scope FROM refresh_tokens " +
+		"INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
+		"WHERE codes.user_id = $1 AND refresh_tokens.revoked = $2 AND refresh_tokens.expires_at > $3 " +
+		liveGrantFamilyUnrecorded + " " +
+		"UNION ALL SELECT refresh_tokens.id, refresh_tokens.client_id, refresh_tokens.scope FROM refresh_tokens " +
+		"WHERE refresh_tokens.user_id = $4 AND refresh_tokens.revoked = $5 AND refresh_tokens.expires_at > $6 " +
+		"AND refresh_tokens.client_id IS NOT NULL " + liveGrantFamilyUnrecorded,
+	mssql: "SELECT refresh_tokens.id, codes.client_id, refresh_tokens.scope FROM refresh_tokens " +
+		"INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
+		"WHERE codes.user_id = @p1 AND refresh_tokens.revoked = @p2 AND refresh_tokens.expires_at > @p3 " +
+		liveGrantFamilyUnrecorded + " " +
+		"UNION ALL SELECT refresh_tokens.id, refresh_tokens.client_id, refresh_tokens.scope FROM refresh_tokens " +
+		"WHERE refresh_tokens.user_id = @p4 AND refresh_tokens.revoked = @p5 AND refresh_tokens.expires_at > @p6 " +
+		"AND refresh_tokens.client_id IS NOT NULL " + liveGrantFamilyUnrecorded,
+}
+
 // selectRefreshTokensByClientId binds the client id once per branch: the code's, then the token's.
 var selectRefreshTokensByClientId = statement{
 	sqlite: "SELECT " + refreshTokenColumns.sqlite + " FROM refresh_tokens INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
@@ -691,6 +729,33 @@ func (d *Database) GetUsableRefreshTokenClientIdsByUserId(ctx context.Context, t
 	return queryAll(ctx, d, tx, []int64(nil), selectUsableRefreshTokenClientIds.text(d.Dialect),
 		[]any{userId, false, now, userId, false, now},
 		func(row rowScanner, clientId *int64) error { return row.Scan(clientId) }, "client id")
+}
+
+// GetLiveGrantsByUserId answers one row for each live refresh token the user holds, with the client
+// it reaches and the scope it records, through either linkage shape: codes.client_id for an
+// authorization-code token, refresh_tokens.client_id for a password grant, the two branches
+// GetRefreshTokensByUserId reads (#135 decision 4). A live token is one whose row is not revoked,
+// whose expires_at is set and after now, and whose rotation family has no revocation record: the
+// record is what refuses a family whose stored members a sweep left looking live, a child a
+// rotation in flight inserted after it (#259). The list of the user's connected clients reads it,
+// and merges each client's scopes itself. A zero userId holds no live grant.
+//
+// The family is matched by the engine's comparison of first_refresh_token_jti, as
+// DeleteOrphanedRefreshTokenFamilyRevocations matches it, not in Go as IsRefreshTokenFamilyRevoked
+// does: the jtis are server-minted UUIDs, so no two families differ only by case or trailing
+// spaces, and a fold could only leave a live grant unlisted, never list a dead one.
+func (d *Database) GetLiveGrantsByUserId(ctx context.Context, tx *sql.Tx, userId int64,
+	now time.Time) ([]record.LiveGrant, error) {
+
+	if userId == 0 {
+		return nil, nil
+	}
+
+	return queryAll(ctx, d, tx, []record.LiveGrant(nil), selectLiveGrantsByUserId.text(d.Dialect),
+		[]any{userId, false, now, userId, false, now},
+		func(row rowScanner, grant *record.LiveGrant) error {
+			return row.Scan(&grant.RefreshTokenId, &grant.ClientId, &grant.Scope)
+		}, "live grant")
 }
 
 // GetRefreshTokensByUserIdAndClientId returns every refresh token one user holds with one

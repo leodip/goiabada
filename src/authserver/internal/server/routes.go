@@ -588,6 +588,10 @@ func (s *Server) initRoutes(branches appBranches) {
 			apihandlers.HandleAccountExportGet(s.database, auditLogger, baseURL))
 		r.Get("/consents", apihandlers.HandleAccountConsentsGet(s.database))
 		r.Delete("/consents/{id}", apihandlers.HandleAccountConsentDelete(s.database, auditLogger, logoutTokens))
+		// The clients the caller is connected to, with or without a consent, and the disconnect of
+		// one, the operation a consent withdrawal runs (#135 decisions 2 and 4).
+		r.Get("/connected-clients", apihandlers.HandleAccountConnectedClientsGet(s.database))
+		r.Delete("/connected-clients/{clientId}", apihandlers.HandleAccountConnectedClientDelete(s.database, auditLogger, logoutTokens))
 		// The legal document versions the caller accepted (#622 decision 10).
 		r.Get("/legal-document-acceptances", apihandlers.HandleAccountLegalDocumentAcceptancesGet(s.database, baseURL))
 

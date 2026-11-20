@@ -11046,6 +11046,86 @@ func (_c *Database_GetLegalDocumentVersionsByLegalDocumentId_Call) RunAndReturn(
 	return _c
 }
 
+// GetLiveGrantsByUserId provides a mock function for the type Database
+func (_mock *Database) GetLiveGrantsByUserId(ctx context.Context, tx *sql.Tx, userId int64, now time.Time) ([]record.LiveGrant, error) {
+	ret := _mock.Called(ctx, tx, userId, now)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetLiveGrantsByUserId")
+	}
+
+	var r0 []record.LiveGrant
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64, time.Time) ([]record.LiveGrant, error)); ok {
+		return returnFunc(ctx, tx, userId, now)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64, time.Time) []record.LiveGrant); ok {
+		r0 = returnFunc(ctx, tx, userId, now)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]record.LiveGrant)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, int64, time.Time) error); ok {
+		r1 = returnFunc(ctx, tx, userId, now)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_GetLiveGrantsByUserId_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetLiveGrantsByUserId'
+type Database_GetLiveGrantsByUserId_Call struct {
+	*mock.Call
+}
+
+// GetLiveGrantsByUserId is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - userId int64
+//   - now time.Time
+func (_e *Database_Expecter) GetLiveGrantsByUserId(ctx any, tx any, userId any, now any) *Database_GetLiveGrantsByUserId_Call {
+	return &Database_GetLiveGrantsByUserId_Call{Call: _e.mock.On("GetLiveGrantsByUserId", ctx, tx, userId, now)}
+}
+
+func (_c *Database_GetLiveGrantsByUserId_Call) Run(run func(ctx context.Context, tx *sql.Tx, userId int64, now time.Time)) *Database_GetLiveGrantsByUserId_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
+		}
+		var arg3 time.Time
+		if args[3] != nil {
+			arg3 = args[3].(time.Time)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_GetLiveGrantsByUserId_Call) Return(liveGrants []record.LiveGrant, err error) *Database_GetLiveGrantsByUserId_Call {
+	_c.Call.Return(liveGrants, err)
+	return _c
+}
+
+func (_c *Database_GetLiveGrantsByUserId_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userId int64, now time.Time) ([]record.LiveGrant, error)) *Database_GetLiveGrantsByUserId_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetPermissionById provides a mock function for the type Database
 func (_mock *Database) GetPermissionById(ctx context.Context, tx *sql.Tx, permissionId int64) (*record.Permission, error) {
 	ret := _mock.Called(ctx, tx, permissionId)

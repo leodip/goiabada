@@ -288,6 +288,30 @@ func ToAccountConsentResponses(consents []record.UserConsent) []api.UserConsentR
 	return responses
 }
 
+// ToAccountConnectedClientResponse maps one of the caller's own connected clients for the account
+// endpoint (#135 decision 4): the client named and described as ToAccountConsentResponses names and
+// describes it, its stored consent or nil, the merged scopes of its live grants, and whether it is
+// the client the calling token was issued to.
+func ToAccountConnectedClientResponse(client *record.Client, consent *record.UserConsent, grantScope string,
+	isCurrent bool) api.ConnectedClientResponse {
+
+	resp := api.ConnectedClientResponse{
+		ClientId:          client.Id,
+		ClientIdentifier:  client.ClientIdentifier,
+		ClientDescription: client.DescriptionForUsers(),
+		GrantScope:        grantScope,
+		IsCurrent:         isCurrent,
+	}
+	resp.ClientName, resp.ClientNameUnverified = client.NameForUsers()
+	if consent != nil {
+		resp.Consent = &api.ConnectedClientConsentResponse{Id: consent.Id, Scope: consent.Scope}
+		if consent.GrantedAt.Valid {
+			resp.Consent.GrantedAt = &consent.GrantedAt.Time
+		}
+	}
+	return resp
+}
+
 func ToGroupResponse(group *record.Group, memberCount int) *api.GroupResponse {
 	if group == nil {
 		return nil

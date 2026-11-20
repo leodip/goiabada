@@ -123,6 +123,8 @@ command itself and fails on a tree it changed.
 | `core/api` | `ClientLogoInfoResponse` | both-apps | — |
 | `core/api` | `ClientLogoUploadResponse` | both-apps | — |
 | `core/api` | `ClientResponse` | both-apps | — |
+| `core/api` | `ConnectedClientConsentResponse` | contract | The consent of one row of the Account API's connected clients (#135). The auth server writes it and no admin console file reads it until the console's Applications page does; #385 exempts this package by name. |
+| `core/api` | `ConnectedClientResponse` | contract | One row of the Account API's connected clients (#135). The auth server writes it and no admin console file reads it until the console's Applications page does; #385 exempts this package by name. |
 | `core/api` | `CreateAccountRecoveryCodesRequest` | both-apps | — |
 | `core/api` | `CreateAccountRecoveryCodesResponse` | both-apps | — |
 | `core/api` | `CreateBrandAssetResponse` | both-apps | Admin API response DTO, which is what `core/api` is for. The auth server writes it and no admin console file reads it yet; #385 exempts this package by name. |
@@ -170,6 +172,7 @@ command itself and fails on a tree it changed.
 | `core/api` | `GetClientSecretResponse` | both-apps | — |
 | `core/api` | `GetClientSessionsResponse` | both-apps | — |
 | `core/api` | `GetClientsResponse` | both-apps | — |
+| `core/api` | `GetConnectedClientsResponse` | contract | Account API response DTO of a user's connected clients, which is what `core/api` is for (#135). The auth server writes it and no admin console file reads it until the console's Applications page does; #385 exempts this package by name. |
 | `core/api` | `GetEmailTemplateResponse` | both-apps | — |
 | `core/api` | `GetEmailTemplatesResponse` | both-apps | — |
 | `core/api` | `GetGroupAttributeResponse` | both-apps | — |

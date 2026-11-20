@@ -224,6 +224,27 @@ func grantStatements() []narrowWrite {
 			},
 		},
 		{
+			// A live grant: its row not revoked, its expiry after the instant, its family unrecorded,
+			// through the code's user and client or the token's own (#135 decision 4).
+			name: "GetLiveGrantsByUserId",
+			run: func(ctx context.Context, d *Database) (any, error) {
+				_, err := d.GetLiveGrantsByUserId(ctx, nil, grantUserId, issuedAt)
+				return nil, err
+			},
+			statements: []string{
+				"SELECT <columns> FROM refresh_tokens INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
+					"WHERE codes.user_id = 7 AND refresh_tokens.revoked = false " +
+					"AND refresh_tokens.expires_at > 2001-01-01T00:00:00Z " +
+					"AND NOT EXISTS (SELECT 1 FROM refresh_token_family_revocations " +
+					"WHERE refresh_token_family_revocations.first_refresh_token_jti = refresh_tokens.first_refresh_token_jti) " +
+					"UNION ALL SELECT <columns> FROM refresh_tokens " +
+					"WHERE refresh_tokens.user_id = 7 AND refresh_tokens.revoked = false " +
+					"AND refresh_tokens.expires_at > 2001-01-01T00:00:00Z AND refresh_tokens.client_id IS NOT NULL " +
+					"AND NOT EXISTS (SELECT 1 FROM refresh_token_family_revocations " +
+					"WHERE refresh_token_family_revocations.first_refresh_token_jti = refresh_tokens.first_refresh_token_jti)",
+			},
+		},
+		{
 			name: "GetRefreshTokensByClientId",
 			run: func(ctx context.Context, d *Database) (any, error) {
 				_, err := d.GetRefreshTokensByClientId(ctx, nil, grantClientId)

@@ -32,6 +32,7 @@ const accountResources = new Map([
 	['profile-picture', 'Profile picture'],
 	['otp', 'Two-factor authentication'],
 	['consents', 'Consents'],
+	['connected-clients', 'Connected clients'],
 	['legal-document-acceptances', 'Legal documents'],
 	['sessions', 'Sessions'],
 	['logout-request', 'Sign-out'],

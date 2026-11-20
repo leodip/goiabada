@@ -194,3 +194,22 @@ func TestBackchannelLogout_WithdrawingAConsentTellsASidRequiringClientOnNoValidS
 	time.Sleep(2 * time.Second)
 	assert.Empty(t, d.told.received())
 }
+
+// TestBackchannelLogout_DisconnectingAConnectedClientTellsIt: the user disconnects the client under
+// Account's connected clients, and the client is told as for a consent withdrawal, its consent
+// deleted with the rest.
+func TestBackchannelLogout_DisconnectingAConnectedClientTellsIt(t *testing.T) {
+	accessToken, user := getUserAccessTokenWithAccountScope(t)
+	d := newDisconnectedUser(t, user)
+
+	resp, requestId := sendAdminRequest(t, accessToken, http.MethodDelete,
+		"/api/v1/account/connected-clients/"+strconv.FormatInt(d.client.Id, 10), nil)
+	_ = resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	d.assertToldAboutTheUser(t, requestId)
+	d.assertSessionUntouched(t)
+	consent, err := database.GetUserConsentById(context.Background(), nil, d.consent.Id)
+	require.NoError(t, err)
+	assert.Nil(t, consent, "the client's consent is deleted")
+}

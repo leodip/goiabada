@@ -991,6 +991,11 @@ type Database interface {
 	// tokens that is unrevoked and unexpired at now, each once, through either linkage shape. It is
 	// the grants a user-wide end tells (#784 decision 3).
 	GetUsableRefreshTokenClientIdsByUserId(ctx context.Context, tx *sql.Tx, userId int64, now time.Time) ([]int64, error)
+	// GetLiveGrantsByUserId answers one row for each live refresh token the user holds, through
+	// either linkage shape, with its client and the scope it records: a token whose row is not
+	// revoked, whose expiry is set and after now, and whose rotation family has no revocation
+	// record. It is what the list of the user's connected clients reads (#135 decision 4).
+	GetLiveGrantsByUserId(ctx context.Context, tx *sql.Tx, userId int64, now time.Time) ([]record.LiveGrant, error)
 	// GetRefreshTokensByUserIdAndClientId returns every refresh token one user holds
 	// with one client, through either linkage shape: codes.user_id with codes.client_id
 	// for the authorization code flow, refresh_tokens.user_id with
