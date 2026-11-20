@@ -78,7 +78,7 @@ func HandleNewPost(
 		createReq := &api.CreateGroupRequest{
 			GroupIdentifier:      groupIdentifier,
 			Description:          description,
-			IncludeInIdToken:     includeInIdToken,
+			IncludeInIDToken:     includeInIdToken,
 			IncludeInAccessToken: includeInAccessToken,
 		}
 

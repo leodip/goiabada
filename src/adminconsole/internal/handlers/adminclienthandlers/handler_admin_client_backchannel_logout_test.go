@@ -97,7 +97,7 @@ func TestHandleBackchannelLogoutGet_BindsBothSettings(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			client := backchannelLogoutBind(t, &stubBackchannelLogoutAPI{client: &api.ClientResponse{
-				Id: 7, ClientIdentifier: "a-web-app", AuthorizationCodeEnabled: true,
+				ID: 7, ClientIdentifier: "a-web-app", AuthorizationCodeEnabled: true,
 				BackchannelLogoutURI: tc.uri, BackchannelLogoutSessionRequired: tc.sessionRequired}})
 
 			assert.Equal(t, tc.uri, client.FieldByName("BackchannelLogoutURI").String())
@@ -127,7 +127,7 @@ func TestHandleBackchannelLogoutGet_ResolvesTheSignInFlows(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			client := backchannelLogoutBind(t, &stubBackchannelLogoutAPI{
-				client: &api.ClientResponse{Id: 7, ClientIdentifier: "a-client", ClientCredentialsEnabled: true,
+				client: &api.ClientResponse{ID: 7, ClientIdentifier: "a-client", ClientCredentialsEnabled: true,
 					AuthorizationCodeEnabled: tc.authCode, ImplicitGrantEnabled: tc.clientImplicit},
 				settings: &api.SettingsGeneralResponse{ImplicitFlowEnabled: tc.globalImplicit},
 			})
@@ -164,7 +164,7 @@ func TestHandleBackchannelLogoutPost_SendsBothSettings(t *testing.T) {
 			wantURI: "https://app.example.com/bcl"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			apiClient := &stubBackchannelLogoutAPI{client: &api.ClientResponse{Id: 7, ClientIdentifier: "a-web-app",
+			apiClient := &stubBackchannelLogoutAPI{client: &api.ClientResponse{ID: 7, ClientIdentifier: "a-web-app",
 				AuthorizationCodeEnabled: true, BackchannelLogoutURI: "https://old.example.com/bcl", BackchannelLogoutSessionRequired: true}}
 			httpHelper := &stubHttpHelper{}
 
@@ -185,7 +185,7 @@ func TestHandleBackchannelLogoutPost_SendsBothSettings(t *testing.T) {
 
 // A field read from the query is no submission of this form, the URI included.
 func TestHandleBackchannelLogoutPost_ReadsTheURIFromTheBodyAlone(t *testing.T) {
-	apiClient := &stubBackchannelLogoutAPI{client: &api.ClientResponse{Id: 7, ClientIdentifier: "a-web-app", AuthorizationCodeEnabled: true}}
+	apiClient := &stubBackchannelLogoutAPI{client: &api.ClientResponse{ID: 7, ClientIdentifier: "a-web-app", AuthorizationCodeEnabled: true}}
 
 	postBackchannelLogout(t, apiClient, &stubHttpHelper{}, url.Values{}, "backchannelLogoutUri=https://evil.example.com/", manageGrant)
 
@@ -213,7 +213,7 @@ func TestHandleBackchannelLogoutPost_ARefusalMarksItsField(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			const refusal = "The auth server's sentence."
 			apiClient := &stubBackchannelLogoutAPI{
-				client:    &api.ClientResponse{Id: 7, ClientIdentifier: "a-web-app", AuthorizationCodeEnabled: true, BackchannelLogoutURI: "https://stored.example.com/bcl"},
+				client:    &api.ClientResponse{ID: 7, ClientIdentifier: "a-web-app", AuthorizationCodeEnabled: true, BackchannelLogoutURI: "https://stored.example.com/bcl"},
 				updateErr: &apiclient.APIError{Code: tc.code, Message: refusal, StatusCode: tc.status},
 			}
 			httpHelper := &stubHttpHelper{}
@@ -240,7 +240,7 @@ func TestHandleBackchannelLogoutPost_ARefusalMarksItsField(t *testing.T) {
 // administrators, or the 500 page another 403 gets.
 func TestHandleBackchannelLogoutPost_TheManageCeilingIsShownOnTheURI(t *testing.T) {
 	apiClient := &stubBackchannelLogoutAPI{
-		client: &api.ClientResponse{Id: 7, ClientIdentifier: "a-web-app", AuthorizationCodeEnabled: true},
+		client: &api.ClientResponse{ID: 7, ClientIdentifier: "a-web-app", AuthorizationCodeEnabled: true},
 		updateErr: &apiclient.APIError{Code: "MANAGE_SCOPE_REQUIRED", StatusCode: http.StatusForbidden,
 			Message: "Only a token with the authserver:manage scope may act on administrators or administrative permissions."},
 	}
@@ -261,7 +261,7 @@ func TestHandleBackchannelLogoutPost_TheManageCeilingIsShownOnTheURI(t *testing.
 // Any other 403 is not this ceiling, and is a server error as on every other tab.
 func TestHandleBackchannelLogoutPost_AnotherForbiddenIsAServerError(t *testing.T) {
 	apiClient := &stubBackchannelLogoutAPI{
-		client:    &api.ClientResponse{Id: 7, ClientIdentifier: "a-web-app", AuthorizationCodeEnabled: true},
+		client:    &api.ClientResponse{ID: 7, ClientIdentifier: "a-web-app", AuthorizationCodeEnabled: true},
 		updateErr: &apiclient.APIError{Code: "INSUFFICIENT_SCOPE", StatusCode: http.StatusForbidden, Message: "Insufficient scope."},
 	}
 	httpHelper := &stubHttpHelper{}

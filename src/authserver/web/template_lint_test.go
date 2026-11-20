@@ -25,14 +25,14 @@ func TestTemplates_NoHTMLInTitle(t *testing.T) {
 // that carried it left every one of them green, across the handler tests and the integration suite,
 // because both assert on the fields a page carries rather than on the absence of a stray one.
 func TestTemplates_NoCsrfField(t *testing.T) {
-	guard.AssertTemplatesNoCsrfField(t, templateFS, "template")
+	guard.AssertTemplatesNoCSRFField(t, templateFS, "template")
 }
 
 // TestTemplates_HtmlLangNotHardcoded guards the <html lang="en"> bug: page layouts must render the
 // lang attribute from the active locale, and the email layout from the language its text is written
 // in.
 func TestTemplates_HtmlLangNotHardcoded(t *testing.T) {
-	guard.AssertTemplatesHtmlLangNotHardcoded(t, templateFS, "template")
+	guard.AssertTemplatesHTMLLangNotHardcoded(t, templateFS, "template")
 }
 
 // TestTemplates_NewTabLinksSaySo holds every link on this server's pages that opens a new tab to

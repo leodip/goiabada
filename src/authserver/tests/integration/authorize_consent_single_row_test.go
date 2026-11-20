@@ -147,7 +147,7 @@ func consentsOf(t *testing.T, adminToken string, userId, clientId int64) []api.U
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&listed))
 	var forClient []api.UserConsentResponse
 	for _, consent := range listed.Consents {
-		if consent.ClientId == clientId {
+		if consent.ClientID == clientId {
 			forClient = append(forClient, consent)
 		}
 	}
@@ -180,7 +180,7 @@ func TestAuthorize_Consent_ASecondSaveReplacesTheConsentAndRefreshesItsDate(t *t
 
 	second := consentsOf(t, adminToken, f.user.Id, f.client.Id)
 	require.Len(t, second, 1, "the second save rewrote the consent, it did not add one")
-	assert.Equal(t, first[0].Id, second[0].Id, "the same row")
+	assert.Equal(t, first[0].ID, second[0].ID, "the same row")
 	assert.Equal(t, "openid profile", second[0].Scope, "the scope is what the second save ticked: the permission the user unticked is gone")
 	require.NotNil(t, second[0].GrantedAt)
 	assert.Truef(t, second[0].GrantedAt.After(*first[0].GrantedAt),

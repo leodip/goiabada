@@ -221,16 +221,16 @@ func callerSubject(r *http.Request) string {
 // The subject is reqctx.ValidatedSubject's, trimmed, which is the one the bearer middleware looked
 // the user up by and the per-subject rate limiter counted against, so a handler acts as the user
 // those two checked. Every handler takes it from here rather than reading the token's sub again.
-func accountCaller(w http.ResponseWriter, r *http.Request) (oauth.JwtToken, string, bool) {
+func accountCaller(w http.ResponseWriter, r *http.Request) (oauth.JWTToken, string, bool) {
 	jwtToken, ok := reqctx.ValidatedTokenFrom(r.Context())
 	if !ok {
 		writeInternalServerError(w, r, errs.New("an account API request reached its handler with no validated access token"))
-		return oauth.JwtToken{}, "", false
+		return oauth.JWTToken{}, "", false
 	}
 	subject, ok := reqctx.ValidatedSubject(r.Context())
 	if !ok {
 		writeInternalServerError(w, r, errs.New("an account API request reached its handler with a token whose subject is empty"))
-		return oauth.JwtToken{}, "", false
+		return oauth.JWTToken{}, "", false
 	}
 	return jwtToken, subject, true
 }

@@ -16,7 +16,7 @@ import (
 // connectedClientsBind is the user's Connected clients tab bind for user 7 with the clients named.
 func connectedClientsBind(clients []render.ConnectedClientInfo) map[string]interface{} {
 	return map[string]interface{}{
-		"user":    &api.UserResponse{Id: 7, Email: "someone@example.com"},
+		"user":    &api.UserResponse{ID: 7, Email: "someone@example.com"},
 		"clients": clients,
 		"page":    "1",
 		"query":   "",

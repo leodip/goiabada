@@ -780,7 +780,7 @@ func TestToken_ClientCred_ScopeSeparators(t *testing.T) {
 
 	// The claim as the client receives it, matched with production's own matcher.
 	claims := decodeJWTPayload(t, accessToken)
-	jwtToken := oauth.JwtToken{Claims: claims}
+	jwtToken := oauth.JWTToken{Claims: claims}
 	assert.True(t, jwtToken.HasScope(readScope),
 		"HasScope must match %q in claim %q", readScope, claims["scope"])
 	assert.True(t, jwtToken.HasScope(writeScope),

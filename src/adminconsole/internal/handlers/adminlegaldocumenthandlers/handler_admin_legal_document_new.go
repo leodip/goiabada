@@ -83,6 +83,6 @@ func HandleNewPost(
 			return
 		}
 
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/legal-documents/%v/draft", baseURL, created.LegalDocument.Id), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/legal-documents/%v/draft", baseURL, created.LegalDocument.ID), http.StatusFound)
 	}
 }

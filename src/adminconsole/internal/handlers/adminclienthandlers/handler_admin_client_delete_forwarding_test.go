@@ -33,7 +33,7 @@ func (c *deleteClientApiClient) GetClientPermissions(_ context.Context, accessTo
 	if c.err != nil {
 		return nil, nil, c.err
 	}
-	return &api.ClientResponse{Id: clientId}, nil, nil
+	return &api.ClientResponse{ID: clientId}, nil, nil
 }
 
 // The rest of the ports deleteClientApiClient is passed to, which no test here reaches.

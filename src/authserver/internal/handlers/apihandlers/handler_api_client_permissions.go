@@ -115,12 +115,12 @@ func HandleClientPermissionsPut(
 
 		// The set as the caller loaded it, required as it is on every list save: absent or null
 		// decodes to nil and is refused, [] means the caller read no grants (#428).
-		if request.ExpectedPermissionIds == nil {
+		if request.ExpectedPermissionIDs == nil {
 			writeJSONError(w, "expectedPermissionIds is required: send the permission ids as you last read them, or [] if there were none.", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
-		wanted := firstOccurrences(request.PermissionIds)
+		wanted := firstOccurrences(request.PermissionIDs)
 
 		// Enforce that client credentials flow must be enabled
 		if !client.ClientCredentialsEnabled {
@@ -144,7 +144,7 @@ func HandleClientPermissionsPut(
 		// The grant ceiling, after the request's 400 and 404 answers and before the transaction:
 		// only authserver:manage grants or revokes an administrative permission. What it read is
 		// what the save's administrative_permission_changed records are written from (#402).
-		administrative, allowed := grantCeilingAllows(w, r, database, auditLogger, targetKindClient, client.Id, wanted, request.ExpectedPermissionIds)
+		administrative, allowed := grantCeilingAllows(w, r, database, auditLogger, targetKindClient, client.Id, wanted, request.ExpectedPermissionIDs)
 		if !allowed {
 			return
 		}
@@ -176,7 +176,7 @@ func HandleClientPermissionsPut(
 			if loadErr != nil {
 				return errs.Wrap(loadErr, "database error loading client permissions before update")
 			}
-			if !sameSet(stored, grantKey, request.ExpectedPermissionIds) {
+			if !sameSet(stored, grantKey, request.ExpectedPermissionIDs) {
 				return errListChanged
 			}
 

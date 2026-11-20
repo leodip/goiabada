@@ -60,7 +60,7 @@ func TestAPIAccountConsentsGet_Success(t *testing.T) {
 	// Find our consent and assert fields
 	var found *api.UserConsentResponse
 	for i := range getResp.Consents {
-		if getResp.Consents[i].Id == consent.Id {
+		if getResp.Consents[i].ID == consent.Id {
 			found = &getResp.Consents[i]
 			break
 		}
@@ -68,8 +68,8 @@ func TestAPIAccountConsentsGet_Success(t *testing.T) {
 	if found == nil {
 		t.Fatalf("expected to find consent id %d in response", consent.Id)
 	}
-	assert.Equal(t, u.Id, found.UserId)
-	assert.Equal(t, client.Id, found.ClientId)
+	assert.Equal(t, u.Id, found.UserID)
+	assert.Equal(t, client.Id, found.ClientID)
 	assert.Equal(t, consent.Scope, found.Scope)
 	assert.Equal(t, client.ClientIdentifier, found.ClientIdentifier)
 	assert.Equal(t, client.ClientIdentifier, found.ClientName, "a client with no display name shown is named by its identifier")
@@ -119,7 +119,7 @@ func TestAPIAccountConsentsGet_NamesClientsAsTheConsentScreenDid(t *testing.T) {
 
 	got := map[string]api.UserConsentResponse{}
 	for _, c := range getResp.Consents {
-		if client, ok := consentIds[c.Id]; ok {
+		if client, ok := consentIds[c.ID]; ok {
 			got[client.ClientIdentifier] = c
 		}
 	}

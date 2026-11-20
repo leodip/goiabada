@@ -63,7 +63,7 @@ func TestHandleKeysRotatePost_ARefusalRedrawsThePageWithItsSentence(t *testing.T
 		httpHelper := handlersmocks.NewHttpHelper(t)
 		handlertest.RefuseInternalServerError(t, httpHelper)
 		handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_keys.html").Once()
-		keys := []api.SettingsSigningKeyResponse{{Id: 1, State: "current", KeyIdentifier: "key-1"}}
+		keys := []api.SettingsSigningKeyResponse{{ID: 1, State: "current", KeyIdentifier: "key-1"}}
 
 		req := handlertest.Request(http.MethodPost, "/admin/settings/keys/rotate", handlertest.WithAccessToken())
 		rec := httptest.NewRecorder()
@@ -168,7 +168,7 @@ func TestHandleKeysGet_RendersTheApiOrder(t *testing.T) {
 			apiKeys := make([]api.SettingsSigningKeyResponse, 0, len(tc.given))
 			for i, state := range tc.given {
 				apiKeys = append(apiKeys, api.SettingsSigningKeyResponse{
-					Id:            int64(i + 1),
+					ID:            int64(i + 1),
 					State:         state,
 					KeyIdentifier: "key-" + strconv.Itoa(i+1),
 					Type:          "RSA",

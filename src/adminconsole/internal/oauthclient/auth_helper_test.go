@@ -284,8 +284,8 @@ func TestIsAuthenticated(t *testing.T) {
 	}{
 		{"nothing", oauthclient.JwtInfo{}, false},
 		{"token strings but no verified id token",
-			oauthclient.JwtInfo{TokenResponse: oauth.TokenResponse{AccessToken: "a", IdToken: "i"}}, false},
-		{"a verified id token", oauthclient.JwtInfo{IdToken: &oauth.JwtToken{TokenBase64: "i"}}, true},
+			oauthclient.JwtInfo{TokenResponse: oauth.TokenResponse{AccessToken: "a", IDToken: "i"}}, false},
+		{"a verified id token", oauthclient.JwtInfo{IdToken: &oauth.JWTToken{TokenBase64: "i"}}, true},
 	}
 
 	helper := oauthclient.NewAuthHelper(nil, helperConsoleBase, helperAuthBase, reqctx.SafeModeFrom)
@@ -306,7 +306,7 @@ func TestIsAuthorizedToAccessResource(t *testing.T) {
 	withGrant := func(scope string) oauthclient.JwtInfo {
 		return oauthclient.JwtInfo{
 			TokenResponse: oauth.TokenResponse{AccessToken: "opaque", Scope: scope},
-			IdToken:       &oauth.JwtToken{TokenBase64: "i"},
+			IdToken:       &oauth.JWTToken{TokenBase64: "i"},
 		}
 	}
 

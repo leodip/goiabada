@@ -190,7 +190,7 @@ func TestValidateIdTokenHint_TypeOfToken(t *testing.T) {
 			}
 			tokenParser := handlersmocks.NewTokenParser(t)
 			tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "the-hint", false).
-				Return(&oauth.JwtToken{TokenBase64: "the-hint", Header: header, Claims: claims}, nil)
+				Return(&oauth.JWTToken{TokenBase64: "the-hint", Header: header, Claims: claims}, nil)
 
 			sub, err := validateIdTokenHint(context.Background(), "the-hint", tokenParser, settings)
 

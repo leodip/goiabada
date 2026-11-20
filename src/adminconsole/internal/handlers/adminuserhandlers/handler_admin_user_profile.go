@@ -177,7 +177,7 @@ func HandleProfilePost(
 			return
 		}
 
-		pagePath := fmt.Sprintf("/admin/users/%v/profile", user.Id)
+		pagePath := fmt.Sprintf("/admin/users/%v/profile", user.ID)
 		sess.SetFlash(pagePath, "savedSuccessfully", "true")
 		// An administrator who saved their own profile sees the page language the API stored on the
 		// next page, as a save in Account > Profile does; an edit of another user leaves the console's
@@ -199,7 +199,7 @@ func HandleProfilePost(
 
 // signedInSubject is the subject of the console's verified ID token, the signed-in user, or empty
 // when the session holds no ID token.
-func signedInSubject(idToken *oauth.JwtToken) string {
+func signedInSubject(idToken *oauth.JWTToken) string {
 	if idToken == nil {
 		return ""
 	}

@@ -121,7 +121,7 @@ func TestDisconnect_RevokesAGrantAndAConsentCommittedAfterItsFirstRead(t *testin
 	req := httptest.NewRequest(http.MethodDelete, "/api/v1/account/connected-clients/"+strconv.FormatInt(client.Id, 10), nil)
 	req.SetPathValue("clientId", strconv.FormatInt(client.Id, 10))
 	reqCtx := reqctx.WithSettings(req.Context(), &record.Settings{Id: 1, Issuer: "https://issuer.example"})
-	reqCtx = reqctx.WithValidatedToken(reqCtx, oauth.JwtToken{Claims: map[string]interface{}{
+	reqCtx = reqctx.WithValidatedToken(reqCtx, oauth.JWTToken{Claims: map[string]interface{}{
 		"sub": user.Subject, "scope": "authserver:manage-account", "auth_time": float64(1),
 	}})
 	audits := &countingAuditLogger{}

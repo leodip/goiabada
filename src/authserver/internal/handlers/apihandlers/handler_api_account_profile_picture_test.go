@@ -64,7 +64,7 @@ func createMultipartRequest(method, url string, fieldName string, fileData []byt
 
 // setTokenContext sets a JWT token in the request context
 func setTokenContext(req *http.Request, sub string) *http.Request {
-	jwtToken := oauth.JwtToken{
+	jwtToken := oauth.JWTToken{
 		Claims: map[string]interface{}{
 			"sub": sub,
 		},

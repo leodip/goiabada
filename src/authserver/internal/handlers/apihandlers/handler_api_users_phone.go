@@ -30,7 +30,7 @@ func HandlePhoneCountriesGet() http.HandlerFunc {
 		phoneCountryResponses := make([]api.PhoneCountryResponse, len(phoneCountries))
 		for i, pc := range phoneCountries {
 			phoneCountryResponses[i] = api.PhoneCountryResponse{
-				UniqueId:    pc.UniqueId,
+				UniqueID:    pc.UniqueID,
 				Alpha2:      pc.Alpha2,
 				Emoji:       pc.Emoji,
 				CallingCode: pc.CallingCode,
@@ -99,7 +99,7 @@ func HandleUserPhonePut(
 
 		// Validate phone data
 		input := &accountvalidation.ValidatePhoneInput{
-			PhoneCountryUniqueId: req.PhoneCountryUniqueId,
+			PhoneCountryUniqueId: req.PhoneCountryUniqueID,
 			PhoneNumber:          strings.TrimSpace(req.PhoneNumber),
 		}
 

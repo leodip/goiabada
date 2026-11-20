@@ -49,11 +49,11 @@ func TestHandleApplicationsGet_BindsEveryConnectedClient(t *testing.T) {
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_applications.html").Once()
 
 	apiClient := &accountApplicationsApiClient{clients: []api.ConnectedClientResponse{
-		{ClientId: 4, ClientIdentifier: "portal", ClientName: "Customer portal",
-			Consent:    &api.ConnectedClientConsentResponse{Id: 11, Scope: "openid email", GrantedAt: &grantedAt},
+		{ClientID: 4, ClientIdentifier: "portal", ClientName: "Customer portal",
+			Consent:    &api.ConnectedClientConsentResponse{ID: 11, Scope: "openid email", GrantedAt: &grantedAt},
 			GrantScope: "openid"},
-		{ClientId: 9, ClientIdentifier: "payroll", ClientName: "Payroll", GrantScope: "openid profile"},
-		{ClientId: 1, ClientIdentifier: "admin-console-client", ClientName: "Admin console", GrantScope: "openid",
+		{ClientID: 9, ClientIdentifier: "payroll", ClientName: "Payroll", GrantScope: "openid profile"},
+		{ClientID: 1, ClientIdentifier: "admin-console-client", ClientName: "Admin console", GrantScope: "openid",
 			IsCurrent: true},
 	}}
 

@@ -19,9 +19,9 @@ import (
 // footerLinks are a brand's three footer links as the public settings carry them, the first with a
 // label for pt-BR and German.
 var footerLinks = []api.BrandFooterLinkResponse{
-	{Url: "https://acme.example/privacy", Label: "Privacy", Labels: map[string]string{"pt-BR": "Privacidade", "de": "Datenschutz"}},
-	{Url: "https://status.acme.example/", Label: "Status", Labels: map[string]string{}},
-	{Url: "https://acme.example/", Label: "Acme", Labels: map[string]string{}},
+	{URL: "https://acme.example/privacy", Label: "Privacy", Labels: map[string]string{"pt-BR": "Privacidade", "de": "Datenschutz"}},
+	{URL: "https://status.acme.example/", Label: "Status", Labels: map[string]string{}},
+	{URL: "https://acme.example/", Label: "Acme", Labels: map[string]string{}},
 }
 
 // footerBrand is kitBrand with links and the contact given.
@@ -214,8 +214,8 @@ func TestRender_TheConsolesMailtoLinkEncodesTheAddress(t *testing.T) {
 // URL that is not one a page may link, which no write stores, is not linked.
 func TestRender_TheConsolesFooterEscapesEveryValue(t *testing.T) {
 	links := []api.BrandFooterLinkResponse{
-		{Url: "https://acme.example/terms?a=1&b=2", Label: `<b>Terms</b> & "more"`},
-		{Url: "javascript:alert(1)", Label: "Script"},
+		{URL: "https://acme.example/terms?a=1&b=2", Label: `<b>Terms</b> & "more"`},
+		{URL: "javascript:alert(1)", Label: "Script"},
 	}
 	brand := footerBrand(links, `<i>x</i>@acme.example`, "", "+1<script>")
 

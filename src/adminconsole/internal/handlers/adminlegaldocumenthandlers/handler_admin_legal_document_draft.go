@@ -78,7 +78,7 @@ func HandleDraftPost(
 			form.shortName = doc.ShortName
 		}
 
-		_, err := apiClient.SaveLegalDocumentDraft(r.Context(), token, doc.Id, request)
+		_, err := apiClient.SaveLegalDocumentDraft(r.Context(), token, doc.ID, request)
 		if err != nil {
 			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
 				renderDraft(httpHelper, w, r, detail, form, map[string]interface{}{
@@ -89,7 +89,7 @@ func HandleDraftPost(
 			return
 		}
 
-		pagePath := fmt.Sprintf("/admin/legal-documents/%v/draft", doc.Id)
+		pagePath := fmt.Sprintf("/admin/legal-documents/%v/draft", doc.ID)
 		if !setFlash(httpHelper, httpSession, w, r, pagePath, flashDraftSaved, "true") {
 			return
 		}
@@ -124,7 +124,7 @@ func HandlePublishPost(
 			return
 		}
 
-		published, err := apiClient.PublishLegalDocument(r.Context(), token, detail.LegalDocument.Id)
+		published, err := apiClient.PublishLegalDocument(r.Context(), token, detail.LegalDocument.ID)
 		if err != nil {
 			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
 				renderStoredDraft(httpHelper, w, r, apiClient, token, detail, map[string]interface{}{
@@ -135,7 +135,7 @@ func HandlePublishPost(
 			return
 		}
 
-		pagePath := fmt.Sprintf("/admin/legal-documents/%v/versions", detail.LegalDocument.Id)
+		pagePath := fmt.Sprintf("/admin/legal-documents/%v/versions", detail.LegalDocument.ID)
 		if !setFlash(httpHelper, httpSession, w, r, pagePath, flashPublished, strconv.Itoa(published.LegalDocument.CurrentVersion)) {
 			return
 		}

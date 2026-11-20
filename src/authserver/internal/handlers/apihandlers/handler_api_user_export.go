@@ -351,7 +351,7 @@ func (p *permissionResources) load(ctx context.Context, permissions []record.Per
 func writeUserExport(w http.ResponseWriter, r *http.Request, document api.UserExportResponse) (ok bool) {
 	var body bytes.Buffer
 	if err := json.NewEncoder(&body).Encode(document); err != nil {
-		writeInternalServerError(w, r, errs.Wrap(err, "unable to encode the user export"), "user_id", document.Identifiers.Id)
+		writeInternalServerError(w, r, errs.Wrap(err, "unable to encode the user export"), "user_id", document.Identifiers.ID)
 		return false
 	}
 
@@ -365,7 +365,7 @@ func writeUserExport(w http.ResponseWriter, r *http.Request, document api.UserEx
 			err = zw.Close()
 		}
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "unable to compress the user export"), "user_id", document.Identifiers.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "unable to compress the user export"), "user_id", document.Identifiers.ID)
 			return false
 		}
 		body = compressed
@@ -373,7 +373,7 @@ func writeUserExport(w http.ResponseWriter, r *http.Request, document api.UserEx
 	}
 
 	header.Set("Content-Type", "application/json")
-	header.Set("Content-Disposition", `attachment; filename="`+userexport.FileName(document.Identifiers.Id, document.ExportedAt)+`"`)
+	header.Set("Content-Disposition", `attachment; filename="`+userexport.FileName(document.Identifiers.ID, document.ExportedAt)+`"`)
 	header.Set("Content-Length", strconv.Itoa(body.Len()))
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(body.Bytes())

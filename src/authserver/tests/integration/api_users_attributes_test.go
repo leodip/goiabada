@@ -69,9 +69,9 @@ func TestAPIUserAttributesGet_Success(t *testing.T) {
 	deptAttr, exists := attrMap["department"]
 	assert.True(t, exists)
 	assert.Equal(t, "engineering", deptAttr.Value)
-	assert.True(t, deptAttr.IncludeInIdToken)
+	assert.True(t, deptAttr.IncludeInIDToken)
 	assert.False(t, deptAttr.IncludeInAccessToken)
-	assert.Equal(t, testUser.Id, deptAttr.UserId)
+	assert.Equal(t, testUser.Id, deptAttr.UserID)
 
 	roleAttr, exists := attrMap["role"]
 	assert.True(t, exists)
@@ -221,12 +221,12 @@ func TestAPIUserAttributeGet_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	// Assert: Should return the correct attribute
-	assert.Equal(t, attr.Id, getResponse.Attribute.Id)
+	assert.Equal(t, attr.Id, getResponse.Attribute.ID)
 	assert.Equal(t, "team", getResponse.Attribute.Key)
 	assert.Equal(t, "backend", getResponse.Attribute.Value)
-	assert.True(t, getResponse.Attribute.IncludeInIdToken)
+	assert.True(t, getResponse.Attribute.IncludeInIDToken)
 	assert.False(t, getResponse.Attribute.IncludeInAccessToken)
-	assert.Equal(t, testUser.Id, getResponse.Attribute.UserId)
+	assert.Equal(t, testUser.Id, getResponse.Attribute.UserID)
 }
 
 func TestAPIUserAttributeGet_NotFound(t *testing.T) {
@@ -324,9 +324,9 @@ func TestAPIUserAttributeCreatePost_Success(t *testing.T) {
 	createReq := api.CreateUserAttributeRequest{
 		Key:                  "location",
 		Value:                "San Francisco",
-		IncludeInIdToken:     true,
+		IncludeInIDToken:     true,
 		IncludeInAccessToken: true,
-		UserId:               testUser.Id,
+		UserID:               testUser.Id,
 	}
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-attributes"
@@ -345,20 +345,20 @@ func TestAPIUserAttributeCreatePost_Success(t *testing.T) {
 	// Assert: Response should match request
 	assert.Equal(t, createReq.Key, createResponse.Attribute.Key)
 	assert.Equal(t, createReq.Value, createResponse.Attribute.Value)
-	assert.Equal(t, createReq.IncludeInIdToken, createResponse.Attribute.IncludeInIdToken)
+	assert.Equal(t, createReq.IncludeInIDToken, createResponse.Attribute.IncludeInIDToken)
 	assert.Equal(t, createReq.IncludeInAccessToken, createResponse.Attribute.IncludeInAccessToken)
-	assert.Equal(t, createReq.UserId, createResponse.Attribute.UserId)
-	assert.Positive(t, createResponse.Attribute.Id)
+	assert.Equal(t, createReq.UserID, createResponse.Attribute.UserID)
+	assert.Positive(t, createResponse.Attribute.ID)
 
 	// Cleanup: Delete created attribute
 	defer func() {
-		if createResponse.Attribute.Id > 0 {
-			_ = database.DeleteUserAttribute(context.Background(), nil, createResponse.Attribute.Id)
+		if createResponse.Attribute.ID > 0 {
+			_ = database.DeleteUserAttribute(context.Background(), nil, createResponse.Attribute.ID)
 		}
 	}()
 
 	// Verify attribute was created in database
-	createdAttr, err := database.GetUserAttributeById(context.Background(), nil, createResponse.Attribute.Id)
+	createdAttr, err := database.GetUserAttributeById(context.Background(), nil, createResponse.Attribute.ID)
 	require.NoError(t, err)
 	assert.NotNil(t, createdAttr)
 	assert.Equal(t, createReq.Key, createdAttr.Key)
@@ -392,7 +392,7 @@ func TestAPIUserAttributeCreatePost_ValidationErrors(t *testing.T) {
 			"missing key",
 			api.CreateUserAttributeRequest{
 				Value:  "test",
-				UserId: testUser.Id,
+				UserID: testUser.Id,
 			},
 			http.StatusBadRequest,
 		},
@@ -401,7 +401,7 @@ func TestAPIUserAttributeCreatePost_ValidationErrors(t *testing.T) {
 			api.CreateUserAttributeRequest{
 				Key:    "",
 				Value:  "test",
-				UserId: testUser.Id,
+				UserID: testUser.Id,
 			},
 			http.StatusBadRequest,
 		},
@@ -410,7 +410,7 @@ func TestAPIUserAttributeCreatePost_ValidationErrors(t *testing.T) {
 			api.CreateUserAttributeRequest{
 				Key:    "test_key",
 				Value:  string(make([]byte, 251)), // 251 characters, exceeds 250 limit
-				UserId: testUser.Id,
+				UserID: testUser.Id,
 			},
 			http.StatusBadRequest,
 		},
@@ -419,7 +419,7 @@ func TestAPIUserAttributeCreatePost_ValidationErrors(t *testing.T) {
 			api.CreateUserAttributeRequest{
 				Key:    "invalid key with spaces",
 				Value:  "test",
-				UserId: testUser.Id,
+				UserID: testUser.Id,
 			},
 			http.StatusBadRequest,
 		},
@@ -428,7 +428,7 @@ func TestAPIUserAttributeCreatePost_ValidationErrors(t *testing.T) {
 			api.CreateUserAttributeRequest{
 				Key:    "valid_key",
 				Value:  "test",
-				UserId: 99999,
+				UserID: 99999,
 			},
 			http.StatusNotFound,
 		},
@@ -509,7 +509,7 @@ func TestAPIUserAttributeUpdatePut_Success(t *testing.T) {
 	updateReq := api.UpdateUserAttributeRequest{
 		Key:                  "status",
 		Value:                "inactive",
-		IncludeInIdToken:     false,
+		IncludeInIDToken:     false,
 		IncludeInAccessToken: true,
 	}
 
@@ -527,10 +527,10 @@ func TestAPIUserAttributeUpdatePut_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	// Assert: Response should reflect updates
-	assert.Equal(t, attr.Id, updateResponse.Attribute.Id)
+	assert.Equal(t, attr.Id, updateResponse.Attribute.ID)
 	assert.Equal(t, updateReq.Key, updateResponse.Attribute.Key)
 	assert.Equal(t, updateReq.Value, updateResponse.Attribute.Value)
-	assert.Equal(t, updateReq.IncludeInIdToken, updateResponse.Attribute.IncludeInIdToken)
+	assert.Equal(t, updateReq.IncludeInIDToken, updateResponse.Attribute.IncludeInIDToken)
 	assert.Equal(t, updateReq.IncludeInAccessToken, updateResponse.Attribute.IncludeInAccessToken)
 
 	// Verify changes were persisted to database
@@ -539,7 +539,7 @@ func TestAPIUserAttributeUpdatePut_Success(t *testing.T) {
 	assert.NotNil(t, updatedAttr)
 	assert.Equal(t, updateReq.Key, updatedAttr.Key)
 	assert.Equal(t, updateReq.Value, updatedAttr.Value)
-	assert.Equal(t, updateReq.IncludeInIdToken, updatedAttr.IncludeInIdToken)
+	assert.Equal(t, updateReq.IncludeInIDToken, updatedAttr.IncludeInIdToken)
 	assert.Equal(t, updateReq.IncludeInAccessToken, updatedAttr.IncludeInAccessToken)
 }
 
@@ -897,7 +897,7 @@ func TestAPIUserAttribute_AngleBracketsRejected(t *testing.T) {
 		resp := makeAPIRequest(t, "POST", base, accessToken, api.CreateUserAttributeRequest{
 			Key:    "location",
 			Value:  "<b>San Francisco</b>",
-			UserId: testUser.Id,
+			UserID: testUser.Id,
 		})
 		defer func() { _ = resp.Body.Close() }()
 
@@ -943,7 +943,7 @@ func TestAPIUserAttribute_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 
 	value := `  Tom & Jerry said "hi"  `
 	resp := makeAPIRequest(t, "POST", appConfig.AuthServer.BaseURL+"/api/v1/admin/user-attributes",
-		accessToken, api.CreateUserAttributeRequest{Key: "motto", Value: value, UserId: testUser.Id})
+		accessToken, api.CreateUserAttributeRequest{Key: "motto", Value: value, UserID: testUser.Id})
 	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusCreated, resp.StatusCode)
@@ -953,14 +953,14 @@ func TestAPIUserAttribute_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, value, createResponse.Attribute.Value)
 
-	stored, err := database.GetUserAttributeById(context.Background(), nil, createResponse.Attribute.Id)
+	stored, err := database.GetUserAttributeById(context.Background(), nil, createResponse.Attribute.ID)
 	require.NoError(t, err)
 	assert.Equal(t, value, stored.Value)
-	defer func() { _ = database.DeleteUserAttribute(context.Background(), nil, createResponse.Attribute.Id) }()
+	defer func() { _ = database.DeleteUserAttribute(context.Background(), nil, createResponse.Attribute.ID) }()
 
 	updated := `  AT&T said "again"  `
 	updateResp := makeAPIRequest(t, "PUT", appConfig.AuthServer.BaseURL+"/api/v1/admin/user-attributes/"+
-		strconv.FormatInt(createResponse.Attribute.Id, 10), accessToken,
+		strconv.FormatInt(createResponse.Attribute.ID, 10), accessToken,
 		api.UpdateUserAttributeRequest{Key: "motto", Value: updated})
 	defer func() { _ = updateResp.Body.Close() }()
 
@@ -971,7 +971,7 @@ func TestAPIUserAttribute_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, updated, updateResponse.Attribute.Value)
 
-	stored, err = database.GetUserAttributeById(context.Background(), nil, createResponse.Attribute.Id)
+	stored, err = database.GetUserAttributeById(context.Background(), nil, createResponse.Attribute.ID)
 	require.NoError(t, err)
 	assert.Equal(t, updated, stored.Value)
 }

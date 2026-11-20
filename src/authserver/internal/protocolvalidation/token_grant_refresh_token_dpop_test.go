@@ -149,7 +149,7 @@ func TestValidateTokenRequest_RefreshGrant_ABoundTokenNeedsAProofByItsKey(t *tes
 						mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, clientIdentifier).
 							Return(clients[clientIdentifier], nil).Once()
 						mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "the_refresh_token", true).
-							Return(&oauth.JwtToken{Claims: jwt.MapClaims{"jti": "the_jti", "typ": "Refresh"}}, nil).Maybe()
+							Return(&oauth.JWTToken{Claims: jwt.MapClaims{"jti": "the_jti", "typ": "Refresh"}}, nil).Maybe()
 						mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "the_jti").Return(refreshToken, nil).Maybe()
 						if ropc {
 							mockDB.On("RefreshTokenLoadUser", mock.Anything, mock.Anything, refreshToken).Return(nil).Maybe()

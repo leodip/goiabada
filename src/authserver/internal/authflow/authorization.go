@@ -97,7 +97,7 @@ type authorizeRequestValidator interface {
 
 // idTokenHintParser verifies an id_token_hint's signature. *signingkeys.TokenParser satisfies it.
 type idTokenHintParser interface {
-	DecodeAndValidateTokenString(ctx context.Context, token string, withExpirationCheck bool) (*oauth.JwtToken, error)
+	DecodeAndValidateTokenString(ctx context.Context, token string, withExpirationCheck bool) (*oauth.JWTToken, error)
 }
 
 // redirectEmission answers whether an error response to this client, at this redirect URI, would

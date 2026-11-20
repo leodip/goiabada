@@ -123,7 +123,7 @@ func serveUserWrite(ctx context.Context, handler http.HandlerFunc, method, targe
 	}
 	ctx = reqctx.WithSettings(req.Context(), &record.Settings{Id: 1, AccountDeletionEnabled: true,
 		UserSessionIdleTimeoutInSeconds: 3600, UserSessionMaxLifetimeInSeconds: 86400})
-	ctx = reqctx.WithValidatedToken(ctx, oauth.JwtToken{Claims: map[string]interface{}{
+	ctx = reqctx.WithValidatedToken(ctx, oauth.JWTToken{Claims: map[string]interface{}{
 		"sub": sub, "scope": scope, "auth_time": float64(1),
 	}})
 	rr := httptest.NewRecorder()

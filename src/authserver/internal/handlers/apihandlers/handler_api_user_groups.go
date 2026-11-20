@@ -131,21 +131,21 @@ func HandleUserGroupsPut(
 
 		// Refused on the body alone, before any query: the ids are not read one at a time, so the
 		// cost of an oversized array is paid by the validation below rather than by the caller.
-		if len(request.GroupIds) > maxGroupIdsPerRequest {
+		if len(request.GroupIDs) > maxGroupIdsPerRequest {
 			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeUserGroupsTooMany, nil))
 			return
 		}
 
 		// The set as the caller loaded it, required as it is on every list save: absent or null
 		// decodes to nil and is refused, [] means the caller read no memberships (#428).
-		if request.ExpectedGroupIds == nil {
+		if request.ExpectedGroupIDs == nil {
 			writeJSONError(w, "expectedGroupIds is required: send the group ids as you last read them, or [] if there were none.", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
 		// Deduplicated as the three permission saves are. A repeated id was answered as a group
 		// that does not exist, since the lookup below returns each group once (#428).
-		wanted := firstOccurrences(request.GroupIds)
+		wanted := firstOccurrences(request.GroupIDs)
 
 		user, err := database.GetUserById(r.Context(), nil, id)
 		if err != nil {
@@ -174,7 +174,7 @@ func HandleUserGroupsPut(
 		// The grant ceiling, after the request's 400 and 404 answers and before the transaction:
 		// only authserver:manage moves a user into or out of a group holding an administrative
 		// permission (#402).
-		if !userGroupsCeilingAllows(w, r, database, auditLogger, user.Id, wanted, request.ExpectedGroupIds) {
+		if !userGroupsCeilingAllows(w, r, database, auditLogger, user.Id, wanted, request.ExpectedGroupIDs) {
 			return
 		}
 
@@ -216,7 +216,7 @@ func HandleUserGroupsPut(
 			if loadErr != nil {
 				return errs.Wrap(loadErr, "database error loading user groups before update")
 			}
-			if !sameSet(stored, membershipKey, request.ExpectedGroupIds) {
+			if !sameSet(stored, membershipKey, request.ExpectedGroupIDs) {
 				return errListChanged
 			}
 

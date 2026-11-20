@@ -123,12 +123,12 @@ func HandleResourcePermissionsPut(
 		seenIds := map[int64]bool{}
 		for i := range req.Permissions {
 			// Reject duplicate IDs (prevents bypass of built-in permission protection)
-			if req.Permissions[i].Id > 0 {
-				if seenIds[req.Permissions[i].Id] {
-					writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodePermissionDuplicateIds, nil))
+			if req.Permissions[i].ID > 0 {
+				if seenIds[req.Permissions[i].ID] {
+					writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodePermissionDuplicateIDs, nil))
 					return
 				}
-				seenIds[req.Permissions[i].Id] = true
+				seenIds[req.Permissions[i].ID] = true
 			}
 
 			// Trim inputs
@@ -137,7 +137,7 @@ func HandleResourcePermissionsPut(
 
 			// Explicitly forbid HTML angle brackets in description
 			if validateNoAngleBracketsErr := accountvalidation.ValidateNoAngleBrackets(rawDescription,
-				i18n.ErrCodeAdminResourcePermissionsDescriptionHtmlNotAllowed); validateNoAngleBracketsErr != nil {
+				i18n.ErrCodeAdminResourcePermissionsDescriptionHTMLNotAllowed); validateNoAngleBracketsErr != nil {
 				writeValidationError(w, r, validateNoAngleBracketsErr)
 				return
 			}
@@ -204,7 +204,7 @@ func HandleResourcePermissionsPut(
 				// The request must include an entry with the same DB row ID
 				var requestEntry *api.ResourcePermissionUpsert
 				for i := range req.Permissions {
-					if req.Permissions[i].Id == existingPerm.Id {
+					if req.Permissions[i].ID == existingPerm.Id {
 						requestEntry = &req.Permissions[i]
 						break
 					}
@@ -233,13 +233,13 @@ func HandleResourcePermissionsPut(
 		// clear of the unique index on (permission_identifier, resource_id) for the rows as read
 		// here, so the index is met only by another save racing this one, and answered 409 (#428).
 		for _, p := range req.Permissions {
-			if p.Id > 0 {
-				if _, ok := existingById[p.Id]; !ok {
+			if p.ID > 0 {
+				if _, ok := existingById[p.ID]; !ok {
 					writeJSONError(w, "Permission not found", "NOT_FOUND", http.StatusNotFound)
 					return
 				}
 			}
-			if other, exists := existingByIdentifier[p.PermissionIdentifier]; exists && other.Id != p.Id {
+			if other, exists := existingByIdentifier[p.PermissionIdentifier]; exists && other.Id != p.ID {
 				writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodePermissionIdentifierInUse, map[string]any{"identifier": p.PermissionIdentifier}))
 				return
 			}
@@ -273,16 +273,16 @@ func HandleResourcePermissionsPut(
 			}
 			named := make(map[int64]bool, len(req.Permissions))
 			for _, p := range req.Permissions {
-				if p.Id <= 0 {
+				if p.ID <= 0 {
 					continue
 				}
-				if _, ok := storedById[p.Id]; !ok {
+				if _, ok := storedById[p.ID]; !ok {
 					// Validated against the rows read before the transaction and gone from this
 					// read, with the loaded list still matching it: the list changed and changed
 					// back between the two reads.
 					return errListChanged
 				}
-				named[p.Id] = true
+				named[p.ID] = true
 			}
 
 			// A stored row the request does not name is dropped: its identifier cannot be wanted,
@@ -296,10 +296,10 @@ func HandleResourcePermissionsPut(
 				}
 			}
 			for _, p := range req.Permissions {
-				if p.Id <= 0 {
+				if p.ID <= 0 {
 					continue
 				}
-				cur := storedById[p.Id]
+				cur := storedById[p.ID]
 				if cur.PermissionIdentifier == p.PermissionIdentifier && cur.Description == p.Description {
 					continue
 				}
@@ -310,7 +310,7 @@ func HandleResourcePermissionsPut(
 				}
 			}
 			for _, p := range req.Permissions {
-				if p.Id > 0 {
+				if p.ID > 0 {
 					continue
 				}
 				if createErr := database.CreatePermission(r.Context(), tx, &record.Permission{
@@ -346,7 +346,7 @@ func HandleResourcePermissionsPut(
 // permission does. The caller's entries are compared as sent: it echoes what it read, and stored
 // values were trimmed when they were written (#428).
 func permissionEntryOf(p record.Permission) api.ResourcePermissionUpsert {
-	return api.ResourcePermissionUpsert{Id: p.Id, PermissionIdentifier: p.PermissionIdentifier, Description: p.Description}
+	return api.ResourcePermissionUpsert{ID: p.Id, PermissionIdentifier: p.PermissionIdentifier, Description: p.Description}
 }
 
 // Note: The previous validation endpoint [/resources/validate-permission] was removed.

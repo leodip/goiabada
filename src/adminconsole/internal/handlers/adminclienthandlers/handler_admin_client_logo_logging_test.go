@@ -25,7 +25,7 @@ type logoApiClient struct {
 }
 
 func (c *logoApiClient) GetClientById(_ context.Context, accessToken string, clientId int64) (*api.ClientResponse, error) {
-	return &api.ClientResponse{Id: clientId, ClientIdentifier: "an-client"}, nil
+	return &api.ClientResponse{ID: clientId, ClientIdentifier: "an-client"}, nil
 }
 
 func (c *logoApiClient) GetClientLogo(_ context.Context, accessToken string, clientId int64) (*api.ClientLogoInfoResponse, error) {

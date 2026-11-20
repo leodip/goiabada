@@ -86,7 +86,7 @@ var tarEntries = []string{versionEntry, iso3166Entry, zone1970Entry}
 // not import the package it writes into).
 type zone struct {
 	CountryCode string
-	Zone        string
+	Name        string
 	CountryName string
 	Comments    string
 }
@@ -301,7 +301,7 @@ func parseZone1970(data []byte, countries map[string]string) ([]zone, error) {
 				return errs.Errorf("%s line %d: %s %s is listed twice", zone1970Entry, n, code, zoneID)
 			}
 			seen[key] = true
-			zones = append(zones, zone{CountryCode: code, Zone: zoneID, CountryName: name, Comments: comments})
+			zones = append(zones, zone{CountryCode: code, Name: zoneID, CountryName: name, Comments: comments})
 		}
 		return nil
 	})
@@ -340,8 +340,8 @@ func sortZones(zones []zone) {
 		if a.CountryName != b.CountryName {
 			return a.CountryName < b.CountryName
 		}
-		if a.Zone != b.Zone {
-			return a.Zone < b.Zone
+		if a.Name != b.Name {
+			return a.Name < b.Name
 		}
 		return a.CountryCode < b.CountryCode
 	})
@@ -374,8 +374,8 @@ var zones = []Zone{
 `, prov.SourceURL, prov.Release, prov.TarballSHA256)
 
 	for _, z := range zones {
-		fmt.Fprintf(&sb, "\t{CountryCode: %q, Zone: %q, CountryName: %q, Comments: %q},\n",
-			z.CountryCode, z.Zone, z.CountryName, z.Comments)
+		fmt.Fprintf(&sb, "\t{CountryCode: %q, Name: %q, CountryName: %q, Comments: %q},\n",
+			z.CountryCode, z.Name, z.CountryName, z.Comments)
 	}
 	sb.WriteString("}\n")
 

@@ -74,25 +74,25 @@ func TestAPIUserConsentsGet_Success(t *testing.T) {
 	// Create a map for easier assertion
 	consentMap := make(map[int64]api.UserConsentResponse)
 	for _, consent := range getResponse.Consents {
-		consentMap[consent.Id] = consent
+		consentMap[consent.ID] = consent
 	}
 
 	// Verify both consents are present
 	c1, exists := consentMap[consent1.Id]
 	assert.True(t, exists)
 	assert.Equal(t, consent1.Scope, c1.Scope)
-	assert.Equal(t, client1.Id, c1.ClientId)
+	assert.Equal(t, client1.Id, c1.ClientID)
 	assert.Equal(t, client1.ClientIdentifier, c1.ClientIdentifier)
 	assert.Equal(t, client1.Description, c1.ClientDescription)
-	assert.Equal(t, testUser.Id, c1.UserId)
+	assert.Equal(t, testUser.Id, c1.UserID)
 
 	c2, exists := consentMap[consent2.Id]
 	assert.True(t, exists)
 	assert.Equal(t, consent2.Scope, c2.Scope)
-	assert.Equal(t, client2.Id, c2.ClientId)
+	assert.Equal(t, client2.Id, c2.ClientID)
 	assert.Equal(t, client2.ClientIdentifier, c2.ClientIdentifier)
 	assert.Equal(t, client2.Description, c2.ClientDescription)
-	assert.Equal(t, testUser.Id, c2.UserId)
+	assert.Equal(t, testUser.Id, c2.UserID)
 }
 
 func TestAPIUserConsentsGet_EmptyConsents(t *testing.T) {
@@ -426,7 +426,7 @@ func TestAPIUserConsentDelete_WithClientDetails(t *testing.T) {
 
 	assert.Len(t, getResponse.Consents, 1)
 	retrievedConsent := getResponse.Consents[0]
-	assert.Equal(t, consent.Id, retrievedConsent.Id)
+	assert.Equal(t, consent.Id, retrievedConsent.ID)
 	assert.Equal(t, client.ClientIdentifier, retrievedConsent.ClientIdentifier)
 	assert.Equal(t, client.Description, retrievedConsent.ClientDescription)
 	assert.Equal(t, "openid profile email address phone", retrievedConsent.Scope)

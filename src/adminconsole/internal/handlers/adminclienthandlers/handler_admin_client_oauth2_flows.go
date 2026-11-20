@@ -77,7 +77,7 @@ func HandleOAuth2FlowsGet(
 			ResourceOwnerPasswordCredentialsEnabled       *bool
 			GlobalResourceOwnerPasswordCredentialsEnabled bool
 		}{
-			ClientId:                                client.Id,
+			ClientId:                                client.ID,
 			ClientIdentifier:                        client.ClientIdentifier,
 			IsPublic:                                client.IsPublic,
 			AuthorizationCodeEnabled:                client.AuthorizationCodeEnabled,
@@ -220,7 +220,7 @@ func HandleOAuth2FlowsPost(
 			ImplicitGrantEnabled:                    implicitGrantEnabled,
 			ResourceOwnerPasswordCredentialsEnabled: ropcEnabled,
 		}
-		_, err = apiClient.UpdateClientOAuth2Flows(r.Context(), jwtInfo.TokenResponse.AccessToken, client.Id, req)
+		_, err = apiClient.UpdateClientOAuth2Flows(r.Context(), jwtInfo.TokenResponse.AccessToken, client.ID, req)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -232,7 +232,7 @@ func HandleOAuth2FlowsPost(
 			return
 		}
 
-		pagePath := fmt.Sprintf("/admin/clients/%v/oauth2-flows", client.Id)
+		pagePath := fmt.Sprintf("/admin/clients/%v/oauth2-flows", client.ID)
 		sess.SetFlash(pagePath, "savedSuccessfully", "true")
 		err = httpSession.Save(r, w, sess)
 		if err != nil {

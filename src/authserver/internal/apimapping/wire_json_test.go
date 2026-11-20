@@ -408,7 +408,7 @@ func TestWireJSON_UserSessionFamily(t *testing.T) {
 			// leaves either nil. Kept so the difference between the two is visible here rather
 			// than asserted only in the mapper's own table.
 			name:  "UserSessionDetailResponse, a nil client list is null",
-			value: api.UserSessionDetailResponse{UserSessionResponse: api.UserSessionResponse{Id: 21, UserId: 7}},
+			value: api.UserSessionDetailResponse{UserSessionResponse: api.UserSessionResponse{ID: 21, UserID: 7}},
 			literal: `{"id":21,"createdAt":null,"updatedAt":null,"sessionIdentifier":"","started":null,` +
 				`"lastAccessed":null,"authMethods":"","acrLevel":"","authTime":null,"ipAddress":"",` +
 				`"deviceName":"","deviceType":"","deviceOS":"","userAgent":"","userId":7,` +
@@ -771,9 +771,9 @@ func TestWireJSON_ClientSessionsEnvelope(t *testing.T) {
 func TestWireJSON_AuditLogFamily(t *testing.T) {
 	aboutUser, actingUser := int64(42), int64(7)
 	entry := api.AuditLogResponse{
-		Id: 1, CreatedAt: wireCreated, AuditEvent: "user_login",
-		Details: `{"email":"alice@example.com"}`, RequestId: "host/Ppg6bHPK5f-000012",
-		UserId: &aboutUser, LoggedInUserId: &actingUser,
+		ID: 1, CreatedAt: wireCreated, AuditEvent: "user_login",
+		Details: `{"email":"alice@example.com"}`, RequestID: "host/Ppg6bHPK5f-000012",
+		UserID: &aboutUser, LoggedInUserID: &actingUser,
 	}
 	entryJSON := `{"id":1,"createdAt":"2026-09-16T10:00:00Z","auditEvent":"user_login",` +
 		`"details":"{\"email\":\"alice@example.com\"}","requestId":"host/Ppg6bHPK5f-000012",` +
@@ -791,7 +791,7 @@ func TestWireJSON_AuditLogFamily(t *testing.T) {
 			// A sub-second instant keeps its precision, where the format it replaced dropped it.
 			name: "AuditLogResponse, sub-second precision survives",
 			value: api.AuditLogResponse{
-				Id: 2, CreatedAt: wireCreated.Add(1500 * time.Millisecond), AuditEvent: "user_login",
+				ID: 2, CreatedAt: wireCreated.Add(1500 * time.Millisecond), AuditEvent: "user_login",
 			},
 			literal: `{"id":2,"createdAt":"2026-09-16T10:00:01.5Z","auditEvent":"user_login",` +
 				`"details":"","requestId":"","userId":null,"loggedInUserId":null}`,

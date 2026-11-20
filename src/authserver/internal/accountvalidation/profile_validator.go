@@ -340,7 +340,7 @@ func (val *ProfileValidator) ValidateProfile(ctx context.Context, input *Validat
 	// option, and the next save of that page erases the user's zone. So a zone requires the name
 	// of a country it is listed under, compared exactly, and no zone requires no name (#432).
 	if input.ZoneInfo != "" {
-		rows := timezones.ByZone(input.ZoneInfo)
+		rows := timezones.ByName(input.ZoneInfo)
 		if !slices.ContainsFunc(rows, func(z timezones.Zone) bool { return z.CountryName == input.ZoneInfoCountryName }) {
 			return i18n.NewLocalizedError(i18n.ErrCodeProfileZoneInfoInvalid, nil)
 		}

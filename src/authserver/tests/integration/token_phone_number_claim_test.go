@@ -50,7 +50,7 @@ func TestToken_PhoneNumber_IsE164AfterAnAdminAPISave(t *testing.T) {
 			adminToken, _ := createAdminClientWithToken(t)
 			phoneURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(code.UserId, 10) + "/phone"
 			saveResp := makeAPIRequest(t, "PUT", phoneURL, adminToken, api.UpdateUserPhoneRequest{
-				PhoneCountryUniqueId: "PRT_0",
+				PhoneCountryUniqueID: "PRT_0",
 				PhoneNumber:          test.number,
 				PhoneNumberVerified:  true,
 			})

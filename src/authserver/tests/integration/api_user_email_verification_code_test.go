@@ -46,7 +46,7 @@ func TestAPIUserEmailVerificationCodePost_Success(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEmpty(t, body.VerificationCode)
 	assert.NotNil(t, body.VerificationCodeExpiresAt)
-	assert.Equal(t, user.Id, body.UserId)
+	assert.Equal(t, user.Id, body.UserID)
 	assert.Equal(t, user.Email, body.Email)
 	// Issued during the request, and good for five minutes.
 	assert.WithinRange(t, *body.VerificationCodeExpiresAt, before.Add(5*time.Minute), after.Add(5*time.Minute))
@@ -92,7 +92,7 @@ func TestAPIUserEmailVerificationCodePost_VerifiedUser(t *testing.T) {
 	err := json.NewDecoder(resp.Body).Decode(&body)
 	require.NoError(t, err)
 	assert.NotEmpty(t, body.VerificationCode)
-	assert.Equal(t, user.Id, body.UserId)
+	assert.Equal(t, user.Id, body.UserID)
 	assert.Equal(t, user.Email, body.Email)
 
 	updatedUser, err := database.GetUserById(context.Background(), nil, user.Id)

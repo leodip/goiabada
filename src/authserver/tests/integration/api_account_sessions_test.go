@@ -60,7 +60,7 @@ func TestAPIAccountSessionsGet_Success_IncludesIsCurrent(t *testing.T) {
 
 	foundCurrent := false
 	for _, s := range out.Sessions {
-		assert.Positive(t, s.Id)
+		assert.Positive(t, s.ID)
 		assert.NotEmpty(t, s.SessionIdentifier)
 		require.NotNil(t, s.Started)
 		require.NotNil(t, s.LastAccessed)

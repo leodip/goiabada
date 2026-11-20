@@ -135,7 +135,7 @@ func TestAPISettingsSections_ConcurrentSavesOfDifferentSectionsAllSurvive(t *tes
 				RefreshTokenOfflineIdleTimeoutInSeconds: start.RefreshTokenOfflineIdleTimeoutInSeconds,
 				RefreshTokenOfflineMaxLifetimeInSeconds: start.RefreshTokenOfflineMaxLifetimeInSeconds,
 				IncludeOpenIDConnectClaimsInAccessToken: start.IncludeOpenIDConnectClaimsInAccessToken,
-				IncludeOpenIDConnectClaimsInIdToken:     start.IncludeOpenIDConnectClaimsInIdToken,
+				IncludeOpenIDConnectClaimsInIDToken:     start.IncludeOpenIDConnectClaimsInIdToken,
 			}},
 			{section: "audit logs", route: "/api/v1/admin/settings/audit-logs", body: api.UpdateSettingsAuditLogsRequest{
 				AuditLogsInConsoleEnabled:  start.AuditLogsInConsoleEnabled,

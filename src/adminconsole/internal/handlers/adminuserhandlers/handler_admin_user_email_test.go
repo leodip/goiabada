@@ -26,7 +26,7 @@ type userEmailApiClient struct {
 }
 
 func (c *userEmailApiClient) GetUserById(_ context.Context, accessToken string, userId int64) (*api.UserResponse, error) {
-	return &api.UserResponse{Id: userId, Email: "before@example.com"}, nil
+	return &api.UserResponse{ID: userId, Email: "before@example.com"}, nil
 }
 
 func (c *userEmailApiClient) UpdateUserEmail(_ context.Context, accessToken string, userId int64,

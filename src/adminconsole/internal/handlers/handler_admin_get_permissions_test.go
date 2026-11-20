@@ -149,7 +149,7 @@ func TestAdminGetPermissions_AMissingResourceStillAnswers404(t *testing.T) {
 // belongs to GetPermissionsResult, a console-local view type rather than part of the auth server's
 // contract, and both halves are asserted here so neither can drift unnoticed.
 func TestAdminGetPermissions_ReturnsThePermissions(t *testing.T) {
-	client := &permissionsByResourceClient{permissions: []api.PermissionResponse{{Id: 3, PermissionIdentifier: "read"}}}
+	client := &permissionsByResourceClient{permissions: []api.PermissionResponse{{ID: 3, PermissionIdentifier: "read"}}}
 
 	recorder, errorLines := permissionRecords(t, client, "resourceId=7")
 
@@ -165,7 +165,7 @@ func TestAdminGetPermissions_ReturnsThePermissions(t *testing.T) {
 // assertion: the compiler accepts context.Background() where r.Context() belongs, so nothing else
 // in the tree can see a handler that stopped carrying the request's cancellation outward.
 func TestAdminGetPermissions_TheCallCarriesTheRequestsContext(t *testing.T) {
-	client := &permissionsByResourceClient{permissions: []api.PermissionResponse{{Id: 8}}}
+	client := &permissionsByResourceClient{permissions: []api.PermissionResponse{{ID: 8}}}
 
 	recorder, _ := permissionRecords(t, client, "resourceId=7")
 

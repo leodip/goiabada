@@ -30,7 +30,7 @@ func TestAPIGroupUpdatePut_Success(t *testing.T) {
 	updateReq := api.UpdateGroupRequest{
 		GroupIdentifier:      "updated-group-" + fake.LetterN(6),
 		Description:          "Updated group description",
-		IncludeInIdToken:     false,
+		IncludeInIDToken:     false,
 		IncludeInAccessToken: true,
 	}
 
@@ -48,10 +48,10 @@ func TestAPIGroupUpdatePut_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	// Assert: Response should reflect updates
-	assert.Equal(t, testGroup.Id, updateResponse.Group.Id)
+	assert.Equal(t, testGroup.Id, updateResponse.Group.ID)
 	assert.Equal(t, updateReq.GroupIdentifier, updateResponse.Group.GroupIdentifier)
 	assert.Equal(t, updateReq.Description, updateResponse.Group.Description)
-	assert.Equal(t, updateReq.IncludeInIdToken, updateResponse.Group.IncludeInIdToken)
+	assert.Equal(t, updateReq.IncludeInIDToken, updateResponse.Group.IncludeInIDToken)
 	assert.Equal(t, updateReq.IncludeInAccessToken, updateResponse.Group.IncludeInAccessToken)
 	assert.GreaterOrEqual(t, updateResponse.Group.MemberCount, 0, "MemberCount should be non-negative")
 
@@ -61,7 +61,7 @@ func TestAPIGroupUpdatePut_Success(t *testing.T) {
 	assert.NotNil(t, updatedGroup)
 	assert.Equal(t, updateReq.GroupIdentifier, updatedGroup.GroupIdentifier)
 	assert.Equal(t, updateReq.Description, updatedGroup.Description)
-	assert.Equal(t, updateReq.IncludeInIdToken, updatedGroup.IncludeInIdToken)
+	assert.Equal(t, updateReq.IncludeInIDToken, updatedGroup.IncludeInIdToken)
 	assert.Equal(t, updateReq.IncludeInAccessToken, updatedGroup.IncludeInAccessToken)
 }
 
@@ -160,7 +160,7 @@ func TestAPIGroupUpdatePut_SameIdentifier(t *testing.T) {
 	updateReq := api.UpdateGroupRequest{
 		GroupIdentifier:      testGroup.GroupIdentifier, // Same identifier
 		Description:          "Updated description",
-		IncludeInIdToken:     !testGroup.IncludeInIdToken,
+		IncludeInIDToken:     !testGroup.IncludeInIdToken,
 		IncludeInAccessToken: !testGroup.IncludeInAccessToken,
 	}
 
@@ -290,7 +290,7 @@ func TestAPIGroupUpdatePut_WhitespaceHandling(t *testing.T) {
 	updateReq := api.UpdateGroupRequest{
 		GroupIdentifier:      "  whitespace-identifier-" + fake.LetterN(4) + "  ",
 		Description:          "  Whitespace description  ",
-		IncludeInIdToken:     true,
+		IncludeInIDToken:     true,
 		IncludeInAccessToken: false,
 	}
 
@@ -352,7 +352,7 @@ func TestAPIGroupUpdatePut_BooleanFlags(t *testing.T) {
 			updateReq := api.UpdateGroupRequest{
 				GroupIdentifier:      testGroup.GroupIdentifier,
 				Description:          "Updated for " + tc.name,
-				IncludeInIdToken:     tc.includeInIdToken,
+				IncludeInIDToken:     tc.includeInIdToken,
 				IncludeInAccessToken: tc.includeInAccessToken,
 			}
 
@@ -369,7 +369,7 @@ func TestAPIGroupUpdatePut_BooleanFlags(t *testing.T) {
 			require.NoError(t, err)
 
 			// Assert: Boolean values should be preserved
-			assert.Equal(t, tc.includeInIdToken, updateResponse.Group.IncludeInIdToken)
+			assert.Equal(t, tc.includeInIdToken, updateResponse.Group.IncludeInIDToken)
 			assert.Equal(t, tc.includeInAccessToken, updateResponse.Group.IncludeInAccessToken)
 		})
 	}
@@ -414,7 +414,7 @@ func TestAPIGroupUpdatePut_MemberCountInResponse(t *testing.T) {
 	updateReq := api.UpdateGroupRequest{
 		GroupIdentifier:      testGroup.GroupIdentifier + "-updated",
 		Description:          "Updated description",
-		IncludeInIdToken:     !testGroup.IncludeInIdToken,
+		IncludeInIDToken:     !testGroup.IncludeInIdToken,
 		IncludeInAccessToken: !testGroup.IncludeInAccessToken,
 	}
 
@@ -436,7 +436,7 @@ func TestAPIGroupUpdatePut_MemberCountInResponse(t *testing.T) {
 	// Assert: Updated fields should be correct
 	assert.Equal(t, updateReq.GroupIdentifier, updateResponse.Group.GroupIdentifier)
 	assert.Equal(t, updateReq.Description, updateResponse.Group.Description)
-	assert.Equal(t, updateReq.IncludeInIdToken, updateResponse.Group.IncludeInIdToken)
+	assert.Equal(t, updateReq.IncludeInIDToken, updateResponse.Group.IncludeInIDToken)
 	assert.Equal(t, updateReq.IncludeInAccessToken, updateResponse.Group.IncludeInAccessToken)
 }
 
@@ -451,7 +451,7 @@ func TestAPIGroupUpdatePut_AngleBracketsRejected(t *testing.T) {
 	updateReq := api.UpdateGroupRequest{
 		GroupIdentifier:      testGroup.GroupIdentifier,
 		Description:          "1 < 2 and 3 > 2",
-		IncludeInIdToken:     true,
+		IncludeInIDToken:     true,
 		IncludeInAccessToken: true,
 	}
 
@@ -479,7 +479,7 @@ func TestAPIGroupUpdatePut_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 	updateReq := api.UpdateGroupRequest{
 		GroupIdentifier:      testGroup.GroupIdentifier,
 		Description:          `R&D "phase 2"`,
-		IncludeInIdToken:     true,
+		IncludeInIDToken:     true,
 		IncludeInAccessToken: true,
 	}
 

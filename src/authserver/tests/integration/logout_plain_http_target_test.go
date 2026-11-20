@@ -129,7 +129,7 @@ func TestAPIAccountLogoutRequest_RefusesATargetLogoutWouldDecline(t *testing.T) 
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			resp := makeAPIRequest(t, "POST", urlLogoutReq, accessToken, api.AccountLogoutRequest{
-				PostLogoutRedirectUri: tc.target,
+				PostLogoutRedirectURI: tc.target,
 				ClientIdentifier:      tc.clientIdentifier,
 			})
 			defer func() { _ = resp.Body.Close() }()
@@ -151,14 +151,14 @@ func TestAPIAccountLogoutRequest_AStoredLoopbackHTTPTargetStillSignsOutAndRedire
 
 	// Resolved by URI, the path that scans every client's rows.
 	resp := makeAPIRequest(t, "POST", appConfig.AuthServer.BaseURL+"/api/v1/account/logout-request", accessToken,
-		api.AccountLogoutRequest{PostLogoutRedirectUri: target, State: "abc"})
+		api.AccountLogoutRequest{PostLogoutRedirectURI: target, State: "abc"})
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
 	var out api.AccountLogoutRedirectResponse
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
 
-	logoutResp, err := httpClientWithCookies.Get(out.LogoutUrl)
+	logoutResp, err := httpClientWithCookies.Get(out.LogoutURL)
 	require.NoError(t, err)
 	defer func() { _ = logoutResp.Body.Close() }()
 

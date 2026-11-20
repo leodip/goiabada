@@ -74,8 +74,8 @@ func newSignedInConsoleServedBy(t *testing.T, scope string, adminAPI http.Handle
 			}
 			_, _ = w.Write([]byte(settings + `}`))
 		case "/certs":
-			assert.NoError(t, json.NewEncoder(w).Encode(oauth.Jwks{
-				Keys: []oauth.Jwk{oauthclienttest.JwkFromPublicKey("key-1", &signing.PublicKey)}}))
+			assert.NoError(t, json.NewEncoder(w).Encode(oauth.JWKS{
+				Keys: []oauth.JWK{oauthclienttest.JwkFromPublicKey("key-1", &signing.PublicKey)}}))
 		default:
 			adminAPI(w, r)
 		}
@@ -105,7 +105,7 @@ func newSignedInConsoleServedBy(t *testing.T, scope string, adminAPI http.Handle
 	require.NoError(t, err)
 	sess.Values[sessionkeys.JWT] = sessionkeys.StoreTokenResponse(oauth.TokenResponse{
 		AccessToken: "an-access-token",
-		IdToken:     oauthclienttest.SignRS256(t, signing, "key-1", claims),
+		IDToken:     oauthclienttest.SignRS256(t, signing, "key-1", claims),
 		TokenType:   "Bearer",
 		Scope:       scope,
 	})

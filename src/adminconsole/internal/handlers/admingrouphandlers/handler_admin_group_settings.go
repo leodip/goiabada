@@ -69,11 +69,11 @@ func HandleSettingsGet(
 		}
 
 		bind := map[string]interface{}{
-			"groupId":              group.Id,
+			"groupId":              group.ID,
 			"storedGroup":          group,
 			"groupIdentifier":      group.GroupIdentifier,
 			"description":          group.Description,
-			"includeInIdToken":     group.IncludeInIdToken,
+			"includeInIdToken":     group.IncludeInIDToken,
 			"includeInAccessToken": group.IncludeInAccessToken,
 			"savedSuccessfully":    savedSuccessfully,
 		}
@@ -131,7 +131,7 @@ func HandleSettingsPost(
 
 		renderError := func(message, errorField string) {
 			bind := map[string]interface{}{
-				"groupId":              group.Id,
+				"groupId":              group.ID,
 				"storedGroup":          group,
 				"groupIdentifier":      groupIdentifier,
 				"description":          description,
@@ -151,7 +151,7 @@ func HandleSettingsPost(
 		updateReq := &api.UpdateGroupRequest{
 			GroupIdentifier:      groupIdentifier,
 			Description:          description,
-			IncludeInIdToken:     includeInIdToken,
+			IncludeInIDToken:     includeInIdToken,
 			IncludeInAccessToken: includeInAccessToken,
 		}
 

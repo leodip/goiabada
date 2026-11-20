@@ -80,7 +80,7 @@ func HandlePhoneGet(
 		bind := map[string]interface{}{
 			"user":                         user,
 			"phoneCountries":               phoneCountries,
-			"selectedPhoneCountryUniqueId": user.PhoneNumberCountryUniqueId,
+			"selectedPhoneCountryUniqueId": user.PhoneNumberCountryUniqueID,
 			"phoneNumber":                  user.PhoneNumber,
 			"phoneNumberVerified":          user.PhoneNumberVerified,
 			"page":                         r.URL.Query().Get("page"),
@@ -143,7 +143,7 @@ func HandlePhonePost(
 
 		// Create request
 		updateReq := &api.UpdateUserPhoneRequest{
-			PhoneCountryUniqueId: phoneCountryUniqueId,
+			PhoneCountryUniqueID: phoneCountryUniqueId,
 			PhoneNumber:          phoneNumber,
 			PhoneNumberVerified:  phoneNumberVerified,
 		}

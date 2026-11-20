@@ -83,7 +83,7 @@ func TestIssuePasswordGrant_BasicOpenIDScope(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, response)
 	assert.NotEmpty(t, response.AccessToken)
-	assert.NotEmpty(t, response.IdToken)
+	assert.NotEmpty(t, response.IDToken)
 	assert.NotEmpty(t, response.RefreshToken)
 	assert.Equal(t, "Bearer", response.TokenType)
 	assert.Equal(t, int64(900), response.ExpiresIn) // Client override
@@ -102,7 +102,7 @@ func TestIssuePasswordGrant_BasicOpenIDScope(t *testing.T) {
 	assert.NotContains(t, accessClaims, "sid")
 
 	// Verify id_token claims
-	idClaims := verifyAndDecodeToken(t, response.IdToken, publicKeyBytes)
+	idClaims := verifyAndDecodeToken(t, response.IDToken, publicKeyBytes)
 	assert.Equal(t, "https://test-issuer.com", idClaims["iss"])
 	assert.Equal(t, sub, idClaims["sub"])
 	assert.Equal(t, "urn:goiabada:level1", idClaims["acr"])
@@ -183,7 +183,7 @@ func TestIssuePasswordGrant_WithOfflineAccess(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, response)
 	assert.NotEmpty(t, response.AccessToken)
-	assert.NotEmpty(t, response.IdToken)
+	assert.NotEmpty(t, response.IDToken)
 	assert.NotEmpty(t, response.RefreshToken)
 	assert.Equal(t, "Bearer", response.TokenType)
 	assert.Contains(t, response.Scope, "offline_access")
@@ -265,10 +265,10 @@ func TestIssuePasswordGrant_WithProfileScope(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.NotNil(t, response)
-	assert.NotEmpty(t, response.IdToken)
+	assert.NotEmpty(t, response.IDToken)
 
 	// Verify id_token contains profile claims
-	idClaims := verifyAndDecodeToken(t, response.IdToken, publicKeyBytes)
+	idClaims := verifyAndDecodeToken(t, response.IDToken, publicKeyBytes)
 	assert.Equal(t, "John", idClaims["given_name"])
 	assert.Equal(t, "Doe", idClaims["family_name"])
 	assert.Equal(t, "johnd", idClaims["nickname"])
@@ -343,10 +343,10 @@ func TestIssuePasswordGrant_WithEmailScope(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.NotNil(t, response)
-	assert.NotEmpty(t, response.IdToken)
+	assert.NotEmpty(t, response.IDToken)
 
 	// Verify id_token contains email claims
-	idClaims := verifyAndDecodeToken(t, response.IdToken, publicKeyBytes)
+	idClaims := verifyAndDecodeToken(t, response.IDToken, publicKeyBytes)
 	assert.Equal(t, "user@example.com", idClaims["email"])
 	assert.Equal(t, true, idClaims["email_verified"])
 
@@ -505,10 +505,10 @@ func TestIssuePasswordGrant_WithGroups(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.NotNil(t, response)
-	assert.NotEmpty(t, response.IdToken)
+	assert.NotEmpty(t, response.IDToken)
 
 	// Verify id_token contains groups
-	idClaims := verifyAndDecodeToken(t, response.IdToken, publicKeyBytes)
+	idClaims := verifyAndDecodeToken(t, response.IDToken, publicKeyBytes)
 	groups := idClaims["groups"].([]interface{})
 	assert.Contains(t, groups, "admins")
 	// "users" has IncludeInIdToken=false so should not be in id_token
@@ -588,7 +588,7 @@ func TestIssuePasswordGrant_WithoutOpenID(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, response)
 	assert.NotEmpty(t, response.AccessToken)
-	assert.Empty(t, response.IdToken) // No openid scope = no id_token
+	assert.Empty(t, response.IDToken) // No openid scope = no id_token
 	assert.NotEmpty(t, response.RefreshToken)
 	assert.Equal(t, "Bearer", response.TokenType)
 

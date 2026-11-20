@@ -90,7 +90,7 @@ func HandleSessionsEndSessionPost(
 
 		isDeletingCurrentSession := false
 		for _, es := range sessions {
-			if es.Id == int64(userSessionId) && es.IsCurrent {
+			if es.ID == int64(userSessionId) && es.IsCurrent {
 				isDeletingCurrentSession = true
 				break
 			}

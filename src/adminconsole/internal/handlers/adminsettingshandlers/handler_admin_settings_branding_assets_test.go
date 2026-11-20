@@ -37,7 +37,7 @@ func (a *brandAssetAPI) UploadBrandAsset(_ context.Context, _ string, kind strin
 	if a.err != nil {
 		return nil, a.err
 	}
-	return &api.BrandAssetResponse{Id: 41, Kind: kind, Url: "https://auth.example.test/brand-assets/41?v=ab",
+	return &api.BrandAssetResponse{ID: 41, Kind: kind, URL: "https://auth.example.test/brand-assets/41?v=ab",
 		ContentType: "image/webp", Width: 1600, Height: 900}, nil
 }
 

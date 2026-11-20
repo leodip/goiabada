@@ -137,13 +137,13 @@ func HandleAuthOtpPost(
 
 		switch result.Answer {
 		case authflow.OTPAccountDisabled:
-			renderRefusal(i18n.ErrCodeOtpAccountDisabled)
+			renderRefusal(i18n.ErrCodeOTPAccountDisabled)
 		case authflow.OTPEnrolmentLost:
 			answerLostEnrolment(w, r, boundary, pageRenderer, result.SaveErr)
 		case authflow.OTPCodeMissing:
-			renderRefusal(i18n.ErrCodeOtpCodeRequired)
+			renderRefusal(i18n.ErrCodeOTPCodeRequired)
 		case authflow.OTPRefused:
-			renderRefusal(i18n.ErrCodeOtpIncorrectCode)
+			renderRefusal(i18n.ErrCodeOTPIncorrectCode)
 		case authflow.OTPClockAhead:
 			renderRefusal(errcode.OtpClockAhead)
 		case authflow.OTPAccepted:
@@ -197,7 +197,7 @@ func answerRecoveryCode(w http.ResponseWriter, r *http.Request, boundary *Ceremo
 
 	switch result.Answer {
 	case authflow.OTPAccountDisabled:
-		renderRefusal(i18n.ErrCodeOtpAccountDisabled)
+		renderRefusal(i18n.ErrCodeOTPAccountDisabled)
 	case authflow.OTPEnrolmentLost:
 		answerLostEnrolment(w, r, boundary, pageRenderer, result.SaveErr)
 	case authflow.OTPRecoveryCodeMissing:

@@ -1617,7 +1617,7 @@ func verificationRequest(subject string) *http.Request {
 	if subject == "" {
 		return req
 	}
-	return req.WithContext(reqctx.WithValidatedToken(req.Context(), oauth.JwtToken{Claims: map[string]interface{}{"sub": subject}}))
+	return req.WithContext(reqctx.WithValidatedToken(req.Context(), oauth.JWTToken{Claims: map[string]interface{}{"sub": subject}}))
 }
 
 // runVerification drives one request through LimitEmailVerification and reports the status,
@@ -1744,7 +1744,7 @@ func TestLimitEmailVerification_PerSubject(t *testing.T) {
 func runVerificationSend(m *RateLimiter, subject string) (int, bool, *httptest.ResponseRecorder) {
 	req := limiterRequest(http.MethodPost, "/api/v1/account/email/verification/send", nil)
 	if subject != "" {
-		req = req.WithContext(reqctx.WithValidatedToken(req.Context(), oauth.JwtToken{Claims: map[string]interface{}{"sub": subject}}))
+		req = req.WithContext(reqctx.WithValidatedToken(req.Context(), oauth.JWTToken{Claims: map[string]interface{}{"sub": subject}}))
 	}
 	rr := httptest.NewRecorder()
 	reached := false
@@ -1852,7 +1852,7 @@ func runAccountEmailChange(m *RateLimiter, subject, email string, failed bool) (
 	req := limiterRequest(http.MethodPut, "/api/v1/account/email",
 		strings.NewReader(fmt.Sprintf(`{"email":%q,"currentPassword":"pw"}`, email)))
 	if subject != "" {
-		req = req.WithContext(reqctx.WithValidatedToken(req.Context(), oauth.JwtToken{Claims: map[string]interface{}{"sub": subject}}))
+		req = req.WithContext(reqctx.WithValidatedToken(req.Context(), oauth.JWTToken{Claims: map[string]interface{}{"sub": subject}}))
 	}
 	rr := httptest.NewRecorder()
 	reached := false
@@ -2108,7 +2108,7 @@ func TestLimitAccountCredentialChange_PerSubject(t *testing.T) {
 func runAccountExport(m *RateLimiter, subject string) (int, bool, *httptest.ResponseRecorder) {
 	req := limiterRequest(http.MethodGet, "/api/v1/account/export", nil)
 	if subject != "" {
-		req = req.WithContext(reqctx.WithValidatedToken(req.Context(), oauth.JwtToken{Claims: map[string]interface{}{"sub": subject}}))
+		req = req.WithContext(reqctx.WithValidatedToken(req.Context(), oauth.JWTToken{Claims: map[string]interface{}{"sub": subject}}))
 	}
 	rr := httptest.NewRecorder()
 	reached := false
@@ -2212,7 +2212,7 @@ func accountPasswordRequest(target, subject string) *http.Request {
 	if subject == "" {
 		return req
 	}
-	return req.WithContext(reqctx.WithValidatedToken(req.Context(), oauth.JwtToken{Claims: map[string]interface{}{"sub": subject}}))
+	return req.WithContext(reqctx.WithValidatedToken(req.Context(), oauth.JWTToken{Claims: map[string]interface{}{"sub": subject}}))
 }
 
 // runAccountPassword drives one request through LimitAccountPassword and reports the status,

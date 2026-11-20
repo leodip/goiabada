@@ -83,16 +83,16 @@ func TestAPIUserGroupsGet_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	// Assert: User data should be correct
-	assert.Equal(t, testUser.Id, getResponse.User.Id)
+	assert.Equal(t, testUser.Id, getResponse.User.ID)
 	assert.Equal(t, testUser.Email, getResponse.User.Email)
 	assert.Equal(t, testUser.GivenName, getResponse.User.GivenName)
 
 	// Assert: Should return only group1
 	assert.Len(t, getResponse.Groups, 1)
-	assert.Equal(t, testGroup1.Id, getResponse.Groups[0].Id)
+	assert.Equal(t, testGroup1.Id, getResponse.Groups[0].ID)
 	assert.Equal(t, "user-group-1", getResponse.Groups[0].GroupIdentifier)
 	assert.Equal(t, "User Group 1", getResponse.Groups[0].Description)
-	assert.True(t, getResponse.Groups[0].IncludeInIdToken)
+	assert.True(t, getResponse.Groups[0].IncludeInIDToken)
 }
 
 func TestAPIUserGroupsGet_NoGroups(t *testing.T) {
@@ -127,7 +127,7 @@ func TestAPIUserGroupsGet_NoGroups(t *testing.T) {
 	require.NoError(t, err)
 
 	// Assert: Should return user with empty groups array
-	assert.Equal(t, testUser.Id, getResponse.User.Id)
+	assert.Equal(t, testUser.Id, getResponse.User.ID)
 	assert.Empty(t, getResponse.Groups)
 }
 

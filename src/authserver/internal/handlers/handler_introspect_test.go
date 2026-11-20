@@ -94,7 +94,7 @@ func (e *introspectEndpoint) callerFound(client *record.Client) {
 		Return(client, nil).Once()
 }
 
-func (e *introspectEndpoint) parses(token *oauth.JwtToken) {
+func (e *introspectEndpoint) parses(token *oauth.JWTToken) {
 	e.parser.On("DecodeAndValidateTokenString", mock.Anything, introspectTokenString, true).Return(token, nil).Once()
 }
 
@@ -163,8 +163,8 @@ func apiForm(extra ...string) url.Values {
 
 // apiAccessToken is a live access token of the password grant, naming its grant and no session,
 // issued to the app for aud, with fixed times so the answer's members are literals.
-func apiAccessToken(aud interface{}) *oauth.JwtToken {
-	return &oauth.JwtToken{
+func apiAccessToken(aud interface{}) *oauth.JWTToken {
+	return &oauth.JWTToken{
 		TokenBase64: introspectTokenString,
 		Header:      map[string]interface{}{"alg": "RS256", "typ": "at+jwt", "kid": "key-1"},
 		Claims: map[string]interface{}{
@@ -188,8 +188,8 @@ func (e *introspectEndpoint) accessTokenLive() {
 }
 
 // callerRefreshToken is a live offline refresh token of the password grant, with fixed times.
-func callerRefreshToken() *oauth.JwtToken {
-	return &oauth.JwtToken{
+func callerRefreshToken() *oauth.JWTToken {
+	return &oauth.JWTToken{
 		TokenBase64: introspectTokenString,
 		Header:      map[string]interface{}{"alg": "RS256", "typ": "JWT", "kid": "key-1"},
 		Claims: map[string]interface{}{
@@ -470,7 +470,7 @@ func TestHandleIntrospectPost_ATokenThatIsNotLiveIsInactive(t *testing.T) {
 			e.parses(token)
 		}},
 		{"an ID token", func(e *introspectEndpoint) {
-			e.parses(&oauth.JwtToken{TokenBase64: introspectTokenString, Header: map[string]interface{}{"typ": "JWT"},
+			e.parses(&oauth.JWTToken{TokenBase64: introspectTokenString, Header: map[string]interface{}{"typ": "JWT"},
 				Claims: map[string]interface{}{"iss": introspectIssuer, "sub": "the-subject", "aud": introspectCallerName, "typ": "ID"}})
 		}},
 		{"a refresh token with no row", func(e *introspectEndpoint) {

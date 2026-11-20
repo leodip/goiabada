@@ -57,7 +57,7 @@ func HandleLegalDocumentAppsPut(database legalDocumentAppsDatabase, auditLogger 
 
 		// The list as the caller loaded it, required as on every list save: absent or null decodes
 		// to nil and is refused, [] means the caller read an empty list (#428).
-		if req.ExpectedClientIds == nil {
+		if req.ExpectedClientIDs == nil {
 			writeJSONError(w, "expectedClientIds is required: send the client ids as you last read them, or [] if there were none.", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
@@ -78,7 +78,7 @@ func HandleLegalDocumentAppsPut(database legalDocumentAppsDatabase, auditLogger 
 			return
 		}
 
-		wanted := firstOccurrences(req.ClientIds)
+		wanted := firstOccurrences(req.ClientIDs)
 		if allApps && len(wanted) > 0 {
 			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeLegalDocumentAppsWithAllApps, nil))
 			return
@@ -124,7 +124,7 @@ func HandleLegalDocumentAppsPut(database legalDocumentAppsDatabase, auditLogger 
 			if loadErr != nil {
 				return errs.Wrap(loadErr, "database error loading legal document apps before update")
 			}
-			if !sameSet(stored, listedKey, req.ExpectedClientIds) {
+			if !sameSet(stored, listedKey, req.ExpectedClientIDs) {
 				return errListChanged
 			}
 

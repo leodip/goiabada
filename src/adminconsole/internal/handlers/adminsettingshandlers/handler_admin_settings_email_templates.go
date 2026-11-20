@@ -134,13 +134,13 @@ func HandleEmailTemplatesGet(httpHelper HttpHelper, apiClient emailTemplatesList
 		rows := map[string]EmailTemplateRow{}
 		var unknown []EmailTemplateRow
 		for _, summary := range summaries {
-			row := EmailTemplateRow{Id: summary.Id, Known: knownEmailTemplate(summary.Id), Languages: []EmailTemplateLanguage{}}
+			row := EmailTemplateRow{Id: summary.ID, Known: knownEmailTemplate(summary.ID), Languages: []EmailTemplateLanguage{}}
 			for _, l := range summary.Languages {
 				if l.Status == api.EmailTemplateStatusEdited || l.Status == api.EmailTemplateStatusInvalid {
 					row.Languages = append(row.Languages, EmailTemplateLanguage{Tag: l.Language, Name: languageName(l.Language), Status: l.Status})
 				}
 			}
-			rows[summary.Id] = row
+			rows[summary.ID] = row
 			if !row.Known {
 				unknown = append(unknown, row)
 			}
@@ -215,7 +215,7 @@ func HandleEmailTemplateOpenGet(httpHelper HttpHelper, apiClient emailTemplateRe
 			return
 		}
 		//nolint:gosec // G710: the configured base URL and a fixed path around two segments, each path-escaped
-		http.Redirect(w, r, baseURL+emailTemplatePagePath(email.Id, tag), http.StatusFound)
+		http.Redirect(w, r, baseURL+emailTemplatePagePath(email.ID, tag), http.StatusFound)
 	}
 }
 
@@ -277,8 +277,8 @@ func renderEmailTemplate(httpHelper HttpHelper, w http.ResponseWriter, r *http.R
 	}
 
 	bind := map[string]interface{}{
-		"email":        email.Id,
-		"known":        knownEmailTemplate(email.Id),
+		"email":        email.ID,
+		"known":        knownEmailTemplate(email.ID),
 		"language":     lang.Language,
 		"languages":    languages,
 		"hasButton":    email.HasButton,
@@ -289,7 +289,7 @@ func renderEmailTemplate(httpHelper HttpHelper, w http.ResponseWriter, r *http.R
 		"invalid":      lang.Status == api.EmailTemplateStatusInvalid,
 		"problems":     lang.Problems,
 		"problemIn":    problemIn,
-		"pagePath":     emailTemplatePagePath(email.Id, lang.Language),
+		"pagePath":     emailTemplatePagePath(email.ID, lang.Language),
 		"savedNotice":  false,
 		"resetNotice":  false,
 	}
@@ -383,7 +383,7 @@ func HandleEmailTemplatePost(httpHelper HttpHelper, httpSession sessionstore.Sto
 			form.ButtonLabel = strings.TrimSpace(r.PostFormValue("buttonLabel"))
 		}
 
-		_, err := apiClient.SaveEmailTemplate(r.Context(), token, email.Id, lang.Language, &api.SaveEmailTemplateRequest{
+		_, err := apiClient.SaveEmailTemplate(r.Context(), token, email.ID, lang.Language, &api.SaveEmailTemplateRequest{
 			Subject: form.Subject, ButtonLabel: form.ButtonLabel, Body: form.Body,
 		})
 		if err != nil {
@@ -396,7 +396,7 @@ func HandleEmailTemplatePost(httpHelper HttpHelper, httpSession sessionstore.Sto
 			return
 		}
 
-		pagePath := emailTemplatePagePath(email.Id, lang.Language)
+		pagePath := emailTemplatePagePath(email.ID, lang.Language)
 		if !leaveEmailTemplateFlash(httpHelper, httpSession, w, r, pagePath, flashEmailTemplateSaved) {
 			return
 		}
@@ -425,7 +425,7 @@ func HandleEmailTemplateResetPost(httpHelper HttpHelper, httpSession sessionstor
 			return
 		}
 
-		if err := apiClient.ResetEmailTemplate(r.Context(), token, email.Id, lang.Language); err != nil {
+		if err := apiClient.ResetEmailTemplate(r.Context(), token, email.ID, lang.Language); err != nil {
 			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
 				renderEmailTemplate(httpHelper, w, r, apiClient, token, email, lang, editorText(lang.EditorText), map[string]interface{}{
 					"error": message,
@@ -434,7 +434,7 @@ func HandleEmailTemplateResetPost(httpHelper HttpHelper, httpSession sessionstor
 			return
 		}
 
-		pagePath := emailTemplatePagePath(email.Id, lang.Language)
+		pagePath := emailTemplatePagePath(email.ID, lang.Language)
 		if !leaveEmailTemplateFlash(httpHelper, httpSession, w, r, pagePath, flashEmailTemplateReset) {
 			return
 		}

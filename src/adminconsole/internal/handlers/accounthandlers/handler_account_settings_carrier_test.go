@@ -34,7 +34,7 @@ type settingsCarrierApiClient struct {
 }
 
 func (settingsCarrierApiClient) GetAccountProfile(context.Context, string) (*api.UserResponse, error) {
-	return &api.UserResponse{Id: 11, Email: "someone@example.com", EmailVerified: true}, nil
+	return &api.UserResponse{ID: 11, Email: "someone@example.com", EmailVerified: true}, nil
 }
 
 // The rest of the ports settingsCarrierApiClient is passed to, which no test here reaches.

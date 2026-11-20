@@ -33,7 +33,7 @@ func setUpAuthenticatorOnTheAccountPages(t *testing.T, accessToken string) []str
 	t.Helper()
 	secret := getOTPEnrollment(t, accessToken).SecretKey
 	status, body := putAccountOTP(t, accessToken, api.UpdateAccountOTPRequest{
-		Enabled: true, Password: passwordNoticeCurrent, OtpCode: otptest.Code(t, secret, time.Now()),
+		Enabled: true, Password: passwordNoticeCurrent, OTPCode: otptest.Code(t, secret, time.Now()),
 	})
 	require.Equal(t, http.StatusOK, status, body)
 	var enabled api.UpdateAccountOTPResponse

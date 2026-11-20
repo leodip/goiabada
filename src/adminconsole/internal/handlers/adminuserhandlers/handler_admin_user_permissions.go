@@ -65,7 +65,7 @@ func HandlePermissionsGet(
 		granted := make([]grantedPermission, 0, len(userPermissions))
 		for _, permission := range userPermissions {
 			granted = append(granted, grantedPermission{
-				Id:    permission.Id,
+				Id:    permission.ID,
 				Scope: permission.Resource.ResourceIdentifier + ":" + permission.PermissionIdentifier,
 			})
 		}
@@ -156,8 +156,8 @@ func HandlePermissionsPost(
 
 		// Convert to API request format
 		request := &api.UpdateUserPermissionsRequest{
-			PermissionIds:         data.AssignedPermissionsIds,
-			ExpectedPermissionIds: data.ExpectedPermissionIds,
+			PermissionIDs:         data.AssignedPermissionsIds,
+			ExpectedPermissionIDs: data.ExpectedPermissionIds,
 		}
 
 		// Update user permissions via API (includes validation and audit logging)

@@ -61,7 +61,7 @@ func HandleAccountLogoutRequestPost(
 			return
 		}
 
-		postLogout := req.PostLogoutRedirectUri
+		postLogout := req.PostLogoutRedirectURI
 		if postLogout == "" {
 			writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.AccountLogoutRedirectURIRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
@@ -238,7 +238,7 @@ func HandleAccountLogoutRequestPost(
 		if req.State != "" {
 			logoutUrl += "&state=" + url.QueryEscape(req.State)
 		}
-		resp := api.AccountLogoutRedirectResponse{LogoutUrl: logoutUrl}
+		resp := api.AccountLogoutRedirectResponse{LogoutURL: logoutUrl}
 		writeJSON(w, r, http.StatusOK, resp)
 	}
 }

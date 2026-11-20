@@ -78,7 +78,7 @@ func HandleLogoGet(
 			}
 			slog.WarnContext(r.Context(), "unable to fetch the client logo info", "error", err, "client_id", id)
 		} else if logoInfo != nil && logoInfo.HasLogo {
-			logoUrl = fmt.Sprintf("%s?t=%d", logoInfo.LogoUrl, time.Now().UnixNano())
+			logoUrl = fmt.Sprintf("%s?t=%d", logoInfo.LogoURL, time.Now().UnixNano())
 		}
 
 		bind := map[string]interface{}{
@@ -143,7 +143,7 @@ func HandleLogoPost(
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"success":    true,
-			"pictureUrl": response.PictureUrl,
+			"pictureUrl": response.PictureURL,
 		})
 	}
 }

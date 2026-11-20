@@ -50,7 +50,7 @@ func saveClientSettings(t *testing.T, adminToken string, clientId int64, identif
 		ShowWebsiteURL:    stored.ShowWebsiteURL,
 	}
 	if stored.AuthorizationCodeEnabled {
-		request.DefaultAcrLevel = stored.DefaultAcrLevel.String()
+		request.DefaultACRLevel = stored.DefaultAcrLevel.String()
 	}
 
 	apiURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10)

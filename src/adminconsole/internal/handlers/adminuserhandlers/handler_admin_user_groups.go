@@ -60,7 +60,7 @@ func HandleGroupsGet(
 		// The groups the user belongs to, in the order the tab lists them: by identifier.
 		memberships := make([]groupMembership, 0, len(userGroups))
 		for _, grp := range userGroups {
-			memberships = append(memberships, groupMembership{Id: grp.Id, GroupIdentifier: grp.GroupIdentifier})
+			memberships = append(memberships, groupMembership{Id: grp.ID, GroupIdentifier: grp.GroupIdentifier})
 		}
 		sort.Slice(memberships, func(i, j int) bool {
 			return memberships[i].GroupIdentifier < memberships[j].GroupIdentifier
@@ -147,8 +147,8 @@ func HandleGroupsPost(
 
 		// Create API request for updating user groups
 		request := &api.UpdateUserGroupsRequest{
-			GroupIds:         data.AssignedGroupsIds,
-			ExpectedGroupIds: data.ExpectedGroupIds,
+			GroupIDs:         data.AssignedGroupsIds,
+			ExpectedGroupIDs: data.ExpectedGroupIds,
 		}
 
 		// Call API to update user groups (this handles all the business logic including audit logging)

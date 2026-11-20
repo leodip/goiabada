@@ -6,12 +6,12 @@
 {{end}}
 
 {{define "page"}}
-{{ template "client_header" (args "logo" .client.Id .client.ClientIdentifier .client.IsSystemLevelClient .client.IsPublic $.ctx) }}
+{{ template "client_header" (args "logo" .client.ID .client.ClientIdentifier .client.IsSystemLevelClient .client.IsPublic $.ctx) }}
 
 <div class="panel">
   <div class="panel-body">
     <div class="image-upload" id="imageUploadContainer"
-      data-upload-url="/admin/clients/{{ .client.Id }}/logo" data-delete-url="/admin/clients/{{ .client.Id }}/logo" data-field-name="picture" data-url-key="pictureUrl"
+      data-upload-url="/admin/clients/{{ .client.ID }}/logo" data-delete-url="/admin/clients/{{ .client.ID }}/logo" data-field-name="picture" data-url-key="pictureUrl"
       data-crop-mode="free" data-output-format="preserve"
       data-alt="{{ T $.ctx "adminconsole.admin_clients.logo.alt_text" }}" data-crop-alt="{{ T $.ctx "adminconsole.admin_clients.logo.crop_alt" }}"
       data-uploaded="{{ T $.ctx "adminconsole.admin_clients.logo.uploaded" }}" data-deleted="{{ T $.ctx "adminconsole.admin_clients.logo.deleted" }}"

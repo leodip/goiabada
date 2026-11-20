@@ -56,7 +56,7 @@ func HandleAttributesAddGet(
 		}
 
 		bind := map[string]interface{}{
-			"groupId":              group.Id,
+			"groupId":              group.ID,
 			"groupIdentifier":      group.GroupIdentifier,
 			"includeInAccessToken": true,
 			"includeInIdToken":     true,
@@ -110,7 +110,7 @@ func HandleAttributesAddPost(
 
 		renderError := func(message, errorField string) {
 			bind := map[string]interface{}{
-				"groupId":              group.Id,
+				"groupId":              group.ID,
 				"groupIdentifier":      group.GroupIdentifier,
 				"attributeKey":         r.FormValue("attributeKey"),
 				"attributeValue":       r.FormValue("attributeValue"),
@@ -136,8 +136,8 @@ func HandleAttributesAddPost(
 			Key:                  attrKey,
 			Value:                attrValue,
 			IncludeInAccessToken: includeInAccessToken,
-			IncludeInIdToken:     includeInIdToken,
-			GroupId:              group.Id,
+			IncludeInIDToken:     includeInIdToken,
+			GroupID:              group.ID,
 		}
 
 		_, err = apiClient.CreateGroupAttribute(r.Context(), jwtInfo.TokenResponse.AccessToken, createReq)
@@ -148,6 +148,6 @@ func HandleAttributesAddPost(
 			return
 		}
 
-		http.Redirect(w, r, fmt.Sprintf("/admin/groups/%v/attributes", group.Id), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("/admin/groups/%v/attributes", group.ID), http.StatusFound)
 	}
 }

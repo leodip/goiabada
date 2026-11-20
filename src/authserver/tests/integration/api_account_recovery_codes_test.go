@@ -30,7 +30,7 @@ func enableOTPForRecoveryCodesTest(t *testing.T, accessToken string, userId int6
 	resetOTPStateForTest(t, userId)
 	secret := getOTPEnrollment(t, accessToken).SecretKey
 	status, body := putAccountOTP(t, accessToken, api.UpdateAccountOTPRequest{
-		Enabled: true, Password: "Correct1!", OtpCode: otptest.Code(t, secret, time.Now()),
+		Enabled: true, Password: "Correct1!", OTPCode: otptest.Code(t, secret, time.Now()),
 	})
 	require.Equal(t, http.StatusOK, status, body)
 	var enabled api.UpdateAccountOTPResponse

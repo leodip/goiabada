@@ -140,10 +140,10 @@ func TestAPIClientBrand_AssignsAndClearsTheBrand(t *testing.T) {
 	require.NoError(t, json.NewDecoder(listing.Body).Decode(&clients))
 	found := false
 	for _, listed := range clients.Clients {
-		if listed.Id == client.Id {
+		if listed.ID == client.Id {
 			found = true
-			require.NotNil(t, listed.BrandId)
-			assert.Equal(t, brandId, *listed.BrandId)
+			require.NotNil(t, listed.BrandID)
+			assert.Equal(t, brandId, *listed.BrandID)
 		}
 	}
 	assert.True(t, found, "the client is in the listing")
@@ -371,7 +371,7 @@ func TestAPIClientBrand_BrandsAnswerHowManyClientsTheyDraw(t *testing.T) {
 	_ = clientsResp.Body.Close()
 	onDefault := 0
 	for _, c := range clients.Clients {
-		if c.BrandId == nil || *c.BrandId == defaultId {
+		if c.BrandID == nil || *c.BrandID == defaultId {
 			onDefault++
 		}
 	}

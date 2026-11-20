@@ -29,14 +29,14 @@
       {{ range .legalDocuments }}
       <tr>
         <td class="cell-wrap">
-          <a class="text-link" href="/admin/legal-documents/{{ .Id }}/draft">{{ .Title }}</a>
+          <a class="text-link" href="/admin/legal-documents/{{ .ID }}/draft">{{ .Title }}</a>
           <span class="cell-secondary font-mono">{{ .ShortName }}</span>
         </td>
         <td data-label="{{ T $.ctx "adminconsole.admin_legal_documents.list.col_state" }}">{{ template "legal_document_tags" (args . $.ctx) }}</td>
         <td data-label="{{ T $.ctx "adminconsole.admin_legal_documents.common.col_applies_to" }}">{{ template "legal_document_applies_to" (args . $.ctx) }}</td>
         <td data-label="{{ T $.ctx "adminconsole.admin_legal_documents.list.col_published" }}">{{ if .PublishedAt }}{{ DateTime $.ctx .PublishedAt }}{{ else }}<span class="text-ink-muted">{{ T $.ctx "adminconsole.admin_legal_documents.list.never_published" }}</span>{{ end }}</td>
         <td class="cell-actions">
-          {{ if not .CurrentVersion }}<a class="text-link text-link-danger" href="/admin/legal-documents/{{ .Id }}/delete">{{ T $.ctx "adminconsole.admin_legal_documents.list.action_delete" }}<span class="sr-only"> {{ .Title }}</span></a>{{ end }}
+          {{ if not .CurrentVersion }}<a class="text-link text-link-danger" href="/admin/legal-documents/{{ .ID }}/delete">{{ T $.ctx "adminconsole.admin_legal_documents.list.action_delete" }}<span class="sr-only"> {{ .Title }}</span></a>{{ end }}
         </td>
       </tr>
       {{ end }}

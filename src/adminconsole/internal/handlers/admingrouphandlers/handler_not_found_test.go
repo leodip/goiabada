@@ -53,7 +53,7 @@ func TestGroup_StaleOrMalformedUrlAnswers404(t *testing.T) {
 	const pathValueName = "groupId"
 
 	// present, gone and broken stand for the three answers the API can give this handler.
-	present := &api.GroupResponse{Id: 42}
+	present := &api.GroupResponse{ID: 42}
 	gone := &apiclient.APIError{Code: "NOT_FOUND", Message: "Group not found", StatusCode: http.StatusNotFound}
 	broken := &apiclient.APIError{Code: "INTERNAL_SERVER_ERROR", Message: "the database is on fire", StatusCode: http.StatusInternalServerError}
 

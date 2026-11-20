@@ -45,9 +45,9 @@ func listUserConnectedClients(t *testing.T, accessToken string, userId int64) (m
 	require.NoError(t, json.Unmarshal(body, &list))
 	rows := map[int64]api.ConnectedClientResponse{}
 	for _, row := range list.Clients {
-		_, repeated := rows[row.ClientId]
+		_, repeated := rows[row.ClientID]
 		require.False(t, repeated, "a client is listed once: %s", body)
-		rows[row.ClientId] = row
+		rows[row.ClientID] = row
 	}
 	return rows, string(body)
 }
@@ -93,17 +93,17 @@ func TestAPIUserConnectedClients_ListsEveryClientOfTheUser(t *testing.T) {
 
 	rows, raw := listUserConnectedClients(t, adminToken, c.user.Id)
 	want := map[int64]api.ConnectedClientResponse{
-		console.Id: {ClientId: console.Id, ClientIdentifier: builtin.AdminConsoleClientIdentifier,
+		console.Id: {ClientID: console.Id, ClientIdentifier: builtin.AdminConsoleClientIdentifier,
 			GrantScope: "openid authserver:manage-account"},
-		c.x.client.Id: {ClientId: c.x.client.Id, ClientIdentifier: c.x.client.ClientIdentifier,
+		c.x.client.Id: {ClientID: c.x.client.Id, ClientIdentifier: c.x.client.ClientIdentifier,
 			ClientName: c.x.client.ClientIdentifier, GrantScope: "openid profile"},
-		c.y.client.Id: {ClientId: c.y.client.Id, ClientIdentifier: c.y.client.ClientIdentifier,
+		c.y.client.Id: {ClientID: c.y.client.Id, ClientIdentifier: c.y.client.ClientIdentifier,
 			ClientName: c.y.client.ClientIdentifier, GrantScope: "openid email"},
-		c.ropc.Id: {ClientId: c.ropc.Id, ClientIdentifier: c.ropc.ClientIdentifier,
+		c.ropc.Id: {ClientID: c.ropc.Id, ClientIdentifier: c.ropc.ClientIdentifier,
 			ClientName: c.ropc.ClientIdentifier, GrantScope: "openid"},
-		hidden.Id: {ClientId: hidden.Id, ClientIdentifier: hidden.ClientIdentifier, ClientName: "Billing",
+		hidden.Id: {ClientID: hidden.Id, ClientIdentifier: hidden.ClientIdentifier, ClientName: "Billing",
 			ClientDescription: "Internal billing tool",
-			Consent:           &api.ConnectedClientConsentResponse{Id: hiddenConsent.Id, Scope: "openid email"}},
+			Consent:           &api.ConnectedClientConsentResponse{ID: hiddenConsent.Id, Scope: "openid email"}},
 	}
 	require.ElementsMatch(t, clientIdsOf(want), clientIdsOf(rows))
 	for id, row := range rows {

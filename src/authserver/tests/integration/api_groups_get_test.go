@@ -75,18 +75,18 @@ func TestAPIGroupsGet_Success(t *testing.T) {
 
 	// Assert: Both test groups should be found
 	assert.NotNil(t, foundGroup1)
-	assert.Equal(t, testGroup1.Id, foundGroup1.Id)
+	assert.Equal(t, testGroup1.Id, foundGroup1.ID)
 	assert.Equal(t, "Test Group 1", foundGroup1.Description)
-	assert.True(t, foundGroup1.IncludeInIdToken)
+	assert.True(t, foundGroup1.IncludeInIDToken)
 	assert.False(t, foundGroup1.IncludeInAccessToken)
 	assert.NotNil(t, foundGroup1.CreatedAt, "CreatedAt should be populated")
 	assert.NotNil(t, foundGroup1.UpdatedAt, "UpdatedAt should be populated")
 	assert.GreaterOrEqual(t, foundGroup1.MemberCount, 0, "MemberCount should be non-negative")
 
 	assert.NotNil(t, foundGroup2)
-	assert.Equal(t, testGroup2.Id, foundGroup2.Id)
+	assert.Equal(t, testGroup2.Id, foundGroup2.ID)
 	assert.Equal(t, "Test Group 2", foundGroup2.Description)
-	assert.False(t, foundGroup2.IncludeInIdToken)
+	assert.False(t, foundGroup2.IncludeInIDToken)
 	assert.True(t, foundGroup2.IncludeInAccessToken)
 	assert.NotNil(t, foundGroup2.CreatedAt, "CreatedAt should be populated")
 	assert.NotNil(t, foundGroup2.UpdatedAt, "UpdatedAt should be populated")
@@ -203,10 +203,10 @@ func TestAPIGroupsGet_EnhancedResponseStructure(t *testing.T) {
 	assert.NotNil(t, foundGroup, "Enhanced test group should be found")
 
 	// Assert: All enhanced fields should be present and properly typed
-	assert.Positive(t, foundGroup.Id, "Id should be a positive integer")
+	assert.Positive(t, foundGroup.ID, "Id should be a positive integer")
 	assert.Equal(t, "enhanced-test-group", foundGroup.GroupIdentifier)
 	assert.Equal(t, "Enhanced Test Group", foundGroup.Description)
-	assert.True(t, foundGroup.IncludeInIdToken, "IncludeInIdToken should be true")
+	assert.True(t, foundGroup.IncludeInIDToken, "IncludeInIdToken should be true")
 	assert.True(t, foundGroup.IncludeInAccessToken, "IncludeInAccessToken should be true")
 
 	// Assert: Timestamp fields should be present and valid
@@ -284,7 +284,7 @@ func TestAPIGroupsGet_MixedTokenInclusion(t *testing.T) {
 	for _, tc := range testCases {
 		foundGroup, exists := groupMap[tc.identifier]
 		assert.True(t, exists, "Group %s should be found", tc.identifier)
-		assert.Equal(t, tc.includeInIdToken, foundGroup.IncludeInIdToken,
+		assert.Equal(t, tc.includeInIdToken, foundGroup.IncludeInIDToken,
 			"Group %s IncludeInIdToken should be %v", tc.identifier, tc.includeInIdToken)
 		assert.Equal(t, tc.includeInAccessToken, foundGroup.IncludeInAccessToken,
 			"Group %s IncludeInAccessToken should be %v", tc.identifier, tc.includeInAccessToken)
@@ -367,7 +367,7 @@ func TestAPIGroupsGet_MemberCountAccuracy(t *testing.T) {
 	// Find our test group
 	var foundGroup *api.GroupResponse
 	for i := range getResponse.Groups {
-		if getResponse.Groups[i].Id == testGroup.Id {
+		if getResponse.Groups[i].ID == testGroup.Id {
 			foundGroup = &getResponse.Groups[i]
 			break
 		}
@@ -394,7 +394,7 @@ func TestAPIGroupsGet_MemberCountAccuracy(t *testing.T) {
 	// Find our test group again
 	var foundGroup2 *api.GroupResponse
 	for i := range getResponse2.Groups {
-		if getResponse2.Groups[i].Id == testGroup.Id {
+		if getResponse2.Groups[i].ID == testGroup.Id {
 			foundGroup2 = &getResponse2.Groups[i]
 			break
 		}

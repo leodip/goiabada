@@ -44,7 +44,7 @@ func choiceOf(id int64, identifier, description string) Choice {
 func ResourceChoices(resources []api.ResourceResponse) []Choice {
 	choices := make([]Choice, 0, len(resources))
 	for _, r := range resources {
-		choices = append(choices, choiceOf(r.Id, r.ResourceIdentifier, r.Description))
+		choices = append(choices, choiceOf(r.ID, r.ResourceIdentifier, r.Description))
 	}
 	return choices
 }
@@ -53,7 +53,7 @@ func ResourceChoices(resources []api.ResourceResponse) []Choice {
 func GroupChoices(groups []api.GroupResponse) []Choice {
 	choices := make([]Choice, 0, len(groups))
 	for _, g := range groups {
-		choices = append(choices, choiceOf(g.Id, g.GroupIdentifier, g.Description))
+		choices = append(choices, choiceOf(g.ID, g.GroupIdentifier, g.Description))
 	}
 	return choices
 }
@@ -63,7 +63,7 @@ func GroupChoices(groups []api.GroupResponse) []Choice {
 func PermissionChoices(permissions []api.PermissionResponse) []Choice {
 	choices := make([]Choice, 0, len(permissions))
 	for _, p := range permissions {
-		choices = append(choices, choiceOf(p.Id, p.PermissionIdentifier, p.Description))
+		choices = append(choices, choiceOf(p.ID, p.PermissionIdentifier, p.Description))
 	}
 	return choices
 }

@@ -33,7 +33,7 @@ type flashStubApiClient struct {
 }
 
 func (flashStubApiClient) GetUserById(_ context.Context, accessToken string, id int64) (*api.UserResponse, error) {
-	return &api.UserResponse{Id: id, Email: "someone@example.com"}, nil
+	return &api.UserResponse{ID: id, Email: "someone@example.com"}, nil
 }
 
 // The rest of the ports flashStubApiClient is passed to, which no test here reaches.

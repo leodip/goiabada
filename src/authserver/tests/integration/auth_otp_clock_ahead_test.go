@@ -134,7 +134,7 @@ func TestAPIAccountOTPPut_Enable_ANextStepCodeIsRefusedAsAClockRunningAhead(t *t
 	issued := getOTPEnrollment(t, accessToken)
 
 	status, body := putAccountOTP(t, accessToken, api.UpdateAccountOTPRequest{
-		Enabled: true, Password: "Correct1!", OtpCode: otptest.NextStepCode(t, issued.SecretKey),
+		Enabled: true, Password: "Correct1!", OTPCode: otptest.NextStepCode(t, issued.SecretKey),
 	})
 	require.Equal(t, http.StatusBadRequest, status, body)
 	var refusal api.ErrorResponse
@@ -150,7 +150,7 @@ func TestAPIAccountOTPPut_Enable_ANextStepCodeIsRefusedAsAClockRunningAhead(t *t
 
 	// The current code, from the same issued key, enables.
 	status, body = putAccountOTP(t, accessToken, api.UpdateAccountOTPRequest{
-		Enabled: true, Password: "Correct1!", OtpCode: otptest.Code(t, issued.SecretKey, time.Now()),
+		Enabled: true, Password: "Correct1!", OTPCode: otptest.Code(t, issued.SecretKey, time.Now()),
 	})
 	assert.Equal(t, http.StatusOK, status, body)
 }

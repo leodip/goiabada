@@ -19,7 +19,7 @@ func TestOAuthWireTypes_JSONRepresentation(t *testing.T) {
 			name: "TokenResponse populated",
 			want: &TokenResponse{
 				AccessToken:      "access-token",
-				IdToken:          "id-token",
+				IDToken:          "id-token",
 				TokenType:        "Bearer",
 				ExpiresIn:        3600,
 				RefreshToken:     "refresh-token",
@@ -39,7 +39,7 @@ func TestOAuthWireTypes_JSONRepresentation(t *testing.T) {
 		},
 		{
 			name: "Jwk populated",
-			want: &Jwk{
+			want: &JWK{
 				Alg: "RS256",
 				Kid: "key-id",
 				Kty: "RSA",
@@ -47,21 +47,21 @@ func TestOAuthWireTypes_JSONRepresentation(t *testing.T) {
 				N:   "modulus",
 				E:   "AQAB",
 			},
-			newValue: func() any { return &Jwk{} },
+			newValue: func() any { return &JWK{} },
 			literal:  `{"alg":"RS256","kid":"key-id","kty":"RSA","use":"sig","n":"modulus","e":"AQAB"}`,
 		},
 		{
-			// No field of Jwk carries omitempty, so all six keys are present even when
+			// No field of JWK carries omitempty, so all six keys are present even when
 			// empty. That is the /certs contract: a consumer reading a key it did not
 			// find gets "" rather than a missing member.
 			name:     "Jwk zero",
-			want:     &Jwk{},
-			newValue: func() any { return &Jwk{} },
+			want:     &JWK{},
+			newValue: func() any { return &JWK{} },
 			literal:  `{"alg":"","kid":"","kty":"","use":"","n":"","e":""}`,
 		},
 		{
 			name: "Jwks populated",
-			want: &Jwks{Keys: []Jwk{{
+			want: &JWKS{Keys: []JWK{{
 				Alg: "RS256",
 				Kid: "key-id",
 				Kty: "RSA",
@@ -69,7 +69,7 @@ func TestOAuthWireTypes_JSONRepresentation(t *testing.T) {
 				N:   "modulus",
 				E:   "AQAB",
 			}}},
-			newValue: func() any { return &Jwks{} },
+			newValue: func() any { return &JWKS{} },
 			literal:  `{"keys":[{"alg":"RS256","kid":"key-id","kty":"RSA","use":"sig","n":"modulus","e":"AQAB"}]}`,
 		},
 		{
@@ -77,8 +77,8 @@ func TestOAuthWireTypes_JSONRepresentation(t *testing.T) {
 			// token_parser_jwks.go decodes /certs into this type, so the empty envelope
 			// is a shape it has to survive.
 			name:     "Jwks zero",
-			want:     &Jwks{},
-			newValue: func() any { return &Jwks{} },
+			want:     &JWKS{},
+			newValue: func() any { return &JWKS{} },
 			literal:  `{"keys":null}`,
 		},
 	}

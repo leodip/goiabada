@@ -72,17 +72,17 @@ func HandleClientBrandPut(
 		}
 		rawBrandId, sent := fields["brandId"]
 		if !sent {
-			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientBrandIdRequired, nil))
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientBrandIDRequired, nil))
 			return
 		}
 		var req api.UpdateClientBrandRequest
-		if decodeErr := json.Unmarshal(rawBrandId, &req.BrandId); decodeErr != nil {
+		if decodeErr := json.Unmarshal(rawBrandId, &req.BrandID); decodeErr != nil {
 			writeJSONError(w, "Invalid request body", "INVALID_REQUEST_BODY", http.StatusBadRequest)
 			return
 		}
 		var brandId sql.NullInt64
-		if req.BrandId != nil {
-			brandId = sql.NullInt64{Int64: *req.BrandId, Valid: true}
+		if req.BrandID != nil {
+			brandId = sql.NullInt64{Int64: *req.BrandID, Valid: true}
 		}
 
 		// Only authserver:manage writes to an administrator client (#402 decision 1).

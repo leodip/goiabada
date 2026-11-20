@@ -84,7 +84,7 @@
           <option value=""{{ if eq .user.ZoneInfo "" }} selected{{ end }}>{{ T $.ctx "adminconsole.account.profile.zone_info_blank" }}</option>
           {{ $user := .user }}
           {{ range .timezones }}
-          <option value="{{ .CountryName }}___{{ .Zone }}"{{ if eq (concat $user.ZoneInfoCountryName "___" $user.ZoneInfo) (concat .CountryName "___" .Zone) }} selected{{ end }}>{{ RefTimezone $.ctx .Zone .CountryCode .CountryName .Comments }}</option>
+          <option value="{{ .CountryName }}___{{ .Name }}"{{ if eq (concat $user.ZoneInfoCountryName "___" $user.ZoneInfo) (concat .CountryName "___" .Name) }} selected{{ end }}>{{ RefTimezone $.ctx .Name .CountryCode .CountryName .Comments }}</option>
           {{ end }}
         </select>
         <p class="field-hint" id="zoneInfoHint">{{ T $.ctx "adminconsole.account.profile.zone_info_tooltip" }}</p>
@@ -96,7 +96,7 @@
           {{- if .error }}{{ if eq .errorField "locale" }} aria-invalid="true" autofocus{{ end }}{{ end }} aria-describedby="{{ if .error }}{{ if eq .errorField "locale" }}profile-error {{ end }}{{ end }}localeHint">
           <option value=""{{ if eq .user.Locale "" }} selected{{ end }}>{{ T $.ctx "adminconsole.account.profile.locale_blank" }}</option>
           {{ range .locales }}
-          <option value="{{ .Id }}"{{ if eq $.user.Locale .Id }} selected{{ end }}>{{ .Id }} – {{ LocaleLabel .Id .Name }}</option>
+          <option value="{{ .ID }}"{{ if eq $.user.Locale .ID }} selected{{ end }}>{{ .ID }} – {{ LocaleLabel .ID .Name }}</option>
           {{ end }}
         </select>
         <p class="field-hint" id="localeHint">{{ T $.ctx "adminconsole.account.profile.locale_tooltip" }}</p>

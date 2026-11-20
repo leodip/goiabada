@@ -25,7 +25,7 @@ type resourcePermissionsSaveApiClient struct {
 }
 
 func (s *resourcePermissionsSaveApiClient) GetResourceById(_ context.Context, _ string, resourceId int64) (*api.ResourceResponse, error) {
-	return &api.ResourceResponse{Id: resourceId}, nil
+	return &api.ResourceResponse{ID: resourceId}, nil
 }
 
 func (s *resourcePermissionsSaveApiClient) UpdateResourcePermissions(_ context.Context, _ string, _ int64, request *api.UpdateResourcePermissionsRequest) error {
@@ -69,7 +69,7 @@ func TestHandlePermissionsPost_SendsTheLoadedList(t *testing.T) {
 			name: "the loaded list passes through as sent beside the wanted one",
 			body: `{"resourceId":3,"permissions":[{"id":9,"permissionIdentifier":" ler ","description":"Ler"}],` +
 				`"expectedPermissions":[{"id":9,"permissionIdentifier":"ler","description":" Ler faturas "}]}`,
-			wantExpected: []api.ResourcePermissionUpsert{{Id: 9, PermissionIdentifier: "ler", Description: " Ler faturas "}},
+			wantExpected: []api.ResourcePermissionUpsert{{ID: 9, PermissionIdentifier: "ler", Description: " Ler faturas "}},
 			wantWire:     `"expectedPermissions":[{"id":9,"permissionIdentifier":"ler","description":" Ler faturas "}]`,
 		},
 		{
@@ -106,7 +106,7 @@ func TestHandlePermissionsPost_SendsTheLoadedList(t *testing.T) {
 		serveResourcePermissionsSave(stub, testCases[0].body)
 
 		require.NotNil(t, stub.sent)
-		assert.Equal(t, []api.ResourcePermissionUpsert{{Id: 9, PermissionIdentifier: "ler", Description: "Ler"}}, stub.sent.Permissions)
+		assert.Equal(t, []api.ResourcePermissionUpsert{{ID: 9, PermissionIdentifier: "ler", Description: "Ler"}}, stub.sent.Permissions)
 	})
 }
 

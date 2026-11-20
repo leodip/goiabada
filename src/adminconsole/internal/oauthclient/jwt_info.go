@@ -19,7 +19,7 @@ import (
 // which stores the TokenResponse alone, so the move renamed nothing persisted.
 type JwtInfo struct {
 	TokenResponse oauth.TokenResponse
-	IdToken       *oauth.JwtToken
+	IdToken       *oauth.JWTToken
 }
 
 // HasScope reports whether the grant the token response records includes scope, matched

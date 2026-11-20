@@ -440,7 +440,7 @@ func HandleLegalDocumentPreviewPost() http.HandlerFunc {
 			return
 		}
 
-		writeJSON(w, r, http.StatusOK, api.PreviewLegalDocumentResponse{Html: string(html)})
+		writeJSON(w, r, http.StatusOK, api.PreviewLegalDocumentResponse{HTML: string(html)})
 	}
 }
 

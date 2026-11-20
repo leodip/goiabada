@@ -42,7 +42,7 @@ func legalRequest(t *testing.T, method string, body any, pathValues ...string) *
 		reader = bytes.NewReader(nil)
 	}
 	req := httptest.NewRequest(method, "/api/v1/admin/legal-documents", reader)
-	req = req.WithContext(reqctx.WithValidatedToken(req.Context(), oauth.JwtToken{Claims: map[string]any{"sub": legalCaller}}))
+	req = req.WithContext(reqctx.WithValidatedToken(req.Context(), oauth.JWTToken{Claims: map[string]any{"sub": legalCaller}}))
 	for i := 0; i+1 < len(pathValues); i += 2 {
 		req.SetPathValue(pathValues[i], pathValues[i+1])
 	}

@@ -31,7 +31,7 @@ type emailRecordingApiClient struct {
 }
 
 func (*emailRecordingApiClient) GetAccountProfile(context.Context, string) (*api.UserResponse, error) {
-	return &api.UserResponse{Id: 11, Email: "old@example.com", EmailVerified: true}, nil
+	return &api.UserResponse{ID: 11, Email: "old@example.com", EmailVerified: true}, nil
 }
 
 func (c *emailRecordingApiClient) UpdateAccountEmail(_ context.Context, _ string,
@@ -40,7 +40,7 @@ func (c *emailRecordingApiClient) UpdateAccountEmail(_ context.Context, _ string
 	if c.refusal != nil {
 		return nil, c.refusal
 	}
-	return &api.UserResponse{Id: 11, Email: request.Email}, nil
+	return &api.UserResponse{ID: 11, Email: request.Email}, nil
 }
 
 // requireNoPasswordInBind fails when any value the page was rendered with carries the password.

@@ -70,7 +70,7 @@ func TestPageLanguage_AProfileSaveLeavingItOutCannotUndoAChoiceSavedMeanwhile(t 
 		{"PUT /api/v1/account/profile", func(t *testing.T, db *choiceSavedDuringTheRead, user *record.User, body string) *httptest.ResponseRecorder {
 			req := httptest.NewRequest(http.MethodPut, "/api/v1/account/profile", strings.NewReader(body))
 			req = req.WithContext(reqctx.WithValidatedToken(req.Context(),
-				oauth.JwtToken{Claims: map[string]interface{}{"sub": user.Subject}}))
+				oauth.JWTToken{Claims: map[string]interface{}{"sub": user.Subject}}))
 			rr := httptest.NewRecorder()
 			apihandlers.HandleAccountProfilePut(db, accountvalidation.NewProfileValidator(database), discardAudit{}).
 				ServeHTTP(rr, req)
@@ -81,7 +81,7 @@ func TestPageLanguage_AProfileSaveLeavingItOutCannotUndoAChoiceSavedMeanwhile(t 
 				strings.NewReader(body))
 			req.SetPathValue("id", strconv.FormatInt(user.Id, 10))
 			req = req.WithContext(reqctx.WithValidatedToken(req.Context(),
-				oauth.JwtToken{Claims: map[string]interface{}{"sub": "an-administrator", "scope": "authserver:manage"}}))
+				oauth.JWTToken{Claims: map[string]interface{}{"sub": "an-administrator", "scope": "authserver:manage"}}))
 			rr := httptest.NewRecorder()
 			apihandlers.HandleUserProfilePut(db, accountvalidation.NewProfileValidator(database), discardAudit{}).
 				ServeHTTP(rr, req)

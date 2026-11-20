@@ -86,7 +86,7 @@ func TestAPIUserCreatePost_HoldsThePasswordToNist(t *testing.T) {
 		require.Equal(t, http.StatusCreated, resp.StatusCode)
 		var created api.CreateUserResponse
 		require.NoError(t, json.NewDecoder(resp.Body).Decode(&created))
-		t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, created.User.Id) })
+		t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, created.User.ID) })
 	})
 }
 

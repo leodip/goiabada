@@ -3,7 +3,7 @@
 {{define "head"}}{{end}}
 
 {{define "page"}}
-{{ template "client_header" (args "legal-documents" .client.Id .client.ClientIdentifier .client.IsSystemLevelClient .client.IsPublic $.ctx) }}
+{{ template "client_header" (args "legal-documents" .client.ID .client.ClientIdentifier .client.IsSystemLevelClient .client.IsPublic $.ctx) }}
 
 {{/* Read only: the legal documents that apply to this client, published or not, retired ones left
      out. A document's apps are chosen on its own Applies to tab. */}}
@@ -29,7 +29,7 @@
       {{ range .legalDocuments }}
       <tr>
         <td class="cell-wrap">
-          <a class="text-link" href="/admin/legal-documents/{{ .Id }}/draft">{{ .Title }}</a>
+          <a class="text-link" href="/admin/legal-documents/{{ .ID }}/draft">{{ .Title }}</a>
           <span class="cell-secondary font-mono">{{ .ShortName }}</span>
         </td>
         <td data-label="{{ T $.ctx "adminconsole.admin_legal_documents.list.col_state" }}">{{ template "legal_document_tags" (args . $.ctx) }}</td>

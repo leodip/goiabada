@@ -1,7 +1,7 @@
 package api
 
 type ResourceResponse struct {
-	Id                 int64  `json:"id"`
+	ID                 int64  `json:"id"`
 	ResourceIdentifier string `json:"resourceIdentifier"`
 	Description        string `json:"description"`
 	// IsSystemLevelResource travels because the API enforces it and a consumer has to mirror it:
@@ -47,10 +47,10 @@ type UpdateResourceResponse struct {
 }
 
 type PermissionResponse struct {
-	Id                   int64            `json:"id"`
+	ID                   int64            `json:"id"`
 	PermissionIdentifier string           `json:"permissionIdentifier"`
 	Description          string           `json:"description"`
-	ResourceId           int64            `json:"resourceId"`
+	ResourceID           int64            `json:"resourceId"`
 	Resource             ResourceResponse `json:"resource"`
 }
 
@@ -63,7 +63,7 @@ type GetPermissionsByResourceResponse struct {
 // and audits.
 //
 // ExpectedPermissions is the resource's permissions as the caller last read them, each entry's id,
-// identifier and description as stored, required and compared as ExpectedPermissionIds is on
+// identifier and description as stored, required and compared as ExpectedPermissionIDs is on
 // UpdateUserPermissionsRequest: absent or null is refused, [] means the caller read none, and a
 // stored list that differs answers 409 CONCURRENT_UPDATE (#428).
 type UpdateResourcePermissionsRequest struct {
@@ -72,9 +72,9 @@ type UpdateResourcePermissionsRequest struct {
 }
 
 // ResourcePermissionUpsert represents a permission to create or update.
-// If Id <= 0 or omitted, a new permission is created.
+// If ID <= 0 or omitted, a new permission is created.
 type ResourcePermissionUpsert struct {
-	Id                   int64  `json:"id,omitempty"`
+	ID                   int64  `json:"id,omitempty"`
 	PermissionIdentifier string `json:"permissionIdentifier"`
 	Description          string `json:"description"`
 }

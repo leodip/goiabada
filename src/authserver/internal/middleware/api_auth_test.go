@@ -34,7 +34,7 @@ func TestRequireBearerTokenScope(t *testing.T) {
 	t.Run("passes when token has required scope", func(t *testing.T) {
 		handler := apiBearerForTest.RequireBearerTokenScope("authserver:manage")
 
-		token := oauth.JwtToken{
+		token := oauth.JWTToken{
 			Claims: map[string]interface{}{
 				"scope": "authserver:manage openid",
 			},
@@ -59,7 +59,7 @@ func TestRequireBearerTokenScope(t *testing.T) {
 	t.Run("passes when token has only the required scope", func(t *testing.T) {
 		handler := apiBearerForTest.RequireBearerTokenScope("authserver:manage")
 
-		token := oauth.JwtToken{
+		token := oauth.JWTToken{
 			Claims: map[string]interface{}{
 				"scope": "authserver:manage",
 			},
@@ -84,7 +84,7 @@ func TestRequireBearerTokenScope(t *testing.T) {
 	t.Run("returns 403 when token lacks required scope", func(t *testing.T) {
 		handler := apiBearerForTest.RequireBearerTokenScope("authserver:manage")
 
-		token := oauth.JwtToken{
+		token := oauth.JWTToken{
 			Claims: map[string]interface{}{
 				"scope": "openid",
 			},
@@ -109,7 +109,7 @@ func TestRequireBearerTokenScope(t *testing.T) {
 	t.Run("returns 403 when scope claim is empty string", func(t *testing.T) {
 		handler := apiBearerForTest.RequireBearerTokenScope("authserver:manage")
 
-		token := oauth.JwtToken{
+		token := oauth.JWTToken{
 			Claims: map[string]interface{}{
 				"scope": "",
 			},
@@ -134,7 +134,7 @@ func TestRequireBearerTokenScope(t *testing.T) {
 	t.Run("returns 403 when scope claim is missing", func(t *testing.T) {
 		handler := apiBearerForTest.RequireBearerTokenScope("authserver:manage")
 
-		token := oauth.JwtToken{
+		token := oauth.JWTToken{
 			Claims: map[string]interface{}{
 				"sub": "user123",
 			},
@@ -176,7 +176,7 @@ func TestRequireBearerTokenScope(t *testing.T) {
 	t.Run("does not match partial scope names", func(t *testing.T) {
 		handler := apiBearerForTest.RequireBearerTokenScope("authserver:manage")
 
-		token := oauth.JwtToken{
+		token := oauth.JWTToken{
 			Claims: map[string]interface{}{
 				"scope": "authserver:manage-users authserver:manage-clients",
 			},
@@ -201,7 +201,7 @@ func TestRequireBearerTokenScope(t *testing.T) {
 	t.Run("adds validated token to context", func(t *testing.T) {
 		handler := apiBearerForTest.RequireBearerTokenScope("authserver:manage")
 
-		token := oauth.JwtToken{
+		token := oauth.JWTToken{
 			Claims: map[string]interface{}{
 				"scope": "authserver:manage",
 				"sub":   "user123",
@@ -213,7 +213,7 @@ func TestRequireBearerTokenScope(t *testing.T) {
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
-		var validatedToken oauth.JwtToken
+		var validatedToken oauth.JWTToken
 		var present bool
 		next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			validatedToken, present = reqctx.ValidatedTokenFrom(r.Context())
@@ -230,7 +230,7 @@ func TestRequireBearerTokenScopeAnyOf(t *testing.T) {
 	t.Run("passes when token has first scope", func(t *testing.T) {
 		handler := apiBearerForTest.RequireBearerTokenScopeAnyOf([]string{"authserver:admin-read", "authserver:manage"})
 
-		token := oauth.JwtToken{
+		token := oauth.JWTToken{
 			Claims: map[string]interface{}{
 				"scope": "authserver:admin-read",
 			},
@@ -255,7 +255,7 @@ func TestRequireBearerTokenScopeAnyOf(t *testing.T) {
 	t.Run("passes when token has second scope", func(t *testing.T) {
 		handler := apiBearerForTest.RequireBearerTokenScopeAnyOf([]string{"authserver:admin-read", "authserver:manage"})
 
-		token := oauth.JwtToken{
+		token := oauth.JWTToken{
 			Claims: map[string]interface{}{
 				"scope": "authserver:manage",
 			},
@@ -284,7 +284,7 @@ func TestRequireBearerTokenScopeAnyOf(t *testing.T) {
 			"authserver:manage",
 		})
 
-		token := oauth.JwtToken{
+		token := oauth.JWTToken{
 			Claims: map[string]interface{}{
 				"scope": "authserver:manage-users openid profile",
 			},
@@ -309,7 +309,7 @@ func TestRequireBearerTokenScopeAnyOf(t *testing.T) {
 	t.Run("returns 403 when token has none of the required scopes", func(t *testing.T) {
 		handler := apiBearerForTest.RequireBearerTokenScopeAnyOf([]string{"authserver:admin-read", "authserver:manage"})
 
-		token := oauth.JwtToken{
+		token := oauth.JWTToken{
 			Claims: map[string]interface{}{
 				"scope": "openid profile",
 			},
@@ -351,7 +351,7 @@ func TestRequireBearerTokenScopeAnyOf(t *testing.T) {
 	t.Run("adds validated token to context", func(t *testing.T) {
 		handler := apiBearerForTest.RequireBearerTokenScopeAnyOf([]string{"authserver:manage"})
 
-		token := oauth.JwtToken{
+		token := oauth.JWTToken{
 			Claims: map[string]interface{}{
 				"scope": "authserver:manage",
 				"sub":   "user123",
@@ -363,7 +363,7 @@ func TestRequireBearerTokenScopeAnyOf(t *testing.T) {
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
-		var validatedToken oauth.JwtToken
+		var validatedToken oauth.JWTToken
 		var present bool
 		next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			validatedToken, present = reqctx.ValidatedTokenFrom(r.Context())
@@ -380,7 +380,7 @@ func TestRequireBearerTokenScopeAnyOf_EdgeCases(t *testing.T) {
 	t.Run("returns 403 when empty scope list is provided", func(t *testing.T) {
 		handler := apiBearerForTest.RequireBearerTokenScopeAnyOf([]string{})
 
-		token := oauth.JwtToken{
+		token := oauth.JWTToken{
 			Claims: map[string]interface{}{
 				"scope": "authserver:manage",
 			},
@@ -405,7 +405,7 @@ func TestRequireBearerTokenScopeAnyOf_EdgeCases(t *testing.T) {
 	t.Run("returns 403 when scope claim is empty string", func(t *testing.T) {
 		handler := apiBearerForTest.RequireBearerTokenScopeAnyOf([]string{"authserver:manage"})
 
-		token := oauth.JwtToken{
+		token := oauth.JWTToken{
 			Claims: map[string]interface{}{
 				"scope": "",
 			},
@@ -430,7 +430,7 @@ func TestRequireBearerTokenScopeAnyOf_EdgeCases(t *testing.T) {
 	t.Run("returns 403 when scope claim is missing", func(t *testing.T) {
 		handler := apiBearerForTest.RequireBearerTokenScopeAnyOf([]string{"authserver:manage"})
 
-		token := oauth.JwtToken{
+		token := oauth.JWTToken{
 			Claims: map[string]interface{}{
 				"sub": "user123",
 			},
@@ -455,7 +455,7 @@ func TestRequireBearerTokenScopeAnyOf_EdgeCases(t *testing.T) {
 	t.Run("does not match partial scope names", func(t *testing.T) {
 		handler := apiBearerForTest.RequireBearerTokenScopeAnyOf([]string{"authserver:manage"})
 
-		token := oauth.JwtToken{
+		token := oauth.JWTToken{
 			Claims: map[string]interface{}{
 				"scope": "authserver:manage-users authserver:manage-clients",
 			},
@@ -480,7 +480,7 @@ func TestRequireBearerTokenScopeAnyOf_EdgeCases(t *testing.T) {
 	t.Run("passes with single scope in list", func(t *testing.T) {
 		handler := apiBearerForTest.RequireBearerTokenScopeAnyOf([]string{"authserver:manage"})
 
-		token := oauth.JwtToken{
+		token := oauth.JWTToken{
 			Claims: map[string]interface{}{
 				"scope": "authserver:manage",
 			},
@@ -510,7 +510,7 @@ func TestRequireBearerTokenScopeAnyOf_EdgeCases(t *testing.T) {
 			"authserver:manage",
 		})
 
-		token := oauth.JwtToken{
+		token := oauth.JWTToken{
 			Claims: map[string]interface{}{
 				"scope": "authserver:manage",
 			},
@@ -538,7 +538,7 @@ func TestRequireBearerTokenScopeAnyOf_EdgeCases(t *testing.T) {
 			"authserver:manage",
 		})
 
-		token := oauth.JwtToken{
+		token := oauth.JWTToken{
 			Claims: map[string]interface{}{
 				"scope": "authserver:admin-read authserver:manage openid",
 			},
@@ -593,7 +593,7 @@ func TestGranularScopeScenarios(t *testing.T) {
 	}
 
 	t.Run("admin-read can read users but not write", func(t *testing.T) {
-		token := oauth.JwtToken{
+		token := oauth.JWTToken{
 			Claims: map[string]interface{}{
 				"scope": "authserver:admin-read",
 			},
@@ -622,7 +622,7 @@ func TestGranularScopeScenarios(t *testing.T) {
 	})
 
 	t.Run("manage-users can read and write users", func(t *testing.T) {
-		token := oauth.JwtToken{
+		token := oauth.JWTToken{
 			Claims: map[string]interface{}{
 				"scope": "authserver:manage-users",
 			},
@@ -650,7 +650,7 @@ func TestGranularScopeScenarios(t *testing.T) {
 	})
 
 	t.Run("manage-users cannot access clients", func(t *testing.T) {
-		token := oauth.JwtToken{
+		token := oauth.JWTToken{
 			Claims: map[string]interface{}{
 				"scope": "authserver:manage-users",
 			},
@@ -680,7 +680,7 @@ func TestGranularScopeScenarios(t *testing.T) {
 	})
 
 	t.Run("manage scope has full access to everything", func(t *testing.T) {
-		token := oauth.JwtToken{
+		token := oauth.JWTToken{
 			Claims: map[string]interface{}{
 				"scope": "authserver:manage",
 			},
@@ -707,7 +707,7 @@ func TestGranularScopeScenarios(t *testing.T) {
 	})
 
 	t.Run("admin-read can read all domains", func(t *testing.T) {
-		token := oauth.JwtToken{
+		token := oauth.JWTToken{
 			Claims: map[string]interface{}{
 				"scope": "authserver:admin-read",
 			},
@@ -730,7 +730,7 @@ func TestGranularScopeScenarios(t *testing.T) {
 	})
 
 	t.Run("admin-read cannot write to any domain", func(t *testing.T) {
-		token := oauth.JwtToken{
+		token := oauth.JWTToken{
 			Claims: map[string]interface{}{
 				"scope": "authserver:admin-read",
 			},
@@ -754,7 +754,7 @@ func TestGranularScopeScenarios(t *testing.T) {
 	})
 
 	t.Run("combined scopes work correctly", func(t *testing.T) {
-		token := oauth.JwtToken{
+		token := oauth.JWTToken{
 			Claims: map[string]interface{}{
 				"scope": "authserver:manage-users authserver:manage-clients",
 			},
@@ -1538,7 +1538,7 @@ func TestRequireUserBoundToken(t *testing.T) {
 	}
 
 	t.Run("passes a token carrying auth_time", func(t *testing.T) {
-		token := oauth.JwtToken{
+		token := oauth.JWTToken{
 			Claims: map[string]interface{}{
 				"sub":       "a1b2c3d4-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
 				"scope":     "authserver:manage-account",
@@ -1563,7 +1563,7 @@ func TestRequireUserBoundToken(t *testing.T) {
 		// Exactly the claim set IssueClientCredentialsGrant produces: sub is the
 		// client identifier, and the scope required by the route is present. Only the
 		// absence of auth_time distinguishes it.
-		token := oauth.JwtToken{
+		token := oauth.JWTToken{
 			Claims: map[string]interface{}{
 				"sub":   "a1b2c3d4-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
 				"scope": "authserver:manage-account",
@@ -1618,7 +1618,7 @@ func TestRequireUserBoundToken(t *testing.T) {
 		// ROPC refresh path the value is already wrong (it reports the refresh moment), so a
 		// guard that validated the value would be asserting a property the issuer does not
 		// currently hold.
-		token := oauth.JwtToken{
+		token := oauth.JWTToken{
 			Claims: map[string]interface{}{
 				"sub":       "some-user-subject",
 				"auth_time": float64(0),

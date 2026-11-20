@@ -127,7 +127,7 @@ func TestResourcePermissionsPost_ForwardsTheApisStatus(t *testing.T) {
 				render.New(nil, nil),
 				nil,
 				&savePermissionsApiClient{
-					resource:  &api.ResourceResponse{Id: 3},
+					resource:  &api.ResourceResponse{ID: 3},
 					updateErr: testCase.updateErr,
 				}).ServeHTTP(rec, req)
 

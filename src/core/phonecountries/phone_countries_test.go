@@ -25,11 +25,11 @@ func TestAll_CountAndUniqueness(t *testing.T) {
 	assert.Len(t, pcs, total, "one phone entry per (country, code)")
 	assert.Len(t, pcs, 252, "expected 252 phone entries for the current dataset")
 
-	seenId := map[string]bool{}
+	seenID := map[string]bool{}
 	seenName := map[string]bool{}
 	for _, pc := range pcs {
-		assert.Falsef(t, seenId[pc.UniqueId], "duplicate UniqueId %q", pc.UniqueId)
-		seenId[pc.UniqueId] = true
+		assert.Falsef(t, seenID[pc.UniqueID], "duplicate UniqueID %q", pc.UniqueID)
+		seenID[pc.UniqueID] = true
 		assert.Falsef(t, seenName[pc.Name], "duplicate Name %q", pc.Name)
 		seenName[pc.Name] = true
 	}
@@ -41,27 +41,27 @@ func TestAll_CountAndUniqueness(t *testing.T) {
 func TestAll_CallingCodeFormat(t *testing.T) {
 	for _, pc := range All() {
 		if !strings.HasPrefix(pc.CallingCode, "+") {
-			t.Errorf("%s: CallingCode %q missing '+'", pc.UniqueId, pc.CallingCode)
+			t.Errorf("%s: CallingCode %q missing '+'", pc.UniqueID, pc.CallingCode)
 			continue
 		}
 		if strings.HasPrefix(pc.CallingCode, "++") {
-			t.Errorf("%s: CallingCode %q has a double '+'", pc.UniqueId, pc.CallingCode)
+			t.Errorf("%s: CallingCode %q has a double '+'", pc.UniqueID, pc.CallingCode)
 		}
 		digits := strings.TrimPrefix(pc.CallingCode, "+")
 		if digits == "" || strings.ContainsFunc(digits, func(r rune) bool { return r < '0' || r > '9' }) {
-			t.Errorf("%s: CallingCode %q is not '+' followed by digits", pc.UniqueId, pc.CallingCode)
+			t.Errorf("%s: CallingCode %q is not '+' followed by digits", pc.UniqueID, pc.CallingCode)
 		}
 		if !strings.Contains(pc.Name, pc.CallingCode) {
-			t.Errorf("%s: Name %q does not embed CallingCode %q", pc.UniqueId, pc.Name, pc.CallingCode)
+			t.Errorf("%s: Name %q does not embed CallingCode %q", pc.UniqueID, pc.Name, pc.CallingCode)
 		}
 	}
 }
 
-// TestByUniqueID_SpotChecks verifies specific entries by UniqueId (stable
+// TestByUniqueID_SpotChecks verifies specific entries by UniqueID (stable
 // across CLDR name changes), covering the migration's calling-code changes and
 // supplements.
 func TestByUniqueID_SpotChecks(t *testing.T) {
-	want := map[string]string{ // UniqueId -> CallingCode
+	want := map[string]string{ // UniqueID -> CallingCode
 		"BRA_0": "+55",
 		"USA_0": "+1",
 		"VAT_0": "+3906", // prefix-changed (biter777 had +3906698)
@@ -78,7 +78,7 @@ func TestByUniqueID_SpotChecks(t *testing.T) {
 			t.Errorf("%s: missing", id)
 			continue
 		}
-		assert.Equalf(t, id, pc.UniqueId, "%s unique id", id)
+		assert.Equalf(t, id, pc.UniqueID, "%s unique id", id)
 		assert.Equalf(t, code, pc.CallingCode, "%s calling code", id)
 	}
 
@@ -90,12 +90,12 @@ func TestByUniqueID_SpotChecks(t *testing.T) {
 	}
 }
 
-// TestAll_UniqueIdFormat checks the UniqueId is "<Alpha3>_<index>".
-func TestAll_UniqueIdFormat(t *testing.T) {
+// TestAll_UniqueIDFormat checks the UniqueID is "<Alpha3>_<index>".
+func TestAll_UniqueIDFormat(t *testing.T) {
 	for _, pc := range All() {
-		parts := strings.Split(pc.UniqueId, "_")
+		parts := strings.Split(pc.UniqueID, "_")
 		if len(parts) != 2 || len(parts[0]) != 3 {
-			t.Errorf("UniqueId %q not in <Alpha3>_<index> form", pc.UniqueId)
+			t.Errorf("UniqueID %q not in <Alpha3>_<index> form", pc.UniqueID)
 		}
 	}
 }
@@ -106,7 +106,7 @@ func TestAll_Isolation(t *testing.T) {
 	first := All()
 	for i := range first {
 		first[i].CallingCode = "+999"
-		first[i].UniqueId = "XXX_" + first[i].UniqueId
+		first[i].UniqueID = "XXX_" + first[i].UniqueID
 	}
 	for i, j := 0, len(first)-1; i < j; i, j = i+1, j-1 {
 		first[i], first[j] = first[j], first[i]
@@ -122,19 +122,19 @@ func TestAll_Isolation(t *testing.T) {
 }
 
 // TestByUniqueID_EqualsScan holds the index to the list: every entry All
-// returns is found by its UniqueId, field for field.
+// returns is found by its UniqueID, field for field.
 func TestByUniqueID_EqualsScan(t *testing.T) {
 	all := All()
 	if len(all) == 0 {
 		t.Fatal("All() returned no entries")
 	}
 	for _, want := range all {
-		got, ok := ByUniqueID(want.UniqueId)
+		got, ok := ByUniqueID(want.UniqueID)
 		if !ok {
-			t.Errorf("ByUniqueID(%q) not found", want.UniqueId)
+			t.Errorf("ByUniqueID(%q) not found", want.UniqueID)
 			continue
 		}
-		assert.Equalf(t, want, got, "ByUniqueID(%q)", want.UniqueId)
+		assert.Equalf(t, want, got, "ByUniqueID(%q)", want.UniqueID)
 	}
 }
 
@@ -185,7 +185,7 @@ func TestBuild_SixCodes(t *testing.T) {
 	})
 	if assert.Len(t, got, 6) {
 		for i, pc := range got {
-			assert.Equal(t, "SIX_"+string(rune('0'+i)), pc.UniqueId)
+			assert.Equal(t, "SIX_"+string(rune('0'+i)), pc.UniqueID)
 			assert.Equal(t, "+"+codes[i], pc.CallingCode)
 		}
 	}

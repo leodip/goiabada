@@ -45,7 +45,7 @@ func (a *brandingAPI) GetAllBrands(context.Context, string) ([]api.BrandResponse
 
 func (a *brandingAPI) GetBrandById(_ context.Context, _ string, brandId int64) (*api.BrandResponse, error) {
 	for _, brand := range a.brands {
-		if brand.Id == brandId {
+		if brand.ID == brandId {
 			return &brand, nil
 		}
 	}
@@ -57,7 +57,7 @@ func (a *brandingAPI) GetBrandAssetById(_ context.Context, _ string, assetId int
 		return nil, a.assetErr
 	}
 	for _, asset := range a.assets {
-		if asset.Id == assetId {
+		if asset.ID == assetId {
 			return &asset, nil
 		}
 	}
@@ -73,7 +73,7 @@ func (a *brandingAPI) CreateBrand(_ context.Context, _ string, request *api.Crea
 	if a.writeErr != nil {
 		return nil, a.writeErr
 	}
-	return &api.BrandResponse{Id: 9, Name: request.Name}, nil
+	return &api.BrandResponse{ID: 9, Name: request.Name}, nil
 }
 
 func (a *brandingAPI) UpdateBrand(_ context.Context, _ string, brandId int64, request *api.UpdateBrandRequest) (*api.BrandResponse, error) {
@@ -81,7 +81,7 @@ func (a *brandingAPI) UpdateBrand(_ context.Context, _ string, brandId int64, re
 	if a.writeErr != nil {
 		return nil, a.writeErr
 	}
-	return &api.BrandResponse{Id: brandId, Name: request.Name}, nil
+	return &api.BrandResponse{ID: brandId, Name: request.Name}, nil
 }
 
 func (a *brandingAPI) DeleteBrand(_ context.Context, _ string, brandId int64) error {
@@ -94,7 +94,7 @@ func (a *brandingAPI) MakeBrandDefault(_ context.Context, _ string, brandId int6
 	if a.writeErr != nil {
 		return nil, a.writeErr
 	}
-	return &api.BrandResponse{Id: brandId, IsDefault: true}, nil
+	return &api.BrandResponse{ID: brandId, IsDefault: true}, nil
 }
 
 // Two of the auth server's themes, with values that are no theme's real ones, so a swatch drawn
@@ -111,19 +111,19 @@ var (
 func newBrandingAPI() *brandingAPI {
 	return &brandingAPI{
 		brands: []api.BrandResponse{
-			{Id: 4, Name: "Autumn", Appearance: "dark", Theme: "plum", ClientCount: 2,
+			{ID: 4, Name: "Autumn", Appearance: "dark", Theme: "plum", ClientCount: 2,
 				Corners: "pill", Font: "serif", BackgroundFit: "tile", HideAppName: true,
-				Logo:        &api.BrandAssetResponse{Id: 11, Kind: "logo", Url: "https://auth.example.test/brand-assets/11?v=a", ContentType: "image/png", Width: 200, Height: 60},
-				Favicon:     &api.BrandAssetResponse{Id: 13, Kind: "favicon", Url: "https://auth.example.test/brand-assets/13?v=c", ContentType: "image/png", Width: 64, Height: 64},
-				RegularFont: &api.BrandAssetResponse{Id: 15, Kind: "font", Url: "https://auth.example.test/brand-assets/15?v=e", ContentType: "font/woff2"},
+				Logo:        &api.BrandAssetResponse{ID: 11, Kind: "logo", URL: "https://auth.example.test/brand-assets/11?v=a", ContentType: "image/png", Width: 200, Height: 60},
+				Favicon:     &api.BrandAssetResponse{ID: 13, Kind: "favicon", URL: "https://auth.example.test/brand-assets/13?v=c", ContentType: "image/png", Width: 64, Height: 64},
+				RegularFont: &api.BrandAssetResponse{ID: 15, Kind: "font", URL: "https://auth.example.test/brand-assets/15?v=e", ContentType: "font/woff2"},
 				FooterLinks: []api.BrandFooterLinkResponse{
-					{Url: "https://autumn.example/privacy", Label: "Privacy", Labels: map[string]string{"de": "Datenschutz", "pt-BR": "Privacidade"}},
-					{Url: "https://status.autumn.example", Label: "Status", Labels: map[string]string{}},
+					{URL: "https://autumn.example/privacy", Label: "Privacy", Labels: map[string]string{"de": "Datenschutz", "pt-BR": "Privacidade"}},
+					{URL: "https://status.autumn.example", Label: "Status", Labels: map[string]string{}},
 				},
-				SupportEmail: "help@autumn.example", SupportUrl: "https://help.autumn.example", SupportPhone: "+15550100199"},
-			{Id: 5, Name: "Default", Appearance: "auto", Theme: "blueberry", IsDefault: true, ClientCount: 3},
-			{Id: 6, Name: "Spring", Appearance: "light", Theme: "plum", ClientCount: 1},
-			{Id: 7, Name: "Unused", Appearance: "auto", Theme: "plum"},
+				SupportEmail: "help@autumn.example", SupportURL: "https://help.autumn.example", SupportPhone: "+15550100199"},
+			{ID: 5, Name: "Default", Appearance: "auto", Theme: "blueberry", IsDefault: true, ClientCount: 3},
+			{ID: 6, Name: "Spring", Appearance: "light", Theme: "plum", ClientCount: 1},
+			{ID: 7, Name: "Unused", Appearance: "auto", Theme: "plum"},
 		},
 		themes: []api.BrandThemeResponse{testBlueberry, testPlum},
 		assets: []api.BrandAssetResponse{uploadedLogo, uploadedDarkLogo, uploadedFavicon, uploadedBackground, uploadedRegularFont, uploadedBoldFont},
@@ -132,12 +132,12 @@ func newBrandingAPI() *brandingAPI {
 
 // Assets uploaded in the editor and not yet saved, as the admin API answers each read by its id.
 var (
-	uploadedLogo        = api.BrandAssetResponse{Id: 21, Kind: "logo", Url: "https://auth.example.test/brand-assets/21?v=l", ContentType: "image/png", Width: 240, Height: 80}
-	uploadedDarkLogo    = api.BrandAssetResponse{Id: 22, Kind: "logo", Url: "https://auth.example.test/brand-assets/22?v=d", ContentType: "image/webp", Width: 240, Height: 80}
-	uploadedFavicon     = api.BrandAssetResponse{Id: 23, Kind: "favicon", Url: "https://auth.example.test/brand-assets/23?v=f", ContentType: "image/png", Width: 64, Height: 64}
-	uploadedBackground  = api.BrandAssetResponse{Id: 24, Kind: "background", Url: "https://auth.example.test/brand-assets/24?v=b", ContentType: "image/jpeg", Width: 1920, Height: 1080}
-	uploadedRegularFont = api.BrandAssetResponse{Id: 25, Kind: "font", Url: "https://auth.example.test/brand-assets/25?v=r", ContentType: "font/woff2"}
-	uploadedBoldFont    = api.BrandAssetResponse{Id: 26, Kind: "font", Url: "https://auth.example.test/brand-assets/26?v=o", ContentType: "font/woff2"}
+	uploadedLogo        = api.BrandAssetResponse{ID: 21, Kind: "logo", URL: "https://auth.example.test/brand-assets/21?v=l", ContentType: "image/png", Width: 240, Height: 80}
+	uploadedDarkLogo    = api.BrandAssetResponse{ID: 22, Kind: "logo", URL: "https://auth.example.test/brand-assets/22?v=d", ContentType: "image/webp", Width: 240, Height: 80}
+	uploadedFavicon     = api.BrandAssetResponse{ID: 23, Kind: "favicon", URL: "https://auth.example.test/brand-assets/23?v=f", ContentType: "image/png", Width: 64, Height: 64}
+	uploadedBackground  = api.BrandAssetResponse{ID: 24, Kind: "background", URL: "https://auth.example.test/brand-assets/24?v=b", ContentType: "image/jpeg", Width: 1920, Height: 1080}
+	uploadedRegularFont = api.BrandAssetResponse{ID: 25, Kind: "font", URL: "https://auth.example.test/brand-assets/25?v=r", ContentType: "font/woff2"}
+	uploadedBoldFont    = api.BrandAssetResponse{ID: 26, Kind: "font", URL: "https://auth.example.test/brand-assets/26?v=o", ContentType: "font/woff2"}
 )
 
 // slotsForm is the six slots' fields as the editor posts them: each slot's asset id, or empty.
@@ -173,11 +173,11 @@ func TestHandleBrandingGet_ListsTheBrandsInTheServersOrderWithTheirLookInWords(t
 
 	assert.Equal(t, []BrandRow{
 		{BrandResponse: newBrandingAPI().brands[0], AppearanceName: "Dark", ThemeName: "Plum"},
-		{BrandResponse: api.BrandResponse{Id: 5, Name: "Default", Appearance: "auto", Theme: "blueberry", IsDefault: true, ClientCount: 3},
+		{BrandResponse: api.BrandResponse{ID: 5, Name: "Default", Appearance: "auto", Theme: "blueberry", IsDefault: true, ClientCount: 3},
 			AppearanceName: "Automatic", ThemeName: "Blueberry"},
-		{BrandResponse: api.BrandResponse{Id: 6, Name: "Spring", Appearance: "light", Theme: "plum", ClientCount: 1},
+		{BrandResponse: api.BrandResponse{ID: 6, Name: "Spring", Appearance: "light", Theme: "plum", ClientCount: 1},
 			AppearanceName: "Light", ThemeName: "Plum"},
-		{BrandResponse: api.BrandResponse{Id: 7, Name: "Unused", Appearance: "auto", Theme: "plum"},
+		{BrandResponse: api.BrandResponse{ID: 7, Name: "Unused", Appearance: "auto", Theme: "plum"},
 			AppearanceName: "Automatic", ThemeName: "Plum"},
 	}, handlertest.Bind(t, httpHelper)["brands"])
 }
@@ -189,7 +189,7 @@ func TestHandleBrandingGet_ATheConsoleDoesNotKnowIsNamedByItsKey(t *testing.T) {
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_branding.html").Once()
 	apiClient := newBrandingAPI()
-	apiClient.brands = []api.BrandResponse{{Id: 6, Name: "Lab", Appearance: "light", Theme: "dragonfruit"}}
+	apiClient.brands = []api.BrandResponse{{ID: 6, Name: "Lab", Appearance: "light", Theme: "dragonfruit"}}
 
 	HandleBrandingGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(),
 		handlertest.Request(http.MethodGet, "/admin/settings/branding", handlertest.WithAccessToken()))
@@ -412,8 +412,8 @@ func TestHandleBrandPost_SavesTheBrandAndSaysSoOnItsPage(t *testing.T) {
 	assert.Equal(t, int64(4), apiClient.updatedId)
 	assert.Equal(t, &api.UpdateBrandRequest{Name: "Winter", Appearance: "light", Theme: "blueberry",
 		Corners: "square", Font: "uploaded", BackgroundFit: "contain", HideAppName: false,
-		Logo: &api.BrandAssetRef{Id: 11}, Background: &api.BrandAssetRef{Id: 24}, RegularFont: &api.BrandAssetRef{Id: 25},
-		FooterLinks:  []api.BrandFooterLink{{Url: "https://status.winter.example", Label: "Status"}},
+		Logo: &api.BrandAssetRef{ID: 11}, Background: &api.BrandAssetRef{ID: 24}, RegularFont: &api.BrandAssetRef{ID: 25},
+		FooterLinks:  []api.BrandFooterLink{{URL: "https://status.winter.example", Label: "Status"}},
 		SupportPhone: "+15550100100"},
 		apiClient.updated)
 	assert.Equal(t, http.StatusFound, w.Code)
@@ -440,8 +440,8 @@ func TestHandleBrandNewPost_AttachesTheUploadedFiles(t *testing.T) {
 
 	assert.Equal(t, &api.CreateBrandRequest{Name: "Spring", Appearance: "auto", Theme: "plum",
 		Corners: "rounded", Font: "uploaded", BackgroundFit: "cover",
-		Logo: &api.BrandAssetRef{Id: 21}, DarkLogo: &api.BrandAssetRef{Id: 22}, Favicon: &api.BrandAssetRef{Id: 23},
-		RegularFont: &api.BrandAssetRef{Id: 25}, BoldFont: &api.BrandAssetRef{Id: 26}}, apiClient.created)
+		Logo: &api.BrandAssetRef{ID: 21}, DarkLogo: &api.BrandAssetRef{ID: 22}, Favicon: &api.BrandAssetRef{ID: 23},
+		RegularFont: &api.BrandAssetRef{ID: 25}, BoldFont: &api.BrandAssetRef{ID: 26}}, apiClient.created)
 }
 
 // A slot holding no number, which the editor never sends, is sent as an asset no store holds, for the
@@ -458,7 +458,7 @@ func TestHandleBrandNewPost_ASlotHoldingNoNumberIsSentForTheAPIToRefuse(t *testi
 				"corners": {"rounded"}, "font": {"system-ui"}, "backgroundFit": {"cover"}}))))
 
 	require.NotNil(t, apiClient.created)
-	assert.Equal(t, &api.BrandAssetRef{Id: 0}, apiClient.created.Logo)
+	assert.Equal(t, &api.BrandAssetRef{ID: 0}, apiClient.created.Logo)
 }
 
 // A refused form is drawn again with the files it held, each read by its id, so an upload not yet
@@ -611,7 +611,7 @@ func TestHandleBrandDeleteGet_DrawsTheBrandInWords(t *testing.T) {
 			handlertest.WithPathValue("brandId", "5")))
 
 	assert.Equal(t, BrandRow{
-		BrandResponse:  api.BrandResponse{Id: 5, Name: "Default", Appearance: "auto", Theme: "blueberry", IsDefault: true, ClientCount: 3},
+		BrandResponse:  api.BrandResponse{ID: 5, Name: "Default", Appearance: "auto", Theme: "blueberry", IsDefault: true, ClientCount: 3},
 		AppearanceName: "Automatic", ThemeName: "Blueberry",
 	}, handlertest.Bind(t, httpHelper)["brand"])
 }

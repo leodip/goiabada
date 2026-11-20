@@ -530,7 +530,7 @@ func TestGranularScopes_PhoneCountriesAccessibleByAnyAdminScope(t *testing.T) {
 			require.NoError(t, json.NewDecoder(resp.Body).Decode(&response))
 			var portugal *api.PhoneCountryResponse
 			for i := range response.PhoneCountries {
-				if response.PhoneCountries[i].UniqueId == "PRT_0" {
+				if response.PhoneCountries[i].UniqueID == "PRT_0" {
 					portugal = &response.PhoneCountries[i]
 				}
 			}

@@ -115,7 +115,7 @@ func TestRFC9068_AuthorizationCodeGrant(t *testing.T) {
 	response, err := tokenIssuer.mintAuthorizationCodeTokens(context.Background(), rfc9068Settings(), code, "")
 	require.NoError(t, err)
 
-	assertTokenHeaders(t, response.AccessToken, response.IdToken, response.RefreshToken)
+	assertTokenHeaders(t, response.AccessToken, response.IDToken, response.RefreshToken)
 	accessClaims := verifyAndDecodeToken(t, response.AccessToken, getTestPublicKey(t))
 	refreshClaims := verifyAndDecodeToken(t, response.RefreshToken, getTestPublicKey(t))
 	assert.Equal(t, "web-app", accessClaims["client_id"])
@@ -149,7 +149,7 @@ func TestRFC9068_RefreshOfACodeGrant(t *testing.T) {
 	response, err := tokenIssuer.mintCodeRefreshTokens(context.Background(), nil, rfc9068Settings(), code, parent, "", "")
 	require.NoError(t, err)
 
-	assertTokenHeaders(t, response.AccessToken, response.IdToken, response.RefreshToken)
+	assertTokenHeaders(t, response.AccessToken, response.IDToken, response.RefreshToken)
 	accessClaims := verifyAndDecodeToken(t, response.AccessToken, getTestPublicKey(t))
 	assert.Equal(t, "web-app", accessClaims["client_id"])
 	assert.Equal(t, "family-jti", accessClaims["grant_id"])
@@ -170,7 +170,7 @@ func TestRFC9068_PasswordGrant(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	assertTokenHeaders(t, response.AccessToken, response.IdToken, response.RefreshToken)
+	assertTokenHeaders(t, response.AccessToken, response.IDToken, response.RefreshToken)
 	accessClaims := verifyAndDecodeToken(t, response.AccessToken, getTestPublicKey(t))
 	refreshClaims := verifyAndDecodeToken(t, response.RefreshToken, getTestPublicKey(t))
 	assert.Equal(t, "legacy-app", accessClaims["client_id"])
@@ -202,7 +202,7 @@ func TestRFC9068_RefreshOfAPasswordGrant(t *testing.T) {
 	response, err := tokenIssuer.mintROPCRefreshTokens(context.Background(), nil, rfc9068Settings(), parent, "", "")
 	require.NoError(t, err)
 
-	assertTokenHeaders(t, response.AccessToken, response.IdToken, response.RefreshToken)
+	assertTokenHeaders(t, response.AccessToken, response.IDToken, response.RefreshToken)
 	accessClaims := verifyAndDecodeToken(t, response.AccessToken, getTestPublicKey(t))
 	assert.Equal(t, "legacy-app", accessClaims["client_id"])
 	assert.Equal(t, "family-jti", accessClaims["grant_id"])

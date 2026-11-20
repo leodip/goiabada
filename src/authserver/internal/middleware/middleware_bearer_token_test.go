@@ -36,7 +36,7 @@ var errRefusedToken = fmt.Errorf("token signature is invalid: %w", signingkeys.E
 type parseGuardResult struct {
 	rr         *httptest.ResponseRecorder
 	nextCalled bool
-	token      oauth.JwtToken
+	token      oauth.JWTToken
 	present    bool
 }
 
@@ -54,8 +54,8 @@ func serveParseGuard(parser tokenParser, req *http.Request) parseGuardResult {
 }
 
 // accessToken is a token the parse guard admits: typ Bearer, aud authserver.
-func accessToken(tokenBase64 string) *oauth.JwtToken {
-	return &oauth.JwtToken{TokenBase64: tokenBase64, Claims: map[string]interface{}{
+func accessToken(tokenBase64 string) *oauth.JWTToken {
+	return &oauth.JWTToken{TokenBase64: tokenBase64, Claims: map[string]interface{}{
 		"sub": "user",
 		"typ": "Bearer",
 		"aud": "authserver",
@@ -609,7 +609,7 @@ func TestJwtAuthorizationHeaderToContext_TokenKindAndAudience(t *testing.T) {
 				claims["aud"] = tc.aud
 			}
 			parser.On("DecodeAndValidateTokenString", mock.Anything, "the-signed-token", true).
-				Return(&oauth.JwtToken{TokenBase64: "the-signed-token", Claims: claims}, nil)
+				Return(&oauth.JWTToken{TokenBase64: "the-signed-token", Claims: claims}, nil)
 
 			req := httptest.NewRequest("GET", "/", nil)
 			req.Header.Set("Authorization", "Bearer the-signed-token")
@@ -638,7 +638,7 @@ func TestJwtAuthorizationHeaderToContext_TokenKindAndAudience(t *testing.T) {
 func TestJwtAuthorizationHeaderToContext_PostBodyRefreshTokenRefused(t *testing.T) {
 	parser := new(middlewaremocks.TokenParser)
 	parser.On("DecodeAndValidateTokenString", mock.Anything, "refreshtoken", true).
-		Return(&oauth.JwtToken{TokenBase64: "refreshtoken", Claims: map[string]interface{}{
+		Return(&oauth.JWTToken{TokenBase64: "refreshtoken", Claims: map[string]interface{}{
 			"sub": "user",
 			"typ": "Refresh",
 			"aud": "https://auth.example.com",

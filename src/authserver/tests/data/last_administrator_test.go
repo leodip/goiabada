@@ -158,7 +158,7 @@ func serveAsManage(handler http.HandlerFunc, method, target string, params map[s
 		req.SetPathValue(key, value)
 	}
 	ctx := reqctx.WithSettings(req.Context(), &record.Settings{Id: 1})
-	ctx = reqctx.WithValidatedToken(ctx, oauth.JwtToken{Claims: map[string]interface{}{
+	ctx = reqctx.WithValidatedToken(ctx, oauth.JWTToken{Claims: map[string]interface{}{
 		"sub":   "last-administrator-test",
 		"scope": builtin.AuthServerResourceIdentifier + ":" + builtin.ManagePermissionIdentifier,
 	}})

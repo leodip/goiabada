@@ -57,7 +57,7 @@ func HandlePhoneGet(
 		}
 
 		bind := map[string]interface{}{
-			"selectedPhoneCountryUniqueId": user.PhoneNumberCountryUniqueId,
+			"selectedPhoneCountryUniqueId": user.PhoneNumberCountryUniqueID,
 			"phoneNumber":                  user.PhoneNumber,
 			"phoneCountries":               phoneCountries,
 			"savedSuccessfully":            savedSuccessfully,
@@ -88,14 +88,14 @@ func HandlePhonePost(
 
 		// Build request
 		req := &api.UpdateAccountPhoneRequest{
-			PhoneCountryUniqueId: r.FormValue("phoneCountryUniqueId"),
+			PhoneCountryUniqueID: r.FormValue("phoneCountryUniqueId"),
 			PhoneNumber:          strings.TrimSpace(r.FormValue("phoneNumber")),
 		}
 
 		// On validation error, re-render with submitted values, the refused field marked.
 		renderError := func(errorMessage, errorField string) {
 			bind := map[string]interface{}{
-				"selectedPhoneCountryUniqueId": req.PhoneCountryUniqueId,
+				"selectedPhoneCountryUniqueId": req.PhoneCountryUniqueID,
 				"phoneNumber":                  req.PhoneNumber,
 				"phoneCountries":               phoneCountries,
 				"error":                        errorMessage,

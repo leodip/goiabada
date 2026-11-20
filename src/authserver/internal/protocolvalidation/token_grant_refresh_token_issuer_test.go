@@ -113,7 +113,7 @@ func TestValidateTokenRequest_RefreshGrant_ATokenOfAnEarlierIssuer(t *testing.T)
 				mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, clientIdentifier).
 					Return(clients[clientIdentifier], nil).Once()
 				mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "the_refresh_token", true).
-					Return(&oauth.JwtToken{Claims: jwt.MapClaims{"jti": "the_jti", "typ": typ, "iss": a.iss, "aud": a.aud,
+					Return(&oauth.JWTToken{Claims: jwt.MapClaims{"jti": "the_jti", "typ": typ, "iss": a.iss, "aud": a.aud,
 						"offline_access_max_lifetime": float64(time.Now().Add(time.Hour).Unix())}}, nil).Once()
 				mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "the_jti").Return(refreshToken, nil).Once()
 				if ropc {
@@ -176,7 +176,7 @@ func TestValidateTokenRequest_RefreshGrant_ARotatedTokenOfAnEarlierIssuerGoesOnT
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "owner").Return(client, nil).Once()
 	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "the_refresh_token", true).
-		Return(&oauth.JwtToken{Claims: jwt.MapClaims{"jti": "the_jti", "typ": "Offline", "sub": "user-7",
+		Return(&oauth.JWTToken{Claims: jwt.MapClaims{"jti": "the_jti", "typ": "Offline", "sub": "user-7",
 			"iss": earlierIssuer, "aud": earlierIssuer,
 			"offline_access_max_lifetime": float64(time.Now().Add(time.Hour).Unix())}}, nil).Once()
 	mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "the_jti").Return(refreshToken, nil).Once()

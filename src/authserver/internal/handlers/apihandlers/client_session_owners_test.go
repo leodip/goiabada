@@ -25,7 +25,7 @@ import (
 
 func ownerSession(id int64, userId int64) api.UserSessionDetailResponse {
 	return api.UserSessionDetailResponse{
-		UserSessionResponse: api.UserSessionResponse{Id: id, UserId: userId},
+		UserSessionResponse: api.UserSessionResponse{ID: id, UserID: userId},
 	}
 }
 
@@ -74,7 +74,7 @@ func TestSessionOwners_FollowTheOrderTheSessionsFirstNameThem(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, owners, 3)
-	assert.Equal(t, []int64{11, 7, 9}, []int64{owners[0].Id, owners[1].Id, owners[2].Id})
+	assert.Equal(t, []int64{11, 7, 9}, []int64{owners[0].ID, owners[1].ID, owners[2].ID})
 }
 
 // An empty page asks nothing and answers an empty array rather than a nil one, which is what
@@ -152,10 +152,10 @@ func TestHandleClientSessionsGet_AnswersTheSessionsWithTheirOwners(t *testing.T)
 	require.Len(t, out.Sessions, 2)
 	require.Len(t, out.Users, 1, "both sessions belong to one person, who appears once")
 	assert.Equal(t, api.SessionOwnerResponse{
-		Id: 42, Email: "jane@example.com", GivenName: "Jane", FamilyName: "Doe",
+		ID: 42, Email: "jane@example.com", GivenName: "Jane", FamilyName: "Doe",
 	}, out.Users[0])
 	for _, session := range out.Sessions {
-		assert.Equal(t, out.Users[0].Id, session.UserId)
+		assert.Equal(t, out.Users[0].ID, session.UserID)
 	}
 	database.AssertExpectations(t)
 }

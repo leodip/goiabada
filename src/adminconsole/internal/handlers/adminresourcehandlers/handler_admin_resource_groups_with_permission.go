@@ -43,7 +43,7 @@ func HandleGroupsWithPermissionGet(
 		selectedPermissionStr := r.URL.Query().Get("permission")
 		if len(selectedPermissionStr) == 0 {
 			if len(permissions) > 0 {
-				selectedPermissionStr = strconv.FormatInt(permissions[0].Id, 10)
+				selectedPermissionStr = strconv.FormatInt(permissions[0].ID, 10)
 			} else {
 				selectedPermissionStr = "0"
 			}
@@ -61,7 +61,7 @@ func HandleGroupsWithPermissionGet(
 			// check if permission belongs to resource
 			var found bool
 			for _, permission := range permissions {
-				if permission.Id == selectedPermission {
+				if permission.ID == selectedPermission {
 					found = true
 					selectedPermissionIdentifier = permission.PermissionIdentifier
 					break
@@ -115,7 +115,7 @@ func HandleGroupsWithPermissionGet(
 			pageGroups := allGroups[start:end]
 			groupInfoArr = make([]GroupInfo, len(pageGroups))
 			for i, g := range pageGroups {
-				groupInfoArr[i] = GroupInfo{Id: g.Id, GroupIdentifier: g.GroupIdentifier, Description: g.Description, HasPermission: false}
+				groupInfoArr[i] = GroupInfo{Id: g.ID, GroupIdentifier: g.GroupIdentifier, Description: g.Description, HasPermission: false}
 			}
 		} else {
 			annotatedGroups, total2, searchErr := apiClient.SearchGroupsWithPermissionAnnotation(r.Context(), accessToken, selectedPermission, pageInt, pageSize)
@@ -141,7 +141,7 @@ func HandleGroupsWithPermissionGet(
 			groupInfoArr = make([]GroupInfo, len(annotatedGroups))
 			for i, grp := range annotatedGroups {
 				groupInfoArr[i] = GroupInfo{
-					Id:              grp.Id,
+					Id:              grp.ID,
 					GroupIdentifier: grp.GroupIdentifier,
 					Description:     grp.Description,
 					HasPermission:   grp.HasPermission,
@@ -153,7 +153,7 @@ func HandleGroupsWithPermissionGet(
 		p := pagination.New(total, pageSize, pageInt, 5)
 
 		bind := map[string]interface{}{
-			"resourceId":                   resource.Id,
+			"resourceId":                   resource.ID,
 			"resourceIdentifier":           resource.ResourceIdentifier,
 			"description":                  resource.Description,
 			"isSystemLevelResource":        resource.IsSystemLevelResource,
@@ -227,7 +227,7 @@ func HandleGroupsWithPermissionAddPermissionPost(
 
 		found := false
 		for _, permission := range permissions {
-			if permission.Id == permissionId {
+			if permission.ID == permissionId {
 				found = true
 				break
 			}
@@ -240,7 +240,7 @@ func HandleGroupsWithPermissionAddPermissionPost(
 
 		found = false
 		for _, permission := range currentPerms {
-			if permission.Id == permissionId {
+			if permission.ID == permissionId {
 				found = true
 				break
 			}
@@ -253,12 +253,12 @@ func HandleGroupsWithPermissionAddPermissionPost(
 		// Build the new set and update via API
 		newIds := make([]int64, 0, len(currentPerms)+1)
 		for _, p := range currentPerms {
-			newIds = append(newIds, p.Id)
+			newIds = append(newIds, p.ID)
 		}
 		newIds = append(newIds, permissionId)
 
-		req := &api.UpdateGroupPermissionsRequest{PermissionIds: newIds, ExpectedPermissionIds: permissionIdsOf(currentPerms)}
-		if err := apiClient.UpdateGroupPermissions(r.Context(), accessToken, group.Id, req); err != nil {
+		req := &api.UpdateGroupPermissionsRequest{PermissionIDs: newIds, ExpectedPermissionIDs: permissionIdsOf(currentPerms)}
+		if err := apiClient.UpdateGroupPermissions(r.Context(), accessToken, group.ID, req); err != nil {
 			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
 		}
@@ -326,7 +326,7 @@ func HandleGroupsWithPermissionRemovePermissionPost(
 
 		found := false
 		for _, permission := range permissions {
-			if permission.Id == permissionId {
+			if permission.ID == permissionId {
 				found = true
 				break
 			}
@@ -339,7 +339,7 @@ func HandleGroupsWithPermissionRemovePermissionPost(
 
 		found = false
 		for _, permission := range currentPerms {
-			if permission.Id == permissionId {
+			if permission.ID == permissionId {
 				found = true
 				break
 			}
@@ -352,12 +352,12 @@ func HandleGroupsWithPermissionRemovePermissionPost(
 		// Build reduced set and update via API
 		newIds := make([]int64, 0, len(currentPerms))
 		for _, p := range currentPerms {
-			if p.Id != permissionId {
-				newIds = append(newIds, p.Id)
+			if p.ID != permissionId {
+				newIds = append(newIds, p.ID)
 			}
 		}
-		req := &api.UpdateGroupPermissionsRequest{PermissionIds: newIds, ExpectedPermissionIds: permissionIdsOf(currentPerms)}
-		if err := apiClient.UpdateGroupPermissions(r.Context(), accessToken, group.Id, req); err != nil {
+		req := &api.UpdateGroupPermissionsRequest{PermissionIDs: newIds, ExpectedPermissionIDs: permissionIdsOf(currentPerms)}
+		if err := apiClient.UpdateGroupPermissions(r.Context(), accessToken, group.ID, req); err != nil {
 			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
 		}

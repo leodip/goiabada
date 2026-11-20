@@ -65,9 +65,9 @@ func createBrandFields(req api.CreateBrandRequest) brandFields {
 		logo: req.Logo, darkLogo: req.DarkLogo, favicon: req.Favicon, background: req.Background,
 		regularFont: req.RegularFont, boldFont: req.BoldFont,
 		footer: brandFooterFields{footerLinks: req.FooterLinks, supportEmail: req.SupportEmail,
-			supportURL: req.SupportUrl, supportPhone: req.SupportPhone},
+			supportURL: req.SupportURL, supportPhone: req.SupportPhone},
 		palette:   req.Palette,
-		customCSS: req.CustomCss,
+		customCSS: req.CustomCSS,
 	}
 }
 
@@ -80,7 +80,7 @@ func slotOf(ref *api.BrandAssetRef) sql.NullInt64 {
 	if ref == nil {
 		return sql.NullInt64{}
 	}
-	return sql.NullInt64{Int64: ref.Id, Valid: true}
+	return sql.NullInt64{Int64: ref.ID, Valid: true}
 }
 
 // validateBrand holds a create's or an update's fields to #810 decision 5 and #813 decision 10, and

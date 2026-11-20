@@ -257,7 +257,7 @@ func TestHTTPBackend_WriteOperationsCarryTheirArguments(t *testing.T) {
 
 	var created api.SessionWriteRequest
 	require.NoError(t, json.Unmarshal([]byte(recorded[0].body), &created))
-	assert.Equal(t, httpTestSessionId, created.Id)
+	assert.Equal(t, httpTestSessionId, created.ID)
 	assert.Equal(t, "the-ciphertext", created.Data)
 	assert.True(t, created.Authenticated)
 
@@ -516,7 +516,7 @@ func TestHTTPBackend_AMaximalSessionCrossesTheWireInBothDirections(t *testing.T)
 	// The request half, measured rather than sent: the endpoint reads the whole body under
 	// one MaxBytesReader, so what has to fit is the encoded envelope and not the blob.
 	encoded, err := json.Marshal(api.SessionWriteRequest{
-		Id: httpTestSessionId, Data: maximal, Authenticated: true,
+		ID: httpTestSessionId, Data: maximal, Authenticated: true,
 	})
 	require.NoError(t, err)
 	assert.LessOrEqual(t, len(encoded), sessionstore.MaxSessionWireBytes,

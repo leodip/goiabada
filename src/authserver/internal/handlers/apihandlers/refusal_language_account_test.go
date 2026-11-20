@@ -415,7 +415,7 @@ func TestAccountOTPRefusals_AreInTheRequestsLanguage(t *testing.T) {
 func TestAccountLogoutRefusals_AreInTheRequestsLanguage(t *testing.T) {
 	settings := &record.Settings{Issuer: "https://auth.example.com"}
 	logout := func(postLogout, clientIdentifier string, expect func(database *datamocks.Database)) func(*testing.T, string) *httptest.ResponseRecorder {
-		body := api.AccountLogoutRequest{PostLogoutRedirectUri: postLogout, ClientIdentifier: clientIdentifier}
+		body := api.AccountLogoutRequest{PostLogoutRedirectURI: postLogout, ClientIdentifier: clientIdentifier}
 		return serveAccount(http.MethodPost, "/api/v1/account/logout-request", body, settings, expect,
 			func(t *testing.T, database *datamocks.Database) http.Handler {
 				return HandleAccountLogoutRequestPost(database, testDataCipher, testBaseURL)

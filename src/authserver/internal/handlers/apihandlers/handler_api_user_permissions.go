@@ -119,7 +119,7 @@ func HandleUserPermissionsPut(
 
 		// The set as the caller loaded it, required as it is on every list save: absent or null
 		// decodes to nil and is refused, [] means the caller read no grants (#428).
-		if request.ExpectedPermissionIds == nil {
+		if request.ExpectedPermissionIDs == nil {
 			writeJSONError(w, "expectedPermissionIds is required: send the permission ids as you last read them, or [] if there were none.", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
@@ -127,7 +127,7 @@ func HandleUserPermissionsPut(
 		// Deduplicated as the group and client saves always were. This one was not, and a repeated
 		// id stored two grant rows, of which a later revocation deleted one and left the other
 		// granting the permission (#406).
-		wanted := firstOccurrences(request.PermissionIds)
+		wanted := firstOccurrences(request.PermissionIDs)
 
 		// Validate that all requested permissions exist
 		for _, permissionId := range wanted {
@@ -145,7 +145,7 @@ func HandleUserPermissionsPut(
 		// The grant ceiling, after the request's 400 and 404 answers and before the transaction:
 		// only authserver:manage grants or revokes an administrative permission. What it read is
 		// what the save's administrative_permission_changed records are written from (#402).
-		administrative, allowed := grantCeilingAllows(w, r, database, auditLogger, targetKindUser, user.Id, wanted, request.ExpectedPermissionIds)
+		administrative, allowed := grantCeilingAllows(w, r, database, auditLogger, targetKindUser, user.Id, wanted, request.ExpectedPermissionIDs)
 		if !allowed {
 			return
 		}
@@ -187,7 +187,7 @@ func HandleUserPermissionsPut(
 			if loadErr != nil {
 				return errs.Wrap(loadErr, "database error loading user permissions before update")
 			}
-			if !sameSet(stored, grantKey, request.ExpectedPermissionIds) {
+			if !sameSet(stored, grantKey, request.ExpectedPermissionIDs) {
 				return errListChanged
 			}
 

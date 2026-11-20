@@ -238,7 +238,7 @@ func HandleOtpPost(
 			otpCode := r.PostFormValue("otp")
 
 			if len(otpCode) == 0 {
-				renderEnrollmentError(i18n.NewLocalizedError(i18n.ErrCodeOtpCodeRequired, nil).Localize(r.Context()), "otp")
+				renderEnrollmentError(i18n.NewLocalizedError(i18n.ErrCodeOTPCodeRequired, nil).Localize(r.Context()), "otp")
 				return
 			}
 
@@ -249,7 +249,7 @@ func HandleOtpPost(
 			req := &api.UpdateAccountOTPRequest{
 				Enabled:  true,
 				Password: password,
-				OtpCode:  otpCode,
+				OTPCode:  otpCode,
 			}
 			enabled, err := apiClient.UpdateAccountOTP(r.Context(), jwtInfo.TokenResponse.AccessToken, req)
 			if err != nil {

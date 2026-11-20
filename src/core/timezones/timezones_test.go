@@ -21,12 +21,12 @@ func TestAll_Count(t *testing.T) {
 func TestAll_SpotChecks(t *testing.T) {
 	all := All()
 	for _, want := range []Zone{
-		{CountryCode: "BR", Zone: "America/Sao_Paulo", CountryName: "Brazil", Comments: "Brazil (southeast: GO, DF, MG, ES, RJ, SP, PR, SC, RS)"},
-		{CountryCode: "DE", Zone: "Europe/Berlin", CountryName: "Germany", Comments: "most of Germany"},
-		{CountryCode: "SE", Zone: "Europe/Berlin", CountryName: "Sweden", Comments: ""},
-		{CountryCode: "US", Zone: "America/New_York", CountryName: "United States", Comments: "Eastern (most areas)"},
+		{CountryCode: "BR", Name: "America/Sao_Paulo", CountryName: "Brazil", Comments: "Brazil (southeast: GO, DF, MG, ES, RJ, SP, PR, SC, RS)"},
+		{CountryCode: "DE", Name: "Europe/Berlin", CountryName: "Germany", Comments: "most of Germany"},
+		{CountryCode: "SE", Name: "Europe/Berlin", CountryName: "Sweden", Comments: ""},
+		{CountryCode: "US", Name: "America/New_York", CountryName: "United States", Comments: "Eastern (most areas)"},
 	} {
-		t.Run(want.CountryName+"/"+want.Zone, func(t *testing.T) {
+		t.Run(want.CountryName+"/"+want.Name, func(t *testing.T) {
 			assert.Contains(t, all, want)
 		})
 	}
@@ -38,8 +38,8 @@ func TestAll_EveryZoneLoads(t *testing.T) {
 	all := All()
 	require.NotEmpty(t, all)
 	for _, z := range all {
-		if _, err := time.LoadLocation(z.Zone); err != nil {
-			t.Errorf("zone %q (%s) does not load: %v", z.Zone, z.CountryName, err)
+		if _, err := time.LoadLocation(z.Name); err != nil {
+			t.Errorf("zone %q (%s) does not load: %v", z.Name, z.CountryName, err)
 		}
 	}
 }
@@ -50,8 +50,8 @@ func TestAll_PairsAreUnique(t *testing.T) {
 	byName := map[[2]string]bool{}
 	byCode := map[[2]string]bool{}
 	for _, z := range All() {
-		name := [2]string{z.CountryName, z.Zone}
-		code := [2]string{z.CountryCode, z.Zone}
+		name := [2]string{z.CountryName, z.Name}
+		code := [2]string{z.CountryCode, z.Name}
 		if byName[name] {
 			t.Errorf("duplicate (CountryName, Zone) %v", name)
 		}
@@ -67,8 +67,8 @@ func TestAll_SortedByCountryNameThenZone(t *testing.T) {
 	all := All()
 	for i := 1; i < len(all); i++ {
 		prev, cur := all[i-1], all[i]
-		if prev.CountryName > cur.CountryName || (prev.CountryName == cur.CountryName && prev.Zone >= cur.Zone) {
-			t.Errorf("row %d (%s, %s) sorts before row %d (%s, %s)", i, cur.CountryName, cur.Zone, i-1, prev.CountryName, prev.Zone)
+		if prev.CountryName > cur.CountryName || (prev.CountryName == cur.CountryName && prev.Name >= cur.Name) {
+			t.Errorf("row %d (%s, %s) sorts before row %d (%s, %s)", i, cur.CountryName, cur.Name, i-1, prev.CountryName, prev.Name)
 		}
 	}
 }
@@ -78,7 +78,7 @@ func TestAll_Fields(t *testing.T) {
 		if len(z.CountryCode) != 2 || z.CountryCode[0] < 'A' || z.CountryCode[0] > 'Z' || z.CountryCode[1] < 'A' || z.CountryCode[1] > 'Z' {
 			t.Errorf("row %d: CountryCode %q is not two upper-case letters", i, z.CountryCode)
 		}
-		if z.Zone == "" {
+		if z.Name == "" {
 			t.Errorf("row %d (%s): empty Zone", i, z.CountryCode)
 		}
 		if z.CountryName == "" {
@@ -103,7 +103,7 @@ func TestAll_CommentsOnlyOnMultiZoneCountries(t *testing.T) {
 		}
 		commented++
 		if rows[z.CountryCode] < 2 {
-			t.Errorf("%s (%s) has one zone, %s, but carries the comment %q", z.CountryName, z.CountryCode, z.Zone, z.Comments)
+			t.Errorf("%s (%s) has one zone, %s, but carries the comment %q", z.CountryName, z.CountryCode, z.Name, z.Comments)
 		}
 	}
 	assert.NotZero(t, commented, "no row carries a comment, so the check read nothing")
@@ -120,57 +120,57 @@ func TestAll_Isolation(t *testing.T) {
 	assert.NotEqual(t, first[0], second[0])
 }
 
-// TestByZone_EqualsFilter: for every zone ID, the lookup returns exactly the rows a filter of All
+// TestByName_EqualsFilter: for every zone ID, the lookup returns exactly the rows a filter of All
 // would find, in table order.
-func TestByZone_EqualsFilter(t *testing.T) {
+func TestByName_EqualsFilter(t *testing.T) {
 	all := All()
 	require.NotEmpty(t, all)
 	shared := 0
 	for _, id := range zoneIDs(all) {
 		var want []Zone
 		for _, z := range all {
-			if z.Zone == id {
+			if z.Name == id {
 				want = append(want, z)
 			}
 		}
 		if len(want) > 1 {
 			shared++
 		}
-		assert.Equalf(t, want, ByZone(id), "ByZone(%q)", id)
+		assert.Equalf(t, want, ByName(id), "ByName(%q)", id)
 	}
 	// 34 of the 312 zone IDs are listed under more than one country at 2026e; the lookup must
 	// answer every row for those, which a first-match lookup would not.
 	assert.Equal(t, 34, shared, "zone IDs listed under more than one country")
 }
 
-// TestByZone_Misses: the lookup is exact, as the scan it replaced was.
-func TestByZone_Misses(t *testing.T) {
+// TestByName_Misses: the lookup is exact, as the scan it replaced was.
+func TestByName_Misses(t *testing.T) {
 	for _, id := range []string{"Not/AZone", "", "america/sao_paulo", "America/Sao_Paulo ", "Sao_Paulo"} {
 		t.Run(id, func(t *testing.T) {
-			assert.Nil(t, ByZone(id))
+			assert.Nil(t, ByName(id))
 		})
 	}
 }
 
-func TestByZone_Isolation(t *testing.T) {
-	rows := ByZone("Europe/Berlin")
+func TestByName_Isolation(t *testing.T) {
+	rows := ByName("Europe/Berlin")
 	require.Greater(t, len(rows), 1)
 	want := rows[0]
 	rows[0].CountryName = "mutated"
 	slices.Reverse(rows)
 
-	again := ByZone("Europe/Berlin")
+	again := ByName("Europe/Berlin")
 	assert.Equal(t, want, again[0])
-	assert.Equal(t, want, All()[slices.IndexFunc(All(), func(z Zone) bool { return z.Zone == "Europe/Berlin" })])
+	assert.Equal(t, want, All()[slices.IndexFunc(All(), func(z Zone) bool { return z.Name == "Europe/Berlin" })])
 }
 
 func zoneIDs(all []Zone) []string {
 	var ids []string
 	seen := map[string]bool{}
 	for _, z := range all {
-		if !seen[z.Zone] {
-			seen[z.Zone] = true
-			ids = append(ids, z.Zone)
+		if !seen[z.Name] {
+			seen[z.Name] = true
+			ids = append(ids, z.Name)
 		}
 	}
 	return ids

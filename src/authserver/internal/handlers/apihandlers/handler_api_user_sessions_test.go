@@ -53,9 +53,9 @@ func TestHandleUserSessionGet_AnswersTheListRowWithTheCallersSid(t *testing.T) {
 	require.Equal(t, http.StatusOK, rr.Code)
 	var out api.GetUserSessionResponse
 	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &out))
-	assert.Equal(t, int64(100), out.Session.Id)
+	assert.Equal(t, int64(100), out.Session.ID)
 	assert.Equal(t, "sid-mine", out.Session.SessionIdentifier)
-	assert.Equal(t, int64(42), out.Session.UserId)
+	assert.Equal(t, int64(42), out.Session.UserID)
 	assert.True(t, out.Session.IsCurrent, "the token's sid names this session")
 	assert.Equal(t, []string{"portal"}, out.Session.ClientIdentifiers)
 	require.Len(t, out.Session.Clients, 1)

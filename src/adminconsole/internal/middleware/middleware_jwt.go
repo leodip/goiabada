@@ -24,8 +24,8 @@ import (
 // themselves and mark a foreign token with oauthclient.ErrForeignToken, so the middleware compares
 // no issuer of its own (#427).
 type tokenParser interface {
-	DecodeAndValidateStoredIDToken(ctx context.Context, raw string) (*oauth.JwtToken, error)
-	DecodeAndValidateRefreshResponse(ctx context.Context, tokenResponse *oauth.TokenResponse, previous *oauth.JwtToken) (*oauthclient.JwtInfo, error)
+	DecodeAndValidateStoredIDToken(ctx context.Context, raw string) (*oauth.JWTToken, error)
+	DecodeAndValidateRefreshResponse(ctx context.Context, tokenResponse *oauth.TokenResponse, previous *oauth.JWTToken) (*oauthclient.JwtInfo, error)
 }
 
 type AuthHelper interface {
@@ -186,14 +186,14 @@ func (m *JWT) SessionHandler() func(http.Handler) http.Handler {
 				m.signOut(w, r, sess, next)
 				return
 			}
-			if tokenResponse.IdToken == "" {
+			if tokenResponse.IDToken == "" {
 				slog.WarnContext(ctx, "the session holds a token response with no id token, signing it out")
 				m.signOut(w, r, sess, next)
 				return
 			}
 
 			// Step 3.
-			idToken, err := m.tokenParser.DecodeAndValidateStoredIDToken(ctx, tokenResponse.IdToken)
+			idToken, err := m.tokenParser.DecodeAndValidateStoredIDToken(ctx, tokenResponse.IDToken)
 			if err != nil {
 				if errors.Is(err, oauthclient.ErrForeignToken) {
 					m.endForeignSession(w, r, sess, err)
@@ -387,7 +387,7 @@ func (m *JWT) refreshToken(
 	storedTokenResponse, hasStored := current.Values[sessionkeys.JWT].(sessionkeys.StoredTokenResponse)
 	stored := storedTokenResponse.TokenResponse()
 	expiresAt, hasExpiry := current.Values[sessionkeys.JWTExpiresAt].(int64)
-	if !hasStored || !hasExpiry || stored.IdToken == "" {
+	if !hasStored || !hasExpiry || stored.IDToken == "" {
 		// Another request ended this session while this one waited for the lock; this
 		// request ends it the same way, presenting nothing.
 		return nil, nil, nil, errSessionEndedMeanwhile
@@ -396,7 +396,7 @@ func (m *JWT) refreshToken(
 	// itself: carried or refreshed, the ID token that reaches the context is verified. Its
 	// failure is refused rather than err, so the session ends whatever request stored the
 	// set, and the classification — foreign or otherwise — stays the parser's.
-	previous, err := m.tokenParser.DecodeAndValidateStoredIDToken(r.Context(), stored.IdToken)
+	previous, err := m.tokenParser.DecodeAndValidateStoredIDToken(r.Context(), stored.IDToken)
 	if err != nil {
 		return nil, err, nil, nil
 	}
@@ -525,7 +525,7 @@ func (m *JWT) supersedingTokens(r *http.Request, presented oauth.TokenResponse, 
 	if !hasStored || !hasExpiry || stored == presented {
 		return nil, 0, nil
 	}
-	idToken, err := m.tokenParser.DecodeAndValidateStoredIDToken(r.Context(), stored.IdToken)
+	idToken, err := m.tokenParser.DecodeAndValidateStoredIDToken(r.Context(), stored.IDToken)
 	if err != nil {
 		return nil, 0, nil
 	}

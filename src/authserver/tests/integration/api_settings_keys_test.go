@@ -68,7 +68,7 @@ func TestAPISettingsKeysRotatePost_Success(t *testing.T) {
 	before := getKeys(t, accessToken)
 	assert.Equal(t, "next", before[0].State)
 	assert.Equal(t, "current", before[1].State)
-	initialCurrentId := before[1].Id
+	initialCurrentId := before[1].ID
 	initialNextKid := before[0].KeyIdentifier
 
 	// Rotate
@@ -88,7 +88,7 @@ func TestAPISettingsKeysRotatePost_Success(t *testing.T) {
 	assert.Equal(t, "current", after[1].State)
 	assert.Equal(t, "previous", after[2].State)
 	// Previous key should be the former current
-	assert.Equal(t, initialCurrentId, after[2].Id)
+	assert.Equal(t, initialCurrentId, after[2].ID)
 	// New next should have a different kid
 	assert.NotEqual(t, initialNextKid, after[0].KeyIdentifier)
 }
@@ -102,8 +102,8 @@ func TestAPISettingsKeysRotatePost_DeletesPrevious(t *testing.T) {
 	_ = makeAPIRequest(t, "POST", url, accessToken, map[string]any{})
 	first := getKeys(t, accessToken)
 	assert.Len(t, first, 3)
-	prevId := first[2].Id
-	currId := first[1].Id
+	prevId := first[2].ID
+	currId := first[1].ID
 
 	// Rotate again: should delete previous at start
 	resp := makeAPIRequest(t, "POST", url, accessToken, map[string]any{})
@@ -117,10 +117,10 @@ func TestAPISettingsKeysRotatePost_DeletesPrevious(t *testing.T) {
 	assert.Len(t, second, 3)
 	// The old previous must be gone
 	for _, k := range second {
-		assert.NotEqual(t, prevId, k.Id)
+		assert.NotEqual(t, prevId, k.ID)
 	}
 	// New previous should be the old current
-	assert.Equal(t, currId, second[2].Id)
+	assert.Equal(t, currId, second[2].ID)
 }
 
 // DELETE /api/v1/admin/settings/keys/{id} - success
@@ -131,7 +131,7 @@ func TestAPISettingsKeyDelete_Success(t *testing.T) {
 	_ = makeAPIRequest(t, "POST", urlRotate, accessToken, map[string]any{})
 	keys := getKeys(t, accessToken)
 	assert.Len(t, keys, 3)
-	prevId := keys[2].Id
+	prevId := keys[2].ID
 
 	// Delete previous
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/keys/" + itoa(prevId)
@@ -145,7 +145,7 @@ func TestAPISettingsKeyDelete_Success(t *testing.T) {
 	keys2 := getKeys(t, accessToken)
 	assert.Len(t, keys2, 2)
 	for _, k := range keys2 {
-		assert.NotEqual(t, prevId, k.Id)
+		assert.NotEqual(t, prevId, k.ID)
 	}
 }
 
@@ -154,7 +154,7 @@ func TestAPISettingsKeyDelete_ValidationAndUnauthorized(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 	// Ensure state has at least current/next
 	keys := getKeys(t, accessToken)
-	currId := keys[1].Id // current
+	currId := keys[1].ID // current
 
 	// Attempt to delete current -> validation error
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/keys/" + itoa(currId)

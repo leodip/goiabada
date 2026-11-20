@@ -100,7 +100,7 @@ func HandleUserInfoGetPost(
 		claims := make(jwt.MapClaims)
 		claims["sub"] = user.Subject
 
-		// The same split JwtToken.HasScope performs internally, done once: a missing or
+		// The same split JWTToken.HasScope performs internally, done once: a missing or
 		// non-string scope claim yields one empty element, which matches nothing, exactly as
 		// HasScope answers false for everything in that case.
 		scopes := strings.Split(jwtToken.StringClaim("scope"), " ")

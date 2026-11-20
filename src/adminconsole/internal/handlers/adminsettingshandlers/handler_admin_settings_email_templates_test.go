@@ -70,7 +70,7 @@ func (f *fakeEmailTemplatesAPI) SendTestEmailTemplate(_ context.Context, _ strin
 }
 
 func (f *fakeEmailTemplatesAPI) GetEmailTemplate(_ context.Context, _ string, email string) (*api.EmailTemplateResponse, error) {
-	if f.email == nil || f.email.Id != email {
+	if f.email == nil || f.email.ID != email {
 		return nil, &apiclient.APIError{Code: "NOT_FOUND", Message: "Email template not found", StatusCode: http.StatusNotFound}
 	}
 	return f.email, nil
@@ -105,7 +105,7 @@ func passwordResetLink() *api.EmailTemplateResponse {
 			EditedFields: []string{}, Problems: []api.EmailTemplateProblemResponse{}}
 	}
 	return &api.EmailTemplateResponse{
-		Id: "password_reset_link", HasButton: true,
+		ID: "password_reset_link", HasButton: true,
 		Placeholders: []api.EmailTemplatePlaceholderResponse{
 			{Name: "app_name", InSubject: true}, {Name: "name", InSubject: true},
 			{Name: "link", Required: true}, {Name: "button"}, {Name: "expiry", InSubject: true},
@@ -121,7 +121,7 @@ func passwordResetLink() *api.EmailTemplateResponse {
 // accountDeleted is a notice with no button.
 func accountDeleted() *api.EmailTemplateResponse {
 	email := passwordResetLink()
-	email.Id, email.HasButton = "account_deleted", false
+	email.ID, email.HasButton = "account_deleted", false
 	email.Placeholders = []api.EmailTemplatePlaceholderResponse{{Name: "app_name", InSubject: true}, {Name: "name", InSubject: true}}
 	return email
 }

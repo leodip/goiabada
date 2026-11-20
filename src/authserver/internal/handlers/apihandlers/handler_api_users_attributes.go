@@ -142,7 +142,7 @@ func HandleUserAttributeCreatePost(
 		}
 
 		// Validate user exists
-		user, err := database.GetUserById(r.Context(), nil, req.UserId)
+		user, err := database.GetUserById(r.Context(), nil, req.UserID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -181,8 +181,8 @@ func HandleUserAttributeCreatePost(
 			Key:                  req.Key,
 			Value:                req.Value,
 			IncludeInAccessToken: req.IncludeInAccessToken,
-			IncludeInIdToken:     req.IncludeInIdToken,
-			UserId:               req.UserId,
+			IncludeInIdToken:     req.IncludeInIDToken,
+			UserId:               req.UserID,
 		}
 
 		err = database.CreateUserAttribute(r.Context(), nil, userAttribute)
@@ -284,7 +284,7 @@ func HandleUserAttributeUpdatePut(
 		attribute.Key = req.Key
 		attribute.Value = req.Value
 		attribute.IncludeInAccessToken = req.IncludeInAccessToken
-		attribute.IncludeInIdToken = req.IncludeInIdToken
+		attribute.IncludeInIdToken = req.IncludeInIDToken
 
 		// Only authserver:manage writes to an administrator (#402 decision 1).
 		if !userTargetCeilingAllows(w, r, database, auditLogger, attribute.UserId) {

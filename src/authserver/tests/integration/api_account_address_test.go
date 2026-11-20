@@ -44,7 +44,7 @@ func TestAPIAccountAddressPut_Success(t *testing.T) {
 	var updateResp api.UpdateUserResponse
 	err := json.NewDecoder(resp.Body).Decode(&updateResp)
 	require.NoError(t, err)
-	assert.Equal(t, u.Id, updateResp.User.Id)
+	assert.Equal(t, u.Id, updateResp.User.ID)
 	assert.Equal(t, reqBody.AddressLine1, updateResp.User.AddressLine1)
 	assert.Equal(t, reqBody.AddressLine2, updateResp.User.AddressLine2)
 	assert.Equal(t, reqBody.AddressLocality, updateResp.User.AddressLocality)

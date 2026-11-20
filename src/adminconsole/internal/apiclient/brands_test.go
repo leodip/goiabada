@@ -30,7 +30,7 @@ func TestAuthServerClient_GetBrandByIdDecodesEveryFieldTheConsoleBinds(t *testin
 	assert.Equal(t, "/api/v1/admin/brands/7", gotPath)
 	assert.Equal(t, "Bearer an-access-token", gotAuthorization)
 
-	assert.Equal(t, int64(7), brand.Id)
+	assert.Equal(t, int64(7), brand.ID)
 	assert.Equal(t, "Spring", brand.Name)
 	assert.Equal(t, "dark", brand.Appearance)
 	assert.Equal(t, "plum", brand.Theme)

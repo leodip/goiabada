@@ -67,7 +67,7 @@ func getAccountUserId(t *testing.T, accessToken string) int64 {
 	var getResp api.GetUserResponse
 	err := json.NewDecoder(resp.Body).Decode(&getResp)
 	assert.NoError(t, err)
-	return getResp.User.Id
+	return getResp.User.ID
 }
 
 // putAccountOTP submits one PUT /api/v1/account/otp and returns its status together with the
@@ -297,7 +297,7 @@ func TestAPIAccountOTPPut_Enable_Success(t *testing.T) {
 	reqBody := api.UpdateAccountOTPRequest{
 		Enabled:  true,
 		Password: "Correct1!",
-		OtpCode:  code,
+		OTPCode:  code,
 	}
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/otp"
@@ -364,7 +364,7 @@ func TestAPIAccountOTPPut_Enable_AuthFailed(t *testing.T) {
 	reqBody := api.UpdateAccountOTPRequest{
 		Enabled:  true,
 		Password: "WrongPwd!",
-		OtpCode:  "000000",
+		OTPCode:  "000000",
 	}
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/otp"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
@@ -383,7 +383,7 @@ func TestAPIAccountOTPPut_Enable_InvalidFormats(t *testing.T) {
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/otp"
 
 	// Invalid code format (non-digits)
-	resp1 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateAccountOTPRequest{Enabled: true, Password: "Correct1!", OtpCode: "aaaaa"})
+	resp1 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateAccountOTPRequest{Enabled: true, Password: "Correct1!", OTPCode: "aaaaa"})
 	defer func() { _ = resp1.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp1.StatusCode)
 	var err1 api.ErrorResponse
@@ -404,7 +404,7 @@ func TestAPIAccountOTPPut_Enable_WrongCode(t *testing.T) {
 	// A well-formed code that the matcher refuses for the seed the server just issued.
 	resetOTPStateForTest(t, userId)
 	secret := getOTPEnrollment(t, accessToken).SecretKey
-	reqBody := api.UpdateAccountOTPRequest{Enabled: true, Password: "Correct1!", OtpCode: wrongOtpCodeFor(t, secret)}
+	reqBody := api.UpdateAccountOTPRequest{Enabled: true, Password: "Correct1!", OTPCode: wrongOtpCodeFor(t, secret)}
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/otp"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
@@ -471,7 +471,7 @@ func TestAPIAccountOTPPut_Disable_ResetsConsumedStep(t *testing.T) {
 	enable := api.UpdateAccountOTPRequest{
 		Enabled:  true,
 		Password: "Correct1!",
-		OtpCode:  code,
+		OTPCode:  code,
 	}
 
 	installPendingEnrollmentForTest(t, userId, keyURL, time.Now().UTC())
@@ -587,7 +587,7 @@ func TestAPIAccountOTPPut_Enable_AdvancesOtpConfigGeneration(t *testing.T) {
 	require.NoError(t, database.ClearPendingOTPEnrollment(context.Background(), nil, userId))
 	secret := getOTPEnrollment(t, accessToken).SecretKey
 	code := otptest.Code(t, secret, time.Now())
-	reqBody := api.UpdateAccountOTPRequest{Enabled: true, Password: "Correct1!", OtpCode: code}
+	reqBody := api.UpdateAccountOTPRequest{Enabled: true, Password: "Correct1!", OTPCode: code}
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/otp"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
@@ -789,7 +789,7 @@ func TestAPIAccountOTPPut_Enable_RefusedWithNoPendingEnrollment(t *testing.T) {
 	code := otptest.Code(t, strangerSecret, time.Now())
 
 	status, body := putAccountOTP(t, accessToken, api.UpdateAccountOTPRequest{
-		Enabled: true, Password: "Correct1!", OtpCode: code,
+		Enabled: true, Password: "Correct1!", OTPCode: code,
 	})
 	assert.Equal(t, http.StatusBadRequest, status)
 	assert.Contains(t, body, "OTP_ENROLLMENT_NOT_PENDING")
@@ -814,7 +814,7 @@ func TestAPIAccountOTPPut_Enable_RefusedWithAnExpiredEnrollment(t *testing.T) {
 	code := otptest.Code(t, secret, time.Now())
 
 	status, body := putAccountOTP(t, accessToken, api.UpdateAccountOTPRequest{
-		Enabled: true, Password: "Correct1!", OtpCode: code,
+		Enabled: true, Password: "Correct1!", OTPCode: code,
 	})
 	assert.Equal(t, http.StatusBadRequest, status)
 	assert.Contains(t, body, "OTP_ENROLLMENT_NOT_PENDING")
@@ -845,7 +845,7 @@ func TestAPIAccountOTPPut_Enable_EnrolsTheIssuedSeedAndClearsThePending(t *testi
 	code := otptest.PreviousStepCode(t, issued.SecretKey)
 
 	status, body := putAccountOTP(t, accessToken, api.UpdateAccountOTPRequest{
-		Enabled: true, Password: "Correct1!", OtpCode: code,
+		Enabled: true, Password: "Correct1!", OTPCode: code,
 	})
 	if status != http.StatusOK {
 		t.Fatalf("expected the enrollment to succeed, got %d. body: %s", status, body)
@@ -902,7 +902,7 @@ func TestAPIOTPPut_EachChangeMatchesTheAuthenticatorItRead(t *testing.T) {
 		secret := getOTPEnrollment(t, accessToken).SecretKey
 		code := otptest.Code(t, secret, time.Now())
 		status, body := putAccountOTP(t, accessToken,
-			api.UpdateAccountOTPRequest{Enabled: true, Password: "Correct1!", OtpCode: code})
+			api.UpdateAccountOTPRequest{Enabled: true, Password: "Correct1!", OTPCode: code})
 		if status != http.StatusOK {
 			t.Fatalf("%s: expected 200, got %d. body: %s", step, status, body)
 		}

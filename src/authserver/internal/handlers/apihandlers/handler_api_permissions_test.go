@@ -97,7 +97,7 @@ func TestHandleResourcePermissionsPut_BuiltInPermissionMissingFromDB(t *testing.
 	var permUpserts []api.ResourcePermissionUpsert
 	for _, p := range existingPerms {
 		permUpserts = append(permUpserts, api.ResourcePermissionUpsert{
-			Id:                   p.Id,
+			ID:                   p.Id,
 			PermissionIdentifier: p.PermissionIdentifier,
 			Description:          p.Description,
 		})
@@ -151,7 +151,7 @@ func resourcePermsStored() []record.Permission {
 func loadedEntries(permissions []record.Permission) []api.ResourcePermissionUpsert {
 	out := make([]api.ResourcePermissionUpsert, 0, len(permissions))
 	for _, p := range permissions {
-		out = append(out, api.ResourcePermissionUpsert{Id: p.Id, PermissionIdentifier: p.PermissionIdentifier, Description: p.Description})
+		out = append(out, api.ResourcePermissionUpsert{ID: p.Id, PermissionIdentifier: p.PermissionIdentifier, Description: p.Description})
 	}
 	return out
 }
@@ -160,8 +160,8 @@ func loadedEntries(permissions []record.Permission) []api.ResourcePermissionUpse
 // write kept as it is, admin dropped, audit created.
 func resourcePermsEdit() []api.ResourcePermissionUpsert {
 	return []api.ResourcePermissionUpsert{
-		{Id: 31, PermissionIdentifier: "read", Description: "Read everything"},
-		{Id: 32, PermissionIdentifier: "write", Description: "Write"},
+		{ID: 31, PermissionIdentifier: "read", Description: "Read everything"},
+		{ID: 32, PermissionIdentifier: "write", Description: "Write"},
 		{PermissionIdentifier: "audit", Description: "Audit"},
 	}
 }
@@ -576,7 +576,7 @@ func TestHandleResourcePermissionsPut_ARefusedSaveNeverOpensTheTransaction(t *te
 		{
 			name:            "an id that is not one of the resource's permissions",
 			stored:          stored,
-			body:            resourcePermsBody(t, append(loadedEntries(stored), api.ResourcePermissionUpsert{Id: 99, PermissionIdentifier: "other", Description: "x"}), loaded),
+			body:            resourcePermsBody(t, append(loadedEntries(stored), api.ResourcePermissionUpsert{ID: 99, PermissionIdentifier: "other", Description: "x"}), loaded),
 			wantStatus:      http.StatusNotFound,
 			wantCode:        "NOT_FOUND",
 			wantDescription: "Permission not found",
@@ -593,8 +593,8 @@ func TestHandleResourcePermissionsPut_ARefusedSaveNeverOpensTheTransaction(t *te
 			name:   "a swap of two stored identifiers",
 			stored: stored,
 			body: resourcePermsBody(t, []api.ResourcePermissionUpsert{
-				{Id: 31, PermissionIdentifier: "write", Description: "Read"},
-				{Id: 32, PermissionIdentifier: "read", Description: "Write"},
+				{ID: 31, PermissionIdentifier: "write", Description: "Read"},
+				{ID: 32, PermissionIdentifier: "read", Description: "Write"},
 			}, loaded),
 			wantStatus:      http.StatusBadRequest,
 			wantCode:        i18n.ErrCodePermissionIdentifierInUse,

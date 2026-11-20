@@ -55,9 +55,9 @@ func TestHandleSessionsGet_BindsTheRawUserAgent(t *testing.T) {
 
 	apiClient := &accountSessionsApiClient{
 		sessions: []api.UserSessionDetailResponse{
-			{Id: 1, DeviceName: "Chrome 120", DeviceType: "Desktop", DeviceOS: "Linux", UserAgent: header},
+			{ID: 1, DeviceName: "Chrome 120", DeviceType: "Desktop", DeviceOS: "Linux", UserAgent: header},
 			// A legacy row: the labels the old parser left behind, and no header at all.
-			{Id: 2, DeviceName: "Chrome 119.0.0.0", DeviceType: "Desktop", DeviceOS: "Linux x86_64"},
+			{ID: 2, DeviceName: "Chrome 119.0.0.0", DeviceType: "Desktop", DeviceOS: "Linux x86_64"},
 		},
 	}
 
@@ -93,7 +93,7 @@ func TestHandleSessionsGet_BindsTheSessionInstants(t *testing.T) {
 
 	apiClient := &accountSessionsApiClient{
 		sessions: []api.UserSessionDetailResponse{
-			{Id: 1, Started: &started, LastAccessed: &lastAccessed},
+			{ID: 1, Started: &started, LastAccessed: &lastAccessed},
 		},
 	}
 
@@ -120,8 +120,8 @@ func TestHandleSessionsGet_BindsIsCurrentFromTheResponse(t *testing.T) {
 
 	apiClient := &accountSessionsApiClient{
 		sessions: []api.UserSessionDetailResponse{
-			{UserSessionResponse: api.UserSessionResponse{Id: 1, SessionIdentifier: "sid-one"}},
-			{UserSessionResponse: api.UserSessionResponse{Id: 2, SessionIdentifier: "sid-two"}, IsCurrent: true},
+			{UserSessionResponse: api.UserSessionResponse{ID: 1, SessionIdentifier: "sid-one"}},
+			{UserSessionResponse: api.UserSessionResponse{ID: 2, SessionIdentifier: "sid-two"}, IsCurrent: true},
 		},
 	}
 
@@ -168,37 +168,37 @@ func TestHandleSessionsEndSessionPost_TheAnswerFollowsIsCurrentOnTheRow(t *testi
 		{
 			name: "the row being deleted is the caller's own",
 			sessions: []api.UserSessionDetailResponse{
-				{UserSessionResponse: api.UserSessionResponse{Id: deleting}, IsCurrent: true},
-				{UserSessionResponse: api.UserSessionResponse{Id: 6}},
+				{UserSessionResponse: api.UserSessionResponse{ID: deleting}, IsCurrent: true},
+				{UserSessionResponse: api.UserSessionResponse{ID: 6}},
 			},
 			wantCurrent: true,
 		},
 		{
 			name: "another row is the caller's own",
 			sessions: []api.UserSessionDetailResponse{
-				{UserSessionResponse: api.UserSessionResponse{Id: deleting}},
-				{UserSessionResponse: api.UserSessionResponse{Id: 6}, IsCurrent: true},
+				{UserSessionResponse: api.UserSessionResponse{ID: deleting}},
+				{UserSessionResponse: api.UserSessionResponse{ID: 6}, IsCurrent: true},
 			},
 		},
 		{
 			name: "no row is the caller's own, which is what a token carrying no sid produces",
 			sessions: []api.UserSessionDetailResponse{
-				{UserSessionResponse: api.UserSessionResponse{Id: deleting}},
-				{UserSessionResponse: api.UserSessionResponse{Id: 6}},
+				{UserSessionResponse: api.UserSessionResponse{ID: deleting}},
+				{UserSessionResponse: api.UserSessionResponse{ID: 6}},
 			},
 		},
 		{
 			name: "the row's identifier matches the console's own claim and the field says no",
 			sid:  "sid-one",
 			sessions: []api.UserSessionDetailResponse{
-				{UserSessionResponse: api.UserSessionResponse{Id: deleting, SessionIdentifier: "sid-one"}},
+				{UserSessionResponse: api.UserSessionResponse{ID: deleting, SessionIdentifier: "sid-one"}},
 			},
 		},
 		{
 			name: "the field says yes and the console's own claim names another session",
 			sid:  "sid-elsewhere",
 			sessions: []api.UserSessionDetailResponse{
-				{UserSessionResponse: api.UserSessionResponse{Id: deleting, SessionIdentifier: "sid-one"},
+				{UserSessionResponse: api.UserSessionResponse{ID: deleting, SessionIdentifier: "sid-one"},
 					IsCurrent: true},
 			},
 			wantCurrent: true,
@@ -220,7 +220,7 @@ func TestHandleSessionsEndSessionPost_TheAnswerFollowsIsCurrentOnTheRow(t *testi
 			} else {
 				opts = append(opts, handlertest.WithJwtInfo(oauthclient.JwtInfo{
 					TokenResponse: oauth.TokenResponse{AccessToken: handlertest.AccessToken},
-					IdToken:       &oauth.JwtToken{Claims: jwt.MapClaims{"sid": testCase.sid}},
+					IdToken:       &oauth.JWTToken{Claims: jwt.MapClaims{"sid": testCase.sid}},
 				}))
 			}
 

@@ -31,8 +31,8 @@ var clientErrorFields = map[string]string{
 	i18n.ErrCodeClientTermsOfServiceURLTooLong:       "termsOfServiceUrl",
 	i18n.ErrCodeClientTermsOfServiceURLInvalid:       "termsOfServiceUrl",
 	i18n.ErrCodeClientTermsOfServiceURLSchemeInvalid: "termsOfServiceUrl",
-	i18n.ErrCodeClientDefaultAcrNotApplicable:        "defaultAcrLevel",
-	i18n.ErrCodeClientDefaultAcrInvalid:              "defaultAcrLevel",
+	i18n.ErrCodeClientDefaultACRNotApplicable:        "defaultAcrLevel",
+	i18n.ErrCodeClientDefaultACRInvalid:              "defaultAcrLevel",
 }
 
 // clientTokensErrorFields maps the token tab's refusals to the duration each is about.

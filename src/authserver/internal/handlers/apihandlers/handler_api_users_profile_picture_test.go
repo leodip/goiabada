@@ -27,7 +27,7 @@ func withPathValue(req *http.Request, key, value string) *http.Request {
 
 // setTokenContextWithClaims sets a JWT token with custom claims in the request context
 func setTokenContextWithClaims(req *http.Request, claims map[string]interface{}) *http.Request {
-	jwtToken := oauth.JwtToken{
+	jwtToken := oauth.JWTToken{
 		Claims: claims,
 	}
 	ctx := reqctx.WithValidatedToken(req.Context(), jwtToken)

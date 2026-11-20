@@ -408,7 +408,7 @@ func (t *TokenIssuer) mintCodeRefreshTokens(ctx context.Context, tx *sql.Tx, set
 		if idTokenErr != nil {
 			return nil, idTokenErr
 		}
-		tokenResponse.IdToken = idTokenStr
+		tokenResponse.IDToken = idTokenStr
 	}
 
 	// refresh_token ----------------------------------------------------------------------
@@ -512,7 +512,7 @@ func (t *TokenIssuer) mintROPCRefreshTokens(ctx context.Context, tx *sql.Tx, set
 		if idTokenErr != nil {
 			return nil, idTokenErr
 		}
-		tokenResponse.IdToken = idTokenStr
+		tokenResponse.IDToken = idTokenStr
 	}
 
 	// refresh_token ----------------------------------------------------------------------

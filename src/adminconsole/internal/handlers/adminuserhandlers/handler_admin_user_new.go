@@ -137,7 +137,7 @@ func HandleNewPost(
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
-		pagePath := fmt.Sprintf("/admin/users/%v/details", created.User.Id)
+		pagePath := fmt.Sprintf("/admin/users/%v/details", created.User.ID)
 		sess.SetFlash(pagePath, "userCreated", "true")
 		// A setup email the auth server could not send is told on the new user's page, with what
 		// to do instead (#725). The member is there only when a setup email was attempted.

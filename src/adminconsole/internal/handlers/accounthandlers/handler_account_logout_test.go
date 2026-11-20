@@ -48,7 +48,7 @@ func logoutRequest() *http.Request {
 	return handlertest.Request(http.MethodPost, "/account/logout",
 		handlertest.WithJwtInfo(oauthclient.JwtInfo{
 			TokenResponse: oauth.TokenResponse{AccessToken: handlertest.AccessToken},
-			IdToken:       &oauth.JwtToken{TokenBase64: "the.id.token"},
+			IdToken:       &oauth.JWTToken{TokenBase64: "the.id.token"},
 		}))
 }
 
@@ -77,7 +77,7 @@ func TestHandleLogoutPost_AsksForTheFormPostModeAndRendersTheForm(t *testing.T) 
 	assert.Equal(t, handlertest.AccessToken, apiClient.gotBearer,
 		"the bearer is the access token string the response carried, never a decoded token (#427)")
 	assert.NotEmpty(t, apiClient.got.State, "the console still sends a state")
-	assert.Equal(t, "https://console.example.test", apiClient.got.PostLogoutRedirectUri,
+	assert.Equal(t, "https://console.example.test", apiClient.got.PostLogoutRedirectURI,
 		"the auth server sends the browser back to the base URL the handler was built with")
 	// The built-in identifier, which no setting changes: the auth server then checks the base URL
 	// against the console's own sign-out redirect URIs only, so another client listing the same
@@ -105,7 +105,7 @@ func TestHandleLogoutPost_StillFollowsARedirectResponse(t *testing.T) {
 	handlertest.RefuseInternalServerError(t, httpHelper)
 
 	apiClient := &logoutApiClient{redirect: &api.AccountLogoutRedirectResponse{
-		LogoutUrl: "https://auth.example.com/auth/logout?id_token_hint=the.id.token",
+		LogoutURL: "https://auth.example.com/auth/logout?id_token_hint=the.id.token",
 	}}
 
 	rec := httptest.NewRecorder()
@@ -127,7 +127,7 @@ func TestHandleLogoutPost_WithoutTokensGoesHomeWithoutCallingTheAPI(t *testing.T
 			handlertest.Request(http.MethodPost, "/account/logout", handlertest.WithAccessToken())},
 		{"an ID token and no access token",
 			handlertest.Request(http.MethodPost, "/account/logout",
-				handlertest.WithJwtInfo(oauthclient.JwtInfo{IdToken: &oauth.JwtToken{TokenBase64: "the.id.token"}}))},
+				handlertest.WithJwtInfo(oauthclient.JwtInfo{IdToken: &oauth.JWTToken{TokenBase64: "the.id.token"}}))},
 	}
 
 	for _, tc := range testCases {
@@ -160,7 +160,7 @@ func TestHandleLogoutConfirmGet_RendersTheConfirmationAndSignsNobodyOut(t *testi
 		handlertest.Request(http.MethodGet, "/auth/logout",
 			handlertest.WithJwtInfo(oauthclient.JwtInfo{
 				TokenResponse: oauth.TokenResponse{AccessToken: handlertest.AccessToken},
-				IdToken:       &oauth.JwtToken{TokenBase64: "the.id.token"},
+				IdToken:       &oauth.JWTToken{TokenBase64: "the.id.token"},
 			})))
 
 	assert.Equal(t, http.StatusOK, rec.Code, "the confirmation page is rendered, not redirected to")
@@ -180,7 +180,7 @@ func TestHandleLogoutConfirmGet_SendsAVisitorWithoutTokensHome(t *testing.T) {
 			handlertest.Request(http.MethodGet, "/auth/logout", handlertest.WithAccessToken())},
 		{"an ID token and no access token",
 			handlertest.Request(http.MethodGet, "/auth/logout",
-				handlertest.WithJwtInfo(oauthclient.JwtInfo{IdToken: &oauth.JwtToken{TokenBase64: "the.id.token"}}))},
+				handlertest.WithJwtInfo(oauthclient.JwtInfo{IdToken: &oauth.JWTToken{TokenBase64: "the.id.token"}}))},
 	}
 
 	for _, tc := range testCases {

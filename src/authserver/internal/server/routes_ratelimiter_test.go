@@ -301,7 +301,7 @@ func apiRequest(method string, target string, body string) *http.Request {
 }
 
 // accountAPIToken is the decoded bearer token apiRequest carries.
-func accountAPIToken() oauth.JwtToken {
+func accountAPIToken() oauth.JWTToken {
 	return routesTestAccessToken(jwt.MapClaims{
 		"sub":       routesTestSubject,
 		"scope":     builtin.AuthServerResourceIdentifier + ":" + builtin.ManageAccountPermissionIdentifier,
@@ -311,12 +311,12 @@ func accountAPIToken() oauth.JwtToken {
 
 // routesTestAccessToken is claims as an access token issuance mints since #676: the at+jwt header,
 // routesTestIssuer, routesTestAPIClientId and routesTestAccessJti on top of claims.
-func routesTestAccessToken(claims jwt.MapClaims) oauth.JwtToken {
+func routesTestAccessToken(claims jwt.MapClaims) oauth.JWTToken {
 	all := jwt.MapClaims{"iss": routesTestIssuer, "client_id": routesTestAPIClientId, "jti": routesTestAccessJti}
 	for name, value := range claims {
 		all[name] = value
 	}
-	return oauth.JwtToken{Header: map[string]interface{}{"alg": "RS256", "typ": "at+jwt"}, Claims: all}
+	return oauth.JWTToken{Header: map[string]interface{}{"alg": "RS256", "typ": "at+jwt"}, Claims: all}
 }
 
 // armRoutesTestAPIClient has the session guard find routesTestAPIClientId, enabled, and

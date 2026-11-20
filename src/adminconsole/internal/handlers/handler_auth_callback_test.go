@@ -118,7 +118,7 @@ func (p *recordingProfiles) GetAccountProfile(_ context.Context, accessToken str
 	if p.err != nil {
 		return nil, p.err
 	}
-	return &api.UserResponse{Id: 7, Locale: "de", PageLanguage: p.pageLanguage}, nil
+	return &api.UserResponse{ID: 7, Locale: "de", PageLanguage: p.pageLanguage}, nil
 }
 
 type callbackHarness struct {
@@ -269,7 +269,7 @@ func (h *callbackHarness) idToken(edit func(jwt.MapClaims)) string {
 func (h *callbackHarness) tokenResponse() *oauth.TokenResponse {
 	return &oauth.TokenResponse{
 		AccessToken:  "the-access-token",
-		IdToken:      h.idToken(nil),
+		IDToken:      h.idToken(nil),
 		TokenType:    "Bearer",
 		ExpiresIn:    300,
 		RefreshToken: "the-refresh-token",
@@ -527,7 +527,7 @@ func TestHandleAuthCallbackPost_RefusesWhatTheAuthServerAnswered(t *testing.T) {
 			name: "no id token",
 			exchange: func(h *callbackHarness) (*oauth.TokenResponse, error) {
 				r := h.tokenResponse()
-				r.IdToken = ""
+				r.IDToken = ""
 				return r, nil
 			},
 			want: refusalUnverified,
@@ -545,7 +545,7 @@ func TestHandleAuthCallbackPost_RefusesWhatTheAuthServerAnswered(t *testing.T) {
 			name: "an id token from another issuer",
 			exchange: func(h *callbackHarness) (*oauth.TokenResponse, error) {
 				r := h.tokenResponse()
-				r.IdToken = h.idToken(func(c jwt.MapClaims) { c["iss"] = "https://another-issuer.example" })
+				r.IDToken = h.idToken(func(c jwt.MapClaims) { c["iss"] = "https://another-issuer.example" })
 				return r, nil
 			},
 			want: refusalUnverified,
@@ -554,7 +554,7 @@ func TestHandleAuthCallbackPost_RefusesWhatTheAuthServerAnswered(t *testing.T) {
 			name: "an id token for another audience",
 			exchange: func(h *callbackHarness) (*oauth.TokenResponse, error) {
 				r := h.tokenResponse()
-				r.IdToken = h.idToken(func(c jwt.MapClaims) { c["aud"] = "another-client" })
+				r.IDToken = h.idToken(func(c jwt.MapClaims) { c["aud"] = "another-client" })
 				return r, nil
 			},
 			want: refusalUnverified,
@@ -563,7 +563,7 @@ func TestHandleAuthCallbackPost_RefusesWhatTheAuthServerAnswered(t *testing.T) {
 			name: "an id token with no nonce",
 			exchange: func(h *callbackHarness) (*oauth.TokenResponse, error) {
 				r := h.tokenResponse()
-				r.IdToken = h.idToken(func(c jwt.MapClaims) { delete(c, "nonce") })
+				r.IDToken = h.idToken(func(c jwt.MapClaims) { delete(c, "nonce") })
 				return r, nil
 			},
 			want: refusalUnverified,
@@ -573,7 +573,7 @@ func TestHandleAuthCallbackPost_RefusesWhatTheAuthServerAnswered(t *testing.T) {
 			exchange: func(h *callbackHarness) (*oauth.TokenResponse, error) {
 				r := h.tokenResponse()
 				other := sha256.Sum256([]byte("another-raw-nonce"))
-				r.IdToken = h.idToken(func(c jwt.MapClaims) { c["nonce"] = hex.EncodeToString(other[:]) })
+				r.IDToken = h.idToken(func(c jwt.MapClaims) { c["nonce"] = hex.EncodeToString(other[:]) })
 				return r, nil
 			},
 			want: refusalUnverified,
@@ -768,7 +768,7 @@ func TestHandleAuthCallbackPost_ARefusedTabLeavesAnotherTabsSignIn(t *testing.T)
 	require.NoError(t, err)
 	sentB := sha256.Sum256([]byte(handshakeB[sessionkeys.Nonce]))
 	response := h.tokenResponse()
-	response.IdToken = h.idToken(func(c jwt.MapClaims) { c["nonce"] = hex.EncodeToString(sentB[:]) })
+	response.IDToken = h.idToken(func(c jwt.MapClaims) { c["nonce"] = hex.EncodeToString(sentB[:]) })
 	exchanger := &recordingExchanger{response: response}
 
 	wA := h.serve(exchanger, jar.Cookies(console), url.Values{"state": {stateA}, "code": {"tab-a-code"}})

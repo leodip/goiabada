@@ -437,7 +437,7 @@ func (f *BrandForm) footerLinks() []api.BrandFooterLink {
 		if row.empty() {
 			continue
 		}
-		links = append(links, api.BrandFooterLink{Url: row.Url, Label: row.Label, Labels: row.Labels})
+		links = append(links, api.BrandFooterLink{URL: row.Url, Label: row.Label, Labels: row.Labels})
 	}
 	return links
 }
@@ -450,7 +450,7 @@ func footerRowsOf(links []api.BrandFooterLinkResponse) [brandFooterRows]BrandFoo
 		if i == brandFooterRows {
 			break
 		}
-		row := BrandFooterLinkRow{Label: link.Label, Url: link.Url}
+		row := BrandFooterLinkRow{Label: link.Label, Url: link.URL}
 		if len(link.Labels) > 0 {
 			row.Labels = link.Labels
 		}
@@ -485,7 +485,7 @@ func brandSlotIdsFrom(r *http.Request) brandSlotIds {
 // ref names the asset slot holds, as a brand's write names it, or none for an empty slot.
 func (ids brandSlotIds) ref(slot string) *api.BrandAssetRef {
 	if id := ids[slot]; id != nil {
-		return &api.BrandAssetRef{Id: *id}
+		return &api.BrandAssetRef{ID: *id}
 	}
 	return nil
 }
@@ -683,10 +683,10 @@ func HandleBrandNewPost(
 			BoldFont:      ids.ref("boldFont"),
 			FooterLinks:   form.footerLinks(),
 			SupportEmail:  form.SupportEmail,
-			SupportUrl:    form.SupportUrl,
+			SupportURL:    form.SupportUrl,
 			SupportPhone:  form.SupportPhone,
 			Palette:       palette.request(form.Theme),
-			CustomCss:     form.CustomCss,
+			CustomCSS:     form.CustomCss,
 		})
 		if err != nil {
 			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
@@ -782,7 +782,7 @@ func HandleBrandGet(
 			Logo: brand.Logo, DarkLogo: brand.DarkLogo, Favicon: brand.Favicon, Background: brand.Background,
 			RegularFont: brand.RegularFont, BoldFont: brand.BoldFont,
 			FooterLinks: footerRowsOf(brand.FooterLinks), SupportEmail: brand.SupportEmail,
-			SupportUrl: brand.SupportUrl, SupportPhone: brand.SupportPhone, CustomCss: brand.CustomCss}
+			SupportUrl: brand.SupportURL, SupportPhone: brand.SupportPhone, CustomCss: brand.CustomCSS}
 		renderBrandForm(httpHelper, w, r, form, brandPaletteFormOf(brand, themes, brand.Theme), themes, map[string]interface{}{
 			"isNew":             false,
 			"storedBrand":       *brand,
@@ -839,10 +839,10 @@ func HandleBrandPost(
 			BoldFont:      ids.ref("boldFont"),
 			FooterLinks:   form.footerLinks(),
 			SupportEmail:  form.SupportEmail,
-			SupportUrl:    form.SupportUrl,
+			SupportURL:    form.SupportUrl,
 			SupportPhone:  form.SupportPhone,
 			Palette:       palette.request(form.Theme),
-			CustomCss:     form.CustomCss,
+			CustomCSS:     form.CustomCss,
 		})
 		if err != nil {
 			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {

@@ -60,7 +60,7 @@ func signedInIDTokenClaims(t *testing.T) []string {
 	if err != nil {
 		t.Fatalf("minting the code's tokens: %v", err)
 	}
-	return claimNames(verifyAndDecodeToken(t, response.IdToken, getTestPublicKey(t)))
+	return claimNames(verifyAndDecodeToken(t, response.IDToken, getTestPublicKey(t)))
 }
 
 // serviceAccessTokenClaims is the claims of the access token the client credentials grant issues.

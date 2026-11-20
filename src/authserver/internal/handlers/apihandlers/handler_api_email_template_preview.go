@@ -132,7 +132,7 @@ func HandleEmailTemplatePreviewPost(database emailTemplateBrandReader, renderer 
 			writeJSONError(w, "Invalid request body", "INVALID_REQUEST_BODY", http.StatusBadRequest)
 			return
 		}
-		sample, ok := checkEmailTemplateSample(w, r, database, email, lang, req.Subject, req.ButtonLabel, req.Body, req.BrandId)
+		sample, ok := checkEmailTemplateSample(w, r, database, email, lang, req.Subject, req.ButtonLabel, req.Body, req.BrandID)
 		if !ok {
 			return
 		}
@@ -148,7 +148,7 @@ func HandleEmailTemplatePreviewPost(database emailTemplateBrandReader, renderer 
 				"email_template", email.ID, "language", lang)
 			return
 		}
-		writeJSON(w, r, http.StatusOK, api.PreviewEmailTemplateResponse{Subject: message.Subject, Html: message.HTML, Text: text})
+		writeJSON(w, r, http.StatusOK, api.PreviewEmailTemplateResponse{Subject: message.Subject, HTML: message.HTML, Text: text})
 	}
 }
 
@@ -192,7 +192,7 @@ func HandleEmailTemplateSendTestPost(
 			writeValidationError(w, r, err)
 			return
 		}
-		sample, ok := checkEmailTemplateSample(w, r, database, email, lang, req.Subject, req.ButtonLabel, req.Body, req.BrandId)
+		sample, ok := checkEmailTemplateSample(w, r, database, email, lang, req.Subject, req.ButtonLabel, req.Body, req.BrandID)
 		if !ok {
 			return
 		}

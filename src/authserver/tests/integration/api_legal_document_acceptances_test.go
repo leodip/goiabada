@@ -115,8 +115,8 @@ func (f *acceptancesFixture) assertTheFixturesAcceptances(t *testing.T, got []ap
 		{f.termsId, f.termsShort, 1, "Terms of use", f.termsV1At, false, baseURL + "/legal/" + f.termsShort + "/versions/1"},
 	} {
 		a := got[i]
-		assert.NotZero(t, a.Id, "acceptance %d", i)
-		assert.Equal(t, w.documentId, a.LegalDocumentId, "acceptance %d", i)
+		assert.NotZero(t, a.ID, "acceptance %d", i)
+		assert.Equal(t, w.documentId, a.LegalDocumentID, "acceptance %d", i)
 		assert.Equal(t, w.shortName, a.ShortName, "acceptance %d", i)
 		assert.Equal(t, w.version, a.Version, "acceptance %d", i)
 		assert.Equal(t, w.title, a.Title, "acceptance %d", i)

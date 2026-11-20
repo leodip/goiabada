@@ -68,8 +68,8 @@ func Keys(t testing.TB) (signing, attacker *rsa.PrivateKey) {
 }
 
 // JwkFromPublicKey publishes pub under kid, as the auth server's /certs does.
-func JwkFromPublicKey(kid string, pub *rsa.PublicKey) oauth.Jwk {
-	return oauth.Jwk{
+func JwkFromPublicKey(kid string, pub *rsa.PublicKey) oauth.JWK {
+	return oauth.JWK{
 		Alg: "RS256",
 		Kid: kid,
 		Kty: "RSA",
@@ -81,7 +81,7 @@ func JwkFromPublicKey(kid string, pub *rsa.PublicKey) oauth.Jwk {
 
 // NewJwksServer serves the given keys at /certs and counts how many times it is hit, so a test
 // can assert the parser caches rather than refetching per token.
-func NewJwksServer(t testing.TB, keys ...oauth.Jwk) (*httptest.Server, *atomic.Int32) {
+func NewJwksServer(t testing.TB, keys ...oauth.JWK) (*httptest.Server, *atomic.Int32) {
 	t.Helper()
 	server := NewMutableJwksServer(t, keys...)
 	return server.Server, &server.Hits
@@ -95,12 +95,12 @@ type JwksServer struct {
 	Hits atomic.Int32
 
 	mu   sync.Mutex
-	keys []oauth.Jwk
+	keys []oauth.JWK
 	down bool
 }
 
 // NewMutableJwksServer starts a JwksServer publishing keys.
-func NewMutableJwksServer(t testing.TB, keys ...oauth.Jwk) *JwksServer {
+func NewMutableJwksServer(t testing.TB, keys ...oauth.JWK) *JwksServer {
 	t.Helper()
 	s := &JwksServer{keys: keys}
 	s.Server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -117,7 +117,7 @@ func NewMutableJwksServer(t testing.TB, keys ...oauth.Jwk) *JwksServer {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(oauth.Jwks{Keys: keys})
+		_ = json.NewEncoder(w).Encode(oauth.JWKS{Keys: keys})
 	}))
 	t.Cleanup(s.Close)
 	return s
@@ -125,7 +125,7 @@ func NewMutableJwksServer(t testing.TB, keys ...oauth.Jwk) *JwksServer {
 
 // Publish replaces the keys /certs publishes, as a rotation or a key deletion on the auth
 // server does.
-func (s *JwksServer) Publish(keys ...oauth.Jwk) {
+func (s *JwksServer) Publish(keys ...oauth.JWK) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.keys = keys

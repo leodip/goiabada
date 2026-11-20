@@ -21,14 +21,14 @@ func TestSessionWireTypes_JSONRepresentation(t *testing.T) {
 	}{
 		{
 			name:     "SessionLoadRequest",
-			want:     &SessionLoadRequest{Id: "session-id"},
+			want:     &SessionLoadRequest{ID: "session-id"},
 			newValue: func() any { return &SessionLoadRequest{} },
 			literal:  `{"id":"session-id"}`,
 		},
 		{
 			name: "SessionWriteRequest",
 			want: &SessionWriteRequest{
-				Id:            "session-id",
+				ID:            "session-id",
 				Data:          "sealed-data",
 				Authenticated: true,
 			},
@@ -38,7 +38,7 @@ func TestSessionWireTypes_JSONRepresentation(t *testing.T) {
 		{
 			name: "SessionTouchRequest",
 			want: &SessionTouchRequest{
-				Id:            "session-id",
+				ID:            "session-id",
 				Authenticated: true,
 			},
 			newValue: func() any { return &SessionTouchRequest{} },

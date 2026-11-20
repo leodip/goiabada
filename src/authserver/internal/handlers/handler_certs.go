@@ -30,7 +30,7 @@ func HandleCertsGet(
 
 		// RFC 7517 section 5: the set MUST have a keys member whose value is an array, so a set with
 		// no keys is [] and never null (#714).
-		result := oauth.Jwks{Keys: []oauth.Jwk{}}
+		result := oauth.JWKS{Keys: []oauth.JWK{}}
 
 		var nextKey *record.KeyPair
 		var currentKey *record.KeyPair
@@ -55,7 +55,7 @@ func HandleCertsGet(
 		}
 
 		if nextKey != nil {
-			var publicKeyJwk oauth.Jwk
+			var publicKeyJwk oauth.JWK
 			err := json.Unmarshal(nextKey.PublicKeyJWK, &publicKeyJwk)
 			if err != nil {
 				jsonWriter.JSONError(w, r, err)
@@ -65,7 +65,7 @@ func HandleCertsGet(
 		}
 
 		if currentKey != nil {
-			var publicKeyJwk oauth.Jwk
+			var publicKeyJwk oauth.JWK
 			err := json.Unmarshal(currentKey.PublicKeyJWK, &publicKeyJwk)
 			if err != nil {
 				jsonWriter.JSONError(w, r, err)
@@ -75,7 +75,7 @@ func HandleCertsGet(
 		}
 
 		if previousKey != nil {
-			var publicKeyJwk oauth.Jwk
+			var publicKeyJwk oauth.JWK
 			err := json.Unmarshal(previousKey.PublicKeyJWK, &publicKeyJwk)
 			if err != nil {
 				jsonWriter.JSONError(w, r, err)

@@ -74,13 +74,13 @@ const (
 // fixtureRows is what the fixture tables parse to, in the generator's order.
 // Germany is the one country with two rows, so it alone keeps its comments.
 var fixtureRows = []zone{
-	{CountryCode: "BR", Zone: "America/Sao_Paulo", CountryName: "Brazil", Comments: ""},
-	{CountryCode: "DE", Zone: "Europe/Berlin", CountryName: "Germany", Comments: "most of Germany"},
-	{CountryCode: "DE", Zone: "Europe/Zurich", CountryName: "Germany", Comments: "Büsingen"},
-	{CountryCode: "LI", Zone: "Europe/Zurich", CountryName: "Liechtenstein", Comments: ""},
-	{CountryCode: "ZZ", Zone: "Europe/Stockholm", CountryName: `Quote "Land" \ Back`, Comments: ""},
-	{CountryCode: "SE", Zone: "Europe/Stockholm", CountryName: "Sweden", Comments: ""},
-	{CountryCode: "CH", Zone: "Europe/Zurich", CountryName: "Switzerland", Comments: ""},
+	{CountryCode: "BR", Name: "America/Sao_Paulo", CountryName: "Brazil", Comments: ""},
+	{CountryCode: "DE", Name: "Europe/Berlin", CountryName: "Germany", Comments: "most of Germany"},
+	{CountryCode: "DE", Name: "Europe/Zurich", CountryName: "Germany", Comments: "Büsingen"},
+	{CountryCode: "LI", Name: "Europe/Zurich", CountryName: "Liechtenstein", Comments: ""},
+	{CountryCode: "ZZ", Name: "Europe/Stockholm", CountryName: `Quote "Land" \ Back`, Comments: ""},
+	{CountryCode: "SE", Name: "Europe/Stockholm", CountryName: "Sweden", Comments: ""},
+	{CountryCode: "CH", Name: "Europe/Zurich", CountryName: "Switzerland", Comments: ""},
 }
 
 // entry is one member of a fixture tarball. A zero typeflag is a regular file.
@@ -210,7 +210,7 @@ func readBack(t *testing.T, src []byte) []zone {
 				}
 				rows = append(rows, zone{
 					CountryCode: fields["CountryCode"],
-					Zone:        fields["Zone"],
+					Name:        fields["Name"],
 					CountryName: fields["CountryName"],
 					Comments:    fields["Comments"],
 				})
@@ -285,45 +285,45 @@ func TestKeepMultiZoneComments(t *testing.T) {
 			// which is in Germany, so it survives for DE alone.
 			name: "a row shared by CH, DE and LI keeps its comment for DE, which has another zone",
 			in: []zone{
-				{CountryCode: "CH", Zone: "Europe/Zurich", Comments: "Büsingen"},
-				{CountryCode: "DE", Zone: "Europe/Zurich", Comments: "Büsingen"},
-				{CountryCode: "LI", Zone: "Europe/Zurich", Comments: "Büsingen"},
-				{CountryCode: "DE", Zone: "Europe/Berlin", Comments: "most of Germany"},
+				{CountryCode: "CH", Name: "Europe/Zurich", Comments: "Büsingen"},
+				{CountryCode: "DE", Name: "Europe/Zurich", Comments: "Büsingen"},
+				{CountryCode: "LI", Name: "Europe/Zurich", Comments: "Büsingen"},
+				{CountryCode: "DE", Name: "Europe/Berlin", Comments: "most of Germany"},
 			},
 			want: []zone{
-				{CountryCode: "CH", Zone: "Europe/Zurich", Comments: ""},
-				{CountryCode: "DE", Zone: "Europe/Zurich", Comments: "Büsingen"},
-				{CountryCode: "LI", Zone: "Europe/Zurich", Comments: ""},
-				{CountryCode: "DE", Zone: "Europe/Berlin", Comments: "most of Germany"},
+				{CountryCode: "CH", Name: "Europe/Zurich", Comments: ""},
+				{CountryCode: "DE", Name: "Europe/Zurich", Comments: "Büsingen"},
+				{CountryCode: "LI", Name: "Europe/Zurich", Comments: ""},
+				{CountryCode: "DE", Name: "Europe/Berlin", Comments: "most of Germany"},
 			},
 		},
 		{
 			name: "a single-country, single-zone row with a comment is emptied",
-			in:   []zone{{CountryCode: "BR", Zone: "America/Sao_Paulo", Comments: "Brazil (southeast)"}},
-			want: []zone{{CountryCode: "BR", Zone: "America/Sao_Paulo", Comments: ""}},
+			in:   []zone{{CountryCode: "BR", Name: "America/Sao_Paulo", Comments: "Brazil (southeast)"}},
+			want: []zone{{CountryCode: "BR", Name: "America/Sao_Paulo", Comments: ""}},
 		},
 		{
 			name: "a country with two zones keeps both comments",
 			in: []zone{
-				{CountryCode: "PT", Zone: "Europe/Lisbon", Comments: "Portugal (mainland)"},
-				{CountryCode: "PT", Zone: "Atlantic/Madeira", Comments: "Madeira Islands"},
+				{CountryCode: "PT", Name: "Europe/Lisbon", Comments: "Portugal (mainland)"},
+				{CountryCode: "PT", Name: "Atlantic/Madeira", Comments: "Madeira Islands"},
 			},
 			want: []zone{
-				{CountryCode: "PT", Zone: "Europe/Lisbon", Comments: "Portugal (mainland)"},
-				{CountryCode: "PT", Zone: "Atlantic/Madeira", Comments: "Madeira Islands"},
+				{CountryCode: "PT", Name: "Europe/Lisbon", Comments: "Portugal (mainland)"},
+				{CountryCode: "PT", Name: "Atlantic/Madeira", Comments: "Madeira Islands"},
 			},
 		},
 		{
 			name: "a row without a comment stays without one",
 			in: []zone{
-				{CountryCode: "PT", Zone: "Europe/Lisbon"},
-				{CountryCode: "PT", Zone: "Atlantic/Madeira", Comments: "Madeira Islands"},
-				{CountryCode: "SE", Zone: "Europe/Stockholm"},
+				{CountryCode: "PT", Name: "Europe/Lisbon"},
+				{CountryCode: "PT", Name: "Atlantic/Madeira", Comments: "Madeira Islands"},
+				{CountryCode: "SE", Name: "Europe/Stockholm"},
 			},
 			want: []zone{
-				{CountryCode: "PT", Zone: "Europe/Lisbon"},
-				{CountryCode: "PT", Zone: "Atlantic/Madeira", Comments: "Madeira Islands"},
-				{CountryCode: "SE", Zone: "Europe/Stockholm"},
+				{CountryCode: "PT", Name: "Europe/Lisbon"},
+				{CountryCode: "PT", Name: "Atlantic/Madeira", Comments: "Madeira Islands"},
+				{CountryCode: "SE", Name: "Europe/Stockholm"},
 			},
 		},
 	}

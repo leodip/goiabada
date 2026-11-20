@@ -5,11 +5,11 @@
 {{end}}
 
 {{define "page"}}
-{{ template "user_header" (args "permissions" .user.Id .user.Email .page .query $.ctx) }}
+{{ template "user_header" (args "permissions" .user.ID .user.Email .page .query $.ctx) }}
 
 {{/* The permissions are drawn as stored; permission-list.js edits them in the page and saves the
      set whole, with the set as drawn, so the server refuses a save from an outdated page (#428). */}}
-<form class="panel" id="permissionListForm" novalidate data-save-url="/admin/users/{{ .user.Id }}/permissions" data-reload-url="/admin/users/{{ .user.Id }}/permissions?page={{ .page }}{{ if .query }}&query={{ .query }}{{ end }}" data-list-key="assignedPermissionsIds" data-expected-key="expectedPermissionIds"
+<form class="panel" id="permissionListForm" novalidate data-save-url="/admin/users/{{ .user.ID }}/permissions" data-reload-url="/admin/users/{{ .user.ID }}/permissions?page={{ .page }}{{ if .query }}&query={{ .query }}{{ end }}" data-list-key="assignedPermissionsIds" data-expected-key="expectedPermissionIds"
   data-choose-permission="{{ T $.ctx "adminconsole.admin_users.permissions.select_permission" }}" data-unchosen="{{ T $.ctx "adminconsole.admin_users.permissions.error_select_permission" }}" data-duplicate="{{ T $.ctx "adminconsole.admin_users.permissions.error_already_in_list" }}"
   data-added="{{ T $.ctx "adminconsole.admin_users.permissions.added" }}" data-removed="{{ T $.ctx "adminconsole.admin_users.permissions.removed" }}" data-remove-label="{{ T $.ctx "adminconsole.admin_users.permissions.remove_label" }}">
   <div class="panel-body stacked">

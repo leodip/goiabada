@@ -845,17 +845,17 @@ func permissionDescriptionCeilingAllows(w http.ResponseWriter, r *http.Request, 
 	}
 	loaded := make(map[int64]string, len(expected))
 	for _, entry := range expected {
-		loaded[entry.Id] = entry.Description
+		loaded[entry.ID] = entry.Description
 	}
 	var causes []int64
 	for _, entry := range wanted {
-		if !administrative[entry.Id] {
+		if !administrative[entry.ID] {
 			continue
 		}
-		if description, ok := loaded[entry.Id]; ok && description == entry.Description {
+		if description, ok := loaded[entry.ID]; ok && description == entry.Description {
 			continue
 		}
-		causes = append(causes, entry.Id)
+		causes = append(causes, entry.ID)
 	}
 	if len(causes) == 0 || callerHoldsManage(r) {
 		return true

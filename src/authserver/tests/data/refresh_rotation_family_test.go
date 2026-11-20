@@ -595,7 +595,7 @@ func TestRefreshRotation_KeepsThePictureInBothTokens(t *testing.T) {
 
 			want := implicitTestBaseURL + "/userinfo/picture/" + f.user.Subject
 			assert.Equal(t, want, claimsOf(t, response.AccessToken)["picture"], "the access token carries the picture")
-			assert.Equal(t, want, claimsOf(t, response.IdToken)["picture"], "the ID token carries the picture")
+			assert.Equal(t, want, claimsOf(t, response.IDToken)["picture"], "the ID token carries the picture")
 		})
 	}
 }

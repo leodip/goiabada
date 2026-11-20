@@ -49,7 +49,7 @@ func HandleLegalDocumentsGet(
 			return
 		}
 
-		acceptances, err := apiClient.GetUserLegalDocumentAcceptances(r.Context(), jwtInfo.TokenResponse.AccessToken, user.Id)
+		acceptances, err := apiClient.GetUserLegalDocumentAcceptances(r.Context(), jwtInfo.TokenResponse.AccessToken, user.ID)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return

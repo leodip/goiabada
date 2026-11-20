@@ -100,7 +100,7 @@ func TestIssueClientCredentialsGrant(t *testing.T) {
 			assert.Equal(t, "Bearer", response.TokenType)
 			assert.Equal(t, int64(tt.expectedLifetime), response.ExpiresIn)
 			assert.NotEmpty(t, response.AccessToken)
-			assert.Empty(t, response.IdToken)
+			assert.Empty(t, response.IDToken)
 			assert.Empty(t, response.RefreshToken)
 			assert.Equal(t, tt.scope, response.Scope)
 

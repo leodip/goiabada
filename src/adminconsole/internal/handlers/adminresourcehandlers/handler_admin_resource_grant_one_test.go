@@ -24,19 +24,19 @@ type grantOneApiClient struct {
 }
 
 func (c *grantOneApiClient) GetResourceById(_ context.Context, _ string, resourceId int64) (*api.ResourceResponse, error) {
-	return &api.ResourceResponse{Id: resourceId, ResourceIdentifier: "some-resource"}, nil
+	return &api.ResourceResponse{ID: resourceId, ResourceIdentifier: "some-resource"}, nil
 }
 
 func (c *grantOneApiClient) GetPermissionsByResource(_ context.Context, _ string, _ int64) ([]api.PermissionResponse, error) {
-	return []api.PermissionResponse{{Id: 7, PermissionIdentifier: "read"}}, nil
+	return []api.PermissionResponse{{ID: 7, PermissionIdentifier: "read"}}, nil
 }
 
 func (c *grantOneApiClient) GetUserPermissions(_ context.Context, _ string, userId int64) (*api.UserResponse, []api.PermissionResponse, error) {
-	return &api.UserResponse{Id: userId}, c.current, nil
+	return &api.UserResponse{ID: userId}, c.current, nil
 }
 
 func (c *grantOneApiClient) GetGroupPermissions(_ context.Context, _ string, groupId int64) (*api.GroupResponse, []api.PermissionResponse, error) {
-	return &api.GroupResponse{Id: groupId}, c.current, nil
+	return &api.GroupResponse{ID: groupId}, c.current, nil
 }
 
 func (c *grantOneApiClient) UpdateUserPermissions(_ context.Context, _ string, _ int64, request *api.UpdateUserPermissionsRequest) error {
@@ -88,7 +88,7 @@ func TestResourceGrantOneHandlers_SendTheGrantsTheyRead(t *testing.T) {
 			build: func(h *render.Renderer, c *grantOneApiClient) http.HandlerFunc {
 				return HandleUsersWithPermissionRemovePermissionPost(h, c)
 			},
-			current:      []api.PermissionResponse{{Id: 3}, {Id: 7}},
+			current:      []api.PermissionResponse{{ID: 3}, {ID: 7}},
 			wantWanted:   []int64{3},
 			wantExpected: []int64{3, 7},
 		},
@@ -108,7 +108,7 @@ func TestResourceGrantOneHandlers_SendTheGrantsTheyRead(t *testing.T) {
 			build: func(h *render.Renderer, c *grantOneApiClient) http.HandlerFunc {
 				return HandleGroupsWithPermissionRemovePermissionPost(h, c)
 			},
-			current:      []api.PermissionResponse{{Id: 7}, {Id: 3}},
+			current:      []api.PermissionResponse{{ID: 7}, {ID: 3}},
 			group:        true,
 			wantWanted:   []int64{3},
 			wantExpected: []int64{7, 3},
@@ -148,10 +148,10 @@ func TestResourceGrantOneHandlers_SendTheGrantsTheyRead(t *testing.T) {
 			var sent any
 			if tc.group {
 				require.NotNil(t, apiClient.sentGroup)
-				wanted, expected, sent = apiClient.sentGroup.PermissionIds, apiClient.sentGroup.ExpectedPermissionIds, apiClient.sentGroup
+				wanted, expected, sent = apiClient.sentGroup.PermissionIDs, apiClient.sentGroup.ExpectedPermissionIDs, apiClient.sentGroup
 			} else {
 				require.NotNil(t, apiClient.sentUser)
-				wanted, expected, sent = apiClient.sentUser.PermissionIds, apiClient.sentUser.ExpectedPermissionIds, apiClient.sentUser
+				wanted, expected, sent = apiClient.sentUser.PermissionIDs, apiClient.sentUser.ExpectedPermissionIDs, apiClient.sentUser
 			}
 			assert.Equal(t, tc.wantWanted, wanted)
 			assert.Equal(t, tc.wantExpected, expected)

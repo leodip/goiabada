@@ -92,12 +92,12 @@ func TestAPIClientPostLogoutRedirectURIsPut_SavesTheListAndLeavesTheRedirectURIs
 
 	var answer api.UpdateClientResponse
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&answer))
-	assert.Equal(t, client.Id, answer.Client.Id)
+	assert.Equal(t, client.Id, answer.Client.ID)
 	answered := make([]string, 0, len(answer.Client.PostLogoutRedirectURIs))
 	for _, row := range answer.Client.PostLogoutRedirectURIs {
 		answered = append(answered, row.URI)
-		assert.Equal(t, client.Id, row.ClientId)
-		assert.NotZero(t, row.Id)
+		assert.Equal(t, client.Id, row.ClientID)
+		assert.NotZero(t, row.ID)
 		assert.NotNil(t, row.CreatedAt)
 	}
 	assert.ElementsMatch(t, []string{"https://app.example.com/bye", "https://app.example.com/signed-out?state=fixed"}, answered)
@@ -122,7 +122,7 @@ func TestAPIClientPostLogoutRedirectURIsPut_TheListingCarriesTheList(t *testing.
 	var listing api.GetClientsResponse
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&listing))
 	for _, listed := range listing.Clients {
-		if listed.Id != client.Id {
+		if listed.ID != client.Id {
 			continue
 		}
 		require.Len(t, listed.PostLogoutRedirectURIs, 1)

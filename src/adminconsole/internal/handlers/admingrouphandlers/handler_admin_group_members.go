@@ -57,7 +57,7 @@ func HandleMembersGet(
 		pageInt := pagination.ParsePage(r.URL.Query().Get("page"))
 
 		const pageSize = 10
-		users, total, err := apiClient.GetGroupMembers(r.Context(), jwtInfo.TokenResponse.AccessToken, group.Id, pageInt, pageSize)
+		users, total, err := apiClient.GetGroupMembers(r.Context(), jwtInfo.TokenResponse.AccessToken, group.ID, pageInt, pageSize)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -68,7 +68,7 @@ func HandleMembersGet(
 		// that highlights a full one (#305).
 		if clamped := pagination.ClampPage(total, pageSize, pageInt); clamped != pageInt {
 			pageInt = clamped
-			users, total, err = apiClient.GetGroupMembers(r.Context(), jwtInfo.TokenResponse.AccessToken, group.Id, pageInt, pageSize)
+			users, total, err = apiClient.GetGroupMembers(r.Context(), jwtInfo.TokenResponse.AccessToken, group.ID, pageInt, pageSize)
 			if err != nil {
 				render.HandleAPIError(httpHelper, w, r, err)
 				return
@@ -85,7 +85,7 @@ func HandleMembersGet(
 		p := pagination.New(total, pageSize, pageInt, 5)
 
 		bind := map[string]interface{}{
-			"groupId":         group.Id,
+			"groupId":         group.ID,
 			"groupIdentifier": group.GroupIdentifier,
 			"pageResult":      pageResult,
 			"paginator":       p,

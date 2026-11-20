@@ -235,7 +235,7 @@ func (s *settingsTabAPI) UpdateClient(_ context.Context, _ string, _ int64,
 
 // GetAllBrands answers the brands the Brand select offers when the refused tab is drawn again.
 func (s *settingsTabAPI) GetAllBrands(context.Context, string) ([]api.BrandResponse, error) {
-	return []api.BrandResponse{{Id: 5, Name: "Default", IsDefault: true}}, nil
+	return []api.BrandResponse{{ID: 5, Name: "Default", IsDefault: true}}, nil
 }
 
 // UpdateClientBrand is never reached: the settings' write before it is refused.
@@ -275,7 +275,7 @@ func postClientSettings(t *testing.T, apiClient *settingsTabAPI, form url.Values
 func TestRender_AdminClientSettings_ARefusedSaveKeepsTheStoredClient(t *testing.T) {
 	const refusal = "The client identifier is already in use."
 	apiClient := &settingsTabAPI{
-		stored:  &api.ClientResponse{Id: 7, ClientIdentifier: "portal", DisplayName: "Portal", Enabled: true},
+		stored:  &api.ClientResponse{ID: 7, ClientIdentifier: "portal", DisplayName: "Portal", Enabled: true},
 		refusal: refusal,
 	}
 
@@ -307,7 +307,7 @@ func TestRender_AdminClientSettings_ARefusedSaveKeepsTheStoredClient(t *testing.
 func TestRender_AdminClientSettings_ARefusedSaveKeepsASelfRegisteredIdentifierReadOnly(t *testing.T) {
 	const identifier = "dcr_3f6c1d2e-8a4b-4c5d-9e0f-1a2b3c4d5e6f"
 	apiClient := &settingsTabAPI{
-		stored:  &api.ClientResponse{Id: 7, ClientIdentifier: identifier, Enabled: true, CreatedViaDCR: true},
+		stored:  &api.ClientResponse{ID: 7, ClientIdentifier: identifier, Enabled: true, CreatedViaDCR: true},
 		refusal: "Invalid website URL.",
 	}
 
@@ -389,7 +389,7 @@ func TestRender_AdminClientSettings_ARefusalByKeyMarksItsField(t *testing.T) {
 	} {
 		t.Run(tc.code, func(t *testing.T) {
 			apiClient := &settingsTabAPI{
-				stored:  &api.ClientResponse{Id: 7, ClientIdentifier: "portal", Enabled: true, AuthorizationCodeEnabled: true},
+				stored:  &api.ClientResponse{ID: 7, ClientIdentifier: "portal", Enabled: true, AuthorizationCodeEnabled: true},
 				refusal: tc.refusal,
 				code:    tc.code,
 			}

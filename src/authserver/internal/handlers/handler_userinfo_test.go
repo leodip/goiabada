@@ -46,7 +46,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 
 	// Note: "User not authorized" test case is removed because authorization is now handled by middleware
 
-	t.Run("JwtToken without sub claim", func(t *testing.T) {
+	t.Run("JWTToken without sub claim", func(t *testing.T) {
 		jsonWriter := handlersmocks.NewJSONWriter(t)
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
@@ -54,7 +54,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		handler := HandleUserInfoGetPost(jsonWriter, database, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/userinfo", nil)
-		jwtToken := oauth.JwtToken{
+		jwtToken := oauth.JWTToken{
 			Claims: map[string]interface{}{
 				"scope": "openid",
 			},
@@ -84,7 +84,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		handler := HandleUserInfoGetPost(jsonWriter, database, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
 		req, _ := http.NewRequest("GET", "/userinfo", nil)
-		jwtToken := oauth.JwtToken{
+		jwtToken := oauth.JWTToken{
 			Claims: map[string]interface{}{
 				"sub":   "user123",
 				"scope": "openid",
@@ -116,7 +116,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		sub := fake.UUID()
 
 		req, _ := http.NewRequest("GET", "/userinfo", nil)
-		jwtToken := oauth.JwtToken{
+		jwtToken := oauth.JWTToken{
 			Claims: map[string]interface{}{
 				"sub":   sub,
 				"scope": "openid",
@@ -153,7 +153,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 
 		sub := fake.UUID()
 		req, _ := http.NewRequest("GET", "/userinfo", nil)
-		jwtToken := oauth.JwtToken{
+		jwtToken := oauth.JWTToken{
 			Claims: map[string]interface{}{
 				"sub":   sub,
 				"scope": "openid profile email address phone groups attributes",
@@ -488,7 +488,7 @@ func userInfoRequestForScopes(t *testing.T, sub string, oidcScopes string) *http
 	}
 	req, err := http.NewRequest("GET", "/userinfo", nil)
 	require.NoError(t, err)
-	jwtToken := oauth.JwtToken{
+	jwtToken := oauth.JWTToken{
 		Claims: map[string]interface{}{
 			"sub":   sub,
 			"scope": scope,
@@ -567,7 +567,7 @@ func TestHandleUserInfoGetPost_RefusalsAreInvalidTokenOnTheWire(t *testing.T) {
 				handler := HandleUserInfoGetPost(render.New(nil, nil, nil), database, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 
 				req, _ := http.NewRequest("GET", "/userinfo", nil)
-				jwtToken := oauth.JwtToken{
+				jwtToken := oauth.JWTToken{
 					Claims: map[string]interface{}{
 						"sub":   "user123",
 						"scope": "openid",

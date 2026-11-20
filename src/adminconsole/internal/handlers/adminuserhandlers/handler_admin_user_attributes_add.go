@@ -144,8 +144,8 @@ func HandleAttributesAddPost(
 			Key:                  attrKey,
 			Value:                attrValue,
 			IncludeInAccessToken: includeInAccessToken,
-			IncludeInIdToken:     includeInIdToken,
-			UserId:               user.Id,
+			IncludeInIDToken:     includeInIdToken,
+			UserID:               user.ID,
 		}
 
 		_, err = apiClient.CreateUserAttribute(r.Context(), jwtInfo.TokenResponse.AccessToken, request)
@@ -156,6 +156,6 @@ func HandleAttributesAddPost(
 			return
 		}
 
-		http.Redirect(w, r, withListPosition(baseURL, fmt.Sprintf("/admin/users/%v/attributes", user.Id), r), http.StatusFound)
+		http.Redirect(w, r, withListPosition(baseURL, fmt.Sprintf("/admin/users/%v/attributes", user.ID), r), http.StatusFound)
 	}
 }

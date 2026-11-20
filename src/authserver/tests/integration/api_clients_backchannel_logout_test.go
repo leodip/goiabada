@@ -128,7 +128,7 @@ func TestAPIClientBackchannelLogoutPut_SavesClearsAndAnswersBothSettings(t *test
 	require.NoError(t, json.NewDecoder(listing.Body).Decode(&clients))
 	found := false
 	for _, listed := range clients.Clients {
-		if listed.Id == client.Id {
+		if listed.ID == client.Id {
 			found = true
 			assert.Equal(t, uri, listed.BackchannelLogoutURI)
 			assert.True(t, listed.BackchannelLogoutSessionRequired)

@@ -278,7 +278,7 @@ func TestPhonePuts_SaveThePhoneColumnsNarrowly(t *testing.T) {
 			rr := httptest.NewRecorder()
 			HandleAccountPhonePut(database, accountvalidation.NewPhoneValidator(), auditLogger).
 				ServeHTTP(rr, columnGroupSelfServiceRequest(t, "/api/v1/account/phone",
-					api.UpdateAccountPhoneRequest{PhoneCountryUniqueId: tc.countryId, PhoneNumber: tc.number}))
+					api.UpdateAccountPhoneRequest{PhoneCountryUniqueID: tc.countryId, PhoneNumber: tc.number}))
 
 			resp := requireSavedNarrowly(t, database, rr, *saved)
 			assertPhoneSaved(t, tc, *saved, resp)
@@ -297,7 +297,7 @@ func TestPhonePuts_SaveThePhoneColumnsNarrowly(t *testing.T) {
 			rr := httptest.NewRecorder()
 			HandleUserPhonePut(database, accountvalidation.NewPhoneValidator(), auditLogger).
 				ServeHTTP(rr, columnGroupAdminRequest(t, "/api/v1/admin/users/61/phone", api.UpdateUserPhoneRequest{
-					PhoneCountryUniqueId: tc.countryId, PhoneNumber: tc.number, PhoneNumberVerified: tc.sendVerified,
+					PhoneCountryUniqueID: tc.countryId, PhoneNumber: tc.number, PhoneNumberVerified: tc.sendVerified,
 				}))
 
 			resp := requireSavedNarrowly(t, database, rr, *saved)

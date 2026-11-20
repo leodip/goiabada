@@ -10,17 +10,17 @@ import (
 
 func TestStringClaim(t *testing.T) {
 	t.Run("Returns string value when claim is string", func(t *testing.T) {
-		token := JwtToken{Claims: map[string]interface{}{"test": "value"}}
+		token := JWTToken{Claims: map[string]interface{}{"test": "value"}}
 		assert.Equal(t, "value", token.StringClaim("test"))
 	})
 
 	t.Run("Returns empty string when claim does not exist", func(t *testing.T) {
-		token := JwtToken{Claims: map[string]interface{}{}}
+		token := JWTToken{Claims: map[string]interface{}{}}
 		assert.Empty(t, token.StringClaim("nonexistent"))
 	})
 
 	t.Run("Returns empty string when claim is int (regression test for panic)", func(t *testing.T) {
-		token := JwtToken{Claims: map[string]interface{}{"test": 123}}
+		token := JWTToken{Claims: map[string]interface{}{"test": 123}}
 		// Before the fix, this would panic with: interface conversion: interface {} is int, not string
 		// After the fix, it returns empty string safely
 		assert.NotPanics(t, func() {
@@ -30,7 +30,7 @@ func TestStringClaim(t *testing.T) {
 	})
 
 	t.Run("Returns empty string when claim is bool (regression test for panic)", func(t *testing.T) {
-		token := JwtToken{Claims: map[string]interface{}{"test": true}}
+		token := JWTToken{Claims: map[string]interface{}{"test": true}}
 		assert.NotPanics(t, func() {
 			result := token.StringClaim("test")
 			assert.Empty(t, result)
@@ -38,7 +38,7 @@ func TestStringClaim(t *testing.T) {
 	})
 
 	t.Run("Returns empty string when claim is object (regression test for panic)", func(t *testing.T) {
-		token := JwtToken{Claims: map[string]interface{}{"test": map[string]interface{}{"nested": "value"}}}
+		token := JWTToken{Claims: map[string]interface{}{"test": map[string]interface{}{"nested": "value"}}}
 		assert.NotPanics(t, func() {
 			result := token.StringClaim("test")
 			assert.Empty(t, result)
@@ -46,7 +46,7 @@ func TestStringClaim(t *testing.T) {
 	})
 
 	t.Run("Returns empty string when claim is array (regression test for panic)", func(t *testing.T) {
-		token := JwtToken{Claims: map[string]interface{}{"test": []string{"a", "b"}}}
+		token := JWTToken{Claims: map[string]interface{}{"test": []string{"a", "b"}}}
 		assert.NotPanics(t, func() {
 			result := token.StringClaim("test")
 			assert.Empty(t, result)
@@ -56,17 +56,17 @@ func TestStringClaim(t *testing.T) {
 
 func TestTimeClaim(t *testing.T) {
 	now := time.Now().Unix()
-	token := JwtToken{Claims: map[string]interface{}{"time": float64(now)}}
+	token := JWTToken{Claims: map[string]interface{}{"time": float64(now)}}
 	assert.Equal(t, time.Unix(now, 0), token.TimeClaim("time"))
 	assert.Equal(t, time.Time{}, token.TimeClaim("nonexistent"))
 }
 
 func TestHasScope(t *testing.T) {
-	token := JwtToken{Claims: map[string]interface{}{"scope": "read write"}}
+	token := JWTToken{Claims: map[string]interface{}{"scope": "read write"}}
 	assert.True(t, token.HasScope("read"))
 	assert.True(t, token.HasScope("write"))
 	assert.False(t, token.HasScope("delete"))
-	assert.False(t, JwtToken{Claims: map[string]interface{}{}}.HasScope("read"))
+	assert.False(t, JWTToken{Claims: map[string]interface{}{}}.HasScope("read"))
 }
 
 // TestIntClaim pins the exact returned tuple for every input shape (#106 decision 15,
@@ -118,7 +118,7 @@ func TestIntClaim(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.label, func(t *testing.T) {
-			token := JwtToken{Claims: tc.claims}
+			token := JWTToken{Claims: tc.claims}
 			gotValue, gotOk := token.IntClaim(name)
 			assert.Equal(t, tc.wantOk, gotOk, "ok flag")
 			assert.Equal(t, tc.wantValue, gotValue, "value")

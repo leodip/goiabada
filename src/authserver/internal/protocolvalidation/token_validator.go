@@ -24,7 +24,7 @@ type PermissionChecker interface {
 }
 
 type TokenParser interface {
-	DecodeAndValidateTokenString(ctx context.Context, token string, withExpirationCheck bool) (*oauth.JwtToken, error)
+	DecodeAndValidateTokenString(ctx context.Context, token string, withExpirationCheck bool) (*oauth.JWTToken, error)
 }
 
 // tokenValidatorDatabase is what the token request validator needs: the client, the grant being

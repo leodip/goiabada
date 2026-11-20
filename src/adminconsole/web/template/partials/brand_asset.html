@@ -15,7 +15,7 @@
 <div class="brand-asset" data-brand-asset="{{ $slot }}"{{ with $uploads }}{{ with index . $kind }} data-upload-url="{{ .URL }}" data-max-bytes="{{ .MaxBytes }}" data-too-large="{{ .TooLarge }}"{{ end }}{{ end }}>
   <div class="brand-asset-row">
     {{- if $thumb }}
-    <span class="{{ $thumb }}" aria-hidden="true"{{ if not $asset }} hidden{{ end }}>{{ if $asset }}<img src="{{ $asset.Url }}" alt="">{{ end }}</span>
+    <span class="{{ $thumb }}" aria-hidden="true"{{ if not $asset }} hidden{{ end }}>{{ if $asset }}<img src="{{ $asset.URL }}" alt="">{{ end }}</span>
     {{- end }}
     <span class="brand-asset-state field-hint" id="{{ $slot }}State"><span data-brand-asset-state="empty"{{ if $asset }} hidden{{ end }}>{{ T $ctx "adminconsole.admin_branding.asset.empty" }}</span><span data-brand-asset-state="filled"{{ if not $asset }} hidden{{ end }}>{{ T $ctx "adminconsole.admin_branding.asset.filled" }}</span></span>
     <span class="brand-asset-actions">
@@ -26,7 +26,7 @@
   </div>
   <div class="not-empty:mt-2" id="{{ $slot }}Status" role="status"></div>
 </div>
-<input type="hidden" name="{{ $slot }}" value="{{ if $asset }}{{ $asset.Id }}{{ end }}">
-<input type="hidden" name="{{ $slot }}Url" value="{{ if $asset }}{{ $asset.Url }}{{ end }}">
+<input type="hidden" name="{{ $slot }}" value="{{ if $asset }}{{ $asset.ID }}{{ end }}">
+<input type="hidden" name="{{ $slot }}Url" value="{{ if $asset }}{{ $asset.URL }}{{ end }}">
 {{- end}}
 

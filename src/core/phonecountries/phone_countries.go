@@ -2,7 +2,7 @@
 // validates and stores: one entry per (country, E.164 calling code), built once
 // at package initialization from core/countries.
 //
-// An entry's UniqueId is "<alpha3>_<index>", the index being the code's
+// An entry's UniqueID is "<alpha3>_<index>", the index being the code's
 // position in that country's calling codes. It is persisted on the user row
 // (users.phone_number_country_uniqueid), so the order of a country's codes is
 // part of the stored contract. Lookups are exact and case-sensitive (#432).
@@ -17,7 +17,7 @@ import (
 )
 
 type PhoneCountry struct {
-	UniqueId    string
+	UniqueID    string
 	Alpha2      string
 	Emoji       string
 	CallingCode string
@@ -47,7 +47,7 @@ func build(allCountries []countries.Country) []PhoneCountry {
 			// User.PhoneNumberCountryCallingCode all keep the "+NN" form.
 			callingCode := "+" + code
 			list = append(list, PhoneCountry{
-				UniqueId:    fmt.Sprintf("%v_%v", c.Alpha3, i),
+				UniqueID:    fmt.Sprintf("%v_%v", c.Alpha3, i),
 				Alpha2:      c.Alpha2,
 				Emoji:       c.Emoji,
 				CallingCode: callingCode,
@@ -61,7 +61,7 @@ func build(allCountries []countries.Country) []PhoneCountry {
 func indexByUniqueID(list []PhoneCountry) map[string]PhoneCountry {
 	index := make(map[string]PhoneCountry, len(list))
 	for _, pc := range list {
-		index[pc.UniqueId] = pc
+		index[pc.UniqueID] = pc
 	}
 	return index
 }
@@ -72,7 +72,7 @@ func All() []PhoneCountry {
 	return slices.Clone(phoneCountries)
 }
 
-// ByUniqueID returns the phone country with that UniqueId, and false when none
+// ByUniqueID returns the phone country with that UniqueID, and false when none
 // has it.
 func ByUniqueID(id string) (PhoneCountry, bool) {
 	pc, ok := byUniqueID[id]

@@ -20,7 +20,7 @@ import (
 type refusingGroupDeleteApiClient struct{}
 
 func (*refusingGroupDeleteApiClient) GetGroupById(_ context.Context, _ string, groupId int64) (*api.GroupResponse, error) {
-	return &api.GroupResponse{Id: groupId, GroupIdentifier: "staff"}, nil
+	return &api.GroupResponse{ID: groupId, GroupIdentifier: "staff"}, nil
 }
 
 func (*refusingGroupDeleteApiClient) DeleteGroup(context.Context, string, int64) error {

@@ -31,7 +31,7 @@ func TestFindRefreshToken(t *testing.T) {
 				args.Get(2).(*record.Code).User = record.User{Id: 1, Subject: "user-1", Enabled: true}
 			})
 
-		stored, err := FindRefreshToken(context.Background(), database, oauth.JwtToken{Claims: map[string]interface{}{"jti": "jti-1"}})
+		stored, err := FindRefreshToken(context.Background(), database, oauth.JWTToken{Claims: map[string]interface{}{"jti": "jti-1"}})
 
 		require.NoError(t, err)
 		require.NotNil(t, stored)
@@ -59,7 +59,7 @@ func TestFindRefreshToken(t *testing.T) {
 			})
 		database.On("RefreshTokenLoadClient", mock.Anything, (*sql.Tx)(nil), row).Return(nil).Once()
 
-		stored, err := FindRefreshToken(context.Background(), database, oauth.JwtToken{Claims: map[string]interface{}{"jti": "jti-1"}})
+		stored, err := FindRefreshToken(context.Background(), database, oauth.JWTToken{Claims: map[string]interface{}{"jti": "jti-1"}})
 
 		require.NoError(t, err)
 		require.NotNil(t, stored)
@@ -76,7 +76,7 @@ func TestFindRefreshToken(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		database.On("GetRefreshTokenByJti", mock.Anything, (*sql.Tx)(nil), "jti-1").Return(nil, nil).Once()
 
-		stored, err := FindRefreshToken(context.Background(), database, oauth.JwtToken{Claims: map[string]interface{}{"jti": "jti-1"}})
+		stored, err := FindRefreshToken(context.Background(), database, oauth.JWTToken{Claims: map[string]interface{}{"jti": "jti-1"}})
 
 		require.NoError(t, err)
 		assert.Nil(t, stored)
@@ -85,7 +85,7 @@ func TestFindRefreshToken(t *testing.T) {
 	t.Run("a token without jti is a fault, read nowhere", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 
-		stored, err := FindRefreshToken(context.Background(), database, oauth.JwtToken{Claims: map[string]interface{}{"typ": "Refresh"}})
+		stored, err := FindRefreshToken(context.Background(), database, oauth.JWTToken{Claims: map[string]interface{}{"typ": "Refresh"}})
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "does not contain a jti claim")
@@ -134,7 +134,7 @@ func TestFindRefreshToken(t *testing.T) {
 				}
 			}
 
-			stored, err := FindRefreshToken(context.Background(), database, oauth.JwtToken{Claims: map[string]interface{}{"jti": "jti-1"}})
+			stored, err := FindRefreshToken(context.Background(), database, oauth.JWTToken{Claims: map[string]interface{}{"jti": "jti-1"}})
 
 			require.ErrorIs(t, err, down)
 			assert.Nil(t, stored)
@@ -627,7 +627,7 @@ func TestRefreshToken(t *testing.T) {
 				}
 			}
 
-			refusal, err := RefreshToken(context.Background(), database, tc.stored(), oauth.JwtToken{Claims: tc.claims}, settings, checkedAt)
+			refusal, err := RefreshToken(context.Background(), database, tc.stored(), oauth.JWTToken{Claims: tc.claims}, settings, checkedAt)
 
 			require.NoError(t, err)
 			assert.Equal(t, tc.want, refusal)
@@ -645,7 +645,7 @@ func TestRefreshToken_Faults(t *testing.T) {
 		database.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, familyJti).Return(false, down)
 
 		refusal, err := RefreshToken(context.Background(), database, codeDescended(),
-			oauth.JwtToken{Claims: sessionBoundClaims()}, settings, checkedAt)
+			oauth.JWTToken{Claims: sessionBoundClaims()}, settings, checkedAt)
 
 		require.ErrorIs(t, err, down)
 		assert.NotEqual(t, RefreshLive, refusal)
@@ -657,7 +657,7 @@ func TestRefreshToken_Faults(t *testing.T) {
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sid).Return(nil, down)
 
 		refusal, err := RefreshToken(context.Background(), database, codeDescended(),
-			oauth.JwtToken{Claims: sessionBoundClaims()}, settings, checkedAt)
+			oauth.JWTToken{Claims: sessionBoundClaims()}, settings, checkedAt)
 
 		require.ErrorIs(t, err, down)
 		assert.NotEqual(t, RefreshLive, refusal)
@@ -669,7 +669,7 @@ func TestRefreshToken_Faults(t *testing.T) {
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sid).Return(nil, down)
 
 		refusal, err := RefreshToken(context.Background(), database, codeDescended(),
-			oauth.JwtToken{Claims: offlineClaims(inAnHour)}, settings, checkedAt)
+			oauth.JWTToken{Claims: offlineClaims(inAnHour)}, settings, checkedAt)
 
 		require.ErrorIs(t, err, down)
 		assert.NotEqual(t, RefreshLive, refusal)
@@ -680,7 +680,7 @@ func TestRefreshToken_Faults(t *testing.T) {
 		database.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, familyJti).Return(false, nil)
 
 		refusal, err := RefreshToken(context.Background(), database, codeDescended(),
-			oauth.JwtToken{Claims: map[string]interface{}{"jti": "jti-1", "typ": "Offline", "iss": testIssuer, "aud": testIssuer}}, settings, checkedAt)
+			oauth.JWTToken{Claims: map[string]interface{}{"jti": "jti-1", "typ": "Offline", "iss": testIssuer, "aud": testIssuer}}, settings, checkedAt)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "does not contain an offline_access_max_lifetime claim")
@@ -697,7 +697,7 @@ func TestRefreshToken_Faults(t *testing.T) {
 			database.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, familyJti).Return(false, nil)
 
 			refusal, err := RefreshToken(context.Background(), database, codeDescended(),
-				oauth.JwtToken{Claims: claims}, settings, checkedAt)
+				oauth.JWTToken{Claims: claims}, settings, checkedAt)
 
 			require.Errorf(t, err, "typ %v", typ)
 			assert.Contains(t, err.Error(), "does not contain a valid typ claim")
@@ -713,7 +713,7 @@ func TestRefreshToken_Faults(t *testing.T) {
 		stored.Row.Revoked = true
 
 		refusal, err := RefreshToken(context.Background(), database, stored,
-			oauth.JwtToken{Claims: sessionBoundClaims()}, nil, checkedAt)
+			oauth.JWTToken{Claims: sessionBoundClaims()}, nil, checkedAt)
 
 		require.ErrorIs(t, err, ErrNoSettings)
 		assert.NotEqual(t, RefreshLive, refusal)
@@ -725,7 +725,7 @@ func TestRefreshToken_Faults(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 
 		refusal, err := RefreshToken(context.Background(), database, passwordGrant(),
-			oauth.JwtToken{Claims: offlineClaims(inAnHour)}, nil, checkedAt)
+			oauth.JWTToken{Claims: offlineClaims(inAnHour)}, nil, checkedAt)
 
 		require.ErrorIs(t, err, ErrNoSettings)
 		assert.NotEqual(t, RefreshLive, refusal)
@@ -738,7 +738,7 @@ func TestRefreshToken_Faults(t *testing.T) {
 		stored.Row.Revoked = true
 
 		refusal, err := RefreshToken(context.Background(), database, stored,
-			oauth.JwtToken{Claims: offlineClaims(inAnHour)}, nil, checkedAt)
+			oauth.JWTToken{Claims: offlineClaims(inAnHour)}, nil, checkedAt)
 
 		require.NoError(t, err)
 		assert.Equal(t, RefreshTokenRevoked, refusal)

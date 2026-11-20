@@ -23,7 +23,7 @@ type systemResourceApiClient struct {
 }
 
 func (c *systemResourceApiClient) GetResourceById(_ context.Context, accessToken string, resourceId int64) (*api.ResourceResponse, error) {
-	return &api.ResourceResponse{Id: resourceId, ResourceIdentifier: builtin.AuthServerResourceIdentifier}, nil
+	return &api.ResourceResponse{ID: resourceId, ResourceIdentifier: builtin.AuthServerResourceIdentifier}, nil
 }
 
 // The rest of the ports systemResourceApiClient is passed to, which no test here reaches.
@@ -49,10 +49,10 @@ func (*systemResourceApiClient) UpdateUserPermissions(context.Context, string, i
 }
 
 func systemResourcePermissions() []api.PermissionResponse {
-	system := api.ResourceResponse{Id: 7, ResourceIdentifier: builtin.AuthServerResourceIdentifier}
+	system := api.ResourceResponse{ID: 7, ResourceIdentifier: builtin.AuthServerResourceIdentifier}
 	return []api.PermissionResponse{
-		{Id: 41, PermissionIdentifier: "userinfo", Resource: system},
-		{Id: 42, PermissionIdentifier: builtin.ManagePermissionIdentifier, Resource: system},
+		{ID: 41, PermissionIdentifier: "userinfo", Resource: system},
+		{ID: 42, PermissionIdentifier: builtin.ManagePermissionIdentifier, Resource: system},
 	}
 }
 

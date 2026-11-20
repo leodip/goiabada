@@ -114,7 +114,7 @@ func TestConditionalStore_ChangeAndSaveAppliesTheChangeToTheFreshValues(t *testi
 	backend := newFakeBackend()
 	store := newConditionalTestStore(backend)
 	cookie := saveNew(t, store.ServerSideStore, map[string]any{"ceremony": "A"})
-	id := decodeCookieId(t, store.ServerSideStore, cookie)
+	id := decodeCookieID(t, store.ServerSideStore, cookie)
 
 	req, session := loadedRequest(t, store, cookie)
 	anotherRequestWrites(t, store, cookie, "ceremony", "B")
@@ -129,7 +129,7 @@ func TestConditionalStore_ChangeAndSaveAppliesTheChangeToTheFreshValues(t *testi
 
 	cookies := w.Result().Cookies()
 	require.Len(t, cookies, 1, "a conditional save names the session as a save does")
-	assert.Equal(t, id, decodeCookieId(t, store.ServerSideStore, cookies[0]))
+	assert.Equal(t, id, decodeCookieID(t, store.ServerSideStore, cookies[0]))
 
 	// The request's cache holds the same session, so a later read in the request sees it too.
 	again, err := store.Get(req, storeTestName)
@@ -143,7 +143,7 @@ func TestConditionalStore_ChangeAndSaveRefusedWritesNothing(t *testing.T) {
 	backend := newFakeBackend()
 	store := newConditionalTestStore(backend)
 	cookie := saveNew(t, store.ServerSideStore, map[string]any{"ceremony": "A"})
-	id := decodeCookieId(t, store.ServerSideStore, cookie)
+	id := decodeCookieID(t, store.ServerSideStore, cookie)
 
 	req, session := loadedRequest(t, store, cookie)
 	anotherRequestWrites(t, store, cookie, "ceremony", "B")
@@ -171,7 +171,7 @@ func TestConditionalStore_ChangeAndSaveOfAGoneRowAnswersNotFound(t *testing.T) {
 	backend := newFakeBackend()
 	store := newConditionalTestStore(backend)
 	cookie := saveNew(t, store.ServerSideStore, map[string]any{"ceremony": "A"})
-	id := decodeCookieId(t, store.ServerSideStore, cookie)
+	id := decodeCookieID(t, store.ServerSideStore, cookie)
 
 	req, session := loadedRequest(t, store, cookie)
 	delete(backend.rows, id)
@@ -196,7 +196,7 @@ func TestConditionalStore_ChangeAndSaveThatLosesOnceTriesAgain(t *testing.T) {
 	backend := newFakeBackend()
 	store := newConditionalTestStore(backend)
 	cookie := saveNew(t, store.ServerSideStore, map[string]any{"ceremony": "A"})
-	id := decodeCookieId(t, store.ServerSideStore, cookie)
+	id := decodeCookieID(t, store.ServerSideStore, cookie)
 
 	req, session := loadedRequest(t, store, cookie)
 	loads := backend.loads
@@ -222,7 +222,7 @@ func TestConditionalStore_ChangeAndSaveGivesUpAfterThreeAttempts(t *testing.T) {
 	backend := newFakeBackend()
 	store := newConditionalTestStore(backend)
 	cookie := saveNew(t, store.ServerSideStore, map[string]any{"ceremony": "A"})
-	id := decodeCookieId(t, store.ServerSideStore, cookie)
+	id := decodeCookieID(t, store.ServerSideStore, cookie)
 
 	req, session := loadedRequest(t, store, cookie)
 	writes := 0
@@ -280,7 +280,7 @@ func TestConditionalStore_ChangeAndSaveThatLosesLastAnswersWhatWon(t *testing.T)
 			backend := newFakeBackend()
 			store := newConditionalTestStore(backend)
 			cookie := saveNew(t, store.ServerSideStore, map[string]any{"ceremony": "A"})
-			id := decodeCookieId(t, store.ServerSideStore, cookie)
+			id := decodeCookieID(t, store.ServerSideStore, cookie)
 
 			req, session := loadedRequest(t, store, cookie)
 			attempt := 0
@@ -381,7 +381,7 @@ func TestConditionalStore_ChangeAndSaveOfANeverStoredSessionCreatesIt(t *testing
 
 	cookies := w.Result().Cookies()
 	require.Len(t, cookies, 1)
-	id := decodeCookieId(t, store.ServerSideStore, cookies[0])
+	id := decodeCookieID(t, store.ServerSideStore, cookies[0])
 	assert.Equal(t, map[string]any{"marker": "set"}, storedValues(t, store, backend, id))
 	assert.Equal(t, id, session.ID)
 	assert.False(t, session.IsNew)
@@ -407,7 +407,7 @@ func TestConditionalStore_ChangeAndRegenerateMovesTheFreshValuesToANewIdentifier
 	backend := newFakeBackend()
 	store := newConditionalTestStore(backend)
 	cookie := saveNew(t, store.ServerSideStore, map[string]any{"ceremony": "A"})
-	oldId := decodeCookieId(t, store.ServerSideStore, cookie)
+	oldID := decodeCookieID(t, store.ServerSideStore, cookie)
 
 	req, session := loadedRequest(t, store, cookie)
 	anotherRequestWrites(t, store, cookie, "marker", "set meanwhile")
@@ -417,15 +417,15 @@ func TestConditionalStore_ChangeAndRegenerateMovesTheFreshValuesToANewIdentifier
 
 	cookies := w.Result().Cookies()
 	require.Len(t, cookies, 1)
-	newId := decodeCookieId(t, store.ServerSideStore, cookies[0])
-	assert.NotEqual(t, oldId, newId)
-	assert.NotContains(t, backend.rows, oldId)
+	newID := decodeCookieID(t, store.ServerSideStore, cookies[0])
+	assert.NotEqual(t, oldID, newID)
+	assert.NotContains(t, backend.rows, oldID)
 	assert.Len(t, backend.rows, 1)
 
 	want := map[string]any{"ceremony": "A", "marker": "set meanwhile", "state": "password verified"}
-	assert.Equal(t, want, storedValues(t, store, backend, newId))
+	assert.Equal(t, want, storedValues(t, store, backend, newID))
 	assert.Equal(t, want, session.Values)
-	assert.Equal(t, newId, session.ID)
+	assert.Equal(t, newID, session.ID)
 	assert.False(t, session.IsNew)
 }
 
@@ -435,16 +435,16 @@ func TestConditionalStore_ChangeAndRegenerateThatLosesRemovesItsNewRowAndTriesAg
 	backend := newFakeBackend()
 	store := newConditionalTestStore(backend)
 	cookie := saveNew(t, store.ServerSideStore, map[string]any{"ceremony": "A"})
-	oldId := decodeCookieId(t, store.ServerSideStore, cookie)
+	oldID := decodeCookieID(t, store.ServerSideStore, cookie)
 
 	req, session := loadedRequest(t, store, cookie)
 	var firstNewRows []string
 	backend.beforeConditional = func(id string) {
 		backend.beforeConditional = nil
-		require.Equal(t, oldId, id, "the conditional removal is of the old row")
-		for rowId := range backend.rows {
-			if rowId != oldId {
-				firstNewRows = append(firstNewRows, rowId)
+		require.Equal(t, oldID, id, "the conditional removal is of the old row")
+		for rowID := range backend.rows {
+			if rowID != oldID {
+				firstNewRows = append(firstNewRows, rowID)
 			}
 		}
 		anotherRequestWrites(t, store, cookie, "ceremony", "B")
@@ -455,13 +455,13 @@ func TestConditionalStore_ChangeAndRegenerateThatLosesRemovesItsNewRowAndTriesAg
 
 	require.Len(t, firstNewRows, 1, "the first attempt had written its new row before the removal")
 	assert.NotContains(t, backend.rows, firstNewRows[0], "the losing attempt's new row is removed")
-	assert.NotContains(t, backend.rows, oldId)
+	assert.NotContains(t, backend.rows, oldID)
 	require.Len(t, backend.rows, 1)
 
 	cookies := w.Result().Cookies()
 	require.Len(t, cookies, 1, "one cookie, for the attempt that won")
-	newId := decodeCookieId(t, store.ServerSideStore, cookies[0])
-	assert.Equal(t, map[string]any{"ceremony": "B", "state": "password verified"}, storedValues(t, store, backend, newId))
+	newID := decodeCookieID(t, store.ServerSideStore, cookies[0])
+	assert.Equal(t, map[string]any{"ceremony": "B", "state": "password verified"}, storedValues(t, store, backend, newID))
 	assert.Equal(t, 2, backend.conditionalDeletes)
 }
 
@@ -471,10 +471,10 @@ func TestConditionalStore_ChangeAndRegenerateOfAGoneRowAnswersNotFound(t *testin
 	backend := newFakeBackend()
 	store := newConditionalTestStore(backend)
 	cookie := saveNew(t, store.ServerSideStore, map[string]any{"ceremony": "A"})
-	oldId := decodeCookieId(t, store.ServerSideStore, cookie)
+	oldID := decodeCookieID(t, store.ServerSideStore, cookie)
 
 	req, session := loadedRequest(t, store, cookie)
-	delete(backend.rows, oldId)
+	delete(backend.rows, oldID)
 	creates := backend.creates
 
 	w := httptest.NewRecorder()
@@ -484,14 +484,14 @@ func TestConditionalStore_ChangeAndRegenerateOfAGoneRowAnswersNotFound(t *testin
 	assert.Equal(t, creates, backend.creates)
 	assert.Empty(t, backend.rows)
 	assert.Empty(t, w.Result().Cookies())
-	assert.Equal(t, oldId, session.ID)
+	assert.Equal(t, oldID, session.ID)
 }
 
 func TestConditionalStore_ChangeAndRegenerateRefusedCreatesNothing(t *testing.T) {
 	backend := newFakeBackend()
 	store := newConditionalTestStore(backend)
 	cookie := saveNew(t, store.ServerSideStore, map[string]any{"ceremony": "A"})
-	oldId := decodeCookieId(t, store.ServerSideStore, cookie)
+	oldID := decodeCookieID(t, store.ServerSideStore, cookie)
 
 	req, session := loadedRequest(t, store, cookie)
 	creates := backend.creates
@@ -502,7 +502,7 @@ func TestConditionalStore_ChangeAndRegenerateRefusedCreatesNothing(t *testing.T)
 
 	require.ErrorIs(t, err, replaced)
 	assert.Equal(t, creates, backend.creates)
-	assert.Contains(t, backend.rows, oldId)
+	assert.Contains(t, backend.rows, oldID)
 	assert.Len(t, backend.rows, 1)
 	assert.Empty(t, w.Result().Cookies())
 }
@@ -513,7 +513,7 @@ func TestConditionalStore_ChangeAndRegenerateGivesUpAfterThreeAttempts(t *testin
 	backend := newFakeBackend()
 	store := newConditionalTestStore(backend)
 	cookie := saveNew(t, store.ServerSideStore, map[string]any{"ceremony": "A"})
-	oldId := decodeCookieId(t, store.ServerSideStore, cookie)
+	oldID := decodeCookieID(t, store.ServerSideStore, cookie)
 
 	req, session := loadedRequest(t, store, cookie)
 	writes := 0
@@ -528,9 +528,9 @@ func TestConditionalStore_ChangeAndRegenerateGivesUpAfterThreeAttempts(t *testin
 	require.ErrorIs(t, err, ErrChanged)
 	assert.Equal(t, 3, backend.conditionalDeletes)
 	require.Len(t, backend.rows, 1)
-	assert.Equal(t, map[string]any{"ceremony": "A", "counter": 3}, storedValues(t, store, backend, oldId))
+	assert.Equal(t, map[string]any{"ceremony": "A", "counter": 3}, storedValues(t, store, backend, oldID))
 	assert.Empty(t, w.Result().Cookies())
-	assert.Equal(t, oldId, session.ID)
+	assert.Equal(t, oldID, session.ID)
 }
 
 // The rotation's twin of ChangeAndSaveThatLosesLastAnswersWhatWon: the third losing attempt's new
@@ -541,14 +541,14 @@ func TestConditionalStore_ChangeAndRegenerateThatLosesLastAnswersWhatWon(t *test
 			backend := newFakeBackend()
 			store := newConditionalTestStore(backend)
 			cookie := saveNew(t, store.ServerSideStore, map[string]any{"ceremony": "A"})
-			oldId := decodeCookieId(t, store.ServerSideStore, cookie)
+			oldID := decodeCookieID(t, store.ServerSideStore, cookie)
 
 			req, session := loadedRequest(t, store, cookie)
 			attempt := 0
 			backend.beforeConditional = func(string) {
 				attempt++
 				if attempt == conditionalAttempts {
-					tc.last(t, store, backend, cookie, oldId)
+					tc.last(t, store, backend, cookie, oldID)
 					return
 				}
 				anotherRequestWrites(t, store, cookie, "counter", attempt)
@@ -560,11 +560,11 @@ func TestConditionalStore_ChangeAndRegenerateThatLosesLastAnswersWhatWon(t *test
 			require.ErrorIs(t, err, tc.want)
 			require.NotErrorIs(t, err, ErrChanged)
 			assert.Equal(t, conditionalAttempts, backend.conditionalDeletes)
-			for rowId := range backend.rows {
-				assert.Equal(t, oldId, rowId, "every losing attempt's new row is removed")
+			for rowID := range backend.rows {
+				assert.Equal(t, oldID, rowID, "every losing attempt's new row is removed")
 			}
 			assert.Empty(t, w.Result().Cookies())
-			assert.Equal(t, oldId, session.ID)
+			assert.Equal(t, oldID, session.ID)
 		})
 	}
 }
@@ -576,7 +576,7 @@ func TestConditionalStore_ChangeAndRegenerateFailureEmitsNoCookie(t *testing.T) 
 		backend := newFakeBackend()
 		store := newConditionalTestStore(backend)
 		cookie := saveNew(t, store.ServerSideStore, map[string]any{"ceremony": "A"})
-		oldId := decodeCookieId(t, store.ServerSideStore, cookie)
+		oldID := decodeCookieID(t, store.ServerSideStore, cookie)
 
 		req, session := loadedRequest(t, store, cookie)
 		cause := errors.New("the database is unreachable")
@@ -587,7 +587,7 @@ func TestConditionalStore_ChangeAndRegenerateFailureEmitsNoCookie(t *testing.T) 
 
 		require.ErrorIs(t, err, cause)
 		assert.Empty(t, w.Result().Cookies())
-		assert.Contains(t, backend.rows, oldId)
+		assert.Contains(t, backend.rows, oldID)
 		assert.Equal(t, 0, backend.conditionalDeletes)
 	})
 
@@ -646,7 +646,7 @@ func TestConditionalStore_ChangeAndRegenerateOfANeverStoredSessionCreatesWithout
 	assert.Equal(t, 0, backend.conditionalDeletes)
 	cookies := w.Result().Cookies()
 	require.Len(t, cookies, 1)
-	id := decodeCookieId(t, store.ServerSideStore, cookies[0])
+	id := decodeCookieID(t, store.ServerSideStore, cookies[0])
 	assert.Equal(t, map[string]any{"state": "password verified"}, storedValues(t, store, backend, id))
 }
 

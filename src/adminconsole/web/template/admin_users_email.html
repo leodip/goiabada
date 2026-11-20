@@ -3,7 +3,7 @@
 {{define "head"}}{{end}}
 
 {{define "page"}}
-{{ template "user_header" (args "email" .user.Id .user.Email .page .query $.ctx) }}
+{{ template "user_header" (args "email" .user.ID .user.Email .page .query $.ctx) }}
 
 {{/* Every refusal this form can meet is about the address, which is marked invalid, described by
      the notice and focused. The heading keeps the address as stored. */}}

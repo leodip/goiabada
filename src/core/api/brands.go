@@ -12,7 +12,7 @@ import "time"
 // add up to every client (#812 decision 3).
 //
 // FooterLinks are the links drawn under the brand's card, in order, [] for none, and SupportEmail,
-// SupportUrl and SupportPhone its support contact, each "" when unset, the phone number in E.164: a
+// SupportURL and SupportPhone its support contact, each "" when unset, the phone number in E.164: a
 // "+" and digits (#814 decisions 1 and 9). The four are always answered.
 //
 // Logo, DarkLogo, Favicon, Background, RegularFont and BoldFont are the brand's six slots, each the
@@ -26,7 +26,7 @@ import "time"
 // only: a write ignores them. A custom brand whose stored palette cannot be read answers Palette and
 // Colors as null and no warnings (#815 decision 3).
 type BrandResponse struct {
-	Id               int64                     `json:"id"`
+	ID               int64                     `json:"id"`
 	Name             string                    `json:"name"`
 	Appearance       string                    `json:"appearance"`
 	Theme            string                    `json:"theme"`
@@ -42,12 +42,12 @@ type BrandResponse struct {
 	BoldFont         *BrandAssetResponse       `json:"boldFont"`
 	FooterLinks      []BrandFooterLinkResponse `json:"footerLinks"`
 	SupportEmail     string                    `json:"supportEmail"`
-	SupportUrl       string                    `json:"supportUrl"`
+	SupportURL       string                    `json:"supportUrl"`
 	SupportPhone     string                    `json:"supportPhone"`
 	Palette          *BrandPaletteResponse     `json:"palette"`
 	Colors           *BrandColors              `json:"colors"`
 	ContrastWarnings []BrandContrastWarning    `json:"contrastWarnings"`
-	CustomCss        string                    `json:"customCss"`
+	CustomCSS        string                    `json:"customCss"`
 	IsDefault        bool                      `json:"isDefault"`
 	ClientCount      int                       `json:"clientCount"`
 	CreatedAt        *time.Time                `json:"createdAt"`
@@ -58,7 +58,7 @@ type BrandResponse struct {
 // opens, the fallback label, and the label of each built-in language that has its own, by language
 // tag, {} when none has (#814 decision 9).
 type BrandFooterLinkResponse struct {
-	Url    string            `json:"url"`
+	URL    string            `json:"url"`
 	Label  string            `json:"label"`
 	Labels map[string]string `json:"labels"`
 }
@@ -71,7 +71,7 @@ type BrandFooterLinkResponse struct {
 // is dropped and any other tag is refused. A BrandFooterLinkResponse sent back as it came is the
 // same link.
 type BrandFooterLink struct {
-	Url    string            `json:"url"`
+	URL    string            `json:"url"`
 	Label  string            `json:"label"`
 	Labels map[string]string `json:"labels"`
 }
@@ -117,7 +117,7 @@ type BrandContrastWarning struct {
 // each slot holds. A slot's answer, a BrandAssetResponse, carries the same id, so it can be sent back
 // as it was read.
 type BrandAssetRef struct {
-	Id int64 `json:"id"`
+	ID int64 `json:"id"`
 }
 
 // GetBrandsResponse is every brand, sorted by name.
@@ -141,7 +141,7 @@ type GetBrandsResponse struct {
 // FooterLinks are at most three, saved in the order sent, each held to BrandFooterLink's rules, and
 // a refusal about one names it in the error answer's error_field, a JSON Pointer such as
 // /footerLinks/1/url. SupportEmail is an address of the shape and the 254-character bound an
-// account's is, SupportUrl a URL held to a footer link's rules, and SupportPhone a number in E.164, a
+// account's is, SupportURL a URL held to a footer link's rules, and SupportPhone a number in E.164, a
 // "+" and up to 15 digits, the first not zero, which may be written with spaces, hyphens, dots and
 // parentheses and is stored without them. Each is trimmed. A member left out or null is no
 // links, or an unset contact value, as [] and "" are (#814 decisions 1, 5, 9 and 10).
@@ -166,10 +166,10 @@ type CreateBrandRequest struct {
 	BoldFont      *BrandAssetRef    `json:"boldFont"`
 	FooterLinks   []BrandFooterLink `json:"footerLinks"`
 	SupportEmail  string            `json:"supportEmail"`
-	SupportUrl    string            `json:"supportUrl"`
+	SupportURL    string            `json:"supportUrl"`
 	SupportPhone  string            `json:"supportPhone"`
 	Palette       *BrandPalette     `json:"palette"`
-	CustomCss     string            `json:"customCss"`
+	CustomCSS     string            `json:"customCss"`
 }
 
 type CreateBrandResponse struct {
@@ -199,10 +199,10 @@ type UpdateBrandRequest struct {
 	BoldFont      *BrandAssetRef    `json:"boldFont"`
 	FooterLinks   []BrandFooterLink `json:"footerLinks"`
 	SupportEmail  string            `json:"supportEmail"`
-	SupportUrl    string            `json:"supportUrl"`
+	SupportURL    string            `json:"supportUrl"`
 	SupportPhone  string            `json:"supportPhone"`
 	Palette       *BrandPalette     `json:"palette"`
-	CustomCss     string            `json:"customCss"`
+	CustomCSS     string            `json:"customCss"`
 }
 
 type UpdateBrandResponse struct {
@@ -232,9 +232,9 @@ type GetBrandThemesResponse struct {
 // fingerprint, the type it was validated as, and its pixel size, zero for a font. A brand names an
 // asset by its id.
 type BrandAssetResponse struct {
-	Id          int64  `json:"id"`
+	ID          int64  `json:"id"`
 	Kind        string `json:"kind"`
-	Url         string `json:"url"`
+	URL         string `json:"url"`
 	ContentType string `json:"contentType"`
 	Width       int    `json:"width"`
 	Height      int    `json:"height"`

@@ -24,7 +24,7 @@
       {{ range .clients }}
       <tr>
         <td class="cell-wrap">
-          <a class="text-link" href="/admin/clients/{{ .Id }}/settings">{{ .ClientIdentifier }}</a>
+          <a class="text-link" href="/admin/clients/{{ .ID }}/settings">{{ .ClientIdentifier }}</a>
           {{ if .IsSystemLevelClient }}<span class="tag tag-note ml-1">{{ T $.ctx "adminconsole.admin_clients.list.system_tag" }}</span>{{ end }}
           {{ if not .Enabled }}<span class="tag tag-caution ml-1">{{ T $.ctx "adminconsole.admin_clients.list.disabled" }}</span>{{ end }}
           {{ if .CreatedViaDCR }}<span class="tag ml-1">{{ T $.ctx "adminconsole.admin_clients.list.self_registered" }}</span>{{ end }}
@@ -35,7 +35,7 @@
         </td>
         <td class="cell-actions">
           {{ if not .IsSystemLevelClient }}
-          <a class="text-link text-link-danger" href="/admin/clients/{{ .Id }}/delete">{{ T $.ctx "adminconsole.admin_clients.list.delete_link" }}<span class="sr-only"> {{ .ClientIdentifier }}</span></a>
+          <a class="text-link text-link-danger" href="/admin/clients/{{ .ID }}/delete">{{ T $.ctx "adminconsole.admin_clients.list.delete_link" }}<span class="sr-only"> {{ .ClientIdentifier }}</span></a>
           {{ end }}
         </td>
       </tr>

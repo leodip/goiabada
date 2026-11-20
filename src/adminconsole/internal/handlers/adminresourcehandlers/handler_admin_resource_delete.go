@@ -50,7 +50,7 @@ func HandleDeleteGet(
 			return
 		}
 
-		permissions, err := apiClient.GetPermissionsByResource(r.Context(), jwtInfo.TokenResponse.AccessToken, resource.Id)
+		permissions, err := apiClient.GetPermissionsByResource(r.Context(), jwtInfo.TokenResponse.AccessToken, resource.ID)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -102,7 +102,7 @@ func HandleDeletePost(
 			return
 		}
 
-		permissions, err := apiClient.GetPermissionsByResource(r.Context(), jwtInfo.TokenResponse.AccessToken, resource.Id)
+		permissions, err := apiClient.GetPermissionsByResource(r.Context(), jwtInfo.TokenResponse.AccessToken, resource.ID)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -140,7 +140,7 @@ func HandleDeletePost(
 		}
 
 		// Call API to delete the resource
-		err = apiClient.DeleteResource(r.Context(), jwtInfo.TokenResponse.AccessToken, resource.Id)
+		err = apiClient.DeleteResource(r.Context(), jwtInfo.TokenResponse.AccessToken, resource.ID)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return

@@ -59,7 +59,7 @@ func bearerKindRoutes() []bearerRoute {
 		{name: "account PUT /api/v1/account/email", method: "PUT", path: "/api/v1/account/email",
 			body: api.UpdateAccountEmailRequest{Email: "bearer-kind-" + strings.ToLower(fake.LetterN(8)) + "@attacker.example.com"}},
 		{name: "browser-sessions POST /api/v1/sessions/load", method: "POST", path: "/api/v1/sessions/load",
-			body: api.SessionLoadRequest{Id: strings.Repeat("ab", 32)}},
+			body: api.SessionLoadRequest{ID: strings.Repeat("ab", 32)}},
 	}
 }
 

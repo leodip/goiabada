@@ -49,7 +49,7 @@ func TestResource_StaleOrMalformedUrlAnswers404(t *testing.T) {
 	const pathValueName = "resourceId"
 
 	// present, gone and broken stand for the three answers the API can give this handler.
-	present := &api.ResourceResponse{Id: 42}
+	present := &api.ResourceResponse{ID: 42}
 	gone := &apiclient.APIError{Code: "NOT_FOUND", Message: "Resource not found", StatusCode: http.StatusNotFound}
 	broken := &apiclient.APIError{Code: "INTERNAL_SERVER_ERROR", Message: "the database is on fire", StatusCode: http.StatusInternalServerError}
 

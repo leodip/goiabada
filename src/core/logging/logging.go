@@ -120,15 +120,15 @@ func (h *requestIDHandler) Enabled(ctx context.Context, level slog.Level) bool {
 }
 
 func (h *requestIDHandler) Handle(ctx context.Context, r slog.Record) error {
-	requestId := requestid.FromContext(ctx)
-	if requestId == "" {
+	requestID := requestid.FromContext(ctx)
+	if requestID == "" {
 		return h.delegate.Handle(ctx, r)
 	}
 
 	// Through FieldForLog because requestid.Middleware adopts an inbound
 	// X-Request-Id header verbatim, so this string is client-chosen on every
 	// request that supplies one (#159).
-	attr := slog.String("request_id", FieldForLog(requestId))
+	attr := slog.String("request_id", FieldForLog(requestID))
 	if !h.grouped {
 		r.AddAttrs(attr)
 		return h.delegate.Handle(ctx, r)

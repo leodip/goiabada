@@ -24,9 +24,9 @@ import (
 // threeClients are the apps the instance holds, out of order, with the admin console's own.
 func threeClients() []api.ClientResponse {
 	return []api.ClientResponse{
-		{Id: 4, ClientIdentifier: "shop", Description: "The shop"},
-		{Id: 1, ClientIdentifier: builtin.AdminConsoleClientIdentifier, IsSystemLevelClient: true},
-		{Id: 6, ClientIdentifier: "blog"},
+		{ID: 4, ClientIdentifier: "shop", Description: "The shop"},
+		{ID: 1, ClientIdentifier: builtin.AdminConsoleClientIdentifier, IsSystemLevelClient: true},
+		{ID: 6, ClientIdentifier: "blog"},
 	}
 }
 
@@ -42,7 +42,7 @@ func TestHandleAppsGet_OffersEveryAppButTheAdminConsoleAndMarksTheSelected(t *te
 	httpHelper := pageHelper(t, "/admin_legal_documents_apps.html")
 	detail := publishedTerms()
 	detail.LegalDocument.AppliesTo = "selected_apps"
-	detail.LegalDocument.ClientIds = []int64{4}
+	detail.LegalDocument.ClientIDs = []int64{4}
 	fake := &fakeLegalDocumentsAPI{detail: detail, clients: threeClients()}
 
 	HandleAppsGet(httpHelper, newSessionStore(t), fake).ServeHTTP(httptest.NewRecorder(), appsRequest(http.MethodGet, nil))
@@ -62,7 +62,7 @@ func TestHandleAppsGet_ADocumentForAllApps(t *testing.T) {
 	httpHelper := pageHelper(t, "/admin_legal_documents_apps.html")
 	detail := publishedTerms()
 	detail.LegalDocument.AppliesTo = "all_apps"
-	detail.LegalDocument.ClientIds = []int64{}
+	detail.LegalDocument.ClientIDs = []int64{}
 	fake := &fakeLegalDocumentsAPI{detail: detail, clients: threeClients()}
 
 	HandleAppsGet(httpHelper, newSessionStore(t), fake).ServeHTTP(httptest.NewRecorder(), appsRequest(http.MethodGet, nil))
@@ -81,7 +81,7 @@ func TestHandleAppsGet_SelectedAppsWithNoneListedIsFlagged(t *testing.T) {
 	httpHelper := pageHelper(t, "/admin_legal_documents_apps.html")
 	detail := publishedTerms()
 	detail.LegalDocument.AppliesTo = "selected_apps"
-	detail.LegalDocument.ClientIds = []int64{}
+	detail.LegalDocument.ClientIDs = []int64{}
 	fake := &fakeLegalDocumentsAPI{detail: detail, clients: threeClients()}
 
 	HandleAppsGet(httpHelper, newSessionStore(t), fake).ServeHTTP(httptest.NewRecorder(), appsRequest(http.MethodGet, nil))
@@ -93,7 +93,7 @@ func TestHandleAppsPost_SavesTheAppsTickedAndSaysSo(t *testing.T) {
 	store := newSessionStore(t)
 	detail := publishedTerms()
 	detail.LegalDocument.AppliesTo = "selected_apps"
-	detail.LegalDocument.ClientIds = []int64{4}
+	detail.LegalDocument.ClientIDs = []int64{4}
 	fake := &fakeLegalDocumentsAPI{detail: detail, clients: threeClients()}
 	rec := httptest.NewRecorder()
 
@@ -105,8 +105,8 @@ func TestHandleAppsPost_SavesTheAppsTickedAndSaysSo(t *testing.T) {
 	assert.Equal(t, consoleBaseURL+"/admin/legal-documents/7/apps", rec.Header().Get("Location"))
 	assert.Equal(t, int64(7), fake.appsSavedId)
 	require.NotNil(t, fake.appsSaved)
-	assert.Equal(t, api.UpdateLegalDocumentAppsRequest{AppliesTo: "selected_apps", ClientIds: []int64{6, 4},
-		ExpectedClientIds: []int64{4}}, *fake.appsSaved)
+	assert.Equal(t, api.UpdateLegalDocumentAppsRequest{AppliesTo: "selected_apps", ClientIDs: []int64{6, 4},
+		ExpectedClientIDs: []int64{4}}, *fake.appsSaved)
 
 	httpHelper := pageHelper(t, "/admin_legal_documents_apps.html")
 	HandleAppsGet(httpHelper, store, fake).ServeHTTP(httptest.NewRecorder(), withCookies(appsRequest(http.MethodGet, nil), rec))
@@ -126,8 +126,8 @@ func TestHandleAppsPost_AllAppsSendsNoAppAndAnEmptyLoadedListAsEmpty(t *testing.
 	require.Equal(t, http.StatusFound, rec.Code, rec.Body.String())
 	require.NotNil(t, fake.appsSaved)
 	assert.Equal(t, "all_apps", fake.appsSaved.AppliesTo)
-	assert.Equal(t, []int64{}, fake.appsSaved.ClientIds)
-	assert.Equal(t, []int64{}, fake.appsSaved.ExpectedClientIds)
+	assert.Equal(t, []int64{}, fake.appsSaved.ClientIDs)
+	assert.Equal(t, []int64{}, fake.appsSaved.ExpectedClientIDs)
 }
 
 // A refused save is drawn again with what was chosen, and the API's sentence.
@@ -140,7 +140,7 @@ func TestHandleAppsPost_ARefusalKeepsWhatWasChosen(t *testing.T) {
 			httpHelper := pageHelper(t, "/admin_legal_documents_apps.html")
 			detail := publishedTerms()
 			detail.LegalDocument.AppliesTo = "all_apps"
-			detail.LegalDocument.ClientIds = []int64{}
+			detail.LegalDocument.ClientIDs = []int64{}
 			fake := &fakeLegalDocumentsAPI{detail: detail, clients: threeClients(), writeErr: err}
 
 			HandleAppsPost(httpHelper, newSessionStore(t), fake, consoleBaseURL).ServeHTTP(httptest.NewRecorder(),

@@ -64,7 +64,7 @@ func TestHandleUserEmailVerificationCodePost_StoresTheCodeForTheAddressItRead(t 
 
 	var resp api.GenerateUserEmailVerificationCodeResponse
 	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &resp))
-	assert.Equal(t, codeGenUserId, resp.UserId)
+	assert.Equal(t, codeGenUserId, resp.UserID)
 	assert.Equal(t, codeGenAddress, resp.Email)
 
 	// The code answered is the code stored, encrypted, and it expires five minutes after the

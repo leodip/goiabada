@@ -35,7 +35,7 @@ func TestAuthServerClient_CreateAccountLogoutRequestReadsTheFormInstruction(t *t
 
 	formResp, redirectResp, err := client.CreateAccountLogoutRequest(context.Background(), "an-access-token",
 		&api.AccountLogoutRequest{
-			PostLogoutRedirectUri: "https://console.example.com/",
+			PostLogoutRedirectURI: "https://console.example.com/",
 			ResponseMode:          api.AccountLogoutResponseModeFormPost,
 		})
 	require.NoError(t, err)
@@ -65,7 +65,7 @@ func TestAuthServerClient_CreateAccountLogoutRequestReadsTheRedirect(t *testing.
 
 	formResp, redirectResp, err := client.CreateAccountLogoutRequest(context.Background(), "an-access-token",
 		&api.AccountLogoutRequest{
-			PostLogoutRedirectUri: "https://console.example.com/",
+			PostLogoutRedirectURI: "https://console.example.com/",
 			ResponseMode:          api.AccountLogoutResponseModeFormPost,
 		})
 	require.NoError(t, err)
@@ -73,7 +73,7 @@ func TestAuthServerClient_CreateAccountLogoutRequestReadsTheRedirect(t *testing.
 	assert.Nil(t, formResp, "a redirect body must not be read as a form with empty fields")
 	require.NotNil(t, redirectResp)
 	assert.Equal(t, "https://auth.example.com/auth/logout?id_token_hint=the.id.token",
-		redirectResp.LogoutUrl)
+		redirectResp.LogoutURL)
 }
 
 // A body that fills neither shape is an error rather than a nil pair, because the caller of a nil
@@ -82,7 +82,7 @@ func TestAuthServerClient_CreateAccountLogoutRequestRefusesABodyOfNeitherShape(t
 	client, _ := serves(t, `{"somethingElse":true}`)
 
 	formResp, redirectResp, err := client.CreateAccountLogoutRequest(context.Background(), "an-access-token",
-		&api.AccountLogoutRequest{PostLogoutRedirectUri: "https://console.example.com/"})
+		&api.AccountLogoutRequest{PostLogoutRedirectURI: "https://console.example.com/"})
 
 	require.Error(t, err)
 	assert.Nil(t, formResp)

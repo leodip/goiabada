@@ -74,7 +74,7 @@ func (s emailTemplateSample) trimmed() emailTemplateSample {
 
 func (s emailTemplateSample) previewRequest() *api.PreviewEmailTemplateRequest {
 	s = s.trimmed()
-	return &api.PreviewEmailTemplateRequest{Subject: s.Subject, ButtonLabel: s.ButtonLabel, Body: s.Body, BrandId: s.BrandId}
+	return &api.PreviewEmailTemplateRequest{Subject: s.Subject, ButtonLabel: s.ButtonLabel, Body: s.Body, BrandID: s.BrandId}
 }
 
 // emailTemplatePreviewAnswer is what the editor shows beside the frame.
@@ -208,7 +208,7 @@ func HandleEmailTemplatePreviewFramePost(httpHelper HttpHelper, apiClient emailT
 		w.Header().Set("Cache-Control", "no-store")
 		w.WriteHeader(http.StatusOK)
 		//nolint:gosec // G705: the auth server's email renderer drew this HTML from the text, escaping every value, and the frame policy above runs no script in it
-		_, _ = io.WriteString(w, withEmailFrameBase(preview.Html))
+		_, _ = io.WriteString(w, withEmailFrameBase(preview.HTML))
 	}
 }
 
@@ -242,7 +242,7 @@ func HandleEmailTemplateSendTestPost(httpHelper HttpHelper, apiClient emailTempl
 		sample := input.trimmed()
 		answer, err := apiClient.SendTestEmailTemplate(r.Context(), token, r.PathValue("email"), r.PathValue("language"),
 			&api.SendTestEmailTemplateRequest{To: to, Subject: sample.Subject, ButtonLabel: sample.ButtonLabel,
-				Body: sample.Body, BrandId: sample.BrandId})
+				Body: sample.Body, BrandID: sample.BrandId})
 		if err != nil {
 			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
@@ -271,7 +271,7 @@ func bindEmailTemplatePreview(httpHelper HttpHelper, w http.ResponseWriter, r *h
 	options := make([]BrandOption, 0, len(brands))
 	defaultName := ""
 	for _, brand := range brands {
-		options = append(options, BrandOption{Id: brand.Id, Name: brand.Name})
+		options = append(options, BrandOption{Id: brand.ID, Name: brand.Name})
 		if brand.IsDefault {
 			defaultName = brand.Name
 		}

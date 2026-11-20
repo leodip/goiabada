@@ -23,13 +23,13 @@
       {{ range .resources }}
       <tr>
         <td class="cell-wrap">
-          <a class="text-link font-mono text-sm" href="/admin/resources/{{ .Id }}/settings">{{ .ResourceIdentifier }}</a>
+          <a class="text-link font-mono text-sm" href="/admin/resources/{{ .ID }}/settings">{{ .ResourceIdentifier }}</a>
           {{ if .IsSystemLevelResource }}<span class="tag tag-note ml-1">{{ T $.ctx "adminconsole.admin_resources.list.system_tag" }}</span>{{ end }}
           {{ if .Description }}<span class="cell-secondary">{{ .Description }}</span>{{ end }}
         </td>
         <td class="cell-actions">
           {{ if not .IsSystemLevelResource }}
-          <a class="text-link text-link-danger" href="/admin/resources/{{ .Id }}/delete">{{ T $.ctx "adminconsole.admin_resources.list.action_delete" }}<span class="sr-only"> {{ .ResourceIdentifier }}</span></a>
+          <a class="text-link text-link-danger" href="/admin/resources/{{ .ID }}/delete">{{ T $.ctx "adminconsole.admin_resources.list.action_delete" }}<span class="sr-only"> {{ .ResourceIdentifier }}</span></a>
           {{ end }}
         </td>
       </tr>

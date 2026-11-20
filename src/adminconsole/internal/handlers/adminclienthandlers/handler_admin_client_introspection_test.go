@@ -101,8 +101,8 @@ func TestHandleIntrospectionPost_SendsTheLoadedList(t *testing.T) {
 
 			require.NotNil(t, stub.sent)
 			assert.Equal(t, int64(5), stub.clientId)
-			assert.Equal(t, tc.wantWanted, stub.sent.ResourceIds)
-			assert.Equal(t, tc.wantExpected, stub.sent.ExpectedResourceIds)
+			assert.Equal(t, tc.wantWanted, stub.sent.ResourceIDs)
+			assert.Equal(t, tc.wantExpected, stub.sent.ExpectedResourceIDs)
 			wire, err := json.Marshal(stub.sent)
 			require.NoError(t, err)
 			assert.JSONEq(t, tc.wantWire, string(wire))

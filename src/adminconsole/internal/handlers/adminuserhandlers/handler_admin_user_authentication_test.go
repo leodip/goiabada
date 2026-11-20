@@ -24,7 +24,7 @@ type authenticationApiClient struct {
 }
 
 func (*authenticationApiClient) GetUserById(_ context.Context, _ string, userId int64) (*api.UserResponse, error) {
-	return &api.UserResponse{Id: userId, Email: "someone@example.com", OTPEnabled: true,
+	return &api.UserResponse{ID: userId, Email: "someone@example.com", OTPEnabled: true,
 		OTPAuthenticatorDisabled: true}, nil
 }
 
@@ -35,13 +35,13 @@ func (c *authenticationApiClient) UpdateUserPassword(_ context.Context, _ string
 		return nil, &apiclient.APIError{Code: "VALIDATION_ERROR", Message: "The password is too short.",
 			StatusCode: http.StatusBadRequest}
 	}
-	return &api.UserResponse{Id: userId}, nil
+	return &api.UserResponse{ID: userId}, nil
 }
 
 func (c *authenticationApiClient) UpdateUserOTP(_ context.Context, _ string, userId int64,
 	_ *api.UpdateUserOTPRequest) (*api.UserResponse, error) {
 	c.writes = append(c.writes, "otp")
-	return &api.UserResponse{Id: userId}, nil
+	return &api.UserResponse{ID: userId}, nil
 }
 
 // postAuthentication submits the authentication form with a new password and the two-factor switch

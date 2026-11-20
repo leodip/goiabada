@@ -37,7 +37,7 @@ type accountProfileRecorder struct {
 func storedAccountProfile() *api.UserResponse {
 	birthDate := time.Date(1970, time.January, 2, 0, 0, 0, 0, time.UTC)
 	return &api.UserResponse{
-		Id:                  7,
+		ID:                  7,
 		Email:               "stored@example.com",
 		Username:            "stored-username",
 		GivenName:           "Stored",
@@ -125,7 +125,7 @@ func TestHandleProfilePost_ARefusalRedrawsThePageWithTheSubmittedValues(t *testi
 	bind := handlertest.Bind(t, httpHelper)
 	storedBirthDate := time.Date(1970, time.January, 2, 0, 0, 0, 0, time.UTC)
 	assert.Equal(t, &api.UserResponse{
-		Id:                  7,
+		ID:                  7,
 		Email:               "stored@example.com",
 		Username:            "jane-doe",
 		GivenName:           "Jane",

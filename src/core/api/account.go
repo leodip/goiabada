@@ -23,7 +23,7 @@ type UpdateAccountPasswordRequest struct {
 type UpdateAccountOTPRequest struct {
 	Enabled  bool   `json:"enabled"`
 	Password string `json:"password"`
-	OtpCode  string `json:"otpCode,omitempty"`
+	OTPCode  string `json:"otpCode,omitempty"`
 }
 
 // UpdateAccountOTPResponse is the account API's answer to PUT /api/v1/account/otp: the user and,
@@ -57,7 +57,7 @@ type CreateAccountRecoveryCodesResponse struct {
 // code or a recovery code in its place, never both (#783 decisions 2 and 3).
 type DeleteAccountRequest struct {
 	Password     string `json:"password"`
-	OtpCode      string `json:"otpCode,omitempty"`
+	OTPCode      string `json:"otpCode,omitempty"`
 	RecoveryCode string `json:"recoveryCode,omitempty"`
 }
 
@@ -98,7 +98,7 @@ type AccountEmailVerificationSendResponse struct {
 // update the currently authenticated user's phone number. The server will
 // always set PhoneNumberVerified to false upon change.
 type UpdateAccountPhoneRequest struct {
-	PhoneCountryUniqueId string `json:"phoneCountryUniqueId"`
+	PhoneCountryUniqueID string `json:"phoneCountryUniqueId"`
 	PhoneNumber          string `json:"phoneNumber"`
 }
 
@@ -106,7 +106,7 @@ type UpdateAccountPhoneRequest struct {
 // The auth server will validate the inputs, mint a short-lived id_token_hint and
 // return either a form_post instruction set or a redirect URL.
 type AccountLogoutRequest struct {
-	PostLogoutRedirectUri string `json:"postLogoutRedirectUri"`
+	PostLogoutRedirectURI string `json:"postLogoutRedirectUri"`
 	State                 string `json:"state,omitempty"`
 	ClientIdentifier      string `json:"clientIdentifier,omitempty"`
 	// ResponseMode selects which of the two response shapes the endpoint answers.
@@ -134,5 +134,5 @@ type AccountLogoutFormPostResponse struct {
 // AccountLogoutRedirectResponse provides a ready-to-follow URL for logout.
 // This is simpler but exposes the token in the URL.
 type AccountLogoutRedirectResponse struct {
-	LogoutUrl string `json:"logoutUrl"`
+	LogoutURL string `json:"logoutUrl"`
 }

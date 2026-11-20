@@ -5,7 +5,7 @@
 {{end}}
 
 {{define "page"}}
-{{ template "user_header" (args "connected_clients" .user.Id .user.Email .page .query $.ctx) }}
+{{ template "user_header" (args "connected_clients" .user.ID .user.Email .page .query $.ctx) }}
 
 {{/* One row per client the user is connected to (#135 decision 7): the scopes it was given consent
      for and the scopes its live grants hold, each under its own label, since either can hold a
@@ -65,7 +65,7 @@
           {{ if .IsCurrent }}
           <span class="tag tag-note">{{ T $.ctx "adminconsole.admin_users.connected_clients.current_tag" }}</span>
           {{ else }}
-          <button class="button button-sm" type="button" data-action-url="/admin/users/{{ $.user.Id }}/connected-clients" data-action-body="{&#34;clientId&#34;:{{ .ClientId }}}" data-dialog="disconnectClient"
+          <button class="button button-sm" type="button" data-action-url="/admin/users/{{ $.user.ID }}/connected-clients" data-action-body="{&#34;clientId&#34;:{{ .ClientId }}}" data-dialog="disconnectClient"
             data-confirm="{{ T $.ctx "adminconsole.admin_users.connected_clients.disconnect_confirm" "client" .Client }}" data-done="{{ T $.ctx "adminconsole.admin_users.connected_clients.disconnected" }}" data-done-label="{{ T $.ctx "adminconsole.admin_users.connected_clients.disconnected_label" }}">{{ T $.ctx "adminconsole.admin_users.connected_clients.disconnect_button" }}<span class="sr-only"> {{ .Client }}</span></button>
           {{ end }}
         </td>

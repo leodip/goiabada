@@ -155,12 +155,12 @@ func (s *ConditionalStore) ChangeAndRegenerate(w http.ResponseWriter, r *http.Re
 		if err != nil {
 			return err
 		}
-		newId, err := s.newSessionId()
+		newID, err := s.newSessionID()
 		if err != nil {
 			return err
 		}
 
-		expiresAt, err := s.conditional.Create(ctx, newId, []byte(encoded), s.valuesAreAuthenticated(values))
+		expiresAt, err := s.conditional.Create(ctx, newID, []byte(encoded), s.valuesAreAuthenticated(values))
 		if err != nil {
 			return errs.Wrap(err, "unable to create the rotated browser session")
 		}
@@ -171,16 +171,16 @@ func (s *ConditionalStore) ChangeAndRegenerate(w http.ResponseWriter, r *http.Re
 			}
 			// The new row holds a copy of contents that are no longer the session's. No cookie
 			// names it yet, so removing it is all it takes for it never to have existed.
-			if err := s.conditional.Delete(ctx, newId); err != nil {
+			if err := s.conditional.Delete(ctx, newID); err != nil {
 				return errs.Wrap(err, "unable to delete the rotated browser session after losing to another write")
 			}
 			continue
 		}
 
-		session.ID = newId
+		session.ID = newID
 		session.IsNew = false
 		session.Values = values
-		return s.setCookie(ctx, w, session, newId, expiresAt)
+		return s.setCookie(ctx, w, session, newID, expiresAt)
 	}
 
 	return s.outOfAttempts(ctx, session, change, "rotate")
@@ -230,7 +230,7 @@ func (s *ConditionalStore) create(r *http.Request, w http.ResponseWriter, sessio
 	if err != nil {
 		return err
 	}
-	id, err := s.newSessionId()
+	id, err := s.newSessionID()
 	if err != nil {
 		return err
 	}

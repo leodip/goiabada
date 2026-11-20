@@ -29,7 +29,7 @@ func TestAPIClientUpdatePut_Success(t *testing.T) {
 		WebsiteURL:       "https://example.com",
 		Enabled:          !client.Enabled,
 		ConsentRequired:  !client.ConsentRequired,
-		DefaultAcrLevel:  "urn:goiabada:level1",
+		DefaultACRLevel:  "urn:goiabada:level1",
 	}
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
@@ -49,7 +49,7 @@ func TestAPIClientUpdatePut_Success(t *testing.T) {
 	assert.Equal(t, "https://example.com", updateResp.Client.WebsiteURL)
 	assert.Equal(t, updateReq.Enabled, updateResp.Client.Enabled)
 	assert.Equal(t, updateReq.ConsentRequired, updateResp.Client.ConsentRequired)
-	assert.Equal(t, updateReq.DefaultAcrLevel, updateResp.Client.DefaultAcrLevel)
+	assert.Equal(t, updateReq.DefaultACRLevel, updateResp.Client.DefaultACRLevel)
 
 	// Verify DB persisted changes
 	refreshed, err2 := database.GetClientById(context.Background(), nil, client.Id)
@@ -276,7 +276,7 @@ func TestAPIClientUpdatePut_ACRRuleEnforcement(t *testing.T) {
 		Description:      client.Description,
 		Enabled:          client.Enabled,
 		ConsentRequired:  client.ConsentRequired,
-		DefaultAcrLevel:  "urn:goiabada:level2_mandatory",
+		DefaultACRLevel:  "urn:goiabada:level2_mandatory",
 	}
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
@@ -341,7 +341,7 @@ func TestAPIClientUpdatePut_SystemLevelClientAllowed(t *testing.T) {
 	var sysId int64
 	for _, c := range listResp.Clients {
 		if c.ClientIdentifier == "admin-console-client" {
-			sysId = c.Id
+			sysId = c.ID
 			break
 		}
 	}
@@ -380,7 +380,7 @@ func TestAPIClientUpdatePut_SystemLevelClientIdentifierChangeBlocked(t *testing.
 	var sysId int64
 	for _, c := range listResp.Clients {
 		if c.ClientIdentifier == "admin-console-client" {
-			sysId = c.Id
+			sysId = c.ID
 			break
 		}
 	}
@@ -573,7 +573,7 @@ func TestAPIClientUpdatePut_InvalidDefaultAcrLevelValue(t *testing.T) {
 	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
-	reqBody := api.UpdateClientSettingsRequest{ClientIdentifier: client.ClientIdentifier, Description: client.Description, DefaultAcrLevel: "invalid-acr"}
+	reqBody := api.UpdateClientSettingsRequest{ClientIdentifier: client.ClientIdentifier, Description: client.Description, DefaultACRLevel: "invalid-acr"}
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -638,12 +638,12 @@ func TestAPIClientUpdatePut_AngleBracketsRejected(t *testing.T) {
 		{"description", api.UpdateClientSettingsRequest{
 			ClientIdentifier: client.ClientIdentifier,
 			Description:      "<b>bold</b>",
-			DefaultAcrLevel:  "urn:goiabada:level1",
+			DefaultACRLevel:  "urn:goiabada:level1",
 		}, "validator.description.angle_brackets"},
 		{"display name", api.UpdateClientSettingsRequest{
 			ClientIdentifier: client.ClientIdentifier,
 			DisplayName:      "Acme <the third>",
-			DefaultAcrLevel:  "urn:goiabada:level1",
+			DefaultACRLevel:  "urn:goiabada:level1",
 		}, "validator.display_name.angle_brackets"},
 	}
 
@@ -677,7 +677,7 @@ func TestAPIClientUpdatePut_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 		ClientIdentifier: client.ClientIdentifier,
 		Description:      `R&D "phase 2"`,
 		DisplayName:      `Tom & Jerry`,
-		DefaultAcrLevel:  "urn:goiabada:level1",
+		DefaultACRLevel:  "urn:goiabada:level1",
 	}
 
 	endpoint := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)

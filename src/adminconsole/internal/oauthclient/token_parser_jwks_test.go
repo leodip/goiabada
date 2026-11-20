@@ -189,8 +189,8 @@ func TestJWKSTokenParser_ARemovedKeyVerifiesUntilTheCacheIsPastItsAge(t *testing
 
 	testCases := []struct {
 		name      string
-		before    []oauth.Jwk
-		after     []oauth.Jwk
+		before    []oauth.JWK
+		after     []oauth.JWK
 		token     string
 		promoted  string // a token under the key the change promoted, verified from the cache
 		wantError error
@@ -198,26 +198,26 @@ func TestJWKSTokenParser_ARemovedKeyVerifiesUntilTheCacheIsPastItsAge(t *testing
 	}{
 		{
 			name:     "the only key removed",
-			before:   []oauth.Jwk{oauthclienttest.JwkFromPublicKey("removed", &removed.PublicKey)},
+			before:   []oauth.JWK{oauthclienttest.JwkFromPublicKey("removed", &removed.PublicKey)},
 			after:    nil,
 			token:    oauthclienttest.SignRS256(t, removed, "removed", oauthclienttest.ValidClaims()),
 			wantText: "public key not found for token kid",
 		},
 		{
 			name: "a rotation: next promoted, current deleted",
-			before: []oauth.Jwk{
+			before: []oauth.JWK{
 				oauthclienttest.JwkFromPublicKey("next", &other.PublicKey),
 				oauthclienttest.JwkFromPublicKey("removed", &removed.PublicKey),
 			},
-			after:    []oauth.Jwk{oauthclienttest.JwkFromPublicKey("next", &other.PublicKey)},
+			after:    []oauth.JWK{oauthclienttest.JwkFromPublicKey("next", &other.PublicKey)},
 			token:    oauthclienttest.SignRS256(t, removed, "removed", oauthclienttest.ValidClaims()),
 			promoted: oauthclienttest.SignRS256(t, other, "next", oauthclienttest.ValidClaims()),
 			wantText: "public key not found for token kid",
 		},
 		{
 			name:      "no kid, and the one key swapped",
-			before:    []oauth.Jwk{oauthclienttest.JwkFromPublicKey("removed", &removed.PublicKey)},
-			after:     []oauth.Jwk{oauthclienttest.JwkFromPublicKey("new", &other.PublicKey)},
+			before:    []oauth.JWK{oauthclienttest.JwkFromPublicKey("removed", &removed.PublicKey)},
+			after:     []oauth.JWK{oauthclienttest.JwkFromPublicKey("new", &other.PublicKey)},
 			token:     oauthclienttest.SignRS256(t, removed, "", oauthclienttest.ValidClaims()),
 			wantError: jwt.ErrTokenSignatureInvalid,
 		},
@@ -556,7 +556,7 @@ func exponentOf(e ...byte) string {
 
 // 2048 bits is the least RFC 7518 section 3.3 allows, and is accepted.
 func TestJwkToRSAPublicKey_AcceptsA2048BitModulus(t *testing.T) {
-	pub, err := jwkToRSAPublicKey(oauth.Jwk{Kty: "RSA", N: modulusOfBits(2048), E: "AQAB"})
+	pub, err := jwkToRSAPublicKey(oauth.JWK{Kty: "RSA", N: modulusOfBits(2048), E: "AQAB"})
 
 	require.NoError(t, err)
 	assert.Equal(t, 2048, pub.N.BitLen())
@@ -569,28 +569,28 @@ func TestJwkToRSAPublicKey_Rejections(t *testing.T) {
 
 	testCases := []struct {
 		name string
-		jwk  oauth.Jwk
+		jwk  oauth.JWK
 	}{
-		{"unsupported kty", oauth.Jwk{Kty: "EC", N: valid.N, E: valid.E}},
-		{"empty kty", oauth.Jwk{Kty: "", N: valid.N, E: valid.E}},
-		{"lowercase kty is not accepted", oauth.Jwk{Kty: "rsa", N: valid.N, E: valid.E}},
-		{"invalid base64 modulus", oauth.Jwk{Kty: "RSA", N: "!!!not base64!!!", E: valid.E}},
-		{"invalid base64 exponent", oauth.Jwk{Kty: "RSA", N: valid.N, E: "!!!not base64!!!"}},
-		{"standard base64 padding is rejected", oauth.Jwk{Kty: "RSA", N: valid.N + "==", E: valid.E}},
+		{"unsupported kty", oauth.JWK{Kty: "EC", N: valid.N, E: valid.E}},
+		{"empty kty", oauth.JWK{Kty: "", N: valid.N, E: valid.E}},
+		{"lowercase kty is not accepted", oauth.JWK{Kty: "rsa", N: valid.N, E: valid.E}},
+		{"invalid base64 modulus", oauth.JWK{Kty: "RSA", N: "!!!not base64!!!", E: valid.E}},
+		{"invalid base64 exponent", oauth.JWK{Kty: "RSA", N: valid.N, E: "!!!not base64!!!"}},
+		{"standard base64 padding is rejected", oauth.JWK{Kty: "RSA", N: valid.N + "==", E: valid.E}},
 		// RFC 7518 section 3.3: "A key of size 2048 bits or larger MUST be used" (#709 finding 6).
-		{"a 2047-bit modulus", oauth.Jwk{Kty: "RSA", N: modulusOfBits(2047), E: "AQAB"}},
-		{"a 1024-bit modulus", oauth.Jwk{Kty: "RSA", N: modulusOfBits(1024), E: "AQAB"}},
-		{"an empty modulus", oauth.Jwk{Kty: "RSA", N: "", E: "AQAB"}},
+		{"a 2047-bit modulus", oauth.JWK{Kty: "RSA", N: modulusOfBits(2047), E: "AQAB"}},
+		{"a 1024-bit modulus", oauth.JWK{Kty: "RSA", N: modulusOfBits(1024), E: "AQAB"}},
+		{"an empty modulus", oauth.JWK{Kty: "RSA", N: "", E: "AQAB"}},
 		// An exponent that is even, below 3 or longer than four bytes (#709 finding 6).
-		{"an empty exponent", oauth.Jwk{Kty: "RSA", N: valid.N, E: ""}},
-		{"exponent 0", oauth.Jwk{Kty: "RSA", N: valid.N, E: exponentOf(0x00)}},
-		{"exponent 1", oauth.Jwk{Kty: "RSA", N: valid.N, E: exponentOf(0x01)}},
-		{"exponent 2", oauth.Jwk{Kty: "RSA", N: valid.N, E: exponentOf(0x02)}},
-		{"exponent 4", oauth.Jwk{Kty: "RSA", N: valid.N, E: exponentOf(0x04)}},
-		{"exponent 65536", oauth.Jwk{Kty: "RSA", N: valid.N, E: exponentOf(0x01, 0x00, 0x00)}},
-		{"exponent 65537 in five bytes", oauth.Jwk{Kty: "RSA", N: valid.N, E: exponentOf(0x00, 0x00, 0x01, 0x00, 0x01)}},
-		{"a five-byte exponent", oauth.Jwk{Kty: "RSA", N: valid.N, E: exponentOf(0x01, 0x00, 0x00, 0x00, 0x01)}},
-		{"a nine-byte exponent that overflows an int", oauth.Jwk{Kty: "RSA", N: valid.N,
+		{"an empty exponent", oauth.JWK{Kty: "RSA", N: valid.N, E: ""}},
+		{"exponent 0", oauth.JWK{Kty: "RSA", N: valid.N, E: exponentOf(0x00)}},
+		{"exponent 1", oauth.JWK{Kty: "RSA", N: valid.N, E: exponentOf(0x01)}},
+		{"exponent 2", oauth.JWK{Kty: "RSA", N: valid.N, E: exponentOf(0x02)}},
+		{"exponent 4", oauth.JWK{Kty: "RSA", N: valid.N, E: exponentOf(0x04)}},
+		{"exponent 65536", oauth.JWK{Kty: "RSA", N: valid.N, E: exponentOf(0x01, 0x00, 0x00)}},
+		{"exponent 65537 in five bytes", oauth.JWK{Kty: "RSA", N: valid.N, E: exponentOf(0x00, 0x00, 0x01, 0x00, 0x01)}},
+		{"a five-byte exponent", oauth.JWK{Kty: "RSA", N: valid.N, E: exponentOf(0x01, 0x00, 0x00, 0x00, 0x01)}},
+		{"a nine-byte exponent that overflows an int", oauth.JWK{Kty: "RSA", N: valid.N,
 			E: exponentOf(0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01)}},
 	}
 
@@ -687,7 +687,7 @@ func TestGetPublicKeyFromCache(t *testing.T) {
 
 	t.Run("empty kid with a single undecodable key returns nil", func(t *testing.T) {
 		tp := NewJWKSTokenParser("https://auth.example.com", nil, nil, oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
-		tp.cachedJwks = cachedKeys(t, oauth.Jwk{Kty: "EC", Kid: "key-1"})
+		tp.cachedJwks = cachedKeys(t, oauth.JWK{Kty: "EC", Kid: "key-1"})
 
 		assert.Nil(t, tp.getPublicKeyFromCache(""))
 	})
@@ -746,7 +746,7 @@ func TestGetPublicKeyFromCache(t *testing.T) {
 
 	t.Run("matching kid on an undecodable key returns nil", func(t *testing.T) {
 		tp := NewJWKSTokenParser("https://auth.example.com", nil, nil, oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
-		tp.cachedJwks = cachedKeys(t, oauth.Jwk{Kty: "EC", Kid: "key-1"})
+		tp.cachedJwks = cachedKeys(t, oauth.JWK{Kty: "EC", Kid: "key-1"})
 
 		assert.Nil(t, tp.getPublicKeyFromCache("key-1"))
 	})
@@ -807,12 +807,12 @@ func TestRefreshJwks_AcceptsADocumentOfExactlyTheCap(t *testing.T) {
 	require.NoError(t, err)
 
 	jwk := oauthclienttest.JwkFromPublicKey("key-1", &key.PublicKey)
-	encoded, err := json.Marshal(oauth.Jwks{Keys: []oauth.Jwk{jwk}})
+	encoded, err := json.Marshal(oauth.JWKS{Keys: []oauth.JWK{jwk}})
 	require.NoError(t, err)
 
 	// Pad the one field of unbounded length until the encoding is the cap to the byte.
 	jwk.Kid = "key-1" + strings.Repeat("x", MaxTokenResponseBytes-len(encoded))
-	encoded, err = json.Marshal(oauth.Jwks{Keys: []oauth.Jwk{jwk}})
+	encoded, err = json.Marshal(oauth.JWKS{Keys: []oauth.JWK{jwk}})
 	require.NoError(t, err)
 	require.Len(t, encoded, MaxTokenResponseBytes)
 
@@ -831,7 +831,7 @@ func TestRefreshJwks_AcceptsADocumentUnderTheCap(t *testing.T) {
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
 
-	encoded, err := json.Marshal(oauth.Jwks{Keys: []oauth.Jwk{oauthclienttest.JwkFromPublicKey("key-1", &key.PublicKey)}})
+	encoded, err := json.Marshal(oauth.JWKS{Keys: []oauth.JWK{oauthclienttest.JwkFromPublicKey("key-1", &key.PublicKey)}})
 	require.NoError(t, err)
 	require.Less(t, len(encoded), MaxTokenResponseBytes)
 
@@ -846,9 +846,9 @@ func TestRefreshJwks_AcceptsADocumentUnderTheCap(t *testing.T) {
 
 // cachedKeys is keys as refreshJwks caches them: encoded as the auth server publishes them and read
 // back through decodeJWKS.
-func cachedKeys(t *testing.T, keys ...oauth.Jwk) publishedKeys {
+func cachedKeys(t *testing.T, keys ...oauth.JWK) publishedKeys {
 	t.Helper()
-	encoded, err := json.Marshal(oauth.Jwks{Keys: keys})
+	encoded, err := json.Marshal(oauth.JWKS{Keys: keys})
 	require.NoError(t, err)
 	decoded, err := decodeJWKS(encoded)
 	require.NoError(t, err)

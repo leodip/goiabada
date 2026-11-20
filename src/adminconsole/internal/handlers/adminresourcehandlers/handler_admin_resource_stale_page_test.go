@@ -99,7 +99,7 @@ func TestAdminResourceHandlers_AStalePageIsAnsweredWithoutAServerFault(t *testin
 		},
 		{
 			name: "revoking from a user a permission the resource no longer holds", build: usersRemove,
-			current:    []api.PermissionResponse{{Id: 9}},
+			current:    []api.PermissionResponse{{ID: 9}},
 			options:    grantRoute("userId", "9"),
 			wantStatus: http.StatusNotFound, wantCode: "not_found",
 		},
@@ -110,25 +110,25 @@ func TestAdminResourceHandlers_AStalePageIsAnsweredWithoutAServerFault(t *testin
 		},
 		{
 			name: "revoking from a group a permission the resource no longer holds", build: groupsRemove,
-			current:    []api.PermissionResponse{{Id: 9}},
+			current:    []api.PermissionResponse{{ID: 9}},
 			options:    grantRoute("groupId", "9"),
 			wantStatus: http.StatusNotFound, wantCode: "not_found",
 		},
 		{
 			name: "granting a user a permission it already holds", build: usersAdd,
-			current:    []api.PermissionResponse{{Id: 3}, {Id: 7}},
+			current:    []api.PermissionResponse{{ID: 3}, {ID: 7}},
 			options:    grantRoute("userId", "7"),
 			wantStatus: http.StatusConflict, wantCode: "concurrent_update",
 		},
 		{
 			name: "revoking from a user a permission it no longer holds", build: usersRemove,
-			current:    []api.PermissionResponse{{Id: 3}},
+			current:    []api.PermissionResponse{{ID: 3}},
 			options:    grantRoute("userId", "7"),
 			wantStatus: http.StatusConflict, wantCode: "concurrent_update",
 		},
 		{
 			name: "granting a group a permission it already holds", build: groupsAdd,
-			current:    []api.PermissionResponse{{Id: 7}},
+			current:    []api.PermissionResponse{{ID: 7}},
 			options:    grantRoute("groupId", "7"),
 			wantStatus: http.StatusConflict, wantCode: "concurrent_update",
 		},

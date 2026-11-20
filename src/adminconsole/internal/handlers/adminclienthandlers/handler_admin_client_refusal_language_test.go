@@ -24,11 +24,11 @@ type refusingClientApiClient struct {
 }
 
 func (c *refusingClientApiClient) GetClientPermissions(_ context.Context, _ string, clientId int64) (*api.ClientResponse, []api.PermissionResponse, error) {
-	return &api.ClientResponse{Id: clientId, ClientIdentifier: "billing-app", IsSystemLevelClient: c.isSystemLevel}, nil, nil
+	return &api.ClientResponse{ID: clientId, ClientIdentifier: "billing-app", IsSystemLevelClient: c.isSystemLevel}, nil, nil
 }
 
 func (c *refusingClientApiClient) GetClientById(_ context.Context, _ string, clientId int64) (*api.ClientResponse, error) {
-	return &api.ClientResponse{Id: clientId, ClientIdentifier: "billing-app", IsSystemLevelClient: c.isSystemLevel}, nil
+	return &api.ClientResponse{ID: clientId, ClientIdentifier: "billing-app", IsSystemLevelClient: c.isSystemLevel}, nil
 }
 
 // GetClientSecret answers the stored secret, which a refused Authentication tab is drawn with.

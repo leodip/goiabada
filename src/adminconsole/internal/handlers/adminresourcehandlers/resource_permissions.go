@@ -54,7 +54,7 @@ func loadResourcePermissions(r *http.Request, apiClient resourceAndPermissionsRe
 		return resourcePermissions{}, errNoSuchResource
 	}
 
-	permissions, err := apiClient.GetPermissionsByResource(r.Context(), accessToken, resource.Id)
+	permissions, err := apiClient.GetPermissionsByResource(r.Context(), accessToken, resource.ID)
 	if err != nil {
 		return resourcePermissions{}, err
 	}

@@ -39,7 +39,7 @@ type flashStubApiClient struct {
 
 func (flashStubApiClient) UpdateAccountPassword(_ context.Context, accessToken string,
 	request *api.UpdateAccountPasswordRequest) (*api.UserResponse, error) {
-	return &api.UserResponse{Id: 7}, nil
+	return &api.UserResponse{ID: 7}, nil
 }
 
 // newFlashTestStore is a real store over an in-memory backend. The flash has to cross a

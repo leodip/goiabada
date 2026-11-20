@@ -18,7 +18,7 @@ import (
 // once, as it loads, and sends with every save (#428).
 func TestRender_AdminUsersPermissions_SendsTheLoadedList(t *testing.T) {
 	out := renderMenuPage(t, "/admin_users_permissions.html", map[string]interface{}{
-		"user": &api.UserResponse{Id: 5, Email: "someone@example.com"},
+		"user": &api.UserResponse{ID: 5, Email: "someone@example.com"},
 		"granted": []struct {
 			Id    int64
 			Scope string
@@ -43,7 +43,7 @@ func TestRender_AdminUsersPermissions_SendsTheLoadedList(t *testing.T) {
 // rather than undo another administrator's change (#428).
 func TestRender_AdminUsersGroups_SendsTheLoadedList(t *testing.T) {
 	out := renderMenuPage(t, "/admin_users_groups.html", map[string]interface{}{
-		"user": &api.UserResponse{Id: 5, Email: "someone@example.com"},
+		"user": &api.UserResponse{ID: 5, Email: "someone@example.com"},
 		"memberships": []struct {
 			Id              int64
 			GroupIdentifier string
@@ -73,7 +73,7 @@ func TestRender_AdminUsersPaginator(t *testing.T) {
 	out := renderMenuPage(t, "/admin_users.html", map[string]interface{}{
 		"pageResult": adminuserhandlers.PageResult{
 			// Subject is left empty: the row only has to render.
-			Users:    []api.UserResponse{{Id: 1, Username: "alice", Email: "alice@example.com"}},
+			Users:    []api.UserResponse{{ID: 1, Username: "alice", Email: "alice@example.com"}},
 			Total:    73,
 			Query:    "",
 			Page:     4,
@@ -109,7 +109,7 @@ func TestRender_AdminUsersPaginator(t *testing.T) {
 	// %2B, so the next page searches for the same address rather than for one with a space in it.
 	searched := renderMenuPage(t, "/admin_users.html", map[string]interface{}{
 		"pageResult": adminuserhandlers.PageResult{
-			Users:    []api.UserResponse{{Id: 1, Username: "ana", Email: "ana+test@example.com"}},
+			Users:    []api.UserResponse{{ID: 1, Username: "ana", Email: "ana+test@example.com"}},
 			Total:    23,
 			Query:    "ana+test@example.com",
 			Page:     1,
@@ -136,7 +136,7 @@ func TestRender_AdminUserDetails(t *testing.T) {
 
 	out := renderMenuPage(t, "/admin_users_details.html", map[string]interface{}{
 		"user": &api.UserResponse{
-			Id: 7, Subject: "3f2a1c4e-5b6d-4e8f-9a0b-1c2d3e4f5a6b", Username: "jdoe",
+			ID: 7, Subject: "3f2a1c4e-5b6d-4e8f-9a0b-1c2d3e4f5a6b", Username: "jdoe",
 			Email: "jane@example.com", Enabled: true,
 			CreatedAt: &createdAt, UpdatedAt: &updatedAt,
 		},
@@ -166,7 +166,7 @@ func TestRender_AdminUserDetails(t *testing.T) {
 // front of each Format call is what stops a nil pointer ending the page in a 500.
 func TestRender_AdminUserDetailsWithNoTimestamps(t *testing.T) {
 	out := renderMenuPage(t, "/admin_users_details.html", map[string]interface{}{
-		"user":              &api.UserResponse{Id: 7, Email: "jane@example.com"},
+		"user":              &api.UserResponse{ID: 7, Email: "jane@example.com"},
 		"userFullName":      "",
 		"page":              "1",
 		"query":             "",
@@ -182,7 +182,7 @@ func TestRender_AdminUserDetailsWithNoTimestamps(t *testing.T) {
 // at the top of the page (#617).
 func TestRender_AdminUserDetailsRefusedFocusesEnabled(t *testing.T) {
 	out := renderMenuPage(t, "/admin_users_details.html", map[string]interface{}{
-		"user":              &api.UserResponse{Id: 7, Email: "jane@example.com", Enabled: true},
+		"user":              &api.UserResponse{ID: 7, Email: "jane@example.com", Enabled: true},
 		"userFullName":      "",
 		"page":              "1",
 		"query":             "",
@@ -210,13 +210,13 @@ func TestRender_AdminUserDelete(t *testing.T) {
 
 	out := renderMenuPage(t, "/admin_users_delete.html", map[string]interface{}{
 		"user": &api.UserResponse{
-			Id: 7, Subject: "3f2a1c4e-5b6d-4e8f-9a0b-1c2d3e4f5a6b", Username: "jdoe",
+			ID: 7, Subject: "3f2a1c4e-5b6d-4e8f-9a0b-1c2d3e4f5a6b", Username: "jdoe",
 			Email: "jane@example.com", CreatedAt: &createdAt,
 		},
 		"userFullName": "Jane Q Doe",
 		"groups": []api.GroupResponse{
-			{Id: 2, GroupIdentifier: "admins"},
-			{Id: 3, GroupIdentifier: "site-viewers"},
+			{ID: 2, GroupIdentifier: "admins"},
+			{ID: 3, GroupIdentifier: "site-viewers"},
 		},
 		"page":  "1",
 		"query": "",
@@ -233,7 +233,7 @@ func TestRender_AdminUserDelete(t *testing.T) {
 // The none arm, which is what every user saw before the fix and what a user in no groups sees now.
 func TestRender_AdminUserDeleteWithNoGroups(t *testing.T) {
 	out := renderMenuPage(t, "/admin_users_delete.html", map[string]interface{}{
-		"user":         &api.UserResponse{Id: 7, Email: "jane@example.com"},
+		"user":         &api.UserResponse{ID: 7, Email: "jane@example.com"},
 		"userFullName": "",
 		"groups":       []api.GroupResponse{},
 		"page":         "1",
@@ -260,7 +260,7 @@ func TestRender_AdminUsersAuthentication_SaysWhenTheAuthenticatorIsDisabled(t *t
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			out := renderMenuPageIn(t, "/admin_users_authentication.html", map[string]interface{}{
-				"user": &api.UserResponse{Id: 5, Email: "someone@example.com", OTPEnabled: true,
+				"user": &api.UserResponse{ID: 5, Email: "someone@example.com", OTPEnabled: true,
 					OTPAuthenticatorDisabled: tc.disabled},
 				"otpEnabled":        true,
 				"page":              "",
@@ -290,7 +290,7 @@ func TestRender_AdminUsersAuthentication_SaysWhenTheAuthenticatorIsDisabled(t *t
 // the user's export route, not a link, so another site cannot start the download (#781 decision 7).
 func TestRender_AdminUserHeaderLinksToTheUsersAuditEventsAndDownloadsTheirData(t *testing.T) {
 	out := renderMenuPage(t, "/admin_users_details.html", map[string]interface{}{
-		"user":              &api.UserResponse{Id: 7, Email: "jane@example.com", Enabled: true},
+		"user":              &api.UserResponse{ID: 7, Email: "jane@example.com", Enabled: true},
 		"userFullName":      "",
 		"page":              "1",
 		"query":             "",
@@ -309,7 +309,7 @@ func TestRender_AdminUserHeaderLinksToTheUsersAuditEventsAndDownloadsTheirData(t
 // The button reads as the UI guide words a button, what it does, in English too.
 func TestRender_AdminUserHeaderDownloadDataInEnglish(t *testing.T) {
 	out := renderMenuPageIn(t, "/admin_users_details.html", map[string]interface{}{
-		"user":              &api.UserResponse{Id: 7, Email: "jane@example.com", Enabled: true},
+		"user":              &api.UserResponse{ID: 7, Email: "jane@example.com", Enabled: true},
 		"userFullName":      "",
 		"page":              "1",
 		"query":             "",
@@ -331,7 +331,7 @@ func TestRender_AdminUserDetailsWarnsOfASetupEmailNotSent(t *testing.T) {
 
 	page := func(emailVerified, setupEmailNotSent bool) string {
 		return renderMenuPageIn(t, "/admin_users_details.html", map[string]interface{}{
-			"user":              &api.UserResponse{Id: 7, Email: "jane@example.com", EmailVerified: emailVerified},
+			"user":              &api.UserResponse{ID: 7, Email: "jane@example.com", EmailVerified: emailVerified},
 			"userFullName":      "",
 			"page":              "",
 			"query":             "",

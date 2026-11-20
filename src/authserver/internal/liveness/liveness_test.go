@@ -43,12 +43,12 @@ var enabledClient = &record.Client{Id: 7, ClientIdentifier: clientIdentifier, En
 // accessToken is an access token as issuance mints it since #676: the at+jwt header, the configured
 // issuer, the client it was issued to and its jti, with claims on top, which may replace any of the
 // four.
-func accessToken(claims map[string]interface{}) oauth.JwtToken {
+func accessToken(claims map[string]interface{}) oauth.JWTToken {
 	all := map[string]interface{}{"iss": testIssuer, "client_id": clientIdentifier, "jti": testJti}
 	for name, value := range claims {
 		all[name] = value
 	}
-	return oauth.JwtToken{Header: map[string]interface{}{"alg": "RS256", "typ": "at+jwt"}, Claims: all}
+	return oauth.JWTToken{Header: map[string]interface{}{"alg": "RS256", "typ": "at+jwt"}, Claims: all}
 }
 
 // expectEnabledClient has the client lookup find enabledClient, once.
@@ -449,7 +449,7 @@ func TestAccessToken_Faults(t *testing.T) {
 	// The issuer is checked against the settings before anything is read, so a token of any kind
 	// is a fault without them. Only the header, which needs none, is refused first.
 	t.Run("no settings to check the issuer against", func(t *testing.T) {
-		for label, token := range map[string]oauth.JwtToken{
+		for label, token := range map[string]oauth.JWTToken{
 			"session-bound": sessionBound,
 			"sid-less":      accessToken(map[string]interface{}{"auth_time": float64(1), "sub": "user-1"}),
 			"a client's":    accessToken(map[string]interface{}{"sub": clientIdentifier}),
@@ -597,13 +597,13 @@ func TestAccessToken_GrantFault(t *testing.T) {
 // names the same user to the check as to reqctx's readers.
 func TestSubject(t *testing.T) {
 	for _, sub := range []string{"user-1", " user-1", "user-1\t", "\n user-1 "} {
-		subject, ok := Subject(oauth.JwtToken{Claims: map[string]interface{}{"sub": sub}})
+		subject, ok := Subject(oauth.JWTToken{Claims: map[string]interface{}{"sub": sub}})
 		assert.Truef(t, ok, "sub %q", sub)
 		assert.Equalf(t, "user-1", subject, "sub %q", sub)
 	}
 
 	for _, claims := range []map[string]interface{}{{}, {"sub": ""}, {"sub": " \t "}, {"sub": 42}} {
-		subject, ok := Subject(oauth.JwtToken{Claims: claims})
+		subject, ok := Subject(oauth.JWTToken{Claims: claims})
 		assert.Falsef(t, ok, "claims %v", claims)
 		assert.Emptyf(t, subject, "claims %v", claims)
 	}

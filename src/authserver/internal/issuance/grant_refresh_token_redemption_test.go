@@ -326,7 +326,7 @@ func TestIssueRefreshTokenGrant_TheMintReadsThePictureOnTheRotationTransaction(t
 			response, _, err := issuer.IssueRefreshTokenGrant(context.Background(), settings, input)
 
 			require.NoError(t, err)
-			assert.NotEmpty(t, response.IdToken)
+			assert.NotEmpty(t, response.IDToken)
 			mockDB.AssertCalled(t, "UserHasProfilePicture", mock.Anything, rotationTx, tc.userId)
 			mockDB.AssertExpectations(t)
 		})
@@ -948,7 +948,7 @@ func TestIssueRefreshTokenGrant_AFailedBumpStillHandsOutTheTokens(t *testing.T) 
 				"the bump fails after the rotation committed")
 			require.NotNil(t, response)
 			assert.NotEmpty(t, response.AccessToken)
-			assert.NotEmpty(t, response.IdToken)
+			assert.NotEmpty(t, response.IDToken)
 			require.NotNil(t, inserted.row)
 			claims := jwt.MapClaims{}
 			_, _, parseErr := jwt.NewParser().ParseUnverified(response.RefreshToken, claims)

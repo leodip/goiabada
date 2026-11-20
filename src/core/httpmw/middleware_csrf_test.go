@@ -437,7 +437,7 @@ func TestCSRF_OriginDecisions(t *testing.T) {
 				req.Header.Set("Sec-Fetch-Site", tt.secFetchSite)
 			}
 			if tt.skipped {
-				req = markCsrfSkipped(req)
+				req = markCSRFSkipped(req)
 			}
 
 			rr := httptest.NewRecorder()
@@ -545,7 +545,7 @@ func TestCSRF_TheRefusalRecordIsBounded(t *testing.T) {
 //
 // It asserts a distinguishing substring rather than a whole sentence, so rewording the explanation
 // does not fail the test while confusing two causes still does.
-func TestExplainCsrfFailure(t *testing.T) {
+func TestExplainCSRFFailure(t *testing.T) {
 	const ourHost = "auth.example.com"
 
 	tests := []struct {
@@ -610,7 +610,7 @@ func TestExplainCsrfFailure(t *testing.T) {
 				t.Fatal("this row is allowed by the origin check, so explainCsrfFailure would never see it")
 			}
 
-			explanation, remedy := explainCsrfFailure(req)
+			explanation, remedy := explainCSRFFailure(req)
 			if !strings.Contains(explanation, tt.wantExplanation) {
 				t.Errorf("explanation = %q, want it to contain %q", explanation, tt.wantExplanation)
 			}

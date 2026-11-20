@@ -356,7 +356,7 @@ func TestAuthOtp_APIEnrolmentCodeIsRefusedAtVerification(t *testing.T) {
 	resp := makeAPIRequest(t, "PUT", enableUrl, accessToken, api.UpdateAccountOTPRequest{
 		Enabled:  true,
 		Password: "Correct1!",
-		OtpCode:  codeC,
+		OTPCode:  codeC,
 	})
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)

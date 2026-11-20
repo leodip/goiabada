@@ -101,7 +101,7 @@ func HandleUserEmailVerificationCodePost(
 		response := api.GenerateUserEmailVerificationCodeResponse{
 			VerificationCode:          verificationCode,
 			VerificationCodeExpiresAt: &expiresAt,
-			UserId:                    user.Id,
+			UserID:                    user.Id,
 			Email:                     user.Email,
 		}
 

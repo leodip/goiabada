@@ -181,7 +181,7 @@ func HandleSettingsEmailPut(
 			return
 		}
 
-		if validateNoAngleBracketsErr := accountvalidation.ValidateNoAngleBrackets(req.SMTPFromName, i18n.ErrCodeSettingsSmtpFromNameAngleBrackets); validateNoAngleBracketsErr != nil {
+		if validateNoAngleBracketsErr := accountvalidation.ValidateNoAngleBrackets(req.SMTPFromName, i18n.ErrCodeSettingsSMTPFromNameAngleBrackets); validateNoAngleBracketsErr != nil {
 			writeValidationError(w, r, validateNoAngleBracketsErr)
 			return
 		}

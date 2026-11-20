@@ -781,8 +781,8 @@ func HandleClientUpdatePut(
 		// before that check existed, editable everywhere else on this form (#151).
 
 		// ACR level validation depending on AuthorizationCodeEnabled
-		if !client.AuthorizationCodeEnabled && strings.TrimSpace(updateReq.DefaultAcrLevel) != "" {
-			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientDefaultAcrNotApplicable, nil))
+		if !client.AuthorizationCodeEnabled && strings.TrimSpace(updateReq.DefaultACRLevel) != "" {
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientDefaultACRNotApplicable, nil))
 			return
 		}
 
@@ -831,10 +831,10 @@ func HandleClientUpdatePut(
 		client.ShowDescription = updateReq.ShowDescription
 		client.ShowWebsiteURL = updateReq.ShowWebsiteURL
 
-		if client.AuthorizationCodeEnabled && strings.TrimSpace(updateReq.DefaultAcrLevel) != "" {
-			acrLevel, err := record.AcrLevelFromString(updateReq.DefaultAcrLevel)
+		if client.AuthorizationCodeEnabled && strings.TrimSpace(updateReq.DefaultACRLevel) != "" {
+			acrLevel, err := record.AcrLevelFromString(updateReq.DefaultACRLevel)
 			if err != nil {
-				writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientDefaultAcrInvalid, nil))
+				writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientDefaultACRInvalid, nil))
 				return
 			}
 			client.DefaultAcrLevel = acrLevel
@@ -1677,9 +1677,9 @@ func HandleClientTokensPut(
 			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientTokensIncludeClaimsInAccessTokenInvalid, nil))
 			return
 		}
-		includeClaimsInIdToken, err := record.ThreeStateSettingFromString(strings.TrimSpace(req.IncludeOpenIDConnectClaimsInIdToken))
+		includeClaimsInIdToken, err := record.ThreeStateSettingFromString(strings.TrimSpace(req.IncludeOpenIDConnectClaimsInIDToken))
 		if err != nil {
-			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientTokensIncludeClaimsInIdTokenInvalid, nil))
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientTokensIncludeClaimsInIDTokenInvalid, nil))
 			return
 		}
 

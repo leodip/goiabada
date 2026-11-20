@@ -188,7 +188,7 @@ func HandleAuthenticationPost(
 			return
 		}
 
-		pagePath := fmt.Sprintf("/admin/users/%v/authentication", user.Id)
+		pagePath := fmt.Sprintf("/admin/users/%v/authentication", user.ID)
 		sess.SetFlash(pagePath, "savedSuccessfully", "true")
 		err = httpSession.Save(r, w, sess)
 		if err != nil {

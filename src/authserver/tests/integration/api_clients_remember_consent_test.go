@@ -241,7 +241,7 @@ func TestAPIClient_SavesThatDoNotOwnRememberConsentLeaveItAlone(t *testing.T) {
 				RefreshTokenOfflineIdleTimeoutInSeconds: 1000,
 				RefreshTokenOfflineMaxLifetimeInSeconds: 2000,
 				IncludeOpenIDConnectClaimsInAccessToken: "default",
-				IncludeOpenIDConnectClaimsInIdToken:     "default",
+				IncludeOpenIDConnectClaimsInIDToken:     "default",
 			}
 		}},
 	}

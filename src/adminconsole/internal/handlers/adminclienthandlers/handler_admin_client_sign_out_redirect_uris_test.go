@@ -65,15 +65,15 @@ func signOutListBind(t *testing.T, apiClient *stubSignOutListAPI) reflect.Value 
 func TestHandleSignOutRedirectURIsGet_ListsTheSignOutList(t *testing.T) {
 	client := signOutListBind(t, &stubSignOutListAPI{
 		client: &api.ClientResponse{
-			Id:                       7,
+			ID:                       7,
 			ClientIdentifier:         "a-web-app",
 			AuthorizationCodeEnabled: true,
 			RedirectURIs: []api.RedirectURIResponse{
-				{Id: 1, URI: "https://app.example.com/callback"},
+				{ID: 1, URI: "https://app.example.com/callback"},
 			},
 			PostLogoutRedirectURIs: []api.PostLogoutRedirectURIResponse{
-				{Id: 4, URI: "https://app.example.com/signed-out"},
-				{Id: 2, URI: "https://app.example.com/bye?state=fixed"},
+				{ID: 4, URI: "https://app.example.com/signed-out"},
+				{ID: 2, URI: "https://app.example.com/bye?state=fixed"},
 			},
 		},
 		settings: &api.SettingsGeneralResponse{},
@@ -90,7 +90,7 @@ func TestHandleSignOutRedirectURIsGet_ListsTheSignOutList(t *testing.T) {
 func TestHandleSignOutRedirectURIsGet_MarksTheSystemClient(t *testing.T) {
 	for _, system := range []bool{true, false} {
 		client := signOutListBind(t, &stubSignOutListAPI{
-			client:   &api.ClientResponse{Id: 7, ClientIdentifier: "a-client", AuthorizationCodeEnabled: true, IsSystemLevelClient: system},
+			client:   &api.ClientResponse{ID: 7, ClientIdentifier: "a-client", AuthorizationCodeEnabled: true, IsSystemLevelClient: system},
 			settings: &api.SettingsGeneralResponse{},
 		})
 		field := client.FieldByName("IsSystemLevelClient")
@@ -122,7 +122,7 @@ func TestHandleSignOutRedirectURIsGet_ResolvesRedirectFlows(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			client := signOutListBind(t, &stubSignOutListAPI{
 				client: &api.ClientResponse{
-					Id:                       7,
+					ID:                       7,
 					ClientIdentifier:         "an-app",
 					AuthorizationCodeEnabled: tc.authCode,
 					ImplicitGrantEnabled:     tc.clientImplicit,
@@ -199,7 +199,7 @@ func TestHandleSignOutRedirectURIsPost_SendsTheLoadedList(t *testing.T) {
 func TestHandleSignOutRedirectURIsPost_ASavedListIsSaidOnTheReloadedTab(t *testing.T) {
 	sessions := newTestSessionStore()
 	stub := &stubSignOutListAPI{
-		client:   &api.ClientResponse{Id: 9, ClientIdentifier: "an-app", AuthorizationCodeEnabled: true},
+		client:   &api.ClientResponse{ID: 9, ClientIdentifier: "an-app", AuthorizationCodeEnabled: true},
 		settings: &api.SettingsGeneralResponse{},
 	}
 

@@ -88,8 +88,8 @@ func TestHandlePermissionsPost_SendsTheLoadedList(t *testing.T) {
 			HandlePermissionsPost(httpHelper, nil, stub).ServeHTTP(httptest.NewRecorder(), req)
 
 			require.NotNil(t, stub.sent)
-			assert.Equal(t, tc.wantWanted, stub.sent.PermissionIds)
-			assert.Equal(t, tc.wantExpected, stub.sent.ExpectedPermissionIds)
+			assert.Equal(t, tc.wantWanted, stub.sent.PermissionIDs)
+			assert.Equal(t, tc.wantExpected, stub.sent.ExpectedPermissionIDs)
 			wire, err := json.Marshal(stub.sent)
 			require.NoError(t, err)
 			assert.Contains(t, string(wire), tc.wantWire)

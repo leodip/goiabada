@@ -17,23 +17,23 @@
     </p>
   </div>
   {{- if $doc.Retired }}
-  <form class="page-actions" id="restoreForm" method="post" action="/admin/legal-documents/{{ $doc.Id }}/restore" data-confirm-dialog="confirmRestore" data-confirm-title="{{ T $ctx "adminconsole.admin_legal_documents.header.restore_title" }}" data-confirm-always="{{ T $ctx "adminconsole.admin_legal_documents.header.restore_body" "version" $doc.CurrentVersion }}{{ if eq $doc.Kind "must_accept" }} {{ T $ctx "adminconsole.admin_legal_documents.header.restore_body_must_accept" }}{{ end }}">
+  <form class="page-actions" id="restoreForm" method="post" action="/admin/legal-documents/{{ $doc.ID }}/restore" data-confirm-dialog="confirmRestore" data-confirm-title="{{ T $ctx "adminconsole.admin_legal_documents.header.restore_title" }}" data-confirm-always="{{ T $ctx "adminconsole.admin_legal_documents.header.restore_body" "version" $doc.CurrentVersion }}{{ if eq $doc.Kind "must_accept" }} {{ T $ctx "adminconsole.admin_legal_documents.header.restore_body_must_accept" }}{{ end }}">
     <button class="button" id="btnRestore" type="submit">{{ T $ctx "adminconsole.admin_legal_documents.header.restore_button" }}</button>
   </form>
   {{- else if $doc.CurrentVersion }}
-  <form class="page-actions" id="retireForm" method="post" action="/admin/legal-documents/{{ $doc.Id }}/retire" data-confirm-dialog="confirmRetire" data-confirm-title="{{ T $ctx "adminconsole.admin_legal_documents.header.retire_title" }}" data-confirm-always="{{ T $ctx "adminconsole.admin_legal_documents.header.retire_body" }}{{ if eq $doc.Kind "must_accept" }} {{ T $ctx "adminconsole.admin_legal_documents.header.retire_body_must_accept" }}{{ end }}">
+  <form class="page-actions" id="retireForm" method="post" action="/admin/legal-documents/{{ $doc.ID }}/retire" data-confirm-dialog="confirmRetire" data-confirm-title="{{ T $ctx "adminconsole.admin_legal_documents.header.retire_title" }}" data-confirm-always="{{ T $ctx "adminconsole.admin_legal_documents.header.retire_body" }}{{ if eq $doc.Kind "must_accept" }} {{ T $ctx "adminconsole.admin_legal_documents.header.retire_body_must_accept" }}{{ end }}">
     <button class="button" id="btnRetire" type="submit">{{ T $ctx "adminconsole.admin_legal_documents.header.retire_button" }}</button>
   </form>
   {{- else }}
   <div class="page-actions">
-    <a class="button button-danger" href="/admin/legal-documents/{{ $doc.Id }}/delete">{{ T $ctx "adminconsole.admin_legal_documents.header.delete_button" }}</a>
+    <a class="button button-danger" href="/admin/legal-documents/{{ $doc.ID }}/delete">{{ T $ctx "adminconsole.admin_legal_documents.header.delete_button" }}</a>
   </div>
   {{- end }}
 </div>
 <nav class="tab-bar" aria-label="{{ T $ctx "adminconsole.tabs.label" }}">
-  <a class="tab-item" href="/admin/legal-documents/{{ $doc.Id }}/draft"{{ if eq $tab "draft" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.legal_document_tabs.draft" }}</a>
-  <a class="tab-item" href="/admin/legal-documents/{{ $doc.Id }}/apps"{{ if eq $tab "apps" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.legal_document_tabs.apps" }}</a>
-  <a class="tab-item" href="/admin/legal-documents/{{ $doc.Id }}/versions"{{ if eq $tab "versions" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.legal_document_tabs.versions" }}</a>
+  <a class="tab-item" href="/admin/legal-documents/{{ $doc.ID }}/draft"{{ if eq $tab "draft" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.legal_document_tabs.draft" }}</a>
+  <a class="tab-item" href="/admin/legal-documents/{{ $doc.ID }}/apps"{{ if eq $tab "apps" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.legal_document_tabs.apps" }}</a>
+  <a class="tab-item" href="/admin/legal-documents/{{ $doc.ID }}/versions"{{ if eq $tab "versions" }} aria-current="page"{{ end }}>{{ T $ctx "adminconsole.legal_document_tabs.versions" }}</a>
 </nav>
 {{- if $doc.Retired }}
 {{ template "modal_dialog" (args "confirmRestore" "confirm_change" $ctx (T $ctx "adminconsole.admin_legal_documents.header.restore_button") (T $ctx "adminconsole.admin_legal_documents.header.restore_title")) }}
@@ -49,7 +49,7 @@
 {{- $doc := index . 0 }}
 {{- $ctx := index . 1 }}
 {{- if eq $doc.AppliesTo "all_apps" }}{{ T $ctx "adminconsole.admin_legal_documents.common.applies_all_apps" }}
-{{- else if and (not $doc.ClientIds) (not $doc.Retired) }}<span class="tag tag-caution">{{ T $ctx "adminconsole.admin_legal_documents.common.applies_no_apps" }}</span><span class="cell-secondary">{{ T $ctx "adminconsole.admin_legal_documents.common.applies_nobody" }}</span>
+{{- else if and (not $doc.ClientIDs) (not $doc.Retired) }}<span class="tag tag-caution">{{ T $ctx "adminconsole.admin_legal_documents.common.applies_no_apps" }}</span><span class="cell-secondary">{{ T $ctx "adminconsole.admin_legal_documents.common.applies_nobody" }}</span>
 {{- else }}{{ T $ctx "adminconsole.admin_legal_documents.common.applies_selected_apps" }}{{ end }}
 {{- end}}
 

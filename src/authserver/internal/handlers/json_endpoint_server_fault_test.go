@@ -77,7 +77,7 @@ func TestHandleUserInfoGetPost_AServerFaultAnswersJSON(t *testing.T) {
 		Return(nil, errs.New("the database went away")).Once()
 
 	req := httptest.NewRequest(http.MethodGet, "/userinfo", nil)
-	req = req.WithContext(reqctx.WithValidatedToken(req.Context(), oauth.JwtToken{
+	req = req.WithContext(reqctx.WithValidatedToken(req.Context(), oauth.JWTToken{
 		Claims: map[string]interface{}{"sub": "user123", "scope": "openid"},
 	}))
 	rr := httptest.NewRecorder()

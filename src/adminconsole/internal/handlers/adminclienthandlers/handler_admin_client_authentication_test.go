@@ -58,7 +58,7 @@ func authenticationTabBind(t *testing.T, apiClient *stubAuthenticationApiClient)
 // A confidential client's secret is shown from the secret route, the client detail having none.
 func TestHandleAuthenticationGet_ShowsTheSecretReadFromTheSecretRoute(t *testing.T) {
 	apiClient := &stubAuthenticationApiClient{
-		client: &api.ClientResponse{Id: 7, ClientIdentifier: "portal", IsPublic: false},
+		client: &api.ClientResponse{ID: 7, ClientIdentifier: "portal", IsPublic: false},
 		secret: "the-secret-from-its-route",
 	}
 
@@ -71,7 +71,7 @@ func TestHandleAuthenticationGet_ShowsTheSecretReadFromTheSecretRoute(t *testing
 // A public client has no secret, so none is read and none is recorded as viewed.
 func TestHandleAuthenticationGet_APublicClientReadsNoSecret(t *testing.T) {
 	apiClient := &stubAuthenticationApiClient{
-		client: &api.ClientResponse{Id: 7, ClientIdentifier: "spa", IsPublic: true},
+		client: &api.ClientResponse{ID: 7, ClientIdentifier: "spa", IsPublic: true},
 		secret: "never-read",
 	}
 
@@ -87,7 +87,7 @@ func TestHandleAuthenticationGet_DrawsTheMethodTheClientIsHeldTo(t *testing.T) {
 	for _, held := range []string{"client_secret_basic", "client_secret_post", ""} {
 		t.Run("held to "+held, func(t *testing.T) {
 			apiClient := &stubAuthenticationApiClient{
-				client: &api.ClientResponse{Id: 7, ClientIdentifier: "dcr_a3f9", CreatedViaDCR: true,
+				client: &api.ClientResponse{ID: 7, ClientIdentifier: "dcr_a3f9", CreatedViaDCR: true,
 					TokenEndpointAuthMethod: held},
 				secret: "the-secret",
 			}
@@ -112,7 +112,7 @@ func TestHandleAuthenticationPost_RefusesAClientTypeThatIsNeither(t *testing.T) 
 	} {
 		t.Run("publicConfidential="+form.Get("publicConfidential"), func(t *testing.T) {
 			apiClient := &stubAuthenticationApiClient{
-				client: &api.ClientResponse{Id: 7, ClientIdentifier: "portal", IsPublic: false},
+				client: &api.ClientResponse{ID: 7, ClientIdentifier: "portal", IsPublic: false},
 				secret: "the-stored-secret",
 			}
 			httpHelper := &stubHttpHelper{}
@@ -147,7 +147,7 @@ func TestHandleAuthenticationPost_RefusesAClientTypeThatIsNeither(t *testing.T) 
 // names from the client as stored (#708 decision 5).
 func TestHandleAuthenticationPost_ARefusedSaveStillDrawsTheMethodTheClientIsHeldTo(t *testing.T) {
 	apiClient := &stubAuthenticationApiClient{
-		client: &api.ClientResponse{Id: 7, ClientIdentifier: "dcr_a3f9", CreatedViaDCR: true,
+		client: &api.ClientResponse{ID: 7, ClientIdentifier: "dcr_a3f9", CreatedViaDCR: true,
 			TokenEndpointAuthMethod: "client_secret_post"},
 		secret: "the-stored-secret",
 	}
@@ -168,7 +168,7 @@ func TestHandleAuthenticationPost_ARefusedSaveStillDrawsTheMethodTheClientIsHeld
 // A public client holds no secret, so its refused tab reads none, as its first draw reads none.
 func TestHandleAuthenticationPost_ARefusedPublicClientReadsNoSecret(t *testing.T) {
 	apiClient := &stubAuthenticationApiClient{
-		client: &api.ClientResponse{Id: 7, ClientIdentifier: "spa", IsPublic: true},
+		client: &api.ClientResponse{ID: 7, ClientIdentifier: "spa", IsPublic: true},
 		secret: "never-read",
 	}
 	httpHelper := &stubHttpHelper{}

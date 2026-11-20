@@ -80,22 +80,22 @@ func TestAPIClientSessionsGet_Success(t *testing.T) {
 	// Decision 10's normalization, at its smallest: two sessions of one person, so the array
 	// they resolve against holds one record and both rows are keys into it.
 	require.Len(t, out.Users, 1)
-	assert.Equal(t, testUser.Id, out.Users[0].Id)
+	assert.Equal(t, testUser.Id, out.Users[0].ID)
 	assert.Equal(t, testUser.Email, out.Users[0].Email)
 	assert.Equal(t, "Test", out.Users[0].GivenName)
 	assert.Equal(t, "User", out.Users[0].FamilyName)
 
 	for _, s := range out.Sessions {
-		assert.Positive(t, s.Id)
+		assert.Positive(t, s.ID)
 		assert.NotEmpty(t, s.SessionIdentifier)
 		require.NotNil(t, s.Started)
 		require.NotNil(t, s.LastAccessed)
-		assert.Equal(t, "192.168.1.100", s.IpAddress)
+		assert.Equal(t, "192.168.1.100", s.IPAddress)
 		assert.Equal(t, "Test Device", s.DeviceName)
 		assert.Equal(t, "computer", s.DeviceType)
 		assert.Equal(t, "linux", s.DeviceOS)
 		assert.Equal(t, testSessionUserAgent, s.UserAgent)
-		assert.Equal(t, testUser.Id, s.UserId)
+		assert.Equal(t, testUser.Id, s.UserID)
 		assert.Contains(t, s.ClientIdentifiers, testClient.ClientIdentifier)
 	}
 }
@@ -460,14 +460,14 @@ func TestAPIClientSessionsGet_UsersAreNormalizedAndCarryOnlyTheOwnerFields(t *te
 
 	owners := make(map[int64]api.SessionOwnerResponse, len(out.Users))
 	for _, owner := range out.Users {
-		_, duplicate := owners[owner.Id]
-		assert.False(t, duplicate, "user %d appears twice in the users array", owner.Id)
-		owners[owner.Id] = owner
+		_, duplicate := owners[owner.ID]
+		assert.False(t, duplicate, "user %d appears twice in the users array", owner.ID)
+		owners[owner.ID] = owner
 	}
 	for _, session := range out.Sessions {
-		_, resolved := owners[session.UserId]
+		_, resolved := owners[session.UserID]
 		assert.True(t, resolved, "session %d names user %d, which the users array does not carry",
-			session.Id, session.UserId)
+			session.ID, session.UserID)
 	}
 
 	assert.Equal(t, "Jane", owners[first.Id].GivenName)

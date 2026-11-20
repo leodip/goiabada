@@ -56,7 +56,7 @@ func HandleConnectedClientsGet(
 			return
 		}
 
-		clients, err := apiClient.GetUserConnectedClients(r.Context(), jwtInfo.TokenResponse.AccessToken, user.Id)
+		clients, err := apiClient.GetUserConnectedClients(r.Context(), jwtInfo.TokenResponse.AccessToken, user.ID)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return

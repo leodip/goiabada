@@ -54,7 +54,7 @@ func TestAPIAccountPasswordPut_Success(t *testing.T) {
 	var updateResp api.UpdateUserResponse
 	err := json.NewDecoder(resp.Body).Decode(&updateResp)
 	require.NoError(t, err)
-	assert.Equal(t, u.Id, updateResp.User.Id)
+	assert.Equal(t, u.Id, updateResp.User.ID)
 
 	// Verify password updated in DB and matches
 	updatedUser, err := database.GetUserById(context.Background(), nil, u.Id)

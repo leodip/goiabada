@@ -106,7 +106,7 @@ func validateBrandFooterLink(i int, link api.BrandFooterLink) (record.BrandFoote
 			map[string]any{"link": number}), "footerLinks", index, "label")
 	}
 
-	linkURL := strings.TrimSpace(link.Url)
+	linkURL := strings.TrimSpace(link.URL)
 	if linkURL == "" {
 		return record.BrandFooterLink{}, refusalAt(i18n.NewLocalizedError(i18n.ErrCodeBrandFooterLinkURLRequired,
 			map[string]any{"link": number}), "footerLinks", index, "url")

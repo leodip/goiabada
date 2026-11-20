@@ -20,9 +20,9 @@ func TestAuthServerClient_GetClientIntrospectionResourcesReturnsTheClientBesideI
 	assert.Equal(t, "/api/v1/admin/clients/7/introspection-resources", gotPath)
 	assert.Equal(t, "Bearer an-access-token", gotAuthorization)
 
-	assert.Equal(t, int64(7), clientResp.Id)
+	assert.Equal(t, int64(7), clientResp.ID)
 	assert.Equal(t, "orders-backend", clientResp.ClientIdentifier)
 	require.Len(t, resources, 1)
-	assert.Equal(t, int64(2), resources[0].Id)
+	assert.Equal(t, int64(2), resources[0].ID)
 	assert.Equal(t, "api", resources[0].ResourceIdentifier)
 }

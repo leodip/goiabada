@@ -56,7 +56,7 @@ func HandleSessionsGet(
 		}
 
 		// Get the user's sessions via API
-		sessions, err := apiClient.GetUserSessionsByUserId(r.Context(), jwtInfo.TokenResponse.AccessToken, user.Id)
+		sessions, err := apiClient.GetUserSessionsByUserId(r.Context(), jwtInfo.TokenResponse.AccessToken, user.ID)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -132,7 +132,7 @@ func HandleSessionsPost(
 		// server computes isCurrent from the sid claim of the very token this request forwards,
 		// so this is the same comparison the console used to make for itself, now made once and
 		// in one place (#373).
-		sessions, err := apiClient.GetUserSessionsByUserId(r.Context(), jwtInfo.TokenResponse.AccessToken, user.Id)
+		sessions, err := apiClient.GetUserSessionsByUserId(r.Context(), jwtInfo.TokenResponse.AccessToken, user.ID)
 		if err != nil {
 			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
@@ -140,7 +140,7 @@ func HandleSessionsPost(
 
 		isDeletingCurrentSession := false
 		for _, es := range sessions {
-			if es.Id == int64(userSessionId) && es.IsCurrent {
+			if es.ID == int64(userSessionId) && es.IsCurrent {
 				isDeletingCurrentSession = true
 				break
 			}

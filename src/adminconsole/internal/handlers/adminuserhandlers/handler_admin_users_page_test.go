@@ -64,7 +64,7 @@ func usersOnPage(total, page, pageSize int) []api.UserResponse {
 	}
 	users := make([]api.UserResponse, 0, end-start)
 	for i := start; i < end; i++ {
-		users = append(users, api.UserResponse{Id: int64(i + 1)})
+		users = append(users, api.UserResponse{ID: int64(i + 1)})
 	}
 	return users
 }
@@ -196,7 +196,7 @@ func TestHandleListGet_PageQueryParameter(t *testing.T) {
 				"the rows are not page %d's: %s", tc.wantPage, tc.why)
 			if tc.total > 0 {
 				require.NotEmpty(t, result.Users, "page %d rendered no rows at all", tc.wantPage)
-				assert.Equal(t, int64((tc.wantPage-1)*pageSize+1), result.Users[0].Id,
+				assert.Equal(t, int64((tc.wantPage-1)*pageSize+1), result.Users[0].ID,
 					"the first row is not the first of page %d", tc.wantPage)
 			}
 		})

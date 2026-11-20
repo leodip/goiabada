@@ -447,7 +447,7 @@ func TestToken_Refresh_DownScopeSeparators(t *testing.T) {
 	assert.True(t, ok, "the reissued token should carry a scope claim")
 
 	// Matched with production's own matcher, not string equality.
-	jwtToken := oauth.JwtToken{Claims: claims}
+	jwtToken := oauth.JWTToken{Claims: claims}
 	assert.True(t, jwtToken.HasScope("openid"), "HasScope should match openid in %q", scopeClaim)
 	assert.True(t, jwtToken.HasScope("profile"), "HasScope should match profile in %q", scopeClaim)
 }

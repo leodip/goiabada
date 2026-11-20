@@ -92,7 +92,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		now := time.Now().UTC()
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "client1").Return(client, nil).Once()
 		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "some_refresh_token", true).
-			Return(&oauth.JwtToken{Claims: jwt.MapClaims{
+			Return(&oauth.JWTToken{Claims: jwt.MapClaims{
 				"jti": "some_jti", "typ": "Refresh", "sub": "user_subject",
 			}}, nil).Once()
 		mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "some_jti").Return(refreshToken, nil).Once()
@@ -298,8 +298,8 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "client1").Return(client, nil).Once()
 
-		// Mock a JwtToken without a JTI claim
-		mockJwtToken := &oauth.JwtToken{}
+		// Mock a JWTToken without a JTI claim
+		mockJwtToken := &oauth.JWTToken{}
 		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "refresh_token_without_jti", true).
 			Return(mockJwtToken, nil).Once()
 
@@ -335,7 +335,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "client1").Return(client, nil).Once()
 
-		mockJwtToken := &oauth.JwtToken{
+		mockJwtToken := &oauth.JWTToken{
 			Claims: jwt.MapClaims{
 				"jti": "non_existent_jti",
 			},
@@ -391,7 +391,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			IsPublic:                 true,
 		}
 
-		refreshTokenJwt := &oauth.JwtToken{
+		refreshTokenJwt := &oauth.JWTToken{
 			Claims: jwt.MapClaims{
 				"jti": "mismatched_jti",
 				"typ": "Refresh",
@@ -455,7 +455,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			IsPublic:                 true,
 		}
 
-		refreshTokenJwt := &oauth.JwtToken{
+		refreshTokenJwt := &oauth.JWTToken{
 			Claims: jwt.MapClaims{
 				"jti": "disabled_user_jti",
 				"typ": "Refresh",
@@ -529,7 +529,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			ClientSecretEncrypted:    clientSecretEncrypted,
 		}
 
-		refreshTokenJwt := &oauth.JwtToken{
+		refreshTokenJwt := &oauth.JWTToken{
 			Claims: jwt.MapClaims{
 				"jti": "nil_session_jti",
 				"typ": "Refresh",
@@ -601,7 +601,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			ClientSecretEncrypted:    clientSecretEncrypted,
 		}
 
-		refreshTokenJwt := &oauth.JwtToken{
+		refreshTokenJwt := &oauth.JWTToken{
 			Claims: jwt.MapClaims{
 				"jti": "invalid_session_jti",
 				"typ": "Refresh",
@@ -678,7 +678,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		}
 
 		pastTime := time.Now().UTC().Add(-24 * time.Hour)
-		refreshTokenJwt := &oauth.JwtToken{
+		refreshTokenJwt := &oauth.JWTToken{
 			Claims: jwt.MapClaims{
 				"jti":                         "expired_offline_jti",
 				"typ":                         "Offline",
@@ -746,7 +746,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			ClientSecretEncrypted:    clientSecretEncrypted,
 		}
 
-		refreshTokenJwt := &oauth.JwtToken{
+		refreshTokenJwt := &oauth.JWTToken{
 			Claims: jwt.MapClaims{
 				"jti": "invalid_offline_jti",
 				"typ": "Offline",
@@ -809,7 +809,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			ClientSecretEncrypted:    clientSecretEncrypted,
 		}
 
-		refreshTokenJwt := &oauth.JwtToken{
+		refreshTokenJwt := &oauth.JWTToken{
 			Claims: jwt.MapClaims{
 				"jti": "invalid_typ_jti",
 				"typ": "InvalidType", // Invalid typ claim
@@ -875,7 +875,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			ClientSecretEncrypted:    clientSecretEncrypted,
 		}
 
-		refreshTokenJwt := &oauth.JwtToken{
+		refreshTokenJwt := &oauth.JWTToken{
 			Claims: jwt.MapClaims{
 				"jti": "invalid_scope_jti",
 				"typ": "Refresh",
@@ -958,7 +958,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		}
 
 		futureTime := time.Now().UTC().Add(24 * time.Hour)
-		refreshTokenJwt := &oauth.JwtToken{
+		refreshTokenJwt := &oauth.JWTToken{
 			Claims: jwt.MapClaims{
 				"jti":                         "valid_offline_jti",
 				"typ":                         "Offline",
@@ -1035,7 +1035,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		}
 
 		futureTime := time.Now().UTC().Add(24 * time.Hour)
-		refreshTokenJwt := &oauth.JwtToken{
+		refreshTokenJwt := &oauth.JWTToken{
 			Claims: jwt.MapClaims{
 				"jti":                         "valid_offline_jti",
 				"typ":                         "Offline",
@@ -1114,7 +1114,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			ClientSecretEncrypted:    clientSecretEncrypted,
 		}
 
-		refreshTokenJwt := &oauth.JwtToken{
+		refreshTokenJwt := &oauth.JWTToken{
 			Claims: jwt.MapClaims{
 				"jti": "valid_refresh_jti",
 				"typ": "Refresh",
@@ -1197,7 +1197,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			ConsentRequired:          true,
 		}
 
-		refreshTokenJwt := &oauth.JwtToken{
+		refreshTokenJwt := &oauth.JWTToken{
 			Claims: jwt.MapClaims{
 				"jti": "revoked_consent_jti",
 				"typ": "Refresh",
@@ -1282,7 +1282,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			ConsentRequired:          true,
 		}
 
-		refreshTokenJwt := &oauth.JwtToken{
+		refreshTokenJwt := &oauth.JWTToken{
 			Claims: jwt.MapClaims{
 				"jti": "partial_consent_jti",
 				"typ": "Refresh",
@@ -1373,7 +1373,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			ClientSecretEncrypted:    clientSecretEncrypted,
 		}
 
-		refreshTokenJwt := &oauth.JwtToken{
+		refreshTokenJwt := &oauth.JWTToken{
 			Claims: jwt.MapClaims{
 				"jti": "revoked_permission_jti",
 				"typ": "Refresh",
@@ -1485,7 +1485,7 @@ func publicClientChallengelessRefresh(t *testing.T, storedChallenge sql.NullStri
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "client1").Return(client, nil)
 	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "the-refresh-token", true).
-		Return(&oauth.JwtToken{Claims: jwt.MapClaims{
+		Return(&oauth.JWTToken{Claims: jwt.MapClaims{
 			"jti": "the-jti", "typ": "Refresh", "sub": "user_subject",
 		}}, nil)
 	mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "the-jti").Return(refreshToken, nil)
@@ -1644,13 +1644,13 @@ func newStoredGrantRefresh(t *testing.T, g storedGrant, requestedScope string, r
 	user := record.User{Id: 1, Subject: "user123", Enabled: true}
 
 	var client *record.Client
-	var refreshTokenJwt *oauth.JwtToken
+	var refreshTokenJwt *oauth.JWTToken
 	var refreshToken *record.RefreshToken
 	if g.ropc {
 		// Always Offline, because ROPC creates no browser session, and presented by a public
 		// client, so no secret.
 		client = &record.Client{Id: 1, ClientIdentifier: clientIdentifier, Enabled: true, IsPublic: true}
-		refreshTokenJwt = &oauth.JwtToken{Claims: jwt.MapClaims{
+		refreshTokenJwt = &oauth.JWTToken{Claims: jwt.MapClaims{
 			"jti":                         "stored_grant_jti",
 			"typ":                         "Offline",
 			"sub":                         "user123",
@@ -1682,7 +1682,7 @@ func newStoredGrantRefresh(t *testing.T, g storedGrant, requestedScope string, r
 			ConsentRequired:          g.consentScope != "" && !g.readsConsent,
 		}
 		input.ClientSecret = "client_secret"
-		refreshTokenJwt = &oauth.JwtToken{Claims: jwt.MapClaims{
+		refreshTokenJwt = &oauth.JWTToken{Claims: jwt.MapClaims{
 			"jti": "stored_grant_jti",
 			"typ": "Refresh",
 			"sub": "user123",
@@ -2148,7 +2148,7 @@ func TestValidateTokenRequest_RefreshToken_SessionOwnership(t *testing.T) {
 			ClientSecretEncrypted:    clientSecretEncrypted,
 		}
 
-		refreshTokenJwt := &oauth.JwtToken{
+		refreshTokenJwt := &oauth.JWTToken{
 			Claims: jwt.MapClaims{
 				"jti": "ownership_jti",
 				"typ": "Refresh",
@@ -2300,7 +2300,7 @@ func TestValidateTokenRequest_OfflineRefreshToken_SessionOwnership(t *testing.T)
 		if expired {
 			maxLifetime = time.Now().UTC().Add(-1 * time.Hour)
 		}
-		offlineClaims := &oauth.JwtToken{Claims: jwt.MapClaims{
+		offlineClaims := &oauth.JWTToken{Claims: jwt.MapClaims{
 			"jti": "the-jti", "typ": "Offline", "sub": "user_subject",
 			"offline_access_max_lifetime": float64(maxLifetime.Unix()),
 		}}
@@ -2477,7 +2477,7 @@ func TestValidateTokenRequest_RefreshToken_SubjectResolvesToNoUser(t *testing.T)
 				IsPublic:                 true,
 			}
 
-			refreshTokenJwt := &oauth.JwtToken{
+			refreshTokenJwt := &oauth.JWTToken{
 				Claims: jwt.MapClaims{
 					"jti":                         "ropc_jti",
 					"typ":                         "Offline",

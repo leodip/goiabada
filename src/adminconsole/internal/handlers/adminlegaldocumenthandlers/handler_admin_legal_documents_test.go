@@ -66,7 +66,7 @@ func (f *fakeLegalDocumentsAPI) CreateLegalDocument(_ context.Context, _ string,
 	if f.writeErr != nil {
 		return nil, f.writeErr
 	}
-	return &api.LegalDocumentDetailResponse{LegalDocument: api.LegalDocumentResponse{Id: 9, ShortName: request.ShortName}}, nil
+	return &api.LegalDocumentDetailResponse{LegalDocument: api.LegalDocumentResponse{ID: 9, ShortName: request.ShortName}}, nil
 }
 
 func (f *fakeLegalDocumentsAPI) PreviewLegalDocument(_ context.Context, _ string, markdown string) (string, error) {
@@ -156,7 +156,7 @@ func refusal(code, message string) error {
 // publishedTerms is a must-accept document at version 2 with no draft.
 func publishedTerms() *api.LegalDocumentDetailResponse {
 	return &api.LegalDocumentDetailResponse{
-		LegalDocument: api.LegalDocumentResponse{Id: 7, ShortName: "terms-of-use", Kind: "must_accept",
+		LegalDocument: api.LegalDocumentResponse{ID: 7, ShortName: "terms-of-use", Kind: "must_accept",
 			Title: "Terms of use", CurrentVersion: 2},
 		Versions: []api.LegalDocumentVersionSummaryResponse{{Version: 1, Title: "Terms"}, {Version: 2, Title: "Terms of use"}},
 	}
@@ -165,7 +165,7 @@ func publishedTerms() *api.LegalDocumentDetailResponse {
 // draftPrivacy is a for-information document that was never published, holding its draft.
 func draftPrivacy() *api.LegalDocumentDetailResponse {
 	return &api.LegalDocumentDetailResponse{
-		LegalDocument: api.LegalDocumentResponse{Id: 7, ShortName: "privacy", Kind: "for_information",
+		LegalDocument: api.LegalDocumentResponse{ID: 7, ShortName: "privacy", Kind: "for_information",
 			Title: "Privacy notice", HasDraft: true},
 		Draft:    &api.LegalDocumentDraftResponse{Title: "Privacy notice", Markdown: "We keep your email."},
 		Versions: []api.LegalDocumentVersionSummaryResponse{},
@@ -202,7 +202,7 @@ func withCookies(req *http.Request, from *httptest.ResponseRecorder) *http.Reque
 
 func TestHandleListGet_ListsTheDocuments(t *testing.T) {
 	httpHelper := pageHelper(t, "/admin_legal_documents.html")
-	fake := &fakeLegalDocumentsAPI{docs: []api.LegalDocumentResponse{{Id: 7, ShortName: "terms-of-use"}, {Id: 8, ShortName: "privacy"}}}
+	fake := &fakeLegalDocumentsAPI{docs: []api.LegalDocumentResponse{{ID: 7, ShortName: "terms-of-use"}, {ID: 8, ShortName: "privacy"}}}
 
 	HandleListGet(httpHelper, fake).ServeHTTP(httptest.NewRecorder(),
 		handlertest.Request(http.MethodGet, "/admin/legal-documents", handlertest.WithAccessToken()))

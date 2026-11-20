@@ -59,7 +59,7 @@ var emailErrorFields = map[string]string{
 	i18n.ErrCodeSettingsEmailSMTPPasswordAndClear:         "password",
 	i18n.ErrCodeSettingsEmailSMTPHostChanged:              "password",
 	i18n.ErrCodeSettingsEmailSMTPFromNameTooLong:          "fromName",
-	i18n.ErrCodeSettingsSmtpFromNameAngleBrackets:         "fromName",
+	i18n.ErrCodeSettingsSMTPFromNameAngleBrackets:         "fromName",
 	i18n.ErrCodeSettingsEmailSMTPFromEmailRequired:        "fromEmail",
 	i18n.ErrCodeSettingsEmailSMTPFromEmailTooLong:         "fromEmail",
 	i18n.ErrCodeEmailRequired:                             "fromEmail",

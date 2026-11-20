@@ -332,7 +332,7 @@ func TestHandleRedirectURIsGet_ResolvesRedirectFlows(t *testing.T) {
 			httpHelper := &stubHttpHelper{}
 			apiClient := &stubApiClient{
 				client: &api.ClientResponse{
-					Id:                       7,
+					ID:                       7,
 					ClientIdentifier:         "an-implicit-app",
 					AuthorizationCodeEnabled: false,
 					ImplicitGrantEnabled:     tc.clientImplicit,

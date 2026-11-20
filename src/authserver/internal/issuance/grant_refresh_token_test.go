@@ -109,14 +109,14 @@ func TestMintCodeRefreshTokens(t *testing.T) {
 	assert.Equal(t, "Bearer", response.TokenType)
 	assert.Equal(t, int64(900), response.ExpiresIn) // client override
 	assert.NotEmpty(t, response.AccessToken)
-	assert.NotEmpty(t, response.IdToken)
+	assert.NotEmpty(t, response.IDToken)
 	assert.NotEmpty(t, response.RefreshToken)
 	assert.Equal(t, "openid profile resource1:read", response.Scope)
 	assertCountdown(t, response.RefreshExpiresIn, 600, now, after, "remaining time based on session max lifetime")
 
 	// validate Id token --------------------------------------------
 
-	idClaims := verifyAndDecodeToken(t, response.IdToken, publicKeyBytes)
+	idClaims := verifyAndDecodeToken(t, response.IDToken, publicKeyBytes)
 	assert.Equal(t, settings.Issuer, idClaims["iss"])
 	assert.Equal(t, user.Subject, idClaims["sub"])
 	assert.Equal(t, client.ClientIdentifier, idClaims["aud"])
@@ -296,7 +296,7 @@ func TestMintCodeRefreshTokens_Offline_NoIdToken(t *testing.T) {
 	assert.Equal(t, "Bearer", response.TokenType)
 	assert.Equal(t, int64(1200), response.ExpiresIn)
 	assert.NotEmpty(t, response.AccessToken)
-	assert.Empty(t, response.IdToken)
+	assert.Empty(t, response.IDToken)
 	assert.NotEmpty(t, response.RefreshToken)
 	assert.Equal(t, "resource1:write offline_access", response.Scope)
 	assert.Equal(t, int64(7200), response.RefreshExpiresIn)
@@ -451,7 +451,7 @@ func TestMintROPCRefreshTokens(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, response)
 	assert.NotEmpty(t, response.AccessToken)
-	assert.NotEmpty(t, response.IdToken)
+	assert.NotEmpty(t, response.IDToken)
 	assert.NotEmpty(t, response.RefreshToken)
 	assert.Equal(t, "Bearer", response.TokenType)
 
@@ -471,7 +471,7 @@ func TestMintROPCRefreshTokens(t *testing.T) {
 	assert.NotContains(t, accessClaims, "sid")
 
 	// Verify id token claims
-	idClaims := verifyAndDecodeToken(t, response.IdToken, publicKeyBytes)
+	idClaims := verifyAndDecodeToken(t, response.IDToken, publicKeyBytes)
 	assert.Equal(t, userSubject, idClaims["sub"])
 	assert.Equal(t, "ropc-client", idClaims["aud"])
 	assert.Equal(t, "urn:goiabada:level1", idClaims["acr"])
@@ -566,7 +566,7 @@ func TestMintROPCRefreshTokens_ScopeDowngrade(t *testing.T) {
 	assert.Equal(t, "resource:read", accessClaims["scope"])
 
 	// Should not have id_token since openid scope not requested
-	assert.Empty(t, response.IdToken)
+	assert.Empty(t, response.IDToken)
 
 	mockDB.AssertExpectations(t)
 }

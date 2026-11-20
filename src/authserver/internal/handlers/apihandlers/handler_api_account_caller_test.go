@@ -85,7 +85,7 @@ func TestAccountHandlers_ACallerWithoutATokenOrSubjectIsAWiringFault(t *testing.
 	callers := map[string]func(r *http.Request) *http.Request{
 		"no validated token": func(r *http.Request) *http.Request { return r },
 		"no sub claim": func(r *http.Request) *http.Request {
-			return r.WithContext(reqctx.WithValidatedToken(r.Context(), oauth.JwtToken{Claims: map[string]interface{}{}}))
+			return r.WithContext(reqctx.WithValidatedToken(r.Context(), oauth.JWTToken{Claims: map[string]interface{}{}}))
 		},
 		"an empty subject": func(r *http.Request) *http.Request {
 			return setTokenContext(r, "")

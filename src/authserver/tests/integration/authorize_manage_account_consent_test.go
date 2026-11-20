@@ -232,7 +232,7 @@ func (f *manageAccountConsentFixture) assertTheAccountAPIAccepts(t *testing.T, a
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	var profile api.GetUserResponse
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&profile))
-	assert.Equal(t, f.user.Id, profile.User.Id)
+	assert.Equal(t, f.user.Id, profile.User.ID)
 }
 
 // assertAnswered holds /auth/issue's or /auth/authorize's response to the client's callback with

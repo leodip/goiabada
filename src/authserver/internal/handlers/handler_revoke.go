@@ -188,7 +188,7 @@ func (e revocationEndpoint) serve(w http.ResponseWriter, r *http.Request) {
 
 // revokeAccessToken answers an access token the access-token check has judged.
 func (e revocationEndpoint) revokeAccessToken(w http.ResponseWriter, r *http.Request, client *record.Client,
-	token oauth.JwtToken, verdict liveness.Verdict) {
+	token oauth.JWTToken, verdict liveness.Verdict) {
 
 	if !verdict.Live() {
 		e.invalid(w)
@@ -220,7 +220,7 @@ func (e revocationEndpoint) revokeAccessToken(w http.ResponseWriter, r *http.Req
 // this one and stored the jti first leaves nothing for this one to do: it is answered as a token
 // already revoked is, and the event is the other's.
 func (e revocationEndpoint) revokeByJti(w http.ResponseWriter, r *http.Request, client *record.Client, userId int64,
-	token oauth.JwtToken) {
+	token oauth.JWTToken) {
 
 	jti := token.StringClaim("jti")
 	stored, err := revocation.RevokeAccessToken(r.Context(), e.database, jti, token.TimeClaim("exp").UTC())
@@ -239,7 +239,7 @@ func (e revocationEndpoint) revokeByJti(w http.ResponseWriter, r *http.Request, 
 
 // revokeRefreshToken judges a refresh token by the refresh grant's own check and answers it.
 func (e revocationEndpoint) revokeRefreshToken(w http.ResponseWriter, r *http.Request, client *record.Client,
-	token oauth.JwtToken, settings *record.Settings, now time.Time) {
+	token oauth.JWTToken, settings *record.Settings, now time.Time) {
 
 	ctx := r.Context()
 	stored, err := liveness.FindRefreshToken(ctx, e.database, token)

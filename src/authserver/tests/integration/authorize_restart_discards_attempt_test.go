@@ -213,7 +213,7 @@ func endSessionsThroughAdminAPI(t *testing.T, adminToken string, userId int64) {
 	require.NotEmpty(t, sessions, "there must be a session to end")
 	for _, session := range sessions {
 		resp := makeAPIRequest(t, "DELETE", appConfig.AuthServer.BaseURL+"/api/v1/admin/user-sessions/"+
-			strconv.FormatInt(session.Id, 10), adminToken, nil)
+			strconv.FormatInt(session.ID, 10), adminToken, nil)
 		require.Equal(t, http.StatusOK, resp.StatusCode)
 		_ = resp.Body.Close()
 	}
@@ -235,7 +235,7 @@ func (f *restartFixture) assertOnlyPasswordWasEarned(t *testing.T, idClaims, acc
 	require.Len(t, sessions, 1, "the second pass creates exactly one session")
 	assert.Equal(t, "pwd", sessions[0].AuthMethods,
 		"the session the second pass created carries only the password it verified")
-	assert.Equal(t, record.AcrLevel1.String(), sessions[0].AcrLevel)
+	assert.Equal(t, record.AcrLevel1.String(), sessions[0].ACRLevel)
 }
 
 // TestRestartRoute1_TheSecondPassEarnsOnlyWhatItVerified carries otp into a ceremony by SSO and

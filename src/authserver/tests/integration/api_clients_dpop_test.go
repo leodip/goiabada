@@ -99,7 +99,7 @@ func TestAPIClientDPoPPut_SavesAndAnswersTheSetting(t *testing.T) {
 	require.NoError(t, json.NewDecoder(listing.Body).Decode(&clients))
 	found := 0
 	for _, listed := range clients.Clients {
-		switch listed.Id {
+		switch listed.ID {
 		case required.Id:
 			found++
 			assert.True(t, listed.DPoPBoundAccessTokens)

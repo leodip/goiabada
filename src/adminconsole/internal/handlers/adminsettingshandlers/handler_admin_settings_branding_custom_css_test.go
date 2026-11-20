@@ -26,7 +26,7 @@ func TestHandleBrandGet_DrawsTheStoredCustomCSS(t *testing.T) {
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_branding_brand.html").Once()
 	apiClient := newBrandingAPI()
-	apiClient.brands[0].CustomCss = storedCustomCSS
+	apiClient.brands[0].CustomCSS = storedCustomCSS
 
 	HandleBrandGet(httpHelper, newSettingsTestStore(), apiClient).ServeHTTP(httptest.NewRecorder(),
 		handlertest.Request(http.MethodGet, "/admin/settings/branding/4/edit", handlertest.WithAccessToken(),
@@ -49,7 +49,7 @@ func TestHandleBrandNewPost_SendsTheCustomCSSAsTyped(t *testing.T) {
 			handlertest.WithForm(footerForm(url.Values{"customCss": {typed}}))))
 
 	require.NotNil(t, apiClient.created)
-	assert.Equal(t, typed, apiClient.created.CustomCss)
+	assert.Equal(t, typed, apiClient.created.CustomCSS)
 }
 
 // A save sends the CSS the form holds, not the stored one: changed, it replaces it, and emptied, it
@@ -66,7 +66,7 @@ func TestHandleBrandPost_SendsTheCustomCSSTheFormHolds(t *testing.T) {
 			httpHelper := handlersmocks.NewHttpHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 			apiClient := newBrandingAPI()
-			apiClient.brands[0].CustomCss = storedCustomCSS
+			apiClient.brands[0].CustomCSS = storedCustomCSS
 
 			HandleBrandPost(httpHelper, newSettingsTestStore(), apiClient, &invalidationRecorder{}, consoleBaseURL).ServeHTTP(
 				httptest.NewRecorder(), handlertest.Request(http.MethodPost, "/admin/settings/branding/4/edit",
@@ -74,7 +74,7 @@ func TestHandleBrandPost_SendsTheCustomCSSTheFormHolds(t *testing.T) {
 					handlertest.WithForm(footerForm(url.Values{"customCss": {tc.typed}}))))
 
 			require.NotNil(t, apiClient.updated)
-			assert.Equal(t, tc.typed, apiClient.updated.CustomCss)
+			assert.Equal(t, tc.typed, apiClient.updated.CustomCSS)
 		})
 	}
 }
@@ -113,7 +113,7 @@ func TestHandleBrandWrite_EachCustomCSSRefusalIsShownAtTheField(t *testing.T) {
 					handlertest.RefuseInternalServerError(t, httpHelper)
 					handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_branding_brand.html").Once()
 					apiClient := newBrandingAPI()
-					apiClient.brands[0].CustomCss = storedCustomCSS
+					apiClient.brands[0].CustomCSS = storedCustomCSS
 					apiClient.writeErr = err
 
 					post(httpHelper, apiClient)

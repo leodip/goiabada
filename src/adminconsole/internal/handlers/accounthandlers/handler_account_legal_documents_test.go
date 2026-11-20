@@ -35,7 +35,7 @@ func TestHandleLegalDocumentsGet_BindsTheUsersAcceptances(t *testing.T) {
 
 	url := "https://auth.example/legal/terms/versions/2"
 	acceptances := []api.LegalDocumentAcceptanceResponse{
-		{Id: 3, LegalDocumentId: 7, ShortName: "terms", Version: 2, Title: "Terms of use", URL: &url},
+		{ID: 3, LegalDocumentID: 7, ShortName: "terms", Version: 2, Title: "Terms of use", URL: &url},
 	}
 	apiClient := &accountLegalDocumentsApiClient{acceptances: acceptances}
 

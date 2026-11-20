@@ -31,17 +31,17 @@ var apiClientNotAllowed = chainAnswer{http.StatusForbidden, challengeClientNotAl
 
 // accountTokenOf is a user's Account API token issued to clientId, or to no client when clientId
 // is empty.
-func accountTokenOf(clientId string) oauth.JwtToken {
+func accountTokenOf(clientId string) oauth.JWTToken {
 	claims := map[string]interface{}{
 		"sub": "u1", "auth_time": float64(1), "scope": "openid authserver:manage-account",
 	}
 	if clientId != "" {
 		claims["client_id"] = clientId
 	}
-	return oauth.JwtToken{Claims: claims}
+	return oauth.JWTToken{Claims: claims}
 }
 
-func serveAdminConsoleClientGuard(t *testing.T, token *oauth.JwtToken) *httptest.ResponseRecorder {
+func serveAdminConsoleClientGuard(t *testing.T, token *oauth.JWTToken) *httptest.ResponseRecorder {
 	t.Helper()
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/account/deletion", nil)
 	if token != nil {

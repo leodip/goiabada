@@ -219,9 +219,9 @@ func TestClientAuthentication_ClientsNotHeldToOneMethodAcceptBoth(t *testing.T) 
 		require.Equal(t, http.StatusCreated, resp.StatusCode)
 		var created api.CreateClientResponse
 		require.NoError(t, json.NewDecoder(resp.Body).Decode(&created))
-		t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, created.Client.Id) })
+		t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, created.Client.ID) })
 
-		assertBothMethodsAuthenticate(t, created.Client.ClientIdentifier, clientSecretThroughTheAdminAPI(t, accessToken, created.Client.Id))
+		assertBothMethodsAuthenticate(t, created.Client.ClientIdentifier, clientSecretThroughTheAdminAPI(t, accessToken, created.Client.ID))
 	})
 
 	t.Run("the admin console's client", func(t *testing.T) {

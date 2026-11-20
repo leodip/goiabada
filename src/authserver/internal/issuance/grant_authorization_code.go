@@ -124,7 +124,7 @@ func (t *TokenIssuer) mintAuthorizationCodeTokens(ctx context.Context, settings 
 		if idTokenErr != nil {
 			return nil, idTokenErr
 		}
-		tokenResponse.IdToken = idTokenStr
+		tokenResponse.IDToken = idTokenStr
 	}
 
 	// refresh_token ----------------------------------------------------------------------

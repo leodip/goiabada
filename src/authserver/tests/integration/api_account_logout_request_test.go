@@ -53,7 +53,7 @@ func TestAPIAccountLogoutRequest_Success_And_LogoutFlow_WithAndWithoutCookie(t *
 
 	// Request logout URL
 	reqBody := api.AccountLogoutRequest{
-		PostLogoutRedirectUri: signOutURI,
+		PostLogoutRedirectURI: signOutURI,
 		State:                 fake.LetterN(12),
 		ResponseMode:          "redirect",
 	}
@@ -65,10 +65,10 @@ func TestAPIAccountLogoutRequest_Success_And_LogoutFlow_WithAndWithoutCookie(t *
 	var out api.AccountLogoutRedirectResponse
 	err := json.NewDecoder(resp.Body).Decode(&out)
 	require.NoError(t, err)
-	assert.NotEmpty(t, out.LogoutUrl)
+	assert.NotEmpty(t, out.LogoutURL)
 
 	// Parse returned logout URL and verify parameters
-	u, err := url.Parse(out.LogoutUrl)
+	u, err := url.Parse(out.LogoutURL)
 	require.NoError(t, err)
 	assert.Equal(t, "/auth/logout", u.Path)
 	q := u.Query()
@@ -78,7 +78,7 @@ func TestAPIAccountLogoutRequest_Success_And_LogoutFlow_WithAndWithoutCookie(t *
 
 	// 1) Call /auth/logout with cookies: expect 302 to post_logout_redirect, carrying state and
 	// nothing else this specification does not define
-	req1, _ := http.NewRequest("GET", out.LogoutUrl, nil)
+	req1, _ := http.NewRequest("GET", out.LogoutURL, nil)
 	resp1, err := httpClientWithCookies.Do(req1)
 	require.NoError(t, err)
 	defer func() { _ = resp1.Body.Close() }()
@@ -96,7 +96,7 @@ func TestAPIAccountLogoutRequest_Success_And_LogoutFlow_WithAndWithoutCookie(t *
 	// 2) Call /auth/logout without cookies (new client): the hint's own sid names the session, which
 	// is what makes RP-initiated logout work from a relying party that cannot reach the browser session
 	httpClientNoCookies := createHttpClient(t)
-	req2, _ := http.NewRequest("GET", out.LogoutUrl, nil)
+	req2, _ := http.NewRequest("GET", out.LogoutURL, nil)
 	resp2, err := httpClientNoCookies.Do(req2)
 	require.NoError(t, err)
 	defer func() { _ = resp2.Body.Close() }()
@@ -488,7 +488,7 @@ func TestAPIAccountLogoutRequest_ValidationErrors_And_Scope(t *testing.T) {
 	assert.Equal(t, "postLogoutRedirectUri is required", err1.ErrorDescription)
 
 	// Unresolvable postLogoutRedirectUri (no client matches)
-	badReq := api.AccountLogoutRequest{PostLogoutRedirectUri: "https://invalid.example/"}
+	badReq := api.AccountLogoutRequest{PostLogoutRedirectURI: "https://invalid.example/"}
 	resp2 := makeAPIRequest(t, "POST", urlLogoutReq, accessToken, badReq)
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
@@ -507,7 +507,7 @@ func TestAPIAccountLogoutRequest_ValidationErrors_And_Scope(t *testing.T) {
 
 	// Insufficient scope
 	tok := createClientCredentialsTokenWithoutRouteScope(t)
-	resp4 := makeAPIRequest(t, "POST", urlLogoutReq, tok, api.AccountLogoutRequest{PostLogoutRedirectUri: "https://example.com/"})
+	resp4 := makeAPIRequest(t, "POST", urlLogoutReq, tok, api.AccountLogoutRequest{PostLogoutRedirectURI: "https://example.com/"})
 	defer func() { _ = resp4.Body.Close() }()
 	assert.Equal(t, http.StatusForbidden, resp4.StatusCode)
 }
@@ -1700,7 +1700,7 @@ func TestAPIAccountLogoutRequest_FormPostMode_AnswersAFormInstruction(t *testing
 	state := fake.LetterN(12)
 	urlLogoutReq := appConfig.AuthServer.BaseURL + "/api/v1/account/logout-request"
 	resp := makeAPIRequest(t, "POST", urlLogoutReq, accessToken, api.AccountLogoutRequest{
-		PostLogoutRedirectUri: signOutURI,
+		PostLogoutRedirectURI: signOutURI,
 		State:                 state,
 		ResponseMode:          api.AccountLogoutResponseModeFormPost,
 	})
@@ -1743,7 +1743,7 @@ func TestAPIAccountLogoutRequest_BothModesCarryTheSameParameters(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			formReq := api.AccountLogoutRequest{
-				PostLogoutRedirectUri: signOutURI,
+				PostLogoutRedirectURI: signOutURI,
 				State:                 state,
 				ResponseMode:          api.AccountLogoutResponseModeFormPost,
 			}
@@ -1761,7 +1761,7 @@ func TestAPIAccountLogoutRequest_BothModesCarryTheSameParameters(t *testing.T) {
 			var redirect api.AccountLogoutRedirectResponse
 			require.NoError(t, json.NewDecoder(redirectResp.Body).Decode(&redirect))
 
-			u, err := url.Parse(redirect.LogoutUrl)
+			u, err := url.Parse(redirect.LogoutURL)
 			require.NoError(t, err)
 			assert.Equal(t, appConfig.AuthServer.BaseURL+u.Path, form.Endpoint,
 				"both modes send the browser to the same endpoint")
@@ -1804,7 +1804,7 @@ func TestAPIAccountLogoutRequest_AbsentAndUnknownResponseModeStillRedirect(t *te
 	for _, mode := range []string{"", "redirect", "form-post", "FORM_POST", "fragment"} {
 		t.Run("responseMode "+strconv.Quote(mode), func(t *testing.T) {
 			resp := makeAPIRequest(t, "POST", urlLogoutReq, accessToken, api.AccountLogoutRequest{
-				PostLogoutRedirectUri: signOutURI,
+				PostLogoutRedirectURI: signOutURI,
 				ResponseMode:          mode,
 			})
 			defer func() { _ = resp.Body.Close() }()
@@ -1876,7 +1876,7 @@ func TestAPIAccountLogoutRequest_MatchesOnlyTheSignOutList(t *testing.T) {
 	refused := func(t *testing.T, uri, clientIdentifier, description string) {
 		t.Helper()
 		resp := makeAPIRequest(t, "POST", urlLogoutReq, accessToken, api.AccountLogoutRequest{
-			PostLogoutRedirectUri: uri,
+			PostLogoutRedirectURI: uri,
 			ClientIdentifier:      clientIdentifier,
 		})
 		defer func() { _ = resp.Body.Close() }()
@@ -1909,14 +1909,14 @@ func TestAPIAccountLogoutRequest_MatchesOnlyTheSignOutList(t *testing.T) {
 	})
 	t.Run("a URI two clients hold, with the caller's clientIdentifier", func(t *testing.T) {
 		resp := makeAPIRequest(t, "POST", urlLogoutReq, accessToken, api.AccountLogoutRequest{
-			PostLogoutRedirectUri: signOutURI,
+			PostLogoutRedirectURI: signOutURI,
 			ClientIdentifier:      code.Client.ClientIdentifier,
 		})
 		defer func() { _ = resp.Body.Close() }()
 		require.Equal(t, http.StatusOK, resp.StatusCode)
 		var out api.AccountLogoutRedirectResponse
 		require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
-		logoutUrl, err := url.Parse(out.LogoutUrl)
+		logoutUrl, err := url.Parse(out.LogoutURL)
 		require.NoError(t, err)
 		assert.Equal(t, signOutURI, logoutUrl.Query().Get("post_logout_redirect_uri"))
 		assert.Equal(t, code.Client.ClientIdentifier, decodeJWTPayload(t, logoutUrl.Query().Get("id_token_hint"))["aud"],

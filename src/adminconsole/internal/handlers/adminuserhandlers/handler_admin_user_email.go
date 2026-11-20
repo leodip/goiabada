@@ -164,7 +164,7 @@ func HandleEmailPost(
 			return
 		}
 
-		pagePath := fmt.Sprintf("/admin/users/%v/email", updatedUser.Id)
+		pagePath := fmt.Sprintf("/admin/users/%v/email", updatedUser.ID)
 		sess.SetFlash(pagePath, "savedSuccessfully", "true")
 		err = httpSession.Save(r, w, sess)
 		if err != nil {

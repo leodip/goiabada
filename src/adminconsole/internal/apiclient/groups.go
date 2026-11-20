@@ -104,7 +104,7 @@ func (c *AuthServerClient) AddUserToGroup(ctx context.Context, accessToken strin
 	_, err := c.do(ctx, accessToken, apiRequest{
 		method:        "POST",
 		url:           fmt.Sprintf("%s/api/v1/admin/groups/%d/members", c.baseURL, groupId),
-		jsonBody:      api.AddGroupMemberRequest{UserId: userId},
+		jsonBody:      api.AddGroupMemberRequest{UserID: userId},
 		contentType:   contentTypeJSON,
 		successStatus: http.StatusCreated,
 	})

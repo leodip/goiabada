@@ -3,7 +3,7 @@
 {{define "head"}}{{end}}
 
 {{define "page"}}
-{{ template "user_header" (args "attributes" .user.Id .user.Email .page .query $.ctx) }}
+{{ template "user_header" (args "attributes" .user.ID .user.Email .page .query $.ctx) }}
 
 {{/* errorField names the field a refusal is about, which is marked invalid, described by the
      notice and focused; a refusal naming no field leaves the focus on the key. */}}
@@ -53,7 +53,7 @@
     </fieldset>
   </div>
   <div class="panel-footer">
-    <a class="button button-quiet" href="/admin/users/{{ .user.Id }}/attributes?page={{ .page }}{{ if .query }}&query={{ .query }}{{ end }}">{{ T $.ctx "common.button.cancel" }}</a>
+    <a class="button button-quiet" href="/admin/users/{{ .user.ID }}/attributes?page={{ .page }}{{ if .query }}&query={{ .query }}{{ end }}">{{ T $.ctx "common.button.cancel" }}</a>
     <button id="btnSave" class="button button-primary" type="submit">{{ T $.ctx "adminconsole.admin_users.attributes_form.add_button" }}</button>
   </div>
 </form>

@@ -44,7 +44,7 @@ var callingCodeAttrRe = regexp.MustCompile(`\sdata-calling-code="([^"]*)"`)
 
 func profileBind() map[string]interface{} {
 	return map[string]interface{}{
-		"user":              &api.UserResponse{Id: 7},
+		"user":              &api.UserResponse{ID: 7},
 		"timezones":         timezones.All(),
 		"locales":           locales.All(),
 		"page":              "1",
@@ -55,7 +55,7 @@ func profileBind() map[string]interface{} {
 
 func addressBind() map[string]interface{} {
 	return map[string]interface{}{
-		"user":              &api.UserResponse{Id: 7},
+		"user":              &api.UserResponse{ID: 7},
 		"address":           map[string]interface{}{"AddressCountry": "BR"},
 		"countries":         countries.All(),
 		"page":              "1",
@@ -66,7 +66,7 @@ func addressBind() map[string]interface{} {
 
 func phoneBind() map[string]interface{} {
 	return map[string]interface{}{
-		"user":                         &api.UserResponse{Id: 7},
+		"user":                         &api.UserResponse{ID: 7},
 		"selectedPhoneCountryUniqueId": "PRT_0",
 		"phoneNumber":                  "912 345 678",
 		"phoneCountries":               phonecountries.All(),

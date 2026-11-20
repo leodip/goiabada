@@ -816,7 +816,7 @@ func TestHandleUserCreatePost_ASetupEmailThatFailsToSendAnswersTheUser(t *testin
 	assert.Equal(t, json.RawMessage("false"), members["setupEmailSent"])
 	var answered api.UserResponse
 	require.NoError(t, json.Unmarshal(members["user"], &answered))
-	assert.Equal(t, int64(7), answered.Id)
+	assert.Equal(t, int64(7), answered.ID)
 	assert.Equal(t, "newuser@example.com", answered.Email)
 
 	// The code the insert stored is a usable one: its hash finds the row the link points at, and

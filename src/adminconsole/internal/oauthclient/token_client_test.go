@@ -312,7 +312,7 @@ func TestTokenClient_DecodesEveryTokenResponseField(t *testing.T) {
 			// Field by field rather than against a struct literal: a field added to
 			// oauth.TokenResponse later leaves a gap here that reads as a gap.
 			assert.Equal(t, "the-access-token", tokenResponse.AccessToken)
-			assert.Equal(t, "the-id-token", tokenResponse.IdToken)
+			assert.Equal(t, "the-id-token", tokenResponse.IDToken)
 			assert.Equal(t, "Bearer", tokenResponse.TokenType)
 			assert.Equal(t, int64(300), tokenResponse.ExpiresIn)
 			assert.Equal(t, "the-refresh-token", tokenResponse.RefreshToken)

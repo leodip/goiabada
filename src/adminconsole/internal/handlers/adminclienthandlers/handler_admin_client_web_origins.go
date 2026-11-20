@@ -111,7 +111,7 @@ func HandleWebOriginsGet(
 			IsSystemLevelClient bool
 			IsPublic            bool
 		}{
-			ClientId:            clientResp.Id,
+			ClientId:            clientResp.ID,
 			ClientIdentifier:    clientResp.ClientIdentifier,
 			EffectiveWebOrigins: effectiveWebOrigins,
 			IsSystemLevelClient: clientResp.IsSystemLevelClient,

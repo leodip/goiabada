@@ -3,7 +3,7 @@
 {{define "head"}}{{end}}
 
 {{define "page"}}
-{{ template "user_header" (args "authentication" .user.Id .user.Email .page .query $.ctx) }}
+{{ template "user_header" (args "authentication" .user.ID .user.Email .page .query $.ctx) }}
 
 {{/* Every refusal this form shows is the new password's, which is marked invalid, described by the
      notice and focused. The hidden username names the user being edited, so a password manager

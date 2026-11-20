@@ -79,7 +79,7 @@ func TestAPIClientGet_Success(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEmpty(t, getResponse.Clients, "Should have at least one client")
 
-	clientId := getResponse.Clients[0].Id
+	clientId := getResponse.Clients[0].ID
 
 	// Test: Get specific client
 	url = appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10)
@@ -96,7 +96,7 @@ func TestAPIClientGet_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	// Assert: Should return the correct client
-	assert.Equal(t, clientId, getClientResponse.Client.Id)
+	assert.Equal(t, clientId, getClientResponse.Client.ID)
 	assert.NotEmpty(t, getClientResponse.Client.ClientIdentifier)
 
 	// Note: Client secret will be included in detail API for confidential clients

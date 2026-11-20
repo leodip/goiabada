@@ -5,12 +5,12 @@ import (
 )
 
 type GroupResponse struct {
-	Id                   int64      `json:"id"`
+	ID                   int64      `json:"id"`
 	CreatedAt            *time.Time `json:"createdAt"`
 	UpdatedAt            *time.Time `json:"updatedAt"`
 	GroupIdentifier      string     `json:"groupIdentifier"`
 	Description          string     `json:"description"`
-	IncludeInIdToken     bool       `json:"includeInIdToken"`
+	IncludeInIDToken     bool       `json:"includeInIdToken"`
 	IncludeInAccessToken bool       `json:"includeInAccessToken"`
 	MemberCount          int        `json:"memberCount"`
 }
@@ -22,7 +22,7 @@ type GetGroupsResponse struct {
 type CreateGroupRequest struct {
 	GroupIdentifier      string `json:"groupIdentifier"`
 	Description          string `json:"description"`
-	IncludeInIdToken     bool   `json:"includeInIdToken"`
+	IncludeInIDToken     bool   `json:"includeInIdToken"`
 	IncludeInAccessToken bool   `json:"includeInAccessToken"`
 }
 
@@ -37,7 +37,7 @@ type GetGroupResponse struct {
 type UpdateGroupRequest struct {
 	GroupIdentifier      string `json:"groupIdentifier"`
 	Description          string `json:"description"`
-	IncludeInIdToken     bool   `json:"includeInIdToken"`
+	IncludeInIDToken     bool   `json:"includeInIdToken"`
 	IncludeInAccessToken bool   `json:"includeInAccessToken"`
 }
 
@@ -46,7 +46,7 @@ type UpdateGroupResponse struct {
 }
 
 type AddGroupMemberRequest struct {
-	UserId int64 `json:"userId"`
+	UserID int64 `json:"userId"`
 }
 
 type GetGroupMembersResponse struct {
@@ -57,14 +57,14 @@ type GetGroupMembersResponse struct {
 }
 
 type GroupAttributeResponse struct {
-	Id                   int64      `json:"id"`
+	ID                   int64      `json:"id"`
 	CreatedAt            *time.Time `json:"createdAt"`
 	UpdatedAt            *time.Time `json:"updatedAt"`
 	Key                  string     `json:"key"`
 	Value                string     `json:"value"`
-	IncludeInIdToken     bool       `json:"includeInIdToken"`
+	IncludeInIDToken     bool       `json:"includeInIdToken"`
 	IncludeInAccessToken bool       `json:"includeInAccessToken"`
-	GroupId              int64      `json:"groupId"`
+	GroupID              int64      `json:"groupId"`
 }
 
 type GetGroupAttributesResponse struct {
@@ -78,9 +78,9 @@ type GetGroupAttributeResponse struct {
 type CreateGroupAttributeRequest struct {
 	Key                  string `json:"key"`
 	Value                string `json:"value"`
-	IncludeInIdToken     bool   `json:"includeInIdToken"`
+	IncludeInIDToken     bool   `json:"includeInIdToken"`
 	IncludeInAccessToken bool   `json:"includeInAccessToken"`
-	GroupId              int64  `json:"groupId"`
+	GroupID              int64  `json:"groupId"`
 }
 
 type CreateGroupAttributeResponse struct {
@@ -90,7 +90,7 @@ type CreateGroupAttributeResponse struct {
 type UpdateGroupAttributeRequest struct {
 	Key                  string `json:"key"`
 	Value                string `json:"value"`
-	IncludeInIdToken     bool   `json:"includeInIdToken"`
+	IncludeInIDToken     bool   `json:"includeInIdToken"`
 	IncludeInAccessToken bool   `json:"includeInAccessToken"`
 }
 
@@ -99,10 +99,10 @@ type UpdateGroupAttributeResponse struct {
 }
 
 // UpdateGroupPermissionsRequest replaces the whole set of permissions granted to a group.
-// ExpectedPermissionIds is as on UpdateUserPermissionsRequest (#428).
+// ExpectedPermissionIDs is as on UpdateUserPermissionsRequest (#428).
 type UpdateGroupPermissionsRequest struct {
-	PermissionIds         []int64 `json:"permissionIds"`
-	ExpectedPermissionIds []int64 `json:"expectedPermissionIds"`
+	PermissionIDs         []int64 `json:"permissionIds"`
+	ExpectedPermissionIDs []int64 `json:"expectedPermissionIds"`
 }
 
 type GetGroupPermissionsResponse struct {

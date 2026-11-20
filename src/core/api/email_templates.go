@@ -30,7 +30,7 @@ type EmailTemplateLanguageStatusResponse struct {
 // EmailTemplateSummaryResponse is one email as the list gives it: its identifier and the status of
 // each of the six languages, in the order of the built-in languages, English first.
 type EmailTemplateSummaryResponse struct {
-	Id        string                                `json:"id"`
+	ID        string                                `json:"id"`
 	Languages []EmailTemplateLanguageStatusResponse `json:"languages"`
 }
 
@@ -82,7 +82,7 @@ type EmailTemplateLanguageResponse struct {
 // EmailTemplateResponse is one email: the placeholders it offers, whether it has a button, and
 // each of the six languages, English first.
 type EmailTemplateResponse struct {
-	Id           string                             `json:"id"`
+	ID           string                             `json:"id"`
 	HasButton    bool                               `json:"hasButton"`
 	Placeholders []EmailTemplatePlaceholderResponse `json:"placeholders"`
 	Languages    []EmailTemplateLanguageResponse    `json:"languages"`
@@ -103,28 +103,28 @@ type SaveEmailTemplateRequest struct {
 
 // PreviewEmailTemplateRequest is a text of one language to preview, saved or not: its subject, its
 // button label for an email with a button, and its body, with the brand to draw it in, the default
-// brand when BrandId is left out.
+// brand when BrandID is left out.
 type PreviewEmailTemplateRequest struct {
 	Subject     string `json:"subject"`
 	ButtonLabel string `json:"buttonLabel"`
 	Body        string `json:"body"`
-	BrandId     *int64 `json:"brandId,omitempty"`
+	BrandID     *int64 `json:"brandId,omitempty"`
 }
 
 // PreviewEmailTemplateResponse is the email a preview draws, with the sample values: its subject,
 // the HTML document it is sent as, and its plain-text part.
 type PreviewEmailTemplateResponse struct {
 	Subject string `json:"subject"`
-	Html    string `json:"html"`
+	HTML    string `json:"html"`
 	Text    string `json:"text"`
 }
 
 // SendTestEmailTemplateRequest is a text of one language to send to To as a recipient would get
-// it, with the preview's sample values, in the brand BrandId names or the default brand.
+// it, with the preview's sample values, in the brand BrandID names or the default brand.
 type SendTestEmailTemplateRequest struct {
 	To          string `json:"to"`
 	Subject     string `json:"subject"`
 	ButtonLabel string `json:"buttonLabel"`
 	Body        string `json:"body"`
-	BrandId     *int64 `json:"brandId,omitempty"`
+	BrandID     *int64 `json:"brandId,omitempty"`
 }

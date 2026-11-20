@@ -137,14 +137,14 @@ func waitForQueued(t *testing.T, queued <-chan string) {
 func winnerSet() oauth.TokenResponse {
 	return oauth.TokenResponse{
 		AccessToken:  "the-winners-access-token",
-		IdToken:      refreshedIDTokenRaw,
+		IDToken:      refreshedIDTokenRaw,
 		RefreshToken: "the-winners-refresh-token",
 		ExpiresIn:    600,
 		Scope:        storedGrant,
 	}
 }
 
-var verifiedRefreshed = &oauth.JwtToken{TokenBase64: refreshedIDTokenRaw, Claims: map[string]any{"sub": "the-admin"}}
+var verifiedRefreshed = &oauth.JWTToken{TokenBase64: refreshedIDTokenRaw, Claims: map[string]any{"sub": "the-admin"}}
 
 func invalidGrant() error {
 	return errs.WithStack(&oauthclient.TokenEndpointError{StatusCode: http.StatusBadRequest, ErrorCode: "invalid_grant"})
@@ -256,7 +256,7 @@ func TestSessionHandler_ConcurrentRequestsShareOneRefreshGrant(t *testing.T) {
 		oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
 
 	response := storedResponse()
-	response.IdToken = stored
+	response.IDToken = stored
 	cookies := h.seed(map[string]any{
 		sessionkeys.JWT:          sessionkeys.StoreTokenResponse(response),
 		sessionkeys.JWTExpiresAt: due(),
@@ -266,7 +266,7 @@ func TestSessionHandler_ConcurrentRequestsShareOneRefreshGrant(t *testing.T) {
 	// The answer the winner stores: its ID token signed by the same key, an expiry an hour out.
 	winner := oauth.TokenResponse{
 		AccessToken:  "the-new-access-token",
-		IdToken:      refreshed,
+		IDToken:      refreshed,
 		RefreshToken: "the-new-refresh-token",
 		ExpiresIn:    600,
 		Scope:        storedGrant,
@@ -659,7 +659,7 @@ func TestSessionHandler_AShortLivedAnswerIsCarriedNotRotatedAgain(t *testing.T) 
 	h.refresher.inOrder = []scriptedGrant{{answer: &answer}, {answer: &again}}
 	h.refresher.err = invalidGrant()
 	h.parser.On("DecodeAndValidateRefreshResponse", mock.Anything, mock.Anything, mock.Anything).
-		Return(func(_ context.Context, tr *oauth.TokenResponse, _ *oauth.JwtToken) (*oauthclient.JwtInfo, error) {
+		Return(func(_ context.Context, tr *oauth.TokenResponse, _ *oauth.JWTToken) (*oauthclient.JwtInfo, error) {
 			return &oauthclient.JwtInfo{TokenResponse: *tr, IdToken: verifiedRefreshed}, nil
 		})
 
@@ -717,10 +717,10 @@ func TestSessionHandler_TheReReadKeepsTheRequestAndOutlivesTheBrowser(t *testing
 	// The browser leaves once the request has loaded its session and step 3 has begun.
 	h.parser.On("DecodeAndValidateStoredIDToken", mock.Anything, storedIDTokenRaw).
 		Run(func(mock.Arguments) { cancel() }).Return(verifiedStored, nil)
-	h.refresher.answer = &oauth.TokenResponse{AccessToken: "the-new-access-token", IdToken: refreshedIDTokenRaw,
+	h.refresher.answer = &oauth.TokenResponse{AccessToken: "the-new-access-token", IDToken: refreshedIDTokenRaw,
 		RefreshToken: "the-new-refresh-token", ExpiresIn: 600}
 	h.parser.On("DecodeAndValidateRefreshResponse", mock.Anything, mock.Anything, verifiedStored).
-		Return(func(_ context.Context, tr *oauth.TokenResponse, _ *oauth.JwtToken) (*oauthclient.JwtInfo, error) {
+		Return(func(_ context.Context, tr *oauth.TokenResponse, _ *oauth.JWTToken) (*oauthclient.JwtInfo, error) {
 			return &oauthclient.JwtInfo{TokenResponse: *tr, IdToken: verifiedRefreshed}, nil
 		})
 	loadsBefore := len(h.backend.recordedLoads())

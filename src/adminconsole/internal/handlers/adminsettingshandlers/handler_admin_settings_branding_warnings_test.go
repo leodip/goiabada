@@ -109,7 +109,7 @@ func TestNewBrandContrastWarnings_NoneWithoutAStoredPalette(t *testing.T) {
 	builtIn.ContrastWarnings = []api.BrandContrastWarning{}
 	assert.Nil(t, NewBrandContrastWarnings(ctx, builtIn))
 
-	unreadable := api.BrandResponse{Id: 8, Theme: "custom", ContrastWarnings: []api.BrandContrastWarning{}}
+	unreadable := api.BrandResponse{ID: 8, Theme: "custom", ContrastWarnings: []api.BrandContrastWarning{}}
 	assert.Nil(t, NewBrandContrastWarnings(ctx, unreadable))
 
 	assert.Nil(t, getBrand(t, newBrandingAPI(), "4")["paletteWarnings"])
@@ -134,7 +134,7 @@ func TestHandleBrandPost_TheSavedPageListsTheBrandsFailingPairs(t *testing.T) {
 	store := newSettingsTestStore()
 	apiClient := newBrandingAPI()
 	failing := failingBrand()
-	failing.Id = 4
+	failing.ID = 4
 	apiClient.brands[0] = failing
 	httpHelper := handlersmocks.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)

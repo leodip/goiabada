@@ -40,10 +40,10 @@ func TestAPIGroupGet_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	// Assert: Group data should match
-	assert.Equal(t, testGroup.Id, getResponse.Group.Id)
+	assert.Equal(t, testGroup.Id, getResponse.Group.ID)
 	assert.Equal(t, testGroup.GroupIdentifier, getResponse.Group.GroupIdentifier)
 	assert.Equal(t, testGroup.Description, getResponse.Group.Description)
-	assert.Equal(t, testGroup.IncludeInIdToken, getResponse.Group.IncludeInIdToken)
+	assert.Equal(t, testGroup.IncludeInIdToken, getResponse.Group.IncludeInIDToken)
 	assert.Equal(t, testGroup.IncludeInAccessToken, getResponse.Group.IncludeInAccessToken)
 	assert.NotNil(t, getResponse.Group.CreatedAt)
 	assert.NotNil(t, getResponse.Group.UpdatedAt)

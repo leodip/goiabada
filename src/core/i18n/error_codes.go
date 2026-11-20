@@ -58,7 +58,7 @@ const (
 	ErrCodeAttributeValueAngleBrackets       = "validator.attribute.value_angle_brackets"
 	ErrCodeSettingsAppNameAngleBrackets      = "validator.settings.app_name_angle_brackets"
 	ErrCodeSettingsIssuerAngleBrackets       = "validator.settings.issuer_angle_brackets"
-	ErrCodeSettingsSmtpFromNameAngleBrackets = "validator.settings.smtp_from_name_angle_brackets"
+	ErrCodeSettingsSMTPFromNameAngleBrackets = "validator.settings.smtp_from_name_angle_brackets"
 
 	// Identifier validator — used for client / resource / permission /
 	// group identifiers and attribute keys.
@@ -98,13 +98,13 @@ const (
 	ErrCodeHandlerPasswordConfirmationMismatch = "handler.password.confirmation_mismatch"
 
 	// OTP handler — second-factor verification step.
-	ErrCodeOtpAccountDisabled = "handler.otp.account_disabled"
-	ErrCodeOtpCodeRequired    = "handler.otp.code_required"
-	ErrCodeOtpIncorrectCode   = "handler.otp.incorrect_code"
+	ErrCodeOTPAccountDisabled = "handler.otp.account_disabled"
+	ErrCodeOTPCodeRequired    = "handler.otp.code_required"
+	ErrCodeOTPIncorrectCode   = "handler.otp.incorrect_code"
 
 	// Admin resource permissions handler — in-page validation for the
 	// permission-creation form (browser-flow JSON, surface A).
-	ErrCodeAdminResourcePermissionsDescriptionHtmlNotAllowed = "handler.admin_resource_permissions.description_html_not_allowed"
+	ErrCodeAdminResourcePermissionsDescriptionHTMLNotAllowed = "handler.admin_resource_permissions.description_html_not_allowed"
 	ErrCodeAdminResourcePermissionsIdentifierRequired        = "handler.admin_resource_permissions.permission_identifier_required"
 	ErrCodeAdminResourcePermissionsDescriptionTooLong        = "handler.admin_resource_permissions.description_too_long" // Args: {"max": int}
 
@@ -231,7 +231,7 @@ const (
 
 	// A resource's permissions. The description bound is the console's own
 	// handler.admin_resource_permissions.description_too_long, which says the same sentence.
-	ErrCodePermissionDuplicateIds       = "handler.permission.duplicate_ids"
+	ErrCodePermissionDuplicateIDs       = "handler.permission.duplicate_ids"
 	ErrCodePermissionIdentifierRequired = "handler.permission.identifier_required"
 	ErrCodePermissionDuplicated         = "handler.permission.duplicated"        // Args: {"identifier": string}
 	ErrCodePermissionBuiltInDeleted     = "handler.permission.built_in_deleted"  // Args: {"identifier": string}
@@ -246,7 +246,7 @@ const (
 	ErrCodeGroupIdentifierInUse          = "handler.group.identifier_in_use"
 	ErrCodeGroupMemberAlreadyMember      = "handler.group_member.already_member"
 	ErrCodeGroupMemberNotMember          = "handler.group_member.not_member"
-	ErrCodeGroupAttributeGroupIdRequired = "handler.group_attribute.group_id_required"
+	ErrCodeGroupAttributeGroupIDRequired = "handler.group_attribute.group_id_required"
 	ErrCodeAttributeValueTooLong         = "handler.attribute.value_too_long" // Args: {"max": int}
 
 	// Users, a user's groups, and the email verification code an administrator generates. The
@@ -268,8 +268,8 @@ const (
 	ErrCodeClientSystemLevelDeleteNotAllowed    = "handler.client.system_level_delete_not_allowed"
 	ErrCodeClientSystemLevelIdentifierFixed     = "handler.client.system_level_identifier_fixed"
 	ErrCodeClientSelfRegisteredIdentifierFixed  = "handler.client.self_registered_identifier_fixed"
-	ErrCodeClientDefaultAcrNotApplicable        = "handler.client.default_acr_not_applicable"
-	ErrCodeClientDefaultAcrInvalid              = "handler.client.default_acr_invalid"
+	ErrCodeClientDefaultACRNotApplicable        = "handler.client.default_acr_not_applicable"
+	ErrCodeClientDefaultACRInvalid              = "handler.client.default_acr_invalid"
 	ErrCodeClientWebsiteURLTooLong              = "handler.client.website_url_too_long" // Args: {"max": int}
 	ErrCodeClientWebsiteURLInvalid              = "handler.client.website_url_invalid"
 	ErrCodeClientWebsiteURLSchemeInvalid        = "handler.client.website_url_scheme_invalid"
@@ -323,7 +323,7 @@ const (
 	ErrCodeClientDPoPAdminConsoleNotAllowed    = "handler.client_dpop.admin_console_not_allowed"
 
 	// A client's brand, PUT /clients/{id}/brand (#812 decision 2).
-	ErrCodeClientBrandIdRequired = "handler.client_brand.brand_id_required"
+	ErrCodeClientBrandIDRequired = "handler.client_brand.brand_id_required"
 	ErrCodeClientBrandNotFound   = "handler.client_brand.brand_not_found"
 
 	ErrCodeClientWebOriginEmpty            = "handler.client_web_origins.empty"
@@ -337,7 +337,7 @@ const (
 	ErrCodeClientTokensOfflineMaxLifetimeOutOfRange       = "handler.client_tokens.offline_max_lifetime_out_of_range" // Args: {"max": int}
 	ErrCodeClientTokensOfflineIdleTimeoutAboveMaxLifetime = "handler.client_tokens.offline_idle_timeout_above_max_lifetime"
 	ErrCodeClientTokensIncludeClaimsInAccessTokenInvalid  = "handler.client_tokens.include_claims_in_access_token_invalid"
-	ErrCodeClientTokensIncludeClaimsInIdTokenInvalid      = "handler.client_tokens.include_claims_in_id_token_invalid"
+	ErrCodeClientTokensIncludeClaimsInIDTokenInvalid      = "handler.client_tokens.include_claims_in_id_token_invalid"
 
 	// Settings: general, sessions, tokens, email, signing keys and audit logs. A settings
 	// refusal sentence that a client's tokens or the account already say reuses that key: the offline

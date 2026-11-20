@@ -66,14 +66,14 @@ func lifecycleAction(
 			return
 		}
 
-		if _, err := act(r.Context(), token, detail.LegalDocument.Id); err != nil {
+		if _, err := act(r.Context(), token, detail.LegalDocument.ID); err != nil {
 			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
 				renderVersions(httpHelper, w, r, detail, map[string]interface{}{"error": message})
 			})
 			return
 		}
 
-		pagePath := fmt.Sprintf("/admin/legal-documents/%v/versions", detail.LegalDocument.Id)
+		pagePath := fmt.Sprintf("/admin/legal-documents/%v/versions", detail.LegalDocument.ID)
 		if !setFlash(httpHelper, httpSession, w, r, pagePath, flash, "true") {
 			return
 		}

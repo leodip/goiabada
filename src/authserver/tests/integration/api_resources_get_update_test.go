@@ -33,7 +33,7 @@ func TestAPIResourceGet_Success(t *testing.T) {
 	err := json.NewDecoder(resp.Body).Decode(&getResp)
 	require.NoError(t, err)
 
-	assert.Equal(t, res.Id, getResp.Resource.Id)
+	assert.Equal(t, res.Id, getResp.Resource.ID)
 	assert.Equal(t, res.ResourceIdentifier, getResp.Resource.ResourceIdentifier)
 	assert.Equal(t, res.Description, getResp.Resource.Description)
 }
@@ -111,7 +111,7 @@ func TestAPIResourceUpdatePut_Success(t *testing.T) {
 	err := json.NewDecoder(resp.Body).Decode(&updResp)
 	require.NoError(t, err)
 
-	assert.Equal(t, res.Id, updResp.Resource.Id)
+	assert.Equal(t, res.Id, updResp.Resource.ID)
 	assert.Equal(t, updateReq.ResourceIdentifier, updResp.Resource.ResourceIdentifier)
 	assert.Equal(t, "Updated desc", updResp.Resource.Description)
 

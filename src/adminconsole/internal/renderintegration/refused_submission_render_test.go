@@ -157,7 +157,7 @@ func TestRender_ProfilePages_ARefusedDateOfBirthIsDrawnAsTyped(t *testing.T) {
 	const refusal = "A data de nascimento é inválida."
 	born := time.Date(1980, 1, 2, 0, 0, 0, 0, time.UTC)
 	apiClient := &profilePageAPI{
-		stored:  &api.UserResponse{Id: 9, Email: "ana@example.com", GivenName: "Ana", BirthDate: &born},
+		stored:  &api.UserResponse{ID: 9, Email: "ana@example.com", GivenName: "Ana", BirthDate: &born},
 		refusal: refusal,
 	}
 
@@ -193,7 +193,7 @@ func TestRender_ProfilePages_ARefusedDateOfBirthIsDrawnAsTyped(t *testing.T) {
 // The text is drawn escaped, as every other input's value is.
 func TestRender_ProfilePages_ARefusedDateOfBirthIsDrawnEscaped(t *testing.T) {
 	apiClient := &profilePageAPI{
-		stored:  &api.UserResponse{Id: 9, Email: "ana@example.com"},
+		stored:  &api.UserResponse{ID: 9, Email: "ana@example.com"},
 		refusal: "A data de nascimento é inválida.",
 	}
 

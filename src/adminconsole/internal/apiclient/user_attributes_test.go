@@ -22,12 +22,12 @@ func TestAuthServerClient_GetUserAttributesByUserIdDecodesTheAttributeShape(t *t
 	assert.Equal(t, "/api/v1/admin/users/42/attributes", gotPath)
 
 	require.Len(t, attributes, 1)
-	assert.Equal(t, int64(7), attributes[0].Id)
+	assert.Equal(t, int64(7), attributes[0].ID)
 	assert.Equal(t, "department", attributes[0].Key)
 	assert.Equal(t, "engineering", attributes[0].Value)
-	assert.True(t, attributes[0].IncludeInIdToken)
+	assert.True(t, attributes[0].IncludeInIDToken)
 	assert.False(t, attributes[0].IncludeInAccessToken)
-	assert.Equal(t, int64(42), attributes[0].UserId)
+	assert.Equal(t, int64(42), attributes[0].UserID)
 	require.NotNil(t, attributes[0].CreatedAt)
 	assert.Equal(t, time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC), attributes[0].CreatedAt.UTC())
 }

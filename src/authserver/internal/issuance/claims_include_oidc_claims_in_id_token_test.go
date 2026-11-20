@@ -497,10 +497,10 @@ func TestMintAuthorizationCodeTokens_IncludeOpenIDConnectClaimsInIdToken_FullFlo
 	assert.NotNil(t, response)
 	assert.Equal(t, "Bearer", response.TokenType)
 	assert.NotEmpty(t, response.AccessToken)
-	assert.NotEmpty(t, response.IdToken)
+	assert.NotEmpty(t, response.IDToken)
 
 	// Verify ID token does NOT have OIDC claims
-	idClaims := verifyAndDecodeToken(t, response.IdToken, publicKeyBytes)
+	idClaims := verifyAndDecodeToken(t, response.IDToken, publicKeyBytes)
 	assert.Equal(t, settings.Issuer, idClaims["iss"])
 	assert.Equal(t, user.Subject, idClaims["sub"])
 	assert.Equal(t, client.ClientIdentifier, idClaims["aud"])
@@ -602,10 +602,10 @@ func TestMintAuthorizationCodeTokens_IncludeOpenIDConnectClaimsInIdToken_ClientO
 
 	require.NoError(t, err)
 	assert.NotNil(t, response)
-	assert.NotEmpty(t, response.IdToken)
+	assert.NotEmpty(t, response.IDToken)
 
 	// Verify ID token DOES have OIDC claims (client override wins)
-	idClaims := verifyAndDecodeToken(t, response.IdToken, publicKeyBytes)
+	idClaims := verifyAndDecodeToken(t, response.IDToken, publicKeyBytes)
 	assert.Equal(t, user.Email, idClaims["email"])
 	assert.Equal(t, user.EmailVerified, idClaims["email_verified"])
 	assert.Equal(t, user.GivenName, idClaims["given_name"])

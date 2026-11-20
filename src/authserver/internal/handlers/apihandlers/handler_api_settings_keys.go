@@ -55,7 +55,7 @@ func HandleSettingsKeysGet(
 				createdAt = &t
 			}
 			mapped = append(mapped, api.SettingsSigningKeyResponse{
-				Id:               k.Id,
+				ID:               k.Id,
 				CreatedAt:        createdAt,
 				State:            k.State,
 				KeyIdentifier:    k.KeyIdentifier,

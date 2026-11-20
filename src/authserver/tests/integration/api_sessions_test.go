@@ -82,7 +82,7 @@ func postSessionEndpointNoToken(t *testing.T, operation string, body interface{}
 // anonymous caller gets nothing from any of the five operations.
 func TestAPISessions_NoTokenIsUnauthorized(t *testing.T) {
 	for _, operation := range []string{"load", "create", "update", "touch", "delete"} {
-		resp := postSessionEndpointNoToken(t, operation, api.SessionLoadRequest{Id: newTestSessionId(t)})
+		resp := postSessionEndpointNoToken(t, operation, api.SessionLoadRequest{ID: newTestSessionId(t)})
 		func() {
 			defer func() { _ = resp.Body.Close() }()
 			assert.Equal(t, http.StatusUnauthorized, resp.StatusCode, "operation %s", operation)
@@ -101,7 +101,7 @@ func TestAPISessions_WrongScopeIsForbidden(t *testing.T) {
 
 	for _, operation := range []string{"load", "create", "update", "touch", "delete"} {
 		resp := makeAPIRequest(t, "POST", sessionEndpointURL(operation), accessToken,
-			api.SessionLoadRequest{Id: newTestSessionId(t)})
+			api.SessionLoadRequest{ID: newTestSessionId(t)})
 		func() {
 			defer func() { _ = resp.Body.Close() }()
 			assert.Equal(t, http.StatusForbidden, resp.StatusCode, "operation %s", operation)
@@ -126,7 +126,7 @@ func TestAPISessions_RoundTrip(t *testing.T) {
 	// is far shorter than the deployment's idle timeout, so the two phases are told apart
 	// by the deadline the endpoint chose rather than by reading anything.
 	created := postSession(t, accessToken, "create", api.SessionWriteRequest{
-		Id:   id,
+		ID:   id,
 		Data: "first-ciphertext",
 	})
 	var createdBody api.SessionWriteResponse
@@ -134,7 +134,7 @@ func TestAPISessions_RoundTrip(t *testing.T) {
 	assert.WithinDuration(t, time.Now().UTC().Add(30*time.Minute), createdBody.ExpiresAt, time.Minute)
 
 	// Load returns what was stored, with both timestamps.
-	loaded := postSession(t, accessToken, "load", api.SessionLoadRequest{Id: id})
+	loaded := postSession(t, accessToken, "load", api.SessionLoadRequest{ID: id})
 	var loadedBody api.SessionLoadResponse
 	decodeSessionBody(t, loaded, http.StatusOK, &loadedBody)
 	assert.Equal(t, "first-ciphertext", loadedBody.Data)
@@ -142,7 +142,7 @@ func TestAPISessions_RoundTrip(t *testing.T) {
 	assert.WithinDuration(t, createdBody.ExpiresAt, loadedBody.ExpiresAt, time.Second)
 
 	// Touch records the session was used and keeps it alive.
-	touched := postSession(t, accessToken, "touch", api.SessionTouchRequest{Id: id})
+	touched := postSession(t, accessToken, "touch", api.SessionTouchRequest{ID: id})
 	var touchedBody api.SessionWriteResponse
 	decodeSessionBody(t, touched, http.StatusOK, &touchedBody)
 	assert.True(t, touchedBody.ExpiresAt.After(time.Now().UTC()))
@@ -152,7 +152,7 @@ func TestAPISessions_RoundTrip(t *testing.T) {
 	// console cannot read the deployment's session settings, so it says what kind of
 	// session it is holding and the auth server says how long that kind lives.
 	updated := postSession(t, accessToken, "update", api.SessionWriteRequest{
-		Id:            id,
+		ID:            id,
 		Data:          "second-ciphertext",
 		Authenticated: true,
 	})
@@ -169,17 +169,17 @@ func TestAPISessions_RoundTrip(t *testing.T) {
 	}
 	assert.WithinDuration(t, expectedExpiry, updatedBody.ExpiresAt, time.Minute)
 
-	reloaded := postSession(t, accessToken, "load", api.SessionLoadRequest{Id: id})
+	reloaded := postSession(t, accessToken, "load", api.SessionLoadRequest{ID: id})
 	var reloadedBody api.SessionLoadResponse
 	decodeSessionBody(t, reloaded, http.StatusOK, &reloadedBody)
 	assert.Equal(t, "second-ciphertext", reloadedBody.Data)
 
 	// Delete, then the session is gone rather than empty.
-	deleted := postSession(t, accessToken, "delete", api.SessionLoadRequest{Id: id})
+	deleted := postSession(t, accessToken, "delete", api.SessionLoadRequest{ID: id})
 	defer func() { _ = deleted.Body.Close() }()
 	assert.Equal(t, http.StatusNoContent, deleted.StatusCode)
 
-	gone := postSession(t, accessToken, "load", api.SessionLoadRequest{Id: id})
+	gone := postSession(t, accessToken, "load", api.SessionLoadRequest{ID: id})
 	defer func() { _ = gone.Body.Close() }()
 	assert.Equal(t, http.StatusNotFound, gone.StatusCode)
 }
@@ -201,7 +201,7 @@ func TestAPISessions_ExpiredSessionIsNotFound(t *testing.T) {
 	}()
 
 	for _, operation := range []string{"load", "update", "touch"} {
-		resp := postSession(t, accessToken, operation, api.SessionWriteRequest{Id: id, Data: "x"})
+		resp := postSession(t, accessToken, operation, api.SessionWriteRequest{ID: id, Data: "x"})
 		func() {
 			defer func() { _ = resp.Body.Close() }()
 			assert.Equal(t, http.StatusNotFound, resp.StatusCode, "operation %s", operation)
@@ -226,7 +226,7 @@ func TestAPISessions_AuthServerSessionIsNotFound(t *testing.T) {
 
 	// The row is live and the identifier is correct. Only the owner differs.
 	for _, operation := range []string{"load", "update", "touch"} {
-		resp := postSession(t, accessToken, operation, api.SessionWriteRequest{Id: id, Data: "x"})
+		resp := postSession(t, accessToken, operation, api.SessionWriteRequest{ID: id, Data: "x"})
 		func() {
 			defer func() { _ = resp.Body.Close() }()
 			assert.Equal(t, http.StatusNotFound, resp.StatusCode, "operation %s", operation)
@@ -236,7 +236,7 @@ func TestAPISessions_AuthServerSessionIsNotFound(t *testing.T) {
 	// Delete answers 204 whether or not a row was there, so the isolation it needs is
 	// that the auth server's row SURVIVES it. That is the one place the row itself is the
 	// only available evidence.
-	deleted := postSession(t, accessToken, "delete", api.SessionLoadRequest{Id: id})
+	deleted := postSession(t, accessToken, "delete", api.SessionLoadRequest{ID: id})
 	defer func() { _ = deleted.Body.Close() }()
 	assert.Equal(t, http.StatusNoContent, deleted.StatusCode)
 
@@ -258,7 +258,7 @@ func TestAPISessions_RealAuthServerSessionIsNotFound(t *testing.T) {
 		_ = database.DeleteClient(context.Background(), nil, client.Id)
 	}()
 
-	resp := postSession(t, accessToken, "load", api.SessionLoadRequest{Id: id})
+	resp := postSession(t, accessToken, "load", api.SessionLoadRequest{ID: id})
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
@@ -319,7 +319,7 @@ func TestAPISessions_RefusesATokenNoLongerLive(t *testing.T) {
 // identifier no session has.
 func assertSessionsAdmitToken(t *testing.T, accessToken string) {
 	t.Helper()
-	resp := postSession(t, accessToken, "load", api.SessionLoadRequest{Id: newTestSessionId(t)})
+	resp := postSession(t, accessToken, "load", api.SessionLoadRequest{ID: newTestSessionId(t)})
 	defer func() { _ = resp.Body.Close() }()
 	body, _ := io.ReadAll(resp.Body)
 	require.Equal(t, http.StatusNotFound, resp.StatusCode, string(body))
@@ -329,7 +329,7 @@ func assertSessionsAdmitToken(t *testing.T, accessToken string) {
 // invalid.", in the challenge and the body, as the admin API answers it.
 func assertSessionsRefuseToken(t *testing.T, accessToken string) {
 	t.Helper()
-	resp := postSession(t, accessToken, "load", api.SessionLoadRequest{Id: newTestSessionId(t)})
+	resp := postSession(t, accessToken, "load", api.SessionLoadRequest{ID: newTestSessionId(t)})
 	defer func() { _ = resp.Body.Close() }()
 	body, _ := io.ReadAll(resp.Body)
 	require.Equal(t, http.StatusUnauthorized, resp.StatusCode, string(body))
@@ -367,7 +367,7 @@ func TestAPISessions_BadRequests(t *testing.T) {
 	assert.Equal(t, "INVALID_REQUEST_BODY", malformedBody.ErrorCode)
 
 	for _, operation := range []string{"load", "create", "update", "touch", "delete"} {
-		resp := postSession(t, accessToken, operation, api.SessionWriteRequest{Id: "  "})
+		resp := postSession(t, accessToken, operation, api.SessionWriteRequest{ID: "  "})
 		func() {
 			defer func() { _ = resp.Body.Close() }()
 			assert.Equal(t, http.StatusBadRequest, resp.StatusCode, "operation %s", operation)

@@ -37,8 +37,8 @@ func handlerFor(t *testing.T, w io.Writer, level, format string) slog.Handler {
 
 // contextWithRequestID builds what requestid.Middleware leaves on a
 // request context, which is the only thing the wrapper reads.
-func contextWithRequestID(requestId string) context.Context {
-	return requestid.NewContext(context.Background(), requestId)
+func contextWithRequestID(requestID string) context.Context {
+	return requestid.NewContext(context.Background(), requestID)
 }
 
 // decodeJSON reads the one record written to buf.
@@ -125,7 +125,7 @@ func TestNewHandler_ErrorAttributeCarriesItsStack(t *testing.T) {
 	}
 }
 
-func TestNewHandler_InjectsTheRequestIdFromTheContext(t *testing.T) {
+func TestNewHandler_InjectsTheRequestIDFromTheContext(t *testing.T) {
 	t.Run("a context carrying one", func(t *testing.T) {
 		buf := &bytes.Buffer{}
 		slog.New(handlerFor(t, buf, "info", "json")).
@@ -144,28 +144,28 @@ func TestNewHandler_InjectsTheRequestIdFromTheContext(t *testing.T) {
 	})
 }
 
-func TestNewHandler_BoundsTheRequestIdItInjects(t *testing.T) {
+func TestNewHandler_BoundsTheRequestIDItInjects(t *testing.T) {
 	// requestid.Middleware adopts an inbound X-Request-Id verbatim, so this
 	// string is client-chosen. Without FieldForLog one header makes one 900 KB
 	// log line, on every record of that request rather than just the access line
 	// (#159).
 	tests := []struct {
 		name      string
-		requestId string
+		requestID string
 	}{
-		{name: "900000 printable bytes", requestId: strings.Repeat("x", 900000)},
-		{name: "900000 non-printable bytes", requestId: strings.Repeat("\x80", 900000)},
-		{name: "an embedded carriage return", requestId: "a\x0db"},
+		{name: "900000 printable bytes", requestID: strings.Repeat("x", 900000)},
+		{name: "900000 non-printable bytes", requestID: strings.Repeat("\x80", 900000)},
+		{name: "an embedded carriage return", requestID: "a\x0db"},
 	}
 
 	for _, test := range tests {
 		for _, format := range []string{"text", "json"} {
 			t.Run(test.name+"/"+format, func(t *testing.T) {
-				want := FieldForLog(test.requestId)
+				want := FieldForLog(test.requestID)
 
 				buf := &bytes.Buffer{}
 				slog.New(handlerFor(t, buf, "info", format)).
-					InfoContext(contextWithRequestID(test.requestId), "a record")
+					InfoContext(contextWithRequestID(test.requestID), "a record")
 
 				if format == "json" {
 					assert.Equal(t, want, decodeJSON(t, buf)["request_id"])
@@ -188,7 +188,7 @@ func TestNewHandler_KeepsTheInjectionThroughWithAttrs(t *testing.T) {
 	assert.Equal(t, "abc", record["request_id"])
 }
 
-func TestNewHandler_KeepsTheRequestIdAtTheRootUnderAGroup(t *testing.T) {
+func TestNewHandler_KeepsTheRequestIDAtTheRootUnderAGroup(t *testing.T) {
 	// slog's contract qualifies every attribute a handler receives after
 	// WithGroup by that group. A wrapper that re-wrapped the grouped handler
 	// would therefore write operation.request_id, and a collector correlating on
@@ -328,7 +328,7 @@ func TestInstall_InstallsTheHandler(t *testing.T) {
 	}
 }
 
-func TestInstall_RequestIdReachesARecordLoggedFromAHandler(t *testing.T) {
+func TestInstall_RequestIDReachesARecordLoggedFromAHandler(t *testing.T) {
 	// The one end-to-end case: a real request, through the real requestid.Middleware
 	// middleware, into a handler that names no id at all. It is what decision 2
 	// promises, and it also shows the bound applies to an id the client chose.

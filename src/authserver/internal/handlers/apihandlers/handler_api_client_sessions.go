@@ -145,9 +145,9 @@ func sessionOwners(ctx context.Context, database clientSessionsDatabase, session
 	userIds := make([]int64, 0, len(sessions))
 	seen := make(map[int64]bool, len(sessions))
 	for _, session := range sessions {
-		if !seen[session.UserId] {
-			seen[session.UserId] = true
-			userIds = append(userIds, session.UserId)
+		if !seen[session.UserID] {
+			seen[session.UserID] = true
+			userIds = append(userIds, session.UserID)
 		}
 	}
 	if len(userIds) == 0 {

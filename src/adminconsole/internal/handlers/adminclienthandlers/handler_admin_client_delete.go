@@ -35,7 +35,7 @@ type clientDeleteView struct {
 
 func newClientDeleteView(client *api.ClientResponse, perms []api.PermissionResponse) clientDeleteView {
 	return clientDeleteView{
-		Id:                       client.Id,
+		Id:                       client.ID,
 		ClientIdentifier:         client.ClientIdentifier,
 		Description:              client.Description,
 		Enabled:                  client.Enabled,
@@ -166,7 +166,7 @@ func HandleDeletePost(
 			return
 		}
 
-		err = apiClient.DeleteClient(r.Context(), jwtInfo.TokenResponse.AccessToken, client.Id)
+		err = apiClient.DeleteClient(r.Context(), jwtInfo.TokenResponse.AccessToken, client.ID)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return

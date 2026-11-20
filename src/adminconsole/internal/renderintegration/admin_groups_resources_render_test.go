@@ -43,9 +43,9 @@ func TestRender_AdminGroupsPermissions_SendsTheLoadedList(t *testing.T) {
 func TestRender_AdminGroups(t *testing.T) {
 	out := renderMenuPage(t, "/admin_groups.html", map[string]interface{}{
 		"groups": []api.GroupResponse{
-			{Id: 2, GroupIdentifier: "admins", Description: "Administradores",
-				IncludeInIdToken: true, IncludeInAccessToken: false, MemberCount: 17},
-			{Id: 3, GroupIdentifier: "site-viewers", MemberCount: 0},
+			{ID: 2, GroupIdentifier: "admins", Description: "Administradores",
+				IncludeInIDToken: true, IncludeInAccessToken: false, MemberCount: 17},
+			{ID: 3, GroupIdentifier: "site-viewers", MemberCount: 0},
 		},
 	})
 
@@ -67,7 +67,7 @@ func TestRender_AdminGroups(t *testing.T) {
 // return value the apiclient answered beside the group.
 func TestRender_AdminGroupDelete(t *testing.T) {
 	out := renderMenuPage(t, "/admin_groups_delete.html", map[string]interface{}{
-		"group":        &api.GroupResponse{Id: 2, GroupIdentifier: "admins", Description: "Administradores"},
+		"group":        &api.GroupResponse{ID: 2, GroupIdentifier: "admins", Description: "Administradores"},
 		"countOfUsers": 17,
 	})
 
@@ -87,8 +87,8 @@ func TestRender_AdminGroupAttributes(t *testing.T) {
 			"groupIdentifier": "admins",
 			"description":     "Administradores",
 			"attributes": []api.GroupAttributeResponse{
-				{Id: 7, Key: "tier", Value: "gold", GroupId: 2, IncludeInIdToken: true},
-				{Id: 8, Key: "region", Value: "br", GroupId: 2, IncludeInAccessToken: true},
+				{ID: 7, Key: "tier", Value: "gold", GroupID: 2, IncludeInIDToken: true},
+				{ID: 8, Key: "region", Value: "br", GroupID: 2, IncludeInAccessToken: true},
 			},
 		})
 
@@ -121,9 +121,9 @@ func TestRender_AdminGroupAttributes(t *testing.T) {
 func TestRender_AdminResourcesList(t *testing.T) {
 	bind := map[string]interface{}{
 		"resources": []api.ResourceResponse{
-			{Id: 1, ResourceIdentifier: "authserver", Description: "Servidor de autenticação",
+			{ID: 1, ResourceIdentifier: "authserver", Description: "Servidor de autenticação",
 				IsSystemLevelResource: true},
-			{Id: 2, ResourceIdentifier: "faturamento", Description: ""},
+			{ID: 2, ResourceIdentifier: "faturamento", Description: ""},
 		},
 	}
 

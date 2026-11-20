@@ -40,7 +40,7 @@ func renderKeys(httpHelper HttpHelper, apiClient settingsKeysAPI, w http.Respons
 		hasPreviousKey = hasPreviousKey || k.State == "previous"
 		// API already returns state/type/algorithm and public key encodings
 		keys = append(keys, SettingsKey{
-			Id: k.Id,
+			Id: k.ID,
 			// The instant, formatted by the page in the viewer's locale (#373).
 			CreatedAt:        k.CreatedAt,
 			State:            k.State,

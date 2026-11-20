@@ -22,8 +22,8 @@ import (
 func TestRender_AdminClients(t *testing.T) {
 	bind := map[string]interface{}{
 		"clients": []api.ClientResponse{
-			{Id: 1, ClientIdentifier: "dcr_a3f9e1b2", Enabled: true, CreatedViaDCR: true},
-			{Id: 2, ClientIdentifier: "web-app", Enabled: true, CreatedViaDCR: false},
+			{ID: 1, ClientIdentifier: "dcr_a3f9e1b2", Enabled: true, CreatedViaDCR: true},
+			{ID: 2, ClientIdentifier: "web-app", Enabled: true, CreatedViaDCR: false},
 		},
 	}
 	out := renderMenuPage(t, "/admin_clients.html", bind)
@@ -278,12 +278,12 @@ func TestRender_ListRemoveButtonsAreNamedForTheirRow(t *testing.T) {
 			"resources": []render.Choice{}},
 			"orders-api", "pages/introspection-resources.js"},
 		{"/admin_users_permissions.html", map[string]interface{}{
-			"user":      &api.UserResponse{Id: 5, Email: "someone@example.com"},
+			"user":      &api.UserResponse{ID: 5, Email: "someone@example.com"},
 			"granted":   []permission{{3, "some-resource:read"}},
 			"resources": []render.Choice{}},
 			"some-resource:read", "pages/permission-list.js"},
 		{"/admin_users_groups.html", map[string]interface{}{
-			"user": &api.UserResponse{Id: 5, Email: "someone@example.com"},
+			"user": &api.UserResponse{ID: 5, Email: "someone@example.com"},
 			"memberships": []struct {
 				Id              int64
 				GroupIdentifier string

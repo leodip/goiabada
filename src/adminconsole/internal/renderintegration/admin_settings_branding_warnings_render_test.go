@@ -33,7 +33,7 @@ func renderWarningsForm(t *testing.T, warnings *adminsettingshandlers.BrandContr
 	t.Helper()
 	bind := map[string]interface{}{
 		"isNew":             false,
-		"storedBrand":       api.BrandResponse{Id: 8, Name: "Custom", Appearance: "auto", Theme: "custom"},
+		"storedBrand":       api.BrandResponse{ID: 8, Name: "Custom", Appearance: "auto", Theme: "custom"},
 		"brand":             adminsettingshandlers.BrandForm{Name: "Custom", Appearance: "auto", Theme: "custom"},
 		"brandThemes":       renderThemes,
 		"appearanceTheme":   renderThemes[0],
@@ -117,9 +117,9 @@ func TestRender_AdminSettingsBrandingListMarksFailingPairsAndDrawsTheColors(t *t
 	colors := &api.BrandColors{Light: testPalette("c10"), Dark: testPalette("d10")}
 	out := renderMenuPageAt(t, "/admin/settings/branding", "/admin_settings_branding.html", map[string]interface{}{
 		"brands": []adminsettingshandlers.BrandRow{
-			{BrandResponse: api.BrandResponse{Id: 8, Name: "Custom", Appearance: "auto", Theme: "custom", Colors: colors},
+			{BrandResponse: api.BrandResponse{ID: 8, Name: "Custom", Appearance: "auto", Theme: "custom", Colors: colors},
 				AppearanceName: "Automático", ThemeName: "Personalizado", WarningsMarker: "2 pares abaixo do mínimo de contraste"},
-			{BrandResponse: api.BrandResponse{Id: 9, Name: "Lost", Appearance: "auto", Theme: "custom"},
+			{BrandResponse: api.BrandResponse{ID: 9, Name: "Lost", Appearance: "auto", Theme: "custom"},
 				AppearanceName: "Automático", ThemeName: "Personalizado"},
 		},
 	})

@@ -154,16 +154,16 @@ func TestHandleSettingsGet_BindsTheAdministrativeScopesAllowance(t *testing.T) {
 	}{
 		{
 			name:        "an allowed client",
-			client:      &api.ClientResponse{Id: 7, ClientIdentifier: "ops-tool", AdministrativeScopesAllowed: true},
+			client:      &api.ClientResponse{ID: 7, ClientIdentifier: "ops-tool", AdministrativeScopesAllowed: true},
 			wantAllowed: true,
 		},
 		{
 			name:   "a client that is not allowed",
-			client: &api.ClientResponse{Id: 7, ClientIdentifier: "portal"},
+			client: &api.ClientResponse{ID: 7, ClientIdentifier: "portal"},
 		},
 		{
 			name: "the admin console's client",
-			client: &api.ClientResponse{Id: 7, ClientIdentifier: "admin-console-client",
+			client: &api.ClientResponse{ID: 7, ClientIdentifier: "admin-console-client",
 				AdministrativeScopesAllowed: true, IsSystemLevelClient: true},
 			wantAllowed: true,
 			wantSystem:  true,
@@ -195,7 +195,7 @@ func TestHandleSettingsGet_BindsWhetherTheClientRegisteredItself(t *testing.T) {
 		httpHelper := &stubHttpHelper{}
 		req := handlertest.Request(http.MethodGet, "/admin/clients/7/settings",
 			handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "7"))
-		client := &api.ClientResponse{Id: 7, ClientIdentifier: "dcr_a3f9e1b2", CreatedViaDCR: createdViaDCR}
+		client := &api.ClientResponse{ID: 7, ClientIdentifier: "dcr_a3f9e1b2", CreatedViaDCR: createdViaDCR}
 
 		HandleSettingsGet(httpHelper, newTestSessionStore(), &stubAdministrativeScopesApiClient{client: client}).
 			ServeHTTP(httptest.NewRecorder(), req)
@@ -228,7 +228,7 @@ func TestHandleSettingsPost_WritesTheAllowanceOnlyWhenItChanged(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			apiClient := &stubAdministrativeScopesApiClient{client: &api.ClientResponse{Id: 7, ClientIdentifier: "ops-tool",
+			apiClient := &stubAdministrativeScopesApiClient{client: &api.ClientResponse{ID: 7, ClientIdentifier: "ops-tool",
 				AdministrativeScopesAllowed: tc.stored}}
 			httpHelper := &stubHttpHelper{}
 
@@ -255,7 +255,7 @@ func TestHandleSettingsPost_WritesTheAllowanceOnlyWhenItChanged(t *testing.T) {
 // submits it, and the save never writes it, whatever the body says.
 func TestHandleSettingsPost_NeverWritesASystemLevelClientsAllowance(t *testing.T) {
 	for _, form := range []url.Values{{}, {"administrativeScopesAllowed": {"on"}}} {
-		apiClient := &stubAdministrativeScopesApiClient{client: &api.ClientResponse{Id: 7, ClientIdentifier: "admin-console-client",
+		apiClient := &stubAdministrativeScopesApiClient{client: &api.ClientResponse{ID: 7, ClientIdentifier: "admin-console-client",
 			AdministrativeScopesAllowed: true, IsSystemLevelClient: true}}
 
 		postSettings(t, apiClient, &stubHttpHelper{}, form, "")
@@ -268,7 +268,7 @@ func TestHandleSettingsPost_NeverWritesASystemLevelClientsAllowance(t *testing.T
 // The switch is read from the request body alone. A switch in the URL is not a submission of the
 // form, so it switches nothing on.
 func TestHandleSettingsPost_IgnoresTheSwitchInTheQuery(t *testing.T) {
-	apiClient := &stubAdministrativeScopesApiClient{client: &api.ClientResponse{Id: 7, ClientIdentifier: "ops-tool"}}
+	apiClient := &stubAdministrativeScopesApiClient{client: &api.ClientResponse{ID: 7, ClientIdentifier: "ops-tool"}}
 
 	postSettings(t, apiClient, &stubHttpHelper{}, url.Values{}, "administrativeScopesAllowed=on")
 
@@ -281,8 +281,8 @@ func TestHandleSettingsPost_IgnoresTheSwitchInTheQuery(t *testing.T) {
 func TestHandleSettingsPost_ARefusedAllowanceLeavesTheSettingsSaved(t *testing.T) {
 	const refusal = "Only authserver:manage may switch this."
 	apiClient := &stubAdministrativeScopesApiClient{
-		client:    &api.ClientResponse{Id: 7, ClientIdentifier: "ops-tool", DisplayName: "Ops"},
-		updated:   &api.ClientResponse{Id: 7, ClientIdentifier: "ops-tool", DisplayName: "Ops tool"},
+		client:    &api.ClientResponse{ID: 7, ClientIdentifier: "ops-tool", DisplayName: "Ops"},
+		updated:   &api.ClientResponse{ID: 7, ClientIdentifier: "ops-tool", DisplayName: "Ops tool"},
 		updateErr: &apiclient.APIError{Code: "VALIDATION_ERROR", Message: refusal, StatusCode: http.StatusBadRequest},
 	}
 	httpHelper := &stubHttpHelper{}
@@ -305,7 +305,7 @@ func TestHandleSettingsPost_ARefusedAllowanceLeavesTheSettingsSaved(t *testing.T
 // as every other input is.
 func TestHandleSettingsPost_ARefusedSettingsSaveWritesNoAllowance(t *testing.T) {
 	apiClient := &stubAdministrativeScopesApiClient{
-		client:      &api.ClientResponse{Id: 7, ClientIdentifier: "ops-tool"},
+		client:      &api.ClientResponse{ID: 7, ClientIdentifier: "ops-tool"},
 		settingsErr: &apiclient.APIError{Code: "VALIDATION_ERROR", Message: "Invalid website URL.", StatusCode: http.StatusBadRequest},
 	}
 	httpHelper := &stubHttpHelper{}
@@ -328,7 +328,7 @@ func TestHandleSettingsPost_ARefusedSettingsSaveWritesNoAllowance(t *testing.T) 
 func TestHandleSettingsPost_WithoutManageTheAllowanceStands(t *testing.T) {
 	for _, stored := range []bool{true, false} {
 		for _, form := range []url.Values{{}, {"administrativeScopesAllowed": {"on"}}} {
-			apiClient := &stubAdministrativeScopesApiClient{client: &api.ClientResponse{Id: 7, ClientIdentifier: "ops-tool",
+			apiClient := &stubAdministrativeScopesApiClient{client: &api.ClientResponse{ID: 7, ClientIdentifier: "ops-tool",
 				AdministrativeScopesAllowed: stored}}
 			httpHelper := &stubHttpHelper{}
 
@@ -348,7 +348,7 @@ func TestHandleSettingsGet_BindsTheClientsDocumentURLs(t *testing.T) {
 	httpHelper := &stubHttpHelper{}
 	req := handlertest.Request(http.MethodGet, "/admin/clients/7/settings",
 		handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "7"))
-	client := &api.ClientResponse{Id: 7, ClientIdentifier: "portal",
+	client := &api.ClientResponse{ID: 7, ClientIdentifier: "portal",
 		PrivacyPolicyURL: "https://portal.example.com/privacy", TermsOfServiceURL: "https://portal.example.com/terms"}
 
 	HandleSettingsGet(httpHelper, newTestSessionStore(), &stubAdministrativeScopesApiClient{client: client}).
@@ -364,7 +364,7 @@ func TestHandleSettingsGet_BindsTheClientsDocumentURLs(t *testing.T) {
 // A save sends the two URLs as typed, trimmed, and an emptied field as empty, which clears it; a
 // refused save draws them again as typed.
 func TestHandleSettingsPost_SendsTheClientsDocumentURLs(t *testing.T) {
-	stored := &api.ClientResponse{Id: 7, ClientIdentifier: "portal",
+	stored := &api.ClientResponse{ID: 7, ClientIdentifier: "portal",
 		PrivacyPolicyURL: "https://portal.example.com/privacy", TermsOfServiceURL: "https://portal.example.com/terms"}
 	apiClient := &stubAdministrativeScopesApiClient{client: stored}
 
@@ -401,9 +401,9 @@ func TestHandleSettingsGet_BindsRememberConsent(t *testing.T) {
 		name   string
 		client *api.ClientResponse
 	}{
-		{"a public client remembering consent", &api.ClientResponse{Id: 7, ClientIdentifier: "spa", IsPublic: true, RememberConsent: true}},
-		{"a public client not remembering consent", &api.ClientResponse{Id: 7, ClientIdentifier: "spa", IsPublic: true}},
-		{"a confidential client", &api.ClientResponse{Id: 7, ClientIdentifier: "portal", RememberConsent: true}},
+		{"a public client remembering consent", &api.ClientResponse{ID: 7, ClientIdentifier: "spa", IsPublic: true, RememberConsent: true}},
+		{"a public client not remembering consent", &api.ClientResponse{ID: 7, ClientIdentifier: "spa", IsPublic: true}},
+		{"a confidential client", &api.ClientResponse{ID: 7, ClientIdentifier: "portal", RememberConsent: true}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			httpHelper := &stubHttpHelper{}
@@ -442,7 +442,7 @@ func TestHandleSettingsPost_SendsAPublicClientsRememberConsentFromTheBody(t *tes
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			apiClient := &stubAdministrativeScopesApiClient{
-				client: &api.ClientResponse{Id: 7, ClientIdentifier: "spa", IsPublic: true, RememberConsent: tc.stored}}
+				client: &api.ClientResponse{ID: 7, ClientIdentifier: "spa", IsPublic: true, RememberConsent: tc.stored}}
 			form := tc.form
 			form.Set("clientIdentifier", "spa")
 
@@ -464,7 +464,7 @@ func TestHandleSettingsPost_SendsNoRememberConsentForAConfidentialClient(t *test
 		{"clientIdentifier": {"portal"}, "rememberConsent": {"on"}},
 	} {
 		apiClient := &stubAdministrativeScopesApiClient{
-			client: &api.ClientResponse{Id: 7, ClientIdentifier: "portal", RememberConsent: true}}
+			client: &api.ClientResponse{ID: 7, ClientIdentifier: "portal", RememberConsent: true}}
 
 		rec := postSettings(t, apiClient, &stubHttpHelper{}, form, "")
 
@@ -477,7 +477,7 @@ func TestHandleSettingsPost_SendsNoRememberConsentForAConfidentialClient(t *test
 // A refused save draws the checkbox again as submitted, so the administrator does not lose it.
 func TestHandleSettingsPost_ARefusedSaveKeepsRememberConsentAsSubmitted(t *testing.T) {
 	apiClient := &stubAdministrativeScopesApiClient{
-		client:      &api.ClientResponse{Id: 7, ClientIdentifier: "spa", IsPublic: true},
+		client:      &api.ClientResponse{ID: 7, ClientIdentifier: "spa", IsPublic: true},
 		settingsErr: &apiclient.APIError{Code: "handler.client.website_url_invalid", Message: "Invalid website URL.", StatusCode: http.StatusBadRequest}}
 	httpHelper := &stubHttpHelper{}
 
@@ -493,9 +493,9 @@ func brandIdPtr(id int64) *int64 { return &id }
 // The brands as the auth server lists them, by name, the default marked: Autumn (4), Default (5)
 // and Spring (6).
 var testBrands = []api.BrandResponse{
-	{Id: 4, Name: "Autumn", Appearance: "dark", Theme: "plum"},
-	{Id: 5, Name: "Default", Appearance: "auto", Theme: "blueberry", IsDefault: true},
-	{Id: 6, Name: "Spring", Appearance: "light", Theme: "avocado"},
+	{ID: 4, Name: "Autumn", Appearance: "dark", Theme: "plum"},
+	{ID: 5, Name: "Default", Appearance: "auto", Theme: "blueberry", IsDefault: true},
+	{ID: 6, Name: "Spring", Appearance: "light", Theme: "avocado"},
 }
 
 // The Brand select under Sign-in and consent pages (#812 decision 6): Default brand first, naming
@@ -516,7 +516,7 @@ func TestHandleSettingsGet_BindsTheBrandSelect(t *testing.T) {
 			req := handlertest.Request(http.MethodGet, "/admin/clients/7/settings",
 				handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "7"))
 			apiClient := &stubAdministrativeScopesApiClient{brands: testBrands,
-				client: &api.ClientResponse{Id: 7, ClientIdentifier: "portal", BrandId: tc.brandId}}
+				client: &api.ClientResponse{ID: 7, ClientIdentifier: "portal", BrandID: tc.brandId}}
 
 			HandleSettingsGet(httpHelper, newTestSessionStore(), apiClient).ServeHTTP(httptest.NewRecorder(), req)
 
@@ -557,7 +557,7 @@ func TestHandleSettingsPost_WritesTheBrandOnlyWhenItChanged(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			apiClient := &stubAdministrativeScopesApiClient{brands: testBrands,
-				client: &api.ClientResponse{Id: 7, ClientIdentifier: "portal", BrandId: tc.stored}}
+				client: &api.ClientResponse{ID: 7, ClientIdentifier: "portal", BrandID: tc.stored}}
 			httpHelper := &stubHttpHelper{}
 			cache := &invalidationRecorder{}
 
@@ -573,7 +573,7 @@ func TestHandleSettingsPost_WritesTheBrandOnlyWhenItChanged(t *testing.T) {
 			}
 			assert.Equal(t, []string{"settings", "brand"}, apiClient.writes, "the brand is written once, after the settings")
 			require.NotNil(t, apiClient.sentBrand)
-			assert.Equal(t, tc.wantSent, apiClient.sentBrand.BrandId)
+			assert.Equal(t, tc.wantSent, apiClient.sentBrand.BrandID)
 			assert.Equal(t, int64(7), apiClient.sentBrandTo)
 			assert.Equal(t, handlertest.AccessToken, apiClient.sentBrandAs)
 			assert.Zero(t, cache.invalidations, "another client's brand leaves the console's look alone")
@@ -585,7 +585,7 @@ func TestHandleSettingsPost_WritesTheBrandOnlyWhenItChanged(t *testing.T) {
 // submission of the form.
 func TestHandleSettingsPost_IgnoresTheBrandInTheQuery(t *testing.T) {
 	apiClient := &stubAdministrativeScopesApiClient{brands: testBrands,
-		client: &api.ClientResponse{Id: 7, ClientIdentifier: "portal", BrandId: brandIdPtr(6)}}
+		client: &api.ClientResponse{ID: 7, ClientIdentifier: "portal", BrandID: brandIdPtr(6)}}
 
 	postSettings(t, apiClient, &stubHttpHelper{}, url.Values{}, "brandId=")
 
@@ -596,7 +596,7 @@ func TestHandleSettingsPost_IgnoresTheBrandInTheQuery(t *testing.T) {
 // beside the brands it offers.
 func TestHandleSettingsPost_ARefusedSettingsSaveWritesNoBrand(t *testing.T) {
 	apiClient := &stubAdministrativeScopesApiClient{brands: testBrands,
-		client:      &api.ClientResponse{Id: 7, ClientIdentifier: "portal"},
+		client:      &api.ClientResponse{ID: 7, ClientIdentifier: "portal"},
 		settingsErr: &apiclient.APIError{Code: "handler.client.website_url_invalid", Message: "Invalid website URL.", StatusCode: http.StatusBadRequest}}
 	httpHelper := &stubHttpHelper{}
 
@@ -619,8 +619,8 @@ func TestHandleSettingsPost_ARefusedSettingsSaveWritesNoBrand(t *testing.T) {
 func TestHandleSettingsPost_ARefusedBrandLeavesTheSettingsSaved(t *testing.T) {
 	const refusal = "The brand does not exist."
 	apiClient := &stubAdministrativeScopesApiClient{brands: testBrands,
-		client:   &api.ClientResponse{Id: 7, ClientIdentifier: "admin-console-client", DisplayName: "Console", IsSystemLevelClient: true},
-		updated:  &api.ClientResponse{Id: 7, ClientIdentifier: "admin-console-client", DisplayName: "Admin console", IsSystemLevelClient: true},
+		client:   &api.ClientResponse{ID: 7, ClientIdentifier: "admin-console-client", DisplayName: "Console", IsSystemLevelClient: true},
+		updated:  &api.ClientResponse{ID: 7, ClientIdentifier: "admin-console-client", DisplayName: "Admin console", IsSystemLevelClient: true},
 		brandErr: &apiclient.APIError{Code: "handler.client_brand.brand_not_found", Message: refusal, StatusCode: http.StatusBadRequest},
 	}
 	httpHelper := &stubHttpHelper{}
@@ -658,7 +658,7 @@ func TestHandleSettingsPost_TheConsolesOwnBrandDropsItsCachedSettings(t *testing
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			apiClient := &stubAdministrativeScopesApiClient{brands: testBrands,
-				client: &api.ClientResponse{Id: 7, ClientIdentifier: "admin-console-client", BrandId: brandIdPtr(6),
+				client: &api.ClientResponse{ID: 7, ClientIdentifier: "admin-console-client", BrandID: brandIdPtr(6),
 					AdministrativeScopesAllowed: true, IsSystemLevelClient: true}}
 			cache := &invalidationRecorder{}
 

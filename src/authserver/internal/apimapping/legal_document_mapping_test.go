@@ -110,7 +110,7 @@ func TestLegalDocument_SelectedAppsCarryTheirClientIds(t *testing.T) {
 	}
 	got := ToLegalDocumentResponse(doc, &versions[1], links)
 	assert.Equal(t, "selected_apps", got.AppliesTo)
-	assert.Equal(t, []int64{5, 3}, got.ClientIds)
+	assert.Equal(t, []int64{5, 3}, got.ClientIDs)
 
 	none := ToLegalDocumentDetailResponse(doc, versions, nil)
 	assert.Contains(t, wire(t, none.LegalDocument), `"appliesTo":"selected_apps","clientIds":[]`)

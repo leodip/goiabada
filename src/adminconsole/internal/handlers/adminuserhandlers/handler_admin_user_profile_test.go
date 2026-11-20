@@ -43,7 +43,7 @@ type userProfileRecorder struct {
 func storedUserProfile(userId int64) *api.UserResponse {
 	birthDate := time.Date(1970, time.January, 2, 0, 0, 0, 0, time.UTC)
 	return &api.UserResponse{
-		Id:                  userId,
+		ID:                  userId,
 		Email:               "stored@example.com",
 		Username:            "stored-username",
 		GivenName:           "Stored",
@@ -135,7 +135,7 @@ func TestHandleProfilePost_ARefusalRedrawsThePageWithTheSubmittedValues(t *testi
 	bind := handlertest.Bind(t, httpHelper)
 	storedBirthDate := time.Date(1970, time.January, 2, 0, 0, 0, 0, time.UTC)
 	assert.Equal(t, &api.UserResponse{
-		Id:                  7,
+		ID:                  7,
 		Email:               "stored@example.com",
 		Username:            "jane-doe",
 		GivenName:           "Jane",
@@ -271,7 +271,7 @@ func TestHandleProfilePost_AnAdministratorsOwnSaveRefreshesTheConsoleLanguage(t 
 	for _, tc := range []struct {
 		name     string
 		saved    string
-		idToken  *oauth.JwtToken
+		idToken  *oauth.JWTToken
 		form     url.Values
 		wantCopy string
 	}{
@@ -314,8 +314,8 @@ func TestHandleProfilePost_AnAdministratorsOwnSaveRefreshesTheConsoleLanguage(t 
 	}
 }
 
-func adminIdToken(subject string) *oauth.JwtToken {
-	return &oauth.JwtToken{TokenBase64: "id", Claims: map[string]any{"sub": subject}}
+func adminIdToken(subject string) *oauth.JWTToken {
+	return &oauth.JWTToken{TokenBase64: "id", Claims: map[string]any{"sub": subject}}
 }
 
 // pageLanguageInSession stores a session holding the console's copy of the page language and

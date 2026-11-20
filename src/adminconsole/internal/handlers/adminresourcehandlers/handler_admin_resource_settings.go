@@ -68,7 +68,7 @@ func HandleSettingsGet(
 		}
 
 		bind := map[string]interface{}{
-			"resourceId":            resource.Id,
+			"resourceId":            resource.ID,
 			"storedResource":        resource,
 			"resourceIdentifier":    resource.ResourceIdentifier,
 			"description":           resource.Description,

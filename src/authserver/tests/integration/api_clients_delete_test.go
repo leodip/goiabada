@@ -62,7 +62,7 @@ func TestAPIClientDelete_SystemLevelRejected(t *testing.T) {
 	var sysId int64
 	for _, c := range listResp.Clients {
 		if c.ClientIdentifier == "admin-console-client" {
-			sysId = c.Id
+			sysId = c.ID
 			break
 		}
 	}
@@ -142,7 +142,7 @@ func TestAPIClientGetPermissions_IncludesPermissions(t *testing.T) {
 	// Verify identifiers present
 	found := false
 	for _, p := range getResp.Permissions {
-		if p.Id == perm.Id {
+		if p.ID == perm.Id {
 			found = true
 			break
 		}

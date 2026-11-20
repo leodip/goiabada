@@ -26,7 +26,7 @@ type passwordRecordingApiClient struct {
 func (c *passwordRecordingApiClient) UpdateAccountPassword(_ context.Context, _ string,
 	request *api.UpdateAccountPasswordRequest) (*api.UserResponse, error) {
 	c.sent = append(c.sent, request)
-	return &api.UserResponse{Id: 7}, nil
+	return &api.UserResponse{ID: 7}, nil
 }
 
 // TestHandleChangePasswordPost_SendsPasswordsAsTyped holds the console to forwarding

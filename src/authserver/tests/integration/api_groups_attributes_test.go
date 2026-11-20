@@ -59,9 +59,9 @@ func TestAPIGroupAttributesGet_Success(t *testing.T) {
 	deptAttr, exists := attrMap["department"]
 	assert.True(t, exists)
 	assert.Equal(t, "engineering", deptAttr.Value)
-	assert.True(t, deptAttr.IncludeInIdToken)
+	assert.True(t, deptAttr.IncludeInIDToken)
 	assert.False(t, deptAttr.IncludeInAccessToken)
-	assert.Equal(t, testGroup.Id, deptAttr.GroupId)
+	assert.Equal(t, testGroup.Id, deptAttr.GroupID)
 
 	roleAttr, exists := attrMap["role"]
 	assert.True(t, exists)
@@ -187,12 +187,12 @@ func TestAPIGroupAttributeGet_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	// Assert: Should return the correct attribute
-	assert.Equal(t, attr.Id, getResponse.Attribute.Id)
+	assert.Equal(t, attr.Id, getResponse.Attribute.ID)
 	assert.Equal(t, "team", getResponse.Attribute.Key)
 	assert.Equal(t, "backend", getResponse.Attribute.Value)
-	assert.True(t, getResponse.Attribute.IncludeInIdToken)
+	assert.True(t, getResponse.Attribute.IncludeInIDToken)
 	assert.False(t, getResponse.Attribute.IncludeInAccessToken)
-	assert.Equal(t, testGroup.Id, getResponse.Attribute.GroupId)
+	assert.Equal(t, testGroup.Id, getResponse.Attribute.GroupID)
 }
 
 func TestAPIGroupAttributeGet_NotFound(t *testing.T) {
@@ -274,9 +274,9 @@ func TestAPIGroupAttributeCreatePost_Success(t *testing.T) {
 	createReq := api.CreateGroupAttributeRequest{
 		Key:                  "location",
 		Value:                "San Francisco",
-		IncludeInIdToken:     true,
+		IncludeInIDToken:     true,
 		IncludeInAccessToken: true,
-		GroupId:              testGroup.Id,
+		GroupID:              testGroup.Id,
 	}
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/group-attributes"
@@ -295,20 +295,20 @@ func TestAPIGroupAttributeCreatePost_Success(t *testing.T) {
 	// Assert: Response should match request
 	assert.Equal(t, createReq.Key, createResponse.Attribute.Key)
 	assert.Equal(t, createReq.Value, createResponse.Attribute.Value)
-	assert.Equal(t, createReq.IncludeInIdToken, createResponse.Attribute.IncludeInIdToken)
+	assert.Equal(t, createReq.IncludeInIDToken, createResponse.Attribute.IncludeInIDToken)
 	assert.Equal(t, createReq.IncludeInAccessToken, createResponse.Attribute.IncludeInAccessToken)
-	assert.Equal(t, createReq.GroupId, createResponse.Attribute.GroupId)
-	assert.Positive(t, createResponse.Attribute.Id)
+	assert.Equal(t, createReq.GroupID, createResponse.Attribute.GroupID)
+	assert.Positive(t, createResponse.Attribute.ID)
 
 	// Cleanup: Delete created attribute
 	defer func() {
-		if createResponse.Attribute.Id > 0 {
-			_ = database.DeleteGroupAttribute(context.Background(), nil, createResponse.Attribute.Id)
+		if createResponse.Attribute.ID > 0 {
+			_ = database.DeleteGroupAttribute(context.Background(), nil, createResponse.Attribute.ID)
 		}
 	}()
 
 	// Verify attribute was created in database
-	createdAttr, err := database.GetGroupAttributeById(context.Background(), nil, createResponse.Attribute.Id)
+	createdAttr, err := database.GetGroupAttributeById(context.Background(), nil, createResponse.Attribute.ID)
 	require.NoError(t, err)
 	assert.NotNil(t, createdAttr)
 	assert.Equal(t, createReq.Key, createdAttr.Key)
@@ -334,7 +334,7 @@ func TestAPIGroupAttributeCreatePost_ValidationErrors(t *testing.T) {
 			"missing key",
 			api.CreateGroupAttributeRequest{
 				Value:   "test",
-				GroupId: testGroup.Id,
+				GroupID: testGroup.Id,
 			},
 			http.StatusBadRequest,
 		},
@@ -343,7 +343,7 @@ func TestAPIGroupAttributeCreatePost_ValidationErrors(t *testing.T) {
 			api.CreateGroupAttributeRequest{
 				Key:     "",
 				Value:   "test",
-				GroupId: testGroup.Id,
+				GroupID: testGroup.Id,
 			},
 			http.StatusBadRequest,
 		},
@@ -352,7 +352,7 @@ func TestAPIGroupAttributeCreatePost_ValidationErrors(t *testing.T) {
 			api.CreateGroupAttributeRequest{
 				Key:     "test_key",
 				Value:   string(make([]byte, 251)), // 251 characters, exceeds 250 limit
-				GroupId: testGroup.Id,
+				GroupID: testGroup.Id,
 			},
 			http.StatusBadRequest,
 		},
@@ -361,7 +361,7 @@ func TestAPIGroupAttributeCreatePost_ValidationErrors(t *testing.T) {
 			api.CreateGroupAttributeRequest{
 				Key:     "invalid key with spaces",
 				Value:   "test",
-				GroupId: testGroup.Id,
+				GroupID: testGroup.Id,
 			},
 			http.StatusBadRequest,
 		},
@@ -370,7 +370,7 @@ func TestAPIGroupAttributeCreatePost_ValidationErrors(t *testing.T) {
 			api.CreateGroupAttributeRequest{
 				Key:     "valid_key",
 				Value:   "test",
-				GroupId: 99999,
+				GroupID: 99999,
 			},
 			http.StatusNotFound,
 		},
@@ -443,7 +443,7 @@ func TestAPIGroupAttributeUpdatePut_Success(t *testing.T) {
 	updateReq := api.UpdateGroupAttributeRequest{
 		Key:                  "status",
 		Value:                "inactive",
-		IncludeInIdToken:     false,
+		IncludeInIDToken:     false,
 		IncludeInAccessToken: true,
 	}
 
@@ -461,10 +461,10 @@ func TestAPIGroupAttributeUpdatePut_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	// Assert: Response should reflect updates
-	assert.Equal(t, attr.Id, updateResponse.Attribute.Id)
+	assert.Equal(t, attr.Id, updateResponse.Attribute.ID)
 	assert.Equal(t, updateReq.Key, updateResponse.Attribute.Key)
 	assert.Equal(t, updateReq.Value, updateResponse.Attribute.Value)
-	assert.Equal(t, updateReq.IncludeInIdToken, updateResponse.Attribute.IncludeInIdToken)
+	assert.Equal(t, updateReq.IncludeInIDToken, updateResponse.Attribute.IncludeInIDToken)
 	assert.Equal(t, updateReq.IncludeInAccessToken, updateResponse.Attribute.IncludeInAccessToken)
 
 	// Verify changes were persisted to database
@@ -473,7 +473,7 @@ func TestAPIGroupAttributeUpdatePut_Success(t *testing.T) {
 	assert.NotNil(t, updatedAttr)
 	assert.Equal(t, updateReq.Key, updatedAttr.Key)
 	assert.Equal(t, updateReq.Value, updatedAttr.Value)
-	assert.Equal(t, updateReq.IncludeInIdToken, updatedAttr.IncludeInIdToken)
+	assert.Equal(t, updateReq.IncludeInIDToken, updatedAttr.IncludeInIdToken)
 	assert.Equal(t, updateReq.IncludeInAccessToken, updatedAttr.IncludeInAccessToken)
 }
 
@@ -783,7 +783,7 @@ func TestAPIGroupAttribute_AngleBracketsRejected(t *testing.T) {
 		resp := makeAPIRequest(t, "POST", base, accessToken, api.CreateGroupAttributeRequest{
 			Key:     "location",
 			Value:   "<b>San Francisco</b>",
-			GroupId: testGroup.Id,
+			GroupID: testGroup.Id,
 		})
 		defer func() { _ = resp.Body.Close() }()
 
@@ -821,7 +821,7 @@ func TestAPIGroupAttribute_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 
 	value := `  R&D "phase 2"  `
 	resp := makeAPIRequest(t, "POST", appConfig.AuthServer.BaseURL+"/api/v1/admin/group-attributes",
-		accessToken, api.CreateGroupAttributeRequest{Key: "motto", Value: value, GroupId: testGroup.Id})
+		accessToken, api.CreateGroupAttributeRequest{Key: "motto", Value: value, GroupID: testGroup.Id})
 	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusCreated, resp.StatusCode)
@@ -831,14 +831,14 @@ func TestAPIGroupAttribute_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, value, createResponse.Attribute.Value)
 
-	stored, err := database.GetGroupAttributeById(context.Background(), nil, createResponse.Attribute.Id)
+	stored, err := database.GetGroupAttributeById(context.Background(), nil, createResponse.Attribute.ID)
 	require.NoError(t, err)
 	assert.Equal(t, value, stored.Value)
-	defer func() { _ = database.DeleteGroupAttribute(context.Background(), nil, createResponse.Attribute.Id) }()
+	defer func() { _ = database.DeleteGroupAttribute(context.Background(), nil, createResponse.Attribute.ID) }()
 
 	updated := `  AT&T "phase 3"  `
 	updateResp := makeAPIRequest(t, "PUT", appConfig.AuthServer.BaseURL+"/api/v1/admin/group-attributes/"+
-		strconv.FormatInt(createResponse.Attribute.Id, 10), accessToken,
+		strconv.FormatInt(createResponse.Attribute.ID, 10), accessToken,
 		api.UpdateGroupAttributeRequest{Key: "motto", Value: updated})
 	defer func() { _ = updateResp.Body.Close() }()
 
@@ -849,7 +849,7 @@ func TestAPIGroupAttribute_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, updated, updateResponse.Attribute.Value)
 
-	stored, err = database.GetGroupAttributeById(context.Background(), nil, createResponse.Attribute.Id)
+	stored, err = database.GetGroupAttributeById(context.Background(), nil, createResponse.Attribute.ID)
 	require.NoError(t, err)
 	assert.Equal(t, updated, stored.Value)
 }

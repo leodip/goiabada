@@ -75,7 +75,7 @@ func TestStoredTokenResponse_DecodesASessionWrittenBeforeIt(t *testing.T) {
 	require.True(t, ok, "the session value decodes as %T, not the stored shape", values[JWT])
 	assert.Equal(t, oauth.TokenResponse{
 		AccessToken:      "access-token",
-		IdToken:          "id-token",
+		IDToken:          "id-token",
 		TokenType:        "Bearer",
 		ExpiresIn:        3600,
 		RefreshToken:     "refresh-token",
@@ -92,7 +92,7 @@ func TestStoredTokenResponse_APreviousBinaryReadsWhatItWrites(t *testing.T) {
 	RegisterStoredTokenResponse()
 	values := map[string]any{JWT: StoreTokenResponse(oauth.TokenResponse{
 		AccessToken:      "access-token",
-		IdToken:          "id-token",
+		IDToken:          "id-token",
 		TokenType:        "Bearer",
 		ExpiresIn:        3600,
 		RefreshToken:     "refresh-token",

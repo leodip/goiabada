@@ -60,10 +60,10 @@ func (*attributesApiClient) GetUserConnectedClients(context.Context, string, int
 }
 
 func TestUserAttributesRemove_StaleOrMalformedUrlAnswers404AsJson(t *testing.T) {
-	present := &api.UserResponse{Id: 42}
+	present := &api.UserResponse{ID: 42}
 	gone := &apiclient.APIError{Code: "NOT_FOUND", Message: "User not found", StatusCode: http.StatusNotFound}
 	broken := &apiclient.APIError{Code: "INTERNAL_SERVER_ERROR", Message: "the database is on fire", StatusCode: http.StatusInternalServerError}
-	attributes := []api.UserAttributeResponse{{Id: 7}}
+	attributes := []api.UserAttributeResponse{{ID: 7}}
 
 	testCases := []struct {
 		name string
@@ -125,7 +125,7 @@ func TestUserAttributesRemove_StaleOrMalformedUrlAnswers404AsJson(t *testing.T) 
 			attributeId: "7",
 			withJwt:     true,
 			user:        present,
-			attributes:  []api.UserAttributeResponse{{Id: 99}},
+			attributes:  []api.UserAttributeResponse{{ID: 99}},
 			wantStatus:  http.StatusNotFound,
 		},
 		{
@@ -223,7 +223,7 @@ func TestUserConnectedClients_MalformedBodyAnswers400AsJson(t *testing.T) {
 				handlertest.WithBody(strings.NewReader(testCase.body)),
 			)
 
-			HandleConnectedClientsDisconnectPost(httpHelper, &attributesApiClient{user: &api.UserResponse{Id: 42}}).
+			HandleConnectedClientsDisconnectPost(httpHelper, &attributesApiClient{user: &api.UserResponse{ID: 42}}).
 				ServeHTTP(httptest.NewRecorder(), req)
 
 			httpHelper.AssertExpectations(t)

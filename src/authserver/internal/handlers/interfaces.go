@@ -108,7 +108,7 @@ type TokenValidator interface {
 }
 
 type TokenParser interface {
-	DecodeAndValidateTokenString(ctx context.Context, token string, withExpirationCheck bool) (*oauth.JwtToken, error)
+	DecodeAndValidateTokenString(ctx context.Context, token string, withExpirationCheck bool) (*oauth.JWTToken, error)
 }
 
 // AuditLogger records one security event. The context is first because every audit event raised

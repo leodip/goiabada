@@ -59,7 +59,7 @@ func TestAPIResourcePermissionsGet_Success(t *testing.T) {
 		permissionMap[perm.PermissionIdentifier] = perm
 
 		// Verify each permission has embedded resource info
-		assert.Equal(t, resource.Id, perm.ResourceId)
+		assert.Equal(t, resource.Id, perm.ResourceID)
 		assert.Equal(t, resource.ResourceIdentifier, perm.Resource.ResourceIdentifier)
 		assert.Equal(t, resource.Description, perm.Resource.Description)
 	}
@@ -67,17 +67,17 @@ func TestAPIResourcePermissionsGet_Success(t *testing.T) {
 	// Verify specific permissions
 	readPerm, foundRead := permissionMap["read"]
 	assert.True(t, foundRead, "Read permission should be present")
-	assert.Equal(t, perm1.Id, readPerm.Id)
+	assert.Equal(t, perm1.Id, readPerm.ID)
 	assert.Equal(t, "Read permission", readPerm.Description)
 
 	writePerm, foundWrite := permissionMap["write"]
 	assert.True(t, foundWrite, "Write permission should be present")
-	assert.Equal(t, perm2.Id, writePerm.Id)
+	assert.Equal(t, perm2.Id, writePerm.ID)
 	assert.Equal(t, "Write permission", writePerm.Description)
 
 	adminPerm, foundAdmin := permissionMap["admin"]
 	assert.True(t, foundAdmin, "Admin permission should be present")
-	assert.Equal(t, perm3.Id, adminPerm.Id)
+	assert.Equal(t, perm3.Id, adminPerm.ID)
 	assert.Equal(t, "Admin permission", adminPerm.Description)
 }
 
@@ -194,7 +194,7 @@ func TestAPIResourcePermissionsGet_TheAuthServerResourceAnswersEveryStoredPermis
 	}
 	answeredIds := make(map[int64]string, len(getResponse.Permissions))
 	for _, p := range getResponse.Permissions {
-		answeredIds[p.Id] = p.PermissionIdentifier
+		answeredIds[p.ID] = p.PermissionIdentifier
 	}
 	assert.Equal(t, storedIds, answeredIds, "the GET answers exactly the stored permissions")
 
@@ -239,7 +239,7 @@ func TestAPIResourcePermissionsGet_AuthServerResourceIncludesOtherPermissions(t 
 	// Assert: Should include our test permission
 	found := false
 	for _, perm := range getResponse.Permissions {
-		if perm.Id == testPerm.Id {
+		if perm.ID == testPerm.Id {
 			found = true
 			assert.Equal(t, "test-auth-perm", perm.PermissionIdentifier)
 			assert.Equal(t, "Test Auth Permission", perm.Description)
@@ -291,11 +291,11 @@ func TestAPIResourcePermissionsGet_NonAuthServerResourceIncludesAllPermissions(t
 	// Both permissions should be present
 	userinfoResp, foundUserinfo := permMap["userinfo"]
 	assert.True(t, foundUserinfo, "Userinfo permission should be present")
-	assert.Equal(t, userinfoLikePerm.Id, userinfoResp.Id)
+	assert.Equal(t, userinfoLikePerm.Id, userinfoResp.ID)
 
 	regularResp, foundRegular := permMap["regular-perm"]
 	assert.True(t, foundRegular, "Regular permission should be present")
-	assert.Equal(t, regularPerm.Id, regularResp.Id)
+	assert.Equal(t, regularPerm.Id, regularResp.ID)
 }
 
 func TestAPIResourcePermissionsGet_Unauthorized(t *testing.T) {
@@ -379,7 +379,7 @@ func TestAPIResourcePermissionsGet_LargeNumberOfPermissions(t *testing.T) {
 
 	// Verify all permissions have proper resource info embedded
 	for _, perm := range getResponse.Permissions {
-		assert.Equal(t, resource.Id, perm.ResourceId)
+		assert.Equal(t, resource.Id, perm.ResourceID)
 		assert.Equal(t, resource.ResourceIdentifier, perm.Resource.ResourceIdentifier)
 		assert.Equal(t, resource.Description, perm.Resource.Description)
 		assert.NotEmpty(t, perm.PermissionIdentifier)
@@ -389,7 +389,7 @@ func TestAPIResourcePermissionsGet_LargeNumberOfPermissions(t *testing.T) {
 	// Verify we can find all our created permissions
 	responsePermIds := make(map[int64]bool)
 	for _, perm := range getResponse.Permissions {
-		responsePermIds[perm.Id] = true
+		responsePermIds[perm.ID] = true
 	}
 
 	for _, createdPerm := range permissions {

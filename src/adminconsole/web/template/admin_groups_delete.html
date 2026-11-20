@@ -28,7 +28,7 @@
       <dd>{{ .group.Description }}</dd>
       {{ end }}
       <dt>{{ T $.ctx "adminconsole.admin_groups.delete.field.member_count" }}</dt>
-      <dd>{{ .countOfUsers }} <a class="text-link ml-2" href="/admin/groups/{{ .group.Id }}/members">{{ T $.ctx "adminconsole.admin_groups.delete.view_users_link" }}</a></dd>
+      <dd>{{ .countOfUsers }} <a class="text-link ml-2" href="/admin/groups/{{ .group.ID }}/members">{{ T $.ctx "adminconsole.admin_groups.delete.view_users_link" }}</a></dd>
     </dl>
 
     <div class="field max-w-md">

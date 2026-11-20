@@ -56,14 +56,14 @@ func HandleAttributesGet(
 		}
 
 		// Get group attributes via API
-		attributes, err := apiClient.GetGroupAttributesByGroupId(r.Context(), jwtInfo.TokenResponse.AccessToken, group.Id)
+		attributes, err := apiClient.GetGroupAttributesByGroupId(r.Context(), jwtInfo.TokenResponse.AccessToken, group.ID)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
 		bind := map[string]interface{}{
-			"groupId":         group.Id,
+			"groupId":         group.ID,
 			"groupIdentifier": group.GroupIdentifier,
 			"description":     group.Description,
 			"attributes":      attributes,

@@ -106,11 +106,11 @@ func HandleSessionLoadPost(database sessionsDatabase) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req api.SessionLoadRequest
-		if !readSessionRequest(r, w, &req, func() string { return req.Id }) {
+		if !readSessionRequest(r, w, &req, func() string { return req.ID }) {
 			return
 		}
 
-		record, err := backend.Load(r.Context(), req.Id)
+		record, err := backend.Load(r.Context(), req.ID)
 		if err != nil {
 			if errors.Is(err, sessionstore.ErrNotFound) {
 				writeJSONError(w, "Session not found", "NOT_FOUND", http.StatusNotFound)
@@ -136,11 +136,11 @@ func HandleSessionCreatePost(database sessionsDatabase) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req api.SessionWriteRequest
-		if !readSessionRequest(r, w, &req, func() string { return req.Id }) {
+		if !readSessionRequest(r, w, &req, func() string { return req.ID }) {
 			return
 		}
 
-		expiresAt, err := backend.Create(r.Context(), req.Id, []byte(req.Data), req.Authenticated)
+		expiresAt, err := backend.Create(r.Context(), req.ID, []byte(req.Data), req.Authenticated)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "failed to create a browser session"))
 			return
@@ -160,11 +160,11 @@ func HandleSessionUpdatePost(database sessionsDatabase) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req api.SessionWriteRequest
-		if !readSessionRequest(r, w, &req, func() string { return req.Id }) {
+		if !readSessionRequest(r, w, &req, func() string { return req.ID }) {
 			return
 		}
 
-		expiresAt, err := backend.Update(r.Context(), req.Id, []byte(req.Data), req.Authenticated)
+		expiresAt, err := backend.Update(r.Context(), req.ID, []byte(req.Data), req.Authenticated)
 		if err != nil {
 			if errors.Is(err, sessionstore.ErrNotFound) {
 				writeJSONError(w, "Session not found", "NOT_FOUND", http.StatusNotFound)
@@ -188,11 +188,11 @@ func HandleSessionTouchPost(database sessionsDatabase) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req api.SessionTouchRequest
-		if !readSessionRequest(r, w, &req, func() string { return req.Id }) {
+		if !readSessionRequest(r, w, &req, func() string { return req.ID }) {
 			return
 		}
 
-		expiresAt, err := backend.Touch(r.Context(), req.Id, req.Authenticated)
+		expiresAt, err := backend.Touch(r.Context(), req.ID, req.Authenticated)
 		if err != nil {
 			if errors.Is(err, sessionstore.ErrNotFound) {
 				writeJSONError(w, "Session not found", "NOT_FOUND", http.StatusNotFound)
@@ -216,11 +216,11 @@ func HandleSessionDeletePost(database sessionsDatabase) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req api.SessionLoadRequest
-		if !readSessionRequest(r, w, &req, func() string { return req.Id }) {
+		if !readSessionRequest(r, w, &req, func() string { return req.ID }) {
 			return
 		}
 
-		if err := backend.Delete(r.Context(), req.Id); err != nil {
+		if err := backend.Delete(r.Context(), req.ID); err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "failed to delete a browser session"))
 			return
 		}

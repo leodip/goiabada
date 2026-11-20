@@ -68,7 +68,7 @@ func TestValidateTokenRequest_RefreshToken_TheAuthenticationInstant(t *testing.T
 
 				mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "ropc_client").Return(client, nil)
 				mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "ropc_refresh_token", true).
-					Return(&oauth.JwtToken{Claims: jwt.MapClaims{
+					Return(&oauth.JWTToken{Claims: jwt.MapClaims{
 						"jti": "ropc_jti", "typ": "Offline", "sub": "ropc_user_subject",
 						"offline_access_max_lifetime": float64(time.Now().UTC().Add(24 * time.Hour).Unix()),
 					}}, nil)
@@ -130,7 +130,7 @@ func TestValidateTokenRequest_RefreshToken_TheAuthenticationInstant(t *testing.T
 		now := time.Now().UTC()
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test_client").Return(client, nil)
 		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "the-refresh-token", true).
-			Return(&oauth.JwtToken{Claims: jwt.MapClaims{"jti": "the-jti", "typ": "Refresh", "sub": "user_subject"}}, nil)
+			Return(&oauth.JWTToken{Claims: jwt.MapClaims{"jti": "the-jti", "typ": "Refresh", "sub": "user_subject"}}, nil)
 		mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "the-jti").Return(refreshToken, nil)
 		mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)

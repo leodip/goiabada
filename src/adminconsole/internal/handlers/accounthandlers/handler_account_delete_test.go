@@ -37,7 +37,7 @@ type deleteAccountAPI struct {
 }
 
 func (a *deleteAccountAPI) GetAccountProfile(_ context.Context, _ string) (*api.UserResponse, error) {
-	return &api.UserResponse{Id: 7, Email: "someone@example.com", OTPEnabled: a.otpEnabled}, nil
+	return &api.UserResponse{ID: 7, Email: "someone@example.com", OTPEnabled: a.otpEnabled}, nil
 }
 
 func (a *deleteAccountAPI) DeleteAccount(_ context.Context, accessToken string, request *api.DeleteAccountRequest) error {
@@ -115,7 +115,7 @@ func TestHandleDeleteAccountPost_SendsThePasswordAndTheCodeShown(t *testing.T) {
 		{"the password alone", url.Values{"password": {"P4ss!word"}},
 			api.DeleteAccountRequest{Password: "P4ss!word"}},
 		{"with an authentication code", url.Values{"password": {"P4ss!word"}, "otp": {"123456"}},
-			api.DeleteAccountRequest{Password: "P4ss!word", OtpCode: "123456"}},
+			api.DeleteAccountRequest{Password: "P4ss!word", OTPCode: "123456"}},
 		{"with a recovery code", url.Values{"password": {"P4ss!word"}, "recoveryCode": {"7kq2-m9xh-4trw-b3np-j6vd-egac"}},
 			api.DeleteAccountRequest{Password: "P4ss!word", RecoveryCode: "7kq2-m9xh-4trw-b3np-j6vd-egac"}},
 	}

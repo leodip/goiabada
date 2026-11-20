@@ -56,7 +56,7 @@ func HandleMembersAddGet(
 		}
 
 		bind := map[string]interface{}{
-			"groupId":         group.Id,
+			"groupId":         group.ID,
 			"groupIdentifier": group.GroupIdentifier,
 			"description":     group.Description,
 		}
@@ -112,7 +112,7 @@ func HandleMembersSearchGet(
 			return
 		}
 
-		users, _, err := apiClient.SearchUsersWithGroupAnnotation(r.Context(), jwtInfo.TokenResponse.AccessToken, query, group.Id, 1, 15)
+		users, _, err := apiClient.SearchUsersWithGroupAnnotation(r.Context(), jwtInfo.TokenResponse.AccessToken, query, group.ID, 1, 15)
 		if err != nil {
 			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
@@ -121,7 +121,7 @@ func HandleMembersSearchGet(
 		usersResult := make([]UserResult, 0)
 		for _, user := range users {
 			usersResult = append(usersResult, UserResult{
-				Id:           user.Id,
+				Id:           user.ID,
 				Subject:      user.Subject,
 				Username:     user.Username,
 				Email:        user.Email,

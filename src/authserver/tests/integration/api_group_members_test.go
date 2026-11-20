@@ -277,7 +277,7 @@ func TestAPIGroupMemberAdd_Success(t *testing.T) {
 
 	// Test: Add user to group
 	addRequest := api.AddGroupMemberRequest{
-		UserId: testUser.Id,
+		UserID: testUser.Id,
 	}
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/members"
 	resp := makeAPIRequest(t, "POST", url, accessToken, addRequest)
@@ -342,7 +342,7 @@ func TestAPIGroupMemberAdd_UserAlreadyInGroup(t *testing.T) {
 
 	// Test: Try to add user to group again
 	addRequest := api.AddGroupMemberRequest{
-		UserId: testUser.Id,
+		UserID: testUser.Id,
 	}
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/members"
 	resp := makeAPIRequest(t, "POST", url, accessToken, addRequest)
@@ -369,7 +369,7 @@ func TestAPIGroupMemberAdd_UserNotFound(t *testing.T) {
 
 	// Test: Try to add non-existent user to group
 	addRequest := api.AddGroupMemberRequest{
-		UserId: 99999,
+		UserID: 99999,
 	}
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/members"
 	resp := makeAPIRequest(t, "POST", url, accessToken, addRequest)
@@ -385,7 +385,7 @@ func TestAPIGroupMemberAdd_GroupNotFound(t *testing.T) {
 
 	// Test: Try to add user to non-existent group
 	addRequest := api.AddGroupMemberRequest{
-		UserId: 1,
+		UserID: 1,
 	}
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/99999/members"
 	resp := makeAPIRequest(t, "POST", url, accessToken, addRequest)

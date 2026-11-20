@@ -52,7 +52,7 @@ type bodyLimitPrefix struct {
 
 // newBodyLimiter compiles a policy and refuses the shapes that are silently wrong.
 //
-// It panics rather than returning an error for the reason newCsrfSkipper does: a policy is a literal
+// It panics rather than returning an error for the reason newCSRFSkipper does: a policy is a literal
 // at a composition root, evaluated once at startup, and every refusal here is a programming error no
 // request can produce. A limit of zero refuses every body on its routes, and a key that is not
 // "METHOD /pattern" or a prefix that is not a path can never match anything, so the entry it was

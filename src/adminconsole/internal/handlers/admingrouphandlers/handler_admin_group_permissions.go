@@ -65,7 +65,7 @@ func HandlePermissionsGet(
 			GroupId         int64
 			GroupIdentifier string
 		}{
-			GroupId:         group.Id,
+			GroupId:         group.ID,
 			GroupIdentifier: group.GroupIdentifier,
 		}
 
@@ -73,7 +73,7 @@ func HandlePermissionsGet(
 		granted := make([]grantedPermission, 0, len(groupPermissions))
 		for _, permission := range groupPermissions {
 			granted = append(granted, grantedPermission{
-				Id:    permission.Id,
+				Id:    permission.ID,
 				Scope: permission.Resource.ResourceIdentifier + ":" + permission.PermissionIdentifier,
 			})
 		}
@@ -152,8 +152,8 @@ func HandlePermissionsPost(
 
 		// Update group permissions via API (includes validation, security, and audit logging)
 		updateReq := &api.UpdateGroupPermissionsRequest{
-			PermissionIds:         data.AssignedPermissionsIds,
-			ExpectedPermissionIds: data.ExpectedPermissionIds,
+			PermissionIDs:         data.AssignedPermissionsIds,
+			ExpectedPermissionIDs: data.ExpectedPermissionIds,
 		}
 
 		err = apiClient.UpdateGroupPermissions(r.Context(), jwtInfo.TokenResponse.AccessToken, data.GroupId, updateReq)

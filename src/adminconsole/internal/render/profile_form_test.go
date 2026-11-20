@@ -88,7 +88,7 @@ func TestParseProfileForm_RefusesAZoneValueThatIsNotTwoHalves(t *testing.T) {
 func TestEchoProfileForm_ShowsTheSubmittedValues(t *testing.T) {
 	stored := time.Date(1980, 1, 2, 0, 0, 0, 0, time.UTC)
 	user := &api.UserResponse{
-		Id:                  4,
+		ID:                  4,
 		Email:               "jane@example.com",
 		Username:            "old",
 		GivenName:           "Old",
@@ -118,7 +118,7 @@ func TestEchoProfileForm_ShowsTheSubmittedValues(t *testing.T) {
 	})
 
 	assert.Equal(t, &api.UserResponse{
-		Id:                  4,
+		ID:                  4,
 		Email:               "jane@example.com",
 		Username:            "jdoe",
 		GivenName:           "Jane",

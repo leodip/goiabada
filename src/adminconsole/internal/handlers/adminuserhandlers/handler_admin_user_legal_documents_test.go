@@ -44,10 +44,10 @@ func TestHandleLegalDocumentsGet_BindsTheUsersAcceptances(t *testing.T) {
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_users_legal_documents.html").Maybe()
 
 	acceptances := []api.LegalDocumentAcceptanceResponse{
-		{Id: 4, LegalDocumentId: 8, ShortName: "house", Version: 1, Title: "House rules", Retired: true},
-		{Id: 3, LegalDocumentId: 7, ShortName: "terms", Version: 2, Title: "Terms of use"},
+		{ID: 4, LegalDocumentID: 8, ShortName: "house", Version: 1, Title: "House rules", Retired: true},
+		{ID: 3, LegalDocumentID: 7, ShortName: "terms", Version: 2, Title: "Terms of use"},
 	}
-	apiClient := &userLegalDocumentsApiClient{user: &api.UserResponse{Id: 7, Email: "someone@example.com"}, acceptances: acceptances}
+	apiClient := &userLegalDocumentsApiClient{user: &api.UserResponse{ID: 7, Email: "someone@example.com"}, acceptances: acceptances}
 
 	req := handlertest.Request(http.MethodGet, "/admin/users/7/legal-documents?page=2&query=some",
 		handlertest.WithAccessToken(), handlertest.WithPathValue("userId", "7"))
@@ -58,7 +58,7 @@ func TestHandleLegalDocumentsGet_BindsTheUsersAcceptances(t *testing.T) {
 	got, ok := bind["acceptances"].([]api.LegalDocumentAcceptanceResponse)
 	require.True(t, ok, "the bind carries no acceptances")
 	assert.Equal(t, acceptances, got)
-	assert.Equal(t, int64(7), bind["user"].(*api.UserResponse).Id)
+	assert.Equal(t, int64(7), bind["user"].(*api.UserResponse).ID)
 	assert.Equal(t, "2", bind["page"])
 	assert.Equal(t, "some", bind["query"])
 }

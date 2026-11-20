@@ -74,7 +74,7 @@ func HandleAttributesEditGet(
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
-		if attribute == nil || attribute.GroupId != group.Id {
+		if attribute == nil || attribute.GroupID != group.ID {
 			httpHelper.NotFound(w, r)
 			return
 		}
@@ -148,7 +148,7 @@ func HandleAttributesEditPost(
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
-		if currentAttribute == nil || currentAttribute.GroupId != group.Id {
+		if currentAttribute == nil || currentAttribute.GroupID != group.ID {
 			httpHelper.NotFound(w, r)
 			return
 		}
@@ -166,7 +166,7 @@ func HandleAttributesEditPost(
 		tempAttribute.Key = key
 		tempAttribute.Value = value
 		tempAttribute.IncludeInAccessToken = includeInAccessToken
-		tempAttribute.IncludeInIdToken = includeInIdToken
+		tempAttribute.IncludeInIDToken = includeInIdToken
 
 		renderError := func(message, errorField string) {
 			bind := map[string]interface{}{
@@ -188,7 +188,7 @@ func HandleAttributesEditPost(
 			Key:                  key,
 			Value:                value,
 			IncludeInAccessToken: includeInAccessToken,
-			IncludeInIdToken:     includeInIdToken,
+			IncludeInIDToken:     includeInIdToken,
 		}
 
 		_, err = apiClient.UpdateGroupAttribute(r.Context(), jwtInfo.TokenResponse.AccessToken, attributeId, updateReq)
@@ -199,6 +199,6 @@ func HandleAttributesEditPost(
 			return
 		}
 
-		http.Redirect(w, r, fmt.Sprintf("/admin/groups/%v/attributes", group.Id), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("/admin/groups/%v/attributes", group.ID), http.StatusFound)
 	}
 }

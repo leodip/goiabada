@@ -62,10 +62,10 @@ func renderUserDelete(t *testing.T, client *deleteUserApiClient) map[string]inte
 // belonged to no groups. The handler loads them now, from the endpoint that serves them (#350).
 func TestHandleDeleteGet_BindsTheMembershipsTheDeletionWillDiscard(t *testing.T) {
 	client := &deleteUserApiClient{
-		user: &api.UserResponse{Id: 7, Email: "someone@example.com"},
+		user: &api.UserResponse{ID: 7, Email: "someone@example.com"},
 		groups: []api.GroupResponse{
-			{Id: 2, GroupIdentifier: "admins"},
-			{Id: 3, GroupIdentifier: "site-viewers"},
+			{ID: 2, GroupIdentifier: "admins"},
+			{ID: 3, GroupIdentifier: "site-viewers"},
 		},
 	}
 
@@ -84,7 +84,7 @@ func TestHandleDeleteGet_BindsTheMembershipsTheDeletionWillDiscard(t *testing.T)
 // A user in no groups still renders, and the row's "none" arm is what it renders. This is the case
 // that was indistinguishable from the defect above before the fix.
 func TestHandleDeleteGet_AUserInNoGroupsBindsNone(t *testing.T) {
-	bind := renderUserDelete(t, &deleteUserApiClient{user: &api.UserResponse{Id: 7}})
+	bind := renderUserDelete(t, &deleteUserApiClient{user: &api.UserResponse{ID: 7}})
 
 	groups, ok := bind["groups"].([]api.GroupResponse)
 	require.True(t, ok, "the bind carries no groups key")
@@ -100,10 +100,10 @@ func TestHandleDeleteGet_BindsTheAssembledFullName(t *testing.T) {
 		user  *api.UserResponse
 		wants string
 	}{
-		{"all three parts", &api.UserResponse{Id: 7, GivenName: "Jane", MiddleName: "Q", FamilyName: "Doe"}, "Jane Q Doe"},
-		{"no middle name", &api.UserResponse{Id: 7, GivenName: "Jane", FamilyName: "Doe"}, "Jane Doe"},
-		{"family name only", &api.UserResponse{Id: 7, FamilyName: "Doe"}, "Doe"},
-		{"no name at all", &api.UserResponse{Id: 7}, ""},
+		{"all three parts", &api.UserResponse{ID: 7, GivenName: "Jane", MiddleName: "Q", FamilyName: "Doe"}, "Jane Q Doe"},
+		{"no middle name", &api.UserResponse{ID: 7, GivenName: "Jane", FamilyName: "Doe"}, "Jane Doe"},
+		{"family name only", &api.UserResponse{ID: 7, FamilyName: "Doe"}, "Doe"},
+		{"no name at all", &api.UserResponse{ID: 7}, ""},
 	}
 
 	for _, tc := range testCases {
@@ -120,7 +120,7 @@ func TestHandleDeleteGet_BindsTheAssembledFullName(t *testing.T) {
 func TestHandleDeletePost_RefusesAnEmailThatIsNotTheUsers(t *testing.T) {
 	for _, typed := range []string{"", "  ", "someone-else@example.com"} {
 		t.Run(typed, func(t *testing.T) {
-			client := &deleteUserApiClient{user: &api.UserResponse{Id: 7, Email: "someone@example.com"}}
+			client := &deleteUserApiClient{user: &api.UserResponse{ID: 7, Email: "someone@example.com"}}
 			httpHelper := handlersmocks.NewHttpHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 			handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_users_delete.html").Once()

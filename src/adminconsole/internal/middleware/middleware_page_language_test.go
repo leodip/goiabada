@@ -47,7 +47,7 @@ func signedInWithPageLanguage(pageLanguage string, present bool) map[string]any 
 
 // The stored ID token carries a locale claim of German in every row, which the console no longer
 // reads: Language and region steers no console page (#631 decision 2).
-var verifiedStoredWithLocale = &oauth.JwtToken{TokenBase64: storedIDTokenRaw,
+var verifiedStoredWithLocale = &oauth.JWTToken{TokenBase64: storedIDTokenRaw,
 	Claims: map[string]any{"sub": "the-admin", "locale": "de"}}
 
 // A user's page language, copied into the console's session, wins over ?ui_locales and the

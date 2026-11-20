@@ -227,36 +227,36 @@ func TestFileName_IsTheUserIdAndTheUTCDate(t *testing.T) {
 func releasedAttributesParts() Parts {
 	return Parts{
 		Attributes: []api.UserAttributeResponse{
-			{Id: 13, Key: "both_flags", Value: "b", IncludeInIdToken: true, IncludeInAccessToken: true, UserId: 42},
-			{Id: 12, Key: "access_token_only", Value: "a", IncludeInAccessToken: true, UserId: 42},
-			{Id: 11, Key: "id_token_only", Value: "i", IncludeInIdToken: true, UserId: 42},
-			{Id: 10, Key: "administrators_note", Value: "slow to answer email", UserId: 42},
+			{ID: 13, Key: "both_flags", Value: "b", IncludeInIDToken: true, IncludeInAccessToken: true, UserID: 42},
+			{ID: 12, Key: "access_token_only", Value: "a", IncludeInAccessToken: true, UserID: 42},
+			{ID: 11, Key: "id_token_only", Value: "i", IncludeInIDToken: true, UserID: 42},
+			{ID: 10, Key: "administrators_note", Value: "slow to answer email", UserID: 42},
 		},
 		Groups: []api.UserExportGroupResponse{
 			{
-				GroupResponse: api.GroupResponse{Id: 5, GroupIdentifier: "sales", Description: "Sales team"},
+				GroupResponse: api.GroupResponse{ID: 5, GroupIdentifier: "sales", Description: "Sales team"},
 				Attributes: []api.GroupAttributeResponse{
-					{Id: 33, Key: "group_both_flags", Value: "gb", IncludeInIdToken: true, IncludeInAccessToken: true, GroupId: 5},
-					{Id: 32, Key: "group_access_token_only", Value: "ga", IncludeInAccessToken: true, GroupId: 5},
-					{Id: 31, Key: "group_id_token_only", Value: "gi", IncludeInIdToken: true, GroupId: 5},
-					{Id: 30, Key: "group_note", Value: "under review", GroupId: 5},
+					{ID: 33, Key: "group_both_flags", Value: "gb", IncludeInIDToken: true, IncludeInAccessToken: true, GroupID: 5},
+					{ID: 32, Key: "group_access_token_only", Value: "ga", IncludeInAccessToken: true, GroupID: 5},
+					{ID: 31, Key: "group_id_token_only", Value: "gi", IncludeInIDToken: true, GroupID: 5},
+					{ID: 30, Key: "group_note", Value: "under review", GroupID: 5},
 				},
 				Permissions: []api.PermissionResponse{
-					{Id: 20, PermissionIdentifier: "orders:read", Description: "Read orders", ResourceId: 3,
-						Resource: api.ResourceResponse{Id: 3, ResourceIdentifier: "orders-api", Description: "Orders API"}},
+					{ID: 20, PermissionIdentifier: "orders:read", Description: "Read orders", ResourceID: 3,
+						Resource: api.ResourceResponse{ID: 3, ResourceIdentifier: "orders-api", Description: "Orders API"}},
 				},
 			},
 			{
-				GroupResponse: api.GroupResponse{Id: 8, GroupIdentifier: "auditors", Description: "Auditors"},
+				GroupResponse: api.GroupResponse{ID: 8, GroupIdentifier: "auditors", Description: "Auditors"},
 				Attributes: []api.GroupAttributeResponse{
-					{Id: 34, Key: "auditors_note", Value: "temporary", GroupId: 8},
+					{ID: 34, Key: "auditors_note", Value: "temporary", GroupID: 8},
 				},
 				Permissions: []api.PermissionResponse{},
 			},
 		},
 		Permissions: []api.PermissionResponse{
-			{Id: 22, PermissionIdentifier: "orders:export", Description: "Export orders", ResourceId: 3,
-				Resource: api.ResourceResponse{Id: 3, ResourceIdentifier: "orders-api", Description: "Orders API"}},
+			{ID: 22, PermissionIdentifier: "orders:export", Description: "Export orders", ResourceID: 3,
+				Resource: api.ResourceResponse{ID: 3, ResourceIdentifier: "orders-api", Description: "Orders API"}},
 		},
 	}
 }

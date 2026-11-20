@@ -86,7 +86,7 @@ type StoredRefreshToken struct {
 // live token from a dead one is decided before that match: a public client_id is no secret, so a
 // check above it would let anyone holding a stolen token learn what became of the grant by
 // presenting it under any public client (#137).
-func FindRefreshToken(ctx context.Context, database RefreshDatabase, token oauth.JwtToken) (*StoredRefreshToken, error) {
+func FindRefreshToken(ctx context.Context, database RefreshDatabase, token oauth.JWTToken) (*StoredRefreshToken, error) {
 	jti := token.StringClaim("jti")
 	if len(jti) == 0 {
 		return nil, errs.New("the refresh token is invalid because it does not contain a jti claim")
@@ -165,7 +165,7 @@ func FindRefreshToken(ctx context.Context, database RefreshDatabase, token oauth
 // revoked one only once it gets as far as its session's bounds: a nil settings is ErrNoSettings.
 // Any error is a fault, never a refusal: the token's state could not be read, and a caller must not
 // answer it as a dead token.
-func RefreshToken(ctx context.Context, database RefreshDatabase, stored *StoredRefreshToken, token oauth.JwtToken,
+func RefreshToken(ctx context.Context, database RefreshDatabase, stored *StoredRefreshToken, token oauth.JWTToken,
 	settings *record.Settings, now time.Time) (RefreshRefusal, error) {
 
 	row := stored.Row

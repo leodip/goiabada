@@ -32,7 +32,7 @@ type systemLevelApiClient struct {
 
 func (c *systemLevelApiClient) GetResourceById(_ context.Context, accessToken string, resourceId int64) (*api.ResourceResponse, error) {
 	resource := c.resource
-	resource.Id = resourceId
+	resource.ID = resourceId
 	return &resource, nil
 }
 

@@ -25,7 +25,7 @@ const refusedPhoneDescription = "The phone number is not valid."
 type phoneApiClient struct{}
 
 func (phoneApiClient) GetUserById(_ context.Context, _ string, userId int64) (*api.UserResponse, error) {
-	return &api.UserResponse{Id: userId, Username: "jdoe", PhoneNumberCountryUniqueId: "PRT_0",
+	return &api.UserResponse{ID: userId, Username: "jdoe", PhoneNumberCountryUniqueID: "PRT_0",
 		PhoneNumberCountryCallingCode: "+351", PhoneNumber: "912 345 678"}, nil
 }
 
@@ -37,7 +37,7 @@ func (phoneApiClient) UpdateUserPhone(_ context.Context, _ string, _ int64, _ *a
 // portugal is the core list's entry for Portugal, written out rather than looked up, so the page is
 // held to the ids and labels a save stores (#563 decision 1).
 var portugal = phonecountries.PhoneCountry{
-	UniqueId:    "PRT_0",
+	UniqueID:    "PRT_0",
 	Alpha2:      "PT",
 	Emoji:       "🇵🇹",
 	CallingCode: "+351",

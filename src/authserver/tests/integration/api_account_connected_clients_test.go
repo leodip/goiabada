@@ -150,9 +150,9 @@ func listConnectedClients(t *testing.T, accessToken string) (map[int64]api.Conne
 	require.NoError(t, json.Unmarshal(body, &list))
 	rows := map[int64]api.ConnectedClientResponse{}
 	for _, row := range list.Clients {
-		_, repeated := rows[row.ClientId]
+		_, repeated := rows[row.ClientID]
 		require.False(t, repeated, "a client is listed once: %s", body)
-		rows[row.ClientId] = row
+		rows[row.ClientID] = row
 	}
 	return rows, string(body)
 }
@@ -214,13 +214,13 @@ func TestAPIAccountConnectedClients_ListsEveryClientWithNoConsent(t *testing.T) 
 
 	rows, _ := listConnectedClients(t, c.console.accessToken(t))
 	want := map[int64]api.ConnectedClientResponse{
-		console.Id: {ClientId: console.Id, ClientIdentifier: builtin.AdminConsoleClientIdentifier,
+		console.Id: {ClientID: console.Id, ClientIdentifier: builtin.AdminConsoleClientIdentifier,
 			GrantScope: "openid authserver:manage-account", IsCurrent: true},
-		c.x.client.Id: {ClientId: c.x.client.Id, ClientIdentifier: c.x.client.ClientIdentifier,
+		c.x.client.Id: {ClientID: c.x.client.Id, ClientIdentifier: c.x.client.ClientIdentifier,
 			ClientName: c.x.client.ClientIdentifier, GrantScope: "openid profile"},
-		c.y.client.Id: {ClientId: c.y.client.Id, ClientIdentifier: c.y.client.ClientIdentifier,
+		c.y.client.Id: {ClientID: c.y.client.Id, ClientIdentifier: c.y.client.ClientIdentifier,
 			ClientName: c.y.client.ClientIdentifier, GrantScope: "openid email"},
-		c.ropc.Id: {ClientId: c.ropc.Id, ClientIdentifier: c.ropc.ClientIdentifier,
+		c.ropc.Id: {ClientID: c.ropc.Id, ClientIdentifier: c.ropc.ClientIdentifier,
 			ClientName: c.ropc.ClientIdentifier, GrantScope: "openid"},
 	}
 	require.ElementsMatch(t, clientIdsOf(want), clientIdsOf(rows))
@@ -356,7 +356,7 @@ func TestAPIAccountConnectedClients_AConsentIsPartOfItsClientsRow(t *testing.T) 
 	rows, raw := listConnectedClients(t, c.console.accessToken(t))
 	require.Contains(t, rows, c.x.client.Id)
 	require.NotNil(t, rows[c.x.client.Id].Consent)
-	assert.Equal(t, xConsent.Id, rows[c.x.client.Id].Consent.Id)
+	assert.Equal(t, xConsent.Id, rows[c.x.client.Id].Consent.ID)
 	assert.Equal(t, "openid profile email", rows[c.x.client.Id].Consent.Scope)
 	require.NotNil(t, rows[c.x.client.Id].Consent.GrantedAt)
 	assert.WithinDuration(t, grantedAt, *rows[c.x.client.Id].Consent.GrantedAt, time.Second)
@@ -364,11 +364,11 @@ func TestAPIAccountConnectedClients_AConsentIsPartOfItsClientsRow(t *testing.T) 
 
 	require.Contains(t, rows, named.Id)
 	assert.Equal(t, api.ConnectedClientResponse{
-		ClientId:          named.Id,
+		ClientID:          named.Id,
 		ClientIdentifier:  named.ClientIdentifier,
 		ClientName:        "Customer portal",
 		ClientDescription: "Orders and invoices",
-		Consent:           &api.ConnectedClientConsentResponse{Id: namedConsent.Id, Scope: "openid"},
+		Consent:           &api.ConnectedClientConsentResponse{ID: namedConsent.Id, Scope: "openid"},
 		GrantScope:        "",
 	}, rows[named.Id])
 	assert.Contains(t, raw, `"grantedAt":null`, "a consent that recorded no time says so")

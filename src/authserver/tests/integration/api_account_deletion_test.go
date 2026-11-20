@@ -154,7 +154,7 @@ func enableAuthenticatorOverAPI(t *testing.T, accessToken string) (string, []str
 	t.Helper()
 	secret := getOTPEnrollment(t, accessToken).SecretKey
 	status, body := putAccountOTP(t, accessToken, api.UpdateAccountOTPRequest{
-		Enabled: true, Password: deletionUserPassword, OtpCode: otptest.PreviousStepCode(t, secret),
+		Enabled: true, Password: deletionUserPassword, OTPCode: otptest.PreviousStepCode(t, secret),
 	})
 	require.Equal(t, http.StatusOK, status, body)
 	var enabled api.UpdateAccountOTPResponse
@@ -214,7 +214,7 @@ func TestAPIAccountDeletion_DeletesWithAnAuthenticatorCode(t *testing.T) {
 	require.True(t, userExists(t, user.Id))
 
 	code := otptest.Code(t, secret, time.Now())
-	status, body, _ = deleteAccount(t, accessToken, api.DeleteAccountRequest{Password: deletionUserPassword, OtpCode: code})
+	status, body, _ = deleteAccount(t, accessToken, api.DeleteAccountRequest{Password: deletionUserPassword, OTPCode: code})
 
 	require.Equal(t, http.StatusOK, status, "body: %v", body)
 	assert.False(t, userExists(t, user.Id))
@@ -266,7 +266,7 @@ func TestAPIAccountDeletion_RefusesAWrongOrUsedRecoveryCodeAndSpendsNone(t *test
 
 	// Both codes at once is refused before anything is checked.
 	status, body, _ := deleteAccount(t, accessToken, api.DeleteAccountRequest{
-		Password: deletionUserPassword, OtpCode: "123456", RecoveryCode: codes[1]})
+		Password: deletionUserPassword, OTPCode: "123456", RecoveryCode: codes[1]})
 	require.Equal(t, http.StatusBadRequest, status)
 	assert.Equal(t, "VALIDATION_ERROR", body["error_code"])
 	assert.Equal(t, 9, getRecoveryCodesRemaining(t, accessToken), "no refused deletion spent a code")

@@ -79,7 +79,7 @@ type ClientSettings struct {
 // clientSettingsFrom draws the Settings tab from the client as the auth server answers it.
 func clientSettingsFrom(c *api.ClientResponse) ClientSettings {
 	return ClientSettings{
-		ClientId:                    c.Id,
+		ClientId:                    c.ID,
 		ClientIdentifier:            c.ClientIdentifier,
 		Description:                 c.Description,
 		WebsiteURL:                  c.WebsiteURL,
@@ -95,10 +95,10 @@ func clientSettingsFrom(c *api.ClientResponse) ClientSettings {
 		ShowDescription:             c.ShowDescription,
 		ShowWebsiteURL:              c.ShowWebsiteURL,
 		AuthorizationCodeEnabled:    c.AuthorizationCodeEnabled,
-		DefaultAcrLevel:             c.DefaultAcrLevel,
+		DefaultAcrLevel:             c.DefaultACRLevel,
 		IsSystemLevelClient:         c.IsSystemLevelClient,
 		CreatedViaDCR:               c.CreatedViaDCR,
-		BrandId:                     brandIdOf(c.BrandId),
+		BrandId:                     brandIdOf(c.BrandID),
 		IsPublic:                    c.IsPublic,
 	}
 }
@@ -149,7 +149,7 @@ func bindBrands(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, a
 	options := make([]BrandOption, 0, len(brands))
 	defaultName := ""
 	for _, brand := range brands {
-		options = append(options, BrandOption{Id: brand.Id, Name: brand.Name})
+		options = append(options, BrandOption{Id: brand.ID, Name: brand.Name})
 		if brand.IsDefault {
 			defaultName = brand.Name
 		}
@@ -323,7 +323,7 @@ func HandleSettingsPost(
 			sentRememberConsent = &rememberConsent
 		}
 
-		brandId := submittedBrand(r, clientResp.BrandId)
+		brandId := submittedBrand(r, clientResp.BrandID)
 
 		adminClientSettings := ClientSettings{
 			ClientId:                    id,
@@ -379,7 +379,7 @@ func HandleSettingsPost(
 			ShowWebsiteURL:    adminClientSettings.ShowWebsiteURL,
 		}
 		if clientResp.AuthorizationCodeEnabled {
-			updateReq.DefaultAcrLevel = r.FormValue("defaultAcrLevel")
+			updateReq.DefaultACRLevel = r.FormValue("defaultAcrLevel")
 		}
 
 		updated, err := apiClient.UpdateClient(r.Context(), accessToken, id, updateReq)
@@ -420,8 +420,8 @@ func HandleSettingsPost(
 			}
 		}
 
-		if !sameBrand(brandId, clientResp.BrandId) {
-			_, err = apiClient.UpdateClientBrand(r.Context(), accessToken, id, &api.UpdateClientBrandRequest{BrandId: brandId})
+		if !sameBrand(brandId, clientResp.BrandID) {
+			_, err = apiClient.UpdateClientBrand(r.Context(), accessToken, id, &api.UpdateClientBrandRequest{BrandID: brandId})
 			if err != nil {
 				render.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderSavedWith("brandError"))
 				return

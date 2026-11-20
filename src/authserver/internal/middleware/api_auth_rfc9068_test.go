@@ -32,12 +32,12 @@ const (
 // issuedAccessToken is an access token as issuance mints it since #676: the at+jwt header, the
 // configured issuer, the client it was issued to and its jti, with claims on top, which may replace
 // any of them.
-func issuedAccessToken(claims map[string]interface{}) oauth.JwtToken {
+func issuedAccessToken(claims map[string]interface{}) oauth.JWTToken {
 	all := map[string]interface{}{"iss": guardIssuer, "client_id": guardClientIdentifier, "jti": guardJti}
 	for name, value := range claims {
 		all[name] = value
 	}
-	return oauth.JwtToken{Header: map[string]interface{}{"alg": "RS256", "typ": "at+jwt"}, Claims: all}
+	return oauth.JWTToken{Header: map[string]interface{}{"alg": "RS256", "typ": "at+jwt"}, Claims: all}
 }
 
 // guardSettings are the settings every guard test puts on the request: the issuer, an hour's idle

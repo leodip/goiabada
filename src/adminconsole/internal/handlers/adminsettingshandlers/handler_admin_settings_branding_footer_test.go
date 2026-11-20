@@ -101,11 +101,11 @@ func TestHandleBrandNewPost_SendsTheRowsInOrderSkippingEmptyOnes(t *testing.T) {
 
 	require.NotNil(t, apiClient.created)
 	assert.Equal(t, []api.BrandFooterLink{
-		{Url: "https://spring.example/privacy", Label: "Privacy", Labels: map[string]string{"de": "Datenschutz"}},
-		{Url: "", Label: "Status"},
+		{URL: "https://spring.example/privacy", Label: "Privacy", Labels: map[string]string{"de": "Datenschutz"}},
+		{URL: "", Label: "Status"},
 	}, apiClient.created.FooterLinks)
 	assert.Equal(t, "help@spring.example", apiClient.created.SupportEmail)
-	assert.Equal(t, "https://help.spring.example", apiClient.created.SupportUrl)
+	assert.Equal(t, "https://help.spring.example", apiClient.created.SupportURL)
 	assert.Equal(t, "+1 (555) 010-0199", apiClient.created.SupportPhone)
 }
 
@@ -140,9 +140,9 @@ func TestHandleBrandPost_SendsTheFooterTheFormHolds(t *testing.T) {
 			}))))
 
 	require.NotNil(t, apiClient.updated)
-	assert.Equal(t, []api.BrandFooterLink{{Url: "https://status.autumn.example", Label: "Status"}}, apiClient.updated.FooterLinks)
+	assert.Equal(t, []api.BrandFooterLink{{URL: "https://status.autumn.example", Label: "Status"}}, apiClient.updated.FooterLinks)
 	assert.Empty(t, apiClient.updated.SupportEmail, "the stored address is cleared")
-	assert.Empty(t, apiClient.updated.SupportUrl)
+	assert.Empty(t, apiClient.updated.SupportURL)
 	assert.Equal(t, "+15550100199", apiClient.updated.SupportPhone)
 
 	apiClient = newBrandingAPI()

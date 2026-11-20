@@ -45,8 +45,8 @@ func TestHandleCertsGet(t *testing.T) {
 
 		database.On("GetAllSigningKeys", mock.Anything, mock.Anything).Return(allKeys, nil)
 
-		jsonWriter.On("EncodeJSON", rr, req, mock.AnythingOfType("oauth.Jwks")).Run(func(args mock.Arguments) {
-			jwks := args.Get(2).(oauth.Jwks)
+		jsonWriter.On("EncodeJSON", rr, req, mock.AnythingOfType("oauth.JWKS")).Run(func(args mock.Arguments) {
+			jwks := args.Get(2).(oauth.JWKS)
 			assert.Len(t, jwks.Keys, 3)
 			assert.Equal(t, "next-kid", jwks.Keys[0].Kid)
 			assert.Equal(t, "current-kid", jwks.Keys[1].Kid)
@@ -80,8 +80,8 @@ func TestHandleCertsGet(t *testing.T) {
 
 		database.On("GetAllSigningKeys", mock.Anything, mock.Anything).Return(allKeys, nil)
 
-		jsonWriter.On("EncodeJSON", rr, req, mock.AnythingOfType("oauth.Jwks")).Run(func(args mock.Arguments) {
-			jwks := args.Get(2).(oauth.Jwks)
+		jsonWriter.On("EncodeJSON", rr, req, mock.AnythingOfType("oauth.JWKS")).Run(func(args mock.Arguments) {
+			jwks := args.Get(2).(oauth.JWKS)
 			assert.Len(t, jwks.Keys, 1)
 			assert.Equal(t, "current-kid", jwks.Keys[0].Kid)
 		}).Return()
@@ -189,7 +189,7 @@ func TestHandleCertsGet(t *testing.T) {
 
 		database.On("GetAllSigningKeys", mock.Anything, mock.Anything).Return([]record.KeyPair{}, nil)
 
-		jsonWriter.On("EncodeJSON", rr, req, mock.MatchedBy(func(jwks oauth.Jwks) bool {
+		jsonWriter.On("EncodeJSON", rr, req, mock.MatchedBy(func(jwks oauth.JWKS) bool {
 			return len(jwks.Keys) == 0
 		})).Return()
 

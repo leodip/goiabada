@@ -5,24 +5,24 @@ package api
 // literal and the admin console decoded them into structs of its own, so nothing declared the
 // shape both sides agreed on until #441. A DELETE on the same endpoints answers SuccessResponse.
 
-// ProfilePictureInfoResponse answers GET on a profile picture. PictureUrl is the picture's public
+// ProfilePictureInfoResponse answers GET on a profile picture. PictureURL is the picture's public
 // URL, and is absent rather than empty when the user has no picture.
 type ProfilePictureInfoResponse struct {
 	HasPicture bool   `json:"hasPicture"`
-	PictureUrl string `json:"pictureUrl,omitempty"`
+	PictureURL string `json:"pictureUrl,omitempty"`
 }
 
 // ProfilePictureUploadResponse answers a profile picture upload with the URL it is now served at.
 type ProfilePictureUploadResponse struct {
 	Success    bool   `json:"success"`
-	PictureUrl string `json:"pictureUrl"`
+	PictureURL string `json:"pictureUrl"`
 }
 
-// ClientLogoInfoResponse answers GET on a client's logo. LogoUrl is the logo's public URL, and is
+// ClientLogoInfoResponse answers GET on a client's logo. LogoURL is the logo's public URL, and is
 // absent rather than empty when the client has no logo.
 type ClientLogoInfoResponse struct {
 	HasLogo bool   `json:"hasLogo"`
-	LogoUrl string `json:"logoUrl,omitempty"`
+	LogoURL string `json:"logoUrl,omitempty"`
 }
 
 // ClientLogoUploadResponse answers a logo upload with the URL it is now served at. The key is
@@ -30,5 +30,5 @@ type ClientLogoInfoResponse struct {
 // openapi.yaml publishes.
 type ClientLogoUploadResponse struct {
 	Success    bool   `json:"success"`
-	PictureUrl string `json:"pictureUrl"`
+	PictureURL string `json:"pictureUrl"`
 }

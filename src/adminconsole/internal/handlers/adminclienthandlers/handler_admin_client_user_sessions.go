@@ -57,7 +57,7 @@ func HandleUserSessionsGet(
 		}
 
 		// Get the first 50 sessions (server filters invalid)
-		clientSessions, err := apiClient.GetClientSessionsByClientId(r.Context(), jwtInfo.TokenResponse.AccessToken, clientResp.Id, 1, 50)
+		clientSessions, err := apiClient.GetClientSessionsByClientId(r.Context(), jwtInfo.TokenResponse.AccessToken, clientResp.ID, 1, 50)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -67,7 +67,7 @@ func HandleUserSessionsGet(
 		// full page that was 50 HTTP round trips to fill two columns (#373 decision 9).
 		owners := make(map[int64]api.SessionOwnerResponse, len(clientSessions.Users))
 		for _, owner := range clientSessions.Users {
-			owners[owner.Id] = owner
+			owners[owner.ID] = owner
 		}
 
 		// IsCurrent comes from the response; this page no longer recomputes it from the sid on
@@ -75,21 +75,21 @@ func HandleUserSessionsGet(
 		sessionInfoArr := []SessionInfo{}
 		for _, es := range clientSessions.Sessions {
 			usi := SessionInfo{
-				UserSessionId: es.Id,
+				UserSessionId: es.ID,
 				IsCurrent:     es.IsCurrent,
-				UserId:        es.UserId,
+				UserId:        es.UserID,
 				UserEmail:     "",
 				UserFullName:  "",
 				Started:       es.Started,
 				LastAccessed:  es.LastAccessed,
-				IpAddress:     es.IpAddress,
+				IpAddress:     es.IPAddress,
 				DeviceName:    es.DeviceName,
 				DeviceType:    es.DeviceType,
 				DeviceOS:      es.DeviceOS,
 				UserAgent:     es.UserAgent,
 				Clients:       es.ClientIdentifiers,
 			}
-			if owner, ok := owners[es.UserId]; ok {
+			if owner, ok := owners[es.UserID]; ok {
 				usi.UserEmail = owner.Email
 				usi.UserFullName = render.SessionOwnerFullName(&owner)
 			}
@@ -167,7 +167,7 @@ func HandleUserSessionsPost(
 		// in one place (#373).
 		//
 		// The page this request comes from is the first 50 rows, so the same page is read back.
-		clientSessions, err := apiClient.GetClientSessionsByClientId(r.Context(), jwtInfo.TokenResponse.AccessToken, clientResp.Id, 1, 50)
+		clientSessions, err := apiClient.GetClientSessionsByClientId(r.Context(), jwtInfo.TokenResponse.AccessToken, clientResp.ID, 1, 50)
 		if err != nil {
 			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
@@ -175,7 +175,7 @@ func HandleUserSessionsPost(
 
 		isDeletingCurrentSession := false
 		for _, es := range clientSessions.Sessions {
-			if es.Id == int64(userSessionId) && es.IsCurrent {
+			if es.ID == int64(userSessionId) && es.IsCurrent {
 				isDeletingCurrentSession = true
 				break
 			}

@@ -41,7 +41,7 @@ func HandleUsersWithPermissionGet(
 		selectedPermissionStr := r.URL.Query().Get("permission")
 		if len(selectedPermissionStr) == 0 {
 			if len(permissions) > 0 {
-				selectedPermissionStr = strconv.FormatInt(permissions[0].Id, 10)
+				selectedPermissionStr = strconv.FormatInt(permissions[0].ID, 10)
 			} else {
 				selectedPermissionStr = "0"
 			}
@@ -57,7 +57,7 @@ func HandleUsersWithPermissionGet(
 			// check if permission belongs to resource
 			var found bool
 			for _, permission := range permissions {
-				if permission.Id == selectedPermission {
+				if permission.ID == selectedPermission {
 					found = true
 					selectedPermissionIdentifier = permission.PermissionIdentifier
 					break
@@ -108,7 +108,7 @@ func HandleUsersWithPermissionGet(
 		p := pagination.New(total, pageSize, pageInt, 5)
 
 		bind := map[string]interface{}{
-			"resourceId":                   resource.Id,
+			"resourceId":                   resource.ID,
 			"resourceIdentifier":           resource.ResourceIdentifier,
 			"description":                  resource.Description,
 			"isSystemLevelResource":        resource.IsSystemLevelResource,
@@ -177,7 +177,7 @@ func HandleUsersWithPermissionRemovePermissionPost(
 		}
 		found := false
 		for _, permission := range permissions {
-			if permission.Id == permissionId {
+			if permission.ID == permissionId {
 				found = true
 				break
 			}
@@ -189,7 +189,7 @@ func HandleUsersWithPermissionRemovePermissionPost(
 
 		found = false
 		for _, permission := range currentPerms {
-			if permission.Id == permissionId {
+			if permission.ID == permissionId {
 				found = true
 				break
 			}
@@ -202,12 +202,12 @@ func HandleUsersWithPermissionRemovePermissionPost(
 		// Build reduced set and update via API
 		newIds := make([]int64, 0, len(currentPerms))
 		for _, p := range currentPerms {
-			if p.Id != permissionId {
-				newIds = append(newIds, p.Id)
+			if p.ID != permissionId {
+				newIds = append(newIds, p.ID)
 			}
 		}
-		apiReq := &api.UpdateUserPermissionsRequest{PermissionIds: newIds, ExpectedPermissionIds: permissionIdsOf(currentPerms)}
-		if err := apiClient.UpdateUserPermissions(r.Context(), accessToken, user.Id, apiReq); err != nil {
+		apiReq := &api.UpdateUserPermissionsRequest{PermissionIDs: newIds, ExpectedPermissionIDs: permissionIdsOf(currentPerms)}
+		if err := apiClient.UpdateUserPermissions(r.Context(), accessToken, user.ID, apiReq); err != nil {
 			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
 		}
@@ -235,7 +235,7 @@ func HandleUsersWithPermissionAddGet(
 		selectedPermissionStr := r.PathValue("permissionId")
 		if len(selectedPermissionStr) == 0 {
 			if len(permissions) > 0 {
-				selectedPermissionStr = strconv.FormatInt(permissions[0].Id, 10)
+				selectedPermissionStr = strconv.FormatInt(permissions[0].ID, 10)
 			} else {
 				selectedPermissionStr = "0"
 			}
@@ -250,7 +250,7 @@ func HandleUsersWithPermissionAddGet(
 		selectedPermissionIdentifier := ""
 		var found bool
 		for _, permission := range permissions {
-			if permission.Id == selectedPermission {
+			if permission.ID == selectedPermission {
 				found = true
 				selectedPermissionIdentifier = permission.PermissionIdentifier
 				break
@@ -267,7 +267,7 @@ func HandleUsersWithPermissionAddGet(
 		pageInt := pagination.ParsePage(r.URL.Query().Get("page"))
 
 		bind := map[string]interface{}{
-			"resourceId":                   resource.Id,
+			"resourceId":                   resource.ID,
 			"resourceIdentifier":           resource.ResourceIdentifier,
 			"description":                  resource.Description,
 			"isSystemLevelResource":        resource.IsSystemLevelResource,
@@ -306,7 +306,7 @@ func HandleUsersWithPermissionSearchGet(
 		selectedPermissionStr := r.PathValue("permissionId")
 		if len(selectedPermissionStr) == 0 {
 			if len(permissions) > 0 {
-				selectedPermissionStr = strconv.FormatInt(permissions[0].Id, 10)
+				selectedPermissionStr = strconv.FormatInt(permissions[0].ID, 10)
 			} else {
 				selectedPermissionStr = "0"
 			}
@@ -319,7 +319,7 @@ func HandleUsersWithPermissionSearchGet(
 		// check if permission belongs to resource
 		var found bool
 		for _, permission := range permissions {
-			if permission.Id == selectedPermission {
+			if permission.ID == selectedPermission {
 				found = true
 				break
 			}
@@ -343,7 +343,7 @@ func HandleUsersWithPermissionSearchGet(
 		usersResult := make([]UserResult, 0, len(annotatedUsers))
 		for _, u := range annotatedUsers {
 			usersResult = append(usersResult, UserResult{
-				Id:            u.Id,
+				Id:            u.ID,
 				Subject:       u.Subject,
 				Username:      u.Username,
 				Email:         u.Email,
@@ -408,7 +408,7 @@ func HandleUsersWithPermissionAddPermissionPost(
 
 		found := false
 		for _, permission := range permissions {
-			if permission.Id == permissionId {
+			if permission.ID == permissionId {
 				found = true
 				break
 			}
@@ -419,7 +419,7 @@ func HandleUsersWithPermissionAddPermissionPost(
 		}
 
 		for _, permission := range currentPerms {
-			if permission.Id == permissionId {
+			if permission.ID == permissionId {
 				render.JSONConflict(httpHelper, w, r)
 				return
 			}
@@ -427,11 +427,11 @@ func HandleUsersWithPermissionAddPermissionPost(
 
 		newIds := make([]int64, 0, len(currentPerms)+1)
 		for _, p := range currentPerms {
-			newIds = append(newIds, p.Id)
+			newIds = append(newIds, p.ID)
 		}
 		newIds = append(newIds, permissionId)
-		apiReq := &api.UpdateUserPermissionsRequest{PermissionIds: newIds, ExpectedPermissionIds: permissionIdsOf(currentPerms)}
-		if err := apiClient.UpdateUserPermissions(r.Context(), accessToken, user.Id, apiReq); err != nil {
+		apiReq := &api.UpdateUserPermissionsRequest{PermissionIDs: newIds, ExpectedPermissionIDs: permissionIdsOf(currentPerms)}
+		if err := apiClient.UpdateUserPermissions(r.Context(), accessToken, user.ID, apiReq); err != nil {
 			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
 		}

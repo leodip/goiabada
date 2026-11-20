@@ -381,8 +381,8 @@ func TestResourcePermissionRefusals_AreInTheRequestsLanguage(t *testing.T) {
 		{
 			name: "two entries naming one stored permission",
 			serve: save("a-resource", nil, []api.ResourcePermissionUpsert{
-				{Id: 31, PermissionIdentifier: "read", Description: "Read"},
-				{Id: 31, PermissionIdentifier: "read-again", Description: "Read"},
+				{ID: 31, PermissionIdentifier: "read", Description: "Read"},
+				{ID: 31, PermissionIdentifier: "read-again", Description: "Read"},
 			}, loaded),
 			status:     http.StatusBadRequest,
 			code:       "handler.permission.duplicate_ids",

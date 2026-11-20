@@ -84,7 +84,7 @@ func TestAPIAuditLogsGet_Success(t *testing.T) {
 
 	for _, entry := range body.AuditLogs {
 		assert.Equal(t, auditEvent, entry.AuditEvent)
-		assert.NotZero(t, entry.Id)
+		assert.NotZero(t, entry.ID)
 		assert.NotEmpty(t, entry.Details)
 		// createdAt is a time.Time now, and the decode above is what proves it is still ISO
 		// 8601 on the wire: encoding/json accepts nothing else into a time.Time, so a payload
@@ -160,10 +160,10 @@ func TestAPIAuditLogsGet_Paging(t *testing.T) {
 
 		seen := map[int64]bool{}
 		for _, e := range first.AuditLogs {
-			seen[e.Id] = true
+			seen[e.ID] = true
 		}
 		for _, e := range second.AuditLogs {
-			assert.False(t, seen[e.Id], "id %d appeared on both pages", e.Id)
+			assert.False(t, seen[e.ID], "id %d appeared on both pages", e.ID)
 		}
 	})
 }
@@ -336,7 +336,7 @@ func TestAPIAuditLogsGet_RequestIdFilter(t *testing.T) {
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 		assert.Equal(t, 1, body.Total)
 		if assert.Len(t, body.AuditLogs, 1) {
-			assert.Equal(t, requestId, body.AuditLogs[0].RequestId)
+			assert.Equal(t, requestId, body.AuditLogs[0].RequestID)
 			assert.Equal(t, audit.EventUpdatedAuditLogsSettings, body.AuditLogs[0].AuditEvent)
 		}
 
@@ -371,7 +371,7 @@ func TestAPIAuditLogsGet_RequestIdFilter(t *testing.T) {
 
 		assert.Equal(t, 1, body.Total)
 		if assert.Len(t, body.AuditLogs, 1) {
-			assert.Equal(t, clipped, body.AuditLogs[0].RequestId)
+			assert.Equal(t, clipped, body.AuditLogs[0].RequestID)
 		}
 
 		raw, resp2 := getAuditLogs(t, accessToken, "requestId="+url.QueryEscape(oversized))
@@ -387,7 +387,7 @@ func TestAPIAuditLogsGet_RequestIdFilter(t *testing.T) {
 		defer func() { _ = resp.Body.Close() }()
 		var lastIdBefore int64
 		if len(before.AuditLogs) > 0 {
-			lastIdBefore = before.AuditLogs[0].Id
+			lastIdBefore = before.AuditLogs[0].ID
 		}
 
 		auditedPutWithRequestId(t, accessToken, "")
@@ -398,11 +398,11 @@ func TestAPIAuditLogsGet_RequestIdFilter(t *testing.T) {
 
 		if assert.Len(t, after.AuditLogs, 1) {
 			entry := after.AuditLogs[0]
-			assert.NotEqual(t, lastIdBefore, entry.Id, "the PUT must have written a new entry")
+			assert.NotEqual(t, lastIdBefore, entry.ID, "the PUT must have written a new entry")
 			// chi's own shape, hostname/prefix-counter, not chi's exact alphabet.
-			assert.Regexp(t, `^.+/.+-\d+$`, entry.RequestId)
+			assert.Regexp(t, `^.+/.+-\d+$`, entry.RequestID)
 
-			found, resp3 := getAuditLogs(t, accessToken, "requestId="+url.QueryEscape(entry.RequestId))
+			found, resp3 := getAuditLogs(t, accessToken, "requestId="+url.QueryEscape(entry.RequestID))
 			defer func() { _ = resp3.Body.Close() }()
 			assert.Equal(t, 1, found.Total, "the generated id must be searchable like any other")
 		}
@@ -527,8 +527,8 @@ func TestAPIAuditLogsGet_UserFilter(t *testing.T) {
 		wantLoggedInUserIds := []*int64{int64Ptr(user), int64Ptr(other), nil, nil,
 			int64Ptr(other), int64Ptr(user), int64Ptr(user), nil}
 		for i, entry := range body.AuditLogs {
-			assert.Equal(t, wantUserIds[i], entry.UserId, "seq %d's userId", 7-i)
-			assert.Equal(t, wantLoggedInUserIds[i], entry.LoggedInUserId, "seq %d's loggedInUserId", 7-i)
+			assert.Equal(t, wantUserIds[i], entry.UserID, "seq %d's userId", 7-i)
+			assert.Equal(t, wantLoggedInUserIds[i], entry.LoggedInUserID, "seq %d's loggedInUserId", 7-i)
 		}
 	})
 
@@ -596,9 +596,9 @@ func TestAPIAuditLogsGet_AChangeIsListedUnderBothUsers(t *testing.T) {
 			events := []string{}
 			for _, entry := range body.AuditLogs {
 				events = append(events, entry.AuditEvent)
-				assert.Equal(t, int64Ptr(changed.Id), entry.UserId,
+				assert.Equal(t, int64Ptr(changed.Id), entry.UserID,
 					"%s: userId is the user the change was made to", entry.AuditEvent)
-				assert.Equal(t, int64Ptr(administrator.Id), entry.LoggedInUserId,
+				assert.Equal(t, int64Ptr(administrator.Id), entry.LoggedInUserID,
 					"%s: loggedInUserId is the administrator whose token made the change", entry.AuditEvent)
 			}
 			assert.Equal(t, []string{"revoked_user_auth_state", "updated_user_details"}, events)
@@ -634,8 +634,8 @@ func TestAPIAuditLogsGet_AChangeMadeWithAClientCredentialsTokenNamesNoActingUser
 
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	require.Equal(t, 1, body.Total)
-	assert.Equal(t, int64Ptr(changed.Id), body.AuditLogs[0].UserId)
-	assert.Nil(t, body.AuditLogs[0].LoggedInUserId, "a client credentials token names no acting user")
+	assert.Equal(t, int64Ptr(changed.Id), body.AuditLogs[0].UserID)
+	assert.Nil(t, body.AuditLogs[0].LoggedInUserID, "a client credentials token names no acting user")
 
 	raw := makeAPIRequest(t, "GET", appConfig.AuthServer.BaseURL+auditLogsURL+"?"+query, clientToken, nil)
 	defer func() { _ = raw.Body.Close() }()

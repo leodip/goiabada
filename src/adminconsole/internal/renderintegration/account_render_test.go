@@ -28,8 +28,8 @@ func TestRender_AccountPhone(t *testing.T) {
 		"selectedPhoneCountryUniqueId": "",
 		"phoneNumber":                  "",
 		"phoneCountries": []phonecountries.PhoneCountry{
-			{UniqueId: "BRA_0", Alpha2: "BR", Emoji: "🇧🇷", CallingCode: "+55", Name: "🇧🇷 - Brazil (+55)"},
-			{UniqueId: "ITA_0", Alpha2: "IT", Emoji: "🇮🇹", CallingCode: "+39", Name: "🇮🇹 - Italy (+39)"},
+			{UniqueID: "BRA_0", Alpha2: "BR", Emoji: "🇧🇷", CallingCode: "+55", Name: "🇧🇷 - Brazil (+55)"},
+			{UniqueID: "ITA_0", Alpha2: "IT", Emoji: "🇮🇹", CallingCode: "+39", Name: "🇮🇹 - Italy (+39)"},
 		},
 		"savedSuccessfully": false,
 	}
@@ -57,7 +57,7 @@ func TestRender_PhonePagesHintHowToTypeTheNumber(t *testing.T) {
 		for locale, hint := range hints {
 			t.Run(page+" "+locale, func(t *testing.T) {
 				out := renderMenuPageIn(t, page, map[string]interface{}{
-					"user":                         &api.UserResponse{Id: 7, Email: "someone@example.com"},
+					"user":                         &api.UserResponse{ID: 7, Email: "someone@example.com"},
 					"selectedPhoneCountryUniqueId": "PRT_0",
 					"phoneNumber":                  "912 345 678",
 					"phoneNumberVerified":          false,
@@ -133,7 +133,7 @@ func TestRender_ProfilePagesLabelLocalesByName(t *testing.T) {
 	for _, page := range []string{"/account_profile.html", "/admin_users_profile.html"} {
 		t.Run(page, func(t *testing.T) {
 			out := renderMenuPage(t, page, map[string]interface{}{
-				"user":              &api.UserResponse{Id: 7},
+				"user":              &api.UserResponse{ID: 7},
 				"timezones":         timezones.All(),
 				"locales":           locales.All(),
 				"page":              "1",
@@ -155,7 +155,7 @@ var zoneOptionRe = regexp.MustCompile(`<option value="([^"]*___[^"]*)"\s*(select
 // the first row carrying the zone: a user stored as Sweden/Europe/Berlin reopens on Sweden, though
 // Denmark and Germany list the same zone ahead of it, on both profile pages (#432).
 func TestRender_ProfilePagesSelectTheStoredZoneRow(t *testing.T) {
-	user := &api.UserResponse{Id: 7, ZoneInfoCountryName: "Sweden", ZoneInfo: "Europe/Berlin"}
+	user := &api.UserResponse{ID: 7, ZoneInfoCountryName: "Sweden", ZoneInfo: "Europe/Berlin"}
 
 	for _, page := range []string{"/account_profile.html", "/admin_users_profile.html"} {
 		t.Run(page, func(t *testing.T) {
@@ -338,7 +338,7 @@ func TestRender_SessionPagesTooltipTheRawUserAgent(t *testing.T) {
 			name: "admin user",
 			page: "/admin_users_sessions.html",
 			bind: map[string]interface{}{
-				"user": &api.UserResponse{Id: 7, Email: "someone@example.com"},
+				"user": &api.UserResponse{ID: 7, Email: "someone@example.com"},
 				"sessions": []render.SessionInfo{{
 					UserSessionId: 1, DeviceName: "Chrome 120", DeviceType: "Desktop",
 					DeviceOS: "Linux", UserAgent: header,
@@ -351,7 +351,7 @@ func TestRender_SessionPagesTooltipTheRawUserAgent(t *testing.T) {
 			name: "admin client",
 			page: "/admin_clients_usersessions.html",
 			bind: map[string]interface{}{
-				"client": &api.ClientResponse{Id: 3, ClientIdentifier: "web-app"},
+				"client": &api.ClientResponse{ID: 3, ClientIdentifier: "web-app"},
 				"sessions": []adminclienthandlers.SessionInfo{{
 					UserSessionId: 1, UserId: 7, UserEmail: "someone@example.com",
 					DeviceName: "Chrome 120", DeviceType: "Desktop",
@@ -418,7 +418,7 @@ func TestRender_SessionPagesLocalizeTheTimestampCells(t *testing.T) {
 			name: "admin user",
 			page: "/admin_users_sessions.html",
 			bind: map[string]interface{}{
-				"user": &api.UserResponse{Id: 7, Email: "someone@example.com"},
+				"user": &api.UserResponse{ID: 7, Email: "someone@example.com"},
 				"sessions": []render.SessionInfo{{
 					UserSessionId: 1, Started: &started, LastAccessed: &lastAccessed,
 				}},
@@ -430,7 +430,7 @@ func TestRender_SessionPagesLocalizeTheTimestampCells(t *testing.T) {
 			name: "admin client",
 			page: "/admin_clients_usersessions.html",
 			bind: map[string]interface{}{
-				"client": &api.ClientResponse{Id: 3, ClientIdentifier: "web-app"},
+				"client": &api.ClientResponse{ID: 3, ClientIdentifier: "web-app"},
 				"sessions": []adminclienthandlers.SessionInfo{{
 					UserSessionId: 1, UserId: 7, UserEmail: "someone@example.com",
 					Started: &started, LastAccessed: &lastAccessed,
@@ -459,7 +459,7 @@ func TestRender_SessionPagesLocalizeTheTimestampCells(t *testing.T) {
 // (#373).
 func TestRender_SessionPagesRenderAMissingInstantAsBlank(t *testing.T) {
 	out := renderMenuPage(t, "/admin_clients_usersessions.html", map[string]interface{}{
-		"client": &api.ClientResponse{Id: 3, ClientIdentifier: "web-app"},
+		"client": &api.ClientResponse{ID: 3, ClientIdentifier: "web-app"},
 		"sessions": []adminclienthandlers.SessionInfo{{
 			UserSessionId: 1, UserId: 7, UserEmail: "someone@example.com",
 		}},
@@ -499,7 +499,7 @@ func TestRender_SessionListsAskWithTheirOwnSentence(t *testing.T) {
 			name: "admin user",
 			page: "/admin_users_sessions.html",
 			bind: map[string]interface{}{
-				"user": &api.UserResponse{Id: 7, Email: "admin@example.com"},
+				"user": &api.UserResponse{ID: 7, Email: "admin@example.com"},
 				"sessions": []render.SessionInfo{
 					{UserSessionId: 1, DeviceName: markup, DeviceType: "Desktop", DeviceOS: "Linux", UserAgent: "curl/8.5.0", IsCurrent: true},
 					{UserSessionId: 2, DeviceName: "Firefox 128", DeviceType: "Desktop", DeviceOS: "Windows", UserAgent: "curl/8.5.0"},
@@ -513,7 +513,7 @@ func TestRender_SessionListsAskWithTheirOwnSentence(t *testing.T) {
 			name: "admin client",
 			page: "/admin_clients_usersessions.html",
 			bind: map[string]interface{}{
-				"client": &api.ClientResponse{Id: 3, ClientIdentifier: "web-app"},
+				"client": &api.ClientResponse{ID: 3, ClientIdentifier: "web-app"},
 				"sessions": []adminclienthandlers.SessionInfo{
 					{UserSessionId: 1, UserId: 7, UserEmail: "admin@example.com", DeviceName: markup, DeviceType: "Desktop", DeviceOS: "Linux", UserAgent: "curl/8.5.0", IsCurrent: true},
 					{UserSessionId: 2, UserId: 8, UserEmail: "someone@example.com", DeviceName: "Firefox 128", DeviceType: "Desktop", DeviceOS: "Windows", UserAgent: "curl/8.5.0"},
@@ -572,7 +572,7 @@ func TestRender_ConnectedClientPagesAskWithTheirOwnSentence(t *testing.T) {
 			name: "admin user",
 			page: "/admin_users_connected_clients.html",
 			bind: map[string]interface{}{
-				"user":    &api.UserResponse{Id: 7, Email: "someone@example.com"},
+				"user":    &api.UserResponse{ID: 7, Email: "someone@example.com"},
 				"clients": []render.ConnectedClientInfo{{ClientId: 4, Client: markup, GrantScope: "openid"}},
 				"page":    "1",
 				"query":   "",
@@ -630,7 +630,7 @@ func TestRender_ConsentPagesLocalizeTheGrantedAtCell(t *testing.T) {
 			page: "/admin_users_connected_clients.html",
 			cell: `<td class="sm:whitespace-nowrap" data-label="Consentimento">16/09/2026 12:00</td>`,
 			bind: map[string]interface{}{
-				"user": &api.UserResponse{Id: 7, Email: "someone@example.com"},
+				"user": &api.UserResponse{ID: 7, Email: "someone@example.com"},
 				"clients": []render.ConnectedClientInfo{{
 					ClientId: 1, Client: "web-app", ClientDescription: "The web app",
 					HasConsent: true, GrantedAt: &granted, ConsentScope: "openid profile",
@@ -705,7 +705,7 @@ func TestRender_ApplicationsPageRendersAMissingGrantedAtAsBlank(t *testing.T) {
 // console for unlocalized dates, and this case is what stops that sweep "finishing the job".
 func TestRender_ProfilePagesKeepTheDateOfBirthMachineFormat(t *testing.T) {
 	born := time.Date(1990, 1, 2, 0, 0, 0, 0, time.UTC)
-	user := &api.UserResponse{Id: 7, Email: "someone@example.com", BirthDate: &born}
+	user := &api.UserResponse{ID: 7, Email: "someone@example.com", BirthDate: &born}
 
 	for _, tc := range []struct {
 		name string

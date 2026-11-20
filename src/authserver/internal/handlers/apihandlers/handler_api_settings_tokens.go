@@ -25,7 +25,7 @@ func HandleSettingsTokensGet() http.HandlerFunc {
 			RefreshTokenOfflineIdleTimeoutInSeconds: settings.RefreshTokenOfflineIdleTimeoutInSeconds,
 			RefreshTokenOfflineMaxLifetimeInSeconds: settings.RefreshTokenOfflineMaxLifetimeInSeconds,
 			IncludeOpenIDConnectClaimsInAccessToken: settings.IncludeOpenIDConnectClaimsInAccessToken,
-			IncludeOpenIDConnectClaimsInIdToken:     settings.IncludeOpenIDConnectClaimsInIdToken,
+			IncludeOpenIDConnectClaimsInIDToken:     settings.IncludeOpenIDConnectClaimsInIdToken,
 		}
 
 		writeJSON(w, r, http.StatusOK, resp)
@@ -104,7 +104,7 @@ func HandleSettingsTokensPut(
 			stored.RefreshTokenOfflineIdleTimeoutInSeconds = req.RefreshTokenOfflineIdleTimeoutInSeconds
 			stored.RefreshTokenOfflineMaxLifetimeInSeconds = req.RefreshTokenOfflineMaxLifetimeInSeconds
 			stored.IncludeOpenIDConnectClaimsInAccessToken = req.IncludeOpenIDConnectClaimsInAccessToken
-			stored.IncludeOpenIDConnectClaimsInIdToken = req.IncludeOpenIDConnectClaimsInIdToken
+			stored.IncludeOpenIDConnectClaimsInIdToken = req.IncludeOpenIDConnectClaimsInIDToken
 		})
 		if err != nil {
 			writeInternalServerError(w, r, err)
@@ -130,7 +130,7 @@ func HandleSettingsTokensPut(
 			RefreshTokenOfflineIdleTimeoutInSeconds: saved.RefreshTokenOfflineIdleTimeoutInSeconds,
 			RefreshTokenOfflineMaxLifetimeInSeconds: saved.RefreshTokenOfflineMaxLifetimeInSeconds,
 			IncludeOpenIDConnectClaimsInAccessToken: saved.IncludeOpenIDConnectClaimsInAccessToken,
-			IncludeOpenIDConnectClaimsInIdToken:     saved.IncludeOpenIDConnectClaimsInIdToken,
+			IncludeOpenIDConnectClaimsInIDToken:     saved.IncludeOpenIDConnectClaimsInIdToken,
 		}
 
 		writeJSON(w, r, http.StatusOK, resp)

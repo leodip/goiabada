@@ -53,7 +53,7 @@ func (*lastAdministratorGroupApiClient) RemoveUserFromGroup(context.Context, str
 // Deleting the group renders the confirmation page again, with the group and its member count as
 // before and the sentence where the page shows an error, rather than the 500 page.
 func TestHandleDeletePost_TheLastAdministratorRefusalIsShownOnThePage(t *testing.T) {
-	group := &api.GroupResponse{Id: 4, GroupIdentifier: "admins", MemberCount: 1}
+	group := &api.GroupResponse{ID: 4, GroupIdentifier: "admins", MemberCount: 1}
 	httpHelper := handlersmocks.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_groups_delete.html").Once()

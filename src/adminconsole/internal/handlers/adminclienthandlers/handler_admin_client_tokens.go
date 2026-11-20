@@ -49,7 +49,7 @@ func clientTokensFrom(c *api.ClientResponse) clientTokens {
 		RefreshTokenOfflineIdleTimeoutInSeconds: strconv.Itoa(c.RefreshTokenOfflineIdleTimeoutInSeconds),
 		RefreshTokenOfflineMaxLifetimeInSeconds: strconv.Itoa(c.RefreshTokenOfflineMaxLifetimeInSeconds),
 		IncludeOpenIDConnectClaimsInAccessToken: c.IncludeOpenIDConnectClaimsInAccessToken,
-		IncludeOpenIDConnectClaimsInIdToken:     c.IncludeOpenIDConnectClaimsInIdToken,
+		IncludeOpenIDConnectClaimsInIdToken:     c.IncludeOpenIDConnectClaimsInIDToken,
 		DPoPBoundAccessTokens:                   c.DPoPBoundAccessTokens,
 	}
 }
@@ -238,7 +238,7 @@ func HandleTokensPost(
 			RefreshTokenOfflineIdleTimeoutInSeconds: refreshTokenOfflineIdleTimeoutInSeconds,
 			RefreshTokenOfflineMaxLifetimeInSeconds: refreshTokenOfflineMaxLifetimeInSeconds,
 			IncludeOpenIDConnectClaimsInAccessToken: settingsInfo.IncludeOpenIDConnectClaimsInAccessToken,
-			IncludeOpenIDConnectClaimsInIdToken:     settingsInfo.IncludeOpenIDConnectClaimsInIdToken,
+			IncludeOpenIDConnectClaimsInIDToken:     settingsInfo.IncludeOpenIDConnectClaimsInIdToken,
 		}
 
 		updated, err := apiClient.UpdateClientTokens(r.Context(), jwtInfo.TokenResponse.AccessToken, id, updateReq)
@@ -286,7 +286,7 @@ func HandleTokensPost(
 			return
 		}
 
-		pagePath := fmt.Sprintf("/admin/clients/%v/tokens", client.Id)
+		pagePath := fmt.Sprintf("/admin/clients/%v/tokens", client.ID)
 		sess.SetFlash(pagePath, "savedSuccessfully", "true")
 		err = httpSession.Save(r, w, sess)
 		if err != nil {

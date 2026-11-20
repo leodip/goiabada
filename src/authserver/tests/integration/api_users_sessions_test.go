@@ -98,18 +98,18 @@ func TestAPIUserSessionsGet_Success(t *testing.T) {
 
 	// Verify session data structure
 	for _, session := range getResponse.Sessions {
-		assert.Positive(t, session.Id)
+		assert.Positive(t, session.ID)
 		assert.NotEmpty(t, session.SessionIdentifier)
 		require.NotNil(t, session.Started)
 		require.NotNil(t, session.LastAccessed)
-		assert.Equal(t, "192.168.1.100", session.IpAddress)
+		assert.Equal(t, "192.168.1.100", session.IPAddress)
 		assert.Equal(t, "Test Device", session.DeviceName)
 		assert.Equal(t, "computer", session.DeviceType)
 		assert.Equal(t, "linux", session.DeviceOS)
 		// The raw header, byte for byte. The three Device* labels beside it are a parser's
 		// guess; this is what the row actually stored (#281 decision 6).
 		assert.Equal(t, testSessionUserAgent, session.UserAgent)
-		assert.Equal(t, testUser.Id, session.UserId)
+		assert.Equal(t, testUser.Id, session.UserID)
 		assert.Contains(t, session.ClientIdentifiers, testClient.ClientIdentifier)
 	}
 }

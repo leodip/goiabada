@@ -47,7 +47,7 @@ func TestIssuedTokensPassTheStructuralCheckAndTheParser(t *testing.T) {
 
 	for name, token := range map[string]string{
 		"the code exchange's access token":     codeTokens.AccessToken,
-		"the code exchange's ID token":         codeTokens.IdToken,
+		"the code exchange's ID token":         codeTokens.IDToken,
 		"the code exchange's refresh token":    codeTokens.RefreshToken,
 		"the client credentials grant's token": clientTokens.AccessToken,
 	} {

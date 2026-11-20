@@ -80,7 +80,7 @@ func TestIssueAuthorizationCodeGrant_ClaimsBeforeMinting(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "openid", response.Scope)
 	assert.NotEmpty(t, response.AccessToken)
-	assert.NotEmpty(t, response.IdToken)
+	assert.NotEmpty(t, response.IDToken)
 	assert.NotEmpty(t, response.RefreshToken)
 	assert.Equal(t, []string{"claim", "mint", "insert"}, order,
 		"the code is claimed before anything is minted, so two redemptions never both mint (#77)")

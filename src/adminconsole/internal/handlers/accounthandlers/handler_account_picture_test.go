@@ -63,7 +63,7 @@ func TestHandlePictureGet_AnswersAFailedPictureRead(t *testing.T) {
 		},
 		{
 			name:          "a picture renders the page with its address",
-			picture:       &api.ProfilePictureInfoResponse{HasPicture: true, PictureUrl: "https://auth.example/account/picture"},
+			picture:       &api.ProfilePictureInfoResponse{HasPicture: true, PictureURL: "https://auth.example/account/picture"},
 			wantUrlPrefix: "https://auth.example/account/picture?t=",
 		},
 		{
@@ -245,7 +245,7 @@ type uploadRecorder struct {
 
 func (c *uploadRecorder) UploadAccountProfilePicture(_ context.Context, _ string, pictureData []byte, _ string) (*api.ProfilePictureUploadResponse, error) {
 	c.picture = pictureData
-	return &api.ProfilePictureUploadResponse{Success: true, PictureUrl: "https://auth.example.com/userinfo/picture/a-subject"}, nil
+	return &api.ProfilePictureUploadResponse{Success: true, PictureURL: "https://auth.example.com/userinfo/picture/a-subject"}, nil
 }
 
 // The rest of the ports uploadRecorder is passed to, which no test here reaches.

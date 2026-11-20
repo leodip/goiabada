@@ -132,9 +132,9 @@ func HandleGroupMemberAddPost(
 		}
 
 		// Validate user exists
-		user, err := database.GetUserById(r.Context(), nil, addReq.UserId)
+		user, err := database.GetUserById(r.Context(), nil, addReq.UserID)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error getting user by ID for group member add"), "user_id", addReq.UserId, "group_id", groupId)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error getting user by ID for group member add"), "user_id", addReq.UserID, "group_id", groupId)
 			return
 		}
 		if user == nil {

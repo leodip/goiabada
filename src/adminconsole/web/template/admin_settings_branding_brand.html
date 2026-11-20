@@ -22,7 +22,7 @@
   {{/* Making a brand the default draws every page in it at once, so it asks first, in the
        confirm_change dialog, and answers with this page again, saying so. */}}
   {{ if not .isNew }}{{ if not .storedBrand.IsDefault }}
-  <form class="page-actions" method="post" action="/admin/settings/branding/{{ .storedBrand.Id }}/make-default" data-confirm-dialog="makeDefault" data-confirm-title="{{ T $.ctx "adminconsole.admin_branding.brand.make_default_title" }}" data-confirm-always="{{ T $.ctx "adminconsole.admin_branding.brand.make_default_body" }}">
+  <form class="page-actions" method="post" action="/admin/settings/branding/{{ .storedBrand.ID }}/make-default" data-confirm-dialog="makeDefault" data-confirm-title="{{ T $.ctx "adminconsole.admin_branding.brand.make_default_title" }}" data-confirm-always="{{ T $.ctx "adminconsole.admin_branding.brand.make_default_body" }}">
     <button class="button" id="btnMakeDefault" type="submit">{{ T $.ctx "adminconsole.admin_branding.brand.make_default_button" }}</button>
   </form>
   {{ end }}{{ end }}

@@ -27,11 +27,11 @@ const permissionUserSearchJSON = `{"Users":[{"Id":7,"Subject":"5e0b1c9a-sub","Us
 type permissionUserSearchAPI struct{}
 
 func (permissionUserSearchAPI) GetPermissionsByResource(_ context.Context, _ string, resourceId int64) ([]api.PermissionResponse, error) {
-	return []api.PermissionResponse{{Id: 11, ResourceId: resourceId}}, nil
+	return []api.PermissionResponse{{ID: 11, ResourceID: resourceId}}, nil
 }
 
 func (permissionUserSearchAPI) GetResourceById(_ context.Context, _ string, resourceId int64) (*api.ResourceResponse, error) {
-	return &api.ResourceResponse{Id: resourceId}, nil
+	return &api.ResourceResponse{ID: resourceId}, nil
 }
 
 func (permissionUserSearchAPI) GetUserPermissions(context.Context, string, int64) (*api.UserResponse, []api.PermissionResponse, error) {
@@ -44,7 +44,7 @@ func (permissionUserSearchAPI) GetUsersByPermission(context.Context, string, int
 
 func (permissionUserSearchAPI) SearchUsersWithPermissionAnnotation(context.Context, string, int64, string, int, int) ([]api.UserWithPermissionResponse, int, error) {
 	user := api.UserWithPermissionResponse{HasPermission: true}
-	user.Id = 7
+	user.ID = 7
 	user.Subject = "5e0b1c9a-sub"
 	user.Username = "ana"
 	user.Email = "ana@example.com"

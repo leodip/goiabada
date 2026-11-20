@@ -44,7 +44,7 @@ func HandlePictureGet(
 		}
 		if pictureInfo != nil && pictureInfo.HasPicture {
 			// Add cache-busting parameter to prevent browser caching
-			profilePictureUrl = fmt.Sprintf("%s?t=%d", pictureInfo.PictureUrl, time.Now().UnixNano())
+			profilePictureUrl = fmt.Sprintf("%s?t=%d", pictureInfo.PictureURL, time.Now().UnixNano())
 		}
 
 		bind := map[string]interface{}{
@@ -130,7 +130,7 @@ func HandleProfilePicturePost(
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"success":    true,
-			"pictureUrl": response.PictureUrl,
+			"pictureUrl": response.PictureURL,
 		})
 	}
 }

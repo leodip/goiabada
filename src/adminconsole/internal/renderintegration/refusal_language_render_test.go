@@ -22,7 +22,7 @@ import (
 type resourceToDelete struct{}
 
 func (resourceToDelete) GetResourceById(_ context.Context, _ string, resourceId int64) (*api.ResourceResponse, error) {
-	return &api.ResourceResponse{Id: resourceId, ResourceIdentifier: "billing", Description: "Billing"}, nil
+	return &api.ResourceResponse{ID: resourceId, ResourceIdentifier: "billing", Description: "Billing"}, nil
 }
 
 func (resourceToDelete) GetPermissionsByResource(context.Context, string, int64) ([]api.PermissionResponse, error) {

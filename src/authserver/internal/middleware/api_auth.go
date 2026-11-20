@@ -327,7 +327,7 @@ func (m *BearerToken) RequireBearerTokenScopeSetAnyOf(requiredScopeSets [][]stri
 }
 
 // holdsEveryScopeOfASet reports whether the token carries every scope of at least one set.
-func holdsEveryScopeOfASet(jwtToken oauth.JwtToken, sets [][]string) bool {
+func holdsEveryScopeOfASet(jwtToken oauth.JWTToken, sets [][]string) bool {
 	for _, set := range sets {
 		holdsAll := true
 		for _, scope := range set {

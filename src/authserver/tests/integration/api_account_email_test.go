@@ -66,7 +66,7 @@ func TestAPIAccountEmailPut_Success(t *testing.T) {
 	var updateResp api.UpdateUserResponse
 	err := json.NewDecoder(resp.Body).Decode(&updateResp)
 	require.NoError(t, err)
-	assert.Equal(t, u.Id, updateResp.User.Id)
+	assert.Equal(t, u.Id, updateResp.User.ID)
 	assert.Equal(t, newEmail, updateResp.User.Email)
 	assert.False(t, updateResp.User.EmailVerified)
 

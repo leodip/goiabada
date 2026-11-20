@@ -144,8 +144,8 @@ func HandleGroupAttributeCreatePost(
 
 		// The group's id rides in the body, so this is no malformed target: it is translated like
 		// the other fields' refusals (#559 decision 1).
-		if createReq.GroupId <= 0 {
-			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeGroupAttributeGroupIdRequired, nil))
+		if createReq.GroupID <= 0 {
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeGroupAttributeGroupIDRequired, nil))
 			return
 		}
 
@@ -169,7 +169,7 @@ func HandleGroupAttributeCreatePost(
 		}
 
 		// Verify group exists
-		group, err := database.GetGroupById(r.Context(), nil, createReq.GroupId)
+		group, err := database.GetGroupById(r.Context(), nil, createReq.GroupID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -183,9 +183,9 @@ func HandleGroupAttributeCreatePost(
 		groupAttribute := &record.GroupAttribute{
 			Key:                  createReq.Key,
 			Value:                createReq.Value,
-			IncludeInIdToken:     createReq.IncludeInIdToken,
+			IncludeInIdToken:     createReq.IncludeInIDToken,
 			IncludeInAccessToken: createReq.IncludeInAccessToken,
-			GroupId:              createReq.GroupId,
+			GroupId:              createReq.GroupID,
 		}
 
 		// Only authserver:manage writes to an administrative group (#402 decision 1).
@@ -299,7 +299,7 @@ func HandleGroupAttributeUpdatePut(
 		// Update attribute
 		attribute.Key = updateReq.Key
 		attribute.Value = updateReq.Value
-		attribute.IncludeInIdToken = updateReq.IncludeInIdToken
+		attribute.IncludeInIdToken = updateReq.IncludeInIDToken
 		attribute.IncludeInAccessToken = updateReq.IncludeInAccessToken
 
 		err = database.UpdateGroupAttribute(r.Context(), nil, attribute)

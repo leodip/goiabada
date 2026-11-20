@@ -51,7 +51,7 @@ func (s *ctxRecordingApiClient) recordWrite(ctx context.Context, name string) er
 // reads it first and everything below it would otherwise be unreachable.
 func (s *ctxRecordingApiClient) GetClientById(ctx context.Context, _ string, clientId int64) (*api.ClientResponse, error) {
 	s.seen = append(s.seen, ctx)
-	return &api.ClientResponse{Id: clientId, ClientIdentifier: "a-client"}, nil
+	return &api.ClientResponse{ID: clientId, ClientIdentifier: "a-client"}, nil
 }
 
 func (s *ctxRecordingApiClient) GetAllClients(ctx context.Context, _ string) ([]api.ClientResponse, error) {
@@ -62,14 +62,14 @@ func (s *ctxRecordingApiClient) GetAllClients(ctx context.Context, _ string) ([]
 // the identifier check and the delete below it.
 func (s *ctxRecordingApiClient) GetClientPermissions(ctx context.Context, _ string, clientId int64) (*api.ClientResponse, []api.PermissionResponse, error) {
 	s.seen = append(s.seen, ctx)
-	return &api.ClientResponse{Id: clientId, ClientIdentifier: "a-client"}, nil, nil
+	return &api.ClientResponse{ID: clientId, ClientIdentifier: "a-client"}, nil, nil
 }
 
 // GetClientIntrospectionResources records and succeeds for the same reason: the Introspection tab
 // reads it first, and the resources to choose from below it.
 func (s *ctxRecordingApiClient) GetClientIntrospectionResources(ctx context.Context, _ string, clientId int64) (*api.ClientResponse, []api.ResourceResponse, error) {
 	s.seen = append(s.seen, ctx)
-	return &api.ClientResponse{Id: clientId, ClientIdentifier: "a-client"}, nil, nil
+	return &api.ClientResponse{ID: clientId, ClientIdentifier: "a-client"}, nil, nil
 }
 
 func (s *ctxRecordingApiClient) GetClientLogo(ctx context.Context, _ string, _ int64) (*api.ClientLogoInfoResponse, error) {
@@ -97,7 +97,7 @@ func (s *ctxRecordingApiClient) GetSettingsTokens(ctx context.Context, _ string)
 func (s *ctxRecordingApiClient) GetClientSessionsByClientId(ctx context.Context, _ string, _ int64, _, _ int) (*api.GetClientSessionsResponse, error) {
 	s.seen = append(s.seen, ctx)
 	return &api.GetClientSessionsResponse{
-		Sessions: []api.UserSessionDetailResponse{{Id: 31, UserId: 42}},
+		Sessions: []api.UserSessionDetailResponse{{ID: 31, UserID: 42}},
 	}, nil
 }
 
@@ -517,7 +517,7 @@ type allowanceWriteApiClient struct {
 func (s *allowanceWriteApiClient) UpdateClient(ctx context.Context, _ string, clientId int64, _ *api.UpdateClientSettingsRequest) (*api.ClientResponse, error) {
 	s.seen = append(s.seen, ctx)
 	s.writes = append(s.writes, "UpdateClient")
-	return &api.ClientResponse{Id: clientId, ClientIdentifier: "a-client"}, nil
+	return &api.ClientResponse{ID: clientId, ClientIdentifier: "a-client"}, nil
 }
 
 // logoUpload is the one request here that is not form-encoded or JSON: the upload handler reads a

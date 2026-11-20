@@ -34,7 +34,7 @@ func TestAPIAccountProfileGet_Success(t *testing.T) {
 	var getResp api.GetUserResponse
 	err := json.NewDecoder(resp.Body).Decode(&getResp)
 	require.NoError(t, err)
-	assert.Equal(t, u.Id, getResp.User.Id)
+	assert.Equal(t, u.Id, getResp.User.ID)
 	assert.Equal(t, u.Email, getResp.User.Email)
 }
 

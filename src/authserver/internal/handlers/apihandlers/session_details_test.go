@@ -122,7 +122,7 @@ func TestBuildSessionDetails_DropsSessionsThatAreNoLongerValid(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Len(t, details, 1)
-	assert.Equal(t, int64(1), details[0].Id)
+	assert.Equal(t, int64(1), details[0].ID)
 
 	// Client 9 belongs only to the dropped sessions, so filtering before hydrating is what keeps
 	// it out of the query. Asking for it would be harmless and wasteful, and this is the only

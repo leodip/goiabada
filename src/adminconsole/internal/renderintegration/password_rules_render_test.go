@@ -51,7 +51,7 @@ func (passwordPage) CreateUserAdmin(context.Context, string, *api.CreateUserAdmi
 }
 
 func (passwordPage) GetUserById(context.Context, string, int64) (*api.UserResponse, error) {
-	return &api.UserResponse{Id: 7, Email: "jane.doe@example.com"}, nil
+	return &api.UserResponse{ID: 7, Email: "jane.doe@example.com"}, nil
 }
 
 func (passwordPage) UpdateUserOTP(context.Context, string, int64, *api.UpdateUserOTPRequest) (*api.UserResponse, error) {

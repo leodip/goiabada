@@ -8,10 +8,10 @@ import "time"
 // LegalDocumentResponse is a legal document as listed: what stays the same across its versions,
 // and its current version's number, title and publish date. A never-published document has
 // currentVersion 0, no publishedAt, and its draft's title. AppliesTo is all_apps or selected_apps;
-// ClientIds are the apps a document set to selected apps lists, never null, and empty for all apps.
+// ClientIDs are the apps a document set to selected apps lists, never null, and empty for all apps.
 // A document set to selected apps with no client ids applies to nobody.
 type LegalDocumentResponse struct {
-	Id             int64      `json:"id"`
+	ID             int64      `json:"id"`
 	CreatedAt      *time.Time `json:"createdAt"`
 	UpdatedAt      *time.Time `json:"updatedAt"`
 	ShortName      string     `json:"shortName"`
@@ -23,7 +23,7 @@ type LegalDocumentResponse struct {
 	Retired        bool       `json:"retired"`
 	RetiredAt      *time.Time `json:"retiredAt"`
 	AppliesTo      string     `json:"appliesTo"`
-	ClientIds      []int64    `json:"clientIds"`
+	ClientIDs      []int64    `json:"clientIds"`
 }
 
 // LegalDocumentDraftResponse is a document's one unpublished draft.
@@ -87,17 +87,17 @@ type PreviewLegalDocumentRequest struct {
 }
 
 type PreviewLegalDocumentResponse struct {
-	Html string `json:"html"`
+	HTML string `json:"html"`
 }
 
 // UpdateLegalDocumentAppsRequest sets a document's Applies to: all_apps, or selected_apps with the
 // client ids it applies to, which all_apps leaves empty. It replaces the whole list as a list save
-// does: ExpectedClientIds is the list as the caller last read it, [] when it was empty, and a
+// does: ExpectedClientIDs is the list as the caller last read it, [] when it was empty, and a
 // stored list that differs from it refuses the save.
 type UpdateLegalDocumentAppsRequest struct {
 	AppliesTo         string  `json:"appliesTo"`
-	ClientIds         []int64 `json:"clientIds"`
-	ExpectedClientIds []int64 `json:"expectedClientIds"`
+	ClientIDs         []int64 `json:"clientIds"`
+	ExpectedClientIDs []int64 `json:"expectedClientIds"`
 }
 
 // GetClientLegalDocumentsResponse is the client and the documents that apply to it: every document
@@ -113,9 +113,9 @@ type GetClientLegalDocumentsResponse struct {
 // null for a retired document, whose pages all answer "not found"; the admin console still opens the
 // version's text through the admin API.
 type LegalDocumentAcceptanceResponse struct {
-	Id              int64      `json:"id"`
+	ID              int64      `json:"id"`
 	AcceptedAt      *time.Time `json:"acceptedAt"`
-	LegalDocumentId int64      `json:"legalDocumentId"`
+	LegalDocumentID int64      `json:"legalDocumentId"`
 	ShortName       string     `json:"shortName"`
 	Version         int        `json:"version"`
 	Title           string     `json:"title"`

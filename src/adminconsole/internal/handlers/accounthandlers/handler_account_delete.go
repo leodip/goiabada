@@ -122,7 +122,7 @@ func HandleDeleteAccountPost(
 		// browser's history and every proxy's access log (#202).
 		request := &api.DeleteAccountRequest{
 			Password:     r.PostFormValue("password"),
-			OtpCode:      r.PostFormValue("otp"),
+			OTPCode:      r.PostFormValue("otp"),
 			RecoveryCode: r.PostFormValue("recoveryCode"),
 		}
 		useRecoveryCode := r.PostForm.Has("recoveryCode")

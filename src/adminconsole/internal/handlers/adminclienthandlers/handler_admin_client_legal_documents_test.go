@@ -34,11 +34,11 @@ func TestHandleLegalDocumentsGet_ListsTheDocumentsThatApplyToTheClient(t *testin
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_clients_legal_documents.html").Once()
 	docs := []api.LegalDocumentResponse{
-		{Id: 7, ShortName: "privacy", AppliesTo: "all_apps", ClientIds: []int64{}},
-		{Id: 8, ShortName: "shop-terms", AppliesTo: "selected_apps", ClientIds: []int64{3}},
+		{ID: 7, ShortName: "privacy", AppliesTo: "all_apps", ClientIDs: []int64{}},
+		{ID: 8, ShortName: "shop-terms", AppliesTo: "selected_apps", ClientIDs: []int64{3}},
 	}
 	fake := &fakeClientLegalDocumentsAPI{answer: &api.GetClientLegalDocumentsResponse{
-		Client: api.ClientResponse{Id: 3, ClientIdentifier: "shop"}, LegalDocuments: docs}}
+		Client: api.ClientResponse{ID: 3, ClientIdentifier: "shop"}, LegalDocuments: docs}}
 
 	HandleLegalDocumentsGet(httpHelper, fake).ServeHTTP(httptest.NewRecorder(),
 		handlertest.Request(http.MethodGet, "/admin/clients/3/legal-documents", handlertest.WithAccessToken(),
@@ -46,7 +46,7 @@ func TestHandleLegalDocumentsGet_ListsTheDocumentsThatApplyToTheClient(t *testin
 
 	bind := handlertest.Bind(t, httpHelper)
 	assert.Equal(t, []int64{3}, fake.readIds)
-	assert.Equal(t, &api.ClientResponse{Id: 3, ClientIdentifier: "shop"}, bind["client"])
+	assert.Equal(t, &api.ClientResponse{ID: 3, ClientIdentifier: "shop"}, bind["client"])
 	assert.Equal(t, docs, bind["legalDocuments"])
 }
 

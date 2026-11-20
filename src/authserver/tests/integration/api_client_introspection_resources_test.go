@@ -162,11 +162,11 @@ func TestAPIClientIntrospectionResources_GetAnswersTheClientAndItsList(t *testin
 
 	var body api.GetClientIntrospectionResourcesResponse
 	require.NoError(t, json.Unmarshal(raw, &body))
-	assert.Equal(t, client.Id, body.Client.Id)
+	assert.Equal(t, client.Id, body.Client.ID)
 	assert.Equal(t, client.ClientIdentifier, body.Client.ClientIdentifier)
 	assert.ElementsMatch(t, []api.ResourceResponse{
-		{Id: first.Id, ResourceIdentifier: first.ResourceIdentifier, Description: "An API"},
-		{Id: second.Id, ResourceIdentifier: second.ResourceIdentifier, Description: "An API"},
+		{ID: first.Id, ResourceIdentifier: first.ResourceIdentifier, Description: "An API"},
+		{ID: second.Id, ResourceIdentifier: second.ResourceIdentifier, Description: "An API"},
 	}, body.Resources)
 }
 

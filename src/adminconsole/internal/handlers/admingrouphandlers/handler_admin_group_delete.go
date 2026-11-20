@@ -134,7 +134,7 @@ func HandleDeletePost(
 		// Delete the group via API. A refusal the administrator can resolve, 409
 		// LAST_ADMINISTRATOR when the group gives the last one manage, is shown on this page
 		// rather than as the 500 page (#402 decision 12).
-		err = apiClient.DeleteGroup(r.Context(), jwtInfo.TokenResponse.AccessToken, group.Id)
+		err = apiClient.DeleteGroup(r.Context(), jwtInfo.TokenResponse.AccessToken, group.ID)
 		if err != nil {
 			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
 			return

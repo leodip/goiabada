@@ -20,11 +20,11 @@ import (
 type refusingUserApiClient struct{}
 
 func (*refusingUserApiClient) GetUserById(_ context.Context, _ string, userId int64) (*api.UserResponse, error) {
-	return &api.UserResponse{Id: userId}, nil
+	return &api.UserResponse{ID: userId}, nil
 }
 
 func (*refusingUserApiClient) GetUserAttributeById(_ context.Context, _ string, attributeId int64) (*api.UserAttributeResponse, error) {
-	return &api.UserAttributeResponse{Id: attributeId, Key: "department", UserId: 5}, nil
+	return &api.UserAttributeResponse{ID: attributeId, Key: "department", UserID: 5}, nil
 }
 
 func (*refusingUserApiClient) CreateUserAdmin(context.Context, string, *api.CreateUserAdminRequest) (*api.CreateUserResponse, error) {

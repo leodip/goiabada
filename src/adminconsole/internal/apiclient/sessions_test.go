@@ -126,16 +126,16 @@ func TestAuthServerClient_SessionListsDecodeEveryFieldTheConsoleBinds(t *testing
 			assert.Equal(t, "Bearer an-access-token", gotAuthorization)
 
 			session := sessions[0]
-			assert.Equal(t, int64(7), session.Id)
+			assert.Equal(t, int64(7), session.ID)
 			assert.Equal(t, "a-session-identifier", session.SessionIdentifier)
 			require.NotNil(t, session.Started)
 			assert.Equal(t, time.Date(2026, time.January, 2, 3, 4, 5, 0, time.UTC), session.Started.UTC())
 			assert.Nil(t, session.LastAccessed)
-			assert.Equal(t, "203.0.113.7", session.IpAddress)
+			assert.Equal(t, "203.0.113.7", session.IPAddress)
 			assert.Equal(t, "Chrome 120", session.DeviceName)
 			assert.Equal(t, "Desktop", session.DeviceType)
 			assert.Equal(t, "Linux", session.DeviceOS)
-			assert.Equal(t, int64(42), session.UserId)
+			assert.Equal(t, int64(42), session.UserID)
 			assert.True(t, session.IsCurrent)
 			assert.Equal(t, []string{"portal", "backoffice"}, session.ClientIdentifiers)
 
@@ -212,15 +212,15 @@ func TestAuthServerClient_ClientSessionsDecodeTheOwnersArray(t *testing.T) {
 	require.Len(t, resp.Users, 2)
 
 	assert.Equal(t, api.SessionOwnerResponse{
-		Id: 42, Email: "jane@example.com", GivenName: "Jane", MiddleName: "Q", FamilyName: "Doe",
+		ID: 42, Email: "jane@example.com", GivenName: "Jane", MiddleName: "Q", FamilyName: "Doe",
 	}, resp.Users[0])
 	assert.Equal(t, api.SessionOwnerResponse{
-		Id: 43, Email: "sam@example.com", GivenName: "Sam", FamilyName: "Reed",
+		ID: 43, Email: "sam@example.com", GivenName: "Sam", FamilyName: "Reed",
 	}, resp.Users[1])
 
 	// The array is what the session's userId resolves against, which is the whole reason it is
 	// on the response.
-	assert.Equal(t, int64(42), resp.Sessions[0].UserId)
+	assert.Equal(t, int64(42), resp.Sessions[0].UserID)
 }
 
 // An endpoint that sent no users at all, which is what a body from before this field existed

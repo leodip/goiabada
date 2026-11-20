@@ -73,7 +73,7 @@ func HandleAttributesEditGet(
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
-		if attribute == nil || attribute.UserId != user.Id {
+		if attribute == nil || attribute.UserID != user.ID {
 			httpHelper.NotFound(w, r)
 			return
 		}
@@ -148,7 +148,7 @@ func HandleAttributesEditPost(
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
-		if attribute == nil || attribute.UserId != user.Id {
+		if attribute == nil || attribute.UserID != user.ID {
 			httpHelper.NotFound(w, r)
 			return
 		}
@@ -161,7 +161,7 @@ func HandleAttributesEditPost(
 		attribute.Key = r.FormValue("attributeKey")
 		attribute.Value = r.FormValue("attributeValue")
 		attribute.IncludeInAccessToken = r.FormValue("includeInAccessToken") == "on"
-		attribute.IncludeInIdToken = r.FormValue("includeInIdToken") == "on"
+		attribute.IncludeInIDToken = r.FormValue("includeInIdToken") == "on"
 
 		renderError := func(message, errorField string) {
 			bind := map[string]interface{}{
@@ -190,7 +190,7 @@ func HandleAttributesEditPost(
 			Key:                  attribute.Key,
 			Value:                attribute.Value,
 			IncludeInAccessToken: attribute.IncludeInAccessToken,
-			IncludeInIdToken:     attribute.IncludeInIdToken,
+			IncludeInIDToken:     attribute.IncludeInIDToken,
 		}
 
 		_, err = apiClient.UpdateUserAttribute(r.Context(), jwtInfo.TokenResponse.AccessToken, attributeId, request)
@@ -201,6 +201,6 @@ func HandleAttributesEditPost(
 			return
 		}
 
-		http.Redirect(w, r, withListPosition(baseURL, fmt.Sprintf("/admin/users/%v/attributes", user.Id), r), http.StatusFound)
+		http.Redirect(w, r, withListPosition(baseURL, fmt.Sprintf("/admin/users/%v/attributes", user.ID), r), http.StatusFound)
 	}
 }

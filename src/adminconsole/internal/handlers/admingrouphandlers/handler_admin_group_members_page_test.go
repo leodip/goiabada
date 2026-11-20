@@ -30,7 +30,7 @@ type membersPagingApiClient struct {
 }
 
 func (c *membersPagingApiClient) GetGroupById(_ context.Context, accessToken string, groupId int64) (*api.GroupResponse, error) {
-	return &api.GroupResponse{Id: groupId, GroupIdentifier: "some-group"}, nil
+	return &api.GroupResponse{ID: groupId, GroupIdentifier: "some-group"}, nil
 }
 
 func (c *membersPagingApiClient) GetGroupMembers(_ context.Context, accessToken string, groupId int64,
@@ -54,7 +54,7 @@ func membersOnPage(total, page, pageSize int) []api.UserResponse {
 	}
 	users := make([]api.UserResponse, 0, end-start)
 	for i := start; i < end; i++ {
-		users = append(users, api.UserResponse{Id: int64(i + 1)})
+		users = append(users, api.UserResponse{ID: int64(i + 1)})
 	}
 	return users
 }

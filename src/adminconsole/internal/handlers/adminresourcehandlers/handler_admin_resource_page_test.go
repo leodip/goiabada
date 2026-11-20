@@ -49,7 +49,7 @@ type resourcePagingApiClient struct {
 }
 
 func (c *resourcePagingApiClient) GetResourceById(_ context.Context, accessToken string, resourceId int64) (*api.ResourceResponse, error) {
-	return &api.ResourceResponse{Id: resourceId, ResourceIdentifier: "some-resource"}, nil
+	return &api.ResourceResponse{ID: resourceId, ResourceIdentifier: "some-resource"}, nil
 }
 
 func (c *resourcePagingApiClient) GetPermissionsByResource(_ context.Context, accessToken string, resourceId int64) ([]api.PermissionResponse, error) {
@@ -60,7 +60,7 @@ func (c *resourcePagingApiClient) GetPermissionsByResource(_ context.Context, ac
 func (c *resourcePagingApiClient) GetAllGroups(_ context.Context, accessToken string) ([]api.GroupResponse, error) {
 	groups := make([]api.GroupResponse, 0, c.total)
 	for i := 0; i < c.total; i++ {
-		groups = append(groups, api.GroupResponse{Id: int64(i + 1), GroupIdentifier: "g" + strconv.Itoa(i+1)})
+		groups = append(groups, api.GroupResponse{ID: int64(i + 1), GroupIdentifier: "g" + strconv.Itoa(i+1)})
 	}
 	return groups, nil
 }
@@ -77,7 +77,7 @@ func (c *resourcePagingApiClient) SearchGroupsWithPermissionAnnotation(_ context
 	groups := make([]api.GroupWithPermissionResponse, 0, end-start)
 	for i := start; i < end; i++ {
 		groups = append(groups, api.GroupWithPermissionResponse{
-			GroupResponse: api.GroupResponse{Id: int64(i + 1), GroupIdentifier: "g" + strconv.Itoa(i+1)},
+			GroupResponse: api.GroupResponse{ID: int64(i + 1), GroupIdentifier: "g" + strconv.Itoa(i+1)},
 		})
 	}
 	return groups, c.total, nil
@@ -94,7 +94,7 @@ func (c *resourcePagingApiClient) GetUsersByPermission(_ context.Context, access
 	}
 	users := make([]api.UserResponse, 0, end-start)
 	for i := start; i < end; i++ {
-		users = append(users, api.UserResponse{Id: int64(i + 1)})
+		users = append(users, api.UserResponse{ID: int64(i + 1)})
 	}
 	return users, c.total, nil
 }
@@ -139,7 +139,7 @@ func window(total, page, pageSize int) (start, end int, ok bool) {
 // aPermission is the one permission a resource has in the cases that exercise
 // the API-backed arm.
 func aPermission() []api.PermissionResponse {
-	return []api.PermissionResponse{{Id: 42, PermissionIdentifier: "manage"}}
+	return []api.PermissionResponse{{ID: 42, PermissionIdentifier: "manage"}}
 }
 
 // testStore is a real session store over an in-memory backend, because both
@@ -390,7 +390,7 @@ func TestHandleUsersWithPermissionGet_PageQueryParameter(t *testing.T) {
 
 			if tc.total > 0 {
 				require.NotEmpty(t, result.Users, "page %d rendered no rows at all", tc.wantPage)
-				assert.Equal(t, int64((tc.wantPage-1)*pageSize+1), result.Users[0].Id,
+				assert.Equal(t, int64((tc.wantPage-1)*pageSize+1), result.Users[0].ID,
 					"the first row is not the first of page %d", tc.wantPage)
 			} else {
 				assert.Empty(t, result.Users)

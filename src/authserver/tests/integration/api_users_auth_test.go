@@ -58,7 +58,7 @@ func TestAPIUserPasswordPut_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	// Assert: User ID should match
-	assert.Equal(t, testUser.Id, updateResponse.User.Id)
+	assert.Equal(t, testUser.Id, updateResponse.User.ID)
 
 	// Verify password was actually updated in database
 	updatedUser, err := database.GetUserById(context.Background(), nil, testUser.Id)
@@ -228,7 +228,7 @@ func TestAPIUserOTPPut_DisableSuccess(t *testing.T) {
 	require.NoError(t, err)
 
 	// Assert: User ID should match and OTP should be disabled
-	assert.Equal(t, testUser.Id, updateResponse.User.Id)
+	assert.Equal(t, testUser.Id, updateResponse.User.ID)
 	assert.False(t, updateResponse.User.OTPEnabled)
 
 	// Verify OTP was actually disabled in database
@@ -265,7 +265,7 @@ func TestAPIUserOTPPut_DisableResetsConsumedStep(t *testing.T) {
 	enable := api.UpdateAccountOTPRequest{
 		Enabled:  true,
 		Password: "Correct1!",
-		OtpCode:  code,
+		OTPCode:  code,
 	}
 
 	// The account API enrolls the seed the server issued and no other, so both enables below have
@@ -453,13 +453,13 @@ func TestAPIUserSessionGet_Success(t *testing.T) {
 
 	// Assert: Session data should match
 	got := getSessionResponse.Session
-	assert.Equal(t, testSession.Id, got.Id)
+	assert.Equal(t, testSession.Id, got.ID)
 	assert.Equal(t, testSession.SessionIdentifier, got.SessionIdentifier)
 	assert.Equal(t, testSession.AuthMethods, got.AuthMethods)
-	assert.Equal(t, testSession.AcrLevel.String(), got.AcrLevel)
-	assert.Equal(t, testSession.IpAddress, got.IpAddress)
+	assert.Equal(t, testSession.AcrLevel.String(), got.ACRLevel)
+	assert.Equal(t, testSession.IpAddress, got.IPAddress)
 	assert.Equal(t, testSession.DeviceName, got.DeviceName)
-	assert.Equal(t, testSession.UserId, got.UserId)
+	assert.Equal(t, testSession.UserId, got.UserID)
 
 	// Assert: The list row's fields, as the user's session list carries them
 	assert.False(t, got.IsCurrent, "a client credentials token carries no sid, so no session is its own")
@@ -510,7 +510,7 @@ func TestAPIUserSessionGet_AdmitsTheUsersReadScopesOnly(t *testing.T) {
 				require.Equal(t, http.StatusOK, resp.StatusCode)
 				var body api.GetUserSessionResponse
 				require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
-				assert.Equal(t, session.Id, body.Session.Id)
+				assert.Equal(t, session.Id, body.Session.ID)
 				assert.Equal(t, session.SessionIdentifier, body.Session.SessionIdentifier)
 				return
 			}

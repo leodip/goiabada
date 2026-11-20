@@ -774,7 +774,7 @@ func requestedPasswordResetRecordsFor(t *testing.T, adminToken string, address s
 		var details map[string]interface{}
 		require.NoError(t, json.Unmarshal([]byte(entry.Details), &details))
 		if details["email_digest"] == digest {
-			assert.NotEmpty(t, entry.RequestId, "the record carries the request's id")
+			assert.NotEmpty(t, entry.RequestID, "the record carries the request's id")
 			records = append(records, details)
 		}
 	}

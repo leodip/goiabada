@@ -65,7 +65,7 @@ type ClientBackchannelLogout struct {
 // drawn when canManage says so.
 func clientBackchannelLogoutFrom(c *api.ClientResponse, canManage bool) ClientBackchannelLogout {
 	return ClientBackchannelLogout{
-		ClientId:                         c.Id,
+		ClientId:                         c.ID,
 		ClientIdentifier:                 c.ClientIdentifier,
 		CanManageBackchannelLogout:       canManage,
 		BackchannelLogoutURI:             c.BackchannelLogoutURI,

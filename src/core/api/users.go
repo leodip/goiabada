@@ -5,7 +5,7 @@ import (
 )
 
 type UserResponse struct {
-	Id                            int64      `json:"id"`
+	ID                            int64      `json:"id"`
 	CreatedAt                     *time.Time `json:"createdAt"`
 	UpdatedAt                     *time.Time `json:"updatedAt"`
 	Enabled                       bool       `json:"enabled"`
@@ -24,7 +24,7 @@ type UserResponse struct {
 	Locale                        string     `json:"locale"`
 	PageLanguage                  string     `json:"pageLanguage"`
 	BirthDate                     *time.Time `json:"birthDate"`
-	PhoneNumberCountryUniqueId    string     `json:"phoneNumberCountryUniqueId"`
+	PhoneNumberCountryUniqueID    string     `json:"phoneNumberCountryUniqueId"`
 	PhoneNumberCountryCallingCode string     `json:"phoneNumberCountryCallingCode"`
 	PhoneNumber                   string     `json:"phoneNumber"`
 	PhoneNumberVerified           bool       `json:"phoneNumberVerified"`
@@ -126,7 +126,7 @@ type UpdateUserAddressRequest struct {
 }
 
 type UpdateUserPhoneRequest struct {
-	PhoneCountryUniqueId string `json:"phoneCountryUniqueId"`
+	PhoneCountryUniqueID string `json:"phoneCountryUniqueId"`
 	PhoneNumber          string `json:"phoneNumber"`
 	PhoneNumberVerified  bool   `json:"phoneNumberVerified"`
 }
@@ -153,12 +153,12 @@ type UpdateUserResponse struct {
 type GenerateUserEmailVerificationCodeResponse struct {
 	VerificationCode          string     `json:"verificationCode"`
 	VerificationCodeExpiresAt *time.Time `json:"verificationCodeExpiresAt"`
-	UserId                    int64      `json:"userId"`
+	UserID                    int64      `json:"userId"`
 	Email                     string     `json:"email"`
 }
 
 type PhoneCountryResponse struct {
-	UniqueId    string `json:"uniqueId"`
+	UniqueID    string `json:"uniqueId"`
 	Alpha2      string `json:"alpha2"`
 	Emoji       string `json:"emoji"`
 	CallingCode string `json:"callingCode"`
@@ -170,14 +170,14 @@ type GetPhoneCountriesResponse struct {
 }
 
 type UserAttributeResponse struct {
-	Id                   int64      `json:"id"`
+	ID                   int64      `json:"id"`
 	CreatedAt            *time.Time `json:"createdAt"`
 	UpdatedAt            *time.Time `json:"updatedAt"`
 	Key                  string     `json:"key"`
 	Value                string     `json:"value"`
-	IncludeInIdToken     bool       `json:"includeInIdToken"`
+	IncludeInIDToken     bool       `json:"includeInIdToken"`
 	IncludeInAccessToken bool       `json:"includeInAccessToken"`
-	UserId               int64      `json:"userId"`
+	UserID               int64      `json:"userId"`
 }
 
 type GetUserAttributesResponse struct {
@@ -191,9 +191,9 @@ type GetUserAttributeResponse struct {
 type CreateUserAttributeRequest struct {
 	Key                  string `json:"key"`
 	Value                string `json:"value"`
-	IncludeInIdToken     bool   `json:"includeInIdToken"`
+	IncludeInIDToken     bool   `json:"includeInIdToken"`
 	IncludeInAccessToken bool   `json:"includeInAccessToken"`
-	UserId               int64  `json:"userId"`
+	UserID               int64  `json:"userId"`
 }
 
 type CreateUserAttributeResponse struct {
@@ -203,7 +203,7 @@ type CreateUserAttributeResponse struct {
 type UpdateUserAttributeRequest struct {
 	Key                  string `json:"key"`
 	Value                string `json:"value"`
-	IncludeInIdToken     bool   `json:"includeInIdToken"`
+	IncludeInIDToken     bool   `json:"includeInIdToken"`
 	IncludeInAccessToken bool   `json:"includeInAccessToken"`
 }
 
@@ -212,11 +212,11 @@ type UpdateUserAttributeResponse struct {
 }
 
 // UpdateUserGroupsRequest replaces the whole set of groups a user belongs to.
-// ExpectedGroupIds is the set as the caller last read it, as ExpectedPermissionIds is on
+// ExpectedGroupIDs is the set as the caller last read it, as ExpectedPermissionIDs is on
 // UpdateUserPermissionsRequest (#428).
 type UpdateUserGroupsRequest struct {
-	GroupIds         []int64 `json:"groupIds"`
-	ExpectedGroupIds []int64 `json:"expectedGroupIds"`
+	GroupIDs         []int64 `json:"groupIds"`
+	ExpectedGroupIDs []int64 `json:"expectedGroupIds"`
 }
 
 type GetUserGroupsResponse struct {
@@ -226,12 +226,12 @@ type GetUserGroupsResponse struct {
 
 // UpdateUserPermissionsRequest replaces the whole set of permissions granted to a user.
 //
-// ExpectedPermissionIds is the set as the caller last read it, required and compared as
+// ExpectedPermissionIDs is the set as the caller last read it, required and compared as
 // ExpectedRedirectURIs is: absent or null is refused, [] means the caller read no grants, and a
 // stored set that differs answers 409 CONCURRENT_UPDATE (#428).
 type UpdateUserPermissionsRequest struct {
-	PermissionIds         []int64 `json:"permissionIds"`
-	ExpectedPermissionIds []int64 `json:"expectedPermissionIds"`
+	PermissionIDs         []int64 `json:"permissionIds"`
+	ExpectedPermissionIDs []int64 `json:"expectedPermissionIds"`
 }
 
 type GetUserPermissionsResponse struct {
@@ -277,11 +277,11 @@ type SearchUsersWithPermissionAnnotationResponse struct {
 // shows it: when an administrator chose to show it, and never beside an unverified name, which is
 // then the description already.
 type UserConsentResponse struct {
-	Id                   int64      `json:"id"`
+	ID                   int64      `json:"id"`
 	CreatedAt            *time.Time `json:"createdAt"`
 	UpdatedAt            *time.Time `json:"updatedAt"`
-	ClientId             int64      `json:"clientId"`
-	UserId               int64      `json:"userId"`
+	ClientID             int64      `json:"clientId"`
+	UserID               int64      `json:"userId"`
 	Scope                string     `json:"scope"`
 	GrantedAt            *time.Time `json:"grantedAt"`
 	ClientIdentifier     string     `json:"clientIdentifier"`
@@ -303,7 +303,7 @@ type GetUserConsentsResponse struct {
 // what a refresh would issue now. IsCurrent is whether the client is the one the caller's token
 // was issued to and the listed user is the caller (decision 5).
 type ConnectedClientResponse struct {
-	ClientId             int64                           `json:"clientId"`
+	ClientID             int64                           `json:"clientId"`
 	ClientIdentifier     string                          `json:"clientIdentifier"`
 	ClientName           string                          `json:"clientName"`
 	ClientNameUnverified bool                            `json:"clientNameUnverified"`
@@ -316,7 +316,7 @@ type ConnectedClientResponse struct {
 // ConnectedClientConsentResponse is a connected client's stored consent: its id, its
 // space-delimited scopes and when it was given, nil for a consent that recorded no time.
 type ConnectedClientConsentResponse struct {
-	Id        int64      `json:"id"`
+	ID        int64      `json:"id"`
 	Scope     string     `json:"scope"`
 	GrantedAt *time.Time `json:"grantedAt"`
 }
@@ -356,7 +356,7 @@ type UserExportResponse struct {
 // UserExportAuditEventResponse is one audit event about the user or made by them in the user
 // export: the audit log's entry, as GET /api/v1/admin/audit-logs answers it, plus
 // ActedByAdministrator (#781 decision 2). An event another user's token made about the user, an
-// administrator's on the admin API, does not name them: ActedByAdministrator is true, LoggedInUserId
+// administrator's on the admin API, does not name them: ActedByAdministrator is true, LoggedInUserID
 // is nil and the details carry no logged_in_user. The other user a sign-in on a shared browser
 // ended is not named either: cross_user_session_replaced carries no previous_user_id. An event the
 // user made keeps whom it acted on, and a client or the recover command named as the actor stays,
@@ -370,7 +370,7 @@ type UserExportAuditEventResponse struct {
 // logs with: the row id, the subject, the email address, and EmailDigest, the SHA-256 hex digest
 // of that address, which is how an audit entry about an address records it.
 type UserExportIdentifiersResponse struct {
-	Id          int64  `json:"id"`
+	ID          int64  `json:"id"`
 	Subject     string `json:"subject"`
 	Email       string `json:"email"`
 	EmailDigest string `json:"emailDigest"`
@@ -395,11 +395,11 @@ type UserExportProfilePictureResponse struct {
 // UserExportRefreshTokenResponse is one refresh token the auth server holds for the user in the
 // user export, rotated-out and revoked ones included (#781 decision 4). ClientName and
 // ClientNameUnverified are the client's name as a consent shows it. MaxLifetime is set on an
-// Offline token, SessionIdentifier on a session-bound (Refresh) one. Jti is the id the audit events
+// Offline token, SessionIdentifier on a session-bound (Refresh) one. JTI is the id the audit events
 // name as refresh_token_jti; the token itself is never stored. Revoked is true when the token's own
 // row, its authorization code or its rotation family is marked revoked.
 //
-// IpAddress, UserAgent and AuthenticatedAt are the sign-in the token came from. A code-flow token
+// IPAddress, UserAgent and AuthenticatedAt are the sign-in the token came from. A code-flow token
 // takes all three from its authorization code. A password-grant token has no code, so its address
 // and browser are empty, and its AuthenticatedAt is when the password was checked, which its row
 // keeps through every rotation and so can differ from IssuedAt; it is nil only where nothing is
@@ -414,9 +414,9 @@ type UserExportRefreshTokenResponse struct {
 	ExpiresAt            *time.Time `json:"expiresAt"`
 	MaxLifetime          *time.Time `json:"maxLifetime"`
 	SessionIdentifier    string     `json:"sessionIdentifier"`
-	Jti                  string     `json:"jti"`
+	JTI                  string     `json:"jti"`
 	Revoked              bool       `json:"revoked"`
-	IpAddress            string     `json:"ipAddress"`
+	IPAddress            string     `json:"ipAddress"`
 	UserAgent            string     `json:"userAgent"`
 	AuthenticatedAt      *time.Time `json:"authenticatedAt"`
 }

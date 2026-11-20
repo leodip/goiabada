@@ -72,24 +72,24 @@ func SessionUserIdFrom(ctx context.Context) (int64, bool) {
 	return userId, ok
 }
 
-func WithBearerToken(ctx context.Context, t oauth.JwtToken) context.Context {
+func WithBearerToken(ctx context.Context, t oauth.JWTToken) context.Context {
 	return context.WithValue(ctx, bearerTokenKey, t)
 }
 
 // BearerTokenFrom answers the token the bearer middleware validated off the request, whether
 // or not any scope guard has run.
-func BearerTokenFrom(ctx context.Context) (oauth.JwtToken, bool) {
-	t, ok := ctx.Value(bearerTokenKey).(oauth.JwtToken)
+func BearerTokenFrom(ctx context.Context) (oauth.JWTToken, bool) {
+	t, ok := ctx.Value(bearerTokenKey).(oauth.JWTToken)
 	return t, ok
 }
 
-func WithValidatedToken(ctx context.Context, t oauth.JwtToken) context.Context {
+func WithValidatedToken(ctx context.Context, t oauth.JWTToken) context.Context {
 	return context.WithValue(ctx, validatedTokenKey, t)
 }
 
 // ValidatedTokenFrom answers the token a scope guard accepted; true means one did.
-func ValidatedTokenFrom(ctx context.Context) (oauth.JwtToken, bool) {
-	t, ok := ctx.Value(validatedTokenKey).(oauth.JwtToken)
+func ValidatedTokenFrom(ctx context.Context) (oauth.JWTToken, bool) {
+	t, ok := ctx.Value(validatedTokenKey).(oauth.JWTToken)
 	return t, ok
 }
 

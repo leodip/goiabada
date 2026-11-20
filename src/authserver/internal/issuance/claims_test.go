@@ -889,7 +889,7 @@ func TestAMR_IsArrayType_InGeneratedTokens(t *testing.T) {
 		assert.ElementsMatch(t, []string{"pwd"}, amrAccess)
 
 		// Verify id_token AMR is an array
-		idClaims := verifyAndDecodeToken(t, response.IdToken, publicKeyBytes)
+		idClaims := verifyAndDecodeToken(t, response.IDToken, publicKeyBytes)
 		amrId := idClaims["amr"]
 		_, isArray = amrId.([]interface{})
 		assert.True(t, isArray, "amr in id_token must be a JSON array, got %T", amrId)
@@ -933,7 +933,7 @@ func TestAMR_IsArrayType_InGeneratedTokens(t *testing.T) {
 		assert.ElementsMatch(t, []string{"pwd", "otp"}, amrAccess)
 
 		// Verify id_token AMR is an array with both methods
-		idClaims := verifyAndDecodeToken(t, response.IdToken, publicKeyBytes)
+		idClaims := verifyAndDecodeToken(t, response.IDToken, publicKeyBytes)
 		amrId := idClaims["amr"]
 		_, isArray = amrId.([]interface{})
 		assert.True(t, isArray, "amr in id_token must be a JSON array, got %T", amrId)
@@ -965,7 +965,7 @@ func TestAMR_IsArrayType_InGeneratedTokens(t *testing.T) {
 		assert.ElementsMatch(t, []string{"pwd"}, amrAccess)
 
 		// Verify id_token AMR is an array
-		idClaims := verifyAndDecodeToken(t, response.IdToken, publicKeyBytes)
+		idClaims := verifyAndDecodeToken(t, response.IDToken, publicKeyBytes)
 		amrId := idClaims["amr"]
 		_, isArray = amrId.([]interface{})
 		assert.True(t, isArray, "amr in ROPC id_token must be a JSON array, got %T", amrId)
@@ -1107,7 +1107,7 @@ func TestAMR_OmittedWhenNoAuthMethodRecorded(t *testing.T) {
 		_, present := accessClaims["amr"]
 		assert.False(t, present, "amr must be absent from the access_token, not an empty array")
 
-		idClaims := verifyAndDecodeToken(t, response.IdToken, publicKeyBytes)
+		idClaims := verifyAndDecodeToken(t, response.IDToken, publicKeyBytes)
 		_, present = idClaims["amr"]
 		assert.False(t, present, "amr must be absent from the id_token, not an empty array")
 	})
@@ -1139,7 +1139,7 @@ func TestAMR_OmittedWhenNoAuthMethodRecorded(t *testing.T) {
 		assert.True(t, present, "amr must still be present in the access_token when a method was recorded")
 		assert.ElementsMatch(t, []string{"pwd"}, amrAccess)
 
-		idClaims := verifyAndDecodeToken(t, response.IdToken, publicKeyBytes)
+		idClaims := verifyAndDecodeToken(t, response.IDToken, publicKeyBytes)
 		amrId, present := idClaims["amr"]
 		assert.True(t, present, "amr must still be present in the id_token when a method was recorded")
 		assert.ElementsMatch(t, []string{"pwd"}, amrId)
@@ -2019,7 +2019,7 @@ func issueCharacterizationTokens(t *testing.T, scope string, baseURL string, adm
 	require.NotNil(t, response)
 
 	publicKeyBytes := getTestPublicKey(t)
-	idClaims := verifyAndDecodeToken(t, response.IdToken, publicKeyBytes)
+	idClaims := verifyAndDecodeToken(t, response.IDToken, publicKeyBytes)
 	accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
 
 	mockDB.AssertExpectations(t)
@@ -2287,7 +2287,7 @@ func issueForScopeIsTheGrant(t *testing.T, flow string, grant string, storedRefr
 		response, err := tokenIssuer.mintAuthorizationCodeTokens(ctx, settings, code, "")
 		require.NoError(t, err)
 		issued.reportedScope, issued.accessToken, issued.idToken, issued.refreshToken =
-			response.Scope, response.AccessToken, response.IdToken, response.RefreshToken
+			response.Scope, response.AccessToken, response.IDToken, response.RefreshToken
 	case "auth code refresh":
 		mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, code).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, code).Return(nil)
@@ -2295,7 +2295,7 @@ func issueForScopeIsTheGrant(t *testing.T, flow string, grant string, storedRefr
 		response, err := tokenIssuer.mintCodeRefreshTokens(ctx, nil, settings, code, parent, "", "")
 		require.NoError(t, err)
 		issued.reportedScope, issued.accessToken, issued.idToken, issued.refreshToken =
-			response.Scope, response.AccessToken, response.IdToken, response.RefreshToken
+			response.Scope, response.AccessToken, response.IDToken, response.RefreshToken
 	case "implicit token", "implicit id_token token", "implicit id_token":
 		issueAccessToken := flow != "implicit id_token"
 		issueIdToken := flow != "implicit token"
@@ -2309,7 +2309,7 @@ func issueForScopeIsTheGrant(t *testing.T, flow string, grant string, storedRefr
 		response, err := tokenIssuer.IssuePasswordGrant(ctx, settings, &ROPCGrantInput{Client: &client, User: &user, Scope: grant})
 		require.NoError(t, err)
 		issued.reportedScope, issued.accessToken, issued.idToken, issued.refreshToken =
-			response.Scope, response.AccessToken, response.IdToken, response.RefreshToken
+			response.Scope, response.AccessToken, response.IDToken, response.RefreshToken
 	case "ROPC refresh":
 		mockDB.On("RefreshTokenLoadUser", mock.Anything, mock.Anything, parent).Return(nil)
 		mockDB.On("RefreshTokenLoadClient", mock.Anything, mock.Anything, parent).Return(nil)
@@ -2317,7 +2317,7 @@ func issueForScopeIsTheGrant(t *testing.T, flow string, grant string, storedRefr
 		response, err := tokenIssuer.mintROPCRefreshTokens(ctx, nil, settings, parent, "", "")
 		require.NoError(t, err)
 		issued.reportedScope, issued.accessToken, issued.idToken, issued.refreshToken =
-			response.Scope, response.AccessToken, response.IdToken, response.RefreshToken
+			response.Scope, response.AccessToken, response.IDToken, response.RefreshToken
 	default:
 		t.Fatalf("unknown flow %q", flow)
 	}

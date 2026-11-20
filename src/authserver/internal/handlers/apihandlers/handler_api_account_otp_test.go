@@ -1191,7 +1191,7 @@ func TestHandleAccountOTPPut_Enable_AnswersWithTheSetOfRecoveryCodes(t *testing.
 	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 	var body api.UpdateAccountOTPResponse
 	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &body))
-	assert.Equal(t, user.Id, body.User.Id, "the user is answered as before")
+	assert.Equal(t, user.Id, body.User.ID, "the user is answered as before")
 	require.Len(t, body.RecoveryCodes, 10, "the set is ten codes")
 	require.Len(t, stored, 10)
 	for i, code := range body.RecoveryCodes {

@@ -32,7 +32,7 @@ type connectedClientsApiClient struct {
 }
 
 func (c *connectedClientsApiClient) GetUserById(_ context.Context, _ string, userId int64) (*api.UserResponse, error) {
-	return &api.UserResponse{Id: userId, Email: "jdoe@example.com"}, nil
+	return &api.UserResponse{ID: userId, Email: "jdoe@example.com"}, nil
 }
 
 func (c *connectedClientsApiClient) GetUserConnectedClients(_ context.Context, _ string, _ int64) ([]api.ConnectedClientResponse, error) {
@@ -56,11 +56,11 @@ func TestHandleConnectedClientsGet_BindsTheUserAndEveryConnectedClient(t *testin
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_users_connected_clients.html").Once()
 
 	apiClient := &connectedClientsApiClient{clients: []api.ConnectedClientResponse{
-		{ClientId: 4, ClientIdentifier: "portal", ClientName: "Customer portal", ClientDescription: "Orders",
-			Consent:    &api.ConnectedClientConsentResponse{Id: 11, Scope: "openid email", GrantedAt: &grantedAt},
+		{ClientID: 4, ClientIdentifier: "portal", ClientName: "Customer portal", ClientDescription: "Orders",
+			Consent:    &api.ConnectedClientConsentResponse{ID: 11, Scope: "openid email", GrantedAt: &grantedAt},
 			GrantScope: "openid"},
-		{ClientId: 9, ClientIdentifier: "payroll", ClientName: "Payroll", GrantScope: "openid profile"},
-		{ClientId: 1, ClientIdentifier: "admin-console-client", ClientName: "Admin console", GrantScope: "openid",
+		{ClientID: 9, ClientIdentifier: "payroll", ClientName: "Payroll", GrantScope: "openid profile"},
+		{ClientID: 1, ClientIdentifier: "admin-console-client", ClientName: "Admin console", GrantScope: "openid",
 			IsCurrent: true},
 	}}
 
@@ -71,7 +71,7 @@ func TestHandleConnectedClientsGet_BindsTheUserAndEveryConnectedClient(t *testin
 	bind := handlertest.Bind(t, httpHelper)
 	user, ok := bind["user"].(*api.UserResponse)
 	require.True(t, ok, "the bind carries no *UserResponse")
-	assert.Equal(t, int64(42), user.Id)
+	assert.Equal(t, int64(42), user.ID)
 	assert.Equal(t, "3", bind["page"])
 	assert.Equal(t, "jd", bind["query"])
 

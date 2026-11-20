@@ -27,7 +27,7 @@ type userPictureApiClient struct {
 }
 
 func (c *userPictureApiClient) GetUserById(_ context.Context, accessToken string, userId int64) (*api.UserResponse, error) {
-	return &api.UserResponse{Id: userId}, nil
+	return &api.UserResponse{ID: userId}, nil
 }
 
 func (c *userPictureApiClient) GetUserProfilePicture(_ context.Context, accessToken string, userId int64) (*api.ProfilePictureInfoResponse, error) {
@@ -61,7 +61,7 @@ func TestHandlePictureGet_AnswersAFailedPictureRead(t *testing.T) {
 		},
 		{
 			name:          "a picture renders the page with its address",
-			picture:       &api.ProfilePictureInfoResponse{HasPicture: true, PictureUrl: "https://auth.example/picture/42"},
+			picture:       &api.ProfilePictureInfoResponse{HasPicture: true, PictureURL: "https://auth.example/picture/42"},
 			wantUrlPrefix: "https://auth.example/picture/42?t=",
 		},
 		{

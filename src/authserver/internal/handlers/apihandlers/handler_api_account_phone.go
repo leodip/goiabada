@@ -55,7 +55,7 @@ func HandleAccountPhonePut(
 
 		// Validate phone input
 		input := &accountvalidation.ValidatePhoneInput{
-			PhoneCountryUniqueId: req.PhoneCountryUniqueId,
+			PhoneCountryUniqueId: req.PhoneCountryUniqueID,
 			PhoneNumber:          strings.TrimSpace(req.PhoneNumber),
 		}
 		if err := phoneValidator.ValidatePhone(input); err != nil {

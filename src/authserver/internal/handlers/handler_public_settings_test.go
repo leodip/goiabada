@@ -553,7 +553,7 @@ var publicBrandAllowedFields = map[string]string{
 // publicBrandFooterLinkAllowedFields is the complete set of fields a footer link carries: its URL,
 // its fallback label and its label per language, all of which its sign-in pages draw.
 var publicBrandFooterLinkAllowedFields = map[string]string{
-	"Url":    "url",
+	"URL":    "url",
 	"Label":  "label",
 	"Labels": "labels",
 }

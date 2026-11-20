@@ -1582,7 +1582,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 
 		// A replay must be indistinguishable from a wrong code, so it renders the same
 		// message the wrong-code branch renders, computed here the way the handler does.
-		expectedError := i18n.NewLocalizedError(i18n.ErrCodeOtpIncorrectCode, nil).Localize(req.Context())
+		expectedError := i18n.NewLocalizedError(i18n.ErrCodeOTPIncorrectCode, nil).Localize(req.Context())
 		pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_otp.html",
 			mock.MatchedBy(func(bind map[string]interface{}) bool {
 				return bind["error"] == expectedError
@@ -1671,7 +1671,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		// Refused exactly as a wrong enrollment code is, back to the enrollment page with
 		// the same secret and QR code, so the user can retype from the authenticator they
 		// have already scanned.
-		expectedError := i18n.NewLocalizedError(i18n.ErrCodeOtpIncorrectCode, nil).Localize(req.Context())
+		expectedError := i18n.NewLocalizedError(i18n.ErrCodeOTPIncorrectCode, nil).Localize(req.Context())
 		pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html",
 			"/auth_otp_enrollment.html", mock.MatchedBy(func(bind map[string]interface{}) bool {
 				return bind["error"] == expectedError &&

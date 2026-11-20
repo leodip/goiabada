@@ -33,7 +33,7 @@ type attributesAddApiClient struct {
 }
 
 func (c *attributesAddApiClient) GetGroupById(_ context.Context, accessToken string, groupId int64) (*api.GroupResponse, error) {
-	return &api.GroupResponse{Id: groupId, GroupIdentifier: "some-group"}, nil
+	return &api.GroupResponse{ID: groupId, GroupIdentifier: "some-group"}, nil
 }
 
 func (c *attributesAddApiClient) CreateGroupAttribute(_ context.Context, accessToken string, request *api.CreateGroupAttributeRequest) (*api.GroupAttributeResponse, error) {

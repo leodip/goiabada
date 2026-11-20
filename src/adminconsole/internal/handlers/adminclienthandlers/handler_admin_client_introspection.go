@@ -65,7 +65,7 @@ func HandleIntrospectionGet(
 			IsSystemLevelClient bool
 			Resources           []listedResource
 		}{
-			ClientId:            clientResp.Id,
+			ClientId:            clientResp.ID,
 			ClientIdentifier:    clientResp.ClientIdentifier,
 			IsPublic:            clientResp.IsPublic,
 			IsSystemLevelClient: clientResp.IsSystemLevelClient,
@@ -73,7 +73,7 @@ func HandleIntrospectionGet(
 		}
 		for _, resource := range listed {
 			adminClientIntrospection.Resources = append(adminClientIntrospection.Resources, listedResource{
-				Id:         resource.Id,
+				Id:         resource.ID,
 				Identifier: resource.ResourceIdentifier,
 			})
 		}
@@ -160,8 +160,8 @@ func HandleIntrospectionPost(
 		// Both lists pass through unchanged, the loaded one included, so the auth server refuses a
 		// save from an outdated page and a list for a client made public since the page loaded.
 		req := &api.UpdateClientIntrospectionResourcesRequest{
-			ResourceIds:         data.ResourceIds,
-			ExpectedResourceIds: data.ExpectedResourceIds,
+			ResourceIDs:         data.ResourceIds,
+			ExpectedResourceIDs: data.ExpectedResourceIds,
 		}
 		if updateErr := apiClient.UpdateClientIntrospectionResources(r.Context(), jwtInfo.TokenResponse.AccessToken, id, req); updateErr != nil {
 			render.HandleAPIErrorJSON(httpHelper, w, r, updateErr)

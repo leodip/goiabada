@@ -35,7 +35,7 @@ func assertBoundTokenResponse(t *testing.T, response *oauth.TokenResponse) {
 	assert.Equal(t, map[string]interface{}{"jkt": boundThumbprint}, claims["cnf"], "cnf.jkt is the key's thumbprint")
 	assert.Equal(t, "Bearer", claims["typ"], "the body's typ is the access-token label, bound or not")
 
-	for name, token := range map[string]string{"ID": response.IdToken, "refresh": response.RefreshToken} {
+	for name, token := range map[string]string{"ID": response.IDToken, "refresh": response.RefreshToken} {
 		if token == "" {
 			continue
 		}
@@ -61,7 +61,7 @@ func TestBoundAccessToken_AuthorizationCodeGrant(t *testing.T) {
 	require.NoError(t, err)
 
 	assertBoundTokenResponse(t, response)
-	require.NotEmpty(t, response.IdToken)
+	require.NotEmpty(t, response.IDToken)
 	require.NotEmpty(t, response.RefreshToken)
 	assertWholeAccessToken(t, response.AccessToken, testStart, 600, map[string]interface{}{
 		"iss":                   "https://test-issuer.com",

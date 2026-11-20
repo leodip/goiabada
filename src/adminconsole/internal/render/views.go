@@ -48,11 +48,11 @@ func SessionInfos(sessions []api.UserSessionDetailResponse) []SessionInfo {
 	infos := make([]SessionInfo, 0, len(sessions))
 	for _, s := range sessions {
 		infos = append(infos, SessionInfo{
-			UserSessionId: s.Id,
+			UserSessionId: s.ID,
 			IsCurrent:     s.IsCurrent,
 			Started:       s.Started,
 			LastAccessed:  s.LastAccessed,
-			IpAddress:     s.IpAddress,
+			IpAddress:     s.IPAddress,
 			DeviceName:    s.DeviceName,
 			DeviceType:    s.DeviceType,
 			DeviceOS:      s.DeviceOS,
@@ -133,7 +133,7 @@ func ConnectedClientInfos(clients []api.ConnectedClientResponse) []ConnectedClie
 	infos := make([]ConnectedClientInfo, 0, len(clients))
 	for _, c := range clients {
 		info := ConnectedClientInfo{
-			ClientId:             c.ClientId,
+			ClientId:             c.ClientID,
 			Client:               c.ClientIdentifier,
 			ClientName:           c.ClientName,
 			ClientNameUnverified: c.ClientNameUnverified,

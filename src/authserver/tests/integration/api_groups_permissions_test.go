@@ -60,7 +60,7 @@ func TestAPIGroupPermissionsGet_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	// Assert: Group information
-	assert.Equal(t, testGroup.Id, getResponse.Group.Id)
+	assert.Equal(t, testGroup.Id, getResponse.Group.ID)
 	assert.Equal(t, testGroup.GroupIdentifier, getResponse.Group.GroupIdentifier)
 
 	// Assert: Should return both permissions with resource info
@@ -76,14 +76,14 @@ func TestAPIGroupPermissionsGet_Success(t *testing.T) {
 	readPerm, exists := permMap["read"]
 	assert.True(t, exists)
 	assert.Equal(t, "Read permission", readPerm.Description)
-	assert.Equal(t, resource.Id, readPerm.ResourceId)
+	assert.Equal(t, resource.Id, readPerm.ResourceID)
 	assert.Equal(t, "test-group-resource", readPerm.Resource.ResourceIdentifier)
 	assert.Equal(t, "Test Group Resource", readPerm.Resource.Description)
 
 	writePerm, exists := permMap["write"]
 	assert.True(t, exists)
 	assert.Equal(t, "Write permission", writePerm.Description)
-	assert.Equal(t, resource.Id, writePerm.ResourceId)
+	assert.Equal(t, resource.Id, writePerm.ResourceID)
 	assert.Equal(t, "test-group-resource", writePerm.Resource.ResourceIdentifier)
 }
 
@@ -138,7 +138,7 @@ func TestAPIGroupPermissionsGet_NoPermissions(t *testing.T) {
 
 	// Assert: Should return empty permissions array
 	assert.Empty(t, getResponse.Permissions)
-	assert.Equal(t, testGroup.Id, getResponse.Group.Id)
+	assert.Equal(t, testGroup.Id, getResponse.Group.ID)
 }
 
 func TestAPIGroupPermissionsGet_Unauthorized(t *testing.T) {
@@ -196,8 +196,8 @@ func TestAPIGroupPermissionsPut_Success(t *testing.T) {
 
 	// Test: Update group permissions (replace with two different permissions)
 	updateReq := api.UpdateGroupPermissionsRequest{
-		PermissionIds:         []int64{perm2.Id, perm3.Id},
-		ExpectedPermissionIds: getGroupPermissionIds(t, accessToken, testGroup.Id),
+		PermissionIDs:         []int64{perm2.Id, perm3.Id},
+		ExpectedPermissionIDs: getGroupPermissionIds(t, accessToken, testGroup.Id),
 	}
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/permissions"
@@ -254,8 +254,8 @@ func TestAPIGroupPermissionsPut_RemoveAllPermissions(t *testing.T) {
 
 	// Test: Remove all permissions (empty array)
 	updateReq := api.UpdateGroupPermissionsRequest{
-		PermissionIds:         []int64{},
-		ExpectedPermissionIds: getGroupPermissionIds(t, accessToken, testGroup.Id),
+		PermissionIDs:         []int64{},
+		ExpectedPermissionIDs: getGroupPermissionIds(t, accessToken, testGroup.Id),
 	}
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/permissions"
@@ -307,8 +307,8 @@ func TestAPIGroupPermissionsPut_AddPermissionsToEmptyGroup(t *testing.T) {
 
 	// Test: Add permissions to group that has none
 	updateReq := api.UpdateGroupPermissionsRequest{
-		PermissionIds:         []int64{perm1.Id, perm2.Id},
-		ExpectedPermissionIds: getGroupPermissionIds(t, accessToken, testGroup.Id),
+		PermissionIDs:         []int64{perm1.Id, perm2.Id},
+		ExpectedPermissionIDs: getGroupPermissionIds(t, accessToken, testGroup.Id),
 	}
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/permissions"
@@ -349,8 +349,8 @@ func TestAPIGroupPermissionsPut_GroupNotFound(t *testing.T) {
 
 	// Test: Update permissions for non-existent group
 	updateReq := api.UpdateGroupPermissionsRequest{
-		PermissionIds:         []int64{},
-		ExpectedPermissionIds: []int64{},
+		PermissionIDs:         []int64{},
+		ExpectedPermissionIDs: []int64{},
 	}
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/99999/permissions"
@@ -373,8 +373,8 @@ func TestAPIGroupPermissionsPut_PermissionNotFound(t *testing.T) {
 
 	// Test: Update with non-existent permission
 	updateReq := api.UpdateGroupPermissionsRequest{
-		PermissionIds:         []int64{99999},
-		ExpectedPermissionIds: getGroupPermissionIds(t, accessToken, testGroup.Id),
+		PermissionIDs:         []int64{99999},
+		ExpectedPermissionIDs: getGroupPermissionIds(t, accessToken, testGroup.Id),
 	}
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/permissions"
@@ -416,8 +416,8 @@ func TestAPIGroupPermissionsPut_InvalidGroupId(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	updateReq := api.UpdateGroupPermissionsRequest{
-		PermissionIds:         []int64{},
-		ExpectedPermissionIds: []int64{},
+		PermissionIDs:         []int64{},
+		ExpectedPermissionIDs: []int64{},
 	}
 
 	testCases := []struct {
@@ -464,8 +464,8 @@ func TestAPIGroupPermissionsPut_DuplicatePermissionIds(t *testing.T) {
 
 	// Test: Update with duplicate permission IDs
 	updateReq := api.UpdateGroupPermissionsRequest{
-		PermissionIds:         []int64{perm.Id, perm.Id, perm.Id}, // Same permission multiple times
-		ExpectedPermissionIds: getGroupPermissionIds(t, accessToken, testGroup.Id),
+		PermissionIDs:         []int64{perm.Id, perm.Id, perm.Id}, // Same permission multiple times
+		ExpectedPermissionIDs: getGroupPermissionIds(t, accessToken, testGroup.Id),
 	}
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/permissions"
@@ -551,8 +551,8 @@ func TestAPIGroupPermissionsPut_ComplexScenario(t *testing.T) {
 
 	// Test: Update to permissions B, C, D (should remove A, keep B and C, add D)
 	updateReq := api.UpdateGroupPermissionsRequest{
-		PermissionIds:         []int64{permB.Id, permC.Id, permD.Id},
-		ExpectedPermissionIds: getGroupPermissionIds(t, accessToken, testGroup.Id),
+		PermissionIDs:         []int64{permB.Id, permC.Id, permD.Id},
+		ExpectedPermissionIDs: getGroupPermissionIds(t, accessToken, testGroup.Id),
 	}
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/permissions"
@@ -606,7 +606,7 @@ func getGroupPermissionIds(t *testing.T, accessToken string, groupId int64) []in
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
 	ids := []int64{}
 	for _, p := range body.Permissions {
-		ids = append(ids, p.Id)
+		ids = append(ids, p.ID)
 	}
 	return ids
 }
@@ -659,12 +659,12 @@ func TestAPIGroupPermissionsPut_AnOutdatedLoadedListIsRefused(t *testing.T) {
 	loadedByBoth := getGroupPermissionIds(t, accessToken, group.Id)
 
 	first := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateGroupPermissionsRequest{
-		PermissionIds: []int64{permB.Id}, ExpectedPermissionIds: loadedByBoth})
+		PermissionIDs: []int64{permB.Id}, ExpectedPermissionIDs: loadedByBoth})
 	defer func() { _ = first.Body.Close() }()
 	require.Equal(t, http.StatusOK, first.StatusCode)
 
 	second := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateGroupPermissionsRequest{
-		PermissionIds: []int64{permA.Id, permB.Id, permC.Id}, ExpectedPermissionIds: loadedByBoth})
+		PermissionIDs: []int64{permA.Id, permB.Id, permC.Id}, ExpectedPermissionIDs: loadedByBoth})
 	defer func() { _ = second.Body.Close() }()
 	assert.Equal(t, http.StatusConflict, second.StatusCode)
 	var body map[string]interface{}

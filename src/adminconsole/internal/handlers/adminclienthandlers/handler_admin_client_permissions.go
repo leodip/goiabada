@@ -67,7 +67,7 @@ func HandlePermissionsGet(
 			IsSystemLevelClient      bool
 			IsPublic                 bool
 		}{
-			ClientId:                 clientResp.Id,
+			ClientId:                 clientResp.ID,
 			ClientIdentifier:         clientResp.ClientIdentifier,
 			ClientCredentialsEnabled: clientResp.ClientCredentialsEnabled,
 			Permissions:              make([]grantedPermission, 0, len(perms)),
@@ -76,7 +76,7 @@ func HandlePermissionsGet(
 		}
 		for _, permission := range perms {
 			adminClientPermissions.Permissions = append(adminClientPermissions.Permissions, grantedPermission{
-				Id:    permission.Id,
+				Id:    permission.ID,
 				Scope: permission.Resource.ResourceIdentifier + ":" + permission.PermissionIdentifier,
 			})
 		}
@@ -153,8 +153,8 @@ func HandlePermissionsPost(
 
 		// Call Auth Server API to update client permissions
 		req := &api.UpdateClientPermissionsRequest{
-			PermissionIds:         data.AssignedPermissionsIds,
-			ExpectedPermissionIds: data.ExpectedPermissionIds,
+			PermissionIDs:         data.AssignedPermissionsIds,
+			ExpectedPermissionIDs: data.ExpectedPermissionIds,
 		}
 		if updateClientPermissionsErr := apiClient.UpdateClientPermissions(r.Context(), jwtInfo.TokenResponse.AccessToken, data.ClientId, req); updateClientPermissionsErr != nil {
 			render.HandleAPIErrorJSON(httpHelper, w, r, updateClientPermissionsErr)

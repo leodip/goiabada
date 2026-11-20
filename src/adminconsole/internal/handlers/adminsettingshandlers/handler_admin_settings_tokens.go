@@ -48,7 +48,7 @@ func HandleTokensGet(
 			RefreshTokenOfflineIdleTimeoutInSeconds: apiResp.RefreshTokenOfflineIdleTimeoutInSeconds,
 			RefreshTokenOfflineMaxLifetimeInSeconds: apiResp.RefreshTokenOfflineMaxLifetimeInSeconds,
 			IncludeOpenIDConnectClaimsInAccessToken: apiResp.IncludeOpenIDConnectClaimsInAccessToken,
-			IncludeOpenIDConnectClaimsInIdToken:     apiResp.IncludeOpenIDConnectClaimsInIdToken,
+			IncludeOpenIDConnectClaimsInIdToken:     apiResp.IncludeOpenIDConnectClaimsInIDToken,
 		}
 
 		sess, err := httpSession.Get(r, builtin.AdminConsoleSessionName)
@@ -139,7 +139,7 @@ func HandleTokensPost(
 			RefreshTokenOfflineIdleTimeoutInSeconds: idle,
 			RefreshTokenOfflineMaxLifetimeInSeconds: maxlife,
 			IncludeOpenIDConnectClaimsInAccessToken: settingsInfo.IncludeOpenIDConnectClaimsInAccessToken,
-			IncludeOpenIDConnectClaimsInIdToken:     settingsInfo.IncludeOpenIDConnectClaimsInIdToken,
+			IncludeOpenIDConnectClaimsInIDToken:     settingsInfo.IncludeOpenIDConnectClaimsInIdToken,
 		}
 
 		_, err = apiClient.UpdateSettingsTokens(r.Context(), jwtInfo.TokenResponse.AccessToken, updateReq)

@@ -64,7 +64,7 @@ func draftText(ctx context.Context, apiClient legalDocumentTextReader, token str
 	if detail.LegalDocument.CurrentVersion == 0 {
 		return detail.LegalDocument.Title, "", nil
 	}
-	current, err := apiClient.GetLegalDocumentVersion(ctx, token, detail.LegalDocument.Id, detail.LegalDocument.CurrentVersion)
+	current, err := apiClient.GetLegalDocumentVersion(ctx, token, detail.LegalDocument.ID, detail.LegalDocument.CurrentVersion)
 	if err != nil {
 		return "", "", err
 	}

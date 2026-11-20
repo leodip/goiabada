@@ -23,12 +23,12 @@ import (
 func TestRender_AdminSettingsAuditLogViewer(t *testing.T) {
 	auditWritten := time.Date(2026, 9, 12, 10, 0, 0, 0, time.UTC)
 	logs := []api.AuditLogResponse{
-		{Id: 1, CreatedAt: auditWritten, AuditEvent: "user_login",
-			Details: `{"email":"alice@example.com","name":"<b>x</b>"}`, RequestId: "host/Ppg6bHPK5f-000012"},
-		{Id: 2, CreatedAt: auditWritten.Add(time.Second), AuditEvent: "revoked_user_auth_state",
-			Details: `{}`, RequestId: ""},
-		{Id: 3, CreatedAt: auditWritten.Add(2 * time.Second), AuditEvent: "user_login",
-			Details: `{}`, RequestId: `x"><b>y</b>&page=9`},
+		{ID: 1, CreatedAt: auditWritten, AuditEvent: "user_login",
+			Details: `{"email":"alice@example.com","name":"<b>x</b>"}`, RequestID: "host/Ppg6bHPK5f-000012"},
+		{ID: 2, CreatedAt: auditWritten.Add(time.Second), AuditEvent: "revoked_user_auth_state",
+			Details: `{}`, RequestID: ""},
+		{ID: 3, CreatedAt: auditWritten.Add(2 * time.Second), AuditEvent: "user_login",
+			Details: `{}`, RequestID: `x"><b>y</b>&page=9`},
 	}
 	rows := []adminsettingshandlers.AuditLogRow{
 		{AuditLogResponse: logs[0], DetailsParsed: true, DetailPairs: []adminsettingshandlers.AuditLogDetail{
@@ -145,10 +145,10 @@ func int64Ptr(v int64) *int64 { return &v }
 func TestRender_AdminSettingsAuditLogViewerNamesEachRowsUsers(t *testing.T) {
 	at := time.Date(2026, 9, 12, 10, 0, 0, 0, time.UTC)
 	logs := []api.AuditLogResponse{
-		{Id: 1, CreatedAt: at, AuditEvent: "updated_user_profile", Details: `{}`,
-			UserId: int64Ptr(42), LoggedInUserId: int64Ptr(7)},
-		{Id: 2, CreatedAt: at, AuditEvent: "user_login", Details: `{}`, UserId: int64Ptr(42)},
-		{Id: 3, CreatedAt: at, AuditEvent: "client_created", Details: `{}`},
+		{ID: 1, CreatedAt: at, AuditEvent: "updated_user_profile", Details: `{}`,
+			UserID: int64Ptr(42), LoggedInUserID: int64Ptr(7)},
+		{ID: 2, CreatedAt: at, AuditEvent: "user_login", Details: `{}`, UserID: int64Ptr(42)},
+		{ID: 3, CreatedAt: at, AuditEvent: "client_created", Details: `{}`},
 	}
 	rows := make([]adminsettingshandlers.AuditLogRow, 0, len(logs))
 	for _, entry := range logs {

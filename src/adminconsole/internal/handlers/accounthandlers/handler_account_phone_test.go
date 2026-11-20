@@ -17,7 +17,7 @@ import (
 // portugal is the core list's entry for Portugal, written out rather than looked up, so the page is
 // held to the ids and labels a save stores (#563 decision 1).
 var portugal = phonecountries.PhoneCountry{
-	UniqueId:    "PRT_0",
+	UniqueID:    "PRT_0",
 	Alpha2:      "PT",
 	Emoji:       "🇵🇹",
 	CallingCode: "+351",

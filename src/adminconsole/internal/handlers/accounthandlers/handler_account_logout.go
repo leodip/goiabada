@@ -112,7 +112,7 @@ func HandleLogoutPost(
 		// decision 11).
 		accessToken := jwtInfo.TokenResponse.AccessToken
 		req := &api.AccountLogoutRequest{
-			PostLogoutRedirectUri: baseURL,
+			PostLogoutRedirectURI: baseURL,
 			ClientIdentifier:      builtin.AdminConsoleClientIdentifier,
 			State:                 securerandom.String(32),
 			ResponseMode:          api.AccountLogoutResponseModeFormPost,
@@ -142,6 +142,6 @@ func HandleLogoutPost(
 			return
 		}
 
-		http.Redirect(w, r, redirectResp.LogoutUrl, http.StatusFound)
+		http.Redirect(w, r, redirectResp.LogoutURL, http.StatusFound)
 	}
 }

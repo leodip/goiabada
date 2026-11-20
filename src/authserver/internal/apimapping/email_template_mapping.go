@@ -46,7 +46,7 @@ func ToEmailTemplateSummaryResponse(email *emailtemplate.Email, edits EmailTempl
 		status, _ := EmailTemplateStatus(email, lang, edits[lang])
 		languages = append(languages, api.EmailTemplateLanguageStatusResponse{Language: lang, Status: status})
 	}
-	return api.EmailTemplateSummaryResponse{Id: email.ID, Languages: languages}
+	return api.EmailTemplateSummaryResponse{ID: email.ID, Languages: languages}
 }
 
 // ToEmailTemplateResponse is the read of one email: its placeholders, whether it has a button, and
@@ -61,7 +61,7 @@ func ToEmailTemplateResponse(email *emailtemplate.Email, edits EmailTemplateEdit
 		languages = append(languages, ToEmailTemplateLanguageResponse(email, lang, edits[lang], message))
 	}
 	return api.EmailTemplateResponse{
-		Id: email.ID, HasButton: email.HasButton(), Placeholders: placeholders, Languages: languages,
+		ID: email.ID, HasButton: email.HasButton(), Placeholders: placeholders, Languages: languages,
 	}
 }
 

@@ -228,7 +228,7 @@ const guardStaticFile = "/static/favicon/favicon.ico"
 // account API's scope and the session API's, of the client and user armGuardBearerToken has the
 // database find. It holds no administrative scope, so an admin route refuses it behind the route
 // itself, which the guard does not ask past.
-func guardBearerToken() oauth.JwtToken {
+func guardBearerToken() oauth.JWTToken {
 	return routesTestAccessToken(jwt.MapClaims{
 		"iss": guardIssuer,
 		"sub": routesTestSubject,

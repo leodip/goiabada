@@ -88,7 +88,7 @@ func HandleDeletePost(
 			return
 		}
 
-		if err := apiClient.DeleteLegalDocument(r.Context(), token, doc.Id); err != nil {
+		if err := apiClient.DeleteLegalDocument(r.Context(), token, doc.ID); err != nil {
 			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
 			return
 		}

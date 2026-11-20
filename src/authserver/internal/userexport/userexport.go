@@ -76,13 +76,13 @@ func Build(user *record.User, parts Parts, issuer string, exportedAt time.Time) 
 	}
 
 	// inIdOrder's copy is the one DeleteFunc changes, so the parts are left as they were.
-	attributes := slices.DeleteFunc(inIdOrder(parts.Attributes, func(a api.UserAttributeResponse) int64 { return a.Id }),
-		func(a api.UserAttributeResponse) bool { return !a.IncludeInIdToken && !a.IncludeInAccessToken })
-	groups := inIdOrder(parts.Groups, func(g api.UserExportGroupResponse) int64 { return g.Id })
+	attributes := slices.DeleteFunc(inIdOrder(parts.Attributes, func(a api.UserAttributeResponse) int64 { return a.ID }),
+		func(a api.UserAttributeResponse) bool { return !a.IncludeInIDToken && !a.IncludeInAccessToken })
+	groups := inIdOrder(parts.Groups, func(g api.UserExportGroupResponse) int64 { return g.ID })
 	for i := range groups {
 		groups[i].Attributes = slices.DeleteFunc(
-			inIdOrder(groups[i].Attributes, func(a api.GroupAttributeResponse) int64 { return a.Id }),
-			func(a api.GroupAttributeResponse) bool { return !a.IncludeInIdToken && !a.IncludeInAccessToken })
+			inIdOrder(groups[i].Attributes, func(a api.GroupAttributeResponse) int64 { return a.ID }),
+			func(a api.GroupAttributeResponse) bool { return !a.IncludeInIDToken && !a.IncludeInAccessToken })
 		groups[i].Permissions = inIdOrder(groups[i].Permissions, permissionId)
 	}
 
@@ -99,7 +99,7 @@ func Build(user *record.User, parts Parts, issuer string, exportedAt time.Time) 
 		ExportedAt:    exportedAt.UTC(),
 		Issuer:        issuer,
 		Identifiers: api.UserExportIdentifiersResponse{
-			Id:      user.Id,
+			ID:      user.Id,
 			Subject: user.Subject,
 			Email:   user.Email,
 			// The digest an audit entry about the address records: the address is stored in
@@ -110,17 +110,17 @@ func Build(user *record.User, parts Parts, issuer string, exportedAt time.Time) 
 		Attributes:    attributes,
 		Groups:        groups,
 		Permissions:   inIdOrder(parts.Permissions, permissionId),
-		Consents:      inIdOrder(parts.Consents, func(c api.UserConsentResponse) int64 { return c.Id }),
-		Sessions:      inIdOrder(parts.Sessions, func(s api.UserSessionDetailResponse) int64 { return s.Id }),
+		Consents:      inIdOrder(parts.Consents, func(c api.UserConsentResponse) int64 { return c.ID }),
+		Sessions:      inIdOrder(parts.Sessions, func(s api.UserSessionDetailResponse) int64 { return s.ID }),
 		RefreshTokens: refreshTokens(parts.RefreshTokens),
 		LegalDocumentAcceptances: inIdOrder(parts.LegalDocumentAcceptances,
-			func(a api.LegalDocumentAcceptanceResponse) int64 { return a.Id }),
+			func(a api.LegalDocumentAcceptanceResponse) int64 { return a.ID }),
 		ProfilePicture: picture,
 		AuditEvents:    events,
 	}, nil
 }
 
-func permissionId(p api.PermissionResponse) int64 { return p.Id }
+func permissionId(p api.PermissionResponse) int64 { return p.ID }
 
 // refreshTokens is each token's entry, in the rows' id order (#781 decision 4). A token is revoked
 // when any of the three marks that stop it is set: its own row, its authorization code's, or its
@@ -140,7 +140,7 @@ func refreshTokens(tokens []RefreshToken) []api.UserExportRefreshTokenResponse {
 			ExpiresAt:         nullTime(row.ExpiresAt),
 			MaxLifetime:       nullTime(row.MaxLifetime),
 			SessionIdentifier: row.SessionIdentifier,
-			Jti:               row.RefreshTokenJti,
+			JTI:               row.RefreshTokenJti,
 			Revoked:           row.Revoked || token.FamilyRevoked,
 		}
 		if token.Client != nil {
@@ -150,7 +150,7 @@ func refreshTokens(tokens []RefreshToken) []api.UserExportRefreshTokenResponse {
 		if row.CodeId.Valid {
 			if code := token.Code; code != nil {
 				entry.Revoked = entry.Revoked || code.Revoked
-				entry.IpAddress = code.IpAddress
+				entry.IPAddress = code.IpAddress
 				entry.UserAgent = code.UserAgent
 				if !code.AuthenticatedAt.IsZero() {
 					authenticatedAt := code.AuthenticatedAt
@@ -182,7 +182,7 @@ func auditEvents(userId int64, rows []record.AuditLog) ([]api.UserExportAuditEve
 		var hidden []string
 		if row.LoggedInUserId.Valid && row.LoggedInUserId.Int64 != userId {
 			entry.ActedByAdministrator = true
-			entry.LoggedInUserId = nil
+			entry.LoggedInUserID = nil
 			hidden = append(hidden, "logged_in_user")
 		}
 		if row.AuditEvent == audit.EventCrossUserSessionReplaced {

@@ -86,7 +86,7 @@ func TestDPoPResources_AHandlersSessionRefusalSpendsTheProof(t *testing.T) {
 	proof := key.ResourceProof(t, http.MethodPost, resourceURL(path), time.Now(), token)
 
 	refused := sendJSONWithProof(t, http.MethodPost, path, token, proof, api.AccountLogoutRequest{
-		ClientIdentifier: u.client.ClientIdentifier, PostLogoutRedirectUri: redirect,
+		ClientIdentifier: u.client.ClientIdentifier, PostLogoutRedirectURI: redirect,
 	})
 
 	require.Equal(t, http.StatusUnauthorized, refused.status, "%v", refused.body)

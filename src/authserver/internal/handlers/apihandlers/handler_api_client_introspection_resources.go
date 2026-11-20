@@ -122,12 +122,12 @@ func HandleClientIntrospectionResourcesPut(
 
 		// The list as the caller loaded it, required as on every list save: absent or null decodes
 		// to nil and is refused, [] means the caller read an empty list (#428).
-		if request.ExpectedResourceIds == nil {
+		if request.ExpectedResourceIDs == nil {
 			writeJSONError(w, "expectedResourceIds is required: send the resource ids as you last read them, or [] if there were none.", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
-		wanted := firstOccurrences(request.ResourceIds)
+		wanted := firstOccurrences(request.ResourceIDs)
 
 		if client.IsPublic && len(wanted) > 0 {
 			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientIntrospectionResourcesPublicClient, nil))
@@ -150,7 +150,7 @@ func HandleClientIntrospectionResourcesPut(
 
 		// Only authserver:manage lists the authserver resource (#676 decision 14), and only it
 		// writes to an administrator client (#402 decision 1).
-		if !introspectionResourceCeilingAllows(w, r, auditLogger, client, resources, request.ExpectedResourceIds) {
+		if !introspectionResourceCeilingAllows(w, r, auditLogger, client, resources, request.ExpectedResourceIDs) {
 			return
 		}
 		if !clientTargetCeilingAllows(w, r, database, auditLogger, client) {
@@ -175,7 +175,7 @@ func HandleClientIntrospectionResourcesPut(
 			if loadErr != nil {
 				return errs.Wrap(loadErr, "database error loading client introspection resources before update")
 			}
-			if !sameSet(stored, listedKey, request.ExpectedResourceIds) {
+			if !sameSet(stored, listedKey, request.ExpectedResourceIDs) {
 				return errListChanged
 			}
 

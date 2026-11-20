@@ -53,23 +53,23 @@ func (_m *TokenParser) EXPECT() *TokenParser_Expecter {
 }
 
 // DecodeAndValidateTokenString provides a mock function for the type TokenParser
-func (_mock *TokenParser) DecodeAndValidateTokenString(ctx context.Context, token string, withExpirationCheck bool) (*oauth.JwtToken, error) {
+func (_mock *TokenParser) DecodeAndValidateTokenString(ctx context.Context, token string, withExpirationCheck bool) (*oauth.JWTToken, error) {
 	ret := _mock.Called(ctx, token, withExpirationCheck)
 
 	if len(ret) == 0 {
 		panic("no return value specified for DecodeAndValidateTokenString")
 	}
 
-	var r0 *oauth.JwtToken
+	var r0 *oauth.JWTToken
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, bool) (*oauth.JwtToken, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, bool) (*oauth.JWTToken, error)); ok {
 		return returnFunc(ctx, token, withExpirationCheck)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, bool) *oauth.JwtToken); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, bool) *oauth.JWTToken); ok {
 		r0 = returnFunc(ctx, token, withExpirationCheck)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*oauth.JwtToken)
+			r0 = ret.Get(0).(*oauth.JWTToken)
 		}
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context, string, bool) error); ok {
@@ -116,12 +116,12 @@ func (_c *TokenParser_DecodeAndValidateTokenString_Call) Run(run func(ctx contex
 	return _c
 }
 
-func (_c *TokenParser_DecodeAndValidateTokenString_Call) Return(jwtToken *oauth.JwtToken, err error) *TokenParser_DecodeAndValidateTokenString_Call {
-	_c.Call.Return(jwtToken, err)
+func (_c *TokenParser_DecodeAndValidateTokenString_Call) Return(jWTToken *oauth.JWTToken, err error) *TokenParser_DecodeAndValidateTokenString_Call {
+	_c.Call.Return(jWTToken, err)
 	return _c
 }
 
-func (_c *TokenParser_DecodeAndValidateTokenString_Call) RunAndReturn(run func(ctx context.Context, token string, withExpirationCheck bool) (*oauth.JwtToken, error)) *TokenParser_DecodeAndValidateTokenString_Call {
+func (_c *TokenParser_DecodeAndValidateTokenString_Call) RunAndReturn(run func(ctx context.Context, token string, withExpirationCheck bool) (*oauth.JWTToken, error)) *TokenParser_DecodeAndValidateTokenString_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -80,10 +80,10 @@ func renderGroupPage(t *testing.T, client *groupBindApiClient, target, page stri
 // one object, so a field lost between the two is lost silently.
 func TestHandleAttributesGet_BindsTheGroupAndItsAttributes(t *testing.T) {
 	client := &groupBindApiClient{
-		group: &api.GroupResponse{Id: 4, GroupIdentifier: "admins", Description: "Administrators"},
+		group: &api.GroupResponse{ID: 4, GroupIdentifier: "admins", Description: "Administrators"},
 		attributes: []api.GroupAttributeResponse{
-			{Id: 7, Key: "tier", Value: "gold", GroupId: 4, IncludeInIdToken: true},
-			{Id: 8, Key: "region", Value: "br", GroupId: 4},
+			{ID: 7, Key: "tier", Value: "gold", GroupID: 4, IncludeInIDToken: true},
+			{ID: 8, Key: "region", Value: "br", GroupID: 4},
 		},
 	}
 
@@ -109,7 +109,7 @@ func TestHandleAttributesGet_BindsTheGroupAndItsAttributes(t *testing.T) {
 // action, so a count that silently became zero tells the administrator the group is empty.
 func TestHandleDeleteGet_BindsTheMemberCountOffTheResponse(t *testing.T) {
 	client := &groupBindApiClient{
-		group: &api.GroupResponse{Id: 4, GroupIdentifier: "admins", Description: "Administrators",
+		group: &api.GroupResponse{ID: 4, GroupIdentifier: "admins", Description: "Administrators",
 			MemberCount: 17},
 	}
 
@@ -131,8 +131,8 @@ func TestHandleDeleteGet_BindsTheMemberCountOffTheResponse(t *testing.T) {
 // unchecked, which is a valid-looking page asserting the opposite of the truth.
 func TestHandleSettingsGet_BindsBothTokenFlags(t *testing.T) {
 	client := &groupBindApiClient{
-		group: &api.GroupResponse{Id: 4, GroupIdentifier: "admins", Description: "Administrators",
-			IncludeInIdToken: true, IncludeInAccessToken: false},
+		group: &api.GroupResponse{ID: 4, GroupIdentifier: "admins", Description: "Administrators",
+			IncludeInIDToken: true, IncludeInAccessToken: false},
 	}
 
 	httpSession := sessionstoremocks.NewStore(t)

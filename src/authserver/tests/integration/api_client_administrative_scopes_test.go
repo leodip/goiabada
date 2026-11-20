@@ -85,7 +85,7 @@ func TestClientAdministrativeScopes_AManageTokenSwitchesTheAllowance(t *testing.
 		resp, requestId := putAdministrativeScopes(t, manageToken, f.clientId, map[string]any{"allowed": allowed})
 		client := switchedClient(t, resp)
 
-		assert.Equal(t, f.clientId, client.Id)
+		assert.Equal(t, f.clientId, client.ID)
 		assert.Equal(t, allowed, client.AdministrativeScopesAllowed, "the answer is the client as switched")
 		assert.Equal(t, allowed, storedClient(t, f.clientId).AdministrativeScopesAllowed, "the store is switched")
 
@@ -262,9 +262,9 @@ func TestClientAdministrativeScopes_EveryClientResponseCarriesTheAllowanceReadOn
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&list))
 	seen := 0
 	for _, client := range list.Clients {
-		if w, ok := want[client.Id]; ok {
+		if w, ok := want[client.ID]; ok {
 			seen++
-			assert.Equalf(t, w, client.AdministrativeScopesAllowed, "GET /clients, client %d", client.Id)
+			assert.Equalf(t, w, client.AdministrativeScopesAllowed, "GET /clients, client %d", client.ID)
 		}
 	}
 	assert.Equal(t, len(want), seen)

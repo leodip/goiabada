@@ -42,7 +42,7 @@ func brandRequest(t *testing.T, method string, body any, pathValues ...string) *
 		reader = bytes.NewReader(b)
 	}
 	req := httptest.NewRequest(method, "/api/v1/admin/brands", reader)
-	req = req.WithContext(reqctx.WithValidatedToken(req.Context(), oauth.JwtToken{Claims: map[string]any{"sub": brandCaller}}))
+	req = req.WithContext(reqctx.WithValidatedToken(req.Context(), oauth.JWTToken{Claims: map[string]any{"sub": brandCaller}}))
 	for i := 0; i+1 < len(pathValues); i += 2 {
 		req.SetPathValue(pathValues[i], pathValues[i+1])
 	}

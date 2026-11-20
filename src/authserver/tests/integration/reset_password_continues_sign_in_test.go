@@ -215,7 +215,7 @@ func TestResetPasswordContinuesSignIn_TheSetupLinkIsNeverCarriedOn(t *testing.T)
 	var created api.CreateUserResponse
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&created))
 	_ = resp.Body.Close()
-	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, created.User.Id) })
+	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, created.User.ID) })
 
 	// latestResetLink asserts the link carries the code and nothing else.
 	link := latestResetLink(t, email)

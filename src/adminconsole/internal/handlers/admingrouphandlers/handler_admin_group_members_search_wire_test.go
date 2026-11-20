@@ -31,12 +31,12 @@ func (memberSearchAPI) AddUserToGroup(context.Context, string, int64, int64) err
 }
 
 func (memberSearchAPI) GetGroupById(_ context.Context, _ string, groupId int64) (*api.GroupResponse, error) {
-	return &api.GroupResponse{Id: groupId}, nil
+	return &api.GroupResponse{ID: groupId}, nil
 }
 
 func (memberSearchAPI) SearchUsersWithGroupAnnotation(context.Context, string, string, int64, int, int) ([]api.UserWithGroupMembershipResponse, int, error) {
 	user := api.UserWithGroupMembershipResponse{InGroup: true}
-	user.Id = 7
+	user.ID = 7
 	user.Subject = "5e0b1c9a-sub"
 	user.Username = "ana"
 	user.Email = "ana@example.com"

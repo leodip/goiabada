@@ -102,9 +102,9 @@ func TestAPIClient_TokenEndpointAuthMethodIsTheRegisteredOne(t *testing.T) {
 		require.Equal(t, http.StatusCreated, resp.StatusCode)
 		var created api.CreateClientResponse
 		require.NoError(t, json.NewDecoder(resp.Body).Decode(&created))
-		t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, created.Client.Id) })
+		t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, created.Client.ID) })
 
-		assert.Empty(t, tokenEndpointAuthMethodOf(t, accessToken, created.Client.Id))
+		assert.Empty(t, tokenEndpointAuthMethodOf(t, accessToken, created.Client.ID))
 	})
 }
 

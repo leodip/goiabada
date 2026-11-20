@@ -37,7 +37,7 @@ var errLogoutLookupFailed = errs.New("the lookup query failed")
 func logoutRequest(t *testing.T, clientIdentifier string) *http.Request {
 	t.Helper()
 	body, err := json.Marshal(api.AccountLogoutRequest{
-		PostLogoutRedirectUri: logoutPostLogoutUri,
+		PostLogoutRedirectURI: logoutPostLogoutUri,
 		ClientIdentifier:      clientIdentifier,
 	})
 	require.NoError(t, err)
@@ -243,7 +243,7 @@ func TestHandleAccountLogoutRequestPost_APlainHTTPLoopbackTargetReachesTheClient
 			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, logoutClientIdent).
 				Return(nil, nil).Once()
 
-			body, err := json.Marshal(api.AccountLogoutRequest{PostLogoutRedirectUri: target, ClientIdentifier: logoutClientIdent})
+			body, err := json.Marshal(api.AccountLogoutRequest{PostLogoutRedirectURI: target, ClientIdentifier: logoutClientIdent})
 			require.NoError(t, err)
 			req := httptest.NewRequest(http.MethodPost, "/api/v1/account/logout-request", bytes.NewReader(body))
 			req = setTokenContextWithClaims(req, map[string]interface{}{"sub": "the-user", "sid": logoutSid})

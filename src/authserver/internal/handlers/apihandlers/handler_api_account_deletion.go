@@ -114,7 +114,7 @@ func HandleAccountDeletionPost(
 			writeJSONError(w, "Invalid request body", "INVALID_REQUEST_BODY", http.StatusBadRequest)
 			return
 		}
-		otpCode := strings.TrimSpace(req.OtpCode)
+		otpCode := strings.TrimSpace(req.OTPCode)
 		recoveryCodeSent := !otpcredential.IsBlankRecoveryCode(req.RecoveryCode)
 		// The shape of the request rather than a credential, so it is refused before anything is
 		// read or checked, and spends nothing.
@@ -263,7 +263,7 @@ func HandleAccountDeletionPost(
 			return
 		case errors.Is(err, errAuthenticatorReplaced):
 			// Answered as a wrong code, which it now is, and spends nothing for the same reason.
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeOtpIncorrectCode, nil),
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeOTPIncorrectCode, nil),
 				"INVALID_OTP_CODE", http.StatusBadRequest)
 			return
 		case errors.Is(err, errSecondFactorNowRequired):
@@ -337,7 +337,7 @@ func verifyDeletionOTPCode(w http.ResponseWriter, r *http.Request, database acco
 	}
 
 	// A replayed code is answered as a wrong one, so the caller cannot tell them apart (#111).
-	incorrectOtpCode := i18n.NewLocalizedError(i18n.ErrCodeOtpIncorrectCode, nil)
+	incorrectOtpCode := i18n.NewLocalizedError(i18n.ErrCodeOTPIncorrectCode, nil)
 	switch verified.Outcome {
 	case otpcredential.OutcomeMatched:
 		return true

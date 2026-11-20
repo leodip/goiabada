@@ -653,8 +653,8 @@ func TestAPIUserExport_HoldsWhatTheAdminAPIReadsAboutTheUser(t *testing.T) {
 	var acceptances []api.LegalDocumentAcceptanceResponse
 	require.NoError(t, json.Unmarshal(document["legalDocumentAcceptances"], &acceptances))
 	require.Len(t, acceptances, 3)
-	assert.Less(t, acceptances[0].Id, acceptances[1].Id)
-	assert.Less(t, acceptances[1].Id, acceptances[2].Id)
+	assert.Less(t, acceptances[0].ID, acceptances[1].ID)
+	assert.Less(t, acceptances[1].ID, acceptances[2].ID)
 	slices.Reverse(acceptances)
 	p.acceptances.assertTheFixturesAcceptances(t, acceptances)
 

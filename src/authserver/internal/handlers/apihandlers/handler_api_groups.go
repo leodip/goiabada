@@ -122,7 +122,7 @@ func HandleGroupCreatePost(
 		group := &record.Group{
 			GroupIdentifier:      strings.TrimSpace(createReq.GroupIdentifier),
 			Description:          strings.TrimSpace(createReq.Description),
-			IncludeInIdToken:     createReq.IncludeInIdToken,
+			IncludeInIdToken:     createReq.IncludeInIDToken,
 			IncludeInAccessToken: createReq.IncludeInAccessToken,
 		}
 
@@ -271,7 +271,7 @@ func HandleGroupUpdatePut(
 		// Update the group
 		group.GroupIdentifier = strings.TrimSpace(updateReq.GroupIdentifier)
 		group.Description = strings.TrimSpace(updateReq.Description)
-		group.IncludeInIdToken = updateReq.IncludeInIdToken
+		group.IncludeInIdToken = updateReq.IncludeInIDToken
 		group.IncludeInAccessToken = updateReq.IncludeInAccessToken
 
 		err = database.UpdateGroup(r.Context(), nil, group)

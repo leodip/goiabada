@@ -86,7 +86,7 @@ func TestIssuePasswordGrant_EveryTokenCarriesTheGrantsInstant(t *testing.T) {
 
 	instant := written.AuthenticatedAt.Time.Unix()
 	accessClaims := verifyAndDecodeToken(t, response.AccessToken, f.publicKey)
-	idClaims := verifyAndDecodeToken(t, response.IdToken, f.publicKey)
+	idClaims := verifyAndDecodeToken(t, response.IDToken, f.publicKey)
 	assert.EqualValues(t, instant, accessClaims["auth_time"])
 	assert.EqualValues(t, instant, idClaims["auth_time"])
 }

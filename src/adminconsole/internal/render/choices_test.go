@@ -20,9 +20,9 @@ func TestShorten_CutsPastTheBoundWithAnEllipsis(t *testing.T) {
 
 func TestResourceChoices_LabelEachWithItsShortenedDescription(t *testing.T) {
 	choices := ResourceChoices([]api.ResourceResponse{
-		{Id: 1, ResourceIdentifier: "orders-api", Description: "Order management API"},
-		{Id: 2, ResourceIdentifier: "reporting", Description: "Internal reporting, dashboards and scheduled exports for finance"},
-		{Id: 3, ResourceIdentifier: "bare"},
+		{ID: 1, ResourceIdentifier: "orders-api", Description: "Order management API"},
+		{ID: 2, ResourceIdentifier: "reporting", Description: "Internal reporting, dashboards and scheduled exports for finance"},
+		{ID: 3, ResourceIdentifier: "bare"},
 	})
 
 	assert.Equal(t, []Choice{
@@ -35,8 +35,8 @@ func TestResourceChoices_LabelEachWithItsShortenedDescription(t *testing.T) {
 
 func TestGroupChoices_LabelEachWithItsShortenedDescription(t *testing.T) {
 	choices := GroupChoices([]api.GroupResponse{
-		{Id: 4, GroupIdentifier: "finance", Description: " Finance team "},
-		{Id: 5, GroupIdentifier: "bare"},
+		{ID: 4, GroupIdentifier: "finance", Description: " Finance team "},
+		{ID: 5, GroupIdentifier: "bare"},
 	})
 
 	assert.Equal(t, []Choice{
@@ -47,8 +47,8 @@ func TestGroupChoices_LabelEachWithItsShortenedDescription(t *testing.T) {
 
 func TestPermissionChoices_NameEachByItsPermissionIdentifier(t *testing.T) {
 	choices := PermissionChoices([]api.PermissionResponse{
-		{Id: 6, PermissionIdentifier: "read", Description: "Read orders", Resource: api.ResourceResponse{ResourceIdentifier: "orders-api"}},
-		{Id: 7, PermissionIdentifier: "write"},
+		{ID: 6, PermissionIdentifier: "read", Description: "Read orders", Resource: api.ResourceResponse{ResourceIdentifier: "orders-api"}},
+		{ID: 7, PermissionIdentifier: "write"},
 	})
 
 	assert.Equal(t, []Choice{

@@ -30,7 +30,7 @@ func TestReqctx_RoundTrip(t *testing.T) {
 	t.Run("token set", func(t *testing.T) {
 		want := oauthclient.JwtInfo{
 			TokenResponse: oauth.TokenResponse{AccessToken: "access", Scope: "openid"},
-			IdToken:       &oauth.JwtToken{TokenBase64: "id", Claims: jwt.MapClaims{"sub": "user-1"}},
+			IdToken:       &oauth.JWTToken{TokenBase64: "id", Claims: jwt.MapClaims{"sub": "user-1"}},
 		}
 		got, ok := JwtInfoFrom(WithJwtInfo(ctx, want))
 		require.True(t, ok)

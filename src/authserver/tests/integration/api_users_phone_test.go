@@ -39,7 +39,7 @@ func TestAPIPhoneCountriesGet_Success(t *testing.T) {
 
 	// Verify structure of first phone country; calling code must be "+"-prefixed.
 	firstCountry := response.PhoneCountries[0]
-	assert.NotEmpty(t, firstCountry.UniqueId)
+	assert.NotEmpty(t, firstCountry.UniqueID)
 	assert.Truef(t, strings.HasPrefix(firstCountry.CallingCode, "+"),
 		"calling code must be +-prefixed, got %q", firstCountry.CallingCode)
 	assert.NotEmpty(t, firstCountry.Name)
@@ -47,7 +47,7 @@ func TestAPIPhoneCountriesGet_Success(t *testing.T) {
 	// Assert: Should contain some expected countries (verify a few common ones)
 	countryMap := make(map[string]api.PhoneCountryResponse)
 	for _, country := range response.PhoneCountries {
-		countryMap[country.UniqueId] = country
+		countryMap[country.UniqueID] = country
 	}
 
 	// We expect at least some basic countries to be present
@@ -112,7 +112,7 @@ func TestAPIUserPhonePut_Success(t *testing.T) {
 
 	// Test: Update user phone
 	updateReq := api.UpdateUserPhoneRequest{
-		PhoneCountryUniqueId: "USA_0", // Assuming this is a valid country ID
+		PhoneCountryUniqueID: "USA_0", // Assuming this is a valid country ID
 		PhoneNumber:          "555-123-4567",
 		PhoneNumberVerified:  true,
 	}
@@ -131,7 +131,7 @@ func TestAPIUserPhonePut_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	// Assert: Phone data should be updated
-	assert.Equal(t, updateReq.PhoneCountryUniqueId, updateResponse.User.PhoneNumberCountryUniqueId)
+	assert.Equal(t, updateReq.PhoneCountryUniqueID, updateResponse.User.PhoneNumberCountryUniqueID)
 	assert.Equal(t, updateReq.PhoneNumber, updateResponse.User.PhoneNumber)
 	assert.Equal(t, updateReq.PhoneNumberVerified, updateResponse.User.PhoneNumberVerified)
 	// USA_0 must resolve to the "+"-prefixed calling code in the API response.
@@ -141,7 +141,7 @@ func TestAPIUserPhonePut_Success(t *testing.T) {
 	updatedUser, err := database.GetUserById(context.Background(), nil, testUser.Id)
 	require.NoError(t, err)
 	assert.NotNil(t, updatedUser)
-	assert.Equal(t, updateReq.PhoneCountryUniqueId, updatedUser.PhoneNumberCountryUniqueId)
+	assert.Equal(t, updateReq.PhoneCountryUniqueID, updatedUser.PhoneNumberCountryUniqueId)
 	assert.Equal(t, updateReq.PhoneNumber, updatedUser.PhoneNumber)
 	assert.Equal(t, updateReq.PhoneNumberVerified, updatedUser.PhoneNumberVerified)
 	// The "+"-prefixed calling code must be persisted, not just returned.
@@ -173,7 +173,7 @@ func TestAPIUserPhonePut_ClearPhoneNumber(t *testing.T) {
 
 	// Test: Clear phone number by setting empty values
 	updateReq := api.UpdateUserPhoneRequest{
-		PhoneCountryUniqueId: "",
+		PhoneCountryUniqueID: "",
 		PhoneNumber:          "",
 		PhoneNumberVerified:  false,
 	}
@@ -191,7 +191,7 @@ func TestAPIUserPhonePut_ClearPhoneNumber(t *testing.T) {
 	require.NoError(t, err)
 
 	// Assert: Phone fields should be cleared
-	assert.Empty(t, updateResponse.User.PhoneNumberCountryUniqueId)
+	assert.Empty(t, updateResponse.User.PhoneNumberCountryUniqueID)
 	assert.Empty(t, updateResponse.User.PhoneNumberCountryCallingCode)
 	assert.Empty(t, updateResponse.User.PhoneNumber)
 	assert.False(t, updateResponse.User.PhoneNumberVerified)
@@ -232,7 +232,7 @@ func TestAPIUserPhonePut_ValidationErrors(t *testing.T) {
 		{
 			"phone number without country",
 			api.UpdateUserPhoneRequest{
-				PhoneCountryUniqueId: "",
+				PhoneCountryUniqueID: "",
 				PhoneNumber:          "555-123-4567",
 				PhoneNumberVerified:  false,
 			},
@@ -241,7 +241,7 @@ func TestAPIUserPhonePut_ValidationErrors(t *testing.T) {
 		{
 			"country without phone number",
 			api.UpdateUserPhoneRequest{
-				PhoneCountryUniqueId: "USA_0",
+				PhoneCountryUniqueID: "USA_0",
 				PhoneNumber:          "",
 				PhoneNumberVerified:  false,
 			},
@@ -250,7 +250,7 @@ func TestAPIUserPhonePut_ValidationErrors(t *testing.T) {
 		{
 			"phone number too short",
 			api.UpdateUserPhoneRequest{
-				PhoneCountryUniqueId: "USA_0",
+				PhoneCountryUniqueID: "USA_0",
 				PhoneNumber:          "123",
 				PhoneNumberVerified:  false,
 			},
@@ -259,7 +259,7 @@ func TestAPIUserPhonePut_ValidationErrors(t *testing.T) {
 		{
 			"phone number too long",
 			api.UpdateUserPhoneRequest{
-				PhoneCountryUniqueId: "USA_0",
+				PhoneCountryUniqueID: "USA_0",
 				PhoneNumber:          "1234567890123456789012345678901", // 31 chars
 				PhoneNumberVerified:  false,
 			},
@@ -268,7 +268,7 @@ func TestAPIUserPhonePut_ValidationErrors(t *testing.T) {
 		{
 			"invalid phone number characters",
 			api.UpdateUserPhoneRequest{
-				PhoneCountryUniqueId: "USA_0",
+				PhoneCountryUniqueID: "USA_0",
 				PhoneNumber:          "555-ABC-DEFG",
 				PhoneNumberVerified:  false,
 			},
@@ -277,7 +277,7 @@ func TestAPIUserPhonePut_ValidationErrors(t *testing.T) {
 		{
 			"invalid country id",
 			api.UpdateUserPhoneRequest{
-				PhoneCountryUniqueId: "INVALID_COUNTRY",
+				PhoneCountryUniqueID: "INVALID_COUNTRY",
 				PhoneNumber:          "555-123-4567",
 				PhoneNumberVerified:  false,
 			},
@@ -302,7 +302,7 @@ func TestAPIUserPhonePut_UserNotFound(t *testing.T) {
 
 	// Test: Update phone for non-existent user
 	updateReq := api.UpdateUserPhoneRequest{
-		PhoneCountryUniqueId: "USA_0",
+		PhoneCountryUniqueID: "USA_0",
 		PhoneNumber:          "555-123-4567",
 		PhoneNumberVerified:  false,
 	}
@@ -320,7 +320,7 @@ func TestAPIUserPhonePut_InvalidUserId(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	updateReq := api.UpdateUserPhoneRequest{
-		PhoneCountryUniqueId: "USA_0",
+		PhoneCountryUniqueID: "USA_0",
 		PhoneNumber:          "555-123-4567",
 		PhoneNumberVerified:  false,
 	}
@@ -434,7 +434,7 @@ func TestAPIUserPhonePut_PhoneNumberVerifiedAutoCleared(t *testing.T) {
 	// Test: Set phone number verified to true but clear the phone number
 	// The verified flag should be automatically set to false when phone is cleared
 	updateReq := api.UpdateUserPhoneRequest{
-		PhoneCountryUniqueId: "",
+		PhoneCountryUniqueID: "",
 		PhoneNumber:          "",
 		PhoneNumberVerified:  true, // This should be ignored/overridden
 	}

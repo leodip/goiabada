@@ -133,7 +133,7 @@ func otpAlreadyEnabled() error {
 
 func newStubApiClient(otpEnabled bool) *stubApiClient {
 	return &stubApiClient{
-		profile: &api.UserResponse{Id: 7, OTPEnabled: otpEnabled},
+		profile: &api.UserResponse{ID: 7, OTPEnabled: otpEnabled},
 		enrollment: &api.AccountOTPEnrollmentResponse{
 			Base64Image: testBase64Image,
 			SecretKey:   testSecretKey,
@@ -282,7 +282,7 @@ func TestHandleOtpPost_EnableSendsOnlyThePasswordAndTheCode(t *testing.T) {
 	require.NotNil(t, client.updateReq)
 	assert.True(t, client.updateReq.Enabled)
 	assert.Equal(t, "P4ss!word", client.updateReq.Password)
-	assert.Equal(t, "123456", client.updateReq.OtpCode)
+	assert.Equal(t, "123456", client.updateReq.OTPCode)
 	assert.NotContains(t, mustJSON(t, client.updateReq), "secretKey",
 		"the wire form must carry no secret, which is the whole of the console's half of #247")
 }

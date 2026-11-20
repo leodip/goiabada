@@ -99,7 +99,7 @@ func TestHandleAuthOtpPost_TheRefusalThatDisablesTheAuthenticatorIsAudited(t *te
 				auditLogger.On("Log", mock.Anything, event, payload).Return().Run(logged).Once()
 			}
 
-			expectedError := i18n.NewLocalizedError(i18n.ErrCodeOtpIncorrectCode, nil).Localize(req.Context())
+			expectedError := i18n.NewLocalizedError(i18n.ErrCodeOTPIncorrectCode, nil).Localize(req.Context())
 			pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_otp.html",
 				mock.MatchedBy(func(bind map[string]interface{}) bool {
 					return bind["error"] == expectedError

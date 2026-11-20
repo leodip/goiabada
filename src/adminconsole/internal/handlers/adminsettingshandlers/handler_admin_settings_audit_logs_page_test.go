@@ -94,7 +94,7 @@ func logsOnPage(total, page, pageSize int) []api.AuditLogResponse {
 	}
 	logs := make([]api.AuditLogResponse, 0, end-start)
 	for i := start; i < end; i++ {
-		logs = append(logs, api.AuditLogResponse{Id: int64(i + 1), AuditEvent: "an-event"})
+		logs = append(logs, api.AuditLogResponse{ID: int64(i + 1), AuditEvent: "an-event"})
 	}
 	return logs
 }
@@ -187,7 +187,7 @@ func TestHandleAuditLogViewerGet_PageQueryParameter(t *testing.T) {
 				"the rows are not page %d's: %s", tc.wantPage, tc.why)
 			if tc.total > 0 {
 				require.NotEmpty(t, result.AuditLogs, "page %d rendered no rows at all", tc.wantPage)
-				assert.Equal(t, int64((tc.wantPage-1)*pageSize+1), result.AuditLogs[0].Id,
+				assert.Equal(t, int64((tc.wantPage-1)*pageSize+1), result.AuditLogs[0].ID,
 					"the first row is not the first of page %d", tc.wantPage)
 			}
 		})

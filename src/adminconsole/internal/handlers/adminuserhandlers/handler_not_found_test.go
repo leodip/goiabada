@@ -45,7 +45,7 @@ func TestUser_StaleOrMalformedUrlAnswers404(t *testing.T) {
 	const pathValueName = "userId"
 
 	// present, gone and broken stand for the three answers the API can give this handler.
-	present := &api.UserResponse{Id: 42}
+	present := &api.UserResponse{ID: 42}
 	gone := &apiclient.APIError{Code: "NOT_FOUND", Message: "User not found", StatusCode: http.StatusNotFound}
 	broken := &apiclient.APIError{Code: "INTERNAL_SERVER_ERROR", Message: "the database is on fire", StatusCode: http.StatusInternalServerError}
 

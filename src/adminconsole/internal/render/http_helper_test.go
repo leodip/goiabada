@@ -249,7 +249,7 @@ func TestRenderTemplate_Binds(t *testing.T) {
 		ctx := req.Context()
 
 		jwtInfo := oauthclient.JwtInfo{
-			IdToken: &oauth.JwtToken{
+			IdToken: &oauth.JWTToken{
 				Claims: map[string]interface{}{
 					"sub":  "user123",
 					"name": "Alice",
@@ -279,7 +279,7 @@ func TestRenderTemplate_Binds(t *testing.T) {
 			req := newRequest("GET", "/", nil)
 			jwtInfo := oauthclient.JwtInfo{
 				TokenResponse: oauth.TokenResponse{AccessToken: "opaque", Scope: "openid " + scope},
-				IdToken:       &oauth.JwtToken{TokenBase64: "i"},
+				IdToken:       &oauth.JWTToken{TokenBase64: "i"},
 			}
 			return req.WithContext(reqctx.WithJwtInfo(req.Context(), jwtInfo))
 		}
@@ -427,7 +427,7 @@ func TestRenderTemplate_MenuNameJoinsTheNameClaims(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			req := newRequest("GET", "/", nil)
 			req = req.WithContext(reqctx.WithJwtInfo(req.Context(), oauthclient.JwtInfo{
-				IdToken: &oauth.JwtToken{Claims: map[string]interface{}{
+				IdToken: &oauth.JWTToken{Claims: map[string]interface{}{
 					"sub":         "user123",
 					"given_name":  tc.givenName,
 					"middle_name": tc.middleName,

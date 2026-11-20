@@ -2709,7 +2709,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
 
-		wrongIssuerToken := &oauth.JwtToken{
+		wrongIssuerToken := &oauth.JWTToken{
 			TokenBase64: "valid-jwt-wrong-issuer",
 			Header:      idTokenHeader(),
 			Claims: jwt.MapClaims{
@@ -2785,7 +2785,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
 
-		accessToken := &oauth.JwtToken{
+		accessToken := &oauth.JWTToken{
 			TokenBase64: "an-access-token",
 			Header:      idTokenHeader(),
 			Claims: jwt.MapClaims{
@@ -2862,7 +2862,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
 
-		noSubToken := &oauth.JwtToken{
+		noSubToken := &oauth.JWTToken{
 			TokenBase64: "valid-jwt-no-sub",
 			Header:      idTokenHeader(),
 			Claims: jwt.MapClaims{
@@ -2936,7 +2936,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
 
-		expiredToken := &oauth.JwtToken{
+		expiredToken := &oauth.JWTToken{
 			TokenBase64: "expired-jwt-token",
 			Header:      idTokenHeader(),
 			Claims: jwt.MapClaims{
@@ -3030,7 +3030,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
 
-		validToken := &oauth.JwtToken{
+		validToken := &oauth.JWTToken{
 			TokenBase64: "valid-jwt-token",
 			Header:      idTokenHeader(),
 			Claims: jwt.MapClaims{
@@ -3126,7 +3126,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
 
-		differentUserToken := &oauth.JwtToken{
+		differentUserToken := &oauth.JWTToken{
 			TokenBase64: "different-user-jwt",
 			Header:      idTokenHeader(),
 			Claims: jwt.MapClaims{
@@ -3224,7 +3224,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "none").Return("none", nil)
 
-		validToken := &oauth.JwtToken{
+		validToken := &oauth.JWTToken{
 			TokenBase64: "valid-jwt-token",
 			Header:      idTokenHeader(),
 			Claims: jwt.MapClaims{
@@ -3353,7 +3353,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authorizeValidator.On("ValidateScopes", mock.Anything, requestedScope).Return(nil)
 		authorizeValidator.On("ValidatePrompt", "none").Return("none", nil)
 
-		validToken := &oauth.JwtToken{
+		validToken := &oauth.JWTToken{
 			TokenBase64: "valid-jwt-token",
 			Header:      idTokenHeader(),
 			Claims: jwt.MapClaims{
@@ -3470,7 +3470,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "none").Return("none", nil)
 
-		differentUserToken := &oauth.JwtToken{
+		differentUserToken := &oauth.JWTToken{
 			TokenBase64: "different-user-jwt",
 			Header:      idTokenHeader(),
 			Claims: jwt.MapClaims{
@@ -3570,7 +3570,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "none").Return("none", nil)
 
-		differentUserToken := &oauth.JwtToken{
+		differentUserToken := &oauth.JWTToken{
 			TokenBase64: "different-user-jwt",
 			Header:      idTokenHeader(),
 			Claims: jwt.MapClaims{

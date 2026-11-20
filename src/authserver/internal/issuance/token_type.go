@@ -85,7 +85,7 @@ func ResponseTokenType(dpopThumbprint string) string {
 // as finishAccessToken writes it (RFC 9449 section 6.1), or "" for a bearer token: one with no cnf,
 // or whose cnf holds no jkt string. The token is one the auth server signed, so its cnf is always
 // the object finishAccessToken wrote, when it has one.
-func AccessTokenThumbprint(token oauth.JwtToken) string {
+func AccessTokenThumbprint(token oauth.JWTToken) string {
 	cnf, _ := token.Claims["cnf"].(map[string]interface{})
 	jkt, _ := cnf["jkt"].(string)
 	return jkt

@@ -119,7 +119,7 @@ func (t *TokenIssuer) IssuePasswordGrant(ctx context.Context, settings *record.S
 		if idTokenErr != nil {
 			return nil, idTokenErr
 		}
-		response.IdToken = idTokenStr
+		response.IDToken = idTokenStr
 	}
 
 	// The first refresh token, with direct UserId/ClientId (no Code entity needed), written in a

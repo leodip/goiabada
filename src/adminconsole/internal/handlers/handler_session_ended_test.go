@@ -118,7 +118,7 @@ func withCookies(req *http.Request, cookies []*http.Cookie) *http.Request {
 // how the tests tell "the tokens were cleared" from "the session was destroyed".
 func signedInValues() map[string]any {
 	return map[string]any{
-		sessionkeys.JWT:          sessionkeys.StoreTokenResponse(oauth.TokenResponse{AccessToken: "the-access-token", IdToken: "the-id-token"}),
+		sessionkeys.JWT:          sessionkeys.StoreTokenResponse(oauth.TokenResponse{AccessToken: "the-access-token", IDToken: "the-id-token"}),
 		sessionkeys.JWTExpiresAt: int64(1_900_000_000),
 		"somethingElse":          "kept",
 	}
@@ -216,7 +216,7 @@ func TestHandleIndexGet_ReadsTheSignedInAdministratorFromTheTokenSet(t *testing.
 	}
 
 	signedIn := serve(handlertest.WithJwtInfo(oauthclient.JwtInfo{
-		IdToken: &oauth.JwtToken{Claims: jwt.MapClaims{"email": "admin@example.com"}},
+		IdToken: &oauth.JWTToken{Claims: jwt.MapClaims{"email": "admin@example.com"}},
 	}))
 	assert.Equal(t, true, signedIn["IsAuthenticated"])
 	assert.Equal(t, "admin@example.com", signedIn["LoggedInUser"])
@@ -358,7 +358,7 @@ func TestHandleIndexGet_ShowsTheQuerysNoticeOnlyToAVisitorNotSignedIn(t *testing
 
 	assert.Equal(t, true, serve("/?session-ended"), "a visitor not signed in")
 	assert.Equal(t, false, serve("/?session-ended", handlertest.WithJwtInfo(oauthclient.JwtInfo{
-		IdToken: &oauth.JwtToken{Claims: jwt.MapClaims{"email": "admin@example.com"}},
+		IdToken: &oauth.JWTToken{Claims: jwt.MapClaims{"email": "admin@example.com"}},
 	})), "a signed-in administrator")
 	assert.Equal(t, false, serve("/"), "no query")
 }

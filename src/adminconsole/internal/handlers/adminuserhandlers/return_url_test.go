@@ -76,27 +76,27 @@ func TestWithListPosition_RendersPlainValuesAsBefore(t *testing.T) {
 type returnURLStubApiClient struct{}
 
 func (returnURLStubApiClient) GetUserById(_ context.Context, _ string, userId int64) (*api.UserResponse, error) {
-	return &api.UserResponse{Id: userId, Email: "someone@example.com"}, nil
+	return &api.UserResponse{ID: userId, Email: "someone@example.com"}, nil
 }
 
 func (returnURLStubApiClient) UpdateUserAddress(_ context.Context, _ string, userId int64,
 	_ *api.UpdateUserAddressRequest) (*api.UserResponse, error) {
-	return &api.UserResponse{Id: userId}, nil
+	return &api.UserResponse{ID: userId}, nil
 }
 
 func (returnURLStubApiClient) CreateUserAttribute(_ context.Context, _ string,
 	request *api.CreateUserAttributeRequest) (*api.UserAttributeResponse, error) {
-	return &api.UserAttributeResponse{Id: 3, UserId: request.UserId}, nil
+	return &api.UserAttributeResponse{ID: 3, UserID: request.UserID}, nil
 }
 
 func (returnURLStubApiClient) GetUserAttributeById(_ context.Context, _ string,
 	attributeId int64) (*api.UserAttributeResponse, error) {
-	return &api.UserAttributeResponse{Id: attributeId, UserId: 7, Key: "k"}, nil
+	return &api.UserAttributeResponse{ID: attributeId, UserID: 7, Key: "k"}, nil
 }
 
 func (returnURLStubApiClient) UpdateUserAttribute(_ context.Context, _ string, attributeId int64,
 	_ *api.UpdateUserAttributeRequest) (*api.UserAttributeResponse, error) {
-	return &api.UserAttributeResponse{Id: attributeId, UserId: 7}, nil
+	return &api.UserAttributeResponse{ID: attributeId, UserID: 7}, nil
 }
 
 func (returnURLStubApiClient) DeleteUser(_ context.Context, _ string, _ int64) error {
@@ -105,27 +105,27 @@ func (returnURLStubApiClient) DeleteUser(_ context.Context, _ string, _ int64) e
 
 func (returnURLStubApiClient) UpdateUserEnabled(_ context.Context, _ string, userId int64,
 	_ bool) (*api.UserResponse, error) {
-	return &api.UserResponse{Id: userId}, nil
+	return &api.UserResponse{ID: userId}, nil
 }
 
 func (returnURLStubApiClient) UpdateUserEmail(_ context.Context, _ string, userId int64,
 	_ *api.UpdateUserEmailRequest) (*api.UserResponse, error) {
-	return &api.UserResponse{Id: userId}, nil
+	return &api.UserResponse{ID: userId}, nil
 }
 
 func (returnURLStubApiClient) CreateUserAdmin(_ context.Context, _ string,
 	_ *api.CreateUserAdminRequest) (*api.CreateUserResponse, error) {
-	return &api.CreateUserResponse{User: api.UserResponse{Id: 7}}, nil
+	return &api.CreateUserResponse{User: api.UserResponse{ID: 7}}, nil
 }
 
 func (returnURLStubApiClient) UpdateUserPhone(_ context.Context, _ string, userId int64,
 	_ *api.UpdateUserPhoneRequest) (*api.UserResponse, error) {
-	return &api.UserResponse{Id: userId}, nil
+	return &api.UserResponse{ID: userId}, nil
 }
 
 func (returnURLStubApiClient) UpdateUserProfile(_ context.Context, _ string, userId int64,
 	_ *api.UpdateUserProfileRequest) (*api.UserResponse, error) {
-	return &api.UserResponse{Id: userId}, nil
+	return &api.UserResponse{ID: userId}, nil
 }
 
 // The rest of the ports returnURLStubApiClient is passed to, which no test here reaches.

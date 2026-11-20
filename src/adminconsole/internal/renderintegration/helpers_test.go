@@ -86,7 +86,7 @@ func renderPageWith(t *testing.T, path, layout, page string, bind map[string]int
 	req := httptest.NewRequest(http.MethodGet, path, nil)
 	req = req.WithContext(reqctx.WithSettings(req.Context(), settings))
 	if idTokenClaims != nil {
-		jwtInfo := oauthclient.JwtInfo{IdToken: &oauth.JwtToken{Claims: idTokenClaims}}
+		jwtInfo := oauthclient.JwtInfo{IdToken: &oauth.JWTToken{Claims: idTokenClaims}}
 		req = req.WithContext(reqctx.WithJwtInfo(req.Context(), jwtInfo))
 	}
 	req = req.WithContext(i18n.WithLocale(req.Context(), true, locale))

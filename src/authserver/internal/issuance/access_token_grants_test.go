@@ -276,7 +276,7 @@ func TestAccessToken_ClientCredentialsGrant(t *testing.T) {
 			assert.Equal(t, "Bearer", response.TokenType)
 			assert.Equal(t, tc.lifetime, response.ExpiresIn)
 			assert.Equal(t, tc.scope, response.Scope)
-			assert.Empty(t, response.IdToken)
+			assert.Empty(t, response.IDToken)
 			assert.Empty(t, response.RefreshToken)
 			assertWholeAccessToken(t, response.AccessToken, testStart, tc.lifetime, map[string]interface{}{
 				"iss":                "https://test-issuer.com",

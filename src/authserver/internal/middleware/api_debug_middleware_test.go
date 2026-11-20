@@ -1060,7 +1060,7 @@ func TestAPIDebug_DoesNotLogARealOTPUpdateRequest(t *testing.T) {
 	sent := api.UpdateAccountOTPRequest{
 		Enabled:  true,
 		Password: "SENTINEL-account-password",
-		OtpCode:  otpCode,
+		OTPCode:  otpCode,
 	}
 	// secretKey is put on the wire by hand rather than through the struct, which no longer
 	// carries it: PUT /api/v1/account/otp now enrolls the seed the server issued and refuses a
@@ -1070,7 +1070,7 @@ func TestAPIDebug_DoesNotLogARealOTPUpdateRequest(t *testing.T) {
 	body, err := json.Marshal(map[string]interface{}{
 		"enabled":   sent.Enabled,
 		"password":  sent.Password,
-		"otpCode":   sent.OtpCode,
+		"otpCode":   sent.OTPCode,
 		"secretKey": secretKey,
 	})
 	require.NoError(t, err)

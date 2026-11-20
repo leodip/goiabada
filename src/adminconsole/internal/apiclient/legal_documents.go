@@ -47,7 +47,7 @@ func (c *AuthServerClient) PreviewLegalDocument(ctx context.Context, accessToken
 	if err != nil {
 		return "", err
 	}
-	return response.Html, nil
+	return response.HTML, nil
 }
 
 func (c *AuthServerClient) GetLegalDocumentById(ctx context.Context, accessToken string,

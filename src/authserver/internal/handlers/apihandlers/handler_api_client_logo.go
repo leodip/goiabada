@@ -118,7 +118,7 @@ func HandleClientLogoPost(
 
 		response := api.ClientLogoUploadResponse{
 			Success:    true,
-			PictureUrl: baseURL + "/client/logo/" + client.ClientIdentifier,
+			PictureURL: baseURL + "/client/logo/" + client.ClientIdentifier,
 		}
 
 		writeJSON(w, r, http.StatusOK, response)
@@ -227,7 +227,7 @@ func HandleClientLogoGet(
 
 		response := api.ClientLogoInfoResponse{HasLogo: hasLogo}
 		if hasLogo {
-			response.LogoUrl = baseURL + "/client/logo/" + client.ClientIdentifier
+			response.LogoURL = baseURL + "/client/logo/" + client.ClientIdentifier
 		}
 
 		writeJSON(w, r, http.StatusOK, response)

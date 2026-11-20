@@ -60,7 +60,7 @@ func TestAPIUsersSearch_Success(t *testing.T) {
 		if _, exists := expectedEmails[user.Email]; exists {
 			expectedEmails[user.Email] = true
 			t.Logf("Found test user: %s '%s' (ID: %d, Enabled: %t)",
-				user.Email, user.GivenName, user.Id, user.Enabled)
+				user.Email, user.GivenName, user.ID, user.Enabled)
 		}
 	}
 
@@ -123,7 +123,7 @@ func TestAPIUsersSearch_WithQuery(t *testing.T) {
 	t.Logf("Search results:")
 	for i, user := range searchResponse.Users {
 		t.Logf("  [%d] ID: %d, Email: %s, GivenName: %s, FamilyName: %s, Enabled: %t",
-			i, user.Id, user.Email, user.GivenName, user.FamilyName, user.Enabled)
+			i, user.ID, user.Email, user.GivenName, user.FamilyName, user.Enabled)
 	}
 
 	// Check if our test user is in results

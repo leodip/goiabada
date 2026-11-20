@@ -40,7 +40,7 @@ func (s *resourceCtxRecordingApiClient) record(ctx context.Context) error {
 
 func (s *resourceCtxRecordingApiClient) GetResourceById(ctx context.Context, _ string, resourceId int64) (*api.ResourceResponse, error) {
 	s.seen = append(s.seen, ctx)
-	return &api.ResourceResponse{Id: resourceId, ResourceIdentifier: "some-resource"}, nil
+	return &api.ResourceResponse{ID: resourceId, ResourceIdentifier: "some-resource"}, nil
 }
 
 func (s *resourceCtxRecordingApiClient) GetPermissionsByResource(ctx context.Context, _ string, _ int64) ([]api.PermissionResponse, error) {
@@ -140,7 +140,7 @@ func TestAdminResourceHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T
 		},
 		{
 			name:        "HandleUsersWithPermissionGet",
-			permissions: []api.PermissionResponse{{Id: 8, PermissionIdentifier: "read"}},
+			permissions: []api.PermissionResponse{{ID: 8, PermissionIdentifier: "read"}},
 			build: func(h *handlersmocks.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
 				return HandleUsersWithPermissionGet(h, c)
 			},
@@ -157,7 +157,7 @@ func TestAdminResourceHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T
 		},
 		{
 			name:        "HandleGroupsWithPermissionGet, one to annotate",
-			permissions: []api.PermissionResponse{{Id: 8, PermissionIdentifier: "read"}},
+			permissions: []api.PermissionResponse{{ID: 8, PermissionIdentifier: "read"}},
 			build: func(h *handlersmocks.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
 				return HandleGroupsWithPermissionGet(h, c)
 			},

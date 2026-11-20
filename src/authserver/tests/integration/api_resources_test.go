@@ -57,12 +57,12 @@ func TestAPIResourcesGet_Success(t *testing.T) {
 	res1, exists := resourceMap["api-test-resource-1"]
 	assert.True(t, exists)
 	assert.Equal(t, "API Test Resource 1", res1.Description)
-	assert.Equal(t, resource1.Id, res1.Id)
+	assert.Equal(t, resource1.Id, res1.ID)
 
 	res2, exists := resourceMap["api-test-resource-2"]
 	assert.True(t, exists)
 	assert.Equal(t, "API Test Resource 2", res2.Description)
-	assert.Equal(t, resource2.Id, res2.Id)
+	assert.Equal(t, resource2.Id, res2.ID)
 
 	// Verify resources are sorted by identifier (should come before existing resources like "goiabada-authserver")
 	if len(getResponse.Resources) >= 2 {

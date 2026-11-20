@@ -135,7 +135,7 @@ func TestValidateTokenRequest_RefreshGrant_ARevokedFamilyIsRefusedBelowTheOtherG
 				mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, a.clientIdentifier).
 					Return(clients[a.clientIdentifier], nil).Once()
 				mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "the_refresh_token", true).
-					Return(&oauth.JwtToken{Claims: jwt.MapClaims{"jti": "the_jti", "typ": "Refresh"}}, nil).Maybe()
+					Return(&oauth.JWTToken{Claims: jwt.MapClaims{"jti": "the_jti", "typ": "Refresh"}}, nil).Maybe()
 				mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "the_jti").Return(refreshToken, nil).Maybe()
 				// The record is asked about by the family's first jti, never the presented token's.
 				mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, familyJti).

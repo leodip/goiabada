@@ -79,7 +79,7 @@ type SearchResult struct {
 func permissionIdsOf(permissions []api.PermissionResponse) []int64 {
 	ids := make([]int64, 0, len(permissions))
 	for _, p := range permissions {
-		ids = append(ids, p.Id)
+		ids = append(ids, p.ID)
 	}
 	return ids
 }

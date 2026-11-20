@@ -54,7 +54,7 @@ func HandleAttributesGet(
 			return
 		}
 
-		attributes, err := apiClient.GetUserAttributesByUserId(r.Context(), jwtInfo.TokenResponse.AccessToken, user.Id)
+		attributes, err := apiClient.GetUserAttributesByUserId(r.Context(), jwtInfo.TokenResponse.AccessToken, user.ID)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -111,7 +111,7 @@ func HandleAttributesRemovePost(
 			return
 		}
 
-		attributes, err := apiClient.GetUserAttributesByUserId(r.Context(), jwtInfo.TokenResponse.AccessToken, user.Id)
+		attributes, err := apiClient.GetUserAttributesByUserId(r.Context(), jwtInfo.TokenResponse.AccessToken, user.ID)
 		if err != nil {
 			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
@@ -131,7 +131,7 @@ func HandleAttributesRemovePost(
 
 		found := false
 		for _, attribute := range attributes {
-			if attribute.Id == attributeId {
+			if attribute.ID == attributeId {
 				found = true
 				break
 			}

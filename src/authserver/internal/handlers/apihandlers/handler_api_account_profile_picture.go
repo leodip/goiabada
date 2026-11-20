@@ -95,7 +95,7 @@ func HandleAccountProfilePicturePost(
 
 		response := api.ProfilePictureUploadResponse{
 			Success:    true,
-			PictureUrl: baseURL + "/userinfo/picture/" + user.Subject,
+			PictureURL: baseURL + "/userinfo/picture/" + user.Subject,
 		}
 
 		writeJSON(w, r, http.StatusOK, response)
@@ -176,7 +176,7 @@ func HandleAccountProfilePictureGet(
 
 		response := api.ProfilePictureInfoResponse{HasPicture: hasPicture}
 		if hasPicture {
-			response.PictureUrl = baseURL + "/userinfo/picture/" + user.Subject
+			response.PictureURL = baseURL + "/userinfo/picture/" + user.Subject
 		}
 
 		writeJSON(w, r, http.StatusOK, response)

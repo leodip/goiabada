@@ -39,8 +39,8 @@ var stepUpNow = time.Date(2026, 11, 7, 12, 0, 0, 0, time.UTC)
 
 // stepUpToken is a console user's Account API token with the given claims added; a nil value
 // leaves that claim out.
-func stepUpToken(claims map[string]interface{}) oauth.JwtToken {
-	token := oauth.JwtToken{Claims: map[string]interface{}{
+func stepUpToken(claims map[string]interface{}) oauth.JWTToken {
+	token := oauth.JWTToken{Claims: map[string]interface{}{
 		"sub": "u1", "client_id": builtin.AdminConsoleClientIdentifier, "scope": "openid authserver:manage-account",
 	}}
 	for name, value := range claims {
@@ -59,7 +59,7 @@ func signedInAgo(seconds int64) float64 {
 
 // serveStepUpGuard runs the guard as the account download mounts it, and reports whether the next
 // handler ran.
-func serveStepUpGuard(t *testing.T, token *oauth.JwtToken) (*httptest.ResponseRecorder, bool) {
+func serveStepUpGuard(t *testing.T, token *oauth.JWTToken) (*httptest.ResponseRecorder, bool) {
 	t.Helper()
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/account/export", nil)
 	if token != nil {

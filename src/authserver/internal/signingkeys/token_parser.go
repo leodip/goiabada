@@ -88,9 +88,9 @@ func refused(err error) error {
 // The key always comes from the database. It used to be a parameter every caller passed as nil, so
 // the one branch that used it was never reached in production (#424).
 func (tp *TokenParser) DecodeAndValidateTokenString(ctx context.Context, token string,
-	withExpirationCheck bool) (*oauth.JwtToken, error) {
+	withExpirationCheck bool) (*oauth.JWTToken, error) {
 
-	result := &oauth.JwtToken{
+	result := &oauth.JWTToken{
 		TokenBase64: token,
 	}
 

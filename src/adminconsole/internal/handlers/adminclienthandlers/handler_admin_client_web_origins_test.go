@@ -56,31 +56,31 @@ func TestHandleWebOriginsGet_AssemblesTheServerWideList(t *testing.T) {
 	apiClient := &stubAllClientsApiClient{
 		stubApiClient: stubApiClient{
 			client: &api.ClientResponse{
-				Id:               7,
+				ID:               7,
 				ClientIdentifier: "this-app",
 				WebOrigins: []api.WebOriginResponse{
-					{Id: 2, ClientId: 7, Origin: "https://mine-b.example.com"},
-					{Id: 1, ClientId: 7, Origin: "https://mine-a.example.com"},
+					{ID: 2, ClientID: 7, Origin: "https://mine-b.example.com"},
+					{ID: 1, ClientID: 7, Origin: "https://mine-a.example.com"},
 				},
 			},
 		},
 		allClients: []api.ClientResponse{
 			{
-				Id:               7,
+				ID:               7,
 				ClientIdentifier: "this-app",
 				WebOrigins: []api.WebOriginResponse{
-					{Id: 2, ClientId: 7, Origin: "https://mine-b.example.com"},
-					{Id: 1, ClientId: 7, Origin: "https://mine-a.example.com"},
+					{ID: 2, ClientID: 7, Origin: "https://mine-b.example.com"},
+					{ID: 1, ClientID: 7, Origin: "https://mine-a.example.com"},
 				},
 			},
 			{
-				Id:               9,
+				ID:               9,
 				ClientIdentifier: "another-app",
 				WebOrigins: []api.WebOriginResponse{
-					{Id: 3, ClientId: 9, Origin: "https://theirs.example.com"},
+					{ID: 3, ClientID: 9, Origin: "https://theirs.example.com"},
 				},
 			},
-			{Id: 11, ClientIdentifier: "no-origins-app"},
+			{ID: 11, ClientIdentifier: "no-origins-app"},
 		},
 	}
 

@@ -39,18 +39,18 @@ func TestAuthServerClient_GetGroupAttributesByGroupIdDecodesTheAttributeShape(t 
 	assert.Equal(t, "Bearer an-access-token", gotAuthorization)
 
 	require.Len(t, attributes, 2)
-	assert.Equal(t, int64(7), attributes[0].Id)
+	assert.Equal(t, int64(7), attributes[0].ID)
 	assert.Equal(t, "tier", attributes[0].Key)
 	assert.Equal(t, "gold", attributes[0].Value)
-	assert.True(t, attributes[0].IncludeInIdToken)
+	assert.True(t, attributes[0].IncludeInIDToken)
 	assert.False(t, attributes[0].IncludeInAccessToken)
-	assert.Equal(t, int64(4), attributes[0].GroupId)
+	assert.Equal(t, int64(4), attributes[0].GroupID)
 
 	require.NotNil(t, attributes[0].CreatedAt)
 	assert.Equal(t, time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC), attributes[0].CreatedAt.UTC())
 	assert.Nil(t, attributes[0].UpdatedAt, "a null timestamp must arrive as nil rather than as a zero time")
 
-	assert.Equal(t, int64(8), attributes[1].Id)
+	assert.Equal(t, int64(8), attributes[1].ID)
 	assert.Equal(t, "region", attributes[1].Key)
 }
 
@@ -64,10 +64,10 @@ func TestAuthServerClient_GetGroupAttributeByIdDecodesTheSingleAttribute(t *test
 	gotPath, _ := recorded()
 	assert.Equal(t, "/api/v1/admin/group-attributes/7", gotPath)
 
-	assert.Equal(t, int64(7), attribute.Id)
+	assert.Equal(t, int64(7), attribute.ID)
 	assert.Equal(t, "tier", attribute.Key)
 	assert.Equal(t, "gold", attribute.Value)
-	assert.Equal(t, int64(4), attribute.GroupId,
+	assert.Equal(t, int64(4), attribute.GroupID,
 		"the edit page compares this against the group in the URL before it renders anything")
 }
 
@@ -83,7 +83,7 @@ func TestAuthServerClient_CreateAndUpdateGroupAttributeReturnTheSavedAttribute(t
 
 		gotPath, _ := recorded()
 		assert.Equal(t, "/api/v1/admin/group-attributes", gotPath)
-		assert.Equal(t, int64(7), attribute.Id)
+		assert.Equal(t, int64(7), attribute.ID)
 		assert.Equal(t, "tier", attribute.Key)
 	})
 
@@ -97,6 +97,6 @@ func TestAuthServerClient_CreateAndUpdateGroupAttributeReturnTheSavedAttribute(t
 		gotPath, _ := recorded()
 		assert.Equal(t, "/api/v1/admin/group-attributes/7", gotPath)
 		assert.Equal(t, "gold", attribute.Value)
-		assert.Equal(t, int64(4), attribute.GroupId)
+		assert.Equal(t, int64(4), attribute.GroupID)
 	})
 }

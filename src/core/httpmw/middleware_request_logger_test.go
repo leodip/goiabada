@@ -94,7 +94,7 @@ func TestRequestLogger_LogsExactlyOneRecord(t *testing.T) {
 }
 
 // The goal sentence of the change: the reported defect, at both endpoints.
-func TestRequestLogger_DoesNotLogTheIdTokenHint(t *testing.T) {
+func TestRequestLogger_DoesNotLogTheIDTokenHint(t *testing.T) {
 	tests := []struct {
 		name   string
 		target string
@@ -176,7 +176,7 @@ func TestRequestLogger_RecordsThePanicStatusFromBeneath(t *testing.T) {
 	})
 }
 
-func TestRequestLogger_RequestId(t *testing.T) {
+func TestRequestLogger_RequestID(t *testing.T) {
 	t.Run("present when requestid.Middleware ran ahead of the logger", func(t *testing.T) {
 		buf := logtest.CaptureSlog(t)
 		ran := false
@@ -266,13 +266,13 @@ func TestRequestLogger_TheClipIsLossy(t *testing.T) {
 	assert.Len(t, second, len(first), "the two must be the same length to collide")
 
 	logged := make([]string, 0, 2)
-	for _, requestId := range []string{first, second} {
+	for _, requestID := range []string{first, second} {
 		buf := logtest.CaptureSlog(t)
 		ran := false
 
 		handler := requestid.Middleware(RequestLogger(true)(okHandler(&ran)))
 		request := httptest.NewRequest(http.MethodGet, "/auth/authorize", nil)
-		request.Header.Set(requestid.Header, requestId)
+		request.Header.Set(requestid.Header, requestID)
 		handler.ServeHTTP(httptest.NewRecorder(), request)
 
 		// request_id is the last attribute on the line now, because the installed handler

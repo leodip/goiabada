@@ -28,13 +28,13 @@ func TestTemplates_NoHTMLInTitle(t *testing.T) {
 // of the same deletion is guarded by internal/handlers/csrf_lint_test.go, which draws the same
 // lexical boundary.
 func TestTemplates_NoCsrfField(t *testing.T) {
-	guard.AssertTemplatesNoCsrfField(t, templateFS, "template")
+	guard.AssertTemplatesNoCSRFField(t, templateFS, "template")
 }
 
 // TestTemplates_HtmlLangNotHardcoded guards the <html lang="en"> bug: page layouts must render the
 // lang attribute from the active locale. This module sends no email, so it has no email layout.
 func TestTemplates_HtmlLangNotHardcoded(t *testing.T) {
-	guard.AssertTemplatesHtmlLangNotHardcoded(t, templateFS, "template")
+	guard.AssertTemplatesHTMLLangNotHardcoded(t, templateFS, "template")
 }
 
 // TestTemplates_NewTabLinksSaySo holds every link on this server's pages that opens a new tab to

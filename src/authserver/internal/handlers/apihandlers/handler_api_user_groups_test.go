@@ -72,7 +72,7 @@ func TestHandleUserGroupsPut_AFailedCountAnswers500(t *testing.T) {
 		Run(loadGroupsOnto(record.Group{Id: 5, GroupIdentifier: "admins"})).Return(nil).Once()
 	database.On("CountGroupMembers", mock.Anything, mock.Anything, int64(5)).Return(0, errCountFailed).Once()
 
-	body, err := json.Marshal(api.UpdateUserGroupsRequest{GroupIds: []int64{5}, ExpectedGroupIds: []int64{}})
+	body, err := json.Marshal(api.UpdateUserGroupsRequest{GroupIDs: []int64{5}, ExpectedGroupIDs: []int64{}})
 	require.NoError(t, err)
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/users/42/groups", bytes.NewReader(body))
 	req.SetPathValue("id", "42")

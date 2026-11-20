@@ -50,10 +50,10 @@ func basicOf(colors map[string]string) map[string]string {
 func withCustomBrands() *brandingAPI {
 	apiClient := newBrandingAPI()
 	apiClient.brands = append(apiClient.brands,
-		api.BrandResponse{Id: 8, Name: "Custom", Appearance: "auto", Theme: "custom",
+		api.BrandResponse{ID: 8, Name: "Custom", Appearance: "auto", Theme: "custom",
 			Palette: &api.BrandPaletteResponse{Mode: "basic", Light: basicOf(fullColors("c0de")), Dark: basicOf(fullColors("d0de"))},
 			Colors:  &api.BrandColors{Light: fullColors("c0de"), Dark: fullColors("d0de")}},
-		api.BrandResponse{Id: 9, Name: "Advanced", Appearance: "light", Theme: "custom",
+		api.BrandResponse{ID: 9, Name: "Advanced", Appearance: "light", Theme: "custom",
 			Palette: &api.BrandPaletteResponse{Mode: "advanced", Light: fullColors("a0de"), Dark: fullColors("b0de")},
 			Colors:  &api.BrandColors{Light: fullColors("a0de"), Dark: fullColors("b0de")}})
 	return apiClient

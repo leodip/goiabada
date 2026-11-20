@@ -70,7 +70,7 @@ func TestRequest_WithSettingsPutsTheValueWhereTheMiddlewarePutsOne(t *testing.T)
 func TestRequest_WithJwtInfoCarriesTheWholeTokenSet(t *testing.T) {
 	want := oauthclient.JwtInfo{
 		TokenResponse: oauth.TokenResponse{AccessToken: "a", Scope: "openid"},
-		IdToken:       &oauth.JwtToken{TokenBase64: "i"},
+		IdToken:       &oauth.JWTToken{TokenBase64: "i"},
 	}
 
 	req := Request(http.MethodGet, "/account/logout", WithJwtInfo(want))

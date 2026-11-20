@@ -173,13 +173,13 @@ func TestAPIUserCreatePost_Success(t *testing.T) {
 
 	// Cleanup: Delete created user
 	defer func() {
-		if createResponse.User.Id > 0 {
-			_ = database.DeleteUser(context.Background(), nil, createResponse.User.Id)
+		if createResponse.User.ID > 0 {
+			_ = database.DeleteUser(context.Background(), nil, createResponse.User.ID)
 		}
 	}()
 
 	// Verify user was actually created in database
-	createdUser, err := database.GetUserById(context.Background(), nil, createResponse.User.Id)
+	createdUser, err := database.GetUserById(context.Background(), nil, createResponse.User.ID)
 	require.NoError(t, err)
 	assert.NotNil(t, createdUser)
 	assert.Equal(t, createReq.Email, createdUser.Email)
@@ -312,7 +312,7 @@ func TestAPIUserCreatePost_AddressLengths(t *testing.T) {
 		var created api.CreateUserResponse
 		if resp.StatusCode == http.StatusCreated {
 			require.NoError(t, json.Unmarshal(body, &created))
-			t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, created.User.Id) })
+			t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, created.User.ID) })
 		} else {
 			require.NoError(t, json.Unmarshal(body, &refusal), string(body))
 		}
@@ -331,7 +331,7 @@ func TestAPIUserCreatePost_AddressLengths(t *testing.T) {
 
 			require.Equal(t, http.StatusCreated, resp.StatusCode, refusal.ErrorDescription)
 			assert.Equal(t, tc.email, created.User.Email)
-			stored, err := database.GetUserById(context.Background(), nil, created.User.Id)
+			stored, err := database.GetUserById(context.Background(), nil, created.User.ID)
 			require.NoError(t, err)
 			require.NotNil(t, stored)
 			assert.Equal(t, tc.email, stored.Email)

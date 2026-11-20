@@ -95,7 +95,7 @@ func (e *revokeEndpoint) callerFound(client *record.Client) {
 }
 
 // parses has the parser accept the presented token as token.
-func (e *revokeEndpoint) parses(token *oauth.JwtToken) {
+func (e *revokeEndpoint) parses(token *oauth.JWTToken) {
 	e.parser.On("DecodeAndValidateTokenString", mock.Anything, revokeTokenString, true).Return(token, nil).Once()
 }
 
@@ -149,8 +149,8 @@ func callerForm(extra ...string) url.Values {
 
 // grantAccessToken is a live access token of the password grant, naming its grant and no session,
 // issued to clientIdentifier.
-func grantAccessToken(clientIdentifier string) *oauth.JwtToken {
-	return &oauth.JwtToken{
+func grantAccessToken(clientIdentifier string) *oauth.JWTToken {
+	return &oauth.JWTToken{
 		TokenBase64: revokeTokenString,
 		Header:      map[string]interface{}{"alg": "RS256", "typ": "at+jwt"},
 		Claims: map[string]interface{}{
@@ -162,8 +162,8 @@ func grantAccessToken(clientIdentifier string) *oauth.JwtToken {
 }
 
 // offlineRefreshToken is a live offline refresh token of the password grant.
-func offlineRefreshToken() *oauth.JwtToken {
-	return &oauth.JwtToken{
+func offlineRefreshToken() *oauth.JWTToken {
+	return &oauth.JWTToken{
 		TokenBase64: revokeTokenString,
 		Header:      map[string]interface{}{"alg": "RS256", "typ": "JWT"},
 		Claims: map[string]interface{}{
@@ -366,7 +366,7 @@ func TestHandleRevokePost_ForeignTokenAuditIsBoundedPerOwner(t *testing.T) {
 	}).Return().Once()
 
 	cases := []struct {
-		token *oauth.JwtToken
+		token *oauth.JWTToken
 		arm   func()
 	}{
 		{grantAccessToken(revokeOwnerName), func() { e.accessTokenLive(owner) }},
@@ -488,7 +488,7 @@ func TestHandleRevokePost_AnInvalidTokenIsAnsweredOK(t *testing.T) {
 			e.parses(token)
 		}},
 		{"an ID token", func(e *revokeEndpoint) {
-			e.parses(&oauth.JwtToken{TokenBase64: revokeTokenString, Header: map[string]interface{}{"typ": "JWT"},
+			e.parses(&oauth.JWTToken{TokenBase64: revokeTokenString, Header: map[string]interface{}{"typ": "JWT"},
 				Claims: map[string]interface{}{"iss": revokeIssuer, "sub": "the-subject", "typ": "ID", "jti": "id-1"}})
 		}},
 		{"an access token from another issuer", func(e *revokeEndpoint) {
@@ -816,7 +816,7 @@ func TestHandleRevokePost_AMalformedRequestIsRefused(t *testing.T) {
 // grantlessAccessToken is a live access token without grant_id, issued to clientIdentifier and
 // expiring at expiresAt: a client's, of the client credentials grant, or, with user true, a user's,
 // of the implicit flow.
-func grantlessAccessToken(clientIdentifier string, user bool, expiresAt time.Time) *oauth.JwtToken {
+func grantlessAccessToken(clientIdentifier string, user bool, expiresAt time.Time) *oauth.JWTToken {
 	claims := map[string]interface{}{
 		"iss": revokeIssuer, "sub": clientIdentifier, "client_id": clientIdentifier, "jti": revokeAccessJti,
 		"typ": "Bearer", "exp": float64(expiresAt.Unix()),
@@ -826,7 +826,7 @@ func grantlessAccessToken(clientIdentifier string, user bool, expiresAt time.Tim
 		claims["auth_time"] = float64(time.Now().Unix())
 		claims["auth_state_generation"] = float64(0)
 	}
-	return &oauth.JwtToken{TokenBase64: revokeTokenString, Header: map[string]interface{}{"alg": "RS256", "typ": "at+jwt"},
+	return &oauth.JWTToken{TokenBase64: revokeTokenString, Header: map[string]interface{}{"alg": "RS256", "typ": "at+jwt"},
 		Claims: claims}
 }
 

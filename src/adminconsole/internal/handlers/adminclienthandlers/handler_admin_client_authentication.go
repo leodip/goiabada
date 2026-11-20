@@ -45,7 +45,7 @@ type ClientAuthentication struct {
 // server answers them.
 func clientAuthenticationFrom(c *api.ClientResponse, clientSecret string) ClientAuthentication {
 	return ClientAuthentication{
-		ClientId:                c.Id,
+		ClientId:                c.ID,
 		ClientIdentifier:        c.ClientIdentifier,
 		IsPublic:                c.IsPublic,
 		ClientSecret:            clientSecret,
@@ -175,7 +175,7 @@ func HandleAuthenticationPost(
 			storedSecret := ""
 			if !client.IsPublic {
 				var secretErr error
-				storedSecret, secretErr = apiClient.GetClientSecret(r.Context(), jwtInfo.TokenResponse.AccessToken, client.Id)
+				storedSecret, secretErr = apiClient.GetClientSecret(r.Context(), jwtInfo.TokenResponse.AccessToken, client.ID)
 				if secretErr != nil {
 					render.HandleAPIError(httpHelper, w, r, secretErr)
 					return
@@ -222,7 +222,7 @@ func HandleAuthenticationPost(
 		// and in the access log of every proxy in front of the deployment. This route is POST-only
 		// with a separate GET handler rendering the form, so the query was never a submission (#202).
 		adminClientAuthentication := ClientAuthentication{
-			ClientId:            client.Id,
+			ClientId:            client.ID,
 			ClientIdentifier:    client.ClientIdentifier,
 			IsPublic:            isPublic,
 			ClientSecret:        r.PostFormValue("clientSecret"),
@@ -240,7 +240,7 @@ func HandleAuthenticationPost(
 			ClientSecret: adminClientAuthentication.ClientSecret,
 		}
 
-		_, err = apiClient.UpdateClientAuthentication(r.Context(), jwtInfo.TokenResponse.AccessToken, client.Id, req)
+		_, err = apiClient.UpdateClientAuthentication(r.Context(), jwtInfo.TokenResponse.AccessToken, client.ID, req)
 		if err != nil {
 			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
 				renderError(message, render.ErrorField(err, clientAuthenticationErrorFields))
@@ -254,7 +254,7 @@ func HandleAuthenticationPost(
 			return
 		}
 
-		pagePath := fmt.Sprintf("/admin/clients/%v/authentication", client.Id)
+		pagePath := fmt.Sprintf("/admin/clients/%v/authentication", client.ID)
 		sess.SetFlash(pagePath, "savedSuccessfully", "true")
 		err = httpSession.Save(r, w, sess)
 		if err != nil {

@@ -131,7 +131,7 @@ func TestPermissionDescriptionCeiling_AnAdministrativeRowTheLoadedListLeavesOutI
 	manageId := descriptionCeilingIdOf(t, stored, builtin.ManagePermissionIdentifier)
 	loaded := make([]api.ResourcePermissionUpsert, 0, len(stored))
 	for _, entry := range loadedEntries(stored) {
-		if entry.Id != manageId {
+		if entry.ID != manageId {
 			loaded = append(loaded, entry)
 		}
 	}
@@ -165,7 +165,7 @@ func TestPermissionDescriptionCeiling_TheSavesOwnAnswersComeFirst(t *testing.T) 
 		{name: "a built-in renamed", wanted: renamedAndRedescribed, wantStatus: http.StatusBadRequest},
 		{name: "a row that is not the resource's",
 			wanted: append(redescribed(stored, builtin.ManagePermissionIdentifier, "Read-only reporting"),
-				api.ResourcePermissionUpsert{Id: 99, PermissionIdentifier: "other", Description: "x"}),
+				api.ResourcePermissionUpsert{ID: 99, PermissionIdentifier: "other", Description: "x"}),
 			wantStatus: http.StatusNotFound},
 	}
 	for _, c := range cases {

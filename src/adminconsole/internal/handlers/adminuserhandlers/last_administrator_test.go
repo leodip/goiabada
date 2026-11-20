@@ -73,7 +73,7 @@ func (*lastAdministratorUserApiClient) GetUserPermissions(context.Context, strin
 // Disabling the last administrator renders the details page again, with the user as stored and the
 // sentence where the page shows an error, and no saved notice.
 func TestHandleDetailsPost_TheLastAdministratorRefusalIsShownOnThePage(t *testing.T) {
-	user := &api.UserResponse{Id: 7, Email: "admin@example.com", GivenName: "Ada", FamilyName: "Admin", Enabled: true}
+	user := &api.UserResponse{ID: 7, Email: "admin@example.com", GivenName: "Ada", FamilyName: "Admin", Enabled: true}
 	httpHelper := handlersmocks.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_users_details.html").Once()
@@ -97,8 +97,8 @@ func TestHandleDetailsPost_TheLastAdministratorRefusalIsShownOnThePage(t *testin
 // Deleting the last administrator renders the confirmation page again, with what it showed before
 // and the sentence where the page shows an error.
 func TestHandleDeletePost_TheLastAdministratorRefusalIsShownOnThePage(t *testing.T) {
-	user := &api.UserResponse{Id: 7, Email: "admin@example.com", GivenName: "Ada", FamilyName: "Admin", Enabled: true}
-	groups := []api.GroupResponse{{Id: 2, GroupIdentifier: "admins"}}
+	user := &api.UserResponse{ID: 7, Email: "admin@example.com", GivenName: "Ada", FamilyName: "Admin", Enabled: true}
+	groups := []api.GroupResponse{{ID: 2, GroupIdentifier: "admins"}}
 	httpHelper := handlersmocks.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_users_delete.html").Once()

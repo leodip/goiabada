@@ -187,7 +187,7 @@ func TestToUserResponse_MapsAllFields(t *testing.T) {
 
 	resp := ToUserResponse(user)
 
-	assert.Equal(t, int64(7), resp.Id)
+	assert.Equal(t, int64(7), resp.ID)
 	assert.Equal(t, &createdAt, resp.CreatedAt)
 	assert.Equal(t, &updatedAt, resp.UpdatedAt)
 	assert.True(t, resp.Enabled)
@@ -206,7 +206,7 @@ func TestToUserResponse_MapsAllFields(t *testing.T) {
 	assert.Equal(t, "pt-BR", resp.Locale)
 	assert.Equal(t, "fr", resp.PageLanguage)
 	assert.Equal(t, &birthDate, resp.BirthDate)
-	assert.Equal(t, "BRA_0", resp.PhoneNumberCountryUniqueId)
+	assert.Equal(t, "BRA_0", resp.PhoneNumberCountryUniqueID)
 	assert.Equal(t, "55", resp.PhoneNumberCountryCallingCode)
 	assert.Equal(t, "11999999999", resp.PhoneNumber)
 	assert.True(t, resp.PhoneNumberVerified)
@@ -269,7 +269,7 @@ func TestToUserResponse_InvalidNullTimesBecomeNil(t *testing.T) {
 func TestUserResponse_SubjectIsABareCanonicalString(t *testing.T) {
 	const subject = "3f2a1c4e-5b6d-4e8f-9a0b-1c2d3e4f5a6b"
 
-	encoded, err := json.Marshal(&api.UserResponse{Id: 9, Subject: subject})
+	encoded, err := json.Marshal(&api.UserResponse{ID: 9, Subject: subject})
 	require.NoError(t, err)
 
 	assert.Contains(t, string(encoded), `"subject":"`+subject+`"`,
@@ -370,7 +370,7 @@ func TestToSessionOwnerResponse_CarriesTheFiveFieldsAndNoOthers(t *testing.T) {
 
 	require.NotNil(t, resp)
 	assert.Equal(t, api.SessionOwnerResponse{
-		Id:         7,
+		ID:         7,
 		Email:      "jane@example.com",
 		GivenName:  "Jane",
 		MiddleName: "Q",
@@ -390,9 +390,9 @@ func TestToSessionOwnerResponses_MapsEachUserDistinctly(t *testing.T) {
 	})
 
 	require.Len(t, resps, 2)
-	assert.Equal(t, int64(1), resps[0].Id)
+	assert.Equal(t, int64(1), resps[0].ID)
 	assert.Equal(t, "one@example.com", resps[0].Email)
-	assert.Equal(t, int64(2), resps[1].Id)
+	assert.Equal(t, int64(2), resps[1].ID)
 	assert.Equal(t, "Two", resps[1].GivenName)
 }
 
@@ -430,19 +430,19 @@ func TestToUserSessionResponse_MapsFields(t *testing.T) {
 
 	resp := ToUserSessionResponse(session)
 
-	assert.Equal(t, int64(3), resp.Id)
+	assert.Equal(t, int64(3), resp.ID)
 	assert.Equal(t, "session-abc", resp.SessionIdentifier)
 	assert.Equal(t, &started, resp.Started)
 	assert.Equal(t, &lastAccessed, resp.LastAccessed)
 	assert.Equal(t, "pwd otp", resp.AuthMethods)
-	assert.Equal(t, "urn:goiabada:level2_mandatory", resp.AcrLevel)
+	assert.Equal(t, "urn:goiabada:level2_mandatory", resp.ACRLevel)
 	assert.Equal(t, &authTime, resp.AuthTime)
-	assert.Equal(t, "10.0.0.1", resp.IpAddress)
+	assert.Equal(t, "10.0.0.1", resp.IPAddress)
 	assert.Equal(t, "Pixel", resp.DeviceName)
 	assert.Equal(t, "mobile", resp.DeviceType)
 	assert.Equal(t, "Android", resp.DeviceOS)
 	assert.Equal(t, "Mozilla/5.0 (Linux; Android 10; K) Chrome/120.0.0.0 Mobile Safari/537.36", resp.UserAgent)
-	assert.Equal(t, int64(42), resp.UserId)
+	assert.Equal(t, int64(42), resp.UserID)
 }
 
 // Started, LastAccessed and AuthTime are plain time.Time, so absence is the
@@ -558,8 +558,8 @@ func TestToUserSessionDetailResponse_CarriesTheBaseResponse(t *testing.T) {
 
 	require.NotNil(t, detail)
 	assert.Equal(t, *ToUserSessionResponse(session), detail.UserSessionResponse)
-	assert.Equal(t, int64(3), detail.Id)
-	assert.Equal(t, int64(42), detail.UserId)
+	assert.Equal(t, int64(3), detail.ID)
+	assert.Equal(t, int64(42), detail.UserID)
 	assert.Equal(t, &started, detail.Started)
 }
 
@@ -573,8 +573,8 @@ func TestUserSessionResponses_OmitLevel2AuthConfigHasChanged(t *testing.T) {
 		name  string
 		value interface{}
 	}{
-		{"api.UserSessionResponse", api.UserSessionResponse{Id: 1}},
-		{"api.UserSessionDetailResponse", api.UserSessionDetailResponse{UserSessionResponse: api.UserSessionResponse{Id: 1}}},
+		{"api.UserSessionResponse", api.UserSessionResponse{ID: 1}},
+		{"api.UserSessionDetailResponse", api.UserSessionDetailResponse{UserSessionResponse: api.UserSessionResponse{ID: 1}}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			raw, err := json.Marshal(tc.value)
@@ -604,8 +604,8 @@ func TestUserSessionResponses_PublishUserAgent(t *testing.T) {
 		name  string
 		value interface{}
 	}{
-		{"api.UserSessionResponse", api.UserSessionResponse{Id: 1, UserAgent: header}},
-		{"api.UserSessionDetailResponse", api.UserSessionDetailResponse{UserSessionResponse: api.UserSessionResponse{Id: 1, UserAgent: header}}},
+		{"api.UserSessionResponse", api.UserSessionResponse{ID: 1, UserAgent: header}},
+		{"api.UserSessionDetailResponse", api.UserSessionDetailResponse{UserSessionResponse: api.UserSessionResponse{ID: 1, UserAgent: header}}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			raw, err := json.Marshal(tc.value)
@@ -628,8 +628,8 @@ func TestUserSessionResponses_PublishUserAgentWhenEmpty(t *testing.T) {
 		name  string
 		value interface{}
 	}{
-		{"api.UserSessionResponse", api.UserSessionResponse{Id: 1}},
-		{"api.UserSessionDetailResponse", api.UserSessionDetailResponse{UserSessionResponse: api.UserSessionResponse{Id: 1}}},
+		{"api.UserSessionResponse", api.UserSessionResponse{ID: 1}},
+		{"api.UserSessionDetailResponse", api.UserSessionDetailResponse{UserSessionResponse: api.UserSessionResponse{ID: 1}}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			raw, err := json.Marshal(tc.value)
@@ -667,9 +667,9 @@ func TestToUserConsentResponse_IncludesClientDetailsWhenClientLoaded(t *testing.
 
 	resp := ToUserConsentResponse(consent)
 
-	assert.Equal(t, int64(5), resp.Id)
-	assert.Equal(t, int64(11), resp.ClientId)
-	assert.Equal(t, int64(22), resp.UserId)
+	assert.Equal(t, int64(5), resp.ID)
+	assert.Equal(t, int64(11), resp.ClientID)
+	assert.Equal(t, int64(22), resp.UserID)
 	assert.Equal(t, "openid profile", resp.Scope)
 	assert.Equal(t, &grantedAt, resp.GrantedAt)
 	assert.Equal(t, "web-app", resp.ClientIdentifier)
@@ -751,10 +751,10 @@ func TestToGroupResponse_MapsFieldsAndMemberCount(t *testing.T) {
 
 	resp := ToGroupResponse(group, 17)
 
-	assert.Equal(t, int64(4), resp.Id)
+	assert.Equal(t, int64(4), resp.ID)
 	assert.Equal(t, "admins", resp.GroupIdentifier)
 	assert.Equal(t, "Administrators", resp.Description)
-	assert.True(t, resp.IncludeInIdToken)
+	assert.True(t, resp.IncludeInIDToken)
 	assert.False(t, resp.IncludeInAccessToken)
 	assert.Equal(t, 17, resp.MemberCount, "member count comes from the argument, not the model")
 }
@@ -805,10 +805,10 @@ func TestToGroupResponse_LeavesAnAbsentUpdatedAtNil(t *testing.T) {
 
 	resp := ToGroupResponse(original, 5)
 
-	assert.Equal(t, int64(4), resp.Id)
+	assert.Equal(t, int64(4), resp.ID)
 	assert.Equal(t, "admins", resp.GroupIdentifier)
 	assert.Equal(t, "Administrators", resp.Description)
-	assert.True(t, resp.IncludeInIdToken)
+	assert.True(t, resp.IncludeInIDToken)
 	assert.True(t, resp.IncludeInAccessToken)
 	assert.Equal(t, 5, resp.MemberCount)
 	assert.Equal(t, &createdAt, resp.CreatedAt)
@@ -830,11 +830,11 @@ func TestToPermissionResponse_IncludesNestedResource(t *testing.T) {
 
 	resp := ToPermissionResponse(perm)
 
-	assert.Equal(t, int64(8), resp.Id)
+	assert.Equal(t, int64(8), resp.ID)
 	assert.Equal(t, "read", resp.PermissionIdentifier)
 	assert.Equal(t, "Read access", resp.Description)
-	assert.Equal(t, int64(10), resp.ResourceId)
-	assert.Equal(t, int64(10), resp.Resource.Id)
+	assert.Equal(t, int64(10), resp.ResourceID)
+	assert.Equal(t, int64(10), resp.Resource.ID)
 	assert.Equal(t, "backend-svc", resp.Resource.ResourceIdentifier)
 	assert.Equal(t, "Backend service", resp.Resource.Description)
 }
@@ -879,9 +879,9 @@ func TestToUserAttributeResponse_MapsFieldsAndTimestamps(t *testing.T) {
 	resp := ToUserAttributeResponse(original)
 	assert.Equal(t, "department", resp.Key)
 	assert.Equal(t, "engineering", resp.Value)
-	assert.True(t, resp.IncludeInIdToken)
+	assert.True(t, resp.IncludeInIDToken)
 	assert.False(t, resp.IncludeInAccessToken)
-	assert.Equal(t, int64(42), resp.UserId)
+	assert.Equal(t, int64(42), resp.UserID)
 	assert.Equal(t, &createdAt, resp.CreatedAt)
 	assert.Equal(t, &updatedAt, resp.UpdatedAt)
 }
@@ -913,10 +913,10 @@ func TestToGroupAttributeResponse_MapsFieldsAndTimestamps(t *testing.T) {
 	resp := ToGroupAttributeResponse(original)
 	assert.Equal(t, "tier", resp.Key)
 	assert.Equal(t, "gold", resp.Value)
-	assert.Equal(t, int64(9), resp.GroupId)
+	assert.Equal(t, int64(9), resp.GroupID)
 	assert.Equal(t, &createdAt, resp.CreatedAt)
-	assert.Equal(t, int64(3), resp.Id)
-	assert.True(t, resp.IncludeInIdToken)
+	assert.Equal(t, int64(3), resp.ID)
+	assert.True(t, resp.IncludeInIDToken)
 	assert.True(t, resp.IncludeInAccessToken)
 	assert.Nil(t, resp.UpdatedAt)
 }
@@ -967,7 +967,7 @@ func TestToClientResponse_MapsFields(t *testing.T) {
 
 	resp := ToClientResponse(client)
 
-	assert.Equal(t, int64(12), resp.Id)
+	assert.Equal(t, int64(12), resp.ID)
 	assert.Equal(t, "web-app", resp.ClientIdentifier)
 	assert.Equal(t, "The web app", resp.Description)
 	assert.Equal(t, "https://app.example.com", resp.WebsiteURL)
@@ -988,8 +988,8 @@ func TestToClientResponse_MapsFields(t *testing.T) {
 	assert.Equal(t, 300, resp.TokenExpirationInSeconds)
 	assert.Equal(t, 3600, resp.RefreshTokenOfflineIdleTimeoutInSeconds)
 	assert.Equal(t, 86400, resp.RefreshTokenOfflineMaxLifetimeInSeconds)
-	assert.Equal(t, []api.RedirectURIResponse{{Id: 1, URI: "https://app.example.com/cb"}}, resp.RedirectURIs)
-	assert.Equal(t, []api.WebOriginResponse{{Id: 1, Origin: "https://app.example.com"}}, resp.WebOrigins)
+	assert.Equal(t, []api.RedirectURIResponse{{ID: 1, URI: "https://app.example.com/cb"}}, resp.RedirectURIs)
+	assert.Equal(t, []api.WebOriginResponse{{ID: 1, Origin: "https://app.example.com"}}, resp.WebOrigins)
 	assert.Equal(t, client.IsSystemLevelClient(), resp.IsSystemLevelClient)
 }
 

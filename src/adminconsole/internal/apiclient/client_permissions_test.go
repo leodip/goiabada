@@ -19,8 +19,8 @@ func TestAuthServerClient_GetClientPermissionsReturnsTheClientBesideThePermissio
 	gotPath, _ := recorded()
 	assert.Equal(t, "/api/v1/admin/clients/7/permissions", gotPath)
 
-	assert.Equal(t, int64(7), clientResp.Id)
+	assert.Equal(t, int64(7), clientResp.ID)
 	assert.Equal(t, "portal", clientResp.ClientIdentifier)
 	require.Len(t, permissions, 1)
-	assert.Equal(t, int64(9), permissions[0].Id)
+	assert.Equal(t, int64(9), permissions[0].ID)
 }

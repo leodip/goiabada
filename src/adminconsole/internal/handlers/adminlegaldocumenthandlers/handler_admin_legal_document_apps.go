@@ -35,7 +35,7 @@ type appsForm struct {
 // storedApps is the document's Applies to as stored.
 func storedApps(doc api.LegalDocumentResponse) appsForm {
 	form := appsForm{allApps: doc.AppliesTo == appliesToAllApps, selected: map[int64]bool{}}
-	for _, id := range doc.ClientIds {
+	for _, id := range doc.ClientIDs {
 		form.selected[id] = true
 	}
 	return form
@@ -56,22 +56,22 @@ func renderApps(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, a
 			continue
 		}
 		apps = append(apps, appChoice{
-			Id:          client.Id,
+			Id:          client.ID,
 			Identifier:  client.ClientIdentifier,
 			Description: client.Description,
-			Selected:    !form.allApps && form.selected[client.Id],
+			Selected:    !form.allApps && form.selected[client.ID],
 		})
 	}
 	sort.Slice(apps, func(i, j int) bool { return apps[i].Identifier < apps[j].Identifier })
 
 	doc := detail.LegalDocument
-	expected := append([]int64{}, doc.ClientIds...)
+	expected := append([]int64{}, doc.ClientIDs...)
 	bind := map[string]interface{}{
 		"doc":               doc,
 		"allApps":           form.allApps,
 		"apps":              apps,
 		"expectedClientIds": expected,
-		"noApps":            doc.AppliesTo != appliesToAllApps && len(doc.ClientIds) == 0,
+		"noApps":            doc.AppliesTo != appliesToAllApps && len(doc.ClientIDs) == 0,
 	}
 	for k, v := range extra {
 		bind[k] = v
@@ -146,18 +146,18 @@ func HandleAppsPost(
 		appliesTo := r.PostFormValue("appliesTo")
 		request := &api.UpdateLegalDocumentAppsRequest{
 			AppliesTo:         appliesTo,
-			ClientIds:         []int64{},
-			ExpectedClientIds: postedIds(r, "expectedClientId"),
+			ClientIDs:         []int64{},
+			ExpectedClientIDs: postedIds(r, "expectedClientId"),
 		}
 		form := appsForm{allApps: appliesTo == appliesToAllApps, selected: map[int64]bool{}}
 		if !form.allApps {
-			request.ClientIds = postedIds(r, "clientId")
-			for _, id := range request.ClientIds {
+			request.ClientIDs = postedIds(r, "clientId")
+			for _, id := range request.ClientIDs {
 				form.selected[id] = true
 			}
 		}
 
-		_, err := apiClient.UpdateLegalDocumentApps(r.Context(), token, detail.LegalDocument.Id, request)
+		_, err := apiClient.UpdateLegalDocumentApps(r.Context(), token, detail.LegalDocument.ID, request)
 		if err != nil {
 			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
 				renderApps(httpHelper, w, r, apiClient, token, detail, form, map[string]interface{}{"error": message})
@@ -165,7 +165,7 @@ func HandleAppsPost(
 			return
 		}
 
-		pagePath := fmt.Sprintf("/admin/legal-documents/%v/apps", detail.LegalDocument.Id)
+		pagePath := fmt.Sprintf("/admin/legal-documents/%v/apps", detail.LegalDocument.ID)
 		if !setFlash(httpHelper, httpSession, w, r, pagePath, flashAppsSaved, "true") {
 			return
 		}

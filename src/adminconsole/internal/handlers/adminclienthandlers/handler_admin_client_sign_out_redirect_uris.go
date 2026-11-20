@@ -77,7 +77,7 @@ func HandleSignOutRedirectURIsGet(
 			IsSystemLevelClient          bool
 			IsPublic                     bool
 		}{
-			ClientId:                     clientResp.Id,
+			ClientId:                     clientResp.ID,
 			ClientIdentifier:             clientResp.ClientIdentifier,
 			CanManageSignOutRedirectURIs: usesARedirectFlow(clientResp, settingsResp),
 			SignOutRedirectURIs:          uris,

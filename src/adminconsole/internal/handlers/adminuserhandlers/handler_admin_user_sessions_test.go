@@ -59,9 +59,9 @@ func TestHandleSessionsGet_BindsTheRawUserAgent(t *testing.T) {
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_users_sessions.html").Maybe()
 
 	apiClient := &userSessionsApiClient{
-		user: &api.UserResponse{Id: 7},
+		user: &api.UserResponse{ID: 7},
 		sessions: []api.UserSessionDetailResponse{
-			{Id: 1, DeviceName: "Safari 17", DeviceType: "Desktop", DeviceOS: "macOS", UserAgent: header},
+			{ID: 1, DeviceName: "Safari 17", DeviceType: "Desktop", DeviceOS: "macOS", UserAgent: header},
 		},
 	}
 
@@ -92,9 +92,9 @@ func TestHandleSessionsGet_BindsTheSessionInstants(t *testing.T) {
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_users_sessions.html").Maybe()
 
 	apiClient := &userSessionsApiClient{
-		user: &api.UserResponse{Id: 7},
+		user: &api.UserResponse{ID: 7},
 		sessions: []api.UserSessionDetailResponse{
-			{Id: 1, Started: &started, LastAccessed: &lastAccessed},
+			{ID: 1, Started: &started, LastAccessed: &lastAccessed},
 		},
 	}
 
@@ -125,10 +125,10 @@ func TestHandleSessionsGet_BindsIsCurrentFromTheResponse(t *testing.T) {
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_users_sessions.html").Maybe()
 
 	apiClient := &userSessionsApiClient{
-		user: &api.UserResponse{Id: 7},
+		user: &api.UserResponse{ID: 7},
 		sessions: []api.UserSessionDetailResponse{
-			{UserSessionResponse: api.UserSessionResponse{Id: 1, SessionIdentifier: "sid-one"}},
-			{UserSessionResponse: api.UserSessionResponse{Id: 2, SessionIdentifier: "sid-two"}, IsCurrent: true},
+			{UserSessionResponse: api.UserSessionResponse{ID: 1, SessionIdentifier: "sid-one"}},
+			{UserSessionResponse: api.UserSessionResponse{ID: 2, SessionIdentifier: "sid-two"}, IsCurrent: true},
 		},
 	}
 
@@ -168,37 +168,37 @@ func TestHandleSessionsPost_TheAnswerFollowsIsCurrentOnTheRow(t *testing.T) {
 		{
 			name: "the row being deleted is the caller's own",
 			sessions: []api.UserSessionDetailResponse{
-				{UserSessionResponse: api.UserSessionResponse{Id: deleting}, IsCurrent: true},
-				{UserSessionResponse: api.UserSessionResponse{Id: 6}},
+				{UserSessionResponse: api.UserSessionResponse{ID: deleting}, IsCurrent: true},
+				{UserSessionResponse: api.UserSessionResponse{ID: 6}},
 			},
 			wantCurrent: true,
 		},
 		{
 			name: "another row is the caller's own",
 			sessions: []api.UserSessionDetailResponse{
-				{UserSessionResponse: api.UserSessionResponse{Id: deleting}},
-				{UserSessionResponse: api.UserSessionResponse{Id: 6}, IsCurrent: true},
+				{UserSessionResponse: api.UserSessionResponse{ID: deleting}},
+				{UserSessionResponse: api.UserSessionResponse{ID: 6}, IsCurrent: true},
 			},
 		},
 		{
 			name: "no row is the caller's own, which is what a client credentials token produces",
 			sessions: []api.UserSessionDetailResponse{
-				{UserSessionResponse: api.UserSessionResponse{Id: deleting}},
-				{UserSessionResponse: api.UserSessionResponse{Id: 6}},
+				{UserSessionResponse: api.UserSessionResponse{ID: deleting}},
+				{UserSessionResponse: api.UserSessionResponse{ID: 6}},
 			},
 		},
 		{
 			name: "the row's identifier matches the console's own claim and the field says no",
 			sid:  "sid-one",
 			sessions: []api.UserSessionDetailResponse{
-				{UserSessionResponse: api.UserSessionResponse{Id: deleting, SessionIdentifier: "sid-one"}},
+				{UserSessionResponse: api.UserSessionResponse{ID: deleting, SessionIdentifier: "sid-one"}},
 			},
 		},
 		{
 			name: "the field says yes and the console's own claim names another session",
 			sid:  "sid-elsewhere",
 			sessions: []api.UserSessionDetailResponse{
-				{UserSessionResponse: api.UserSessionResponse{Id: deleting, SessionIdentifier: "sid-one"},
+				{UserSessionResponse: api.UserSessionResponse{ID: deleting, SessionIdentifier: "sid-one"},
 					IsCurrent: true},
 			},
 			wantCurrent: true,
@@ -211,7 +211,7 @@ func TestHandleSessionsPost_TheAnswerFollowsIsCurrentOnTheRow(t *testing.T) {
 			handlertest.ExpectEncodeJSON(httpHelper).Once()
 
 			apiClient := &userSessionsApiClient{
-				user:     &api.UserResponse{Id: 7},
+				user:     &api.UserResponse{ID: 7},
 				sessions: testCase.sessions,
 			}
 
@@ -224,7 +224,7 @@ func TestHandleSessionsPost_TheAnswerFollowsIsCurrentOnTheRow(t *testing.T) {
 			} else {
 				opts = append(opts, handlertest.WithJwtInfo(oauthclient.JwtInfo{
 					TokenResponse: oauth.TokenResponse{AccessToken: handlertest.AccessToken},
-					IdToken:       &oauth.JwtToken{Claims: jwt.MapClaims{"sid": testCase.sid}},
+					IdToken:       &oauth.JWTToken{Claims: jwt.MapClaims{"sid": testCase.sid}},
 				}))
 			}
 
@@ -261,7 +261,7 @@ func TestHandleSessionsPost_AListTheApiCannotReadStopsTheDelete(t *testing.T) {
 		}).Return().Once()
 
 	apiClient := &userSessionsApiClient{
-		user: &api.UserResponse{Id: 7},
+		user: &api.UserResponse{ID: 7},
 		sessionsErr: &apiclient.APIError{
 			Code: "INTERNAL_SERVER_ERROR", Message: "the database is on fire",
 			StatusCode: http.StatusInternalServerError,

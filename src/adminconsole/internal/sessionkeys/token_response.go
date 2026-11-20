@@ -21,7 +21,7 @@ const storedShapeGobName = "github.com/leodip/goiabada/core/oauth.TokenResponse"
 // read it back. They are not respelled, whatever oauth.TokenResponse's fields are called.
 type StoredTokenResponse struct {
 	AccessToken      string
-	IdToken          string
+	IdToken          string //nolint:staticcheck // ST1003: gob stores this field by its name, which every session in flight holds (#482 decision 6)
 	TokenType        string
 	ExpiresIn        int64
 	RefreshToken     string
@@ -40,7 +40,7 @@ func RegisterStoredTokenResponse() {
 func StoreTokenResponse(tokenResponse oauth.TokenResponse) StoredTokenResponse {
 	return StoredTokenResponse{
 		AccessToken:      tokenResponse.AccessToken,
-		IdToken:          tokenResponse.IdToken,
+		IdToken:          tokenResponse.IDToken,
 		TokenType:        tokenResponse.TokenType,
 		ExpiresIn:        tokenResponse.ExpiresIn,
 		RefreshToken:     tokenResponse.RefreshToken,
@@ -53,7 +53,7 @@ func StoreTokenResponse(tokenResponse oauth.TokenResponse) StoredTokenResponse {
 func (s StoredTokenResponse) TokenResponse() oauth.TokenResponse {
 	return oauth.TokenResponse{
 		AccessToken:      s.AccessToken,
-		IdToken:          s.IdToken,
+		IDToken:          s.IdToken,
 		TokenType:        s.TokenType,
 		ExpiresIn:        s.ExpiresIn,
 		RefreshToken:     s.RefreshToken,

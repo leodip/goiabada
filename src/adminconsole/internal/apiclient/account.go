@@ -200,7 +200,7 @@ func (c *AuthServerClient) CreateAccountLogoutRequest(ctx context.Context, acces
 
 	// Fallback: redirect response
 	var redirResp api.AccountLogoutRedirectResponse
-	if err := json.Unmarshal(body, &redirResp); err == nil && redirResp.LogoutUrl != "" {
+	if err := json.Unmarshal(body, &redirResp); err == nil && redirResp.LogoutURL != "" {
 		return nil, &redirResp, nil
 	}
 

@@ -193,7 +193,7 @@ func (e introspectionEndpoint) serve(w http.ResponseWriter, r *http.Request) {
 // introspectAccessToken answers an access token the access-token check has judged: active when it is
 // live and its aud names a resource on the caller's list.
 func (e introspectionEndpoint) introspectAccessToken(w http.ResponseWriter, r *http.Request, client *record.Client,
-	token oauth.JwtToken, verdict liveness.Verdict) {
+	token oauth.JWTToken, verdict liveness.Verdict) {
 
 	if !verdict.Live() {
 		e.inactive(w, r)
@@ -237,7 +237,7 @@ func (e introspectionEndpoint) introspectAccessToken(w http.ResponseWriter, r *h
 // listsAnAudience reports whether the token's aud names a resource on the client's introspection
 // resources (decision 5). A resource identifier is compared exactly, as aud's StringOrURI values are
 // (RFC 7519 section 4.1.3).
-func (e introspectionEndpoint) listsAnAudience(ctx context.Context, client *record.Client, token oauth.JwtToken) (bool, error) {
+func (e introspectionEndpoint) listsAnAudience(ctx context.Context, client *record.Client, token oauth.JWTToken) (bool, error) {
 	links, err := e.database.GetClientIntrospectionResourcesByClientId(ctx, nil, client.Id)
 	if err != nil {
 		return false, errs.Wrap(err, "failed to load the caller's introspection resources")
@@ -272,7 +272,7 @@ func (e introspectionEndpoint) listsAnAudience(ctx context.Context, client *reco
 // it does not own. The check reads no client: the caller is the token's own, which client
 // authentication found to exist and be enabled.
 func (e introspectionEndpoint) introspectRefreshToken(w http.ResponseWriter, r *http.Request, client *record.Client,
-	token oauth.JwtToken, settings *record.Settings, now time.Time) {
+	token oauth.JWTToken, settings *record.Settings, now time.Time) {
 
 	ctx := r.Context()
 	stored, err := liveness.FindRefreshToken(ctx, e.database, token)
@@ -314,7 +314,7 @@ func (e introspectionEndpoint) introspectRefreshToken(w http.ResponseWriter, r *
 }
 
 // tokenAudiences reads aud, a single string or an array of them (RFC 7519 section 4.1.3).
-func tokenAudiences(token oauth.JwtToken) []string {
+func tokenAudiences(token oauth.JWTToken) []string {
 	switch aud := token.Claims["aud"].(type) {
 	case string:
 		return []string{aud}
@@ -332,7 +332,7 @@ func tokenAudiences(token oauth.JwtToken) []string {
 
 // numericDateClaim reads a NumericDate claim as seconds, or 0, which the answer omits, when the token
 // carries none.
-func numericDateClaim(token oauth.JwtToken, name string) int64 {
+func numericDateClaim(token oauth.JWTToken, name string) int64 {
 	seconds, _ := token.Claims[name].(float64)
 	return int64(seconds)
 }

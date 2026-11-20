@@ -109,7 +109,7 @@ func TestAccountDeletion_RefusesCredentialsReplacedBeforeTheDeletion(t *testing.
 			req := httptest.NewRequest(http.MethodPost, "/api/v1/account/deletion", bytes.NewReader(encoded))
 			req.Header.Set("Content-Type", "application/json")
 			reqCtx := reqctx.WithSettings(req.Context(), &record.Settings{Id: 1, AccountDeletionEnabled: true})
-			reqCtx = reqctx.WithValidatedToken(reqCtx, oauth.JwtToken{Claims: map[string]interface{}{
+			reqCtx = reqctx.WithValidatedToken(reqCtx, oauth.JWTToken{Claims: map[string]interface{}{
 				"sub": user.Subject, "scope": "authserver:manage-account", "auth_time": float64(1),
 			}})
 			rr := httptest.NewRecorder()

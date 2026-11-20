@@ -70,10 +70,10 @@ func TestHandleUserSessionsGet_BindsTheRawUserAgent(t *testing.T) {
 		"/layouts/menu_layout.html", "/admin_clients_usersessions.html").Maybe()
 
 	apiClient := &clientSessionsApiClient{
-		client: &api.ClientResponse{Id: 3, ClientIdentifier: "web-app"},
-		users:  []api.SessionOwnerResponse{{Id: 7, Email: "someone@example.com"}},
+		client: &api.ClientResponse{ID: 3, ClientIdentifier: "web-app"},
+		users:  []api.SessionOwnerResponse{{ID: 7, Email: "someone@example.com"}},
 		sessions: []api.UserSessionDetailResponse{
-			{Id: 1, UserId: 7, DeviceName: "goiabada-d2-second-device", DeviceType: "unknown", UserAgent: header},
+			{ID: 1, UserID: 7, DeviceName: "goiabada-d2-second-device", DeviceType: "unknown", UserAgent: header},
 		},
 	}
 
@@ -105,10 +105,10 @@ func TestHandleUserSessionsGet_BindsTheSessionInstants(t *testing.T) {
 		"/layouts/menu_layout.html", "/admin_clients_usersessions.html").Maybe()
 
 	apiClient := &clientSessionsApiClient{
-		client: &api.ClientResponse{Id: 3, ClientIdentifier: "web-app"},
-		users:  []api.SessionOwnerResponse{{Id: 7, Email: "someone@example.com"}},
+		client: &api.ClientResponse{ID: 3, ClientIdentifier: "web-app"},
+		users:  []api.SessionOwnerResponse{{ID: 7, Email: "someone@example.com"}},
 		sessions: []api.UserSessionDetailResponse{
-			{Id: 1, UserId: 7, Started: &started, LastAccessed: &lastAccessed},
+			{ID: 1, UserID: 7, Started: &started, LastAccessed: &lastAccessed},
 		},
 	}
 
@@ -137,11 +137,11 @@ func TestHandleUserSessionsGet_BindsIsCurrentFromTheResponse(t *testing.T) {
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_clients_usersessions.html").Maybe()
 
 	apiClient := &clientSessionsApiClient{
-		client: &api.ClientResponse{Id: 3},
-		users:  []api.SessionOwnerResponse{{Id: 7}},
+		client: &api.ClientResponse{ID: 3},
+		users:  []api.SessionOwnerResponse{{ID: 7}},
 		sessions: []api.UserSessionDetailResponse{
-			{UserSessionResponse: api.UserSessionResponse{Id: 1, SessionIdentifier: "sid-one"}},
-			{UserSessionResponse: api.UserSessionResponse{Id: 2, SessionIdentifier: "sid-two"}, IsCurrent: true},
+			{UserSessionResponse: api.UserSessionResponse{ID: 1, SessionIdentifier: "sid-one"}},
+			{UserSessionResponse: api.UserSessionResponse{ID: 2, SessionIdentifier: "sid-two"}, IsCurrent: true},
 		},
 	}
 
@@ -171,14 +171,14 @@ func TestHandleUserSessionsGet_FillsTheOwnerColumnsFromTheEnvelope(t *testing.T)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_clients_usersessions.html").Maybe()
 
 	apiClient := &clientSessionsApiClient{
-		client: &api.ClientResponse{Id: 3},
+		client: &api.ClientResponse{ID: 3},
 		sessions: []api.UserSessionDetailResponse{
-			{UserSessionResponse: api.UserSessionResponse{Id: 1, UserId: 7}},
-			{UserSessionResponse: api.UserSessionResponse{Id: 2, UserId: 9}},
+			{UserSessionResponse: api.UserSessionResponse{ID: 1, UserID: 7}},
+			{UserSessionResponse: api.UserSessionResponse{ID: 2, UserID: 9}},
 		},
 		users: []api.SessionOwnerResponse{
-			{Id: 7, Email: "jane@example.com", GivenName: "Jane", MiddleName: "Q", FamilyName: "Doe"},
-			{Id: 9, Email: "sam@example.com", GivenName: "Sam", FamilyName: "Reed"},
+			{ID: 7, Email: "jane@example.com", GivenName: "Jane", MiddleName: "Q", FamilyName: "Doe"},
+			{ID: 9, Email: "sam@example.com", GivenName: "Sam", FamilyName: "Reed"},
 		},
 	}
 
@@ -214,12 +214,12 @@ func TestHandleUserSessionsGet_OneOwnerAnswersEveryRowOfTheirs(t *testing.T) {
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_clients_usersessions.html").Maybe()
 
 	apiClient := &clientSessionsApiClient{
-		client: &api.ClientResponse{Id: 3},
+		client: &api.ClientResponse{ID: 3},
 		sessions: []api.UserSessionDetailResponse{
-			{UserSessionResponse: api.UserSessionResponse{Id: 1, UserId: 7}},
-			{UserSessionResponse: api.UserSessionResponse{Id: 2, UserId: 7}},
+			{UserSessionResponse: api.UserSessionResponse{ID: 1, UserID: 7}},
+			{UserSessionResponse: api.UserSessionResponse{ID: 2, UserID: 7}},
 		},
-		users: []api.SessionOwnerResponse{{Id: 7, Email: "jane@example.com", GivenName: "Jane"}},
+		users: []api.SessionOwnerResponse{{ID: 7, Email: "jane@example.com", GivenName: "Jane"}},
 	}
 
 	req := handlertest.Request(http.MethodGet, "/admin/clients/3/user-sessions",
@@ -248,9 +248,9 @@ func TestHandleUserSessionsGet_AnAbsentOwnerLeavesTheColumnsEmpty(t *testing.T) 
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_clients_usersessions.html").Maybe()
 
 	apiClient := &clientSessionsApiClient{
-		client: &api.ClientResponse{Id: 3},
+		client: &api.ClientResponse{ID: 3},
 		sessions: []api.UserSessionDetailResponse{
-			{UserSessionResponse: api.UserSessionResponse{Id: 1, UserId: 7, DeviceName: "Firefox"}},
+			{UserSessionResponse: api.UserSessionResponse{ID: 1, UserID: 7, DeviceName: "Firefox"}},
 		},
 		users: []api.SessionOwnerResponse{},
 	}
@@ -289,37 +289,37 @@ func TestHandleUserSessionsPost_TheAnswerFollowsIsCurrentOnTheRow(t *testing.T) 
 		{
 			name: "the row being deleted is the caller's own",
 			sessions: []api.UserSessionDetailResponse{
-				{UserSessionResponse: api.UserSessionResponse{Id: deleting}, IsCurrent: true},
-				{UserSessionResponse: api.UserSessionResponse{Id: 6}},
+				{UserSessionResponse: api.UserSessionResponse{ID: deleting}, IsCurrent: true},
+				{UserSessionResponse: api.UserSessionResponse{ID: 6}},
 			},
 			wantCurrent: true,
 		},
 		{
 			name: "another row is the caller's own",
 			sessions: []api.UserSessionDetailResponse{
-				{UserSessionResponse: api.UserSessionResponse{Id: deleting}},
-				{UserSessionResponse: api.UserSessionResponse{Id: 6}, IsCurrent: true},
+				{UserSessionResponse: api.UserSessionResponse{ID: deleting}},
+				{UserSessionResponse: api.UserSessionResponse{ID: 6}, IsCurrent: true},
 			},
 		},
 		{
 			name: "no row is the caller's own, which is what a client credentials token produces",
 			sessions: []api.UserSessionDetailResponse{
-				{UserSessionResponse: api.UserSessionResponse{Id: deleting}},
-				{UserSessionResponse: api.UserSessionResponse{Id: 6}},
+				{UserSessionResponse: api.UserSessionResponse{ID: deleting}},
+				{UserSessionResponse: api.UserSessionResponse{ID: 6}},
 			},
 		},
 		{
 			name: "the row's identifier matches the console's own claim and the field says no",
 			sid:  "sid-one",
 			sessions: []api.UserSessionDetailResponse{
-				{UserSessionResponse: api.UserSessionResponse{Id: deleting, SessionIdentifier: "sid-one"}},
+				{UserSessionResponse: api.UserSessionResponse{ID: deleting, SessionIdentifier: "sid-one"}},
 			},
 		},
 		{
 			name: "the field says yes and the console's own claim names another session",
 			sid:  "sid-elsewhere",
 			sessions: []api.UserSessionDetailResponse{
-				{UserSessionResponse: api.UserSessionResponse{Id: deleting, SessionIdentifier: "sid-one"},
+				{UserSessionResponse: api.UserSessionResponse{ID: deleting, SessionIdentifier: "sid-one"},
 					IsCurrent: true},
 			},
 			wantCurrent: true,
@@ -332,7 +332,7 @@ func TestHandleUserSessionsPost_TheAnswerFollowsIsCurrentOnTheRow(t *testing.T) 
 			handlertest.ExpectEncodeJSON(httpHelper).Once()
 
 			apiClient := &clientSessionsApiClient{
-				client:   &api.ClientResponse{Id: 3},
+				client:   &api.ClientResponse{ID: 3},
 				sessions: testCase.sessions,
 			}
 
@@ -345,7 +345,7 @@ func TestHandleUserSessionsPost_TheAnswerFollowsIsCurrentOnTheRow(t *testing.T) 
 			} else {
 				opts = append(opts, handlertest.WithJwtInfo(oauthclient.JwtInfo{
 					TokenResponse: oauth.TokenResponse{AccessToken: handlertest.AccessToken},
-					IdToken:       &oauth.JwtToken{Claims: jwt.MapClaims{"sid": testCase.sid}},
+					IdToken:       &oauth.JWTToken{Claims: jwt.MapClaims{"sid": testCase.sid}},
 				}))
 			}
 
@@ -383,7 +383,7 @@ func TestHandleUserSessionsPost_AListTheApiCannotReadStopsTheDelete(t *testing.T
 		}).Return().Once()
 
 	apiClient := &clientSessionsApiClient{
-		client: &api.ClientResponse{Id: 3},
+		client: &api.ClientResponse{ID: 3},
 		sessionsErr: &apiclient.APIError{
 			Code: "INTERNAL_SERVER_ERROR", Message: "the database is on fire",
 			StatusCode: http.StatusInternalServerError,

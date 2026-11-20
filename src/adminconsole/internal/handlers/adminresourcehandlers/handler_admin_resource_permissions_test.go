@@ -55,7 +55,7 @@ func validatePermissionResponse(t *testing.T, identifier string, description str
 }
 
 func TestValidatePermissionPost_DescriptionAngleBrackets(t *testing.T) {
-	htmlNotAllowed := i18n.NewLocalizedError(i18n.ErrCodeAdminResourcePermissionsDescriptionHtmlNotAllowed, nil).
+	htmlNotAllowed := i18n.NewLocalizedError(i18n.ErrCodeAdminResourcePermissionsDescriptionHTMLNotAllowed, nil).
 		Localize(context.Background())
 
 	testCases := []struct {

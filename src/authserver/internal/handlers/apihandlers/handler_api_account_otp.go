@@ -362,18 +362,18 @@ func HandleAccountOTPPut(
 				writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.AccountOTPAlreadyEnabled, nil), "OTP_ALREADY_ENABLED", http.StatusBadRequest)
 				return
 			}
-			if strings.TrimSpace(req.OtpCode) == "" {
+			if strings.TrimSpace(req.OTPCode) == "" {
 				writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.AccountOTPCodeRequired, nil), "OTP_CODE_REQUIRED", http.StatusBadRequest)
 				return
 			}
 
 			// OTP code must be 6 digits
-			if len(req.OtpCode) != 6 {
+			if len(req.OTPCode) != 6 {
 				writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.AccountOTPCodeInvalid, nil), "INVALID_OTP_CODE", http.StatusBadRequest)
 				return
 			}
 			for i := 0; i < 6; i++ {
-				if req.OtpCode[i] < '0' || req.OtpCode[i] > '9' {
+				if req.OTPCode[i] < '0' || req.OTPCode[i] > '9' {
 					writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.AccountOTPCodeInvalid, nil), "INVALID_OTP_CODE", http.StatusBadRequest)
 					return
 				}
@@ -409,7 +409,7 @@ func HandleAccountOTPPut(
 
 			// A replayed code must be indistinguishable from a wrong one to the caller, so
 			// both branches below write this same body (#111).
-			incorrectOtpCode := i18n.NewLocalizedError(i18n.ErrCodeOtpIncorrectCode, nil)
+			incorrectOtpCode := i18n.NewLocalizedError(i18n.ErrCodeOTPIncorrectCode, nil)
 
 			// VerifySupplied rather than VerifyStored, because this code is checked against
 			// the seed the server issued and recorded and not against an enrolled
@@ -417,7 +417,7 @@ func HandleAccountOTPPut(
 			// here, since the OTP_ALREADY_ENABLED check above refuses an enable when it is
 			// on (#111 decision 10).
 			verified, verifyErr := otpcredential.VerifySupplied(r.Context(), database, user, pendingSecret,
-				req.OtpCode, now)
+				req.OTPCode, now)
 			if verifyErr != nil {
 				writeInternalServerError(w, r, verifyErr)
 				return

@@ -218,7 +218,7 @@ func TestAPIUserCreatePost_TheSetupLinkSendsNoNotice(t *testing.T) {
 	var created api.CreateUserResponse
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&created))
 	_ = resp.Body.Close()
-	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, created.User.Id) })
+	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, created.User.ID) })
 
 	setPasswordThroughLink(t, createHttpClient(t), latestResetLink(t, email))
 

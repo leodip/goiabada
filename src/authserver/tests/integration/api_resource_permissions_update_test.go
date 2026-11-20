@@ -35,9 +35,9 @@ func TestAPIResourcePermissionsPut_Success_CreateUpdateDelete(t *testing.T) {
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.Id, 10) + "/permissions"
 	req := api.UpdateResourcePermissionsRequest{
 		Permissions: []api.ResourcePermissionUpsert{
-			{Id: p1.Id, PermissionIdentifier: "read", Description: "Read updated"},
-			{Id: 0, PermissionIdentifier: "admin", Description: "Admin"},
-			{Id: 0, PermissionIdentifier: "read-extra", Description: "Extra"},
+			{ID: p1.Id, PermissionIdentifier: "read", Description: "Read updated"},
+			{ID: 0, PermissionIdentifier: "admin", Description: "Admin"},
+			{ID: 0, PermissionIdentifier: "read-extra", Description: "Extra"},
 		},
 		ExpectedPermissions: storedPermissionEntries(t, resource.Id),
 	}
@@ -139,7 +139,7 @@ func TestAPIResourcePermissionsPut_UpdateConflict(t *testing.T) {
 	// Try to change p1 identifier to "bbb" which already exists in DB (do not include p2 in request)
 	// This should fail before deletion phase due to identifier conflict with existing permission p2
 	req := api.UpdateResourcePermissionsRequest{
-		Permissions:         []api.ResourcePermissionUpsert{{Id: p1.Id, PermissionIdentifier: "bbb", Description: "A"}},
+		Permissions:         []api.ResourcePermissionUpsert{{ID: p1.Id, PermissionIdentifier: "bbb", Description: "A"}},
 		ExpectedPermissions: storedPermissionEntries(t, resource.Id),
 	}
 	resp := makeAPIRequest(t, "PUT", url, accessToken, req)
@@ -169,7 +169,7 @@ func TestAPIResourcePermissionsPut_SystemResourceAddPermissionAllowed(t *testing
 	var permUpserts []api.ResourcePermissionUpsert
 	for _, p := range existingPerms {
 		permUpserts = append(permUpserts, api.ResourcePermissionUpsert{
-			Id:                   p.Id,
+			ID:                   p.Id,
 			PermissionIdentifier: p.PermissionIdentifier,
 			Description:          p.Description,
 		})
@@ -177,7 +177,7 @@ func TestAPIResourcePermissionsPut_SystemResourceAddPermissionAllowed(t *testing
 	// Add a new permission
 	newPermIdentifier := "test-new-perm-" + fake.LetterN(6)
 	permUpserts = append(permUpserts, api.ResourcePermissionUpsert{
-		Id:                   0, // New permission
+		ID:                   0, // New permission
 		PermissionIdentifier: newPermIdentifier,
 		Description:          "Test new permission",
 	})
@@ -234,7 +234,7 @@ func TestAPIResourcePermissionsPut_SystemResourceRenameBuiltInBlocked(t *testing
 			identifier = "manage-renamed" // Attempt to rename
 		}
 		permUpserts = append(permUpserts, api.ResourcePermissionUpsert{
-			Id:                   p.Id,
+			ID:                   p.Id,
 			PermissionIdentifier: identifier,
 			Description:          p.Description,
 		})
@@ -272,7 +272,7 @@ func TestAPIResourcePermissionsPut_SystemResourceDeleteBuiltInBlocked(t *testing
 	for _, p := range existingPerms {
 		if p.PermissionIdentifier != builtin.ManageAccountPermissionIdentifier {
 			permUpserts = append(permUpserts, api.ResourcePermissionUpsert{
-				Id:                   p.Id,
+				ID:                   p.Id,
 				PermissionIdentifier: p.PermissionIdentifier,
 				Description:          p.Description,
 			})
@@ -326,14 +326,14 @@ func TestAPIResourcePermissionsPut_SystemResourceDeleteRecreateBuiltInBlocked(t 
 			continue // Omit original manage row
 		}
 		permUpserts = append(permUpserts, api.ResourcePermissionUpsert{
-			Id:                   p.Id,
+			ID:                   p.Id,
 			PermissionIdentifier: p.PermissionIdentifier,
 			Description:          p.Description,
 		})
 	}
 	// Add new row with same identifier but Id=0 (new)
 	permUpserts = append(permUpserts, api.ResourcePermissionUpsert{
-		Id:                   0,
+		ID:                   0,
 		PermissionIdentifier: builtin.ManagePermissionIdentifier,
 		Description:          "Recreated manage",
 	})
@@ -396,7 +396,7 @@ func TestAPIResourcePermissionsPut_SystemResourceChangeDescriptionAllowed(t *tes
 			desc = "Updated description for manage permission"
 		}
 		permUpserts = append(permUpserts, api.ResourcePermissionUpsert{
-			Id:                   p.Id,
+			ID:                   p.Id,
 			PermissionIdentifier: p.PermissionIdentifier,
 			Description:          desc,
 		})
@@ -450,14 +450,14 @@ func TestAPIResourcePermissionsPut_DuplicateIdRejected(t *testing.T) {
 	var permUpserts []api.ResourcePermissionUpsert
 	for _, p := range existingPerms {
 		permUpserts = append(permUpserts, api.ResourcePermissionUpsert{
-			Id:                   p.Id,
+			ID:                   p.Id,
 			PermissionIdentifier: p.PermissionIdentifier,
 			Description:          p.Description,
 		})
 	}
 	// Duplicate entry for manage ID with a different identifier
 	permUpserts = append(permUpserts, api.ResourcePermissionUpsert{
-		Id:                   managePermId,
+		ID:                   managePermId,
 		PermissionIdentifier: "manage-renamed",
 		Description:          "Bypass attempt",
 	})
@@ -487,8 +487,8 @@ func TestAPIResourcePermissionsPut_DuplicateIdNonSystemRejected(t *testing.T) {
 	// Two entries with the same existing ID
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.Id, 10) + "/permissions"
 	req := api.UpdateResourcePermissionsRequest{Permissions: []api.ResourcePermissionUpsert{
-		{Id: p1.Id, PermissionIdentifier: "read", Description: "Read"},
-		{Id: p1.Id, PermissionIdentifier: "read-changed", Description: "Changed"},
+		{ID: p1.Id, PermissionIdentifier: "read", Description: "Read"},
+		{ID: p1.Id, PermissionIdentifier: "read-changed", Description: "Changed"},
 	}, ExpectedPermissions: storedPermissionEntries(t, resource.Id)}
 	resp := makeAPIRequest(t, "PUT", url, accessToken, req)
 	defer func() { _ = resp.Body.Close() }()
@@ -530,7 +530,7 @@ func storedPermissionEntries(t *testing.T, resourceId int64) []api.ResourcePermi
 	require.NoError(t, err)
 	entries := make([]api.ResourcePermissionUpsert, 0, len(stored))
 	for _, p := range stored {
-		entries = append(entries, api.ResourcePermissionUpsert{Id: p.Id, PermissionIdentifier: p.PermissionIdentifier, Description: p.Description})
+		entries = append(entries, api.ResourcePermissionUpsert{ID: p.Id, PermissionIdentifier: p.PermissionIdentifier, Description: p.Description})
 	}
 	return entries
 }
@@ -570,7 +570,7 @@ func TestAPIResourcePermissionsPut_TheLoadedListIsRequired(t *testing.T) {
 			assert.Equal(t, "VALIDATION_ERROR", errResp.ErrorCode)
 			assert.Contains(t, errResp.ErrorDescription, "expectedPermissions is required")
 
-			assert.Equal(t, []api.ResourcePermissionUpsert{{Id: p1.Id, PermissionIdentifier: "read", Description: "Read"}},
+			assert.Equal(t, []api.ResourcePermissionUpsert{{ID: p1.Id, PermissionIdentifier: "read", Description: "Read"}},
 				storedPermissionEntries(t, resource.Id), "the save that would have dropped read wrote nothing")
 		})
 	}
@@ -597,8 +597,8 @@ func TestAPIResourcePermissionsPut_AnOutdatedLoadedListIsRefused(t *testing.T) {
 
 	first := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateResourcePermissionsRequest{
 		Permissions: []api.ResourcePermissionUpsert{
-			{Id: p1.Id, PermissionIdentifier: "read", Description: "Read"},
-			{Id: p2.Id, PermissionIdentifier: "write", Description: "Write anything"},
+			{ID: p1.Id, PermissionIdentifier: "read", Description: "Read"},
+			{ID: p2.Id, PermissionIdentifier: "write", Description: "Write anything"},
 		},
 		ExpectedPermissions: loaded,
 	})
@@ -607,7 +607,7 @@ func TestAPIResourcePermissionsPut_AnOutdatedLoadedListIsRefused(t *testing.T) {
 	afterFirst := storedPermissionEntries(t, resource.Id)
 
 	second := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateResourcePermissionsRequest{
-		Permissions:         []api.ResourcePermissionUpsert{{Id: p1.Id, PermissionIdentifier: "read", Description: "Read"}},
+		Permissions:         []api.ResourcePermissionUpsert{{ID: p1.Id, PermissionIdentifier: "read", Description: "Read"}},
 		ExpectedPermissions: loaded,
 	})
 	defer func() { _ = second.Body.Close() }()
@@ -618,8 +618,8 @@ func TestAPIResourcePermissionsPut_AnOutdatedLoadedListIsRefused(t *testing.T) {
 
 	assert.ElementsMatch(t, afterFirst, storedPermissionEntries(t, resource.Id), "the outdated save wrote nothing")
 	assert.ElementsMatch(t, []api.ResourcePermissionUpsert{
-		{Id: p1.Id, PermissionIdentifier: "read", Description: "Read"},
-		{Id: p2.Id, PermissionIdentifier: "write", Description: "Write anything"},
+		{ID: p1.Id, PermissionIdentifier: "read", Description: "Read"},
+		{ID: p2.Id, PermissionIdentifier: "write", Description: "Write anything"},
 	}, afterFirst)
 }
 
@@ -645,12 +645,12 @@ func TestAPIResourcePermissionsPut_SavedWithTheListTheAPIRead(t *testing.T) {
 	require.Len(t, read, 2)
 	loaded := make([]api.ResourcePermissionUpsert, 0, len(read))
 	for _, p := range read {
-		loaded = append(loaded, api.ResourcePermissionUpsert{Id: p.Id, PermissionIdentifier: p.PermissionIdentifier, Description: p.Description})
+		loaded = append(loaded, api.ResourcePermissionUpsert{ID: p.ID, PermissionIdentifier: p.PermissionIdentifier, Description: p.Description})
 	}
 
 	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateResourcePermissionsRequest{
 		Permissions: []api.ResourcePermissionUpsert{
-			{Id: p1.Id, PermissionIdentifier: "read", Description: "Reads every invoice"},
+			{ID: p1.Id, PermissionIdentifier: "read", Description: "Reads every invoice"},
 			{PermissionIdentifier: "export", Description: "Exports the invoices"},
 		},
 		ExpectedPermissions: loaded,
@@ -681,7 +681,7 @@ func TestAPIResourcePermissionsPut_TheSystemResourceSavedWithTheListTheAPIRead(t
 	var manageDescription string
 	for _, p := range storedPermissionEntries(t, sysRes.Id) {
 		if p.PermissionIdentifier == builtin.ManagePermissionIdentifier {
-			manageId, manageDescription = p.Id, p.Description
+			manageId, manageDescription = p.ID, p.Description
 		}
 	}
 	require.NotZero(t, manageId, "the seed writes the manage permission")
@@ -698,7 +698,7 @@ func TestAPIResourcePermissionsPut_TheSystemResourceSavedWithTheListTheAPIRead(t
 		read := readResourcePermissions(t, url, accessToken)
 		entries := make([]api.ResourcePermissionUpsert, 0, len(read))
 		for _, p := range read {
-			entries = append(entries, api.ResourcePermissionUpsert{Id: p.Id, PermissionIdentifier: p.PermissionIdentifier, Description: p.Description})
+			entries = append(entries, api.ResourcePermissionUpsert{ID: p.ID, PermissionIdentifier: p.PermissionIdentifier, Description: p.Description})
 		}
 		return entries
 	}
@@ -716,7 +716,7 @@ func TestAPIResourcePermissionsPut_TheSystemResourceSavedWithTheListTheAPIRead(t
 		edited := make([]api.ResourcePermissionUpsert, len(loaded))
 		copy(edited, loaded)
 		for i := range edited {
-			if edited[i].Id == manageId {
+			if edited[i].ID == manageId {
 				edited[i].Description = "Edited from the system resource's page"
 			}
 		}
@@ -770,7 +770,7 @@ func TestAPIResourcePermissionsPut_EveryBuiltInIsProtected(t *testing.T) {
 				read := readResourcePermissions(t, url, accessToken)
 				loaded := make([]api.ResourcePermissionUpsert, 0, len(read))
 				for _, p := range read {
-					loaded = append(loaded, api.ResourcePermissionUpsert{Id: p.Id, PermissionIdentifier: p.PermissionIdentifier, Description: p.Description})
+					loaded = append(loaded, api.ResourcePermissionUpsert{ID: p.ID, PermissionIdentifier: p.PermissionIdentifier, Description: p.Description})
 				}
 
 				resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateResourcePermissionsRequest{Permissions: change.apply(loaded), ExpectedPermissions: loaded})

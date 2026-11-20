@@ -30,7 +30,7 @@ type storedUserAPI struct {
 }
 
 func (a *storedUserAPI) GetUserById(_ context.Context, _ string, userId int64) (*api.UserResponse, error) {
-	return &api.UserResponse{Id: userId, Email: "ana@example.com", Locale: "de", PageLanguage: a.pageLanguage}, nil
+	return &api.UserResponse{ID: userId, Email: "ana@example.com", Locale: "de", PageLanguage: a.pageLanguage}, nil
 }
 
 func (a *storedUserAPI) UpdateUserProfile(context.Context, string, int64, *api.UpdateUserProfileRequest) (*api.UserResponse, error) {

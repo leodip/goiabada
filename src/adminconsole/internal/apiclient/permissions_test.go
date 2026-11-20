@@ -28,10 +28,10 @@ func TestAuthServerClient_GetPermissionsByResourceDecodesTheNestedResource(t *te
 	assert.Equal(t, "/api/v1/admin/resources/2/permissions", gotPath)
 
 	require.Len(t, permissions, 1)
-	assert.Equal(t, int64(9), permissions[0].Id)
+	assert.Equal(t, int64(9), permissions[0].ID)
 	assert.Equal(t, "read", permissions[0].PermissionIdentifier)
 	assert.Equal(t, "Read it", permissions[0].Description)
-	assert.Equal(t, int64(2), permissions[0].ResourceId)
+	assert.Equal(t, int64(2), permissions[0].ResourceID)
 	assert.Equal(t, "api", permissions[0].Resource.ResourceIdentifier)
 	assert.True(t, permissions[0].Resource.IsSystemLevelResource,
 		"the flag survives the nested position too, which the rebuild loop could not carry at all")
@@ -48,7 +48,7 @@ func TestAuthServerClient_GetUserPermissionsReturnsTheUserBesideThePermissions(t
 	gotPath, _ := recorded()
 	assert.Equal(t, "/api/v1/admin/users/42/permissions", gotPath)
 
-	assert.Equal(t, int64(42), user.Id)
+	assert.Equal(t, int64(42), user.ID)
 	assert.Equal(t, "jdoe", user.Username)
 	require.Len(t, permissions, 1)
 	assert.Equal(t, "read", permissions[0].PermissionIdentifier)

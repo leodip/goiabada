@@ -325,7 +325,7 @@ func TestHandleAccountEmailPut_ResubmittingTheCurrentAddressChangesNothing(t *te
 	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 	var resp api.UpdateUserResponse
 	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &resp))
-	assert.Equal(t, emailTestUserId, resp.User.Id)
+	assert.Equal(t, emailTestUserId, resp.User.ID)
 	assert.Equal(t, "same@example.com", resp.User.Email)
 	assert.True(t, resp.User.EmailVerified, "re-saving the address keeps it verified")
 	assert.Equal(t, 0, credentials.failures)

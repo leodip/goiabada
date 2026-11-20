@@ -78,7 +78,7 @@ func TestIssuePasswordGrant_WritesItsFirstRefreshTokenUnderTheClientsRow(t *test
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	assert.NotEmpty(t, response.AccessToken)
-	assert.NotEmpty(t, response.IdToken)
+	assert.NotEmpty(t, response.IDToken)
 	assert.NotEmpty(t, response.RefreshToken)
 	require.NoError(t, stub.BodyErr)
 	require.NotNil(t, written)

@@ -603,7 +603,7 @@ func TestHandleLogoutGet(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, hintedToken, false).
-			Return(&oauth.JwtToken{TokenBase64: hintedToken, Header: idTokenHeader(), Claims: hintedClaims()}, nil)
+			Return(&oauth.JWTToken{TokenBase64: hintedToken, Header: idTokenHeader(), Claims: hintedClaims()}, nil)
 
 		var bound map[string]interface{}
 		pageRenderer.On("RenderTemplate", rr, mock.Anything, "/layouts/auth_layout.html", "/logout_consent.html",
@@ -1244,7 +1244,7 @@ func stubConfirmedHint(
 	client := &record.Client{Id: 11, ClientIdentifier: hintedClientId}
 
 	tokenParser.On("DecodeAndValidateTokenString", mock.Anything, hintedToken, false).
-		Return(&oauth.JwtToken{TokenBase64: hintedToken, Header: idTokenHeader(), Claims: claims}, nil)
+		Return(&oauth.JWTToken{TokenBase64: hintedToken, Header: idTokenHeader(), Claims: claims}, nil)
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, hintedClientId).Return(client, nil)
 	database.On("GetUserBySubject", mock.Anything, mock.Anything, hintedSubject).
 		Return(&record.User{Id: hintedUserId}, nil).Maybe()
@@ -2173,7 +2173,7 @@ func TestHandleLogoutPost(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, hintedToken, false).
-			Return(&oauth.JwtToken{TokenBase64: hintedToken, Header: idTokenHeader(), Claims: hintedClaims()}, nil)
+			Return(&oauth.JWTToken{TokenBase64: hintedToken, Header: idTokenHeader(), Claims: hintedClaims()}, nil)
 
 		handler.ServeHTTP(rr, req)
 
@@ -2230,7 +2230,7 @@ func TestHandleLogoutPost(t *testing.T) {
 				rr := httptest.NewRecorder()
 
 				tokenParser.On("DecodeAndValidateTokenString", mock.Anything, hintedToken, false).
-					Return(&oauth.JwtToken{TokenBase64: hintedToken, Header: idTokenHeader(), Claims: hintedClaims()}, nil)
+					Return(&oauth.JWTToken{TokenBase64: hintedToken, Header: idTokenHeader(), Claims: hintedClaims()}, nil)
 
 				handler.ServeHTTP(rr, req)
 
@@ -3116,7 +3116,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			if tc.parserErr != nil {
 				parserCall.Return(nil, tc.parserErr).Maybe()
 			} else {
-				parserCall.Return(&oauth.JwtToken{TokenBase64: parsed, Header: header, Claims: claims}, nil).Maybe()
+				parserCall.Return(&oauth.JWTToken{TokenBase64: parsed, Header: header, Claims: claims}, nil).Maybe()
 			}
 
 			stubDB := tc.stubDB

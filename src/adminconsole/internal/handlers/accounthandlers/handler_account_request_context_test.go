@@ -122,7 +122,7 @@ func (s *ctxRecordingApiClient) DeleteAccountProfilePicture(ctx context.Context,
 // refusing, because the delete below it is reached only through the list it answers.
 func (s *ctxRecordingApiClient) GetAccountSessions(ctx context.Context, _ string) ([]api.UserSessionDetailResponse, error) {
 	s.seen = append(s.seen, ctx)
-	return []api.UserSessionDetailResponse{{Id: 31}}, nil
+	return []api.UserSessionDetailResponse{{ID: 31}}, nil
 }
 
 func (s *ctxRecordingApiClient) DeleteAccountSession(ctx context.Context, _ string, _ int64) error {
@@ -281,7 +281,7 @@ func accountHandlerCases() []accountHandlerCase {
 				return handlertest.Request(http.MethodPost, "/account/logout",
 					handlertest.WithJwtInfo(oauthclient.JwtInfo{
 						TokenResponse: oauth.TokenResponse{AccessToken: handlertest.AccessToken},
-						IdToken:       &oauth.JwtToken{TokenBase64: "the.id.token"},
+						IdToken:       &oauth.JWTToken{TokenBase64: "the.id.token"},
 					}))
 			},
 		},

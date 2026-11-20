@@ -203,7 +203,7 @@ func TestAPIClientWebOriginsPut_SystemLevelClientAllowed(t *testing.T) {
 	var sysId int64
 	for _, c := range listResp.Clients {
 		if c.ClientIdentifier == builtin.AdminConsoleClientIdentifier {
-			sysId = c.Id
+			sysId = c.ID
 			break
 		}
 	}
