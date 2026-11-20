@@ -71,7 +71,7 @@ A sign-out with the ID token as its hint revokes your app's refresh tokens tied 
 
 Revoking the refresh token, or an access token that hasn't expired, ends the whole grant, so one call is enough. See [What revoking ends](/reference/endpoints/revoke/#what-revoking-ends).
 
-To cut off everything a session handed out, to every app, end the session instead. A user can, under **Account**, **Sessions** in the admin console, and an administrator can, on the user's **Sessions** tab. See [Ending sessions](/concepts/ending-sessions/#end-a-session).
+To cut off everything a session handed out, to every app, end the session instead. A user can, under **Account**, **Sessions** in the admin console, and an administrator can, on the user's **Sessions** tab. See [Ending sessions](/concepts/ending-sessions/#end-a-session). To cut one app off from a user on every device, offline refresh tokens included, while they stay signed in to the rest, [disconnect it](/concepts/ending-sessions/#disconnect-a-client).
 
 ## Where the user lands
 

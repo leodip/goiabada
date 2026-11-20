@@ -1,11 +1,11 @@
 ---
 title: Ending sessions
-description: End a user's session, and know what ending one, signing out, a credential change or another user signing in revokes.
+description: End a user's session or disconnect a client from them, and know what each, signing out, a credential change or another user signing in revokes.
 ---
 
 import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
 
-This page helps you end a user's session, and know what that cuts off.
+This page helps you end a user's session or cut one client off from a user, and know what each cuts off.
 
 A [session](/concepts/sessions/) ends in one of four ways: someone ends it from the admin console or the API, the user signs out, the user's credentials change, or a different user signs in on the same browser. And when an app redeems an authorization code twice, the auth server ends the session the code came from if it had refresh tokens to revoke: see `auth_code_reuse_detected` in the [audit log](/concepts/audit-log/#signs-of-an-attack). Each is a security action rather than housekeeping, so each one decides what happens to the tokens the session handed out. A session that merely expires is different: it revokes nothing.
 
@@ -36,6 +36,45 @@ That's what sets ending a session apart from one expiring. An [offline refresh t
 
 Each one leaves two entries in the [audit log](/concepts/audit-log/): `terminated_user_session`, which records what was revoked, and `deleted_user_session`, the record that the session is gone. Count `terminated_user_session` to know how many sessions were ended.
 
+## Disconnect a client
+
+Disconnecting a client cuts one app off from one user, on every device, and leaves the user signed in to everything else. Use it when a user wants an app to stop using their account, whether or not they ever gave it consent.
+
+<Steps>
+
+1. Find the client. A user sees the apps that can use their account under **Account**, **Applications** in the admin console. An administrator sees a user's on the user's **Connected clients** tab. Each lists every client the user gave consent to or holds a refresh token with, and what it can access.
+
+2. Choose **Disconnect** beside it, and confirm. Your own row for the admin console has no **Disconnect**: you'd only be signed straight back in.
+
+   The same goes through the API: a user calls [`DELETE /api/v1/account/connected-clients/{clientId}`](/reference/api/account/operations/deleteaccountconnectedclient/), and an administrator calls [`DELETE /api/v1/admin/users/{id}/connected-clients/{clientId}`](/reference/api/admin/operations/deleteuserconnectedclient/). [`GET /api/v1/account/connected-clients`](/reference/api/account/operations/getaccountconnectedclients/) and [`GET /api/v1/admin/users/{id}/connected-clients`](/reference/api/admin/operations/getuserconnectedclients/) list the clients.
+
+3. The client's tokens for the user stop working, as below, and the auth server [tries to tell the client](#telling-your-apps).
+
+</Steps>
+
+Withdrawing a consent, with [`DELETE /api/v1/account/consents/{id}`](/reference/api/account/operations/deleteaccountconsent/) or [`DELETE /api/v1/admin/user-consents/{id}`](/reference/api/admin/operations/deleteuserconsent/), disconnects the consent's client in just the same way.
+
+## What disconnecting revokes
+
+| What | What happens |
+|---|---|
+| The user's refresh tokens with the client | Revoked, on every session and device, offline ones and those from the [password grant](/legacy-flows/ropc/) included |
+| The user's authorization codes with the client | Revoked, so a code that wasn't redeemed yet can't be exchanged |
+| The user's consent to the client | Deleted, so a client that asks for consent asks again |
+| The user's sessions and their other clients | Untouched. The client stays listed on the user's sessions until each one ends |
+
+The access tokens of those grants are refused at once by the auth server's own endpoints: see [Access tokens already issued](#access-tokens-already-issued).
+
+A disconnect isn't a ban. The client can send the user to sign in again, and gets new tokens once they do. Their session is still there, so they usually go straight through.
+
+Each disconnect leaves a `disconnected_client` entry in the [audit log](/concepts/audit-log/), naming the user, the client, who did it, and what was revoked. When a consent was deleted, `deleted_own_user_consent` or `deleted_user_consent` is written beside it.
+
+### What a disconnect doesn't reach
+
+- **Access tokens from the [implicit flow](/legacy-flows/implicit/).** They belong to no [grant](/concepts/glossary/#grant), so the auth server accepts them until they expire or their session ends. When they must stop at once, end the session too.
+- **A client using the [password grant](/legacy-flows/ropc/).** It can get new tokens straight away, with the user's password, since the password grant asks for no consent. To keep it out, [turn the flow off](/legacy-flows/ropc/#turning-it-off) for the client, or change the user's password if the client kept it.
+- **A code exchange already under way.** A code the client was exchanging at the very moment of the disconnect can still give it a working grant. The client is then listed again, and you can disconnect it again.
+
 ## Telling your apps
 
 Ending a session also tells the apps the session was signed in to. Each one with a [back-channel logout URI](/concepts/clients/#back-channel-logout) is sent a logout token there: a signed statement naming the user (`sub`) and the session (`sid`), so the app can end its own session for that user. That happens whenever a session that was still valid ends:
@@ -49,7 +88,7 @@ Ending a session also tells the apps the session was signed in to. Each one with
 
 A session that has expired tells nobody, whatever removes it. Disabling or deleting a user, a password reset, an administrator setting the password and the `recover` command tell every app that knew the user instead, expired sessions or not: see [Credential changes](#credential-changes).
 
-Withdrawing a user's consent to a client tells that client too, though no session ends. It's sent one logout token naming the user and no session, which asks it to end every session it has for that user. A client that [requires the session identifier](/concepts/clients/#back-channel-logout) is sent one naming the session instead, for each of the user's sessions it's on that's still valid, and nothing when it's on none. The user stays signed in, their other apps are told nothing, and the client stays listed on their sessions until each one ends.
+[Disconnecting a client](#disconnect-a-client) tells that client too, though no session ends. It's sent one logout token naming the user and no session, which asks it to end every session it has for that user. A client that [requires the session identifier](/concepts/clients/#back-channel-logout) is sent one naming the session instead, for each of the user's sessions it's on that's still valid, and nothing when it's on none. The user stays signed in, and their other apps are told nothing.
 
 [Back-channel logout](/reference/endpoints/back-channel-logout/) gives the request, the token, its retries, what your app answers, and [what happens when a delivery is lost](/reference/endpoints/back-channel-logout/#when-a-delivery-is-lost).
 
@@ -57,7 +96,7 @@ Withdrawing a user's consent to a client tells that client too, though no sessio
 
 You can't end a session that has passed its [idle timeout or maximum lifetime](/concepts/sessions/#how-long-a-session-lasts), because it's already gone. The session lists leave it out, and both `DELETE` calls answer it with 404, just as they would a session that was never there. Nothing is revoked and nothing is written to the audit log. The background job deletes the row later, and that revokes nothing either.
 
-Its offline refresh tokens keep working, as they're meant to. To cut them, withdraw the user's consent to the client: on the user's **Consents** tab in the admin console, with [`DELETE /api/v1/admin/user-consents/{id}`](/reference/api/admin/operations/deleteuserconsent/), or by the user under **Account**, **Consents**. Or change the user's credentials, as [below](#credential-changes).
+Its offline refresh tokens keep working, as they're meant to. To cut one app's, [disconnect the client](#disconnect-a-client) from the user. To cut them all, change the user's credentials, as [below](#credential-changes).
 
 ## A sign-in under way
 
@@ -134,7 +173,7 @@ When the **same** user signs in again, none of this applies. Their session is re
 
 An access token is a signed JWT, and nothing on this page changes a token already issued. What happens to it depends on who checks it:
 
-- **The auth server's own endpoints**, [`/userinfo`](/reference/endpoints/userinfo/) and the Admin and Account APIs, refuse an access token on the very next request once its session has ended or expired, its user was disabled or changed their credentials, or its grant was revoked. [Ending a session](#end-a-session) from the admin console or the API revokes the grants it handed out, offline ones included, so this reaches an offline grant's access tokens too. Withdrawing the user's consent to the client and making the client public revoke the grant as well, and so does your app signing the user out with an `id_token_hint`, for its grants tied to that session. Disabling the client refuses its tokens while it stays disabled.
+- **The auth server's own endpoints**, [`/userinfo`](/reference/endpoints/userinfo/) and the Admin and Account APIs, refuse an access token on the very next request once its session has ended or expired, its user was disabled or changed their credentials, or its grant was revoked. [Ending a session](#end-a-session) from the admin console or the API revokes the grants it handed out, offline ones included, so this reaches an offline grant's access tokens too. [Disconnecting the client](#disconnect-a-client) from the user and making the client public revoke the grant as well, and so does your app signing the user out with an `id_token_hint`, for its grants tied to that session. Disabling the client refuses its tokens while it stays disabled.
 - **An API that introspects the token**, asking the [introspection endpoint](/reference/endpoints/introspect/), gets `{"active": false}` from the same moment, for every one of these.
 - **An API checking the signature alone** accepts the token until it expires.
 

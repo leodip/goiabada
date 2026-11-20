@@ -10,7 +10,7 @@ This page shows you how to get an access token for Goiabada's APIs and call them
 Goiabada has two APIs, both served by the auth server:
 
 - The **Admin API**, under `/api/v1/admin/`, manages users, groups, clients, resources, permissions and settings. It's the API the admin console itself calls. A service calls it with a token of its own.
-- The **Account API**, under `/api/v1/account/`, lets a signed-in user manage their own account: profile, email, password, two-factor authentication, sessions and consents. Your app calls it with the user's token.
+- The **Account API**, under `/api/v1/account/`, lets a signed-in user manage their own account: profile, email, password, two-factor authentication, sessions, consents and connected clients. Your app calls it with the user's token.
 
 Every operation is in the [Admin API](/reference/api/admin/) and [Account API](/reference/api/account/) reference, with a curl example.
 
@@ -92,7 +92,7 @@ The Account API acts on the account of the user the token was issued for, so it 
 
 </Steps>
 
-Every user holds the `manage-account` permission from the moment they're created, and it isn't an administrative permission, so your client needs no permission of its own, and no allowance, to ask for it. What it needs is the user's approval. The consent screen is shown the first time each user signs in to your app asking for `authserver:manage-account`, whatever your client's **Ask users for consent** says, and again if they untick it or withdraw it under **Account**, **Consents**. [Add sign-in to a web app](/guides/add-sign-in-to-a-web-app/) covers the sign-in itself, PKCE included.
+Every user holds the `manage-account` permission from the moment they're created, and it isn't an administrative permission, so your client needs no permission of its own, and no allowance, to ask for it. What it needs is the user's approval. The consent screen is shown the first time each user signs in to your app asking for `authserver:manage-account`, whatever your client's **Ask users for consent** says, and again if they untick it or disconnect your app under **Account**, **Applications**. [Add sign-in to a web app](/guides/add-sign-in-to-a-web-app/) covers the sign-in itself, PKCE included.
 
 Until a user has approved it, your app can't get the scope without them:
 
@@ -107,7 +107,7 @@ There are three ways, and which one fits depends on who's making the change:
 
 - **The Account API, with the user's token.** For an app that changes the signed-in user's own account on their behalf. It asks for `authserver:manage-account` as [above](#call-the-account-api), and each user approves that on the consent screen: once, or at every sign-in for a public client with [**Remember consent**](/concepts/clients/#consent-required) off. The token reaches that user's account and nothing else.
 - **The Admin API, with your client's own token.** For a service that changes users' accounts with no user present, such as provisioning from an HR system. It gets its token through the client credentials flow, as in [Call the Admin API](#call-the-admin-api), holding `authserver:manage-users`, which only an administrator with `authserver:manage` can grant it. That makes the client an [administrator](/reference/api/administrators/), and it still can't change an administrator.
-- **A link to the admin console's Account pages.** For a change the user makes themselves. Link to `/account/profile` on the admin console, such as `https://admin.example.com/account/profile`. The user signs in there if they need to and edits their profile, email, phone, address, picture, password, two-factor authentication, sessions and consents. Your app needs no scope at all.
+- **A link to the admin console's Account pages.** For a change the user makes themselves. Link to `/account/profile` on the admin console, such as `https://admin.example.com/account/profile`. The user signs in there if they need to and edits their profile, email, phone, address, picture, password, two-factor authentication, sessions and applications. Your app needs no scope at all.
 
 ## The bearer token
 

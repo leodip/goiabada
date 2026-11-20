@@ -290,9 +290,12 @@ A client ends one of its grants by sending a token of it.
 
 ### Disconnect
 A user, or an administrator acting for them, ends everything the user holds with one client.
-- Entry: withdrawing a consent, `DELETE /api/v1/account/consents/{id}` and
-  `DELETE /api/v1/admin/user-consents/{id}`, is a disconnect of the consent's client (#135
-  decision 1)
+- Entry: `DELETE /api/v1/account/connected-clients/{clientId}` and
+  `DELETE /api/v1/admin/users/{id}/connected-clients/{clientId}`, from the console's Account,
+  Applications page and a user's Connected clients tab; withdrawing a consent,
+  `DELETE /api/v1/account/consents/{id}` and `DELETE /api/v1/admin/user-consents/{id}`, is a
+  disconnect of the consent's client (#135 decisions 1 and 2). The two `GET .../connected-clients`
+  list the clients a user holds a stored consent or a live refresh token with (decision 4)
 - Operation: `revocation.DisconnectClientTx`, in one transaction: the consent's deletion when the
   caller passes one (`DeleteUserConsent` reports whether this call deleted the row), the user's
   unredeemed codes with the client marked revoked, each family of the user's refresh tokens with the
@@ -309,8 +312,11 @@ A user, or an administrator acting for them, ends everything the user holds with
   changed something; the caller sends them after the commit. See Back-channel logout below
 - Gap: a code exchange that claimed its code before the commit and writes its first refresh token
   after it finishes, and its grant is live (#135 decision 11)
-- Implementation: `handler_api_account_consents.go`, `handler_api_user_consents.go`,
-  `revocation/revocation.go`
+- Not reached: implicit-flow access tokens, which belong to no grant and stand until they expire
+  or their session ends (decision 8), and a password-grant client, which can get new tokens at once
+  with the user's password since that grant asks for no consent
+- Implementation: `handler_api_account_connected_clients.go`, `handler_api_user_connected_clients.go`,
+  `handler_api_account_consents.go`, `handler_api_user_consents.go`, `revocation/revocation.go`
 
 ### Hinted sign-out
 A sign-out at `/auth/logout` with a confirmed `id_token_hint` ends the hint's client's part of the
