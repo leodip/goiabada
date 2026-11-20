@@ -48,11 +48,11 @@ effects after it succeeds. Audit events describe the committed outcome.
 snapshot that every later ordinary read in it answers. PostgreSQL and SQL Server read at READ
 COMMITTED, each statement seeing what was committed when it began. SQLite in WAL mode keeps a
 transaction's first snapshot too, but its pool has one connection, so no other transaction of the
-server commits while one runs. So a write that must see rows another transaction may commit while it runs, such as a sweep, a
-revocation or a deletion, either makes no ordinary read before it holds its lock, or reads those
-rows with a locking read (a `…ForUpdate` method, or `FOR SHARE` on MySQL). Its data test commits
-the competing row while the write waits, and runs on MySQL (#796, #135). The operations below hold
-this today.
+server commits while one runs. So a write that must see rows another transaction may commit while it
+runs, such as a sweep, a revocation or a deletion, either makes no ordinary read before it holds its
+lock, or reads those rows with a locking read (a `…ForUpdate` method, or `FOR SHARE` on MySQL). Its
+data test commits the competing row while the write waits, and runs on MySQL (#796, #135). The
+operations below hold this today.
 
 Preserve the row locks that make security decisions atomic:
 
