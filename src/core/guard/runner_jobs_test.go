@@ -78,7 +78,8 @@ type checkJob struct {
 	tiers map[string][]tierCall
 	// setupGoStep is the place of the first step that sets Go up with actions/setup-go, itself or
 	// through the runner's test setup, whenever the job reaches it, or -1, and setupGoLine its line;
-	// setupGoIf is the line of the if: of one that sets it up only under a condition, or 0.
+	// setupGoIf is the line of the if: of the first one that sets it up only under a condition,
+	// or 0.
 	setupGoStep, setupGoLine, setupGoIf int
 	// entries are the job's matrix entries, one without values when it has no matrix, and
 	// matrixProblem why the guard cannot list them, or "".
@@ -273,7 +274,9 @@ func readCheckJobs(text string) ([]checkJob, error) {
 			if strings.HasPrefix(uses, "actions/setup-go@") || uses == setupTestRunner {
 				switch n := step.conditional(); {
 				case n != 0:
-					job.setupGoIf = n
+					if job.setupGoIf == 0 {
+						job.setupGoIf = n
+					}
 				case job.setupGoStep < 0:
 					job.setupGoStep, job.setupGoLine = step.index, step.line
 				}
@@ -349,8 +352,8 @@ func runnerJobFindings(file, text string) []string {
 				findings = append(findings, fmt.Sprintf("runner jobs: %s runs the %s tier in a job container; "+
 					"run it on the runner with actions/setup-go, as Lint does, so the job pulls no image", at(job, job.container), tier))
 			case job.setupGoStep < 0 && job.setupGoIf != 0:
-				findings = append(findings, fmt.Sprintf("runner jobs: %s sets Go up only under a condition, so a run that skips the step runs the %s tier "+
-					"on the runner's own Go: set it up in a step with no if:", at(job, job.setupGoIf), tier))
+				findings = append(findings, fmt.Sprintf("runner jobs: %s runs the %s tier on the runner, where each step that sets Go up has an if:, as at line %d: "+
+					"set Go up in a step with no if:, before the tests", at(job, calls[0].line), tier, job.setupGoIf))
 			case job.setupGoStep < 0:
 				findings = append(findings, fmt.Sprintf("runner jobs: %s runs the %s tier on the runner without actions/setup-go; "+
 					"set Go up at the pin with it, or with ./.github/actions/setup-test-runner", at(job, calls[0].line), tier))
@@ -639,7 +642,7 @@ func TestCheckWorkflow_RunnerJobFindings(t *testing.T) {
 	t.Run("the runner's cache saved from a step its condition skips", func(t *testing.T) {
 		assertFindings(t, findings(replace(t, workflow, "      - uses: ./.github/actions/setup-test-runner\n        with:\n",
 			"      - uses: ./.github/actions/setup-test-runner\n        if: ${{ false }}\n        with:\n")),
-			"runner jobs: check.yml:12 (unit-authserver) sets Go up only under a condition",
+			"runner jobs: check.yml:17 (unit-authserver) runs the internal tier on the runner, where each step that sets Go up has an if:, as at line 12",
 			"runner jobs: check.yml:12 (unit-authserver) saves the runner's Go cache from a step under a condition")
 	})
 	t.Run("the container's cache saved from a step its condition skips", func(t *testing.T) {
@@ -661,7 +664,15 @@ func TestCheckWorkflow_RunnerJobFindings(t *testing.T) {
 	t.Run("a module tier after a setup-go step its condition skips", func(t *testing.T) {
 		assertFindings(t, findings(replace(t, workflow, "      - uses: actions/setup-go@0123 # v7\n",
 			"      - uses: actions/setup-go@0123 # v7\n        if: ${{ false }}\n")),
-			"runner jobs: check.yml:21 (unit-setup) sets Go up only under a condition")
+			"runner jobs: check.yml:24 (unit-setup) runs the setup tier on the runner, where each step that sets Go up has an if:, as at line 21: "+
+				"set Go up in a step with no if:, before the tests")
+	})
+	t.Run("a module tier before a setup-go step under a condition", func(t *testing.T) {
+		setup := "      - uses: actions/setup-go@0123 # v7\n        with:\n          cache: false\n"
+		tests := "      - run: ./run-tests.sh --type setup --no-build\n"
+		conditional := "      - uses: actions/setup-go@0123 # v7\n        if: github.event_name == 'push'\n        with:\n          cache: false\n"
+		assertFindings(t, findings(replace(t, workflow, setup+tests, tests+conditional)),
+			"runner jobs: check.yml:20 (unit-setup) runs the setup tier on the runner, where each step that sets Go up has an if:, as at line 22")
 	})
 	t.Run("a module tier run before Go is set up", func(t *testing.T) {
 		setup := "      - uses: actions/setup-go@0123 # v7\n        with:\n          cache: false\n"
