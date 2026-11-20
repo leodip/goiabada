@@ -129,13 +129,13 @@ func TestAdminUserHandlers_AnAbsentTokenSetIsAnsweredWithTheSentinel(t *testing.
 			return HandleAttributesEditPost(h, c, consoleBaseURL)
 		}, request(http.MethodPost, "/admin/users/42/attributes/21/edit", routed, attribute,
 			handlertest.WithForm(url.Values{"attributeKey": {"k"}, "attributeValue": {"v"}}))},
-		{"HandleConsentsGet", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-			return HandleConsentsGet(h, c)
-		}, request(http.MethodGet, "/admin/users/42/consents", routed)},
-		{"HandleConsentsPost", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-			return HandleConsentsPost(h, c)
-		}, request(http.MethodPost, "/admin/users/42/consents",
-			append([]handlertest.Option{routed}, jsonBody(`{"consentId":13}`)...)...)},
+		{"HandleConnectedClientsGet", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			return HandleConnectedClientsGet(h, c)
+		}, request(http.MethodGet, "/admin/users/42/connected-clients", routed)},
+		{"HandleConnectedClientsDisconnectPost", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			return HandleConnectedClientsDisconnectPost(h, c)
+		}, request(http.MethodPost, "/admin/users/42/connected-clients",
+			append([]handlertest.Option{routed}, jsonBody(`{"clientId":13}`)...)...)},
 		{"HandleSessionsGet", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleSessionsGet(h, c)
 		}, request(http.MethodGet, "/admin/users/42/sessions", routed)},

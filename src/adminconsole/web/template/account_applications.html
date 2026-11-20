@@ -1,0 +1,86 @@
+{{define "title"}}{{ T $.ctx "adminconsole.account.applications.page_title" }} – {{ .appName }}{{end}}
+{{define "data-page"}}account-applications{{end}}
+{{define "menu"}}{{ template "account_menu" . }}{{end}}
+{{define "head"}}
+<script src="{{ asset "/static/pages/row-actions.js" }}" defer></script>
+{{end}}
+
+{{define "page"}}
+<div class="page-header">
+  <div>
+    <p class="page-eyebrow">{{ T $.ctx "adminconsole.menu.account" }}</p>
+    <h1 class="page-title" id="page-title">{{ T $.ctx "adminconsole.account.applications.page_title" }}</h1>
+    <p class="page-lead">{{ T $.ctx "adminconsole.account.applications.intro" }}</p>
+  </div>
+</div>
+
+{{/* One row per client the user is connected to (#135 decision 7): the scopes it was given consent
+     for and the scopes its live grants hold, each under its own label, since either can hold a
+     scope the other lacks; and a Disconnect, except on the console's own row (decision 5). */}}
+{{ if .clients }}
+<div class="not-empty:mb-4" id="row-actions-status" role="status" data-confirm-title="{{ T $.ctx "adminconsole.account.applications.modal_confirm_title" }}"></div>
+
+<div class="table-scroll" role="region" aria-labelledby="page-title" tabindex="0">
+  <table class="data-table data-table-stack">
+    <thead>
+      <tr>
+        <th scope="col">{{ T $.ctx "adminconsole.account.applications.col_application" }}</th>
+        <th scope="col">{{ T $.ctx "adminconsole.account.applications.col_access" }}</th>
+        <th scope="col">{{ T $.ctx "adminconsole.account.applications.col_consent" }}</th>
+        <th scope="col"><span class="sr-only">{{ T $.ctx "adminconsole.account.applications.col_actions" }}</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      {{ range .clients }}
+      <tr>
+        <td class="cell-wrap">
+          <span class="font-semibold">{{ .ClientName }}</span>
+          {{ if .ClientNameUnverified }}<span class="tag tag-caution ml-1">{{ T $.ctx "adminconsole.account.applications.unverified_tag" }}</span>
+          <span class="cell-secondary">{{ T $.ctx "adminconsole.account.applications.unverified_note" }}</span>
+          {{ else if .ClientDescription }}<span class="cell-secondary">{{ .ClientDescription }}</span>{{ end }}
+        </td>
+        <td class="cell-wrap" data-label="{{ T $.ctx "adminconsole.account.applications.col_access" }}">
+          <div class="grid gap-3">
+            {{ if .HasConsent }}
+            <div class="grid gap-1">
+              <span class="block text-sm text-ink-muted" id="consent-scope-{{ .ClientId }}">{{ T $.ctx "adminconsole.account.applications.consent_scope_label" }}</span>
+              <ul class="grid gap-2" aria-labelledby="consent-scope-{{ .ClientId }}">
+                {{ range ScopeList $.ctx .ConsentScope }}
+                <li class="grid gap-0.5">{{ with .Description }}<span>{{ . }}</span>{{ end }}<span class="code-hint">{{ .Scope }}</span></li>
+                {{ end }}
+              </ul>
+            </div>
+            {{ end }}
+            {{ if .GrantScope }}
+            <div class="grid gap-1">
+              <span class="block text-sm text-ink-muted" id="grant-scope-{{ .ClientId }}">{{ T $.ctx "adminconsole.account.applications.grant_scope_label" }}</span>
+              <ul class="grid gap-2" aria-labelledby="grant-scope-{{ .ClientId }}">
+                {{ range ScopeList $.ctx .GrantScope }}
+                <li class="grid gap-0.5">{{ with .Description }}<span>{{ . }}</span>{{ end }}<span class="code-hint">{{ .Scope }}</span></li>
+                {{ end }}
+              </ul>
+            </div>
+            {{ end }}
+          </div>
+        </td>
+        <td class="sm:whitespace-nowrap" data-label="{{ T $.ctx "adminconsole.account.applications.col_consent" }}">{{ if .HasConsent }}{{ DateTime $.ctx .GrantedAt }}{{ else }}{{ T $.ctx "adminconsole.account.applications.consent_not_asked" }}{{ end }}</td>
+        <td class="cell-actions">
+          {{ if .IsCurrent }}
+          <span class="tag tag-note">{{ T $.ctx "adminconsole.account.applications.current_tag" }}</span>
+          {{ else }}
+          <button class="button button-sm" type="button" data-action-url="/account/applications" data-action-body="{&#34;clientId&#34;:{{ .ClientId }}}" data-dialog="disconnectClient" data-done="{{ T $.ctx "adminconsole.account.applications.disconnected" }}" data-done-label="{{ T $.ctx "adminconsole.account.applications.disconnected_label" }}" data-confirm="{{ if .ClientNameUnverified }}{{ T $.ctx "adminconsole.account.applications.disconnect_confirm_unverified" "client" .ClientName }}{{ else }}{{ T $.ctx "adminconsole.account.applications.disconnect_confirm" "client" .ClientName }}{{ end }}">{{ T $.ctx "adminconsole.account.applications.disconnect_button" }}<span class="sr-only"> {{ .ClientName }}</span></button>
+          {{ end }}
+        </td>
+      </tr>
+      {{ end }}
+    </tbody>
+  </table>
+</div>
+
+{{ template "modal_dialog" (args "disconnectClient" "confirm" $.ctx (T $.ctx "adminconsole.account.applications.disconnect_button") (T $.ctx "adminconsole.account.applications.modal_confirm_title")) }}
+{{ else }}
+<div class="panel">
+  <p class="empty-state">{{ T $.ctx "adminconsole.account.applications.empty" }}</p>
+</div>
+{{ end }}
+{{end}}

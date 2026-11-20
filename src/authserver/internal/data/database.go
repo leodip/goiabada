@@ -421,6 +421,13 @@ type Database interface {
 	// it for a grant the withdrawal's sweep never saw. Used codes are left alone: their
 	// grants are the refresh tokens the same withdrawal sweeps (see #622).
 	RevokeUnusedCodesByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (int64, error)
+	// RevokeUnusedCodesBySessionIdentifierAndClientId marks every unused, not-yet-revoked code
+	// one client holds from one session revoked and reports how many rows it transitioned. A
+	// sign-out with a confirmed id_token_hint marks the departing client's, so a code issued
+	// before it cannot start a grant on the session after it. Used codes are left alone: their
+	// grants are the refresh tokens the same sign-out sweeps, and an offline one among them must
+	// survive (see #135 decision 9).
+	RevokeUnusedCodesBySessionIdentifierAndClientId(ctx context.Context, tx *sql.Tx, sessionIdentifier string, clientId int64) (int64, error)
 	GetCodeById(ctx context.Context, tx *sql.Tx, codeId int64) (*record.Code, error)
 	GetCodeByCodeHash(ctx context.Context, tx *sql.Tx, codeHash string, used bool) (*record.Code, error)
 	DeleteCode(ctx context.Context, tx *sql.Tx, codeId int64) error
@@ -869,8 +876,13 @@ type Database interface {
 	UpdateUserConsent(ctx context.Context, tx *sql.Tx, userConsent *record.UserConsent) error
 	GetUserConsentById(ctx context.Context, tx *sql.Tx, userConsentId int64) (*record.UserConsent, error)
 	GetConsentByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (*record.UserConsent, error)
+	// GetConsentByUserIdAndClientIdForUpdate reads the user's consent to the client as last
+	// committed and takes its row until the transaction ends: what a disconnect deletes, read so
+	// that a consent committed after the transaction's first read is not missed on MySQL (#135).
+	// A transaction is required.
+	GetConsentByUserIdAndClientIdForUpdate(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (*record.UserConsent, error)
 	GetConsentsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserConsent, error)
-	DeleteUserConsent(ctx context.Context, tx *sql.Tx, userConsentId int64) error
+	DeleteUserConsent(ctx context.Context, tx *sql.Tx, userConsentId int64) (bool, error)
 	DeleteAllUserConsent(ctx context.Context, tx *sql.Tx) error
 	UserConsentsLoadClients(ctx context.Context, tx *sql.Tx, userConsents []record.UserConsent) error
 
@@ -981,6 +993,12 @@ type Database interface {
 	GetRefreshTokensByFirstRefreshTokenJti(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string) ([]*record.RefreshToken, error)
 	GetRefreshTokensByCodeId(ctx context.Context, tx *sql.Tx, codeId int64) ([]*record.RefreshToken, error)
 	GetRefreshTokensBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) ([]*record.RefreshToken, error)
+	// GetSessionBoundRefreshTokensBySessionIdentifierAndClientId returns the session-bound
+	// refresh tokens one client holds from one session, revoked ones included: the tokens of the
+	// client's codes on the session whose own session identifier is the session's, which an
+	// offline token's is not. A sign-out with a confirmed id_token_hint revokes them and records
+	// their families (see #135 decision 9).
+	GetSessionBoundRefreshTokensBySessionIdentifierAndClientId(ctx context.Context, tx *sql.Tx, sessionIdentifier string, clientId int64) ([]*record.RefreshToken, error)
 	// GetRefreshTokensByUserId returns every refresh token belonging to a user,
 	// through either linkage shape: codes.user_id for the authorization code flow and
 	// refresh_tokens.user_id for ROPC. GetRefreshTokensBySessionIdentifier cannot
@@ -991,13 +1009,20 @@ type Database interface {
 	// tokens that is unrevoked and unexpired at now, each once, through either linkage shape. It is
 	// the grants a user-wide end tells (#784 decision 3).
 	GetUsableRefreshTokenClientIdsByUserId(ctx context.Context, tx *sql.Tx, userId int64, now time.Time) ([]int64, error)
+	// GetLiveGrantsByUserId answers one row for each live refresh token the user holds, through
+	// either linkage shape, with its client and the scope it records: a token whose row is not
+	// revoked, whose expiry is set and after now, and whose rotation family has no revocation
+	// record. It is what the list of the user's connected clients reads (#135 decision 4).
+	GetLiveGrantsByUserId(ctx context.Context, tx *sql.Tx, userId int64, now time.Time) ([]record.LiveGrant, error)
 	// GetRefreshTokensByUserIdAndClientId returns every refresh token one user holds
 	// with one client, through either linkage shape: codes.user_id with codes.client_id
 	// for the authorization code flow, refresh_tokens.user_id with
 	// refresh_tokens.client_id for ROPC. It is what a consent withdrawal sweeps, and
 	// GetRefreshTokensByUserId plus a client filter cannot substitute for it, because
 	// an auth-code token's row carries no client to filter on (#622). Revoked rows are
-	// returned too, on purpose: the withdrawal records the family of every row it reads.
+	// returned too, on purpose: the withdrawal records the family of every row it reads. The
+	// rows are read as last committed, a locking read on MySQL, so a grant committed after the
+	// transaction's first read is swept too (#135).
 	GetRefreshTokensByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) ([]*record.RefreshToken, error)
 	// GetRefreshTokensByClientId returns every refresh token belonging to a client,
 	// through either linkage shape: codes.client_id for the authorization code flow,

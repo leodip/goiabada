@@ -33,6 +33,13 @@ func TestAccountHandlers_AnAbsentTokenSetIsAnsweredWithTheSentinel(t *testing.T)
 		{"HandleAddressPost", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleAddressPost(h, nil, c, consoleBaseURL)
 		}, handlertest.Request(http.MethodPost, "/account/address", handlertest.WithForm(url.Values{}))},
+		{"HandleApplicationsGet", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			return HandleApplicationsGet(h, c)
+		}, handlertest.Request(http.MethodGet, "/account/applications")},
+		{"HandleApplicationsDisconnectPost", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			return HandleApplicationsDisconnectPost(h, c)
+		}, handlertest.Request(http.MethodPost, "/account/applications",
+			handlertest.WithBody(strings.NewReader(`{"clientId":13}`)), handlertest.WithContentType("application/json"))},
 		{"HandleChangePasswordPost", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleChangePasswordPost(h, nil, c, consoleBaseURL)
 		}, handlertest.Request(http.MethodPost, "/account/change-password", handlertest.WithForm(url.Values{
@@ -57,13 +64,6 @@ func TestAccountHandlers_AnAbsentTokenSetIsAnsweredWithTheSentinel(t *testing.T)
 			return HandleEmailVerificationPost(h, nil, c, consoleBaseURL)
 		}, handlertest.Request(http.MethodPost, "/account/email-verification",
 			handlertest.WithForm(url.Values{"verificationCode": {"123456"}}))},
-		{"HandleManageConsentsGet", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-			return HandleManageConsentsGet(h, c)
-		}, handlertest.Request(http.MethodGet, "/account/manage-consents")},
-		{"HandleManageConsentsRevokePost", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
-			return HandleManageConsentsRevokePost(h, c)
-		}, handlertest.Request(http.MethodPost, "/account/manage-consents",
-			handlertest.WithBody(strings.NewReader(`{"consentId":13}`)), handlertest.WithContentType("application/json"))},
 		{"HandleOtpGet", func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
 			return HandleOtpGet(h, c)
 		}, handlertest.Request(http.MethodGet, "/account/otp")},

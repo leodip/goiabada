@@ -1,14 +1,15 @@
-// What only a browser sign-in leaves behind: a session, and the consent given on the consent screen.
+// What only a browser sign-in leaves behind: a session, and the clients the user is connected to,
+// with the consent given on the consent screen or without one.
 import type { Page } from "@playwright/test";
 import { cancelDialog, clientUrl, confirmDialog, idFromListLink, rowWithCell, userUrl } from "../../../lib/admin-console";
 import { openSignIn, signInThroughClient, submitPassword, testRedirectUri } from "../../../lib/browser-sign-in";
 import { env } from "../../../lib/environment";
 import { expect, test } from "../../../lib/fixtures";
-import { codeToken, jwtClaims } from "../../../lib/oauth";
+import { codeToken, jwtClaims, refreshToken } from "../../../lib/oauth";
 import { browserSignInClient } from "../../../lib/test-clients";
 
 const noUserSessions = "This user isn't signed in anywhere.";
-const noConsents = "This user hasn't given consent to any client.";
+const noConnectedClients = "This user isn't connected to any client.";
 
 // Starts another sign-in in the same browser and says where it lands: straight back at the client
 // (the session signed the user in), or on the password form.
@@ -116,13 +117,16 @@ test("the administrator's own session is listed first as this device, and ending
   await expect(page.locator("#sessionsTable tbody tr").first().getByText("This device", { exact: true })).toBeVisible();
 });
 
-test("consent given on the consent screen is listed, remembered, and revoked", async ({ page, browser, clients, users }) => {
+// A client that asked for consent is listed on the user's Connected clients tab with what the user
+// consented to, and disconnecting it withdraws the consent with everything else (#135 decisions 1
+// and 7): the consent screen asks again.
+test("consent given on the consent screen is listed, remembered, and ends with a disconnect", async ({ page, browser, clients, users }) => {
   const user = await users.create();
   const { client } = await browserSignInClient(page, clients, { consentRequired: true });
   const options = { clientId: client.identifier, scope: "openid profile" };
 
-  await page.goto(userUrl(user.id, "consents"));
-  await expect(page.getByText(noConsents)).toBeVisible();
+  await page.goto(userUrl(user.id, "connected-clients"));
+  await expect(page.getByText(noConnectedClients)).toBeVisible();
 
   // First sign-in: the consent screen asks.
   let attempt = await openSignIn(browser, options);
@@ -132,10 +136,13 @@ test("consent given on the consent screen is listed, remembered, and revoked", a
   await attempt.page.waitForURL((url) => url.href.startsWith(testRedirectUri));
   await attempt.context.close();
 
-  // Listed under the client, one scope a line.
+  // Listed under the client, what the user consented to one scope a line. Its code was never
+  // redeemed, so it holds no grant, and the consent is all the row shows.
   await page.reload();
   const row = rowWithCell(page, client.identifier);
-  await expect(row.getByRole("listitem")).toHaveText(["openid", "profile"]);
+  await expect(row.getByRole("list", { name: "Consented to" }).getByRole("listitem")).toHaveText(["openid", "profile"]);
+  await expect(row.getByRole("list", { name: "Holds now" })).toHaveCount(0);
+  await expect(row).not.toContainText("Not asked");
 
   // Another browser, same scope: no consent screen, the stored consent covers it.
   attempt = await openSignIn(browser, options);
@@ -143,23 +150,82 @@ test("consent given on the consent screen is listed, remembered, and revoked", a
   await attempt.page.waitForURL((url) => url.href.startsWith(testRedirectUri));
   await attempt.context.close();
 
-  // Revoking asks first, and Cancel keeps the consent.
-  const revoke = row.getByRole("button", { name: `Revoke ${client.identifier}`, exact: true });
-  await revoke.click();
-  await cancelDialog(page, client.identifier);
+  // Disconnecting asks first, and Cancel keeps the consent.
+  const disconnect = row.getByRole("button", { name: `Disconnect ${client.identifier}`, exact: true });
+  const question = `Disconnect ${client.identifier}? Any consent the user gave it will be deleted and the access it holds for the user ` +
+    "revoked on every device, offline refresh tokens included, though some access tokens already issued can keep " +
+    "working until they expire. The auth server will try to tell it to sign the user out. " +
+    "It can still ask the user to sign in again.";
+  await disconnect.click();
+  await cancelDialog(page, question);
   await page.reload();
-  await expect(revoke).toBeVisible();
+  await expect(disconnect).toBeVisible();
 
-  await revoke.click();
-  await confirmDialog(page, client.identifier);
-  await expect(row.getByText("Revoked", { exact: true })).toBeVisible();
-  await expect(page.locator("#row-actions-status")).toContainText("Consent revoked.");
+  await disconnect.click();
+  await confirmDialog(page, question);
+  await expect(row.getByText("Disconnected", { exact: true })).toBeVisible();
+  await expect(page.locator("#row-actions-status")).toContainText("Client disconnected.");
   await page.reload();
-  await expect(page.getByText(noConsents)).toBeVisible();
+  await expect(page.getByText(noConnectedClients)).toBeVisible();
 
-  // Revoked: the consent screen asks again.
+  // Disconnected: the consent screen asks again.
   attempt = await openSignIn(browser, options);
   await submitPassword(attempt.page, user.email, user.password);
   await expect(attempt.page).toHaveURL(/\/auth\/consent/);
   await attempt.context.close();
+});
+
+// A client with Consent required off never asks, and still holds a grant: it is listed with what
+// its grant holds and as never asked, and a disconnect refuses its refresh token at once while the
+// user's session goes on signing them in, since a disconnect is not a ban (#135 decisions 1, 3, 4
+// and 7).
+test("a client that never asked for consent is listed with what it holds, and disconnected", async ({
+  page,
+  request,
+  browser,
+  clients,
+  users,
+}) => {
+  const user = await users.create();
+  const { client, secret } = await browserSignInClient(page, clients);
+  const signIn = await signInThroughClient(browser, {
+    clientId: client.identifier,
+    email: user.email,
+    password: user.password,
+    scope: "openid profile",
+  });
+  const tokens = await codeToken(request, client.identifier, secret, signIn.code, signIn.codeVerifier, testRedirectUri);
+  expect(tokens.status, JSON.stringify(tokens.body)).toBe(200);
+
+  await page.goto(userUrl(user.id, "connected-clients"));
+  const row = rowWithCell(page, client.identifier);
+  await expect(row.getByRole("list", { name: "Holds now" }).getByRole("listitem")).toHaveText(["openid", "profile"]);
+  await expect(row.getByRole("list", { name: "Consented to" })).toHaveCount(0);
+  await expect(row).toContainText("Not asked");
+
+  await row.getByRole("button", { name: `Disconnect ${client.identifier}`, exact: true }).click();
+  await confirmDialog(page, `Disconnect ${client.identifier}?`);
+  await expect(row.getByText("Disconnected", { exact: true })).toBeVisible();
+
+  const refused = await refreshToken(request, client.identifier, secret, tokens.body.refresh_token as string);
+  expect(refused.status, JSON.stringify(refused.body)).toBe(400);
+  expect(refused.body.error).toBe("invalid_grant");
+  await page.reload();
+  await expect(page.getByText(noConnectedClients)).toBeVisible();
+
+  // The user's session stays: the same browser is signed straight back in to the client.
+  const userPage = await signIn.context.newPage();
+  expect(await signInAgainLandsOn(userPage, client.identifier)).toBe("client");
+  await signIn.context.close();
+});
+
+// The console's own client, on the administrator's own user, is tagged rather than offered a
+// Disconnect: disconnecting it from inside it would only send them through sign-in again (#135
+// decision 5).
+test("the administrator's own user lists the console as this client, with nothing to press", async ({ page }) => {
+  const id = await idFromListLink(page, `${env.adminUrl}/admin/users?query=${encodeURIComponent(env.adminEmail)}`, env.adminEmail);
+  await page.goto(userUrl(id, "connected-clients"));
+  const own = rowWithCell(page, "admin-console-client");
+  await expect(own.getByText("This client", { exact: true })).toBeVisible();
+  await expect(own.getByRole("button")).toHaveCount(0);
 });

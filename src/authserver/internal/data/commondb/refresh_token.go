@@ -169,6 +169,19 @@ var selectRefreshTokensBySessionIdentifier = statement{
 		"WHERE codes.session_identifier = @p1",
 }
 
+// selectSessionBoundRefreshTokensBySessionIdentifierAndClientId binds the session identifier, the
+// client id, then the session identifier again for the token's own column.
+var selectSessionBoundRefreshTokensBySessionIdentifierAndClientId = statement{
+	sqlite: "SELECT " + refreshTokenColumns.sqlite + " FROM refresh_tokens INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
+		"WHERE codes.session_identifier = ? AND codes.client_id = ? AND refresh_tokens.session_identifier = ?",
+	mysql: "SELECT " + refreshTokenColumns.mysql + " FROM refresh_tokens INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
+		"WHERE codes.session_identifier = ? AND codes.client_id = ? AND refresh_tokens.session_identifier = ?",
+	postgres: "SELECT " + refreshTokenColumns.postgres + " FROM refresh_tokens INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
+		"WHERE codes.session_identifier = $1 AND codes.client_id = $2 AND refresh_tokens.session_identifier = $3",
+	mssql: "SELECT " + refreshTokenColumns.mssql + " FROM refresh_tokens INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
+		"WHERE codes.session_identifier = @p1 AND codes.client_id = @p2 AND refresh_tokens.session_identifier = @p3",
+}
+
 // selectRefreshTokensByUserId binds the user id once per branch: the code's user, then the token's.
 var selectRefreshTokensByUserId = statement{
 	sqlite: "SELECT " + refreshTokenColumns.sqlite + " FROM refresh_tokens INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
@@ -190,16 +203,20 @@ var selectRefreshTokensByUserId = statement{
 }
 
 // selectRefreshTokensByUserIdAndClientId binds the user id and the client id once per branch: the
-// code's, then the token's.
+// code's, then the token's. MySQL's is a locking read, FOR UPDATE in each parenthesized branch, so
+// it answers the rows as last committed (see GetRefreshTokensByUserIdAndClientId). It locks the
+// codes the first branch joins through as well as the tokens: InnoDB answers a joined table the
+// locking clause does not name from the snapshot, which would miss the code of a grant committed
+// after it.
 var selectRefreshTokensByUserIdAndClientId = statement{
 	sqlite: "SELECT " + refreshTokenColumns.sqlite + " FROM refresh_tokens INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
 		"WHERE codes.user_id = ? AND codes.client_id = ? " +
 		"UNION ALL SELECT " + refreshTokenColumns.sqlite + " FROM refresh_tokens " +
 		"WHERE refresh_tokens.user_id = ? AND refresh_tokens.client_id = ?",
-	mysql: "SELECT " + refreshTokenColumns.mysql + " FROM refresh_tokens INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
-		"WHERE codes.user_id = ? AND codes.client_id = ? " +
-		"UNION ALL SELECT " + refreshTokenColumns.mysql + " FROM refresh_tokens " +
-		"WHERE refresh_tokens.user_id = ? AND refresh_tokens.client_id = ?",
+	mysql: "(SELECT " + refreshTokenColumns.mysql + " FROM refresh_tokens INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
+		"WHERE codes.user_id = ? AND codes.client_id = ? FOR UPDATE) " +
+		"UNION ALL (SELECT " + refreshTokenColumns.mysql + " FROM refresh_tokens " +
+		"WHERE refresh_tokens.user_id = ? AND refresh_tokens.client_id = ? FOR UPDATE)",
 	postgres: "SELECT " + refreshTokenColumns.postgres + " FROM refresh_tokens INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
 		"WHERE codes.user_id = $1 AND codes.client_id = $2 " +
 		"UNION ALL SELECT " + refreshTokenColumns.postgres + " FROM refresh_tokens " +
@@ -234,6 +251,44 @@ var selectUsableRefreshTokenClientIds = statement{
 		"UNION SELECT refresh_tokens.client_id FROM refresh_tokens " +
 		"WHERE refresh_tokens.user_id = @p4 AND refresh_tokens.revoked = @p5 AND refresh_tokens.expires_at > @p6 " +
 		"AND refresh_tokens.client_id IS NOT NULL",
+}
+
+// liveGrantFamilyUnrecorded is the condition both branches of selectLiveGrantsByUserId end with:
+// the token's rotation family has no revocation record.
+const liveGrantFamilyUnrecorded = "AND NOT EXISTS (SELECT 1 FROM refresh_token_family_revocations " +
+	"WHERE refresh_token_family_revocations.first_refresh_token_jti = refresh_tokens.first_refresh_token_jti)"
+
+// selectLiveGrantsByUserId binds the user id, false for revoked and the instant once per branch:
+// the code's user, then the token's. UNION ALL, since the two shapes are mutually exclusive.
+var selectLiveGrantsByUserId = statement{
+	sqlite: "SELECT refresh_tokens.id, codes.client_id, refresh_tokens.scope FROM refresh_tokens " +
+		"INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
+		"WHERE codes.user_id = ? AND refresh_tokens.revoked = ? AND refresh_tokens.expires_at > ? " +
+		liveGrantFamilyUnrecorded + " " +
+		"UNION ALL SELECT refresh_tokens.id, refresh_tokens.client_id, refresh_tokens.scope FROM refresh_tokens " +
+		"WHERE refresh_tokens.user_id = ? AND refresh_tokens.revoked = ? AND refresh_tokens.expires_at > ? " +
+		"AND refresh_tokens.client_id IS NOT NULL " + liveGrantFamilyUnrecorded,
+	mysql: "SELECT refresh_tokens.id, codes.client_id, refresh_tokens.scope FROM refresh_tokens " +
+		"INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
+		"WHERE codes.user_id = ? AND refresh_tokens.revoked = ? AND refresh_tokens.expires_at > ? " +
+		liveGrantFamilyUnrecorded + " " +
+		"UNION ALL SELECT refresh_tokens.id, refresh_tokens.client_id, refresh_tokens.scope FROM refresh_tokens " +
+		"WHERE refresh_tokens.user_id = ? AND refresh_tokens.revoked = ? AND refresh_tokens.expires_at > ? " +
+		"AND refresh_tokens.client_id IS NOT NULL " + liveGrantFamilyUnrecorded,
+	postgres: "SELECT refresh_tokens.id, codes.client_id, refresh_tokens.scope FROM refresh_tokens " +
+		"INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
+		"WHERE codes.user_id = $1 AND refresh_tokens.revoked = $2 AND refresh_tokens.expires_at > $3 " +
+		liveGrantFamilyUnrecorded + " " +
+		"UNION ALL SELECT refresh_tokens.id, refresh_tokens.client_id, refresh_tokens.scope FROM refresh_tokens " +
+		"WHERE refresh_tokens.user_id = $4 AND refresh_tokens.revoked = $5 AND refresh_tokens.expires_at > $6 " +
+		"AND refresh_tokens.client_id IS NOT NULL " + liveGrantFamilyUnrecorded,
+	mssql: "SELECT refresh_tokens.id, codes.client_id, refresh_tokens.scope FROM refresh_tokens " +
+		"INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
+		"WHERE codes.user_id = @p1 AND refresh_tokens.revoked = @p2 AND refresh_tokens.expires_at > @p3 " +
+		liveGrantFamilyUnrecorded + " " +
+		"UNION ALL SELECT refresh_tokens.id, refresh_tokens.client_id, refresh_tokens.scope FROM refresh_tokens " +
+		"WHERE refresh_tokens.user_id = @p4 AND refresh_tokens.revoked = @p5 AND refresh_tokens.expires_at > @p6 " +
+		"AND refresh_tokens.client_id IS NOT NULL " + liveGrantFamilyUnrecorded,
 }
 
 // selectRefreshTokensByClientId binds the client id once per branch: the code's, then the token's.
@@ -573,6 +628,35 @@ func (d *Database) GetRefreshTokensBySessionIdentifier(ctx context.Context, tx *
 		[]any{sessionIdentifier})
 }
 
+// GetSessionBoundRefreshTokensBySessionIdentifierAndClientId returns the session-bound refresh tokens
+// one client holds from one session: the tokens descended from the client's codes on the session
+// whose own session_identifier is the session's. That last term is what leaves out the client's
+// offline tokens from the same session, whose own session_identifier is empty and whose code carries
+// the sid, the shape GetRefreshTokensBySessionIdentifier reaches on purpose and this must not. A
+// password grant token has no code and no session, so it is never one of them.
+//
+// It exists for the sign-out with a confirmed id_token_hint (#135 decision 9), which revokes these
+// and leaves the client's offline grants working (Back-Channel Logout 1.0 section 2.7). Revoked rows
+// are returned beside the live ones, for the reason GetRefreshTokensByUserIdAndClientId gives: the
+// sign-out records the family of every row it reads, and a family whose stored members are all
+// revoked can still have a child mid-rotation that only that record refuses (#259).
+//
+// The session is matched on codes.session_identifier, which idx_codes_session_identifier serves, as
+// well as on the token's own. An empty session identifier or a zero client id names no grant and
+// returns an empty slice with no error, following GetRefreshTokensBySessionIdentifier: the join
+// would otherwise match every code with an empty session_identifier.
+func (d *Database) GetSessionBoundRefreshTokensBySessionIdentifierAndClientId(ctx context.Context, tx *sql.Tx,
+	sessionIdentifier string, clientId int64) ([]*record.RefreshToken, error) {
+
+	if sessionIdentifier == "" || clientId == 0 {
+		return nil, nil
+	}
+
+	return queryRefreshTokens(ctx, d, tx,
+		selectSessionBoundRefreshTokensBySessionIdentifierAndClientId.text(d.Dialect),
+		[]any{sessionIdentifier, clientId, sessionIdentifier})
+}
+
 func (d *Database) DeleteRefreshToken(ctx context.Context, tx *sql.Tx, refreshTokenId int64) error {
 
 	_, err := d.ExecSQL(ctx, tx, deleteRefreshToken.text(d.Dialect), refreshTokenId)
@@ -693,6 +777,33 @@ func (d *Database) GetUsableRefreshTokenClientIdsByUserId(ctx context.Context, t
 		func(row rowScanner, clientId *int64) error { return row.Scan(clientId) }, "client id")
 }
 
+// GetLiveGrantsByUserId answers one row for each live refresh token the user holds, with the client
+// it reaches and the scope it records, through either linkage shape: codes.client_id for an
+// authorization-code token, refresh_tokens.client_id for a password grant, the two branches
+// GetRefreshTokensByUserId reads (#135 decision 4). A live token is one whose row is not revoked,
+// whose expires_at is set and after now, and whose rotation family has no revocation record: the
+// record is what refuses a family whose stored members a sweep left looking live, a child a
+// rotation in flight inserted after it (#259). The list of the user's connected clients reads it,
+// and merges each client's scopes itself. A zero userId holds no live grant.
+//
+// The family is matched by the engine's comparison of first_refresh_token_jti, as
+// DeleteOrphanedRefreshTokenFamilyRevocations matches it, not in Go as IsRefreshTokenFamilyRevoked
+// does: the jtis are server-minted UUIDs, so no two families differ only by case or trailing
+// spaces, and a fold could only leave a live grant unlisted, never list a dead one.
+func (d *Database) GetLiveGrantsByUserId(ctx context.Context, tx *sql.Tx, userId int64,
+	now time.Time) ([]record.LiveGrant, error) {
+
+	if userId == 0 {
+		return nil, nil
+	}
+
+	return queryAll(ctx, d, tx, []record.LiveGrant(nil), selectLiveGrantsByUserId.text(d.Dialect),
+		[]any{userId, false, now, userId, false, now},
+		func(row rowScanner, grant *record.LiveGrant) error {
+			return row.Scan(&grant.RefreshTokenId, &grant.ClientId, &grant.Scope)
+		}, "live grant")
+}
+
 // GetRefreshTokensByUserIdAndClientId returns every refresh token one user holds with one
 // client, whatever shape links it to them: GetRefreshTokensByUserId's two branches with
 // the client predicate added to each, so an authorization-code token matches through
@@ -708,6 +819,17 @@ func (d *Database) GetUsableRefreshTokenClientIdsByUserId(ctx context.Context, t
 // Revoked rows are returned on purpose, beside the live ones: the withdrawal records the
 // rotation family of every row it reads, and a family whose stored members are all revoked
 // can still have a child mid-rotation that only that record refuses.
+//
+// The rows are read as last committed, whatever the caller's transaction read before. The
+// difference is MySQL's: under InnoDB's REPEATABLE READ an ordinary read answers the snapshot
+// the transaction's first read fixed, and the disconnect reads the client and the user's
+// sessions before it sweeps, so a grant committed in between would be left live by a
+// disconnect that reported success (#135 decision 1). MySQL's statement is therefore a locking
+// read, FOR UPDATE on the refresh_tokens rows, which the sweep writes next anyway, and on the
+// codes the authorization-code branch joins through, for the reason its statement gives: FOR SHARE
+// would have two overlapping disconnects each hold a shared lock the other's write waits for.
+// On PostgreSQL and SQL Server at READ COMMITTED each statement reads what was committed when
+// it started, and SQLite has one writer at a time, so their statements take no lock.
 //
 // Built as two UNION ALL branches for the reason GetRefreshTokensByUserId is: the shapes
 // are mutually exclusive, so the union cannot produce duplicates, and each branch can

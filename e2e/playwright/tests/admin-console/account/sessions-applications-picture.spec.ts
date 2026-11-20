@@ -1,13 +1,41 @@
-// The user's own sessions, consents and picture.
+// The user's own sessions, applications and picture.
+import type { APIRequestContext, Browser } from "@playwright/test";
 import { cancelDialog, confirmDialog, rowWithCell } from "../../../lib/admin-console";
-import { signInThroughClient } from "../../../lib/browser-sign-in";
+import { signInThroughClient, testRedirectUri } from "../../../lib/browser-sign-in";
 import { signInToConsole } from "../../../lib/console-user";
 import { env } from "../../../lib/environment";
 import { expect, test } from "../../../lib/fixtures";
 import { solidPng } from "../../../lib/images";
+import { basicAuth, expectTokenError, expectTokenResponse, postToken, type RawAnswer } from "../../../lib/rfc6749";
 import { browserSignInClient } from "../../../lib/test-clients";
 
 const picture = { name: "me.png", mimeType: "image/png", buffer: solidPng(300, 300, [90, 160, 60]) };
+
+interface SignInClient {
+  client: { identifier: string };
+  secret: string;
+}
+
+// A refresh with the client's own credentials.
+function refresh(request: APIRequestContext, { client, secret }: SignInClient, refreshToken: string): Promise<RawAnswer> {
+  return postToken(request, { grant_type: "refresh_token", refresh_token: refreshToken }, {
+    headers: { Authorization: basicAuth(client.identifier, secret) },
+  });
+}
+
+// The refresh token of a sign-in to the client, through the authorization code flow in a browser of
+// its own, which is closed again: the client holds its grant on another device.
+async function refreshTokenOf(browser: Browser, request: APIRequestContext, { client, secret }: SignInClient,
+  user: { email: string; password: string }, scope: string): Promise<string> {
+  const signIn = await signInThroughClient(browser, { clientId: client.identifier, email: user.email, password: user.password, scope });
+  await signIn.context.close();
+  const answer = await postToken(request, { grant_type: "authorization_code", code: signIn.code, code_verifier: signIn.codeVerifier, redirect_uri: testRedirectUri }, {
+    headers: { Authorization: basicAuth(client.identifier, secret) },
+  });
+  expectTokenResponse(answer);
+  expect(answer.body.refresh_token, "a refresh token was issued").toBeTruthy();
+  return answer.body.refresh_token as string;
+}
 
 test("the user sees their sessions, the current one marked, and ends another", async ({ browser, users }) => {
   const user = await users.create();
@@ -68,40 +96,76 @@ test("cancelling the end of the current session leaves the user signed in", asyn
   await own.context.close();
 });
 
-test("the user sees the consent they gave a client, and revokes it", async ({ page, browser, clients, users }) => {
+// The Applications page lists every client the user is connected to (#135 decisions 4, 5 and 7):
+// one they gave consent to, one that never asked, and the console itself, which is tagged rather
+// than offered a Disconnect. A disconnect ends the client's refresh token at once, and leaves the
+// others as they were.
+test("the user sees each application connected to their account, and disconnects them", async ({ page, browser, clients, request, users }) => {
   const user = await users.create();
-  const { client } = await browserSignInClient(page, clients, { consentRequired: true });
-  const signIn = await signInThroughClient(browser, {
-    clientId: client.identifier,
-    email: user.email,
-    password: user.password,
-    scope: "openid email",
-  });
-  await signIn.context.close();
+  const consented = await browserSignInClient(page, clients, { consentRequired: true });
+  const unasked = await browserSignInClient(page, clients);
+  const consentedToken = await refreshTokenOf(browser, request, consented, user, "openid email");
+  const unaskedToken = await refreshTokenOf(browser, request, unasked, user, "openid profile");
 
-  const own = await signInToConsole(browser, user, "/account/manage-consents");
-  // The client is named as the consent screen named it: with no display name shown, by its identifier.
-  const row = rowWithCell(own.page, client.identifier);
-  // Each scope in plain words, with the scope itself beneath.
-  await expect(row).toContainText("Your email address, and whether it's verified");
-  await expect(row.locator(".code-hint").filter({ hasText: /^email$/ })).toBeVisible();
-  await expect(row.locator(".code-hint").filter({ hasText: /^openid$/ })).toBeVisible();
+  const own = await signInToConsole(browser, user, "/account/applications");
+  const status = own.page.locator("#row-actions-status");
+  // Each client is named as the consent screen names it: with no display name shown, by its identifier.
+  const consentedRow = rowWithCell(own.page, consented.client.identifier);
+  // What the user allowed and what the client holds now, each under its own label, each scope in
+  // plain words with the scope itself beneath.
+  await expect(consentedRow).toContainText("You allowed");
+  await expect(consentedRow).toContainText("It holds now");
+  await expect(consentedRow).toContainText("Your email address, and whether it's verified");
+  await expect(consentedRow.locator(".code-hint").filter({ hasText: /^email$/ })).toHaveCount(2);
+  await expect(consentedRow).not.toContainText("Not asked");
 
-  const revoke = row.getByRole("button", { name: `Revoke ${client.identifier}`, exact: true });
-  const question = `Revoke the consent you gave ${client.identifier}? It will have to ask you again before it can use your account.`;
-  // Cancel leaves the consent as it was.
-  await revoke.click();
+  // A client with Consent required off was never asked, and still holds what it was given.
+  const unaskedRow = rowWithCell(own.page, unasked.client.identifier);
+  await expect(unaskedRow).toContainText("Not asked");
+  await expect(unaskedRow).not.toContainText("You allowed");
+  await expect(unaskedRow).toContainText("It holds now");
+  await expect(unaskedRow.locator(".code-hint").filter({ hasText: /^profile$/ })).toBeVisible();
+
+  // The console itself is tagged, and offers nothing to press.
+  const current = own.page.locator("table tbody tr").filter({ hasText: "This application" });
+  await expect(current).toHaveCount(1);
+  await expect(current.getByRole("button")).toHaveCount(0);
+
+  const disconnect = unaskedRow.getByRole("button", { name: `Disconnect ${unasked.client.identifier}`, exact: true });
+  const question = `Disconnect ${unasked.client.identifier}? The access it was given will be revoked on every device and any approval you gave it removed, though some of that access can last until it expires. We'll try to tell it to sign you out. It can still ask you to sign in again.`;
+  // Cancel leaves the client as it was.
+  await disconnect.click();
   await cancelDialog(own.page, question);
-  await expect(revoke).toBeEnabled();
-  await expect(own.page.locator("#row-actions-status")).toBeEmpty();
+  await expect(disconnect).toBeEnabled();
+  await expect(status).toBeEmpty();
+  // Still working, and rotated: the token it hands back is the one the client holds now.
+  const unaskedRefreshed = await refresh(request, unasked, unaskedToken);
+  expectTokenResponse(unaskedRefreshed);
 
-  await revoke.click();
+  await disconnect.click();
   await confirmDialog(own.page, question);
   // The button gives way to a tag, and the page says so.
-  await expect(row.getByText("Revoked", { exact: true })).toBeVisible();
-  await expect(own.page.locator("#row-actions-status")).toHaveText("Consent revoked.");
+  await expect(unaskedRow.getByText("Disconnected", { exact: true })).toBeVisible();
+  await expect(status).toHaveText("Application disconnected.");
+  // Its refresh token is refused, and the other client's still works.
+  expectTokenError(await refresh(request, unasked, unaskedRefreshed.body.refresh_token as string), "invalid_grant");
+  const consentedRefreshed = await refresh(request, consented, consentedToken);
+  expectTokenResponse(consentedRefreshed);
+
   await own.page.reload();
-  await expect(own.page.getByText("You haven't given consent to any application.")).toBeVisible();
+  await expect(rowWithCell(own.page, unasked.client.identifier)).toHaveCount(0);
+  // The client with a consent goes the same way, its consent with it.
+  await rowWithCell(own.page, consented.client.identifier)
+    .getByRole("button", { name: `Disconnect ${consented.client.identifier}`, exact: true })
+    .click();
+  await confirmDialog(own.page, `Disconnect ${consented.client.identifier}?`);
+  await expect(status).toHaveText("Application disconnected.");
+  expectTokenError(await refresh(request, consented, consentedRefreshed.body.refresh_token as string), "invalid_grant");
+  await own.page.reload();
+  await expect(rowWithCell(own.page, consented.client.identifier)).toHaveCount(0);
+  // The console is still listed, and the user is still signed in to it.
+  await expect(own.page.locator("table tbody tr")).toHaveCount(1);
+  await expect(own.page.locator("table tbody tr")).toContainText("This application");
   await own.context.close();
 });
 

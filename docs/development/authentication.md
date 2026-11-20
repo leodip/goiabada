@@ -214,7 +214,7 @@ One check decides whether an access token is one under RFC 9068 and still stands
 - Last, a token carrying `grant_id` is live only while its grant is: `IsRefreshTokenFamilyLive`
   answers whether the family has no revocation record and still has a member that is not revoked,
   in one indexed read. Every revocation that ends a grant writes the record in its transaction, for
-  every family it reads: consent withdrawal, a client made public or renamed, a session's termination,
+  every family it reads: a disconnect, a client made public or renamed, a session's termination,
   authorization-code reuse containment, replay containment and `/auth/revoke`. A sweep alone misses
   the child of a rotation that claimed its parent before the sweep read the rows, so the record is
   what refuses that child's access token at once. A credential change ends access tokens through
@@ -288,6 +288,54 @@ A client ends one of its grants by sending a token of it.
   `goiabada_revocation_requests_total` counts each answer by outcome (#676)
 - Implementation: `handler_revoke.go`, `revocation/revocation.go`, `revocationmetrics`
 
+### Disconnect
+A user, or an administrator acting for them, ends everything the user holds with one client.
+- Entry: `DELETE /api/v1/account/connected-clients/{clientId}` and
+  `DELETE /api/v1/admin/users/{id}/connected-clients/{clientId}`, from the console's Account,
+  Applications page and a user's Connected clients tab; withdrawing a consent,
+  `DELETE /api/v1/account/consents/{id}` and `DELETE /api/v1/admin/user-consents/{id}`, is a
+  disconnect of the consent's client (#135 decisions 1 and 2). The two `GET .../connected-clients`
+  list the clients a user holds a stored consent or a live refresh token with (decision 4)
+- Operation: `revocation.DisconnectClientTx`, in one transaction: the consent's deletion when the
+  caller passes one (`DeleteUserConsent` reports whether this call deleted the row), the user's
+  unredeemed codes with the client marked revoked, each family of the user's refresh tokens with the
+  client recorded under `client_disconnected`, and the live ones revoked, session-bound, offline
+  and password grant alike. Sessions, the generation and the user's other clients are untouched
+- Answer: from what the transaction changed, `DisconnectResult.Changed`: the consent deleted, a
+  code marked, a token moved from live to revoked or a family newly recorded. A call that changed
+  nothing, such as a repeat or a consent another request deleted first with nothing left to end,
+  answers 404 `NOT_FOUND` and writes no audit entry. Otherwise `disconnected_client` is written
+  after the commit, with `deleted_own_user_consent` or `deleted_user_consent` beside it only when
+  this call deleted the consent (#135 decisions 2 and 6)
+- Telling the client: the transaction reads its logout tokens first, before any write
+  (`disconnectDeliveries`), and `DisconnectResult.LogoutDeliveries` carries them only when the call
+  changed something; the caller sends them after the commit. See Back-channel logout below
+- Gap: a code exchange that claimed its code before the commit and writes its first refresh token
+  after it finishes, and its grant is live (#135 decision 11)
+- Not reached: implicit-flow access tokens, which belong to no grant and stand until they expire
+  or their session ends (decision 8), and a password-grant client, which can get new tokens at once
+  with the user's password since that grant asks for no consent
+- Implementation: `handler_api_account_connected_clients.go`, `handler_api_user_connected_clients.go`,
+  `handler_api_account_consents.go`, `handler_api_user_consents.go`, `revocation/revocation.go`
+
+### Hinted sign-out
+A sign-out at `/auth/logout` with a confirmed `id_token_hint` ends the hint's client's part of the
+session and revokes that client's session-bound grants from it (#135 decision 9).
+- Operation: `revocation.EndClientPartTx`, in one transaction under the session's row: the client's
+  row deleted, the session too when the client was its last, then
+  `RevokeUnusedCodesBySessionIdentifierAndClientId` and the client's session-bound tokens from the
+  session (`GetSessionBoundRefreshTokensBySessionIdentifierAndClientId`, the tokens whose own
+  `session_identifier` is the session's), each family recorded under `client_signed_out` before the
+  live ones are revoked. Whether other clients share the session decides only whether it is deleted
+- Untouched: the client's offline tokens (Back-Channel Logout 1.0 section 2.7: they "normally SHOULD
+  NOT be" revoked), its used codes, its grants from other sessions, every other client's grants, and
+  everything a hintless sign-out ends
+- Audit: `revoked_sign_out_grants` after the commit, beside `deleted_user_session_client`, whenever
+  the client's part ended, with the tokens it moved from live to revoked and the codes it marked
+- Gap: a code exchange already under way when it commits may finish, as for a disconnect (#135
+  decision 11)
+- Implementation: `handler_logout.go`, `revocation/revocation.go`
+
 ### Token introspection (RFC 7662)
 An API, calling as a confidential client, asks whether a token is active.
 - Endpoint: `POST /auth/introspect`, form-encoded, CSRF-exempt, no CORS; every other method is
@@ -330,6 +378,13 @@ client's back-channel logout URI (#784).
     deletion of a user, through `revocation.UserWideDeliveries` inside the deletion's transaction,
     under `GetUserByIdForUpdate` and before `DeleteUser` cascades the sessions and grants away. Every
     deletion of a user must call it there
+  - a disconnect, which ends no session (#135 decision 3): the client alone, with a `sub`-only
+    token, or, when it has `backchannel_logout_session_required`, a `sub`+`sid` token per valid
+    session of the user it is on and nothing when it is on none. `revocation.DisconnectClientTx`
+    reads the client, the user and, for `sid`, the sessions and their apps with ordinary reads before
+    its first write and takes no session row: it deletes nothing to hold them for, and a read made
+    after the sweep could wait, on SQL Server, for a termination that waits for the tokens the sweep
+    holds. The client's row on each session stays
 - Two shapes (decision 3). A user-wide end (`LogoutNotice.UserWide`: disabling or deleting the
   user, a password reset, an administrator setting the password) sends one `sub`-only token to each
   app with a URI on any stored session of the user, valid or not, or holding an unrevoked, unexpired
@@ -359,7 +414,8 @@ client's back-channel logout URI (#784).
   among those they tell, and the disable ends and revokes them (#796). The hinted
   sign-out (`revocation.EndClientPartTx`) deletes the hinting app's row, and the session when that
   app is its last as read under the row, so an app a sign-in added after the sign-out first read the
-  session keeps it; it tells the hinting app after the commit. Each caller hands its deliveries to
+  session keeps it, and revokes the app's session-bound grants (see Hinted sign-out above); it tells
+  the hinting app after the commit. Each caller hands its deliveries to
   `backchannel.Sender.Send` after the commit, beside its audit events
 - The token: `typ: logout+jwt`, RS256 under the current signing key's `kid`; `iss`, `aud` (the
   client identifier), `iat`, `exp` 120 seconds on, `jti`, the back-channel logout event with `{}`,
@@ -386,7 +442,8 @@ client's back-channel logout URI (#784).
 - Implementation: `backchannel`, `revocation/revocation.go`, `authflow/completion.go`,
   `usersession/usersession_manager.go`, `handler_logout.go`, `handler_token.go`,
   `handler_api_account_sessions.go`, `handler_api_users_sessions.go`, `handler_api_users_crud.go`,
-  `handler_api_account_password.go`, `accounthandlers/handler_reset_password.go`
+  `handler_api_account_password.go`, `accounthandlers/handler_reset_password.go`,
+  `handler_api_account_consents.go`, `handler_api_user_consents.go`
 
 ### Implicit Flow (Deprecated)
 Legacy flow returning tokens directly in redirect URI fragment. **Deprecated in OAuth 2.1.**

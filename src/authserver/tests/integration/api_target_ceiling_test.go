@@ -327,6 +327,27 @@ var userTargetCeilingWrites = []targetCeilingWrite{
 		},
 	},
 	{
+		// The user holds a live refresh token with a client and no consent (#135 decision 2).
+		name: "DELETE users connected clients", method: http.MethodDelete,
+		route: "/api/v1/admin/users/{id}/connected-clients/{clientId}", kind: "user",
+		prepare: func(t *testing.T, f *targetFixture) {
+			client := createTestClient(t, "target-connected-"+strings.ToLower(fake.LetterN(8)))
+			t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+			holdRefreshToken(t, storedUser(t, f.userId), client, false, time.Now().UTC().Add(time.Hour))
+			f.rowId = client.Id
+		},
+		send: func(t *testing.T, token string, f *targetFixture) (*http.Response, string) {
+			return sendAdmin(t, token, http.MethodDelete,
+				fmt.Sprintf("/api/v1/admin/users/%d/connected-clients/%d", f.userId, f.rowId), nil)
+		},
+		changed: func(t *testing.T, f *targetFixture) bool {
+			tokens, err := database.GetRefreshTokensByUserId(context.Background(), nil, f.userId)
+			require.NoError(t, err)
+			require.Len(t, tokens, 1)
+			return tokens[0].Revoked
+		},
+	},
+	{
 		// Joining an ordinary group, keeping every membership the user has: nothing administrative
 		// changes, so the grant ceiling lets it through and the target ceiling judges it.
 		name: "PUT users groups", method: http.MethodPut, route: "/api/v1/admin/users/{id}/groups", kind: "user",

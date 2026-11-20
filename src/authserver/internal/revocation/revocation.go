@@ -36,9 +36,11 @@ type Database interface {
 	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
 	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
 	GetUserSessionsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserSession, error)
+	GetUserSessionClientsByUserSessionIds(ctx context.Context, tx *sql.Tx, userSessionIds []int64) ([]record.UserSessionClient, error)
 	GetUsableRefreshTokenClientIdsByUserId(ctx context.Context, tx *sql.Tx, userId int64, now time.Time) ([]int64, error)
 	GetClientsByIds(ctx context.Context, tx *sql.Tx, clientIds []int64) ([]record.Client, error)
 	IncrementUserAuthStateGeneration(ctx context.Context, tx *sql.Tx, userId int64) (int64, error)
+	MarkRefreshTokenAsRevoked(ctx context.Context, tx *sql.Tx, refreshTokenId int64) (bool, error)
 	PromoteRefreshTokenGenerations(ctx context.Context, tx *sql.Tx, refreshTokenIds []int64, generation int64) error
 	PromoteUserSessionGeneration(ctx context.Context, tx *sql.Tx, userSessionId int64, generation int64) error
 	RecordRefreshTokenFamilyRevoked(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string, reason string) (bool, error)
@@ -61,7 +63,7 @@ type Database interface {
 //
 // The caller owns the transaction. Passing a nil tx is permitted and means no transaction,
 // following the data layer's convention, but every caller here supplies one.
-func RevokeRefreshTokens(ctx context.Context, db Database, tx *sql.Tx, tokens []*record.RefreshToken) ([]string, error) {
+func RevokeRefreshTokens(ctx context.Context, db refreshTokenWriter, tx *sql.Tx, tokens []*record.RefreshToken) ([]string, error) {
 	revokedJtis := make([]string, 0, len(tokens))
 	for _, rt := range tokens {
 		if rt.Revoked {
@@ -74,6 +76,50 @@ func RevokeRefreshTokens(ctx context.Context, db Database, tx *sql.Tx, tokens []
 		revokedJtis = append(revokedJtis, rt.RefreshTokenJti)
 	}
 	return revokedJtis, nil
+}
+
+// refreshTokenWriter is the one write RevokeRefreshTokens makes.
+type refreshTokenWriter interface {
+	UpdateRefreshToken(ctx context.Context, tx *sql.Tx, refreshToken *record.RefreshToken) error
+}
+
+// markRefreshTokensRevoked revokes the given refresh tokens with the conditional write,
+// MarkRefreshTokenAsRevoked, and returns the JTIs of the rows THIS call moved from live to revoked,
+// never nil. A row read live that another transaction revoked and committed before this one's write
+// reached it is not reported: the write matches no live row, on every engine, whatever snapshot
+// the read answered. That is what lets a disconnect and a hinted sign-out answer from what their own
+// transaction committed, so two overlapping calls never both report or audit one token (#135
+// decision 2). RevokeRefreshTokens writes the row it read whole, so it would report that token
+// again. A row read revoked already is skipped without a statement.
+func markRefreshTokensRevoked(ctx context.Context, db refreshTokenMarker, tx *sql.Tx,
+	tokens []*record.RefreshToken) ([]string, error) {
+
+	revokedJtis := make([]string, 0, len(tokens))
+	for _, rt := range tokens {
+		if rt.Revoked {
+			continue
+		}
+		marked, err := db.MarkRefreshTokenAsRevoked(ctx, tx, rt.Id)
+		if err != nil {
+			return nil, err
+		}
+		if marked {
+			rt.Revoked = true
+			revokedJtis = append(revokedJtis, rt.RefreshTokenJti)
+		}
+	}
+	return revokedJtis, nil
+}
+
+// refreshTokenMarker is the one write markRefreshTokensRevoked makes, so a port narrower than
+// Database, EndClientPartTx's, can sweep with it.
+type refreshTokenMarker interface {
+	MarkRefreshTokenAsRevoked(ctx context.Context, tx *sql.Tx, refreshTokenId int64) (bool, error)
+}
+
+// familyRecorder is the one write recordFamilies makes, for the reason refreshTokenWriter is apart.
+type familyRecorder interface {
+	RecordRefreshTokenFamilyRevoked(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string, reason string) (bool, error)
 }
 
 // UserAuthStateResult reports what revoking a user's authentication state actually did. Its
@@ -328,11 +374,15 @@ func RevokeUserAuthState(ctx context.Context, db Database, tx *sql.Tx, userId in
 // database credentials rather than a signed-in administrator (#498). ReasonClientBecamePublic
 // and ReasonClientIdentifierChanged are recorded on EventRevokedClientGrants, one per cause of a
 // client's revocation, and each is also the reason a family's revocation record carries when
-// RevokeClientGrants wrote it for that cause (#245, #259, #710). ReasonConsentWithdrawn is the reason a
-// family's revocation record carries when a consent withdrawal's sweep wrote it (#622),
+// RevokeClientGrants wrote it for that cause (#245, #259, #710). ReasonClientDisconnected is the
+// reason a family's revocation record carries when a disconnect's sweep wrote it, a consent
+// withdrawal's included (#622, #135 decision 6; records written before #135 carry
+// consent_withdrawn, and nothing reads the reason to decide anything),
 // ReasonClientRevoked the one it carries when a client revoked the grant at /auth/revoke (#676),
 // and ReasonSessionTerminated and ReasonAuthCodeReuse the ones it carries when a session's
 // termination or the response to a reused authorization code wrote it (#676).
+// ReasonClientSignedOut is the one it carries when a sign-out with a confirmed id_token_hint revoked
+// the departing client's session-bound grants (#135 decision 9).
 // Constants rather than inline strings so the sites cannot drift and a log consumer has
 // something to match against, and one block so the next site's reason has one place to go.
 // Every value is stored data: renaming a constant is free, changing its string is not.
@@ -350,9 +400,10 @@ const (
 	ReasonAccountDisabled         = "account_disabled"
 	ReasonClientBecamePublic      = "client_became_public"
 	ReasonClientIdentifierChanged = "client_identifier_changed"
-	ReasonConsentWithdrawn        = "consent_withdrawn"
+	ReasonClientDisconnected      = "client_disconnected"
 	ReasonClientRevoked           = "client_revoked"
 	ReasonSessionTerminated       = "session_terminated"
+	ReasonClientSignedOut         = "client_signed_out"
 	ReasonAuthCodeReuse           = "auth_code_reuse"
 )
 
@@ -742,13 +793,21 @@ func TerminateUserSessionTx(ctx context.Context, db Database, userSession *recor
 	return result, nil
 }
 
-// ClientPartDatabase is what EndClientPartTx reads and writes.
+// ClientPartDatabase is what EndClientPartTx reads and writes: the session's row and its apps, and
+// the departing app's session-bound grants it revokes (#135 decision 9).
 type ClientPartDatabase interface {
+	familyRecorder
+	refreshTokenMarker
+
 	AcquireUserSessionRow(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (bool, error)
 	DeleteUserSession(ctx context.Context, tx *sql.Tx, userSessionId int64) error
 	DeleteUserSessionClient(ctx context.Context, tx *sql.Tx, userSessionClientId int64) error
 	GetCommittedUserSessionClients(ctx context.Context, tx *sql.Tx, userSessionId int64) ([]record.UserSessionClient, error)
+	GetSessionBoundRefreshTokensBySessionIdentifierAndClientId(ctx context.Context, tx *sql.Tx, sessionIdentifier string,
+		clientId int64) ([]*record.RefreshToken, error)
 	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
+	RevokeUnusedCodesBySessionIdentifierAndClientId(ctx context.Context, tx *sql.Tx, sessionIdentifier string,
+		clientId int64) (int64, error)
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 }
 
@@ -762,6 +821,13 @@ type ClientPartEnd struct {
 	Ended *record.UserSessionClient
 	// SessionDeleted is true when that app was the session's last, so the session went with it.
 	SessionDeleted bool
+	// RevokedCodeCount is how many of the app's codes from the session not yet redeemed this call
+	// TRANSITIONED from live to revoked (#135 decision 9).
+	RevokedCodeCount int64
+	// RevokedRefreshTokenJtis lists the app's session-bound refresh tokens from the session this
+	// call transitioned, per markRefreshTokensRevoked. Non-nil when the app's part ended, so a JSON audit
+	// payload carries [] rather than null.
+	RevokedRefreshTokenJtis []string
 }
 
 // EndClientPartTx ends one app's part of a session, the teardown a confirmed id_token_hint earns at
@@ -775,7 +841,21 @@ type ClientPartEnd struct {
 // seen here and keeps the session: its part did not end, and deleting the session would take its row
 // with it untold. A session ended meanwhile is held by nothing: that end told its apps.
 //
-// The audit events and the app's logout token are the caller's, after the commit.
+// In the same transaction, once the app's row is gone, it revokes the app's session-bound grants from
+// the session (#135 decision 9): it marks the app's codes from the session not yet redeemed revoked,
+// records the rotation family of each session-bound refresh token the app holds from the session
+// under ReasonClientSignedOut, and revokes those tokens. It does so whether or not other apps share
+// the session, so a client's sign-out no longer leaves its token working only while another client
+// is on the session. Their access tokens are refused at once, since each names its grant and the
+// family is recorded (#676 decision 1). The app's offline tokens, which Back-Channel Logout 1.0
+// section 2.7 says "normally SHOULD NOT be" revoked, its grants from other sessions and every other
+// app's grants are untouched. The sweep follows the session's row and its deletion, the order
+// TerminateUserSessionTx writes in: a ceremony minting a code for the session takes that row first,
+// so its code is either marked here or never written. A code already being exchanged when this
+// commits may still yield its grant (#135 decision 11).
+//
+// The audit events and the app's logout token are the caller's, after the commit. On any error the
+// result is the zero value, so a caller cannot audit a sign-out that rolled back.
 func EndClientPartTx(ctx context.Context, db ClientPartDatabase, sessionIdentifier string,
 	clientIdentifier string) (ClientPartEnd, error) {
 
@@ -787,10 +867,16 @@ func EndClientPartTx(ctx context.Context, db ClientPartDatabase, sessionIdentifi
 		return ClientPartEnd{}, nil
 	}
 
+	// Opened through RunInTransactionRetryingConflict, so a family record lost to a containment of
+	// the same family that overlaps this transaction runs the body again, as RevokeClientGrantsTx
+	// states. The body is safe to rerun: it reads what it ends afresh on each attempt and resets what
+	// it reports, so the result is the committing attempt's.
 	var ended *record.UserSessionClient
 	sessionDeleted := false
-	err = db.RunInTransaction(ctx, func(tx *sql.Tx) error {
-		ended, sessionDeleted = nil, false
+	var revokedCodeCount int64
+	var revokedJtis []string
+	err = data.RunInTransactionRetryingConflict(ctx, db, func(tx *sql.Tx) error {
+		ended, sessionDeleted, revokedCodeCount, revokedJtis = nil, false, 0, nil
 		held, acquireErr := db.AcquireUserSessionRow(ctx, tx, sessionIdentifier)
 		if acquireErr != nil {
 			return acquireErr
@@ -816,6 +902,12 @@ func EndClientPartTx(ctx context.Context, db ClientPartDatabase, sessionIdentifi
 				sessionDeleted = true
 			}
 			found := sessionClients[i]
+
+			var sweepErr error
+			revokedCodeCount, revokedJtis, sweepErr = revokeSignOutGrants(ctx, db, tx, sessionIdentifier, found.Client.Id)
+			if sweepErr != nil {
+				return sweepErr
+			}
 			ended = &found
 			return nil
 		}
@@ -824,7 +916,34 @@ func EndClientPartTx(ctx context.Context, db ClientPartDatabase, sessionIdentifi
 	if err != nil {
 		return ClientPartEnd{}, err
 	}
-	return ClientPartEnd{Session: session, Ended: ended, SessionDeleted: sessionDeleted}, nil
+	return ClientPartEnd{Session: session, Ended: ended, SessionDeleted: sessionDeleted,
+		RevokedCodeCount: revokedCodeCount, RevokedRefreshTokenJtis: revokedJtis}, nil
+}
+
+// revokeSignOutGrants is EndClientPartTx's sweep of the client clientId's session-bound grants from
+// the session sessionIdentifier, on the sign-out's transaction. The code mark comes first, as in
+// every other sweep, and each family is recorded before its tokens are flipped (#259). It answers
+// the codes it marked and the tokens it moved from live to revoked, never a nil list.
+func revokeSignOutGrants(ctx context.Context, db ClientPartDatabase, tx *sql.Tx, sessionIdentifier string,
+	clientId int64) (int64, []string, error) {
+
+	revokedCodeCount, err := db.RevokeUnusedCodesBySessionIdentifierAndClientId(ctx, tx, sessionIdentifier, clientId)
+	if err != nil {
+		return 0, nil, err
+	}
+	tokens, err := db.GetSessionBoundRefreshTokensBySessionIdentifierAndClientId(ctx, tx, sessionIdentifier, clientId)
+	if err != nil {
+		return 0, nil, err
+	}
+	err = recordFamilies(ctx, db, tx, tokens, ReasonClientSignedOut)
+	if err != nil {
+		return 0, nil, err
+	}
+	revokedJtis, err := markRefreshTokensRevoked(ctx, db, tx, tokens)
+	if err != nil {
+		return 0, nil, err
+	}
+	return revokedCodeCount, revokedJtis, nil
 }
 
 // AuthCodeReuseResult reports what the response to a reused authorization code actually did. It
@@ -1014,10 +1133,13 @@ func RevokeOnAuthCodeReuseTx(ctx context.Context, db Database, code *record.Code
 	return result, nil
 }
 
-// RevokeOnConsentWithdrawalTx ends what a withdrawn consent leaves standing: it deletes the
-// consent row, marks the unused codes that user holds with that client revoked, and sweeps
-// the refresh tokens that user holds with that client, in ONE transaction it opens and
-// commits (#622).
+// DisconnectClientTx ends everything one user holds with one client, on every session and
+// device: it deletes the stored consent when the caller asks, marks the unused codes that user
+// holds with that client revoked, and sweeps the refresh tokens that user holds with that
+// client, session-bound, offline and password-grant alike, in ONE transaction it opens and
+// commits (#622, #135 decision 1). Withdrawing a consent is this operation for that consent's
+// client, with the consent's deletion as deleteConsent; a disconnect of a client the user holds
+// no consent with passes nil.
 //
 // Withdrawing consent through Account, Manage consents or the admin console's user page
 // used to delete the row and nothing else, and the refresh arm consults a stored consent
@@ -1028,12 +1150,13 @@ func RevokeOnAuthCodeReuseTx(ctx context.Context, db Database, code *record.Code
 //
 // The four writes, in the order this transaction issues them:
 //
-//  1. withdraw, the caller's own deletion of the consent row, FIRST because it is the
+//  1. deleteConsent, the caller's own deletion of the consent row, FIRST because it is the
 //     write that decides. The sweep exists to enforce it, not the other way round, and a
 //     caller must not be able to end up revoked without the withdrawal that asked for it
-//     (RevokeUserAuthStateTx's write-then-sweep shape).
+//     (RevokeUserAuthStateTx's write-then-sweep shape). It reports whether it deleted the
+//     row, which another request may have deleted first.
 //  2. RevokeUnusedCodesByUserIdAndClientId, before the sweep as RevokeClientGrants marks
-//     its codes first. A code issued before the withdrawal can still be redeemed for its
+//     its codes first. A code issued before the disconnect can still be redeemed for its
 //     60 seconds, redemption consults no stored consent, and the grant it would start has
 //     no refresh token yet for the sweep to reach. Marked, it is refused at redemption.
 //     Used codes are left alone: their grants are the tokens the sweep revokes, and a
@@ -1042,20 +1165,38 @@ func RevokeOnAuthCodeReuseTx(ctx context.Context, db Database, code *record.Code
 //     That leaves one window open, narrower than the code's lifetime: a redemption that
 //     claimed its code before this transaction and inserts its refresh token after it
 //     commits, since the claim and the insert are two autocommit statements.
-//  3. recordFamilies, before the sweep for the reason RevokeClientGrants states (#259):
+//  3. The family records, before the sweep for the reason RevokeClientGrants states (#259):
 //     rotation claims its parent and inserts its child in two separate statements, so a
 //     refresh that validated before this transaction began can insert a live child after
 //     it commits. The family record is the fact that outlives the sweep: the validator
 //     refuses a token whose family has one, and rotation re-checks it inside its own
 //     transaction, so the child is refused at its next refresh or never inserted.
-//  4. RevokeRefreshTokens over the user-and-client-scoped rows, which flips what stands
-//     now. Scoped by BOTH, because the withdrawal ends one app's access, not what the
+//  4. markRefreshTokensRevoked over the user-and-client-scoped rows, which flips what stands
+//     now. Scoped by BOTH, because the disconnect ends one app's access, not what the
 //     user holds with every other client and not the session they are signed in with.
+//
+// The consent the caller deletes and the refresh tokens the sweep reads must be what is
+// committed when they are read, not what the transaction's first read saw: on MySQL that first
+// read, of the client below, fixes the REPEATABLE READ snapshot every later ordinary read
+// answers, and a grant or a consent committed in between would be left in place by a
+// disconnect that reported success. So the caller reads the consent with
+// GetConsentByUserIdAndClientIdForUpdate, and GetRefreshTokensByUserIdAndClientId is a locking
+// read on MySQL; the code mark is an UPDATE, which reads current rows on every engine. The
+// tokens are flipped by a conditional write, so a token an overlapping disconnect revoked first
+// is not reported twice.
 //
 // It deliberately does NOT advance the user's authentication generation and does NOT
 // touch any session: both are user-scoped, for the reason RevokeClientGrants states about
-// its own sweep, and the user withdrawing consent to one app is signed in with a session
-// that may be serving every other app.
+// its own sweep, and the user disconnecting one app is signed in with a session that may be
+// serving every other app. The client's row on each session stays too, so the Sessions pages
+// list it until that session ends. A later authorization to the same client succeeds: a
+// disconnect is not a ban.
+//
+// It tells the client (#135 decision 3): before those writes the transaction reads the logout
+// tokens disconnectDeliveries describes, live judging which of the user's sessions are still
+// valid for a client that requires sid, and the result carries them when the call changed
+// something. They are the CALLER's to send after the commit, as the audit events are; delivery
+// is attempted and can fail.
 //
 // The access tokens those grants issued are refused at once, exactly as under
 // RevokeClientGrants: each names its grant, and liveness.AccessToken, which the bearer guard
@@ -1071,23 +1212,36 @@ func RevokeOnAuthCodeReuseTx(ctx context.Context, db Database, code *record.Code
 // found already written, the sweep reads its rows afresh on each attempt, and result is
 // the committing attempt's.
 //
-// It returns what it revoked for the caller to audit AFTER the commit, through
-// LogRevokedConsentGrants, beside and not instead of EventDeletedOwnUserConsent or
-// EventDeletedUserConsent, whose payloads stay as they were. That is #129 decision 9's shape:
-// TerminateUserSessionTx added EventTerminatedUserSession beside EventDeletedUserSession,
-// one a lifecycle fact and one the security action. On any error the result is the zero
-// value, so a caller cannot audit a rolled-back revocation.
-func RevokeOnConsentWithdrawalTx(ctx context.Context, db Database, userId int64, clientId int64,
-	withdraw func(tx *sql.Tx) error) (ConsentWithdrawalResult, error) {
+// It returns what its own transaction changed, for the caller to answer from and to audit
+// AFTER the commit (#135 decision 2): whether it deleted the consent, the codes it marked, the
+// refresh tokens it moved from live to revoked and the families it newly recorded. A change
+// another request committed first is not counted, so two overlapping calls never both report
+// it, and a call whose result reports no change has nothing to audit. Its record is
+// LogDisconnectedClient, beside and not instead of EventDeletedOwnUserConsent or
+// EventDeletedUserConsent, which the caller writes only when the consent was deleted and whose
+// payloads stay as they were. That is #129 decision 9's shape: TerminateUserSessionTx added
+// EventTerminatedUserSession beside EventDeletedUserSession, one a lifecycle fact and one the
+// security action. On any error the result is the zero value, so a caller cannot audit a
+// rolled-back revocation.
+func DisconnectClientTx(ctx context.Context, db Database, userId int64, clientId int64, live SessionLive,
+	deleteConsent func(tx *sql.Tx) (bool, error)) (DisconnectResult, error) {
 
-	if withdraw == nil {
-		return ConsentWithdrawalResult{}, errs.New("revoking on a consent withdrawal requires the withdrawal's own write")
-	}
-
-	var result ConsentWithdrawalResult
+	var result DisconnectResult
 	err := data.RunInTransactionRetryingConflict(ctx, db, func(tx *sql.Tx) error {
-		if err := withdraw(tx); err != nil {
+		// The logout tokens, read before any write, so these reads wait for nothing while this
+		// transaction holds a row another transaction wants (see disconnectDeliveries).
+		deliveries, err := disconnectDeliveries(ctx, db, tx, userId, clientId, live)
+		if err != nil {
 			return err
+		}
+
+		consentDeleted := false
+		if deleteConsent != nil {
+			deleted, deleteErr := deleteConsent(tx)
+			if deleteErr != nil {
+				return deleteErr
+			}
+			consentDeleted = deleted
 		}
 
 		revokedCodeCount, err := db.RevokeUnusedCodesByUserIdAndClientId(ctx, tx, userId, clientId)
@@ -1100,33 +1254,153 @@ func RevokeOnConsentWithdrawalTx(ctx context.Context, db Database, userId int64,
 			return err
 		}
 
-		if err = recordFamilies(ctx, db, tx, tokens, ReasonConsentWithdrawn); err != nil {
-			return err
-		}
-
-		revokedJtis, err := RevokeRefreshTokens(ctx, db, tx, tokens)
+		recordedFamilyCount, err := recordNewFamilies(ctx, db, tx, tokens, ReasonClientDisconnected)
 		if err != nil {
 			return err
 		}
-		result = ConsentWithdrawalResult{RevokedCodeCount: revokedCodeCount, RevokedRefreshTokenJtis: revokedJtis}
+
+		revokedJtis, err := markRefreshTokensRevoked(ctx, db, tx, tokens)
+		if err != nil {
+			return err
+		}
+		result = DisconnectResult{
+			ConsentDeleted:          consentDeleted,
+			RevokedCodeCount:        revokedCodeCount,
+			RevokedRefreshTokenJtis: revokedJtis,
+			RecordedFamilyCount:     recordedFamilyCount,
+		}
+		// A call that changed nothing had nothing to end, and tells nobody (#135 decision 2).
+		if result.Changed() {
+			result.LogoutDeliveries = deliveries
+		}
 		return nil
 	})
 	if err != nil {
-		return ConsentWithdrawalResult{}, err
+		return DisconnectResult{}, err
 	}
 	return result, nil
 }
 
-// ConsentWithdrawalResult reports what a consent withdrawal's sweep actually did (#622). It is
-// a type of its own rather than ClientGrantResult because its code count is of unused codes
-// alone, one user's with one client, where ClientGrantResult's is of every code the client has.
-type ConsentWithdrawalResult struct {
+// DisconnectResult reports what a disconnect's own transaction changed (#622, #135 decision 2).
+// It is a type of its own rather than ClientGrantResult because its code count is of unused
+// codes alone, one user's with one client, where ClientGrantResult's is of every code the client
+// has, and because it also reports the consent and the families, which decide whether the call
+// changed anything.
+type DisconnectResult struct {
+	// ConsentDeleted is whether this call deleted the stored consent: false when the caller
+	// asked for no deletion, and when another request deleted the row first.
+	ConsentDeleted bool
 	// RevokedCodeCount is how many unused codes this call TRANSITIONED from live to revoked.
 	RevokedCodeCount int64
 	// RevokedRefreshTokenJtis lists only the tokens this call transitioned, per
-	// RevokeRefreshTokens. A token already revoked before the call is absent. Non-nil on the
-	// success path, so a JSON audit payload carries [] rather than null.
+	// markRefreshTokensRevoked. A token already revoked before the call, or revoked by an
+	// overlapping call that committed first, is absent. Non-nil on the success path, so a JSON
+	// audit payload carries [] rather than null.
 	RevokedRefreshTokenJtis []string
+	// RecordedFamilyCount is how many rotation families this call newly recorded revoked. A
+	// family whose members were all revoked already and that had no record yet counts: the record
+	// is what refuses a child that a rotation in flight inserts after the commit (#259).
+	RecordedFamilyCount int
+	// LogoutDeliveries is the logout tokens that tell the client, collected inside the transaction
+	// (#135 decision 3, see disconnectDeliveries); nil when there is nobody to tell, and when the
+	// call changed nothing. The caller hands it to the back-channel sender after the commit, beside
+	// the audit events. It is no part of the audit payload and does not decide Changed.
+	LogoutDeliveries []backchannel.Delivery
+}
+
+// disconnectDeliveries is the logout tokens a disconnect of the client clientId from the user
+// userId sends, read on the disconnect's own transaction (#135 decision 3). A client with a
+// back-channel logout URI is sent one token naming the user alone, which asks it to end every
+// session it has for the user (Back-Channel Logout 1.0 section 2.4). A client that registered
+// backchannel_logout_session_required is instead sent a sub+sid token for each of the user's
+// sessions it is on that live judges still valid, and nothing when it is on none: the rule of a
+// user-wide end (LogoutNotice), narrowed to one client. A client without a URI, a client or a
+// user already gone, is sent nothing. nil live judges no session valid.
+//
+// It runs before the disconnect's first write and takes no row: the sessions and their apps stay
+// as they are, so there is nothing to hold them for, and a read made before the transaction holds
+// any row can wait for another transaction but never complete a cycle with it. On SQL Server a
+// read of a session row that a termination holds, made after the sweep, would wait for the
+// termination while the termination waits for the refresh tokens the sweep holds. A sign-in that
+// adds the client to a session meanwhile is a grant the sweep may not reach either, the code
+// exchange already under way of decision 11.
+func disconnectDeliveries(ctx context.Context, db Database, tx *sql.Tx, userId int64, clientId int64,
+	live SessionLive) ([]backchannel.Delivery, error) {
+
+	clients, err := db.GetClientsByIds(ctx, tx, []int64{clientId})
+	if err != nil {
+		return nil, err
+	}
+	if len(clients) == 0 || clients[0].BackchannelLogoutURI == "" {
+		return nil, nil
+	}
+	client := &clients[0]
+
+	// The user's sub, which every logout token names. A user being deleted tells their apps itself.
+	user, err := db.GetUserById(ctx, tx, userId)
+	if err != nil || user == nil {
+		return nil, err
+	}
+
+	if !client.BackchannelLogoutSessionRequired {
+		return []backchannel.Delivery{{
+			ClientId:         client.Id,
+			ClientIdentifier: client.ClientIdentifier,
+			URI:              client.BackchannelLogoutURI,
+			IsPublic:         client.IsPublic,
+			CreatedViaDCR:    client.CreatedViaDCR,
+			UserId:           userId,
+			Subject:          user.Subject,
+		}}, nil
+	}
+
+	if live == nil {
+		return nil, nil
+	}
+	sessions, err := db.GetUserSessionsByUserId(ctx, tx, userId)
+	if err != nil {
+		return nil, err
+	}
+	sort.Slice(sessions, func(i, j int) bool { return sessions[i].Id < sessions[j].Id })
+	liveSessionIds := make([]int64, 0, len(sessions))
+	for i := range sessions {
+		if live(&sessions[i]) {
+			liveSessionIds = append(liveSessionIds, sessions[i].Id)
+		}
+	}
+	if len(liveSessionIds) == 0 {
+		return nil, nil
+	}
+	sessionClients, err := db.GetUserSessionClientsByUserSessionIds(ctx, tx, liveSessionIds)
+	if err != nil {
+		return nil, err
+	}
+	onSession := map[int64]bool{}
+	for _, sessionClient := range sessionClients {
+		if sessionClient.ClientId == clientId {
+			onSession[sessionClient.UserSessionId] = true
+		}
+	}
+
+	var deliveries []backchannel.Delivery
+	for i := range sessions {
+		session := &sessions[i]
+		if !onSession[session.Id] {
+			continue
+		}
+		if delivery, tells := backchannel.SessionClientDelivery(client, session, user.Subject); tells {
+			deliveries = append(deliveries, delivery)
+		}
+	}
+	return deliveries, nil
+}
+
+// Changed reports whether the disconnect's transaction changed anything: deleted the consent,
+// marked a code, revoked a refresh token or recorded a family. A call that changed nothing had
+// nothing to end, and its caller answers 404 and writes no audit entry (#135 decision 2).
+func (r DisconnectResult) Changed() bool {
+	return r.ConsentDeleted || r.RevokedCodeCount > 0 || len(r.RevokedRefreshTokenJtis) > 0 ||
+		r.RecordedFamilyCount > 0
 }
 
 // ClientGrantResult reports what revoking one client's grants actually did. It is
@@ -1238,7 +1512,18 @@ func RevokeClientGrants(ctx context.Context, db Database, tx *sql.Tx, clientId i
 // given refresh tokens, each once, under the reason this sweep revokes them for. A token
 // with no family identifier carries no family to record: no issuer writes one, and
 // RecordRefreshTokenFamilyRevoked refuses an empty jti as a caller bug.
-func recordFamilies(ctx context.Context, db Database, tx *sql.Tx, tokens []*record.RefreshToken, reason string) error {
+func recordFamilies(ctx context.Context, db familyRecorder, tx *sql.Tx, tokens []*record.RefreshToken, reason string) error {
+	_, err := recordNewFamilies(ctx, db, tx, tokens, reason)
+	return err
+}
+
+// recordNewFamilies is recordFamilies reporting how many of the records THIS call wrote, as
+// RecordRefreshTokenFamilyRevoked reports each: a family already recorded, by an earlier
+// revocation or by a containment that committed first, is not counted.
+func recordNewFamilies(ctx context.Context, db familyRecorder, tx *sql.Tx, tokens []*record.RefreshToken,
+	reason string) (int, error) {
+
+	recorded := 0
 	seen := make(map[string]struct{}, len(tokens))
 	for _, rt := range tokens {
 		jti := rt.FirstRefreshTokenJti
@@ -1249,11 +1534,15 @@ func recordFamilies(ctx context.Context, db Database, tx *sql.Tx, tokens []*reco
 			continue
 		}
 		seen[jti] = struct{}{}
-		if _, err := db.RecordRefreshTokenFamilyRevoked(ctx, tx, jti, reason); err != nil {
-			return err
+		wrote, err := db.RecordRefreshTokenFamilyRevoked(ctx, tx, jti, reason)
+		if err != nil {
+			return 0, err
+		}
+		if wrote {
+			recorded++
 		}
 	}
-	return nil
+	return recorded, nil
 }
 
 // RevokeClientGrantsTx runs a narrow client write and RevokeClientGrants inside ONE transaction
@@ -1432,21 +1721,21 @@ func LogRevokedClientGrants(ctx context.Context, auditLogger AuditLogger, client
 	})
 }
 
-// LogRevokedConsentGrants emits EventRevokedConsentGrants, the security record of what a
-// consent withdrawal revoked (#622). One function rather than a literal at each of its two call
-// sites, the account API's and the admin API's consent deletions, following
+// LogDisconnectedClient emits EventDisconnectedClient, the security record of what a disconnect
+// revoked (#622, #135 decision 6). One function rather than a literal at each call site, every
+// endpoint that disconnects a client, a consent DELETE included, following
 // LogTerminatedUserSession: the payload cannot then differ between sites, and there is a single
 // place to assert its shape field by field.
 //
-// Call this only after RevokeOnConsentWithdrawalTx returned without error, and beside rather
-// than instead of EventDeletedOwnUserConsent or EventDeletedUserConsent, whose fields stay as
-// they were.
+// Call this only after DisconnectClientTx returned without error and reported a change, and
+// beside rather than instead of EventDeletedOwnUserConsent or EventDeletedUserConsent, whose
+// fields stay as they were.
 //
 // ctx is the request's, for the reason LogRevokedClientGrants states (#328).
-func LogRevokedConsentGrants(ctx context.Context, auditLogger AuditLogger, userId int64, clientId int64,
-	loggedInUser string, result ConsentWithdrawalResult) {
+func LogDisconnectedClient(ctx context.Context, auditLogger AuditLogger, userId int64, clientId int64,
+	loggedInUser string, result DisconnectResult) {
 
-	auditLogger.Log(ctx, audit.EventRevokedConsentGrants, map[string]interface{}{
+	auditLogger.Log(ctx, audit.EventDisconnectedClient, map[string]interface{}{
 		"user_id":        userId,
 		"client_id":      clientId,
 		"logged_in_user": loggedInUser,
@@ -1455,6 +1744,29 @@ func LogRevokedConsentGrants(ctx context.Context, auditLogger AuditLogger, userI
 		// What this call TRANSITIONED, not what the user held. Always a list rather than null:
 		// the success path fills it from RevokeRefreshTokens.
 		"revoked_refresh_token_jtis": result.RevokedRefreshTokenJtis,
+	})
+}
+
+// LogRevokedSignOutGrants emits EventRevokedSignOutGrants, the security record of what a sign-out
+// with a confirmed id_token_hint revoked (#135 decision 9). One function beside the operation,
+// following the other Log* helpers: the payload has one place to be asserted field by field.
+//
+// Call this only after EndClientPartTx returned without error and ended the client's part, beside
+// EventDeletedUserSessionClient. logged_in_user is "": no bearer token reaches /auth/logout, and the
+// actor is the event's own user_id, as on the sign-out's other entries (#385).
+//
+// ctx is the request's, for the reason LogRevokedClientGrants states (#328).
+func LogRevokedSignOutGrants(ctx context.Context, auditLogger AuditLogger, end ClientPartEnd) {
+	auditLogger.Log(ctx, audit.EventRevokedSignOutGrants, map[string]interface{}{
+		"user_id":            end.Session.UserId,
+		"client_id":          end.Ended.Client.Id,
+		"user_session_id":    end.Session.Id,
+		"session_identifier": end.Session.SessionIdentifier,
+		"logged_in_user":     "",
+		// What this call TRANSITIONED, for the reason LogRevokedClientGrants gives.
+		"revoked_code_count": end.RevokedCodeCount,
+		// Always a list rather than null: EndClientPartTx fills it from RevokeRefreshTokens.
+		"revoked_refresh_token_jtis": end.RevokedRefreshTokenJtis,
 	})
 }
 

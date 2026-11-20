@@ -51,12 +51,12 @@ func (c *attributesApiClient) DeleteUserAttribute(_ context.Context, accessToken
 
 // The rest of the ports attributesApiClient is passed to, which no test here reaches.
 
-func (*attributesApiClient) DeleteUserConsent(context.Context, string, int64) error {
-	panic("unexpected call to DeleteUserConsent")
+func (*attributesApiClient) DisconnectUserClient(context.Context, string, int64, int64) error {
+	panic("unexpected call to DisconnectUserClient")
 }
 
-func (*attributesApiClient) GetUserConsents(context.Context, string, int64) ([]api.UserConsentResponse, error) {
-	panic("unexpected call to GetUserConsents")
+func (*attributesApiClient) GetUserConnectedClients(context.Context, string, int64) ([]api.ConnectedClientResponse, error) {
+	panic("unexpected call to GetUserConnectedClients")
 }
 
 func TestUserAttributesRemove_StaleOrMalformedUrlAnswers404AsJson(t *testing.T) {
@@ -192,20 +192,20 @@ func TestUserAttributesRemove_StaleOrMalformedUrlAnswers404AsJson(t *testing.T) 
 	}
 }
 
-// TestUserConsents_MalformedBodyAnswers400AsJson is decision 12 at this seam, in both its shapes. A
+// TestUserConnectedClients_MalformedBodyAnswers400AsJson is decision 12 at this seam, in both its shapes. A
 // body that does not decode and a body that decodes without the field the endpoint acts on are the
 // same condition -- the request the console's own script sent is not one this endpoint can act on
 // -- and RFC 9110 section 15.5.1 covers it: "malformed request syntax". Both answered 500 with a
 // stack before #279. Decision 12 named only the decode failure; pinning only that one would let
 // the other drift back, since they are separate branches.
-func TestUserConsents_MalformedBodyAnswers400AsJson(t *testing.T) {
+func TestUserConnectedClients_MalformedBodyAnswers400AsJson(t *testing.T) {
 	testCases := []struct {
 		name string
 		body string
 	}{
 		{name: "a body that is not JSON at all", body: "{this is not json"},
-		{name: "a body that parses but carries no consentId", body: "{\"somethingElse\": 1}"},
-		{name: "a body whose consentId is not a number", body: "{\"consentId\": \"seven\"}"},
+		{name: "a body that parses but carries no clientId", body: "{\"somethingElse\": 1}"},
+		{name: "a body whose clientId is not a number", body: "{\"clientId\": \"seven\"}"},
 	}
 
 	for _, testCase := range testCases {
@@ -217,13 +217,13 @@ func TestUserConsents_MalformedBodyAnswers400AsJson(t *testing.T) {
 					captured, _ = args.Get(2).(error)
 				}).Return().Once()
 
-			req := handlertest.Request(http.MethodPost, "/admin/users/42/consents",
+			req := handlertest.Request(http.MethodPost, "/admin/users/42/connected-clients",
 				handlertest.WithAccessToken(),
 				handlertest.WithPathValue("userId", "42"),
 				handlertest.WithBody(strings.NewReader(testCase.body)),
 			)
 
-			HandleConsentsPost(httpHelper, &attributesApiClient{user: &api.UserResponse{Id: 42}}).
+			HandleConnectedClientsDisconnectPost(httpHelper, &attributesApiClient{user: &api.UserResponse{Id: 42}}).
 				ServeHTTP(httptest.NewRecorder(), req)
 
 			httpHelper.AssertExpectations(t)

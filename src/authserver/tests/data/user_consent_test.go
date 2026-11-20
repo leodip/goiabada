@@ -185,9 +185,12 @@ func TestGetConsentsByUserId(t *testing.T) {
 func TestDeleteUserConsent(t *testing.T) {
 	userConsent := createTestUserConsent(t)
 
-	err := database.DeleteUserConsent(context.Background(), nil, userConsent.Id)
+	deleted, err := database.DeleteUserConsent(context.Background(), nil, userConsent.Id)
 	if err != nil {
 		t.Fatalf("Failed to delete user consent: %v", err)
+	}
+	if !deleted {
+		t.Errorf("Expected the deletion of an existing user consent to report it deleted the row")
 	}
 
 	deletedConsent, err := database.GetUserConsentById(context.Background(), nil, userConsent.Id)
@@ -198,9 +201,56 @@ func TestDeleteUserConsent(t *testing.T) {
 		t.Errorf("User consent still exists after deletion")
 	}
 
-	err = database.DeleteUserConsent(context.Background(), nil, 99999)
+	// The same row again, as a second request withdrawing the same consent would: no error, and
+	// the answer says this call deleted nothing (#135 decision 2).
+	deleted, err = database.DeleteUserConsent(context.Background(), nil, userConsent.Id)
+	if err != nil {
+		t.Errorf("Expected no error when deleting an already deleted user consent, got: %v", err)
+	}
+	if deleted {
+		t.Errorf("Expected the deletion of an already deleted user consent to report it deleted nothing")
+	}
+
+	deleted, err = database.DeleteUserConsent(context.Background(), nil, 99999)
 	if err != nil {
 		t.Errorf("Expected no error when deleting non-existent user consent, got: %v", err)
+	}
+	if deleted {
+		t.Errorf("Expected the deletion of a non-existent user consent to report it deleted nothing")
+	}
+}
+
+// TestGetConsentByUserIdAndClientIdForUpdate reads the consent a disconnect deletes, inside a
+// transaction, on every engine's own locking grammar: the user's consent to the client, nil for a
+// client the user gave none, and a refusal without a transaction (#135).
+func TestGetConsentByUserIdAndClientIdForUpdate(t *testing.T) {
+	ctx := context.Background()
+	userConsent := createTestUserConsent(t)
+	otherClient := createTestClient(t)
+
+	err := database.RunInTransaction(ctx, func(tx *sql.Tx) error {
+		got, err := database.GetConsentByUserIdAndClientIdForUpdate(ctx, tx, userConsent.UserId, userConsent.ClientId)
+		if err != nil {
+			return err
+		}
+		if got == nil || got.Id != userConsent.Id || got.Scope != "openid profile" {
+			t.Errorf("expected consent %d with scope %q, got %+v", userConsent.Id, "openid profile", got)
+		}
+		none, err := database.GetConsentByUserIdAndClientIdForUpdate(ctx, tx, userConsent.UserId, otherClient.Id)
+		if err != nil {
+			return err
+		}
+		if none != nil {
+			t.Errorf("expected no consent with a client the user gave none, got %+v", none)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("locking read failed: %v", err)
+	}
+
+	if _, err := database.GetConsentByUserIdAndClientIdForUpdate(ctx, nil, userConsent.UserId, userConsent.ClientId); err == nil {
+		t.Error("expected a locking read without a transaction to be refused")
 	}
 }
 

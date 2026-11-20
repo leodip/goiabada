@@ -126,7 +126,7 @@ Behind each cookie that names a session is a **browser-session row**, encrypted 
 - **Rectification.** Users correct their own details in their account pages, and you on the user's tabs in the admin console.
 - **Erasure.** Delete the user from **Users**, or let them delete their own account. [Deleting users](/concepts/users-and-groups/#deleting-users) lists what a deletion leaves behind.
 - **Restriction.** Disable the user. That ends their sessions, revokes their refresh tokens and sends logout tokens. See [Enabled and disabled](/concepts/users-and-groups/#enabled-and-disabled).
-- **Withdrawn consent.** Withdrawing a user's consent to a client, on their **Consents** tab or by the user under **Account**, **Consents**, revokes that client's refresh tokens and unredeemed authorization codes for the user. The app keeps what it already received.
+- **Withdrawn consent.** Disconnect the client from the user, on their **Connected clients** tab, or let them do it under **Account**, **Applications**. That deletes their consent to it, and revokes the refresh tokens and unredeemed authorization codes they hold with it. The app keeps what it already received. See [Disconnect a client](/concepts/ending-sessions/#disconnect-a-client).
 - **Telling apps (GDPR Article 19).** That's a step you take yourself. A logout token ends sessions; it doesn't ask an app to erase anything. To find the apps that got the person's data, filter the audit log by their **User id**: each `created_auth_code` entry names an app they signed in to. See [See what happened](/concepts/audit-log/#see-what-happened).
 
 ## Next steps

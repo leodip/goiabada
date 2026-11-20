@@ -42,7 +42,7 @@ func TestAPIAccountConsentsGet_Success(t *testing.T) {
 	}
 	err = database.CreateUserConsent(context.Background(), nil, consent)
 	require.NoError(t, err)
-	defer func() { _ = database.DeleteUserConsent(context.Background(), nil, consent.Id) }()
+	defer func() { _, _ = database.DeleteUserConsent(context.Background(), nil, consent.Id) }()
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/consents"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
@@ -107,7 +107,7 @@ func TestAPIAccountConsentsGet_NamesClientsAsTheConsentScreenDid(t *testing.T) {
 		consent := &record.UserConsent{UserId: u.Id, ClientId: client.Id, Scope: "openid",
 			GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true}}
 		require.NoError(t, database.CreateUserConsent(context.Background(), nil, consent))
-		defer func() { _ = database.DeleteUserConsent(context.Background(), nil, consent.Id) }()
+		defer func() { _, _ = database.DeleteUserConsent(context.Background(), nil, consent.Id) }()
 		consentIds[consent.Id] = client
 	}
 
@@ -204,7 +204,7 @@ func TestAPIAccountConsentDelete_Success(t *testing.T) {
 	assert.Nil(t, got)
 }
 
-// Account, Manage consents withdraws a consent through this endpoint, the path #622 names: the
+// A user withdraws a consent through this endpoint, the path #622 names: the
 // withdrawal revokes the refresh tokens the user holds with that client, of a client whose
 // Consent required is off too, while the user's grant with another client keeps refreshing.
 func TestAPIAccountConsentDelete_RevokesTheClientsRefreshTokens(t *testing.T) {
@@ -225,7 +225,13 @@ func TestAPIAccountConsentDelete_RevokesTheClientsRefreshTokens(t *testing.T) {
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
-	f.assertWithdrawn(t, adminToken, u.Subject)
+	// Repeated, the DELETE has nothing left to end: 404, and no second audit entry, which the
+	// counts below hold (#135 decision 2).
+	repeat := makeAPIRequest(t, "DELETE", url, accessToken, nil)
+	defer func() { _ = repeat.Body.Close() }()
+	assert.Equal(t, http.StatusNotFound, repeat.StatusCode)
+
+	f.assertWithdrawn(t, adminToken, u.Subject, audit.EventDeletedOwnUserConsent)
 }
 
 // A code issued before the withdrawal and redeemed after it would start a grant the withdrawal's
@@ -286,7 +292,7 @@ func TestAPIAccountConsentDelete_RefusesACodeIssuedBeforeTheWithdrawal(t *testin
 	// The same user's code with another client is outside the withdrawal and still redeems.
 	redeemCode(t, otherClient, otherCode, otherSecret)
 
-	logs, logsResp := getAuditLogs(t, adminToken, "auditEvent="+audit.EventRevokedConsentGrants)
+	logs, logsResp := getAuditLogs(t, adminToken, "auditEvent="+audit.EventDisconnectedClient)
 	defer func() { _ = logsResp.Body.Close() }()
 	require.Equal(t, http.StatusOK, logsResp.StatusCode)
 	found := 0
@@ -302,7 +308,7 @@ func TestAPIAccountConsentDelete_RefusesACodeIssuedBeforeTheWithdrawal(t *testin
 		assert.InDelta(t, float64(1), details["revoked_code_count"], 0, "the record counts the code the mark moved")
 		assert.Empty(t, details["revoked_refresh_token_jtis"])
 	}
-	assert.Equal(t, 1, found, "the withdrawal must record %v once for this client", audit.EventRevokedConsentGrants)
+	assert.Equal(t, 1, found, "the withdrawal must record %v once for this client", audit.EventDisconnectedClient)
 }
 
 func TestAPIAccountConsentDelete_ForbiddenOnOtherUser(t *testing.T) {
@@ -340,7 +346,7 @@ func TestAPIAccountConsentDelete_ForbiddenOnOtherUser(t *testing.T) {
 	}
 	err = database.CreateUserConsent(context.Background(), nil, consent)
 	require.NoError(t, err)
-	defer func() { _ = database.DeleteUserConsent(context.Background(), nil, consent.Id) }()
+	defer func() { _, _ = database.DeleteUserConsent(context.Background(), nil, consent.Id) }()
 
 	// Attempt to delete using user1 token
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/consents/" + fmt.Sprintf("%d", consent.Id)

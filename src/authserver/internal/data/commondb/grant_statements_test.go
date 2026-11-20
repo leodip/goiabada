@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql/driver"
 	"testing"
+
+	"github.com/leodip/goiabada/authserver/internal/data"
 )
 
 // The statements of a grant's records, held on all four engines to what each asks of the engine:
@@ -15,7 +17,8 @@ import (
 // a user's grants reaches the rows of that session, client or user and no other, and a cleanup
 // reaps only the rows nothing can use any more. The condition is in the statement's text and
 // nowhere else, so this reads the text with each placeholder rendered as the value it binds, one
-// expected statement for all four engines, as the users' narrow writes are read. The columns of a
+// expected statement for all four engines, as the users' narrow writes are read, except where an
+// engine's own differs, such as MySQL's locking read of one user's tokens with one client. The columns of a
 // read of whole records are left to the record mapping test.
 
 const (
@@ -83,6 +86,20 @@ func grantStatements() []narrowWrite {
 			statements: []string{
 				"UPDATE codes SET revoked = true, updated_at = <now> " +
 					"WHERE user_id = 7 AND client_id = 3 AND used = false AND revoked = false",
+			},
+		},
+		{
+			// A hinted sign-out's code mark: the departing client's codes from the session not yet
+			// redeemed (#135 decision 9).
+			name:  "RevokeUnusedCodesBySessionIdentifierAndClientId",
+			execs: []*scriptedExec{{rowsAffected: 2}},
+			run: func(ctx context.Context, d *Database) (any, error) {
+				return d.RevokeUnusedCodesBySessionIdentifierAndClientId(ctx, nil, grantSessionId, grantClientId)
+			},
+			answer: int64(2),
+			statements: []string{
+				"UPDATE codes SET revoked = true, updated_at = <now> " +
+					"WHERE session_identifier = 'sid-1' AND client_id = 3 AND used = false AND revoked = false",
 			},
 		},
 		{
@@ -199,6 +216,21 @@ func grantStatements() []narrowWrite {
 			},
 		},
 		{
+			// A hinted sign-out's sweep: the departing client's tokens through codes on the session,
+			// the token's own session identifier the session's, which is what an offline token's lacks
+			// (#135 decision 9).
+			name: "GetSessionBoundRefreshTokensBySessionIdentifierAndClientId",
+			run: func(ctx context.Context, d *Database) (any, error) {
+				_, err := d.GetSessionBoundRefreshTokensBySessionIdentifierAndClientId(ctx, nil, grantSessionId, grantClientId)
+				return nil, err
+			},
+			statements: []string{
+				"SELECT <columns> FROM refresh_tokens INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
+					"WHERE codes.session_identifier = 'sid-1' AND codes.client_id = 3 " +
+					"AND refresh_tokens.session_identifier = 'sid-1'",
+			},
+		},
+		{
 			name: "GetRefreshTokensByUserId",
 			run: func(ctx context.Context, d *Database) (any, error) {
 				_, err := d.GetRefreshTokensByUserId(ctx, nil, grantUserId)
@@ -221,6 +253,35 @@ func grantStatements() []narrowWrite {
 					"WHERE codes.user_id = 7 AND codes.client_id = 3 " +
 					"UNION ALL SELECT <columns> FROM refresh_tokens " +
 					"WHERE refresh_tokens.user_id = 7 AND refresh_tokens.client_id = 3",
+			},
+			// MySQL's is a locking read, so the rows a disconnect sweeps are the committed ones
+			// whatever its transaction read first (#135 decision 1).
+			statementsOn: map[data.Dialect][]string{data.MySQL: {
+				"(SELECT <columns> FROM refresh_tokens INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
+					"WHERE codes.user_id = 7 AND codes.client_id = 3 FOR UPDATE) " +
+					"UNION ALL (SELECT <columns> FROM refresh_tokens " +
+					"WHERE refresh_tokens.user_id = 7 AND refresh_tokens.client_id = 3 FOR UPDATE)",
+			}},
+		},
+		{
+			// A live grant: its row not revoked, its expiry after the instant, its family unrecorded,
+			// through the code's user and client or the token's own (#135 decision 4).
+			name: "GetLiveGrantsByUserId",
+			run: func(ctx context.Context, d *Database) (any, error) {
+				_, err := d.GetLiveGrantsByUserId(ctx, nil, grantUserId, issuedAt)
+				return nil, err
+			},
+			statements: []string{
+				"SELECT <columns> FROM refresh_tokens INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
+					"WHERE codes.user_id = 7 AND refresh_tokens.revoked = false " +
+					"AND refresh_tokens.expires_at > 2001-01-01T00:00:00Z " +
+					"AND NOT EXISTS (SELECT 1 FROM refresh_token_family_revocations " +
+					"WHERE refresh_token_family_revocations.first_refresh_token_jti = refresh_tokens.first_refresh_token_jti) " +
+					"UNION ALL SELECT <columns> FROM refresh_tokens " +
+					"WHERE refresh_tokens.user_id = 7 AND refresh_tokens.revoked = false " +
+					"AND refresh_tokens.expires_at > 2001-01-01T00:00:00Z AND refresh_tokens.client_id IS NOT NULL " +
+					"AND NOT EXISTS (SELECT 1 FROM refresh_token_family_revocations " +
+					"WHERE refresh_token_family_revocations.first_refresh_token_jti = refresh_tokens.first_refresh_token_jti)",
 			},
 		},
 		{

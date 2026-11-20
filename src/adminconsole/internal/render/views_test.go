@@ -92,35 +92,39 @@ func TestSessionInfos_NoSessionsIsAnEmptyList(t *testing.T) {
 	assert.Empty(t, got)
 }
 
-// The account consents page and the admin user consents page render the same row. The order is
-// the API's: neither page has ever sorted it.
-func TestConsentInfos_CarriesEveryFieldTheRowRendersInTheAPIsOrder(t *testing.T) {
+// The account Applications page renders one row per connected client, in the API's order: a
+// client with a consent carries the consent's scopes and date beside the scopes its live grants
+// hold, and a client with none carries no consent at all, rather than an empty one (#135
+// decision 7).
+func TestConnectedClientInfos_CarriesEveryFieldTheRowRendersInTheAPIsOrder(t *testing.T) {
 	grantedAt := time.Date(2026, 8, 2, 10, 30, 0, 0, time.UTC)
 
-	got := ConsentInfos([]api.UserConsentResponse{
+	got := ConnectedClientInfos([]api.ConnectedClientResponse{
 		{
-			Id:                9,
 			ClientId:          100,
-			UserId:            4,
-			Scope:             "openid profile",
-			GrantedAt:         &grantedAt,
 			ClientIdentifier:  "billing",
 			ClientName:        "Billing",
 			ClientDescription: "The billing app",
+			Consent:           &api.ConnectedClientConsentResponse{Id: 9, Scope: "openid profile", GrantedAt: &grantedAt},
+			GrantScope:        "openid profile email",
 		},
-		// grantedAt is nullable on the wire: the row is shown undated rather than dropped.
-		{Id: 2, Scope: "openid", ClientIdentifier: "dcr_a3f9", ClientName: "Reports", ClientNameUnverified: true},
+		{ClientId: 7, ClientIdentifier: "dcr_a3f9", ClientName: "Reports", ClientNameUnverified: true, GrantScope: "openid"},
+		// A consent that recorded no time is still a consent.
+		{ClientId: 3, ClientIdentifier: "admin-console", ClientName: "Admin console", IsCurrent: true,
+			Consent: &api.ConnectedClientConsentResponse{Id: 2, Scope: "openid"}},
 	})
 
-	assert.Equal(t, []ConsentInfo{
-		{ConsentId: 9, Client: "billing", ClientName: "Billing", ClientDescription: "The billing app", GrantedAt: &grantedAt,
-			Scope: "openid profile"},
-		{ConsentId: 2, Client: "dcr_a3f9", ClientName: "Reports", ClientNameUnverified: true, Scope: "openid"},
+	assert.Equal(t, []ConnectedClientInfo{
+		{ClientId: 100, Client: "billing", ClientName: "Billing", ClientDescription: "The billing app",
+			HasConsent: true, ConsentScope: "openid profile", GrantedAt: &grantedAt, GrantScope: "openid profile email"},
+		{ClientId: 7, Client: "dcr_a3f9", ClientName: "Reports", ClientNameUnverified: true, GrantScope: "openid"},
+		{ClientId: 3, Client: "admin-console", ClientName: "Admin console", HasConsent: true, ConsentScope: "openid",
+			IsCurrent: true},
 	}, got)
 }
 
-func TestConsentInfos_NoConsentsIsAnEmptyList(t *testing.T) {
-	got := ConsentInfos(nil)
+func TestConnectedClientInfos_NoClientsIsAnEmptyList(t *testing.T) {
+	got := ConnectedClientInfos(nil)
 	require.NotNil(t, got)
 	assert.Empty(t, got)
 }

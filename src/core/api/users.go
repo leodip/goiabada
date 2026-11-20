@@ -294,6 +294,39 @@ type GetUserConsentsResponse struct {
 	Consents []UserConsentResponse `json:"consents"`
 }
 
+// ConnectedClientResponse is one client a user is connected to: one the user holds a stored
+// consent with, or a live refresh token with, or both (#135 decision 4). ClientIdentifier,
+// ClientName, ClientNameUnverified and ClientDescription are named and filled as
+// UserConsentResponse's are on the same API. Consent is the stored consent, nil when there is
+// none. GrantScope is the scopes recorded on the user's live refresh tokens with the client,
+// merged into one space-delimited value, empty when there are none: what those tokens record, not
+// what a refresh would issue now. IsCurrent is whether the client is the one the caller's token
+// was issued to and the listed user is the caller (decision 5).
+type ConnectedClientResponse struct {
+	ClientId             int64                           `json:"clientId"`
+	ClientIdentifier     string                          `json:"clientIdentifier"`
+	ClientName           string                          `json:"clientName"`
+	ClientNameUnverified bool                            `json:"clientNameUnverified"`
+	ClientDescription    string                          `json:"clientDescription"`
+	Consent              *ConnectedClientConsentResponse `json:"consent"`
+	GrantScope           string                          `json:"grantScope"`
+	IsCurrent            bool                            `json:"isCurrent"`
+}
+
+// ConnectedClientConsentResponse is a connected client's stored consent: its id, its
+// space-delimited scopes and when it was given, nil for a consent that recorded no time.
+type ConnectedClientConsentResponse struct {
+	Id        int64      `json:"id"`
+	Scope     string     `json:"scope"`
+	GrantedAt *time.Time `json:"grantedAt"`
+}
+
+// GetConnectedClientsResponse is a user's connected clients. Clients is an empty array when there
+// are none, never null.
+type GetConnectedClientsResponse struct {
+	Clients []ConnectedClientResponse `json:"clients"`
+}
+
 // UserExportResponse is what the auth server holds about one user, in one document, as GET
 // /api/v1/admin/users/{id}/export answers it: what an operator hands a person who asked for their
 // data (#781). It leaves out every attribute, the user's own or a group's, that no app receives,

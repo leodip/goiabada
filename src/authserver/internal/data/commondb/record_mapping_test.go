@@ -702,6 +702,10 @@ func refreshTokenMapping() mappingCase {
 			"GetRefreshTokensBySessionIdentifier": func(ctx context.Context, d *Database) (any, error) {
 				return firstPointerOf(d.GetRefreshTokensBySessionIdentifier(ctx, nil, distinctString("session_identifier")))
 			},
+			"GetSessionBoundRefreshTokensBySessionIdentifierAndClientId": func(ctx context.Context, d *Database) (any, error) {
+				return firstPointerOf(d.GetSessionBoundRefreshTokensBySessionIdentifierAndClientId(ctx, nil,
+					distinctString("session_identifier"), 2))
+			},
 			"GetRefreshTokensByUserId": func(ctx context.Context, d *Database) (any, error) {
 				return firstPointerOf(d.GetRefreshTokensByUserId(ctx, nil, 1))
 			},
@@ -833,6 +837,14 @@ func userConsentMapping() mappingCase {
 			},
 			"GetConsentByUserIdAndClientId": func(ctx context.Context, d *Database) (any, error) {
 				return d.GetConsentByUserIdAndClientId(ctx, nil, 1, 2)
+			},
+			"GetConsentByUserIdAndClientIdForUpdate": func(ctx context.Context, d *Database) (any, error) {
+				tx, err := d.BeginTransaction(ctx)
+				if err != nil {
+					return nil, err
+				}
+				defer func() { _ = tx.Rollback() }()
+				return d.GetConsentByUserIdAndClientIdForUpdate(ctx, tx, 1, 2)
 			},
 			"GetConsentsByUserId": func(ctx context.Context, d *Database) (any, error) {
 				return firstOf(d.GetConsentsByUserId(ctx, nil, 1))
@@ -1445,6 +1457,7 @@ func checkRead(t *testing.T, dialect data.Dialect, c mappingCase, fields []tagge
 
 	script := &scriptedDriver{}
 	script.answer = func(query string, _ []driver.Value) *scriptedRows {
+		query = unparenthesizedUnion(query)
 		problems = append(problems, unionProblems(where, query)...)
 		m := selectList.FindStringSubmatch(query)
 		if m == nil {
@@ -1515,6 +1528,21 @@ func checkRead(t *testing.T, dialect data.Dialect, c mappingCase, fields []tagge
 		}
 	}
 	return problems
+}
+
+// unparenthesizedUnion is a UNION ALL of parenthesized branches, as MySQL's locking read of one
+// spells it, "(SELECT ... FOR UPDATE) UNION ALL (SELECT ... FOR UPDATE)", with each branch's
+// parentheses and locking clause taken off, so its select lists are read as any union's are. Any
+// other statement is answered as it is.
+func unparenthesizedUnion(query string) string {
+	if !strings.HasPrefix(query, "(SELECT ") || !strings.HasSuffix(query, ")") {
+		return query
+	}
+	branches := strings.Split(query[1:len(query)-1], ") UNION ALL (")
+	for i := range branches {
+		branches[i] = strings.TrimSuffix(branches[i], " FOR UPDATE")
+	}
+	return strings.Join(branches, " UNION ALL ")
 }
 
 // unionProblems holds every branch of a UNION ALL to selecting the list its first branch selects,

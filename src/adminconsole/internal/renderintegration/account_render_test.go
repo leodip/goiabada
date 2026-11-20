@@ -546,44 +546,48 @@ func TestRender_SessionListsAskWithTheirOwnSentence(t *testing.T) {
 		"the session is ended through the route the page names")
 }
 
-// The consent pages' Revoke buttons, held as the sessions pages' are: the sentence, the client's
-// name in it escaped, rides in data-confirm, and row-actions.js shows it as the dialog's plain
-// message, then posts the body the button names to the route it names.
-func TestRender_ConsentPagesAskWithTheirOwnSentence(t *testing.T) {
+// The account Applications page's and the user's Connected clients tab's Disconnect buttons, held
+// as the sessions pages' are: the sentence, the client's name in it escaped, rides in
+// data-confirm, and row-actions.js shows it as the dialog's plain message, then posts the body the
+// button names to the route it names.
+func TestRender_ConnectedClientPagesAskWithTheirOwnSentence(t *testing.T) {
 	const markup = `<b>web-app</b>`
 	for _, tc := range []struct {
 		name   string
 		page   string
 		bind   map[string]interface{}
 		action string
+		dialog string
 	}{
 		{
 			name: "account",
-			page: "/account_manage_consents.html",
+			page: "/account_applications.html",
 			bind: map[string]interface{}{
-				"consents": []render.ConsentInfo{{ConsentId: 4, Client: "web-app", ClientName: markup, Scope: "openid"}},
+				"clients": []render.ConnectedClientInfo{{ClientId: 4, Client: "web-app", ClientName: markup, GrantScope: "openid"}},
 			},
-			action: `data-action-url="/account/manage-consents" data-action-body="{&#34;consentId&#34;:4}"`,
+			action: `data-action-url="/account/applications" data-action-body="{&#34;clientId&#34;:4}"`,
+			dialog: "disconnectClient",
 		},
 		{
 			name: "admin user",
-			page: "/admin_users_consents.html",
+			page: "/admin_users_connected_clients.html",
 			bind: map[string]interface{}{
-				"user":     &api.UserResponse{Id: 7, Email: "someone@example.com"},
-				"consents": []render.ConsentInfo{{ConsentId: 4, Client: markup, Scope: "openid"}},
-				"page":     "1",
-				"query":    "",
+				"user":    &api.UserResponse{Id: 7, Email: "someone@example.com"},
+				"clients": []render.ConnectedClientInfo{{ClientId: 4, Client: markup, GrantScope: "openid"}},
+				"page":    "1",
+				"query":   "",
 			},
-			action: `data-action-url="/admin/users/7/consents" data-action-body="{&#34;consentId&#34;:4}"`,
+			action: `data-action-url="/admin/users/7/connected-clients" data-action-body="{&#34;clientId&#34;:4}"`,
+			dialog: "disconnectClient",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			out := renderMenuPage(t, tc.page, tc.bind)
 
 			assert.NotContains(t, out, markup, "the client's name must never reach the page as markup")
-			assert.Contains(t, out, tc.action, "the button names the route and the consent it revokes")
-			assert.Regexp(t, `data-dialog="revokeConsent"[^>]*data-confirm="[^"]*&lt;b&gt;web-app&lt;/b&gt;`, out)
-			assert.Contains(t, out, `id="revokeConsent_modalDialog"`)
+			assert.Contains(t, out, tc.action, "the button names the route and what it ends")
+			assert.Regexp(t, `data-dialog="`+tc.dialog+`"[^>]*data-confirm="[^"]*&lt;b&gt;web-app&lt;/b&gt;`, out)
+			assert.Contains(t, out, `id="`+tc.dialog+`_modalDialog"`)
 			assert.Contains(t, out, `id="row-actions-status" role="status"`)
 		})
 	}
@@ -595,7 +599,8 @@ func TestRender_ConsentPagesAskWithTheirOwnSentence(t *testing.T) {
 	assert.Contains(t, string(script), `bodyData: button.dataset.actionBody || null,`)
 }
 
-// The two consent pages, which are two of decision 8's seven other dates (#373). Each rendered
+// The account Applications page and the user's Connected clients tab, which are two of decision
+// 8's seven other dates (#373), as the two consent pages they replaced (#135 decision 7). Each rendered
 // GrantedAt as an English RFC1123 string its handler had already formatted -- "Wed, 16 Sep 2026
 // 12:00:00 UTC" beside Portuguese column headings -- and each now binds the instant and lets the
 // page format it. They are one case because they are one edit made twice, in two packages, and a
@@ -611,24 +616,24 @@ func TestRender_ConsentPagesLocalizeTheGrantedAtCell(t *testing.T) {
 	}{
 		{
 			name: "account",
-			page: "/account_manage_consents.html",
-			cell: `<td class="sm:whitespace-nowrap" data-label="Concedido em">16/09/2026 12:00</td>`,
+			page: "/account_applications.html",
+			cell: `<td class="sm:whitespace-nowrap" data-label="Consentimento">16/09/2026 12:00</td>`,
 			bind: map[string]interface{}{
-				"consents": []render.ConsentInfo{{
-					ConsentId: 1, Client: "web-app", ClientDescription: "The web app",
-					GrantedAt: &granted, Scope: "openid profile",
+				"clients": []render.ConnectedClientInfo{{
+					ClientId: 1, Client: "web-app", ClientDescription: "The web app",
+					HasConsent: true, GrantedAt: &granted, ConsentScope: "openid profile",
 				}},
 			},
 		},
 		{
 			name: "admin user",
-			page: "/admin_users_consents.html",
-			cell: `<td class="sm:whitespace-nowrap" data-label="Dado em">16/09/2026 12:00</td>`,
+			page: "/admin_users_connected_clients.html",
+			cell: `<td class="sm:whitespace-nowrap" data-label="Consentimento">16/09/2026 12:00</td>`,
 			bind: map[string]interface{}{
 				"user": &api.UserResponse{Id: 7, Email: "someone@example.com"},
-				"consents": []render.ConsentInfo{{
-					ConsentId: 1, Client: "web-app", ClientDescription: "The web app",
-					GrantedAt: &granted, Scope: "openid profile",
+				"clients": []render.ConnectedClientInfo{{
+					ClientId: 1, Client: "web-app", ClientDescription: "The web app",
+					HasConsent: true, GrantedAt: &granted, ConsentScope: "openid profile",
 				}},
 				"page":              "1",
 				"query":             "",
@@ -650,10 +655,11 @@ func TestRender_ConsentPagesLocalizeTheGrantedAtCell(t *testing.T) {
 // identifier, and mark a name the application gave itself, as that screen does (#108). The admin
 // pages keep the identifier, which is what an administrator knows a client by.
 func TestRender_AccountPagesNameApplicationsAsTheConsentScreenDid(t *testing.T) {
-	consents := renderMenuPage(t, "/account_manage_consents.html", map[string]interface{}{
-		"consents": []render.ConsentInfo{
-			{ConsentId: 1, Client: "portal", ClientName: "Customer portal", ClientDescription: "Orders and invoices", Scope: "openid"},
-			{ConsentId: 2, Client: "dcr_a3f9", ClientName: "Payroll Portal", ClientNameUnverified: true, Scope: "openid"},
+	consents := renderMenuPage(t, "/account_applications.html", map[string]interface{}{
+		"clients": []render.ConnectedClientInfo{
+			{ClientId: 1, Client: "portal", ClientName: "Customer portal", ClientDescription: "Orders and invoices",
+				HasConsent: true, ConsentScope: "openid"},
+			{ClientId: 2, Client: "dcr_a3f9", ClientName: "Payroll Portal", ClientNameUnverified: true, GrantScope: "openid"},
 		},
 	})
 	assert.Contains(t, consents, `<span class="font-semibold">Customer portal</span>`)
@@ -675,19 +681,21 @@ func TestRender_AccountPagesNameApplicationsAsTheConsentScreenDid(t *testing.T) 
 	assert.NotContains(t, sessions, "dcr_a3f9")
 }
 
-// A consent whose grantedAt is absent renders an empty cell rather than year 1. The column is NOT
-// NULL in the database, so this is the shape of a response the console cannot date rather than of
-// an ungranted consent (#350), and the guard that used to stand in front of the Format call is now
-// the formatter's own nil answer (#373).
-func TestRender_ConsentPageRendersAMissingGrantedAtAsBlank(t *testing.T) {
-	out := renderMenuPage(t, "/account_manage_consents.html", map[string]interface{}{
-		"consents": []render.ConsentInfo{{
-			ConsentId: 1, Client: "web-app", Scope: "openid",
+// A consent whose grantedAt is absent renders an empty cell rather than year 1, and not as a
+// client that was never asked: there is a consent. The column is NOT NULL in the database, so this
+// is the shape of a response the console cannot date rather than of an ungranted consent (#350),
+// and the guard that used to stand in front of the Format call is now the formatter's own nil
+// answer (#373).
+func TestRender_ApplicationsPageRendersAMissingGrantedAtAsBlank(t *testing.T) {
+	out := renderMenuPage(t, "/account_applications.html", map[string]interface{}{
+		"clients": []render.ConnectedClientInfo{{
+			ClientId: 1, Client: "web-app", HasConsent: true, ConsentScope: "openid",
 		}},
 	})
 
-	assert.Contains(t, out, `<td class="sm:whitespace-nowrap" data-label="Concedido em"></td>`, "a nil instant must render an empty cell")
+	assert.Contains(t, out, `<td class="sm:whitespace-nowrap" data-label="Consentimento"></td>`, "a nil instant must render an empty cell")
 	assert.NotContains(t, out, "0001", "year 1 is what a zero instant renders as")
+	assert.NotContains(t, out, "Não solicitado", "a consent with no date was still asked for")
 }
 
 // Decision 8's exclusion, kept deliberately (#373). The dateOfBirth input is not a date the page

@@ -44,13 +44,14 @@ type manageAccountAuthServer struct {
 }
 
 // minimalAccountReplies are the account routes whose minimal reply is more than an empty object:
-// the session list the end-session POST finds its session in, the end of that session, which the
-// client refuses without its success flag, and the logout request's answer, which the client
-// refuses when it fills neither of its two shapes.
+// the session list the end-session POST finds its session in, the end of that session and the
+// disconnect of a client, which the client refuses without their success flag, and the logout
+// request's answer, which the client refuses when it fills neither of its two shapes.
 var minimalAccountReplies = map[string]string{
-	"GET /api/v1/account/sessions":        `{"sessions":[{"id":31}]}`,
-	"DELETE /api/v1/account/sessions/31":  `{"success":true}`,
-	"POST /api/v1/account/logout-request": `{"logoutUrl":"https://auth.example.test/auth/logout"}`,
+	"GET /api/v1/account/sessions":                `{"sessions":[{"id":31}]}`,
+	"DELETE /api/v1/account/sessions/31":          `{"success":true}`,
+	"DELETE /api/v1/account/connected-clients/13": `{"success":true}`,
+	"POST /api/v1/account/logout-request":         `{"logoutUrl":"https://auth.example.test/auth/logout"}`,
 }
 
 // client starts the stub and returns the console's real API client pointed at it.

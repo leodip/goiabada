@@ -101,38 +101,52 @@ func clientNames(clients []api.SessionClientResponse) []ClientName {
 	return names
 }
 
-// ConsentInfo is one row of the account consents page and of the admin user consents page. Client
-// is the identifier, which the admin page shows; ClientName and ClientNameUnverified are the name
-// the consent screen showed the user, which the account page shows.
-type ConsentInfo struct {
-	ConsentId            int64
+// ConnectedClientInfo is one row of the account Applications page and of a user's Connected
+// clients tab: a client the user holds a stored consent with, a live refresh token with, or both
+// (#135 decision 4). Client is the identifier; ClientName and ClientNameUnverified are the name the
+// consent screen shows the user, which the account page shows, and the admin tab shows beside the
+// identifier when it is neither the identifier nor the description.
+// HasConsent says whether the client has a stored consent, ConsentScope and GrantedAt being that
+// consent's; GrantScope is the scopes the user's live refresh tokens with it record. The page shows
+// each scope list under its own label, since either can hold a scope the other lacks (decision 7).
+// IsCurrent marks the client the caller's own token was issued to, on the caller's own user, which
+// neither page offers a Disconnect for (decision 5).
+type ConnectedClientInfo struct {
+	ClientId             int64
 	Client               string
 	ClientName           string
 	ClientNameUnverified bool
 	ClientDescription    string
-	// GrantedAt is the instant rather than pre-rendered text, for the reason SessionInfo's
-	// two carry theirs: formatting here produced an English RFC1123 date under every
-	// locale, because Go's time.Format has no locale of its own (#373).
-	GrantedAt *time.Time
-	Scope     string
+	HasConsent           bool
+	ConsentScope         string
+	// GrantedAt is the instant rather than pre-rendered text, for the reason SessionInfo's two
+	// carry theirs: Go's time.Format has no locale of its own (#373). It is nil for a consent
+	// that recorded no time, which the page renders as an empty cell (#350).
+	GrantedAt  *time.Time
+	GrantScope string
+	IsCurrent  bool
 }
 
-// ConsentInfos maps the API's consents to the rows both consent pages render, in the API's order.
-func ConsentInfos(consents []api.UserConsentResponse) []ConsentInfo {
-	infos := make([]ConsentInfo, 0, len(consents))
-	for _, c := range consents {
-		infos = append(infos, ConsentInfo{
-			ConsentId:            c.Id,
+// ConnectedClientInfos maps the API's connected clients to the rows the page renders, in the API's
+// order.
+func ConnectedClientInfos(clients []api.ConnectedClientResponse) []ConnectedClientInfo {
+	infos := make([]ConnectedClientInfo, 0, len(clients))
+	for _, c := range clients {
+		info := ConnectedClientInfo{
+			ClientId:             c.ClientId,
 			Client:               c.ClientIdentifier,
 			ClientName:           c.ClientName,
 			ClientNameUnverified: c.ClientNameUnverified,
 			ClientDescription:    c.ClientDescription,
-			Scope:                c.Scope,
-			// grantedAt is nullable on the wire, where the column it comes from is not:
-			// a consent row always records when it was granted, so an absent value is a
-			// response this console cannot date rather than an ungranted consent (#350).
-			GrantedAt: c.GrantedAt,
-		})
+			GrantScope:           c.GrantScope,
+			IsCurrent:            c.IsCurrent,
+		}
+		if c.Consent != nil {
+			info.HasConsent = true
+			info.ConsentScope = c.Consent.Scope
+			info.GrantedAt = c.Consent.GrantedAt
+		}
+		infos = append(infos, info)
 	}
 
 	return infos

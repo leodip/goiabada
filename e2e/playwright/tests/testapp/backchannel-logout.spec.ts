@@ -1,9 +1,10 @@
 // OpenID Connect Back-Channel Logout 1.0, through the test app's two web apps. Each registered its
 // /<app>/backchannel-logout route as its back-channel logout URI, as Sign users out, "Get told when a
 // session ends", says, and the route checks each logout token as the guide says, ends the app's own
-// sessions the token names and answers 200. Each test drives a real end of the user's session and
-// watches the app sign the user out, from the tokens it shows it accepted for this browser's user.
-import { confirmDialog, userUrl } from "../../lib/admin-console";
+// sessions the token names and answers 200. Each test drives a real end of the user's session, or a
+// disconnect of the app from the user's account, and watches the app sign the user out, from the
+// tokens it shows it accepted for this browser's user.
+import { confirmDialog, rowWithCell, userUrl } from "../../lib/admin-console";
 import { signInToConsole } from "../../lib/console-user";
 import { expect, test } from "../../lib/fixtures";
 import {
@@ -134,5 +135,38 @@ test("signing out of one app with its ID token tells that app alone, and the oth
   // Its part of the session is still there.
   await app.getByRole("button", { name: "Call /userinfo" }).click();
   await expectResult(app, "/userinfo answered");
+  await context.close();
+});
+
+test("disconnecting the app from the user's account tells it with a token naming no session, and the user stays signed in", async ({ browser, users }) => {
+  const user = await users.create();
+  const { context, page: app } = await userBrowser(browser);
+  // The app has consent off, so the user approves the consent screen it asks for with prompt=consent.
+  await signInToWebApp(app, testapp.web, user, { prompt: "consent" });
+  await expect(app).toHaveURL(/\/auth\/consent/);
+  await app.getByRole("button", { name: "Allow", exact: true }).click();
+  await app.waitForURL(testapp.web.url);
+  await expectResult(app, "Signed in");
+  const idToken = await shownClaims(app, "ID token claims");
+
+  // The user disconnects it, consent and all, from another device's Account, Applications.
+  const own = await signInToConsole(browser, user, "/account/applications");
+  const row = rowWithCell(own.page, testapp.web.clientId);
+  await expect(row).toContainText("You allowed");
+  await row.getByRole("button", { name: `Disconnect ${testapp.web.clientId}`, exact: true }).click();
+  await confirmDialog(own.page, `Disconnect ${testapp.web.clientId}?`);
+  await expect(own.page.locator("#row-actions-status")).toHaveText("Application disconnected.");
+  await own.context.close();
+
+  const [token] = await waitForLogoutTokens(app, testapp.web, 1);
+  expectLogoutToken(token, testapp.web, idToken, "none");
+  await expectResult(app, "Signed out by the auth server");
+  await expect(app.getByText("Not signed in to this app.")).toBeVisible();
+
+  // The browser's session is untouched: signing in to the app again asks for no password.
+  const { askedForPassword } = await signInToWebApp(app, testapp.web, user);
+  expect(askedForPassword).toBe(false);
+  await app.waitForURL(testapp.web.url);
+  await expectResult(app, "Signed in");
   await context.close();
 });

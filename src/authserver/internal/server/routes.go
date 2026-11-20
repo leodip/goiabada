@@ -359,7 +359,11 @@ func (s *Server) initRoutes(branches appBranches) {
 
 		// User consent routes
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/users/{id}/consents", apihandlers.HandleUserConsentsGet(s.database))
-		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Delete("/user-consents/{id}", apihandlers.HandleUserConsentDelete(s.database, auditLogger))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Delete("/user-consents/{id}", apihandlers.HandleUserConsentDelete(s.database, auditLogger, logoutTokens))
+
+		// A user's connected clients: consents and live grants, and their disconnect (#135 decision 2).
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/users/{id}/connected-clients", apihandlers.HandleUserConnectedClientsGet(s.database))
+		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Delete("/users/{id}/connected-clients/{clientId}", apihandlers.HandleUserConnectedClientDelete(s.database, auditLogger, logoutTokens))
 
 		// The legal document versions the user accepted, read as part of the user (#622 decision 6).
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/users/{id}/legal-document-acceptances", apihandlers.HandleUserLegalDocumentAcceptancesGet(s.database, baseURL))
@@ -587,7 +591,11 @@ func (s *Server) initRoutes(branches appBranches) {
 			rateLimiter.LimitAccountExport).Get("/export",
 			apihandlers.HandleAccountExportGet(s.database, auditLogger, baseURL))
 		r.Get("/consents", apihandlers.HandleAccountConsentsGet(s.database))
-		r.Delete("/consents/{id}", apihandlers.HandleAccountConsentDelete(s.database, auditLogger))
+		r.Delete("/consents/{id}", apihandlers.HandleAccountConsentDelete(s.database, auditLogger, logoutTokens))
+		// The clients the caller is connected to, with or without a consent, and the disconnect of
+		// one, the operation a consent withdrawal runs (#135 decisions 2 and 4).
+		r.Get("/connected-clients", apihandlers.HandleAccountConnectedClientsGet(s.database))
+		r.Delete("/connected-clients/{clientId}", apihandlers.HandleAccountConnectedClientDelete(s.database, auditLogger, logoutTokens))
 		// The legal document versions the caller accepted (#622 decision 10).
 		r.Get("/legal-document-acceptances", apihandlers.HandleAccountLegalDocumentAcceptancesGet(s.database, baseURL))
 

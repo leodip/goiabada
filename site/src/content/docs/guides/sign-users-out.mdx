@@ -7,7 +7,7 @@ import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components'
 
 This guide adds a sign-out button that ends your app's tokens, signs the user out of the auth server too, and brings them back to your app.
 
-Ending your app's own session isn't enough. The auth server keeps a [session](/concepts/sessions/) of its own, so the next time your app sent the user to sign in, they'd be signed straight back in. And the tokens your app was given can outlive the sign-out. Your app revokes its tokens at the revocation endpoint, `/auth/revoke`, then sends the browser to the logout endpoint, `/auth/logout`, with the ID token the user signed in with, and the auth server signs them out and sends them back.
+Ending your app's own session isn't enough. The auth server keeps a [session](/concepts/sessions/) of its own, so the next time your app sent the user to sign in, they'd be signed straight back in. And an offline refresh token your app was given outlives the sign-out. Your app revokes its tokens at the revocation endpoint, `/auth/revoke`, then sends the browser to the logout endpoint, `/auth/logout`, with the ID token the user signed in with, and the auth server signs them out and sends them back.
 
 ## Sign users out
 
@@ -56,20 +56,22 @@ With the ID token as its hint, a sign-out ends your app's part of the user's ses
 
 A sign-out with no hint, or with one the auth server can't confirm, asks the user "Do you want to sign out?" first, and when they click **Sign out**, it ends the whole session, every client's part of it. RP-Initiated Logout, the OpenID Connect standard the endpoint follows, asks for that, since anyone can send a browser to `/auth/logout`. [Ending sessions](/concepts/ending-sessions/#signing-out) has the precise rules.
 
-When your client has a [back-channel logout URI](#get-told-when-a-session-ends), a sign-out with the hint sends your app a [logout token](/reference/endpoints/back-channel-logout/#the-logout-token), a signed message saying the session ended, for its part of the session too, after it has already ended its own. Answer it with `200` like any other. A sign-out with no hint sends one to every app on the session.
+When your client has a [back-channel logout URI](#get-told-when-a-session-ends), a sign-out with the hint sends your app a [logout token](/reference/endpoints/back-channel-logout/#the-logout-token), a signed message saying the session ended, for its part of the session too, after it has already ended its own. Answer it with `200` like any other. A sign-out with no hint, or with one the auth server can't confirm, sends a logout token to each app on the session that has a back-channel logout URI. Neither sends one for a session that had already expired: see [Telling your apps](/concepts/ending-sessions/#telling-your-apps).
 
 An ID token that has expired still works as a hint while the session it came from is there, so a user who leaves your app open all day can still sign out without the question.
 
 ## Your app's tokens
 
-Signing out at `/auth/logout` revokes no token. That's why step 3 revokes them:
+A sign-out with the ID token as its hint revokes your app's refresh tokens tied to the user's session, and its authorization codes from it that weren't redeemed yet, even when other apps share that session. It doesn't reach everything, and that's why step 3 revokes first:
 
-- **A refresh token** keeps working while the session it's tied to does, which, when other apps share that session, is after your app has signed out. An offline refresh token, from the `offline_access` scope, isn't tied to a session at all.
-- **An access token** works at `/userinfo` and the auth server's APIs until it expires or is revoked. An API that checks only its signature accepts it until it expires, revoked or not.
+- **An offline refresh token**, from the `offline_access` scope, isn't tied to a session, so signing out leaves it working.
+- **A sign-out without the hint**, or with one the auth server can't confirm, revokes nothing. Ending the session stops your app's normal refresh tokens all the same.
+- **A code your app is exchanging** at the very moment it signs out can still give it a working refresh token.
+- **An access token** is refused at `/userinfo` and the auth server's APIs once its grant is revoked. An API that checks only its signature accepts it until it expires, revoked or not.
 
 Revoking the refresh token, or an access token that hasn't expired, ends the whole grant, so one call is enough. See [What revoking ends](/reference/endpoints/revoke/#what-revoking-ends).
 
-To cut off everything a session handed out, to every app, end the session instead. A user can, under **Account**, **Sessions** in the admin console, and an administrator can, on the user's **Sessions** tab. See [Ending sessions](/concepts/ending-sessions/#end-a-session).
+To revoke every grant a session handed out, to every app, end the session instead. The auth server, and any API that introspects tokens, refuses those grants' tokens at once; an API that checks only the signature accepts an access token until it expires, as above. A user can, under **Account**, **Sessions** in the admin console, and an administrator can, on the user's **Sessions** tab. See [Ending sessions](/concepts/ending-sessions/#end-a-session). To cut one app off from a user on every device, offline refresh tokens included, while they stay signed in to the rest, [disconnect it](/concepts/ending-sessions/#disconnect-a-client).
 
 ## Where the user lands
 
@@ -99,7 +101,7 @@ A POST from another origin with no hint, whether another site or another host of
 
 ## Get told when a session ends
 
-Your app's own session can outlive the user's session on the auth server: when they sign out of another app with no hint, someone ends their session under **Account**, **Sessions**, or an administrator disables them. Give your client a back-channel logout URI, and the auth server tells your app each time a session it was on ends, by POSTing a signed logout token there, as [OpenID Connect Back-Channel Logout 1.0](https://openid.net/specs/openid-connect-backchannel-1_0.html) describes. Your app then signs the user out at once.
+Your app's own session can outlive the user's session on the auth server: when they sign out of another app with no hint, someone ends their session under **Account**, **Sessions**, or an administrator disables them. Give your client a back-channel logout URI, and the auth server tells your app when a session it was on ends while still valid, by POSTing a signed logout token there, as [OpenID Connect Back-Channel Logout 1.0](https://openid.net/specs/openid-connect-backchannel-1_0.html) describes. Your app then signs the user out at once. [Telling your apps](/concepts/ending-sessions/#telling-your-apps) lists every end that tells it.
 
 <Steps>
 

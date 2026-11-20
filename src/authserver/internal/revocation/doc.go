@@ -6,15 +6,18 @@
 // TerminateUserSessionTx, which ends one session and the grants issued under it;
 // RevokeOnAuthCodeReuseTx, the answer to a redeemed code presented again;
 // RevokeClientGrantsTx, for a client that no longer has to authenticate; and
-// RevokeOnConsentWithdrawalTx, which deletes a user's consent to one client, marks that user's
-// unused codes with it revoked and revokes the refresh tokens that user holds with it (#622); and
+// DisconnectClientTx, which a consent withdrawal runs, for one user and one client: it deletes
+// the user's consent to the client when the caller asks, marks the user's unused codes with it
+// revoked, and revokes the user's refresh grants with it, recording each grant's rotation family.
+// Implicit-flow access tokens belong to no grant, so it leaves them to their own expiry and
+// session rules (#622, #135 decision 8); and
 // RevokeGrantTx, which ends one grant at its client's request at /auth/revoke (#676).
 // RevokeAccessToken, beside them, stores the jti of an access token without a grant revoked at
 // /auth/revoke, on no transaction: a lookup, then an insert (#676).
 // RevokeUserAuthState, RevokeOnAuthCodeReuse and RevokeClientGrants are the same operations on a
 // transaction the caller owns, which they require, and RevokeRefreshTokens, beneath them, runs on
 // the caller's transaction or, given nil, on none. The Reason* constants are the reasons a
-// revocation records (#106, #129, #245, #387, #622, #676).
+// revocation records (#106, #129, #245, #387, #622, #676, #135).
 //
 // Each operation reports what it actually did, the sessions it ended and only the tokens it moved
 // from live to revoked. On an error each *Tx operation reports nothing, the zero result, so a

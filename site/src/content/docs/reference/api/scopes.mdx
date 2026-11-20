@@ -16,7 +16,7 @@ Give each integration the smallest scope that does its job. A service that creat
 | Scope | Reads | Writes |
 |---|---|---|
 | `authserver:admin-read` | Every Admin API operation that reads, administrators included, except a client's secret | Nothing |
-| `authserver:manage-users` | Users and groups, with their attributes, sessions, consents, memberships and permissions | The same, except administrators and administrative permissions |
+| `authserver:manage-users` | Users and groups, with their attributes, sessions, consents, connected clients, memberships and permissions | The same, except administrators and administrative permissions |
 | `authserver:manage-clients` | Clients, their secrets included, except an administrator client's or one listed for the `authserver` resource | Clients, except administrator clients, adding the `authserver` resource to a client's [introspection resources](/concepts/clients/#introspection-resources), and setting the secret of a client listed for it |
 | `authserver:manage-settings` | Settings, email templates, brands and their uploaded files, resources and their permissions, legal documents, signing keys, and the audit log | Settings except email and audit logging, brands and their uploaded files, resources and their permissions, legal documents, signing keys. Not email templates |
 | `authserver:manage` | Everything | Everything, administrators included |
@@ -33,9 +33,9 @@ The four granular scopes stop short of administrators: they read them, but they 
 
 ## The Account API scope
 
-Every Account API operation takes `authserver:manage-account`, on a token issued for a user. It isn't an administrative scope: a token carrying it reaches the user's own account and nothing else. That still means the user's profile, sessions and consents, and every user holds the `manage-account` permission from the moment they're created, so the user decides which clients get it.
+Every Account API operation takes `authserver:manage-account`, on a token issued for a user. It isn't an administrative scope: a token carrying it reaches the user's own account and nothing else. That still means the user's profile, sessions, consents and connected clients, and every user holds the `manage-account` permission from the moment they're created, so the user decides which clients get it.
 
-Any client that signs users in, with the authorization code or the implicit flow, can ask for it, and gets it once the user has approved it on the consent screen. Whatever the client's **Ask users for consent** says, the user is asked the first time. Their answer is kept, so refreshes go through without asking, and so do later sign-ins, `prompt=none` included, unless the client is public with **Remember consent** off. A user who unticks it, or withdraws it under **Account**, **Consents**, is asked again. Until they've approved it, `prompt=none` is answered `consent_required` and a refresh renewing it `invalid_grant`. [Consent required](/concepts/clients/#consent-required) has the whole rule.
+Any client that signs users in, with the authorization code or the implicit flow, can ask for it, and gets it once the user has approved it on the consent screen. Whatever the client's **Ask users for consent** says, the user is asked the first time. Their answer is kept, so refreshes go through without asking, and so do later sign-ins, `prompt=none` included, unless the client is public with **Remember consent** off. A user who unticks it, or disconnects the client under **Account**, **Applications**, is asked again. Until they've approved it, `prompt=none` is answered `consent_required` and a refresh renewing it `invalid_grant`. [Consent required](/concepts/clients/#consent-required) has the whole rule.
 
 The admin console's own client is the one exception: it gets `authserver:manage-account` with no screen, since that's how users reach their own **Account** pages. It's also the only client whose token can delete the account, `POST /api/v1/account/deletion`, or download its data, `GET /api/v1/account/export`. A token any other client holds is refused `403` with `CLIENT_NOT_ALLOWED`, so an app the user granted `authserver:manage-account` can change their account but can't delete it or download it. A client allowed to [request the administrative scopes](#administrative-scopes-on-a-users-behalf) is asked like any other. The [password grant](/legacy-flows/ropc/) shows no screen at all, so a client using it gets `authserver:manage-account` as it gets any scope the user holds: the user has typed their password into it.
 
@@ -45,7 +45,7 @@ Each Admin API operation belongs to one domain, and the domain decides which gra
 
 | Domain | Operations |
 |---|---|
-| Users | Users, user attributes, user sessions, user consents, the legal documents each user accepted, read only, groups, group members, group attributes, and the permissions of users and groups |
+| Users | Users, user attributes, user sessions, user consents, user connected clients, the legal documents each user accepted, read only, groups, group members, group attributes, and the permissions of users and groups |
 | Clients | Clients, with their authentication, flows, redirect URIs, sign-out redirect URIs, web origins, tokens, permissions, introspection resources, sessions, logo and secret, and the legal documents that apply to each, read only |
 | Settings | General, email, session, token and audit log settings, email templates, brands and their uploaded files, the built-in themes, signing keys, resources and their permissions, legal documents and the clients each applies to, and the audit log |
 

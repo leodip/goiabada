@@ -123,6 +123,8 @@ command itself and fails on a tree it changed.
 | `core/api` | `ClientLogoInfoResponse` | both-apps | — |
 | `core/api` | `ClientLogoUploadResponse` | both-apps | — |
 | `core/api` | `ClientResponse` | both-apps | — |
+| `core/api` | `ConnectedClientConsentResponse` | reachable | — |
+| `core/api` | `ConnectedClientResponse` | both-apps | — |
 | `core/api` | `CreateAccountRecoveryCodesRequest` | both-apps | — |
 | `core/api` | `CreateAccountRecoveryCodesResponse` | both-apps | — |
 | `core/api` | `CreateBrandAssetResponse` | both-apps | Admin API response DTO, which is what `core/api` is for. The auth server writes it and no admin console file reads it yet; #385 exempts this package by name. |
@@ -170,6 +172,7 @@ command itself and fails on a tree it changed.
 | `core/api` | `GetClientSecretResponse` | both-apps | — |
 | `core/api` | `GetClientSessionsResponse` | both-apps | — |
 | `core/api` | `GetClientsResponse` | both-apps | — |
+| `core/api` | `GetConnectedClientsResponse` | both-apps | — |
 | `core/api` | `GetEmailTemplateResponse` | both-apps | — |
 | `core/api` | `GetEmailTemplatesResponse` | both-apps | — |
 | `core/api` | `GetGroupAttributeResponse` | both-apps | — |
@@ -188,7 +191,7 @@ command itself and fails on a tree it changed.
 | `core/api` | `GetSettingsKeysResponse` | both-apps | — |
 | `core/api` | `GetUserAttributeResponse` | both-apps | — |
 | `core/api` | `GetUserAttributesResponse` | both-apps | — |
-| `core/api` | `GetUserConsentsResponse` | both-apps | — |
+| `core/api` | `GetUserConsentsResponse` | contract | Admin and Account API response DTO of a user's consents, which is what `core/api` is for. The auth server writes it and no admin console file reads it since the console's consent pages gave way to its connected-clients pages (#135); #385 exempts this package by name. |
 | `core/api` | `GetUserGroupsResponse` | both-apps | — |
 | `core/api` | `GetUserPermissionsResponse` | both-apps | — |
 | `core/api` | `GetUserResponse` | both-apps | — |
@@ -295,7 +298,7 @@ command itself and fails on a tree it changed.
 | `core/api` | `UpdateUserProfileRequest` | both-apps | — |
 | `core/api` | `UpdateUserResponse` | both-apps | — |
 | `core/api` | `UserAttributeResponse` | both-apps | — |
-| `core/api` | `UserConsentResponse` | both-apps | — |
+| `core/api` | `UserConsentResponse` | contract | One consent of the Admin and Account API consent responses (#135). The auth server writes it and no admin console file reads it since the console's consent pages gave way to its connected-clients pages; #385 exempts this package by name. |
 | `core/api` | `UserExportAuditEventResponse` | contract | An audit event in the user export, `GET /api/v1/admin/users/{id}/export`, a published admin API answer whose wire types live here as every one does (#781 decision 2). The auth server writes it and no admin console file reads it. |
 | `core/api` | `UserExportGroupResponse` | contract | A group with its attributes and permissions in the user export, `GET /api/v1/admin/users/{id}/export`, a published admin API answer whose wire types live here as every one does (#781 decision 3). The auth server writes it and no admin console file reads it. |
 | `core/api` | `UserExportIdentifiersResponse` | contract | The identifiers part of the user export, `GET /api/v1/admin/users/{id}/export`, a published admin API answer whose wire types live here as every one does (#781 decision 3). The auth server writes it and no admin console file reads it. |

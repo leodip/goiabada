@@ -84,7 +84,7 @@ The scope can hold the OpenID Connect scopes, such as `openid`, `profile` and `e
 - **An offline refresh token,** whether or not your app asked for `offline_access`, since there's no session for it to belong to. It follows the offline refresh token's idle timeout and maximum lifetime, 30 days and a year in a new install. See [Refresh tokens](/concepts/refresh-tokens/).
 - **No consent screen.** Sending the password counts as the user's consent to the scope asked for.
 - **`acr` is `urn:goiabada:level1` and `amr` is `["pwd"]`,** since a password is all that was checked. An API that requires two-factor authentication refuses these tokens by their `acr`. See [ACR and AMR](/concepts/acr-and-amr/).
-- **No `sid`.** The tokens belong to no session, so signing out of the browser doesn't touch them.
+- **No `sid`.** The tokens belong to no session, so signing out of the browser doesn't touch them. [Disconnecting](/concepts/ending-sessions/#disconnect-a-client) your app from the user revokes them, but your app can get new ones straight away with the user's password: nothing asks for consent.
 - **`auth_time` is when the password was checked,** and stays that across every refresh.
 
 Each grant leaves a `token_issued_ropc_response` entry in the [audit log](/concepts/audit-log/). Each `invalid_grant` below leaves a `ropc_auth_failed` entry, which records the address only as `email_digest`.

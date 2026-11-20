@@ -17,13 +17,13 @@ Your app refreshes, and the token endpoint answers `400`:
 
 Then the refresh token your app got from its previous refresh fails too, with the same "This refresh token has been revoked." The audit log may hold a `refresh_token_replay_detected` [event](/concepts/audit-log/) for your client.
 
-Or every refresh token the user holds with your app fails at once, on every device, and the audit log may hold a `revoked_consent_grants` event naming the user and your client: the user's consent was withdrawn. See [A withdrawn consent](#a-withdrawn-consent).
+Or every refresh token the user holds with your app fails at once, on every device, and the audit log may hold a `disconnected_client` event naming the user and your client: your app was disconnected from the user. See [A disconnected app](#a-disconnected-app).
 
 Or every refresh token your app got from the password grant fails at once, for every user: an administrator changed your app's client identifier or made it public. If audit logging is on, look in the [audit log](/concepts/audit-log/) for a `revoked_client_grants` event for your client, with the reason `client_identifier_changed` or `client_became_public`. See [A changed client identifier](#a-changed-client-identifier) and [A client made public](#a-client-made-public).
 
 ## Why it happens
 
-There are five causes: a refresh token that came back after it was rotated, which is the usual one, a consent withdrawn, a changed client identifier, a client made public, and your app revoking the grant.
+There are six causes: a refresh token that came back after it was rotated, which is the usual one, your app disconnected from the user, a changed client identifier, a client made public, your app revoking the grant, and your app signing the user out.
 
 A refresh token is good for one refresh. Each refresh returns a new one and retires the old one, and that's called rotation.
 
@@ -36,9 +36,9 @@ Your own app usually causes it in one of two ways:
 
 There's no grace period for either: a retired token is retired the moment the refresh succeeds.
 
-### A withdrawn consent
+### A disconnected app
 
-When the user withdraws their consent to your app under **Account**, **Consents**, or an administrator revokes it on the user's **Consents** tab, every refresh token the user holds with your app is revoked at once: the grants of every sign-in and every device, offline ones included. The user's grants with other apps, and their session with the auth server, keep working.
+When the user disconnects your app under **Account**, **Applications**, or an administrator does on the user's **Connected clients** tab, every refresh token the user holds with your app is revoked at once: the grants of every sign-in and every device, offline ones included. So is withdrawing the user's consent to your app through the API. The user's grants with other apps, and their session with the auth server, keep working. See [Disconnect a client](/concepts/ending-sessions/#disconnect-a-client).
 
 There's nothing to fix in your app beyond signing the user in again. If your app asks for consent, the user is asked again.
 
@@ -57,6 +57,10 @@ Sign your app's users in again.
 ### A grant your app revoked
 
 When your app sends one of a grant's tokens to [`/auth/revoke`](/reference/endpoints/revoke/), at sign-out for example, the grant's refresh tokens are refused from then on, usually with "This refresh token has been revoked." The audit log holds a `revoked_grant` event for your client, and no `refresh_token_replay_detected`. Look for a sign-out in one tab or instance while another was refreshing. Sign the user in again.
+
+### A sign-out with your app's ID token
+
+When your app signs the user out at [`/auth/logout`](/reference/endpoints/logout/) with its ID token as an `id_token_hint` the auth server confirms, its normal refresh tokens from that session are revoked, even while other apps keep the session. The audit log holds a `revoked_sign_out_grants` event for your client. A refresh token your app needs after the user signs out has to be an offline one, from the `offline_access` scope. A hint the auth server can't confirm revokes nothing: once the user confirms, the whole session ends, and its normal refresh tokens are refused as an ended session's. See [Signing out](/concepts/ending-sessions/#signing-out).
 
 ## Fix it
 
@@ -90,7 +94,7 @@ These refreshes answer `invalid_grant` too:
 | "The refresh token is invalid because the associated session has expired or been terminated." | The session it was issued through ended, or the client was made public or its identifier was changed. A refresh token from the password grant answers "This refresh token has been revoked." for those two instead. |
 | "The refresh token is invalid because it has expired (offline_access_max_lifetime)." | An offline refresh token reached its maximum lifetime. |
 | "The refresh token is invalid." | The user is disabled, or the token is unknown, or an administrator changed the auth server's [issuer](/reference/endpoints/discovery-and-jwks/#the-discovery-document) after the token was issued. So is a token that's malformed or that none of the auth server's signing keys verifies: one cut short or changed on its way, or one signed by a key that [rotating the signing keys](/reference/endpoints/discovery-and-jwks/#the-key-set) deleted. Rarely, a token issued while its family was being revoked. |
-| "The user has either not given consent to this client or the previously granted consent has been revoked." | The user's consent was withdrawn (see [A withdrawn consent](#a-withdrawn-consent)), or it was never given, because **Ask users for consent** was turned on after the user signed in. Checked only for a refresh token from a sign-in: an offline one, any of a client that requires consent, and one renewing `authserver:manage-account` to any client but the admin console's. Sign the user in again. |
+| "The user has either not given consent to this client or the previously granted consent has been revoked." | The user's consent was withdrawn (see [A disconnected app](#a-disconnected-app)), or it was never given, because **Ask users for consent** was turned on after the user signed in. Checked only for a refresh token from a sign-in: an offline one, any of a client that requires consent, and one renewing `authserver:manage-account` to any client but the admin console's. Sign the user in again. |
 | "Scope 'authserver:manage-account' is not recognized. The user has not consented to the 'authserver:manage-account' permission." | The user's consent leaves `authserver:manage-account` out: they unticked it on the consent screen. Send them through an ordinary sign-in to approve it, or refresh with a `scope` that leaves it out. |
 | "The refresh token is invalid because it does not belong to the client." | The request named a client other than the one the token was issued to. Each client refreshes only its own tokens. |
 

@@ -1012,13 +1012,14 @@ func TestGetRefreshTokensByUserIdAndClientId(t *testing.T) {
 	}
 }
 
-// TestRevokeOnConsentWithdrawalTx_RecordsFamiliesWithNoLiveMember runs the real withdrawal over
-// a user's families with one client whose stored members are all revoked already, one of each
-// linkage shape (#622). The sweep has nothing left to flip, so it reports no token, but both
-// families must be recorded: a rotation that claimed a member before the withdrawal can still
-// insert a live child after it, and only the record refuses that child. Another client's family
-// of the same user is left unrecorded.
-func TestRevokeOnConsentWithdrawalTx_RecordsFamiliesWithNoLiveMember(t *testing.T) {
+// TestDisconnectClientTx_RecordsFamiliesWithNoLiveMember runs the real disconnect over a user's
+// families with one client whose stored members are all revoked already, one of each linkage
+// shape (#622, #135). The sweep has nothing left to flip, so it reports no token, but both
+// families must be recorded, and the call reports them as its change: a rotation that claimed a
+// member before the disconnect can still insert a live child after it, and only the record
+// refuses that child. Another client's family of the same user is left unrecorded, and the same
+// disconnect again records nothing and reports no change.
+func TestDisconnectClientTx_RecordsFamiliesWithNoLiveMember(t *testing.T) {
 	ctx := context.Background()
 	client := createTestClient(t)
 	otherClient := createTestClient(t)
@@ -1050,10 +1051,16 @@ func TestRevokeOnConsentWithdrawalTx_RecordsFamiliesWithNoLiveMember(t *testing.
 		RefreshTokenType: "Refresh", FirstRefreshTokenJti: otherClientFamily, Revoked: true,
 	})
 
-	result, err := revocation.RevokeOnConsentWithdrawalTx(ctx, database, user.Id, client.Id,
-		func(*sql.Tx) error { return nil })
-	require.NoError(t, err, "RevokeOnConsentWithdrawalTx")
+	result, err := revocation.DisconnectClientTx(ctx, database, user.Id, client.Id, nil, nil)
+	require.NoError(t, err, "DisconnectClientTx")
 	assert.Empty(t, result.RevokedRefreshTokenJtis, "every member was revoked already, so the sweep flips none")
+	assert.Equal(t, 2, result.RecordedFamilyCount, "the call newly recorded both families with this client")
+	assert.True(t, result.Changed())
+
+	again, err := revocation.DisconnectClientTx(ctx, database, user.Id, client.Id, nil, nil)
+	require.NoError(t, err, "DisconnectClientTx again")
+	assert.Equal(t, 0, again.RecordedFamilyCount, "both families were recorded by the first call")
+	assert.False(t, again.Changed(), "the second call changed nothing: %+v", again)
 
 	for _, f := range []struct {
 		label string

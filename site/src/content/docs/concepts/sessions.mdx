@@ -9,7 +9,7 @@ This page helps you understand when users are asked to sign in, and when they go
 
 When a user signs in, the auth server starts a session for their browser and names it in a cookie. The next time any client sends that browser to sign in, the session is enough: the user isn't asked for their password again. That's [single sign-on](/concepts/glossary/#single-sign-on-sso). The session remembers who signed in, when, and how strongly, as its [ACR level](/concepts/acr-and-amr/).
 
-Each user can see their sessions under **Account**, **Sessions** in the admin console, and an administrator sees them on the user's **Sessions** tab and on a client's **Sessions** tab.
+Each user can see their sessions under **Account**, **Sessions** in the admin console, and an administrator sees them on the user's **Sessions** tab and on a client's **Sessions** tab. Each session lists the clients the user signed in to with it. A client [disconnected](/concepts/ending-sessions/#disconnect-a-client) from the user stays listed until the session ends, since a disconnect revokes the client's tokens and leaves the session alone.
 
 ## Ask for a recent sign-in
 
@@ -155,7 +155,7 @@ The admin console's own cookie always ends when the browser closes. But the cons
 </Aside>
 
 <Aside>
-To end a session rather than leave it to expire, sign out or end it from the sessions page. See [Ending sessions](/concepts/ending-sessions/).
+To end a session rather than leave it to expire, end it from the sessions page. See [Ending sessions](/concepts/ending-sessions/).
 </Aside>
 
 ## Next steps
