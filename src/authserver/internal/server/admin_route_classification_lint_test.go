@@ -1059,6 +1059,23 @@ func TestAdminRouteClassification_Guard_FailsOnAnUnclassifiedWriteRoute(t *testi
 	assert.Contains(t, report.Errors[0], "PUT /api/v1/admin/users/{id}/enabled: a write route the policy does not classify; its handler applies the target ceiling")
 }
 
+// A write registered through the router an r.Route call returns is an admin route under the group's
+// prefix, and is classified as one.
+func TestAdminRouteClassification_Guard_FailsOnAnUnclassifiedWriteThroughAReturnedGroupRouter(t *testing.T) {
+	root := writeAdminRouteFixture(t, adminRouteFixtureHandlers)
+	routes := strings.Replace(adminRouteFixtureRoutes, "\tapi.Route(\"/api/v1/admin\"", "\tadmin := api.Route(\"/api/v1/admin\"", 1)
+	routes = strings.Replace(routes, "\tapi.Route(\"/api/v1/account\"",
+		"\tadmin.Post(\"/jobs\", apihandlers.HandleUserCreatePost(s.database, auditLogger))\n\tapi.Route(\"/api/v1/account\"", 1)
+	require.NotEqual(t, adminRouteFixtureRoutes, routes)
+	require.NoError(t, os.WriteFile(filepath.Join(root, filepath.FromSlash(adminRoutesFile)), []byte(routes), 0o600))
+
+	report := runAdminRouteGuard(root, adminRouteFixtureClassification(), adminRouteFixtureCeilings)
+
+	require.Len(t, report.Errors, 1)
+	assert.Contains(t, report.Errors[0], "1 admin route(s)")
+	assert.Contains(t, report.Errors[0], "POST /api/v1/admin/jobs: a write route the policy does not classify; its handler applies no ceiling")
+}
+
 func TestAdminRouteClassification_Guard_FailsOnAnUnclassifiedReadApplyingACeiling(t *testing.T) {
 	root := writeAdminRouteFixture(t, adminRouteFixtureHandlers)
 	classification := adminRouteFixtureClassification()
