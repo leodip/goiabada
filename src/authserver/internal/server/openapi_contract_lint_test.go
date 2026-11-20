@@ -3231,8 +3231,8 @@ func (c *Clocked) Check() func(http.Handler) http.Handler {
 // internal helper returns, and a function literal called in place. A field of an interface type a
 // parameter fills the same way, which may hold a writer of the package, is still reported, and so
 // are a field of a function type, http.HandlerFunc, whose ServeHTTP calls the function of the
-// package it holds, and a path that goes on through a struct outside the package to a field of it
-// holding a writer.
+// package it holds, one of an internal helper's alias of a function type, type Refusal = Handler,
+// and a path that goes on through a struct outside the package to a field of it holding a writer.
 func TestRouteChains_AFieldOfATypeOutsideThePackageIsReadWhateverFilledIt(t *testing.T) {
 	root := t.TempDir()
 	routeShapesFixture(t, root, "\toptional := middleware.NewOptionalLogger(nil)\n"+
@@ -3247,6 +3247,8 @@ func TestRouteChains_AFieldOfATypeOutsideThePackageIsReadWhateverFilledIt(t *tes
 		"\tpages.With(swapped.Check()).Get(\"/swapped-writer\", apihandlers.HandleOkGet())\n"+
 		"\thandlerFunc := middleware.NewHandlerFuncDefault(nil)\n"+
 		"\tpages.With(handlerFunc.Check()).Get(\"/handler-func\", apihandlers.HandleOkGet())\n"+
+		"\taliased := middleware.NewAliasedFuncDefault(nil)\n"+
+		"\tpages.With(aliased.Check()).Get(\"/aliased-func\", apihandlers.HandleOkGet())\n"+
 		"\tdeps := middleware.NewDepsDefault(nil)\n"+
 		"\tpages.With(deps.Check()).Get(\"/nested-deps\", apihandlers.HandleOkGet())\n")
 	writeDocFixture(t, root, "internal/helper/logger.go", `package helper
@@ -3255,6 +3257,18 @@ import "log/slog"
 
 func NewLogger() *slog.Logger {
 	return slog.Default()
+}
+`)
+	writeDocFixture(t, root, "internal/helper/handler.go", `package helper
+
+import "net/http"
+
+type Handler func(http.ResponseWriter, *http.Request)
+
+type Refusal = Handler
+
+func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	h(w, r)
 }
 `)
 	writeDocFixture(t, root, "internal/middleware/typed.go", `package middleware
@@ -3272,6 +3286,7 @@ type Typed struct {
 	validator *inputvalidation.IdentifierValidator
 	refusals  writer
 	refusal   http.HandlerFunc
+	aliased   helper.Refusal
 	deps      *struct{ refusals writer }
 }
 
@@ -3315,6 +3330,13 @@ func NewHandlerFuncDefault(refusal http.HandlerFunc) *Typed {
 	return &Typed{refusal: refusal}
 }
 
+func NewAliasedFuncDefault(refusal helper.Refusal) *Typed {
+	if refusal == nil {
+		refusal = func(w http.ResponseWriter, r *http.Request) { unprocessable{}.refuse(w) }
+	}
+	return &Typed{aliased: refusal}
+}
+
 func NewDepsDefault(deps *struct{ refusals writer }) *Typed {
 	if deps == nil {
 		deps = &struct{ refusals writer }{refusals: unprocessable{}}
@@ -3334,6 +3356,10 @@ func (m *Typed) Check() func(http.Handler) http.Handler {
 				m.refusal.ServeHTTP(w, r)
 				return
 			}
+			if r.Body == nil {
+				m.aliased.ServeHTTP(w, r)
+				return
+			}
 			if r.Method == "" {
 				m.deps.refusals.refuse(w)
 				return
@@ -3346,12 +3372,13 @@ func (m *Typed) Check() func(http.Handler) http.Handler {
 	routes, handlers, report := fixtureRouteChains(t, root, 1, 1)
 
 	joined := strings.Join(report.Errors, "\n")
-	if report.Stopped || len(report.Errors) != 3 ||
+	if report.Stopped || len(report.Errors) != 4 ||
 		!strings.Contains(joined, "GET /swapped-writer mounts swapped.Check, which the status lint cannot read") ||
 		!strings.Contains(joined, "GET /handler-func mounts handlerFunc.Check, which the status lint cannot read") ||
+		!strings.Contains(joined, "GET /aliased-func mounts aliased.Check, which the status lint cannot read") ||
 		!strings.Contains(joined, "GET /nested-deps mounts deps.Check, which the status lint cannot read") {
-		t.Fatalf("only the writer field, the handler function and the nested writer a reassigned parameter "+
-			"fills should fail the check, once each: %+v", report)
+		t.Fatalf("only the writer field, the two handler functions and the nested writer a reassigned "+
+			"parameter fills should fail the check, once each: %+v", report)
 	}
 	chains := map[string][]int{}
 	for _, r := range routes {
@@ -6100,7 +6127,7 @@ func (c *chainResolver) fieldOutside(p *goPackage, typ, name string) bool {
 	for _, field := range st.Fields.List {
 		for _, id := range field.Names {
 			if id.Name == name {
-				return !c.funcTyped(declared.imports, field.Type) &&
+				return !c.funcTyped(p, declared.imports, field.Type, map[*ast.TypeSpec]bool{}) &&
 					c.typeOutside(p, p, declared.imports, field.Type, typeParamNames(declared.spec.TypeParams), map[string]bool{})
 			}
 		}
@@ -6108,10 +6135,12 @@ func (c *chainResolver) fieldOutside(p *goPackage, typ, name string) bool {
 	return false
 }
 
-// funcTyped reports whether t, spelled in a file with the imports imports, is a function type: one
-// spelled in place, a pointer to one, or a named type of another package defined as one, such as
-// http.HandlerFunc, read as typeOutside reads that package.
-func (c *chainResolver) funcTyped(imports fileImports, t ast.Expr) bool {
+// funcTyped reports whether t, spelled in package q's source in a file with the imports imports, is
+// a function type: one spelled in place, a pointer to one, or a named type defined as one or as an
+// alias of one, followed to its declaration, such as http.HandlerFunc or a type Refusal = Handler of
+// a package under internal, read as typeOutside reads that package. seen holds the declarations
+// followed, so a declaration that leads back to itself is followed once.
+func (c *chainResolver) funcTyped(q *goPackage, imports fileImports, t ast.Expr, seen map[*ast.TypeSpec]bool) bool {
 	t = ast.Unparen(t)
 	if star, isStar := t.(*ast.StarExpr); isStar {
 		t = ast.Unparen(star.X)
@@ -6119,6 +6148,8 @@ func (c *chainResolver) funcTyped(imports fileImports, t ast.Expr) bool {
 	switch x := t.(type) {
 	case *ast.FuncType:
 		return true
+	case *ast.Ident:
+		return c.declaredFuncTyped(q, x.Name, seen)
 	case *ast.SelectorExpr:
 		root, isIdent := ast.Unparen(x.X).(*ast.Ident)
 		if !isIdent {
@@ -6128,9 +6159,8 @@ func (c *chainResolver) funcTyped(imports fileImports, t ast.Expr) bool {
 		if !imported {
 			return false
 		}
-		if q, fromSource := c.sourcePkg(path); fromSource {
-			declared, isDeclared := q.types[x.Sel.Name]
-			return isDeclared && c.funcTyped(declared.imports, declared.spec.Type)
+		if r, fromSource := c.sourcePkg(path); fromSource {
+			return c.declaredFuncTyped(r, x.Sel.Name, seen)
 		}
 		pkg, loaded := c.stdPackage(path)
 		if !loaded {
@@ -6144,6 +6174,17 @@ func (c *chainResolver) funcTyped(imports fileImports, t ast.Expr) bool {
 		return isFunc
 	}
 	return false
+}
+
+// declaredFuncTyped reports whether the type name of package q is declared as a function type, as
+// funcTyped reads its declaration in the file declaring it.
+func (c *chainResolver) declaredFuncTyped(q *goPackage, name string, seen map[*ast.TypeSpec]bool) bool {
+	declared, isDeclared := q.types[name]
+	if !isDeclared || seen[declared.spec] {
+		return false
+	}
+	seen[declared.spec] = true
+	return c.funcTyped(q, declared.imports, declared.spec.Type, seen)
 }
 
 // specOperation is the part of an operation these tests read.
