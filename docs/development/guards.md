@@ -169,6 +169,14 @@ moving one has one more step: `cd src/core && go run ./cmd/ownershipdump`, and c
 to invent a justification, so the answer is to move the symbol or to write `test-support`,
 `contract` or `moving` with the reason. The lint tier runs it and fails on a tree it changed.
 
+The census reads the tree through `core/pkgload`, type-checked, and a reference is the object an
+identifier resolves to, whatever the file spells: a dot import counts, and a local spelled like a
+symbol does not. Production references, and the packages a binary links from every production
+`main`, are read as each release build selects them, so a file only one platform compiles still
+counts; test references come from the test machine's test build. A package that does not
+type-check stops the guard and `ownershipdump` with one message naming it. Every fixture tree of
+the census therefore compiles, and its helper makes the tree loadable with `pkgload.MakeLoadable`.
+
 ## Generated mocks
 
 The `*_mock.go` files are written by mockery, at the version `versions.yaml` pins as

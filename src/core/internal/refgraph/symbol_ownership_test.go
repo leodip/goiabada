@@ -157,9 +157,7 @@ func checkSymbols(t *testing.T, files map[string]string, rows []string) []string
 	t.Helper()
 
 	root := writeTree(t, files)
-	graph, err := BuildImportGraph(root)
-	require.NoError(t, err)
-	census, err := buildSymbolCensus(root, graph)
+	census, err := buildSymbolCensus(root)
 	require.NoError(t, err)
 
 	findings := checkSymbolOwnership(symbolRows(rows...), census)
@@ -172,9 +170,7 @@ func computedOver(t *testing.T, files map[string]string) map[string]string {
 	t.Helper()
 
 	root := writeTree(t, files)
-	graph, err := BuildImportGraph(root)
-	require.NoError(t, err)
-	census, err := buildSymbolCensus(root, graph)
+	census, err := buildSymbolCensus(root)
 	require.NoError(t, err)
 
 	out := map[string]string{}
@@ -1650,6 +1646,89 @@ func elsewhere() Cog
 		"the walk reached the rest of the package")
 }
 
+// TestSymbolOwnership_ADotImportIsAReference is the first of the two blind spots the census had
+// while it read references by spelling: a file that dot-imports a core package names its symbols
+// with no selector at all, so both applications naming Spoke here read as nobody naming it.
+// References are read by the object an identifier resolves to now, and a dot import is an import
+// like any other (#420).
+func TestSymbolOwnership_ADotImportIsAReference(t *testing.T) {
+	files := withSymbolBaseline(map[string]string{
+		"core/shared/spoke.go": "package shared\n\ntype Spoke struct{}\n",
+		"authserver/dot.go": `package main
+
+import . "example.test/core/shared"
+
+var _ = Spoke{}
+`,
+		"adminconsole/dot.go": `package main
+
+import . "example.test/core/shared"
+
+var _ = Spoke{}
+`,
+	})
+
+	computed := computedOver(t, files)
+
+	assert.Equal(t, JustificationBothApps, computed["core/shared.Spoke"],
+		"a dot-imported symbol named by both applications is named by both applications")
+}
+
+// TestSymbolOwnership_ALocalShadowingAPackageNameIsNotAReference is identity across packages: a
+// parameter spelled like the package it shadows. `shared.Unused` there selects the parameter's
+// field, and a reader matching the selector's spelling would take it for the package's symbol and
+// let a production file name a symbol it never touched. Resolved by object, it is the field (#420).
+func TestSymbolOwnership_ALocalShadowingAPackageNameIsNotAReference(t *testing.T) {
+	files := withSymbolBaseline(map[string]string{
+		"core/shared/orphan.go": "package shared\n\ntype Unused struct{}\n",
+		"authserver/shadow.go": `package main
+
+import "example.test/core/shared"
+
+var _ = shared.Widget{}
+
+func describe(shared struct{ Unused int }) int {
+	return shared.Unused
+}
+
+var _ = describe
+`,
+	})
+	rows := append(symbolBaselineRows(), "core/shared Unused test-support Nothing names it.")
+
+	findings := checkSymbols(t, files, rows)
+
+	assertFindings(t, findings, "records core/shared.Unused as test-support, but nothing names it")
+}
+
+// TestSymbolOwnership_AFieldSpelledLikeASymbolIsNotAReference is the same rule one level down: the
+// field Envelope.Cog belongs to core/shared and is spelled like its type Cog, and both applications
+// select the field. A field is not a package-level declaration, so it backs no row, and Cog stays
+// reachable through Widget alone rather than becoming both-apps (#420).
+func TestSymbolOwnership_AFieldSpelledLikeASymbolIsNotAReference(t *testing.T) {
+	files := withSymbolBaseline(map[string]string{
+		"core/shared/envelope.go": "package shared\n\ntype Envelope struct {\n\tCog string\n}\n",
+		"authserver/field.go": `package main
+
+import "example.test/core/shared"
+
+var _ = shared.Envelope{}.Cog
+`,
+		"adminconsole/field.go": `package main
+
+import "example.test/core/shared"
+
+var _ = shared.Envelope{}.Cog
+`,
+	})
+
+	computed := computedOver(t, files)
+
+	assert.Equal(t, JustificationBothApps, computed["core/shared.Envelope"])
+	assert.Equal(t, justificationReachable, computed["core/shared.Cog"],
+		"the selected field is Envelope's, not a reference to the type spelled the same")
+}
+
 // ---- the asserted words ----------------------------------------------------------------------
 
 // TestSymbolOwnership_AnAssertedRowWithNoNote is what keeps contract an argument rather than a
@@ -1985,6 +2064,60 @@ func Build() shared.Helper {
 	assert.Empty(t, checkSymbols(t, files, symbolBaselineRows()))
 }
 
+// TestSymbolOwnership_ATestSupportRowALinkedImportContradicts is the walk behind "a binary links
+// it": the production file naming Helper is in authserver/relay, which is no main package but
+// which the auth server's main imports, so the binary links it and the test-support row is
+// contradicted. Reading only the main packages themselves as linked would let it pass.
+func TestSymbolOwnership_ATestSupportRowALinkedImportContradicts(t *testing.T) {
+	files := withSymbolBaseline(map[string]string{
+		"authserver/relay/relay.go": `package relay
+
+import "example.test/core/shared"
+
+var Pass = shared.Helper{}
+`,
+		"authserver/main.go": `package main
+
+import (
+	"example.test/authserver/relay"
+	"example.test/core/shared"
+)
+
+var (
+	_ = shared.Widget{}
+	_ = shared.Colour("")
+	_ = shared.New()
+	_ = shared.Stable{}
+	_ = relay.Pass
+)
+`,
+	})
+
+	findings := checkSymbols(t, files, symbolBaselineRows())
+
+	assertFindings(t, findings, "records core/shared.Helper as test-support, but authserver names it in production and a binary links that package")
+}
+
+// TestSymbolOwnership_ATestSupportRowAnotherPlatformsFileContradicts is why production references
+// are read as every release build selects them, and not only as the machine running the tests
+// builds them: the one production reference naming Helper is in a file only a Windows build
+// compiles, and Windows is a platform the releases ship. Read on the test machine alone, that file
+// is invisible and the test-support row passes while a shipped binary links the reference (#420).
+func TestSymbolOwnership_ATestSupportRowAnotherPlatformsFileContradicts(t *testing.T) {
+	files := withSymbolBaseline(map[string]string{
+		"authserver/console_windows.go": `package main
+
+import "example.test/core/shared"
+
+var _ = shared.Helper{}
+`,
+	})
+
+	findings := checkSymbols(t, files, symbolBaselineRows())
+
+	assertFindings(t, findings, "records core/shared.Helper as test-support, but authserver names it in production and a binary links that package")
+}
+
 // ---- the finder the guard reports ----------------------------------------------------------------
 
 // TestCheckOwnership_CountsWhatTheCensusReached pins the three counts the reporting half turns a
@@ -2045,6 +2178,30 @@ func TestCheckOwnership_ADocumentThatCannotBeReadIsAnError(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "reading core/OWNERSHIP.md")
+}
+
+// brokenPackage is a core package that does not type-check: it names a symbol nothing declares.
+const brokenPackage = `package broken
+
+var _ = missing.Thing
+`
+
+// TestCheckOwnership_APackageThatDoesNotCompileIsAnError is decision 3 of #420 for the guard: a
+// tree with a package that does not type-check cannot be read, since a half-checked package hides
+// the references it holds, so the census stops with an error naming the package rather than
+// reporting the rows those references would have backed.
+func TestCheckOwnership_APackageThatDoesNotCompileIsAnError(t *testing.T) {
+	root := writeTree(t, withSymbolBaseline(map[string]string{
+		"core/OWNERSHIP.md":     symbolOwnershipDoc(symbolBaselineRows()...),
+		"core/broken/broken.go": brokenPackage,
+	}))
+
+	_, err := CheckOwnership(root)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "example.test/core/broken")
+	assert.Contains(t, err.Error(), "undefined: missing")
+	assert.Contains(t, err.Error(), "the tree cannot be read until it does")
 }
 
 // ---- the generator ------------------------------------------------------------------------------
@@ -2121,4 +2278,21 @@ func TestRenderSymbolOwnership_IsIdempotent(t *testing.T) {
 
 	assert.Empty(t, unjustified)
 	assert.Equal(t, first, second)
+}
+
+// TestRenderSymbolOwnership_APackageThatDoesNotCompileIsAnError is the same decision for
+// ownershipdump: a table written from a half-checked tree would be wrong, so the generator writes
+// nothing and names the package.
+func TestRenderSymbolOwnership_APackageThatDoesNotCompileIsAnError(t *testing.T) {
+	root := writeTree(t, withSymbolBaseline(map[string]string{
+		"core/OWNERSHIP.md":           symbolOwnershipDoc(symbolBaselineRows()...),
+		"authserver/broken/broken.go": brokenPackage,
+	}))
+
+	doc, _, err := RenderSymbolOwnership(root)
+
+	require.Error(t, err)
+	assert.Empty(t, doc)
+	assert.Contains(t, err.Error(), "example.test/authserver/broken")
+	assert.Contains(t, err.Error(), "undefined: missing")
 }

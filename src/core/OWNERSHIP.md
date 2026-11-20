@@ -79,16 +79,16 @@ note names an issue; the reviewer does the rest.
   assertion panics on the other's value. It satisfied the letter of `both-apps`, and that row would
   have been true and misleading (#351).
 
-**ceiling:** a reference from outside the declaring package is a selector on the identifier the
-import binds, resolved by name within the file. A package-level declaration shadowing that name is
-caught; a local variable inside a function shadowing it would be read as the package. Nothing in this
-tree does that, and closing it means type-checking every package in four modules rather than parsing
-them. Revisit if a row ever rests on a reference that turns out to be a false one (#385). References
-from inside the declaring package are not read that way — they carry no selector, and matching them
-by spelling would let a local, a parameter or a struct field justify its namesake — so those are
-resolved with `go/types` over each package's own syntax, against a stub importer. The residual
-ceiling there is a dot import, of which this tree has none; revisit if one is ever written under
-`src/`, which would need a real importer rather than a stub.
+**How the tree is read.** The census loads the four modules type-checked, through `core/pkgload`, and
+a reference is an identifier the type checker resolved to the symbol's own object. A dot import is
+therefore a reference like any other, and a local, a parameter or a field spelled like a package or
+a symbol is none. Production code is read as each of the five release builds selects it: the
+declarations, the references from outside the declaring package, and the packages a binary links,
+walked from every production `main` package of the four modules, developer commands included. A
+file only one platform compiles still counts. Test references come from the test build of the
+machine running the census. A file only a race build or a custom build tag selects is read by
+neither. A package that does not type-check stops the guard and `ownershipdump` with one message
+naming it, because a table read from a half-checked tree would be wrong (#420).
 
 ## Regenerating
 
@@ -776,11 +776,11 @@ command itself and fails on a tree it changed.
 | `core/internal/refgraph` | `JustificationContract` | own-package | — |
 | `core/internal/refgraph` | `JustificationKernel` | own-package | — |
 | `core/internal/refgraph` | `JustificationMoving` | own-package | — |
-| `core/internal/refgraph` | `LocalImportName` | own-package | — |
+| `core/internal/refgraph` | `LocalImportName` | moving | #420 deletes it: the census resolves references by object now, and nothing calls it. |
 | `core/internal/refgraph` | `ModulePath` | kernel | — |
 | `core/internal/refgraph` | `OwnershipCheck` | own-package | — |
 | `core/internal/refgraph` | `RenderSymbolOwnership` | kernel | — |
-| `core/internal/refgraph` | `SelectedNames` | own-package | — |
+| `core/internal/refgraph` | `SelectedNames` | moving | #420 deletes it: the census resolves references by object now, and nothing calls it. |
 | `core/internal/refgraph` | `TableUnder` | kernel | — |
 | `core/internal/refgraph` | `Unparen` | kernel | — |
 | `core/issuerlength` | `Check` | contract | The one bound on an issuer's length. The setup wizard, which is not one of the two applications, writes the auth server URL the first start seeds as the issuer, and the auth server refuses to start on one longer than the general settings save would keep, so the bound is defined once here for the start, the save and the wizard rather than copied into each (#615). |
@@ -849,12 +849,12 @@ command itself and fails on a tree it changed.
 | `core/phonecountries` | `All` | both-apps | — |
 | `core/phonecountries` | `ByUniqueID` | contract | The lookup half of the phone country list, by the id the user row stores (`users.phone_number_country_uniqueid`). Moving it would put one list, whose ids are stored data, in two places (#563 decision 1). |
 | `core/phonecountries` | `PhoneCountry` | own-package | — |
-| `core/pkgload` | `Build` | test-support | Test support: the shared loader, compiled into no binary, which the guards and `ownershipdump` read the tree through; until they move onto it (#420), its own tests name it. |
-| `core/pkgload` | `ErrNoPackages` | test-support | Test support: the shared loader, compiled into no binary, which the guards and `ownershipdump` read the tree through; until they move onto it (#420), its own tests name it. |
-| `core/pkgload` | `Load` | test-support | Test support: the shared loader, compiled into no binary, which the guards and `ownershipdump` read the tree through; until they move onto it (#420), its own tests name it. |
-| `core/pkgload` | `MakeLoadable` | test-support | Test support: the shared loader, compiled into no binary, which the guards and `ownershipdump` read the tree through; until they move onto it (#420), its own tests name it. |
+| `core/pkgload` | `Build` | kernel | — |
+| `core/pkgload` | `ErrNoPackages` | kernel | — |
+| `core/pkgload` | `Load` | kernel | — |
+| `core/pkgload` | `MakeLoadable` | test-support | Test support: makes a guard's fixture tree a set of modules the go command can load; the fixture helpers of the guards that read through `core/pkgload` name it, and no binary links it. |
 | `core/pkgload` | `Platform` | kernel | — |
-| `core/pkgload` | `ReleaseBuilds` | test-support | Test support: the shared loader, compiled into no binary, which the guards and `ownershipdump` read the tree through; until they move onto it (#420), its own tests name it. |
+| `core/pkgload` | `ReleaseBuilds` | kernel | — |
 | `core/pkgload` | `ReleasePlatforms` | kernel | — |
 | `core/requestid` | `FromContext` | kernel | — |
 | `core/requestid` | `Header` | own-package | — |

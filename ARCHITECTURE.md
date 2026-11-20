@@ -502,10 +502,10 @@ Rule 7 lives beside them rather than in this file. `AssertSymbolOwnership` in
 `src/core/guard/symbol_ownership.go` is called from the same three tiers and checks
 `src/core/OWNERSHIP.md`; `src/core/cmd/ownershipdump` writes the computed rows from the same census,
 `core/internal/refgraph`, so the tool and the guard cannot read the tree differently, and
-`./run-tests.sh --type lint` runs the tool and fails on a tree it changed. References from outside a declaring package are read as
-selectors on whatever identifier the file binds the import to; references from inside it are resolved with `go/types`, because there an
-identifier carries no selector and matching one by spelling would let a local or a struct field
-justify its namesake.
+`./run-tests.sh --type lint` runs the tool and fails on a tree it changed. The census loads the four
+modules type-checked through `core/pkgload`, production code as every release build selects it, and
+reads a reference as the object an identifier resolves to, so a local or a struct field spelled like
+a symbol never justifies its namesake.
 
 `src/core/guard/architecture_lint_test.go` is the core tier's caller;
 `src/core/guard/architecture_rules_test.go`,

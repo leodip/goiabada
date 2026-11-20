@@ -11,8 +11,20 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/core/pkgload"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+// writeLoadableTree is writeTree for this guard, whose census loads the tree through the go
+// command: the same files, made a set of modules the go command can load.
+func writeLoadableTree(t *testing.T, files map[string]string) string {
+	t.Helper()
+
+	root := writeTree(t, files)
+	require.NoError(t, pkgload.MakeLoadable(root))
+	return root
+}
 
 // symbolReportingFiles is the smallest tree the census justifies whole: one exported type another
 // core package names in production, which makes it kernel.
@@ -50,7 +62,7 @@ func symbolOwnershipDoc(rows ...string) string {
 // TestSymbolOwnership_ReportingHalfPasses drives assertSymbolOwnership itself over a tree its table
 // describes.
 func TestSymbolOwnership_ReportingHalfPasses(t *testing.T) {
-	root := writeTree(t, symbolReportingFiles("core/shared Kernelled kernel —"))
+	root := writeLoadableTree(t, symbolReportingFiles("core/shared Kernelled kernel —"))
 
 	report := Run(func(r Reporter) { assertSymbolOwnership(r, root) })
 
@@ -61,7 +73,7 @@ func TestSymbolOwnership_ReportingHalfPasses(t *testing.T) {
 // being computed and dropped. Blinding the five lines that report is what disabled
 // AssertNoDeadInterfaces across every module with nothing going red.
 func TestSymbolOwnership_ReportingHalfReports(t *testing.T) {
-	root := writeTree(t, symbolReportingFiles("core/shared Kernelled reachable —"))
+	root := writeLoadableTree(t, symbolReportingFiles("core/shared Kernelled reachable —"))
 
 	report := Run(func(r Reporter) { assertSymbolOwnership(r, root) })
 
@@ -75,7 +87,7 @@ func TestSymbolOwnership_ReportingHalfReports(t *testing.T) {
 func TestSymbolOwnership_ACensusThatCannotBeReadIsFatal(t *testing.T) {
 	files := symbolReportingFiles()
 	delete(files, "core/OWNERSHIP.md")
-	root := writeTree(t, files)
+	root := writeLoadableTree(t, files)
 
 	report := Run(func(r Reporter) { assertSymbolOwnership(r, root) })
 
@@ -87,7 +99,7 @@ func TestSymbolOwnership_ACensusThatCannotBeReadIsFatal(t *testing.T) {
 // from a correct one. A census that read no declaration satisfies "every symbol has a row" over an
 // empty set.
 func TestSymbolOwnership_TheWalkThatReachedNothing(t *testing.T) {
-	root := writeTree(t, map[string]string{
+	root := writeLoadableTree(t, map[string]string{
 		"core/OWNERSHIP.md": symbolOwnershipDoc(),
 		"core/quiet/quiet.go": `package quiet
 
@@ -104,7 +116,7 @@ func helper() int { return 1 }
 // TestSymbolOwnership_TheWalkThatFoundNoPackage is the same failure one step earlier, and it is
 // the one a mistyped root produces: a guard rooted at the wrong directory passes everything.
 func TestSymbolOwnership_TheWalkThatFoundNoPackage(t *testing.T) {
-	root := writeTree(t, map[string]string{"core/OWNERSHIP.md": symbolOwnershipDoc()})
+	root := writeLoadableTree(t, map[string]string{"core/OWNERSHIP.md": symbolOwnershipDoc()})
 
 	report := Run(func(r Reporter) { assertSymbolOwnership(r, root) })
 
@@ -115,7 +127,7 @@ func TestSymbolOwnership_TheWalkThatFoundNoPackage(t *testing.T) {
 // TestSymbolOwnership_TheWalkThatFoundNoReference is the same failure one step along: declarations
 // read, but nothing naming them, which would rest every justification on an empty set.
 func TestSymbolOwnership_TheWalkThatFoundNoReference(t *testing.T) {
-	root := writeTree(t, map[string]string{
+	root := writeLoadableTree(t, map[string]string{
 		"core/OWNERSHIP.md":     symbolOwnershipDoc("core/lonely Thing contract Nothing names it."),
 		"core/lonely/lonely.go": "package lonely\n\ntype Thing struct{}\n",
 	})
@@ -124,4 +136,19 @@ func TestSymbolOwnership_TheWalkThatFoundNoReference(t *testing.T) {
 
 	assert.True(t, report.Stopped)
 	assert.Contains(t, report.Fatal, "found no production reference to any core symbol")
+}
+
+// TestSymbolOwnership_APackageThatDoesNotCompileIsFatal is decision 3 of #420 at the reporting
+// half: the census cannot read a tree holding a package that does not type-check, and the guard
+// stops with the one message naming it rather than reporting rows a half-checked tree misreads.
+func TestSymbolOwnership_APackageThatDoesNotCompileIsFatal(t *testing.T) {
+	files := symbolReportingFiles("core/shared Kernelled kernel —")
+	files["core/broken/broken.go"] = "package broken\n\nvar _ = missing.Thing\n"
+	root := writeLoadableTree(t, files)
+
+	report := Run(func(r Reporter) { assertSymbolOwnership(r, root) })
+
+	assert.True(t, report.Stopped)
+	assert.Contains(t, report.Fatal, "example.test/core/broken")
+	assert.Contains(t, report.Fatal, "the tree cannot be read until it does")
 }
