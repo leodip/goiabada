@@ -6273,7 +6273,10 @@ components:
             On a malformed bearer request, such as a repeated `Authorization` header or a token
             sent in the header and the body, the challenge of each scheme the request used, Bearer
             first, each carrying `error="invalid_request"`: Bearer, DPoP or both, and Bearer when
-            it used neither. An ordinary validation error carries no challenge.
+            it used neither. Each `Authorization` header uses its own scheme, and an
+            `access_token` parameter in a URL-encoded POST body uses Bearer when the body parses;
+            a body that does not parse uses none. An ordinary validation error carries no
+            challenge.
           schema:
             type: string
       content:

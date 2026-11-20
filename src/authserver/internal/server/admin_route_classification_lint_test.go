@@ -254,8 +254,7 @@ func findAdminRouteClassificationGaps(
 	if err != nil {
 		return nil, 0, 0, err
 	}
-	var registered []routeRegistration
-	collectRoutes(fset, routesSource, "", nil, &registered)
+	registered := collectRoutes(fset, routesSource)
 
 	applied, unlisted, misapplied, files, err := adminHandlerCeilings(filepath.Join(root, filepath.FromSlash(adminHandlersDir)), ceilings)
 	if err != nil {
