@@ -2,8 +2,8 @@
 // /<app>/backchannel-logout route as its back-channel logout URI, as Sign users out, "Get told when a
 // session ends", says, and the route checks each logout token as the guide says, ends the app's own
 // sessions the token names and answers 200. Each test drives a real end of the user's session, or a
-// withdrawal of their consent to the app, and watches the app sign the user out, from the tokens it
-// shows it accepted for this browser's user.
+// disconnect of the app from the user's account, and watches the app sign the user out, from the
+// tokens it shows it accepted for this browser's user.
 import { confirmDialog, rowWithCell, userUrl } from "../../lib/admin-console";
 import { signInToConsole } from "../../lib/console-user";
 import { expect, test } from "../../lib/fixtures";
@@ -138,7 +138,7 @@ test("signing out of one app with its ID token tells that app alone, and the oth
   await context.close();
 });
 
-test("withdrawing the user's consent to the app tells it with a token naming no session, and the user stays signed in", async ({ browser, users }) => {
+test("disconnecting the app from the user's account tells it with a token naming no session, and the user stays signed in", async ({ browser, users }) => {
   const user = await users.create();
   const { context, page: app } = await userBrowser(browser);
   // The app has consent off, so the user approves the consent screen it asks for with prompt=consent.
@@ -149,12 +149,13 @@ test("withdrawing the user's consent to the app tells it with a token naming no 
   await expectResult(app, "Signed in");
   const idToken = await shownClaims(app, "ID token claims");
 
-  // The user withdraws it from another device's Account, Manage consents.
-  const own = await signInToConsole(browser, user, "/account/manage-consents");
+  // The user disconnects it, consent and all, from another device's Account, Applications.
+  const own = await signInToConsole(browser, user, "/account/applications");
   const row = rowWithCell(own.page, testapp.web.clientId);
-  await row.getByRole("button", { name: `Revoke ${testapp.web.clientId}`, exact: true }).click();
-  await confirmDialog(own.page, `Revoke the consent you gave ${testapp.web.clientId}?`);
-  await expect(own.page.locator("#row-actions-status")).toHaveText("Consent revoked.");
+  await expect(row).toContainText("You allowed");
+  await row.getByRole("button", { name: `Disconnect ${testapp.web.clientId}`, exact: true }).click();
+  await confirmDialog(own.page, `Disconnect ${testapp.web.clientId}?`);
+  await expect(own.page.locator("#row-actions-status")).toHaveText("Application disconnected.");
   await own.context.close();
 
   const [token] = await waitForLogoutTokens(app, testapp.web, 1);

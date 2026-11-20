@@ -24,7 +24,7 @@ import (
 //
 // The grants here are issued while the user's consent covers manage-account, through the fixture
 // every Account API test uses, and the consent is then withdrawn or rewritten: the grant a user's
-// withdrawal under Account, Manage consents leaves in a client's hands, and the same state a token
+// withdrawal through the account consent endpoint leaves in a client's hands, and the same state a token
 // issued with no consent before the upgrade is in.
 
 // refreshNoConsent is the refresh grant's answer when the user has no stored consent to the client.
@@ -86,7 +86,7 @@ func (g *manageAccountGrant) storedConsent(t *testing.T) *record.UserConsent {
 }
 
 // withdrawConsent deletes the user's consent row to the grant's client and nothing else, which is
-// the state of a consent never given. It is not what Account, Manage consents does: that withdrawal
+// the state of a consent never given. It is not what the account consent endpoint does: that withdrawal
 // also revokes the user's refresh tokens with the client (#622), which
 // TestAPIAccountConsentDelete_RevokesTheClientsRefreshTokens holds.
 func (g *manageAccountGrant) withdrawConsent(t *testing.T) {

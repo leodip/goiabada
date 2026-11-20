@@ -49,7 +49,7 @@ for (const theme of ["light", "dark"] as const) {
       new URL(grant!, env.adminUrl).href,
       ...["general", "branding", "branding/new", "sessions", "tokens", "keys", "email", "email/send-test-email", "audit-logs", "audit-log-viewer"].map((tab) => `${env.adminUrl}/admin/settings/${tab}`),
       brandUrl(seededBrand.id, "edit"), brandUrl(seededBrand.id, "delete"),
-      ...["profile", "picture", "email", "email-verification", "phone", "address", "change-password", "otp", "manage-consents", "legal-documents", "sessions", "data", "delete", "deleted"].map((tab) => `${env.adminUrl}/account/${tab}`),
+      ...["profile", "picture", "email", "email-verification", "phone", "address", "change-password", "otp", "applications", "legal-documents", "sessions", "data", "delete", "deleted"].map((tab) => `${env.adminUrl}/account/${tab}`),
       `${env.adminUrl}/missing-german-page`, `${env.adminUrl}/auth/callback`, `${env.adminUrl}/auth/logout`,
     ];
     for (const url of urls) {

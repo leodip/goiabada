@@ -74,7 +74,7 @@ var pageGroups = []pageGroup{
 	{Name: "Account pages", Server: AdminConsole, Pages: []string{
 		"account-profile", "account-email", "account-email-verification", "account-phone",
 		"account-address", "account-password", "account-authenticator", "account-picture",
-		"account-consents", "account-legal-documents", "account-sessions", "account-data",
+		"account-applications", "account-legal-documents", "account-sessions", "account-data",
 		"account-delete", "account-deleted",
 	}},
 	{Name: "Other console pages", Server: AdminConsole, Pages: []string{

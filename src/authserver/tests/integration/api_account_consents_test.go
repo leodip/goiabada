@@ -204,7 +204,7 @@ func TestAPIAccountConsentDelete_Success(t *testing.T) {
 	assert.Nil(t, got)
 }
 
-// Account, Manage consents withdraws a consent through this endpoint, the path #622 names: the
+// A user withdraws a consent through this endpoint, the path #622 names: the
 // withdrawal revokes the refresh tokens the user holds with that client, of a client whose
 // Consent required is off too, while the user's grant with another client keeps refreshing.
 func TestAPIAccountConsentDelete_RevokesTheClientsRefreshTokens(t *testing.T) {

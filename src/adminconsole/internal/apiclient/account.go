@@ -207,29 +207,37 @@ func (c *AuthServerClient) CreateAccountLogoutRequest(ctx context.Context, acces
 	return nil, nil, errs.Errorf("unexpected logout-request response format")
 }
 
-// GetAccountConsents retrieves the current user's consents
-func (c *AuthServerClient) GetAccountConsents(ctx context.Context, accessToken string) ([]api.UserConsentResponse, error) {
-	response, err := execute[api.GetUserConsentsResponse](ctx, c, accessToken, apiRequest{
+// GetAccountConnectedClients retrieves the clients the current user is connected to: each one the
+// user holds a stored consent with or a live refresh token with.
+func (c *AuthServerClient) GetAccountConnectedClients(ctx context.Context, accessToken string) ([]api.ConnectedClientResponse, error) {
+	response, err := execute[api.GetConnectedClientsResponse](ctx, c, accessToken, apiRequest{
 		method:        "GET",
-		url:           c.baseURL + "/api/v1/account/consents",
+		url:           c.baseURL + "/api/v1/account/connected-clients",
 		contentType:   contentTypeJSON,
 		successStatus: http.StatusOK,
 	})
 	if err != nil {
 		return nil, err
 	}
-	return response.Consents, nil
+	return response.Clients, nil
 }
 
-// RevokeAccountConsent deletes a consent for the current user
-func (c *AuthServerClient) RevokeAccountConsent(ctx context.Context, accessToken string, consentId int64) error {
-	_, err := c.do(ctx, accessToken, apiRequest{
+// DisconnectAccountClient disconnects the current user from a client, ending everything the user
+// holds with it, its stored consent included.
+func (c *AuthServerClient) DisconnectAccountClient(ctx context.Context, accessToken string, clientId int64) error {
+	response, err := execute[api.SuccessResponse](ctx, c, accessToken, apiRequest{
 		method:        "DELETE",
-		url:           fmt.Sprintf("%s/api/v1/account/consents/%d", c.baseURL, consentId),
+		url:           fmt.Sprintf("%s/api/v1/account/connected-clients/%d", c.baseURL, clientId),
 		contentType:   contentTypeJSON,
 		successStatus: http.StatusOK,
 	})
-	return err
+	if err != nil {
+		return err
+	}
+	if !response.Success {
+		return errs.Errorf("API returned success=false")
+	}
+	return nil
 }
 
 // GetAccountProfilePicture retrieves the current user's profile picture info

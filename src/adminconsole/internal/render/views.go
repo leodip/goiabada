@@ -137,3 +137,50 @@ func ConsentInfos(consents []api.UserConsentResponse) []ConsentInfo {
 
 	return infos
 }
+
+// ConnectedClientInfo is one row of the account Applications page: a client the user holds a
+// stored consent with, a live refresh token with, or both (#135 decision 4). Client is the
+// identifier; ClientName and ClientNameUnverified are the name the consent screen shows the user.
+// HasConsent says whether the client has a stored consent, ConsentScope and GrantedAt being that
+// consent's; GrantScope is the scopes the user's live refresh tokens with it record. The page shows
+// each scope list under its own label, since either can hold a scope the other lacks (decision 7).
+// IsCurrent marks the client the caller's own token was issued to, which the page offers no
+// Disconnect for (decision 5).
+type ConnectedClientInfo struct {
+	ClientId             int64
+	Client               string
+	ClientName           string
+	ClientNameUnverified bool
+	ClientDescription    string
+	HasConsent           bool
+	ConsentScope         string
+	// GrantedAt is the instant, as ConsentInfo's is (#373).
+	GrantedAt  *time.Time
+	GrantScope string
+	IsCurrent  bool
+}
+
+// ConnectedClientInfos maps the API's connected clients to the rows the page renders, in the API's
+// order.
+func ConnectedClientInfos(clients []api.ConnectedClientResponse) []ConnectedClientInfo {
+	infos := make([]ConnectedClientInfo, 0, len(clients))
+	for _, c := range clients {
+		info := ConnectedClientInfo{
+			ClientId:             c.ClientId,
+			Client:               c.ClientIdentifier,
+			ClientName:           c.ClientName,
+			ClientNameUnverified: c.ClientNameUnverified,
+			ClientDescription:    c.ClientDescription,
+			GrantScope:           c.GrantScope,
+			IsCurrent:            c.IsCurrent,
+		}
+		if c.Consent != nil {
+			info.HasConsent = true
+			info.ConsentScope = c.Consent.Scope
+			info.GrantedAt = c.Consent.GrantedAt
+		}
+		infos = append(infos, info)
+	}
+
+	return infos
+}

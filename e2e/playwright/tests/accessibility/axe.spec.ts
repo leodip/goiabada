@@ -594,24 +594,27 @@ test("a user's account pages", async ({ page, browser, clients, users, legalDocu
       await submit();
     }),
     {
-      name: "consents, none yet",
+      // The console holds the user's grant, so it is listed, tagged and with nothing to press.
+      name: "applications, the console's own alone",
       reach: async () => {
-        await own.goto(account("manage-consents"));
-        await expect(own.locator(".empty-state")).toBeVisible();
+        await own.goto(account("applications"));
+        await expect(own.locator("table tbody tr")).toHaveCount(1);
+        await expect(own.getByText("This application", { exact: true })).toBeVisible();
+        await expect(own.locator("button[data-action-url]")).toHaveCount(0);
       },
     },
     {
       // Signed in already, the user goes straight to the client's consent screen.
-      name: "consents",
+      name: "applications, one with a consent",
       reach: async () => {
         await own.goto(authorizeUrl(client.identifier));
         await own.getByRole("button", { name: "Allow", exact: true }).click();
         await own.waitForURL((url) => url.href.startsWith(testRedirectUri));
-        await own.goto(account("manage-consents"));
+        await own.goto(account("applications"));
         await expect(own.locator("button[data-action-url]")).toBeVisible();
       },
     },
-    asks(own, "consents, revoking one asking first", () => own.locator("button[data-action-url]").click()),
+    asks(own, "applications, disconnecting one asking first", () => own.locator("button[data-action-url]").click()),
     at(own, "legal documents, none yet", account("legal-documents")),
     {
       // Signed in already, the user goes straight to the client's acceptance step.

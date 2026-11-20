@@ -98,11 +98,11 @@ func (s *ctxRecordingApiClient) CreateAccountLogoutRequest(ctx context.Context, 
 	return nil, nil, s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) GetAccountConsents(ctx context.Context, _ string) ([]api.UserConsentResponse, error) {
+func (s *ctxRecordingApiClient) GetAccountConnectedClients(ctx context.Context, _ string) ([]api.ConnectedClientResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) RevokeAccountConsent(ctx context.Context, _ string, _ int64) error {
+func (s *ctxRecordingApiClient) DisconnectAccountClient(ctx context.Context, _ string, _ int64) error {
 	return s.record(ctx)
 }
 
@@ -136,10 +136,10 @@ func (s *ctxRecordingApiClient) DeleteAccountSession(ctx context.Context, _ stri
 // admin API (#563 decision 3). A method a port gains fails to compile here until the union names it.
 type accountAPI interface {
 	accountAddressAPI
+	accountApplicationsAPI
 	accountEmailAPI
 	accountEmailVerificationAPI
 	accountLogoutAPI
-	accountConsentsAPI
 	accountOTPAPI
 	accountPasswordAPI
 	accountPhoneAPI
@@ -177,6 +177,26 @@ func accountHandlerCases() []accountHandlerCase {
 			request: func() *http.Request {
 				return handlertest.Request(http.MethodPost, "/account/address",
 					handlertest.WithAccessToken(), handlertest.WithForm(url.Values{}))
+			},
+		},
+		{
+			name: "HandleApplicationsGet",
+			build: func(h *handlersmocks.HttpHelper, c accountAPI) http.HandlerFunc {
+				return HandleApplicationsGet(h, c)
+			},
+			request: func() *http.Request {
+				return handlertest.Request(http.MethodGet, "/account/applications", handlertest.WithAccessToken())
+			},
+		},
+		{
+			name: "HandleApplicationsDisconnectPost",
+			build: func(h *handlersmocks.HttpHelper, c accountAPI) http.HandlerFunc {
+				return HandleApplicationsDisconnectPost(h, c)
+			},
+			request: func() *http.Request {
+				return handlertest.Request(http.MethodPost, "/account/applications",
+					handlertest.WithAccessToken(), handlertest.WithBody(strings.NewReader(`{"clientId":13}`)),
+					handlertest.WithContentType("application/json"))
 			},
 		},
 		{
@@ -263,27 +283,6 @@ func accountHandlerCases() []accountHandlerCase {
 						TokenResponse: oauth.TokenResponse{AccessToken: handlertest.AccessToken},
 						IdToken:       &oauth.JwtToken{TokenBase64: "the.id.token"},
 					}))
-			},
-		},
-		{
-			name: "HandleManageConsentsGet",
-			build: func(h *handlersmocks.HttpHelper, c accountAPI) http.HandlerFunc {
-				return HandleManageConsentsGet(h, c)
-			},
-			request: func() *http.Request {
-				return handlertest.Request(http.MethodGet, "/account/manage-consents",
-					handlertest.WithAccessToken())
-			},
-		},
-		{
-			name: "HandleManageConsentsRevokePost",
-			build: func(h *handlersmocks.HttpHelper, c accountAPI) http.HandlerFunc {
-				return HandleManageConsentsRevokePost(h, c)
-			},
-			request: func() *http.Request {
-				return handlertest.Request(http.MethodPost, "/account/manage-consents/revoke",
-					handlertest.WithAccessToken(), handlertest.WithBody(strings.NewReader(`{"consentId":13}`)),
-					handlertest.WithContentType("application/json"))
 			},
 		},
 		{

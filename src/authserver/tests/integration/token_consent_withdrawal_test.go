@@ -39,8 +39,8 @@ func TestToken_Refresh_ConsentRemovedFromAConsentNotRequiredClient(t *testing.T)
 	refreshToken := data["refresh_token"].(string)
 
 	// The stored consent the user once granted through the consent screen, for a client
-	// whose Consent required is off today: the row is what Account, Manage consents shows
-	// and deletes.
+	// whose Consent required is off today: the row the account consent endpoint lists and
+	// deletes.
 	consent := &record.UserConsent{
 		UserId:    code.User.Id,
 		ClientId:  code.Client.Id,
@@ -60,8 +60,8 @@ func TestToken_Refresh_ConsentRemovedFromAConsentNotRequiredClient(t *testing.T)
 	require.NotNil(t, data["refresh_token"])
 	rotatedRefreshToken := data["refresh_token"].(string)
 
-	// The user withdraws the consent. Account, Manage consents and the admin console's
-	// user page both route the deletion through revocation.DisconnectClientTx; calling it
+	// The user withdraws the consent. The account and admin consent DELETEs and both
+	// connected-clients DELETEs route it through revocation.DisconnectClientTx; calling it
 	// here runs the identical transaction those handlers do, without minting the Account
 	// API token the endpoint itself would ask for.
 	result, err := revocation.DisconnectClientTx(context.Background(), database, consent.UserId, consent.ClientId, nil,
