@@ -5,6 +5,7 @@ package server
 import (
 	"fmt"
 	"go/ast"
+	"go/importer"
 	"go/parser"
 	"go/token"
 	"go/types"
@@ -576,6 +577,30 @@ func TestRoutePaths_ARouterWhosePrefixDependsOnTheBranchFails(t *testing.T) {
 	want := []string{fmt.Sprintf("routes.go:%d registers POST /jobs through a router whose path prefix "+
 		"the OpenAPI contract tests cannot tell: other is assigned inside a block at routes.go:%d, so which path prefix it "+
 		"holds depends on the branch taken. Assign each router once, at the top level of its function", line, line-2)}
+	if report.Stopped || !slices.Equal(report.Errors, want) {
+		t.Errorf("stopped %v (%s), failures\n%q\nwant\n%q", report.Stopped, report.Fatal, report.Errors, want)
+	}
+}
+
+// A route registered through a router routes.go holds in a value the walk cannot tell, such as an
+// element of a slice holding a group's router, may sit under that group's prefix, so it fails here
+// rather than being read at its own pattern. A field of a parameter, such as an application branch
+// initRoutes unpacks, is a root router of its own, and passes.
+func TestRoutePaths_ARouterTheWalkCannotTellFails(t *testing.T) {
+	src := routePathsFixture("" +
+		"\tadmin := api.Route(\"/api/v1/admin\", func(r *routing.Router) {})\n" +
+		"\trouters := []*routing.Router{admin}\n" +
+		"\trouters[0].Post(\"/jobs\", apihandlers.HandleJobsPost(db))\n" +
+		"\tpages := branches.pages\n" +
+		"\tpages.Get(\"/plain\", handlers.HandleThing(h))\n" +
+		"\tbranches.api.Get(\"/api/v1/direct\", apihandlers.HandleThing(h))\n")
+
+	report := runRoutePathsGuard(t, src)
+
+	line := 4 + len(routeConstants) + 2
+	want := []string{fmt.Sprintf("routes.go:%d registers POST /jobs through a router whose path prefix "+
+		"the OpenAPI contract tests cannot tell: routers[0] at routes.go:%d is not a router the walk can tell. "+
+		"Assign each router once, at the top level of its function", line, line)}
 	if report.Stopped || !slices.Equal(report.Errors, want) {
 		t.Errorf("stopped %v (%s), failures\n%q\nwant\n%q", report.Stopped, report.Fatal, report.Errors, want)
 	}
@@ -2628,13 +2653,16 @@ func TestRouteChains_AUseInsideAPlainBlockCoversTheRoutesAfterIt(t *testing.T) {
 
 // A local of a constructor hides a helper of its package only inside the block that declares it,
 // so a call to the helper after that block fills the field with what the helper returns, and a
-// call the local hides is not read as the helper's.
+// call the local hides is read as the local's: what the function literal it holds returns, or,
+// where the lint cannot read that, such as a parameter it returns, a value the route reports.
 func TestRouteChains_ALocalHidesAHelperOnlyWithinItsScope(t *testing.T) {
 	root := t.TempDir()
 	routeShapesFixture(t, root, "\tafter := middleware.NewHelperAfterABlock()\n"+
 		"\tpages.With(after.Check()).Get(\"/after-block\", apihandlers.HandleOkGet())\n"+
 		"\thidden := middleware.NewHelperHidden()\n"+
-		"\tpages.With(hidden.Check()).Get(\"/hidden\", apihandlers.HandleOkGet())\n")
+		"\tpages.With(hidden.Check()).Get(\"/hidden\", apihandlers.HandleOkGet())\n"+
+		"\tpassed := middleware.NewHelperHiddenPassed()\n"+
+		"\tpages.With(passed.Check()).Get(\"/hidden-passed\", apihandlers.HandleOkGet())\n")
 	writeDocFixture(t, root, "internal/middleware/scoped.go", `package middleware
 
 import "net/http"
@@ -2663,25 +2691,33 @@ func NewHelperHidden() *Probed {
 	newScopedRefusal := func(string) writer { return unprocessable{} }
 	return &Probed{refusals: newScopedRefusal("no")}
 }
+
+func NewHelperHiddenPassed() *Probed {
+	newScopedRefusal := func(refusal writer) writer { return refusal }
+	return &Probed{refusals: newScopedRefusal(unprocessable{})}
+}
 `)
 	routes, handlers, report := fixtureRouteChains(t, root, 1, 1)
 
-	if report.Failed() {
-		t.Fatalf("reading the fixture chains failed: %+v", report)
+	if report.Stopped || len(report.Errors) != 1 ||
+		!strings.Contains(report.Errors[0], "GET /hidden-passed mounts passed.Check, which the status lint cannot read") {
+		t.Fatalf("only the field a local returning its parameter fills should fail the check: %+v", report)
 	}
 	chains := map[string][]int{}
 	for _, r := range routes {
 		chains[r.key] = sortedKeysInt(r.chain)
 	}
-	assertChains(t, chains, map[string][]int{"get /after-block": {403}, "get /hidden": {}})
+	assertChains(t, chains, map[string][]int{"get /after-block": {403}, "get /hidden": {422}})
 
-	ids := map[string]string{"get /after-block": "getAfterBlock"}
+	ids := map[string]string{"get /after-block": "getAfterBlock", "get /hidden": "getHidden"}
 	report = guard.Run(func(r guard.Reporter) {
 		assertDeclaresEveryStatus(r, routes, handlers, declaringEach(ids, 200))
 	})
-	if report.Stopped || len(report.Errors) != 1 ||
-		!strings.Contains(report.Errors[0], "getAfterBlock (GET /after-block) can answer 403 from after.Check") {
-		t.Errorf("a spec omitting the 403 of a helper called after a block hiding it did not fail once: %+v", report)
+	if report.Stopped || len(report.Errors) != 2 ||
+		!strings.Contains(strings.Join(report.Errors, "\n"), "getAfterBlock (GET /after-block) can answer 403 from after.Check") ||
+		!strings.Contains(strings.Join(report.Errors, "\n"), "getHidden (GET /hidden) can answer 422 from hidden.Check") {
+		t.Errorf("a spec omitting the 403 of a helper called after a block hiding it, or the 422 of the local "+
+			"hiding it, did not fail once each: %+v", report)
 	}
 }
 
@@ -2857,10 +2893,11 @@ func (l *Logged) Check() func(http.Handler) http.Handler {
 }
 
 // A field a constructor fills with a local that a call the lint cannot read assigned, a call to a
-// local function or to a function literal returning a type of the package, may hold a writer of
-// the package, so it is reported where the walk reaches through it, whether a literal or a later
-// field write fills the field. The same call shape returning a type of another package, such as a
-// function literal returning a logger, holds nothing the walk follows.
+// local function or to a function literal returning its parameter, which is whatever the call was
+// handed, may hold a writer of the package, so it is reported where the walk reaches through it,
+// whether a literal or a later field write fills the field. The same call shape returning a type
+// of another package, such as a function literal returning a logger, holds nothing the walk
+// follows.
 func TestRouteChains_AFieldALocalFactoryFillsIsReported(t *testing.T) {
 	root := t.TempDir()
 	routeShapesFixture(t, root, "\tnamed := middleware.NewFactoryNamed()\n"+
@@ -2877,14 +2914,14 @@ import (
 )
 
 func NewFactoryNamed() *Probed {
-	makeWriter := func() writer { return unprocessable{} }
-	refusals := makeWriter()
+	makeWriter := func(refusal writer) writer { return refusal }
+	refusals := makeWriter(unprocessable{})
 	return &Probed{refusals: refusals}
 }
 
 func NewFactoryInvoked() *Probed {
 	p := &Probed{}
-	refusals := func() writer { return unprocessable{} }()
+	refusals := func(refusal writer) writer { return refusal }(unprocessable{})
 	p.refusals = refusals
 	return p
 }
@@ -2936,6 +2973,319 @@ func (l *FactoryLogged) Check() func(http.Handler) http.Handler {
 	})
 	if report.Failed() {
 		t.Errorf("a spec declaring the 422 of a writer beside an invoked logger factory failed: %+v", report)
+	}
+}
+
+// A field a constructor fills with a call of a function literal, invoked in place or through the
+// local holding it, holds what the literal returns, so the route answers what that writer writes,
+// and one whose returns bind the field two ways is reported where the walk reaches through it.
+func TestRouteChains_AFieldAFunctionLiteralFillsIsReadAsWhatItReturns(t *testing.T) {
+	root := t.TempDir()
+	routeShapesFixture(t, root, "\tdirect := middleware.NewLiteralFactoryDirect()\n"+
+		"\tpages.With(direct.Check()).Get(\"/literal-direct\", apihandlers.HandleOkGet())\n"+
+		"\tthroughLocal := middleware.NewLiteralFactoryThroughLocal()\n"+
+		"\tpages.With(throughLocal.Check()).Get(\"/literal-local\", apihandlers.HandleOkGet())\n"+
+		"\tinPlace := middleware.NewLiteralFactoryInPlace()\n"+
+		"\tpages.With(inPlace.Check()).Get(\"/literal-in-place\", apihandlers.HandleOkGet())\n"+
+		"\ttwoWays := middleware.NewLiteralFactoryTwoWays()\n"+
+		"\tpages.With(twoWays.Check()).Get(\"/literal-two-ways\", apihandlers.HandleOkGet())\n")
+	writeDocFixture(t, root, "internal/middleware/literal_factory.go", `package middleware
+
+func NewLiteralFactoryDirect() *Probed {
+	makeWriter := func() writer { return unprocessable{} }
+	return &Probed{refusals: makeWriter()}
+}
+
+func NewLiteralFactoryThroughLocal() *Probed {
+	makeWriter := func() writer { return unprocessable{} }
+	refusals := makeWriter()
+	return &Probed{refusals: refusals}
+}
+
+func NewLiteralFactoryInPlace() *Probed {
+	return &Probed{refusals: func() writer { return unprocessable{} }()}
+}
+
+func NewLiteralFactoryTwoWays() *Probed {
+	return &Probed{refusals: func(swap bool) writer {
+		if swap {
+			return forbid{}
+		}
+		return unprocessable{}
+	}(false)}
+}
+`)
+	routes, handlers, report := fixtureRouteChains(t, root, 1, 1)
+
+	if report.Stopped || len(report.Errors) != 1 ||
+		!strings.Contains(report.Errors[0], "GET /literal-two-ways mounts twoWays.Check, which the status lint cannot read") {
+		t.Fatalf("only the literal returning two writers should fail the check: %+v", report)
+	}
+	chains := map[string][]int{}
+	for _, r := range routes {
+		chains[r.key] = sortedKeysInt(r.chain)
+	}
+	assertChains(t, chains, map[string][]int{
+		"get /literal-direct": {422}, "get /literal-local": {422}, "get /literal-in-place": {422},
+	})
+
+	ids := map[string]string{
+		"get /literal-direct": "getLiteralDirect", "get /literal-local": "getLiteralLocal",
+		"get /literal-in-place": "getLiteralInPlace",
+	}
+	report = guard.Run(func(r guard.Reporter) {
+		assertDeclaresEveryStatus(r, routes, handlers, declaringEach(ids, 200))
+	})
+	if report.Stopped || len(report.Errors) != 3 ||
+		!strings.Contains(strings.Join(report.Errors, "\n"), "getLiteralDirect (GET /literal-direct) can answer 422 from direct.Check") ||
+		!strings.Contains(strings.Join(report.Errors, "\n"), "getLiteralLocal (GET /literal-local) can answer 422 from throughLocal.Check") ||
+		!strings.Contains(strings.Join(report.Errors, "\n"), "getLiteralInPlace (GET /literal-in-place) can answer 422 from inPlace.Check") {
+		t.Errorf("a spec omitting the 422 a function literal's writer answers did not fail once per route: %+v", report)
+	}
+	report = guard.Run(func(r guard.Reporter) {
+		assertDeclaresEveryStatus(r, routes, handlers, declaringEach(ids, 200, 422))
+		assertDeclaresNoUndeliverableStatus(r, routes, handlers, declaringEach(ids, 200, 422))
+	})
+	if report.Failed() {
+		t.Errorf("a spec declaring the 422 a function literal's writer answers failed: %+v", report)
+	}
+}
+
+// A local a block of a constructor declares is another variable than the one of the same name
+// outside the block, so the outer one returned after the block holds the one value it was
+// assigned, whatever the inner one is assigned. An outer local the block assigns again holds two
+// values, and is reported where the walk reaches through it.
+func TestRouteChains_ALocalABlockDeclaresIsAnotherVariable(t *testing.T) {
+	root := t.TempDir()
+	routeShapesFixture(t, root, "\tshadowed := middleware.NewShadowedLocal()\n"+
+		"\tpages.With(shadowed.Check()).Get(\"/shadowed-local\", apihandlers.HandleOkGet())\n"+
+		"\treassigned := middleware.NewShadowedLocalReassigned()\n"+
+		"\tpages.With(reassigned.Check()).Get(\"/shadowed-reassigned\", apihandlers.HandleOkGet())\n"+
+		"\touter := middleware.NewOuterLocalAssignedInABlock()\n"+
+		"\tpages.With(outer.Check()).Get(\"/outer-assigned\", apihandlers.HandleOkGet())\n")
+	writeDocFixture(t, root, "internal/middleware/shadowed_local.go", `package middleware
+
+func NewShadowedLocal() *Probed {
+	refusals := unprocessable{}
+	{
+		refusals := forbid{}
+		_ = refusals
+	}
+	return &Probed{refusals: refusals}
+}
+
+func NewShadowedLocalReassigned() *Probed {
+	var refusals writer = unprocessable{}
+	{
+		var refusals writer = forbid{}
+		refusals = forbid{}
+		_ = refusals
+	}
+	return &Probed{refusals: refusals}
+}
+
+func NewOuterLocalAssignedInABlock() *Probed {
+	var refusals writer = unprocessable{}
+	{
+		refusals = forbid{}
+	}
+	return &Probed{refusals: refusals}
+}
+`)
+	routes, handlers, report := fixtureRouteChains(t, root, 1, 1)
+
+	if report.Stopped || len(report.Errors) != 1 ||
+		!strings.Contains(report.Errors[0], "GET /outer-assigned mounts outer.Check, which the status lint cannot read") {
+		t.Fatalf("only the outer local the block assigns again should fail the check: %+v", report)
+	}
+	chains := map[string][]int{}
+	for _, r := range routes {
+		chains[r.key] = sortedKeysInt(r.chain)
+	}
+	assertChains(t, chains, map[string][]int{"get /shadowed-local": {422}, "get /shadowed-reassigned": {422}})
+
+	ids := map[string]string{"get /shadowed-local": "getShadowedLocal", "get /shadowed-reassigned": "getShadowedReassigned"}
+	report = guard.Run(func(r guard.Reporter) {
+		assertDeclaresEveryStatus(r, routes, handlers, declaringEach(ids, 200))
+	})
+	if report.Stopped || len(report.Errors) != 2 ||
+		!strings.Contains(strings.Join(report.Errors, "\n"), "getShadowedLocal (GET /shadowed-local) can answer 422 from shadowed.Check") ||
+		!strings.Contains(strings.Join(report.Errors, "\n"), "getShadowedReassigned (GET /shadowed-reassigned) can answer 422 from reassigned.Check") {
+		t.Errorf("a spec omitting the 422 of the outer local did not fail once per route: %+v", report)
+	}
+	report = guard.Run(func(r guard.Reporter) {
+		assertDeclaresEveryStatus(r, routes, handlers, declaringEach(ids, 200, 422))
+		assertDeclaresNoUndeliverableStatus(r, routes, handlers, declaringEach(ids, 200, 422))
+	})
+	if report.Failed() {
+		t.Errorf("a spec declaring the outer local's 422 and not the inner one's 403 failed: %+v", report)
+	}
+}
+
+// A field a constructor fills with a call of another package's function is read by the result
+// that function declares: one of a concrete type of that package, such as a clock, holds nothing
+// the walk follows, while one of a type parameter, such as a generic identity function's, may be
+// the writer of the package the call was handed, and is reported where the walk reaches through
+// it, whether in place or through a local, and whether the package is under internal or in the
+// standard library.
+func TestRouteChains_AFieldAnImportedCallFillsIsReadByItsDeclaredResult(t *testing.T) {
+	root := t.TempDir()
+	routeShapesFixture(t, root, "\tidentity := middleware.NewImportedIdentity()\n"+
+		"\tpages.With(identity.Check()).Get(\"/imported-identity\", apihandlers.HandleOkGet())\n"+
+		"\tinPlace := middleware.NewImportedIdentityInPlace()\n"+
+		"\tpages.With(inPlace.Check()).Get(\"/imported-in-place\", apihandlers.HandleOkGet())\n"+
+		"\tstd := middleware.NewImportedStdGeneric()\n"+
+		"\tpages.With(std.Check()).Get(\"/imported-std\", apihandlers.HandleOkGet())\n"+
+		"\tclocked := middleware.NewClocked()\n"+
+		"\tpages.With(clocked.Check()).Get(\"/imported-clock\", apihandlers.HandleOkGet())\n")
+	writeDocFixture(t, root, "internal/helper/helper.go", `package helper
+
+type Clock struct {
+	zone string
+}
+
+func NewClock() *Clock {
+	return &Clock{zone: "UTC"}
+}
+
+func (c *Clock) Zone() string {
+	return c.zone
+}
+
+func Identity[T any](value T) T {
+	return value
+}
+`)
+	writeDocFixture(t, root, "internal/middleware/imported.go", `package middleware
+
+import (
+	"cmp"
+	"net/http"
+
+	"github.com/leodip/goiabada/authserver/internal/helper"
+)
+
+func NewImportedIdentity() *Probed {
+	refusals := helper.Identity(unprocessable{})
+	return &Probed{refusals: refusals}
+}
+
+func NewImportedIdentityInPlace() *Probed {
+	return &Probed{refusals: helper.Identity(unprocessable{})}
+}
+
+func NewImportedStdGeneric() *Probed {
+	refusals := cmp.Or(unprocessable{}, unprocessable{})
+	return &Probed{refusals: refusals}
+}
+
+type Clocked struct {
+	clock    *helper.Clock
+	refusals writer
+}
+
+func NewClocked() *Clocked {
+	clock := helper.NewClock()
+	return &Clocked{clock: clock, refusals: unprocessable{}}
+}
+
+func (c *Clocked) Check() func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("X-Zone", c.clock.Zone())
+			c.refusals.refuse(w)
+		})
+	}
+}
+`)
+	routes, handlers, report := fixtureRouteChains(t, root, 1, 1)
+
+	joined := strings.Join(report.Errors, "\n")
+	if report.Stopped || len(report.Errors) != 3 ||
+		!strings.Contains(joined, "GET /imported-identity mounts identity.Check, which the status lint cannot read") ||
+		!strings.Contains(joined, "GET /imported-in-place mounts inPlace.Check, which the status lint cannot read") ||
+		!strings.Contains(joined, "GET /imported-std mounts std.Check, which the status lint cannot read") {
+		t.Fatalf("a field filled from a generic function's result did not fail the check once each, "+
+			"or the clock's did: %+v", report)
+	}
+	chains := map[string][]int{}
+	for _, r := range routes {
+		chains[r.key] = sortedKeysInt(r.chain)
+	}
+	assertChains(t, chains, map[string][]int{"get /imported-clock": {422}})
+
+	ids := map[string]string{"get /imported-clock": "getImportedClock"}
+	report = guard.Run(func(r guard.Reporter) {
+		assertDeclaresEveryStatus(r, routes, handlers, declaringEach(ids, 200))
+	})
+	if report.Stopped || len(report.Errors) != 1 ||
+		!strings.Contains(report.Errors[0], "getImportedClock (GET /imported-clock) can answer 422 from clocked.Check") {
+		t.Errorf("a spec omitting the 422 of a writer beside a clock field did not fail once: %+v", report)
+	}
+}
+
+// A name in a method's body is its receiver only where it refers to the receiver's declaration, so
+// a local or a function literal's parameter of the same name is not read with the binding the
+// receiver's constructor gave it: a method of the package called through one is reported, rather
+// than read as the receiver's writer.
+func TestRouteChains_ALocalThatShadowsTheReceiverIsNotReadWithItsBinding(t *testing.T) {
+	root := t.TempDir()
+	routeShapesFixture(t, root, "\tshadowed := middleware.NewProbed()\n"+
+		"\tpages.With(shadowed.CheckShadowed()).Get(\"/receiver-shadowed\", apihandlers.HandleOkGet())\n"+
+		"\tparam := middleware.NewProbed()\n"+
+		"\tpages.With(param.CheckParam()).Get(\"/receiver-param\", apihandlers.HandleOkGet())\n")
+	writeDocFixture(t, root, "internal/middleware/receiver.go", `package middleware
+
+import "net/http"
+
+func (p *Probed) CheckShadowed() func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			p := Probed{refusals: unprocessable{}}
+			p.refusals.refuse(w)
+		})
+	}
+}
+
+func (p *Probed) CheckParam() func(http.Handler) http.Handler {
+	refuse := func(p *Probed, w http.ResponseWriter) {
+		p.refusals.refuse(w)
+	}
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			refuse(&Probed{refusals: unprocessable{}}, w)
+		})
+	}
+}
+`)
+	routes, _, report := fixtureRouteChains(t, root, 1, 1)
+
+	if report.Stopped || len(report.Errors) != 2 ||
+		!strings.Contains(strings.Join(report.Errors, "\n"), "GET /receiver-shadowed mounts shadowed.CheckShadowed, which the status lint cannot read") ||
+		!strings.Contains(strings.Join(report.Errors, "\n"), "GET /receiver-param mounts param.CheckParam, which the status lint cannot read") {
+		t.Fatalf("a method called through a local or a parameter shadowing the receiver did not fail the "+
+			"check once each: %+v", report)
+	}
+	for _, r := range routes {
+		if (r.key == "get /receiver-shadowed" || r.key == "get /receiver-param") && r.chain[403] != nil {
+			t.Errorf("%s was read with the receiver's 403: %v", r.key, r.chain)
+		}
+	}
+}
+
+// A route registered through a router routes.go holds in a value the walk cannot tell, such as an
+// element of a slice of routers, runs behind middleware the status lint cannot read.
+func TestRouteChains_ARouteThroughARouterTheWalkCannotTellFails(t *testing.T) {
+	root := t.TempDir()
+	routeShapesFixture(t, root, "\trouters := []*routing.Router{pages.With(middleware.Refuse())}\n"+
+		"\trouters[0].Get(\"/indexed\", apihandlers.HandleOkGet())\n")
+
+	_, _, report := fixtureRouteChains(t, root, 1, 1)
+
+	if report.Stopped || len(report.Errors) != 1 ||
+		!strings.Contains(report.Errors[0], "cannot tell which middleware GET /indexed runs behind: routers[0] at routes.go:") ||
+		!strings.Contains(report.Errors[0], "is not a router the walk can tell") {
+		t.Errorf("a route through an element of a slice of routers did not fail the check once: %+v", report)
 	}
 }
 
@@ -3089,7 +3439,9 @@ var specVerbs = func() map[string]bool {
 // inside it, has its own names, and a block, such as an if's, its own, so a name a block declares
 // leaves the one outside it as it was. A name routes.go never assigns, such as initRoutes's
 // parameters and the branches it unpacks, is a router built outside it, a root of its own:
-// middleware mounted there is out of this lint's reach. Whether a block runs is read apart from
+// middleware mounted there is out of this lint's reach. Any other value, such as an element of a
+// slice of routers or a call's result, is one the walk cannot tell, so a route registered through
+// it is unresolved and so is its path prefix, which may be a group's. Whether a block runs is read apart from
 // its names: an if's, a loop's, a switch's or select's, a case's, or a function literal's body may
 // not run, while a plain block, {...}, runs each time the code around it does, so an assignment or
 // a Use inside a plain block is read as one outside it. A router name declared outside a block
@@ -3415,11 +3767,16 @@ func (w *routeWalk) assign(lhs, rhs []ast.Expr, define bool, pos token.Pos,
 			continue
 		}
 		target, branched := env.target(id.Name, define)
-		v := routerValue{scope: &routeScope{env: target}} // one of several results of a call: no router of routes.go's
+		var v routerValue
 		var entry mountedEntry
-		if len(rhs) == len(lhs) {
+		switch {
+		case len(rhs) == len(lhs):
 			v = values[i]
 			entry = written[i]
+		case len(rhs) == 1:
+			v = w.unknownRouter(rhs[0]) // one of several results of a call
+		default:
+			v = routerValue{scope: &routeScope{env: target}} // a var declared with no value: a nil router
 		}
 		if branched {
 			before, held := target.names[id.Name]
@@ -3454,12 +3811,20 @@ func branchedValue(assigned string, before, after routerValue) routerValue {
 }
 
 // value is what a router expression holds: a name, a With call on a router, or an r.Route call,
-// which returns the group's router. Anything else is a router of its own, after the walk reads
-// the registrations inside it, such as a function literal's.
+// which returns the group's router. A field of a name routes.go never assigns, such as
+// branches.pages of initRoutes's parameter, is a router built outside routes.go, a root of its own.
+// Anything else, such as an element of a slice of routers, a call's result or a field of a local,
+// is a value the walk cannot tell, after it reads the registrations inside it, such as a function
+// literal's: a route through it is unresolved, and so is its path prefix, since the router it
+// holds may be a group's.
 func (w *routeWalk) value(e ast.Expr, env *routerEnv) routerValue {
 	switch x := ast.Unparen(e).(type) {
 	case *ast.Ident:
 		return env.lookup(x.Name)
+	case *ast.SelectorExpr:
+		if root, ok := ast.Unparen(x.X).(*ast.Ident); ok && env.decl(root.Name) == nil {
+			return routerValue{scope: &routeScope{env: env}}
+		}
 	case *ast.CallExpr:
 		if sel, ok := x.Fun.(*ast.SelectorExpr); ok {
 			switch sel.Sel.Name {
@@ -3475,7 +3840,15 @@ func (w *routeWalk) value(e ast.Expr, env *routerEnv) routerValue {
 		}
 	}
 	w.node(e, env)
-	return routerValue{scope: &routeScope{env: env}}
+	return w.unknownRouter(e)
+}
+
+// unknownRouter is what a name or expression of routes.go holds where the walk cannot tell which
+// router it is: no chain and no path prefix.
+func (w *routeWalk) unknownRouter(e ast.Expr) routerValue {
+	why := fmt.Sprintf("%s at routes.go:%d is not a router the walk can tell", types.ExprString(e),
+		w.fset.Position(e.Pos()).Line)
+	return routerValue{unresolved: why, pathUnresolved: why}
 }
 
 // routePrefix is the path prefix of the router v holds, or why it cannot be told, with an empty
@@ -3988,7 +4361,12 @@ func readRouteChains(r guard.Reporter, routesPath, internalRoot string, routes [
 // /userinfo ones beside them, which no API route runs. A field filled with a constructor's
 // parameter, and any call into another package, is not followed: ownStatuses names the shared
 // writers there. A field filled by a helper of the package the lint cannot read makes the
-// middleware unreadable where a method reaches through it, and nowhere else.
+// middleware unreadable where a method reaches through it, and nowhere else, and so does one a
+// call into another package fills whose declared result may be a writer of the package, such as
+// a generic function's type parameter: that result is read from the source of a package under
+// internal and from the compiled standard library's signature otherwise (fieldFiller.outside).
+// Every name of a constructor or a method is read as the declaration it refers to where it
+// stands, so a local that shadows another, or the receiver, is its own variable.
 //
 // A failure joins the chain wherever the middleware names it, as a handler's does. A success or a
 // redirect joins it only where the middleware writes it, such as the 307 it hands http.Redirect,
@@ -4001,10 +4379,11 @@ func routeChains(routesPath, internalRoot string, routes []routeRegistration) ([
 		return nil, 0, 0, nil, fmt.Errorf("parsing %s: %w", routesPath, err)
 	}
 	c := &chainResolver{
-		imports: map[string]string{},
-		pkgs:    map[string]*goPackage{},
-		cache:   map[string]map[int]bool{},
-		unknown: map[string]bool{},
+		internalRoot: internalRoot,
+		imports:      map[string]string{},
+		pkgs:         map[string]*goPackage{},
+		cache:        map[string]map[int]bool{},
+		unknown:      map[string]bool{},
 	}
 	for _, spec := range file.Imports {
 		path, err := strconv.Unquote(spec.Path.Value)
@@ -4063,12 +4442,16 @@ func middlewareLabel(e ast.Expr) string {
 
 // chainResolver reads the statuses the middleware of one routes.go can write.
 type chainResolver struct {
-	imports  map[string]string // package name, as routes.go spells it, to its directory
-	pkgs     map[string]*goPackage
-	cache    map[string]map[int]bool // by middleware read, so each is walked once
-	followed int
-	unknown  map[string]bool
-	err      error
+	imports map[string]string // package name, as routes.go spells it, to its directory
+	// internalRoot is the directory of the packages under internal, and std loads the standard
+	// library's compiled packages, which the types of a call's result are read from.
+	internalRoot string
+	std          types.Importer
+	pkgs         map[string]*goPackage
+	cache        map[string]map[int]bool // by middleware read, so each is walked once
+	followed     int
+	unknown      map[string]bool
+	err          error
 }
 
 // goPackage is one directory's non-test Go sources, as the chain resolver reads them.
@@ -4076,7 +4459,8 @@ type goPackage struct {
 	funcs   map[string][]funcSource // plain functions, by name
 	methods map[string][]funcSource // methods, by Type.name
 	plain   map[string]bool
-	imports map[string]bool // the names its files import packages under
+	imports map[string]string        // the names its files import packages under, to each one's import path
+	types   map[string]*ast.TypeSpec // the types it declares, by name
 }
 
 type funcSource struct {
@@ -4109,7 +4493,7 @@ func (c *chainResolver) pkg(dir string) *goPackage {
 	}
 	p := &goPackage{
 		funcs: map[string][]funcSource{}, methods: map[string][]funcSource{},
-		plain: map[string]bool{}, imports: map[string]bool{},
+		plain: map[string]bool{}, imports: map[string]string{}, types: map[string]*ast.TypeSpec{},
 	}
 	c.pkgs[dir] = p
 	entries, err := os.ReadDir(dir)
@@ -4130,15 +4514,24 @@ func (c *chainResolver) pkg(dir string) *goPackage {
 			return p
 		}
 		for _, spec := range file.Imports {
-			if spec.Name != nil {
-				p.imports[spec.Name.Name] = true
+			imported, err := strconv.Unquote(spec.Path.Value)
+			if err != nil {
 				continue
 			}
-			if imported, err := strconv.Unquote(spec.Path.Value); err == nil {
-				p.imports[filepath.Base(imported)] = true
+			name := imported[strings.LastIndex(imported, "/")+1:]
+			if spec.Name != nil {
+				name = spec.Name.Name
 			}
+			p.imports[name] = imported
 		}
 		for _, decl := range file.Decls {
+			if gen, ok := decl.(*ast.GenDecl); ok && gen.Tok == token.TYPE {
+				for _, spec := range gen.Specs {
+					if ts, ok := spec.(*ast.TypeSpec); ok {
+						p.types[ts.Name.Name] = ts
+					}
+				}
+			}
 			fn, ok := decl.(*ast.FuncDecl)
 			if !ok || fn.Body == nil {
 				continue
@@ -4246,7 +4639,7 @@ func (c *chainResolver) entry(m mountedEntry, depth int) (string, *goPackage, ch
 		if len(ctors) != 1 {
 			break
 		}
-		binding, ok := constructed(ctors[0].decl, p, map[string]bool{ctorSel.Sel.Name: true})
+		binding, ok := constructed(c, ctors[0].decl, p, map[string]bool{ctorSel.Sel.Name: true})
 		method := binding.typ + "." + x.Sel.Name
 		if !ok || len(p.methods[method]) == 0 {
 			break
@@ -4262,13 +4655,15 @@ func (c *chainResolver) entry(m mountedEntry, depth int) (string, *goPackage, ch
 // of the result type, its address, or a local the body assigns once, from one of those. A bare
 // return returns the named result, read as such a local. A local's field the body assigns at its
 // top level, local.field = value, holds that value from the statement on, as a literal's field
-// would, with a local value read as localValue and fieldFiller.localHolds read it, and one that body assigns anywhere else,
-// inside a block or a function literal, holds a value that depends on whether it ran, so the local
-// is not read. A constructor returning anything else, or returning two values that fill one field
-// with different types, is not read, rather than read from another literal of the type, such as
-// one it builds and discards. visiting names the constructors whose reading led here, this one
-// included.
-func constructed(ctor *ast.FuncDecl, p *goPackage, visiting map[string]bool) (fieldBinding, bool) {
+// would, with a local value read as fieldFiller.localValue and fieldFiller.localHolds read it, and
+// one that body assigns anywhere else, inside a block or a function literal, holds a value that
+// depends on whether it ran, so the local is not read. Every name is read as the declaration it
+// refers to where it stands, as Go scopes it, so a local a block declares is another variable than
+// one of the same name outside it, and a write counts only for the declaration it assigns. A
+// constructor returning anything else, or returning two values that fill one field with different
+// types, is not read, rather than read from another literal of the type, such as one it builds and
+// discards. visiting names the constructors whose reading led here, this one included.
+func constructed(c *chainResolver, ctor *ast.FuncDecl, p *goPackage, visiting map[string]bool) (fieldBinding, bool) {
 	if ctor.Type.Results == nil || len(ctor.Type.Results.List) == 0 {
 		return fieldBinding{}, false
 	}
@@ -4276,31 +4671,33 @@ func constructed(ctor *ast.FuncDecl, p *goPackage, visiting map[string]bool) (fi
 	if !ok {
 		return fieldBinding{}, false
 	}
+	scopes := functionScopes(ctor)
 	// A named result, which a bare return returns.
 	var named *ast.Ident
 	if names := ctor.Type.Results.List[0].Names; len(names) > 0 {
 		named = names[0]
 	}
-	// Each local of the body, with every value assigned to it, a nil for one this cannot read.
-	locals := map[string][]ast.Expr{}
-	type returned struct {
-		expr ast.Expr
-		pos  token.Pos
+	// Each declaration of the function with every value assigned to it, anywhere in its body, a function
+	// literal's included, a nil for one this cannot read.
+	locals := map[*declaration][]ast.Expr{}
+	assigned := func(id *ast.Ident, define bool, end token.Pos, value ast.Expr) {
+		if id.Name == "_" {
+			return
+		}
+		if d := scopes.assigned(id, define, end); d != nil {
+			locals[d] = append(locals[d], value)
+		}
 	}
-	var returns []returned
-	writes, branched := fieldWrites(ctor.Body)
 	ast.Inspect(ctor.Body, func(n ast.Node) bool {
 		switch x := n.(type) {
-		case *ast.FuncLit:
-			return false
 		case *ast.AssignStmt:
 			for i, lhs := range x.Lhs {
-				if id, ok := lhs.(*ast.Ident); ok {
+				if id, ok := ast.Unparen(lhs).(*ast.Ident); ok {
 					var value ast.Expr
-					if len(x.Lhs) == len(x.Rhs) {
+					if len(x.Lhs) == len(x.Rhs) && (x.Tok == token.DEFINE || x.Tok == token.ASSIGN) {
 						value = x.Rhs[i]
 					}
-					locals[id.Name] = append(locals[id.Name], value)
+					assigned(id, x.Tok == token.DEFINE, x.End(), value)
 				}
 			}
 		case *ast.ValueSpec:
@@ -4309,14 +4706,44 @@ func constructed(ctor *ast.FuncDecl, p *goPackage, visiting map[string]bool) (fi
 				if len(x.Names) == len(x.Values) {
 					value = x.Values[i]
 				}
-				locals[name.Name] = append(locals[name.Name], value)
+				assigned(name, true, x.End(), value)
 			}
+		case *ast.RangeStmt:
+			if x.Tok == token.ASSIGN {
+				for _, e := range []ast.Expr{x.Key, x.Value} {
+					if id, ok := e.(*ast.Ident); ok {
+						assigned(id, false, x.End(), nil)
+					}
+				}
+			}
+		case *ast.IncDecStmt:
+			if id, ok := ast.Unparen(x.X).(*ast.Ident); ok {
+				assigned(id, false, x.End(), nil)
+			}
+		}
+		return true
+	})
+	type returned struct {
+		expr ast.Expr
+		decl *declaration // the declaration a returned name refers to
+		pos  token.Pos
+	}
+	var returns []returned
+	ast.Inspect(ctor.Body, func(n ast.Node) bool {
+		switch x := n.(type) {
+		case *ast.FuncLit:
+			return false
 		case *ast.ReturnStmt:
 			switch {
 			case len(x.Results) > 0:
-				returns = append(returns, returned{x.Results[0], x.Pos()})
+				ret := returned{expr: x.Results[0], pos: x.Pos()}
+				if id, isIdent := ast.Unparen(ret.expr).(*ast.Ident); isIdent {
+					ret.decl = scopes.at(id)
+				}
+				returns = append(returns, ret)
 			case named != nil:
-				returns = append(returns, returned{named, x.Pos()}) // a bare return returns the named result
+				// A bare return returns the named result.
+				returns = append(returns, returned{expr: named, decl: scopes.param(named.Name), pos: x.Pos()})
 			}
 		}
 		return true
@@ -4324,21 +4751,11 @@ func constructed(ctor *ast.FuncDecl, p *goPackage, visiting map[string]bool) (fi
 	if len(returns) == 0 {
 		return fieldBinding{}, false
 	}
-	fill := fieldFiller{p: p, params: map[string]bool{}, scopes: localScopes(ctor.Body), locals: locals,
-		writes: writes, branched: branched, visiting: visiting}
-	for _, list := range []*ast.FieldList{ctor.Recv, ctor.Type.Params, ctor.Type.Results} {
-		if list == nil {
-			continue
-		}
-		for _, field := range list.List {
-			for _, name := range field.Names {
-				fill.params[name.Name] = true
-			}
-		}
-	}
+	writes, branched := fieldWrites(ctor.Body, scopes)
+	fill := fieldFiller{c: c, p: p, scopes: scopes, locals: locals, writes: writes, branched: branched, visiting: visiting}
 	out := fieldBinding{typ: typ, fields: map[string]fieldBinding{}}
 	for _, ret := range returns {
-		lit, ok := returnedLiteral(ret.expr, locals, typ)
+		lit, ok := returnedLiteral(ret.expr, ret.decl, locals, typ)
 		if !ok {
 			return fieldBinding{}, false
 		}
@@ -4346,13 +4763,13 @@ func constructed(ctor *ast.FuncDecl, p *goPackage, visiting map[string]bool) (fi
 			continue // a nil, which has no fields
 		}
 		binding := fill.literal(lit)
-		if local, isLocal := ast.Unparen(ret.expr).(*ast.Ident); isLocal {
-			if branched[local.Name] {
+		if ret.decl != nil {
+			if branched[ret.decl] {
 				return fieldBinding{}, false
 			}
 			for _, write := range writes {
-				if write.local == local.Name && write.pos < ret.pos {
-					value, ok := localValue(write.value, locals, writes, branched)
+				if write.decl == ret.decl && write.pos < ret.pos {
+					value, ok := fill.localValue(write.value)
 					if !ok {
 						return fieldBinding{}, false
 					}
@@ -4375,16 +4792,16 @@ func constructed(ctor *ast.FuncDecl, p *goPackage, visiting map[string]bool) (fi
 }
 
 // returnedLiteral is the composite literal of type typ a constructor's return statement returns:
-// the literal, its address, or a local assigned once from one of those. It is nil for a returned
-// nil, and false for anything else.
-func returnedLiteral(e ast.Expr, locals map[string][]ast.Expr, typ string) (*ast.CompositeLit, bool) {
+// the literal, its address, or a local assigned once from one of those, decl being the declaration
+// a returned name refers to. It is nil for a returned nil, and false for anything else.
+func returnedLiteral(e ast.Expr, decl *declaration, locals map[*declaration][]ast.Expr, typ string) (*ast.CompositeLit, bool) {
 	e = ast.Unparen(e)
 	if id, ok := e.(*ast.Ident); ok {
-		if id.Name == "nil" {
+		if id.Name == "nil" && decl == nil {
 			return nil, true
 		}
-		values := locals[id.Name]
-		if len(values) != 1 || values[0] == nil {
+		values := locals[decl]
+		if decl == nil || decl.param && !decl.result || len(values) != 1 || values[0] == nil {
 			return nil, false
 		}
 		e = ast.Unparen(values[0])
@@ -4402,25 +4819,27 @@ func returnedLiteral(e ast.Expr, locals map[string][]ast.Expr, typ string) (*ast
 	return lit, true
 }
 
-// localValue is the value a field write assigns, with a local of the constructor read as the one
-// value it was assigned, so a writer built in a local binds the field as a literal written in place
-// would. It is false for a local assigned more than once or from a value this cannot read, or one
-// whose own fields the body assigns, since what it holds then depends on more than its value.
-// Anything else, such as a parameter, is returned as it is.
-func localValue(e ast.Expr, locals map[string][]ast.Expr, writes []fieldWrite, branched map[string]bool) (ast.Expr, bool) {
+// localValue is the value a field write assigns, with a local of the constructor, or a named
+// result, read as the one value its declaration was assigned, so a writer built in a local binds
+// the field as a literal written in place would. It is false for a local assigned more than once
+// or from a value this cannot read, a parameter the body assigns, which holds its argument before,
+// or one whose own fields the body assigns, since what it holds then depends on more than its
+// value. Anything else, such as a parameter the body never assigns, is returned as it is.
+func (f fieldFiller) localValue(e ast.Expr) (ast.Expr, bool) {
 	id, ok := ast.Unparen(e).(*ast.Ident)
 	if !ok {
 		return e, true
 	}
-	values, isLocal := locals[id.Name]
-	if !isLocal {
+	d := f.scopes.at(id)
+	values, isAssigned := f.locals[d]
+	if d == nil || !isAssigned {
 		return e, true
 	}
-	if len(values) != 1 || values[0] == nil || branched[id.Name] {
+	if d.param && !d.result || len(values) != 1 || values[0] == nil || f.branched[d] {
 		return nil, false
 	}
-	for _, write := range writes {
-		if write.local == id.Name {
+	for _, write := range f.writes {
+		if write.decl == d {
 			return nil, false
 		}
 	}
@@ -4431,39 +4850,43 @@ func localValue(e ast.Expr, locals map[string][]ast.Expr, writes []fieldWrite, b
 }
 
 // fieldWrite is one statement of a constructor's body assigning a field of a local:
-// local.path[0]...path[n] = value.
+// local.path[0]...path[n] = value, decl being the declaration local refers to there.
 type fieldWrite struct {
-	local string
+	decl  *declaration
 	path  []string
 	value ast.Expr
 	pos   token.Pos
 }
 
-// fieldWrites is every field write of body's top-level statements, in order, and the locals a
-// field write anywhere else assigns, inside a block or a function literal, or as one of several
-// results of a call.
-func fieldWrites(body *ast.BlockStmt) ([]fieldWrite, map[string]bool) {
+// fieldWrites is every field write of body's top-level statements, in order, and the declarations
+// a field write anywhere else assigns, inside a block or a function literal, or as one of several
+// results of a call. A write to a variable of the package is neither.
+func fieldWrites(body *ast.BlockStmt, scopes scopeIndex) ([]fieldWrite, map[*declaration]bool) {
 	top := map[ast.Node]bool{}
 	for _, stmt := range body.List {
 		top[stmt] = true
 	}
 	var writes []fieldWrite
-	branched := map[string]bool{}
+	branched := map[*declaration]bool{}
 	ast.Inspect(body, func(n ast.Node) bool {
 		assign, ok := n.(*ast.AssignStmt)
 		if !ok {
 			return true
 		}
 		for i, lhs := range assign.Lhs {
-			local, path, ok := fieldPath(lhs)
+			root, path, ok := fieldPath(lhs)
 			if !ok {
 				continue
 			}
-			if !top[assign] || len(assign.Lhs) != len(assign.Rhs) {
-				branched[local] = true
+			d := scopes.at(root)
+			if d == nil {
 				continue
 			}
-			writes = append(writes, fieldWrite{local: local, path: path, value: assign.Rhs[i], pos: assign.Pos()})
+			if !top[assign] || len(assign.Lhs) != len(assign.Rhs) {
+				branched[d] = true
+				continue
+			}
+			writes = append(writes, fieldWrite{decl: d, path: path, value: assign.Rhs[i], pos: assign.Pos()})
 		}
 		return true
 	})
@@ -4472,7 +4895,7 @@ func fieldWrites(body *ast.BlockStmt) ([]fieldWrite, map[string]bool) {
 
 // fieldPath reads local.a.b as local and [a b], and reports false for anything else, such as an
 // element of a map field, which leaves the field holding the same map.
-func fieldPath(e ast.Expr) (string, []string, bool) {
+func fieldPath(e ast.Expr) (*ast.Ident, []string, bool) {
 	var path []string
 	for {
 		switch x := ast.Unparen(e).(type) {
@@ -4480,9 +4903,9 @@ func fieldPath(e ast.Expr) (string, []string, bool) {
 			path = append([]string{x.Sel.Name}, path...)
 			e = x.X
 		case *ast.Ident:
-			return x.Name, path, len(path) > 0
+			return x, path, len(path) > 0
 		default:
-			return "", nil, false
+			return nil, nil, false
 		}
 	}
 }
@@ -4525,52 +4948,109 @@ func (b fieldBinding) key() string {
 // fieldFiller reads the values one constructor of package p fills the fields of what it returns
 // with.
 type fieldFiller struct {
+	c        *chainResolver
 	p        *goPackage
-	params   map[string]bool         // the constructor's receiver, parameters and results, which hide a function of p
-	scopes   map[string][]localScope // the locals of its body, which hide a function of p within their scope
-	locals   map[string][]ast.Expr   // each local of its body with every value assigned to it, as constructed reads them
+	scopes   scopeIndex                  // the constructor's declarations, which hide a function of p within their scope
+	locals   map[*declaration][]ast.Expr // each declaration with every value assigned to it, as constructed reads them
 	writes   []fieldWrite
-	branched map[string]bool
+	branched map[*declaration]bool
 	visiting map[string]bool // the constructors whose reading led here, so one that reaches itself is not read
 }
 
-// localAt reports whether id names a local of the constructor's body where it stands.
-func (f fieldFiller) localAt(id *ast.Ident) bool {
-	for _, s := range f.scopes[id.Name] {
-		if s.from <= id.Pos() && id.Pos() < s.to {
-			return true
-		}
-	}
-	return false
-}
-
-// localScope is the span of a function's source in which one local it declares hides what its
-// name refers to outside: from the end of its declaration to the end of the innermost block, or
-// if, for, switch, select, case or function literal, declaring it.
-type localScope struct {
+// declaration is one name a function declares: its receiver, a parameter or a result, which param
+// marks, and result for a result, which holds nothing before the body assigns it, or a local of
+// its body, with the span of source in which it hides what its name refers to outside, and the
+// node whose scope declares it.
+type declaration struct {
 	from, to token.Pos
+	owner    ast.Node
+	param    bool
+	result   bool
 }
 
-// localScopes is the scope of each local body declares, by name: one a := or a var declares, a
-// range's key and value, and a function literal's parameters and results.
-func localScopes(body *ast.BlockStmt) map[string][]localScope {
-	out := map[string][]localScope{}
-	var stack []ast.Node
-	declare := func(id *ast.Ident, from, to token.Pos) {
-		if id.Name != "_" {
-			out[id.Name] = append(out[id.Name], localScope{from: from, to: to})
+// scopeIndex is every declaration of one function, by name.
+type scopeIndex map[string][]*declaration
+
+// at is the declaration id refers to where it stands, the innermost one whose span holds it, or
+// nil for a name of the package or a predeclared one.
+func (s scopeIndex) at(id *ast.Ident) *declaration {
+	var innermost *declaration
+	for _, d := range s[id.Name] {
+		if d.from <= id.Pos() && id.Pos() < d.to && (innermost == nil || d.from > innermost.from) {
+			innermost = d
 		}
 	}
-	// enclosing is the end of the innermost node below the top of the stack that opens a scope.
-	enclosing := func() token.Pos {
-		for i := len(stack) - 2; i >= 0; i-- {
-			if _, lit := stack[i].(*ast.FuncLit); lit || opensScope(stack[i]) {
-				return stack[i].End()
+	return innermost
+}
+
+// assigned is the declaration an assignment to id ending at end writes: for a := or a var, the one
+// it declares, or for a := naming a variable its own scope declared already, that one; and for an
+// =, the one id refers to.
+func (s scopeIndex) assigned(id *ast.Ident, define bool, end token.Pos) *declaration {
+	if define {
+		for _, d := range s[id.Name] {
+			if d.from == end && !d.param {
+				return d
 			}
 		}
-		return body.End()
 	}
-	ast.Inspect(body, func(n ast.Node) bool {
+	return s.at(id)
+}
+
+// param is the function's own receiver, parameter or result named name, or nil.
+func (s scopeIndex) param(name string) *declaration {
+	for _, d := range s[name] {
+		if d.param {
+			return d
+		}
+	}
+	return nil
+}
+
+// functionScopes is the scope of each name fn declares: its receiver, parameters and results, over
+// its body, and each local its body declares, from the end of its declaration to the end of the
+// innermost block, or if, for, switch, select, case or function literal, declaring it. A local is
+// one a := or a var declares, a range's key and value, and a function literal's parameters and
+// results. A := naming a variable its own scope declares already declares none.
+func functionScopes(fn *ast.FuncDecl) scopeIndex {
+	out := scopeIndex{}
+	for _, list := range []*ast.FieldList{fn.Recv, fn.Type.Params, fn.Type.Results} {
+		if list == nil {
+			continue
+		}
+		for _, field := range list.List {
+			for _, name := range field.Names {
+				if name.Name != "_" {
+					out[name.Name] = append(out[name.Name], &declaration{from: fn.Body.Pos(), to: fn.Body.End(),
+						owner: fn.Body, param: true, result: list == fn.Type.Results})
+				}
+			}
+		}
+	}
+	var stack []ast.Node
+	declare := func(id *ast.Ident, from token.Pos, owner ast.Node, redeclares bool) {
+		if id.Name == "_" {
+			return
+		}
+		if redeclares {
+			for _, d := range out[id.Name] {
+				if d.owner == owner && d.from <= id.Pos() {
+					return // assigned, not declared
+				}
+			}
+		}
+		out[id.Name] = append(out[id.Name], &declaration{from: from, to: owner.End(), owner: owner})
+	}
+	// enclosing is the innermost node below the top of the stack that opens a scope.
+	enclosing := func() ast.Node {
+		for i := len(stack) - 2; i >= 0; i-- {
+			if _, lit := stack[i].(*ast.FuncLit); lit || opensScope(stack[i]) {
+				return stack[i]
+			}
+		}
+		return fn.Body
+	}
+	ast.Inspect(fn.Body, func(n ast.Node) bool {
 		if n == nil {
 			stack = stack[:len(stack)-1]
 			return true
@@ -4581,19 +5061,19 @@ func localScopes(body *ast.BlockStmt) map[string][]localScope {
 			if x.Tok == token.DEFINE {
 				for _, lhs := range x.Lhs {
 					if id, ok := lhs.(*ast.Ident); ok {
-						declare(id, x.End(), enclosing())
+						declare(id, x.End(), enclosing(), true)
 					}
 				}
 			}
 		case *ast.ValueSpec:
 			for _, name := range x.Names {
-				declare(name, x.End(), enclosing())
+				declare(name, x.End(), enclosing(), false)
 			}
 		case *ast.RangeStmt:
 			if x.Tok == token.DEFINE {
 				for _, e := range []ast.Expr{x.Key, x.Value} {
 					if id, ok := e.(*ast.Ident); ok {
-						declare(id, x.Body.Pos(), x.End())
+						declare(id, x.Body.Pos(), x, false)
 					}
 				}
 			}
@@ -4604,7 +5084,7 @@ func localScopes(body *ast.BlockStmt) map[string][]localScope {
 				}
 				for _, field := range list.List {
 					for _, name := range field.Names {
-						declare(name, x.Body.Pos(), x.End())
+						declare(name, x.Body.Pos(), x, false)
 					}
 				}
 			}
@@ -4639,13 +5119,16 @@ func (f fieldFiller) literal(lit *ast.CompositeLit) fieldBinding {
 // is read as literal reads it. A local of the constructor holds the one value it was assigned, read
 // as localValue reads it, or, where that value would leave the field unbound and is not one outside
 // the walk, such as another value's field, an unread binding, as localHolds reads it. A call to a
-// function of p that no local or parameter hides where it is called, returning a type of p, such as a helper building a refusal writer, holds what that
-// function returns, read as constructed reads a constructor. A local or a call it cannot read, or
-// a call already being read, such as a helper returning a named string for a refusal's text, holds
-// an unread binding rather than nothing, so a walk that reaches through the field is not read, and
-// one that never does is read as if it held nothing. Anything else, such as a parameter, a call to
-// another package or to a function literal, or a function returning a predeclared type, leaves
-// the field unbound, holding nothing the walk follows.
+// function of p that no declaration of the constructor hides where it is called, returning a named
+// type of p, such as a helper building a refusal writer, holds what that function returns, read as
+// constructed reads a constructor. A local or a call it cannot read, or a call already being read,
+// such as a helper returning a named string for a refusal's text, holds an unread binding rather
+// than nothing, so a walk that reaches through the field is not read, and one that never does is
+// read as if it held nothing; so does any other call outside does not report as outside the walk,
+// such as one to a local function, or to another package's function whose result may be the
+// argument it was handed. Anything else, such as a parameter, a call outside reports as outside,
+// such as slog.Default(), or a name of the package, leaves the field unbound, holding nothing the
+// walk follows.
 func (f fieldFiller) value(e ast.Expr) (binding fieldBinding, bound bool) {
 	e = ast.Unparen(e)
 	if addr, isAddr := e.(*ast.UnaryExpr); isAddr && addr.Op == token.AND {
@@ -4657,42 +5140,145 @@ func (f fieldFiller) value(e ast.Expr) (binding fieldBinding, bound bool) {
 			return f.literal(x), true
 		}
 	case *ast.Ident:
-		if !f.localAt(x) {
-			break // a parameter, or a name of another scope
+		d := f.scopes.at(x)
+		if d == nil {
+			break // a name of the package
 		}
-		if _, assigned := f.locals[x.Name]; !assigned {
+		_, assigned := f.locals[d]
+		if d.param && !assigned {
+			break // a parameter, which holds its argument
+		}
+		if !assigned {
 			return fieldBinding{unread: true}, true // a range's or a function literal's
 		}
-		value, ok := localValue(x, f.locals, f.writes, f.branched)
+		value, ok := f.localValue(x)
 		if !ok {
 			return fieldBinding{unread: true}, true
 		}
 		return f.localHolds(value)
 	case *ast.CallExpr:
-		id, isIdent := ast.Unparen(x.Fun).(*ast.Ident)
-		if !isIdent || f.params[id.Name] || f.localAt(id) || !f.p.plain[id.Name] {
+		if lit := f.calledLiteral(x); lit != nil {
+			return f.called(lit)
+		}
+		if id, isIdent := ast.Unparen(x.Fun).(*ast.Ident); isIdent && f.scopes.at(id) == nil && f.p.plain[id.Name] {
+			decls := f.p.funcs[id.Name]
+			if len(decls) != 1 || f.visiting[id.Name] {
+				return fieldBinding{unread: true}, true
+			}
+			results := decls[0].decl.Type.Results
+			if results != nil && len(results.List) > 0 {
+				if typ, named := typeName(results.List[0].Type); named && types.Universe.Lookup(typ) == nil {
+					visiting := maps.Clone(f.visiting)
+					visiting[id.Name] = true
+					binding, ok := constructed(f.c, decls[0].decl, f.p, visiting)
+					if !ok {
+						return fieldBinding{unread: true}, true
+					}
+					return binding, true
+				}
+			}
+			if !f.resultOutside(f.p, decls[0].decl.Type) {
+				return fieldBinding{unread: true}, true
+			}
 			break
 		}
-		decls := f.p.funcs[id.Name]
-		if len(decls) != 1 || f.visiting[id.Name] {
+		if id, isIdent := ast.Unparen(x.Fun).(*ast.Ident); isIdent {
+			if d := f.scopes.at(id); d != nil && !d.param {
+				return fieldBinding{unread: true}, true // a local function the walk cannot read
+			}
+		}
+		if f.importedCall(x) && !f.outside(x) {
 			return fieldBinding{unread: true}, true
 		}
-		results := decls[0].decl.Type.Results
-		if results == nil || len(results.List) == 0 {
-			break
-		}
-		if typ, named := typeName(results.List[0].Type); !named || types.Universe.Lookup(typ) != nil {
-			break
-		}
-		visiting := maps.Clone(f.visiting)
-		visiting[id.Name] = true
-		binding, ok := constructed(decls[0].decl, f.p, visiting)
-		if !ok {
-			return fieldBinding{unread: true}, true
-		}
-		return binding, true
 	}
 	return fieldBinding{}, false
+}
+
+// importedCall reports whether call calls a function of a package p imports, pkg.F(...), or a
+// method on what such a call returns, pkg.F(...).M(...), at any depth, rather than a method of a
+// parameter's or another value's.
+func (f fieldFiller) importedCall(call *ast.CallExpr) bool {
+	fun := ast.Unparen(call.Fun)
+	for {
+		switch x := fun.(type) {
+		case *ast.IndexExpr:
+			fun = ast.Unparen(x.X)
+		case *ast.IndexListExpr:
+			fun = ast.Unparen(x.X)
+		case *ast.SelectorExpr:
+			switch y := ast.Unparen(x.X).(type) {
+			case *ast.Ident:
+				_, imported := f.p.imports[y.Name]
+				return imported && f.scopes.at(y) == nil
+			case *ast.CallExpr:
+				fun = ast.Unparen(y.Fun)
+			default:
+				return false
+			}
+		default:
+			return false
+		}
+	}
+}
+
+// calledLiteral is the function literal call calls: its callee, or the one value a local of the
+// constructor naming it was assigned, func(...) T { ... }; nil for any other call.
+func (f fieldFiller) calledLiteral(call *ast.CallExpr) *ast.FuncLit {
+	switch callee := ast.Unparen(call.Fun).(type) {
+	case *ast.FuncLit:
+		return callee
+	case *ast.Ident:
+		d := f.scopes.at(callee)
+		if d == nil || d.param {
+			return nil
+		}
+		values := f.locals[d]
+		if len(values) != 1 || values[0] == nil || f.branched[d] {
+			return nil
+		}
+		lit, _ := ast.Unparen(values[0]).(*ast.FuncLit)
+		return lit
+	}
+	return nil
+}
+
+// called is what a field filled with a call of the function literal lit holds: what each of its
+// return statements returns, not those of a function literal inside it, as value reads it. A
+// return value value leaves unbound is outside the walk where outside reports it so, such as a nil
+// or a logger, and otherwise unread, such as one of the literal's parameters, which is whatever the
+// call was handed. Returns that bind the field two ways, or that leave it unread, hold an unread
+// binding, and returns that all leave it outside leave the field unbound.
+func (f fieldFiller) called(lit *ast.FuncLit) (fieldBinding, bool) {
+	var held *fieldBinding
+	read := true
+	ast.Inspect(lit.Body, func(n ast.Node) bool {
+		switch x := n.(type) {
+		case *ast.FuncLit:
+			return false
+		case *ast.ReturnStmt:
+			if len(x.Results) == 0 {
+				read = false // a bare return of a named result
+				return false
+			}
+			binding, bound := f.value(x.Results[0])
+			switch {
+			case !bound:
+				read = read && f.outside(x.Results[0])
+			case held != nil && held.key() != binding.key():
+				read = false
+			default:
+				held = &binding
+			}
+		}
+		return true
+	})
+	switch {
+	case !read:
+		return fieldBinding{unread: true}, true
+	case held == nil:
+		return fieldBinding{}, false
+	}
+	return *held, true
 }
 
 // localHolds is what a field filled with a local holds, given the one value the local was assigned:
@@ -4711,14 +5297,16 @@ func (f fieldFiller) localHolds(assigned ast.Expr) (fieldBinding, bool) {
 }
 
 // outside reports whether e, a value value leaves unbound, is one no walk of the package can reach
-// through: a parameter, a predeclared name such as nil, a literal, a call whose callee or result
-// shows it returns nothing of the package, and a call whose function a package the constructor's
-// package imports names, pkg.F(...), or a method on what such a call returns, pkg.F(...).M(...).
-// The first is a call to a parameter, a predeclared type's conversion, a builtin other than new,
-// or a function of p or function literal returning nothing or a type resultOutside reads as
-// outside p. Anything else, such as a field of another value, v.field, a method called on one,
-// v.M(), a variable of the package, a call to a local function, or a function literal returning a
-// type of p, may hold a writer of the package.
+// through: a parameter the constructor never assigns, a predeclared name such as nil, a literal,
+// and a call whose callee and declared result show it returns nothing of the package. That is a
+// call to such a parameter, a predeclared type's conversion, a builtin other than new, a function
+// of p or function literal returning nothing or a type typeOutside reads as outside p, and a call
+// to a function of an imported package, pkg.F(...), or a method on what such a call returns,
+// pkg.F(...).M(...), whose declared result is such a type, read from the source of a package under
+// internal and from the compiled standard library otherwise. Anything else may hold a writer of the
+// package: a field of another value, v.field, a method called on one, v.M(), a variable of the
+// package, a call to a local function, a result of an interface type such as any, or a result of a
+// type parameter, which is whatever the call was handed, such as a generic identity function's.
 func (f fieldFiller) outside(e ast.Expr) bool {
 	e = ast.Unparen(e)
 	if addr, isAddr := e.(*ast.UnaryExpr); isAddr && addr.Op == token.AND {
@@ -4726,69 +5314,271 @@ func (f fieldFiller) outside(e ast.Expr) bool {
 	}
 	switch x := e.(type) {
 	case *ast.Ident:
-		return !f.localAt(x) && (f.params[x.Name] || types.Universe.Lookup(x.Name) != nil)
+		if d := f.scopes.at(x); d != nil {
+			_, assigned := f.locals[d]
+			return d.param && !assigned
+		}
+		return types.Universe.Lookup(x.Name) != nil
 	case *ast.BasicLit, *ast.CompositeLit, *ast.FuncLit:
 		return true
 	case *ast.CallExpr:
 		switch callee := ast.Unparen(x.Fun).(type) {
 		case *ast.Ident:
-			switch {
-			case f.localAt(callee):
-				return false
-			case f.params[callee.Name]:
-				return true
-			case f.p.plain[callee.Name]:
+			if lit := f.calledLiteral(x); lit != nil {
+				return f.resultOutside(f.p, lit.Type)
+			}
+			if d := f.scopes.at(callee); d != nil {
+				_, assigned := f.locals[d]
+				return d.param && !assigned
+			}
+			if f.p.plain[callee.Name] {
 				decls := f.p.funcs[callee.Name]
-				return len(decls) == 1 && f.resultOutside(decls[0].decl.Type.Results)
+				return len(decls) == 1 && f.resultOutside(f.p, decls[0].decl.Type)
 			}
 			universe := types.Universe.Lookup(callee.Name)
 			_, isType := universe.(*types.TypeName)
 			_, isBuiltin := universe.(*types.Builtin)
 			return isType || isBuiltin && callee.Name != "new"
 		case *ast.FuncLit:
-			return f.resultOutside(callee.Type.Results)
-		}
-		fun := ast.Unparen(x.Fun)
-		for {
-			switch y := fun.(type) {
-			case *ast.SelectorExpr:
-				root, isIdent := ast.Unparen(y.X).(*ast.Ident)
-				if isIdent {
-					return f.p.imports[root.Name] && !f.params[root.Name] && !f.localAt(root)
-				}
-				call, isCall := ast.Unparen(y.X).(*ast.CallExpr)
-				if !isCall {
-					return false
-				}
-				fun = ast.Unparen(call.Fun)
-			default:
-				return false
-			}
+			return f.resultOutside(f.p, callee.Type)
+		case *ast.SelectorExpr:
+			t, ok := f.c.callResult(f.p, x, f.scopes)
+			return ok && f.c.declaredOutside(f.p, t)
 		}
 	}
 	return false
 }
 
-// resultOutside reports whether a function with results returns nothing a walk of the package can
-// reach through: no result, or a first result of a predeclared type, such as string or error, or of
-// a type a package the constructor's package imports names, such as *slog.Logger. A result of a
-// type of p, or of one spelled inline, such as an interface, may be a writer of the package.
-func (f fieldFiller) resultOutside(results *ast.FieldList) bool {
-	if results == nil || len(results.List) == 0 {
+// resultOutside reports whether a function of q with signature fn returns nothing a walk of p can
+// reach through: no result, or a first result of a type typeOutside reads as outside p.
+func (f fieldFiller) resultOutside(q *goPackage, fn *ast.FuncType) bool {
+	if fn.Results == nil || len(fn.Results.List) == 0 {
 		return true
 	}
-	typ := ast.Unparen(results.List[0].Type)
-	if star, isStar := typ.(*ast.StarExpr); isStar {
-		typ = ast.Unparen(star.X)
+	return f.c.typeOutside(f.p, q, fn.Results.List[0].Type, typeParamNames(fn.TypeParams), map[string]bool{})
+}
+
+// typeParamNames is the names a type parameter list declares.
+func typeParamNames(list *ast.FieldList) map[string]bool {
+	out := map[string]bool{}
+	if list == nil {
+		return out
 	}
-	switch t := typ.(type) {
+	for _, field := range list.List {
+		for _, name := range field.Names {
+			out[name.Name] = true
+		}
+	}
+	return out
+}
+
+// typeOutside reports whether a value of the type t spells in package q's source holds nothing a
+// walk of p can reach through: a type that is neither an interface, which may hold a writer of p,
+// nor a type parameter, which is whatever its caller chose, nor a type of p. A predeclared type
+// such as string, a struct, map, slice, function or channel type spelled in place, a pointer to
+// one, and a named type of another package whose definition is one of those, are outside. A named
+// type of a package under internal is read from its source, and one of another package from the
+// compiled standard library, so an interface such as any or error, or a type the lint cannot find,
+// is not outside. seen names the types of q being read, so a recursive one is read once.
+func (c *chainResolver) typeOutside(p, q *goPackage, t ast.Expr, typeParams, seen map[string]bool) bool {
+	switch x := ast.Unparen(t).(type) {
+	case *ast.StarExpr:
+		return c.typeOutside(p, q, x.X, typeParams, seen)
 	case *ast.Ident:
-		return types.Universe.Lookup(t.Name) != nil
+		if typeParams[x.Name] {
+			return false
+		}
+		if spec, declared := q.types[x.Name]; declared {
+			if q == p || spec.TypeParams != nil {
+				return false
+			}
+			if seen[x.Name] {
+				return true
+			}
+			seen[x.Name] = true
+			return c.typeOutside(p, q, spec.Type, nil, seen)
+		}
+		named, isType := types.Universe.Lookup(x.Name).(*types.TypeName)
+		return isType && !types.IsInterface(named.Type())
 	case *ast.SelectorExpr:
-		root, isIdent := ast.Unparen(t.X).(*ast.Ident)
-		return isIdent && f.p.imports[root.Name]
+		root, isIdent := ast.Unparen(x.X).(*ast.Ident)
+		if !isIdent {
+			return false
+		}
+		path, imported := q.imports[root.Name]
+		if !imported {
+			return false
+		}
+		if r, ok := c.internalPkg(path); ok {
+			return c.typeOutside(p, r, ast.NewIdent(x.Sel.Name), nil, map[string]bool{})
+		}
+		pkg, ok := c.stdPackage(path)
+		if !ok {
+			return false
+		}
+		named, isType := pkg.Scope().Lookup(x.Sel.Name).(*types.TypeName)
+		return isType && stdTypeOutside(named.Type())
+	case *ast.StructType, *ast.MapType, *ast.ArrayType, *ast.FuncType, *ast.ChanType:
+		return true
 	}
-	return false
+	return false // an interface, or an instance of a generic type, which may hold a type of p
+}
+
+// declaredType is a type a function or method declares as its first result: one of the compiled
+// standard library, std, where isStd is set, and otherwise as package q's source spells it, expr,
+// with the type parameters the declaration names. A nil std or expr is no result.
+type declaredType struct {
+	isStd      bool
+	std        types.Type
+	q          *goPackage
+	expr       ast.Expr
+	typeParams map[string]bool
+}
+
+// sourceResult is the first result fn, a declaration of q, declares.
+func sourceResult(q *goPackage, fn *ast.FuncType) declaredType {
+	t := declaredType{q: q, typeParams: typeParamNames(fn.TypeParams)}
+	if fn.Results != nil && len(fn.Results.List) > 0 {
+		t.expr = fn.Results.List[0].Type
+	}
+	return t
+}
+
+// callResult is the declared first result of call: a call of a function of a package p imports,
+// pkg.F(...), or of a method on what such a call returns, pkg.F(...).M(...), at any depth. A package
+// under internal is read from its source, and any other from the compiled standard library. It is
+// false for any other call, and for one whose function or method the lint cannot find, such as a
+// method a type gains by embedding.
+func (c *chainResolver) callResult(p *goPackage, call *ast.CallExpr, scopes scopeIndex) (declaredType, bool) {
+	sel, ok := ast.Unparen(call.Fun).(*ast.SelectorExpr)
+	if !ok {
+		return declaredType{}, false
+	}
+	if root, isIdent := ast.Unparen(sel.X).(*ast.Ident); isIdent {
+		path, imported := p.imports[root.Name]
+		if !imported || scopes.at(root) != nil {
+			return declaredType{}, false
+		}
+		if q, internal := c.internalPkg(path); internal {
+			decls := q.funcs[sel.Sel.Name]
+			if len(decls) != 1 {
+				return declaredType{}, false
+			}
+			return sourceResult(q, decls[0].decl.Type), true
+		}
+		pkg, loaded := c.stdPackage(path)
+		if !loaded {
+			return declaredType{}, false
+		}
+		t, known := stdResult(pkg.Scope().Lookup(sel.Sel.Name))
+		return declaredType{isStd: true, std: t}, known
+	}
+	inner, isCall := ast.Unparen(sel.X).(*ast.CallExpr)
+	if !isCall {
+		return declaredType{}, false
+	}
+	recv, ok := c.callResult(p, inner, scopes)
+	if !ok {
+		return declaredType{}, false
+	}
+	if recv.isStd {
+		if recv.std == nil {
+			return declaredType{}, false
+		}
+		method, _, _ := types.LookupFieldOrMethod(recv.std, true, nil, sel.Sel.Name)
+		t, known := stdResult(method)
+		return declaredType{isStd: true, std: t}, known
+	}
+	if recv.expr == nil {
+		return declaredType{}, false
+	}
+	typ, named := typeName(recv.expr)
+	if !named || recv.typeParams[typ] {
+		return declaredType{}, false
+	}
+	if spec, declared := recv.q.types[typ]; !declared || spec.TypeParams != nil {
+		return declaredType{}, false
+	}
+	methods := recv.q.methods[typ+"."+sel.Sel.Name]
+	if len(methods) != 1 {
+		return declaredType{}, false
+	}
+	return sourceResult(recv.q, methods[0].decl.Type), true
+}
+
+// declaredOutside reports whether a value of the declared type t holds nothing a walk of p can
+// reach through, as typeOutside and stdTypeOutside read it; no result holds nothing.
+func (c *chainResolver) declaredOutside(p *goPackage, t declaredType) bool {
+	if t.isStd {
+		return stdTypeOutside(t.std)
+	}
+	if t.expr == nil {
+		return true
+	}
+	return c.typeOutside(p, t.q, t.expr, t.typeParams, map[string]bool{})
+}
+
+// stdResult is the first result of a call of obj, a function or a type's conversion, nil for a
+// function returning nothing. It is false for anything else, and for a generic function, whose
+// result depends on what it was handed.
+func stdResult(obj types.Object) (types.Type, bool) {
+	switch o := obj.(type) {
+	case *types.TypeName:
+		return o.Type(), true
+	case *types.Func:
+		sig, ok := o.Type().(*types.Signature)
+		if !ok || sig.TypeParams().Len() > 0 {
+			return nil, false
+		}
+		if sig.Results().Len() == 0 {
+			return nil, true
+		}
+		return sig.Results().At(0).Type(), true
+	}
+	return nil, false
+}
+
+// stdTypeOutside reports whether a value of the standard library's type t, nil for no result, holds
+// nothing a walk of a package under internal can reach through: no interface, which may hold one
+// of its writers, and no generic type's instance.
+func stdTypeOutside(t types.Type) bool {
+	if t == nil {
+		return true
+	}
+	if ptr, ok := t.(*types.Pointer); ok {
+		t = ptr.Elem()
+	}
+	if named, ok := t.(*types.Named); ok && named.TypeParams().Len() > 0 {
+		return false
+	}
+	return !types.IsInterface(t)
+}
+
+// internalPkg is the package under internal at the import path path, read from its source, or false
+// for a path elsewhere or a directory the tree does not hold.
+func (c *chainResolver) internalPkg(path string) (*goPackage, bool) {
+	rel, internal := strings.CutPrefix(path, authserverInternalImport)
+	if !internal {
+		return nil, false
+	}
+	dir := filepath.Join(c.internalRoot, filepath.FromSlash(rel))
+	if info, err := os.Stat(dir); err != nil || !info.IsDir() {
+		return nil, false
+	}
+	return c.pkg(dir), true
+}
+
+// stdPackage is the standard library package at path as the toolchain compiled it, or false for a
+// package outside the standard library or one the toolchain cannot load.
+func (c *chainResolver) stdPackage(path string) (*types.Package, bool) {
+	if first, _, _ := strings.Cut(path, "/"); strings.Contains(first, ".") {
+		return nil, false
+	}
+	if c.std == nil {
+		c.std = importer.ForCompiler(token.NewFileSet(), "gc", nil)
+	}
+	pkg, err := c.std.Import(path)
+	return pkg, err == nil
 }
 
 // walk reads the statuses of start and of every function of its package it reaches, each read
@@ -4908,15 +5698,22 @@ func chainStatuses(path string, fset *token.FileSet, fn *ast.FuncDecl,
 
 // receiverCalls is every method of the package a method's body reaches through its receiver:
 // recv.M, another method of the receiver's type, and recv.field.M or recv.a.b.M, a method of the
-// type the constructor filled the field at the end of that path with. It also returns the
-// selectors it resolved, which name a method of the package rather than a port, and whether the
-// body reaches through a field an unread helper filled, at any depth, recv.field.X, whose type it
-// cannot tell.
+// type the constructor filled the field at the end of that path with. A name is the receiver only
+// where it refers to the receiver's declaration, so a local or a function literal's parameter that
+// shadows it is not read with the receiver's binding. It also returns the selectors it resolved,
+// which name a method of the package rather than a port, and whether the body reaches through a
+// field an unread helper filled, at any depth, recv.field.X, whose type it cannot tell, or names a
+// method of the package through a shadowing local, whose value it does not read.
 func receiverCalls(fn *ast.FuncDecl, binding fieldBinding, p *goPackage) ([]chainWalk, map[*ast.SelectorExpr]bool, bool) {
 	if len(fn.Recv.List[0].Names) == 0 {
 		return nil, nil, false
 	}
 	recv := fn.Recv.List[0].Names[0].Name
+	scopes := functionScopes(fn)
+	methodNames := map[string]bool{}
+	for key := range p.methods {
+		methodNames[key[strings.LastIndex(key, ".")+1:]] = true
+	}
 	var out []chainWalk
 	resolved := map[*ast.SelectorExpr]bool{}
 	unread := false
@@ -4925,11 +5722,17 @@ func receiverCalls(fn *ast.FuncDecl, binding fieldBinding, p *goPackage) ([]chai
 		if !ok {
 			return true
 		}
-		local, path, isPath := fieldPath(sel.X)
+		root, path, isPath := fieldPath(sel.X)
 		if id, isIdent := ast.Unparen(sel.X).(*ast.Ident); isIdent {
-			local, isPath = id.Name, true
+			root, isPath = id, true
 		}
-		if !isPath || local != recv {
+		if !isPath || root.Name != recv {
+			return true
+		}
+		if d := scopes.at(root); d == nil || !d.param {
+			if methodNames[sel.Sel.Name] {
+				unread = true
+			}
 			return true
 		}
 		at := binding
