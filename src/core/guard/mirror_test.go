@@ -98,7 +98,7 @@ for a in "$@"; do
         --header) if [ "$a" = @- ]; then stdin=$(cat); headers+="$stdin"$'\n'; else headers+="$a"$'\n'; fi ;;
     esac
     [ "$a" = --netrc-file ] && netrc=1
-    [ "$a" = --head ] && head=1
+    [ "$a" = --head ] || [ "$a" = -I ] && head=1
     prev=$a
 done
 { printf 'curl'; printf ' %s' "$@"; [ -z "$stdin" ] || printf ' stdin=%s' "$(tr '\n' ';' <<< "$stdin")"; echo; } >> "$STUB/log"
@@ -827,7 +827,7 @@ func assertAnonymousReads(t *testing.T, run mirrorRun, refused, single []string)
 		assert.NotContains(t, c, "--netrc", "a request that may be logged in: %s", c)
 		words := strings.Fields(strings.Split(c, " stdin=")[0])
 		method := "GET"
-		if slices.Contains(words, "--head") {
+		if slices.Contains(words, "--head") || slices.Contains(words, "-I") {
 			method = "HEAD"
 		}
 		got = append(got, method+" "+words[len(words)-1])
