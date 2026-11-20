@@ -77,10 +77,10 @@ Each disconnect leaves a `disconnected_client` entry in the [audit log](/concept
 
 ## Telling your apps
 
-Ending a session also tells the apps the session was signed in to. Each one with a [back-channel logout URI](/concepts/clients/#back-channel-logout) is sent a logout token there: a signed statement naming the user (`sub`) and the session (`sid`), so the app can end its own session for that user. That happens whenever a session that was still valid ends:
+Ending a session also tells the apps the session was signed in to. Each one with a [back-channel logout URI](/concepts/clients/#back-channel-logout) is sent a logout token there: a signed statement naming the user (`sub`) and the session (`sid`), so the app can end its own session for that user. That happens whenever a session, or an app's part of one, ends while the session is still valid:
 
 - someone ends it from the admin console or the API;
-- the user [signs out](#signing-out). With an `id_token_hint` the auth server confirms, only the app that signed the user out is told, since only its part of the session ended;
+- the user [signs out](#signing-out). With an `id_token_hint` the auth server confirms, only the app that signed the user out is told;
 - a [different user signs in](#a-different-user-signs-in-on-the-same-browser) on the browser;
 - a sign-in ends it: the user's own session the browser had, their other sessions [from the same browser](/concepts/sessions/#how-the-auth-server-recognizes-a-browser), or the ones over [the cap](/concepts/sessions/#how-many-sessions-a-user-can-hold);
 - an app redeems an authorization code from it twice;
