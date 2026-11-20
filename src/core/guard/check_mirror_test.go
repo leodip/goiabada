@@ -59,10 +59,7 @@ const (
 )
 
 var (
-	wholeExpression = regexp.MustCompile(`^\$\{\{\s*(.+?)\s*\}\}$`)
-	// choiceExpression is cond && A || B, split at the last && before the first || after it, so a
-	// condition can itself join comparisons with &&.
-	choiceExpression = regexp.MustCompile(`^(.+)\s*&&\s*(.+?)\s*\|\|\s*(.+)$`)
+	wholeExpression  = regexp.MustCompile(`^\$\{\{\s*(.+?)\s*\}\}$`)
 	formatExpression = regexp.MustCompile(`^format\(\s*'((?:[^']|'')*)'\s*((?:,\s*[A-Za-z0-9_.-]+\s*)*)\)$`)
 	quotedExpression = regexp.MustCompile(`^'((?:[^']|'')*)'$`)
 	pinExpression    = regexp.MustCompile(`\$\{\{\s*needs\.versions\.outputs\.([A-Za-z0-9_-]+)\s*\}\}`)
@@ -82,6 +79,22 @@ func conjuncts(expression string) []string {
 	for len(expression) > 1 && expression[0] == '(' && closingParenthesis(expression) == len(expression)-1 {
 		expression = strings.TrimSpace(expression[1 : len(expression)-1])
 	}
+	if len(operands(expression, "||")) > 1 {
+		return []string{expression}
+	}
+	parts := operands(expression, "&&")
+	if len(parts) == 1 {
+		return parts
+	}
+	var out []string
+	for _, part := range parts {
+		out = append(out, conjuncts(part)...)
+	}
+	return out
+}
+
+// operands splits an expression at each operator outside parentheses and quoted strings.
+func operands(expression, operator string) []string {
 	var parts []string
 	depth, quoted, start := 0, false, 0
 	for i := 0; i < len(expression); i++ {
@@ -93,22 +106,28 @@ func conjuncts(expression string) []string {
 			depth++
 		case c == ')':
 			depth--
-		case depth == 0 && strings.HasPrefix(expression[i:], "||"):
-			return []string{expression}
-		case depth == 0 && strings.HasPrefix(expression[i:], "&&"):
+		case depth == 0 && strings.HasPrefix(expression[i:], operator):
 			parts = append(parts, expression[start:i])
-			start, i = i+2, i+1
+			start, i = i+len(operator), i+len(operator)-1
 		}
 	}
-	parts = append(parts, expression[start:])
-	if len(parts) == 1 {
-		return parts
+	return append(parts, expression[start:])
+}
+
+// choice splits cond && A || B into its condition and its two results, each trimmed: the
+// expression's one || outside parentheses and quoted strings, and the last && before it, so the
+// condition can itself join operands with &&. ok is false for any other form, a second || among
+// them, since a choice among three results hides the first in what reads as the condition.
+func choice(expression string) (condition, a, b string, ok bool) {
+	or := operands(expression, "||")
+	if len(or) != 2 {
+		return "", "", "", false
 	}
-	var out []string
-	for _, part := range parts {
-		out = append(out, conjuncts(part)...)
+	and := operands(or[0], "&&")
+	if len(and) < 2 {
+		return "", "", "", false
 	}
-	return out
+	return strings.TrimSpace(strings.Join(and[:len(and)-1], "&&")), strings.TrimSpace(and[len(and)-1]), strings.TrimSpace(or[1]), true
 }
 
 // closingParenthesis is the place of the parenthesis that closes the one expression opens with,
@@ -163,11 +182,11 @@ func imageWrittenForms(value string) (forms []string, ok bool) {
 	if whole == nil || strings.Contains(whole[1], "${{") {
 		return []string{value}, true
 	}
-	operands := []string{whole[1]}
-	if choice := choiceExpression.FindStringSubmatch(whole[1]); choice != nil {
-		operands = choice[2:]
+	results := []string{whole[1]}
+	if _, a, b, ok := choice(whole[1]); ok {
+		results = []string{a, b}
 	}
-	for _, operand := range operands {
+	for _, operand := range results {
 		operand = strings.TrimSpace(operand)
 		if quoted := quotedExpression.FindStringSubmatch(operand); quoted != nil {
 			if text := strings.ReplaceAll(quoted[1], "''", "'"); text != "" {
@@ -823,6 +842,14 @@ func TestCheckWorkflow_RegistryFindings(t *testing.T) {
 	t.Run("a Docker Hub image inside a choice by the matrix", func(t *testing.T) {
 		assertFindings(t, findings(edit(t, "format('ghcr.io/leodip/goiabada-ci/mailpit:v{0}'", "format('axllent/mailpit:v{0}'")),
 			"check mirror: check.yml:28 (tests) names axllent/mailpit:v${{ needs.versions.outputs.mailpit }}, from Docker Hub")
+	})
+	t.Run("a choice whose condition joins operands with && passes", func(t *testing.T) {
+		assertFindings(t, findings(edit(t, "${{ matrix.tier == 'integration' && ", "${{ matrix.tier == 'integration' && inputs.full && ")))
+	})
+	t.Run("a choice among three images is an expression this check cannot read", func(t *testing.T) {
+		assertFindings(t, findings(edit(t, "${{ matrix.tier == 'integration' && ", "${{ matrix.tier == 'data' && 'axllent/mailpit:v1' || matrix.tier == 'integration' && ")),
+			"check mirror: check.yml:28 (tests) names the image ${{ matrix.tier == 'data' && 'axllent/mailpit:v1' || matrix.tier == 'integration' && "+
+				"format('ghcr.io/leodip/goiabada-ci/mailpit:v{0}', needs.versions.outputs.mailpit) || '' }} through an expression this check cannot read")
 	})
 	t.Run("a mirror address the list does not hold", func(t *testing.T) {
 		assertFindings(t, findings(edit(t, "ghcr.io/leodip/goiabada-ci/mysql:26", "ghcr.io/leodip/goiabada-ci/mysql:27")),

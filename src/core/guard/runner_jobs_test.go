@@ -165,12 +165,12 @@ func savesCache(value string, entry map[string]string) (saves, ok bool) {
 	if whole == nil {
 		return strings.EqualFold(value, "true"), true
 	}
-	choice := choiceExpression.FindStringSubmatch(whole[1])
-	if choice == nil {
+	condition, first, second, ok := choice(whole[1])
+	if !ok {
 		return false, false
 	}
-	holds, ok := matrixCondition(choice[1], entry)
-	a, b := quotedExpression.FindStringSubmatch(strings.TrimSpace(choice[2])), quotedExpression.FindStringSubmatch(strings.TrimSpace(choice[3]))
+	holds, ok := matrixCondition(condition, entry)
+	a, b := quotedExpression.FindStringSubmatch(first), quotedExpression.FindStringSubmatch(second)
 	if !ok || a == nil || b == nil {
 		return false, false
 	}
