@@ -737,6 +737,11 @@ func TestCheckWorkflow_RunnerJobFindings(t *testing.T) {
 			"runner jobs: check.yml:36 (tests-sqlite) gives save-cache ${{ inputs.full && 'true' || 'false' }}, which this guard cannot read",
 			"runner jobs: check.yml saves the container's Go cache in no job")
 	})
+	t.Run("a save-cache choice with no condition this guard cannot read", func(t *testing.T) {
+		assertFindings(t, findings(replace(t, workflow, "matrix.tier == 'data' && 'true'", "&& 'true'")),
+			"runner jobs: check.yml:36 (tests-sqlite) gives save-cache ${{ && 'true' || 'false' }}, which this guard cannot read",
+			"runner jobs: check.yml saves the container's Go cache in no job")
+	})
 	t.Run("Mailpit's ports in a flow sequence pass", func(t *testing.T) {
 		assertFindings(t, findings(replace(t, workflow, "        ports:\n          - 1025:1025\n          - '8025:8025'\n",
 			"        ports: ['1025:1025', \"8025:8025\"]\n")))

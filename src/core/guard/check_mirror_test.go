@@ -116,18 +116,20 @@ func operands(expression, operator string) []string {
 
 // choice splits cond && A || B into its condition and its two results, each trimmed: the
 // expression's one || outside parentheses and quoted strings, and the last && before it, so the
-// condition can itself join operands with &&. ok is false for any other form, a second || among
-// them, since a choice among three results hides the first in what reads as the condition.
+// condition can itself join operands with &&. ok is false for any other form, an empty condition
+// or a second || among them, since a choice among three results hides the first in what reads as
+// the condition.
 func choice(expression string) (condition, a, b string, ok bool) {
 	or := operands(expression, "||")
 	if len(or) != 2 {
 		return "", "", "", false
 	}
 	and := operands(or[0], "&&")
-	if len(and) < 2 {
+	condition = strings.TrimSpace(strings.Join(and[:len(and)-1], "&&"))
+	if len(and) < 2 || condition == "" {
 		return "", "", "", false
 	}
-	return strings.TrimSpace(strings.Join(and[:len(and)-1], "&&")), strings.TrimSpace(and[len(and)-1]), strings.TrimSpace(or[1]), true
+	return condition, strings.TrimSpace(and[len(and)-1]), strings.TrimSpace(or[1]), true
 }
 
 // closingParenthesis is the place of the parenthesis that closes the one expression opens with,
