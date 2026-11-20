@@ -29,15 +29,14 @@ import (
 // boolean and let a caller get it wrong.
 //
 // Each handler writes its own statuses rather than delegating them to a shared helper.
-// That is deliberate and it is not repetition for its own sake: openapi_contract_lint_test
-// reads a handler's failure surface out of the http.Status constants its own body names,
-// so a status written from inside a helper is invisible to the scan and openapi.yaml could
-// drift under it with every test still passing. It also makes each operation's surface
-// exact, which is why create declares no 404 and delete declares no 404 either.
+// openapi_contract_lint_test reads a handler's failure surface from its body and from every
+// helper of this package it reaches, a branch the handler cannot take included, so a status
+// written from inside a shared helper becomes every caller's. Writing them in the handler
+// keeps each operation's surface exact, which is why create declares no 404 and delete
+// declares no 404 either.
 //
-// readSessionRequest is the one exception, and it pays that scan's price the way the other
-// implicit-status helpers do: it answers its own 400, and statusesWrittenIn reads it by
-// name so the five callers keep their documented 400 (#279).
+// readSessionRequest is the one shared helper: it answers its own 400, for a body that will
+// not decode and for a missing session id, and each of the five callers declares it (#279).
 
 // maxSessionRequestBytes bounds a request body. The largest real payload is an admin
 // console session holding a full token set, which measures about 13 KB of ciphertext, and

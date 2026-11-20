@@ -9,6 +9,7 @@ import (
 	"go/token"
 	"go/types"
 	"io/fs"
+	"maps"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -43,10 +44,12 @@ import (
 // happen loses nothing) and a status produced by a value computed at run time would be
 // missed. No handler in this module does the latter today: writeJSONError and
 // writeLocalizedError are always called with an http.Status constant, which
-// TestAPIHandlers_WriteStatusesAsConstants below is what keeps true. The helpers that carry a status implicitly rather than as an argument
-// are read by name in statusesWrittenIn: writeValidationError at 400,
-// writeInternalServerError at 500, writeJSON at 500 for a buffered encode that fails, and
-// readSessionRequest at 400 for a body it cannot decode.
+// TestAPIHandlers_WriteStatusesAsConstants below is what keeps true. A handler's statuses
+// include those of every function of its own package it reaches, read from that function's
+// body, so a status a helper writes needs no entry here. Only the shared writers of other
+// packages that write a status they are not handed are read by name, in ownStatuses. A
+// helper's branch one caller cannot reach is still read as that caller's, the same
+// conservative direction as an unreachable branch.
 //
 // What it does not check: response bodies, schemas, parameters, or whether an operation's
 // description is true. Those stay hand-maintained.
@@ -909,6 +912,164 @@ func TestStatusesAsConstants_AWalkThatReachedNoWriterStops(t *testing.T) {
 	}
 }
 
+// handlerStatusesFixture is three handler packages whose handlers write most of their statuses
+// through helpers of their own package: called directly, through a chain of two, passed as a
+// value, and in a pair that refer to each other. The accounthandlers package declares a helper of
+// the same name as apihandlers', writing another status, and calls the parent package's
+// ResourceNotFound through its package name and a method that shares the name of one of its
+// plain functions, neither of which is followed.
+func handlerStatusesFixture(t *testing.T, root string) {
+	t.Helper()
+	writeDocFixture(t, root, "handlers/apihandlers/handler_widget.go", `package apihandlers
+
+import "net/http"
+
+func HandleWidgetGet() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		widget, ok := loadWidget(w, r)
+		if !ok {
+			return
+		}
+		writeJSON(w, r, http.StatusOK, widget)
+	}
+}
+
+func HandleWidgetDelete() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		onMissing := writeWidgetNotFound
+		if r.URL == nil {
+			onMissing(w)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func HandleWidgetRetry() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		retryWidget(w)
+	}
+}
+`)
+	writeDocFixture(t, root, "handlers/apihandlers/widget_common.go", `package apihandlers
+
+import "net/http"
+
+func loadWidget(w http.ResponseWriter, r *http.Request) (any, bool) {
+	if r.URL == nil {
+		writeWidgetNotFound(w)
+		return nil, false
+	}
+	return struct{}{}, true
+}
+
+func writeWidgetNotFound(w http.ResponseWriter) {
+	writeJSONError(w, "Widget not found", "WIDGET_NOT_FOUND", http.StatusNotFound)
+}
+
+func writeJSON(w http.ResponseWriter, r *http.Request, status int, v any) {
+	apiresponse.WriteJSON(w, r, status, v)
+}
+
+func retryWidget(w http.ResponseWriter) {
+	retryWidgetAgain(w)
+}
+
+func retryWidgetAgain(w http.ResponseWriter) {
+	retryWidget(w)
+	writeJSONError(w, "Widget changed", "CONCURRENT_UPDATE", http.StatusConflict)
+}
+`)
+	writeDocFixture(t, root, "handlers/accounthandlers/handler_gadget.go", `package accounthandlers
+
+import "net/http"
+
+func HandleGadgetGet() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.URL == nil {
+			writeWidgetNotFound(w)
+			return
+		}
+		if r.Body == nil {
+			handlers.ResourceNotFound(w, r)
+			return
+		}
+		if r.Form == nil {
+			gadgets.refuseGadget(w)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}
+}
+
+func writeWidgetNotFound(w http.ResponseWriter) {
+	w.WriteHeader(http.StatusGone)
+}
+
+func refuseGadget(w http.ResponseWriter) {
+	w.WriteHeader(http.StatusForbidden)
+}
+`)
+	writeDocFixture(t, root, "handlers/not_found.go", `package handlers
+
+import "net/http"
+
+func HandleResource() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ResourceNotFound(w, r)
+	}
+}
+
+func ResourceNotFound(w http.ResponseWriter, r *http.Request) {
+	http.NotFound(w, r)
+}
+`)
+}
+
+func TestHandlerStatuses_AStatusReachedThroughASamePackageCallIsSeen(t *testing.T) {
+	root := t.TempDir()
+	handlerStatusesFixture(t, root)
+
+	var statuses map[string]map[int]bool
+	report := guard.Run(func(r guard.Reporter) {
+		statuses = readHandlerStatuses(r, filepath.Join(root, "handlers"), 1, 0)
+	})
+
+	if report.Failed() {
+		t.Fatalf("reading the fixture handlers failed: %+v", report)
+	}
+	want := map[string][]int{
+		"apihandlers.HandleWidgetGet":     {200, 404, 500},
+		"apihandlers.HandleWidgetDelete":  {204, 404},
+		"apihandlers.HandleWidgetRetry":   {409},
+		"accounthandlers.HandleGadgetGet": {200, 410},
+		"handlers.HandleResource":         {404},
+	}
+	got := map[string][]int{}
+	for name, codes := range statuses {
+		got[name] = sortedCodes(codes)
+	}
+	if !maps.EqualFunc(got, want, slices.Equal[[]int]) {
+		t.Errorf("statuses\n%v\nwant\n%v", got, want)
+	}
+}
+
+func TestHandlerStatuses_AResolverThatFollowedNoCallStops(t *testing.T) {
+	root := t.TempDir()
+	writeDocFixture(t, root, "handlers/apihandlers/handler_direct.go", "package apihandlers\n\n"+
+		"func HandleDirect(w http.ResponseWriter, r *http.Request) {\n"+
+		"\twriteJSONError(w, \"m\", \"C\", http.StatusBadRequest)\n"+
+		"}\n")
+
+	report := guard.Run(func(r guard.Reporter) {
+		readHandlerStatuses(r, filepath.Join(root, "handlers"), 1, 1)
+	})
+
+	if !report.Stopped || !strings.Contains(report.Fatal, "followed only 0 references to a same-package function") {
+		t.Errorf("a resolver that followed no call did not stop the check: %+v", report)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // The three parsers.
 // ---------------------------------------------------------------------------
@@ -1130,229 +1291,79 @@ func mentionsRateLimiter(e ast.Expr) bool {
 }
 
 // parseHandlerStatuses maps every Handle* constructor under internal/handlers, keyed by its
-// package-qualified name as handlerConstructor reads it from routes.go, to the statuses its
-// body can write.
+// package-qualified name as handlerConstructor reads it from routes.go, to the statuses it can
+// write, as handlerStatuses reads them.
 func parseHandlerStatuses(t *testing.T) map[string]map[int]bool {
 	t.Helper()
-
-	out := map[string]map[int]bool{}
-	seenIn := map[string]string{}
-	forEachHandlerSource(t, func(t *testing.T, path string, fset *token.FileSet, file *ast.File) {
-		for _, decl := range file.Decls {
-			fn, ok := decl.(*ast.FuncDecl)
-			if !ok || fn.Recv != nil || fn.Body == nil || !strings.HasPrefix(fn.Name.Name, "Handle") {
-				continue
-			}
-			// Two handler packages of the same name would make the lookup ambiguous and the
-			// result arbitrary. There are none; this says so.
-			name := file.Name.Name + "." + fn.Name.Name
-			if prev, dup := seenIn[name]; dup {
-				t.Fatalf("%s is declared in both %s and %s; the status scan looks handlers "+
-					"up by package and name and cannot tell them apart", name, prev, path)
-			}
-			seenIn[name] = path
-			out[name] = statusesWrittenIn(t, path, fset, fn)
-		}
-	})
-
-	if len(out) < 100 {
-		t.Fatalf("found only %d Handle* functions under internal/handlers; the walk is no "+
-			"longer reaching the handler sources", len(out))
-	}
-	return out
-}
-
-// statusesWrittenIn reads one handler's failure surface. Four spellings write a status in
-// this module and all four are read here; anything else is a fifth nobody has taught this
-// file about, which is what the unknown-constant failure below is for.
-func statusesWrittenIn(t *testing.T, path string, fset *token.FileSet, fn *ast.FuncDecl) map[int]bool {
-	out := map[int]bool{}
-	ast.Inspect(fn.Body, func(n ast.Node) bool {
-		switch e := n.(type) {
-		case *ast.SelectorExpr:
-			// http.StatusXxx, wherever it appears: w.WriteHeader, writeJSONError's fourth
-			// argument, or a comparison.
-			pkg, ok := e.X.(*ast.Ident)
-			if !ok || pkg.Name != "http" || !strings.HasPrefix(e.Sel.Name, "Status") {
-				return true
-			}
-			if e.Sel.Name == "StatusText" {
-				return true // the formatter, not a status
-			}
-			code, known := httpStatusConstants[e.Sel.Name]
-			if !known {
-				t.Errorf("%s:%d: %s uses http.%s, which openapi_contract_lint_test.go does "+
-					"not know the number of; add it to httpStatusConstants",
-					path, fset.Position(e.Pos()).Line, fn.Name.Name, e.Sel.Name)
-				return true
-			}
-			out[code] = true
-		case *ast.CallExpr:
-			switch f := e.Fun.(type) {
-			case *ast.Ident:
-				// writeValidationError names no constant; it is a 400 by
-				// construction. Nothing depends on this line today: every handler
-				// that calls it also writes an http.StatusBadRequest somewhere
-				// else, so removing it changes no result and a mutation of it
-				// survives. It is here for the first handler that validates and
-				// does nothing else, which would otherwise have its 400 go
-				// undocumented with every test in this file still passing.
-				if f.Name == "writeValidationError" {
-					out[400] = true
-				}
-				// writeInternalServerError names no constant either: it is the API's one
-				// 500 by construction, and after #279 decision 7 it is how every 500 on
-				// this surface is written, so without this line the scan would read the
-				// handlers as unable to fail at all and the reverse test would order
-				// every declared 500 out of the spec.
-				if f.Name == "writeInternalServerError" {
-					out[500] = true
-				}
-				// writeJSON buffers the encode before it writes anything, and answers 500
-				// through the primitive above when the encode fails. That arm lives in the
-				// helper rather than in the handler, so the caller names no constant for a
-				// failure it can still produce (#279 decision 8).
-				if f.Name == "writeJSON" {
-					out[500] = true
-				}
-				// readSessionRequest answers its own 400 for a body that will not decode and
-				// for a missing session id, so the five session handlers that call it name no
-				// constant for the refusal they can still produce. It writes the code as a
-				// literal rather than returning one, which is what holds it to the survivor
-				// table in api_error_code_lint_test.go (#279 decision 18).
-				if f.Name == "readSessionRequest" {
-					out[400] = true
-				}
-				// writeEmailTakenOrInternalServerError answers a failed user write 409 when the
-				// engine refused the email as taken and 500 otherwise, so the two email PUTs that
-				// call it name neither constant for failures they can produce (#425).
-				if f.Name == "writeEmailTakenOrInternalServerError" {
-					out[409] = true
-					out[500] = true
-				}
-				// writeListSaveFailure answers a failed list save 409 CONCURRENT_UPDATE when the
-				// stored list changed after the caller loaded it or the engine refused a
-				// concurrent duplicate, and 500 otherwise, so the list saves that call it name
-				// neither constant for failures they can produce (#428).
-				if f.Name == "writeListSaveFailure" {
-					out[409] = true
-					out[500] = true
-				}
-				// writeLastAdministrator answers 409 LAST_ADMINISTRATOR for a write that would
-				// leave no enabled user holding authserver:manage, so the six writes the guard
-				// covers name no constant for it (#402 decision 12).
-				if f.Name == "writeLastAdministrator" {
-					out[409] = true
-				}
-				// writeLostOTPChange answers an OTP enable or disable whose compare-and-set
-				// matched nothing from a re-read: 400 when OTP is already as asked, 404 when the
-				// user is gone (#796 decision 3), 409 CONCURRENT_UPDATE otherwise, and 500 when the
-				// re-read fails, so the account and administrator OTP PUTs name no constant for the
-				// 409 (#471 decision 2).
-				if f.Name == "writeLostOTPChange" {
-					out[400] = true
-					out[404] = true
-					out[409] = true
-					out[500] = true
-				}
-				// The legal document handlers' readers answer their own refusals (#622):
-				// legalDocumentId 400 for a path id that is not one, loadLegalDocument that 400,
-				// 404 for no such document and 500 for a failed read, legalDocumentVersions and
-				// legalDocumentApps 500 for a failed read, writeLegalDocumentDetail the 500 of
-				// the apps it reads, and shortNameIsFree 400 for a short name another document
-				// holds and 500 for a failed read. writeLegalDocumentNotFound is the 404.
-				// writeLegalDocumentRefusal answers a lifecycle write's failed transaction: 404 for
-				// a document gone, 400 for a refusal decided under the document's row, 500
-				// otherwise. handleLegalDocumentRetirement is retire's and restore's whole body,
-				// which reads the path id (400), answers through writeLegalDocumentRefusal and
-				// writes the detail (500).
-				switch f.Name {
-				case "writeLegalDocumentRefusal", "handleLegalDocumentRetirement":
-					out[400] = true
-					out[404] = true
-					out[500] = true
-				case "legalDocumentId":
-					out[400] = true
-				case "loadLegalDocument":
-					out[400] = true
-					out[404] = true
-					out[500] = true
-				case "legalDocumentVersions", "legalDocumentApps", "writeLegalDocumentDetail":
-					out[500] = true
-				case "shortNameIsFree":
-					out[400] = true
-					out[500] = true
-				case "writeLegalDocumentNotFound":
-					out[404] = true
-				}
-				// A brand's two stylesheets are answered by serveBrandStylesheet (#813): 200, 404
-				// for a path id that is not one or names no brand, 500 for a failed read.
-				if f.Name == "serveBrandStylesheet" {
-					out[200] = true
-					out[404] = true
-					out[500] = true
-				}
-				// The brand handlers' readers answer their own refusals (#810): brandId 400 for a
-				// path id that is not one, loadBrand that 400, 404 for no such brand and 500 for a
-				// failed read, defaultBrandId 500 for a failed read, and brandNameTaken 400 for a
-				// name the engine refused as another brand's. writeBrandNotFound is the 404.
-				switch f.Name {
-				case "brandId", "brandNameTaken":
-					out[400] = true
-				case "loadBrand":
-					out[400] = true
-					out[404] = true
-					out[500] = true
-				case "defaultBrandId":
-					out[500] = true
-				case "writeBrandNotFound":
-					out[404] = true
-				}
-				// The email template handlers' readers of the path answer 404 for an email or a
-				// language there is none of (#818 decision 10), through writeEmailTemplateNotFound.
-				switch f.Name {
-				case "emailTemplateFromPath", "emailTemplateLanguageFromPath", "writeEmailTemplateNotFound":
-					out[404] = true
-				}
-				// ResourceNotFound is net/http's 404 with no-store, which a public resource answers
-				// when it is not found (#825 decision 3).
-				if f.Name == "ResourceNotFound" {
-					out[404] = true
-				}
-			case *ast.SelectorExpr:
-				switch f.Sel.Name {
-				case "InternalServerError", "JSONError":
-					// httpHelper's two error renderers. Both write 500 for a bare error,
-					// which is the only kind these handlers hand them.
-					out[500] = true
-				case "NotFound":
-					if pkg, ok := f.X.(*ast.Ident); ok && pkg.Name == "http" {
-						out[404] = true
-					}
-				case "WriteInternalServerError", "WriteJSON":
-					// The shared primitives writeInternalServerError and writeJSON wrap, called
-					// directly by the handlers outside apihandlers, such as the public settings:
-					// each can answer 500 for the reason its wrapper above can.
-					if pkg, ok := f.X.(*ast.Ident); ok && pkg.Name == "apiresponse" {
-						out[500] = true
-					}
-				}
-			}
-		}
-		return true
-	})
-	return out
-}
-
-// forEachHandlerSource walks the non-test Go sources under internal/handlers. Tests are
-// skipped: a test names statuses to assert on them, and it is production code that decides
-// what a route can answer.
-func forEachHandlerSource(t *testing.T, visit func(*testing.T, string, *token.FileSet, *ast.File)) {
-	t.Helper()
-
 	// go test runs with the package directory as the working directory, so this is
 	// src/authserver/internal/handlers.
-	root := filepath.Join("..", "handlers")
+	return readHandlerStatuses(t, filepath.Join("..", "handlers"), handlerFloor, samePackageReferenceFloor)
+}
+
+// handlerFloor and samePackageReferenceFloor are how many Handle* functions the handlers hold
+// and how many references to a function of their own package their functions make, as floors
+// well below the real counts so ordinary growth does not move them. A walk that reached no
+// handler, or a resolver that followed no reference, reads every handler as writing nothing,
+// which the reverse test would pass for every operation that declares no failure.
+const (
+	handlerFloor              = 100
+	samePackageReferenceFloor = 500
+)
+
+// readHandlerStatuses is the reporting half of handlerStatuses: one failure per finding, and a
+// stop for a walk that could not be read, reached fewer Handle* functions than handlers, or
+// followed fewer same-package references than references.
+func readHandlerStatuses(r guard.Reporter, root string, handlers, references int) map[string]map[int]bool {
+	r.Helper()
+	statuses, followed, findings, err := handlerStatuses(root)
+	if err != nil {
+		r.Fatalf("%v", err)
+		return nil
+	}
+	if len(statuses) < handlers {
+		r.Fatalf("found only %d Handle* functions under %s; the walk is no longer reaching the "+
+			"handler sources", len(statuses), root)
+		return nil
+	}
+	if followed < references {
+		r.Fatalf("followed only %d references to a same-package function under %s; the resolver "+
+			"is no longer reading the statuses the handlers' helpers write", followed, root)
+		return nil
+	}
+	for _, finding := range findings {
+		r.Errorf("%s", finding)
+	}
+	return statuses
+}
+
+// handlerSource is one parsed non-test Go file under the handlers.
+type handlerSource struct {
+	path string
+	fset *token.FileSet
+	file *ast.File
+}
+
+// handlerFunc is one plain function of a handler package: the statuses its own body writes, and
+// the names of the plain functions of its package that its body refers to.
+type handlerFunc struct {
+	own  map[int]bool
+	refs []string
+}
+
+// handlerStatuses walks the non-test Go sources under root and maps every Handle* function, keyed
+// by its package-qualified name, to the statuses it can write: those its own body writes and those
+// of every plain function of its package it reaches, through any number of references. It also
+// returns how many such references it followed, and one finding per status it cannot read. Tests
+// are skipped: a test names statuses to assert on them, and it is production code that decides
+// what a route can answer.
+//
+// A package is a directory. A reference is any use of a same-package function's name in a body
+// other than as the member of a selector, so a helper passed as a value is reached as one called
+// is, and a local that shares a helper's name is read as the helper, which can only add statuses:
+// the conservative direction, as for an unreachable branch. A call into another package is not
+// followed. The shared writers there are read by name in ownStatuses.
+func handlerStatuses(root string) (map[string]map[int]bool, int, []string, error) {
+	byDir := map[string][]handlerSource{}
 	files := 0
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -1367,15 +1378,179 @@ func forEachHandlerSource(t *testing.T, visit func(*testing.T, string, *token.Fi
 			return fmt.Errorf("parsing %s: %w", path, pErr)
 		}
 		files++
-		visit(t, filepath.ToSlash(path), fset, file)
+		dir := filepath.Dir(path)
+		byDir[dir] = append(byDir[dir], handlerSource{path: filepath.ToSlash(path), fset: fset, file: file})
 		return nil
 	})
 	if err != nil {
-		t.Fatalf("walking %s: %v", root, err)
+		return nil, 0, nil, fmt.Errorf("walking %s: %w", root, err)
 	}
 	if files == 0 {
-		t.Fatalf("walked no non-test Go files under %s", root)
+		return nil, 0, nil, fmt.Errorf("walked no non-test Go files under %s", root)
 	}
+
+	out := map[string]map[int]bool{}
+	seenIn := map[string]string{}
+	followed := 0
+	var findings []string
+	for _, dir := range sortedKeys(byDir) {
+		sources := byDir[dir]
+		names := map[string]bool{}
+		for _, src := range sources {
+			for _, fn := range plainFuncs(src.file) {
+				names[fn.Name.Name] = true
+			}
+		}
+		// A name maps to every declaration of it, since build constraints can give one
+		// function a file per platform, and the lint reads them all.
+		funcs := map[string][]*handlerFunc{}
+		type handler struct {
+			name, path string
+			fn         *handlerFunc
+		}
+		var handlers []handler
+		for _, src := range sources {
+			for _, fn := range plainFuncs(src.file) {
+				own, unknown := ownStatuses(src.path, src.fset, fn)
+				findings = append(findings, unknown...)
+				hf := &handlerFunc{own: own, refs: samePackageReferences(fn.Body, names)}
+				followed += len(hf.refs)
+				funcs[fn.Name.Name] = append(funcs[fn.Name.Name], hf)
+				if strings.HasPrefix(fn.Name.Name, "Handle") {
+					handlers = append(handlers, handler{
+						name: src.file.Name.Name + "." + fn.Name.Name, path: src.path, fn: hf})
+				}
+			}
+		}
+		for _, h := range handlers {
+			// Two handler packages of the same name would make the lookup ambiguous and the
+			// result arbitrary. There are none; this says so.
+			if prev, dup := seenIn[h.name]; dup {
+				return nil, 0, nil, fmt.Errorf("%s is declared in both %s and %s; the status scan "+
+					"looks handlers up by package and name and cannot tell them apart", h.name, prev, h.path)
+			}
+			seenIn[h.name] = h.path
+			out[h.name] = reachedStatuses(h.fn, funcs)
+		}
+	}
+	return out, followed, findings, nil
+}
+
+// plainFuncs is a file's functions with a body and no receiver, the ones a bare name refers to.
+// The blank function and init cannot be referred to, so they are no one's helper.
+func plainFuncs(file *ast.File) []*ast.FuncDecl {
+	var out []*ast.FuncDecl
+	for _, decl := range file.Decls {
+		fn, ok := decl.(*ast.FuncDecl)
+		if !ok || fn.Recv != nil || fn.Body == nil || fn.Name.Name == "_" || fn.Name.Name == "init" {
+			continue
+		}
+		out = append(out, fn)
+	}
+	return out
+}
+
+// samePackageReferences is every use in body of one of names, the plain functions of the body's
+// own package, other than as the member of a selector, which names a field, a method or another
+// package's function.
+func samePackageReferences(body *ast.BlockStmt, names map[string]bool) []string {
+	var refs []string
+	var visit func(ast.Node) bool
+	visit = func(n ast.Node) bool {
+		switch e := n.(type) {
+		case *ast.SelectorExpr:
+			ast.Inspect(e.X, visit)
+			return false
+		case *ast.Ident:
+			if names[e.Name] {
+				refs = append(refs, e.Name)
+			}
+		}
+		return true
+	}
+	ast.Inspect(body, visit)
+	return refs
+}
+
+// reachedStatuses is start's own statuses and those of every function of its package it reaches,
+// each read once however many paths lead to it, so a helper that refers back to its caller ends
+// the walk rather than looping it.
+func reachedStatuses(start *handlerFunc, funcs map[string][]*handlerFunc) map[int]bool {
+	out := maps.Clone(start.own)
+	seen := map[string]bool{}
+	queue := slices.Clone(start.refs)
+	for len(queue) > 0 {
+		name := queue[0]
+		queue = queue[1:]
+		if seen[name] {
+			continue
+		}
+		seen[name] = true
+		for _, fn := range funcs[name] {
+			maps.Copy(out, fn.own)
+			queue = append(queue, fn.refs...)
+		}
+	}
+	return out
+}
+
+// ownStatuses reads the statuses one function's own body writes, with one finding per status
+// constant it does not know the number of. Four spellings write a status in this module and all
+// four are read here; anything else is a fifth nobody has taught this file about, which is what
+// the unknown-constant finding is for. A same-package helper is not named here: handlerStatuses
+// follows the reference and reads the helper's own body.
+func ownStatuses(path string, fset *token.FileSet, fn *ast.FuncDecl) (map[int]bool, []string) {
+	out := map[int]bool{}
+	var findings []string
+	ast.Inspect(fn.Body, func(n ast.Node) bool {
+		switch e := n.(type) {
+		case *ast.SelectorExpr:
+			// http.StatusXxx, wherever it appears: w.WriteHeader, writeJSONError's fourth
+			// argument, or a comparison.
+			pkg, ok := e.X.(*ast.Ident)
+			if !ok || pkg.Name != "http" || !strings.HasPrefix(e.Sel.Name, "Status") {
+				return true
+			}
+			if e.Sel.Name == "StatusText" {
+				return true // the formatter, not a status
+			}
+			code, known := httpStatusConstants[e.Sel.Name]
+			if !known {
+				findings = append(findings, fmt.Sprintf("%s:%d: %s uses http.%s, which "+
+					"openapi_contract_lint_test.go does not know the number of; add it to "+
+					"httpStatusConstants", path, fset.Position(e.Pos()).Line, fn.Name.Name, e.Sel.Name))
+				return true
+			}
+			out[code] = true
+		case *ast.CallExpr:
+			f, ok := e.Fun.(*ast.SelectorExpr)
+			if !ok {
+				return true
+			}
+			// The shared writers outside the handler packages, which write a status they are
+			// not handed as a constant.
+			switch f.Sel.Name {
+			case "InternalServerError", "JSONError":
+				// httpHelper's two error renderers. Both write 500 for a bare error,
+				// which is the only kind these handlers hand them.
+				out[500] = true
+			case "NotFound":
+				if pkg, ok := f.X.(*ast.Ident); ok && pkg.Name == "http" {
+					out[404] = true
+				}
+			case "WriteInternalServerError", "WriteJSON":
+				// apiresponse's 500 and its JSON writer, which buffers the encode before it
+				// writes anything and answers 500 when the encode fails (#279 decisions 7 and
+				// 8). apihandlers reaches them through writeInternalServerError and writeJSON,
+				// and the handlers outside it, such as the public settings, call them directly.
+				if pkg, ok := f.X.(*ast.Ident); ok && pkg.Name == "apiresponse" {
+					out[500] = true
+				}
+			}
+		}
+		return true
+	})
+	return out, findings
 }
 
 // specOperation is the part of an operation these tests read.
