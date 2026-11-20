@@ -2753,6 +2753,109 @@ func NewWriteCopied() *Probed {
 	}
 }
 
+// A field a constructor fills with a value of another package, such as a logger slog.Default
+// returns, holds nothing the walk follows whether the value is written inline or through a local,
+// in a literal or in a later field write, so a method calling through it is read for the statuses
+// the receiver's refusal writer answers, while a local copied from another value's field is still
+// reported where the walk reaches through it.
+func TestRouteChains_AFieldALocalFillsFromAnotherPackageIsNotFollowed(t *testing.T) {
+	root := t.TempDir()
+	routeShapesFixture(t, root, "\tinline := middleware.NewLoggedInline()\n"+
+		"\tpages.With(inline.Check()).Get(\"/logged-inline\", apihandlers.HandleOkGet())\n"+
+		"\tlocal := middleware.NewLoggedLocal()\n"+
+		"\tpages.With(local.Check()).Get(\"/logged-local\", apihandlers.HandleOkGet())\n"+
+		"\twritten := middleware.NewLoggedWrite()\n"+
+		"\tpages.With(written.Check()).Get(\"/logged-write\", apihandlers.HandleOkGet())\n"+
+		"\tchained := middleware.NewLoggedChained()\n"+
+		"\tpages.With(chained.Check()).Get(\"/logged-chained\", apihandlers.HandleOkGet())\n"+
+		"\tcopied := middleware.NewLoggedCopied()\n"+
+		"\tpages.With(copied.Check()).Get(\"/logged-copied\", apihandlers.HandleOkGet())\n")
+	writeDocFixture(t, root, "internal/middleware/logged.go", `package middleware
+
+import (
+	"log/slog"
+	"net/http"
+)
+
+var loggedPrototype = Logged{refusals: forbid{}}
+
+type Logged struct {
+	logger   *slog.Logger
+	refusals writer
+}
+
+func NewLoggedInline() *Logged {
+	return &Logged{logger: slog.Default(), refusals: forbid{}}
+}
+
+func NewLoggedLocal() *Logged {
+	logger := slog.Default()
+	return &Logged{logger: logger, refusals: forbid{}}
+}
+
+func NewLoggedWrite() *Logged {
+	l := &Logged{refusals: forbid{}}
+	logger := slog.Default()
+	l.logger = logger
+	return l
+}
+
+func NewLoggedChained() *Logged {
+	logger := slog.Default().With("component", "logged")
+	return &Logged{logger: logger, refusals: forbid{}}
+}
+
+func NewLoggedCopied() *Logged {
+	logger := loggedPrototype.refusals
+	return &Logged{logger: slog.Default(), refusals: logger}
+}
+
+func (l *Logged) Check() func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			l.logger.DebugContext(r.Context(), "refusing")
+			l.refusals.refuse(w)
+		})
+	}
+}
+`)
+	routes, handlers, report := fixtureRouteChains(t, root, 1, 1)
+
+	if report.Stopped || len(report.Errors) != 1 ||
+		!strings.Contains(report.Errors[0], "GET /logged-copied mounts copied.Check, which the status lint cannot read") {
+		t.Fatalf("only the refusal writer copied from another value's field should fail the check: %+v", report)
+	}
+	chains := map[string][]int{}
+	for _, r := range routes {
+		chains[r.key] = sortedKeysInt(r.chain)
+	}
+	assertChains(t, chains, map[string][]int{
+		"get /logged-inline": {403}, "get /logged-local": {403}, "get /logged-write": {403}, "get /logged-chained": {403},
+	})
+
+	ids := map[string]string{
+		"get /logged-inline": "getLoggedInline", "get /logged-local": "getLoggedLocal",
+		"get /logged-write": "getLoggedWrite", "get /logged-chained": "getLoggedChained",
+	}
+	report = guard.Run(func(r guard.Reporter) {
+		assertDeclaresEveryStatus(r, routes, handlers, declaringEach(ids, 200))
+	})
+	if report.Stopped || len(report.Errors) != 4 ||
+		!strings.Contains(strings.Join(report.Errors, "\n"), "getLoggedInline (GET /logged-inline) can answer 403 from inline.Check") ||
+		!strings.Contains(strings.Join(report.Errors, "\n"), "getLoggedLocal (GET /logged-local) can answer 403 from local.Check") ||
+		!strings.Contains(strings.Join(report.Errors, "\n"), "getLoggedWrite (GET /logged-write) can answer 403 from written.Check") ||
+		!strings.Contains(strings.Join(report.Errors, "\n"), "getLoggedChained (GET /logged-chained) can answer 403 from chained.Check") {
+		t.Errorf("a spec omitting the 403 of a writer beside a logger field did not fail once per route: %+v", report)
+	}
+	report = guard.Run(func(r guard.Reporter) {
+		assertDeclaresEveryStatus(r, routes, handlers, declaringEach(ids, 200, 403))
+		assertDeclaresNoUndeliverableStatus(r, routes, handlers, declaringEach(ids, 200, 403))
+	})
+	if report.Failed() {
+		t.Errorf("a spec declaring the 403 of a writer beside a logger field failed: %+v", report)
+	}
+}
+
 // A method reached through a field of a field of the receiver is read with the binding at the end
 // of that path, and one reached through a field an unread helper filled, at any depth, is reported.
 func TestRouteChains_AMethodReachedThroughANestedFieldIsRead(t *testing.T) {
@@ -3890,6 +3993,7 @@ type goPackage struct {
 	funcs   map[string][]funcSource // plain functions, by name
 	methods map[string][]funcSource // methods, by Type.name
 	plain   map[string]bool
+	imports map[string]bool // the names its files import packages under
 }
 
 type funcSource struct {
@@ -3920,7 +4024,10 @@ func (c *chainResolver) pkg(dir string) *goPackage {
 	if p, ok := c.pkgs[dir]; ok {
 		return p
 	}
-	p := &goPackage{funcs: map[string][]funcSource{}, methods: map[string][]funcSource{}, plain: map[string]bool{}}
+	p := &goPackage{
+		funcs: map[string][]funcSource{}, methods: map[string][]funcSource{},
+		plain: map[string]bool{}, imports: map[string]bool{},
+	}
 	c.pkgs[dir] = p
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -3938,6 +4045,15 @@ func (c *chainResolver) pkg(dir string) *goPackage {
 		if err != nil {
 			c.err = fmt.Errorf("parsing %s: %w", path, err)
 			return p
+		}
+		for _, spec := range file.Imports {
+			if spec.Name != nil {
+				p.imports[spec.Name.Name] = true
+				continue
+			}
+			if imported, err := strconv.Unquote(spec.Path.Value); err == nil {
+				p.imports[filepath.Base(imported)] = true
+			}
 		}
 		for _, decl := range file.Decls {
 			fn, ok := decl.(*ast.FuncDecl)
@@ -4438,9 +4554,9 @@ func (f fieldFiller) literal(lit *ast.CompositeLit) fieldBinding {
 
 // value is what a field filled with e holds. A composite literal of a named type, or its address,
 // is read as literal reads it. A local of the constructor holds the one value it was assigned, read
-// as localValue reads it, or an unread binding where that value would leave the field unbound, as
-// localHolds reads it. A call to a function of p that no local or parameter hides where it is
-// called, returning a type of p, such as a helper building a refusal writer, holds what that
+// as localValue reads it, or, where that value would leave the field unbound and is not one outside
+// the walk, such as another value's field, an unread binding, as localHolds reads it. A call to a
+// function of p that no local or parameter hides where it is called, returning a type of p, such as a helper building a refusal writer, holds what that
 // function returns, read as constructed reads a constructor. A local or a call it cannot read, or
 // a call already being read, such as a helper returning a named string for a refusal's text, holds
 // an unread binding rather than nothing, so a walk that reaches through the field is not read, and
@@ -4497,14 +4613,61 @@ func (f fieldFiller) value(e ast.Expr) (binding fieldBinding, bound bool) {
 }
 
 // localHolds is what a field filled with a local holds, given the one value the local was assigned:
-// that value as value reads it, or an unread binding for one value leaves unbound, such as another
-// value's field, since a local of the constructor may hold a writer of the package whatever it was
-// assigned from.
+// that value as value reads it. Where value leaves it unbound, the field holds nothing the walk
+// follows if the value is one outside reports as outside the walk, such as a logger slog.Default
+// returns, as it would if the field were filled with that value directly, and an unread binding
+// otherwise, such as for another value's field, since that may hold a writer of the package.
 func (f fieldFiller) localHolds(assigned ast.Expr) (fieldBinding, bool) {
 	if binding, bound := f.value(assigned); bound {
 		return binding, true
 	}
+	if f.outside(assigned) {
+		return fieldBinding{}, false
+	}
 	return fieldBinding{unread: true}, true
+}
+
+// outside reports whether e, a value value leaves unbound, is one no walk of the package can reach
+// through: a parameter, a predeclared name such as nil, a literal, a call value reads as holding
+// nothing, such as a builtin's, a function literal's or one returning a predeclared type, and a call
+// whose function a package the constructor's package imports names, pkg.F(...), or a method on
+// what such a call returns, pkg.F(...).M(...). Anything else, such as a field of another value,
+// v.field, a method called on one, v.M(), or a variable of the package, may hold a writer of the
+// package.
+func (f fieldFiller) outside(e ast.Expr) bool {
+	e = ast.Unparen(e)
+	if addr, isAddr := e.(*ast.UnaryExpr); isAddr && addr.Op == token.AND {
+		e = ast.Unparen(addr.X)
+	}
+	switch x := e.(type) {
+	case *ast.Ident:
+		return !f.localAt(x) && (f.params[x.Name] || types.Universe.Lookup(x.Name) != nil)
+	case *ast.BasicLit, *ast.CompositeLit, *ast.FuncLit:
+		return true
+	case *ast.CallExpr:
+		fun := ast.Unparen(x.Fun)
+		for {
+			switch y := fun.(type) {
+			case *ast.Ident:
+				return true // value read it as a call to a function of p, or as one outside p
+			case *ast.FuncLit:
+				return true
+			case *ast.SelectorExpr:
+				root, isIdent := ast.Unparen(y.X).(*ast.Ident)
+				if isIdent {
+					return f.p.imports[root.Name] && !f.params[root.Name] && !f.localAt(root)
+				}
+				call, isCall := ast.Unparen(y.X).(*ast.CallExpr)
+				if !isCall {
+					return false
+				}
+				fun = ast.Unparen(call.Fun)
+			default:
+				return false
+			}
+		}
+	}
+	return false
 }
 
 // walk reads the statuses of start and of every function of its package it reaches, each read
