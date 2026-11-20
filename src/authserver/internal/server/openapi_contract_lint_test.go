@@ -2176,6 +2176,68 @@ func NewBranched(swap bool) *Probed {
 	})
 }
 
+// A field the constructor assigns from a local holds the value that local was assigned, so the
+// status its writer answers must be declared, and a local assigned twice is reported unread.
+func TestRouteChains_AFieldTheConstructorAssignsFromALocalIsReadAsThatLocal(t *testing.T) {
+	root := t.TempDir()
+	routeShapesFixture(t, root, "\tswapped := middleware.NewSwapped()\n"+
+		"\tpages.With(swapped.Check()).Get(\"/swapped\", apihandlers.HandleOkGet())\n"+
+		"\tchosen := middleware.NewChosen(false)\n"+
+		"\tpages.With(chosen.Check()).Get(\"/chosen\", apihandlers.HandleOkGet())\n")
+	writeDocFixture(t, root, "internal/middleware/swapped.go", `package middleware
+
+func NewSwapped() *Probed {
+	probed := &Probed{refusals: unprocessable{}}
+	refusals := forbid{}
+	probed.refusals = refusals
+	return probed
+}
+
+func NewChosen(swap bool) *Probed {
+	probed := &Probed{refusals: forbid{}}
+	var refusals writer = forbid{}
+	if swap {
+		refusals = unprocessable{}
+	}
+	probed.refusals = refusals
+	return probed
+}
+`)
+	routes, handlers, report := fixtureRouteChains(t, root, 1, 1)
+
+	if report.Stopped || len(report.Errors) != 1 ||
+		!strings.Contains(report.Errors[0], "GET /chosen mounts chosen.Check, which the status lint cannot read") {
+		t.Fatalf("a field assigned from a local assigned twice did not fail the check once: %+v", report)
+	}
+	chains := map[string][]int{}
+	for _, r := range routes {
+		chains[r.key] = sortedKeysInt(r.chain)
+	}
+	assertChains(t, chains, map[string][]int{"get /swapped": {403}})
+
+	declaring := func(codes ...int) map[string]specOperation {
+		responses := map[int]bool{}
+		for _, code := range codes {
+			responses[code] = true
+		}
+		return map[string]specOperation{"get /swapped": {operationId: "getSwapped", responses: responses}}
+	}
+	report = guard.Run(func(r guard.Reporter) {
+		assertDeclaresEveryStatus(r, routes, handlers, declaring(200))
+	})
+	if report.Stopped || len(report.Errors) != 1 ||
+		!strings.Contains(report.Errors[0], "getSwapped (GET /swapped) can answer 403 from swapped.Check") {
+		t.Errorf("a spec omitting the 403 the assigned local writes did not fail once: %+v", report)
+	}
+	report = guard.Run(func(r guard.Reporter) {
+		assertDeclaresEveryStatus(r, routes, handlers, declaring(200, 403))
+		assertDeclaresNoUndeliverableStatus(r, routes, handlers, declaring(200, 403))
+	})
+	if report.Failed() {
+		t.Errorf("a spec declaring the 403 the assigned local writes failed: %+v", report)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // The three parsers.
 // ---------------------------------------------------------------------------
@@ -3279,7 +3341,7 @@ func (c *chainResolver) entry(m mountedEntry, depth int) (string, *goPackage, ch
 // of the result type, its address, or a local the body assigns once, from one of those. A bare
 // return returns the named result, read as such a local. A local's field the body assigns at its
 // top level, local.field = value, holds that value from the statement on, as a literal's field
-// would, and one that body assigns anywhere else, inside a block or a function literal, holds a
+// would, with a local value read as localValue reads it, and one that body assigns anywhere else, inside a block or a function literal, holds a
 // value that depends on whether it ran, so the local is not read. A constructor returning anything
 // else, or two values that fill one field with different types, is not read, rather than read from
 // another literal of the type, such as one it builds and discards.
@@ -3355,7 +3417,11 @@ func constructed(ctor *ast.FuncDecl) (fieldBinding, bool) {
 			}
 			for _, write := range writes {
 				if write.local == local.Name && write.pos < ret.pos {
-					binding.assign(write.path, write.value)
+					value, ok := localValue(write.value, locals, writes, branched)
+					if !ok {
+						return fieldBinding{}, false
+					}
+					binding.assign(write.path, value)
 				}
 			}
 		}
@@ -3395,6 +3461,34 @@ func returnedLiteral(e ast.Expr, locals map[string][]ast.Expr, typ string) (*ast
 		return nil, false
 	}
 	return lit, true
+}
+
+// localValue is the value a field write assigns, with a local of the constructor read as the one
+// value it was assigned, so a writer built in a local binds the field as a literal written in place
+// would. It is false for a local assigned more than once or from a value this cannot read, or one
+// whose own fields the body assigns, since what it holds then depends on more than its value.
+// Anything else, such as a parameter, is returned as it is.
+func localValue(e ast.Expr, locals map[string][]ast.Expr, writes []fieldWrite, branched map[string]bool) (ast.Expr, bool) {
+	id, ok := ast.Unparen(e).(*ast.Ident)
+	if !ok {
+		return e, true
+	}
+	values, isLocal := locals[id.Name]
+	if !isLocal {
+		return e, true
+	}
+	if len(values) != 1 || values[0] == nil || branched[id.Name] {
+		return nil, false
+	}
+	for _, write := range writes {
+		if write.local == id.Name {
+			return nil, false
+		}
+	}
+	if _, chained := ast.Unparen(values[0]).(*ast.Ident); chained {
+		return nil, false
+	}
+	return ast.Unparen(values[0]), true
 }
 
 // fieldWrite is one statement of a constructor's body assigning a field of a local:
