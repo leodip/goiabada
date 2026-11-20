@@ -3430,13 +3430,18 @@ func (l *Logged) Check() func(http.Handler) http.Handler {
 // A name in a method's body is its receiver only where it refers to the receiver's declaration, so
 // a local or a function literal's parameter of the same name is not read with the binding the
 // receiver's constructor gave it: a method of the package called through one is reported, rather
-// than read as the receiver's writer.
+// than read as the receiver's writer. A parameter declared with another package's type, such as a
+// handler's w http.ResponseWriter shadowing a receiver named w, holds no value of the package's
+// types, and the status it writes is read, even where a type of the package has a method of the
+// name it calls.
 func TestRouteChains_ALocalThatShadowsTheReceiverIsNotReadWithItsBinding(t *testing.T) {
 	root := t.TempDir()
 	routeShapesFixture(t, root, "\tshadowed := middleware.NewProbed()\n"+
 		"\tpages.With(shadowed.CheckShadowed()).Get(\"/receiver-shadowed\", apihandlers.HandleOkGet())\n"+
 		"\tparam := middleware.NewProbed()\n"+
-		"\tpages.With(param.CheckParam()).Get(\"/receiver-param\", apihandlers.HandleOkGet())\n")
+		"\tpages.With(param.CheckParam()).Get(\"/receiver-param\", apihandlers.HandleOkGet())\n"+
+		"\twriter := middleware.NewWorkGate()\n"+
+		"\tpages.With(writer.Check()).Get(\"/receiver-writer\", apihandlers.HandleOkGet())\n")
 	writeDocFixture(t, root, "internal/middleware/receiver.go", `package middleware
 
 import "net/http"
@@ -3460,6 +3465,28 @@ func (p *Probed) CheckParam() func(http.Handler) http.Handler {
 		})
 	}
 }
+
+type recorder struct {
+	http.ResponseWriter
+}
+
+func (rec *recorder) WriteHeader(code int) {
+	rec.ResponseWriter.WriteHeader(code)
+}
+
+type WorkGate struct{}
+
+func NewWorkGate() *WorkGate {
+	return &WorkGate{}
+}
+
+func (w *WorkGate) Check() func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusUnprocessableEntity)
+		})
+	}
+}
 `)
 	routes, _, report := fixtureRouteChains(t, root, 1, 1)
 
@@ -3469,11 +3496,14 @@ func (p *Probed) CheckParam() func(http.Handler) http.Handler {
 		t.Fatalf("a method called through a local or a parameter shadowing the receiver did not fail the "+
 			"check once each: %+v", report)
 	}
+	chains := map[string][]int{}
 	for _, r := range routes {
+		chains[r.key] = sortedKeysInt(r.chain)
 		if (r.key == "get /receiver-shadowed" || r.key == "get /receiver-param") && r.chain[403] != nil {
 			t.Errorf("%s was read with the receiver's 403: %v", r.key, r.chain)
 		}
 	}
+	assertChains(t, chains, map[string][]int{"get /receiver-writer": {422}})
 }
 
 // A route registered through a router routes.go holds in a value the walk cannot tell, such as an
@@ -5185,13 +5215,15 @@ type fieldFiller struct {
 
 // declaration is one name a function declares: its receiver, a parameter or a result, which param
 // marks, and result for a result, which holds nothing before the body assigns it, or a local of
-// its body, with the span of source in which it hides what its name refers to outside, and the
-// node whose scope declares it.
+// its body, with the span of source in which it hides what its name refers to outside, the node
+// whose scope declares it, and the type it is declared with, where its declaration spells one: a
+// function literal's parameter or result, or a var with a type.
 type declaration struct {
 	from, to token.Pos
 	owner    ast.Node
 	param    bool
 	result   bool
+	typ      ast.Expr
 }
 
 // scopeIndex is every declaration of one function, by name.
@@ -5254,7 +5286,7 @@ func functionScopes(fn *ast.FuncDecl) scopeIndex {
 		}
 	}
 	var stack []ast.Node
-	declare := func(id *ast.Ident, from token.Pos, owner ast.Node, redeclares bool) {
+	declare := func(id *ast.Ident, typ ast.Expr, from token.Pos, owner ast.Node, redeclares bool) {
 		if id.Name == "_" {
 			return
 		}
@@ -5265,7 +5297,7 @@ func functionScopes(fn *ast.FuncDecl) scopeIndex {
 				}
 			}
 		}
-		out[id.Name] = append(out[id.Name], &declaration{from: from, to: owner.End(), owner: owner})
+		out[id.Name] = append(out[id.Name], &declaration{from: from, to: owner.End(), owner: owner, typ: typ})
 	}
 	// enclosing is the innermost node below the top of the stack that opens a scope.
 	enclosing := func() ast.Node {
@@ -5287,19 +5319,19 @@ func functionScopes(fn *ast.FuncDecl) scopeIndex {
 			if x.Tok == token.DEFINE {
 				for _, lhs := range x.Lhs {
 					if id, ok := lhs.(*ast.Ident); ok {
-						declare(id, x.End(), enclosing(), true)
+						declare(id, nil, x.End(), enclosing(), true)
 					}
 				}
 			}
 		case *ast.ValueSpec:
 			for _, name := range x.Names {
-				declare(name, x.End(), enclosing(), false)
+				declare(name, x.Type, x.End(), enclosing(), false)
 			}
 		case *ast.RangeStmt:
 			if x.Tok == token.DEFINE {
 				for _, e := range []ast.Expr{x.Key, x.Value} {
 					if id, ok := e.(*ast.Ident); ok {
-						declare(id, x.Body.Pos(), x, false)
+						declare(id, nil, x.Body.Pos(), x, false)
 					}
 				}
 			}
@@ -5310,7 +5342,7 @@ func functionScopes(fn *ast.FuncDecl) scopeIndex {
 				}
 				for _, field := range list.List {
 					for _, name := range field.Names {
-						declare(name, x.Body.Pos(), x, false)
+						declare(name, field.Type, x.Body.Pos(), x, false)
 					}
 				}
 			}
@@ -5940,7 +5972,9 @@ func chainStatuses(path string, fset *token.FileSet, fn *ast.FuncDecl,
 // shadows it is not read with the receiver's binding. It also returns the selectors it resolved,
 // which name a method of the package rather than a port, and whether the body reaches through a
 // field an unread helper filled, at any depth, recv.field.X, whose type it cannot tell, or names a
-// method of the package through a shadowing local, whose value it does not read. A field its struct
+// method of the package through a shadowing local, whose value it does not read. A shadowing name
+// declared with another package's type, such as a handler's w http.ResponseWriter, is not one: the
+// walk reads a call on it as it reads one on any value of another package, through chainStatuses. A field its struct
 // declares with a type outside the package, as fieldOutside reads it, such as a *slog.Logger, holds
 // nothing of the package whatever filled it, so the walk passes it by rather than stopping there.
 func (c *chainResolver) receiverCalls(fn *ast.FuncDecl, binding fieldBinding, p *goPackage) ([]chainWalk, map[*ast.SelectorExpr]bool, bool) {
@@ -5969,7 +6003,7 @@ func (c *chainResolver) receiverCalls(fn *ast.FuncDecl, binding fieldBinding, p 
 			return true
 		}
 		if d := scopes.at(root); d == nil || !d.param {
-			if methodNames[sel.Sel.Name] {
+			if methodNames[sel.Sel.Name] && !declaredElsewhere(d) {
 				unread = true
 			}
 			return true
@@ -5994,6 +6028,21 @@ func (c *chainResolver) receiverCalls(fn *ast.FuncDecl, binding fieldBinding, p 
 		return true
 	})
 	return out, resolved, unread
+}
+
+// declaredElsewhere reports whether d, the declaration a name refers to, spells its type as one of
+// another package, pkg.T or *pkg.T, such as a function literal's w http.ResponseWriter: the only
+// shape a type spelled with a selector takes.
+func declaredElsewhere(d *declaration) bool {
+	if d == nil || d.typ == nil {
+		return false
+	}
+	t := ast.Unparen(d.typ)
+	if star, isStar := t.(*ast.StarExpr); isStar {
+		t = ast.Unparen(star.X)
+	}
+	_, qualified := t.(*ast.SelectorExpr)
+	return qualified
 }
 
 // fieldOutside reports whether the struct type typ of package p declares its field name with a
