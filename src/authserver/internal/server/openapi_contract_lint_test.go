@@ -3501,10 +3501,7 @@ func (p *Probed) CheckParam() func(http.Handler) http.Handler {
 	}
 }
 
-type recorder struct {
-	http.ResponseWriter
-}
-
+// recorder is routeShapesFixture's, which gains a WriteHeader method here.
 func (rec *recorder) WriteHeader(code int) {
 	rec.ResponseWriter.WriteHeader(code)
 }
