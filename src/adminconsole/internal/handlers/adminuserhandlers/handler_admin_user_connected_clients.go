@@ -106,19 +106,17 @@ func HandleConnectedClientsDisconnectPost(
 			return
 		}
 
-		var data map[string]interface{}
-		if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
+		// The id decodes straight into an int64, so a fraction is refused rather than truncated
+		// and a large id is not rounded to a neighbour's: either could name another client.
+		var data struct {
+			ClientId int64 `json:"clientId"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&data); err != nil || data.ClientId <= 0 {
 			render.JSONBadRequestBody(httpHelper, w, r)
 			return
 		}
 
-		clientId, ok := data["clientId"].(float64)
-		if !ok || clientId == 0 {
-			render.JSONBadRequestBody(httpHelper, w, r)
-			return
-		}
-
-		if err := apiClient.DisconnectUserClient(r.Context(), jwtInfo.TokenResponse.AccessToken, id, int64(clientId)); err != nil {
+		if err := apiClient.DisconnectUserClient(r.Context(), jwtInfo.TokenResponse.AccessToken, id, data.ClientId); err != nil {
 			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
 		}

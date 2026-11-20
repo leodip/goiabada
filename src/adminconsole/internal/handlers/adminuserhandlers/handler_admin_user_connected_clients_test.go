@@ -132,10 +132,22 @@ func TestHandleConnectedClientsDisconnectPost_NothingLeftToEndIs404WithNothingLo
 	assert.Empty(t, logs.Records(), "a stale page is not a server fault")
 }
 
+// An id beyond float64's exact integers reaches the auth server unchanged: a float decode would
+// round it to a neighbouring id, which can name another client.
+func TestHandleConnectedClientsDisconnectPost_ALargeIdReachesTheAuthServerExactly(t *testing.T) {
+	apiClient := &connectedClientsApiClient{}
+
+	recorder := disconnectClient(t, apiClient, "42", `{"clientId":9007199254740993}`)
+
+	assert.Equal(t, http.StatusOK, recorder.Code)
+	assert.Equal(t, [][2]int64{{42, 9007199254740993}}, apiClient.disconnected)
+}
+
 // A body naming no client is refused before anything is asked of the auth server: a missing id, a
-// zero, a string, the consent id the old tab posted, and a body that is not JSON.
+// zero, a negative id, a fraction (which a float decode would truncate to another client's id), a
+// string, the consent id the old tab posted, and a body that is not JSON.
 func TestHandleConnectedClientsDisconnectPost_ABodyNamingNoClientIsRefused(t *testing.T) {
-	for _, body := range []string{`{}`, `{"clientId":0}`, `{"clientId":"9"}`, `{"consentId":9}`, `not json`} {
+	for _, body := range []string{`{}`, `{"clientId":0}`, `{"clientId":-9}`, `{"clientId":9.5}`, `{"clientId":"9"}`, `{"consentId":9}`, `not json`} {
 		t.Run(body, func(t *testing.T) {
 			apiClient := &connectedClientsApiClient{}
 

@@ -6,9 +6,11 @@
 // TerminateUserSessionTx, which ends one session and the grants issued under it;
 // RevokeOnAuthCodeReuseTx, the answer to a redeemed code presented again;
 // RevokeClientGrantsTx, for a client that no longer has to authenticate; and
-// DisconnectClientTx, which ends everything a user holds with one client, deleting the user's
-// consent to it when asked, marking that user's unused codes with it revoked and revoking the
-// refresh tokens that user holds with it, and which a consent withdrawal runs (#622, #135); and
+// DisconnectClientTx, which a consent withdrawal runs, for one user and one client: it deletes
+// the user's consent to the client when the caller asks, marks the user's unused codes with it
+// revoked, and revokes the user's refresh grants with it, recording each grant's rotation family.
+// Implicit-flow access tokens belong to no grant, so it leaves them to their own expiry and
+// session rules (#622, #135 decision 8); and
 // RevokeGrantTx, which ends one grant at its client's request at /auth/revoke (#676).
 // RevokeAccessToken, beside them, stores the jti of an access token without a grant revoked at
 // /auth/revoke, on no transaction: a lookup, then an insert (#676).

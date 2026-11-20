@@ -97,10 +97,22 @@ func TestHandleApplicationsDisconnectPost_DisconnectsTheClientTheRowNames(t *tes
 	assert.Empty(t, logs.Records())
 }
 
+// An id beyond float64's exact integers reaches the auth server unchanged: a float decode would
+// round it to a neighbouring id, which can name another client.
+func TestHandleApplicationsDisconnectPost_ALargeIdReachesTheAuthServerExactly(t *testing.T) {
+	apiClient := &accountApplicationsApiClient{}
+
+	recorder := disconnectApplication(t, apiClient, `{"clientId":9007199254740993}`)
+
+	assert.Equal(t, http.StatusOK, recorder.Code)
+	assert.Equal(t, []int64{9007199254740993}, apiClient.disconnected)
+}
+
 // A body naming no client is refused before anything is asked of the auth server: a missing id,
-// a zero, a string and a body that is not JSON.
+// a zero, a negative id, a fraction (which a float decode would truncate to another client's id),
+// a string and a body that is not JSON.
 func TestHandleApplicationsDisconnectPost_ABodyNamingNoClientIsRefused(t *testing.T) {
-	for _, body := range []string{`{}`, `{"clientId":0}`, `{"clientId":"9"}`, `{"consentId":9}`, `not json`} {
+	for _, body := range []string{`{}`, `{"clientId":0}`, `{"clientId":-9}`, `{"clientId":9.5}`, `{"clientId":"9"}`, `{"consentId":9}`, `not json`} {
 		t.Run(body, func(t *testing.T) {
 			apiClient := &accountApplicationsApiClient{}
 

@@ -104,8 +104,9 @@ func TestRender_ApplicationsPageTagsTheCurrentApplicationInPlaceOfDisconnect(t *
 	assert.NotContains(t, rows[1], "Este aplicativo")
 }
 
-// The confirmation says what a disconnect does: the application loses its access on every device,
-// the auth server tries to tell it to sign the user out, and it can ask to sign them in again (#135
+// The confirmation says what a disconnect does: the access the application was given is revoked on
+// every device and the approval removed, some of it can last until it expires (decision 8), the auth
+// server tries to tell it to sign the user out, and it can ask to sign them in again (#135
 // decision 7). An application that named itself says so in the same sentence, as its row does.
 func TestRender_ApplicationsPageConfirmationSaysWhatADisconnectDoes(t *testing.T) {
 	out := renderMenuPageIn(t, "/account_applications.html", map[string]interface{}{
@@ -117,10 +118,12 @@ func TestRender_ApplicationsPageConfirmationSaysWhatADisconnectDoes(t *testing.T
 
 	confirms := regexp.MustCompile(`data-confirm="([^"]*)"`).FindAllStringSubmatch(out, -1)
 	require.Len(t, confirms, 2)
-	assert.Equal(t, "Disconnect Customer portal? It will lose access to your account on every device, "+
-		"and we'll try to tell it to sign you out. It can still ask you to sign in again.", html.UnescapeString(confirms[0][1]))
+	assert.Equal(t, "Disconnect Customer portal? The access it was given will be revoked on every device "+
+		"and any approval you gave it removed, though some of that access can last until it expires. "+
+		"We'll try to tell it to sign you out. It can still ask you to sign in again.", html.UnescapeString(confirms[0][1]))
 	assert.Equal(t, "Disconnect Payroll Portal, an application that registered itself and has not been verified? "+
-		"It will lose access to your account on every device, and we'll try to tell it to sign you out. "+
+		"The access it was given will be revoked on every device and any approval you gave it removed, "+
+		"though some of that access can last until it expires. We'll try to tell it to sign you out. "+
 		"It can still ask you to sign in again.", html.UnescapeString(confirms[1][1]))
 
 	assert.Contains(t, out, `data-done="Application disconnected." data-done-label="Disconnected"`)

@@ -132,7 +132,7 @@ test("the user sees each application connected to their account, and disconnects
   await expect(current.getByRole("button")).toHaveCount(0);
 
   const disconnect = unaskedRow.getByRole("button", { name: `Disconnect ${unasked.client.identifier}`, exact: true });
-  const question = `Disconnect ${unasked.client.identifier}? It will lose access to your account on every device, and we'll try to tell it to sign you out. It can still ask you to sign in again.`;
+  const question = `Disconnect ${unasked.client.identifier}? The access it was given will be revoked on every device and any approval you gave it removed, though some of that access can last until it expires. We'll try to tell it to sign you out. It can still ask you to sign in again.`;
   // Cancel leaves the client as it was.
   await disconnect.click();
   await cancelDialog(own.page, question);

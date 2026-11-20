@@ -152,8 +152,9 @@ test("consent given on the consent screen is listed, remembered, and ends with a
 
   // Disconnecting asks first, and Cancel keeps the consent.
   const disconnect = row.getByRole("button", { name: `Disconnect ${client.identifier}`, exact: true });
-  const question = `Disconnect ${client.identifier}? It will lose access to this user's account on every device, ` +
-    "its consent and offline refresh tokens included, and the auth server will try to tell it to sign the user out. " +
+  const question = `Disconnect ${client.identifier}? Any consent the user gave it will be deleted and the access it holds for the user ` +
+    "revoked on every device, offline refresh tokens included, though some access tokens already issued can keep " +
+    "working until they expire. The auth server will try to tell it to sign the user out. " +
     "It can still ask the user to sign in again.";
   await disconnect.click();
   await cancelDialog(page, question);

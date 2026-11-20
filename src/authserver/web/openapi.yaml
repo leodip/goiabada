@@ -7494,10 +7494,7 @@ components:
           description: The client's description, as `clientDescription` of a consent carries it on the same API.
           type: string
         consent:
-          description: The user's stored consent to the client, null when there is none.
-          nullable: true
-          allOf:
-            - $ref: '#/components/schemas/ConnectedClientConsentResponse'
+          $ref: '#/components/schemas/ConnectedClientConsentResponse'
         grantScope:
           description: |
             The scopes the user's live refresh tokens with the client record, merged into one
@@ -7519,7 +7516,9 @@ components:
         - isCurrent
 
     ConnectedClientConsentResponse:
+      description: The user's stored consent to the client, null when there is none.
       type: object
+      nullable: true
       properties:
         id:
           type: integer

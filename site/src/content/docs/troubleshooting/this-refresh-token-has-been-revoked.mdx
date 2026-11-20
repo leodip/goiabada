@@ -60,7 +60,7 @@ When your app sends one of a grant's tokens to [`/auth/revoke`](/reference/endpo
 
 ### A sign-out with your app's ID token
 
-When your app signs the user out at [`/auth/logout`](/reference/endpoints/logout/) with its ID token as the `id_token_hint`, its normal refresh tokens from that session are revoked, even while other apps keep the session. The audit log holds a `revoked_sign_out_grants` event for your client. A refresh token your app needs after the user signs out has to be an offline one, from the `offline_access` scope. See [Signing out](/concepts/ending-sessions/#signing-out).
+When your app signs the user out at [`/auth/logout`](/reference/endpoints/logout/) with its ID token as an `id_token_hint` the auth server confirms, its normal refresh tokens from that session are revoked, even while other apps keep the session. The audit log holds a `revoked_sign_out_grants` event for your client. A refresh token your app needs after the user signs out has to be an offline one, from the `offline_access` scope. A hint the auth server can't confirm revokes nothing: once the user confirms, the whole session ends, and its normal refresh tokens are refused as an ended session's. See [Signing out](/concepts/ending-sessions/#signing-out).
 
 ## Fix it
 

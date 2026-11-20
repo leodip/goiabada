@@ -131,9 +131,10 @@ func TestRender_UserConnectedClientsTabTagsTheCurrentClientInPlaceOfDisconnect(t
 	assert.NotContains(t, rows[1], "This client")
 }
 
-// The confirmation says what a disconnect does: the client loses its access on every device, the
-// auth server tries to tell it to sign the user out, and it can ask the user to sign in again
-// (#135 decision 7). The administrator's page names the client by its identifier.
+// The confirmation says what a disconnect does: the consent is deleted and the client's access
+// revoked on every device, some access tokens can last until they expire (decision 8), the auth
+// server tries to tell it to sign the user out, and it can ask the user to sign in again (#135
+// decision 7). The administrator's page names the client by its identifier.
 func TestRender_UserConnectedClientsTabConfirmationSaysWhatADisconnectDoes(t *testing.T) {
 	out := renderMenuPageIn(t, "/admin_users_connected_clients.html", connectedClientsBind([]render.ConnectedClientInfo{
 		{ClientId: 2, Client: "portal", ClientName: "Customer portal", GrantScope: "openid"},
@@ -141,8 +142,9 @@ func TestRender_UserConnectedClientsTabConfirmationSaysWhatADisconnectDoes(t *te
 
 	confirms := regexp.MustCompile(`data-confirm="([^"]*)"`).FindAllStringSubmatch(out, -1)
 	require.Len(t, confirms, 1)
-	assert.Equal(t, "Disconnect portal? It will lose access to this user's account on every device, "+
-		"its consent and offline refresh tokens included, and the auth server will try to tell it to sign "+
+	assert.Equal(t, "Disconnect portal? Any consent the user gave it will be deleted and the access it holds "+
+		"for the user revoked on every device, offline refresh tokens included, though some access tokens "+
+		"already issued can keep working until they expire. The auth server will try to tell it to sign "+
 		"the user out. It can still ask the user to sign in again.", html.UnescapeString(confirms[0][1]))
 
 	assert.Contains(t, out, `data-done="Client disconnected." data-done-label="Disconnected"`)

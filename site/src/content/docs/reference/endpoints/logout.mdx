@@ -7,7 +7,7 @@ import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components'
 
 This page helps you sign a user out of the auth server from your app, with the logout endpoint, `/auth/logout`.
 
-It's OpenID Connect's [RP-Initiated Logout 1.0](https://openid.net/specs/openid-connect-rpinitiated-1_0.html) endpoint, the `end_session_endpoint` in the [discovery document](/reference/endpoints/discovery-and-jwks/). What a sign-out ends, and what it leaves alone, is on [Ending sessions](/concepts/ending-sessions/#signing-out). A sign-out with a hint revokes your app's refresh tokens tied to the session, and not its offline ones: revoke those first at [`/auth/revoke`](/reference/endpoints/revoke/), as [Sign users out](/guides/sign-users-out/) shows.
+It's OpenID Connect's [RP-Initiated Logout 1.0](https://openid.net/specs/openid-connect-rpinitiated-1_0.html) endpoint, the `end_session_endpoint` in the [discovery document](/reference/endpoints/discovery-and-jwks/). What a sign-out ends, and what it leaves alone, is on [Ending sessions](/concepts/ending-sessions/#signing-out). A sign-out with a hint the auth server confirms revokes your app's refresh tokens tied to the session, and not its offline ones: revoke those first at [`/auth/revoke`](/reference/endpoints/revoke/), as [Sign users out](/guides/sign-users-out/) shows. A hint it can't confirm asks the user first, as [Whether the user is asked](#whether-the-user-is-asked) shows, and then ends the whole session.
 
 ## Sign a user out
 
