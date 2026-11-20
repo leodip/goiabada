@@ -571,7 +571,7 @@ func TestToken_Refresh_ConsentRemoved(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, consent)
 
-	err = database.DeleteUserConsent(context.Background(), nil, consent.Id)
+	_, err = database.DeleteUserConsent(context.Background(), nil, consent.Id)
 	require.NoError(t, err)
 
 	// Attempt to use the refresh token

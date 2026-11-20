@@ -19,7 +19,7 @@ import (
 type accountConsentsDatabase interface {
 	revocation.Database
 
-	DeleteUserConsent(ctx context.Context, tx *sql.Tx, userConsentId int64) error
+	DeleteUserConsent(ctx context.Context, tx *sql.Tx, userConsentId int64) (bool, error)
 	GetConsentsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserConsent, error)
 	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error)
 	GetUserConsentById(ctx context.Context, tx *sql.Tx, userConsentId int64) (*record.UserConsent, error)
@@ -110,13 +110,14 @@ func HandleAccountConsentDelete(
 			return
 		}
 
-		// The withdrawal also revokes the codes this user has not yet redeemed with this
-		// client and the refresh tokens this user holds with it.
-		// The refresh arm consults a stored consent only when the client has Consent required
-		// on or the grant is an offline one, so deleting the row alone would leave a
-		// once-consented client's grant standing (#622).
-		result, err := revocation.RevokeOnConsentWithdrawalTx(r.Context(), database, consent.UserId, consent.ClientId,
-			func(tx *sql.Tx) error {
+		// Withdrawing a consent disconnects its client: the same transaction deletes the consent,
+		// revokes the codes this user has not yet redeemed with that client and the refresh
+		// tokens this user holds with it (#622, #135 decision 1). The refresh arm consults a
+		// stored consent only when the client has Consent required on or the grant is an
+		// offline one, so deleting the row alone would leave a once-consented client's grant
+		// standing.
+		result, err := revocation.DisconnectClientTx(r.Context(), database, consent.UserId, consent.ClientId,
+			func(tx *sql.Tx) (bool, error) {
 				return database.DeleteUserConsent(r.Context(), tx, consentId)
 			})
 		if err != nil {
@@ -124,14 +125,24 @@ func HandleAccountConsentDelete(
 			return
 		}
 
-		auditLogger.Log(r.Context(), audit.EventDeletedOwnUserConsent, map[string]interface{}{
-			"user_id":        user.Id,
-			"consent_id":     consentId,
-			"logged_in_user": subject,
-		})
-		// What the withdrawal revoked, beside the deletion event and after the commit, as
-		// TerminateUserSessionTx's callers record EventTerminatedUserSession (#622).
-		revocation.LogRevokedConsentGrants(r.Context(), auditLogger, consent.UserId, consent.ClientId,
+		// The answer comes from what this call's own transaction changed, not from the read
+		// above: a consent another request deleted meanwhile, with nothing else left to end, is
+		// answered as a repeated DELETE is, and that request wrote the record (#135 decision 2).
+		if !result.Changed() {
+			writeJSONError(w, "Consent not found", "NOT_FOUND", http.StatusNotFound)
+			return
+		}
+
+		if result.ConsentDeleted {
+			auditLogger.Log(r.Context(), audit.EventDeletedOwnUserConsent, map[string]interface{}{
+				"user_id":        user.Id,
+				"consent_id":     consentId,
+				"logged_in_user": subject,
+			})
+		}
+		// What the disconnect revoked, beside the deletion event and after the commit, as
+		// TerminateUserSessionTx's callers record EventTerminatedUserSession (#135 decision 6).
+		revocation.LogDisconnectedClient(r.Context(), auditLogger, consent.UserId, consent.ClientId,
 			subject, result)
 
 		resp := api.SuccessResponse{Success: true}

@@ -61,14 +61,25 @@ func TestToken_Refresh_ConsentRemovedFromAConsentNotRequiredClient(t *testing.T)
 	rotatedRefreshToken := data["refresh_token"].(string)
 
 	// The user withdraws the consent. Account, Manage consents and the admin console's
-	// user page both route the deletion through revocation.RevokeOnConsentWithdrawalTx;
-	// calling it here runs the identical transaction those handlers do, without minting
-	// the Account API token the endpoint itself would ask for.
-	_, err := revocation.RevokeOnConsentWithdrawalTx(context.Background(), database, consent.UserId, consent.ClientId,
-		func(tx *sql.Tx) error {
+	// user page both route the deletion through revocation.DisconnectClientTx; calling it
+	// here runs the identical transaction those handlers do, without minting the Account
+	// API token the endpoint itself would ask for.
+	result, err := revocation.DisconnectClientTx(context.Background(), database, consent.UserId, consent.ClientId,
+		func(tx *sql.Tx) (bool, error) {
 			return database.DeleteUserConsent(context.Background(), tx, consent.Id)
 		})
 	require.NoError(t, err)
+	assert.True(t, result.ConsentDeleted, "this call deleted the consent")
+	assert.Len(t, result.RevokedRefreshTokenJtis, 1, "the rotated token is the one live token it revoked")
+	assert.Equal(t, 1, result.RecordedFamilyCount, "the grant's one family is newly recorded")
+
+	// The same disconnect again finds nothing left to end, and says so.
+	again, err := revocation.DisconnectClientTx(context.Background(), database, consent.UserId, consent.ClientId,
+		func(tx *sql.Tx) (bool, error) {
+			return database.DeleteUserConsent(context.Background(), tx, consent.Id)
+		})
+	require.NoError(t, err)
+	assert.False(t, again.Changed(), "a repeated disconnect changes nothing: %+v", again)
 
 	formData = url.Values{
 		"grant_type":    {"refresh_token"},
@@ -139,9 +150,10 @@ func newConsentWithdrawalFixture(t *testing.T, user *record.User, password strin
 
 // assertWithdrawn holds what a withdrawal through either endpoint leaves: the consent row gone,
 // the client's grant refused as revoked, the user's grant with the other client still refreshing,
-// and the revoked_consent_grants record naming the user, the client and the one token the sweep
-// moved from live to revoked, beside the deletion event.
-func (f consentWithdrawalFixture) assertWithdrawn(t *testing.T, adminToken string, loggedInUser string) {
+// and one disconnected_client record naming the user, the client and the one token the sweep
+// moved from live to revoked, beside one deletionEvent naming the consent (#135 decision 6).
+func (f consentWithdrawalFixture) assertWithdrawn(t *testing.T, adminToken string, loggedInUser string,
+	deletionEvent string) {
 	t.Helper()
 
 	got, err := database.GetUserConsentById(context.Background(), nil, f.consent.Id)
@@ -158,7 +170,7 @@ func (f consentWithdrawalFixture) assertWithdrawn(t *testing.T, adminToken strin
 		"the same user's grant with another client must survive the withdrawal: %v", survives["error_description"])
 	assert.NotEmpty(t, survives["access_token"])
 
-	logs, resp := getAuditLogs(t, adminToken, "auditEvent="+audit.EventRevokedConsentGrants)
+	logs, resp := getAuditLogs(t, adminToken, "auditEvent="+audit.EventDisconnectedClient)
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	found := 0
@@ -178,5 +190,20 @@ func (f consentWithdrawalFixture) assertWithdrawn(t *testing.T, adminToken strin
 		assert.Len(t, details["revoked_refresh_token_jtis"], 1)
 		assert.InDelta(t, float64(0), details["revoked_code_count"], 0)
 	}
-	assert.Equal(t, 1, found, "the withdrawal must record %v once for this client", audit.EventRevokedConsentGrants)
+	assert.Equal(t, 1, found, "the withdrawal must record %v once for this client", audit.EventDisconnectedClient)
+
+	deletions, deletionsResp := getAuditLogs(t, adminToken, "auditEvent="+deletionEvent)
+	defer func() { _ = deletionsResp.Body.Close() }()
+	require.Equal(t, http.StatusOK, deletionsResp.StatusCode)
+	foundDeletion := 0
+	for _, entry := range deletions.AuditLogs {
+		var details map[string]interface{}
+		if err := json.Unmarshal([]byte(entry.Details), &details); err != nil {
+			continue
+		}
+		if int64(details["consent_id"].(float64)) == f.consent.Id {
+			foundDeletion++
+		}
+	}
+	assert.Equal(t, 1, foundDeletion, "the withdrawal must record %v once for this consent", deletionEvent)
 }

@@ -138,7 +138,7 @@ func TestHandleUserConsentDelete_Success(t *testing.T) {
 	// expected on exactly this user and client, so a sweep that reached for any other user's
 	// tokens would fail as an unexpected call.
 	datamocks.ExpectRunInTransaction(database, consentWithdrawalTx)
-	database.On("DeleteUserConsent", mock.Anything, consentWithdrawalTx, int64(5)).Return(nil).Once()
+	database.On("DeleteUserConsent", mock.Anything, consentWithdrawalTx, int64(5)).Return(true, nil).Once()
 	database.On("RevokeUnusedCodesByUserIdAndClientId", mock.Anything, consentWithdrawalTx, int64(7), int64(3)).
 		Return(int64(1), nil).Once()
 	database.On("GetRefreshTokensByUserIdAndClientId", mock.Anything, consentWithdrawalTx, int64(7), int64(3)).
@@ -146,7 +146,7 @@ func TestHandleUserConsentDelete_Success(t *testing.T) {
 			{Id: 11, RefreshTokenJti: "rt-live", FirstRefreshTokenJti: "rt-first"},
 			{Id: 12, RefreshTokenJti: "rt-already-gone", FirstRefreshTokenJti: "rt-first", Revoked: true},
 		}, nil).Once()
-	database.On("RecordRefreshTokenFamilyRevoked", mock.Anything, consentWithdrawalTx, "rt-first", revocation.ReasonConsentWithdrawn).
+	database.On("RecordRefreshTokenFamilyRevoked", mock.Anything, consentWithdrawalTx, "rt-first", revocation.ReasonClientDisconnected).
 		Return(true, nil).Once()
 	database.On("UpdateRefreshToken", mock.Anything, consentWithdrawalTx, mock.MatchedBy(func(rt *record.RefreshToken) bool {
 		return rt.RefreshTokenJti == "rt-live" && rt.Revoked
@@ -158,7 +158,7 @@ func TestHandleUserConsentDelete_Success(t *testing.T) {
 	// What the withdrawal revoked, beside the deletion event: the live token alone, since the
 	// other was revoked before the call.
 	var revokedPayload map[string]interface{}
-	auditLogger.On("Log", mock.Anything, audit.EventRevokedConsentGrants, mock.Anything).
+	auditLogger.On("Log", mock.Anything, audit.EventDisconnectedClient, mock.Anything).
 		Run(func(args mock.Arguments) {
 			revokedPayload = args.Get(2).(map[string]interface{})
 		}).Return().Once()
@@ -211,7 +211,7 @@ func TestHandleUserConsentDelete_DeleteFails_JSON500(t *testing.T) {
 	// failure is what the handler reports: nothing after it, neither the enumeration nor the
 	// sweep, runs (#622).
 	datamocks.ExpectRunInTransaction(database, consentWithdrawalTx)
-	database.On("DeleteUserConsent", mock.Anything, consentWithdrawalTx, int64(5)).Return(assert.AnError).Once()
+	database.On("DeleteUserConsent", mock.Anything, consentWithdrawalTx, int64(5)).Return(false, assert.AnError).Once()
 
 	handler.ServeHTTP(rr, req)
 
@@ -219,4 +219,62 @@ func TestHandleUserConsentDelete_DeleteFails_JSON500(t *testing.T) {
 	database.AssertExpectations(t)
 	// Nothing was deleted, so nothing is audited.
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+}
+
+// adminConsentDeleteRaced sets up an administrator's DELETE whose consent another request deleted
+// between the handler's read and its transaction's write.
+func adminConsentDeleteRaced(database *datamocks.Database) *http.Request {
+	req, _ := http.NewRequest("DELETE", "/api/v1/admin/user-consents/5", nil)
+	req.SetPathValue("id", "5")
+	req = setTokenContextWithClaims(req, map[string]interface{}{"scope": "authserver:manage", "sub": "admin-subject-1"})
+	database.On("GetUserConsentById", mock.Anything, (*sql.Tx)(nil), int64(5)).
+		Return(&record.UserConsent{Id: 5, UserId: 7, ClientId: 3}, nil).Once()
+	datamocks.ExpectRunInTransaction(database, consentWithdrawalTx)
+	database.On("DeleteUserConsent", mock.Anything, consentWithdrawalTx, int64(5)).Return(false, nil).Once()
+	database.On("RevokeUnusedCodesByUserIdAndClientId", mock.Anything, consentWithdrawalTx, int64(7), int64(3)).
+		Return(int64(0), nil).Once()
+	return req
+}
+
+// The administrator's DELETE answers a consent another request deleted meanwhile as the account
+// one does: 404 with nothing audited when its own transaction changed nothing (#135 decision 2).
+func TestHandleUserConsentDelete_AConsentDeletedMeanwhileWithNothingToEndIs404(t *testing.T) {
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
+	req := adminConsentDeleteRaced(database)
+	database.On("GetRefreshTokensByUserIdAndClientId", mock.Anything, consentWithdrawalTx, int64(7), int64(3)).
+		Return([]*record.RefreshToken{}, nil).Once()
+
+	rr := httptest.NewRecorder()
+	HandleUserConsentDelete(database, auditLogger).ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusNotFound, rr.Code)
+	var body map[string]interface{}
+	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &body))
+	assert.Equal(t, "NOT_FOUND", body["error_code"])
+	database.AssertExpectations(t)
+	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+}
+
+// And 200 with disconnected_client alone when its own transaction still changed something, here a
+// family it newly recorded whose members were already revoked (#135 decision 2).
+func TestHandleUserConsentDelete_AConsentDeletedMeanwhileStillAuditsWhatItRecorded(t *testing.T) {
+	database := datamocks.NewDatabase(t)
+	auditLogger := handlersmocks.NewAuditLogger(t)
+	req := adminConsentDeleteRaced(database)
+	database.On("GetRefreshTokensByUserIdAndClientId", mock.Anything, consentWithdrawalTx, int64(7), int64(3)).
+		Return([]*record.RefreshToken{
+			{Id: 11, RefreshTokenJti: "rt-claimed", FirstRefreshTokenJti: "rt-first", Revoked: true},
+		}, nil).Once()
+	database.On("RecordRefreshTokenFamilyRevoked", mock.Anything, consentWithdrawalTx, "rt-first", revocation.ReasonClientDisconnected).
+		Return(true, nil).Once()
+	auditLogger.On("Log", mock.Anything, audit.EventDisconnectedClient, mock.Anything).Return().Once()
+
+	rr := httptest.NewRecorder()
+	HandleUserConsentDelete(database, auditLogger).ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusOK, rr.Code)
+	database.AssertExpectations(t)
+	auditLogger.AssertExpectations(t)
+	auditLogger.AssertNotCalled(t, "Log", mock.Anything, audit.EventDeletedUserConsent, mock.Anything)
 }

@@ -182,14 +182,23 @@ func (d *Database) GetConsentsByUserId(ctx context.Context, tx *sql.Tx, userId i
 		scanUserConsent, "userConsent")
 }
 
-func (d *Database) DeleteUserConsent(ctx context.Context, tx *sql.Tx, userConsentId int64) error {
+// DeleteUserConsent deletes one stored consent and reports whether THIS call deleted it: false
+// when no row had the id, because it never existed or another request deleted it first. A
+// consent withdrawal answers from it, so two overlapping withdrawals never both report the
+// deletion (#135 decision 2).
+func (d *Database) DeleteUserConsent(ctx context.Context, tx *sql.Tx, userConsentId int64) (bool, error) {
 
-	_, err := d.ExecSQL(ctx, tx, deleteUserConsent.text(d.Dialect), userConsentId)
+	result, err := d.ExecSQL(ctx, tx, deleteUserConsent.text(d.Dialect), userConsentId)
 	if err != nil {
-		return errs.Wrap(err, "unable to delete userConsent")
+		return false, errs.Wrap(err, "unable to delete userConsent")
 	}
 
-	return nil
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return false, errs.Wrap(err, "unable to get rows affected when deleting userConsent")
+	}
+
+	return rowsAffected > 0, nil
 }
 
 func (d *Database) DeleteAllUserConsent(ctx context.Context, tx *sql.Tx) error {

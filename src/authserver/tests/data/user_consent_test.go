@@ -185,9 +185,12 @@ func TestGetConsentsByUserId(t *testing.T) {
 func TestDeleteUserConsent(t *testing.T) {
 	userConsent := createTestUserConsent(t)
 
-	err := database.DeleteUserConsent(context.Background(), nil, userConsent.Id)
+	deleted, err := database.DeleteUserConsent(context.Background(), nil, userConsent.Id)
 	if err != nil {
 		t.Fatalf("Failed to delete user consent: %v", err)
+	}
+	if !deleted {
+		t.Errorf("Expected the deletion of an existing user consent to report it deleted the row")
 	}
 
 	deletedConsent, err := database.GetUserConsentById(context.Background(), nil, userConsent.Id)
@@ -198,9 +201,22 @@ func TestDeleteUserConsent(t *testing.T) {
 		t.Errorf("User consent still exists after deletion")
 	}
 
-	err = database.DeleteUserConsent(context.Background(), nil, 99999)
+	// The same row again, as a second request withdrawing the same consent would: no error, and
+	// the answer says this call deleted nothing (#135 decision 2).
+	deleted, err = database.DeleteUserConsent(context.Background(), nil, userConsent.Id)
+	if err != nil {
+		t.Errorf("Expected no error when deleting an already deleted user consent, got: %v", err)
+	}
+	if deleted {
+		t.Errorf("Expected the deletion of an already deleted user consent to report it deleted nothing")
+	}
+
+	deleted, err = database.DeleteUserConsent(context.Background(), nil, 99999)
 	if err != nil {
 		t.Errorf("Expected no error when deleting non-existent user consent, got: %v", err)
+	}
+	if deleted {
+		t.Errorf("Expected the deletion of a non-existent user consent to report it deleted nothing")
 	}
 }
 

@@ -6280,20 +6280,29 @@ func (_c *Database_DeleteUserAttribute_Call) RunAndReturn(run func(ctx context.C
 }
 
 // DeleteUserConsent provides a mock function for the type Database
-func (_mock *Database) DeleteUserConsent(ctx context.Context, tx *sql.Tx, userConsentId int64) error {
+func (_mock *Database) DeleteUserConsent(ctx context.Context, tx *sql.Tx, userConsentId int64) (bool, error) {
 	ret := _mock.Called(ctx, tx, userConsentId)
 
 	if len(ret) == 0 {
 		panic("no return value specified for DeleteUserConsent")
 	}
 
-	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) error); ok {
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) (bool, error)); ok {
+		return returnFunc(ctx, tx, userConsentId)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) bool); ok {
 		r0 = returnFunc(ctx, tx, userConsentId)
 	} else {
-		r0 = ret.Error(0)
+		r0 = ret.Get(0).(bool)
 	}
-	return r0
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, int64) error); ok {
+		r1 = returnFunc(ctx, tx, userConsentId)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
 }
 
 // Database_DeleteUserConsent_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteUserConsent'
@@ -6332,12 +6341,12 @@ func (_c *Database_DeleteUserConsent_Call) Run(run func(ctx context.Context, tx 
 	return _c
 }
 
-func (_c *Database_DeleteUserConsent_Call) Return(err error) *Database_DeleteUserConsent_Call {
-	_c.Call.Return(err)
+func (_c *Database_DeleteUserConsent_Call) Return(b bool, err error) *Database_DeleteUserConsent_Call {
+	_c.Call.Return(b, err)
 	return _c
 }
 
-func (_c *Database_DeleteUserConsent_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userConsentId int64) error) *Database_DeleteUserConsent_Call {
+func (_c *Database_DeleteUserConsent_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userConsentId int64) (bool, error)) *Database_DeleteUserConsent_Call {
 	_c.Call.Return(run)
 	return _c
 }

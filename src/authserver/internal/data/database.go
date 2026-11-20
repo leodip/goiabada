@@ -870,7 +870,7 @@ type Database interface {
 	GetUserConsentById(ctx context.Context, tx *sql.Tx, userConsentId int64) (*record.UserConsent, error)
 	GetConsentByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (*record.UserConsent, error)
 	GetConsentsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserConsent, error)
-	DeleteUserConsent(ctx context.Context, tx *sql.Tx, userConsentId int64) error
+	DeleteUserConsent(ctx context.Context, tx *sql.Tx, userConsentId int64) (bool, error)
 	DeleteAllUserConsent(ctx context.Context, tx *sql.Tx) error
 	UserConsentsLoadClients(ctx context.Context, tx *sql.Tx, userConsents []record.UserConsent) error
 

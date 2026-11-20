@@ -214,7 +214,7 @@ One check decides whether an access token is one under RFC 9068 and still stands
 - Last, a token carrying `grant_id` is live only while its grant is: `IsRefreshTokenFamilyLive`
   answers whether the family has no revocation record and still has a member that is not revoked,
   in one indexed read. Every revocation that ends a grant writes the record in its transaction, for
-  every family it reads: consent withdrawal, a client made public or renamed, a session's termination,
+  every family it reads: a disconnect, a client made public or renamed, a session's termination,
   authorization-code reuse containment, replay containment and `/auth/revoke`. A sweep alone misses
   the child of a rotation that claimed its parent before the sweep read the rows, so the record is
   what refuses that child's access token at once. A credential change ends access tokens through
@@ -287,6 +287,27 @@ A client ends one of its grants by sending a token of it.
 - A fault reading the database or the keys answers 503 `temporarily_unavailable`, never 200.
   `goiabada_revocation_requests_total` counts each answer by outcome (#676)
 - Implementation: `handler_revoke.go`, `revocation/revocation.go`, `revocationmetrics`
+
+### Disconnect
+A user, or an administrator acting for them, ends everything the user holds with one client.
+- Entry: withdrawing a consent, `DELETE /api/v1/account/consents/{id}` and
+  `DELETE /api/v1/admin/user-consents/{id}`, is a disconnect of the consent's client (#135
+  decision 1)
+- Operation: `revocation.DisconnectClientTx`, in one transaction: the consent's deletion when the
+  caller passes one (`DeleteUserConsent` reports whether this call deleted the row), the user's
+  unredeemed codes with the client marked revoked, each family of the user's refresh tokens with the
+  client recorded under `client_disconnected`, and the live ones revoked, session-bound, offline
+  and password grant alike. Sessions, the generation and the user's other clients are untouched
+- Answer: from what the transaction changed, `DisconnectResult.Changed`: the consent deleted, a
+  code marked, a token moved from live to revoked or a family newly recorded. A call that changed
+  nothing, such as a repeat or a consent another request deleted first with nothing left to end,
+  answers 404 `NOT_FOUND` and writes no audit entry. Otherwise `disconnected_client` is written
+  after the commit, with `deleted_own_user_consent` or `deleted_user_consent` beside it only when
+  this call deleted the consent (#135 decisions 2 and 6)
+- Gap: a code exchange that claimed its code before the commit and writes its first refresh token
+  after it finishes, and its grant is live (#135 decision 11)
+- Implementation: `handler_api_account_consents.go`, `handler_api_user_consents.go`,
+  `revocation/revocation.go`
 
 ### Token introspection (RFC 7662)
 An API, calling as a confidential client, asks whether a token is active.

@@ -354,10 +354,23 @@ func sessionStatements() []narrowWrite {
 			statements: []string{"SELECT <columns> FROM user_consents WHERE user_id = 7"},
 		},
 		{
-			name: "DeleteUserConsent",
+			name:  "DeleteUserConsent",
+			execs: []*scriptedExec{{rowsAffected: 1}},
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return nil, d.DeleteUserConsent(ctx, nil, sessionId)
+				return d.DeleteUserConsent(ctx, nil, sessionId)
 			},
+			answer:     true,
+			statements: []string{"DELETE FROM user_consents WHERE id = 9"},
+		},
+		{
+			// A row another request deleted first: the statement matched nothing, and the answer
+			// says so, which is what a consent DELETE's 404 is decided from (#135 decision 2).
+			name:  "DeleteUserConsent of a row already gone",
+			execs: []*scriptedExec{{rowsAffected: 0}},
+			run: func(ctx context.Context, d *Database) (any, error) {
+				return d.DeleteUserConsent(ctx, nil, sessionId)
+			},
+			answer:     false,
 			statements: []string{"DELETE FROM user_consents WHERE id = 9"},
 		},
 		{

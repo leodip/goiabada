@@ -42,12 +42,15 @@ func TestAPIAuditEventTypesGet_ServesTheWholeCatalog(t *testing.T) {
 	assert.Equal(t, audit.EventTypes(), body.AuditEventTypes)
 	assert.NotContains(t, body.AuditEventTypes, "updated_ui_theme_settings",
 		"the theme setting's event is retired with the setting (#810)")
+	assert.NotContains(t, body.AuditEventTypes, "revoked_consent_grants",
+		"a consent withdrawal writes disconnected_client now, and the old name is retired (#135)")
 	assert.Len(t, body.AuditEventTypes, 141,
 		"the catalog is the 104 declared names less the four #351 decision 11 deleted, "+
 			"plus failed_account_activation_code (#435), requested_password_reset (#404), "+
 			"administrator_change_refused, administrative_permission_changed and "+
 			"viewed_client_secret (#402), administrative_scope_refused and "+
-			"updated_client_administrative_scopes (#499), revoked_consent_grants (#622), "+
+			"updated_client_administrative_scopes (#499), revoked_consent_grants (#622), renamed "+
+			"disconnected_client (#135), "+
 			"otp_authenticator_disabled (#489), and revoked_grant, token_revocation_refused, "+
 			"revoked_access_token and updated_client_introspection_resources (#676), "+
 			"updated_post_logout_redirect_uris (#147), recovery_codes_created, "+

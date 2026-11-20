@@ -91,7 +91,7 @@ func (g *manageAccountGrant) storedConsent(t *testing.T) *record.UserConsent {
 // TestAPIAccountConsentDelete_RevokesTheClientsRefreshTokens holds.
 func (g *manageAccountGrant) withdrawConsent(t *testing.T) {
 	t.Helper()
-	require.NoError(t, database.DeleteUserConsent(context.Background(), nil, g.storedConsent(t).Id))
+	deleteConsentRowAlone(t, g.storedConsent(t).Id)
 }
 
 // assertManageAccountRefreshRefused holds a refresh's answer to invalid_grant with description, and
@@ -186,7 +186,7 @@ func TestToken_ManageAccount_AnOfflineRefreshWithTheConsentRowGone(t *testing.T)
 	consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, f.user.Id, f.client.Id)
 	require.NoError(t, err)
 	require.NotNil(t, consent)
-	require.NoError(t, database.DeleteUserConsent(context.Background(), nil, consent.Id))
+	deleteConsentRowAlone(t, consent.Id)
 
 	status, body = refreshWithScope(t, f.browser, f.client.ClientIdentifier, f.clientSecret, refreshToken, "")
 	assertManageAccountRefreshRefused(t, status, body, refreshNoConsent)
@@ -266,7 +266,7 @@ func TestToken_ManageAccount_AReplayIsContainedWhateverTheConsent(t *testing.T) 
 			require.NotNil(t, consent)
 			switch change {
 			case "consent withdrawn":
-				require.NoError(t, database.DeleteUserConsent(context.Background(), nil, consent.Id))
+				deleteConsentRowAlone(t, consent.Id)
 			case "consent leaves manage-account out":
 				consent.Scope = "openid profile"
 				require.NoError(t, database.UpdateUserConsent(context.Background(), nil, consent))
@@ -289,4 +289,13 @@ func TestToken_ManageAccount_AReplayIsContainedWhateverTheConsent(t *testing.T) 
 			assert.False(t, hasRefreshToken, "the contained successor gets no refresh token")
 		})
 	}
+}
+
+// deleteConsentRowAlone deletes a stored consent's row and nothing else, without the disconnect a
+// consent DELETE runs, so a test sees what the refresh arm does with the row gone.
+func deleteConsentRowAlone(t *testing.T, consentId int64) {
+	t.Helper()
+	deleted, err := database.DeleteUserConsent(context.Background(), nil, consentId)
+	require.NoError(t, err)
+	require.True(t, deleted, "the consent row must exist to be deleted")
 }

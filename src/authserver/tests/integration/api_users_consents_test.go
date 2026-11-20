@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -49,8 +50,8 @@ func TestAPIUserConsentsGet_Success(t *testing.T) {
 	consent1 := createTestUserConsent(t, testUser.Id, client1.Id)
 	consent2 := createTestUserConsent(t, testUser.Id, client2.Id)
 	defer func() {
-		_ = database.DeleteUserConsent(context.Background(), nil, consent1.Id)
-		_ = database.DeleteUserConsent(context.Background(), nil, consent2.Id)
+		_, _ = database.DeleteUserConsent(context.Background(), nil, consent1.Id)
+		_, _ = database.DeleteUserConsent(context.Background(), nil, consent2.Id)
 	}()
 
 	// Test: Get user consents
@@ -274,7 +275,13 @@ func TestAPIUserConsentDelete_RevokesTheClientsRefreshTokens(t *testing.T) {
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
-	f.assertWithdrawn(t, adminToken, adminClient.ClientIdentifier)
+	// Repeated, the DELETE has nothing left to end: 404, and no second audit entry, which the
+	// counts below hold (#135 decision 2).
+	repeat := makeAPIRequest(t, "DELETE", url, adminToken, nil)
+	defer func() { _ = repeat.Body.Close() }()
+	assert.Equal(t, http.StatusNotFound, repeat.StatusCode)
+
+	f.assertWithdrawn(t, adminToken, adminClient.ClientIdentifier, audit.EventDeletedUserConsent)
 }
 
 func TestAPIUserConsentDelete_NotFound(t *testing.T) {
@@ -339,7 +346,7 @@ func TestAPIUserConsentDelete_Unauthorized(t *testing.T) {
 	// Setup: Create test consent
 	consent := createTestUserConsent(t, testUser.Id, client.Id)
 	defer func() {
-		_ = database.DeleteUserConsent(context.Background(), nil, consent.Id)
+		_, _ = database.DeleteUserConsent(context.Background(), nil, consent.Id)
 	}()
 
 	// Test: Request without access token

@@ -379,24 +379,27 @@ const (
 	// terminated_user_session, because no event here lists code ids and a count answers the only
 	// question an auditor has, whether anything was revoked.
 	EventRevokedClientGrants = "revoked_client_grants"
-	// EventRevokedConsentGrants records that withdrawing a user's consent to one client revoked
-	// the refresh tokens that user holds with that client, through both linkage shapes, and
-	// recorded each of their rotation families revoked, and marked the user's codes with that
-	// client not yet redeemed revoked (#622). Emitted AFTER the withdrawal's
-	// transaction commits, on success only, by the account API's and the admin API's consent
-	// deletions, and emitted even when nothing was found to revoke, so the event attests that
-	// the action happened.
+	// EventDisconnectedClient records that a disconnect ended what one user held with one client
+	// (#622, #135): it marked the user's codes with that client not yet redeemed revoked, revoked
+	// the refresh tokens the user holds with it, through both linkage shapes, recorded each of
+	// their rotation families revoked, and deleted the stored consent when there was one.
+	// Withdrawing a consent is a disconnect of that consent's client, so the account API's and the
+	// admin API's consent deletions write it. Emitted AFTER the disconnect's transaction commits,
+	// on success only, and only when that transaction changed something: a consent deletion that
+	// deleted the row writes it even when nothing else was revoked. It replaced
+	// revoked_consent_grants, which entries already stored keep (#135 decision 6).
 	//
 	// It accompanies EventDeletedOwnUserConsent or EventDeletedUserConsent rather than replacing
 	// it, for the reason EventTerminatedUserSession accompanies EventDeletedUserSession: the
-	// deletion event keeps its fields, and this is the record of what the withdrawal revoked.
-	// It advances no generation and ends no session, so the user stays signed in. The access
-	// tokens of the revoked grants are refused at once at the auth server's own endpoints and at
-	// introspection, since each names its grant (#676 decision 1).
+	// deletion event keeps its fields, and is written only when the consent row was deleted, and
+	// this is the record of what the disconnect revoked. It advances no generation and ends no
+	// session, so the user stays signed in. The access tokens of the revoked grants are refused at
+	// once at the auth server's own endpoints and at introspection, since each names its grant
+	// (#676 decision 1).
 	//
 	// Its payload carries user_id, client_id, revoked_code_count and revoked_refresh_token_jtis,
 	// plus logged_in_user.
-	EventRevokedConsentGrants = "revoked_consent_grants"
+	EventDisconnectedClient = "disconnected_client"
 	// EventRevokedGrant records that a client ended one of its grants at the revocation endpoint
 	// (RFC 7009, #676), by sending the grant's refresh token or an access token carrying its
 	// grant_id: the grant's refresh token family was recorded revoked under client_revoked and every
@@ -783,6 +786,7 @@ var auditEventTypes = []string{
 	EventDeletedUserSession,
 	EventDeletedUserSessionClient,
 	EventDisabledOTP,
+	EventDisconnectedClient,
 	EventDynamicClientRegistration,
 	EventEnabledOTP,
 	EventExportedOwnUserData,
@@ -810,7 +814,6 @@ var auditEventTypes = []string{
 	EventRetiredLegalDocument,
 	EventRevokedAccessToken,
 	EventRevokedClientGrants,
-	EventRevokedConsentGrants,
 	EventRevokedGrant,
 	EventRevokedKey,
 	EventRevokedUserAuthState,

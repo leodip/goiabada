@@ -17,7 +17,7 @@ Your app refreshes, and the token endpoint answers `400`:
 
 Then the refresh token your app got from its previous refresh fails too, with the same "This refresh token has been revoked." The audit log may hold a `refresh_token_replay_detected` [event](/concepts/audit-log/) for your client.
 
-Or every refresh token the user holds with your app fails at once, on every device, and the audit log may hold a `revoked_consent_grants` event naming the user and your client: the user's consent was withdrawn. See [A withdrawn consent](#a-withdrawn-consent).
+Or every refresh token the user holds with your app fails at once, on every device, and the audit log may hold a `disconnected_client` event naming the user and your client: the user's consent was withdrawn. See [A withdrawn consent](#a-withdrawn-consent).
 
 Or every refresh token your app got from the password grant fails at once, for every user: an administrator changed your app's client identifier or made it public. If audit logging is on, look in the [audit log](/concepts/audit-log/) for a `revoked_client_grants` event for your client, with the reason `client_identifier_changed` or `client_became_public`. See [A changed client identifier](#a-changed-client-identifier) and [A client made public](#a-client-made-public).
 
