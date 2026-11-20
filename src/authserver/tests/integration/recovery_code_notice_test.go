@@ -79,7 +79,7 @@ func TestRecoveryCode_SigningInTellsTheUserHowManyCodesAreLeft(t *testing.T) {
 			assert.Equal(t, tc.lang, lang)
 			assert.Contains(t, text, tc.left, "the notice says how many unused codes are left")
 			assert.Contains(t, text, tc.advice, "the advice holds for any count")
-			assert.NotContains(t, messages[0].HTML, "href", "the notice carries no link")
+			assertCarriesNoLink(t, messages[0].HTML)
 			assertNoCodeIn(t, messages[0].HTML, messages[0].Text, codes)
 		})
 	}
@@ -159,7 +159,7 @@ func TestAPIAccountRecoveryCodesPost_TellsTheUserANewSetWasMade(t *testing.T) {
 			replaced := awaitMailWithSubject(t, u.Email, tc.subject, 1)
 			require.Len(t, replaced, 1, "the account's address is told exactly once")
 			assert.Contains(t, replaced[0].HTML, tc.sentence)
-			assert.NotContains(t, replaced[0].HTML, "href", "the notice carries no link")
+			assertCarriesNoLink(t, replaced[0].HTML)
 			assertNoCodeIn(t, replaced[0].HTML, replaced[0].Text, append(oldCodes, created.RecoveryCodes...))
 			assert.Len(t, messagesTo(t, u.Email), 2, "the set-up notice, then this one")
 		})
@@ -241,7 +241,7 @@ func TestAuthOtp_TheRefusalThatDisablesTheAuthenticatorTellsTheUserOnce(t *testi
 			lockout := awaitMailWithSubject(t, user.Email, tc.subject, 1)
 			require.Len(t, lockout, 1, "the lockout is told exactly once")
 			assert.Contains(t, lockout[0].HTML, tc.advice, "the notice says to sign in with a recovery code")
-			assert.NotContains(t, lockout[0].HTML, "href", "the notice carries no link")
+			assertCarriesNoLink(t, lockout[0].HTML)
 			assert.Len(t, messagesTo(t, user.Email), 2, "the lockout and the recovery-code sign-in, nothing more")
 		})
 	}

@@ -186,7 +186,7 @@ func TestAPIAccountDeletion_DeletesTheAccountWithThePassword(t *testing.T) {
 	require.Len(t, messages, 1, "the account's address is told exactly once")
 	assert.Equal(t, "Your account was deleted", messages[0].Subject)
 	assert.Contains(t, messages[0].HTML, "someone else knew your password")
-	assert.NotContains(t, messages[0].HTML, "href", "the notice carries no link")
+	assertCarriesNoLink(t, messages[0].HTML)
 }
 
 func TestAPIAccountDeletion_TellsTheUserInTheirLanguage(t *testing.T) {

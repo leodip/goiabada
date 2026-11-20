@@ -24,6 +24,15 @@ func assertStampedSince(t *testing.T, stamp, started time.Time) {
 		"stamped by the flow under test")
 }
 
+// assertCarriesNoLink holds a notice's HTML to having no link: no anchor and no href attribute. It
+// looks for the markup, not the letters "href", because a notice greets its recipient by address,
+// and plusAddress's ten random letters once came out as reset+tag.hrefdtxscl@example.com (#261).
+func assertCarriesNoLink(t *testing.T, html string) {
+	t.Helper()
+	assert.NotContains(t, html, "<a ", "the notice carries no link")
+	assert.NotContains(t, html, "href=", "the notice carries no link")
+}
+
 // parseHTMLResponse reads the response body and returns a goquery document
 // while preserving the response body for potential re-reading
 func parseHTMLResponse(t *testing.T, response *http.Response) *goquery.Document {

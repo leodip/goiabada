@@ -65,7 +65,7 @@ func TestAPIAccountOTPPut_TellsTheUserTwoFactorWasSetUpAndTurnedOff(t *testing.T
 			setUp := awaitMailWithSubject(t, u.Email, tc.setUp, 1)
 			require.Len(t, setUp, 1, "the account's address is told exactly once")
 			assert.Contains(t, setUp[0].HTML, tc.codes, "the notice mentions the recovery codes it came with")
-			assert.NotContains(t, setUp[0].HTML, "href", "the notice carries no link")
+			assertCarriesNoLink(t, setUp[0].HTML)
 			for _, code := range codes {
 				assert.NotContains(t, setUp[0].HTML+setUp[0].Text, code, "the notice carries no recovery code")
 			}
@@ -77,7 +77,7 @@ func TestAPIAccountOTPPut_TellsTheUserTwoFactorWasSetUpAndTurnedOff(t *testing.T
 			turnedOff := awaitMailWithSubject(t, u.Email, tc.turnedOff, 1)
 			require.Len(t, turnedOff, 1, "the account's address is told exactly once")
 			assert.Contains(t, turnedOff[0].HTML, tc.turnedOffMsg)
-			assert.NotContains(t, turnedOff[0].HTML, "href", "the notice carries no link")
+			assertCarriesNoLink(t, turnedOff[0].HTML)
 			assert.Len(t, messagesTo(t, u.Email), 2, "one notice for each change")
 		})
 	}
@@ -125,7 +125,7 @@ func TestAPIUserOTPPut_TellsTheUserAnAdministratorTurnedItOff(t *testing.T) {
 			require.Len(t, messages, 1, "the account's address is told exactly once")
 			assert.Equal(t, tc.subject, messages[0].Subject)
 			assert.Contains(t, messages[0].HTML, tc.advice)
-			assert.NotContains(t, messages[0].HTML, "href", "the notice carries no link")
+			assertCarriesNoLink(t, messages[0].HTML)
 		})
 	}
 }
@@ -181,7 +181,7 @@ func TestOtpCeremony_SettingUpAnAuthenticatorDuringTheSignInTellsTheUser(t *test
 			require.Len(t, messages, 1, "the account's address is told exactly once")
 			assert.Equal(t, tc.subject, messages[0].Subject)
 			assert.Contains(t, messages[0].HTML, tc.codes, "the notice mentions the recovery codes it came with")
-			assert.NotContains(t, messages[0].HTML, "href", "the notice carries no link")
+			assertCarriesNoLink(t, messages[0].HTML)
 			for _, code := range codes {
 				assert.NotContains(t, messages[0].HTML+messages[0].Text, code, "the notice carries no recovery code")
 			}
