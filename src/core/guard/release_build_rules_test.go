@@ -1,6 +1,6 @@
 package guard
 
-// Rule 9 reads every shipped main the way its release build compiles it: the production tag set and
+// Rule 8 reads every shipped main the way its release build compiles it: the production tag set and
 // every other tag free, on each of pkgload.ReleasePlatforms. Both halves of that are a premise about files the
 // guard never opens, the scripts and Dockerfiles a release builds with, so this test opens them: every
 // go build in them sets production, and each cross-compile script builds for exactly the platforms
@@ -843,7 +843,7 @@ func checkReleaseStamps(root string, builds []releaseBuild, graph *refgraph.Impo
 }
 
 // checkReleaseBuilds holds the release-build files under root to the shipped mains and release
-// platforms rule 9 reads, and returns what does not hold, sorted.
+// platforms rule 8 reads, and returns what does not hold, sorted.
 func checkReleaseBuilds(root string, builds []releaseBuild, mains []string, targets []pkgload.Platform) []string {
 	var findings []string
 
@@ -1839,9 +1839,9 @@ func TestReleaseBuilds_CrossCompile(t *testing.T) {
 // ---- the real tree --------------------------------------------------------------------------
 
 // TestReleaseBuilds_TheRealReleaseBuildsSetProduction holds this repository's release builds to the
-// premise rule 9 rests on: every go build a release runs sets production, the release builds listed
+// premise rule 8 rests on: every go build a release runs sets production, the release builds listed
 // name exactly the guard's shippedMains, and both cross-compile scripts build for exactly
-// pkgload.ReleasePlatforms, the one declaration rule 9 and the loader's release builds read.
+// pkgload.ReleasePlatforms, the one declaration rule 8 and the loader's release builds read.
 func TestReleaseBuilds_TheRealReleaseBuildsSetProduction(t *testing.T) {
 	assert.Empty(t, checkReleaseBuilds(SourceRoot(t), releaseBuilds, shippedMains, pkgload.ReleasePlatforms()))
 }

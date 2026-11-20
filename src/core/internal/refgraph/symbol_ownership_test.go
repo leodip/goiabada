@@ -2054,11 +2054,12 @@ func TestCheckOwnership_ADocumentThatCannotBeReadIsAnError(t *testing.T) {
 // file, and the prose around the table is untouched.
 func TestRenderSymbolOwnership_WritesTheComputedRowsAndKeepsTheAssertedOnes(t *testing.T) {
 	// The table on disk is wrong in both available directions: a computed row states the wrong
-	// word, and an asserted row carries a note only a human could have written.
+	// word, and an asserted row carries a note only a human could have written. The computed row
+	// carries a note too, which the regenerated word must not take away.
 	stale := symbolBaselineRows()
 	for i, r := range stale {
 		if strings.HasPrefix(r, "core/shared Widget ") {
-			stale[i] = "core/shared Widget reachable —"
+			stale[i] = "core/shared Widget reachable Named by both applications on purpose."
 		}
 	}
 	files := withSymbolBaseline(map[string]string{"core/OWNERSHIP.md": symbolOwnershipDoc(stale...)})
@@ -2069,7 +2070,7 @@ func TestRenderSymbolOwnership_WritesTheComputedRowsAndKeepsTheAssertedOnes(t *t
 
 	assert.Empty(t, unjustified)
 	assert.Contains(t, doc, "Preamble prose the parser never reads.")
-	assert.Contains(t, doc, "| `core/shared` | `Widget` | both-apps | — |")
+	assert.Contains(t, doc, "| `core/shared` | `Widget` | both-apps | Named by both applications on purpose. |")
 	assert.Contains(t, doc, "| `core/shared` | `Stable` | contract | A value the two processes agree on. |")
 	assert.Contains(t, doc, "| `core/shared` | `Departing` | moving | #385 carries it to the admin console. |")
 }

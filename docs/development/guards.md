@@ -103,23 +103,20 @@ golangci-lint run.
 ## Architecture guard
 
 `ARCHITECTURE.md` at the repository root records the allowed module edges, the intended final owner
-of every top-level `core` package, why each symbol in `core/builtin` is still there, the temporary
-exceptions to those rules, the third-party modules the admin console must not compile, and the
-packages no shipped binary may link. Its five tables are data, not prose: `AssertArchitecture` in
-`core/guard/architecture.go` parses them and checks four against the real import graph and the
-built-in identifiers table against every production reference to `core/builtin`; all three module
-unit tiers call it. The check runs in both directions, which is what makes the document a burn-down
-list rather than a wish — an edge the tables do not allow is a failure, and so is an exception left
-standing for an edge that no longer exists, so the issue that removes an edge has to remove its row
-with it (#332). A new top-level `core` package fails the tier until the table says where it belongs,
-and so does a new symbol in `core/builtin`, whose row has to name the strongest of `kernel`,
-`both-apps`, `moving` and `contract` that the reference graph backs (#351). A sixth table lives in
-`src/core/OWNERSHIP.md`, one row per exported symbol any `core` package declares:
-`core/guard.AssertSymbolOwnership` reads it from the same three tiers, four justifications are
-computed from the reference graph and three are asserted with a note the guard requires (#385). Rule
-9 walks the production closure of the three shipped mains, the auth server, the admin console and
-the setup wizard, and refuses `testing` and everything under it, `net/http/httptest` and every
-testify package, so a production import of a test helper or mock fails the unit tier rather than
+of every top-level `core` package, the temporary exceptions to those rules, the third-party modules
+the admin console must not compile, and the packages no shipped binary may link. Its four tables are
+data, not prose: `AssertArchitecture` in `core/guard/architecture.go` parses them and checks them
+against the real import graph; all three module unit tiers call it. The check runs in both
+directions, which is what makes the document a burn-down list rather than a wish — an edge the
+tables do not allow is a failure, and so is an exception left standing for an edge that no longer
+exists, so the issue that removes an edge has to remove its row with it (#332). A new top-level
+`core` package fails the tier until the table says where it belongs. A fifth table lives in
+`src/core/OWNERSHIP.md`, one row per exported symbol any `core` package declares, `core/builtin`'s
+among them: `core/guard.AssertSymbolOwnership` reads it from the same three tiers, four
+justifications are computed from the reference graph and three are asserted with a note the guard
+requires (#385). Rule 8 walks the production closure of the three shipped mains, the auth server,
+the admin console and the setup wizard, and refuses `testing` and everything under it,
+`net/http/httptest` and every testify package, so a production import of a test helper or mock fails the unit tier rather than
 reaching a release, `net/http/pprof` and `expvar`, which register the process's profiles and
 variables on Go's default mux the moment they are linked (#462), and `golang.org/x/tools`, the
 package loading `core/pkgload` reads the tree through, so the loader stays developer tooling (#420);

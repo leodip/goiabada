@@ -1,9 +1,9 @@
 # Core symbol ownership
 
 Every exported symbol a package under `src/core` declares has a row here saying why `core` declares
-it. `ARCHITECTURE.md` records the same thing two grains coarser — which module each top-level `core`
-package must end up in, and why each symbol in `core/builtin` is still there — and this table
-is the rest of that question, asked per symbol because that is the grain at which it decays.
+it. `ARCHITECTURE.md` records the same thing one grain coarser — which module each top-level `core`
+package must end up in — and this table is the rest of that question, asked per symbol because
+that is the grain at which it decays.
 
 Nothing else could catch what this catches. A package both processes genuinely share can still hide
 an implementation only one of them uses, and no import rule notices: `core/constants` reached 139
@@ -53,8 +53,8 @@ note names an issue; the reviewer does the rest.
 
 ## What is and is not a row
 
-- **Production files only**, which is what the justifications are about and the same reading rules 2,
-  3 and 7 of `ARCHITECTURE.md` already use. A test may name anything it likes from anywhere. The one
+- **Production files only**, which is what the justifications are about and the same reading rules 2
+  and 3 of `ARCHITECTURE.md` already use. A test may name anything it likes from anywhere. The one
   place a test reference decides anything is the second half of a `test-support` row.
 - **`test-support` asks a different question from the other six**, and deliberately: not "who names
   it" but "does a binary ship it", which is what `ARCHITECTURE.md`'s package table already says about
@@ -68,10 +68,16 @@ note names an issue; the reviewer does the rest.
   are two packages, so nothing hides in a subdirectory the table never enumerated. A package whose
   every file carries `//go:build !production` — the generated mock subpackages — declares nothing any
   build includes and has no rows.
-- **`core/builtin` is here too**, and is also the subject of `ARCHITECTURE.md`'s fourth table. That
-  table is stricter rather than looser: in a package of identifiers, an identifier its own sibling
-  names is not use at all, so `own-package` would be vacuous there. `core/buildinfo`, the build
-  stamp that left `core/constants` beside it, is held by this table alone (#442).
+- **`core/builtin` is read like every other package**, and this table alone holds its symbols.
+  `own-package` counts there as anywhere: an identifier its sibling `AuthServerPermissionIdentifiers`
+  lists is justified by that list, which is `both-apps`. `core/buildinfo`, the build stamp that left
+  `core/constants` beside it, is held here the same way (#442).
+- **No context key has a row**, `ContextKeySettings` included, because the two processes share
+  nothing but its spelling. Each declares its own, now an unexported key in that module's
+  `internal/reqctx` (#433, #440), and each asserts a different type out of it — `*record.Settings`
+  in the auth server against `*api.PublicSettingsResponse` in the admin console — so either
+  assertion panics on the other's value. It satisfied the letter of `both-apps`, and that row would
+  have been true and misleading (#351).
 
 **ceiling:** a reference from outside the declaring package is a selector on the identifier the
 import binds, resolved by name within the file. A package-level declaration shadowing that name is
@@ -332,17 +338,17 @@ command itself and fails on a tree it changed.
 | `core/buildinfo` | `BuildDate` | both-apps | — |
 | `core/buildinfo` | `GitCommit` | kernel | — |
 | `core/buildinfo` | `Version` | kernel | — |
-| `core/builtin` | `AdminConsoleClientIdentifier` | both-apps | — |
-| `core/builtin` | `AdminConsoleSessionName` | both-apps | — |
-| `core/builtin` | `AdminReadPermissionIdentifier` | own-package | — |
+| `core/builtin` | `AdminConsoleClientIdentifier` | both-apps | Both applications name it: the admin console signs in as this client, and the auth server seeds the client row under it, in `authserver/internal/bootstrap`, and tells the console's client apart from every other by it (#359, #424). |
+| `core/builtin` | `AdminConsoleSessionName` | both-apps | Both applications name it, and the two must agree on the string: the auth server's session backend stores the admin console's server-side sessions under it, at one production site, so a different spelling would write those sessions under a name the console does not read (#266). Its twin is not in core: nothing outside the auth server names `AuthServerSessionName`, which `authserver/internal/sessionkeys` declares. |
+| `core/builtin` | `AdminReadPermissionIdentifier` | own-package | A scope string a client asks for and a token carries. Outside core only the auth server names it, in its routes, its administrative scope set and the bootstrap seeder, so it is `own-package` on the strength of `AuthServerPermissionIdentifiers`, which lists it and is `both-apps`: the admin console reads every built-in permission through that list, and moving the four granular identifiers out beside it would spell the scope strings twice with nothing holding the two spellings equal (#359, #424). |
 | `core/builtin` | `AuthServerPermissionIdentifiers` | both-apps | — |
 | `core/builtin` | `AuthServerResourceIdentifier` | both-apps | — |
 | `core/builtin` | `BrowserSessionsPermissionIdentifier` | both-apps | — |
 | `core/builtin` | `ManageAccountPermissionIdentifier` | both-apps | — |
-| `core/builtin` | `ManageClientsPermissionIdentifier` | own-package | — |
+| `core/builtin` | `ManageClientsPermissionIdentifier` | own-package | A scope string a client asks for and a token carries. Outside core only the auth server names it, in its routes, its administrative scope set and the bootstrap seeder, so it is `own-package` on the strength of `AuthServerPermissionIdentifiers`, which lists it and is `both-apps`: the admin console reads every built-in permission through that list, and moving the four granular identifiers out beside it would spell the scope strings twice with nothing holding the two spellings equal (#359, #424). |
 | `core/builtin` | `ManagePermissionIdentifier` | both-apps | — |
-| `core/builtin` | `ManageSettingsPermissionIdentifier` | own-package | — |
-| `core/builtin` | `ManageUsersPermissionIdentifier` | own-package | — |
+| `core/builtin` | `ManageSettingsPermissionIdentifier` | own-package | A scope string a client asks for and a token carries. Outside core only the auth server names it, in its routes, its administrative scope set and the bootstrap seeder, so it is `own-package` on the strength of `AuthServerPermissionIdentifiers`, which lists it and is `both-apps`: the admin console reads every built-in permission through that list, and moving the four granular identifiers out beside it would spell the scope strings twice with nothing holding the two spellings equal (#359, #424). |
+| `core/builtin` | `ManageUsersPermissionIdentifier` | own-package | A scope string a client asks for and a token carries. Outside core only the auth server names it, in its routes, its administrative scope set and the bootstrap seeder, so it is `own-package` on the strength of `AuthServerPermissionIdentifiers`, which lists it and is `both-apps`: the admin console reads every built-in permission through that list, and moving the four granular identifiers out beside it would spell the scope strings twice with nothing holding the two spellings equal (#359, #424). |
 | `core/countries` | `All` | kernel | — |
 | `core/countries` | `ByAlpha2` | contract | The lookup half of the country table whose other half the admin console uses. Moving it would put one ISO 3166 dataset in two places. |
 | `core/countries` | `Country` | kernel | — |
@@ -766,15 +772,15 @@ command itself and fails on a tree it changed.
 | `core/internal/refgraph` | `ExemptByBuildConstraint` | kernel | — |
 | `core/internal/refgraph` | `Flatten` | kernel | — |
 | `core/internal/refgraph` | `ImportGraph` | kernel | — |
-| `core/internal/refgraph` | `JustificationBothApps` | kernel | — |
-| `core/internal/refgraph` | `JustificationContract` | kernel | — |
-| `core/internal/refgraph` | `JustificationKernel` | kernel | — |
-| `core/internal/refgraph` | `JustificationMoving` | kernel | — |
-| `core/internal/refgraph` | `LocalImportName` | kernel | — |
+| `core/internal/refgraph` | `JustificationBothApps` | own-package | — |
+| `core/internal/refgraph` | `JustificationContract` | own-package | — |
+| `core/internal/refgraph` | `JustificationKernel` | own-package | — |
+| `core/internal/refgraph` | `JustificationMoving` | own-package | — |
+| `core/internal/refgraph` | `LocalImportName` | own-package | — |
 | `core/internal/refgraph` | `ModulePath` | kernel | — |
 | `core/internal/refgraph` | `OwnershipCheck` | own-package | — |
 | `core/internal/refgraph` | `RenderSymbolOwnership` | kernel | — |
-| `core/internal/refgraph` | `SelectedNames` | kernel | — |
+| `core/internal/refgraph` | `SelectedNames` | own-package | — |
 | `core/internal/refgraph` | `TableUnder` | kernel | — |
 | `core/internal/refgraph` | `Unparen` | kernel | — |
 | `core/issuerlength` | `Check` | contract | The one bound on an issuer's length. The setup wizard, which is not one of the two applications, writes the auth server URL the first start seeds as the issuer, and the auth server refuses to start on one longer than the general settings save would keep, so the bound is defined once here for the start, the save and the wizard rather than copied into each (#615). |

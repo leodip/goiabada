@@ -1,7 +1,7 @@
 // Package pkgload loads a module's packages type-checked, through golang.org/x/tools/go/packages,
 // for one build: the machine's own, or one of the release builds a release ships. It is the one
 // loader the guards that need types read the tree through, in place of a hand-written importer
-// each (#420), and it holds the one declaration of the release platforms, which rule 9 of
+// each (#420), and it holds the one declaration of the release platforms, which rule 8 of
 // ARCHITECTURE.md and the release-build test read too.
 //
 // It is an exported leaf rather than part of core/internal/refgraph because the auth server's

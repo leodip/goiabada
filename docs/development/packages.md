@@ -42,7 +42,7 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   every call, the admin console's client identifier, and its session name in `session_name.go`. No
   context key and no other session key: each process declares its own, the auth server and the admin
   console alike their context keys in `internal/reqctx` and their session keys in
-  `internal/sessionkeys`, and no row of `ARCHITECTURE.md`'s table here reads `kernel` any more. It
+  `internal/sessionkeys`, and none of its rows in `src/core/OWNERSHIP.md` reads `kernel`. It
   was `core/constants` until #442 moved the build stamp to `buildinfo/` (#351, #385, #433, #440,
   #442)
 - `cmd/` - `ownershipdump`, which regenerates `OWNERSHIP.md`'s table from the reference graph. It
@@ -220,7 +220,7 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   package that does not load or type-check as an error naming it, and a build that selects no
   package as `ErrNoPackages`. It holds the one declaration of the release platforms,
   `ReleasePlatforms`, and their release builds, `ReleaseBuilds` (the `production` tag, cgo off),
-  which rule 9 and the release-build test read too, and `MakeLoadable`, which gives a fixture tree's
+  which rule 8 and the release-build test read too, and `MakeLoadable`, which gives a fixture tree's
   go.mod files a go line and each other module by its directory. It imports neither `testing` nor
   testify, and the refused-packages table keeps `golang.org/x/tools` out of every shipped binary
   (#420)

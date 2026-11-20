@@ -16,6 +16,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -208,4 +209,26 @@ func TestImportBinding_EveryInTreeWatchedPathCarriesItsDirectory(t *testing.T) {
 				table, path)
 		}
 	}
+}
+
+// declaredPackageName returns the package clause a directory's production files carry, or "" when
+// none of them parses. It is what an unaliased import of that directory binds, which is the name
+// TestImportBinding_EveryWatchedPackageIsNamedAsTheTableSays holds each watched table to.
+func declaredPackageName(dir string) string {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return ""
+	}
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".go") || strings.HasSuffix(entry.Name(), "_test.go") {
+			continue
+		}
+		fset := token.NewFileSet()
+		file, pErr := parser.ParseFile(fset, filepath.Join(dir, entry.Name()), nil, parser.PackageClauseOnly)
+		if pErr != nil {
+			continue
+		}
+		return file.Name.Name
+	}
+	return ""
 }
