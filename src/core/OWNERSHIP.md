@@ -776,11 +776,9 @@ command itself and fails on a tree it changed.
 | `core/internal/refgraph` | `JustificationContract` | own-package | — |
 | `core/internal/refgraph` | `JustificationKernel` | own-package | — |
 | `core/internal/refgraph` | `JustificationMoving` | own-package | — |
-| `core/internal/refgraph` | `LocalImportName` | moving | #420 deletes it: the census resolves references by object now, and nothing calls it. |
 | `core/internal/refgraph` | `ModulePath` | kernel | — |
 | `core/internal/refgraph` | `OwnershipCheck` | own-package | — |
 | `core/internal/refgraph` | `RenderSymbolOwnership` | kernel | — |
-| `core/internal/refgraph` | `SelectedNames` | moving | #420 deletes it: the census resolves references by object now, and nothing calls it. |
 | `core/internal/refgraph` | `TableUnder` | kernel | — |
 | `core/internal/refgraph` | `Unparen` | kernel | — |
 | `core/issuerlength` | `Check` | contract | The one bound on an issuer's length. The setup wizard, which is not one of the two applications, writes the auth server URL the first start seeds as the issuer, and the auth server refuses to start on one longer than the general settings save would keep, so the bound is defined once here for the start, the save and the wizard rather than copied into each (#615). |

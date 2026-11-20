@@ -5,7 +5,6 @@ import (
 	"go/build/constraint"
 	"go/token"
 	"sort"
-	"strings"
 )
 
 // ExemptByBuildConstraint reports whether the file's //go:build expression cannot be true in any
@@ -106,62 +105,4 @@ func Unparen(expr ast.Expr) ast.Expr {
 		}
 		expr = paren.X
 	}
-}
-
-// LocalImportName returns the identifier a file binds an import path to. A blank or dot import
-// binds no identifier a selector can name, so neither counts as a reference.
-//
-// declared is the package clause of the imported package, which is what Go binds when the import
-// carries no alias -- the last segment of the path is only the usual spelling of it, not the rule.
-// A caller that does not know the name passes "" and gets that usual spelling; the two differ
-// exactly when a package is named for something other than its directory, and there every
-// reference to it would otherwise be read as no reference at all. Final review round 3, finding 5.
-func LocalImportName(file *ast.File, importPath, declared string) (string, bool) {
-	for _, spec := range file.Imports {
-		if spec.Path == nil || strings.Trim(spec.Path.Value, `"`) != importPath {
-			continue
-		}
-		if spec.Name == nil {
-			if declared != "" {
-				return declared, true
-			}
-			return importPath[strings.LastIndex(importPath, "/")+1:], true
-		}
-		if spec.Name.Name == "_" || spec.Name.Name == "." {
-			return "", false
-		}
-		return spec.Name.Name, true
-	}
-	return "", false
-}
-
-// SelectedNames lists the exported symbols selected off the given identifier.
-func SelectedNames(file *ast.File, local string) []string {
-	seen := map[string]bool{}
-	ast.Inspect(file, func(n ast.Node) bool {
-		sel, ok := n.(*ast.SelectorExpr)
-		if !ok {
-			return true
-		}
-		ident, ok := sel.X.(*ast.Ident)
-		if !ok || ident.Name != local {
-			return true
-		}
-		// A non-nil Obj means the parser resolved the name to a declaration in this file, so it is
-		// something shadowing the import rather than the package.
-		if ident.Obj != nil {
-			return true
-		}
-		if sel.Sel.IsExported() {
-			seen[sel.Sel.Name] = true
-		}
-		return true
-	})
-
-	names := make([]string, 0, len(seen))
-	for name := range seen {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	return names
 }
