@@ -80,10 +80,13 @@ host_paths = [".placido", ".claude", ".codex", ".mcp.json", "src/.devcontainer",
 # so its review is in once CI concludes. Codex's security review reports no check and
 # runs only when the pull request opens: it took 7.5 minutes on #868, against CI's 10,
 # so placido waits until the pull request is 30 minutes old and reads a last time.
-# Placido answers their comments, fixes what holds in the pull request, and drafts the
-# rest as follow-ups; what their comments look like is in
-# .placido/notes/review-comments.md.
+# Placido answers their comments, fixes what holds in the pull request, drafts the rest
+# as follow-ups, and replies to every comment; what their comments look like is in
+# .placido/notes/review-comments.md. CodeRabbit reviews each push, so the passes loop:
+# two fix whatever holds, then up to five in all while blocking or significant
+# findings come up.
 [review_comments]
-accounts = ["coderabbitai[bot]", "chatgpt-codex-connector[bot]"]
-passes   = 2       # their first reviews, then CodeRabbit's review of placido's fixes
-wait     = "30m"   # for Codex, which may comment after CI concludes
+accounts   = ["coderabbitai[bot]", "chatgpt-codex-connector[bot]"]
+passes     = 2       # their first reviews, then CodeRabbit's review of placido's fixes
+max_passes = 5       # more of CodeRabbit's reviews of the fixes, while they find serious problems
+wait       = "30m"   # for Codex, which may comment after CI concludes
