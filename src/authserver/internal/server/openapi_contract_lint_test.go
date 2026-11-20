@@ -3224,6 +3224,92 @@ func (c *Clocked) Check() func(http.Handler) http.Handler {
 	}
 }
 
+// Each Go file has its own imports, so a name is read as the package the file it stands in imports
+// under it, whichever order a package's files sort in. Here the middleware's file and the helper's
+// file declaring Recorder import log/slog as logging, while a sibling file of each, sorting before
+// or after them, imports the project's core/logging under the same name. The logger and the
+// recorder, whose type the helper's file names apart from the function returning it, stay outside
+// the walk, and the writer beside them is read as answering 422.
+func TestRouteChains_AnImportIsReadInTheFileThatSpellsIt(t *testing.T) {
+	for _, sibling := range []string{"a_bookkeeping.go", "z_bookkeeping.go"} {
+		t.Run(sibling, func(t *testing.T) {
+			root := t.TempDir()
+			routeShapesFixture(t, root, "\tlogged := middleware.NewLogged()\n"+
+				"\tpages.With(logged.Check()).Get(\"/logged\", apihandlers.HandleOkGet())\n")
+			bookkeeping := `
+
+import "github.com/leodip/goiabada/core/logging"
+
+func bookkeeping() {
+	logging.Record("bookkeeping")
+}
+`
+			writeDocFixture(t, root, "internal/middleware/"+sibling, "package middleware"+bookkeeping)
+			writeDocFixture(t, root, "internal/helper/"+sibling, "package helper"+bookkeeping)
+			writeDocFixture(t, root, "internal/helper/m_types.go", `package helper
+
+import logging "log/slog"
+
+type Recorder = logging.Logger
+`)
+			writeDocFixture(t, root, "internal/helper/recorder.go", `package helper
+
+func NewRecorder() *Recorder {
+	return &Recorder{}
+}
+`)
+			writeDocFixture(t, root, "internal/middleware/m_logged.go", `package middleware
+
+import (
+	logging "log/slog"
+	"net/http"
+
+	"github.com/leodip/goiabada/authserver/internal/helper"
+)
+
+type Logged struct {
+	logger   *logging.Logger
+	recorder *helper.Recorder
+	refusals writer
+}
+
+func NewLogged() *Logged {
+	logger := logging.Default()
+	return &Logged{logger: logger, recorder: helper.NewRecorder(), refusals: unprocessable{}}
+}
+
+func (l *Logged) Check() func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			l.logger.Info("refused")
+			l.recorder.Info("refused")
+			l.refusals.refuse(w)
+		})
+	}
+}
+`)
+			routes, handlers, report := fixtureRouteChains(t, root, 1, 1)
+			if report.Failed() {
+				t.Fatalf("a logger and a recorder of log/slog left the mount unread: %+v", report)
+			}
+			chains := map[string][]int{}
+			for _, r := range routes {
+				chains[r.key] = sortedKeysInt(r.chain)
+			}
+			assertChains(t, chains, map[string][]int{"get /logged": {422}})
+
+			ids := map[string]string{"get /logged": "getLogged"}
+			report = guard.Run(func(r guard.Reporter) {
+				assertDeclaresEveryStatus(r, routes, handlers, declaringEach(ids, 200))
+			})
+			if report.Stopped || len(report.Errors) != 1 ||
+				!strings.Contains(report.Errors[0], "getLogged (GET /logged) can answer 422 from logged.Check") {
+				t.Errorf("a spec omitting the 422 of a writer beside a logger did not fail once: %+v", report)
+			}
+		})
+	}
+}
+
 // A name in a method's body is its receiver only where it refers to the receiver's declaration, so
 // a local or a function literal's parameter of the same name is not read with the binding the
 // receiver's constructor gave it: a method of the package called through one is reported, rather
@@ -4459,14 +4545,24 @@ type goPackage struct {
 	funcs   map[string][]funcSource // plain functions, by name
 	methods map[string][]funcSource // methods, by Type.name
 	plain   map[string]bool
-	imports map[string]string        // the names its files import packages under, to each one's import path
-	types   map[string]*ast.TypeSpec // the types it declares, by name
+	types   map[string]typeSource // the types it declares, by name
 }
 
+// fileImports is the names one source file imports packages under, to each one's import path. Each
+// Go file has its own, so a name is read as the file it stands in imports it.
+type fileImports map[string]string
+
 type funcSource struct {
-	path string
-	fset *token.FileSet
-	decl *ast.FuncDecl
+	path    string
+	fset    *token.FileSet
+	decl    *ast.FuncDecl
+	imports fileImports // of the file declaring it
+}
+
+// typeSource is a type a package declares, with the imports of the file declaring it.
+type typeSource struct {
+	spec    *ast.TypeSpec
+	imports fileImports
 }
 
 // fieldBinding is the type a constructor gave a value, and the same for each field it filled with
@@ -4493,7 +4589,7 @@ func (c *chainResolver) pkg(dir string) *goPackage {
 	}
 	p := &goPackage{
 		funcs: map[string][]funcSource{}, methods: map[string][]funcSource{},
-		plain: map[string]bool{}, imports: map[string]string{}, types: map[string]*ast.TypeSpec{},
+		plain: map[string]bool{}, types: map[string]typeSource{},
 	}
 	c.pkgs[dir] = p
 	entries, err := os.ReadDir(dir)
@@ -4513,6 +4609,7 @@ func (c *chainResolver) pkg(dir string) *goPackage {
 			c.err = fmt.Errorf("parsing %s: %w", path, err)
 			return p
 		}
+		imports := fileImports{}
 		for _, spec := range file.Imports {
 			imported, err := strconv.Unquote(spec.Path.Value)
 			if err != nil {
@@ -4522,13 +4619,13 @@ func (c *chainResolver) pkg(dir string) *goPackage {
 			if spec.Name != nil {
 				name = spec.Name.Name
 			}
-			p.imports[name] = imported
+			imports[name] = imported
 		}
 		for _, decl := range file.Decls {
 			if gen, ok := decl.(*ast.GenDecl); ok && gen.Tok == token.TYPE {
 				for _, spec := range gen.Specs {
 					if ts, ok := spec.(*ast.TypeSpec); ok {
-						p.types[ts.Name.Name] = ts
+						p.types[ts.Name.Name] = typeSource{spec: ts, imports: imports}
 					}
 				}
 			}
@@ -4536,7 +4633,7 @@ func (c *chainResolver) pkg(dir string) *goPackage {
 			if !ok || fn.Body == nil {
 				continue
 			}
-			src := funcSource{path: filepath.ToSlash(path), fset: fset, decl: fn}
+			src := funcSource{path: filepath.ToSlash(path), fset: fset, decl: fn, imports: imports}
 			if fn.Recv == nil {
 				p.funcs[fn.Name.Name] = append(p.funcs[fn.Name.Name], src)
 				p.plain[fn.Name.Name] = true
@@ -4639,7 +4736,7 @@ func (c *chainResolver) entry(m mountedEntry, depth int) (string, *goPackage, ch
 		if len(ctors) != 1 {
 			break
 		}
-		binding, ok := constructed(c, ctors[0].decl, p, map[string]bool{ctorSel.Sel.Name: true})
+		binding, ok := constructed(c, ctors[0], p, map[string]bool{ctorSel.Sel.Name: true})
 		method := binding.typ + "." + x.Sel.Name
 		if !ok || len(p.methods[method]) == 0 {
 			break
@@ -4663,7 +4760,8 @@ func (c *chainResolver) entry(m mountedEntry, depth int) (string, *goPackage, ch
 // constructor returning anything else, or returning two values that fill one field with different
 // types, is not read, rather than read from another literal of the type, such as one it builds and
 // discards. visiting names the constructors whose reading led here, this one included.
-func constructed(c *chainResolver, ctor *ast.FuncDecl, p *goPackage, visiting map[string]bool) (fieldBinding, bool) {
+func constructed(c *chainResolver, src funcSource, p *goPackage, visiting map[string]bool) (fieldBinding, bool) {
+	ctor := src.decl
 	if ctor.Type.Results == nil || len(ctor.Type.Results.List) == 0 {
 		return fieldBinding{}, false
 	}
@@ -4752,7 +4850,7 @@ func constructed(c *chainResolver, ctor *ast.FuncDecl, p *goPackage, visiting ma
 		return fieldBinding{}, false
 	}
 	writes, branched := fieldWrites(ctor.Body, scopes)
-	fill := fieldFiller{c: c, p: p, scopes: scopes, locals: locals, writes: writes, branched: branched, visiting: visiting}
+	fill := fieldFiller{c: c, p: p, imports: src.imports, scopes: scopes, locals: locals, writes: writes, branched: branched, visiting: visiting}
 	out := fieldBinding{typ: typ, fields: map[string]fieldBinding{}}
 	for _, ret := range returns {
 		lit, ok := returnedLiteral(ret.expr, ret.decl, locals, typ)
@@ -4950,6 +5048,7 @@ func (b fieldBinding) key() string {
 type fieldFiller struct {
 	c        *chainResolver
 	p        *goPackage
+	imports  fileImports                 // of the constructor's file
 	scopes   scopeIndex                  // the constructor's declarations, which hide a function of p within their scope
 	locals   map[*declaration][]ast.Expr // each declaration with every value assigned to it, as constructed reads them
 	writes   []fieldWrite
@@ -5170,14 +5269,14 @@ func (f fieldFiller) value(e ast.Expr) (binding fieldBinding, bound bool) {
 				if typ, named := typeName(results.List[0].Type); named && types.Universe.Lookup(typ) == nil {
 					visiting := maps.Clone(f.visiting)
 					visiting[id.Name] = true
-					binding, ok := constructed(f.c, decls[0].decl, f.p, visiting)
+					binding, ok := constructed(f.c, decls[0], f.p, visiting)
 					if !ok {
 						return fieldBinding{unread: true}, true
 					}
 					return binding, true
 				}
 			}
-			if !f.resultOutside(f.p, decls[0].decl.Type) {
+			if !f.resultOutside(f.p, decls[0].imports, decls[0].decl.Type) {
 				return fieldBinding{unread: true}, true
 			}
 			break
@@ -5194,9 +5293,9 @@ func (f fieldFiller) value(e ast.Expr) (binding fieldBinding, bound bool) {
 	return fieldBinding{}, false
 }
 
-// importedCall reports whether call calls a function of a package p imports, pkg.F(...), or a
-// method on what such a call returns, pkg.F(...).M(...), at any depth, rather than a method of a
-// parameter's or another value's.
+// importedCall reports whether call calls a function of a package the constructor's file imports,
+// pkg.F(...), or a method on what such a call returns, pkg.F(...).M(...), at any depth, rather than
+// a method of a parameter's or another value's.
 func (f fieldFiller) importedCall(call *ast.CallExpr) bool {
 	fun := ast.Unparen(call.Fun)
 	for {
@@ -5208,7 +5307,7 @@ func (f fieldFiller) importedCall(call *ast.CallExpr) bool {
 		case *ast.SelectorExpr:
 			switch y := ast.Unparen(x.X).(type) {
 			case *ast.Ident:
-				_, imported := f.p.imports[y.Name]
+				_, imported := f.imports[y.Name]
 				return imported && f.scopes.at(y) == nil
 			case *ast.CallExpr:
 				fun = ast.Unparen(y.Fun)
@@ -5325,7 +5424,7 @@ func (f fieldFiller) outside(e ast.Expr) bool {
 		switch callee := ast.Unparen(x.Fun).(type) {
 		case *ast.Ident:
 			if lit := f.calledLiteral(x); lit != nil {
-				return f.resultOutside(f.p, lit.Type)
+				return f.resultOutside(f.p, f.imports, lit.Type)
 			}
 			if d := f.scopes.at(callee); d != nil {
 				_, assigned := f.locals[d]
@@ -5333,29 +5432,30 @@ func (f fieldFiller) outside(e ast.Expr) bool {
 			}
 			if f.p.plain[callee.Name] {
 				decls := f.p.funcs[callee.Name]
-				return len(decls) == 1 && f.resultOutside(f.p, decls[0].decl.Type)
+				return len(decls) == 1 && f.resultOutside(f.p, decls[0].imports, decls[0].decl.Type)
 			}
 			universe := types.Universe.Lookup(callee.Name)
 			_, isType := universe.(*types.TypeName)
 			_, isBuiltin := universe.(*types.Builtin)
 			return isType || isBuiltin && callee.Name != "new"
 		case *ast.FuncLit:
-			return f.resultOutside(f.p, callee.Type)
+			return f.resultOutside(f.p, f.imports, callee.Type)
 		case *ast.SelectorExpr:
-			t, ok := f.c.callResult(f.p, x, f.scopes)
+			t, ok := f.c.callResult(f.imports, x, f.scopes)
 			return ok && f.c.declaredOutside(f.p, t)
 		}
 	}
 	return false
 }
 
-// resultOutside reports whether a function of q with signature fn returns nothing a walk of p can
-// reach through: no result, or a first result of a type typeOutside reads as outside p.
-func (f fieldFiller) resultOutside(q *goPackage, fn *ast.FuncType) bool {
+// resultOutside reports whether a function of q with signature fn, spelled in a file with the
+// imports imports, returns nothing a walk of p can reach through: no result, or a first result of a
+// type typeOutside reads as outside p.
+func (f fieldFiller) resultOutside(q *goPackage, imports fileImports, fn *ast.FuncType) bool {
 	if fn.Results == nil || len(fn.Results.List) == 0 {
 		return true
 	}
-	return f.c.typeOutside(f.p, q, fn.Results.List[0].Type, typeParamNames(fn.TypeParams), map[string]bool{})
+	return f.c.typeOutside(f.p, q, imports, fn.Results.List[0].Type, typeParamNames(fn.TypeParams), map[string]bool{})
 }
 
 // typeParamNames is the names a type parameter list declares.
@@ -5372,31 +5472,32 @@ func typeParamNames(list *ast.FieldList) map[string]bool {
 	return out
 }
 
-// typeOutside reports whether a value of the type t spells in package q's source holds nothing a
-// walk of p can reach through: a type that is neither an interface, which may hold a writer of p,
-// nor a type parameter, which is whatever its caller chose, nor a type of p. A predeclared type
-// such as string, a struct, map, slice, function or channel type spelled in place, a pointer to
-// one, and a named type of another package whose definition is one of those, are outside. A named
-// type of a package under internal is read from its source, and one of another package from the
-// compiled standard library, so an interface such as any or error, or a type the lint cannot find,
-// is not outside. seen names the types of q being read, so a recursive one is read once.
-func (c *chainResolver) typeOutside(p, q *goPackage, t ast.Expr, typeParams, seen map[string]bool) bool {
+// typeOutside reports whether a value of the type t spells in package q's source, in a file with the
+// imports imports, holds nothing a walk of p can reach through: a type that is neither an
+// interface, which may hold a writer of p, nor a type parameter, which is whatever its caller
+// chose, nor a type of p. A predeclared type such as string, a struct, map, slice, function or
+// channel type spelled in place, a pointer to one, and a named type of another package whose
+// definition is one of those, are outside. A named type of a package under internal is read from
+// its source, in the file declaring it, and one of another package from the compiled standard
+// library, so an interface such as any or error, or a type the lint cannot find, is not outside.
+// seen names the types of q being read, so a recursive one is read once.
+func (c *chainResolver) typeOutside(p, q *goPackage, imports fileImports, t ast.Expr, typeParams, seen map[string]bool) bool {
 	switch x := ast.Unparen(t).(type) {
 	case *ast.StarExpr:
-		return c.typeOutside(p, q, x.X, typeParams, seen)
+		return c.typeOutside(p, q, imports, x.X, typeParams, seen)
 	case *ast.Ident:
 		if typeParams[x.Name] {
 			return false
 		}
-		if spec, declared := q.types[x.Name]; declared {
-			if q == p || spec.TypeParams != nil {
+		if declared, isDeclared := q.types[x.Name]; isDeclared {
+			if q == p || declared.spec.TypeParams != nil {
 				return false
 			}
 			if seen[x.Name] {
 				return true
 			}
 			seen[x.Name] = true
-			return c.typeOutside(p, q, spec.Type, nil, seen)
+			return c.typeOutside(p, q, declared.imports, declared.spec.Type, nil, seen)
 		}
 		named, isType := types.Universe.Lookup(x.Name).(*types.TypeName)
 		return isType && !types.IsInterface(named.Type())
@@ -5405,12 +5506,12 @@ func (c *chainResolver) typeOutside(p, q *goPackage, t ast.Expr, typeParams, see
 		if !isIdent {
 			return false
 		}
-		path, imported := q.imports[root.Name]
+		path, imported := imports[root.Name]
 		if !imported {
 			return false
 		}
 		if r, ok := c.internalPkg(path); ok {
-			return c.typeOutside(p, r, ast.NewIdent(x.Sel.Name), nil, map[string]bool{})
+			return c.typeOutside(p, r, nil, ast.NewIdent(x.Sel.Name), nil, map[string]bool{})
 		}
 		pkg, ok := c.stdPackage(path)
 		if !ok {
@@ -5426,36 +5527,39 @@ func (c *chainResolver) typeOutside(p, q *goPackage, t ast.Expr, typeParams, see
 
 // declaredType is a type a function or method declares as its first result: one of the compiled
 // standard library, std, where isStd is set, and otherwise as package q's source spells it, expr,
-// with the type parameters the declaration names. A nil std or expr is no result.
+// in a file with the imports imports, with the type parameters the declaration names. A nil std or
+// expr is no result.
 type declaredType struct {
 	isStd      bool
 	std        types.Type
 	q          *goPackage
+	imports    fileImports
 	expr       ast.Expr
 	typeParams map[string]bool
 }
 
-// sourceResult is the first result fn, a declaration of q, declares.
-func sourceResult(q *goPackage, fn *ast.FuncType) declaredType {
-	t := declaredType{q: q, typeParams: typeParamNames(fn.TypeParams)}
+// sourceResult is the first result src, a declaration of q, declares.
+func sourceResult(q *goPackage, src funcSource) declaredType {
+	fn := src.decl.Type
+	t := declaredType{q: q, imports: src.imports, typeParams: typeParamNames(fn.TypeParams)}
 	if fn.Results != nil && len(fn.Results.List) > 0 {
 		t.expr = fn.Results.List[0].Type
 	}
 	return t
 }
 
-// callResult is the declared first result of call: a call of a function of a package p imports,
-// pkg.F(...), or of a method on what such a call returns, pkg.F(...).M(...), at any depth. A package
-// under internal is read from its source, and any other from the compiled standard library. It is
-// false for any other call, and for one whose function or method the lint cannot find, such as a
-// method a type gains by embedding.
-func (c *chainResolver) callResult(p *goPackage, call *ast.CallExpr, scopes scopeIndex) (declaredType, bool) {
+// callResult is the declared first result of call, which stands in a file with the imports imports:
+// a call of a function of a package the file imports, pkg.F(...), or of a method on what such a call
+// returns, pkg.F(...).M(...), at any depth. A package under internal is read from its source, and
+// any other from the compiled standard library. It is false for any other call, and for one whose
+// function or method the lint cannot find, such as a method a type gains by embedding.
+func (c *chainResolver) callResult(imports fileImports, call *ast.CallExpr, scopes scopeIndex) (declaredType, bool) {
 	sel, ok := ast.Unparen(call.Fun).(*ast.SelectorExpr)
 	if !ok {
 		return declaredType{}, false
 	}
 	if root, isIdent := ast.Unparen(sel.X).(*ast.Ident); isIdent {
-		path, imported := p.imports[root.Name]
+		path, imported := imports[root.Name]
 		if !imported || scopes.at(root) != nil {
 			return declaredType{}, false
 		}
@@ -5464,7 +5568,7 @@ func (c *chainResolver) callResult(p *goPackage, call *ast.CallExpr, scopes scop
 			if len(decls) != 1 {
 				return declaredType{}, false
 			}
-			return sourceResult(q, decls[0].decl.Type), true
+			return sourceResult(q, decls[0]), true
 		}
 		pkg, loaded := c.stdPackage(path)
 		if !loaded {
@@ -5477,7 +5581,7 @@ func (c *chainResolver) callResult(p *goPackage, call *ast.CallExpr, scopes scop
 	if !isCall {
 		return declaredType{}, false
 	}
-	recv, ok := c.callResult(p, inner, scopes)
+	recv, ok := c.callResult(imports, inner, scopes)
 	if !ok {
 		return declaredType{}, false
 	}
@@ -5496,14 +5600,14 @@ func (c *chainResolver) callResult(p *goPackage, call *ast.CallExpr, scopes scop
 	if !named || recv.typeParams[typ] {
 		return declaredType{}, false
 	}
-	if spec, declared := recv.q.types[typ]; !declared || spec.TypeParams != nil {
+	if declared, isDeclared := recv.q.types[typ]; !isDeclared || declared.spec.TypeParams != nil {
 		return declaredType{}, false
 	}
 	methods := recv.q.methods[typ+"."+sel.Sel.Name]
 	if len(methods) != 1 {
 		return declaredType{}, false
 	}
-	return sourceResult(recv.q, methods[0].decl.Type), true
+	return sourceResult(recv.q, methods[0]), true
 }
 
 // declaredOutside reports whether a value of the declared type t holds nothing a walk of p can
@@ -5515,7 +5619,7 @@ func (c *chainResolver) declaredOutside(p *goPackage, t declaredType) bool {
 	if t.expr == nil {
 		return true
 	}
-	return c.typeOutside(p, t.q, t.expr, t.typeParams, map[string]bool{})
+	return c.typeOutside(p, t.q, t.imports, t.expr, t.typeParams, map[string]bool{})
 }
 
 // stdResult is the first result of a call of obj, a function or a type's conversion, nil for a
