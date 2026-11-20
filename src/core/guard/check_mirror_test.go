@@ -22,9 +22,10 @@ package guard
 // A job that pulls runs only when the Versions job succeeded: its if: holds no status function,
 // always(), failure(), cancelled() or success(), any of which replaces the implicit success() check
 // of the jobs it needs, or success() is an operand of the && that joins the whole condition,
-// (a && b) && c counting as a && b && c, so the condition requires it. The Versions job runs
-// mirror.sh missing alone in its step's script, in the foreground, so its exit status is the
-// step's. A docker logout from Docker Hub between the Release workflow's login and its Buildx
+// (a && b) && c counting as a && b && c, so the condition requires it. Actions binds && more
+// tightly than ||, so success() && a || b requires no success(), and success() && (a || b) does.
+// The Versions job runs mirror.sh missing alone in its step's script, in the foreground, so its
+// exit status is the step's. A docker logout from Docker Hub between the Release workflow's login and its Buildx
 // undoes the login.
 //
 // Jobs' containers, services, needs and if:, and steps' fields and scripts, are read as YAML reads
@@ -69,9 +70,11 @@ var (
 	standaloneMirrorCheck = regexp.MustCompile(`^(\./)?` + regexp.QuoteMeta(mirrorScript) + `[ \t]+missing$`)
 )
 
-// conjuncts are an expression's operands of && outside parentheses and quoted strings, each with the
-// parentheses that wrap all of it removed and its own operands of && in its place: (a && b) && c
-// gives a, b and c.
+// conjuncts are the operands an expression requires: its operands of && outside parentheses and
+// quoted strings, each with the parentheses that wrap all of it removed and its own operands of &&
+// in its place, so (a && b) && c gives a, b and c. Actions binds && more tightly than ||, so an
+// expression with || outside parentheses and quoted strings, a && b || c, requires none of its
+// operands and is returned whole.
 func conjuncts(expression string) []string {
 	expression = strings.TrimSpace(expression)
 	for len(expression) > 1 && expression[0] == '(' && closingParenthesis(expression) == len(expression)-1 {
@@ -88,6 +91,8 @@ func conjuncts(expression string) []string {
 			depth++
 		case c == ')':
 			depth--
+		case depth == 0 && strings.HasPrefix(expression[i:], "||"):
+			return []string{expression}
 		case depth == 0 && strings.HasPrefix(expression[i:], "&&"):
 			parts = append(parts, expression[start:i])
 			start, i = i+2, i+1
@@ -527,7 +532,7 @@ func checkRegistryFindings(file, text string, pins map[string]string, mirrored m
 				condition, _ := yamlScalar(v)
 				if m := statusFunction.FindStringSubmatch(condition); m != nil && !requiresSuccess(condition) {
 					add(n, "%s runs under %s(), which drops the check that the jobs it needs succeeded, so it can pull after the Versions job has found a tag missing: "+
-						"write the if: with no status function, or with success() && before the rest, so the job runs only when Versions succeeded", at(n), m[1])
+						"write the if: with no status function, or as success() && (<the rest>), so the job runs only when Versions succeeded", at(n), m[1])
 				}
 			}
 		}
@@ -1023,6 +1028,21 @@ func TestCheckWorkflow_RegistryFindings(t *testing.T) {
 	t.Run("a job that pulls under success() and an event condition passes", func(t *testing.T) {
 		assertFindings(t, findings(edit(t, "    needs: versions\n    strategy:\n",
 			"    needs: versions\n    if: (Success ( ) && !cancelled()) && (github.event_name != 'pull_request' || github.event.pull_request.draft == false)\n    strategy:\n")))
+	})
+	t.Run("a job that pulls when success() binds only the left side of ||", func(t *testing.T) {
+		assertFindings(t, findings(edit(t, "    needs: versions\n    strategy:\n",
+			"    needs: versions\n    if: success() && github.event_name != 'pull_request' || github.event.pull_request.draft == false\n    strategy:\n")),
+			"check mirror: check.yml:15 (tests) runs under success(), which drops the check that the jobs it needs succeeded, so it can pull after the Versions job has found a tag missing: "+
+				"write the if: with no status function, or as success() && (<the rest>), so the job runs only when Versions succeeded")
+	})
+	t.Run("a job that pulls under success() and a grouped event condition passes", func(t *testing.T) {
+		assertFindings(t, findings(edit(t, "    needs: versions\n    strategy:\n",
+			"    needs: versions\n    if: success() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false)\n    strategy:\n")))
+	})
+	t.Run("a job that pulls when a grouped success() binds only one side of ||", func(t *testing.T) {
+		assertFindings(t, findings(edit(t, "    needs: versions\n    strategy:\n",
+			"    needs: versions\n    if: (success() && inputs.full || github.event.pull_request.draft == false) && inputs.other\n    strategy:\n")),
+			"check mirror: check.yml:15 (tests) runs under success(), which drops the check")
 	})
 	t.Run("a job that pulls when success() or another status function holds", func(t *testing.T) {
 		assertFindings(t, findings(edit(t, "    needs: versions\n    strategy:\n", "    needs: versions\n    if: success() || failure()\n    strategy:\n")),
