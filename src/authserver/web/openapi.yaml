@@ -1252,6 +1252,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GetGroupsResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -1738,6 +1740,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GetResourcesResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -1991,6 +1995,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GetLegalDocumentsResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -2343,6 +2349,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GetBrandsResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -2566,6 +2574,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GetBrandThemesResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -2813,6 +2823,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GetEmailTemplatesResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -2840,6 +2852,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GetEmailTemplateResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -2915,6 +2929,8 @@ paths:
       responses:
         '204':
           description: The language is the built-in text
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -3032,6 +3048,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GetClientsResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -4248,6 +4266,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SettingsGeneralResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -4342,6 +4362,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SettingsEmailResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -4547,6 +4569,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SettingsTurnstileResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -4607,6 +4631,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SettingsSessionsResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -4660,6 +4686,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SettingsTokensResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -4706,6 +4734,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SettingsAuditLogsResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -4760,6 +4790,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GetSettingsKeysResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -4780,6 +4812,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -4871,6 +4905,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GetPhoneCountriesResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -4959,6 +4995,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GetAuditEventTypesResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -4982,6 +5020,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GetUserResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -5381,6 +5421,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AccountRecoveryCodesResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -5554,6 +5596,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UserExportResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           description: |
             Missing or invalid access token (`ACCESS_TOKEN_REQUIRED`, `INVALID_TOKEN`), a refused
@@ -5595,6 +5639,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GetUserConsentsResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -5656,6 +5702,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GetLegalDocumentAcceptancesResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -5681,6 +5729,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GetUserSessionsResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -5775,6 +5825,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ProfilePictureInfoResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -5835,6 +5887,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -6212,10 +6266,17 @@ components:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
     BadRequest:
-      description: Invalid request body or parameters
+      description: Invalid request body or parameters, or a malformed bearer request (INVALID_REQUEST)
       headers:
         WWW-Authenticate:
-          description: Bearer challenge when token transport is malformed; ordinary validation errors omit it.
+          description: |
+            On a malformed bearer request, such as a repeated `Authorization` header or a token
+            sent in the header and the body, the challenge of each scheme the request used, Bearer
+            first, each carrying `error="invalid_request"`: Bearer, DPoP or both, and Bearer when
+            it used neither. Each `Authorization` header uses its own scheme, and an
+            `access_token` parameter in a URL-encoded POST body uses Bearer when the body parses;
+            a body that does not parse uses none. An ordinary validation error carries no
+            challenge.
           schema:
             type: string
       content:

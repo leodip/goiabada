@@ -75,7 +75,7 @@ That's every tier below, the data and integration tiers on all four databases, s
 | `modules` | `internal`, `core` and `adminconsole` together |
 | `data` | The data layer against a real database |
 | `integration` | End-to-end tests against a running auth server, which the script builds, starts and stops |
-| `lint` | The linters, and the checks that generated files are committed |
+| `lint` | The linters, the checks that generated files are committed, and a check that a Go client generated from the OpenAPI document compiles |
 | `all` | Everything. The default |
 
 For example, the three unit tiers:

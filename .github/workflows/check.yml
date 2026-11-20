@@ -351,6 +351,16 @@ jobs:
             exit 1
           fi
 
+      # Every other check on web/openapi.yaml compares it with this repository's
+      # Go source, so a document that passes them all could still generate a
+      # client that does not compile, as it did under oapi-codegen's default
+      # settings (#261). This generates a Go client from the served document
+      # with oapi-codegen, fetched and built at its versions.yaml pin, and builds
+      # and vets it; nothing generated is kept. run-tests.sh's lint tier runs the
+      # same script, so a contributor sees what this step sees.
+      - name: A Go client generated from openapi.yaml compiles
+        run: src/authserver/check-openapi-client.sh
+
       # No compiled binary belongs in the tree, and until #187 two did:
       # src/cmd/goiabada-setup/goiabada-setup and
       # src/cmd/goiabada-setup/build/goiabada-setup-linux-amd64, both outputs of
