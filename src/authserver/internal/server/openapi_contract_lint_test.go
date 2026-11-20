@@ -3479,7 +3479,7 @@ func (c *chainResolver) statuses(e mountedEntry) (map[int]bool, bool) {
 	if !ok || c.err != nil {
 		return nil, false
 	}
-	if cached, ok := c.cache[key]; ok {
+	if cached, hit := c.cache[key]; hit {
 		return cached, true
 	}
 	out, ok := c.walk(p, start)
