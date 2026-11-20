@@ -296,7 +296,7 @@ This is every event the auth server writes, grouped by what raises it. The viewe
 |---|---|
 | `logout` | A user signed out and their session ended. A sign-out confirmed with no session to end writes it too. |
 | `deleted_user_session_client` | A client signed a user out, and was removed from the user's session. The session ends only when no other client is left on it. |
-| `revoked_sign_out_grants` | A client signed a user out with an `id_token_hint`, and its refresh tokens tied to that session and its authorization codes from it not yet redeemed were revoked. It's written beside `deleted_user_session_client`, and names the client, the session, the tokens revoked and how many codes. |
+| `revoked_sign_out_grants` | A client signed a user out with an `id_token_hint` the auth server confirmed, and its refresh tokens tied to that session and its authorization codes from it not yet redeemed were revoked. It's written beside `deleted_user_session_client`, and names the client, the session, the tokens revoked and how many codes. |
 | `deleted_user_session` | A session was deleted by a sign-in, a sign-out, its user or an administrator. Its `reason` says which: see [Why a session was deleted](#why-a-session-was-deleted). |
 | `terminated_user_session` | A session was ended by an administrator, by its own user, or by another user signing in on the same browser, and its codes and refresh tokens were revoked. |
 | `sent_logout_token` | The auth server sent a logout token to an app's [back-channel logout URI](/concepts/clients/#back-channel-logout), telling it a user's session ended. It's written once the delivery finishes, so its `outcome` and `attempts` say whether the app was told. A delivery dropped because too many were already running writes none. |

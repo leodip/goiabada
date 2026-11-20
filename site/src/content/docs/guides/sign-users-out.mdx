@@ -56,7 +56,7 @@ With the ID token as its hint, a sign-out ends your app's part of the user's ses
 
 A sign-out with no hint, or with one the auth server can't confirm, asks the user "Do you want to sign out?" first, and when they click **Sign out**, it ends the whole session, every client's part of it. RP-Initiated Logout, the OpenID Connect standard the endpoint follows, asks for that, since anyone can send a browser to `/auth/logout`. [Ending sessions](/concepts/ending-sessions/#signing-out) has the precise rules.
 
-When your client has a [back-channel logout URI](#get-told-when-a-session-ends), a sign-out with the hint sends your app a [logout token](/reference/endpoints/back-channel-logout/#the-logout-token), a signed message saying the session ended, for its part of the session too, after it has already ended its own. Answer it with `200` like any other. A sign-out with no hint sends one to every app on the session.
+When your client has a [back-channel logout URI](#get-told-when-a-session-ends), a sign-out with the hint sends your app a [logout token](/reference/endpoints/back-channel-logout/#the-logout-token), a signed message saying the session ended, for its part of the session too, after it has already ended its own. Answer it with `200` like any other. A sign-out with no hint, or with one the auth server can't confirm, sends a logout token to every app on the session.
 
 An ID token that has expired still works as a hint while the session it came from is there, so a user who leaves your app open all day can still sign out without the question.
 
