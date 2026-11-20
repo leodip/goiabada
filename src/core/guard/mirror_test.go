@@ -135,7 +135,8 @@ case "$url" in
             blobs='"config":{"digest":"sha256:9999999999999999999999999999999999999999999999999999999999999999"},"layers":[{"digest":"sha256:8888888888888888888888888888888888888888888888888888888888888888"}]'
             [ "$ref" != sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd ] ||
                 blobs='"config":{"digest":"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"},"layers":[{"digest":"sha256:1111111111111111111111111111111111111111111111111111111111111111"},{"digest":"sha256:2222222222222222222222222222222222222222222222222222222222222222"}]'
-            printf 'HTTP/2 200 \r\ncontent-type: application/vnd.oci.image.manifest.v1+json\r\n\r\n{"schemaVersion":2,"mediaType":"application/vnd.oci.image.manifest.v1+json",%s}\n' "$blobs"
+            printf 'HTTP/2 200 \r\ncontent-type: application/vnd.oci.image.manifest.v1+json\r\n\r\n'
+            [ $head = 1 ] || printf '{"schemaVersion":2,"mediaType":"application/vnd.oci.image.manifest.v1+json",%s}\n' "$blobs"
         elif [ ! -f "$f" ]; then
             printf 'HTTP/2 404 \r\ncontent-type: application/json\r\n\r\n'
         elif [ $head = 1 ]; then
@@ -702,7 +703,7 @@ func TestMirrorPublic_EveryTagReadAnonymouslyPasses(t *testing.T) {
 	run := runMirror(t, "public", mirrorVersions, publicRegistry())
 	assert.True(t, run.ok, "public failed with every package public:\n%s", run.out)
 	assert.Empty(t, run.errors())
-	assertAnonymousReads(t, run, nil)
+	assertAnonymousReads(t, run, nil, nil)
 	assertCurlReadsNoConfig(t, run)
 }
 
@@ -726,7 +727,7 @@ func TestMirrorPublic_ASinglePlatformImageIsReadThroughItsManifest(t *testing.T)
 	registry.single = []string{"leodip/goiabada-ci/mailpit"}
 	run := runMirror(t, "public", mirrorVersions, registry)
 	assert.True(t, run.ok, "public failed with every package public:\n%s", run.out)
-	assertAnonymousReads(t, run, nil)
+	assertAnonymousReads(t, run, nil, registry.single)
 }
 
 // A package that is not public is named once, however many of its tags were refused, with where to
@@ -742,7 +743,7 @@ func TestMirrorPublic_APackageNotPublicIsNamedOnceWithHowToMakeItPublic(t *testi
 	assert.Contains(t, errs[0], "https://github.com/users/leodip/packages/container/goiabada-ci%2Fgolang/settings")
 	assert.Contains(t, errs[1], "ghcr.io/leodip/goiabada-ci/buildkit refused an anonymous read")
 	assert.Contains(t, errs[1], "https://github.com/users/leodip/packages/container/goiabada-ci%2Fbuildkit/settings")
-	assertAnonymousReads(t, run, []string{"leodip/goiabada-ci/golang", "leodip/goiabada-ci/buildkit"})
+	assertAnonymousReads(t, run, registry.private, nil)
 }
 
 // A request is taken for a package that is not public only when the registry refused it for want of
@@ -799,43 +800,39 @@ func TestMirrorPublic_AStalledRequestFailsItsTagAndTheOthersAreStillRead(t *test
 	assert.Contains(t, run.out, "read ghcr.io/leodip/goiabada-ci/buildkit:buildx-stable-1 anonymously")
 }
 
-// assertAnonymousReads holds run to reading every tag of the list anonymously, as a pull on the
-// runner does but without downloading a layer: no login, each tag's token, its manifest, and for a
-// package outside refused a HEAD of the linux/amd64 image's config and each of its layers, and no
-// other platform's.
-func assertAnonymousReads(t *testing.T, run mirrorRun, refused []string) {
+// assertAnonymousReads holds run to reading every tag of the list anonymously, one after another,
+// as a pull on the runner does but without downloading a layer: for each, with no login, a token,
+// a GET of the tag's manifest and, unless the package is in single, of its linux/amd64 image's, and
+// a HEAD of that image's config and each of its layers; a package in refused stops at its token.
+func assertAnonymousReads(t *testing.T, run mirrorRun, refused, single []string) {
 	t.Helper()
-	blobs := map[string][]string{}
-	tokens := map[string]bool{}
+	var want, got []string
+	for _, tag := range mirrorTags {
+		i := strings.LastIndex(tag[1], ":")
+		repo, name := strings.TrimPrefix(tag[1][:i], "ghcr.io/"), tag[1][i+1:]
+		want = append(want, "GET https://ghcr.io/token?service=ghcr.io&scope=repository:"+repo+":pull")
+		if slices.Contains(refused, repo) {
+			continue
+		}
+		want = append(want, "GET https://ghcr.io/v2/"+repo+"/manifests/"+name)
+		if !slices.Contains(single, repo) {
+			want = append(want, "GET https://ghcr.io/v2/"+repo+"/manifests/"+mirrorDigest('d'))
+		}
+		for _, blob := range []byte("c12") {
+			want = append(want, "HEAD https://ghcr.io/v2/"+repo+"/blobs/"+mirrorDigest(blob))
+		}
+	}
 	for _, c := range run.calls {
 		require.True(t, strings.HasPrefix(c, "curl "), "public ran %s", c)
 		assert.NotContains(t, c, "--netrc", "a request that may be logged in: %s", c)
-		url := strings.Fields(strings.Split(c, " stdin=")[0])
-		target := url[len(url)-1]
-		switch {
-		case strings.HasPrefix(target, "https://ghcr.io/token?"):
-			repo := strings.TrimSuffix(strings.SplitN(target, "scope=repository:", 2)[1], ":pull")
-			tokens[repo] = true
-		case strings.Contains(target, "/blobs/"):
-			assert.Contains(t, c, " --head ", "a blob read whole: %s", c)
-			repo := strings.SplitN(strings.TrimPrefix(target, "https://ghcr.io/v2/"), "/blobs/", 2)
-			blobs[repo[0]] = append(blobs[repo[0]], repo[1])
-		case strings.Contains(target, "/manifests/"):
-		default:
-			t.Errorf("public asked %s", target)
+		words := strings.Fields(strings.Split(c, " stdin=")[0])
+		method := "GET"
+		if slices.Contains(words, "--head") {
+			method = "HEAD"
 		}
+		got = append(got, method+" "+words[len(words)-1])
 	}
-	amd64 := []string{mirrorDigest('c'), mirrorDigest('1'), mirrorDigest('2')}
-	for _, tag := range mirrorTags {
-		repo := strings.TrimPrefix(tag[1][:strings.LastIndex(tag[1], ":")], "ghcr.io/")
-		assert.True(t, tokens[repo], "public asked no token for %s", repo)
-		if slices.Contains(refused, repo) {
-			assert.Empty(t, blobs[repo], "public read the blobs of %s, which refused its token", repo)
-			continue
-		}
-		read := slices.Compact(slices.Sorted(slices.Values(blobs[repo])))
-		assert.Equal(t, slices.Sorted(slices.Values(amd64)), read, "the blobs of %s read", repo)
-	}
+	assert.Equal(t, want, got)
 }
 
 // ---- the workflow ----------------------------------------------------------------------------
