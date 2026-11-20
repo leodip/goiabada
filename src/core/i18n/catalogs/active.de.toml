@@ -153,7 +153,7 @@
 "consent.scope.attributes.description" = "Die Attribute, die Ihnen in der Verwaltung zugewiesen wurden"
 "consent.scope.offline_access.description" = "Den Zugriff auch in Ihrer Abwesenheit behalten, ohne Sie erneut zu fragen"
 "consent.scope.permission_template" = "Berechtigung {{.permission}} für Ressource {{.resource}}"
-"consent.scope.authserver_manage_account.description" = "Ihr Konto für Sie verwalten: Profil, Telefonnummer, Adresse und Bild ändern, Ihre Sitzungen anzeigen und beenden sowie erteilte Zustimmungen widerrufen. Änderungen an Ihrer E-Mail-Adresse, Ihrem Passwort oder Ihrer Zwei-Faktor-Authentifizierung erfordern weiterhin Ihr Passwort."
+"consent.scope.authserver_manage_account.description" = "Ihr Konto für Sie verwalten: Profil, Telefonnummer, Adresse und Bild ändern, Ihre Sitzungen anzeigen und beenden sowie die mit Ihrem Konto verbundenen Anwendungen anzeigen und trennen. Änderungen an Ihrer E-Mail-Adresse, Ihrem Passwort oder Ihrer Zwei-Faktor-Authentifizierung erfordern weiterhin Ihr Passwort."
 
 # --- Logout confirmation (auth/logout) --------------------------------------
 
@@ -757,7 +757,7 @@
 # --- Account applications ---------------------------------------------------
 
 "adminconsole.account.applications.page_title" = "Anwendungen"
-"adminconsole.account.applications.intro" = "Die Anwendungen, die Ihr Konto verwenden können, und worauf jede von ihnen zugreifen kann."
+"adminconsole.account.applications.intro" = "Die mit Ihrem Konto verbundenen Anwendungen und der Zugriff, den jede von ihnen erhalten hat."
 "adminconsole.account.applications.col_application" = "Anwendung"
 "adminconsole.account.applications.unverified_tag" = "Ungeprüft"
 "adminconsole.account.applications.unverified_note" = "Diese Anwendung hat sich selbst registriert und wurde nicht überprüft."
@@ -771,10 +771,10 @@
 "adminconsole.account.applications.disconnect_button" = "Trennen"
 "adminconsole.account.applications.disconnected_label" = "Getrennt"
 "adminconsole.account.applications.disconnected" = "Anwendung getrennt."
-"adminconsole.account.applications.empty" = "Keine Anwendung kann Ihr Konto verwenden."
+"adminconsole.account.applications.empty" = "Keine Anwendung ist mit Ihrem Konto verbunden."
 "adminconsole.account.applications.modal_confirm_title" = "Diese Anwendung trennen?"
-"adminconsole.account.applications.disconnect_confirm" = "Möchten Sie {{.client}} trennen? Die Anwendung verliert auf allen Geräten den Zugriff auf Ihr Konto und wird aufgefordert, Sie abzumelden. Sie kann Sie weiterhin bitten, sich erneut anzumelden."
-"adminconsole.account.applications.disconnect_confirm_unverified" = "Möchten Sie {{.client}} trennen? Diese Anwendung hat sich selbst registriert und wurde nicht überprüft. Sie verliert auf allen Geräten den Zugriff auf Ihr Konto und wird aufgefordert, Sie abzumelden. Sie kann Sie weiterhin bitten, sich erneut anzumelden."
+"adminconsole.account.applications.disconnect_confirm" = "Möchten Sie {{.client}} trennen? Die Anwendung verliert auf allen Geräten den Zugriff auf Ihr Konto, und wir versuchen, sie aufzufordern, Sie abzumelden. Sie kann Sie weiterhin bitten, sich erneut anzumelden."
+"adminconsole.account.applications.disconnect_confirm_unverified" = "Möchten Sie {{.client}} trennen? Diese Anwendung hat sich selbst registriert und wurde nicht überprüft. Sie verliert auf allen Geräten den Zugriff auf Ihr Konto, und wir versuchen, sie aufzufordern, Sie abzumelden. Sie kann Sie weiterhin bitten, sich erneut anzumelden."
 "adminconsole.account.legal_documents.page_title" = "Rechtsdokumente"
 "adminconsole.account.legal_documents.intro" = "Die Rechtsdokumente, die Sie bei der Anmeldung bei einer Anwendung akzeptiert haben."
 "adminconsole.account.legal_documents.col_document" = "Dokument"

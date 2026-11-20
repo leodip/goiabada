@@ -57,6 +57,9 @@ type narrowWrite struct {
 	// error.
 	answer     any
 	statements []string
+	// statementsOn is the statements on an engine whose own differ from statements, such as
+	// MySQL's locking read of a union.
+	statementsOn map[data.Dialect][]string
 }
 
 // inTx runs write inside a transaction, for the writes that refuse to run outside one.
@@ -487,7 +490,7 @@ func assertNarrowWriteOn(t *testing.T, w narrowWrite, dialect data.Dialect, elid
 	var execs, queries int
 	for _, query := range script.statements {
 		var args []driver.Value
-		if strings.HasPrefix(query, "SELECT") {
+		if strings.HasPrefix(strings.TrimPrefix(query, "("), "SELECT") {
 			require.Less(t, queries, len(script.queryArgs))
 			args = script.queryArgs[queries]
 			queries++
@@ -504,7 +507,11 @@ func assertNarrowWriteOn(t *testing.T, w narrowWrite, dialect data.Dialect, elid
 		problems = append(problems, found...)
 	}
 	assert.Empty(t, problems, "\n%s", strings.Join(problems, "\n"))
-	assert.Equal(t, w.statements, got)
+	want := w.statements
+	if own, differs := w.statementsOn[dialect]; differs {
+		want = own
+	}
+	assert.Equal(t, want, got)
 }
 
 // The renderer's own cases: without them the test above would pass on a renderer that had stopped

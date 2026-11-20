@@ -59,6 +59,37 @@ func TestRender_UserConnectedClientsTabLabelsEachScopeListItHas(t *testing.T) {
 	assert.NotContains(t, both, notAsked)
 }
 
+// Each row names the client by the name the user is shown for it, with its identifier beside it to
+// tell clients apart (#135 decision 7). A client whose name is its identifier shows the identifier
+// once, and a client that named itself, whose name is then its stored description, shows that
+// description once under the identifier.
+func TestRender_UserConnectedClientsTabNamesEachClient(t *testing.T) {
+	out := renderMenuPageIn(t, "/admin_users_connected_clients.html", connectedClientsBind([]render.ConnectedClientInfo{
+		{ClientId: 1, Client: "review-calendar", ClientName: "Review calendar", ClientDescription: "Team calendar", GrantScope: "openid"},
+		{ClientId: 2, Client: "portal", ClientName: "portal", GrantScope: "openid"},
+		{ClientId: 3, Client: "dcr_a3f9", ClientName: "Payroll Portal", ClientNameUnverified: true,
+			ClientDescription: "Payroll Portal", GrantScope: "openid"},
+	}), "en", true)
+	rows := applicationRows(t, out)
+	require.Len(t, rows, 3)
+
+	named := rows[0]
+	assert.Contains(t, named, `<span class="font-semibold">Review calendar</span>`)
+	assert.Contains(t, named, `<span class="cell-secondary font-mono text-sm">review-calendar</span>`,
+		"the identifier stays visible beside the name")
+	assert.Contains(t, named, `<span class="cell-secondary">Team calendar</span>`)
+
+	unnamed := rows[1]
+	assert.Contains(t, unnamed, `<span class="font-mono text-sm">portal</span>`)
+	assert.NotContains(t, unnamed, "font-semibold", "a name that is the identifier is not shown twice")
+	assert.Equal(t, 1, strings.Count(unnamed, ">portal<"))
+
+	selfNamed := rows[2]
+	assert.Contains(t, selfNamed, `<span class="font-mono text-sm">dcr_a3f9</span>`)
+	assert.NotContains(t, selfNamed, "font-semibold")
+	assert.Equal(t, 1, strings.Count(selfNamed, ">Payroll Portal<"), "the self-given name is the description, shown once")
+}
+
 // scopeItems is the scopes a fragment of a row of the tab lists, in order, one list item each.
 func scopeItems(fragment string) []string {
 	var scopes []string

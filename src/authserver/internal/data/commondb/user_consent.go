@@ -64,6 +64,16 @@ var selectUserConsentByUserIdAndClientId = statement{
 	mssql:    "SELECT " + userConsentColumns.mssql + " FROM user_consents WHERE user_id = @p1 AND client_id = @p2",
 }
 
+// selectUserConsentByUserIdAndClientIdForUpdate is the locking read
+// GetConsentByUserIdAndClientIdForUpdate runs, the lock in each engine's own grammar, as
+// selectUserByIdForUpdate spells it.
+var selectUserConsentByUserIdAndClientIdForUpdate = statement{
+	sqlite:   "SELECT " + userConsentColumns.sqlite + " FROM user_consents WHERE user_id = ? AND client_id = ?",
+	mysql:    "SELECT " + userConsentColumns.mysql + " FROM user_consents WHERE user_id = ? AND client_id = ? FOR UPDATE",
+	postgres: "SELECT " + userConsentColumns.postgres + " FROM user_consents WHERE user_id = $1 AND client_id = $2 FOR UPDATE",
+	mssql:    "SELECT " + userConsentColumns.mssql + " FROM user_consents WITH (UPDLOCK, ROWLOCK) WHERE user_id = @p1 AND client_id = @p2",
+}
+
 var selectUserConsentsByUserId = statement{
 	sqlite:   "SELECT " + userConsentColumns.sqlite + " FROM user_consents WHERE user_id = ?",
 	mysql:    "SELECT " + userConsentColumns.mysql + " FROM user_consents WHERE user_id = ?",
@@ -142,6 +152,27 @@ func (d *Database) GetUserConsentById(ctx context.Context, tx *sql.Tx, userConse
 
 func (d *Database) GetConsentByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (*record.UserConsent, error) {
 	return queryOne(ctx, d, tx, selectUserConsentByUserIdAndClientId.text(d.Dialect), []any{userId, clientId},
+		scanUserConsent, "userConsent")
+}
+
+// GetConsentByUserIdAndClientIdForUpdate reads the user's consent to the client as last committed
+// and takes its row for the rest of the caller's transaction: a locking read, where
+// GetConsentByUserIdAndClientId is a consistent one. A disconnect reads the consent it deletes
+// this way (#135 decision 1). Under MySQL's REPEATABLE READ a consistent read answers the
+// snapshot the transaction's first read fixed, and the disconnect reads the client and the user's
+// sessions before it, so a consent given in between would survive a disconnect that reported
+// success. The lock is each engine's own, as GetUserByIdForUpdate's is: FOR UPDATE on MySQL and
+// PostgreSQL, UPDLOCK and ROWLOCK on SQL Server, none on SQLite, which has no row locks.
+//
+// A transaction is required, for the reason GetUserByIdForUpdate gives.
+func (d *Database) GetConsentByUserIdAndClientIdForUpdate(ctx context.Context, tx *sql.Tx, userId int64,
+	clientId int64) (*record.UserConsent, error) {
+
+	if tx == nil {
+		return nil, errs.New("a locking read of a consent requires a transaction: an autocommitted statement releases the row before the caller can decide on it")
+	}
+
+	return queryOne(ctx, d, tx, selectUserConsentByUserIdAndClientIdForUpdate.text(d.Dialect), []any{userId, clientId},
 		scanUserConsent, "userConsent")
 }
 

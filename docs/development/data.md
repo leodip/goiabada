@@ -66,6 +66,13 @@ Preserve the row locks that make security decisions atomic:
   reading the user's grants. The rule is MySQL's; the other engines' ordinary reads fix no snapshot.
   On PostgreSQL the disable's lookup also makes it wait for a sign-in inserting a session, which
   holds a key-share lock on the user's row, so it ends that session too.
+- A disconnect (`revocation.DisconnectClientTx`) reads the client and the user's sessions before it
+  sweeps, which on MySQL fixes the snapshot. So it reads the consent it deletes with
+  `GetConsentByUserIdAndClientIdForUpdate`, and `GetRefreshTokensByUserIdAndClientId` is a
+  `FOR UPDATE` read on MySQL, of the tokens and the codes it joins through: a grant or a consent
+  committed after the first read is ended too. It and the hinted sign-out flip tokens with
+  `MarkRefreshTokenAsRevoked` and report only the rows they moved, so two overlapping calls never
+  both report one token (#135, `disconnect_current_read_test.go`).
 - Refresh rotation takes the user's row first (`AcquireUserRow`), as credential changes do through
   their write and generation increment. A rotation cannot stamp a child from a token a revocation
   already moved past, and the revocation's sweep cannot miss that child (#131).

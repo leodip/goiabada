@@ -27,7 +27,7 @@ type connectedClientsDatabase interface {
 
 	DeleteUserConsent(ctx context.Context, tx *sql.Tx, userConsentId int64) (bool, error)
 	GetClientById(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error)
-	GetConsentByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (*record.UserConsent, error)
+	GetConsentByUserIdAndClientIdForUpdate(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (*record.UserConsent, error)
 	GetConsentsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserConsent, error)
 	GetLiveGrantsByUserId(ctx context.Context, tx *sql.Tx, userId int64, now time.Time) ([]record.LiveGrant, error)
 }
@@ -128,14 +128,15 @@ func connectedClientsOf(ctx context.Context, database connectedClientsDatabase, 
 func disconnectClient(ctx context.Context, database connectedClientsDatabase, userId int64, clientId int64,
 	settings *record.Settings) (revocation.DisconnectResult, int64, error) {
 
-	// The consent is read inside the transaction, as its first step, so a consent given between
-	// the request's reads and its sweep is deleted with the rest. The body can run again after a
-	// deadlock, so the id is set afresh on each attempt.
+	// The consent is read inside the transaction, with a locking read, so a consent given between
+	// the request's reads and its sweep is deleted with the rest: on MySQL an ordinary read would
+	// answer the snapshot the transaction's earlier read of the client fixed (#135 decision 1). The
+	// body can run again after a deadlock, so the id is set afresh on each attempt.
 	var consentId int64
 	result, err := revocation.DisconnectClientTx(ctx, database, userId, clientId,
 		sessionLive(settings), func(tx *sql.Tx) (bool, error) {
 			consentId = 0
-			consent, getErr := database.GetConsentByUserIdAndClientId(ctx, tx, userId, clientId)
+			consent, getErr := database.GetConsentByUserIdAndClientIdForUpdate(ctx, tx, userId, clientId)
 			if getErr != nil || consent == nil {
 				return false, getErr
 			}

@@ -203,16 +203,20 @@ var selectRefreshTokensByUserId = statement{
 }
 
 // selectRefreshTokensByUserIdAndClientId binds the user id and the client id once per branch: the
-// code's, then the token's.
+// code's, then the token's. MySQL's is a locking read, FOR UPDATE in each parenthesized branch, so
+// it answers the rows as last committed (see GetRefreshTokensByUserIdAndClientId). It locks the
+// codes the first branch joins through as well as the tokens: InnoDB answers a joined table the
+// locking clause does not name from the snapshot, which would miss the code of a grant committed
+// after it.
 var selectRefreshTokensByUserIdAndClientId = statement{
 	sqlite: "SELECT " + refreshTokenColumns.sqlite + " FROM refresh_tokens INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
 		"WHERE codes.user_id = ? AND codes.client_id = ? " +
 		"UNION ALL SELECT " + refreshTokenColumns.sqlite + " FROM refresh_tokens " +
 		"WHERE refresh_tokens.user_id = ? AND refresh_tokens.client_id = ?",
-	mysql: "SELECT " + refreshTokenColumns.mysql + " FROM refresh_tokens INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
-		"WHERE codes.user_id = ? AND codes.client_id = ? " +
-		"UNION ALL SELECT " + refreshTokenColumns.mysql + " FROM refresh_tokens " +
-		"WHERE refresh_tokens.user_id = ? AND refresh_tokens.client_id = ?",
+	mysql: "(SELECT " + refreshTokenColumns.mysql + " FROM refresh_tokens INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
+		"WHERE codes.user_id = ? AND codes.client_id = ? FOR UPDATE) " +
+		"UNION ALL (SELECT " + refreshTokenColumns.mysql + " FROM refresh_tokens " +
+		"WHERE refresh_tokens.user_id = ? AND refresh_tokens.client_id = ? FOR UPDATE)",
 	postgres: "SELECT " + refreshTokenColumns.postgres + " FROM refresh_tokens INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
 		"WHERE codes.user_id = $1 AND codes.client_id = $2 " +
 		"UNION ALL SELECT " + refreshTokenColumns.postgres + " FROM refresh_tokens " +
@@ -815,6 +819,17 @@ func (d *Database) GetLiveGrantsByUserId(ctx context.Context, tx *sql.Tx, userId
 // Revoked rows are returned on purpose, beside the live ones: the withdrawal records the
 // rotation family of every row it reads, and a family whose stored members are all revoked
 // can still have a child mid-rotation that only that record refuses.
+//
+// The rows are read as last committed, whatever the caller's transaction read before. The
+// difference is MySQL's: under InnoDB's REPEATABLE READ an ordinary read answers the snapshot
+// the transaction's first read fixed, and the disconnect reads the client and the user's
+// sessions before it sweeps, so a grant committed in between would be left live by a
+// disconnect that reported success (#135 decision 1). MySQL's statement is therefore a locking
+// read, FOR UPDATE on the refresh_tokens rows, which the sweep writes next anyway, and on the
+// codes the authorization-code branch joins through, for the reason its statement gives: FOR SHARE
+// would have two overlapping disconnects each hold a shared lock the other's write waits for.
+// On PostgreSQL and SQL Server at READ COMMITTED each statement reads what was committed when
+// it started, and SQLite has one writer at a time, so their statements take no lock.
 //
 // Built as two UNION ALL branches for the reason GetRefreshTokensByUserId is: the shapes
 // are mutually exclusive, so the union cannot produce duplicates, and each branch can

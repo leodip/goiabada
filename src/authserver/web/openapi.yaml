@@ -5801,8 +5801,10 @@ paths:
         URI, naming the user alone; a client that requires `sid` is sent one for each of the user's
         still-valid sessions it is on, and nothing when it is on none.
 
-        The client the calling token was issued to is disconnected like any other, and that token
-        is refused from then on.
+        The client the calling token was issued to is disconnected like any other. The calling
+        token is refused from then on when it belongs to one of the grants the call revoked; a token
+        from the implicit flow belongs to no grant and keeps working until it expires or its
+        session ends.
 
         Answers 404 when the client does not exist, or when the user held nothing with it to end;
         such a call changes nothing and tells nobody.

@@ -150,7 +150,7 @@
 "consent.scope.attributes.description" = "The attributes an administrator has assigned to you"
 "consent.scope.offline_access.description" = "Keep access while you're away, without asking you again"
 "consent.scope.permission_template" = "Permission {{.permission}} on resource {{.resource}}"
-"consent.scope.authserver_manage_account.description" = "Manage your account for you: change your profile, phone, address and picture, see and sign out your sessions, and withdraw consents you have given. Changing your email, password or two-factor authentication still needs your password."
+"consent.scope.authserver_manage_account.description" = "Manage your account for you: change your profile, phone, address and picture, see and sign out your sessions, and see and disconnect the applications connected to your account. Changing your email, password or two-factor authentication still needs your password."
 
 # --- Logout confirmation (auth/logout) --------------------------------------
 
@@ -754,7 +754,7 @@
 # --- Account applications ---------------------------------------------------
 
 "adminconsole.account.applications.page_title" = "Applications"
-"adminconsole.account.applications.intro" = "The applications that can use your account, and what each one can access."
+"adminconsole.account.applications.intro" = "The applications connected to your account, and the access each one was given."
 "adminconsole.account.applications.col_application" = "Application"
 "adminconsole.account.applications.unverified_tag" = "Unverified"
 "adminconsole.account.applications.unverified_note" = "This application registered itself and has not been verified."
@@ -768,10 +768,10 @@
 "adminconsole.account.applications.disconnect_button" = "Disconnect"
 "adminconsole.account.applications.disconnected_label" = "Disconnected"
 "adminconsole.account.applications.disconnected" = "Application disconnected."
-"adminconsole.account.applications.empty" = "No application can use your account."
+"adminconsole.account.applications.empty" = "No application is connected to your account."
 "adminconsole.account.applications.modal_confirm_title" = "Disconnect this application?"
-"adminconsole.account.applications.disconnect_confirm" = "Disconnect {{.client}}? It will lose access to your account on every device, and will be asked to sign you out. It can still ask you to sign in again."
-"adminconsole.account.applications.disconnect_confirm_unverified" = "Disconnect {{.client}}, an application that registered itself and has not been verified? It will lose access to your account on every device, and will be asked to sign you out. It can still ask you to sign in again."
+"adminconsole.account.applications.disconnect_confirm" = "Disconnect {{.client}}? It will lose access to your account on every device, and we'll try to tell it to sign you out. It can still ask you to sign in again."
+"adminconsole.account.applications.disconnect_confirm_unverified" = "Disconnect {{.client}}, an application that registered itself and has not been verified? It will lose access to your account on every device, and we'll try to tell it to sign you out. It can still ask you to sign in again."
 "adminconsole.account.legal_documents.page_title" = "Legal documents"
 "adminconsole.account.legal_documents.intro" = "The legal documents you accepted when you signed in to an application."
 "adminconsole.account.legal_documents.col_document" = "Document"

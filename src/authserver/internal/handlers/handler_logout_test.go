@@ -862,7 +862,7 @@ func expectSignOutSweep(database *datamocks.Database, sessionIdentifier string, 
 	for _, rt := range tokens {
 		database.On("RecordRefreshTokenFamilyRevoked", mock.Anything, clientPartTx, rt.FirstRefreshTokenJti,
 			revocation.ReasonClientSignedOut).Return(true, nil).Once()
-		database.On("UpdateRefreshToken", mock.Anything, clientPartTx, rt).Return(nil).Once()
+		database.On("MarkRefreshTokenAsRevoked", mock.Anything, clientPartTx, rt.Id).Return(true, nil).Once()
 	}
 }
 

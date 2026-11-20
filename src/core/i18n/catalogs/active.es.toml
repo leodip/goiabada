@@ -155,7 +155,7 @@
 "consent.scope.attributes.description" = "Los atributos que te ha asignado un administrador"
 "consent.scope.offline_access.description" = "Mantener el acceso cuando no estés, sin volver a preguntarte"
 "consent.scope.permission_template" = "Permiso {{.permission}} sobre el recurso {{.resource}}"
-"consent.scope.authserver_manage_account.description" = "Gestionar tu cuenta por ti: cambiar tu perfil, teléfono, dirección y foto, ver y cerrar tus sesiones, y retirar los consentimientos que has dado. Para cambiar tu correo electrónico, contraseña o autenticación de dos factores seguirá haciendo falta tu contraseña."
+"consent.scope.authserver_manage_account.description" = "Gestionar tu cuenta por ti: cambiar tu perfil, teléfono, dirección y foto, ver y cerrar tus sesiones, y ver y desconectar las aplicaciones conectadas a tu cuenta. Para cambiar tu correo electrónico, contraseña o autenticación de dos factores seguirá haciendo falta tu contraseña."
 
 # --- Logout confirmation (auth/logout) --------------------------------------
 
@@ -759,7 +759,7 @@
 # --- Account applications ---------------------------------------------------
 
 "adminconsole.account.applications.page_title" = "Aplicaciones"
-"adminconsole.account.applications.intro" = "Las aplicaciones que pueden usar tu cuenta y a qué puede acceder cada una."
+"adminconsole.account.applications.intro" = "Las aplicaciones conectadas a tu cuenta y el acceso que se le dio a cada una."
 "adminconsole.account.applications.col_application" = "Aplicación"
 "adminconsole.account.applications.unverified_tag" = "Sin verificar"
 "adminconsole.account.applications.unverified_note" = "Esta aplicación se registró por su cuenta y no se ha verificado."
@@ -773,10 +773,10 @@
 "adminconsole.account.applications.disconnect_button" = "Desconectar"
 "adminconsole.account.applications.disconnected_label" = "Desconectada"
 "adminconsole.account.applications.disconnected" = "Aplicación desconectada."
-"adminconsole.account.applications.empty" = "Ninguna aplicación puede usar tu cuenta."
+"adminconsole.account.applications.empty" = "Ninguna aplicación está conectada a tu cuenta."
 "adminconsole.account.applications.modal_confirm_title" = "¿Desconectar esta aplicación?"
-"adminconsole.account.applications.disconnect_confirm" = "¿Quieres desconectar {{.client}}? Perderá el acceso a tu cuenta en todos los dispositivos y se le pedirá que cierre tu sesión. Podrá volver a pedirte que inicies sesión."
-"adminconsole.account.applications.disconnect_confirm_unverified" = "¿Quieres desconectar {{.client}}, una aplicación que se registró por su cuenta y no se ha verificado? Perderá el acceso a tu cuenta en todos los dispositivos y se le pedirá que cierre tu sesión. Podrá volver a pedirte que inicies sesión."
+"adminconsole.account.applications.disconnect_confirm" = "¿Quieres desconectar {{.client}}? Perderá el acceso a tu cuenta en todos los dispositivos e intentaremos avisarle para que cierre tu sesión. Podrá volver a pedirte que inicies sesión."
+"adminconsole.account.applications.disconnect_confirm_unverified" = "¿Quieres desconectar {{.client}}, una aplicación que se registró por su cuenta y no se ha verificado? Perderá el acceso a tu cuenta en todos los dispositivos e intentaremos avisarle para que cierre tu sesión. Podrá volver a pedirte que inicies sesión."
 "adminconsole.account.legal_documents.page_title" = "Documentos legales"
 "adminconsole.account.legal_documents.intro" = "Los documentos legales que aceptaste al iniciar sesión en una aplicación."
 "adminconsole.account.legal_documents.col_document" = "Documento"

@@ -9178,6 +9178,86 @@ func (_c *Database_GetConsentByUserIdAndClientId_Call) RunAndReturn(run func(ctx
 	return _c
 }
 
+// GetConsentByUserIdAndClientIdForUpdate provides a mock function for the type Database
+func (_mock *Database) GetConsentByUserIdAndClientIdForUpdate(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (*record.UserConsent, error) {
+	ret := _mock.Called(ctx, tx, userId, clientId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetConsentByUserIdAndClientIdForUpdate")
+	}
+
+	var r0 *record.UserConsent
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64, int64) (*record.UserConsent, error)); ok {
+		return returnFunc(ctx, tx, userId, clientId)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64, int64) *record.UserConsent); ok {
+		r0 = returnFunc(ctx, tx, userId, clientId)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*record.UserConsent)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, int64, int64) error); ok {
+		r1 = returnFunc(ctx, tx, userId, clientId)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_GetConsentByUserIdAndClientIdForUpdate_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetConsentByUserIdAndClientIdForUpdate'
+type Database_GetConsentByUserIdAndClientIdForUpdate_Call struct {
+	*mock.Call
+}
+
+// GetConsentByUserIdAndClientIdForUpdate is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - userId int64
+//   - clientId int64
+func (_e *Database_Expecter) GetConsentByUserIdAndClientIdForUpdate(ctx any, tx any, userId any, clientId any) *Database_GetConsentByUserIdAndClientIdForUpdate_Call {
+	return &Database_GetConsentByUserIdAndClientIdForUpdate_Call{Call: _e.mock.On("GetConsentByUserIdAndClientIdForUpdate", ctx, tx, userId, clientId)}
+}
+
+func (_c *Database_GetConsentByUserIdAndClientIdForUpdate_Call) Run(run func(ctx context.Context, tx *sql.Tx, userId int64, clientId int64)) *Database_GetConsentByUserIdAndClientIdForUpdate_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
+		}
+		var arg3 int64
+		if args[3] != nil {
+			arg3 = args[3].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_GetConsentByUserIdAndClientIdForUpdate_Call) Return(userConsent *record.UserConsent, err error) *Database_GetConsentByUserIdAndClientIdForUpdate_Call {
+	_c.Call.Return(userConsent, err)
+	return _c
+}
+
+func (_c *Database_GetConsentByUserIdAndClientIdForUpdate_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (*record.UserConsent, error)) *Database_GetConsentByUserIdAndClientIdForUpdate_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetConsentsByUserId provides a mock function for the type Database
 func (_mock *Database) GetConsentsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserConsent, error) {
 	ret := _mock.Called(ctx, tx, userId)

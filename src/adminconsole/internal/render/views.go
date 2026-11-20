@@ -103,8 +103,9 @@ func clientNames(clients []api.SessionClientResponse) []ClientName {
 
 // ConnectedClientInfo is one row of the account Applications page and of a user's Connected
 // clients tab: a client the user holds a stored consent with, a live refresh token with, or both
-// (#135 decision 4). Client is the identifier, which the admin tab shows; ClientName and
-// ClientNameUnverified are the name the consent screen shows the user, which the account page shows.
+// (#135 decision 4). Client is the identifier; ClientName and ClientNameUnverified are the name the
+// consent screen shows the user, which the account page shows, and the admin tab shows beside the
+// identifier when it is neither the identifier nor the description.
 // HasConsent says whether the client has a stored consent, ConsentScope and GrantedAt being that
 // consent's; GrantScope is the scopes the user's live refresh tokens with it record. The page shows
 // each scope list under its own label, since either can hold a scope the other lacks (decision 7).

@@ -60,9 +60,13 @@ func HandleUserConnectedClientsGet(
 			return
 		}
 
+		// The caller is the listed user only on a token issued for a user, which carries auth_time, as
+		// RequireUserBoundToken judges it. A client credentials token carries none, and its sub is its
+		// client identifier, which a user's subject can equal.
 		callerClient := ""
-		if subject := callerSubject(r); subject != "" && subject == user.Subject {
-			if jwtToken, ok := reqctx.ValidatedTokenFrom(r.Context()); ok {
+		if jwtToken, ok := reqctx.ValidatedTokenFrom(r.Context()); ok {
+			_, userBound := jwtToken.Claims["auth_time"]
+			if subject := callerSubject(r); userBound && subject != "" && subject == user.Subject {
 				callerClient = jwtToken.StringClaim("client_id")
 			}
 		}

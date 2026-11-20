@@ -63,7 +63,7 @@ func TestEndClientPartTx_RevokesInTheSameTransaction(t *testing.T) {
 		signOutClientId).Return(tokens, nil).Once()
 	recorded := db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, signOutTx, "fam-a", "client_signed_out").
 		Return(true, nil).Once()
-	db.On("UpdateRefreshToken", mock.Anything, signOutTx, tokens[1]).Return(nil).Once().NotBefore(recorded)
+	db.On("MarkRefreshTokenAsRevoked", mock.Anything, signOutTx, tokens[1].Id).Return(true, nil).Once().NotBefore(recorded)
 
 	end, err := EndClientPartTx(context.Background(), db, signOutSid, "departing")
 
@@ -91,6 +91,32 @@ func TestEndClientPartTx_NothingToRevokeReportsAnEmptyList(t *testing.T) {
 	require.NotNil(t, end.Ended)
 	assert.NotNil(t, end.RevokedRefreshTokenJtis)
 	assert.Empty(t, end.RevokedRefreshTokenJtis)
+}
+
+// TestEndClientPartTx_ATokenRevokedMeanwhileIsNotReported: a session-bound token read live that
+// another revocation committed first is not reported by the sign-out, whose conditional write
+// matches no live row, so revoked_sign_out_grants never lists a token this call did not revoke
+// (#135 decision 2's accounting, which the sign-out's sweep shares).
+func TestEndClientPartTx_ATokenRevokedMeanwhileIsNotReported(t *testing.T) {
+	db := datamocks.NewDatabase(t)
+	expectClientPartRemoval(db)
+	db.On("RevokeUnusedCodesBySessionIdentifierAndClientId", mock.Anything, signOutTx, signOutSid, signOutClientId).
+		Return(int64(0), nil).Once()
+	db.On("GetSessionBoundRefreshTokensBySessionIdentifierAndClientId", mock.Anything, signOutTx, signOutSid,
+		signOutClientId).Return([]*record.RefreshToken{
+		{Id: 3, RefreshTokenJti: "rt-revoked-meanwhile", FirstRefreshTokenJti: "fam-b"},
+		{Id: 4, RefreshTokenJti: "rt-live", FirstRefreshTokenJti: "fam-b"},
+	}, nil).Once()
+	db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, signOutTx, "fam-b", ReasonClientSignedOut).
+		Return(false, nil).Once()
+	db.On("MarkRefreshTokenAsRevoked", mock.Anything, signOutTx, int64(3)).Return(false, nil).Once()
+	db.On("MarkRefreshTokenAsRevoked", mock.Anything, signOutTx, int64(4)).Return(true, nil).Once()
+
+	end, err := EndClientPartTx(context.Background(), db, signOutSid, "departing")
+
+	require.NoError(t, err)
+	require.NotNil(t, end.Ended)
+	assert.Equal(t, []string{"rt-live"}, end.RevokedRefreshTokenJtis)
 }
 
 // TestEndClientPartTx_ASweepFailureYieldsTheZeroResult: a failure of the revocation fails the whole

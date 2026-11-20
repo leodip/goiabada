@@ -2213,16 +2213,16 @@ func TestHandleConsentGet_DescribesManageAccountInPlainWords(t *testing.T) {
 		{
 			locale: "en",
 			manageAccount: "Manage your account for you: change your profile, phone, address and picture, " +
-				"see and sign out your sessions, and withdraw consents you have given. Changing your email, " +
-				"password or two-factor authentication still needs your password.",
+				"see and sign out your sessions, and see and disconnect the applications connected to your account. " +
+				"Changing your email, password or two-factor authentication still needs your password.",
 			manageUsers: "Permission manage-users on resource authserver",
 			customRead:  "Permission read on resource custom",
 		},
 		{
 			locale: "pt-BR",
 			manageAccount: "Gerenciar sua conta por você: alterar seu perfil, telefone, endereço e foto, ver e " +
-				"encerrar suas sessões e revogar consentimentos que você deu. Alterar seu e-mail, senha ou " +
-				"autenticação de dois fatores ainda exige sua senha.",
+				"encerrar suas sessões, e ver e desconectar os aplicativos conectados à sua conta. Alterar seu e-mail, " +
+				"senha ou autenticação de dois fatores ainda exige sua senha.",
 			manageUsers: "Permissão manage-users no recurso authserver",
 			customRead:  "Permissão read no recurso custom",
 		},

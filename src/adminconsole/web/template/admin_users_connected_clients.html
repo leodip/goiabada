@@ -29,7 +29,15 @@
       {{ range .clients }}
       <tr>
         <td class="cell-wrap">
+          {{/* The name the user is shown for the client, when it is not just the identifier, and the
+               identifier beside it to tell clients apart. A name the client gave itself is its
+               description, which follows anyway. */}}
+          {{ if and .ClientName (ne .ClientName .Client) (ne .ClientName .ClientDescription) }}
+          <span class="font-semibold">{{ .ClientName }}</span>
+          <span class="cell-secondary font-mono text-sm">{{ .Client }}</span>
+          {{ else }}
           <span class="font-mono text-sm">{{ .Client }}</span>
+          {{ end }}
           {{ if .ClientDescription }}<span class="cell-secondary">{{ .ClientDescription }}</span>{{ end }}
         </td>
         <td class="cell-wrap" data-label="{{ T $.ctx "adminconsole.admin_users.connected_clients.col_scopes" }}">

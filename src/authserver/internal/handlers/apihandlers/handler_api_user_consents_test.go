@@ -158,9 +158,7 @@ func TestHandleUserConsentDelete_Success(t *testing.T) {
 		}, nil).Once()
 	database.On("RecordRefreshTokenFamilyRevoked", mock.Anything, consentWithdrawalTx, "rt-first", revocation.ReasonClientDisconnected).
 		Return(true, nil).Once()
-	database.On("UpdateRefreshToken", mock.Anything, consentWithdrawalTx, mock.MatchedBy(func(rt *record.RefreshToken) bool {
-		return rt.RefreshTokenJti == "rt-live" && rt.Revoked
-	})).Return(nil).Once()
+	database.On("MarkRefreshTokenAsRevoked", mock.Anything, consentWithdrawalTx, int64(11)).Return(true, nil).Once()
 	auditLogger.On("Log", mock.Anything, audit.EventDeletedUserConsent, mock.MatchedBy(func(details map[string]interface{}) bool {
 		return details["user_id"] == int64(7) && details["consent_id"] == int64(5) &&
 			details["logged_in_user"] == "admin-subject-1"

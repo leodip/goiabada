@@ -321,3 +321,96 @@ func TestAPIUserConnectedClients_Scopes(t *testing.T) {
 		assert.Equal(t, http.StatusForbidden, resp.StatusCode, "%s without an admin scope", op.method)
 	}
 }
+
+// TestAPIUserConnectedClientDelete_EndsTheClientOnEverySessionAndTellsIt: one client holds an
+// authorization-code offline grant and a session-bound grant on each of two of the user's sessions,
+// and a second app shares the first session. An administrator disconnects the client through the
+// client-keyed Admin DELETE. Its four refresh tokens are refused, offline and session-bound alike,
+// and so are their access tokens at /userinfo; the other app still refreshes, both sessions stay,
+// and the client, alone, is sent one logout token naming the user and no session (#135 decisions 1
+// and 3).
+func TestAPIUserConnectedClientDelete_EndsTheClientOnEverySessionAndTellsIt(t *testing.T) {
+	requireDatabaseAuditLogs(t)
+	adminToken, adminClient := createAdminClientWithToken(t)
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, adminClient.Id) })
+
+	sessionBoundScope := "openid " + builtin.AuthServerResourceIdentifier + ":" + builtin.ManageAccountPermissionIdentifier
+	first := createOfflineGrant(t)
+	second := secondOfflineGrantForSameUser(t, first, first.password)
+	require.NotEqual(t, first.sessionIdentifier, second.sessionIdentifier, "two sessions of the user")
+
+	type grant struct {
+		label         string
+		accessToken   string
+		refreshToken  string
+		wantTokenType string
+	}
+	grants := []grant{
+		{"the offline grant on the first session", first.accessToken, first.refreshToken, "Offline"},
+		{"the offline grant on the second session", second.accessToken, second.refreshToken, "Offline"},
+	}
+	for i, g := range []*offlineGrant{first, second} {
+		verifier := testCodeVerifier + "-session-bound-" + strconv.Itoa(i)
+		exchanged := g.exchange(t, g.codeFromSameSession(t, sessionBoundScope, verifier), verifier)
+		accessToken, ok := exchanged["access_token"].(string)
+		require.True(t, ok, "%v", exchanged)
+		refreshToken, ok := exchanged["refresh_token"].(string)
+		require.True(t, ok, "%v", exchanged)
+		require.Equal(t, g.sessionIdentifier, claimString(t, accessToken, "sid"))
+		grants = append(grants, grant{"the session-bound grant on session " + strconv.Itoa(i+1),
+			accessToken, refreshToken, "Refresh"})
+	}
+	for _, g := range grants {
+		require.Equal(t, g.wantTokenType, claimString(t, g.refreshToken, "typ"), g.label)
+	}
+
+	other := newConnectedApp(t, "openid")
+	otherTokens := signInOn(t, first.httpClient, other.signIn, first.user, nil, nil)
+	require.False(t, otherTokens.askedPassword, "the other app signs in on the first session")
+
+	told := newLogoutReceiver(t, http.StatusOK)
+	require.NoError(t, database.SetClientBackchannelLogout(context.Background(), nil, first.client.Id, told.uri(), false))
+	untold := newLogoutReceiver(t, http.StatusOK)
+	require.NoError(t, database.SetClientBackchannelLogout(context.Background(), nil, other.client.Id, untold.uri(), false))
+
+	status, body, requestId := disconnectUser(t, adminToken, first.user.Id, first.client.Id)
+	require.Equal(t, http.StatusOK, status, "%v", body)
+
+	for _, g := range grants {
+		t.Run(g.label, func(t *testing.T) {
+			// An offline refresh is checked against the stored consent before its row, and the
+			// disconnect deleted that consent, so it is refused for the consent; the row is revoked
+			// all the same.
+			answer := presentRefreshToken(t, first.client.ClientIdentifier, g.refreshToken, first.clientSecret)
+			assert.Equal(t, "invalid_grant", answer["error"], "the disconnected client's refresh is refused: %v", answer)
+			assert.Empty(t, answer["access_token"])
+			stored, err := database.GetRefreshTokenByJti(context.Background(), nil, claimString(t, g.refreshToken, "jti"))
+			require.NoError(t, err)
+			require.NotNil(t, stored)
+			assert.True(t, stored.Revoked, "the refresh token's row is revoked")
+			if g.wantTokenType == "Refresh" {
+				assertRefreshRevoked(t, first.client.ClientIdentifier, g.refreshToken, first.clientSecret)
+			}
+			assertUserinfoRefusesTheToken(t, g.accessToken)
+		})
+	}
+	assertRefreshes(t, other.client.ClientIdentifier, signInRefreshToken(t, otherTokens), other.signIn.secret)
+
+	for _, sid := range []string{first.sessionIdentifier, second.sessionIdentifier} {
+		session, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, sid)
+		require.NoError(t, err)
+		assert.NotNil(t, session, "a disconnect ends no session")
+	}
+
+	posts := told.waitFor(t, 1, 10*time.Second)
+	assertLogoutToken(t, posts[0], first.client.ClientIdentifier, first.user.Subject, "")
+	sentLogoutTokenRow(t, requestId, 10*time.Second)
+	// Every delivery has started by now; any further one would have arrived meanwhile.
+	time.Sleep(2 * time.Second)
+	assert.Len(t, told.received(), 1, "the client is told once, about every session of the user")
+	assert.Empty(t, untold.received(), "the other app is told nothing")
+
+	entries := disconnectedClientEntries(t, first.user.Id, first.client.Id)
+	require.Len(t, entries, 1)
+	assert.Len(t, entries[0]["revoked_refresh_token_jtis"], 4, "the four live refresh tokens, on both sessions")
+}

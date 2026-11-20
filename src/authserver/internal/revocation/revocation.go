@@ -40,6 +40,7 @@ type Database interface {
 	GetUsableRefreshTokenClientIdsByUserId(ctx context.Context, tx *sql.Tx, userId int64, now time.Time) ([]int64, error)
 	GetClientsByIds(ctx context.Context, tx *sql.Tx, clientIds []int64) ([]record.Client, error)
 	IncrementUserAuthStateGeneration(ctx context.Context, tx *sql.Tx, userId int64) (int64, error)
+	MarkRefreshTokenAsRevoked(ctx context.Context, tx *sql.Tx, refreshTokenId int64) (bool, error)
 	PromoteRefreshTokenGenerations(ctx context.Context, tx *sql.Tx, refreshTokenIds []int64, generation int64) error
 	PromoteUserSessionGeneration(ctx context.Context, tx *sql.Tx, userSessionId int64, generation int64) error
 	RecordRefreshTokenFamilyRevoked(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string, reason string) (bool, error)
@@ -77,10 +78,43 @@ func RevokeRefreshTokens(ctx context.Context, db refreshTokenWriter, tx *sql.Tx,
 	return revokedJtis, nil
 }
 
-// refreshTokenWriter is the one write RevokeRefreshTokens makes, so a port narrower than Database,
-// EndClientPartTx's, can sweep with it.
+// refreshTokenWriter is the one write RevokeRefreshTokens makes.
 type refreshTokenWriter interface {
 	UpdateRefreshToken(ctx context.Context, tx *sql.Tx, refreshToken *record.RefreshToken) error
+}
+
+// markRefreshTokensRevoked revokes the given refresh tokens with the conditional write,
+// MarkRefreshTokenAsRevoked, and returns the JTIs of the rows THIS call moved from live to revoked,
+// never nil. A row read live that another transaction revoked and committed before this one's write
+// reached it is not reported: the write matches no live row, on every engine, whatever snapshot
+// the read answered. That is what lets a disconnect and a hinted sign-out answer from what their own
+// transaction committed, so two overlapping calls never both report or audit one token (#135
+// decision 2). RevokeRefreshTokens writes the row it read whole, so it would report that token
+// again. A row read revoked already is skipped without a statement.
+func markRefreshTokensRevoked(ctx context.Context, db refreshTokenMarker, tx *sql.Tx,
+	tokens []*record.RefreshToken) ([]string, error) {
+
+	revokedJtis := make([]string, 0, len(tokens))
+	for _, rt := range tokens {
+		if rt.Revoked {
+			continue
+		}
+		marked, err := db.MarkRefreshTokenAsRevoked(ctx, tx, rt.Id)
+		if err != nil {
+			return nil, err
+		}
+		if marked {
+			rt.Revoked = true
+			revokedJtis = append(revokedJtis, rt.RefreshTokenJti)
+		}
+	}
+	return revokedJtis, nil
+}
+
+// refreshTokenMarker is the one write markRefreshTokensRevoked makes, so a port narrower than
+// Database, EndClientPartTx's, can sweep with it.
+type refreshTokenMarker interface {
+	MarkRefreshTokenAsRevoked(ctx context.Context, tx *sql.Tx, refreshTokenId int64) (bool, error)
 }
 
 // familyRecorder is the one write recordFamilies makes, for the reason refreshTokenWriter is apart.
@@ -763,7 +797,7 @@ func TerminateUserSessionTx(ctx context.Context, db Database, userSession *recor
 // the departing app's session-bound grants it revokes (#135 decision 9).
 type ClientPartDatabase interface {
 	familyRecorder
-	refreshTokenWriter
+	refreshTokenMarker
 
 	AcquireUserSessionRow(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (bool, error)
 	DeleteUserSession(ctx context.Context, tx *sql.Tx, userSessionId int64) error
@@ -791,7 +825,7 @@ type ClientPartEnd struct {
 	// TRANSITIONED from live to revoked (#135 decision 9).
 	RevokedCodeCount int64
 	// RevokedRefreshTokenJtis lists the app's session-bound refresh tokens from the session this
-	// call transitioned, per RevokeRefreshTokens. Non-nil when the app's part ended, so a JSON audit
+	// call transitioned, per markRefreshTokensRevoked. Non-nil when the app's part ended, so a JSON audit
 	// payload carries [] rather than null.
 	RevokedRefreshTokenJtis []string
 }
@@ -905,7 +939,7 @@ func revokeSignOutGrants(ctx context.Context, db ClientPartDatabase, tx *sql.Tx,
 	if err != nil {
 		return 0, nil, err
 	}
-	revokedJtis, err := RevokeRefreshTokens(ctx, db, tx, tokens)
+	revokedJtis, err := markRefreshTokensRevoked(ctx, db, tx, tokens)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -1137,9 +1171,19 @@ func RevokeOnAuthCodeReuseTx(ctx context.Context, db Database, code *record.Code
 //     it commits. The family record is the fact that outlives the sweep: the validator
 //     refuses a token whose family has one, and rotation re-checks it inside its own
 //     transaction, so the child is refused at its next refresh or never inserted.
-//  4. RevokeRefreshTokens over the user-and-client-scoped rows, which flips what stands
+//  4. markRefreshTokensRevoked over the user-and-client-scoped rows, which flips what stands
 //     now. Scoped by BOTH, because the disconnect ends one app's access, not what the
 //     user holds with every other client and not the session they are signed in with.
+//
+// The consent the caller deletes and the refresh tokens the sweep reads must be what is
+// committed when they are read, not what the transaction's first read saw: on MySQL that first
+// read, of the client below, fixes the REPEATABLE READ snapshot every later ordinary read
+// answers, and a grant or a consent committed in between would be left in place by a
+// disconnect that reported success. So the caller reads the consent with
+// GetConsentByUserIdAndClientIdForUpdate, and GetRefreshTokensByUserIdAndClientId is a locking
+// read on MySQL; the code mark is an UPDATE, which reads current rows on every engine. The
+// tokens are flipped by a conditional write, so a token an overlapping disconnect revoked first
+// is not reported twice.
 //
 // It deliberately does NOT advance the user's authentication generation and does NOT
 // touch any session: both are user-scoped, for the reason RevokeClientGrants states about
@@ -1215,7 +1259,7 @@ func DisconnectClientTx(ctx context.Context, db Database, userId int64, clientId
 			return err
 		}
 
-		revokedJtis, err := RevokeRefreshTokens(ctx, db, tx, tokens)
+		revokedJtis, err := markRefreshTokensRevoked(ctx, db, tx, tokens)
 		if err != nil {
 			return err
 		}
@@ -1249,8 +1293,9 @@ type DisconnectResult struct {
 	// RevokedCodeCount is how many unused codes this call TRANSITIONED from live to revoked.
 	RevokedCodeCount int64
 	// RevokedRefreshTokenJtis lists only the tokens this call transitioned, per
-	// RevokeRefreshTokens. A token already revoked before the call is absent. Non-nil on the
-	// success path, so a JSON audit payload carries [] rather than null.
+	// markRefreshTokensRevoked. A token already revoked before the call, or revoked by an
+	// overlapping call that committed first, is absent. Non-nil on the success path, so a JSON
+	// audit payload carries [] rather than null.
 	RevokedRefreshTokenJtis []string
 	// RecordedFamilyCount is how many rotation families this call newly recorded revoked. A
 	// family whose members were all revoked already and that had no record yet counts: the record

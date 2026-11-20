@@ -61,7 +61,7 @@ func expectOneTokenSwept(db *datamocks.Database) {
 		Return([]*record.RefreshToken{token}, nil).Once()
 	db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, "fam-live", ReasonClientDisconnected).
 		Return(true, nil).Once()
-	db.On("UpdateRefreshToken", mock.Anything, revokeTx, token).Return(nil).Once()
+	db.On("MarkRefreshTokenAsRevoked", mock.Anything, revokeTx, token.Id).Return(true, nil).Once()
 }
 
 // disconnectSessions is the user's four sessions, out of id order as the query may answer them.

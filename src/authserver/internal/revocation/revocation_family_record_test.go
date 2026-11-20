@@ -195,7 +195,7 @@ func TestDisconnectClientTx_ALostKeyRunsTheDisconnectOnceMore(t *testing.T) {
 			Return(false, lostTheKey).Once()
 		db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, "fam-1", ReasonClientDisconnected).
 			Return(false, nil).Once()
-		db.On("UpdateRefreshToken", mock.Anything, revokeTx, token).Return(nil).Once()
+		db.On("MarkRefreshTokenAsRevoked", mock.Anything, revokeTx, token.Id).Return(true, nil).Once()
 
 		deletions := 0
 		result, err := DisconnectClientTx(context.Background(), db, disconnectUserId, disconnectClientId, nil,

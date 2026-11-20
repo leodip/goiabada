@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql/driver"
 	"testing"
+
+	"github.com/leodip/goiabada/authserver/internal/data"
 )
 
 // The statements of a grant's records, held on all four engines to what each asks of the engine:
@@ -15,7 +17,8 @@ import (
 // a user's grants reaches the rows of that session, client or user and no other, and a cleanup
 // reaps only the rows nothing can use any more. The condition is in the statement's text and
 // nowhere else, so this reads the text with each placeholder rendered as the value it binds, one
-// expected statement for all four engines, as the users' narrow writes are read. The columns of a
+// expected statement for all four engines, as the users' narrow writes are read, except where an
+// engine's own differs, such as MySQL's locking read of one user's tokens with one client. The columns of a
 // read of whole records are left to the record mapping test.
 
 const (
@@ -251,6 +254,14 @@ func grantStatements() []narrowWrite {
 					"UNION ALL SELECT <columns> FROM refresh_tokens " +
 					"WHERE refresh_tokens.user_id = 7 AND refresh_tokens.client_id = 3",
 			},
+			// MySQL's is a locking read, so the rows a disconnect sweeps are the committed ones
+			// whatever its transaction read first (#135 decision 1).
+			statementsOn: map[data.Dialect][]string{data.MySQL: {
+				"(SELECT <columns> FROM refresh_tokens INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
+					"WHERE codes.user_id = 7 AND codes.client_id = 3 FOR UPDATE) " +
+					"UNION ALL (SELECT <columns> FROM refresh_tokens " +
+					"WHERE refresh_tokens.user_id = 7 AND refresh_tokens.client_id = 3 FOR UPDATE)",
+			}},
 		},
 		{
 			// A live grant: its row not revoked, its expiry after the instant, its family unrecorded,

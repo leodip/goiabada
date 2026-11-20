@@ -876,6 +876,11 @@ type Database interface {
 	UpdateUserConsent(ctx context.Context, tx *sql.Tx, userConsent *record.UserConsent) error
 	GetUserConsentById(ctx context.Context, tx *sql.Tx, userConsentId int64) (*record.UserConsent, error)
 	GetConsentByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (*record.UserConsent, error)
+	// GetConsentByUserIdAndClientIdForUpdate reads the user's consent to the client as last
+	// committed and takes its row until the transaction ends: what a disconnect deletes, read so
+	// that a consent committed after the transaction's first read is not missed on MySQL (#135).
+	// A transaction is required.
+	GetConsentByUserIdAndClientIdForUpdate(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (*record.UserConsent, error)
 	GetConsentsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserConsent, error)
 	DeleteUserConsent(ctx context.Context, tx *sql.Tx, userConsentId int64) (bool, error)
 	DeleteAllUserConsent(ctx context.Context, tx *sql.Tx) error
@@ -1015,7 +1020,9 @@ type Database interface {
 	// refresh_tokens.client_id for ROPC. It is what a consent withdrawal sweeps, and
 	// GetRefreshTokensByUserId plus a client filter cannot substitute for it, because
 	// an auth-code token's row carries no client to filter on (#622). Revoked rows are
-	// returned too, on purpose: the withdrawal records the family of every row it reads.
+	// returned too, on purpose: the withdrawal records the family of every row it reads. The
+	// rows are read as last committed, a locking read on MySQL, so a grant committed after the
+	// transaction's first read is swept too (#135).
 	GetRefreshTokensByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) ([]*record.RefreshToken, error)
 	// GetRefreshTokensByClientId returns every refresh token belonging to a client,
 	// through either linkage shape: codes.client_id for the authorization code flow,

@@ -64,12 +64,12 @@ func TestDisconnectClientTx_DeletesTheConsentRecordsAndSweeps(t *testing.T) {
 	db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, "fam-b", "client_disconnected").
 		Run(func(mock.Arguments) { order = append(order, "record") }).
 		Return(true, nil).Once()
-	db.On("UpdateRefreshToken", mock.Anything, revokeTx, tokens[1]).
+	db.On("MarkRefreshTokenAsRevoked", mock.Anything, revokeTx, tokens[1].Id).
 		Run(func(mock.Arguments) { order = append(order, "sweep") }).
-		Return(nil).Once()
-	db.On("UpdateRefreshToken", mock.Anything, revokeTx, tokens[2]).
+		Return(true, nil).Once()
+	db.On("MarkRefreshTokenAsRevoked", mock.Anything, revokeTx, tokens[2].Id).
 		Run(func(mock.Arguments) { order = append(order, "sweep") }).
-		Return(nil).Once()
+		Return(true, nil).Once()
 
 	result, err := DisconnectClientTx(context.Background(), db, disconnectUserId, disconnectClientId, nil,
 		func(tx *sql.Tx) (bool, error) {
@@ -102,7 +102,7 @@ func TestDisconnectClientTx_WithoutAConsentDeletion(t *testing.T) {
 		Return(tokens, nil).Once()
 	db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, "fam-ropc", "client_disconnected").
 		Return(true, nil).Once()
-	db.On("UpdateRefreshToken", mock.Anything, revokeTx, tokens[0]).Return(nil).Once()
+	db.On("MarkRefreshTokenAsRevoked", mock.Anything, revokeTx, tokens[0].Id).Return(true, nil).Once()
 
 	result, err := DisconnectClientTx(context.Background(), db, disconnectUserId, disconnectClientId, nil, nil)
 
@@ -137,6 +137,32 @@ func TestDisconnectClientTx_NothingToEndReportsNoChange(t *testing.T) {
 	require.NotNil(t, result.RevokedRefreshTokenJtis)
 	assert.Equal(t, DisconnectResult{RevokedRefreshTokenJtis: []string{}}, result)
 	assert.False(t, result.Changed(), "a call that deleted, marked, revoked and recorded nothing changed nothing")
+}
+
+// A token read live that an overlapping disconnect revoked and committed before this one's write
+// reached it is not reported: the conditional write matches no live row, and the family that call
+// recorded is found already recorded. The call changed nothing, so its caller answers 404 and
+// audits nothing, and the token is audited once, by the call that revoked it (#135 decision 2).
+func TestDisconnectClientTx_ATokenAnOverlappingCallRevokedFirstIsNotReported(t *testing.T) {
+	db := datamocks.NewDatabase(t)
+	datamocks.ExpectRunInTransaction(db, revokeTx)
+	expectClientWithoutLogoutURI(db)
+	db.On("RevokeUnusedCodesByUserIdAndClientId", mock.Anything, revokeTx, disconnectUserId, disconnectClientId).
+		Return(int64(0), nil).Once()
+	db.On("GetRefreshTokensByUserIdAndClientId", mock.Anything, revokeTx, disconnectUserId, disconnectClientId).
+		Return([]*record.RefreshToken{
+			{Id: 7, RefreshTokenJti: "rt-read-live", FirstRefreshTokenJti: "fam-overlap"},
+		}, nil).Once()
+	db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, "fam-overlap", "client_disconnected").
+		Return(false, nil).Once()
+	db.On("MarkRefreshTokenAsRevoked", mock.Anything, revokeTx, int64(7)).Return(false, nil).Once()
+
+	result, err := DisconnectClientTx(context.Background(), db, disconnectUserId, disconnectClientId, nil,
+		func(*sql.Tx) (bool, error) { return false, nil })
+
+	require.NoError(t, err)
+	assert.Equal(t, DisconnectResult{RevokedRefreshTokenJtis: []string{}}, result)
+	assert.False(t, result.Changed(), "the overlapping call made every change this one would have")
 }
 
 // A family whose members were all revoked already, by a rotation's parent claim for instance, and
@@ -214,7 +240,7 @@ func TestDisconnectClientTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 				expectClientWithoutLogoutURI(db)
 			},
 			notAttempted: []string{"RevokeUnusedCodesByUserIdAndClientId", "GetRefreshTokensByUserIdAndClientId",
-				"RecordRefreshTokenFamilyRevoked", "UpdateRefreshToken"},
+				"RecordRefreshTokenFamilyRevoked", "MarkRefreshTokenAsRevoked"},
 		},
 		{
 			// A disconnect that committed without its code mark would leave a code issued before
@@ -227,7 +253,7 @@ func TestDisconnectClientTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 					Return(int64(0), boom).Once()
 			},
 			notAttempted: []string{"GetRefreshTokensByUserIdAndClientId", "RecordRefreshTokenFamilyRevoked",
-				"UpdateRefreshToken"},
+				"MarkRefreshTokenAsRevoked"},
 		},
 		{
 			name: "the enumeration fails",
@@ -239,7 +265,7 @@ func TestDisconnectClientTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 				db.On("GetRefreshTokensByUserIdAndClientId", mock.Anything, revokeTx, disconnectUserId, disconnectClientId).
 					Return(nil, boom).Once()
 			},
-			notAttempted: []string{"RecordRefreshTokenFamilyRevoked", "UpdateRefreshToken"},
+			notAttempted: []string{"RecordRefreshTokenFamilyRevoked", "MarkRefreshTokenAsRevoked"},
 		},
 		{
 			name: "a family record fails",
@@ -253,7 +279,7 @@ func TestDisconnectClientTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 				db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, "fam-a", ReasonClientDisconnected).
 					Return(false, boom).Once()
 			},
-			notAttempted: []string{"UpdateRefreshToken"},
+			notAttempted: []string{"MarkRefreshTokenAsRevoked"},
 		},
 		{
 			// The first live token's write fails, so the second is never written.
@@ -268,7 +294,7 @@ func TestDisconnectClientTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 					Return(tokens, nil).Once()
 				db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, mock.Anything, ReasonClientDisconnected).
 					Return(true, nil).Twice()
-				db.On("UpdateRefreshToken", mock.Anything, revokeTx, tokens[1]).Return(boom).Once()
+				db.On("MarkRefreshTokenAsRevoked", mock.Anything, revokeTx, tokens[1].Id).Return(false, boom).Once()
 			},
 		},
 		{
@@ -285,7 +311,7 @@ func TestDisconnectClientTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 					Return(tokens, nil).Once()
 				db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, mock.Anything, ReasonClientDisconnected).
 					Return(true, nil).Twice()
-				db.On("UpdateRefreshToken", mock.Anything, revokeTx, mock.Anything).Return(nil).Twice()
+				db.On("MarkRefreshTokenAsRevoked", mock.Anything, revokeTx, mock.Anything).Return(true, nil).Twice()
 			},
 		},
 	}

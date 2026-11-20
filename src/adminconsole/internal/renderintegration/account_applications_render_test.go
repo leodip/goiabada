@@ -105,8 +105,8 @@ func TestRender_ApplicationsPageTagsTheCurrentApplicationInPlaceOfDisconnect(t *
 }
 
 // The confirmation says what a disconnect does: the application loses its access on every device,
-// it is asked to sign the user out, and it can ask to sign them in again (#135 decision 7). An
-// application that named itself says so in the same sentence, as its row does.
+// the auth server tries to tell it to sign the user out, and it can ask to sign them in again (#135
+// decision 7). An application that named itself says so in the same sentence, as its row does.
 func TestRender_ApplicationsPageConfirmationSaysWhatADisconnectDoes(t *testing.T) {
 	out := renderMenuPageIn(t, "/account_applications.html", map[string]interface{}{
 		"clients": []render.ConnectedClientInfo{
@@ -118,9 +118,9 @@ func TestRender_ApplicationsPageConfirmationSaysWhatADisconnectDoes(t *testing.T
 	confirms := regexp.MustCompile(`data-confirm="([^"]*)"`).FindAllStringSubmatch(out, -1)
 	require.Len(t, confirms, 2)
 	assert.Equal(t, "Disconnect Customer portal? It will lose access to your account on every device, "+
-		"and will be asked to sign you out. It can still ask you to sign in again.", html.UnescapeString(confirms[0][1]))
+		"and we'll try to tell it to sign you out. It can still ask you to sign in again.", html.UnescapeString(confirms[0][1]))
 	assert.Equal(t, "Disconnect Payroll Portal, an application that registered itself and has not been verified? "+
-		"It will lose access to your account on every device, and will be asked to sign you out. "+
+		"It will lose access to your account on every device, and we'll try to tell it to sign you out. "+
 		"It can still ask you to sign in again.", html.UnescapeString(confirms[1][1]))
 
 	assert.Contains(t, out, `data-done="Application disconnected." data-done-label="Disconnected"`)
@@ -135,7 +135,7 @@ func TestRender_ApplicationsPageWithNoClientsSaysSo(t *testing.T) {
 		"clients": []render.ConnectedClientInfo{},
 	}, "en", true)
 
-	assert.Contains(t, out, `<p class="empty-state">No application can use your account.</p>`)
+	assert.Contains(t, out, `<p class="empty-state">No application is connected to your account.</p>`)
 	assert.NotContains(t, out, "<table")
 }
 
