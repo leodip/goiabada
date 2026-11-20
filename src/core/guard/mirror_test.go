@@ -401,6 +401,7 @@ func TestMirrorCopy_AnEmptyMirrorGetsEveryTagAtUpstreamsDigest(t *testing.T) {
 	upstream := upstreamDigests()
 	run := runMirror(t, "copy", mirrorVersions, mirrorRegistry{digests: upstream}, mirrorCredentials...)
 	require.True(t, run.ok, "copy failed:\n%s", run.out)
+	assertCurlReadsNoConfig(t, run)
 	var want []string
 	for _, tag := range mirrorTags {
 		repo := tag[0][:strings.LastIndex(tag[0], ":")]
@@ -621,6 +622,7 @@ func TestMirrorMissing_AllEightPresentPasses(t *testing.T) {
 	assert.True(t, run.ok, "missing failed with every tag present:\n%s", run.out)
 	assert.Empty(t, run.errors())
 	assertAnonymousMirrorRequests(t, run)
+	assertCurlReadsNoConfig(t, run)
 }
 
 // Each tag the mirror lacks, or holds in a package that is not public, is named, with what to do.
@@ -701,6 +703,21 @@ func TestMirrorPublic_EveryTagReadAnonymouslyPasses(t *testing.T) {
 	assert.True(t, run.ok, "public failed with every package public:\n%s", run.out)
 	assert.Empty(t, run.errors())
 	assertAnonymousReads(t, run, nil)
+	assertCurlReadsNoConfig(t, run)
+}
+
+// assertCurlReadsNoConfig holds every curl the run made to --disable, first, so curl reads no
+// .curlrc, whose user or header could log an anonymous request in, or change what a request asks.
+func assertCurlReadsNoConfig(t *testing.T, run mirrorRun) {
+	t.Helper()
+	n := 0
+	for _, c := range run.calls {
+		if strings.HasPrefix(c, "curl ") {
+			n++
+			assert.True(t, strings.HasPrefix(c, "curl --disable "), "a curl that reads its .curlrc: %s", c)
+		}
+	}
+	assert.Positive(t, n, "the run made no request")
 }
 
 // A tag that is one platform's image rather than an index is read through its own manifest.

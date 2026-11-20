@@ -45,6 +45,8 @@ VERSIONS=${MIRROR_VERSIONS:-$here/../../src/authserver/versions.yaml}
 # every pulling job of Check waits for, asks the mirror for every tag on every run.
 REQUEST_SECONDS=${MIRROR_REQUEST_SECONDS:-20}
 CURL_LIMITS=(--connect-timeout 5 --max-time "$REQUEST_SECONDS")
+# Every curl starts with --disable, which reads no .curlrc, so a user or header in one logs no
+# anonymous request in and changes no request.
 
 # How many times copy copies one tag before it gives up on a mirror that is still not upstream's.
 COPY_ATTEMPTS=3
@@ -124,7 +126,7 @@ registry_token() {
         ghcr.io) url="https://ghcr.io/token?service=ghcr.io&scope=repository:$repository:pull" ;;
         *) echo "mirror.sh: no token service known for $registry" >&2; return 2 ;;
     esac
-    answer=$(curl --silent --show-error --include "${CURL_LIMITS[@]}" ${netrc:+--netrc-file "$netrc"} "$url") || return 2
+    answer=$(curl --disable --silent --show-error --include "${CURL_LIMITS[@]}" ${netrc:+--netrc-file "$netrc"} "$url") || return 2
     status=$(http_status "$answer")
     case $status in
         200) ;;
@@ -149,7 +151,7 @@ registry_digest() {
     host=$registry
     [ "$registry" != docker.io ] || host=registry-1.docker.io
     token=$(registry_token "$registry" "$repository" "$netrc") || return
-    answer=$(printf 'Authorization: Bearer %s\n' "$token" | curl --silent --show-error --head "${CURL_LIMITS[@]}" \
+    answer=$(printf 'Authorization: Bearer %s\n' "$token" | curl --disable --silent --show-error --head "${CURL_LIMITS[@]}" \
         --header @- --header "Accept: $MANIFEST_TYPES" \
         "https://$host/v2/$repository/manifests/$tag") || return 2
     status=$(http_status "$answer")
@@ -259,7 +261,7 @@ mirror_missing() {
 registry_answer() {
     local token=$1 url=$2
     shift 2
-    printf 'Authorization: Bearer %s\n' "$token" | curl --silent --show-error --include "${CURL_LIMITS[@]}" \
+    printf 'Authorization: Bearer %s\n' "$token" | curl --disable --silent --show-error --include "${CURL_LIMITS[@]}" \
         --header @- "$@" "$url" || return 2
 }
 
