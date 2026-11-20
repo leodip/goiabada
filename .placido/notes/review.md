@@ -17,8 +17,9 @@
 - **Data changes must hold on all four engines.** Look for SQL that differs between
   engines without a case for each, and run the changed data tier on at least one
   real engine besides SQLite (`data postgres`, for example). On MySQL, check that a
-  sweep, a revocation or a deletion does not read the rows it must catch after an
-  ordinary read has fixed the snapshot ("MySQL snapshots" in `docs/development/data.md`).
+  sweep, a revocation or a deletion does not read the rows it must catch with an
+  ordinary read once an earlier ordinary read has fixed the snapshot; a locking read
+  sees them ("MySQL snapshots" in `docs/development/data.md`).
 - **Guards that read code or a workflow** follow "Guards that read code or
   configuration" in `docs/development/guards.md`. A finding shown only in a fixture of
   a form the tree does not write is minor; say in it whether the guard reads the real
