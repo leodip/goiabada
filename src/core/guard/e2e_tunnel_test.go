@@ -1,3 +1,5 @@
+//go:build linux
+
 package guard
 
 // The e2e suite reads the mail through an SSH tunnel to Mailpit on the VPS (e2e/test.sh). A network
@@ -8,16 +10,20 @@ package guard
 // (SSH_OPTS), and keep_tunnel opens the tunnel again, on the same port, whenever its ssh exits.
 //
 // These tests source lib.sh with ssh and scp replaced by a stub that logs its arguments and then
-// exits or stays up, as a plan the test writes says, call by call.
+// exits or stays up, as a plan the test writes says, call by call. They run on Linux, whose process
+// groups and subreapers let a run end everything it started.
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -50,9 +56,13 @@ type e2eLibRun struct {
 }
 
 // runE2ELib sources e2e/infra/lib.sh and runs script after it, with ssh and scp the stub following
-// plan, the VPS vps.example and its user root.
+// plan, the VPS vps.example and its user root. The script and every job it starts run in a process
+// group of their own. A run that times out is killed as a group, and whatever of the group outlives
+// the script, a keeper the script never stopped or the stub it started, is killed and reaped when the
+// run ends, however it ends.
 func runE2ELib(t *testing.T, plan []string, script string) e2eLibRun {
 	t.Helper()
+	require.NoError(t, becomeSubreaper(), "making the test process the reaper of what the scripts leave")
 	stub := t.TempDir()
 	bin := filepath.Join(stub, "bin")
 	require.NoError(t, os.MkdirAll(bin, 0o755))
@@ -66,18 +76,50 @@ func runE2ELib(t *testing.T, plan []string, script string) e2eLibRun {
 	defer cancel()
 	lib := filepath.Join(filepath.Dir(SourceRoot(t)), "e2e", "infra", "lib.sh")
 	cmd := exec.CommandContext(ctx, "bash", "-c", `. "$1" || exit 1`+"\n"+script, "bash", lib)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.Cancel = func() error { return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) }
 	cmd.WaitDelay = time.Second
 	cmd.Env = []string{
 		"PATH=" + bin + ":" + os.Getenv("PATH"), "STUB=" + stub, "HOME=" + stub,
 		"E2E_VPS_HOST=vps.example", "E2E_VPS_USER=root",
 	}
 	out, err := cmd.CombinedOutput()
+	endProcessGroup(cmd)
 	require.NoError(t, err, "%s", out)
 	run := e2eLibRun{out: string(out), stub: stub}
 	if log, err := os.ReadFile(filepath.Join(stub, "log")); err == nil {
 		run.calls = strings.Split(strings.TrimRight(string(log), "\n"), "\n")
 	}
 	return run
+}
+
+// prSetChildSubreaper is PR_SET_CHILD_SUBREAPER, from linux/prctl.h.
+const prSetChildSubreaper = 36
+
+// becomeSubreaper makes the test process the parent of every process orphaned below it, in place of
+// the init of its PID namespace. The dev container's init is sleep (src/.devcontainer), which reaps
+// nothing.
+var becomeSubreaper = sync.OnceValue(func() error {
+	if _, _, errno := syscall.RawSyscall(syscall.SYS_PRCTL, prSetChildSubreaper, 1, 0); errno != 0 {
+		return errno
+	}
+	return nil
+})
+
+// endProcessGroup kills what is left of the process group cmd led and reaps it, once Wait has reaped
+// cmd's own process. What that process left behind is then the test process's child (becomeSubreaper),
+// and wait4 on the group returns ECHILD once none is left.
+func endProcessGroup(cmd *exec.Cmd) {
+	if cmd.Process == nil {
+		return // it never started
+	}
+	pgid := cmd.Process.Pid
+	_ = syscall.Kill(-pgid, syscall.SIGKILL)
+	for {
+		if _, err := syscall.Wait4(-pgid, nil, 0, nil); err != nil && !errors.Is(err, syscall.EINTR) {
+			return
+		}
+	}
 }
 
 // waitForStub waits, in the script, until the stub has been called n times, and stops the script if

@@ -53,10 +53,10 @@ scp_vps() { scp -q "${SSH_OPTS[@]}" "$@"; }
 # not connect, the tunnel is opened again on the same port, so an address handed to the tests stays
 # right. The wait before each try doubles while tries fail at once, up to 30 seconds, and each
 # reopening is reported on standard error with the time. Run it in the background and stop it with
-# kill, which ends its ssh too.
+# kill, which ends its ssh too: keep_tunnel exits once its ssh has.
 keep_tunnel() { # local_port remote_port
   local ssh_pid="" pause_pid="" status started delay=1
-  trap 'kill $ssh_pid $pause_pid 2>/dev/null; exit 0' TERM
+  trap 'kill $ssh_pid $pause_pid 2>/dev/null; wait $ssh_pid $pause_pid 2>/dev/null; exit 0' TERM
   while :; do
     started=$SECONDS
     ssh "${SSH_OPTS[@]}" -o ExitOnForwardFailure=yes -N -L "127.0.0.1:$1:127.0.0.1:$2" \
