@@ -2,12 +2,13 @@ package integration
 
 import (
 	"context"
+	"database/sql"
+	"fmt"
 	"net/http"
 	"net/url"
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/otp/otptest"
 	"github.com/leodip/goiabada/authserver/internal/record"
@@ -15,19 +16,30 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// createdAuthCodeEvents counts the created_auth_code rows about userId: one per code /auth/issue
-// stored for them.
-func createdAuthCodeEvents(t *testing.T, userId int64) int {
+// storedCodeIds lists, in order, the ids of the codes rows stored for userId: what /auth/issue
+// committed for them, read from the table itself. The issuer commits a code before its response is
+// written, so a read after the response sees it.
+func storedCodeIds(t *testing.T, userId int64) []int64 {
 	t.Helper()
-	rows, err := database.GetAuditLogsByUserId(context.Background(), nil, userId)
-	require.NoError(t, err)
-	count := 0
-	for _, row := range rows {
-		if row.AuditEvent == audit.EventCreatedAuthCode {
-			count++
+	var ids []int64
+	require.NoError(t, database.RunInTransaction(context.Background(), func(tx *sql.Tx) error {
+		ids = nil
+		rows, err := tx.QueryContext(context.Background(),
+			fmt.Sprintf("SELECT id FROM codes WHERE user_id = %d ORDER BY id", userId))
+		if err != nil {
+			return err
 		}
-	}
-	return count
+		defer func() { _ = rows.Close() }()
+		for rows.Next() {
+			var id int64
+			if err := rows.Scan(&id); err != nil {
+				return err
+			}
+			ids = append(ids, id)
+		}
+		return rows.Err()
+	}))
+	return ids
 }
 
 // TestIssue_ALevelItsMethodsDoNotEarnSignsInAgain: a browser's session is stored at
@@ -38,8 +50,6 @@ func createdAuthCodeEvents(t *testing.T, userId int64) int {
 // other request starts over at the password step, with no code stored either way. The sign-in that
 // starts over earns its own level (#199 decisions 6 and 7).
 func TestIssue_ALevelItsMethodsDoNotEarnSignsInAgain(t *testing.T) {
-	enableAuditLogsInDatabase(t)
-
 	// A level 3 sign-in, password and code, which leaves a level 3 session naming "pwd otp".
 	level3Client, level3RedirectUri, user, password, otpSecret := createLevel2MandatoryUser(t, true)
 	httpClient, otpPage, otpUrl := startOtpCeremony(t, level3Client, level3RedirectUri, user, password, "")
@@ -51,10 +61,10 @@ func TestIssue_ALevelItsMethodsDoNotEarnSignsInAgain(t *testing.T) {
 	location = assertRedirect(t, resp, "/auth/issue")
 	_ = resp.Body.Close()
 	resp = loadPage(t, httpClient, location)
-	_ = issuedCode(t, resp)
+	level3Code := issuedCode(t, resp)
 	_ = resp.Body.Close()
-	require.Eventually(t, func() bool { return createdAuthCodeEvents(t, user.Id) == 1 }, afterResponseWait,
-		100*time.Millisecond, "the level 3 sign-in stored one code")
+	codesBefore := storedCodeIds(t, user.Id)
+	require.Equal(t, []int64{level3Code.Id}, codesBefore, "the level 3 sign-in stored one code")
 
 	// The session's methods lose the code, its level kept.
 	sessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
@@ -90,12 +100,14 @@ func TestIssue_ALevelItsMethodsDoNotEarnSignsInAgain(t *testing.T) {
 	assert.Equal(t, "login_required", answer.Query().Get("error"))
 	assert.Equal(t, state, answer.Query().Get("state"))
 	assert.Empty(t, answer.Query().Get("code"), "no code")
+	assert.Equal(t, codesBefore, storedCodeIds(t, user.Id), "the silent refusal stored no code")
 
 	// Interactive: the single sign-on reaches /auth/issue too, and is sent back to the password step.
 	where, page, _ := authorizeOnExistingSession(t, httpClient, level1Client, level1RedirectUri)
 	require.Equal(t, "/auth/issue", where, "nothing before issuance refuses the sign-on")
 	location = assertRedirect(t, page, "/auth/level1")
 	_ = page.Body.Close()
+	assert.Equal(t, codesBefore, storedCodeIds(t, user.Id), "the interactive refusal stored no code")
 	resp = loadPage(t, httpClient, location)
 	location = assertRedirect(t, resp, "/auth/pwd")
 	_ = resp.Body.Close()
@@ -117,12 +129,8 @@ func TestIssue_ALevelItsMethodsDoNotEarnSignsInAgain(t *testing.T) {
 	_ = resp.Body.Close()
 	assert.Equal(t, record.AcrLevel1, code.AcrLevel, "the level a password alone earns")
 	assert.Equal(t, "pwd", code.AuthMethods)
-
-	// The restarted sign-in's code bounds the wait: once its row is stored, a code stored by either
-	// refusal would be too. The level 3 sign-in's and the restarted one's are the only two.
-	require.Eventually(t, func() bool { return createdAuthCodeEvents(t, user.Id) >= 2 }, afterResponseWait,
-		100*time.Millisecond, "the restarted sign-in stored its code")
-	assert.Equal(t, 2, createdAuthCodeEvents(t, user.Id), "neither refused sign-in stored a code")
+	assert.Equal(t, []int64{level3Code.Id, code.Id}, storedCodeIds(t, user.Id),
+		"the level 3 sign-in's code and the restarted one's are the only two stored")
 
 	// The session behind it now claims what its methods name.
 	repaired, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, session.SessionIdentifier)

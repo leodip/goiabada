@@ -751,8 +751,10 @@ that session, so its token ACR is the target (#537).
 
 A stored sign-in (`codes`) keeps its level and methods, and every refresh of its grant copies them
 into the new tokens. A level never claims a second factor its methods do not name: `level2_mandatory`
-needs `otp` or `recovery_code` in the methods, whole, case-exact names in the space-separated list,
-and `ceremony.LevelClaimsUnnamedFactor` is the rule's one statement (#199). Releases before 1.7.0
+needs `otp` or `recovery_code` in the methods, whole, case-exact names in the list split on single
+spaces, the boundaries migration 000097 matches; a tab separates nothing there, though
+`AuthContext.ClaimsOTP`, which triggers the authenticator checks, splits on any whitespace.
+`ceremony.LevelClaimsUnnamedFactor` is the rule's one statement (#199). Releases before 1.7.0
 broke it through three bugs, since fixed: the cross-user bind (#133), a user's own expired session
 lending its level to a fresh password sign-in, and `prompt=login` over a level 3 session (#537).
 Migration 000097 lowered every stored sign-in breaking it to `level1`, and changed nothing else; its

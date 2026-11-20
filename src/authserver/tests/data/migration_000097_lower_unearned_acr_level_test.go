@@ -2,13 +2,13 @@ package datatests
 
 import (
 	"context"
-	"errors"
+	"database/sql"
 	"fmt"
 	"slices"
+	"strconv"
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/data/migrator"
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
@@ -67,6 +67,12 @@ func signInShapes000097() []signInShape000097 {
 		{mandatory, "pwd recovery_codes", level1, false, "recovery_codes starts with recovery_code but is not the name"},
 		{mandatory, "pwd OTP", level1, false, "the name is case-exact, so OTP names no second factor"},
 		{mandatory, "pwd Recovery_Code", level1, false, "the name is case-exact, so Recovery_Code names no second factor"},
+		{mandatory, "pwd\totp", level1, false,
+			"a tab is not the list's separator, so pwd<tab>otp is one name, neither otp nor recovery_code; issuance reads it so too"},
+		{mandatory, "pwd\trecovery_code", level1, false,
+			"a tab is not the list's separator, so pwd<tab>recovery_code names no second factor"},
+		{mandatory, "pwd  otp", mandatory, true,
+			"two spaces leave an empty name between them, and otp is still named whole; issuance reads it so too"},
 		{mandatory, "pwd o\u00adtp", level1, false,
 			"a soft hyphen inside otp, which a linguistic collation ignores: the name is matched character for character"},
 		{mandatory, "pwd recovery\u00ad_code", level1, false,
@@ -90,6 +96,12 @@ func signInShapes000097() []signInShape000097 {
 //     lowers among those naming only methods some release has written.
 //  3. The down migration leaves every row as the up left it, and 000097 applies again after it,
 //     changing nothing more.
+//  4. The grant lives on and nobody is signed out (#199 decision 1): a live offline refresh token
+//     of a lowered sign-in, and a live browser session stored at the level the migration lowers in
+//     codes, are byte for byte as they were across the up, the down and the re-applied up.
+//
+// Every baseline is read at 000096, straight after seeding, so nothing a migration writes, the
+// down's included, is part of what the rows are compared against.
 //
 // Run per dialect via: ./run-tests.sh --type data --db <sqlite|mysql|postgres|mssql>
 //
@@ -100,11 +112,10 @@ func TestMigration000097_LowerUnearnedAcrLevel(t *testing.T) {
 	ctx := context.Background()
 	h := newIsolatedDB(t)
 
-	// Seeded through the ORM at head, then carried down to 000096, on 000062's pattern: the ORM
-	// writes every column the record carries, so it can only write at head.
-	if err := h.Migrator.Up(ctx); err != nil && !errors.Is(err, migrator.ErrNoChange) {
-		require.NoError(t, err, "migrate to head before seeding through the ORM")
-	}
+	// Seeded through the ORM at 000096 itself, so no down migration runs before the baselines are
+	// read. The ORM writes every column the record carries, which is head's schema; 000097 changes
+	// data only, so 000096's schema is head's.
+	require.NoErrorf(t, h.Migrator.Migrate(ctx, beforeLowerUnearnedLevel000097), "migrate to 000096 on %s", dbType())
 	user := &record.User{Subject: fake.UUID(), Email: fake.Email(), Enabled: true}
 	require.NoError(t, h.DB.CreateUser(ctx, nil, user))
 	client := &record.Client{ClientIdentifier: "m97_" + fake.LetterN(6), Description: "Migration 000097 test client"}
@@ -115,8 +126,12 @@ func TestMigration000097_LowerUnearnedAcrLevel(t *testing.T) {
 	for i, s := range shapes {
 		ids[i] = createSignIn000097(t, h, client.Id, user.Id, s.level, s.methods)
 	}
-
-	require.NoErrorf(t, h.Migrator.Migrate(ctx, beforeLowerUnearnedLevel000097), "roll back to 000096 on %s", dbType())
+	// 4. The first shape is the one the migration exists for: a password alone at the highest
+	// level. Its grant's live offline refresh token, and a live browser session of the user stored
+	// at that same unearned pair.
+	require.Equal(t, "pwd", shapes[0].methods, "the first shape is the password-only sign-in at the highest level")
+	refreshTokenId := createOfflineRefreshToken000097(t, h, ids[0])
+	sessionId := createBrowserSession000097(t, h, user.Id)
 
 	before := make([]map[string]string, len(shapes))
 	for i := range shapes {
@@ -124,6 +139,9 @@ func TestMigration000097_LowerUnearnedAcrLevel(t *testing.T) {
 		require.Equalf(t, shapes[i].level, before[i]["acr_level"], "seeded level of %q", shapes[i].methods)
 		require.Equalf(t, shapes[i].methods, before[i]["auth_methods"], "seeded methods of %q", shapes[i].methods)
 	}
+	refreshTokenBefore := row000097(t, h, "refresh_tokens", refreshTokenId)
+	require.Equalf(t, ids[0], mustInt000097(t, refreshTokenBefore["code_id"]), "the refresh token belongs to the lowered sign-in")
+	sessionBefore := row000097(t, h, "user_sessions", sessionId)
 
 	// 2, first half: what the release-note query lists before the upgrade.
 	listed := releaseNoteQueryIds000097(t, h)
@@ -145,6 +163,9 @@ func TestMigration000097_LowerUnearnedAcrLevel(t *testing.T) {
 		}
 	}
 
+	// 4.
+	assertGrantAndSessionKept000097(t, h, "the up", refreshTokenId, refreshTokenBefore, sessionId, sessionBefore)
+
 	// 2, second half: among the rows naming only real methods, the query listed exactly the ones
 	// the migration lowered.
 	for i, s := range shapes {
@@ -163,11 +184,90 @@ func TestMigration000097_LowerUnearnedAcrLevel(t *testing.T) {
 		assert.Equalf(t, after[i], codeRow000097(t, h, ids[i]),
 			"3. on %s the down migration is a no-op: the sign-in with methods %q stays as the up left it", dbType(), s.methods)
 	}
+	assertGrantAndSessionKept000097(t, h, "the down", refreshTokenId, refreshTokenBefore, sessionId, sessionBefore)
 	require.NoErrorf(t, h.Migrator.Migrate(ctx, lowerUnearnedLevel000097), "re-apply 000097 on %s", dbType())
 	for i, s := range shapes {
 		assert.Equalf(t, after[i], codeRow000097(t, h, ids[i]),
 			"3. on %s the re-applied up changes nothing more on the sign-in with methods %q", dbType(), s.methods)
 	}
+	assertGrantAndSessionKept000097(t, h, "the re-applied up", refreshTokenId, refreshTokenBefore, sessionId, sessionBefore)
+}
+
+// assertGrantAndSessionKept000097 checks property 4 after the migration step named by step: the
+// refresh token and the browser session are each the row they were at seeding, every column.
+func assertGrantAndSessionKept000097(t *testing.T, h *isolatedDB, step string,
+	refreshTokenId int64, refreshTokenBefore map[string]string, sessionId int64, sessionBefore map[string]string) {
+	t.Helper()
+	refreshToken := row000097(t, h, "refresh_tokens", refreshTokenId)
+	assert.Equalf(t, refreshTokenBefore, refreshToken,
+		"4. on %s %s leaves the lowered sign-in's offline refresh token as it was: the grant lives on", dbType(), step)
+	assert.Equalf(t, "false", boolText000097(refreshToken["revoked"]),
+		"4. on %s the refresh token is still live after %s", dbType(), step)
+	assert.Equalf(t, sessionBefore, row000097(t, h, "user_sessions", sessionId),
+		"4. on %s %s leaves the browser session as it was: nobody is signed out", dbType(), step)
+}
+
+// createOfflineRefreshToken000097 stores a live offline refresh token of the sign-in codeId, bound
+// to its session, and returns its id.
+func createOfflineRefreshToken000097(t *testing.T, h *isolatedDB, codeId int64) int64 {
+	t.Helper()
+	code := codeRow000097(t, h, codeId)
+	now := time.Now().UTC().Truncate(time.Second)
+	jti := "m97jti_" + fake.LetterN(8)
+	refreshToken := &record.RefreshToken{
+		CodeId:               sql.NullInt64{Int64: codeId, Valid: true},
+		RefreshTokenJti:      jti,
+		FirstRefreshTokenJti: jti,
+		SessionIdentifier:    code["session_identifier"],
+		RefreshTokenType:     "Offline",
+		Scope:                "openid offline_access",
+		IssuedAt:             sql.NullTime{Time: now, Valid: true},
+		ExpiresAt:            sql.NullTime{Time: now.Add(30 * 24 * time.Hour), Valid: true},
+		MaxLifetime:          sql.NullTime{Time: now.Add(365 * 24 * time.Hour), Valid: true},
+		Revoked:              false,
+	}
+	require.NoErrorf(t, h.DB.CreateRefreshToken(context.Background(), nil, refreshToken), "store the offline refresh token on %s", dbType())
+	return refreshToken.Id
+}
+
+// createBrowserSession000097 stores a live browser session of userId at the highest level with a
+// password alone, the pair the migration lowers in codes and leaves in sessions, and returns its id.
+func createBrowserSession000097(t *testing.T, h *isolatedDB, userId int64) int64 {
+	t.Helper()
+	now := time.Now().UTC().Truncate(time.Second)
+	session := &record.UserSession{
+		SessionIdentifier: "m97session_" + fake.LetterN(8),
+		Started:           now,
+		LastAccessed:      now,
+		AuthTime:          now,
+		PasswordAuthTime:  now,
+		AuthMethods:       "pwd",
+		AcrLevel:          record.AcrLevel2Mandatory,
+		IpAddress:         "192.0.2.1",
+		UserId:            userId,
+	}
+	require.NoErrorf(t, h.DB.CreateUserSession(context.Background(), nil, session), "store the browser session on %s", dbType())
+	return session.Id
+}
+
+// boolText000097 reads a boolean column as row000097 renders it on any engine: SQLite, SQL Server
+// and MySQL hand back 0 or 1 (or true or false), PostgreSQL true or false.
+func boolText000097(value string) string {
+	switch value {
+	case "1", "true":
+		return "true"
+	case "0", "false":
+		return "false"
+	}
+	return value
+}
+
+// mustInt000097 parses an id column as row000097 renders it.
+func mustInt000097(t *testing.T, value string) int64 {
+	t.Helper()
+	id, err := strconv.ParseInt(value, 10, 64)
+	require.NoErrorf(t, err, "parse %q as an id", value)
+	return id
 }
 
 // createSignIn000097 stores one sign-in of client and user at level with methods, and returns its
@@ -201,13 +301,19 @@ func createSignIn000097(t *testing.T, h *isolatedDB, clientId, userId int64, lev
 // should not touch is compared whatever it is.
 func codeRow000097(t *testing.T, h *isolatedDB, id int64) map[string]string {
 	t.Helper()
-	rows, err := h.SQL.Query(fmt.Sprintf("SELECT * FROM codes WHERE id = %d", id))
-	require.NoErrorf(t, err, "read codes.id=%d on %s", id, dbType())
+	return row000097(t, h, "codes", id)
+}
+
+// row000097 reads every column of the row of table with id in SQL, as text.
+func row000097(t *testing.T, h *isolatedDB, table string, id int64) map[string]string {
+	t.Helper()
+	rows, err := h.SQL.Query(fmt.Sprintf("SELECT * FROM %s WHERE id = %d", table, id))
+	require.NoErrorf(t, err, "read %s.id=%d on %s", table, id, dbType())
 	defer func() { _ = rows.Close() }()
 
 	columns, err := rows.Columns()
 	require.NoError(t, err)
-	require.Truef(t, rows.Next(), "codes.id=%d is gone on %s; this migration deletes nothing", id, dbType())
+	require.Truef(t, rows.Next(), "%s.id=%d is gone on %s; this migration deletes nothing", table, id, dbType())
 	values := make([]any, len(columns))
 	pointers := make([]any, len(columns))
 	for i := range values {

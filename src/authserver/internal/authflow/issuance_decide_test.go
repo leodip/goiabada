@@ -695,6 +695,52 @@ func TestDecideIssuance(t *testing.T) {
 			wantReads: []issuanceFact{registration, flows, session, validity, user},
 		},
 		{
+			// Migration 000097 splits the list on single spaces and lowers this row, so issuance
+			// reads it on the same boundaries. ClaimsOTP still reads a code here, so the
+			// authenticator checks ran first and passed.
+			name: "otp after a tab names no second factor",
+			world: with(func(w *issuanceWorld) {
+				w.acrLevel = record.AcrLevel2Mandatory
+				w.methods = "pwd\totp"
+				w.claimsOTP = true
+			}),
+			want:      issuanceAnswer{outcome: issuanceRefuseUnusableSession, sessionShape: sessionLevelUnearned},
+			wantReads: []issuanceFact{registration, flows, session, validity, user},
+		},
+		{
+			name: "an implicit ceremony naming recovery_code after a tab restarts",
+			world: with(func(w *issuanceWorld) {
+				w.responseType = "id_token"
+				w.acrLevel = record.AcrLevel2Mandatory
+				w.methods = "pwd\trecovery_code"
+				w.claimsOTP = true
+			}),
+			want:      issuanceAnswer{outcome: issuanceRefuseUnusableSession, sessionShape: sessionLevelUnearned},
+			wantReads: []issuanceFact{registration, flows, session, validity, user},
+		},
+		{
+			name: "a removed authenticator is named before otp after a tab",
+			world: with(func(w *issuanceWorld) {
+				w.acrLevel = record.AcrLevel2Mandatory
+				w.methods = "pwd\totp"
+				w.claimsOTP = true
+				w.noAuthenticator = true
+			}),
+			want:      issuanceAnswer{outcome: issuanceRefuseUnusableSession, sessionShape: sessionAuthenticatorRemoved},
+			wantReads: []issuanceFact{registration, flows, session, validity, user},
+		},
+		{
+			// Two spaces leave an empty name between them; the migration keeps this row too.
+			name: "otp after two spaces still names a second factor",
+			world: with(func(w *issuanceWorld) {
+				w.acrLevel = record.AcrLevel2Mandatory
+				w.methods = "pwd  otp"
+				w.claimsOTP = true
+			}),
+			want:      issuanceAnswer{outcome: issuanceIssueCode},
+			wantReads: []issuanceFact{registration, flows, session, validity, user, scope},
+		},
+		{
 			name: "a one-time-code sign-in at level 3 issues a code",
 			world: with(func(w *issuanceWorld) {
 				w.acrLevel = record.AcrLevel2Mandatory

@@ -471,16 +471,27 @@ func namesSecondFactor(authMethods string) bool {
 
 // LevelClaimsUnnamedFactor reports whether acrLevel claims a second factor that authMethods, the
 // space-separated amr list, does not name. It is the one statement of the rule a sign-in's level
-// keeps: urn:goiabada:level2_mandatory is earned only by methods naming otp or recovery_code, read
-// as ClaimsOTP reads them, and the two lower levels claim no second factor. #828, which makes each
-// level's methods configurable, replaces this definition.
+// keeps: urn:goiabada:level2_mandatory is earned only by methods naming otp or recovery_code, and
+// the two lower levels claim no second factor. #828, which makes each level's methods configurable,
+// replaces this definition.
+//
+// A method is named when the list, split on single spaces, holds exactly that name, case included:
+// the boundaries migration 000097 matches in SQL, so issuance accepts no list the migration would
+// lower. A tab or other whitespace is not a separator here, unlike in ClaimsOTP, which reads every
+// whitespace as one so that the authenticator checks it guards fire on any list naming a code.
+// AddAuthMethod writes single spaces, so the two readings differ only on a list no release wrote.
 //
 // Releases before 1.7.0 stored sign-ins breaking it, through three bugs since fixed (#133, #537),
 // and migration 000097 lowered every one of them to level 1. /auth/issue refuses to issue a code or
 // implicit tokens for a ceremony breaking it, so a bug that writes the pair again is refused there
 // rather than carried into a grant (#199).
 func LevelClaimsUnnamedFactor(acrLevel record.AcrLevel, authMethods string) bool {
-	return acrLevel == record.AcrLevel2Mandatory && !namesSecondFactor(authMethods)
+	if acrLevel != record.AcrLevel2Mandatory {
+		return false
+	}
+	methods := strings.Split(authMethods, " ")
+	return !slices.Contains(methods, oidc.AuthMethodOTP.String()) &&
+		!slices.Contains(methods, oidc.AuthMethodRecoveryCode.String())
 }
 
 // RequestedMaxAge is the client's max_age as every hop after /auth/authorize reads it: nil when
