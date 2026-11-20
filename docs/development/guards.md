@@ -175,7 +175,9 @@ timezones tables, which have generators of their own, out of it (#338).
 
 `./run-tests.sh --type lint` runs golangci-lint and `unparam -exported` over the four modules with
 the commands CI's Lint job uses, then regenerates the Tailwind CSS, the mocks and the core ownership
-table and fails if any differs from what is committed; `all` includes it. It fails rather than skips
+table and fails if any differs from what is committed, and runs `check-openapi-client.sh`, which
+generates a Go client from `web/openapi.yaml` with oapi-codegen at its `versions.yaml` pin, with
+`response-type-suffix: Result`, and fails unless it builds and vets; `all` includes it. It fails rather than skips
 when a binary is missing, and refuses `--race`. It is where `sloglint` holds most of the logging
 convention in [Logging](conventions.md#logging), which is why it is a tier of the script and not
 CI-only (#320), and where `gosec` holds shipping code to every rule, each false positive suppressed
@@ -186,7 +188,10 @@ set holds the tree, each measured before it was enabled and listed with why in t
 each was CI-only and nothing local could see it: a template class that never reached `main.css`
 (#328) and sixteen mocks stale against their own pin (#338). `unparam` joined them for the same
 reason: #385 moved an exported parse into the module whose two call sites discard its result, and
-only CI could see the finding (#385).
+only CI could see the finding (#385). The client check is here and in CI's Lint job, through the one
+script, because every other check on the document compares it with this repository's source, and
+oapi-codegen's default settings generated a client from it that failed on 57 name collisions with
+nothing to say so (#261).
 
 ## Agent instruction guard
 

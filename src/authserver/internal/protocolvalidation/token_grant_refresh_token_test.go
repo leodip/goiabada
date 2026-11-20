@@ -2103,19 +2103,20 @@ func TestValidateTokenRequest_RefreshToken_ExpiryPrecedesTheLookup(t *testing.T)
 	mockTokenParser.AssertExpectations(t)
 }
 
-// TestValidateTokenRequest_RefreshToken_SessionOwnership covers the refresh half of #133's
-// post-issuance backstop: a normal refresh token names a session in its `sid`, and until this
-// check nothing on the path compared that session's owner with the grant's user.
+// TestValidateTokenRequest_RefreshToken_SessionOwnership covers the session-bound half of the
+// ownership rule #133 introduced: a normal refresh token names a session in its `sid`, and every
+// refresh compares that session's owner with the grant's user.
 //
 // The two subtests differ in exactly one field, the session's UserId, so neither can pass with
 // the comparison removed. Everything else is the ordinary auth code flow refresh: the grant
 // belongs to user 1, the client matches, the session is well inside both its idle timeout and
 // its max lifetime.
 //
-// A cross-bound grant is no longer reachable through issuance, so what this protects is the
-// tokens minted before that fix. Left unchecked they refresh indefinitely against a stranger's
-// session and bump it on the way, which both keeps that session alive on someone else's
-// activity and ends the grant when its owner signs out.
+// A ceremony can no longer bind a grant to another user's session, so the comparison holds the
+// rule itself for every session-bound grant: a second line that refuses a violation whatever
+// produced it (#199 decision 5). A grant refreshed against a stranger's session would bump that
+// session on the way, keeping it alive on someone else's activity, and would end when its owner
+// signs out.
 func TestValidateTokenRequest_RefreshToken_SessionOwnership(t *testing.T) {
 	const grantUserId = int64(1)
 
@@ -2228,13 +2229,17 @@ func TestValidateTokenRequest_RefreshToken_SessionOwnership(t *testing.T) {
 	})
 }
 
-// TestValidateTokenRequest_OfflineRefreshToken_SessionOwnership covers the last shape #133's
-// decision 8 reaches: an offline refresh token descended from a cross-bound authorization
-// code. The Offline arm deliberately never consults the session, because an offline grant is
-// meant to outlive the browser session it came from, and that silence is what a pre-fix
-// cross-bound grant rode for the whole offline maximum lifetime, seeded at a year, re-copying
-// the code's inherited acr on every rotation. Only acr was inherited: amr and auth_time
-// described the ceremony that actually happened.
+// TestValidateTokenRequest_OfflineRefreshToken_SessionOwnership covers the offline half of the
+// ownership rule #133 introduced: while an offline grant's session row exists, it belongs to the
+// grant's user. The Offline arm reads that row, named by the grant's code, only for this
+// comparison, because an offline grant is meant to outlive the browser session it came from and
+// its absence refuses nothing. Like the session-bound comparison, it holds the rule itself and
+// refuses a future violation whatever produced it (#199 decision 5).
+//
+// It is not what corrects the level of a grant cross-bound before #133's fix, whose session row
+// is long gone: migration 000097 lowered every stored sign-in whose level claims a second factor
+// its methods do not name, so its next refresh reads the lowered level, and /auth/issue refuses to
+// issue such a level (ceremony.LevelClaimsUnnamedFactor, #199).
 //
 // The three rows are the same three the code branch has, and the middle one carries the same
 // weight for a stronger reason here: "the session is gone" is not an edge case for an offline

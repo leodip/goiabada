@@ -17,7 +17,8 @@
 #                                             per module, plus
 #                                             checks that the generated Tailwind CSS, the
 #                                             mocks and the core symbol ownership table
-#                                             are committed
+#                                             are committed, and that a Go client
+#                                             generated from web/openapi.yaml compiles
 #                             setup         - the setup wizard module, src/cmd/goiabada-setup;
 #                                             never builds; in all, not in modules
 #                             modules       - shorthand for internal+core+adminconsole
@@ -93,7 +94,8 @@
 #     pins, which the dev container installs. Without them the tier fails rather
 #     than skipping: a tier that reports green having run nothing is the failure
 #     this script's comments keep returning to. Refused with --race, which it
-#     does not cover.
+#     does not cover. Its OpenAPI client check fetches oapi-codegen through the
+#     Go module proxy, so it needs the network.
 #   * Rate limiter is disabled via GOIABADA_AUTHSERVER_RATELIMITER_ENABLED=false.
 #   * The integration server runs with its metrics listener on, on port 19190,
 #     which the integration tier scrapes (#400). CI runs this script, so it does too.
@@ -921,6 +923,22 @@ if should_run_lint; then
     fi
     gha_endgroup
     gha_summary_row "Core symbol ownership" "-" "pass" "$(fmt_duration $((SECONDS - start)))"
+
+    # web/openapi.yaml is the contract the auth server serves, and the docs tell app developers
+    # to generate a client from it, but every other check on it compares it with this
+    # repository's Go source. This one runs a generator: oapi-codegen at its pin, whose Go client
+    # must build and vet (#261). The script is the one CI's Lint job runs, so the two cannot
+    # disagree; it writes nothing into the tree.
+    log="$LOG_DIR/00-lint-openapi-client.log"
+    echo "Checking a Go client generated from the OpenAPI document compiles... (log: $log)"
+    start=$SECONDS
+    gha_group "OpenAPI client"
+    if ! ./check-openapi-client.sh 2>&1 | tee "$log"; then
+        gha_summary_row "OpenAPI client" "-" "FAIL" "$(fmt_duration $((SECONDS - start)))"
+        fail_with "OpenAPI client" "$log"
+    fi
+    gha_endgroup
+    gha_summary_row "OpenAPI client" "-" "pass" "$(fmt_duration $((SECONDS - start)))"
 fi
 
 if should_run_internal; then
