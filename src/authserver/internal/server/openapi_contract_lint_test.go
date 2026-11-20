@@ -3229,7 +3229,10 @@ func (c *Clocked) Check() func(http.Handler) http.Handler {
 // reaches through it is read, and the writer beside it answers 422: an optional logger parameter one
 // branch replaces, a value a function of the core module returns, a method called on what an
 // internal helper returns, and a function literal called in place. A field of an interface type a
-// parameter fills the same way, which may hold a writer of the package, is still reported.
+// parameter fills the same way, which may hold a writer of the package, is still reported, and so
+// are a field of a function type, http.HandlerFunc, whose ServeHTTP calls the function of the
+// package it holds, and a path that goes on through a struct outside the package to a field of it
+// holding a writer.
 func TestRouteChains_AFieldOfATypeOutsideThePackageIsReadWhateverFilledIt(t *testing.T) {
 	root := t.TempDir()
 	routeShapesFixture(t, root, "\toptional := middleware.NewOptionalLogger(nil)\n"+
@@ -3241,7 +3244,11 @@ func TestRouteChains_AFieldOfATypeOutsideThePackageIsReadWhateverFilledIt(t *tes
 		"\tinPlace := middleware.NewLoggerInPlace(nil)\n"+
 		"\tpages.With(inPlace.Check()).Get(\"/logger-in-place\", apihandlers.HandleOkGet())\n"+
 		"\tswapped := middleware.NewSwappedWriter(nil)\n"+
-		"\tpages.With(swapped.Check()).Get(\"/swapped-writer\", apihandlers.HandleOkGet())\n")
+		"\tpages.With(swapped.Check()).Get(\"/swapped-writer\", apihandlers.HandleOkGet())\n"+
+		"\thandlerFunc := middleware.NewHandlerFuncDefault(nil)\n"+
+		"\tpages.With(handlerFunc.Check()).Get(\"/handler-func\", apihandlers.HandleOkGet())\n"+
+		"\tdeps := middleware.NewDepsDefault(nil)\n"+
+		"\tpages.With(deps.Check()).Get(\"/nested-deps\", apihandlers.HandleOkGet())\n")
 	writeDocFixture(t, root, "internal/helper/logger.go", `package helper
 
 import "log/slog"
@@ -3264,6 +3271,8 @@ type Typed struct {
 	logger    *slog.Logger
 	validator *inputvalidation.IdentifierValidator
 	refusals  writer
+	refusal   http.HandlerFunc
+	deps      *struct{ refusals writer }
 }
 
 func NewOptionalLogger(logger *slog.Logger) *Typed {
@@ -3299,12 +3308,34 @@ func NewSwappedWriter(refusals writer) *Typed {
 	return &Typed{refusals: refusals}
 }
 
+func NewHandlerFuncDefault(refusal http.HandlerFunc) *Typed {
+	if refusal == nil {
+		refusal = func(w http.ResponseWriter, r *http.Request) { unprocessable{}.refuse(w) }
+	}
+	return &Typed{refusal: refusal}
+}
+
+func NewDepsDefault(deps *struct{ refusals writer }) *Typed {
+	if deps == nil {
+		deps = &struct{ refusals writer }{refusals: unprocessable{}}
+	}
+	return &Typed{deps: deps}
+}
+
 func (m *Typed) Check() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if err := m.validator.Validate(r.PathValue("id"), true); err != nil {
 				m.logger.InfoContext(r.Context(), "refused")
 				m.refusals.refuse(w)
+				return
+			}
+			if r.URL == nil {
+				m.refusal.ServeHTTP(w, r)
+				return
+			}
+			if r.Method == "" {
+				m.deps.refusals.refuse(w)
 				return
 			}
 			next.ServeHTTP(w, r)
@@ -3314,9 +3345,13 @@ func (m *Typed) Check() func(http.Handler) http.Handler {
 `)
 	routes, handlers, report := fixtureRouteChains(t, root, 1, 1)
 
-	if report.Stopped || len(report.Errors) != 1 ||
-		!strings.Contains(report.Errors[0], "GET /swapped-writer mounts swapped.Check, which the status lint cannot read") {
-		t.Fatalf("only the writer field a reassigned parameter fills should fail the check: %+v", report)
+	joined := strings.Join(report.Errors, "\n")
+	if report.Stopped || len(report.Errors) != 3 ||
+		!strings.Contains(joined, "GET /swapped-writer mounts swapped.Check, which the status lint cannot read") ||
+		!strings.Contains(joined, "GET /handler-func mounts handlerFunc.Check, which the status lint cannot read") ||
+		!strings.Contains(joined, "GET /nested-deps mounts deps.Check, which the status lint cannot read") {
+		t.Fatalf("only the writer field, the handler function and the nested writer a reassigned parameter "+
+			"fills should fail the check, once each: %+v", report)
 	}
 	chains := map[string][]int{}
 	for _, r := range routes {
@@ -3330,7 +3365,7 @@ func (m *Typed) Check() func(http.Handler) http.Handler {
 	report = guard.Run(func(r guard.Reporter) {
 		assertDeclaresEveryStatus(r, routes, handlers, declaringEach(ids, 200))
 	})
-	joined := strings.Join(report.Errors, "\n")
+	joined = strings.Join(report.Errors, "\n")
 	if report.Stopped || len(report.Errors) != 4 ||
 		!strings.Contains(joined, "getOptionalLogger (GET /optional-logger) can answer 422 from optional.Check") ||
 		!strings.Contains(joined, "getCoreValidator (GET /core-validator) can answer 422 from validated.Check") ||
@@ -5974,9 +6009,12 @@ func chainStatuses(path string, fset *token.FileSet, fn *ast.FuncDecl,
 // field an unread helper filled, at any depth, recv.field.X, whose type it cannot tell, or names a
 // method of the package through a shadowing local, whose value it does not read. A shadowing name
 // declared with another package's type, such as a handler's w http.ResponseWriter, is not one: the
-// walk reads a call on it as it reads one on any value of another package, through chainStatuses. A field its struct
-// declares with a type outside the package, as fieldOutside reads it, such as a *slog.Logger, holds
-// nothing of the package whatever filled it, so the walk passes it by rather than stopping there.
+// walk reads a call on it as it reads one on any value of another package, through chainStatuses.
+// A field its struct declares with a type outside the package, as fieldOutside reads it, such as a
+// *slog.Logger, holds nothing of the package whatever filled it, so a call of its own method,
+// recv.logger.Info(...), passes it by rather than stopping the walk. A path that goes on through
+// it, recv.deps.x.M(...), still stops the walk, since a struct outside the package may have a
+// field that holds a writer of it.
 func (c *chainResolver) receiverCalls(fn *ast.FuncDecl, binding fieldBinding, p *goPackage) ([]chainWalk, map[*ast.SelectorExpr]bool, bool) {
 	if len(fn.Recv.List[0].Names) == 0 {
 		return nil, nil, false
@@ -6009,10 +6047,11 @@ func (c *chainResolver) receiverCalls(fn *ast.FuncDecl, binding fieldBinding, p 
 			return true
 		}
 		at := binding
-		for _, name := range path {
+		for i, name := range path {
 			field, filled := at.fields[name]
 			if field.unread {
-				unread = unread || !c.fieldOutside(p, at.typ, name)
+				last := i == len(path)-1 // the selector calls a method of the field itself
+				unread = unread || !last || !c.fieldOutside(p, at.typ, name)
 				return true
 			}
 			if !filled {
@@ -6049,7 +6088,9 @@ func declaredElsewhere(d *declaration) bool {
 // type typeOutside reads as outside p, such as a *slog.Logger or a pointer to a struct of the core
 // module. A value of that type holds nothing a walk of p can reach through, whichever value filled
 // the field, a parameter reassigned on one branch or a helper's result alike. A field of an
-// interface type, which may hold a writer of p, or of a type the lint cannot find, is not outside.
+// interface type, which may hold a writer of p, or of a type the lint cannot find, is not outside,
+// and nor is one of a function type, such as http.HandlerFunc, whose value may be a function of p
+// that its ServeHTTP calls (funcTyped).
 func (c *chainResolver) fieldOutside(p *goPackage, typ, name string) bool {
 	declared, isDeclared := p.types[typ]
 	if !isDeclared {
@@ -6062,9 +6103,48 @@ func (c *chainResolver) fieldOutside(p *goPackage, typ, name string) bool {
 	for _, field := range st.Fields.List {
 		for _, id := range field.Names {
 			if id.Name == name {
-				return c.typeOutside(p, p, declared.imports, field.Type, typeParamNames(declared.spec.TypeParams), map[string]bool{})
+				return !c.funcTyped(declared.imports, field.Type) &&
+					c.typeOutside(p, p, declared.imports, field.Type, typeParamNames(declared.spec.TypeParams), map[string]bool{})
 			}
 		}
+	}
+	return false
+}
+
+// funcTyped reports whether t, spelled in a file with the imports imports, is a function type: one
+// spelled in place, a pointer to one, or a named type of another package defined as one, such as
+// http.HandlerFunc, read as typeOutside reads that package.
+func (c *chainResolver) funcTyped(imports fileImports, t ast.Expr) bool {
+	t = ast.Unparen(t)
+	if star, isStar := t.(*ast.StarExpr); isStar {
+		t = ast.Unparen(star.X)
+	}
+	switch x := t.(type) {
+	case *ast.FuncType:
+		return true
+	case *ast.SelectorExpr:
+		root, isIdent := ast.Unparen(x.X).(*ast.Ident)
+		if !isIdent {
+			return false
+		}
+		path, imported := imports[root.Name]
+		if !imported {
+			return false
+		}
+		if q, fromSource := c.sourcePkg(path); fromSource {
+			declared, isDeclared := q.types[x.Sel.Name]
+			return isDeclared && c.funcTyped(declared.imports, declared.spec.Type)
+		}
+		pkg, loaded := c.stdPackage(path)
+		if !loaded {
+			return false
+		}
+		named, isType := pkg.Scope().Lookup(x.Sel.Name).(*types.TypeName)
+		if !isType {
+			return false
+		}
+		_, isFunc := named.Type().Underlying().(*types.Signature)
+		return isFunc
 	}
 	return false
 }
