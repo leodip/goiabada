@@ -129,7 +129,7 @@ JavaScript can call `/auth/logout` across origins when its origin is registered 
 
 ## The audit log
 
-A sign-out with a confirmed hint leaves `deleted_user_session_client` in the [audit log](/concepts/audit-log/), for your app leaving the session, and `revoked_sign_out_grants`, naming the refresh tokens it revoked and how many codes. When yours was the session's last client, the session ends too, and it also leaves `deleted_user_session`, with the reason `signed_out`, and `logout`. One without a hint leaves `logout`, even when there was no session, and `deleted_user_session` when there was one. Each app told leaves `sent_logout_token`.
+A sign-out with a confirmed hint leaves `deleted_user_session_client` in the [audit log](/concepts/audit-log/), for your app leaving the session, and `revoked_sign_out_grants`, naming the refresh tokens it revoked and how many codes. When yours was the session's last client, the session ends too, and it also leaves `deleted_user_session`, with the reason `signed_out`, and `logout`. A sign-out without a confirmed hint, once the user clicks **Sign out**, leaves `logout`, even when there was no session, and `deleted_user_session` when there was one. Each app told leaves `sent_logout_token`.
 
 ## Next steps
 
