@@ -149,7 +149,7 @@ registry_digest() {
     repository=${rest%:*}
     tag=${rest##*:}
     host=$registry
-    [ "$registry" != docker.io ] || host=registry-1.docker.io
+    [ "$registry" != docker.io ] || host="registry-1.docker.io"
     token=$(registry_token "$registry" "$repository" "$netrc") || return
     answer=$(printf 'Authorization: Bearer %s\n' "$token" | curl --disable --silent --show-error --head "${CURL_LIMITS[@]}" \
         --header @- --header "Accept: $MANIFEST_TYPES" \
@@ -217,6 +217,7 @@ mirror_copy() {
     # The logins live in files of this run alone: curl reads a netrc and skopeo an auth file, and
     # the tokens reach neither on a command line, which any process on the runner can read.
     secrets=$(mktemp -d)
+    # shellcheck disable=SC2064 # $secrets is local to this function, gone by EXIT: expand it now.
     trap "rm -rf '$secrets'" EXIT
     (
         umask 077
