@@ -276,7 +276,9 @@ func findAdminRouteClassificationGaps(
 					"an admin route: " + registration.pathUnresolved})
 			continue
 		}
-		if !strings.HasPrefix(registration.path, adminRoutePrefix) {
+		// The admin group's own "/" is named /api/v1/admin, as the router names it, and the
+		// routes below it /api/v1/admin/...; a route such as /api/v1/administrators is neither.
+		if registration.path != adminRouteGroupPrefix && !strings.HasPrefix(registration.path, adminRoutePrefix) {
 			continue
 		}
 		routes++
@@ -1082,6 +1084,32 @@ func TestAdminRouteClassification_Guard_FailsOnAnUnclassifiedWriteThroughAReturn
 	require.Len(t, report.Errors, 1)
 	assert.Contains(t, report.Errors[0], "1 admin route(s)")
 	assert.Contains(t, report.Errors[0], "POST /api/v1/admin/jobs: a write route the policy does not classify; its handler applies no ceiling")
+}
+
+// The admin group's own "/" is named by the group's prefix, /api/v1/admin, as the router names it,
+// and is an admin route like the ones below it: a write there needs its row, and its row under that
+// name is not stale.
+func TestAdminRouteClassification_Guard_ReadsTheAdminGroupsOwnRoute(t *testing.T) {
+	root := writeAdminRouteFixture(t, adminRouteFixtureHandlers)
+	routes := strings.Replace(adminRouteFixtureRoutes, "\t\tr.Use(apiBearer.JwtAuthorizationHeaderToContext())\n",
+		"\t\tr.Use(apiBearer.JwtAuthorizationHeaderToContext())\n"+
+			"\t\tr.Post(\"/\", apihandlers.HandleUserCreatePost(s.database, auditLogger))\n", 1)
+	require.NotEqual(t, adminRouteFixtureRoutes, routes)
+	require.NoError(t, os.WriteFile(filepath.Join(root, filepath.FromSlash(adminRoutesFile)), []byte(routes), 0o600))
+
+	report := runAdminRouteGuard(root, adminRouteFixtureClassification(), adminRouteFixtureCeilings)
+
+	require.Len(t, report.Errors, 1, "a write at the admin group's own route with no row must fail")
+	assert.Contains(t, report.Errors[0], "1 admin route(s)")
+	assert.Contains(t, report.Errors[0], "POST /api/v1/admin: a write route the policy does not classify; its handler applies no ceiling")
+
+	classification := adminRouteFixtureClassification()
+	classification["POST /api/v1/admin"] = outsideCeilings("creates a user, who is never an administrator")
+
+	report = runAdminRouteGuard(root, classification, adminRouteFixtureCeilings)
+
+	assert.False(t, report.Stopped, "a tree read in full must not be fatal: %s", report.Fatal)
+	assert.Empty(t, report.Errors, "the admin group's own route, classified under the name the router gives it, must pass")
 }
 
 // A write registered through a group router a branch wraps in more middleware is an admin route

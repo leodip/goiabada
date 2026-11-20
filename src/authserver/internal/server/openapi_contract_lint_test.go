@@ -2587,6 +2587,45 @@ func TestRouteChains_AUseInsideABlockLeavesTheRoutesAfterItUnread(t *testing.T) 
 	}
 }
 
+// A plain block runs each time the code around it does, so a Use inside one covers the routes of
+// its router registered after it, while a plain block inside an if's branch runs only on that
+// branch, and a Use there still leaves its router's later routes unread.
+func TestRouteChains_AUseInsideAPlainBlockCoversTheRoutesAfterIt(t *testing.T) {
+	root := t.TempDir()
+	routeShapesFixture(t, root, "\t{\n"+
+		"\t\tguard := middleware.Refuse()\n"+
+		"\t\tblock.Use(guard)\n"+
+		"\t}\n"+
+		"\tblock.Get(\"/api/v1/block\", apihandlers.HandleOkGet())\n"+
+		"\tif s != nil {\n"+
+		"\t\t{\n"+
+		"\t\t\tbranch.Use(middleware.Refuse())\n"+
+		"\t\t}\n"+
+		"\t}\n"+
+		"\tbranch.Get(\"/api/v1/branch\", apihandlers.HandleOkGet())\n")
+
+	routes, handlers, report := fixtureRouteChains(t, root, 1, 1)
+
+	if report.Stopped || len(report.Errors) != 1 ||
+		!strings.Contains(report.Errors[0], "cannot tell which middleware GET /api/v1/branch runs behind: routes.go:") ||
+		!strings.Contains(report.Errors[0], "calls Use on branch inside a block") {
+		t.Fatalf("only the route after a Use in an if's branch should fail the check: %+v", report)
+	}
+	chains := map[string][]int{}
+	for _, r := range routes {
+		chains[r.key] = sortedKeysInt(r.chain)
+	}
+	assertChains(t, chains, map[string][]int{"get /api/v1/block": {403}, "get /api/v1/branch": {}})
+
+	report = guard.Run(func(r guard.Reporter) {
+		assertDeclaresEveryStatus(r, routes, handlers, declaringEach(map[string]string{"get /api/v1/block": "getBlock"}, 200))
+	})
+	if report.Stopped || len(report.Errors) != 1 ||
+		!strings.Contains(report.Errors[0], "getBlock (GET /api/v1/block) can answer 403") {
+		t.Errorf("a spec omitting the 403 of a Use inside a plain block did not fail once: %+v", report)
+	}
+}
+
 // A local of a constructor hides a helper of its package only inside the block that declares it,
 // so a call to the helper after that block fills the field with what the helper returns, and a
 // call the local hides is not read as the helper's.
@@ -2647,15 +2686,22 @@ func NewHelperHidden() *Probed {
 }
 
 // A field a constructor's literal fills with a local holds the one value that local was assigned,
-// as a field the body assigns from it does, and one filled with a local the lint cannot read is
-// reported where the walk reaches through it.
+// as a field the body assigns from it does, and one filled with a local the lint cannot read, such
+// as one assigned more than once or copied from another value's field, is reported where the walk
+// reaches through it, whether a literal or a field write fills the field.
 func TestRouteChains_AFieldALiteralFillsWithALocalIsReadAsThatLocal(t *testing.T) {
 	root := t.TempDir()
 	routeShapesFixture(t, root, "\tliteral := middleware.NewLiteralLocal()\n"+
 		"\tpages.With(literal.Check()).Get(\"/literal\", apihandlers.HandleOkGet())\n"+
 		"\ttwice := middleware.NewLiteralTwice(false)\n"+
-		"\tpages.With(twice.Check()).Get(\"/twice\", apihandlers.HandleOkGet())\n")
+		"\tpages.With(twice.Check()).Get(\"/twice\", apihandlers.HandleOkGet())\n"+
+		"\tcopied := middleware.NewLiteralCopied()\n"+
+		"\tpages.With(copied.Check()).Get(\"/copied\", apihandlers.HandleOkGet())\n"+
+		"\tcopiedWrite := middleware.NewWriteCopied()\n"+
+		"\tpages.With(copiedWrite.Check()).Get(\"/copied-write\", apihandlers.HandleOkGet())\n")
 	writeDocFixture(t, root, "internal/middleware/literal.go", `package middleware
+
+var prototype = Probed{refusals: unprocessable{}}
 
 func NewLiteralLocal() *Probed {
 	refusals := unprocessable{}
@@ -2669,12 +2715,27 @@ func NewLiteralTwice(swap bool) *Probed {
 	}
 	return &Probed{refusals: refusals}
 }
+
+func NewLiteralCopied() *Probed {
+	refusals := prototype.refusals
+	return &Probed{refusals: refusals}
+}
+
+func NewWriteCopied() *Probed {
+	p := &Probed{}
+	refusals := prototype.refusals
+	p.refusals = refusals
+	return p
+}
 `)
 	routes, handlers, report := fixtureRouteChains(t, root, 1, 1)
 
-	if report.Stopped || len(report.Errors) != 1 ||
-		!strings.Contains(report.Errors[0], "GET /twice mounts twice.Check, which the status lint cannot read") {
-		t.Fatalf("a field filled with a local assigned twice did not fail the check once: %+v", report)
+	if report.Stopped || len(report.Errors) != 3 ||
+		!strings.Contains(strings.Join(report.Errors, "\n"), "GET /twice mounts twice.Check, which the status lint cannot read") ||
+		!strings.Contains(strings.Join(report.Errors, "\n"), "GET /copied mounts copied.Check, which the status lint cannot read") ||
+		!strings.Contains(strings.Join(report.Errors, "\n"), "GET /copied-write mounts copiedWrite.Check, which the status lint cannot read") {
+		t.Fatalf("a field filled with a local assigned twice, or copied from another value's field, did not fail "+
+			"the check once each: %+v", report)
 	}
 	chains := map[string][]int{}
 	for _, r := range routes {
@@ -2842,18 +2903,21 @@ var specVerbs = func() map[string]bool {
 // inside it, has its own names, and a block, such as an if's, its own, so a name a block declares
 // leaves the one outside it as it was. A name routes.go never assigns, such as initRoutes's
 // parameters and the branches it unpacks, is a router built outside it, a root of its own:
-// middleware mounted there is out of this lint's reach. A router name declared outside a block
-// and assigned inside it has a value that depends on the branch taken, and a registration through
+// middleware mounted there is out of this lint's reach. Whether a block runs is read apart from
+// its names: an if's, a loop's, a switch's or select's, a case's, or a function literal's body may
+// not run, while a plain block, {...}, runs each time the code around it does, so an assignment or
+// a Use inside a plain block is read as one outside it. A router name declared outside a block
+// that may not run and assigned inside it has a value that depends on the branch taken, and a registration through
 // it, or after a Use on it in the same function, is marked unresolved rather than read with either
 // value. Its path prefix is kept apart: one the router held before the block and the router
 // assigned share is the route's, and otherwise the route is recorded at its own pattern with
 // pathUnresolved saying why, which TestOpenAPI_ReadsEveryRoutePath and the administrative route
-// classification report. A Use inside a block, on a router whose routes are registered outside it,
-// covers them only on the branch that ran it, so every route of that router registered after it
+// classification report. A Use inside a block that may not run, on a router whose routes are
+// registered outside it, covers them only on the branch that ran it, so every route of that router registered after it
 // is marked unresolved too. Each middleware a route mounts is kept with the declarations its names
 // referred to where it was mounted, which routeChains reads.
 func collectRoutes(fset *token.FileSet, file *ast.File) []routeRegistration {
-	w := &routeWalk{fset: fset}
+	w := &routeWalk{fset: fset, plain: plainBlocks(file)}
 	for _, decl := range file.Decls {
 		if fn, ok := decl.(*ast.FuncDecl); ok && fn.Body != nil {
 			w.poison = "" // an unresolved Use in another function wraps none of this one's routes
@@ -2925,7 +2989,8 @@ type routerValue struct {
 }
 
 // routerEnv is the names of one scope of routes.go: a function's, a group callback's, or a
-// block's, inside its parent's. names is what each router name holds; decls is each name's
+// block's, inside its parent's. block is set on a block that may not run each time its parent's
+// code does, and not on a plain block. names is what each router name holds; decls is each name's
 // declaration, for the middleware a route mounts.
 type routerEnv struct {
 	parent *routerEnv
@@ -3053,7 +3118,42 @@ type routeWalk struct {
 	// poison is set by a Use on a router the walk cannot tell, after which no registration's chain
 	// in the same function is known.
 	poison string
-	out    []routeRegistration
+	// plain is each block that is a statement of its own, {...}, which runs each time the code
+	// around it does: it has its own names, but whether it ran does not depend on a branch.
+	plain map[ast.Node]bool
+	out   []routeRegistration
+}
+
+// plainBlocks is each block of file that is a statement of a statement list rather than the body
+// of an if, for, switch, select or function literal, or one of an if's else branches.
+func plainBlocks(file *ast.File) map[ast.Node]bool {
+	out := map[ast.Node]bool{}
+	mark := func(list []ast.Stmt) {
+		for _, stmt := range list {
+			for {
+				labeled, ok := stmt.(*ast.LabeledStmt)
+				if !ok {
+					break
+				}
+				stmt = labeled.Stmt
+			}
+			if block, ok := stmt.(*ast.BlockStmt); ok {
+				out[block] = true
+			}
+		}
+	}
+	ast.Inspect(file, func(n ast.Node) bool {
+		switch x := n.(type) {
+		case *ast.BlockStmt:
+			mark(x.List)
+		case *ast.CaseClause:
+			mark(x.Body)
+		case *ast.CommClause:
+			mark(x.Body)
+		}
+		return true
+	})
+	return out
 }
 
 func (w *routeWalk) body(body *ast.BlockStmt, env *routerEnv) {
@@ -3075,7 +3175,7 @@ func opensScope(n ast.Node) bool {
 
 func (w *routeWalk) node(n ast.Node, env *routerEnv) {
 	if opensScope(n) {
-		env = env.child(true)
+		env = env.child(!w.plain[n])
 	}
 	root := n
 	ast.Inspect(n, func(n ast.Node) bool {
@@ -3963,7 +4063,7 @@ func (c *chainResolver) entry(m mountedEntry, depth int) (string, *goPackage, ch
 // of the result type, its address, or a local the body assigns once, from one of those. A bare
 // return returns the named result, read as such a local. A local's field the body assigns at its
 // top level, local.field = value, holds that value from the statement on, as a literal's field
-// would, with a local value read as localValue reads it, and one that body assigns anywhere else,
+// would, with a local value read as localValue and fieldFiller.localHolds read it, and one that body assigns anywhere else,
 // inside a block or a function literal, holds a value that depends on whether it ran, so the local
 // is not read. A constructor returning anything else, or returning two values that fill one field
 // with different types, is not read, rather than read from another literal of the type, such as
@@ -4058,6 +4158,9 @@ func constructed(ctor *ast.FuncDecl, p *goPackage, visiting map[string]bool) (fi
 						return fieldBinding{}, false
 					}
 					field, bound := fill.value(value)
+					if value != write.value { // a local's value
+						field, bound = fill.localHolds(value)
+					}
 					binding.assign(write.path, field, bound)
 				}
 			}
@@ -4335,7 +4438,8 @@ func (f fieldFiller) literal(lit *ast.CompositeLit) fieldBinding {
 
 // value is what a field filled with e holds. A composite literal of a named type, or its address,
 // is read as literal reads it. A local of the constructor holds the one value it was assigned, read
-// as localValue reads it. A call to a function of p that no local or parameter hides where it is
+// as localValue reads it, or an unread binding where that value would leave the field unbound, as
+// localHolds reads it. A call to a function of p that no local or parameter hides where it is
 // called, returning a type of p, such as a helper building a refusal writer, holds what that
 // function returns, read as constructed reads a constructor. A local or a call it cannot read, or
 // a call already being read, such as a helper returning a named string for a refusal's text, holds
@@ -4364,7 +4468,7 @@ func (f fieldFiller) value(e ast.Expr) (binding fieldBinding, bound bool) {
 		if !ok {
 			return fieldBinding{unread: true}, true
 		}
-		return f.value(value)
+		return f.localHolds(value)
 	case *ast.CallExpr:
 		id, isIdent := ast.Unparen(x.Fun).(*ast.Ident)
 		if !isIdent || f.params[id.Name] || f.localAt(id) || !f.p.plain[id.Name] {
@@ -4390,6 +4494,17 @@ func (f fieldFiller) value(e ast.Expr) (binding fieldBinding, bound bool) {
 		return binding, true
 	}
 	return fieldBinding{}, false
+}
+
+// localHolds is what a field filled with a local holds, given the one value the local was assigned:
+// that value as value reads it, or an unread binding for one value leaves unbound, such as another
+// value's field, since a local of the constructor may hold a writer of the package whatever it was
+// assigned from.
+func (f fieldFiller) localHolds(assigned ast.Expr) (fieldBinding, bool) {
+	if binding, bound := f.value(assigned); bound {
+		return binding, true
+	}
+	return fieldBinding{unread: true}, true
 }
 
 // walk reads the statuses of start and of every function of its package it reaches, each read
