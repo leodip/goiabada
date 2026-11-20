@@ -67,7 +67,8 @@ export async function waitForSubject(request: APIRequestContext, address: string
 // returns it whole. A read that fails is tried again rather than ending the wait, so a tunnel that
 // dropped and was opened again (e2e/test.sh) costs the wait only the time it was down. No read starts
 // once the wait is over, and one already started gets its full time, so a wait that ends says what its
-// last read found: that Mailpit did not answer, or what Mailpit held for the address.
+// last read found: that Mailpit did not answer, what Mailpit held for the address, or that the search
+// listing the message answered only after the wait was over.
 async function waitFor(
   request: APIRequestContext,
   address: string,
@@ -75,26 +76,31 @@ async function waitFor(
   pick: (messages: MailSummary[]) => MailSummary | undefined,
 ): Promise<Mail> {
   const deadline = Date.now() + mailWait;
+  const waited = `${wanted}: not found within ${mailWait / 1000}s`;
   let subjects: string[] = [];
   let failure: Error | undefined;
-  for (let pause = 100; ; pause = Math.min(pause * 2, 1_000)) {
+  for (let pause = 100; Date.now() < deadline; pause = Math.min(pause * 2, 1_000)) {
+    let summary: MailSummary | undefined;
     try {
       const messages = await mailTo(request, address);
       subjects = messages.map((m) => m.Subject);
       failure = undefined;
-      const summary = pick(messages);
-      if (summary) {
-        const message = await readMailpit<{ Subject: string; Text: string; HTML: string }>(request, `/api/v1/message/${summary.ID}`);
-        return { id: summary.ID, subject: message.Subject, text: message.Text, html: message.HTML };
-      }
+      summary = pick(messages);
     } catch (error) {
       failure = error as Error;
     }
+    if (summary) {
+      if (Date.now() >= deadline) throw new Error(`${waited}. The search that listed it answered after the wait was over`);
+      try {
+        const message = await readMailpit<{ Subject: string; Text: string; HTML: string }>(request, `/api/v1/message/${summary.ID}`);
+        return { id: summary.ID, subject: message.Subject, text: message.Text, html: message.HTML };
+      } catch (error) {
+        failure = error as Error;
+      }
+    }
     const remaining = deadline - Date.now();
-    if (remaining <= 0) break;
-    await new Promise((resolve) => setTimeout(resolve, Math.min(pause, remaining)));
+    if (remaining > 0) await new Promise((resolve) => setTimeout(resolve, Math.min(pause, remaining)));
   }
-  const waited = `${wanted}: not found within ${mailWait / 1000}s`;
   if (failure) throw new Error(`${waited}. The last read failed: ${failure.message}`, { cause: failure });
   const held = subjects.length === 0 ? "no message" : `${subjects.length} (${subjects.map((s) => JSON.stringify(s)).join(", ")})`;
   throw new Error(`${waited}. Mailpit answered, holding ${held} for the address`);

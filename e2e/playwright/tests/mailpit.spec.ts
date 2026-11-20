@@ -6,8 +6,10 @@ import type { AddressInfo } from "node:net";
 import { expect, test as base } from "@playwright/test";
 import { mailTo, waitForMail, waitForSubject } from "../lib/mailpit";
 
-// One read's answer: JSON with a status, no answer at all, or the connection closed under it.
-type Answer = { status: number; body: unknown } | "hang" | "drop";
+// One read's answer: JSON with a status, given after a delay of after milliseconds if set, no answer at
+// all, or the connection closed under it.
+type Reply = { status: number; body: unknown; after?: number };
+type Answer = Reply | "hang" | "drop";
 
 // What the stub was asked: each search's query and each message's ID, in order.
 interface Asked {
@@ -16,8 +18,8 @@ interface Asked {
 }
 
 const address = "someone@example.com";
-const found = (...messages: { ID: string; Subject: string }[]): Answer => ({ status: 200, body: { messages } });
-const message = (subject: string): Answer => ({ status: 200, body: { Subject: subject, Text: `${subject} text`, HTML: "" } });
+const found = (...messages: { ID: string; Subject: string }[]): Reply => ({ status: 200, body: { messages } });
+const message = (subject: string): Reply => ({ status: 200, body: { Subject: subject, Text: `${subject} text`, HTML: "" } });
 
 // Starts a stub Mailpit and points the mail wait at it, for the test. Each read takes the next answer
 // of its kind, and the last answer repeats.
@@ -44,8 +46,11 @@ const test = base.extend<{ mailpit: (searches: Answer[], messages?: Answer[]) =>
           req.socket.destroy();
           return;
         }
-        res.writeHead(answer.status, { "Content-Type": "application/json" });
-        res.end(JSON.stringify(answer.body));
+        const reply = answer;
+        setTimeout(() => {
+          res.writeHead(reply.status, { "Content-Type": "application/json" });
+          res.end(JSON.stringify(reply.body));
+        }, reply.after ?? 0);
       });
       await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
       servers.push(server);
@@ -107,6 +112,38 @@ test("a wait that Mailpit answers without the message ends after 30 seconds, nam
   expect((error as Error).message).toBe(
     'message 2 to someone@example.com: not found within 30s. Mailpit answered, holding 1 ("Welcome") for the address',
   );
+});
+
+// Five searches Mailpit does not answer, and the pauses after them, take a wait some 27.5 seconds in.
+const fiveUnanswered: Answer[] = ["hang", "hang", "hang", "hang", "hang"];
+
+test("no search starts once the 30 seconds are up, even when the one before answered with less than a pause left", async ({
+  mailpit,
+  request,
+}) => {
+  // The sixth search answers some 29.5 seconds in, and the pause before a seventh would be a second.
+  const asked = await mailpit([...fiveUnanswered, { ...found(), after: 2_000 }]);
+
+  const error = await waitForMail(request, address).catch((e: Error) => e);
+
+  expect((error as Error).message).toBe("mail to someone@example.com: not found within 30s. Mailpit answered, holding no message for the address");
+  expect(asked.searches).toHaveLength(6);
+});
+
+test("a search that lists the message only after the 30 seconds are up ends the wait without reading the message, saying so", async ({
+  mailpit,
+  request,
+}) => {
+  // The sixth search starts some 27.5 seconds in and answers four seconds later.
+  const asked = await mailpit([...fiveUnanswered, { ...found({ ID: "m1", Subject: "Welcome" }), after: 4_000 }], [message("Welcome")]);
+
+  const error = await waitForMail(request, address).catch((e: Error) => e);
+
+  expect((error as Error).message).toBe(
+    "mail to someone@example.com: not found within 30s. The search that listed it answered after the wait was over",
+  );
+  expect(asked.searches).toHaveLength(6);
+  expect(asked.messages).toEqual([]);
 });
 
 test("waitForMail counts from the oldest message, and waitForSubject takes the newest with the subject", async ({ mailpit, request }) => {
