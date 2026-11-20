@@ -15,9 +15,9 @@
 #                      holds in a package that is not public, and what to do.
 #   mirror.sh public   Reads every tag anonymously, as a pull on the runner does, and names each
 #                      package whose registry refuses a read, so is not public, with where to make it
-#                      public: a new GHCR package starts private, and GitHub has no API to change
-#                      that. A read the registry answers otherwise, an error or a stall, is reported
-#                      with that answer, as no answer on the package.
+#                      public: a new GHCR package may start private, as GitHub documents, and
+#                      GitHub has no API to change that. A read the registry answers otherwise, an
+#                      error or a stall, is reported with that answer, as no answer on the package.
 #
 # Docker Hub counts a pull per manifest GET, once per platform for a multi-platform image, and none
 # for a HEAD, which answers a tag's digest in its Docker-Content-Digest header. So copy asks both
@@ -341,7 +341,7 @@ mirror_public() {
     done 3<<< "$list"
     for package in "${order[@]}"; do
         local name=${package#ghcr.io/"$MIRROR_OWNER"/}
-        error "$package refused an anonymous read (tags:${refused[$package]}), so the package is not public: a new GHCR package starts private. Make it public at https://github.com/users/$MIRROR_OWNER/packages/container/${name//\//%2F}/settings, under Danger Zone, Change visibility, then re-run this job."
+        error "$package refused an anonymous read (tags:${refused[$package]}), so the package is not public. Make it public at https://github.com/users/$MIRROR_OWNER/packages/container/${name//\//%2F}/settings, under Danger Zone, Change visibility, then re-run this job."
     done
     [ "${#order[@]}" = 0 ] && [ "$failed" = 0 ]
 }

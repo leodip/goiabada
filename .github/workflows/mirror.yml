@@ -10,10 +10,10 @@
 # whose digest at the mirror is already upstream's is not copied, so a refresh pulls from Docker
 # Hub only what upstream moved. Old tags stay, so a branch on an older pin keeps working.
 #
-# A new GHCR package starts private, and GitHub has no API to change that. The Public job reads
-# every tag anonymously, as CI's pull does, its manifests whole and each blob's headers alone, so it
-# downloads no layer, and fails naming each package that is not public and where to make it public;
-# its first run on a new package fails so, until the maintainer has.
+# A new GHCR package may start private, as GitHub documents, and GitHub has no API to change that.
+# The Public job reads every tag anonymously, as CI's pull does, its manifests whole and each blob's
+# headers alone, so it downloads no layer, and fails naming each package that is not public and
+# where to make it public, until the maintainer has.
 
 name: Mirror
 
