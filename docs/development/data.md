@@ -164,6 +164,28 @@ introspection resources takes the client's row (`AcquireClientRow`) and refuses 
 finds public, because making a client public takes that row first and clears the list in the same
 transaction (#676)
 
+## Stored secrets and the re-encryption sweep
+
+Every stored secret is ciphertext under the data key: the columns in `commondb`'s
+`aesProtectedColumns` and `key_pairs.private_key_pem`. A new encrypted column joins that list, or
+the sweep never moves it. `ReencryptStoredSecrets` moves them to the current key while auth servers
+serve (#492 decisions 4 to 6). It reads each column in batches of 100 rows after the last id read,
+opens no transaction, and writes each value with an `UPDATE` that names the bytes it read, so a
+value a server replaced or cleared meanwhile is left as the server wrote it. A write that misses
+reads the row again and decides on what it now holds. The signing keys go last, and the current one
+last of all.
+
+That is correct only while every server write keeps one rule: **a stored secret is written only as
+ciphertext just sealed by the data cipher, or as read under that row's lock in the same
+transaction.** Bytes read without the lock, at the start of a request or before a dial or a call to
+another service, are never written back. Re-read them under the lock, as the client saves do after
+`AcquireClientRow`, or open them and seal them again, as the email and Turnstile settings saves do
+for a kept credential (`sealKeptSecretAgain`). A write conditional on stored ciphertext misses when
+the sweep sealed the value again in between. `TryVerifyUserEmail` is the one such write: the email
+verification handler re-reads the row after a miss and writes once more when its pending code
+opens to the code it compared. The data tier's `reencrypt_stored_secrets_test.go` runs the sweep
+against each of these writers, in each order, on every engine.
+
 ## Brand assets
 
 A brand asset's row (`brand_assets`) never changes after its upload, and nothing but the cleanup

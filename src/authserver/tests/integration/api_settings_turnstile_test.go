@@ -128,8 +128,8 @@ func TestAPISettingsTurnstilePut_TheSecretKeyLifecycle(t *testing.T) {
 		t.Helper()
 		after := storedTurnstile(t).TurnstileSecretKeyEncrypted
 		assert.NotEqual(t, before, after, message+": sealed anew")
-		kept, err := dataCipher.Decrypt(after)
-		require.NoError(t, err)
+		kept, decryptErr := dataCipher.Decrypt(after)
+		require.NoError(t, decryptErr)
 		assert.Equal(t, turnstilePassingSecretKey, kept, message)
 		return after
 	}

@@ -11,7 +11,8 @@ import (
 
 // aesProtectedColumns lists the (table, column) pairs holding AES-GCM ciphertext
 // of string secrets that must be re-keyed when the data-encryption key changes
-// (issue #83).
+// (issue #83). ReencryptToKey and the re-encryption sweep, ReencryptStoredSecrets,
+// both take every column through in this order.
 var aesProtectedColumns = []struct{ table, column string }{
 	{"settings", "smtp_password_encrypted"},
 	{"settings", "turnstile_secret_key_encrypted"},

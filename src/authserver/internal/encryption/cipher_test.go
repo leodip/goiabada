@@ -294,8 +294,8 @@ func TestDataCipherWithPrevious_APreviousKeyThatTakesNoPart(t *testing.T) {
 		if err != nil {
 			t.Fatalf("EncryptText: %v", err)
 		}
-		if pt, err := c.Decrypt(mine); err != nil || pt != "mine" {
-			t.Errorf("%s: the current key's value opens as %q, %v", name, pt, err)
+		if pt, decryptErr := c.Decrypt(mine); decryptErr != nil || pt != "mine" {
+			t.Errorf("%s: the current key's value opens as %q, %v", name, pt, decryptErr)
 		}
 		other, err := EncryptText("other", []byte(otherDataKey))
 		if err != nil {

@@ -58,6 +58,17 @@ type Database interface {
 	// under oldKey. It decides nothing. Whether the data is under oldKey at all is the startup
 	// task's question, answered from a canary before this is called (#83, #438 decision 8).
 	ReencryptToKey(ctx context.Context, oldKey, newKey []byte) error
+	// ReencryptStoredSecrets is the re-encryption sweep, which runs beside serving auth servers
+	// (#492 decisions 4 to 6). It moves every stored secret under previousKey to currentKey, row
+	// by row: it reads each column in bounded batches with no transaction across a table, and
+	// writes a value only while its row still holds the bytes it read, so a value a server
+	// replaced or cleared meanwhile stays as the server left it. The signing keys go last, and
+	// the current one last of all. A value neither key opens is left as it is and reported, and
+	// the sweep goes on. With previousKey absent, or equal to currentKey, it writes nothing and
+	// checks that everything opens under currentKey. currentKey is 32 bytes, and so is a
+	// previousKey given. A run that stops early, its context cancelled or a statement failing,
+	// answers what it did up to there beside the error, and can be run again.
+	ReencryptStoredSecrets(ctx context.Context, currentKey, previousKey []byte) (record.Reencryption, error)
 	IsEmpty(ctx context.Context) (bool, error)
 	// PoolStats answers the connection pool's statistics as database/sql keeps them: its cap, its
 	// connections by state, the requests that waited for one and for how long, and the connections

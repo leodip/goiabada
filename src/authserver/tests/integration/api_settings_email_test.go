@@ -574,8 +574,8 @@ func TestAPISettingsEmailPut_PasswordLifecycle(t *testing.T) {
 		t.Helper()
 		after := storedCiphertext(t)
 		assert.NotEqual(t, before, after, message+": sealed anew")
-		kept, err := dataCipher.Decrypt(after)
-		require.NoError(t, err)
+		kept, decryptErr := dataCipher.Decrypt(after)
+		require.NoError(t, decryptErr)
 		assert.Equal(t, "abc123", kept, message)
 		return after
 	}

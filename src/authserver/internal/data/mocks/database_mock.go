@@ -16804,6 +16804,78 @@ func (_c *Database_RecordRefreshTokenFamilyRevoked_Call) RunAndReturn(run func(c
 	return _c
 }
 
+// ReencryptStoredSecrets provides a mock function for the type Database
+func (_mock *Database) ReencryptStoredSecrets(ctx context.Context, currentKey []byte, previousKey []byte) (record.Reencryption, error) {
+	ret := _mock.Called(ctx, currentKey, previousKey)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ReencryptStoredSecrets")
+	}
+
+	var r0 record.Reencryption
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, []byte, []byte) (record.Reencryption, error)); ok {
+		return returnFunc(ctx, currentKey, previousKey)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, []byte, []byte) record.Reencryption); ok {
+		r0 = returnFunc(ctx, currentKey, previousKey)
+	} else {
+		r0 = ret.Get(0).(record.Reencryption)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, []byte, []byte) error); ok {
+		r1 = returnFunc(ctx, currentKey, previousKey)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_ReencryptStoredSecrets_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ReencryptStoredSecrets'
+type Database_ReencryptStoredSecrets_Call struct {
+	*mock.Call
+}
+
+// ReencryptStoredSecrets is a helper method to define mock.On call
+//   - ctx context.Context
+//   - currentKey []byte
+//   - previousKey []byte
+func (_e *Database_Expecter) ReencryptStoredSecrets(ctx any, currentKey any, previousKey any) *Database_ReencryptStoredSecrets_Call {
+	return &Database_ReencryptStoredSecrets_Call{Call: _e.mock.On("ReencryptStoredSecrets", ctx, currentKey, previousKey)}
+}
+
+func (_c *Database_ReencryptStoredSecrets_Call) Run(run func(ctx context.Context, currentKey []byte, previousKey []byte)) *Database_ReencryptStoredSecrets_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 []byte
+		if args[1] != nil {
+			arg1 = args[1].([]byte)
+		}
+		var arg2 []byte
+		if args[2] != nil {
+			arg2 = args[2].([]byte)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_ReencryptStoredSecrets_Call) Return(reencryption record.Reencryption, err error) *Database_ReencryptStoredSecrets_Call {
+	_c.Call.Return(reencryption, err)
+	return _c
+}
+
+func (_c *Database_ReencryptStoredSecrets_Call) RunAndReturn(run func(ctx context.Context, currentKey []byte, previousKey []byte) (record.Reencryption, error)) *Database_ReencryptStoredSecrets_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ReencryptToKey provides a mock function for the type Database
 func (_mock *Database) ReencryptToKey(ctx context.Context, oldKey []byte, newKey []byte) error {
 	ret := _mock.Called(ctx, oldKey, newKey)
