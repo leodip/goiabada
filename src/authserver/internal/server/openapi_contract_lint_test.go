@@ -2238,6 +2238,94 @@ func NewChosen(swap bool) *Probed {
 	}
 }
 
+// A field the constructor fills with a call to a constructor of its package, in its literal or
+// through a local, holds what that constructor returns, so the status its writer answers must be
+// declared. A call to one the lint cannot read is reported unread.
+func TestRouteChains_AFieldFilledByAConstructorOfThePackageIsReadAsItsValue(t *testing.T) {
+	root := t.TempDir()
+	routeShapesFixture(t, root, "\tconfigured := middleware.NewConfigured(\"no\")\n"+
+		"\tpages.With(configured.Check()).Get(\"/configured\", apihandlers.HandleOkGet())\n"+
+		"\tinPlace := middleware.NewInPlace()\n"+
+		"\tpages.With(inPlace.Check()).Get(\"/in-place\", apihandlers.HandleOkGet())\n"+
+		"\tchosen := middleware.NewChosenRefusal(false)\n"+
+		"\tpages.With(chosen.Check()).Get(\"/chosen\", apihandlers.HandleOkGet())\n")
+	writeDocFixture(t, root, "internal/middleware/configured.go", `package middleware
+
+import "net/http"
+
+type configuredRefusal struct {
+	detail string
+}
+
+func (c configuredRefusal) refuse(w http.ResponseWriter) {
+	http.Error(w, c.detail, http.StatusForbidden)
+}
+
+func newConfiguredRefusal(detail string) configuredRefusal {
+	return configuredRefusal{detail: detail}
+}
+
+func NewConfigured(detail string) *Probed {
+	probed := &Probed{refusals: unprocessable{}}
+	refusal := newConfiguredRefusal(detail)
+	probed.refusals = refusal
+	return probed
+}
+
+func NewInPlace() *Probed {
+	return &Probed{refusals: newConfiguredRefusal("no")}
+}
+
+func chooseRefusal(swap bool) writer {
+	if swap {
+		return unprocessable{}
+	}
+	return forbid{}
+}
+
+func NewChosenRefusal(swap bool) *Probed {
+	return &Probed{refusals: chooseRefusal(swap)}
+}
+`)
+	routes, handlers, report := fixtureRouteChains(t, root, 1, 1)
+
+	if report.Stopped || len(report.Errors) != 1 ||
+		!strings.Contains(report.Errors[0], "GET /chosen mounts chosen.Check, which the status lint cannot read") {
+		t.Fatalf("a field filled by a call the lint cannot read did not fail the check once: %+v", report)
+	}
+	chains := map[string][]int{}
+	for _, r := range routes {
+		chains[r.key] = sortedKeysInt(r.chain)
+	}
+	assertChains(t, chains, map[string][]int{"get /configured": {403}, "get /in-place": {403}})
+
+	declaring := func(codes ...int) map[string]specOperation {
+		responses := map[int]bool{}
+		for _, code := range codes {
+			responses[code] = true
+		}
+		return map[string]specOperation{
+			"get /configured": {operationId: "getConfigured", responses: responses},
+			"get /in-place":   {operationId: "getInPlace", responses: responses},
+		}
+	}
+	report = guard.Run(func(r guard.Reporter) {
+		assertDeclaresEveryStatus(r, routes, handlers, declaring(200))
+	})
+	if report.Stopped || len(report.Errors) != 2 ||
+		!strings.Contains(strings.Join(report.Errors, "\n"), "getConfigured (GET /configured) can answer 403 from configured.Check") ||
+		!strings.Contains(strings.Join(report.Errors, "\n"), "getInPlace (GET /in-place) can answer 403 from inPlace.Check") {
+		t.Errorf("a spec omitting the 403 the constructed writer answers did not fail once per route: %+v", report)
+	}
+	report = guard.Run(func(r guard.Reporter) {
+		assertDeclaresEveryStatus(r, routes, handlers, declaring(200, 403))
+		assertDeclaresNoUndeliverableStatus(r, routes, handlers, declaring(200, 403))
+	})
+	if report.Failed() {
+		t.Errorf("a spec declaring the 403 the constructed writer answers failed: %+v", report)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // The three parsers.
 // ---------------------------------------------------------------------------
@@ -3325,7 +3413,7 @@ func (c *chainResolver) entry(m mountedEntry, depth int) (string, *goPackage, ch
 		if len(ctors) != 1 {
 			break
 		}
-		binding, ok := constructed(ctors[0].decl)
+		binding, ok := constructed(ctors[0].decl, p, map[string]bool{ctorSel.Sel.Name: true})
 		method := binding.typ + "." + x.Sel.Name
 		if !ok || len(p.methods[method]) == 0 {
 			break
@@ -3335,17 +3423,19 @@ func (c *chainResolver) entry(m mountedEntry, depth int) (string, *goPackage, ch
 	return "", nil, chainWalk{}, false
 }
 
-// constructed is what a constructor returns: its result type, and the fields the value it returns
-// fills with a composite literal of a type of the package. The value is read from each return
+// constructed is what a constructor of package p returns: its result type, and the fields the value
+// it returns fills, each read as fieldFiller.value reads it. The value is read from each return
 // statement of the constructor's own body, not of a function literal inside it: a composite literal
 // of the result type, its address, or a local the body assigns once, from one of those. A bare
 // return returns the named result, read as such a local. A local's field the body assigns at its
 // top level, local.field = value, holds that value from the statement on, as a literal's field
-// would, with a local value read as localValue reads it, and one that body assigns anywhere else, inside a block or a function literal, holds a
-// value that depends on whether it ran, so the local is not read. A constructor returning anything
-// else, or two values that fill one field with different types, is not read, rather than read from
-// another literal of the type, such as one it builds and discards.
-func constructed(ctor *ast.FuncDecl) (fieldBinding, bool) {
+// would, with a local value read as localValue reads it, and one that body assigns anywhere else,
+// inside a block or a function literal, holds a value that depends on whether it ran, so the local
+// is not read. A constructor returning anything else, filling a field with a value fieldFiller
+// cannot read, or returning two values that fill one field with different types, is not read,
+// rather than read from another literal of the type, such as one it builds and discards. visiting
+// names the constructors whose reading led here, this one included.
+func constructed(ctor *ast.FuncDecl, p *goPackage, visiting map[string]bool) (fieldBinding, bool) {
 	if ctor.Type.Results == nil || len(ctor.Type.Results.List) == 0 {
 		return fieldBinding{}, false
 	}
@@ -3401,6 +3491,20 @@ func constructed(ctor *ast.FuncDecl) (fieldBinding, bool) {
 	if len(returns) == 0 {
 		return fieldBinding{}, false
 	}
+	fill := fieldFiller{p: p, shadowed: map[string]bool{}, visiting: visiting}
+	for name := range locals {
+		fill.shadowed[name] = true
+	}
+	for _, list := range []*ast.FieldList{ctor.Recv, ctor.Type.Params, ctor.Type.Results} {
+		if list == nil {
+			continue
+		}
+		for _, field := range list.List {
+			for _, name := range field.Names {
+				fill.shadowed[name.Name] = true
+			}
+		}
+	}
 	out := fieldBinding{typ: typ, fields: map[string]fieldBinding{}}
 	for _, ret := range returns {
 		lit, ok := returnedLiteral(ret.expr, locals, typ)
@@ -3410,7 +3514,10 @@ func constructed(ctor *ast.FuncDecl) (fieldBinding, bool) {
 		if lit == nil {
 			continue // a nil, which has no fields
 		}
-		binding := literalBinding(lit)
+		binding, ok := fill.literal(lit)
+		if !ok {
+			return fieldBinding{}, false
+		}
 		if local, isLocal := ast.Unparen(ret.expr).(*ast.Ident); isLocal {
 			if branched[local.Name] {
 				return fieldBinding{}, false
@@ -3421,7 +3528,11 @@ func constructed(ctor *ast.FuncDecl) (fieldBinding, bool) {
 					if !ok {
 						return fieldBinding{}, false
 					}
-					binding.assign(write.path, value)
+					field, bound, ok := fill.value(value)
+					if !ok {
+						return fieldBinding{}, false
+					}
+					binding.assign(write.path, field, bound)
 				}
 			}
 		}
@@ -3548,11 +3659,10 @@ func fieldPath(e ast.Expr) (string, []string, bool) {
 	}
 }
 
-// assign records value as written to the field at path: a composite literal of a named type, or
-// its address, binds the field as literalBinding reads one, and anything else, such as a
-// constructor's parameter, leaves it holding nothing the walk follows. A path through a field the
-// binding does not hold changes nothing it follows.
-func (b fieldBinding) assign(path []string, value ast.Expr) {
+// assign records value as written to the field at path, as fieldFiller.value read it: bound, the
+// field holds value, and otherwise, as for a constructor's parameter, nothing the walk follows. A
+// path through a field the binding does not hold changes nothing it follows.
+func (b fieldBinding) assign(path []string, value fieldBinding, bound bool) {
 	for _, name := range path[:len(path)-1] {
 		next, ok := b.fields[name]
 		if !ok {
@@ -3561,14 +3671,9 @@ func (b fieldBinding) assign(path []string, value ast.Expr) {
 		b = next
 	}
 	last := path[len(path)-1]
-	if addr, ok := value.(*ast.UnaryExpr); ok && addr.Op == token.AND {
-		value = addr.X
-	}
-	if inner, ok := value.(*ast.CompositeLit); ok {
-		if _, named := typeName(inner.Type); named {
-			b.fields[last] = literalBinding(inner)
-			return
-		}
+	if bound {
+		b.fields[last] = value
+		return
 	}
 	delete(b.fields, last)
 }
@@ -3585,8 +3690,17 @@ func (b fieldBinding) key() string {
 	return b.typ + "{" + strings.Join(parts, ",") + "}"
 }
 
-// literalBinding is a composite literal's type and the same for each field it fills with one.
-func literalBinding(lit *ast.CompositeLit) fieldBinding {
+// fieldFiller reads the values one constructor of package p fills the fields of what it returns
+// with.
+type fieldFiller struct {
+	p        *goPackage
+	shadowed map[string]bool // the constructor's receiver, parameters, results and locals, which hide a function of p
+	visiting map[string]bool // the constructors whose reading led here, so one that reaches itself is not read
+}
+
+// literal is a composite literal's type and, for each field it fills, the value it holds, as
+// value reads it. It is false when one of those values cannot be read.
+func (f fieldFiller) literal(lit *ast.CompositeLit) (fieldBinding, bool) {
 	typ, _ := typeName(lit.Type)
 	out := fieldBinding{typ: typ, fields: map[string]fieldBinding{}}
 	for _, elt := range lit.Elts {
@@ -3598,17 +3712,57 @@ func literalBinding(lit *ast.CompositeLit) fieldBinding {
 		if !ok {
 			continue
 		}
-		value := kv.Value
-		if addr, ok := value.(*ast.UnaryExpr); ok && addr.Op == token.AND {
-			value = addr.X
+		binding, bound, ok := f.value(kv.Value)
+		if !ok {
+			return fieldBinding{}, false
 		}
-		if inner, ok := value.(*ast.CompositeLit); ok {
-			if _, named := typeName(inner.Type); named {
-				out.fields[field.Name] = literalBinding(inner)
-			}
+		if bound {
+			out.fields[field.Name] = binding
 		}
 	}
-	return out
+	return out, true
+}
+
+// value is what a field filled with e holds. A composite literal of a named type, or its address,
+// is read as literal reads it. A call to a function of p returning a type of p, such as a helper
+// building a refusal writer, holds what that function returns, read as constructed reads a
+// constructor; one it cannot read, or one already being read, makes the value unreadable, false,
+// rather than leave the field holding nothing. Anything else, such as a parameter, a call to
+// another package or to a function literal, or a function returning a predeclared type, leaves the
+// field unbound, holding nothing the walk follows.
+func (f fieldFiller) value(e ast.Expr) (binding fieldBinding, bound, ok bool) {
+	e = ast.Unparen(e)
+	if addr, isAddr := e.(*ast.UnaryExpr); isAddr && addr.Op == token.AND {
+		e = ast.Unparen(addr.X)
+	}
+	switch x := e.(type) {
+	case *ast.CompositeLit:
+		if _, named := typeName(x.Type); named {
+			binding, ok = f.literal(x)
+			return binding, ok, ok
+		}
+	case *ast.CallExpr:
+		id, isIdent := ast.Unparen(x.Fun).(*ast.Ident)
+		if !isIdent || f.shadowed[id.Name] || !f.p.plain[id.Name] {
+			break
+		}
+		decls := f.p.funcs[id.Name]
+		if len(decls) != 1 || f.visiting[id.Name] {
+			return fieldBinding{}, false, false
+		}
+		results := decls[0].decl.Type.Results
+		if results == nil || len(results.List) == 0 {
+			break
+		}
+		if typ, named := typeName(results.List[0].Type); !named || types.Universe.Lookup(typ) != nil {
+			break
+		}
+		visiting := maps.Clone(f.visiting)
+		visiting[id.Name] = true
+		binding, ok = constructed(decls[0].decl, f.p, visiting)
+		return binding, ok, ok
+	}
+	return fieldBinding{}, false, true
 }
 
 // walk reads the statuses of start and of every function of its package it reaches, each read
