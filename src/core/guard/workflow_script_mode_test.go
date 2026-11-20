@@ -279,9 +279,13 @@ func TestWorkflowScripts_TheRealRunStepsRunExecutableFiles(t *testing.T) {
 		"the walk reaches build validation's binary scan, which reached main without its execute bit")
 }
 
-// scriptModeGit runs git in root, a repository of its own, with gitEnvironment.
+// scriptModeGit runs git in root, a repository of its own, with gitEnvironment. A test that needs it
+// is skipped where git is not installed.
 func scriptModeGit(t *testing.T, root string, args ...string) {
 	t.Helper()
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git is not installed")
+	}
 	cmd := exec.CommandContext(t.Context(), "git", args...)
 	cmd.Dir = root
 	cmd.Env = gitEnvironment(root)
