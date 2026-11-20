@@ -1857,6 +1857,95 @@ func build() *Probed {
 	}
 }
 
+// A bare return of a named result returns the value the body assigned to it, so a constructor that
+// returns nil on one branch and its named result on another is read with the named result's fields.
+func TestRouteChains_ABareReturnOfANamedResultIsRead(t *testing.T) {
+	root := t.TempDir()
+	routeShapesFixture(t, root, "\tgate := middleware.NewGate(false)\n"+
+		"\tpages.With(gate.Check()).Get(\"/gated\", apihandlers.HandleOkGet())\n")
+	writeDocFixture(t, root, "internal/middleware/gate.go", `package middleware
+
+import "net/http"
+
+type Gate struct {
+	refusals writer
+}
+
+func NewGate(disabled bool) (gate *Gate) {
+	if disabled {
+		return nil
+	}
+	gate = &Gate{refusals: forbid{}}
+	return
+}
+
+func (g *Gate) Check() func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			g.refusals.refuse(w)
+		})
+	}
+}
+`)
+
+	routes, _, report := fixtureRouteChains(t, root, 1, 1)
+
+	if report.Failed() {
+		t.Fatalf("reading the fixture chains failed: %+v", report)
+	}
+	var got []int
+	for _, r := range routes {
+		if r.key == "get /gated" {
+			got = sortedKeysInt(r.chain)
+		}
+	}
+	if !slices.Equal(got, []int{403}) {
+		t.Errorf("chain of GET /gated is %v, want [403]", got)
+	}
+}
+
+// A named result assigned from a call is a value the lint cannot read, so the route is reported.
+func TestRouteChains_ABareReturnOfANamedResultTheLintCannotReadFails(t *testing.T) {
+	root := t.TempDir()
+	routeShapesFixture(t, root, "\tgate := middleware.NewGate(false)\n"+
+		"\tpages.With(gate.Check()).Get(\"/gated\", apihandlers.HandleOkGet())\n")
+	writeDocFixture(t, root, "internal/middleware/gate.go", `package middleware
+
+import "net/http"
+
+type Gate struct {
+	refusals writer
+}
+
+func NewGate(disabled bool) (gate *Gate) {
+	if disabled {
+		return nil
+	}
+	gate = build()
+	return
+}
+
+func build() *Gate {
+	return &Gate{refusals: forbid{}}
+}
+
+func (g *Gate) Check() func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			g.refusals.refuse(w)
+		})
+	}
+}
+`)
+
+	_, _, report := fixtureRouteChains(t, root, 1, 1)
+
+	if report.Stopped || len(report.Errors) != 1 ||
+		!strings.Contains(report.Errors[0], "GET /gated mounts gate.Check, which the status lint cannot read") {
+		t.Errorf("a named result whose value cannot be read did not fail the check once: %+v", report)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // The three parsers.
 // ---------------------------------------------------------------------------
@@ -2841,7 +2930,8 @@ func (c *chainResolver) entry(e ast.Expr, depth int) (string, *goPackage, chainW
 // constructed is what a constructor returns: its result type, and the fields the value it returns
 // fills with a composite literal of a type of the package. The value is read from each return
 // statement of the constructor's own body, not of a function literal inside it: a composite literal
-// of the result type, its address, or a local the body assigns once, from one of those. A
+// of the result type, its address, or a local the body assigns once, from one of those. A bare
+// return returns the named result, read as such a local. A
 // constructor returning anything else, or two values that fill one field with different types, is
 // not read, rather than read from another literal of the type, such as one it builds and discards.
 func constructed(ctor *ast.FuncDecl) (fieldBinding, bool) {
@@ -2851,6 +2941,11 @@ func constructed(ctor *ast.FuncDecl) (fieldBinding, bool) {
 	typ, ok := typeName(ctor.Type.Results.List[0].Type)
 	if !ok {
 		return fieldBinding{}, false
+	}
+	// A named result, which a bare return returns.
+	var named *ast.Ident
+	if names := ctor.Type.Results.List[0].Names; len(names) > 0 {
+		named = names[0]
 	}
 	// Each local of the body, with every value assigned to it, a nil for one this cannot read.
 	locals := map[string][]ast.Expr{}
@@ -2878,8 +2973,11 @@ func constructed(ctor *ast.FuncDecl) (fieldBinding, bool) {
 				locals[name.Name] = append(locals[name.Name], value)
 			}
 		case *ast.ReturnStmt:
-			if len(x.Results) > 0 {
+			switch {
+			case len(x.Results) > 0:
 				returns = append(returns, x.Results[0])
+			case named != nil:
+				returns = append(returns, named) // a bare return returns the named result
 			}
 		}
 		return true
