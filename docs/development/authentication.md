@@ -748,6 +748,12 @@ Token ACR = `max(targetACR, sessionACR)`, against the session the ceremony bound
 downgrades within a session. A ceremony that authenticated afresh has just written its target onto
 that session, so its token ACR is the target (#537).
 
+A stored sign-in (`codes`) keeps its level and methods, and every refresh of its grant copies them
+into the new tokens. Releases before 1.7.0 could store one at `level2_mandatory` whose methods name
+neither `otp` nor `recovery_code` (#133, #537). Migration 000097 lowered every such row to `level1`,
+matching whole, case-exact names in the space-separated list, and changed nothing else; its down
+migration does nothing, since the earlier level is recorded nowhere (#199).
+
 ### Re-authentication over a session (#537)
 A ceremony that verified the password itself is a **new authentication**, not an extension of the
 browser's session. That is `AuthContext.Level1AuthCompleted`, set only by `RecordPasswordVerified`,
