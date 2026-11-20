@@ -101,7 +101,7 @@ A POST from another origin with no hint, whether another site or another host of
 
 ## Get told when a session ends
 
-Your app's own session can outlive the user's session on the auth server: when they sign out of another app with no hint, someone ends their session under **Account**, **Sessions**, or an administrator disables them. Give your client a back-channel logout URI, and the auth server tells your app each time a session it was on ends, by POSTing a signed logout token there, as [OpenID Connect Back-Channel Logout 1.0](https://openid.net/specs/openid-connect-backchannel-1_0.html) describes. Your app then signs the user out at once.
+Your app's own session can outlive the user's session on the auth server: when they sign out of another app with no hint, someone ends their session under **Account**, **Sessions**, or an administrator disables them. Give your client a back-channel logout URI, and the auth server tells your app when a session it was on ends while still valid, by POSTing a signed logout token there, as [OpenID Connect Back-Channel Logout 1.0](https://openid.net/specs/openid-connect-backchannel-1_0.html) describes. Your app then signs the user out at once. [Telling your apps](/concepts/ending-sessions/#telling-your-apps) lists every end that tells it.
 
 <Steps>
 
