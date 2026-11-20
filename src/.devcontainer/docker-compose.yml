@@ -124,8 +124,9 @@ services:
         limits:
           memory: 4GB    # SQL Server requires at least 2GB of RAM, increased for stability
 
+  # tools.mailpit in src/authserver/versions.yaml, written here by ./version-manager.sh update.
   mailpit:
-    image: axllent/mailpit
+    image: axllent/mailpit:v1.33.1
     ports:
       - 8025:8025
     networks:

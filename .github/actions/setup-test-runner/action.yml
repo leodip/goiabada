@@ -1,0 +1,85 @@
+# Shared setup for the test jobs in check.yml that run on the hosted runner: the unit jobs and the
+# race jobs, which need no database network and so pull no job container (#867). The database jobs
+# run in the golang container and use setup-test-container instead.
+#
+# The runner already carries what run-tests.sh's module tiers need besides these: git, curl, jq
+# and the C compiler `go test -race` uses. It runs as an ordinary user that owns the checkout, so
+# git needs no safe.directory here.
+
+name: Set up test runner
+description: Set up Go and Node.js at their pins, the Tailwind CLI and the runner's Go cache for run-tests.sh's module tiers.
+
+inputs:
+  go:
+    description: Go version, from versions.yaml
+    required: true
+  tailwind:
+    description: Tailwind CLI version, from versions.yaml
+    required: true
+  node:
+    description: Node.js version, from versions.yaml
+    required: true
+  save-cache:
+    description: Save the Go cache at the end of the job when its key is new ('true' in one job only)
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    # setup-go's own cache is off: every job would save it, racing for one key. The steps below
+    # restore it in every job and save it in one.
+    - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      with:
+        go-version: ${{ inputs.go }}
+        cache: false
+
+    # Node at its pin, which core/guard's script check runs acorn under, not the runner's own.
+    - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      with:
+        node-version: ${{ inputs.node }}
+        package-manager-cache: false
+
+    - name: Install Tailwind CLI
+      uses: ./.github/actions/install-tailwind
+      with:
+        version: ${{ inputs.tailwind }}
+
+    # Where Go keeps its modules and its build output, asked of go itself. The Go version is part
+    # of the key, since one toolchain's build output is no use to another. The paths are the
+    # runner's, not the container's, and the cache tells its entries apart by the paths as written,
+    # so this entry and the container's are never restored into each other; the key's prefix says
+    # which is which in the cache list.
+    - name: Locate the Go caches
+      shell: bash
+      run: |
+        {
+          echo "GO_MODULES_DIR=$(go env GOMODCACHE)"
+          echo "GO_BUILD_OUTPUT_DIR=$(go env GOCACHE)"
+          echo "GO_TOOLCHAIN_VERSION=$(go env GOVERSION)"
+        } >> "$GITHUB_ENV"
+
+    # Every job restores the cache and one saves it: the job that passes save-cache, Unit /
+    # authserver. Its modules include every module the core and console tiers download. A key is
+    # new after every go.sum change, and saving one compresses the whole cache, which one job pays
+    # rather than every job.
+    - name: Cache Go modules and build output
+      if: inputs.save-cache == 'true'
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: |
+          ${{ env.GO_MODULES_DIR }}
+          ${{ env.GO_BUILD_OUTPUT_DIR }}
+        key: runner-${{ runner.os }}-${{ env.GO_TOOLCHAIN_VERSION }}-${{ hashFiles('src/**/go.sum') }}
+        restore-keys: |
+          runner-${{ runner.os }}-${{ env.GO_TOOLCHAIN_VERSION }}-
+    - name: Restore Go modules and build output
+      if: inputs.save-cache != 'true'
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: |
+          ${{ env.GO_MODULES_DIR }}
+          ${{ env.GO_BUILD_OUTPUT_DIR }}
+        key: runner-${{ runner.os }}-${{ env.GO_TOOLCHAIN_VERSION }}-${{ hashFiles('src/**/go.sum') }}
+        restore-keys: |
+          runner-${{ runner.os }}-${{ env.GO_TOOLCHAIN_VERSION }}-

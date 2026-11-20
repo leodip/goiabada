@@ -663,8 +663,9 @@ func newFakeCert(t *testing.T) *fakeCert {
 }
 
 // fakeHostname is this machine's name, which the decision 1 rows use as a host that is not
-// loopback. In the dev container and in CI's job containers it is the container id and resolves to
-// the container's own non-loopback address, confirmed for #274.
+// loopback. In the dev container it is the container id and resolves to the container's own
+// non-loopback address, confirmed for #274; CI runs this tier on the hosted runner, under its
+// machine name.
 func fakeHostname(t *testing.T) string {
 	t.Helper()
 	name, err := os.Hostname()

@@ -305,11 +305,60 @@ var developmentStacks = []string{
 	"../../../.github/workflows/check.yml",
 }
 
+// ciMirror is the registry CI pulls Docker Hub's images from, public copies under it (#867), and
+// ciMirrorList the list of the tags it copies, each a Docker Hub address. A copy keeps upstream's tag
+// in a package named by the image's last path segment, so docker.io/library/mysql:26 is
+// ghcr.io/leodip/goiabada-ci/mysql:26.
+const (
+	ciMirror     = "ghcr.io/leodip/goiabada-ci"
+	ciMirrorList = "../../../.github/mirror/images"
+)
+
+// mirroredRepositories maps the repository of each image the mirror's list holds, at the mirror, to
+// the repository it copies, as an image line names it: ghcr.io/leodip/goiabada-ci/mysql to mysql.
+func mirroredRepositories(t *testing.T) map[string]string {
+	t.Helper()
+	content, err := os.ReadFile(ciMirrorList)
+	if err != nil {
+		t.Fatalf("unable to read the mirror's list, %s: %v", ciMirrorList, err)
+	}
+	repositories := map[string]string{}
+	for _, line := range strings.Split(string(content), "\n") {
+		line, _, _ = strings.Cut(line, "#")
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		upstream, ok := strings.CutPrefix(imageRepository(line), "docker.io/")
+		if !ok {
+			t.Fatalf("%s holds %s, not a Docker Hub address", ciMirrorList, line)
+		}
+		mirrored := ciMirror + "/" + upstream[strings.LastIndex(upstream, "/")+1:]
+		repositories[mirrored] = strings.TrimPrefix(upstream, "library/")
+	}
+	if len(repositories) == 0 {
+		t.Fatalf("%s holds no image", ciMirrorList)
+	}
+	return repositories
+}
+
+// upstreamImage is the image a mirrored image copies, as an image line names it, and any other image
+// as it is.
+func upstreamImage(image string, mirrored map[string]string) string {
+	repository := imageRepository(image)
+	if upstream, ok := mirrored[repository]; ok {
+		return upstream + strings.TrimPrefix(image, repository)
+	}
+	return image
+}
+
 // The development and test stacks run each database the image the generated deployments run, so
 // the tiers test the database an operator deploys and a major upgrade is one reviewed change to
 // all of them. A tag that moves on its own also moved the tiers onto a new major with no change in
-// this repository, and stopped the dev container on a data volume the old one wrote.
+// this repository, and stopped the dev container on a data volume the old one wrote. CI pulls the
+// MySQL and PostgreSQL images from its mirror, where each is the Docker Hub image of the same tag.
 func TestDevelopmentStacks_RunTheGeneratedDatabaseImages(t *testing.T) {
+	mirrored := mirroredRepositories(t)
 	for _, file := range developmentStacks {
 		t.Run(file, func(t *testing.T) {
 			content, err := os.ReadFile(file)
@@ -327,13 +376,14 @@ func TestDevelopmentStacks_RunTheGeneratedDatabaseImages(t *testing.T) {
 				}
 				repository := imageRepository(e.image)
 				found := false
-				for _, image := range images {
+				for _, written := range images {
+					image := upstreamImage(written, mirrored)
 					if imageRepository(image) != repository {
 						continue
 					}
 					found = true
 					if image != e.image {
-						t.Errorf("runs %s, want %s, the image the generated deployments run", image, e.image)
+						t.Errorf("runs %s, want %s, the image the generated deployments run", written, e.image)
 					}
 				}
 				if !found {

@@ -1,0 +1,22 @@
+# The images CI pulls, copied from Docker Hub into public packages under ghcr.io/leodip/goiabada-ci/
+# by the Mirror workflow (#867). One tag per line, as its Docker Hub address; the mirror keeps the
+# tag under a package named by the image's last path segment, so docker.io/library/golang:X is
+# ghcr.io/leodip/goiabada-ci/golang:X. A {tools.<name>} in a tag is that pin of
+# src/authserver/versions.yaml, so a version bump changes the tag here with nothing to edit.
+# mirror.sh list prints each tag with its mirror address.
+#
+# The Go container of the data and integration jobs.
+docker.io/library/golang:{tools.go}-bookworm
+# The release Dockerfiles' base.
+docker.io/library/golang:{tools.go}-alpine
+# The docs build's and the e2e test app's base.
+docker.io/library/node:{tools.node}-alpine
+# The docs image's base.
+docker.io/library/nginx:alpine
+# The MySQL and PostgreSQL services of the database jobs.
+docker.io/library/mysql:26
+docker.io/library/postgres:18
+# The Mailpit services of the integration and email tests.
+docker.io/axllent/mailpit:v{tools.mailpit}
+# The BuildKit image Buildx starts a builder from by default, docker/setup-buildx-action's.
+docker.io/moby/buildkit:buildx-stable-1

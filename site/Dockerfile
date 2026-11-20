@@ -5,9 +5,14 @@
 #
 # Site/Dockerfile.dockerignore keeps the context to site/ and src/.
 
+# The bases' registry: Docker Hub's library by default, so the Docs workflow's build, or anyone's
+# own, builds on the images it always has. Check's docs job passes CI's mirror of them,
+# --build-arg baseRegistry=ghcr.io/leodip/goiabada-ci, so it pulls nothing from Docker Hub (#867).
+ARG baseRegistry=docker.io/library
+
 # Dependencies and sources, with nothing built yet. CI runs the site checks'
 # tests in this stage, so they run on the Node version the site is built with.
-FROM node:26.13.1-alpine AS sources
+FROM ${baseRegistry}/node:26.13.1-alpine AS sources
 
 WORKDIR /repo/site
 
@@ -25,7 +30,7 @@ FROM sources AS builder
 RUN npm run build
 
 # Production stage
-FROM nginx:alpine
+FROM ${baseRegistry}/nginx:alpine
 
 COPY site/nginx.conf /etc/nginx/conf.d/default.conf
 

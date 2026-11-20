@@ -1,9 +1,16 @@
+# The bases' registry: Docker Hub's library by default, so a release build, or anyone's own docker
+# build, builds on the images it always has. Check's build validation passes CI's mirror of them,
+# --build-arg baseRegistry=ghcr.io/leodip/goiabada-ci, so it pulls nothing from Docker Hub (#867).
+# TestBaseRegistry_TheDockerfilesDefaultToDockerHubAndOnlyChecksBuildsPassTheMirror, in
+# src/core/guard/base_registry_test.go, holds every FROM to it and the builds to their registry.
+ARG baseRegistry=docker.io/library
+
 # The build stage runs on the builder's platform and cross-compiles for the image's, which
 # BuildKit passes as TARGETOS and TARGETARCH: a release builds linux/amd64 and linux/arm64
 # from this file, and compiling the arm64 binary under emulation takes minutes longer for a
 # byte-identical one (#808). TestReleaseBuilds_CrossCompile, in
 # src/core/guard/release_build_rules_test.go, holds the build to this form.
-FROM --platform=$BUILDPLATFORM golang:1.27.4-alpine AS build
+FROM --platform=$BUILDPLATFORM ${baseRegistry}/golang:1.27.4-alpine AS build
 
 ARG version
 ARG buildDate
@@ -78,7 +85,7 @@ RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -buildvcs=false -ta
 # but the final stage's COPY of its file is cached and ships an earlier build's bundle.
 # TestReleaseBuilds_TheRealImageBuildsRerunTheRefresh, in
 # src/core/guard/release_cache_filter_test.go, holds those builds to both.
-FROM --platform=$BUILDPLATFORM golang:1.27.4-alpine AS certs
+FROM --platform=$BUILDPLATFORM ${baseRegistry}/golang:1.27.4-alpine AS certs
 RUN apk upgrade --no-cache ca-certificates-bundle
 
 # ------------------------------------------------------------------------------

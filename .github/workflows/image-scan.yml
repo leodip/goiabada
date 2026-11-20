@@ -70,7 +70,7 @@ jobs:
         with:
           go-version: ${{ needs.versions.outputs.go }}
           cache-dependency-path: src/core/go.sum
-      # The read-only Docker Hub token the Check workflow pulls with, so the pulls do not count
+      # The read-only Docker Hub token the Mirror workflow reads with, so the pulls do not count
       # against the allowance GitHub's runners share. GHCR's images pull anonymously.
       - name: Log in to Docker Hub
         if: env.DOCKERHUB_USERNAME != ''

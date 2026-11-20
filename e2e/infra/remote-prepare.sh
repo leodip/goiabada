@@ -7,6 +7,8 @@
 # It replaces whatever environment ran before, from scratch: the Compose project and its volumes go,
 # the release's own setup wizard writes new Compose files, and nginx is pointed at the new servers.
 # For a build of a checkout, the wizard and both images are built here from that source first.
+# Every image built here builds on CI's mirror of its bases, --build-arg
+# baseRegistry=ghcr.io/leodip/goiabada-ci, rather than asking Docker Hub for them (#867).
 # The certificate is the one thing kept, and requested only when it is missing or does not cover
 # the four hosts.
 set -euo pipefail
@@ -59,7 +61,8 @@ if [[ "${E2E_SOURCE_BUILD:-false}" == true ]]; then
   # What a release ships, built from the checkout's source as the release builds it: both servers from
   # their Dockerfiles with the same build arguments, and the wizard with the same tag and -X values,
   # imageTag naming the images built here. The images are labelled so the next build, and
-  # teardown.sh, remove them without touching anyone else's.
+  # teardown.sh, remove them without touching anyone else's. Unlike a release, they build on the
+  # mirror's copy of their bases.
   tar -xzf "$stage/src.tar.gz" -C "$stage"
   src="$stage/src"
   commit="${E2E_TAG#e2e-}"
@@ -67,7 +70,8 @@ if [[ "${E2E_SOURCE_BUILD:-false}" == true ]]; then
     log "building leodip/goiabada:$server-$version"
     if ! docker build --label goiabada-e2e=server -f "$src/build/Dockerfile-$server" \
       -t "leodip/goiabada:$server-$version" --build-arg "version=$version" \
-      --build-arg "buildDate=$(date -u +%Y-%m-%d)" --build-arg "gitCommit=${commit%-dirty}" "$src" \
+      --build-arg "buildDate=$(date -u +%Y-%m-%d)" --build-arg "gitCommit=${commit%-dirty}" \
+      --build-arg baseRegistry=ghcr.io/leodip/goiabada-ci "$src" \
       >"$stage/build-$server.log" 2>&1; then
       tail -40 "$stage/build-$server.log" >&2
       fail "the $server image did not build"
@@ -77,12 +81,13 @@ if [[ "${E2E_SOURCE_BUILD:-false}" == true ]]; then
     { grep -v -e "-$version\$" -e '<none>' || true; } | xargs -r docker image rm >/dev/null
   docker image prune -f --filter label=goiabada-e2e=server >/dev/null
 
-  golang="$(sed -n 's/^FROM --platform=\$BUILDPLATFORM \(golang:[^ ]*\) AS build$/\1/p' "$src/build/Dockerfile-authserver")"
-  [[ -n "$golang" ]] || fail "build/Dockerfile-authserver names no golang image"
-  log "building $wizard with $golang"
+  # The wizard's Go image is tools.go, the release Dockerfiles' Go, which version-manager.sh update
+  # writes into the build stage's base below.
+  log "building $wizard"
   if ! docker build --output "type=local,dest=$E2E_REMOTE_DIR" --build-arg "version=$version" \
-    -f - "$src" >"$stage/build-wizard.log" 2>&1 <<EOF
-FROM $golang AS build
+    --build-arg baseRegistry=ghcr.io/leodip/goiabada-ci -f - "$src" >"$stage/build-wizard.log" 2>&1 <<EOF
+ARG baseRegistry=docker.io/library
+FROM \${baseRegistry}/golang:1.27.4-alpine AS build
 COPY core /src/core
 COPY cmd/goiabada-setup /src/cmd/goiabada-setup
 WORKDIR /src/cmd/goiabada-setup

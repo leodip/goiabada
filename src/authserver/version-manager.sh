@@ -18,7 +18,7 @@
 #
 # Scope: this script manages TOOLCHAIN and CDN pins (Go, Tailwind, Node.js,
 # golangci-lint, mockery, staticcheck, unparam, govulncheck, Trivy, Grype,
-# npm-check-updates, cropperjs, acorn), and
+# npm-check-updates, Mailpit, cropperjs, acorn), and
 # the dependencies of the Go modules and of the npm projects in NPM_PROJECTS.
 # check also reports when the pinned sources of generate's data have moved.
 # It does NOT manage the product version.
@@ -54,6 +54,16 @@
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 BASE_DIR=$(cd "${SCRIPT_DIR}/../.." && pwd)
 VERSIONS_FILE="${SCRIPT_DIR}/versions.yaml"
+
+# Mailpit's image on Docker Hub, whose tags are its GitHub repository's releases, of the same
+# name. update writes it at tools.mailpit into MAILPIT_FILES, each a path relative to the
+# repository root and the image the file names, after a |: the dev container's Compose file runs
+# Docker Hub's, and the e2e server's default CI's mirror of it (#867). CI reads the pin itself.
+MAILPIT_REPOSITORY="axllent/mailpit"
+MAILPIT_FILES=(
+    "src/.devcontainer/docker-compose.yml|${MAILPIT_REPOSITORY}"
+    "e2e/infra/lib.sh|ghcr.io/leodip/goiabada-ci/mailpit"
+)
 
 # =============================================================================
 # Color Codes for Output
@@ -189,6 +199,7 @@ get_all_versions() {
         echo "tools.trivy=$(get_version 'tools.trivy')"
         echo "tools.grype=$(get_version 'tools.grype')"
         echo "tools.npm-check-updates=$(get_version 'tools."npm-check-updates"')"
+        echo "tools.mailpit=$(get_version 'tools.mailpit')"
         echo "vendored.cropperjs=$(get_version 'vendored.cropperjs')"
         echo "vendored.acorn=$(get_version 'vendored.acorn')"
     }
@@ -587,6 +598,27 @@ update_file() {
     fi
 }
 
+# update_mailpit writes Mailpit's image at VERSION, tagged vVERSION as upstream tags it, into each
+# of MAILPIT_FILES, as the image that file names, replacing whatever tag it had, or none. A file
+# that names its image nowhere fails the step, so a moved line is reported rather than left on
+# another Mailpit; the other files are still written.
+# Usage: update_mailpit VERSION
+update_mailpit() {
+    local version="$1" entry file image failed=0
+    for entry in "${MAILPIT_FILES[@]}"; do
+        file="${entry%%|*}" image="${entry#*|}"
+        if ! grep -qF "${image}" "$BASE_DIR/$file" 2>/dev/null; then
+            print_error "$file names no ${image} image to pin"
+            failed=1
+            continue
+        fi
+        update_file "$BASE_DIR/$file" \
+            "s|${image//./\\.}\(:[^[:space:]\"'}]*\)\{0,1\}|${image}:v${version}|g" \
+            "Mailpit image" || failed=1
+    done
+    return "$failed"
+}
+
 # =============================================================================
 # Command: show
 # =============================================================================
@@ -619,6 +651,7 @@ cmd_show() {
     printf "  %-23s ${GREEN}%s${NC}\n" "trivy" "$(get_version 'tools.trivy')"
     printf "  %-23s ${GREEN}%s${NC}\n" "grype" "$(get_version 'tools.grype')"
     printf "  %-23s ${GREEN}%s${NC}\n" "npm-check-updates" "$(get_version 'tools."npm-check-updates"')"
+    printf "  %-23s ${GREEN}%s${NC}\n" "mailpit" "$(get_version 'tools.mailpit')"
 
     # Vendored dependencies
     echo -e "\n${BOLD}Vendored dependencies:${NC}"
@@ -844,6 +877,24 @@ cmd_check() {
         print_warning "Check failed"
     fi
 
+    # --- Mailpit ---
+    # The SMTP server the email tests send to, suggested under the same
+    # RELEASE_MIN_AGE_DAYS as Trivy, so a new release reaches the tests only
+    # through a reviewed change (#867).
+    echo -n "Checking Mailpit... "
+    local current_mailpit=$(get_version 'tools.mailpit')
+    local latest_mailpit=$(get_github_settled "$MAILPIT_REPOSITORY")
+    if [ -n "$latest_mailpit" ]; then
+        if version_lt "$current_mailpit" "$latest_mailpit"; then
+            echo -e "${YELLOW}UPDATE AVAILABLE${NC}"
+            updates_available+=("Mailpit|$current_mailpit|$latest_mailpit|https://github.com/${MAILPIT_REPOSITORY}/releases")
+        else
+            print_success "Up to date ($current_mailpit)"
+        fi
+    else
+        print_warning "Check failed"
+    fi
+
     # --- cropperjs ---
     echo -n "Checking cropperjs... "
     local current_cropper=$(get_version 'vendored.cropperjs')
@@ -997,6 +1048,10 @@ cmd_check() {
 # Command: update
 # =============================================================================
 # Update version strings in all project files based on versions.yaml
+#
+# Exit status: every target is attempted, and the command returns non-zero
+# when any of them failed, so CI's "versions.yaml is applied" step stops
+# rather than taking an incomplete update.
 
 cmd_update() {
     require_yq
@@ -1011,6 +1066,7 @@ cmd_update() {
     local STATICCHECK_VERSION=$(get_version 'tools.staticcheck')
     local UNPARAM_VERSION=$(get_version 'tools.unparam')
     local GOVULNCHECK_VERSION=$(get_version 'tools.govulncheck')
+    local MAILPIT_VERSION=$(get_version 'tools.mailpit')
     local CROPPER_VERSION=$(get_version 'vendored.cropperjs')
     local ACORN_VERSION=$(get_version 'vendored.acorn')
 
@@ -1142,8 +1198,11 @@ cmd_update() {
     # -------------------------------------------------------------------------
     echo -e "\n${BOLD}Production Dockerfiles${NC}"
 
+    # The e2e server's build of the setup wizard writes its Dockerfile in remote-prepare.sh, on the
+    # release Dockerfiles' Go.
     for dockerfile in "$BASE_DIR/src/build/Dockerfile-adminconsole" \
-                      "$BASE_DIR/src/build/Dockerfile-authserver"; do
+                      "$BASE_DIR/src/build/Dockerfile-authserver" \
+                      "$BASE_DIR/e2e/infra/remote-prepare.sh"; do
         if [ -f "$dockerfile" ]; then
             # Go base image: golang:X.Y.Z-alpine
             if update_file "$dockerfile" \
@@ -1176,6 +1235,17 @@ cmd_update() {
             fi
         fi
     done
+
+    # -------------------------------------------------------------------------
+    # Mailpit
+    # -------------------------------------------------------------------------
+    # The dev container and the e2e server run the Mailpit CI's services run.
+    echo -e "\n${BOLD}Mailpit${NC}"
+    if update_mailpit "$MAILPIT_VERSION"; then
+        ((success_count++))
+    else
+        ((fail_count++))
+    fi
 
     # -------------------------------------------------------------------------
     # Go Module Files
@@ -1243,6 +1313,8 @@ cmd_update() {
     echo "     the header above is written here, but only the generator carries it into the mocks"
     echo "  3. Run tests: make test-ci"
     echo "  4. Commit changes"
+
+    [ "$fail_count" -eq 0 ]
 }
 
 # settled_go_version reads candidate versions of a module, newest first, each

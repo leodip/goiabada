@@ -295,7 +295,7 @@ func gitRepository(t *testing.T, root string, commands ...[]string) {
 	for _, args := range commands {
 		cmd := exec.CommandContext(t.Context(), "git", args...)
 		cmd.Dir = root
-		cmd.Env = append(os.Environ(), "GIT_CEILING_DIRECTORIES="+filepath.Dir(root),
+		cmd.Env = append(gitEnvironment(root),
 			"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.com",
 			"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.com", "GIT_CONFIG_GLOBAL=/dev/null")
 		out, err := cmd.CombinedOutput()

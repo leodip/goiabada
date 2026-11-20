@@ -8,20 +8,28 @@ package guard
 // (#820). This test reads the run: steps of every workflow and composite action as the shell runs
 // them, resolves each command that is a path against its step's working-directory and the cds
 // before it in the script, and holds the file it names to existing and being executable. It reads
-// the mode from the tree, which on CI's fresh checkout is the committed one. The shell reader keeps
+// the mode git's index records, which a checkout with core.fileMode=false, as on Windows or WSL, can
+// hold apart from the disk's: git add records 100644 there for a file that looks executable. Where
+// git cannot answer, as in a dev container whose worktree's .git names a path outside it, it reads
+// the disk, as for a file git does not track; on CI, whose fresh checkout git always reads, that is
+// a failure rather than a fallback. The shell reader keeps
 // no parentheses, so a cd on a line that opens with ( is read as a subshell's, ending with that
 // line. A path behind a runner other than commandWrappers, such as sudo or xargs, and a command
 // inside $(…) are not read.
 
 import (
+	"bytes"
+	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -124,12 +132,38 @@ func executedPath(c shellCommand) (string, bool) {
 	return name, strings.Contains(name, "/") && !strings.HasPrefix(name, "/")
 }
 
+// gitModes maps each file git's index holds under root, relative to it, to the mode git records
+// for it: 100755 for an executable file, 100644 for another. git runs with gitEnvironment, so a tree
+// that is no repository of its own is an error.
+func gitModes(ctx context.Context, root string) (map[string]string, error) {
+	cmd := exec.CommandContext(ctx, "git", "ls-files", "--stage", "-z")
+	cmd.Dir = root
+	cmd.Env = gitEnvironment(root)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return nil, errs.Wrapf(err, "git ls-files: %s", strings.TrimSpace(stderr.String()))
+	}
+	modes := map[string]string{}
+	for entry := range strings.SplitSeq(stdout.String(), "\x00") {
+		// <mode> <object> <stage>\t<path>
+		info, name, ok := strings.Cut(entry, "\t")
+		if mode, _, _ := strings.Cut(info, " "); ok && name != "" {
+			modes[name] = mode
+		}
+	}
+	return modes, nil
+}
+
 // scriptModeFindings reads the run: steps of each file, named relative to root, and returns every
 // command that is a path naming no file in the repository or a file without an execute bit, every
 // such command whose working-directory is an expression it cannot resolve, and every form its shell
-// reader cannot read, with the files it found executable, relative to root. A list of files holding
-// no run: step is a finding too, since a check that read nothing would pass on any tree.
-func scriptModeFindings(root string, files []string) (findings, checked []string) {
+// reader cannot read, with the files it found executable, relative to root. A file modes holds, as
+// gitModes lists them, is held to its mode there, and any other, or every file when modes is nil, to
+// its mode on the disk. A list of files holding no run: step is a finding too, since a check that
+// read nothing would pass on any tree.
+func scriptModeFindings(root string, files []string, modes map[string]string) (findings, checked []string) {
 	steps := 0
 	for _, file := range files {
 		text, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(file)))
@@ -185,6 +219,13 @@ func scriptModeFindings(root string, files []string) (findings, checked []string
 					findings = append(findings, fmt.Sprintf("%s, but the repository has no file %s for it to run", at, rel))
 				case !info.Mode().IsRegular():
 					findings = append(findings, fmt.Sprintf("%s, but %s is not a file", at, rel))
+				case modes[rel] == "100644":
+					findings = append(findings, fmt.Sprintf("%s, but git records %s with mode 100644, with no execute bit, so the runner refuses it with Permission denied: "+
+						"git update-index --chmod=+x %s", at, rel, rel))
+				case modes[rel] == "100755":
+					if !slices.Contains(checked, rel) {
+						checked = append(checked, rel)
+					}
 				case info.Mode().Perm()&0o111 == 0:
 					findings = append(findings, fmt.Sprintf("%s, but %s has mode %04o, with no execute bit, so the runner refuses it with Permission denied: "+
 						"git update-index --chmod=+x %s, and chmod +x it", at, rel, info.Mode().Perm(), rel))
@@ -227,10 +268,29 @@ func TestWorkflowScripts_TheRealRunStepsRunExecutableFiles(t *testing.T) {
 	files := workflowFiles(t, repo)
 	require.Contains(t, files, buildValidationWorkflow, "the walk finds the workflows")
 
-	findings, checked := scriptModeFindings(repo, files)
+	modes, err := gitModes(t.Context(), repo)
+	if err != nil {
+		require.NotEqual(t, "true", os.Getenv("GITHUB_ACTIONS"), "CI's checkout should be one git reads: %v", err)
+		t.Logf("git cannot list the modes under %s, so each script is held to its mode on the disk: %v", repo, err)
+	}
+	findings, checked := scriptModeFindings(repo, files, modes)
 	assert.Empty(t, findings)
 	assert.Contains(t, checked, "src/build/"+binaryScanCommand,
 		"the walk reaches build validation's binary scan, which reached main without its execute bit")
+}
+
+// scriptModeGit runs git in root, a repository of its own, with gitEnvironment. A test that needs it
+// is skipped where git is not installed.
+func scriptModeGit(t *testing.T, root string, args ...string) {
+	t.Helper()
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git is not installed")
+	}
+	cmd := exec.CommandContext(t.Context(), "git", args...)
+	cmd.Dir = root
+	cmd.Env = gitEnvironment(root)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, "git %s: %s", strings.Join(args, " "), out)
 }
 
 // scriptModeTree writes a repository holding workflow as .github/workflows/w.yml and each script
@@ -285,14 +345,14 @@ func TestWorkflowScripts_Findings(t *testing.T) {
 		// Line 9's step names no working-directory: resolved in src/build, the step before it's,
 		// ./src/build/scan.sh would name no file. Line 23 runs after the subshell's cd, line 25
 		// after the cd before it, and lines 26 and 27 are read without their YAML quotes.
-		findings, checked := scriptModeFindings(scriptModeTree(t, workflow, scripts), []string{".github/workflows/w.yml"})
+		findings, checked := scriptModeFindings(scriptModeTree(t, workflow, scripts), []string{".github/workflows/w.yml"}, nil)
 		assert.Empty(t, findings)
 		assert.Equal(t, []string{"src/build/scan.sh", "src/tool/run.sh"}, checked)
 	})
 
 	t.Run("a script without an execute bit", func(t *testing.T) {
 		root := scriptModeTree(t, workflow, map[string]os.FileMode{"src/build/scan.sh": 0o644, "src/tool/run.sh": 0o755})
-		findings, checked := scriptModeFindings(root, []string{".github/workflows/w.yml"})
+		findings, checked := scriptModeFindings(root, []string{".github/workflows/w.yml"}, nil)
 		assertFindings(t, findings,
 			"w.yml:7 runs ./scan.sh, but src/build/scan.sh has mode 0644, with no execute bit",
 			"w.yml:9 runs ./src/build/scan.sh, but src/build/scan.sh has mode 0644",
@@ -303,9 +363,69 @@ func TestWorkflowScripts_Findings(t *testing.T) {
 		assert.Equal(t, []string{"src/tool/run.sh"}, checked, "bash ./src/build/scan.sh reads the file, which needs no execute bit")
 	})
 
+	t.Run("a script git records without an execute bit, executable on disk", func(t *testing.T) {
+		// As on a checkout with core.fileMode=false, where git add records 100644 whatever the disk says.
+		root := scriptModeTree(t, workflow, scripts)
+		scriptModeGit(t, root, "init", "--quiet")
+		scriptModeGit(t, root, "add", ".")
+		scriptModeGit(t, root, "update-index", "--chmod=-x", "src/build/scan.sh")
+		modes, err := gitModes(t.Context(), root)
+		require.NoError(t, err)
+		findings, checked := scriptModeFindings(root, []string{".github/workflows/w.yml"}, modes)
+		assertFindings(t, findings,
+			"w.yml:7 runs ./scan.sh, but git records src/build/scan.sh with mode 100644, with no execute bit",
+			"w.yml:9 runs ./src/build/scan.sh, but git records src/build/scan.sh with mode 100644",
+			"w.yml:15 runs ./src/build/scan.sh, but git records src/build/scan.sh with mode 100644",
+			"w.yml:22 runs ./scan.sh, but git records src/build/scan.sh with mode 100644",
+			"w.yml:26 runs ./src/build/scan.sh, but git records src/build/scan.sh with mode 100644")
+		assert.Contains(t, findings[0], "git update-index --chmod=+x src/build/scan.sh")
+		assert.Equal(t, []string{"src/tool/run.sh"}, checked)
+	})
+
+	t.Run("a script git records as executable passes whatever the disk says", func(t *testing.T) {
+		root := scriptModeTree(t, workflow, map[string]os.FileMode{"src/build/scan.sh": 0o644, "src/tool/run.sh": 0o755})
+		scriptModeGit(t, root, "init", "--quiet")
+		scriptModeGit(t, root, "add", ".")
+		scriptModeGit(t, root, "update-index", "--chmod=+x", "src/build/scan.sh")
+		modes, err := gitModes(t.Context(), root)
+		require.NoError(t, err)
+		findings, checked := scriptModeFindings(root, []string{".github/workflows/w.yml"}, modes)
+		assert.Empty(t, findings)
+		assert.Equal(t, []string{"src/build/scan.sh", "src/tool/run.sh"}, checked)
+	})
+
+	t.Run("a script git does not track is held to its disk mode", func(t *testing.T) {
+		root := scriptModeTree(t, workflow, map[string]os.FileMode{"src/build/scan.sh": 0o644, "src/tool/run.sh": 0o755})
+		scriptModeGit(t, root, "init", "--quiet")
+		scriptModeGit(t, root, "add", ".github", "src/tool")
+		modes, err := gitModes(t.Context(), root)
+		require.NoError(t, err)
+		findings, _ := scriptModeFindings(root, []string{".github/workflows/w.yml"}, modes)
+		require.NotEmpty(t, findings)
+		assert.Contains(t, findings[0], "w.yml:7 runs ./scan.sh, but src/build/scan.sh has mode 0644, with no execute bit")
+	})
+
+	t.Run("the caller's git environment reaches neither a fixture nor its modes", func(t *testing.T) {
+		// As a pre-commit hook runs these tests, with GIT_INDEX_FILE naming its repository's index.
+		callers := filepath.Join(t.TempDir(), "index")
+		t.Setenv("GIT_INDEX_FILE", callers)
+		root := scriptModeTree(t, workflow, scripts)
+		scriptModeGit(t, root, "init", "--quiet")
+		scriptModeGit(t, root, "add", ".")
+		modes, err := gitModes(t.Context(), root)
+		require.NoError(t, err)
+		assert.Equal(t, "100755", modes["src/build/scan.sh"])
+		assert.NoFileExists(t, callers, "the fixture wrote the caller's index")
+	})
+
+	t.Run("a tree that is no repository has no git modes", func(t *testing.T) {
+		_, err := gitModes(t.Context(), scriptModeTree(t, workflow, scripts))
+		require.Error(t, err)
+	})
+
 	t.Run("a working-directory after the run key is the step's", func(t *testing.T) {
 		removed := strings.Replace(workflow, "        working-directory: \"src\" # quoted\n", "", 1)
-		findings, _ := scriptModeFindings(scriptModeTree(t, removed, scripts), []string{".github/workflows/w.yml"})
+		findings, _ := scriptModeFindings(scriptModeTree(t, removed, scripts), []string{".github/workflows/w.yml"}, nil)
 		assertFindings(t, findings, "w.yml:11 runs tool/run.sh, but the repository has no file tool/run.sh for it to run")
 	})
 
@@ -320,7 +440,7 @@ func TestWorkflowScripts_Findings(t *testing.T) {
 			"      - run: ./src\n" + // 8
 			"      - run: cd \"$RUNNER_TEMP\" && ./tool.sh\n" // 9
 		root := scriptModeTree(t, workflow, map[string]os.FileMode{"src/build/scan.sh": 0o755})
-		findings, checked := scriptModeFindings(root, []string{".github/workflows/w.yml"})
+		findings, checked := scriptModeFindings(root, []string{".github/workflows/w.yml"}, nil)
 		assertFindings(t, findings,
 			"w.yml:4 runs ./gone.sh, but the repository has no file gone.sh",
 			"w.yml:5 runs ../outside.sh, which is outside the repository",
@@ -332,7 +452,7 @@ func TestWorkflowScripts_Findings(t *testing.T) {
 
 	t.Run("a script the reader cannot read", func(t *testing.T) {
 		const workflow = "jobs:\n  build:\n    steps:\n      - run: |\n          echo \"never closed\n"
-		findings, _ := scriptModeFindings(scriptModeTree(t, workflow, nil), []string{".github/workflows/w.yml"})
+		findings, _ := scriptModeFindings(scriptModeTree(t, workflow, nil), []string{".github/workflows/w.yml"}, nil)
 		require.NotEmpty(t, findings)
 		assert.Contains(t, findings[0], "script mode: .github/workflows/w.yml:5 ")
 		assert.Contains(t, findings[0], "which this reader cannot read as the shell would")
@@ -340,15 +460,15 @@ func TestWorkflowScripts_Findings(t *testing.T) {
 
 	t.Run("files holding no run: step", func(t *testing.T) {
 		root := scriptModeTree(t, "jobs:\n  build:\n    steps:\n      - uses: ./.github/actions/x\n", nil)
-		findings, _ := scriptModeFindings(root, []string{".github/workflows/w.yml"})
+		findings, _ := scriptModeFindings(root, []string{".github/workflows/w.yml"}, nil)
 		assertFindings(t, findings, "script mode: .github/workflows/w.yml hold no run: step, so this check read nothing")
 
-		findings, _ = scriptModeFindings(root, nil)
+		findings, _ = scriptModeFindings(root, nil, nil)
 		assertFindings(t, findings, "script mode: no workflow file was found, so this check read nothing")
 	})
 
 	t.Run("a file that cannot be read", func(t *testing.T) {
-		findings, _ := scriptModeFindings(t.TempDir(), []string{".github/workflows/missing.yml"})
+		findings, _ := scriptModeFindings(t.TempDir(), []string{".github/workflows/missing.yml"}, nil)
 		assertFindings(t, findings,
 			"script mode: .github/workflows/missing.yml cannot be read",
 			"hold no run: step, so this check read nothing")

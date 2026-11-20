@@ -1,7 +1,10 @@
-# Shared setup for the container-based test jobs in check.yml.
+# Shared setup for the container-based test jobs in check.yml: the data and
+# integration jobs, which run in the golang container to reach their databases on
+# the job's network. The unit and race jobs run on the runner and use
+# setup-test-runner instead.
 #
 # The golang:*-bookworm image is close to what run-tests.sh needs but not
-# identical, and seven jobs need the same four steps. Debian rather than
+# identical, and every database job needs the same four steps. Debian rather than
 # alpine, because GitHub injects a glibc-linked Node.js runtime into container
 # jobs to execute actions, which does not run on musl.
 
@@ -72,11 +75,11 @@ runs:
           echo "GO_TOOLCHAIN_VERSION=$(go env GOVERSION)"
         } >> "$GITHUB_ENV"
 
-    # Every job restores the cache and one saves it: the job that passes save-cache, Unit /
-    # authserver. Its modules include every module the core and console tiers download, and it
-    # compiles what the database jobs compile too, so they restore the auth server's build
-    # rather than compile it. A key is new after every go.sum change, and saving one compresses
-    # the whole cache, which one job pays rather than every job.
+    # Every job restores the cache and one saves it: the job that passes save-cache, Data /
+    # sqlite. It compiles what the other database jobs compile too, so they restore the auth
+    # server's build rather than compile it. The runner jobs keep their own cache under the
+    # runner's paths, which this one is never restored from. A key is new after every go.sum
+    # change, and saving one compresses the whole cache, which one job pays rather than every job.
     - name: Cache Go modules and build output
       if: inputs.save-cache == 'true'
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0

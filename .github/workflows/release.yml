@@ -2,9 +2,9 @@
 # derives from that one tag, and it stops at a DRAFT so the notes can be written
 # before anything user-visible moves.
 #
-# Actions are SHA-pinned here, not tag-pinned as in check.yml. This workflow
-# holds Docker Hub credentials, and a moving tag like @v3 means whoever controls
-# that tag chooses what executes next to those secrets.
+# Actions are SHA-pinned. This workflow holds Docker Hub credentials, and a
+# moving tag like @v3 means whoever controls that tag chooses what executes
+# next to those secrets.
 
 name: Release
 
@@ -108,9 +108,6 @@ jobs:
     uses: ./.github/workflows/check.yml
     with:
       full: true
-    secrets:
-      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
 
   binaries:
     name: Binaries
@@ -210,16 +207,19 @@ jobs:
       adminconsole: ${{ steps.digests.outputs.adminconsole }}
     # The push credentials, DOCKER_USERNAME and DOCKER_PASSWORD, exist only in this environment,
     # which admits main and v* tags alone, and GitHub exposes environment secrets only to jobs
-    # that declare it. The Check workflow pulls with a separate read-only token.
+    # that declare it. The Check workflow logs in nowhere: it pulls from CI's public mirror.
     environment: prod
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
+      # Before Buildx, whose setup pulls its BuildKit image from Docker Hub, so that pull counts
+      # against this account's allowance rather than the one GitHub's runners share by address.
       - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
