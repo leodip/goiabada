@@ -1062,8 +1062,8 @@ func TestArchitecture_TheRealShippedMainsAreWalked(t *testing.T) {
 	for _, row := range tables.refused {
 		pkgs = append(pkgs, row.pkg)
 	}
-	assert.Equal(t, []string{"testing", "net/http/httptest", "github.com/stretchr/testify", "net/http/pprof", "expvar"}, pkgs,
-		"rule 9 refuses testing, net/http/httptest and testify (#331), and net/http/pprof and expvar (#462), and nothing else")
+	assert.Equal(t, []string{"testing", "net/http/httptest", "github.com/stretchr/testify", "net/http/pprof", "expvar", "golang.org/x/tools"}, pkgs,
+		"rule 9 refuses testing, net/http/httptest and testify (#331), net/http/pprof and expvar (#462), and golang.org/x/tools (#420), and nothing else")
 
 	graph, err := refgraph.BuildImportGraph(root)
 	require.NoError(t, err)

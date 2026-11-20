@@ -843,6 +843,13 @@ command itself and fails on a tree it changed.
 | `core/phonecountries` | `All` | both-apps | — |
 | `core/phonecountries` | `ByUniqueID` | contract | The lookup half of the phone country list, by the id the user row stores (`users.phone_number_country_uniqueid`). Moving it would put one list, whose ids are stored data, in two places (#563 decision 1). |
 | `core/phonecountries` | `PhoneCountry` | own-package | — |
+| `core/pkgload` | `Build` | test-support | Test support: the shared loader, compiled into no binary, which the guards and `ownershipdump` read the tree through; until they move onto it (#420), its own tests name it. |
+| `core/pkgload` | `ErrNoPackages` | test-support | Test support: the shared loader, compiled into no binary, which the guards and `ownershipdump` read the tree through; until they move onto it (#420), its own tests name it. |
+| `core/pkgload` | `Load` | test-support | Test support: the shared loader, compiled into no binary, which the guards and `ownershipdump` read the tree through; until they move onto it (#420), its own tests name it. |
+| `core/pkgload` | `MakeLoadable` | test-support | Test support: the shared loader, compiled into no binary, which the guards and `ownershipdump` read the tree through; until they move onto it (#420), its own tests name it. |
+| `core/pkgload` | `Platform` | kernel | — |
+| `core/pkgload` | `ReleaseBuilds` | test-support | Test support: the shared loader, compiled into no binary, which the guards and `ownershipdump` read the tree through; until they move onto it (#420), its own tests name it. |
+| `core/pkgload` | `ReleasePlatforms` | kernel | — |
 | `core/requestid` | `FromContext` | kernel | — |
 | `core/requestid` | `Header` | own-package | — |
 | `core/requestid` | `Middleware` | both-apps | — |

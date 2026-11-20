@@ -17,6 +17,7 @@ import (
 
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/internal/refgraph"
+	"github.com/leodip/goiabada/core/pkgload"
 )
 
 // AssertArchitecture holds the repository's module and package ownership rules to the tree they
@@ -144,20 +145,6 @@ var shippedMains = []string{
 	"authserver/cmd/goiabada-authserver",
 	"adminconsole/cmd/goiabada-adminconsole",
 	"cmd/goiabada-setup",
-}
-
-// releaseTargets are the platforms every shipped main is built for: the five build_platform calls
-// in src/build/build-binaries.sh and in the setup tool's build-binaries.sh, the Docker images being
-// the first of them. Rule 9 asks the go command for each main's dependencies on every one, because
-// a package outside the four modules may import differently on each.
-// TestReleaseBuilds_TheRealReleaseBuildsSetProduction fails when either script's build_platform
-// calls differ from this list as a set (#463).
-var releaseTargets = []struct{ goos, goarch string }{
-	{"linux", "amd64"},
-	{"linux", "arm64"},
-	{"darwin", "amd64"},
-	{"darwin", "arm64"},
-	{"windows", "amd64"},
 }
 
 // The owner values a package row may carry. Their meanings are in ARCHITECTURE.md; what matters
@@ -554,10 +541,11 @@ func isStdlib(importPath string) bool {
 }
 
 // checkRefusedPackages is rule 9: no shipped main links a package the refused-package table refuses:
-// the test frameworks, and net/http/pprof and expvar, which publish the process's internals on Go's
-// default mux (#462). Test code is defined by the frameworks rather than by where a helper lives or
-// what it is called, so the rule needs no list of first-party helpers: a helper reaching testing or
-// testify is caught through the framework behind it, the moment it gains one (#331).
+// the test frameworks, net/http/pprof and expvar, which publish the process's internals on Go's
+// default mux (#462), and golang.org/x/tools, which core/pkgload reads the tree through (#420).
+// Test code is defined by the frameworks rather than by where a helper lives or what it is called,
+// so the rule needs no list of first-party helpers: a helper reaching testing or testify is caught
+// through the framework behind it, the moment it gains one (#331).
 //
 // The walk starts at each shipped main rather than at every production package of its module, which
 // is the difference from rule 5. The graph counts core/guard's untagged files as production, so a
@@ -639,11 +627,12 @@ func refusedPackagesReached(graph *refgraph.ImportGraph, external map[string][]s
 }
 
 // compiledClosure asks the go command for the production dependencies of every shipped main on
-// every release target, and returns the imports of each package outside the four modules, merged
-// across mains and targets. The source graph cannot supply those: it reads the four modules and
-// nothing else, so without this a test framework that a third-party dependency imports would be
-// linked into a release with nothing going red. First-party packages are left to the graph, which
-// reads them with every tag but production free rather than one target at a time.
+// every release platform, pkgload.ReleasePlatforms, and returns the imports of each package outside
+// the four modules, merged across mains and platforms. The source graph cannot supply those: it
+// reads the four modules and nothing else, so without this a test framework that a third-party
+// dependency imports would be linked into a release with nothing going red. First-party packages
+// are left to the graph, which reads them with every tag but production free rather than one
+// platform at a time.
 //
 // A package the go command cannot load is a finding rather than a skipped package, since rule 9
 // cannot see what it imports; on this tree that is a dependency missing from the module cache or a
@@ -658,10 +647,10 @@ func compiledClosure(root string, graph *refgraph.ImportGraph) (map[string][]str
 		if _, ok := shippedMainPackage(graph, dir); !ok {
 			continue
 		}
-		for _, target := range releaseTargets {
-			pkgs, err := goListDeps(filepath.Join(root, filepath.FromSlash(dir)), target.goos, target.goarch)
+		for _, target := range pkgload.ReleasePlatforms() {
+			pkgs, err := goListDeps(filepath.Join(root, filepath.FromSlash(dir)), target)
 			if err != nil {
-				return nil, nil, errs.Wrapf(err, "%s on %s/%s", dir, target.goos, target.goarch)
+				return nil, nil, errs.Wrapf(err, "%s on %s", dir, target)
 			}
 			for _, p := range pkgs {
 				if p.Error != nil {
@@ -669,8 +658,8 @@ func compiledClosure(root string, graph *refgraph.ImportGraph) (map[string][]str
 					if !reported[key] {
 						reported[key] = true
 						findings = append(findings, fmt.Sprintf(
-							"refused package: the go command cannot load %s for %s on %s/%s, so rule 9 cannot see what it imports: %s",
-							p.ImportPath, dir, target.goos, target.goarch, strings.TrimSpace(p.Error.Err)))
+							"refused package: the go command cannot load %s for %s on %s, so rule 9 cannot see what it imports: %s",
+							p.ImportPath, dir, target, strings.TrimSpace(p.Error.Err)))
 					}
 					continue
 				}
@@ -702,12 +691,12 @@ type listedPackage struct {
 //
 // The context is Background because the reporting half holds none: a Reporter is Helper, Errorf
 // and Fatalf, and the tier's own timeout is what bounds the run.
-func goListDeps(dir, goos, goarch string) ([]listedPackage, error) {
+func goListDeps(dir string, target pkgload.Platform) ([]listedPackage, error) {
 	cmd := exec.CommandContext(context.Background(),
 		"go", "list", "-e", "-deps", "-tags", "production", "-json=ImportPath,Imports,Error", ".")
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(),
-		"GOOS="+goos, "GOARCH="+goarch, "CGO_ENABLED=0", "GOFLAGS=-mod=readonly", "GOWORK=off")
+		"GOOS="+target.GOOS, "GOARCH="+target.GOARCH, "CGO_ENABLED=0", "GOFLAGS=-mod=readonly", "GOWORK=off")
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr

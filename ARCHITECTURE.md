@@ -124,6 +124,7 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 | `core/passwordblocklist` | kernel | — |
 | `core/passwordrules` | kernel | — |
 | `core/phonecountries` | kernel | — |
+| `core/pkgload` | kernel | — |
 | `core/requestid` | kernel | — |
 | `core/routing` | kernel | — |
 | `core/securerandom` | kernel | — |
@@ -157,6 +158,14 @@ Notes on rows that are not self-evident:
   and it is an exported leaf rather than part of `refgraph` because Go's internal rule kept the
   auth server from reading it there (#480). Like `core/cmd` and `core/guard`, it is developer
   tooling compiled into no shipped binary.
+- `core/pkgload` is kernel because it is the one loader the guards that need types read the tree
+  through, a module's packages type-checked for one build through `golang.org/x/tools/go/packages`,
+  and the one declaration of the release platforms, which rule 9 reads too. It is an exported leaf
+  rather than part of `refgraph` because the auth server's tests load through it and Go's internal
+  rule keeps them out of `core/internal`, as `core/sourceroot` set the precedent for; it imports
+  neither `testing` nor testify, so `ownershipdump` can load through it. Like `core/guard`, it is
+  developer tooling compiled into no shipped binary, and the refused-packages table holds its
+  dependency to that (#420).
 - `core/guard` is kernel because it is test support compiled into no binary, and it holds the
   tree-wide guards and nothing else: it was `core/testutil` until #442, when its one helper that was
   no guard, `SkipWithoutIPv6Loopback`, left for `core/hostport/hostporttest`. It is still held to
@@ -388,7 +397,8 @@ The guard reports findings by these names.
    file's own header carries the definitions and the ceilings (#385).
 9. **refused package** — no shipped binary links a package the
    [Refused packages](#packages-no-shipped-binary-may-link) table refuses, or any package under one:
-   the test frameworks, and the two packages that publish a process's internals on Go's default mux.
+   the test frameworks, the two packages that publish a process's internals on Go's default mux, and
+   the package loading the guards read the source tree through.
    The shipped binaries are the three a release ships: the auth server, the admin console and the
    setup wizard. Each is walked from its `main` package, and the guard fails when one of the three is
    not where it looks, so a renamed main cannot drop out of the rule unnoticed (#331).
@@ -497,8 +507,8 @@ sqlbuilder, OTP and image libraries, provider-only crypto — and each is a row 
 
 ## Packages no shipped binary may link
 
-A shipped binary carries no test code, and nothing that publishes the process's internals. The rows
-below are both kinds.
+A shipped binary carries no test code, nothing that publishes the process's internals, and none of
+the tooling the guards read the source tree with. The rows below are all three kinds.
 
 The second kind is two packages of the standard library, `net/http/pprof` and `expvar`, which
 register live heap, goroutine, CPU and trace profiles under `/debug/pprof/` and the process's
@@ -507,6 +517,12 @@ the default mux, so linking them is one listener written the obvious way away fr
 both, and a `grep` of the source would not say they were there: until #462 both servers linked them
 through chi's middleware package, which no file needed for them. The rule holds them out by the same
 walk as the test frameworks, through a dependency as through first-party code.
+
+The third kind is `golang.org/x/tools`, Go's package loader and the analysis tooling around it, which
+`core/pkgload` loads the source tree through for the guards and `ownershipdump`. It imports no test
+framework, so the first kind's row would not catch it, and a production import of the loader would
+link it into a binary with nothing going red. Its row is what holds the loader to being developer
+tooling (#420).
 
 The rest of this section is about the first kind. A shipped binary carries no test code: no assertion library, no mock, no test helper, and none of
 the test frameworks they are written with. Both servers and the setup wizard are clean, and before
@@ -532,22 +548,23 @@ in the guard, as `shippedMains`, rather than found by looking for `package main`
 `schemadump`, `droptestdb`, `ownershipdump`, `imagescanreport`, `screenshotcheck` and the two
 reference-data generators are main packages too and ship in no release. A file belongs to a binary the way the rest of this
 document decides it: the `production` tag set and every other tag free, so a file in any of the five
-release targets counts. That is exact because every release build of all three sets `production`:
+release platforms counts. That is exact because every release build of all three sets `production`:
 the servers' cross-compile script, the two server Dockerfiles and the setup wizard's cross-compile
 script, so a `//go:build !production` helper anywhere in the wizard's closure stays out of the
 wizard as the generated mocks stay out of the servers. A rule test in core's unit tier,
 `TestReleaseBuilds_TheRealReleaseBuildsSetProduction`, reads those four files and fails when a
 `go build` in them does not set the tag, when one of them is missing or holds no `go build`, when the
 mains they build stop being exactly `shippedMains`, or when either script's `build_platform` calls
-differ as a set from `releaseTargets` (#463).
+differ as a set from `pkgload.ReleasePlatforms`, the one declaration of the release platforms, which
+the loader's release builds read too (#463, #420).
 
 The refusal does not stop at the edge of the four modules. Past it, the walk follows the imports
 the go command reports: `go list -deps` under the `production` tag, run over each shipped main for
-each of the five release targets, `releaseTargets` in the guard, supplies the imports of every
+each of the five release platforms, `pkgload.ReleasePlatforms`, supplies the imports of every
 third-party and standard-library package a main reaches, so a dependency whose own production code
 imports `testing` or testify is refused like a first-party helper that does. First-party packages
 are still read from source, with every tag but `production` free, because that covers all five
-targets at once. A package the go command cannot load is a finding, since the walk cannot see what
+platforms at once. A package the go command cannot load is a finding, since the walk cannot see what
 it imports.
 
 ### Refused packages
@@ -559,6 +576,7 @@ it imports.
 | `github.com/stretchr/testify` | the assertions, `require`, `mock` and `suite` the tests and the generated mocks are written with |
 | `net/http/pprof` | the profiler, which registers live heap, goroutine, CPU and trace profiles under `/debug/pprof/` on the default mux |
 | `expvar` | the process's variables, its command line and memory statistics among them, which it registers under `/debug/vars` on the default mux |
+| `golang.org/x/tools` | Go's package loader and analysis tooling, which `core/pkgload` loads the source tree through for the guards and `ownershipdump` |
 
 ## The guard
 

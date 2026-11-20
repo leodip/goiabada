@@ -1,10 +1,10 @@
 package guard
 
 // Rule 9 reads every shipped main the way its release build compiles it: the production tag set and
-// every other tag free, on each of releaseTargets. Both halves of that are a premise about files the
+// every other tag free, on each of pkgload.ReleasePlatforms. Both halves of that are a premise about files the
 // guard never opens, the scripts and Dockerfiles a release builds with, so this test opens them: every
 // go build in them sets production, and each cross-compile script builds for exactly the platforms
-// releaseTargets lists (#463). It also reads every -X target their go builds pass the linker, and
+// pkgload.ReleasePlatforms lists (#463). It also reads every -X target their go builds pass the linker, and
 // holds each to naming a package-level string variable, because the linker ignores one that names
 // nothing and the binary ships reporting "development" (#442).
 //
@@ -28,13 +28,14 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/core/internal/refgraph"
+	"github.com/leodip/goiabada/core/pkgload"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 // releaseBuild is one file a release builds with, relative to the source root: the shipped mains its
 // go build commands compile, and whether it is a cross-compile script, whose build_platform calls are
-// held to releaseTargets.
+// held to pkgload.ReleasePlatforms.
 type releaseBuild struct {
 	file      string
 	mains     []string
@@ -842,8 +843,8 @@ func checkReleaseStamps(root string, builds []releaseBuild, graph *refgraph.Impo
 }
 
 // checkReleaseBuilds holds the release-build files under root to the shipped mains and release
-// targets rule 9 reads, and returns what does not hold, sorted.
-func checkReleaseBuilds(root string, builds []releaseBuild, mains []string, targets []struct{ goos, goarch string }) []string {
+// platforms rule 9 reads, and returns what does not hold, sorted.
+func checkReleaseBuilds(root string, builds []releaseBuild, mains []string, targets []pkgload.Platform) []string {
 	var findings []string
 
 	shipped := map[string]bool{}
@@ -867,7 +868,7 @@ func checkReleaseBuilds(root string, builds []releaseBuild, mains []string, targ
 
 	want := map[string]bool{}
 	for _, t := range targets {
-		want[t.goos+"/"+t.goarch] = true
+		want[t.String()] = true
 	}
 
 	for _, b := range builds {
@@ -900,12 +901,12 @@ func checkReleaseBuilds(root string, builds []releaseBuild, mains []string, targ
 		for _, p := range platforms {
 			got[p] = true
 			if !want[p] {
-				findings = append(findings, fmt.Sprintf("release builds: %s builds for %s, which releaseTargets does not list", b.file, p))
+				findings = append(findings, fmt.Sprintf("release builds: %s builds for %s, which pkgload.ReleasePlatforms does not list", b.file, p))
 			}
 		}
 		for _, p := range sortedKeys(want) {
 			if !got[p] {
-				findings = append(findings, fmt.Sprintf("release builds: %s never builds for %s, which releaseTargets lists", b.file, p))
+				findings = append(findings, fmt.Sprintf("release builds: %s never builds for %s, which pkgload.ReleasePlatforms lists", b.file, p))
 			}
 		}
 	}
@@ -1208,8 +1209,8 @@ func TestReleaseBuilds_StampTargets(t *testing.T) {
 
 // ---- the check, over fixture trees ----------------------------------------------------------
 
-// releaseFixtureTargets is the release-target list the fixture scripts are held to.
-var releaseFixtureTargets = []struct{ goos, goarch string }{{"linux", "amd64"}, {"windows", "amd64"}}
+// releaseFixtureTargets is the release-platform list the fixture scripts are held to.
+var releaseFixtureTargets = []pkgload.Platform{{GOOS: "linux", GOARCH: "amd64"}, {GOOS: "windows", GOARCH: "amd64"}}
 
 // releaseFixtureMains is the shipped-mains list the fixture builds are held to.
 var releaseFixtureMains = []string{"one/cmd/one", "two/cmd/two"}
@@ -1348,12 +1349,12 @@ func TestReleaseBuilds_Check(t *testing.T) {
 			"release builds: build/Dockerfile-one:2 opens a ' that never closes")
 	})
 
-	t.Run("a script building for a platform the release targets lack fails", func(t *testing.T) {
+	t.Run("a script building for a platform the release platforms lack fails", func(t *testing.T) {
 		root := writeReleaseFixture(t, map[string]string{
 			"build/build.sh": cleanReleaseScript + "build_platform \"freebsd\" \"amd64\" \"\"\n",
 		})
 		assertFindings(t, checkReleaseBuilds(root, releaseFixtureBuilds, releaseFixtureMains, releaseFixtureTargets),
-			"release builds: build/build.sh builds for freebsd/amd64, which releaseTargets does not list")
+			"release builds: build/build.sh builds for freebsd/amd64, which pkgload.ReleasePlatforms does not list")
 	})
 
 	t.Run("a second build_platform call on one line is read", func(t *testing.T) {
@@ -1361,14 +1362,14 @@ func TestReleaseBuilds_Check(t *testing.T) {
 			"build/build.sh": strings.Replace(cleanReleaseScript, `build_platform "linux" "amd64" ""`, `build_platform "linux" "amd64" ""; build_platform "freebsd" "amd64" ""`, 1),
 		})
 		assertFindings(t, checkReleaseBuilds(root, releaseFixtureBuilds, releaseFixtureMains, releaseFixtureTargets),
-			"release builds: build/build.sh builds for freebsd/amd64, which releaseTargets does not list")
+			"release builds: build/build.sh builds for freebsd/amd64, which pkgload.ReleasePlatforms does not list")
 	})
 
-	t.Run("release targets naming a platform the script never builds for fail", func(t *testing.T) {
+	t.Run("release platforms naming a platform the script never builds for fail", func(t *testing.T) {
 		root := writeReleaseFixture(t, nil)
-		targets := append(append([]struct{ goos, goarch string }{}, releaseFixtureTargets...), struct{ goos, goarch string }{"darwin", "arm64"})
+		targets := append(append([]pkgload.Platform{}, releaseFixtureTargets...), pkgload.Platform{GOOS: "darwin", GOARCH: "arm64"})
 		assertFindings(t, checkReleaseBuilds(root, releaseFixtureBuilds, releaseFixtureMains, targets),
-			"release builds: build/build.sh never builds for darwin/arm64, which releaseTargets lists")
+			"release builds: build/build.sh never builds for darwin/arm64, which pkgload.ReleasePlatforms lists")
 	})
 
 	t.Run("a shipped main no release build is listed for fails", func(t *testing.T) {
@@ -1839,10 +1840,10 @@ func TestReleaseBuilds_CrossCompile(t *testing.T) {
 
 // TestReleaseBuilds_TheRealReleaseBuildsSetProduction holds this repository's release builds to the
 // premise rule 9 rests on: every go build a release runs sets production, the release builds listed
-// name exactly the guard's shippedMains, and both cross-compile scripts build for exactly its
-// releaseTargets.
+// name exactly the guard's shippedMains, and both cross-compile scripts build for exactly
+// pkgload.ReleasePlatforms, the one declaration rule 9 and the loader's release builds read.
 func TestReleaseBuilds_TheRealReleaseBuildsSetProduction(t *testing.T) {
-	assert.Empty(t, checkReleaseBuilds(SourceRoot(t), releaseBuilds, shippedMains, releaseTargets))
+	assert.Empty(t, checkReleaseBuilds(SourceRoot(t), releaseBuilds, shippedMains, pkgload.ReleasePlatforms()))
 }
 
 // TestReleaseBuilds_TheRealImagesCrossCompile holds both release Dockerfiles to the cross-compiled

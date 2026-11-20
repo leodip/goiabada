@@ -120,14 +120,16 @@ computed from the reference graph and three are asserted with a note the guard r
 9 walks the production closure of the three shipped mains, the auth server, the admin console and
 the setup wizard, and refuses `testing` and everything under it, `net/http/httptest` and every
 testify package, so a production import of a test helper or mock fails the unit tier rather than
-reaching a release, and `net/http/pprof` and `expvar`, which register the process's profiles and
-variables on Go's default mux the moment they are linked (#462); the three mains are `shippedMains`
+reaching a release, `net/http/pprof` and `expvar`, which register the process's profiles and
+variables on Go's default mux the moment they are linked (#462), and `golang.org/x/tools`, the
+package loading `core/pkgload` reads the tree through, so the loader stays developer tooling (#420);
+the three mains are `shippedMains`
 in `architecture.go`, and the guard fails when one is not found (#331). It reads each main with the
 `production` tag set because all three release builds set it, the setup wizard's since #463, and
 `TestReleaseBuilds_TheRealReleaseBuildsSetProduction` in core's tier holds them to it: every `go
 build` in the servers' cross-compile script, the two server Dockerfiles and the wizard's
 cross-compile script sets `production`, the mains they build are exactly `shippedMains`, and both
-scripts' `build_platform` calls equal `releaseTargets` as a set (#463). Beside it,
+scripts' `build_platform` calls equal `pkgload.ReleasePlatforms` as a set (#463). Beside it,
 `TestReleaseBuilds_TheRealStampsNameVariables` holds every `-ldflags -X` target in the same four
 files, the servers' script's `$LDFLAGS` read from its one assignment, to naming a package-level
 string variable a production build declares, `main.` resolved against the main its `go build`
