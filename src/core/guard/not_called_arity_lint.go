@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/core/pkgload"
+	"golang.org/x/tools/go/packages"
 )
 
 // testifyMockImportPath is testify's mock package, whose Mock every generated double embeds and
@@ -175,10 +176,10 @@ func findNotCalledArity(root string, dirs []string) ([]notCalledFinding, []notCa
 			for _, file := range p.Syntax {
 				// The file's own name, not one a //line directive maps its package clause to: the
 				// directory a file is in is what the caller's dirs are about.
-				if !byModule[modRoot][filepath.Dir(p.Fset.File(file.Pos()).Name())] {
+				if !byModule[modRoot][filepath.Dir(pkgload.Position(p, file.Pos()).Filename)] {
 					continue
 				}
-				f, r := notCalledSitesIn(file, p.Fset, p.TypesInfo, p.Types, root, seen)
+				f, r := notCalledSitesIn(file, p, root, seen)
 				findings = append(findings, f...)
 				refused = append(refused, r...)
 			}
@@ -212,9 +213,9 @@ func isNotCalledSite(info *types.Info, sel *ast.SelectorExpr) bool {
 
 // notCalledSitesIn applies the rule to every site in one checked file that seen has not counted.
 func notCalledSitesIn(
-	file *ast.File, fset *token.FileSet, info *types.Info, pkg *types.Package, root string,
-	seen map[token.Position]bool,
+	file *ast.File, p *packages.Package, root string, seen map[token.Position]bool,
 ) ([]notCalledFinding, []notCalledRefusal) {
+	info, pkg := p.TypesInfo, p.Types
 	var findings []notCalledFinding
 	var refused []notCalledRefusal
 
@@ -230,7 +231,7 @@ func notCalledSitesIn(
 		}
 		// The physical position, not one a //line directive maps: two files mapping to one line are
 		// two sites, and a site is reported at its own file's line.
-		position := fset.PositionFor(call.Pos(), false)
+		position := pkgload.Position(p, call.Pos())
 		if seen[position] {
 			return true
 		}

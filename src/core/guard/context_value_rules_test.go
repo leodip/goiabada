@@ -11,6 +11,7 @@ package guard
 // pkgload, where a package that does not compile is fatal (#420).
 
 import (
+	"os/exec"
 	"strconv"
 	"strings"
 	"testing"
@@ -398,6 +399,55 @@ func TestContextValues_ALineDirectiveDoesNotMoveASiteIntoTheAccessor(t *testing.
 
 	assert.Equal(t, []string{
 		"handlers/generated.go:" + strconv.Itoa(lineOf(t, contextFixtureMapped, "mapped-read")) + " a context Value read",
+	}, contextFindingNames(walk.findings))
+	assert.Empty(t, walk.problems)
+}
+
+// contextFixtureCgoAccessor is an accessor that imports "C".
+const contextFixtureCgoAccessor = `package reqctx
+
+/* static int one(void) { return 1; } */
+import "C"
+
+import "context"
+
+func SettingsWithCgo(ctx context.Context) (any, int) {
+	return ctx.Value(settingsKey), int(C.one())
+}
+`
+
+// contextFixtureCgoHandler is a handler that imports "C" and reads a context value raw.
+const contextFixtureCgoHandler = `package handlers
+
+/* static int two(void) { return 2; } */
+import "C"
+
+import "context"
+
+func RawWithCgo(ctx context.Context) (any, int) {
+	return ctx.Value("k"), int(C.two()) // site:cgo-read
+}
+`
+
+// A file that imports "C" is compiled from the file cmd/cgo generates from it, in the build cache. A
+// read in such a file is judged, and reported, by the file it came from: in the accessor it is the
+// accessor's, and in a handler it is a raw read at the handler's own line.
+func TestContextValues_AFileThatImportsCIsJudgedByItsOwnPath(t *testing.T) {
+	cgo, err := exec.Command("go", "env", "CGO_ENABLED").Output()
+	require.NoError(t, err)
+	if strings.TrimSpace(string(cgo)) != "1" {
+		t.Skip("the default build has cgo off here, as it does without a C compiler")
+	}
+	root := t.TempDir()
+	contextFixtureModule(t, root)
+	writeFixture(t, root, "mod/reqctx/cgo.go", contextFixtureCgoAccessor)
+	writeFixture(t, root, "mod/handlers/cgo.go", contextFixtureCgoHandler)
+
+	walk, err := findContextValueSites(root, "mod", "reqctx", contextFixtureExemptions)
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{
+		"handlers/cgo.go:" + strconv.Itoa(lineOf(t, contextFixtureCgoHandler, "cgo-read")) + " a context Value read",
 	}, contextFindingNames(walk.findings))
 	assert.Empty(t, walk.problems)
 }

@@ -849,6 +849,7 @@ command itself and fails on a tree it changed.
 | `core/pkgload` | `LoadBuilds` | kernel | — |
 | `core/pkgload` | `MakeLoadable` | test-support | Test support: makes a guard's fixture tree a set of modules the go command can load; the fixture helpers of the guards that read through `core/pkgload` name it, and no binary links it. |
 | `core/pkgload` | `Platform` | kernel | — |
+| `core/pkgload` | `Position` | kernel | — |
 | `core/pkgload` | `ReleaseBuilds` | kernel | — |
 | `core/pkgload` | `ReleasePlatforms` | kernel | — |
 | `core/requestid` | `FromContext` | kernel | — |

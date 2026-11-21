@@ -31,6 +31,7 @@ import (
 	"go/token"
 	"go/types"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"sort"
@@ -154,23 +155,23 @@ func findRequestFieldWrites(
 		}
 		for _, p := range pkgs {
 			for _, file := range p.Syntax {
-				name := p.Fset.File(file.Pos()).Name()
-				readFiles[name] = true
+				readFiles[p.Fset.File(file.Pos()).Name()] = true
 				if rule == nil {
 					continue
 				}
-				rel, rErr := filepath.Rel(root, name)
-				if rErr != nil {
-					return requestFieldWalk{}, rErr
-				}
 				for _, w := range rule.check(file, p.PkgPath, p.TypesInfo) {
 					// The physical position, not one a //line directive maps: two files that map a write to
-					// the same template line are two writes, and the line reported is the file's own.
-					at := p.Fset.PositionFor(w.pos, false)
+					// the same template line are two writes, and the line reported is the file's own. A
+					// file cgo generated is reported as the one it came from.
+					at := pkgload.Position(p, w.pos)
 					if seen[at] {
 						continue
 					}
 					seen[at] = true
+					rel, rErr := filepath.Rel(root, at.Filename)
+					if rErr != nil {
+						return requestFieldWalk{}, rErr
+					}
 					walk.found = append(walk.found, requestFieldWrite{file: filepath.ToSlash(rel), line: at.Line, what: w.what})
 				}
 			}
@@ -787,6 +788,36 @@ func completed(ac *ceremony.AuthContext, effective string) {
 		"authserver/internal/handlers/completed_amd64.go:7: assigns State",
 		"authserver/internal/handlers/completed_arm64.go:7: assigns State",
 	}, requestFieldStrings(walk.found))
+}
+
+// A file that imports "C" is compiled from the file cmd/cgo generates from it, in the build cache, and
+// a write in it is reported at the original file's line.
+func TestRequestFieldWrites_Finder_ReportsAFileThatImportsCAtItsOwnLine(t *testing.T) {
+	cgo, err := exec.Command("go", "env", "CGO_ENABLED").Output()
+	require.NoError(t, err)
+	if strings.TrimSpace(string(cgo)) != "1" {
+		t.Skip("the default build has cgo off here, as it does without a C compiler")
+	}
+	root := t.TempDir()
+	writeRequestFieldModule(t, root)
+	writeRequestFieldFixture(t, root, "authserver/internal/ceremony/auth_context.go", requestFieldCeremonyFixture)
+	writeRequestFieldFixture(t, root, "authserver/internal/handlers/completed.go", `package handlers
+
+/* static int one(void) { return 1; } */
+import "C"
+
+import "github.com/leodip/goiabada/authserver/internal/ceremony"
+
+func completed(ac *ceremony.AuthContext, effective string) int {
+	ac.State = effective
+	return int(C.one())
+}
+`)
+
+	walk, err := findRequestFieldWrites(root, requestFieldScope, requestFieldFixtureFields, requestFieldSetters, requestFieldWriter)
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"authserver/internal/handlers/completed.go:9: assigns State"}, requestFieldStrings(walk.found))
 }
 
 // A package that does not compile cannot be read whole, and a write in it would pass unseen, so the

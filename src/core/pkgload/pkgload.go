@@ -18,6 +18,7 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"sync"
 
@@ -156,6 +157,20 @@ func LoadBuilds(builds []Build, dirs ...string) ([][]*packages.Package, error) {
 		}
 	}
 	return out, nil
+}
+
+// Position is where pos, in one of the syntax trees of a package Load returned, is in the source a
+// developer edits. In a file of the package's own it is the physical position, which a //line
+// directive does not move: two files that map to one template line are two places, each at its own
+// line. A file that imports "C" is compiled from what cmd/cgo generates from it, a file in the build
+// cache in its place, whose own //line directives lead back to it, so there it is the position those
+// give: the original file's, at its line.
+func Position(p *packages.Package, pos token.Pos) token.Position {
+	at := p.Fset.PositionFor(pos, false)
+	if slices.Contains(p.GoFiles, at.Filename) {
+		return at
+	}
+	return p.Fset.PositionFor(pos, true)
 }
 
 func load(dir string, build Build) ([]*packages.Package, error) {

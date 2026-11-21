@@ -29,6 +29,7 @@ import (
 	"go/token"
 	"go/types"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"sort"
@@ -124,20 +125,20 @@ func findDiscardedErrors(
 		listedTypes := discardedErrorListedTypes(pkgs, methods)
 		for _, p := range pkgs {
 			for _, file := range p.Syntax {
-				name := p.Fset.File(file.Pos()).Name()
-				readFiles[name] = true
-				rel, rErr := filepath.Rel(root, name)
-				if rErr != nil {
-					return nil, 0, rErr
-				}
+				readFiles[p.Fset.File(file.Pos()).Name()] = true
 				for _, d := range discardedErrorsIn(file, p.TypesInfo, listed, methods, listedTypes) {
 					// The physical position, not one a //line directive maps: two files that map a discard
 					// to the same template line are two discards, and the line reported is the file's own.
-					at := p.Fset.PositionFor(d.pos, false)
+					// A file cgo generated is reported as the one it came from.
+					at := pkgload.Position(p, d.pos)
 					if seen[at] {
 						continue
 					}
 					seen[at] = true
+					rel, rErr := filepath.Rel(root, at.Filename)
+					if rErr != nil {
+						return nil, 0, rErr
+					}
 					found = append(found, discardedError{file: filepath.ToSlash(rel), line: at.Line, fn: d.fn})
 				}
 			}
@@ -871,6 +872,35 @@ func seed(p string) string {
 		"authserver/internal/data/seeder_amd64.go:7: passwordhash.Hash",
 		"authserver/internal/data/seeder_arm64.go:7: passwordhash.Hash",
 	}, discardedErrorStrings(found))
+}
+
+// A file that imports "C" is compiled from the file cmd/cgo generates from it, in the build cache, and
+// a discard in it is reported at the original file's line.
+func TestDiscardedErrors_Finder_ReportsAFileThatImportsCAtItsOwnLine(t *testing.T) {
+	cgo, err := exec.Command("go", "env", "CGO_ENABLED").Output()
+	require.NoError(t, err)
+	if strings.TrimSpace(string(cgo)) != "1" {
+		t.Skip("the default build has cgo off here, as it does without a C compiler")
+	}
+	root := t.TempDir()
+	writeDiscardedErrorModule(t, root)
+	writeDiscardedErrorFixture(t, root, "authserver/internal/data/seeder.go", `package data
+
+/* static int one(void) { return 1; } */
+import "C"
+
+import "github.com/leodip/goiabada/authserver/internal/passwordhash"
+
+func seed(p string) (string, int) {
+	hash, _ := passwordhash.Hash(p)
+	return hash, int(C.one())
+}
+`)
+
+	found, _, err := findDiscardedErrors(root, discardedErrorScope, discardedErrorFuncs, discardedErrorMethods)
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"authserver/internal/data/seeder.go:9: passwordhash.Hash"}, discardedErrorStrings(found))
 }
 
 // A listed name may return an error in only some builds, which the list check allows. Where its last

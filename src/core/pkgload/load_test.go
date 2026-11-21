@@ -2,7 +2,9 @@ package pkgload_test
 
 import (
 	"go/ast"
+	"go/token"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -482,6 +484,61 @@ func TestLoadBuilds_OrdersErrorsByBuildBeforeDir(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "example.test/b/q")
 	assert.NotContains(t, err.Error(), "example.test/a/p")
+}
+
+// ---- where a position is --------------------------------------------------------------------
+
+// funcName is where the package's top-level function of that name is named.
+func funcName(t *testing.T, p *packages.Package, name string) token.Pos {
+	t.Helper()
+	for _, file := range p.Syntax {
+		for _, decl := range file.Decls {
+			if fn, ok := decl.(*ast.FuncDecl); ok && fn.Name.Name == name {
+				return fn.Name.Pos()
+			}
+		}
+	}
+	t.Fatalf("%s declares no function %s", p.ID, name)
+	return token.NoPos
+}
+
+// A //line directive in a file of the package's own moves where the go command's diagnostics point,
+// not where the code is.
+func TestPosition_IsThePhysicalPositionInAFileOfThePackagesOwn(t *testing.T) {
+	root := loadable(t, map[string]string{
+		"mod/go.mod": "module example.test/mod\n",
+		"mod/a/a.go": "package a\n\n//line a.tmpl:100\nfunc F() int { return 1 }\n",
+	})
+	pkgs, err := pkgload.Load(filepath.Join(root, "mod"), pkgload.Build{})
+	require.NoError(t, err)
+
+	at := pkgload.Position(pkgs[0], funcName(t, pkgs[0], "F"))
+	assert.Equal(t, filepath.Join(root, "mod", "a", "a.go"), at.Filename)
+	assert.Equal(t, 4, at.Line)
+}
+
+// A file that imports "C" is compiled from the file cmd/cgo generates from it, in the build cache,
+// and a position there is the original file's, at its own line.
+func TestPosition_IsTheOriginalFileInOneCgoGenerated(t *testing.T) {
+	cgo, err := exec.Command("go", "env", "CGO_ENABLED").Output()
+	require.NoError(t, err)
+	if strings.TrimSpace(string(cgo)) != "1" {
+		t.Skip("the default build has cgo off here, as it does without a C compiler")
+	}
+	root := loadable(t, map[string]string{
+		"mod/go.mod": "module example.test/mod\n",
+		"mod/a/a.go": "package a\n\n/* static int one(void) { return 1; } */\nimport \"C\"\n\nfunc One() int { return int(C.one()) }\n",
+	})
+	pkgs, err := pkgload.Load(filepath.Join(root, "mod"), pkgload.Build{})
+	require.NoError(t, err)
+	pos := funcName(t, pkgs[0], "One")
+	original := filepath.Join(root, "mod", "a", "a.go")
+	require.NotEqual(t, original, pkgs[0].Fset.PositionFor(pos, false).Filename,
+		"the syntax read is cgo's, from the build cache")
+
+	at := pkgload.Position(pkgs[0], pos)
+	assert.Equal(t, original, at.Filename)
+	assert.Equal(t, 6, at.Line)
 }
 
 // ---- making a fixture tree loadable ---------------------------------------------------------

@@ -323,7 +323,7 @@ func deadInterfacesIn(root, modRoot string, declDirs map[string]bool) ([]deadInt
 					key := declarationKey(p.Fset, ts.Name.Pos())
 					// The physical position, not one a //line directive maps: the file the
 					// declaration is in is the one to edit, as the other guards on the loader report.
-					position := p.Fset.PositionFor(ts.Name.Pos(), false)
+					position := pkgload.Position(p, ts.Name.Pos())
 					declared[key] = deadInterface{
 						pkg:  p.PkgPath,
 						file: relativeTo(root, position.Filename),

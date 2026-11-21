@@ -196,8 +196,8 @@ func contextValueSitesIn(modRoot string) ([]contextValueFinding, error) {
 				}
 				// The physical position, not one a //line directive maps: the file a site is in is what
 				// the accessor directory and the exemptions are about, and two files mapping to one
-				// line are two sites.
-				at := p.Fset.PositionFor(ident.Pos(), false)
+				// line are two sites. A file cgo generated stands for the one it came from.
+				at := pkgload.Position(p, ident.Pos())
 				if seen[at] {
 					continue
 				}
