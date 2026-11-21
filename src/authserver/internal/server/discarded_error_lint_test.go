@@ -949,6 +949,31 @@ func Generate(bits int, kid string) (Material, bool) { return Material{}, true }
 	}, stale)
 }
 
+// An entry only the release builds declare, and one only the default build declares, each guard
+// something, since the finder reads both: the check reads every build the finder reads, not one.
+func TestDiscardedErrors_ListCheck_AcceptsAnEntryOnlyOneBuildDeclares(t *testing.T) {
+	root := t.TempDir()
+	writeDiscardedErrorModule(t, root)
+	writeDiscardedErrorFixture(t, root, "authserver/internal/idtokenhint/idtokenhint.go", `//go:build production
+
+package idtokenhint
+
+func Encrypt(hint, secret string) (string, error) { return "", nil }
+`)
+	writeDiscardedErrorFixture(t, root, "authserver/internal/idtokenhint/dev.go", `//go:build !production
+
+package idtokenhint
+
+func Decrypt(hint, secret string) (string, error) { return "", nil }
+`)
+
+	stale, err := staleDiscardedErrorEntries(root, discardedErrorScope, map[string][]string{
+		"github.com/leodip/goiabada/authserver/internal/idtokenhint": {"Encrypt", "Decrypt"},
+	}, nil)
+	require.NoError(t, err)
+	assert.Empty(t, stale)
+}
+
 // staleDiscardedErrorEntries returns, sorted, each listed function or method that none of the
 // builds the finder reads declares with the universe's error as its last result, the position the
 // finder reads. A function entry has to be a top-level function of its package, and a method entry
