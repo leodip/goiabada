@@ -20,8 +20,9 @@ import (
 )
 
 // stubAPIClient implements the keys page's port. The method no test here reaches panics, which is
-// the right outcome for a call the test did not expect. There is no generated mock: adminconsole
-// has no .mockery.yaml. Same shape as adminclienthandlers' stub, for the same reason.
+// the right outcome for a call the test did not expect. There is no generated mock: a console
+// handler fake implements its page's port directly, and adminconsole/.mockery.yaml does not list
+// it. Same shape as adminclienthandlers' stub, for the same reason.
 type stubAPIClient struct {
 	rotateErr error
 	keys      []api.SettingsSigningKeyResponse

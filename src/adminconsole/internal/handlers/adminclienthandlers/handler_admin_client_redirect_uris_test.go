@@ -20,8 +20,8 @@ import (
 )
 
 // stubAPIClient implements the redirect URIs page's port, and nothing beyond it, so a call the
-// page's port does not name does not compile. There is no generated mock: adminconsole has no
-// .mockery.yaml.
+// page's port does not name does not compile. There is no generated mock: a console handler
+// fake implements its page's port directly, and adminconsole/.mockery.yaml does not list it.
 type stubAPIClient struct {
 	updateErr error
 	client    *api.ClientResponse
