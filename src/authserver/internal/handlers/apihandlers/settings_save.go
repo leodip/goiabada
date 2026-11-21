@@ -31,7 +31,7 @@ type settingsSaveDatabase interface {
 // with them, which is what the audit logger reads its switches from.
 func saveSettingsSection(ctx context.Context, database settingsSaveDatabase, settingsID int64,
 	apply func(stored *record.Settings)) (*record.Settings, error) {
-	return saveSettingsSectionOrRefuse(ctx, database, settingsId, func(stored *record.Settings) error {
+	return saveSettingsSectionOrRefuse(ctx, database, settingsID, func(stored *record.Settings) error {
 		apply(stored)
 		return nil
 	})
@@ -40,7 +40,7 @@ func saveSettingsSection(ctx context.Context, database settingsSaveDatabase, set
 // saveSettingsSectionOrRefuse is saveSettingsSection for a section whose write depends on what the
 // row holds under the lock: apply may refuse the save, and its error is answered unchanged, with
 // nothing written.
-func saveSettingsSectionOrRefuse(ctx context.Context, database settingsSaveDatabase, settingsId int64,
+func saveSettingsSectionOrRefuse(ctx context.Context, database settingsSaveDatabase, settingsID int64,
 	apply func(stored *record.Settings) error) (*record.Settings, error) {
 
 	var saved *record.Settings

@@ -765,7 +765,7 @@ func TestHandleAccountEmailVerificationPost_OnlyTheComparedCodeIsWrittenOnceMore
 			},
 			retryMisses: true,
 			lastRead: func(user *record.User) *record.User {
-				return &record.User{Id: 7, Subject: verificationSubject, Email: user.Email, EmailVerified: true}
+				return &record.User{ID: 7, Subject: verificationSubject, Email: user.Email, EmailVerified: true}
 			},
 			wantStatus: http.StatusOK,
 		},

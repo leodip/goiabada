@@ -401,9 +401,9 @@ func storedSigningKey(t *testing.T, db *sqlitedb.Database) []byte {
 func TestRecover_SignsWithASigningKeySealedUnderThePreviousKey(t *testing.T) {
 	db, _ := newRecoverDatabase(t)
 	user := recoverUser(t, db)
-	rc := newLogoutReceiver(t, db, user.Id, nil)
+	rc := newLogoutReceiver(t, db, user.ID, nil)
 	app := seedLogoutClient(t, db, "app-sub-only", rc.server.URL+"/sub-only", false)
-	seedLogoutSession(t, db, user.Id, "sid-valid", time.Minute, app)
+	seedLogoutSession(t, db, user.ID, "sid-valid", time.Minute, app)
 	before := storedSigningKey(t, db)
 
 	m, err := db.NewMigrator(context.Background(), nil)
@@ -475,9 +475,9 @@ func currentSigningKeyIdentifier(t *testing.T, db *sqlitedb.Database) string {
 func recoverWithAnUnsignableKey(t *testing.T, db *sqlitedb.Database, dataKey recoverDataKey) string {
 	t.Helper()
 	user := recoverUser(t, db)
-	rc := newLogoutReceiver(t, db, user.Id, nil)
+	rc := newLogoutReceiver(t, db, user.ID, nil)
 	app := seedLogoutClient(t, db, "app-sub-only", rc.server.URL+"/sub-only", false)
-	seedLogoutSession(t, db, user.Id, "sid-valid", time.Minute, app)
+	seedLogoutSession(t, db, user.ID, "sid-valid", time.Minute, app)
 	logs := logtest.CaptureSlog(t)
 
 	m, err := db.NewMigrator(context.Background(), nil)

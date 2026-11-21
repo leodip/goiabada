@@ -145,7 +145,7 @@ func storedSecrets(t *testing.T, db *sqlitedb.Database) map[string][]byte {
 	ctx := context.Background()
 	secrets := map[string][]byte{}
 
-	settings, err := db.GetSettingsById(ctx, nil, 1)
+	settings, err := db.GetSettingsByID(ctx, nil, 1)
 	require.NoError(t, err)
 	secrets["settings.smtp_password_encrypted"] = settings.SMTPPasswordEncrypted
 
@@ -458,7 +458,7 @@ func TestReencrypt_MovesEveryStoredSecretToTheCurrentKey(t *testing.T) {
 		assert.Truef(t, opensUnder(reencryptNewKey, value), "%s is under the new key", where)
 		assert.Falsef(t, opensUnder(reencryptOldKey, value), "%s is no longer under the old key", where)
 	}
-	settings, err := db.GetSettingsById(context.Background(), nil, 1)
+	settings, err := db.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err)
 	password, err := encryption.DecryptText(settings.SMTPPasswordEncrypted, reencryptNewKey)
 	require.NoError(t, err)
@@ -472,8 +472,8 @@ func TestReencrypt_MovesEveryStoredSecretToTheCurrentKey(t *testing.T) {
 		"reencrypted": float64(3),
 		"unreadable":  float64(0),
 	}, reencryptDetails(t, rows[0]))
-	assert.False(t, rows[0].UserId.Valid, "the event is about no user")
-	assert.False(t, rows[0].LoggedInUserId.Valid, "and no user's token made it")
+	assert.False(t, rows[0].UserID.Valid, "the event is about no user")
+	assert.False(t, rows[0].LoggedInUserID.Valid, "and no user's token made it")
 
 	// Run again, it finds everything under the current key, re-encrypts nothing and records nothing.
 	code, stdout, stderr = runReencryptOn(t, db, reencryptNewKey, reencryptOldKey)

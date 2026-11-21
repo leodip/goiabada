@@ -115,7 +115,7 @@ func serveTurnstileSaveUnder(t *testing.T, dataCipher *encryption.DataCipher, se
 		database.EXPECT().RunInTransaction(mock.Anything, mock.Anything).
 			RunAndReturn(func(_ context.Context, fn func(tx *sql.Tx) error) error { return fn(settingsSaveTx) }).Maybe()
 		database.EXPECT().AcquireSettingsRow(mock.Anything, settingsSaveTx, mock.Anything).Return(nil).Maybe()
-		database.EXPECT().GetSettingsById(mock.Anything, settingsSaveTx, mock.Anything).
+		database.EXPECT().GetSettingsByID(mock.Anything, settingsSaveTx, mock.Anything).
 			RunAndReturn(func(context.Context, *sql.Tx, int64) (*record.Settings, error) {
 				stored := *locked
 				stored.TurnstileSecretKeyEncrypted = bytes.Clone(locked.TurnstileSecretKeyEncrypted)

@@ -6,7 +6,7 @@ package record
 type StoredSecret struct {
 	Table  string
 	Column string
-	Id     int64
+	ID     int64
 }
 
 // Reencryption is what one run of the re-encryption sweep did. A run that stopped early, cancelled

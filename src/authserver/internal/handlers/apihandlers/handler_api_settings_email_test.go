@@ -297,7 +297,7 @@ func serveEmailSaveUnder(t *testing.T, dataCipher *encryption.DataCipher, settin
 		database.EXPECT().RunInTransaction(mock.Anything, mock.Anything).
 			RunAndReturn(func(_ context.Context, fn func(tx *sql.Tx) error) error { return fn(settingsSaveTx) }).Maybe()
 		database.EXPECT().AcquireSettingsRow(mock.Anything, settingsSaveTx, mock.Anything).Return(nil).Maybe()
-		database.EXPECT().GetSettingsById(mock.Anything, settingsSaveTx, mock.Anything).
+		database.EXPECT().GetSettingsByID(mock.Anything, settingsSaveTx, mock.Anything).
 			RunAndReturn(func(context.Context, *sql.Tx, int64) (*record.Settings, error) {
 				stored := *locked
 				stored.SMTPPasswordEncrypted = bytes.Clone(locked.SMTPPasswordEncrypted)
@@ -442,7 +442,7 @@ func TestHandleSettingsEmailPut_AKeptPasswordNeitherKeyOpensIsWrittenBackAsStore
 	assert.Equal(t, "the stored secret the request read opens under neither data encryption key, so the save checks the row under its lock",
 		records[0].Message)
 	assert.Equal(t, "smtp_password", records[0].Attrs["secret"])
-	assert.Equal(t, emailSaveRequestId, records[0].Attrs["request_id"], "logged through the request's context")
+	assert.Equal(t, emailSaveRequestID, records[0].Attrs["request_id"], "logged through the request's context")
 	assert.NotContains(t, capture.Text(), storedSMTPPassword)
 }
 
