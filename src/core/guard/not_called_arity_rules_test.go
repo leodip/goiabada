@@ -227,6 +227,11 @@ func (_mock *local) Send(ctx context.Context, to string) error {
 	return ret.Error(0)
 }
 
+func (_mock *local) Ping(to string) error {
+	ret := _mock.Called(to)
+	return ret.Error(0)
+}
+
 // held carries a double in a field, which is how a table-driven test in this tree reaches one.
 type held struct {
 	database *doubles.Database
@@ -282,9 +287,9 @@ func TestRules(t *testing.T) {
 	(*doubles.Database).AssertNotCalled(database, t, "CreateUser", mock.Anything)
 
 	// Rows 16 and 17: matchers spread from a slice, whose length the call does not show. Counted
-	// as one argument, the empty spread would pass against a Send of two and the full one would
+	// as one argument, the empty spread would pass against a Ping of one and the full one would
 	// be a finding against a CreateUser of three; both are refused, in both call forms.
-	sender.AssertNotCalled(t, "Send", []any{}...)
+	sender.AssertNotCalled(t, "Ping", []any{}...)
 	(*doubles.Database).AssertNotCalled(database, t, "CreateUser", []any{mock.Anything, mock.Anything, mock.Anything}...)
 }
 `)
