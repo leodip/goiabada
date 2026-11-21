@@ -379,7 +379,7 @@ func (s *Sender) sign(ctx context.Context, issuer string, delivery Delivery, jti
 	}
 	privateKey, err := signingkeys.ParsePrivateKey(s.dataCipher, keyPair)
 	if err != nil {
-		return "", errs.Wrap(err, "unable to parse private key from PEM")
+		return "", err
 	}
 
 	claims := jwt.MapClaims{

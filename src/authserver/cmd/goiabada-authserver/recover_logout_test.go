@@ -426,10 +426,54 @@ func TestRecover_SignsWithASigningKeySealedUnderThePreviousKey(t *testing.T) {
 
 // TestRecover_NamesTheCauseWhenNeitherKeyOpensTheSigningKey: with two keys configured and the
 // signing key sealed under a third, no token can be signed. The recovery stands, the app is
-// reported as not told, nothing is sent, and the record the delivery writes says that neither data
-// key opens the value, which is what the operator has to put right.
+// reported as not told, nothing is sent, and the record the delivery writes says that the signing
+// key did not decrypt, because neither data key opens it, which is what the operator has to put
+// right.
 func TestRecover_NamesTheCauseWhenNeitherKeyOpensTheSigningKey(t *testing.T) {
 	db, _ := newRecoverDatabase(t)
+	kid := currentSigningKeyIdentifier(t, db)
+
+	cause := recoverWithAnUnsignableKey(t, db,
+		recoverRotationDataKey(t, strings.Repeat("ab", 32), strings.Repeat("cd", 32)))
+
+	assert.Contains(t, cause, "unable to decrypt signing key "+kid+
+		": the value decrypts under neither the current data encryption key nor the previous one: ")
+	assert.NotContains(t, cause, "PEM", "nothing points at the stored key's contents")
+}
+
+// TestRecover_SaysSoWhenTheSigningKeyDecryptsToSomethingOtherThanAPEM is the other way a signing
+// key fails to load: the data key opens it, and what it holds is not a private key. The record says
+// so, and not that a data key is wrong, which is where the case above points the operator.
+func TestRecover_SaysSoWhenTheSigningKeyDecryptsToSomethingOtherThanAPEM(t *testing.T) {
+	db, _ := newRecoverDatabase(t)
+	keyPair, err := db.GetCurrentSigningKey(context.Background(), nil)
+	require.NoError(t, err)
+	require.NotNil(t, keyPair)
+	keyPair.PrivateKeyPEM, err = recoverTestCipher.Encrypt("not a pem")
+	require.NoError(t, err)
+	require.NoError(t, db.UpdateKeyPair(context.Background(), nil, keyPair))
+
+	cause := recoverWithAnUnsignableKey(t, db, recoverTestDataKey(t))
+
+	assert.Contains(t, cause, "signing key "+keyPair.KeyIdentifier+
+		" decrypts, but it is not an RSA private key PEM: "+jwt.ErrKeyMustBePEMEncoded.Error())
+	assert.NotContains(t, cause, "decrypt signing key", "nothing points at the data keys")
+}
+
+// currentSigningKeyIdentifier answers the kid of the test database's current signing key.
+func currentSigningKeyIdentifier(t *testing.T, db *sqlitedb.Database) string {
+	t.Helper()
+	keyPair, err := db.GetCurrentSigningKey(context.Background(), nil)
+	require.NoError(t, err)
+	require.NotNil(t, keyPair)
+	return keyPair.KeyIdentifier
+}
+
+// recoverWithAnUnsignableKey runs the recovery of one user with one app to tell, through a data
+// key that can't load the signing key into something to sign with. The recovery stands, the app is
+// reported as not told and nothing is sent; it answers the cause the delivery's record gives.
+func recoverWithAnUnsignableKey(t *testing.T, db *sqlitedb.Database, dataKey recoverDataKey) string {
+	t.Helper()
 	user := recoverUser(t, db)
 	rc := newLogoutReceiver(t, db, user.Id, nil)
 	app := seedLogoutClient(t, db, "app-sub-only", rc.server.URL+"/sub-only", false)
@@ -440,8 +484,7 @@ func TestRecover_NamesTheCauseWhenNeitherKeyOpensTheSigningKey(t *testing.T) {
 	require.NoError(t, err)
 	var out, errOut strings.Builder
 	code := runRecover(context.Background(), db, m, &recoverAuditRecorder{},
-		recoverInvocation{email: "admin@example.com", grantManage: true},
-		recoverRotationDataKey(t, strings.Repeat("ab", 32), strings.Repeat("cd", 32)), &out, &errOut)
+		recoverInvocation{email: "admin@example.com", grantManage: true}, dataKey, &out, &errOut)
 
 	assert.Equal(t, migrateExitOK, code, "an app not told does not fail the recovery: %s", errOut.String())
 	assert.Equal(t, int64(1), recoverUser(t, db).AuthStateGeneration, "the recovery committed")
@@ -457,6 +500,5 @@ func TestRecover_NamesTheCauseWhenNeitherKeyOpensTheSigningKey(t *testing.T) {
 		}
 	}
 	require.Len(t, causes, 1, logs.Text())
-	assert.Contains(t, causes[0],
-		"the value decrypts under neither the current data encryption key nor the previous one")
+	return causes[0]
 }

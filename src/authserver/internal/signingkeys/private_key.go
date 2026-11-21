@@ -6,6 +6,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/core/errs"
 )
 
 // ParsePrivateKey decrypts a key pair's stored private-key PEM with the data cipher it is given
@@ -19,12 +20,19 @@ import (
 // same capability, key-pair generation in Rotator and public-key lookup in TokenParser,
 // so the private key's one read belongs beside them.
 //
-// The error is returned as it arrives, from the cipher or from the parser, which is what the four
-// call sites expect: each wraps or answers it in its own terms.
+// A failure says which of the two steps failed, names the key by the kid /certs publishes, and
+// keeps the cause after it. A key no configured data key opens is usually a missing or wrong
+// GOIABADA_AES_ENCRYPTION_KEY or GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS, most often mid-rotation,
+// while a parse failure is the stored key itself; each caller passes the error on as it is.
 func ParsePrivateKey(dataCipher *encryption.DataCipher, keyPair *record.KeyPair) (*rsa.PrivateKey, error) {
 	pem, err := dataCipher.Decrypt(keyPair.PrivateKeyPEM)
 	if err != nil {
-		return nil, err
+		return nil, errs.Wrapf(err, "unable to decrypt signing key %s", keyPair.KeyIdentifier)
 	}
-	return jwt.ParseRSAPrivateKeyFromPEM([]byte(pem))
+	privateKey, err := jwt.ParseRSAPrivateKeyFromPEM([]byte(pem))
+	if err != nil {
+		return nil, errs.Wrapf(err, "signing key %s decrypts, but it is not an RSA private key PEM",
+			keyPair.KeyIdentifier)
+	}
+	return privateKey, nil
 }
