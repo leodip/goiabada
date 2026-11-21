@@ -42,7 +42,7 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   every call, the admin console's client identifier, and its session name in `session_name.go`. No
   context key and no other session key: each process declares its own, the auth server and the admin
   console alike their context keys in `internal/reqctx` and their session keys in
-  `internal/sessionkeys`, and no row of `ARCHITECTURE.md`'s table here reads `kernel` any more. It
+  `internal/sessionkeys`, and none of its rows in `src/core/OWNERSHIP.md` reads `kernel`. It
   was `core/constants` until #442 moved the build stamp to `buildinfo/` (#351, #385, #433, #440,
   #442)
 - `cmd/` - `ownershipdump`, which regenerates `OWNERSHIP.md`'s table from the reference graph. It
@@ -215,6 +215,19 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   `authserver/internal/phonecountries` in #344, when no console code read it, and came back in #563
   so the admin console's two phone pages can build their list from it instead of asking the admin
   API, which refuses a token carrying `authserver:manage-account` alone
+- `pkgload/` - The shared loader: `Load` returns a module's packages type-checked for one `Build`
+  through `golang.org/x/tools/go/packages`, each build of a module at most once in a process, a
+  package that does not load or type-check, or that imports a package of its module `./...` skips,
+  as an error naming it, and a build that selects no package as `ErrNoPackages`; `LoadBuilds` loads
+  several modules for several builds, one slice per build, where a module a build selects no package
+  of adds nothing, and returns the first other error in build order, so it never reports an empty
+  walk; `Position` is where a loaded position is in the file a developer edits, its physical
+  position or, in a file cgo generated, the original's. It holds the one declaration of the release
+  platforms, `ReleasePlatforms`, and their release builds, `ReleaseBuilds` (the `production` tag and
+  `ReleaseEnv`: cgo off, the default `GOAMD64` and `GOARM64`), which rule 8 and the release-build
+  test read too, and `MakeLoadable`, which gives a fixture tree's go.mod files a go line and each
+  other module by its directory. It imports neither `testing` nor testify, and the refused-packages
+  table keeps `golang.org/x/tools` out of every shipped binary (#420)
 - `requestid/` - The request id both servers carry: `Middleware` adopts an incoming `X-Request-Id`
   verbatim or mints `<hostname>/<10 base62>-<counter>`, exactly as chi's middleware did, and writes
   no response header; `FromContext` is how the log handler, the audit log, the error pages and the

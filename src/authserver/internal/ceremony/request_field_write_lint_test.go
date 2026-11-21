@@ -20,36 +20,37 @@ package ceremony
 // type, and a copy of it taken into a local, or passed to a callee, shares its backing array, so a
 // write through that copy reaches the context unseen. Every other request field is a string.
 //
-// It reads, parses and type-checks files and nothing else: no database, no git, no network.
+// It reads the auth server's module type-checked through core/pkgload and nothing else: no
+// database, and no git of its own. The go command the loader runs reaches the network only to
+// download a dependency missing from the module cache, as any build of the module would: from a
+// module proxy, or from the dependency's own repository through git or whichever version-control
+// tool hosts it, where GOPROXY, GOPRIVATE or GONOPROXY sends the go command there.
 
 import (
 	"go/ast"
-	"go/parser"
 	"go/token"
 	"go/types"
-	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"sort"
 	"strconv"
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/guard"
+	"github.com/leodip/goiabada/core/pkgload"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// requestFieldScope is the tree the rule covers, relative to the source root, forward slashes.
-// AuthContext is internal to the auth server, so no other module can name it.
+// requestFieldScope is the tree the rule covers, relative to the source root, forward slashes: the
+// auth server's module. AuthContext is internal to the auth server, so no other module can name it.
 const requestFieldScope = "authserver"
 
 // requestFieldModuleParent is what a directory under the source root is prefixed with to make its
-// import path. Every first-party package is read from source through it, so a context reached
-// through any of them has a type the walk can see.
+// import path.
 const requestFieldModuleParent = "github.com/leodip/goiabada/"
 
 const (
@@ -82,7 +83,7 @@ func (f requestFieldFunc) String() string {
 	return f.recv + "." + f.name
 }
 
-// requestFieldWrite is one write the rule refuses, or one it could not judge.
+// requestFieldWrite is one write the rule refuses.
 type requestFieldWrite struct {
 	// file is relative to the root the walk started from, forward slashes.
 	file string
@@ -91,19 +92,18 @@ type requestFieldWrite struct {
 }
 
 // requestFieldWalk is what one walk found. The last three fields are how the reporting half tells
-// "nothing to report" from "nothing was read": a walk that parsed no file, that never found
+// "nothing to report" from "nothing was read": a walk that read no file, that never found
 // AuthContext, or that was handed a field or setter AuthContext does not declare has checked nothing
 // it was asked to check.
 type requestFieldWalk struct {
-	found, unresolved []requestFieldWrite
-	files             int
-	authContextFound  bool
-	undeclared        []string
+	found            []requestFieldWrite
+	files            int
+	authContextFound bool
+	undeclared       []string
 }
 
-// findRequestFieldWrites walks root/scope for non-test Go files, type-checks every package it finds,
-// and reports each write to a listed request field of ceremony.AuthContext outside the writer. The
-// forms it refuses:
+// findRequestFieldWrites reads the module at root/scope and reports each write, in a production
+// file, to a listed request field of ceremony.AuthContext outside the writer. The forms it refuses:
 //
 //   - `=`, `op=`, `++` and `--`, and a range clause assigning with `=`, whose target is a request
 //     field or an index or slice expression rooted at one;
@@ -116,128 +116,127 @@ type requestFieldWalk struct {
 //     the first argument of append, or the argument of clear;
 //   - any reference to a listed setter: a call, a method value or a method expression.
 //
-// Each of those written on a receiver whose type the checker could not determine, and naming a
-// request field or a setter, is returned as unresolved rather than guessed at.
+// The module is read through pkgload as every release build selects its files, and as the test
+// machine's default build does, and what they find is merged: a write in a file only Windows
+// compiles is shipped all the same, and one in a development-only file runs in the development
+// server (#420). A file only a race build or a custom tag selects is read by none of them. Each
+// build is its own type-check, so the rule is resolved against each build's AuthContext. A package
+// that does not load or type-check is an error naming it, since a write in it would go unseen.
 func findRequestFieldWrites(
 	root, scope string, fields, setters []string, writer requestFieldFunc,
 ) (requestFieldWalk, error) {
 	var walk requestFieldWalk
-	start := filepath.Join(root, filepath.FromSlash(scope))
+	modRoot := filepath.Join(root, filepath.FromSlash(scope))
 
-	var dirs []string
-	err := filepath.WalkDir(start, func(p string, d fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
-		}
-		if d.IsDir() {
-			if p != start && (strings.HasPrefix(d.Name(), ".") || d.Name() == "testdata" || d.Name() == "node_modules") {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if isProductionGoFile(d.Name()) && !slices.Contains(dirs, filepath.Dir(p)) {
-			dirs = append(dirs, filepath.Dir(p))
-		}
-		return nil
-	})
+	// The first load error in build order is the one returned, and a build that selects no package of
+	// the module adds nothing.
+	loaded, err := pkgload.LoadBuilds(append(pkgload.ReleaseBuilds(), pkgload.Build{}), modRoot)
 	if err != nil {
-		return walk, err
-	}
-	sort.Strings(dirs)
-
-	imp := newRequestFieldPackages(root)
-	ceremonyPkg, err := imp.Import(requestFieldCeremonyPath)
-	if err != nil {
-		return walk, err
-	}
-	rule := requestFieldRule{
-		fieldNames:  map[string]bool{},
-		setterNames: map[string]bool{},
-		fields:      map[*types.Var]string{},
-		setters:     map[*types.Func]string{},
-		writer:      writer,
-	}
-	for _, name := range fields {
-		rule.fieldNames[name] = true
-	}
-	for _, name := range setters {
-		rule.setterNames[name] = true
-	}
-	if typeName, ok := ceremonyPkg.Scope().Lookup("AuthContext").(*types.TypeName); ok {
-		if named, isNamed := typeName.Type().(*types.Named); isNamed {
-			walk.authContextFound = true
-			rule.authContext = named
-			walk.undeclared = rule.resolve(named, fields, setters)
-		}
+		return requestFieldWalk{}, err
 	}
 
-	for _, dir := range dirs {
-		relDir, rErr := filepath.Rel(root, dir)
-		if rErr != nil {
-			return walk, rErr
-		}
-		pkgPath := requestFieldModuleParent + filepath.ToSlash(relDir)
-		if _, iErr := imp.Import(pkgPath); iErr != nil {
-			return walk, iErr
-		}
-		info := imp.infos[pkgPath]
-		for _, file := range imp.files[pkgPath] {
-			walk.files++
-			if !walk.authContextFound {
+	readFiles := map[string]bool{}
+	// seen holds each finding's physical position; a file several builds select is read once per build.
+	seen := map[token.Position]bool{}
+	// declared holds each listed name some build's AuthContext declares; a name no build declares
+	// guards nothing.
+	declared := map[string]bool{}
+	for _, pkgs := range loaded {
+		var rule *requestFieldRule
+		for _, p := range pkgs {
+			if p.PkgPath != requestFieldCeremonyPath {
 				continue
 			}
-			rel, rErr := filepath.Rel(root, imp.fset.Position(file.Pos()).Filename)
-			if rErr != nil {
-				return walk, rErr
+			if typeName, ok := p.Types.Scope().Lookup("AuthContext").(*types.TypeName); ok {
+				if named, isNamed := typeName.Type().(*types.Named); isNamed {
+					rule = newRequestFieldRule(named, fields, setters, writer, declared)
+				}
 			}
-			found, unresolved := rule.check(file, imp.fset, filepath.ToSlash(rel), pkgPath, info)
-			walk.found = append(walk.found, found...)
-			walk.unresolved = append(walk.unresolved, unresolved...)
+		}
+		for _, p := range pkgs {
+			for _, file := range p.Syntax {
+				readFiles[p.Fset.File(file.Pos()).Name()] = true
+				if rule == nil {
+					continue
+				}
+				for _, w := range rule.check(file, p.PkgPath, p.TypesInfo) {
+					// The physical position, not one a //line directive maps: two files that map a write to
+					// the same template line are two writes, and the line reported is the file's own. A
+					// file cgo generated is reported as the one it came from.
+					at := pkgload.Position(p, w.pos)
+					if seen[at] {
+						continue
+					}
+					seen[at] = true
+					rel, rErr := filepath.Rel(root, at.Filename)
+					if rErr != nil {
+						return requestFieldWalk{}, rErr
+					}
+					walk.found = append(walk.found, requestFieldWrite{file: filepath.ToSlash(rel), line: at.Line, what: w.what})
+				}
+			}
+		}
+		walk.authContextFound = walk.authContextFound || rule != nil
+	}
+	walk.files = len(readFiles)
+	if walk.authContextFound {
+		for _, name := range fields {
+			if !declared["field "+name] {
+				walk.undeclared = append(walk.undeclared, "field "+name)
+			}
+		}
+		for _, name := range setters {
+			if !declared["method "+name] {
+				walk.undeclared = append(walk.undeclared, "method "+name)
+			}
 		}
 	}
 	return walk, nil
 }
 
-// requestFieldRule is the rule with every listed name resolved to the object the checker made for
-// it, so a match is object identity and never a spelling.
+// requestFieldRule is the rule with every listed name resolved to the object one build's checker
+// made for it, so a match is object identity and never a spelling.
 type requestFieldRule struct {
 	authContext *types.Named
-	fieldNames  map[string]bool
 	setterNames map[string]bool
 	fields      map[*types.Var]string
 	setters     map[*types.Func]string
 	writer      requestFieldFunc
 }
 
-// resolve finds each listed field and setter on AuthContext and returns the names it does not
-// declare, each of which guards nothing.
-func (rule *requestFieldRule) resolve(named *types.Named, fields, setters []string) (undeclared []string) {
+// newRequestFieldRule finds each listed field and setter on one build's AuthContext, and records in
+// declared, as "field Name" or "method Name", each one it declares.
+func newRequestFieldRule(
+	named *types.Named, fields, setters []string, writer requestFieldFunc, declared map[string]bool,
+) *requestFieldRule {
+	rule := &requestFieldRule{
+		authContext: named,
+		setterNames: map[string]bool{},
+		fields:      map[*types.Var]string{},
+		setters:     map[*types.Func]string{},
+		writer:      writer,
+	}
+	for _, name := range setters {
+		rule.setterNames[name] = true
+	}
 	st, _ := named.Underlying().(*types.Struct)
 	for _, name := range fields {
-		found := false
 		for i := 0; st != nil && i < st.NumFields(); i++ {
 			if st.Field(i).Name() == name {
 				rule.fields[st.Field(i)] = name
-				found = true
+				declared["field "+name] = true
 			}
-		}
-		if !found {
-			undeclared = append(undeclared, "field "+name)
 		}
 	}
 	for _, name := range setters {
-		found := false
 		for i := range named.NumMethods() {
 			if named.Method(i).Name() == name {
 				rule.setters[named.Method(i)] = name
-				found = true
+				declared["method "+name] = true
 			}
 		}
-		if !found {
-			undeclared = append(undeclared, "method "+name)
-		}
 	}
-	return undeclared
+	return rule
 }
 
 // exempt reports whether a declaration's body may write a request field: the writer's, and each
@@ -263,19 +262,22 @@ func (rule *requestFieldRule) exempt(decl ast.Decl, pkgPath string) bool {
 	return pkgPath == requestFieldCeremonyPath && recv == "AuthContext" && rule.setterNames[fn.Name.Name]
 }
 
-// check applies the rule to one file, skipping the exempt declarations whole.
-func (rule *requestFieldRule) check(
-	file *ast.File, fset *token.FileSet, rel, pkgPath string, info *types.Info,
-) (found, unresolved []requestFieldWrite) {
-	at := func(pos token.Pos, what string) requestFieldWrite {
-		return requestFieldWrite{file: rel, line: fset.Position(pos).Line, what: what}
+// requestFieldSite is one write within a file, before its position is made relative.
+type requestFieldSite struct {
+	pos  token.Pos
+	what string
+}
+
+// check applies the rule to one type-checked file, skipping the exempt declarations whole.
+func (rule *requestFieldRule) check(file *ast.File, pkgPath string, info *types.Info) (found []requestFieldSite) {
+	at := func(pos token.Pos, what string) requestFieldSite {
+		return requestFieldSite{pos: pos, what: what}
 	}
 
 	// target judges an expression something writes through: a request field, or an element or a
-	// slice of one, is a finding; a field-named selector the checker could not type is unresolved.
+	// slice of one, is a finding.
 	target := func(expr ast.Expr, verb string) {
-		root := requestFieldRoot(expr)
-		sel, ok := root.(*ast.SelectorExpr)
+		sel, ok := requestFieldRoot(expr).(*ast.SelectorExpr)
 		if !ok {
 			return
 		}
@@ -283,10 +285,6 @@ func (rule *requestFieldRule) check(
 			if name, isRequest := rule.fields[v]; isRequest {
 				found = append(found, at(expr.Pos(), verb+" "+name))
 			}
-			return
-		}
-		if rule.fieldNames[sel.Sel.Name] && info.Uses[sel.Sel] == nil && !requestFieldIsPackage(sel.X, info) {
-			unresolved = append(unresolved, at(expr.Pos(), verb+" "+sel.Sel.Name))
 		}
 	}
 	whole := func(expr ast.Expr) {
@@ -366,16 +364,12 @@ func (rule *requestFieldRule) check(
 					if name, isSetter := rule.setters[fn]; isSetter {
 						found = append(found, at(n.Pos(), "calls "+name))
 					}
-					return true
-				}
-				if rule.setterNames[n.Sel.Name] && info.Uses[n.Sel] == nil && !requestFieldIsPackage(n.X, info) {
-					unresolved = append(unresolved, at(n.Pos(), "calls "+n.Sel.Name))
 				}
 			}
 			return true
 		})
 	}
-	return found, unresolved
+	return found
 }
 
 // requestFieldRoot strips the parentheses, index and slice expressions off what a statement writes
@@ -394,134 +388,6 @@ func requestFieldRoot(expr ast.Expr) ast.Expr {
 			return expr
 		}
 	}
-}
-
-// requestFieldIsPackage reports whether a selector's operand is a package name, which makes it a
-// qualified identifier rather than a field or method on a receiver.
-func requestFieldIsPackage(x ast.Expr, info *types.Info) bool {
-	ident, ok := x.(*ast.Ident)
-	if !ok {
-		return false
-	}
-	_, isPkg := info.Uses[ident].(*types.PkgName)
-	return isPkg
-}
-
-func isProductionGoFile(name string) bool {
-	return strings.HasSuffix(name, ".go") && !strings.HasSuffix(name, "_test.go")
-}
-
-// requestFieldPackages is the importer the rule type-checks against, and the record of what it
-// checked: every first-party package is read from the source root, once, with what the checker
-// resolved in it kept for the walk, and every other path is an empty stub. One check per package is
-// what makes a field reached through another package the same object as the one the rule resolved.
-//
-// A stubbed package's types are invalid, so a context could only hide behind one if a stdlib or
-// third-party function returned it, which none can name. core/guard's stubPackages and the
-// discarded-error lint's importer in internal/server are the twins of the stub half.
-type requestFieldPackages struct {
-	root  string
-	fset  *token.FileSet
-	made  map[string]*types.Package
-	infos map[string]*types.Info
-	files map[string][]*ast.File
-}
-
-func newRequestFieldPackages(root string) *requestFieldPackages {
-	return &requestFieldPackages{
-		root:  root,
-		fset:  token.NewFileSet(),
-		made:  map[string]*types.Package{},
-		infos: map[string]*types.Info{},
-		files: map[string][]*ast.File{},
-	}
-}
-
-func (p *requestFieldPackages) Import(importPath string) (*types.Package, error) {
-	if made, ok := p.made[importPath]; ok {
-		return made, nil
-	}
-
-	var files []*ast.File
-	if strings.HasPrefix(importPath, requestFieldModuleParent) {
-		dir := filepath.Join(p.root, filepath.FromSlash(strings.TrimPrefix(importPath, requestFieldModuleParent)))
-		entries, err := os.ReadDir(dir)
-		if err != nil && !os.IsNotExist(err) {
-			return nil, errs.Wrapf(err, "reading %s from the source root", importPath)
-		}
-		clause := ""
-		for _, entry := range entries {
-			if entry.IsDir() || !isProductionGoFile(entry.Name()) {
-				continue
-			}
-			file, pErr := parser.ParseFile(p.fset, filepath.Join(dir, entry.Name()), nil, parser.SkipObjectResolution)
-			if pErr != nil {
-				// A file that does not parse is a compile error the build tier owns.
-				continue
-			}
-			// One package per directory; a stray clause would be a second package the build tier
-			// refuses, and checking it with the first would only add errors.
-			if clause == "" {
-				clause = file.Name.Name
-			}
-			if file.Name.Name == clause {
-				files = append(files, file)
-			}
-		}
-	}
-	if len(files) == 0 {
-		// A path outside this repository, or one a fixture tree does not hold.
-		pkg := types.NewPackage(importPath, requestFieldPackageName(importPath))
-		pkg.MarkComplete()
-		p.made[importPath] = pkg
-		return pkg, nil
-	}
-
-	info := &types.Info{
-		Types: map[ast.Expr]types.TypeAndValue{},
-		Uses:  map[*ast.Ident]types.Object{},
-	}
-	conf := types.Config{
-		Importer: p,
-		// Every package outside this repository is a stub, so the checker has plenty to say about
-		// members it never read. Discarding it keeps the check running to the end; what this guard
-		// asks survives, because a receiver's type either came from a package that was read or is
-		// reported as unresolved.
-		Error:                    func(error) {},
-		DisableUnusedImportCheck: true,
-	}
-	// The returned error is the first one Error already saw; info is filled in either way.
-	pkg, _ := conf.Check(importPath, p.fset, files, info)
-	if pkg == nil {
-		return nil, errs.Errorf("type-checking %s produced no package", importPath)
-	}
-	pkg.MarkComplete()
-	p.made[importPath] = pkg
-	p.infos[importPath] = info
-	p.files[importPath] = files
-	return pkg, nil
-}
-
-// requestFieldMajorVersion is a module path's major-version element, which is never the name.
-var requestFieldMajorVersion = regexp.MustCompile(`^v[0-9]+$`)
-
-// requestFieldPackageName guesses a stubbed path's package name, and is harmless when wrong: a name
-// that does not match only leaves that package's selectors unresolved, and a stub declares nothing
-// to resolve anyway.
-func requestFieldPackageName(importPath string) string {
-	elems := strings.Split(importPath, "/")
-	base := elems[len(elems)-1]
-	if requestFieldMajorVersion.MatchString(base) && len(elems) > 1 {
-		base = elems[len(elems)-2]
-	}
-	if i := strings.Index(base, "."); i > 0 {
-		base = base[:i]
-	}
-	base = strings.ReplaceAll(base, "-", "")
-	if base == "" {
-		return "p"
-	}
-	return base
 }
 
 // TestRequestFields_WrittenOnlyAtAuthorize holds the real tree to the rule, with the request fields
@@ -558,13 +424,6 @@ func assertRequestFieldsWrittenOnce(r guard.Reporter, root, scope string, fields
 			"authentication decides, move the field to attemptFields in auth_context_fields_test.go so Restart "+
 			"discards it (#436).",
 			len(walk.found), scope, writer, requestFieldLines(walk.found), writer)
-	}
-	if len(walk.unresolved) > 0 {
-		r.Errorf("%d write(s) under %s to a field or setter named like an AuthContext request field, on a "+
-			"receiver whose type this walk cannot resolve:\n\t%s\n\n"+
-			"Request fields are found by type, and a receiver typed through a package outside this repository "+
-			"cannot be told from an AuthContext. Give the receiver a type the walk can see (#436).",
-			len(walk.unresolved), scope, requestFieldLines(walk.unresolved))
 	}
 }
 
@@ -663,6 +522,7 @@ func (o *Authorization) Run(state string) func() *ceremony.AuthContext {
 // than trusted.
 func TestRequestFieldWrites_Finder_RefusesEveryWriteFormAndNoRead(t *testing.T) {
 	root := t.TempDir()
+	writeRequestFieldModule(t, root)
 	writeRequestFieldFixture(t, root, "authserver/internal/ceremony/auth_context.go", requestFieldCeremonyFixture)
 	writeRequestFieldFixture(t, root, "authserver/internal/authflow/authorization.go", requestFieldAuthorizeFixture)
 
@@ -815,34 +675,6 @@ func fixture(ac *ceremony.AuthContext) {
 		"authserver/internal/issuance/code_issuer.go:8: assigns UILocales",
 		"authserver/internal/issuance/code_issuer.go:12: sets UILocales in an AuthContext literal",
 	}, requestFieldStrings(walk.found), "the finder matched the wrong set")
-	assert.Empty(t, walk.unresolved)
-}
-
-// TestRequestFieldWrites_Finder_ReportsAnUntypedReceiver pins the unresolved half: a write to a
-// request field's name, or a call of a setter's, on a receiver typed through a package the walk
-// stubs is not judged either way.
-func TestRequestFieldWrites_Finder_ReportsAnUntypedReceiver(t *testing.T) {
-	root := t.TempDir()
-	writeRequestFieldFixture(t, root, "authserver/internal/ceremony/auth_context.go", requestFieldCeremonyFixture)
-	writeRequestFieldFixture(t, root, "authserver/internal/handlers/handler_auth_issue.go", `package handlers
-
-import "example.com/thirdparty/flow"
-
-func issue(f *flow.Context) {
-	f.State = "a"
-	f.Other = "b"
-	f.SetTargetAcrLevel("c")
-	flow.State = "d"
-}
-`)
-
-	walk, err := findRequestFieldWrites(root, requestFieldScope, requestFieldFixtureFields, requestFieldSetters, requestFieldWriter)
-	require.NoError(t, err)
-	assert.Empty(t, walk.found)
-	assert.ElementsMatch(t, []string{
-		"authserver/internal/handlers/handler_auth_issue.go:6: assigns State",
-		"authserver/internal/handlers/handler_auth_issue.go:8: calls SetTargetAcrLevel",
-	}, requestFieldStrings(walk.unresolved), "the finder judged the wrong receivers unresolvable")
 }
 
 // TestRequestFieldWrites_Guard_FailsOnAWrite is the third half. The cases above assert on what the
@@ -850,6 +682,7 @@ func issue(f *flow.Context) {
 // case, which passes.
 func TestRequestFieldWrites_Guard_FailsOnAWrite(t *testing.T) {
 	root := t.TempDir()
+	writeRequestFieldModule(t, root)
 	writeRequestFieldFixture(t, root, "authserver/internal/ceremony/auth_context.go", requestFieldCeremonyFixture)
 	writeRequestFieldFixture(t, root, "authserver/internal/handlers/handler_auth_completed.go", `package handlers
 
@@ -871,34 +704,11 @@ func completed(ac *ceremony.AuthContext, effective string) {
 	assert.Contains(t, report.Text(), "#436")
 }
 
-// TestRequestFieldWrites_Guard_FailsOnAnUntypedReceiver is the same through the unresolved half: a
-// write the walk cannot judge fails rather than passing on a guess.
-func TestRequestFieldWrites_Guard_FailsOnAnUntypedReceiver(t *testing.T) {
-	root := t.TempDir()
-	writeRequestFieldFixture(t, root, "authserver/internal/ceremony/auth_context.go", requestFieldCeremonyFixture)
-	writeRequestFieldFixture(t, root, "authserver/internal/handlers/handler_auth_issue.go", `package handlers
-
-import "example.com/thirdparty/flow"
-
-func issue(f *flow.Context) {
-	f.UILocales = nil
-}
-`)
-
-	report := guard.Run(func(r guard.Reporter) {
-		assertRequestFieldsWrittenOnce(r, root, requestFieldScope, requestFieldFixtureFields, requestFieldSetters, requestFieldWriter)
-	})
-
-	require.True(t, report.Failed(), "a write on an unresolvable receiver passed the guard")
-	assert.False(t, report.Stopped, "a finding is an Errorf, not a Fatalf")
-	assert.Contains(t, report.Text(), "authserver/internal/handlers/handler_auth_issue.go:6: assigns UILocales")
-	assert.Contains(t, report.Text(), "whose type this walk cannot resolve")
-}
-
 // TestRequestFieldWrites_Guard_PassesTheWriterAndTheReads is the other direction: the writer writing
 // every field by every form, and the reads and attempt-field writes everywhere else.
 func TestRequestFieldWrites_Guard_PassesTheWriterAndTheReads(t *testing.T) {
 	root := t.TempDir()
+	writeRequestFieldModule(t, root)
 	writeRequestFieldFixture(t, root, "authserver/internal/ceremony/auth_context.go", requestFieldCeremonyFixture)
 	writeRequestFieldFixture(t, root, "authserver/internal/authflow/authorization.go", requestFieldAuthorizeFixture)
 	writeRequestFieldFixture(t, root, "authserver/internal/handlers/handler_auth_completed.go", `package handlers
@@ -918,10 +728,128 @@ func completed(store *ceremony.Store, ac *ceremony.AuthContext) []string {
 	assert.False(t, report.Failed(), "the writer or a read failed the guard: %s", report.Text())
 }
 
+// A write in a file only one of the builds selects is still shipped, or runs in the development
+// server, so the walk reads every release build and the default build and merges what they find
+// (#420 decision 11).
+func TestRequestFieldWrites_Finder_ReadsAFileOnlyOneBuildSelects(t *testing.T) {
+	const write = `
+package handlers
+
+import "github.com/leodip/goiabada/authserver/internal/ceremony"
+
+func completed(ac *ceremony.AuthContext, effective string) {
+	ac.State = effective
+}
+`
+	for _, tc := range []struct{ name, constraint string }{
+		{"another platform's release build", "//go:build windows && production\n"},
+		{"the production tag", "//go:build production\n"},
+		{"the default build only", "//go:build !production\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			writeRequestFieldModule(t, root)
+			writeRequestFieldFixture(t, root, "authserver/internal/ceremony/auth_context.go", requestFieldCeremonyFixture)
+			writeRequestFieldFixture(t, root, "authserver/internal/handlers/handler_auth_completed.go", tc.constraint+write)
+
+			walk, err := findRequestFieldWrites(root, requestFieldScope, requestFieldFixtureFields, requestFieldSetters, requestFieldWriter)
+			require.NoError(t, err)
+
+			assert.Equal(t, []string{"authserver/internal/handlers/handler_auth_completed.go:8: assigns State"},
+				requestFieldStrings(walk.found), "found once however many builds select the file")
+			assert.Equal(t, 2, walk.files, "the ceremony fixture and the handler, each counted once")
+		})
+	}
+}
+
+// Two files of different builds whose writes a //line directive maps to the same template line,
+// at the same offset, are two writes, each reported at its own file's line.
+func TestRequestFieldWrites_Finder_KeepsTwoFilesThatMapToTheSameLine(t *testing.T) {
+	const generated = `package handlers
+
+import "github.com/leodip/goiabada/authserver/internal/ceremony"
+
+func completed(ac *ceremony.AuthContext, effective string) {
+//line handler.tmpl:100
+	ac.State = effective
+}
+`
+	root := t.TempDir()
+	writeRequestFieldModule(t, root)
+	writeRequestFieldFixture(t, root, "authserver/internal/ceremony/auth_context.go", requestFieldCeremonyFixture)
+	writeRequestFieldFixture(t, root, "authserver/internal/handlers/completed_amd64.go", generated)
+	writeRequestFieldFixture(t, root, "authserver/internal/handlers/completed_arm64.go", generated)
+
+	walk, err := findRequestFieldWrites(root, requestFieldScope, requestFieldFixtureFields, requestFieldSetters, requestFieldWriter)
+	require.NoError(t, err)
+
+	// Which of the two a build reads first depends on the test machine's architecture.
+	assert.ElementsMatch(t, []string{
+		"authserver/internal/handlers/completed_amd64.go:7: assigns State",
+		"authserver/internal/handlers/completed_arm64.go:7: assigns State",
+	}, requestFieldStrings(walk.found))
+}
+
+// A file that imports "C" is compiled from the file cmd/cgo generates from it, in the build cache, and
+// a write in it is reported at the original file's line.
+func TestRequestFieldWrites_Finder_ReportsAFileThatImportsCAtItsOwnLine(t *testing.T) {
+	cgo, err := exec.Command("go", "env", "CGO_ENABLED").Output()
+	require.NoError(t, err)
+	if strings.TrimSpace(string(cgo)) != "1" {
+		t.Skip("the default build has cgo off here, as it does without a C compiler")
+	}
+	root := t.TempDir()
+	writeRequestFieldModule(t, root)
+	writeRequestFieldFixture(t, root, "authserver/internal/ceremony/auth_context.go", requestFieldCeremonyFixture)
+	writeRequestFieldFixture(t, root, "authserver/internal/handlers/completed.go", `package handlers
+
+/* static int one(void) { return 1; } */
+import "C"
+
+import "github.com/leodip/goiabada/authserver/internal/ceremony"
+
+func completed(ac *ceremony.AuthContext, effective string) int {
+	ac.State = effective
+	return int(C.one())
+}
+`)
+
+	walk, err := findRequestFieldWrites(root, requestFieldScope, requestFieldFixtureFields, requestFieldSetters, requestFieldWriter)
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"authserver/internal/handlers/completed.go:9: assigns State"}, requestFieldStrings(walk.found))
+}
+
+// A package that does not compile cannot be read whole, and a write in it would pass unseen, so the
+// walk stops and names it (#420 decision 3).
+func TestRequestFieldWrites_Guard_IsFatalOnAPackageThatDoesNotCompile(t *testing.T) {
+	root := t.TempDir()
+	writeRequestFieldModule(t, root)
+	writeRequestFieldFixture(t, root, "authserver/internal/ceremony/auth_context.go", requestFieldCeremonyFixture)
+	writeRequestFieldFixture(t, root, "authserver/internal/handlers/handler_auth_completed.go", `package handlers
+
+import "github.com/leodip/goiabada/authserver/internal/ceremony"
+
+func completed(ac *ceremony.AuthContext) int {
+	ac.State = "a"
+	return "not an int"
+}
+`)
+
+	report := guard.Run(func(r guard.Reporter) {
+		assertRequestFieldsWrittenOnce(r, root, requestFieldScope, requestFieldFixtureFields, requestFieldSetters, requestFieldWriter)
+	})
+
+	require.True(t, report.Stopped, "a package that does not compile must be fatal rather than read in part")
+	assert.Contains(t, report.Fatal, "github.com/leodip/goiabada/authserver/internal/handlers")
+	assert.Contains(t, report.Fatal, "does not load or type-check")
+}
+
 // TestRequestFieldWrites_Guard_IsFatalOnAnEmptyRead pins the seam: a walk that read nothing is a
 // failure, not a clean pass.
 func TestRequestFieldWrites_Guard_IsFatalOnAnEmptyRead(t *testing.T) {
 	root := t.TempDir()
+	writeRequestFieldModule(t, root)
 	writeRequestFieldFixture(t, root, "authserver/README.md", "no Go here\n")
 	writeRequestFieldFixture(t, root, "authserver/internal/ceremony/auth_context_test.go", "package ceremony\n")
 
@@ -937,6 +865,7 @@ func TestRequestFieldWrites_Guard_IsFatalOnAnEmptyRead(t *testing.T) {
 // read but the type every match is made against was not among them, so every write would pass.
 func TestRequestFieldWrites_Guard_IsFatalWithoutAnAuthContext(t *testing.T) {
 	root := t.TempDir()
+	writeRequestFieldModule(t, root)
 	writeRequestFieldFixture(t, root, "authserver/internal/ceremony/store.go", "package ceremony\n\ntype Store struct{}\n")
 	writeRequestFieldFixture(t, root, "authserver/internal/handlers/handler_auth_issue.go", `package handlers
 
@@ -960,6 +889,7 @@ func issue(ac *AuthContext) {
 // replaced it.
 func TestRequestFieldWrites_Guard_IsFatalOnAnUndeclaredName(t *testing.T) {
 	root := t.TempDir()
+	writeRequestFieldModule(t, root)
 	writeRequestFieldFixture(t, root, "authserver/internal/ceremony/auth_context.go", requestFieldCeremonyFixture)
 
 	report := guard.Run(func(r guard.Reporter) {
@@ -969,6 +899,14 @@ func TestRequestFieldWrites_Guard_IsFatalOnAnUndeclaredName(t *testing.T) {
 
 	require.True(t, report.Stopped, "an undeclared name must be fatal rather than a pass")
 	assert.Contains(t, report.Fatal, "AuthContext declares no field Nonce, method SetNonce")
+}
+
+// writeRequestFieldModule writes the auth server's module file into a fixture tree and makes the
+// tree loadable, so a case adds only the packages it is about.
+func writeRequestFieldModule(t *testing.T, root string) {
+	t.Helper()
+	writeRequestFieldFixture(t, root, "authserver/go.mod", "module github.com/leodip/goiabada/authserver\n")
+	require.NoError(t, pkgload.MakeLoadable(root))
 }
 
 // writeRequestFieldFixture writes one file into a fixture tree, creating its directories.

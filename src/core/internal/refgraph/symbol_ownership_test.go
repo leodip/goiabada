@@ -157,9 +157,7 @@ func checkSymbols(t *testing.T, files map[string]string, rows []string) []string
 	t.Helper()
 
 	root := writeTree(t, files)
-	graph, err := BuildImportGraph(root)
-	require.NoError(t, err)
-	census, err := buildSymbolCensus(root, graph)
+	census, err := buildSymbolCensus(root)
 	require.NoError(t, err)
 
 	findings := checkSymbolOwnership(symbolRows(rows...), census)
@@ -172,9 +170,7 @@ func computedOver(t *testing.T, files map[string]string) map[string]string {
 	t.Helper()
 
 	root := writeTree(t, files)
-	graph, err := BuildImportGraph(root)
-	require.NoError(t, err)
-	census, err := buildSymbolCensus(root, graph)
+	census, err := buildSymbolCensus(root)
 	require.NoError(t, err)
 
 	out := map[string]string{}
@@ -216,10 +212,10 @@ func TestSymbolOwnership_TheBaselineTreeResolves(t *testing.T) {
 	computed := computedOver(t, symbolBaselineFiles())
 
 	assert.Equal(t, map[string]string{
-		"core/shared.Widget":     JustificationBothApps,
-		"core/shared.New":        JustificationBothApps,
-		"core/shared.Colour":     JustificationBothApps,
-		"core/shared.Kernelled":  JustificationKernel,
+		"core/shared.Widget":     justificationBothApps,
+		"core/shared.New":        justificationBothApps,
+		"core/shared.Colour":     justificationBothApps,
+		"core/shared.Kernelled":  justificationKernel,
 		"core/shared.Limit":      justificationOwnPackage,
 		"core/shared.Cog":        justificationReachable,
 		"core/shared.ColourRed":  justificationReachable,
@@ -241,6 +237,22 @@ func TestSymbolOwnership_AConstInheritsItsType(t *testing.T) {
 
 	assert.Equal(t, justificationReachable, computed["core/shared.ColourRed"])
 	assert.Equal(t, justificationReachable, computed["core/shared.ColourBlue"])
+}
+
+// TestSymbolOwnership_AValueKeepsItsTypeFromEveryReleaseBuild: Default is declared with the
+// justified type Colour in a Linux file and with an unjustified type in a Windows file. Every
+// release build's declaration is read into one record, and the Windows build, read after the
+// Linux ones, does not take away the Linux declaration's evidence (#420).
+func TestSymbolOwnership_AValueKeepsItsTypeFromEveryReleaseBuild(t *testing.T) {
+	files := withSymbolBaseline(map[string]string{
+		"core/shared/default_linux.go":   "package shared\n\nvar Default Colour\n",
+		"core/shared/default_windows.go": "package shared\n\ntype Other string\n\nvar Default Other\n",
+	})
+
+	computed := computedOver(t, files)
+
+	assert.Equal(t, justificationReachable, computed["core/shared.Default"])
+	assert.Empty(t, computed["core/shared.Other"])
 }
 
 // TestSymbolOwnership_AConstTypedByConversionIsReachable is the same arm where the type is in the
@@ -286,7 +298,7 @@ var (
 
 	computed := computedOver(t, files)
 
-	assert.Equal(t, JustificationBothApps, computed["core/shared.Tint"])
+	assert.Equal(t, justificationBothApps, computed["core/shared.Tint"])
 	assert.Equal(t, justificationReachable, computed["core/shared.TintRed"],
 		"a const whose type comes from a conversion is a const of that type")
 	assert.Equal(t, justificationReachable, computed["core/shared.TintBlue"],
@@ -344,7 +356,7 @@ var (
 
 	computed := computedOver(t, files)
 
-	assert.Equal(t, JustificationBothApps, computed["core/ring.Describe"])
+	assert.Equal(t, justificationBothApps, computed["core/ring.Describe"])
 	assert.Equal(t, justificationReachable, computed["core/ring.Level"],
 		"Describe's signature is the evidence; LevelLow's own conversion is not")
 	assert.Equal(t, justificationReachable, computed["core/ring.LevelLow"])
@@ -536,7 +548,7 @@ var (
 	})
 
 	computed := computedOver(t, files)
-	assert.Equal(t, JustificationBothApps, computed["core/ring.Level"])
+	assert.Equal(t, justificationBothApps, computed["core/ring.Level"])
 	// The two constants follow, now that the type whose method names them has a seed. The
 	// constructor does not: NewLevel names Level, which is the arrow pointing the other way, and
 	// nothing in production calls it. So it still owes a written word, which is the rule working
@@ -556,16 +568,13 @@ var (
 	assertFindings(t, findings, "records core/ring.Level as moving, but the tree backs both-apps")
 }
 
-// ---- a method rides with its receiver, however the receiver is spelled -----------------------
+// ---- a method rides with its receiver ----------------------------------------------------------
 
 // TestSymbolOwnership_AGenericMethodRidesWithItsReceiver is the attribution half of the same rule,
-// at the two shapes the parser keeps for a generic receiver: `Box[T]` is an IndexExpr and
-// `Pair[K, V]` an IndexListExpr, so each is a separate arm of the walk that finds the base name.
-// Fail to unwrap one and the method is discarded rather than attributed, which is the quiet
-// direction: everything only that method reaches loses its evidence, and the table then asks a
-// human to assert a symbol the tree does in fact justify. Before these two receivers existed,
-// replacing either arm on its own left the whole core tier green. Final review round 5, finding 3
-// (#385).
+// for a generic receiver with one type parameter, by value, and one with two, through a pointer. A
+// method that is discarded rather than attributed is the quiet direction: everything only that
+// method reaches loses its evidence, and the table then asks a human to assert a symbol the tree
+// does in fact justify. Final review round 5, finding 3 (#385).
 func TestSymbolOwnership_AGenericMethodRidesWithItsReceiver(t *testing.T) {
 	files := withSymbolBaseline(map[string]string{
 		"core/ring/ring.go": `package ring
@@ -592,7 +601,7 @@ type Pair[K, V any] struct {
 	Value V
 }
 
-func (p Pair[K, V]) Build() *Sprocket {
+func (p *Pair[K, V]) Build() *Sprocket {
 	_ = Bearing{}
 	return nil
 }
@@ -633,143 +642,23 @@ var (
 
 	computed := computedOver(t, files)
 
-	assert.Equal(t, JustificationBothApps, computed["core/ring.Box"])
-	assert.Equal(t, JustificationBothApps, computed["core/ring.Pair"])
+	assert.Equal(t, justificationBothApps, computed["core/ring.Box"])
+	assert.Equal(t, justificationBothApps, computed["core/ring.Pair"])
 	assert.Equal(t, justificationReachable, computed["core/ring.Crank"],
 		"a one-parameter generic method's signature is its receiver's declaration")
 	assert.Equal(t, justificationOwnPackage, computed["core/ring.Flange"],
 		"and its body is its receiver's body")
 	assert.Equal(t, justificationReachable, computed["core/ring.Sprocket"],
-		"which holds for a receiver carrying more than one type parameter too")
+		"which holds for a pointer receiver carrying more than one type parameter too")
 	assert.Equal(t, justificationOwnPackage, computed["core/ring.Bearing"],
-		"in the body as in the signature")
-}
-
-// TestSymbolOwnership_AParenthesizedReceiverStillNamesItsType is the receiver form the walk did not
-// know. Go accepts `func (l *(Level)) Build()` and gofmt preserves parentheses between the pointer
-// and its base, so the form survives every formatting check this repository runs and a reader has
-// no hint it is unusual. The walk stripped pointers and type arguments but not parentheses, so it
-// returned "" and the method was dropped rather than attributed to Level -- a symbol only that
-// method reaches would then be asked to justify itself in writing. The second receiver is the
-// composition, `*(Box[T])`, which is a pointer, parentheses and an instantiation at once. Final
-// review round 5, finding 4 (#385).
-func TestSymbolOwnership_AParenthesizedReceiverStillNamesItsType(t *testing.T) {
-	files := withSymbolBaseline(map[string]string{
-		"core/ring/ring.go": `package ring
-
-type Level struct{}
-
-type Orphan struct{}
-
-type Cotter struct{}
-
-type Gasket struct{}
-
-type Spindle struct{}
-
-type Box[T any] struct {
-	V T
-}
-
-func (l *(Level)) Build() *Orphan {
-	_ = Cotter{}
-	return nil
-}
-
-func (b *(Box[T])) Peek() *Gasket {
-	_ = Spindle{}
-	return nil
-}
-`,
-		"authserver/main.go": `package main
-
-import (
-	"example.test/core/ring"
-	"example.test/core/shared"
-)
-
-var (
-	_ = shared.Widget{}
-	_ = shared.Colour("")
-	_ = shared.New()
-	_ = shared.Stable{}
-	_ = ring.Level{}
-	_ = ring.Box[int]{}
-)
-`,
-		"adminconsole/main.go": `package main
-
-import (
-	"example.test/core/ring"
-	"example.test/core/shared"
-)
-
-var (
-	_ = shared.Widget{}
-	_ = shared.Colour("")
-	_ = shared.New()
-	_ = shared.Departing{}
-	_ = ring.Level{}
-	_ = ring.Box[int]{}
-)
-`,
-	})
-
-	computed := computedOver(t, files)
-
-	assert.Equal(t, JustificationBothApps, computed["core/ring.Level"])
-	assert.Equal(t, JustificationBothApps, computed["core/ring.Box"])
-	assert.Equal(t, justificationReachable, computed["core/ring.Orphan"],
-		"a parenthesized pointer receiver names its type as surely as a bare one")
-	assert.Equal(t, justificationOwnPackage, computed["core/ring.Cotter"],
-		"so the method's body is its receiver's body")
-	assert.Equal(t, justificationReachable, computed["core/ring.Gasket"],
-		"and parentheses compose with the pointer and the type arguments")
-	assert.Equal(t, justificationOwnPackage, computed["core/ring.Spindle"],
 		"in the body as in the signature")
 }
 
 // ---- a name is not a reference ---------------------------------------------------------------
 
-// TestSymbolOwnership_ASameSpelledNameIsNotAReference is why the own-package arm resolves objects
-// rather than matching spellings. This tree already has the shape: core/guard declares a type
-// Address and a field named Address, and addr.Address matches the type's spelling without
-// referring to it.
-func TestSymbolOwnership_ASameSpelledNameIsNotAReference(t *testing.T) {
-	files := withSymbolBaseline(map[string]string{
-		"core/shared/shadow.go": `package shared
-
-type Envelope struct {
-	// A field whose name is the type's, which resolves to the field and not to Cog.
-	Cog string
-}
-
-func Sort(list []string) string {
-	// A local, a parameter and a selector member, all spelled like exported symbols.
-	Limit := len(list)
-	e := Envelope{Cog: "x"}
-	if Limit > 0 {
-		return e.Cog
-	}
-	return ""
-}
-`,
-	})
-
-	computed := computedOver(t, files)
-
-	// Sort has no consumer, so nothing it names could be justified through it either way. What
-	// matters is that Cog is still reachable through Widget alone and Limit still own-package
-	// through New alone: the shadowing file added no evidence.
-	assert.Equal(t, justificationReachable, computed["core/shared.Cog"])
-	assert.Equal(t, justificationOwnPackage, computed["core/shared.Limit"])
-	assert.Empty(t, computed["core/shared.Envelope"])
-	assert.Empty(t, computed["core/shared.Sort"])
-}
-
-// TestSymbolOwnership_AShadowedNameDoesNotJustifyItsNamesake is the same rule where it could
-// actually mislead: a justified function whose body declares a local spelled like an unreferenced
-// exported symbol must not justify it.
+// TestSymbolOwnership_AShadowedNameDoesNotJustifyItsNamesake is identity inside a package: a
+// justified function whose body declares a local spelled like an unreferenced exported symbol must
+// not justify it. Resolved by object, the local is the local.
 func TestSymbolOwnership_AShadowedNameDoesNotJustifyItsNamesake(t *testing.T) {
 	files := withSymbolBaseline(map[string]string{
 		"core/shared/shadow.go": `package shared
@@ -809,8 +698,35 @@ var (
 
 	computed := computedOver(t, files)
 
-	assert.Equal(t, JustificationBothApps, computed["core/shared.Reset"])
+	assert.Equal(t, justificationBothApps, computed["core/shared.Reset"])
 	assert.Empty(t, computed["core/shared.Orphan"], "the local spelled Orphan is not a reference to the type")
+}
+
+// TestSymbolOwnership_ADotImportIsAReference is the same rule across packages: a file that
+// dot-imports a core package names its symbols with no selector at all, so a reader matching
+// selectors would read both applications naming Spoke here as nobody naming it. Resolved by
+// object, a dot import is an import like any other (#420).
+func TestSymbolOwnership_ADotImportIsAReference(t *testing.T) {
+	files := withSymbolBaseline(map[string]string{
+		"core/shared/spoke.go": "package shared\n\ntype Spoke struct{}\n",
+		"authserver/dot.go": `package main
+
+import . "example.test/core/shared"
+
+var _ = Spoke{}
+`,
+		"adminconsole/dot.go": `package main
+
+import . "example.test/core/shared"
+
+var _ = Spoke{}
+`,
+	})
+
+	computed := computedOver(t, files)
+
+	assert.Equal(t, justificationBothApps, computed["core/shared.Spoke"],
+		"a dot-imported symbol named by both applications is named by both applications")
 }
 
 // TestSymbolOwnership_OneNameInAValueSpecDoesNotVouchForItsSiblings: `var Ready, discarded = true,
@@ -854,7 +770,7 @@ var (
 
 	computed := computedOver(t, files)
 
-	assert.Equal(t, JustificationBothApps, computed["core/shared.Ready"])
+	assert.Equal(t, justificationBothApps, computed["core/shared.Ready"])
 	assert.Empty(t, computed["core/shared.Orphan"],
 		"only discarded's initializer names Orphan, and nothing justifies discarded")
 }
@@ -903,7 +819,7 @@ var (
 
 	computed := computedOver(t, files)
 
-	assert.Equal(t, JustificationBothApps, computed["core/shared.Loaded"])
+	assert.Equal(t, justificationBothApps, computed["core/shared.Loaded"])
 	assert.Equal(t, justificationReachable, computed["core/shared.Tupled"],
 		"Loaded reaches pair, whose signature names Tupled")
 }
@@ -953,7 +869,7 @@ var (
 
 	computed := computedOver(t, files)
 
-	assert.Equal(t, JustificationBothApps, computed["core/shared.Rearmed"])
+	assert.Equal(t, justificationBothApps, computed["core/shared.Rearmed"])
 	assert.Equal(t, justificationOwnPackage, computed["core/shared.Tick"],
 		"Rearmed repeats the expression above it, and that expression names Tick")
 }
@@ -1001,7 +917,7 @@ var (
 
 	computed := computedOver(t, files)
 
-	assert.Equal(t, JustificationBothApps, computed["core/shared.Repeated"])
+	assert.Equal(t, justificationBothApps, computed["core/shared.Repeated"])
 	assert.Empty(t, computed["core/shared.Tick"],
 		"Repeated inherits the 1; only alsoDiscarded inherits the expression naming Tick")
 }
@@ -1051,7 +967,7 @@ var (
 
 	computed := computedOver(t, files)
 
-	assert.Equal(t, JustificationBothApps, computed["core/shared.Reset"])
+	assert.Equal(t, justificationBothApps, computed["core/shared.Reset"])
 	assert.Empty(t, computed["core/shared.Tick"],
 		"Reset is its type's zero value; it repeats nothing and names nothing")
 }
@@ -1101,7 +1017,7 @@ var (
 
 	computed := computedOver(t, files)
 
-	assert.Equal(t, JustificationBothApps, computed["core/shared.Rearmed"])
+	assert.Equal(t, justificationBothApps, computed["core/shared.Rearmed"])
 	assert.Equal(t, justificationReachable, computed["core/shared.Tick"],
 		"Rearmed inherits the type slot as well as the expression, and a type slot is a declaration")
 }
@@ -1152,7 +1068,7 @@ var (
 
 	computed := computedOver(t, files)
 
-	assert.Equal(t, JustificationBothApps, computed["core/shared.Reset"])
+	assert.Equal(t, justificationBothApps, computed["core/shared.Reset"])
 	assert.Empty(t, computed["core/shared.Tick"],
 		"Reset inherits the untyped 2 above it, which carries no type slot with it")
 }
@@ -1198,7 +1114,7 @@ var (
 
 	computed := computedOver(t, files)
 
-	assert.Equal(t, JustificationBothApps, computed["core/shared.Registry"])
+	assert.Equal(t, justificationBothApps, computed["core/shared.Registry"])
 	assert.Equal(t, justificationReachable, computed["core/shared.Slotted"],
 		"Registry's declared type names Slotted, and a declaration is reachable")
 }
@@ -1244,7 +1160,7 @@ var (
 
 	computed := computedOver(t, files)
 
-	assert.Equal(t, JustificationBothApps, computed["core/shared.ToneWarm"])
+	assert.Equal(t, justificationBothApps, computed["core/shared.ToneWarm"])
 	assert.Empty(t, computed["core/shared.Tone"],
 		"a value never justifies the type it is declared with, whichever slot that type is spelled in")
 }
@@ -1294,7 +1210,7 @@ var (
 
 	computed := computedOver(t, files)
 
-	assert.Equal(t, JustificationBothApps, computed["core/shared.Default"])
+	assert.Equal(t, justificationBothApps, computed["core/shared.Default"])
 	assert.Empty(t, computed["core/shared.Box"],
 		"an instantiated generic type slot spells the value's own type as surely as a bare one")
 	assert.Equal(t, justificationReachable, computed["core/shared.Knob"],
@@ -1359,8 +1275,8 @@ var (
 
 	computed := computedOver(t, files)
 
-	assert.Equal(t, JustificationBothApps, computed["core/shared.Default"])
-	assert.Equal(t, JustificationBothApps, computed["core/shared.Generated"])
+	assert.Equal(t, justificationBothApps, computed["core/shared.Default"])
+	assert.Equal(t, justificationBothApps, computed["core/shared.Generated"])
 	assert.Empty(t, computed["core/shared.Pair"],
 		"a two-argument instantiation spells the value's own type, in the slot and at the head of an initializer alike")
 	assert.Equal(t, justificationReachable, computed["core/shared.Knob"],
@@ -1417,7 +1333,7 @@ var (
 
 	computed := computedOver(t, files)
 
-	assert.Equal(t, JustificationBothApps, computed["core/shared.Default"])
+	assert.Equal(t, justificationBothApps, computed["core/shared.Default"])
 	assert.Empty(t, computed["core/shared.Tone"],
 		"a composite literal at the head of an initializer is the value's own type, not a use of it")
 }
@@ -1471,8 +1387,8 @@ var (
 
 	computed := computedOver(t, files)
 
-	assert.Equal(t, JustificationBothApps, computed["core/shared.ToneWarm"])
-	assert.Equal(t, JustificationBothApps, computed["core/shared.ToneCool"])
+	assert.Equal(t, justificationBothApps, computed["core/shared.ToneWarm"])
+	assert.Equal(t, justificationBothApps, computed["core/shared.ToneCool"])
 	assert.Empty(t, computed["core/shared.Tone"],
 		"an asserted type is the value's own type, not a use of it, in either form of the assertion")
 }
@@ -1524,7 +1440,7 @@ var (
 
 	computed := computedOver(t, files)
 
-	assert.Equal(t, JustificationBothApps, computed["core/shared.ToneCoolOk"])
+	assert.Equal(t, justificationBothApps, computed["core/shared.ToneCoolOk"])
 	assert.Equal(t, justificationOwnPackage, computed["core/shared.Tone"],
 		"the bool was not declared with Tone, so its declaration names Tone like any other")
 }
@@ -1575,7 +1491,7 @@ var (
 
 	computed := computedOver(t, files)
 
-	assert.Equal(t, JustificationBothApps, computed["core/shared.ToneWarm"])
+	assert.Equal(t, justificationBothApps, computed["core/shared.ToneWarm"])
 	assert.Equal(t, justificationOwnPackage, computed["core/shared.Tone"],
 		"the type slot is the excluded occurrence; the slice the initializer builds is a use of Tone")
 }
@@ -1623,7 +1539,7 @@ var (
 
 	computed := computedOver(t, files)
 
-	assert.Equal(t, JustificationBothApps, computed["core/shared.Box"])
+	assert.Equal(t, justificationBothApps, computed["core/shared.Box"])
 	assert.Equal(t, justificationReachable, computed["core/shared.Bounded"],
 		"Box's type parameter list names Bounded")
 }
@@ -1646,7 +1562,7 @@ func elsewhere() Cog
 
 	computed := computedOver(t, files)
 
-	assert.Equal(t, JustificationBothApps, computed["core/shared.Widget"],
+	assert.Equal(t, justificationBothApps, computed["core/shared.Widget"],
 		"the walk reached the rest of the package")
 }
 
@@ -1702,31 +1618,6 @@ func TestSymbolOwnership_ATestSupportRowAProductionReferenceContradicts(t *testi
 func TestSymbolOwnership_ATestSupportRowNothingNames(t *testing.T) {
 	files := withSymbolBaseline(map[string]string{
 		"core/shared/orphan.go": "package shared\n\ntype Unused struct{}\n",
-	})
-	rows := append(symbolBaselineRows(), "core/shared Unused test-support Nothing names it.")
-
-	findings := checkSymbols(t, files, rows)
-
-	assertFindings(t, findings, "records core/shared.Unused as test-support, but nothing names it")
-}
-
-// TestSymbolOwnership_ALocalInATestSpelledLikeASymbolNamesNothing is the same refusal where the
-// spelling is there and the reference is not. test-support is the one asserted word the tree can
-// contradict, so evidence for it has to be a reference rather than a matching identifier: a local,
-// a parameter or a field spelled like an exported orphan would otherwise park dead code in core
-// behind a word the guard believes it checked. Final review round 1, finding 1.
-func TestSymbolOwnership_ALocalInATestSpelledLikeASymbolNamesNothing(t *testing.T) {
-	files := withSymbolBaseline(map[string]string{
-		"core/shared/orphan.go": "package shared\n\ntype Unused struct{}\n",
-		"core/shared/orphan_test.go": `package shared
-
-import "testing"
-
-func TestNothingNamesUnused(t *testing.T) {
-	Unused := 1
-	_ = Unused
-}
-`,
 	})
 	rows := append(symbolBaselineRows(), "core/shared Unused test-support Nothing names it.")
 
@@ -1802,168 +1693,54 @@ func TestUnusedIsNamed(t *testing.T) {
 	assert.Empty(t, checkSymbols(t, files, rows))
 }
 
-// TestSymbolOwnership_AnInternalTestOfAPackageNamedLikeATestIsEvidence is the shape the spelling
-// heuristic could not read. A production package may legally be named `odd_test`, and then its own
-// internal tests carry that same clause: classifying a test file by whether its package name ends
-// in `_test` sent them down the external arm, which looks for a self-import no internal test has,
-// and the guard then refused genuine evidence for the one asserted word the tree can argue with.
-// The declaring package's own name decides it instead. Final review round 2, finding 2.
-func TestSymbolOwnership_AnInternalTestOfAPackageNamedLikeATestIsEvidence(t *testing.T) {
+// TestSymbolOwnership_ATestOnlyDeclarationIsNoEvidenceForItsNamesake: a release build declares the
+// type Probe, and the test build, which leaves that file out, has the package's own test declare a
+// const Probe and name it. The reference is to the test's const, so nothing names the production
+// type, and its test-support row is refused (#420).
+func TestSymbolOwnership_ATestOnlyDeclarationIsNoEvidenceForItsNamesake(t *testing.T) {
 	files := withSymbolBaseline(map[string]string{
-		"core/odd/odd.go": "package odd_test\n\ntype Unused struct{}\n",
-		"core/odd/odd_test.go": `package odd_test
+		"core/shared/probe.go":      "//go:build production\n\npackage shared\n\ntype Probe struct{}\n",
+		"core/shared/probe_test.go": "package shared\n\nconst Probe = 1\n\nvar _ = Probe\n",
+	})
+	rows := append(symbolBaselineRows(), "core/shared Probe test-support Only a test names it.")
+
+	findings := checkSymbols(t, files, rows)
+
+	assertFindings(t, findings, "records core/shared.Probe as test-support, but nothing names it")
+}
+
+// TestSymbolOwnership_AnImportedDeclarationAfterATestFileLineDirectiveIsStillEvidence: the
+// auth server's test is the only one naming Helper, which a production file declares after a
+// //line directive mapping it to a _test.go name. The auth server's load reads core from export
+// data, whose positions carry the mapped name, so a declaration's own position cannot say whether
+// a test declared it (#420).
+func TestSymbolOwnership_AnImportedDeclarationAfterATestFileLineDirectiveIsStillEvidence(t *testing.T) {
+	files := symbolBaselineFiles()
+	files["core/shared/shared.go"] = strings.Replace(files["core/shared/shared.go"],
+		"type Helper struct{}", "//line generated_test.go:1\ntype Helper struct{}", 1)
+
+	assert.Empty(t, checkSymbols(t, files, symbolBaselineRows()))
+}
+
+// TestSymbolOwnership_ALineDirectiveDoesNotMoveATestReference: the only reference to Unused is in a
+// test file, after a //line directive mapping it to a file that is not one. Which build compiles a
+// reference is decided by the file it is in, so it is still a test's (#420).
+func TestSymbolOwnership_ALineDirectiveDoesNotMoveATestReference(t *testing.T) {
+	files := withSymbolBaseline(map[string]string{
+		"core/shared/orphan.go": "package shared\n\ntype Unused struct{}\n",
+		"core/shared/orphan_test.go": `package shared
 
 import "testing"
 
 func TestUnusedIsNamed(t *testing.T) {
+//line generated.go:1
 	_ = Unused{}
 }
 `,
 	})
-	rows := append(symbolBaselineRows(), "core/odd Unused test-support Only a test names it.")
+	rows := append(symbolBaselineRows(), "core/shared Unused test-support Only a test names it.")
 
 	assert.Empty(t, checkSymbols(t, files, rows))
-}
-
-// TestSymbolOwnership_ALocalInTheTestOfAPackageNamedLikeATestNamesNothing is that arm's other half:
-// reaching the internal pass must not cost it the identity check, so a local spelled like the
-// orphan is still not a reference to it.
-func TestSymbolOwnership_ALocalInTheTestOfAPackageNamedLikeATestNamesNothing(t *testing.T) {
-	files := withSymbolBaseline(map[string]string{
-		"core/odd/odd.go": "package odd_test\n\ntype Unused struct{}\n",
-		"core/odd/odd_test.go": `package odd_test
-
-import "testing"
-
-func TestNothingNamesUnused(t *testing.T) {
-	Unused := 1
-	_ = Unused
-}
-`,
-	})
-	rows := append(symbolBaselineRows(), "core/odd Unused test-support Nothing names it.")
-
-	findings := checkSymbols(t, files, rows)
-
-	assertFindings(t, findings, "records core/odd.Unused as test-support, but nothing names it")
-}
-
-// TestSymbolOwnership_AnExternalTestOfAPackageNamedLikeATestIsEvidence is the external half of the
-// same shape, and it turns on what Go binds an unaliased import to: the imported package's
-// declared name, not the last segment of its path. An external test of a package named `odd_test`
-// living in `core/odd` therefore writes `odd_test.Unused`, and looking for `odd.Unused` refused
-// the evidence and with it the one asserted word the tree can argue with. Final review round 3,
-// finding 4.
-func TestSymbolOwnership_AnExternalTestOfAPackageNamedLikeATestIsEvidence(t *testing.T) {
-	files := withSymbolBaseline(map[string]string{
-		"core/odd/odd.go": "package odd_test\n\ntype Unused struct{}\n",
-		"core/odd/orphan_test.go": `package odd_test_test
-
-import (
-	"testing"
-
-	"example.test/core/odd"
-)
-
-func TestUnusedIsNamed(t *testing.T) {
-	_ = odd_test.Unused{}
-}
-`,
-	})
-	rows := append(symbolBaselineRows(), "core/odd Unused test-support Only a test names it.")
-
-	assert.Empty(t, checkSymbols(t, files, rows))
-}
-
-// TestSymbolOwnership_APackageNamedForSomethingOtherThanItsDirectory is that same binding rule on
-// the production side, where it decides every row rather than one asserted word. Both applications
-// import `core/odd` without an alias and name its symbol through the identifier the package
-// declares, and reading the path's last segment instead saw no reference at all: a symbol the
-// whole tree shares would have been offered an asserted escape hatch, which is the one thing this
-// table exists to refuse. Final review round 3, finding 5.
-func TestSymbolOwnership_APackageNamedForSomethingOtherThanItsDirectory(t *testing.T) {
-	files := withSymbolBaseline(map[string]string{
-		"core/odd/odd.go": "package renamed\n\ntype Shared struct{}\n",
-		"authserver/main.go": `package main
-
-import (
-	"example.test/core/odd"
-	"example.test/core/shared"
-)
-
-var (
-	_ = shared.Widget{}
-	_ = shared.Colour("")
-	_ = shared.New()
-	_ = shared.Stable{}
-	_ = renamed.Shared{}
-)
-`,
-		"adminconsole/main.go": `package main
-
-import (
-	"example.test/core/odd"
-	"example.test/core/shared"
-)
-
-var (
-	_ = shared.Widget{}
-	_ = shared.Colour("")
-	_ = shared.New()
-	_ = shared.Departing{}
-	_ = renamed.Shared{}
-)
-`,
-	})
-
-	computed := computedOver(t, files)
-
-	assert.Equal(t, JustificationBothApps, computed["core/odd.Shared"],
-		"an unaliased import binds the name the package declares, which is what both applications wrote")
-}
-
-// TestSymbolOwnership_AnAliasedImportStillOverridesTheDeclaredName is the negative that binding
-// rule must not swallow: an explicit alias is the file's own word on the identifier, and it beats
-// both the declared name and the path.
-func TestSymbolOwnership_AnAliasedImportStillOverridesTheDeclaredName(t *testing.T) {
-	files := withSymbolBaseline(map[string]string{
-		"core/odd/odd.go": "package renamed\n\ntype Shared struct{}\n",
-		"authserver/main.go": `package main
-
-import (
-	odd "example.test/core/odd"
-	"example.test/core/shared"
-)
-
-var (
-	_ = shared.Widget{}
-	_ = shared.Colour("")
-	_ = shared.New()
-	_ = shared.Stable{}
-	_ = odd.Shared{}
-)
-`,
-		"adminconsole/main.go": `package main
-
-import (
-	odd "example.test/core/odd"
-	"example.test/core/shared"
-)
-
-var (
-	_ = shared.Widget{}
-	_ = shared.Colour("")
-	_ = shared.New()
-	_ = shared.Departing{}
-	_ = odd.Shared{}
-)
-`,
-	})
-
-	computed := computedOver(t, files)
-
-	assert.Equal(t, JustificationBothApps, computed["core/odd.Shared"],
-		"the alias is what the selector names, whatever the package calls itself")
 }
 
 // TestSymbolOwnership_ATestSupportRowAnUnlinkedProductionFileNames is the deliberate leniency that
@@ -1980,6 +1757,75 @@ func Build() shared.Helper {
 	return shared.Helper{}
 }
 `,
+	})
+
+	assert.Empty(t, checkSymbols(t, files, symbolBaselineRows()))
+}
+
+// TestSymbolOwnership_ATestSupportRowALinkedImportContradicts is the walk behind "a binary links
+// it": the production file naming Helper is in authserver/relay, which is no main package but
+// which the auth server's main imports, so the binary links it and the test-support row is
+// contradicted. Reading only the main packages themselves as linked would let it pass.
+func TestSymbolOwnership_ATestSupportRowALinkedImportContradicts(t *testing.T) {
+	files := withSymbolBaseline(map[string]string{
+		"authserver/relay/relay.go": `package relay
+
+import "example.test/core/shared"
+
+var Pass = shared.Helper{}
+`,
+		"authserver/main.go": `package main
+
+import (
+	"example.test/authserver/relay"
+	"example.test/core/shared"
+)
+
+var (
+	_ = shared.Widget{}
+	_ = shared.Colour("")
+	_ = shared.New()
+	_ = shared.Stable{}
+	_ = relay.Pass
+)
+`,
+	})
+
+	findings := checkSymbols(t, files, symbolBaselineRows())
+
+	assertFindings(t, findings, "records core/shared.Helper as test-support, but authserver names it in production and a binary links that package")
+}
+
+// TestSymbolOwnership_ATestSupportRowAnotherPlatformsFileContradicts is why production references
+// are read as every release build selects them, and not only as the machine running the tests
+// builds them: the one production reference naming Helper is in a file only a Windows build
+// compiles, and Windows is a platform the releases ship. Read on the test machine alone, that file
+// is invisible and the test-support row passes while a shipped binary links the reference (#420).
+func TestSymbolOwnership_ATestSupportRowAnotherPlatformsFileContradicts(t *testing.T) {
+	files := withSymbolBaseline(map[string]string{
+		"authserver/console_windows.go": `package main
+
+import "example.test/core/shared"
+
+var _ = shared.Helper{}
+`,
+	})
+
+	findings := checkSymbols(t, files, symbolBaselineRows())
+
+	assertFindings(t, findings, "records core/shared.Helper as test-support, but authserver names it in production and a binary links that package")
+}
+
+// TestSymbolOwnership_ATestSupportRowLinkedAndNamedInDifferentBuildsPasses is that case's other
+// side: linkage and the reference have to hold in the same release build. authserver/relay names
+// Helper only in a file a Windows build compiles, and only a Linux build's main imports relay, so
+// no shipped binary both links relay and compiles the reference. Joining every build's linked
+// packages before reading the references would contradict the row anyway (#420).
+func TestSymbolOwnership_ATestSupportRowLinkedAndNamedInDifferentBuildsPasses(t *testing.T) {
+	files := withSymbolBaseline(map[string]string{
+		"authserver/relay/relay.go":         "package relay\n\nvar Pass = 1\n",
+		"authserver/relay/relay_windows.go": "package relay\n\nimport \"example.test/core/shared\"\n\nvar _ = shared.Helper{}\n",
+		"authserver/main_linux.go":          "package main\n\nimport \"example.test/authserver/relay\"\n\nvar _ = relay.Pass\n",
 	})
 
 	assert.Empty(t, checkSymbols(t, files, symbolBaselineRows()))
@@ -2047,6 +1893,30 @@ func TestCheckOwnership_ADocumentThatCannotBeReadIsAnError(t *testing.T) {
 	assert.Contains(t, err.Error(), "reading core/OWNERSHIP.md")
 }
 
+// brokenPackage is a core package that does not type-check: it names a symbol nothing declares.
+const brokenPackage = `package broken
+
+var _ = missing.Thing
+`
+
+// TestCheckOwnership_APackageThatDoesNotCompileIsAnError is decision 3 of #420 for the guard: a
+// tree with a package that does not type-check cannot be read, since a half-checked package hides
+// the references it holds, so the census stops with an error naming the package rather than
+// reporting the rows those references would have backed.
+func TestCheckOwnership_APackageThatDoesNotCompileIsAnError(t *testing.T) {
+	root := writeTree(t, withSymbolBaseline(map[string]string{
+		"core/OWNERSHIP.md":     symbolOwnershipDoc(symbolBaselineRows()...),
+		"core/broken/broken.go": brokenPackage,
+	}))
+
+	_, err := CheckOwnership(root)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "example.test/core/broken")
+	assert.Contains(t, err.Error(), "undefined: missing")
+	assert.Contains(t, err.Error(), "the tree cannot be read until it does")
+}
+
 // ---- the generator ------------------------------------------------------------------------------
 
 // TestRenderSymbolOwnership_WritesTheComputedRowsAndKeepsTheAssertedOnes pins what ownershipdump
@@ -2054,11 +1924,12 @@ func TestCheckOwnership_ADocumentThatCannotBeReadIsAnError(t *testing.T) {
 // file, and the prose around the table is untouched.
 func TestRenderSymbolOwnership_WritesTheComputedRowsAndKeepsTheAssertedOnes(t *testing.T) {
 	// The table on disk is wrong in both available directions: a computed row states the wrong
-	// word, and an asserted row carries a note only a human could have written.
+	// word, and an asserted row carries a note only a human could have written. The computed row
+	// carries a note too, which the regenerated word must not take away.
 	stale := symbolBaselineRows()
 	for i, r := range stale {
 		if strings.HasPrefix(r, "core/shared Widget ") {
-			stale[i] = "core/shared Widget reachable —"
+			stale[i] = "core/shared Widget reachable Named by both applications on purpose."
 		}
 	}
 	files := withSymbolBaseline(map[string]string{"core/OWNERSHIP.md": symbolOwnershipDoc(stale...)})
@@ -2069,7 +1940,7 @@ func TestRenderSymbolOwnership_WritesTheComputedRowsAndKeepsTheAssertedOnes(t *t
 
 	assert.Empty(t, unjustified)
 	assert.Contains(t, doc, "Preamble prose the parser never reads.")
-	assert.Contains(t, doc, "| `core/shared` | `Widget` | both-apps | — |")
+	assert.Contains(t, doc, "| `core/shared` | `Widget` | both-apps | Named by both applications on purpose. |")
 	assert.Contains(t, doc, "| `core/shared` | `Stable` | contract | A value the two processes agree on. |")
 	assert.Contains(t, doc, "| `core/shared` | `Departing` | moving | #385 carries it to the admin console. |")
 }
@@ -2120,4 +1991,21 @@ func TestRenderSymbolOwnership_IsIdempotent(t *testing.T) {
 
 	assert.Empty(t, unjustified)
 	assert.Equal(t, first, second)
+}
+
+// TestRenderSymbolOwnership_APackageThatDoesNotCompileIsAnError is the same decision for
+// ownershipdump: a table written from a half-checked tree would be wrong, so the generator writes
+// nothing and names the package.
+func TestRenderSymbolOwnership_APackageThatDoesNotCompileIsAnError(t *testing.T) {
+	root := writeTree(t, withSymbolBaseline(map[string]string{
+		"core/OWNERSHIP.md":           symbolOwnershipDoc(symbolBaselineRows()...),
+		"authserver/broken/broken.go": brokenPackage,
+	}))
+
+	doc, _, err := RenderSymbolOwnership(root)
+
+	require.Error(t, err)
+	assert.Empty(t, doc)
+	assert.Contains(t, err.Error(), "example.test/authserver/broken")
+	assert.Contains(t, err.Error(), "undefined: missing")
 }

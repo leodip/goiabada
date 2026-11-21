@@ -90,7 +90,7 @@ func scrape(t *testing.T, s *Server) string {
 
 // The listener answers GET /metrics with the exposition and 404 for every other path, the paths
 // net/http/pprof and expvar register on Go's default mux included. Neither is linked any more, and
-// rule 9 refuses both in every shipped binary (#462), so the default mux answers both 404 here: this
+// rule 8 refuses both in every shipped binary (#462), so the default mux answers both 404 here: this
 // test binary links the server package's whole production closure, so a dependency bringing either
 // back makes it answer 200.
 func TestMetricsListener_ServesTheExpositionAndNothingElse(t *testing.T) {

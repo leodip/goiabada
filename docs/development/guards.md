@@ -14,54 +14,43 @@ the measured surface of `*testing.T`, and an interface rather than a `testing.TB
 `testing.TB` cannot be implemented outside the testing package. The exported `Assert*` keeps its
 `*testing.T` and delegates, so no caller moves. Both halves are then driven from a rule test: the
 finder directly, the reporting half through `guard.Run`, which runs it on its own goroutine so a
-recorded `Fatalf` ends it in `runtime.Goexit` the way the real one does. Every guard follows this:
-those in `core/guard`, the newest `AssertNoLiteralStackSecrets`, which refuses a data key or
-database password supplied by literal in any runnable file -- workflows, Compose and other YAML,
-devcontainer and editor configurations, Dockerfiles, Makefiles, env files (`.env` and `.env.*` among
-them, unless git tracks no copy of it and the repository's `.gitignore` files, its own directory's
-or a parent's, read as git reads them, keep it out of the repository), shell scripts, Go mains and
-Markdown code blocks -- and the published sample key and passwords anywhere outside the refusal and
-its tests (#501), and before it `AssertNoStaleDeferredBodyCloses`, which refuses a deferred
-func-literal close of a response body reading a variable the same function reassigns after the defer
-is registered, in a later statement, a nested closure or the next iteration of a loop, so only the
-last response is closed (#591), and before it `AssertNoGuardInTestsReachedFrom`, which refuses a
-test importing `core/guard`, directly or through first-party production code, in any package a
-module reaches, called over the setup wizard because `go mod tidy` reads those tests and would put
-TOML in its `go.sum` (#500), and before it `AssertImportsOnly`, which holds one package's production
-files to importing the standard library and an allowlist its caller names, which #387 wrote as
-`record`'s own lint, holding that package to `core/builtin` and `core/errs`, before #500 moved it
-here when `core/adminpassword` became the second package held to one, to `core/errs` alone, so the
-setup wizard links nothing more to reach the admin password rule, and before it
-`AssertNoParentImport`, which holds each child handler package a caller names to naming no import of
-its parent, which the auth server calls over `apihandlers` and `accounthandlers` and the admin
-console over its six, and which #387 wrote as that server's own lint before #440 moved it here for
-both applications, and before it `AssertContextValuesThroughAccessors`, which refuses a
-`context.WithValue` or a context `Value` read in a production file outside the module's accessor
-package, resolved with `go/types`, and which each application calls with its own `internal/reqctx`
-and no exemption, the admin console's last, `internal/handlertest`'s write of chi's route context,
-gone once it set path values with `r.SetPathValue` (#433, #440, #462), and
-`AssertNoAgreementPointers`, which refuses a comment pointing at an issue's agreement or a probe
-file instead of stating the fact with its issue number (#428), plus `authserver/internal/data`'s
-begin-transaction, benign-sentinel, page-offset, id-list-bound, transaction-pass-through and
-SQL-context lints, the auth server's API error-code and audit-catalog lints, its discarded-error
-lint in `internal/server`, which refuses `_` in the error position of a hash, encryption or
-key-generation call (#409) and resolves the data cipher's methods by receiver type with `go/types`
-(#434), its admin-route classification lint beside it, which holds every admin write route, and
-every admin read whose handler applies a ceiling of the administrative policy, to a row naming the
-ceilings its handler applies or why it needs none, in both directions (#402), and its write-once
-lint in `internal/ceremony`, which refuses a write to an `AuthContext` request field outside
-`authflow.Authorization.Run`, resolved with `go/types` (#436). `AssertImportsOnly` and
-`AssertNoParentImport` both parse imports with `go/parser` rather than matching text, because an
-alias binds a different name to the same path and one of the 39 production files did exactly that.
-`git grep -n 'func assert.*\(r Reporter\|r guard\.Reporter\)' -- '*.go'` lists them; no count is
-kept here, because the one that was drifted each time a guard was added (#442). Each owes three
-cases: a tree that must fail, a tree that must pass, and the walk that reached nothing. One of
-`core/guard`'s, `AssertNotCalledArity`, owes a fourth: a test that measures testify's matching
-against testify, because a guard whose premise is a reading of a dependency stops meaning anything
-the moment that dependency changes and nothing says so (#421). Without the last two the first proves
-nothing, and without the reporting half under test a defect in the five lines that report disables
-the guard across every module with nothing going red -- which is what blinding
-`AssertNoDeadInterfaces` demonstrated on `8883642d` (#333).
+recorded `Fatalf` ends it in `runtime.Goexit` the way the real one does. What a guard holds, and
+why, is written in the comment above its `Assert*` function or its test, and the sections below
+describe the few that need more.
+`git grep -n -E 'func assert[[:alnum:]]*\((r (guard\.)?Reporter|$)' -- '*.go'` lists them, a
+declaration whose parameters wrap onto the next line by its opening line; no roster or count is
+kept here, because the one that was kept drifted each time a guard was added (#442).
+
+Each guard owes three cases: a tree that must fail, a tree that must pass, and the walk that
+reached nothing. A guard whose premise is a reading of a dependency's behavior owes a fourth: a test
+that measures that dependency against itself, as `AssertNotCalledArity`'s measures testify's
+matching against testify, because such a guard stops meaning anything the moment the dependency
+changes and nothing says so (#421). Without the last two the first proves nothing, and without the
+reporting half under test a defect in the five lines that report disables the guard across every
+module with nothing going red -- which is what blinding `AssertNoDeadInterfaces` demonstrated on
+`8883642d` (#333).
+
+A guard that must know which object a name refers to reads the tree through `core/pkgload`, which
+returns a module's type-checked packages, and does not load types its own way. Where a file it
+missed would pass silently, it reads production code as every one of `pkgload.ReleaseBuilds`
+selects it. The context-value, discarded-error and request-field guards also read the test
+machine's default build and merge what they find; the ownership census reads its test references
+from the test machine's test build. Any other guard on the loader reads only the test machine's
+test build. A package that does not load or type-check stops it with one message naming the
+package, so every fixture tree compiles, made loadable with `pkgload.MakeLoadable`. So does a
+package that imports one of its own module's packages that `./...` skips, in a directory whose name
+begins with `_` or `.` or is `testdata`, which the build compiles and no guard would read; the
+dead-interface and vacuous-assertion guards also refuse a directory beginning with `_` or `.` among
+those they walk. A guard that reads only syntax, such as an import list, parses with `go/parser`
+rather than matching text: an alias binds a different name to the same path.
+
+Before writing a guard, look for a `golangci-lint` check that already holds the rule, as #443 did
+when it turned on staticcheck's ST1000 for package comments; `.golangci.yml` lists what is enabled
+and why. A new guard has a threshold of 250 lines of its own code, the finder and the reporting
+half, not counting its rule tests; `credential_read_lint.go`, one rule in one file, is the model.
+The threshold is a question, not a ban: a guard over it says in its pull request why no existing
+linter check can hold the rule, why the rule cannot be narrower, and why the code it polices should
+not change instead (#420).
 
 ## Guards that read code or configuration
 
@@ -103,31 +92,30 @@ golangci-lint run.
 ## Architecture guard
 
 `ARCHITECTURE.md` at the repository root records the allowed module edges, the intended final owner
-of every top-level `core` package, why each symbol in `core/builtin` is still there, the temporary
-exceptions to those rules, the third-party modules the admin console must not compile, and the
-packages no shipped binary may link. Its five tables are data, not prose: `AssertArchitecture` in
-`core/guard/architecture.go` parses them and checks four against the real import graph and the
-built-in identifiers table against every production reference to `core/builtin`; all three module
-unit tiers call it. The check runs in both directions, which is what makes the document a burn-down
-list rather than a wish — an edge the tables do not allow is a failure, and so is an exception left
-standing for an edge that no longer exists, so the issue that removes an edge has to remove its row
-with it (#332). A new top-level `core` package fails the tier until the table says where it belongs,
-and so does a new symbol in `core/builtin`, whose row has to name the strongest of `kernel`,
-`both-apps`, `moving` and `contract` that the reference graph backs (#351). A sixth table lives in
-`src/core/OWNERSHIP.md`, one row per exported symbol any `core` package declares:
-`core/guard.AssertSymbolOwnership` reads it from the same three tiers, four justifications are
-computed from the reference graph and three are asserted with a note the guard requires (#385). Rule
-9 walks the production closure of the three shipped mains, the auth server, the admin console and
-the setup wizard, and refuses `testing` and everything under it, `net/http/httptest` and every
-testify package, so a production import of a test helper or mock fails the unit tier rather than
-reaching a release, and `net/http/pprof` and `expvar`, which register the process's profiles and
-variables on Go's default mux the moment they are linked (#462); the three mains are `shippedMains`
+of every top-level `core` package, the temporary exceptions to those rules, the third-party modules
+the admin console must not compile, and the packages no shipped binary may link. Its four tables are
+data, not prose: `AssertArchitecture` in `core/guard/architecture.go` parses them and checks them
+against the real import graph; all three module unit tiers call it. The check runs in both
+directions, which is what makes the document a burn-down list rather than a wish — an edge the
+tables do not allow is a failure, and so is an exception left standing for an edge that no longer
+exists, so the issue that removes an edge has to remove its row with it (#332). A new top-level
+`core` package fails the tier until the table says where it belongs. A fifth table lives in
+`src/core/OWNERSHIP.md`, one row per exported symbol any `core` package declares, `core/builtin`'s
+among them: `core/guard.AssertSymbolOwnership` reads it from the same three tiers, four
+justifications are computed from the reference graph and three are asserted with a note the guard
+requires (#385). Rule 8 walks the production closure of the three shipped mains, the auth server,
+the admin console and the setup wizard, and refuses `testing` and everything under it,
+`net/http/httptest` and every testify package, so a production import of a test helper or mock fails the unit tier rather than
+reaching a release, `net/http/pprof` and `expvar`, which register the process's profiles and
+variables on Go's default mux the moment they are linked (#462), and `golang.org/x/tools`, the
+package loading `core/pkgload` reads the tree through, so the loader stays developer tooling (#420);
+the three mains are `shippedMains`
 in `architecture.go`, and the guard fails when one is not found (#331). It reads each main with the
 `production` tag set because all three release builds set it, the setup wizard's since #463, and
 `TestReleaseBuilds_TheRealReleaseBuildsSetProduction` in core's tier holds them to it: every `go
 build` in the servers' cross-compile script, the two server Dockerfiles and the wizard's
 cross-compile script sets `production`, the mains they build are exactly `shippedMains`, and both
-scripts' `build_platform` calls equal `releaseTargets` as a set (#463). Beside it,
+scripts' `build_platform` calls equal `pkgload.ReleasePlatforms` as a set (#463). Beside it,
 `TestReleaseBuilds_TheRealStampsNameVariables` holds every `-ldflags -X` target in the same four
 files, the servers' script's `$LDFLAGS` read from its one assignment, to naming a package-level
 string variable a production build declares, `main.` resolved against the main its `go build`
@@ -146,8 +134,11 @@ the ports #387 gave them, and its call names
 beside it, because a package that declares a port nobody reaches is the same defect wherever it sits
 (#387, #437, #580, #498). Liveness is `go/types` object identity and not a matching spelling — a
 shadowed name and a same-named type in another package each count as nothing, which is how the
-census behind #333 first read `TCPConnectionTester` as live — and structural satisfaction does not
-count at all, since an interface no code names is what dead means here (#333).
+census behind #333 first read `TCPConnectionTester` as live, and a name a dot import brings in
+counts like any other — and structural satisfaction does not count at all, since an interface no
+code names is what dead means here (#333). The module is read through `core/pkgload` as the test
+machine's test build, so a reference the walk misses shows up as a false finding rather than a
+silent pass, and a package that does not type-check stops the guard (#420).
 
 ## Vacuous-assertion guard
 
@@ -156,12 +147,17 @@ testify `AssertNotCalled` to carrying one matcher per parameter of the method it
 `core/guard.AssertNotCalledArity`. testify matches a recorded call on the method name *and* the
 whole argument list, so `AssertNotCalled(t, "Log")` against a three-parameter `Log` compares lists
 that can never be equal and passes whatever the subject did; the compiler sees a variadic call and
-says nothing. Forty-one such sites shipped, one of them false since #241. The receiver is resolved
-with `go/types` rather than by spelling, because one method name can sit on two doubles at two
-arities (`CreateUser` is 3 on `Database` and 2 on `UserCreator`), and four shapes are reported
-rather than skipped: a method named through anything but a string literal, an unresolvable receiver,
-a name the double does not declare, and a variadic method. It does not widen to `AssertCalled`,
-whose arity mismatch fails loudly, or to `.On(...)`, where a stub matching nothing panics (#421).
+says nothing. Forty-one such sites shipped, one of them false since #241. A site is a call of
+testify's own method, so a method of that name on a type that is not a testify double is not one,
+and the receiver is resolved by type rather than by spelling, because one method name can sit on
+two doubles at two arities (`CreateUser` is 3 on `Database` and 2 on `UserCreator`). Each walked
+module is read through `core/pkgload` as the test machine's test build, and the rule tests'
+fixtures require the testify version `core` pins. Five shapes are reported rather than skipped: a
+method named through anything but a string literal, a name the double does not declare, a variadic
+method, matchers spread from a slice with `...`, whose number the call does not show, and a call on
+a `Mock` field, `d.Mock.AssertNotCalled`, rather than on the double. It does not widen to
+`AssertCalled`, whose arity mismatch fails loudly, or to `.On(...)`, where a stub matching nothing
+panics (#421).
 
 ## Core symbol ownership table
 
@@ -169,6 +165,16 @@ whose arity mismatch fails loudly, or to `.On(...)`, where a stub matching nothi
 moving one has one more step: `cd src/core && go run ./cmd/ownershipdump`, and commit it. It refuses
 to invent a justification, so the answer is to move the symbol or to write `test-support`,
 `contract` or `moving` with the reason. The lint tier runs it and fails on a tree it changed.
+
+The census reads the tree through `core/pkgload`, type-checked, and a reference is the object an
+identifier resolves to, whatever the file spells: a dot import counts, and a local spelled like a
+symbol does not. Production references, and the packages a binary links from every production
+`main`, are read as each release build selects them, so a file only one platform compiles still
+counts. A production reference contradicts a `test-support` row only where a binary of the same
+build links its package. Test references come from the test machine's test build. A package that
+does not type-check stops the guard and `ownershipdump` with one message naming it. Every fixture
+tree of the census therefore compiles, and its helper makes the tree loadable with
+`pkgload.MakeLoadable`.
 
 ## Generated mocks
 

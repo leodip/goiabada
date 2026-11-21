@@ -1,13 +1,10 @@
 package refgraph
 
 import (
-	"bytes"
 	"fmt"
 	"go/ast"
-	"go/parser"
 	"go/token"
 	"go/types"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -15,24 +12,27 @@ import (
 	"strings"
 
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/pkgload"
+	"github.com/leodip/goiabada/core/sourceroot"
+	"golang.org/x/tools/go/packages"
 )
 
-// The justifications a row of ARCHITECTURE.md's core constants table may carry, strongest first,
-// which core/guard's constants guard checks. A row states the strongest claim the tree backs,
-// which is what keeps contract honest: it is reachable only when none of the other three holds, so
-// writing it is a claim a reviewer can argue with rather than a shrug.
+// Four of the seven justifications, the ones that answer whether a symbol belongs in core at all,
+// strongest first. A row states the strongest claim the tree backs, which is what keeps contract
+// honest: it is reachable only when none of the other three holds, so writing it is a claim a
+// reviewer can argue with rather than a shrug.
 const (
-	// JustificationKernel: a kernel core package references it in production, so rule 2 forbids it
+	// justificationKernel: a kernel core package references it in production, so rule 2 forbids it
 	// leaving whatever the applications do.
-	JustificationKernel = "kernel"
-	// JustificationBothApps: both applications reference it in production.
-	JustificationBothApps = "both-apps"
-	// JustificationMoving: the only core packages referencing it are ones on their way out of core,
+	justificationKernel = "kernel"
+	// justificationBothApps: both applications reference it in production.
+	justificationBothApps = "both-apps"
+	// justificationMoving: the only core packages referencing it are ones on their way out of core,
 	// so the answer expires with them. The issue cell names the move that ends it.
-	JustificationMoving = "moving"
-	// JustificationContract: none of the above, but it is an intentionally stable cross-process
+	justificationMoving = "moving"
+	// justificationContract: none of the above, but it is an intentionally stable cross-process
 	// value. Nothing can check this, which is exactly why somebody has to write the word.
-	JustificationContract = "contract"
+	justificationContract = "contract"
 )
 
 // The fifth table, and the first one that is not in ARCHITECTURE.md: one row per exported symbol
@@ -56,10 +56,7 @@ const ownershipDoc = "core/OWNERSHIP.md"
 // it is free to change without touching the parser. Same arrangement as the four in ARCHITECTURE.md.
 const symbolOwnershipHeading = "### Core symbol ownership"
 
-// The three justifications this table adds to the constants table's four above.
-// JustificationKernel, JustificationBothApps, JustificationContract and JustificationMoving are
-// shared with that table deliberately: the two answer the same question at two grains, and a
-// reader should not have to learn two vocabularies to read them.
+// The other three, which answer whether a symbol belongs to the package declaring it.
 const (
 	// justificationOwnPackage: the declaring package's own production code names it, from a
 	// declaration that is itself justified. The table asks why core declares a symbol, which is
@@ -90,22 +87,22 @@ const (
 // legal only where the tree offers no computed answer at all.
 var assertedJustifications = map[string]bool{
 	justificationTestSupport: true,
-	JustificationContract:    true,
-	JustificationMoving:      true,
+	justificationContract:    true,
+	justificationMoving:      true,
 }
 
 // justificationStrength orders the computed words. A row states the strongest the tree backs,
 // which is what keeps the weaker ones honest: reachable is reachable only where own-package does
 // not hold.
 var justificationStrength = map[string]int{
-	JustificationKernel:     4,
-	JustificationBothApps:   3,
+	justificationKernel:     4,
+	justificationBothApps:   3,
 	justificationOwnPackage: 2,
 	justificationReachable:  1,
 }
 
-// issueInNote matches the "#385" form a moving note has to carry. issueRef is anchored because the
-// constants table's issue cell holds nothing else; a note is prose with an issue somewhere in it.
+// issueInNote matches the "#385" form a moving note has to carry. It is not anchored, because a
+// note is prose with an issue somewhere in it.
 var issueInNote = regexp.MustCompile(`#\d+`)
 
 // symbolKey identifies one row: the declaring package as a directory relative to the source root,
@@ -138,36 +135,36 @@ type symbolCensus struct {
 	corePkgs map[symbolKey]map[string]bool
 	apps     map[symbolKey]map[string]bool
 	tests    map[symbolKey]bool
-	// linkedApps records, per symbol, the modules naming it in production from a package one of
-	// their binaries actually links. It is the same evidence as apps, narrowed, and only a
-	// test-support row reads it.
+	// linkedCore and linkedApps record, per symbol, the core packages and the modules naming it
+	// in production from a package a binary of the same release build links. They are the same
+	// evidence as corePkgs and apps, narrowed, and only a test-support row reads them. Linkage and
+	// reference are paired build by build: a package one platform links and a reference only
+	// another platform compiles ship together in no binary.
+	linkedCore map[symbolKey]map[string]bool
 	linkedApps map[symbolKey]map[string]bool
-	// linked is every package directory a shipped binary reaches through production imports.
-	linked map[string]bool
 	// pkgs carries each package's internal shape: what it declares, what each top-level
 	// declaration names, and the type of each package-level const and var.
 	pkgs map[string]*packageSymbols
+	// dirs maps a core package's import path to its directory, which is how an object's package
+	// becomes the row it backs.
+	dirs map[string]string
 }
 
 // packageSymbols is one core package as the resolver reads it.
 type packageSymbols struct {
-	// name is the package clause its production files carry, which is the identifier an unaliased
-	// import of it binds. Go binds the declared name and not the last segment of the import path,
-	// and a package named for something other than its directory is read through that name
-	// everywhere: by the applications importing it, and by its own external tests.
-	name     string
 	exported map[string]bool
 	// nodes is one entry per top-level declaration owner: a function by its name, a method by its
 	// receiver type, a type by its name, a const or var by each name it introduces. Unexported
 	// owners are nodes too, because an exported symbol reached only through an unexported helper
 	// is still reached.
 	nodes map[string]*declNode
-	// valueType maps a package-level const or var to the same-package named type it is declared
+	// valueType maps a package-level const or var to the same-package named types it is declared
 	// with, including the type a const inherits from the nearest preceding ValueSpec carrying one.
 	// That inheritance is the Go spec's, and reading the syntax spec-by-spec instead once
 	// misclassified gender.Female, Male and Other as test-only while Gender was both-apps, caught
-	// during #385.
-	valueType map[string]string
+	// during #385. It is a set because each release build's declaration is read into the one record,
+	// and two platforms' files can declare the value with different types.
+	valueType map[string]map[string]bool
 	// ownRefs is every package-level name the package's own production code reaches, from any
 	// declaration, justified or not. Only a test-support row reads it.
 	ownRefs map[string]bool
@@ -216,12 +213,7 @@ func CheckOwnership(root string) (OwnershipCheck, error) {
 
 	rows, findings := parseSymbolOwnershipDoc(string(doc))
 
-	graph, err := BuildImportGraph(root)
-	if err != nil {
-		return OwnershipCheck{}, errs.Wrapf(err, "reading the import graph under %s", root)
-	}
-
-	census, err := buildSymbolCensus(root, graph)
+	census, err := buildSymbolCensus(root)
 	if err != nil {
 		return OwnershipCheck{}, errs.Wrapf(err, "reading the core symbol census under %s", root)
 	}
@@ -356,7 +348,7 @@ func checkSymbolRow(row symbolRow, census *symbolCensus, computed string) []stri
 		return []string{fmt.Sprintf(
 			"core symbols: %s:%d records %s as %s, but nothing in the tree backs a computed justification for it: %s; either move the symbol out of core or assert %s, %s or %s with a note",
 			ownershipDoc, row.line, row.key(), row.justification, census.evidenceFor(row.key(), ""),
-			justificationTestSupport, JustificationContract, JustificationMoving)}
+			justificationTestSupport, justificationContract, justificationMoving)}
 	}
 
 	var findings []string
@@ -366,11 +358,11 @@ func checkSymbolRow(row symbolRow, census *symbolCensus, computed string) []stri
 			ownershipDoc, row.line, row.justification, row.key()))
 	}
 	switch row.justification {
-	case JustificationMoving:
+	case justificationMoving:
 		if !issueInNote.MatchString(row.note) {
 			findings = append(findings, fmt.Sprintf(
 				"core symbols: %s:%d records %s as %s but its note names no issue; a justification that expires has to say when",
-				ownershipDoc, row.line, row.key(), JustificationMoving))
+				ownershipDoc, row.line, row.key(), justificationMoving))
 		}
 	case justificationTestSupport:
 		if linked := census.linkedReferrers(row.key()); len(linked) > 0 {
@@ -416,10 +408,8 @@ func (c *symbolCensus) productionReferrersOutside(key symbolKey) []string {
 // a shipped binary is shipped.
 func (c *symbolCensus) linkedReferrers(key symbolKey) []string {
 	var out []string
-	for pkg := range c.corePkgs[key] {
-		if c.linked[pkg] {
-			out = append(out, pkg)
-		}
+	for pkg := range c.linkedCore[key] {
+		out = append(out, pkg)
 	}
 	for app := range c.linkedApps[key] {
 		out = append(out, app)
@@ -494,9 +484,9 @@ func (c *symbolCensus) computeJustifications() map[symbolKey]string {
 	for _, key := range c.declared {
 		switch {
 		case len(c.corePkgs[key]) > 0:
-			best[key] = JustificationKernel
+			best[key] = justificationKernel
 		case c.apps[key]["authserver"] && c.apps[key]["adminconsole"]:
-			best[key] = JustificationBothApps
+			best[key] = justificationBothApps
 		}
 	}
 
@@ -527,12 +517,18 @@ func (c *symbolCensus) computeJustifications() map[symbolKey]string {
 					changed = true
 				}
 			}
-			for name, typeName := range pkg.valueType {
-				if !pkg.exported[name] || best[symbolKey{pkg: dir, name: typeName}] == "" {
+			for name, typeNames := range pkg.valueType {
+				if !pkg.exported[name] {
 					continue
 				}
-				if set(symbolKey{pkg: dir, name: name}, justificationReachable) {
-					changed = true
+				for typeName := range typeNames {
+					if best[symbolKey{pkg: dir, name: typeName}] == "" {
+						continue
+					}
+					if set(symbolKey{pkg: dir, name: name}, justificationReachable) {
+						changed = true
+					}
+					break
 				}
 			}
 		}
@@ -560,72 +556,81 @@ func (c *symbolCensus) spread(dir string, pkg *packageSymbols, names map[string]
 
 // ---- the census ----------------------------------------------------------------------------
 
-// buildSymbolCensus reads every core package's exported declarations and internal reference graph,
-// then every production and test reference to them from anywhere in the tree.
+// buildSymbolCensus loads the four modules type-checked through core/pkgload, and reads from those
+// packages every core package's exported declarations and internal reference graph, then every
+// production and test reference to them from anywhere in the tree.
 //
-// ceiling: a reference from outside the declaring package is a selector on the identifier the
-// import binds, resolved by name within the file, exactly as core/guard's constants census reads
-// one. A package-level declaration shadowing that name is caught, because the parser resolves it; a local
-// variable inside a function shadowing it would be read as the package. Nothing in this tree does
-// that, and closing it means type-checking every package in four modules rather than parsing them.
-// Revisit if a row ever rests on a reference that turns out to be a false one (#385).
+// A reference is an identifier the type checker resolved to a core symbol, which is an object
+// declared at the package level of a core package: the declaring package and the name are the row
+// it backs. Reading the object rather than the spelling is what makes a dot import a reference like
+// any other, and a local, a parameter or a field spelled like a package or a symbol no reference at
+// all. It is also what lets a test variant, the package type-checked a second time with its own
+// tests, back the same rows as the package itself (#420).
 //
-// References from inside the declaring package are not read that way, because there they carry no
-// selector and an unqualified identifier matched by spelling is the over-count that matters: a
-// local, a parameter, a struct field, a struct-literal key or a label sharing an exported symbol's
-// name would justify it, and this tree already has that shape -- core/guard declares a type
-// Address and a field named Address. Those are resolved with go/types over each package's own
-// syntax instead, production files and internal test files alike, so an identifier counts only
-// when it resolves to the declared object.
+// Production code is read as every release build selects it, pkgload.ReleaseBuilds: the
+// declarations, the references from outside the declaring package, and the packages a binary
+// links. A production reference in a file only another platform compiles is still shipped, and it
+// can be the one that contradicts a test-support row. Test references are read from the test build
+// of the machine the census runs on, since a test for another platform does not run there (#420
+// decision 11). A file only a race build or a custom tag selects is read by neither.
 //
-// ceiling: the go/types pass runs with a stub importer, so nothing an import contributes is
-// resolved and every selector on an imported package is an error the checker is told to continue
-// past. In-package name resolution does not depend on imports, so Uses and Defs are sound for
-// exactly the identifiers this arm reads. A dot import would break that, and this tree has none.
-// Revisit if a dot import is ever written under src/, which would need a real importer here rather
-// than a stub (#385).
-func buildSymbolCensus(root string, graph *ImportGraph) (*symbolCensus, error) {
+// A package that does not load or type-check stops the census with pkgload's error naming it: a
+// reading of a half-checked tree misses references, and a table written from it would be wrong
+// (#420 decision 3). A module the build selects no package of holds none.
+func buildSymbolCensus(root string) (*symbolCensus, error) {
+	abs, err := filepath.Abs(root)
+	if err != nil {
+		return nil, errs.Wrapf(err, "resolving %s", root)
+	}
 	census := &symbolCensus{
 		corePkgs:   map[symbolKey]map[string]bool{},
 		apps:       map[symbolKey]map[string]bool{},
 		tests:      map[symbolKey]bool{},
+		linkedCore: map[symbolKey]map[string]bool{},
 		linkedApps: map[symbolKey]map[string]bool{},
 		pkgs:       map[string]*packageSymbols{},
+		dirs:       map[string]string{},
 	}
 
-	linked, err := linkedPackages(root, graph)
+	builds := append(pkgload.ReleaseBuilds(), pkgload.Build{Tests: true})
+	loaded, err := loadTree(abs, builds)
 	if err != nil {
 		return nil, err
 	}
-	census.linked = linked
+	release, tests := loaded[:len(builds)-1], loaded[len(builds)-1]
 
-	dirs, err := corePackageDirs(root)
-	if err != nil {
-		return nil, err
+	// A platform's build adds what only its own files declare, so every build of a package is read
+	// into the one record its directory has.
+	for _, pkgs := range release {
+		for _, lp := range pkgs {
+			if !isCoreDir(lp.dir) {
+				continue
+			}
+			pkg := census.pkgs[lp.dir]
+			if pkg == nil {
+				pkg = newPackageSymbols()
+				census.pkgs[lp.dir] = pkg
+			}
+			census.dirs[lp.pkg.PkgPath] = lp.dir
+			for _, file := range lp.pkg.Syntax {
+				for _, decl := range file.Decls {
+					readDecl(pkg, decl, lp.pkg.Types.Scope(), lp.pkg.TypesInfo)
+				}
+			}
+		}
 	}
-
-	// byImportPath lets the reference walk below turn an import into the package directory whose
-	// row the reference backs.
-	byImportPath := map[string]string{}
-	for _, dir := range dirs {
-		pkg, err := readPackageSymbols(root, dir)
-		if err != nil {
-			return nil, err
+	for dir, pkg := range census.pkgs {
+		for _, node := range pkg.nodes {
+			for name := range node.decl {
+				pkg.ownRefs[name] = true
+			}
+			for name := range node.body {
+				pkg.ownRefs[name] = true
+			}
 		}
-		census.pkgs[dir] = pkg
-		if len(pkg.exported) == 0 {
-			// A package declaring nothing exported owns no row and nothing can select off it.
-			// core/countries/generate and core/timezones/generate are both package main whose
-			// only exported spellings sit inside a raw string template.
-			continue
-		}
-		importPath, hasPath := graph.ImportPath(dir)
-		if hasPath {
-			byImportPath[importPath] = dir
-		}
-		if err := census.readOwnPackageTests(root, dir, importPath); err != nil {
-			return nil, err
-		}
+		// A package declaring nothing exported owns no row. core/countries/generate and
+		// core/timezones/generate are both package main whose only exported spellings sit inside
+		// a raw string template.
 		for name := range pkg.exported {
 			census.declared = append(census.declared, symbolKey{pkg: dir, name: name})
 		}
@@ -637,137 +642,67 @@ func buildSymbolCensus(root string, graph *ImportGraph) (*symbolCensus, error) {
 		return census.declared[i].name < census.declared[j].name
 	})
 
-	if err := census.readReferences(root, graph, byImportPath); err != nil {
-		return nil, err
+	for _, pkgs := range release {
+		linked := linkedPackages(pkgs)
+		for _, lp := range pkgs {
+			census.readProductionReferences(lp, linked[lp.dir])
+		}
+	}
+	testOnly := testOnlyDeclarations(tests)
+	for _, lp := range tests {
+		census.readTestReferences(lp, testOnly)
 	}
 	return census, nil
 }
 
-// corePackageDirs lists every directory under core holding at least one production Go file that
-// some build includes, as a directory relative to the source root. Recursive, because decision 15
-// grants no package-level exemption and a symbol in a subdirectory is still a symbol core declares.
-// The generated mock subpackages drop out here rather than by name: every file in them carries
-// //go:build !production, which is the rule that already excludes them everywhere else.
-func corePackageDirs(root string) ([]string, error) {
-	seen := map[string]bool{}
-	err := filepath.WalkDir(filepath.Join(root, "core"), func(path string, d fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
-		}
-		if d.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
-			return nil
-		}
-		fset := token.NewFileSet()
-		file, pErr := parser.ParseFile(fset, path, nil, parser.PackageClauseOnly|parser.ParseComments)
-		if pErr != nil {
-			// A file that does not parse is a compile error the build tier owns, and reporting it
-			// here would send the reader to the wrong place.
-			return nil
-		}
-		if ExemptByBuildConstraint(file, fset) {
-			return nil
-		}
-		rel, relErr := filepath.Rel(root, filepath.Dir(path))
-		if relErr != nil {
-			return errs.Wrapf(relErr, "relating %s to %s", path, root)
-		}
-		seen[filepath.ToSlash(rel)] = true
-		return nil
-	})
-	if err != nil {
-		return nil, errs.Wrapf(err, "walking the core module under %s", root)
-	}
-
-	dirs := make([]string, 0, len(seen))
-	for dir := range seen {
-		dirs = append(dirs, dir)
-	}
-	sort.Strings(dirs)
-	return dirs, nil
+// loadedPackage is one package a build of the tree holds, with its directory relative to the
+// source root, which is how the table names a package.
+type loadedPackage struct {
+	dir string
+	pkg *packages.Package
 }
 
-// readPackageSymbols type-checks one core package's production files and reads its exported
-// declarations, its internal reference graph and the declared type of each package-level value.
-func readPackageSymbols(root, dir string) (*packageSymbols, error) {
-	abs := filepath.Join(root, filepath.FromSlash(dir))
-	entries, err := os.ReadDir(abs)
+// loadTree loads every package of the four modules for each build, one slice per build in the
+// order given. The first load error in build and then module order is the one returned. A package
+// whose files are not under the root is the go command's own, a test binary's generated main, and
+// names nothing.
+func loadTree(root string, builds []pkgload.Build) ([][]loadedPackage, error) {
+	var dirs []string
+	for _, module := range sourceroot.ModuleDirs() {
+		dirs = append(dirs, filepath.Join(root, filepath.FromSlash(module)))
+	}
+	loaded, err := pkgload.LoadBuilds(builds, dirs...)
 	if err != nil {
-		return nil, errs.Wrapf(err, "reading %s", dir)
+		return nil, err
 	}
 
-	fset := token.NewFileSet()
-	var files []*ast.File
-	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".go") || strings.HasSuffix(entry.Name(), "_test.go") {
-			continue
+	out := make([][]loadedPackage, len(builds))
+	for b, pkgs := range loaded {
+		for _, p := range pkgs {
+			if len(p.GoFiles) == 0 {
+				continue
+			}
+			rel, err := filepath.Rel(root, filepath.Dir(p.GoFiles[0]))
+			if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+				continue
+			}
+			out[b] = append(out[b], loadedPackage{dir: filepath.ToSlash(rel), pkg: p})
 		}
-		file, pErr := parser.ParseFile(fset, filepath.Join(abs, entry.Name()), nil, parser.ParseComments)
-		if pErr != nil {
-			return nil, errs.Wrapf(pErr, "parsing %s/%s", dir, entry.Name())
-		}
-		if ExemptByBuildConstraint(file, fset) {
-			continue
-		}
-		files = append(files, file)
 	}
+	return out, nil
+}
 
-	pkg := &packageSymbols{
+func newPackageSymbols() *packageSymbols {
+	return &packageSymbols{
 		exported:  map[string]bool{},
 		nodes:     map[string]*declNode{},
-		valueType: map[string]string{},
+		valueType: map[string]map[string]bool{},
 		ownRefs:   map[string]bool{},
 	}
-	if len(files) == 0 {
-		return pkg, nil
-	}
-	pkg.name = files[0].Name.Name
-
-	scope, info := checkPackage(fset, dir, files)
-	for _, file := range files {
-		for _, decl := range file.Decls {
-			readDecl(pkg, decl, scope, info)
-		}
-	}
-	for _, node := range pkg.nodes {
-		for name := range node.decl {
-			pkg.ownRefs[name] = true
-		}
-		for name := range node.body {
-			pkg.ownRefs[name] = true
-		}
-	}
-	return pkg, nil
 }
 
-// stubImporter answers every import with an empty package of the right name. Nothing this census
-// reads comes from an import, so resolving them would buy nothing and cost the whole dependency
-// graph of four modules on every unit tier.
-type stubImporter struct{}
-
-func (stubImporter) Import(path string) (*types.Package, error) {
-	name := path[strings.LastIndex(path, "/")+1:]
-	pkg := types.NewPackage(path, name)
-	pkg.MarkComplete()
-	return pkg, nil
-}
-
-// checkPackage runs go/types over one package's own syntax and returns its package scope and the
-// identifier resolution. Errors are collected and ignored: with a stub importer every selector on
-// an imported package is one, and a non-nil Error is what makes the checker continue past them
-// rather than stop at the first.
-func checkPackage(fset *token.FileSet, dir string, files []*ast.File) (*types.Scope, *types.Info) {
-	conf := types.Config{
-		Importer:                 stubImporter{},
-		Error:                    func(error) {},
-		DisableUnusedImportCheck: true,
-		IgnoreFuncBodies:         false,
-	}
-	info := &types.Info{Uses: map[*ast.Ident]types.Object{}}
-	pkg, _ := conf.Check(dir, fset, files, info)
-	if pkg == nil {
-		return types.NewScope(nil, 0, 0, dir), info
-	}
-	return pkg.Scope(), info
+func isCoreDir(dir string) bool {
+	return dir == "core" || strings.HasPrefix(dir, "core/")
 }
 
 // readDecl records one top-level declaration: the names it introduces, and the package-level names
@@ -792,7 +727,7 @@ func readDecl(pkg *packageSymbols, decl ast.Decl, scope *types.Scope, info *type
 		// type it hangs off: what it reaches, its receiver reaches. The receiver field itself is
 		// never read, which is the first of the two shapes that would otherwise let a package
 		// justify itself.
-		name := receiverTypeName(d.Recv)
+		name := receiverTypeName(d, info)
 		if name == "" {
 			return
 		}
@@ -854,7 +789,10 @@ func readDecl(pkg *packageSymbols, decl ast.Decl, scope *types.Scope, info *type
 						value = values[i]
 					}
 					if named != "" {
-						pkg.valueType[name.Name] = named
+						if pkg.valueType[name.Name] == nil {
+							pkg.valueType[name.Name] = map[string]bool{}
+						}
+						pkg.valueType[name.Name][named] = true
 					}
 					// head is the expression whose head spells this name's own type. For the
 					// positional form that is the name's own value; for the tuple form it is the
@@ -903,35 +841,27 @@ func (p *packageSymbols) node(name string) *declNode {
 	return node
 }
 
-// receiverTypeName returns the base type name a method hangs off, with any pointer, any
-// parentheses and any type parameters stripped.
-//
-// Parentheses are part of that list because Go accepts `func (l *(Level)) Build()` and gofmt
-// preserves them between the pointer and its base, so nothing this repository runs would flag the
-// spelling. Left unstripped it is not a name, and readDecl discards the method instead of
-// attributing it -- which loses every edge that method carries and asks a human to assert a symbol
-// the tree justifies. Final review round 5, finding 4 (#385).
-func receiverTypeName(recv *ast.FieldList) string {
-	if recv == nil || len(recv.List) == 0 {
+// receiverTypeName returns the name of the type a method hangs off, read from the method's own
+// object, so a pointer, parentheses and type parameters around the receiver's spelling change
+// nothing. A method go/types gave no named receiver is discarded.
+func receiverTypeName(d *ast.FuncDecl, info *types.Info) string {
+	fn, ok := info.Defs[d.Name].(*types.Func)
+	if !ok {
 		return ""
 	}
-	expr := recv.List[0].Type
-	for {
-		switch t := expr.(type) {
-		case *ast.StarExpr:
-			expr = t.X
-		case *ast.ParenExpr:
-			expr = t.X
-		case *ast.IndexExpr:
-			expr = t.X
-		case *ast.IndexListExpr:
-			expr = t.X
-		case *ast.Ident:
-			return t.Name
-		default:
-			return ""
-		}
+	recv := fn.Type().(*types.Signature).Recv()
+	if recv == nil {
+		return ""
 	}
+	t := types.Unalias(recv.Type())
+	if ptr, isPtr := t.(*types.Pointer); isPtr {
+		t = types.Unalias(ptr.Elem())
+	}
+	named, isNamed := t.(*types.Named)
+	if !isNamed {
+		return ""
+	}
+	return named.Obj().Name()
 }
 
 // namedValueType returns the same-package named type a package-level const or var has, or "" when
@@ -1053,251 +983,140 @@ func collectExcept(pkg *packageSymbols, into map[string]bool, node ast.Node, own
 	}
 }
 
-// readReferences walks the whole tree for references to core symbols from outside their declaring
-// package, and for the test references that are the other half of a test-support row.
-func (c *symbolCensus) readReferences(root string, graph *ImportGraph, byImportPath map[string]string) error {
-	corePath := graph.Modules["core"]
-	if corePath == "" {
-		return errs.Errorf("the import graph knows no core module")
+// symbolOf returns the row an object backs: a symbol a core package declares at its package level
+// and exports. A method, a field, a local and anything another module declares back none. An
+// instantiated generic function or variable backs the row of the declaration it instantiates.
+func (c *symbolCensus) symbolOf(obj types.Object) (symbolKey, bool) {
+	switch o := obj.(type) {
+	case *types.Func:
+		obj = o.Origin()
+	case *types.Var:
+		obj = o.Origin()
 	}
-
-	return filepath.WalkDir(root, func(path string, d fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
-		}
-		if d.IsDir() || !strings.HasSuffix(path, ".go") {
-			return nil
-		}
-		rel, relErr := filepath.Rel(root, path)
-		if relErr != nil {
-			return errs.Wrapf(relErr, "relating %s to %s", path, root)
-		}
-		dir := filepath.ToSlash(filepath.Dir(rel))
-		isTest := strings.HasSuffix(path, "_test.go")
-
-		content, readErr := os.ReadFile(path)
-		if readErr != nil {
-			return errs.Wrapf(readErr, "reading %s", path)
-		}
-		// A file not containing the core module path cannot import a core package, so it cannot
-		// name a symbol from one. A declaring package's own tests name their symbols with no
-		// import at all, and readOwnPackageTests has already read those.
-		if !bytes.Contains(content, []byte(corePath)) {
-			return nil
-		}
-
-		fset := token.NewFileSet()
-		file, pErr := parser.ParseFile(fset, path, content, parser.ParseComments)
-		if pErr != nil {
-			return nil
-		}
-		if !isTest && ExemptByBuildConstraint(file, fset) {
-			return nil
-		}
-
-		c.recordSelectors(dir, isTest, byImportPath, file)
-		return nil
-	})
+	if obj == nil || obj.Pkg() == nil || !obj.Exported() || obj.Pkg().Scope().Lookup(obj.Name()) != obj {
+		return symbolKey{}, false
+	}
+	dir, ok := c.dirs[obj.Pkg().Path()]
+	if !ok || !c.pkgs[dir].exported[obj.Name()] {
+		return symbolKey{}, false
+	}
+	return symbolKey{pkg: dir, name: obj.Name()}, true
 }
 
-// readOwnPackageTests records the symbols a core package's own tests name, which is the half of a
-// test-support row that the tree can supply rather than contradict.
-//
-// It is a per-package pass rather than a branch of the reference walk because the two kinds of
-// test file in a directory resolve a name two different ways. An internal test, whose clause is
-// the production package's own name, names a symbol unqualified, so it is type-checked together
-// with the production files and read by object identity, exactly as collect reads a production
-// declaration. An external test, whose clause is that name with `_test` on the end, is a different
-// package that reaches the symbol through the import, so it is read as a selector like any other
-// importing file.
-//
-// Reading the internal arm by spelling instead is what the final review caught: a local variable,
-// a parameter or a field spelled like an exported orphan made the orphan look named, so
-// test-support -- the one asserted word the tree can argue with -- would have parked dead code in
-// core behind a word the guard believed it had checked (#385).
-func (c *symbolCensus) readOwnPackageTests(root, dir, importPath string) error {
-	abs := filepath.Join(root, filepath.FromSlash(dir))
-	entries, err := os.ReadDir(abs)
-	if err != nil {
-		return errs.Wrapf(err, "reading %s", dir)
-	}
-
-	fset := token.NewFileSet()
-	var production, tests []*ast.File
-	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".go") {
+// readProductionReferences files every core symbol one production package names from outside the
+// symbol's own package under the core package or the module that named it, and also as linked
+// evidence when a binary of the build that loaded the package links it. A reference from inside
+// the declaring package is the internal graph's, which readDecl has read.
+func (c *symbolCensus) readProductionReferences(lp loadedPackage, linked bool) {
+	for _, obj := range lp.pkg.TypesInfo.Uses {
+		key, ok := c.symbolOf(obj)
+		if !ok || key.pkg == lp.dir {
 			continue
 		}
-		file, pErr := parser.ParseFile(fset, filepath.Join(abs, entry.Name()), nil, parser.ParseComments)
-		if pErr != nil {
-			// A file that does not parse is a compile error the build tier owns, exactly as in
-			// corePackageDirs.
+		if isCoreDir(lp.dir) {
+			addTo(c.corePkgs, key, lp.dir)
+			if linked {
+				addTo(c.linkedCore, key, lp.dir)
+			}
 			continue
 		}
-		if strings.HasSuffix(entry.Name(), "_test.go") {
-			tests = append(tests, file)
+		module := moduleOfDir(lp.dir)
+		if module == "" {
 			continue
 		}
-		if !ExemptByBuildConstraint(file, fset) {
-			production = append(production, file)
-		}
-	}
-
-	// Which of the two shapes a test file is, is decided by the declaring package's own name
-	// rather than by whether the test's package clause ends in `_test`. A production package may
-	// legally be named that way, and then its internal tests carry the same clause: the spelling
-	// sent them down the external arm, which looks for a self-import no internal test has, and the
-	// guard refused genuine evidence for test-support. The suffix is the fallback for a directory
-	// whose production files did not parse, where there is no name to compare against. Final
-	// review round 2, finding 2.
-	declared := ""
-	if len(production) > 0 {
-		declared = production[0].Name.Name
-	}
-	var internal, external []*ast.File
-	for _, file := range tests {
-		isExternal := strings.HasSuffix(file.Name.Name, "_test")
-		if declared != "" {
-			isExternal = file.Name.Name != declared
-		}
-		if isExternal {
-			external = append(external, file)
-			continue
-		}
-		internal = append(internal, file)
-	}
-
-	pkg := c.pkgs[dir]
-	for _, file := range external {
-		// The self-import binds the declaring package's own name when it carries no alias, so an
-		// external test of a package named `odd_test` in core/odd writes `odd_test.Unused` and
-		// looking for `odd.Unused` finds nothing. Final review round 3, finding 4.
-		local, imports := LocalImportName(file, importPath, declared)
-		if !imports {
-			continue
-		}
-		for _, name := range SelectedNames(file, local) {
-			if pkg.exported[name] {
-				c.tests[symbolKey{pkg: dir, name: name}] = true
-			}
-		}
-	}
-
-	if len(internal) == 0 {
-		return nil
-	}
-	scope, info := checkPackage(fset, dir, append(production, internal...))
-	for _, file := range internal {
-		ast.Inspect(file, func(n ast.Node) bool {
-			ident, ok := n.(*ast.Ident)
-			if !ok || !pkg.exported[ident.Name] {
-				return true
-			}
-			if obj := info.Uses[ident]; obj != nil && obj.Parent() == scope {
-				c.tests[symbolKey{pkg: dir, name: ident.Name}] = true
-			}
-			return true
-		})
-	}
-	return nil
-}
-
-// recordSelectors reads the symbols one file selects off the core packages it imports, and files
-// each reference under the module or the core package that made it.
-func (c *symbolCensus) recordSelectors(dir string, isTest bool, byImportPath map[string]string, file *ast.File) {
-	for importPath, declaring := range byImportPath {
-		if declaring == dir {
-			continue
-		}
-		local, imports := LocalImportName(file, importPath, c.pkgs[declaring].name)
-		if !imports {
-			continue
-		}
-		for _, name := range SelectedNames(file, local) {
-			key := symbolKey{pkg: declaring, name: name}
-			if !c.pkgs[declaring].exported[name] {
-				continue
-			}
-			if isTest {
-				c.tests[key] = true
-				continue
-			}
-			if dir == "core" || strings.HasPrefix(dir, "core/") {
-				if c.corePkgs[key] == nil {
-					c.corePkgs[key] = map[string]bool{}
-				}
-				c.corePkgs[key][dir] = true
-				continue
-			}
-			module := moduleOfDir(dir)
-			if module == "" {
-				continue
-			}
-			if c.apps[key] == nil {
-				c.apps[key] = map[string]bool{}
-			}
-			c.apps[key][module] = true
-			if c.linked[dir] {
-				if c.linkedApps[key] == nil {
-					c.linkedApps[key] = map[string]bool{}
-				}
-				c.linkedApps[key][module] = true
-			}
+		addTo(c.apps, key, module)
+		if linked {
+			addTo(c.linkedApps, key, module)
 		}
 	}
 }
 
-// linkedPackages returns every package directory a shipped binary reaches, as directories relative
-// to the source root: each main package under the four modules, and everything its production
-// imports reach transitively.
+// readTestReferences records the core symbols one package of the test build names from its test
+// files, which is the half of a test-support row the tree can supply rather than contradict. The
+// declaring package's own tests count, internal and external alike: an internal test names a symbol
+// unqualified, an external one through the import, and both resolve to the symbol's object. An
+// internal test's own declaration of an exported name is no production symbol, even where a
+// release build's file declares the same name, so a reference to it, one of testOnly, is evidence
+// for nothing.
+func (c *symbolCensus) readTestReferences(lp loadedPackage, testOnly map[types.Object]bool) {
+	for ident, obj := range lp.pkg.TypesInfo.Uses {
+		if !inTestFile(lp.pkg.Fset, ident.Pos()) {
+			continue
+		}
+		if key, ok := c.symbolOf(obj); ok && !testOnly[obj] {
+			c.tests[key] = true
+		}
+	}
+}
+
+// testOnlyDeclarations returns the package-level objects the test build's test files declare, read
+// from each package's parsed source. An object's own position cannot say this: one another module
+// imports comes from export data, whose positions carry the file a //line directive names, so a
+// production declaration mapped to a _test.go name would read as a test's. A test-only declaration
+// is only ever visible to its own package and that package's external test, both in the same load,
+// so the object is the one their references resolve to.
+func testOnlyDeclarations(pkgs []loadedPackage) map[types.Object]bool {
+	testOnly := map[types.Object]bool{}
+	for _, lp := range pkgs {
+		scope := lp.pkg.Types.Scope()
+		for ident, obj := range lp.pkg.TypesInfo.Defs {
+			if obj != nil && obj.Parent() == scope && inTestFile(lp.pkg.Fset, ident.Pos()) {
+				testOnly[obj] = true
+			}
+		}
+	}
+	return testOnly
+}
+
+// inTestFile reports whether pos is in a _test.go file: the file itself, not one a //line directive
+// maps it to, since the directive moves where a diagnostic points and not which build compiles it.
+func inTestFile(fset *token.FileSet, pos token.Pos) bool {
+	return strings.HasSuffix(fset.PositionFor(pos, false).Filename, "_test.go")
+}
+
+// addTo records value in the set evidence holds for key.
+func addTo(evidence map[symbolKey]map[string]bool, key symbolKey, value string) {
+	if evidence[key] == nil {
+		evidence[key] = map[string]bool{}
+	}
+	evidence[key][value] = true
+}
+
+// linkedPackages returns every package directory a binary of one release build reaches, as
+// directories relative to the source root: each main package of the four modules as that build
+// selects it, developer commands included, and every first-party package its imports reach
+// transitively in the same build.
 //
 // Only a test-support row reads this, and it is what lets the word mean what ARCHITECTURE.md's
 // package table already says about core/guard -- "test support compiled into no binary". Test
-// support in this tree is written in files with no _test.go suffix, so "a production file names it" and "a binary ships it" are genuinely different questions, and
-// only the second one is the one test-support asks.
-func linkedPackages(root string, graph *ImportGraph) (map[string]bool, error) {
+// support in this tree is written in files with no _test.go suffix, so "a production file names
+// it" and "a binary ships it" are genuinely different questions, and only the second one is the one
+// test-support asks.
+func linkedPackages(pkgs []loadedPackage) map[string]bool {
+	linked := map[string]bool{}
+	byID := make(map[string]loadedPackage, len(pkgs))
 	var queue []string
-	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
+	for _, lp := range pkgs {
+		byID[lp.pkg.ID] = lp
+		if lp.pkg.Name == "main" {
+			queue = append(queue, lp.pkg.ID)
 		}
-		if d.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
-			return nil
-		}
-		fset := token.NewFileSet()
-		file, pErr := parser.ParseFile(fset, path, nil, parser.PackageClauseOnly|parser.ParseComments)
-		if pErr != nil || file.Name == nil || file.Name.Name != "main" || ExemptByBuildConstraint(file, fset) {
-			return nil
-		}
-		rel, relErr := filepath.Rel(root, filepath.Dir(path))
-		if relErr != nil {
-			return errs.Wrapf(relErr, "relating %s to %s", path, root)
-		}
-		if importPath, ok := graph.ImportPath(filepath.ToSlash(rel)); ok {
-			queue = append(queue, importPath)
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, errs.Wrapf(err, "finding the main packages under %s", root)
 	}
-
 	seen := map[string]bool{}
 	for len(queue) > 0 {
-		path := queue[0]
+		id := queue[0]
 		queue = queue[1:]
-		if seen[path] {
+		lp, firstParty := byID[id]
+		if !firstParty || seen[id] {
 			continue
 		}
-		seen[path] = true
-		queue = append(queue, graph.Prod[path]...)
+		seen[id] = true
+		linked[lp.dir] = true
+		for _, imported := range lp.pkg.Imports {
+			queue = append(queue, imported.ID)
+		}
 	}
-
-	linked := make(map[string]bool, len(seen))
-	for path := range seen {
-		linked[graph.RelPath(path)] = true
-	}
-	return linked, nil
+	return linked
 }
 
 // moduleOfDir names the module a directory belongs to the way the justifications do: the two
@@ -1345,13 +1164,9 @@ func RenderSymbolOwnership(root string) (string, []string, error) {
 		return "", nil, errs.Wrapf(err, "reading %s", ownershipDoc)
 	}
 
-	graph, err := BuildImportGraph(root)
+	census, err := buildSymbolCensus(root)
 	if err != nil {
-		return "", nil, err
-	}
-	census, err := buildSymbolCensus(root, graph)
-	if err != nil {
-		return "", nil, err
+		return "", nil, errs.Wrapf(err, "reading the core symbol census under %s", root)
 	}
 	if len(census.declared) == 0 {
 		return "", nil, errs.Errorf("found no exported declarations in any core package under %s", root)

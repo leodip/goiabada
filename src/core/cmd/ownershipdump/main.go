@@ -8,6 +8,9 @@
 // symbol: all three module unit tiers compare the committed table against the tree, and the lint
 // tier runs this command and fails on a tree it changed.
 //
+// It loads the four modules type-checked through core/pkgload, so a package that does not compile
+// stops it with a message naming the package, and nothing is written (#420).
+//
 // It writes the four computed justifications from the reference graph and preserves the three a
 // human asserts, together with every note. What it will not do is invent a justification: a symbol
 // the tree does not justify and nobody has argued for stops this command with a non-zero exit

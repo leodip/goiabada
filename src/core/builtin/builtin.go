@@ -4,7 +4,7 @@
 // seeder writes, a scope a token carries or a session name both processes read, so its spelling is
 // a contract between the two binaries rather than a choice either makes alone.
 //
-// ARCHITECTURE.md's rule 7 gives every exported symbol here a row saying why core declares it, so
+// src/core/OWNERSHIP.md gives every exported symbol here a row saying why core declares it, so
 // an identifier only one process names does not settle here by default (#351, #442).
 package builtin
 

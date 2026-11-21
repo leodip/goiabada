@@ -17,13 +17,13 @@ import (
 
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/internal/refgraph"
+	"github.com/leodip/goiabada/core/pkgload"
 )
 
 // AssertArchitecture holds the repository's module and package ownership rules to the tree they
-// describe. The rules themselves are not written here: they are the five tables in
+// describe. The rules themselves are not written here: they are the four tables in
 // ARCHITECTURE.md at the repository root, which this function parses and then checks against the
-// real tree — four against the import graph, and the fifth against the production references to
-// core/builtin. That file names each rule and carries the reasoning; this one decides.
+// real tree's import graph. That file names each rule and carries the reasoning; this one decides.
 //
 // Putting the data in the document rather than in Go is the same choice AssertAgentDocs made for
 // the ceremony's state roster (#252). A dependency rule is prose about code, and prose about code
@@ -71,21 +71,7 @@ func assertArchitecture(r Reporter, root string) {
 		r.Fatalf("found no production Go packages under %s", root)
 	}
 
-	census, err := buildBuiltinCensus(root, graph)
-	if err != nil {
-		r.Fatalf("reading the %s census under %s: %v", builtinPkgDir, root, err)
-	}
-	// The same silent failure as the empty graph, one table down. A census that read no
-	// declaration satisfies "every symbol has a row" for nothing at all, and a census that found no
-	// reference would rest every justification on an empty set.
-	if len(census.declared) == 0 {
-		r.Fatalf("found no exported declarations in %s under %s", builtinPkgDir, root)
-	}
-	if len(census.refs) == 0 {
-		r.Fatalf("found no production reference to any %s symbol under %s", builtinPkgDir, root)
-	}
-
-	// Rule 9's walk that reached nothing. A tree in which no shipped main is found links no test
+	// Rule 8's walk that reached nothing. A tree in which no shipped main is found links no test
 	// framework into any of them, so a source root resolved somewhere else, or all three mains
 	// renamed, would read as a clean tree. One missing of three is a finding instead: the other two
 	// are still walked, and the reader is owed what they say too.
@@ -100,7 +86,7 @@ func assertArchitecture(r Reporter, root string) {
 	}
 	for _, dir := range missing {
 		findings = append(findings, fmt.Sprintf(
-			"refused package: the shipped main %s holds no production Go file, so rule 9 walks nothing for it; if it moved, shippedMains in core/guard/architecture.go moves with it",
+			"refused package: the shipped main %s holds no production Go file, so rule 8 walks nothing for it; if it moved, shippedMains in core/guard/architecture.go moves with it",
 			dir))
 	}
 
@@ -111,7 +97,6 @@ func assertArchitecture(r Reporter, root string) {
 	findings = append(findings, loadFindings...)
 
 	findings = append(findings, checkArchitecture(tables, graph, external)...)
-	findings = append(findings, checkBuiltinOwnership(tables, graph, census)...)
 
 	sort.Strings(findings)
 	for _, f := range findings {
@@ -123,8 +108,7 @@ func assertArchitecture(r Reporter, root string) {
 const architectureDoc = "ARCHITECTURE.md"
 
 // The headings whose tables are data. Each is the deepest heading of its section, so the
-// prose above it is free to change without touching the parser. The fifth, builtinHeading,
-// is declared beside the checks that read it in builtin_ownership.go.
+// prose above it is free to change without touching the parser.
 const (
 	ownershipHeading      = "### Package ownership"
 	exceptionHeading      = "### Temporary exceptions"
@@ -134,30 +118,16 @@ const (
 
 // shippedMains are the binaries a release ships, as directories relative to the source root: the
 // auth server, the admin console and the setup wizard, the three release.yml builds and nothing
-// else. Rule 9 walks the production closure of each. They are listed here rather than found by
+// else. Rule 8 walks the production closure of each. They are listed here rather than found by
 // looking for package main, because schemadump, droptestdb, ownershipdump and the two generators
 // are main packages too, ship in no release, and may link what they like. Every release build of
-// all three sets the production tag, which is what lets rule 9 read each with production set;
+// all three sets the production tag, which is what lets rule 8 read each with production set;
 // TestReleaseBuilds_TheRealReleaseBuildsSetProduction holds the release scripts and Dockerfiles to
 // that, and fails while a main listed here has no release build listed there (#463).
 var shippedMains = []string{
 	"authserver/cmd/goiabada-authserver",
 	"adminconsole/cmd/goiabada-adminconsole",
 	"cmd/goiabada-setup",
-}
-
-// releaseTargets are the platforms every shipped main is built for: the five build_platform calls
-// in src/build/build-binaries.sh and in the setup tool's build-binaries.sh, the Docker images being
-// the first of them. Rule 9 asks the go command for each main's dependencies on every one, because
-// a package outside the four modules may import differently on each.
-// TestReleaseBuilds_TheRealReleaseBuildsSetProduction fails when either script's build_platform
-// calls differ from this list as a set (#463).
-var releaseTargets = []struct{ goos, goarch string }{
-	{"linux", "amd64"},
-	{"linux", "arm64"},
-	{"darwin", "amd64"},
-	{"darwin", "arm64"},
-	{"windows", "amd64"},
 }
 
 // The owner values a package row may carry. Their meanings are in ARCHITECTURE.md; what matters
@@ -192,7 +162,7 @@ type foreignRow struct {
 	line      int
 }
 
-// refusedPackageRow names a package rule 9 refuses in a shipped binary, together with every package
+// refusedPackageRow names a package rule 8 refuses in a shipped binary, together with every package
 // under it.
 type refusedPackageRow struct {
 	pkg  string
@@ -204,10 +174,9 @@ type architectureTables struct {
 	exceptions []exceptionRow
 	foreign    []foreignRow
 	refused    []refusedPackageRow
-	builtin    []builtinRow
 }
 
-// parseArchitectureDoc reads the five data tables. A malformed row is a finding rather than a
+// parseArchitectureDoc reads the four data tables. A malformed row is a finding rather than a
 // parse failure, so one bad cell reports itself instead of silently shortening a table and turning
 // every edge it covered into a violation.
 func parseArchitectureDoc(doc string) (architectureTables, []string) {
@@ -262,9 +231,9 @@ func parseArchitectureDoc(doc string) (architectureTables, []string) {
 		findings = append(findings, fmt.Sprintf("%s has no %q table", architectureDoc, refusedPackageHeading))
 	}
 	// The exception table may be empty, since an empty burn-down list is where it is meant to end.
-	// This one empty is rule 9 refusing nothing, which passes every tree.
+	// This one empty is rule 8 refusing nothing, which passes every tree.
 	if ok && len(refused) == 0 {
-		findings = append(findings, fmt.Sprintf("%s has an empty %q table, so rule 9 refuses nothing", architectureDoc, refusedPackageHeading))
+		findings = append(findings, fmt.Sprintf("%s has an empty %q table, so rule 8 refuses nothing", architectureDoc, refusedPackageHeading))
 	}
 	for _, row := range refused {
 		if len(row.Cells) != 2 {
@@ -272,18 +241,6 @@ func parseArchitectureDoc(doc string) (architectureTables, []string) {
 			continue
 		}
 		tables.refused = append(tables.refused, refusedPackageRow{pkg: row.Cells[0], line: row.Line})
-	}
-
-	builtinRows, ok := refgraph.TableUnder(lines, builtinHeading)
-	if !ok {
-		findings = append(findings, fmt.Sprintf("%s has no %q table", architectureDoc, builtinHeading))
-	}
-	for _, row := range builtinRows {
-		if len(row.Cells) != 3 {
-			findings = append(findings, fmt.Sprintf("%s:%d: a built-in identifiers row needs 3 cells, found %d", architectureDoc, row.Line, len(row.Cells)))
-			continue
-		}
-		tables.builtin = append(tables.builtin, builtinRow{symbol: row.Cells[0], justification: row.Cells[1], issue: row.Cells[2], line: row.Line})
 	}
 
 	return tables, findings
@@ -321,8 +278,8 @@ type edge struct {
 	to   string
 }
 
-// checkArchitecture runs rules 1 to 6 and 9 over the graph and returns their findings. external holds the imports of the packages outside the four modules that the shipped
-// mains reach, as compiledClosure reads them; rule 9 walks through them, and nil stops its walk at
+// checkArchitecture runs rules 1 to 6 and 8 over the graph and returns their findings. external holds the imports of the packages outside the four modules that the shipped
+// mains reach, as compiledClosure reads them; rule 8 walks through them, and nil stops its walk at
 // the edge of the four modules.
 func checkArchitecture(tables architectureTables, graph *refgraph.ImportGraph, external map[string][]string) []string {
 	findings := checkTableHygiene(tables, graph)
@@ -553,11 +510,12 @@ func isStdlib(importPath string) bool {
 	return !strings.Contains(first, ".")
 }
 
-// checkRefusedPackages is rule 9: no shipped main links a package the refused-package table refuses:
-// the test frameworks, and net/http/pprof and expvar, which publish the process's internals on Go's
-// default mux (#462). Test code is defined by the frameworks rather than by where a helper lives or
-// what it is called, so the rule needs no list of first-party helpers: a helper reaching testing or
-// testify is caught through the framework behind it, the moment it gains one (#331).
+// checkRefusedPackages is rule 8: no shipped main links a package the refused-package table refuses:
+// the test frameworks, net/http/pprof and expvar, which publish the process's internals on Go's
+// default mux (#462), and golang.org/x/tools, which core/pkgload reads the tree through (#420).
+// Test code is defined by the frameworks rather than by where a helper lives or what it is called,
+// so the rule needs no list of first-party helpers: a helper reaching testing or testify is caught
+// through the framework behind it, the moment it gains one (#331).
 //
 // The walk starts at each shipped main rather than at every production package of its module, which
 // is the difference from rule 5. The graph counts core/guard's untagged files as production, so a
@@ -639,13 +597,14 @@ func refusedPackagesReached(graph *refgraph.ImportGraph, external map[string][]s
 }
 
 // compiledClosure asks the go command for the production dependencies of every shipped main on
-// every release target, and returns the imports of each package outside the four modules, merged
-// across mains and targets. The source graph cannot supply those: it reads the four modules and
-// nothing else, so without this a test framework that a third-party dependency imports would be
-// linked into a release with nothing going red. First-party packages are left to the graph, which
-// reads them with every tag but production free rather than one target at a time.
+// every release platform, pkgload.ReleasePlatforms, and returns the imports of each package outside
+// the four modules, merged across mains and platforms. The source graph cannot supply those: it
+// reads the four modules and nothing else, so without this a test framework that a third-party
+// dependency imports would be linked into a release with nothing going red. First-party packages
+// are left to the graph, which reads them with every tag but production free rather than one
+// platform at a time.
 //
-// A package the go command cannot load is a finding rather than a skipped package, since rule 9
+// A package the go command cannot load is a finding rather than a skipped package, since rule 8
 // cannot see what it imports; on this tree that is a dependency missing from the module cache or a
 // build broken for one target, either of which the release would meet too. A main missing from
 // the graph is skipped here, because the reporting half already accounts for it.
@@ -658,10 +617,10 @@ func compiledClosure(root string, graph *refgraph.ImportGraph) (map[string][]str
 		if _, ok := shippedMainPackage(graph, dir); !ok {
 			continue
 		}
-		for _, target := range releaseTargets {
-			pkgs, err := goListDeps(filepath.Join(root, filepath.FromSlash(dir)), target.goos, target.goarch)
+		for _, target := range pkgload.ReleasePlatforms() {
+			pkgs, err := goListDeps(filepath.Join(root, filepath.FromSlash(dir)), target)
 			if err != nil {
-				return nil, nil, errs.Wrapf(err, "%s on %s/%s", dir, target.goos, target.goarch)
+				return nil, nil, errs.Wrapf(err, "%s on %s", dir, target)
 			}
 			for _, p := range pkgs {
 				if p.Error != nil {
@@ -669,8 +628,8 @@ func compiledClosure(root string, graph *refgraph.ImportGraph) (map[string][]str
 					if !reported[key] {
 						reported[key] = true
 						findings = append(findings, fmt.Sprintf(
-							"refused package: the go command cannot load %s for %s on %s/%s, so rule 9 cannot see what it imports: %s",
-							p.ImportPath, dir, target.goos, target.goarch, strings.TrimSpace(p.Error.Err)))
+							"refused package: the go command cannot load %s for %s on %s, so rule 8 cannot see what it imports: %s",
+							p.ImportPath, dir, target, strings.TrimSpace(p.Error.Err)))
 					}
 					continue
 				}
@@ -702,12 +661,12 @@ type listedPackage struct {
 //
 // The context is Background because the reporting half holds none: a Reporter is Helper, Errorf
 // and Fatalf, and the tier's own timeout is what bounds the run.
-func goListDeps(dir, goos, goarch string) ([]listedPackage, error) {
+func goListDeps(dir string, target pkgload.Platform) ([]listedPackage, error) {
 	cmd := exec.CommandContext(context.Background(),
 		"go", "list", "-e", "-deps", "-tags", "production", "-json=ImportPath,Imports,Error", ".")
 	cmd.Dir = dir
-	cmd.Env = append(os.Environ(),
-		"GOOS="+goos, "GOARCH="+goarch, "CGO_ENABLED=0", "GOFLAGS=-mod=readonly", "GOWORK=off")
+	cmd.Env = append(append(os.Environ(),
+		"GOOS="+target.GOOS, "GOARCH="+target.GOARCH, "GOFLAGS=-mod=readonly", "GOWORK=off"), pkgload.ReleaseEnv()...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr

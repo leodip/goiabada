@@ -1,9 +1,8 @@
 package guard
 
 // Seam: bindImports, the resolver the call-site guards share -- AssertNoLegacyErrors,
-// AssertSlogConvention, AssertAuditLogContext and AssertRequestPathContext over a call, and
-// AssertNotCalledArity over a struct's embedded field. Each of them asks one question of a
-// selector, "is its left side the package at this path", and each answer is only as good as the
+// AssertSlogConvention, AssertAuditLogContext and AssertRequestPathContext, each over a call. Each
+// of them asks one question of a selector, "is its left side the package at this path", and each answer is only as good as the
 // name the import is read as binding.
 //
 // The rows below are the resolver itself, over source text rather than a tree, because it is a
@@ -14,8 +13,10 @@ package guard
 
 import (
 	"go/ast"
+	"go/build"
 	"go/parser"
 	"go/token"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -147,13 +148,12 @@ import (
 }
 
 // watchedTables is every table bindImports is called with in production, so the two tests below
-// hold all four rather than whichever one was remembered.
+// hold all three rather than whichever one was remembered.
 func watchedTables() map[string]watchedImports {
 	return map[string]watchedImports{
-		"errorsWatchedImports":    errorsWatchedImports,
-		"slogWatchedImports":      slogWatchedImports,
-		"auditWatchedImports":     auditWatchedImports,
-		"notCalledWatchedImports": notCalledWatchedImports,
+		"errorsWatchedImports": errorsWatchedImports,
+		"slogWatchedImports":   slogWatchedImports,
+		"auditWatchedImports":  auditWatchedImports,
 	}
 }
 
@@ -208,4 +208,39 @@ func TestImportBinding_EveryInTreeWatchedPathCarriesItsDirectory(t *testing.T) {
 				table, path)
 		}
 	}
+}
+
+// declaredPackageName returns the package clause a directory's production files carry, or "" when
+// none of them parses. It is what an unaliased import of that directory binds, which is the name
+// TestImportBinding_EveryWatchedPackageIsNamedAsTheTableSays holds each watched table to. Only a
+// file the go command builds counts: one it ignores, such as _example.go, binds nothing.
+func declaredPackageName(dir string) string {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return ""
+	}
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".go") || strings.HasSuffix(entry.Name(), "_test.go") {
+			continue
+		}
+		if match, mErr := build.Default.MatchFile(dir, entry.Name()); mErr != nil || !match {
+			continue
+		}
+		fset := token.NewFileSet()
+		file, pErr := parser.ParseFile(fset, filepath.Join(dir, entry.Name()), nil, parser.PackageClauseOnly)
+		if pErr != nil {
+			continue
+		}
+		return file.Name.Name
+	}
+	return ""
+}
+
+// A file the go command ignores carries no package name: _example.go sorts before errs.go, and
+// errs.go's clause is still the one read.
+func TestDeclaredPackageName_ReadsOnlyAFileTheGoCommandBuilds(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "_example.go"), []byte("package example\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "errs.go"), []byte("package errs\n"), 0o644))
+	assert.Equal(t, "errs", declaredPackageName(dir))
 }

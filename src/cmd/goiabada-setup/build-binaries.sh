@@ -66,7 +66,7 @@ build_platform() {
     # describes the shipped binary.
     #
     # -tags=production is what both servers' release builds set, so the tag
-    # means one thing, release build, for all three shipped binaries: rule 9 in
+    # means one thing, release build, for all three shipped binaries: rule 8 in
     # ARCHITECTURE.md reads the wizard with it set, and a test helper tagged
     # //go:build !production stays out of the wizard as the generated mocks stay
     # out of the servers. TestReleaseBuilds_TheRealReleaseBuildsSetProduction,

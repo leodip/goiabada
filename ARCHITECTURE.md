@@ -1,15 +1,14 @@
 # Architecture
 
-This file records which module owns what, and it is executable. The five tables below —
-[package ownership](#package-ownership), [built-in identifiers ownership](#built-in-identifiers-ownership),
-[temporary exceptions](#temporary-exceptions),
+This file records which module owns what, and it is executable. The four tables below —
+[package ownership](#package-ownership), [temporary exceptions](#temporary-exceptions),
 [foreign modules](#foreign-modules-the-admin-console-must-not-compile) and
 [refused packages](#packages-no-shipped-binary-may-link) — are parsed by
 `AssertArchitecture` in `src/core/guard/architecture.go`, which every module's unit tier calls.
 A row that stops describing the tree fails the tier, in both directions: an edge the tables do not
-allow is a finding, and so is an exception listed for an edge that no longer exists. A sixth table,
+allow is a finding, and so is an exception listed for an edge that no longer exists. A fifth table,
 one row per exported symbol every `core` package declares, is data in the same sense and lives in
-[`src/core/OWNERSHIP.md`](src/core/OWNERSHIP.md); rule 8 below is its rule, and
+[`src/core/OWNERSHIP.md`](src/core/OWNERSHIP.md); rule 7 below is its rule, and
 `AssertSymbolOwnership` reads it from the same three tiers.
 
 That is the whole point of writing it down here rather than in prose. The dependency direction
@@ -72,7 +71,7 @@ or is it an intentionally stable cross-process contract". Reusability is a prope
 well-written package and is the reason `core` grew into a second application.
 
 The same question asked one grain finer — why does `core` declare *this symbol* — has a row per
-exported symbol in [`src/core/OWNERSHIP.md`](src/core/OWNERSHIP.md), which is rule 8 below. It lives
+exported symbol in [`src/core/OWNERSHIP.md`](src/core/OWNERSHIP.md), which is rule 7 below. It lives
 there rather than here because it is some four hundred rows of data, and this document's value is
 the prose they would bury (#385).
 
@@ -124,6 +123,7 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 | `core/passwordblocklist` | kernel | — |
 | `core/passwordrules` | kernel | — |
 | `core/phonecountries` | kernel | — |
+| `core/pkgload` | kernel | — |
 | `core/requestid` | kernel | — |
 | `core/routing` | kernel | — |
 | `core/securerandom` | kernel | — |
@@ -134,10 +134,10 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 
 Notes on rows that are not self-evident:
 
-- There is no `core/audit` row because there is no `core/audit` in the repository. #333 lists it for
-  deletion, and it does exist as a directory of generated mocks in a working tree that has run the
-  mock generator, but git has never tracked a file under it. A row for it fails the completeness
-  rule, which is how this was found.
+- There is no `core/audit` row because there is no `core/audit` in the repository. #333 listed it for
+  deletion; #328 deleted the last file git tracked under it, a generated mock, and the mock
+  generator no longer writes there. A row for it fails the completeness rule, which is how this was
+  found.
 - `core/cmd` is kernel because it holds three developer tools: `ownershipdump`, which writes the
   per-symbol table described below, `imagescanreport`, which turns the weekly scan of the
   published images into the issue listing what someone can act on (#520), and `screenshotcheck`,
@@ -157,6 +157,14 @@ Notes on rows that are not self-evident:
   and it is an exported leaf rather than part of `refgraph` because Go's internal rule kept the
   auth server from reading it there (#480). Like `core/cmd` and `core/guard`, it is developer
   tooling compiled into no shipped binary.
+- `core/pkgload` is kernel because it is the one loader the guards that need types read the tree
+  through, a module's packages type-checked for one build through `golang.org/x/tools/go/packages`,
+  and the one declaration of the release platforms, which rule 8 reads too. It is an exported leaf
+  rather than part of `refgraph` because the auth server's tests load through it and Go's internal
+  rule keeps them out of `core/internal`, as `core/sourceroot` set the precedent for; it imports
+  neither `testing` nor testify, so `ownershipdump` can load through it. Like `core/guard`, it is
+  developer tooling compiled into no shipped binary, and the refused-packages table holds its
+  dependency to that (#420).
 - `core/guard` is kernel because it is test support compiled into no binary, and it holds the
   tree-wide guards and nothing else: it was `core/testutil` until #442, when its one helper that was
   no guard, `SkipWithoutIPv6Loopback`, left for `core/hostport/hostporttest`. It is still held to
@@ -260,100 +268,13 @@ Notes on rows that are not self-evident:
   gone; what remains is the wire contract the admin console decodes. The mapping was once #349's
   alone, but moving it without the fields would have left every exception row below standing, so
   the two were one issue.
-- `core/builtin` is `kernel`, and it is the one package whose ownership is also recorded symbol
-  by symbol, in the table below. Package granularity cannot hold it: a constant is a string, so an
-  auth-server-only name declared there costs nothing at compile time and breaks none of the rules
-  below. It and `core/buildinfo` are what `core/constants` split into: the identifiers both
-  processes agree on here, and the build stamp the release builds set with `-ldflags -X` there,
-  which as values the linker writes rather than names two processes share is held by
-  `src/core/OWNERSHIP.md` alone (#442).
-
-## Built-in identifiers ownership
-
-Every exported symbol `core/builtin` declares has a row saying why core still declares it, as one
-of four justifications, checked against the real reference graph the way the tables above and below
-are checked against the import graph. Production references only, for the same reason rules 2 and 3
-read production files: a test may name anything from anywhere.
-
-This table exists because nothing else could have caught what it catches. `core/constants`, which
-`core/builtin` is what remains of, reached 139 symbols, 108 of them named by a single process, with
-every import rule satisfied at every step (#351, #442).
-
-| justification | means |
-|---|---|
-| `kernel` | a `kernel` core package references it in production, so rule 2 forbids it leaving |
-| `both-apps` | both applications reference it in production |
-| `moving` | in core, only a package on its way out of core references it; the issue names the move that ends the justification |
-| `contract` | none of the above, but it is an intentionally stable cross-process value |
-
-A row states the strongest justification the tree backs, in that order, and a row claiming less than
-the tree supports fails. So `contract` is reachable only when nothing else holds, which is the whole
-point of it: making somebody write the word turns it into a claim a reviewer can argue with, where
-silence is not. Four rows carry it, the permission identifiers #359 left behind.
-
-### Built-in identifiers ownership
-
-| symbol | justification | issue |
-|---|---|---|
-| `AdminConsoleClientIdentifier` | both-apps | — |
-| `AdminConsoleSessionName` | both-apps | — |
-| `AdminReadPermissionIdentifier` | contract | — |
-| `AuthServerPermissionIdentifiers` | both-apps | — |
-| `AuthServerResourceIdentifier` | both-apps | — |
-| `BrowserSessionsPermissionIdentifier` | both-apps | — |
-| `ManageAccountPermissionIdentifier` | both-apps | — |
-| `ManageClientsPermissionIdentifier` | contract | — |
-| `ManagePermissionIdentifier` | both-apps | — |
-| `ManageSettingsPermissionIdentifier` | contract | — |
-| `ManageUsersPermissionIdentifier` | contract | — |
-
-Notes on rows that are not self-evident:
-
-- `AdminConsoleSessionName` is here and its twin is not. The auth server's session backend stores
-  the admin console's server-side sessions, so it names that session name at one production site,
-  and the two processes must agree on the string or the admin console's sessions are written under
-  a name it does not read (#266). Nothing outside the auth server names `AuthServerSessionName`.
-- These five were `moving | #359` until #359 carried the seeder that named them out of core. The
-  note here then predicted that nothing would reference them afterwards; it was wrong.
-  `AdminConsoleClientIdentifier` is `both-apps`, named by the admin console at four production
-  sites and by the seeder, now `authserver/internal/bootstrap` (#424). The four permission
-  identifiers are `contract`, their only referrers being `authserver/internal/server/routes.go`
-  and that seeder. The word is earned and
-  not conceded to the guard: they are the scope strings a client asks for and a token carries, and
-  the admin console compiles all four through `AuthServerPermissionIdentifiers`, which is
-  `both-apps` on its own account and cannot leave core — moving them out beside it would spell
-  eight scope strings twice with nothing holding the two spellings equal.
-- There is no `ContextKeySettings` row because the two processes share nothing but its spelling.
-  Each declares its own, now an unexported key in that module's `internal/reqctx` (#433, #440), and
-  each asserts a different type out of it — `*record.Settings` in the auth server against
-  `*api.PublicSettingsResponse` in the admin console — so either assertion panics on the other's
-  value. It satisfied the letter of `both-apps`, and that row would have been
-  true and misleading (#351).
-- No row reads `kernel` any more, and that is #385's doing rather than an omission. Every symbol
-  that carried the word did so on the strength of one core package: `core/handlerhelpers`, which
-  put `Version`, `BuildDate` and `GitCommit` into every rendered page's template data and read
-  `AuthServerResourceIdentifier` and `ManagePermissionIdentifier` to decide `isAdmin`. That
-  renderer was two applications' renderers in one package, so #385 split it, and the five dropped
-  to `both-apps` in the same commit with nothing else in the tree changing. The two identifiers are
-  still named by both binaries, which is why they are still here; the three build-stamp variables
-  left for `core/buildinfo` when `core/constants` split (#442).
-- The six `SessionKey*`, `ContextKeyBearerToken` and `ContextKeyJwtInfo` were here until #385 and
-  are not any more, so core declares no context key at all and `core/constants/context_key.go` is
-  gone. Each was `kernel` on the strength of one core package: `core/handlerhelpers/auth_helper.go`
-  and `core/middleware/middleware_jwt.go` for the session keys, the latter alone for the bearer
-  key, `core/handlerhelpers/http_helper.go` for `ContextKeyJwtInfo`, which read it to bind the
-  admin page data. Every one of those files held one application's implementation, so #385 moved
-  them — the OAuth client, the JWT session middleware and the console's renderer to
-  `adminconsole/internal`, the bearer middleware and the auth server's renderer to
-  `authserver/internal` — and every key went with its one writer, to that module's own
-  `internal/constants`. Both modules' have since moved on, the auth server's in #433 and the admin
-  console's in #440: their context keys to `internal/reqctx`, as unexported keys behind typed
-  accessors, and their session keys to `internal/sessionkeys`, so neither module has an
-  `internal/constants` any more.
-- `ManageAccountPermissionIdentifier` dropped from `kernel` to `both-apps` in the same commit, for
-  the same reason and with no change in the tree beyond it: `core/middleware/middleware_jwt.go`
-  was its one core referrer, through `buildScopeString`. Both applications still name it, so it
-  stays in core on the weaker claim.
+- `core/builtin` is `kernel`, and package granularity cannot hold it: a constant is a string, so
+  an auth-server-only name declared there costs nothing at compile time and breaks none of the
+  rules below. Its symbols are held where every core package's are, one row each in
+  `src/core/OWNERSHIP.md`, which rule 7 checks (#351, #420). It and `core/buildinfo` are what
+  `core/constants` split into: the identifiers both processes agree on here, and the build stamp
+  the release builds set with `-ldflags -X` there, values the linker writes rather than names two
+  processes share (#442).
 
 ## Rules
 
@@ -367,37 +288,38 @@ The guard reports findings by these names.
 3. **process isolation** — `adminconsole` may not import an `authserver`-owned package, and vice
    versa. `cmd/goiabada-setup` may import neither.
 4. **dead package** — a `delete` package must have no importer anywhere, production or test. If one
-   appears, the row is wrong and the package is not dead.
+   appears, the row is wrong and the package is not dead: a mocks package one test keeps alive is the
+   shape #333 deleted.
 5. **foreign closure** — the modules in
    [Foreign modules](#foreign-modules-the-admin-console-must-not-compile) must be reachable from the
    admin console's production packages exactly as declared there.
 6. **table hygiene** — every top-level `core` package has exactly one ownership row; every non-kernel
    row names an issue and every kernel row names none; every exception corresponds to a violation
    that exists right now; every violation has an exception.
-7. **built-in identifiers** — every exported symbol `core/builtin` declares has exactly one row in
-   [Built-in identifiers ownership](#built-in-identifiers-ownership-1), and each row states the strongest
-   justification the reference graph backs. A symbol with no row fails, a row for a symbol that is
-   gone fails, and a row claiming less than the tree supports fails. Only a `moving` row names an
-   issue, because it is the only justification that expires.
-8. **core symbols** — every exported symbol any `core` package declares has exactly one row in
+7. **core symbols** — every exported symbol any `core` package declares has exactly one row in
    [`src/core/OWNERSHIP.md`](src/core/OWNERSHIP.md), stating the strongest of seven justifications
    the reference graph backs. Four are computed — `kernel`, `both-apps`, `own-package`, `reachable`
    — and three are asserted with a note the guard requires to be non-empty: `test-support`,
-   `contract` and `moving`. Same both directions as rule 7, and the same reason: `core/constants`
-   reached 139 symbols, 108 named by a single process, with every rule above green throughout. That
-   file's own header carries the definitions and the ceilings (#385).
-9. **refused package** — no shipped binary links a package the
+   `contract` and `moving`. A symbol with no row fails, a row for a symbol that is gone fails, and
+   a row claiming less than the tree supports fails, because `core/constants` reached 139 symbols,
+   108 named by a single process, with every rule above green throughout. That file's own header
+   carries the definitions and the ceilings (#385).
+8. **refused package** — no shipped binary links a package the
    [Refused packages](#packages-no-shipped-binary-may-link) table refuses, or any package under one:
-   the test frameworks, and the two packages that publish a process's internals on Go's default mux.
+   the test frameworks, the two packages that publish a process's internals on Go's default mux, and
+   the package loading the guards read the source tree through.
    The shipped binaries are the three a release ships: the auth server, the admin console and the
    setup wizard. Each is walked from its `main` package, and the guard fails when one of the three is
    not where it looks, so a renamed main cannot drop out of the rule unnoticed (#331).
 
-Rules 2, 3, 4, 7 and 8 read production files only. A test may import a mock, a fixture or a helper from
+Rules 2 and 3 read production files only. A test may import a mock, a fixture or a helper from
 anywhere; that is what test code is for, and holding it to the production graph would make
-`core/guard` unusable from the tiers that call it. Rule 1 is the exception, for the reason given
-above. Rule 5 reads production files because it is about what lands in a shipped binary, and rule
-8's `test-support` half and rule 9 read them the same way, for the same reason.
+`core/guard` unusable from the tiers that call it. Rules 5 and 8 read production files too, because
+they are about what lands in a shipped binary. Rules 1 and 4 read test files as well, for the reasons
+given in their entries. Rule 7 reads both: its four computed justifications come from production
+references, and so does what contradicts a `test-support` row, since that is about what a binary
+links; what supports one is a reference from a test anywhere, or from the declaring package's own
+production code.
 
 ## Temporary exceptions
 
@@ -497,8 +419,8 @@ sqlbuilder, OTP and image libraries, provider-only crypto — and each is a row 
 
 ## Packages no shipped binary may link
 
-A shipped binary carries no test code, and nothing that publishes the process's internals. The rows
-below are both kinds.
+A shipped binary carries no test code, nothing that publishes the process's internals, and none of
+the tooling the guards read the source tree with. The rows below are all three kinds.
 
 The second kind is two packages of the standard library, `net/http/pprof` and `expvar`, which
 register live heap, goroutine, CPU and trace profiles under `/debug/pprof/` and the process's
@@ -507,6 +429,12 @@ the default mux, so linking them is one listener written the obvious way away fr
 both, and a `grep` of the source would not say they were there: until #462 both servers linked them
 through chi's middleware package, which no file needed for them. The rule holds them out by the same
 walk as the test frameworks, through a dependency as through first-party code.
+
+The third kind is `golang.org/x/tools`, Go's package loader and the analysis tooling around it, which
+`core/pkgload` loads the source tree through for the guards and `ownershipdump`. It imports no test
+framework, so the first kind's row would not catch it, and a production import of the loader would
+link it into a binary with nothing going red. Its row is what holds the loader to being developer
+tooling (#420).
 
 The rest of this section is about the first kind. A shipped binary carries no test code: no assertion library, no mock, no test helper, and none of
 the test frameworks they are written with. Both servers and the setup wizard are clean, and before
@@ -532,22 +460,24 @@ in the guard, as `shippedMains`, rather than found by looking for `package main`
 `schemadump`, `droptestdb`, `ownershipdump`, `imagescanreport`, `screenshotcheck` and the two
 reference-data generators are main packages too and ship in no release. A file belongs to a binary the way the rest of this
 document decides it: the `production` tag set and every other tag free, so a file in any of the five
-release targets counts. That is exact because every release build of all three sets `production`:
+release platforms counts. That is exact because every release build of all three sets `production`:
 the servers' cross-compile script, the two server Dockerfiles and the setup wizard's cross-compile
 script, so a `//go:build !production` helper anywhere in the wizard's closure stays out of the
 wizard as the generated mocks stay out of the servers. A rule test in core's unit tier,
 `TestReleaseBuilds_TheRealReleaseBuildsSetProduction`, reads those four files and fails when a
 `go build` in them does not set the tag, when one of them is missing or holds no `go build`, when the
 mains they build stop being exactly `shippedMains`, or when either script's `build_platform` calls
-differ as a set from `releaseTargets` (#463).
+differ as a set from `pkgload.ReleasePlatforms`, the one declaration of the release platforms, which
+the loader's release builds read too (#463, #420).
 
 The refusal does not stop at the edge of the four modules. Past it, the walk follows the imports
 the go command reports: `go list -deps` under the `production` tag, run over each shipped main for
-each of the five release targets, `releaseTargets` in the guard, supplies the imports of every
-third-party and standard-library package a main reaches, so a dependency whose own production code
-imports `testing` or testify is refused like a first-party helper that does. First-party packages
+each of the five release platforms, `pkgload.ReleasePlatforms`, with a release's cgo and
+architecture levels, `pkgload.ReleaseEnv`, supplies the imports of every third-party and
+standard-library package a main reaches, so a dependency whose own production code imports
+`testing` or testify is refused like a first-party helper that does. First-party packages
 are still read from source, with every tag but `production` free, because that covers all five
-targets at once. A package the go command cannot load is a finding, since the walk cannot see what
+platforms at once. A package the go command cannot load is a finding, since the walk cannot see what
 it imports.
 
 ### Refused packages
@@ -559,6 +489,7 @@ it imports.
 | `github.com/stretchr/testify` | the assertions, `require`, `mock` and `suite` the tests and the generated mocks are written with |
 | `net/http/pprof` | the profiler, which registers live heap, goroutine, CPU and trace profiles under `/debug/pprof/` on the default mux |
 | `expvar` | the process's variables, its command line and memory statistics among them, which it registers under `/debug/vars` on the default mux |
+| `golang.org/x/tools` | Go's package loader and analysis tooling, which `core/pkgload` loads the source tree through for the guards and `ownershipdump` |
 
 ## The guard
 
@@ -567,26 +498,22 @@ module unit tiers, so it fires whichever tier runs — the same arrangement as t
 slog and agent-document guards.
 
 It reads imports from the AST rather than matching text, so an import inside a comment or a string
-is not a finding and a renamed import alias still is one. Rule 9 is the one rule that also asks the
+is not a finding and a renamed import alias still is one. Rule 8 is the one rule that also asks the
 go command, for what the packages outside the four modules import, since no source of theirs is
 under the source root. It parses production and test files
-separately because the rules above treat them differently. Rule 7 reads the same way, one level
-down: `src/core/guard/builtin_ownership.go` reads the exported declarations of
-`core/builtin` and, from every production file that imports it, the symbols selected off whatever
-identifier that file binds the import to.
+separately because the rules above treat them differently.
 
-Rule 8 lives beside them rather than in this file. `AssertSymbolOwnership` in
+Rule 7 lives beside them rather than in this file. `AssertSymbolOwnership` in
 `src/core/guard/symbol_ownership.go` is called from the same three tiers and checks
 `src/core/OWNERSHIP.md`; `src/core/cmd/ownershipdump` writes the computed rows from the same census,
 `core/internal/refgraph`, so the tool and the guard cannot read the tree differently, and
-`./run-tests.sh --type lint` runs the tool and fails on a tree it changed. References from outside a declaring package are read as
-selectors, like rule 7's; references from inside it are resolved with `go/types`, because there an
-identifier carries no selector and matching one by spelling would let a local or a struct field
-justify its namesake.
+`./run-tests.sh --type lint` runs the tool and fails on a tree it changed. The census loads the four
+modules type-checked through `core/pkgload`, production code as every release build selects it, and
+reads a reference as the object an identifier resolves to, so a local or a struct field spelled like
+a symbol never justifies its namesake.
 
 `src/core/guard/architecture_lint_test.go` is the core tier's caller;
 `src/core/guard/architecture_rules_test.go`,
-`src/core/guard/builtin_ownership_rules_test.go`,
 `src/core/guard/symbol_ownership_rules_test.go` and
 `src/core/internal/refgraph/symbol_ownership_test.go` hold the guard's own tests. They run the rule table
 against fixture trees written into a temp directory, one fixture per rule and per deliberate

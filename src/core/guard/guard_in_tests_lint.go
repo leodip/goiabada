@@ -105,7 +105,7 @@ func findGuardInTests(root, moduleDir string) ([]guardInTest, int, error) {
 	var found []guardInTest
 	for _, pkg := range pkgs {
 		// core/guard's own tests are not a leak: whatever reaches core/guard has its dependencies
-		// already, and rule 9 refuses a shipped main that does.
+		// already, and rule 8 refuses a shipped main that does.
 		if pkg == guardPath {
 			continue
 		}

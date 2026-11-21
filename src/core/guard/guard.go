@@ -43,7 +43,7 @@ import (
 // there is no recording fake that satisfies it. It is exported rather than internal because some
 // guards live outside this package, in the _test.go files of the applications whose rules they
 // hold, and they report through the same harness. List them with
-// `git grep -n 'func assert.*\(r Reporter\|r guard\.Reporter\)' -- '*.go'` rather than trusting a
+// `git grep -n -E 'func assert[[:alnum:]]*\((r (guard\.)?Reporter|$)' -- '*.go'` rather than trusting a
 // count written down: this comment used to give one, and #333, #338, #354 and #386 each moved or
 // added a guard without touching it, which is how it came to be wrong on the path and on both
 // counts at once (#359), and wrong again by #442.

@@ -615,7 +615,9 @@ the user no longer has, or its level claims a second factor its methods do not n
 request is not `prompt=none`. The split is held by
 `TestAuthContextFields_EveryFieldIsClassifiedOnce` in `ceremony`, which fails on a field in neither
 list. Request fields are written only in `authflow.Authorization.Run`, which
-`TestRequestFields_WrittenOnlyAtAuthorize` in `ceremony` holds with `go/types`. A bind that finds a
+`TestRequestFields_WrittenOnlyAtAuthorize` in `ceremony` holds by `go/types` object identity, reading
+the auth server's production files type-checked through `core/pkgload` as every release build and
+the default build select them; a package that does not compile stops it. A bind that finds a
 newer authentication already on the session is not a restart: it writes nothing
 (`ErrStaleAuthentication`, #538) and `/auth/completed` answers it with the "no longer active" page,
 saving no auth context: a newer sign-in's authentication has reached the session since this ceremony

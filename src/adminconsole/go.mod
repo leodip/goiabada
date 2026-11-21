@@ -16,5 +16,8 @@ require (
 	github.com/BurntSushi/toml v1.6.0 // indirect
 	github.com/stretchr/objx v0.8.0 // indirect
 	golang.org/x/crypto v0.59.0 // indirect
+	golang.org/x/mod v0.43.0 // indirect
+	golang.org/x/sync v0.25.0 // indirect
 	golang.org/x/sys v0.50.0 // indirect
+	golang.org/x/tools v0.53.0 // indirect
 )

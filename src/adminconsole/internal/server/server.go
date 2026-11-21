@@ -351,7 +351,7 @@ func (s *Server) assetOrigins() []string {
 // shared because each binary owns its listener: a mux of its own answering GET /metrics with reg's
 // exposition and 404 for every other path. It is never Go's default mux, on which the
 // net/http/pprof and expvar packages would register /debug/pprof/ and /debug/vars, were either
-// linked (rule 9 refuses both in every shipped binary, #462), and nothing on it passes through the
+// linked (rule 8 refuses both in every shipped binary, #462), and nothing on it passes through the
 // main router's chain, so a scrape is neither logged by the request logger nor counted in the HTTP
 // metrics (#400 decision 3).
 func metricsHandler(reg *metrics.Registry) http.Handler {
