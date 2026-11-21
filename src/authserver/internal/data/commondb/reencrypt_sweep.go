@@ -30,14 +30,15 @@ const reencryptionAttempts = 5
 // lands between the sweep's read and its write is then either a value freshly sealed under the
 // current key, or the bytes the sweep read, written back under the lock the sweep's write waits
 // for; the sweep's conditional write leaves the first as it is and still moves the second.
-func (d *Database) ReencryptStoredSecrets(ctx context.Context, currentKey, previousKey []byte) (record.Reencryption, error) {
+func (d *Database) ReencryptStoredSecrets(ctx context.Context, currentKey, previousKey []byte,
+	unreadable func(record.StoredSecret)) (record.Reencryption, error) {
 	// The cipher's constructor holds the keys to the rules a start holds them to: the current
 	// key 32 bytes, and a previous key absent, equal to the current one, or 32 bytes too.
 	cipher, err := encryption.NewDataCipherWithPrevious(currentKey, previousKey)
 	if err != nil {
 		return record.Reencryption{}, err
 	}
-	s := &reencryptionSweep{d: d, cipher: cipher, current: append([]byte(nil), currentKey...)}
+	s := &reencryptionSweep{d: d, cipher: cipher, current: append([]byte(nil), currentKey...), unreadable: unreadable}
 	if len(previousKey) > 0 && !bytes.Equal(previousKey, currentKey) {
 		s.previous = append([]byte(nil), previousKey...)
 	}
@@ -61,7 +62,10 @@ type reencryptionSweep struct {
 	// apart is which key opens a value, which the cipher does not answer.
 	current  []byte
 	previous []byte
-	report   record.Reencryption
+	// unreadable is handed each value neither key opens as the sweep reaches it, so a run over a
+	// database that opens under neither key holds a batch in memory, never a list of every row.
+	unreadable func(record.StoredSecret)
+	report     record.Reencryption
 }
 
 // stopped answers err so that a run stopped by its context says so, whatever the driver made of
@@ -74,7 +78,7 @@ func (s *reencryptionSweep) stopped(ctx context.Context, err error) error {
 }
 
 // sweepColumn takes one column of a table through the sweep, a batch at a time, with no
-// transaction: a value's write is a statement of its own, committed as it lands.
+// transaction across the table: a value's write is a transaction of its own, committed as it lands.
 func (s *reencryptionSweep) sweepColumn(ctx context.Context, table, column string) error {
 	var after int64
 	for {
@@ -143,7 +147,10 @@ func (s *reencryptionSweep) sweepValue(ctx context.Context, table, column string
 		}
 		plaintext, opened := s.openUnderPrevious(value)
 		if !opened {
-			s.report.Unreadable = append(s.report.Unreadable, record.StoredSecret{Table: table, Column: column, Id: item.id})
+			s.report.Unreadable++
+			if s.unreadable != nil {
+				s.unreadable(record.StoredSecret{Table: table, Column: column, Id: item.id})
+			}
 			return nil
 		}
 		sealed, err := s.cipher.Encrypt(plaintext)
@@ -249,9 +256,34 @@ func storedSecretById(table, column string) statement {
 // read, the bytes the sweep read, and reports whether it did. The new ciphertext always differs
 // from read, its nonce being fresh, so a matched row is a changed row on all four engines, MySQL
 // included.
+//
+// The write is a transaction of its own, so that its outcome is known whatever a stop does to it
+// (#492 decision 8). The UPDATE runs under ctx, so a stop still ends its wait for a row lock; a
+// driver can answer that cancellation after the statement took effect, as SQLite's does while it
+// hands the result back, so a failed UPDATE is rolled back and never counted. One that succeeded
+// is committed under a context the stop does not reach, and counted when the commit returns. The
+// connection is taken under ctx, so a stop also ends a wait for one; the transaction is begun on
+// it without ctx's cancellation, which database/sql would otherwise answer by rolling back a
+// write the sweep goes on to count.
 func (d *Database) writeStoredSecretIfUnchanged(ctx context.Context, table, column string, id int64,
-	sealed, read []byte) (bool, error) {
-	result, err := d.ExecSQL(ctx, nil, storedSecretIfUnchanged(table, column).text(d.Dialect), sealed, id, read)
+	sealed, read []byte) (written bool, err error) {
+	conn, err := d.DB.Conn(ctx)
+	if err != nil {
+		return false, errs.Wrap(err, "unable to take a connection")
+	}
+	defer func() { _ = conn.Close() }()
+	settled := context.WithoutCancel(ctx)
+	tx, err := conn.BeginTx(settled, nil)
+	if err != nil {
+		return false, errs.Wrap(err, "unable to begin transaction")
+	}
+	defer func() {
+		if !written {
+			_ = tx.Rollback()
+		}
+	}()
+
+	result, err := d.ExecSQL(ctx, tx, storedSecretIfUnchanged(table, column).text(d.Dialect), sealed, id, read)
 	if err != nil {
 		return false, err
 	}
@@ -259,17 +291,26 @@ func (d *Database) writeStoredSecretIfUnchanged(ctx context.Context, table, colu
 	if err != nil {
 		return false, err
 	}
-	return rowsAffected == 1, nil
+	if rowsAffected != 1 {
+		return false, nil
+	}
+	if err := d.CommitTransaction(settled, tx); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // storedSecretIfUnchanged is writeStoredSecretIfUnchanged's statement: the new ciphertext, the
-// row's id and the bytes read.
+// row's id and the bytes read. SQL Server compares two VARBINARY values equal when one is the other
+// with trailing zero bytes, so its statement also holds the lengths equal: a row a server changed
+// to the bytes read and a trailing zero is a changed row there too.
 func storedSecretIfUnchanged(table, column string) statement {
 	return statement{
 		sqlite:   "UPDATE " + table + " SET " + column + " = ? WHERE id = ? AND " + column + " = ?",
 		mysql:    "UPDATE " + table + " SET " + column + " = ? WHERE id = ? AND " + column + " = ?",
 		postgres: "UPDATE " + table + " SET " + column + " = $1 WHERE id = $2 AND " + column + " = $3",
-		mssql:    "UPDATE " + table + " SET " + column + " = @p1 WHERE id = @p2 AND " + column + " = @p3",
+		mssql: "UPDATE " + table + " SET " + column + " = @p1 WHERE id = @p2 AND " + column + " = @p3" +
+			" AND DATALENGTH(" + column + ") = DATALENGTH(@p3)",
 	}
 }
 

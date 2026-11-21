@@ -19,7 +19,7 @@ type Reencryption struct {
 	// AlreadyCurrent counts the values the sweep found under the current data key, which it left
 	// as they were.
 	AlreadyCurrent int
-	// Unreadable is every value neither data key opens, in the order the sweep reached them. Each
-	// is left exactly as it is.
-	Unreadable []StoredSecret
+	// Unreadable counts the values neither data key opens, each left exactly as it is. The sweep
+	// names each one to its caller as it reaches it, so a run holds no list of them.
+	Unreadable int
 }

@@ -62,12 +62,17 @@ func expectNoSharedIdentifiers(db *datamocks.Database) {
 // re-encrypts, and never writes anything to the database (#492 decision 3).
 func assertOnlyRead(t *testing.T, db *datamocks.Database) {
 	t.Helper()
+	assertCalled(t, db, "GetAllSigningKeys", "GetIdentifiersSharedByClientsAndResources")
+}
+
+// assertCalled pins the calls a start made, in order.
+func assertCalled(t *testing.T, db *datamocks.Database, methods ...string) {
+	t.Helper()
 	var called []string
 	for _, c := range db.Calls {
 		called = append(called, c.Method)
 	}
-	assert.Equal(t, []string{"GetAllSigningKeys", "GetIdentifiersSharedByClientsAndResources"}, called,
-		"a start reads the signing keys and the shared identifiers, and writes nothing")
+	assert.Equal(t, methods, called, "a start reads, and writes nothing")
 }
 
 // TestRunStartupDataTasks_ChecksTheKeyWithoutAUsablePreviousKey pins what a start does with no
@@ -102,16 +107,24 @@ func TestRunStartupDataTasks_ChecksTheKeyWithoutAUsablePreviousKey(t *testing.T)
 			t.Run(p.name+", "+st.name, func(t *testing.T) {
 				capture := logtest.CaptureSlog(t)
 				db := datamocks.NewDatabase(t)
-				db.EXPECT().GetAllSigningKeys(mock.Anything, (*sql.Tx)(nil)).Return(st.keys(t), nil).Once()
+				keys := st.keys(t)
+				db.EXPECT().GetAllSigningKeys(mock.Anything, (*sql.Tx)(nil)).Return(keys, nil).Once()
+				if len(keys) == 0 {
+					db.EXPECT().IsEmpty(mock.Anything).Return(true, nil).Once()
+				}
 				if !st.mismatch {
 					expectNoSharedIdentifiers(db)
 				}
 
 				err := runStartupDataTasks(context.Background(), db, currentKey, p.previous)
-				if st.mismatch {
+				switch {
+				case st.mismatch:
 					require.ErrorIs(t, err, ErrDataKeyMismatch, "a key that opens nothing must stop the start")
 					assert.Equal(t, currentKeyRefusal, err.Error(), "the troubleshooting page quotes this text whole")
-				} else {
+				case len(keys) == 0:
+					require.NoError(t, err)
+					assertCalled(t, db, "GetAllSigningKeys", "IsEmpty", "GetIdentifiersSharedByClientsAndResources")
+				default:
 					require.NoError(t, err)
 					assertOnlyRead(t, db)
 				}
@@ -211,27 +224,67 @@ func TestRunStartupDataTasks_TheCurrentSigningKeyIsTheOneRead(t *testing.T) {
 }
 
 // TestRunStartupDataTasks_NoSigningKeyToReadPassesUnchecked pins the database not yet seeded: with
-// no current signing key holding a PEM there is nothing encrypted to check, and the start goes on
-// to seed it.
+// no signing key and no settings row there is nothing encrypted to check, and the start goes on to
+// seed it.
 func TestRunStartupDataTasks_NoSigningKeyToReadPassesUnchecked(t *testing.T) {
+	db := datamocks.NewDatabase(t)
+	db.EXPECT().GetAllSigningKeys(mock.Anything, (*sql.Tx)(nil)).Return(nil, nil).Once()
+	db.EXPECT().IsEmpty(mock.Anything).Return(true, nil).Once()
+	expectNoSharedIdentifiers(db)
+
+	require.NoError(t, runStartupDataTasks(context.Background(), db, currentKey, previousKey))
+	assertCalled(t, db, "GetAllSigningKeys", "IsEmpty", "GetIdentifiersSharedByClientsAndResources")
+}
+
+// TestRunStartupDataTasks_RefusesASetUpDatabaseWithNoUsableCurrentSigningKey: a database that has
+// been set up and holds no current signing key with a private key is refused, rather than passed
+// as one not yet seeded: the seed, seeing the settings row, would put no key back, and the server
+// would become ready unable to sign a token. Whether the database is seeded is asked only when it
+// holds no signing key at all, which is the one shape the signing keys cannot tell apart.
+func TestRunStartupDataTasks_RefusesASetUpDatabaseWithNoUsableCurrentSigningKey(t *testing.T) {
 	cases := []struct {
-		name string
-		keys []record.KeyPair
+		name      string
+		keys      func(t *testing.T) []record.KeyPair
+		asksEmpty bool
+		want      string
 	}{
-		{"no key pairs", nil},
-		{"a current key pair holding no PEM", []record.KeyPair{{State: record.KeyStateCurrent.String()}}},
+		{"the current signing key holding no PEM", func(t *testing.T) []record.KeyPair {
+			return []record.KeyPair{{State: record.KeyStateCurrent.String()}, signingKeyUnder(t, record.KeyStateNext, currentKey)}
+		}, false, "the current signing key's private key is empty"},
+		{"other signing keys and no current one", func(t *testing.T) []record.KeyPair {
+			return []record.KeyPair{signingKeyUnder(t, record.KeyStateNext, currentKey), signingKeyUnder(t, record.KeyStatePrevious, currentKey)}
+		}, false, "no signing key is in the current state"},
+		{"no signing key, the settings row seeded", func(*testing.T) []record.KeyPair { return nil },
+			true, "the database holds no signing key"},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			db := datamocks.NewDatabase(t)
-			db.EXPECT().GetAllSigningKeys(mock.Anything, (*sql.Tx)(nil)).Return(tc.keys, nil).Once()
-			expectNoSharedIdentifiers(db)
+			db.EXPECT().GetAllSigningKeys(mock.Anything, (*sql.Tx)(nil)).Return(tc.keys(t), nil).Once()
+			if tc.asksEmpty {
+				db.EXPECT().IsEmpty(mock.Anything).Return(false, nil).Once()
+			}
 
-			require.NoError(t, runStartupDataTasks(context.Background(), db, currentKey, previousKey))
-			assertOnlyRead(t, db)
+			err := runStartupDataTasks(context.Background(), db, currentKey, previousKey)
+
+			require.ErrorIs(t, err, ErrNoCurrentSigningKey)
+			require.NotErrorIs(t, err, ErrDataKeyMismatch, "no key failed to open anything")
+			assert.Equal(t, "the data encryption key check failed: "+tc.want+": "+ErrNoCurrentSigningKey.Error(), err.Error())
 		})
 	}
+
+	t.Run("a failed read of whether the database is seeded stops startup", func(t *testing.T) {
+		boom := errors.New("storage is unavailable")
+		db := datamocks.NewDatabase(t)
+		db.EXPECT().GetAllSigningKeys(mock.Anything, (*sql.Tx)(nil)).Return(nil, nil).Once()
+		db.EXPECT().IsEmpty(mock.Anything).Return(false, boom).Once()
+
+		err := runStartupDataTasks(context.Background(), db, currentKey, previousKey)
+
+		require.ErrorIs(t, err, boom)
+		assert.Contains(t, err.Error(), "the data encryption key check failed")
+	})
 }
 
 // TestRunStartupDataTasks_IsFailClosed pins the boundary every start crosses exactly once, before

@@ -16805,8 +16805,8 @@ func (_c *Database_RecordRefreshTokenFamilyRevoked_Call) RunAndReturn(run func(c
 }
 
 // ReencryptStoredSecrets provides a mock function for the type Database
-func (_mock *Database) ReencryptStoredSecrets(ctx context.Context, currentKey []byte, previousKey []byte) (record.Reencryption, error) {
-	ret := _mock.Called(ctx, currentKey, previousKey)
+func (_mock *Database) ReencryptStoredSecrets(ctx context.Context, currentKey []byte, previousKey []byte, unreadable func(record.StoredSecret)) (record.Reencryption, error) {
+	ret := _mock.Called(ctx, currentKey, previousKey, unreadable)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ReencryptStoredSecrets")
@@ -16814,16 +16814,16 @@ func (_mock *Database) ReencryptStoredSecrets(ctx context.Context, currentKey []
 
 	var r0 record.Reencryption
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, []byte, []byte) (record.Reencryption, error)); ok {
-		return returnFunc(ctx, currentKey, previousKey)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, []byte, []byte, func(record.StoredSecret)) (record.Reencryption, error)); ok {
+		return returnFunc(ctx, currentKey, previousKey, unreadable)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, []byte, []byte) record.Reencryption); ok {
-		r0 = returnFunc(ctx, currentKey, previousKey)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, []byte, []byte, func(record.StoredSecret)) record.Reencryption); ok {
+		r0 = returnFunc(ctx, currentKey, previousKey, unreadable)
 	} else {
 		r0 = ret.Get(0).(record.Reencryption)
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, []byte, []byte) error); ok {
-		r1 = returnFunc(ctx, currentKey, previousKey)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, []byte, []byte, func(record.StoredSecret)) error); ok {
+		r1 = returnFunc(ctx, currentKey, previousKey, unreadable)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -16839,11 +16839,12 @@ type Database_ReencryptStoredSecrets_Call struct {
 //   - ctx context.Context
 //   - currentKey []byte
 //   - previousKey []byte
-func (_e *Database_Expecter) ReencryptStoredSecrets(ctx any, currentKey any, previousKey any) *Database_ReencryptStoredSecrets_Call {
-	return &Database_ReencryptStoredSecrets_Call{Call: _e.mock.On("ReencryptStoredSecrets", ctx, currentKey, previousKey)}
+//   - unreadable func(record.StoredSecret)
+func (_e *Database_Expecter) ReencryptStoredSecrets(ctx any, currentKey any, previousKey any, unreadable any) *Database_ReencryptStoredSecrets_Call {
+	return &Database_ReencryptStoredSecrets_Call{Call: _e.mock.On("ReencryptStoredSecrets", ctx, currentKey, previousKey, unreadable)}
 }
 
-func (_c *Database_ReencryptStoredSecrets_Call) Run(run func(ctx context.Context, currentKey []byte, previousKey []byte)) *Database_ReencryptStoredSecrets_Call {
+func (_c *Database_ReencryptStoredSecrets_Call) Run(run func(ctx context.Context, currentKey []byte, previousKey []byte, unreadable func(record.StoredSecret))) *Database_ReencryptStoredSecrets_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -16857,10 +16858,15 @@ func (_c *Database_ReencryptStoredSecrets_Call) Run(run func(ctx context.Context
 		if args[2] != nil {
 			arg2 = args[2].([]byte)
 		}
+		var arg3 func(record.StoredSecret)
+		if args[3] != nil {
+			arg3 = args[3].(func(record.StoredSecret))
+		}
 		run(
 			arg0,
 			arg1,
 			arg2,
+			arg3,
 		)
 	})
 	return _c
@@ -16871,7 +16877,7 @@ func (_c *Database_ReencryptStoredSecrets_Call) Return(reencryption record.Reenc
 	return _c
 }
 
-func (_c *Database_ReencryptStoredSecrets_Call) RunAndReturn(run func(ctx context.Context, currentKey []byte, previousKey []byte) (record.Reencryption, error)) *Database_ReencryptStoredSecrets_Call {
+func (_c *Database_ReencryptStoredSecrets_Call) RunAndReturn(run func(ctx context.Context, currentKey []byte, previousKey []byte, unreadable func(record.StoredSecret)) (record.Reencryption, error)) *Database_ReencryptStoredSecrets_Call {
 	_c.Call.Return(run)
 	return _c
 }

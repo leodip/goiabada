@@ -72,9 +72,21 @@ func mustSweepCipher(current, previous []byte) *encryption.DataCipher {
 // sweep is the sweep an operator runs once every auth server has the swapped configuration.
 func sweep(t *testing.T, db data.Database) record.Reencryption {
 	t.Helper()
-	report, err := db.ReencryptStoredSecrets(context.Background(), sweepNewKey, sweepOldKey)
-	require.NoError(t, err, "the sweep")
+	report, unreadable := sweepNaming(t, db, sweepNewKey, sweepOldKey)
+	require.Len(t, unreadable, report.Unreadable, "the sweep names each value it counts as unreadable")
 	return report
+}
+
+// sweepNaming runs the sweep with the given keys and answers its report and every value it named
+// as unreadable, in the order it named them.
+func sweepNaming(t *testing.T, db data.Database, currentKey, previousKey []byte) (record.Reencryption, []record.StoredSecret) {
+	t.Helper()
+	var unreadable []record.StoredSecret
+	report, err := db.ReencryptStoredSecrets(context.Background(), currentKey, previousKey, func(value record.StoredSecret) {
+		unreadable = append(unreadable, value)
+	})
+	require.NoError(t, err, "the sweep")
+	return report, unreadable
 }
 
 // The nine kinds of stored secret, by where each is held.
@@ -272,21 +284,22 @@ func TestReencryptStoredSecrets_ReportsAndLeavesWhatNeitherKeyOpens_TheSigningKe
 	require.NoError(t, h.DB.CreateClient(ctx, nil, readableClient))
 	before := unreadable.read(t, h.DB)
 
-	report := sweep(t, h.DB)
+	report, named := sweepNaming(t, h.DB, sweepNewKey, sweepOldKey)
 
 	assert.Equal(t, 1, report.Reencrypted, "the readable client secret is re-encrypted past the unreadable values")
 	assert.Zero(t, report.AlreadyCurrent)
-	require.Len(t, report.Unreadable, 11, "each value neither key opens is reported: %+v", report.Unreadable)
+	assert.Equal(t, 11, report.Unreadable, "each value neither key opens is counted")
+	require.Len(t, named, 11, "each value neither key opens is named: %+v", named)
 	var stringKinds []record.StoredSecret
 	for _, kind := range nineKinds[:8] {
 		stringKinds = append(stringKinds, unreadable.where(kind))
 	}
-	assert.ElementsMatch(t, stringKinds, report.Unreadable[:8], "the stored secrets other than the signing keys come first")
+	assert.ElementsMatch(t, stringKinds, named[:8], "the stored secrets other than the signing keys come first")
 	assert.ElementsMatch(t, []record.StoredSecret{
 		{Table: "key_pairs", Column: "private_key_pem", Id: nextKeyPair.Id},
 		{Table: "key_pairs", Column: "private_key_pem", Id: previousKeyPair.Id},
-	}, report.Unreadable[8:10], "the next and previous signing keys come after every other stored secret")
-	assert.Equal(t, unreadable.where(kindSigningKey), report.Unreadable[10], "the current signing key comes last of all")
+	}, named[8:10], "the next and previous signing keys come after every other stored secret")
+	assert.Equal(t, unreadable.where(kindSigningKey), named[10], "the current signing key comes last of all")
 
 	after := unreadable.read(t, h.DB)
 	for _, kind := range nineKinds {
@@ -322,16 +335,16 @@ func TestReencryptStoredSecrets_WithNoPreviousKeyWritesNothing(t *testing.T) {
 		{"the previous key equal to the current one", append([]byte(nil), sweepNewKey...)},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			report, err := h.DB.ReencryptStoredSecrets(context.Background(), sweepNewKey, tc.previousKey)
-			require.NoError(t, err)
+			report, named := sweepNaming(t, h.DB, sweepNewKey, tc.previousKey)
 
 			assert.Zero(t, report.Reencrypted)
 			assert.Equal(t, 9, report.AlreadyCurrent)
+			assert.Equal(t, 9, report.Unreadable)
 			var wantUnreadable []record.StoredSecret
 			for _, kind := range nineKinds {
 				wantUnreadable = append(wantUnreadable, underOld.where(kind))
 			}
-			assert.ElementsMatch(t, wantUnreadable, report.Unreadable, "the values under the old key open under no key given")
+			assert.ElementsMatch(t, wantUnreadable, named, "the values under the old key open under no key given")
 
 			afterNew, afterOld := underNew.read(t, h.DB), underOld.read(t, h.DB)
 			for _, kind := range nineKinds {
@@ -392,7 +405,7 @@ func TestReencryptStoredSecrets_InterruptedAndRunAgainFinishes(t *testing.T) {
 	var first record.Reencryption
 	go func() {
 		var err error
-		first, err = h.DB.ReencryptStoredSecrets(sweepCtx, sweepNewKey, sweepOldKey)
+		first, err = h.DB.ReencryptStoredSecrets(sweepCtx, sweepNewKey, sweepOldKey, nil)
 		done <- err
 	}()
 	select {
@@ -412,9 +425,81 @@ func TestReencryptStoredSecrets_InterruptedAndRunAgainFinishes(t *testing.T) {
 
 	second := sweep(t, h.DB)
 
-	assert.Empty(t, second.Unreadable)
+	assert.Zero(t, second.Unreadable)
 	assert.Equal(t, 9, second.Reencrypted+second.AlreadyCurrent, "the second run reaches every value")
 	assertNineOpen(t, h.DB, set, newKeyAlone, "the new key alone")
+}
+
+// A server's write that lands while the sweep waits for the row, leaving the bytes the sweep read
+// with a zero byte after them, is a change: the sweep's conditional write misses and leaves the
+// server's bytes as they are. SQL Server compares two VARBINARY values equal when they differ only
+// in trailing zero bytes, so this is the case its statement must tell apart by length (#492
+// decision 4).
+func TestReencryptStoredSecrets_ATrailingZeroByteIsAChange(t *testing.T) {
+	t.Parallel()
+	runTrailingZeroByteIsAChange(t, migratedIsolatedDB(t).DB)
+}
+
+// TestReencryptStoredSecrets_ATrailingZeroByteIsAChange_RCSI is the same case on a SQL Server
+// database with READ_COMMITTED_SNAPSHOT on, the one where the sweep's batch read does not wait for
+// the row the server holds: it reads the bytes as last committed, and its write, waiting for the
+// row, then finds the server's. On the tier's own database the read waits instead, and reads the
+// server's bytes. It skips on the other three engines. The database is shared, so the case looks
+// only at its own client.
+func TestReencryptStoredSecrets_ATrailingZeroByteIsAChange_RCSI(t *testing.T) {
+	runTrailingZeroByteIsAChange(t, rcsiDatabase(t).primary)
+}
+
+func runTrailingZeroByteIsAChange(t *testing.T, db data.Database) {
+	ctx := context.Background()
+
+	sealed, err := oldKeyAlone.Encrypt("the client's secret")
+	require.NoError(t, err)
+	client := &record.Client{ClientIdentifier: "c-" + fake.UUID(), ClientSecretEncrypted: sealed}
+	require.NoError(t, db.CreateClient(ctx, nil, client))
+
+	// A server holds the client's row, so the sweep waits to write it.
+	held := beginTxOn(t, db)
+	require.NoError(t, db.AcquireClientRow(ctx, held, client.Id))
+	type outcome struct {
+		named []record.StoredSecret
+		err   error
+	}
+	done := make(chan outcome, 1)
+	go func() {
+		var o outcome
+		_, o.err = db.ReencryptStoredSecrets(ctx, sweepNewKey, sweepOldKey, func(value record.StoredSecret) {
+			o.named = append(o.named, value)
+		})
+		done <- o
+	}()
+	select {
+	case o := <-done:
+		t.Fatalf("the sweep finished while a server held the row it re-encrypts (err %v)", o.err)
+	case <-time.After(500 * time.Millisecond):
+	}
+
+	// The server writes the bytes the sweep read with a zero byte after them, and commits.
+	changed := append(append([]byte(nil), sealed...), 0)
+	stored, err := db.GetClientById(ctx, held, client.Id)
+	require.NoError(t, err)
+	stored.ClientSecretEncrypted = changed
+	require.NoError(t, db.UpdateClient(ctx, held, stored))
+	require.NoError(t, db.CommitTransaction(ctx, held))
+
+	var o outcome
+	select {
+	case o = <-done:
+	case <-time.After(30 * time.Second):
+		t.Fatal("the sweep never returned after the server committed")
+	}
+	require.NoError(t, o.err)
+	assert.Contains(t, o.named, record.StoredSecret{Table: "clients", Column: "client_secret_encrypted", Id: client.Id},
+		"the server's bytes open under neither key, and are reported")
+
+	after, err := db.GetClientById(ctx, nil, client.Id)
+	require.NoError(t, err)
+	assert.Equal(t, changed, after.ClientSecretEncrypted, "the server's bytes are left as the server wrote them")
 }
 
 // A current key or a previous key of the wrong length is refused before anything is read.
@@ -433,7 +518,7 @@ func TestReencryptStoredSecrets_RefusesKeysOfTheWrongLength(t *testing.T) {
 			"previous data encryption key must be 32 bytes, but it has 33 bytes"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			report, err := h.DB.ReencryptStoredSecrets(context.Background(), tc.currentKey, tc.previousKey)
+			report, err := h.DB.ReencryptStoredSecrets(context.Background(), tc.currentKey, tc.previousKey, nil)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tc.want)
 			assert.Equal(t, record.Reencryption{}, report)
@@ -471,6 +556,9 @@ type sweepDuring struct {
 	// gap runs right after a sweep at sweepBeforeVerification, for a change committed in the same
 	// gap.
 	gap func()
+	// previousKey, when set, is the previous key the sweep runs with in place of the old key: a
+	// sweep run with an older key, which opens what the servers' keys do not.
+	previousKey []byte
 
 	mu      sync.Mutex
 	fired   bool
@@ -490,7 +578,11 @@ func (d *sweepDuring) firesAt(point sweepPoint) bool {
 
 // sweepToTheEnd runs the sweep and waits for it.
 func (d *sweepDuring) sweepToTheEnd() {
-	report, err := d.ReencryptStoredSecrets(context.Background(), sweepNewKey, sweepOldKey)
+	previous := sweepOldKey
+	if d.previousKey != nil {
+		previous = d.previousKey
+	}
+	report, err := d.ReencryptStoredSecrets(context.Background(), sweepNewKey, previous, nil)
 	require.NoError(d.t, err, "the sweep")
 	d.report = report
 }
@@ -500,7 +592,7 @@ func (d *sweepDuring) sweepToTheEnd() {
 func (d *sweepDuring) sweepAgainstTheHeldRow() {
 	d.pending = make(chan error, 1)
 	go func() {
-		report, err := d.ReencryptStoredSecrets(context.Background(), sweepNewKey, sweepOldKey)
+		report, err := d.ReencryptStoredSecrets(context.Background(), sweepNewKey, sweepOldKey, nil)
 		d.mu.Lock()
 		d.report = report
 		d.mu.Unlock()
@@ -789,6 +881,81 @@ func TestReencryptStoredSecrets_BesideAServerWrite(t *testing.T) {
 			tc.write(t, tc.holds)
 		})
 	}
+}
+
+// A settings save keeping a credential neither of the servers' keys opens, with a sweep committing
+// between the request's read and its save that repairs it: the sweep runs with the older key the
+// credential was sealed under as its previous key, and moves it under the new key. The save then
+// keeps the repaired credential rather than writing back the stale bytes its request read, which
+// would leave a value no key opens after the sweep saw it under the new key (#492 decisions 4 and
+// 10). Turning the Turnstile challenge off still goes through.
+func TestReencryptStoredSecrets_ASettingsSaveKeepsACredentialTheSweepRepaired(t *testing.T) {
+	h := migratedIsolatedDB(t)
+	ctx := context.Background()
+	smtpHost, smtpPort := smtpListener(t)
+
+	newSettings := func(t *testing.T) *record.Settings {
+		settings := initialSettings("A repaired credential")
+		settings.SMTPEnabled = true
+		settings.SMTPHost = smtpHost
+		settings.SMTPPort = smtpPort
+		settings.SMTPEncryption = emaildelivery.SMTPEncryptionNone.String()
+		settings.SMTPFromEmail = "noreply@example.com"
+		password, err := otherKeyAlone.Encrypt("the smtp password")
+		require.NoError(t, err)
+		settings.SMTPPasswordEncrypted = password
+		settings.TurnstileEnabled = true
+		settings.TurnstileSiteKey = "1x00000000000000000000AA"
+		secretKey, err := otherKeyAlone.Encrypt("the turnstile secret key")
+		require.NoError(t, err)
+		settings.TurnstileSecretKeyEncrypted = secretKey
+		require.NoError(t, h.DB.CreateSettings(ctx, nil, settings))
+		read, err := h.DB.GetSettingsById(ctx, nil, settings.Id)
+		require.NoError(t, err)
+		return read
+	}
+	save := func(t *testing.T, handler http.HandlerFunc, route string, body any, settings *record.Settings) *record.Settings {
+		t.Helper()
+		rr := httptest.NewRecorder()
+		handler.ServeHTTP(rr, adminRequest(t, http.MethodPut, "/api/v1/admin/settings/"+route, body, settings))
+		require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+		stored, err := h.DB.GetSettingsById(ctx, nil, settings.Id)
+		require.NoError(t, err)
+		return stored
+	}
+	underNewKey := func(t *testing.T, sealed []byte, want, what string) {
+		t.Helper()
+		opened, err := newKeyAlone.Decrypt(sealed)
+		if assert.NoErrorf(t, err, "%s is not under the new key", what) {
+			assert.Equalf(t, want, opened, "%s", what)
+		}
+	}
+
+	t.Run("an email save keeping its password", func(t *testing.T) {
+		settings := newSettings(t)
+		db := &sweepDuring{Database: h.DB, t: t, point: sweepBeforeTransaction, previousKey: sweepOtherKey}
+		stored := save(t, apihandlers.HandleSettingsEmailPut(db, acceptingEmailValidator{}, &countingAuditLogger{}, configSwapped),
+			"email", api.UpdateSettingsEmailRequest{
+				SMTPEnabled: true, SMTPHost: smtpHost, SMTPPort: smtpPort,
+				SMTPEncryption: emaildelivery.SMTPEncryptionNone.String(),
+				SMTPFromName:   "Saved after the repair", SMTPFromEmail: "noreply@example.com",
+			}, settings)
+		db.finished()
+
+		assert.Equal(t, "Saved after the repair", stored.SMTPFromName, "the email save was lost")
+		underNewKey(t, stored.SMTPPasswordEncrypted, "the smtp password", "the repaired SMTP password")
+	})
+	t.Run("a Turnstile save turning the challenge off", func(t *testing.T) {
+		settings := newSettings(t)
+		db := &sweepDuring{Database: h.DB, t: t, point: sweepBeforeTransaction, previousKey: sweepOtherKey}
+		stored := save(t, apihandlers.HandleSettingsTurnstilePut(db, &countingAuditLogger{}, configSwapped, acceptingSecretKeyChecker{}),
+			"turnstile", api.UpdateSettingsTurnstileRequest{TurnstileEnabled: false, TurnstileSiteKey: settings.TurnstileSiteKey},
+			settings)
+		db.finished()
+
+		assert.False(t, stored.TurnstileEnabled, "the Turnstile save was lost")
+		underNewKey(t, stored.TurnstileSecretKeyEncrypted, "the turnstile secret key", "the repaired Turnstile secret key")
+	})
 }
 
 // An email verification across a re-seal (#492 decision 11): the sweep commits between the

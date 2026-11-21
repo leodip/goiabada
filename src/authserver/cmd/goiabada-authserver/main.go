@@ -255,6 +255,14 @@ func run() int {
 					"put GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS back, start, and run goiabada-authserver reencrypt")
 			return 1
 		}
+		if errors.Is(err, datafactory.ErrNoCurrentSigningKey) {
+			slog.Error("the database holds no current signing key, so the auth server cannot start",
+				"error", err,
+				"remedy", "restore the database from a backup taken before its signing keys changed: "+
+					"the auth server signs every token with the current signing key, and does not create one "+
+					"for a database already set up")
+			return 1
+		}
 		slog.Error("unable to create the database connection", "error", err)
 		return 1
 	}

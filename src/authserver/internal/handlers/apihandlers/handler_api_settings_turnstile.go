@@ -3,6 +3,7 @@ package apihandlers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -159,6 +160,7 @@ func HandleSettingsTurnstilePut(
 		// request read it: a re-encryption committed since, while Cloudflare was asked, moved the
 		// row to the current key, and the bytes read before it would undo that (#492 decision 10).
 		var secretKeyEncrypted []byte
+		keptUnreadable := false
 		switch {
 		case req.ClearTurnstileSecretKey:
 			secretKeyEncrypted = nil
@@ -170,22 +172,44 @@ func HandleSettingsTurnstilePut(
 			}
 			secretKeyEncrypted = encrypted
 		case storedSecretKey:
-			kept, keepErr := sealKeptSecretAgain(r.Context(), dataCipher, currentSettings.TurnstileSecretKeyEncrypted,
+			kept, opened, keepErr := sealKeptSecretAgain(r.Context(), dataCipher, currentSettings.TurnstileSecretKeyEncrypted,
 				"turnstile_secret_key")
 			if keepErr != nil {
 				writeInternalServerError(w, r, keepErr)
 				return
 			}
 			secretKeyEncrypted = kept
+			keptUnreadable = !opened
 		}
 
 		var oldVals map[string]interface{}
-		saved, err := saveSettingsSection(r.Context(), database, currentSettings.Id, func(stored *record.Settings) {
+		saved, err := saveSettingsSectionOrRefuse(r.Context(), database, currentSettings.Id, func(stored *record.Settings) error {
+			secret := secretKeyEncrypted
+			if keptUnreadable {
+				// The kept secret key opens under neither key, so it could not be sealed again, and the
+				// row as locked decides what is written (see keptUnreadableSecret).
+				locked, keep := keptUnreadableSecret(currentSettings.TurnstileSecretKeyEncrypted, stored.TurnstileSecretKeyEncrypted,
+					siteKey == strings.TrimSpace(stored.TurnstileSiteKey))
+				if !keep {
+					return i18n.NewLocalizedError(i18n.ErrCodeSettingsTurnstileSiteKeyChanged, nil)
+				}
+				// The challenge on needs a secret key, which another save removed meanwhile.
+				if req.TurnstileEnabled && len(locked) == 0 {
+					return i18n.NewLocalizedError(i18n.ErrCodeSettingsTurnstileSecretKeyRequired, nil)
+				}
+				secret = locked
+			}
 			oldVals = turnstileSettingsAuditValues(stored)
 			stored.TurnstileEnabled = req.TurnstileEnabled
 			stored.TurnstileSiteKey = siteKey
-			stored.TurnstileSecretKeyEncrypted = secretKeyEncrypted
+			stored.TurnstileSecretKeyEncrypted = secret
+			return nil
 		})
+		var refusal *i18n.LocalizedError
+		if errors.As(err, &refusal) {
+			writeValidationError(w, r, refusal)
+			return
+		}
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return

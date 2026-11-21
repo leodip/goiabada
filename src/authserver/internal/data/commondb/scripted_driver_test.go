@@ -122,6 +122,10 @@ type scriptedExec struct {
 	// way this seam can observe a cancellation that arrives mid-call, and it works only because
 	// the driver implements StmtExecContext -- see the context interfaces below (#386).
 	delay time.Duration
+	// during, when set, runs inside the statement once its delay is spent, just before it answers.
+	// It is how a test plays a stop arriving while a statement is in flight, which then answers as
+	// scripted (#492).
+	during func()
 }
 
 // scriptedResult is what a statement answers once it has an id to report. driver.RowsAffected
@@ -299,6 +303,9 @@ func (s *scriptedStmt) exec(ctx context.Context, args []driver.Value) (driver.Re
 	}
 	if err := spendInsideTheCall(ctx, scripted.delay); err != nil {
 		return nil, err
+	}
+	if scripted.during != nil {
+		scripted.during()
 	}
 	if scripted.err != nil {
 		return nil, scripted.err

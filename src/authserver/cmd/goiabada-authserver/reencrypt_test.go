@@ -515,6 +515,38 @@ func TestReencrypt_GoesOnPastAValueNeitherKeyOpens(t *testing.T) {
 	}, reencryptDetails(t, rows[0]))
 }
 
+// TestReencrypt_NamesEveryUnreadableValueAcrossBatches: a table larger than one of the sweep's
+// batches has each value neither key opens named on stderr, once and in id order, however many
+// batches the sweep reads it in, and the closing line counts them all.
+func TestReencrypt_NamesEveryUnreadableValueAcrossBatches(t *testing.T) {
+	const clients = 250
+	seal := reencryptSeal{smtp: reencryptOldKey, signingKey: reencryptOldKey}
+	for range clients {
+		seal.clients = append(seal.clients, reencryptOtherKey)
+	}
+	db := newReencryptDatabase(t, seal)
+
+	code, stdout, stderr := runReencryptOn(t, db, reencryptNewKey, reencryptOldKey)
+
+	require.Equal(t, migrateExitError, code)
+	assert.Equal(t, "stored secrets re-encrypted to the current data key: 2, already under it: 0\n", stdout)
+	var want strings.Builder
+	for id := 1; id <= clients; id++ {
+		fmt.Fprintf(&want, "unreadable: clients.client_secret_encrypted, row %d: neither data key opens it, so it was left as it is\n", id)
+	}
+	want.WriteString("250 stored secrets open under neither data key and were left as they are. If they were sealed " +
+		"under an older key, set that key as GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS and run reencrypt again\n")
+	assert.Equal(t, want.String(), stderr)
+
+	rows := reencryptAuditRows(t, db)
+	require.Len(t, rows, 1)
+	assert.Equal(t, map[string]interface{}{
+		"command":     "goiabada-authserver reencrypt",
+		"reencrypted": float64(2),
+		"unreadable":  float64(clients),
+	}, reencryptDetails(t, rows[0]))
+}
+
 // TestReencrypt_WithNoPreviousKeyItChecks is the check an operator runs after removing the previous
 // key: nothing is re-encrypted or written, the summary says the run checked, and the exit status
 // says whether every stored secret opens under the current key alone. A run that changed nothing
@@ -636,82 +668,98 @@ func reencryptCounts(t *testing.T, pattern, printed string) (int, int) {
 // every value under the new key. The signals are real, so what runReencryptCommand installs is
 // what is tested.
 //
-// The write held when the signal arrives may land or not: the driver answers the cancellation
-// either way, so the first run counts at most the values written before it, and the second finds
-// every value the first wrote already under the new key.
+// The write held when the signal arrives is a transaction of its own, so its outcome is known: the
+// first run's count is exactly what it committed, which the second run finds already under the new
+// key, and its event is written exactly when that count is not zero (#492 decision 8). With the
+// SMTP password already under the new key, the held client write is the run's first.
 func TestReencryptCommand_AStopSignalEndsItBetweenValues(t *testing.T) {
 	for _, sig := range []syscall.Signal{syscall.SIGINT, syscall.SIGTERM} {
-		t.Run(sig.String(), func(t *testing.T) {
-			hold := holdTheFile(t)
-			path := filepath.Join(t.TempDir(), "held.db")
-			db := newReencryptDatabaseAt(t, path, reencryptSeal{
-				smtp:       reencryptOldKey,
-				clients:    [][]byte{reencryptOldKey, reencryptOldKey},
-				signingKey: reencryptOldKey,
+		for _, smtp := range []struct {
+			name           string
+			key            []byte
+			alreadyCurrent int
+		}{
+			{"the SMTP password written before the held write", reencryptOldKey, 0},
+			{"the held write the first", reencryptNewKey, 1},
+		} {
+			t.Run(sig.String()+", "+smtp.name, func(t *testing.T) {
+				hold := holdTheFile(t)
+				path := filepath.Join(t.TempDir(), "held.db")
+				db := newReencryptDatabaseAt(t, path, reencryptSeal{
+					smtp:       smtp.key,
+					clients:    [][]byte{reencryptOldKey, reencryptOldKey},
+					signingKey: reencryptOldKey,
+				})
+				_, err := db.DB.Exec(reencryptStopTrigger)
+				require.NoError(t, err)
+
+				var stderr bytes.Buffer
+				inv, ok := readReencryptCommand([]string{"--db-dsn=file:" + path}, sqliteBase(path), &stderr)
+				require.True(t, ok, "stderr: %s", stderr.String())
+				var out lockedWriter
+				done := make(chan int, 1)
+				go func() {
+					done <- runReencryptCommand(inv, datafactory.OpenDatabase,
+						reencryptDataKeys{current: reencryptNewKey, previous: reencryptOldKey}, &out, &stderr)
+				}()
+
+				select {
+				case <-hold.entered:
+				case code := <-done:
+					t.Fatalf("reencrypt returned %d before reaching the held write\n%s%s", code, out.String(), stderr.String())
+				case <-time.After(30 * time.Second):
+					t.Fatal("the sweep never reached the held write")
+				}
+				require.NoError(t, syscall.Kill(syscall.Getpid(), sig))
+				require.Eventually(t, func() bool {
+					return strings.Contains(out.String(), reencryptStopAcknowledgement)
+				}, 10*time.Second, 10*time.Millisecond, "the signal is answered as it arrives")
+				hold.let()
+
+				var code int
+				select {
+				case code = <-done:
+				case <-time.After(30 * time.Second):
+					t.Fatal("reencrypt did not return after the held write was let go")
+				}
+				require.Equal(t, migrateExitError, code, "%s%s", out.String(), stderr.String())
+				assert.True(t, strings.HasPrefix(out.String(), reencryptStopAcknowledgement+"\n"), out.String())
+				assert.NotContains(t, out.String(), "stored secrets re-encrypted to the current data key",
+					"a stop is not a finished run")
+				first, _ := reencryptCounts(t, `stopped by a signal: stored secrets re-encrypted so far: (\d+), `+
+					`already under the current data key: (\d+); run the same command again to carry on\n`, out.String())
+				if smtp.alreadyCurrent == 0 {
+					assert.GreaterOrEqual(t, first, 1, "the SMTP password, before the clients, was re-encrypted")
+				}
+				assert.Less(t, first, 4-smtp.alreadyCurrent, "the run ended before the end")
+				assert.Empty(t, stderr.String(), "a stop is not a failure")
+
+				rows := reencryptAuditRows(t, db)
+				if first == 0 {
+					assert.Empty(t, rows, "a stopped run that committed nothing records nothing")
+				} else {
+					require.Len(t, rows, 1, "the event is written after a stop too")
+					assert.Equal(t, map[string]interface{}{
+						"command":     "goiabada-authserver reencrypt",
+						"reencrypted": float64(first),
+						"unreadable":  float64(0),
+					}, reencryptDetails(t, rows[0]))
+				}
+
+				_, err = db.DB.Exec("DROP TRIGGER reencrypt_test_hold")
+				require.NoError(t, err)
+				code, stdout, errOut := runReencryptOn(t, db, reencryptNewKey, reencryptOldKey)
+				require.Equal(t, migrateExitOK, code, "stderr: %s", errOut)
+				second, already := reencryptCounts(t, `stored secrets re-encrypted to the current data key: (\d+), `+
+					`already under it: (\d+)\n`, stdout)
+				assert.Equal(t, 4, second+already, "the second run reaches every value")
+				assert.Equal(t, first+smtp.alreadyCurrent, already,
+					"the first run counted exactly the writes it committed, the held one included when it landed")
+				for where, value := range storedSecrets(t, db) {
+					assert.Truef(t, opensUnder(reencryptNewKey, value), "%s is under the new key", where)
+				}
 			})
-			_, err := db.DB.Exec(reencryptStopTrigger)
-			require.NoError(t, err)
-
-			var stderr bytes.Buffer
-			inv, ok := readReencryptCommand([]string{"--db-dsn=file:" + path}, sqliteBase(path), &stderr)
-			require.True(t, ok, "stderr: %s", stderr.String())
-			var out lockedWriter
-			done := make(chan int, 1)
-			go func() {
-				done <- runReencryptCommand(inv, datafactory.OpenDatabase,
-					reencryptDataKeys{current: reencryptNewKey, previous: reencryptOldKey}, &out, &stderr)
-			}()
-
-			select {
-			case <-hold.entered:
-			case code := <-done:
-				t.Fatalf("reencrypt returned %d before reaching the held write\n%s%s", code, out.String(), stderr.String())
-			case <-time.After(30 * time.Second):
-				t.Fatal("the sweep never reached the held write")
-			}
-			require.NoError(t, syscall.Kill(syscall.Getpid(), sig))
-			require.Eventually(t, func() bool {
-				return strings.Contains(out.String(), reencryptStopAcknowledgement)
-			}, 10*time.Second, 10*time.Millisecond, "the signal is answered as it arrives")
-			hold.let()
-
-			var code int
-			select {
-			case code = <-done:
-			case <-time.After(30 * time.Second):
-				t.Fatal("reencrypt did not return after the held write was let go")
-			}
-			require.Equal(t, migrateExitError, code, "%s%s", out.String(), stderr.String())
-			assert.True(t, strings.HasPrefix(out.String(), reencryptStopAcknowledgement+"\n"), out.String())
-			assert.NotContains(t, out.String(), "stored secrets re-encrypted to the current data key",
-				"a stop is not a finished run")
-			first, _ := reencryptCounts(t, `stopped by a signal: stored secrets re-encrypted so far: (\d+), `+
-				`already under the current data key: (\d+); run the same command again to carry on\n`, out.String())
-			assert.GreaterOrEqual(t, first, 1, "the SMTP password, before the clients, was re-encrypted")
-			assert.Less(t, first, 4, "the run ended before the end")
-			assert.Empty(t, stderr.String(), "a stop is not a failure")
-
-			rows := reencryptAuditRows(t, db)
-			require.Len(t, rows, 1, "the event is written after a stop too")
-			assert.Equal(t, map[string]interface{}{
-				"command":     "goiabada-authserver reencrypt",
-				"reencrypted": float64(first),
-				"unreadable":  float64(0),
-			}, reencryptDetails(t, rows[0]))
-
-			_, err = db.DB.Exec("DROP TRIGGER reencrypt_test_hold")
-			require.NoError(t, err)
-			code, stdout, errOut := runReencryptOn(t, db, reencryptNewKey, reencryptOldKey)
-			require.Equal(t, migrateExitOK, code, "stderr: %s", errOut)
-			second, already := reencryptCounts(t, `stored secrets re-encrypted to the current data key: (\d+), `+
-				`already under it: (\d+)\n`, stdout)
-			assert.Equal(t, 4, second+already, "the second run reaches every value")
-			assert.GreaterOrEqual(t, already, first, "what the first run counted stays under the new key")
-			assert.LessOrEqual(t, already, first+1, "and at most the write held when the stop arrived landed beside it")
-			for where, value := range storedSecrets(t, db) {
-				assert.Truef(t, opensUnder(reencryptNewKey, value), "%s is under the new key", where)
-			}
-		})
+		}
 	}
 }
 

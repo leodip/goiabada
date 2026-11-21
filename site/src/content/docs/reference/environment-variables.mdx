@@ -275,14 +275,7 @@ openssl rand -hex 32
 If you lose this key, every secret and signing key in the database is lost with it, and nothing can decrypt them. **Never** keep the key only beside the database it protects.
 </Aside>
 
-The auth server seals with `GOIABADA_AES_ENCRYPTION_KEY`, and opens what it stores with that key and then, when it's set, `GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS`. To rotate the key:
-
-1. Set `GOIABADA_AES_ENCRYPTION_KEY` to a new key and `GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS` to the old one.
-2. Restart the auth server. It goes on serving, sealing under the new key. On Kubernetes, where a rollout runs old and new pods side by side, this takes two rollouts instead: see below.
-3. Run `goiabada-authserver reencrypt`, which moves every stored secret to the new key while the auth server serves.
-4. Once it exits 0, remove `GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS` and restart the auth server.
-
-If the stored data opens under neither key, the auth server refuses to start rather than risk damaging it. [Rotate secrets](/deploy/rotate-secrets/#the-aes-key) has the commands for each platform, and [Back up the AES key](/deploy/secrets/#back-up-the-aes-key) where to keep the key.
+The auth server seals with `GOIABADA_AES_ENCRYPTION_KEY`, and opens what it stores with that key and then, when it's set, `GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS`, which is set only while the key rotates. [Rotate secrets](/deploy/rotate-secrets/#the-aes-key) has the rotation for each platform, including when to run `goiabada-authserver reencrypt` and when to remove the previous key, and [Back up the AES key](/deploy/secrets/#back-up-the-aes-key) where to keep the key.
 
 ## The first start
 

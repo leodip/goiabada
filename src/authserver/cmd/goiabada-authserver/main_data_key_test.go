@@ -52,6 +52,53 @@ func TestMain_AKeyThatDoesNotOpenTheStoredDataStopsTheStart(t *testing.T) {
 	require.Equalf(t, 0, code, "the key the database was set up with still starts it\n%s", dump(records))
 }
 
+// TestMain_ASetUpDatabaseWithNoUsableCurrentSigningKeyStopsTheStart is the start of a database that
+// has been set up and has lost its current signing key, at the process: the row is gone, or its
+// private key is empty. It is not a database not yet seeded, which the seed would set up: the seed
+// sees the settings row and writes no key, so a start that went on would listen and become ready
+// unable to sign a token. It exits 1 before it listens, with a record naming the signing key.
+func TestMain_ASetUpDatabaseWithNoUsableCurrentSigningKeyStopsTheStart(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		damage string
+	}{
+		{"the current signing key's row deleted", "DELETE FROM key_pairs WHERE state = 'current'"},
+		{"the current signing key's private key emptied", "UPDATE key_pairs SET private_key_pem = NULL WHERE state = 'current'"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "k.db")
+			code, records := runMainSignalledAt(t, path, "starting the http listener")
+			require.Equalf(t, 0, code, "the first start seeds the database\n%s", dump(records))
+
+			db, err := sqlitedb.New(context.Background(), "file:"+path, false)
+			require.NoError(t, err)
+			result, err := db.DB.Exec(tc.damage)
+			require.NoError(t, err)
+			changed, err := result.RowsAffected()
+			require.NoError(t, err)
+			require.Equal(t, int64(1), changed)
+			remaining, err := db.GetAllSigningKeys(context.Background(), nil)
+			require.NoError(t, err)
+			require.NotEmpty(t, remaining, "the seeded database still holds its other signing keys")
+			require.NoError(t, db.DB.Close())
+
+			code, records = runMainSignalledAtWith(t, path, "", singleStepEnv)
+
+			require.Equalf(t, 1, code, "a set-up database with no usable current signing key stops the start\n%s", dump(records))
+			refusal := recordNamed(records, "the database holds no current signing key, so the auth server cannot start")
+			require.NotNilf(t, refusal, "the refusal is its own record\n%s", dump(records))
+			assert.Equal(t, "ERROR", refusal["level"])
+			assert.Contains(t, refusal["error"], "the database is set up but holds no current signing key with a private key")
+			assert.Contains(t, refusal["remedy"], "backup")
+			messages := messagesOf(records)
+			assert.NotContains(t, messages, "unable to create the database connection", "nor reported as a connection failure")
+			assert.NotContains(t, messages, "the data encryption key does not decrypt the stored data, so the auth server cannot start",
+				"nor as a key that opens nothing")
+			assert.NotContains(t, messages, "starting the http listener", "and it never listens")
+		})
+	}
+}
+
 // TestMain_ThePublishedSampleKeyStopsTheStartBeforeTheDatabase is the refusal of the data key the
 // Compose samples published (#501) at the process: a start under it exits 1 under a headline that
 // names it, with the refusal's remedy in the record's error, and before the database is opened, so

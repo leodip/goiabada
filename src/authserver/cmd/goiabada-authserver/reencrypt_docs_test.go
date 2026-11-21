@@ -128,7 +128,10 @@ func TestRotateSecretsPage_TheAESKeyRunsReencryptInEachDeploymentShape(t *testin
 // order that keeps every pod opening what every other one seals: on Kubernetes the new key goes in
 // as the previous key and rolls out, the keys are swapped and roll out, reencrypt runs, and only
 // then is the previous key removed and rolled out; on Compose and natively the swap is the first
-// restart (#492 decision 2).
+// restart (#492 decision 2). Each of the two Kubernetes rollouts before reencrypt waits, after
+// `rollout status`, for the pods listed before its restart to stop: `rollout status` ends once the
+// new pods are ready, while old ones still drain, and one of those on the earlier keys could seal
+// under a key the next step leaves.
 func TestRotateSecretsPage_TheAESKeyRotatesThroughRestartsAlone(t *testing.T) {
 	section := docsSection(t, rotateSecretsPage, aesKeySection)
 	sample, found := docsreader.SectionText(section, sampleKeySection)
@@ -140,11 +143,16 @@ func TestRotateSecretsPage_TheAESKeyRotatesThroughRestartsAlone(t *testing.T) {
 		"%s: only the sample key's rotation changes the auth server's replicas", rotateSecretsPage)
 
 	commands := reencryptCommands(t)
-	const restart = "kubectl rollout restart deployment/goiabada-authserver -n goiabada"
+	const (
+		restart = "kubectl rollout restart deployment/goiabada-authserver -n goiabada"
+		listed  = "old=$(kubectl get pods -n goiabada -l app=goiabada-authserver -o name)"
+		status  = "kubectl rollout status deployment/goiabada-authserver -n goiabada"
+		stopped = "kubectl wait -n goiabada $old --for=delete"
+	)
 	kubernetes := platformTabs(t, stopFree, "Kubernetes")
 	assertInOrder(t, kubernetes, rotateSecretsPage+": the Kubernetes rotation",
-		`"aes-encryption-key-previous": "$(openssl rand -hex 32)"`, restart,
-		`"aes-encryption-key": "$(aes aes-encryption-key-previous)"`, restart,
+		`"aes-encryption-key-previous": "$(openssl rand -hex 32)"`, listed, restart, status, stopped,
+		`"aes-encryption-key": "$(aes aes-encryption-key-previous)"`, listed, restart, status, stopped,
 		commands["Kubernetes"],
 		`"/data/aes-encryption-key-previous"`, restart)
 	assert.Containsf(t, kubernetes, `"aes-encryption-key-previous": "$(aes aes-encryption-key)"`,
@@ -198,6 +206,9 @@ func TestKubernetesSecretsPage_TheSealedAESKeyGoesInAsThePreviousKeyBeforeTheSwa
 		"--from-file=aes-encryption-key-previous=<(aes aes-encryption-key)")
 	assert.NotContainsf(t, section, "--from-file=aes-encryption-key=<(openssl",
 		"%s: no rotation seals a new key straight in as the current key", kubernetesSecretsPage)
+	assert.Equalf(t, 2, strings.Count(section, "waiting for the pods listed before the restart to stop"),
+		"%s: the External Secrets Operator's and SealedSecrets' AES key rotations each wait, after a rollout, "+
+			"for the pods listed before it to stop, as the rotate page does", kubernetesSecretsPage)
 }
 
 // dataKeyDocs is every section outside the rotate page that tells an operator to move stored data

@@ -294,7 +294,7 @@ func TestNewDatabase_ChecksTheDataKeyAtEveryStartAndNeverRotates(t *testing.T) {
 	require.ErrorIs(t, err, datafactory.ErrDataKeyMismatch, "the previous key removed before the sweep is refused")
 
 	withDatabase(func(db *sqlitedb.Database) {
-		_, sweepErr := db.ReencryptStoredSecrets(context.Background(), newKey, oldKey)
+		_, sweepErr := db.ReencryptStoredSecrets(context.Background(), newKey, oldKey, nil)
 		require.NoError(t, sweepErr)
 	})
 	storedUnder(newKey)

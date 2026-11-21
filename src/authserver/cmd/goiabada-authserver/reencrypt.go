@@ -58,8 +58,9 @@ missing file unless it is a file: URI with mode=rw.`
 const reencryptActor = "goiabada-authserver reencrypt"
 
 // reencryptStopAnswers are the lines the command answers stop signals with as they arrive: no
-// further value is re-encrypted. Each value's write is one statement, so a stop leaves no value
-// half written, whether the write in flight lands or the stop ends its wait for a row lock.
+// further value is re-encrypted. Each value's write is a transaction of its own, so a stop leaves
+// no value half written: the write in flight is counted when it commits, and rolled back when the
+// stop ends its statement, a wait for a row lock included.
 var reencryptStopAnswers = stopAnswers{
 	first:   "stopping: no further stored secret will be re-encrypted",
 	further: "still stopping: a further Ctrl-C changes nothing",
@@ -143,7 +144,8 @@ func runReencryptCommand(inv reencryptInvocation, open recoverDatabaseOpener, ke
 	}
 
 	// The command owns the stop signals, so Ctrl-C or a pod's SIGTERM ends it between values: the
-	// value being written is one statement, which lands or does not, and the next does not start.
+	// value being written is a transaction of its own, which commits or does not, and the next does
+	// not start.
 	// The sweep can be run again from wherever it stopped (#492 decision 4). The signals are
 	// migrate's, and so is SIGPIPE's handling, since the acknowledgement is written while the run
 	// goes on.
@@ -188,7 +190,8 @@ func runReencryptCommand(inv reencryptInvocation, open recoverDatabaseOpener, ke
 
 // reencryptDatabase is what runReencrypt asks of the database: the sweep.
 type reencryptDatabase interface {
-	ReencryptStoredSecrets(ctx context.Context, currentKey, previousKey []byte) (record.Reencryption, error)
+	ReencryptStoredSecrets(ctx context.Context, currentKey, previousKey []byte,
+		unreadable func(record.StoredSecret)) (record.Reencryption, error)
 }
 
 // reencryptAuditLogger records the event a run that re-encrypted something writes.
@@ -215,16 +218,17 @@ func runReencrypt(ctx context.Context, database reencryptDatabase, m schemaVersi
 		return migrateExitError
 	}
 
-	report, err := database.ReencryptStoredSecrets(ctx, keys.current, keys.previous)
-	for _, value := range report.Unreadable {
+	// Each unreadable value is named as the sweep reaches it, so a run over a database no key opens
+	// prints as it goes and holds no list of every row.
+	report, err := database.ReencryptStoredSecrets(ctx, keys.current, keys.previous, func(value record.StoredSecret) {
 		outf(stderr, "unreadable: %s.%s, row %d: neither data key opens it, so it was left as it is\n",
 			value.Table, value.Column, value.Id)
-	}
+	})
 	if report.Reencrypted > 0 {
 		auditLogger.Log(ctx, audit.EventReencryptedStoredSecrets, map[string]interface{}{
 			"command":     reencryptActor,
 			"reencrypted": report.Reencrypted,
-			"unreadable":  len(report.Unreadable),
+			"unreadable":  report.Unreadable,
 		})
 	}
 
@@ -250,7 +254,7 @@ func runReencrypt(ctx context.Context, database reencryptDatabase, m schemaVersi
 			report.Reencrypted, report.AlreadyCurrent)
 	}
 
-	if n := len(report.Unreadable); n > 0 {
+	if n := report.Unreadable; n > 0 {
 		subject := fmt.Sprintf("%d stored secrets open under neither data key and were left as they are. "+
 			"If they were sealed under an older key", n)
 		if n == 1 {

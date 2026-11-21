@@ -486,7 +486,8 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
 - `internal/data/datafactory/` - Database composition: engine selection, config mapping, the
   email-case pre-flight, which the migrator runs under its lock on its own connection (#542), the
   startup data tasks, which read the current signing key, refuse a start whose data keys do not
-  open it, warn when it is under the previous key, and write nothing (#353, #438, #542, #492)
+  open it or a seeded database without one, warn when it is under the previous key, and write
+  nothing (#353, #438, #542, #492)
 - `internal/bootstrap/` - The first run: which of the three bootstrap modes applies, and the seed,
   whose 18 writes commit in one transaction with the bootstrap file published only after it (#424).
   A seed that loses an empty database to another instance seeding it at once (a unique key, and the

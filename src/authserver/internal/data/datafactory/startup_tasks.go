@@ -21,10 +21,18 @@ import (
 // the rollout waits with them still serving (#542).
 var ErrDataKeyMismatch = errors.New("the stored data does not decrypt under GOIABADA_AES_ENCRYPTION_KEY")
 
+// ErrNoCurrentSigningKey is a database that has been set up, its settings row seeded, but holds no
+// current signing key with a private key: the row is gone, or its private key is empty. Every start
+// refuses it, since a server that went on would listen and become ready while it could sign no
+// token, and the seed, which sees the settings row, would not put a key back.
+var ErrNoCurrentSigningKey = errors.New("the database is set up but holds no current signing key with a private key")
+
 // signingKeyReader is what the data key check reads: the signing keys, among which the current
-// one is the stored value it opens.
+// one is the stored value it opens, and, only when there is no signing key at all, whether the
+// database has been seeded yet.
 type signingKeyReader interface {
 	GetAllSigningKeys(ctx context.Context, tx *sql.Tx) ([]record.KeyPair, error)
+	IsEmpty(ctx context.Context) (bool, error)
 }
 
 // sharedIdentifierReader is what the startup warning reads: the identifiers a client and a
@@ -51,9 +59,11 @@ type startupDataStore interface {
 // the reencrypt command's now, run when the operator knows every auth server holds the swapped
 // keys, which a start cannot know (#492 decision 3).
 //
-// So this function reads no settings at all, and writes nothing. Nothing here is allowed to re-add
-// a settings read: the legacy key column is the conversion's, and startup_tasks_test.go asserts the
-// two reads below are the only calls a start makes.
+// So this function writes nothing, and acts on no setting. It asks whether the settings row exists
+// only when the database holds no signing key at all, to tell a database not yet seeded from one
+// whose signing keys are gone; nothing here is allowed to act on what the row holds, since the
+// legacy key column is the conversion's. startup_tasks_test.go asserts the two reads below are the
+// only calls a start on a seeded database makes.
 //
 // THE CHECK IS FAIL-CLOSED, and that is the property this function exists to make testable rather
 // than merely true. It returns an error that must stop startup: a server whose keys open none of
@@ -115,7 +125,11 @@ func warnOfSharedIdentifiers(ctx context.Context, database sharedIdentifierReade
 // with no previous key is the proof. The other signing keys are never opened, so a damaged one
 // that signs nothing does not stop a start.
 //
-// Only a database not yet seeded, with no current signing key holding a PEM, passes unchecked. A
+// Only a database not yet seeded, holding no signing key and no settings row, passes unchecked: the
+// seed then writes both in one transaction. A database holding other signing keys but no current
+// one with a PEM, or holding none while its settings row exists, has been set up and lost its
+// current signing key, and is refused with ErrNoCurrentSigningKey. The settings row is asked about
+// only when there is no signing key at all, so a seeded database's start still makes one read. A
 // previous key that is not 32 bytes, or equals the current one, takes no part.
 func checkDataKey(ctx context.Context, database signingKeyReader, currentKey, previousKey []byte) (bool, error) {
 	keys, err := database.GetAllSigningKeys(ctx, nil)
@@ -123,14 +137,28 @@ func checkDataKey(ctx context.Context, database signingKeyReader, currentKey, pr
 		return false, errs.Wrap(err, "unable to load signing keys to check the data key")
 	}
 	var stored []byte
+	foundCurrent := false
 	for _, k := range keys {
 		if k.State == record.KeyStateCurrent.String() {
 			stored = k.PrivateKeyPEM
+			foundCurrent = true
 			break
 		}
 	}
-	if len(stored) == 0 {
-		return false, nil // no encrypted data yet
+	switch {
+	case foundCurrent && len(stored) == 0:
+		return false, errs.Wrap(ErrNoCurrentSigningKey, "the current signing key's private key is empty")
+	case !foundCurrent && len(keys) > 0:
+		return false, errs.Wrap(ErrNoCurrentSigningKey, "no signing key is in the current state")
+	case !foundCurrent:
+		empty, err := database.IsEmpty(ctx)
+		if err != nil {
+			return false, errs.Wrap(err, "unable to tell whether the database holding no signing key is seeded")
+		}
+		if empty {
+			return false, nil // not yet seeded: no encrypted data yet
+		}
+		return false, errs.Wrap(ErrNoCurrentSigningKey, "the database holds no signing key")
 	}
 
 	if _, err := encryption.DecryptText(stored, currentKey); err == nil {

@@ -16,8 +16,8 @@ import (
 
 // The re-encryption sweep's statements on every engine (#492 decision 4): each column read in
 // batches of 100 rows after the last id read, with no transaction, and each value written only
-// while its row still holds the bytes read. A write that finds other bytes reads the row again and
-// takes what it holds now. The data tier runs the same statements on the four engines; this pins
+// while its row still holds the bytes read, in a transaction of its own. A write that finds other
+// bytes reads the row again and takes what it holds now. The data tier runs the same statements on the four engines; this pins
 // their text and the paging, which a table smaller than a batch cannot show.
 func TestReencryptStoredSecrets_ReadsInBatchesAndWritesOnlyWhatItRead(t *testing.T) {
 	oldKey := []byte(strings.Repeat("o", 32))
@@ -66,12 +66,14 @@ func TestReencryptStoredSecrets_ReadsInBatchesAndWritesOnlyWhatItRead(t *testing
 			}
 			started := time.Now().UTC()
 
-			report, err := scriptedDBFor(t, script, dialect).ReencryptStoredSecrets(context.Background(), newKey, oldKey)
+			report, err := scriptedDBFor(t, script, dialect).ReencryptStoredSecrets(context.Background(), newKey, oldKey, nil)
 
 			require.NoError(t, err)
 			assert.Equal(t, record.Reencryption{Reencrypted: 100, AlreadyCurrent: 1}, report,
 				"clients 2 to 101 are re-encrypted, and client 1 holds a secret already under the current key")
-			assert.Empty(t, script.txOptions, "the sweep opens no transaction")
+			counts := script.settled(t)
+			assert.Equal(t, 100, counts.commits, "each write that lands is a transaction of its own, committed")
+			assert.Equal(t, 1, counts.rollbacks, "the write that found other bytes changed nothing, and is rolled back")
 
 			var clientReads []string
 			for _, query := range script.statements {
@@ -101,7 +103,12 @@ func TestReencryptStoredSecrets_ReadsInBatchesAndWritesOnlyWhatItRead(t *testing
 			assert.Equal(t, firstBatch[0][1], readBytes, "the write is conditional on the bytes the sweep read")
 			rendered, problems := renderStatement(dialect, firstWrite, []driver.Value{"<new>", args[1], "<read>"}, started)
 			assert.Empty(t, problems, "\n%s", strings.Join(problems, "\n"))
-			assert.Equal(t, "UPDATE clients SET client_secret_encrypted = '<new>' WHERE id = 1 AND client_secret_encrypted = '<read>'", rendered)
+			wantWrite := "UPDATE clients SET client_secret_encrypted = '<new>' WHERE id = 1 AND client_secret_encrypted = '<read>'"
+			if dialect == data.MSSQL {
+				// SQL Server compares VARBINARY values equal when they differ in trailing zero bytes.
+				wantWrite += " AND DATALENGTH(client_secret_encrypted) = DATALENGTH('<read>')"
+			}
+			assert.Equal(t, wantWrite, rendered)
 			sealed, ok := args[0].([]byte)
 			require.True(t, ok)
 			opened, err := encryption.DecryptText(sealed, newKey)
@@ -140,4 +147,121 @@ func firstStatement(script *scriptedDriver, prefix string) string {
 		}
 	}
 	return ""
+}
+
+// A stop that reaches a write in flight leaves the run's count equal to what the database holds
+// (#492 decision 8). A driver can answer the cancellation of an UPDATE that took effect, as
+// SQLite's does while it hands the result back, so a write that answers an error is rolled back and
+// not counted; one that answers success is committed whatever the stop did meanwhile, and counted.
+// Either way the run then stops, before the next value.
+func TestReencryptStoredSecrets_AWriteAStopReachesIsCountedOnlyWhenItCommits(t *testing.T) {
+	oldKey := []byte(strings.Repeat("o", 32))
+	newKey := []byte(strings.Repeat("n", 32))
+	twoClients := func(t *testing.T) [][]driver.Value {
+		var rows [][]driver.Value
+		for id := int64(1); id <= 2; id++ {
+			sealed, err := encryption.EncryptText("secret", oldKey)
+			require.NoError(t, err)
+			rows = append(rows, []driver.Value{id, sealed})
+		}
+		return rows
+	}
+
+	for _, tc := range []struct {
+		name string
+		// write is the first write's answer, given the stop it calls inside the statement.
+		write              func(stop context.CancelFunc) *scriptedExec
+		reencrypted        int
+		commits, rollbacks int
+	}{
+		{"the statement answers the cancellation", func(stop context.CancelFunc) *scriptedExec {
+			return &scriptedExec{during: stop, err: context.Canceled}
+		}, 0, 0, 1},
+		{"the statement lands as the stop arrives", func(stop context.CancelFunc) *scriptedExec {
+			return &scriptedExec{during: stop, rowsAffected: 1}
+		}, 1, 1, 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, stop := context.WithCancel(context.Background())
+			defer stop()
+			clients := twoClients(t)
+			script := &scriptedDriver{execs: []*scriptedExec{tc.write(stop)}}
+			script.answer = func(query string, args []driver.Value) *scriptedRows {
+				if strings.Contains(query, "id, client_secret_encrypted FROM clients") && args[0] == int64(0) {
+					return &scriptedRows{cols: []string{"id", "value"}, values: clients}
+				}
+				return &scriptedRows{cols: []string{"id", "value"}}
+			}
+
+			report, err := scriptedDBFor(t, script, data.SQLite).ReencryptStoredSecrets(ctx, newKey, oldKey, nil)
+
+			require.ErrorIs(t, err, context.Canceled, "the run answers the stop")
+			assert.Equal(t, tc.reencrypted, report.Reencrypted)
+			counts := script.settled(t)
+			assert.Equal(t, tc.commits, counts.commits, "commits")
+			assert.Equal(t, tc.rollbacks, counts.rollbacks, "rollbacks")
+			assert.Equal(t, report.Reencrypted, counts.commits, "the count is what was committed")
+			assert.Len(t, script.execArgs, 1, "no write starts after the stop")
+		})
+	}
+}
+
+// The sweep names each value neither key opens as it reaches it, never holding them to the end of
+// the run: the first is named before the table's second batch is read (#492 decisions 4 and 5).
+func TestReencryptStoredSecrets_NamesEachUnreadableValueAsItReachesIt(t *testing.T) {
+	otherKey := []byte(strings.Repeat("x", 32))
+	oldKey := []byte(strings.Repeat("o", 32))
+	newKey := []byte(strings.Repeat("n", 32))
+	var firstBatch [][]driver.Value
+	for id := int64(1); id <= 100; id++ {
+		sealed, err := encryption.EncryptText("secret", otherKey)
+		require.NoError(t, err)
+		firstBatch = append(firstBatch, []driver.Value{id, sealed})
+	}
+	sealed, err := encryption.EncryptText("secret", otherKey)
+	require.NoError(t, err)
+	secondBatch := [][]driver.Value{{int64(101), sealed}}
+
+	script := &scriptedDriver{}
+	script.answer = func(query string, args []driver.Value) *scriptedRows {
+		if strings.Contains(query, "id, client_secret_encrypted FROM clients") {
+			switch args[0] {
+			case int64(0):
+				return &scriptedRows{cols: []string{"id", "value"}, values: firstBatch}
+			case int64(100):
+				return &scriptedRows{cols: []string{"id", "value"}, values: secondBatch}
+			}
+		}
+		return &scriptedRows{cols: []string{"id", "value"}}
+	}
+	clientBatchesRead := func() int {
+		script.mu.Lock()
+		defer script.mu.Unlock()
+		n := 0
+		for _, statement := range script.statements {
+			if strings.Contains(statement, "FROM clients WHERE id >") {
+				n++
+			}
+		}
+		return n
+	}
+	var named []record.StoredSecret
+	var batchesReadAtEach []int
+
+	report, err := scriptedDBFor(t, script, data.SQLite).ReencryptStoredSecrets(context.Background(), newKey, oldKey,
+		func(value record.StoredSecret) {
+			named = append(named, value)
+			batchesReadAtEach = append(batchesReadAtEach, clientBatchesRead())
+		})
+
+	require.NoError(t, err)
+	assert.Equal(t, record.Reencryption{Unreadable: 101}, report)
+	require.Len(t, named, 101)
+	for i, value := range named {
+		assert.Equal(t, record.StoredSecret{Table: "clients", Column: "client_secret_encrypted", Id: int64(i + 1)}, value)
+	}
+	assert.Equal(t, 1, batchesReadAtEach[0], "the first unreadable value is named before the second batch is read")
+	assert.Equal(t, 1, batchesReadAtEach[99], "the first batch's values are all named before the second is read")
+	assert.Equal(t, 2, batchesReadAtEach[100])
+	assert.Empty(t, script.execArgs, "nothing unreadable is written")
 }
