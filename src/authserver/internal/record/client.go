@@ -7,7 +7,7 @@ import (
 )
 
 type Client struct {
-	Id        int64        `db:"id" fieldtag:"pk"`
+	ID        int64        `db:"id" fieldtag:"pk"`
 	CreatedAt sql.NullTime `db:"created_at" fieldtag:"dont-update"`
 	UpdatedAt sql.NullTime `db:"updated_at"`
 	// ClientIdentifier is the client_id the client sends. Tagged dont-update, so the whole-row
@@ -73,13 +73,13 @@ type Client struct {
 	// read earlier would write back a method cleared since. CreateClient writes it, and
 	// SetClientPublic's transition clears it.
 	TokenEndpointAuthMethod string `db:"token_endpoint_auth_method" fieldtag:"dont-update"`
-	// BrandId is the brand this client's pages are drawn in, or NULL to follow the default brand,
+	// BrandID is the brand this client's pages are drawn in, or NULL to follow the default brand,
 	// whichever it is at the time (#812 decision 1). Tagged dont-update, so the whole-row
 	// UpdateClient never writes it: a save made from a copy read earlier would write back a brand
 	// changed since. SetClientBrand assigns it under the settings row's lock, and a brand's deletion
 	// clears it under that lock on the clients it moves. CreateClient writes what the record carries,
 	// which every create path leaves empty: a new client starts on the default.
-	BrandId                  sql.NullInt64 `db:"brand_id" fieldtag:"dont-update"`
+	BrandID                  sql.NullInt64 `db:"brand_id" fieldtag:"dont-update"`
 	ShowLogo                 bool          `db:"show_logo"`
 	ShowDisplayName          bool          `db:"show_display_name"`
 	ShowDescription          bool          `db:"show_description"`
@@ -103,8 +103,8 @@ type Client struct {
 	RefreshTokenOfflineIdleTimeoutInSeconds int           `db:"refresh_token_offline_idle_timeout_in_seconds"`
 	RefreshTokenOfflineMaxLifetimeInSeconds int           `db:"refresh_token_offline_max_lifetime_in_seconds"`
 	IncludeOpenIDConnectClaimsInAccessToken string        `db:"include_open_id_connect_claims_in_access_token"`
-	IncludeOpenIDConnectClaimsInIdToken     string        `db:"include_open_id_connect_claims_in_id_token"`
-	DefaultAcrLevel                         AcrLevel      `db:"default_acr_level"`
+	IncludeOpenIDConnectClaimsInIDToken     string        `db:"include_open_id_connect_claims_in_id_token"`
+	DefaultACRLevel                         ACRLevel      `db:"default_acr_level"`
 	Permissions                             []Permission  `db:"-"`
 	RedirectURIs                            []RedirectURI `db:"-"`
 	// PostLogoutRedirectURIs are the client's sign-out redirect URIs, never read at sign-in (#147).

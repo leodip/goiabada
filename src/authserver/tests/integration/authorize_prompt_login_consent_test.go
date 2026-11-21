@@ -26,18 +26,18 @@ func TestPromptConsent_ForcesConsentEvenWhenAlreadyConsented(t *testing.T) {
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false, // Consent NOT normally required
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+	redirectURI := &record.RedirectURI{
+		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,8 +62,8 @@ func TestPromptConsent_ForcesConsentEvenWhenAlreadyConsented(t *testing.T) {
 
 	// Create consent for all scopes
 	consent := &record.UserConsent{
-		UserId:    user.Id,
-		ClientId:  client.Id,
+		UserID:    user.ID,
+		ClientID:  client.ID,
 		Scope:     "openid profile",
 		GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
 	}
@@ -73,13 +73,13 @@ func TestPromptConsent_ForcesConsentEvenWhenAlreadyConsented(t *testing.T) {
 	}
 
 	// Create session first
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -87,7 +87,7 @@ func TestPromptConsent_ForcesConsentEvenWhenAlreadyConsented(t *testing.T) {
 		"&state=" + requestState +
 		"&nonce=" + requestNonce
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,15 +118,15 @@ func TestPromptConsent_ForcesConsentEvenWhenAlreadyConsented(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	_, _ = getCodeAndStateFromUrl(t, resp)
+	_, _ = getCodeAndStateFromURL(t, resp)
 
 	// Now request with prompt=consent - should force consent screen
 	requestState2 := fake.LetterN(8)
 	requestNonce2 := fake.LetterN(8)
 	requestCodeChallenge2 := randomCodeChallenge()
 
-	destUrl2 := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL2 := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge2 +
@@ -135,7 +135,7 @@ func TestPromptConsent_ForcesConsentEvenWhenAlreadyConsented(t *testing.T) {
 		"&nonce=" + requestNonce2 +
 		"&prompt=consent"
 
-	resp2, err := httpClient.Get(destUrl2)
+	resp2, err := httpClient.Get(destURL2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -155,13 +155,13 @@ func TestPromptConsent_ForcesConsentEvenWhenAlreadyConsented(t *testing.T) {
 }
 
 func TestPromptConsent_NoSession_RequiresLoginFirst(t *testing.T) {
-	client, redirectUri := createTestClientAndRedirectURI(t)
-	httpClient := createHttpClient(t)
+	client, redirectURI := createTestClientAndRedirectURI(t)
+	httpClient := createHTTPClient(t)
 
 	requestState := fake.LetterN(8)
 	requestCodeChallenge := randomCodeChallenge()
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -169,7 +169,7 @@ func TestPromptConsent_NoSession_RequiresLoginFirst(t *testing.T) {
 		"&state=" + requestState +
 		"&prompt=consent"
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -181,12 +181,12 @@ func TestPromptConsent_NoSession_RequiresLoginFirst(t *testing.T) {
 
 func TestPromptLoginConsent_Combined(t *testing.T) {
 	// Create session
-	httpClient, client, redirectUri, user, password := createSessionWithAcrLevel1AndPassword(t)
+	httpClient, client, redirectURI, user, password := createSessionWithACRLevel1AndPassword(t)
 
 	// Create consent for all scopes
 	consent := &record.UserConsent{
-		UserId:    user.Id,
-		ClientId:  client.Id,
+		UserID:    user.ID,
+		ClientID:  client.ID,
 		Scope:     "openid profile email",
 		GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
 	}
@@ -200,8 +200,8 @@ func TestPromptLoginConsent_Combined(t *testing.T) {
 	requestCodeChallenge := randomCodeChallenge()
 
 	// Use both prompt=login and prompt=consent
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -210,7 +210,7 @@ func TestPromptLoginConsent_Combined(t *testing.T) {
 		"&nonce=" + requestNonce +
 		"&prompt=login%20consent"
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -245,13 +245,13 @@ func TestPromptLoginConsent_Combined(t *testing.T) {
 // =============================================================================
 
 func TestPromptLogin_NoSession(t *testing.T) {
-	client, redirectUri := createTestClientAndRedirectURI(t)
-	httpClient := createHttpClient(t)
+	client, redirectURI := createTestClientAndRedirectURI(t)
+	httpClient := createHTTPClient(t)
 
 	requestState := fake.LetterN(8)
 	requestCodeChallenge := randomCodeChallenge()
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -259,7 +259,7 @@ func TestPromptLogin_NoSession(t *testing.T) {
 		"&state=" + requestState +
 		"&prompt=login"
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -271,13 +271,13 @@ func TestPromptLogin_NoSession(t *testing.T) {
 
 func TestPromptLogin_MaxAgeIrrelevant(t *testing.T) {
 	// Create very recent session
-	httpClient, client, redirectUri, _, _ := createSessionWithAcrLevel1AndPassword(t)
+	httpClient, client, redirectURI, _, _ := createSessionWithACRLevel1AndPassword(t)
 
 	requestState := fake.LetterN(8)
 	requestCodeChallenge := randomCodeChallenge()
 	// Even with max_age=600 (which would normally allow SSO), prompt=login forces re-auth
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -286,7 +286,7 @@ func TestPromptLogin_MaxAgeIrrelevant(t *testing.T) {
 		"&prompt=login" +
 		"&max_age=600"
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -296,8 +296,8 @@ func TestPromptLogin_MaxAgeIrrelevant(t *testing.T) {
 	assertRedirect(t, resp, "/auth/level1")
 }
 
-func TestPromptLogin_PreservesAcrLevel(t *testing.T) {
-	httpClient, client, redirectUri, user, password := createSessionWithAcrLevel1AndPassword(t)
+func TestPromptLogin_PreservesACRLevel(t *testing.T) {
+	httpClient, client, redirectURI, user, password := createSessionWithACRLevel1AndPassword(t)
 
 	// Enable OTP for user
 	otpSecret := newOTPSecretForTest(t, user.Email)
@@ -313,8 +313,8 @@ func TestPromptLogin_PreservesAcrLevel(t *testing.T) {
 	requestCodeChallenge := randomCodeChallenge()
 
 	// Request level2_optional with prompt=login
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -322,9 +322,9 @@ func TestPromptLogin_PreservesAcrLevel(t *testing.T) {
 		"&state=" + requestState +
 		"&nonce=" + requestNonce +
 		"&prompt=login" +
-		"&acr_values=" + record.AcrLevel2Optional.String()
+		"&acr_values=" + record.ACRLevel2Optional.String()
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -351,14 +351,14 @@ func TestPromptLogin_PreservesAcrLevel(t *testing.T) {
 }
 
 func TestPromptLogin_PreservesNonce(t *testing.T) {
-	httpClient, client, redirectUri, user, password := createSessionWithAcrLevel1AndPassword(t)
+	httpClient, client, redirectURI, user, password := createSessionWithACRLevel1AndPassword(t)
 
 	requestState := fake.LetterN(8)
 	requestNonce := "test-nonce-" + fake.LetterN(16)
 	requestCodeChallenge := randomCodeChallenge()
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -367,7 +367,7 @@ func TestPromptLogin_PreservesNonce(t *testing.T) {
 		"&nonce=" + requestNonce +
 		"&prompt=login"
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -397,7 +397,7 @@ func TestPromptLogin_PreservesNonce(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	codeVal, _ := getCodeAndStateFromUrl(t, resp)
+	codeVal, _ := getCodeAndStateFromURL(t, resp)
 
 	// Verify the code has the nonce preserved
 	code := loadCodeFromDatabase(t, codeVal)
@@ -414,18 +414,18 @@ func TestPromptConsent_UserDeclines(t *testing.T) {
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+	redirectURI := &record.RedirectURI{
+		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -447,13 +447,13 @@ func TestPromptConsent_UserDeclines(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -462,7 +462,7 @@ func TestPromptConsent_UserDeclines(t *testing.T) {
 		"&nonce=" + requestNonce +
 		"&prompt=consent"
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -501,21 +501,21 @@ func TestPromptConsent_UserDeclines(t *testing.T) {
 	// Should redirect to client with access_denied error
 	assert.Equal(t, http.StatusSeeOther, resp.StatusCode)
 
-	errorCode, _, state := getErrorFromUrl(t, resp)
+	errorCode, _, state := getErrorFromURL(t, resp)
 
 	assert.Equal(t, "access_denied", errorCode)
 	assert.Equal(t, requestState, state)
 }
 
 func TestPromptLogin_WrongPassword(t *testing.T) {
-	httpClient, client, redirectUri, user, _ := createSessionWithAcrLevel1AndPassword(t)
+	httpClient, client, redirectURI, user, _ := createSessionWithACRLevel1AndPassword(t)
 
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 	requestCodeChallenge := randomCodeChallenge()
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -524,7 +524,7 @@ func TestPromptLogin_WrongPassword(t *testing.T) {
 		"&nonce=" + requestNonce +
 		"&prompt=login"
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -557,7 +557,7 @@ func TestPromptLogin_WrongPassword(t *testing.T) {
 // TestPromptLogin_UserDisabled verifies that when prompt=login forces re-authentication,
 // a disabled user sees an error on the password form.
 func TestPromptLogin_UserDisabled(t *testing.T) {
-	httpClient, client, redirectUri, user, password := createSessionWithAcrLevel1AndPassword(t)
+	httpClient, client, redirectURI, user, password := createSessionWithACRLevel1AndPassword(t)
 
 	// Disable the user
 	user.Enabled = false
@@ -569,8 +569,8 @@ func TestPromptLogin_UserDisabled(t *testing.T) {
 	requestState := fake.LetterN(8)
 	requestCodeChallenge := randomCodeChallenge()
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -579,7 +579,7 @@ func TestPromptLogin_UserDisabled(t *testing.T) {
 		"&nonce=" + fake.LetterN(8) +
 		"&prompt=login"
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -620,7 +620,7 @@ func TestPromptLogin_NewAuthTime(t *testing.T) {
 		Enabled:                                 true,
 		AuthorizationCodeEnabled:                true,
 		ConsentRequired:                         false,
-		DefaultAcrLevel:                         record.AcrLevel1,
+		DefaultACRLevel:                         record.ACRLevel1,
 		TokenExpirationInSeconds:                300,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 3600,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 86400,
@@ -630,11 +630,11 @@ func TestPromptLogin_NewAuthTime(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+	redirectURI := &record.RedirectURI{
+		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -656,14 +656,14 @@ func TestPromptLogin_NewAuthTime(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	codeVerifier := testCodeVerifier
 	codeChallenge := oauth.GeneratePKCECodeChallenge(codeVerifier)
 	requestState := fake.LetterN(8)
 
 	// Login at T1 to establish session
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + codeChallenge +
@@ -671,7 +671,7 @@ func TestPromptLogin_NewAuthTime(t *testing.T) {
 		"&state=" + requestState +
 		"&nonce=" + fake.LetterN(8)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -700,7 +700,7 @@ func TestPromptLogin_NewAuthTime(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	codeVal1, _ := getCodeAndStateFromUrl(t, resp)
+	codeVal1, _ := getCodeAndStateFromURL(t, resp)
 
 	// Exchange first code for tokens to get T1 auth_time
 	tokenEndpoint := appConfig.AuthServer.BaseURL + "/auth/token"
@@ -709,7 +709,7 @@ func TestPromptLogin_NewAuthTime(t *testing.T) {
 		"client_id":     {client.ClientIdentifier},
 		"client_secret": {clientSecret},
 		"code":          {codeVal1},
-		"redirect_uri":  {redirectUri.URI},
+		"redirect_uri":  {redirectURI.URI},
 		"code_verifier": {codeVerifier},
 	}
 
@@ -727,8 +727,8 @@ func TestPromptLogin_NewAuthTime(t *testing.T) {
 	codeChallenge2 := oauth.GeneratePKCECodeChallenge(codeVerifier2)
 	requestState2 := fake.LetterN(8)
 
-	destUrl2 := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL2 := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + codeChallenge2 +
@@ -737,7 +737,7 @@ func TestPromptLogin_NewAuthTime(t *testing.T) {
 		"&nonce=" + fake.LetterN(8) +
 		"&prompt=login"
 
-	resp2, err := httpClient.Get(destUrl2)
+	resp2, err := httpClient.Get(destURL2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -766,7 +766,7 @@ func TestPromptLogin_NewAuthTime(t *testing.T) {
 	resp2 = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp2.Body.Close() }()
 
-	codeVal2, _ := getCodeAndStateFromUrl(t, resp2)
+	codeVal2, _ := getCodeAndStateFromURL(t, resp2)
 
 	// Exchange second code for tokens to get T2 auth_time
 	form2 := url.Values{
@@ -774,7 +774,7 @@ func TestPromptLogin_NewAuthTime(t *testing.T) {
 		"client_id":     {client.ClientIdentifier},
 		"client_secret": {clientSecret},
 		"code":          {codeVal2},
-		"redirect_uri":  {redirectUri.URI},
+		"redirect_uri":  {redirectURI.URI},
 		"code_verifier": {codeVerifier2},
 	}
 

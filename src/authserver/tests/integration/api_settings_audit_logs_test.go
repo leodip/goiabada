@@ -22,7 +22,7 @@ const settingsAuditLogsURL = "/api/v1/admin/settings/audit-logs"
 func TestAPISettingsAuditLogsGet_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
+	settings, err := database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err)
 	assert.NotNil(t, settings)
 
@@ -68,7 +68,7 @@ func TestAPISettingsAuditLogsPut_Success(t *testing.T) {
 	assert.Equal(t, req.AuditLogRetentionDays, body.AuditLogRetentionDays)
 
 	// Persisted, not just echoed back.
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
+	settings, err := database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err)
 	assert.Equal(t, req.AuditLogsInConsoleEnabled, settings.AuditLogsInConsoleEnabled)
 	assert.Equal(t, req.AuditLogsInDatabaseEnabled, settings.AuditLogsInDatabaseEnabled)
@@ -93,7 +93,7 @@ func TestAPISettingsAuditLogsPut_CanDisableBothSinks(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
+	settings, err := database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err)
 	assert.False(t, settings.AuditLogsInConsoleEnabled)
 	assert.False(t, settings.AuditLogsInDatabaseEnabled)
@@ -163,7 +163,7 @@ func TestAPISettingsAuditLogsPut_ValidationErrors(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Capture the stored value so we can prove a rejected request changed nothing.
-			before, err := database.GetSettingsById(context.Background(), nil, 1)
+			before, err := database.GetSettingsByID(context.Background(), nil, 1)
 			require.NoError(t, err)
 
 			resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsAuditLogsRequest{
@@ -179,7 +179,7 @@ func TestAPISettingsAuditLogsPut_ValidationErrors(t *testing.T) {
 			_ = json.NewDecoder(resp.Body).Decode(&errResp)
 			assert.Equal(t, tc.wantMsg, errResp.ErrorDescription)
 
-			after, err := database.GetSettingsById(context.Background(), nil, 1)
+			after, err := database.GetSettingsByID(context.Background(), nil, 1)
 			require.NoError(t, err)
 			assert.Equal(t, before.AuditLogRetentionDays, after.AuditLogRetentionDays,
 				"a rejected request must not change the stored retention")
@@ -197,7 +197,7 @@ func TestAPISettingsAuditLogsPut_InvalidBody(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -219,9 +219,9 @@ func TestAPISettingsAuditLogsPut_IsItselfAudited(t *testing.T) {
 
 	before, _, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 1, record.AuditLogFilter{AuditEvent: audit.EventUpdatedAuditLogsSettings})
 	require.NoError(t, err)
-	var lastIdBefore int64
+	var lastIDBefore int64
 	if len(before) > 0 {
-		lastIdBefore = before[0].Id
+		lastIDBefore = before[0].ID
 	}
 
 	url := appConfig.AuthServer.BaseURL + settingsAuditLogsURL
@@ -238,14 +238,14 @@ func TestAPISettingsAuditLogsPut_IsItselfAudited(t *testing.T) {
 	assert.Positive(t, total, "the settings change must be recorded")
 	assert.NotEmpty(t, after)
 	if len(after) > 0 {
-		assert.NotEqual(t, lastIdBefore, after[0].Id, "a new audit entry must have been written")
+		assert.NotEqual(t, lastIDBefore, after[0].ID, "a new audit entry must have been written")
 		assert.Contains(t, after[0].Details, "audit_log_retention_days")
 	}
 }
 
 func TestAPISettingsAuditLogs_UnauthorizedAndScope(t *testing.T) {
 	url := appConfig.AuthServer.BaseURL + settingsAuditLogsURL
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
 	for _, method := range []string{"GET", "PUT"} {
 		t.Run(method+" without a token", func(t *testing.T) {

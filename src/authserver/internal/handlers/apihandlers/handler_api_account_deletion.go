@@ -34,9 +34,9 @@ type accountDeletionDatabase interface {
 	revocation.Database
 
 	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error)
-	TryUseUserRecoveryCode(ctx context.Context, tx *sql.Tx, userId int64, codeHash string) (bool, error)
-	UserRecoveryCodeExists(ctx context.Context, tx *sql.Tx, userId int64, codeHash string) (bool, error)
-	DeleteUser(ctx context.Context, tx *sql.Tx, userId int64) error
+	TryUseUserRecoveryCode(ctx context.Context, tx *sql.Tx, userID int64, codeHash string) (bool, error)
+	UserRecoveryCodeExists(ctx context.Context, tx *sql.Tx, userID int64, codeHash string) (bool, error)
+	DeleteUser(ctx context.Context, tx *sql.Tx, userID int64) error
 }
 
 // The deletion's transaction returns these to say why it rolled back, so the response is written
@@ -114,7 +114,7 @@ func HandleAccountDeletionPost(
 			writeJSONError(w, "Invalid request body", "INVALID_REQUEST_BODY", http.StatusBadRequest)
 			return
 		}
-		otpCode := strings.TrimSpace(req.OtpCode)
+		otpCode := strings.TrimSpace(req.OTPCode)
 		recoveryCodeSent := !otpcredential.IsBlankRecoveryCode(req.RecoveryCode)
 		// The shape of the request rather than a credential, so it is refused before anything is
 		// read or checked, and spends nothing.
@@ -198,7 +198,7 @@ func HandleAccountDeletionPost(
 			if lockErr != nil {
 				return lockErr
 			}
-			locked, readErr := database.GetUserByIdForUpdate(r.Context(), tx, user.Id)
+			locked, readErr := database.GetUserByIDForUpdate(r.Context(), tx, user.ID)
 			if readErr != nil {
 				return errs.Wrap(readErr, "unable to read the account under its lock")
 			}
@@ -215,11 +215,11 @@ func HandleAccountDeletionPost(
 				return errSecondFactorNowRequired
 			}
 			// Two-factor removed meanwhile leaves the password alone enough, as decision 1 allows.
-			if locked.OTPEnabled && usedOTPCode && locked.OtpConfigGeneration != user.OtpConfigGeneration {
+			if locked.OTPEnabled && usedOTPCode && locked.OTPConfigGeneration != user.OTPConfigGeneration {
 				return errAuthenticatorReplaced
 			}
 			if useRecoveryCode {
-				used, claimErr := database.TryUseUserRecoveryCode(r.Context(), tx, user.Id, codeHash)
+				used, claimErr := database.TryUseUserRecoveryCode(r.Context(), tx, user.ID, codeHash)
 				if claimErr != nil {
 					return errs.Wrap(claimErr, "unable to claim the recovery code")
 				}
@@ -227,19 +227,19 @@ func HandleAccountDeletionPost(
 					return errRecoveryCodeRefused
 				}
 			}
-			holdsManage, guardErr := administrators.userHoldsManage(r.Context(), database, user.Id)
+			holdsManage, guardErr := administrators.userHoldsManage(r.Context(), database, user.ID)
 			if guardErr != nil {
 				return guardErr
 			}
 			if decideErr := administrators.decide(r.Context(), holdsManage); decideErr != nil {
 				return decideErr
 			}
-			told, collectErr := revocation.UserWideDeliveries(r.Context(), database, tx, user.Id, locked.Subject,
+			told, collectErr := revocation.UserWideDeliveries(r.Context(), database, tx, user.ID, locked.Subject,
 				sessionLive(settings))
 			if collectErr != nil {
 				return collectErr
 			}
-			if deleteErr := database.DeleteUser(r.Context(), tx, user.Id); deleteErr != nil {
+			if deleteErr := database.DeleteUser(r.Context(), tx, user.ID); deleteErr != nil {
 				return errs.Wrap(deleteErr, "unable to delete the account")
 			}
 			if leaveErr := administrators.leavesAnAdministrator(r.Context()); leaveErr != nil {
@@ -254,7 +254,7 @@ func HandleAccountDeletionPost(
 			writeLocalizedError(w, r, lastAdministrator, "LAST_ADMINISTRATOR", http.StatusConflict)
 			return
 		case errors.Is(err, errRecoveryCodeRefused):
-			refuseDeletionRecoveryCode(w, r, database, auditLogger, credentialFailures, user.Id, subject, codeHash)
+			refuseDeletionRecoveryCode(w, r, database, auditLogger, credentialFailures, user.ID, subject, codeHash)
 			return
 		case errors.Is(err, errPasswordReplaced):
 			// Not a guess: the password was right when it was checked, so it spends nothing.
@@ -263,7 +263,7 @@ func HandleAccountDeletionPost(
 			return
 		case errors.Is(err, errAuthenticatorReplaced):
 			// Answered as a wrong code, which it now is, and spends nothing for the same reason.
-			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeOtpIncorrectCode, nil),
+			writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodeOTPIncorrectCode, nil),
 				"INVALID_OTP_CODE", http.StatusBadRequest)
 			return
 		case errors.Is(err, errSecondFactorNowRequired):
@@ -284,7 +284,7 @@ func HandleAccountDeletionPost(
 		defer notifier.Send(r, accountnotice.AccountDeleted, accountnotice.To(current))
 
 		auditLogger.Log(r.Context(), audit.EventDeletedOwnAccount, map[string]interface{}{
-			"user_id":        user.Id,
+			"user_id":        user.ID,
 			"logged_in_user": subject,
 		})
 		logoutTokens.Send(r.Context(), settings.Issuer, deliveries)
@@ -306,11 +306,11 @@ func soleAdministrator(ctx context.Context, database accountDeletionDatabase, us
 		if err != nil {
 			return err
 		}
-		holdsManage, err := administrators.userHoldsManage(ctx, database, user.Id)
+		holdsManage, err := administrators.userHoldsManage(ctx, database, user.ID)
 		if err != nil || !holdsManage || !user.Enabled {
 			return err
 		}
-		holders, err := database.CountEnabledUsersHoldingPermission(ctx, tx, administrators.manageId)
+		holders, err := database.CountEnabledUsersHoldingPermission(ctx, tx, administrators.manageID)
 		if err != nil {
 			return errs.Wrap(err, "unable to count the administrators")
 		}
@@ -337,7 +337,7 @@ func verifyDeletionOTPCode(w http.ResponseWriter, r *http.Request, database acco
 	}
 
 	// A replayed code is answered as a wrong one, so the caller cannot tell them apart (#111).
-	incorrectOtpCode := i18n.NewLocalizedError(i18n.ErrCodeOtpIncorrectCode, nil)
+	incorrectOTPCode := i18n.NewLocalizedError(i18n.ErrCodeOTPIncorrectCode, nil)
 	switch verified.Outcome {
 	case otpcredential.OutcomeMatched:
 		return true
@@ -349,7 +349,7 @@ func verifyDeletionOTPCode(w http.ResponseWriter, r *http.Request, database acco
 		// against the account's row, so the account was there when the code was claimed: it is a
 		// replay, and its committed lockout is audited and told whatever a read now would say.
 		if !verified.Disabled {
-			current, readErr := database.GetUserById(r.Context(), nil, user.Id)
+			current, readErr := database.GetUserByID(r.Context(), nil, user.ID)
 			if readErr != nil {
 				writeInternalServerError(w, r, readErr)
 				return false
@@ -361,17 +361,17 @@ func verifyDeletionOTPCode(w http.ResponseWriter, r *http.Request, database acco
 		}
 		credentialFailures.RecordCredentialFailure(r)
 		auditLogger.Log(r.Context(), audit.EventOTPCodeReplayDetected, map[string]interface{}{
-			"user_id":        user.Id,
+			"user_id":        user.ID,
 			"step":           verified.Step,
 			"logged_in_user": subject,
 		})
 	case otpcredential.OutcomeClockAhead:
-		auditLogger.Log(r.Context(), audit.EventAuthFailedOtp, map[string]interface{}{
-			"user_id":        user.Id,
+		auditLogger.Log(r.Context(), audit.EventAuthFailedOTP, map[string]interface{}{
+			"user_id":        user.ID,
 			"logged_in_user": subject,
-			"reason":         audit.AuthFailedOtpClockAhead,
+			"reason":         audit.AuthFailedOTPClockAhead,
 		})
-		writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.OtpClockAhead, nil),
+		writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.OTPClockAhead, nil),
 			"OTP_CLOCK_AHEAD", http.StatusBadRequest)
 		return false
 	default:
@@ -380,12 +380,12 @@ func verifyDeletionOTPCode(w http.ResponseWriter, r *http.Request, database acco
 
 	if verified.Disabled {
 		auditLogger.Log(r.Context(), audit.EventOTPAuthenticatorDisabled, map[string]interface{}{
-			"user_id":        user.Id,
+			"user_id":        user.ID,
 			"logged_in_user": subject,
 		})
 		defer notifier.Send(r, accountnotice.OTPLockout, accountnotice.To(verified.Current))
 	}
-	writeLocalizedError(w, r, incorrectOtpCode, "INVALID_OTP_CODE", http.StatusBadRequest)
+	writeLocalizedError(w, r, incorrectOTPCode, "INVALID_OTP_CODE", http.StatusBadRequest)
 	return false
 }
 
@@ -394,9 +394,9 @@ func verifyDeletionOTPCode(w http.ResponseWriter, r *http.Request, database acco
 // answer for a wrong code and a used one (#257 decisions 6 and 10). The transaction rolled back, so
 // nothing was deleted and no code was spent.
 func refuseDeletionRecoveryCode(w http.ResponseWriter, r *http.Request, database accountDeletionDatabase,
-	auditLogger AuditLogger, credentialFailures CredentialFailureRecorder, userId int64, subject string, codeHash string) {
+	auditLogger AuditLogger, credentialFailures CredentialFailureRecorder, userID int64, subject string, codeHash string) {
 
-	exists, err := database.UserRecoveryCodeExists(r.Context(), nil, userId, codeHash)
+	exists, err := database.UserRecoveryCodeExists(r.Context(), nil, userID, codeHash)
 	if err != nil {
 		writeInternalServerError(w, r, err)
 		return
@@ -404,10 +404,10 @@ func refuseDeletionRecoveryCode(w http.ResponseWriter, r *http.Request, database
 	credentialFailures.RecordCredentialFailure(r)
 	if exists {
 		auditLogger.Log(r.Context(), audit.EventRecoveryCodeReplayDetected, map[string]interface{}{
-			"user_id":        userId,
+			"user_id":        userID,
 			"logged_in_user": subject,
 		})
 	}
-	writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.OtpIncorrectRecoveryCode, nil),
+	writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.OTPIncorrectRecoveryCode, nil),
 		"INVALID_RECOVERY_CODE", http.StatusBadRequest)
 }

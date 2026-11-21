@@ -19,7 +19,7 @@ func TestAPISettingsSessionsGet_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Read current settings from DB for comparison
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
+	settings, err := database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err)
 	assert.NotNil(t, settings)
 
@@ -69,7 +69,7 @@ func TestAPISettingsSessionsPut_Success(t *testing.T) {
 	assert.Equal(t, "never", body.KeepSignedIn)
 
 	// Verify DB persisted
-	settings, err2 := database.GetSettingsById(context.Background(), nil, 1)
+	settings, err2 := database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err2)
 	assert.Equal(t, req.UserSessionIdleTimeoutInSeconds, settings.UserSessionIdleTimeoutInSeconds)
 	assert.Equal(t, req.UserSessionMaxLifetimeInSeconds, settings.UserSessionMaxLifetimeInSeconds)
@@ -159,7 +159,7 @@ func TestAPISettingsSessionsPut_InvalidRequestBodyAndUnauthorized(t *testing.T) 
 	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -186,7 +186,7 @@ func TestAPISettingsSessions_UnauthorizedAndScope(t *testing.T) {
 	// No token - GET
 	req, err := http.NewRequest("GET", url, nil)
 	require.NoError(t, err)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -243,7 +243,7 @@ func TestAPISettingsSessionsPut_TheCapIsRequiredAndBounded(t *testing.T) {
 			require.NoError(t, err)
 			req.Header.Set("Authorization", "Bearer "+accessToken)
 			req.Header.Set("Content-Type", "application/json")
-			resp, err := createHttpClient(t).Do(req)
+			resp, err := createHTTPClient(t).Do(req)
 			require.NoError(t, err)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -253,7 +253,7 @@ func TestAPISettingsSessionsPut_TheCapIsRequiredAndBounded(t *testing.T) {
 			assert.Equal(t, tc.code, refusal.ErrorCode)
 			assert.Equal(t, tc.message, refusal.ErrorDescription)
 
-			after, err := database.GetSettingsById(context.Background(), nil, 1)
+			after, err := database.GetSettingsByID(context.Background(), nil, 1)
 			require.NoError(t, err)
 			assert.Equal(t, before.UserSessionIdleTimeoutInSeconds, after.UserSessionIdleTimeoutInSeconds, "nothing is saved")
 			assert.Equal(t, before.MaxUserSessionsPerUser, after.MaxUserSessionsPerUser, "nothing is saved")
@@ -269,7 +269,7 @@ func TestAPISettingsSessionsPut_TheCapIsRequiredAndBounded(t *testing.T) {
 		})
 		defer func() { _ = resp.Body.Close() }()
 		require.Equal(t, http.StatusOK, resp.StatusCode)
-		after, err := database.GetSettingsById(context.Background(), nil, 1)
+		after, err := database.GetSettingsByID(context.Background(), nil, 1)
 		require.NoError(t, err)
 		assert.Equal(t, 0, after.MaxUserSessionsPerUser)
 	})
@@ -287,7 +287,7 @@ func TestAPISettingsSessionsPut_TheEventRecordsEachValueBeforeAndAfter(t *testin
 	})
 	accessToken, adminClient := createAdminClientWithToken(t)
 
-	resp, requestId := sendAdmin(t, accessToken, http.MethodPut, "/api/v1/admin/settings/sessions", api.UpdateSettingsSessionsRequest{
+	resp, requestID := sendAdmin(t, accessToken, http.MethodPut, "/api/v1/admin/settings/sessions", api.UpdateSettingsSessionsRequest{
 		UserSessionIdleTimeoutInSeconds: 3600,
 		UserSessionMaxLifetimeInSeconds: 43200,
 		MaxUserSessionsPerUser:          sessionCapOf(5),
@@ -311,7 +311,7 @@ func TestAPISettingsSessionsPut_TheEventRecordsEachValueBeforeAndAfter(t *testin
 			"max_user_sessions_per_user":           float64(5),
 			"keep_signed_in":                       "never",
 		},
-	}}, auditRows(t, accessToken, "updated_sessions_settings", requestId))
+	}}, auditRows(t, accessToken, "updated_sessions_settings", requestID))
 }
 
 // PUT /api/v1/admin/settings/sessions requires keepSignedIn, one of always, ask and never, and
@@ -341,7 +341,7 @@ func TestAPISettingsSessionsPut_KeepSignedInIsRequiredAndOneOfThreeModes(t *test
 			require.NoError(t, err)
 			req.Header.Set("Authorization", "Bearer "+accessToken)
 			req.Header.Set("Content-Type", "application/json")
-			resp, err := createHttpClient(t).Do(req)
+			resp, err := createHTTPClient(t).Do(req)
 			require.NoError(t, err)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -351,7 +351,7 @@ func TestAPISettingsSessionsPut_KeepSignedInIsRequiredAndOneOfThreeModes(t *test
 			assert.Equal(t, tc.code, refusal.ErrorCode)
 			assert.Equal(t, tc.message, refusal.ErrorDescription)
 
-			after, err := database.GetSettingsById(context.Background(), nil, 1)
+			after, err := database.GetSettingsByID(context.Background(), nil, 1)
 			require.NoError(t, err)
 			assert.Equal(t, before.UserSessionIdleTimeoutInSeconds, after.UserSessionIdleTimeoutInSeconds, "nothing is saved")
 			assert.Equal(t, record.KeepSignedIn("ask"), after.KeepSignedIn, "nothing is saved")
@@ -369,7 +369,7 @@ func TestAPISettingsSessionsPut_KeepSignedInIsRequiredAndOneOfThreeModes(t *test
 			defer func() { _ = resp.Body.Close() }()
 			require.Equal(t, http.StatusOK, resp.StatusCode)
 
-			after, err := database.GetSettingsById(context.Background(), nil, 1)
+			after, err := database.GetSettingsByID(context.Background(), nil, 1)
 			require.NoError(t, err)
 			assert.Equal(t, record.KeepSignedIn(mode), after.KeepSignedIn)
 

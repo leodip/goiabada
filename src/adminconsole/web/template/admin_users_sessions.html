@@ -5,12 +5,12 @@
 {{end}}
 
 {{define "page"}}
-{{ template "user_header" (args "sessions" .user.Id .user.Email .page .query $.ctx) }}
+{{ template "user_header" (args "sessions" .user.ID .user.Email .page .query $.ctx) }}
 
 {{/* A device label is attacker-chosen text: it is derived from Sec-CH-UA and Sec-CH-UA-Platform,
      which UA-CH requires a server to accept with arbitrary values (#281). It reaches the dialog in
      the server-rendered data-confirm, which the script shows as text (#120). */}}
-<div class="not-empty:mb-4" id="sessions-status" role="status" data-end-url="/admin/users/{{ .user.Id }}/sessions" data-confirm-title="{{ T $.ctx "adminconsole.admin_users.sessions.modal_confirm_title" }}" data-ended="{{ T $.ctx "adminconsole.admin_users.sessions.ended" }}" data-ended-label="{{ T $.ctx "adminconsole.admin_users.sessions.ended_label" }}"></div>
+<div class="not-empty:mb-4" id="sessions-status" role="status" data-end-url="/admin/users/{{ .user.ID }}/sessions" data-confirm-title="{{ T $.ctx "adminconsole.admin_users.sessions.modal_confirm_title" }}" data-ended="{{ T $.ctx "adminconsole.admin_users.sessions.ended" }}" data-ended-label="{{ T $.ctx "adminconsole.admin_users.sessions.ended_label" }}"></div>
 
 {{ if .sessions }}
 <p class="mb-4 max-w-prose text-ink-muted">{{ T $.ctx "adminconsole.admin_users.sessions.lead" }}</p>
@@ -39,14 +39,14 @@
             {{ range .Clients }}<li>{{ . }}</li>{{ end }}
           </ul>
         </td>
-        <td class="cell-mono" data-label="{{ T $.ctx "adminconsole.admin_users.sessions.col_ip" }}">{{ .IpAddress }}</td>
+        <td class="cell-mono" data-label="{{ T $.ctx "adminconsole.admin_users.sessions.col_ip" }}">{{ .IPAddress }}</td>
         <td class="sm:whitespace-nowrap" data-label="{{ T $.ctx "adminconsole.admin_users.sessions.col_started_at" }}">{{ DateTime $.ctx .Started }}<span class="cell-secondary">{{ Since $.ctx .Started }}</span></td>
         <td class="sm:whitespace-nowrap" data-label="{{ T $.ctx "adminconsole.admin_users.sessions.col_last_accessed_at" }}">{{ DateTime $.ctx .LastAccessed }}<span class="cell-secondary">{{ Since $.ctx .LastAccessed }}</span></td>
         <td class="cell-actions">
           {{ if .IsCurrent }}
-          <button class="button button-sm" type="button" data-end-session="{{ .UserSessionId }}" data-dialog="endCurrentSession" data-confirm="{{ T $.ctx "adminconsole.admin_users.sessions.end_current_confirm" "device" $device }}">{{ T $.ctx "adminconsole.admin_users.sessions.end_button" }}<span class="sr-only"> {{ $device }}</span></button>
+          <button class="button button-sm" type="button" data-end-session="{{ .UserSessionID }}" data-dialog="endCurrentSession" data-confirm="{{ T $.ctx "adminconsole.admin_users.sessions.end_current_confirm" "device" $device }}">{{ T $.ctx "adminconsole.admin_users.sessions.end_button" }}<span class="sr-only"> {{ $device }}</span></button>
           {{ else }}
-          <button class="button button-sm" type="button" data-end-session="{{ .UserSessionId }}" data-dialog="endSession" data-confirm="{{ T $.ctx "adminconsole.admin_users.sessions.end_confirm" "device" $device }}">{{ T $.ctx "adminconsole.admin_users.sessions.end_button" }}<span class="sr-only"> {{ $device }}</span></button>
+          <button class="button button-sm" type="button" data-end-session="{{ .UserSessionID }}" data-dialog="endSession" data-confirm="{{ T $.ctx "adminconsole.admin_users.sessions.end_confirm" "device" $device }}">{{ T $.ctx "adminconsole.admin_users.sessions.end_button" }}<span class="sr-only"> {{ $device }}</span></button>
           {{ end }}
         </td>
       </tr>

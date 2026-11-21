@@ -68,9 +68,9 @@ func (m recoveryCodesStepMocks) post() http.HandlerFunc {
 func (m recoveryCodesStepMocks) armRecoveryCodesCeremony(codes []string) *ceremony.AuthContext {
 	authContext := &ceremony.AuthContext{
 		AuthState:   ceremony.AuthStateLevel2RecoveryCodes,
-		CeremonyId:  testCeremonyId,
-		UserId:      1,
-		ClientId:    "test-client",
+		CeremonyID:  testCeremonyID,
+		UserID:      1,
+		ClientID:    "test-client",
 		AuthMethods: "pwd otp",
 	}
 	if codes != nil {
@@ -86,13 +86,13 @@ func (m recoveryCodesStepMocks) armClient() {
 }
 
 func recoveryCodesGetRequest() *http.Request {
-	req := httptest.NewRequest(http.MethodGet, "/auth/recovery-codes?ceremony="+testCeremonyId, nil)
+	req := httptest.NewRequest(http.MethodGet, "/auth/recovery-codes?ceremony="+testCeremonyID, nil)
 	return req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{AppName: "TestApp"}))
 }
 
 func recoveryCodesContinueRequest() *http.Request {
 	form := url.Values{}
-	form.Add(ceremony.IdField, testCeremonyId)
+	form.Add(ceremony.IDField, testCeremonyID)
 	req := httptest.NewRequest(http.MethodPost, "/auth/recovery-codes", strings.NewReader(form.Encode()))
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	return req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
@@ -112,12 +112,12 @@ func TestHandleAuthRecoveryCodesGet_TheFirstRenderShowsTheSetOnce(t *testing.T) 
 	rr := httptest.NewRecorder()
 
 	taken := false
-	m.ceremonyStore.On("TakeRecoveryCodes", rr, req, testCeremonyId).Return(setupRecoveryCodes, nil).Once().
+	m.ceremonyStore.On("TakeRecoveryCodes", rr, req, testCeremonyID).Return(setupRecoveryCodes, nil).Once().
 		Run(func(mock.Arguments) { taken = true })
 	m.pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_recovery_codes.html",
 		mock.MatchedBy(func(bind map[string]interface{}) bool {
 			return assert.Equal(t, setupRecoveryCodes, bind["recoveryCodes"]) &&
-				bind["ceremonyId"] == testCeremonyId &&
+				bind["ceremonyId"] == testCeremonyID &&
 				bind["layoutShowClientSection"] == true &&
 				bind["layoutClientName"] == "Test Client"
 		})).Return(nil).Once().Run(func(mock.Arguments) {
@@ -147,7 +147,7 @@ func TestHandleAuthRecoveryCodesGet_AReloadDoesNotShowTheCodesAgain(t *testing.T
 	m.pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_recovery_codes.html",
 		mock.MatchedBy(func(bind map[string]interface{}) bool {
 			codes, _ := bind["recoveryCodes"].([]string)
-			return len(codes) == 0 && bind["ceremonyId"] == testCeremonyId
+			return len(codes) == 0 && bind["ceremonyId"] == testCeremonyID
 		})).Return(nil).Once()
 
 	m.get().ServeHTTP(rr, req)
@@ -167,11 +167,11 @@ func TestHandleAuthRecoveryCodesGet_ALoadWhoseTakeFindsNoCodesShowsNone(t *testi
 
 	req := recoveryCodesGetRequest()
 	rr := httptest.NewRecorder()
-	m.ceremonyStore.On("TakeRecoveryCodes", rr, req, testCeremonyId).Return(nil, nil).Once()
+	m.ceremonyStore.On("TakeRecoveryCodes", rr, req, testCeremonyID).Return(nil, nil).Once()
 	m.pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_recovery_codes.html",
 		mock.MatchedBy(func(bind map[string]interface{}) bool {
 			codes, _ := bind["recoveryCodes"].([]string)
-			return len(codes) == 0 && bind["ceremonyId"] == testCeremonyId
+			return len(codes) == 0 && bind["ceremonyId"] == testCeremonyID
 		})).Return(nil).Once()
 
 	m.get().ServeHTTP(rr, req)
@@ -189,7 +189,7 @@ func TestHandleAuthRecoveryCodesGet_AReplacedCeremonyShowsNoCodes(t *testing.T) 
 
 	req := recoveryCodesGetRequest()
 	rr := httptest.NewRecorder()
-	m.ceremonyStore.On("TakeRecoveryCodes", rr, req, testCeremonyId).Return(nil, ceremony.ErrCeremonyReplaced).Once()
+	m.ceremonyStore.On("TakeRecoveryCodes", rr, req, testCeremonyID).Return(nil, ceremony.ErrCeremonyReplaced).Once()
 	expectCeremonyNoLongerActive(t, m.pageRenderer, rr, req)
 
 	m.get().ServeHTTP(rr, req)
@@ -208,7 +208,7 @@ func TestHandleAuthRecoveryCodesGet_AFailedSaveShowsNoCodes(t *testing.T) {
 	req := recoveryCodesGetRequest()
 	rr := httptest.NewRecorder()
 	saveErr := errors.New("session store down")
-	m.ceremonyStore.On("TakeRecoveryCodes", rr, req, testCeremonyId).Return(nil, saveErr).Once()
+	m.ceremonyStore.On("TakeRecoveryCodes", rr, req, testCeremonyID).Return(nil, saveErr).Once()
 	m.pageRenderer.On("InternalServerError", rr, req, saveErr).Return().Once()
 
 	m.get().ServeHTTP(rr, req)
@@ -254,7 +254,7 @@ func TestHandleAuthRecoveryCodesPost_ContinueGoesOnToCompleted(t *testing.T) {
 	m.post().ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusSeeOther, rr.Code)
-	assert.Equal(t, testBaseURL+"/auth/completed?ceremony="+testCeremonyId, rr.Header().Get("Location"))
+	assert.Equal(t, testBaseURL+"/auth/completed?ceremony="+testCeremonyID, rr.Header().Get("Location"))
 	m.ceremonyStore.AssertExpectations(t)
 }
 
@@ -313,7 +313,7 @@ func TestHandleAuthRecoveryCodesGet_OverlappingLoadsShowTheSetOnce(t *testing.T)
 	ceremonyStore, _ := newRealCeremonyStore(t)
 	seed := httptest.NewRecorder()
 	require.NoError(t, ceremonyStore.AddAuthContext(seed, httptest.NewRequest(http.MethodGet, "/auth/authorize", nil),
-		&ceremony.AuthContext{CeremonyId: testCeremonyId, ClientId: "test-client", UserId: 1,
+		&ceremony.AuthContext{CeremonyID: testCeremonyID, ClientID: "test-client", UserID: 1,
 			AuthState: ceremony.AuthStateLevel2RecoveryCodes, AuthMethods: "pwd otp",
 			RecoveryCodes: setupRecoveryCodes}))
 	cookies := seed.Result().Cookies()
@@ -373,7 +373,7 @@ func TestHandleAuthRecoveryCodesGet_OverlappingLoadsShowTheSetOnce(t *testing.T)
 	}
 	assert.Equal(t, 1, withCodes, "exactly one of the overlapping loads shows the set")
 
-	stored, err := heldCeremony(ceremonyStore, cookies, testCeremonyId)
+	stored, err := heldCeremony(ceremonyStore, cookies, testCeremonyID)
 	require.NoError(t, err)
 	assert.Empty(t, stored.RecoveryCodes, "the set is off the ceremony")
 	assert.Equal(t, ceremony.AuthStateLevel2RecoveryCodes, stored.AuthState)

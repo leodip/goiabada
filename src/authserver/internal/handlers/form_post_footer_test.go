@@ -47,8 +47,8 @@ func readFormPostFooterLinks(links *goquery.Selection) []formPostFooterLink {
 func TestFormPost_ThePageDrawsTheBrandsFooter(t *testing.T) {
 	const callback = "https://example.com/callback"
 	brand := record.NewBrand("Night", record.BrandAppearanceAuto, "plum")
-	brand.Id = 7
-	brand.BackgroundAssetId = sql.NullInt64{Int64: 14, Valid: true}
+	brand.ID = 7
+	brand.BackgroundAssetID = sql.NullInt64{Int64: 14, Valid: true}
 	brand.FooterLinks = record.BrandFooterLinks{
 		{URL: "https://acme.example/privacy", Label: "Privacy", Labels: map[string]string{"de": "Datenschutz"}},
 		{URL: "https://status.acme.example/", Label: "Status"},
@@ -58,8 +58,8 @@ func TestFormPost_ThePageDrawsTheBrandsFooter(t *testing.T) {
 	brand.SupportPhone = "+442079460958"
 	database := datamocks.NewDatabase(t)
 	database.On("GetDefaultBrand", mock.Anything, (*sql.Tx)(nil)).Return(&brand, nil).Once()
-	database.On("GetBrandAssetsByIds", mock.Anything, (*sql.Tx)(nil), []int64{14}).Return([]record.BrandAsset{
-		{Id: 14, Kind: record.BrandAssetKindBackground, Fingerprint: "444444444444"},
+	database.On("GetBrandAssetsByIDs", mock.Anything, (*sql.Tx)(nil), []int64{14}).Return([]record.BrandAsset{
+		{ID: 14, Kind: record.BrandAssetKindBackground, Fingerprint: "444444444444"},
 	}, nil).Once()
 	w := httptest.NewRecorder()
 	r := withSettings(httptest.NewRequest(http.MethodGet, "/auth/issue", nil),
@@ -100,7 +100,7 @@ func TestFormPost_ThePageDrawsTheBrandsFooter(t *testing.T) {
 func TestFormPost_ABrandWithNoFooterDrawsNone(t *testing.T) {
 	const callback = "https://example.com/callback"
 	brand := record.NewBrand("Night", record.BrandAppearanceDark, "plum")
-	brand.Id = 7
+	brand.ID = 7
 	database := datamocks.NewDatabase(t)
 	database.On("GetDefaultBrand", mock.Anything, (*sql.Tx)(nil)).Return(&brand, nil).Once()
 	w := httptest.NewRecorder()

@@ -12,7 +12,7 @@ import (
 // KeepSignedInDatabase is what the auth server's Keep users signed in rule reads: the settings row,
 // when the request carries no settings of its own.
 type KeepSignedInDatabase interface {
-	GetSettingsById(ctx context.Context, tx *sql.Tx, settingsId int64) (*record.Settings, error)
+	GetSettingsByID(ctx context.Context, tx *sql.Tx, settingsID int64) (*record.Settings, error)
 }
 
 // NewKeepSignedIn is the rule the auth server's session store asks, per write, whether a signed-in

@@ -163,28 +163,28 @@ func assertLegalDocumentsClientsBehaviour(t *testing.T, h *isolatedDB, when stri
 		return scalar("SELECT COUNT(*) FROM legal_documents_clients WHERE %s = %d", column, id)
 	}
 
-	documentId := newDocument()
-	clientId := newClient()
-	otherClientId := newClient()
+	documentID := newDocument()
+	clientID := newClient()
+	otherClientID := newClient()
 
 	link := "INSERT INTO legal_documents_clients (legal_document_id, client_id) VALUES (%d, %d)"
-	require.NoErrorf(t, exec(link, documentId, clientId), "the first link is accepted %s", when)
-	require.Errorf(t, exec(link, documentId, clientId), "a second link of the pair is refused by the key %s", when)
-	assert.Equalf(t, int64(1), links("legal_document_id", documentId), "and writes nothing %s", when)
-	require.Errorf(t, exec(link, documentId, clientId+1_000_000), "a link to no client is refused %s", when)
-	require.Errorf(t, exec(link, documentId+1_000_000, clientId), "a link from no document is refused %s", when)
-	require.NoError(t, exec(link, documentId, otherClientId))
+	require.NoErrorf(t, exec(link, documentID, clientID), "the first link is accepted %s", when)
+	require.Errorf(t, exec(link, documentID, clientID), "a second link of the pair is refused by the key %s", when)
+	assert.Equalf(t, int64(1), links("legal_document_id", documentID), "and writes nothing %s", when)
+	require.Errorf(t, exec(link, documentID, clientID+1_000_000), "a link to no client is refused %s", when)
+	require.Errorf(t, exec(link, documentID+1_000_000, clientID), "a link from no document is refused %s", when)
+	require.NoError(t, exec(link, documentID, otherClientID))
 
-	require.NoError(t, exec("DELETE FROM clients WHERE id = %d", clientId))
-	assert.Equalf(t, int64(1), links("legal_document_id", documentId),
+	require.NoError(t, exec("DELETE FROM clients WHERE id = %d", clientID))
+	assert.Equalf(t, int64(1), links("legal_document_id", documentID),
 		"deleting a client removed its link and left the document's other app %s", when)
-	assert.Equalf(t, int64(1), scalar("SELECT COUNT(*) FROM legal_documents WHERE id = %d", documentId),
+	assert.Equalf(t, int64(1), scalar("SELECT COUNT(*) FROM legal_documents WHERE id = %d", documentID),
 		"the document stays %s", when)
 
-	require.NoError(t, exec("DELETE FROM legal_documents WHERE id = %d", documentId))
-	assert.Equalf(t, int64(0), links("client_id", otherClientId), "deleting the document removed its links %s", when)
-	assert.Equalf(t, int64(1), scalar("SELECT COUNT(*) FROM clients WHERE id = %d", otherClientId),
+	require.NoError(t, exec("DELETE FROM legal_documents WHERE id = %d", documentID))
+	assert.Equalf(t, int64(0), links("client_id", otherClientID), "deleting the document removed its links %s", when)
+	assert.Equalf(t, int64(1), scalar("SELECT COUNT(*) FROM clients WHERE id = %d", otherClientID),
 		"the client stays %s", when)
 
-	require.NoError(t, exec("DELETE FROM clients WHERE id = %d", otherClientId))
+	require.NoError(t, exec("DELETE FROM clients WHERE id = %d", otherClientID))
 }

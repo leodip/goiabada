@@ -13,12 +13,12 @@ import (
 // sign-in to client: in effect for it, whose current version the user has not accepted. The admin
 // console's own client owes none (#622). *legaldocuments.Reader satisfies it.
 type legalDocumentsOwed interface {
-	Owed(ctx context.Context, client *record.Client, userId int64) ([]legaldocuments.InEffect, error)
+	Owed(ctx context.Context, client *record.Client, userID int64) ([]legaldocuments.InEffect, error)
 }
 
 // consentReader reads the user's stored consent to a client.
 type consentReader interface {
-	GetConsentByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (*record.UserConsent, error)
+	GetConsentByUserIDAndClientID(ctx context.Context, tx *sql.Tx, userID int64, clientID int64) (*record.UserConsent, error)
 }
 
 // routeBoundCeremony decides where a ceremony bound to a session goes (decideAfterBinding), loading
@@ -47,7 +47,7 @@ func routeBoundCeremony(ctx context.Context, database consentReader, scopes scop
 			scope := authContext.Scope
 			facts.EffectiveScope = &scope
 		case afterBindingFactConsent:
-			consent, err := database.GetConsentByUserIdAndClientId(ctx, nil, user.Id, client.Id)
+			consent, err := database.GetConsentByUserIDAndClientID(ctx, nil, user.ID, client.ID)
 			if err != nil {
 				return afterBindingUndecided, err
 			}
@@ -70,7 +70,7 @@ func moveBoundCeremonyOn(answer afterBindingAnswer, browser legalAcceptanceBrows
 	case afterBindingNoScope:
 		return "", &ClientError{Client: client, Code: "access_denied",
 				Description: "The user is not authorized to access any of the requested scopes"},
-			browser.ClearAuthContext(authContext.CeremonyId)
+			browser.ClearAuthContext(authContext.CeremonyID)
 	case afterBindingConsent:
 		authContext.AuthState = ceremony.AuthStateRequiresConsent
 		return "/auth/consent", nil, browser.SaveAuthContext(authContext)

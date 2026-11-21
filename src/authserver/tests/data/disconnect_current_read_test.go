@@ -30,15 +30,15 @@ import (
 // so these run on the three engines with row locks.
 
 // hookAfterDisconnectRead runs its hook once, right after the named read of the disconnect's
-// transaction: the client's (GetClientsByIds) or the refresh tokens' (GetRefreshTokensByUserIdAndClientId).
+// transaction: the client's (GetClientsByIDs) or the refresh tokens' (GetRefreshTokensByUserIDAndClientID).
 type hookAfterDisconnectRead struct {
 	data.Database
 	afterClientRead func()
 	afterTokenRead  func()
 }
 
-func (d *hookAfterDisconnectRead) GetClientsByIds(ctx context.Context, tx *sql.Tx, clientIds []int64) ([]record.Client, error) {
-	clients, err := d.Database.GetClientsByIds(ctx, tx, clientIds)
+func (d *hookAfterDisconnectRead) GetClientsByIDs(ctx context.Context, tx *sql.Tx, clientIDs []int64) ([]record.Client, error) {
+	clients, err := d.Database.GetClientsByIDs(ctx, tx, clientIDs)
 	if err == nil && tx != nil && d.afterClientRead != nil {
 		hook := d.afterClientRead
 		d.afterClientRead = nil
@@ -47,9 +47,9 @@ func (d *hookAfterDisconnectRead) GetClientsByIds(ctx context.Context, tx *sql.T
 	return clients, err
 }
 
-func (d *hookAfterDisconnectRead) GetRefreshTokensByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64,
-	clientId int64) ([]*record.RefreshToken, error) {
-	tokens, err := d.Database.GetRefreshTokensByUserIdAndClientId(ctx, tx, userId, clientId)
+func (d *hookAfterDisconnectRead) GetRefreshTokensByUserIDAndClientID(ctx context.Context, tx *sql.Tx, userID int64,
+	clientID int64) ([]*record.RefreshToken, error) {
+	tokens, err := d.Database.GetRefreshTokensByUserIDAndClientID(ctx, tx, userID, clientID)
 	if err == nil && d.afterTokenRead != nil {
 		hook := d.afterTokenRead
 		d.afterTokenRead = nil
@@ -60,33 +60,33 @@ func (d *hookAfterDisconnectRead) GetRefreshTokensByUserIdAndClientId(ctx contex
 
 // liveCodeGrant stores, on db, a redeemed code of the user with the client and the live refresh
 // token it issued, the shape a completed authorization-code sign-in leaves, and returns the token.
-func liveCodeGrant(t *testing.T, db data.Database, userId int64, clientId int64) *record.RefreshToken {
+func liveCodeGrant(t *testing.T, db data.Database, userID int64, clientID int64) *record.RefreshToken {
 	t.Helper()
 	ctx := context.Background()
 	code := &record.Code{
-		ClientId:            clientId,
-		UserId:              userId,
+		ClientID:            clientID,
+		UserID:              userID,
 		Code:                "code_" + fake.LetterN(8),
 		CodeHash:            "hash_" + fake.LetterN(8),
 		CodeChallenge:       sql.NullString{String: "chal_" + fake.LetterN(8), Valid: true},
 		CodeChallengeMethod: sql.NullString{String: "S256", Valid: true},
 		RedirectURI:         "https://example.com/callback",
 		Scope:               "openid",
-		IpAddress:           "127.0.0.1",
+		IPAddress:           "127.0.0.1",
 		UserAgent:           "test",
 		ResponseMode:        "query",
 		AuthenticatedAt:     time.Now().UTC().Truncate(time.Microsecond),
 		SessionIdentifier:   "sess_" + fake.LetterN(8),
-		AcrLevel:            "1",
+		ACRLevel:            "1",
 		AuthMethods:         "pwd",
 		Used:                true,
 	}
 	require.NoError(t, db.CreateCode(ctx, nil, code), "CreateCode")
 	jti := fake.UUID()
 	token := &record.RefreshToken{
-		CodeId:               sql.NullInt64{Int64: code.Id, Valid: true},
-		RefreshTokenJti:      jti,
-		FirstRefreshTokenJti: jti,
+		CodeID:               sql.NullInt64{Int64: code.ID, Valid: true},
+		RefreshTokenJTI:      jti,
+		FirstRefreshTokenJTI: jti,
 		SessionIdentifier:    code.SessionIdentifier,
 		RefreshTokenType:     "Refresh",
 		Scope:                "openid",
@@ -107,21 +107,21 @@ func TestDisconnect_RevokesAGrantAndAConsentCommittedAfterItsFirstRead(t *testin
 	ctx := context.Background()
 	user := createTestUser(t)
 	client := createTestClient(t)
-	before := liveCodeGrant(t, database, user.Id, client.Id)
+	before := liveCodeGrant(t, database, user.ID, client.ID)
 
 	var after *record.RefreshToken
 	db := &hookAfterDisconnectRead{Database: database, afterClientRead: func() {
-		after = liveCodeGrant(t, database, user.Id, client.Id)
+		after = liveCodeGrant(t, database, user.ID, client.ID)
 		require.NoError(t, database.CreateUserConsent(ctx, nil, &record.UserConsent{
-			UserId: user.Id, ClientId: client.Id, Scope: "openid",
+			UserID: user.ID, ClientID: client.ID, Scope: "openid",
 			GrantedAt: sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
 		}), "CreateUserConsent")
 	}}
 
-	req := httptest.NewRequest(http.MethodDelete, "/api/v1/account/connected-clients/"+strconv.FormatInt(client.Id, 10), nil)
-	req.SetPathValue("clientId", strconv.FormatInt(client.Id, 10))
-	reqCtx := reqctx.WithSettings(req.Context(), &record.Settings{Id: 1, Issuer: "https://issuer.example"})
-	reqCtx = reqctx.WithValidatedToken(reqCtx, oauth.JwtToken{Claims: map[string]interface{}{
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/account/connected-clients/"+strconv.FormatInt(client.ID, 10), nil)
+	req.SetPathValue("clientId", strconv.FormatInt(client.ID, 10))
+	reqCtx := reqctx.WithSettings(req.Context(), &record.Settings{ID: 1, Issuer: "https://issuer.example"})
+	reqCtx = reqctx.WithValidatedToken(reqCtx, oauth.JWTToken{Claims: map[string]interface{}{
 		"sub": user.Subject, "scope": "authserver:manage-account", "auth_time": float64(1),
 	}})
 	audits := &countingAuditLogger{}
@@ -132,20 +132,20 @@ func TestDisconnect_RevokesAGrantAndAConsentCommittedAfterItsFirstRead(t *testin
 	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 	assert.Equal(t, 2, audits.count(), "deleted_own_user_consent and disconnected_client")
 
-	grants, err := database.GetLiveGrantsByUserId(ctx, nil, user.Id, time.Now().UTC())
+	grants, err := database.GetLiveGrantsByUserID(ctx, nil, user.ID, time.Now().UTC())
 	require.NoError(t, err)
 	assert.Empty(t, grants, "no grant of the user with the client survives the disconnect")
-	consent, err := database.GetConsentByUserIdAndClientId(ctx, nil, user.Id, client.Id)
+	consent, err := database.GetConsentByUserIDAndClientID(ctx, nil, user.ID, client.ID)
 	require.NoError(t, err)
 	assert.Nil(t, consent, "the consent given after the disconnect's first read is deleted")
 	for _, token := range []*record.RefreshToken{before, after} {
-		stored, err := database.GetRefreshTokenByJti(ctx, nil, token.RefreshTokenJti)
+		stored, err := database.GetRefreshTokenByJTI(ctx, nil, token.RefreshTokenJTI)
 		require.NoError(t, err)
 		require.NotNil(t, stored)
-		assert.True(t, stored.Revoked, "token %s revoked", token.RefreshTokenJti)
-		recorded, err := database.IsRefreshTokenFamilyRevoked(ctx, nil, token.FirstRefreshTokenJti)
+		assert.True(t, stored.Revoked, "token %s revoked", token.RefreshTokenJTI)
+		recorded, err := database.IsRefreshTokenFamilyRevoked(ctx, nil, token.FirstRefreshTokenJTI)
 		require.NoError(t, err)
-		assert.True(t, recorded, "family %s recorded", token.FirstRefreshTokenJti)
+		assert.True(t, recorded, "family %s recorded", token.FirstRefreshTokenJTI)
 	}
 }
 
@@ -160,7 +160,7 @@ func TestDisconnect_OverlappingCallsReportOneRevocation(t *testing.T) {
 	ctx := context.Background()
 	user := createTestUser(t)
 	client := createTestClient(t)
-	token := liveCodeGrant(t, database, user.Id, client.Id)
+	token := liveCodeGrant(t, database, user.ID, client.ID)
 
 	type outcome struct {
 		result revocation.DisconnectResult
@@ -169,7 +169,7 @@ func TestDisconnect_OverlappingCallsReportOneRevocation(t *testing.T) {
 	second := make(chan outcome, 1)
 	db := &hookAfterDisconnectRead{Database: database, afterTokenRead: func() {
 		go func() {
-			result, err := revocation.DisconnectClientTx(ctx, database, user.Id, client.Id, nil, nil)
+			result, err := revocation.DisconnectClientTx(ctx, database, user.ID, client.ID, nil, nil)
 			second <- outcome{result, err}
 		}()
 		select {
@@ -179,7 +179,7 @@ func TestDisconnect_OverlappingCallsReportOneRevocation(t *testing.T) {
 		}
 	}}
 
-	first, err := revocation.DisconnectClientTx(ctx, db, user.Id, client.Id, nil, nil)
+	first, err := revocation.DisconnectClientTx(ctx, db, user.ID, client.ID, nil, nil)
 	require.NoError(t, err, "the first disconnect")
 	other := <-second
 	require.NoError(t, other.err, "the second disconnect")
@@ -190,8 +190,8 @@ func TestDisconnect_OverlappingCallsReportOneRevocation(t *testing.T) {
 		if result.Changed() {
 			changed++
 		}
-		for _, jti := range result.RevokedRefreshTokenJtis {
-			if jti == token.RefreshTokenJti {
+		for _, jti := range result.RevokedRefreshTokenJTIs {
+			if jti == token.RefreshTokenJTI {
 				reported++
 			}
 		}
@@ -200,7 +200,7 @@ func TestDisconnect_OverlappingCallsReportOneRevocation(t *testing.T) {
 	assert.Equal(t, 1, reported, "the token is reported by the one call that revoked it")
 	assert.Equal(t, 1, first.RecordedFamilyCount+other.result.RecordedFamilyCount, "the family is recorded once")
 
-	stored, err := database.GetRefreshTokenByJti(ctx, nil, token.RefreshTokenJti)
+	stored, err := database.GetRefreshTokenByJTI(ctx, nil, token.RefreshTokenJTI)
 	require.NoError(t, err)
 	require.NotNil(t, stored)
 	assert.True(t, stored.Revoked)

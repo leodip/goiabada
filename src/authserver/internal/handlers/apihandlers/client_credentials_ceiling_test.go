@@ -21,22 +21,22 @@ import (
 // is authenticating as it, so the credentials ceiling holds both to authserver:manage too, and
 // leaves every other write to it with authserver:manage-clients.
 
-// otherIntrospectedResourceId is a resource other than authserver a client may be listed for.
-const otherIntrospectedResourceId = int64(77)
+// otherIntrospectedResourceID is a resource other than authserver a client may be listed for.
+const otherIntrospectedResourceID = int64(77)
 
 // expectIntrospectionResources registers the credentials ceiling's read of the target client's
 // introspection resources, outside any transaction, and of the authserver resource when the list
 // is not empty.
-func expectIntrospectionResources(database *datamocks.Database, resourceIds ...int64) {
-	links := make([]record.ClientIntrospectionResource, 0, len(resourceIds))
-	for _, resourceId := range resourceIds {
-		links = append(links, record.ClientIntrospectionResource{ClientId: targetClientId, ResourceId: resourceId})
+func expectIntrospectionResources(database *datamocks.Database, resourceIDs ...int64) {
+	links := make([]record.ClientIntrospectionResource, 0, len(resourceIDs))
+	for _, resourceID := range resourceIDs {
+		links = append(links, record.ClientIntrospectionResource{ClientID: targetClientID, ResourceID: resourceID})
 	}
-	database.On("GetClientIntrospectionResourcesByClientId", mock.Anything, (*sql.Tx)(nil), targetClientId).
+	database.On("GetClientIntrospectionResourcesByClientID", mock.Anything, (*sql.Tx)(nil), targetClientID).
 		Return(links, nil).Once()
 	if len(links) > 0 {
 		database.On("GetResourceByResourceIdentifier", mock.Anything, (*sql.Tx)(nil), "authserver").
-			Return(&record.Resource{Id: ceilingResourceId, ResourceIdentifier: "authserver"}, nil).Once()
+			Return(&record.Resource{ID: ceilingResourceID, ResourceIdentifier: "authserver"}, nil).Once()
 	}
 }
 
@@ -57,7 +57,7 @@ func TestClientCredentialsCeiling_AGranularTokenIsRefusedTheSecretOfAnAuthServer
 		t.Run(write.name, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
 			auditLogger := handlersmocks.NewAuditLogger(t)
-			expectIntrospectionResources(database, otherIntrospectedResourceId, ceilingResourceId)
+			expectIntrospectionResources(database, otherIntrospectedResourceID, ceilingResourceID)
 
 			rr, records := serveClientCase(t, clientTargetCase{write, ordinaryClient}, granularScopeOfClients, database, auditLogger)
 
@@ -74,7 +74,7 @@ func TestClientCredentialsCeiling_AGranularTokenIsRefusedTheSecretOfAnAuthServer
 			assert.Equal(t, grantCaller, refusal.details["logged_in_user"])
 			assert.Equal(t, "target", refusal.details["ceiling"])
 			assert.Equal(t, "client", refusal.details["target_kind"])
-			assert.Equal(t, targetClientId, refusal.details["target_id"])
+			assert.Equal(t, targetClientID, refusal.details["target_id"])
 		})
 	}
 }
@@ -89,7 +89,7 @@ func TestClientCredentialsCeiling_AnotherResourcesIntrospectorProceeds(t *testin
 			if write.expectFirstWrite != nil {
 				write.expectFirstWrite(database)
 			}
-			expectIntrospectionResources(database, otherIntrospectedResourceId)
+			expectIntrospectionResources(database, otherIntrospectedResourceID)
 
 			rr, records := serveClientCase(t, clientTargetCase{write, ordinaryClient}, granularScopeOfClients, database, auditLogger)
 
@@ -139,7 +139,7 @@ func TestClientCredentialsCeiling_AManageTokenReadsNothingForIt(t *testing.T) {
 
 			assertReachedPastTheCeiling(t, write, rr, records)
 			database.AssertExpectations(t)
-			assertNotAttemptedOnClientDatabase(t, database, "GetClientIntrospectionResourcesByClientId")
+			assertNotAttemptedOnClientDatabase(t, database, "GetClientIntrospectionResourcesByClientID")
 		})
 	}
 }
@@ -153,7 +153,7 @@ func TestClientCredentialsCeiling_AFailedListReadIsOneFiveHundred(t *testing.T) 
 			client := targetClient(t, ordinaryClient)
 			expectTheTargetClient(client)(database)
 			expectClientHolding(database, ordinaryClient)
-			database.On("GetClientIntrospectionResourcesByClientId", mock.Anything, (*sql.Tx)(nil), targetClientId).
+			database.On("GetClientIntrospectionResourcesByClientID", mock.Anything, (*sql.Tx)(nil), targetClientID).
 				Return(nil, errors.New("the read failed")).Once()
 
 			rr := write.serve(t, database, auditLogger, granularScopeOfClients, client)

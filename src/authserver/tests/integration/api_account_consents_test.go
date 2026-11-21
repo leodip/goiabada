@@ -32,17 +32,17 @@ func TestAPIAccountConsentsGet_Success(t *testing.T) {
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	require.NoError(t, err)
-	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.ID) }()
 
 	consent := &record.UserConsent{
-		UserId:    u.Id,
-		ClientId:  client.Id,
+		UserID:    u.ID,
+		ClientID:  client.ID,
 		Scope:     "openid profile email",
 		GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
 	}
 	err = database.CreateUserConsent(context.Background(), nil, consent)
 	require.NoError(t, err)
-	defer func() { _, _ = database.DeleteUserConsent(context.Background(), nil, consent.Id) }()
+	defer func() { _, _ = database.DeleteUserConsent(context.Background(), nil, consent.ID) }()
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/consents"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
@@ -60,16 +60,16 @@ func TestAPIAccountConsentsGet_Success(t *testing.T) {
 	// Find our consent and assert fields
 	var found *api.UserConsentResponse
 	for i := range getResp.Consents {
-		if getResp.Consents[i].Id == consent.Id {
+		if getResp.Consents[i].ID == consent.ID {
 			found = &getResp.Consents[i]
 			break
 		}
 	}
 	if found == nil {
-		t.Fatalf("expected to find consent id %d in response", consent.Id)
+		t.Fatalf("expected to find consent id %d in response", consent.ID)
 	}
-	assert.Equal(t, u.Id, found.UserId)
-	assert.Equal(t, client.Id, found.ClientId)
+	assert.Equal(t, u.ID, found.UserID)
+	assert.Equal(t, client.ID, found.ClientID)
 	assert.Equal(t, consent.Scope, found.Scope)
 	assert.Equal(t, client.ClientIdentifier, found.ClientIdentifier)
 	assert.Equal(t, client.ClientIdentifier, found.ClientName, "a client with no display name shown is named by its identifier")
@@ -100,15 +100,15 @@ func TestAPIAccountConsentsGet_NamesClientsAsTheConsentScreenDid(t *testing.T) {
 		Enabled:          true,
 		IsPublic:         true,
 	}
-	consentIds := map[int64]*record.Client{}
+	consentIDs := map[int64]*record.Client{}
 	for _, client := range []*record.Client{named, selfRegistered} {
 		require.NoError(t, database.CreateClient(context.Background(), nil, client))
-		defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
-		consent := &record.UserConsent{UserId: u.Id, ClientId: client.Id, Scope: "openid",
+		defer func() { _ = database.DeleteClient(context.Background(), nil, client.ID) }()
+		consent := &record.UserConsent{UserID: u.ID, ClientID: client.ID, Scope: "openid",
 			GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true}}
 		require.NoError(t, database.CreateUserConsent(context.Background(), nil, consent))
-		defer func() { _, _ = database.DeleteUserConsent(context.Background(), nil, consent.Id) }()
-		consentIds[consent.Id] = client
+		defer func() { _, _ = database.DeleteUserConsent(context.Background(), nil, consent.ID) }()
+		consentIDs[consent.ID] = client
 	}
 
 	resp := makeAPIRequest(t, "GET", appConfig.AuthServer.BaseURL+"/api/v1/account/consents", accessToken, nil)
@@ -119,7 +119,7 @@ func TestAPIAccountConsentsGet_NamesClientsAsTheConsentScreenDid(t *testing.T) {
 
 	got := map[string]api.UserConsentResponse{}
 	for _, c := range getResp.Consents {
-		if client, ok := consentIds[c.Id]; ok {
+		if client, ok := consentIDs[c.ID]; ok {
 			got[client.ClientIdentifier] = c
 		}
 	}
@@ -138,7 +138,7 @@ func TestAPIAccountConsentsGet_UnauthorizedAndScope(t *testing.T) {
 	// No token
 	req, err := http.NewRequest("GET", url, nil)
 	require.NoError(t, err)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -175,18 +175,18 @@ func TestAPIAccountConsentDelete_Success(t *testing.T) {
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	require.NoError(t, err)
-	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.ID) }()
 
 	consent := &record.UserConsent{
-		UserId:    u.Id,
-		ClientId:  client.Id,
+		UserID:    u.ID,
+		ClientID:  client.ID,
 		Scope:     "openid profile",
 		GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
 	}
 	err = database.CreateUserConsent(context.Background(), nil, consent)
 	require.NoError(t, err)
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/account/consents/" + fmt.Sprintf("%d", consent.Id)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/consents/" + fmt.Sprintf("%d", consent.ID)
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -199,7 +199,7 @@ func TestAPIAccountConsentDelete_Success(t *testing.T) {
 	assert.True(t, delResp.Success)
 
 	// Confirm deletion
-	got, err := database.GetUserConsentById(context.Background(), nil, consent.Id)
+	got, err := database.GetUserConsentByID(context.Background(), nil, consent.ID)
 	require.NoError(t, err)
 	assert.Nil(t, got)
 }
@@ -217,10 +217,10 @@ func TestAPIAccountConsentDelete_RevokesTheClientsRefreshTokens(t *testing.T) {
 	password := fake.Password(8)
 	passwordHashed, err := passwordhash.Hash(password)
 	require.NoError(t, err)
-	require.NoError(t, database.SetUserPasswordHash(context.Background(), nil, u.Id, passwordHashed))
+	require.NoError(t, database.SetUserPasswordHash(context.Background(), nil, u.ID, passwordHashed))
 	f := newConsentWithdrawalFixture(t, u, password)
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/account/consents/" + fmt.Sprintf("%d", f.consent.Id)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/consents/" + fmt.Sprintf("%d", f.consent.ID)
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -246,27 +246,27 @@ func TestAPIAccountConsentDelete_RefusesACodeIssuedBeforeTheWithdrawal(t *testin
 	password := fake.Password(8)
 	passwordHashed, err := passwordhash.Hash(password)
 	require.NoError(t, err)
-	require.NoError(t, database.SetUserPasswordHash(context.Background(), nil, u.Id, passwordHashed))
+	require.NoError(t, database.SetUserPasswordHash(context.Background(), nil, u.ID, passwordHashed))
 
 	withdrawnSecret, otherSecret := fake.LetterN(32), fake.LetterN(32)
 	withdrawnClient, withdrawnCode := createAuthCode(t, withdrawnSecret, "openid profile email",
 		authCodeOptions{user: u, userPassword: password})
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, withdrawnCode.ClientId) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, withdrawnCode.ClientID) })
 	otherClient, otherCode := createAuthCode(t, otherSecret, "openid profile email",
 		authCodeOptions{user: u, userPassword: password})
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, otherCode.ClientId) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, otherCode.ClientID) })
 	// Consent required off, so nothing but the withdrawal's mark can refuse the redemption.
 	require.False(t, withdrawnCode.Client.ConsentRequired)
 
 	consent := &record.UserConsent{
-		UserId:    u.Id,
-		ClientId:  withdrawnCode.ClientId,
+		UserID:    u.ID,
+		ClientID:  withdrawnCode.ClientID,
 		Scope:     "openid profile email",
 		GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
 	}
 	require.NoError(t, database.CreateUserConsent(context.Background(), nil, consent))
 
-	deleteURL := appConfig.AuthServer.BaseURL + "/api/v1/account/consents/" + fmt.Sprintf("%d", consent.Id)
+	deleteURL := appConfig.AuthServer.BaseURL + "/api/v1/account/consents/" + fmt.Sprintf("%d", consent.ID)
 	resp := makeAPIRequest(t, "DELETE", deleteURL, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -284,7 +284,7 @@ func TestAPIAccountConsentDelete_RefusesACodeIssuedBeforeTheWithdrawal(t *testin
 	assert.Equal(t, "Code is invalid.", refused["error_description"])
 	assert.Empty(t, refused["refresh_token"])
 
-	stored, err := database.GetCodeById(context.Background(), nil, withdrawnCode.Id)
+	stored, err := database.GetCodeByID(context.Background(), nil, withdrawnCode.ID)
 	require.NoError(t, err)
 	require.NotNil(t, stored)
 	assert.True(t, stored.Revoked, "the withdrawal marks the unused code revoked")
@@ -301,7 +301,7 @@ func TestAPIAccountConsentDelete_RefusesACodeIssuedBeforeTheWithdrawal(t *testin
 		if err := json.Unmarshal([]byte(entry.Details), &details); err != nil {
 			continue
 		}
-		if int64(details["client_id"].(float64)) != withdrawnCode.ClientId {
+		if int64(details["client_id"].(float64)) != withdrawnCode.ClientID {
 			continue
 		}
 		found++
@@ -325,7 +325,7 @@ func TestAPIAccountConsentDelete_ForbiddenOnOtherUser(t *testing.T) {
 	}
 	err := database.CreateUser(context.Background(), nil, user2)
 	require.NoError(t, err)
-	defer func() { _ = database.DeleteUser(context.Background(), nil, user2.Id) }()
+	defer func() { _ = database.DeleteUser(context.Background(), nil, user2.ID) }()
 
 	// Create client and consent for user2
 	client := &record.Client{
@@ -336,20 +336,20 @@ func TestAPIAccountConsentDelete_ForbiddenOnOtherUser(t *testing.T) {
 	}
 	err = database.CreateClient(context.Background(), nil, client)
 	require.NoError(t, err)
-	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.ID) }()
 
 	consent := &record.UserConsent{
-		UserId:    user2.Id,
-		ClientId:  client.Id,
+		UserID:    user2.ID,
+		ClientID:  client.ID,
 		Scope:     "openid",
 		GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
 	}
 	err = database.CreateUserConsent(context.Background(), nil, consent)
 	require.NoError(t, err)
-	defer func() { _, _ = database.DeleteUserConsent(context.Background(), nil, consent.Id) }()
+	defer func() { _, _ = database.DeleteUserConsent(context.Background(), nil, consent.ID) }()
 
 	// Attempt to delete using user1 token
-	url := appConfig.AuthServer.BaseURL + "/api/v1/account/consents/" + fmt.Sprintf("%d", consent.Id)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/consents/" + fmt.Sprintf("%d", consent.ID)
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -362,15 +362,15 @@ func TestAPIAccountConsentDelete_ForbiddenOnOtherUser(t *testing.T) {
 	assert.Equal(t, "FORBIDDEN", errResp.ErrorCode)
 
 	// Ensure consent still exists
-	got, err := database.GetUserConsentById(context.Background(), nil, consent.Id)
+	got, err := database.GetUserConsentByID(context.Background(), nil, consent.ID)
 	require.NoError(t, err)
 	assert.NotNil(t, got)
 
 	// Sanity check user ids differ
-	assert.NotEqual(t, user1.Id, user2.Id)
+	assert.NotEqual(t, user1.ID, user2.ID)
 }
 
-func TestAPIAccountConsentDelete_NotFoundAndBadId(t *testing.T) {
+func TestAPIAccountConsentDelete_NotFoundAndBadID(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope(t)
 
 	// Not found

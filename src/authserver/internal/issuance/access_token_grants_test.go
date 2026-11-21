@@ -64,13 +64,13 @@ func TestAccessToken_AuthorizationCodeGrant(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 	code := sessionBoundCode(testStart)
-	code.ClientId = 7
-	code.Client.Id = 7
+	code.ClientID = 7
+	code.Client.ID = 7
 	code.Scope = "openid email product-api:read"
 	code.Nonce = "n-0S6_WzA2Mj"
 	code.AuthStateGeneration = 4
 	code.AuthMethods = "pwd otp"
-	code.AcrLevel = record.AcrLevel2Optional
+	code.ACRLevel = record.ACRLevel2Optional
 	code.Client.TokenExpirationInSeconds = 900
 	code.Client.IncludeOpenIDConnectClaimsInAccessToken = record.ThreeStateSettingOn.String()
 	code.User.Email = "ana@example.com"
@@ -79,7 +79,7 @@ func TestAccessToken_AuthorizationCodeGrant(t *testing.T) {
 	mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, code).Return(nil)
 	mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, code).Return(nil)
 	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "session-1").
-		Return(&record.UserSession{Id: 1, UserId: 1, Started: testStart.Add(-10 * time.Minute)}, nil)
+		Return(&record.UserSession{ID: 1, UserID: 1, Started: testStart.Add(-10 * time.Minute)}, nil)
 	expectSigningKeyAndUserLoads(t, mockDB)
 	row := captureRefreshTokenRow(mockDB)
 
@@ -88,13 +88,13 @@ func TestAccessToken_AuthorizationCodeGrant(t *testing.T) {
 
 	assert.Equal(t, "Bearer", response.TokenType)
 	assert.Equal(t, int64(900), response.ExpiresIn, "the client's lifetime")
-	require.NotEmpty(t, row.FirstRefreshTokenJti)
+	require.NotEmpty(t, row.FirstRefreshTokenJTI)
 	assertWholeAccessToken(t, response.AccessToken, testStart, 900, map[string]interface{}{
 		"iss":                   "https://test-issuer.com",
 		"sub":                   code.User.Subject,
 		"client_id":             "web-app",
 		"client_internal_id":    float64(7),
-		"grant_id":              row.FirstRefreshTokenJti,
+		"grant_id":              row.FirstRefreshTokenJTI,
 		"auth_time":             float64(testStart.Add(-5 * time.Minute).Unix()),
 		"acr":                   "urn:goiabada:level2_optional",
 		"amr":                   []interface{}{"pwd", "otp"},
@@ -113,14 +113,14 @@ func TestAccessToken_RefreshOfACodeGrant(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 	code := sessionBoundCode(testStart)
-	code.ClientId = 7
-	code.Client.Id = 7
+	code.ClientID = 7
+	code.Client.ID = 7
 	code.Nonce = "n-0S6_WzA2Mj"
 	code.AuthStateGeneration = 4
 	parent := &record.RefreshToken{
-		Id:                   2,
-		RefreshTokenJti:      "parent-jti",
-		FirstRefreshTokenJti: "family-jti",
+		ID:                   2,
+		RefreshTokenJTI:      "parent-jti",
+		FirstRefreshTokenJTI: "family-jti",
 		Scope:                code.Scope,
 		RefreshTokenType:     TokenTypeRefresh.String(),
 		AuthStateGeneration:  6,
@@ -129,7 +129,7 @@ func TestAccessToken_RefreshOfACodeGrant(t *testing.T) {
 	mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, code).Return(nil)
 	mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, code).Return(nil)
 	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "session-1").
-		Return(&record.UserSession{Id: 1, UserId: 1, Started: testStart.Add(-10 * time.Minute)}, nil)
+		Return(&record.UserSession{ID: 1, UserID: 1, Started: testStart.Add(-10 * time.Minute)}, nil)
 	expectSigningKeyAndUserLoads(t, mockDB)
 	captureRefreshTokenRow(mockDB)
 
@@ -161,11 +161,11 @@ func TestAccessToken_PasswordGrant(t *testing.T) {
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 	expectSigningKeyAndUserLoads(t, mockDB)
 	row := captureRefreshTokenRow(mockDB)
-	user := &record.User{Id: 1, Subject: fake.UUID(), AuthStateGeneration: 2}
+	user := &record.User{ID: 1, Subject: fake.UUID(), AuthStateGeneration: 2}
 
-	expectPasswordGrantClientRow(mockDB, 3, &record.Client{Id: 3, ClientIdentifier: "legacy-app"})
+	expectPasswordGrantClientRow(mockDB, 3, &record.Client{ID: 3, ClientIdentifier: "legacy-app"})
 	response, err := tokenIssuer.IssuePasswordGrant(context.Background(), rfc9068Settings(), &ROPCGrantInput{
-		Client: &record.Client{Id: 3, ClientIdentifier: "legacy-app", TokenExpirationInSeconds: 900},
+		Client: &record.Client{ID: 3, ClientIdentifier: "legacy-app", TokenExpirationInSeconds: 900},
 		User:   user,
 		Scope:  "openid product-api:read",
 	})
@@ -173,14 +173,14 @@ func TestAccessToken_PasswordGrant(t *testing.T) {
 
 	assert.Equal(t, "Bearer", response.TokenType)
 	assert.Equal(t, int64(900), response.ExpiresIn, "the client's lifetime")
-	require.NotEmpty(t, row.FirstRefreshTokenJti)
+	require.NotEmpty(t, row.FirstRefreshTokenJTI)
 	claims := verifyAndDecodeToken(t, response.AccessToken, getTestPublicKey(t))
 	assertWholeAccessToken(t, response.AccessToken, testStart, 900, map[string]interface{}{
 		"iss":                "https://test-issuer.com",
 		"sub":                user.Subject,
 		"client_id":          "legacy-app",
 		"client_internal_id": float64(3),
-		"grant_id":           row.FirstRefreshTokenJti,
+		"grant_id":           row.FirstRefreshTokenJTI,
 		// The password was checked for this request, so it was checked when the token was issued.
 		"auth_time":             claims["iat"],
 		"acr":                   "urn:goiabada:level1",
@@ -198,16 +198,16 @@ func TestAccessToken_RefreshOfAPasswordGrant(t *testing.T) {
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 	authenticatedAt := testStart.Add(-time.Hour)
 	parent := &record.RefreshToken{
-		Id:                   2,
-		RefreshTokenJti:      "parent-jti",
-		FirstRefreshTokenJti: "family-jti",
+		ID:                   2,
+		RefreshTokenJTI:      "parent-jti",
+		FirstRefreshTokenJTI: "family-jti",
 		Scope:                "openid product-api:read",
 		RefreshTokenType:     TokenTypeOffline.String(),
 		AuthStateGeneration:  5,
 		MaxLifetime:          sql.NullTime{Time: testStart.Add(time.Hour), Valid: true},
 		AuthenticatedAt:      sql.NullTime{Time: authenticatedAt, Valid: true},
-		User:                 record.User{Id: 1, Subject: fake.UUID(), AuthStateGeneration: 9},
-		Client:               record.Client{Id: 3, ClientIdentifier: "legacy-app"},
+		User:                 record.User{ID: 1, Subject: fake.UUID(), AuthStateGeneration: 9},
+		Client:               record.Client{ID: 3, ClientIdentifier: "legacy-app"},
 	}
 	mockDB.On("RefreshTokenLoadUser", mock.Anything, mock.Anything, parent).Return(nil)
 	mockDB.On("RefreshTokenLoadClient", mock.Anything, mock.Anything, parent).Return(nil)
@@ -255,14 +255,14 @@ func TestAccessToken_ClientCredentialsGrant(t *testing.T) {
 	}{
 		{
 			name:     "one resource, the server's lifetime",
-			client:   &record.Client{Id: 4, ClientIdentifier: "billing-service"},
+			client:   &record.Client{ID: 4, ClientIdentifier: "billing-service"},
 			scope:    "product-api:read",
 			lifetime: 600,
 			wantAud:  "product-api",
 		},
 		{
 			name:     "two resources and a claim scope, the client's lifetime",
-			client:   &record.Client{Id: 4, ClientIdentifier: "billing-service", TokenExpirationInSeconds: 900},
+			client:   &record.Client{ID: 4, ClientIdentifier: "billing-service", TokenExpirationInSeconds: 900},
 			scope:    "product-api:read openid orders-api:write product-api:write",
 			lifetime: 900,
 			wantAud:  []interface{}{"product-api", "orders-api"},
@@ -276,7 +276,7 @@ func TestAccessToken_ClientCredentialsGrant(t *testing.T) {
 			assert.Equal(t, "Bearer", response.TokenType)
 			assert.Equal(t, tc.lifetime, response.ExpiresIn)
 			assert.Equal(t, tc.scope, response.Scope)
-			assert.Empty(t, response.IdToken)
+			assert.Empty(t, response.IDToken)
 			assert.Empty(t, response.RefreshToken)
 			assertWholeAccessToken(t, response.AccessToken, testStart, tc.lifetime, map[string]interface{}{
 				"iss":                "https://test-issuer.com",
@@ -295,7 +295,7 @@ func TestAccessToken_ImplicitFlow(t *testing.T) {
 	testStart := time.Now().UTC()
 	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
-	user := &record.User{Id: 1, Subject: fake.UUID()}
+	user := &record.User{ID: 1, Subject: fake.UUID()}
 	mockDB.On("GetCurrentSigningKey", mock.Anything, issueTx).Return(&record.KeyPair{
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, getTestPrivateKey(t)),
@@ -305,10 +305,10 @@ func TestAccessToken_ImplicitFlow(t *testing.T) {
 	mockDB.On("UserLoadAttributes", mock.Anything, issueTx, user).Return(nil)
 	authenticatedAt := testStart.Add(-2 * time.Minute)
 	input := &ImplicitGrantInput{
-		Client:              &record.Client{Id: 5, ClientIdentifier: "old-spa", TokenExpirationInSeconds: 900},
+		Client:              &record.Client{ID: 5, ClientIdentifier: "old-spa", TokenExpirationInSeconds: 900},
 		User:                user,
 		Scope:               "openid",
-		AcrLevel:            record.AcrLevel2Mandatory,
+		ACRLevel:            record.ACRLevel2Mandatory,
 		AuthMethods:         "pwd otp",
 		SessionIdentifier:   "session-1",
 		Nonce:               "n-0S6_WzA2Mj",

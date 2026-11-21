@@ -1208,9 +1208,10 @@ cmd_update() {
     # Generated mock header
     # -------------------------------------------------------------------------
     # src/mockery-header.txt is inlined verbatim into the header of every
-    # generated mock, through template-data.boilerplate-file in the two
-    # .mockery.yaml files, so a clone can read which generator wrote the tree
-    # rather than having to run one to find out.
+    # generated mock, through template-data.boilerplate-file in the three
+    # .mockery.yaml files (core, authserver and adminconsole), so a clone can
+    # read which generator wrote the tree rather than having to run one to find
+    # out.
     #
     # Writing it here is what keeps that line the pin instead of a literal
     # somebody remembered to change. It does not carry itself into the mocks:

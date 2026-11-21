@@ -48,8 +48,8 @@ func recoveryNoticeUser(t *testing.T) *record.User {
 func stubNewRecoveryCodes(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, user *record.User) {
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), recoveryCodesSubject).Return(user, nil).Once()
 	datamocks.ExpectRunInTransaction(database, recoveryCodesTx)
-	database.On("GetUserByIdForUpdate", mock.Anything, recoveryCodesTx, user.Id).Return(user, nil).Once()
-	database.On("ReplaceUserRecoveryCodes", mock.Anything, recoveryCodesTx, user.Id, mock.Anything).Return(nil).Once()
+	database.On("GetUserByIDForUpdate", mock.Anything, recoveryCodesTx, user.ID).Return(user, nil).Once()
+	database.On("ReplaceUserRecoveryCodes", mock.Anything, recoveryCodesTx, user.ID, mock.Anything).Return(nil).Once()
 	auditLogger.On("Log", mock.Anything, audit.EventRecoveryCodesCreated, mock.Anything).Return().Once()
 }
 
@@ -147,14 +147,14 @@ func TestHandleAccountRecoveryCodesPost_SendsNoNoticeWhereNoneMayGo(t *testing.T
 				datamocks.ExpectRunInTransaction(database, recoveryCodesTx)
 				removed := *user
 				removed.OTPEnabled = false
-				database.On("GetUserByIdForUpdate", mock.Anything, recoveryCodesTx, user.Id).Return(&removed, nil).Once()
+				database.On("GetUserByIDForUpdate", mock.Anything, recoveryCodesTx, user.ID).Return(&removed, nil).Once()
 			}},
 		{"the replacement rolls back", recoveryCodesPassword, http.StatusInternalServerError,
 			func(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, user *record.User, settings *record.Settings) {
 				database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), recoveryCodesSubject).Return(user, nil).Once()
 				datamocks.ExpectRunInTransaction(database, recoveryCodesTx)
-				database.On("GetUserByIdForUpdate", mock.Anything, recoveryCodesTx, user.Id).Return(user, nil).Once()
-				database.On("ReplaceUserRecoveryCodes", mock.Anything, recoveryCodesTx, user.Id, mock.Anything).
+				database.On("GetUserByIDForUpdate", mock.Anything, recoveryCodesTx, user.ID).Return(user, nil).Once()
+				database.On("ReplaceUserRecoveryCodes", mock.Anything, recoveryCodesTx, user.ID, mock.Anything).
 					Return(errors.New("replace failed")).Once()
 			}},
 	} {
@@ -203,7 +203,7 @@ func TestHandleAccountRecoveryCodesPost_AFailedNoticeIsOneErrorRecord(t *testing
 	assert.Equal(t, slog.LevelError, records[0].Level)
 	assert.Equal(t, "unable to render an account notice", records[0].Message)
 	assert.Equal(t, "recovery_codes_replaced", records[0].Attrs["notice"])
-	assert.Equal(t, otpNoticeRequestId, records[0].Attrs["request_id"])
-	assert.Equal(t, user.Id, records[0].Attrs["user_id"])
+	assert.Equal(t, otpNoticeRequestID, records[0].Attrs["request_id"])
+	assert.Equal(t, user.ID, records[0].Attrs["user_id"])
 	assert.NotContains(t, capture.Text(), recoveryNoticeAddress, "the record names no address")
 }

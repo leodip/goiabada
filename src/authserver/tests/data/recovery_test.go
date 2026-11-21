@@ -73,41 +73,41 @@ func seedRecoveryFixture(t *testing.T) recoveryFixture {
 	require.NoError(t, database.UpdateUser(ctx, nil, user))
 	require.NoError(t, database.RunInTransaction(ctx, func(tx *sql.Tx) error {
 		for range 2 {
-			if _, err := database.IncrementUserAuthStateGeneration(ctx, tx, user.Id); err != nil {
+			if _, err := database.IncrementUserAuthStateGeneration(ctx, tx, user.ID); err != nil {
 				return err
 			}
 		}
 		return nil
 	}))
 	var err error
-	f.user, err = database.GetUserById(ctx, nil, user.Id)
+	f.user, err = database.GetUserByID(ctx, nil, user.ID)
 	require.NoError(t, err)
 	require.Equal(t, int64(2), f.user.AuthStateGeneration)
 	// The authenticator's recovery codes, which a removal deletes with it (#257 decision 3).
-	replaceRecoveryCodes(t, f.user.Id, recoveryCodeHashes(10))
+	replaceRecoveryCodes(t, f.user.ID, recoveryCodeHashes(10))
 
 	f.otherPermission = createTestPermission(t, createTestResource(t))
 	require.NoError(t, database.CreateUserPermission(ctx, nil, &record.UserPermission{
-		UserId: f.user.Id, PermissionId: f.otherPermission.Id,
+		UserID: f.user.ID, PermissionID: f.otherPermission.ID,
 	}))
 
 	client := createTestClient(t)
-	f.session = createTestUserSession(t, f.user.Id)
-	code := createTestCodeInSession(t, client.Id, f.user.Id, f.session.SessionIdentifier)
-	f.sessionToken = createRecoveryTokenOfCode(t, client.Id, code.Id, f.session.SessionIdentifier)
-	f.offlineToken = createRecoveryTokenOfCode(t, client.Id, code.Id, "")
+	f.session = createTestUserSession(t, f.user.ID)
+	code := createTestCodeInSession(t, client.ID, f.user.ID, f.session.SessionIdentifier)
+	f.sessionToken = createRecoveryTokenOfCode(t, client.ID, code.ID, f.session.SessionIdentifier)
+	f.offlineToken = createRecoveryTokenOfCode(t, client.ID, code.ID, "")
 
 	bystander := createTestUser(t)
-	f.bystanderSession = createTestUserSession(t, bystander.Id)
-	bystanderCode := createTestCodeInSession(t, client.Id, bystander.Id, f.bystanderSession.SessionIdentifier)
-	f.bystanderToken = createRecoveryTokenOfCode(t, client.Id, bystanderCode.Id, f.bystanderSession.SessionIdentifier)
+	f.bystanderSession = createTestUserSession(t, bystander.ID)
+	bystanderCode := createTestCodeInSession(t, client.ID, bystander.ID, f.bystanderSession.SessionIdentifier)
+	f.bystanderToken = createRecoveryTokenOfCode(t, client.ID, bystanderCode.ID, f.bystanderSession.SessionIdentifier)
 	return f
 }
 
 // createRecoveryTokenOfCode is createTokenOfCode in the shape issuance writes a code's token in:
 // the user is reached through the code alone, user_id left null. The sweep's read unions the two
 // shapes, so a token carrying both would be read, and reported, twice.
-func createRecoveryTokenOfCode(t *testing.T, clientId, codeId int64, sessionIdentifier string) *record.RefreshToken {
+func createRecoveryTokenOfCode(t *testing.T, clientID, codeID int64, sessionIdentifier string) *record.RefreshToken {
 	t.Helper()
 	tokenType := "Refresh"
 	if sessionIdentifier == "" {
@@ -115,9 +115,9 @@ func createRecoveryTokenOfCode(t *testing.T, clientId, codeId int64, sessionIden
 	}
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	token := &record.RefreshToken{
-		CodeId:            sql.NullInt64{Int64: codeId, Valid: true},
-		ClientId:          sql.NullInt64{Int64: clientId, Valid: true},
-		RefreshTokenJti:   fake.UUID(),
+		CodeID:            sql.NullInt64{Int64: codeID, Valid: true},
+		ClientID:          sql.NullInt64{Int64: clientID, Valid: true},
+		RefreshTokenJTI:   fake.UUID(),
 		SessionIdentifier: sessionIdentifier,
 		RefreshTokenType:  tokenType,
 		Scope:             "openid profile offline_access",
@@ -135,7 +135,7 @@ func createRecoveryTokenOfCode(t *testing.T, clientId, codeId int64, sessionIden
 func ensureSettingsRowOne(t *testing.T) {
 	t.Helper()
 	ctx := context.Background()
-	settings, err := database.GetSettingsById(ctx, nil, 1)
+	settings, err := database.GetSettingsByID(ctx, nil, 1)
 	require.NoError(t, err)
 	if settings != nil {
 		return
@@ -150,14 +150,14 @@ func ensureSettingsRowOne(t *testing.T) {
 	}))
 }
 
-// heldPermissionIds answers the permission ids the user holds, one entry per row.
-func heldPermissionIds(t *testing.T, userId int64) []int64 {
+// heldPermissionIDs answers the permission ids the user holds, one entry per row.
+func heldPermissionIDs(t *testing.T, userID int64) []int64 {
 	t.Helper()
-	grants, err := database.GetUserPermissionsByUserId(context.Background(), nil, userId)
+	grants, err := database.GetUserPermissionsByUserID(context.Background(), nil, userID)
 	require.NoError(t, err)
 	ids := make([]int64, 0, len(grants))
 	for _, grant := range grants {
-		ids = append(ids, grant.PermissionId)
+		ids = append(ids, grant.PermissionID)
 	}
 	return ids
 }
@@ -169,25 +169,25 @@ func assertRevokedEverything(t *testing.T, f recoveryFixture, outcome recovery.O
 	t.Helper()
 	ctx := context.Background()
 
-	after, err := database.GetUserById(ctx, nil, f.user.Id)
+	after, err := database.GetUserByID(ctx, nil, f.user.ID)
 	require.NoError(t, err)
 	assert.Equal(t, f.user.AuthStateGeneration+1, after.AuthStateGeneration, "the generation moved by exactly one")
 	assert.Equal(t, f.user.AuthStateGeneration, outcome.Revocation.OldGeneration)
 	assert.Equal(t, f.user.AuthStateGeneration+1, outcome.Revocation.NewGeneration)
 
-	session, err := database.GetUserSessionById(ctx, nil, f.session.Id)
+	session, err := database.GetUserSessionByID(ctx, nil, f.session.ID)
 	require.NoError(t, err)
 	assert.Nil(t, session, "the user's session ended")
 	assert.Equal(t, []string{f.session.SessionIdentifier}, outcome.Revocation.TerminatedSessionIdentifiers)
-	assertTokenRevoked(t, f.sessionToken.Id, true, "the session-bound refresh token")
-	assertTokenRevoked(t, f.offlineToken.Id, true, "the offline refresh token")
-	assert.ElementsMatch(t, []string{f.sessionToken.RefreshTokenJti, f.offlineToken.RefreshTokenJti},
-		outcome.Revocation.RevokedRefreshTokenJtis)
+	assertTokenRevoked(t, f.sessionToken.ID, true, "the session-bound refresh token")
+	assertTokenRevoked(t, f.offlineToken.ID, true, "the offline refresh token")
+	assert.ElementsMatch(t, []string{f.sessionToken.RefreshTokenJTI, f.offlineToken.RefreshTokenJTI},
+		outcome.Revocation.RevokedRefreshTokenJTIs)
 
-	bystander, err := database.GetUserSessionById(ctx, nil, f.bystanderSession.Id)
+	bystander, err := database.GetUserSessionByID(ctx, nil, f.bystanderSession.ID)
 	require.NoError(t, err)
 	assert.NotNil(t, bystander, "another user's session is untouched")
-	assertTokenRevoked(t, f.bystanderToken.Id, false, "another user's refresh token")
+	assertTokenRevoked(t, f.bystanderToken.ID, false, "another user's refresh token")
 }
 
 func TestRecovery_EachActionAloneAndAllTogether(t *testing.T) {
@@ -219,7 +219,7 @@ func TestRecovery_EachActionAloneAndAllTogether(t *testing.T) {
 			require.NoError(t, err)
 
 			assertRevokedEverything(t, f, outcome)
-			after, err := database.GetUserById(ctx, nil, f.user.Id)
+			after, err := database.GetUserByID(ctx, nil, f.user.ID)
 			require.NoError(t, err)
 
 			// Each action changed what it names, and nothing it does not.
@@ -233,22 +233,22 @@ func TestRecovery_EachActionAloneAndAllTogether(t *testing.T) {
 			if req.RemoveOTP {
 				assert.True(t, outcome.OTPRemoved)
 				assert.False(t, after.OTPEnabled, "the authenticator is removed")
-				assert.Equal(t, f.user.OtpConfigGeneration+1, after.OtpConfigGeneration)
-				assert.Equal(t, 0, unusedRecoveryCodes(t, f.user.Id), "the recovery codes go with it")
+				assert.Equal(t, f.user.OTPConfigGeneration+1, after.OTPConfigGeneration)
+				assert.Equal(t, 0, unusedRecoveryCodes(t, f.user.ID), "the recovery codes go with it")
 			} else {
 				assert.False(t, outcome.OTPRemoved)
 				assert.True(t, after.OTPEnabled, "the authenticator is untouched")
-				assert.Equal(t, 10, unusedRecoveryCodes(t, f.user.Id), "and so are its recovery codes")
+				assert.Equal(t, 10, unusedRecoveryCodes(t, f.user.ID), "and so are its recovery codes")
 				assert.Equal(t, f.user.OTPSecretEncrypted, after.OTPSecretEncrypted)
-				assert.Equal(t, f.user.OtpConfigGeneration, after.OtpConfigGeneration)
+				assert.Equal(t, f.user.OTPConfigGeneration, after.OTPConfigGeneration)
 			}
 			if req.GrantManage {
 				assert.True(t, outcome.ManageGranted)
-				assert.ElementsMatch(t, []int64{f.otherPermission.Id, f.manage.Id}, heldPermissionIds(t, f.user.Id),
+				assert.ElementsMatch(t, []int64{f.otherPermission.ID, f.manage.ID}, heldPermissionIDs(t, f.user.ID),
 					"manage is granted beside the permission the user held")
 			} else {
 				assert.False(t, outcome.ManageGranted)
-				assert.Equal(t, []int64{f.otherPermission.Id}, heldPermissionIds(t, f.user.Id), "the permissions are untouched")
+				assert.Equal(t, []int64{f.otherPermission.ID}, heldPermissionIDs(t, f.user.ID), "the permissions are untouched")
 			}
 			assert.True(t, after.Enabled)
 			assert.Equal(t, f.user.Email, after.Email)
@@ -283,22 +283,22 @@ func TestRecovery_ASecondGrantWritesNoSecondRow(t *testing.T) {
 	_, err := recovery.Run(ctx, database, &recoveryAuditRecorder{}, req)
 	require.NoError(t, err)
 
-	afterFirst, err := database.GetUserById(ctx, nil, f.user.Id)
+	afterFirst, err := database.GetUserByID(ctx, nil, f.user.ID)
 	require.NoError(t, err)
-	session := createTestUserSession(t, f.user.Id)
+	session := createTestUserSession(t, f.user.ID)
 	recorder := &recoveryAuditRecorder{}
 
 	outcome, err := recovery.Run(ctx, database, recorder, req)
 	require.NoError(t, err)
 
 	assert.False(t, outcome.ManageGranted)
-	assert.ElementsMatch(t, []int64{f.otherPermission.Id, f.manage.Id}, heldPermissionIds(t, f.user.Id),
+	assert.ElementsMatch(t, []int64{f.otherPermission.ID, f.manage.ID}, heldPermissionIDs(t, f.user.ID),
 		"one manage row, not two")
 	assert.Equal(t, []string{audit.EventRevokedUserAuthState}, recorder.events)
-	afterSecond, err := database.GetUserById(ctx, nil, f.user.Id)
+	afterSecond, err := database.GetUserByID(ctx, nil, f.user.ID)
 	require.NoError(t, err)
 	assert.Equal(t, afterFirst.AuthStateGeneration+1, afterSecond.AuthStateGeneration)
-	ended, err := database.GetUserSessionById(ctx, nil, session.Id)
+	ended, err := database.GetUserSessionByID(ctx, nil, session.ID)
 	require.NoError(t, err)
 	assert.Nil(t, ended, "the session started after the first run ended with the second")
 }
@@ -318,15 +318,15 @@ func TestRecovery_ARefusalWritesNothing(t *testing.T) {
 	require.ErrorAs(t, err, &refusal)
 	assert.Contains(t, refusal.Reason, "the password is refused by the stored password policy")
 	assert.Empty(t, recorder.events)
-	after, err := database.GetUserById(ctx, nil, f.user.Id)
+	after, err := database.GetUserByID(ctx, nil, f.user.ID)
 	require.NoError(t, err)
 	assert.Equal(t, f.user.AuthStateGeneration, after.AuthStateGeneration)
 	assert.True(t, after.OTPEnabled)
-	assert.Equal(t, []int64{f.otherPermission.Id}, heldPermissionIds(t, f.user.Id))
-	session, err := database.GetUserSessionById(ctx, nil, f.session.Id)
+	assert.Equal(t, []int64{f.otherPermission.ID}, heldPermissionIDs(t, f.user.ID))
+	session, err := database.GetUserSessionByID(ctx, nil, f.session.ID)
 	require.NoError(t, err)
 	assert.NotNil(t, session)
-	assertTokenRevoked(t, f.sessionToken.Id, false, "the session-bound refresh token")
+	assertTokenRevoked(t, f.sessionToken.ID, false, "the session-bound refresh token")
 }
 
 // recoveryWriteRefuser passes every call through to the real database but the one failAt names,
@@ -346,20 +346,20 @@ func (d *recoveryWriteRefuser) refuse(method string, tx *sql.Tx) bool {
 	return true
 }
 
-func (d *recoveryWriteRefuser) SetUserPasswordHash(ctx context.Context, tx *sql.Tx, userId int64, passwordHash string) error {
+func (d *recoveryWriteRefuser) SetUserPasswordHash(ctx context.Context, tx *sql.Tx, userID int64, passwordHash string) error {
 	if d.refuse("SetUserPasswordHash", tx) {
 		return d.failure
 	}
-	return d.Database.SetUserPasswordHash(ctx, tx, userId, passwordHash)
+	return d.Database.SetUserPasswordHash(ctx, tx, userID, passwordHash)
 }
 
-func (d *recoveryWriteRefuser) GetUserPermissionsByUserId(ctx context.Context, tx *sql.Tx,
-	userId int64) ([]record.UserPermission, error) {
+func (d *recoveryWriteRefuser) GetUserPermissionsByUserID(ctx context.Context, tx *sql.Tx,
+	userID int64) ([]record.UserPermission, error) {
 
-	if d.refuse("GetUserPermissionsByUserId", tx) {
+	if d.refuse("GetUserPermissionsByUserID", tx) {
 		return nil, d.failure
 	}
-	return d.Database.GetUserPermissionsByUserId(ctx, tx, userId)
+	return d.Database.GetUserPermissionsByUserID(ctx, tx, userID)
 }
 
 func (d *recoveryWriteRefuser) CreateUserPermission(ctx context.Context, tx *sql.Tx,
@@ -386,7 +386,7 @@ func (d *recoveryWriteRefuser) UpdateSettings(ctx context.Context, tx *sql.Tx, s
 func TestRecovery_AFailedGrantRollsBackEarlierActions(t *testing.T) {
 	ctx := context.Background()
 
-	for _, failAt := range []string{"SetUserPasswordHash", "GetUserPermissionsByUserId", "CreateUserPermission"} {
+	for _, failAt := range []string{"SetUserPasswordHash", "GetUserPermissionsByUserID", "CreateUserPermission"} {
 		t.Run(failAt, func(t *testing.T) {
 			f := seedRecoveryFixture(t)
 			db := &recoveryWriteRefuser{Database: database, failAt: failAt,
@@ -404,20 +404,20 @@ func TestRecovery_AFailedGrantRollsBackEarlierActions(t *testing.T) {
 			assert.Equal(t, recovery.Outcome{}, outcome)
 			assert.Empty(t, recorder.events, "nothing is recorded for a rollback")
 
-			after, err := database.GetUserById(ctx, nil, f.user.Id)
+			after, err := database.GetUserByID(ctx, nil, f.user.ID)
 			require.NoError(t, err)
 			assert.Equal(t, f.user.PasswordHash, after.PasswordHash, "the password is as it was")
 			assert.True(t, after.OTPEnabled, "the authenticator is still enrolled")
 			assert.Equal(t, f.user.OTPSecretEncrypted, after.OTPSecretEncrypted)
-			assert.Equal(t, f.user.OtpConfigGeneration, after.OtpConfigGeneration)
-			assert.Equal(t, 10, unusedRecoveryCodes(t, f.user.Id), "and so are its recovery codes")
+			assert.Equal(t, f.user.OTPConfigGeneration, after.OTPConfigGeneration)
+			assert.Equal(t, 10, unusedRecoveryCodes(t, f.user.ID), "and so are its recovery codes")
 			assert.Equal(t, f.user.AuthStateGeneration, after.AuthStateGeneration, "the generation did not move")
-			assert.Equal(t, []int64{f.otherPermission.Id}, heldPermissionIds(t, f.user.Id), "manage is not granted")
-			session, err := database.GetUserSessionById(ctx, nil, f.session.Id)
+			assert.Equal(t, []int64{f.otherPermission.ID}, heldPermissionIDs(t, f.user.ID), "manage is not granted")
+			session, err := database.GetUserSessionByID(ctx, nil, f.session.ID)
 			require.NoError(t, err)
 			assert.NotNil(t, session, "the user's session still stands")
-			assertTokenRevoked(t, f.sessionToken.Id, false, "the session-bound refresh token")
-			assertTokenRevoked(t, f.offlineToken.Id, false, "the offline refresh token")
+			assertTokenRevoked(t, f.sessionToken.ID, false, "the session-bound refresh token")
+			assertTokenRevoked(t, f.offlineToken.ID, false, "the offline refresh token")
 		})
 	}
 }
@@ -445,15 +445,15 @@ func TestRecovery_RemovesTheAuthenticatorAChangeHoldingTheRowLeft(t *testing.T) 
 			f := seedRecoveryFixture(t)
 
 			holder := beginTx(t)
-			require.NoError(t, database.AcquireUserRow(ctx, holder, f.user.Id))
+			require.NoError(t, database.AcquireUserRow(ctx, holder, f.user.ID))
 			removed, err := otpcredential.RemoveTx(ctx, database, holder, f.user)
 			require.NoError(t, err)
 			require.True(t, removed)
-			established, err := database.TryEstablishUserOTP(ctx, holder, f.user.Id, f.user.OtpConfigGeneration+1,
+			established, err := database.TryEstablishUserOTP(ctx, holder, f.user.ID, f.user.OTPConfigGeneration+1,
 				[]byte("the new authenticator's seed"))
 			require.NoError(t, err)
 			require.True(t, established)
-			_, err = database.IncrementUserOtpConfigGeneration(ctx, holder, f.user.Id)
+			_, err = database.IncrementUserOTPConfigGeneration(ctx, holder, f.user.ID)
 			require.NoError(t, err)
 
 			recorder := &recoveryAuditRecorder{}
@@ -469,10 +469,10 @@ func TestRecovery_RemovesTheAuthenticatorAChangeHoldingTheRowLeft(t *testing.T) 
 			require.NoError(t, database.CommitTransaction(ctx, holder))
 			require.NoError(t, recovering.await(t))
 
-			after, err := database.GetUserById(ctx, nil, f.user.Id)
+			after, err := database.GetUserByID(ctx, nil, f.user.ID)
 			require.NoError(t, err)
 			assert.False(t, after.OTPEnabled, "the authenticator enrolled while the recovery waited is removed")
-			assert.Equal(t, f.user.OtpConfigGeneration+3, after.OtpConfigGeneration)
+			assert.Equal(t, f.user.OTPConfigGeneration+3, after.OTPConfigGeneration)
 			want := []string{audit.EventDisabledOTP}
 			if grantManage {
 				want = append(want, audit.EventAddedUserPermission, audit.EventAdministrativePermissionChanged)
@@ -496,17 +496,17 @@ func TestRecovery_AGrantAndARemovalRemoveAnEnrolmentHoldingTheRow(t *testing.T) 
 	_, removed, err := otpcredential.Remove(ctx, database, f.user)
 	require.NoError(t, err)
 	require.True(t, removed)
-	f.user, err = database.GetUserById(ctx, nil, f.user.Id)
+	f.user, err = database.GetUserByID(ctx, nil, f.user.ID)
 	require.NoError(t, err)
 	require.False(t, f.user.OTPEnabled)
 
 	holder := beginTx(t)
-	require.NoError(t, database.AcquireUserRow(ctx, holder, f.user.Id))
-	established, err := database.TryEstablishUserOTP(ctx, holder, f.user.Id, f.user.OtpConfigGeneration,
+	require.NoError(t, database.AcquireUserRow(ctx, holder, f.user.ID))
+	established, err := database.TryEstablishUserOTP(ctx, holder, f.user.ID, f.user.OTPConfigGeneration,
 		[]byte("the newly enrolled authenticator's seed"))
 	require.NoError(t, err)
 	require.True(t, established)
-	_, err = database.IncrementUserOtpConfigGeneration(ctx, holder, f.user.Id)
+	_, err = database.IncrementUserOTPConfigGeneration(ctx, holder, f.user.ID)
 	require.NoError(t, err)
 
 	recorder := &recoveryAuditRecorder{}
@@ -527,10 +527,10 @@ func TestRecovery_AGrantAndARemovalRemoveAnEnrolmentHoldingTheRow(t *testing.T) 
 	got := recovering.await(t)
 	require.NoError(t, got.err)
 
-	after, err := database.GetUserById(ctx, nil, f.user.Id)
+	after, err := database.GetUserByID(ctx, nil, f.user.ID)
 	require.NoError(t, err)
 	assert.False(t, after.OTPEnabled, "the authenticator enrolled while the recovery waited is removed")
-	assert.Equal(t, f.user.OtpConfigGeneration+2, after.OtpConfigGeneration)
+	assert.Equal(t, f.user.OTPConfigGeneration+2, after.OTPConfigGeneration)
 	assert.True(t, got.outcome.OTPRemoved, "the operator is told an authenticator was removed")
 	assert.True(t, got.outcome.ManageGranted)
 	assert.Equal(t, []string{audit.EventDisabledOTP, audit.EventAddedUserPermission,
@@ -549,8 +549,8 @@ func TestRecovery_AGrantAndAPasswordRefuseAUserDisabledHoldingTheRow(t *testing.
 	f := seedRecoveryFixture(t)
 
 	holder := beginTx(t)
-	require.NoError(t, database.AcquireUserRow(ctx, holder, f.user.Id))
-	changed, err := database.TrySetUserEnabled(ctx, holder, f.user.Id, true, false)
+	require.NoError(t, database.AcquireUserRow(ctx, holder, f.user.ID))
+	changed, err := database.TrySetUserEnabled(ctx, holder, f.user.ID, true, false)
 	require.NoError(t, err)
 	require.True(t, changed)
 
@@ -573,12 +573,12 @@ func TestRecovery_AGrantAndAPasswordRefuseAUserDisabledHoldingTheRow(t *testing.
 	require.ErrorAs(t, runErr, &refusal)
 	assert.Contains(t, refusal.Reason, "disabled")
 	assert.Empty(t, recorder.events, "a refusal writes no audit event")
-	after, err := database.GetUserById(ctx, nil, f.user.Id)
+	after, err := database.GetUserByID(ctx, nil, f.user.ID)
 	require.NoError(t, err)
 	assert.False(t, after.Enabled)
 	assert.Equal(t, f.user.PasswordHash, after.PasswordHash, "the password is as it was")
 	assert.Equal(t, f.user.AuthStateGeneration, after.AuthStateGeneration, "the generation did not move")
-	assert.Equal(t, []int64{f.otherPermission.Id}, heldPermissionIds(t, f.user.Id), "manage is not granted")
+	assert.Equal(t, []int64{f.otherPermission.ID}, heldPermissionIDs(t, f.user.ID), "manage is not granted")
 }
 
 // A sign-in starts a session, or a refresh rotation writes an offline token's child, holding the
@@ -599,9 +599,9 @@ func TestRecovery_AGrantSweepsStateCommittedHoldingTheUsersRow(t *testing.T) {
 				// The fixture's tokens carry generation zero, which no rotation accepts; this
 				// rotation's parent carries the user's current generation, as a usable one does.
 				parent := *f.offlineToken
-				parent.Id = 0
-				parent.RefreshTokenJti = fake.UUID()
-				parent.FirstRefreshTokenJti = parent.RefreshTokenJti
+				parent.ID = 0
+				parent.RefreshTokenJTI = fake.UUID()
+				parent.FirstRefreshTokenJTI = parent.RefreshTokenJTI
 				parent.AuthStateGeneration = f.user.AuthStateGeneration
 				require.NoError(t, database.CreateRefreshToken(ctx, nil, &parent))
 				f.offlineToken = &parent
@@ -609,22 +609,22 @@ func TestRecovery_AGrantSweepsStateCommittedHoldingTheUsersRow(t *testing.T) {
 
 			// The holder makes the writes its production operation makes under the user's row.
 			holder := beginTx(t)
-			require.NoError(t, database.AcquireUserRow(ctx, holder, f.user.Id))
+			require.NoError(t, database.AcquireUserRow(ctx, holder, f.user.ID))
 			session := *f.session
 			token := *f.offlineToken
 			if state == "a new session" {
-				session.Id = 0
+				session.ID = 0
 				session.SessionIdentifier = fake.UUID()
 				session.AuthStateGeneration = f.user.AuthStateGeneration
 				require.NoError(t, database.CreateUserSession(ctx, holder, &session))
 			} else {
-				retired, err := database.MarkRefreshTokenAsRevoked(ctx, holder, token.Id)
+				retired, err := database.MarkRefreshTokenAsRevoked(ctx, holder, token.ID)
 				require.NoError(t, err)
 				require.True(t, retired)
-				token.Id = 0
-				token.PreviousRefreshTokenJti = token.RefreshTokenJti
-				token.FirstRefreshTokenJti = token.RefreshTokenJti
-				token.RefreshTokenJti = fake.UUID()
+				token.ID = 0
+				token.PreviousRefreshTokenJTI = token.RefreshTokenJTI
+				token.FirstRefreshTokenJTI = token.RefreshTokenJTI
+				token.RefreshTokenJTI = fake.UUID()
 				token.AuthStateGeneration = f.user.AuthStateGeneration
 				require.NoError(t, database.CreateRefreshToken(ctx, holder, &token))
 			}
@@ -648,13 +648,13 @@ func TestRecovery_AGrantSweepsStateCommittedHoldingTheUsersRow(t *testing.T) {
 			require.NoError(t, got.err)
 
 			if state == "a new session" {
-				left, err := database.GetUserSessionById(ctx, nil, session.Id)
+				left, err := database.GetUserSessionByID(ctx, nil, session.ID)
 				require.NoError(t, err)
 				assert.Nil(t, left, "the session started while the recovery waited is ended")
 				assert.Contains(t, got.outcome.Revocation.TerminatedSessionIdentifiers, session.SessionIdentifier)
 			} else {
-				assertTokenRevoked(t, token.Id, true, "the child written while the recovery waited")
-				assert.Contains(t, got.outcome.Revocation.RevokedRefreshTokenJtis, token.RefreshTokenJti)
+				assertTokenRevoked(t, token.ID, true, "the child written while the recovery waited")
+				assert.Contains(t, got.outcome.Revocation.RevokedRefreshTokenJTIs, token.RefreshTokenJTI)
 			}
 			assert.Equal(t, f.user.AuthStateGeneration+1, got.outcome.Revocation.NewGeneration)
 			assert.True(t, got.outcome.ManageGranted)
@@ -688,10 +688,10 @@ func TestRecovery_FindsAGrantHoldingTheRowAndWritesNoSecond(t *testing.T) {
 	holder := beginTx(t)
 	_, err := database.AcquireManagePermissionRow(ctx, holder)
 	require.NoError(t, err)
-	held, err := database.GetUserPermissionsByUserId(ctx, holder, f.user.Id)
+	held, err := database.GetUserPermissionsByUserID(ctx, holder, f.user.ID)
 	require.NoError(t, err)
 	for _, grant := range held {
-		require.NotEqual(t, f.manage.Id, grant.PermissionId, "the save finds manage not yet held")
+		require.NotEqual(t, f.manage.ID, grant.PermissionID, "the save finds manage not yet held")
 	}
 
 	recorder := &recoveryAuditRecorder{}
@@ -707,12 +707,12 @@ func TestRecovery_FindsAGrantHoldingTheRowAndWritesNoSecond(t *testing.T) {
 		recovering.requireStillWaiting(t)
 	}
 	require.NoError(t, database.CreateUserPermission(ctx, holder, &record.UserPermission{
-		UserId: f.user.Id, PermissionId: f.manage.Id,
+		UserID: f.user.ID, PermissionID: f.manage.ID,
 	}))
 	require.NoError(t, database.CommitTransaction(ctx, holder))
 	require.NoError(t, recovering.await(t))
 
-	assert.ElementsMatch(t, []int64{f.otherPermission.Id, f.manage.Id}, heldPermissionIds(t, f.user.Id),
+	assert.ElementsMatch(t, []int64{f.otherPermission.ID, f.manage.ID}, heldPermissionIDs(t, f.user.ID),
 		"one manage row, the one granted while the recovery waited")
 	assert.Equal(t, []string{audit.EventRevokedUserAuthState}, recorder.events)
 }
@@ -724,7 +724,7 @@ func turnTurnstileOnInRowOne(t *testing.T) {
 	t.Helper()
 	ctx := context.Background()
 	ensureSettingsRowOne(t)
-	settings, err := database.GetSettingsById(ctx, nil, 1)
+	settings, err := database.GetSettingsByID(ctx, nil, 1)
 	require.NoError(t, err)
 	original := *settings
 	t.Cleanup(func() {
@@ -740,7 +740,7 @@ func turnTurnstileOnInRowOne(t *testing.T) {
 // turnTurnstileOnInRowOne stored kept either way.
 func assertTurnstile(t *testing.T, enabled bool, msg string) {
 	t.Helper()
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
+	settings, err := database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err)
 	assert.Equal(t, enabled, settings.TurnstileEnabled, msg)
 	assert.Equal(t, "1x00000000000000000000AA", settings.TurnstileSiteKey, "the site key is kept")
@@ -760,17 +760,17 @@ func TestRecovery_DisableTurnstileAloneTouchesNoUser(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.True(t, outcome.TurnstileDisabled)
-	assert.Zero(t, outcome.UserId, "no user was recovered")
+	assert.Zero(t, outcome.UserID, "no user was recovered")
 	assertTurnstile(t, false, "the challenge is off")
 
-	after, err := database.GetUserById(ctx, nil, f.user.Id)
+	after, err := database.GetUserByID(ctx, nil, f.user.ID)
 	require.NoError(t, err)
 	assert.Equal(t, f.user.AuthStateGeneration, after.AuthStateGeneration, "the generation did not move")
 	assert.True(t, after.OTPEnabled)
-	session, err := database.GetUserSessionById(ctx, nil, f.session.Id)
+	session, err := database.GetUserSessionByID(ctx, nil, f.session.ID)
 	require.NoError(t, err)
 	assert.NotNil(t, session, "the user's session still stands")
-	assertTokenRevoked(t, f.sessionToken.Id, false, "the session-bound refresh token")
+	assertTokenRevoked(t, f.sessionToken.ID, false, "the session-bound refresh token")
 
 	assert.Equal(t, []string{audit.EventUpdatedTurnstileSettings}, recorder.events)
 	assert.Equal(t, map[string]interface{}{
@@ -838,11 +838,11 @@ func TestRecovery_DisableTurnstileRollsBackWithTheUserActions(t *testing.T) {
 			require.True(t, db.reached, "the recovery reached the refused call")
 			assert.Empty(t, recorder.events, "nothing is recorded for a rollback")
 			assertTurnstile(t, true, "the challenge is still on")
-			after, err := database.GetUserById(ctx, nil, f.user.Id)
+			after, err := database.GetUserByID(ctx, nil, f.user.ID)
 			require.NoError(t, err)
 			assert.Equal(t, f.user.PasswordHash, after.PasswordHash, "the password is as it was")
 			assert.Equal(t, f.user.AuthStateGeneration, after.AuthStateGeneration, "the generation did not move")
-			assert.Equal(t, []int64{f.otherPermission.Id}, heldPermissionIds(t, f.user.Id), "manage is not granted")
+			assert.Equal(t, []int64{f.otherPermission.ID}, heldPermissionIDs(t, f.user.ID), "manage is not granted")
 		})
 	}
 }

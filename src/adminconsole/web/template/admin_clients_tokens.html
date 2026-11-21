@@ -4,8 +4,8 @@
 
 {{define "page"}}
 {{- $access := .settings.IncludeOpenIDConnectClaimsInAccessToken }}
-{{- $id := .settings.IncludeOpenIDConnectClaimsInIdToken }}
-{{ template "client_header" (args "tokens" .client.Id .client.ClientIdentifier .client.IsSystemLevelClient .client.IsPublic $.ctx) }}
+{{- $id := .settings.IncludeOpenIDConnectClaimsInIDToken }}
+{{ template "client_header" (args "tokens" .client.ID .client.ClientIdentifier .client.IsSystemLevelClient .client.IsPublic $.ctx) }}
 
 {{/* errorField names the duration a refusal is about, which is marked invalid, described by the
      notice and focused. */}}
@@ -68,7 +68,7 @@
         <div class="grid gap-2">
           <label class="choice"><input type="radio" name="includeOpenIDConnectClaimsInIdToken" value="on"{{ if eq $id "on" }} checked{{ end }}><span>{{ T $.ctx "adminconsole.admin_clients.tokens.id_on" }}</span></label>
           <label class="choice"><input type="radio" name="includeOpenIDConnectClaimsInIdToken" value="off"{{ if eq $id "off" }} checked{{ end }}><span>{{ T $.ctx "adminconsole.admin_clients.tokens.id_off" }}</span></label>
-          <label class="choice"><input type="radio" name="includeOpenIDConnectClaimsInIdToken" value="default"{{ if eq $id "default" }} checked{{ end }}><span>{{ if .global.IncludeOpenIDConnectClaimsInIdToken }}{{ T $.ctx "adminconsole.admin_clients.tokens.global_included" }}{{ else }}{{ T $.ctx "adminconsole.admin_clients.tokens.global_left_out" }}{{ end }}</span></label>
+          <label class="choice"><input type="radio" name="includeOpenIDConnectClaimsInIdToken" value="default"{{ if eq $id "default" }} checked{{ end }}><span>{{ if .global.IncludeOpenIDConnectClaimsInIDToken }}{{ T $.ctx "adminconsole.admin_clients.tokens.global_included" }}{{ else }}{{ T $.ctx "adminconsole.admin_clients.tokens.global_left_out" }}{{ end }}</span></label>
         </div>
       </fieldset>
     </div>

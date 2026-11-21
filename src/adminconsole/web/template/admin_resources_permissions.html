@@ -56,7 +56,7 @@
           </thead>
           <tbody data-list-rows>
             {{ range .entries }}
-            <tr data-id="{{ .Id }}" data-identifier="{{ .Identifier }}" data-description="{{ .Description }}">
+            <tr data-id="{{ .ID }}" data-identifier="{{ .Identifier }}" data-description="{{ .Description }}">
               <td class="cell-mono cell-wrap">{{ .Identifier }}</td>
               <td class="cell-wrap" data-label="{{ T $.ctx "adminconsole.admin_resources.permissions.col_description" }}">{{ .Description }}</td>
               <td class="cell-actions">

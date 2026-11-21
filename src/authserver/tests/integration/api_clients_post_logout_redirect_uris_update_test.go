@@ -23,9 +23,9 @@ import (
 // readPostLogoutRedirectURIs is the client's sign-out list as GET /clients/{id} reads it, which is
 // what a save sends as expectedPostLogoutRedirectURIs. Never nil, so an empty list goes on the wire
 // as [].
-func readPostLogoutRedirectURIs(t *testing.T, accessToken string, clientId int64) []string {
+func readPostLogoutRedirectURIs(t *testing.T, accessToken string, clientID int64) []string {
 	t.Helper()
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientID, 10)
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -41,9 +41,9 @@ func readPostLogoutRedirectURIs(t *testing.T, accessToken string, clientId int64
 
 // storedPostLogoutRedirectURIs is the client's sign-out list as the database holds it, one entry
 // per row, so a duplicate shows twice.
-func storedPostLogoutRedirectURIs(t *testing.T, clientId int64) []string {
+func storedPostLogoutRedirectURIs(t *testing.T, clientID int64) []string {
 	t.Helper()
-	rows, err := database.GetPostLogoutRedirectURIsByClientId(context.Background(), nil, clientId)
+	rows, err := database.GetPostLogoutRedirectURIsByClientID(context.Background(), nil, clientID)
 	require.NoError(t, err)
 	uris := make([]string, 0, len(rows))
 	for _, row := range rows {
@@ -53,14 +53,14 @@ func storedPostLogoutRedirectURIs(t *testing.T, clientId int64) []string {
 }
 
 // postLogoutRedirectURIsURL is the save's address for a client.
-func postLogoutRedirectURIsURL(clientId int64) string {
-	return appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10) + "/post-logout-redirect-uris"
+func postLogoutRedirectURIsURL(clientID int64) string {
+	return appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientID, 10) + "/post-logout-redirect-uris"
 }
 
 // savePostLogoutRedirectURIs sends one save and decodes the error envelope when there is one.
-func savePostLogoutRedirectURIs(t *testing.T, accessToken string, clientId int64, wanted, expected []string) (int, map[string]any) {
+func savePostLogoutRedirectURIs(t *testing.T, accessToken string, clientID int64, wanted, expected []string) (int, map[string]any) {
 	t.Helper()
-	resp := makeAPIRequest(t, "PUT", postLogoutRedirectURIsURL(clientId), accessToken, api.UpdateClientPostLogoutRedirectURIsRequest{
+	resp := makeAPIRequest(t, "PUT", postLogoutRedirectURIsURL(clientID), accessToken, api.UpdateClientPostLogoutRedirectURIsRequest{
 		PostLogoutRedirectURIs: wanted, ExpectedPostLogoutRedirectURIs: expected})
 	defer func() { _ = resp.Body.Close() }()
 	var body map[string]any
@@ -74,15 +74,15 @@ func TestAPIClientPostLogoutRedirectURIsPut_SavesTheListAndLeavesTheRedirectURIs
 	accessToken, _ := createAdminClientWithToken(t)
 	client := newRedirectURIsClient(t, "signout-save-")
 	callback := "https://app.example.com/callback"
-	require.NoError(t, database.CreateRedirectURI(context.Background(), nil, &record.RedirectURI{ClientId: client.Id, URI: callback}))
+	require.NoError(t, database.CreateRedirectURI(context.Background(), nil, &record.RedirectURI{ClientID: client.ID, URI: callback}))
 	for _, uri := range []string{"https://app.example.com/bye", "https://app.example.com/retired"} {
 		require.NoError(t, database.CreatePostLogoutRedirectURI(context.Background(), nil,
-			&record.PostLogoutRedirectURI{ClientId: client.Id, URI: uri}))
+			&record.PostLogoutRedirectURI{ClientID: client.ID, URI: uri}))
 	}
-	loaded := readPostLogoutRedirectURIs(t, accessToken, client.Id)
+	loaded := readPostLogoutRedirectURIs(t, accessToken, client.ID)
 	assert.ElementsMatch(t, []string{"https://app.example.com/bye", "https://app.example.com/retired"}, loaded)
 
-	resp := makeAPIRequest(t, "PUT", postLogoutRedirectURIsURL(client.Id), accessToken, api.UpdateClientPostLogoutRedirectURIsRequest{
+	resp := makeAPIRequest(t, "PUT", postLogoutRedirectURIsURL(client.ID), accessToken, api.UpdateClientPostLogoutRedirectURIsRequest{
 		PostLogoutRedirectURIs:         []string{"  https://app.example.com/bye  ", "https://app.example.com/signed-out?state=fixed"},
 		ExpectedPostLogoutRedirectURIs: loaded,
 	})
@@ -92,12 +92,12 @@ func TestAPIClientPostLogoutRedirectURIsPut_SavesTheListAndLeavesTheRedirectURIs
 
 	var answer api.UpdateClientResponse
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&answer))
-	assert.Equal(t, client.Id, answer.Client.Id)
+	assert.Equal(t, client.ID, answer.Client.ID)
 	answered := make([]string, 0, len(answer.Client.PostLogoutRedirectURIs))
 	for _, row := range answer.Client.PostLogoutRedirectURIs {
 		answered = append(answered, row.URI)
-		assert.Equal(t, client.Id, row.ClientId)
-		assert.NotZero(t, row.Id)
+		assert.Equal(t, client.ID, row.ClientID)
+		assert.NotZero(t, row.ID)
 		assert.NotNil(t, row.CreatedAt)
 	}
 	assert.ElementsMatch(t, []string{"https://app.example.com/bye", "https://app.example.com/signed-out?state=fixed"}, answered)
@@ -105,15 +105,15 @@ func TestAPIClientPostLogoutRedirectURIsPut_SavesTheListAndLeavesTheRedirectURIs
 	assert.Equal(t, callback, answer.Client.RedirectURIs[0].URI)
 
 	assert.ElementsMatch(t, []string{"https://app.example.com/bye", "https://app.example.com/signed-out?state=fixed"},
-		storedPostLogoutRedirectURIs(t, client.Id))
-	assert.Equal(t, []string{callback}, readRedirectURIs(t, accessToken, client.Id), "the redirect URIs are untouched")
+		storedPostLogoutRedirectURIs(t, client.ID))
+	assert.Equal(t, []string{callback}, readRedirectURIs(t, accessToken, client.ID), "the redirect URIs are untouched")
 }
 
 // The list reaches the client listing as well as the detail.
 func TestAPIClientPostLogoutRedirectURIsPut_TheListingCarriesTheList(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 	client := newRedirectURIsClient(t, "signout-list-")
-	status, body := savePostLogoutRedirectURIs(t, accessToken, client.Id, []string{"https://listed.example.com/bye"}, []string{})
+	status, body := savePostLogoutRedirectURIs(t, accessToken, client.ID, []string{"https://listed.example.com/bye"}, []string{})
 	require.Equal(t, http.StatusOK, status, body)
 
 	resp := makeAPIRequest(t, "GET", appConfig.AuthServer.BaseURL+"/api/v1/admin/clients", accessToken, nil)
@@ -122,14 +122,14 @@ func TestAPIClientPostLogoutRedirectURIsPut_TheListingCarriesTheList(t *testing.
 	var listing api.GetClientsResponse
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&listing))
 	for _, listed := range listing.Clients {
-		if listed.Id != client.Id {
+		if listed.ID != client.ID {
 			continue
 		}
 		require.Len(t, listed.PostLogoutRedirectURIs, 1)
 		assert.Equal(t, "https://listed.example.com/bye", listed.PostLogoutRedirectURIs[0].URI)
 		return
 	}
-	t.Fatalf("client %d is not in the listing", client.Id)
+	t.Fatalf("client %d is not in the listing", client.ID)
 }
 
 // The bounds are the redirect URI save's, counted apart from the redirect URIs: a client already
@@ -140,16 +140,16 @@ func TestAPIClientPostLogoutRedirectURIsPut_TheBoundsAt60And2048CountedApart(t *
 	client := newRedirectURIsClient(t, "signout-bounds-")
 	for i := 0; i < 60; i++ {
 		require.NoError(t, database.CreateRedirectURI(context.Background(), nil,
-			&record.RedirectURI{ClientId: client.Id, URI: fmt.Sprintf("https://cb%02d.example.com/callback", i)}))
+			&record.RedirectURI{ClientID: client.ID, URI: fmt.Sprintf("https://cb%02d.example.com/callback", i)}))
 	}
 
 	sixty := make([]string, 60)
 	for i := range sixty {
 		sixty[i] = redirectURIOfBytes(t, 2048, fmt.Sprintf("bye%02d", i))
 	}
-	status, body := savePostLogoutRedirectURIs(t, accessToken, client.Id, sixty, []string{})
+	status, body := savePostLogoutRedirectURIs(t, accessToken, client.ID, sixty, []string{})
 	require.Equal(t, http.StatusOK, status, body)
-	assert.ElementsMatch(t, sixty, readPostLogoutRedirectURIs(t, accessToken, client.Id))
+	assert.ElementsMatch(t, sixty, readPostLogoutRedirectURIs(t, accessToken, client.ID))
 
 	refusals := []struct {
 		name            string
@@ -163,11 +163,11 @@ func TestAPIClientPostLogoutRedirectURIsPut_TheBoundsAt60And2048CountedApart(t *
 	}
 	for _, tc := range refusals {
 		t.Run(tc.name, func(t *testing.T) {
-			status, body := savePostLogoutRedirectURIs(t, accessToken, client.Id, tc.uris, sixty)
+			status, body := savePostLogoutRedirectURIs(t, accessToken, client.ID, tc.uris, sixty)
 			assert.Equal(t, http.StatusBadRequest, status)
 			assert.Regexp(t, `^handler\.client_post_logout_redirect_uris\.[a-z_]+$`, body["error_code"])
 			assert.Contains(t, body["error_description"], tc.wantDescription)
-			assert.ElementsMatch(t, sixty, readPostLogoutRedirectURIs(t, accessToken, client.Id), "a refused save changes nothing")
+			assert.ElementsMatch(t, sixty, readPostLogoutRedirectURIs(t, accessToken, client.ID), "a refused save changes nothing")
 		})
 	}
 }
@@ -184,7 +184,7 @@ func TestAPIClientPostLogoutRedirectURIsPut_TheLoadedListIsRequired(t *testing.T
 	}
 	for name, body := range bodies {
 		t.Run(name, func(t *testing.T) {
-			resp := makeAPIRequest(t, "PUT", postLogoutRedirectURIsURL(client.Id), accessToken, body)
+			resp := makeAPIRequest(t, "PUT", postLogoutRedirectURIsURL(client.ID), accessToken, body)
 			defer func() { _ = resp.Body.Close() }()
 			assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 			var got map[string]any
@@ -192,7 +192,7 @@ func TestAPIClientPostLogoutRedirectURIsPut_TheLoadedListIsRequired(t *testing.T
 			assert.Equal(t, "VALIDATION_ERROR", got["error_code"])
 			assert.Equal(t, "expectedPostLogoutRedirectURIs is required: send the sign-out redirect URIs as you last read them, or [] if there were none.",
 				got["error_description"])
-			assert.Empty(t, storedPostLogoutRedirectURIs(t, client.Id))
+			assert.Empty(t, storedPostLogoutRedirectURIs(t, client.ID))
 		})
 	}
 }
@@ -203,21 +203,21 @@ func TestAPIClientPostLogoutRedirectURIsPut_AnOutdatedLoadedListIsRefused(t *tes
 	accessToken, _ := createAdminClientWithToken(t)
 	client := newRedirectURIsClient(t, "signout-outdated-")
 	require.NoError(t, database.CreatePostLogoutRedirectURI(context.Background(), nil,
-		&record.PostLogoutRedirectURI{ClientId: client.Id, URI: "https://a.example.com/bye"}))
+		&record.PostLogoutRedirectURI{ClientID: client.ID, URI: "https://a.example.com/bye"}))
 
-	loadedByBoth := readPostLogoutRedirectURIs(t, accessToken, client.Id)
+	loadedByBoth := readPostLogoutRedirectURIs(t, accessToken, client.ID)
 
-	status, body := savePostLogoutRedirectURIs(t, accessToken, client.Id,
+	status, body := savePostLogoutRedirectURIs(t, accessToken, client.ID,
 		[]string{"https://a.example.com/bye", "https://b.example.com/bye"}, loadedByBoth)
 	require.Equal(t, http.StatusOK, status, body)
 
-	status, body = savePostLogoutRedirectURIs(t, accessToken, client.Id, []string{"https://c.example.com/bye"}, loadedByBoth)
+	status, body = savePostLogoutRedirectURIs(t, accessToken, client.ID, []string{"https://c.example.com/bye"}, loadedByBoth)
 	assert.Equal(t, http.StatusConflict, status)
 	assert.Equal(t, "CONCURRENT_UPDATE", body["error_code"])
 	assert.Contains(t, body["error_description"], "reload it")
 
 	assert.ElementsMatch(t, []string{"https://a.example.com/bye", "https://b.example.com/bye"},
-		storedPostLogoutRedirectURIs(t, client.Id), "the refused save wrote nothing")
+		storedPostLogoutRedirectURIs(t, client.ID), "the refused save wrote nothing")
 }
 
 // The gate asks whether the client signs users in through a browser at all: a client with neither
@@ -235,25 +235,25 @@ func TestAPIClientPostLogoutRedirectURIsPut_TheRedirectFlowGate(t *testing.T) {
 			ImplicitGrantEnabled:     &implicit,
 		}
 		require.NoError(t, database.CreateClient(context.Background(), nil, client))
-		t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+		t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 		return client
 	}
 
 	t.Run("neither flow", func(t *testing.T) {
 		client := newClient(t, "signout-noflow-", false)
-		status, body := savePostLogoutRedirectURIs(t, accessToken, client.Id, []string{"https://app.example.com/bye"}, []string{})
+		status, body := savePostLogoutRedirectURIs(t, accessToken, client.ID, []string{"https://app.example.com/bye"}, []string{})
 		assert.Equal(t, http.StatusBadRequest, status)
 		assert.Equal(t, "handler.client_post_logout_redirect_uris.no_redirect_flow", body["error_code"])
 		assert.Equal(t, "Sign-out redirect URIs are used by clients that sign users in through the authorization code with PKCE flow or the implicit flow, and neither is enabled for this client.",
 			body["error_description"])
-		assert.Empty(t, storedPostLogoutRedirectURIs(t, client.Id))
+		assert.Empty(t, storedPostLogoutRedirectURIs(t, client.ID))
 	})
 
 	t.Run("the implicit flow alone", func(t *testing.T) {
 		client := newClient(t, "signout-implicit-", true)
-		status, body := savePostLogoutRedirectURIs(t, accessToken, client.Id, []string{"https://app.example.com/bye"}, []string{})
+		status, body := savePostLogoutRedirectURIs(t, accessToken, client.ID, []string{"https://app.example.com/bye"}, []string{})
 		require.Equal(t, http.StatusOK, status, body)
-		assert.Equal(t, []string{"https://app.example.com/bye"}, storedPostLogoutRedirectURIs(t, client.Id))
+		assert.Equal(t, []string{"https://app.example.com/bye"}, storedPostLogoutRedirectURIs(t, client.ID))
 	})
 }
 
@@ -282,11 +282,11 @@ func TestAPIClientPostLogoutRedirectURIsPut_TheEntryRules(t *testing.T) {
 	}
 	for _, tc := range refused {
 		t.Run(tc.uris[0], func(t *testing.T) {
-			status, body := savePostLogoutRedirectURIs(t, accessToken, client.Id, tc.uris, []string{})
+			status, body := savePostLogoutRedirectURIs(t, accessToken, client.ID, tc.uris, []string{})
 			assert.Equal(t, http.StatusBadRequest, status)
 			assert.Equal(t, "handler.client_post_logout_redirect_uris."+tc.wantCode, body["error_code"])
 			assert.Equal(t, tc.wantDescription, body["error_description"])
-			assert.Empty(t, storedPostLogoutRedirectURIs(t, client.Id))
+			assert.Empty(t, storedPostLogoutRedirectURIs(t, client.ID))
 		})
 	}
 
@@ -297,9 +297,9 @@ func TestAPIClientPostLogoutRedirectURIsPut_TheEntryRules(t *testing.T) {
 		"http://localhost:3000/bye",
 		"com.example.app:/signed-out",
 	}
-	status, body := savePostLogoutRedirectURIs(t, accessToken, client.Id, admitted, []string{})
+	status, body := savePostLogoutRedirectURIs(t, accessToken, client.ID, admitted, []string{})
 	require.Equal(t, http.StatusOK, status, body)
-	assert.ElementsMatch(t, admitted, storedPostLogoutRedirectURIs(t, client.Id))
+	assert.ElementsMatch(t, admitted, storedPostLogoutRedirectURIs(t, client.ID))
 }
 
 // A stored plain-http sign-out redirect URI receives nothing at sign-out (#590), so a save that
@@ -313,24 +313,24 @@ func TestAPIClientPostLogoutRedirectURIsPut_AStoredPlainHTTPURIBlocksTheSaveUnti
 	loopbackURI := "http://127.0.0.1:8765/bye"
 	for _, uri := range []string{legacy, loopbackURI, "https://retired.example.com/bye"} {
 		require.NoError(t, database.CreatePostLogoutRedirectURI(context.Background(), nil,
-			&record.PostLogoutRedirectURI{ClientId: client.Id, URI: uri}))
+			&record.PostLogoutRedirectURI{ClientID: client.ID, URI: uri}))
 	}
-	loaded := readPostLogoutRedirectURIs(t, accessToken, client.Id)
+	loaded := readPostLogoutRedirectURIs(t, accessToken, client.ID)
 
 	// The retired entry is swapped for its replacement with the http row kept: 400 naming the http
 	// row, and the stored list untouched.
 	kept := []string{legacy, loopbackURI, "https://replacement.example.com/bye"}
-	status, body := savePostLogoutRedirectURIs(t, accessToken, client.Id, kept, loaded)
+	status, body := savePostLogoutRedirectURIs(t, accessToken, client.ID, kept, loaded)
 	assert.Equal(t, http.StatusBadRequest, status, "a stored http URI carried back must block the save")
 	assert.Equal(t, "Sign-out redirect URI must not use plain http on a host other than the loopback interface (127.0.0.1, [::1] or localhost): "+legacy,
 		body["error_description"])
-	assert.ElementsMatch(t, loaded, storedPostLogoutRedirectURIs(t, client.Id), "a refused save writes nothing")
+	assert.ElementsMatch(t, loaded, storedPostLogoutRedirectURIs(t, client.ID), "a refused save writes nothing")
 
 	// The same change with the http row removed saves, the loopback http row carried back with it.
 	removed := []string{loopbackURI, "https://replacement.example.com/bye"}
-	status, body = savePostLogoutRedirectURIs(t, accessToken, client.Id, removed, loaded)
+	status, body = savePostLogoutRedirectURIs(t, accessToken, client.ID, removed, loaded)
 	require.Equal(t, http.StatusOK, status, body)
-	assert.ElementsMatch(t, removed, storedPostLogoutRedirectURIs(t, client.Id))
+	assert.ElementsMatch(t, removed, storedPostLogoutRedirectURIs(t, client.ID))
 }
 
 // A committed save leaves one updated_post_logout_redirect_uris row naming the client and the caller;
@@ -340,22 +340,22 @@ func TestAPIClientPostLogoutRedirectURIsPut_TheSaveIsAudited(t *testing.T) {
 	accessToken, caller := createAdminClientWithToken(t)
 	client := newRedirectURIsClient(t, "signout-audit-")
 
-	resp, requestId := sendAdmin(t, accessToken, http.MethodPut, fmt.Sprintf("/api/v1/admin/clients/%d/post-logout-redirect-uris", client.Id),
+	resp, requestID := sendAdmin(t, accessToken, http.MethodPut, fmt.Sprintf("/api/v1/admin/clients/%d/post-logout-redirect-uris", client.ID),
 		map[string]any{"postLogoutRedirectURIs": []string{"https://app.example.com/bye"}, "expectedPostLogoutRedirectURIs": []string{}})
 	_ = resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
-	assert.Equal(t, []map[string]any{{"client_id": float64(client.Id), "logged_in_user": caller.ClientIdentifier}},
-		auditRows(t, accessToken, "updated_post_logout_redirect_uris", requestId))
+	assert.Equal(t, []map[string]any{{"client_id": float64(client.ID), "logged_in_user": caller.ClientIdentifier}},
+		auditRows(t, accessToken, "updated_post_logout_redirect_uris", requestID))
 
-	resp, requestId = sendAdmin(t, accessToken, http.MethodPut, fmt.Sprintf("/api/v1/admin/clients/%d/post-logout-redirect-uris", client.Id),
+	resp, requestID = sendAdmin(t, accessToken, http.MethodPut, fmt.Sprintf("/api/v1/admin/clients/%d/post-logout-redirect-uris", client.ID),
 		map[string]any{"postLogoutRedirectURIs": []string{"http://app.example.com/bye"}, "expectedPostLogoutRedirectURIs": []string{"https://app.example.com/bye"}})
 	_ = resp.Body.Close()
 	require.Equal(t, http.StatusBadRequest, resp.StatusCode)
-	assert.Empty(t, auditRows(t, accessToken, "updated_post_logout_redirect_uris", requestId))
+	assert.Empty(t, auditRows(t, accessToken, "updated_post_logout_redirect_uris", requestID))
 }
 
 // The request's own refusals, and the route's scope.
-func TestAPIClientPostLogoutRedirectURIsPut_NotFound_InvalidId_InvalidBody_Unauthorized_InsufficientScope(t *testing.T) {
+func TestAPIClientPostLogoutRedirectURIsPut_NotFound_InvalidID_InvalidBody_Unauthorized_InsufficientScope(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	status, body := savePostLogoutRedirectURIs(t, accessToken, 999999, []string{"https://example.com/bye"}, []string{})
@@ -371,9 +371,9 @@ func TestAPIClientPostLogoutRedirectURIsPut_NotFound_InvalidId_InvalidBody_Unaut
 	assert.Equal(t, "Invalid client ID", bad["error_description"])
 
 	client := newRedirectURIsClient(t, "signout-request-")
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
-	req, err := http.NewRequest("PUT", postLogoutRedirectURIsURL(client.Id), nil)
+	req, err := http.NewRequest("PUT", postLogoutRedirectURIsURL(client.ID), nil)
 	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
@@ -385,7 +385,7 @@ func TestAPIClientPostLogoutRedirectURIsPut_NotFound_InvalidId_InvalidBody_Unaut
 	require.NoError(t, json.NewDecoder(emptyBody.Body).Decode(&invalid))
 	assert.Equal(t, "Invalid request body", invalid["error_description"])
 
-	unauthenticated, err := http.NewRequest("PUT", postLogoutRedirectURIsURL(client.Id), nil)
+	unauthenticated, err := http.NewRequest("PUT", postLogoutRedirectURIsURL(client.ID), nil)
 	require.NoError(t, err)
 	noToken, err := httpClient.Do(unauthenticated)
 	require.NoError(t, err)
@@ -393,9 +393,9 @@ func TestAPIClientPostLogoutRedirectURIsPut_NotFound_InvalidId_InvalidBody_Unaut
 	assert.Equal(t, http.StatusUnauthorized, noToken.StatusCode)
 
 	wrongScope := createClientCredentialsTokenWithoutRouteScope(t)
-	forbidden := makeAPIRequest(t, "PUT", postLogoutRedirectURIsURL(client.Id), wrongScope,
+	forbidden := makeAPIRequest(t, "PUT", postLogoutRedirectURIsURL(client.ID), wrongScope,
 		api.UpdateClientPostLogoutRedirectURIsRequest{PostLogoutRedirectURIs: []string{"https://example.com/bye"}, ExpectedPostLogoutRedirectURIs: []string{}})
 	defer func() { _ = forbidden.Body.Close() }()
 	assert.Equal(t, http.StatusForbidden, forbidden.StatusCode)
-	assert.Empty(t, storedPostLogoutRedirectURIs(t, client.Id))
+	assert.Empty(t, storedPostLogoutRedirectURIs(t, client.ID))
 }

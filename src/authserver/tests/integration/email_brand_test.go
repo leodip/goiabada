@@ -90,8 +90,8 @@ func requestResetAt(t *testing.T, browser *http.Client, forgotURL string, email 
 func TestEmails_FromASignInsPagesAreDrawnInItsClientsBrand(t *testing.T) {
 	useMailpitSMTP(t)
 	makeDefaultBrand(t, record.BrandAppearanceDark, "plum")
-	client, _, redirectURI := brandedSignInClient(t, record.AcrLevel1)
-	browser := createHttpClient(t)
+	client, _, redirectURI := brandedSignInClient(t, record.ACRLevel1)
+	browser := createHTTPClient(t)
 	forgotURL, _ := forgotPasswordLink(t, browser, brandAuthorizeURL(client, redirectURI, ""))
 
 	t.Run("a password reset asked for from the sign-in's forgot password page", func(t *testing.T) {
@@ -143,7 +143,7 @@ func TestEmails_ThroughTheAccountAPIAreDrawnInTheBrandOfTheTokensClient(t *testi
 		accessToken, user, client := accountAPIUserOfClient(t)
 		giveClientBrand(t, client, record.BrandAppearanceLight, "avocado")
 		givePassword(t, user, passwordNoticeCurrent)
-		stored, err := database.GetUserById(context.Background(), nil, user.Id)
+		stored, err := database.GetUserByID(context.Background(), nil, user.ID)
 		require.NoError(t, err)
 		stored.EmailVerified = true
 		require.NoError(t, database.UpdateUser(context.Background(), nil, stored))
@@ -179,7 +179,7 @@ func TestEmails_AnAdministratorsActionSendsInTheDefaultBrand(t *testing.T) {
 	require.Equal(t, http.StatusCreated, resp.StatusCode)
 	t.Cleanup(func() {
 		if created, err := database.GetUserByEmail(context.Background(), nil, email); err == nil && created != nil {
-			_ = database.DeleteUser(context.Background(), nil, created.Id)
+			_ = database.DeleteUser(context.Background(), nil, created.ID)
 		}
 	})
 
@@ -191,9 +191,9 @@ func TestEmails_AnAdministratorsActionSendsInTheDefaultBrand(t *testing.T) {
 func TestEmails_FromASignInInSafeModeAreDrawnSafe(t *testing.T) {
 	useMailpitSMTP(t)
 	makeDefaultBrand(t, record.BrandAppearanceDark, "plum")
-	client, redirectURI := brandSignInClient(t, record.AcrLevel1)
+	client, redirectURI := brandSignInClient(t, record.ACRLevel1)
 	giveClientSafeModeBrand(t, client)
-	browser := createHttpClient(t)
+	browser := createHTTPClient(t)
 	forgotURL, _ := forgotPasswordLink(t, browser, withSafeMode(t, brandAuthorizeURL(client, redirectURI, "")))
 
 	user, _ := createResetTestUser(t, plusAddress())

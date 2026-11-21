@@ -23,13 +23,13 @@ func TestAPIGroupMembersGet_Success(t *testing.T) {
 	testGroup := &record.Group{
 		GroupIdentifier:      "test-group-members",
 		Description:          "Test Group for Members",
-		IncludeInIdToken:     true,
+		IncludeInIDToken:     true,
 		IncludeInAccessToken: false,
 	}
 	err := database.CreateGroup(context.Background(), nil, testGroup)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.ID)
 	}()
 
 	// Setup: Create test users and add to group. The addresses are asserted
@@ -46,7 +46,7 @@ func TestAPIGroupMembersGet_Success(t *testing.T) {
 	err = database.CreateUser(context.Background(), nil, testUser1)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser1.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser1.ID)
 	}()
 
 	testUser2 := &record.User{
@@ -60,26 +60,26 @@ func TestAPIGroupMembersGet_Success(t *testing.T) {
 	err = database.CreateUser(context.Background(), nil, testUser2)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser2.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser2.ID)
 	}()
 
 	// Add users to group
-	userGroup1 := &record.UserGroup{UserId: testUser1.Id, GroupId: testGroup.Id}
+	userGroup1 := &record.UserGroup{UserID: testUser1.ID, GroupID: testGroup.ID}
 	err = database.CreateUserGroup(context.Background(), nil, userGroup1)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUserGroup(context.Background(), nil, userGroup1.Id)
+		_ = database.DeleteUserGroup(context.Background(), nil, userGroup1.ID)
 	}()
 
-	userGroup2 := &record.UserGroup{UserId: testUser2.Id, GroupId: testGroup.Id}
+	userGroup2 := &record.UserGroup{UserID: testUser2.ID, GroupID: testGroup.ID}
 	err = database.CreateUserGroup(context.Background(), nil, userGroup2)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUserGroup(context.Background(), nil, userGroup2.Id)
+		_ = database.DeleteUserGroup(context.Background(), nil, userGroup2.ID)
 	}()
 
 	// Test: Get group members
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/members"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.ID, 10) + "/members"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -115,17 +115,17 @@ func TestAPIGroupMembersGet_EmptyGroup(t *testing.T) {
 	testGroup := &record.Group{
 		GroupIdentifier:      "empty-group",
 		Description:          "Empty Test Group",
-		IncludeInIdToken:     true,
+		IncludeInIDToken:     true,
 		IncludeInAccessToken: false,
 	}
 	err := database.CreateGroup(context.Background(), nil, testGroup)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.ID)
 	}()
 
 	// Test: Get group members
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/members"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.ID, 10) + "/members"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -154,7 +154,7 @@ func TestAPIGroupMembersGet_Pagination(t *testing.T) {
 	err := database.CreateGroup(context.Background(), nil, testGroup)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.ID)
 	}()
 
 	// Setup: Create multiple users and add to group
@@ -173,7 +173,7 @@ func TestAPIGroupMembersGet_Pagination(t *testing.T) {
 		require.NoError(t, err)
 		testUsers = append(testUsers, user)
 
-		userGroup := &record.UserGroup{UserId: user.Id, GroupId: testGroup.Id}
+		userGroup := &record.UserGroup{UserID: user.ID, GroupID: testGroup.ID}
 		err = database.CreateUserGroup(context.Background(), nil, userGroup)
 		require.NoError(t, err)
 		userGroups = append(userGroups, userGroup)
@@ -181,15 +181,15 @@ func TestAPIGroupMembersGet_Pagination(t *testing.T) {
 
 	defer func() {
 		for _, userGroup := range userGroups {
-			_ = database.DeleteUserGroup(context.Background(), nil, userGroup.Id)
+			_ = database.DeleteUserGroup(context.Background(), nil, userGroup.ID)
 		}
 		for _, user := range testUsers {
-			_ = database.DeleteUser(context.Background(), nil, user.Id)
+			_ = database.DeleteUser(context.Background(), nil, user.ID)
 		}
 	}()
 
 	// Test: Get first page with size=2
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/members?page=1&size=2"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.ID, 10) + "/members?page=1&size=2"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -219,13 +219,13 @@ func TestAPIGroupMembersGet_GroupNotFound(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
-func TestAPIGroupMembersGet_InvalidGroupId(t *testing.T) {
+func TestAPIGroupMembersGet_InvalidGroupID(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)
 
 	testCases := []struct {
 		name           string
-		groupId        string
+		groupID        string
 		expectedStatus int
 	}{
 		{"non-numeric ID", "abc", http.StatusBadRequest},
@@ -236,7 +236,7 @@ func TestAPIGroupMembersGet_InvalidGroupId(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + tc.groupId + "/members"
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + tc.groupID + "/members"
 			resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -258,7 +258,7 @@ func TestAPIGroupMemberAdd_Success(t *testing.T) {
 	err := database.CreateGroup(context.Background(), nil, testGroup)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.ID)
 	}()
 
 	// Setup: Create test user
@@ -272,14 +272,14 @@ func TestAPIGroupMemberAdd_Success(t *testing.T) {
 	err = database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	// Test: Add user to group
 	addRequest := api.AddGroupMemberRequest{
-		UserId: testUser.Id,
+		UserID: testUser.ID,
 	}
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/members"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.ID, 10) + "/members"
 	resp := makeAPIRequest(t, "POST", url, accessToken, addRequest)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -294,14 +294,14 @@ func TestAPIGroupMemberAdd_Success(t *testing.T) {
 	assert.True(t, successResponse.Success)
 
 	// Verify user was added to group in database
-	userGroup, err := database.GetUserGroupByUserIdAndGroupId(context.Background(), nil, testUser.Id, testGroup.Id)
+	userGroup, err := database.GetUserGroupByUserIDAndGroupID(context.Background(), nil, testUser.ID, testGroup.ID)
 	require.NoError(t, err)
 	assert.NotNil(t, userGroup)
-	assert.Equal(t, testUser.Id, userGroup.UserId)
-	assert.Equal(t, testGroup.Id, userGroup.GroupId)
+	assert.Equal(t, testUser.ID, userGroup.UserID)
+	assert.Equal(t, testGroup.ID, userGroup.GroupID)
 
 	// Cleanup
-	_ = database.DeleteUserGroup(context.Background(), nil, userGroup.Id)
+	_ = database.DeleteUserGroup(context.Background(), nil, userGroup.ID)
 }
 
 func TestAPIGroupMemberAdd_UserAlreadyInGroup(t *testing.T) {
@@ -316,7 +316,7 @@ func TestAPIGroupMemberAdd_UserAlreadyInGroup(t *testing.T) {
 	err := database.CreateGroup(context.Background(), nil, testGroup)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.ID)
 	}()
 
 	// Setup: Create test user and add to group
@@ -330,21 +330,21 @@ func TestAPIGroupMemberAdd_UserAlreadyInGroup(t *testing.T) {
 	err = database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
-	userGroup := &record.UserGroup{UserId: testUser.Id, GroupId: testGroup.Id}
+	userGroup := &record.UserGroup{UserID: testUser.ID, GroupID: testGroup.ID}
 	err = database.CreateUserGroup(context.Background(), nil, userGroup)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUserGroup(context.Background(), nil, userGroup.Id)
+		_ = database.DeleteUserGroup(context.Background(), nil, userGroup.ID)
 	}()
 
 	// Test: Try to add user to group again
 	addRequest := api.AddGroupMemberRequest{
-		UserId: testUser.Id,
+		UserID: testUser.ID,
 	}
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/members"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.ID, 10) + "/members"
 	resp := makeAPIRequest(t, "POST", url, accessToken, addRequest)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -364,14 +364,14 @@ func TestAPIGroupMemberAdd_UserNotFound(t *testing.T) {
 	err := database.CreateGroup(context.Background(), nil, testGroup)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.ID)
 	}()
 
 	// Test: Try to add non-existent user to group
 	addRequest := api.AddGroupMemberRequest{
-		UserId: 99999,
+		UserID: 99999,
 	}
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/members"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.ID, 10) + "/members"
 	resp := makeAPIRequest(t, "POST", url, accessToken, addRequest)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -385,7 +385,7 @@ func TestAPIGroupMemberAdd_GroupNotFound(t *testing.T) {
 
 	// Test: Try to add user to non-existent group
 	addRequest := api.AddGroupMemberRequest{
-		UserId: 1,
+		UserID: 1,
 	}
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/99999/members"
 	resp := makeAPIRequest(t, "POST", url, accessToken, addRequest)
@@ -407,17 +407,17 @@ func TestAPIGroupMemberAdd_InvalidRequestBody(t *testing.T) {
 	err := database.CreateGroup(context.Background(), nil, testGroup)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.ID)
 	}()
 
 	// Test: Send request with no body
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/members"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.ID, 10) + "/members"
 	req, err := http.NewRequest("POST", url, nil)
 	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -439,7 +439,7 @@ func TestAPIGroupMemberRemove_Success(t *testing.T) {
 	err := database.CreateGroup(context.Background(), nil, testGroup)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.ID)
 	}()
 
 	// Setup: Create test user and add to group
@@ -453,15 +453,15 @@ func TestAPIGroupMemberRemove_Success(t *testing.T) {
 	err = database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
-	userGroup := &record.UserGroup{UserId: testUser.Id, GroupId: testGroup.Id}
+	userGroup := &record.UserGroup{UserID: testUser.ID, GroupID: testGroup.ID}
 	err = database.CreateUserGroup(context.Background(), nil, userGroup)
 	require.NoError(t, err)
 
 	// Test: Remove user from group
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/members/" + strconv.FormatInt(testUser.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.ID, 10) + "/members/" + strconv.FormatInt(testUser.ID, 10)
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -476,7 +476,7 @@ func TestAPIGroupMemberRemove_Success(t *testing.T) {
 	assert.True(t, successResponse.Success)
 
 	// Verify user was removed from group in database
-	removedUserGroup, err := database.GetUserGroupByUserIdAndGroupId(context.Background(), nil, testUser.Id, testGroup.Id)
+	removedUserGroup, err := database.GetUserGroupByUserIDAndGroupID(context.Background(), nil, testUser.ID, testGroup.ID)
 	require.NoError(t, err)
 	assert.Nil(t, removedUserGroup)
 }
@@ -493,7 +493,7 @@ func TestAPIGroupMemberRemove_UserNotInGroup(t *testing.T) {
 	err := database.CreateGroup(context.Background(), nil, testGroup)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.ID)
 	}()
 
 	// Setup: Create test user (not in group)
@@ -507,11 +507,11 @@ func TestAPIGroupMemberRemove_UserNotInGroup(t *testing.T) {
 	err = database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	// Test: Try to remove user from group they're not in
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/members/" + strconv.FormatInt(testUser.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.ID, 10) + "/members/" + strconv.FormatInt(testUser.ID, 10)
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -531,11 +531,11 @@ func TestAPIGroupMemberRemove_UserNotFound(t *testing.T) {
 	err := database.CreateGroup(context.Background(), nil, testGroup)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.ID)
 	}()
 
 	// Test: Try to remove non-existent user from group
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/members/99999"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.ID, 10) + "/members/99999"
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -556,14 +556,14 @@ func TestAPIGroupMemberRemove_GroupNotFound(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
-func TestAPIGroupMemberRemove_InvalidIds(t *testing.T) {
+func TestAPIGroupMemberRemove_InvalidIDs(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)
 
 	testCases := []struct {
 		name           string
-		groupId        string
-		userId         string
+		groupID        string
+		userID         string
 		expectedStatus int
 	}{
 		{"non-numeric group ID", "abc", "1", http.StatusBadRequest},
@@ -574,7 +574,7 @@ func TestAPIGroupMemberRemove_InvalidIds(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + tc.groupId + "/members/" + tc.userId
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + tc.groupID + "/members/" + tc.userID
 			resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -593,7 +593,7 @@ func TestAPIGroupMembers_Unauthorized(t *testing.T) {
 	err := database.CreateGroup(context.Background(), nil, testGroup)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.ID)
 	}()
 
 	testCases := []struct {
@@ -601,9 +601,9 @@ func TestAPIGroupMembers_Unauthorized(t *testing.T) {
 		method string
 		url    string
 	}{
-		{"GET members", "GET", "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/members"},
-		{"POST add member", "POST", "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/members"},
-		{"DELETE remove member", "DELETE", "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/members/1"},
+		{"GET members", "GET", "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.ID, 10) + "/members"},
+		{"POST add member", "POST", "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.ID, 10) + "/members"},
+		{"DELETE remove member", "DELETE", "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.ID, 10) + "/members/1"},
 	}
 
 	for _, tc := range testCases {
@@ -612,7 +612,7 @@ func TestAPIGroupMembers_Unauthorized(t *testing.T) {
 			req, err := http.NewRequest(tc.method, url, nil)
 			require.NoError(t, err)
 
-			httpClient := createHttpClient(t)
+			httpClient := createHTTPClient(t)
 			resp, err := httpClient.Do(req)
 			require.NoError(t, err)
 			defer func() { _ = resp.Body.Close() }()

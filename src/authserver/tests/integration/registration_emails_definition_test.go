@@ -38,7 +38,7 @@ func readEmail(t *testing.T, message mailpit.Message) (title, lang, text string)
 // appNameOfSettings is the app name the emails sign with.
 func appNameOfSettings(t *testing.T) string {
 	t.Helper()
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
+	settings, err := database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err)
 	return settings.AppName
 }
@@ -47,11 +47,11 @@ func appNameOfSettings(t *testing.T) string {
 // acceptLanguage, which is the language a registration's emails are written in.
 func postRegisterAddressIn(t *testing.T, client *http.Client, email, acceptLanguage string) {
 	t.Helper()
-	destUrl := appConfig.AuthServer.BaseURL + "/account/register"
-	req, err := http.NewRequest("POST", destUrl, strings.NewReader(url.Values{"email": {email}}.Encode()))
+	destURL := appConfig.AuthServer.BaseURL + "/account/register"
+	req, err := http.NewRequest("POST", destURL, strings.NewReader(url.Values{"email": {email}}.Encode()))
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("Referer", destUrl)
+	req.Header.Set("Referer", destURL)
 	req.Header.Set("Origin", appConfig.AuthServer.BaseURL)
 	req.Header.Set("Accept-Language", acceptLanguage)
 	resp, err := client.Do(req)
@@ -67,7 +67,7 @@ func TestActivationLinkEmail_IsSentFromItsDefinition(t *testing.T) {
 
 	t.Run("in English", func(t *testing.T) {
 		email := registerPlusAddress()
-		client := createHttpClient(t)
+		client := createHTTPClient(t)
 		loadRegisterPage(t, client)
 		postRegisterAddressIn(t, client, email, "en")
 
@@ -86,7 +86,7 @@ func TestActivationLinkEmail_IsSentFromItsDefinition(t *testing.T) {
 
 	t.Run("from a page read in Canadian French, in French", func(t *testing.T) {
 		email := registerPlusAddress()
-		client := createHttpClient(t)
+		client := createHTTPClient(t)
 		loadRegisterPage(t, client)
 		postRegisterAddressIn(t, client, email, "fr-CA")
 
@@ -105,7 +105,7 @@ func TestWelcomeEmail_IsSentFromItsDefinition(t *testing.T) {
 	appName := appNameOfSettings(t)
 
 	email := registerPlusAddress()
-	client := createHttpClient(t)
+	client := createHTTPClient(t)
 	loadRegisterPage(t, client)
 	password := fake.Password(20)
 	resp := postRegister(t, client, email, password, password)
@@ -131,7 +131,7 @@ func TestExistingAccountNotice_IsSentFromItsDefinition(t *testing.T) {
 
 	email := registerAddress()
 	createResetTestUser(t, email)
-	client := createHttpClient(t)
+	client := createHTTPClient(t)
 	loadRegisterPage(t, client)
 	registerPage(t, client, email)
 
@@ -181,7 +181,7 @@ func TestVerificationCodeEmail_IsSentFromItsDefinition(t *testing.T) {
 	appName := appNameOfSettings(t)
 
 	// A user with no name is greeted by their address.
-	accessToken, user := getUserAccessTokenWithAccountScope_EmailVerification(t)
+	accessToken, user := getUserAccessTokenWithAccountScopeEmailVerification(t)
 	user.GivenName, user.MiddleName, user.FamilyName = "", "", ""
 	require.NoError(t, database.UpdateUser(context.Background(), nil, user))
 

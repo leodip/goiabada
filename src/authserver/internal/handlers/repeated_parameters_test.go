@@ -81,7 +81,7 @@ func (e *authorizeEndpoint) expectsPage(message string) {
 func (e *authorizeEndpoint) passesDeliveryChecks() {
 	e.validator.On("ValidateClientAndRedirectURI", mock.Anything, mock.Anything).Return(nil)
 	e.database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
-		&record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: record.AcrLevel1}, nil)
+		&record.Client{ID: 1, ClientIdentifier: "test-client", DefaultACRLevel: record.ACRLevel1}, nil)
 	stubRegisteredRedirectURI(e.database, "https://example.com")
 }
 
@@ -204,7 +204,7 @@ func TestHandleAuthorizeGet_ARepeatedDeliveryParameterIsAnsweredOnThePage(t *tes
 		e := newAuthorizeEndpoint(t)
 		e.validator.On("ValidateClientAndRedirectURI", mock.Anything,
 			mock.MatchedBy(func(in *protocolvalidation.ValidateClientAndRedirectURIInput) bool {
-				return in.ClientId == "test-client" && in.RedirectURI == "https://example.com"
+				return in.ClientID == "test-client" && in.RedirectURI == "https://example.com"
 			})).Return(i18n.NewLocalizedError(errcode.AuthorizeClientNotFound, nil))
 		e.pageRenderer.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/no_menu_layout.html", "/auth_error.html",
 			mock.Anything).Return(nil)
@@ -360,7 +360,7 @@ func TestHandleTokenPost_ARepeatedParameterIsInvalidRequest(t *testing.T) {
 			endpoint := newTokenEndpoint(t)
 			endpoint.validator.On("ValidateTokenRequest", mock.Anything, mock.Anything,
 				mock.MatchedBy(func(in *protocolvalidation.ValidateTokenRequestInput) bool {
-					return in.ClientId == "c" && in.ClientSecret == "s"
+					return in.ClientID == "c" && in.ClientSecret == "s"
 				})).Return(nil, oauth.NewErrorDetail("invalid_client", "stop")).Once()
 			endpoint.jsonWriter.On("JSONError", mock.Anything, mock.Anything, mock.Anything).Return().Once()
 

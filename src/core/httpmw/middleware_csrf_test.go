@@ -437,7 +437,7 @@ func TestCSRF_OriginDecisions(t *testing.T) {
 				req.Header.Set("Sec-Fetch-Site", tt.secFetchSite)
 			}
 			if tt.skipped {
-				req = markCsrfSkipped(req)
+				req = markCSRFSkipped(req)
 			}
 
 			rr := httptest.NewRecorder()
@@ -463,7 +463,7 @@ func TestCSRF_OriginDecisions(t *testing.T) {
 			//
 			// The refusal's reason is asserted absent. It used to be interpolated into the
 			// body, where it described the deployment's own origin handling to whoever was
-			// refused, an attacker included. TestExplainCsrfFailure covers it in the log,
+			// refused, an attacker included. TestExplainCSRFFailure covers it in the log,
 			// which is where it belongs.
 			wantBody := i18n.T(context.Background(), "error.csrf_refused")
 			if body := strings.TrimSpace(rr.Body.String()); body != wantBody {
@@ -540,12 +540,12 @@ func TestCSRF_TheRefusalRecordIsBounded(t *testing.T) {
 	assert.Less(t, len(capture.Text()), 16<<10)
 }
 
-// TestExplainCsrfFailure covers the diagnostic the 403 carries into the log, which is the only place
+// TestExplainCSRFFailure covers the diagnostic the 403 carries into the log, which is the only place
 // an operator can learn which of four unrelated causes produced the same status code.
 //
 // It asserts a distinguishing substring rather than a whole sentence, so rewording the explanation
 // does not fail the test while confusing two causes still does.
-func TestExplainCsrfFailure(t *testing.T) {
+func TestExplainCSRFFailure(t *testing.T) {
 	const ourHost = "auth.example.com"
 
 	tests := []struct {
@@ -610,7 +610,7 @@ func TestExplainCsrfFailure(t *testing.T) {
 				t.Fatal("this row is allowed by the origin check, so explainCsrfFailure would never see it")
 			}
 
-			explanation, remedy := explainCsrfFailure(req)
+			explanation, remedy := explainCSRFFailure(req)
 			if !strings.Contains(explanation, tt.wantExplanation) {
 				t.Errorf("explanation = %q, want it to contain %q", explanation, tt.wantExplanation)
 			}

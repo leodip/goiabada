@@ -23,21 +23,21 @@ func TestAPIResourcePermissionsGet_Success(t *testing.T) {
 	// Setup: Create test resource
 	resource := createTestResource(t, "test-resource-perms-"+fake.UUID()[:8], "Test Resource for Permissions")
 	defer func() {
-		_ = database.DeleteResource(context.Background(), nil, resource.Id)
+		_ = database.DeleteResource(context.Background(), nil, resource.ID)
 	}()
 
 	// Setup: Create test permissions
-	perm1 := createTestPermission(t, resource.Id, "read", "Read permission")
-	perm2 := createTestPermission(t, resource.Id, "write", "Write permission")
-	perm3 := createTestPermission(t, resource.Id, "admin", "Admin permission")
+	perm1 := createTestPermission(t, resource.ID, "read", "Read permission")
+	perm2 := createTestPermission(t, resource.ID, "write", "Write permission")
+	perm3 := createTestPermission(t, resource.ID, "admin", "Admin permission")
 	defer func() {
-		_ = database.DeletePermission(context.Background(), nil, perm1.Id)
-		_ = database.DeletePermission(context.Background(), nil, perm2.Id)
-		_ = database.DeletePermission(context.Background(), nil, perm3.Id)
+		_ = database.DeletePermission(context.Background(), nil, perm1.ID)
+		_ = database.DeletePermission(context.Background(), nil, perm2.ID)
+		_ = database.DeletePermission(context.Background(), nil, perm3.ID)
 	}()
 
 	// Test: Get permissions for resource
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.ID, 10) + "/permissions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -59,7 +59,7 @@ func TestAPIResourcePermissionsGet_Success(t *testing.T) {
 		permissionMap[perm.PermissionIdentifier] = perm
 
 		// Verify each permission has embedded resource info
-		assert.Equal(t, resource.Id, perm.ResourceId)
+		assert.Equal(t, resource.ID, perm.ResourceID)
 		assert.Equal(t, resource.ResourceIdentifier, perm.Resource.ResourceIdentifier)
 		assert.Equal(t, resource.Description, perm.Resource.Description)
 	}
@@ -67,17 +67,17 @@ func TestAPIResourcePermissionsGet_Success(t *testing.T) {
 	// Verify specific permissions
 	readPerm, foundRead := permissionMap["read"]
 	assert.True(t, foundRead, "Read permission should be present")
-	assert.Equal(t, perm1.Id, readPerm.Id)
+	assert.Equal(t, perm1.ID, readPerm.ID)
 	assert.Equal(t, "Read permission", readPerm.Description)
 
 	writePerm, foundWrite := permissionMap["write"]
 	assert.True(t, foundWrite, "Write permission should be present")
-	assert.Equal(t, perm2.Id, writePerm.Id)
+	assert.Equal(t, perm2.ID, writePerm.ID)
 	assert.Equal(t, "Write permission", writePerm.Description)
 
 	adminPerm, foundAdmin := permissionMap["admin"]
 	assert.True(t, foundAdmin, "Admin permission should be present")
-	assert.Equal(t, perm3.Id, adminPerm.Id)
+	assert.Equal(t, perm3.ID, adminPerm.ID)
 	assert.Equal(t, "Admin permission", adminPerm.Description)
 }
 
@@ -88,11 +88,11 @@ func TestAPIResourcePermissionsGet_NoPermissions(t *testing.T) {
 	// Setup: Create test resource without permissions
 	resource := createTestResource(t, "test-resource-no-perms-"+fake.UUID()[:8], "Test Resource without Permissions")
 	defer func() {
-		_ = database.DeleteResource(context.Background(), nil, resource.Id)
+		_ = database.DeleteResource(context.Background(), nil, resource.ID)
 	}()
 
 	// Test: Get permissions for resource with no permissions
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.ID, 10) + "/permissions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -130,13 +130,13 @@ func TestAPIResourcePermissionsGet_NonExistentResource(t *testing.T) {
 	assert.Empty(t, getResponse.Permissions)
 }
 
-func TestAPIResourcePermissionsGet_InvalidResourceId(t *testing.T) {
+func TestAPIResourcePermissionsGet_InvalidResourceID(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)
 
 	testCases := []struct {
 		name           string
-		resourceId     string
+		resourceID     string
 		expectedStatus int
 	}{
 		{"non-numeric ID", "abc", http.StatusBadRequest},
@@ -148,7 +148,7 @@ func TestAPIResourcePermissionsGet_InvalidResourceId(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + tc.resourceId + "/permissions"
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + tc.resourceID + "/permissions"
 			resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -175,10 +175,10 @@ func TestAPIResourcePermissionsGet_TheAuthServerResourceAnswersEveryStoredPermis
 	require.NoError(t, err)
 	require.NotNil(t, authServerResource, "the seed creates the authserver resource")
 
-	userinfoNamed := createTestPermission(t, authServerResource.Id, "userinfo", "Created by an administrator")
-	t.Cleanup(func() { _ = database.DeletePermission(context.Background(), nil, userinfoNamed.Id) })
+	userinfoNamed := createTestPermission(t, authServerResource.ID, "userinfo", "Created by an administrator")
+	t.Cleanup(func() { _ = database.DeletePermission(context.Background(), nil, userinfoNamed.ID) })
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(authServerResource.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(authServerResource.ID, 10) + "/permissions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -186,17 +186,17 @@ func TestAPIResourcePermissionsGet_TheAuthServerResourceAnswersEveryStoredPermis
 	var getResponse api.GetPermissionsByResourceResponse
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&getResponse))
 
-	stored, err := database.GetPermissionsByResourceId(context.Background(), nil, authServerResource.Id)
+	stored, err := database.GetPermissionsByResourceID(context.Background(), nil, authServerResource.ID)
 	require.NoError(t, err)
-	storedIds := make(map[int64]string, len(stored))
+	storedIDs := make(map[int64]string, len(stored))
 	for _, p := range stored {
-		storedIds[p.Id] = p.PermissionIdentifier
+		storedIDs[p.ID] = p.PermissionIdentifier
 	}
-	answeredIds := make(map[int64]string, len(getResponse.Permissions))
+	answeredIDs := make(map[int64]string, len(getResponse.Permissions))
 	for _, p := range getResponse.Permissions {
-		answeredIds[p.Id] = p.PermissionIdentifier
+		answeredIDs[p.ID] = p.PermissionIdentifier
 	}
-	assert.Equal(t, storedIds, answeredIds, "the GET answers exactly the stored permissions")
+	assert.Equal(t, storedIDs, answeredIDs, "the GET answers exactly the stored permissions")
 
 	answered := make([]string, 0, len(getResponse.Permissions))
 	for _, p := range getResponse.Permissions {
@@ -218,13 +218,13 @@ func TestAPIResourcePermissionsGet_AuthServerResourceIncludesOtherPermissions(t 
 	}
 
 	// Setup: Create a test permission for AuthServer resource (non-userinfo)
-	testPerm := createTestPermission(t, authServerResource.Id, "test-auth-perm", "Test Auth Permission")
+	testPerm := createTestPermission(t, authServerResource.ID, "test-auth-perm", "Test Auth Permission")
 	defer func() {
-		_ = database.DeletePermission(context.Background(), nil, testPerm.Id)
+		_ = database.DeletePermission(context.Background(), nil, testPerm.ID)
 	}()
 
 	// Test: Get permissions for AuthServer resource
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(authServerResource.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(authServerResource.ID, 10) + "/permissions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -239,7 +239,7 @@ func TestAPIResourcePermissionsGet_AuthServerResourceIncludesOtherPermissions(t 
 	// Assert: Should include our test permission
 	found := false
 	for _, perm := range getResponse.Permissions {
-		if perm.Id == testPerm.Id {
+		if perm.ID == testPerm.ID {
 			found = true
 			assert.Equal(t, "test-auth-perm", perm.PermissionIdentifier)
 			assert.Equal(t, "Test Auth Permission", perm.Description)
@@ -256,19 +256,19 @@ func TestAPIResourcePermissionsGet_NonAuthServerResourceIncludesAllPermissions(t
 	// Setup: Create test resource (non-AuthServer)
 	resource := createTestResource(t, "test-non-authserver-"+fake.UUID()[:8], "Test Non-AuthServer Resource")
 	defer func() {
-		_ = database.DeleteResource(context.Background(), nil, resource.Id)
+		_ = database.DeleteResource(context.Background(), nil, resource.ID)
 	}()
 
 	// Setup: a permission identified userinfo, which the authserver resource's GET used to leave out
-	userinfoLikePerm := createTestPermission(t, resource.Id, "userinfo", "Userinfo-like permission")
-	regularPerm := createTestPermission(t, resource.Id, "regular-perm", "Regular permission")
+	userinfoLikePerm := createTestPermission(t, resource.ID, "userinfo", "Userinfo-like permission")
+	regularPerm := createTestPermission(t, resource.ID, "regular-perm", "Regular permission")
 	defer func() {
-		_ = database.DeletePermission(context.Background(), nil, userinfoLikePerm.Id)
-		_ = database.DeletePermission(context.Background(), nil, regularPerm.Id)
+		_ = database.DeletePermission(context.Background(), nil, userinfoLikePerm.ID)
+		_ = database.DeletePermission(context.Background(), nil, regularPerm.ID)
 	}()
 
 	// Test: Get permissions for non-AuthServer resource
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.ID, 10) + "/permissions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -291,26 +291,26 @@ func TestAPIResourcePermissionsGet_NonAuthServerResourceIncludesAllPermissions(t
 	// Both permissions should be present
 	userinfoResp, foundUserinfo := permMap["userinfo"]
 	assert.True(t, foundUserinfo, "Userinfo permission should be present")
-	assert.Equal(t, userinfoLikePerm.Id, userinfoResp.Id)
+	assert.Equal(t, userinfoLikePerm.ID, userinfoResp.ID)
 
 	regularResp, foundRegular := permMap["regular-perm"]
 	assert.True(t, foundRegular, "Regular permission should be present")
-	assert.Equal(t, regularPerm.Id, regularResp.Id)
+	assert.Equal(t, regularPerm.ID, regularResp.ID)
 }
 
 func TestAPIResourcePermissionsGet_Unauthorized(t *testing.T) {
 	// Setup: Create test resource
 	resource := createTestResource(t, "test-resource-unauth-"+fake.UUID()[:8], "Test Resource for Unauthorized Test")
 	defer func() {
-		_ = database.DeleteResource(context.Background(), nil, resource.Id)
+		_ = database.DeleteResource(context.Background(), nil, resource.ID)
 	}()
 
 	// Test: Request without access token
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.ID, 10) + "/permissions"
 	req, err := http.NewRequest("GET", url, nil)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -323,11 +323,11 @@ func TestAPIResourcePermissionsGet_InvalidAccessToken(t *testing.T) {
 	// Setup: Create test resource
 	resource := createTestResource(t, "test-resource-invalid-token-"+fake.UUID()[:8], "Test Resource for Invalid Token Test")
 	defer func() {
-		_ = database.DeleteResource(context.Background(), nil, resource.Id)
+		_ = database.DeleteResource(context.Background(), nil, resource.ID)
 	}()
 
 	// Test: Request with invalid access token
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.ID, 10) + "/permissions"
 	resp := makeAPIRequest(t, "GET", url, "invalid-token-here", nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -342,14 +342,14 @@ func TestAPIResourcePermissionsGet_LargeNumberOfPermissions(t *testing.T) {
 	// Setup: Create test resource
 	resource := createTestResource(t, "test-resource-many-perms-"+fake.UUID()[:8], "Test Resource with Many Permissions")
 	defer func() {
-		_ = database.DeleteResource(context.Background(), nil, resource.Id)
+		_ = database.DeleteResource(context.Background(), nil, resource.ID)
 	}()
 
 	// Setup: Create many permissions
 	const numPermissions = 10
 	var permissions []*record.Permission
 	for i := 0; i < numPermissions; i++ {
-		perm := createTestPermission(t, resource.Id,
+		perm := createTestPermission(t, resource.ID,
 			"permission-"+strconv.Itoa(i),
 			"Permission number "+strconv.Itoa(i))
 		permissions = append(permissions, perm)
@@ -357,12 +357,12 @@ func TestAPIResourcePermissionsGet_LargeNumberOfPermissions(t *testing.T) {
 
 	defer func() {
 		for _, perm := range permissions {
-			_ = database.DeletePermission(context.Background(), nil, perm.Id)
+			_ = database.DeletePermission(context.Background(), nil, perm.ID)
 		}
 	}()
 
 	// Test: Get permissions for resource with many permissions
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.ID, 10) + "/permissions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -379,7 +379,7 @@ func TestAPIResourcePermissionsGet_LargeNumberOfPermissions(t *testing.T) {
 
 	// Verify all permissions have proper resource info embedded
 	for _, perm := range getResponse.Permissions {
-		assert.Equal(t, resource.Id, perm.ResourceId)
+		assert.Equal(t, resource.ID, perm.ResourceID)
 		assert.Equal(t, resource.ResourceIdentifier, perm.Resource.ResourceIdentifier)
 		assert.Equal(t, resource.Description, perm.Resource.Description)
 		assert.NotEmpty(t, perm.PermissionIdentifier)
@@ -387,13 +387,13 @@ func TestAPIResourcePermissionsGet_LargeNumberOfPermissions(t *testing.T) {
 	}
 
 	// Verify we can find all our created permissions
-	responsePermIds := make(map[int64]bool)
+	responsePermIDs := make(map[int64]bool)
 	for _, perm := range getResponse.Permissions {
-		responsePermIds[perm.Id] = true
+		responsePermIDs[perm.ID] = true
 	}
 
 	for _, createdPerm := range permissions {
-		assert.True(t, responsePermIds[createdPerm.Id],
-			"Permission %d should be in response", createdPerm.Id)
+		assert.True(t, responsePermIDs[createdPerm.ID],
+			"Permission %d should be in response", createdPerm.ID)
 	}
 }

@@ -40,9 +40,9 @@ type committedClientWrite struct {
 // transaction, committing.
 func expectUpdateNotOwningAuthenticationMode(database *datamocks.Database) {
 	datamocks.ExpectRunInTransaction(database, clientUpdateTx)
-	database.On("AcquireClientRow", mock.Anything, clientUpdateTx, targetClientId).Return(nil).Once()
-	database.On("GetClientById", mock.Anything, clientUpdateTx, targetClientId).
-		Return(&record.Client{Id: targetClientId, ClientIdentifier: "target-client"}, nil).Once()
+	database.On("AcquireClientRow", mock.Anything, clientUpdateTx, targetClientID).Return(nil).Once()
+	database.On("GetClientByID", mock.Anything, clientUpdateTx, targetClientID).
+		Return(&record.Client{ID: targetClientID, ClientIdentifier: "target-client"}, nil).Once()
 	database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
 }
 
@@ -50,7 +50,7 @@ func expectUpdateNotOwningAuthenticationMode(database *datamocks.Database) {
 // the identifier's write, which finds the row's own identifier.
 func expectClientSettingsSave(database *datamocks.Database) {
 	expectUpdateNotOwningAuthenticationMode(database)
-	database.On("SetClientIdentifier", mock.Anything, clientUpdateTx, targetClientId, "target-client").Return(false, nil).Once()
+	database.On("SetClientIdentifier", mock.Anything, clientUpdateTx, targetClientID, "target-client").Return(false, nil).Once()
 }
 
 var committedClientWrites = []committedClientWrite{
@@ -80,9 +80,9 @@ var committedClientWrites = []committedClientWrite{
 		expectWrite: func(database *datamocks.Database) {
 			datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 			database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
-			database.On("SetClientRememberConsent", mock.Anything, clientUpdateTx, targetClientId, true).Return(nil).Once()
-			database.On("GetClientById", mock.Anything, clientUpdateTx, targetClientId).
-				Return(&record.Client{Id: targetClientId, ClientIdentifier: "target-client"}, nil).Once()
+			database.On("SetClientRememberConsent", mock.Anything, clientUpdateTx, targetClientID, true).Return(nil).Once()
+			database.On("GetClientByID", mock.Anything, clientUpdateTx, targetClientID).
+				Return(&record.Client{ID: targetClientID, ClientIdentifier: "target-client"}, nil).Once()
 		},
 		expectFailingWrite: failingWrite("RunInTransaction", mock.Anything, mock.Anything),
 	},
@@ -98,13 +98,13 @@ var committedClientWrites = []committedClientWrite{
 		},
 		expectWrite: func(database *datamocks.Database) {
 			datamocks.ExpectRunInTransaction(database, clientUpdateTx)
-			database.On("SetClientPublic", mock.Anything, clientUpdateTx, targetClientId).Return(true, nil).Once()
-			database.On("DeleteClientIntrospectionResourcesByClientId", mock.Anything, clientUpdateTx, targetClientId).Return(nil).Once()
+			database.On("SetClientPublic", mock.Anything, clientUpdateTx, targetClientID).Return(true, nil).Once()
+			database.On("DeleteClientIntrospectionResourcesByClientID", mock.Anything, clientUpdateTx, targetClientID).Return(nil).Once()
 			database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
-			database.On("GetClientById", mock.Anything, clientUpdateTx, targetClientId).
-				Return(&record.Client{Id: targetClientId, ClientIdentifier: "target-client", IsPublic: true}, nil).Once()
-			database.On("RevokeCodesByClientId", mock.Anything, clientUpdateTx, targetClientId).Return(int64(1), nil).Once()
-			database.On("GetRefreshTokensByClientId", mock.Anything, clientUpdateTx, targetClientId).
+			database.On("GetClientByID", mock.Anything, clientUpdateTx, targetClientID).
+				Return(&record.Client{ID: targetClientID, ClientIdentifier: "target-client", IsPublic: true}, nil).Once()
+			database.On("RevokeCodesByClientID", mock.Anything, clientUpdateTx, targetClientID).Return(int64(1), nil).Once()
+			database.On("GetRefreshTokensByClientID", mock.Anything, clientUpdateTx, targetClientID).
 				Return([]*record.RefreshToken{}, nil).Once()
 		},
 		expectFailingWrite: failingWrite("RunInTransaction", mock.Anything, mock.Anything),
@@ -202,7 +202,7 @@ func TestClientWrites_ACommittedWriteIsAuditedWhateverTheAnswerReadsDo(t *testin
 				}
 				require.Equal(t, want, events, "a committed write leaves exactly its entries")
 				assert.Equal(t, map[string]interface{}{
-					"client_id":      targetClientId,
+					"client_id":      targetClientID,
 					"logged_in_user": grantCaller,
 				}, (*records)[len(*records)-1].details)
 			})

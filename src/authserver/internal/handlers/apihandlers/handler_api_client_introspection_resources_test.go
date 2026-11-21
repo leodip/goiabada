@@ -26,7 +26,7 @@ import (
 // it cannot be matched by one made outside the transaction.
 var introspectionTx = &sql.Tx{}
 
-const introspectedResourceId = int64(3)
+const introspectedResourceID = int64(3)
 
 func serveIntrospectionResourcesPut(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, body string) *httptest.ResponseRecorder {
 	r := clientRequest(http.MethodPut, "/api/v1/admin/clients/58/introspection-resources", body, "authserver:manage")
@@ -38,10 +38,10 @@ func serveIntrospectionResourcesPut(database *datamocks.Database, auditLogger *h
 // expectIntrospectionSaveReads registers the reads before the transaction: the client, confidential,
 // and the one resource the save names.
 func expectIntrospectionSaveReads(database *datamocks.Database) {
-	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), targetClientId).
-		Return(&record.Client{Id: targetClientId, ClientIdentifier: "an-api-backend"}, nil).Once()
-	database.On("GetResourceById", mock.Anything, (*sql.Tx)(nil), introspectedResourceId).
-		Return(&record.Resource{Id: introspectedResourceId, ResourceIdentifier: "product-api"}, nil).Once()
+	database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), targetClientID).
+		Return(&record.Client{ID: targetClientID, ClientIdentifier: "an-api-backend"}, nil).Once()
+	database.On("GetResourceByID", mock.Anything, (*sql.Tx)(nil), introspectedResourceID).
+		Return(&record.Resource{ID: introspectedResourceID, ResourceIdentifier: "product-api"}, nil).Once()
 }
 
 // A save adding a resource reads the client again under its row, which making it public takes
@@ -52,11 +52,11 @@ func TestHandleClientIntrospectionResourcesPut_AClientMadePublicMeanwhileIsRefus
 	auditLogger := handlersmocks.NewAuditLogger(t)
 	expectIntrospectionSaveReads(database)
 	stub := datamocks.ExpectRunInTransaction(database, introspectionTx)
-	database.On("GetClientIntrospectionResourcesByClientId", mock.Anything, introspectionTx, targetClientId).
+	database.On("GetClientIntrospectionResourcesByClientID", mock.Anything, introspectionTx, targetClientID).
 		Return([]record.ClientIntrospectionResource{}, nil).Once()
-	database.On("AcquireClientRow", mock.Anything, introspectionTx, targetClientId).Return(nil).Once()
-	database.On("GetClientById", mock.Anything, introspectionTx, targetClientId).
-		Return(&record.Client{Id: targetClientId, ClientIdentifier: "an-api-backend", IsPublic: true}, nil).Once()
+	database.On("AcquireClientRow", mock.Anything, introspectionTx, targetClientID).Return(nil).Once()
+	database.On("GetClientByID", mock.Anything, introspectionTx, targetClientID).
+		Return(&record.Client{ID: targetClientID, ClientIdentifier: "an-api-backend", IsPublic: true}, nil).Once()
 
 	rr := serveIntrospectionResourcesPut(database, auditLogger, `{"resourceIds":[3],"expectedResourceIds":[]}`)
 
@@ -76,18 +76,18 @@ func TestHandleClientIntrospectionResourcesPut_AClientMadePublicMeanwhileIsRefus
 			underTheRow = append(underTheRow, call.Method)
 		}
 	}
-	assert.Equal(t, []string{"GetClientIntrospectionResourcesByClientId", "AcquireClientRow", "GetClientById"}, underTheRow)
+	assert.Equal(t, []string{"GetClientIntrospectionResourcesByClientID", "AcquireClientRow", "GetClientByID"}, underTheRow)
 }
 
 // A save that only removes adds nothing a public client could hold, so it takes no row lock.
 func TestHandleClientIntrospectionResourcesPut_ASaveAddingNothingTakesNoRow(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
-	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), targetClientId).
-		Return(&record.Client{Id: targetClientId, ClientIdentifier: "an-api-backend"}, nil).Once()
+	database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), targetClientID).
+		Return(&record.Client{ID: targetClientID, ClientIdentifier: "an-api-backend"}, nil).Once()
 	datamocks.ExpectRunInTransaction(database, introspectionTx)
-	database.On("GetClientIntrospectionResourcesByClientId", mock.Anything, introspectionTx, targetClientId).
-		Return([]record.ClientIntrospectionResource{{Id: 90, ClientId: targetClientId, ResourceId: introspectedResourceId}}, nil).Once()
+	database.On("GetClientIntrospectionResourcesByClientID", mock.Anything, introspectionTx, targetClientID).
+		Return([]record.ClientIntrospectionResource{{ID: 90, ClientID: targetClientID, ResourceID: introspectedResourceID}}, nil).Once()
 	database.On("DeleteClientIntrospectionResource", mock.Anything, introspectionTx, int64(90)).Return(nil).Once()
 	auditLogger.On("Log", mock.Anything, audit.EventUpdatedClientIntrospectionResources, mock.Anything).Return().Once()
 
@@ -105,11 +105,11 @@ func TestHandleClientIntrospectionResourcesPut_ACommittedSaveRecordsWhatItChange
 	expectIntrospectionSaveReads(database)
 	var order []string
 	datamocks.ExpectRunInTransaction(database, introspectionTx, func(step string) { order = append(order, step) })
-	database.On("GetClientIntrospectionResourcesByClientId", mock.Anything, introspectionTx, targetClientId).
-		Return([]record.ClientIntrospectionResource{{Id: 91, ClientId: targetClientId, ResourceId: 8}}, nil).Once()
-	database.On("AcquireClientRow", mock.Anything, introspectionTx, targetClientId).Return(nil).Once()
-	database.On("GetClientById", mock.Anything, introspectionTx, targetClientId).
-		Return(&record.Client{Id: targetClientId, ClientIdentifier: "an-api-backend"}, nil).Once()
+	database.On("GetClientIntrospectionResourcesByClientID", mock.Anything, introspectionTx, targetClientID).
+		Return([]record.ClientIntrospectionResource{{ID: 91, ClientID: targetClientID, ResourceID: 8}}, nil).Once()
+	database.On("AcquireClientRow", mock.Anything, introspectionTx, targetClientID).Return(nil).Once()
+	database.On("GetClientByID", mock.Anything, introspectionTx, targetClientID).
+		Return(&record.Client{ID: targetClientID, ClientIdentifier: "an-api-backend"}, nil).Once()
 	database.On("DeleteClientIntrospectionResource", mock.Anything, introspectionTx, int64(91)).Return(nil).Once()
 	var created *record.ClientIntrospectionResource
 	database.On("CreateClientIntrospectionResource", mock.Anything, introspectionTx, mock.Anything).
@@ -126,9 +126,9 @@ func TestHandleClientIntrospectionResourcesPut_ACommittedSaveRecordsWhatItChange
 	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 	assert.JSONEq(t, `{"success":true}`, rr.Body.String())
 	require.NotNil(t, created)
-	assert.Equal(t, record.ClientIntrospectionResource{ClientId: targetClientId, ResourceId: introspectedResourceId}, *created)
+	assert.Equal(t, record.ClientIntrospectionResource{ClientID: targetClientID, ResourceID: introspectedResourceID}, *created)
 	assert.Equal(t, map[string]interface{}{
-		"client_id":            targetClientId,
+		"client_id":            targetClientID,
 		"added_resource_ids":   []int64{3},
 		"removed_resource_ids": []int64{8},
 		"logged_in_user":       grantCaller,
@@ -142,11 +142,11 @@ func TestHandleClientIntrospectionResourcesPut_AFaultInTheTransactionIs500AndRec
 	auditLogger := handlersmocks.NewAuditLogger(t)
 	expectIntrospectionSaveReads(database)
 	datamocks.ExpectRunInTransaction(database, introspectionTx)
-	database.On("GetClientIntrospectionResourcesByClientId", mock.Anything, introspectionTx, targetClientId).
+	database.On("GetClientIntrospectionResourcesByClientID", mock.Anything, introspectionTx, targetClientID).
 		Return([]record.ClientIntrospectionResource{}, nil).Once()
-	database.On("AcquireClientRow", mock.Anything, introspectionTx, targetClientId).Return(nil).Once()
-	database.On("GetClientById", mock.Anything, introspectionTx, targetClientId).
-		Return(&record.Client{Id: targetClientId, ClientIdentifier: "an-api-backend"}, nil).Once()
+	database.On("AcquireClientRow", mock.Anything, introspectionTx, targetClientID).Return(nil).Once()
+	database.On("GetClientByID", mock.Anything, introspectionTx, targetClientID).
+		Return(&record.Client{ID: targetClientID, ClientIdentifier: "an-api-backend"}, nil).Once()
 	database.On("CreateClientIntrospectionResource", mock.Anything, introspectionTx, mock.Anything).
 		Return(errors.New("connection reset")).Once()
 
@@ -161,8 +161,8 @@ func TestHandleClientIntrospectionResourcesPut_AFaultInTheTransactionIs500AndRec
 func TestHandleClientIntrospectionResourcesPut_APublicClientIsRefusedBeforeTheTransaction(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
-	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), targetClientId).
-		Return(&record.Client{Id: targetClientId, ClientIdentifier: "a-spa", IsPublic: true}, nil).Once()
+	database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), targetClientID).
+		Return(&record.Client{ID: targetClientID, ClientIdentifier: "a-spa", IsPublic: true}, nil).Once()
 
 	rr := serveIntrospectionResourcesPut(database, auditLogger, `{"resourceIds":[3],"expectedResourceIds":[]}`)
 
@@ -170,7 +170,7 @@ func TestHandleClientIntrospectionResourcesPut_APublicClientIsRefusedBeforeTheTr
 	code, _ := decodeErrorEnvelope(t, rr)
 	assert.Equal(t, "handler.client_introspection_resources.public_client", code)
 	database.AssertExpectations(t)
-	assertNotAttemptedOnClientDatabase(t, database, "GetResourceById", "RunInTransaction")
+	assertNotAttemptedOnClientDatabase(t, database, "GetResourceByID", "RunInTransaction")
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 }
 
@@ -178,10 +178,10 @@ func TestHandleClientIntrospectionResourcesPut_APublicClientIsRefusedBeforeTheTr
 func TestHandleClientIntrospectionResourcesPut_APublicClientSavesItsEmptyList(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
-	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), targetClientId).
-		Return(&record.Client{Id: targetClientId, ClientIdentifier: "a-spa", IsPublic: true}, nil).Once()
+	database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), targetClientID).
+		Return(&record.Client{ID: targetClientID, ClientIdentifier: "a-spa", IsPublic: true}, nil).Once()
 	datamocks.ExpectRunInTransaction(database, introspectionTx)
-	database.On("GetClientIntrospectionResourcesByClientId", mock.Anything, introspectionTx, targetClientId).
+	database.On("GetClientIntrospectionResourcesByClientID", mock.Anything, introspectionTx, targetClientID).
 		Return([]record.ClientIntrospectionResource{}, nil).Once()
 	auditLogger.On("Log", mock.Anything, audit.EventUpdatedClientIntrospectionResources, mock.Anything).Return().Once()
 
@@ -196,11 +196,11 @@ func TestHandleClientIntrospectionResourcesPut_APublicClientSavesItsEmptyList(t 
 func TestHandleClientAuthenticationPut_AFailedClearingOfTheIntrospectionResourcesSavesNothing(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
-	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
-		Return(&record.Client{Id: 7, IsPublic: false, ClientSecretEncrypted: []byte("secret")}, nil).Once()
+	database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), int64(7)).
+		Return(&record.Client{ID: 7, IsPublic: false, ClientSecretEncrypted: []byte("secret")}, nil).Once()
 	stub := datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 	database.On("SetClientPublic", mock.Anything, clientUpdateTx, int64(7)).Return(true, nil).Once()
-	database.On("DeleteClientIntrospectionResourcesByClientId", mock.Anything, clientUpdateTx, int64(7)).
+	database.On("DeleteClientIntrospectionResourcesByClientID", mock.Anything, clientUpdateTx, int64(7)).
 		Return(errors.New("connection reset")).Once()
 
 	rr := httptest.NewRecorder()
@@ -209,6 +209,6 @@ func TestHandleClientAuthenticationPut_AFailedClearingOfTheIntrospectionResource
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 	require.EqualError(t, stub.BodyErr, "connection reset")
-	assertNotAttemptedOnClientDatabase(t, database, "UpdateClient", "RevokeCodesByClientId", "GetRefreshTokensByClientId")
+	assertNotAttemptedOnClientDatabase(t, database, "UpdateClient", "RevokeCodesByClientID", "GetRefreshTokensByClientID")
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 }

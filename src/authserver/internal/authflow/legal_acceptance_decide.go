@@ -62,13 +62,13 @@ func decideLegalAcceptance(shown, ticked map[int64]bool, owed []int64) legalAcce
 	if len(shown) != len(owed) {
 		return legalAcceptanceChanged
 	}
-	for _, versionId := range owed {
-		if !shown[versionId] {
+	for _, versionID := range owed {
+		if !shown[versionID] {
 			return legalAcceptanceChanged
 		}
 	}
-	for _, versionId := range owed {
-		if !ticked[versionId] {
+	for _, versionID := range owed {
+		if !ticked[versionID] {
 			return legalAcceptanceUnticked
 		}
 	}

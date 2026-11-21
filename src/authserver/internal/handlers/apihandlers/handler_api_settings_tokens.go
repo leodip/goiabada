@@ -25,7 +25,7 @@ func HandleSettingsTokensGet() http.HandlerFunc {
 			RefreshTokenOfflineIdleTimeoutInSeconds: settings.RefreshTokenOfflineIdleTimeoutInSeconds,
 			RefreshTokenOfflineMaxLifetimeInSeconds: settings.RefreshTokenOfflineMaxLifetimeInSeconds,
 			IncludeOpenIDConnectClaimsInAccessToken: settings.IncludeOpenIDConnectClaimsInAccessToken,
-			IncludeOpenIDConnectClaimsInIdToken:     settings.IncludeOpenIDConnectClaimsInIdToken,
+			IncludeOpenIDConnectClaimsInIDToken:     settings.IncludeOpenIDConnectClaimsInIDToken,
 		}
 
 		writeJSON(w, r, http.StatusOK, resp)
@@ -92,19 +92,19 @@ func HandleSettingsTokensPut(
 		// Apply updates, onto the row as stored when the save runs (#407). The old values, for
 		// auditing, are that row's, read under the save's lock, which is what the save replaced.
 		var oldVals map[string]interface{}
-		saved, err := saveSettingsSection(r.Context(), database, currentSettings.Id, func(stored *record.Settings) {
+		saved, err := saveSettingsSection(r.Context(), database, currentSettings.ID, func(stored *record.Settings) {
 			oldVals = map[string]interface{}{
 				"token_expiration_in_seconds":                    stored.TokenExpirationInSeconds,
 				"refresh_token_offline_idle_timeout_in_seconds":  stored.RefreshTokenOfflineIdleTimeoutInSeconds,
 				"refresh_token_offline_max_lifetime_in_seconds":  stored.RefreshTokenOfflineMaxLifetimeInSeconds,
 				"include_open_id_connect_claims_in_access_token": stored.IncludeOpenIDConnectClaimsInAccessToken,
-				"include_open_id_connect_claims_in_id_token":     stored.IncludeOpenIDConnectClaimsInIdToken,
+				"include_open_id_connect_claims_in_id_token":     stored.IncludeOpenIDConnectClaimsInIDToken,
 			}
 			stored.TokenExpirationInSeconds = req.TokenExpirationInSeconds
 			stored.RefreshTokenOfflineIdleTimeoutInSeconds = req.RefreshTokenOfflineIdleTimeoutInSeconds
 			stored.RefreshTokenOfflineMaxLifetimeInSeconds = req.RefreshTokenOfflineMaxLifetimeInSeconds
 			stored.IncludeOpenIDConnectClaimsInAccessToken = req.IncludeOpenIDConnectClaimsInAccessToken
-			stored.IncludeOpenIDConnectClaimsInIdToken = req.IncludeOpenIDConnectClaimsInIdToken
+			stored.IncludeOpenIDConnectClaimsInIDToken = req.IncludeOpenIDConnectClaimsInIDToken
 		})
 		if err != nil {
 			writeInternalServerError(w, r, err)
@@ -117,7 +117,7 @@ func HandleSettingsTokensPut(
 			"refresh_token_offline_idle_timeout_in_seconds":  saved.RefreshTokenOfflineIdleTimeoutInSeconds,
 			"refresh_token_offline_max_lifetime_in_seconds":  saved.RefreshTokenOfflineMaxLifetimeInSeconds,
 			"include_open_id_connect_claims_in_access_token": saved.IncludeOpenIDConnectClaimsInAccessToken,
-			"include_open_id_connect_claims_in_id_token":     saved.IncludeOpenIDConnectClaimsInIdToken,
+			"include_open_id_connect_claims_in_id_token":     saved.IncludeOpenIDConnectClaimsInIDToken,
 		}
 		auditLogger.Log(r.Context(), audit.EventUpdatedTokensSettings, map[string]interface{}{
 			"logged_in_user": callerSubject(r),
@@ -130,7 +130,7 @@ func HandleSettingsTokensPut(
 			RefreshTokenOfflineIdleTimeoutInSeconds: saved.RefreshTokenOfflineIdleTimeoutInSeconds,
 			RefreshTokenOfflineMaxLifetimeInSeconds: saved.RefreshTokenOfflineMaxLifetimeInSeconds,
 			IncludeOpenIDConnectClaimsInAccessToken: saved.IncludeOpenIDConnectClaimsInAccessToken,
-			IncludeOpenIDConnectClaimsInIdToken:     saved.IncludeOpenIDConnectClaimsInIdToken,
+			IncludeOpenIDConnectClaimsInIDToken:     saved.IncludeOpenIDConnectClaimsInIDToken,
 		}
 
 		writeJSON(w, r, http.StatusOK, resp)

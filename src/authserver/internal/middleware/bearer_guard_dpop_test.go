@@ -56,7 +56,7 @@ var dpopNow = time.Unix(1_800_000_000, 0)
 // bound to RFC 7517's key and one bearer token.
 type dpopParser struct{ jkt string }
 
-func (p dpopParser) DecodeAndValidateTokenString(_ context.Context, token string, _ bool) (*oauth.JwtToken, error) {
+func (p dpopParser) DecodeAndValidateTokenString(_ context.Context, token string, _ bool) (*oauth.JWTToken, error) {
 	claims := map[string]interface{}{"typ": "Bearer", "aud": "authserver", "sub": "u1", "auth_time": float64(1),
 		"scope": "openid profile", "client_id": "spa-1", "cnf": map[string]interface{}{"jkt": p.jkt}}
 	switch token {
@@ -70,7 +70,7 @@ func (p dpopParser) DecodeAndValidateTokenString(_ context.Context, token string
 	default:
 		return nil, fmt.Errorf("the token does not verify: %w", signingkeys.ErrTokenRefused)
 	}
-	return &oauth.JwtToken{TokenBase64: token, Claims: claims}, nil
+	return &oauth.JWTToken{TokenBase64: token, Claims: claims}, nil
 }
 
 // replayStore is the replay table: a proof hash is recorded once, with its expiry, and fault, when
@@ -117,7 +117,7 @@ func dpopGuards(t *testing.T, surface, baseURL string, store *replayStore) *Bear
 
 // dpopChain is /userinfo's chain as routes.go mounts it, the session guard aside.
 func dpopChain(guards *BearerToken) http.Handler {
-	return guards.JwtAuthorizationHeaderToContext()(
+	return guards.JWTAuthorizationHeaderToContext()(
 		guards.RequireBearerTokenScope("openid")(guards.RequireUserBoundToken()(http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte("admitted")) }))))
 }

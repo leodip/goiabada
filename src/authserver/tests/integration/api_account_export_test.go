@@ -141,7 +141,7 @@ func signInOn(t *testing.T, browser *http.Client, client signInClient, user *rec
 		case "/auth/otp":
 			require.NotNil(t, code, "the sign-in asked for a code from a user with no authenticator")
 			page := loadPage(t, browser, location)
-			resp = authenticateWithOtp(t, browser, location, page, code())
+			resp = authenticateWithOTP(t, browser, location, page, code())
 			_ = page.Body.Close()
 			result.askedCode = true
 		default:
@@ -166,9 +166,9 @@ func giveAuthenticator(t *testing.T, user *record.User) string {
 }
 
 // theSession is the user's one session.
-func theSession(t *testing.T, userId int64) record.UserSession {
+func theSession(t *testing.T, userID int64) record.UserSession {
 	t.Helper()
-	sessions, err := database.GetUserSessionsByUserId(context.Background(), nil, userId)
+	sessions, err := database.GetUserSessionsByUserID(context.Background(), nil, userID)
 	require.NoError(t, err)
 	require.Len(t, sessions, 1, "the user has one session")
 	return sessions[0]
@@ -176,9 +176,9 @@ func theSession(t *testing.T, userId int64) record.UserSession {
 
 // ageSignIn moves the user's session's sign-in an hour back, password and all, as if it had been
 // made then, and answers the session as it now is.
-func ageSignIn(t *testing.T, userId int64) record.UserSession {
+func ageSignIn(t *testing.T, userID int64) record.UserSession {
 	t.Helper()
-	session := theSession(t, userId)
+	session := theSession(t, userID)
 	session.AuthTime = session.AuthTime.Add(-time.Hour)
 	session.PasswordAuthTime = session.PasswordAuthTime.Add(-time.Hour)
 	require.NoError(t, database.UpdateUserSession(context.Background(), nil, &session))
@@ -197,9 +197,9 @@ func authTimeOf(t *testing.T, accessToken string) time.Time {
 }
 
 // ownExportEvents is the exported_own_user_data rows about the user, oldest first.
-func ownExportEvents(t *testing.T, userId int64) []record.AuditLog {
+func ownExportEvents(t *testing.T, userID int64) []record.AuditLog {
 	t.Helper()
-	rows, err := database.GetAuditLogsByUserId(context.Background(), nil, userId)
+	rows, err := database.GetAuditLogsByUserID(context.Background(), nil, userID)
 	require.NoError(t, err)
 	var events []record.AuditLog
 	for _, row := range rows {
@@ -212,15 +212,15 @@ func ownExportEvents(t *testing.T, userId int64) []record.AuditLog {
 
 // assertOwnExportEvents waits for the user's exported_own_user_data rows to number n, then checks
 // for a moment that no more arrive.
-func assertOwnExportEvents(t *testing.T, userId int64, n int) []record.AuditLog {
+func assertOwnExportEvents(t *testing.T, userID int64, n int) []record.AuditLog {
 	t.Helper()
 	var events []record.AuditLog
 	require.Eventually(t, func() bool {
-		events = ownExportEvents(t, userId)
+		events = ownExportEvents(t, userID)
 		return len(events) >= n
 	}, afterResponseWait, 100*time.Millisecond, "%d exported_own_user_data about the user", n)
 	time.Sleep(200 * time.Millisecond)
-	events = ownExportEvents(t, userId)
+	events = ownExportEvents(t, userID)
 	require.Len(t, events, n, "exported_own_user_data is written once for each download, and never for a refusal")
 	return events
 }
@@ -268,12 +268,12 @@ func TestAPIAccountExport_AFreshSignInDownloadsTheUsersOwnDocument(t *testing.T)
 	adminToken, _ := createAdminClientWithToken(t)
 	administratorToken, administrator := createUserAccessTokenWithScope(t, "openid authserver:manage-users authserver:manage-settings")
 	user := consoleSignInUser(t, "en")
-	signedIn := signInOn(t, createHttpClient(t), consoleSignInClient(t), user, nil, nil)
+	signedIn := signInOn(t, createHTTPClient(t), consoleSignInClient(t), user, nil, nil)
 	require.True(t, signedIn.askedPassword)
-	byAdministrator := enableUser(t, administratorToken, user.Id)
+	byAdministrator := enableUser(t, administratorToken, user.ID)
 	// The sign-in's own rows are in before either download, so the two list the same ones.
 	require.Eventually(t, func() bool {
-		rows, err := database.GetAuditLogsByUserId(context.Background(), nil, user.Id)
+		rows, err := database.GetAuditLogsByUserID(context.Background(), nil, user.ID)
 		require.NoError(t, err)
 		for _, row := range rows {
 			if row.AuditEvent == audit.EventTokenIssuedAuthorizationCodeResponse {
@@ -294,39 +294,39 @@ func TestAPIAccountExport_AFreshSignInDownloadsTheUsersOwnDocument(t *testing.T)
 	assert.Equal(t, strconv.Itoa(len(answer.raw)), answer.header.Get("Content-Length"))
 	var document struct {
 		ExportedAt  time.Time                         `json:"exportedAt"`
-		Identifiers struct{ Id int64 }                `json:"identifiers"`
+		Identifiers struct{ ID int64 }                `json:"identifiers"`
 		User        struct{ Email, GivenName string } `json:"user"`
 		AuditEvents []json.RawMessage                 `json:"auditEvents"`
 	}
 	require.NoError(t, json.Unmarshal(answer.document(t), &document))
 	assert.False(t, document.ExportedAt.Before(before.Truncate(time.Second)))
-	assert.Equal(t, user.Id, document.Identifiers.Id)
+	assert.Equal(t, user.ID, document.Identifiers.ID)
 	assert.Equal(t, user.Email, document.User.Email)
 	assert.Equal(t, "Dana", document.User.GivenName)
-	assert.Equal(t, fmt.Sprintf(`attachment; filename="user-%d-%s.json"`, user.Id, document.ExportedAt.UTC().Format("2006-01-02")),
+	assert.Equal(t, fmt.Sprintf(`attachment; filename="user-%d-%s.json"`, user.ID, document.ExportedAt.UTC().Format("2006-01-02")),
 		answer.header.Get("Content-Disposition"))
 
 	var marked []json.RawMessage
 	for _, raw := range document.AuditEvents {
-		var entry struct{ Id int64 }
+		var entry struct{ ID int64 }
 		require.NoError(t, json.Unmarshal(raw, &entry))
-		if entry.Id == byAdministrator.Id {
+		if entry.ID == byAdministrator.ID {
 			marked = append(marked, raw)
 		}
 	}
 	require.Len(t, marked, 1, "the administrator's change is in the user's copy")
-	assert.JSONEq(t, expectedAuditEvent(byAdministrator, fmt.Sprintf(`{"user_id":%d}`, user.Id), fmt.Sprint(user.Id), "null", true),
+	assert.JSONEq(t, expectedAuditEvent(byAdministrator, fmt.Sprintf(`{"user_id":%d}`, user.ID), fmt.Sprint(user.ID), "null", true),
 		string(marked[0]))
 	assert.NotContains(t, string(answer.document(t)), administrator.Subject, "the administrator is named nowhere")
 
-	events := assertOwnExportEvents(t, user.Id, 1)
+	events := assertOwnExportEvents(t, user.ID, 1)
 	assert.Equal(t, "exported_own_user_data", events[0].AuditEvent, "the stored event name")
-	assert.Equal(t, sql.NullInt64{Int64: user.Id, Valid: true}, events[0].UserId)
-	assert.Equal(t, sql.NullInt64{Int64: user.Id, Valid: true}, events[0].LoggedInUserId)
-	assert.JSONEq(t, fmt.Sprintf(`{"user_id": %d, "logged_in_user": %q}`, user.Id, user.Subject), events[0].Details)
-	assert.Empty(t, exportEvents(t, user.Id), "the user's own download is not exported_user_data")
+	assert.Equal(t, sql.NullInt64{Int64: user.ID, Valid: true}, events[0].UserID)
+	assert.Equal(t, sql.NullInt64{Int64: user.ID, Valid: true}, events[0].LoggedInUserID)
+	assert.JSONEq(t, fmt.Sprintf(`{"user_id": %d, "logged_in_user": %q}`, user.ID, user.Subject), events[0].Details)
+	assert.Empty(t, exportEvents(t, user.ID), "the user's own download is not exported_user_data")
 
-	adminAnswer := getUserExport(t, adminToken, user.Id, "gzip")
+	adminAnswer := getUserExport(t, adminToken, user.ID, "gzip")
 	require.Equal(t, http.StatusOK, adminAnswer.status, "%s", adminAnswer.raw)
 	for _, name := range []string{"Content-Type", "Content-Encoding", "Cache-Control", "Vary"} {
 		assert.Equal(t, adminAnswer.header.Values(name), answer.header.Values(name), name)
@@ -351,10 +351,10 @@ func TestAPIAccountExport_AnotherClientsTokenIsRefused(t *testing.T) {
 		assertExportErrorCode(t, answer, "CLIENT_NOT_ALLOWED")
 	}
 
-	console := signInOn(t, createHttpClient(t), consoleSignInClient(t), user, nil, nil)
+	console := signInOn(t, createHTTPClient(t), consoleSignInClient(t), user, nil, nil)
 	answer := getAccountExport(t, console.accessToken(t), "")
 	require.Equal(t, http.StatusOK, answer.status, "the refusals spent none of the user's downloads: %s", answer.raw)
-	assertOwnExportEvents(t, user.Id, 1)
+	assertOwnExportEvents(t, user.ID, 1)
 }
 
 // An old sign-in is refused with RFC 9470's challenge: the session's sign-in is moved an hour back,
@@ -366,10 +366,10 @@ func TestAPIAccountExport_AnOldSignInSignsInAgainWithTheCode(t *testing.T) {
 	requireDatabaseAuditLogs(t)
 	user := consoleSignInUser(t, "en")
 	secret := giveAuthenticator(t, user)
-	browser := createHttpClient(t)
+	browser := createHTTPClient(t)
 	first := signInOn(t, browser, consoleSignInClient(t), user, func() string { return otptest.PreviousStepCode(t, secret) }, nil)
 	require.True(t, first.askedPassword && first.askedCode, "a sign-in at the console asks for the code of a user with one")
-	ageSignIn(t, user.Id)
+	ageSignIn(t, user.ID)
 
 	old := signInOn(t, browser, consoleSignInClient(t), user, nil, nil)
 	require.False(t, old.askedPassword || old.askedCode, "the session signs the console in again with nothing asked")
@@ -387,7 +387,7 @@ func TestAPIAccountExport_AnOldSignInSignsInAgainWithTheCode(t *testing.T) {
 		answer := getAccountExport(t, again.accessToken(t), "")
 		require.Equal(t, http.StatusOK, answer.status, "download %d: the refusals spent none of the tier: %s", i+1, answer.raw)
 	}
-	assertOwnExportEvents(t, user.Id, 5)
+	assertOwnExportEvents(t, user.ID, 5)
 }
 
 // The console's prompt=login sign-in keeps the user's other apps signed in. Another client signed in
@@ -398,7 +398,7 @@ func TestAPIAccountExport_SigningInAgainKeepsTheOtherAppsSignedIn(t *testing.T) 
 	adminToken, _ := createAdminClientWithToken(t)
 	receiver := newLogoutReceiver(t)
 	otherClient := backchannelClient(t, adminToken, receiver.uri())
-	otherRedirect := &record.RedirectURI{ClientId: otherClient.Id, URI: "https://other-app.example.com/callback"}
+	otherRedirect := &record.RedirectURI{ClientID: otherClient.ID, URI: "https://other-app.example.com/callback"}
 	require.NoError(t, database.CreateRedirectURI(context.Background(), nil, otherRedirect))
 	otherSecret, err := dataCipher.Decrypt(otherClient.ClientSecretEncrypted)
 	require.NoError(t, err)
@@ -406,14 +406,14 @@ func TestAPIAccountExport_SigningInAgainKeepsTheOtherAppsSignedIn(t *testing.T) 
 		scope: "openid profile"}
 
 	user := consoleSignInUser(t, "en")
-	browser := createHttpClient(t)
+	browser := createHTTPClient(t)
 	signInOn(t, browser, consoleSignInClient(t), user, nil, nil)
 	otherSignIn := signInOn(t, browser, other, user, nil, nil)
 	require.False(t, otherSignIn.askedPassword, "the other app signs in through the session")
 	otherRefresh, ok := otherSignIn.tokens["refresh_token"].(string)
 	require.True(t, ok, "the other app holds a refresh token: %v", otherSignIn.tokens)
 	otherAccess := otherSignIn.accessToken(t)
-	before := ageSignIn(t, user.Id)
+	before := ageSignIn(t, user.ID)
 
 	old := signInOn(t, browser, consoleSignInClient(t), user, nil, nil)
 	assertStepUpRefusal(t, getAccountExport(t, old.accessToken(t), ""))
@@ -421,12 +421,12 @@ func TestAPIAccountExport_SigningInAgainKeepsTheOtherAppsSignedIn(t *testing.T) 
 	require.True(t, again.askedPassword)
 	require.Equal(t, http.StatusOK, getAccountExport(t, again.accessToken(t), "").status)
 
-	after := theSession(t, user.Id)
-	assert.Equal(t, before.Id, after.Id, "the session row is kept")
+	after := theSession(t, user.ID)
+	assert.Equal(t, before.ID, after.ID, "the session row is kept")
 	assert.Equal(t, before.SessionIdentifier, after.SessionIdentifier)
 	assert.WithinDuration(t, time.Now(), after.AuthTime, time.Minute, "the session's sign-in time is now")
 
-	refreshed := postToTokenEndpoint(t, createHttpClient(t), appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
+	refreshed := postToTokenEndpoint(t, createHTTPClient(t), appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
 		"grant_type":    {"refresh_token"},
 		"client_id":     {other.identifier},
 		"client_secret": {other.secret},
@@ -448,19 +448,19 @@ func TestAPIAccountExport_AConsoleAtLevel1StillAsksForTheCode(t *testing.T) {
 	ctx := context.Background()
 	console, err := database.GetClientByClientIdentifier(ctx, nil, builtin.AdminConsoleClientIdentifier)
 	require.NoError(t, err)
-	configured := console.DefaultAcrLevel
+	configured := console.DefaultACRLevel
 	t.Cleanup(func() {
 		restored, err := database.GetClientByClientIdentifier(ctx, nil, builtin.AdminConsoleClientIdentifier)
 		require.NoError(t, err)
-		restored.DefaultAcrLevel = configured
+		restored.DefaultACRLevel = configured
 		require.NoError(t, database.UpdateClient(ctx, nil, restored))
 	})
-	console.DefaultAcrLevel = record.AcrLevel1
+	console.DefaultACRLevel = record.ACRLevel1
 	require.NoError(t, database.UpdateClient(ctx, nil, console))
 
 	user := consoleSignInUser(t, "en")
 	secret := giveAuthenticator(t, user)
-	browser := createHttpClient(t)
+	browser := createHTTPClient(t)
 	weak := signInOn(t, browser, consoleSignInClient(t), user, nil, nil)
 	require.True(t, weak.askedPassword)
 	require.False(t, weak.askedCode, "a level 1 console asks for the password alone")
@@ -478,15 +478,15 @@ func TestAPIAccountExport_AConsoleAtLevel1StillAsksForTheCode(t *testing.T) {
 // still refused.
 func TestAPIAccountExport_ARefreshedTokenKeepsItsSignInsAge(t *testing.T) {
 	user := consoleSignInUser(t, "en")
-	browser := createHttpClient(t)
+	browser := createHTTPClient(t)
 	signInOn(t, browser, consoleSignInClient(t), user, nil, nil)
-	ageSignIn(t, user.Id)
+	ageSignIn(t, user.ID)
 	old := signInOn(t, browser, consoleSignInClient(t), user, nil, nil)
 	refreshToken, ok := old.tokens["refresh_token"].(string)
 	require.True(t, ok, "the console holds a refresh token: %v", old.tokens)
 	console := consoleSignInClient(t)
 
-	refreshed := postToTokenEndpoint(t, createHttpClient(t), appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
+	refreshed := postToTokenEndpoint(t, createHTTPClient(t), appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
 		"grant_type":    {"refresh_token"},
 		"client_id":     {console.identifier},
 		"client_secret": {console.secret},
@@ -504,7 +504,7 @@ func TestAPIAccountExport_ARefreshedTokenKeepsItsSignInsAge(t *testing.T) {
 func TestAPIAccountExport_TheSixthDownloadInAnHourIsRefused(t *testing.T) {
 	requireDatabaseAuditLogs(t)
 	user := consoleSignInUser(t, "en")
-	accessToken := signInOn(t, createHttpClient(t), consoleSignInClient(t), user, nil, nil).accessToken(t)
+	accessToken := signInOn(t, createHTTPClient(t), consoleSignInClient(t), user, nil, nil).accessToken(t)
 
 	for i := 0; i < 5; i++ {
 		answer := getAccountExport(t, accessToken, "")
@@ -517,5 +517,5 @@ func TestAPIAccountExport_TheSixthDownloadInAnHourIsRefused(t *testing.T) {
 	var refusal api.ErrorResponse
 	require.NoError(t, json.Unmarshal(answer.raw, &refusal))
 	assert.Equal(t, "TOO_MANY_REQUESTS", refusal.ErrorCode)
-	assertOwnExportEvents(t, user.Id, 5)
+	assertOwnExportEvents(t, user.ID, 5)
 }

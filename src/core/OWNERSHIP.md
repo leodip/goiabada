@@ -28,7 +28,7 @@ reference graph; three are asserted by a human and each of those needs a note.
 
 `own-package` is here because the table asks two questions at once — does the package belong in
 `core`, and does the symbol belong to the package — and they come apart for a package with
-behaviour. `sessionstore.SessionIdBytes` is the width the store mints an identifier at, inside a
+behaviour. `sessionstore.SessionIDBytes` is the width the store mints an identifier at, inside a
 store both processes depend on; asserting a word for it would record a judgement where the tree
 already has an answer. `reachable` is here for the same reason one step further out:
 `api.RedirectURIResponse` is the element type of `ClientResponse.RedirectURIs`, and outside its
@@ -396,9 +396,9 @@ command itself and fails on a tree it changed.
 | `core/guard` | `AssertSlogConvention` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `AssertStylingContract` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `AssertSymbolOwnership` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
-| `core/guard` | `AssertTemplatesHtmlLangNotHardcoded` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
+| `core/guard` | `AssertTemplatesHTMLLangNotHardcoded` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `AssertTemplatesNewTabLinksSaySo` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
-| `core/guard` | `AssertTemplatesNoCsrfField` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
+| `core/guard` | `AssertTemplatesNoCSRFField` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `AssertTemplatesNoHTMLInTitle` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `AssertWellFormedTemplates` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
 | `core/guard` | `ContextValueExemption` | test-support | Test support: compiled into no binary, and nothing outside `core/guard` names it in production. |
@@ -450,7 +450,7 @@ command itself and fails on a tree it changed.
 | `core/i18n` | `ErrCodeAddressLocalityTooLong` | both-apps | — |
 | `core/i18n` | `ErrCodeAddressPostalCodeTooLong` | both-apps | — |
 | `core/i18n` | `ErrCodeAddressRegionTooLong` | both-apps | — |
-| `core/i18n` | `ErrCodeAdminResourcePermissionsDescriptionHtmlNotAllowed` | both-apps | — |
+| `core/i18n` | `ErrCodeAdminResourcePermissionsDescriptionHTMLNotAllowed` | both-apps | — |
 | `core/i18n` | `ErrCodeAdminResourcePermissionsDescriptionTooLong` | both-apps | Catalog key of the permission description bound, which the admin console's permission form and the admin API's permission save both say (#559). |
 | `core/i18n` | `ErrCodeAdminResourcePermissionsIdentifierRequired` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
 | `core/i18n` | `ErrCodeAttributeKeyRequired` | both-apps | — |
@@ -514,12 +514,12 @@ command itself and fails on a tree it changed.
 | `core/i18n` | `ErrCodeClientBackchannelLogoutURISchemeInvalid` | both-apps | Catalog key of an admin API refusal whose `error_description` is written in the request's language (#559). |
 | `core/i18n` | `ErrCodeClientBackchannelLogoutURITooLong` | both-apps | Catalog key of an admin API refusal whose `error_description` is written in the request's language (#559). |
 | `core/i18n` | `ErrCodeClientBackchannelLogoutURIUserinfo` | both-apps | Catalog key of an admin API refusal whose `error_description` is written in the request's language (#559). |
-| `core/i18n` | `ErrCodeClientBrandIdRequired` | contract | Catalog key of an admin API refusal that answers it as its `error_code`, its `error_description` written in the request's language (#559). Only the auth server writes it, and it is a stable identifier because it is the refusal's wire `error_code`. |
+| `core/i18n` | `ErrCodeClientBrandIDRequired` | contract | Catalog key of an admin API refusal that answers it as its `error_code`, its `error_description` written in the request's language (#559). Only the auth server writes it, and it is a stable identifier because it is the refusal's wire `error_code`. |
 | `core/i18n` | `ErrCodeClientBrandNotFound` | contract | Catalog key of an admin API refusal that answers it as its `error_code`, its `error_description` written in the request's language (#559). Only the auth server writes it, and it is a stable identifier because it is the refusal's wire `error_code`. |
 | `core/i18n` | `ErrCodeClientDPoPAdminConsoleNotAllowed` | contract | Catalog key of an admin API refusal that answers it as its `error_code`, its `error_description` written in the request's language (#559). Only the auth server writes it, and it is a stable identifier because it is the refusal's wire `error_code`. |
 | `core/i18n` | `ErrCodeClientDPoPBoundAccessTokensRequired` | contract | Catalog key of an admin API refusal that answers it as its `error_code`, its `error_description` written in the request's language (#559). Only the auth server writes it, and it is a stable identifier because it is the refusal's wire `error_code`. |
-| `core/i18n` | `ErrCodeClientDefaultAcrInvalid` | both-apps | Catalog key of an admin API refusal whose `error_description` is written in the request's language (#559). |
-| `core/i18n` | `ErrCodeClientDefaultAcrNotApplicable` | both-apps | Catalog key of an admin API refusal whose `error_description` is written in the request's language (#559). |
+| `core/i18n` | `ErrCodeClientDefaultACRInvalid` | both-apps | Catalog key of an admin API refusal whose `error_description` is written in the request's language (#559). |
+| `core/i18n` | `ErrCodeClientDefaultACRNotApplicable` | both-apps | Catalog key of an admin API refusal whose `error_description` is written in the request's language (#559). |
 | `core/i18n` | `ErrCodeClientDescriptionTooLong` | both-apps | — |
 | `core/i18n` | `ErrCodeClientDisplayNameTooLong` | both-apps | Catalog key of an admin API refusal whose `error_description` is written in the request's language (#559). |
 | `core/i18n` | `ErrCodeClientIdentifierInUse` | both-apps | Catalog key of an admin API refusal whose `error_description` is written in the request's language (#559). |
@@ -554,7 +554,7 @@ command itself and fails on a tree it changed.
 | `core/i18n` | `ErrCodeClientTermsOfServiceURLSchemeInvalid` | both-apps | Catalog key of an admin API refusal whose `error_description` is written in the request's language (#559). |
 | `core/i18n` | `ErrCodeClientTermsOfServiceURLTooLong` | both-apps | Catalog key of an admin API refusal whose `error_description` is written in the request's language (#559). |
 | `core/i18n` | `ErrCodeClientTokensIncludeClaimsInAccessTokenInvalid` | contract | Catalog key of an admin API refusal that answers it as its `error_code`, its `error_description` written in the request's language (#559). Only the auth server writes it, and it is a stable identifier because it is the refusal's wire `error_code`. |
-| `core/i18n` | `ErrCodeClientTokensIncludeClaimsInIdTokenInvalid` | contract | Catalog key of an admin API refusal that answers it as its `error_code`, its `error_description` written in the request's language (#559). Only the auth server writes it, and it is a stable identifier because it is the refusal's wire `error_code`. |
+| `core/i18n` | `ErrCodeClientTokensIncludeClaimsInIDTokenInvalid` | contract | Catalog key of an admin API refusal that answers it as its `error_code`, its `error_description` written in the request's language (#559). Only the auth server writes it, and it is a stable identifier because it is the refusal's wire `error_code`. |
 | `core/i18n` | `ErrCodeClientTokensOfflineIdleTimeoutAboveMaxLifetime` | both-apps | Catalog key of an admin API refusal whose `error_description` is written in the request's language (#559). |
 | `core/i18n` | `ErrCodeClientTokensOfflineIdleTimeoutOutOfRange` | both-apps | Catalog key of an admin API refusal whose `error_description` is written in the request's language (#559). |
 | `core/i18n` | `ErrCodeClientTokensOfflineMaxLifetimeOutOfRange` | both-apps | Catalog key of an admin API refusal whose `error_description` is written in the request's language (#559). |
@@ -590,7 +590,7 @@ command itself and fails on a tree it changed.
 | `core/i18n` | `ErrCodeFontEmpty` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
 | `core/i18n` | `ErrCodeFontTooLarge` | both-apps | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
 | `core/i18n` | `ErrCodeFontUnsupportedType` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
-| `core/i18n` | `ErrCodeGroupAttributeGroupIdRequired` | contract | Catalog key of an admin API refusal that answers it as its `error_code`, its `error_description` written in the request's language (#559). Only the auth server writes it, and it is a stable identifier because it is the refusal's wire `error_code`. |
+| `core/i18n` | `ErrCodeGroupAttributeGroupIDRequired` | contract | Catalog key of an admin API refusal that answers it as its `error_code`, its `error_description` written in the request's language (#559). Only the auth server writes it, and it is a stable identifier because it is the refusal's wire `error_code`. |
 | `core/i18n` | `ErrCodeGroupDescriptionTooLong` | both-apps | Catalog key of an admin API refusal whose `error_description` is written in the request's language (#559). |
 | `core/i18n` | `ErrCodeGroupIdentifierInUse` | both-apps | Catalog key of an admin API refusal whose `error_description` is written in the request's language (#559). |
 | `core/i18n` | `ErrCodeGroupIdentifierRequired` | both-apps | Catalog key of an admin API refusal whose `error_description` is written in the request's language (#559). |
@@ -637,9 +637,9 @@ command itself and fails on a tree it changed.
 | `core/i18n` | `ErrCodeLoginAuthFailed` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
 | `core/i18n` | `ErrCodeLoginEmailRequired` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
 | `core/i18n` | `ErrCodeLoginPasswordRequired` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
-| `core/i18n` | `ErrCodeOtpAccountDisabled` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
-| `core/i18n` | `ErrCodeOtpCodeRequired` | both-apps | — |
-| `core/i18n` | `ErrCodeOtpIncorrectCode` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
+| `core/i18n` | `ErrCodeOTPAccountDisabled` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
+| `core/i18n` | `ErrCodeOTPCodeRequired` | both-apps | — |
+| `core/i18n` | `ErrCodeOTPIncorrectCode` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
 | `core/i18n` | `ErrCodePasswordLowercaseRequired` | both-apps | — |
 | `core/i18n` | `ErrCodePasswordNumberRequired` | both-apps | — |
 | `core/i18n` | `ErrCodePasswordSpecialCharRequired` | both-apps | — |
@@ -650,7 +650,7 @@ command itself and fails on a tree it changed.
 | `core/i18n` | `ErrCodePasswordUppercaseRequired` | both-apps | — |
 | `core/i18n` | `ErrCodePermissionBuiltInDeleted` | contract | Catalog key of an admin API refusal that answers it as its `error_code`, its `error_description` written in the request's language (#559). Only the auth server writes it, and it is a stable identifier because it is the refusal's wire `error_code`. |
 | `core/i18n` | `ErrCodePermissionBuiltInRenamed` | contract | Catalog key of an admin API refusal that answers it as its `error_code`, its `error_description` written in the request's language (#559). Only the auth server writes it, and it is a stable identifier because it is the refusal's wire `error_code`. |
-| `core/i18n` | `ErrCodePermissionDuplicateIds` | contract | Catalog key of an admin API refusal that answers it as its `error_code`, its `error_description` written in the request's language (#559). Only the auth server writes it, and it is a stable identifier because it is the refusal's wire `error_code`. |
+| `core/i18n` | `ErrCodePermissionDuplicateIDs` | contract | Catalog key of an admin API refusal that answers it as its `error_code`, its `error_description` written in the request's language (#559). Only the auth server writes it, and it is a stable identifier because it is the refusal's wire `error_code`. |
 | `core/i18n` | `ErrCodePermissionDuplicated` | contract | Catalog key of an admin API refusal that answers it as its `error_code`, its `error_description` written in the request's language (#559). Only the auth server writes it, and it is a stable identifier because it is the refusal's wire `error_code`. |
 | `core/i18n` | `ErrCodePermissionIdentifierInUse` | contract | Catalog key of an admin API refusal that answers it as its `error_code`, its `error_description` written in the request's language (#559). Only the auth server writes it, and it is a stable identifier because it is the refusal's wire `error_code`. |
 | `core/i18n` | `ErrCodePermissionIdentifierRequired` | contract | Catalog key of an admin API refusal that answers it as its `error_code`, its `error_description` written in the request's language (#559). Only the auth server writes it, and it is a stable identifier because it is the refusal's wire `error_code`. |
@@ -714,6 +714,7 @@ command itself and fails on a tree it changed.
 | `core/i18n` | `ErrCodeSettingsIssuerAngleBrackets` | both-apps | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
 | `core/i18n` | `ErrCodeSettingsKeysKeyNotFound` | contract | Catalog key of an admin API refusal that answers it as its `error_code`, its `error_description` written in the request's language (#559). Only the auth server writes it, and it is a stable identifier because it is the refusal's wire `error_code`. |
 | `core/i18n` | `ErrCodeSettingsKeysOnlyPreviousRevocable` | contract | Catalog key of an admin API refusal that answers it as its `error_code`, its `error_description` written in the request's language (#559). Only the auth server writes it, and it is a stable identifier because it is the refusal's wire `error_code`. |
+| `core/i18n` | `ErrCodeSettingsSMTPFromNameAngleBrackets` | both-apps | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
 | `core/i18n` | `ErrCodeSettingsSessionsIdleTimeoutAboveMaxLifetime` | both-apps | Catalog key of an admin API refusal whose `error_description` is written in the request's language (#559). |
 | `core/i18n` | `ErrCodeSettingsSessionsIdleTimeoutNotPositive` | both-apps | Catalog key of an admin API refusal whose `error_description` is written in the request's language (#559). |
 | `core/i18n` | `ErrCodeSettingsSessionsIdleTimeoutTooLarge` | both-apps | Catalog key of an admin API refusal whose `error_description` is written in the request's language (#559). |
@@ -723,7 +724,6 @@ command itself and fails on a tree it changed.
 | `core/i18n` | `ErrCodeSettingsSessionsMaxLifetimeTooLarge` | both-apps | Catalog key of an admin API refusal whose `error_description` is written in the request's language (#559). |
 | `core/i18n` | `ErrCodeSettingsSessionsMaxSessionsPerUserOutOfRange` | both-apps | Catalog key of an admin API refusal whose `error_description` is written in the request's language (#559). |
 | `core/i18n` | `ErrCodeSettingsSessionsMaxSessionsPerUserRequired` | both-apps | Catalog key of an admin API refusal whose `error_description` is written in the request's language (#559). |
-| `core/i18n` | `ErrCodeSettingsSmtpFromNameAngleBrackets` | both-apps | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
 | `core/i18n` | `ErrCodeSettingsTokensOfflineIdleTimeoutNotPositive` | both-apps | Catalog key of an admin API refusal whose `error_description` is written in the request's language (#559). |
 | `core/i18n` | `ErrCodeSettingsTokensOfflineIdleTimeoutTooLarge` | both-apps | Catalog key of an admin API refusal whose `error_description` is written in the request's language (#559). |
 | `core/i18n` | `ErrCodeSettingsTokensOfflineMaxLifetimeNotPositive` | both-apps | Catalog key of an admin API refusal whose `error_description` is written in the request's language (#559). |
@@ -817,9 +817,9 @@ command itself and fails on a tree it changed.
 | `core/oauth` | `ErrorDetail` | both-apps | — |
 | `core/oauth` | `GeneratePKCECodeChallenge` | both-apps | — |
 | `core/oauth` | `IsWellFormedSpaceDelimited` | kernel | — |
-| `core/oauth` | `Jwk` | both-apps | — |
-| `core/oauth` | `Jwks` | both-apps | — |
-| `core/oauth` | `JwtToken` | both-apps | — |
+| `core/oauth` | `JWK` | both-apps | — |
+| `core/oauth` | `JWKS` | both-apps | — |
+| `core/oauth` | `JWTToken` | both-apps | — |
 | `core/oauth` | `NewErrorDetail` | own-package | — |
 | `core/oauth` | `NewErrorDetailWithHTTPStatus` | both-apps | — |
 | `core/oauth` | `SplitSpaceDelimited` | kernel | — |
@@ -892,7 +892,7 @@ command itself and fails on a tree it changed.
 | `core/sessionstore` | `Refreshing` | contract | The middleware that makes a request activity on its browser session, so the first read of it touches a stale row and the session's cookie is sent again, a sign-in in progress's with its renewed 30 minutes and a signed-in session's as the store's KeepSignedIn answers, once the response's headers go out and only while the request wrote none of its own and the row still holds the contents the read found (#743). Only the auth server mounts it, on its page branch; it stays because the reissue seals the identifier and sets the cookie with the keys and codec this package keeps private, and because the rule it switches, that a persistent-cookie store touches only where it can send the cookie, is the store's own. |
 | `core/sessionstore` | `ServerSideStore` | own-package | — |
 | `core/sessionstore` | `Session` | both-apps | — |
-| `core/sessionstore` | `SessionIdBytes` | own-package | — |
+| `core/sessionstore` | `SessionIDBytes` | own-package | — |
 | `core/sessionstore` | `Store` | kernel | — |
 | `core/sessionstore` | `TouchThreshold` | own-package | — |
 | `core/sessionstore/sessiontest` | `KeepEverySignedInSession` | test-support | Test support: the `KeepSignedIn` rule under Always, for the tests across the two servers that build the auth server's kind of store for something other than the setting (#743). Its own package precisely so no binary links it (#385). |
@@ -909,5 +909,5 @@ command itself and fails on a tree it changed.
 | `core/stylingcontract` | `Server` | test-support | Test support: no binary names it, and both servers' template guards read the styling contract's lists for their pages through it. |
 | `core/stylingcontract` | `Variables` | test-support | Test support: no binary names it, and both servers' template guards read the styling contract's lists for their pages through it. |
 | `core/timezones` | `All` | contract | The list half of the time zone table whose lookup the auth server validates against. Moving it would put one zone table in two places. |
-| `core/timezones` | `ByZone` | contract | The lookup half of the time zone table whose list the admin console renders. Moving it would put one zone table in two places. |
+| `core/timezones` | `ByName` | contract | The lookup half of the time zone table whose list the admin console renders. Moving it would put one zone table in two places. |
 | `core/timezones` | `Zone` | contract | The row type both halves of the table share. |

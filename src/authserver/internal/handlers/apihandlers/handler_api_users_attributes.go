@@ -23,10 +23,10 @@ import (
 type usersAttributesDatabase interface {
 	userTargetPolicyDatabase
 	CreateUserAttribute(ctx context.Context, tx *sql.Tx, userAttribute *record.UserAttribute) error
-	DeleteUserAttribute(ctx context.Context, tx *sql.Tx, userAttributeId int64) error
-	GetUserAttributeById(ctx context.Context, tx *sql.Tx, userAttributeId int64) (*record.UserAttribute, error)
-	GetUserAttributesByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserAttribute, error)
-	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	DeleteUserAttribute(ctx context.Context, tx *sql.Tx, userAttributeID int64) error
+	GetUserAttributeByID(ctx context.Context, tx *sql.Tx, userAttributeID int64) (*record.UserAttribute, error)
+	GetUserAttributesByUserID(ctx context.Context, tx *sql.Tx, userID int64) ([]record.UserAttribute, error)
+	GetUserByID(ctx context.Context, tx *sql.Tx, userID int64) (*record.User, error)
 	UpdateUserAttribute(ctx context.Context, tx *sql.Tx, userAttribute *record.UserAttribute) error
 }
 
@@ -38,20 +38,20 @@ func HandleUserAttributesGet(
 		// Authentication and authorization handled by middleware
 
 		// Get user ID from URL parameter
-		userIdStr := r.PathValue("id")
-		if userIdStr == "" {
+		userIDStr := r.PathValue("id")
+		if userIDStr == "" {
 			writeJSONError(w, "User ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
-		userId, err := strconv.ParseInt(userIdStr, 10, 64)
+		userID, err := strconv.ParseInt(userIDStr, 10, 64)
 		if err != nil {
 			writeJSONError(w, "Invalid user ID", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
 		// Check if user exists
-		user, err := database.GetUserById(r.Context(), nil, userId)
+		user, err := database.GetUserByID(r.Context(), nil, userID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -62,7 +62,7 @@ func HandleUserAttributesGet(
 		}
 
 		// Get user attributes
-		attributes, err := database.GetUserAttributesByUserId(r.Context(), nil, userId)
+		attributes, err := database.GetUserAttributesByUserID(r.Context(), nil, userID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -86,20 +86,20 @@ func HandleUserAttributeGet(
 		// Authentication and authorization handled by middleware
 
 		// Get attribute ID from URL parameter
-		attributeIdStr := r.PathValue("id")
-		if attributeIdStr == "" {
+		attributeIDStr := r.PathValue("id")
+		if attributeIDStr == "" {
 			writeJSONError(w, "Attribute ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
-		attributeId, err := strconv.ParseInt(attributeIdStr, 10, 64)
+		attributeID, err := strconv.ParseInt(attributeIDStr, 10, 64)
 		if err != nil {
 			writeJSONError(w, "Invalid attribute ID", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
 		// Get user attribute from database
-		attribute, err := database.GetUserAttributeById(r.Context(), nil, attributeId)
+		attribute, err := database.GetUserAttributeByID(r.Context(), nil, attributeID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -142,7 +142,7 @@ func HandleUserAttributeCreatePost(
 		}
 
 		// Validate user exists
-		user, err := database.GetUserById(r.Context(), nil, req.UserId)
+		user, err := database.GetUserByID(r.Context(), nil, req.UserID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -172,7 +172,7 @@ func HandleUserAttributeCreatePost(
 		}
 
 		// Only authserver:manage writes to an administrator (#402 decision 1).
-		if !userTargetCeilingAllows(w, r, database, auditLogger, user.Id) {
+		if !userTargetCeilingAllows(w, r, database, auditLogger, user.ID) {
 			return
 		}
 
@@ -181,8 +181,8 @@ func HandleUserAttributeCreatePost(
 			Key:                  req.Key,
 			Value:                req.Value,
 			IncludeInAccessToken: req.IncludeInAccessToken,
-			IncludeInIdToken:     req.IncludeInIdToken,
-			UserId:               req.UserId,
+			IncludeInIDToken:     req.IncludeInIDToken,
+			UserID:               req.UserID,
 		}
 
 		err = database.CreateUserAttribute(r.Context(), nil, userAttribute)
@@ -200,8 +200,8 @@ func HandleUserAttributeCreatePost(
 
 		// Log audit event
 		auditLogger.Log(r.Context(), audit.EventAddedUserAttribute, map[string]interface{}{
-			"user_id":           user.Id,
-			"user_attribute_id": userAttribute.Id,
+			"user_id":           user.ID,
+			"user_attribute_id": userAttribute.ID,
 			"logged_in_user":    loggedInUser,
 		})
 
@@ -225,13 +225,13 @@ func HandleUserAttributeUpdatePut(
 		// Authentication and authorization handled by middleware
 
 		// Get attribute ID from URL parameter
-		attributeIdStr := r.PathValue("id")
-		if attributeIdStr == "" {
+		attributeIDStr := r.PathValue("id")
+		if attributeIDStr == "" {
 			writeJSONError(w, "Attribute ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
-		attributeId, err := strconv.ParseInt(attributeIdStr, 10, 64)
+		attributeID, err := strconv.ParseInt(attributeIDStr, 10, 64)
 		if err != nil {
 			writeJSONError(w, "Invalid attribute ID", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
@@ -245,7 +245,7 @@ func HandleUserAttributeUpdatePut(
 		}
 
 		// Get existing attribute
-		attribute, err := database.GetUserAttributeById(r.Context(), nil, attributeId)
+		attribute, err := database.GetUserAttributeByID(r.Context(), nil, attributeID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -284,10 +284,10 @@ func HandleUserAttributeUpdatePut(
 		attribute.Key = req.Key
 		attribute.Value = req.Value
 		attribute.IncludeInAccessToken = req.IncludeInAccessToken
-		attribute.IncludeInIdToken = req.IncludeInIdToken
+		attribute.IncludeInIDToken = req.IncludeInIDToken
 
 		// Only authserver:manage writes to an administrator (#402 decision 1).
-		if !userTargetCeilingAllows(w, r, database, auditLogger, attribute.UserId) {
+		if !userTargetCeilingAllows(w, r, database, auditLogger, attribute.UserID) {
 			return
 		}
 
@@ -307,8 +307,8 @@ func HandleUserAttributeUpdatePut(
 
 		// Log audit event
 		auditLogger.Log(r.Context(), audit.EventUpdatedUserAttribute, map[string]interface{}{
-			"user_id":           attribute.UserId,
-			"user_attribute_id": attribute.Id,
+			"user_id":           attribute.UserID,
+			"user_attribute_id": attribute.ID,
 			"logged_in_user":    loggedInUser,
 		})
 
@@ -331,20 +331,20 @@ func HandleUserAttributeDelete(
 		// Authentication and authorization handled by middleware
 
 		// Get attribute ID from URL parameter
-		attributeIdStr := r.PathValue("id")
-		if attributeIdStr == "" {
+		attributeIDStr := r.PathValue("id")
+		if attributeIDStr == "" {
 			writeJSONError(w, "Attribute ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
-		attributeId, err := strconv.ParseInt(attributeIdStr, 10, 64)
+		attributeID, err := strconv.ParseInt(attributeIDStr, 10, 64)
 		if err != nil {
 			writeJSONError(w, "Invalid attribute ID", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
 		// Check if attribute exists before deleting
-		attribute, err := database.GetUserAttributeById(r.Context(), nil, attributeId)
+		attribute, err := database.GetUserAttributeByID(r.Context(), nil, attributeID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -355,12 +355,12 @@ func HandleUserAttributeDelete(
 		}
 
 		// Only authserver:manage writes to an administrator (#402 decision 1).
-		if !userTargetCeilingAllows(w, r, database, auditLogger, attribute.UserId) {
+		if !userTargetCeilingAllows(w, r, database, auditLogger, attribute.UserID) {
 			return
 		}
 
 		// Delete attribute from database
-		err = database.DeleteUserAttribute(r.Context(), nil, attributeId)
+		err = database.DeleteUserAttribute(r.Context(), nil, attributeID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -375,8 +375,8 @@ func HandleUserAttributeDelete(
 
 		// Log audit event
 		auditLogger.Log(r.Context(), audit.EventDeleteUserAttribute, map[string]interface{}{
-			"user_id":           attribute.UserId,
-			"user_attribute_id": attributeId,
+			"user_id":           attribute.UserID,
+			"user_attribute_id": attributeID,
 			"logged_in_user":    loggedInUser,
 		})
 

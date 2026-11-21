@@ -69,8 +69,8 @@ type consentReader struct {
 	reads      atomic.Int32
 }
 
-func (c *consentReader) GetConsentByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (*record.UserConsent, error) {
-	consent, err := c.Database.GetConsentByUserIdAndClientId(ctx, tx, userId, clientId)
+func (c *consentReader) GetConsentByUserIDAndClientID(ctx context.Context, tx *sql.Tx, userID int64, clientID int64) (*record.UserConsent, error) {
+	consent, err := c.Database.GetConsentByUserIDAndClientID(ctx, tx, userID, clientID)
 	c.reads.Add(1)
 	c.rendezvous.meet()
 	return consent, err
@@ -92,14 +92,14 @@ func (s *sessionReader) UserSessionLoadClients(ctx context.Context, tx *sql.Tx, 
 }
 
 // consentsOf is the rows a user holds for one client, read through the data layer.
-func consentsOf(t *testing.T, userId, clientId int64) []record.UserConsent {
+func consentsOf(t *testing.T, userID, clientID int64) []record.UserConsent {
 	t.Helper()
 
-	all, err := database.GetConsentsByUserId(context.Background(), nil, userId)
+	all, err := database.GetConsentsByUserID(context.Background(), nil, userID)
 	require.NoError(t, err)
 	var pair []record.UserConsent
 	for _, consent := range all {
-		if consent.ClientId == clientId {
+		if consent.ClientID == clientID {
 			pair = append(pair, consent)
 		}
 	}
@@ -107,7 +107,7 @@ func consentsOf(t *testing.T, userId, clientId int64) []record.UserConsent {
 }
 
 // associationsOf is the session's associations for one client.
-func associationsOf(t *testing.T, sessionIdentifier string, clientId int64) (pair []record.UserSessionClient, all []record.UserSessionClient) {
+func associationsOf(t *testing.T, sessionIdentifier string, clientID int64) (pair []record.UserSessionClient, all []record.UserSessionClient) {
 	t.Helper()
 
 	session, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, sessionIdentifier)
@@ -115,7 +115,7 @@ func associationsOf(t *testing.T, sessionIdentifier string, clientId int64) (pai
 	require.NotNil(t, session)
 	require.NoError(t, database.UserSessionLoadClients(context.Background(), nil, session))
 	for _, association := range session.Clients {
-		if association.ClientId == clientId {
+		if association.ClientID == clientID {
 			pair = append(pair, association)
 		}
 	}
@@ -129,14 +129,14 @@ func TestUserConsentRecord_ASecondSaveRewritesTheRowAndRefreshesItsDate(t *testi
 	user := createTestUser(t)
 	client := createTestClient(t)
 
-	first, err := userconsent.Record(ctx, database, user.Id, client.Id, "openid profile email")
+	first, err := userconsent.Record(ctx, database, user.ID, client.ID, "openid profile email")
 	require.NoError(t, err)
 	time.Sleep(10 * time.Millisecond) // a later instant than the first save, at every engine's resolution
-	second, err := userconsent.Record(ctx, database, user.Id, client.Id, "openid")
+	second, err := userconsent.Record(ctx, database, user.ID, client.ID, "openid")
 	require.NoError(t, err)
 
-	assert.Equal(t, first.Id, second.Id, "the second save rewrote the row, it did not add one")
-	rows := consentsOf(t, user.Id, client.Id)
+	assert.Equal(t, first.ID, second.ID, "the second save rewrote the row, it did not add one")
+	rows := consentsOf(t, user.ID, client.ID)
 	require.Len(t, rows, 1, "one row for the pair")
 	assert.Equal(t, "openid", rows[0].Scope, "the scope is what the second save ticked, not appended to the first's")
 	require.True(t, rows[0].GrantedAt.Valid)
@@ -168,7 +168,7 @@ func TestUserConsentRecord_TwoSavesThatOverlapBothSucceedAndLeaveOneRow(t *testi
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				outcomes[i].consent, outcomes[i].err = userconsent.Record(ctx, callers[i], user.Id, client.Id, scopes[i])
+				outcomes[i].consent, outcomes[i].err = userconsent.Record(ctx, callers[i], user.ID, client.ID, scopes[i])
 			}()
 		}
 		wg.Wait()
@@ -178,7 +178,7 @@ func TestUserConsentRecord_TwoSavesThatOverlapBothSucceedAndLeaveOneRow(t *testi
 			require.NoErrorf(t, o.err, "round %d: caller %d succeeds, a loser on the key is rerun", round, i)
 			require.NotNilf(t, o.consent, "round %d: caller %d is handed the row it saved", round, i)
 		}
-		rows := consentsOf(t, user.Id, client.Id)
+		rows := consentsOf(t, user.ID, client.ID)
 		require.Lenf(t, rows, 1, "round %d: the pair has one row however the two saves overlapped", round)
 
 		reads := [2]int32{callers[0].reads.Load(), callers[1].reads.Load()}
@@ -192,8 +192,8 @@ func TestUserConsentRecord_TwoSavesThatOverlapBothSucceedAndLeaveOneRow(t *testi
 			require.Failf(t, "the reruns were not the lost key's", "round %d: reads per caller were %v, and one caller reading twice is the lost key", round, reads)
 		}
 		assert.Equalf(t, scopes[loser], rows[0].Scope, "round %d: the loser reran after the winner committed, so the last writer's scope is the one that stays", round)
-		assert.Equalf(t, rows[0].Id, outcomes[0].consent.Id, "round %d: both callers saved the one row", round)
-		assert.Equalf(t, rows[0].Id, outcomes[1].consent.Id, "round %d: both callers saved the one row", round)
+		assert.Equalf(t, rows[0].ID, outcomes[0].consent.ID, "round %d: both callers saved the one row", round)
+		assert.Equalf(t, rows[0].ID, outcomes[1].consent.ID, "round %d: both callers saved the one row", round)
 	}
 }
 
@@ -204,21 +204,21 @@ func TestBumpUserSession_ASecondBumpForTheSameClientUpdatesItsAssociation(t *tes
 	user := createTestUser(t)
 	held := createTestClient(t)
 	added := createTestClient(t)
-	session := createTestUserSessionWithClient(t, user.Id, held.Id)
+	session := createTestUserSessionWithClient(t, user.ID, held.ID)
 	manager := usersession.NewManager(database)
 
-	_, err := manager.BumpUserSession(ctx, session.SessionIdentifier, added.Id, "pwd", record.AcrLevel1, "")
+	_, err := manager.BumpUserSession(ctx, session.SessionIdentifier, added.ID, "pwd", record.ACRLevel1, "")
 	require.NoError(t, err)
-	pair, all := associationsOf(t, session.SessionIdentifier, added.Id)
+	pair, all := associationsOf(t, session.SessionIdentifier, added.ID)
 	require.Len(t, pair, 1, "the first bump added the client")
 	require.Len(t, all, 2)
 	firstAccessed := pair[0].LastAccessed
 
 	time.Sleep(10 * time.Millisecond)
-	_, err = manager.BumpUserSession(ctx, session.SessionIdentifier, added.Id, "pwd", record.AcrLevel1, "")
+	_, err = manager.BumpUserSession(ctx, session.SessionIdentifier, added.ID, "pwd", record.ACRLevel1, "")
 	require.NoError(t, err)
 
-	pair, all = associationsOf(t, session.SessionIdentifier, added.Id)
+	pair, all = associationsOf(t, session.SessionIdentifier, added.ID)
 	require.Len(t, pair, 1, "the second bump found the association and updated it")
 	require.Len(t, all, 2, "and added nothing")
 	assert.Truef(t, pair[0].LastAccessed.After(firstAccessed), "last_accessed moved on: %v after %v", pair[0].LastAccessed, firstAccessed)
@@ -239,7 +239,7 @@ func TestBumpUserSession_TwoBumpsThatOverlapQueueOnTheSessionAndLeaveOnePair(t *
 	user := createTestUser(t)
 	held := createTestClient(t)
 	added := createTestClient(t)
-	session := createTestUserSessionWithClient(t, user.Id, held.Id)
+	session := createTestUserSessionWithClient(t, user.ID, held.ID)
 
 	holder, err := database.BeginTransaction(ctx)
 	require.NoError(t, err)
@@ -258,7 +258,7 @@ func TestBumpUserSession_TwoBumpsThatOverlapQueueOnTheSessionAndLeaveOnePair(t *
 		bumps[i] = goBlocked(t, fmt.Sprintf("bump %d", i), holder, func(reached func()) error {
 			reached()
 			_, bumpErr := usersession.NewManager(callers[i]).
-				BumpUserSession(ctx, session.SessionIdentifier, added.Id, "pwd", record.AcrLevel1, "")
+				BumpUserSession(ctx, session.SessionIdentifier, added.ID, "pwd", record.ACRLevel1, "")
 			return bumpErr
 		})
 	}
@@ -270,7 +270,7 @@ func TestBumpUserSession_TwoBumpsThatOverlapQueueOnTheSessionAndLeaveOnePair(t *
 		require.NoErrorf(t, bump.await(t), "bump %d succeeds", i)
 	}
 
-	pair, all := associationsOf(t, session.SessionIdentifier, added.Id)
+	pair, all := associationsOf(t, session.SessionIdentifier, added.ID)
 	require.Len(t, pair, 1, "the session holds the client once")
 	assert.Len(t, all, 2, "the client it already held, and the one the bumps added")
 	assert.Equal(t, [2]int32{1, 1}, [2]int32{callers[0].reads.Load(), callers[1].reads.Load()},

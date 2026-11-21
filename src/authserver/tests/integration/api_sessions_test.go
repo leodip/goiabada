@@ -35,16 +35,16 @@ func sessionEndpointURL(operation string) string {
 	return appConfig.AuthServer.BaseURL + "/api/v1/sessions/" + operation
 }
 
-// newTestSessionId mints an identifier the way the store does, so the fixtures below hash
+// newTestSessionID mints an identifier the way the store does, so the fixtures below hash
 // the same shape of value the endpoint will be handed.
-func newTestSessionId(t *testing.T) string {
+func newTestSessionID(t *testing.T) string {
 	buf := make([]byte, 32)
 	_, err := rand.Read(buf)
 	require.NoError(t, err)
 	return hex.EncodeToString(buf)
 }
 
-func hashTestSessionId(id string) string {
+func hashTestSessionID(id string) string {
 	sum := sha256.Sum256([]byte(id))
 	return hex.EncodeToString(sum[:])
 }
@@ -54,8 +54,8 @@ func hashTestSessionId(id string) string {
 func createBrowserSessionFixture(t *testing.T, owner, id string, expiresAt time.Time) {
 	err := database.CreateBrowserSession(context.Background(), nil, &record.BrowserSession{
 		Owner:         owner,
-		SessionId:     id,
-		SessionIdHash: hashTestSessionId(id),
+		SessionID:     id,
+		SessionIDHash: hashTestSessionID(id),
 		Data:          "fixture-ciphertext",
 		LastAccessed:  time.Now().UTC(),
 		ExpiresAt:     expiresAt,
@@ -73,7 +73,7 @@ func postSessionEndpointNoToken(t *testing.T, operation string, body interface{}
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := createHttpClient(t).Do(req)
+	resp, err := createHTTPClient(t).Do(req)
 	require.NoError(t, err)
 	return resp
 }
@@ -82,7 +82,7 @@ func postSessionEndpointNoToken(t *testing.T, operation string, body interface{}
 // anonymous caller gets nothing from any of the five operations.
 func TestAPISessions_NoTokenIsUnauthorized(t *testing.T) {
 	for _, operation := range []string{"load", "create", "update", "touch", "delete"} {
-		resp := postSessionEndpointNoToken(t, operation, api.SessionLoadRequest{Id: newTestSessionId(t)})
+		resp := postSessionEndpointNoToken(t, operation, api.SessionLoadRequest{ID: newTestSessionID(t)})
 		func() {
 			defer func() { _ = resp.Body.Close() }()
 			assert.Equal(t, http.StatusUnauthorized, resp.StatusCode, "operation %s", operation)
@@ -96,12 +96,12 @@ func TestAPISessions_NoTokenIsUnauthorized(t *testing.T) {
 func TestAPISessions_WrongScopeIsForbidden(t *testing.T) {
 	accessToken, client := createClientWithGranularScope(t, builtin.AdminReadPermissionIdentifier)
 	defer func() {
-		_ = database.DeleteClient(context.Background(), nil, client.Id)
+		_ = database.DeleteClient(context.Background(), nil, client.ID)
 	}()
 
 	for _, operation := range []string{"load", "create", "update", "touch", "delete"} {
 		resp := makeAPIRequest(t, "POST", sessionEndpointURL(operation), accessToken,
-			api.SessionLoadRequest{Id: newTestSessionId(t)})
+			api.SessionLoadRequest{ID: newTestSessionID(t)})
 		func() {
 			defer func() { _ = resp.Body.Close() }()
 			assert.Equal(t, http.StatusForbidden, resp.StatusCode, "operation %s", operation)
@@ -114,19 +114,19 @@ func TestAPISessions_WrongScopeIsForbidden(t *testing.T) {
 func TestAPISessions_RoundTrip(t *testing.T) {
 	accessToken, client := createClientWithGranularScope(t, builtin.BrowserSessionsPermissionIdentifier)
 	defer func() {
-		_ = database.DeleteClient(context.Background(), nil, client.Id)
+		_ = database.DeleteClient(context.Background(), nil, client.ID)
 	}()
 
-	id := newTestSessionId(t)
+	id := newTestSessionID(t)
 	defer func() {
-		_ = database.DeleteBrowserSession(context.Background(), nil, builtin.AdminConsoleSessionName, hashTestSessionId(id))
+		_ = database.DeleteBrowserSession(context.Background(), nil, builtin.AdminConsoleSessionName, hashTestSessionID(id))
 	}()
 
 	// Create. An unauthenticated session gets the flat pre-authentication lifetime, which
 	// is far shorter than the deployment's idle timeout, so the two phases are told apart
 	// by the deadline the endpoint chose rather than by reading anything.
 	created := postSession(t, accessToken, "create", api.SessionWriteRequest{
-		Id:   id,
+		ID:   id,
 		Data: "first-ciphertext",
 	})
 	var createdBody api.SessionWriteResponse
@@ -134,7 +134,7 @@ func TestAPISessions_RoundTrip(t *testing.T) {
 	assert.WithinDuration(t, time.Now().UTC().Add(30*time.Minute), createdBody.ExpiresAt, time.Minute)
 
 	// Load returns what was stored, with both timestamps.
-	loaded := postSession(t, accessToken, "load", api.SessionLoadRequest{Id: id})
+	loaded := postSession(t, accessToken, "load", api.SessionLoadRequest{ID: id})
 	var loadedBody api.SessionLoadResponse
 	decodeSessionBody(t, loaded, http.StatusOK, &loadedBody)
 	assert.Equal(t, "first-ciphertext", loadedBody.Data)
@@ -142,7 +142,7 @@ func TestAPISessions_RoundTrip(t *testing.T) {
 	assert.WithinDuration(t, createdBody.ExpiresAt, loadedBody.ExpiresAt, time.Second)
 
 	// Touch records the session was used and keeps it alive.
-	touched := postSession(t, accessToken, "touch", api.SessionTouchRequest{Id: id})
+	touched := postSession(t, accessToken, "touch", api.SessionTouchRequest{ID: id})
 	var touchedBody api.SessionWriteResponse
 	decodeSessionBody(t, touched, http.StatusOK, &touchedBody)
 	assert.True(t, touchedBody.ExpiresAt.After(time.Now().UTC()))
@@ -152,7 +152,7 @@ func TestAPISessions_RoundTrip(t *testing.T) {
 	// console cannot read the deployment's session settings, so it says what kind of
 	// session it is holding and the auth server says how long that kind lives.
 	updated := postSession(t, accessToken, "update", api.SessionWriteRequest{
-		Id:            id,
+		ID:            id,
 		Data:          "second-ciphertext",
 		Authenticated: true,
 	})
@@ -161,7 +161,7 @@ func TestAPISessions_RoundTrip(t *testing.T) {
 
 	// Read the settings rather than assuming the defaults: other tests in this package
 	// write them, and the claim is that the endpoint follows whatever they say.
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
+	settings, err := database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err)
 	expectedExpiry := time.Now().UTC().Add(time.Duration(settings.UserSessionIdleTimeoutInSeconds) * time.Second)
 	if absolute := time.Now().UTC().Add(time.Duration(settings.UserSessionMaxLifetimeInSeconds) * time.Second); absolute.Before(expectedExpiry) {
@@ -169,17 +169,17 @@ func TestAPISessions_RoundTrip(t *testing.T) {
 	}
 	assert.WithinDuration(t, expectedExpiry, updatedBody.ExpiresAt, time.Minute)
 
-	reloaded := postSession(t, accessToken, "load", api.SessionLoadRequest{Id: id})
+	reloaded := postSession(t, accessToken, "load", api.SessionLoadRequest{ID: id})
 	var reloadedBody api.SessionLoadResponse
 	decodeSessionBody(t, reloaded, http.StatusOK, &reloadedBody)
 	assert.Equal(t, "second-ciphertext", reloadedBody.Data)
 
 	// Delete, then the session is gone rather than empty.
-	deleted := postSession(t, accessToken, "delete", api.SessionLoadRequest{Id: id})
+	deleted := postSession(t, accessToken, "delete", api.SessionLoadRequest{ID: id})
 	defer func() { _ = deleted.Body.Close() }()
 	assert.Equal(t, http.StatusNoContent, deleted.StatusCode)
 
-	gone := postSession(t, accessToken, "load", api.SessionLoadRequest{Id: id})
+	gone := postSession(t, accessToken, "load", api.SessionLoadRequest{ID: id})
 	defer func() { _ = gone.Body.Close() }()
 	assert.Equal(t, http.StatusNotFound, gone.StatusCode)
 }
@@ -191,17 +191,17 @@ func TestAPISessions_RoundTrip(t *testing.T) {
 func TestAPISessions_ExpiredSessionIsNotFound(t *testing.T) {
 	accessToken, client := createClientWithGranularScope(t, builtin.BrowserSessionsPermissionIdentifier)
 	defer func() {
-		_ = database.DeleteClient(context.Background(), nil, client.Id)
+		_ = database.DeleteClient(context.Background(), nil, client.ID)
 	}()
 
-	id := newTestSessionId(t)
+	id := newTestSessionID(t)
 	createBrowserSessionFixture(t, builtin.AdminConsoleSessionName, id, time.Now().UTC().Add(-time.Minute))
 	defer func() {
-		_ = database.DeleteBrowserSession(context.Background(), nil, builtin.AdminConsoleSessionName, hashTestSessionId(id))
+		_ = database.DeleteBrowserSession(context.Background(), nil, builtin.AdminConsoleSessionName, hashTestSessionID(id))
 	}()
 
 	for _, operation := range []string{"load", "update", "touch"} {
-		resp := postSession(t, accessToken, operation, api.SessionWriteRequest{Id: id, Data: "x"})
+		resp := postSession(t, accessToken, operation, api.SessionWriteRequest{ID: id, Data: "x"})
 		func() {
 			defer func() { _ = resp.Body.Close() }()
 			assert.Equal(t, http.StatusNotFound, resp.StatusCode, "operation %s", operation)
@@ -215,18 +215,18 @@ func TestAPISessions_ExpiredSessionIsNotFound(t *testing.T) {
 func TestAPISessions_AuthServerSessionIsNotFound(t *testing.T) {
 	accessToken, client := createClientWithGranularScope(t, builtin.BrowserSessionsPermissionIdentifier)
 	defer func() {
-		_ = database.DeleteClient(context.Background(), nil, client.Id)
+		_ = database.DeleteClient(context.Background(), nil, client.ID)
 	}()
 
-	id := newTestSessionId(t)
+	id := newTestSessionID(t)
 	createBrowserSessionFixture(t, sessionkeys.AuthServerSessionName, id, time.Now().UTC().Add(time.Hour))
 	defer func() {
-		_ = database.DeleteBrowserSession(context.Background(), nil, sessionkeys.AuthServerSessionName, hashTestSessionId(id))
+		_ = database.DeleteBrowserSession(context.Background(), nil, sessionkeys.AuthServerSessionName, hashTestSessionID(id))
 	}()
 
 	// The row is live and the identifier is correct. Only the owner differs.
 	for _, operation := range []string{"load", "update", "touch"} {
-		resp := postSession(t, accessToken, operation, api.SessionWriteRequest{Id: id, Data: "x"})
+		resp := postSession(t, accessToken, operation, api.SessionWriteRequest{ID: id, Data: "x"})
 		func() {
 			defer func() { _ = resp.Body.Close() }()
 			assert.Equal(t, http.StatusNotFound, resp.StatusCode, "operation %s", operation)
@@ -236,12 +236,12 @@ func TestAPISessions_AuthServerSessionIsNotFound(t *testing.T) {
 	// Delete answers 204 whether or not a row was there, so the isolation it needs is
 	// that the auth server's row SURVIVES it. That is the one place the row itself is the
 	// only available evidence.
-	deleted := postSession(t, accessToken, "delete", api.SessionLoadRequest{Id: id})
+	deleted := postSession(t, accessToken, "delete", api.SessionLoadRequest{ID: id})
 	defer func() { _ = deleted.Body.Close() }()
 	assert.Equal(t, http.StatusNoContent, deleted.StatusCode)
 
-	survivor, err := database.GetBrowserSessionByOwnerAndSessionIdHash(context.Background(), nil,
-		sessionkeys.AuthServerSessionName, hashTestSessionId(id), time.Now().UTC())
+	survivor, err := database.GetBrowserSessionByOwnerAndSessionIDHash(context.Background(), nil,
+		sessionkeys.AuthServerSessionName, hashTestSessionID(id), time.Now().UTC())
 	require.NoError(t, err)
 	assert.NotNil(t, survivor, "deleting through the admin console's endpoint must not reach an auth server session")
 }
@@ -250,15 +250,15 @@ func TestAPISessions_AuthServerSessionIsNotFound(t *testing.T) {
 // sites: the browser obtains a real auth server session, then the narrowly scoped session
 // endpoint must still be unable to load its identifier.
 func TestAPISessions_RealAuthServerSessionIsNotFound(t *testing.T) {
-	httpClient, _, _, _ := createSessionWithAcrLevel1(t)
+	httpClient, _, _, _ := createSessionWithACRLevel1(t)
 	id := decodeSessionIdentifier(t, requireSessionCookie(t, httpClient))
 
 	accessToken, client := createClientWithGranularScope(t, builtin.BrowserSessionsPermissionIdentifier)
 	defer func() {
-		_ = database.DeleteClient(context.Background(), nil, client.Id)
+		_ = database.DeleteClient(context.Background(), nil, client.ID)
 	}()
 
-	resp := postSession(t, accessToken, "load", api.SessionLoadRequest{Id: id})
+	resp := postSession(t, accessToken, "load", api.SessionLoadRequest{ID: id})
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
@@ -270,7 +270,7 @@ func TestAPISessions_RealAuthServerSessionIsNotFound(t *testing.T) {
 func TestAPISessions_RefusesATokenNoLongerLive(t *testing.T) {
 	newClient := func(t *testing.T) (string, *record.Client, string) {
 		accessToken, client, clientSecret := createClientWithGranularScopeAndSecret(t, builtin.BrowserSessionsPermissionIdentifier)
-		t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+		t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 		assertSessionsAdmitToken(t, accessToken)
 		return accessToken, client, clientSecret
 	}
@@ -296,13 +296,13 @@ func TestAPISessions_RefusesATokenNoLongerLive(t *testing.T) {
 	t.Run("a disabled or deleted client's token", func(t *testing.T) {
 		accessToken, client, _ := newClient(t)
 
-		setClientEnabled(t, client.Id, false)
+		setClientEnabled(t, client.ID, false)
 		assertSessionsRefuseToken(t, accessToken)
 
-		setClientEnabled(t, client.Id, true)
+		setClientEnabled(t, client.ID, true)
 		assertSessionsAdmitToken(t, accessToken)
 
-		require.NoError(t, database.DeleteClient(context.Background(), nil, client.Id))
+		require.NoError(t, database.DeleteClient(context.Background(), nil, client.ID))
 		assertSessionsRefuseToken(t, accessToken)
 	})
 
@@ -319,7 +319,7 @@ func TestAPISessions_RefusesATokenNoLongerLive(t *testing.T) {
 // identifier no session has.
 func assertSessionsAdmitToken(t *testing.T, accessToken string) {
 	t.Helper()
-	resp := postSession(t, accessToken, "load", api.SessionLoadRequest{Id: newTestSessionId(t)})
+	resp := postSession(t, accessToken, "load", api.SessionLoadRequest{ID: newTestSessionID(t)})
 	defer func() { _ = resp.Body.Close() }()
 	body, _ := io.ReadAll(resp.Body)
 	require.Equal(t, http.StatusNotFound, resp.StatusCode, string(body))
@@ -329,7 +329,7 @@ func assertSessionsAdmitToken(t *testing.T, accessToken string) {
 // invalid.", in the challenge and the body, as the admin API answers it.
 func assertSessionsRefuseToken(t *testing.T, accessToken string) {
 	t.Helper()
-	resp := postSession(t, accessToken, "load", api.SessionLoadRequest{Id: newTestSessionId(t)})
+	resp := postSession(t, accessToken, "load", api.SessionLoadRequest{ID: newTestSessionID(t)})
 	defer func() { _ = resp.Body.Close() }()
 	body, _ := io.ReadAll(resp.Body)
 	require.Equal(t, http.StatusUnauthorized, resp.StatusCode, string(body))
@@ -351,14 +351,14 @@ func assertSessionsRefuseToken(t *testing.T, accessToken string) {
 func TestAPISessions_BadRequests(t *testing.T) {
 	accessToken, client := createClientWithGranularScope(t, builtin.BrowserSessionsPermissionIdentifier)
 	defer func() {
-		_ = database.DeleteClient(context.Background(), nil, client.Id)
+		_ = database.DeleteClient(context.Background(), nil, client.ID)
 	}()
 
 	req, err := http.NewRequest("POST", sessionEndpointURL("load"), bytes.NewReader([]byte("not json")))
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+accessToken)
-	malformed, err := createHttpClient(t).Do(req)
+	malformed, err := createHTTPClient(t).Do(req)
 	require.NoError(t, err)
 	defer func() { _ = malformed.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, malformed.StatusCode)
@@ -367,7 +367,7 @@ func TestAPISessions_BadRequests(t *testing.T) {
 	assert.Equal(t, "INVALID_REQUEST_BODY", malformedBody.ErrorCode)
 
 	for _, operation := range []string{"load", "create", "update", "touch", "delete"} {
-		resp := postSession(t, accessToken, operation, api.SessionWriteRequest{Id: "  "})
+		resp := postSession(t, accessToken, operation, api.SessionWriteRequest{ID: "  "})
 		func() {
 			defer func() { _ = resp.Body.Close() }()
 			assert.Equal(t, http.StatusBadRequest, resp.StatusCode, "operation %s", operation)

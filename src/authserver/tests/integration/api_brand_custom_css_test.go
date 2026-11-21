@@ -37,7 +37,7 @@ func TestAPIBrandCustomCSS_StoredReadListedAndWrittenBack(t *testing.T) {
 	*created = append(*created, id)
 	assert.Equal(t, storedCustomCSS, answer["brand"].(map[string]any)["customCss"])
 
-	stored, err := database.GetBrandById(context.Background(), nil, id)
+	stored, err := database.GetBrandByID(context.Background(), nil, id)
 	require.NoError(t, err)
 	require.NotNil(t, stored)
 	assert.Equal(t, storedCustomCSS, stored.CustomCSS, "stored with its line endings made uniform")
@@ -74,7 +74,7 @@ func TestAPIBrandCustomCSS_StoredReadListedAndWrittenBack(t *testing.T) {
 			want = storedCustomCSS
 		}
 		assert.Equal(t, want, answer["brand"].(map[string]any)["customCss"])
-		stored, err = database.GetBrandById(context.Background(), nil, id)
+		stored, err = database.GetBrandByID(context.Background(), nil, id)
 		require.NoError(t, err)
 		assert.Equal(t, want, stored.CustomCSS)
 	}
@@ -116,7 +116,7 @@ func TestAPIBrandCustomCSS_Refusals(t *testing.T) {
 		}
 	}
 
-	stored, err := database.GetBrandById(context.Background(), nil, other)
+	stored, err := database.GetBrandByID(context.Background(), nil, other)
 	require.NoError(t, err)
 	assert.Equal(t, "blueberry", stored.Theme, "no refused update wrote the brand")
 	assert.Empty(t, stored.CustomCSS)
@@ -130,7 +130,7 @@ func TestAPIBrandCustomCSS_ChangesAreAudited(t *testing.T) {
 	_, created := keepDefaultBrand(t)
 
 	name := brandName("AuditCSS")
-	resp, requestId := sendAdmin(t, accessToken, http.MethodPost, brandsPath, brandBody(map[string]any{
+	resp, requestID := sendAdmin(t, accessToken, http.MethodPost, brandsPath, brandBody(map[string]any{
 		"name": name, "appearance": "light", "theme": "plum", "customCss": writtenCustomCSS}))
 	var answer map[string]any
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&answer))
@@ -138,13 +138,13 @@ func TestAPIBrandCustomCSS_ChangesAreAudited(t *testing.T) {
 	require.Equal(t, http.StatusCreated, resp.StatusCode, "%v", answer)
 	id := int64(answer["brand"].(map[string]any)["id"].(float64))
 	*created = append(*created, id)
-	createdRows := auditRows(t, accessToken, "created_brand", requestId)
+	createdRows := auditRows(t, accessToken, "created_brand", requestID)
 	assert.Equal(t, []map[string]any{{"brand_id": float64(id), "brand_name": name,
 		"custom_css_bytes": float64(len(storedCustomCSS)), "logged_in_user": who}}, createdRows)
 
-	_, _, requestId = brandCall(t, accessToken, http.MethodPut, brandPath(id, ""),
+	_, _, requestID = brandCall(t, accessToken, http.MethodPut, brandPath(id, ""),
 		brandBody(map[string]any{"name": name, "appearance": "dark", "theme": "plum", "customCss": ".x{}"}))
-	updatedRows := auditRows(t, accessToken, "updated_brand", requestId)
+	updatedRows := auditRows(t, accessToken, "updated_brand", requestID)
 	assert.Equal(t, []map[string]any{{"brand_id": float64(id), "brand_name": name, "appearance": "dark",
 		"theme": "plum", "corners": "rounded", "font": "system-ui", "background_fit": "cover",
 		"hide_app_name": false, "custom_css_bytes": float64(4), "logged_in_user": who}}, updatedRows)
@@ -160,7 +160,7 @@ func TestAPIBrandCustomCSS_TheFullStylesheetEndsWithIt(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 	_, created := keepDefaultBrand(t)
 	base := appConfig.AuthServer.BaseURL
-	browser := createHttpClient(t)
+	browser := createHTTPClient(t)
 
 	name := brandName("Served")
 	status, answer, _ := brandCall(t, accessToken, http.MethodPost, brandsPath,

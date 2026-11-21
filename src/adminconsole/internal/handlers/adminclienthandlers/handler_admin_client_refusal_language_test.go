@@ -15,49 +15,49 @@ import (
 	"github.com/leodip/goiabada/core/api"
 )
 
-// refusingClientApiClient answers the reads the client pages make before they refuse a form, and
+// refusingClientAPIClient answers the reads the client pages make before they refuse a form, and
 // panics on every write: each refusal below happens before the console calls the API to change
 // anything.
-type refusingClientApiClient struct {
+type refusingClientAPIClient struct {
 	// isSystemLevel answers the client as the admin console's own.
 	isSystemLevel bool
 }
 
-func (c *refusingClientApiClient) GetClientPermissions(_ context.Context, _ string, clientId int64) (*api.ClientResponse, []api.PermissionResponse, error) {
-	return &api.ClientResponse{Id: clientId, ClientIdentifier: "billing-app", IsSystemLevelClient: c.isSystemLevel}, nil, nil
+func (c *refusingClientAPIClient) GetClientPermissions(_ context.Context, _ string, clientID int64) (*api.ClientResponse, []api.PermissionResponse, error) {
+	return &api.ClientResponse{ID: clientID, ClientIdentifier: "billing-app", IsSystemLevelClient: c.isSystemLevel}, nil, nil
 }
 
-func (c *refusingClientApiClient) GetClientById(_ context.Context, _ string, clientId int64) (*api.ClientResponse, error) {
-	return &api.ClientResponse{Id: clientId, ClientIdentifier: "billing-app", IsSystemLevelClient: c.isSystemLevel}, nil
+func (c *refusingClientAPIClient) GetClientByID(_ context.Context, _ string, clientID int64) (*api.ClientResponse, error) {
+	return &api.ClientResponse{ID: clientID, ClientIdentifier: "billing-app", IsSystemLevelClient: c.isSystemLevel}, nil
 }
 
 // GetClientSecret answers the stored secret, which a refused Authentication tab is drawn with.
-func (*refusingClientApiClient) GetClientSecret(context.Context, string, int64) (string, error) {
+func (*refusingClientAPIClient) GetClientSecret(context.Context, string, int64) (string, error) {
 	return "the-stored-secret", nil
 }
 
-func (*refusingClientApiClient) UpdateClientAuthentication(context.Context, string, int64, *api.UpdateClientAuthenticationRequest) (*api.ClientResponse, error) {
+func (*refusingClientAPIClient) UpdateClientAuthentication(context.Context, string, int64, *api.UpdateClientAuthenticationRequest) (*api.ClientResponse, error) {
 	panic("unexpected call to UpdateClientAuthentication")
 }
 
-func (*refusingClientApiClient) DeleteClient(context.Context, string, int64) error {
+func (*refusingClientAPIClient) DeleteClient(context.Context, string, int64) error {
 	panic("unexpected call to DeleteClient")
 }
 
-func (*refusingClientApiClient) CreateClient(context.Context, string, *api.CreateClientRequest) (*api.ClientResponse, error) {
+func (*refusingClientAPIClient) CreateClient(context.Context, string, *api.CreateClientRequest) (*api.ClientResponse, error) {
 	panic("unexpected call to CreateClient")
 }
 
 // GetSettingsTokens answers the global token settings, which the refused tokens tab names.
-func (*refusingClientApiClient) GetSettingsTokens(context.Context, string) (*api.SettingsTokensResponse, error) {
+func (*refusingClientAPIClient) GetSettingsTokens(context.Context, string) (*api.SettingsTokensResponse, error) {
 	return &api.SettingsTokensResponse{TokenExpirationInSeconds: 300}, nil
 }
 
-func (*refusingClientApiClient) UpdateClientTokens(context.Context, string, int64, *api.UpdateClientTokensRequest) (*api.ClientResponse, error) {
+func (*refusingClientAPIClient) UpdateClientTokens(context.Context, string, int64, *api.UpdateClientTokensRequest) (*api.ClientResponse, error) {
 	panic("unexpected call to UpdateClientTokens")
 }
 
-func (*refusingClientApiClient) UpdateClientDPoP(context.Context, string, int64, *api.UpdateClientDPoPRequest) (*api.ClientResponse, error) {
+func (*refusingClientAPIClient) UpdateClientDPoP(context.Context, string, int64, *api.UpdateClientDPoPRequest) (*api.ClientResponse, error) {
 	panic("unexpected call to UpdateClientDPoP")
 }
 
@@ -83,7 +83,7 @@ func TestAdminClientPages_RefuseInThePagesLanguage(t *testing.T) {
 	testCases := []struct {
 		name       string
 		template   string
-		handler    func(httpHelper *handlersmocks.HttpHelper) http.HandlerFunc
+		handler    func(httpHelper *handlersmocks.HTTPHelper) http.HandlerFunc
 		target     string
 		form       url.Values
 		english    string
@@ -92,8 +92,8 @@ func TestAdminClientPages_RefuseInThePagesLanguage(t *testing.T) {
 		{
 			name:     "a new client with no identifier",
 			template: "/admin_clients_new.html",
-			handler: func(h *handlersmocks.HttpHelper) http.HandlerFunc {
-				return HandleNewPost(h, &refusingClientApiClient{}, consoleBaseURL)
+			handler: func(h *handlersmocks.HTTPHelper) http.HandlerFunc {
+				return HandleNewPost(h, &refusingClientAPIClient{}, consoleBaseURL)
 			},
 			target:     "/admin/clients/new",
 			form:       url.Values{"clientIdentifier": {"  "}},
@@ -103,8 +103,8 @@ func TestAdminClientPages_RefuseInThePagesLanguage(t *testing.T) {
 		{
 			name:     "a delete of the admin console's own client",
 			template: "/admin_clients_delete.html",
-			handler: func(h *handlersmocks.HttpHelper) http.HandlerFunc {
-				return HandleDeletePost(h, &refusingClientApiClient{isSystemLevel: true}, consoleBaseURL)
+			handler: func(h *handlersmocks.HTTPHelper) http.HandlerFunc {
+				return HandleDeletePost(h, &refusingClientAPIClient{isSystemLevel: true}, consoleBaseURL)
 			},
 			target:     "/admin/clients/3/delete",
 			form:       url.Values{"clientIdentifier": {"billing-app"}},
@@ -114,8 +114,8 @@ func TestAdminClientPages_RefuseInThePagesLanguage(t *testing.T) {
 		{
 			name:     "a delete with no identifier",
 			template: "/admin_clients_delete.html",
-			handler: func(h *handlersmocks.HttpHelper) http.HandlerFunc {
-				return HandleDeletePost(h, &refusingClientApiClient{}, consoleBaseURL)
+			handler: func(h *handlersmocks.HTTPHelper) http.HandlerFunc {
+				return HandleDeletePost(h, &refusingClientAPIClient{}, consoleBaseURL)
 			},
 			target:     "/admin/clients/3/delete",
 			form:       url.Values{"clientIdentifier": {""}},
@@ -125,8 +125,8 @@ func TestAdminClientPages_RefuseInThePagesLanguage(t *testing.T) {
 		{
 			name:     "a delete naming another client",
 			template: "/admin_clients_delete.html",
-			handler: func(h *handlersmocks.HttpHelper) http.HandlerFunc {
-				return HandleDeletePost(h, &refusingClientApiClient{}, consoleBaseURL)
+			handler: func(h *handlersmocks.HTTPHelper) http.HandlerFunc {
+				return HandleDeletePost(h, &refusingClientAPIClient{}, consoleBaseURL)
 			},
 			target:     "/admin/clients/3/delete",
 			form:       url.Values{"clientIdentifier": {"shipping-app"}},
@@ -136,8 +136,8 @@ func TestAdminClientPages_RefuseInThePagesLanguage(t *testing.T) {
 		{
 			name:     "an authentication save with no client type",
 			template: "/admin_clients_authentication.html",
-			handler: func(h *handlersmocks.HttpHelper) http.HandlerFunc {
-				return HandleAuthenticationPost(h, newTestSessionStore(), &refusingClientApiClient{}, consoleBaseURL)
+			handler: func(h *handlersmocks.HTTPHelper) http.HandlerFunc {
+				return HandleAuthenticationPost(h, newTestSessionStore(), &refusingClientAPIClient{}, consoleBaseURL)
 			},
 			target:     "/admin/clients/3/authentication",
 			form:       url.Values{"clientSecret": {"a-new-secret"}},
@@ -147,8 +147,8 @@ func TestAdminClientPages_RefuseInThePagesLanguage(t *testing.T) {
 		{
 			name:     "an authentication save with a client type that is neither",
 			template: "/admin_clients_authentication.html",
-			handler: func(h *handlersmocks.HttpHelper) http.HandlerFunc {
-				return HandleAuthenticationPost(h, newTestSessionStore(), &refusingClientApiClient{}, consoleBaseURL)
+			handler: func(h *handlersmocks.HTTPHelper) http.HandlerFunc {
+				return HandleAuthenticationPost(h, newTestSessionStore(), &refusingClientAPIClient{}, consoleBaseURL)
 			},
 			target:     "/admin/clients/3/authentication",
 			form:       url.Values{"publicConfidential": {"Public"}, "clientSecret": {"a-new-secret"}},
@@ -158,8 +158,8 @@ func TestAdminClientPages_RefuseInThePagesLanguage(t *testing.T) {
 		{
 			name:     "a token expiration that is not a number",
 			template: "/admin_clients_tokens.html",
-			handler: func(h *handlersmocks.HttpHelper) http.HandlerFunc {
-				return HandleTokensPost(h, nil, &refusingClientApiClient{}, consoleBaseURL)
+			handler: func(h *handlersmocks.HTTPHelper) http.HandlerFunc {
+				return HandleTokensPost(h, nil, &refusingClientAPIClient{}, consoleBaseURL)
 			},
 			target:     "/admin/clients/3/tokens",
 			form:       tokensWith("tokenExpirationInSeconds", "soon"),
@@ -169,8 +169,8 @@ func TestAdminClientPages_RefuseInThePagesLanguage(t *testing.T) {
 		{
 			name:     "an offline idle timeout that is not a number",
 			template: "/admin_clients_tokens.html",
-			handler: func(h *handlersmocks.HttpHelper) http.HandlerFunc {
-				return HandleTokensPost(h, nil, &refusingClientApiClient{}, consoleBaseURL)
+			handler: func(h *handlersmocks.HTTPHelper) http.HandlerFunc {
+				return HandleTokensPost(h, nil, &refusingClientAPIClient{}, consoleBaseURL)
 			},
 			target:     "/admin/clients/3/tokens",
 			form:       tokensWith("refreshTokenOfflineIdleTimeoutInSeconds", "soon"),
@@ -180,8 +180,8 @@ func TestAdminClientPages_RefuseInThePagesLanguage(t *testing.T) {
 		{
 			name:     "an offline max lifetime that is not a number",
 			template: "/admin_clients_tokens.html",
-			handler: func(h *handlersmocks.HttpHelper) http.HandlerFunc {
-				return HandleTokensPost(h, nil, &refusingClientApiClient{}, consoleBaseURL)
+			handler: func(h *handlersmocks.HTTPHelper) http.HandlerFunc {
+				return HandleTokensPost(h, nil, &refusingClientAPIClient{}, consoleBaseURL)
 			},
 			target:     "/admin/clients/3/tokens",
 			form:       tokensWith("refreshTokenOfflineMaxLifetimeInSeconds", "soon"),
@@ -196,7 +196,7 @@ func TestAdminClientPages_RefuseInThePagesLanguage(t *testing.T) {
 			{"in pt-BR", "pt-BR", testCase.portuguese},
 		} {
 			t.Run(testCase.name+" "+language.name, func(t *testing.T) {
-				httpHelper := handlersmocks.NewHttpHelper(t)
+				httpHelper := handlersmocks.NewHTTPHelper(t)
 				handlertest.RefuseInternalServerError(t, httpHelper)
 				handlertest.ExpectRender(httpHelper, mock.Anything, testCase.template).Once()
 

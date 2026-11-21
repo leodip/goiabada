@@ -21,16 +21,16 @@ import (
 // the request id is on this request's context and on no other, so a handler that passed
 // context.Background() matches nothing and the strict mock reports an unexpected call.
 
-const apiPropagatedRequestId = "goiabada/req-api-propagation-1"
+const apiPropagatedRequestID = "goiabada/req-api-propagation-1"
 
-func apiRequestCarryingId(target string) *http.Request {
+func apiRequestCarryingID(target string) *http.Request {
 	req := httptest.NewRequest(http.MethodGet, target, nil)
-	return req.WithContext(requestid.NewContext(req.Context(), apiPropagatedRequestId))
+	return req.WithContext(requestid.NewContext(req.Context(), apiPropagatedRequestID))
 }
 
-func theApiRequestsContext() interface{} {
+func theAPIRequestsContext() interface{} {
 	return mock.MatchedBy(func(ctx context.Context) bool {
-		return requestid.FromContext(ctx) == apiPropagatedRequestId
+		return requestid.FromContext(ctx) == apiPropagatedRequestID
 	})
 }
 
@@ -40,11 +40,11 @@ func theApiRequestsContext() interface{} {
 func TestHandleUsersSearchGet_SearchesUnderTheRequestsContext(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 
-	database.On("SearchUsersPaginated", theApiRequestsContext(), mock.Anything, "ada", 1, 10).
-		Return([]record.User{{Id: 1, Subject: "sub-1", Email: "ada@example.com"}}, 1, nil).Once()
+	database.On("SearchUsersPaginated", theAPIRequestsContext(), mock.Anything, "ada", 1, 10).
+		Return([]record.User{{ID: 1, Subject: "sub-1", Email: "ada@example.com"}}, 1, nil).Once()
 
 	rr := httptest.NewRecorder()
-	HandleUsersSearchGet(database).ServeHTTP(rr, apiRequestCarryingId("/api/v1/admin/users/search?query=ada"))
+	HandleUsersSearchGet(database).ServeHTTP(rr, apiRequestCarryingID("/api/v1/admin/users/search?query=ada"))
 
 	require.Equal(t, http.StatusOK, rr.Code)
 	database.AssertExpectations(t)
@@ -55,27 +55,27 @@ func TestHandleUsersSearchGet_SearchesUnderTheRequestsContext(t *testing.T) {
 func TestHandleUsersSearchGet_ConflictingAnnotationsReachNoAnnotationPort(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 
-	database.On("SearchUsersPaginated", theApiRequestsContext(), mock.Anything, "ada", 1, 10).
-		Return([]record.User{{Id: 1, Subject: "sub-1"}}, 1, nil).Once()
+	database.On("SearchUsersPaginated", theAPIRequestsContext(), mock.Anything, "ada", 1, 10).
+		Return([]record.User{{ID: 1, Subject: "sub-1"}}, 1, nil).Once()
 
 	rr := httptest.NewRecorder()
 	HandleUsersSearchGet(database).ServeHTTP(rr,
-		apiRequestCarryingId("/api/v1/admin/users/search?query=ada&annotateGroupMembership=1&annotatePermissionId=2"))
+		apiRequestCarryingID("/api/v1/admin/users/search?query=ada&annotateGroupMembership=1&annotatePermissionId=2"))
 
 	require.Equal(t, http.StatusBadRequest, rr.Code)
-	database.AssertNotCalled(t, "GetUserGroupsByUserIds", mock.Anything, mock.Anything, mock.Anything)
-	database.AssertNotCalled(t, "GetUserPermissionsByUserIds", mock.Anything, mock.Anything, mock.Anything)
+	database.AssertNotCalled(t, "GetUserGroupsByUserIDs", mock.Anything, mock.Anything, mock.Anything)
+	database.AssertNotCalled(t, "GetUserPermissionsByUserIDs", mock.Anything, mock.Anything, mock.Anything)
 }
 
 // Stage 6 adds the session half. The admin API's session pages are the widest reads in this
 // package: one user's sessions, one client's sessions, each hydrating every client behind them,
 // and each of them now issued on behalf of the request that asked.
 
-// apiSessionsRequest is apiRequestCarryingId plus the id path value and the settings the
+// apiSessionsRequest is apiRequestCarryingID plus the id path value and the settings the
 // session handlers read, which is everything HandleUserSessionsGet needs before its first query.
-func apiSessionsRequest(userId string) *http.Request {
-	req := apiRequestCarryingId("/api/v1/admin/users/" + userId + "/sessions")
-	req.SetPathValue("id", userId)
+func apiSessionsRequest(userID string) *http.Request {
+	req := apiRequestCarryingID("/api/v1/admin/users/" + userID + "/sessions")
+	req.SetPathValue("id", userID)
 	ctx := reqctx.WithSettings(req.Context(), &record.Settings{
 		UserSessionIdleTimeoutInSeconds: 3600,
 		UserSessionMaxLifetimeInSeconds: 86400,
@@ -89,11 +89,11 @@ func apiSessionsRequest(userId string) *http.Request {
 func TestHandleUserSessionsGet_ReadsSessionsUnderTheRequestsContext(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 
-	database.On("GetUserById", theApiRequestsContext(), mock.Anything, int64(7)).
-		Return(&record.User{Id: 7, Subject: "sub-7"}, nil).Once()
-	database.On("GetUserSessionsByUserId", theApiRequestsContext(), mock.Anything, int64(7)).
+	database.On("GetUserByID", theAPIRequestsContext(), mock.Anything, int64(7)).
+		Return(&record.User{ID: 7, Subject: "sub-7"}, nil).Once()
+	database.On("GetUserSessionsByUserID", theAPIRequestsContext(), mock.Anything, int64(7)).
 		Return([]record.UserSession{}, nil).Once()
-	database.On("UserSessionsLoadClients", theApiRequestsContext(), mock.Anything, mock.Anything).
+	database.On("UserSessionsLoadClients", theAPIRequestsContext(), mock.Anything, mock.Anything).
 		Return(nil).Once()
 
 	rr := httptest.NewRecorder()
@@ -105,14 +105,14 @@ func TestHandleUserSessionsGet_ReadsSessionsUnderTheRequestsContext(t *testing.T
 
 // The reject arm: an id that is not a number is refused before the first query, so no session
 // port is reached at all and there is no context to get wrong.
-func TestHandleUserSessionsGet_MalformedIdReachesNoSessionPort(t *testing.T) {
+func TestHandleUserSessionsGet_MalformedIDReachesNoSessionPort(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 
 	rr := httptest.NewRecorder()
 	HandleUserSessionsGet(database).ServeHTTP(rr, apiSessionsRequest("not-a-number"))
 
 	require.Equal(t, http.StatusBadRequest, rr.Code)
-	database.AssertNotCalled(t, "GetUserSessionsByUserId", mock.Anything, mock.Anything, mock.Anything)
+	database.AssertNotCalled(t, "GetUserSessionsByUserID", mock.Anything, mock.Anything, mock.Anything)
 	database.AssertNotCalled(t, "UserSessionsLoadClients", mock.Anything, mock.Anything, mock.Anything)
 }
 
@@ -121,11 +121,11 @@ func TestHandleUserSessionsGet_MalformedIdReachesNoSessionPort(t *testing.T) {
 // with its redirect URIs and its web origins through two loaders that reach the database again
 // inside commondb.
 
-// apiClientRequest is apiRequestCarryingId plus the id path value the single-client handlers
+// apiClientRequest is apiRequestCarryingID plus the id path value the single-client handlers
 // read, which is everything HandleClientGet needs before its first query.
-func apiClientRequest(clientId string) *http.Request {
-	req := apiRequestCarryingId("/api/v1/admin/clients/" + clientId)
-	req.SetPathValue("id", clientId)
+func apiClientRequest(clientID string) *http.Request {
+	req := apiRequestCarryingID("/api/v1/admin/clients/" + clientID)
+	req.SetPathValue("id", clientID)
 	return req
 }
 
@@ -136,17 +136,17 @@ func apiClientRequest(clientId string) *http.Request {
 func TestHandleClientsGet_ListsClientsUnderTheRequestsContext(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 
-	database.On("GetAllClients", theApiRequestsContext(), mock.Anything).
-		Return([]record.Client{{Id: 3, ClientIdentifier: "portal"}}, nil).Once()
-	database.On("ClientLoadRedirectURIs", theApiRequestsContext(), mock.Anything, mock.Anything).
+	database.On("GetAllClients", theAPIRequestsContext(), mock.Anything).
+		Return([]record.Client{{ID: 3, ClientIdentifier: "portal"}}, nil).Once()
+	database.On("ClientLoadRedirectURIs", theAPIRequestsContext(), mock.Anything, mock.Anything).
 		Return(nil).Once()
-	database.On("ClientLoadPostLogoutRedirectURIs", theApiRequestsContext(), mock.Anything, mock.Anything).
+	database.On("ClientLoadPostLogoutRedirectURIs", theAPIRequestsContext(), mock.Anything, mock.Anything).
 		Return(nil).Once()
-	database.On("ClientLoadWebOrigins", theApiRequestsContext(), mock.Anything, mock.Anything).
+	database.On("ClientLoadWebOrigins", theAPIRequestsContext(), mock.Anything, mock.Anything).
 		Return(nil).Once()
 
 	rr := httptest.NewRecorder()
-	HandleClientsGet(database).ServeHTTP(rr, apiRequestCarryingId("/api/v1/admin/clients"))
+	HandleClientsGet(database).ServeHTTP(rr, apiRequestCarryingID("/api/v1/admin/clients"))
 
 	require.Equal(t, http.StatusOK, rr.Code)
 	database.AssertExpectations(t)
@@ -154,23 +154,23 @@ func TestHandleClientsGet_ListsClientsUnderTheRequestsContext(t *testing.T) {
 
 // The reject arm: an id that is not a number is refused before the first query, so neither the
 // client read nor either loader is reached and there is no context to get wrong.
-func TestHandleClientGet_MalformedIdReachesNoClientPort(t *testing.T) {
+func TestHandleClientGet_MalformedIDReachesNoClientPort(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 
 	rr := httptest.NewRecorder()
 	HandleClientGet(database).ServeHTTP(rr, apiClientRequest("not-a-number"))
 
 	require.Equal(t, http.StatusBadRequest, rr.Code)
-	database.AssertNotCalled(t, "GetClientById", mock.Anything, mock.Anything, mock.Anything)
+	database.AssertNotCalled(t, "GetClientByID", mock.Anything, mock.Anything, mock.Anything)
 	database.AssertNotCalled(t, "ClientLoadRedirectURIs", mock.Anything, mock.Anything, mock.Anything)
 	database.AssertNotCalled(t, "ClientLoadPostLogoutRedirectURIs", mock.Anything, mock.Anything, mock.Anything)
 	database.AssertNotCalled(t, "ClientLoadWebOrigins", mock.Anything, mock.Anything, mock.Anything)
 }
 
 // apiResourcePermissionsRequest carries the resourceId parameter the permission listing reads.
-func apiResourcePermissionsRequest(resourceId string) *http.Request {
-	req := apiRequestCarryingId("/api/v1/admin/resources/" + resourceId + "/permissions")
-	req.SetPathValue("resourceId", resourceId)
+func apiResourcePermissionsRequest(resourceID string) *http.Request {
+	req := apiRequestCarryingID("/api/v1/admin/resources/" + resourceID + "/permissions")
+	req.SetPathValue("resourceId", resourceID)
 	return req
 }
 
@@ -179,9 +179,9 @@ func apiResourcePermissionsRequest(resourceId string) *http.Request {
 func TestHandlePermissionsByResourceGet_ReadsPermissionsUnderTheRequestsContext(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 
-	database.On("GetPermissionsByResourceId", theApiRequestsContext(), mock.Anything, int64(4)).
-		Return([]record.Permission{{Id: 11, PermissionIdentifier: "read", ResourceId: 4}}, nil).Once()
-	database.On("PermissionsLoadResources", theApiRequestsContext(), mock.Anything, mock.Anything).
+	database.On("GetPermissionsByResourceID", theAPIRequestsContext(), mock.Anything, int64(4)).
+		Return([]record.Permission{{ID: 11, PermissionIdentifier: "read", ResourceID: 4}}, nil).Once()
+	database.On("PermissionsLoadResources", theAPIRequestsContext(), mock.Anything, mock.Anything).
 		Return(nil).Once()
 
 	rr := httptest.NewRecorder()
@@ -193,13 +193,13 @@ func TestHandlePermissionsByResourceGet_ReadsPermissionsUnderTheRequestsContext(
 
 // The reject arm: a resource id that is not a number is refused before the listing, so neither
 // permission port is reached.
-func TestHandlePermissionsByResourceGet_MalformedResourceIdReachesNoPermissionPort(t *testing.T) {
+func TestHandlePermissionsByResourceGet_MalformedResourceIDReachesNoPermissionPort(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 
 	rr := httptest.NewRecorder()
 	HandlePermissionsByResourceGet(database).ServeHTTP(rr, apiResourcePermissionsRequest("not-a-number"))
 
 	require.Equal(t, http.StatusBadRequest, rr.Code)
-	database.AssertNotCalled(t, "GetPermissionsByResourceId", mock.Anything, mock.Anything, mock.Anything)
+	database.AssertNotCalled(t, "GetPermissionsByResourceID", mock.Anything, mock.Anything, mock.Anything)
 	database.AssertNotCalled(t, "PermissionsLoadResources", mock.Anything, mock.Anything, mock.Anything)
 }

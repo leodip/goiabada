@@ -24,7 +24,7 @@ import (
 // without its bytes.
 type brandAssetsDatabase interface {
 	CreateBrandAsset(ctx context.Context, tx *sql.Tx, asset *record.BrandAsset) error
-	GetBrandAssetsByIds(ctx context.Context, tx *sql.Tx, assetIds []int64) ([]record.BrandAsset, error)
+	GetBrandAssetsByIDs(ctx context.Context, tx *sql.Tx, assetIDs []int64) ([]record.BrandAsset, error)
 }
 
 // HandleBrandAssetPost - POST /api/v1/admin/brand-assets/{logo,favicon,background,font}, one route
@@ -58,7 +58,7 @@ func HandleBrandAssetPost(database brandAssetsDatabase, auditLogger AuditLogger,
 		}
 
 		auditLogger.Log(r.Context(), audit.EventUploadedBrandAsset, map[string]interface{}{
-			"brand_asset_id": asset.Id,
+			"brand_asset_id": asset.ID,
 			"kind":           string(kind),
 			"logged_in_user": callerSubject(r),
 		})
@@ -77,7 +77,7 @@ func HandleBrandAssetGet(database brandAssetsDatabase, baseURL string) http.Hand
 			return
 		}
 
-		assets, err := database.GetBrandAssetsByIds(r.Context(), nil, []int64{id})
+		assets, err := database.GetBrandAssetsByIDs(r.Context(), nil, []int64{id})
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error getting a brand asset by ID"), "brand_asset_id", id)
 			return

@@ -16,8 +16,8 @@ import (
 // usersSearchDatabase is what the user search endpoint needs: one page of users and the groups
 // and permissions each carries.
 type usersSearchDatabase interface {
-	GetGroupById(ctx context.Context, tx *sql.Tx, groupId int64) (*record.Group, error)
-	GetPermissionById(ctx context.Context, tx *sql.Tx, permissionId int64) (*record.Permission, error)
+	GetGroupByID(ctx context.Context, tx *sql.Tx, groupID int64) (*record.Group, error)
+	GetPermissionByID(ctx context.Context, tx *sql.Tx, permissionID int64) (*record.Permission, error)
 	SearchUsersPaginated(ctx context.Context, tx *sql.Tx, query string, page int, pageSize int) ([]record.User, int, error)
 	UsersLoadGroups(ctx context.Context, tx *sql.Tx, users []record.User) error
 	UsersLoadPermissions(ctx context.Context, tx *sql.Tx, users []record.User) error
@@ -74,16 +74,16 @@ func HandleUsersSearchGet(
 		}
 
 		if annotateGroupMembershipStr != "" {
-			annotateGroupId, err := strconv.ParseInt(annotateGroupMembershipStr, 10, 64)
+			annotateGroupID, err := strconv.ParseInt(annotateGroupMembershipStr, 10, 64)
 			if err != nil {
 				writeJSONError(w, "Invalid annotateGroupMembership value", "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
 
 			// Verify group exists
-			group, err := database.GetGroupById(r.Context(), nil, annotateGroupId)
+			group, err := database.GetGroupByID(r.Context(), nil, annotateGroupID)
 			if err != nil {
-				writeInternalServerError(w, r, errs.Wrap(err, "failed to get group by ID"), "group_id", annotateGroupId, "query", logging.FieldForLog(query), "page", page)
+				writeInternalServerError(w, r, errs.Wrap(err, "failed to get group by ID"), "group_id", annotateGroupID, "query", logging.FieldForLog(query), "page", page)
 				return
 			}
 			if group == nil {
@@ -103,7 +103,7 @@ func HandleUsersSearchGet(
 			for i, user := range users {
 				inGroup := false
 				for _, userGroup := range user.Groups {
-					if userGroup.Id == annotateGroupId {
+					if userGroup.ID == annotateGroupID {
 						inGroup = true
 						break
 					}
@@ -128,16 +128,16 @@ func HandleUsersSearchGet(
 
 		// Handle permission annotation if requested
 		if annotatePermissionStr != "" {
-			permId, err := strconv.ParseInt(annotatePermissionStr, 10, 64)
+			permID, err := strconv.ParseInt(annotatePermissionStr, 10, 64)
 			if err != nil {
 				writeJSONError(w, "Invalid annotatePermissionId value", "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
 
 			// Verify the permission exists
-			perm, err := database.GetPermissionById(r.Context(), nil, permId)
+			perm, err := database.GetPermissionByID(r.Context(), nil, permID)
 			if err != nil {
-				writeInternalServerError(w, r, errs.Wrap(err, "failed to get permission by ID"), "permission_id", permId)
+				writeInternalServerError(w, r, errs.Wrap(err, "failed to get permission by ID"), "permission_id", permID)
 				return
 			}
 			if perm == nil {
@@ -145,7 +145,7 @@ func HandleUsersSearchGet(
 				return
 			}
 
-			// Load permissions for all users to check if they have permId
+			// Load permissions for all users to check if they have permID
 			if err := database.UsersLoadPermissions(r.Context(), nil, users); err != nil {
 				writeInternalServerError(w, r, errs.Wrap(err, "failed to load user permissions"), "user_count", len(users))
 				return
@@ -155,7 +155,7 @@ func HandleUsersSearchGet(
 			for i, u := range users {
 				has := false
 				for _, up := range u.Permissions {
-					if up.Id == permId {
+					if up.ID == permID {
 						has = true
 						break
 					}

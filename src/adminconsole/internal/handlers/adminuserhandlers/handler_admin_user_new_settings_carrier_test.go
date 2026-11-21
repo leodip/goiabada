@@ -23,7 +23,7 @@ import (
 func TestHandleNewGet_BindsSMTPEnabledFromTheSettingsCarrier(t *testing.T) {
 	for _, smtpEnabled := range []bool{true, false} {
 		t.Run(map[bool]string{true: "smtp enabled", false: "smtp disabled"}[smtpEnabled], func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 			handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_users_new.html").Once()
 

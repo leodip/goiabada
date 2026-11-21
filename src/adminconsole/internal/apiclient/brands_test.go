@@ -19,10 +19,10 @@ import (
 const brandBodyFields = `"id":7,"name":"Spring","appearance":"dark","theme":"plum","isDefault":true,"clientCount":3,` +
 	`"createdAt":"2026-11-09T10:00:00Z","updatedAt":"2026-11-09T11:30:00Z"`
 
-func TestAuthServerClient_GetBrandByIdDecodesEveryFieldTheConsoleBinds(t *testing.T) {
+func TestAuthServerClient_GetBrandByIDDecodesEveryFieldTheConsoleBinds(t *testing.T) {
 	client, recorded := serves(t, `{"brand":{`+brandBodyFields+`}}`)
 
-	brand, err := client.GetBrandById(context.Background(), "an-access-token", 7)
+	brand, err := client.GetBrandByID(context.Background(), "an-access-token", 7)
 	require.NoError(t, err)
 	require.NotNil(t, brand)
 
@@ -30,7 +30,7 @@ func TestAuthServerClient_GetBrandByIdDecodesEveryFieldTheConsoleBinds(t *testin
 	assert.Equal(t, "/api/v1/admin/brands/7", gotPath)
 	assert.Equal(t, "Bearer an-access-token", gotAuthorization)
 
-	assert.Equal(t, int64(7), brand.Id)
+	assert.Equal(t, int64(7), brand.ID)
 	assert.Equal(t, "Spring", brand.Name)
 	assert.Equal(t, "dark", brand.Appearance)
 	assert.Equal(t, "plum", brand.Theme)

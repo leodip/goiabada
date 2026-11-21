@@ -6,12 +6,12 @@
 {{end}}
 
 {{define "page"}}
-{{ template "user_header" (args "picture" .user.Id .user.Email .page .query $.ctx) }}
+{{ template "user_header" (args "picture" .user.ID .user.Email .page .query $.ctx) }}
 
 <div class="panel">
   <div class="panel-body">
     <div class="image-upload" id="imageUploadContainer"
-      data-upload-url="/admin/users/{{ .user.Id }}/picture" data-delete-url="/admin/users/{{ .user.Id }}/picture" data-field-name="picture" data-url-key="pictureUrl"
+      data-upload-url="/admin/users/{{ .user.ID }}/picture" data-delete-url="/admin/users/{{ .user.ID }}/picture" data-field-name="picture" data-url-key="pictureUrl"
       data-crop-mode="square" data-output-format="preserve"
       data-alt="{{ T $.ctx "adminconsole.admin_users.picture.alt_text" }}" data-crop-alt="{{ T $.ctx "adminconsole.admin_users.picture.crop_alt" }}"
       data-uploaded="{{ T $.ctx "adminconsole.admin_users.picture.uploaded" }}" data-deleted="{{ T $.ctx "adminconsole.admin_users.picture.deleted" }}"

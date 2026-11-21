@@ -28,14 +28,14 @@ import (
 // reading the call site: the attribute is on the record because requestid.Middleware ran ahead of the
 // middleware and the installed handler took the id off the context, and no call here names it.
 
-// requestIdOf reads the injected attribute, failing the test when it is absent.
-func requestIdOf(t *testing.T, record logtest.CapturedRecord) string {
+// requestIDOf reads the injected attribute, failing the test when it is absent.
+func requestIDOf(t *testing.T, record logtest.CapturedRecord) string {
 	t.Helper()
-	requestId, isString := record.Attrs["request_id"].(string)
+	requestID, isString := record.Attrs["request_id"].(string)
 	require.True(t, isString,
 		"the record must carry request_id, injected by the handler from the request id")
-	require.NotEmpty(t, requestId)
-	return requestId
+	require.NotEmpty(t, requestID)
+	return requestID
 }
 
 // theOneRecord returns the single record captured, failing when there is not exactly one.
@@ -46,11 +46,11 @@ func theOneRecord(t *testing.T, logged *logtest.SlogCapture) logtest.CapturedRec
 	return records[0]
 }
 
-// The refusal's message is a literal now, and the sentence explainCsrfFailure builds is an
+// The refusal's message is a literal now, and the sentence explainCSRFFailure builds is an
 // attribute. Warn rather than Error because the control working is not a fault, and the record is
 // pinned whole: a collector counting refusals matches on the message, and a message that went back
 // to being the explanation would give it four different strings to know about (#320 decision 4).
-func TestSlogConvention_CsrfRefusalIsWarnWithALiteralMessage(t *testing.T) {
+func TestSlogConvention_CSRFRefusalIsWarnWithALiteralMessage(t *testing.T) {
 	logged := logtest.CaptureSlog(t)
 
 	req := httptest.NewRequest(http.MethodPost, "/auth/pwd", nil)
@@ -79,13 +79,13 @@ func TestSlogConvention_CsrfRefusalIsWarnWithALiteralMessage(t *testing.T) {
 	assert.Equal(t, "auth.example.com", record.Attrs["request_host"])
 	assert.Equal(t, "https://evil.example.com", record.Attrs["origin_header"])
 	assert.Equal(t, "cross-site", record.Attrs["sec_fetch_site"])
-	requestIdOf(t, record)
+	requestIDOf(t, record)
 }
 
 // The request logger is the record everything else correlates to, and it was the other site that
 // named request_id itself. The whole textual rule is stage 7's lint; this is the behavioural half
 // for the one record that would be useless without the attribute.
-func TestSlogConvention_RequestLogCarriesTheInjectedRequestIdOnce(t *testing.T) {
+func TestSlogConvention_RequestLogCarriesTheInjectedRequestIDOnce(t *testing.T) {
 	logged := logtest.CaptureSlog(t)
 
 	rr := httptest.NewRecorder()
@@ -96,7 +96,7 @@ func TestSlogConvention_RequestLogCarriesTheInjectedRequestIdOnce(t *testing.T) 
 	record := theOneRecord(t, logged)
 	assert.Equal(t, slog.LevelInfo, record.Level)
 	assert.Equal(t, "http request", record.Message)
-	requestIdOf(t, record)
+	requestIDOf(t, record)
 	assert.Equal(t, 1, strings.Count(logged.Text(), "request_id="),
 		"the request logger no longer writes request_id itself")
 }

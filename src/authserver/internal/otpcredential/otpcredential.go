@@ -10,8 +10,8 @@
 //
 // **The audit call stays at the caller**, as revocation requires of its own callers and for the
 // same reason: the two verification sites raise deliberately different event sets. The browser,
-// which verifies a stored authenticator or one being enrolled, raises EventAuthFailedOtp on a
-// wrong code and EventAuthSuccessOtp on a good one; the account API raises neither, because
+// which verifies a stored authenticator or one being enrolled, raises EventAuthFailedOTP on a
+// wrong code and EventAuthSuccessOTP on a good one; the account API raises neither, because
 // enabling an authenticator is not an authentication ceremony; both raise
 // EventOTPCodeReplayDetected. That is what VerifyResult reports an outcome for instead of deciding
 // anything itself.
@@ -52,26 +52,26 @@ import (
 // ceremony never reaches. Three ports in a package this small would name the same six methods
 // between them and leave each consumer choosing which to embed.
 type Database interface {
-	ClearPendingOTPEnrollment(ctx context.Context, tx *sql.Tx, userId int64) error
-	// GetUserByIdForUpdate reads the user's row, which the operation's own write already holds,
+	ClearPendingOTPEnrollment(ctx context.Context, tx *sql.Tx, userID int64) error
+	// GetUserByIDForUpdate reads the user's row, which the operation's own write already holds,
 	// after that write: the account as the change commits it, which a caller notifying the user
 	// addresses (#724).
-	GetUserByIdForUpdate(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
-	IncrementUserOtpConfigGeneration(ctx context.Context, tx *sql.Tx, userId int64) (int64, error)
-	LowerUserSessionsToPassword(ctx context.Context, tx *sql.Tx, userId int64, passwordMethods string) error
-	ResetUserOTPStep(ctx context.Context, tx *sql.Tx, userId int64) error
-	IncrementUserOtpConsecutiveFailures(ctx context.Context, tx *sql.Tx, userId int64,
+	GetUserByIDForUpdate(ctx context.Context, tx *sql.Tx, userID int64) (*record.User, error)
+	IncrementUserOTPConfigGeneration(ctx context.Context, tx *sql.Tx, userID int64) (int64, error)
+	LowerUserSessionsToPassword(ctx context.Context, tx *sql.Tx, userID int64, passwordMethods string) error
+	ResetUserOTPStep(ctx context.Context, tx *sql.Tx, userID int64) error
+	IncrementUserOTPConsecutiveFailures(ctx context.Context, tx *sql.Tx, userID int64,
 		expectedGeneration int64) (bool, error)
-	ClearUserOtpConsecutiveFailures(ctx context.Context, tx *sql.Tx, userId int64) error
+	ClearUserOTPConsecutiveFailures(ctx context.Context, tx *sql.Tx, userID int64) error
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
-	TryConsumeEnrolledUserOTPStep(ctx context.Context, tx *sql.Tx, userId int64, step int64,
+	TryConsumeEnrolledUserOTPStep(ctx context.Context, tx *sql.Tx, userID int64, step int64,
 		expectedGeneration int64) (bool, error)
-	TryConsumeUserOTPStep(ctx context.Context, tx *sql.Tx, userId int64, step int64) (bool, error)
-	TryEstablishUserOTP(ctx context.Context, tx *sql.Tx, userId int64, expectedGeneration int64,
+	TryConsumeUserOTPStep(ctx context.Context, tx *sql.Tx, userID int64, step int64) (bool, error)
+	TryEstablishUserOTP(ctx context.Context, tx *sql.Tx, userID int64, expectedGeneration int64,
 		secretEncrypted []byte) (bool, error)
-	TryRemoveUserOTP(ctx context.Context, tx *sql.Tx, userId int64, expectedGeneration int64) (bool, error)
-	ReplaceUserRecoveryCodes(ctx context.Context, tx *sql.Tx, userId int64, codeHashes []string) error
-	DeleteUserRecoveryCodes(ctx context.Context, tx *sql.Tx, userId int64) error
+	TryRemoveUserOTP(ctx context.Context, tx *sql.Tx, userID int64, expectedGeneration int64) (bool, error)
+	ReplaceUserRecoveryCodes(ctx context.Context, tx *sql.Tx, userID int64, codeHashes []string) error
+	DeleteUserRecoveryCodes(ctx context.Context, tx *sql.Tx, userID int64) error
 }
 
 // VerifyOutcome is what a passcode check concluded. The first three values are the three arms
@@ -108,7 +108,7 @@ const (
 // it is zero when no step inside the window matched, since there is no step to name.
 //
 // Disabled is true on the one refusal that moved the consecutive-failure count to
-// record.OtpConsecutiveFailureLimit, disabling the authenticator until it is rebound, so the
+// record.OTPConsecutiveFailureLimit, disabling the authenticator until it is rebound, so the
 // caller audits the disable exactly once (#489). It never changes what the submitter is told.
 // Current, beside it, is the user's row as the disabling transaction read it under the lock its
 // write holds, which the lockout notice addresses (#724 decision 7); nil otherwise.
@@ -178,14 +178,14 @@ func Establish(ctx context.Context, db Database, dataCipher *encryption.DataCiph
 		generation = 0
 		current = nil
 		var writeErr error
-		established, writeErr = db.TryEstablishUserOTP(ctx, tx, user.Id, user.OtpConfigGeneration, encrypted)
+		established, writeErr = db.TryEstablishUserOTP(ctx, tx, user.ID, user.OTPConfigGeneration, encrypted)
 		if writeErr != nil {
 			return writeErr
 		}
 		if !established {
 			return nil
 		}
-		generation, writeErr = db.IncrementUserOtpConfigGeneration(ctx, tx, user.Id)
+		generation, writeErr = db.IncrementUserOTPConfigGeneration(ctx, tx, user.ID)
 		if writeErr != nil {
 			return writeErr
 		}
@@ -199,27 +199,27 @@ func Establish(ctx context.Context, db Database, dataCipher *encryption.DataCiph
 		// enrollment and whose clear is therefore a no-op. Putting it here rather than at the account
 		// API's own enable branch is what makes "an enabled authenticator has no pending seed behind
 		// it" a property of the transaction rather than of one caller (#247).
-		if clearErr := db.ClearPendingOTPEnrollment(ctx, tx, user.Id); clearErr != nil {
+		if clearErr := db.ClearPendingOTPEnrollment(ctx, tx, user.ID); clearErr != nil {
 			return clearErr
 		}
 		// The rebind clears the consecutive-failure count, in the same transaction as the
 		// establish: the count disables the authenticator at
-		// record.OtpConsecutiveFailureLimit until it is rebound, and rebinding is this
+		// record.OTPConsecutiveFailureLimit until it is rebound, and rebinding is this
 		// enrolment (NIST SP 800-63B section 3.2.2, #489). Unconditional for the pending
 		// enrollment's reason: putting it here makes "a bound authenticator starts at no
 		// failed attempts against it" a property of the transaction rather than of one
 		// caller.
-		if clearErr := db.ClearUserOtpConsecutiveFailures(ctx, tx, user.Id); clearErr != nil {
+		if clearErr := db.ClearUserOTPConsecutiveFailures(ctx, tx, user.ID); clearErr != nil {
 			return clearErr
 		}
 		// The new authenticator's recovery codes, replacing any set the user still had, in the
 		// same transaction: whatever the path, a committed authenticator comes with its set and a
 		// rolled back one leaves none behind (#257 decision 1). Only their hashes are stored.
-		if writeErr = db.ReplaceUserRecoveryCodes(ctx, tx, user.Id, codeHashes); writeErr != nil {
+		if writeErr = db.ReplaceUserRecoveryCodes(ctx, tx, user.ID, codeHashes); writeErr != nil {
 			return writeErr
 		}
 		// The row the establish holds, read last, so it is the account the change commits beside.
-		current, writeErr = db.GetUserByIdForUpdate(ctx, tx, user.Id)
+		current, writeErr = db.GetUserByIDForUpdate(ctx, tx, user.ID)
 		return writeErr
 	})
 	if err != nil {
@@ -231,7 +231,7 @@ func Establish(ctx context.Context, db Database, dataCipher *encryption.DataCiph
 
 	user.OTPSecretEncrypted = encrypted
 	user.OTPEnabled = true
-	user.OtpConfigGeneration = generation
+	user.OTPConfigGeneration = generation
 	return generation, codes, current, true, nil
 }
 
@@ -304,7 +304,7 @@ func Remove(ctx context.Context, db Database, user *record.User) (current *recor
 		}
 		// The row the removal holds, read last; RemoveTx leaves it out, since the recover command
 		// tells nobody.
-		current, writeErr = db.GetUserByIdForUpdate(ctx, tx, user.Id)
+		current, writeErr = db.GetUserByIDForUpdate(ctx, tx, user.ID)
 		return writeErr
 	})
 	if err != nil {
@@ -333,20 +333,20 @@ func Remove(ctx context.Context, db Database, user *record.User) (current *recor
 // sessions afterwards sweeps the rows it wrote, in the same transaction, so no committed state
 // can hold the authenticator gone and a session still naming it either way.
 func RemoveTx(ctx context.Context, db Database, tx *sql.Tx, user *record.User) (removed bool, err error) {
-	removed, err = db.TryRemoveUserOTP(ctx, tx, user.Id, user.OtpConfigGeneration)
+	removed, err = db.TryRemoveUserOTP(ctx, tx, user.ID, user.OTPConfigGeneration)
 	if err != nil {
 		return false, err
 	}
 	if !removed {
 		return false, nil
 	}
-	if err = db.ResetUserOTPStep(ctx, tx, user.Id); err != nil {
+	if err = db.ResetUserOTPStep(ctx, tx, user.ID); err != nil {
 		return false, err
 	}
 	// The authenticator's recovery codes go with it, used and unused, so every path that removes
 	// one, the account page, the administrator's and the recover command's, clears them; the next
 	// authenticator comes with a set of its own (#257 decision 3).
-	if err = db.DeleteUserRecoveryCodes(ctx, tx, user.Id); err != nil {
+	if err = db.DeleteUserRecoveryCodes(ctx, tx, user.ID); err != nil {
 		return false, err
 	}
 	// The counter that tells every one of this user's sessions they owe a second factor
@@ -359,10 +359,10 @@ func RemoveTx(ctx context.Context, db Database, tx *sql.Tx, user *record.User) (
 	// Its error is returned rather than discarded, and that is the other half of decision 2:
 	// a removal that commits without the counter moving is precisely the state the re-prompt
 	// exists to prevent.
-	if _, err = db.IncrementUserOtpConfigGeneration(ctx, tx, user.Id); err != nil {
+	if _, err = db.IncrementUserOTPConfigGeneration(ctx, tx, user.ID); err != nil {
 		return false, err
 	}
-	return removed, db.LowerUserSessionsToPassword(ctx, tx, user.Id, oidc.AuthMethodPassword.String())
+	return removed, db.LowerUserSessionsToPassword(ctx, tx, user.ID, oidc.AuthMethodPassword.String())
 }
 
 // VerifyStored checks a passcode against the authenticator the user has enrolled, and claims the
@@ -381,7 +381,7 @@ func RemoveTx(ctx context.Context, db Database, tx *sql.Tx, user *record.User) (
 //
 // VerifyStored also counts. Every attempt it refuses as a wrong code or a replayed one
 // advances the consecutive-failure count that disables the authenticator at
-// record.OtpConsecutiveFailureLimit, and an authenticator already at the limit is
+// record.OTPConsecutiveFailureLimit, and an authenticator already at the limit is
 // disabled: it answers as a wrong code does, and the claim's own predicate holds the
 // row's count under the limit, so the disable answers the row rather than the caller's
 // snapshot of it (NIST SP 800-63B section 3.2.2, #489). The refusal that moved the count
@@ -397,7 +397,7 @@ func VerifyStored(ctx context.Context, db Database, dataCipher *encryption.DataC
 	// Before the seed is touched, for the replay's reason: nothing about the refusal
 	// tells the submitter whether the code matched, was replayed, or was never looked at
 	// (#111).
-	if user.OtpConsecutiveFailures >= record.OtpConsecutiveFailureLimit {
+	if user.OTPConsecutiveFailures >= record.OTPConsecutiveFailureLimit {
 		return VerifyResult{Outcome: OutcomeWrong}, nil
 	}
 
@@ -406,7 +406,7 @@ func VerifyStored(ctx context.Context, db Database, dataCipher *encryption.DataC
 		return VerifyResult{}, err
 	}
 	result, err := verify(secret, code, now, func(step int64) (bool, error) {
-		return db.TryConsumeEnrolledUserOTPStep(ctx, nil, user.Id, step, user.OtpConfigGeneration)
+		return db.TryConsumeEnrolledUserOTPStep(ctx, nil, user.ID, step, user.OTPConfigGeneration)
 	})
 	if err != nil {
 		return VerifyResult{}, err
@@ -425,11 +425,11 @@ func VerifyStored(ctx context.Context, db Database, dataCipher *encryption.DataC
 		err := db.RunInTransaction(ctx, func(tx *sql.Tx) error {
 			current = nil
 			var writeErr error
-			disabled, writeErr = db.IncrementUserOtpConsecutiveFailures(ctx, tx, user.Id, user.OtpConfigGeneration)
+			disabled, writeErr = db.IncrementUserOTPConsecutiveFailures(ctx, tx, user.ID, user.OTPConfigGeneration)
 			if writeErr != nil || !disabled {
 				return writeErr
 			}
-			current, writeErr = db.GetUserByIdForUpdate(ctx, tx, user.Id)
+			current, writeErr = db.GetUserByIDForUpdate(ctx, tx, user.ID)
 			return writeErr
 		})
 		if err != nil {
@@ -457,7 +457,7 @@ func VerifyStored(ctx context.Context, db Database, dataCipher *encryption.DataC
 func VerifySupplied(ctx context.Context, db Database, user *record.User, seed string, code string,
 	now time.Time) (VerifyResult, error) {
 	return verify(seed, code, now, func(step int64) (bool, error) {
-		return db.TryConsumeUserOTPStep(ctx, nil, user.Id, step)
+		return db.TryConsumeUserOTPStep(ctx, nil, user.ID, step)
 	})
 }
 

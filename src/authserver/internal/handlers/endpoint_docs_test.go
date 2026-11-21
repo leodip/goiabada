@@ -255,10 +255,10 @@ func assertNamedTable(r guard.Reporter, root string, section conceptSection, col
 func clientLogoCacheControl(t *testing.T) string {
 	t.Helper()
 	database := datamocks.NewDatabase(t)
-	client := &record.Client{Id: 1, ClientIdentifier: "my-app"}
+	client := &record.Client{ID: 1, ClientIdentifier: "my-app"}
 	database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "my-app").Return(client, nil)
-	database.On("GetClientLogoByClientId", mock.Anything, (*sql.Tx)(nil), int64(1)).
-		Return(&record.ClientLogo{ClientId: 1, Logo: createTestLogoData(10, 10), ContentType: "image/png"}, nil)
+	database.On("GetClientLogoByClientID", mock.Anything, (*sql.Tx)(nil), int64(1)).
+		Return(&record.ClientLogo{ClientID: 1, Logo: createTestLogoData(10, 10), ContentType: "image/png"}, nil)
 
 	req := withPathValue(httptest.NewRequest(http.MethodGet, "/client/logo/my-app", nil), "clientIdentifier", "my-app")
 	rr := httptest.NewRecorder()
@@ -273,10 +273,10 @@ func clientLogoCacheControl(t *testing.T) string {
 func profilePictureCacheControl(t *testing.T) string {
 	t.Helper()
 	database := datamocks.NewDatabase(t)
-	user := &record.User{Id: 1, Subject: "2bd9ff17-7cb1-4c11-8d6d-6a3e1a0f5a6b", Enabled: true}
+	user := &record.User{ID: 1, Subject: "2bd9ff17-7cb1-4c11-8d6d-6a3e1a0f5a6b", Enabled: true}
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), user.Subject).Return(user, nil)
-	database.On("GetUserProfilePictureByUserId", mock.Anything, (*sql.Tx)(nil), int64(1)).
-		Return(&record.UserProfilePicture{UserId: 1, Picture: createTestLogoData(10, 10), ContentType: "image/png"}, nil)
+	database.On("GetUserProfilePictureByUserID", mock.Anything, (*sql.Tx)(nil), int64(1)).
+		Return(&record.UserProfilePicture{UserID: 1, Picture: createTestLogoData(10, 10), ContentType: "image/png"}, nil)
 
 	req := withPathValue(httptest.NewRequest(http.MethodGet, "/userinfo/picture/"+user.Subject, nil), "subject", user.Subject)
 	rr := httptest.NewRecorder()
@@ -346,10 +346,10 @@ type registrationRefusal struct {
 // error: registration turned off, a body that is not JSON, metadata it refuses, a redirect URI or
 // sign-out redirect URI it refuses, missing settings, and a write the database refuses.
 func registrationRefusals() []registrationRefusal {
-	on := &record.Settings{Id: 1, DynamicClientRegistrationEnabled: true}
+	on := &record.Settings{ID: 1, DynamicClientRegistrationEnabled: true}
 	valid := `{"redirect_uris":["http://127.0.0.1/callback"],"token_endpoint_auth_method":"none"}`
 	return []registrationRefusal{
-		{name: "registration off", settings: &record.Settings{Id: 1}, body: valid},
+		{name: "registration off", settings: &record.Settings{ID: 1}, body: valid},
 		{name: "a body that is not JSON", settings: on, body: `{`},
 		{name: "an unsupported grant", settings: on, body: `{"grant_types":["password"]}`},
 		{name: "a refused redirect URI", settings: on, body: `{"redirect_uris":["ftp://example.com/cb"]}`},

@@ -21,8 +21,8 @@ func twoAcceptances() []api.LegalDocumentAcceptanceResponse {
 	earlier := time.Date(2026, 10, 20, 9, 30, 0, 0, time.UTC)
 	url := "https://auth.example/legal/terms/versions/2"
 	return []api.LegalDocumentAcceptanceResponse{
-		{Id: 4, AcceptedAt: &accepted, LegalDocumentId: 8, ShortName: "house", Version: 1, Title: "Regras da casa", Retired: true},
-		{Id: 3, AcceptedAt: &earlier, LegalDocumentId: 7, ShortName: "terms", Version: 2, Title: "Termos de uso", URL: &url},
+		{ID: 4, AcceptedAt: &accepted, LegalDocumentID: 8, ShortName: "house", Version: 1, Title: "Regras da casa", Retired: true},
+		{ID: 3, AcceptedAt: &earlier, LegalDocumentID: 7, ShortName: "terms", Version: 2, Title: "Termos de uso", URL: &url},
 	}
 }
 
@@ -59,7 +59,7 @@ func TestRender_AccountLegalDocuments(t *testing.T) {
 func TestRender_AdminUserLegalDocuments(t *testing.T) {
 	t.Run("acceptances", func(t *testing.T) {
 		out := renderMenuPage(t, "/admin_users_legal_documents.html", map[string]interface{}{
-			"user":        &api.UserResponse{Id: 5, Email: "someone@example.com"},
+			"user":        &api.UserResponse{ID: 5, Email: "someone@example.com"},
 			"acceptances": twoAcceptances(),
 			"page":        "2",
 			"query":       "some",
@@ -81,7 +81,7 @@ func TestRender_AdminUserLegalDocuments(t *testing.T) {
 
 	t.Run("none", func(t *testing.T) {
 		out := renderMenuPage(t, "/admin_users_legal_documents.html", map[string]interface{}{
-			"user":        &api.UserResponse{Id: 5, Email: "someone@example.com"},
+			"user":        &api.UserResponse{ID: 5, Email: "someone@example.com"},
 			"acceptances": []api.LegalDocumentAcceptanceResponse{},
 			"page":        "",
 			"query":       "",

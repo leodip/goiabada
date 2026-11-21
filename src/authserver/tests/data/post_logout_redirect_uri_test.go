@@ -14,21 +14,21 @@ import (
 // A client's sign-out redirect URIs (#147 decision 2): the addresses a sign-out may send the browser
 // back to, kept in post_logout_redirect_uris apart from the client's redirect URIs.
 
-func createTestPostLogoutRedirectURI(t *testing.T, clientId int64, uri string) *record.PostLogoutRedirectURI {
+func createTestPostLogoutRedirectURI(t *testing.T, clientID int64, uri string) *record.PostLogoutRedirectURI {
 	t.Helper()
-	signOutURI := &record.PostLogoutRedirectURI{URI: uri, ClientId: clientId}
+	signOutURI := &record.PostLogoutRedirectURI{URI: uri, ClientID: clientID}
 	require.NoError(t, database.CreatePostLogoutRedirectURI(context.Background(), nil, signOutURI), "CreatePostLogoutRedirectURI")
 	return signOutURI
 }
 
 // storedPostLogoutRedirectURIs is the URIs a client's stored sign-out list holds, in no particular order.
-func storedPostLogoutRedirectURIs(t *testing.T, clientId int64) []string {
+func storedPostLogoutRedirectURIs(t *testing.T, clientID int64) []string {
 	t.Helper()
-	rows, err := database.GetPostLogoutRedirectURIsByClientId(context.Background(), nil, clientId)
-	require.NoError(t, err, "GetPostLogoutRedirectURIsByClientId")
+	rows, err := database.GetPostLogoutRedirectURIsByClientID(context.Background(), nil, clientID)
+	require.NoError(t, err, "GetPostLogoutRedirectURIsByClientID")
 	uris := []string{}
 	for _, row := range rows {
-		assert.Equal(t, clientId, row.ClientId, "a client's rows name that client")
+		assert.Equal(t, clientID, row.ClientID, "a client's rows name that client")
 		uris = append(uris, row.URI)
 	}
 	return uris
@@ -49,45 +49,45 @@ func clientIdentifiersHolding(t *testing.T, uri string) []string {
 func TestCreatePostLogoutRedirectURI(t *testing.T) {
 	client := createTestClient(t)
 
-	signOutURI := createTestPostLogoutRedirectURI(t, client.Id, "https://app.example/signed-out")
-	assert.NotZero(t, signOutURI.Id, "the row's id is set")
+	signOutURI := createTestPostLogoutRedirectURI(t, client.ID, "https://app.example/signed-out")
+	assert.NotZero(t, signOutURI.ID, "the row's id is set")
 	require.True(t, signOutURI.CreatedAt.Valid, "created_at is set")
-	createTestPostLogoutRedirectURI(t, client.Id, "com.example.app:/signed-out?state=fixed")
+	createTestPostLogoutRedirectURI(t, client.ID, "com.example.app:/signed-out?state=fixed")
 
 	assert.ElementsMatch(t, []string{"https://app.example/signed-out", "com.example.app:/signed-out?state=fixed"},
-		storedPostLogoutRedirectURIs(t, client.Id))
+		storedPostLogoutRedirectURIs(t, client.ID))
 
-	rows, err := database.GetPostLogoutRedirectURIsByClientId(context.Background(), nil, client.Id)
+	rows, err := database.GetPostLogoutRedirectURIsByClientID(context.Background(), nil, client.ID)
 	require.NoError(t, err)
 	for _, row := range rows {
 		if row.URI == "https://app.example/signed-out" {
-			assert.Equal(t, signOutURI.Id, row.Id, "the row read back is the row written")
+			assert.Equal(t, signOutURI.ID, row.ID, "the row read back is the row written")
 			assert.WithinDuration(t, signOutURI.CreatedAt.Time, row.CreatedAt.Time, time.Millisecond, "with its created_at")
 		}
 	}
 
-	assert.Empty(t, storedPostLogoutRedirectURIs(t, createTestClient(t).Id), "another client lists nothing")
+	assert.Empty(t, storedPostLogoutRedirectURIs(t, createTestClient(t).ID), "another client lists nothing")
 }
 
-func TestCreatePostLogoutRedirectURI_RefusesAZeroClientId(t *testing.T) {
+func TestCreatePostLogoutRedirectURI_RefusesAZeroClientID(t *testing.T) {
 	err := database.CreatePostLogoutRedirectURI(context.Background(), nil,
-		&record.PostLogoutRedirectURI{URI: "https://app.example/signed-out", ClientId: 0})
+		&record.PostLogoutRedirectURI{URI: "https://app.example/signed-out", ClientID: 0})
 	require.Error(t, err, "a sign-out redirect URI of no client is refused")
 }
 
 // The list is kept apart from the redirect URIs: a row of one is never a row of the other.
 func TestCreatePostLogoutRedirectURI_IsNotARedirectURI(t *testing.T) {
 	client := createTestClient(t)
-	createTestPostLogoutRedirectURI(t, client.Id, "https://app.example/signed-out")
+	createTestPostLogoutRedirectURI(t, client.ID, "https://app.example/signed-out")
 	require.NoError(t, database.CreateRedirectURI(context.Background(), nil,
-		&record.RedirectURI{URI: "https://app.example/callback", ClientId: client.Id}))
+		&record.RedirectURI{URI: "https://app.example/callback", ClientID: client.ID}))
 
-	redirectURIs, err := database.GetRedirectURIsByClientId(context.Background(), nil, client.Id)
+	redirectURIs, err := database.GetRedirectURIsByClientID(context.Background(), nil, client.ID)
 	require.NoError(t, err)
 	require.Len(t, redirectURIs, 1, "the sign-out redirect URI is not among the redirect URIs")
 	assert.Equal(t, "https://app.example/callback", redirectURIs[0].URI)
 
-	assert.Equal(t, []string{"https://app.example/signed-out"}, storedPostLogoutRedirectURIs(t, client.Id),
+	assert.Equal(t, []string{"https://app.example/signed-out"}, storedPostLogoutRedirectURIs(t, client.ID),
 		"and the redirect URI is not among the sign-out redirect URIs")
 }
 
@@ -97,8 +97,8 @@ func TestCreatePostLogoutRedirectURI_AURIAtTheBoundRoundTrips(t *testing.T) {
 	for _, tc := range redirectURIsAtTheBound(t) {
 		t.Run(tc.name, func(t *testing.T) {
 			client := createTestClient(t)
-			createTestPostLogoutRedirectURI(t, client.Id, tc.value)
-			assert.Equal(t, []string{tc.value}, storedPostLogoutRedirectURIs(t, client.Id),
+			createTestPostLogoutRedirectURI(t, client.ID, tc.value)
+			assert.Equal(t, []string{tc.value}, storedPostLogoutRedirectURIs(t, client.ID),
 				"the sign-out redirect URI did not round-trip unchanged")
 		})
 	}
@@ -107,32 +107,32 @@ func TestCreatePostLogoutRedirectURI_AURIAtTheBoundRoundTrips(t *testing.T) {
 func TestDeletePostLogoutRedirectURI(t *testing.T) {
 	client := createTestClient(t)
 	other := createTestClient(t)
-	createTestPostLogoutRedirectURI(t, client.Id, "https://app.example/kept")
-	removed := createTestPostLogoutRedirectURI(t, client.Id, "https://app.example/removed")
-	createTestPostLogoutRedirectURI(t, other.Id, "https://app.example/removed")
+	createTestPostLogoutRedirectURI(t, client.ID, "https://app.example/kept")
+	removed := createTestPostLogoutRedirectURI(t, client.ID, "https://app.example/removed")
+	createTestPostLogoutRedirectURI(t, other.ID, "https://app.example/removed")
 
-	require.NoError(t, database.DeletePostLogoutRedirectURI(context.Background(), nil, removed.Id))
+	require.NoError(t, database.DeletePostLogoutRedirectURI(context.Background(), nil, removed.ID))
 
-	assert.Equal(t, []string{"https://app.example/kept"}, storedPostLogoutRedirectURIs(t, client.Id), "only that row went")
-	assert.Equal(t, []string{"https://app.example/removed"}, storedPostLogoutRedirectURIs(t, other.Id),
+	assert.Equal(t, []string{"https://app.example/kept"}, storedPostLogoutRedirectURIs(t, client.ID), "only that row went")
+	assert.Equal(t, []string{"https://app.example/removed"}, storedPostLogoutRedirectURIs(t, other.ID),
 		"another client's row of the same URI stays")
 }
 
 func TestClientLoadPostLogoutRedirectURIs(t *testing.T) {
 	client := createTestClient(t)
-	first := createTestPostLogoutRedirectURI(t, client.Id, "https://app.example/one")
-	second := createTestPostLogoutRedirectURI(t, client.Id, "https://app.example/two")
-	createTestPostLogoutRedirectURI(t, createTestClient(t).Id, "https://app.example/another-clients")
+	first := createTestPostLogoutRedirectURI(t, client.ID, "https://app.example/one")
+	second := createTestPostLogoutRedirectURI(t, client.ID, "https://app.example/two")
+	createTestPostLogoutRedirectURI(t, createTestClient(t).ID, "https://app.example/another-clients")
 
 	require.NoError(t, database.ClientLoadPostLogoutRedirectURIs(context.Background(), nil, client))
 
 	ids := []int64{}
 	uris := []string{}
 	for _, row := range client.PostLogoutRedirectURIs {
-		ids = append(ids, row.Id)
+		ids = append(ids, row.ID)
 		uris = append(uris, row.URI)
 	}
-	assert.ElementsMatch(t, []int64{first.Id, second.Id}, ids, "the client's own rows are loaded")
+	assert.ElementsMatch(t, []int64{first.ID, second.ID}, ids, "the client's own rows are loaded")
 	assert.ElementsMatch(t, []string{"https://app.example/one", "https://app.example/two"}, uris)
 	assert.Empty(t, client.RedirectURIs, "and the redirect URIs are left alone")
 
@@ -150,13 +150,13 @@ func TestClientLoadPostLogoutRedirectURIs_AnEmptyListLoadsEmpty(t *testing.T) {
 func TestPostLogoutRedirectURIs_CascadeWithTheirClient(t *testing.T) {
 	client := createTestClient(t)
 	other := createTestClient(t)
-	createTestPostLogoutRedirectURI(t, client.Id, "https://app.example/signed-out")
-	createTestPostLogoutRedirectURI(t, other.Id, "https://app.example/signed-out")
+	createTestPostLogoutRedirectURI(t, client.ID, "https://app.example/signed-out")
+	createTestPostLogoutRedirectURI(t, other.ID, "https://app.example/signed-out")
 
-	require.NoError(t, database.DeleteClient(context.Background(), nil, client.Id))
+	require.NoError(t, database.DeleteClient(context.Background(), nil, client.ID))
 
-	assert.Empty(t, storedPostLogoutRedirectURIs(t, client.Id), "post_logout_redirect_uris must cascade from clients")
-	assert.Equal(t, []string{"https://app.example/signed-out"}, storedPostLogoutRedirectURIs(t, other.Id),
+	assert.Empty(t, storedPostLogoutRedirectURIs(t, client.ID), "post_logout_redirect_uris must cascade from clients")
+	assert.Equal(t, []string{"https://app.example/signed-out"}, storedPostLogoutRedirectURIs(t, other.ID),
 		"and only the deleted client's rows go")
 }
 
@@ -171,27 +171,27 @@ func TestGetClientsByPostLogoutRedirectURI(t *testing.T) {
 	})
 
 	first := createTestClient(t)
-	createTestPostLogoutRedirectURI(t, first.Id, uri)
-	createTestPostLogoutRedirectURI(t, first.Id, "https://lookup-"+random+".example/other")
+	createTestPostLogoutRedirectURI(t, first.ID, uri)
+	createTestPostLogoutRedirectURI(t, first.ID, "https://lookup-"+random+".example/other")
 
 	t.Run("one client holds it", func(t *testing.T) {
 		clients, err := database.GetClientsByPostLogoutRedirectURI(context.Background(), nil, uri)
 		require.NoError(t, err)
 		require.Len(t, clients, 1)
-		assert.Equal(t, first.Id, clients[0].Id)
+		assert.Equal(t, first.ID, clients[0].ID)
 		assert.Equal(t, first.ClientIdentifier, clients[0].ClientIdentifier)
 		assert.Equal(t, "Test Client", clients[0].Description, "the whole client is read")
 	})
 
 	second := createTestClient(t)
-	createTestPostLogoutRedirectURI(t, second.Id, uri)
+	createTestPostLogoutRedirectURI(t, second.ID, uri)
 
 	t.Run("several clients hold it, each once, in id order", func(t *testing.T) {
 		assert.Equal(t, []string{first.ClientIdentifier, second.ClientIdentifier}, clientIdentifiersHolding(t, uri))
 	})
 
 	t.Run("a client holding it twice is answered once", func(t *testing.T) {
-		createTestPostLogoutRedirectURI(t, second.Id, uri)
+		createTestPostLogoutRedirectURI(t, second.ID, uri)
 		assert.Equal(t, []string{first.ClientIdentifier, second.ClientIdentifier}, clientIdentifiersHolding(t, uri))
 	})
 }
@@ -200,7 +200,7 @@ func TestGetClientsByPostLogoutRedirectURI(t *testing.T) {
 func TestGetClientsByPostLogoutRedirectURI_ARedirectURIIsNotFound(t *testing.T) {
 	uri := "https://lookup-" + fake.LetterN(8) + ".example/callback"
 	client := createTestClient(t)
-	require.NoError(t, database.CreateRedirectURI(context.Background(), nil, &record.RedirectURI{URI: uri, ClientId: client.Id}))
+	require.NoError(t, database.CreateRedirectURI(context.Background(), nil, &record.RedirectURI{URI: uri, ClientID: client.ID}))
 
 	assert.Empty(t, clientIdentifiersHolding(t, uri))
 }
@@ -223,7 +223,7 @@ func TestGetClientsByPostLogoutRedirectURI_TheMatchIsExact(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			client := createTestClient(t)
-			createTestPostLogoutRedirectURI(t, client.Id, tc.stored)
+			createTestPostLogoutRedirectURI(t, client.ID, tc.stored)
 
 			assert.Empty(t, clientIdentifiersHolding(t, tc.asked), "%q does not match %q", tc.asked, tc.stored)
 			assert.Equal(t, []string{client.ClientIdentifier}, clientIdentifiersHolding(t, tc.stored),
@@ -237,8 +237,8 @@ func TestGetClientsByPostLogoutRedirectURI_ATrailingSpaceIsAnotherURI(t *testing
 	uri := "https://lookup-" + fake.LetterN(8) + ".example/signed-out"
 	bare := createTestClient(t)
 	padded := createTestClient(t)
-	createTestPostLogoutRedirectURI(t, bare.Id, uri)
-	createTestPostLogoutRedirectURI(t, padded.Id, uri+" ")
+	createTestPostLogoutRedirectURI(t, bare.ID, uri)
+	createTestPostLogoutRedirectURI(t, padded.ID, uri+" ")
 
 	assert.Equal(t, []string{bare.ClientIdentifier}, clientIdentifiersHolding(t, uri))
 	assert.Equal(t, []string{padded.ClientIdentifier}, clientIdentifiersHolding(t, uri+" "))

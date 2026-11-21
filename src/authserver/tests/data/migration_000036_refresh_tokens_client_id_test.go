@@ -9,11 +9,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// refreshTokensClientIdIndex000036 is the index SQLite was missing, and the name the
+// refreshTokensClientIDIndex000036 is the index SQLite was missing, and the name the
 // other three engines have carried since their own 000011.
-const refreshTokensClientIdIndex000036 = "idx_refresh_tokens_client_id"
+const refreshTokensClientIDIndex000036 = "idx_refresh_tokens_client_id"
 
-// TestMigration000036_RefreshTokensClientIdIndex is goal 1 of #282 stated as a test:
+// TestMigration000036_RefreshTokensClientIDIndex is goal 1 of #282 stated as a test:
 // refresh_tokens(client_id) is indexed on all four engines. It runs against an ISOLATED
 // database of the configured dialect (see migration_testdb_helper_test.go).
 //
@@ -39,8 +39,8 @@ const refreshTokensClientIdIndex000036 = "idx_refresh_tokens_client_id"
 //
 // Run per dialect via: ./run-tests.sh --type data --db <sqlite|mysql|postgres|mssql>
 //
-//	--run TestMigration000036_RefreshTokensClientIdIndex
-func TestMigration000036_RefreshTokensClientIdIndex(t *testing.T) {
+//	--run TestMigration000036_RefreshTokensClientIDIndex
+func TestMigration000036_RefreshTokensClientIDIndex(t *testing.T) {
 	t.Parallel()
 
 	h := newIsolatedDB(t)
@@ -54,40 +54,40 @@ func TestMigration000036_RefreshTokensClientIdIndex(t *testing.T) {
 		"control index idx_refresh_token_jti is UNIQUE on every engine; reading it as non-unique means the uniqueness flag is being read backwards")
 
 	if !isSQLite000036() {
-		assertRefreshTokensClientIdIndex000036(t, h, "at 000035")
+		assertRefreshTokensClientIDIndex000036(t, h, "at 000035")
 		return
 	}
 
-	require.False(t, describeIndex(t, h, "refresh_tokens", refreshTokensClientIdIndex000036).Exists,
+	require.False(t, describeIndex(t, h, "refresh_tokens", refreshTokensClientIDIndex000036).Exists,
 		"%s must not exist on SQLite at 000035: that absence is the divergence #282 reports",
-		refreshTokensClientIdIndex000036)
+		refreshTokensClientIDIndex000036)
 
 	require.NoError(t, h.Migrator.Migrate(context.Background(), 36), "apply 000036")
-	assertRefreshTokensClientIdIndex000036(t, h, "after apply")
+	assertRefreshTokensClientIDIndex000036(t, h, "after apply")
 
 	require.NoError(t, h.Migrator.Migrate(context.Background(), 35), "roll back 000036")
-	assert.False(t, describeIndex(t, h, "refresh_tokens", refreshTokensClientIdIndex000036).Exists,
-		"%s must be gone after rolling back to 000035", refreshTokensClientIdIndex000036)
+	assert.False(t, describeIndex(t, h, "refresh_tokens", refreshTokensClientIDIndex000036).Exists,
+		"%s must be gone after rolling back to 000035", refreshTokensClientIDIndex000036)
 
 	require.NoError(t, h.Migrator.Migrate(context.Background(), 36), "re-apply 000036")
-	assertRefreshTokensClientIdIndex000036(t, h, "after down/up round trip")
+	assertRefreshTokensClientIDIndex000036(t, h, "after down/up round trip")
 }
 
-// assertRefreshTokensClientIdIndex000036 checks the index's shape in the catalog: present,
+// assertRefreshTokensClientIDIndex000036 checks the index's shape in the catalog: present,
 // covering exactly client_id, and not unique. Not unique matters as much as present, since
 // a client holds many refresh tokens and a unique index here would refuse the second one.
-func assertRefreshTokensClientIdIndex000036(t *testing.T, h *isolatedDB, phase string) {
+func assertRefreshTokensClientIDIndex000036(t *testing.T, h *isolatedDB, phase string) {
 	t.Helper()
 
-	shape := describeIndex(t, h, "refresh_tokens", refreshTokensClientIdIndex000036)
+	shape := describeIndex(t, h, "refresh_tokens", refreshTokensClientIDIndex000036)
 
 	require.Truef(t, shape.Exists, "[%s] %s is missing on %s",
-		phase, refreshTokensClientIdIndex000036, dbType())
+		phase, refreshTokensClientIDIndex000036, dbType())
 	assert.Equalf(t, []string{"client_id"}, shape.Columns,
-		"[%s] %s must cover exactly client_id", phase, refreshTokensClientIdIndex000036)
+		"[%s] %s must cover exactly client_id", phase, refreshTokensClientIDIndex000036)
 	assert.Falsef(t, shape.Unique,
 		"[%s] %s must NOT be unique: a client holds many refresh tokens",
-		phase, refreshTokensClientIdIndex000036)
+		phase, refreshTokensClientIDIndex000036)
 }
 
 func isSQLite000036() bool {

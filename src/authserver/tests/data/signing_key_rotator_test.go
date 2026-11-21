@@ -55,7 +55,7 @@ func TestRotator_Rotate_MovesEveryKeyOneStep(t *testing.T) {
 	for i := range keyPairs {
 		kp := &keyPairs[i]
 		if existing, duplicate := byState[kp.State]; duplicate {
-			t.Fatalf("Two key pairs in state %s: ids %d and %d", kp.State, existing.Id, kp.Id)
+			t.Fatalf("Two key pairs in state %s: ids %d and %d", kp.State, existing.ID, kp.ID)
 		}
 		byState[kp.State] = kp
 	}
@@ -66,9 +66,9 @@ func TestRotator_Rotate_MovesEveryKeyOneStep(t *testing.T) {
 	if newPrevious == nil {
 		t.Fatal("Expected a previous key after rotating")
 	}
-	if newPrevious.Id != current.Id {
+	if newPrevious.ID != current.ID {
 		t.Errorf("Expected the old current key (id %d) to be previous, got id %d",
-			current.Id, newPrevious.Id)
+			current.ID, newPrevious.ID)
 	}
 
 	// The old next key is now current, so the deployment can still sign.
@@ -76,20 +76,20 @@ func TestRotator_Rotate_MovesEveryKeyOneStep(t *testing.T) {
 	if newCurrent == nil {
 		t.Fatal("Expected a current key after rotating")
 	}
-	if newCurrent.Id != next.Id {
+	if newCurrent.ID != next.ID {
 		t.Errorf("Expected the old next key (id %d) to be current, got id %d",
-			next.Id, newCurrent.Id)
+			next.ID, newCurrent.ID)
 	}
 
 	// The key that was previous before the rotation is gone, which is the one deletion
 	// the rotation is entitled to make.
-	deleted, err := database.GetKeyPairById(context.Background(), nil, previous.Id)
+	deleted, err := database.GetKeyPairByID(context.Background(), nil, previous.ID)
 	if err != nil {
 		t.Fatalf("Failed to look up the old previous key: %v", err)
 	}
 	if deleted != nil {
 		t.Errorf("Expected the old previous key (id %d) to be gone, it is still in state %s",
-			previous.Id, deleted.State)
+			previous.ID, deleted.State)
 	}
 
 	// A freshly generated next key, not a row moved from somewhere else.
@@ -97,8 +97,8 @@ func TestRotator_Rotate_MovesEveryKeyOneStep(t *testing.T) {
 	if newNext == nil {
 		t.Fatal("Expected a next key after rotating")
 	}
-	if newNext.Id == previous.Id || newNext.Id == current.Id || newNext.Id == next.Id {
-		t.Errorf("Expected a newly created next key, got the seeded id %d", newNext.Id)
+	if newNext.ID == previous.ID || newNext.ID == current.ID || newNext.ID == next.ID {
+		t.Errorf("Expected a newly created next key, got the seeded id %d", newNext.ID)
 	}
 	if newNext.KeyIdentifier == next.KeyIdentifier {
 		t.Error("Expected the new next key to carry a fresh key identifier")
@@ -106,7 +106,7 @@ func TestRotator_Rotate_MovesEveryKeyOneStep(t *testing.T) {
 	if newNext.Type != "RSA" || newNext.Algorithm != "RS256" {
 		t.Errorf("Expected an RSA/RS256 key, got %s/%s", newNext.Type, newNext.Algorithm)
 	}
-	if len(newNext.PublicKeyASN1_DER) == 0 || len(newNext.PublicKeyJWK) == 0 {
+	if len(newNext.PublicKeyASN1DER) == 0 || len(newNext.PublicKeyJWK) == 0 {
 		t.Error("Expected the new next key to carry its DER and JWK encodings")
 	}
 
@@ -126,8 +126,8 @@ func TestRotator_Rotate_MovesEveryKeyOneStep(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to get the current signing key: %v", err)
 	}
-	if signingKey.Id != next.Id {
-		t.Errorf("Expected the current signing key to be id %d, got id %d", next.Id, signingKey.Id)
+	if signingKey.ID != next.ID {
+		t.Errorf("Expected the current signing key to be id %d, got id %d", next.ID, signingKey.ID)
 	}
 }
 
@@ -148,7 +148,7 @@ func TestRotator_Rotate_RefusesWithNoNextKeyAndKeepsThePrevious(t *testing.T) {
 
 	// Nothing moved. The previous key is the whole point: the old code deleted it before
 	// discovering it could not rotate, retiring every token it had signed (#251).
-	survivor, err := database.GetKeyPairById(context.Background(), nil, previous.Id)
+	survivor, err := database.GetKeyPairByID(context.Background(), nil, previous.ID)
 	if err != nil {
 		t.Fatalf("Failed to look up the previous key: %v", err)
 	}
@@ -159,7 +159,7 @@ func TestRotator_Rotate_RefusesWithNoNextKeyAndKeepsThePrevious(t *testing.T) {
 		t.Errorf("Expected the previous key to be untouched, it is in state %s", survivor.State)
 	}
 
-	stillCurrent, err := database.GetKeyPairById(context.Background(), nil, current.Id)
+	stillCurrent, err := database.GetKeyPairByID(context.Background(), nil, current.ID)
 	if err != nil {
 		t.Fatalf("Failed to look up the current key: %v", err)
 	}

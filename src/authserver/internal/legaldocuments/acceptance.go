@@ -13,7 +13,7 @@ import (
 // adds one, and the transaction they run in. data.Database satisfies it.
 type AcceptanceDatabase interface {
 	CreateLegalDocumentAcceptance(ctx context.Context, tx *sql.Tx, acceptance *record.LegalDocumentAcceptance) error
-	GetLegalDocumentAcceptancesByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.LegalDocumentAcceptance, error)
+	GetLegalDocumentAcceptancesByUserID(ctx context.Context, tx *sql.Tx, userID int64) ([]record.LegalDocumentAcceptance, error)
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 }
 
@@ -25,31 +25,31 @@ type AcceptanceDatabase interface {
 // accepted; the engine refuses the second insert on the user and version's key, and the loser runs
 // again (data.RunInTransactionRetryingConflict), reads the winner's row and writes nothing for it.
 // The audit records stay with the caller, after the commit, written from what this answers.
-func RecordAcceptances(ctx context.Context, db AcceptanceDatabase, userId int64,
-	versionIds []int64) ([]record.LegalDocumentAcceptance, error) {
+func RecordAcceptances(ctx context.Context, db AcceptanceDatabase, userID int64,
+	versionIDs []int64) ([]record.LegalDocumentAcceptance, error) {
 
 	var written []record.LegalDocumentAcceptance
 	err := data.RunInTransactionRetryingConflict(ctx, db, func(tx *sql.Tx) error {
 		// Set by the attempt that commits, so a rerun's rows replace a first attempt's.
 		written = nil
-		acceptances, err := db.GetLegalDocumentAcceptancesByUserId(ctx, tx, userId)
+		acceptances, err := db.GetLegalDocumentAcceptancesByUserID(ctx, tx, userID)
 		if err != nil {
 			return err
 		}
 		accepted := make(map[int64]bool, len(acceptances))
 		for _, acceptance := range acceptances {
-			accepted[acceptance.LegalDocumentVersionId] = true
+			accepted[acceptance.LegalDocumentVersionID] = true
 		}
 		now := time.Now().UTC()
-		for _, versionId := range versionIds {
-			if accepted[versionId] {
+		for _, versionID := range versionIDs {
+			if accepted[versionID] {
 				continue
 			}
-			acceptance := record.LegalDocumentAcceptance{AcceptedAt: now, UserId: userId, LegalDocumentVersionId: versionId}
+			acceptance := record.LegalDocumentAcceptance{AcceptedAt: now, UserID: userID, LegalDocumentVersionID: versionID}
 			if err = db.CreateLegalDocumentAcceptance(ctx, tx, &acceptance); err != nil {
 				return err
 			}
-			accepted[versionId] = true
+			accepted[versionID] = true
 			written = append(written, acceptance)
 		}
 		return nil

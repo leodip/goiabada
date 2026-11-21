@@ -3,7 +3,7 @@
 {{define "head"}}{{end}}
 
 {{define "page"}}
-{{ template "user_header" (args "legal_documents" .user.Id .user.Email .page .query $.ctx) }}
+{{ template "user_header" (args "legal_documents" .user.ID .user.Email .page .query $.ctx) }}
 
 {{/* Each version the user accepted, the latest first, read only. View text opens the version as it
      was published, a retired document's included. */}}
@@ -29,7 +29,7 @@
         <td data-label="{{ T $.ctx "adminconsole.admin_users.legal_documents.col_version" }}">{{ .Version }}</td>
         <td class="sm:whitespace-nowrap" data-label="{{ T $.ctx "adminconsole.admin_users.legal_documents.col_accepted_at" }}">{{ DateTime $.ctx .AcceptedAt }}</td>
         <td class="cell-actions">
-          <a class="button button-sm" href="/admin/legal-documents/{{ .LegalDocumentId }}/versions/{{ .Version }}">{{ T $.ctx "adminconsole.admin_users.legal_documents.view_text" }}<span class="sr-only"> {{ .Title }}, {{ T $.ctx "adminconsole.admin_legal_documents.common.status_version" "version" .Version }}</span></a>
+          <a class="button button-sm" href="/admin/legal-documents/{{ .LegalDocumentID }}/versions/{{ .Version }}">{{ T $.ctx "adminconsole.admin_users.legal_documents.view_text" }}<span class="sr-only"> {{ .Title }}, {{ T $.ctx "adminconsole.admin_legal_documents.common.status_version" "version" .Version }}</span></a>
         </td>
       </tr>
       {{ end }}

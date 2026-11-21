@@ -35,7 +35,7 @@ func assertBoundTokenResponse(t *testing.T, response *oauth.TokenResponse) {
 	assert.Equal(t, map[string]interface{}{"jkt": boundThumbprint}, claims["cnf"], "cnf.jkt is the key's thumbprint")
 	assert.Equal(t, "Bearer", claims["typ"], "the body's typ is the access-token label, bound or not")
 
-	for name, token := range map[string]string{"ID": response.IdToken, "refresh": response.RefreshToken} {
+	for name, token := range map[string]string{"ID": response.IDToken, "refresh": response.RefreshToken} {
 		if token == "" {
 			continue
 		}
@@ -49,11 +49,11 @@ func TestBoundAccessToken_AuthorizationCodeGrant(t *testing.T) {
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 	code := sessionBoundCode(testStart)
 
-	mockDB.On("MarkCodeAsUsed", mock.Anything, mock.Anything, code.Id).Return(true, nil)
+	mockDB.On("MarkCodeAsUsed", mock.Anything, mock.Anything, code.ID).Return(true, nil)
 	mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, code).Return(nil)
 	mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, code).Return(nil)
 	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "session-1").
-		Return(&record.UserSession{Id: 1, UserId: 1, Started: testStart.Add(-10 * time.Minute)}, nil)
+		Return(&record.UserSession{ID: 1, UserID: 1, Started: testStart.Add(-10 * time.Minute)}, nil)
 	expectSigningKeyAndUserLoads(t, mockDB)
 	row := captureRefreshTokenRow(mockDB)
 
@@ -61,14 +61,14 @@ func TestBoundAccessToken_AuthorizationCodeGrant(t *testing.T) {
 	require.NoError(t, err)
 
 	assertBoundTokenResponse(t, response)
-	require.NotEmpty(t, response.IdToken)
+	require.NotEmpty(t, response.IDToken)
 	require.NotEmpty(t, response.RefreshToken)
 	assertWholeAccessToken(t, response.AccessToken, testStart, 600, map[string]interface{}{
 		"iss":                   "https://test-issuer.com",
 		"sub":                   code.User.Subject,
 		"client_id":             "web-app",
 		"client_internal_id":    float64(1),
-		"grant_id":              row.FirstRefreshTokenJti,
+		"grant_id":              row.FirstRefreshTokenJTI,
 		"auth_time":             float64(testStart.Add(-5 * time.Minute).Unix()),
 		"acr":                   "urn:goiabada:level1",
 		"amr":                   []interface{}{"pwd"},
@@ -87,16 +87,16 @@ func TestBoundAccessToken_RefreshOfACodeGrant(t *testing.T) {
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 	code := sessionBoundCode(testStart)
 	parent := &record.RefreshToken{
-		Id:                   2,
-		RefreshTokenJti:      "parent-jti",
-		FirstRefreshTokenJti: "family-jti",
+		ID:                   2,
+		RefreshTokenJTI:      "parent-jti",
+		FirstRefreshTokenJTI: "family-jti",
 		Scope:                code.Scope,
 		RefreshTokenType:     TokenTypeRefresh.String(),
 	}
 	mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, code).Return(nil)
 	mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, code).Return(nil)
 	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "session-1").
-		Return(&record.UserSession{Id: 1, UserId: 1, Started: testStart.Add(-10 * time.Minute)}, nil)
+		Return(&record.UserSession{ID: 1, UserID: 1, Started: testStart.Add(-10 * time.Minute)}, nil)
 	expectSigningKeyAndUserLoads(t, mockDB)
 	captureRefreshTokenRow(mockDB)
 
@@ -113,10 +113,10 @@ func TestBoundAccessToken_PasswordGrant(t *testing.T) {
 	expectSigningKeyAndUserLoads(t, mockDB)
 	captureRefreshTokenRow(mockDB)
 
-	expectPasswordGrantClientRow(mockDB, 3, &record.Client{Id: 3, ClientIdentifier: "legacy-app"})
+	expectPasswordGrantClientRow(mockDB, 3, &record.Client{ID: 3, ClientIdentifier: "legacy-app"})
 	response, err := tokenIssuer.IssuePasswordGrant(context.Background(), rfc9068Settings(), &ROPCGrantInput{
-		Client:         &record.Client{Id: 3, ClientIdentifier: "legacy-app"},
-		User:           &record.User{Id: 1, Subject: fake.UUID()},
+		Client:         &record.Client{ID: 3, ClientIdentifier: "legacy-app"},
+		User:           &record.User{ID: 1, Subject: fake.UUID()},
 		Scope:          "openid product-api:read",
 		DPoPThumbprint: boundThumbprint,
 	})
@@ -131,15 +131,15 @@ func TestBoundAccessToken_RefreshOfAPasswordGrant(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 	parent := &record.RefreshToken{
-		Id:                   2,
-		RefreshTokenJti:      "parent-jti",
-		FirstRefreshTokenJti: "family-jti",
+		ID:                   2,
+		RefreshTokenJTI:      "parent-jti",
+		FirstRefreshTokenJTI: "family-jti",
 		Scope:                "openid product-api:read",
 		RefreshTokenType:     TokenTypeOffline.String(),
 		MaxLifetime:          sql.NullTime{Time: testStart.Add(time.Hour), Valid: true},
 		AuthenticatedAt:      sql.NullTime{Time: testStart.Add(-time.Hour), Valid: true},
-		User:                 record.User{Id: 1, Subject: fake.UUID()},
-		Client:               record.Client{Id: 3, ClientIdentifier: "legacy-app"},
+		User:                 record.User{ID: 1, Subject: fake.UUID()},
+		Client:               record.Client{ID: 3, ClientIdentifier: "legacy-app"},
 	}
 	mockDB.On("RefreshTokenLoadUser", mock.Anything, mock.Anything, parent).Return(nil)
 	mockDB.On("RefreshTokenLoadClient", mock.Anything, mock.Anything, parent).Return(nil)
@@ -163,7 +163,7 @@ func TestBoundAccessToken_ClientCredentialsGrant(t *testing.T) {
 	}, nil)
 
 	response, err := tokenIssuer.IssueClientCredentialsGrant(context.Background(), rfc9068Settings(),
-		&record.Client{Id: 4, ClientIdentifier: "billing-service"}, "product-api:read", boundThumbprint)
+		&record.Client{ID: 4, ClientIdentifier: "billing-service"}, "product-api:read", boundThumbprint)
 	require.NoError(t, err)
 
 	assertBoundTokenResponse(t, response)

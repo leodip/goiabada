@@ -27,7 +27,7 @@ import (
 // 400 or 401 for a missing row.
 
 const (
-	logoutPostLogoutUri = "https://app.example.com/after-logout"
+	logoutPostLogoutURI = "https://app.example.com/after-logout"
 	logoutClientIdent   = "the-app"
 	logoutSid           = "the-sid"
 )
@@ -37,7 +37,7 @@ var errLogoutLookupFailed = errs.New("the lookup query failed")
 func logoutRequest(t *testing.T, clientIdentifier string) *http.Request {
 	t.Helper()
 	body, err := json.Marshal(api.AccountLogoutRequest{
-		PostLogoutRedirectUri: logoutPostLogoutUri,
+		PostLogoutRedirectURI: logoutPostLogoutURI,
 		ClientIdentifier:      clientIdentifier,
 	})
 	require.NoError(t, err)
@@ -76,7 +76,7 @@ func assertNothingAfterTheClient(t *testing.T, database *datamocks.Database) {
 // record carries the failure, so the 500 names its cause (#414 item 2).
 func TestHandleAccountLogoutRequestPost_ASignOutLookupFailureIsOnTheRecord(t *testing.T) {
 	database := datamocks.NewDatabase(t)
-	database.On("GetClientsByPostLogoutRedirectURI", mock.Anything, mock.Anything, logoutPostLogoutUri).
+	database.On("GetClientsByPostLogoutRedirectURI", mock.Anything, mock.Anything, logoutPostLogoutURI).
 		Return(nil, errLogoutLookupFailed).Once()
 
 	capture := logtest.CaptureSlog(t)
@@ -105,7 +105,7 @@ func TestHandleAccountLogoutRequestPost_ResolvesTheClientFromItsSignOutList(t *t
 
 	t.Run("no client holds the URI", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
-		database.On("GetClientsByPostLogoutRedirectURI", mock.Anything, mock.Anything, logoutPostLogoutUri).
+		database.On("GetClientsByPostLogoutRedirectURI", mock.Anything, mock.Anything, logoutPostLogoutURI).
 			Return([]record.Client{}, nil).Once()
 
 		capture := logtest.CaptureSlog(t)
@@ -118,8 +118,8 @@ func TestHandleAccountLogoutRequestPost_ResolvesTheClientFromItsSignOutList(t *t
 
 	t.Run("two clients hold the URI", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
-		database.On("GetClientsByPostLogoutRedirectURI", mock.Anything, mock.Anything, logoutPostLogoutUri).
-			Return([]record.Client{{Id: 7, ClientIdentifier: logoutClientIdent}, {Id: 8, ClientIdentifier: "another-app"}}, nil).Once()
+		database.On("GetClientsByPostLogoutRedirectURI", mock.Anything, mock.Anything, logoutPostLogoutURI).
+			Return([]record.Client{{ID: 7, ClientIdentifier: logoutClientIdent}, {ID: 8, ClientIdentifier: "another-app"}}, nil).Once()
 
 		capture := logtest.CaptureSlog(t)
 		rr := httptest.NewRecorder()
@@ -133,8 +133,8 @@ func TestHandleAccountLogoutRequestPost_ResolvesTheClientFromItsSignOutList(t *t
 	// resolution passed, and the session row is what the request stopped at.
 	t.Run("one client holds the URI", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
-		database.On("GetClientsByPostLogoutRedirectURI", mock.Anything, mock.Anything, logoutPostLogoutUri).
-			Return([]record.Client{{Id: 7, ClientIdentifier: logoutClientIdent}}, nil).Once()
+		database.On("GetClientsByPostLogoutRedirectURI", mock.Anything, mock.Anything, logoutPostLogoutURI).
+			Return([]record.Client{{ID: 7, ClientIdentifier: logoutClientIdent}}, nil).Once()
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, logoutSid).
 			Return(nil, nil).Once()
 
@@ -168,8 +168,8 @@ func TestHandleAccountLogoutRequestPost_ChecksTheNamedClientsSignOutList(t *test
 		database := datamocks.NewDatabase(t)
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, logoutClientIdent).
 			Return(&record.Client{
-				Id: 7, ClientIdentifier: logoutClientIdent,
-				RedirectURIs: []record.RedirectURI{{URI: logoutPostLogoutUri}},
+				ID: 7, ClientIdentifier: logoutClientIdent,
+				RedirectURIs: []record.RedirectURI{{URI: logoutPostLogoutURI}},
 			}, nil).Once()
 		database.On("ClientLoadPostLogoutRedirectURIs", mock.Anything, mock.Anything, mock.Anything).
 			Run(func(args mock.Arguments) {
@@ -187,7 +187,7 @@ func TestHandleAccountLogoutRequestPost_ChecksTheNamedClientsSignOutList(t *test
 	t.Run("the client's sign-out redirect URIs fail to load", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, logoutClientIdent).
-			Return(&record.Client{Id: 7, ClientIdentifier: logoutClientIdent}, nil).Once()
+			Return(&record.Client{ID: 7, ClientIdentifier: logoutClientIdent}, nil).Once()
 		database.On("ClientLoadPostLogoutRedirectURIs", mock.Anything, mock.Anything, mock.Anything).
 			Return(errLogoutLookupFailed).Once()
 
@@ -243,7 +243,7 @@ func TestHandleAccountLogoutRequestPost_APlainHTTPLoopbackTargetReachesTheClient
 			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, logoutClientIdent).
 				Return(nil, nil).Once()
 
-			body, err := json.Marshal(api.AccountLogoutRequest{PostLogoutRedirectUri: target, ClientIdentifier: logoutClientIdent})
+			body, err := json.Marshal(api.AccountLogoutRequest{PostLogoutRedirectURI: target, ClientIdentifier: logoutClientIdent})
 			require.NoError(t, err)
 			req := httptest.NewRequest(http.MethodPost, "/api/v1/account/logout-request", bytes.NewReader(body))
 			req = setTokenContextWithClaims(req, map[string]interface{}{"sub": "the-user", "sid": logoutSid})
@@ -265,10 +265,10 @@ func TestHandleAccountLogoutRequestPost_APlainHTTPLoopbackTargetReachesTheClient
 // reaches the session.
 func stubResolvedClient(database *datamocks.Database) {
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, logoutClientIdent).
-		Return(&record.Client{Id: 7, ClientIdentifier: logoutClientIdent}, nil).Once()
+		Return(&record.Client{ID: 7, ClientIdentifier: logoutClientIdent}, nil).Once()
 	database.On("ClientLoadPostLogoutRedirectURIs", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
-			args.Get(2).(*record.Client).PostLogoutRedirectURIs = []record.PostLogoutRedirectURI{{URI: logoutPostLogoutUri}}
+			args.Get(2).(*record.Client).PostLogoutRedirectURIs = []record.PostLogoutRedirectURI{{URI: logoutPostLogoutURI}}
 		}).Return(nil).Once()
 }
 
@@ -323,7 +323,7 @@ func TestHandleAccountLogoutRequestPost_Every401CarriesBothChallenges(t *testing
 		{"a session the client is not part of", "Client not part of the current session",
 			map[string]interface{}{"sub": "the-user", "sid": logoutSid}, func(database *datamocks.Database) {
 				database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, logoutSid).
-					Return(&record.UserSession{Id: 3}, nil).Once()
+					Return(&record.UserSession{ID: 3}, nil).Once()
 				database.On("UserSessionLoadClients", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 				database.On("UserSessionClientsLoadClients", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 			}},

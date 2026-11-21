@@ -51,17 +51,17 @@ func TestInitRoutes_ADPoPTokenRequestRefusedBeforeTheHandlerCarriesANonce(t *tes
 	t.Run("the limiter's 429", func(t *testing.T) {
 		server := newRoutesTestServer(t)
 		noPassword := func(attempt int) *http.Request {
-			r := browserForm(http.MethodPost, "/auth/token", "grant_type=password&client_id="+routesTestROPCClientId+
+			r := browserForm(http.MethodPost, "/auth/token", "grant_type=password&client_id="+routesTestROPCClientID+
 				"&username=user"+strconv.Itoa(attempt)+"%40example.com")
-			if attempt == pwdIpCeiling {
+			if attempt == pwdIPCeiling {
 				r.Header.Set("DPoP", "a-proof-not-read-because-the-limiter-refuses")
 			}
 			return r
 		}
 
-		rr := exhaust(t, server, pwdIpCeiling, noPassword)
+		rr := exhaust(t, server, pwdIPCeiling, noPassword)
 
-		assertRefused(t, rr, pwdIpWindow, shapeOAuth)
+		assertRefused(t, rr, pwdIPWindow, shapeOAuth)
 		assertRoutedFreshNonce(t, rr)
 	})
 

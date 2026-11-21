@@ -41,7 +41,7 @@ func newTestRotator(database *datamocks.Database) *Rotator {
 
 func keyPairInState(id int64, state string) record.KeyPair {
 	return record.KeyPair{
-		Id:            id,
+		ID:            id,
 		State:         state,
 		KeyIdentifier: "kid-" + state,
 		Type:          "RSA",
@@ -115,7 +115,7 @@ func TestRotator_Rotate_Success(t *testing.T) {
 	// The replacement key comes from NewKeyPair, so it carries RFC 7468's label (#424).
 	assert.True(t, strings.HasPrefix(string(created.PublicKeyPEM), "-----BEGIN PUBLIC KEY-----\n"),
 		"the replacement key's public PEM is not labelled PUBLIC KEY")
-	assert.NotEmpty(t, created.PublicKeyASN1_DER)
+	assert.NotEmpty(t, created.PublicKeyASN1DER)
 	assert.NotEmpty(t, created.PublicKeyJWK)
 	// The private key is stored encrypted (#83), so the PEM header must not survive, and it is
 	// sealed under the cipher the rotator was built with, so that cipher opens it (#434).

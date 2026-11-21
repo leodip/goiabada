@@ -106,7 +106,7 @@ func (r *administrativeScopeAuditRecorder) Log(_ context.Context, auditEvent str
 // field, the one shape /auth/authorize, /auth/issue and the token endpoint all record (#499
 // decision 9).
 func TestLogAdministrativeScopeRefused_Payload(t *testing.T) {
-	client := &record.Client{Id: 7, ClientIdentifier: "my-reporting-tool"}
+	client := &record.Client{ID: 7, ClientIdentifier: "my-reporting-tool"}
 	recorder := &administrativeScopeAuditRecorder{}
 
 	LogAdministrativeScopeRefused(context.Background(), recorder, client,

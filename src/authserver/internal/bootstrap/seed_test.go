@@ -102,7 +102,7 @@ func assertSeeded(t *testing.T, db *seedDB, cfg Config) string {
 	require.NoError(t, err)
 	assert.False(t, isEmpty, "the database reads as seeded")
 
-	settings, err := db.GetSettingsById(ctx, nil, 1)
+	settings, err := db.GetSettingsByID(ctx, nil, 1)
 	require.NoError(t, err)
 	require.NotNil(t, settings, "the settings row is at id 1, the id every reader asks for")
 	assert.Equal(t, cfg.AppName, settings.AppName)
@@ -146,11 +146,11 @@ func assertSeeded(t *testing.T, db *seedDB, cfg Config) string {
 	// The console signs in at its callback and signs out to its bare base URL, and each address is
 	// on the one list that use reads: the bare URL is no place an authorization code can be sent
 	// (#147 decision 8).
-	redirectURIs, err := db.GetRedirectURIsByClientId(ctx, nil, client.Id)
+	redirectURIs, err := db.GetRedirectURIsByClientID(ctx, nil, client.ID)
 	require.NoError(t, err)
 	assert.Equal(t, []string{"https://admin.example.com/auth/callback"}, storedURIs(redirectURIs, func(u record.RedirectURI) string { return u.URI }),
 		"the console's one redirect URI is its callback")
-	signOutURIs, err := db.GetPostLogoutRedirectURIsByClientId(ctx, nil, client.Id)
+	signOutURIs, err := db.GetPostLogoutRedirectURIsByClientID(ctx, nil, client.ID)
 	require.NoError(t, err)
 	assert.Equal(t, []string{"https://admin.example.com"}, storedURIs(signOutURIs, func(u record.PostLogoutRedirectURI) string { return u.URI }),
 		"the console's one sign-out redirect URI is its bare base URL")
@@ -665,7 +665,7 @@ func TestRun_SeedsTheAppNameTrimmed(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.Equal(t, Continue, outcome)
-			settings, err := db.GetSettingsById(context.Background(), nil, 1)
+			settings, err := db.GetSettingsByID(context.Background(), nil, 1)
 			require.NoError(t, err)
 			require.NotNil(t, settings)
 			assert.Equal(t, c.stored, settings.AppName)

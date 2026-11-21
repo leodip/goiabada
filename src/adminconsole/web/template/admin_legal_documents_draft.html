@@ -12,7 +12,7 @@
      pages use. A retired document is read only until it is restored. errorField names the field a
      refusal is about, which is marked invalid, described by the notice and focused. */}}
 <div class="grid items-start gap-6 xl:grid-cols-2">
-  <form class="panel" id="draftForm" method="post" action="/admin/legal-documents/{{ .doc.Id }}/draft" novalidate>
+  <form class="panel" id="draftForm" method="post" action="/admin/legal-documents/{{ .doc.ID }}/draft" novalidate>
     <div class="panel-body stacked">
       {{ if .error }}
       <div class="notice notice-danger" role="alert" id="draft-error">
@@ -84,7 +84,7 @@
 {{ if and .hasDraft (not .doc.Retired) }}
 {{/* Publish publishes the draft as saved, asked first; the question says what the version will
      mean to users, and that changes not saved are not part of it. */}}
-<form class="panel mt-6" id="publishForm" method="post" action="/admin/legal-documents/{{ .doc.Id }}/publish" data-confirm-dialog="confirmPublish" data-confirm-title="{{ T $.ctx "adminconsole.admin_legal_documents.draft.publish_confirm_title" "version" .nextVersion }}" data-confirm-always="{{ if .mustAccept }}{{ T $.ctx "adminconsole.admin_legal_documents.draft.publish_body_must_accept" "version" .nextVersion }}{{ else }}{{ T $.ctx "adminconsole.admin_legal_documents.draft.publish_body_for_information" "version" .nextVersion }}{{ end }}">
+<form class="panel mt-6" id="publishForm" method="post" action="/admin/legal-documents/{{ .doc.ID }}/publish" data-confirm-dialog="confirmPublish" data-confirm-title="{{ T $.ctx "adminconsole.admin_legal_documents.draft.publish_confirm_title" "version" .nextVersion }}" data-confirm-always="{{ if .mustAccept }}{{ T $.ctx "adminconsole.admin_legal_documents.draft.publish_body_must_accept" "version" .nextVersion }}{{ else }}{{ T $.ctx "adminconsole.admin_legal_documents.draft.publish_body_for_information" "version" .nextVersion }}{{ end }}">
   <div class="panel-body stacked">
     <h2 class="panel-title">{{ T $.ctx "adminconsole.admin_legal_documents.draft.publish_title" }}</h2>
     <p>{{ if .mustAccept }}{{ T $.ctx "adminconsole.admin_legal_documents.draft.publish_body_must_accept" "version" .nextVersion }}{{ else }}{{ T $.ctx "adminconsole.admin_legal_documents.draft.publish_body_for_information" "version" .nextVersion }}{{ end }}</p>

@@ -15,17 +15,17 @@ type Address struct {
 }
 
 type GroupsPostInput struct {
-	AssignedGroupsIds []int64 `json:"assignedGroupsIds"`
-	// ExpectedGroupIds is the set as the page loaded it, passed through unchanged so the auth
+	AssignedGroupsIDs []int64 `json:"assignedGroupsIds"`
+	// ExpectedGroupIDs is the set as the page loaded it, passed through unchanged so the auth
 	// server can refuse a save from an outdated page (#428).
-	ExpectedGroupIds []int64 `json:"expectedGroupIds"`
+	ExpectedGroupIDs []int64 `json:"expectedGroupIds"`
 }
 
 type PermissionsPostInput struct {
-	AssignedPermissionsIds []int64 `json:"assignedPermissionsIds"`
-	// ExpectedPermissionIds is the set as the page loaded it, passed through unchanged so the auth
+	AssignedPermissionsIDs []int64 `json:"assignedPermissionsIds"`
+	// ExpectedPermissionIDs is the set as the page loaded it, passed through unchanged so the auth
 	// server can refuse a save from an outdated page (#428).
-	ExpectedPermissionIds []int64 `json:"expectedPermissionIds"`
+	ExpectedPermissionIDs []int64 `json:"expectedPermissionIds"`
 }
 
 type PageResult struct {
@@ -63,13 +63,13 @@ var userNewErrorFields = map[string]string{
 // groupMembership is a group a user belongs to, as the user's groups tab lists it: the group's id,
 // which the save sends, and its identifier, which the row shows.
 type groupMembership struct {
-	Id              int64
+	ID              int64
 	GroupIdentifier string
 }
 
 // grantedPermission is a permission a user holds, as the user's permissions tab lists it: the
 // permission's id, which the save sends, and its scope, resource:permission, which the row shows.
 type grantedPermission struct {
-	Id    int64
+	ID    int64
 	Scope string
 }

@@ -59,8 +59,8 @@ func (m pwdStepMocks) post() http.HandlerFunc {
 func (m pwdStepMocks) armPasswordCeremony() {
 	m.ceremonyStore.On("GetAuthContext", mock.Anything).Return(&ceremony.AuthContext{
 		AuthState:  ceremony.AuthStateLevel1Password,
-		CeremonyId: testCeremonyId,
-		ClientId:   "test-client",
+		CeremonyID: testCeremonyID,
+		ClientID:   "test-client",
 	}, nil)
 }
 
@@ -70,13 +70,13 @@ func (m pwdStepMocks) armClient() {
 }
 
 func pwdGetRequest() *http.Request {
-	req := httptest.NewRequest(http.MethodGet, "/auth/pwd?ceremony="+testCeremonyId, nil)
+	req := httptest.NewRequest(http.MethodGet, "/auth/pwd?ceremony="+testCeremonyID, nil)
 	return req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 }
 
 func pwdPostRequest(email string, password string) *http.Request {
 	form := url.Values{}
-	form.Add(ceremony.IdField, testCeremonyId)
+	form.Add(ceremony.IDField, testCeremonyID)
 	form.Add("email", email)
 	form.Add("password", password)
 	req := httptest.NewRequest(http.MethodPost, "/auth/pwd", strings.NewReader(form.Encode()))
@@ -150,7 +150,7 @@ func TestHandleAuthPwdPost_AClientReadFailingOnARefusalAnswers500AfterTheCredent
 	passwordHash, err := passwordhash.Hash("testpassword")
 	require.NoError(t, err)
 	m.database.On("GetUserByEmail", mock.Anything, mock.Anything, "test@example.com").Return(&record.User{
-		Id: 1, Email: "test@example.com", PasswordHash: passwordHash, Enabled: true,
+		ID: 1, Email: "test@example.com", PasswordHash: passwordHash, Enabled: true,
 	}, nil).Once()
 	m.auditLogger.On("Log", mock.Anything, audit.EventAuthFailedPwd, mock.Anything).Return().Once()
 	m.database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
@@ -190,13 +190,13 @@ func TestHandleAuthPwdPost_AnAcceptedPasswordReadsNoClient(t *testing.T) {
 	rr := httptest.NewRecorder()
 	m.armPasswordCeremony()
 	m.armAcceptedPassword(t, "")
-	m.ceremonyStore.On("RegenerateSession", rr, mock.Anything, testCeremonyId, int64(1)).Return(nil).Once()
+	m.ceremonyStore.On("RegenerateSession", rr, mock.Anything, testCeremonyID, int64(1)).Return(nil).Once()
 	m.ceremonyStore.On("SaveAuthContext", rr, mock.Anything, mock.Anything).Return(nil).Once()
 
 	m.post().ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusSeeOther, rr.Code)
-	assert.Equal(t, "https://auth.test/auth/level1completed?ceremony="+testCeremonyId, rr.Header().Get("Location"))
+	assert.Equal(t, "https://auth.test/auth/level1completed?ceremony="+testCeremonyID, rr.Header().Get("Location"))
 	m.database.AssertNotCalled(t, "GetClientByClientIdentifier", mock.Anything, mock.Anything, mock.Anything)
 	m.database.AssertNotCalled(t, "ClientHasLogo", mock.Anything, mock.Anything, mock.Anything)
 }
@@ -238,7 +238,7 @@ func (m pwdStepMocks) armAcceptedPassword(t *testing.T, pageLanguage string) {
 	passwordHash, err := passwordhash.Hash("testpassword")
 	require.NoError(t, err)
 	m.database.On("GetUserByEmail", mock.Anything, mock.Anything, "test@example.com").Return(&record.User{
-		Id: 1, Email: "test@example.com", PasswordHash: passwordHash, Enabled: true, Locale: "fr",
+		ID: 1, Email: "test@example.com", PasswordHash: passwordHash, Enabled: true, Locale: "fr",
 		PageLanguage: pageLanguage,
 	}, nil)
 	m.auditLogger.On("Log", mock.Anything, audit.EventAuthSuccessPwd, map[string]interface{}{"user_id": int64(1)}).
@@ -253,7 +253,7 @@ func TestHandleAuthPwdPost_ARotationFailingAnswers500AndSavesNothing(t *testing.
 	rr := httptest.NewRecorder()
 	m.armPasswordCeremony()
 	m.armAcceptedPassword(t, "")
-	m.ceremonyStore.On("RegenerateSession", rr, mock.Anything, testCeremonyId, int64(1)).Return(assert.AnError).Once()
+	m.ceremonyStore.On("RegenerateSession", rr, mock.Anything, testCeremonyID, int64(1)).Return(assert.AnError).Once()
 	m.pageRenderer.On("InternalServerError", rr, mock.Anything, isTheError(assert.AnError)).Return().Once()
 
 	m.post().ServeHTTP(rr, req)
@@ -268,7 +268,7 @@ func TestHandleAuthPwdPost_ASaveFailingAnswers500(t *testing.T) {
 	rr := httptest.NewRecorder()
 	m.armPasswordCeremony()
 	m.armAcceptedPassword(t, "")
-	m.ceremonyStore.On("RegenerateSession", rr, mock.Anything, testCeremonyId, int64(1)).Return(nil).Once()
+	m.ceremonyStore.On("RegenerateSession", rr, mock.Anything, testCeremonyID, int64(1)).Return(nil).Once()
 	m.ceremonyStore.On("SaveAuthContext", rr, mock.Anything, mock.Anything).Return(assert.AnError).Once()
 	m.pageRenderer.On("InternalServerError", rr, mock.Anything, isTheError(assert.AnError)).Return().Once()
 
@@ -294,7 +294,7 @@ func TestHandleAuthPwdPost_AnswersInTheUsersPageLanguageOnlyOnceThePasswordIsVer
 		passwordHash, err := passwordhash.Hash("testpassword")
 		require.NoError(t, err)
 		m.database.On("GetUserByEmail", mock.Anything, mock.Anything, "test@example.com").Return(&record.User{
-			Id: 1, Email: "test@example.com", PasswordHash: passwordHash, Enabled: true, Locale: "fr",
+			ID: 1, Email: "test@example.com", PasswordHash: passwordHash, Enabled: true, Locale: "fr",
 			PageLanguage: "pt-BR",
 		}, nil)
 		m.auditLogger.On("Log", mock.Anything, audit.EventAuthFailedPwd, mock.Anything).Return().Once()
@@ -315,7 +315,7 @@ func TestHandleAuthPwdPost_AnswersInTheUsersPageLanguageOnlyOnceThePasswordIsVer
 		passwordHash, err := passwordhash.Hash("testpassword")
 		require.NoError(t, err)
 		m.database.On("GetUserByEmail", mock.Anything, mock.Anything, "test@example.com").Return(&record.User{
-			Id: 2, Email: "test@example.com", PasswordHash: passwordHash, Enabled: false, Locale: "fr",
+			ID: 2, Email: "test@example.com", PasswordHash: passwordHash, Enabled: false, Locale: "fr",
 			PageLanguage: "pt-BR",
 		}, nil)
 		m.auditLogger.On("Log", mock.Anything, audit.EventUserDisabled, map[string]interface{}{"user_id": int64(2)}).
@@ -340,7 +340,7 @@ func TestHandleAuthPwdPost_AnswersInTheUsersPageLanguageOnlyOnceThePasswordIsVer
 		passwordHash, err := passwordhash.Hash("testpassword")
 		require.NoError(t, err)
 		m.database.On("GetUserByEmail", mock.Anything, mock.Anything, "test@example.com").Return(&record.User{
-			Id: 2, Email: "test@example.com", PasswordHash: passwordHash, Enabled: false, Locale: "fr",
+			ID: 2, Email: "test@example.com", PasswordHash: passwordHash, Enabled: false, Locale: "fr",
 		}, nil)
 		m.auditLogger.On("Log", mock.Anything, audit.EventUserDisabled, map[string]interface{}{"user_id": int64(2)}).
 			Return().Once()
@@ -358,7 +358,7 @@ func TestHandleAuthPwdPost_AnswersInTheUsersPageLanguageOnlyOnceThePasswordIsVer
 		rr := httptest.NewRecorder()
 		m.armPasswordCeremony()
 		m.armAcceptedPassword(t, "pt-BR")
-		m.ceremonyStore.On("RegenerateSession", rr, mock.Anything, testCeremonyId, int64(1)).
+		m.ceremonyStore.On("RegenerateSession", rr, mock.Anything, testCeremonyID, int64(1)).
 			Return(ceremony.ErrCeremonyReplaced).Once()
 		m.pageRenderer.On("RenderTemplate", rr, mock.Anything, "/layouts/no_menu_layout.html", "/auth_error.html",
 			mock.MatchedBy(func(data map[string]interface{}) bool {

@@ -54,7 +54,7 @@ func (a *emailTemplatesAPI) ResetEmailTemplate(context.Context, string, string, 
 }
 
 func (a *emailTemplatesAPI) GetAllBrands(context.Context, string) ([]api.BrandResponse, error) {
-	return []api.BrandResponse{{Id: 1, Name: "Goiabada", IsDefault: true}, {Id: 4, Name: "Acme <Corp>"}}, nil
+	return []api.BrandResponse{{ID: 1, Name: "Goiabada", IsDefault: true}, {ID: 4, Name: "Acme <Corp>"}}, nil
 }
 
 func emailTemplatesStore(t *testing.T) sessionstore.Store {
@@ -70,7 +70,7 @@ func emailTemplatesStore(t *testing.T) sessionstore.Store {
 
 // summary is one email as the list gives it, every language at the built-in text but those named.
 func summary(id string, statuses map[string]string) api.EmailTemplateSummaryResponse {
-	s := api.EmailTemplateSummaryResponse{Id: id}
+	s := api.EmailTemplateSummaryResponse{ID: id}
 	for _, tag := range []string{"en", "de", "es", "fr", "it", "pt-BR"} {
 		status := "default"
 		if named, ok := statuses[tag]; ok {
@@ -165,7 +165,7 @@ func emailTemplate() *api.EmailTemplateResponse {
 		{Field: "body", Rule: "required_placeholder_missing", Placeholder: "link", Message: "O corpo precisa de {{link}}."},
 	}
 	return &api.EmailTemplateResponse{
-		Id: "password_reset_link", HasButton: true,
+		ID: "password_reset_link", HasButton: true,
 		Placeholders: []api.EmailTemplatePlaceholderResponse{
 			{Name: "app_name", InSubject: true}, {Name: "name", InSubject: true}, {Name: "link", Required: true},
 			{Name: "button"}, {Name: "expiry", InSubject: true},
@@ -181,10 +181,10 @@ func strPtr(s string) *string { return &s }
 
 func serveEditor(t *testing.T, apiClient *emailTemplatesAPI, language string, options ...handlertest.Option) string {
 	t.Helper()
-	options = append([]handlertest.Option{handlertest.WithPathValue("email", apiClient.email.Id),
+	options = append([]handlertest.Option{handlertest.WithPathValue("email", apiClient.email.ID),
 		handlertest.WithPathValue("language", language)}, options...)
 	return servePage(t, adminsettingshandlers.HandleEmailTemplateGet(render.New(web.TemplateFS(), web.StaticFS()),
-		emailTemplatesStore(t), apiClient), http.MethodGet, "/admin/settings/email/templates/"+apiClient.email.Id+"/"+language,
+		emailTemplatesStore(t), apiClient), http.MethodGet, "/admin/settings/email/templates/"+apiClient.email.ID+"/"+language,
 		options...)
 }
 
@@ -192,9 +192,9 @@ func serveEditor(t *testing.T, apiClient *emailTemplatesAPI, language string, op
 // server with SMTP on.
 func signedInWithSMTP() []handlertest.Option {
 	return []handlertest.Option{
-		handlertest.WithJwtInfo(oauthclient.JwtInfo{
+		handlertest.WithJWTInfo(oauthclient.JWTInfo{
 			TokenResponse: oauth.TokenResponse{AccessToken: handlertest.AccessToken},
-			IdToken:       &oauth.JwtToken{Claims: jwt.MapClaims{"email": "admin@example.com"}},
+			IDToken:       &oauth.JWTToken{Claims: jwt.MapClaims{"email": "admin@example.com"}},
 		}),
 		handlertest.WithSettings(&api.PublicSettingsResponse{AppName: "Test", SMTPEnabled: true}),
 	}
@@ -242,7 +242,7 @@ func TestRender_AdminSettingsEmailTemplate(t *testing.T) {
 // A language at the built-in text has nothing to reset, and an email without a button no label.
 func TestRender_AdminSettingsEmailTemplate_TheBuiltInTextOfAnEmailWithoutAButton(t *testing.T) {
 	email := emailTemplate()
-	email.Id, email.HasButton = "account_deleted", false
+	email.ID, email.HasButton = "account_deleted", false
 	email.Placeholders = email.Placeholders[:2]
 	for i := range email.Languages {
 		email.Languages[i].EditorText.ButtonLabel = nil

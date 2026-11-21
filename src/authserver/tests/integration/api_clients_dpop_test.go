@@ -22,18 +22,18 @@ import (
 // audited as updated_client_dpop. Every client the admin API answers carries the field.
 
 // clientDPoPPath is the save's path for a client.
-func clientDPoPPath(clientId int64) string {
-	return "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10) + "/dpop"
+func clientDPoPPath(clientID int64) string {
+	return "/api/v1/admin/clients/" + strconv.FormatInt(clientID, 10) + "/dpop"
 }
 
 // saveClientDPoP sends one save and decodes the answer as a JSON object.
-func saveClientDPoP(t *testing.T, accessToken string, clientId int64, body any) (int, map[string]any, string) {
+func saveClientDPoP(t *testing.T, accessToken string, clientID int64, body any) (int, map[string]any, string) {
 	t.Helper()
-	resp, requestId := sendAdmin(t, accessToken, http.MethodPut, clientDPoPPath(clientId), body)
+	resp, requestID := sendAdmin(t, accessToken, http.MethodPut, clientDPoPPath(clientID), body)
 	defer func() { _ = resp.Body.Close() }()
 	var decoded map[string]any
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&decoded))
-	return resp.StatusCode, decoded, requestId
+	return resp.StatusCode, decoded, requestID
 }
 
 // newClientRequiringDPoP creates a confidential client with the authorization code flow on, which
@@ -46,19 +46,19 @@ func newClientRequiringDPoP(t *testing.T, prefix string, requires bool) *record.
 		ClientIdentifier:         prefix + strings.ToLower(fake.LetterN(8)),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
-		DefaultAcrLevel:          record.AcrLevel2Optional,
+		DefaultACRLevel:          record.ACRLevel2Optional,
 		ClientSecretEncrypted:    secret,
 		DPoPBoundAccessTokens:    requires,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 	return client
 }
 
 // readClientDPoP is the setting as GET /clients/{id} answers it.
-func readClientDPoP(t *testing.T, accessToken string, clientId int64) bool {
+func readClientDPoP(t *testing.T, accessToken string, clientID int64) bool {
 	t.Helper()
-	resp := makeAPIRequest(t, http.MethodGet, appConfig.AuthServer.BaseURL+"/api/v1/admin/clients/"+strconv.FormatInt(clientId, 10), accessToken, nil)
+	resp := makeAPIRequest(t, http.MethodGet, appConfig.AuthServer.BaseURL+"/api/v1/admin/clients/"+strconv.FormatInt(clientID, 10), accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	var got api.GetClientResponse
@@ -73,22 +73,22 @@ func TestAPIClientDPoPPut_SavesAndAnswersTheSetting(t *testing.T) {
 	requireDatabaseAuditLogs(t)
 	accessToken, caller := createAdminClientWithToken(t)
 	client := newClientRequiringDPoP(t, "dpop-save-", false)
-	assert.False(t, readClientDPoP(t, accessToken, client.Id), "a client created without it does not require DPoP")
+	assert.False(t, readClientDPoP(t, accessToken, client.ID), "a client created without it does not require DPoP")
 
 	for _, on := range []bool{true, false} {
-		status, body, requestId := saveClientDPoP(t, accessToken, client.Id, map[string]any{"dpopBoundAccessTokens": on})
+		status, body, requestID := saveClientDPoP(t, accessToken, client.ID, map[string]any{"dpopBoundAccessTokens": on})
 		require.Equal(t, http.StatusOK, status, body)
 		answered := body["client"].(map[string]any)
-		assert.InDelta(t, float64(client.Id), answered["id"], 0)
+		assert.InDelta(t, float64(client.ID), answered["id"], 0)
 		assert.Equal(t, on, answered["dpopBoundAccessTokens"])
-		assert.Equal(t, on, storedClient(t, client.Id).DPoPBoundAccessTokens)
-		assert.Equal(t, on, readClientDPoP(t, accessToken, client.Id))
+		assert.Equal(t, on, storedClient(t, client.ID).DPoPBoundAccessTokens)
+		assert.Equal(t, on, readClientDPoP(t, accessToken, client.ID))
 		assert.Equal(t, []map[string]any{{
-			"client_id":                float64(client.Id),
+			"client_id":                float64(client.ID),
 			"client_identifier":        client.ClientIdentifier,
 			"dpop_bound_access_tokens": on,
 			"logged_in_user":           caller.ClientIdentifier,
-		}}, auditRows(t, accessToken, "updated_client_dpop", requestId))
+		}}, auditRows(t, accessToken, "updated_client_dpop", requestID))
 	}
 
 	required := newClientRequiringDPoP(t, "dpop-listed-", true)
@@ -99,11 +99,11 @@ func TestAPIClientDPoPPut_SavesAndAnswersTheSetting(t *testing.T) {
 	require.NoError(t, json.NewDecoder(listing.Body).Decode(&clients))
 	found := 0
 	for _, listed := range clients.Clients {
-		switch listed.Id {
-		case required.Id:
+		switch listed.ID {
+		case required.ID:
 			found++
 			assert.True(t, listed.DPoPBoundAccessTokens)
-		case client.Id:
+		case client.ID:
 			found++
 			assert.False(t, listed.DPoPBoundAccessTokens)
 		}
@@ -118,11 +118,11 @@ func TestAPIClientDPoPPut_TheBooleanIsRequired(t *testing.T) {
 	client := newClientRequiringDPoP(t, "dpop-required-", true)
 
 	for _, body := range []map[string]any{{}, {"dpopBoundAccessTokens": nil}} {
-		status, answer, _ := saveClientDPoP(t, accessToken, client.Id, body)
+		status, answer, _ := saveClientDPoP(t, accessToken, client.ID, body)
 		assert.Equal(t, http.StatusBadRequest, status)
 		assert.Equal(t, "handler.client_dpop.dpop_bound_access_tokens_required", answer["error_code"])
 		assert.Equal(t, "dpopBoundAccessTokens is required: send true or false.", answer["error_description"])
-		assert.True(t, storedClient(t, client.Id).DPoPBoundAccessTokens, "nothing changed")
+		assert.True(t, storedClient(t, client.ID).DPoPBoundAccessTokens, "nothing changed")
 	}
 }
 
@@ -135,12 +135,12 @@ func TestAPIClientDPoPPut_TheAdminConsolesClientIsNeverSwitchedOn(t *testing.T) 
 	require.NoError(t, err)
 	require.NotNil(t, console)
 
-	status, body, requestId := saveClientDPoP(t, accessToken, console.Id, map[string]any{"dpopBoundAccessTokens": true})
+	status, body, requestID := saveClientDPoP(t, accessToken, console.ID, map[string]any{"dpopBoundAccessTokens": true})
 	assert.Equal(t, http.StatusBadRequest, status)
 	assert.Equal(t, "handler.client_dpop.admin_console_not_allowed", body["error_code"])
 	assert.Equal(t, "The admin console's client can't require DPoP for token requests.", body["error_description"])
-	assert.False(t, storedClient(t, console.Id).DPoPBoundAccessTokens)
-	assert.Empty(t, auditRows(t, accessToken, "updated_client_dpop", requestId))
+	assert.False(t, storedClient(t, console.ID).DPoPBoundAccessTokens)
+	assert.Empty(t, auditRows(t, accessToken, "updated_client_dpop", requestID))
 }
 
 // The route takes the scopes of the client's other settings: manage-clients saves an ordinary
@@ -151,18 +151,18 @@ func TestAPIClientDPoPPut_ScopesAndTheRequestsOwnRefusals(t *testing.T) {
 	client := newClientRequiringDPoP(t, "dpop-scopes-", false)
 
 	granularToken, granular := createClientWithGranularScope(t, builtin.ManageClientsPermissionIdentifier)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, granular.Id) })
-	status, body, _ := saveClientDPoP(t, granularToken, client.Id, map[string]any{"dpopBoundAccessTokens": true})
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, granular.ID) })
+	status, body, _ := saveClientDPoP(t, granularToken, client.ID, map[string]any{"dpopBoundAccessTokens": true})
 	require.Equal(t, http.StatusOK, status, body)
-	assert.True(t, storedClient(t, client.Id).DPoPBoundAccessTokens)
+	assert.True(t, storedClient(t, client.ID).DPoPBoundAccessTokens)
 
 	readToken, reader := createClientWithGranularScope(t, builtin.AdminReadPermissionIdentifier)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, reader.Id) })
-	assert.True(t, readClientDPoP(t, readToken, client.Id), "admin-read reads the setting")
-	status, body, _ = saveClientDPoP(t, readToken, client.Id, map[string]any{"dpopBoundAccessTokens": false})
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, reader.ID) })
+	assert.True(t, readClientDPoP(t, readToken, client.ID), "admin-read reads the setting")
+	status, body, _ = saveClientDPoP(t, readToken, client.ID, map[string]any{"dpopBoundAccessTokens": false})
 	assert.Equal(t, http.StatusForbidden, status)
 	assert.Equal(t, "INSUFFICIENT_SCOPE", body["error_code"])
-	assert.True(t, storedClient(t, client.Id).DPoPBoundAccessTokens, "nothing changed")
+	assert.True(t, storedClient(t, client.ID).DPoPBoundAccessTokens, "nothing changed")
 
 	status, body, _ = saveClientDPoP(t, accessToken, 999999, map[string]any{"dpopBoundAccessTokens": true})
 	assert.Equal(t, http.StatusNotFound, status)
@@ -172,9 +172,9 @@ func TestAPIClientDPoPPut_ScopesAndTheRequestsOwnRefusals(t *testing.T) {
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 
-	unauthenticated, err := http.NewRequest(http.MethodPut, appConfig.AuthServer.BaseURL+clientDPoPPath(client.Id), nil)
+	unauthenticated, err := http.NewRequest(http.MethodPut, appConfig.AuthServer.BaseURL+clientDPoPPath(client.ID), nil)
 	require.NoError(t, err)
-	noToken, err := createHttpClient(t).Do(unauthenticated)
+	noToken, err := createHTTPClient(t).Do(unauthenticated)
 	require.NoError(t, err)
 	defer func() { _ = noToken.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, noToken.StatusCode)

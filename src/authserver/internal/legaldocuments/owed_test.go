@@ -31,50 +31,50 @@ const (
 //	7 must accept, all apps, version 71
 func mustAcceptDocuments(database *datamocks.Database) {
 	database.EXPECT().GetAllLegalDocuments(mock.Anything, (*sql.Tx)(nil)).Return([]record.LegalDocument{
-		{Id: 1, ShortName: "terms", Kind: mustAccept, AppliesToAllApps: true},
-		{Id: 2, ShortName: "shop-terms", Kind: mustAccept},
-		{Id: 3, ShortName: "privacy", Kind: forInformation, AppliesToAllApps: true},
-		{Id: 4, ShortName: "other-shop-terms", Kind: mustAccept},
-		{Id: 5, ShortName: "retired", Kind: mustAccept, AppliesToAllApps: true, RetiredAt: sql.NullTime{Time: published, Valid: true}},
-		{Id: 6, ShortName: "unpublished", Kind: mustAccept, AppliesToAllApps: true},
-		{Id: 7, ShortName: "house-rules", Kind: mustAccept, AppliesToAllApps: true},
+		{ID: 1, ShortName: "terms", Kind: mustAccept, AppliesToAllApps: true},
+		{ID: 2, ShortName: "shop-terms", Kind: mustAccept},
+		{ID: 3, ShortName: "privacy", Kind: forInformation, AppliesToAllApps: true},
+		{ID: 4, ShortName: "other-shop-terms", Kind: mustAccept},
+		{ID: 5, ShortName: "retired", Kind: mustAccept, AppliesToAllApps: true, RetiredAt: sql.NullTime{Time: published, Valid: true}},
+		{ID: 6, ShortName: "unpublished", Kind: mustAccept, AppliesToAllApps: true},
+		{ID: 7, ShortName: "house-rules", Kind: mustAccept, AppliesToAllApps: true},
 	}, nil)
 	versions := map[int64][]record.LegalDocumentVersion{
-		1: {{Id: 11, LegalDocumentId: 1, VersionNumber: 1, Title: "Terms v1"}, {Id: 12, LegalDocumentId: 1, VersionNumber: 2, Title: "Terms v2"}},
-		2: {{Id: 21, LegalDocumentId: 2, VersionNumber: 1, Title: "Shop terms"}},
-		3: {{Id: 31, LegalDocumentId: 3, VersionNumber: 1, Title: "Privacy"}},
-		4: {{Id: 41, LegalDocumentId: 4, VersionNumber: 1, Title: "Other shop terms"}},
-		5: {{Id: 51, LegalDocumentId: 5, VersionNumber: 1, Title: "Retired"}},
+		1: {{ID: 11, LegalDocumentID: 1, VersionNumber: 1, Title: "Terms v1"}, {ID: 12, LegalDocumentID: 1, VersionNumber: 2, Title: "Terms v2"}},
+		2: {{ID: 21, LegalDocumentID: 2, VersionNumber: 1, Title: "Shop terms"}},
+		3: {{ID: 31, LegalDocumentID: 3, VersionNumber: 1, Title: "Privacy"}},
+		4: {{ID: 41, LegalDocumentID: 4, VersionNumber: 1, Title: "Other shop terms"}},
+		5: {{ID: 51, LegalDocumentID: 5, VersionNumber: 1, Title: "Retired"}},
 		6: {},
-		7: {{Id: 71, LegalDocumentId: 7, VersionNumber: 1, Title: "House rules"}},
+		7: {{ID: 71, LegalDocumentID: 7, VersionNumber: 1, Title: "House rules"}},
 	}
-	database.EXPECT().GetLegalDocumentVersionsByLegalDocumentId(mock.Anything, (*sql.Tx)(nil), mock.Anything).
+	database.EXPECT().GetLegalDocumentVersionsByLegalDocumentID(mock.Anything, (*sql.Tx)(nil), mock.Anything).
 		RunAndReturn(func(_ context.Context, _ *sql.Tx, id int64) ([]record.LegalDocumentVersion, error) {
 			return versions[id], nil
 		}).Maybe()
-	database.EXPECT().GetLegalDocumentClientsByClientId(mock.Anything, (*sql.Tx)(nil), int64(7)).
-		Return([]record.LegalDocumentClient{{LegalDocumentId: 2, ClientId: 7}}, nil).Maybe()
+	database.EXPECT().GetLegalDocumentClientsByClientID(mock.Anything, (*sql.Tx)(nil), int64(7)).
+		Return([]record.LegalDocumentClient{{LegalDocumentID: 2, ClientID: 7}}, nil).Maybe()
 }
 
 // acceptedVersions makes the user 42 hold acceptances of the versions given.
-func acceptedVersions(database *datamocks.Database, versionIds ...int64) {
+func acceptedVersions(database *datamocks.Database, versionIDs ...int64) {
 	acceptances := []record.LegalDocumentAcceptance{}
-	for _, id := range versionIds {
-		acceptances = append(acceptances, record.LegalDocumentAcceptance{UserId: 42, LegalDocumentVersionId: id})
+	for _, id := range versionIDs {
+		acceptances = append(acceptances, record.LegalDocumentAcceptance{UserID: 42, LegalDocumentVersionID: id})
 	}
-	database.EXPECT().GetLegalDocumentAcceptancesByUserId(mock.Anything, (*sql.Tx)(nil), int64(42)).Return(acceptances, nil)
+	database.EXPECT().GetLegalDocumentAcceptancesByUserID(mock.Anything, (*sql.Tx)(nil), int64(42)).Return(acceptances, nil)
 }
 
 // owedVersions answers each owed document's short name and the id of the version owed.
 func owedVersions(owed []InEffect) map[string]int64 {
 	out := map[string]int64{}
 	for _, d := range owed {
-		out[d.Document.ShortName] = d.Current.Id
+		out[d.Document.ShortName] = d.Current.ID
 	}
 	return out
 }
 
-var shop = &record.Client{Id: 7, ClientIdentifier: "shop"}
+var shop = &record.Client{ID: 7, ClientIdentifier: "shop"}
 
 func TestOwed_TheMustAcceptDocumentsForTheAppWhoseCurrentVersionTheUserHasNotAccepted(t *testing.T) {
 	database := datamocks.NewDatabase(t)
@@ -103,11 +103,11 @@ func TestOwed_EveryCurrentVersionAcceptedOwesNothing(t *testing.T) {
 func TestOwed_AnotherAppsDocumentIsNotOwed(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	mustAcceptDocuments(database)
-	database.EXPECT().GetLegalDocumentClientsByClientId(mock.Anything, (*sql.Tx)(nil), int64(9)).
+	database.EXPECT().GetLegalDocumentClientsByClientID(mock.Anything, (*sql.Tx)(nil), int64(9)).
 		Return([]record.LegalDocumentClient{}, nil)
 	acceptedVersions(database)
 
-	owed, err := NewReader(database).Owed(context.Background(), &record.Client{Id: 9, ClientIdentifier: "blog"}, 42)
+	owed, err := NewReader(database).Owed(context.Background(), &record.Client{ID: 9, ClientIdentifier: "blog"}, 42)
 	require.NoError(t, err)
 	assert.Equal(t, map[string]int64{"terms": 12, "house-rules": 71}, owedVersions(owed),
 		"the all-apps documents alone: the shop's terms and client 8's are not the blog's")
@@ -118,7 +118,7 @@ func TestOwed_TheAdminConsolesOwnClientOwesNothingAndReadsNothing(t *testing.T) 
 	database := datamocks.NewDatabase(t)
 
 	owed, err := NewReader(database).Owed(context.Background(),
-		&record.Client{Id: 1, ClientIdentifier: builtin.AdminConsoleClientIdentifier}, 42)
+		&record.Client{ID: 1, ClientIdentifier: builtin.AdminConsoleClientIdentifier}, 42)
 	require.NoError(t, err)
 	assert.Empty(t, owed)
 }
@@ -126,11 +126,11 @@ func TestOwed_TheAdminConsolesOwnClientOwesNothingAndReadsNothing(t *testing.T) 
 func TestOwed_NoMustAcceptDocumentInEffectReadsNoAcceptance(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	database.EXPECT().GetAllLegalDocuments(mock.Anything, (*sql.Tx)(nil)).Return([]record.LegalDocument{
-		{Id: 3, ShortName: "privacy", Kind: forInformation, AppliesToAllApps: true},
+		{ID: 3, ShortName: "privacy", Kind: forInformation, AppliesToAllApps: true},
 	}, nil)
-	database.EXPECT().GetLegalDocumentVersionsByLegalDocumentId(mock.Anything, (*sql.Tx)(nil), int64(3)).
-		Return([]record.LegalDocumentVersion{{Id: 31, LegalDocumentId: 3, VersionNumber: 1}}, nil)
-	database.EXPECT().GetLegalDocumentClientsByClientId(mock.Anything, (*sql.Tx)(nil), int64(7)).
+	database.EXPECT().GetLegalDocumentVersionsByLegalDocumentID(mock.Anything, (*sql.Tx)(nil), int64(3)).
+		Return([]record.LegalDocumentVersion{{ID: 31, LegalDocumentID: 3, VersionNumber: 1}}, nil)
+	database.EXPECT().GetLegalDocumentClientsByClientID(mock.Anything, (*sql.Tx)(nil), int64(7)).
 		Return([]record.LegalDocumentClient{}, nil)
 
 	owed, err := NewReader(database).Owed(context.Background(), shop, 42)
@@ -142,25 +142,25 @@ func TestOwed_AFailedReadIsAnError(t *testing.T) {
 	failure := errors.New("database down")
 
 	database := datamocks.NewDatabase(t)
-	database.EXPECT().GetLegalDocumentClientsByClientId(mock.Anything, (*sql.Tx)(nil), int64(7)).Return(nil, failure)
+	database.EXPECT().GetLegalDocumentClientsByClientID(mock.Anything, (*sql.Tx)(nil), int64(7)).Return(nil, failure)
 	_, err := NewReader(database).Owed(context.Background(), shop, 42)
 	require.ErrorIs(t, err, failure)
 
 	database = datamocks.NewDatabase(t)
 	mustAcceptDocuments(database)
-	database.EXPECT().GetLegalDocumentAcceptancesByUserId(mock.Anything, (*sql.Tx)(nil), int64(42)).Return(nil, failure)
+	database.EXPECT().GetLegalDocumentAcceptancesByUserID(mock.Anything, (*sql.Tx)(nil), int64(42)).Return(nil, failure)
 	_, err = NewReader(database).Owed(context.Background(), shop, 42)
 	require.ErrorIs(t, err, failure, "never read as nothing accepted, nor as everything")
 
 	// A document whose versions can't be read is never skipped: skipping it would leave a must-accept
 	// document unowed, and its users signing in without it.
 	database = datamocks.NewDatabase(t)
-	database.EXPECT().GetLegalDocumentClientsByClientId(mock.Anything, (*sql.Tx)(nil), int64(7)).
+	database.EXPECT().GetLegalDocumentClientsByClientID(mock.Anything, (*sql.Tx)(nil), int64(7)).
 		Return([]record.LegalDocumentClient{}, nil)
 	database.EXPECT().GetAllLegalDocuments(mock.Anything, (*sql.Tx)(nil)).Return([]record.LegalDocument{
-		{Id: 1, ShortName: "terms", Kind: mustAccept, AppliesToAllApps: true},
+		{ID: 1, ShortName: "terms", Kind: mustAccept, AppliesToAllApps: true},
 	}, nil)
-	database.EXPECT().GetLegalDocumentVersionsByLegalDocumentId(mock.Anything, (*sql.Tx)(nil), int64(1)).Return(nil, failure)
+	database.EXPECT().GetLegalDocumentVersionsByLegalDocumentID(mock.Anything, (*sql.Tx)(nil), int64(1)).Return(nil, failure)
 	owed, err := NewReader(database).Owed(context.Background(), shop, 42)
 	require.ErrorIs(t, err, failure, "a document whose versions can't be read is not skipped")
 	assert.Nil(t, owed)

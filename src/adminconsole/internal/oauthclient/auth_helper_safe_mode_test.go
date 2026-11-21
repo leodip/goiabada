@@ -54,7 +54,7 @@ func TestRedirToAuthorize_SendsSafeModeWhileTheRequestIsInIt(t *testing.T) {
 		}},
 		{"a stronger sign-in", func(h *oauthclient.AuthHelper, w http.ResponseWriter, r *http.Request) error {
 			return h.RedirToAuthorizeWith(w, r, helperClientID, helperScope, helperRedirectBack,
-				oauthclient.SignInOptions{Prompt: "login", AcrValues: "urn:goiabada:level2_mandatory"})
+				oauthclient.SignInOptions{Prompt: "login", ACRValues: "urn:goiabada:level2_mandatory"})
 		}},
 	}
 	for _, signIn := range signIns {

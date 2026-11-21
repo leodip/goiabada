@@ -26,14 +26,14 @@ import (
 type userSessionManagerDatabase interface {
 	backchannel.SessionDatabase
 
-	AcquireUserRow(ctx context.Context, tx *sql.Tx, userId int64) error
+	AcquireUserRow(ctx context.Context, tx *sql.Tx, userID int64) error
 	AcquireUserSessionRow(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (bool, error)
 	CreateUserSession(ctx context.Context, tx *sql.Tx, userSession *record.UserSession) error
 	CreateUserSessionClient(ctx context.Context, tx *sql.Tx, userSessionClient *record.UserSessionClient) error
-	DeleteUserSession(ctx context.Context, tx *sql.Tx, userSessionId int64) error
-	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	DeleteUserSession(ctx context.Context, tx *sql.Tx, userSessionID int64) error
+	GetUserByID(ctx context.Context, tx *sql.Tx, userID int64) (*record.User, error)
 	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
-	GetUserSessionsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserSession, error)
+	GetUserSessionsByUserID(ctx context.Context, tx *sql.Tx, userID int64) ([]record.UserSession, error)
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 	UpdateUserSession(ctx context.Context, tx *sql.Tx, userSession *record.UserSession) error
 	UpdateUserSessionClient(ctx context.Context, tx *sql.Tx, userSessionClient *record.UserSessionClient) error
@@ -78,11 +78,11 @@ func (u *Manager) HasValidUserSession(userSession *record.UserSession, idleTimeo
 
 // Authentication is what a sign-in writes onto the session it creates or binds to.
 type Authentication struct {
-	// UserId is the user who signed in, and the row an OTPClaim is checked on.
-	UserId int64
-	// AuthMethods and AcrLevel are the methods the sign-in claims and the level it reached.
+	// UserID is the user who signed in, and the row an OTPClaim is checked on.
+	UserID int64
+	// AuthMethods and ACRLevel are the methods the sign-in claims and the level it reached.
 	AuthMethods string
-	AcrLevel    record.AcrLevel
+	ACRLevel    record.ACRLevel
 	// AuthTime, when set, becomes the session's auth_time: the instant of the credential the sign-in
 	// last entered, a code's when it entered one after the password.
 	AuthTime *time.Time
@@ -200,11 +200,11 @@ type Device struct {
 // served, read under its row before its deletion; an expired one tells nobody (#784 decision 1). The
 // user's subject, which the tokens name, is read before the transaction, so the transaction reads no
 // users row while it holds a session's.
-func (u *Manager) StartNewUserSession(ctx context.Context, clientId int64, authentication Authentication,
+func (u *Manager) StartNewUserSession(ctx context.Context, clientID int64, authentication Authentication,
 	authStateGeneration int64, otpConfigGeneration *int64, device Device, ipAddress string,
 	replacing *record.UserSession, limits SessionLimits) (*record.UserSession, []Removal, error) {
 
-	userId := authentication.UserId
+	userID := authentication.UserID
 	if authentication.AuthTime == nil || authentication.AuthTime.IsZero() {
 		return nil, nil, errs.New("no credential instant captured; refusing to mint a session whose auth_time would be invented")
 	}
@@ -214,12 +214,12 @@ func (u *Manager) StartNewUserSession(ctx context.Context, clientId int64, authe
 	if device.Identifier == "" {
 		return nil, nil, errs.New("no device identifier given; refusing to record a device every such browser would share")
 	}
-	if replacing != nil && replacing.UserId != userId {
+	if replacing != nil && replacing.UserID != userID {
 		return nil, nil, errs.Errorf("refusing to replace user session %v: it belongs to user %v, not %v",
-			replacing.Id, replacing.UserId, userId)
+			replacing.ID, replacing.UserID, userID)
 	}
 
-	user, err := u.database.GetUserById(ctx, nil, userId)
+	user, err := u.database.GetUserByID(ctx, nil, userID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -231,9 +231,9 @@ func (u *Manager) StartNewUserSession(ctx context.Context, clientId int64, authe
 
 	utcNow := time.Now().UTC()
 
-	observedOtpConfigGeneration := int64(0)
+	observedOTPConfigGeneration := int64(0)
 	if otpConfigGeneration != nil {
-		observedOtpConfigGeneration = *otpConfigGeneration
+		observedOTPConfigGeneration = *otpConfigGeneration
 	}
 
 	// The identifier is minted here, outside the transaction, so a rerun excludes the same row from
@@ -242,26 +242,26 @@ func (u *Manager) StartNewUserSession(ctx context.Context, clientId int64, authe
 		SessionIdentifier: uuid.New(),
 		Started:           utcNow,
 		LastAccessed:      utcNow,
-		IpAddress:         ipAddress,
+		IPAddress:         ipAddress,
 		AuthMethods:       authentication.AuthMethods,
-		AcrLevel:          authentication.AcrLevel,
+		ACRLevel:          authentication.ACRLevel,
 		AuthTime:          authentication.AuthTime.UTC(),
 		PasswordAuthTime:  authentication.PasswordAuthTime.UTC(),
-		UserId:            userId,
+		UserID:            userID,
 		DeviceName:        device.Name,
 		DeviceType:        device.Type,
 		DeviceOS:          device.OS,
 		UserAgent:         useragent.BoundRaw(device.UserAgent),
-		DeviceId:          deviceDigest(device.Identifier),
+		DeviceID:          deviceDigest(device.Identifier),
 
 		AuthStateGeneration: authStateGeneration,
-		OtpConfigGeneration: observedOtpConfigGeneration,
+		OTPConfigGeneration: observedOTPConfigGeneration,
 	}
 
 	userSession.Clients = append(userSession.Clients, record.UserSessionClient{
 		Started:      utcNow,
 		LastAccessed: utcNow,
-		ClientId:     clientId,
+		ClientID:     clientID,
 	})
 
 	// One transaction, opened through RunInTransaction, which reruns the body after a deadlock
@@ -289,14 +289,14 @@ func (u *Manager) StartNewUserSession(ctx context.Context, clientId int64, authe
 					removal.LogoutDeliveries = deliveries
 				}
 			}
-			if deleteUserSessionErr := u.database.DeleteUserSession(ctx, tx, us.Id); deleteUserSessionErr != nil {
+			if deleteUserSessionErr := u.database.DeleteUserSession(ctx, tx, us.ID); deleteUserSessionErr != nil {
 				return deleteUserSessionErr
 			}
 			removedThisAttempt = append(removedThisAttempt, removal)
 			return nil
 		}
 
-		if claimErr := authentication.OTPClaim.Recheck(ctx, u.database, tx, userId); claimErr != nil {
+		if claimErr := authentication.OTPClaim.Recheck(ctx, u.database, tx, userID); claimErr != nil {
 			return claimErr
 		}
 
@@ -307,13 +307,13 @@ func (u *Manager) StartNewUserSession(ctx context.Context, clientId int64, authe
 		// The association belongs to the row created just above, whose id no other caller holds, so
 		// it cannot lose the (session, client) key to a concurrent insert (#249).
 		for _, client := range userSession.Clients {
-			client.UserSessionId = userSession.Id
+			client.UserSessionID = userSession.ID
 			if createUserSessionClientErr := u.database.CreateUserSessionClient(ctx, tx, &client); createUserSessionClientErr != nil {
 				return createUserSessionClientErr
 			}
 		}
 
-		allUserSessions, getUserSessionsErr := u.database.GetUserSessionsByUserId(ctx, tx, userId)
+		allUserSessions, getUserSessionsErr := u.database.GetUserSessionsByUserID(ctx, tx, userID)
 		if getUserSessionsErr != nil {
 			return getUserSessionsErr
 		}
@@ -330,9 +330,9 @@ func (u *Manager) StartNewUserSession(ctx context.Context, clientId int64, authe
 			}
 			var reason string
 			switch {
-			case replacing != nil && us.Id == replacing.Id:
+			case replacing != nil && us.ID == replacing.ID:
 				reason = audit.DeletedUserSessionReplacedBySignIn
-			case !device.New && us.DeviceId != "" && us.DeviceId == userSession.DeviceId:
+			case !device.New && us.DeviceID != "" && us.DeviceID == userSession.DeviceID:
 				reason = audit.DeletedUserSessionSameDevice
 			default:
 				kept = append(kept, us)
@@ -402,7 +402,7 @@ func sessionsOverCap(others []record.UserSession, now time.Time, limits SessionL
 		if c := a.LastAccessed.Compare(b.LastAccessed); c != 0 {
 			return c
 		}
-		return cmp.Compare(a.Id, b.Id)
+		return cmp.Compare(a.ID, b.ID)
 	})
 	return candidates[:excess]
 }
@@ -428,7 +428,7 @@ func (u *Manager) AbandonUserSession(ctx context.Context, userSession *record.Us
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), sessionCleanupTimeout)
 	defer cancel()
 
-	if err := u.database.DeleteUserSession(ctx, nil, userSession.Id); err != nil {
+	if err := u.database.DeleteUserSession(ctx, nil, userSession.ID); err != nil {
 		return errs.Join(cause, errs.Wrap(err,
 			"unable to delete the user session left behind by a failed browser session write"))
 	}
@@ -446,7 +446,7 @@ func deviceDigest(identifier string) string {
 //
 // Step-up authentication occurs when a user with an existing session (e.g., password-only)
 // accesses a client that requires a higher authentication level (e.g., password + OTP).
-// In this case, the session's AuthMethods and AcrLevel must be upgraded to reflect
+// In this case, the session's AuthMethods and ACRLevel must be upgraded to reflect
 // the stronger authentication that was actually performed.
 //
 // **A bump only ever raises.** It never lowers the session's level and never drops a method from
@@ -488,10 +488,10 @@ func deviceDigest(identifier string) string {
 // the session between the read and the write was undone: the write put back the otp and the level
 // the removal had just taken away (#542). With it, a removal that got there first has committed by
 // the time the read runs, and one that arrives later waits for this write and then lowers it.
-func (u *Manager) BumpUserSession(ctx context.Context, sessionIdentifier string, clientId int64,
-	authMethods string, acrLevel record.AcrLevel, ipAddress string) (*record.UserSession, error) {
-	return u.bindUserSession(ctx, sessionIdentifier, clientId,
-		Authentication{AuthMethods: authMethods, AcrLevel: acrLevel}, false, ipAddress)
+func (u *Manager) BumpUserSession(ctx context.Context, sessionIdentifier string, clientID int64,
+	authMethods string, acrLevel record.ACRLevel, ipAddress string) (*record.UserSession, error) {
+	return u.bindUserSession(ctx, sessionIdentifier, clientID,
+		Authentication{AuthMethods: authMethods, ACRLevel: acrLevel}, false, ipAddress)
 }
 
 // BindUserSession binds a completed sign-in to the session the browser arrived with, which is
@@ -502,7 +502,7 @@ func (u *Manager) BumpUserSession(ctx context.Context, sessionIdentifier string,
 //     authentication.PasswordAuthTime;
 //   - authentication.AuthTime, when set, becomes the session's auth_time;
 //   - authentication.OTPClaim is checked on the user under the user's row lock, first in the
-//     transaction (otpcredential.OTPClaim.Recheck), and the session must be authentication.UserId's.
+//     transaction (otpcredential.OTPClaim.Recheck), and the session must be authentication.UserID's.
 //
 // All of it is one transaction under the session's row, where the replacement and the auth_time
 // used to be a second whole-row write after the bump's, unlocked and outside its transaction, which
@@ -511,12 +511,12 @@ func (u *Manager) BumpUserSession(ctx context.Context, sessionIdentifier string,
 // A bind whose sign-in predates the session's current authentication, or whose adopted session
 // holds neither the auth_time it adopted nor the ceremony's own, writes nothing and returns
 // ErrStaleAuthentication (#538).
-func (u *Manager) BindUserSession(ctx context.Context, sessionIdentifier string, clientId int64,
+func (u *Manager) BindUserSession(ctx context.Context, sessionIdentifier string, clientID int64,
 	authentication Authentication, replace bool, ipAddress string) (*record.UserSession, error) {
 	if replace && (authentication.PasswordAuthTime == nil || authentication.PasswordAuthTime.IsZero()) {
 		return nil, errs.New("no password instant captured; refusing to replace a session's authentication with a password_auth_time that would be invented")
 	}
-	return u.bindUserSession(ctx, sessionIdentifier, clientId, authentication, replace, ipAddress)
+	return u.bindUserSession(ctx, sessionIdentifier, clientID, authentication, replace, ipAddress)
 }
 
 // AuthenticationIsStale answers, from the session row as it is now, whether the ordering rule would
@@ -538,15 +538,15 @@ func (u *Manager) AuthenticationIsStale(ctx context.Context, sessionIdentifier s
 	return staleAuthentication(userSession, authentication), nil
 }
 
-func (u *Manager) bindUserSession(ctx context.Context, sessionIdentifier string, clientId int64,
+func (u *Manager) bindUserSession(ctx context.Context, sessionIdentifier string, clientID int64,
 	authentication Authentication, replace bool, ipAddress string) (*record.UserSession, error) {
 
 	authMethods := authentication.AuthMethods
-	acrLevel := authentication.AcrLevel
+	acrLevel := authentication.ACRLevel
 
 	var bumped *record.UserSession
 	err := data.RunInTransactionRetryingConflict(ctx, u.database, func(tx *sql.Tx) error {
-		if claimErr := authentication.OTPClaim.Recheck(ctx, u.database, tx, authentication.UserId); claimErr != nil {
+		if claimErr := authentication.OTPClaim.Recheck(ctx, u.database, tx, authentication.UserID); claimErr != nil {
 			return claimErr
 		}
 
@@ -565,9 +565,9 @@ func (u *Manager) bindUserSession(ctx context.Context, sessionIdentifier string,
 		if userSession == nil {
 			return errs.New("can't bump user session because user session is nil")
 		}
-		if authentication.UserId != 0 && userSession.UserId != authentication.UserId {
+		if authentication.UserID != 0 && userSession.UserID != authentication.UserID {
 			return errs.Errorf("refusing to bind user session %v of user %v to a sign-in of user %v",
-				userSession.Id, userSession.UserId, authentication.UserId)
+				userSession.ID, userSession.UserID, authentication.UserID)
 		}
 
 		// The ordering rule (#538). Two ceremonies can complete on the same session: one whose
@@ -608,14 +608,14 @@ func (u *Manager) bindUserSession(ctx context.Context, sessionIdentifier string,
 		// substring test deciding what was new read 10.0.0.1 as already present in 10.0.0.12
 		// (#243).
 		if ipAddress != "" {
-			userSession.IpAddress = ipAddress
+			userSession.IPAddress = ipAddress
 		}
 
 		if replace {
 			// A new authentication replaces the session's, as /auth/completed's decideCompletion
 			// explains: the level it was asked for, the methods it performed and when it entered
 			// the password, never merged with what the session held before (#537, #542).
-			userSession.AcrLevel = acrLevel
+			userSession.ACRLevel = acrLevel
 			userSession.AuthMethods = authMethods
 			userSession.PasswordAuthTime = authentication.PasswordAuthTime.UTC()
 		} else {
@@ -632,8 +632,8 @@ func (u *Manager) bindUserSession(ctx context.Context, sessionIdentifier string,
 			// of authentication in this session, that security guarantee should be preserved.
 			// Example: User logged in with pwd+otp (level2), then visits a level1 client.
 			// The session should remain at level2 because that's what was actually achieved.
-			if acrLevel != "" && shouldUpgradeAcrLevel(userSession.AcrLevel, acrLevel) {
-				userSession.AcrLevel = acrLevel
+			if acrLevel != "" && shouldUpgradeACRLevel(userSession.ACRLevel, acrLevel) {
+				userSession.ACRLevel = acrLevel
 			}
 		}
 
@@ -644,7 +644,7 @@ func (u *Manager) bindUserSession(ctx context.Context, sessionIdentifier string,
 		// append client if not already present
 		clientFound := false
 		for _, c := range userSession.Clients {
-			if c.ClientId == clientId {
+			if c.ClientID == clientID {
 				clientFound = true
 				break
 			}
@@ -653,33 +653,33 @@ func (u *Manager) bindUserSession(ctx context.Context, sessionIdentifier string,
 			userSession.Clients = append(userSession.Clients, record.UserSessionClient{
 				Started:      utcNow,
 				LastAccessed: utcNow,
-				ClientId:     clientId,
+				ClientID:     clientID,
 			})
 		} else {
 			// update last accessed
 			for i, c := range userSession.Clients {
-				if c.ClientId == clientId {
+				if c.ClientID == clientID {
 					userSession.Clients[i].LastAccessed = utcNow
 					break
 				}
 			}
 		}
 
-		// The insert-versus-update decision comes from client.Id on a copy, so an attempt that
+		// The insert-versus-update decision comes from client.ID on a copy, so an attempt that
 		// inserted leaves the slice as it found it.
 		if updateUserSessionErr := u.database.UpdateUserSession(ctx, tx, userSession); updateUserSessionErr != nil {
 			return updateUserSessionErr
 		}
 
 		for _, client := range userSession.Clients {
-			if client.Id > 0 {
+			if client.ID > 0 {
 				// update
 				if updateUserSessionClientErr := u.database.UpdateUserSessionClient(ctx, tx, &client); updateUserSessionClientErr != nil {
 					return updateUserSessionClientErr
 				}
 			} else {
 				// insert new
-				client.UserSessionId = userSession.Id
+				client.UserSessionID = userSession.ID
 				if createUserSessionClientErr := u.database.CreateUserSessionClient(ctx, tx, &client); createUserSessionClientErr != nil {
 					return createUserSessionClientErr
 				}
@@ -785,12 +785,12 @@ func sameInstant(a, b time.Time) bool {
 //
 // It is built from the same two predicates BumpUserSession applies, so the decider and
 // the writer cannot drift apart.
-func WillRaisePrivilege(userSession *record.UserSession, authMethods string, acrLevel record.AcrLevel) bool {
+func WillRaisePrivilege(userSession *record.UserSession, authMethods string, acrLevel record.ACRLevel) bool {
 	if userSession == nil {
 		return false
 	}
 	return raisesAuthMethods(userSession.AuthMethods, authMethods) ||
-		(acrLevel != "" && shouldUpgradeAcrLevel(userSession.AcrLevel, acrLevel))
+		(acrLevel != "" && shouldUpgradeACRLevel(userSession.ACRLevel, acrLevel))
 }
 
 // raisesAuthMethods reports whether incoming lists a method current lacks, which is the only change
@@ -823,21 +823,21 @@ func mergeAuthMethods(current, incoming string) string {
 	return strings.Join(merged, " ")
 }
 
-// shouldUpgradeAcrLevel determines if the session's ACR level should be upgraded.
-// Returns true if newAcr represents a stronger authentication level than currentAcr.
+// shouldUpgradeACRLevel determines if the session's ACR level should be upgraded.
+// Returns true if newACR represents a stronger authentication level than currentACR.
 //
 // This is used during step-up authentication: when a user with a level1 session
 // authenticates with OTP for a level2 client, the session's ACR should be upgraded.
 //
-// Uses record.AcrLevel.IsHigherThan() as the single source of truth for ACR comparison.
+// Uses record.ACRLevel.IsHigherThan() as the single source of truth for ACR comparison.
 // A level outside the three answers false on either side, which IsHigherThan alone does not:
 // an unrecognized current level has priority 0, so any known level would be higher than it,
 // and a session row carrying a value this server never wrote would be raised rather than
 // left as found. Priority 0 is what marks the value unrecognized (#433).
-func shouldUpgradeAcrLevel(currentAcr, newAcr record.AcrLevel) bool {
-	if currentAcr.Priority() == 0 || newAcr.Priority() == 0 {
+func shouldUpgradeACRLevel(currentACR, newACR record.ACRLevel) bool {
+	if currentACR.Priority() == 0 || newACR.Priority() == 0 {
 		return false // Unknown ACR, fail safe
 	}
 
-	return newAcr.IsHigherThan(currentAcr)
+	return newACR.IsHigherThan(currentACR)
 }

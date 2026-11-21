@@ -39,7 +39,7 @@ func TestHTTPBackend_RecordsEachAttemptUnderTheSessionsTarget(t *testing.T) {
 	reg := metrics.NewRegistry()
 	backend := New(stub.server.URL, newStubTokens(), nil, upstreammetrics.Register(reg))
 
-	_, err := backend.Load(context.Background(), httpTestSessionId)
+	_, err := backend.Load(context.Background(), httpTestSessionID)
 	require.NoError(t, err)
 
 	exposition := scrape(t, reg)
@@ -57,7 +57,7 @@ func TestHTTPBackend_AnEndpointNothingAnswersIsAnErrorPerAttempt(t *testing.T) {
 	reg := metrics.NewRegistry()
 	backend := New(baseURL, newStubTokens(), nil, upstreammetrics.Register(reg))
 
-	_, err = backend.Load(context.Background(), httpTestSessionId)
+	_, err = backend.Load(context.Background(), httpTestSessionID)
 	require.Error(t, err)
 
 	assert.Contains(t, scrape(t, reg), `goiabada_upstream_requests_total{target="sessions",status="error"} 2`+"\n")

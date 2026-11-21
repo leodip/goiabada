@@ -29,7 +29,7 @@ import (
 // forwards silently on purpose was still announced at ERROR with a stack. Counting records is the
 // only way to see either: the status and the body are identical with the extra line and without it.
 //
-// The real HttpHelper rather than the mock, for the same reason: the mock's JSONError logs nothing,
+// The real HTTPHelper rather than the mock, for the same reason: the mock's JSONError logs nothing,
 // so a handler that logged once would look correct against it (#279).
 
 type permissionsByResourceClient struct {
@@ -40,7 +40,7 @@ type permissionsByResourceClient struct {
 	seen context.Context
 }
 
-func (c *permissionsByResourceClient) GetPermissionsByResource(ctx context.Context, accessToken string, resourceId int64) ([]api.PermissionResponse, error) {
+func (c *permissionsByResourceClient) GetPermissionsByResource(ctx context.Context, accessToken string, resourceID int64) ([]api.PermissionResponse, error) {
 	c.seen = ctx
 	return c.permissions, c.err
 }
@@ -58,8 +58,8 @@ func permissionRecords(t *testing.T, client *permissionsByResourceClient, query 
 	router.Use(requestid.Middleware)
 	router.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ctx := reqctx.WithJwtInfo(r.Context(),
-				oauthclient.JwtInfo{TokenResponse: oauth.TokenResponse{AccessToken: "an-access-token"}})
+			ctx := reqctx.WithJWTInfo(r.Context(),
+				oauthclient.JWTInfo{TokenResponse: oauth.TokenResponse{AccessToken: "an-access-token"}})
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	})
@@ -149,7 +149,7 @@ func TestAdminGetPermissions_AMissingResourceStillAnswers404(t *testing.T) {
 // belongs to GetPermissionsResult, a console-local view type rather than part of the auth server's
 // contract, and both halves are asserted here so neither can drift unnoticed.
 func TestAdminGetPermissions_ReturnsThePermissions(t *testing.T) {
-	client := &permissionsByResourceClient{permissions: []api.PermissionResponse{{Id: 3, PermissionIdentifier: "read"}}}
+	client := &permissionsByResourceClient{permissions: []api.PermissionResponse{{ID: 3, PermissionIdentifier: "read"}}}
 
 	recorder, errorLines := permissionRecords(t, client, "resourceId=7")
 
@@ -165,7 +165,7 @@ func TestAdminGetPermissions_ReturnsThePermissions(t *testing.T) {
 // assertion: the compiler accepts context.Background() where r.Context() belongs, so nothing else
 // in the tree can see a handler that stopped carrying the request's cancellation outward.
 func TestAdminGetPermissions_TheCallCarriesTheRequestsContext(t *testing.T) {
-	client := &permissionsByResourceClient{permissions: []api.PermissionResponse{{Id: 8}}}
+	client := &permissionsByResourceClient{permissions: []api.PermissionResponse{{ID: 8}}}
 
 	recorder, _ := permissionRecords(t, client, "resourceId=7")
 
@@ -199,5 +199,5 @@ func TestAdminGetPermissions_WithoutATokenSetAnswersTheSentinel(t *testing.T) {
 	require.Len(t, records, 1)
 	logged, isError := records[0].Attrs["error"].(error)
 	require.True(t, isError, "the error attribute carries the error value")
-	assert.ErrorIs(t, logged, reqctx.ErrNoJwtInfo)
+	assert.ErrorIs(t, logged, reqctx.ErrNoJWTInfo)
 }

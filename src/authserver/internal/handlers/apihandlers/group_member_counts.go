@@ -10,7 +10,7 @@ import (
 
 // groupMemberCounter is what countGroupMembers needs: the one count every group response carries.
 type groupMemberCounter interface {
-	CountGroupMembers(ctx context.Context, tx *sql.Tx, groupId int64) (int, error)
+	CountGroupMembers(ctx context.Context, tx *sql.Tx, groupID int64) (int, error)
 }
 
 // countGroupMembers counts the members of every group given, or answers the first count that
@@ -23,11 +23,11 @@ type groupMemberCounter interface {
 func countGroupMembers(ctx context.Context, database groupMemberCounter, groups []record.Group) (map[int64]int, error) {
 	counts := make(map[int64]int, len(groups))
 	for _, group := range groups {
-		count, err := database.CountGroupMembers(ctx, nil, group.Id)
+		count, err := database.CountGroupMembers(ctx, nil, group.ID)
 		if err != nil {
-			return nil, errs.Wrapf(err, "unable to count the members of group %d", group.Id)
+			return nil, errs.Wrapf(err, "unable to count the members of group %d", group.ID)
 		}
-		counts[group.Id] = count
+		counts[group.ID] = count
 	}
 	return counts, nil
 }

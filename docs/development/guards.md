@@ -182,13 +182,14 @@ The `*_mock.go` files are written by mockery, at the version `versions.yaml` pin
 `tools.mockery`, and committed. Regenerate with `src/authserver/generate-mocks.sh` inside the dev
 container, which refuses to run on any other version rather than stamp one that did not produce the
 output. Each generated file opens with `src/mockery-header.txt`, inlined by
-`template-data.boilerplate-file` in the two `.mockery.yaml` files and written from the pin by
-`./version-manager.sh update`, so a clone reads which generator wrote the tree instead of having to
-install one to find out. That is checked in both halves, because they catch different things: every
-module's unit tier runs `TestGeneratedMocksArePinned`, which holds the pin, the header and every
-generated file to each other through `core/guard.AssertGeneratedMocksArePinned` and needs no
-generator; the lint tier and CI's Lint job run the generator itself and fail on a tree it changed,
-which is the only thing that catches an interface newly named in a config. Keying on mockery's own
+`template-data.boilerplate-file` in the three `.mockery.yaml` files (core, authserver and
+adminconsole) and written from the pin by `./version-manager.sh update`, so a clone reads which
+generator wrote the tree instead of having to install one to find out. That is checked in both
+halves, because they catch different things: every module's unit tier runs
+`TestGeneratedMocksArePinned`, which holds the pin, the header and every generated file to each
+other through `core/guard.AssertGeneratedMocksArePinned` and needs no generator; the lint tier and
+CI's Lint job run the generator itself and fail on a tree it changed, which is the only thing that
+catches an interface newly named in a config. Keying on mockery's own
 `Code generated ... DO NOT EDIT` marker rather than on the filename is what leaves the countries and
 timezones tables, which have generators of their own, out of it (#338).
 

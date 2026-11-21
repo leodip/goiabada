@@ -33,7 +33,7 @@ import (
 
 // The sign-in code step's two other notices (#724, #737): a sign-in with a recovery code tells
 // the user, with how many unused codes are left, and the refusal whose count reached
-// record.OtpConsecutiveFailureLimit, which disables the authenticator, tells them that, once per
+// record.OTPConsecutiveFailureLimit, which disables the authenticator, tells them that, once per
 // lockout. The step's operation reports each as a plain value, and the handler hands it off after
 // its response, as it does the set-up notice. A refused or missing recovery code, a refusal that
 // does not reach the limit and one against an authenticator already disabled tell nobody.
@@ -46,7 +46,7 @@ func enrolledNoticeUser(t *testing.T, locale string) *record.User {
 	user.Locale = locale
 	user.OTPEnabled = true
 	user.OTPSecretEncrypted = encryptOTPForTest(t, otpTestMintedSecret(t))
-	user.OtpConfigGeneration = 3
+	user.OTPConfigGeneration = 3
 	return user
 }
 
@@ -54,12 +54,12 @@ func enrolledNoticeUser(t *testing.T, locale string) *record.User {
 func recoveryNoticeRequest(t *testing.T, settings *record.Settings, code string) *http.Request {
 	t.Helper()
 	form := url.Values{}
-	form.Add(ceremony.IdField, testCeremonyId)
+	form.Add(ceremony.IDField, testCeremonyID)
 	form.Add("recoveryCode", code)
 	req, err := http.NewRequest(http.MethodPost, "/auth/otp", strings.NewReader(form.Encode()))
 	require.NoError(t, err)
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-	ctx := requestid.NewContext(req.Context(), signInNoticeRequestId)
+	ctx := requestid.NewContext(req.Context(), signInNoticeRequestID)
 	return req.WithContext(reqctx.WithSettings(ctx, settings))
 }
 
@@ -67,21 +67,21 @@ func recoveryNoticeRequest(t *testing.T, settings *record.Settings, code string)
 func otpNoticeCeremony() *ceremony.AuthContext {
 	return &ceremony.AuthContext{
 		AuthState:  ceremony.AuthStateLevel2OTP,
-		CeremonyId: testCeremonyId,
-		UserId:     1,
-		ClientId:   "test-client",
+		CeremonyID: testCeremonyID,
+		UserID:     1,
+		ClientID:   "test-client",
 	}
 }
 
 // stubAcceptedRecoveryCode answers a recovery code that is claimed, leaving remaining unused.
 func stubAcceptedRecoveryCode(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger,
 	user *record.User, remaining int) {
-	database.On("GetUserById", mock.Anything, mock.Anything, user.Id).Return(user, nil)
+	database.On("GetUserByID", mock.Anything, mock.Anything, user.ID).Return(user, nil)
 	expectOTPWriteTransactions(database)
 	expectUserRowLocked(database, user)
-	database.On("TryUseUserRecoveryCode", mock.Anything, mock.Anything, user.Id,
+	database.On("TryUseUserRecoveryCode", mock.Anything, mock.Anything, user.ID,
 		recoveryCodeHashForTest(recoveryCodeNormalized)).Return(true, nil).Once()
-	database.On("CountUnusedUserRecoveryCodes", mock.Anything, mock.Anything, user.Id).Return(remaining, nil).Once()
+	database.On("CountUnusedUserRecoveryCodes", mock.Anything, mock.Anything, user.ID).Return(remaining, nil).Once()
 	auditLogger.On("Log", mock.Anything, audit.EventAuthSuccessRecoveryCode, mock.Anything).Return().Once()
 }
 
@@ -119,7 +119,7 @@ func expectSignInNotice(pageRenderer *handlersmocks.PageRenderer, emailSender *a
 	return captured
 }
 
-func TestHandleAuthOtpPost_TellsTheUserARecoveryCodeSignedIn(t *testing.T) {
+func TestHandleAuthOTPPost_TellsTheUserARecoveryCodeSignedIn(t *testing.T) {
 	for _, tc := range []struct {
 		name          string
 		locale        string
@@ -141,7 +141,7 @@ func TestHandleAuthOtpPost_TellsTheUserARecoveryCodeSignedIn(t *testing.T) {
 			emailSender := accounthandlersmocks.NewEmailSender(t)
 			jobs := &signInNoticeJobs{}
 
-			handler := buildAuthOtpPost(authOtpPostDeps{
+			handler := buildAuthOTPPost(authOTPPostDeps{
 				pageRenderer:  pageRenderer,
 				ceremonyStore: ceremonyStore,
 				database:      database,
@@ -153,7 +153,7 @@ func TestHandleAuthOtpPost_TellsTheUserARecoveryCodeSignedIn(t *testing.T) {
 			rr := httptest.NewRecorder()
 			ceremonyStore.On("GetAuthContext", mock.Anything).Return(otpNoticeCeremony(), nil)
 			stubAcceptedRecoveryCode(database, auditLogger, enrolledNoticeUser(t, tc.locale), tc.remaining)
-			ceremonyStore.On("RegenerateSession", rr, req, testCeremonyId, int64(1)).Return(tc.saveErr).Once()
+			ceremonyStore.On("RegenerateSession", rr, req, testCeremonyID, int64(1)).Return(tc.saveErr).Once()
 			if tc.saveErr == nil {
 				ceremonyStore.On("SaveAuthContext", rr, req, mock.Anything).Return(nil).Once()
 			} else {
@@ -187,7 +187,7 @@ func TestHandleAuthOtpPost_TellsTheUserARecoveryCodeSignedIn(t *testing.T) {
 
 // Where no recovery-code notice may go, the step hands nothing off: a wrong code, a used one, no
 // code, and an accepted code with SMTP off or to an unverified address.
-func TestHandleAuthOtpPost_SendsNoRecoveryCodeNoticeWhereNoneMayGo(t *testing.T) {
+func TestHandleAuthOTPPost_SendsNoRecoveryCodeNoticeWhereNoneMayGo(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
 		code    string
@@ -199,11 +199,11 @@ func TestHandleAuthOtpPost_SendsNoRecoveryCodeNoticeWhereNoneMayGo(t *testing.T)
 			func(rr *httptest.ResponseRecorder, req *http.Request, user *record.User, settings *record.Settings,
 				database *datamocks.Database, auditLogger *handlersmocks.AuditLogger,
 				ceremonyStore *handlersmocks.CeremonyStore, pageRenderer *handlersmocks.PageRenderer) {
-				database.On("GetUserById", mock.Anything, mock.Anything, user.Id).Return(user, nil)
+				database.On("GetUserByID", mock.Anything, mock.Anything, user.ID).Return(user, nil)
 				expectOTPWriteTransactions(database)
 				expectUserRowLocked(database, user)
-				database.On("TryUseUserRecoveryCode", mock.Anything, mock.Anything, user.Id, mock.Anything).Return(false, nil).Once()
-				database.On("UserRecoveryCodeExists", mock.Anything, mock.Anything, user.Id, mock.Anything).Return(false, nil).Once()
+				database.On("TryUseUserRecoveryCode", mock.Anything, mock.Anything, user.ID, mock.Anything).Return(false, nil).Once()
+				database.On("UserRecoveryCodeExists", mock.Anything, mock.Anything, user.ID, mock.Anything).Return(false, nil).Once()
 				database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
 					Return(&record.Client{ClientIdentifier: "test-client"}, nil)
 				auditLogger.On("Log", mock.Anything, audit.EventAuthFailedRecoveryCode, mock.Anything).Return().Once()
@@ -214,11 +214,11 @@ func TestHandleAuthOtpPost_SendsNoRecoveryCodeNoticeWhereNoneMayGo(t *testing.T)
 			func(rr *httptest.ResponseRecorder, req *http.Request, user *record.User, settings *record.Settings,
 				database *datamocks.Database, auditLogger *handlersmocks.AuditLogger,
 				ceremonyStore *handlersmocks.CeremonyStore, pageRenderer *handlersmocks.PageRenderer) {
-				database.On("GetUserById", mock.Anything, mock.Anything, user.Id).Return(user, nil)
+				database.On("GetUserByID", mock.Anything, mock.Anything, user.ID).Return(user, nil)
 				expectOTPWriteTransactions(database)
 				expectUserRowLocked(database, user)
-				database.On("TryUseUserRecoveryCode", mock.Anything, mock.Anything, user.Id, mock.Anything).Return(false, nil).Once()
-				database.On("UserRecoveryCodeExists", mock.Anything, mock.Anything, user.Id, mock.Anything).Return(true, nil).Once()
+				database.On("TryUseUserRecoveryCode", mock.Anything, mock.Anything, user.ID, mock.Anything).Return(false, nil).Once()
+				database.On("UserRecoveryCodeExists", mock.Anything, mock.Anything, user.ID, mock.Anything).Return(true, nil).Once()
 				database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
 					Return(&record.Client{ClientIdentifier: "test-client"}, nil)
 				auditLogger.On("Log", mock.Anything, audit.EventRecoveryCodeReplayDetected, mock.Anything).Return().Once()
@@ -230,7 +230,7 @@ func TestHandleAuthOtpPost_SendsNoRecoveryCodeNoticeWhereNoneMayGo(t *testing.T)
 			func(rr *httptest.ResponseRecorder, req *http.Request, user *record.User, settings *record.Settings,
 				database *datamocks.Database, auditLogger *handlersmocks.AuditLogger,
 				ceremonyStore *handlersmocks.CeremonyStore, pageRenderer *handlersmocks.PageRenderer) {
-				database.On("GetUserById", mock.Anything, mock.Anything, user.Id).Return(user, nil)
+				database.On("GetUserByID", mock.Anything, mock.Anything, user.ID).Return(user, nil)
 				database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
 					Return(&record.Client{ClientIdentifier: "test-client"}, nil)
 				pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_otp_recovery_code.html",
@@ -242,7 +242,7 @@ func TestHandleAuthOtpPost_SendsNoRecoveryCodeNoticeWhereNoneMayGo(t *testing.T)
 				ceremonyStore *handlersmocks.CeremonyStore, pageRenderer *handlersmocks.PageRenderer) {
 				settings.SMTPEnabled = false
 				stubAcceptedRecoveryCode(database, auditLogger, user, 9)
-				ceremonyStore.On("RegenerateSession", rr, req, testCeremonyId, int64(1)).Return(nil).Once()
+				ceremonyStore.On("RegenerateSession", rr, req, testCeremonyID, int64(1)).Return(nil).Once()
 				ceremonyStore.On("SaveAuthContext", rr, req, mock.Anything).Return(nil).Once()
 			}},
 		{"an accepted code for an unverified address", recoveryCodeTyped,
@@ -251,7 +251,7 @@ func TestHandleAuthOtpPost_SendsNoRecoveryCodeNoticeWhereNoneMayGo(t *testing.T)
 				ceremonyStore *handlersmocks.CeremonyStore, pageRenderer *handlersmocks.PageRenderer) {
 				user.EmailVerified = false
 				stubAcceptedRecoveryCode(database, auditLogger, user, 9)
-				ceremonyStore.On("RegenerateSession", rr, req, testCeremonyId, int64(1)).Return(nil).Once()
+				ceremonyStore.On("RegenerateSession", rr, req, testCeremonyID, int64(1)).Return(nil).Once()
 				ceremonyStore.On("SaveAuthContext", rr, req, mock.Anything).Return(nil).Once()
 			}},
 	} {
@@ -262,7 +262,7 @@ func TestHandleAuthOtpPost_SendsNoRecoveryCodeNoticeWhereNoneMayGo(t *testing.T)
 			auditLogger := handlersmocks.NewAuditLogger(t)
 			jobs := &signInNoticeJobs{}
 
-			handler := buildAuthOtpPost(authOtpPostDeps{
+			handler := buildAuthOTPPost(authOTPPostDeps{
 				pageRenderer:  pageRenderer,
 				ceremonyStore: ceremonyStore,
 				database:      database,
@@ -294,26 +294,26 @@ func otpCodeNoticeRequest(t *testing.T, code string) *http.Request {
 // reports: whether this refusal is the one that moved the count to the limit.
 func stubRefusedCode(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, pageRenderer *handlersmocks.PageRenderer,
 	rr *httptest.ResponseRecorder, req *http.Request, user *record.User, replay bool, reachesLimit bool) {
-	database.On("GetUserById", mock.Anything, mock.Anything, user.Id).Return(user, nil)
+	database.On("GetUserByID", mock.Anything, mock.Anything, user.ID).Return(user, nil)
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
 		Return(&record.Client{ClientIdentifier: "test-client"}, nil)
 	if replay {
-		database.On("TryConsumeEnrolledUserOTPStep", mock.Anything, mock.Anything, user.Id, mock.Anything,
-			user.OtpConfigGeneration).Return(false, nil).Once()
+		database.On("TryConsumeEnrolledUserOTPStep", mock.Anything, mock.Anything, user.ID, mock.Anything,
+			user.OTPConfigGeneration).Return(false, nil).Once()
 		auditLogger.On("Log", mock.Anything, audit.EventOTPCodeReplayDetected, mock.Anything).Return().Once()
 	}
 	expectOTPWriteTransactions(database)
 	expectUserRowLocked(database, user)
-	database.On("IncrementUserOtpConsecutiveFailures", mock.Anything, mock.Anything, user.Id, user.OtpConfigGeneration).
+	database.On("IncrementUserOTPConsecutiveFailures", mock.Anything, mock.Anything, user.ID, user.OTPConfigGeneration).
 		Return(reachesLimit, nil).Once()
-	auditLogger.On("Log", mock.Anything, audit.EventAuthFailedOtp, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, audit.EventAuthFailedOTP, mock.Anything).Return().Once()
 	if reachesLimit {
 		auditLogger.On("Log", mock.Anything, audit.EventOTPAuthenticatorDisabled, mock.Anything).Return().Once()
 	}
 	pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_otp.html", mock.Anything).Return(nil).Once()
 }
 
-func TestHandleAuthOtpPost_TellsTheUserTheRefusalThatDisabledTheirAuthenticator(t *testing.T) {
+func TestHandleAuthOTPPost_TellsTheUserTheRefusalThatDisabledTheirAuthenticator(t *testing.T) {
 	for _, tc := range []struct {
 		name          string
 		locale        string
@@ -331,7 +331,7 @@ func TestHandleAuthOtpPost_TellsTheUserTheRefusalThatDisabledTheirAuthenticator(
 			emailSender := accounthandlersmocks.NewEmailSender(t)
 			jobs := &signInNoticeJobs{}
 
-			handler := buildAuthOtpPost(authOtpPostDeps{
+			handler := buildAuthOTPPost(authOTPPostDeps{
 				pageRenderer:  pageRenderer,
 				ceremonyStore: ceremonyStore,
 				database:      database,
@@ -340,7 +340,7 @@ func TestHandleAuthOtpPost_TellsTheUserTheRefusalThatDisabledTheirAuthenticator(
 			})
 
 			user := enrolledNoticeUser(t, tc.locale)
-			user.OtpConsecutiveFailures = record.OtpConsecutiveFailureLimit - 1
+			user.OTPConsecutiveFailures = record.OTPConsecutiveFailureLimit - 1
 			secret := otpTestMintedSecret(t)
 			user.OTPSecretEncrypted = encryptOTPForTest(t, secret)
 			code := "000000"
@@ -374,7 +374,7 @@ func TestHandleAuthOtpPost_TellsTheUserTheRefusalThatDisabledTheirAuthenticator(
 // A replayed code whose count disabled the authenticator counted against the user's row, so the user
 // was there when the code was claimed: a replay, whose committed lockout is audited and told whatever
 // a read of the user now would say, gone or failing (#796 decision 3, #724 decision 7).
-func TestHandleAuthOtpPost_TellsTheLockoutOfAReplayWithoutReadingTheUserAgain(t *testing.T) {
+func TestHandleAuthOTPPost_TellsTheLockoutOfAReplayWithoutReadingTheUserAgain(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
 		reread  *record.User
@@ -391,7 +391,7 @@ func TestHandleAuthOtpPost_TellsTheLockoutOfAReplayWithoutReadingTheUserAgain(t 
 			emailSender := accounthandlersmocks.NewEmailSender(t)
 			jobs := &signInNoticeJobs{}
 
-			handler := buildAuthOtpPost(authOtpPostDeps{
+			handler := buildAuthOTPPost(authOTPPostDeps{
 				pageRenderer:  pageRenderer,
 				ceremonyStore: ceremonyStore,
 				database:      database,
@@ -400,25 +400,25 @@ func TestHandleAuthOtpPost_TellsTheLockoutOfAReplayWithoutReadingTheUserAgain(t 
 			})
 
 			user := enrolledNoticeUser(t, "en")
-			user.OtpConsecutiveFailures = record.OtpConsecutiveFailureLimit - 1
+			user.OTPConsecutiveFailures = record.OTPConsecutiveFailureLimit - 1
 			secret := otpTestMintedSecret(t)
 			user.OTPSecretEncrypted = encryptOTPForTest(t, secret)
 			req := otpCodeNoticeRequest(t, otptest.Code(t, secret, time.Now()))
 			rr := httptest.NewRecorder()
 			ceremonyStore.On("GetAuthContext", mock.Anything).Return(otpNoticeCeremony(), nil)
-			database.On("GetUserById", mock.Anything, mock.Anything, user.Id).Return(user, nil).Once()
-			database.On("TryConsumeEnrolledUserOTPStep", mock.Anything, mock.Anything, user.Id, mock.Anything,
-				user.OtpConfigGeneration).Return(false, nil).Once()
+			database.On("GetUserByID", mock.Anything, mock.Anything, user.ID).Return(user, nil).Once()
+			database.On("TryConsumeEnrolledUserOTPStep", mock.Anything, mock.Anything, user.ID, mock.Anything,
+				user.OTPConfigGeneration).Return(false, nil).Once()
 			expectOTPWriteTransactions(database)
 			expectUserRowLocked(database, user)
-			database.On("IncrementUserOtpConsecutiveFailures", mock.Anything, mock.Anything, user.Id,
-				user.OtpConfigGeneration).Return(true, nil).Once()
-			database.On("GetUserById", mock.Anything, mock.Anything, user.Id).Return(tc.reread, tc.readErr).Maybe()
+			database.On("IncrementUserOTPConsecutiveFailures", mock.Anything, mock.Anything, user.ID,
+				user.OTPConfigGeneration).Return(true, nil).Once()
+			database.On("GetUserByID", mock.Anything, mock.Anything, user.ID).Return(tc.reread, tc.readErr).Maybe()
 			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
 				Return(&record.Client{ClientIdentifier: "test-client"}, nil).Once()
 			var events []string
 			logged := func(args mock.Arguments) { events = append(events, args.String(1)) }
-			for _, event := range []string{audit.EventOTPCodeReplayDetected, audit.EventAuthFailedOtp,
+			for _, event := range []string{audit.EventOTPCodeReplayDetected, audit.EventAuthFailedOTP,
 				audit.EventOTPAuthenticatorDisabled} {
 				auditLogger.On("Log", mock.Anything, event, mock.Anything).Return().Run(logged).Once()
 			}
@@ -427,7 +427,7 @@ func TestHandleAuthOtpPost_TellsTheLockoutOfAReplayWithoutReadingTheUserAgain(t 
 
 			handler.ServeHTTP(rr, req)
 
-			assert.Equal(t, []string{audit.EventOTPCodeReplayDetected, audit.EventAuthFailedOtp,
+			assert.Equal(t, []string{audit.EventOTPCodeReplayDetected, audit.EventAuthFailedOTP,
 				audit.EventOTPAuthenticatorDisabled}, events)
 			require.Len(t, jobs.jobs, 1, "the lockout is handed off")
 			captured := expectSignInNotice(pageRenderer, emailSender, emailtemplate.OTPLockout)
@@ -441,7 +441,7 @@ func TestHandleAuthOtpPost_TellsTheLockoutOfAReplayWithoutReadingTheUserAgain(t 
 // The lockout is told once: a refusal that leaves the count under the limit tells nobody, and
 // neither does one against an authenticator already disabled, which moves no count. With SMTP off
 // or an unverified address the disabling refusal tells nobody either.
-func TestHandleAuthOtpPost_SendsNoLockoutNoticeWhereNoneMayGo(t *testing.T) {
+func TestHandleAuthOTPPost_SendsNoLockoutNoticeWhereNoneMayGo(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
 		arrange func(rr *httptest.ResponseRecorder, req *http.Request, user *record.User, settings *record.Settings,
@@ -450,17 +450,17 @@ func TestHandleAuthOtpPost_SendsNoLockoutNoticeWhereNoneMayGo(t *testing.T) {
 		{"a refusal under the limit",
 			func(rr *httptest.ResponseRecorder, req *http.Request, user *record.User, settings *record.Settings,
 				database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, pageRenderer *handlersmocks.PageRenderer) {
-				user.OtpConsecutiveFailures = record.OtpConsecutiveFailureLimit - 2
+				user.OTPConsecutiveFailures = record.OTPConsecutiveFailureLimit - 2
 				stubRefusedCode(database, auditLogger, pageRenderer, rr, req, user, false, false)
 			}},
 		{"a refusal after the authenticator was disabled",
 			func(rr *httptest.ResponseRecorder, req *http.Request, user *record.User, settings *record.Settings,
 				database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, pageRenderer *handlersmocks.PageRenderer) {
-				user.OtpConsecutiveFailures = record.OtpConsecutiveFailureLimit
-				database.On("GetUserById", mock.Anything, mock.Anything, user.Id).Return(user, nil)
+				user.OTPConsecutiveFailures = record.OTPConsecutiveFailureLimit
+				database.On("GetUserByID", mock.Anything, mock.Anything, user.ID).Return(user, nil)
 				database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
 					Return(&record.Client{ClientIdentifier: "test-client"}, nil)
-				auditLogger.On("Log", mock.Anything, audit.EventAuthFailedOtp, mock.Anything).Return().Once()
+				auditLogger.On("Log", mock.Anything, audit.EventAuthFailedOTP, mock.Anything).Return().Once()
 				pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_otp.html", mock.Anything).
 					Return(nil).Once()
 			}},
@@ -468,14 +468,14 @@ func TestHandleAuthOtpPost_SendsNoLockoutNoticeWhereNoneMayGo(t *testing.T) {
 			func(rr *httptest.ResponseRecorder, req *http.Request, user *record.User, settings *record.Settings,
 				database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, pageRenderer *handlersmocks.PageRenderer) {
 				settings.SMTPEnabled = false
-				user.OtpConsecutiveFailures = record.OtpConsecutiveFailureLimit - 1
+				user.OTPConsecutiveFailures = record.OTPConsecutiveFailureLimit - 1
 				stubRefusedCode(database, auditLogger, pageRenderer, rr, req, user, false, true)
 			}},
 		{"the disabling refusal for an unverified address",
 			func(rr *httptest.ResponseRecorder, req *http.Request, user *record.User, settings *record.Settings,
 				database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, pageRenderer *handlersmocks.PageRenderer) {
 				user.EmailVerified = false
-				user.OtpConsecutiveFailures = record.OtpConsecutiveFailureLimit - 1
+				user.OTPConsecutiveFailures = record.OTPConsecutiveFailureLimit - 1
 				stubRefusedCode(database, auditLogger, pageRenderer, rr, req, user, false, true)
 			}},
 	} {
@@ -486,7 +486,7 @@ func TestHandleAuthOtpPost_SendsNoLockoutNoticeWhereNoneMayGo(t *testing.T) {
 			auditLogger := handlersmocks.NewAuditLogger(t)
 			jobs := &signInNoticeJobs{}
 
-			handler := buildAuthOtpPost(authOtpPostDeps{
+			handler := buildAuthOTPPost(authOTPPostDeps{
 				pageRenderer:  pageRenderer,
 				ceremonyStore: ceremonyStore,
 				database:      database,
@@ -510,7 +510,7 @@ func TestHandleAuthOtpPost_SendsNoLockoutNoticeWhereNoneMayGo(t *testing.T) {
 
 // A lockout notice that cannot be sent is one Error record on the request's id, and nothing else:
 // the refusal was answered before it ran.
-func TestHandleAuthOtpPost_AFailedLockoutNoticeIsOneErrorRecord(t *testing.T) {
+func TestHandleAuthOTPPost_AFailedLockoutNoticeIsOneErrorRecord(t *testing.T) {
 	pageRenderer := handlersmocks.NewPageRenderer(t)
 	ceremonyStore := handlersmocks.NewCeremonyStore(t)
 	database := datamocks.NewDatabase(t)
@@ -518,7 +518,7 @@ func TestHandleAuthOtpPost_AFailedLockoutNoticeIsOneErrorRecord(t *testing.T) {
 	emailSender := accounthandlersmocks.NewEmailSender(t)
 	jobs := &signInNoticeJobs{}
 
-	handler := buildAuthOtpPost(authOtpPostDeps{
+	handler := buildAuthOTPPost(authOTPPostDeps{
 		pageRenderer:  pageRenderer,
 		ceremonyStore: ceremonyStore,
 		database:      database,
@@ -527,7 +527,7 @@ func TestHandleAuthOtpPost_AFailedLockoutNoticeIsOneErrorRecord(t *testing.T) {
 	})
 
 	user := enrolledNoticeUser(t, "en")
-	user.OtpConsecutiveFailures = record.OtpConsecutiveFailureLimit - 1
+	user.OTPConsecutiveFailures = record.OTPConsecutiveFailureLimit - 1
 	req := otpCodeNoticeRequest(t, "000000")
 	rr := httptest.NewRecorder()
 	ceremonyStore.On("GetAuthContext", mock.Anything).Return(otpNoticeCeremony(), nil)
@@ -548,7 +548,7 @@ func TestHandleAuthOtpPost_AFailedLockoutNoticeIsOneErrorRecord(t *testing.T) {
 	assert.Equal(t, slog.LevelError, records[0].Level)
 	assert.Equal(t, "unable to send an account notice", records[0].Message)
 	assert.Equal(t, "otp_lockout", records[0].Attrs["notice"])
-	assert.Equal(t, signInNoticeRequestId, records[0].Attrs["request_id"])
-	assert.Equal(t, user.Id, records[0].Attrs["user_id"])
+	assert.Equal(t, signInNoticeRequestID, records[0].Attrs["request_id"])
+	assert.Equal(t, user.ID, records[0].Attrs["user_id"])
 	assert.NotContains(t, capture.Text(), signInNoticeAddress, "the record names no address")
 }

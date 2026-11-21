@@ -72,7 +72,7 @@ func TestLogToConsole_KeepsNestedValuesAsValues(t *testing.T) {
 // it: core/logging's handler reads chi's id off the context, and CaptureSlog installs that same
 // wrapper, so what these two cases exercise is the injection the servers run rather than a second
 // copy of it.
-func TestLogToConsole_CarriesTheRequestIdOfTheContextItIsGiven(t *testing.T) {
+func TestLogToConsole_CarriesTheRequestIDOfTheContextItIsGiven(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
 
 	ctx := requestid.NewContext(context.Background(), "host/req-0000001")
@@ -87,7 +87,7 @@ func TestLogToConsole_CarriesTheRequestIdOfTheContextItIsGiven(t *testing.T) {
 // The backfill's shape, and the reason decision 2 gave LogToConsole one entry point rather than
 // two: a context with no request on it writes the same record without a request id, so the absence
 // is the truth about a startup event rather than a gap in the record.
-func TestLogToConsole_WritesNoRequestIdUnderAContextThatCarriesNone(t *testing.T) {
+func TestLogToConsole_WritesNoRequestIDUnderAContextThatCarriesNone(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
 
 	LogToConsole(context.Background(), "revoked_user_auth_state", map[string]any{"userId": int64(7)})

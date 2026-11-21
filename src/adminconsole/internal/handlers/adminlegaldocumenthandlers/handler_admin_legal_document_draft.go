@@ -13,7 +13,7 @@ import (
 )
 
 func HandleDraftGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient legalDocumentTextReader,
 ) http.HandlerFunc {
@@ -42,14 +42,14 @@ func HandleDraftGet(
 // with, and the write.
 type legalDocumentDraftAPI interface {
 	legalDocumentReader
-	SaveLegalDocumentDraft(ctx context.Context, accessToken string, legalDocumentId int64, request *api.SaveLegalDocumentDraftRequest) (*api.LegalDocumentDetailResponse, error)
+	SaveLegalDocumentDraft(ctx context.Context, accessToken string, legalDocumentID int64, request *api.SaveLegalDocumentDraftRequest) (*api.LegalDocumentDetailResponse, error)
 }
 
 // HandleDraftPost saves the editor's fields as the document's one draft, which replaces the draft
 // it held or starts one. The short name goes with it only until the document is first published:
 // from then on it is fixed, so links to its public page keep working.
 func HandleDraftPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient legalDocumentDraftAPI,
 	baseURL string,
@@ -78,7 +78,7 @@ func HandleDraftPost(
 			form.shortName = doc.ShortName
 		}
 
-		_, err := apiClient.SaveLegalDocumentDraft(r.Context(), token, doc.Id, request)
+		_, err := apiClient.SaveLegalDocumentDraft(r.Context(), token, doc.ID, request)
 		if err != nil {
 			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
 				renderDraft(httpHelper, w, r, detail, form, map[string]interface{}{
@@ -89,7 +89,7 @@ func HandleDraftPost(
 			return
 		}
 
-		pagePath := fmt.Sprintf("/admin/legal-documents/%v/draft", doc.Id)
+		pagePath := fmt.Sprintf("/admin/legal-documents/%v/draft", doc.ID)
 		if !setFlash(httpHelper, httpSession, w, r, pagePath, flashDraftSaved, "true") {
 			return
 		}
@@ -101,13 +101,13 @@ func HandleDraftPost(
 // drawn with, and the write.
 type legalDocumentPublishAPI interface {
 	legalDocumentTextReader
-	PublishLegalDocument(ctx context.Context, accessToken string, legalDocumentId int64) (*api.LegalDocumentDetailResponse, error)
+	PublishLegalDocument(ctx context.Context, accessToken string, legalDocumentID int64) (*api.LegalDocumentDetailResponse, error)
 }
 
 // HandlePublishPost publishes the document's saved draft as its next version and opens the
 // versions, which name the one published. A refusal is said on the editor.
 func HandlePublishPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient legalDocumentPublishAPI,
 	baseURL string,
@@ -124,7 +124,7 @@ func HandlePublishPost(
 			return
 		}
 
-		published, err := apiClient.PublishLegalDocument(r.Context(), token, detail.LegalDocument.Id)
+		published, err := apiClient.PublishLegalDocument(r.Context(), token, detail.LegalDocument.ID)
 		if err != nil {
 			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
 				renderStoredDraft(httpHelper, w, r, apiClient, token, detail, map[string]interface{}{
@@ -135,7 +135,7 @@ func HandlePublishPost(
 			return
 		}
 
-		pagePath := fmt.Sprintf("/admin/legal-documents/%v/versions", detail.LegalDocument.Id)
+		pagePath := fmt.Sprintf("/admin/legal-documents/%v/versions", detail.LegalDocument.ID)
 		if !setFlash(httpHelper, httpSession, w, r, pagePath, flashPublished, strconv.Itoa(published.LegalDocument.CurrentVersion)) {
 			return
 		}

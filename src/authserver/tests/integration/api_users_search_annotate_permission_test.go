@@ -20,7 +20,7 @@ func TestAPIUsersSearch_AnnotatePermission_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	res := createResource(t)
-	perm := createPermission(t, res.Id)
+	perm := createPermission(t, res.ID)
 
 	// Create three users; grant permission to two
 	randSuffix := fake.LetterN(6)
@@ -31,16 +31,16 @@ func TestAPIUsersSearch_AnnotatePermission_Success(t *testing.T) {
 	assert.NoError(t, database.CreateUser(context.Background(), nil, u2))
 	assert.NoError(t, database.CreateUser(context.Background(), nil, u3))
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, u1.Id)
-		_ = database.DeleteUser(context.Background(), nil, u2.Id)
-		_ = database.DeleteUser(context.Background(), nil, u3.Id)
+		_ = database.DeleteUser(context.Background(), nil, u1.ID)
+		_ = database.DeleteUser(context.Background(), nil, u2.ID)
+		_ = database.DeleteUser(context.Background(), nil, u3.ID)
 	}()
 
-	assignPermissionToUser(t, u1.Id, perm.Id)
-	assignPermissionToUser(t, u3.Id, perm.Id)
+	assignPermissionToUser(t, u1.ID, perm.ID)
+	assignPermissionToUser(t, u3.ID, perm.ID)
 
 	// Use query parameter to filter to our test users (search matches on email, username, given_name, etc.)
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/search?query=annperm&annotatePermissionId=" + strconv.FormatInt(perm.Id, 10) + "&page=1&size=200"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/search?query=annperm&annotatePermissionId=" + strconv.FormatInt(perm.ID, 10) + "&page=1&size=200"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -84,8 +84,8 @@ func TestAPIUsersSearch_AnnotatePermission_InvalidParam(t *testing.T) {
 
 func TestAPIUsersSearch_AnnotatePermission_PermissionNotFound(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
-	missingId := int64(fake.Number(8_000_000, 8_999_999))
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/search?annotatePermissionId=" + strconv.FormatInt(missingId, 10)
+	missingID := int64(fake.Number(8_000_000, 8_999_999))
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/search?annotatePermissionId=" + strconv.FormatInt(missingID, 10)
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
@@ -96,9 +96,9 @@ func TestAPIUsersSearch_AnnotatePermission_PermissionNotFound(t *testing.T) {
 
 func TestAPIUsersSearch_AnnotatePermission_Unauthorized(t *testing.T) {
 	res := createResource(t)
-	perm := createPermission(t, res.Id)
-	u := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/search?annotatePermissionId=" + neturl.QueryEscape(strconv.FormatInt(perm.Id, 10))
-	httpClient := createHttpClient(t)
+	perm := createPermission(t, res.ID)
+	u := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/search?annotatePermissionId=" + neturl.QueryEscape(strconv.FormatInt(perm.ID, 10))
+	httpClient := createHTTPClient(t)
 	req, _ := http.NewRequest("GET", u, nil)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
@@ -110,13 +110,13 @@ func TestAPIUsersSearch_AnnotatePermission_ConflictWithGroupAnnotation(t *testin
 	accessToken, _ := createAdminClientWithToken(t)
 
 	res := createResource(t)
-	perm := createPermission(t, res.Id)
+	perm := createPermission(t, res.ID)
 
 	// Create a group to reference
 	grp := createTestGroup(t)
-	defer func() { _ = database.DeleteGroup(context.Background(), nil, grp.Id) }()
+	defer func() { _ = database.DeleteGroup(context.Background(), nil, grp.ID) }()
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/search?annotatePermissionId=" + strconv.FormatInt(perm.Id, 10) + "&annotateGroupMembership=" + strconv.FormatInt(grp.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/search?annotatePermissionId=" + strconv.FormatInt(perm.ID, 10) + "&annotateGroupMembership=" + strconv.FormatInt(grp.ID, 10)
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -136,7 +136,7 @@ func TestAPIUsersSearch_AnnotatePermission_AnAuthServerPermission(t *testing.T) 
 	authRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
 	require.NoError(t, err)
 	require.NotNil(t, authRes, "the seed creates the authserver resource")
-	perms, err := database.GetPermissionsByResourceId(context.Background(), nil, authRes.Id)
+	perms, err := database.GetPermissionsByResourceID(context.Background(), nil, authRes.ID)
 	require.NoError(t, err)
 	var manageAccount *record.Permission
 	for i := range perms {
@@ -145,8 +145,8 @@ func TestAPIUsersSearch_AnnotatePermission_AnAuthServerPermission(t *testing.T) 
 		}
 	}
 	require.NotNil(t, manageAccount, "the seed writes the manage-account permission")
-	userinfoNamed := createTestPermission(t, authRes.Id, "userinfo", "Created by an administrator")
-	t.Cleanup(func() { _ = database.DeletePermission(context.Background(), nil, userinfoNamed.Id) })
+	userinfoNamed := createTestPermission(t, authRes.ID, "userinfo", "Created by an administrator")
+	t.Cleanup(func() { _ = database.DeletePermission(context.Background(), nil, userinfoNamed.ID) })
 
 	for _, perm := range []*record.Permission{manageAccount, userinfoNamed} {
 		t.Run(perm.PermissionIdentifier, func(t *testing.T) {
@@ -156,12 +156,12 @@ func TestAPIUsersSearch_AnnotatePermission_AnAuthServerPermission(t *testing.T) 
 			require.NoError(t, database.CreateUser(context.Background(), nil, holder))
 			require.NoError(t, database.CreateUser(context.Background(), nil, other))
 			t.Cleanup(func() {
-				_ = database.DeleteUser(context.Background(), nil, holder.Id)
-				_ = database.DeleteUser(context.Background(), nil, other.Id)
+				_ = database.DeleteUser(context.Background(), nil, holder.ID)
+				_ = database.DeleteUser(context.Background(), nil, other.ID)
 			})
-			assignPermissionToUser(t, holder.Id, perm.Id)
+			assignPermissionToUser(t, holder.ID, perm.ID)
 
-			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/search?query=" + randSuffix + "&annotatePermissionId=" + strconv.FormatInt(perm.Id, 10) + "&page=1&size=200"
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/search?query=" + randSuffix + "&annotatePermissionId=" + strconv.FormatInt(perm.ID, 10) + "&page=1&size=200"
 			resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 			defer func() { _ = resp.Body.Close() }()
 			require.Equal(t, http.StatusOK, resp.StatusCode)

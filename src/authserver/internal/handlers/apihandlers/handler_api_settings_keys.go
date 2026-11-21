@@ -30,9 +30,9 @@ import (
 type settingsKeysDatabase interface {
 	signingkeys.RotationDatabase
 
-	DeleteKeyPair(ctx context.Context, tx *sql.Tx, keyPairId int64) error
+	DeleteKeyPair(ctx context.Context, tx *sql.Tx, keyPairID int64) error
 	GetAllSigningKeys(ctx context.Context, tx *sql.Tx) ([]record.KeyPair, error)
-	GetKeyPairById(ctx context.Context, tx *sql.Tx, keyPairId int64) (*record.KeyPair, error)
+	GetKeyPairByID(ctx context.Context, tx *sql.Tx, keyPairID int64) (*record.KeyPair, error)
 }
 
 // HandleSettingsKeysGet - GET /api/v1/admin/settings/keys
@@ -55,13 +55,13 @@ func HandleSettingsKeysGet(
 				createdAt = &t
 			}
 			mapped = append(mapped, api.SettingsSigningKeyResponse{
-				Id:               k.Id,
+				ID:               k.ID,
 				CreatedAt:        createdAt,
 				State:            k.State,
 				KeyIdentifier:    k.KeyIdentifier,
 				Type:             k.Type,
 				Algorithm:        k.Algorithm,
-				PublicKeyASN1DER: base64.StdEncoding.EncodeToString(k.PublicKeyASN1_DER),
+				PublicKeyASN1DER: base64.StdEncoding.EncodeToString(k.PublicKeyASN1DER),
 				PublicKeyPEM:     apimapping.ToPublicKeyPEM(k.PublicKeyPEM),
 				PublicKeyJWK:     string(k.PublicKeyJWK),
 			})
@@ -146,9 +146,9 @@ func HandleSettingsKeysRotatePost(
 			// (#371). It still owes what KEY_SET_INCOMPLETE writes, one Error record carrying the
 			// driver's error and the same request id on the wire, because an operator has to
 			// inspect the keys and that record is what joins the refusal to its cause (#279).
-			requestId := apiresponse.LogInternalServerError(r, errs.Wrap(err, "unable to rotate the signing keys"))
+			requestID := apiresponse.LogInternalServerError(r, errs.Wrap(err, "unable to rotate the signing keys"))
 			writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.SettingsKeysCommitOutcomeUnknown,
-				map[string]any{"requestId": requestId}),
+				map[string]any{"requestId": requestID}),
 				"ROTATION_OUTCOME_UNKNOWN", http.StatusConflict)
 
 		default:
@@ -170,7 +170,7 @@ func HandleSettingsKeyDelete(
 			return
 		}
 
-		kp, err := database.GetKeyPairById(r.Context(), nil, id)
+		kp, err := database.GetKeyPairByID(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -190,7 +190,7 @@ func HandleSettingsKeyDelete(
 			return
 		}
 
-		if err := database.DeleteKeyPair(r.Context(), nil, kp.Id); err != nil {
+		if err := database.DeleteKeyPair(r.Context(), nil, kp.ID); err != nil {
 			writeInternalServerError(w, r, err)
 			return
 		}

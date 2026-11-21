@@ -24,28 +24,28 @@ func TestTryConsumeEnrolledUserOTPStep(t *testing.T) {
 		read := otpStateUser(t, true)
 		step := nowStep()
 
-		claimed, err := database.TryConsumeEnrolledUserOTPStep(ctx, nil, read.Id, step, read.OtpConfigGeneration)
+		claimed, err := database.TryConsumeEnrolledUserOTPStep(ctx, nil, read.ID, step, read.OTPConfigGeneration)
 		if err != nil || !claimed {
 			t.Fatalf("TryConsumeEnrolledUserOTPStep: claimed=%v err=%v, want true and no error", claimed, err)
 		}
-		if got := reloadUser(t, read.Id).LastOTPStep; got != step {
+		if got := reloadUser(t, read.ID).LastOTPStep; got != step {
 			t.Errorf("last_otp_step = %d, want %d", got, step)
 		}
 	})
 
 	t.Run("refuses an authenticator whose generation moved since it was read", func(t *testing.T) {
 		read := otpStateUser(t, true)
-		advanceGenerationUnder(t, read.Id)
-		moved := reloadUser(t, read.Id)
+		advanceGenerationUnder(t, read.ID)
+		moved := reloadUser(t, read.ID)
 
-		claimed, err := database.TryConsumeEnrolledUserOTPStep(ctx, nil, read.Id, nowStep(), read.OtpConfigGeneration)
+		claimed, err := database.TryConsumeEnrolledUserOTPStep(ctx, nil, read.ID, nowStep(), read.OTPConfigGeneration)
 		if err != nil {
 			t.Fatalf("TryConsumeEnrolledUserOTPStep failed: %v", err)
 		}
 		if claimed {
 			t.Error("a passcode checked against an authenticator read before it was replaced claimed its step")
 		}
-		if got := reloadUser(t, read.Id).LastOTPStep; got != moved.LastOTPStep {
+		if got := reloadUser(t, read.ID).LastOTPStep; got != moved.LastOTPStep {
 			t.Errorf("last_otp_step = %d, want %d: a refused claim must leave the marker", got, moved.LastOTPStep)
 		}
 	})
@@ -54,22 +54,22 @@ func TestTryConsumeEnrolledUserOTPStep(t *testing.T) {
 		read := otpStateUser(t, true)
 		// The narrow removal alone, which turns otp_enabled off and leaves the generation where it
 		// was, so only the otp_enabled term can refuse the claim below.
-		removed, err := database.TryRemoveUserOTP(ctx, nil, read.Id, read.OtpConfigGeneration)
+		removed, err := database.TryRemoveUserOTP(ctx, nil, read.ID, read.OTPConfigGeneration)
 		if err != nil || !removed {
 			t.Fatalf("the removal must land: removed=%v err=%v", removed, err)
 		}
-		if got := reloadUser(t, read.Id).OtpConfigGeneration; got != read.OtpConfigGeneration {
-			t.Fatalf("OtpConfigGeneration = %d, want %d: the removal alone must not move it", got, read.OtpConfigGeneration)
+		if got := reloadUser(t, read.ID).OTPConfigGeneration; got != read.OTPConfigGeneration {
+			t.Fatalf("OTPConfigGeneration = %d, want %d: the removal alone must not move it", got, read.OTPConfigGeneration)
 		}
 
-		claimed, err := database.TryConsumeEnrolledUserOTPStep(ctx, nil, read.Id, nowStep(), read.OtpConfigGeneration)
+		claimed, err := database.TryConsumeEnrolledUserOTPStep(ctx, nil, read.ID, nowStep(), read.OTPConfigGeneration)
 		if err != nil {
 			t.Fatalf("TryConsumeEnrolledUserOTPStep failed: %v", err)
 		}
 		if claimed {
 			t.Error("a verification claim landed on an account whose authenticator is off")
 		}
-		if got := reloadUser(t, read.Id).LastOTPStep; got != 0 {
+		if got := reloadUser(t, read.ID).LastOTPStep; got != 0 {
 			t.Errorf("last_otp_step = %d, want 0: a refused claim must leave the marker", got)
 		}
 	})
@@ -77,13 +77,13 @@ func TestTryConsumeEnrolledUserOTPStep(t *testing.T) {
 	t.Run("refuses a step at or below the one stored", func(t *testing.T) {
 		read := otpStateUser(t, true)
 		step := nowStep()
-		claimed, err := database.TryConsumeEnrolledUserOTPStep(ctx, nil, read.Id, step, read.OtpConfigGeneration)
+		claimed, err := database.TryConsumeEnrolledUserOTPStep(ctx, nil, read.ID, step, read.OTPConfigGeneration)
 		if err != nil || !claimed {
 			t.Fatalf("the first claim must land: claimed=%v err=%v", claimed, err)
 		}
 
 		for _, replayed := range []int64{step, step - 1} {
-			again, err := database.TryConsumeEnrolledUserOTPStep(ctx, nil, read.Id, replayed, read.OtpConfigGeneration)
+			again, err := database.TryConsumeEnrolledUserOTPStep(ctx, nil, read.ID, replayed, read.OTPConfigGeneration)
 			if err != nil {
 				t.Fatalf("claim of step %d errored instead of being refused: %v", replayed, err)
 			}
@@ -101,7 +101,7 @@ func TestTryConsumeEnrolledUserOTPStep(t *testing.T) {
 		for round := 0; round < raceRounds; round++ {
 			step := base + int64(round) + 1
 			won := raceOnce(t, raceCallers, func(int) (bool, error) {
-				return database.TryConsumeEnrolledUserOTPStep(ctx, nil, read.Id, step, read.OtpConfigGeneration)
+				return database.TryConsumeEnrolledUserOTPStep(ctx, nil, read.ID, step, read.OTPConfigGeneration)
 			})
 			if won != 1 {
 				t.Fatalf("round %d: %d claims of step %d landed from one read, want exactly 1", round, won, step)
@@ -135,7 +135,7 @@ func TestVerifyStored_RefusesAPasscodeCheckedAgainstAReplacedAuthenticator(t *te
 		if err != nil || !established {
 			t.Fatalf("the first authenticator must establish: established=%v err=%v", established, err)
 		}
-		return user.Id
+		return user.ID
 	}
 	t.Run("the authenticator read is still the one enrolled", func(t *testing.T) {
 		read := reloadUser(t, enrolled(t))
@@ -151,18 +151,18 @@ func TestVerifyStored_RefusesAPasscodeCheckedAgainstAReplacedAuthenticator(t *te
 	})
 
 	t.Run("the authenticator read was replaced under the request", func(t *testing.T) {
-		userId := enrolled(t)
-		read := reloadUser(t, userId)
+		userID := enrolled(t)
+		read := reloadUser(t, userID)
 
-		_, removed, err := otpcredential.Remove(ctx, database, reloadUser(t, userId))
+		_, removed, err := otpcredential.Remove(ctx, database, reloadUser(t, userID))
 		if err != nil || !removed {
 			t.Fatalf("the removal must land: removed=%v err=%v", removed, err)
 		}
-		_, _, _, established, err := otpcredential.Establish(ctx, database, dataCipher, reloadUser(t, userId), replacementSeed)
+		_, _, _, established, err := otpcredential.Establish(ctx, database, dataCipher, reloadUser(t, userID), replacementSeed)
 		if err != nil || !established {
 			t.Fatalf("the replacement must establish: established=%v err=%v", established, err)
 		}
-		replaced := reloadUser(t, userId)
+		replaced := reloadUser(t, userID)
 		if !replaced.OTPEnabled || replaced.LastOTPStep != 0 {
 			t.Fatalf("the replaced row reads otp_enabled=%v last_otp_step=%d, want true and 0",
 				replaced.OTPEnabled, replaced.LastOTPStep)
@@ -176,11 +176,11 @@ func TestVerifyStored_RefusesAPasscodeCheckedAgainstAReplacedAuthenticator(t *te
 		if result.Outcome == otpcredential.OutcomeMatched {
 			t.Error("a passcode checked against the removed authenticator was accepted as a second factor")
 		}
-		if got := reloadUser(t, userId).LastOTPStep; got != 0 {
+		if got := reloadUser(t, userID).LastOTPStep; got != 0 {
 			t.Errorf("last_otp_step = %d, want 0: the refused claim must not spend a step of the replacement", got)
 		}
 		// Nor is the refusal counted against the replacement: it was never tried against it (#489).
-		if got := reloadUser(t, userId).OtpConsecutiveFailures; got != 0 {
+		if got := reloadUser(t, userID).OTPConsecutiveFailures; got != 0 {
 			t.Errorf("otp_consecutive_failures = %d, want 0: the refused claim must not count against the replacement", got)
 		}
 		// And a wrong code checked against the first authenticator counts nothing either.
@@ -191,7 +191,7 @@ func TestVerifyStored_RefusesAPasscodeCheckedAgainstAReplacedAuthenticator(t *te
 		if result.Outcome != otpcredential.OutcomeWrong {
 			t.Errorf("a wrong code: Outcome = %v, want OutcomeWrong", result.Outcome)
 		}
-		if got := reloadUser(t, userId).OtpConsecutiveFailures; got != 0 {
+		if got := reloadUser(t, userID).OTPConsecutiveFailures; got != 0 {
 			t.Errorf("otp_consecutive_failures = %d, want 0: a wrong code for the removed authenticator must not count against the replacement", got)
 		}
 

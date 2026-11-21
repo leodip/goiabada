@@ -150,7 +150,7 @@ func (s *reencryptionSweep) sweepValue(ctx context.Context, table, column string
 		if !opened {
 			s.report.Unreadable++
 			if s.unreadable != nil {
-				s.unreadable(record.StoredSecret{Table: table, Column: column, Id: item.id})
+				s.unreadable(record.StoredSecret{Table: table, Column: column, ID: item.id})
 			}
 			return nil
 		}
@@ -231,7 +231,7 @@ func storedSecretBatch(table, column string) statement {
 // readStoredSecret reads one row's column again, after the sweep's write found other bytes than it
 // read. found is false when the row is gone.
 func (d *Database) readStoredSecret(ctx context.Context, table, column string, id int64) ([]byte, bool, error) {
-	rows, err := d.QuerySQL(ctx, nil, storedSecretById(table, column).text(d.Dialect), id)
+	rows, err := d.QuerySQL(ctx, nil, storedSecretByID(table, column).text(d.Dialect), id)
 	if err != nil {
 		return nil, false, err
 	}
@@ -247,8 +247,8 @@ func (d *Database) readStoredSecret(ctx context.Context, table, column string, i
 	return value, true, rows.Err()
 }
 
-// storedSecretById is readStoredSecret's statement for one column.
-func storedSecretById(table, column string) statement {
+// storedSecretByID is readStoredSecret's statement for one column.
+func storedSecretByID(table, column string) statement {
 	query := "SELECT " + column + " FROM " + table + " WHERE id = "
 	return statement{sqlite: query + "?", mysql: query + "?", postgres: query + "$1", mssql: query + "@p1"}
 }

@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"encoding/gob"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -15,7 +14,6 @@ import (
 	handlersmocks "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
-	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/sessionstore/sessiontest"
 )
@@ -52,7 +50,7 @@ func (c *createCountingBackend) creates() int {
 // newCountingStore is newMemoryStore's construction over a backend this test can count.
 func newCountingStore(t *testing.T) (*sessionstore.ServerSideStore, *createCountingBackend) {
 	t.Helper()
-	gob.Register(oauth.TokenResponse{})
+	sessionkeys.RegisterStoredTokenResponse()
 	backend := &createCountingBackend{MemoryBackend: sessiontest.NewMemoryBackend()}
 	store, err := sessionstore.NewServerSideStore(backend, sessionkeys.JWT, false, sessionstore.BrowserSessionCookie,
 		sessionstore.KeyPair{
@@ -65,7 +63,7 @@ func newCountingStore(t *testing.T) (*sessionstore.ServerSideStore, *createCount
 
 func TestHandleSessionEndedGet_ACookielessRequestWritesNoRow(t *testing.T) {
 	store, backend := newCountingStore(t)
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 
 	w := httptest.NewRecorder()
 	HandleSessionEndedGet(httpHelper, store).ServeHTTP(w,

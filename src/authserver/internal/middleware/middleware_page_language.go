@@ -17,14 +17,14 @@ import (
 // pageLanguageCeremonies is what the page-language middleware reads of the sign-in a page belongs
 // to: its user, once it has verified the password or adopted a session.
 type pageLanguageCeremonies interface {
-	SignInUserId(r *http.Request) int64
+	SignInUserID(r *http.Request) int64
 }
 
 // pageLanguageDatabase is what the page-language middleware reads: the user whose page language it
 // applies. The browser session's user comes off the request context, where the session identifier
 // middleware put it when it read the session.
 type pageLanguageDatabase interface {
-	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	GetUserByID(ctx context.Context, tx *sql.Tx, userID int64) (*record.User, error)
 }
 
 // PageLanguage draws a page for a known user in the page language they chose, over the ui_locales
@@ -49,8 +49,8 @@ func PageLanguage(ceremonies pageLanguageCeremonies, database pageLanguageDataba
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
 
-			if userId := knownUserId(r, ceremonies); userId != 0 {
-				user, err := database.GetUserById(ctx, nil, userId)
+			if userID := knownUserID(r, ceremonies); userID != 0 {
+				user, err := database.GetUserByID(ctx, nil, userID)
 				if err != nil {
 					slog.ErrorContext(ctx, "unable to read the page language", "error", errs.Wrap(err, "unable to get the user"))
 					http.Error(w, fmt.Sprintf("fatal failure in page language middleware. For additional information, refer to the server logs. Request Id: %v",
@@ -67,12 +67,12 @@ func PageLanguage(ceremonies pageLanguageCeremonies, database pageLanguageDataba
 	}
 }
 
-// knownUserId is the user a page is drawn for: the sign-in's, else the signed-in session's, else
+// knownUserID is the user a page is drawn for: the sign-in's, else the signed-in session's, else
 // zero. The sign-in's wins when the two differ, being the person signing in now.
-func knownUserId(r *http.Request, ceremonies pageLanguageCeremonies) int64 {
-	if userId := ceremonies.SignInUserId(r); userId != 0 {
-		return userId
+func knownUserID(r *http.Request, ceremonies pageLanguageCeremonies) int64 {
+	if userID := ceremonies.SignInUserID(r); userID != 0 {
+		return userID
 	}
-	userId, _ := reqctx.SessionUserIdFrom(r.Context())
-	return userId
+	userID, _ := reqctx.SessionUserIDFrom(r.Context())
+	return userID
 }

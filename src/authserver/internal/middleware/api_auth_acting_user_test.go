@@ -21,7 +21,7 @@ import (
 // (#780 decision 2). A client credentials token has no user, and a request without a token has no
 // check, so neither carries one.
 func TestRequireValidSession_PutsTheActingUserOnTheContext(t *testing.T) {
-	const actingUserId = int64(42)
+	const actingUserID = int64(42)
 
 	tests := []struct {
 		label string
@@ -37,11 +37,11 @@ func TestRequireValidSession_PutsTheActingUserOnTheContext(t *testing.T) {
 			arm: func(mockDB *datamocks.Database) {
 				now := time.Now().UTC()
 				mockDB.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), "user-42").
-					Return(&record.User{Id: actingUserId, Subject: "user-42", Enabled: true}, nil).Once()
+					Return(&record.User{ID: actingUserID, Subject: "user-42", Enabled: true}, nil).Once()
 				mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, (*sql.Tx)(nil), "sid-42").
 					Return(&record.UserSession{
 						SessionIdentifier: "sid-42",
-						UserId:            actingUserId,
+						UserID:            actingUserID,
 						Started:           now.Add(-time.Hour),
 						LastAccessed:      now.Add(-time.Minute),
 					}, nil).Once()
@@ -53,7 +53,7 @@ func TestRequireValidSession_PutsTheActingUserOnTheContext(t *testing.T) {
 			label: "a user's token of a live grant, with no session",
 			arm: func(mockDB *datamocks.Database) {
 				mockDB.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), "user-42").
-					Return(&record.User{Id: actingUserId, Subject: "user-42", Enabled: true}, nil).Once()
+					Return(&record.User{ID: actingUserID, Subject: "user-42", Enabled: true}, nil).Once()
 				mockDB.On("IsRefreshTokenFamilyLive", mock.Anything, (*sql.Tx)(nil), "grant-42").Return(true, nil).Once()
 			},
 			token:    map[string]interface{}{"auth_time": float64(1), "sub": "user-42", "grant_id": "grant-42"},
@@ -97,16 +97,16 @@ func TestRequireValidSession_PutsTheActingUserOnTheContext(t *testing.T) {
 			require.Equal(t, http.StatusOK, rr.Code)
 			require.NotNil(t, reached, "the request reaches the handler")
 
-			got, ok := reqctx.ActingUserIdFrom(reached)
+			got, ok := reqctx.ActingUserIDFrom(reached)
 			assert.Equal(t, tc.wantUser, ok, "whether the handler's context names an acting user")
 			if tc.wantUser {
-				assert.Equal(t, actingUserId, got, "the acting user is the user the check found")
+				assert.Equal(t, actingUserID, got, "the acting user is the user the check found")
 			}
 
 			// The audit logger's port reads the same value off the same context.
-			portId, portOk := ActingUser{}.ActingUserId(reached)
+			portID, portOk := ActingUser{}.ActingUserID(reached)
 			assert.Equal(t, ok, portOk)
-			assert.Equal(t, got, portId)
+			assert.Equal(t, got, portID)
 		})
 	}
 }
@@ -114,7 +114,7 @@ func TestRequireValidSession_PutsTheActingUserOnTheContext(t *testing.T) {
 // The port answers nothing off a context the session guard never ran for: the browser sign-in
 // flows, the rate limiter's root tiers and the recover command.
 func TestActingUser_AnswersNothingWithoutTheSessionGuard(t *testing.T) {
-	id, ok := ActingUser{}.ActingUserId(context.Background())
+	id, ok := ActingUser{}.ActingUserID(context.Background())
 	assert.False(t, ok)
 	assert.Zero(t, id)
 }

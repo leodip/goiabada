@@ -11,10 +11,10 @@ const (
 	// StepUpLevel means the target is above the level the session reached, or there is no session
 	// to reuse and the target is above level 1.
 	StepUpLevel
-	// StepUpOtpConfigChanged means the session reached the target's level, but the user's
+	// StepUpOTPConfigChanged means the session reached the target's level, but the user's
 	// authenticator has changed since the session last answered the level 2 question, and the
 	// target asks that question.
-	StepUpOtpConfigChanged
+	StepUpOTPConfigChanged
 	// StepUpAuthenticatorMissing means the target is urn:goiabada:level2_mandatory and the session
 	// reached it, but the user has no authenticator now: they or an administrator removed it since.
 	// The code the session answered can't be asked again, so the user sets one up, as at a sign-in
@@ -25,8 +25,8 @@ const (
 // TargetRequiresSecondFactor reports whether a ceremony aiming at target has to answer the level 2
 // question, which is every level above level 1. A level outside the three answers false, as
 // IsHigherThan ranks it below level 1.
-func TargetRequiresSecondFactor(target record.AcrLevel) bool {
-	return target.IsHigherThan(record.AcrLevel1)
+func TargetRequiresSecondFactor(target record.ACRLevel) bool {
+	return target.IsHigherThan(record.ACRLevel1)
 }
 
 // StepUpOwed is the one "does this session satisfy the target level" rule, read by
@@ -46,7 +46,7 @@ func TargetRequiresSecondFactor(target record.AcrLevel) bool {
 // no re-prompt (#242 decision 1).
 //
 // A session ACR that does not parse is returned as an error; each caller decides what that answers.
-func StepUpOwed(target record.AcrLevel, session *record.UserSession) (StepUp, error) {
+func StepUpOwed(target record.ACRLevel, session *record.UserSession) (StepUp, error) {
 	if session == nil {
 		if TargetRequiresSecondFactor(target) {
 			return StepUpLevel, nil
@@ -54,11 +54,11 @@ func StepUpOwed(target record.AcrLevel, session *record.UserSession) (StepUp, er
 		return StepUpNone, nil
 	}
 
-	sessionAcrLevel, err := record.AcrLevelFromString(session.AcrLevel.String())
+	sessionACRLevel, err := record.ACRLevelFromString(session.ACRLevel.String())
 	if err != nil {
 		return StepUpNone, err
 	}
-	if target.IsHigherThan(sessionAcrLevel) {
+	if target.IsHigherThan(sessionACRLevel) {
 		return StepUpLevel, nil
 	}
 	// Checked apart from the generation, because a level 2 optional ceremony answers a changed
@@ -66,11 +66,11 @@ func StepUpOwed(target record.AcrLevel, session *record.UserSession) (StepUp, er
 	// the generation alone, a session at level 3 whose user then removed their authenticator went
 	// on answering level 3 after any such sign-in, with no authenticator to answer it, while
 	// prompt=none refused the same request.
-	if target == record.AcrLevel2Mandatory && !session.User.OTPEnabled {
+	if target == record.ACRLevel2Mandatory && !session.User.OTPEnabled {
 		return StepUpAuthenticatorMissing, nil
 	}
-	if session.OtpConfigGeneration != session.User.OtpConfigGeneration && TargetRequiresSecondFactor(target) {
-		return StepUpOtpConfigChanged, nil
+	if session.OTPConfigGeneration != session.User.OTPConfigGeneration && TargetRequiresSecondFactor(target) {
+		return StepUpOTPConfigChanged, nil
 	}
 	return StepUpNone, nil
 }

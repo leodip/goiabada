@@ -13,7 +13,7 @@ import (
 
 // sessionDetailsDatabase is what buildSessionDetails needs: the clients a session authorized.
 type sessionDetailsDatabase interface {
-	GetClientsByIds(ctx context.Context, tx *sql.Tx, clientIds []int64) ([]record.Client, error)
+	GetClientsByIDs(ctx context.Context, tx *sql.Tx, clientIDs []int64) ([]record.Client, error)
 }
 
 // buildSessionDetails is the one loop behind all three session list endpoints: filter to the
@@ -46,7 +46,7 @@ func buildSessionDetails(
 		valid = append(valid, session)
 	}
 
-	// One GetClientsByIds over the union of client ids across the whole page, in place of the
+	// One GetClientsByIDs over the union of client ids across the whole page, in place of the
 	// per-session UserSessionClientsLoadClients the three loops used to call: at 50 sessions that
 	// was 50 queries to name the handful of clients a deployment has (#373 decision 9).
 	if err := loadSessionClients(ctx, database, valid); err != nil {
@@ -81,38 +81,38 @@ func sessionIsLive(session *record.UserSession, settings *record.Settings) bool 
 // client silently missing would hide it.
 //
 // The union it hands over is bounded by the deployment's client count and by nothing else, so
-// GetClientsByIds is the one that decides how many ids a single statement may bind; an id list
+// GetClientsByIDs is the one that decides how many ids a single statement may bind; an id list
 // longer than that is read in several statements there rather than refused by the engine (#373).
 func loadSessionClients(ctx context.Context, database sessionDetailsDatabase, sessions []record.UserSession) error {
-	clientIds := make([]int64, 0)
+	clientIDs := make([]int64, 0)
 	seen := make(map[int64]bool)
 	for _, session := range sessions {
 		for _, usc := range session.Clients {
-			if !seen[usc.ClientId] {
-				seen[usc.ClientId] = true
-				clientIds = append(clientIds, usc.ClientId)
+			if !seen[usc.ClientID] {
+				seen[usc.ClientID] = true
+				clientIDs = append(clientIDs, usc.ClientID)
 			}
 		}
 	}
-	if len(clientIds) == 0 {
+	if len(clientIDs) == 0 {
 		return nil
 	}
 
-	clients, err := database.GetClientsByIds(ctx, nil, clientIds)
+	clients, err := database.GetClientsByIDs(ctx, nil, clientIDs)
 	if err != nil {
 		return errs.Wrap(err, "unable to get clients by ids")
 	}
 
-	clientsById := make(map[int64]record.Client, len(clients))
+	clientsByID := make(map[int64]record.Client, len(clients))
 	for _, client := range clients {
-		clientsById[client.Id] = client
+		clientsByID[client.ID] = client
 	}
 
 	for _, session := range sessions {
 		for i, usc := range session.Clients {
-			client, ok := clientsById[usc.ClientId]
+			client, ok := clientsByID[usc.ClientID]
 			if !ok {
-				return errs.Errorf("client with id %d not found", usc.ClientId)
+				return errs.Errorf("client with id %d not found", usc.ClientID)
 			}
 			session.Clients[i].Client = client
 		}

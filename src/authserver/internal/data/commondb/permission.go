@@ -21,12 +21,12 @@ var permissionColumns = columnList{
 // scanPermission reads one row selected with permissionColumns.
 func scanPermission(row rowScanner, permission *record.Permission) error {
 	return row.Scan(
-		&permission.Id,
+		&permission.ID,
 		&permission.CreatedAt,
 		&permission.UpdatedAt,
 		&permission.PermissionIdentifier,
 		&permission.Description,
-		&permission.ResourceId,
+		&permission.ResourceID,
 	)
 }
 
@@ -45,14 +45,14 @@ var updatePermission = statement{
 	mssql:    "UPDATE permissions SET updated_at = @p1, permission_identifier = @p2, description = @p3, resource_id = @p4 WHERE id = @p5",
 }
 
-var selectPermissionById = statement{
+var selectPermissionByID = statement{
 	sqlite:   "SELECT " + permissionColumns.sqlite + " FROM permissions WHERE id = ?",
 	mysql:    "SELECT " + permissionColumns.mysql + " FROM permissions WHERE id = ?",
 	postgres: "SELECT " + permissionColumns.postgres + " FROM permissions WHERE id = $1",
 	mssql:    "SELECT " + permissionColumns.mssql + " FROM permissions WHERE id = @p1",
 }
 
-var selectPermissionsByResourceId = statement{
+var selectPermissionsByResourceID = statement{
 	sqlite:   "SELECT " + permissionColumns.sqlite + " FROM permissions WHERE resource_id = ?",
 	mysql:    "SELECT " + permissionColumns.mysql + " FROM permissions WHERE resource_id = ?",
 	postgres: "SELECT " + permissionColumns.postgres + " FROM permissions WHERE resource_id = $1",
@@ -111,7 +111,7 @@ var selectManagePermission = statement{
 
 func (d *Database) CreatePermission(ctx context.Context, tx *sql.Tx, permission *record.Permission) error {
 
-	if permission.ResourceId == 0 {
+	if permission.ResourceID == 0 {
 		return errs.New("can't create permission with resource_id 0")
 	}
 
@@ -124,20 +124,20 @@ func (d *Database) CreatePermission(ctx context.Context, tx *sql.Tx, permission 
 
 	id, err := d.insert(ctx, tx, insertPermission, "permission",
 		permission.CreatedAt, permission.UpdatedAt, permission.PermissionIdentifier, permission.Description,
-		permission.ResourceId)
+		permission.ResourceID)
 	if err != nil {
 		permission.CreatedAt = originalCreatedAt
 		permission.UpdatedAt = originalUpdatedAt
 		return err
 	}
 
-	permission.Id = id
+	permission.ID = id
 	return nil
 }
 
 func (d *Database) UpdatePermission(ctx context.Context, tx *sql.Tx, permission *record.Permission) error {
 
-	if permission.Id == 0 {
+	if permission.ID == 0 {
 		return errs.New("can't update permission with id 0")
 	}
 
@@ -145,8 +145,8 @@ func (d *Database) UpdatePermission(ctx context.Context, tx *sql.Tx, permission 
 	permission.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
 	_, err := d.ExecSQL(ctx, tx, updatePermission.text(d.Dialect),
-		permission.UpdatedAt, permission.PermissionIdentifier, permission.Description, permission.ResourceId,
-		permission.Id)
+		permission.UpdatedAt, permission.PermissionIdentifier, permission.Description, permission.ResourceID,
+		permission.ID)
 	if err != nil {
 		permission.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update permission")
@@ -155,12 +155,12 @@ func (d *Database) UpdatePermission(ctx context.Context, tx *sql.Tx, permission 
 	return nil
 }
 
-func (d *Database) GetPermissionById(ctx context.Context, tx *sql.Tx, permissionId int64) (*record.Permission, error) {
-	return queryOne(ctx, d, tx, selectPermissionById.text(d.Dialect), []any{permissionId}, scanPermission, "permission")
+func (d *Database) GetPermissionByID(ctx context.Context, tx *sql.Tx, permissionID int64) (*record.Permission, error) {
+	return queryOne(ctx, d, tx, selectPermissionByID.text(d.Dialect), []any{permissionID}, scanPermission, "permission")
 }
 
-func (d *Database) GetPermissionsByResourceId(ctx context.Context, tx *sql.Tx, resourceId int64) ([]record.Permission, error) {
-	return queryAll(ctx, d, tx, nil, selectPermissionsByResourceId.text(d.Dialect), []any{resourceId},
+func (d *Database) GetPermissionsByResourceID(ctx context.Context, tx *sql.Tx, resourceID int64) ([]record.Permission, error) {
+	return queryAll(ctx, d, tx, nil, selectPermissionsByResourceID.text(d.Dialect), []any{resourceID},
 		scanPermission, "permission")
 }
 
@@ -170,37 +170,37 @@ func (d *Database) PermissionsLoadResources(ctx context.Context, tx *sql.Tx, per
 		return nil
 	}
 
-	resourceIds := make([]int64, 0, len(permissions))
+	resourceIDs := make([]int64, 0, len(permissions))
 	for _, permission := range permissions {
-		resourceIds = append(resourceIds, permission.ResourceId)
+		resourceIDs = append(resourceIDs, permission.ResourceID)
 	}
 
-	resources, err := d.GetResourcesByIds(ctx, tx, resourceIds)
+	resources, err := d.GetResourcesByIDs(ctx, tx, resourceIDs)
 	if err != nil {
 		return errs.Wrap(err, "unable to get resources for permissions")
 	}
 
 	resourceMap := make(map[int64]record.Resource, len(resources))
 	for _, resource := range resources {
-		resourceMap[resource.Id] = resource
+		resourceMap[resource.ID] = resource
 	}
 
 	for i := range permissions {
-		permissions[i].Resource = resourceMap[permissions[i].ResourceId]
+		permissions[i].Resource = resourceMap[permissions[i].ResourceID]
 	}
 
 	return nil
 }
 
-func (d *Database) GetPermissionsByIds(ctx context.Context, tx *sql.Tx, permissionIds []int64) ([]record.Permission, error) {
+func (d *Database) GetPermissionsByIDs(ctx context.Context, tx *sql.Tx, permissionIDs []int64) ([]record.Permission, error) {
 
-	if len(permissionIds) == 0 {
+	if len(permissionIDs) == 0 {
 		return nil, nil
 	}
 
 	var permissions []record.Permission
 
-	err := forEachIdBatch(permissionIds, func(batch []int64) error {
+	err := forEachIDBatch(permissionIDs, func(batch []int64) error {
 		query := selectPermissionsWhere.text(d.Dialect) + inList(d.Dialect, "id", 1, len(batch))
 		var err error
 		permissions, err = queryAll(ctx, d, tx, permissions, query, int64Args(batch), scanPermission, "permission")
@@ -213,9 +213,9 @@ func (d *Database) GetPermissionsByIds(ctx context.Context, tx *sql.Tx, permissi
 	return permissions, nil
 }
 
-func (d *Database) DeletePermission(ctx context.Context, tx *sql.Tx, permissionId int64) error {
+func (d *Database) DeletePermission(ctx context.Context, tx *sql.Tx, permissionID int64) error {
 
-	_, err := d.ExecSQL(ctx, tx, deletePermission.text(d.Dialect), permissionId)
+	_, err := d.ExecSQL(ctx, tx, deletePermission.text(d.Dialect), permissionID)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete permission")
 	}

@@ -21,7 +21,7 @@ import (
 // The bearer path admits only an access token issued for authserver (#401). Every token this server
 // signs verifies against the same key, so before this a refresh token or an ID token presented as a
 // bearer credential got as far as each route's own checks, and a refresh token whose scope carried a
-// route's permission passed that route's scope check. Now JwtAuthorizationHeaderToContext requires
+// route's permission passed that route's scope check. Now JWTAuthorizationHeaderToContext requires
 // typ Bearer and an aud naming authserver, and a token failing either is answered exactly as one
 // that does not parse.
 
@@ -59,7 +59,7 @@ func bearerKindRoutes() []bearerRoute {
 		{name: "account PUT /api/v1/account/email", method: "PUT", path: "/api/v1/account/email",
 			body: api.UpdateAccountEmailRequest{Email: "bearer-kind-" + strings.ToLower(fake.LetterN(8)) + "@attacker.example.com"}},
 		{name: "browser-sessions POST /api/v1/sessions/load", method: "POST", path: "/api/v1/sessions/load",
-			body: api.SessionLoadRequest{Id: strings.Repeat("ab", 32)}},
+			body: api.SessionLoadRequest{ID: strings.Repeat("ab", 32)}},
 	}
 }
 
@@ -73,7 +73,7 @@ func sendBearer(t *testing.T, route bearerRoute, token string) bearerKindRespons
 			strings.NewReader(url.Values{"access_token": {token}}.Encode()))
 		require.NoError(t, err)
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		resp, err = createHttpClient(t).Do(req)
+		resp, err = createHTTPClient(t).Do(req)
 		require.NoError(t, err)
 	} else {
 		resp = makeAPIRequest(t, route.method, appConfig.AuthServer.BaseURL+route.path, token, route.body)
@@ -95,13 +95,13 @@ func grantAuthServerPermissionsToUser(t *testing.T, user *record.User, identifie
 
 	resource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
 	require.NoError(t, err)
-	permissions, err := database.GetPermissionsByResourceId(context.Background(), nil, resource.Id)
+	permissions, err := database.GetPermissionsByResourceID(context.Background(), nil, resource.ID)
 	require.NoError(t, err)
 	for _, identifier := range identifiers {
 		granted := false
 		for i := range permissions {
 			if permissions[i].PermissionIdentifier == identifier {
-				assignPermissionToUser(t, user.Id, permissions[i].Id)
+				assignPermissionToUser(t, user.ID, permissions[i].ID)
 				granted = true
 				break
 			}
@@ -175,14 +175,14 @@ func TestBearerToken_NonAccessTokensAreRefusedAtEveryGroup(t *testing.T) {
 
 		for _, tc := range tokens {
 			t.Run(route.name+", "+tc.name, func(t *testing.T) {
-				before, err := database.GetUserById(context.Background(), nil, tc.user.Id)
+				before, err := database.GetUserByID(context.Background(), nil, tc.user.ID)
 				require.NoError(t, err)
 
 				got := sendBearer(t, route, tc.token)
 
 				assert.Equal(t, unparseable, got, "answered exactly as a token that does not parse")
 
-				after, err := database.GetUserById(context.Background(), nil, tc.user.Id)
+				after, err := database.GetUserByID(context.Background(), nil, tc.user.ID)
 				require.NoError(t, err)
 				assert.Equal(t, before.Email, after.Email, "the handler never ran")
 			})
@@ -196,12 +196,12 @@ func TestBearerToken_NonAccessTokensAreRefusedAtEveryGroup(t *testing.T) {
 // signer and parser shows the aud check reads the shape it will be given.
 func TestBearerToken_AccessTokensWithAnAudienceArrayStillPass(t *testing.T) {
 	secondResource := createTestResource(t, "bearer-aud-"+strings.ToLower(fake.LetterN(8)), "A second audience")
-	require.NotZero(t, secondResource.Id)
+	require.NotZero(t, secondResource.ID)
 	t.Cleanup(func() {
-		assert.NoError(t, database.DeleteResource(context.Background(), nil, secondResource.Id))
+		assert.NoError(t, database.DeleteResource(context.Background(), nil, secondResource.ID))
 	})
-	secondPermission := createTestPermission(t, secondResource.Id, "read", "Read")
-	require.NotZero(t, secondPermission.Id)
+	secondPermission := createTestPermission(t, secondResource.ID, "read", "Read")
+	require.NotZero(t, secondPermission.ID)
 	secondScope := secondResource.ResourceIdentifier + ":" + secondPermission.PermissionIdentifier
 
 	requireAudienceArray := func(t *testing.T, token string) {
@@ -234,24 +234,24 @@ func TestBearerToken_AccessTokensWithAnAudienceArrayStillPass(t *testing.T) {
 		}
 		require.NoError(t, database.CreateClient(context.Background(), nil, client))
 		t.Cleanup(func() {
-			assert.NoError(t, database.DeleteClient(context.Background(), nil, client.Id))
+			assert.NoError(t, database.DeleteClient(context.Background(), nil, client.ID))
 		})
 
 		authserverResource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
 		require.NoError(t, err)
-		permissions, err := database.GetPermissionsByResourceId(context.Background(), nil, authserverResource.Id)
+		permissions, err := database.GetPermissionsByResourceID(context.Background(), nil, authserverResource.ID)
 		require.NoError(t, err)
 		for i := range permissions {
 			if permissions[i].PermissionIdentifier == builtin.ManagePermissionIdentifier {
 				require.NoError(t, database.CreateClientPermission(context.Background(), nil,
-					&record.ClientPermission{ClientId: client.Id, PermissionId: permissions[i].Id}))
+					&record.ClientPermission{ClientID: client.ID, PermissionID: permissions[i].ID}))
 			}
 		}
 		require.NoError(t, database.CreateClientPermission(context.Background(), nil,
-			&record.ClientPermission{ClientId: client.Id, PermissionId: secondPermission.Id}))
+			&record.ClientPermission{ClientID: client.ID, PermissionID: secondPermission.ID}))
 
 		scope := builtin.AuthServerResourceIdentifier + ":" + builtin.ManagePermissionIdentifier + " " + secondScope
-		data := postToTokenEndpoint(t, createHttpClient(t), appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
+		data := postToTokenEndpoint(t, createHTTPClient(t), appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
 			"grant_type":    {"client_credentials"},
 			"client_id":     {client.ClientIdentifier},
 			"client_secret": {clientSecret},
@@ -266,16 +266,16 @@ func TestBearerToken_AccessTokensWithAnAudienceArrayStillPass(t *testing.T) {
 	})
 }
 
-// TestBearerToken_NonIdTokenAsIdTokenHintIsRefused: at /auth/authorize a validly signed token of
+// TestBearerToken_NonIDTokenAsIDTokenHintIsRefused: at /auth/authorize a validly signed token of
 // this server that is not an ID Token is refused as a hint, with the answer an unparseable hint
 // gets. prompt=none from a browser with no session makes the answer immediate: a hint that passes
 // goes on to login_required, a refused one stops at invalid_request.
-func TestBearerToken_NonIdTokenAsIdTokenHintIsRefused(t *testing.T) {
+func TestBearerToken_NonIDTokenAsIDTokenHintIsRefused(t *testing.T) {
 	tokens, code, _, _ := userTokenResponseWithScope(t, "openid", nil)
 
 	authorizeWithHint := func(t *testing.T, hint string) (string, string) {
 		t.Helper()
-		destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + code.Client.ClientIdentifier +
+		destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + code.Client.ClientIdentifier +
 			"&redirect_uri=" + url.QueryEscape(code.RedirectURI) +
 			"&response_type=code" +
 			"&code_challenge_method=S256" +
@@ -285,13 +285,13 @@ func TestBearerToken_NonIdTokenAsIdTokenHintIsRefused(t *testing.T) {
 			"&prompt=none" +
 			"&id_token_hint=" + url.QueryEscape(hint)
 
-		resp, err := createHttpClient(t).Get(destUrl)
+		resp, err := createHTTPClient(t).Get(destURL)
 		require.NoError(t, err)
 		defer func() { _ = resp.Body.Close() }()
 		require.Equal(t, http.StatusFound, resp.StatusCode)
 		require.True(t, strings.HasPrefix(resp.Header.Get("Location"), code.RedirectURI),
 			"answered at the client's redirect_uri: %s", resp.Header.Get("Location"))
-		errorCode, errorDescription, _ := getErrorFromUrl(t, resp)
+		errorCode, errorDescription, _ := getErrorFromURL(t, resp)
 		return errorCode, errorDescription
 	}
 

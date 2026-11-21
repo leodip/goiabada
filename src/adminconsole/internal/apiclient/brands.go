@@ -38,11 +38,11 @@ func (c *AuthServerClient) CreateBrand(ctx context.Context, accessToken string, 
 	return &response.Brand, nil
 }
 
-// GetBrandById retrieves one brand.
-func (c *AuthServerClient) GetBrandById(ctx context.Context, accessToken string, brandId int64) (*api.BrandResponse, error) {
+// GetBrandByID retrieves one brand.
+func (c *AuthServerClient) GetBrandByID(ctx context.Context, accessToken string, brandID int64) (*api.BrandResponse, error) {
 	response, err := execute[api.GetBrandResponse](ctx, c, accessToken, apiRequest{
 		method:        "GET",
-		url:           fmt.Sprintf("%s/api/v1/admin/brands/%d", c.baseURL, brandId),
+		url:           fmt.Sprintf("%s/api/v1/admin/brands/%d", c.baseURL, brandID),
 		contentType:   contentTypeJSON,
 		successStatus: http.StatusOK,
 	})
@@ -53,10 +53,10 @@ func (c *AuthServerClient) GetBrandById(ctx context.Context, accessToken string,
 }
 
 // UpdateBrand replaces a brand's name, appearance and theme.
-func (c *AuthServerClient) UpdateBrand(ctx context.Context, accessToken string, brandId int64, request *api.UpdateBrandRequest) (*api.BrandResponse, error) {
+func (c *AuthServerClient) UpdateBrand(ctx context.Context, accessToken string, brandID int64, request *api.UpdateBrandRequest) (*api.BrandResponse, error) {
 	response, err := execute[api.UpdateBrandResponse](ctx, c, accessToken, apiRequest{
 		method:        "PUT",
-		url:           fmt.Sprintf("%s/api/v1/admin/brands/%d", c.baseURL, brandId),
+		url:           fmt.Sprintf("%s/api/v1/admin/brands/%d", c.baseURL, brandID),
 		jsonBody:      request,
 		contentType:   contentTypeJSON,
 		successStatus: http.StatusOK,
@@ -68,10 +68,10 @@ func (c *AuthServerClient) UpdateBrand(ctx context.Context, accessToken string, 
 }
 
 // DeleteBrand deletes a brand; the auth server refuses the default.
-func (c *AuthServerClient) DeleteBrand(ctx context.Context, accessToken string, brandId int64) error {
+func (c *AuthServerClient) DeleteBrand(ctx context.Context, accessToken string, brandID int64) error {
 	_, err := c.do(ctx, accessToken, apiRequest{
 		method:        "DELETE",
-		url:           fmt.Sprintf("%s/api/v1/admin/brands/%d", c.baseURL, brandId),
+		url:           fmt.Sprintf("%s/api/v1/admin/brands/%d", c.baseURL, brandID),
 		contentType:   contentTypeJSON,
 		successStatus: http.StatusOK,
 	})
@@ -79,10 +79,10 @@ func (c *AuthServerClient) DeleteBrand(ctx context.Context, accessToken string, 
 }
 
 // MakeBrandDefault makes a brand the default, the one every page is drawn in.
-func (c *AuthServerClient) MakeBrandDefault(ctx context.Context, accessToken string, brandId int64) (*api.BrandResponse, error) {
+func (c *AuthServerClient) MakeBrandDefault(ctx context.Context, accessToken string, brandID int64) (*api.BrandResponse, error) {
 	response, err := execute[api.MakeBrandDefaultResponse](ctx, c, accessToken, apiRequest{
 		method:        "POST",
-		url:           fmt.Sprintf("%s/api/v1/admin/brands/%d/make-default", c.baseURL, brandId),
+		url:           fmt.Sprintf("%s/api/v1/admin/brands/%d/make-default", c.baseURL, brandID),
 		contentType:   contentTypeJSON,
 		successStatus: http.StatusOK,
 	})
@@ -128,12 +128,12 @@ func (c *AuthServerClient) UploadBrandAsset(ctx context.Context, accessToken str
 	return &response.BrandAsset, nil
 }
 
-// GetBrandAssetById retrieves a stored brand asset without its bytes, attached to a brand or not,
+// GetBrandAssetByID retrieves a stored brand asset without its bytes, attached to a brand or not,
 // which the brand editor draws a slot's asset from when it was uploaded and not yet saved.
-func (c *AuthServerClient) GetBrandAssetById(ctx context.Context, accessToken string, assetId int64) (*api.BrandAssetResponse, error) {
+func (c *AuthServerClient) GetBrandAssetByID(ctx context.Context, accessToken string, assetID int64) (*api.BrandAssetResponse, error) {
 	response, err := execute[api.GetBrandAssetResponse](ctx, c, accessToken, apiRequest{
 		method:        "GET",
-		url:           fmt.Sprintf("%s/api/v1/admin/brand-assets/%d", c.baseURL, assetId),
+		url:           fmt.Sprintf("%s/api/v1/admin/brand-assets/%d", c.baseURL, assetID),
 		contentType:   contentTypeJSON,
 		successStatus: http.StatusOK,
 	})

@@ -47,12 +47,12 @@ func giveClientSafeModeBrand(t *testing.T, client *record.Client) *record.Brand 
 	require.NoError(t, database.CreateBrand(ctx, nil, &brand))
 	t.Cleanup(func() {
 		assert.NoError(t, database.RunInTransaction(ctx, func(tx *sql.Tx) error {
-			_, err := database.DeleteBrand(ctx, tx, brand.Id)
+			_, err := database.DeleteBrand(ctx, tx, brand.ID)
 			return err
 		}), "unable to delete the client's brand")
 	})
 	require.NoError(t, database.RunInTransaction(ctx, func(tx *sql.Tx) error {
-		_, err := database.SetClientBrand(ctx, tx, client.Id, sql.NullInt64{Int64: brand.Id, Valid: true})
+		_, err := database.SetClientBrand(ctx, tx, client.ID, sql.NullInt64{Int64: brand.ID, Valid: true})
 		return err
 	}))
 	return &brand
@@ -72,7 +72,7 @@ func assertDrawnSafe(t *testing.T, resp *http.Response, brand *record.Brand) {
 	head := readBrandedPageHead(t, resp)
 	assert.Equal(t, "light", head.dataTheme, "the appearance stays")
 	if assert.Len(t, head.stylesheets, 2, "main.css, then the brand's stylesheet") {
-		assert.Regexp(t, `^/brand/`+strconv.FormatInt(brand.Id, 10)+`/safe-stylesheet\.css\?v=[0-9a-f]{12}$`,
+		assert.Regexp(t, `^/brand/`+strconv.FormatInt(brand.ID, 10)+`/safe-stylesheet\.css\?v=[0-9a-f]{12}$`,
 			head.stylesheets[1])
 	}
 }
@@ -91,7 +91,7 @@ func withSafeMode(t *testing.T, raw string) string {
 // getBody answers the body served at path on the auth server.
 func getBody(t *testing.T, path string) string {
 	t.Helper()
-	resp, err := createHttpClient(t).Get(appConfig.AuthServer.BaseURL + path)
+	resp, err := createHTTPClient(t).Get(appConfig.AuthServer.BaseURL + path)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode, path)
@@ -103,10 +103,10 @@ func getBody(t *testing.T, path string) string {
 func TestSafeMode_ASignInAskingForItIsDrawnSafeOnEveryPage(t *testing.T) {
 	useMailpitSMTP(t)
 	makeDefaultBrand(t, record.BrandAppearanceDark, "plum")
-	client, redirectURI := brandSignInClient(t, record.AcrLevel1)
+	client, redirectURI := brandSignInClient(t, record.ACRLevel1)
 	brand := giveClientSafeModeBrand(t, client)
 	user, password := brandSignInUser(t, "")
-	browser := createHttpClient(t)
+	browser := createHTTPClient(t)
 
 	resp := loadPage(t, browser, withSafeMode(t, brandAuthorizeURL(client, redirectURI, "form_post")))
 	resp, _ = brandFollowTo(t, browser, resp, "/auth/level1")
@@ -166,25 +166,25 @@ func TestSafeMode_ASignInAskingForItIsDrawnSafeOnEveryPage(t *testing.T) {
 		page := followToPage(t, browser, brandAuthorizeURL(client, redirectURI, "form_post"))
 		defer func() { _ = page.Body.Close() }()
 		require.Equal(t, http.StatusOK, page.StatusCode)
-		assert.Regexp(t, `^/brand/`+strconv.FormatInt(brand.Id, 10)+`/stylesheet\.css\?v=[0-9a-f]{12}$`,
+		assert.Regexp(t, `^/brand/`+strconv.FormatInt(brand.ID, 10)+`/stylesheet\.css\?v=[0-9a-f]{12}$`,
 			brandStylesheetLink(t, page))
 	})
 
 	// Another browser's sign-in, of the same client, is drawn as usual.
 	t.Run("another browser's sign-in", func(t *testing.T) {
-		other := createHttpClient(t)
+		other := createHTTPClient(t)
 		page := loadPage(t, other, brandAuthorizeURL(client, redirectURI, ""))
 		page, _ = brandFollowTo(t, other, page, "/auth/level1")
 		page, _ = brandFollowTo(t, other, page, "/auth/pwd")
 		defer func() { _ = page.Body.Close() }()
 		require.Equal(t, http.StatusOK, page.StatusCode)
-		assert.Regexp(t, `^/brand/`+strconv.FormatInt(brand.Id, 10)+`/stylesheet\.css\?v=[0-9a-f]{12}$`,
+		assert.Regexp(t, `^/brand/`+strconv.FormatInt(brand.ID, 10)+`/stylesheet\.css\?v=[0-9a-f]{12}$`,
 			brandStylesheetLink(t, page))
 	})
 
 	// Nothing stored changes.
 	t.Run("the stored brand", func(t *testing.T) {
-		stored, err := database.GetBrandById(context.Background(), nil, brand.Id)
+		stored, err := database.GetBrandByID(context.Background(), nil, brand.ID)
 		require.NoError(t, err)
 		require.NotNil(t, stored)
 		assert.Equal(t, safeModeCSS, stored.CustomCSS)
@@ -198,16 +198,16 @@ func TestSafeMode_ASignInAskingForItIsDrawnSafeOnEveryPage(t *testing.T) {
 // request asks for it, from the first page.
 func TestSafeMode_TheAuthorizeRefusalPageIsDrawnSafe(t *testing.T) {
 	makeDefaultBrand(t, record.BrandAppearanceDark, "plum")
-	client, redirectURI := brandSignInClient(t, record.AcrLevel1)
+	client, redirectURI := brandSignInClient(t, record.ACRLevel1)
 	brand := giveClientSafeModeBrand(t, client)
 
-	resp := loadPage(t, createHttpClient(t),
+	resp := loadPage(t, createHTTPClient(t),
 		withSafeMode(t, brandAuthorizeURL(client, "https://elsewhere.example.com/callback", "")))
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	assertDrawnSafe(t, resp, brand)
 
-	asUsual := loadPage(t, createHttpClient(t), brandAuthorizeURL(client, redirectURI, "no-such-mode"))
+	asUsual := loadPage(t, createHTTPClient(t), brandAuthorizeURL(client, redirectURI, "no-such-mode"))
 	defer func() { _ = asUsual.Body.Close() }()
 	require.Equal(t, http.StatusBadRequest, asUsual.StatusCode)
 	assert.Regexp(t, `/stylesheet\.css\?v=`, brandStylesheetLink(t, asUsual))
@@ -221,7 +221,7 @@ func TestSafeMode_ThePublicSettingsCarryTheSafeStylesheets(t *testing.T) {
 	brand.CustomCSS = safeModeCSS
 	makeDefaultBrandOf(t, &brand)
 
-	resp, err := createHttpClient(t).Get(appConfig.AuthServer.BaseURL + "/api/public/settings")
+	resp, err := createHTTPClient(t).Get(appConfig.AuthServer.BaseURL + "/api/public/settings")
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -234,7 +234,7 @@ func TestSafeMode_ThePublicSettingsCarryTheSafeStylesheets(t *testing.T) {
 		} `json:"brand"`
 	}
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
-	id := strconv.FormatInt(brand.Id, 10)
+	id := strconv.FormatInt(brand.ID, 10)
 	base := appConfig.AuthServer.BaseURL
 	assert.Regexp(t, `^`+base+`/brand/`+id+`/stylesheet\.css\?v=[0-9a-f]{12}$`, body.Brand.StylesheetURL)
 	assert.Regexp(t, `^`+base+`/brand/`+id+`/safe-stylesheet\.css\?v=[0-9a-f]{12}$`, body.Brand.SafeStylesheetURL)

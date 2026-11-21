@@ -47,16 +47,16 @@ func adminRequestClient(t *testing.T, method, path, accessToken string, body any
 	return client
 }
 
-func storedRememberConsent(t *testing.T, clientId int64) bool {
+func storedRememberConsent(t *testing.T, clientID int64) bool {
 	t.Helper()
-	client, err := database.GetClientById(context.Background(), nil, clientId)
+	client, err := database.GetClientByID(context.Background(), nil, clientID)
 	require.NoError(t, err)
 	require.NotNil(t, client)
 	return client.RememberConsent
 }
 
-func clientPath(clientId int64) string {
-	return "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10)
+func clientPath(clientID int64) string {
+	return "/api/v1/admin/clients/" + strconv.FormatInt(clientID, 10)
 }
 
 // createRememberConsentClient stores a client with Remember consent as given, through the data
@@ -77,7 +77,7 @@ func createRememberConsentClient(t *testing.T, isPublic, remember bool) *record.
 	}
 	client.ApplyPublicClientInvariants()
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 	return client
 }
 
@@ -107,7 +107,7 @@ func TestAPIClients_ListAnswersRememberConsent(t *testing.T) {
 	publicOn := createRememberConsentClient(t, true, true)
 	publicOff := createRememberConsentClient(t, true, false)
 	confidential := createRememberConsentClient(t, false, true)
-	want := map[int64]bool{publicOn.Id: true, publicOff.Id: false, confidential.Id: true}
+	want := map[int64]bool{publicOn.ID: true, publicOff.ID: false, confidential.ID: true}
 
 	resp := makeAPIRequest(t, "GET", appConfig.AuthServer.BaseURL+"/api/v1/admin/clients", accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
@@ -152,8 +152,8 @@ func TestDCR_StoresRememberConsentOffForPublicOnForConfidential(t *testing.T) {
 		client, err := database.GetClientByClientIdentifier(context.Background(), nil, registered.ClientID)
 		require.NoError(t, err)
 		require.NotNil(t, client)
-		t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
-		return client.Id
+		t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
+		return client.ID
 	}
 
 	t.Run("public", func(t *testing.T) {
@@ -177,11 +177,11 @@ func TestAPIClientAuthenticationPut_SwitchToPublic_TurnsRememberConsentOff(t *te
 	accessToken, _ := createAdminClientWithToken(t)
 	client := createRememberConsentClient(t, false, true)
 
-	answer := adminRequestClient(t, "PUT", clientPath(client.Id)+"/authentication", accessToken,
+	answer := adminRequestClient(t, "PUT", clientPath(client.ID)+"/authentication", accessToken,
 		api.UpdateClientAuthenticationRequest{IsPublic: true}, http.StatusOK)
 
 	assert.False(t, clientRememberConsentAnswer(t, answer), "the switch's answer")
-	assert.False(t, storedRememberConsent(t, client.Id), "the stored row")
+	assert.False(t, storedRememberConsent(t, client.ID), "the stored row")
 }
 
 // TestAPIClientAuthenticationPut_SavingAnAlreadyPublicClient_KeepsRememberConsent: saving a public
@@ -192,11 +192,11 @@ func TestAPIClientAuthenticationPut_SavingAnAlreadyPublicClient_KeepsRememberCon
 	for _, stored := range []bool{true, false} {
 		client := createRememberConsentClient(t, true, stored)
 
-		answer := adminRequestClient(t, "PUT", clientPath(client.Id)+"/authentication", accessToken,
+		answer := adminRequestClient(t, "PUT", clientPath(client.ID)+"/authentication", accessToken,
 			api.UpdateClientAuthenticationRequest{IsPublic: true}, http.StatusOK)
 
 		assert.Equalf(t, stored, clientRememberConsentAnswer(t, answer), "the save's answer, stored %v", stored)
-		assert.Equalf(t, stored, storedRememberConsent(t, client.Id), "the stored row, stored %v", stored)
+		assert.Equalf(t, stored, storedRememberConsent(t, client.ID), "the stored row, stored %v", stored)
 	}
 }
 
@@ -206,11 +206,11 @@ func TestAPIClientAuthenticationPut_SwitchToConfidential_TurnsRememberConsentOn(
 	accessToken, _ := createAdminClientWithToken(t)
 	client := createRememberConsentClient(t, true, false)
 
-	answer := adminRequestClient(t, "PUT", clientPath(client.Id)+"/authentication", accessToken,
+	answer := adminRequestClient(t, "PUT", clientPath(client.ID)+"/authentication", accessToken,
 		api.UpdateClientAuthenticationRequest{IsPublic: false, ClientSecret: securerandom.String(60)}, http.StatusOK)
 
 	assert.True(t, clientRememberConsentAnswer(t, answer), "the switch's answer")
-	assert.True(t, storedRememberConsent(t, client.Id), "the stored row")
+	assert.True(t, storedRememberConsent(t, client.ID), "the stored row")
 }
 
 // TestAPIClient_SavesThatDoNotOwnRememberConsentLeaveItAlone: the settings save without
@@ -241,7 +241,7 @@ func TestAPIClient_SavesThatDoNotOwnRememberConsentLeaveItAlone(t *testing.T) {
 				RefreshTokenOfflineIdleTimeoutInSeconds: 1000,
 				RefreshTokenOfflineMaxLifetimeInSeconds: 2000,
 				IncludeOpenIDConnectClaimsInAccessToken: "default",
-				IncludeOpenIDConnectClaimsInIdToken:     "default",
+				IncludeOpenIDConnectClaimsInIDToken:     "default",
 			}
 		}},
 	}
@@ -251,11 +251,11 @@ func TestAPIClient_SavesThatDoNotOwnRememberConsentLeaveItAlone(t *testing.T) {
 			t.Run(save.name+" stored "+strconv.FormatBool(stored), func(t *testing.T) {
 				client := createRememberConsentClient(t, true, stored)
 
-				answer := adminRequestClient(t, "PUT", clientPath(client.Id)+save.suffix, accessToken,
+				answer := adminRequestClient(t, "PUT", clientPath(client.ID)+save.suffix, accessToken,
 					save.body(client), http.StatusOK)
 
 				assert.Equal(t, stored, clientRememberConsentAnswer(t, answer), "the save's answer")
-				assert.Equal(t, stored, storedRememberConsent(t, client.Id), "the stored row")
+				assert.Equal(t, stored, storedRememberConsent(t, client.ID), "the stored row")
 			})
 		}
 	}
@@ -269,7 +269,7 @@ func TestAPIClientSettingsPut_PublicClient_AppliesRememberConsent(t *testing.T) 
 	client := createRememberConsentClient(t, true, false)
 
 	save := func(remember bool) map[string]any {
-		return adminRequestClient(t, "PUT", clientPath(client.Id), accessToken, map[string]any{
+		return adminRequestClient(t, "PUT", clientPath(client.ID), accessToken, map[string]any{
 			"clientIdentifier": client.ClientIdentifier,
 			"enabled":          true,
 			"consentRequired":  true,
@@ -278,10 +278,10 @@ func TestAPIClientSettingsPut_PublicClient_AppliesRememberConsent(t *testing.T) 
 	}
 
 	assert.True(t, clientRememberConsentAnswer(t, save(true)), "the save's answer, turned on")
-	assert.True(t, storedRememberConsent(t, client.Id), "the stored row, turned on")
+	assert.True(t, storedRememberConsent(t, client.ID), "the stored row, turned on")
 
 	assert.False(t, clientRememberConsentAnswer(t, save(false)), "the save's answer, turned off")
-	assert.False(t, storedRememberConsent(t, client.Id), "the stored row, turned off")
+	assert.False(t, storedRememberConsent(t, client.ID), "the stored row, turned off")
 }
 
 // TestAPIClientSettingsPut_ConfidentialClient_StoresRememberConsentOn: a confidential client always
@@ -292,12 +292,12 @@ func TestAPIClientSettingsPut_ConfidentialClient_StoresRememberConsentOn(t *test
 	accessToken, _ := createAdminClientWithToken(t)
 	client := createRememberConsentClient(t, false, false)
 
-	answer := adminRequestClient(t, "PUT", clientPath(client.Id), accessToken, map[string]any{
+	answer := adminRequestClient(t, "PUT", clientPath(client.ID), accessToken, map[string]any{
 		"clientIdentifier": client.ClientIdentifier,
 		"enabled":          true,
 		"rememberConsent":  false,
 	}, http.StatusOK)
 
 	assert.True(t, clientRememberConsentAnswer(t, answer), "the save's answer")
-	assert.True(t, storedRememberConsent(t, client.Id), "the stored row")
+	assert.True(t, storedRememberConsent(t, client.ID), "the stored row")
 }

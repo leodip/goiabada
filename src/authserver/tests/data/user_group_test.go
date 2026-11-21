@@ -13,8 +13,8 @@ func TestCreateUserGroup(t *testing.T) {
 	group := createTestGroup(t)
 
 	userGroup := &record.UserGroup{
-		UserId:  user.Id,
-		GroupId: group.Id,
+		UserID:  user.ID,
+		GroupID: group.ID,
 	}
 
 	err := database.CreateUserGroup(context.Background(), nil, userGroup)
@@ -22,7 +22,7 @@ func TestCreateUserGroup(t *testing.T) {
 		t.Fatalf("Failed to create user group: %v", err)
 	}
 
-	if userGroup.Id == 0 {
+	if userGroup.ID == 0 {
 		t.Error("Expected non-zero ID after creation")
 	}
 	if !userGroup.CreatedAt.Valid || userGroup.CreatedAt.Time.IsZero() {
@@ -32,16 +32,16 @@ func TestCreateUserGroup(t *testing.T) {
 		t.Error("Expected UpdatedAt to be set")
 	}
 
-	retrievedUserGroup, err := database.GetUserGroupById(context.Background(), nil, userGroup.Id)
+	retrievedUserGroup, err := database.GetUserGroupByID(context.Background(), nil, userGroup.ID)
 	if err != nil {
 		t.Fatalf("Failed to retrieve created user group: %v", err)
 	}
 
-	if retrievedUserGroup.UserId != userGroup.UserId {
-		t.Errorf("Expected UserId %d, got %d", userGroup.UserId, retrievedUserGroup.UserId)
+	if retrievedUserGroup.UserID != userGroup.UserID {
+		t.Errorf("Expected UserID %d, got %d", userGroup.UserID, retrievedUserGroup.UserID)
 	}
-	if retrievedUserGroup.GroupId != userGroup.GroupId {
-		t.Errorf("Expected GroupId %d, got %d", userGroup.GroupId, retrievedUserGroup.GroupId)
+	if retrievedUserGroup.GroupID != userGroup.GroupID {
+		t.Errorf("Expected GroupID %d, got %d", userGroup.GroupID, retrievedUserGroup.GroupID)
 	}
 }
 
@@ -51,8 +51,8 @@ func TestUpdateUserGroup(t *testing.T) {
 	newUser := createTestUser(t)
 	newGroup := createTestGroup(t)
 
-	userGroup.UserId = newUser.Id
-	userGroup.GroupId = newGroup.Id
+	userGroup.UserID = newUser.ID
+	userGroup.GroupID = newGroup.ID
 
 	time.Sleep(timestampTick)
 
@@ -61,60 +61,60 @@ func TestUpdateUserGroup(t *testing.T) {
 		t.Fatalf("Failed to update user group: %v", err)
 	}
 
-	updatedUserGroup, err := database.GetUserGroupById(context.Background(), nil, userGroup.Id)
+	updatedUserGroup, err := database.GetUserGroupByID(context.Background(), nil, userGroup.ID)
 	if err != nil {
 		t.Fatalf("Failed to retrieve updated user group: %v", err)
 	}
 
-	if updatedUserGroup.UserId != newUser.Id {
-		t.Errorf("Expected UserId %d, got %d", newUser.Id, updatedUserGroup.UserId)
+	if updatedUserGroup.UserID != newUser.ID {
+		t.Errorf("Expected UserID %d, got %d", newUser.ID, updatedUserGroup.UserID)
 	}
-	if updatedUserGroup.GroupId != newGroup.Id {
-		t.Errorf("Expected GroupId %d, got %d", newGroup.Id, updatedUserGroup.GroupId)
+	if updatedUserGroup.GroupID != newGroup.ID {
+		t.Errorf("Expected GroupID %d, got %d", newGroup.ID, updatedUserGroup.GroupID)
 	}
 	if !updatedUserGroup.UpdatedAt.Time.After(updatedUserGroup.CreatedAt.Time) {
 		t.Error("Expected UpdatedAt to be after CreatedAt")
 	}
 }
 
-func TestGetUserGroupById(t *testing.T) {
+func TestGetUserGroupByID(t *testing.T) {
 	userGroup := createTestUserGroup(t)
 
-	retrievedUserGroup, err := database.GetUserGroupById(context.Background(), nil, userGroup.Id)
+	retrievedUserGroup, err := database.GetUserGroupByID(context.Background(), nil, userGroup.ID)
 	if err != nil {
 		t.Fatalf("Failed to get user group by ID: %v", err)
 	}
 
-	if retrievedUserGroup.Id != userGroup.Id {
-		t.Errorf("Expected ID %d, got %d", userGroup.Id, retrievedUserGroup.Id)
+	if retrievedUserGroup.ID != userGroup.ID {
+		t.Errorf("Expected ID %d, got %d", userGroup.ID, retrievedUserGroup.ID)
 	}
-	if retrievedUserGroup.UserId != userGroup.UserId {
-		t.Errorf("Expected UserId %d, got %d", userGroup.UserId, retrievedUserGroup.UserId)
+	if retrievedUserGroup.UserID != userGroup.UserID {
+		t.Errorf("Expected UserID %d, got %d", userGroup.UserID, retrievedUserGroup.UserID)
 	}
-	if retrievedUserGroup.GroupId != userGroup.GroupId {
-		t.Errorf("Expected GroupId %d, got %d", userGroup.GroupId, retrievedUserGroup.GroupId)
+	if retrievedUserGroup.GroupID != userGroup.GroupID {
+		t.Errorf("Expected GroupID %d, got %d", userGroup.GroupID, retrievedUserGroup.GroupID)
 	}
 
-	nonExistentUserGroup, err := database.GetUserGroupById(context.Background(), nil, 99999)
+	nonExistentUserGroup, err := database.GetUserGroupByID(context.Background(), nil, 99999)
 	if err != nil {
 		t.Errorf("Expected no error for non-existent user group, got: %v", err)
 	}
 	if nonExistentUserGroup != nil {
-		t.Errorf("Expected nil for non-existent user group, got a user group with ID: %d", nonExistentUserGroup.Id)
+		t.Errorf("Expected nil for non-existent user group, got a user group with ID: %d", nonExistentUserGroup.ID)
 	}
 }
 
-func TestGetUserGroupsByUserIds(t *testing.T) {
+func TestGetUserGroupsByUserIDs(t *testing.T) {
 	user1 := createTestUser(t)
 	user2 := createTestUser(t)
 	group1 := createTestGroup(t)
 	group2 := createTestGroup(t)
 
-	userGroup1 := createTestUserGroupWithUserAndGroup(t, user1.Id, group1.Id)
-	userGroup2 := createTestUserGroupWithUserAndGroup(t, user2.Id, group2.Id)
+	userGroup1 := createTestUserGroupWithUserAndGroup(t, user1.ID, group1.ID)
+	userGroup2 := createTestUserGroupWithUserAndGroup(t, user2.ID, group2.ID)
 
-	userIds := []int64{user1.Id, user2.Id}
-	userGroups, err := database.GetUserGroupsByUserIds(context.Background(), nil, userIds)
+	userIDs := []int64{user1.ID, user2.ID}
+	userGroups, err := database.GetUserGroupsByUserIDs(context.Background(), nil, userIDs)
 	if err != nil {
 		t.Fatalf("Failed to get user groups by user IDs: %v", err)
 	}
@@ -126,28 +126,28 @@ func TestGetUserGroupsByUserIds(t *testing.T) {
 	foundUserGroup1 := false
 	foundUserGroup2 := false
 	for _, ug := range userGroups {
-		if ug.Id == userGroup1.Id {
+		if ug.ID == userGroup1.ID {
 			foundUserGroup1 = true
 		}
-		if ug.Id == userGroup2.Id {
+		if ug.ID == userGroup2.ID {
 			foundUserGroup2 = true
 		}
 	}
 
 	if !foundUserGroup1 || !foundUserGroup2 {
-		t.Error("Not all created user groups were found in GetUserGroupsByUserIds result")
+		t.Error("Not all created user groups were found in GetUserGroupsByUserIDs result")
 	}
 }
 
-func TestGetUserGroupsByUserId(t *testing.T) {
+func TestGetUserGroupsByUserID(t *testing.T) {
 	user := createTestUser(t)
 	group1 := createTestGroup(t)
 	group2 := createTestGroup(t)
 
-	userGroup1 := createTestUserGroupWithUserAndGroup(t, user.Id, group1.Id)
-	userGroup2 := createTestUserGroupWithUserAndGroup(t, user.Id, group2.Id)
+	userGroup1 := createTestUserGroupWithUserAndGroup(t, user.ID, group1.ID)
+	userGroup2 := createTestUserGroupWithUserAndGroup(t, user.ID, group2.ID)
 
-	userGroups, err := database.GetUserGroupsByUserId(context.Background(), nil, user.Id)
+	userGroups, err := database.GetUserGroupsByUserID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatalf("Failed to get user groups by user ID: %v", err)
 	}
@@ -159,57 +159,57 @@ func TestGetUserGroupsByUserId(t *testing.T) {
 	foundUserGroup1 := false
 	foundUserGroup2 := false
 	for _, ug := range userGroups {
-		if ug.Id == userGroup1.Id {
+		if ug.ID == userGroup1.ID {
 			foundUserGroup1 = true
 		}
-		if ug.Id == userGroup2.Id {
+		if ug.ID == userGroup2.ID {
 			foundUserGroup2 = true
 		}
 	}
 
 	if !foundUserGroup1 || !foundUserGroup2 {
-		t.Error("Not all created user groups were found in GetUserGroupsByUserId result")
+		t.Error("Not all created user groups were found in GetUserGroupsByUserID result")
 	}
 }
 
-func TestGetUserGroupByUserIdAndGroupId(t *testing.T) {
+func TestGetUserGroupByUserIDAndGroupID(t *testing.T) {
 	user := createTestUser(t)
 	group := createTestGroup(t)
-	userGroup := createTestUserGroupWithUserAndGroup(t, user.Id, group.Id)
+	userGroup := createTestUserGroupWithUserAndGroup(t, user.ID, group.ID)
 
-	retrievedUserGroup, err := database.GetUserGroupByUserIdAndGroupId(context.Background(), nil, user.Id, group.Id)
+	retrievedUserGroup, err := database.GetUserGroupByUserIDAndGroupID(context.Background(), nil, user.ID, group.ID)
 	if err != nil {
 		t.Fatalf("Failed to get user group by user ID and group ID: %v", err)
 	}
 
-	if retrievedUserGroup.Id != userGroup.Id {
-		t.Errorf("Expected ID %d, got %d", userGroup.Id, retrievedUserGroup.Id)
+	if retrievedUserGroup.ID != userGroup.ID {
+		t.Errorf("Expected ID %d, got %d", userGroup.ID, retrievedUserGroup.ID)
 	}
-	if retrievedUserGroup.UserId != user.Id {
-		t.Errorf("Expected UserId %d, got %d", user.Id, retrievedUserGroup.UserId)
+	if retrievedUserGroup.UserID != user.ID {
+		t.Errorf("Expected UserID %d, got %d", user.ID, retrievedUserGroup.UserID)
 	}
-	if retrievedUserGroup.GroupId != group.Id {
-		t.Errorf("Expected GroupId %d, got %d", group.Id, retrievedUserGroup.GroupId)
+	if retrievedUserGroup.GroupID != group.ID {
+		t.Errorf("Expected GroupID %d, got %d", group.ID, retrievedUserGroup.GroupID)
 	}
 
-	nonExistentUserGroup, err := database.GetUserGroupByUserIdAndGroupId(context.Background(), nil, 99999, 99999)
+	nonExistentUserGroup, err := database.GetUserGroupByUserIDAndGroupID(context.Background(), nil, 99999, 99999)
 	if err != nil {
 		t.Errorf("Expected no error for non-existent user group, got: %v", err)
 	}
 	if nonExistentUserGroup != nil {
-		t.Errorf("Expected nil for non-existent user group, got a user group with ID: %d", nonExistentUserGroup.Id)
+		t.Errorf("Expected nil for non-existent user group, got a user group with ID: %d", nonExistentUserGroup.ID)
 	}
 }
 
 func TestDeleteUserGroup(t *testing.T) {
 	userGroup := createTestUserGroup(t)
 
-	err := database.DeleteUserGroup(context.Background(), nil, userGroup.Id)
+	err := database.DeleteUserGroup(context.Background(), nil, userGroup.ID)
 	if err != nil {
 		t.Fatalf("Failed to delete user group: %v", err)
 	}
 
-	deletedUserGroup, err := database.GetUserGroupById(context.Background(), nil, userGroup.Id)
+	deletedUserGroup, err := database.GetUserGroupByID(context.Background(), nil, userGroup.ID)
 	if err != nil {
 		t.Fatalf("Error while checking for deleted user group: %v", err)
 	}
@@ -226,13 +226,13 @@ func TestDeleteUserGroup(t *testing.T) {
 func createTestUserGroup(t *testing.T) *record.UserGroup {
 	user := createTestUser(t)
 	group := createTestGroup(t)
-	return createTestUserGroupWithUserAndGroup(t, user.Id, group.Id)
+	return createTestUserGroupWithUserAndGroup(t, user.ID, group.ID)
 }
 
-func createTestUserGroupWithUserAndGroup(t *testing.T, userId, groupId int64) *record.UserGroup {
+func createTestUserGroupWithUserAndGroup(t *testing.T, userID, groupID int64) *record.UserGroup {
 	userGroup := &record.UserGroup{
-		UserId:  userId,
-		GroupId: groupId,
+		UserID:  userID,
+		GroupID: groupID,
 	}
 	err := database.CreateUserGroup(context.Background(), nil, userGroup)
 	if err != nil {

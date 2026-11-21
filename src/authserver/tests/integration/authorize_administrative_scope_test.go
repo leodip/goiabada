@@ -57,16 +57,16 @@ func newAdministrativeScopeFixture(t *testing.T, allowed bool) *administrativeSc
 		AuthorizationCodeEnabled:    true,
 		ImplicitGrantEnabled:        &implicit,
 		ConsentRequired:             false,
-		DefaultAcrLevel:             record.AcrLevel1,
+		DefaultACRLevel:             record.ACRLevel1,
 		AdministrativeScopesAllowed: allowed,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 	require.NoError(t, database.CreateRedirectURI(context.Background(), nil,
-		&record.RedirectURI{ClientId: client.Id, URI: administrativeScopeRedirectURI}))
+		&record.RedirectURI{ClientID: client.ID, URI: administrativeScopeRedirectURI}))
 
 	user, password := newSignInAdministrator(t)
-	return &administrativeScopeFixture{client: client, user: user, password: password, browser: createHttpClient(t)}
+	return &administrativeScopeFixture{client: client, user: user, password: password, browser: createHTTPClient(t)}
 }
 
 // newSignInAdministrator is a user holding authserver:manage, and its password.
@@ -78,24 +78,24 @@ func newSignInAdministrator(t *testing.T) (*record.User, string) {
 	require.NoError(t, err)
 	user := &record.User{Subject: fake.UUID(), Enabled: true, Email: fake.Email(), PasswordHash: passwordHashed}
 	require.NoError(t, database.CreateUser(context.Background(), nil, user))
-	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.Id) })
-	assignPermissionToUser(t, user.Id, authServerPermissionId(t, builtin.ManagePermissionIdentifier))
+	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.ID) })
+	assignPermissionToUser(t, user.ID, authServerPermissionID(t, builtin.ManagePermissionIdentifier))
 	return user, password
 }
 
 // craftedLink is the authorization request the issue describes, for responseType, with extra
 // appended as it is.
 func (f *administrativeScopeFixture) craftedLink(responseType string, extra string) string {
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + f.client.ClientIdentifier +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + f.client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(administrativeScopeRedirectURI) +
 		"&response_type=" + url.QueryEscape(responseType) +
 		"&scope=" + url.QueryEscape("openid authserver:manage") +
 		"&state=" + administrativeScopeState +
 		"&nonce=" + fake.LetterN(8)
 	if responseType == "code" {
-		destUrl += "&code_challenge_method=S256&code_challenge=" + oauth.GeneratePKCECodeChallenge(testCodeVerifier)
+		destURL += "&code_challenge_method=S256&code_challenge=" + oauth.GeneratePKCECodeChallenge(testCodeVerifier)
 	}
-	return destUrl + extra
+	return destURL + extra
 }
 
 // signIn gives the browser a valid session, through the same client asking for openid alone, which
@@ -103,11 +103,11 @@ func (f *administrativeScopeFixture) craftedLink(responseType string, extra stri
 func (f *administrativeScopeFixture) signIn(t *testing.T) {
 	t.Helper()
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + f.client.ClientIdentifier +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + f.client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(administrativeScopeRedirectURI) +
 		"&response_type=code&scope=openid&state=sign-in" +
 		"&code_challenge_method=S256&code_challenge=" + oauth.GeneratePKCECodeChallenge(testCodeVerifier)
-	resp := f.signInFrom(t, destUrl)
+	resp := f.signInFrom(t, destURL)
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusFound, resp.StatusCode)
 	require.Contains(t, resp.Header.Get("Location"), "code=", "the sign-in completes with a code")
@@ -115,10 +115,10 @@ func (f *administrativeScopeFixture) signIn(t *testing.T) {
 
 // signInFrom drives a ceremony that needs the password from its authorization request to
 // /auth/issue, and answers /auth/issue's response.
-func (f *administrativeScopeFixture) signInFrom(t *testing.T, destUrl string) *http.Response {
+func (f *administrativeScopeFixture) signInFrom(t *testing.T, destURL string) *http.Response {
 	t.Helper()
 
-	resp, err := f.browser.Get(destUrl)
+	resp, err := f.browser.Get(destURL)
 	require.NoError(t, err)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 	location := assertRedirect(t, resp, "/auth/level1")
@@ -139,10 +139,10 @@ func (f *administrativeScopeFixture) signInFrom(t *testing.T, destUrl string) *h
 	return loadPage(t, f.browser, location)
 }
 
-// get loads destUrl in the fixture's browser without following redirects.
-func (f *administrativeScopeFixture) get(t *testing.T, destUrl string) *http.Response {
+// get loads destURL in the fixture's browser without following redirects.
+func (f *administrativeScopeFixture) get(t *testing.T, destURL string) *http.Response {
 	t.Helper()
-	resp, err := f.browser.Get(destUrl)
+	resp, err := f.browser.Get(destURL)
 	require.NoError(t, err)
 	return resp
 }
@@ -152,7 +152,7 @@ func administrativeScopeRefusedRows(t *testing.T, clientIdentifier string) []map
 	t.Helper()
 
 	readerToken, readerClient := createAdminClientWithToken(t)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, readerClient.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, readerClient.ID) })
 	logs, resp := getAuditLogs(t, readerToken, "auditEvent="+audit.EventAdministrativeScopeRefused+"&size=200")
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -175,11 +175,11 @@ func (f *administrativeScopeFixture) assertRefusedAtAuthorize(t *testing.T) {
 	rows := administrativeScopeRefusedRows(t, f.client.ClientIdentifier)
 	require.Len(t, rows, 1, "one row for the refusal")
 	assert.Equal(t, map[string]any{
-		"client_id":         float64(f.client.Id),
+		"client_id":         float64(f.client.ID),
 		"client_identifier": f.client.ClientIdentifier,
 		"scopes":            []any{"authserver:manage"},
 		"checkpoint":        "authorize",
-		"user_id":           float64(f.user.Id),
+		"user_id":           float64(f.user.ID),
 	}, rows[0])
 }
 
@@ -240,7 +240,7 @@ func TestAuthorize_AdministrativeScope_RefusedForTheImplicitFlow(t *testing.T) {
 	require.Len(t, rows, 2, "one row for each refusal")
 	for _, row := range rows {
 		assert.Equal(t, "authorize", row["checkpoint"])
-		assert.InDelta(t, float64(f.user.Id), row["user_id"], 0)
+		assert.InDelta(t, float64(f.user.ID), row["user_id"], 0)
 	}
 }
 
@@ -270,11 +270,11 @@ func TestAuthorize_AdministrativeScope_AnAllowedClientGetsTheCode(t *testing.T) 
 	resp := f.signInFrom(t, f.craftedLink("code", ""))
 	defer func() { _ = resp.Body.Close() }()
 
-	codeVal, state := getCodeAndStateFromUrl(t, resp)
+	codeVal, state := getCodeAndStateFromURL(t, resp)
 	assert.Equal(t, administrativeScopeState, state)
 	code := loadCodeFromDatabase(t, codeVal)
 	assert.Equal(t, "openid authserver:manage", code.Scope)
-	assert.Equal(t, f.user.Id, code.User.Id)
+	assert.Equal(t, f.user.ID, code.User.ID)
 	assert.Empty(t, administrativeScopeRefusedRows(t, f.client.ClientIdentifier))
 }
 
@@ -285,15 +285,15 @@ func TestAuthorize_AdministrativeScope_AnAllowedClientGetsTheCode(t *testing.T) 
 // owed to (#509 decision 2).
 func TestAuthorize_AdministrativeScope_TheAdminConsoleClientSignsInWithNoConsentScreen(t *testing.T) {
 	user, password := newSignInAdministrator(t)
-	assignPermissionToUser(t, user.Id, authServerPermissionId(t, builtin.ManageAccountPermissionIdentifier))
-	browser := createHttpClient(t)
+	assignPermissionToUser(t, user.ID, authServerPermissionID(t, builtin.ManageAccountPermissionIdentifier))
+	browser := createHTTPClient(t)
 	callback := appConfig.AdminConsole.BaseURL + "/auth/callback"
 
 	// The admin console's request, as middleware_jwt.go's buildScopeString and auth_helper.go's
 	// RedirToAuthorize build it.
 	const scope = "authserver:manage authserver:manage-account email openid profile"
 	state := fake.LetterN(16)
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize?" + url.Values{
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize?" + url.Values{
 		"client_id":             {builtin.AdminConsoleClientIdentifier},
 		"redirect_uri":          {callback},
 		"response_mode":         {"form_post"},
@@ -305,7 +305,7 @@ func TestAuthorize_AdministrativeScope_TheAdminConsoleClientSignsInWithNoConsent
 		"scope":                 {scope},
 	}.Encode()
 
-	resp, err := browser.Get(destUrl)
+	resp, err := browser.Get(destURL)
 	require.NoError(t, err)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 	location := assertRedirect(t, resp, "/auth/level1")
@@ -344,8 +344,8 @@ func TestAuthorize_AdministrativeScope_TheAdminConsoleClientSignsInWithNoConsent
 	assert.Equal(t, builtin.AdminConsoleClientIdentifier, code.Client.ClientIdentifier)
 	assert.Contains(t, strings.Fields(code.Scope), "authserver:manage")
 	assert.Contains(t, strings.Fields(code.Scope), "authserver:manage-account")
-	assert.Equal(t, user.Id, code.User.Id)
-	consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, code.Client.Id)
+	assert.Equal(t, user.ID, code.User.ID)
+	consent, err := database.GetConsentByUserIDAndClientID(context.Background(), nil, user.ID, code.Client.ID)
 	require.NoError(t, err)
 	assert.Nil(t, consent, "no consent was asked for or stored")
 }

@@ -66,7 +66,7 @@ func TestCaptureSlog_CapturesEveryLevelIncludingDebug(t *testing.T) {
 
 // The injection is why the recorder sits under the servers' own wrapper instead of being installed
 // bare. Every level test and level pin the later stages write reads request_id through this path.
-func TestCaptureSlog_ARecordLoggedWithChisRequestIdCarriesIt(t *testing.T) {
+func TestCaptureSlog_ARecordLoggedWithChisRequestIDCarriesIt(t *testing.T) {
 	capture := CaptureSlog(t)
 
 	ctx := requestid.NewContext(context.Background(), "req-abc-123")
@@ -77,7 +77,7 @@ func TestCaptureSlog_ARecordLoggedWithChisRequestIdCarriesIt(t *testing.T) {
 
 // The other half, and the one that fails if the wrapper ever starts inventing an id: a startup
 // line has no request to correlate to, and an attribute there would be a fabricated join key.
-func TestCaptureSlog_ARecordWithNoRequestIdCarriesNothing(t *testing.T) {
+func TestCaptureSlog_ARecordWithNoRequestIDCarriesNothing(t *testing.T) {
 	capture := CaptureSlog(t)
 
 	slog.Info("a startup line")

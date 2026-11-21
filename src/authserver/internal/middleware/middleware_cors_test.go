@@ -280,18 +280,18 @@ func TestCORS_APreflightIsCacheable(t *testing.T) {
 // the request id is on this request's context and on no other, so a middleware that passed
 // context.Background() matches nothing and the strict mock reports an unexpected call.
 
-const corsPropagatedRequestId = "goiabada/req-cors-propagation-1"
+const corsPropagatedRequestID = "goiabada/req-cors-propagation-1"
 
-func corsRequestCarryingId(path, origin string) *http.Request {
+func corsRequestCarryingID(path, origin string) *http.Request {
 	req := httptest.NewRequest("OPTIONS", path, nil)
 	req.Header.Set("Origin", origin)
 	req.Header.Set("Access-Control-Request-Method", "GET")
-	return req.WithContext(requestid.NewContext(req.Context(), corsPropagatedRequestId))
+	return req.WithContext(requestid.NewContext(req.Context(), corsPropagatedRequestID))
 }
 
-func theCorsRequestsContext() interface{} {
+func theCORSRequestsContext() interface{} {
 	return mock.MatchedBy(func(ctx context.Context) bool {
-		return requestid.FromContext(ctx) == corsPropagatedRequestId
+		return requestid.FromContext(ctx) == corsPropagatedRequestID
 	})
 }
 
@@ -299,7 +299,7 @@ func theCorsRequestsContext() interface{} {
 // asked for it.
 func TestCORS_ChecksTheOriginUnderTheRequestsContext(t *testing.T) {
 	db := datamocks.NewDatabase(t)
-	db.On("WebOriginExists", theCorsRequestsContext(), mock.Anything, "http://allowed.com").
+	db.On("WebOriginExists", theCORSRequestsContext(), mock.Anything, "http://allowed.com").
 		Return(true, nil).Once()
 
 	handler := CORS(db)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -307,7 +307,7 @@ func TestCORS_ChecksTheOriginUnderTheRequestsContext(t *testing.T) {
 	}))
 
 	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, corsRequestCarryingId("/userinfo", "http://allowed.com"))
+	handler.ServeHTTP(rr, corsRequestCarryingID("/userinfo", "http://allowed.com"))
 
 	assert.Equal(t, "http://allowed.com", rr.Header().Get("Access-Control-Allow-Origin"))
 	db.AssertExpectations(t)
@@ -324,7 +324,7 @@ func TestCORS_AnUngatedPathReachesNoOriginPort(t *testing.T) {
 	}))
 
 	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, corsRequestCarryingId("/.well-known/openid-configuration", "http://anywhere.com"))
+	handler.ServeHTTP(rr, corsRequestCarryingID("/.well-known/openid-configuration", "http://anywhere.com"))
 
 	assert.Equal(t, "http://anywhere.com", rr.Header().Get("Access-Control-Allow-Origin"))
 	db.AssertNotCalled(t, "WebOriginExists", mock.Anything, mock.Anything, mock.Anything)

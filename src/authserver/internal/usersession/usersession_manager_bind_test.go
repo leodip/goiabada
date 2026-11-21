@@ -48,8 +48,8 @@ func TestBindUserSession_ChecksTheClaimUnderTheUserRowFirst(t *testing.T) {
 	datamocks.ExpectRunInTransaction(database, txSentinel)
 	database.On("AcquireUserRow", mock.Anything, txSentinel, int64(123)).Return(nil).
 		Run(func(mock.Arguments) { order = append(order, "user lock") }).Once()
-	database.On("GetUserById", mock.Anything, txSentinel, int64(123)).
-		Return(&record.User{Id: 123, OTPEnabled: true, OtpConfigGeneration: 4}, nil).
+	database.On("GetUserByID", mock.Anything, txSentinel, int64(123)).
+		Return(&record.User{ID: 123, OTPEnabled: true, OTPConfigGeneration: 4}, nil).
 		Run(func(mock.Arguments) { order = append(order, "user read") }).Once()
 	database.On("AcquireUserSessionRow", mock.Anything, txSentinel, bumpSessionIdentifier).Return(true, nil).
 		Run(func(mock.Arguments) { order = append(order, "session lock") }).Once()
@@ -57,12 +57,12 @@ func TestBindUserSession_ChecksTheClaimUnderTheUserRowFirst(t *testing.T) {
 		Run(func(mock.Arguments) { order = append(order, "session read") }).Once()
 	database.On("UserSessionLoadClients", mock.Anything, txSentinel, mock.Anything).Return(nil).Once()
 	database.On("UpdateUserSession", mock.Anything, txSentinel, mock.MatchedBy(func(s *record.UserSession) bool {
-		return s.AuthMethods == "pwd otp" && s.AcrLevel == record.AcrLevel2Mandatory
+		return s.AuthMethods == "pwd otp" && s.ACRLevel == record.ACRLevel2Mandatory
 	})).Return(nil).Once()
 	database.On("CreateUserSessionClient", mock.Anything, txSentinel, mock.Anything).Return(nil).Once()
 
 	_, err := manager.BindUserSession(context.Background(), bumpSessionIdentifier, 456, Authentication{
-		UserId: 123, AuthMethods: "pwd otp", AcrLevel: record.AcrLevel2Mandatory,
+		UserID: 123, AuthMethods: "pwd otp", ACRLevel: record.ACRLevel2Mandatory,
 		OTPClaim: otpcredential.OTPClaim{Claimed: true, Generation: &generation},
 	}, false, "")
 
@@ -77,8 +77,8 @@ func TestBindUserSession_AClaimThatNoLongerStandsWritesNothing(t *testing.T) {
 		name string
 		user *record.User
 	}{
-		{"the authenticator removed", &record.User{Id: 123, OtpConfigGeneration: 5}},
-		{"the authenticator removed and another set up", &record.User{Id: 123, OTPEnabled: true, OtpConfigGeneration: 6}},
+		{"the authenticator removed", &record.User{ID: 123, OTPConfigGeneration: 5}},
+		{"the authenticator removed and another set up", &record.User{ID: 123, OTPEnabled: true, OTPConfigGeneration: 6}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
@@ -87,10 +87,10 @@ func TestBindUserSession_AClaimThatNoLongerStandsWritesNothing(t *testing.T) {
 
 			stub := datamocks.ExpectRunInTransaction(database, txSentinel)
 			database.On("AcquireUserRow", mock.Anything, txSentinel, int64(123)).Return(nil).Once()
-			database.On("GetUserById", mock.Anything, txSentinel, int64(123)).Return(tc.user, nil).Once()
+			database.On("GetUserByID", mock.Anything, txSentinel, int64(123)).Return(tc.user, nil).Once()
 
 			result, err := manager.BindUserSession(context.Background(), bumpSessionIdentifier, 456, Authentication{
-				UserId: 123, AuthMethods: "pwd otp", AcrLevel: record.AcrLevel2Mandatory,
+				UserID: 123, AuthMethods: "pwd otp", ACRLevel: record.ACRLevel2Mandatory,
 				OTPClaim: otpcredential.OTPClaim{Claimed: true, Generation: &generation},
 			}, false, "")
 
@@ -112,8 +112,8 @@ func TestBindUserSession_ReplaceWritesTheSignInsAuthentication(t *testing.T) {
 
 	old := time.Date(2026, 10, 10, 6, 0, 0, 0, time.UTC)
 	session := bumpedSession()
-	session.AcrLevel, session.AuthMethods, session.AuthTime, session.PasswordAuthTime =
-		record.AcrLevel2Mandatory, "pwd otp", old, old
+	session.ACRLevel, session.AuthMethods, session.AuthTime, session.PasswordAuthTime =
+		record.ACRLevel2Mandatory, "pwd otp", old, old
 	signedIn := time.Date(2026, 10, 10, 9, 0, 0, 0, time.UTC)
 
 	datamocks.ExpectRunInTransaction(database, txSentinel)
@@ -121,17 +121,17 @@ func TestBindUserSession_ReplaceWritesTheSignInsAuthentication(t *testing.T) {
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, txSentinel, bumpSessionIdentifier).Return(session, nil).Once()
 	database.On("UserSessionLoadClients", mock.Anything, txSentinel, session).Return(nil).Once()
 	database.On("UpdateUserSession", mock.Anything, txSentinel, mock.MatchedBy(func(s *record.UserSession) bool {
-		return s.AcrLevel == record.AcrLevel1 && s.AuthMethods == "pwd" &&
+		return s.ACRLevel == record.ACRLevel1 && s.AuthMethods == "pwd" &&
 			s.AuthTime.Equal(signedIn) && s.PasswordAuthTime.Equal(signedIn)
 	})).Return(nil).Once()
 	database.On("CreateUserSessionClient", mock.Anything, txSentinel, mock.Anything).Return(nil).Once()
 
 	result, err := manager.BindUserSession(context.Background(), bumpSessionIdentifier, 456, Authentication{
-		UserId: 123, AuthMethods: "pwd", AcrLevel: record.AcrLevel1, AuthTime: &signedIn, PasswordAuthTime: &signedIn,
+		UserID: 123, AuthMethods: "pwd", ACRLevel: record.ACRLevel1, AuthTime: &signedIn, PasswordAuthTime: &signedIn,
 	}, true, "")
 
 	require.NoError(t, err)
-	assert.Equal(t, record.AcrLevel1, result.AcrLevel)
+	assert.Equal(t, record.ACRLevel1, result.ACRLevel)
 }
 
 // A code entered over a reused session moves auth_time and leaves the password's instant alone:
@@ -155,7 +155,7 @@ func TestBindUserSession_AStepUpLeavesThePasswordInstant(t *testing.T) {
 	database.On("CreateUserSessionClient", mock.Anything, txSentinel, mock.Anything).Return(nil).Once()
 
 	_, err := manager.BindUserSession(context.Background(), bumpSessionIdentifier, 456, Authentication{
-		AuthMethods: "pwd otp", AcrLevel: record.AcrLevel2Optional, AuthTime: &codeAt,
+		AuthMethods: "pwd otp", ACRLevel: record.ACRLevel2Optional, AuthTime: &codeAt,
 	}, false, "")
 
 	require.NoError(t, err)
@@ -169,7 +169,7 @@ func TestBindUserSession_ReplaceWithoutAPasswordInstantIsRefused(t *testing.T) {
 	signedIn := time.Now().UTC()
 
 	_, err := manager.BindUserSession(context.Background(), bumpSessionIdentifier, 456, Authentication{
-		UserId: 123, AuthMethods: "pwd", AcrLevel: record.AcrLevel1, AuthTime: &signedIn,
+		UserID: 123, AuthMethods: "pwd", ACRLevel: record.ACRLevel1, AuthTime: &signedIn,
 	}, true, "")
 
 	require.ErrorContains(t, err, "no password instant captured")
@@ -186,7 +186,7 @@ func TestBindUserSession_RefusesAnotherUsersSession(t *testing.T) {
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, txSentinel, bumpSessionIdentifier).Return(bumpedSession(), nil).Once()
 
 	_, err := manager.BindUserSession(context.Background(), bumpSessionIdentifier, 456, Authentication{
-		UserId: 999, AuthMethods: "pwd", AcrLevel: record.AcrLevel1,
+		UserID: 999, AuthMethods: "pwd", ACRLevel: record.ACRLevel1,
 	}, false, "")
 
 	require.ErrorContains(t, err, "refusing to bind user session")
@@ -203,7 +203,7 @@ func TestStartNewUserSession_RecordsThePasswordInstant(t *testing.T) {
 	codeAt := passwordAt.Add(time.Minute)
 
 	result, _, err := m.manager.StartNewUserSession(context.Background(), 7,
-		Authentication{UserId: 123, AuthMethods: "pwd otp", AcrLevel: record.AcrLevel2Mandatory, AuthTime: &codeAt, PasswordAuthTime: &passwordAt},
+		Authentication{UserID: 123, AuthMethods: "pwd otp", ACRLevel: record.ACRLevel2Mandatory, AuthTime: &codeAt, PasswordAuthTime: &passwordAt},
 		0, nil, thisBrowser(), "192.168.1.50", nil, SessionLimits{})
 
 	require.NoError(t, err)
@@ -219,7 +219,7 @@ func TestStartNewUserSession_RefusesAMissingPasswordInstant(t *testing.T) {
 	at := time.Now().UTC()
 
 	_, _, err := m.manager.StartNewUserSession(context.Background(), 7,
-		Authentication{UserId: 123, AuthMethods: "pwd", AcrLevel: record.AcrLevel1, AuthTime: &at},
+		Authentication{UserID: 123, AuthMethods: "pwd", ACRLevel: record.ACRLevel1, AuthTime: &at},
 		0, nil, thisBrowser(), "192.168.1.50", nil, SessionLimits{})
 
 	require.ErrorContains(t, err, "no password instant captured")
@@ -235,11 +235,11 @@ func TestStartNewUserSession_AClaimThatNoLongerStandsCreatesNothing(t *testing.T
 
 	stub := datamocks.ExpectRunInTransaction(m.db, txSentinel)
 	m.db.On("AcquireUserRow", mock.Anything, txSentinel, int64(123)).Return(nil).Once()
-	m.db.On("GetUserById", mock.Anything, txSentinel, int64(123)).Return(&record.User{Id: 123, OtpConfigGeneration: 5}, nil).Once()
+	m.db.On("GetUserByID", mock.Anything, txSentinel, int64(123)).Return(&record.User{ID: 123, OTPConfigGeneration: 5}, nil).Once()
 
 	result, removed, err := m.manager.StartNewUserSession(context.Background(), 7,
 		Authentication{
-			UserId: 123, AuthMethods: "pwd otp", AcrLevel: record.AcrLevel2Mandatory, AuthTime: &at, PasswordAuthTime: &at,
+			UserID: 123, AuthMethods: "pwd otp", ACRLevel: record.ACRLevel2Mandatory, AuthTime: &at, PasswordAuthTime: &at,
 			OTPClaim: otpcredential.OTPClaim{Claimed: true, Generation: &generation},
 		},
 		0, &generation, thisBrowser(), "192.168.1.50", nil, SessionLimits{})

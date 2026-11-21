@@ -31,27 +31,27 @@ func stressedRead(t *testing.T, seed func(user *record.User)) (read *record.User
 	ctx := context.Background()
 	seeded := enabledTestUser(t, seed)
 
-	read, err := database.GetUserById(ctx, nil, seeded.Id)
+	read, err := database.GetUserByID(ctx, nil, seeded.ID)
 	if err != nil || read == nil {
 		t.Fatalf("Failed to read the user: user=%v err=%v", read, err)
 	}
 
-	disabled, err := database.TrySetUserEnabled(ctx, nil, read.Id, true, false)
+	disabled, err := database.TrySetUserEnabled(ctx, nil, read.ID, true, false)
 	if err != nil || !disabled {
 		t.Fatalf("the concurrent disable must take effect: disabled=%v err=%v", disabled, err)
 	}
 	newHash = "changed-under-the-save-" + fake.Password(32)
-	if err = database.SetUserPasswordHash(ctx, nil, read.Id, newHash); err != nil {
+	if err = database.SetUserPasswordHash(ctx, nil, read.ID, newHash); err != nil {
 		t.Fatalf("the concurrent password change must take effect: %v", err)
 	}
-	changeOTPUnder(t, read.Id)
+	changeOTPUnder(t, read.ID)
 
-	moved, err = database.GetUserById(ctx, nil, read.Id)
+	moved, err = database.GetUserByID(ctx, nil, read.ID)
 	if err != nil || moved == nil {
 		t.Fatalf("Failed to reload the user: user=%v err=%v", moved, err)
 	}
 	if moved.Enabled || moved.PasswordHash != newHash || moved.OTPEnabled == read.OTPEnabled ||
-		moved.OtpConfigGeneration == read.OtpConfigGeneration {
+		moved.OTPConfigGeneration == read.OTPConfigGeneration {
 		t.Fatal("the concurrent changes did not land, so the case would prove nothing")
 	}
 	return read, moved, newHash
@@ -70,8 +70,8 @@ func assertConcurrentChangesSurvived(t *testing.T, moved, after *record.User, ne
 	if after.OTPEnabled != moved.OTPEnabled || string(after.OTPSecretEncrypted) != string(moved.OTPSecretEncrypted) {
 		t.Error("the write reversed an OTP change made under it")
 	}
-	if after.OtpConfigGeneration != moved.OtpConfigGeneration {
-		t.Errorf("OtpConfigGeneration = %d, want %d", after.OtpConfigGeneration, moved.OtpConfigGeneration)
+	if after.OTPConfigGeneration != moved.OTPConfigGeneration {
+		t.Errorf("OTPConfigGeneration = %d, want %d", after.OTPConfigGeneration, moved.OTPConfigGeneration)
 	}
 	if after.AuthStateGeneration != moved.AuthStateGeneration {
 		t.Errorf("AuthStateGeneration = %d, want %d", after.AuthStateGeneration, moved.AuthStateGeneration)
@@ -102,7 +102,7 @@ func TestSetUserEmail_ConcurrentDisablePasswordAndOTPChangesSurvive(t *testing.T
 				t.Fatalf("SetUserEmail failed: %v", err)
 			}
 
-			after, err := database.GetUserById(ctx, nil, read.Id)
+			after, err := database.GetUserByID(ctx, nil, read.ID)
 			if err != nil || after == nil {
 				t.Fatalf("Failed to reload the saved user: user=%v err=%v", after, err)
 			}
@@ -152,7 +152,7 @@ var emailChanges = []emailChange{
 		name: "the account's own",
 		change: func(t *testing.T, read *record.User, toEmail string) {
 			t.Helper()
-			changed, err := database.TrySetUserEmail(context.Background(), nil, read.Id, read.Email, read.EmailVerified, toEmail)
+			changed, err := database.TrySetUserEmail(context.Background(), nil, read.ID, read.Email, read.EmailVerified, toEmail)
 			if err != nil || !changed {
 				t.Fatalf("TrySetUserEmail: changed=%v err=%v, want true and no error", changed, err)
 			}
@@ -168,7 +168,7 @@ func TestEmailChanges_ClearAnOutstandingResetCode(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			ctx := context.Background()
 			user, hash := createUserWithResetCode(t)
-			read, err := database.GetUserById(ctx, nil, user.Id)
+			read, err := database.GetUserByID(ctx, nil, user.ID)
 			if err != nil || read == nil {
 				t.Fatalf("Failed to read the user: user=%v err=%v", read, err)
 			}
@@ -178,7 +178,7 @@ func TestEmailChanges_ClearAnOutstandingResetCode(t *testing.T) {
 
 			c.change(t, read, "moved_"+fake.Email())
 
-			after, err := database.GetUserById(ctx, nil, user.Id)
+			after, err := database.GetUserByID(ctx, nil, user.ID)
 			if err != nil || after == nil {
 				t.Fatalf("Failed to reload the user: user=%v err=%v", after, err)
 			}
@@ -219,8 +219,8 @@ func TestSetUserEmail_KeepsTheResetCodeOfAnUnchangedAddress(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
 			user, hash := createUserWithResetCode(t)
-			defer func() { _ = database.DeleteUser(ctx, nil, user.Id) }()
-			read, err := database.GetUserById(ctx, nil, user.Id)
+			defer func() { _ = database.DeleteUser(ctx, nil, user.ID) }()
+			read, err := database.GetUserByID(ctx, nil, user.ID)
 			if err != nil || read == nil {
 				t.Fatalf("Failed to read the user: user=%v err=%v", read, err)
 			}
@@ -231,7 +231,7 @@ func TestSetUserEmail_KeepsTheResetCodeOfAnUnchangedAddress(t *testing.T) {
 				t.Fatalf("SetUserEmail failed: %v", err)
 			}
 
-			after, err := database.GetUserById(ctx, nil, user.Id)
+			after, err := database.GetUserByID(ctx, nil, user.ID)
 			if err != nil || after == nil {
 				t.Fatalf("Failed to reload the user: user=%v err=%v", after, err)
 			}
@@ -253,7 +253,7 @@ func TestSetUserEmail_KeepsTheResetCodeOfAnUnchangedAddress(t *testing.T) {
 			if err != nil {
 				t.Fatalf("lookup by the mailed link's hash failed: %v", err)
 			}
-			if found == nil || found.Id != user.Id {
+			if found == nil || found.ID != user.ID {
 				t.Error("the link mailed to the unchanged address no longer finds its account")
 			}
 		})
@@ -269,9 +269,9 @@ func TestSetUserEmail_Refusals(t *testing.T) {
 
 	t.Run("a taken address is ErrUniqueViolation", func(t *testing.T) {
 		first := createTestUser(t)
-		defer func() { _ = database.DeleteUser(context.Background(), nil, first.Id) }()
+		defer func() { _ = database.DeleteUser(context.Background(), nil, first.ID) }()
 		second := createTestUser(t)
-		defer func() { _ = database.DeleteUser(context.Background(), nil, second.Id) }()
+		defer func() { _ = database.DeleteUser(context.Background(), nil, second.ID) }()
 
 		second.Email = first.Email
 		err := database.SetUserEmail(context.Background(), nil, second)
@@ -296,12 +296,12 @@ func TestTryIssueEmailVerificationCode(t *testing.T) {
 
 		now := time.Now().UTC().Truncate(time.Microsecond)
 		code := []byte("fresh-ciphertext-" + fake.LetterN(16))
-		stored, err := database.TryIssueEmailVerificationCode(ctx, nil, user.Id, user.Email, code, now)
+		stored, err := database.TryIssueEmailVerificationCode(ctx, nil, user.ID, user.Email, code, now)
 		if err != nil || !stored {
 			t.Fatalf("TryIssueEmailVerificationCode: stored=%v err=%v, want true and no error", stored, err)
 		}
 
-		after, err := database.GetUserById(ctx, nil, user.Id)
+		after, err := database.GetUserByID(ctx, nil, user.ID)
 		if err != nil {
 			t.Fatalf("Failed to reload user: %v", err)
 		}
@@ -317,17 +317,17 @@ func TestTryIssueEmailVerificationCode(t *testing.T) {
 		readEmail := user.Email
 
 		// Another request moves the address while this one is issuing.
-		changed, err := database.TrySetUserEmail(ctx, nil, user.Id, user.Email, user.EmailVerified, "moved_"+fake.Email())
+		changed, err := database.TrySetUserEmail(ctx, nil, user.ID, user.Email, user.EmailVerified, "moved_"+fake.Email())
 		if err != nil || !changed {
 			t.Fatalf("the concurrent email change must take effect: changed=%v err=%v", changed, err)
 		}
-		moved, err := database.GetUserById(ctx, nil, user.Id)
+		moved, err := database.GetUserByID(ctx, nil, user.ID)
 		if err != nil {
 			t.Fatalf("Failed to reload user: %v", err)
 		}
 
 		now := time.Now().UTC()
-		stored, err := database.TryIssueEmailVerificationCode(ctx, nil, user.Id, readEmail,
+		stored, err := database.TryIssueEmailVerificationCode(ctx, nil, user.ID, readEmail,
 			[]byte("fresh-ciphertext-"+fake.LetterN(16)), now)
 		if err != nil {
 			t.Fatalf("TryIssueEmailVerificationCode failed: %v", err)
@@ -336,7 +336,7 @@ func TestTryIssueEmailVerificationCode(t *testing.T) {
 			t.Error("a code was stored for an address the account no longer holds")
 		}
 
-		after, err := database.GetUserById(ctx, nil, user.Id)
+		after, err := database.GetUserByID(ctx, nil, user.ID)
 		if err != nil {
 			t.Fatalf("Failed to reload user: %v", err)
 		}
@@ -348,12 +348,12 @@ func TestTryIssueEmailVerificationCode(t *testing.T) {
 
 		now := time.Now().UTC().Truncate(time.Microsecond)
 		code := []byte("fresh-ciphertext-" + fake.LetterN(16))
-		stored, err := database.TryIssueEmailVerificationCode(ctx, nil, read.Id, read.Email, code, now)
+		stored, err := database.TryIssueEmailVerificationCode(ctx, nil, read.ID, read.Email, code, now)
 		if err != nil || !stored {
 			t.Fatalf("TryIssueEmailVerificationCode: stored=%v err=%v, want true and no error", stored, err)
 		}
 
-		after, err := database.GetUserById(ctx, nil, read.Id)
+		after, err := database.GetUserByID(ctx, nil, read.ID)
 		if err != nil || after == nil {
 			t.Fatalf("Failed to reload the user: user=%v err=%v", after, err)
 		}

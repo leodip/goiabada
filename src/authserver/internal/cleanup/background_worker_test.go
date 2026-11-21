@@ -22,13 +22,13 @@ func TestWorker_AuditLogRetention_Enabled(t *testing.T) {
 	// Worker reads retention from settings (30 days)
 	worker := New(mockDB, metrics.NewRegistry())
 
-	// Mock GetSettingsById with retention enabled
+	// Mock GetSettingsByID with retention enabled
 	settings := &record.Settings{
 		UserSessionIdleTimeoutInSeconds: 3600,
 		UserSessionMaxLifetimeInSeconds: 86400,
 		AuditLogRetentionDays:           30,
 	}
-	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(settings, nil).Maybe()
+	mockDB.On("GetSettingsByID", mock.Anything, mock.Anything, int64(1)).Return(settings, nil).Maybe()
 
 	// Mock other worker cleanup operations (they should still run)
 	mockDB.On("DeleteExpiredRefreshTokens", mock.Anything, mock.Anything).Return(nil).Maybe()
@@ -61,13 +61,13 @@ func TestWorker_AuditLogRetention_Disabled(t *testing.T) {
 	// Worker reads retention from settings (0 = infinite retention = disabled)
 	worker := New(mockDB, metrics.NewRegistry())
 
-	// Mock GetSettingsById with retention disabled
+	// Mock GetSettingsByID with retention disabled
 	settings := &record.Settings{
 		UserSessionIdleTimeoutInSeconds: 3600,
 		UserSessionMaxLifetimeInSeconds: 86400,
 		AuditLogRetentionDays:           0,
 	}
-	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(settings, nil).Maybe()
+	mockDB.On("GetSettingsByID", mock.Anything, mock.Anything, int64(1)).Return(settings, nil).Maybe()
 
 	// Mock other worker cleanup operations
 	mockDB.On("DeleteExpiredRefreshTokens", mock.Anything, mock.Anything).Return(nil).Maybe()
@@ -95,13 +95,13 @@ func TestWorker_AuditLogRetention_BatchDeletion(t *testing.T) {
 	// Worker reads retention from settings (90 days)
 	worker := New(mockDB, metrics.NewRegistry())
 
-	// Mock GetSettingsById with retention enabled
+	// Mock GetSettingsByID with retention enabled
 	settings := &record.Settings{
 		UserSessionIdleTimeoutInSeconds: 3600,
 		UserSessionMaxLifetimeInSeconds: 86400,
 		AuditLogRetentionDays:           90,
 	}
-	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(settings, nil).Maybe()
+	mockDB.On("GetSettingsByID", mock.Anything, mock.Anything, int64(1)).Return(settings, nil).Maybe()
 
 	// Mock other worker cleanup operations
 	mockDB.On("DeleteExpiredRefreshTokens", mock.Anything, mock.Anything).Return(nil).Maybe()
@@ -131,13 +131,13 @@ func TestWorker_AuditLogRetention_MaxBatches(t *testing.T) {
 	// Worker reads retention from settings (60 days)
 	worker := New(mockDB, metrics.NewRegistry())
 
-	// Mock GetSettingsById with retention enabled
+	// Mock GetSettingsByID with retention enabled
 	settings := &record.Settings{
 		UserSessionIdleTimeoutInSeconds: 3600,
 		UserSessionMaxLifetimeInSeconds: 86400,
 		AuditLogRetentionDays:           60,
 	}
-	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(settings, nil).Maybe()
+	mockDB.On("GetSettingsByID", mock.Anything, mock.Anything, int64(1)).Return(settings, nil).Maybe()
 
 	// Mock other worker cleanup operations
 	mockDB.On("DeleteExpiredRefreshTokens", mock.Anything, mock.Anything).Return(nil).Maybe()
@@ -167,13 +167,13 @@ func TestWorker_AuditLogRetention_Error(t *testing.T) {
 	// Worker reads retention from settings (45 days)
 	worker := New(mockDB, metrics.NewRegistry())
 
-	// Mock GetSettingsById with retention enabled
+	// Mock GetSettingsByID with retention enabled
 	settings := &record.Settings{
 		UserSessionIdleTimeoutInSeconds: 3600,
 		UserSessionMaxLifetimeInSeconds: 86400,
 		AuditLogRetentionDays:           45,
 	}
-	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(settings, nil).Maybe()
+	mockDB.On("GetSettingsByID", mock.Anything, mock.Anything, int64(1)).Return(settings, nil).Maybe()
 
 	// Mock other worker cleanup operations
 	mockDB.On("DeleteExpiredRefreshTokens", mock.Anything, mock.Anything).Return(nil).Maybe()
@@ -204,13 +204,13 @@ func TestWorker_AuditLogRetention_NoDeletion(t *testing.T) {
 	// Worker reads retention from settings (180 days)
 	worker := New(mockDB, metrics.NewRegistry())
 
-	// Mock GetSettingsById with retention enabled
+	// Mock GetSettingsByID with retention enabled
 	settings := &record.Settings{
 		UserSessionIdleTimeoutInSeconds: 3600,
 		UserSessionMaxLifetimeInSeconds: 86400,
 		AuditLogRetentionDays:           180,
 	}
-	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(settings, nil).Maybe()
+	mockDB.On("GetSettingsByID", mock.Anything, mock.Anything, int64(1)).Return(settings, nil).Maybe()
 
 	// Mock other worker cleanup operations
 	mockDB.On("DeleteExpiredRefreshTokens", mock.Anything, mock.Anything).Return(nil).Maybe()
@@ -384,7 +384,7 @@ func expectFullCleanup(mockDB *datamocks.Database) {
 	mockDB.On("DeleteCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteDeadPreRegistrations", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteUnattachedBrandAssets", mock.Anything, mock.Anything, mock.Anything).Return(0, nil).Maybe()
-	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(&record.Settings{
+	mockDB.On("GetSettingsByID", mock.Anything, mock.Anything, int64(1)).Return(&record.Settings{
 		UserSessionIdleTimeoutInSeconds: 3600,
 		UserSessionMaxLifetimeInSeconds: 86400,
 	}, nil).Maybe()
@@ -468,7 +468,7 @@ func TestWorker_RunIfClaimed_PassesTheIntervalCutoff(t *testing.T) {
 // performTask guards
 // =============================================================================
 
-// GetSettingsById returns (nil, nil) when the row is absent. The steps after it
+// GetSettingsByID returns (nil, nil) when the row is absent. The steps after it
 // all read a value from settings, so there is nothing to salvage, but it must not
 // be dereferenced. The steps before it read nothing from settings, the pending
 // registration sweep among them, and still run.
@@ -482,7 +482,7 @@ func TestWorker_PerformTask_MissingSettingsRowDoesNotPanic(t *testing.T) {
 	mockDB.On("DeleteCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	mockDB.On("DeleteDeadPreRegistrations", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	mockDB.On("DeleteUnattachedBrandAssets", mock.Anything, mock.Anything, mock.Anything).Return(0, nil).Once()
-	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(nil, nil).Once()
+	mockDB.On("GetSettingsByID", mock.Anything, mock.Anything, int64(1)).Return(nil, nil).Once()
 
 	assert.NotPanics(t, func() {
 		worker.performTask(context.Background())
@@ -509,7 +509,7 @@ func TestWorker_PerformTask_SweepsCodesPastTheGrace(t *testing.T) {
 		Return(nil).Once()
 	mockDB.On("DeleteDeadPreRegistrations", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	mockDB.On("DeleteUnattachedBrandAssets", mock.Anything, mock.Anything, mock.Anything).Return(0, nil).Once()
-	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(nil, nil).Once()
+	mockDB.On("GetSettingsByID", mock.Anything, mock.Anything, int64(1)).Return(nil, nil).Once()
 
 	before := time.Now().UTC()
 	worker.performTask(context.Background())
@@ -536,7 +536,7 @@ func TestWorker_PerformTask_ContinuesAfterAStepFails(t *testing.T) {
 	mockDB.On("DeleteCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	mockDB.On("DeleteDeadPreRegistrations", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	mockDB.On("DeleteUnattachedBrandAssets", mock.Anything, mock.Anything, mock.Anything).Return(0, nil).Once()
-	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(&record.Settings{
+	mockDB.On("GetSettingsByID", mock.Anything, mock.Anything, int64(1)).Return(&record.Settings{
 		UserSessionIdleTimeoutInSeconds: 3600,
 		UserSessionMaxLifetimeInSeconds: 86400,
 	}, nil).Once()
@@ -564,7 +564,7 @@ func TestWorker_PerformTask_StopsEarlyWhenCancelled(t *testing.T) {
 
 	// Nothing after the first step may have run.
 	mockDB.AssertNumberOfCalls(t, "DeleteCodesWithoutRefreshTokens", 0)
-	mockDB.AssertNumberOfCalls(t, "GetSettingsById", 0)
+	mockDB.AssertNumberOfCalls(t, "GetSettingsByID", 0)
 	mockDB.AssertExpectations(t)
 }
 

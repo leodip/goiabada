@@ -16,7 +16,7 @@ import (
 //
 // Why the kernel still needs a caller of its own, now that the read has left: both application
 // callers walk their own module's internal/ tree, so nothing but this file reaches core. Until
-// #385 this caller held JwtAuthorizationHeaderToContext in middleware_jwt.go, which reads a bearer
+// #385 this caller held JWTAuthorizationHeaderToContext in middleware_jwt.go, which reads a bearer
 // token out of a form body -- correctly, with r.PostFormValue, and moved to r.FormValue it left
 // the whole module tier green, which is the regression this caller was written to redden (#333).
 // That middleware is now authserver/internal/middleware's and the name is on the auth server's

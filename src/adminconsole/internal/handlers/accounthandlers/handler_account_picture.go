@@ -20,21 +20,21 @@ type accountPictureAPI interface {
 }
 
 func HandlePictureGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient accountPictureAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		// Get JWT info to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
 		// Get profile picture info
-		var profilePictureUrl string
+		var profilePictureURL string
 		// A user with no picture is a 200 from the API with HasPicture false, so an error here is a
 		// real failure and is answered as one rather than drawn as an empty picture (#425).
 		pictureInfo, err := apiClient.GetAccountProfilePicture(r.Context(), jwtInfo.TokenResponse.AccessToken)
@@ -44,11 +44,11 @@ func HandlePictureGet(
 		}
 		if pictureInfo != nil && pictureInfo.HasPicture {
 			// Add cache-busting parameter to prevent browser caching
-			profilePictureUrl = fmt.Sprintf("%s?t=%d", pictureInfo.PictureUrl, time.Now().UnixNano())
+			profilePictureURL = fmt.Sprintf("%s?t=%d", pictureInfo.PictureURL, time.Now().UnixNano())
 		}
 
 		bind := map[string]interface{}{
-			"profilePictureUrl": profilePictureUrl,
+			"profilePictureUrl": profilePictureURL,
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_picture.html", bind)
@@ -85,14 +85,14 @@ type accountProfilePictureAPI interface {
 
 // HandleProfilePicturePost handles uploading a profile picture for the current user
 func HandleProfilePicturePost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient accountProfilePictureAPI,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get JWT info to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JSONError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.JSONError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
@@ -130,21 +130,21 @@ func HandleProfilePicturePost(
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"success":    true,
-			"pictureUrl": response.PictureUrl,
+			"pictureUrl": response.PictureURL,
 		})
 	}
 }
 
 // HandleProfilePictureDelete handles deleting the current user's profile picture
 func HandleProfilePictureDelete(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient accountProfilePictureAPI,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get JWT info to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JSONError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.JSONError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 

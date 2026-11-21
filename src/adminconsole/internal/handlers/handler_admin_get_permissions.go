@@ -13,19 +13,19 @@ import (
 
 // permissionsAPI is what the permissions lookup needs: the one read it answers with.
 type permissionsAPI interface {
-	GetPermissionsByResource(ctx context.Context, accessToken string, resourceId int64) ([]api.PermissionResponse, error)
+	GetPermissionsByResource(ctx context.Context, accessToken string, resourceID int64) ([]api.PermissionResponse, error)
 }
 
 func HandleAdminGetPermissionsGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient permissionsAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JSONError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.JSONError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 		accessToken := jwtInfo.TokenResponse.AccessToken
@@ -34,15 +34,15 @@ func HandleAdminGetPermissionsGet(
 			Permissions: []api.PermissionResponse{}, // Initialize with empty slice to avoid null
 		}
 
-		resourceIdStr := r.URL.Query().Get("resourceId")
-		resourceId, err := strconv.ParseInt(resourceIdStr, 10, 64)
+		resourceIDStr := r.URL.Query().Get("resourceId")
+		resourceID, err := strconv.ParseInt(resourceIDStr, 10, 64)
 		if err != nil {
 			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
 
 		// Get permissions via API client
-		permissions, err := apiClient.GetPermissionsByResource(r.Context(), accessToken, resourceId)
+		permissions, err := apiClient.GetPermissionsByResource(r.Context(), accessToken, resourceID)
 		if err != nil {
 			// The resource id goes into the message rather than into a record of its own. This
 			// was the console's one caller-side error log, and it ran before the classifier: an
@@ -50,7 +50,7 @@ func HandleAdminGetPermissionsGet(
 			// silently on purpose was still announced at ERROR. errors.As sees the
 			// *apiclient.APIError through this wrap, so the forwarding is unaffected (#279).
 			render.HandleAPIErrorJSON(httpHelper, w, r,
-				errs.Wrapf(err, "unable to get the permissions of resource %d", resourceId))
+				errs.Wrapf(err, "unable to get the permissions of resource %d", resourceID))
 			return
 		}
 

@@ -17,9 +17,9 @@ import (
 const adminDeletedSubjectEn = "An administrator deleted your account"
 
 // deleteUserAsAdministrator deletes the user through the admin API and requires the 200.
-func deleteUserAsAdministrator(t *testing.T, accessToken string, userId int64) {
+func deleteUserAsAdministrator(t *testing.T, accessToken string, userID int64) {
 	t.Helper()
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(userId, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(userID, 10)
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 	_ = resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -41,9 +41,9 @@ func TestAPIUserDelete_TellsTheUserAnAdministratorDeletedTheirAccount(t *testing
 		t.Run(tc.locale, func(t *testing.T) {
 			user := adminNoticeUser(t, tc.locale, "the-hash")
 
-			deleteUserAsAdministrator(t, accessToken, user.Id)
+			deleteUserAsAdministrator(t, accessToken, user.ID)
 
-			deleted, err := database.GetUserById(context.Background(), nil, user.Id)
+			deleted, err := database.GetUserByID(context.Background(), nil, user.ID)
 			require.NoError(t, err)
 			assert.Nil(t, deleted, "the user's row is gone")
 			messages := awaitMailTo(t, user.Email)
@@ -68,8 +68,8 @@ func TestAPIUserDelete_SendsNoNoticeToAnUnverifiedAddress(t *testing.T) {
 	require.NoError(t, database.UpdateUser(context.Background(), nil, unverified))
 	verified := adminNoticeUser(t, "en", "the-hash")
 
-	deleteUserAsAdministrator(t, accessToken, unverified.Id)
-	deleteUserAsAdministrator(t, accessToken, verified.Id)
+	deleteUserAsAdministrator(t, accessToken, unverified.ID)
+	deleteUserAsAdministrator(t, accessToken, verified.ID)
 
 	require.Len(t, awaitMailWithSubject(t, verified.Email, adminDeletedSubjectEn, 1), 1,
 		"the verified user is told, so mail was on")

@@ -33,9 +33,9 @@ import (
 // decision 13). A relay that was down used to answer a registration that had succeeded with the
 // error page.
 
-// welcomeRequestId is the request id a registration without verification carries, as
+// welcomeRequestID is the request id a registration without verification carries, as
 // requestid.Middleware puts one on every request.
-const welcomeRequestId = "req-welcome-0001"
+const welcomeRequestID = "req-welcome-0001"
 
 // jobsAfterTheResponse holds the jobs handed to it, as heldJobs does, and notes for each whether
 // the response had been written when it was handed over: a redirect's Location, or a page's body.
@@ -77,7 +77,7 @@ func newWelcomeRegistration(t *testing.T, signIns signInCeremonies, rr *httptest
 	passwordValidator.On("ValidatePassword", mock.Anything, newAccountPassword, mock.Anything).Return(nil).Once()
 	userCreator.On("CreateUser", mock.Anything, mock.MatchedBy(func(input *usercreation.Input) bool {
 		return input.Email == newAccountEmail
-	})).Return(&record.User{Id: newAccountId, Email: newAccountEmail, Enabled: true}, nil).Once()
+	})).Return(&record.User{ID: newAccountID, Email: newAccountEmail, Enabled: true}, nil).Once()
 	auditLogger.On("Log", mock.Anything, audit.EventCreatedUser, mock.Anything).Return().Once()
 	auditLogger.On("Log", mock.Anything, audit.EventAuthSuccessPwd, mock.Anything).Return().Maybe()
 
@@ -90,7 +90,7 @@ func newWelcomeRegistration(t *testing.T, signIns signInCeremonies, rr *httptest
 // welcomeRequest is registerWithoutVerification with email on and a request id.
 func welcomeRequest(query string, smtpEnabled bool) *http.Request {
 	req := registerWithoutVerification(query)
-	ctx := requestid.NewContext(req.Context(), welcomeRequestId)
+	ctx := requestid.NewContext(req.Context(), welcomeRequestID)
 	return req.WithContext(reqctx.WithSettings(ctx, &record.Settings{
 		AppName:                 "TestApp",
 		SelfRegistrationEnabled: true,
@@ -139,9 +139,9 @@ func TestHandleRegisterPost_TheWelcomeEmailIsSentAfterTheResponse(t *testing.T) 
 		wantLocation string
 	}
 	landings := []landing{
-		{name: "signed in to the app", query: "?ceremony=" + aCeremonyId,
+		{name: "signed in to the app", query: "?ceremony=" + aCeremonyID,
 			signIns: func() signInCeremonies {
-				return &signInsHeld{held: map[string]*ceremony.AuthContext{aCeremonyId: atThePasswordStep()}}
+				return &signInsHeld{held: map[string]*ceremony.AuthContext{aCeremonyID: atThePasswordStep()}}
 			},
 			wantCode: http.StatusSeeOther, wantLocation: continuedSignIn},
 		{name: "shown the account created page", query: "",
@@ -175,8 +175,8 @@ func TestHandleRegisterPost_TheWelcomeEmailIsSentAfterTheResponse(t *testing.T) 
 				records := capture.Records()
 				require.Len(t, records, 1, capture.Text())
 				assert.Equal(t, "ERROR", records[0].Level.String())
-				assert.Equal(t, welcomeRequestId, records[0].Attrs["request_id"])
-				assert.Equal(t, newAccountId, records[0].Attrs["user_id"])
+				assert.Equal(t, welcomeRequestID, records[0].Attrs["request_id"])
+				assert.Equal(t, newAccountID, records[0].Attrs["user_id"])
 				assert.NotNil(t, records[0].Attrs["error"])
 			})
 		}
@@ -198,7 +198,7 @@ func TestHandleRegisterPost_TheWelcomeEmailJob(t *testing.T) {
 			emailtemplate.Values{Link: testAdminConsoleBaseURL + "/account/profile"}).
 			Return(emailtemplate.Message{Subject: "Welcome!", HTML: "welcome"}, nil).Once()
 		w.emailSender.On("SendEmail", mock.Anything, emaildelivery.SMTPConfig{Host: "smtp.example.com", Port: 2525},
-			&emaildelivery.SendEmailInput{To: newAccountEmail, Subject: "Welcome!", HtmlBody: "welcome"}).
+			&emaildelivery.SendEmailInput{To: newAccountEmail, Subject: "Welcome!", HTMLBody: "welcome"}).
 			Return(emaildelivery.SendResult{}, nil).Once()
 		w.jobs.runAll(t, afterresponse.ClassRegistration)
 

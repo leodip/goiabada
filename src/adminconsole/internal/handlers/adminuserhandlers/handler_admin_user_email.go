@@ -16,12 +16,12 @@ import (
 
 // userEmailAPI is what the user email page needs: the user, and the email write.
 type userEmailAPI interface {
-	GetUserById(ctx context.Context, accessToken string, userId int64) (*api.UserResponse, error)
-	UpdateUserEmail(ctx context.Context, accessToken string, userId int64, request *api.UpdateUserEmailRequest) (*api.UserResponse, error)
+	GetUserByID(ctx context.Context, accessToken string, userID int64) (*api.UserResponse, error)
+	UpdateUserEmail(ctx context.Context, accessToken string, userID int64, request *api.UpdateUserEmailRequest) (*api.UserResponse, error)
 }
 
 func HandleEmailGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient userEmailAPI,
 ) http.HandlerFunc {
@@ -41,13 +41,13 @@ func HandleEmailGet(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
-		user, err := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		user, err := apiClient.GetUserByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -90,7 +90,7 @@ func HandleEmailGet(
 }
 
 func HandleEmailPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient userEmailAPI,
 	baseURL string,
@@ -111,14 +111,14 @@ func HandleEmailPost(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
 		// Get user first for error handling template
-		user, err := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		user, err := apiClient.GetUserByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -164,7 +164,7 @@ func HandleEmailPost(
 			return
 		}
 
-		pagePath := fmt.Sprintf("/admin/users/%v/email", updatedUser.Id)
+		pagePath := fmt.Sprintf("/admin/users/%v/email", updatedUser.ID)
 		sess.SetFlash(pagePath, "savedSuccessfully", "true")
 		err = httpSession.Save(r, w, sess)
 		if err != nil {

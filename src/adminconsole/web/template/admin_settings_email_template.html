@@ -138,7 +138,7 @@
         <select class="control" id="previewBrand" name="brandId" aria-describedby="previewBrandHint">
           <option value="" selected>{{ T $.ctx "adminconsole.email_templates.editor.preview_brand_default" "name" .defaultBrandName }}</option>
           {{- range .brands }}
-          <option value="{{ .Id }}">{{ .Name }}</option>
+          <option value="{{ .ID }}">{{ .Name }}</option>
           {{- end }}
         </select>
         <p class="field-hint" id="previewBrandHint">{{ T $.ctx "adminconsole.email_templates.editor.preview_brand_hint" }}</p>

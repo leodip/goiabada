@@ -113,9 +113,9 @@ func TestHandleSettingsEmailSendTestPost_AnswersWhetherTheMessageWentEncrypted(t
 	}
 }
 
-// sendTestRequestId is the request id every failed test send case carries, as the request id
+// sendTestRequestID is the request id every failed test send case carries, as the request id
 // middleware would have put it on the request.
-const sendTestRequestId = "req-send-test"
+const sendTestRequestID = "req-send-test"
 
 // leakyRelayError is a send failure carrying everything the answer must not: an address and port, an
 // operating-system string, and text the server sent.
@@ -202,7 +202,7 @@ func TestHandleSettingsEmailSendTestPost_AFailedSendAnswersTheFixedMessageOfItsK
 			emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).Return(emaildelivery.SendResult{}, tc.err).Once()
 
 			r := sendTestEmailRequest(t, &record.Settings{SMTPEnabled: true})
-			r = r.WithContext(requestid.NewContext(r.Context(), sendTestRequestId))
+			r = r.WithContext(requestid.NewContext(r.Context(), sendTestRequestID))
 			rr := httptest.NewRecorder()
 			HandleSettingsEmailSendTestPost(accountvalidation.NewEmailValidator(nil), emailSender, testEmailRenderer(), auditLogger).ServeHTTP(rr, r)
 
@@ -219,7 +219,7 @@ func TestHandleSettingsEmailSendTestPost_AFailedSendAnswersTheFixedMessageOfItsK
 			require.Len(t, records, 1, "one failed send writes one record")
 			assert.Equal(t, slog.LevelWarn, records[0].Level)
 			assert.Equal(t, "unable to send the test email", records[0].Message)
-			assert.Equal(t, sendTestRequestId, records[0].Attrs["request_id"], "logged through the request's context")
+			assert.Equal(t, sendTestRequestID, records[0].Attrs["request_id"], "logged through the request's context")
 			logged, ok := records[0].Attrs["error"].(error)
 			require.True(t, ok, "the error attribute is the error itself")
 			assert.Equal(t, tc.err, logged, "the log keeps what the answer leaves out")
@@ -272,9 +272,9 @@ func emailSaveBody(t *testing.T, host string, port int, extra map[string]interfa
 	return string(encoded)
 }
 
-// emailSaveRequestId is the request id every email save case carries, as the request id middleware
+// emailSaveRequestID is the request id every email save case carries, as the request id middleware
 // would have put it on the request.
-const emailSaveRequestId = "req-email-save"
+const emailSaveRequestID = "req-email-save"
 
 // serveEmailSave runs PUT /api/v1/admin/settings/email as an authserver:manage caller, starting from
 // settings, and answers what the save wrote, or nil when it wrote nothing.
@@ -297,7 +297,7 @@ func serveEmailSaveUnder(t *testing.T, dataCipher *encryption.DataCipher, settin
 		database.EXPECT().RunInTransaction(mock.Anything, mock.Anything).
 			RunAndReturn(func(_ context.Context, fn func(tx *sql.Tx) error) error { return fn(settingsSaveTx) }).Maybe()
 		database.EXPECT().AcquireSettingsRow(mock.Anything, settingsSaveTx, mock.Anything).Return(nil).Maybe()
-		database.EXPECT().GetSettingsById(mock.Anything, settingsSaveTx, mock.Anything).
+		database.EXPECT().GetSettingsByID(mock.Anything, settingsSaveTx, mock.Anything).
 			RunAndReturn(func(context.Context, *sql.Tx, int64) (*record.Settings, error) {
 				stored := *locked
 				stored.SMTPPasswordEncrypted = bytes.Clone(locked.SMTPPasswordEncrypted)
@@ -313,7 +313,7 @@ func serveEmailSaveUnder(t *testing.T, dataCipher *encryption.DataCipher, settin
 	auditLogger.On("Log", mock.Anything, audit.EventUpdatedSMTPSettings, mock.Anything).Return().Maybe()
 
 	r := httptest.NewRequest(http.MethodPut, "/api/v1/admin/settings/email", strings.NewReader(body))
-	r = r.WithContext(requestid.NewContext(reqctx.WithSettings(r.Context(), settings), emailSaveRequestId))
+	r = r.WithContext(requestid.NewContext(reqctx.WithSettings(r.Context(), settings), emailSaveRequestID))
 	r = setTokenContextWithClaims(r, map[string]interface{}{"scope": "authserver:manage", "sub": grantCaller})
 	rr := httptest.NewRecorder()
 	HandleSettingsEmailPut(database, accountvalidation.NewEmailValidator(nil), auditLogger, dataCipher).ServeHTTP(rr, r)
@@ -442,7 +442,7 @@ func TestHandleSettingsEmailPut_AKeptPasswordNeitherKeyOpensIsWrittenBackAsStore
 	assert.Equal(t, "the stored secret the request read opens under neither data encryption key, so the save checks the row under its lock",
 		records[0].Message)
 	assert.Equal(t, "smtp_password", records[0].Attrs["secret"])
-	assert.Equal(t, emailSaveRequestId, records[0].Attrs["request_id"], "logged through the request's context")
+	assert.Equal(t, emailSaveRequestID, records[0].Attrs["request_id"], "logged through the request's context")
 	assert.NotContains(t, capture.Text(), storedSMTPPassword)
 }
 
@@ -523,7 +523,7 @@ func TestHandleSettingsEmailPut_ANewPasswordReplacesTheStoredOne(t *testing.T) {
 }
 
 // clearSmtpPassword removes the stored password, and with nothing stored it is a save like any other.
-func TestHandleSettingsEmailPut_ClearSmtpPasswordRemovesTheStoredOne(t *testing.T) {
+func TestHandleSettingsEmailPut_ClearSMTPPasswordRemovesTheStoredOne(t *testing.T) {
 	for _, withPassword := range []bool{true, false} {
 		t.Run(fmt.Sprintf("password stored: %v", withPassword), func(t *testing.T) {
 			settings := emailSaveSettings(t, "127.0.0.1", withPassword)
@@ -824,7 +824,7 @@ func TestHandleSettingsEmailPut_ARefusedDialAnswersItsCauseAndLogsTheError(t *te
 	require.Len(t, records, 1, "one refused dial writes one record")
 	assert.Equal(t, slog.LevelWarn, records[0].Level)
 	assert.Equal(t, "unable to connect to the smtp server", records[0].Message)
-	assert.Equal(t, emailSaveRequestId, records[0].Attrs["request_id"], "logged through the request's context")
+	assert.Equal(t, emailSaveRequestID, records[0].Attrs["request_id"], "logged through the request's context")
 	logged, ok := records[0].Attrs["error"].(error)
 	require.True(t, ok, "the error attribute is the error itself")
 	require.ErrorIs(t, logged, syscall.ECONNREFUSED)

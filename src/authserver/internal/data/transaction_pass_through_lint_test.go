@@ -289,7 +289,7 @@ func (d *Database) QuerySQL(tx *sql.Tx, query string, args ...any) (*sql.Rows, e
 	return nil, nil
 }
 
-func (d *Database) GetPermissionsByIds(tx *sql.Tx, ids []int64) ([]int64, error) {
+func (d *Database) GetPermissionsByIDs(tx *sql.Tx, ids []int64) ([]int64, error) {
 	return nil, nil
 }
 `)
@@ -303,7 +303,7 @@ func (d *Database) SearchUsersPaginated(tx *sql.Tx, query string) error {
 }
 
 func (d *Database) ClientLoadPermissions(tx *sql.Tx, ids []int64) error {
-	_, err := d.GetPermissionsByIds(nil, ids)
+	_, err := d.GetPermissionsByIDs(nil, ids)
 	return err
 }
 `)
@@ -317,7 +317,7 @@ type PostgresDatabase struct{ CommonDB *anything }
 
 type anything struct{}
 
-func (d *PostgresDatabase) GetUsersByPermissionIdPaginated(tx *sql.Tx, query string) error {
+func (d *PostgresDatabase) GetUsersByPermissionIDPaginated(tx *sql.Tx, query string) error {
 	_, err := d.CommonDB.QuerySQL(nil, query)
 	return err
 }
@@ -328,7 +328,7 @@ func (d *PostgresDatabase) GetUsersByPermissionIdPaginated(tx *sql.Tx, query str
 	assert.Equal(t, 3, files, "every non-test file under the data package is parsed")
 	assert.Equal(t, []escapedTransactionCall{
 		{file: "authserver/internal/data/commondb/user.go", line: 6, callee: "QuerySQL"},
-		{file: "authserver/internal/data/commondb/user.go", line: 11, callee: "GetPermissionsByIds"},
+		{file: "authserver/internal/data/commondb/user.go", line: 11, callee: "GetPermissionsByIDs"},
 		{file: "authserver/internal/data/postgresdb/user.go", line: 10, callee: "QuerySQL"},
 	}, findings)
 
@@ -387,17 +387,17 @@ func (d *Database) QuerySQL(tx *sql.Tx, query string, args ...any) (*sql.Rows, e
 	return nil, nil
 }
 
-func (d *Database) GetPermissionsByIds(tx *sql.Tx, ids []int64) ([]int64, error) {
+func (d *Database) GetPermissionsByIDs(tx *sql.Tx, ids []int64) ([]int64, error) {
 	return nil, nil
 }
 
-func (d *Database) GetSettingsById(tx *sql.Tx, id int64) (any, error) {
+func (d *Database) GetSettingsByID(tx *sql.Tx, id int64) (any, error) {
 	return nil, nil
 }
 
 // IsEmpty holds no transaction, so its nil is the pool's next connection and not a dropped one.
 func (d *Database) IsEmpty() (bool, error) {
-	_, err := d.GetSettingsById(context.Background(), nil, 1)
+	_, err := d.GetSettingsByID(context.Background(), nil, 1)
 	return false, err
 }
 
@@ -416,7 +416,7 @@ func (d *Database) SearchUsersPaginated(tx *sql.Tx, query string) error {
 	if err != nil {
 		return err
 	}
-	_, err = d.GetPermissionsByIds(tx, nil)
+	_, err = d.GetPermissionsByIDs(tx, nil)
 	return err
 }
 `)

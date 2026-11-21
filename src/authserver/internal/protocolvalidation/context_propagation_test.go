@@ -24,15 +24,15 @@ import (
 // furthest to travel from this package: ValidateScopes takes it, hands it to the resolver it shares
 // with the token endpoint, and that function makes two reads.
 
-const propagatedRequestId = "goiabada/req-validation-propagation-1"
+const propagatedRequestID = "goiabada/req-validation-propagation-1"
 
 func aCallersContext() context.Context {
-	return requestid.NewContext(context.Background(), propagatedRequestId)
+	return requestid.NewContext(context.Background(), propagatedRequestID)
 }
 
 func theCallersContext() interface{} {
 	return mock.MatchedBy(func(ctx context.Context) bool {
-		return requestid.FromContext(ctx) == propagatedRequestId
+		return requestid.FromContext(ctx) == propagatedRequestID
 	})
 }
 
@@ -42,9 +42,9 @@ func TestValidateScopes_ResolvesUnderTheCallersContext(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 
 	mockDB.On("GetResourceByResourceIdentifier", theCallersContext(), mock.Anything, "billing-api").
-		Return(&record.Resource{Id: 9, ResourceIdentifier: "billing-api"}, nil).Once()
-	mockDB.On("GetPermissionsByResourceId", theCallersContext(), mock.Anything, int64(9)).
-		Return([]record.Permission{{Id: 21, PermissionIdentifier: "read", ResourceId: 9}}, nil).Once()
+		Return(&record.Resource{ID: 9, ResourceIdentifier: "billing-api"}, nil).Once()
+	mockDB.On("GetPermissionsByResourceID", theCallersContext(), mock.Anything, int64(9)).
+		Return([]record.Permission{{ID: 21, PermissionIdentifier: "read", ResourceID: 9}}, nil).Once()
 
 	err := NewAuthorizeValidator(mockDB).ValidateScopes(aCallersContext(), "billing-api:read")
 
@@ -62,7 +62,7 @@ func TestValidateScopes_AMalformedScopeReachesNoDatabasePort(t *testing.T) {
 
 	require.Error(t, err)
 	mockDB.AssertNotCalled(t, "GetResourceByResourceIdentifier", mock.Anything, mock.Anything, mock.Anything)
-	mockDB.AssertNotCalled(t, "GetPermissionsByResourceId", mock.Anything, mock.Anything, mock.Anything)
+	mockDB.AssertNotCalled(t, "GetPermissionsByResourceID", mock.Anything, mock.Anything, mock.Anything)
 }
 
 // The client half of the same claim, and the loader is the part worth pinning: the client read is
@@ -71,7 +71,7 @@ func TestValidateScopes_AMalformedScopeReachesNoDatabasePort(t *testing.T) {
 func TestValidateClientAndRedirectURI_ReadsTheClientUnderTheCallersContext(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 
-	client := &record.Client{Id: 5, ClientIdentifier: "portal", Enabled: true, AuthorizationCodeEnabled: true}
+	client := &record.Client{ID: 5, ClientIdentifier: "portal", Enabled: true, AuthorizationCodeEnabled: true}
 
 	mockDB.On("GetClientByClientIdentifier", theCallersContext(), mock.Anything, "portal").
 		Return(client, nil).Once()
@@ -82,7 +82,7 @@ func TestValidateClientAndRedirectURI_ReadsTheClientUnderTheCallersContext(t *te
 
 	err := NewAuthorizeValidator(mockDB).ValidateClientAndRedirectURI(aCallersContext(),
 		&ValidateClientAndRedirectURIInput{
-			ClientId:    "portal",
+			ClientID:    "portal",
 			RedirectURI: "https://example.com/callback",
 		})
 
@@ -92,12 +92,12 @@ func TestValidateClientAndRedirectURI_ReadsTheClientUnderTheCallersContext(t *te
 
 // The reject arm for the client half: an empty client_id is refused before the lookup, so the
 // client port is never reached.
-func TestValidateClientAndRedirectURI_AnEmptyClientIdReachesNoClientPort(t *testing.T) {
+func TestValidateClientAndRedirectURI_AnEmptyClientIDReachesNoClientPort(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 
 	err := NewAuthorizeValidator(mockDB).ValidateClientAndRedirectURI(aCallersContext(),
 		&ValidateClientAndRedirectURIInput{
-			ClientId:    "",
+			ClientID:    "",
 			RedirectURI: "https://example.com/callback",
 		})
 

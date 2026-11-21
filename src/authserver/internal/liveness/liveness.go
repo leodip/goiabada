@@ -85,7 +85,7 @@ type Database interface {
 	GetDeletedClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.DeletedClient, error)
 	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error)
 	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
-	IsRefreshTokenFamilyLive(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string) (bool, error)
+	IsRefreshTokenFamilyLive(ctx context.Context, tx *sql.Tx, firstRefreshTokenJTI string) (bool, error)
 	IsAccessTokenRevoked(ctx context.Context, tx *sql.Tx, jti string) (bool, error)
 }
 
@@ -110,7 +110,7 @@ func (v Verdict) Live() bool {
 // limiter and the account handlers, so they cannot name different users for one token. They used
 // to read it separately, the first two trimming and the handlers not, which agreed only because the
 // auth server mints no subject with surrounding whitespace.
-func Subject(token oauth.JwtToken) (string, bool) {
+func Subject(token oauth.JWTToken) (string, bool) {
 	subject := strings.TrimSpace(token.StringClaim("sub"))
 	return subject, subject != ""
 }
@@ -170,7 +170,7 @@ func Subject(token oauth.JwtToken) (string, bool) {
 // settings carry the issuer and bound the session, so every token that gets past its header needs
 // them: a nil settings is ErrNoSettings. Any error is a fault, never a refusal: the token's state
 // could not be read, and a caller must not answer it as a dead token.
-func AccessToken(ctx context.Context, database Database, token oauth.JwtToken, settings *record.Settings,
+func AccessToken(ctx context.Context, database Database, token oauth.JWTToken, settings *record.Settings,
 	now time.Time) (Verdict, error) {
 
 	if !hasAccessTokenHeader(token) {
@@ -200,7 +200,7 @@ func AccessToken(ctx context.Context, database Database, token oauth.JwtToken, s
 	if client == nil {
 		return Verdict{Refusal: ClientNotFound}, nil
 	}
-	if namesClientRow && clientRow != client.Id {
+	if namesClientRow && clientRow != client.ID {
 		return Verdict{Refusal: ClientNotFound}, nil
 	}
 	issued, err := issuedToClient(ctx, database, token, client)
@@ -239,7 +239,7 @@ func AccessToken(ctx context.Context, database Database, token oauth.JwtToken, s
 // every JSON number to a float64, which holds every integer up to 2^53-1 and not every one above,
 // where two neighbouring ids decode to the same float64. A claim the float64 holds exactly is read
 // from it; a larger one is read as the payload the token's signature covers spells it.
-func tokenClientRow(token oauth.JwtToken) (int64, bool, bool) {
+func tokenClientRow(token oauth.JWTToken) (int64, bool, bool) {
 	if _, present := token.Claims["client_internal_id"]; !present {
 		return 0, false, true
 	}
@@ -306,7 +306,7 @@ func signedClientRow(compact string) (int64, bool) {
 // A token without an integral iat is one the auth server never signs, and is refused unread. A
 // client without created_at, which only a row written outside the auth server has, is not judged
 // here.
-func issuedToClient(ctx context.Context, database Database, token oauth.JwtToken, client *record.Client) (bool, error) {
+func issuedToClient(ctx context.Context, database Database, token oauth.JWTToken, client *record.Client) (bool, error) {
 	if !client.CreatedAt.Valid {
 		return true, nil
 	}
@@ -338,17 +338,17 @@ func issuedToClient(ctx context.Context, database Database, token oauth.JwtToken
 // A token without grant_id, a client's or one from the implicit flow, has no grant to check, and is
 // judged by its own jti instead: see revokedAccessToken. One whose grant_id is present but empty or
 // not a string is one the auth server never signs, and is refused without a read.
-func grantAccessToken(ctx context.Context, database Database, token oauth.JwtToken, verdict Verdict) (Verdict, error) {
+func grantAccessToken(ctx context.Context, database Database, token oauth.JWTToken, verdict Verdict) (Verdict, error) {
 	if _, hasGrant := token.Claims["grant_id"]; !hasGrant {
 		return revokedAccessToken(ctx, database, token, verdict)
 	}
-	grantId := token.StringClaim("grant_id")
-	if grantId == "" {
+	grantID := token.StringClaim("grant_id")
+	if grantID == "" {
 		verdict.Refusal = GrantRevoked
 		return verdict, nil
 	}
 
-	live, err := database.IsRefreshTokenFamilyLive(ctx, nil, grantId)
+	live, err := database.IsRefreshTokenFamilyLive(ctx, nil, grantID)
 	if err != nil {
 		verdict.Refusal = 0
 		return verdict, errs.Wrap(err, "failed to look up the grant for bearer token validation")
@@ -367,7 +367,7 @@ func grantAccessToken(ctx context.Context, database Database, token oauth.JwtTok
 //
 // One whose jti is absent, empty or not a string is one the auth server never signs, and is refused
 // without a read: no revocation could ever store it.
-func revokedAccessToken(ctx context.Context, database Database, token oauth.JwtToken, verdict Verdict) (Verdict, error) {
+func revokedAccessToken(ctx context.Context, database Database, token oauth.JWTToken, verdict Verdict) (Verdict, error) {
 	jti := token.StringClaim("jti")
 	if jti == "" {
 		verdict.Refusal = AccessTokenRevoked
@@ -387,7 +387,7 @@ func revokedAccessToken(ctx context.Context, database Database, token oauth.JwtT
 
 // userAccessToken is AccessToken's checks of the user, the session and the generation, for a token
 // whose own checks and client have passed.
-func userAccessToken(ctx context.Context, database Database, token oauth.JwtToken, settings *record.Settings,
+func userAccessToken(ctx context.Context, database Database, token oauth.JWTToken, settings *record.Settings,
 	now time.Time) (Verdict, error) {
 
 	if _, hasAuthTime := token.Claims["auth_time"]; !hasAuthTime {
@@ -437,7 +437,7 @@ func userAccessToken(ctx context.Context, database Database, token oauth.JwtToke
 	// ending when its owner's session ends and staying alive while its owner keeps using the browser
 	// (#133).
 	//
-	if session.UserId != user.Id {
+	if session.UserID != user.ID {
 		return Verdict{Refusal: SessionOfAnotherUser, User: user, SessionIdentifier: sid, Session: session}, nil
 	}
 
@@ -457,7 +457,7 @@ func userAccessToken(ctx context.Context, database Database, token oauth.JwtToke
 // hasAccessTokenHeader reports whether the token's JOSE header typ is at+jwt, which RFC 9068
 // section 4 says a resource server MUST require, accepting application/at+jwt too. A typ is a media
 // type, compared without regard to case (RFC 7515 section 4.1.9).
-func hasAccessTokenHeader(token oauth.JwtToken) bool {
+func hasAccessTokenHeader(token oauth.JWTToken) bool {
 	typ, _ := token.Header["typ"].(string)
 	return strings.EqualFold(typ, issuance.AccessTokenHeaderType) ||
 		strings.EqualFold(typ, "application/"+issuance.AccessTokenHeaderType)
@@ -477,7 +477,7 @@ func hasAccessTokenHeader(token oauth.JwtToken) bool {
 // BIGINT/INTEGER on all four engines with no nonnegative constraint, so any sentinel value a
 // caller might compare against is also a value a user row can legitimately hold, and a user
 // sitting on it would accept every malformed claim.
-func tokenGeneration(token oauth.JwtToken) (int64, bool) {
+func tokenGeneration(token oauth.JWTToken) (int64, bool) {
 	if _, present := token.Claims["auth_state_generation"]; !present {
 		return 0, true
 	}

@@ -16,13 +16,13 @@ import (
 // userAuthenticationAPI is what the user authentication page needs: the user, and the password
 // and OTP writes.
 type userAuthenticationAPI interface {
-	GetUserById(ctx context.Context, accessToken string, userId int64) (*api.UserResponse, error)
-	UpdateUserOTP(ctx context.Context, accessToken string, userId int64, request *api.UpdateUserOTPRequest) (*api.UserResponse, error)
-	UpdateUserPassword(ctx context.Context, accessToken string, userId int64, request *api.UpdateUserPasswordRequest) (*api.UserResponse, error)
+	GetUserByID(ctx context.Context, accessToken string, userID int64) (*api.UserResponse, error)
+	UpdateUserOTP(ctx context.Context, accessToken string, userID int64, request *api.UpdateUserOTPRequest) (*api.UserResponse, error)
+	UpdateUserPassword(ctx context.Context, accessToken string, userID int64, request *api.UpdateUserPasswordRequest) (*api.UserResponse, error)
 }
 
 func HandleAuthenticationGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient userAuthenticationAPI,
 ) http.HandlerFunc {
@@ -42,14 +42,14 @@ func HandleAuthenticationGet(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 		accessToken := jwtInfo.TokenResponse.AccessToken
 
-		user, err := apiClient.GetUserById(r.Context(), accessToken, id)
+		user, err := apiClient.GetUserByID(r.Context(), accessToken, id)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -92,7 +92,7 @@ func HandleAuthenticationGet(
 }
 
 func HandleAuthenticationPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient userAuthenticationAPI,
 	baseURL string,
@@ -113,14 +113,14 @@ func HandleAuthenticationPost(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 		accessToken := jwtInfo.TokenResponse.AccessToken
 
-		user, err := apiClient.GetUserById(r.Context(), accessToken, id)
+		user, err := apiClient.GetUserByID(r.Context(), accessToken, id)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -188,7 +188,7 @@ func HandleAuthenticationPost(
 			return
 		}
 
-		pagePath := fmt.Sprintf("/admin/users/%v/authentication", user.Id)
+		pagePath := fmt.Sprintf("/admin/users/%v/authentication", user.ID)
 		sess.SetFlash(pagePath, "savedSuccessfully", "true")
 		err = httpSession.Save(r, w, sess)
 		if err != nil {

@@ -16,11 +16,11 @@ import (
 // user row and the picture attached to it.
 type accountProfilePictureDatabase interface {
 	CreateUserProfilePicture(ctx context.Context, tx *sql.Tx, profilePicture *record.UserProfilePicture) error
-	DeleteUserProfilePicture(ctx context.Context, tx *sql.Tx, userId int64) error
+	DeleteUserProfilePicture(ctx context.Context, tx *sql.Tx, userID int64) error
 	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error)
-	GetUserProfilePictureByUserId(ctx context.Context, tx *sql.Tx, userId int64) (*record.UserProfilePicture, error)
+	GetUserProfilePictureByUserID(ctx context.Context, tx *sql.Tx, userID int64) (*record.UserProfilePicture, error)
 	UpdateUserProfilePicture(ctx context.Context, tx *sql.Tx, profilePicture *record.UserProfilePicture) error
-	UserHasProfilePicture(ctx context.Context, tx *sql.Tx, userId int64) (bool, error)
+	UserHasProfilePicture(ctx context.Context, tx *sql.Tx, userID int64) (bool, error)
 }
 
 // HandleAccountProfilePicturePost - POST /api/v1/account/profile-picture
@@ -61,7 +61,7 @@ func HandleAccountProfilePicturePost(
 		}
 
 		// Check if user already has a profile picture
-		existingPicture, err := database.GetUserProfilePictureByUserId(r.Context(), nil, user.Id)
+		existingPicture, err := database.GetUserProfilePictureByUserID(r.Context(), nil, user.ID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -75,7 +75,7 @@ func HandleAccountProfilePicturePost(
 		} else {
 			// Create new picture
 			profilePicture := &record.UserProfilePicture{
-				UserId:      user.Id,
+				UserID:      user.ID,
 				Picture:     pictureData,
 				ContentType: result.ContentType,
 			}
@@ -89,13 +89,13 @@ func HandleAccountProfilePicturePost(
 
 		// Log audit event
 		auditLogger.Log(r.Context(), audit.EventUpdatedOwnProfilePicture, map[string]interface{}{
-			"user_id":        user.Id,
+			"user_id":        user.ID,
 			"logged_in_user": sub,
 		})
 
 		response := api.ProfilePictureUploadResponse{
 			Success:    true,
-			PictureUrl: baseURL + "/userinfo/picture/" + user.Subject,
+			PictureURL: baseURL + "/userinfo/picture/" + user.Subject,
 		}
 
 		writeJSON(w, r, http.StatusOK, response)
@@ -126,7 +126,7 @@ func HandleAccountProfilePictureDelete(
 		}
 
 		// Delete the profile picture
-		err = database.DeleteUserProfilePicture(r.Context(), nil, user.Id)
+		err = database.DeleteUserProfilePicture(r.Context(), nil, user.ID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -134,7 +134,7 @@ func HandleAccountProfilePictureDelete(
 
 		// Log audit event
 		auditLogger.Log(r.Context(), audit.EventDeletedOwnProfilePicture, map[string]interface{}{
-			"user_id":        user.Id,
+			"user_id":        user.ID,
 			"logged_in_user": sub,
 		})
 
@@ -168,7 +168,7 @@ func HandleAccountProfilePictureGet(
 		}
 
 		// Check if user has profile picture
-		hasPicture, err := database.UserHasProfilePicture(r.Context(), nil, user.Id)
+		hasPicture, err := database.UserHasProfilePicture(r.Context(), nil, user.ID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -176,7 +176,7 @@ func HandleAccountProfilePictureGet(
 
 		response := api.ProfilePictureInfoResponse{HasPicture: hasPicture}
 		if hasPicture {
-			response.PictureUrl = baseURL + "/userinfo/picture/" + user.Subject
+			response.PictureURL = baseURL + "/userinfo/picture/" + user.Subject
 		}
 
 		writeJSON(w, r, http.StatusOK, response)

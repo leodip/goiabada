@@ -32,23 +32,23 @@ func TestAuthorize_PostRequest(t *testing.T) {
 				Enabled:                  true,
 				AuthorizationCodeEnabled: true,
 				ConsentRequired:          false,
-				DefaultAcrLevel:          record.AcrLevel1,
+				DefaultACRLevel:          record.ACRLevel1,
 			}
 			if err := database.CreateClient(context.Background(), nil, client); err != nil {
 				t.Fatal(err)
 			}
 
-			redirectUri := &record.RedirectURI{
-				ClientId: client.Id,
+			redirectURI := &record.RedirectURI{
+				ClientID: client.ID,
 				URI:      fake.URL(),
 			}
-			if err := database.CreateRedirectURI(context.Background(), nil, redirectUri); err != nil {
+			if err := database.CreateRedirectURI(context.Background(), nil, redirectURI); err != nil {
 				t.Fatal(err)
 			}
 
 			form := url.Values{}
 			form.Set("client_id", client.ClientIdentifier)
-			form.Set("redirect_uri", redirectUri.URI)
+			form.Set("redirect_uri", redirectURI.URI)
 			form.Set("response_type", "code")
 			form.Set("code_challenge_method", "S256")
 			form.Set("code_challenge", randomCodeChallenge())
@@ -68,7 +68,7 @@ func TestAuthorize_PostRequest(t *testing.T) {
 			// /auth/authorize exemption is what prevents (#67).
 			req.Header.Set("Origin", "https://www.certification.openid.net")
 
-			httpClient := createHttpClient(t)
+			httpClient := createHTTPClient(t)
 			resp, err := httpClient.Do(req)
 			if err != nil {
 				t.Fatal(err)

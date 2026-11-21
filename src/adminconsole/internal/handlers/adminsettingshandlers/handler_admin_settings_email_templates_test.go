@@ -70,7 +70,7 @@ func (f *fakeEmailTemplatesAPI) SendTestEmailTemplate(_ context.Context, _ strin
 }
 
 func (f *fakeEmailTemplatesAPI) GetEmailTemplate(_ context.Context, _ string, email string) (*api.EmailTemplateResponse, error) {
-	if f.email == nil || f.email.Id != email {
+	if f.email == nil || f.email.ID != email {
 		return nil, &apiclient.APIError{Code: "NOT_FOUND", Message: "Email template not found", StatusCode: http.StatusNotFound}
 	}
 	return f.email, nil
@@ -105,7 +105,7 @@ func passwordResetLink() *api.EmailTemplateResponse {
 			EditedFields: []string{}, Problems: []api.EmailTemplateProblemResponse{}}
 	}
 	return &api.EmailTemplateResponse{
-		Id: "password_reset_link", HasButton: true,
+		ID: "password_reset_link", HasButton: true,
 		Placeholders: []api.EmailTemplatePlaceholderResponse{
 			{Name: "app_name", InSubject: true}, {Name: "name", InSubject: true},
 			{Name: "link", Required: true}, {Name: "button"}, {Name: "expiry", InSubject: true},
@@ -121,7 +121,7 @@ func passwordResetLink() *api.EmailTemplateResponse {
 // accountDeleted is a notice with no button.
 func accountDeleted() *api.EmailTemplateResponse {
 	email := passwordResetLink()
-	email.Id, email.HasButton = "account_deleted", false
+	email.ID, email.HasButton = "account_deleted", false
 	email.Placeholders = []api.EmailTemplatePlaceholderResponse{{Name: "app_name", InSubject: true}, {Name: "name", InSubject: true}}
 	return email
 }
@@ -154,7 +154,7 @@ func TestHandleEmailTemplateOpenGet_OpensTheLanguageTheConsoleIsReadIn(t *testin
 		"nl":    "/admin/settings/email/templates/password_reset_link/en",
 	} {
 		t.Run(locale, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 			rec := httptest.NewRecorder()
 
@@ -176,7 +176,7 @@ func TestHandleEmailTemplateGet_AnUnknownEmailOrLanguageIsNotFound(t *testing.T)
 		"a language tag in another case":    {"password_reset_link", "pt-br"},
 	} {
 		t.Run(name, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			httpHelper.On("NotFound", mock.Anything, mock.Anything).Return().Once()
 
 			HandleEmailTemplateGet(httpHelper, newSettingsTestStore(), &fakeEmailTemplatesAPI{email: passwordResetLink()}).ServeHTTP(
@@ -195,7 +195,7 @@ func TestHandleEmailTemplatePost_SavesTheTextAndSaysSo(t *testing.T) {
 	apiClient := &fakeEmailTemplatesAPI{email: passwordResetLink()}
 	const pagePath = "/admin/settings/email/templates/password_reset_link/fr"
 
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	rec := httptest.NewRecorder()
 	HandleEmailTemplatePost(httpHelper, store, apiClient, consoleBaseURL).ServeHTTP(rec,
@@ -217,7 +217,7 @@ func TestHandleEmailTemplatePost_SavesTheTextAndSaysSo(t *testing.T) {
 	}, apiClient.saved)
 
 	for i, want := range []bool{true, false} {
-		page := handlersmocks.NewHttpHelper(t)
+		page := handlersmocks.NewHTTPHelper(t)
 		handlertest.RefuseInternalServerError(t, page)
 		handlertest.ExpectRender(page, "/layouts/menu_layout.html", "/admin_settings_email_template.html").Once()
 		next := cookiesFrom(emailTemplateRequest(http.MethodGet, pagePath, "password_reset_link", "fr"), rec)
@@ -231,7 +231,7 @@ func TestHandleEmailTemplatePost_SavesTheTextAndSaysSo(t *testing.T) {
 // An email without a button sends no button label, whatever the form holds.
 func TestHandleEmailTemplatePost_AnEmailWithoutAButtonSendsNoLabel(t *testing.T) {
 	apiClient := &fakeEmailTemplatesAPI{email: accountDeleted()}
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 
 	HandleEmailTemplatePost(httpHelper, newSettingsTestStore(), apiClient, consoleBaseURL).ServeHTTP(httptest.NewRecorder(),
@@ -246,7 +246,7 @@ func TestHandleEmailTemplatePost_AnEmailWithoutAButtonSendsNoLabel(t *testing.T)
 // A save to an address naming no language of the email is the 404 page, and nothing is saved.
 func TestHandleEmailTemplatePost_AnUnknownLanguageSavesNothing(t *testing.T) {
 	apiClient := &fakeEmailTemplatesAPI{email: passwordResetLink()}
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	httpHelper.On("NotFound", mock.Anything, mock.Anything).Return().Once()
 
 	HandleEmailTemplatePost(httpHelper, newSettingsTestStore(), apiClient, consoleBaseURL).ServeHTTP(httptest.NewRecorder(),
@@ -266,7 +266,7 @@ func TestHandleEmailTemplatePost_ARefusalIsDrawnOnTheFormAsTyped(t *testing.T) {
 			apiClient := &fakeEmailTemplatesAPI{email: passwordResetLink(), writeErr: &apiclient.APIError{
 				Code: "handler.email_template.unknown_placeholder", Message: "O corpo usa {{nome}}.",
 				StatusCode: http.StatusBadRequest, Field: pointer}}
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 			handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_email_template.html").Once()
 
@@ -294,7 +294,7 @@ func TestHandleEmailTemplateResetPost_RemovesTheEditAndSaysSo(t *testing.T) {
 	apiClient := &fakeEmailTemplatesAPI{email: passwordResetLink()}
 	const pagePath = "/admin/settings/email/templates/password_reset_link/fr"
 
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	rec := httptest.NewRecorder()
 	HandleEmailTemplateResetPost(httpHelper, store, apiClient, consoleBaseURL).ServeHTTP(rec,
@@ -307,7 +307,7 @@ func TestHandleEmailTemplateResetPost_RemovesTheEditAndSaysSo(t *testing.T) {
 	assert.Equal(t, "fr", apiClient.resetLang)
 	assert.Equal(t, 0, apiClient.savedCalled)
 
-	page := handlersmocks.NewHttpHelper(t)
+	page := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, page)
 	handlertest.ExpectRender(page, "/layouts/menu_layout.html", "/admin_settings_email_template.html").Once()
 	HandleEmailTemplateGet(page, store, apiClient).ServeHTTP(httptest.NewRecorder(),
@@ -321,7 +321,7 @@ func TestHandleEmailTemplateResetPost_RemovesTheEditAndSaysSo(t *testing.T) {
 func TestHandleEmailTemplateResetPost_ARefusalIsDrawnOnTheEditor(t *testing.T) {
 	apiClient := &fakeEmailTemplatesAPI{email: passwordResetLink(), writeErr: &apiclient.APIError{
 		Code: "CONCURRENT_UPDATE", Message: "Outra alteração venceu.", StatusCode: http.StatusConflict}}
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_email_template.html").Once()
 

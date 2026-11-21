@@ -21,10 +21,10 @@ type clientPermissionsDatabase interface {
 	clientTargetPolicyDatabase
 	ClientLoadPermissions(ctx context.Context, tx *sql.Tx, client *record.Client) error
 	CreateClientPermission(ctx context.Context, tx *sql.Tx, clientPermission *record.ClientPermission) error
-	DeleteClientPermission(ctx context.Context, tx *sql.Tx, clientPermissionId int64) error
-	GetClientById(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error)
-	GetClientPermissionsByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.ClientPermission, error)
-	GetPermissionById(ctx context.Context, tx *sql.Tx, permissionId int64) (*record.Permission, error)
+	DeleteClientPermission(ctx context.Context, tx *sql.Tx, clientPermissionID int64) error
+	GetClientByID(ctx context.Context, tx *sql.Tx, clientID int64) (*record.Client, error)
+	GetClientPermissionsByClientID(ctx context.Context, tx *sql.Tx, clientID int64) ([]record.ClientPermission, error)
+	GetPermissionByID(ctx context.Context, tx *sql.Tx, permissionID int64) (*record.Permission, error)
 	PermissionsLoadResources(ctx context.Context, tx *sql.Tx, permissions []record.Permission) error
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 }
@@ -46,7 +46,7 @@ func HandleClientPermissionsGet(
 			return
 		}
 
-		client, err := database.GetClientById(r.Context(), nil, id)
+		client, err := database.GetClientByID(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error getting client by ID for permissions"), "client_id", id)
 			return
@@ -57,13 +57,13 @@ func HandleClientPermissionsGet(
 		}
 
 		if err := database.ClientLoadPermissions(r.Context(), nil, client); err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client permissions"), "client_id", client.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client permissions"), "client_id", client.ID)
 			return
 		}
 
 		if client.Permissions != nil {
 			if err := database.PermissionsLoadResources(r.Context(), nil, client.Permissions); err != nil {
-				writeInternalServerError(w, r, errs.Wrap(err, "database error loading permission resources"), "client_id", client.Id)
+				writeInternalServerError(w, r, errs.Wrap(err, "database error loading permission resources"), "client_id", client.ID)
 				return
 			}
 		}
@@ -97,7 +97,7 @@ func HandleClientPermissionsPut(
 			return
 		}
 
-		client, err := database.GetClientById(r.Context(), nil, id)
+		client, err := database.GetClientByID(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error getting client by ID for permissions update"), "client_id", id)
 			return
@@ -115,12 +115,12 @@ func HandleClientPermissionsPut(
 
 		// The set as the caller loaded it, required as it is on every list save: absent or null
 		// decodes to nil and is refused, [] means the caller read no grants (#428).
-		if request.ExpectedPermissionIds == nil {
+		if request.ExpectedPermissionIDs == nil {
 			writeJSONError(w, "expectedPermissionIds is required: send the permission ids as you last read them, or [] if there were none.", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
-		wanted := firstOccurrences(request.PermissionIds)
+		wanted := firstOccurrences(request.PermissionIDs)
 
 		// Enforce that client credentials flow must be enabled
 		if !client.ClientCredentialsEnabled {
@@ -129,10 +129,10 @@ func HandleClientPermissionsPut(
 		}
 
 		// Validate that all requested permissions exist
-		for _, permissionId := range wanted {
-			permission, getErr := database.GetPermissionById(r.Context(), nil, permissionId)
+		for _, permissionID := range wanted {
+			permission, getErr := database.GetPermissionByID(r.Context(), nil, permissionID)
 			if getErr != nil {
-				writeInternalServerError(w, r, errs.Wrap(getErr, "database error getting permission by ID for validation"), "permission_id", permissionId, "client_id", client.Id)
+				writeInternalServerError(w, r, errs.Wrap(getErr, "database error getting permission by ID for validation"), "permission_id", permissionID, "client_id", client.ID)
 				return
 			}
 			if permission == nil {
@@ -144,7 +144,7 @@ func HandleClientPermissionsPut(
 		// The grant ceiling, after the request's 400 and 404 answers and before the transaction:
 		// only authserver:manage grants or revokes an administrative permission. What it read is
 		// what the save's administrative_permission_changed records are written from (#402).
-		administrative, allowed := grantCeilingAllows(w, r, database, auditLogger, targetKindClient, client.Id, wanted, request.ExpectedPermissionIds)
+		administrative, allowed := grantCeilingAllows(w, r, database, auditLogger, targetKindClient, client.ID, wanted, request.ExpectedPermissionIDs)
 		if !allowed {
 			return
 		}
@@ -154,8 +154,8 @@ func HandleClientPermissionsPut(
 			return
 		}
 
-		grantKey := func(cp record.ClientPermission) int64 { return cp.PermissionId }
-		grantId := func(cp record.ClientPermission) int64 { return cp.Id }
+		grantKey := func(cp record.ClientPermission) int64 { return cp.PermissionID }
+		grantID := func(cp record.ClientPermission) int64 { return cp.ID }
 
 		// One transaction, so a failure part way through commits nothing and the 500 is true, where
 		// the autocommitted writes this replaced could leave a grant made or a revocation done under
@@ -172,26 +172,26 @@ func HandleClientPermissionsPut(
 		// reported as a 404 after the grants before it were already written (#406).
 		granted, revoked := []int64{}, []int64{}
 		err = database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
-			stored, loadErr := database.GetClientPermissionsByClientId(r.Context(), tx, client.Id)
+			stored, loadErr := database.GetClientPermissionsByClientID(r.Context(), tx, client.ID)
 			if loadErr != nil {
 				return errs.Wrap(loadErr, "database error loading client permissions before update")
 			}
-			if !sameSet(stored, grantKey, request.ExpectedPermissionIds) {
+			if !sameSet(stored, grantKey, request.ExpectedPermissionIDs) {
 				return errListChanged
 			}
 
-			insert, remove := replaceSet(stored, grantKey, grantId, wanted)
-			for _, rowId := range remove {
-				if deleteErr := database.DeleteClientPermission(r.Context(), tx, rowId); deleteErr != nil {
-					return errs.Wrapf(deleteErr, "database error deleting client permission %d", rowId)
+			insert, remove := replaceSet(stored, grantKey, grantID, wanted)
+			for _, rowID := range remove {
+				if deleteErr := database.DeleteClientPermission(r.Context(), tx, rowID); deleteErr != nil {
+					return errs.Wrapf(deleteErr, "database error deleting client permission %d", rowID)
 				}
 			}
-			for _, permissionId := range insert {
+			for _, permissionID := range insert {
 				if createErr := database.CreateClientPermission(r.Context(), tx, &record.ClientPermission{
-					ClientId:     client.Id,
-					PermissionId: permissionId,
+					ClientID:     client.ID,
+					PermissionID: permissionID,
 				}); createErr != nil {
-					return errs.Wrapf(createErr, "database error granting permission %d", permissionId)
+					return errs.Wrapf(createErr, "database error granting permission %d", permissionID)
 				}
 			}
 			// Assigned only by an attempt that reached its end, as the user and group saves do.
@@ -201,7 +201,7 @@ func HandleClientPermissionsPut(
 			return nil
 		})
 		if err != nil {
-			writeListSaveFailure(w, r, err, "client_id", client.Id)
+			writeListSaveFailure(w, r, err, "client_id", client.ID)
 			return
 		}
 
@@ -209,12 +209,12 @@ func HandleClientPermissionsPut(
 		// revoked, where it named only the client and a grant of authserver:manage to a client
 		// left no trace of which permission it was (#402).
 		auditLogger.Log(r.Context(), audit.EventUpdatedClientPermissions, map[string]interface{}{
-			"client_id":              client.Id,
+			"client_id":              client.ID,
 			"granted_permission_ids": granted,
 			"revoked_permission_ids": revoked,
 			"logged_in_user":         callerSubject(r),
 		})
-		recordAdministrativePermissionChanges(r, auditLogger, administrative, targetKindClient, client.Id, granted, revoked)
+		recordAdministrativePermissionChanges(r, auditLogger, administrative, targetKindClient, client.ID, granted, revoked)
 
 		// Respond success
 		resp := api.SuccessResponse{Success: true}

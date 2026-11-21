@@ -46,11 +46,11 @@ func TestCreateBrand_ReadsBackWhatWasWritten(t *testing.T) {
 	} {
 		brand := &record.Brand{Name: "Brand " + fake.LetterN(16), Appearance: c.appearance, Theme: c.theme}
 		require.NoError(t, database.CreateBrand(ctx, nil, brand))
-		require.Positive(t, brand.Id, "the create answers the brand's id")
+		require.Positive(t, brand.ID, "the create answers the brand's id")
 
-		stored, err := database.GetBrandById(ctx, nil, brand.Id)
+		stored, err := database.GetBrandByID(ctx, nil, brand.ID)
 		require.NoError(t, err)
-		require.NotNilf(t, stored, "the brand %d reads back", brand.Id)
+		require.NotNilf(t, stored, "the brand %d reads back", brand.ID)
 		assert.Equal(t, brand.Name, stored.Name)
 		assert.Equal(t, c.appearance, stored.Appearance)
 		assert.Equal(t, c.theme, stored.Theme)
@@ -60,8 +60,8 @@ func TestCreateBrand_ReadsBackWhatWasWritten(t *testing.T) {
 	}
 }
 
-func TestGetBrandById_AnUnknownIdIsNil(t *testing.T) {
-	stored, err := database.GetBrandById(context.Background(), nil, 987_654_321)
+func TestGetBrandByID_AnUnknownIDIsNil(t *testing.T) {
+	stored, err := database.GetBrandByID(context.Background(), nil, 987_654_321)
 	require.NoError(t, err)
 	assert.Nil(t, stored)
 }
@@ -69,14 +69,14 @@ func TestGetBrandById_AnUnknownIdIsNil(t *testing.T) {
 func TestUpdateBrand_WritesNameAppearanceAndThemeAndKeepsCreatedAt(t *testing.T) {
 	ctx := context.Background()
 	brand := createTestBrand(t, "auto", "blueberry")
-	created, err := database.GetBrandById(ctx, nil, brand.Id)
+	created, err := database.GetBrandByID(ctx, nil, brand.ID)
 	require.NoError(t, err)
 	require.NotNil(t, created)
 
 	time.Sleep(10 * time.Millisecond)
 	renamed := "Renamed " + fake.LetterN(16)
 	edit := &record.Brand{
-		Id:         brand.Id,
+		ID:         brand.ID,
 		CreatedAt:  sql.NullTime{Time: time.Date(2001, 1, 1, 0, 0, 0, 0, time.UTC), Valid: true},
 		Name:       renamed,
 		Appearance: "dark",
@@ -84,7 +84,7 @@ func TestUpdateBrand_WritesNameAppearanceAndThemeAndKeepsCreatedAt(t *testing.T)
 	}
 	require.NoError(t, database.UpdateBrand(ctx, nil, edit))
 
-	stored, err := database.GetBrandById(ctx, nil, brand.Id)
+	stored, err := database.GetBrandByID(ctx, nil, brand.ID)
 	require.NoError(t, err)
 	require.NotNil(t, stored)
 	assert.Equal(t, renamed, stored.Name)
@@ -97,7 +97,7 @@ func TestUpdateBrand_WritesNameAppearanceAndThemeAndKeepsCreatedAt(t *testing.T)
 	require.Error(t, database.UpdateBrand(ctx, nil, &record.Brand{Name: "No id"}), "an update with no id")
 }
 
-func TestGetAllBrands_AnswersEveryBrandInIdOrder(t *testing.T) {
+func TestGetAllBrands_AnswersEveryBrandInIDOrder(t *testing.T) {
 	ctx := context.Background()
 	first := createTestBrand(t, "light", "guava")
 	second := createTestBrand(t, "dark", "coconut")
@@ -107,15 +107,15 @@ func TestGetAllBrands_AnswersEveryBrandInIdOrder(t *testing.T) {
 	var firstAt, secondAt = -1, -1
 	for i, b := range brands {
 		if i > 0 {
-			assert.Less(t, brands[i-1].Id, b.Id, "the list is in id order")
+			assert.Less(t, brands[i-1].ID, b.ID, "the list is in id order")
 		}
-		switch b.Id {
-		case first.Id:
+		switch b.ID {
+		case first.ID:
 			firstAt = i
 			assert.Equal(t, first.Name, b.Name)
 			assert.Equal(t, record.BrandAppearance("light"), b.Appearance)
 			assert.Equal(t, "guava", b.Theme)
-		case second.Id:
+		case second.ID:
 			secondAt = i
 		}
 	}
@@ -157,14 +157,14 @@ func brandsIsolatedDB(t *testing.T) (*isolatedDB, *record.Brand) {
 			return err
 		}
 		settings := initialSettings("Brands")
-		settings.DefaultBrandId = sql.NullInt64{Int64: brand.Id, Valid: true}
+		settings.DefaultBrandID = sql.NullInt64{Int64: brand.ID, Valid: true}
 		return h.DB.CreateInitialSettings(ctx, tx, settings)
 	}))
 	return h, brand
 }
 
-// defaultBrandIdOf reads the pointer with raw SQL, a second read beside the data layer's.
-func defaultBrandIdOf(t *testing.T, h *isolatedDB) sql.NullInt64 {
+// defaultBrandIDOf reads the pointer with raw SQL, a second read beside the data layer's.
+func defaultBrandIDOf(t *testing.T, h *isolatedDB) sql.NullInt64 {
 	t.Helper()
 	var id sql.NullInt64
 	require.NoErrorf(t, h.SQL.QueryRow("SELECT default_brand_id FROM settings WHERE id = 1").Scan(&id),
@@ -172,21 +172,21 @@ func defaultBrandIdOf(t *testing.T, h *isolatedDB) sql.NullInt64 {
 	return id
 }
 
-func makeDefault(h *isolatedDB, brandId int64) (int64, error) {
+func makeDefault(h *isolatedDB, brandID int64) (int64, error) {
 	ctx := context.Background()
 	var previous int64
 	err := h.DB.RunInTransaction(ctx, func(tx *sql.Tx) error {
 		var err error
-		previous, err = h.DB.MakeBrandDefault(ctx, tx, brandId)
+		previous, err = h.DB.MakeBrandDefault(ctx, tx, brandID)
 		return err
 	})
 	return previous, err
 }
 
-func deleteBrand(h *isolatedDB, brandId int64) error {
+func deleteBrand(h *isolatedDB, brandID int64) error {
 	ctx := context.Background()
 	return h.DB.RunInTransaction(ctx, func(tx *sql.Tx) error {
-		_, err := h.DB.DeleteBrand(ctx, tx, brandId)
+		_, err := h.DB.DeleteBrand(ctx, tx, brandID)
 		return err
 	})
 }
@@ -202,71 +202,71 @@ func TestBrands_TheDefaultPointer(t *testing.T) {
 	def, err := h.DB.GetDefaultBrand(ctx, nil)
 	require.NoError(t, err)
 	require.NotNil(t, def, "the default brand reads")
-	assert.Equal(t, seeded.Id, def.Id)
+	assert.Equal(t, seeded.ID, def.ID)
 	assert.Equal(t, "Default", def.Name)
 	assert.Equal(t, record.BrandAppearance("auto"), def.Appearance)
 	assert.Equal(t, "blueberry", def.Theme)
-	settings, err := h.DB.GetSettingsById(ctx, nil, 1)
+	settings, err := h.DB.GetSettingsByID(ctx, nil, 1)
 	require.NoError(t, err)
 	require.NotNil(t, settings)
-	assert.Equal(t, sql.NullInt64{Int64: seeded.Id, Valid: true}, settings.DefaultBrandId, "the settings row reads its pointer")
+	assert.Equal(t, sql.NullInt64{Int64: seeded.ID, Valid: true}, settings.DefaultBrandID, "the settings row reads its pointer")
 
 	other := &record.Brand{Name: "Other", Appearance: "dark", Theme: "plum"}
 	require.NoError(t, h.DB.CreateBrand(ctx, nil, other))
 
 	// No settings save moves or clears the pointer, whatever its copy of the row says.
-	for _, written := range []sql.NullInt64{{}, {Int64: other.Id, Valid: true}} {
-		settings.DefaultBrandId = written
+	for _, written := range []sql.NullInt64{{}, {Int64: other.ID, Valid: true}} {
+		settings.DefaultBrandID = written
 		settings.AppName = "Saved " + fake.LetterN(6)
 		require.NoError(t, h.DB.UpdateSettings(ctx, nil, settings))
-		assert.Equalf(t, sql.NullInt64{Int64: seeded.Id, Valid: true}, defaultBrandIdOf(t, h),
+		assert.Equalf(t, sql.NullInt64{Int64: seeded.ID, Valid: true}, defaultBrandIDOf(t, h),
 			"a settings save carrying %v leaves the pointer", written)
 	}
 
 	// A move answers the brand it moved from.
-	previous, err := makeDefault(h, other.Id)
+	previous, err := makeDefault(h, other.ID)
 	require.NoError(t, err)
-	assert.Equal(t, seeded.Id, previous, "the move answers the old default")
-	assert.Equal(t, sql.NullInt64{Int64: other.Id, Valid: true}, defaultBrandIdOf(t, h), "the pointer moved")
+	assert.Equal(t, seeded.ID, previous, "the move answers the old default")
+	assert.Equal(t, sql.NullInt64{Int64: other.ID, Valid: true}, defaultBrandIDOf(t, h), "the pointer moved")
 	def, err = h.DB.GetDefaultBrand(ctx, nil)
 	require.NoError(t, err)
 	require.NotNil(t, def)
-	assert.Equal(t, other.Id, def.Id)
+	assert.Equal(t, other.ID, def.ID)
 	assert.Equal(t, "Other", def.Name)
 
 	// A move to the default changes nothing and says so.
-	previous, err = makeDefault(h, other.Id)
+	previous, err = makeDefault(h, other.ID)
 	require.NoError(t, err)
-	assert.Equal(t, other.Id, previous, "a move to the default answers the default itself")
-	assert.Equal(t, sql.NullInt64{Int64: other.Id, Valid: true}, defaultBrandIdOf(t, h))
+	assert.Equal(t, other.ID, previous, "a move to the default answers the default itself")
+	assert.Equal(t, sql.NullInt64{Int64: other.ID, Valid: true}, defaultBrandIDOf(t, h))
 
 	// A move to a brand that is not there is refused and writes nothing.
-	_, err = makeDefault(h, other.Id+1_000)
+	_, err = makeDefault(h, other.ID+1_000)
 	require.ErrorIs(t, err, data.ErrBrandNotFound)
-	assert.Equal(t, sql.NullInt64{Int64: other.Id, Valid: true}, defaultBrandIdOf(t, h), "a refused move leaves the pointer")
+	assert.Equal(t, sql.NullInt64{Int64: other.ID, Valid: true}, defaultBrandIDOf(t, h), "a refused move leaves the pointer")
 
 	// The default cannot be deleted.
-	err = deleteBrand(h, other.Id)
+	err = deleteBrand(h, other.ID)
 	require.ErrorIs(t, err, data.ErrDefaultBrandNotDeletable)
-	kept, err := h.DB.GetBrandById(ctx, nil, other.Id)
+	kept, err := h.DB.GetBrandByID(ctx, nil, other.ID)
 	require.NoError(t, err)
 	assert.NotNil(t, kept, "the refused deletion kept the default brand")
 
 	// Nor can the schema be made to: the foreign key refuses deleting the brand the row names.
-	_, err = h.SQL.Exec(fmt.Sprintf("DELETE FROM brands WHERE id = %d", other.Id))
+	_, err = h.SQL.Exec(fmt.Sprintf("DELETE FROM brands WHERE id = %d", other.ID))
 	require.Errorf(t, err, "the foreign key refuses deleting the default brand on %s", dbType())
 
 	// Another brand is deleted, once.
-	require.NoError(t, deleteBrand(h, seeded.Id), "the brand that is no longer the default")
-	gone, err := h.DB.GetBrandById(ctx, nil, seeded.Id)
+	require.NoError(t, deleteBrand(h, seeded.ID), "the brand that is no longer the default")
+	gone, err := h.DB.GetBrandByID(ctx, nil, seeded.ID)
 	require.NoError(t, err)
 	assert.Nil(t, gone, "the brand is gone")
-	require.ErrorIs(t, deleteBrand(h, seeded.Id), data.ErrBrandNotFound, "a second deletion finds nothing")
+	require.ErrorIs(t, deleteBrand(h, seeded.ID), data.ErrBrandNotFound, "a second deletion finds nothing")
 
 	// Both writes need a transaction, as the lock they take does.
-	_, err = h.DB.MakeBrandDefault(ctx, nil, other.Id)
+	_, err = h.DB.MakeBrandDefault(ctx, nil, other.ID)
 	require.Error(t, err, "a move without a transaction")
-	_, err = h.DB.DeleteBrand(ctx, nil, other.Id)
+	_, err = h.DB.DeleteBrand(ctx, nil, other.ID)
 	require.Error(t, err, "a deletion without a transaction")
 
 	// An empty pointer reads as no default, and a move from it answers 0.
@@ -275,10 +275,10 @@ func TestBrands_TheDefaultPointer(t *testing.T) {
 	def, err = h.DB.GetDefaultBrand(ctx, nil)
 	require.NoError(t, err)
 	assert.Nil(t, def, "an empty pointer names no brand")
-	previous, err = makeDefault(h, other.Id)
+	previous, err = makeDefault(h, other.ID)
 	require.NoError(t, err)
 	assert.Equal(t, int64(0), previous, "a move from an empty pointer answers 0")
-	assert.Equal(t, sql.NullInt64{Int64: other.Id, Valid: true}, defaultBrandIdOf(t, h))
+	assert.Equal(t, sql.NullInt64{Int64: other.ID, Valid: true}, defaultBrandIDOf(t, h))
 }
 
 // A database with no settings row has no default brand: a page drawn before the first start's seed
@@ -331,38 +331,38 @@ func TestBrands_ADeletionRacingAChangeOfDefault(t *testing.T) {
 		move, err := h.DB.BeginTransaction(ctx)
 		require.NoError(t, err)
 		t.Cleanup(func() { _ = move.Rollback() })
-		previous, err := h.DB.MakeBrandDefault(ctx, move, target.Id)
+		previous, err := h.DB.MakeBrandDefault(ctx, move, target.ID)
 		require.NoError(t, err)
-		require.Equal(t, seeded.Id, previous)
+		require.Equal(t, seeded.ID, previous)
 
 		done := make(chan error, 1)
-		go func() { done <- deleteBrand(h, target.Id) }()
+		go func() { done <- deleteBrand(h, target.ID) }()
 		awaitBlocked(t, done, "the deletion")
 
 		require.NoError(t, h.DB.CommitTransaction(ctx, move))
 		err = awaitDone(t, done, "the deletion")
 		require.ErrorIs(t, err, data.ErrDefaultBrandNotDeletable, "the deletion decides on the committed move")
 
-		assert.Equal(t, sql.NullInt64{Int64: target.Id, Valid: true}, defaultBrandIdOf(t, h))
-		kept, err := h.DB.GetBrandById(ctx, nil, target.Id)
+		assert.Equal(t, sql.NullInt64{Int64: target.ID, Valid: true}, defaultBrandIDOf(t, h))
+		kept, err := h.DB.GetBrandByID(ctx, nil, target.ID)
 		require.NoError(t, err)
 		assert.NotNil(t, kept, "the default brand is still there")
 	})
 
 	t.Run("a deletion in flight, then a move to the brand it deletes", func(t *testing.T) {
-		before := defaultBrandIdOf(t, h)
+		before := defaultBrandIDOf(t, h)
 		doomed := &record.Brand{Name: "Doomed", Appearance: "dark", Theme: "guava"}
 		require.NoError(t, h.DB.CreateBrand(ctx, nil, doomed))
 
 		deletion, err := h.DB.BeginTransaction(ctx)
 		require.NoError(t, err)
 		t.Cleanup(func() { _ = deletion.Rollback() })
-		_, err = h.DB.DeleteBrand(ctx, deletion, doomed.Id)
+		_, err = h.DB.DeleteBrand(ctx, deletion, doomed.ID)
 		require.NoError(t, err)
 
 		done := make(chan error, 1)
 		go func() {
-			_, moveErr := makeDefault(h, doomed.Id)
+			_, moveErr := makeDefault(h, doomed.ID)
 			done <- moveErr
 		}()
 		awaitBlocked(t, done, "the move")
@@ -371,8 +371,8 @@ func TestBrands_ADeletionRacingAChangeOfDefault(t *testing.T) {
 		err = awaitDone(t, done, "the move")
 		require.ErrorIs(t, err, data.ErrBrandNotFound, "the move decides on the committed deletion")
 
-		assert.Equal(t, before, defaultBrandIdOf(t, h), "the pointer stays where it was")
-		gone, err := h.DB.GetBrandById(ctx, nil, doomed.Id)
+		assert.Equal(t, before, defaultBrandIDOf(t, h), "the pointer stays where it was")
+		gone, err := h.DB.GetBrandByID(ctx, nil, doomed.ID)
 		require.NoError(t, err)
 		assert.Nil(t, gone, "the brand is deleted")
 	})
@@ -400,10 +400,10 @@ func TestSeed_ANewInstallationHasADefaultBrand(t *testing.T) {
 	assertBrandKit(t, &record.Brand{Corners: "rounded", Font: "system-ui", BackgroundFit: "cover"}, &brands[0],
 		"the seeded brand is drawn as before the kit (#813)")
 
-	assert.Equal(t, sql.NullInt64{Int64: brands[0].Id, Valid: true}, defaultBrandIdOf(t, h),
+	assert.Equal(t, sql.NullInt64{Int64: brands[0].ID, Valid: true}, defaultBrandIDOf(t, h),
 		"the settings row points at the seeded brand")
 	def, err := h.DB.GetDefaultBrand(ctx, nil)
 	require.NoError(t, err)
 	require.NotNil(t, def)
-	assert.Equal(t, brands[0].Id, def.Id)
+	assert.Equal(t, brands[0].ID, def.ID)
 }

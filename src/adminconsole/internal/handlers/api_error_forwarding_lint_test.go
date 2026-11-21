@@ -14,7 +14,7 @@ import (
 	"testing"
 )
 
-// TestHandlers_ApiClientErrorsReachTheClassifier refuses a console handler that decides for itself
+// TestHandlers_APIClientErrorsReachTheClassifier refuses a console handler that decides for itself
 // what an auth server API failure means.
 //
 // Every apiclient method funnels a non-2xx through parseAPIError, so "the row is gone", "you typed
@@ -51,7 +51,7 @@ import (
 // follows is itself a problem, because it is a call whose error this rule cannot see go anywhere.
 // The theme list redrawn beside a refused UI theme form was one, written as `if ...; err == nil`,
 // and it dropped the admin API's 401 with every other failure (#427, final review round 2).
-func TestHandlers_ApiClientErrorsReachTheClassifier(t *testing.T) {
+func TestHandlers_APIClientErrorsReachTheClassifier(t *testing.T) {
 	// go test runs with the package directory as the working directory, so ".." is
 	// src/adminconsole/internal.
 	const root = "../handlers"
@@ -502,11 +502,11 @@ func TestHandlers_BlindCatchRuleTable(t *testing.T) {
 	}
 }
 
-// TestHandlers_ApiClientGuardRuleTable holds apiClientGuardProblems to its rules over source text.
+// TestHandlers_APIClientGuardRuleTable holds apiClientGuardProblems to its rules over source text.
 // Its first two rows are the two shapes #427's final review round 2 found dropping the admin API's
 // 401, each as it was before the fix, and the two rows after them are the same reads as they are
 // now. The walk above cannot show either rule failing, because nothing in the tree breaks them.
-func TestHandlers_ApiClientGuardRuleTable(t *testing.T) {
+func TestHandlers_APIClientGuardRuleTable(t *testing.T) {
 	testCases := []struct {
 		name     string
 		body     string
@@ -622,37 +622,37 @@ func TestHandlers_ApiClientGuardRuleTable(t *testing.T) {
 		},
 		{
 			name: "a guard that answers without a classifier is still refused",
-			body: `client, err := apiClient.GetClientById(ctx, token, id)
+			body: `client, err := apiClient.GetClientByID(ctx, token, id)
 				if err != nil {
 					httpHelper.InternalServerError(w, r, err)
 					return
 				}`,
 			guards:   1,
-			problems: []string{"GetClientById is answered here without reaching"},
+			problems: []string{"GetClientByID is answered here without reaching"},
 		},
 		{
 			name: "a classifier named without its package is a local copy, not the classifier",
-			body: `client, err := apiClient.GetClientById(ctx, token, id)
+			body: `client, err := apiClient.GetClientByID(ctx, token, id)
 				if err != nil {
 					HandleAPIError(httpHelper, w, r, err)
 					return
 				}`,
 			guards:   1,
-			problems: []string{"GetClientById is answered here without reaching"},
+			problems: []string{"GetClientByID is answered here without reaching"},
 		},
 		{
 			name: "nor is one named on another package",
-			body: `client, err := apiClient.GetClientById(ctx, token, id)
+			body: `client, err := apiClient.GetClientByID(ctx, token, id)
 				if err != nil {
 					handlers.HandleAPIErrorJSON(httpHelper, w, r, err)
 					return
 				}`,
 			guards:   1,
-			problems: []string{"GetClientById is answered here without reaching"},
+			problems: []string{"GetClientByID is answered here without reaching"},
 		},
 		{
 			name: "the classifier where it lives",
-			body: `client, err := apiClient.GetClientById(ctx, token, id)
+			body: `client, err := apiClient.GetClientByID(ctx, token, id)
 				if err != nil {
 					render.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
 					return
@@ -661,7 +661,7 @@ func TestHandlers_ApiClientGuardRuleTable(t *testing.T) {
 		},
 		{
 			name: "a blind catch in front of the classifier is still refused",
-			body: `client, err := apiClient.GetClientById(ctx, token, id)
+			body: `client, err := apiClient.GetClientByID(ctx, token, id)
 				if err != nil {
 					if errors.As(err, &apiErr) {
 						renderError(apiErr.Message)
@@ -671,7 +671,7 @@ func TestHandlers_ApiClientGuardRuleTable(t *testing.T) {
 					return
 				}`,
 			guards:   1,
-			problems: []string{"GetClientById is caught here for every status"},
+			problems: []string{"GetClientByID is caught here for every status"},
 		},
 	}
 

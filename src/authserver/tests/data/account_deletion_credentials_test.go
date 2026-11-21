@@ -63,13 +63,13 @@ func TestAccountDeletion_RefusesCredentialsReplacedBeforeTheDeletion(t *testing.
 			h := migratedIsolatedDB(t)
 			resource := &record.Resource{ResourceIdentifier: builtin.AuthServerResourceIdentifier}
 			require.NoError(t, h.DB.CreateResource(ctx, nil, resource))
-			manage := &record.Permission{ResourceId: resource.Id, PermissionIdentifier: builtin.ManagePermissionIdentifier}
+			manage := &record.Permission{ResourceID: resource.ID, PermissionIdentifier: builtin.ManagePermissionIdentifier}
 			require.NoError(t, h.DB.CreatePermission(ctx, nil, manage))
 			user := newHolder(t, h.DB, true)
 			hash, err := passwordhash.Hash(password)
 			require.NoError(t, err)
-			require.NoError(t, h.DB.SetUserPasswordHash(ctx, nil, user.Id, hash))
-			user, err = h.DB.GetUserById(ctx, nil, user.Id)
+			require.NoError(t, h.DB.SetUserPasswordHash(ctx, nil, user.ID, hash))
+			user, err = h.DB.GetUserByID(ctx, nil, user.ID)
 			require.NoError(t, err)
 
 			body := map[string]string{"password": password}
@@ -86,15 +86,15 @@ func TestAccountDeletion_RefusesCredentialsReplacedBeforeTheDeletion(t *testing.
 					replacement, hashErr := passwordhash.Hash("A-new-current-password-123!")
 					require.NoError(t, hashErr)
 					require.NoError(t, h.DB.RunInTransaction(ctx, func(tx *sql.Tx) error {
-						if setErr := h.DB.SetUserPasswordHash(ctx, tx, user.Id, replacement); setErr != nil {
+						if setErr := h.DB.SetUserPasswordHash(ctx, tx, user.ID, replacement); setErr != nil {
 							return setErr
 						}
-						_, incrementErr := h.DB.IncrementUserAuthStateGeneration(ctx, tx, user.Id)
+						_, incrementErr := h.DB.IncrementUserAuthStateGeneration(ctx, tx, user.ID)
 						return incrementErr
 					}))
 					return
 				}
-				current, readErr := h.DB.GetUserById(ctx, nil, user.Id)
+				current, readErr := h.DB.GetUserByID(ctx, nil, user.ID)
 				require.NoError(t, readErr)
 				removed, removedOK, removeErr := otpcredential.Remove(ctx, h.DB, current)
 				require.NoError(t, removeErr)
@@ -108,8 +108,8 @@ func TestAccountDeletion_RefusesCredentialsReplacedBeforeTheDeletion(t *testing.
 			require.NoError(t, err)
 			req := httptest.NewRequest(http.MethodPost, "/api/v1/account/deletion", bytes.NewReader(encoded))
 			req.Header.Set("Content-Type", "application/json")
-			reqCtx := reqctx.WithSettings(req.Context(), &record.Settings{Id: 1, AccountDeletionEnabled: true})
-			reqCtx = reqctx.WithValidatedToken(reqCtx, oauth.JwtToken{Claims: map[string]interface{}{
+			reqCtx := reqctx.WithSettings(req.Context(), &record.Settings{ID: 1, AccountDeletionEnabled: true})
+			reqCtx = reqctx.WithValidatedToken(reqCtx, oauth.JWTToken{Claims: map[string]interface{}{
 				"sub": user.Subject, "scope": "authserver:manage-account", "auth_time": float64(1),
 			}})
 			rr := httptest.NewRecorder()
@@ -121,7 +121,7 @@ func TestAccountDeletion_RefusesCredentialsReplacedBeforeTheDeletion(t *testing.
 			var refusal api.ErrorResponse
 			require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &refusal))
 			assert.Equal(t, tc.wantCode, refusal.ErrorCode)
-			kept, err := h.DB.GetUserById(ctx, nil, user.Id)
+			kept, err := h.DB.GetUserByID(ctx, nil, user.ID)
 			require.NoError(t, err)
 			assert.NotNil(t, kept, "the account is kept")
 		})

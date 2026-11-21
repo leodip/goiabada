@@ -14,12 +14,12 @@ import (
 
 // groupDeleteAPI is what the group delete page needs: the group it confirms, and the delete.
 type groupDeleteAPI interface {
-	DeleteGroup(ctx context.Context, accessToken string, groupId int64) error
-	GetGroupById(ctx context.Context, accessToken string, groupId int64) (*api.GroupResponse, error)
+	DeleteGroup(ctx context.Context, accessToken string, groupID int64) error
+	GetGroupByID(ctx context.Context, accessToken string, groupID int64) (*api.GroupResponse, error)
 }
 
 func HandleDeleteGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient groupDeleteAPI,
 ) http.HandlerFunc {
 
@@ -37,13 +37,13 @@ func HandleDeleteGet(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
-		group, err := apiClient.GetGroupById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		group, err := apiClient.GetGroupByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -69,7 +69,7 @@ func HandleDeleteGet(
 }
 
 func HandleDeletePost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient groupDeleteAPI,
 	baseURL string,
 ) http.HandlerFunc {
@@ -89,13 +89,13 @@ func HandleDeletePost(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
-		group, err := apiClient.GetGroupById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		group, err := apiClient.GetGroupByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -134,7 +134,7 @@ func HandleDeletePost(
 		// Delete the group via API. A refusal the administrator can resolve, 409
 		// LAST_ADMINISTRATOR when the group gives the last one manage, is shown on this page
 		// rather than as the 500 page (#402 decision 12).
-		err = apiClient.DeleteGroup(r.Context(), jwtInfo.TokenResponse.AccessToken, group.Id)
+		err = apiClient.DeleteGroup(r.Context(), jwtInfo.TokenResponse.AccessToken, group.ID)
 		if err != nil {
 			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
 			return

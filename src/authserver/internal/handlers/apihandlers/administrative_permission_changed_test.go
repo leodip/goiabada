@@ -24,21 +24,21 @@ import (
 // granted and revoked. Deleting an administrative group keeps its own record alone (#402 decision
 // 6).
 
-// withUserIdOfAUserTarget is want with the user_id a user target's record carries beside its
+// withUserIDOfAUserTarget is want with the user_id a user target's record carries beside its
 // target_id, and want unchanged for a group or a client (#780 decision 5).
-func withUserIdOfAUserTarget(want map[string]interface{}, kind string, targetId int64) map[string]interface{} {
+func withUserIDOfAUserTarget(want map[string]interface{}, kind string, targetID int64) map[string]interface{} {
 	if kind == "user" {
-		want["user_id"] = targetId
+		want["user_id"] = targetID
 	}
 	return want
 }
 
-// assertUserIdOfAUserTarget holds a refusal's user_id to its target: the target's id when the
+// assertUserIDOfAUserTarget holds a refusal's user_id to its target: the target's id when the
 // target is a user, and no user_id at all for any other target (#780 decision 5).
-func assertUserIdOfAUserTarget(t *testing.T, details map[string]interface{}, kind string, targetId int64) {
+func assertUserIDOfAUserTarget(t *testing.T, details map[string]interface{}, kind string, targetID int64) {
 	t.Helper()
 	if kind == "user" {
-		assert.Equal(t, targetId, details["user_id"], "a user target is named by user_id")
+		assert.Equal(t, targetID, details["user_id"], "a user target is named by user_id")
 	} else {
 		assert.NotContains(t, details, "user_id", "a %s target names no user", kind)
 	}
@@ -91,7 +91,7 @@ func TestAdministrativePermissionChanged_APermissionSaveRecordsWhatItGrantsAndRe
 			expectPermissionsExist(database, permManage, permAdminRead, 6, 4)
 			expectAuthServerPermissions(database)
 			datamocks.ExpectRunInTransaction(database, grantsTx)
-			save.expectStored(database, grantRow{id: 21, permissionId: permManageUsers}, grantRow{id: 22, permissionId: 4})
+			save.expectStored(database, grantRow{id: 21, permissionID: permManageUsers}, grantRow{id: 22, permissionID: 4})
 			database.On(save.deleteMethod, mock.Anything, grantsTx, int64(21)).Return(nil).Once()
 			database.On(save.createMethod, mock.Anything, grantsTx, mock.Anything).Return(nil).Times(3)
 			records := recordLoggedEvents(auditLogger)
@@ -106,20 +106,20 @@ func TestAdministrativePermissionChanged_APermissionSaveRecordsWhatItGrantsAndRe
 			want := append(save.existingEvents(3, 1), "administrative_permission_changed", "administrative_permission_changed")
 			assert.Equal(t, want, eventNames(*records), "beside the save's own records, after them, one per direction")
 			assert.Equal(t, []map[string]interface{}{
-				withUserIdOfAUserTarget(map[string]interface{}{
+				withUserIDOfAUserTarget(map[string]interface{}{
 					"change":                 "granted",
 					"target_kind":            save.kind,
-					"target_id":              grantOwnerId,
+					"target_id":              grantOwnerID,
 					"permission_identifiers": []string{"authserver:manage", "authserver:admin-read"},
 					"logged_in_user":         grantCaller,
-				}, save.kind, grantOwnerId),
-				withUserIdOfAUserTarget(map[string]interface{}{
+				}, save.kind, grantOwnerID),
+				withUserIDOfAUserTarget(map[string]interface{}{
 					"change":                 "revoked",
 					"target_kind":            save.kind,
-					"target_id":              grantOwnerId,
+					"target_id":              grantOwnerID,
 					"permission_identifiers": []string{"authserver:manage-users"},
 					"logged_in_user":         grantCaller,
-				}, save.kind, grantOwnerId),
+				}, save.kind, grantOwnerID),
 			}, administrativeChanges(*records))
 		})
 	}
@@ -138,7 +138,7 @@ func TestAdministrativePermissionChanged_AnOrdinaryChangeIsNotRecorded(t *testin
 			expectPermissionsExist(database, permManageAccount, permCustomOnAuthServer)
 			expectAuthServerPermissions(database)
 			datamocks.ExpectRunInTransaction(database, grantsTx)
-			save.expectStored(database, grantRow{id: 21, permissionId: 4})
+			save.expectStored(database, grantRow{id: 21, permissionID: 4})
 			database.On(save.deleteMethod, mock.Anything, grantsTx, int64(21)).Return(nil).Once()
 			database.On(save.createMethod, mock.Anything, grantsTx, mock.Anything).Return(nil).Twice()
 			records := recordLoggedEvents(auditLogger)
@@ -179,7 +179,7 @@ func TestAdministrativePermissionChanged_TheClientRecordNamesWhatTheSaveChanged(
 		expectPermissionsExist(database, permManage, 6)
 		expectAuthServerPermissions(database)
 		datamocks.ExpectRunInTransaction(database, grantsTx)
-		save.expectStored(database, grantRow{id: 21, permissionId: 3}, grantRow{id: 22, permissionId: 6})
+		save.expectStored(database, grantRow{id: 21, permissionID: 3}, grantRow{id: 22, permissionID: 6})
 		database.On(save.deleteMethod, mock.Anything, grantsTx, int64(21)).Return(nil).Once()
 		database.On(save.createMethod, mock.Anything, grantsTx, mock.Anything).Return(nil).Once()
 		records := recordLoggedEvents(auditLogger)
@@ -188,7 +188,7 @@ func TestAdministrativePermissionChanged_TheClientRecordNamesWhatTheSaveChanged(
 
 		require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 		assert.Equal(t, map[string]interface{}{
-			"client_id":              grantOwnerId,
+			"client_id":              grantOwnerID,
 			"granted_permission_ids": []int64{permManage},
 			"revoked_permission_ids": []int64{3},
 			"logged_in_user":         grantCaller,
@@ -202,7 +202,7 @@ func TestAdministrativePermissionChanged_TheClientRecordNamesWhatTheSaveChanged(
 		save.expectOwner(database)
 		expectPermissionsExist(database, 6)
 		datamocks.ExpectRunInTransaction(database, grantsTx)
-		save.expectStored(database, grantRow{id: 22, permissionId: 6})
+		save.expectStored(database, grantRow{id: 22, permissionID: 6})
 		records := recordLoggedEvents(auditLogger)
 
 		rr := save.serveWithScope(database, auditLogger, save.body(t, []int64{6}, []int64{6}), "authserver:manage")
@@ -212,7 +212,7 @@ func TestAdministrativePermissionChanged_TheClientRecordNamesWhatTheSaveChanged(
 		details := clientRecord(t, *records)
 		assert.Equal(t, []int64{}, details["granted_permission_ids"])
 		assert.Equal(t, []int64{}, details["revoked_permission_ids"])
-		assertNotAttemptedOnClientDatabase(t, database, "GetResourceByResourceIdentifier", "GetPermissionsByResourceId")
+		assertNotAttemptedOnClientDatabase(t, database, "GetResourceByResourceIdentifier", "GetPermissionsByResourceID")
 	})
 }
 
@@ -254,17 +254,17 @@ func TestAdministrativePermissionChanged_MovingAUserThroughAnAdministrativeGroup
 			database := datamocks.NewDatabase(t)
 			auditLogger := handlersmocks.NewAuditLogger(t)
 
-			change.expectReads(database, administrativeGroupId, false)
+			change.expectReads(database, administrativeGroupID, false)
 			if change.expectAlertReads != nil {
-				change.expectAlertReads(database, administrativeGroupId)
+				change.expectAlertReads(database, administrativeGroupID)
 			}
-			change.expectWrite(t, database, auditLogger, administrativeGroupId)
+			change.expectWrite(t, database, auditLogger, administrativeGroupID)
 			var changes []map[string]interface{}
 			auditLogger.On("Log", mock.Anything, "administrative_permission_changed", mock.Anything).
 				Run(func(args mock.Arguments) { changes = append(changes, args.Get(2).(map[string]interface{})) }).
 				Return().Once()
 
-			rr := change.serve(database, auditLogger, administrativeGroupId, "authserver:manage-users authserver:manage")
+			rr := change.serve(database, auditLogger, administrativeGroupID, "authserver:manage-users authserver:manage")
 
 			require.Less(t, rr.Code, 300, rr.Body.String())
 			database.AssertExpectations(t)
@@ -272,9 +272,9 @@ func TestAdministrativePermissionChanged_MovingAUserThroughAnAdministrativeGroup
 			assert.Equal(t, []map[string]interface{}{{
 				"change":                 change.change,
 				"target_kind":            "user",
-				"target_id":              ceilingMemberId,
+				"target_id":              ceilingMemberID,
 				"user_id":                int64(42),
-				"group_id":               administrativeGroupId,
+				"group_id":               administrativeGroupID,
 				"permission_identifiers": []string{"authserver:manage"},
 				"logged_in_user":         grantCaller,
 			}}, changes)
@@ -297,10 +297,10 @@ func TestAdministrativePermissionChanged_DeletingAnAdministrativeGroupKeepsItsOw
 
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
-	deletion.expectReads(database, administrativeGroupId, false)
-	deletion.expectWrite(t, database, auditLogger, administrativeGroupId)
+	deletion.expectReads(database, administrativeGroupID, false)
+	deletion.expectWrite(t, database, auditLogger, administrativeGroupID)
 
-	rr := deletion.serve(database, auditLogger, administrativeGroupId, "authserver:manage")
+	rr := deletion.serve(database, auditLogger, administrativeGroupID, "authserver:manage")
 
 	require.Less(t, rr.Code, 300, rr.Body.String())
 	database.AssertExpectations(t)
@@ -317,15 +317,15 @@ func TestAdministrativePermissionChanged_AUserGroupsSaveRecordsEachAdministrativ
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	expectMember(database)
-	database.On("GetGroupsByIds", mock.Anything, (*sql.Tx)(nil), []int64{ordinaryGroupId, administrativeGroupId}).
-		Return([]record.Group{{Id: ordinaryGroupId}, {Id: administrativeGroupId}}, nil).Once()
+	database.On("GetGroupsByIDs", mock.Anything, (*sql.Tx)(nil), []int64{ordinaryGroupID, administrativeGroupID}).
+		Return([]record.Group{{ID: ordinaryGroupID}, {ID: administrativeGroupID}}, nil).Once()
 	datamocks.ExpectRunInTransaction(database, userGroupsTx)
 	expectAdministratorsLock(database, userGroupsTx)
-	expectStoredMemberships(database, membershipRow{id: ceilingMembershipRowId, groupId: adminReadGroupId})
-	expectGuardOfGroup(database, userGroupsTx, adminReadGroupId)
-	database.On("DeleteUserGroup", mock.Anything, userGroupsTx, ceilingMembershipRowId).Return(nil).Once()
+	expectStoredMemberships(database, membershipRow{id: ceilingMembershipRowID, groupID: adminReadGroupID})
+	expectGuardOfGroup(database, userGroupsTx, adminReadGroupID)
+	database.On("DeleteUserGroup", mock.Anything, userGroupsTx, ceilingMembershipRowID).Return(nil).Once()
 	database.On("CreateUserGroup", mock.Anything, userGroupsTx, mock.Anything).Return(nil).Twice()
-	expectGroupPermissionsOn(database, userGroupsTx, ordinaryGroupId, administrativeGroupId, adminReadGroupId)
+	expectGroupPermissionsOn(database, userGroupsTx, ordinaryGroupID, administrativeGroupID, adminReadGroupID)
 	expectAuthServerPermissionsOn(database, userGroupsTx)
 	expectReload(database, nil)
 	records := recordLoggedEvents(auditLogger)
@@ -345,18 +345,18 @@ func TestAdministrativePermissionChanged_AUserGroupsSaveRecordsEachAdministrativ
 		{
 			"change":                 "granted",
 			"target_kind":            "user",
-			"target_id":              ceilingMemberId,
+			"target_id":              ceilingMemberID,
 			"user_id":                int64(42),
-			"group_id":               administrativeGroupId,
+			"group_id":               administrativeGroupID,
 			"permission_identifiers": []string{"authserver:manage"},
 			"logged_in_user":         grantCaller,
 		},
 		{
 			"change":                 "revoked",
 			"target_kind":            "user",
-			"target_id":              ceilingMemberId,
+			"target_id":              ceilingMemberID,
 			"user_id":                int64(42),
-			"group_id":               adminReadGroupId,
+			"group_id":               adminReadGroupID,
 			"permission_identifiers": []string{"authserver:admin-read"},
 			"logged_in_user":         grantCaller,
 		},
@@ -370,14 +370,14 @@ func TestAdministrativePermissionChanged_AFailedReadInTheUserGroupsSaveCommitsNo
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	expectMember(database)
-	database.On("GetGroupsByIds", mock.Anything, (*sql.Tx)(nil), []int64{administrativeGroupId}).
-		Return([]record.Group{{Id: administrativeGroupId}}, nil).Once()
+	database.On("GetGroupsByIDs", mock.Anything, (*sql.Tx)(nil), []int64{administrativeGroupID}).
+		Return([]record.Group{{ID: administrativeGroupID}}, nil).Once()
 	stub := datamocks.ExpectRunInTransaction(database, userGroupsTx)
 	expectAdministratorsLock(database, userGroupsTx)
 	expectStoredMemberships(database)
 	database.On("CreateUserGroup", mock.Anything, userGroupsTx, mock.Anything).Return(nil).Once()
 	readErr := errors.New("the read failed")
-	database.On("GetGroupPermissionsByGroupIds", mock.Anything, userGroupsTx, []int64{administrativeGroupId}).Return(nil, readErr).Once()
+	database.On("GetGroupPermissionsByGroupIDs", mock.Anything, userGroupsTx, []int64{administrativeGroupID}).Return(nil, readErr).Once()
 
 	body := `{"groupIds":[7],"expectedGroupIds":[]}`
 	r := membershipRequest(http.MethodPut, "/api/v1/admin/users/42/groups", body, "authserver:manage", map[string]string{"id": "42"})

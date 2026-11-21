@@ -106,7 +106,7 @@ func columnGroupWrites() []columnGroupWrite {
 			// The fixture draws the flag at random; it starts opposite to what the save writes.
 			seed: func(user *record.User) { user.PhoneNumberVerified = false },
 			apply: func(user *record.User) {
-				user.PhoneNumberCountryUniqueId = "PRT_0"
+				user.PhoneNumberCountryUniqueID = "PRT_0"
 				user.PhoneNumberCountryCallingCode = "+351"
 				user.PhoneNumber = "912 345 678"
 				user.PhoneNumberVerified = true
@@ -117,7 +117,7 @@ func columnGroupWrites() []columnGroupWrite {
 			name: "phone cleared",
 			seed: func(user *record.User) { user.PhoneNumberVerified = true },
 			apply: func(user *record.User) {
-				user.PhoneNumberCountryUniqueId = ""
+				user.PhoneNumberCountryUniqueID = ""
 				user.PhoneNumberCountryCallingCode = ""
 				user.PhoneNumber = ""
 				user.PhoneNumberVerified = false
@@ -139,7 +139,7 @@ func enabledTestUser(t *testing.T, seed func(user *record.User)) *record.User {
 		}
 	}
 	if !user.Enabled {
-		enabled, err := database.TrySetUserEnabled(context.Background(), nil, user.Id, false, true)
+		enabled, err := database.TrySetUserEnabled(context.Background(), nil, user.ID, false, true)
 		if err != nil || !enabled {
 			t.Fatalf("the fixture must start enabled: enabled=%v err=%v", enabled, err)
 		}
@@ -150,9 +150,9 @@ func enabledTestUser(t *testing.T, seed func(user *record.User)) *record.User {
 // changeOTPUnder flips the user's OTP on or off with a new secret, and advances the generation,
 // the three columns establishing or removing an authenticator moves. It writes them from a fresh
 // read, so it stands for an OTP change that completed while the save's request was in flight.
-func changeOTPUnder(t *testing.T, userId int64) {
+func changeOTPUnder(t *testing.T, userID int64) {
 	t.Helper()
-	fresh, err := database.GetUserById(context.Background(), nil, userId)
+	fresh, err := database.GetUserByID(context.Background(), nil, userID)
 	if err != nil || fresh == nil {
 		t.Fatalf("Failed to read the user for the OTP change: user=%v err=%v", fresh, err)
 	}
@@ -162,7 +162,7 @@ func changeOTPUnder(t *testing.T, userId int64) {
 		if updateErr := database.UpdateUser(context.Background(), tx, fresh); updateErr != nil {
 			return updateErr
 		}
-		_, incrementErr := database.IncrementUserOtpConfigGeneration(context.Background(), tx, userId)
+		_, incrementErr := database.IncrementUserOTPConfigGeneration(context.Background(), tx, userID)
 		return incrementErr
 	})
 	if err != nil {
@@ -177,28 +177,28 @@ func TestColumnGroupWrites_ConcurrentDisablePasswordAndOTPChangesSurvive(t *test
 			seeded := enabledTestUser(t, w.seed)
 
 			// The row as the save's request read it at its start.
-			read, err := database.GetUserById(ctx, nil, seeded.Id)
+			read, err := database.GetUserByID(ctx, nil, seeded.ID)
 			if err != nil || read == nil {
 				t.Fatalf("Failed to read the user: user=%v err=%v", read, err)
 			}
 
 			// What other requests change while the save is in flight.
-			disabled, err := database.TrySetUserEnabled(ctx, nil, read.Id, true, false)
+			disabled, err := database.TrySetUserEnabled(ctx, nil, read.ID, true, false)
 			if err != nil || !disabled {
 				t.Fatalf("the concurrent disable must take effect: disabled=%v err=%v", disabled, err)
 			}
 			newHash := "changed-under-the-save-" + fake.Password(32)
-			if err = database.SetUserPasswordHash(ctx, nil, read.Id, newHash); err != nil {
+			if err = database.SetUserPasswordHash(ctx, nil, read.ID, newHash); err != nil {
 				t.Fatalf("the concurrent password change must take effect: %v", err)
 			}
-			changeOTPUnder(t, read.Id)
+			changeOTPUnder(t, read.ID)
 
-			moved, err := database.GetUserById(ctx, nil, read.Id)
+			moved, err := database.GetUserByID(ctx, nil, read.ID)
 			if err != nil || moved == nil {
 				t.Fatalf("Failed to reload the user: user=%v err=%v", moved, err)
 			}
 			if moved.Enabled || moved.PasswordHash != newHash || moved.OTPEnabled == read.OTPEnabled ||
-				moved.OtpConfigGeneration == read.OtpConfigGeneration {
+				moved.OTPConfigGeneration == read.OTPConfigGeneration {
 				t.Fatal("the concurrent changes did not land, so the case would prove nothing")
 			}
 
@@ -209,7 +209,7 @@ func TestColumnGroupWrites_ConcurrentDisablePasswordAndOTPChangesSurvive(t *test
 				t.Fatalf("the save failed: %v", err)
 			}
 
-			after, err := database.GetUserById(ctx, nil, read.Id)
+			after, err := database.GetUserByID(ctx, nil, read.ID)
 			if err != nil || after == nil {
 				t.Fatalf("Failed to reload the saved user: user=%v err=%v", after, err)
 			}
@@ -227,8 +227,8 @@ func TestColumnGroupWrites_ConcurrentDisablePasswordAndOTPChangesSurvive(t *test
 			if after.OTPEnabled != moved.OTPEnabled || string(after.OTPSecretEncrypted) != string(moved.OTPSecretEncrypted) {
 				t.Error("the save reversed an OTP change made under it")
 			}
-			if after.OtpConfigGeneration != moved.OtpConfigGeneration {
-				t.Errorf("OtpConfigGeneration = %d, want %d", after.OtpConfigGeneration, moved.OtpConfigGeneration)
+			if after.OTPConfigGeneration != moved.OTPConfigGeneration {
+				t.Errorf("OTPConfigGeneration = %d, want %d", after.OTPConfigGeneration, moved.OTPConfigGeneration)
 			}
 			if after.AuthStateGeneration != moved.AuthStateGeneration {
 				t.Errorf("AuthStateGeneration = %d, want %d", after.AuthStateGeneration, moved.AuthStateGeneration)
@@ -248,7 +248,7 @@ func TestColumnGroupWrites_ConcurrentDisablePasswordAndOTPChangesSurvive(t *test
 	}
 }
 
-func TestColumnGroupWrites_RefuseUserIdZero(t *testing.T) {
+func TestColumnGroupWrites_RefuseUserIDZero(t *testing.T) {
 	for _, w := range columnGroupWrites() {
 		t.Run(w.name, func(t *testing.T) {
 			user := &record.User{}
@@ -268,7 +268,7 @@ func TestSetUserProfile_LeavesThePageLanguageAloneWhenTheSaveLeavesItOut(t *test
 	user := createTestUser(t)
 
 	// The row as the save's request read it at its start, on Automatic.
-	read, err := database.GetUserById(ctx, nil, user.Id)
+	read, err := database.GetUserByID(ctx, nil, user.ID)
 	if err != nil || read == nil {
 		t.Fatalf("Failed to read the user: user=%v err=%v", read, err)
 	}
@@ -278,7 +278,7 @@ func TestSetUserProfile_LeavesThePageLanguageAloneWhenTheSaveLeavesItOut(t *test
 	}
 
 	// Another save commits German while the first is in flight.
-	chooser, err := database.GetUserById(ctx, nil, user.Id)
+	chooser, err := database.GetUserByID(ctx, nil, user.ID)
 	if err != nil || chooser == nil {
 		t.Fatalf("Failed to read the user: user=%v err=%v", chooser, err)
 	}
@@ -292,7 +292,7 @@ func TestSetUserProfile_LeavesThePageLanguageAloneWhenTheSaveLeavesItOut(t *test
 	if err = database.SetUserProfile(ctx, nil, read, false); err != nil {
 		t.Fatalf("Failed to save the profile: %v", err)
 	}
-	stored, err := database.GetUserById(ctx, nil, user.Id)
+	stored, err := database.GetUserByID(ctx, nil, user.ID)
 	if err != nil || stored == nil {
 		t.Fatalf("Failed to reload the user: user=%v err=%v", stored, err)
 	}
@@ -308,7 +308,7 @@ func TestSetUserProfile_LeavesThePageLanguageAloneWhenTheSaveLeavesItOut(t *test
 	if err = database.SetUserProfile(ctx, nil, read, true); err != nil {
 		t.Fatalf("Failed to save the profile: %v", err)
 	}
-	stored, err = database.GetUserById(ctx, nil, user.Id)
+	stored, err = database.GetUserByID(ctx, nil, user.ID)
 	if err != nil || stored == nil {
 		t.Fatalf("Failed to reload the user: user=%v err=%v", stored, err)
 	}

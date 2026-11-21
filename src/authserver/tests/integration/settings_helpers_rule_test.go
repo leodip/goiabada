@@ -27,7 +27,7 @@ import (
 func populatedSettings() record.Settings {
 	stamp := sql.NullTime{Time: time.Date(2026, 9, 28, 10, 0, 0, 0, time.UTC), Valid: true}
 	return record.Settings{
-		Id:                                      1,
+		ID:                                      1,
 		CreatedAt:                               stamp,
 		UpdatedAt:                               stamp,
 		AppName:                                 "Goiabada",
@@ -39,7 +39,7 @@ func populatedSettings() record.Settings {
 		RefreshTokenOfflineMaxLifetimeInSeconds: 31536000,
 		UserSessionIdleTimeoutInSeconds:         7200,
 		UserSessionMaxLifetimeInSeconds:         86400,
-		IncludeOpenIDConnectClaimsInIdToken:     true,
+		IncludeOpenIDConnectClaimsInIDToken:     true,
 		AESEncryptionKeyLegacy:                  []byte{},
 		SMTPHost:                                "mailpit",
 		SMTPPort:                                1025,
@@ -160,7 +160,7 @@ func TestSettingsChanges_PrintsBothValuesOfAnyOtherField(t *testing.T) {
 func readSettingsRow(t *testing.T) *record.Settings {
 	t.Helper()
 
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
+	settings, err := database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err)
 	require.NotNil(t, settings)
 	return settings

@@ -8,36 +8,36 @@ import (
 )
 
 // =============================================================================
-// Tests for AcrLevel.Priority()
+// Tests for ACRLevel.Priority()
 // =============================================================================
 
-func TestAcrLevel_Priority(t *testing.T) {
+func TestACRLevel_Priority(t *testing.T) {
 	t.Run("All known ACR levels have correct priority ordering", func(t *testing.T) {
 		// Verify exact priority values
-		assert.Equal(t, 1, AcrLevel1.Priority(), "AcrLevel1 should have priority 1")
-		assert.Equal(t, 2, AcrLevel2Optional.Priority(), "AcrLevel2Optional should have priority 2")
-		assert.Equal(t, 3, AcrLevel2Mandatory.Priority(), "AcrLevel2Mandatory should have priority 3")
+		assert.Equal(t, 1, ACRLevel1.Priority(), "ACRLevel1 should have priority 1")
+		assert.Equal(t, 2, ACRLevel2Optional.Priority(), "ACRLevel2Optional should have priority 2")
+		assert.Equal(t, 3, ACRLevel2Mandatory.Priority(), "ACRLevel2Mandatory should have priority 3")
 
 		// Verify ordering relationships
-		assert.Less(t, AcrLevel1.Priority(), AcrLevel2Optional.Priority(),
+		assert.Less(t, ACRLevel1.Priority(), ACRLevel2Optional.Priority(),
 			"level1 priority should be less than level2_optional priority")
-		assert.Less(t, AcrLevel2Optional.Priority(), AcrLevel2Mandatory.Priority(),
+		assert.Less(t, ACRLevel2Optional.Priority(), ACRLevel2Mandatory.Priority(),
 			"level2_optional priority should be less than level2_mandatory priority")
-		assert.Less(t, AcrLevel1.Priority(), AcrLevel2Mandatory.Priority(),
+		assert.Less(t, ACRLevel1.Priority(), ACRLevel2Mandatory.Priority(),
 			"level1 priority should be less than level2_mandatory priority")
 	})
 
 	t.Run("Unknown ACR level returns 0", func(t *testing.T) {
 		testCases := []struct {
 			name     string
-			acrLevel AcrLevel
+			acrLevel ACRLevel
 		}{
-			{"arbitrary unknown string", AcrLevel("unknown:acr:level")},
-			{"empty string", AcrLevel("")},
-			{"whitespace only", AcrLevel("   ")},
-			{"similar but wrong format", AcrLevel("urn:goiabada:level3")},
-			{"partial match", AcrLevel("level1")},
-			{"case sensitive check", AcrLevel("urn:goiabada:LEVEL1")},
+			{"arbitrary unknown string", ACRLevel("unknown:acr:level")},
+			{"empty string", ACRLevel("")},
+			{"whitespace only", ACRLevel("   ")},
+			{"similar but wrong format", ACRLevel("urn:goiabada:level3")},
+			{"partial match", ACRLevel("level1")},
+			{"case sensitive check", ACRLevel("urn:goiabada:LEVEL1")},
 		}
 
 		for _, tc := range testCases {
@@ -50,12 +50,12 @@ func TestAcrLevel_Priority(t *testing.T) {
 }
 
 // =============================================================================
-// Tests for AcrLevel.IsHigherThan() - Exhaustive 3x3 matrix
+// Tests for ACRLevel.IsHigherThan() - Exhaustive 3x3 matrix
 // =============================================================================
 
-func TestAcrLevel_IsHigherThan_ExhaustiveMatrix(t *testing.T) {
+func TestACRLevel_IsHigherThan_ExhaustiveMatrix(t *testing.T) {
 	// Define all ACR levels for exhaustive testing
-	allLevels := []AcrLevel{AcrLevel1, AcrLevel2Optional, AcrLevel2Mandatory}
+	allLevels := []ACRLevel{ACRLevel1, ACRLevel2Optional, ACRLevel2Mandatory}
 
 	// Expected results for IsHigherThan(row, col) where row.IsHigherThan(col)
 	// Matrix[i][j] = true if allLevels[i].IsHigherThan(allLevels[j])
@@ -82,34 +82,34 @@ func TestAcrLevel_IsHigherThan_ExhaustiveMatrix(t *testing.T) {
 	}
 }
 
-func TestAcrLevel_IsHigherThan_UnknownACR(t *testing.T) {
-	unknown := AcrLevel("unknown")
-	empty := AcrLevel("")
+func TestACRLevel_IsHigherThan_UnknownACR(t *testing.T) {
+	unknown := ACRLevel("unknown")
+	empty := ACRLevel("")
 
 	t.Run("unknown ACR vs all known ACRs", func(t *testing.T) {
 		// Unknown (priority 0) is never higher than known levels (priority >= 1)
-		assert.False(t, unknown.IsHigherThan(AcrLevel1))
-		assert.False(t, unknown.IsHigherThan(AcrLevel2Optional))
-		assert.False(t, unknown.IsHigherThan(AcrLevel2Mandatory))
+		assert.False(t, unknown.IsHigherThan(ACRLevel1))
+		assert.False(t, unknown.IsHigherThan(ACRLevel2Optional))
+		assert.False(t, unknown.IsHigherThan(ACRLevel2Mandatory))
 	})
 
 	t.Run("all known ACRs vs unknown ACR", func(t *testing.T) {
 		// Known levels (priority >= 1) are always higher than unknown (priority 0)
-		assert.True(t, AcrLevel1.IsHigherThan(unknown))
-		assert.True(t, AcrLevel2Optional.IsHigherThan(unknown))
-		assert.True(t, AcrLevel2Mandatory.IsHigherThan(unknown))
+		assert.True(t, ACRLevel1.IsHigherThan(unknown))
+		assert.True(t, ACRLevel2Optional.IsHigherThan(unknown))
+		assert.True(t, ACRLevel2Mandatory.IsHigherThan(unknown))
 	})
 
 	t.Run("empty ACR vs all known ACRs", func(t *testing.T) {
-		assert.False(t, empty.IsHigherThan(AcrLevel1))
-		assert.False(t, empty.IsHigherThan(AcrLevel2Optional))
-		assert.False(t, empty.IsHigherThan(AcrLevel2Mandatory))
+		assert.False(t, empty.IsHigherThan(ACRLevel1))
+		assert.False(t, empty.IsHigherThan(ACRLevel2Optional))
+		assert.False(t, empty.IsHigherThan(ACRLevel2Mandatory))
 	})
 
 	t.Run("all known ACRs vs empty ACR", func(t *testing.T) {
-		assert.True(t, AcrLevel1.IsHigherThan(empty))
-		assert.True(t, AcrLevel2Optional.IsHigherThan(empty))
-		assert.True(t, AcrLevel2Mandatory.IsHigherThan(empty))
+		assert.True(t, ACRLevel1.IsHigherThan(empty))
+		assert.True(t, ACRLevel2Optional.IsHigherThan(empty))
+		assert.True(t, ACRLevel2Mandatory.IsHigherThan(empty))
 	})
 
 	t.Run("unknown vs unknown", func(t *testing.T) {
@@ -122,110 +122,110 @@ func TestAcrLevel_IsHigherThan_UnknownACR(t *testing.T) {
 }
 
 // =============================================================================
-// Tests for AcrMax() - Exhaustive 3x3 matrix
+// Tests for ACRMax() - Exhaustive 3x3 matrix
 // =============================================================================
 
-func TestAcrMax_ExhaustiveMatrix(t *testing.T) {
-	allLevels := []AcrLevel{AcrLevel1, AcrLevel2Optional, AcrLevel2Mandatory}
+func TestACRMax_ExhaustiveMatrix(t *testing.T) {
+	allLevels := []ACRLevel{ACRLevel1, ACRLevel2Optional, ACRLevel2Mandatory}
 
-	// Expected results for AcrMax(row, col)
+	// Expected results for ACRMax(row, col)
 	// The result should always be the higher of the two
 	//
 	//                    col: level1       level2_opt       level2_mand
 	// row: level1              level1      level2_opt       level2_mand
 	// row: level2_optional     level2_opt  level2_opt       level2_mand
 	// row: level2_mandatory    level2_mand level2_mand      level2_mand
-	expectedMatrix := [][]AcrLevel{
-		{AcrLevel1, AcrLevel2Optional, AcrLevel2Mandatory},
-		{AcrLevel2Optional, AcrLevel2Optional, AcrLevel2Mandatory},
-		{AcrLevel2Mandatory, AcrLevel2Mandatory, AcrLevel2Mandatory},
+	expectedMatrix := [][]ACRLevel{
+		{ACRLevel1, ACRLevel2Optional, ACRLevel2Mandatory},
+		{ACRLevel2Optional, ACRLevel2Optional, ACRLevel2Mandatory},
+		{ACRLevel2Mandatory, ACRLevel2Mandatory, ACRLevel2Mandatory},
 	}
 
 	for i, rowLevel := range allLevels {
 		for j, colLevel := range allLevels {
 			expected := expectedMatrix[i][j]
 			t.Run(rowLevel.String()+"_and_"+colLevel.String(), func(t *testing.T) {
-				result := AcrMax(rowLevel, colLevel)
+				result := ACRMax(rowLevel, colLevel)
 				assert.Equal(t, expected, result,
-					"AcrMax(%s, %s) should be %s", rowLevel, colLevel, expected)
+					"ACRMax(%s, %s) should be %s", rowLevel, colLevel, expected)
 			})
 		}
 	}
 }
 
-func TestAcrMax_Commutativity(t *testing.T) {
-	// AcrMax should be commutative: AcrMax(a, b) == AcrMax(b, a)
-	allLevels := []AcrLevel{AcrLevel1, AcrLevel2Optional, AcrLevel2Mandatory}
+func TestACRMax_Commutativity(t *testing.T) {
+	// ACRMax should be commutative: ACRMax(a, b) == ACRMax(b, a)
+	allLevels := []ACRLevel{ACRLevel1, ACRLevel2Optional, ACRLevel2Mandatory}
 
 	for _, a := range allLevels {
 		for _, b := range allLevels {
 			t.Run(a.String()+"_commutes_with_"+b.String(), func(t *testing.T) {
-				assert.Equal(t, AcrMax(a, b), AcrMax(b, a),
-					"AcrMax should be commutative: AcrMax(%s, %s) == AcrMax(%s, %s)",
+				assert.Equal(t, ACRMax(a, b), ACRMax(b, a),
+					"ACRMax should be commutative: ACRMax(%s, %s) == ACRMax(%s, %s)",
 					a, b, b, a)
 			})
 		}
 	}
 }
 
-func TestAcrMax_UnknownACR(t *testing.T) {
-	unknown := AcrLevel("unknown")
-	empty := AcrLevel("")
+func TestACRMax_UnknownACR(t *testing.T) {
+	unknown := ACRLevel("unknown")
+	empty := ACRLevel("")
 
 	t.Run("max of known and unknown returns known", func(t *testing.T) {
 		// When one is known (priority > 0) and one is unknown (priority 0),
 		// the known one should be returned
-		assert.Equal(t, AcrLevel1, AcrMax(AcrLevel1, unknown))
-		assert.Equal(t, AcrLevel1, AcrMax(unknown, AcrLevel1))
+		assert.Equal(t, ACRLevel1, ACRMax(ACRLevel1, unknown))
+		assert.Equal(t, ACRLevel1, ACRMax(unknown, ACRLevel1))
 
-		assert.Equal(t, AcrLevel2Optional, AcrMax(AcrLevel2Optional, unknown))
-		assert.Equal(t, AcrLevel2Optional, AcrMax(unknown, AcrLevel2Optional))
+		assert.Equal(t, ACRLevel2Optional, ACRMax(ACRLevel2Optional, unknown))
+		assert.Equal(t, ACRLevel2Optional, ACRMax(unknown, ACRLevel2Optional))
 
-		assert.Equal(t, AcrLevel2Mandatory, AcrMax(AcrLevel2Mandatory, unknown))
-		assert.Equal(t, AcrLevel2Mandatory, AcrMax(unknown, AcrLevel2Mandatory))
+		assert.Equal(t, ACRLevel2Mandatory, ACRMax(ACRLevel2Mandatory, unknown))
+		assert.Equal(t, ACRLevel2Mandatory, ACRMax(unknown, ACRLevel2Mandatory))
 	})
 
 	t.Run("max of known and empty returns known", func(t *testing.T) {
-		assert.Equal(t, AcrLevel1, AcrMax(AcrLevel1, empty))
-		assert.Equal(t, AcrLevel1, AcrMax(empty, AcrLevel1))
+		assert.Equal(t, ACRLevel1, ACRMax(ACRLevel1, empty))
+		assert.Equal(t, ACRLevel1, ACRMax(empty, ACRLevel1))
 
-		assert.Equal(t, AcrLevel2Optional, AcrMax(AcrLevel2Optional, empty))
-		assert.Equal(t, AcrLevel2Optional, AcrMax(empty, AcrLevel2Optional))
+		assert.Equal(t, ACRLevel2Optional, ACRMax(ACRLevel2Optional, empty))
+		assert.Equal(t, ACRLevel2Optional, ACRMax(empty, ACRLevel2Optional))
 
-		assert.Equal(t, AcrLevel2Mandatory, AcrMax(AcrLevel2Mandatory, empty))
-		assert.Equal(t, AcrLevel2Mandatory, AcrMax(empty, AcrLevel2Mandatory))
+		assert.Equal(t, ACRLevel2Mandatory, ACRMax(ACRLevel2Mandatory, empty))
+		assert.Equal(t, ACRLevel2Mandatory, ACRMax(empty, ACRLevel2Mandatory))
 	})
 
 	t.Run("max of two unknowns returns first argument", func(t *testing.T) {
-		// When both have priority 0, AcrMax returns first argument (a >= b is true when both are 0)
-		unknown1 := AcrLevel("unknown1")
-		unknown2 := AcrLevel("unknown2")
+		// When both have priority 0, ACRMax returns first argument (a >= b is true when both are 0)
+		unknown1 := ACRLevel("unknown1")
+		unknown2 := ACRLevel("unknown2")
 
-		assert.Equal(t, unknown1, AcrMax(unknown1, unknown2))
-		assert.Equal(t, unknown2, AcrMax(unknown2, unknown1))
-		assert.Equal(t, unknown, AcrMax(unknown, empty))
-		assert.Equal(t, empty, AcrMax(empty, unknown))
+		assert.Equal(t, unknown1, ACRMax(unknown1, unknown2))
+		assert.Equal(t, unknown2, ACRMax(unknown2, unknown1))
+		assert.Equal(t, unknown, ACRMax(unknown, empty))
+		assert.Equal(t, empty, ACRMax(empty, unknown))
 	})
 }
 
 // =============================================================================
-// Tests for AcrLevelFromString()
+// Tests for ACRLevelFromString()
 // =============================================================================
 
-func TestAcrLevelFromString(t *testing.T) {
+func TestACRLevelFromString(t *testing.T) {
 	t.Run("Valid ACR strings return correct levels", func(t *testing.T) {
 		testCases := []struct {
 			input    string
-			expected AcrLevel
+			expected ACRLevel
 		}{
-			{"urn:goiabada:level1", AcrLevel1},
-			{"urn:goiabada:level2_optional", AcrLevel2Optional},
-			{"urn:goiabada:level2_mandatory", AcrLevel2Mandatory},
+			{"urn:goiabada:level1", ACRLevel1},
+			{"urn:goiabada:level2_optional", ACRLevel2Optional},
+			{"urn:goiabada:level2_mandatory", ACRLevel2Mandatory},
 		}
 
 		for _, tc := range testCases {
 			t.Run(tc.input, func(t *testing.T) {
-				level, err := AcrLevelFromString(tc.input)
+				level, err := ACRLevelFromString(tc.input)
 				require.NoError(t, err)
 				assert.Equal(t, tc.expected, level)
 			})
@@ -252,7 +252,7 @@ func TestAcrLevelFromString(t *testing.T) {
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
-				_, err := AcrLevelFromString(tc.input)
+				_, err := ACRLevelFromString(tc.input)
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), "invalid ACR level")
 			})
@@ -261,31 +261,31 @@ func TestAcrLevelFromString(t *testing.T) {
 }
 
 // =============================================================================
-// Tests for AcrLevel.String()
+// Tests for ACRLevel.String()
 // =============================================================================
 
-func TestAcrLevel_String(t *testing.T) {
+func TestACRLevel_String(t *testing.T) {
 	t.Run("All known ACR levels return correct strings", func(t *testing.T) {
-		assert.Equal(t, "urn:goiabada:level1", AcrLevel1.String())
-		assert.Equal(t, "urn:goiabada:level2_optional", AcrLevel2Optional.String())
-		assert.Equal(t, "urn:goiabada:level2_mandatory", AcrLevel2Mandatory.String())
+		assert.Equal(t, "urn:goiabada:level1", ACRLevel1.String())
+		assert.Equal(t, "urn:goiabada:level2_optional", ACRLevel2Optional.String())
+		assert.Equal(t, "urn:goiabada:level2_mandatory", ACRLevel2Mandatory.String())
 	})
 
-	t.Run("String and AcrLevelFromString are inverse operations", func(t *testing.T) {
-		allLevels := []AcrLevel{AcrLevel1, AcrLevel2Optional, AcrLevel2Mandatory}
+	t.Run("String and ACRLevelFromString are inverse operations", func(t *testing.T) {
+		allLevels := []ACRLevel{ACRLevel1, ACRLevel2Optional, ACRLevel2Mandatory}
 
 		for _, level := range allLevels {
 			t.Run(level.String(), func(t *testing.T) {
 				// Convert to string and back
 				str := level.String()
-				parsed, err := AcrLevelFromString(str)
+				parsed, err := ACRLevelFromString(str)
 				require.NoError(t, err)
 				assert.Equal(t, level, parsed)
 			})
 		}
 	})
 
-	// The complement of the totality the six integer enums gained in #385: AcrLevel is
+	// The complement of the totality the six integer enums gained in #385: ACRLevel is
 	// string-backed, so there is no range to be outside of, and an unrecognized value has to
 	// survive rather than collapse to "". OIDC Core defines acr as a case-sensitive string whose
 	// meaning can be deployment-specific, so discarding one would change what a token carries for
@@ -303,9 +303,9 @@ func TestAcrLevel_String(t *testing.T) {
 
 		for _, raw := range testCases {
 			t.Run(raw, func(t *testing.T) {
-				assert.Equal(t, raw, AcrLevel(raw).String(),
+				assert.Equal(t, raw, ACRLevel(raw).String(),
 					"String must not collapse an acr value this server does not rank")
-				assert.Equal(t, 0, AcrLevel(raw).Priority(),
+				assert.Equal(t, 0, ACRLevel(raw).Priority(),
 					"and it must rank 0, which is what makes keeping the value safe")
 			})
 		}
@@ -316,15 +316,15 @@ func TestAcrLevel_String(t *testing.T) {
 // Property-based tests for mathematical properties
 // =============================================================================
 
-func TestAcrLevel_MathematicalProperties(t *testing.T) {
-	allLevels := []AcrLevel{AcrLevel1, AcrLevel2Optional, AcrLevel2Mandatory}
+func TestACRLevel_MathematicalProperties(t *testing.T) {
+	allLevels := []ACRLevel{ACRLevel1, ACRLevel2Optional, ACRLevel2Mandatory}
 
 	t.Run("Transitivity: if a > b and b > c then a > c", func(t *testing.T) {
 		// level2_mandatory > level2_optional > level1
 		// Therefore: level2_mandatory > level1
-		assert.True(t, AcrLevel2Mandatory.IsHigherThan(AcrLevel2Optional))
-		assert.True(t, AcrLevel2Optional.IsHigherThan(AcrLevel1))
-		assert.True(t, AcrLevel2Mandatory.IsHigherThan(AcrLevel1))
+		assert.True(t, ACRLevel2Mandatory.IsHigherThan(ACRLevel2Optional))
+		assert.True(t, ACRLevel2Optional.IsHigherThan(ACRLevel1))
+		assert.True(t, ACRLevel2Mandatory.IsHigherThan(ACRLevel1))
 	})
 
 	t.Run("Antisymmetry: if a > b then NOT b > a", func(t *testing.T) {
@@ -371,12 +371,12 @@ func TestAcrLevel_MathematicalProperties(t *testing.T) {
 		}
 	})
 
-	t.Run("AcrMax is associative: max(max(a,b),c) == max(a,max(b,c))", func(t *testing.T) {
+	t.Run("ACRMax is associative: max(max(a,b),c) == max(a,max(b,c))", func(t *testing.T) {
 		for _, a := range allLevels {
 			for _, b := range allLevels {
 				for _, c := range allLevels {
-					left := AcrMax(AcrMax(a, b), c)
-					right := AcrMax(a, AcrMax(b, c))
+					left := ACRMax(ACRMax(a, b), c)
+					right := ACRMax(a, ACRMax(b, c))
 					assert.Equal(t, left, right,
 						"Associativity violated: max(max(%s,%s),%s) != max(%s,max(%s,%s))",
 						a, b, c, a, b, c)
@@ -385,9 +385,9 @@ func TestAcrLevel_MathematicalProperties(t *testing.T) {
 		}
 	})
 
-	t.Run("AcrMax is idempotent: max(a,a) == a", func(t *testing.T) {
+	t.Run("ACRMax is idempotent: max(a,a) == a", func(t *testing.T) {
 		for _, level := range allLevels {
-			assert.Equal(t, level, AcrMax(level, level),
+			assert.Equal(t, level, ACRMax(level, level),
 				"Idempotency violated: max(%s,%s) != %s", level, level, level)
 		}
 	})
@@ -397,11 +397,11 @@ func TestAcrLevel_MathematicalProperties(t *testing.T) {
 // Integration test: verify priority map covers all defined ACR levels
 // =============================================================================
 
-func TestAcrLevel_PriorityMapCompleteness(t *testing.T) {
+func TestACRLevel_PriorityMapCompleteness(t *testing.T) {
 	t.Run("All defined ACR levels have a priority", func(t *testing.T) {
-		// This test ensures that if someone adds a new AcrLevel constant,
+		// This test ensures that if someone adds a new ACRLevel constant,
 		// they must also add it to the priority map
-		definedLevels := []AcrLevel{AcrLevel1, AcrLevel2Optional, AcrLevel2Mandatory}
+		definedLevels := []ACRLevel{ACRLevel1, ACRLevel2Optional, ACRLevel2Mandatory}
 
 		for _, level := range definedLevels {
 			priority := level.Priority()
@@ -411,8 +411,8 @@ func TestAcrLevel_PriorityMapCompleteness(t *testing.T) {
 	})
 
 	t.Run("Priority values are unique", func(t *testing.T) {
-		definedLevels := []AcrLevel{AcrLevel1, AcrLevel2Optional, AcrLevel2Mandatory}
-		seenPriorities := make(map[int]AcrLevel)
+		definedLevels := []ACRLevel{ACRLevel1, ACRLevel2Optional, ACRLevel2Mandatory}
+		seenPriorities := make(map[int]ACRLevel)
 
 		for _, level := range definedLevels {
 			priority := level.Priority()
@@ -424,7 +424,7 @@ func TestAcrLevel_PriorityMapCompleteness(t *testing.T) {
 	})
 
 	t.Run("Priority values are consecutive starting from 1", func(t *testing.T) {
-		definedLevels := []AcrLevel{AcrLevel1, AcrLevel2Optional, AcrLevel2Mandatory}
+		definedLevels := []ACRLevel{ACRLevel1, ACRLevel2Optional, ACRLevel2Mandatory}
 		priorities := make([]int, len(definedLevels))
 
 		for i, level := range definedLevels {

@@ -85,15 +85,15 @@ func TestValidateTokenRequest_RefreshGrant_ATokenOfAnEarlierIssuer(t *testing.T)
 				// A public client and a code issued without PKCE, and a disabled user: each would
 				// refuse the token if the issuer did not first.
 				clients := map[string]*record.Client{
-					"owner":    {Id: 1, ClientIdentifier: "owner", Enabled: true, AuthorizationCodeEnabled: true, IsPublic: true},
-					"stranger": {Id: 2, ClientIdentifier: "stranger", Enabled: true, AuthorizationCodeEnabled: true, IsPublic: true},
+					"owner":    {ID: 1, ClientIdentifier: "owner", Enabled: true, AuthorizationCodeEnabled: true, IsPublic: true},
+					"stranger": {ID: 2, ClientIdentifier: "stranger", Enabled: true, AuthorizationCodeEnabled: true, IsPublic: true},
 				}
 				clientIdentifier := "owner"
 				if a.clientIdentifier != "" {
 					clientIdentifier = a.clientIdentifier
 				}
-				user := record.User{Id: 7, Enabled: false, AuthStateGeneration: 3}
-				refreshToken := &record.RefreshToken{Id: 21, RefreshTokenJti: "the_jti", FirstRefreshTokenJti: "family-jti",
+				user := record.User{ID: 7, Enabled: false, AuthStateGeneration: 3}
+				refreshToken := &record.RefreshToken{ID: 21, RefreshTokenJTI: "the_jti", FirstRefreshTokenJTI: "family-jti",
 					AuthStateGeneration: 3}
 				if a.binding != "" {
 					refreshToken.DPoPJkt = sql.NullString{String: a.binding, Valid: true}
@@ -101,21 +101,21 @@ func TestValidateTokenRequest_RefreshGrant_ATokenOfAnEarlierIssuer(t *testing.T)
 				typ := "Refresh"
 				if ropc {
 					typ = "Offline"
-					refreshToken.ClientId = sql.NullInt64{Int64: 1, Valid: true}
-					refreshToken.UserId = sql.NullInt64{Int64: 7, Valid: true}
+					refreshToken.ClientID = sql.NullInt64{Int64: 1, Valid: true}
+					refreshToken.UserID = sql.NullInt64{Int64: 7, Valid: true}
 					refreshToken.User = user
 					refreshToken.AuthenticatedAt = sql.NullTime{Time: time.Now().UTC().Add(-time.Hour), Valid: true}
 				} else {
-					refreshToken.CodeId = sql.NullInt64{Int64: 11, Valid: true}
-					refreshToken.Code = record.Code{Id: 11, ClientId: 1, UserId: 7, User: user}
+					refreshToken.CodeID = sql.NullInt64{Int64: 11, Valid: true}
+					refreshToken.Code = record.Code{ID: 11, ClientID: 1, UserID: 7, User: user}
 				}
 
 				mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, clientIdentifier).
 					Return(clients[clientIdentifier], nil).Once()
 				mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "the_refresh_token", true).
-					Return(&oauth.JwtToken{Claims: jwt.MapClaims{"jti": "the_jti", "typ": typ, "iss": a.iss, "aud": a.aud,
+					Return(&oauth.JWTToken{Claims: jwt.MapClaims{"jti": "the_jti", "typ": typ, "iss": a.iss, "aud": a.aud,
 						"offline_access_max_lifetime": float64(time.Now().Add(time.Hour).Unix())}}, nil).Once()
-				mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "the_jti").Return(refreshToken, nil).Once()
+				mockDB.On("GetRefreshTokenByJTI", mock.Anything, mock.Anything, "the_jti").Return(refreshToken, nil).Once()
 				if ropc {
 					mockDB.On("RefreshTokenLoadUser", mock.Anything, mock.Anything, refreshToken).Return(nil).Once()
 					mockDB.On("RefreshTokenLoadClient", mock.Anything, mock.Anything, refreshToken).Return(nil).Once()
@@ -128,7 +128,7 @@ func TestValidateTokenRequest_RefreshGrant_ATokenOfAnEarlierIssuer(t *testing.T)
 				grant, err := validator.ValidateTokenRequest(context.Background(), &record.Settings{Issuer: currentIssuer},
 					&ValidateTokenRequestInput{
 						GrantType:    "refresh_token",
-						ClientId:     clientIdentifier,
+						ClientID:     clientIdentifier,
 						RefreshToken: "the_refresh_token",
 					})
 
@@ -164,29 +164,29 @@ func TestValidateTokenRequest_RefreshGrant_ARotatedTokenOfAnEarlierIssuerGoesOnT
 	mockTokenParser := protocolvalidationmocks.NewTokenParser(t)
 	validator := NewTokenValidator(mockDB, mockTokenParser, protocolvalidationmocks.NewPermissionChecker(t), testDataCipher)
 
-	client := &record.Client{Id: 1, ClientIdentifier: "owner", Enabled: true, IsPublic: true}
+	client := &record.Client{ID: 1, ClientIdentifier: "owner", Enabled: true, IsPublic: true}
 	refreshToken := &record.RefreshToken{
-		Id: 21, RefreshTokenJti: "the_jti", FirstRefreshTokenJti: "family-jti", AuthStateGeneration: 3, Revoked: true,
-		ClientId:        sql.NullInt64{Int64: 1, Valid: true},
-		UserId:          sql.NullInt64{Int64: 7, Valid: true},
-		User:            record.User{Id: 7, Enabled: true, AuthStateGeneration: 3},
+		ID: 21, RefreshTokenJTI: "the_jti", FirstRefreshTokenJTI: "family-jti", AuthStateGeneration: 3, Revoked: true,
+		ClientID:        sql.NullInt64{Int64: 1, Valid: true},
+		UserID:          sql.NullInt64{Int64: 7, Valid: true},
+		User:            record.User{ID: 7, Enabled: true, AuthStateGeneration: 3},
 		AuthenticatedAt: sql.NullTime{Time: time.Now().UTC().Add(-time.Hour), Valid: true},
 		Scope:           "openid",
 	}
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "owner").Return(client, nil).Once()
 	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "the_refresh_token", true).
-		Return(&oauth.JwtToken{Claims: jwt.MapClaims{"jti": "the_jti", "typ": "Offline", "sub": "user-7",
+		Return(&oauth.JWTToken{Claims: jwt.MapClaims{"jti": "the_jti", "typ": "Offline", "sub": "user-7",
 			"iss": earlierIssuer, "aud": earlierIssuer,
 			"offline_access_max_lifetime": float64(time.Now().Add(time.Hour).Unix())}}, nil).Once()
-	mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "the_jti").Return(refreshToken, nil).Once()
+	mockDB.On("GetRefreshTokenByJTI", mock.Anything, mock.Anything, "the_jti").Return(refreshToken, nil).Once()
 	mockDB.On("RefreshTokenLoadUser", mock.Anything, mock.Anything, refreshToken).Return(nil).Once()
 	mockDB.On("RefreshTokenLoadClient", mock.Anything, mock.Anything, refreshToken).Return(nil).Once()
-	mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user-7").Return(&record.User{Id: 7, Enabled: true}, nil).Once()
+	mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user-7").Return(&record.User{ID: 7, Enabled: true}, nil).Once()
 
 	capture := logtest.CaptureSlog(t)
 	result, err := validator.ValidateTokenRequest(context.Background(), &record.Settings{Issuer: currentIssuer},
-		&ValidateTokenRequestInput{GrantType: "refresh_token", ClientId: "owner", RefreshToken: "the_refresh_token"})
+		&ValidateTokenRequestInput{GrantType: "refresh_token", ClientID: "owner", RefreshToken: "the_refresh_token"})
 
 	require.NoError(t, err)
 	grant := grantAs[*RefreshTokenGrant](t, result)

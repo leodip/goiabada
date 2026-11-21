@@ -44,12 +44,12 @@ func TestCreateRedirectURI_AURIAtTheBoundRoundTrips(t *testing.T) {
 	for _, tc := range redirectURIsAtTheBound(t) {
 		t.Run(tc.name, func(t *testing.T) {
 			client := createTestClient(t)
-			redirectURI := &record.RedirectURI{URI: tc.value, ClientId: client.Id}
+			redirectURI := &record.RedirectURI{URI: tc.value, ClientID: client.ID}
 
 			err := database.CreateRedirectURI(context.Background(), nil, redirectURI)
 			require.NoError(t, err, "a redirect URI of %d bytes was refused by the column", record.RedirectURIMaxBytes)
 
-			stored, err := database.GetRedirectURIById(context.Background(), nil, redirectURI.Id)
+			stored, err := database.GetRedirectURIByID(context.Background(), nil, redirectURI.ID)
 			require.NoError(t, err)
 			require.NotNil(t, stored)
 			require.Equal(t, tc.value, stored.URI, "the redirect URI did not round-trip unchanged")
@@ -61,7 +61,7 @@ func TestCreateRedirectURI(t *testing.T) {
 	client := createTestClient(t)
 	redirectURI := &record.RedirectURI{
 		URI:      "https://example.com/callback",
-		ClientId: client.Id,
+		ClientID: client.ID,
 	}
 
 	err := database.CreateRedirectURI(context.Background(), nil, redirectURI)
@@ -69,14 +69,14 @@ func TestCreateRedirectURI(t *testing.T) {
 		t.Fatalf("Failed to create redirect URI: %v", err)
 	}
 
-	if redirectURI.Id == 0 {
+	if redirectURI.ID == 0 {
 		t.Error("Expected non-zero ID after creation")
 	}
 	if !redirectURI.CreatedAt.Valid || redirectURI.CreatedAt.Time.IsZero() {
 		t.Error("Expected CreatedAt to be set")
 	}
 
-	retrievedRedirectURI, err := database.GetRedirectURIById(context.Background(), nil, redirectURI.Id)
+	retrievedRedirectURI, err := database.GetRedirectURIByID(context.Background(), nil, redirectURI.ID)
 	if err != nil {
 		t.Fatalf("Failed to retrieve created redirect URI: %v", err)
 	}
@@ -84,42 +84,42 @@ func TestCreateRedirectURI(t *testing.T) {
 	if retrievedRedirectURI.URI != redirectURI.URI {
 		t.Errorf("Expected URI %s, got %s", redirectURI.URI, retrievedRedirectURI.URI)
 	}
-	if retrievedRedirectURI.ClientId != redirectURI.ClientId {
-		t.Errorf("Expected ClientId %d, got %d", redirectURI.ClientId, retrievedRedirectURI.ClientId)
+	if retrievedRedirectURI.ClientID != redirectURI.ClientID {
+		t.Errorf("Expected ClientID %d, got %d", redirectURI.ClientID, retrievedRedirectURI.ClientID)
 	}
 }
 
-func TestGetRedirectURIById(t *testing.T) {
+func TestGetRedirectURIByID(t *testing.T) {
 	client := createTestClient(t)
-	redirectURI := createTestRedirectURI(t, client.Id)
+	redirectURI := createTestRedirectURI(t, client.ID)
 
-	retrievedRedirectURI, err := database.GetRedirectURIById(context.Background(), nil, redirectURI.Id)
+	retrievedRedirectURI, err := database.GetRedirectURIByID(context.Background(), nil, redirectURI.ID)
 	if err != nil {
 		t.Fatalf("Failed to get redirect URI by ID: %v", err)
 	}
 
-	if retrievedRedirectURI.Id != redirectURI.Id {
-		t.Errorf("Expected ID %d, got %d", redirectURI.Id, retrievedRedirectURI.Id)
+	if retrievedRedirectURI.ID != redirectURI.ID {
+		t.Errorf("Expected ID %d, got %d", redirectURI.ID, retrievedRedirectURI.ID)
 	}
 	if retrievedRedirectURI.URI != redirectURI.URI {
 		t.Errorf("Expected URI %s, got %s", redirectURI.URI, retrievedRedirectURI.URI)
 	}
 
-	nonExistentRedirectURI, err := database.GetRedirectURIById(context.Background(), nil, 99999)
+	nonExistentRedirectURI, err := database.GetRedirectURIByID(context.Background(), nil, 99999)
 	if err != nil {
 		t.Errorf("Expected no error for non-existent redirect URI, got: %v", err)
 	}
 	if nonExistentRedirectURI != nil {
-		t.Errorf("Expected nil for non-existent redirect URI, got a redirect URI with ID: %d", nonExistentRedirectURI.Id)
+		t.Errorf("Expected nil for non-existent redirect URI, got a redirect URI with ID: %d", nonExistentRedirectURI.ID)
 	}
 }
 
-func TestGetRedirectURIsByClientId(t *testing.T) {
+func TestGetRedirectURIsByClientID(t *testing.T) {
 	client := createTestClient(t)
-	redirectURI1 := createTestRedirectURI(t, client.Id)
-	redirectURI2 := createTestRedirectURI(t, client.Id)
+	redirectURI1 := createTestRedirectURI(t, client.ID)
+	redirectURI2 := createTestRedirectURI(t, client.ID)
 
-	redirectURIs, err := database.GetRedirectURIsByClientId(context.Background(), nil, client.Id)
+	redirectURIs, err := database.GetRedirectURIsByClientID(context.Background(), nil, client.ID)
 	if err != nil {
 		t.Fatalf("Failed to get redirect URIs by client ID: %v", err)
 	}
@@ -131,29 +131,29 @@ func TestGetRedirectURIsByClientId(t *testing.T) {
 	foundURI1 := false
 	foundURI2 := false
 	for _, uri := range redirectURIs {
-		if uri.Id == redirectURI1.Id {
+		if uri.ID == redirectURI1.ID {
 			foundURI1 = true
 		}
-		if uri.Id == redirectURI2.Id {
+		if uri.ID == redirectURI2.ID {
 			foundURI2 = true
 		}
 	}
 
 	if !foundURI1 || !foundURI2 {
-		t.Error("Not all created redirect URIs were found in GetRedirectURIsByClientId result")
+		t.Error("Not all created redirect URIs were found in GetRedirectURIsByClientID result")
 	}
 }
 
 func TestDeleteRedirectURI(t *testing.T) {
 	client := createTestClient(t)
-	redirectURI := createTestRedirectURI(t, client.Id)
+	redirectURI := createTestRedirectURI(t, client.ID)
 
-	err := database.DeleteRedirectURI(context.Background(), nil, redirectURI.Id)
+	err := database.DeleteRedirectURI(context.Background(), nil, redirectURI.ID)
 	if err != nil {
 		t.Fatalf("Failed to delete redirect URI: %v", err)
 	}
 
-	deletedRedirectURI, err := database.GetRedirectURIById(context.Background(), nil, redirectURI.Id)
+	deletedRedirectURI, err := database.GetRedirectURIByID(context.Background(), nil, redirectURI.ID)
 	if err != nil {
 		t.Fatalf("Error while checking for deleted redirect URI: %v", err)
 	}
@@ -167,10 +167,10 @@ func TestDeleteRedirectURI(t *testing.T) {
 	}
 }
 
-func createTestRedirectURI(t *testing.T, clientId int64) *record.RedirectURI {
+func createTestRedirectURI(t *testing.T, clientID int64) *record.RedirectURI {
 	redirectURI := &record.RedirectURI{
 		URI:      "https://example.com/callback_" + fake.LetterN(6),
-		ClientId: clientId,
+		ClientID: clientID,
 	}
 	err := database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	if err != nil {

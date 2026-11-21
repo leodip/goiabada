@@ -22,7 +22,7 @@ type accountPhoneAPI interface {
 }
 
 func HandlePhoneGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient accountPhoneAPI,
 ) http.HandlerFunc {
@@ -30,9 +30,9 @@ func HandlePhoneGet(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get JWT info to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
@@ -57,7 +57,7 @@ func HandlePhoneGet(
 		}
 
 		bind := map[string]interface{}{
-			"selectedPhoneCountryUniqueId": user.PhoneNumberCountryUniqueId,
+			"selectedPhoneCountryUniqueId": user.PhoneNumberCountryUniqueID,
 			"phoneNumber":                  user.PhoneNumber,
 			"phoneCountries":               phoneCountries,
 			"savedSuccessfully":            savedSuccessfully,
@@ -71,7 +71,7 @@ func HandlePhoneGet(
 }
 
 func HandlePhonePost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient accountPhoneAPI,
 	baseURL string,
@@ -80,22 +80,22 @@ func HandlePhonePost(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get access token and current data for re-rendering errors
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
 		// Build request
 		req := &api.UpdateAccountPhoneRequest{
-			PhoneCountryUniqueId: r.FormValue("phoneCountryUniqueId"),
+			PhoneCountryUniqueID: r.FormValue("phoneCountryUniqueId"),
 			PhoneNumber:          strings.TrimSpace(r.FormValue("phoneNumber")),
 		}
 
 		// On validation error, re-render with submitted values, the refused field marked.
 		renderError := func(errorMessage, errorField string) {
 			bind := map[string]interface{}{
-				"selectedPhoneCountryUniqueId": req.PhoneCountryUniqueId,
+				"selectedPhoneCountryUniqueId": req.PhoneCountryUniqueID,
 				"phoneNumber":                  req.PhoneNumber,
 				"phoneCountries":               phoneCountries,
 				"error":                        errorMessage,

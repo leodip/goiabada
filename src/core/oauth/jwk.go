@@ -1,6 +1,6 @@
 package oauth
 
-type Jwk struct {
+type JWK struct {
 	Alg string `json:"alg"`
 	Kid string `json:"kid"`
 	Kty string `json:"kty"`
@@ -9,6 +9,6 @@ type Jwk struct {
 	E   string `json:"e"`
 }
 
-type Jwks struct {
-	Keys []Jwk `json:"keys"`
+type JWKS struct {
+	Keys []JWK `json:"keys"`
 }

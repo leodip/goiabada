@@ -132,11 +132,11 @@ func pageSafeMode(ctx context.Context) bool {
 func pageBrandOf(ctx context.Context, assets brandasset.SlotsReader, brand *record.Brand) PageBrand {
 	slots, err := brandasset.ReadSlots(ctx, assets, nil, brand)
 	if err != nil {
-		slog.ErrorContext(ctx, "unable to read the assets of the brand a page is drawn in", "brand_id", brand.Id, "error", err)
+		slog.ErrorContext(ctx, "unable to read the assets of the brand a page is drawn in", "brand_id", brand.ID, "error", err)
 		return PageBrand{}
 	}
 	unlinkable := func(err error) PageBrand {
-		slog.ErrorContext(ctx, "unable to link the brand's stylesheet", "brand_id", brand.Id, "error", err)
+		slog.ErrorContext(ctx, "unable to link the brand's stylesheet", "brand_id", brand.ID, "error", err)
 		return PageBrand{}
 	}
 	safeStylesheet, err := brandthemes.SafeStylesheetPath(brand, slots)

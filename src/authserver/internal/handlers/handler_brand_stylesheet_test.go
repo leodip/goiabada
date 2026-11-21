@@ -114,7 +114,7 @@ const (
 // on System UI, which draws as a brand did before the kit.
 func themedBrand(id int64, theme string) *record.Brand {
 	brand := record.NewBrand("Shop", record.BrandAppearanceAuto, theme)
-	brand.Id = id
+	brand.ID = id
 	return &brand
 }
 
@@ -126,9 +126,9 @@ func kitBrand(theme string, corners record.BrandCorners, font record.BrandFont) 
 }
 
 // brandStylesheetPath is a brand's stylesheet path as the pages link it, fingerprint included.
-func brandStylesheetPath(t *testing.T, brandId int64, theme string) string {
+func brandStylesheetPath(t *testing.T, brandID int64, theme string) string {
 	t.Helper()
-	path, err := brandthemes.StylesheetPath(themedBrand(brandId, theme), brandasset.Slots{})
+	path, err := brandthemes.StylesheetPath(themedBrand(brandID, theme), brandasset.Slots{})
 	require.NoError(t, err)
 	return path
 }
@@ -151,7 +151,7 @@ func getStylesheetFrom(t *testing.T, handler func(PageRenderer, brandStylesheetD
 	target string, brand *record.Brand) *httptest.ResponseRecorder {
 	t.Helper()
 	database := datamocks.NewDatabase(t)
-	database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(brand, nil).Once()
+	database.On("GetBrandByID", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(brand, nil).Once()
 
 	req := withPathValue(httptest.NewRequest(http.MethodGet, target, nil), "id", "7")
 	rr := httptest.NewRecorder()
@@ -244,7 +244,7 @@ func TestHandleBrandStylesheetGet_UnknownBrandIsNotFound(t *testing.T) {
 }
 
 // An id that names no brand at all is not looked up.
-func TestHandleBrandStylesheetGet_MalformedIdIsNotFound(t *testing.T) {
+func TestHandleBrandStylesheetGet_MalformedIDIsNotFound(t *testing.T) {
 	for _, id := range []string{"", "abc", "-1", "0", "7x", "99999999999999999999"} {
 		t.Run(id, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
@@ -263,7 +263,7 @@ func TestHandleBrandStylesheetGet_MalformedIdIsNotFound(t *testing.T) {
 func TestHandleBrandStylesheetGet_FaultsAreServerErrors(t *testing.T) {
 	t.Run("database", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
-		database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(nil, errors.New("connection refused")).Once()
+		database.On("GetBrandByID", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(nil, errors.New("connection refused")).Once()
 		pageRenderer := handlersmocks.NewPageRenderer(t)
 		pageRenderer.On("InternalServerError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
 			return strings.Contains(err.Error(), "connection refused")
@@ -274,8 +274,8 @@ func TestHandleBrandStylesheetGet_FaultsAreServerErrors(t *testing.T) {
 	})
 	t.Run("unknown theme", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
-		database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(7)).
-			Return(&record.Brand{Id: 7, Name: "Shop", Appearance: record.BrandAppearanceAuto, Theme: "lime"}, nil).Once()
+		database.On("GetBrandByID", mock.Anything, (*sql.Tx)(nil), int64(7)).
+			Return(&record.Brand{ID: 7, Name: "Shop", Appearance: record.BrandAppearanceAuto, Theme: "lime"}, nil).Once()
 		pageRenderer := handlersmocks.NewPageRenderer(t)
 		pageRenderer.On("InternalServerError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
 			return strings.Contains(err.Error(), "lime")
@@ -471,7 +471,7 @@ func TestHandleBrandColorsStylesheetGet_AnswersFaultsAsTheFullOneDoes(t *testing
 	assert.Equal(t, http.StatusNotFound, rr.Code)
 
 	database = datamocks.NewDatabase(t)
-	database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(themedBrand(7, "lime"), nil).Once()
+	database.On("GetBrandByID", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(themedBrand(7, "lime"), nil).Once()
 	pageRenderer := handlersmocks.NewPageRenderer(t)
 	pageRenderer.On("InternalServerError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
 		return strings.Contains(err.Error(), "lime")
@@ -484,7 +484,7 @@ func TestHandleBrandColorsStylesheetGet_AnswersFaultsAsTheFullOneDoes(t *testing
 
 // kitAsset is a stored asset as a slot names it, read without its bytes.
 func kitAsset(id int64, kind record.BrandAssetKind, fingerprint string) record.BrandAsset {
-	return record.BrandAsset{Id: id, Kind: kind, ContentType: "image/png", Fingerprint: fingerprint, Width: 64, Height: 64}
+	return record.BrandAsset{ID: id, Kind: kind, ContentType: "image/png", Fingerprint: fingerprint, Width: 64, Height: 64}
 }
 
 // getFullStylesheetWithAssets requests target from the full stylesheet's handler, the brand of id 7
@@ -493,8 +493,8 @@ func getFullStylesheetWithAssets(t *testing.T, target string, brand *record.Bran
 	assets []record.BrandAsset) *httptest.ResponseRecorder {
 	t.Helper()
 	database := datamocks.NewDatabase(t)
-	database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(brand, nil).Once()
-	database.On("GetBrandAssetsByIds", mock.Anything, (*sql.Tx)(nil), ids).Return(assets, nil).Once()
+	database.On("GetBrandByID", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(brand, nil).Once()
+	database.On("GetBrandAssetsByIDs", mock.Anything, (*sql.Tx)(nil), ids).Return(assets, nil).Once()
 
 	req := withPathValue(httptest.NewRequest(http.MethodGet, target, nil), "id", "7")
 	rr := httptest.NewRecorder()
@@ -536,7 +536,7 @@ func TestHandleBrandStylesheetGet_DrawsTheBackgroundAtItsFit(t *testing.T) {
 		t.Run(string(tc.fit), func(t *testing.T) {
 			brand := kitBrand("blueberry", "rounded", "system-ui")
 			brand.BackgroundFit = tc.fit
-			brand.BackgroundAssetId = sql.NullInt64{Int64: 14, Valid: true}
+			brand.BackgroundAssetID = sql.NullInt64{Int64: 14, Valid: true}
 			background := kitAsset(14, record.BrandAssetKindBackground, "0a1b2c3d4e5f")
 
 			rr := getFullStylesheetWithAssets(t, "/brand/7/stylesheet.css", brand, []int64{14}, []record.BrandAsset{background})
@@ -553,7 +553,7 @@ func TestHandleBrandStylesheetGet_DrawsTheBackgroundAtItsFit(t *testing.T) {
 // (#813 decision 7).
 func TestHandleBrandStylesheetGet_DrawsTheUploadedFontFromOneFile(t *testing.T) {
 	brand := kitBrand("blueberry", "rounded", "uploaded")
-	brand.RegularFontAssetId = sql.NullInt64{Int64: 15, Valid: true}
+	brand.RegularFontAssetID = sql.NullInt64{Int64: 15, Valid: true}
 	regular := kitAsset(15, record.BrandAssetKindFont, "aaaaaaaaaaaa")
 
 	rr := getFullStylesheetWithAssets(t, "/brand/7/stylesheet.css", brand, []int64{15}, []record.BrandAsset{regular})
@@ -576,8 +576,8 @@ func TestHandleBrandStylesheetGet_DrawsTheUploadedFontFromOneFile(t *testing.T) 
 // ones (#813 decision 7). The corners come first in the root rule, as they do beside a system family.
 func TestHandleBrandStylesheetGet_DrawsTheUploadedFontFromTwoFiles(t *testing.T) {
 	brand := kitBrand("avocado", "square", "uploaded")
-	brand.RegularFontAssetId = sql.NullInt64{Int64: 15, Valid: true}
-	brand.BoldFontAssetId = sql.NullInt64{Int64: 16, Valid: true}
+	brand.RegularFontAssetID = sql.NullInt64{Int64: 15, Valid: true}
+	brand.BoldFontAssetID = sql.NullInt64{Int64: 16, Valid: true}
 	assets := []record.BrandAsset{
 		kitAsset(16, record.BrandAssetKindFont, "bbbbbbbbbbbb"),
 		kitAsset(15, record.BrandAssetKindFont, "aaaaaaaaaaaa"),
@@ -615,8 +615,8 @@ func TestHandleBrandStylesheetGet_DrawsTheUploadedFontFromTwoFiles(t *testing.T)
 func TestHandleBrandStylesheetGet_ASystemFamilyLoadsNoAttachedFontFile(t *testing.T) {
 	brand := kitBrand("blueberry", "rounded", "serif")
 	brand.BackgroundFit = "tile"
-	brand.BackgroundAssetId = sql.NullInt64{Int64: 14, Valid: true}
-	brand.RegularFontAssetId = sql.NullInt64{Int64: 15, Valid: true}
+	brand.BackgroundAssetID = sql.NullInt64{Int64: 14, Valid: true}
+	brand.RegularFontAssetID = sql.NullInt64{Int64: 15, Valid: true}
 	assets := []record.BrandAsset{
 		kitAsset(14, record.BrandAssetKindBackground, "0a1b2c3d4e5f"),
 		kitAsset(15, record.BrandAssetKindFont, "aaaaaaaaaaaa"),
@@ -642,10 +642,10 @@ func TestHandleBrandStylesheetGet_ASystemFamilyLoadsNoAttachedFontFile(t *testin
 // decision 9).
 func TestBrandStylesheets_TheImagesOnThePageAndTheColorsOnlyOneReadNoAsset(t *testing.T) {
 	brand := kitBrand("avocado", "rounded", "system-ui")
-	brand.LogoAssetId = sql.NullInt64{Int64: 11, Valid: true}
-	brand.DarkLogoAssetId = sql.NullInt64{Int64: 12, Valid: true}
-	brand.FaviconAssetId = sql.NullInt64{Int64: 13, Valid: true}
-	brand.BackgroundAssetId = sql.NullInt64{Int64: 14, Valid: true}
+	brand.LogoAssetID = sql.NullInt64{Int64: 11, Valid: true}
+	brand.DarkLogoAssetID = sql.NullInt64{Int64: 12, Valid: true}
+	brand.FaviconAssetID = sql.NullInt64{Int64: 13, Valid: true}
+	brand.BackgroundAssetID = sql.NullInt64{Int64: 14, Valid: true}
 	assets := []record.BrandAsset{
 		kitAsset(11, record.BrandAssetKindLogo, "111111111111"),
 		kitAsset(12, record.BrandAssetKindLogo, "222222222222"),
@@ -671,9 +671,9 @@ func TestBrandStylesheets_TheImagesOnThePageAndTheColorsOnlyOneReadNoAsset(t *te
 // with it. A brand's assets that cannot be read are a server fault.
 func TestHandleBrandStylesheetGet_ThePathFollowsTheFilesAndAFailedReadIsAFault(t *testing.T) {
 	brand := kitBrand("blueberry", "rounded", "system-ui")
-	brand.BackgroundAssetId = sql.NullInt64{Int64: 14, Valid: true}
-	first := brandasset.Slots{Background: &record.BrandAsset{Id: 14, Kind: record.BrandAssetKindBackground, Fingerprint: "0a1b2c3d4e5f"}}
-	second := brandasset.Slots{Background: &record.BrandAsset{Id: 21, Kind: record.BrandAssetKindBackground, Fingerprint: "5f4e3d2c1b0a"}}
+	brand.BackgroundAssetID = sql.NullInt64{Int64: 14, Valid: true}
+	first := brandasset.Slots{Background: &record.BrandAsset{ID: 14, Kind: record.BrandAssetKindBackground, Fingerprint: "0a1b2c3d4e5f"}}
+	second := brandasset.Slots{Background: &record.BrandAsset{ID: 21, Kind: record.BrandAssetKindBackground, Fingerprint: "5f4e3d2c1b0a"}}
 	firstPath, err := brandthemes.StylesheetPath(brand, first)
 	require.NoError(t, err)
 	secondPath, err := brandthemes.StylesheetPath(brand, second)
@@ -688,8 +688,8 @@ func TestHandleBrandStylesheetGet_ThePathFollowsTheFilesAndAFailedReadIsAFault(t
 	assert.Equal(t, yearCache, rr.Header().Get("Cache-Control"))
 
 	database := datamocks.NewDatabase(t)
-	database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(brand, nil).Once()
-	database.On("GetBrandAssetsByIds", mock.Anything, (*sql.Tx)(nil), []int64{14}).Return(nil, errors.New("connection refused")).Once()
+	database.On("GetBrandByID", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(brand, nil).Once()
+	database.On("GetBrandAssetsByIDs", mock.Anything, (*sql.Tx)(nil), []int64{14}).Return(nil, errors.New("connection refused")).Once()
 	pageRenderer := handlersmocks.NewPageRenderer(t)
 	pageRenderer.On("InternalServerError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
 		return strings.Contains(err.Error(), "connection refused")

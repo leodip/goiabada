@@ -37,14 +37,14 @@ func TestAPIUserPasswordPut_Success(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	// Test: Update password
 	updateReq := api.UpdateUserPasswordRequest{
 		NewPassword: "newSecurePassword123!",
 	}
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/password"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.ID, 10) + "/password"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -58,10 +58,10 @@ func TestAPIUserPasswordPut_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	// Assert: User ID should match
-	assert.Equal(t, testUser.Id, updateResponse.User.Id)
+	assert.Equal(t, testUser.ID, updateResponse.User.ID)
 
 	// Verify password was actually updated in database
-	updatedUser, err := database.GetUserById(context.Background(), nil, testUser.Id)
+	updatedUser, err := database.GetUserByID(context.Background(), nil, testUser.ID)
 	require.NoError(t, err)
 	assert.NotEqual(t, "old-password-hash", updatedUser.PasswordHash)
 
@@ -87,7 +87,7 @@ func TestAPIUserPasswordPut_AtBcryptsBound(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	// Every policy's character classes, at exactly the bound.
@@ -95,13 +95,13 @@ func TestAPIUserPasswordPut_AtBcryptsBound(t *testing.T) {
 	require.Len(t, password, passwordhash.MaxPasswordBytes)
 
 	updateReq := api.UpdateUserPasswordRequest{NewPassword: password}
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/password"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.ID, 10) + "/password"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-	updatedUser, err := database.GetUserById(context.Background(), nil, testUser.Id)
+	updatedUser, err := database.GetUserByID(context.Background(), nil, testUser.ID)
 	require.NoError(t, err)
 	assert.True(t, passwordhash.Verify(updatedUser.PasswordHash, password), "the password set verifies")
 	assert.False(t, passwordhash.Verify(updatedUser.PasswordHash, password+"x"),
@@ -124,7 +124,7 @@ func TestAPIUserPasswordPut_ValidationError(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	testCases := []struct {
@@ -141,7 +141,7 @@ func TestAPIUserPasswordPut_ValidationError(t *testing.T) {
 			updateReq := api.UpdateUserPasswordRequest{
 				NewPassword: tc.password,
 			}
-			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/password"
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.ID, 10) + "/password"
 			resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -167,7 +167,7 @@ func TestAPIUserPasswordPut_UserNotFound(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
-func TestAPIUserPasswordPut_InvalidUserId(t *testing.T) {
+func TestAPIUserPasswordPut_InvalidUserID(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)
 
@@ -206,15 +206,15 @@ func TestAPIUserOTPPut_DisableSuccess(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
-	seedRecoveryCodesForTest(t, testUser.Id)
+	seedRecoveryCodesForTest(t, testUser.ID)
 
 	// Test: Disable OTP
 	updateReq := api.UpdateUserOTPRequest{
 		Enabled: false,
 	}
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/otp"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.ID, 10) + "/otp"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -228,18 +228,18 @@ func TestAPIUserOTPPut_DisableSuccess(t *testing.T) {
 	require.NoError(t, err)
 
 	// Assert: User ID should match and OTP should be disabled
-	assert.Equal(t, testUser.Id, updateResponse.User.Id)
+	assert.Equal(t, testUser.ID, updateResponse.User.ID)
 	assert.False(t, updateResponse.User.OTPEnabled)
 
 	// Verify OTP was actually disabled in database
-	updatedUser, err := database.GetUserById(context.Background(), nil, testUser.Id)
+	updatedUser, err := database.GetUserByID(context.Background(), nil, testUser.ID)
 	require.NoError(t, err)
 	assert.False(t, updatedUser.OTPEnabled)
 	// The seed itself is gone, not merely unreachable (#98).
 	assert.Empty(t, updatedUser.OTPSecretEncrypted)
 	// And so are the user's recovery codes: an administrator turning two-factor authentication off
 	// leaves none of them working (#257 decision 3).
-	assert.Equal(t, 0, unusedRecoveryCodesForTest(t, testUser.Id))
+	assert.Equal(t, 0, unusedRecoveryCodesForTest(t, testUser.ID))
 }
 
 // TestAPIUserOTPPut_DisableResetsConsumedStep pins the second of the two disable sites #111
@@ -256,7 +256,7 @@ func TestAPIUserOTPPut_DisableSuccess(t *testing.T) {
 // reads like the replay #111 refuses. See TestAPIAccountOTPPut_Disable_ResetsConsumedStep.
 func TestAPIUserOTPPut_DisableResetsConsumedStep(t *testing.T) {
 	accessToken, user := getUserAccessTokenWithAccountScope(t)
-	setUserPasswordForOTP(t, user.Id, "Correct1!")
+	setUserPasswordForOTP(t, user.ID, "Correct1!")
 
 	keyURL, secret := newOTPKeyURLForTest(t, "adminreset@otp.test")
 
@@ -265,14 +265,14 @@ func TestAPIUserOTPPut_DisableResetsConsumedStep(t *testing.T) {
 	enable := api.UpdateAccountOTPRequest{
 		Enabled:  true,
 		Password: "Correct1!",
-		OtpCode:  code,
+		OTPCode:  code,
 	}
 
 	// The account API enrolls the seed the server issued and no other, so both enables below have
 	// to be staged against this same key rather than named in the request. A second call to the
 	// issuing endpoint would mint a different secret, and the same code could not match twice
 	// (#247).
-	installPendingEnrollmentForTest(t, user.Id, keyURL, time.Now().UTC())
+	installPendingEnrollmentForTest(t, user.ID, keyURL, time.Now().UTC())
 	status, body := putAccountOTP(t, accessToken, enable)
 	if status != http.StatusOK {
 		t.Fatalf("expected the enable to succeed, got %d. body: %s", status, body)
@@ -280,15 +280,15 @@ func TestAPIUserOTPPut_DisableResetsConsumedStep(t *testing.T) {
 
 	// Disable through the admin endpoint, which is the site under test here.
 	adminToken, _ := createAdminClientWithToken(t)
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(user.Id, 10) + "/otp"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(user.ID, 10) + "/otp"
 	resp := makeAPIRequest(t, "PUT", url, adminToken, api.UpdateUserOTPRequest{Enabled: false})
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	// The same code the enable already consumed. It is accepted only because the admin disable
 	// reset the marker.
-	skipIfOtpCodeOutsideWindow(t, secret, code)
-	installPendingEnrollmentForTest(t, user.Id, keyURL, time.Now().UTC())
+	skipIfOTPCodeOutsideWindow(t, secret, code)
+	installPendingEnrollmentForTest(t, user.ID, keyURL, time.Now().UTC())
 	status, body = putAccountOTP(t, accessToken, enable)
 	if status != http.StatusOK {
 		t.Fatalf("expected the re-enable with the same code to succeed after the admin disable reset "+
@@ -313,14 +313,14 @@ func TestAPIUserOTPPut_EnableNotSupported(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	// Test: Try to enable OTP (should fail)
 	updateReq := api.UpdateUserOTPRequest{
 		Enabled: true,
 	}
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/otp"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.ID, 10) + "/otp"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -361,14 +361,14 @@ func TestAPIUserOTPPut_OTPNotEnabled(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	// Test: Try to disable OTP when it's already disabled
 	updateReq := api.UpdateUserOTPRequest{
 		Enabled: false,
 	}
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/otp"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.ID, 10) + "/otp"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -395,7 +395,7 @@ func TestAPIUserSessionGet_Success(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	// Setup: A client the session authorized, shown to users under a name of its own
@@ -409,7 +409,7 @@ func TestAPIUserSessionGet_Success(t *testing.T) {
 	}
 	err = database.CreateClient(context.Background(), nil, testClient)
 	require.NoError(t, err)
-	defer func() { _ = database.DeleteClient(context.Background(), nil, testClient.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, testClient.ID) }()
 
 	// Setup: Create test session
 	testSession := &record.UserSession{
@@ -417,28 +417,28 @@ func TestAPIUserSessionGet_Success(t *testing.T) {
 		Started:           time.Now().UTC(),
 		LastAccessed:      time.Now().UTC(),
 		AuthMethods:       "pwd",
-		AcrLevel:          "urn:goiabada:pwd",
+		ACRLevel:          "urn:goiabada:pwd",
 		AuthTime:          time.Now().UTC(),
 		PasswordAuthTime:  time.Now().UTC(),
-		IpAddress:         "192.168.1.1",
+		IPAddress:         "192.168.1.1",
 		DeviceName:        "Test Device",
 		DeviceType:        "computer",
 		DeviceOS:          "linux",
-		UserId:            testUser.Id,
+		UserID:            testUser.ID,
 	}
 	err = database.CreateUserSession(context.Background(), nil, testSession)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUserSession(context.Background(), nil, testSession.Id)
+		_ = database.DeleteUserSession(context.Background(), nil, testSession.ID)
 	}()
 	now := time.Now().UTC()
 	err = database.CreateUserSessionClient(context.Background(), nil, &record.UserSessionClient{
-		UserSessionId: testSession.Id, ClientId: testClient.Id, Started: now, LastAccessed: now,
+		UserSessionID: testSession.ID, ClientID: testClient.ID, Started: now, LastAccessed: now,
 	})
 	require.NoError(t, err)
 
 	// Test: Get user session by its numeric id
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-sessions/" + strconv.FormatInt(testSession.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-sessions/" + strconv.FormatInt(testSession.ID, 10)
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -453,13 +453,13 @@ func TestAPIUserSessionGet_Success(t *testing.T) {
 
 	// Assert: Session data should match
 	got := getSessionResponse.Session
-	assert.Equal(t, testSession.Id, got.Id)
+	assert.Equal(t, testSession.ID, got.ID)
 	assert.Equal(t, testSession.SessionIdentifier, got.SessionIdentifier)
 	assert.Equal(t, testSession.AuthMethods, got.AuthMethods)
-	assert.Equal(t, testSession.AcrLevel.String(), got.AcrLevel)
-	assert.Equal(t, testSession.IpAddress, got.IpAddress)
+	assert.Equal(t, testSession.ACRLevel.String(), got.ACRLevel)
+	assert.Equal(t, testSession.IPAddress, got.IPAddress)
 	assert.Equal(t, testSession.DeviceName, got.DeviceName)
-	assert.Equal(t, testSession.UserId, got.UserId)
+	assert.Equal(t, testSession.UserID, got.UserID)
 
 	// Assert: The list row's fields, as the user's session list carries them
 	assert.False(t, got.IsCurrent, "a client credentials token carries no sid, so no session is its own")
@@ -480,9 +480,9 @@ func TestAPIUserSessionGet_AdmitsTheUsersReadScopesOnly(t *testing.T) {
 		EmailVerified: true,
 	}
 	require.NoError(t, database.CreateUser(context.Background(), nil, testUser))
-	defer func() { _ = database.DeleteUser(context.Background(), nil, testUser.Id) }()
-	session := createTestUserSession(t, testUser.Id, fake.UUID())
-	defer func() { _ = database.DeleteUserSession(context.Background(), nil, session.Id) }()
+	defer func() { _ = database.DeleteUser(context.Background(), nil, testUser.ID) }()
+	session := createTestUserSession(t, testUser.ID, fake.UUID())
+	defer func() { _ = database.DeleteUserSession(context.Background(), nil, session.ID) }()
 	session.Started = time.Now().UTC()
 	session.LastAccessed = time.Now().UTC()
 	require.NoError(t, database.UpdateUserSession(context.Background(), nil, session))
@@ -500,9 +500,9 @@ func TestAPIUserSessionGet_AdmitsTheUsersReadScopesOnly(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.permission, func(t *testing.T) {
 			token, caller := createClientWithGranularScope(t, tc.permission)
-			t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.Id) })
+			t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.ID) })
 
-			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-sessions/" + strconv.FormatInt(session.Id, 10)
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-sessions/" + strconv.FormatInt(session.ID, 10)
 			resp := makeAPIRequest(t, "GET", url, token, nil)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -510,7 +510,7 @@ func TestAPIUserSessionGet_AdmitsTheUsersReadScopesOnly(t *testing.T) {
 				require.Equal(t, http.StatusOK, resp.StatusCode)
 				var body api.GetUserSessionResponse
 				require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
-				assert.Equal(t, session.Id, body.Session.Id)
+				assert.Equal(t, session.ID, body.Session.ID)
 				assert.Equal(t, session.SessionIdentifier, body.Session.SessionIdentifier)
 				return
 			}
@@ -528,7 +528,7 @@ func TestAPIUserSessionGet_AdmitsTheUsersReadScopesOnly(t *testing.T) {
 func TestAPIUserSessionGet_ASessionNoLongerLiveIsNotFound(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
+	settings, err := database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err)
 	idle := time.Duration(settings.UserSessionIdleTimeoutInSeconds) * time.Second
 	lifetime := time.Duration(settings.UserSessionMaxLifetimeInSeconds) * time.Second
@@ -541,7 +541,7 @@ func TestAPIUserSessionGet_ASessionNoLongerLiveIsNotFound(t *testing.T) {
 		EmailVerified: true,
 	}
 	require.NoError(t, database.CreateUser(context.Background(), nil, testUser))
-	defer func() { _ = database.DeleteUser(context.Background(), nil, testUser.Id) }()
+	defer func() { _ = database.DeleteUser(context.Background(), nil, testUser.ID) }()
 
 	now := time.Now().UTC()
 	for _, tc := range []struct {
@@ -553,13 +553,13 @@ func TestAPIUserSessionGet_ASessionNoLongerLiveIsNotFound(t *testing.T) {
 		{"past the maximum lifetime", now.Add(-lifetime - 10*time.Minute), now.Add(-time.Minute)},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			session := createTestUserSession(t, testUser.Id, fake.UUID())
-			defer func() { _ = database.DeleteUserSession(context.Background(), nil, session.Id) }()
+			session := createTestUserSession(t, testUser.ID, fake.UUID())
+			defer func() { _ = database.DeleteUserSession(context.Background(), nil, session.ID) }()
 			session.Started = tc.started
 			session.LastAccessed = tc.lastAccessed
 			require.NoError(t, database.UpdateUserSession(context.Background(), nil, session))
 
-			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-sessions/" + strconv.FormatInt(session.Id, 10)
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-sessions/" + strconv.FormatInt(session.ID, 10)
 			resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -569,7 +569,7 @@ func TestAPIUserSessionGet_ASessionNoLongerLiveIsNotFound(t *testing.T) {
 			assert.Equal(t, "NOT_FOUND", body.ErrorCode)
 
 			// Still stored: the 404 is the API's answer, not the sweep's.
-			stored, err := database.GetUserSessionById(context.Background(), nil, session.Id)
+			stored, err := database.GetUserSessionByID(context.Background(), nil, session.ID)
 			require.NoError(t, err)
 			assert.NotNil(t, stored)
 		})
@@ -604,9 +604,9 @@ func TestAPIUserSessionGet_ANonIntegerIsAValidationError(t *testing.T) {
 		EmailVerified: true,
 	}
 	require.NoError(t, database.CreateUser(context.Background(), nil, testUser))
-	defer func() { _ = database.DeleteUser(context.Background(), nil, testUser.Id) }()
-	session := createTestUserSession(t, testUser.Id, fake.UUID())
-	defer func() { _ = database.DeleteUserSession(context.Background(), nil, session.Id) }()
+	defer func() { _ = database.DeleteUser(context.Background(), nil, testUser.ID) }()
+	session := createTestUserSession(t, testUser.ID, fake.UUID())
+	defer func() { _ = database.DeleteUserSession(context.Background(), nil, session.ID) }()
 
 	for _, value := range []string{session.SessionIdentifier, "abc"} {
 		t.Run(value, func(t *testing.T) {

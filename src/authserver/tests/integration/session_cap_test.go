@@ -21,11 +21,11 @@ func withSessionCap(t *testing.T, maxSessions int) *record.Settings {
 	return changeSettings(t, func(settings *record.Settings) { settings.MaxUserSessionsPerUser = maxSessions })
 }
 
-// storedSessionIds is the ids of sessions, in the order given.
-func storedSessionIds(sessions []record.UserSession) []int64 {
+// storedSessionIDs is the ids of sessions, in the order given.
+func storedSessionIDs(sessions []record.UserSession) []int64 {
 	ids := []int64{}
 	for _, session := range sessions {
-		ids = append(ids, session.Id)
+		ids = append(ids, session.ID)
 	}
 	return ids
 }
@@ -42,18 +42,18 @@ func TestSessionCap_ASignInOverTheCapEndsTheLeastRecentlyUsedSession(t *testing.
 	f.signIn(t, newDeviceBrowser(t))
 	require.Len(t, f.storedSessions(t), 2)
 
-	requestId := f.signIn(t, newDeviceBrowser(t))
+	requestID := f.signIn(t, newDeviceBrowser(t))
 
 	sessions := f.storedSessions(t)
 	require.Len(t, sessions, 2, "the user holds no more than the cap")
-	assert.NotContains(t, storedSessionIds(sessions), first[0].Id, "the first browser's session is the one ended")
-	assert.Len(t, sessionsThroughAdminAPI(t, f.adminToken, f.user.Id), 2)
+	assert.NotContains(t, storedSessionIDs(sessions), first[0].ID, "the first browser's session is the one ended")
+	assert.Len(t, sessionsThroughAdminAPI(t, f.adminToken, f.user.ID), 2)
 	assert.Equal(t, []map[string]any{{
-		"user_session_id": float64(first[0].Id),
-		"user_id":         float64(f.user.Id),
+		"user_session_id": float64(first[0].ID),
+		"user_id":         float64(f.user.ID),
 		"logged_in_user":  "",
 		"reason":          "session_cap",
-	}}, auditRows(t, f.adminToken, "deleted_user_session", requestId))
+	}}, auditRows(t, f.adminToken, "deleted_user_session", requestID))
 }
 
 // An expired session goes before a valid one even when it was used more recently: here the second
@@ -68,7 +68,7 @@ func TestSessionCap_ExpiredSessionsGoFirst(t *testing.T) {
 	sessions := f.storedSessions(t)
 	require.Len(t, sessions, 2)
 	valid, expired := sessions[0], sessions[1]
-	if valid.Id > expired.Id {
+	if valid.ID > expired.ID {
 		valid, expired = expired, valid
 	}
 	now := time.Now().UTC()
@@ -78,18 +78,18 @@ func TestSessionCap_ExpiredSessionsGoFirst(t *testing.T) {
 	valid.LastAccessed = now.Add(-10 * time.Minute)
 	require.NoError(t, database.UpdateUserSession(context.Background(), nil, &valid))
 
-	requestId := f.signIn(t, newDeviceBrowser(t))
+	requestID := f.signIn(t, newDeviceBrowser(t))
 
 	after := f.storedSessions(t)
 	require.Len(t, after, 2)
-	assert.Contains(t, storedSessionIds(after), valid.Id, "the valid session stays")
-	assert.NotContains(t, storedSessionIds(after), expired.Id, "the expired session is the one ended")
+	assert.Contains(t, storedSessionIDs(after), valid.ID, "the valid session stays")
+	assert.NotContains(t, storedSessionIDs(after), expired.ID, "the expired session is the one ended")
 	assert.Equal(t, []map[string]any{{
-		"user_session_id": float64(expired.Id),
-		"user_id":         float64(f.user.Id),
+		"user_session_id": float64(expired.ID),
+		"user_id":         float64(f.user.ID),
 		"logged_in_user":  "",
 		"reason":          "session_cap",
-	}}, auditRows(t, f.adminToken, "deleted_user_session", requestId))
+	}}, auditRows(t, f.adminToken, "deleted_user_session", requestID))
 }
 
 // A cap of 0 is no limit: three browsers keep three sessions.
@@ -99,8 +99,8 @@ func TestSessionCap_ACapOfZeroEndsNothing(t *testing.T) {
 
 	f.signIn(t, newDeviceBrowser(t))
 	f.signIn(t, newDeviceBrowser(t))
-	requestId := f.signIn(t, newDeviceBrowser(t))
+	requestID := f.signIn(t, newDeviceBrowser(t))
 
 	assert.Len(t, f.storedSessions(t), 3)
-	assert.Empty(t, auditRows(t, f.adminToken, "deleted_user_session", requestId))
+	assert.Empty(t, auditRows(t, f.adminToken, "deleted_user_session", requestID))
 }

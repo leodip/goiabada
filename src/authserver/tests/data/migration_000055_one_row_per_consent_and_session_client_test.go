@@ -90,9 +90,9 @@ func TestMigration000055_OneRowPerConsentAndSessionClient(t *testing.T) {
 	assertPairIndexes000055(t, h, "after down then up")
 	assert.Equal(t, []consentRow000055{{readmittedConsent, "openid profile"}}, consentRows000055(t, h, seed.userA, seed.client1),
 		"the consent saved while the key was gone is the latest, so it is the one kept, whatever its id")
-	assert.Equal(t, []int64{seed.session1Client1Kept}, sessionClientIds000055(t, h, seed.session1, seed.client1),
+	assert.Equal(t, []int64{seed.session1Client1Kept}, sessionClientIDs000055(t, h, seed.session1, seed.client1),
 		"the association inserted while the key was gone is swept, and the lowest id stays")
-	assert.Len(t, sessionClientIds000055(t, h, seed.session2, seed.client2), 1,
+	assert.Len(t, sessionClientIDs000055(t, h, seed.session2, seed.client2), 1,
 		"two rows for a pair the first run never saw are swept to one")
 }
 
@@ -135,7 +135,7 @@ type seeded000055 struct {
 	// The consent that must survive in each pair, which is the whole of decision 28's claim.
 	narrowedAfterward consentRow000055 // (A,1): the LOWER id, saved later with the narrower scope
 	equalTimes        consentRow000055 // (A,2): two rows saved at one instant, the higher id
-	nullOnTheHigherId consentRow000055 // (B,1): the lower id, against a NULL updated_at
+	nullOnTheHigherID consentRow000055 // (B,1): the lower id, against a NULL updated_at
 	bothNull          consentRow000055 // (B,2): nothing but the id to order by, the higher
 	middleOfThree     consentRow000055 // (A,3): neither the highest id nor the lowest, but the latest save
 	untouched         consentRow000055 // (B,3): a pair nothing duplicated
@@ -172,7 +172,7 @@ func seedDuplicates000055(t *testing.T, h *isolatedDB) *seeded000055 {
 	s.equalTimes = consentRow000055{seedConsent000055(t, h, s.userA, s.client2, "openid profile", middle000055), "openid profile"}
 
 	// A NULL updated_at is the oldest: the lower id has a real time and wins against the higher id's NULL.
-	s.nullOnTheHigherId = consentRow000055{seedConsent000055(t, h, s.userB, s.client1, "openid", middle000055), "openid"}
+	s.nullOnTheHigherID = consentRow000055{seedConsent000055(t, h, s.userB, s.client1, "openid", middle000055), "openid"}
 	seedConsent000055(t, h, s.userB, s.client1, "openid email", "NULL")
 
 	// Both NULL: nothing to order by but the id, so the higher id is kept.
@@ -209,31 +209,31 @@ func seedDuplicates000055(t *testing.T, h *isolatedDB) *seeded000055 {
 
 // seedConsent000055 creates a consent below 000055, which has no key to refuse a second, and sets
 // its updated_at to the literal given, which is NULL for a row a pre-upgrade binary might have left.
-func seedConsent000055(t *testing.T, h *isolatedDB, userId, clientId int64, scope, updatedAt string) int64 {
+func seedConsent000055(t *testing.T, h *isolatedDB, userID, clientID int64, scope, updatedAt string) int64 {
 	t.Helper()
 
-	id := seedUserConsent(t, h, userId, clientId, scope)
+	id := seedUserConsent(t, h, userID, clientID, scope)
 	_, err := h.SQL.ExecContext(context.Background(), fmt.Sprintf(
 		"UPDATE user_consents SET updated_at = %s WHERE id = %d", updatedAt, id))
 	require.NoError(t, err, "set the consent's updated_at")
 	return id
 }
 
-func seedSessionClient000055(t *testing.T, h *isolatedDB, sessionId, clientId int64) int64 {
+func seedSessionClient000055(t *testing.T, h *isolatedDB, sessionID, clientID int64) int64 {
 	t.Helper()
 
 	// Seeded through the shared SQL seed for the same reason as the consent above, and every
 	// other row this test writes below head (#510).
-	return seedUserSessionClient(t, h, sessionId, clientId)
+	return seedUserSessionClient(t, h, sessionID, clientID)
 }
 
 // consentRows000055 reads the pair's rows straight from the table, ordered by id, so what is
 // asserted is what the migration left and not what a data method chose to return of several.
-func consentRows000055(t *testing.T, h *isolatedDB, userId, clientId int64) []consentRow000055 {
+func consentRows000055(t *testing.T, h *isolatedDB, userID, clientID int64) []consentRow000055 {
 	t.Helper()
 
 	rows, err := h.SQL.QueryContext(context.Background(), fmt.Sprintf(
-		"SELECT id, scope FROM user_consents WHERE user_id = %d AND client_id = %d ORDER BY id", userId, clientId))
+		"SELECT id, scope FROM user_consents WHERE user_id = %d AND client_id = %d ORDER BY id", userID, clientID))
 	require.NoError(t, err)
 	defer func() { _ = rows.Close() }()
 
@@ -263,24 +263,24 @@ func assertUntouchedGrantedAt000055(t *testing.T, h *isolatedDB, s *seeded000055
 }
 
 // consentGrantedAt000055 reads the granted_at of a pair that holds one row. In SQL rather than
-// through GetConsentByUserIdAndClientId, as consentRows000055 is: the read runs below head, and the
+// through GetConsentByUserIDAndClientID, as consentRows000055 is: the read runs below head, and the
 // ORM's SELECT names every column the record declares, so the next column any migration adds to
 // user_consents would fail it for a reason this migration does not own (#510).
-func consentGrantedAt000055(t *testing.T, h *isolatedDB, userId, clientId int64) sql.NullTime {
+func consentGrantedAt000055(t *testing.T, h *isolatedDB, userID, clientID int64) sql.NullTime {
 	t.Helper()
 
 	var grantedAt sql.NullTime
 	require.NoError(t, h.SQL.QueryRowContext(context.Background(), fmt.Sprintf(
-		"SELECT granted_at FROM user_consents WHERE user_id = %d AND client_id = %d", userId, clientId)).Scan(&grantedAt),
+		"SELECT granted_at FROM user_consents WHERE user_id = %d AND client_id = %d", userID, clientID)).Scan(&grantedAt),
 		"read the pair's granted_at")
 	return grantedAt
 }
 
-func sessionClientIds000055(t *testing.T, h *isolatedDB, sessionId, clientId int64) []int64 {
+func sessionClientIDs000055(t *testing.T, h *isolatedDB, sessionID, clientID int64) []int64 {
 	t.Helper()
 
 	rows, err := h.SQL.QueryContext(context.Background(), fmt.Sprintf(
-		"SELECT id FROM user_session_clients WHERE user_session_id = %d AND client_id = %d ORDER BY id", sessionId, clientId))
+		"SELECT id FROM user_session_clients WHERE user_session_id = %d AND client_id = %d ORDER BY id", sessionID, clientID))
 	require.NoError(t, err)
 	defer func() { _ = rows.Close() }()
 
@@ -308,7 +308,7 @@ func (s *seeded000055) assertSwept(t *testing.T, h *isolatedDB, when string) {
 			"the latest save is kept, not the highest id"},
 		{"two rows saved at one instant", s.userA, s.client2, s.equalTimes,
 			"the highest id breaks a tie, and its scope is unchanged"},
-		{"a NULL updated_at on the higher id", s.userB, s.client1, s.nullOnTheHigherId,
+		{"a NULL updated_at on the higher id", s.userB, s.client1, s.nullOnTheHigherID,
 			"NULL is the oldest, so a real time outranks a higher id"},
 		{"both updated_at NULL", s.userB, s.client2, s.bothNull,
 			"with nothing to order by the highest id is kept"},
@@ -332,11 +332,11 @@ func (s *seeded000055) assertSwept(t *testing.T, h *isolatedDB, when string) {
 
 	assertUntouchedGrantedAt000055(t, h, s, "an untouched consent keeps its granted_at "+when)
 
-	assert.Equalf(t, []int64{s.session1Client1Kept}, sessionClientIds000055(t, h, s.session1, s.client1),
+	assert.Equalf(t, []int64{s.session1Client1Kept}, sessionClientIDs000055(t, h, s.session1, s.client1),
 		"three associations for a pair keep the lowest id %s", when)
-	assert.Equalf(t, []int64{s.session1Client2Only}, sessionClientIds000055(t, h, s.session1, s.client2),
+	assert.Equalf(t, []int64{s.session1Client2Only}, sessionClientIDs000055(t, h, s.session1, s.client2),
 		"an association nothing duplicated is not touched %s", when)
-	assert.Equalf(t, []int64{s.session2Client1Kept}, sessionClientIds000055(t, h, s.session2, s.client1),
+	assert.Equalf(t, []int64{s.session2Client1Kept}, sessionClientIDs000055(t, h, s.session2, s.client1),
 		"the same client in another session is another pair, with its own lowest id %s", when)
 }
 
@@ -347,22 +347,22 @@ func (s *seeded000055) assertTheKeysRefuseADuplicate(t *testing.T, h *isolatedDB
 	t.Helper()
 	ctx := context.Background()
 
-	err := h.DB.CreateUserConsent(ctx, nil, &record.UserConsent{UserId: s.userA, ClientId: s.client1, Scope: "openid"})
+	err := h.DB.CreateUserConsent(ctx, nil, &record.UserConsent{UserID: s.userA, ClientID: s.client1, Scope: "openid"})
 	require.ErrorIsf(t, err, data.ErrUniqueViolation, "a second consent for a pair is refused by the key %s", when)
 	assert.Lenf(t, consentRows000055(t, h, s.userA, s.client1), 1, "and writes nothing %s", when)
 
 	other := seedClient000055(t, h)
-	require.NoErrorf(t, h.DB.CreateUserConsent(ctx, nil, &record.UserConsent{UserId: s.userA, ClientId: other, Scope: "openid"}),
+	require.NoErrorf(t, h.DB.CreateUserConsent(ctx, nil, &record.UserConsent{UserID: s.userA, ClientID: other, Scope: "openid"}),
 		"a consent for another pair is accepted %s", when)
 
 	now := time.Now().UTC().Truncate(time.Microsecond)
-	err = h.DB.CreateUserSessionClient(ctx, nil, &record.UserSessionClient{UserSessionId: s.session1, ClientId: s.client1, Started: now, LastAccessed: now})
+	err = h.DB.CreateUserSessionClient(ctx, nil, &record.UserSessionClient{UserSessionID: s.session1, ClientID: s.client1, Started: now, LastAccessed: now})
 	require.ErrorIsf(t, err, data.ErrUniqueViolation, "a second association for a pair is refused by the key %s", when)
-	assert.Lenf(t, sessionClientIds000055(t, h, s.session1, s.client1), 1, "and writes nothing %s", when)
+	assert.Lenf(t, sessionClientIDs000055(t, h, s.session1, s.client1), 1, "and writes nothing %s", when)
 
-	assert.NoErrorf(t, h.DB.CreateUserSessionClient(ctx, nil, &record.UserSessionClient{UserSessionId: s.session1, ClientId: s.client3, Started: now, LastAccessed: now}),
+	assert.NoErrorf(t, h.DB.CreateUserSessionClient(ctx, nil, &record.UserSessionClient{UserSessionID: s.session1, ClientID: s.client3, Started: now, LastAccessed: now}),
 		"an association for another client is accepted %s", when)
-	assert.NoErrorf(t, h.DB.CreateUserSessionClient(ctx, nil, &record.UserSessionClient{UserSessionId: s.session2, ClientId: s.client2, Started: now, LastAccessed: now}),
+	assert.NoErrorf(t, h.DB.CreateUserSessionClient(ctx, nil, &record.UserSessionClient{UserSessionID: s.session2, ClientID: s.client2, Started: now, LastAccessed: now}),
 		"and so is the same client in another session %s", when)
 	// Clear what the two controls added, so the down and up that follow start from the seed.
 	_, err = h.SQL.ExecContext(ctx, fmt.Sprintf(
@@ -373,7 +373,7 @@ func (s *seeded000055) assertTheKeysRefuseADuplicate(t *testing.T, h *isolatedDB
 
 // seedSession000055 inserts a session with raw SQL and answers its id: the ORM writes every column
 // the record carries, and at 000054 a column a later migration adds is not there yet.
-func seedSession000055(t *testing.T, h *isolatedDB, userId int64) int64 {
+func seedSession000055(t *testing.T, h *isolatedDB, userID int64) int64 {
 	t.Helper()
 	const ts = "'2026-01-01 00:00:00'"
 	identifier := fake.UUID()
@@ -381,7 +381,7 @@ func seedSession000055(t *testing.T, h *isolatedDB, userId int64) int64 {
 		(session_identifier, started, last_accessed, auth_methods, acr_level, auth_time,
 		 ip_address, device_name, device_type, device_os, user_id)
 		VALUES ('%s', %s, %s, 'pwd', 'urn:goiabada:level1', %s, '127.0.0.1', 'device', 'Desktop', 'Linux', %d)`,
-		identifier, ts, ts, ts, userId))
+		identifier, ts, ts, ts, userID))
 	require.NoError(t, err, "seed a session at 000054")
 	var id int64
 	require.NoError(t, h.SQL.QueryRow(fmt.Sprintf("SELECT id FROM user_sessions WHERE session_identifier = '%s'", identifier)).Scan(&id))

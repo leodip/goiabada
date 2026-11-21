@@ -14,11 +14,11 @@ const (
 	// OTP handler — second-factor verification step.
 	// A code from the time step after the server's current one, which only an authenticator
 	// whose clock runs ahead shows: refused with this rather than as a wrong code (#142).
-	OtpClockAhead = "handler.otp.clock_ahead"
+	OTPClockAhead = "handler.otp.clock_ahead"
 	// The recovery-code form's refusals (#257): no code, and a code that is wrong, of a replaced
 	// set or already used, which one message answers so the submitter cannot tell them apart.
-	OtpRecoveryCodeRequired  = "handler.otp.recovery_code_required"
-	OtpIncorrectRecoveryCode = "handler.otp.incorrect_recovery_code"
+	OTPRecoveryCodeRequired  = "handler.otp.recovery_code_required"
+	OTPIncorrectRecoveryCode = "handler.otp.incorrect_recovery_code"
 
 	// Refusals of the admin and account API that a person reaches through the admin console. The
 	// API writes each with the error_code and the status it always had, and only the description
@@ -101,7 +101,7 @@ const (
 	// page and none of them ever becomes an error_description. The five
 	// validations that run after them do become one, are addressed to the
 	// client developer, and stay English (#213).
-	AuthorizeClientIdMissing          = "validator.authorize.client_id_missing"
+	AuthorizeClientIDMissing          = "validator.authorize.client_id_missing"
 	AuthorizeClientNotFound           = "validator.authorize.client_not_found"
 	AuthorizeClientDisabled           = "validator.authorize.client_disabled"
 	AuthorizeRedirectURIMissing       = "validator.authorize.redirect_uri_missing"

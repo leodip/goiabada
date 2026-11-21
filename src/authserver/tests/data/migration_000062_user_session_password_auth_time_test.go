@@ -61,18 +61,18 @@ func TestMigration000062_UserSessionPasswordAuthTime(t *testing.T) {
 		now := time.Now().UTC().Truncate(time.Microsecond)
 		session := &record.UserSession{
 			SessionIdentifier: fake.UUID(), Started: now, LastAccessed: now, AuthTime: now, PasswordAuthTime: now.Add(-time.Minute),
-			AuthMethods: "pwd otp", AcrLevel: record.AcrLevel2Mandatory, IpAddress: "192.0.2.1", UserId: user.Id,
+			AuthMethods: "pwd otp", ACRLevel: record.ACRLevel2Mandatory, IPAddress: "192.0.2.1", UserID: user.ID,
 		}
 		require.NoError(t, h.DB.CreateUserSession(ctx, nil, session))
 		require.NoError(t, h.DB.CreateUserSessionClient(ctx, nil, &record.UserSessionClient{
-			UserSessionId: session.Id, ClientId: client.Id, Started: now, LastAccessed: now,
+			UserSessionID: session.ID, ClientID: client.ID, Started: now, LastAccessed: now,
 		}))
 		return session
 	}
 	seedSession()
 	seedSession()
-	pending := createTestCodeOn(t, h.DB, client.Id, user.Id)
-	redeemed := createTestCodeOn(t, h.DB, client.Id, user.Id)
+	pending := createTestCodeOn(t, h.DB, client.ID, user.ID)
+	redeemed := createTestCodeOn(t, h.DB, client.ID, user.ID)
 	redeemed.Used = true
 	require.NoError(t, h.DB.UpdateCode(ctx, nil, redeemed))
 
@@ -85,8 +85,8 @@ func TestMigration000062_UserSessionPasswordAuthTime(t *testing.T) {
 	require.NoErrorf(t, h.Migrator.Migrate(ctx, passwordAuthTime000062), "apply 000062 on %s", dbType())
 	assert.Zerof(t, count000062(t, h, "user_sessions"), "1. every stored session is ended on %s", dbType())
 	assert.Zerof(t, count000062(t, h, "user_session_clients"), "1. and the clients each one authorized on %s", dbType())
-	assert.Truef(t, codeRevoked000062(t, h, pending.Id), "1. a code not yet redeemed is revoked on %s", dbType())
-	assert.Falsef(t, codeRevoked000062(t, h, redeemed.Id), "1. a redeemed code is left as it was on %s", dbType())
+	assert.Truef(t, codeRevoked000062(t, h, pending.ID), "1. a code not yet redeemed is revoked on %s", dbType())
+	assert.Falsef(t, codeRevoked000062(t, h, redeemed.ID), "1. a redeemed code is left as it was on %s", dbType())
 
 	// 2.
 	column := dumpTable(t, h, "user_sessions").column(t, "password_auth_time")
@@ -97,7 +97,7 @@ func TestMigration000062_UserSessionPasswordAuthTime(t *testing.T) {
 		(session_identifier, started, last_accessed, auth_methods, acr_level, auth_time,
 		 ip_address, device_name, device_type, device_os, user_agent, user_id)
 		VALUES ('%s', %s, %s, 'pwd', 'urn:goiabada:level1', %s, '127.0.0.1', 'device', 'Desktop', 'Linux', '', %d)`,
-		fake.UUID(), ts, ts, ts, user.Id))
+		fake.UUID(), ts, ts, ts, user.ID))
 	require.Errorf(t, err, "4. a session naming no password_auth_time is refused on %s", dbType())
 	assert.Zerof(t, count000062(t, h, "user_sessions"), "4. and nothing is stored on %s", dbType())
 
@@ -107,7 +107,7 @@ func TestMigration000062_UserSessionPasswordAuthTime(t *testing.T) {
 		require.NoError(t, upErr, "migrate to head for the round trip")
 	}
 	written := seedSession()
-	read, err := h.DB.GetUserSessionById(ctx, nil, written.Id)
+	read, err := h.DB.GetUserSessionByID(ctx, nil, written.ID)
 	require.NoError(t, err)
 	assert.Truef(t, read.PasswordAuthTime.Equal(written.PasswordAuthTime), "2. the password's instant round-trips on %s", dbType())
 
@@ -125,10 +125,10 @@ func count000062(t *testing.T, h *isolatedDB, table string) int {
 	return n
 }
 
-func codeRevoked000062(t *testing.T, h *isolatedDB, codeId int64) bool {
+func codeRevoked000062(t *testing.T, h *isolatedDB, codeID int64) bool {
 	t.Helper()
 	var revoked bool
-	require.NoErrorf(t, h.SQL.QueryRow(fmt.Sprintf("SELECT revoked FROM codes WHERE id = %d", codeId)).Scan(&revoked),
-		"read code %d on %s", codeId, dbType())
+	require.NoErrorf(t, h.SQL.QueryRow(fmt.Sprintf("SELECT revoked FROM codes WHERE id = %d", codeID)).Scan(&revoked),
+		"read code %d on %s", codeID, dbType())
 	return revoked
 }

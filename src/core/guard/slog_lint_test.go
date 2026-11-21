@@ -263,14 +263,14 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/apiresponse"
 )
 
-func rejectIdTokenHint(ctx context.Context, gate string, args ...any) {}
+func rejectIDTokenHint(ctx context.Context, gate string, args ...any) {}
 
 func qualified(w http.ResponseWriter, r *http.Request, err error, attrs []any) {
 	apiresponse.WriteInternalServerError(w, r, err, attrs...)
 }
 
 func bareReject(ctx context.Context, attrs []any) {
-	rejectIdTokenHint(ctx, "aud", attrs...)
+	rejectIDTokenHint(ctx, "aud", attrs...)
 }
 `)
 	// The forwarders themselves, spreading their own run and each other's, and the two builders.
@@ -390,7 +390,7 @@ func parseCIDRs(entries []string) { slog.Warn("ignoring invalid trusted proxy en
 
 import "log/slog"
 
-func addUrlParam(u string) string { slog.Warn("unable to parse url", "url", u); return u }
+func addURLParam(u string) string { slog.Warn("unable to parse url", "url", u); return u }
 
 func convertToString(v any) string { slog.Warn("unable to convert value", "value", v); return "" }
 `)
@@ -398,9 +398,9 @@ func convertToString(v any) string { slog.Warn("unable to convert value", "value
 
 import "log/slog"
 
-func addUrlParam2() { slog.Warn("not the admitted function") }
+func addURLParam2() { slog.Warn("not the admitted function") }
 
-func (m *limiter) addUrlParam() { slog.Warn("a method by the admitted name, in another file") }
+func (m *limiter) addURLParam() { slog.Warn("a method by the admitted name, in another file") }
 `)
 	// The audit path, listed by #328 now that audit.Logger.Log takes a context. Two files of the one
 	// package are planted because the rule decides per file: a walk that reached the directory and
@@ -430,7 +430,7 @@ func LogToConsole(event string) { slog.Info("audit event", "event", event) }
 
 import "log/slog"
 
-func addUrlParam(u string) string { slog.Warn("unable to parse url", "url", u); return u }
+func addURLParam(u string) string { slog.Warn("unable to parse url", "url", u); return u }
 `)
 
 	// ---- rule 5's scope: every package but the ones slogNoRequestDirs names ------------------
@@ -540,7 +540,7 @@ func tagged() { slog.SetDefault(slog.Default()); slog.Info("failed to x") }
 		"core/caught/spreads.go:19 a run spread into a record outside slogSpreadSites",
 		"authserver/internal/handlers/apihandlers/caught.go:8 a run spread into writeInternalServerError outside slogSpreadSites",
 		"authserver/internal/handlers/caught.go:13 a run spread into WriteInternalServerError outside slogSpreadSites",
-		"authserver/internal/handlers/caught.go:17 a run spread into rejectIdTokenHint outside slogSpreadSites",
+		"authserver/internal/handlers/caught.go:17 a run spread into rejectIDTokenHint outside slogSpreadSites",
 		// rule 5
 		"authserver/internal/audit/audit.go:9 a plain slog.Error in a request-path package",
 		"authserver/internal/audit/log_to_console.go:5 a plain slog.Info in a request-path package",

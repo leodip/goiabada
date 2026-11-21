@@ -20,19 +20,19 @@ func TestTemplates_NoHTMLInTitle(t *testing.T) {
 	guard.AssertTemplatesNoHTMLInTitle(t, templateFS, "template")
 }
 
-// TestTemplates_NoCsrfField guards the half of the CSRF token deletion that nothing else in this
+// TestTemplates_NoCSRFField guards the half of the CSRF token deletion that nothing else in this
 // module observes. Measured here rather than assumed: restoring {{ .csrfField }} to all eight forms
 // that carried it left every one of them green, across the handler tests and the integration suite,
 // because both assert on the fields a page carries rather than on the absence of a stray one.
-func TestTemplates_NoCsrfField(t *testing.T) {
-	guard.AssertTemplatesNoCsrfField(t, templateFS, "template")
+func TestTemplates_NoCSRFField(t *testing.T) {
+	guard.AssertTemplatesNoCSRFField(t, templateFS, "template")
 }
 
-// TestTemplates_HtmlLangNotHardcoded guards the <html lang="en"> bug: page layouts must render the
+// TestTemplates_HTMLLangNotHardcoded guards the <html lang="en"> bug: page layouts must render the
 // lang attribute from the active locale, and the email layout from the language its text is written
 // in.
-func TestTemplates_HtmlLangNotHardcoded(t *testing.T) {
-	guard.AssertTemplatesHtmlLangNotHardcoded(t, templateFS, "template")
+func TestTemplates_HTMLLangNotHardcoded(t *testing.T) {
+	guard.AssertTemplatesHTMLLangNotHardcoded(t, templateFS, "template")
 }
 
 // TestTemplates_NewTabLinksSaySo holds every link on this server's pages that opens a new tab to

@@ -27,13 +27,13 @@ import (
 // in apihandlers and its own port has to name this capability to hand it on (#386 decision 8).
 type BrowserSessionDatabase interface {
 	CreateBrowserSession(ctx context.Context, tx *sql.Tx, browserSession *record.BrowserSession) error
-	DeleteBrowserSession(ctx context.Context, tx *sql.Tx, owner, sessionIdHash string) error
-	DeleteBrowserSessionIfUnchanged(ctx context.Context, tx *sql.Tx, owner, sessionIdHash, expectedData string, now time.Time) (bool, error)
-	GetBrowserSessionByOwnerAndSessionIdHash(ctx context.Context, tx *sql.Tx, owner, sessionIdHash string, now time.Time) (*record.BrowserSession, error)
-	GetSettingsById(ctx context.Context, tx *sql.Tx, settingsId int64) (*record.Settings, error)
-	TouchBrowserSession(ctx context.Context, tx *sql.Tx, owner, sessionIdHash string, now, expiresAt time.Time) (bool, error)
-	UpdateBrowserSessionData(ctx context.Context, tx *sql.Tx, owner, sessionIdHash, data string, now, expiresAt time.Time) (bool, error)
-	UpdateBrowserSessionDataIfUnchanged(ctx context.Context, tx *sql.Tx, owner, sessionIdHash, expectedData, data string, now, expiresAt time.Time) (bool, error)
+	DeleteBrowserSession(ctx context.Context, tx *sql.Tx, owner, sessionIDHash string) error
+	DeleteBrowserSessionIfUnchanged(ctx context.Context, tx *sql.Tx, owner, sessionIDHash, expectedData string, now time.Time) (bool, error)
+	GetBrowserSessionByOwnerAndSessionIDHash(ctx context.Context, tx *sql.Tx, owner, sessionIDHash string, now time.Time) (*record.BrowserSession, error)
+	GetSettingsByID(ctx context.Context, tx *sql.Tx, settingsID int64) (*record.Settings, error)
+	TouchBrowserSession(ctx context.Context, tx *sql.Tx, owner, sessionIDHash string, now, expiresAt time.Time) (bool, error)
+	UpdateBrowserSessionData(ctx context.Context, tx *sql.Tx, owner, sessionIDHash, data string, now, expiresAt time.Time) (bool, error)
+	UpdateBrowserSessionDataIfUnchanged(ctx context.Context, tx *sql.Tx, owner, sessionIDHash, expectedData, data string, now, expiresAt time.Time) (bool, error)
 }
 
 // dbBackend keeps browser sessions in the database this deployment already runs. It is
@@ -75,7 +75,7 @@ func newBackend(database BrowserSessionDatabase, owner string) *dbBackend {
 }
 
 func (b *dbBackend) Load(ctx context.Context, id string) (*sessionstore.Record, error) {
-	browserSession, err := b.database.GetBrowserSessionByOwnerAndSessionIdHash(ctx, nil, b.owner,
+	browserSession, err := b.database.GetBrowserSessionByOwnerAndSessionIDHash(ctx, nil, b.owner,
 		hashutil.HashString(id), b.now())
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to read the browser session")
@@ -105,8 +105,8 @@ func (b *dbBackend) Create(ctx context.Context, id string, data []byte, authenti
 
 	browserSession := &record.BrowserSession{
 		Owner:         b.owner,
-		SessionId:     id,
-		SessionIdHash: hashutil.HashString(id),
+		SessionID:     id,
+		SessionIDHash: hashutil.HashString(id),
 		Data:          string(data),
 		LastAccessed:  now,
 		ExpiresAt:     expiresAt,
@@ -223,7 +223,7 @@ func (b *dbBackend) expiryFor(ctx context.Context, hash string, authenticated bo
 		return time.Time{}, err
 	}
 
-	browserSession, err := b.database.GetBrowserSessionByOwnerAndSessionIdHash(ctx, nil, b.owner, hash, now)
+	browserSession, err := b.database.GetBrowserSessionByOwnerAndSessionIDHash(ctx, nil, b.owner, hash, now)
 	if err != nil {
 		return time.Time{}, errs.Wrap(err, "unable to read the browser session")
 	}
@@ -255,7 +255,7 @@ func (b *dbBackend) lifetimes(ctx context.Context) (idleTimeout, maxLifetime tim
 
 // settingsReader is what settingsFor reads the settings row through.
 type settingsReader interface {
-	GetSettingsById(ctx context.Context, tx *sql.Tx, settingsId int64) (*record.Settings, error)
+	GetSettingsByID(ctx context.Context, tx *sql.Tx, settingsID int64) (*record.Settings, error)
 }
 
 // settingsFor returns the deployment's settings for this request.
@@ -269,7 +269,7 @@ func settingsFor(ctx context.Context, database settingsReader) (*record.Settings
 		return settings, nil
 	}
 
-	settings, err := database.GetSettingsById(ctx, nil, 1)
+	settings, err := database.GetSettingsByID(ctx, nil, 1)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to read the settings")
 	}

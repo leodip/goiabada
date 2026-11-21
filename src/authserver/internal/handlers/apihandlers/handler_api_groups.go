@@ -24,12 +24,12 @@ import (
 type groupsDatabase interface {
 	administrativeGroupPolicyDatabase
 	lastAdministratorDatabase
-	CountGroupMembers(ctx context.Context, tx *sql.Tx, groupId int64) (int, error)
+	CountGroupMembers(ctx context.Context, tx *sql.Tx, groupID int64) (int, error)
 	CreateGroup(ctx context.Context, tx *sql.Tx, group *record.Group) error
-	DeleteGroup(ctx context.Context, tx *sql.Tx, groupId int64) error
+	DeleteGroup(ctx context.Context, tx *sql.Tx, groupID int64) error
 	GetAllGroups(ctx context.Context, tx *sql.Tx) ([]record.Group, error)
 	GetGroupByGroupIdentifier(ctx context.Context, tx *sql.Tx, groupIdentifier string) (*record.Group, error)
-	GetGroupById(ctx context.Context, tx *sql.Tx, groupId int64) (*record.Group, error)
+	GetGroupByID(ctx context.Context, tx *sql.Tx, groupID int64) (*record.Group, error)
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 	UpdateGroup(ctx context.Context, tx *sql.Tx, group *record.Group) error
 }
@@ -122,7 +122,7 @@ func HandleGroupCreatePost(
 		group := &record.Group{
 			GroupIdentifier:      strings.TrimSpace(createReq.GroupIdentifier),
 			Description:          strings.TrimSpace(createReq.Description),
-			IncludeInIdToken:     createReq.IncludeInIdToken,
+			IncludeInIDToken:     createReq.IncludeInIDToken,
 			IncludeInAccessToken: createReq.IncludeInAccessToken,
 		}
 
@@ -134,7 +134,7 @@ func HandleGroupCreatePost(
 
 		// Audit log
 		auditLogger.Log(r.Context(), audit.EventCreatedGroup, map[string]interface{}{
-			"group_id":         group.Id,
+			"group_id":         group.ID,
 			"group_identifier": group.GroupIdentifier,
 			"logged_in_user":   callerSubject(r),
 		})
@@ -166,7 +166,7 @@ func HandleGroupGet(
 			return
 		}
 
-		group, err := database.GetGroupById(r.Context(), nil, id)
+		group, err := database.GetGroupByID(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error getting group by ID"), "group_id", id)
 			return
@@ -183,7 +183,7 @@ func HandleGroupGet(
 		}
 
 		response := api.GetGroupResponse{
-			Group: *apimapping.ToGroupResponse(group, memberCounts[group.Id]),
+			Group: *apimapping.ToGroupResponse(group, memberCounts[group.ID]),
 		}
 
 		writeJSON(w, r, http.StatusOK, response)
@@ -210,7 +210,7 @@ func HandleGroupUpdatePut(
 			return
 		}
 
-		group, err := database.GetGroupById(r.Context(), nil, id)
+		group, err := database.GetGroupByID(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error getting group by ID for update"), "group_id", id)
 			return
@@ -255,34 +255,34 @@ func HandleGroupUpdatePut(
 		// Check if group identifier already exists (but not for this group)
 		existingGroup, err := database.GetGroupByGroupIdentifier(r.Context(), nil, updateReq.GroupIdentifier)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error checking group existence by identifier for update"), "group_identifier", updateReq.GroupIdentifier, "group_id", group.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error checking group existence by identifier for update"), "group_identifier", updateReq.GroupIdentifier, "group_id", group.ID)
 			return
 		}
-		if existingGroup != nil && existingGroup.Id != group.Id {
+		if existingGroup != nil && existingGroup.ID != group.ID {
 			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeGroupIdentifierInUse, nil))
 			return
 		}
 
 		// Only authserver:manage writes to an administrative group (#402 decision 1).
-		if !groupTargetCeilingAllows(w, r, database, auditLogger, group.Id) {
+		if !groupTargetCeilingAllows(w, r, database, auditLogger, group.ID) {
 			return
 		}
 
 		// Update the group
 		group.GroupIdentifier = strings.TrimSpace(updateReq.GroupIdentifier)
 		group.Description = strings.TrimSpace(updateReq.Description)
-		group.IncludeInIdToken = updateReq.IncludeInIdToken
+		group.IncludeInIDToken = updateReq.IncludeInIDToken
 		group.IncludeInAccessToken = updateReq.IncludeInAccessToken
 
 		err = database.UpdateGroup(r.Context(), nil, group)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error updating group"), "group_id", group.Id, "group_identifier", group.GroupIdentifier)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error updating group"), "group_id", group.ID, "group_identifier", group.GroupIdentifier)
 			return
 		}
 
 		// Audit log
 		auditLogger.Log(r.Context(), audit.EventUpdatedGroup, map[string]interface{}{
-			"group_id":         group.Id,
+			"group_id":         group.ID,
 			"group_identifier": group.GroupIdentifier,
 			"logged_in_user":   callerSubject(r),
 		})
@@ -295,7 +295,7 @@ func HandleGroupUpdatePut(
 
 		// Return updated group
 		response := api.UpdateGroupResponse{
-			Group: *apimapping.ToGroupResponse(group, memberCounts[group.Id]),
+			Group: *apimapping.ToGroupResponse(group, memberCounts[group.ID]),
 		}
 
 		writeJSON(w, r, http.StatusOK, response)
@@ -322,7 +322,7 @@ func HandleGroupDelete(
 		}
 
 		// Check if group exists
-		group, err := database.GetGroupById(r.Context(), nil, id)
+		group, err := database.GetGroupByID(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error getting group by ID for deletion"), "group_id", id)
 			return
@@ -336,7 +336,7 @@ func HandleGroupDelete(
 		// deletes a group holding an administrative permission (#402). Such a group is an
 		// administrator, and the grant ceiling refuses exactly the groups the target ceiling would, so
 		// it is the one check here.
-		if !groupDeletionCeilingAllows(w, r, database, auditLogger, group.Id) {
+		if !groupDeletionCeilingAllows(w, r, database, auditLogger, group.ID) {
 			return
 		}
 
@@ -350,14 +350,14 @@ func HandleGroupDelete(
 			if lockErr != nil {
 				return lockErr
 			}
-			givesManage, readErr := administrators.groupsGiveManage(r.Context(), []int64{group.Id})
+			givesManage, readErr := administrators.groupsGiveManage(r.Context(), []int64{group.ID})
 			if readErr != nil {
 				return readErr
 			}
 			if decideErr := administrators.decide(r.Context(), givesManage); decideErr != nil {
 				return decideErr
 			}
-			if deleteErr := database.DeleteGroup(r.Context(), tx, group.Id); deleteErr != nil {
+			if deleteErr := database.DeleteGroup(r.Context(), tx, group.ID); deleteErr != nil {
 				return errs.Wrap(deleteErr, "database error deleting group")
 			}
 			return administrators.leavesAnAdministrator(r.Context())
@@ -367,13 +367,13 @@ func HandleGroupDelete(
 			return
 		}
 		if err != nil {
-			writeInternalServerError(w, r, err, "group_id", group.Id, "group_identifier", group.GroupIdentifier)
+			writeInternalServerError(w, r, err, "group_id", group.ID, "group_identifier", group.GroupIdentifier)
 			return
 		}
 
 		// Audit log
 		auditLogger.Log(r.Context(), audit.EventDeletedGroup, map[string]interface{}{
-			"group_id":         group.Id,
+			"group_id":         group.ID,
 			"group_identifier": group.GroupIdentifier,
 			"logged_in_user":   callerSubject(r),
 		})

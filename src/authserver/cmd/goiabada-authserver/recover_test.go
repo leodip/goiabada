@@ -101,7 +101,7 @@ func newRecoverDatabaseAt(t *testing.T, path string) (*sqlitedb.Database, *recor
 		if err := db.CreateResource(ctx, tx, resource); err != nil {
 			return err
 		}
-		manage.ResourceId = resource.Id
+		manage.ResourceID = resource.ID
 		if err := db.CreatePermission(ctx, tx, manage); err != nil {
 			return err
 		}
@@ -395,10 +395,10 @@ func TestRecoverCommand_AFlagAfterRecoverChoosesTheDatabaseOpened(t *testing.T) 
 	assert.NoFileExists(t, a)
 	user, err := db.GetUserByEmail(context.Background(), nil, "admin@example.com")
 	require.NoError(t, err)
-	grants, err := db.GetUserPermissionsByUserId(context.Background(), nil, user.Id)
+	grants, err := db.GetUserPermissionsByUserID(context.Background(), nil, user.ID)
 	require.NoError(t, err)
 	require.Len(t, grants, 1, "the grant was written in the database the flag after recover named")
-	assert.Equal(t, manage.Id, grants[0].PermissionId)
+	assert.Equal(t, manage.ID, grants[0].PermissionID)
 }
 
 // TestRecoverCommand_NeverCreatesTheDatabase: on every server engine the opener is handed a
@@ -567,7 +567,7 @@ func TestRecover_HoldsThePasswordToTheStoredPolicy(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			db, _ := newRecoverDatabase(t)
 			ctx := context.Background()
-			settings, err := db.GetSettingsById(ctx, nil, 1)
+			settings, err := db.GetSettingsByID(ctx, nil, 1)
 			require.NoError(t, err)
 			settings.PasswordPolicy = tc.policy
 			require.NoError(t, db.UpdateSettings(ctx, nil, settings))
@@ -653,7 +653,7 @@ func TestRecover_RefusesASchemaThisBinaryDoesNotCarry(t *testing.T) {
 			require.NoError(t, err)
 			assert.True(t, user.OTPEnabled, "nothing was removed")
 			assert.Zero(t, user.AuthStateGeneration, "the generation did not move")
-			grants, err := db.GetUserPermissionsByUserId(context.Background(), nil, user.Id)
+			grants, err := db.GetUserPermissionsByUserID(context.Background(), nil, user.ID)
 			require.NoError(t, err)
 			assert.Empty(t, grants, "nothing was granted")
 		})
@@ -707,10 +707,10 @@ func TestRecover_AppliesEachAskedActionInOneRevocation(t *testing.T) {
 	assert.Equal(t, int64(1), after.AuthStateGeneration)
 
 	// The permission is granted.
-	grants, err := db.GetUserPermissionsByUserId(ctx, nil, after.Id)
+	grants, err := db.GetUserPermissionsByUserID(ctx, nil, after.ID)
 	require.NoError(t, err)
 	require.Len(t, grants, 1)
-	assert.Equal(t, manage.Id, grants[0].PermissionId)
+	assert.Equal(t, manage.ID, grants[0].PermissionID)
 
 	// The audit trail: one record per thing done, in the Admin API's order, each naming the
 	// command as the actor under one key (#498 review F6, F7 and F11).
@@ -721,16 +721,16 @@ func TestRecover_AppliesEachAskedActionInOneRevocation(t *testing.T) {
 		audit.EventAdministrativePermissionChanged,
 		audit.EventRevokedUserAuthState,
 	}, recorder.events)
-	assert.Equal(t, map[string]interface{}{"user_id": after.Id, "command": recovery.Actor}, recorder.details[0])
-	assert.Equal(t, map[string]interface{}{"user_id": after.Id, "command": recovery.Actor}, recorder.details[1])
+	assert.Equal(t, map[string]interface{}{"user_id": after.ID, "command": recovery.Actor}, recorder.details[0])
+	assert.Equal(t, map[string]interface{}{"user_id": after.ID, "command": recovery.Actor}, recorder.details[1])
 	assert.Equal(t, map[string]interface{}{
-		"user_id": after.Id, "permission_id": manage.Id, "command": recovery.Actor,
+		"user_id": after.ID, "permission_id": manage.ID, "command": recovery.Actor,
 	}, recorder.details[2])
 	assert.Equal(t, map[string]interface{}{
 		"change":                 "granted",
 		"target_kind":            "user",
-		"target_id":              after.Id,
-		"user_id":                after.Id,
+		"target_id":              after.ID,
+		"user_id":                after.ID,
 		"permission_identifiers": []string{"authserver:manage"},
 		"command":                recovery.Actor,
 	}, recorder.details[3])
@@ -739,7 +739,7 @@ func TestRecover_AppliesEachAskedActionInOneRevocation(t *testing.T) {
 	assert.Equal(t, recovery.Actor, revoked["command"])
 	assert.Empty(t, revoked["logged_in_user"], "no token made the recovery")
 	assert.Contains(t, revoked, "logged_in_user", "the key is present, empty, as at the sign-in sites")
-	assert.Equal(t, after.Id, revoked["user_id"])
+	assert.Equal(t, after.ID, revoked["user_id"])
 	assert.Equal(t, int64(0), revoked["old_generation"])
 	assert.Equal(t, int64(1), revoked["new_generation"])
 }
@@ -816,10 +816,10 @@ func TestRecover_ReportsManageAlreadyHeldAndGrantsNothing(t *testing.T) {
 
 	user, err := db.GetUserByEmail(ctx, nil, "admin@example.com")
 	require.NoError(t, err)
-	grants, err := db.GetUserPermissionsByUserId(ctx, nil, user.Id)
+	grants, err := db.GetUserPermissionsByUserID(ctx, nil, user.ID)
 	require.NoError(t, err)
 	assert.Len(t, grants, 1, "the second run wrote no second grant")
-	assert.Equal(t, manage.Id, grants[0].PermissionId)
+	assert.Equal(t, manage.ID, grants[0].PermissionID)
 	assert.Equal(t, []string{audit.EventRevokedUserAuthState}, recorder.events,
 		"no permission event for a grant that did not happen")
 }
@@ -836,7 +836,7 @@ func TestRecoverUsage_NamesDisableTurnstile(t *testing.T) {
 func turnTurnstileOn(t *testing.T, db data.Database) {
 	t.Helper()
 	ctx := context.Background()
-	settings, err := db.GetSettingsById(ctx, nil, 1)
+	settings, err := db.GetSettingsByID(ctx, nil, 1)
 	require.NoError(t, err)
 	settings.TurnstileEnabled = true
 	settings.TurnstileSiteKey = "1x00000000000000000000AA"
@@ -860,7 +860,7 @@ func TestRecover_DisableTurnstileAloneTouchesNoUser(t *testing.T) {
 	assert.NotContains(t, stdout, "recovered", "no user was recovered")
 	assert.NotContains(t, stdout, "sessions ended")
 
-	settings, err := db.GetSettingsById(ctx, nil, 1)
+	settings, err := db.GetSettingsByID(ctx, nil, 1)
 	require.NoError(t, err)
 	assert.False(t, settings.TurnstileEnabled, "the challenge is off")
 	assert.Equal(t, "1x00000000000000000000AA", settings.TurnstileSiteKey, "the site key is kept")
@@ -917,15 +917,15 @@ func TestRecover_DisableTurnstileWithAUserAction(t *testing.T) {
 	assert.Contains(t, stdout, "recovered admin@example.com")
 	assert.Contains(t, stdout, "authentication generation 0 to 1")
 
-	settings, err := db.GetSettingsById(ctx, nil, 1)
+	settings, err := db.GetSettingsByID(ctx, nil, 1)
 	require.NoError(t, err)
 	assert.False(t, settings.TurnstileEnabled)
 	user, err := db.GetUserByEmail(ctx, nil, "admin@example.com")
 	require.NoError(t, err)
-	grants, err := db.GetUserPermissionsByUserId(ctx, nil, user.Id)
+	grants, err := db.GetUserPermissionsByUserID(ctx, nil, user.ID)
 	require.NoError(t, err)
 	require.Len(t, grants, 1)
-	assert.Equal(t, manage.Id, grants[0].PermissionId)
+	assert.Equal(t, manage.ID, grants[0].PermissionID)
 
 	assert.Equal(t, []string{
 		audit.EventAddedUserPermission,

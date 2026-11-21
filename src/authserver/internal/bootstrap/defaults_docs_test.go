@@ -83,7 +83,7 @@ func seededDefaults(settings *record.Settings) map[string]string {
 	return map[string]string{
 		"Token lifetime, in seconds":                        strconv.Itoa(settings.TokenExpirationInSeconds),
 		"Include OpenID Connect claims in the access token": onOff[settings.IncludeOpenIDConnectClaimsInAccessToken],
-		"Include OpenID Connect claims in the ID token":     onOff[settings.IncludeOpenIDConnectClaimsInIdToken],
+		"Include OpenID Connect claims in the ID token":     onOff[settings.IncludeOpenIDConnectClaimsInIDToken],
 		"Offline idle timeout, in seconds":                  strconv.Itoa(settings.RefreshTokenOfflineIdleTimeoutInSeconds),
 		"Offline maximum lifetime, in seconds":              strconv.Itoa(settings.RefreshTokenOfflineMaxLifetimeInSeconds),
 		"Idle timeout, in seconds":                          strconv.Itoa(settings.UserSessionIdleTimeoutInSeconds),
@@ -103,7 +103,7 @@ func TestConceptDocs_TheDefaultsAreWhatTheSeedWrites(t *testing.T) {
 	db := newSeedDB(t)
 	_, err := testRunner(db, singleStepConfig()).run(context.Background())
 	require.NoError(t, err)
-	settings, err := db.GetSettingsById(context.Background(), nil, 1)
+	settings, err := db.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err)
 	require.NotNil(t, settings)
 

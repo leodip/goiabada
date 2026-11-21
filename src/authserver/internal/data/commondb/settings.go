@@ -64,7 +64,7 @@ var settingsColumns = columnList{
 // scanSettings reads one row selected with settingsColumns.
 func scanSettings(row rowScanner, settings *record.Settings) error {
 	return row.Scan(
-		&settings.Id,
+		&settings.ID,
 		&settings.CreatedAt,
 		&settings.UpdatedAt,
 		&settings.AppName,
@@ -78,7 +78,7 @@ func scanSettings(row rowScanner, settings *record.Settings) error {
 		&settings.UserSessionIdleTimeoutInSeconds,
 		&settings.UserSessionMaxLifetimeInSeconds,
 		&settings.IncludeOpenIDConnectClaimsInAccessToken,
-		&settings.IncludeOpenIDConnectClaimsInIdToken,
+		&settings.IncludeOpenIDConnectClaimsInIDToken,
 		&settings.MaxUserSessionsPerUser,
 		&settings.KeepSignedIn,
 		&settings.AESEncryptionKeyLegacy,
@@ -102,7 +102,7 @@ func scanSettings(row rowScanner, settings *record.Settings) error {
 		&settings.AuditLogRetentionDays,
 		&settings.LastCleanupAt,
 		&settings.AccountDeletionEnabled,
-		&settings.DefaultBrandId,
+		&settings.DefaultBrandID,
 	)
 }
 
@@ -296,7 +296,7 @@ var updateSettings = statement{
 		"WHERE id = @p35",
 }
 
-var selectSettingsById = statement{
+var selectSettingsByID = statement{
 	sqlite:   "SELECT " + settingsColumns.sqlite + " FROM settings WHERE id = ?",
 	mysql:    "SELECT " + settingsColumns.mysql + " FROM settings WHERE id = ?",
 	postgres: "SELECT " + settingsColumns.postgres + " FROM settings WHERE id = $1",
@@ -338,7 +338,7 @@ func (d *Database) CreateSettings(ctx context.Context, tx *sql.Tx, settings *rec
 		settings.SelfRegistrationRequiresEmailVerification, settings.TokenExpirationInSeconds,
 		settings.RefreshTokenOfflineIdleTimeoutInSeconds, settings.RefreshTokenOfflineMaxLifetimeInSeconds,
 		settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds,
-		settings.IncludeOpenIDConnectClaimsInAccessToken, settings.IncludeOpenIDConnectClaimsInIdToken,
+		settings.IncludeOpenIDConnectClaimsInAccessToken, settings.IncludeOpenIDConnectClaimsInIDToken,
 		settings.MaxUserSessionsPerUser, settings.KeepSignedIn, settings.AESEncryptionKeyLegacy, settings.SMTPHost,
 		settings.SMTPPort, settings.SMTPUsername, settings.SMTPPasswordEncrypted, settings.SMTPFromName,
 		settings.SMTPFromEmail, settings.SMTPEncryption, settings.SMTPEnabled,
@@ -346,29 +346,29 @@ func (d *Database) CreateSettings(ctx context.Context, tx *sql.Tx, settings *rec
 		settings.DynamicClientRegistrationEnabled, settings.PKCERequired, settings.ImplicitFlowEnabled,
 		settings.ResourceOwnerPasswordCredentialsEnabled, settings.AuditLogsInConsoleEnabled,
 		settings.AuditLogsInDatabaseEnabled, settings.AuditLogRetentionDays, settings.LastCleanupAt,
-		settings.AccountDeletionEnabled, settings.DefaultBrandId)
+		settings.AccountDeletionEnabled, settings.DefaultBrandID)
 	if err != nil {
 		settings.CreatedAt = originalCreatedAt
 		settings.UpdatedAt = originalUpdatedAt
 		return err
 	}
 
-	settings.Id = id
+	settings.ID = id
 	return nil
 }
 
-// initialSettingsId is the settings row's id: IsEmpty and every reader of the settings ask for this
+// initialSettingsID is the settings row's id: IsEmpty and every reader of the settings ask for this
 // id and no other, so the one row a deployment carries has to be written at it.
-const initialSettingsId = 1
+const initialSettingsID = 1
 
-// CreateInitialSettings writes a deployment's settings row at initialSettingsId rather than at the
+// CreateInitialSettings writes a deployment's settings row at initialSettingsID rather than at the
 // id the engine's counter hands out. PostgreSQL, MySQL and SQL Server do not give back an id drawn
 // inside a transaction that rolled back, so a first seed that failed after its settings insert left
 // the next seed's row at 2, which no reader finds: the database stayed unusable and every later
 // start failed on the rows it re-inserted (#424 decision 14). Naming the id makes a rolled-back
 // seed leave nothing behind, whatever the engine's counter did.
 //
-// It refuses a nil transaction because SQL Server's IDENTITY_INSERT, which ExplicitIdInsertSQL
+// It refuses a nil transaction because SQL Server's IDENTITY_INSERT, which ExplicitIDInsertSQL
 // brackets the insert with there, is a setting of the connection, and only a transaction pins the
 // three statements to one.
 func (d *Database) CreateInitialSettings(ctx context.Context, tx *sql.Tx, settings *record.Settings) error {
@@ -378,21 +378,21 @@ func (d *Database) CreateInitialSettings(ctx context.Context, tx *sql.Tx, settin
 
 	now := time.Now().UTC()
 
-	originalId := settings.Id
+	originalID := settings.ID
 	originalCreatedAt := settings.CreatedAt
 	originalUpdatedAt := settings.UpdatedAt
 	restore := func() {
-		settings.Id = originalId
+		settings.ID = originalID
 		settings.CreatedAt = originalCreatedAt
 		settings.UpdatedAt = originalUpdatedAt
 	}
-	settings.Id = initialSettingsId
+	settings.ID = initialSettingsID
 	settings.CreatedAt = sql.NullTime{Time: now, Valid: true}
 	settings.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
 	var before, after []string
-	if d.ExplicitIdInsertSQL != nil {
-		before, after = d.ExplicitIdInsertSQL("settings")
+	if d.ExplicitIDInsertSQL != nil {
+		before, after = d.ExplicitIDInsertSQL("settings")
 	}
 
 	for _, statement := range before {
@@ -403,12 +403,12 @@ func (d *Database) CreateInitialSettings(ctx context.Context, tx *sql.Tx, settin
 	}
 
 	if _, err := d.ExecSQL(ctx, tx, insertInitialSettings.text(d.Dialect),
-		settings.Id, settings.CreatedAt, settings.UpdatedAt, settings.AppName, settings.Issuer,
+		settings.ID, settings.CreatedAt, settings.UpdatedAt, settings.AppName, settings.Issuer,
 		settings.PasswordPolicy, settings.SelfRegistrationEnabled,
 		settings.SelfRegistrationRequiresEmailVerification, settings.TokenExpirationInSeconds,
 		settings.RefreshTokenOfflineIdleTimeoutInSeconds, settings.RefreshTokenOfflineMaxLifetimeInSeconds,
 		settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds,
-		settings.IncludeOpenIDConnectClaimsInAccessToken, settings.IncludeOpenIDConnectClaimsInIdToken,
+		settings.IncludeOpenIDConnectClaimsInAccessToken, settings.IncludeOpenIDConnectClaimsInIDToken,
 		settings.MaxUserSessionsPerUser, settings.KeepSignedIn, settings.AESEncryptionKeyLegacy, settings.SMTPHost,
 		settings.SMTPPort, settings.SMTPUsername, settings.SMTPPasswordEncrypted, settings.SMTPFromName,
 		settings.SMTPFromEmail, settings.SMTPEncryption, settings.SMTPEnabled,
@@ -416,7 +416,7 @@ func (d *Database) CreateInitialSettings(ctx context.Context, tx *sql.Tx, settin
 		settings.DynamicClientRegistrationEnabled, settings.PKCERequired, settings.ImplicitFlowEnabled,
 		settings.ResourceOwnerPasswordCredentialsEnabled, settings.AuditLogsInConsoleEnabled,
 		settings.AuditLogsInDatabaseEnabled, settings.AuditLogRetentionDays, settings.LastCleanupAt,
-		settings.AccountDeletionEnabled, settings.DefaultBrandId); err != nil {
+		settings.AccountDeletionEnabled, settings.DefaultBrandID); err != nil {
 		restore()
 		return d.wrapSQLError(err, "unable to insert the initial settings")
 	}
@@ -433,7 +433,7 @@ func (d *Database) CreateInitialSettings(ctx context.Context, tx *sql.Tx, settin
 
 func (d *Database) UpdateSettings(ctx context.Context, tx *sql.Tx, settings *record.Settings) error {
 
-	if settings.Id == 0 {
+	if settings.ID == 0 {
 		return errs.New("can't update settings with id 0")
 	}
 
@@ -446,7 +446,7 @@ func (d *Database) UpdateSettings(ctx context.Context, tx *sql.Tx, settings *rec
 		settings.TokenExpirationInSeconds, settings.RefreshTokenOfflineIdleTimeoutInSeconds,
 		settings.RefreshTokenOfflineMaxLifetimeInSeconds, settings.UserSessionIdleTimeoutInSeconds,
 		settings.UserSessionMaxLifetimeInSeconds, settings.IncludeOpenIDConnectClaimsInAccessToken,
-		settings.IncludeOpenIDConnectClaimsInIdToken, settings.MaxUserSessionsPerUser, settings.KeepSignedIn,
+		settings.IncludeOpenIDConnectClaimsInIDToken, settings.MaxUserSessionsPerUser, settings.KeepSignedIn,
 		settings.SMTPHost,
 		settings.SMTPPort, settings.SMTPUsername, settings.SMTPPasswordEncrypted, settings.SMTPFromName,
 		settings.SMTPFromEmail, settings.SMTPEncryption, settings.SMTPEnabled,
@@ -454,7 +454,7 @@ func (d *Database) UpdateSettings(ctx context.Context, tx *sql.Tx, settings *rec
 		settings.DynamicClientRegistrationEnabled, settings.PKCERequired, settings.ImplicitFlowEnabled,
 		settings.ResourceOwnerPasswordCredentialsEnabled, settings.AuditLogsInConsoleEnabled,
 		settings.AuditLogsInDatabaseEnabled, settings.AuditLogRetentionDays, settings.AccountDeletionEnabled,
-		settings.Id)
+		settings.ID)
 	if err != nil {
 		settings.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update settings")
@@ -489,25 +489,25 @@ func (d *Database) UpdateSettings(ctx context.Context, tx *sql.Tx, settings *rec
 //
 // The transaction is required. Without one the statement autocommits and releases the row before
 // the caller's read runs, which is the whole of what this buys.
-func (d *Database) AcquireSettingsRow(ctx context.Context, tx *sql.Tx, settingsId int64) error {
+func (d *Database) AcquireSettingsRow(ctx context.Context, tx *sql.Tx, settingsID int64) error {
 
 	if tx == nil {
 		return errs.New("acquiring the settings row requires a transaction: an autocommitted statement releases the row before the caller can read it")
 	}
 
-	if settingsId == 0 {
+	if settingsID == 0 {
 		return errs.New("can't acquire a settings row with an id of 0")
 	}
 
-	if _, err := d.ExecSQL(ctx, tx, acquireSettingsRow.text(d.Dialect), time.Now().UTC(), settingsId); err != nil {
+	if _, err := d.ExecSQL(ctx, tx, acquireSettingsRow.text(d.Dialect), time.Now().UTC(), settingsID); err != nil {
 		return errs.Wrap(err, "unable to acquire the settings row")
 	}
 
 	return nil
 }
 
-func (d *Database) GetSettingsById(ctx context.Context, tx *sql.Tx, settingsId int64) (*record.Settings, error) {
-	return queryOne(ctx, d, tx, selectSettingsById.text(d.Dialect), []any{settingsId}, scanSettings, "settings")
+func (d *Database) GetSettingsByID(ctx context.Context, tx *sql.Tx, settingsID int64) (*record.Settings, error) {
+	return queryOne(ctx, d, tx, selectSettingsByID.text(d.Dialect), []any{settingsID}, scanSettings, "settings")
 }
 
 // TryClaimCleanupRun atomically claims the next background cleanup run, and
@@ -530,7 +530,7 @@ func (d *Database) GetSettingsById(ctx context.Context, tx *sql.Tx, settingsId i
 // attempt by one interval rather than letting every instance retry immediately.
 func (d *Database) TryClaimCleanupRun(ctx context.Context, tx *sql.Tx, now time.Time, claimableBefore time.Time) (bool, error) {
 
-	result, err := d.ExecSQL(ctx, tx, claimCleanupRun.text(d.Dialect), now, now, initialSettingsId, claimableBefore)
+	result, err := d.ExecSQL(ctx, tx, claimCleanupRun.text(d.Dialect), now, now, initialSettingsID, claimableBefore)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to claim the cleanup run")
 	}

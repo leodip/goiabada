@@ -21,7 +21,7 @@ func TestAPISettingsEmailGet_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Read current settings from DB for comparison
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
+	settings, err := database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err)
 	assert.NotNil(t, settings)
 
@@ -83,7 +83,7 @@ func TestAPISettingsEmailPut_EnableSuccess(t *testing.T) {
 	assert.True(t, body.HasSMTPPassword)
 
 	// Verify DB persisted
-	settings, err2 := database.GetSettingsById(context.Background(), nil, 1)
+	settings, err2 := database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err2)
 	assert.True(t, settings.SMTPEnabled)
 	assert.Equal(t, req.SMTPHost, settings.SMTPHost)
@@ -121,7 +121,7 @@ func TestAPISettingsEmailPut_DisableResetsFields(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	// Verify DB reset
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
+	settings, err := database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err)
 	assert.False(t, settings.SMTPEnabled)
 	assert.Empty(t, settings.SMTPHost)
@@ -260,7 +260,7 @@ func TestAPISettingsEmailPut_PasswordAtBoundIsAccepted(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, body.HasSMTPPassword)
 
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
+	settings, err := database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err)
 	stored, err := dataCipher.Decrypt(settings.SMTPPasswordEncrypted)
 	require.NoError(t, err)
@@ -298,7 +298,7 @@ func TestAPISettingsEmailPut_TheSenderAddressAndUsernameTakeUpTo254Characters(t 
 	assert.Equal(t, username254, body.SMTPUsername)
 	assert.Equal(t, address254, body.SMTPFromEmail)
 
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
+	settings, err := database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err)
 	assert.Equal(t, username254, settings.SMTPUsername, "stored whole")
 	assert.Equal(t, address254, settings.SMTPFromEmail, "stored whole")
@@ -326,7 +326,7 @@ func TestAPISettingsEmailPut_TheSenderAddressAndUsernameTakeUpTo254Characters(t 
 			assert.Equal(t, c.code, errBody.ErrorCode)
 			assert.Equal(t, c.description, errBody.ErrorDescription)
 
-			after, err := database.GetSettingsById(context.Background(), nil, 1)
+			after, err := database.GetSettingsByID(context.Background(), nil, 1)
 			require.NoError(t, err)
 			assert.Equal(t, address254, after.SMTPFromEmail, "nothing is written")
 			assert.Equal(t, username254, after.SMTPUsername, "nothing is written")
@@ -355,7 +355,7 @@ func TestAPISettingsEmailPut_TheSenderAddressKeepsTheCaseOfItsLocalPart(t *testi
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
 	assert.Equal(t, "Notify@example.com", body.SMTPFromEmail)
 
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
+	settings, err := database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err)
 	assert.Equal(t, "Notify@example.com", settings.SMTPFromEmail, "stored with its local part's case")
 
@@ -407,7 +407,7 @@ func TestAPISettingsEmailPut_ANullCharacterInTheUsernameOrPasswordIsRefused(t *t
 			assert.Equal(t, c.code, errBody.ErrorCode)
 			assert.Equal(t, c.description, errBody.ErrorDescription)
 
-			after, err := database.GetSettingsById(context.Background(), nil, 1)
+			after, err := database.GetSettingsByID(context.Background(), nil, 1)
 			require.NoError(t, err)
 			assert.Equal(t, "relay-user", after.SMTPUsername, "nothing is written")
 			stored, err := dataCipher.Decrypt(after.SMTPPasswordEncrypted)
@@ -510,7 +510,7 @@ func TestAPISettingsEmailPut_HostIsStoredBare(t *testing.T) {
 			require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
 			assert.Equal(t, test.want, body.SMTPHost)
 
-			settings, err := database.GetSettingsById(context.Background(), nil, 1)
+			settings, err := database.GetSettingsByID(context.Background(), nil, 1)
 			require.NoError(t, err)
 			assert.Equal(t, test.want, settings.SMTPHost)
 		})
@@ -555,7 +555,7 @@ func TestAPISettingsEmailPut_PasswordLifecycle(t *testing.T) {
 	}
 	storedCiphertext := func(t *testing.T) []byte {
 		t.Helper()
-		settings, err := database.GetSettingsById(context.Background(), nil, 1)
+		settings, err := database.GetSettingsByID(context.Background(), nil, 1)
 		require.NoError(t, err)
 		return settings.SMTPPasswordEncrypted
 	}
@@ -593,7 +593,7 @@ func TestAPISettingsEmailPut_PasswordLifecycle(t *testing.T) {
 	require.NoError(t, json.NewDecoder(refused.Body).Decode(&errBody))
 	assert.Equal(t, "handler.settings_email.smtp_host_changed", errBody.ErrorCode)
 	assert.Equal(t, "The SMTP host has changed: enter the SMTP password again, or remove it.", errBody.ErrorDescription)
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
+	settings, err := database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err)
 	assert.Equal(t, "mailpit", settings.SMTPHost)
 	assert.Equal(t, set, settings.SMTPPasswordEncrypted)
@@ -651,7 +651,7 @@ func TestAPISettingsEmailSendTest_SMTPDisabled(t *testing.T) {
 // Unauthorized scenarios
 func TestAPISettingsEmail_Unauthorized(t *testing.T) {
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/email"
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
 	// No token - GET
 	req, _ := http.NewRequest("GET", url, nil)
@@ -721,7 +721,7 @@ func TestAPISettingsEmailPut_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, `Tom & Jerry "QA"`, body.SMTPFromName)
 
-	stored, err := database.GetSettingsById(context.Background(), nil, 1)
+	stored, err := database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err)
 	assert.Equal(t, `Tom & Jerry "QA"`, stored.SMTPFromName)
 }

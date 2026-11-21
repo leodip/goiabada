@@ -136,15 +136,15 @@ func TestHandleAuthLevel2Get_AStepResumingAfterANewerAuthorize(t *testing.T) {
 			seed := httptest.NewRecorder()
 			require.NoError(t, ceremonyStore.AddAuthContext(seed, httptest.NewRequest(http.MethodGet, "/auth/authorize", nil),
 				&ceremony.AuthContext{
-					CeremonyId: testCeremonyId,
+					CeremonyID: testCeremonyID,
 					AuthState:  ceremony.AuthStateRequiresLevel2,
-					ClientId:   "test-client",
-					UserId:     1,
+					ClientID:   "test-client",
+					UserID:     1,
 				}))
 			cookies := seed.Result().Cookies()
 			require.Len(t, cookies, 1)
 
-			// Tab A, held in GetUserById until the other tabs have saved.
+			// Tab A, held in GetUserByID until the other tabs have saved.
 			pageRendererA := handlersmocks.NewPageRenderer(t)
 			databaseA := datamocks.NewDatabase(t)
 			auditLoggerA := handlersmocks.NewAuditLogger(t)
@@ -158,14 +158,14 @@ func TestHandleAuthLevel2Get_AStepResumingAfterANewerAuthorize(t *testing.T) {
 				}
 			}()
 			databaseA.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
-				&record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: record.AcrLevel2Optional}, nil).Maybe()
-			databaseA.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Run(func(mock.Arguments) {
+				&record.Client{ID: 1, ClientIdentifier: "test-client", DefaultACRLevel: record.ACRLevel2Optional}, nil).Maybe()
+			databaseA.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Run(func(mock.Arguments) {
 				close(reached)
 				<-release
-			}).Return(&record.User{Id: 1, Enabled: true, OTPEnabled: true, OtpConfigGeneration: 4}, nil)
+			}).Return(&record.User{ID: 1, Enabled: true, OTPEnabled: true, OTPConfigGeneration: 4}, nil)
 
 			reqA := withCookies(withSessionSettings(httptest.NewRequest(http.MethodGet,
-				"/auth/level2?ceremony="+testCeremonyId, nil)), cookies)
+				"/auth/level2?ceremony="+testCeremonyID, nil)), cookies)
 			rrA := httptest.NewRecorder()
 			if !tc.carriesOn {
 				expectCeremonyNoLongerActive(t, pageRendererA, rrA, reqA)
@@ -209,7 +209,7 @@ func TestHandleAuthLevel2Get_AStepResumingAfterANewerAuthorize(t *testing.T) {
 			if tc.carriesOn {
 				require.Equal(t, http.StatusFound, rrA.Code, rrA.Body.String())
 				assertStepLocation(t, rrA.Header().Get("Location"), "/auth/otp")
-				storedA, err := heldCeremony(ceremonyStore, cookies, testCeremonyId)
+				storedA, err := heldCeremony(ceremonyStore, cookies, testCeremonyID)
 				require.NoError(t, err, "tab A's ceremony is still held")
 				assert.Equal(t, ceremony.AuthStateLevel2OTP, storedA.AuthState, "and tab A's save landed on it")
 				return
@@ -227,7 +227,7 @@ func TestHandleAuthLevel2Get_AStepResumingAfterANewerAuthorize(t *testing.T) {
 				}
 			}
 			assert.True(t, warned, "the pushed-out step is logged at warn:\n%s", logged.Text())
-			_, err := heldCeremony(ceremonyStore, cookies, testCeremonyId)
+			_, err := heldCeremony(ceremonyStore, cookies, testCeremonyID)
 			require.ErrorIs(t, err, ceremony.ErrCeremonyNotHeld, "ceremony A is not put back")
 		})
 	}
@@ -246,10 +246,10 @@ func TestHandleAuthLevel1Get_AReplacedCeremonyAnswersNoLongerActive(t *testing.T
 		auditLogger:   handlersmocks.NewAuditLogger(t),
 	})
 
-	req := withSessionSettings(httptest.NewRequest(http.MethodGet, "/auth/level1?ceremony="+testCeremonyId, nil))
+	req := withSessionSettings(httptest.NewRequest(http.MethodGet, "/auth/level1?ceremony="+testCeremonyID, nil))
 	rr := httptest.NewRecorder()
 	ceremonyStore.On("GetAuthContext", mock.Anything).Return(&ceremony.AuthContext{
-		CeremonyId: testCeremonyId,
+		CeremonyID: testCeremonyID,
 		AuthState:  ceremony.AuthStateRequiresLevel1,
 	}, nil)
 	expectStepSaveReplaced(t, ceremonyStore, pageRenderer, rr, req)
@@ -267,10 +267,10 @@ func TestHandleAuthLevel1Get_AReplacedCeremonyAnswersNoLongerActive(t *testing.T
 func TestHandleAuthLevel1CompletedGet_AReplacedCeremonyAnswersNoLongerActive(t *testing.T) {
 	for _, tc := range []struct {
 		name        string
-		clientLevel record.AcrLevel
+		clientLevel record.ACRLevel
 	}{
-		{name: "on the way to level 2", clientLevel: record.AcrLevel2Optional},
-		{name: "on the way to completed", clientLevel: record.AcrLevel1},
+		{name: "on the way to level 2", clientLevel: record.ACRLevel2Optional},
+		{name: "on the way to completed", clientLevel: record.ACRLevel1},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			pageRenderer := handlersmocks.NewPageRenderer(t)
@@ -286,19 +286,19 @@ func TestHandleAuthLevel1CompletedGet_AReplacedCeremonyAnswersNoLongerActive(t *
 			})
 
 			req := withSessionSettings(httptest.NewRequest(http.MethodGet,
-				"/auth/level1completed?ceremony="+testCeremonyId, nil))
+				"/auth/level1completed?ceremony="+testCeremonyID, nil))
 			rr := httptest.NewRecorder()
 			ceremonyStore.On("GetAuthContext", mock.Anything).Return(&ceremony.AuthContext{
-				CeremonyId:          testCeremonyId,
+				CeremonyID:          testCeremonyID,
 				AuthState:           ceremony.AuthStateLevel1PasswordCompleted,
-				ClientId:            "test-client",
-				UserId:              1,
+				ClientID:            "test-client",
+				UserID:              1,
 				Level1AuthCompleted: true,
 			}, nil)
 			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 			database.On("UserSessionLoadUser", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
-				&record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: tc.clientLevel}, nil)
+				&record.Client{ID: 1, ClientIdentifier: "test-client", DefaultACRLevel: tc.clientLevel}, nil)
 			expectStepSaveReplaced(t, ceremonyStore, pageRenderer, rr, req)
 
 			handler.ServeHTTP(rr, req)
@@ -321,18 +321,18 @@ func TestHandleAuthLevel2Get_AReplacedCeremonyAnswersNoLongerActive(t *testing.T
 		auditLogger:   handlersmocks.NewAuditLogger(t),
 	})
 
-	req := withSessionSettings(httptest.NewRequest(http.MethodGet, "/auth/level2?ceremony="+testCeremonyId, nil))
+	req := withSessionSettings(httptest.NewRequest(http.MethodGet, "/auth/level2?ceremony="+testCeremonyID, nil))
 	rr := httptest.NewRecorder()
 	ceremonyStore.On("GetAuthContext", mock.Anything).Return(&ceremony.AuthContext{
-		CeremonyId: testCeremonyId,
+		CeremonyID: testCeremonyID,
 		AuthState:  ceremony.AuthStateRequiresLevel2,
-		ClientId:   "test-client",
-		UserId:     1,
+		ClientID:   "test-client",
+		UserID:     1,
 	}, nil)
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
-		&record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: record.AcrLevel2Optional}, nil)
-	database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(
-		&record.User{Id: 1, OTPEnabled: true, OtpConfigGeneration: 4}, nil)
+		&record.Client{ID: 1, ClientIdentifier: "test-client", DefaultACRLevel: record.ACRLevel2Optional}, nil)
+	database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(
+		&record.User{ID: 1, OTPEnabled: true, OTPConfigGeneration: 4}, nil)
 	expectStepSaveReplaced(t, ceremonyStore, pageRenderer, rr, req)
 
 	handler.ServeHTTP(rr, req)
@@ -344,7 +344,7 @@ func TestHandleAuthLevel2Get_AReplacedCeremonyAnswersNoLongerActive(t *testing.T
 
 // /auth/otp's page saves before it renders, on both arms: the code form for a user with an
 // authenticator, and the enrolment form for one without. A replaced ceremony renders neither.
-func TestHandleAuthOtpGet_AReplacedCeremonyAnswersNoLongerActive(t *testing.T) {
+func TestHandleAuthOTPGet_AReplacedCeremonyAnswersNoLongerActive(t *testing.T) {
 	for _, tc := range []struct {
 		name       string
 		otpEnabled bool
@@ -356,27 +356,27 @@ func TestHandleAuthOtpGet_AReplacedCeremonyAnswersNoLongerActive(t *testing.T) {
 			pageRenderer := handlersmocks.NewPageRenderer(t)
 			ceremonyStore := handlersmocks.NewCeremonyStore(t)
 			database := datamocks.NewDatabase(t)
-			handler := buildAuthOtpGet(authOtpGetDeps{
+			handler := buildAuthOTPGet(authOTPGetDeps{
 				pageRenderer:       pageRenderer,
 				ceremonyStore:      ceremonyStore,
 				database:           database,
-				otpSecretGenerator: handlersmocks.NewOtpSecretGenerator(t),
+				otpSecretGenerator: handlersmocks.NewOTPSecretGenerator(t),
 				auditLogger:        handlersmocks.NewAuditLogger(t),
 			})
 
-			req := withSettings(httptest.NewRequest(http.MethodGet, "/auth/otp?ceremony="+testCeremonyId, nil),
+			req := withSettings(httptest.NewRequest(http.MethodGet, "/auth/otp?ceremony="+testCeremonyID, nil),
 				&record.Settings{AppName: "TestApp"})
 			rr := httptest.NewRecorder()
 			ceremonyStore.On("GetAuthContext", mock.Anything).Return(&ceremony.AuthContext{
-				CeremonyId: testCeremonyId,
+				CeremonyID: testCeremonyID,
 				AuthState:  ceremony.AuthStateLevel2OTP,
-				ClientId:   "test-client",
-				UserId:     1,
+				ClientID:   "test-client",
+				UserID:     1,
 				// A key this ceremony already generated, so the enrolment arm draws no new one.
 				OTPKeyURL: otpTestKeyURL("JBSWY3DPEHPK3PXP"),
 			}, nil)
-			database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(
-				&record.User{Id: 1, Email: "test@example.com", OTPEnabled: tc.otpEnabled}, nil)
+			database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(
+				&record.User{ID: 1, Email: "test@example.com", OTPEnabled: tc.otpEnabled}, nil)
 			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
 				&record.Client{ClientIdentifier: "test-client"}, nil)
 			expectStepSaveReplaced(t, ceremonyStore, pageRenderer, rr, req)

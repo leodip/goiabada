@@ -56,7 +56,7 @@ func HandleAccountLegalDocumentAcceptancesGet(database accountLegalDocumentAccep
 type userLegalDocumentAcceptancesDatabase interface {
 	legaldocuments.AcceptedDatabase
 
-	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	GetUserByID(ctx context.Context, tx *sql.Tx, userID int64) (*record.User, error)
 }
 
 // HandleUserLegalDocumentAcceptancesGet - GET /api/v1/admin/users/{id}/legal-document-acceptances
@@ -70,7 +70,7 @@ func HandleUserLegalDocumentAcceptancesGet(database userLegalDocumentAcceptances
 			return
 		}
 
-		user, err := database.GetUserById(r.Context(), nil, id)
+		user, err := database.GetUserByID(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error getting user by ID for legal document acceptances"), "user_id", id)
 			return
@@ -88,9 +88,9 @@ func HandleUserLegalDocumentAcceptancesGet(database userLegalDocumentAcceptances
 func writeLegalDocumentAcceptances(w http.ResponseWriter, r *http.Request, database legaldocuments.AcceptedDatabase,
 	user *record.User, baseURL string) {
 
-	accepted, err := legaldocuments.AcceptedBy(r.Context(), database, user.Id)
+	accepted, err := legaldocuments.AcceptedBy(r.Context(), database, user.ID)
 	if err != nil {
-		writeInternalServerError(w, r, err, "user_id", user.Id)
+		writeInternalServerError(w, r, err, "user_id", user.ID)
 		return
 	}
 

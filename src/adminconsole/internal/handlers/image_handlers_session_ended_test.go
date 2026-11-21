@@ -55,7 +55,7 @@ func (refusingImageAPI) DeleteClientLogo(context.Context, string, int64) error {
 	return sessionRefusal()
 }
 
-func (refusingImageAPI) GetClientById(context.Context, string, int64) (*api.ClientResponse, error) {
+func (refusingImageAPI) GetClientByID(context.Context, string, int64) (*api.ClientResponse, error) {
 	return nil, sessionRefusal()
 }
 
@@ -81,7 +81,7 @@ func pictureForm(t *testing.T) []handlertest.Option {
 // contract at each of them, through the production JSON writer, so what is asserted is the wire: a
 // 403 whose body carries the code (#427 decisions 17 and 18; plan review round 2, finding 1).
 func TestImageHandlers_AnAdminAPI401IsAnsweredAsTheSessionEnded(t *testing.T) {
-	type build func(httpHelper handlers.HttpHelper) http.HandlerFunc
+	type build func(httpHelper handlers.HTTPHelper) http.HandlerFunc
 
 	testCases := []struct {
 		name       string
@@ -92,7 +92,7 @@ func TestImageHandlers_AnAdminAPI401IsAnsweredAsTheSessionEnded(t *testing.T) {
 	}{
 		{
 			name: "HandleProfilePicturePost",
-			handler: func(h handlers.HttpHelper) http.HandlerFunc {
+			handler: func(h handlers.HTTPHelper) http.HandlerFunc {
 				return accounthandlers.HandleProfilePicturePost(h, refusingImageAPI{})
 			},
 			method: http.MethodPost,
@@ -100,14 +100,14 @@ func TestImageHandlers_AnAdminAPI401IsAnsweredAsTheSessionEnded(t *testing.T) {
 		},
 		{
 			name: "HandleProfilePictureDelete",
-			handler: func(h handlers.HttpHelper) http.HandlerFunc {
+			handler: func(h handlers.HTTPHelper) http.HandlerFunc {
 				return accounthandlers.HandleProfilePictureDelete(h, refusingImageAPI{})
 			},
 			method: http.MethodDelete,
 		},
 		{
 			name: "HandleProfilePicturePost",
-			handler: func(h handlers.HttpHelper) http.HandlerFunc {
+			handler: func(h handlers.HTTPHelper) http.HandlerFunc {
 				return adminuserhandlers.HandleProfilePicturePost(h, refusingImageAPI{})
 			},
 			method:     http.MethodPost,
@@ -116,7 +116,7 @@ func TestImageHandlers_AnAdminAPI401IsAnsweredAsTheSessionEnded(t *testing.T) {
 		},
 		{
 			name: "HandleProfilePictureDelete",
-			handler: func(h handlers.HttpHelper) http.HandlerFunc {
+			handler: func(h handlers.HTTPHelper) http.HandlerFunc {
 				return adminuserhandlers.HandleProfilePictureDelete(h, refusingImageAPI{})
 			},
 			method:     http.MethodDelete,
@@ -124,7 +124,7 @@ func TestImageHandlers_AnAdminAPI401IsAnsweredAsTheSessionEnded(t *testing.T) {
 		},
 		{
 			name: "HandleLogoPost",
-			handler: func(h handlers.HttpHelper) http.HandlerFunc {
+			handler: func(h handlers.HTTPHelper) http.HandlerFunc {
 				return adminclienthandlers.HandleLogoPost(h, refusingImageAPI{})
 			},
 			method:     http.MethodPost,
@@ -133,7 +133,7 @@ func TestImageHandlers_AnAdminAPI401IsAnsweredAsTheSessionEnded(t *testing.T) {
 		},
 		{
 			name: "HandleLogoDelete",
-			handler: func(h handlers.HttpHelper) http.HandlerFunc {
+			handler: func(h handlers.HTTPHelper) http.HandlerFunc {
 				return adminclienthandlers.HandleLogoDelete(h, refusingImageAPI{})
 			},
 			method:     http.MethodDelete,

@@ -18,9 +18,9 @@ import (
 // clientRedirectURIsAPI is what the redirect URIs page needs: the client, the global switches it
 // reads against, and the write.
 type clientRedirectURIsAPI interface {
-	GetClientById(ctx context.Context, accessToken string, clientId int64) (*api.ClientResponse, error)
+	GetClientByID(ctx context.Context, accessToken string, clientID int64) (*api.ClientResponse, error)
 	GetSettingsGeneral(ctx context.Context, accessToken string) (*api.SettingsGeneralResponse, error)
-	UpdateClientRedirectURIs(ctx context.Context, accessToken string, clientId int64, request *api.UpdateClientRedirectURIsRequest) (*api.ClientResponse, error)
+	UpdateClientRedirectURIs(ctx context.Context, accessToken string, clientID int64, request *api.UpdateClientRedirectURIsRequest) (*api.ClientResponse, error)
 }
 
 // usesARedirectFlow says whether the client signs users in through a redirect: the authorization
@@ -35,7 +35,7 @@ func usesARedirectFlow(client *api.ClientResponse, settings *api.SettingsGeneral
 }
 
 func HandleRedirectURIsGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient clientRedirectURIsAPI,
 ) http.HandlerFunc {
@@ -54,13 +54,13 @@ func HandleRedirectURIsGet(
 			return
 		}
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
-		clientResp, err := apiClient.GetClientById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		clientResp, err := apiClient.GetClientByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -83,14 +83,14 @@ func HandleRedirectURIsGet(
 		}
 
 		adminClientRedirectURIs := struct {
-			ClientId              int64
+			ClientID              int64
 			ClientIdentifier      string
 			CanManageRedirectURIs bool
 			RedirectURIs          []string
 			IsSystemLevelClient   bool
 			IsPublic              bool
 		}{
-			ClientId:              clientResp.Id,
+			ClientID:              clientResp.ID,
 			ClientIdentifier:      clientResp.ClientIdentifier,
 			CanManageRedirectURIs: usesARedirectFlow(clientResp, settingsResp),
 			IsSystemLevelClient:   clientResp.IsSystemLevelClient,
@@ -137,7 +137,7 @@ func HandleRedirectURIsGet(
 }
 
 func HandleRedirectURIsPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient clientRedirectURIsAPI,
 ) http.HandlerFunc {
@@ -158,9 +158,9 @@ func HandleRedirectURIsPost(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JSONError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.JSONError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
@@ -169,7 +169,7 @@ func HandleRedirectURIsPost(
 			RedirectURIs:         data.RedirectURIs,
 			ExpectedRedirectURIs: data.ExpectedRedirectURIs,
 		}
-		_, err = apiClient.UpdateClientRedirectURIs(r.Context(), jwtInfo.TokenResponse.AccessToken, data.ClientId, req)
+		_, err = apiClient.UpdateClientRedirectURIs(r.Context(), jwtInfo.TokenResponse.AccessToken, data.ClientID, req)
 		if err != nil {
 			// Not JSONError directly: the API refuses a redirect URI with a 400 whose
 			// description names the offending value, and that sentence is the only thing

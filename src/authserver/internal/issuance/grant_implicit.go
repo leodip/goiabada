@@ -17,8 +17,8 @@ type ImplicitGrantInput struct {
 	Client *record.Client
 	User   *record.User
 	Scope  string
-	// AcrLevel and AuthMethods are what the tokens' acr and amr claims are written from.
-	AcrLevel    record.AcrLevel
+	// ACRLevel and AuthMethods are what the tokens' acr and amr claims are written from.
+	ACRLevel    record.ACRLevel
 	AuthMethods string
 	// SessionIdentifier is the session the tokens are bound to, through their sid claim, and the
 	// row IssueImplicit takes before it signs anything. An identifier with no row is refused
@@ -40,7 +40,7 @@ type ImplicitGrantInput struct {
 // Per RFC 6749 4.2.2, NO refresh token is issued for implicit flow.
 type ImplicitGrantResponse struct {
 	AccessToken string
-	IdToken     string
+	IDToken     string
 	TokenType   string
 	ExpiresIn   int64
 	Scope       string
@@ -57,7 +57,7 @@ type ImplicitGrantResponse struct {
 // writes on a nil transaction, and on SQLite the whole process shares the one connection this
 // transaction holds (#139).
 func (t *TokenIssuer) IssueImplicitTx(ctx context.Context, settings *record.Settings,
-	input *ImplicitGrantInput, issueAccessToken bool, issueIdToken bool) (*ImplicitGrantResponse, error) {
+	input *ImplicitGrantInput, issueAccessToken bool, issueIDToken bool) (*ImplicitGrantResponse, error) {
 
 	// Opened through RunInTransaction, so a deadlock reruns the body (#301). It is safe to rerun:
 	// input is only read, the user's groups and attributes are loaded afresh each time, and
@@ -65,7 +65,7 @@ func (t *TokenIssuer) IssueImplicitTx(ctx context.Context, settings *record.Sett
 	var response *ImplicitGrantResponse
 	err := t.database.RunInTransaction(ctx, func(tx *sql.Tx) error {
 		var err error
-		response, err = t.IssueImplicit(ctx, tx, settings, input, issueAccessToken, issueIdToken)
+		response, err = t.IssueImplicit(ctx, tx, settings, input, issueAccessToken, issueIDToken)
 		return err
 	})
 	if err != nil {
@@ -99,7 +99,7 @@ func (t *TokenIssuer) IssueImplicitTx(ctx context.Context, settings *record.Sett
 // PostgreSQL or SQL Server, and RunInTransaction reruns the loser. Do not add ordering here to
 // prevent a deadlock; add a test that forces it and shows the retry resolves it (#301).
 func (t *TokenIssuer) IssueImplicit(ctx context.Context, tx *sql.Tx, settings *record.Settings,
-	input *ImplicitGrantInput, issueAccessToken bool, issueIdToken bool) (*ImplicitGrantResponse, error) {
+	input *ImplicitGrantInput, issueAccessToken bool, issueIDToken bool) (*ImplicitGrantResponse, error) {
 
 	if tx == nil {
 		return nil, errs.New("issuing implicit tokens requires a transaction: the session row it takes first is released by an autocommitted statement")
@@ -109,7 +109,7 @@ func (t *TokenIssuer) IssueImplicit(ctx context.Context, tx *sql.Tx, settings *r
 	// caller a few statements ago, and the only thing this narrower question misses is an idle
 	// timeout elapsing in the microseconds between the two (#139 decision 7).
 	// The code claim recheck IssueAuthCode makes, for the tokens signed here (#542).
-	if err := input.OTPClaim.Recheck(ctx, t.database, tx, input.User.Id); err != nil {
+	if err := input.OTPClaim.Recheck(ctx, t.database, tx, input.User.ID); err != nil {
 		return nil, err
 	}
 
@@ -164,13 +164,13 @@ func (t *TokenIssuer) IssueImplicit(ctx context.Context, tx *sql.Tx, settings *r
 	}
 
 	// Generate id_token if requested (response_type contains "id_token")
-	if issueIdToken {
+	if issueIDToken {
 		// For id_token token response, include at_hash in id_token (OIDC Core 3.2.2.10)
-		idToken, err := t.generateImplicitIdToken(ctx, tx, settings, input, now, privKey, keyIdentifier, response.AccessToken)
+		idToken, err := t.generateImplicitIDToken(ctx, tx, settings, input, now, privKey, keyIdentifier, response.AccessToken)
 		if err != nil {
 			return nil, err
 		}
-		response.IdToken = idToken
+		response.IDToken = idToken
 	}
 
 	return response, nil
@@ -184,12 +184,12 @@ func (t *TokenIssuer) generateImplicitAccessToken(ctx context.Context, tx *sql.T
 	return t.generateAccessTokenCore(ctx, tx, settings, tokenInput, now, signingKey, keyIdentifier)
 }
 
-// generateImplicitIdToken creates an id_token for implicit flow.
+// generateImplicitIDToken creates an id_token for implicit flow.
 // Per OIDC Core 3.2.2.10, at_hash is REQUIRED when id_token is issued alongside access_token.
-func (t *TokenIssuer) generateImplicitIdToken(ctx context.Context, tx *sql.Tx, settings *record.Settings,
+func (t *TokenIssuer) generateImplicitIDToken(ctx context.Context, tx *sql.Tx, settings *record.Settings,
 	input *ImplicitGrantInput, now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string, accessToken string) (string, error) {
 
 	tokenInput := t.createTokenInputFromImplicit(input)
 	tokenInput.AccessToken = accessToken // For at_hash claim
-	return t.generateIdTokenCore(ctx, tx, settings, tokenInput, now, signingKey, keyIdentifier)
+	return t.generateIDTokenCore(ctx, tx, settings, tokenInput, now, signingKey, keyIdentifier)
 }

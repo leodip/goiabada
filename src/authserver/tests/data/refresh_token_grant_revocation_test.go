@@ -24,31 +24,31 @@ import (
 func jtisOf(tokens []*record.RefreshToken) []string {
 	jtis := make([]string, 0, len(tokens))
 	for _, rt := range tokens {
-		jtis = append(jtis, rt.RefreshTokenJti)
+		jtis = append(jtis, rt.RefreshTokenJTI)
 	}
 	sort.Strings(jtis)
 	return jtis
 }
 
 // Every member of the family, live and revoked, and no member of another.
-func TestGetRefreshTokensByFirstRefreshTokenJti(t *testing.T) {
+func TestGetRefreshTokensByFirstRefreshTokenJTI(t *testing.T) {
 	ctx := context.Background()
-	family := newFamilyJti()
+	family := newFamilyJTI()
 	members := seedFamilyMembers(t, family, true, false, false)
-	seedFamilyMembers(t, newFamilyJti(), false)
+	seedFamilyMembers(t, newFamilyJTI(), false)
 
-	got, err := database.GetRefreshTokensByFirstRefreshTokenJti(ctx, nil, family)
+	got, err := database.GetRefreshTokensByFirstRefreshTokenJTI(ctx, nil, family)
 
 	require.NoError(t, err)
 	assert.Equal(t, jtisOf(members), jtisOf(got))
 	for _, rt := range got {
-		assert.Equal(t, family, rt.FirstRefreshTokenJti)
+		assert.Equal(t, family, rt.FirstRefreshTokenJTI)
 	}
 }
 
 // A family with no member left answers no member, and no error.
-func TestGetRefreshTokensByFirstRefreshTokenJti_NoMember(t *testing.T) {
-	got, err := database.GetRefreshTokensByFirstRefreshTokenJti(context.Background(), nil, newFamilyJti())
+func TestGetRefreshTokensByFirstRefreshTokenJTI_NoMember(t *testing.T) {
+	got, err := database.GetRefreshTokensByFirstRefreshTokenJTI(context.Background(), nil, newFamilyJTI())
 
 	require.NoError(t, err)
 	assert.Empty(t, got)
@@ -58,8 +58,8 @@ func TestGetRefreshTokensByFirstRefreshTokenJti_NoMember(t *testing.T) {
 // TestIsRefreshTokenFamilyLive_ComparesTheIdentifierExactly states (#283): SQL Server pads for `=`,
 // so a trailing space would otherwise find the family without one, and a revocation of a grant
 // nobody holds would end one somebody does.
-func TestGetRefreshTokensByFirstRefreshTokenJti_ComparesTheIdentifierExactly(t *testing.T) {
-	family := newFamilyJti()
+func TestGetRefreshTokensByFirstRefreshTokenJTI_ComparesTheIdentifierExactly(t *testing.T) {
+	family := newFamilyJTI()
 	seedFamilyMembers(t, family, false)
 
 	for name, asked := range map[string]string{
@@ -70,7 +70,7 @@ func TestGetRefreshTokensByFirstRefreshTokenJti_ComparesTheIdentifierExactly(t *
 		t.Run(name, func(t *testing.T) {
 			require.NotEqual(t, family, asked)
 
-			got, err := database.GetRefreshTokensByFirstRefreshTokenJti(context.Background(), nil, asked)
+			got, err := database.GetRefreshTokensByFirstRefreshTokenJTI(context.Background(), nil, asked)
 
 			require.NoError(t, err)
 			assert.Empty(t, got, "another spelling is another family")
@@ -80,8 +80,8 @@ func TestGetRefreshTokensByFirstRefreshTokenJti_ComparesTheIdentifierExactly(t *
 
 // An empty identifier is an error, for the reason RevokeRefreshTokenFamily states: on a revocation
 // path it can only be a caller bug, and answering it would sweep every row with an empty family.
-func TestGetRefreshTokensByFirstRefreshTokenJti_RefusesAnEmptyIdentifier(t *testing.T) {
-	got, err := database.GetRefreshTokensByFirstRefreshTokenJti(context.Background(), nil, "")
+func TestGetRefreshTokensByFirstRefreshTokenJTI_RefusesAnEmptyIdentifier(t *testing.T) {
+	got, err := database.GetRefreshTokensByFirstRefreshTokenJTI(context.Background(), nil, "")
 
 	require.Error(t, err)
 	assert.Empty(t, got)
@@ -91,23 +91,23 @@ func TestGetRefreshTokensByFirstRefreshTokenJti_RefusesAnEmptyIdentifier(t *test
 // family under client_revoked, and leaves another family alone.
 func TestRevokeGrantTx(t *testing.T) {
 	ctx := context.Background()
-	family := newFamilyJti()
+	family := newFamilyJTI()
 	members := seedFamilyMembers(t, family, true, false, false)
-	bystander := newFamilyJti()
+	bystander := newFamilyJTI()
 	seedFamilyMembers(t, bystander, false)
 	require.True(t, familyIsLive(t, family), "control: the grant is live before it is revoked")
 
 	result, err := revocation.RevokeGrantTx(ctx, database, family)
 
 	require.NoError(t, err)
-	assert.ElementsMatch(t, []string{members[1].RefreshTokenJti, members[2].RefreshTokenJti},
-		result.RevokedRefreshTokenJtis, "the two live members, and not the one rotated before")
+	assert.ElementsMatch(t, []string{members[1].RefreshTokenJTI, members[2].RefreshTokenJTI},
+		result.RevokedRefreshTokenJTIs, "the two live members, and not the one rotated before")
 
-	stored, err := database.GetRefreshTokensByFirstRefreshTokenJti(ctx, nil, family)
+	stored, err := database.GetRefreshTokensByFirstRefreshTokenJTI(ctx, nil, family)
 	require.NoError(t, err)
 	require.Len(t, stored, 3)
 	for _, rt := range stored {
-		assert.True(t, rt.Revoked, "member %s is revoked", rt.RefreshTokenJti)
+		assert.True(t, rt.Revoked, "member %s is revoked", rt.RefreshTokenJTI)
 	}
 	reason, _, found := familyRevocationRow(t, family)
 	require.True(t, found, "the family is recorded")
@@ -125,7 +125,7 @@ func TestRevokeGrantTx_AGrantAlreadyRevoked(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("revoked twice by the client", func(t *testing.T) {
-		family := newFamilyJti()
+		family := newFamilyJTI()
 		seedFamilyMembers(t, family, false)
 		_, err := revocation.RevokeGrantTx(ctx, database, family)
 		require.NoError(t, err)
@@ -133,22 +133,22 @@ func TestRevokeGrantTx_AGrantAlreadyRevoked(t *testing.T) {
 		result, err := revocation.RevokeGrantTx(ctx, database, family)
 
 		require.NoError(t, err)
-		require.NotNil(t, result.RevokedRefreshTokenJtis)
-		assert.Empty(t, result.RevokedRefreshTokenJtis)
+		require.NotNil(t, result.RevokedRefreshTokenJTIs)
+		assert.Empty(t, result.RevokedRefreshTokenJTIs)
 		reason, _, found := familyRevocationRow(t, family)
 		require.True(t, found)
 		assert.Equal(t, "client_revoked", reason)
 	})
 
 	t.Run("recorded by another path first", func(t *testing.T) {
-		family := newFamilyJti()
+		family := newFamilyJTI()
 		seedFamilyMembers(t, family, false)
 		recordFamily(t, family)
 
 		result, err := revocation.RevokeGrantTx(ctx, database, family)
 
 		require.NoError(t, err)
-		assert.Len(t, result.RevokedRefreshTokenJtis, 1, "the live member is still swept")
+		assert.Len(t, result.RevokedRefreshTokenJTIs, 1, "the live member is still swept")
 		reason, _, found := familyRevocationRow(t, family)
 		require.True(t, found)
 		assert.Equal(t, familyRevocationReason, reason, "the first record stays as it was")

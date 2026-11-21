@@ -29,7 +29,7 @@ func TestMissingSettings_ThePasswordStepAnswersBeforeReadingItsCeremony(t *testi
 			var handler http.Handler
 			if method == http.MethodPost {
 				form := url.Values{}
-				form.Add(ceremony.IdField, testCeremonyId)
+				form.Add(ceremony.IDField, testCeremonyID)
 				form.Add("email", "test@example.com")
 				form.Add("password", "testpassword")
 				req = httptest.NewRequest(http.MethodPost, "/auth/pwd", strings.NewReader(form.Encode()))
@@ -37,7 +37,7 @@ func TestMissingSettings_ThePasswordStepAnswersBeforeReadingItsCeremony(t *testi
 				handler = buildAuthPwdPost(authPwdPostDeps{pageRenderer: pageRenderer, ceremonyStore: ceremonyStore,
 					database: database, auditLogger: auditLogger})
 			} else {
-				req = httptest.NewRequest(http.MethodGet, "/auth/pwd?ceremony="+testCeremonyId, nil)
+				req = httptest.NewRequest(http.MethodGet, "/auth/pwd?ceremony="+testCeremonyID, nil)
 				handler = buildAuthPwdGet(authPwdGetDeps{pageRenderer: pageRenderer, ceremonyStore: ceremonyStore,
 					database: database, auditLogger: auditLogger})
 			}

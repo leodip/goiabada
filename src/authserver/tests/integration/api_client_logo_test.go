@@ -40,7 +40,7 @@ func TestAPIClientLogoGet_NoPicture(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 	client := createTestClientForLogo(t)
 
-	url := fmt.Sprintf("%s/api/v1/admin/clients/%d/logo", appConfig.AuthServer.BaseURL, client.Id)
+	url := fmt.Sprintf("%s/api/v1/admin/clients/%d/logo", appConfig.AuthServer.BaseURL, client.ID)
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -63,7 +63,7 @@ func TestAPIClientLogoGet_ClientNotFound(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
-func TestAPIClientLogoGet_InvalidClientId(t *testing.T) {
+func TestAPIClientLogoGet_InvalidClientID(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	url := fmt.Sprintf("%s/api/v1/admin/clients/invalid/logo", appConfig.AuthServer.BaseURL)
@@ -78,7 +78,7 @@ func TestAPIClientLogoGet_Unauthorized(t *testing.T) {
 
 	req, err := http.NewRequest("GET", url, nil)
 	require.NoError(t, err)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -88,7 +88,7 @@ func TestAPIClientLogoGet_Unauthorized(t *testing.T) {
 func TestAPIClientLogoGet_InsufficientScope(t *testing.T) {
 	client := createTestClientForLogo(t)
 
-	url := fmt.Sprintf("%s/api/v1/admin/clients/%d/logo", appConfig.AuthServer.BaseURL, client.Id)
+	url := fmt.Sprintf("%s/api/v1/admin/clients/%d/logo", appConfig.AuthServer.BaseURL, client.ID)
 	tok := createClientCredentialsTokenWithoutRouteScope(t)
 	resp := makeAPIRequest(t, "GET", url, tok, nil)
 	defer func() { _ = resp.Body.Close() }()
@@ -99,7 +99,7 @@ func TestAPIClientLogoPost_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 	client := createTestClientForLogo(t)
 
-	url := fmt.Sprintf("%s/api/v1/admin/clients/%d/logo", appConfig.AuthServer.BaseURL, client.Id)
+	url := fmt.Sprintf("%s/api/v1/admin/clients/%d/logo", appConfig.AuthServer.BaseURL, client.ID)
 	logoData := createTestPNGImage(100, 100)
 	resp := makeMultipartRequest(t, "POST", url, accessToken, "picture", logoData, "logo.png")
 	defer func() { _ = resp.Body.Close() }()
@@ -127,7 +127,7 @@ func TestAPIClientLogoPost_UpdateExisting(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 	client := createTestClientForLogo(t)
 
-	url := fmt.Sprintf("%s/api/v1/admin/clients/%d/logo", appConfig.AuthServer.BaseURL, client.Id)
+	url := fmt.Sprintf("%s/api/v1/admin/clients/%d/logo", appConfig.AuthServer.BaseURL, client.ID)
 
 	// Upload first logo
 	logoData1 := createTestPNGImage(100, 100)
@@ -162,7 +162,7 @@ func TestAPIClientLogoPost_InvalidImage(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 	client := createTestClientForLogo(t)
 
-	url := fmt.Sprintf("%s/api/v1/admin/clients/%d/logo", appConfig.AuthServer.BaseURL, client.Id)
+	url := fmt.Sprintf("%s/api/v1/admin/clients/%d/logo", appConfig.AuthServer.BaseURL, client.ID)
 	invalidData := []byte("not a valid image")
 	resp := makeMultipartRequest(t, "POST", url, accessToken, "picture", invalidData, "invalid.png")
 	defer func() { _ = resp.Body.Close() }()
@@ -189,7 +189,7 @@ func TestAPIClientLogoPost_Unauthorized(t *testing.T) {
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -200,7 +200,7 @@ func TestAPIClientLogoDelete_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 	client := createTestClientForLogo(t)
 
-	url := fmt.Sprintf("%s/api/v1/admin/clients/%d/logo", appConfig.AuthServer.BaseURL, client.Id)
+	url := fmt.Sprintf("%s/api/v1/admin/clients/%d/logo", appConfig.AuthServer.BaseURL, client.ID)
 
 	// First upload a logo
 	logoData := createTestPNGImage(100, 100)
@@ -237,7 +237,7 @@ func TestAPIClientLogoDelete_NoPicture(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 	client := createTestClientForLogo(t)
 
-	url := fmt.Sprintf("%s/api/v1/admin/clients/%d/logo", appConfig.AuthServer.BaseURL, client.Id)
+	url := fmt.Sprintf("%s/api/v1/admin/clients/%d/logo", appConfig.AuthServer.BaseURL, client.ID)
 
 	// Delete when no logo exists should still succeed
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
@@ -260,7 +260,7 @@ func TestAPIClientLogoDelete_Unauthorized(t *testing.T) {
 
 	req, err := http.NewRequest("DELETE", url, nil)
 	require.NoError(t, err)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -276,16 +276,16 @@ func TestClientLogo_PublicEndpoint_Success(t *testing.T) {
 	client := createTestClientForLogo(t)
 
 	// Upload a logo via admin API
-	adminUrl := fmt.Sprintf("%s/api/v1/admin/clients/%d/logo", appConfig.AuthServer.BaseURL, client.Id)
+	adminURL := fmt.Sprintf("%s/api/v1/admin/clients/%d/logo", appConfig.AuthServer.BaseURL, client.ID)
 	logoData := createTestPNGImage(100, 100)
-	uploadResp := makeMultipartRequest(t, "POST", adminUrl, accessToken, "picture", logoData, "logo.png")
+	uploadResp := makeMultipartRequest(t, "POST", adminURL, accessToken, "picture", logoData, "logo.png")
 	defer func() { _ = uploadResp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, uploadResp.StatusCode)
 
 	// Fetch the logo via the public endpoint (no auth required)
-	publicUrl := fmt.Sprintf("%s/client/logo/%s", appConfig.AuthServer.BaseURL, client.ClientIdentifier)
-	httpClient := createHttpClient(t)
-	req, err := http.NewRequest("GET", publicUrl, nil)
+	publicURL := fmt.Sprintf("%s/client/logo/%s", appConfig.AuthServer.BaseURL, client.ClientIdentifier)
+	httpClient := createHTTPClient(t)
+	req, err := http.NewRequest("GET", publicURL, nil)
 	require.NoError(t, err)
 
 	resp, err := httpClient.Do(req)
@@ -305,10 +305,10 @@ func TestClientLogo_PublicEndpoint_Success(t *testing.T) {
 }
 
 func TestClientLogo_PublicEndpoint_NotFound(t *testing.T) {
-	publicUrl := fmt.Sprintf("%s/client/logo/nonexistent-client-identifier", appConfig.AuthServer.BaseURL)
+	publicURL := fmt.Sprintf("%s/client/logo/nonexistent-client-identifier", appConfig.AuthServer.BaseURL)
 
-	httpClient := createHttpClient(t)
-	req, err := http.NewRequest("GET", publicUrl, nil)
+	httpClient := createHTTPClient(t)
+	req, err := http.NewRequest("GET", publicURL, nil)
 	require.NoError(t, err)
 
 	resp, err := httpClient.Do(req)
@@ -321,10 +321,10 @@ func TestClientLogo_PublicEndpoint_NotFound(t *testing.T) {
 func TestClientLogo_PublicEndpoint_ClientHasNoLogo(t *testing.T) {
 	client := createTestClientForLogo(t)
 
-	publicUrl := fmt.Sprintf("%s/client/logo/%s", appConfig.AuthServer.BaseURL, client.ClientIdentifier)
+	publicURL := fmt.Sprintf("%s/client/logo/%s", appConfig.AuthServer.BaseURL, client.ClientIdentifier)
 
-	httpClient := createHttpClient(t)
-	req, err := http.NewRequest("GET", publicUrl, nil)
+	httpClient := createHTTPClient(t)
+	req, err := http.NewRequest("GET", publicURL, nil)
 	require.NoError(t, err)
 
 	resp, err := httpClient.Do(req)
@@ -339,16 +339,16 @@ func TestClientLogo_PublicEndpoint_CacheHeaders(t *testing.T) {
 	client := createTestClientForLogo(t)
 
 	// Upload a logo
-	adminUrl := fmt.Sprintf("%s/api/v1/admin/clients/%d/logo", appConfig.AuthServer.BaseURL, client.Id)
+	adminURL := fmt.Sprintf("%s/api/v1/admin/clients/%d/logo", appConfig.AuthServer.BaseURL, client.ID)
 	logoData := createTestPNGImage(100, 100)
-	uploadResp := makeMultipartRequest(t, "POST", adminUrl, accessToken, "picture", logoData, "logo.png")
+	uploadResp := makeMultipartRequest(t, "POST", adminURL, accessToken, "picture", logoData, "logo.png")
 	defer func() { _ = uploadResp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, uploadResp.StatusCode)
 
 	// Fetch via public endpoint and check cache headers
-	publicUrl := fmt.Sprintf("%s/client/logo/%s", appConfig.AuthServer.BaseURL, client.ClientIdentifier)
-	httpClient := createHttpClient(t)
-	req, err := http.NewRequest("GET", publicUrl, nil)
+	publicURL := fmt.Sprintf("%s/client/logo/%s", appConfig.AuthServer.BaseURL, client.ClientIdentifier)
+	httpClient := createHTTPClient(t)
+	req, err := http.NewRequest("GET", publicURL, nil)
 	require.NoError(t, err)
 
 	resp, err := httpClient.Do(req)
@@ -373,17 +373,17 @@ func TestClientLogo_PublicEndpoint_ETagConditionalGet(t *testing.T) {
 	client := createTestClientForLogo(t)
 
 	// Upload a logo
-	adminUrl := fmt.Sprintf("%s/api/v1/admin/clients/%d/logo", appConfig.AuthServer.BaseURL, client.Id)
+	adminURL := fmt.Sprintf("%s/api/v1/admin/clients/%d/logo", appConfig.AuthServer.BaseURL, client.ID)
 	logoData := createTestPNGImage(100, 100)
-	uploadResp := makeMultipartRequest(t, "POST", adminUrl, accessToken, "picture", logoData, "logo.png")
+	uploadResp := makeMultipartRequest(t, "POST", adminURL, accessToken, "picture", logoData, "logo.png")
 	defer func() { _ = uploadResp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, uploadResp.StatusCode)
 
-	publicUrl := fmt.Sprintf("%s/client/logo/%s", appConfig.AuthServer.BaseURL, client.ClientIdentifier)
-	httpClient := createHttpClient(t)
+	publicURL := fmt.Sprintf("%s/client/logo/%s", appConfig.AuthServer.BaseURL, client.ClientIdentifier)
+	httpClient := createHTTPClient(t)
 
 	// First request: get the ETag
-	req1, err := http.NewRequest("GET", publicUrl, nil)
+	req1, err := http.NewRequest("GET", publicURL, nil)
 	require.NoError(t, err)
 	resp1, err := httpClient.Do(req1)
 	require.NoError(t, err)
@@ -395,7 +395,7 @@ func TestClientLogo_PublicEndpoint_ETagConditionalGet(t *testing.T) {
 	_, _ = io.ReadAll(resp1.Body)
 
 	// Second request: send If-None-Match with the ETag
-	req2, err := http.NewRequest("GET", publicUrl, nil)
+	req2, err := http.NewRequest("GET", publicURL, nil)
 	require.NoError(t, err)
 	req2.Header.Set("If-None-Match", etag)
 	resp2, err := httpClient.Do(req2)
@@ -413,17 +413,17 @@ func TestClientLogo_PublicEndpoint_ETagChangesAfterUpdate(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 	client := createTestClientForLogo(t)
 
-	adminUrl := fmt.Sprintf("%s/api/v1/admin/clients/%d/logo", appConfig.AuthServer.BaseURL, client.Id)
-	publicUrl := fmt.Sprintf("%s/client/logo/%s", appConfig.AuthServer.BaseURL, client.ClientIdentifier)
-	httpClient := createHttpClient(t)
+	adminURL := fmt.Sprintf("%s/api/v1/admin/clients/%d/logo", appConfig.AuthServer.BaseURL, client.ID)
+	publicURL := fmt.Sprintf("%s/client/logo/%s", appConfig.AuthServer.BaseURL, client.ClientIdentifier)
+	httpClient := createHTTPClient(t)
 
 	// Upload first logo and get ETag
 	logoData1 := createTestPNGImage(100, 100)
-	uploadResp1 := makeMultipartRequest(t, "POST", adminUrl, accessToken, "picture", logoData1, "logo1.png")
+	uploadResp1 := makeMultipartRequest(t, "POST", adminURL, accessToken, "picture", logoData1, "logo1.png")
 	defer func() { _ = uploadResp1.Body.Close() }()
 	assert.Equal(t, http.StatusOK, uploadResp1.StatusCode)
 
-	req1, err := http.NewRequest("GET", publicUrl, nil)
+	req1, err := http.NewRequest("GET", publicURL, nil)
 	require.NoError(t, err)
 	resp1, err := httpClient.Do(req1)
 	require.NoError(t, err)
@@ -433,12 +433,12 @@ func TestClientLogo_PublicEndpoint_ETagChangesAfterUpdate(t *testing.T) {
 
 	// Upload different logo
 	logoData2 := createTestPNGImage(200, 200)
-	uploadResp2 := makeMultipartRequest(t, "POST", adminUrl, accessToken, "picture", logoData2, "logo2.png")
+	uploadResp2 := makeMultipartRequest(t, "POST", adminURL, accessToken, "picture", logoData2, "logo2.png")
 	defer func() { _ = uploadResp2.Body.Close() }()
 	assert.Equal(t, http.StatusOK, uploadResp2.StatusCode)
 
 	// Get new ETag
-	req2, err := http.NewRequest("GET", publicUrl, nil)
+	req2, err := http.NewRequest("GET", publicURL, nil)
 	require.NoError(t, err)
 	resp2, err := httpClient.Do(req2)
 	require.NoError(t, err)
@@ -450,7 +450,7 @@ func TestClientLogo_PublicEndpoint_ETagChangesAfterUpdate(t *testing.T) {
 	assert.NotEqual(t, etag1, etag2, "ETag should change after logo update")
 
 	// Old ETag should not produce 304
-	req3, err := http.NewRequest("GET", publicUrl, nil)
+	req3, err := http.NewRequest("GET", publicURL, nil)
 	require.NoError(t, err)
 	req3.Header.Set("If-None-Match", etag1)
 	resp3, err := httpClient.Do(req3)
@@ -466,16 +466,16 @@ func TestClientLogo_PublicEndpoint_ContentMatchesUpload(t *testing.T) {
 	client := createTestClientForLogo(t)
 
 	// Upload a logo
-	adminUrl := fmt.Sprintf("%s/api/v1/admin/clients/%d/logo", appConfig.AuthServer.BaseURL, client.Id)
+	adminURL := fmt.Sprintf("%s/api/v1/admin/clients/%d/logo", appConfig.AuthServer.BaseURL, client.ID)
 	logoData := createTestPNGImage(150, 150)
-	uploadResp := makeMultipartRequest(t, "POST", adminUrl, accessToken, "picture", logoData, "logo.png")
+	uploadResp := makeMultipartRequest(t, "POST", adminURL, accessToken, "picture", logoData, "logo.png")
 	defer func() { _ = uploadResp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, uploadResp.StatusCode)
 
 	// Fetch via public endpoint
-	publicUrl := fmt.Sprintf("%s/client/logo/%s", appConfig.AuthServer.BaseURL, client.ClientIdentifier)
-	httpClient := createHttpClient(t)
-	req, err := http.NewRequest("GET", publicUrl, nil)
+	publicURL := fmt.Sprintf("%s/client/logo/%s", appConfig.AuthServer.BaseURL, client.ClientIdentifier)
+	httpClient := createHTTPClient(t)
+	req, err := http.NewRequest("GET", publicURL, nil)
 	require.NoError(t, err)
 
 	resp, err := httpClient.Do(req)
@@ -499,19 +499,19 @@ func TestClientLogo_FullWorkflow(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 	client := createTestClientForLogo(t)
 
-	adminUrl := fmt.Sprintf("%s/api/v1/admin/clients/%d/logo", appConfig.AuthServer.BaseURL, client.Id)
-	publicUrl := fmt.Sprintf("%s/client/logo/%s", appConfig.AuthServer.BaseURL, client.ClientIdentifier)
-	httpClient := createHttpClient(t)
+	adminURL := fmt.Sprintf("%s/api/v1/admin/clients/%d/logo", appConfig.AuthServer.BaseURL, client.ID)
+	publicURL := fmt.Sprintf("%s/client/logo/%s", appConfig.AuthServer.BaseURL, client.ClientIdentifier)
+	httpClient := createHTTPClient(t)
 
 	// 1. Verify no logo initially
-	getResp1 := makeAPIRequest(t, "GET", adminUrl, accessToken, nil)
+	getResp1 := makeAPIRequest(t, "GET", adminURL, accessToken, nil)
 	defer func() { _ = getResp1.Body.Close() }()
 	var getResponse1 map[string]interface{}
 	_ = json.NewDecoder(getResp1.Body).Decode(&getResponse1)
 	assert.False(t, getResponse1["hasLogo"].(bool))
 
 	// 2. Public endpoint returns 404
-	pubReq1, _ := http.NewRequest("GET", publicUrl, nil)
+	pubReq1, _ := http.NewRequest("GET", publicURL, nil)
 	pubResp1, err := httpClient.Do(pubReq1)
 	require.NoError(t, err)
 	defer func() { _ = pubResp1.Body.Close() }()
@@ -520,7 +520,7 @@ func TestClientLogo_FullWorkflow(t *testing.T) {
 
 	// 3. Upload a logo
 	logoData := createTestPNGImage(150, 150)
-	uploadResp := makeMultipartRequest(t, "POST", adminUrl, accessToken, "picture", logoData, "logo.png")
+	uploadResp := makeMultipartRequest(t, "POST", adminURL, accessToken, "picture", logoData, "logo.png")
 	defer func() { _ = uploadResp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, uploadResp.StatusCode)
 
@@ -530,14 +530,14 @@ func TestClientLogo_FullWorkflow(t *testing.T) {
 	assert.Contains(t, uploadResponse["pictureUrl"].(string), client.ClientIdentifier)
 
 	// 4. Verify logo exists via admin API
-	getResp2 := makeAPIRequest(t, "GET", adminUrl, accessToken, nil)
+	getResp2 := makeAPIRequest(t, "GET", adminURL, accessToken, nil)
 	defer func() { _ = getResp2.Body.Close() }()
 	var getResponse2 map[string]interface{}
 	_ = json.NewDecoder(getResp2.Body).Decode(&getResponse2)
 	assert.True(t, getResponse2["hasLogo"].(bool))
 
 	// 5. Fetch the actual logo via public endpoint
-	pubReq2, _ := http.NewRequest("GET", publicUrl, nil)
+	pubReq2, _ := http.NewRequest("GET", publicURL, nil)
 	pubResp2, err := httpClient.Do(pubReq2)
 	require.NoError(t, err)
 	defer func() { _ = pubResp2.Body.Close() }()
@@ -548,24 +548,24 @@ func TestClientLogo_FullWorkflow(t *testing.T) {
 
 	// 6. Update the logo
 	newLogoData := createTestPNGImage(200, 200)
-	updateResp := makeMultipartRequest(t, "POST", adminUrl, accessToken, "picture", newLogoData, "new_logo.png")
+	updateResp := makeMultipartRequest(t, "POST", adminURL, accessToken, "picture", newLogoData, "new_logo.png")
 	defer func() { _ = updateResp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, updateResp.StatusCode)
 
 	// 7. Delete the logo
-	deleteResp := makeAPIRequest(t, "DELETE", adminUrl, accessToken, nil)
+	deleteResp := makeAPIRequest(t, "DELETE", adminURL, accessToken, nil)
 	defer func() { _ = deleteResp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, deleteResp.StatusCode)
 
 	// 8. Verify logo no longer exists via admin API
-	getResp3 := makeAPIRequest(t, "GET", adminUrl, accessToken, nil)
+	getResp3 := makeAPIRequest(t, "GET", adminURL, accessToken, nil)
 	defer func() { _ = getResp3.Body.Close() }()
 	var getResponse3 map[string]interface{}
 	_ = json.NewDecoder(getResp3.Body).Decode(&getResponse3)
 	assert.False(t, getResponse3["hasLogo"].(bool))
 
 	// 9. Public endpoint returns 404
-	pubReq3, _ := http.NewRequest("GET", publicUrl, nil)
+	pubReq3, _ := http.NewRequest("GET", publicURL, nil)
 	pubResp3, err := httpClient.Do(pubReq3)
 	require.NoError(t, err)
 	defer func() { _ = pubResp3.Body.Close() }()

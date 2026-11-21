@@ -76,7 +76,7 @@ func (p *RecoveryCodesPrompt) Run(ctx context.Context, browser recoveryCodesTake
 		return RecoveryCodesPromptResult{Display: display}, nil
 	}
 
-	codes, takeErr := browser.TakeRecoveryCodes(authContext.CeremonyId)
+	codes, takeErr := browser.TakeRecoveryCodes(authContext.CeremonyID)
 	authContext.RecoveryCodes = nil
 	if takeErr != nil {
 		return RecoveryCodesPromptResult{Display: display, SaveErr: takeErr}, nil

@@ -41,7 +41,7 @@ func (a *accountDeletionAPI) UpdateSettingsGeneral(_ context.Context, _ string, 
 // decision 5).
 func TestHandleGeneralGet_ShowsAccountDeletionAsStored(t *testing.T) {
 	for _, stored := range []bool{true, false} {
-		httpHelper := handlersmocks.NewHttpHelper(t)
+		httpHelper := handlersmocks.NewHTTPHelper(t)
 		handlertest.RefuseInternalServerError(t, httpHelper)
 		handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_general.html").Once()
 
@@ -73,7 +73,7 @@ func TestHandleGeneralPost_AlwaysSendsAccountDeletionEnabled(t *testing.T) {
 			req := handlertest.Request(http.MethodPost, "/admin/settings/general",
 				handlertest.WithAccessToken(), handlertest.WithForm(tc.form))
 
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 			apiClient := &accountDeletionAPI{stored: tc.stored}
 			w := httptest.NewRecorder()
@@ -90,7 +90,7 @@ func TestHandleGeneralPost_AlwaysSendsAccountDeletionEnabled(t *testing.T) {
 // The auth server's refusal of a missing value marks the checkbox, and the form is drawn again
 // with the box as it was submitted.
 func TestHandleGeneralPost_AnAccountDeletionRefusalMarksItsCheckbox(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_general.html").Once()
 	const message = "Choose whether to let users delete their own account."

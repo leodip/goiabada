@@ -230,7 +230,7 @@ func authorizeQuery(t *testing.T, redirect func(*oauthclient.AuthHelper, http.Re
 // The console's ordinary sign-in asks the auth server for nothing beyond the sign-in itself: no
 // prompt, no acr_values and no max_age, so a live auth server session signs the user in without
 // asking again (#782).
-func TestRedirToAuthorize_TheOrdinarySignInSendsNoPromptAndNoAcrValues(t *testing.T) {
+func TestRedirToAuthorize_TheOrdinarySignInSendsNoPromptAndNoACRValues(t *testing.T) {
 	query, _ := authorizeQuery(t, func(h *oauthclient.AuthHelper, w http.ResponseWriter, r *http.Request) error {
 		return h.RedirToAuthorize(w, r, helperClientID, helperScope, helperRedirectBack)
 	})
@@ -243,10 +243,10 @@ func TestRedirToAuthorize_TheOrdinarySignInSendsNoPromptAndNoAcrValues(t *testin
 // challenge asks for a fresh sign-in at the level the challenge names: prompt=login and
 // acr_values, and still no max_age, which would replace the user's session (#782 decision 1). The
 // rest of the request and its handshake are the ordinary sign-in's.
-func TestRedirToAuthorizeWith_SendsPromptAndAcrValuesWhenAsked(t *testing.T) {
+func TestRedirToAuthorizeWith_SendsPromptAndACRValuesWhenAsked(t *testing.T) {
 	query, handshake := authorizeQuery(t, func(h *oauthclient.AuthHelper, w http.ResponseWriter, r *http.Request) error {
 		return h.RedirToAuthorizeWith(w, r, helperClientID, helperScope, "https://console.example/account/data",
-			oauthclient.SignInOptions{Prompt: "login", AcrValues: "urn:goiabada:level2_optional"})
+			oauthclient.SignInOptions{Prompt: "login", ACRValues: "urn:goiabada:level2_optional"})
 	})
 
 	assert.Equal(t, []string{"login"}, query["prompt"])
@@ -279,13 +279,13 @@ func TestRedirToAuthorizeWith_SendsOnlyTheOptionsThatAreSet(t *testing.T) {
 func TestIsAuthenticated(t *testing.T) {
 	testCases := []struct {
 		name    string
-		jwtInfo oauthclient.JwtInfo
+		jwtInfo oauthclient.JWTInfo
 		want    bool
 	}{
-		{"nothing", oauthclient.JwtInfo{}, false},
+		{"nothing", oauthclient.JWTInfo{}, false},
 		{"token strings but no verified id token",
-			oauthclient.JwtInfo{TokenResponse: oauth.TokenResponse{AccessToken: "a", IdToken: "i"}}, false},
-		{"a verified id token", oauthclient.JwtInfo{IdToken: &oauth.JwtToken{TokenBase64: "i"}}, true},
+			oauthclient.JWTInfo{TokenResponse: oauth.TokenResponse{AccessToken: "a", IDToken: "i"}}, false},
+		{"a verified id token", oauthclient.JWTInfo{IDToken: &oauth.JWTToken{TokenBase64: "i"}}, true},
 	}
 
 	helper := oauthclient.NewAuthHelper(nil, helperConsoleBase, helperAuthBase, reqctx.SafeModeFrom)
@@ -303,20 +303,20 @@ func TestIsAuthenticated(t *testing.T) {
 func TestIsAuthorizedToAccessResource(t *testing.T) {
 	const manage = "authserver:manage"
 	const manageAccount = "authserver:manage-account"
-	withGrant := func(scope string) oauthclient.JwtInfo {
-		return oauthclient.JwtInfo{
+	withGrant := func(scope string) oauthclient.JWTInfo {
+		return oauthclient.JWTInfo{
 			TokenResponse: oauth.TokenResponse{AccessToken: "opaque", Scope: scope},
-			IdToken:       &oauth.JwtToken{TokenBase64: "i"},
+			IDToken:       &oauth.JWTToken{TokenBase64: "i"},
 		}
 	}
 
 	testCases := []struct {
 		name        string
-		jwtInfo     oauthclient.JwtInfo
+		jwtInfo     oauthclient.JWTInfo
 		scopesAnyOf []string
 		want        bool
 	}{
-		{"nothing", oauthclient.JwtInfo{}, []string{manage}, false},
+		{"nothing", oauthclient.JWTInfo{}, []string{manage}, false},
 		{"the one scope asked for", withGrant("openid " + manage), []string{manage}, true},
 		{"the second of two asked for", withGrant("openid " + manageAccount), []string{manage, manageAccount}, true},
 		{"none of those asked for", withGrant("openid profile"), []string{manage, manageAccount}, false},
@@ -327,7 +327,7 @@ func TestIsAuthorizedToAccessResource(t *testing.T) {
 		{"an empty grant", withGrant(""), []string{manage}, false},
 		{"an empty scope asked for against a doubled space", withGrant("openid  " + manage), []string{""}, false},
 		{"the scope only inside the access token string",
-			oauthclient.JwtInfo{TokenResponse: oauth.TokenResponse{AccessToken: manage, Scope: "openid"}},
+			oauthclient.JWTInfo{TokenResponse: oauth.TokenResponse{AccessToken: manage, Scope: "openid"}},
 			[]string{manage}, false},
 	}
 

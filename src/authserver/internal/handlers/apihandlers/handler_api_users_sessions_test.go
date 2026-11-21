@@ -48,37 +48,37 @@ func stubTermination(database *datamocks.Database, userSession *record.UserSessi
 		if tokens[i].Revoked {
 			continue
 		}
-		jti := tokens[i].RefreshTokenJti
+		jti := tokens[i].RefreshTokenJTI
 		database.On("UpdateRefreshToken", mock.Anything, apiTerminateTx, mock.MatchedBy(func(rt *record.RefreshToken) bool {
-			return rt.RefreshTokenJti == jti
+			return rt.RefreshTokenJTI == jti
 		})).Return(nil).Once()
 	}
-	database.On("DeleteUserSession", mock.Anything, apiTerminateTx, userSession.Id).Return(nil).Once()
+	database.On("DeleteUserSession", mock.Anything, apiTerminateTx, userSession.ID).Return(nil).Once()
 }
 
 // toldClient is the one app on every stubbed session with a back-channel logout URI, and
 // toldDelivery the logout token its termination hands the sender for userSession (#784).
-var toldClient = record.Client{Id: 9, ClientIdentifier: "app-told", BackchannelLogoutURI: "https://app.example/bc"}
+var toldClient = record.Client{ID: 9, ClientIdentifier: "app-told", BackchannelLogoutURI: "https://app.example/bc"}
 
 func toldDelivery(userSession *record.UserSession) backchannel.Delivery {
-	return backchannel.Delivery{ClientId: 9, ClientIdentifier: "app-told", URI: "https://app.example/bc",
-		UserId: userSession.UserId, Subject: "subject-of-session-user", SessionIdentifier: userSession.SessionIdentifier}
+	return backchannel.Delivery{ClientID: 9, ClientIdentifier: "app-told", URI: "https://app.example/bc",
+		UserID: userSession.UserID, Subject: "subject-of-session-user", SessionIdentifier: userSession.SessionIdentifier}
 }
 
 // stubTerminationOpening registers what a termination of a live session does before its first
 // write: it reads the session's user's subject, opens the transaction, takes the session's row and
 // reads the apps on it, toldClient and one with no URI (#784 decision 1).
 func stubTerminationOpening(database *datamocks.Database, userSession *record.UserSession) *datamocks.RunInTransactionStub {
-	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), userSession.UserId).
-		Return(&record.User{Id: userSession.UserId, Subject: "subject-of-session-user"}, nil).Once()
+	database.On("GetUserByID", mock.Anything, (*sql.Tx)(nil), userSession.UserID).
+		Return(&record.User{ID: userSession.UserID, Subject: "subject-of-session-user"}, nil).Once()
 	stub := datamocks.ExpectRunInTransaction(database, apiTerminateTx)
 	database.On("AcquireUserSessionRow", mock.Anything, apiTerminateTx, userSession.SessionIdentifier).
 		Return(true, nil).Once()
 	sessionClients := []record.UserSessionClient{
-		{Id: 1, UserSessionId: userSession.Id, ClientId: toldClient.Id, Client: toldClient},
-		{Id: 2, UserSessionId: userSession.Id, ClientId: 10, Client: record.Client{Id: 10, ClientIdentifier: "app-without-uri"}},
+		{ID: 1, UserSessionID: userSession.ID, ClientID: toldClient.ID, Client: toldClient},
+		{ID: 2, UserSessionID: userSession.ID, ClientID: 10, Client: record.Client{ID: 10, ClientIdentifier: "app-without-uri"}},
 	}
-	database.On("GetCommittedUserSessionClients", mock.Anything, apiTerminateTx, userSession.Id).
+	database.On("GetCommittedUserSessionClients", mock.Anything, apiTerminateTx, userSession.ID).
 		Return(sessionClients, nil).Once()
 	return stub
 }
@@ -90,36 +90,36 @@ func stubTerminationOpening(database *datamocks.Database, userSession *record.Us
 // mocked AuthHelper.GetLoggedInSubject, which is why nothing here noticed that the real accessor
 // read a session key no auth server middleware writes and returned "" at every one of these sites
 // (#385). A caller with no token is a separate case, covered below.
-func adminSessionDeleteRequest(sessionId string, subject string) *http.Request {
-	return adminSessionDeleteRequestWithScope(sessionId, subject, "authserver:manage")
+func adminSessionDeleteRequest(sessionID string, subject string) *http.Request {
+	return adminSessionDeleteRequestWithScope(sessionID, subject, "authserver:manage")
 }
 
 // adminSessionDeleteRequestWithScope is adminSessionDeleteRequest with the token's scope named.
-func adminSessionDeleteRequestWithScope(sessionId string, subject string, scope string) *http.Request {
-	req := httptest.NewRequest(http.MethodDelete, "/api/v1/admin/user-sessions/"+sessionId, nil)
-	req.SetPathValue("id", sessionId)
+func adminSessionDeleteRequestWithScope(sessionID string, subject string, scope string) *http.Request {
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/admin/user-sessions/"+sessionID, nil)
+	req.SetPathValue("id", sessionID)
 	req = req.WithContext(reqctx.WithSettings(req.Context(), sessionSettings))
 	return setTokenContextWithClaims(req, map[string]interface{}{"scope": scope, "sub": subject})
 }
 
 // liveSessionOf is liveSession for the user given: a session the DELETEs end, not one they answer
 // 404 as already gone (#651 decision 5).
-func liveSessionOf(id int64, identifier string, userId int64) *record.UserSession {
+func liveSessionOf(id int64, identifier string, userID int64) *record.UserSession {
 	session := liveSession(id, identifier)
-	session.UserId = userId
+	session.UserID = userID
 	return &session
 }
 
 // deadSessions are a session of the user given past the idle timeout and one past the maximum
 // lifetime under sessionSettings, each by a minute: stored rows the background worker has not swept
 // yet, which every session endpoint treats as gone (#651 decisions 4 and 5).
-func deadSessions(id int64, userId int64) map[string]*record.UserSession {
+func deadSessions(id int64, userID int64) map[string]*record.UserSession {
 	now := time.Now().UTC()
 
-	idle := liveSessionOf(id, "sid-idle", userId)
+	idle := liveSessionOf(id, "sid-idle", userID)
 	idle.LastAccessed = now.Add(-time.Duration(sessionSettings.UserSessionIdleTimeoutInSeconds+60) * time.Second)
 
-	old := liveSessionOf(id, "sid-old", userId)
+	old := liveSessionOf(id, "sid-old", userID)
 	old.Started = now.Add(-time.Duration(sessionSettings.UserSessionMaxLifetimeInSeconds+60) * time.Second)
 
 	return map[string]*record.UserSession{"past the idle timeout": idle, "past the maximum lifetime": old}
@@ -134,12 +134,12 @@ func TestHandleUserSessionDelete_TerminatesAndAuditsBothEvents(t *testing.T) {
 
 	userSession := liveSessionOf(100, "sid-terminated", 42)
 
-	database.On("GetUserSessionById", mock.Anything, (*sql.Tx)(nil), int64(100)).Return(userSession, nil).Once()
+	database.On("GetUserSessionByID", mock.Anything, (*sql.Tx)(nil), int64(100)).Return(userSession, nil).Once()
 	// One live token and one already revoked, so the JTI list below proves the payload reports what
 	// this call TRANSITIONED rather than what the session held.
 	stubTermination(database, userSession, 3, []*record.RefreshToken{
-		{Id: 1, RefreshTokenJti: "rt-live"},
-		{Id: 2, RefreshTokenJti: "rt-already-gone", Revoked: true},
+		{ID: 1, RefreshTokenJTI: "rt-live"},
+		{ID: 2, RefreshTokenJTI: "rt-already-gone", Revoked: true},
 	})
 
 	var deletedPayload map[string]interface{}
@@ -209,7 +209,7 @@ func TestHandleUserSessionDelete_NoTokenAuditsAnEmptySubject(t *testing.T) {
 
 	userSession := liveSessionOf(100, "sid-terminated", 42)
 
-	database.On("GetUserSessionById", mock.Anything, (*sql.Tx)(nil), int64(100)).Return(userSession, nil).Once()
+	database.On("GetUserSessionByID", mock.Anything, (*sql.Tx)(nil), int64(100)).Return(userSession, nil).Once()
 	// No token holds no authority, so the target ceiling reads what the user holds; an ordinary
 	// user's session is terminated as before.
 	expectHoldsNothing(database, 42)
@@ -247,10 +247,10 @@ func TestHandleUserSessionDelete_TerminationFailureIsA500(t *testing.T) {
 
 	userSession := liveSessionOf(100, "sid-terminated", 42)
 
-	database.On("GetUserSessionById", mock.Anything, (*sql.Tx)(nil), int64(100)).Return(userSession, nil).Once()
+	database.On("GetUserSessionByID", mock.Anything, (*sql.Tx)(nil), int64(100)).Return(userSession, nil).Once()
 	// The deletion, which since #139 is the first write inside the termination transaction.
 	stub := stubTerminationOpening(database, userSession)
-	database.On("DeleteUserSession", mock.Anything, apiTerminateTx, userSession.Id).
+	database.On("DeleteUserSession", mock.Anything, apiTerminateTx, userSession.ID).
 		Return(errors.New("the session delete failed")).Once()
 
 	rr := httptest.NewRecorder()
@@ -273,7 +273,7 @@ func TestHandleUserSessionDelete_NotFoundDoesNotTerminate(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
-	database.On("GetUserSessionById", mock.Anything, (*sql.Tx)(nil), int64(999)).Return(nil, nil).Once()
+	database.On("GetUserSessionByID", mock.Anything, (*sql.Tx)(nil), int64(999)).Return(nil, nil).Once()
 
 	rr := httptest.NewRecorder()
 	handler := HandleUserSessionDelete(database, auditLogger, &recordingLogoutTokens{})
@@ -295,12 +295,12 @@ func TestHandleUserSessionDelete_NotFoundDoesNotTerminate(t *testing.T) {
 // liveness 404 answers before it: the strict mock has none of the ceiling's reads registered and
 // the audit logger no record, so either one reached fails the test.
 func TestHandleUserSessionDelete_ASessionNoLongerLiveIsNotFound(t *testing.T) {
-	for name, session := range deadSessions(100, targetUserId) {
+	for name, session := range deadSessions(100, targetUserID) {
 		t.Run(name, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
 			auditLogger := handlersmocks.NewAuditLogger(t)
 
-			database.On("GetUserSessionById", mock.Anything, (*sql.Tx)(nil), int64(100)).Return(session, nil).Once()
+			database.On("GetUserSessionByID", mock.Anything, (*sql.Tx)(nil), int64(100)).Return(session, nil).Once()
 
 			rr := httptest.NewRecorder()
 			HandleUserSessionDelete(database, auditLogger, &recordingLogoutTokens{}).
@@ -310,7 +310,7 @@ func TestHandleUserSessionDelete_ASessionNoLongerLiveIsNotFound(t *testing.T) {
 			assert.Equal(t, "NOT_FOUND", decodeAPIError(t, rr))
 			database.AssertExpectations(t)
 			database.AssertNotCalled(t, "RunInTransaction", mock.Anything, mock.Anything)
-			database.AssertNotCalled(t, "GetUserPermissionsByUserId", mock.Anything, mock.Anything, mock.Anything)
+			database.AssertNotCalled(t, "GetUserPermissionsByUserID", mock.Anything, mock.Anything, mock.Anything)
 			auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 		})
 	}
@@ -321,7 +321,7 @@ func TestHandleUserSessionDelete_ASessionNoLongerLiveIsNotFound(t *testing.T) {
 func TestHandleUserSessionDelete_ADeadSessionAnswersAsAMissingOne(t *testing.T) {
 	serve := func(session *record.UserSession) *httptest.ResponseRecorder {
 		database := datamocks.NewDatabase(t)
-		database.On("GetUserSessionById", mock.Anything, (*sql.Tx)(nil), int64(100)).Return(session, nil).Once()
+		database.On("GetUserSessionByID", mock.Anything, (*sql.Tx)(nil), int64(100)).Return(session, nil).Once()
 		rr := httptest.NewRecorder()
 		HandleUserSessionDelete(database, handlersmocks.NewAuditLogger(t), &recordingLogoutTokens{}).ServeHTTP(rr, adminSessionDeleteRequest("100", adminSubject))
 		return rr

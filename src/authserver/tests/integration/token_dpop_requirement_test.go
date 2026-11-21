@@ -28,9 +28,9 @@ var requiresDPoPRefusal = map[string]any{
 }
 
 // requireDPoPFor switches the client's requirement on.
-func requireDPoPFor(t *testing.T, clientId int64) {
+func requireDPoPFor(t *testing.T, clientID int64) {
 	t.Helper()
-	require.NoError(t, database.SetClientDPoPBoundAccessTokens(context.Background(), nil, clientId, true))
+	require.NoError(t, database.SetClientDPoPBoundAccessTokens(context.Background(), nil, clientID, true))
 }
 
 // assertRefusedForNoProof holds an answer to the requirement's refusal: a request without a DPoP
@@ -47,19 +47,19 @@ func TestDPoPRequirement_TheClientCredentialsGrant(t *testing.T) {
 	clientSecret := fake.Password(32)
 	secretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	require.NoError(t, err)
-	resource := createResourceWithId(t, "dpop-required-api-"+fake.LetterN(8))
-	permission := createPermissionWithId(t, resource.Id, "read-"+fake.LetterN(8))
+	resource := createResourceWithID(t, "dpop-required-api-"+fake.LetterN(8))
+	permission := createPermissionWithID(t, resource.ID, "read-"+fake.LetterN(8))
 	client := &record.Client{
 		ClientIdentifier:         "dpop-required-service-" + fake.LetterN(8),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
-		DefaultAcrLevel:          record.AcrLevel2Optional,
+		DefaultACRLevel:          record.ACRLevel2Optional,
 		ClientSecretEncrypted:    secretEncrypted,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 	require.NoError(t, database.CreateClientPermission(context.Background(), nil,
-		&record.ClientPermission{ClientId: client.Id, PermissionId: permission.Id}))
+		&record.ClientPermission{ClientID: client.ID, PermissionID: permission.ID}))
 	form := url.Values{"grant_type": {"client_credentials"}}
 
 	// Before the requirement, the same request is answered a Bearer token.
@@ -67,7 +67,7 @@ func TestDPoPRequirement_TheClientCredentialsGrant(t *testing.T) {
 	require.Equal(t, http.StatusOK, resp.StatusCode, "%v", body)
 	assert.Equal(t, "Bearer", body["token_type"])
 
-	requireDPoPFor(t, client.Id)
+	requireDPoPFor(t, client.ID)
 
 	resp, body = postWithProof(t, form, client.ClientIdentifier, clientSecret, "")
 	assertRefusedForNoProof(t, resp, body)
@@ -84,7 +84,7 @@ func TestDPoPRequirement_TheClientCredentialsGrant(t *testing.T) {
 func TestDPoPRequirement_TheAuthorizationCodeAndRefreshTokenGrants(t *testing.T) {
 	clientSecret := fake.Password(32)
 	_, code := createAuthCode(t, clientSecret, "openid profile")
-	requireDPoPFor(t, code.ClientId)
+	requireDPoPFor(t, code.ClientID)
 	form := url.Values{
 		"grant_type":    {"authorization_code"},
 		"code":          {code.Code},
@@ -114,7 +114,7 @@ func TestDPoPRequirement_ThePasswordGrant(t *testing.T) {
 	client := createROPCClient(t, clientSecret, false)
 	password := fake.Password(12)
 	user := createROPCUser(t, password)
-	requireDPoPFor(t, client.Id)
+	requireDPoPFor(t, client.ID)
 	form := func(password string) url.Values {
 		return url.Values{"grant_type": {"password"}, "username": {user.Email}, "password": {password}, "scope": {"openid"}}
 	}

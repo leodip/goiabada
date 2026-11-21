@@ -23,7 +23,7 @@ import (
 // decision 3). Off, both are as usual.
 func TestRegisterRoutes_TheSafeModeSwitchReachesEveryPageAndThePublicSettings(t *testing.T) {
 	brand := record.NewBrand("Shop", record.BrandAppearanceAuto, "plum")
-	brand.Id = 7
+	brand.ID = 7
 	brand.CustomCSS = ".auth-card { border-width: 3px; }"
 
 	for _, tc := range []struct {
@@ -39,8 +39,8 @@ func TestRegisterRoutes_TheSafeModeSwitchReachesEveryPageAndThePublicSettings(t 
 			database.On("PoolStats").Return(testPoolStats).Maybe()
 			database.On("GetDefaultBrand", mock.Anything, mock.Anything).Return(&brand, nil).Maybe()
 			database.On("GetClientPageBrand", mock.Anything, mock.Anything, mock.Anything).Return(&brand, nil).Maybe()
-			database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).
-				Return(&record.Settings{Id: 1, AppName: "Goiabada"}, nil).Maybe()
+			database.On("GetSettingsByID", mock.Anything, mock.Anything, int64(1)).
+				Return(&record.Settings{ID: 1, AppName: "Goiabada"}, nil).Maybe()
 			cfg := &config.Config{}
 			cfg.AuthServer.ProfilePictureMaxSizeBytes = testProfilePictureMaxSizeBytes
 			cfg.AuthServer.BrandSafeMode = tc.switchOn

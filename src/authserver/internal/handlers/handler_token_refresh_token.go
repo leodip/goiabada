@@ -77,23 +77,23 @@ func (tr tokenResponder) respondRefreshToken(w http.ResponseWriter, r *http.Requ
 	refreshToken := grant.RefreshToken
 	if grant.IsROPC {
 		tr.auditLogger.Log(r.Context(), audit.EventTokenIssuedRefreshTokenResponse, map[string]interface{}{
-			"user_id":           refreshToken.UserId.Int64,
-			"client_id":         refreshToken.ClientId.Int64,
-			"refresh_token_jti": refreshToken.RefreshTokenJti,
+			"user_id":           refreshToken.UserID.Int64,
+			"client_id":         refreshToken.ClientID.Int64,
+			"refresh_token_jti": refreshToken.RefreshTokenJTI,
 			"flow":              "ropc",
 		})
 	} else {
 		if outcome.BumpedSession != nil {
 			tr.auditLogger.Log(r.Context(), audit.EventBumpedUserSession, map[string]interface{}{
-				"user_id":   outcome.BumpedSession.UserId,
-				"client_id": refreshToken.Code.ClientId,
+				"user_id":   outcome.BumpedSession.UserID,
+				"client_id": refreshToken.Code.ClientID,
 			})
 		}
 		tr.auditLogger.Log(r.Context(), audit.EventTokenIssuedRefreshTokenResponse, map[string]interface{}{
-			"code_id":           refreshToken.Code.Id,
-			"user_id":           refreshToken.Code.UserId,
-			"client_id":         refreshToken.Code.ClientId,
-			"refresh_token_jti": refreshToken.RefreshTokenJti,
+			"code_id":           refreshToken.Code.ID,
+			"user_id":           refreshToken.Code.UserID,
+			"client_id":         refreshToken.Code.ClientID,
+			"refresh_token_jti": refreshToken.RefreshTokenJTI,
 			"flow":              "auth_code",
 		})
 	}
@@ -121,29 +121,29 @@ func (tr tokenResponder) auditRefreshTokenReplay(ctx context.Context, grant *pro
 	if revokedCount == 0 && !recorded {
 		slog.DebugContext(ctx, "revoked refresh token presented, with no live family members to revoke",
 			"grant_type", oidc.GrantTypeRefreshToken.String(),
-			"refresh_token_id", refreshToken.Id)
+			"refresh_token_id", refreshToken.ID)
 		return
 	}
 
 	// The principal fields are populated uniformly for both linkage shapes, so a security-event
 	// consumer does not need flow-specific logic just to identify the client and user. This
-	// deliberately departs from EventTokenIssuedRefreshTokenResponse, which logs codeId on one shape
-	// and userId/clientId on the other.
-	replayClientId := refreshToken.ClientId.Int64
-	replayUserId := refreshToken.UserId.Int64
+	// deliberately departs from EventTokenIssuedRefreshTokenResponse, which logs codeID on one shape
+	// and userID/clientID on the other.
+	replayClientID := refreshToken.ClientID.Int64
+	replayUserID := refreshToken.UserID.Int64
 	replayFlow := "ropc"
 	if !grant.IsROPC {
-		replayClientId = refreshToken.Code.ClientId
-		replayUserId = refreshToken.Code.UserId
+		replayClientID = refreshToken.Code.ClientID
+		replayUserID = refreshToken.Code.UserID
 		replayFlow = "auth_code"
 	}
 
 	tr.auditLogger.Log(ctx, audit.EventRefreshTokenReplayDetected, map[string]interface{}{
-		"presented_refresh_token_jti": refreshToken.RefreshTokenJti,
-		"first_refresh_token_jti":     refreshToken.FirstRefreshTokenJti,
+		"presented_refresh_token_jti": refreshToken.RefreshTokenJTI,
+		"first_refresh_token_jti":     refreshToken.FirstRefreshTokenJTI,
 		"revoked_count":               revokedCount,
-		"client_id":                   replayClientId,
-		"user_id":                     replayUserId,
+		"client_id":                   replayClientID,
+		"user_id":                     replayUserID,
 		"flow":                        replayFlow,
 	})
 }

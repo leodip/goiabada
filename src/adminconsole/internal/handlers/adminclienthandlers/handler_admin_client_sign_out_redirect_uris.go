@@ -18,9 +18,9 @@ import (
 // clientSignOutRedirectURIsAPI is what the Sign-out redirect URIs page needs: the client, the
 // global switches its gate reads against, and the write.
 type clientSignOutRedirectURIsAPI interface {
-	GetClientById(ctx context.Context, accessToken string, clientId int64) (*api.ClientResponse, error)
+	GetClientByID(ctx context.Context, accessToken string, clientID int64) (*api.ClientResponse, error)
 	GetSettingsGeneral(ctx context.Context, accessToken string) (*api.SettingsGeneralResponse, error)
-	UpdateClientPostLogoutRedirectURIs(ctx context.Context, accessToken string, clientId int64, request *api.UpdateClientPostLogoutRedirectURIsRequest) (*api.ClientResponse, error)
+	UpdateClientPostLogoutRedirectURIs(ctx context.Context, accessToken string, clientID int64, request *api.UpdateClientPostLogoutRedirectURIsRequest) (*api.ClientResponse, error)
 }
 
 // HandleSignOutRedirectURIsGet draws a client's Sign-out redirect URIs tab: the addresses a
@@ -28,7 +28,7 @@ type clientSignOutRedirectURIsAPI interface {
 // gated as the Redirect URIs tab is, since a client that signs nobody in through a browser has no
 // sign-out to return from.
 func HandleSignOutRedirectURIsGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient clientSignOutRedirectURIsAPI,
 ) http.HandlerFunc {
@@ -41,13 +41,13 @@ func HandleSignOutRedirectURIsGet(
 			return
 		}
 
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
-		clientResp, err := apiClient.GetClientById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		clientResp, err := apiClient.GetClientByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -70,14 +70,14 @@ func HandleSignOutRedirectURIsGet(
 		sort.Strings(uris)
 
 		client := struct {
-			ClientId                     int64
+			ClientID                     int64
 			ClientIdentifier             string
 			CanManageSignOutRedirectURIs bool
 			SignOutRedirectURIs          []string
 			IsSystemLevelClient          bool
 			IsPublic                     bool
 		}{
-			ClientId:                     clientResp.Id,
+			ClientID:                     clientResp.ID,
 			ClientIdentifier:             clientResp.ClientIdentifier,
 			CanManageSignOutRedirectURIs: usesARedirectFlow(clientResp, settingsResp),
 			SignOutRedirectURIs:          uris,
@@ -116,7 +116,7 @@ func HandleSignOutRedirectURIsGet(
 // HandleSignOutRedirectURIsPost saves the list the page sends, beside the list as the page loaded
 // it, through the admin API, which refuses a save from an outdated page (#428).
 func HandleSignOutRedirectURIsPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient clientSignOutRedirectURIsAPI,
 ) http.HandlerFunc {
@@ -136,9 +136,9 @@ func HandleSignOutRedirectURIsPost(
 			return
 		}
 
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JSONError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.JSONError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
@@ -146,7 +146,7 @@ func HandleSignOutRedirectURIsPost(
 			PostLogoutRedirectURIs:         data.SignOutRedirectURIs,
 			ExpectedPostLogoutRedirectURIs: data.ExpectedSignOutRedirectURIs,
 		}
-		_, err = apiClient.UpdateClientPostLogoutRedirectURIs(r.Context(), jwtInfo.TokenResponse.AccessToken, data.ClientId, req)
+		_, err = apiClient.UpdateClientPostLogoutRedirectURIs(r.Context(), jwtInfo.TokenResponse.AccessToken, data.ClientID, req)
 		if err != nil {
 			// The API's 400 names the entry it refused and why, and its 409 says the list changed
 			// since the page loaded it: both are for the administrator to read (#122).

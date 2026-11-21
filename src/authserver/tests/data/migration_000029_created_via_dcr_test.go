@@ -110,7 +110,7 @@ func TestMigration000029_CreatedViaDCR(t *testing.T) {
 			CreatedViaDCR:    false,
 		}
 		require.NoErrorf(t, h.DB.CreateClient(context.Background(), nil, client), "seed client %s", c.identifier)
-		ids[i] = client.Id
+		ids[i] = client.ID
 	}
 
 	require.NoError(t, h.Migrator.Migrate(context.Background(), 28), "roll back to 000028")
@@ -128,10 +128,10 @@ func TestMigration000029_CreatedViaDCR(t *testing.T) {
 	assertCreatedViaDCRShape000029(t, h, "after down/up round trip")
 }
 
-func readClientFlags000029(t *testing.T, h *isolatedDB, clientId int64) (bool, bool) {
+func readClientFlags000029(t *testing.T, h *isolatedDB, clientID int64) (bool, bool) {
 	t.Helper()
 	var createdViaDCR, consentRequired bool
-	q := fmt.Sprintf("SELECT created_via_dcr, consent_required FROM clients WHERE id = %d", clientId)
+	q := fmt.Sprintf("SELECT created_via_dcr, consent_required FROM clients WHERE id = %d", clientID)
 	require.NoError(t, h.SQL.QueryRow(q).Scan(&createdViaDCR, &consentRequired),
 		"read clients.created_via_dcr and clients.consent_required")
 	return createdViaDCR, consentRequired

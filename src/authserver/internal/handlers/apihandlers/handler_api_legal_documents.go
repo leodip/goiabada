@@ -35,16 +35,16 @@ import (
 // the document's row its lifecycle writes take, and the transaction they run in.
 type legalDocumentsDatabase interface {
 	CreateLegalDocument(ctx context.Context, tx *sql.Tx, legalDocument *record.LegalDocument) error
-	AcquireLegalDocumentRow(ctx context.Context, tx *sql.Tx, legalDocumentId int64) error
+	AcquireLegalDocumentRow(ctx context.Context, tx *sql.Tx, legalDocumentID int64) error
 	UpdateLegalDocument(ctx context.Context, tx *sql.Tx, legalDocument *record.LegalDocument) error
-	GetLegalDocumentById(ctx context.Context, tx *sql.Tx, legalDocumentId int64) (*record.LegalDocument, error)
+	GetLegalDocumentByID(ctx context.Context, tx *sql.Tx, legalDocumentID int64) (*record.LegalDocument, error)
 	GetLegalDocumentByShortName(ctx context.Context, tx *sql.Tx, shortName string) (*record.LegalDocument, error)
 	GetAllLegalDocuments(ctx context.Context, tx *sql.Tx) ([]record.LegalDocument, error)
-	DeleteLegalDocument(ctx context.Context, tx *sql.Tx, legalDocumentId int64) error
+	DeleteLegalDocument(ctx context.Context, tx *sql.Tx, legalDocumentID int64) error
 	CreateLegalDocumentVersion(ctx context.Context, tx *sql.Tx, version *record.LegalDocumentVersion) error
-	GetLegalDocumentVersionsByLegalDocumentId(ctx context.Context, tx *sql.Tx, legalDocumentId int64) ([]record.LegalDocumentVersion, error)
-	GetLegalDocumentVersion(ctx context.Context, tx *sql.Tx, legalDocumentId int64, versionNumber int) (*record.LegalDocumentVersion, error)
-	GetLegalDocumentClientsByLegalDocumentId(ctx context.Context, tx *sql.Tx, legalDocumentId int64) ([]record.LegalDocumentClient, error)
+	GetLegalDocumentVersionsByLegalDocumentID(ctx context.Context, tx *sql.Tx, legalDocumentID int64) ([]record.LegalDocumentVersion, error)
+	GetLegalDocumentVersion(ctx context.Context, tx *sql.Tx, legalDocumentID int64, versionNumber int) (*record.LegalDocumentVersion, error)
+	GetLegalDocumentClientsByLegalDocumentID(ctx context.Context, tx *sql.Tx, legalDocumentID int64) ([]record.LegalDocumentClient, error)
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 }
 
@@ -68,7 +68,7 @@ func lockLegalDocument(ctx context.Context, database legalDocumentsDatabase, tx 
 	if err := database.AcquireLegalDocumentRow(ctx, tx, id); err != nil {
 		return nil, errs.Wrap(err, "database error taking the legal document's row")
 	}
-	doc, err := database.GetLegalDocumentById(ctx, tx, id)
+	doc, err := database.GetLegalDocumentByID(ctx, tx, id)
 	if err != nil {
 		return nil, errs.Wrap(err, "database error getting the legal document under its row")
 	}
@@ -134,8 +134,8 @@ func validateLegalDocumentMarkdown(markdown string) error {
 	return nil
 }
 
-// legalDocumentId reads the {id} path value, answering the request when it is not an id.
-func legalDocumentId(w http.ResponseWriter, r *http.Request) (int64, bool) {
+// legalDocumentID reads the {id} path value, answering the request when it is not an id.
+func legalDocumentID(w http.ResponseWriter, r *http.Request) (int64, bool) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil || id <= 0 {
 		writeJSONError(w, "Invalid legal document ID", "VALIDATION_ERROR", http.StatusBadRequest)
@@ -146,11 +146,11 @@ func legalDocumentId(w http.ResponseWriter, r *http.Request) (int64, bool) {
 
 // loadLegalDocument reads the document the path names, answering the request when it cannot.
 func loadLegalDocument(w http.ResponseWriter, r *http.Request, database legalDocumentsDatabase) (*record.LegalDocument, bool) {
-	id, ok := legalDocumentId(w, r)
+	id, ok := legalDocumentID(w, r)
 	if !ok {
 		return nil, false
 	}
-	doc, err := database.GetLegalDocumentById(r.Context(), nil, id)
+	doc, err := database.GetLegalDocumentByID(r.Context(), nil, id)
 	if err != nil {
 		writeInternalServerError(w, r, errs.Wrap(err, "database error getting legal document by ID"), "legal_document_id", id)
 		return nil, false
@@ -170,9 +170,9 @@ func writeLegalDocumentNotFound(w http.ResponseWriter) {
 // it cannot.
 func legalDocumentVersions(w http.ResponseWriter, r *http.Request, database legalDocumentsDatabase,
 	doc *record.LegalDocument) ([]record.LegalDocumentVersion, bool) {
-	versions, err := database.GetLegalDocumentVersionsByLegalDocumentId(r.Context(), nil, doc.Id)
+	versions, err := database.GetLegalDocumentVersionsByLegalDocumentID(r.Context(), nil, doc.ID)
 	if err != nil {
-		writeInternalServerError(w, r, errs.Wrap(err, "database error getting legal document versions"), "legal_document_id", doc.Id)
+		writeInternalServerError(w, r, errs.Wrap(err, "database error getting legal document versions"), "legal_document_id", doc.ID)
 		return nil, false
 	}
 	return versions, true
@@ -181,9 +181,9 @@ func legalDocumentVersions(w http.ResponseWriter, r *http.Request, database lega
 // legalDocumentApps reads the apps a document lists, answering the request when it cannot.
 func legalDocumentApps(w http.ResponseWriter, r *http.Request, database legalDocumentsDatabase,
 	doc *record.LegalDocument) ([]record.LegalDocumentClient, bool) {
-	links, err := database.GetLegalDocumentClientsByLegalDocumentId(r.Context(), nil, doc.Id)
+	links, err := database.GetLegalDocumentClientsByLegalDocumentID(r.Context(), nil, doc.ID)
 	if err != nil {
-		writeInternalServerError(w, r, errs.Wrap(err, "database error getting legal document apps"), "legal_document_id", doc.Id)
+		writeInternalServerError(w, r, errs.Wrap(err, "database error getting legal document apps"), "legal_document_id", doc.ID)
 		return nil, false
 	}
 	return links, true
@@ -221,7 +221,7 @@ func checkShortNameFree(ctx context.Context, database legalDocumentsDatabase, tx
 	if err != nil {
 		return errs.Wrap(err, "database error checking legal document short name")
 	}
-	if holder != nil && holder.Id != self {
+	if holder != nil && holder.ID != self {
 		return i18n.NewLocalizedError(i18n.ErrCodeLegalDocumentShortNameInUse, nil)
 	}
 	return nil
@@ -313,7 +313,7 @@ func HandleLegalDocumentCreatePost(database legalDocumentsDatabase, auditLogger 
 		}
 
 		auditLogger.Log(r.Context(), audit.EventCreatedLegalDocument, map[string]interface{}{
-			"legal_document_id": doc.Id,
+			"legal_document_id": doc.ID,
 			"short_name":        doc.ShortName,
 			"kind":              doc.Kind,
 			"logged_in_user":    callerSubject(r),
@@ -349,7 +349,7 @@ func HandleLegalDocumentDraftPut(database legalDocumentsDatabase, auditLogger Au
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		id, ok := legalDocumentId(w, r)
+		id, ok := legalDocumentID(w, r)
 		if !ok {
 			return
 		}
@@ -378,7 +378,7 @@ func HandleLegalDocumentDraftPut(database legalDocumentsDatabase, auditLogger Au
 				return err
 			}
 
-			versions, err = database.GetLegalDocumentVersionsByLegalDocumentId(r.Context(), tx, id)
+			versions, err = database.GetLegalDocumentVersionsByLegalDocumentID(r.Context(), tx, id)
 			if err != nil {
 				return errs.Wrap(err, "database error getting legal document versions to save its draft")
 			}
@@ -392,7 +392,7 @@ func HandleLegalDocumentDraftPut(database legalDocumentsDatabase, auditLogger Au
 				if err = validateLegalDocumentShortName(shortName); err != nil {
 					return err
 				}
-				if err = checkShortNameFree(r.Context(), database, tx, shortName, doc.Id); err != nil {
+				if err = checkShortNameFree(r.Context(), database, tx, shortName, doc.ID); err != nil {
 					return err
 				}
 				doc.ShortName = shortName
@@ -410,7 +410,7 @@ func HandleLegalDocumentDraftPut(database legalDocumentsDatabase, auditLogger Au
 		}
 
 		auditLogger.Log(r.Context(), audit.EventUpdatedLegalDocumentDraft, map[string]interface{}{
-			"legal_document_id": doc.Id,
+			"legal_document_id": doc.ID,
 			"short_name":        doc.ShortName,
 			"logged_in_user":    callerSubject(r),
 		})
@@ -440,7 +440,7 @@ func HandleLegalDocumentPreviewPost() http.HandlerFunc {
 			return
 		}
 
-		writeJSON(w, r, http.StatusOK, api.PreviewLegalDocumentResponse{Html: string(html)})
+		writeJSON(w, r, http.StatusOK, api.PreviewLegalDocumentResponse{HTML: string(html)})
 	}
 }
 
@@ -453,7 +453,7 @@ func HandleLegalDocumentPublishPost(database legalDocumentsDatabase, auditLogger
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		id, ok := legalDocumentId(w, r)
+		id, ok := legalDocumentID(w, r)
 		if !ok {
 			return
 		}
@@ -476,7 +476,7 @@ func HandleLegalDocumentPublishPost(database legalDocumentsDatabase, auditLogger
 				return i18n.NewLocalizedError(i18n.ErrCodeLegalDocumentDraftEmpty, nil)
 			}
 
-			versions, err = database.GetLegalDocumentVersionsByLegalDocumentId(r.Context(), tx, id)
+			versions, err = database.GetLegalDocumentVersionsByLegalDocumentID(r.Context(), tx, id)
 			if err != nil {
 				return errs.Wrap(err, "database error getting legal document versions to publish")
 			}
@@ -486,7 +486,7 @@ func HandleLegalDocumentPublishPost(database legalDocumentsDatabase, auditLogger
 			}
 			published = &record.LegalDocumentVersion{
 				PublishedAt:     time.Now().UTC(),
-				LegalDocumentId: doc.Id,
+				LegalDocumentID: doc.ID,
 				VersionNumber:   next,
 				Title:           doc.DraftTitle.String,
 				Markdown:        doc.DraftMarkdown.String,
@@ -513,7 +513,7 @@ func HandleLegalDocumentPublishPost(database legalDocumentsDatabase, auditLogger
 		}
 
 		auditLogger.Log(r.Context(), audit.EventPublishedLegalDocument, map[string]interface{}{
-			"legal_document_id": doc.Id,
+			"legal_document_id": doc.ID,
 			"short_name":        doc.ShortName,
 			"version":           published.VersionNumber,
 			"logged_in_user":    callerSubject(r),
@@ -542,7 +542,7 @@ func handleLegalDocumentRetirement(database legalDocumentsDatabase, auditLogger 
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		id, ok := legalDocumentId(w, r)
+		id, ok := legalDocumentID(w, r)
 		if !ok {
 			return
 		}
@@ -561,7 +561,7 @@ func handleLegalDocumentRetirement(database legalDocumentsDatabase, auditLogger 
 			case !retire && !doc.IsRetired():
 				return i18n.NewLocalizedError(i18n.ErrCodeLegalDocumentNotRetired, nil)
 			}
-			versions, err = database.GetLegalDocumentVersionsByLegalDocumentId(r.Context(), tx, id)
+			versions, err = database.GetLegalDocumentVersionsByLegalDocumentID(r.Context(), tx, id)
 			if err != nil {
 				return errs.Wrap(err, "database error getting legal document versions")
 			}
@@ -587,7 +587,7 @@ func handleLegalDocumentRetirement(database legalDocumentsDatabase, auditLogger 
 		}
 
 		details := map[string]interface{}{
-			"legal_document_id": doc.Id,
+			"legal_document_id": doc.ID,
 			"short_name":        doc.ShortName,
 			"logged_in_user":    callerSubject(r),
 		}
@@ -609,7 +609,7 @@ func HandleLegalDocumentDelete(database legalDocumentsDatabase, auditLogger Audi
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		id, ok := legalDocumentId(w, r)
+		id, ok := legalDocumentID(w, r)
 		if !ok {
 			return
 		}
@@ -621,14 +621,14 @@ func HandleLegalDocumentDelete(database legalDocumentsDatabase, auditLogger Audi
 			if err != nil {
 				return err
 			}
-			versions, err := database.GetLegalDocumentVersionsByLegalDocumentId(r.Context(), tx, doc.Id)
+			versions, err := database.GetLegalDocumentVersionsByLegalDocumentID(r.Context(), tx, doc.ID)
 			if err != nil {
 				return errs.Wrap(err, "database error getting legal document versions to delete")
 			}
 			if len(versions) > 0 {
 				return i18n.NewLocalizedError(i18n.ErrCodeLegalDocumentPublishedNotDeleted, nil)
 			}
-			if err := database.DeleteLegalDocument(r.Context(), tx, doc.Id); err != nil {
+			if err := database.DeleteLegalDocument(r.Context(), tx, doc.ID); err != nil {
 				return errs.Wrap(err, "database error deleting legal document")
 			}
 			return nil
@@ -638,7 +638,7 @@ func HandleLegalDocumentDelete(database legalDocumentsDatabase, auditLogger Audi
 		}
 
 		auditLogger.Log(r.Context(), audit.EventDeletedLegalDocument, map[string]interface{}{
-			"legal_document_id": doc.Id,
+			"legal_document_id": doc.ID,
 			"short_name":        doc.ShortName,
 			"logged_in_user":    callerSubject(r),
 		})
@@ -663,10 +663,10 @@ func HandleLegalDocumentVersionGet(database legalDocumentsDatabase) http.Handler
 			return
 		}
 
-		version, err := database.GetLegalDocumentVersion(r.Context(), nil, doc.Id, number)
+		version, err := database.GetLegalDocumentVersion(r.Context(), nil, doc.ID, number)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error getting legal document version"),
-				"legal_document_id", doc.Id, "version", number)
+				"legal_document_id", doc.ID, "version", number)
 			return
 		}
 		if version == nil {

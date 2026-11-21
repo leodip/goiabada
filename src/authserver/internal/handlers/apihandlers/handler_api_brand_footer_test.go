@@ -157,7 +157,7 @@ func TestBrandFooter_UpdateRefusals(t *testing.T) {
 	for _, c := range brandFooterRefusals {
 		t.Run(c.name, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
-			database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(3)).
+			database.On("GetBrandByID", mock.Anything, (*sql.Tx)(nil), int64(3)).
 				Return(storedBrand(3, "Acme", record.BrandAppearanceDark, "plum"), nil).Once()
 
 			status, answer := serveBrand(HandleBrandUpdatePut(database, handlersmocks.NewAuditLogger(t), brandBaseURL),
@@ -228,7 +228,7 @@ func expectCreate(database *datamocks.Database, stored *record.Brand) {
 	database.On("CreateBrand", mock.Anything, (*sql.Tx)(nil), mock.Anything).Run(func(args mock.Arguments) {
 		brand := args.Get(2).(*record.Brand)
 		*stored = *brand
-		brand.Id = 7
+		brand.ID = 7
 		brand.CreatedAt = sql.NullTime{Time: brandTime, Valid: true}
 		brand.UpdatedAt = sql.NullTime{Time: brandTime, Valid: true}
 	}).Return(nil).Once()
@@ -456,7 +456,7 @@ func storedFooterBrand() *record.Brand {
 // (decision 9), and the answer is the read's.
 func TestBrandFooter_ABrandReadAndWrittenBackIsUnchanged(t *testing.T) {
 	database := datamocks.NewDatabase(t)
-	database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(5)).Return(storedFooterBrand(), nil).Twice()
+	database.On("GetBrandByID", mock.Anything, (*sql.Tx)(nil), int64(5)).Return(storedFooterBrand(), nil).Twice()
 	database.On("GetDefaultBrand", mock.Anything, (*sql.Tx)(nil)).
 		Return(storedBrand(1, "Default", record.BrandAppearanceAuto, "blueberry"), nil).Twice()
 	database.On("CountClientsPerBrand", mock.Anything, (*sql.Tx)(nil)).Return(map[int64]int{}, nil).Twice()
@@ -489,7 +489,7 @@ func TestBrandFooter_ABrandReadAndWrittenBackIsUnchanged(t *testing.T) {
 func TestBrandFooter_UpdateReplacesAndAudits(t *testing.T) {
 	t.Run("new links and contact", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
-		database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(5)).Return(storedFooterBrand(), nil).Once()
+		database.On("GetBrandByID", mock.Anything, (*sql.Tx)(nil), int64(5)).Return(storedFooterBrand(), nil).Once()
 		var written record.Brand
 		database.On("UpdateBrand", mock.Anything, (*sql.Tx)(nil), mock.Anything).Run(func(args mock.Arguments) {
 			written = *args.Get(2).(*record.Brand)
@@ -521,7 +521,7 @@ func TestBrandFooter_UpdateReplacesAndAudits(t *testing.T) {
 
 	t.Run("everything removed", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
-		database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(5)).Return(storedFooterBrand(), nil).Once()
+		database.On("GetBrandByID", mock.Anything, (*sql.Tx)(nil), int64(5)).Return(storedFooterBrand(), nil).Once()
 		var written record.Brand
 		database.On("UpdateBrand", mock.Anything, (*sql.Tx)(nil), mock.Anything).Run(func(args mock.Arguments) {
 			written = *args.Get(2).(*record.Brand)

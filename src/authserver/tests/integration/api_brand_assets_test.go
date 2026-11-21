@@ -44,17 +44,17 @@ func uploadBrandAsset(t *testing.T, accessToken, kind string, data []byte) (*htt
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 	req.Header.Set("Authorization", "Bearer "+accessToken)
-	requestId := "brand-asset-" + fake.LetterN(16)
-	req.Header.Set("X-Request-Id", requestId)
-	resp, err := createHttpClient(t).Do(req)
+	requestID := "brand-asset-" + fake.LetterN(16)
+	req.Header.Set("X-Request-Id", requestID)
+	resp, err := createHTTPClient(t).Do(req)
 	require.NoError(t, err)
-	return resp, requestId
+	return resp, requestID
 }
 
 type brandAssetAnswer struct {
-	Id          int64  `json:"id"`
+	ID          int64  `json:"id"`
 	Kind        string `json:"kind"`
-	Url         string `json:"url"`
+	URL         string `json:"url"`
 	ContentType string `json:"contentType"`
 	Width       int    `json:"width"`
 	Height      int    `json:"height"`
@@ -142,15 +142,15 @@ func TestAPIBrandAssets_EachKindIsStoredReadAndServed(t *testing.T) {
 			resp, _ := uploadBrandAsset(t, accessToken, tt.kind, tt.data)
 			require.Equal(t, http.StatusCreated, resp.StatusCode)
 			uploaded := decodeBrandAsset(t, resp)
-			require.Positive(t, uploaded.Id)
-			id := strconv.FormatInt(uploaded.Id, 10)
+			require.Positive(t, uploaded.ID)
+			id := strconv.FormatInt(uploaded.ID, 10)
 			assert.Equal(t, tt.kind, uploaded.Kind)
 			assert.Equal(t, tt.contentType, uploaded.ContentType)
 			assert.Equal(t, tt.width, uploaded.Width)
 			assert.Equal(t, tt.height, uploaded.Height)
-			assert.Regexp(t, `^`+regexp.QuoteMeta(base)+`/brand-assets/`+id+`\?v=[0-9a-f]{12}$`, uploaded.Url)
+			assert.Regexp(t, `^`+regexp.QuoteMeta(base)+`/brand-assets/`+id+`\?v=[0-9a-f]{12}$`, uploaded.URL)
 
-			stored, err := database.GetBrandAssetById(context.Background(), nil, uploaded.Id)
+			stored, err := database.GetBrandAssetByID(context.Background(), nil, uploaded.ID)
 			require.NoError(t, err)
 			require.NotNil(t, stored)
 			assert.Equal(t, tt.data, stored.Content)
@@ -161,7 +161,7 @@ func TestAPIBrandAssets_EachKindIsStoredReadAndServed(t *testing.T) {
 			assert.Equal(t, uploaded, decodeBrandAsset(t, resp))
 
 			// The public route answers anyone, with no cookie.
-			status, body, header := getStylesheet(t, createHttpClient(t), uploaded.Url)
+			status, body, header := getStylesheet(t, createHTTPClient(t), uploaded.URL)
 			require.Equal(t, http.StatusOK, status)
 			assert.Equal(t, string(tt.data), body)
 			assert.Equal(t, tt.contentType, header.Get("Content-Type"))
@@ -176,7 +176,7 @@ func TestAPIBrandAssets_EachKindIsStoredReadAndServed(t *testing.T) {
 			assert.Empty(t, header.Values("Access-Control-Allow-Credentials"))
 
 			// Any other fingerprint is the current bytes, kept five minutes.
-			status, body, header = getStylesheet(t, createHttpClient(t), base+"/brand-assets/"+id+"?v=000000000000")
+			status, body, header = getStylesheet(t, createHTTPClient(t), base+"/brand-assets/"+id+"?v=000000000000")
 			require.Equal(t, http.StatusOK, status)
 			assert.Equal(t, string(tt.data), body)
 			assert.Equal(t, "public, max-age=300", header.Get("Cache-Control"))
@@ -225,19 +225,19 @@ func TestAPIBrandAssets_AnUploadIsAudited(t *testing.T) {
 	requireDatabaseAuditLogs(t)
 	accessToken, caller := createAdminClientWithToken(t)
 
-	resp, requestId := uploadBrandAsset(t, accessToken, "favicon", createTestPNGImage(48, 48))
+	resp, requestID := uploadBrandAsset(t, accessToken, "favicon", createTestPNGImage(48, 48))
 	require.Equal(t, http.StatusCreated, resp.StatusCode)
 	uploaded := decodeBrandAsset(t, resp)
 
-	assert.Equal(t, []map[string]any{{"brand_asset_id": float64(uploaded.Id), "kind": "favicon",
+	assert.Equal(t, []map[string]any{{"brand_asset_id": float64(uploaded.ID), "kind": "favicon",
 		"logged_in_user": caller.ClientIdentifier}},
-		auditRows(t, accessToken, "uploaded_brand_asset", requestId))
+		auditRows(t, accessToken, "uploaded_brand_asset", requestID))
 
 	// A refused upload records nothing.
-	resp, requestId = uploadBrandAsset(t, accessToken, "favicon", createTestPNGImage(48, 60))
+	resp, requestID = uploadBrandAsset(t, accessToken, "favicon", createTestPNGImage(48, 60))
 	_ = resp.Body.Close()
 	require.Equal(t, http.StatusBadRequest, resp.StatusCode)
-	assert.Empty(t, auditRows(t, accessToken, "uploaded_brand_asset", requestId))
+	assert.Empty(t, auditRows(t, accessToken, "uploaded_brand_asset", requestID))
 }
 
 func TestAPIBrandAssets_AccessAndMissingAssets(t *testing.T) {
@@ -267,7 +267,7 @@ func TestAPIBrandAssets_AccessAndMissingAssets(t *testing.T) {
 		assert.Equal(t, http.StatusNotFound, status)
 		assert.Equal(t, "NOT_FOUND", code)
 
-		publicResp, err := createHttpClient(t).Get(base + "/brand-assets/999999999")
+		publicResp, err := createHTTPClient(t).Get(base + "/brand-assets/999999999")
 		require.NoError(t, err)
 		_, _ = io.Copy(io.Discard, publicResp.Body)
 		_ = publicResp.Body.Close()

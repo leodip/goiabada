@@ -66,11 +66,11 @@ const (
 	LinkMarkerContinuationInFlight LinkMarkerRejection = "continuation_in_flight"
 )
 
-// continuationIdLength matches the length of the codes both flows email
+// continuationIDLength matches the length of the codes both flows email
 // (GenerateSecurityRandomString(32)), which over that 65-character alphabet is far
 // more entropy than this value needs. It is not guessed at: nobody outside the
 // session ever sees it, and it authorizes nothing on its own.
-const continuationIdLength = 32
+const continuationIDLength = 32
 
 // markerSessionStore is what the marker's functions call on the browser session store: the request's
 // session, and the conditional write the marker's save and clear are made with, which only
@@ -102,11 +102,11 @@ var errMarkerNotHeld = errors.New("the browser session holds no link marker of t
 // in depth now, where it used to be the whole boundary (#112, #266).
 type LinkMarker struct {
 	Flow LinkMarkerFlow `json:"flow"`
-	// Id is the userId for a reset and the pre-registration id for an activation.
-	Id        int64     `json:"id"`
+	// ID is the userId for a reset and the pre-registration id for an activation.
+	ID        int64     `json:"id"`
 	CodeHash  string    `json:"codeHash"`
 	ExpiresAt time.Time `json:"expiresAt"`
-	// ContinuationId names this continuation, so a page rendered from this marker can
+	// ContinuationID names this continuation, so a page rendered from this marker can
 	// say which marker rendered it and be refused once the slot holds another one.
 	//
 	// No rule about WRITING the slot can do that job, because the retarget happens to a
@@ -115,7 +115,7 @@ type LinkMarker struct {
 	// reset form in a browser posts to the identical clean URL. The reset POST is what
 	// checks it. Activation carries no id anywhere, because its continuation is the
 	// browser following a 303 with no page in between (#112).
-	ContinuationId string `json:"continuationId"`
+	ContinuationID string `json:"continuationId"`
 }
 
 // expired reports whether the marker is past its window. A marker whose ExpiresAt is
@@ -188,20 +188,20 @@ func SaveLinkMarker(httpSession markerSessionStore, w http.ResponseWriter, r *ht
 		// A live marker with this code hash is this same continuation, so it keeps its id.
 		// Rotating here would refuse the form that link had already rendered, which is the
 		// legitimate sequence "the user clicked the emailed link again".
-		continuationId := ""
+		continuationID := ""
 		if live {
-			continuationId = held.ContinuationId
+			continuationID = held.ContinuationID
 		}
-		if continuationId == "" {
-			continuationId = securerandom.String(continuationIdLength)
+		if continuationID == "" {
+			continuationID = securerandom.String(continuationIDLength)
 		}
 
 		jsonData, err := json.Marshal(&LinkMarker{
 			Flow:           flow,
-			Id:             id,
+			ID:             id,
 			CodeHash:       codeHash,
 			ExpiresAt:      now.Add(linkMarkerLifetime),
-			ContinuationId: continuationId,
+			ContinuationID: continuationID,
 		})
 		if err != nil {
 			return errs.Wrap(err, "unable to marshal link marker")
@@ -286,7 +286,7 @@ func readLinkMarker(sess *sessionstore.Session, want LinkMarkerFlow,
 	return marker, "", nil
 }
 
-// ClearLinkMarker removes the marker of the continuation named by continuationId, the one
+// ClearLinkMarker removes the marker of the continuation named by continuationID, the one
 // its caller consumed, from the session.
 //
 // This does invalidate the marker, for every copy of it: the session is a row in the
@@ -304,7 +304,7 @@ func readLinkMarker(sess *sessionstore.Session, want LinkMarkerFlow,
 // or reissued, which clearing at the end of a flow says nothing about. Defence in depth
 // now rather than the boundary itself.
 func ClearLinkMarker(httpSession markerSessionStore, w http.ResponseWriter, r *http.Request,
-	continuationId string) error {
+	continuationID string) error {
 
 	sess, err := httpSession.Get(r, sessionkeys.AuthServerSessionName)
 	if err != nil {
@@ -320,7 +320,7 @@ func ClearLinkMarker(httpSession markerSessionStore, w http.ResponseWriter, r *h
 		if err != nil {
 			return err
 		}
-		if held == nil || held.ContinuationId != continuationId {
+		if held == nil || held.ContinuationID != continuationID {
 			return errMarkerNotHeld
 		}
 		delete(values, sessionkeys.LinkMarker)

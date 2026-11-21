@@ -11,7 +11,7 @@ import (
 // render the same fields. The client sessions page keeps its own, because its rows also name the
 // user each session belongs to (#440).
 type SessionInfo struct {
-	UserSessionId int64
+	UserSessionID int64
 	IsCurrent     bool
 	// Started and LastAccessed are the instants themselves rather than pre-rendered text: the
 	// page formats them with the DateTime and Since template functions, which read the layout
@@ -20,7 +20,7 @@ type SessionInfo struct {
 	// time.Format has no locale and Duration.String() is not anybody's language (#373).
 	Started      *time.Time
 	LastAccessed *time.Time
-	IpAddress    string
+	IPAddress    string
 	DeviceName   string
 	DeviceType   string
 	DeviceOS     string
@@ -48,11 +48,11 @@ func SessionInfos(sessions []api.UserSessionDetailResponse) []SessionInfo {
 	infos := make([]SessionInfo, 0, len(sessions))
 	for _, s := range sessions {
 		infos = append(infos, SessionInfo{
-			UserSessionId: s.Id,
+			UserSessionID: s.ID,
 			IsCurrent:     s.IsCurrent,
 			Started:       s.Started,
 			LastAccessed:  s.LastAccessed,
-			IpAddress:     s.IpAddress,
+			IPAddress:     s.IPAddress,
 			DeviceName:    s.DeviceName,
 			DeviceType:    s.DeviceType,
 			DeviceOS:      s.DeviceOS,
@@ -64,7 +64,7 @@ func SessionInfos(sessions []api.UserSessionDetailResponse) []SessionInfo {
 
 	sort.Slice(infos, func(i, j int) bool {
 		a, b := infos[i], infos[j]
-		return SessionListedBefore(a.IsCurrent, a.LastAccessed, a.UserSessionId, b.IsCurrent, b.LastAccessed, b.UserSessionId)
+		return SessionListedBefore(a.IsCurrent, a.LastAccessed, a.UserSessionID, b.IsCurrent, b.LastAccessed, b.UserSessionID)
 	})
 
 	return infos
@@ -73,14 +73,14 @@ func SessionInfos(sessions []api.UserSessionDetailResponse) []SessionInfo {
 // SessionListedBefore says whether session a goes before session b in a list of sessions, as every
 // session page lists them: the session of the device in use first, then the others by when each was
 // last active, the most recent first, a newer session first between two last active at once.
-func SessionListedBefore(aCurrent bool, aLastAccessed *time.Time, aId int64, bCurrent bool, bLastAccessed *time.Time, bId int64) bool {
+func SessionListedBefore(aCurrent bool, aLastAccessed *time.Time, aID int64, bCurrent bool, bLastAccessed *time.Time, bID int64) bool {
 	if aCurrent != bCurrent {
 		return aCurrent
 	}
 	if !lastAccessed(aLastAccessed).Equal(lastAccessed(bLastAccessed)) {
 		return lastAccessed(aLastAccessed).After(lastAccessed(bLastAccessed))
 	}
-	return aId > bId
+	return aID > bID
 }
 
 // lastAccessed is when a session was last active, the zero instant when the response did not say,
@@ -112,7 +112,7 @@ func clientNames(clients []api.SessionClientResponse) []ClientName {
 // IsCurrent marks the client the caller's own token was issued to, on the caller's own user, which
 // neither page offers a Disconnect for (decision 5).
 type ConnectedClientInfo struct {
-	ClientId             int64
+	ClientID             int64
 	Client               string
 	ClientName           string
 	ClientNameUnverified bool
@@ -133,7 +133,7 @@ func ConnectedClientInfos(clients []api.ConnectedClientResponse) []ConnectedClie
 	infos := make([]ConnectedClientInfo, 0, len(clients))
 	for _, c := range clients {
 		info := ConnectedClientInfo{
-			ClientId:             c.ClientId,
+			ClientID:             c.ClientID,
 			Client:               c.ClientIdentifier,
 			ClientName:           c.ClientName,
 			ClientNameUnverified: c.ClientNameUnverified,

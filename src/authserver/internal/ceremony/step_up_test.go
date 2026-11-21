@@ -13,12 +13,12 @@ import (
 
 func TestTargetRequiresSecondFactor(t *testing.T) {
 	testCases := []struct {
-		target record.AcrLevel
+		target record.ACRLevel
 		want   bool
 	}{
-		{record.AcrLevel1, false},
-		{record.AcrLevel2Optional, true},
-		{record.AcrLevel2Mandatory, true},
+		{record.ACRLevel1, false},
+		{record.ACRLevel2Optional, true},
+		{record.ACRLevel2Mandatory, true},
 		// A level outside the three ranks below level 1, so it asks nothing.
 		{"", false},
 		{"urn:goiabada:level3", false},
@@ -33,12 +33,12 @@ func TestTargetRequiresSecondFactor(t *testing.T) {
 
 func TestStepUpOwed_NoSession(t *testing.T) {
 	testCases := []struct {
-		target record.AcrLevel
+		target record.ACRLevel
 		want   StepUp
 	}{
-		{record.AcrLevel1, StepUpNone},
-		{record.AcrLevel2Optional, StepUpLevel},
-		{record.AcrLevel2Mandatory, StepUpLevel},
+		{record.ACRLevel1, StepUpNone},
+		{record.ACRLevel2Optional, StepUpLevel},
+		{record.ACRLevel2Mandatory, StepUpLevel},
 		{"", StepUpNone},
 	}
 
@@ -54,17 +54,17 @@ func TestStepUpOwed_NoSession(t *testing.T) {
 
 func TestStepUpOwed_Session(t *testing.T) {
 	const (
-		level1    = record.AcrLevel1
-		optional  = record.AcrLevel2Optional
-		mandatory = record.AcrLevel2Mandatory
+		level1    = record.ACRLevel1
+		optional  = record.ACRLevel2Optional
+		mandatory = record.ACRLevel2Mandatory
 	)
 
 	testCases := []struct {
 		name          string
-		target        record.AcrLevel
-		sessionAcr    record.AcrLevel
-		sessionOtpGen int64
-		userOtpGen    int64
+		target        record.ACRLevel
+		sessionACR    record.ACRLevel
+		sessionOTPGen int64
+		userOTPGen    int64
 		want          StepUp
 	}{
 		// Generations equal: only the levels decide.
@@ -82,15 +82,15 @@ func TestStepUpOwed_Session(t *testing.T) {
 		{"changed, level1 target, level1 session", level1, level1, 2, 3, StepUpNone},
 		{"changed, level1 target, mandatory session", level1, mandatory, 2, 3, StepUpNone},
 		{"changed, optional target, level1 session", optional, level1, 2, 3, StepUpLevel},
-		{"changed, optional target, optional session", optional, optional, 2, 3, StepUpOtpConfigChanged},
-		{"changed, optional target, mandatory session", optional, mandatory, 2, 3, StepUpOtpConfigChanged},
+		{"changed, optional target, optional session", optional, optional, 2, 3, StepUpOTPConfigChanged},
+		{"changed, optional target, mandatory session", optional, mandatory, 2, 3, StepUpOTPConfigChanged},
 		{"changed, mandatory target, optional session", mandatory, optional, 2, 3, StepUpLevel},
-		{"changed, mandatory target, mandatory session", mandatory, mandatory, 2, 3, StepUpOtpConfigChanged},
+		{"changed, mandatory target, mandatory session", mandatory, mandatory, 2, 3, StepUpOTPConfigChanged},
 
 		// != rather than <: a snapshot ahead of the counter asks again too, and migration 000031's
 		// -1 seed asks with no special case (#242).
-		{"snapshot ahead of the counter", optional, optional, 4, 3, StepUpOtpConfigChanged},
-		{"the -1 seed", mandatory, mandatory, -1, 0, StepUpOtpConfigChanged},
+		{"snapshot ahead of the counter", optional, optional, 4, 3, StepUpOTPConfigChanged},
+		{"the -1 seed", mandatory, mandatory, -1, 0, StepUpOTPConfigChanged},
 
 		// A target outside the three asks nothing of any session.
 		{"unknown target, level1 session, changed", "", level1, 2, 3, StepUpNone},
@@ -101,9 +101,9 @@ func TestStepUpOwed_Session(t *testing.T) {
 			// Every row's user has an authenticator. TestStepUpOwed_UserWithNoAuthenticator is the
 			// table for a user without one.
 			session := &record.UserSession{
-				AcrLevel:            tc.sessionAcr,
-				OtpConfigGeneration: tc.sessionOtpGen,
-				User:                record.User{OTPEnabled: true, OtpConfigGeneration: tc.userOtpGen},
+				ACRLevel:            tc.sessionACR,
+				OTPConfigGeneration: tc.sessionOTPGen,
+				User:                record.User{OTPEnabled: true, OTPConfigGeneration: tc.userOTPGen},
 			}
 
 			got, err := StepUpOwed(tc.target, session)
@@ -121,17 +121,17 @@ func TestStepUpOwed_Session(t *testing.T) {
 // answering level 3 with nothing to answer it, while prompt=none refused the same request.
 func TestStepUpOwed_UserWithNoAuthenticator(t *testing.T) {
 	const (
-		level1    = record.AcrLevel1
-		optional  = record.AcrLevel2Optional
-		mandatory = record.AcrLevel2Mandatory
+		level1    = record.ACRLevel1
+		optional  = record.ACRLevel2Optional
+		mandatory = record.ACRLevel2Mandatory
 	)
 
 	testCases := []struct {
 		name          string
-		target        record.AcrLevel
-		sessionAcr    record.AcrLevel
-		sessionOtpGen int64
-		userOtpGen    int64
+		target        record.ACRLevel
+		sessionACR    record.ACRLevel
+		sessionOTPGen int64
+		userOTPGen    int64
 		want          StepUp
 	}{
 		{"mandatory target, mandatory session, generation answered", mandatory, mandatory, 3, 3, StepUpAuthenticatorMissing},
@@ -140,16 +140,16 @@ func TestStepUpOwed_UserWithNoAuthenticator(t *testing.T) {
 		{"mandatory target, optional session", mandatory, optional, 3, 3, StepUpLevel},
 		// Level 2 optional needs no authenticator: a moved generation is answered by the skip.
 		{"optional target, mandatory session, generation answered", optional, mandatory, 3, 3, StepUpNone},
-		{"optional target, mandatory session, generation moved", optional, mandatory, 2, 3, StepUpOtpConfigChanged},
+		{"optional target, mandatory session, generation moved", optional, mandatory, 2, 3, StepUpOTPConfigChanged},
 		{"level1 target, mandatory session", level1, mandatory, 2, 3, StepUpNone},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			session := &record.UserSession{
-				AcrLevel:            tc.sessionAcr,
-				OtpConfigGeneration: tc.sessionOtpGen,
-				User:                record.User{OTPEnabled: false, OtpConfigGeneration: tc.userOtpGen},
+				ACRLevel:            tc.sessionACR,
+				OTPConfigGeneration: tc.sessionOTPGen,
+				User:                record.User{OTPEnabled: false, OTPConfigGeneration: tc.userOTPGen},
 			}
 
 			got, err := StepUpOwed(tc.target, session)
@@ -160,10 +160,10 @@ func TestStepUpOwed_UserWithNoAuthenticator(t *testing.T) {
 	}
 }
 
-func TestStepUpOwed_UnparsableSessionAcr(t *testing.T) {
-	for _, target := range []record.AcrLevel{record.AcrLevel1, record.AcrLevel2Mandatory} {
+func TestStepUpOwed_UnparsableSessionACR(t *testing.T) {
+	for _, target := range []record.ACRLevel{record.ACRLevel1, record.ACRLevel2Mandatory} {
 		t.Run(string(target), func(t *testing.T) {
-			session := &record.UserSession{AcrLevel: "urn:goiabada:unknown"}
+			session := &record.UserSession{ACRLevel: "urn:goiabada:unknown"}
 
 			_, err := StepUpOwed(target, session)
 

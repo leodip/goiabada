@@ -22,10 +22,10 @@ var (
 	charUpdateAccountPhone  = &api.UpdateAccountPhoneRequest{PhoneNumber: "5551234"}
 	charUpdateAccountPwd    = &api.UpdateAccountPasswordRequest{CurrentPassword: "old", NewPassword: "new"}
 	charVerifyAccountEmail  = &api.VerifyAccountEmailRequest{VerificationCode: "123456"}
-	charUpdateAccountOTP    = &api.UpdateAccountOTPRequest{Enabled: true, OtpCode: "654321"}
+	charUpdateAccountOTP    = &api.UpdateAccountOTPRequest{Enabled: true, OTPCode: "654321"}
 	charCreateRecoveryCodes = &api.CreateAccountRecoveryCodesRequest{Password: "the-password"}
 	charDeleteAccount       = &api.DeleteAccountRequest{Password: "the-password", RecoveryCode: "7kq2-m9xh-4trw-b3np-j6vd-egac"}
-	charAccountLogout       = &api.AccountLogoutRequest{PostLogoutRedirectUri: "https://console.example.com/"}
+	charAccountLogout       = &api.AccountLogoutRequest{PostLogoutRedirectURI: "https://console.example.com/"}
 	charUpdateAuditSettings = &api.UpdateSettingsAuditLogsRequest{AuditLogRetentionDays: 30}
 
 	charCreateClient      = &api.CreateClientRequest{ClientIdentifier: "a-new-client"}
@@ -43,23 +43,23 @@ var (
 	charUpdateClientOrig = &api.UpdateClientWebOriginsRequest{WebOrigins: []string{"https://app.example.com"},
 		ExpectedWebOrigins: []string{"https://old.example.com"}}
 	charUpdateClientToken = &api.UpdateClientTokensRequest{TokenExpirationInSeconds: 300}
-	charUpdateClientPerms = &api.UpdateClientPermissionsRequest{PermissionIds: []int64{8}, ExpectedPermissionIds: []int64{3}}
-	charUpdateClientIntro = &api.UpdateClientIntrospectionResourcesRequest{ResourceIds: []int64{4}, ExpectedResourceIds: []int64{2}}
+	charUpdateClientPerms = &api.UpdateClientPermissionsRequest{PermissionIDs: []int64{8}, ExpectedPermissionIDs: []int64{3}}
+	charUpdateClientIntro = &api.UpdateClientIntrospectionResourcesRequest{ResourceIDs: []int64{4}, ExpectedResourceIDs: []int64{2}}
 	charAllowed           = true
 	charUpdateClientAdmin = &api.UpdateClientAdministrativeScopesRequest{Allowed: &charAllowed}
 	charRequireDPoP       = false
 	charUpdateClientDPoP  = &api.UpdateClientDPoPRequest{DPoPBoundAccessTokens: &charRequireDPoP}
-	charUpdateClientBrand = &api.UpdateClientBrandRequest{BrandId: nil}
+	charUpdateClientBrand = &api.UpdateClientBrandRequest{BrandID: nil}
 
 	charCreateGroupAttr = &api.CreateGroupAttributeRequest{Key: "department", Value: "sales"}
 	charUpdateGroupAttr = &api.UpdateGroupAttributeRequest{Key: "department", Value: "support"}
 	charCreateGroup     = &api.CreateGroupRequest{GroupIdentifier: "a-new-group"}
 	charUpdateGroup     = &api.UpdateGroupRequest{GroupIdentifier: "a-group"}
-	charUpdateUserGrps  = &api.UpdateUserGroupsRequest{GroupIds: []int64{5}, ExpectedGroupIds: []int64{3}}
-	charUpdateGroupPerm = &api.UpdateGroupPermissionsRequest{PermissionIds: []int64{8}, ExpectedPermissionIds: []int64{3}}
-	charUpdateUserPerm  = &api.UpdateUserPermissionsRequest{PermissionIds: []int64{8}, ExpectedPermissionIds: []int64{3}}
+	charUpdateUserGrps  = &api.UpdateUserGroupsRequest{GroupIDs: []int64{5}, ExpectedGroupIDs: []int64{3}}
+	charUpdateGroupPerm = &api.UpdateGroupPermissionsRequest{PermissionIDs: []int64{8}, ExpectedPermissionIDs: []int64{3}}
+	charUpdateUserPerm  = &api.UpdateUserPermissionsRequest{PermissionIDs: []int64{8}, ExpectedPermissionIDs: []int64{3}}
 	charUpdateResPerms  = &api.UpdateResourcePermissionsRequest{Permissions: []api.ResourcePermissionUpsert{},
-		ExpectedPermissions: []api.ResourcePermissionUpsert{{Id: 3, PermissionIdentifier: "read", Description: "Read"}}}
+		ExpectedPermissions: []api.ResourcePermissionUpsert{{ID: 3, PermissionIdentifier: "read", Description: "Read"}}}
 
 	charUpdateUserPhone = &api.UpdateUserPhoneRequest{PhoneNumber: "5555678"}
 	charCreateResource  = &api.CreateResourceRequest{ResourceIdentifier: "a-new-resource"}
@@ -84,14 +84,14 @@ var (
 
 	charCreateLegalDocument = &api.CreateLegalDocumentRequest{Kind: "must_accept", ShortName: "terms", Title: "Terms"}
 	charSaveLegalDocDraft   = &api.SaveLegalDocumentDraftRequest{Title: "Terms", Markdown: "Be kind."}
-	charUpdateLegalDocApps  = &api.UpdateLegalDocumentAppsRequest{AppliesTo: "selected_apps", ClientIds: []int64{3, 4}, ExpectedClientIds: []int64{3}}
+	charUpdateLegalDocApps  = &api.UpdateLegalDocumentAppsRequest{AppliesTo: "selected_apps", ClientIDs: []int64{3, 4}, ExpectedClientIDs: []int64{3}}
 
 	charSaveEmailTemplate    = &api.SaveEmailTemplateRequest{Subject: "Reset your password", ButtonLabel: "Reset", Body: "Hello {{name}},\n\n{{link}}"}
-	charBrandId              = int64(4)
+	charBrandID              = int64(4)
 	charPreviewEmailTemplate = &api.PreviewEmailTemplateRequest{Subject: "Reset your password", ButtonLabel: "Reset",
-		Body: "Hello {{name}},\n\n{{button}}\n\n{{link}}", BrandId: &charBrandId}
+		Body: "Hello {{name}},\n\n{{button}}\n\n{{link}}", BrandID: &charBrandID}
 	charSendTestEmailTemplate = &api.SendTestEmailTemplateRequest{To: "jane@example.com", Subject: "Reset your password",
-		ButtonLabel: "Reset", Body: "Hello {{name}},\n\n{{link}}", BrandId: &charBrandId}
+		ButtonLabel: "Reset", Body: "Hello {{name}},\n\n{{link}}", BrandID: &charBrandID}
 )
 
 const (
@@ -109,7 +109,7 @@ func wireCharacterization() []wireCase {
 				if err != nil {
 					return nil, err
 				}
-				return got.Id, nil
+				return got.ID, nil
 			},
 			verb: "GET", path: "/api/v1/account/profile", contentType: charJSON,
 			successStatus: 200, reply: `{"user":{"id":42}}`, want: int64(42),
@@ -121,7 +121,7 @@ func wireCharacterization() []wireCase {
 				if err != nil {
 					return nil, err
 				}
-				return got.Id, nil
+				return got.ID, nil
 			},
 			verb: "PUT", path: "/api/v1/account/profile", contentType: charJSON,
 			bodyOf:        charUpdateUserProfile,
@@ -173,7 +173,7 @@ func wireCharacterization() []wireCase {
 				if err != nil {
 					return nil, err
 				}
-				return got.Id, nil
+				return got.ID, nil
 			},
 			verb: "PUT", path: "/api/v1/account/password", contentType: charJSON,
 			bodyOf:        charUpdateAccountPwd,
@@ -301,7 +301,7 @@ func wireCharacterization() []wireCase {
 				if err != nil {
 					return nil, err
 				}
-				return got.PictureUrl, nil
+				return got.PictureURL, nil
 			},
 			verb: "GET", path: "/api/v1/account/profile-picture", contentType: charJSON,
 			successStatus: 200, reply: `{"hasPicture":true,"pictureUrl":"/account/picture.png"}`,
@@ -314,7 +314,7 @@ func wireCharacterization() []wireCase {
 				if err != nil {
 					return nil, err
 				}
-				return got.PictureUrl, nil
+				return got.PictureURL, nil
 			},
 			verb: "POST", path: "/api/v1/account/profile-picture", contentTypePrefix: charMultipart,
 			bodyHas:       []string{`name="picture"`, `filename="face.png"`, "the-picture-bytes"},
@@ -427,16 +427,16 @@ func wireCharacterization() []wireCase {
 				if err != nil {
 					return nil, err
 				}
-				return got.Id, nil
+				return got.ID, nil
 			},
 			verb: "POST", path: "/api/v1/admin/brands", contentType: charJSON,
 			bodyOf:        charCreateBrand,
 			successStatus: 201, reply: `{"brand":{"id":5}}`, want: int64(5),
 		},
 		{
-			name: "GetBrandById",
+			name: "GetBrandByID",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.GetBrandById(ctx, charAccessToken, 5)
+				got, err := c.GetBrandByID(ctx, charAccessToken, 5)
 				if err != nil {
 					return nil, err
 				}
@@ -473,7 +473,7 @@ func wireCharacterization() []wireCase {
 				if err != nil {
 					return nil, err
 				}
-				return []any{got.Id, got.IsDefault}, nil
+				return []any{got.ID, got.IsDefault}, nil
 			},
 			verb: "POST", path: "/api/v1/admin/brands/5/make-default", contentType: charJSON,
 			successStatus: 200, reply: `{"brand":{"id":5,"isDefault":true}}`, want: []any{int64(5), true},
@@ -499,7 +499,7 @@ func wireCharacterization() []wireCase {
 				if err != nil {
 					return nil, err
 				}
-				return []any{got.Id, got.Kind, got.Url, got.Width}, nil
+				return []any{got.ID, got.Kind, got.URL, got.Width}, nil
 			},
 			verb: "POST", path: "/api/v1/admin/brand-assets/background", contentTypePrefix: charMultipart,
 			bodyHas:       []string{`name="file"; filename="beach.webp"`, "the-picture-bytes"},
@@ -508,13 +508,13 @@ func wireCharacterization() []wireCase {
 			want:          []any{int64(41), "background", "https://auth.example.com/brand-assets/41?v=ab", 1600},
 		},
 		{
-			name: "GetBrandAssetById",
+			name: "GetBrandAssetByID",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.GetBrandAssetById(ctx, charAccessToken, 41)
+				got, err := c.GetBrandAssetByID(ctx, charAccessToken, 41)
 				if err != nil {
 					return nil, err
 				}
-				return []any{got.Id, got.ContentType, got.Height}, nil
+				return []any{got.ID, got.ContentType, got.Height}, nil
 			},
 			verb: "GET", path: "/api/v1/admin/brand-assets/41", contentType: charJSON,
 			successStatus: 200, reply: `{"brandAsset":{"id":41,"kind":"logo","contentType":"image/png","height":60}}`,
@@ -529,7 +529,7 @@ func wireCharacterization() []wireCase {
 				if err != nil {
 					return nil, err
 				}
-				return []any{client.Id, resources[0].Id}, nil
+				return []any{client.ID, resources[0].ID}, nil
 			},
 			verb: "GET", path: "/api/v1/admin/clients/3/introspection-resources",
 			successStatus: 200, reply: `{"client":{"id":3},"resources":[{"id":4}]}`,
@@ -553,7 +553,7 @@ func wireCharacterization() []wireCase {
 				if err != nil {
 					return nil, err
 				}
-				return []any{client.Id, permissions[0].Id}, nil
+				return []any{client.ID, permissions[0].ID}, nil
 			},
 			verb: "GET", path: "/api/v1/admin/clients/3/permissions",
 			successStatus: 200, reply: `{"client":{"id":3},"permissions":[{"id":8}]}`,
@@ -577,19 +577,19 @@ func wireCharacterization() []wireCase {
 				if err != nil {
 					return nil, err
 				}
-				return got[0].Id, nil
+				return got[0].ID, nil
 			},
 			verb: "GET", path: "/api/v1/admin/clients", contentType: charJSON, anySuccess2xx: true,
 			reply: `{"clients":[{"id":3}]}`, want: int64(3),
 		},
 		{
-			name: "GetClientById",
+			name: "GetClientByID",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.GetClientById(ctx, charAccessToken, 3)
+				got, err := c.GetClientByID(ctx, charAccessToken, 3)
 				if err != nil {
 					return nil, err
 				}
-				return got.Id, nil
+				return got.ID, nil
 			},
 			verb: "GET", path: "/api/v1/admin/clients/3", contentType: charJSON, anySuccess2xx: true,
 			reply: `{"client":{"id":3}}`, want: int64(3),
@@ -609,7 +609,7 @@ func wireCharacterization() []wireCase {
 				if err != nil {
 					return nil, err
 				}
-				return got.Id, nil
+				return got.ID, nil
 			},
 			verb: "POST", path: "/api/v1/admin/clients", contentType: charJSON,
 			bodyOf: charCreateClient, anySuccess2xx: true,
@@ -622,7 +622,7 @@ func wireCharacterization() []wireCase {
 				if err != nil {
 					return nil, err
 				}
-				return got.Id, nil
+				return got.ID, nil
 			},
 			verb: "PUT", path: "/api/v1/admin/clients/3", contentType: charJSON,
 			bodyOf: charUpdateClient, anySuccess2xx: true,
@@ -635,7 +635,7 @@ func wireCharacterization() []wireCase {
 				if err != nil {
 					return nil, err
 				}
-				return got.Id, nil
+				return got.ID, nil
 			},
 			verb: "PUT", path: "/api/v1/admin/clients/3/authentication", contentType: charJSON,
 			bodyOf: charUpdateClientAuth, anySuccess2xx: true,
@@ -648,7 +648,7 @@ func wireCharacterization() []wireCase {
 				if err != nil {
 					return nil, err
 				}
-				return got.Id, nil
+				return got.ID, nil
 			},
 			verb: "PUT", path: "/api/v1/admin/clients/3/oauth2-flows", contentType: charJSON,
 			bodyOf: charUpdateClientFlows, anySuccess2xx: true,
@@ -669,7 +669,7 @@ func wireCharacterization() []wireCase {
 				if err != nil {
 					return nil, err
 				}
-				return got.Id, nil
+				return got.ID, nil
 			},
 			verb: "PUT", path: "/api/v1/admin/clients/3/redirect-uris", contentType: charJSON,
 			bodyOf: charUpdateClientRedir, anySuccess2xx: true,
@@ -682,7 +682,7 @@ func wireCharacterization() []wireCase {
 				if err != nil {
 					return nil, err
 				}
-				return got.Id, nil
+				return got.ID, nil
 			},
 			verb: "PUT", path: "/api/v1/admin/clients/3/post-logout-redirect-uris", contentType: charJSON,
 			bodyOf: charUpdateClientPLRU, anySuccess2xx: true,
@@ -695,7 +695,7 @@ func wireCharacterization() []wireCase {
 				if err != nil {
 					return nil, err
 				}
-				return got.Id, nil
+				return got.ID, nil
 			},
 			verb: "PUT", path: "/api/v1/admin/clients/3/backchannel-logout", contentType: charJSON,
 			bodyOf: charUpdateClientBCL, anySuccess2xx: true,
@@ -708,7 +708,7 @@ func wireCharacterization() []wireCase {
 				if err != nil {
 					return nil, err
 				}
-				return got.Id, nil
+				return got.ID, nil
 			},
 			verb: "PUT", path: "/api/v1/admin/clients/3/web-origins", contentType: charJSON,
 			bodyOf: charUpdateClientOrig, anySuccess2xx: true,
@@ -721,7 +721,7 @@ func wireCharacterization() []wireCase {
 				if err != nil {
 					return nil, err
 				}
-				return got.Id, nil
+				return got.ID, nil
 			},
 			verb: "PUT", path: "/api/v1/admin/clients/3/tokens", contentType: charJSON,
 			bodyOf: charUpdateClientToken, anySuccess2xx: true,
@@ -764,7 +764,7 @@ func wireCharacterization() []wireCase {
 				if err != nil {
 					return nil, err
 				}
-				return got.BrandId == nil, nil
+				return got.BrandID == nil, nil
 			},
 			verb: "PUT", path: "/api/v1/admin/clients/3/brand", contentType: charJSON,
 			// The literal, not the struct marshalled: the auth server refuses a body without
@@ -779,7 +779,7 @@ func wireCharacterization() []wireCase {
 				if err != nil {
 					return nil, err
 				}
-				return got.LogoUrl, nil
+				return got.LogoURL, nil
 			},
 			verb: "GET", path: "/api/v1/admin/clients/3/logo", contentType: charJSON,
 			successStatus: 200, reply: `{"hasLogo":true,"logoUrl":"/clients/3/logo.png"}`,
@@ -792,7 +792,7 @@ func wireCharacterization() []wireCase {
 				if err != nil {
 					return nil, err
 				}
-				return got.PictureUrl, nil
+				return got.PictureURL, nil
 			},
 			verb: "POST", path: "/api/v1/admin/clients/3/logo", contentTypePrefix: charMultipart,
 			bodyHas:       []string{`filename="logo.png"`, "the-picture-bytes"},
@@ -810,25 +810,25 @@ func wireCharacterization() []wireCase {
 
 		// --- group_attributes.go ----------------------------------------------------------
 		{
-			name: "GetGroupAttributesByGroupId",
+			name: "GetGroupAttributesByGroupID",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.GetGroupAttributesByGroupId(ctx, charAccessToken, 5)
+				got, err := c.GetGroupAttributesByGroupID(ctx, charAccessToken, 5)
 				if err != nil {
 					return nil, err
 				}
-				return got[0].Id, nil
+				return got[0].ID, nil
 			},
 			verb: "GET", path: "/api/v1/admin/groups/5/attributes", contentType: charJSON,
 			successStatus: 200, reply: `{"attributes":[{"id":11}]}`, want: int64(11),
 		},
 		{
-			name: "GetGroupAttributeById",
+			name: "GetGroupAttributeByID",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.GetGroupAttributeById(ctx, charAccessToken, 11)
+				got, err := c.GetGroupAttributeByID(ctx, charAccessToken, 11)
 				if err != nil {
 					return nil, err
 				}
-				return got.Id, nil
+				return got.ID, nil
 			},
 			verb: "GET", path: "/api/v1/admin/group-attributes/11", contentType: charJSON,
 			successStatus: 200, reply: `{"attribute":{"id":11}}`, want: int64(11),
@@ -840,7 +840,7 @@ func wireCharacterization() []wireCase {
 				if err != nil {
 					return nil, err
 				}
-				return got.Id, nil
+				return got.ID, nil
 			},
 			verb: "POST", path: "/api/v1/admin/group-attributes", contentType: charJSON,
 			bodyOf:        charCreateGroupAttr,
@@ -876,7 +876,7 @@ func wireCharacterization() []wireCase {
 				if err != nil {
 					return nil, err
 				}
-				return []any{group.Id, permissions[0].Id}, nil
+				return []any{group.ID, permissions[0].ID}, nil
 			},
 			verb: "GET", path: "/api/v1/admin/groups/5/permissions",
 			successStatus: 200, reply: `{"group":{"id":5},"permissions":[{"id":8}]}`,
@@ -900,7 +900,7 @@ func wireCharacterization() []wireCase {
 				if err != nil {
 					return nil, err
 				}
-				return got[0].Id, nil
+				return got[0].ID, nil
 			},
 			verb: "GET", path: "/api/v1/admin/groups",
 			successStatus: 200, reply: `{"groups":[{"id":5}]}`, want: int64(5),
@@ -912,20 +912,20 @@ func wireCharacterization() []wireCase {
 				if err != nil {
 					return nil, err
 				}
-				return got.Id, nil
+				return got.ID, nil
 			},
 			verb: "POST", path: "/api/v1/admin/groups", contentType: charJSON,
 			bodyOf:        charCreateGroup,
 			successStatus: 201, reply: `{"group":{"id":6}}`, want: int64(6),
 		},
 		{
-			name: "GetGroupById",
+			name: "GetGroupByID",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.GetGroupById(ctx, charAccessToken, 5)
+				got, err := c.GetGroupByID(ctx, charAccessToken, 5)
 				if err != nil {
 					return nil, err
 				}
-				return got.Id, nil
+				return got.ID, nil
 			},
 			verb: "GET", path: "/api/v1/admin/groups/5",
 			successStatus: 200, reply: `{"group":{"id":5}}`, want: int64(5),
@@ -937,7 +937,7 @@ func wireCharacterization() []wireCase {
 				if err != nil {
 					return nil, err
 				}
-				return got.Id, nil
+				return got.ID, nil
 			},
 			verb: "PUT", path: "/api/v1/admin/groups/5", contentType: charJSON,
 			bodyOf:        charUpdateGroup,
@@ -958,7 +958,7 @@ func wireCharacterization() []wireCase {
 				if err != nil {
 					return nil, err
 				}
-				return []any{user.Id, groups[0].Id}, nil
+				return []any{user.ID, groups[0].ID}, nil
 			},
 			verb: "GET", path: "/api/v1/admin/users/42/groups",
 			successStatus: 200, reply: `{"user":{"id":42},"groups":[{"id":5}]}`,
@@ -971,7 +971,7 @@ func wireCharacterization() []wireCase {
 				if err != nil {
 					return nil, err
 				}
-				return []any{members[0].Id, total}, nil
+				return []any{members[0].ID, total}, nil
 			},
 			verb: "GET", path: "/api/v1/admin/groups/5/members", query: "page=1&size=10",
 			successStatus: 200, reply: `{"members":[{"id":42}],"total":3}`,
@@ -1029,7 +1029,7 @@ func wireCharacterization() []wireCase {
 				if err != nil {
 					return nil, err
 				}
-				return []any{user.Id, groups[0].Id}, nil
+				return []any{user.ID, groups[0].ID}, nil
 			},
 			verb: "PUT", path: "/api/v1/admin/users/42/groups", contentType: charJSON,
 			bodyOf:        charUpdateUserGrps,
@@ -1045,7 +1045,7 @@ func wireCharacterization() []wireCase {
 				if err != nil {
 					return nil, err
 				}
-				return []any{user.Id, permissions[0].Id}, nil
+				return []any{user.ID, permissions[0].ID}, nil
 			},
 			verb: "GET", path: "/api/v1/admin/users/42/permissions", contentType: charJSON,
 			successStatus: 200, reply: `{"user":{"id":42},"permissions":[{"id":8}]}`,
@@ -1067,7 +1067,7 @@ func wireCharacterization() []wireCase {
 				if err != nil {
 					return nil, err
 				}
-				return got[0].Id, nil
+				return got[0].ID, nil
 			},
 			verb: "GET", path: "/api/v1/admin/resources/2/permissions", contentType: charJSON,
 			successStatus: 200, reply: `{"permissions":[{"id":8}]}`, want: int64(8),
@@ -1088,7 +1088,7 @@ func wireCharacterization() []wireCase {
 				if err != nil {
 					return nil, err
 				}
-				return []any{users[0].Id, total}, nil
+				return []any{users[0].ID, total}, nil
 			},
 			verb: "GET", path: "/api/v1/admin/permissions/8/users", query: "page=1&size=10",
 			contentType:   charJSON,
@@ -1118,7 +1118,7 @@ func wireCharacterization() []wireCase {
 				if err != nil {
 					return nil, err
 				}
-				return got[0].Id, nil
+				return got[0].ID, nil
 			},
 			verb: "GET", path: "/api/v1/admin/resources", contentType: charJSON,
 			successStatus: 200, reply: `{"resources":[{"id":2}]}`, want: int64(2),
@@ -1130,20 +1130,20 @@ func wireCharacterization() []wireCase {
 				if err != nil {
 					return nil, err
 				}
-				return got.Id, nil
+				return got.ID, nil
 			},
 			verb: "POST", path: "/api/v1/admin/resources", contentType: charJSON,
 			bodyOf:        charCreateResource,
 			successStatus: 201, reply: `{"resource":{"id":2}}`, want: int64(2),
 		},
 		{
-			name: "GetResourceById",
+			name: "GetResourceByID",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.GetResourceById(ctx, charAccessToken, 2)
+				got, err := c.GetResourceByID(ctx, charAccessToken, 2)
 				if err != nil {
 					return nil, err
 				}
-				return got.Id, nil
+				return got.ID, nil
 			},
 			verb: "GET", path: "/api/v1/admin/resources/2", contentType: charJSON,
 			successStatus: 200, reply: `{"resource":{"id":2}}`, want: int64(2),
@@ -1172,9 +1172,9 @@ func wireCharacterization() []wireCase {
 
 		// --- sessions.go ------------------------------------------------------------------
 		{
-			name: "GetUserSessionsByUserId",
+			name: "GetUserSessionsByUserID",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.GetUserSessionsByUserId(ctx, charAccessToken, 42)
+				got, err := c.GetUserSessionsByUserID(ctx, charAccessToken, 42)
 				if err != nil {
 					return nil, err
 				}
@@ -1184,17 +1184,17 @@ func wireCharacterization() []wireCase {
 			successStatus: 200, reply: `{"sessions":[{"isCurrent":true}]}`, want: true,
 		},
 		{
-			name: "DeleteUserSessionById",
+			name: "DeleteUserSessionByID",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				return nil, c.DeleteUserSessionById(ctx, charAccessToken, 31)
+				return nil, c.DeleteUserSessionByID(ctx, charAccessToken, 31)
 			},
 			verb: "DELETE", path: "/api/v1/admin/user-sessions/31", contentType: charJSON,
 			successStatus: 200, reply: `{"success":true}`,
 		},
 		{
-			name: "GetClientSessionsByClientId",
+			name: "GetClientSessionsByClientID",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.GetClientSessionsByClientId(ctx, charAccessToken, 3, 1, 10)
+				got, err := c.GetClientSessionsByClientID(ctx, charAccessToken, 3, 1, 10)
 				if err != nil {
 					return nil, err
 				}
@@ -1408,25 +1408,25 @@ func wireCharacterization() []wireCase {
 
 		// --- user_attributes.go -----------------------------------------------------------
 		{
-			name: "GetUserAttributesByUserId",
+			name: "GetUserAttributesByUserID",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.GetUserAttributesByUserId(ctx, charAccessToken, 42)
+				got, err := c.GetUserAttributesByUserID(ctx, charAccessToken, 42)
 				if err != nil {
 					return nil, err
 				}
-				return got[0].Id, nil
+				return got[0].ID, nil
 			},
 			verb: "GET", path: "/api/v1/admin/users/42/attributes", contentType: charJSON,
 			successStatus: 200, reply: `{"attributes":[{"id":21}]}`, want: int64(21),
 		},
 		{
-			name: "GetUserAttributeById",
+			name: "GetUserAttributeByID",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.GetUserAttributeById(ctx, charAccessToken, 21)
+				got, err := c.GetUserAttributeByID(ctx, charAccessToken, 21)
 				if err != nil {
 					return nil, err
 				}
-				return got.Id, nil
+				return got.ID, nil
 			},
 			verb: "GET", path: "/api/v1/admin/user-attributes/21", contentType: charJSON,
 			successStatus: 200, reply: `{"attribute":{"id":21}}`, want: int64(21),
@@ -1438,7 +1438,7 @@ func wireCharacterization() []wireCase {
 				if err != nil {
 					return nil, err
 				}
-				return got.Id, nil
+				return got.ID, nil
 			},
 			verb: "POST", path: "/api/v1/admin/user-attributes", contentType: charJSON,
 			bodyOf:        charCreateUserAttr,
@@ -1498,7 +1498,7 @@ func wireCharacterization() []wireCase {
 				if err != nil {
 					return nil, err
 				}
-				return []any{users[0].Id, total}, nil
+				return []any{users[0].ID, total}, nil
 			},
 			verb: "GET", path: "/api/v1/admin/users/search", query: "page=1&query=jane+doe&size=10",
 			contentType:   charJSON,
@@ -1506,13 +1506,13 @@ func wireCharacterization() []wireCase {
 			want: []any{int64(42), 5},
 		},
 		{
-			name: "GetUserById",
+			name: "GetUserByID",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.GetUserById(ctx, charAccessToken, 42)
+				got, err := c.GetUserByID(ctx, charAccessToken, 42)
 				if err != nil {
 					return nil, err
 				}
-				return got.Id, nil
+				return got.ID, nil
 			},
 			verb: "GET", path: "/api/v1/admin/users/42", contentType: charJSON,
 			successStatus: 200, reply: `{"user":{"id":42}}`, want: int64(42),
@@ -1589,7 +1589,7 @@ func wireCharacterization() []wireCase {
 				if err != nil {
 					return nil, err
 				}
-				return got.Id, nil
+				return got.ID, nil
 			},
 			verb: "PUT", path: "/api/v1/admin/users/42/password", contentType: charJSON,
 			bodyOf:        charUpdateUserPwd,
@@ -1618,9 +1618,9 @@ func wireCharacterization() []wireCase {
 					return nil, err
 				}
 				if got.SetupEmailSent == nil {
-					return []any{got.User.Id, "absent"}, nil
+					return []any{got.User.ID, "absent"}, nil
 				}
-				return []any{got.User.Id, *got.SetupEmailSent}, nil
+				return []any{got.User.ID, *got.SetupEmailSent}, nil
 			},
 			verb: "POST", path: "/api/v1/admin/users/create", contentType: charJSON,
 			bodyOf:        charCreateUser,
@@ -1633,7 +1633,7 @@ func wireCharacterization() []wireCase {
 				if err != nil {
 					return nil, err
 				}
-				return got.PictureUrl, nil
+				return got.PictureURL, nil
 			},
 			verb: "GET", path: "/api/v1/admin/users/42/profile-picture", contentType: charJSON,
 			successStatus: 200, reply: `{"hasPicture":true,"pictureUrl":"/users/42/picture.png"}`,
@@ -1646,7 +1646,7 @@ func wireCharacterization() []wireCase {
 				if err != nil {
 					return nil, err
 				}
-				return got.PictureUrl, nil
+				return got.PictureURL, nil
 			},
 			verb: "POST", path: "/api/v1/admin/users/42/profile-picture", contentTypePrefix: charMultipart,
 			bodyHas:       []string{`filename="face.png"`, "the-picture-bytes"},
@@ -1693,7 +1693,7 @@ func wireCharacterization() []wireCase {
 				if err != nil {
 					return nil, err
 				}
-				return got[0].Id, nil
+				return got[0].ID, nil
 			},
 			verb: "GET", path: "/api/v1/admin/legal-documents",
 			successStatus: 200, reply: `{"legalDocuments":[{"id":7}]}`, want: int64(7),
@@ -1705,7 +1705,7 @@ func wireCharacterization() []wireCase {
 				if err != nil {
 					return nil, err
 				}
-				return got.LegalDocument.Id, nil
+				return got.LegalDocument.ID, nil
 			},
 			verb: "POST", path: "/api/v1/admin/legal-documents", contentType: charJSON,
 			bodyOf:        charCreateLegalDocument,
@@ -1721,9 +1721,9 @@ func wireCharacterization() []wireCase {
 			successStatus: 200, reply: `{"html":"<h1>Terms</h1>"}`, want: "<h1>Terms</h1>",
 		},
 		{
-			name: "GetLegalDocumentById",
+			name: "GetLegalDocumentByID",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.GetLegalDocumentById(ctx, charAccessToken, 7)
+				got, err := c.GetLegalDocumentByID(ctx, charAccessToken, 7)
 				if err != nil {
 					return nil, err
 				}
@@ -1918,7 +1918,7 @@ func wireCharacterization() []wireCase {
 			verb: "POST", path: "/api/v1/admin/email-templates/password_reset_link/pt-BR/preview", contentType: charJSON,
 			bodyOf:        charPreviewEmailTemplate,
 			successStatus: 200, reply: `{"subject":"Reset your password","html":"<!DOCTYPE html><p>Hello</p>","text":"Hello"}`,
-			want: api.PreviewEmailTemplateResponse{Subject: "Reset your password", Html: "<!DOCTYPE html><p>Hello</p>", Text: "Hello"},
+			want: api.PreviewEmailTemplateResponse{Subject: "Reset your password", HTML: "<!DOCTYPE html><p>Hello</p>", Text: "Hello"},
 		},
 		{
 			name: "SendTestEmailTemplate",

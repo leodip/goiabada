@@ -23,9 +23,9 @@ func renderCustomCSSForm(t *testing.T, locale, css, errorField string) string {
 	t.Helper()
 	bind := map[string]interface{}{
 		"isNew":       false,
-		"storedBrand": api.BrandResponse{Id: 4, Name: "Autumn", Appearance: "auto", Theme: "plum"},
+		"storedBrand": api.BrandResponse{ID: 4, Name: "Autumn", Appearance: "auto", Theme: "plum"},
 		"brand": adminsettingshandlers.BrandForm{Name: "Autumn", Appearance: "auto", Theme: "plum",
-			Corners: "rounded", Font: "system-ui", BackgroundFit: "cover", CustomCss: css},
+			Corners: "rounded", Font: "system-ui", BackgroundFit: "cover", CustomCSS: css},
 		"brandThemes":     renderThemes,
 		"appearanceTheme": renderThemes[1],
 		"footerLanguages": renderFooterLanguages,

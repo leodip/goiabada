@@ -22,23 +22,23 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 )
 
-// accountSessionsApiClient answers the read this page performs and the delete its row buttons
+// accountSessionsAPIClient answers the read this page performs and the delete its row buttons
 // perform, which is the whole of accountSessionsAPI. Deletes are recorded rather than counted, so a
 // case can say which session was deleted and a case expecting none can say so by asserting the
 // slice is empty.
-type accountSessionsApiClient struct {
+type accountSessionsAPIClient struct {
 	sessions    []api.UserSessionDetailResponse
 	sessionsErr error
 
 	deleted []int64
 }
 
-func (c *accountSessionsApiClient) GetAccountSessions(_ context.Context, accessToken string) ([]api.UserSessionDetailResponse, error) {
+func (c *accountSessionsAPIClient) GetAccountSessions(_ context.Context, accessToken string) ([]api.UserSessionDetailResponse, error) {
 	return c.sessions, c.sessionsErr
 }
 
-func (c *accountSessionsApiClient) DeleteAccountSession(_ context.Context, accessToken string, sessionId int64) error {
-	c.deleted = append(c.deleted, sessionId)
+func (c *accountSessionsAPIClient) DeleteAccountSession(_ context.Context, accessToken string, sessionID int64) error {
+	c.deleted = append(c.deleted, sessionID)
 	return nil
 }
 
@@ -49,15 +49,15 @@ func (c *accountSessionsApiClient) DeleteAccountSession(_ context.Context, acces
 func TestHandleSessionsGet_BindsTheRawUserAgent(t *testing.T) {
 	const header = `Mozilla/5.0 (X11; Linux x86_64) Chrome/120.0.0.0`
 
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_user_sessions.html").Maybe()
 
-	apiClient := &accountSessionsApiClient{
+	apiClient := &accountSessionsAPIClient{
 		sessions: []api.UserSessionDetailResponse{
-			{Id: 1, DeviceName: "Chrome 120", DeviceType: "Desktop", DeviceOS: "Linux", UserAgent: header},
+			{ID: 1, DeviceName: "Chrome 120", DeviceType: "Desktop", DeviceOS: "Linux", UserAgent: header},
 			// A legacy row: the labels the old parser left behind, and no header at all.
-			{Id: 2, DeviceName: "Chrome 119.0.0.0", DeviceType: "Desktop", DeviceOS: "Linux x86_64"},
+			{ID: 2, DeviceName: "Chrome 119.0.0.0", DeviceType: "Desktop", DeviceOS: "Linux x86_64"},
 		},
 	}
 
@@ -72,10 +72,10 @@ func TestHandleSessionsGet_BindsTheRawUserAgent(t *testing.T) {
 	require.Len(t, sessions, 2)
 
 	// Sorted by id descending, so the legacy row comes first.
-	assert.Equal(t, int64(2), sessions[0].UserSessionId)
+	assert.Equal(t, int64(2), sessions[0].UserSessionID)
 	assert.Empty(t, sessions[0].UserAgent, "a legacy row has no header to show")
 
-	assert.Equal(t, int64(1), sessions[1].UserSessionId)
+	assert.Equal(t, int64(1), sessions[1].UserSessionID)
 	assert.Equal(t, header, sessions[1].UserAgent)
 }
 
@@ -87,13 +87,13 @@ func TestHandleSessionsGet_BindsTheSessionInstants(t *testing.T) {
 	started := time.Date(2026, 9, 14, 21, 3, 0, 0, time.UTC)
 	lastAccessed := time.Date(2026, 9, 17, 8, 45, 0, 0, time.UTC)
 
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_user_sessions.html").Maybe()
 
-	apiClient := &accountSessionsApiClient{
+	apiClient := &accountSessionsAPIClient{
 		sessions: []api.UserSessionDetailResponse{
-			{Id: 1, Started: &started, LastAccessed: &lastAccessed},
+			{ID: 1, Started: &started, LastAccessed: &lastAccessed},
 		},
 	}
 
@@ -114,14 +114,14 @@ func TestHandleSessionsGet_BindsTheSessionInstants(t *testing.T) {
 // symmetric: the mapping is shared with the admin user page since #440 but the client page keeps
 // its own, and a case in two of them cannot see the third going wrong (#373 decision 1).
 func TestHandleSessionsGet_BindsIsCurrentFromTheResponse(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_user_sessions.html").Maybe()
 
-	apiClient := &accountSessionsApiClient{
+	apiClient := &accountSessionsAPIClient{
 		sessions: []api.UserSessionDetailResponse{
-			{UserSessionResponse: api.UserSessionResponse{Id: 1, SessionIdentifier: "sid-one"}},
-			{UserSessionResponse: api.UserSessionResponse{Id: 2, SessionIdentifier: "sid-two"}, IsCurrent: true},
+			{UserSessionResponse: api.UserSessionResponse{ID: 1, SessionIdentifier: "sid-one"}},
+			{UserSessionResponse: api.UserSessionResponse{ID: 2, SessionIdentifier: "sid-two"}, IsCurrent: true},
 		},
 	}
 
@@ -133,7 +133,7 @@ func TestHandleSessionsGet_BindsIsCurrentFromTheResponse(t *testing.T) {
 	require.True(t, ok, "the bind carries no []SessionInfo")
 	require.Len(t, sessions, 2)
 
-	assert.Equal(t, int64(2), sessions[0].UserSessionId)
+	assert.Equal(t, int64(2), sessions[0].UserSessionID)
 	assert.True(t, sessions[0].IsCurrent)
 	assert.False(t, sessions[1].IsCurrent)
 }
@@ -168,37 +168,37 @@ func TestHandleSessionsEndSessionPost_TheAnswerFollowsIsCurrentOnTheRow(t *testi
 		{
 			name: "the row being deleted is the caller's own",
 			sessions: []api.UserSessionDetailResponse{
-				{UserSessionResponse: api.UserSessionResponse{Id: deleting}, IsCurrent: true},
-				{UserSessionResponse: api.UserSessionResponse{Id: 6}},
+				{UserSessionResponse: api.UserSessionResponse{ID: deleting}, IsCurrent: true},
+				{UserSessionResponse: api.UserSessionResponse{ID: 6}},
 			},
 			wantCurrent: true,
 		},
 		{
 			name: "another row is the caller's own",
 			sessions: []api.UserSessionDetailResponse{
-				{UserSessionResponse: api.UserSessionResponse{Id: deleting}},
-				{UserSessionResponse: api.UserSessionResponse{Id: 6}, IsCurrent: true},
+				{UserSessionResponse: api.UserSessionResponse{ID: deleting}},
+				{UserSessionResponse: api.UserSessionResponse{ID: 6}, IsCurrent: true},
 			},
 		},
 		{
 			name: "no row is the caller's own, which is what a token carrying no sid produces",
 			sessions: []api.UserSessionDetailResponse{
-				{UserSessionResponse: api.UserSessionResponse{Id: deleting}},
-				{UserSessionResponse: api.UserSessionResponse{Id: 6}},
+				{UserSessionResponse: api.UserSessionResponse{ID: deleting}},
+				{UserSessionResponse: api.UserSessionResponse{ID: 6}},
 			},
 		},
 		{
 			name: "the row's identifier matches the console's own claim and the field says no",
 			sid:  "sid-one",
 			sessions: []api.UserSessionDetailResponse{
-				{UserSessionResponse: api.UserSessionResponse{Id: deleting, SessionIdentifier: "sid-one"}},
+				{UserSessionResponse: api.UserSessionResponse{ID: deleting, SessionIdentifier: "sid-one"}},
 			},
 		},
 		{
 			name: "the field says yes and the console's own claim names another session",
 			sid:  "sid-elsewhere",
 			sessions: []api.UserSessionDetailResponse{
-				{UserSessionResponse: api.UserSessionResponse{Id: deleting, SessionIdentifier: "sid-one"},
+				{UserSessionResponse: api.UserSessionResponse{ID: deleting, SessionIdentifier: "sid-one"},
 					IsCurrent: true},
 			},
 			wantCurrent: true,
@@ -207,10 +207,10 @@ func TestHandleSessionsEndSessionPost_TheAnswerFollowsIsCurrentOnTheRow(t *testi
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			handlertest.ExpectEncodeJSON(httpHelper).Once()
 
-			apiClient := &accountSessionsApiClient{sessions: testCase.sessions}
+			apiClient := &accountSessionsAPIClient{sessions: testCase.sessions}
 
 			opts := []handlertest.Option{
 				handlertest.WithBody(strings.NewReader(`{"userSessionId": 5}`)),
@@ -218,9 +218,9 @@ func TestHandleSessionsEndSessionPost_TheAnswerFollowsIsCurrentOnTheRow(t *testi
 			if testCase.sid == "" {
 				opts = append(opts, handlertest.WithAccessToken())
 			} else {
-				opts = append(opts, handlertest.WithJwtInfo(oauthclient.JwtInfo{
+				opts = append(opts, handlertest.WithJWTInfo(oauthclient.JWTInfo{
 					TokenResponse: oauth.TokenResponse{AccessToken: handlertest.AccessToken},
-					IdToken:       &oauth.JwtToken{Claims: jwt.MapClaims{"sid": testCase.sid}},
+					IDToken:       &oauth.JWTToken{Claims: jwt.MapClaims{"sid": testCase.sid}},
 				}))
 			}
 
@@ -251,15 +251,15 @@ func TestHandleSessionsEndSessionPost_TheAnswerFollowsIsCurrentOnTheRow(t *testi
 // the browser it had deleted somebody else's: no logout, and a console holding a session the auth
 // server has already forgotten. It swallowed the failure until #373, because the read was made
 // only to compare against a claim rather than to decide the answer.
-func TestHandleSessionsEndSessionPost_AListTheApiCannotReadStopsTheDelete(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+func TestHandleSessionsEndSessionPost_AListTheAPICannotReadStopsTheDelete(t *testing.T) {
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	var captured error
 	httpHelper.On("JSONError", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
 			captured, _ = args.Get(2).(error)
 		}).Return().Once()
 
-	apiClient := &accountSessionsApiClient{
+	apiClient := &accountSessionsAPIClient{
 		sessionsErr: &apiclient.APIError{
 			Code: "INTERNAL_SERVER_ERROR", Message: "the database is on fire",
 			StatusCode: http.StatusInternalServerError,

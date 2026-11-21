@@ -36,13 +36,13 @@ func giveClientBrand(t *testing.T, client *record.Client, appearance record.Bran
 	require.NoError(t, database.CreateBrand(ctx, nil, brand))
 	t.Cleanup(func() {
 		assert.NoError(t, database.RunInTransaction(ctx, func(tx *sql.Tx) error {
-			_, err := database.DeleteBrand(ctx, tx, brand.Id)
+			_, err := database.DeleteBrand(ctx, tx, brand.ID)
 			return err
 		}), "unable to delete the client's brand")
 	})
 
 	require.NoError(t, database.RunInTransaction(ctx, func(tx *sql.Tx) error {
-		_, err := database.SetClientBrand(ctx, tx, client.Id, sql.NullInt64{Int64: brand.Id, Valid: true})
+		_, err := database.SetClientBrand(ctx, tx, client.ID, sql.NullInt64{Int64: brand.ID, Valid: true})
 		return err
 	}))
 	return brand
@@ -57,14 +57,14 @@ func assertDrawnInBrand(t *testing.T, resp *http.Response, brand *record.Brand, 
 	assert.Equal(t, dataTheme, head.colorScheme, "color-scheme")
 	if assert.Len(t, head.stylesheets, 2, "main.css, then the brand's stylesheet") {
 		assert.Regexp(t, `^/static/main\.css\?v=[0-9a-f]{12}$`, head.stylesheets[0])
-		assert.Regexp(t, `^/brand/`+strconv.FormatInt(brand.Id, 10)+`/stylesheet\.css\?v=[0-9a-f]{12}$`,
+		assert.Regexp(t, `^/brand/`+strconv.FormatInt(brand.ID, 10)+`/stylesheet\.css\?v=[0-9a-f]{12}$`,
 			head.stylesheets[1])
 	}
 }
 
 // brandedSignInClient is a client given the light Avocado brand, with the authorization code flow on
 // and consent required, and its one redirect URI.
-func brandedSignInClient(t *testing.T, acrLevel record.AcrLevel) (*record.Client, *record.Brand, string) {
+func brandedSignInClient(t *testing.T, acrLevel record.ACRLevel) (*record.Client, *record.Brand, string) {
 	t.Helper()
 	client, redirectURI := brandSignInClient(t, acrLevel)
 	return client, giveClientBrand(t, client, record.BrandAppearanceLight, "avocado"), redirectURI
@@ -72,7 +72,7 @@ func brandedSignInClient(t *testing.T, acrLevel record.AcrLevel) (*record.Client
 
 // brandSignInClient is a client with no brand of its own, with the authorization code flow on and consent
 // required, and its one redirect URI.
-func brandSignInClient(t *testing.T, acrLevel record.AcrLevel) (*record.Client, string) {
+func brandSignInClient(t *testing.T, acrLevel record.ACRLevel) (*record.Client, string) {
 	t.Helper()
 	ctx := context.Background()
 	client := &record.Client{
@@ -80,11 +80,11 @@ func brandSignInClient(t *testing.T, acrLevel record.AcrLevel) (*record.Client, 
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          acrLevel,
+		DefaultACRLevel:          acrLevel,
 	}
 	require.NoError(t, database.CreateClient(ctx, nil, client))
 	redirectURI := "https://brand.example.com/callback"
-	require.NoError(t, database.CreateRedirectURI(ctx, nil, &record.RedirectURI{ClientId: client.Id, URI: redirectURI}))
+	require.NoError(t, database.CreateRedirectURI(ctx, nil, &record.RedirectURI{ClientID: client.ID, URI: redirectURI}))
 	return client, redirectURI
 }
 
@@ -133,9 +133,9 @@ func brandFollowTo(t *testing.T, browser *http.Client, resp *http.Response, path
 
 func TestSignInPages_AreDrawnInTheClientsBrand(t *testing.T) {
 	defaultBrand := makeDefaultBrand(t, record.BrandAppearanceDark, "plum")
-	client, clientBrand, redirectURI := brandedSignInClient(t, record.AcrLevel1)
+	client, clientBrand, redirectURI := brandedSignInClient(t, record.ACRLevel1)
 	user, password := brandSignInUser(t, "")
-	browser := createHttpClient(t)
+	browser := createHTTPClient(t)
 
 	resp := loadPage(t, browser, brandAuthorizeURL(client, redirectURI, "form_post"))
 	resp, _ = brandFollowTo(t, browser, resp, "/auth/level1")
@@ -174,7 +174,7 @@ func TestSignInPages_AreDrawnInTheClientsBrand(t *testing.T) {
 	// The page saying a sign-in is no longer active acts on no sign-in, whatever the browser holds.
 	t.Run("the page saying a sign-in is no longer active", func(t *testing.T) {
 		page := loadPage(t, browser, appConfig.AuthServer.BaseURL+"/auth/pwd?"+
-			url.Values{ceremony.QueryParameter: {ceremony.NewId()}}.Encode())
+			url.Values{ceremony.QueryParameter: {ceremony.NewID()}}.Encode())
 		defer func() { _ = page.Body.Close() }()
 		require.Equal(t, http.StatusBadRequest, page.StatusCode)
 		assertDrawnInBrand(t, page, defaultBrand, "dark")
@@ -193,8 +193,8 @@ func TestSignInPages_AreDrawnInTheClientsBrand(t *testing.T) {
 
 	// Another client's sign-in, in another browser, keeps the default brand.
 	t.Run("another client's password page", func(t *testing.T) {
-		other, otherRedirectURI := brandSignInClient(t, record.AcrLevel1)
-		otherBrowser := createHttpClient(t)
+		other, otherRedirectURI := brandSignInClient(t, record.ACRLevel1)
+		otherBrowser := createHTTPClient(t)
 		page := loadPage(t, otherBrowser, brandAuthorizeURL(other, otherRedirectURI, ""))
 		page, _ = brandFollowTo(t, otherBrowser, page, "/auth/level1")
 		page, _ = brandFollowTo(t, otherBrowser, page, "/auth/pwd")
@@ -211,8 +211,8 @@ func TestSignInPages_TheOneTimeCodeStepIsDrawnInTheClientsBrand(t *testing.T) {
 	otpSecret := newOTPSecretForTest(t, "brand@example.com")
 	user, password := brandSignInUser(t, otpSecret)
 
-	branded, clientBrand, brandedRedirectURI := brandedSignInClient(t, record.AcrLevel2Mandatory)
-	plain, plainRedirectURI := brandSignInClient(t, record.AcrLevel2Mandatory)
+	branded, clientBrand, brandedRedirectURI := brandedSignInClient(t, record.ACRLevel2Mandatory)
+	plain, plainRedirectURI := brandSignInClient(t, record.ACRLevel2Mandatory)
 
 	for _, tc := range []struct {
 		name        string
@@ -225,14 +225,14 @@ func TestSignInPages_TheOneTimeCodeStepIsDrawnInTheClientsBrand(t *testing.T) {
 		{"a client on the default brand", plain, plainRedirectURI, defaultBrand, "dark"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			browser := createHttpClient(t)
-			otpPage := navigateToOtpScreen(t, browser, tc.client, user, password, tc.redirectURI)
+			browser := createHTTPClient(t)
+			otpPage := navigateToOTPScreen(t, browser, tc.client, user, password, tc.redirectURI)
 			otpURL := otpPage.Request.URL.String()
 			require.Equal(t, http.StatusOK, otpPage.StatusCode)
 			assertDrawnInBrand(t, otpPage, tc.brand, tc.dataTheme)
 
 			wrong := otptest.Code(t, otpSecret, time.Now().Add(-10*time.Minute))
-			refused := authenticateWithOtp(t, browser, otpURL, otpPage, wrong)
+			refused := authenticateWithOTP(t, browser, otpURL, otpPage, wrong)
 			_ = otpPage.Body.Close()
 			defer func() { _ = refused.Body.Close() }()
 			require.Equal(t, http.StatusOK, refused.StatusCode)
@@ -246,9 +246,9 @@ func TestSignInPages_TheOneTimeCodeStepIsDrawnInTheClientsBrand(t *testing.T) {
 // One refused before its client is read, or naming no client, is answered in the default brand.
 func TestAuthorizeRefusals_AreDrawnInTheClientsBrandOnceTheClientIsKnown(t *testing.T) {
 	defaultBrand := makeDefaultBrand(t, record.BrandAppearanceDark, "plum")
-	client, clientBrand, redirectURI := brandedSignInClient(t, record.AcrLevel1)
+	client, clientBrand, redirectURI := brandedSignInClient(t, record.ACRLevel1)
 
-	disabled, _ := brandSignInClient(t, record.AcrLevel1)
+	disabled, _ := brandSignInClient(t, record.ACRLevel1)
 	disabled.Enabled = false
 	require.NoError(t, database.UpdateClient(context.Background(), nil, disabled))
 	disabledBrand := giveClientBrand(t, disabled, record.BrandAppearanceLight, "avocado")
@@ -319,7 +319,7 @@ func TestAuthorizeRefusals_AreDrawnInTheClientsBrandOnceTheClientIsKnown(t *test
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			resp := loadPage(t, createHttpClient(t), tc.target)
+			resp := loadPage(t, createHTTPClient(t), tc.target)
 			defer func() { _ = resp.Body.Close() }()
 			require.Equal(t, tc.wantStatus, resp.StatusCode)
 			assertDrawnInBrand(t, resp, tc.brand, tc.dataTheme)

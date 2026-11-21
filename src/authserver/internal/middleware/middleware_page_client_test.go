@@ -33,7 +33,7 @@ func TestSignInPageClient_NamesTheClientOfTheSignInTheRequestNames(t *testing.T)
 		ceremonies heldSignIn
 		want       string
 	}{
-		{"a sign-in the browser holds", heldSignIn{authContext: &ceremony.AuthContext{ClientId: "app-1"}}, "app-1"},
+		{"a sign-in the browser holds", heldSignIn{authContext: &ceremony.AuthContext{ClientID: "app-1"}}, "app-1"},
 		{"a sign-in the browser does not hold", heldSignIn{err: errs.WithStack(ceremony.ErrCeremonyNotHeld)}, ""},
 		{"a browser holding no sign-in", heldSignIn{err: ceremony.ErrNoAuthContext}, ""},
 		{"a sign-in that cannot be read", heldSignIn{err: errs.New("the session went away")}, ""},
@@ -66,12 +66,12 @@ type heldSignInNamed struct {
 	askedFor    *[]string
 }
 
-func (h heldSignInNamed) HeldAuthContext(_ *http.Request, ceremonyId string) (*ceremony.AuthContext, error) {
-	*h.askedFor = append(*h.askedFor, ceremonyId)
+func (h heldSignInNamed) HeldAuthContext(_ *http.Request, ceremonyID string) (*ceremony.AuthContext, error) {
+	*h.askedFor = append(*h.askedFor, ceremonyID)
 	if h.err != nil {
 		return nil, h.err
 	}
-	if h.authContext == nil || h.authContext.CeremonyId != ceremonyId {
+	if h.authContext == nil || h.authContext.CeremonyID != ceremonyID {
 		return nil, errs.WithStack(ceremony.ErrCeremonyNotHeld)
 	}
 	return h.authContext, nil
@@ -82,9 +82,9 @@ func (h heldSignInNamed) HeldAuthContext(_ *http.Request, ceremonyId string) (*c
 // id, none, an id in the form's body alone, or a sign-in that cannot be read names no client, and the
 // page still runs (#812 decision 4).
 func TestLinkedSignInPageClient_NamesTheClientOfTheSignInTheURLNames(t *testing.T) {
-	const heldId = "abcdefghijklmnopqrstuvwxyz012345"
-	held := &ceremony.AuthContext{CeremonyId: heldId, ClientId: "app-1"}
-	otherId := "ABCDEFGHIJKLMNOPQRSTUVWXYZ012345"
+	const heldID = "abcdefghijklmnopqrstuvwxyz012345"
+	held := &ceremony.AuthContext{CeremonyID: heldID, ClientID: "app-1"}
+	otherID := "ABCDEFGHIJKLMNOPQRSTUVWXYZ012345"
 
 	for _, tc := range []struct {
 		name     string
@@ -95,13 +95,13 @@ func TestLinkedSignInPageClient_NamesTheClientOfTheSignInTheURLNames(t *testing.
 		want     string
 		wantRead bool
 	}{
-		{"a GET naming a sign-in the browser holds", http.MethodGet, "/forgot-password?ceremony=" + heldId, "", nil, "app-1", true},
-		{"a POST whose URL names a sign-in the browser holds", http.MethodPost, "/account/register?ceremony=" + heldId, "email=a%40b.c", nil, "app-1", true},
-		{"a sign-in the browser does not hold", http.MethodGet, "/forgot-password?ceremony=" + otherId, "", nil, "", true},
-		{"a malformed id", http.MethodGet, "/forgot-password?ceremony=" + heldId + "x", "", nil, "", false},
+		{"a GET naming a sign-in the browser holds", http.MethodGet, "/forgot-password?ceremony=" + heldID, "", nil, "app-1", true},
+		{"a POST whose URL names a sign-in the browser holds", http.MethodPost, "/account/register?ceremony=" + heldID, "email=a%40b.c", nil, "app-1", true},
+		{"a sign-in the browser does not hold", http.MethodGet, "/forgot-password?ceremony=" + otherID, "", nil, "", true},
+		{"a malformed id", http.MethodGet, "/forgot-password?ceremony=" + heldID + "x", "", nil, "", false},
 		{"no id", http.MethodGet, "/forgot-password", "", nil, "", false},
-		{"an id in the form's body alone", http.MethodPost, "/forgot-password", "ceremony=" + heldId + "&ceremonyId=" + heldId, nil, "", false},
-		{"a sign-in that cannot be read", http.MethodGet, "/account/activate?ceremony=" + heldId, "", errs.New("the session went away"), "", true},
+		{"an id in the form's body alone", http.MethodPost, "/forgot-password", "ceremony=" + heldID + "&ceremonyId=" + heldID, nil, "", false},
+		{"a sign-in that cannot be read", http.MethodGet, "/account/activate?ceremony=" + heldID, "", errs.New("the session went away"), "", true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var askedFor []string
@@ -137,8 +137,8 @@ func TestSignInPageClient_KeepsTheSafeModeOfTheSignInTheRequestNames(t *testing.
 		ceremonies heldSignIn
 		want       bool
 	}{
-		{"a sign-in in safe mode", heldSignIn{authContext: &ceremony.AuthContext{ClientId: "app-1", SafeMode: true}}, true},
-		{"a sign-in drawn as usual", heldSignIn{authContext: &ceremony.AuthContext{ClientId: "app-1"}}, false},
+		{"a sign-in in safe mode", heldSignIn{authContext: &ceremony.AuthContext{ClientID: "app-1", SafeMode: true}}, true},
+		{"a sign-in drawn as usual", heldSignIn{authContext: &ceremony.AuthContext{ClientID: "app-1"}}, false},
 		{"a sign-in the browser does not hold", heldSignIn{err: errs.WithStack(ceremony.ErrCeremonyNotHeld)}, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -157,18 +157,18 @@ func TestSignInPageClient_KeepsTheSafeModeOfTheSignInTheRequestNames(t *testing.
 // A page a sign-in links to is drawn in safe mode while its URL names a sign-in in safe mode the
 // browser holds, and as usual otherwise.
 func TestLinkedSignInPageClient_KeepsTheSafeModeOfTheSignInTheURLNames(t *testing.T) {
-	const heldId = "abcdefghijklmnopqrstuvwxyz012345"
+	const heldID = "abcdefghijklmnopqrstuvwxyz012345"
 	for _, tc := range []struct {
 		name     string
 		held     *ceremony.AuthContext
 		target   string
 		wantSafe bool
 	}{
-		{"a sign-in in safe mode", &ceremony.AuthContext{CeremonyId: heldId, ClientId: "app-1", SafeMode: true},
-			"/forgot-password?ceremony=" + heldId, true},
-		{"a sign-in drawn as usual", &ceremony.AuthContext{CeremonyId: heldId, ClientId: "app-1"},
-			"/forgot-password?ceremony=" + heldId, false},
-		{"a URL naming no sign-in", &ceremony.AuthContext{CeremonyId: heldId, ClientId: "app-1", SafeMode: true},
+		{"a sign-in in safe mode", &ceremony.AuthContext{CeremonyID: heldID, ClientID: "app-1", SafeMode: true},
+			"/forgot-password?ceremony=" + heldID, true},
+		{"a sign-in drawn as usual", &ceremony.AuthContext{CeremonyID: heldID, ClientID: "app-1"},
+			"/forgot-password?ceremony=" + heldID, false},
+		{"a URL naming no sign-in", &ceremony.AuthContext{CeremonyID: heldID, ClientID: "app-1", SafeMode: true},
 			"/forgot-password", false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

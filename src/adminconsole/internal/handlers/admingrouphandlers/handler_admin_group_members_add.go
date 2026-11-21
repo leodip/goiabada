@@ -14,13 +14,13 @@ import (
 // groupMembersAddAPI is what the add member page needs: the group, the annotated user search, and
 // the add.
 type groupMembersAddAPI interface {
-	AddUserToGroup(ctx context.Context, accessToken string, groupId int64, userId int64) error
-	GetGroupById(ctx context.Context, accessToken string, groupId int64) (*api.GroupResponse, error)
-	SearchUsersWithGroupAnnotation(ctx context.Context, accessToken, query string, groupId int64, page, size int) ([]api.UserWithGroupMembershipResponse, int, error)
+	AddUserToGroup(ctx context.Context, accessToken string, groupID int64, userID int64) error
+	GetGroupByID(ctx context.Context, accessToken string, groupID int64) (*api.GroupResponse, error)
+	SearchUsersWithGroupAnnotation(ctx context.Context, accessToken, query string, groupID int64, page, size int) ([]api.UserWithGroupMembershipResponse, int, error)
 }
 
 func HandleMembersAddGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient groupMembersAddAPI,
 ) http.HandlerFunc {
 
@@ -39,13 +39,13 @@ func HandleMembersAddGet(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
-		group, err := apiClient.GetGroupById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		group, err := apiClient.GetGroupByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -56,7 +56,7 @@ func HandleMembersAddGet(
 		}
 
 		bind := map[string]interface{}{
-			"groupId":         group.Id,
+			"groupId":         group.ID,
 			"groupIdentifier": group.GroupIdentifier,
 			"description":     group.Description,
 		}
@@ -70,7 +70,7 @@ func HandleMembersAddGet(
 }
 
 func HandleMembersSearchGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient groupMembersAddAPI,
 ) http.HandlerFunc {
 
@@ -90,13 +90,13 @@ func HandleMembersSearchGet(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JSONError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.JSONError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
-		group, err := apiClient.GetGroupById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		group, err := apiClient.GetGroupByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
@@ -112,7 +112,7 @@ func HandleMembersSearchGet(
 			return
 		}
 
-		users, _, err := apiClient.SearchUsersWithGroupAnnotation(r.Context(), jwtInfo.TokenResponse.AccessToken, query, group.Id, 1, 15)
+		users, _, err := apiClient.SearchUsersWithGroupAnnotation(r.Context(), jwtInfo.TokenResponse.AccessToken, query, group.ID, 1, 15)
 		if err != nil {
 			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
@@ -121,7 +121,7 @@ func HandleMembersSearchGet(
 		usersResult := make([]UserResult, 0)
 		for _, user := range users {
 			usersResult = append(usersResult, UserResult{
-				Id:           user.Id,
+				ID:           user.ID,
 				Subject:      user.Subject,
 				Username:     user.Username,
 				Email:        user.Email,
@@ -138,7 +138,7 @@ func HandleMembersSearchGet(
 }
 
 func HandleMembersAddPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient groupMembersAddAPI,
 ) http.HandlerFunc {
 
@@ -156,26 +156,26 @@ func HandleMembersAddPost(
 			return
 		}
 
-		userIdStr := r.URL.Query().Get("userId")
-		if len(userIdStr) == 0 {
+		userIDStr := r.URL.Query().Get("userId")
+		if len(userIDStr) == 0 {
 			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
 
-		userId, err := strconv.ParseInt(userIdStr, 10, 64)
+		userID, err := strconv.ParseInt(userIDStr, 10, 64)
 		if err != nil {
 			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JSONError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.JSONError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
-		err = apiClient.AddUserToGroup(r.Context(), jwtInfo.TokenResponse.AccessToken, id, userId)
+		err = apiClient.AddUserToGroup(r.Context(), jwtInfo.TokenResponse.AccessToken, id, userID)
 		if err != nil {
 			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return

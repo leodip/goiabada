@@ -59,9 +59,9 @@ func TestHandleLogoGet_OnlyASessionEndedLogoReadStopsThePage(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			logs := logtest.CaptureSlog(t)
 
-			httpHelper := &stubHttpHelper{}
+			httpHelper := &stubHTTPHelper{}
 			recorder := httptest.NewRecorder()
-			HandleLogoGet(httpHelper, &logoApiClient{logoErr: tc.logoErr}).ServeHTTP(recorder,
+			HandleLogoGet(httpHelper, &logoAPIClient{logoErr: tc.logoErr}).ServeHTTP(recorder,
 				handlertest.Request(http.MethodGet, "/admin/clients/42/logo",
 					handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "42")))
 

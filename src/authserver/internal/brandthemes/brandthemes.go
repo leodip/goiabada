@@ -244,7 +244,7 @@ func ColorsStylesheet(brand *record.Brand) (Stylesheet, error) {
 	}
 	stylesheet, ok := stylesheets[brand.Theme]
 	if !ok {
-		return Stylesheet{}, errs.Errorf("brand %d has the theme %q, which is none of the built-in themes", brand.Id, brand.Theme)
+		return Stylesheet{}, errs.Errorf("brand %d has the theme %q, which is none of the built-in themes", brand.ID, brand.Theme)
 	}
 	return stylesheet, nil
 }
@@ -263,7 +263,7 @@ func ModeColors(brand *record.Brand, dark bool) (Palette, error) {
 	} else {
 		preset, ok := Get(brand.Theme)
 		if !ok {
-			return nil, errs.Errorf("brand %d has the theme %q, which is none of the built-in themes", brand.Id, brand.Theme)
+			return nil, errs.Errorf("brand %d has the theme %q, which is none of the built-in themes", brand.ID, brand.Theme)
 		}
 		light, darkColors = preset.Light, preset.Dark
 	}
@@ -292,7 +292,7 @@ func SafeModeColors(brand *record.Brand, dark bool) (Palette, error) {
 // is, so a value never reaches the stylesheet unless it is a color (decision 3).
 func customStylesheet(brand *record.Brand) (Stylesheet, error) {
 	if brand.Palette == nil {
-		return Stylesheet{}, errs.Errorf("brand %d has the custom theme and no palette", brand.Id)
+		return Stylesheet{}, errs.Errorf("brand %d has the custom theme and no palette", brand.ID)
 	}
 	for _, mode := range []struct {
 		name   string
@@ -301,7 +301,7 @@ func customStylesheet(brand *record.Brand) (Stylesheet, error) {
 		for _, token := range tokens {
 			if !palette.IsColor(mode.colors[token]) {
 				return Stylesheet{}, errs.Errorf("brand %d has a custom palette whose %s %s color is not a #rrggbb color",
-					brand.Id, mode.name, token)
+					brand.ID, mode.name, token)
 			}
 		}
 	}
@@ -318,7 +318,7 @@ func StylesheetPath(brand *record.Brand, slots brandasset.Slots) (string, error)
 	if err != nil {
 		return "", err
 	}
-	return linkPath(StylesheetRoute, brand.Id, stylesheet), nil
+	return linkPath(StylesheetRoute, brand.ID, stylesheet), nil
 }
 
 // ColorsStylesheetPath returns the path a page links brand's colors-only stylesheet by, as
@@ -328,7 +328,7 @@ func ColorsStylesheetPath(brand *record.Brand) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return linkPath(ColorsStylesheetRoute, brand.Id, stylesheet), nil
+	return linkPath(ColorsStylesheetRoute, brand.ID, stylesheet), nil
 }
 
 // SafeStylesheetPath returns the path a page drawn in safe mode links brand's safe full stylesheet by,
@@ -338,7 +338,7 @@ func SafeStylesheetPath(brand *record.Brand, slots brandasset.Slots) (string, er
 	if err != nil {
 		return "", err
 	}
-	return linkPath(SafeStylesheetRoute, brand.Id, stylesheet), nil
+	return linkPath(SafeStylesheetRoute, brand.ID, stylesheet), nil
 }
 
 // SafeColorsStylesheetPath returns the path of brand's safe colors-only stylesheet, as
@@ -348,11 +348,11 @@ func SafeColorsStylesheetPath(brand *record.Brand) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return linkPath(SafeColorsStylesheetRoute, brand.Id, stylesheet), nil
+	return linkPath(SafeColorsStylesheetRoute, brand.ID, stylesheet), nil
 }
 
-func linkPath(route string, brandId int64, stylesheet Stylesheet) string {
-	path := strings.Replace(route, "{id}", strconv.FormatInt(brandId, 10), 1)
+func linkPath(route string, brandID int64, stylesheet Stylesheet) string {
+	path := strings.Replace(route, "{id}", strconv.FormatInt(brandID, 10), 1)
 	return path + "?v=" + stylesheet.Fingerprint
 }
 

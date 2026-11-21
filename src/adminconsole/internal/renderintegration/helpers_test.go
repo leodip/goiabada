@@ -37,7 +37,7 @@ func renderWithLayout(t *testing.T, layout, page string, bind map[string]interfa
 }
 
 // renderWithLayoutAs is renderWithLayout with an ID token on the context, which is how every
-// authenticated page reaches the renderer in production: middleware.SessionHandler puts an oauthclient.JwtInfo
+// authenticated page reaches the renderer in production: middleware.SessionHandler puts an oauthclient.JWTInfo
 // there and render.Renderer.RenderTemplate turns its claims into the `loggedInUser` bind that
 // menu_layout.html reads for the dropdown label. Passing nil claims is the anonymous request, which
 // is what every other case in this package renders and why the label is blank in all of them.
@@ -86,8 +86,8 @@ func renderPageWith(t *testing.T, path, layout, page string, bind map[string]int
 	req := httptest.NewRequest(http.MethodGet, path, nil)
 	req = req.WithContext(reqctx.WithSettings(req.Context(), settings))
 	if idTokenClaims != nil {
-		jwtInfo := oauthclient.JwtInfo{IdToken: &oauth.JwtToken{Claims: idTokenClaims}}
-		req = req.WithContext(reqctx.WithJwtInfo(req.Context(), jwtInfo))
+		jwtInfo := oauthclient.JWTInfo{IDToken: &oauth.JWTToken{Claims: idTokenClaims}}
+		req = req.WithContext(reqctx.WithJWTInfo(req.Context(), jwtInfo))
 	}
 	req = req.WithContext(i18n.WithLocale(req.Context(), true, locale))
 

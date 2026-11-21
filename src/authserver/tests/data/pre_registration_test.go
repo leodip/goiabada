@@ -14,7 +14,7 @@ import (
 func TestCreatePreRegistration(t *testing.T) {
 	preReg := createTestPreRegistration(t)
 
-	if preReg.Id == 0 {
+	if preReg.ID == 0 {
 		t.Error("Expected non-zero ID after creation")
 	}
 	if !preReg.CreatedAt.Valid || preReg.CreatedAt.Time.IsZero() {
@@ -24,7 +24,7 @@ func TestCreatePreRegistration(t *testing.T) {
 		t.Error("Expected UpdatedAt to be set")
 	}
 
-	retrievedPreReg, err := database.GetPreRegistrationById(context.Background(), nil, preReg.Id)
+	retrievedPreReg, err := database.GetPreRegistrationByID(context.Background(), nil, preReg.ID)
 	if err != nil {
 		t.Fatalf("Failed to retrieve created pre-registration: %v", err)
 	}
@@ -46,7 +46,7 @@ func TestUpdatePreRegistration(t *testing.T) {
 		t.Fatalf("Failed to update pre-registration: %v", err)
 	}
 
-	updatedPreReg, err := database.GetPreRegistrationById(context.Background(), nil, preReg.Id)
+	updatedPreReg, err := database.GetPreRegistrationByID(context.Background(), nil, preReg.ID)
 	if err != nil {
 		t.Fatalf("Failed to retrieve updated pre-registration: %v", err)
 	}
@@ -58,22 +58,22 @@ func TestUpdatePreRegistration(t *testing.T) {
 	}
 }
 
-func TestGetPreRegistrationById(t *testing.T) {
+func TestGetPreRegistrationByID(t *testing.T) {
 	preReg := createTestPreRegistration(t)
 
-	retrievedPreReg, err := database.GetPreRegistrationById(context.Background(), nil, preReg.Id)
+	retrievedPreReg, err := database.GetPreRegistrationByID(context.Background(), nil, preReg.ID)
 	if err != nil {
 		t.Fatalf("Failed to get pre-registration by ID: %v", err)
 	}
 
 	validatePreRegistration(t, preReg, retrievedPreReg)
 
-	nonExistentPreReg, err := database.GetPreRegistrationById(context.Background(), nil, 99999)
+	nonExistentPreReg, err := database.GetPreRegistrationByID(context.Background(), nil, 99999)
 	if err != nil {
 		t.Errorf("Expected no error for non-existent pre-registration, got: %v", err)
 	}
 	if nonExistentPreReg != nil {
-		t.Errorf("Expected nil for non-existent pre-registration, got a pre-registration with ID: %d", nonExistentPreReg.Id)
+		t.Errorf("Expected nil for non-existent pre-registration, got a pre-registration with ID: %d", nonExistentPreReg.ID)
 	}
 }
 
@@ -92,19 +92,19 @@ func TestGetPreRegistrationByEmail(t *testing.T) {
 		t.Errorf("Expected no error for non-existent pre-registration, got: %v", err)
 	}
 	if nonExistentPreReg != nil {
-		t.Errorf("Expected nil for non-existent pre-registration, got a pre-registration with ID: %d", nonExistentPreReg.Id)
+		t.Errorf("Expected nil for non-existent pre-registration, got a pre-registration with ID: %d", nonExistentPreReg.ID)
 	}
 }
 
 func TestDeletePreRegistration(t *testing.T) {
 	preReg := createTestPreRegistration(t)
 
-	err := database.DeletePreRegistration(context.Background(), nil, preReg.Id)
+	err := database.DeletePreRegistration(context.Background(), nil, preReg.ID)
 	if err != nil {
 		t.Fatalf("Failed to delete pre-registration: %v", err)
 	}
 
-	deletedPreReg, err := database.GetPreRegistrationById(context.Background(), nil, preReg.Id)
+	deletedPreReg, err := database.GetPreRegistrationByID(context.Background(), nil, preReg.ID)
 	if err != nil {
 		t.Fatalf("Error while checking for deleted pre-registration: %v", err)
 	}
@@ -125,14 +125,14 @@ func TestDeletePreRegistrationHoldingCode(t *testing.T) {
 	t.Run("a row still holding the code is deleted", func(t *testing.T) {
 		preReg := createTestPreRegistration(t)
 
-		deleted, err := database.DeletePreRegistrationHoldingCode(context.Background(), nil, preReg.Id, preReg.VerificationCodeHash)
+		deleted, err := database.DeletePreRegistrationHoldingCode(context.Background(), nil, preReg.ID, preReg.VerificationCodeHash)
 		if err != nil {
 			t.Fatalf("DeletePreRegistrationHoldingCode failed: %v", err)
 		}
 		if !deleted {
 			t.Error("the delete must report taking effect on a row still holding the code")
 		}
-		if preRegistrationExists(t, preReg.Id) {
+		if preRegistrationExists(t, preReg.ID) {
 			t.Error("the row must be gone")
 		}
 	})
@@ -143,14 +143,14 @@ func TestDeletePreRegistrationHoldingCode(t *testing.T) {
 		freshEncrypted := []byte("ENCRYPTEDFRESHCODE")
 		issuedAt := time.Now().UTC().Truncate(time.Microsecond)
 
-		replaced, err := database.TryReplacePreRegistrationCode(context.Background(), nil, preReg.Id,
+		replaced, err := database.TryReplacePreRegistrationCode(context.Background(), nil, preReg.ID,
 			preReg.VerificationCodeHash, freshEncrypted, freshHash, issuedAt)
 		if err != nil || !replaced {
 			t.Fatalf("the replacement must take effect: replaced=%v err=%v", replaced, err)
 		}
 
 		// The expired link still names the code it carried, which the row no longer holds.
-		deleted, err := database.DeletePreRegistrationHoldingCode(context.Background(), nil, preReg.Id, preReg.VerificationCodeHash)
+		deleted, err := database.DeletePreRegistrationHoldingCode(context.Background(), nil, preReg.ID, preReg.VerificationCodeHash)
 		if err != nil {
 			t.Fatalf("DeletePreRegistrationHoldingCode failed: %v", err)
 		}
@@ -159,18 +159,18 @@ func TestDeletePreRegistrationHoldingCode(t *testing.T) {
 		}
 
 		fresh, err := database.GetPreRegistrationByVerificationCodeHash(context.Background(), nil, freshHash)
-		if err != nil || fresh == nil || fresh.Id != preReg.Id {
+		if err != nil || fresh == nil || fresh.ID != preReg.ID {
 			t.Errorf("the fresh link must still find its row: row=%v err=%v", fresh, err)
 		}
 	})
 
 	t.Run("a row already gone reports nothing deleted", func(t *testing.T) {
 		preReg := createTestPreRegistration(t)
-		if err := database.DeletePreRegistration(context.Background(), nil, preReg.Id); err != nil {
+		if err := database.DeletePreRegistration(context.Background(), nil, preReg.ID); err != nil {
 			t.Fatalf("Failed to delete the pre-registration: %v", err)
 		}
 
-		deleted, err := database.DeletePreRegistrationHoldingCode(context.Background(), nil, preReg.Id, preReg.VerificationCodeHash)
+		deleted, err := database.DeletePreRegistrationHoldingCode(context.Background(), nil, preReg.ID, preReg.VerificationCodeHash)
 		if err != nil {
 			t.Fatalf("DeletePreRegistrationHoldingCode failed: %v", err)
 		}
@@ -183,14 +183,14 @@ func TestDeletePreRegistrationHoldingCode(t *testing.T) {
 		preReg := createTestPreRegistration(t)
 		other := createTestPreRegistration(t)
 
-		deleted, err := database.DeletePreRegistrationHoldingCode(context.Background(), nil, preReg.Id, other.VerificationCodeHash)
+		deleted, err := database.DeletePreRegistrationHoldingCode(context.Background(), nil, preReg.ID, other.VerificationCodeHash)
 		if err != nil {
 			t.Fatalf("DeletePreRegistrationHoldingCode failed: %v", err)
 		}
 		if deleted {
 			t.Error("the id and the code must both match")
 		}
-		if !preRegistrationExists(t, preReg.Id) || !preRegistrationExists(t, other.Id) {
+		if !preRegistrationExists(t, preReg.ID) || !preRegistrationExists(t, other.ID) {
 			t.Error("both rows must remain")
 		}
 	})
@@ -198,14 +198,14 @@ func TestDeletePreRegistrationHoldingCode(t *testing.T) {
 	t.Run("an empty code hash is refused", func(t *testing.T) {
 		preReg := createTestPreRegistration(t)
 
-		deleted, err := database.DeletePreRegistrationHoldingCode(context.Background(), nil, preReg.Id, "")
+		deleted, err := database.DeletePreRegistrationHoldingCode(context.Background(), nil, preReg.ID, "")
 		if err == nil {
 			t.Error("an empty code hash would match a row nobody issued a code for, and must be refused")
 		}
 		if deleted {
 			t.Error("a refused delete must not report taking effect")
 		}
-		if !preRegistrationExists(t, preReg.Id) {
+		if !preRegistrationExists(t, preReg.ID) {
 			t.Error("the row must remain")
 		}
 	})
@@ -214,11 +214,11 @@ func TestDeletePreRegistrationHoldingCode(t *testing.T) {
 		preReg := createTestPreRegistration(t)
 
 		tx := beginTx(t)
-		deleted, err := database.DeletePreRegistrationHoldingCode(context.Background(), tx, preReg.Id, preReg.VerificationCodeHash)
+		deleted, err := database.DeletePreRegistrationHoldingCode(context.Background(), tx, preReg.ID, preReg.VerificationCodeHash)
 		if err != nil || !deleted {
 			t.Fatalf("the delete inside the transaction must take effect: deleted=%v err=%v", deleted, err)
 		}
-		inTx, err := database.GetPreRegistrationById(context.Background(), tx, preReg.Id)
+		inTx, err := database.GetPreRegistrationByID(context.Background(), tx, preReg.ID)
 		if err != nil || inTx != nil {
 			t.Fatalf("the delete must be visible through its transaction: row=%v err=%v", inTx, err)
 		}
@@ -226,7 +226,7 @@ func TestDeletePreRegistrationHoldingCode(t *testing.T) {
 			t.Fatalf("RollbackTransaction failed: %v", rollbackErr)
 		}
 
-		if !preRegistrationExists(t, preReg.Id) {
+		if !preRegistrationExists(t, preReg.ID) {
 			t.Error("a rolled-back delete must leave the row")
 		}
 	})
@@ -250,8 +250,8 @@ func createTestPreRegistration(t *testing.T) *record.PreRegistration {
 }
 
 func validatePreRegistration(t *testing.T, expected, actual *record.PreRegistration) {
-	if actual.Id != expected.Id {
-		t.Errorf("Expected ID %d, got %d", expected.Id, actual.Id)
+	if actual.ID != expected.ID {
+		t.Errorf("Expected ID %d, got %d", expected.ID, actual.ID)
 	}
 	if actual.Email != expected.Email {
 		t.Errorf("Expected Email %s, got %s", expected.Email, actual.Email)
@@ -289,7 +289,7 @@ func TestGetPreRegistrationByVerificationCodeHash(t *testing.T) {
 		t.Errorf("a hash no row carries must not be an error, got: %v", err)
 	}
 	if missing != nil {
-		t.Errorf("a hash no row carries must return nil, got pre-registration id %d", missing.Id)
+		t.Errorf("a hash no row carries must return nil, got pre-registration id %d", missing.ID)
 	}
 }
 
@@ -312,7 +312,7 @@ func TestGetPreRegistrationByVerificationCodeHash_EmptyNeverMatches(t *testing.T
 	const dormantEmail = "dormant-code-hash@goiabada.test"
 	deleteDormant := func() {
 		if leftover, err := database.GetPreRegistrationByEmail(context.Background(), nil, dormantEmail); err == nil && leftover != nil {
-			_ = database.DeletePreRegistration(context.Background(), nil, leftover.Id)
+			_ = database.DeletePreRegistration(context.Background(), nil, leftover.ID)
 		}
 	}
 	deleteDormant()
@@ -334,7 +334,7 @@ func TestGetPreRegistrationByVerificationCodeHash_EmptyNeverMatches(t *testing.T
 		t.Errorf("an empty hash must not be an error, got: %v", err)
 	}
 	if found != nil {
-		t.Errorf("an empty hash matched pre-registration id %d; the dormant value must never be findable", found.Id)
+		t.Errorf("an empty hash matched pre-registration id %d; the dormant value must never be findable", found.ID)
 	}
 
 	// The same fact from the other side: a real hash nobody holds still misses while the
@@ -344,7 +344,7 @@ func TestGetPreRegistrationByVerificationCodeHash_EmptyNeverMatches(t *testing.T
 		t.Errorf("a hash no row carries must not be an error, got: %v", err)
 	}
 	if found != nil {
-		t.Errorf("a hash no row carries matched pre-registration id %d", found.Id)
+		t.Errorf("a hash no row carries matched pre-registration id %d", found.ID)
 	}
 }
 
@@ -376,8 +376,8 @@ func TestGetPreRegistrationByVerificationCodeHash_Transaction(t *testing.T) {
 	if inTx == nil {
 		t.Fatal("a row written in this transaction must be visible through it (did the lookup ignore its tx?)")
 	}
-	if inTx.Id != preReg.Id {
-		t.Errorf("found pre-registration id %d through the transaction, want %d", inTx.Id, preReg.Id)
+	if inTx.ID != preReg.ID {
+		t.Errorf("found pre-registration id %d through the transaction, want %d", inTx.ID, preReg.ID)
 	}
 
 	if rollbackErr := database.RollbackTransaction(context.Background(), tx); rollbackErr != nil {
@@ -390,7 +390,7 @@ func TestGetPreRegistrationByVerificationCodeHash_Transaction(t *testing.T) {
 		t.Fatalf("lookup after rollback failed: %v", err)
 	}
 	if afterRollback != nil {
-		t.Errorf("a rolled-back write must leave no findable hash, found pre-registration id %d", afterRollback.Id)
+		t.Errorf("a rolled-back write must leave no findable hash, found pre-registration id %d", afterRollback.ID)
 	}
 
 	// 12b. The finished transaction is the forced fault.
@@ -416,11 +416,11 @@ func TestCreatePreRegistration_DistinctCodeHashesCoexist(t *testing.T) {
 	}
 
 	foundFirst, err := database.GetPreRegistrationByVerificationCodeHash(context.Background(), nil, first.VerificationCodeHash)
-	if err != nil || foundFirst == nil || foundFirst.Id != first.Id {
+	if err != nil || foundFirst == nil || foundFirst.ID != first.ID {
 		t.Fatalf("the first hash must find the first row: row=%v err=%v", foundFirst, err)
 	}
 	foundSecond, err := database.GetPreRegistrationByVerificationCodeHash(context.Background(), nil, second.VerificationCodeHash)
-	if err != nil || foundSecond == nil || foundSecond.Id != second.Id {
+	if err != nil || foundSecond == nil || foundSecond.ID != second.ID {
 		t.Fatalf("the second hash must find the second row: row=%v err=%v", foundSecond, err)
 	}
 }
@@ -435,14 +435,14 @@ func TestTryReplacePreRegistrationCode(t *testing.T) {
 	t.Run("a row still holding the dead code takes the fresh one and nothing else", func(t *testing.T) {
 		dead := createTestPreRegistration(t)
 		freshHash := codeHashOf(t, fake.UUID())
-		before, err := database.GetPreRegistrationById(context.Background(), nil, dead.Id)
+		before, err := database.GetPreRegistrationByID(context.Background(), nil, dead.ID)
 		if err != nil || before == nil {
 			t.Fatalf("Failed to reload the pre-registration: row=%v err=%v", before, err)
 		}
 
 		time.Sleep(timestampTick)
 
-		replaced, err := database.TryReplacePreRegistrationCode(context.Background(), nil, dead.Id,
+		replaced, err := database.TryReplacePreRegistrationCode(context.Background(), nil, dead.ID,
 			dead.VerificationCodeHash, freshEncrypted, freshHash, issuedAt)
 		if err != nil {
 			t.Fatalf("TryReplacePreRegistrationCode failed: %v", err)
@@ -451,7 +451,7 @@ func TestTryReplacePreRegistrationCode(t *testing.T) {
 			t.Fatal("the replacement must take effect on a row still holding the dead code")
 		}
 
-		after, err := database.GetPreRegistrationById(context.Background(), nil, dead.Id)
+		after, err := database.GetPreRegistrationByID(context.Background(), nil, dead.ID)
 		if err != nil || after == nil {
 			t.Fatalf("Failed to reload the pre-registration: row=%v err=%v", after, err)
 		}
@@ -469,7 +469,7 @@ func TestTryReplacePreRegistrationCode(t *testing.T) {
 
 		// The fresh link finds the row, and the dead one no longer does.
 		found, err := database.GetPreRegistrationByVerificationCodeHash(context.Background(), nil, freshHash)
-		if err != nil || found == nil || found.Id != dead.Id {
+		if err != nil || found == nil || found.ID != dead.ID {
 			t.Errorf("the fresh hash must find the replaced row: row=%v err=%v", found, err)
 		}
 		stale, err := database.GetPreRegistrationByVerificationCodeHash(context.Background(), nil, dead.VerificationCodeHash)
@@ -484,14 +484,14 @@ func TestTryReplacePreRegistrationCode(t *testing.T) {
 		firstEncrypted := []byte("ENCRYPTEDFIRSTCODE")
 
 		// The first of two repeats that read the same dead row.
-		first, err := database.TryReplacePreRegistrationCode(context.Background(), nil, dead.Id,
+		first, err := database.TryReplacePreRegistrationCode(context.Background(), nil, dead.ID,
 			dead.VerificationCodeHash, firstEncrypted, firstHash, issuedAt)
 		if err != nil || !first {
 			t.Fatalf("the first replacement must take effect: replaced=%v err=%v", first, err)
 		}
 
 		// The second still names the dead code it read, which the row no longer holds.
-		second, err := database.TryReplacePreRegistrationCode(context.Background(), nil, dead.Id,
+		second, err := database.TryReplacePreRegistrationCode(context.Background(), nil, dead.ID,
 			dead.VerificationCodeHash, freshEncrypted, codeHashOf(t, fake.UUID()), issuedAt.Add(time.Second))
 		if err != nil {
 			t.Fatalf("TryReplacePreRegistrationCode failed: %v", err)
@@ -500,7 +500,7 @@ func TestTryReplacePreRegistrationCode(t *testing.T) {
 			t.Fatal("a replacement naming a code the row no longer holds must not take effect")
 		}
 
-		after, err := database.GetPreRegistrationById(context.Background(), nil, dead.Id)
+		after, err := database.GetPreRegistrationByID(context.Background(), nil, dead.ID)
 		if err != nil || after == nil {
 			t.Fatalf("Failed to reload the pre-registration: row=%v err=%v", after, err)
 		}
@@ -513,11 +513,11 @@ func TestTryReplacePreRegistrationCode(t *testing.T) {
 
 	t.Run("a row consumed underneath is not recreated", func(t *testing.T) {
 		dead := createTestPreRegistration(t)
-		if err := database.DeletePreRegistration(context.Background(), nil, dead.Id); err != nil {
+		if err := database.DeletePreRegistration(context.Background(), nil, dead.ID); err != nil {
 			t.Fatalf("Failed to delete the pre-registration: %v", err)
 		}
 
-		replaced, err := database.TryReplacePreRegistrationCode(context.Background(), nil, dead.Id,
+		replaced, err := database.TryReplacePreRegistrationCode(context.Background(), nil, dead.ID,
 			dead.VerificationCodeHash, freshEncrypted, codeHashOf(t, fake.UUID()), issuedAt)
 		if err != nil {
 			t.Fatalf("TryReplacePreRegistrationCode failed: %v", err)
@@ -525,7 +525,7 @@ func TestTryReplacePreRegistrationCode(t *testing.T) {
 		if replaced {
 			t.Error("a replacement of a row that no longer exists must not report taking effect")
 		}
-		gone, err := database.GetPreRegistrationById(context.Background(), nil, dead.Id)
+		gone, err := database.GetPreRegistrationByID(context.Background(), nil, dead.ID)
 		if err != nil || gone != nil {
 			t.Errorf("the deleted row must stay deleted: row=%v err=%v", gone, err)
 		}
@@ -534,7 +534,7 @@ func TestTryReplacePreRegistrationCode(t *testing.T) {
 	t.Run("an empty fresh hash is refused", func(t *testing.T) {
 		dead := createTestPreRegistration(t)
 
-		replaced, err := database.TryReplacePreRegistrationCode(context.Background(), nil, dead.Id,
+		replaced, err := database.TryReplacePreRegistrationCode(context.Background(), nil, dead.ID,
 			dead.VerificationCodeHash, freshEncrypted, "", issuedAt)
 		if err == nil {
 			t.Error("a fresh code with no hash could never be found by its link, and must be refused")
@@ -542,7 +542,7 @@ func TestTryReplacePreRegistrationCode(t *testing.T) {
 		if replaced {
 			t.Error("a refused replacement must not report taking effect")
 		}
-		after, err := database.GetPreRegistrationById(context.Background(), nil, dead.Id)
+		after, err := database.GetPreRegistrationByID(context.Background(), nil, dead.ID)
 		if err != nil || after == nil {
 			t.Fatalf("Failed to reload the pre-registration: row=%v err=%v", after, err)
 		}
@@ -554,20 +554,20 @@ func TestTryReplacePreRegistrationCode(t *testing.T) {
 		freshHash := codeHashOf(t, fake.UUID())
 
 		tx := beginTx(t)
-		replaced, err := database.TryReplacePreRegistrationCode(context.Background(), tx, dead.Id,
+		replaced, err := database.TryReplacePreRegistrationCode(context.Background(), tx, dead.ID,
 			dead.VerificationCodeHash, freshEncrypted, freshHash, issuedAt)
 		if err != nil || !replaced {
 			t.Fatalf("the replacement inside the transaction must take effect: replaced=%v err=%v", replaced, err)
 		}
 		inTx, err := database.GetPreRegistrationByVerificationCodeHash(context.Background(), tx, freshHash)
-		if err != nil || inTx == nil || inTx.Id != dead.Id {
+		if err != nil || inTx == nil || inTx.ID != dead.ID {
 			t.Fatalf("the replacement must be visible through its transaction: row=%v err=%v", inTx, err)
 		}
 		if rollbackErr := database.RollbackTransaction(context.Background(), tx); rollbackErr != nil {
 			t.Fatalf("RollbackTransaction failed: %v", rollbackErr)
 		}
 
-		after, err := database.GetPreRegistrationById(context.Background(), nil, dead.Id)
+		after, err := database.GetPreRegistrationByID(context.Background(), nil, dead.ID)
 		if err != nil || after == nil {
 			t.Fatalf("Failed to reload the pre-registration: row=%v err=%v", after, err)
 		}
@@ -591,11 +591,11 @@ func createPreRegistrationIssuedAt(t *testing.T, issuedAt time.Time) *record.Pre
 	return preReg
 }
 
-func preRegistrationExists(t *testing.T, preRegistrationId int64) bool {
+func preRegistrationExists(t *testing.T, preRegistrationID int64) bool {
 	t.Helper()
-	found, err := database.GetPreRegistrationById(context.Background(), nil, preRegistrationId)
+	found, err := database.GetPreRegistrationByID(context.Background(), nil, preRegistrationID)
 	if err != nil {
-		t.Fatalf("Failed to reload pre-registration %d: %v", preRegistrationId, err)
+		t.Fatalf("Failed to reload pre-registration %d: %v", preRegistrationID, err)
 	}
 	return found != nil
 }
@@ -634,7 +634,7 @@ func TestDeleteDeadPreRegistrations(t *testing.T) {
 		{"issued now", fresh, false, "its link has not even expired"},
 	}
 	for _, tc := range cases {
-		if exists := preRegistrationExists(t, tc.row.Id); exists == tc.swept {
+		if exists := preRegistrationExists(t, tc.row.ID); exists == tc.swept {
 			t.Errorf("a row %s: exists=%v, want swept=%v, because %s", tc.name, exists, tc.swept, tc.because)
 		}
 		// The registration's replacement reads the same rows through the predicate; the sweep must
@@ -648,7 +648,7 @@ func TestDeleteDeadPreRegistrations(t *testing.T) {
 	if err := database.DeleteDeadPreRegistrations(context.Background(), nil, deadBefore); err != nil {
 		t.Fatalf("a sweep finding nothing must not fail: %v", err)
 	}
-	if !preRegistrationExists(t, atTheCutoff.Id) || !preRegistrationExists(t, fresh.Id) {
+	if !preRegistrationExists(t, atTheCutoff.ID) || !preRegistrationExists(t, fresh.ID) {
 		t.Error("a second sweep at the same cutoff must leave the live rows")
 	}
 }
@@ -663,7 +663,7 @@ func TestDeleteDeadPreRegistrations_Transaction(t *testing.T) {
 	if err := database.DeleteDeadPreRegistrations(context.Background(), tx, now.Add(-10*time.Minute)); err != nil {
 		t.Fatalf("DeleteDeadPreRegistrations failed: %v", err)
 	}
-	inTx, err := database.GetPreRegistrationById(context.Background(), tx, dead.Id)
+	inTx, err := database.GetPreRegistrationByID(context.Background(), tx, dead.ID)
 	if err != nil || inTx != nil {
 		t.Fatalf("the sweep must be visible through its transaction: row=%v err=%v", inTx, err)
 	}
@@ -671,7 +671,7 @@ func TestDeleteDeadPreRegistrations_Transaction(t *testing.T) {
 		t.Fatalf("RollbackTransaction failed: %v", rollbackErr)
 	}
 
-	if !preRegistrationExists(t, dead.Id) {
+	if !preRegistrationExists(t, dead.ID) {
 		t.Error("a sweep rolled back must leave the row in place")
 	}
 }

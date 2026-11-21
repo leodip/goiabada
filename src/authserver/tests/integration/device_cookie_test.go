@@ -53,7 +53,7 @@ type observedDeviceCookie struct {
 // session cookie.
 type deviceBrowser struct {
 	*http.Client
-	requestId string
+	requestID string
 	observed  []observedDeviceCookie
 	sessions  []observedDeviceCookie
 }
@@ -65,7 +65,7 @@ type deviceBrowserTransport struct {
 
 func (d *deviceBrowserTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	req.Header.Set("User-Agent", sameBrowserUserAgent)
-	req.Header.Set("X-Request-Id", d.browser.requestId)
+	req.Header.Set("X-Request-Id", d.browser.requestID)
 	resp, err := d.base.RoundTrip(req)
 	if err != nil {
 		return nil, err
@@ -83,7 +83,7 @@ func (d *deviceBrowserTransport) RoundTrip(req *http.Request) (*http.Response, e
 
 func newDeviceBrowser(t *testing.T) *deviceBrowser {
 	t.Helper()
-	browser := &deviceBrowser{Client: createHttpClient(t)}
+	browser := &deviceBrowser{Client: createHTTPClient(t)}
 	browser.Transport = &deviceBrowserTransport{base: browser.Transport, browser: browser}
 	return browser
 }
@@ -104,7 +104,7 @@ func newDeviceFixture(t *testing.T) *deviceFixture {
 	t.Helper()
 	requireDatabaseAuditLogs(t)
 	adminToken, adminClient := createAdminClientWithToken(t)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, adminClient.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, adminClient.ID) })
 
 	clientSecret := fake.LetterN(32)
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
@@ -113,13 +113,13 @@ func newDeviceFixture(t *testing.T) *deviceFixture {
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 
-	redirectURI := &record.RedirectURI{ClientId: client.Id, URI: fake.URL()}
+	redirectURI := &record.RedirectURI{ClientID: client.ID, URI: fake.URL()}
 	require.NoError(t, database.CreateRedirectURI(context.Background(), nil, redirectURI))
 
 	password := fake.Password(10)
@@ -132,7 +132,7 @@ func newDeviceFixture(t *testing.T) *deviceFixture {
 		PasswordHash: passwordHashed,
 	}
 	require.NoError(t, database.CreateUser(context.Background(), nil, user))
-	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.Id) })
+	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.ID) })
 
 	return &deviceFixture{client: client, clientSecret: clientSecret, redirectURI: redirectURI, user: user,
 		password: password, adminToken: adminToken}
@@ -165,19 +165,19 @@ func (f *deviceFixture) signInForTokens(t *testing.T, browser *deviceBrowser) ma
 	resource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
 	require.NoError(t, err)
 	require.NotNil(t, resource)
-	perms, err := database.GetPermissionsByResourceId(context.Background(), nil, resource.Id)
+	perms, err := database.GetPermissionsByResourceID(context.Background(), nil, resource.ID)
 	require.NoError(t, err)
 	idx := slices.IndexFunc(perms, func(p record.Permission) bool {
 		return p.PermissionIdentifier == builtin.ManageAccountPermissionIdentifier
 	})
 	require.GreaterOrEqual(t, idx, 0, "the account permission is seeded")
-	assignPermissionToUser(t, f.user.Id, perms[idx].Id)
+	assignPermissionToUser(t, f.user.ID, perms[idx].ID)
 	require.NoError(t, database.CreateUserConsent(context.Background(), nil, &record.UserConsent{
-		UserId: f.user.Id, ClientId: f.client.Id, Scope: deviceAccountScope,
+		UserID: f.user.ID, ClientID: f.client.ID, Scope: deviceAccountScope,
 		GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
 	}))
 
-	browser.requestId = "device-" + fake.LetterN(16)
+	browser.requestID = "device-" + fake.LetterN(16)
 	browser.observed = nil
 	code := signInWithPassword(t, browser.Client,
 		f.authorizeURLFor(deviceAccountScope, oauth.GeneratePKCECodeChallenge(testCodeVerifier)),
@@ -197,18 +197,18 @@ func (f *deviceFixture) signInForTokens(t *testing.T, browser *deviceBrowser) ma
 // returns that id, so the audit rows this sign-in left can be read back by it.
 func (f *deviceFixture) signIn(t *testing.T, browser *deviceBrowser) string {
 	t.Helper()
-	browser.requestId = "device-" + fake.LetterN(16)
+	browser.requestID = "device-" + fake.LetterN(16)
 	browser.observed = nil
 	code := signInWithPassword(t, browser.Client, f.authorizeURL(), f.user.Email, f.password, false, "")
 	require.NotEmpty(t, code, "the sign-in reaches the client with a code")
-	return browser.requestId
+	return browser.requestID
 }
 
 // storedSessions is the user's sessions as the database holds them, device identifiers included,
 // which the APIs never return.
 func (f *deviceFixture) storedSessions(t *testing.T) []record.UserSession {
 	t.Helper()
-	sessions, err := database.GetUserSessionsByUserId(context.Background(), nil, f.user.Id)
+	sessions, err := database.GetUserSessionsByUserID(context.Background(), nil, f.user.ID)
 	require.NoError(t, err)
 	return sessions
 }
@@ -247,12 +247,12 @@ func TestDeviceCookie_ASignInThatStartsASessionSetsIt(t *testing.T) {
 
 	sessions := f.storedSessions(t)
 	require.Len(t, sessions, 1)
-	assert.Equal(t, sha256OfDevice(cookie.Value), sessions[0].DeviceId, "the session stores the value's SHA-256")
+	assert.Equal(t, sha256OfDevice(cookie.Value), sessions[0].DeviceID, "the session stores the value's SHA-256")
 
 	t.Run("no API returns the identifier or its digest", func(t *testing.T) {
 		for _, path := range []string{
-			"/api/v1/admin/users/" + strconv.FormatInt(f.user.Id, 10) + "/sessions",
-			"/api/v1/admin/user-sessions/" + strconv.FormatInt(sessions[0].Id, 10),
+			"/api/v1/admin/users/" + strconv.FormatInt(f.user.ID, 10) + "/sessions",
+			"/api/v1/admin/user-sessions/" + strconv.FormatInt(sessions[0].ID, 10),
 		} {
 			resp := makeAPIRequest(t, "GET", appConfig.AuthServer.BaseURL+path, f.adminToken, nil)
 			body, err := io.ReadAll(resp.Body)
@@ -260,7 +260,7 @@ func TestDeviceCookie_ASignInThatStartsASessionSetsIt(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, http.StatusOK, resp.StatusCode, path)
 			assert.NotContains(t, string(body), cookie.Value, path)
-			assert.NotContains(t, string(body), sessions[0].DeviceId, path)
+			assert.NotContains(t, string(body), sessions[0].DeviceID, path)
 		}
 	})
 
@@ -292,19 +292,19 @@ func TestDeviceCookie_TwoBrowsersWithOneUserAgentKeepBothSessions(t *testing.T) 
 	first, second := newDeviceBrowser(t), newDeviceBrowser(t)
 
 	f.signIn(t, first)
-	requestId := f.signIn(t, second)
+	requestID := f.signIn(t, second)
 
 	sessions := f.storedSessions(t)
 	require.Len(t, sessions, 2, "both browsers stay signed in")
 	assert.Equal(t, sessions[0].UserAgent, sessions[1].UserAgent, "the two send the same header")
 	assert.Equal(t, sameBrowserUserAgent, sessions[0].UserAgent)
-	assert.Equal(t, sessions[0].IpAddress, sessions[1].IpAddress, "from the same address")
-	assert.NotEqual(t, sessions[0].DeviceId, sessions[1].DeviceId, "and are two devices")
+	assert.Equal(t, sessions[0].IPAddress, sessions[1].IPAddress, "from the same address")
+	assert.NotEqual(t, sessions[0].DeviceID, sessions[1].DeviceID, "and are two devices")
 	assert.NotEqual(t, theDeviceCookieSet(t, second).cookie.Value, deviceCookieIn(t, first.Client).Value,
 		"each browser holds an identifier of its own")
 
-	assert.Empty(t, auditRows(t, f.adminToken, "deleted_user_session", requestId), "the second sign-in removed nothing")
-	assert.Len(t, sessionsThroughAdminAPI(t, f.adminToken, f.user.Id), 2)
+	assert.Empty(t, auditRows(t, f.adminToken, "deleted_user_session", requestID), "the second sign-in removed nothing")
+	assert.Len(t, sessionsThroughAdminAPI(t, f.adminToken, f.user.ID), 2)
 }
 
 // One browser that lost its session cookie but kept its device cookie signs in again: it gets the
@@ -326,7 +326,7 @@ func TestDeviceCookie_ABrowserThatLostItsSessionCookieReplacesItsOwnSession(t *t
 		Name: deviceCookieName(), Value: device, Path: "/", Secure: appConfig.AuthServer.IsCookieSecure(),
 	}})
 
-	requestId := f.signIn(t, after)
+	requestID := f.signIn(t, after)
 
 	set := theDeviceCookieSet(t, after)
 	assert.Equal(t, device, set.cookie.Value, "the browser keeps its identifier")
@@ -334,15 +334,15 @@ func TestDeviceCookie_ABrowserThatLostItsSessionCookieReplacesItsOwnSession(t *t
 
 	sessions := f.storedSessions(t)
 	require.Len(t, sessions, 1, "the browser's earlier session is gone")
-	assert.NotEqual(t, earlier[0].Id, sessions[0].Id, "and the one left is the new session")
-	assert.Equal(t, sha256OfDevice(device), sessions[0].DeviceId)
+	assert.NotEqual(t, earlier[0].ID, sessions[0].ID, "and the one left is the new session")
+	assert.Equal(t, sha256OfDevice(device), sessions[0].DeviceID)
 
 	assert.Equal(t, []map[string]any{{
-		"user_session_id": float64(earlier[0].Id),
-		"user_id":         float64(f.user.Id),
+		"user_session_id": float64(earlier[0].ID),
+		"user_id":         float64(f.user.ID),
 		"logged_in_user":  "",
 		"reason":          "same_device",
-	}}, auditRows(t, f.adminToken, "deleted_user_session", requestId))
+	}}, auditRows(t, f.adminToken, "deleted_user_session", requestID))
 }
 
 // Ending a session, by signing out or through either API, leaves the device cookie as it is: it
@@ -379,14 +379,14 @@ func TestDeviceCookie_EndingTheSessionKeepsIt(t *testing.T) {
 				accessToken, ok := tokens["access_token"].(string)
 				require.True(t, ok, "the sign-in yields an access token: %v", tokens)
 				deleteThroughBrowser(t, browser, appConfig.AuthServer.BaseURL+"/api/v1/account/sessions/"+
-					strconv.FormatInt(session.Id, 10), accessToken)
+					strconv.FormatInt(session.ID, 10), accessToken)
 			},
 		},
 		{
 			name: "an administrator ending it through the admin API",
 			end: func(t *testing.T, f *deviceFixture, browser *deviceBrowser, session record.UserSession, _ map[string]interface{}) {
 				deleteThroughBrowser(t, browser, appConfig.AuthServer.BaseURL+"/api/v1/admin/user-sessions/"+
-					strconv.FormatInt(session.Id, 10), f.adminToken)
+					strconv.FormatInt(session.ID, 10), f.adminToken)
 			},
 		},
 	}
@@ -412,8 +412,8 @@ func TestDeviceCookie_EndingTheSessionKeepsIt(t *testing.T) {
 				"the next sign-in gets the same identifier back")
 			after := f.storedSessions(t)
 			require.Len(t, after, 1)
-			assert.NotEqual(t, sessions[0].Id, after[0].Id, "on a new session")
-			assert.Equal(t, sha256OfDevice(device), after[0].DeviceId, "which stores its digest")
+			assert.NotEqual(t, sessions[0].ID, after[0].ID, "on a new session")
+			assert.Equal(t, sha256OfDevice(device), after[0].DeviceID, "which stores its digest")
 		})
 	}
 }

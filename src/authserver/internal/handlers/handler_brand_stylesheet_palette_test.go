@@ -267,7 +267,7 @@ func TestBrandStylesheets_ACustomPaletteThatCannotBeDrawnIsAnUnknownTheme(t *tes
 				{"/brand/7/colors.css", HandleBrandColorsStylesheetGet},
 			} {
 				database := datamocks.NewDatabase(t)
-				database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(tc.brand, nil).Once()
+				database.On("GetBrandByID", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(tc.brand, nil).Once()
 				pageRenderer := handlersmocks.NewPageRenderer(t)
 				pageRenderer.On("InternalServerError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
 					return strings.Contains(err.Error(), "brand 7")

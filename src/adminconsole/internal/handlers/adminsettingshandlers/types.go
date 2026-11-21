@@ -59,7 +59,7 @@ var emailErrorFields = map[string]string{
 	i18n.ErrCodeSettingsEmailSMTPPasswordAndClear:         "password",
 	i18n.ErrCodeSettingsEmailSMTPHostChanged:              "password",
 	i18n.ErrCodeSettingsEmailSMTPFromNameTooLong:          "fromName",
-	i18n.ErrCodeSettingsSmtpFromNameAngleBrackets:         "fromName",
+	i18n.ErrCodeSettingsSMTPFromNameAngleBrackets:         "fromName",
 	i18n.ErrCodeSettingsEmailSMTPFromEmailRequired:        "fromEmail",
 	i18n.ErrCodeSettingsEmailSMTPFromEmailTooLong:         "fromEmail",
 	i18n.ErrCodeEmailRequired:                             "fromEmail",
@@ -171,20 +171,24 @@ type SettingsGeneral struct {
 	AccountDeletionEnabled bool
 }
 
+// SettingsKey is one signing key as the keys page lists it. The page also writes the list into its
+// signing-keys data block, where html/template encodes it as JSON for the page's script, so each
+// field declares the key it is written under, and a field is respelled without moving its key (#482
+// decision 7).
 type SettingsKey struct {
-	Id int64
+	ID int64 `json:"Id"`
 	// CreatedAt is the instant rather than pre-rendered text: the page formats it with the
 	// DateTime template function, which reads the layout from the viewer's catalog. Formatting
 	// it here produced "02 Jan 2006 15:04:05 MST" under every locale, month name included,
 	// because Go's time.Format has no locale of its own (#373).
-	CreatedAt        *time.Time
-	State            string
-	KeyIdentifier    string
-	Type             string
-	Algorithm        string
-	PublicKeyASN1DER string
-	PublicKeyPEM     string
-	PublicKeyJWK     string
+	CreatedAt        *time.Time `json:"CreatedAt"`
+	State            string     `json:"State"`
+	KeyIdentifier    string     `json:"KeyIdentifier"`
+	Type             string     `json:"Type"`
+	Algorithm        string     `json:"Algorithm"`
+	PublicKeyASN1DER string     `json:"PublicKeyASN1DER"`
+	PublicKeyPEM     string     `json:"PublicKeyPEM"`
+	PublicKeyJWK     string     `json:"PublicKeyJWK"`
 }
 
 type SettingsSessionGet struct {
@@ -206,7 +210,7 @@ type SettingsTokenGet struct {
 	RefreshTokenOfflineIdleTimeoutInSeconds int
 	RefreshTokenOfflineMaxLifetimeInSeconds int
 	IncludeOpenIDConnectClaimsInAccessToken bool
-	IncludeOpenIDConnectClaimsInIdToken     bool
+	IncludeOpenIDConnectClaimsInIDToken     bool
 }
 
 type SettingsTokenPost struct {
@@ -214,7 +218,7 @@ type SettingsTokenPost struct {
 	RefreshTokenOfflineIdleTimeoutInSeconds string
 	RefreshTokenOfflineMaxLifetimeInSeconds string
 	IncludeOpenIDConnectClaimsInAccessToken bool
-	IncludeOpenIDConnectClaimsInIdToken     bool
+	IncludeOpenIDConnectClaimsInIDToken     bool
 }
 
 type SettingsAuditLogsGet struct {
@@ -256,6 +260,6 @@ type AuditLogsPageResult struct {
 	Page       int
 	PageSize   int
 	AuditEvent string
-	RequestId  string
-	UserId     string
+	RequestID  string
+	UserID     string
 }

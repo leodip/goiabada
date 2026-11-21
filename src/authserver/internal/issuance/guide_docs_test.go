@@ -51,16 +51,16 @@ func signedInIDTokenClaims(t *testing.T) []string {
 	code := armCodeMint(t, mockDB, func(string) {})
 	code.Scope = "openid email"
 	code.Nonce = "n-0S6_WzA2Mj"
-	code.AcrLevel = record.AcrLevel2Optional
+	code.ACRLevel = record.ACRLevel2Optional
 	code.User.EmailVerified = true
 
 	settings := codeGrantSettings()
-	settings.IncludeOpenIDConnectClaimsInIdToken = true
+	settings.IncludeOpenIDConnectClaimsInIDToken = true
 	response, err := issuer.mintAuthorizationCodeTokens(context.Background(), settings, code, "")
 	if err != nil {
 		t.Fatalf("minting the code's tokens: %v", err)
 	}
-	return claimNames(verifyAndDecodeToken(t, response.IdToken, getTestPublicKey(t)))
+	return claimNames(verifyAndDecodeToken(t, response.IDToken, getTestPublicKey(t)))
 }
 
 // serviceAccessTokenClaims is the claims of the access token the client credentials grant issues.
@@ -74,7 +74,7 @@ func serviceAccessTokenClaims(t *testing.T) []string {
 	}, nil)
 
 	settings := &record.Settings{Issuer: "https://auth.example.com", TokenExpirationInSeconds: 300}
-	client := &record.Client{Id: 1, ClientIdentifier: "billing-service"}
+	client := &record.Client{ID: 1, ClientIdentifier: "billing-service"}
 	response, err := issuer.IssueClientCredentialsGrant(context.Background(), settings, client, "product-api:read", "")
 	if err != nil {
 		t.Fatalf("issuing the client credentials grant: %v", err)

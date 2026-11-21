@@ -52,8 +52,8 @@ func (_m *PermissionChecker) EXPECT() *PermissionChecker_Expecter {
 }
 
 // UserHasScopePermission provides a mock function for the type PermissionChecker
-func (_mock *PermissionChecker) UserHasScopePermission(ctx context.Context, userId int64, scope string) (bool, error) {
-	ret := _mock.Called(ctx, userId, scope)
+func (_mock *PermissionChecker) UserHasScopePermission(ctx context.Context, userID int64, scope string) (bool, error) {
+	ret := _mock.Called(ctx, userID, scope)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UserHasScopePermission")
@@ -62,15 +62,15 @@ func (_mock *PermissionChecker) UserHasScopePermission(ctx context.Context, user
 	var r0 bool
 	var r1 error
 	if returnFunc, ok := ret.Get(0).(func(context.Context, int64, string) (bool, error)); ok {
-		return returnFunc(ctx, userId, scope)
+		return returnFunc(ctx, userID, scope)
 	}
 	if returnFunc, ok := ret.Get(0).(func(context.Context, int64, string) bool); ok {
-		r0 = returnFunc(ctx, userId, scope)
+		r0 = returnFunc(ctx, userID, scope)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context, int64, string) error); ok {
-		r1 = returnFunc(ctx, userId, scope)
+		r1 = returnFunc(ctx, userID, scope)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -84,13 +84,13 @@ type PermissionChecker_UserHasScopePermission_Call struct {
 
 // UserHasScopePermission is a helper method to define mock.On call
 //   - ctx context.Context
-//   - userId int64
+//   - userID int64
 //   - scope string
-func (_e *PermissionChecker_Expecter) UserHasScopePermission(ctx any, userId any, scope any) *PermissionChecker_UserHasScopePermission_Call {
-	return &PermissionChecker_UserHasScopePermission_Call{Call: _e.mock.On("UserHasScopePermission", ctx, userId, scope)}
+func (_e *PermissionChecker_Expecter) UserHasScopePermission(ctx any, userID any, scope any) *PermissionChecker_UserHasScopePermission_Call {
+	return &PermissionChecker_UserHasScopePermission_Call{Call: _e.mock.On("UserHasScopePermission", ctx, userID, scope)}
 }
 
-func (_c *PermissionChecker_UserHasScopePermission_Call) Run(run func(ctx context.Context, userId int64, scope string)) *PermissionChecker_UserHasScopePermission_Call {
+func (_c *PermissionChecker_UserHasScopePermission_Call) Run(run func(ctx context.Context, userID int64, scope string)) *PermissionChecker_UserHasScopePermission_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -118,7 +118,7 @@ func (_c *PermissionChecker_UserHasScopePermission_Call) Return(b bool, err erro
 	return _c
 }
 
-func (_c *PermissionChecker_UserHasScopePermission_Call) RunAndReturn(run func(ctx context.Context, userId int64, scope string) (bool, error)) *PermissionChecker_UserHasScopePermission_Call {
+func (_c *PermissionChecker_UserHasScopePermission_Call) RunAndReturn(run func(ctx context.Context, userID int64, scope string) (bool, error)) *PermissionChecker_UserHasScopePermission_Call {
 	_c.Call.Return(run)
 	return _c
 }

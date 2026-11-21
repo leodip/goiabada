@@ -13,15 +13,15 @@ import (
 // userLegalDocumentsAPI is what the user's Legal documents tab needs: the user, and the versions
 // they accepted.
 type userLegalDocumentsAPI interface {
-	GetUserById(ctx context.Context, accessToken string, userId int64) (*api.UserResponse, error)
-	GetUserLegalDocumentAcceptances(ctx context.Context, accessToken string, userId int64) ([]api.LegalDocumentAcceptanceResponse, error)
+	GetUserByID(ctx context.Context, accessToken string, userID int64) (*api.UserResponse, error)
+	GetUserLegalDocumentAcceptances(ctx context.Context, accessToken string, userID int64) ([]api.LegalDocumentAcceptanceResponse, error)
 }
 
 // HandleLegalDocumentsGet draws the legal documents the user accepted, the latest first, each
 // opening the accepted version's text in the console, a retired document's included (#622 decision
 // 10). The tab only reads: acceptances are never edited or removed by hand.
 func HandleLegalDocumentsGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient userLegalDocumentsAPI,
 ) http.HandlerFunc {
 
@@ -33,13 +33,13 @@ func HandleLegalDocumentsGet(
 			return
 		}
 
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
-		user, err := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		user, err := apiClient.GetUserByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -49,7 +49,7 @@ func HandleLegalDocumentsGet(
 			return
 		}
 
-		acceptances, err := apiClient.GetUserLegalDocumentAcceptances(r.Context(), jwtInfo.TokenResponse.AccessToken, user.Id)
+		acceptances, err := apiClient.GetUserLegalDocumentAcceptances(r.Context(), jwtInfo.TokenResponse.AccessToken, user.ID)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return

@@ -55,7 +55,7 @@ func authServerCookieNames(t *testing.T) []string {
 	require.NoError(t, err)
 
 	rec := httptest.NewRecorder()
-	NewDeviceCookie(true).write(rec, strings.Repeat("ab", deviceIdBytes), 60)
+	NewDeviceCookie(true).write(rec, strings.Repeat("ab", deviceIDBytes), 60)
 	written := rec.Result().Cookies()
 	require.Len(t, written, 1, "the device cookie wrote %d cookies", len(written))
 

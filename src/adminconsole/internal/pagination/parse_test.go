@@ -336,26 +336,26 @@ func TestParsePage_OffsetNeverOverflows(t *testing.T) {
 // this test did exactly that, so it passed while the bound was a page tighter
 // than the arithmetic required.
 func TestMaxPage_IsTheLargestSafeBound(t *testing.T) {
-	assert.Equal(t, math.MaxInt/maxApiPageSize+1, maxPage)
+	assert.Equal(t, math.MaxInt/maxAPIPageSize+1, maxPage)
 
 	// offsetOf is the offset a page produces, computed exactly, so an int
 	// expression that overflows cannot agree with another that overflows.
 	offsetOf := func(page int) *big.Int {
-		return new(big.Int).Mul(big.NewInt(int64(page)-1), big.NewInt(int64(maxApiPageSize)))
+		return new(big.Int).Mul(big.NewInt(int64(page)-1), big.NewInt(int64(maxAPIPageSize)))
 	}
 
 	// The bound itself fits: the int arithmetic gives the exact answer, and
 	// that answer is not negative.
-	assert.Equal(t, offsetOf(maxPage).String(), strconv.Itoa((maxPage-1)*maxApiPageSize),
+	assert.Equal(t, offsetOf(maxPage).String(), strconv.Itoa((maxPage-1)*maxAPIPageSize),
 		"the bound overflows the offset it was chosen for")
-	assert.GreaterOrEqual(t, (maxPage-1)*maxApiPageSize, 0, "the bound wraps its own offset")
+	assert.GreaterOrEqual(t, (maxPage-1)*maxAPIPageSize, 0, "the bound wraps its own offset")
 
 	// One page further does not fit, which is what makes this bound the largest
 	// rather than merely a safe one. If this assertion ever fails, the bound can
 	// be raised.
-	assert.NotEqual(t, offsetOf(maxPage+1).String(), strconv.Itoa(maxPage*maxApiPageSize),
+	assert.NotEqual(t, offsetOf(maxPage+1).String(), strconv.Itoa(maxPage*maxAPIPageSize),
 		"the page above the bound still fits at size %d, so the bound is tighter than it needs to be",
-		maxApiPageSize)
+		maxAPIPageSize)
 
 	// And it is far beyond anything the console can page through: at its own
 	// page size, a list of this many pages is more rows than any deployment

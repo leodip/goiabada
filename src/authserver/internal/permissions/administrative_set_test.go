@@ -73,14 +73,14 @@ func TestIsAdministrativeScope_EveryOneIsBuiltIn(t *testing.T) {
 // one an operator added, each at an id unrelated to its position.
 func authServerRows() []record.Permission {
 	return []record.Permission{
-		{Id: 41, PermissionIdentifier: "manage-account", ResourceId: 3},
-		{Id: 42, PermissionIdentifier: "manage", ResourceId: 3},
-		{Id: 43, PermissionIdentifier: "admin-read", ResourceId: 3},
-		{Id: 44, PermissionIdentifier: "manage-users", ResourceId: 3},
-		{Id: 45, PermissionIdentifier: "manage-clients", ResourceId: 3},
-		{Id: 46, PermissionIdentifier: "manage-settings", ResourceId: 3},
-		{Id: 47, PermissionIdentifier: "browser-sessions", ResourceId: 3},
-		{Id: 48, PermissionIdentifier: "custom-report", ResourceId: 3},
+		{ID: 41, PermissionIdentifier: "manage-account", ResourceID: 3},
+		{ID: 42, PermissionIdentifier: "manage", ResourceID: 3},
+		{ID: 43, PermissionIdentifier: "admin-read", ResourceID: 3},
+		{ID: 44, PermissionIdentifier: "manage-users", ResourceID: 3},
+		{ID: 45, PermissionIdentifier: "manage-clients", ResourceID: 3},
+		{ID: 46, PermissionIdentifier: "manage-settings", ResourceID: 3},
+		{ID: 47, PermissionIdentifier: "browser-sessions", ResourceID: 3},
+		{ID: 48, PermissionIdentifier: "custom-report", ResourceID: 3},
 	}
 }
 
@@ -88,8 +88,8 @@ func TestAdministrativePermissions_MapsEachAdministrativeRowToItsScope(t *testin
 	database := datamocks.NewDatabase(t)
 	tx := &sql.Tx{}
 	database.On("GetResourceByResourceIdentifier", mock.Anything, tx, "authserver").
-		Return(&record.Resource{Id: 3, ResourceIdentifier: "authserver"}, nil).Once()
-	database.On("GetPermissionsByResourceId", mock.Anything, tx, int64(3)).Return(authServerRows(), nil).Once()
+		Return(&record.Resource{ID: 3, ResourceIdentifier: "authserver"}, nil).Once()
+	database.On("GetPermissionsByResourceID", mock.Anything, tx, int64(3)).Return(authServerRows(), nil).Once()
 
 	administrative, err := AdministrativePermissions(context.Background(), database, tx)
 
@@ -108,8 +108,8 @@ func TestAdministrativePermissions_MapsEachAdministrativeRowToItsScope(t *testin
 func TestAdministrativePermissions_ReadsOutsideAnyTransactionOnNil(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	database.On("GetResourceByResourceIdentifier", mock.Anything, (*sql.Tx)(nil), "authserver").
-		Return(&record.Resource{Id: 3, ResourceIdentifier: "authserver"}, nil).Once()
-	database.On("GetPermissionsByResourceId", mock.Anything, (*sql.Tx)(nil), int64(3)).
+		Return(&record.Resource{ID: 3, ResourceIdentifier: "authserver"}, nil).Once()
+	database.On("GetPermissionsByResourceID", mock.Anything, (*sql.Tx)(nil), int64(3)).
 		Return(slices.Clone(authServerRows()[:2]), nil).Once()
 
 	administrative, err := AdministrativePermissions(context.Background(), database, nil)
@@ -143,8 +143,8 @@ func TestAdministrativePermissions_ReadFailuresAreErrors(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		cause := errors.New("permissions read failed")
 		database.On("GetResourceByResourceIdentifier", mock.Anything, (*sql.Tx)(nil), "authserver").
-			Return(&record.Resource{Id: 3, ResourceIdentifier: "authserver"}, nil).Once()
-		database.On("GetPermissionsByResourceId", mock.Anything, (*sql.Tx)(nil), int64(3)).Return(nil, cause).Once()
+			Return(&record.Resource{ID: 3, ResourceIdentifier: "authserver"}, nil).Once()
+		database.On("GetPermissionsByResourceID", mock.Anything, (*sql.Tx)(nil), int64(3)).Return(nil, cause).Once()
 
 		administrative, err := AdministrativePermissions(context.Background(), database, nil)
 

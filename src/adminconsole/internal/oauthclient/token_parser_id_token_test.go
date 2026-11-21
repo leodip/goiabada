@@ -49,7 +49,7 @@ type idTokenFixture struct {
 func newIDTokenFixture(t *testing.T, issuer string) *idTokenFixture {
 	t.Helper()
 	key, attacker := oauthclienttest.Keys(t)
-	server, _ := oauthclienttest.NewJwksServer(t, oauthclienttest.JwkFromPublicKey("key-1", &key.PublicKey))
+	server, _ := oauthclienttest.NewJWKSServer(t, oauthclienttest.JWKFromPublicKey("key-1", &key.PublicKey))
 	return &idTokenFixture{
 		key:      key,
 		attacker: attacker,
@@ -87,7 +87,7 @@ func idClaims() jwt.MapClaims {
 // obtains it: verified, by a parser expecting the issuer it names and, when its aud is one string,
 // that audience. Two tokens that both verify under one parser cannot differ in iss or aud, so a
 // row breaking either comparison stores a token verified under the setting before it changed.
-func (f *idTokenFixture) previousToken(t *testing.T, claims jwt.MapClaims) *oauth.JwtToken {
+func (f *idTokenFixture) previousToken(t *testing.T, claims jwt.MapClaims) *oauth.JWTToken {
 	t.Helper()
 	issuer, _ := claims["iss"].(string)
 	clientID, ok := claims["aud"].(string)
@@ -110,12 +110,12 @@ func idTokenMethods() []idTokenMethod {
 	return []idTokenMethod{
 		{"sign-in", func(t *testing.T, f *idTokenFixture, parser *oauthclient.JWKSTokenParser, idToken string) error {
 			_, err := parser.DecodeAndValidateSignInResponse(context.Background(),
-				&oauth.TokenResponse{AccessToken: "opaque-access-token", IdToken: idToken}, rawNonce)
+				&oauth.TokenResponse{AccessToken: "opaque-access-token", IDToken: idToken}, rawNonce)
 			return err
 		}},
 		{"refresh", func(t *testing.T, f *idTokenFixture, parser *oauthclient.JWKSTokenParser, idToken string) error {
 			_, err := parser.DecodeAndValidateRefreshResponse(context.Background(),
-				&oauth.TokenResponse{AccessToken: "opaque-access-token", IdToken: idToken}, f.previousToken(t, idClaims()))
+				&oauth.TokenResponse{AccessToken: "opaque-access-token", IDToken: idToken}, f.previousToken(t, idClaims()))
 			return err
 		}},
 		{"stored", func(t *testing.T, f *idTokenFixture, parser *oauthclient.JWKSTokenParser, idToken string) error {
@@ -330,14 +330,14 @@ func TestDecodeAndValidateSignInResponse(t *testing.T) {
 		{
 			name: "no access token",
 			response: func(t *testing.T, f *idTokenFixture) *oauth.TokenResponse {
-				return &oauth.TokenResponse{IdToken: f.sign(t, idClaims())}
+				return &oauth.TokenResponse{IDToken: f.sign(t, idClaims())}
 			},
 			nonce: rawNonce,
 		},
 		{
 			name: "empty nonce",
 			response: func(t *testing.T, f *idTokenFixture) *oauth.TokenResponse {
-				return &oauth.TokenResponse{AccessToken: "opaque-access-token", IdToken: f.sign(t, idClaims())}
+				return &oauth.TokenResponse{AccessToken: "opaque-access-token", IDToken: f.sign(t, idClaims())}
 			},
 			nonce: "",
 		},
@@ -346,7 +346,7 @@ func TestDecodeAndValidateSignInResponse(t *testing.T) {
 			response: func(t *testing.T, f *idTokenFixture) *oauth.TokenResponse {
 				claims := idClaims()
 				delete(claims, "nonce")
-				return &oauth.TokenResponse{AccessToken: "opaque-access-token", IdToken: f.sign(t, claims)}
+				return &oauth.TokenResponse{AccessToken: "opaque-access-token", IDToken: f.sign(t, claims)}
 			},
 			nonce: rawNonce,
 		},
@@ -355,7 +355,7 @@ func TestDecodeAndValidateSignInResponse(t *testing.T) {
 			response: func(t *testing.T, f *idTokenFixture) *oauth.TokenResponse {
 				claims := idClaims()
 				claims["nonce"] = 42
-				return &oauth.TokenResponse{AccessToken: "opaque-access-token", IdToken: f.sign(t, claims)}
+				return &oauth.TokenResponse{AccessToken: "opaque-access-token", IDToken: f.sign(t, claims)}
 			},
 			nonce: rawNonce,
 		},
@@ -364,7 +364,7 @@ func TestDecodeAndValidateSignInResponse(t *testing.T) {
 			response: func(t *testing.T, f *idTokenFixture) *oauth.TokenResponse {
 				claims := idClaims()
 				claims["nonce"] = sentNonce("another-sign-in's-nonce")
-				return &oauth.TokenResponse{AccessToken: "opaque-access-token", IdToken: f.sign(t, claims)}
+				return &oauth.TokenResponse{AccessToken: "opaque-access-token", IDToken: f.sign(t, claims)}
 			},
 			nonce: rawNonce,
 		},
@@ -374,7 +374,7 @@ func TestDecodeAndValidateSignInResponse(t *testing.T) {
 			response: func(t *testing.T, f *idTokenFixture) *oauth.TokenResponse {
 				claims := idClaims()
 				claims["nonce"] = rawNonce
-				return &oauth.TokenResponse{AccessToken: "opaque-access-token", IdToken: f.sign(t, claims)}
+				return &oauth.TokenResponse{AccessToken: "opaque-access-token", IDToken: f.sign(t, claims)}
 			},
 			nonce: rawNonce,
 		},
@@ -396,7 +396,7 @@ func TestDecodeAndValidateSignInResponse(t *testing.T) {
 		idToken := f.sign(t, idClaims())
 		response := &oauth.TokenResponse{
 			AccessToken:  "opaque-access-token",
-			IdToken:      idToken,
+			IDToken:      idToken,
 			RefreshToken: "opaque-refresh-token",
 			TokenType:    "Bearer",
 			ExpiresIn:    300,
@@ -407,10 +407,10 @@ func TestDecodeAndValidateSignInResponse(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, *response, result.TokenResponse)
-		require.NotNil(t, result.IdToken)
-		assert.Equal(t, idToken, result.IdToken.TokenBase64)
-		assert.Equal(t, "1234567890", result.IdToken.StringClaim("sub"))
-		// The access and refresh tokens are carried, never decoded: JwtInfo has no field to
+		require.NotNil(t, result.IDToken)
+		assert.Equal(t, idToken, result.IDToken.TokenBase64)
+		assert.Equal(t, "1234567890", result.IDToken.StringClaim("sub"))
+		// The access and refresh tokens are carried, never decoded: JWTInfo has no field to
 		// decode them into since #427, so the equality with the response above is the whole of it.
 	})
 }
@@ -426,36 +426,36 @@ func TestDecodeAndValidateRefreshResponse(t *testing.T) {
 		result, err := f.parser.DecodeAndValidateRefreshResponse(context.Background(), response, previous)
 
 		require.NoError(t, err)
-		assert.Same(t, previous, result.IdToken)
-		assert.Equal(t, previous.TokenBase64, result.TokenResponse.IdToken)
+		assert.Same(t, previous, result.IDToken)
+		assert.Equal(t, previous.TokenBase64, result.TokenResponse.IDToken)
 		assert.Equal(t, "new-access-token", result.TokenResponse.AccessToken)
 		assert.Equal(t, "new-refresh-token", result.TokenResponse.RefreshToken)
-		assert.Empty(t, response.IdToken, "the argument is not mutated")
+		assert.Empty(t, response.IDToken, "the argument is not mutated")
 	})
 
 	refusals := []struct {
 		name     string
 		response func(t *testing.T, f *idTokenFixture) *oauth.TokenResponse
-		previous func(t *testing.T, f *idTokenFixture) *oauth.JwtToken
+		previous func(t *testing.T, f *idTokenFixture) *oauth.JWTToken
 	}{
 		{
 			name:     "no token response",
 			response: func(*testing.T, *idTokenFixture) *oauth.TokenResponse { return nil },
-			previous: func(t *testing.T, f *idTokenFixture) *oauth.JwtToken { return f.previousToken(t, idClaims()) },
+			previous: func(t *testing.T, f *idTokenFixture) *oauth.JWTToken { return f.previousToken(t, idClaims()) },
 		},
 		{
 			name: "no previous ID token",
 			response: func(t *testing.T, f *idTokenFixture) *oauth.TokenResponse {
-				return &oauth.TokenResponse{AccessToken: "new-access-token", IdToken: f.sign(t, idClaims())}
+				return &oauth.TokenResponse{AccessToken: "new-access-token", IDToken: f.sign(t, idClaims())}
 			},
-			previous: func(*testing.T, *idTokenFixture) *oauth.JwtToken { return nil },
+			previous: func(*testing.T, *idTokenFixture) *oauth.JWTToken { return nil },
 		},
 		{
 			name: "no access token",
 			response: func(t *testing.T, f *idTokenFixture) *oauth.TokenResponse {
-				return &oauth.TokenResponse{IdToken: f.sign(t, idClaims())}
+				return &oauth.TokenResponse{IDToken: f.sign(t, idClaims())}
 			},
-			previous: func(t *testing.T, f *idTokenFixture) *oauth.JwtToken { return f.previousToken(t, idClaims()) },
+			previous: func(t *testing.T, f *idTokenFixture) *oauth.JWTToken { return f.previousToken(t, idClaims()) },
 		},
 	}
 	for _, tc := range refusals {
@@ -591,13 +591,13 @@ func TestDecodeAndValidateRefreshResponse(t *testing.T) {
 			refreshed := f.sign(t, refreshedClaims)
 
 			result, err := f.parser.DecodeAndValidateRefreshResponse(context.Background(),
-				&oauth.TokenResponse{AccessToken: "new-access-token", IdToken: refreshed}, previous)
+				&oauth.TokenResponse{AccessToken: "new-access-token", IDToken: refreshed}, previous)
 
 			assertOutcome(t, tc.want, err)
 			if tc.want == accepted {
 				require.NotNil(t, result)
-				assert.Equal(t, refreshed, result.IdToken.TokenBase64, "the refreshed ID token replaces the previous one")
-				assert.Equal(t, refreshed, result.TokenResponse.IdToken)
+				assert.Equal(t, refreshed, result.IDToken.TokenBase64, "the refreshed ID token replaces the previous one")
+				assert.Equal(t, refreshed, result.TokenResponse.IDToken)
 			} else {
 				assert.Nil(t, result)
 			}

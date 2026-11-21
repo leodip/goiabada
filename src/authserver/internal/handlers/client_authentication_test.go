@@ -17,28 +17,28 @@ import (
 
 func TestParseBasicAuth(t *testing.T) {
 	t.Run("Empty header returns false", func(t *testing.T) {
-		clientId, clientSecret, ok, err := parseBasicAuth("")
+		clientID, clientSecret, ok, err := parseBasicAuth("")
 		require.NoError(t, err)
 		assert.False(t, ok)
-		assert.Empty(t, clientId)
+		assert.Empty(t, clientID)
 		assert.Empty(t, clientSecret)
 	})
 
 	t.Run("Non-Basic scheme returns false", func(t *testing.T) {
-		clientId, clientSecret, ok, err := parseBasicAuth("Bearer some-token")
+		clientID, clientSecret, ok, err := parseBasicAuth("Bearer some-token")
 		require.NoError(t, err)
 		assert.False(t, ok)
-		assert.Empty(t, clientId)
+		assert.Empty(t, clientID)
 		assert.Empty(t, clientSecret)
 	})
 
 	t.Run("The scheme name is case-insensitive", func(t *testing.T) {
 		encoded := base64.StdEncoding.EncodeToString([]byte("client:secret"))
 		for _, scheme := range []string{"basic", "BASIC", "bAsIc"} {
-			clientId, clientSecret, ok, err := parseBasicAuth(scheme + " " + encoded)
+			clientID, clientSecret, ok, err := parseBasicAuth(scheme + " " + encoded)
 			require.NoError(t, err)
 			assert.True(t, ok, scheme)
-			assert.Equal(t, "client", clientId, scheme)
+			assert.Equal(t, "client", clientID, scheme)
 			assert.Equal(t, "secret", clientSecret, scheme)
 		}
 	})
@@ -58,9 +58,9 @@ func TestParseBasicAuth(t *testing.T) {
 			"Basic",
 			"Basic ",
 		} {
-			clientId, clientSecret, ok, err := parseBasicAuth(header)
+			clientID, clientSecret, ok, err := parseBasicAuth(header)
 			assert.False(t, ok, header)
-			assert.Empty(t, clientId, header)
+			assert.Empty(t, clientID, header)
 			assert.Empty(t, clientSecret, header)
 			var errDetail *oauth.ErrorDetail
 			require.ErrorAs(t, err, &errDetail, header)
@@ -71,10 +71,10 @@ func TestParseBasicAuth(t *testing.T) {
 
 	t.Run("Valid credentials are parsed correctly", func(t *testing.T) {
 		encoded := base64.StdEncoding.EncodeToString([]byte("my-client-id:my-secret"))
-		clientId, clientSecret, ok, err := parseBasicAuth("Basic " + encoded)
+		clientID, clientSecret, ok, err := parseBasicAuth("Basic " + encoded)
 		require.NoError(t, err)
 		assert.True(t, ok)
-		assert.Equal(t, "my-client-id", clientId)
+		assert.Equal(t, "my-client-id", clientID)
 		assert.Equal(t, "my-secret", clientSecret)
 	})
 
@@ -82,47 +82,47 @@ func TestParseBasicAuth(t *testing.T) {
 	// openid-client does, escaping even '-', '.' and '_'. Every generated secret holds those.
 	t.Run("Form-urlencoded credentials are decoded", func(t *testing.T) {
 		encoded := base64.StdEncoding.EncodeToString([]byte("my%2Dclient%5Fid:s3cr%2Et%2Dwith%2Bplus%3Aand%25+a+space"))
-		clientId, clientSecret, ok, err := parseBasicAuth("Basic " + encoded)
+		clientID, clientSecret, ok, err := parseBasicAuth("Basic " + encoded)
 		require.NoError(t, err)
 		assert.True(t, ok)
-		assert.Equal(t, "my-client_id", clientId)
+		assert.Equal(t, "my-client_id", clientID)
 		assert.Equal(t, "s3cr.t-with+plus:and% a space", clientSecret)
 	})
 
 	// Preserve the legacy fallback only when form decoding fails on a malformed percent escape.
 	t.Run("A malformed escape keeps the unencoded value", func(t *testing.T) {
 		encoded := base64.StdEncoding.EncodeToString([]byte("my-client:a+b/c=d%zz"))
-		clientId, clientSecret, ok, err := parseBasicAuth("Basic " + encoded)
+		clientID, clientSecret, ok, err := parseBasicAuth("Basic " + encoded)
 		require.NoError(t, err)
 		assert.True(t, ok)
-		assert.Equal(t, "my-client", clientId)
+		assert.Equal(t, "my-client", clientID)
 		assert.Equal(t, "a+b/c=d%zz", clientSecret)
 	})
 
 	t.Run("A plus in either encoded value is a space", func(t *testing.T) {
 		encoded := base64.StdEncoding.EncodeToString([]byte("my+client:a+b%2Bc"))
-		clientId, clientSecret, ok, err := parseBasicAuth("Basic " + encoded)
+		clientID, clientSecret, ok, err := parseBasicAuth("Basic " + encoded)
 		require.NoError(t, err)
 		assert.True(t, ok)
-		assert.Equal(t, "my client", clientId)
+		assert.Equal(t, "my client", clientID)
 		assert.Equal(t, "a b+c", clientSecret)
 	})
 
 	t.Run("Password with colons is parsed correctly", func(t *testing.T) {
 		encoded := base64.StdEncoding.EncodeToString([]byte("client:pass:with:colons"))
-		clientId, clientSecret, ok, err := parseBasicAuth("Basic " + encoded)
+		clientID, clientSecret, ok, err := parseBasicAuth("Basic " + encoded)
 		require.NoError(t, err)
 		assert.True(t, ok)
-		assert.Equal(t, "client", clientId)
+		assert.Equal(t, "client", clientID)
 		assert.Equal(t, "pass:with:colons", clientSecret)
 	})
 
 	t.Run("Empty password is valid", func(t *testing.T) {
 		encoded := base64.StdEncoding.EncodeToString([]byte("client:"))
-		clientId, clientSecret, ok, err := parseBasicAuth("Basic " + encoded)
+		clientID, clientSecret, ok, err := parseBasicAuth("Basic " + encoded)
 		require.NoError(t, err)
 		assert.True(t, ok)
-		assert.Equal(t, "client", clientId)
+		assert.Equal(t, "client", clientID)
 		assert.Empty(t, clientSecret)
 	})
 
@@ -131,9 +131,9 @@ func TestParseBasicAuth(t *testing.T) {
 	t.Run("Basic credentials naming no client are invalid_client", func(t *testing.T) {
 		for _, credentials := range []string{":secret", ":"} {
 			encoded := base64.StdEncoding.EncodeToString([]byte(credentials))
-			clientId, clientSecret, ok, err := parseBasicAuth("Basic " + encoded)
+			clientID, clientSecret, ok, err := parseBasicAuth("Basic " + encoded)
 			assert.False(t, ok, credentials)
-			assert.Empty(t, clientId, credentials)
+			assert.Empty(t, clientID, credentials)
 			assert.Empty(t, clientSecret, credentials)
 			var errDetail *oauth.ErrorDetail
 			require.ErrorAs(t, err, &errDetail, credentials)
@@ -147,49 +147,49 @@ func TestParseBasicAuth(t *testing.T) {
 	t.Run("Special characters in credentials", func(t *testing.T) {
 		// Test with special chars that might cause issues
 		encoded := base64.StdEncoding.EncodeToString([]byte("client%2Bid%40example.com:p%40ss%3Dword%26special%21"))
-		clientId, clientSecret, ok, err := parseBasicAuth("Basic " + encoded)
+		clientID, clientSecret, ok, err := parseBasicAuth("Basic " + encoded)
 		require.NoError(t, err)
 		assert.True(t, ok)
-		assert.Equal(t, "client+id@example.com", clientId)
+		assert.Equal(t, "client+id@example.com", clientID)
 		assert.Equal(t, "p@ss=word&special!", clientSecret)
 	})
 
 	t.Run("Unicode characters in credentials", func(t *testing.T) {
 		encoded := base64.StdEncoding.EncodeToString([]byte("клиент:密码"))
-		clientId, clientSecret, ok, err := parseBasicAuth("Basic " + encoded)
+		clientID, clientSecret, ok, err := parseBasicAuth("Basic " + encoded)
 		require.NoError(t, err)
 		assert.True(t, ok)
-		assert.Equal(t, "клиент", clientId)
+		assert.Equal(t, "клиент", clientID)
 		assert.Equal(t, "密码", clientSecret)
 	})
 
 	// RFC 9110 section 11.4: one or more spaces follow the scheme (#707 decision 8).
 	t.Run("Two spaces after Basic are read", func(t *testing.T) {
 		encoded := base64.StdEncoding.EncodeToString([]byte("client:secret"))
-		clientId, clientSecret, ok, err := parseBasicAuth("Basic  " + encoded) // two spaces
+		clientID, clientSecret, ok, err := parseBasicAuth("Basic  " + encoded) // two spaces
 		require.NoError(t, err)
 		assert.True(t, ok)
-		assert.Equal(t, "client", clientId)
+		assert.Equal(t, "client", clientID)
 		assert.Equal(t, "secret", clientSecret)
 	})
 
 	t.Run("Missing space after Basic is another scheme", func(t *testing.T) {
 		encoded := base64.StdEncoding.EncodeToString([]byte("client:secret"))
-		clientId, clientSecret, ok, err := parseBasicAuth("Basic" + encoded) // no space
+		clientID, clientSecret, ok, err := parseBasicAuth("Basic" + encoded) // no space
 		require.NoError(t, err)
 		assert.False(t, ok)
-		assert.Empty(t, clientId)
+		assert.Empty(t, clientID)
 		assert.Empty(t, clientSecret)
 	})
 
 	t.Run("Very long credentials", func(t *testing.T) {
-		longClientId := strings.Repeat("a", 1000)
+		longClientID := strings.Repeat("a", 1000)
 		longSecret := strings.Repeat("b", 1000)
-		encoded := base64.StdEncoding.EncodeToString([]byte(longClientId + ":" + longSecret))
-		clientId, clientSecret, ok, err := parseBasicAuth("Basic " + encoded)
+		encoded := base64.StdEncoding.EncodeToString([]byte(longClientID + ":" + longSecret))
+		clientID, clientSecret, ok, err := parseBasicAuth("Basic " + encoded)
 		require.NoError(t, err)
 		assert.True(t, ok)
-		assert.Equal(t, longClientId, clientId)
+		assert.Equal(t, longClientID, clientID)
 		assert.Equal(t, longSecret, clientSecret)
 	})
 }
@@ -203,10 +203,10 @@ func TestExtractClientCredentials(t *testing.T) {
 		req.Header.Set("Authorization", "Basic "+encoded)
 		_ = req.ParseForm()
 
-		clientId, clientSecret, method, err := extractClientCredentials(req)
+		clientID, clientSecret, method, err := extractClientCredentials(req)
 		assert.Equal(t, clientauth.ClientSecretBasic, method)
 		require.NoError(t, err)
-		assert.Equal(t, "basic-client", clientId)
+		assert.Equal(t, "basic-client", clientID)
 		assert.Equal(t, "basic-secret", clientSecret)
 	})
 
@@ -217,10 +217,10 @@ func TestExtractClientCredentials(t *testing.T) {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		_ = req.ParseForm()
 
-		clientId, clientSecret, method, err := extractClientCredentials(req)
+		clientID, clientSecret, method, err := extractClientCredentials(req)
 		assert.Equal(t, clientauth.ClientSecretPost, method)
 		require.NoError(t, err)
-		assert.Equal(t, "post-client", clientId)
+		assert.Equal(t, "post-client", clientID)
 		assert.Equal(t, "post-secret", clientSecret)
 	})
 
@@ -233,10 +233,10 @@ func TestExtractClientCredentials(t *testing.T) {
 		req.Header.Set("Authorization", "Basic "+encoded)
 		_ = req.ParseForm()
 
-		clientId, clientSecret, method, err := extractClientCredentials(req)
+		clientID, clientSecret, method, err := extractClientCredentials(req)
 		assert.Equal(t, clientauth.Method(""), method)
 		require.Error(t, err)
-		assert.Empty(t, clientId)
+		assert.Empty(t, clientID)
 		assert.Empty(t, clientSecret)
 
 		var errDetail *oauth.ErrorDetail
@@ -253,10 +253,10 @@ func TestExtractClientCredentials(t *testing.T) {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		_ = req.ParseForm()
 
-		clientId, clientSecret, method, err := extractClientCredentials(req)
+		clientID, clientSecret, method, err := extractClientCredentials(req)
 		assert.Equal(t, clientauth.MethodNone, method)
 		require.NoError(t, err)
-		assert.Empty(t, clientId)
+		assert.Empty(t, clientID)
 		assert.Empty(t, clientSecret)
 	})
 
@@ -270,10 +270,10 @@ func TestExtractClientCredentials(t *testing.T) {
 		req.Header.Set("Authorization", "Basic "+encoded)
 		_ = req.ParseForm()
 
-		clientId, clientSecret, method, err := extractClientCredentials(req)
+		clientID, clientSecret, method, err := extractClientCredentials(req)
 		assert.Equal(t, clientauth.ClientSecretBasic, method)
 		require.NoError(t, err)
-		assert.Equal(t, "basic-client", clientId)
+		assert.Equal(t, "basic-client", clientID)
 		assert.Equal(t, "basic-secret", clientSecret)
 	})
 
@@ -286,9 +286,9 @@ func TestExtractClientCredentials(t *testing.T) {
 		req.Header.Set("Authorization", "Basic invalid-base64!")
 		_ = req.ParseForm()
 
-		clientId, clientSecret, method, err := extractClientCredentials(req)
+		clientID, clientSecret, method, err := extractClientCredentials(req)
 		assert.Equal(t, clientauth.Method(""), method)
-		assert.Empty(t, clientId)
+		assert.Empty(t, clientID)
 		assert.Empty(t, clientSecret)
 		var errDetail *oauth.ErrorDetail
 		require.ErrorAs(t, err, &errDetail)
@@ -304,10 +304,10 @@ func TestExtractClientCredentials(t *testing.T) {
 		req.Header.Set("Authorization", "Bearer some-access-token")
 		_ = req.ParseForm()
 
-		clientId, clientSecret, method, err := extractClientCredentials(req)
+		clientID, clientSecret, method, err := extractClientCredentials(req)
 		assert.Equal(t, clientauth.ClientSecretPost, method)
 		require.NoError(t, err)
-		assert.Equal(t, "post-client", clientId)
+		assert.Equal(t, "post-client", clientID)
 		assert.Equal(t, "post-secret", clientSecret)
 	})
 
@@ -321,10 +321,10 @@ func TestExtractClientCredentials(t *testing.T) {
 		req.Header.Set("Authorization", "Basic "+encoded)
 		_ = req.ParseForm()
 
-		clientId, clientSecret, method, err := extractClientCredentials(req)
+		clientID, clientSecret, method, err := extractClientCredentials(req)
 		assert.Equal(t, clientauth.ClientSecretBasic, method)
 		require.NoError(t, err)
-		assert.Equal(t, "basic-client", clientId)
+		assert.Equal(t, "basic-client", clientID)
 		assert.Equal(t, "basic-secret", clientSecret)
 	})
 
@@ -335,10 +335,10 @@ func TestExtractClientCredentials(t *testing.T) {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		_ = req.ParseForm()
 
-		clientId, clientSecret, method, err := extractClientCredentials(req)
+		clientID, clientSecret, method, err := extractClientCredentials(req)
 		assert.Equal(t, clientauth.MethodNone, method)
 		require.NoError(t, err)
-		assert.Equal(t, "public-client", clientId)
+		assert.Equal(t, "public-client", clientID)
 		assert.Empty(t, clientSecret)
 	})
 
@@ -351,9 +351,9 @@ func TestExtractClientCredentials(t *testing.T) {
 		req.Header.Set("Authorization", "Basic "+encoded)
 		_ = req.ParseForm()
 
-		clientId, clientSecret, method, err := extractClientCredentials(req)
+		clientID, clientSecret, method, err := extractClientCredentials(req)
 		require.NoError(t, err)
-		assert.Equal(t, "basic-client", clientId)
+		assert.Equal(t, "basic-client", clientID)
 		assert.Empty(t, clientSecret)
 		assert.Equal(t, clientauth.ClientSecretBasic, method)
 	})

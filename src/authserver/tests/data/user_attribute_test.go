@@ -11,9 +11,9 @@ import (
 
 func TestCreateUserAttribute(t *testing.T) {
 	user := createTestUser(t)
-	attr := createTestUserAttribute(t, user.Id)
+	attr := createTestUserAttribute(t, user.ID)
 
-	if attr.Id == 0 {
+	if attr.ID == 0 {
 		t.Error("Expected non-zero ID after creation")
 	}
 	if !attr.CreatedAt.Valid || attr.CreatedAt.Time.IsZero() {
@@ -23,7 +23,7 @@ func TestCreateUserAttribute(t *testing.T) {
 		t.Error("Expected UpdatedAt to be set")
 	}
 
-	retrievedAttr, err := database.GetUserAttributeById(context.Background(), nil, attr.Id)
+	retrievedAttr, err := database.GetUserAttributeByID(context.Background(), nil, attr.ID)
 	if err != nil {
 		t.Fatalf("Failed to retrieve created user attribute: %v", err)
 	}
@@ -34,24 +34,24 @@ func TestCreateUserAttribute(t *testing.T) {
 	if retrievedAttr.Value != attr.Value {
 		t.Errorf("Expected Value %s, got %s", attr.Value, retrievedAttr.Value)
 	}
-	if retrievedAttr.IncludeInIdToken != attr.IncludeInIdToken {
-		t.Errorf("Expected IncludeInIdToken %v, got %v", attr.IncludeInIdToken, retrievedAttr.IncludeInIdToken)
+	if retrievedAttr.IncludeInIDToken != attr.IncludeInIDToken {
+		t.Errorf("Expected IncludeInIDToken %v, got %v", attr.IncludeInIDToken, retrievedAttr.IncludeInIDToken)
 	}
 	if retrievedAttr.IncludeInAccessToken != attr.IncludeInAccessToken {
 		t.Errorf("Expected IncludeInAccessToken %v, got %v", attr.IncludeInAccessToken, retrievedAttr.IncludeInAccessToken)
 	}
-	if retrievedAttr.UserId != attr.UserId {
-		t.Errorf("Expected UserId %d, got %d", attr.UserId, retrievedAttr.UserId)
+	if retrievedAttr.UserID != attr.UserID {
+		t.Errorf("Expected UserID %d, got %d", attr.UserID, retrievedAttr.UserID)
 	}
 }
 
 func TestUpdateUserAttribute(t *testing.T) {
 	user := createTestUser(t)
-	attr := createTestUserAttribute(t, user.Id)
+	attr := createTestUserAttribute(t, user.ID)
 
 	attr.Key = "UpdatedKey"
 	attr.Value = "UpdatedValue"
-	attr.IncludeInIdToken = !attr.IncludeInIdToken
+	attr.IncludeInIDToken = !attr.IncludeInIDToken
 	attr.IncludeInAccessToken = !attr.IncludeInAccessToken
 
 	time.Sleep(timestampTick)
@@ -61,7 +61,7 @@ func TestUpdateUserAttribute(t *testing.T) {
 		t.Fatalf("Failed to update user attribute: %v", err)
 	}
 
-	updatedAttr, err := database.GetUserAttributeById(context.Background(), nil, attr.Id)
+	updatedAttr, err := database.GetUserAttributeByID(context.Background(), nil, attr.ID)
 	if err != nil {
 		t.Fatalf("Failed to retrieve updated user attribute: %v", err)
 	}
@@ -72,8 +72,8 @@ func TestUpdateUserAttribute(t *testing.T) {
 	if updatedAttr.Value != attr.Value {
 		t.Errorf("Expected Value %s, got %s", attr.Value, updatedAttr.Value)
 	}
-	if updatedAttr.IncludeInIdToken != attr.IncludeInIdToken {
-		t.Errorf("Expected IncludeInIdToken %v, got %v", attr.IncludeInIdToken, updatedAttr.IncludeInIdToken)
+	if updatedAttr.IncludeInIDToken != attr.IncludeInIDToken {
+		t.Errorf("Expected IncludeInIDToken %v, got %v", attr.IncludeInIDToken, updatedAttr.IncludeInIDToken)
 	}
 	if updatedAttr.IncludeInAccessToken != attr.IncludeInAccessToken {
 		t.Errorf("Expected IncludeInAccessToken %v, got %v", attr.IncludeInAccessToken, updatedAttr.IncludeInAccessToken)
@@ -83,37 +83,37 @@ func TestUpdateUserAttribute(t *testing.T) {
 	}
 }
 
-func TestGetUserAttributeById(t *testing.T) {
+func TestGetUserAttributeByID(t *testing.T) {
 	user := createTestUser(t)
-	attr := createTestUserAttribute(t, user.Id)
+	attr := createTestUserAttribute(t, user.ID)
 
-	retrievedAttr, err := database.GetUserAttributeById(context.Background(), nil, attr.Id)
+	retrievedAttr, err := database.GetUserAttributeByID(context.Background(), nil, attr.ID)
 	if err != nil {
 		t.Fatalf("Failed to get user attribute by ID: %v", err)
 	}
 
-	if retrievedAttr.Id != attr.Id {
-		t.Errorf("Expected ID %d, got %d", attr.Id, retrievedAttr.Id)
+	if retrievedAttr.ID != attr.ID {
+		t.Errorf("Expected ID %d, got %d", attr.ID, retrievedAttr.ID)
 	}
 	if retrievedAttr.Key != attr.Key {
 		t.Errorf("Expected Key %s, got %s", attr.Key, retrievedAttr.Key)
 	}
 
-	nonExistentAttr, err := database.GetUserAttributeById(context.Background(), nil, 99999)
+	nonExistentAttr, err := database.GetUserAttributeByID(context.Background(), nil, 99999)
 	if err != nil {
 		t.Errorf("Expected no error for non-existent user attribute, got: %v", err)
 	}
 	if nonExistentAttr != nil {
-		t.Errorf("Expected nil for non-existent user attribute, got an attribute with ID: %d", nonExistentAttr.Id)
+		t.Errorf("Expected nil for non-existent user attribute, got an attribute with ID: %d", nonExistentAttr.ID)
 	}
 }
 
-func TestGetUserAttributesByUserId(t *testing.T) {
+func TestGetUserAttributesByUserID(t *testing.T) {
 	user := createTestUser(t)
-	attr1 := createTestUserAttribute(t, user.Id)
-	attr2 := createTestUserAttribute(t, user.Id)
+	attr1 := createTestUserAttribute(t, user.ID)
+	attr2 := createTestUserAttribute(t, user.ID)
 
-	attrs, err := database.GetUserAttributesByUserId(context.Background(), nil, user.Id)
+	attrs, err := database.GetUserAttributesByUserID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatalf("Failed to get user attributes by user ID: %v", err)
 	}
@@ -125,29 +125,29 @@ func TestGetUserAttributesByUserId(t *testing.T) {
 	foundAttr1 := false
 	foundAttr2 := false
 	for _, attr := range attrs {
-		if attr.Id == attr1.Id {
+		if attr.ID == attr1.ID {
 			foundAttr1 = true
 		}
-		if attr.Id == attr2.Id {
+		if attr.ID == attr2.ID {
 			foundAttr2 = true
 		}
 	}
 
 	if !foundAttr1 || !foundAttr2 {
-		t.Error("Not all created attributes were found in GetUserAttributesByUserId result")
+		t.Error("Not all created attributes were found in GetUserAttributesByUserID result")
 	}
 }
 
 func TestDeleteUserAttribute(t *testing.T) {
 	user := createTestUser(t)
-	attr := createTestUserAttribute(t, user.Id)
+	attr := createTestUserAttribute(t, user.ID)
 
-	err := database.DeleteUserAttribute(context.Background(), nil, attr.Id)
+	err := database.DeleteUserAttribute(context.Background(), nil, attr.ID)
 	if err != nil {
 		t.Fatalf("Failed to delete user attribute: %v", err)
 	}
 
-	deletedAttr, err := database.GetUserAttributeById(context.Background(), nil, attr.Id)
+	deletedAttr, err := database.GetUserAttributeByID(context.Background(), nil, attr.ID)
 	if err != nil {
 		t.Fatalf("Error while checking for deleted user attribute: %v", err)
 	}
@@ -161,13 +161,13 @@ func TestDeleteUserAttribute(t *testing.T) {
 	}
 }
 
-func createTestUserAttribute(t *testing.T, userId int64) *record.UserAttribute {
+func createTestUserAttribute(t *testing.T, userID int64) *record.UserAttribute {
 	attr := &record.UserAttribute{
 		Key:                  "TestKey_" + fake.LetterN(6),
 		Value:                "TestValue_" + fake.LetterN(6),
-		IncludeInIdToken:     fake.Bool(),
+		IncludeInIDToken:     fake.Bool(),
 		IncludeInAccessToken: fake.Bool(),
-		UserId:               userId,
+		UserID:               userID,
 	}
 	err := database.CreateUserAttribute(context.Background(), nil, attr)
 	if err != nil {

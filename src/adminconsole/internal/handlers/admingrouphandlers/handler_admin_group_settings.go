@@ -16,12 +16,12 @@ import (
 
 // groupSettingsAPI is what the group settings page needs: the group, and the write.
 type groupSettingsAPI interface {
-	GetGroupById(ctx context.Context, accessToken string, groupId int64) (*api.GroupResponse, error)
-	UpdateGroup(ctx context.Context, accessToken string, groupId int64, request *api.UpdateGroupRequest) (*api.GroupResponse, error)
+	GetGroupByID(ctx context.Context, accessToken string, groupID int64) (*api.GroupResponse, error)
+	UpdateGroup(ctx context.Context, accessToken string, groupID int64, request *api.UpdateGroupRequest) (*api.GroupResponse, error)
 }
 
 func HandleSettingsGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient groupSettingsAPI,
 ) http.HandlerFunc {
@@ -41,13 +41,13 @@ func HandleSettingsGet(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
-		group, err := apiClient.GetGroupById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		group, err := apiClient.GetGroupByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -69,11 +69,11 @@ func HandleSettingsGet(
 		}
 
 		bind := map[string]interface{}{
-			"groupId":              group.Id,
+			"groupId":              group.ID,
 			"storedGroup":          group,
 			"groupIdentifier":      group.GroupIdentifier,
 			"description":          group.Description,
-			"includeInIdToken":     group.IncludeInIdToken,
+			"includeInIdToken":     group.IncludeInIDToken,
 			"includeInAccessToken": group.IncludeInAccessToken,
 			"savedSuccessfully":    savedSuccessfully,
 		}
@@ -87,7 +87,7 @@ func HandleSettingsGet(
 }
 
 func HandleSettingsPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient groupSettingsAPI,
 	baseURL string,
@@ -108,16 +108,16 @@ func HandleSettingsPost(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
 		// The group as stored, which a refused save is drawn with: the page title and the original
 		// identifier the rename question compares against stand for the group as it is, so the same
 		// rename attempted again is asked again (#562 decision 6).
-		group, err := apiClient.GetGroupById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		group, err := apiClient.GetGroupByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -126,16 +126,16 @@ func HandleSettingsPost(
 		// Parse form data
 		groupIdentifier := strings.TrimSpace(r.FormValue("groupIdentifier"))
 		description := strings.TrimSpace(r.FormValue("description"))
-		includeInIdToken := r.FormValue("includeInIdToken") == "on"
+		includeInIDToken := r.FormValue("includeInIdToken") == "on"
 		includeInAccessToken := r.FormValue("includeInAccessToken") == "on"
 
 		renderError := func(message, errorField string) {
 			bind := map[string]interface{}{
-				"groupId":              group.Id,
+				"groupId":              group.ID,
 				"storedGroup":          group,
 				"groupIdentifier":      groupIdentifier,
 				"description":          description,
-				"includeInIdToken":     includeInIdToken,
+				"includeInIdToken":     includeInIDToken,
 				"includeInAccessToken": includeInAccessToken,
 				"error":                message,
 				"errorField":           errorField,
@@ -151,7 +151,7 @@ func HandleSettingsPost(
 		updateReq := &api.UpdateGroupRequest{
 			GroupIdentifier:      groupIdentifier,
 			Description:          description,
-			IncludeInIdToken:     includeInIdToken,
+			IncludeInIDToken:     includeInIDToken,
 			IncludeInAccessToken: includeInAccessToken,
 		}
 

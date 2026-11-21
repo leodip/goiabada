@@ -9,19 +9,19 @@ import (
 // carries names this row with an opaque identifier and holds nothing else, so the
 // session's contents never leave the deployment (#266).
 type BrowserSession struct {
-	Id        int64        `db:"id" fieldtag:"pk"`
+	ID        int64        `db:"id" fieldtag:"pk"`
 	CreatedAt sql.NullTime `db:"created_at" fieldtag:"dont-update"`
 	UpdatedAt sql.NullTime `db:"updated_at"`
 	// Owner is the application the session belongs to, "authserver" or "adminconsole".
 	// One table serves both, and every lookup is keyed on this column together with the
 	// hash, so neither application can reach the other's rows.
 	Owner string `db:"owner"`
-	// SessionId is the plaintext identifier. It has a field so a caller can carry it
+	// SessionID is the plaintext identifier. It has a field so a caller can carry it
 	// between generating it and putting it in the cookie, and `db:"-"` so it can never
 	// reach a column: only its digest is stored, following the shape codes.Code
 	// established for reset and activation codes (#112, #266).
-	SessionId     string `db:"-"`
-	SessionIdHash string `db:"session_id_hash"`
+	SessionID     string `db:"-"`
+	SessionIDHash string `db:"session_id_hash"`
 	// Data is the encrypted session contents. The storage layer holds ciphertext and
 	// no key for it, so nothing here can read what a session contains.
 	Data string `db:"data"`

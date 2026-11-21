@@ -39,7 +39,7 @@ type logoutDatabase interface {
 	ClientLoadPostLogoutRedirectURIs(ctx context.Context, tx *sql.Tx, client *record.Client) error
 	ClientLoadRedirectURIs(ctx context.Context, tx *sql.Tx, client *record.Client) error
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
-	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	GetUserByID(ctx context.Context, tx *sql.Tx, userID int64) (*record.User, error)
 	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error)
 }
 
@@ -116,16 +116,16 @@ func refineLogoutLocale(r *http.Request) *http.Request {
 func renderLogoutConsent(w http.ResponseWriter, r *http.Request, pageRenderer PageRenderer, hint hintState) {
 	state, statePresent := render.LookupQueryOrFormValue(r, "state")
 
-	clientId := ""
+	clientID := ""
 	if hint == hintAbsent {
-		clientId = render.QueryOrFormValue(r, "client_id")
+		clientID = render.QueryOrFormValue(r, "client_id")
 	}
 
 	bind := map[string]interface{}{
 		"formAction":            logoutFormPath,
-		"declineHref":           logoutDeclineHref(r, clientId),
+		"declineHref":           logoutDeclineHref(r, clientID),
 		"postLogoutRedirectUri": render.QueryOrFormValue(r, "post_logout_redirect_uri"),
-		"clientId":              clientId,
+		"clientId":              clientID,
 		"state":                 state,
 		"statePresent":          statePresent,
 		"uiLocales":             render.QueryOrFormValue(r, "ui_locales"),
@@ -138,18 +138,18 @@ func renderLogoutConsent(w http.ResponseWriter, r *http.Request, pageRenderer Pa
 }
 
 // logoutDeclineHref is the declining control's destination: the declined page, carrying the
-// End-User's language, and clientId, the client_id the consent page carries, so the declined page
-// is drawn in that client's brand (#812 decision 5). clientId is empty when a hint was rejected, so
+// End-User's language, and clientID, the client_id the consent page carries, so the declined page
+// is drawn in that client's brand (#812 decision 5). clientID is empty when a hint was rejected, so
 // that page stays in the default brand as the others do. A decline is not a logout, so it hands the
 // RP nothing: no post_logout_redirect_uri or state, and never the id_token_hint (RP-Initiated
 // Logout 1.0 sections 2 and 3, #152); the declined page reads client_id for its look alone.
-func logoutDeclineHref(r *http.Request, clientId string) string {
+func logoutDeclineHref(r *http.Request, clientID string) string {
 	query := url.Values{}
 	if uiLocales := render.QueryOrFormValue(r, "ui_locales"); len(uiLocales) > 0 {
 		query.Set("ui_locales", uiLocales)
 	}
-	if len(clientId) > 0 {
-		query.Set("client_id", clientId)
+	if len(clientID) > 0 {
+		query.Set("client_id", clientID)
 	}
 	if len(query) > 0 {
 		return logoutDeclinedPath + "?" + query.Encode()
@@ -246,7 +246,7 @@ func decryptIDTokenHint(ctx context.Context, idTokenHint, clientID string, datab
 	return decryptedToken, nil
 }
 
-// hintState is what classifyIdTokenHint decided about a request's id_token_hint, and it has three
+// hintState is what classifyIDTokenHint decided about a request's id_token_hint, and it has three
 // values rather than two on purpose. Collapsing "supplied and rejected" into "absent" is what let a
 // detected client_id/aud mismatch go on to authorize a post-logout redirect: the rejected hint
 // vanished, the unauthenticated client_id beside it survived, and client_id then chose the target.
@@ -276,7 +276,7 @@ func (h hintState) String() string {
 	}
 }
 
-// hintClassification is classifyIdTokenHint's answer. client and sessionIdentifier are populated for
+// hintClassification is classifyIDTokenHint's answer. client and sessionIdentifier are populated for
 // hintConfirmed and left empty otherwise, so a caller that forgets to check the state still cannot
 // scope a teardown or authorize a redirect from a hint that failed to validate.
 type hintClassification struct {
@@ -288,17 +288,17 @@ type hintClassification struct {
 	subject string
 }
 
-// rejectIdTokenHint is the one answer for a hint classifyIdTokenHint refuses: the record every
+// rejectIDTokenHint is the one answer for a hint classifyIDTokenHint refuses: the record every
 // refusal writes, and the classification the caller falls back to a hintless logout on. The gate
 // rides as an attribute rather than inside the message, so the twenty rejections are one greppable
 // message a collector can group and count, and Warn rather than Error because every one of them is
 // a hint refused and handled (#320 decisions 4 and 5).
 //
-// A package function rather than a closure in classifyIdTokenHint, which it was until the review
+// A package function rather than a closure in classifyIDTokenHint, which it was until the review
 // of #320: sloglint reads the attribute keys at a call site only for a function it can name, and a
 // closure has no name to give it. It is registered under custom-funcs in .golangci.yml and in
 // slogSpreadSites in core/guard, which together are what let it spread attrs below.
-func rejectIdTokenHint(ctx context.Context, gate string, args ...any) (hintClassification, error) {
+func rejectIDTokenHint(ctx context.Context, gate string, args ...any) (hintClassification, error) {
 	attrs := make([]any, 0, len(args)+2)
 	attrs = append(attrs, "gate", gate)
 	attrs = append(attrs, args...)
@@ -306,7 +306,7 @@ func rejectIdTokenHint(ctx context.Context, gate string, args ...any) (hintClass
 	return hintClassification{state: hintRejected}, nil
 }
 
-// classifyIdTokenHint decides whether a request's id_token_hint can be trusted, and returns which of
+// classifyIDTokenHint decides whether a request's id_token_hint can be trusted, and returns which of
 // the three states it is in along with the client and session a confirmed hint names.
 //
 // The error return is reserved for the two lookups that decide whether the hint's session may be
@@ -340,7 +340,7 @@ func rejectIdTokenHint(ctx context.Context, gate string, args ...any) (hintClass
 //
 // issuer is this OP's own, which doLogout reads from the settings and passes down, so this helper
 // has no failure of its own to answer when the settings are missing (#433).
-func classifyIdTokenHint(
+func classifyIDTokenHint(
 	r *http.Request,
 	issuer string,
 	database logoutDatabase,
@@ -353,33 +353,33 @@ func classifyIdTokenHint(
 		return hintClassification{state: hintAbsent}, nil
 	}
 	if len(hint) == 0 {
-		return rejectIdTokenHint(r.Context(), "presence", "reason", "id_token_hint was supplied with an empty value")
+		return rejectIDTokenHint(r.Context(), "presence", "reason", "id_token_hint was supplied with an empty value")
 	}
 
 	// Presence-aware, like the hint above and for the same reason: the client_id gate further down
 	// fires when the parameter is PRESENT, and a value-only read cannot tell "client_id=" from no
 	// client_id at all. See the comment on that gate for why the difference matters (#109).
-	clientId, clientIdPresent := render.LookupQueryOrFormValue(r, "client_id")
+	clientID, clientIDPresent := render.LookupQueryOrFormValue(r, "client_id")
 
 	// An encrypted hint is a Nested JWT (OpenID Connect Core 1.0 section 2) and must be decrypted
 	// before anything can be read from it. The key derives from a client secret, so client_id is what
 	// says whose. This one reads the value rather than the presence, correctly: an empty client_id
 	// selects no key whether it was supplied empty or left out.
 	if isEncryptedIDTokenHint(hint) {
-		if len(clientId) == 0 {
-			return rejectIdTokenHint(r.Context(), "JWE key selection", "reason", "an encrypted id_token_hint needs client_id to select the key")
+		if len(clientID) == 0 {
+			return rejectIDTokenHint(r.Context(), "JWE key selection", "reason", "an encrypted id_token_hint needs client_id to select the key")
 		}
-		decrypted, err := decryptIDTokenHint(r.Context(), hint, clientId, database, dataCipher)
+		decrypted, err := decryptIDTokenHint(r.Context(), hint, clientID, database, dataCipher)
 		if err != nil {
 			// decryptIDTokenHint has already logged which half failed.
-			return rejectIdTokenHint(r.Context(), "JWE decryption")
+			return rejectIDTokenHint(r.Context(), "JWE decryption")
 		}
 		hint = decrypted
 	}
 
 	idToken, err := tokenParser.DecodeAndValidateTokenString(r.Context(), hint, false)
 	if err != nil || idToken == nil {
-		return rejectIdTokenHint(r.Context(), "parse and signature", "error", err)
+		return rejectIDTokenHint(r.Context(), "parse and signature", "error", err)
 	}
 
 	// Is this an ID Token at all? Without this gate a session-bound ACCESS token satisfies every
@@ -394,10 +394,10 @@ func classifyIdTokenHint(
 	// the same key and names sub, sid and aud, so every claim gate below would take it for an ID
 	// Token, and an access token's header says at+jwt (#784 decision 12).
 	if typ, _ := idToken.Header["typ"].(string); !issuance.HasIDTokenHeader(idToken.Header) {
-		return rejectIdTokenHint(r.Context(), "ID-Token shape", "reason", "the JOSE header typ is not an ID Token's", "header_typ", typ)
+		return rejectIDTokenHint(r.Context(), "ID-Token shape", "reason", "the JOSE header typ is not an ID Token's", "header_typ", typ)
 	}
 	if typ := idToken.StringClaim("typ"); issuance.IsNotIDTokenTyp(typ) {
-		return rejectIdTokenHint(r.Context(), "ID-Token shape", "reason", "typ names a token that is not an ID Token", "typ", typ)
+		return rejectIDTokenHint(r.Context(), "ID-Token shape", "reason", "typ names a token that is not an ID Token", "typ", typ)
 	}
 
 	// sub and iat are REQUIRED on an ID Token by OpenID Connect Core 1.0 section 2, and RP-Initiated
@@ -409,25 +409,25 @@ func classifyIdTokenHint(
 	// the owner of the session sid names.
 	subject := idToken.StringClaim("sub")
 	if len(subject) == 0 {
-		return rejectIdTokenHint(r.Context(), "ID-Token shape", "reason", "sub is missing or empty")
+		return rejectIDTokenHint(r.Context(), "ID-Token shape", "reason", "sub is missing or empty")
 	}
 	if _, ok := idToken.IntClaim("iat"); !ok {
-		return rejectIdTokenHint(r.Context(), "ID-Token shape", "reason", "iat is missing or is not an integral number")
+		return rejectIDTokenHint(r.Context(), "ID-Token shape", "reason", "iat is missing or is not an integral number")
 	}
 
 	hintIssuer := idToken.StringClaim("iss")
 	if len(hintIssuer) == 0 {
-		return rejectIdTokenHint(r.Context(), "iss", "reason", "iss is missing")
+		return rejectIDTokenHint(r.Context(), "iss", "reason", "iss is missing")
 	}
 	if hintIssuer != issuer {
-		return rejectIdTokenHint(r.Context(), "iss", "reason", "iss is not this server", "iss", hintIssuer)
+		return rejectIDTokenHint(r.Context(), "iss", "reason", "iss is not this server", "iss", hintIssuer)
 	}
 
 	// StringClaim yields "" for an aud that arrived as an array, which is right for a hint: an ID
 	// Token this server issues has exactly one audience, the client identifier.
 	clientIdentifier := idToken.StringClaim("aud")
 	if len(clientIdentifier) == 0 {
-		return rejectIdTokenHint(r.Context(), "aud", "reason", "aud is missing, or is not a single string")
+		return rejectIDTokenHint(r.Context(), "aud", "reason", "aud is missing, or is not a single string")
 	}
 
 	// RP-Initiated Logout 1.0 section 2: "When both client_id and id_token_hint are present, the OP
@@ -447,9 +447,9 @@ func classifyIdTokenHint(
 	// the fail-safe direction of both (#109).
 	//
 	// Compared before the lookup so a mismatch costs no query.
-	if clientIdPresent && clientId != clientIdentifier {
-		return rejectIdTokenHint(r.Context(), "client_id", "reason", "client_id does not match the aud the hint is signed over",
-			"client_identifier", clientId, "aud", clientIdentifier)
+	if clientIDPresent && clientID != clientIdentifier {
+		return rejectIDTokenHint(r.Context(), "client_id", "reason", "client_id does not match the aud the hint is signed over",
+			"client_identifier", clientID, "aud", clientIdentifier)
 	}
 
 	client, err := database.GetClientByClientIdentifier(r.Context(), nil, clientIdentifier)
@@ -458,10 +458,10 @@ func classifyIdTokenHint(
 		// teardown, so a 500 here would put the End-User on a terminal page while still signed in,
 		// which is the defect #109 exists to remove. Rejecting instead widens the teardown from
 		// per-client to whole-session and forbids the redirect, which is the fail-safe direction.
-		return rejectIdTokenHint(r.Context(), "aud", "reason", "the client lookup failed", "aud", clientIdentifier, "error", err)
+		return rejectIDTokenHint(r.Context(), "aud", "reason", "the client lookup failed", "aud", clientIdentifier, "error", err)
 	}
 	if client == nil {
-		return rejectIdTokenHint(r.Context(), "aud", "reason", "aud names no client", "aud", clientIdentifier)
+		return rejectIDTokenHint(r.Context(), "aud", "reason", "aud names no client", "aud", clientIdentifier)
 	}
 
 	now := time.Now().UTC()
@@ -471,10 +471,10 @@ func classifyIdTokenHint(
 	if _, hasNbf := idToken.Claims["nbf"]; hasNbf {
 		nbf, ok := idToken.IntClaim("nbf")
 		if !ok {
-			return rejectIdTokenHint(r.Context(), "nbf", "reason", "nbf is present and is not an integral number")
+			return rejectIDTokenHint(r.Context(), "nbf", "reason", "nbf is present and is not an integral number")
 		}
 		if time.Unix(nbf, 0).After(now) {
-			return rejectIdTokenHint(r.Context(), "nbf", "reason", "nbf is in the future")
+			return rejectIDTokenHint(r.Context(), "nbf", "reason", "nbf is in the future")
 		}
 	}
 
@@ -483,12 +483,12 @@ func classifyIdTokenHint(
 	// below is bounded to avoid becoming.
 	exp, ok := idToken.IntClaim("exp")
 	if !ok {
-		return rejectIdTokenHint(r.Context(), "exp", "reason", "exp is missing or is not an integral number")
+		return rejectIDTokenHint(r.Context(), "exp", "reason", "exp is missing or is not an integral number")
 	}
 
 	sid := idToken.StringClaim("sid")
 	if len(sid) == 0 {
-		return rejectIdTokenHint(r.Context(), "sid", "reason", "sid is missing")
+		return rejectIDTokenHint(r.Context(), "sid", "reason", "sid is missing")
 	}
 
 	sessionIdentifier, _ := reqctx.SessionIdentifierFrom(r.Context())
@@ -502,7 +502,7 @@ func classifyIdTokenHint(
 		// Not an error and not a 500, which is what it used to be. The spec's answer to a hint that
 		// does not belong to the current session is to ask the End-User, and a user whose session was
 		// reaped or replaced between signing in and logging out reaches this with nobody at fault.
-		return rejectIdTokenHint(r.Context(), "sid", "reason", "sid names a different session than the browser's")
+		return rejectIDTokenHint(r.Context(), "sid", "reason", "sid names a different session than the browser's")
 	}
 
 	// One lookup, read by the expiry-tolerance branch below and by the ownership gate after it. It
@@ -520,7 +520,7 @@ func classifyIdTokenHint(
 
 	if time.Unix(exp, 0).Before(now) {
 		if userSession == nil {
-			return rejectIdTokenHint(r.Context(), "expiry tolerance", "reason", "exp has passed and sid names no live session")
+			return rejectIDTokenHint(r.Context(), "expiry tolerance", "reason", "exp has passed and sid names no live session")
 		}
 		// "Recent session" has exactly one meaning in this codebase: the row is still there.
 		slog.InfoContext(r.Context(), "accepting an expired id_token_hint because its session is still live",
@@ -554,8 +554,8 @@ func classifyIdTokenHint(
 			// the database's health is what the comment above refuses to do.
 			return hintClassification{}, err
 		}
-		if user == nil || user.Id != userSession.UserId {
-			return rejectIdTokenHint(r.Context(), "session ownership", "reason", "sid names a session that does not belong to sub")
+		if user == nil || user.ID != userSession.UserID {
+			return rejectIDTokenHint(r.Context(), "session ownership", "reason", "sid names a session that does not belong to sub")
 		}
 	}
 
@@ -578,7 +578,7 @@ func classifyIdTokenHint(
 // client's offline grants and every other client's grants are untouched.
 //
 // The sid guard this used to open with is gone. Whether the hint names the browser's session is part
-// of whether the hint can be confirmed at all, and classifyIdTokenHint decides that before anything
+// of whether the hint can be confirmed at all, and classifyIDTokenHint decides that before anything
 // reaches here. It used to be decided here, by returning an error the caller turned into a 500, which
 // is what a user whose session had merely been reaped or replaced saw (#109 decision 11).
 //
@@ -613,9 +613,9 @@ func handleExistingSessionOnLogout(
 	// is no caller identity to read here, and "" is what this row has always carried. The actor is
 	// this event's own user_id, which is where an auditor reads it (#385).
 	auditLogger.Log(r.Context(), audit.EventDeletedUserSessionClient, map[string]interface{}{
-		"user_id":         userSession.UserId,
-		"user_session_id": userSession.Id,
-		"client_id":       sessionClient.Client.Id,
+		"user_id":         userSession.UserID,
+		"user_session_id": userSession.ID,
+		"client_id":       sessionClient.Client.ID,
 		"logged_in_user":  "",
 	})
 	revocation.LogRevokedSignOutGrants(r.Context(), auditLogger, end)
@@ -625,13 +625,13 @@ func handleExistingSessionOnLogout(
 		// event's own user_id. The session went, so it is recorded as every other deletion of one is,
 		// with the reason the sign-out without a hint gives (#564).
 		auditLogger.Log(r.Context(), audit.EventDeletedUserSession, map[string]interface{}{
-			"user_session_id": userSession.Id,
-			"user_id":         userSession.UserId,
+			"user_session_id": userSession.ID,
+			"user_id":         userSession.UserID,
 			"logged_in_user":  "",
 			"reason":          audit.DeletedUserSessionSignedOut,
 		})
 		auditLogger.Log(r.Context(), audit.EventLogout, map[string]interface{}{
-			"user_id":            userSession.UserId,
+			"user_id":            userSession.UserID,
 			"session_identifier": hint.sessionIdentifier,
 			"logged_in_user":     "",
 		})
@@ -699,7 +699,7 @@ func doLogout(
 	}
 
 	// 1. Classify.
-	hint, err := classifyIdTokenHint(r, settings.Issuer, database, tokenParser, dataCipher)
+	hint, err := classifyIDTokenHint(r, settings.Issuer, database, tokenParser, dataCipher)
 	if err != nil {
 		// Classification propagates a failure instead of rejecting for one narrow reason: a database
 		// fault in either of the two lookups that decide whether the hint's session may be trusted,
@@ -786,10 +786,10 @@ func doLogout(
 		// No client to scope to, so the whole session goes (#109 decision 2).
 		sessionIdentifier, _ := reqctx.SessionIdentifierFrom(r.Context())
 
-		userId := int64(0)
+		userID := int64(0)
 		if len(sessionIdentifier) > 0 {
 			var err error
-			userId, err = deleteWholeUserSession(r, settings, sessionIdentifier, database, auditLogger, logoutTokens)
+			userID, err = deleteWholeUserSession(r, settings, sessionIdentifier, database, auditLogger, logoutTokens)
 			if err != nil {
 				pageRenderer.InternalServerError(w, r, err)
 				return
@@ -803,7 +803,7 @@ func doLogout(
 		// so there is no caller identity to read, and "" is what this row has always
 		// carried. The actor is this event's own user_id (#385).
 		auditLogger.Log(r.Context(), audit.EventLogout, map[string]interface{}{
-			"user_id":            userId,
+			"user_id":            userID,
 			"session_identifier": sessionIdentifier,
 			"logged_in_user":     "",
 		})
@@ -907,7 +907,7 @@ func deleteWholeUserSession(
 	if sessionLive(settings, userSession) {
 		deliveries, err = endLiveUserSession(r.Context(), database, userSession)
 	} else {
-		err = database.DeleteUserSession(r.Context(), nil, userSession.Id)
+		err = database.DeleteUserSession(r.Context(), nil, userSession.ID)
 	}
 	if err != nil {
 		return 0, err
@@ -917,14 +917,14 @@ func deleteWholeUserSession(
 	// there is no caller identity to read, and "" is what this row has always carried. The
 	// actor is this event's own user_id, the session's user (#385, #780).
 	auditLogger.Log(r.Context(), audit.EventDeletedUserSession, map[string]interface{}{
-		"user_session_id": userSession.Id,
-		"user_id":         userSession.UserId,
+		"user_session_id": userSession.ID,
+		"user_id":         userSession.UserID,
 		"logged_in_user":  "",
 		"reason":          audit.DeletedUserSessionSignedOut,
 	})
 	logoutTokens.Send(r.Context(), settings.Issuer, deliveries)
 
-	return userSession.UserId, nil
+	return userSession.UserID, nil
 }
 
 // endLiveUserSession deletes userSession and answers the logout tokens for the apps it served, read
@@ -932,7 +932,7 @@ func deleteWholeUserSession(
 // app: that end tells them. A user already gone names nobody either, since deleting a user takes
 // their sessions with it.
 func endLiveUserSession(ctx context.Context, database logoutDatabase, userSession *record.UserSession) ([]backchannel.Delivery, error) {
-	user, err := database.GetUserById(ctx, nil, userSession.UserId)
+	user, err := database.GetUserByID(ctx, nil, userSession.UserID)
 	if err != nil {
 		return nil, err
 	}
@@ -954,7 +954,7 @@ func endLiveUserSession(ctx context.Context, database logoutDatabase, userSessio
 			}
 			deliveries = read
 		}
-		return database.DeleteUserSession(ctx, tx, userSession.Id)
+		return database.DeleteUserSession(ctx, tx, userSession.ID)
 	})
 	if err != nil {
 		return nil, err
@@ -975,8 +975,8 @@ func endLiveUserSession(ctx context.Context, database logoutDatabase, userSessio
 // the teardown, so turning it into a 500 would put the End-User back on a terminal page while still
 // signed in, which is the defect #109 exists to remove. Losing a redirect is the safe direction; the
 // reason is logged.
-func clientForPostLogoutRedirect(ctx context.Context, clientId string, database logoutDatabase) *record.Client {
-	if len(clientId) == 0 {
+func clientForPostLogoutRedirect(ctx context.Context, clientID string, database logoutDatabase) *record.Client {
+	if len(clientID) == 0 {
 		// RP-Initiated Logout 1.0 section 3: "if it is not supplied with post_logout_redirect_uri,
 		// the OP MUST NOT perform post-logout redirection unless the OP has other means of
 		// confirming the legitimacy of the post-logout redirection target". With neither a hint nor
@@ -985,14 +985,14 @@ func clientForPostLogoutRedirect(ctx context.Context, clientId string, database 
 		return nil
 	}
 
-	client, err := database.GetClientByClientIdentifier(ctx, nil, clientId)
+	client, err := database.GetClientByClientIdentifier(ctx, nil, clientID)
 	if err != nil {
 		slog.ErrorContext(ctx, "unable to look up the client named by client_id, not redirecting",
-			"client_identifier", clientId, "error", err)
+			"client_identifier", clientID, "error", err)
 		return nil
 	}
 	if client == nil {
-		slog.WarnContext(ctx, "client_id names no client, not redirecting", "client_identifier", clientId)
+		slog.WarnContext(ctx, "client_id names no client, not redirecting", "client_identifier", clientID)
 		return nil
 	}
 	if client.CreatedViaDCR {
@@ -1003,7 +1003,7 @@ func clientForPostLogoutRedirect(ctx context.Context, clientId string, database 
 		// client. A confirmed hint still earns the redirect, since it proves the End-User signed in
 		// to the client its aud names, and that path does not come through here (#682).
 		slog.WarnContext(ctx, "client_id names a self-registered client and there is no id_token_hint, not redirecting",
-			"client_identifier", clientId)
+			"client_identifier", clientID)
 		return nil
 	}
 

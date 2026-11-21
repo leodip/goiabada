@@ -57,17 +57,17 @@ func deleteThroughAdminAPI(t *testing.T, adminToken, target string) {
 func TestAccessTokenGrant_ConsentWithdrawnEndsItsAccessTokens(t *testing.T) {
 	adminToken, _ := createAdminClientWithToken(t)
 	_, accessToken, code := getUserAccessTokenAndCodeForAccountScope(t)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, code.ClientId) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, code.ClientID) })
 	require.Contains(t, decodeJWTPayload(t, accessToken), "grant_id", "the token names its grant")
 
 	// The consent the user gave on the consent screen, or one standing for it when the client did
 	// not ask: the row the withdrawal endpoints delete.
-	consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, code.UserId, code.ClientId)
+	consent, err := database.GetConsentByUserIDAndClientID(context.Background(), nil, code.UserID, code.ClientID)
 	require.NoError(t, err)
 	if consent == nil {
 		consent = &record.UserConsent{
-			UserId:    code.UserId,
-			ClientId:  code.ClientId,
+			UserID:    code.UserID,
+			ClientID:  code.ClientID,
 			Scope:     code.Scope,
 			GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
 		}
@@ -77,20 +77,20 @@ func TestAccessTokenGrant_ConsentWithdrawnEndsItsAccessTokens(t *testing.T) {
 	// The same user's grant with another client, from a browser of its own.
 	otherSecret := fake.LetterN(32)
 	password := fake.Password(12)
-	user, err := database.GetUserById(context.Background(), nil, code.UserId)
+	user, err := database.GetUserByID(context.Background(), nil, code.UserID)
 	require.NoError(t, err)
 	setUserPassword(t, user, password)
-	otherHttpClient, otherCode := createAuthCode(t, otherSecret, "openid",
+	otherHTTPClient, otherCode := createAuthCode(t, otherSecret, "openid",
 		authCodeOptions{user: user, userPassword: password})
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, otherCode.ClientId) })
-	otherToken := redeemCode(t, otherHttpClient, otherCode, otherSecret)["access_token"].(string)
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, otherCode.ClientID) })
+	otherToken := redeemCode(t, otherHTTPClient, otherCode, otherSecret)["access_token"].(string)
 
 	// The positive control: the token works before the withdrawal.
 	assertUserinfoAdmits(t, accessToken, code.User.Subject)
 	assertAPIAdmitsToken(t, "/api/v1/account/profile", accessToken)
 	assertUserinfoAdmits(t, otherToken, code.User.Subject)
 
-	deleteThroughAdminAPI(t, adminToken, "/api/v1/admin/user-consents/"+strconv.FormatInt(consent.Id, 10))
+	deleteThroughAdminAPI(t, adminToken, "/api/v1/admin/user-consents/"+strconv.FormatInt(consent.ID, 10))
 
 	assertUserinfoRefusesTheToken(t, accessToken)
 	assertAPIRefusesToken(t, "/api/v1/account/profile", accessToken)
@@ -103,13 +103,13 @@ func TestAccessTokenGrant_ClientMadePublicEndsItsAccessTokens(t *testing.T) {
 	adminToken, _ := createAdminClientWithToken(t)
 	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, code.ClientId) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, code.ClientID) })
 	accessToken := redeemCode(t, httpClient, code, clientSecret)["access_token"].(string)
 	assertUserinfoAdmits(t, accessToken, code.User.Subject)
 
-	flipToPublic(t, adminToken, code.ClientId)
+	flipToPublic(t, adminToken, code.ClientID)
 
-	client, err := database.GetClientById(context.Background(), nil, code.ClientId)
+	client, err := database.GetClientByID(context.Background(), nil, code.ClientID)
 	require.NoError(t, err)
 	require.True(t, client.Enabled, "the client stays enabled, so only its grant can refuse the token")
 	assertUserinfoRefusesTheToken(t, accessToken)
@@ -129,7 +129,7 @@ func TestAccessTokenGrant_EndingTheSessionOfAnOfflineGrantEndsItsAccessTokens(t 
 	session, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, grant.sessionIdentifier)
 	require.NoError(t, err)
 	require.NotNil(t, session)
-	deleteThroughAdminAPI(t, adminToken, "/api/v1/admin/user-sessions/"+strconv.FormatInt(session.Id, 10))
+	deleteThroughAdminAPI(t, adminToken, "/api/v1/admin/user-sessions/"+strconv.FormatInt(session.ID, 10))
 
 	assertUserinfoRefusesTheToken(t, grant.accessToken)
 	assertAPIRefusesToken(t, "/api/v1/account/profile", grant.accessToken)

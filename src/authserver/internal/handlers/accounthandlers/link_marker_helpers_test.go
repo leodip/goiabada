@@ -107,7 +107,7 @@ func expiredMarkerJSON(t *testing.T, flow emaillinks.LinkMarkerFlow, id int64, c
 	t.Helper()
 	return marshalMarker(t, &emaillinks.LinkMarker{
 		Flow:      flow,
-		Id:        id,
+		ID:        id,
 		CodeHash:  codeHash,
 		ExpiresAt: time.Now().UTC().Add(-time.Second),
 	})

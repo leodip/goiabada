@@ -30,8 +30,8 @@ import (
 
 const interleavingSessionName = "goiabada-auth-test"
 
-// rotatingUserId is the user a rotation here is for, whose password or code the step has just accepted.
-const rotatingUserId int64 = 1
+// rotatingUserID is the user a rotation here is for, whose password or code the step has just accepted.
+const rotatingUserID int64 = 1
 
 // newDatabaseCeremonyStore is the ceremony store as the auth server builds it, over this run's
 // database, with the session store and the backend under it.
@@ -68,21 +68,21 @@ func ceremonyRequest(cookies []*http.Cookie) *http.Request {
 	return req
 }
 
-// stepRequest is ceremonyRequest naming ceremonyId in its URL, as every request of a step after
+// stepRequest is ceremonyRequest naming ceremonyID in its URL, as every request of a step after
 // /auth/authorize names the ceremony it belongs to.
-func stepRequest(cookies []*http.Cookie, ceremonyId string) *http.Request {
+func stepRequest(cookies []*http.Cookie, ceremonyID string) *http.Request {
 	req := ceremonyRequest(cookies)
-	req.URL.RawQuery = url.Values{ceremony.QueryParameter: {ceremonyId}}.Encode()
+	req.URL.RawQuery = url.Values{ceremony.QueryParameter: {ceremonyID}}.Encode()
 	return req
 }
 
 // startCeremony stores a ceremony as /auth/authorize does, in a browser with no session, and
 // answers the cookie naming it.
-func startCeremony(t *testing.T, ceremonyStore *ceremony.Store, ceremonyId string) []*http.Cookie {
+func startCeremony(t *testing.T, ceremonyStore *ceremony.Store, ceremonyID string) []*http.Cookie {
 	t.Helper()
 	rr := httptest.NewRecorder()
 	require.NoError(t, ceremonyStore.AddAuthContext(rr, ceremonyRequest(nil), &ceremony.AuthContext{
-		CeremonyId: ceremonyId, ClientId: "client-" + ceremonyId, AuthState: ceremony.AuthStateRequiresLevel1,
+		CeremonyID: ceremonyID, ClientID: "client-" + ceremonyID, AuthState: ceremony.AuthStateRequiresLevel1,
 	}))
 	cookies := rr.Result().Cookies()
 	require.Len(t, cookies, 1)
@@ -97,11 +97,11 @@ func TestCeremonyStore_AStepThatResumesAfterANewerAuthorizeLeavesBothCeremoniesS
 	tabA := stepRequest(cookies, "ceremony-a")
 	loaded, err := ceremonyStore.GetAuthContext(tabA)
 	require.NoError(t, err)
-	require.Equal(t, "ceremony-a", loaded.CeremonyId)
+	require.Equal(t, "ceremony-a", loaded.CeremonyID)
 
 	// Tab B's /auth/authorize, carrying the same cookie, adds ceremony B.
 	require.NoError(t, ceremonyStore.AddAuthContext(httptest.NewRecorder(), ceremonyRequest(cookies),
-		&ceremony.AuthContext{CeremonyId: "ceremony-b", ClientId: "client-b", AuthState: ceremony.AuthStateRequiresLevel1}))
+		&ceremony.AuthContext{CeremonyID: "ceremony-b", ClientID: "client-b", AuthState: ceremony.AuthStateRequiresLevel1}))
 
 	// Tab A's step resumes and saves the ceremony it loaded.
 	loaded.AuthState = ceremony.AuthStateLevel1Password
@@ -111,13 +111,13 @@ func TestCeremonyStore_AStepThatResumesAfterANewerAuthorizeLeavesBothCeremoniesS
 	requireHeld(t, ceremonyStore, cookies, "ceremony-b", ceremony.AuthStateRequiresLevel1)
 }
 
-// requireHeld is that the browser cookies name holds the ceremony ceremonyId names, at state.
-func requireHeld(t *testing.T, ceremonyStore *ceremony.Store, cookies []*http.Cookie, ceremonyId string,
+// requireHeld is that the browser cookies name holds the ceremony ceremonyID names, at state.
+func requireHeld(t *testing.T, ceremonyStore *ceremony.Store, cookies []*http.Cookie, ceremonyID string,
 	state ceremony.AuthState) {
 	t.Helper()
-	stored, err := ceremonyStore.GetAuthContext(stepRequest(cookies, ceremonyId))
-	require.NoError(t, err, "the browser session holds %s", ceremonyId)
-	assert.Equal(t, state, stored.AuthState, "%s is at its own state", ceremonyId)
+	stored, err := ceremonyStore.GetAuthContext(stepRequest(cookies, ceremonyID))
+	require.NoError(t, err, "the browser session holds %s", ceremonyID)
+	assert.Equal(t, state, stored.AuthState, "%s is at its own state", ceremonyID)
 }
 
 // interleavingBackend is the database backend with a turn for the test before its next conditional
@@ -156,7 +156,7 @@ func TestCeremonyStore_WritesOfTwoCeremoniesLandingInsideEachOtherAreBothKept(t 
 			cookies := startCeremony(t, ceremonyStore, "ceremony-a")
 			if tc.inside == "save of b" {
 				require.NoError(t, ceremonyStore.AddAuthContext(httptest.NewRecorder(), ceremonyRequest(cookies),
-					&ceremony.AuthContext{CeremonyId: "ceremony-b", AuthState: ceremony.AuthStateRequiresLevel1}))
+					&ceremony.AuthContext{CeremonyID: "ceremony-b", AuthState: ceremony.AuthStateRequiresLevel1}))
 			}
 
 			want := map[string]ceremony.AuthState{
@@ -167,7 +167,7 @@ func TestCeremonyStore_WritesOfTwoCeremoniesLandingInsideEachOtherAreBothKept(t 
 				switch which {
 				case "add":
 					require.NoError(t, ceremonyStore.AddAuthContext(httptest.NewRecorder(), ceremonyRequest(cookies),
-						&ceremony.AuthContext{CeremonyId: "ceremony-b", AuthState: ceremony.AuthStateRequiresLevel1}))
+						&ceremony.AuthContext{CeremonyID: "ceremony-b", AuthState: ceremony.AuthStateRequiresLevel1}))
 				case "save", "save of b":
 					id, state := "ceremony-a", ceremony.AuthStateLevel1Password
 					if which == "save of b" {
@@ -206,7 +206,7 @@ func TestCeremonyStore_AStepThatStillHoldsItsCeremonySaves(t *testing.T) {
 
 	stored, err := ceremonyStore.LatestAuthContext(ceremonyRequest(cookies))
 	require.NoError(t, err)
-	assert.Equal(t, "ceremony-a", stored.CeremonyId)
+	assert.Equal(t, "ceremony-a", stored.CeremonyID)
 	assert.Equal(t, ceremony.AuthStateLevel1Password, stored.AuthState)
 }
 
@@ -243,13 +243,13 @@ func TestCeremonyStore_ARotationThatResumesAfterANewerAuthorizeCarriesBothCeremo
 	tabA := stepRequest(cookies, "ceremony-a")
 	loaded, err := ceremonyStore.GetAuthContext(tabA)
 	require.NoError(t, err)
-	require.Equal(t, "ceremony-a", loaded.CeremonyId)
+	require.Equal(t, "ceremony-a", loaded.CeremonyID)
 
 	require.NoError(t, ceremonyStore.AddAuthContext(httptest.NewRecorder(), ceremonyRequest(cookies),
-		&ceremony.AuthContext{CeremonyId: "ceremony-b", ClientId: "client-b", AuthState: ceremony.AuthStateRequiresLevel1}))
+		&ceremony.AuthContext{CeremonyID: "ceremony-b", ClientID: "client-b", AuthState: ceremony.AuthStateRequiresLevel1}))
 
 	rr := httptest.NewRecorder()
-	require.NoError(t, ceremonyStore.RegenerateSession(rr, tabA, loaded.CeremonyId, rotatingUserId))
+	require.NoError(t, ceremonyStore.RegenerateSession(rr, tabA, loaded.CeremonyID, rotatingUserID))
 
 	rotated := rr.Result().Cookies()
 	require.Len(t, rotated, 1)
@@ -270,11 +270,11 @@ func TestCeremonyStore_ARotationOfAPushedOutCeremonyLeavesTheNewerOnesStored(t *
 	newer := []string{"newer-1", "newer-2", "newer-3", "newer-4", "newer-5"}
 	for _, id := range newer {
 		require.NoError(t, ceremonyStore.AddAuthContext(httptest.NewRecorder(), ceremonyRequest(cookies),
-			&ceremony.AuthContext{CeremonyId: id, AuthState: ceremony.AuthStateRequiresLevel1}))
+			&ceremony.AuthContext{CeremonyID: id, AuthState: ceremony.AuthStateRequiresLevel1}))
 	}
 
 	rr := httptest.NewRecorder()
-	err = ceremonyStore.RegenerateSession(rr, tabA, loaded.CeremonyId, rotatingUserId)
+	err = ceremonyStore.RegenerateSession(rr, tabA, loaded.CeremonyID, rotatingUserID)
 
 	require.ErrorIs(t, err, ceremony.ErrCeremonyReplaced)
 	assert.Empty(t, rr.Result().Cookies(), "tab A rotated nothing, so it tells the browser nothing")
@@ -290,7 +290,7 @@ func TestCeremonyStore_ARotationOfAPushedOutCeremonyLeavesTheNewerOnesStored(t *
 func TestCeremonyStore_ARotationThatStillHoldsItsCeremonyRotates(t *testing.T) {
 	ceremonyStore, store, backend := newDatabaseCeremonyStore(t)
 	cookies := startCeremony(t, ceremonyStore, "ceremony-a")
-	oldId, err := store.OpenCookie(interleavingSessionName, cookies[0].Value)
+	oldID, err := store.OpenCookie(interleavingSessionName, cookies[0].Value)
 	require.NoError(t, err)
 
 	tabA := stepRequest(cookies, "ceremony-a")
@@ -298,17 +298,17 @@ func TestCeremonyStore_ARotationThatStillHoldsItsCeremonyRotates(t *testing.T) {
 	require.NoError(t, err)
 
 	rr := httptest.NewRecorder()
-	require.NoError(t, ceremonyStore.RegenerateSession(rr, tabA, "ceremony-a", rotatingUserId))
+	require.NoError(t, ceremonyStore.RegenerateSession(rr, tabA, "ceremony-a", rotatingUserID))
 
 	rotated := rr.Result().Cookies()
 	require.Len(t, rotated, 1)
-	newId, err := store.OpenCookie(interleavingSessionName, rotated[0].Value)
+	newID, err := store.OpenCookie(interleavingSessionName, rotated[0].Value)
 	require.NoError(t, err)
-	assert.NotEqual(t, oldId, newId)
+	assert.NotEqual(t, oldID, newID)
 	stored, err := ceremonyStore.LatestAuthContext(ceremonyRequest(rotated))
 	require.NoError(t, err)
-	assert.Equal(t, "ceremony-a", stored.CeremonyId)
-	_, err = backend.Load(context.Background(), oldId)
+	assert.Equal(t, "ceremony-a", stored.CeremonyID)
+	_, err = backend.Load(context.Background(), oldID)
 	require.ErrorIs(t, err, sessionstore.ErrNotFound, "the identifier the browser arrived with names nothing any more")
 }
 
@@ -326,7 +326,7 @@ func TestCeremonyStore_ARotationWhoseSessionIsGoneDoesNotPutItBack(t *testing.T)
 	require.NoError(t, backend.Delete(context.Background(), id))
 
 	rr := httptest.NewRecorder()
-	err = ceremonyStore.RegenerateSession(rr, tabA, "ceremony-a", rotatingUserId)
+	err = ceremonyStore.RegenerateSession(rr, tabA, "ceremony-a", rotatingUserID)
 
 	require.ErrorIs(t, err, ceremony.ErrCeremonyReplaced)
 	assert.Empty(t, rr.Result().Cookies(), "no cookie names a session re-created from tab A's copy")

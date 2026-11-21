@@ -61,9 +61,9 @@ type JWKSTokenParser struct {
 	fetchMu sync.Mutex
 
 	mu         sync.RWMutex
-	cachedJwks publishedKeys
+	cachedJWKS publishedKeys
 	fetchedAt  time.Time
-	// generation counts the fetches that replaced cachedJwks; it is how a request that waited
+	// generation counts the fetches that replaced cachedJWKS; it is how a request that waited
 	// on fetchMu tells that the fetch it was waiting for has already happened.
 	generation uint64
 }
@@ -108,18 +108,18 @@ func NewJWKSTokenParser(baseURL string, httpClient *http.Client, upstream *upstr
 // so an empty expected nonce is refused rather than skipping the check. The claim must be
 // nonceHash of the raw value the session kept, the scheme OIDC Core 15.5.2 describes. Only the
 // ID token is decoded; the access and refresh tokens are carried as the strings they arrived as.
-func (tp *JWKSTokenParser) DecodeAndValidateSignInResponse(ctx context.Context, tokenResponse *oauth.TokenResponse, nonce string) (*JwtInfo, error) {
+func (tp *JWKSTokenParser) DecodeAndValidateSignInResponse(ctx context.Context, tokenResponse *oauth.TokenResponse, nonce string) (*JWTInfo, error) {
 	if tokenResponse == nil {
 		return nil, errs.New("there is no token response")
 	}
 	if tokenResponse.AccessToken == "" {
 		return nil, errs.New("the token response carries no access token")
 	}
-	if tokenResponse.IdToken == "" {
+	if tokenResponse.IDToken == "" {
 		return nil, errs.New("the token response carries no id token")
 	}
 
-	idToken, err := tp.verifyIDToken(ctx, tokenResponse.IdToken, true)
+	idToken, err := tp.verifyIDToken(ctx, tokenResponse.IDToken, true)
 	if err != nil {
 		return nil, err
 	}
@@ -138,7 +138,7 @@ func (tp *JWKSTokenParser) DecodeAndValidateSignInResponse(ctx context.Context, 
 		return nil, errs.New("the id token's nonce is not the one this sign-in sent")
 	}
 
-	return &JwtInfo{TokenResponse: *tokenResponse, IdToken: idToken}, nil
+	return &JWTInfo{TokenResponse: *tokenResponse, IDToken: idToken}, nil
 }
 
 // DecodeAndValidateRefreshResponse accepts the token response to a refresh grant. previous is
@@ -151,7 +151,7 @@ func (tp *JWKSTokenParser) DecodeAndValidateSignInResponse(ctx context.Context, 
 // it; and requires iat not to go backwards. An iss that differs from previous is
 // ErrForeignToken; every other mismatch is not, because a different user or sign-in time in a
 // refresh is something someone must look at rather than a changed setting.
-func (tp *JWKSTokenParser) DecodeAndValidateRefreshResponse(ctx context.Context, tokenResponse *oauth.TokenResponse, previous *oauth.JwtToken) (*JwtInfo, error) {
+func (tp *JWKSTokenParser) DecodeAndValidateRefreshResponse(ctx context.Context, tokenResponse *oauth.TokenResponse, previous *oauth.JWTToken) (*JWTInfo, error) {
 	if tokenResponse == nil {
 		return nil, errs.New("there is no token response")
 	}
@@ -162,13 +162,13 @@ func (tp *JWKSTokenParser) DecodeAndValidateRefreshResponse(ctx context.Context,
 		return nil, errs.New("the token response carries no access token")
 	}
 
-	if tokenResponse.IdToken == "" {
+	if tokenResponse.IDToken == "" {
 		kept := *tokenResponse
-		kept.IdToken = previous.TokenBase64
-		return &JwtInfo{TokenResponse: kept, IdToken: previous}, nil
+		kept.IDToken = previous.TokenBase64
+		return &JWTInfo{TokenResponse: kept, IDToken: previous}, nil
 	}
 
-	idToken, err := tp.verifyIDToken(ctx, tokenResponse.IdToken, true)
+	idToken, err := tp.verifyIDToken(ctx, tokenResponse.IDToken, true)
 	if err != nil {
 		return nil, err
 	}
@@ -176,7 +176,7 @@ func (tp *JWKSTokenParser) DecodeAndValidateRefreshResponse(ctx context.Context,
 		return nil, err
 	}
 
-	return &JwtInfo{TokenResponse: *tokenResponse, IdToken: idToken}, nil
+	return &JWTInfo{TokenResponse: *tokenResponse, IDToken: idToken}, nil
 }
 
 // DecodeAndValidateStoredIDToken re-verifies the ID token a session holds, on every request:
@@ -184,7 +184,7 @@ func (tp *JWKSTokenParser) DecodeAndValidateRefreshResponse(ctx context.Context,
 // accepting the token from a token response, which happens at sign-in and on every refresh; the
 // console session's length is the refresh cycle and the session store's own lifetimes, not the
 // ID token's, which a refresh may leave unrenewed (OIDC Core 12.2).
-func (tp *JWKSTokenParser) DecodeAndValidateStoredIDToken(ctx context.Context, raw string) (*oauth.JwtToken, error) {
+func (tp *JWKSTokenParser) DecodeAndValidateStoredIDToken(ctx context.Context, raw string) (*oauth.JWTToken, error) {
 	return tp.verifyIDToken(ctx, raw, false)
 }
 
@@ -208,7 +208,7 @@ func (tp *JWKSTokenParser) DecodeAndValidateStoredIDToken(ctx context.Context, r
 // because an unverifiable token is evidence of nothing, and before the expiry, because a token
 // that is both foreign and expired must be reported as foreign: that is the answer callers
 // branch on, and moving the expiry first would report such a token as merely expired (#427).
-func (tp *JWKSTokenParser) verifyIDToken(ctx context.Context, raw string, acceptingFromResponse bool) (*oauth.JwtToken, error) {
+func (tp *JWKSTokenParser) verifyIDToken(ctx context.Context, raw string, acceptingFromResponse bool) (*oauth.JWTToken, error) {
 	if raw == "" {
 		return nil, errs.New("the id token is empty")
 	}
@@ -261,7 +261,7 @@ func (tp *JWKSTokenParser) verifyIDToken(ctx context.Context, raw string, accept
 		}
 	}
 
-	return &oauth.JwtToken{TokenBase64: raw, Claims: claims}, nil
+	return &oauth.JWTToken{TokenBase64: raw, Claims: claims}, nil
 }
 
 // maxSubjectLength is OIDC Core 1.0 section 2's bound on sub: it "MUST NOT exceed 255 ASCII
@@ -292,7 +292,7 @@ func checkSubjectAndIssuedAt(claims jwt.MapClaims) error {
 
 // sameAuthentication is OIDC Core 12.2's comparison of a refreshed ID token with the one it
 // replaces.
-func sameAuthentication(previous, refreshed *oauth.JwtToken) error {
+func sameAuthentication(previous, refreshed *oauth.JWTToken) error {
 	if previous.StringClaim("iss") != refreshed.StringClaim("iss") {
 		return errs.Wrap(ErrForeignToken, "the refreshed id token's iss differs from the previous one's")
 	}
@@ -333,7 +333,7 @@ func sameAuthentication(previous, refreshed *oauth.JwtToken) error {
 
 // sameAudience compares the two tokens' aud values as sets, so the string and the one-element
 // array spellings of one audience are equal.
-func sameAudience(previous, refreshed *oauth.JwtToken) bool {
+func sameAudience(previous, refreshed *oauth.JWTToken) bool {
 	previousAud, previousErr := previous.Claims.GetAudience()
 	refreshedAud, refreshedErr := refreshed.Claims.GetAudience()
 	if previousErr != nil || refreshedErr != nil {
@@ -373,7 +373,7 @@ func (tp *JWKSTokenParser) keyFunc(ctx context.Context) jwt.Keyfunc {
 				return pub, nil
 			}
 		}
-		if err := tp.refreshJwksSince(ctx, generation); err != nil {
+		if err := tp.refreshJWKSSince(ctx, generation); err != nil {
 			return nil, err
 		}
 		if pub := tp.getPublicKeyFromCache(kid); pub != nil {
@@ -391,10 +391,10 @@ func (tp *JWKSTokenParser) cacheState() (generation uint64, fresh bool) {
 	return tp.generation, tp.now().Sub(tp.fetchedAt) < jwksMaxAge
 }
 
-// refreshJwksSince fetches /certs unless the cache has been replaced since the caller found it
+// refreshJWKSSince fetches /certs unless the cache has been replaced since the caller found it
 // wanting at generation seen: a request that waited on fetchMu behind another request's fetch
 // uses that fetch rather than making its own.
-func (tp *JWKSTokenParser) refreshJwksSince(ctx context.Context, seen uint64) error {
+func (tp *JWKSTokenParser) refreshJWKSSince(ctx context.Context, seen uint64) error {
 	tp.fetchMu.Lock()
 	defer tp.fetchMu.Unlock()
 
@@ -404,7 +404,7 @@ func (tp *JWKSTokenParser) refreshJwksSince(ctx context.Context, seen uint64) er
 	if replaced {
 		return nil
 	}
-	return tp.refreshJwks(ctx)
+	return tp.refreshJWKS(ctx)
 }
 
 // getPublicKeyFromCache answers the cached key kid names, or for a token without a kid the JWKS's
@@ -415,12 +415,12 @@ func (tp *JWKSTokenParser) getPublicKeyFromCache(kid string) *rsa.PublicKey {
 	defer tp.mu.RUnlock()
 	if kid == "" {
 		// If no kid, attempt current key if single
-		if len(tp.cachedJwks.Keys) == 1 {
-			return verificationKey(tp.cachedJwks.Keys[0])
+		if len(tp.cachedJWKS.Keys) == 1 {
+			return verificationKey(tp.cachedJWKS.Keys[0])
 		}
 		return nil
 	}
-	for _, k := range tp.cachedJwks.Keys {
+	for _, k := range tp.cachedJWKS.Keys {
 		if k.Kid == kid {
 			if pub := verificationKey(k); pub != nil {
 				return pub
@@ -437,16 +437,16 @@ type publishedKeys struct {
 }
 
 // publishedKey is one key of the JWKS: its members, and whether its use and alg allow it to
-// verify an ID token (usableSigningKey), judged from the document's own members, since oauth.Jwk
+// verify an ID token (usableSigningKey), judged from the document's own members, since oauth.JWK
 // holds each as a string and so reads an empty or null member as an absent one.
 type publishedKey struct {
-	oauth.Jwk
+	oauth.JWK
 	signing bool
 }
 
 // decodeJWKS reads a JWKS document into its keys. A document that is not a JSON object with a keys
 // array, or a key that is not a JSON object, is an error. A key whose members are not the strings
-// oauth.Jwk holds is kept, under the kid it names, and never used.
+// oauth.JWK holds is kept, under the kid it names, and never used.
 func decodeJWKS(document []byte) (publishedKeys, error) {
 	var raw struct {
 		Keys []json.RawMessage `json:"keys"`
@@ -460,10 +460,10 @@ func decodeJWKS(document []byte) (publishedKeys, error) {
 		if err := json.Unmarshal(member, &members); err != nil {
 			return publishedKeys{}, err
 		}
-		var jwk oauth.Jwk
+		var jwk oauth.JWK
 		// A member of another type fails the decode after every other member is read.
 		fits := json.Unmarshal(member, &jwk) == nil
-		keys = append(keys, publishedKey{Jwk: jwk, signing: fits && usableSigningKey(members)})
+		keys = append(keys, publishedKey{JWK: jwk, signing: fits && usableSigningKey(members)})
 	}
 	return publishedKeys{Keys: keys}, nil
 }
@@ -474,7 +474,7 @@ func verificationKey(k publishedKey) *rsa.PublicKey {
 	if !k.signing {
 		return nil
 	}
-	pub, err := jwkToRSAPublicKey(k.Jwk)
+	pub, err := jwkToRSAPublicKey(k.JWK)
 	if err != nil {
 		return nil
 	}
@@ -506,7 +506,7 @@ func memberAbsentOr(members map[string]json.RawMessage, name, want string) bool 
 	return value == want
 }
 
-func (tp *JWKSTokenParser) refreshJwks(ctx context.Context) error {
+func (tp *JWKSTokenParser) refreshJWKS(ctx context.Context) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, tp.jwksURL, nil)
 	if err != nil {
 		return err
@@ -539,7 +539,7 @@ func (tp *JWKSTokenParser) refreshJwks(ctx context.Context) error {
 		return err
 	}
 	tp.mu.Lock()
-	tp.cachedJwks = jwks
+	tp.cachedJWKS = jwks
 	tp.fetchedAt = tp.now()
 	tp.generation++
 	tp.mu.Unlock()
@@ -558,7 +558,7 @@ const maxRSAExponentBytes = 4
 // malformed to verify with (#709 finding 6): a modulus under minRSAModulusBits, and an exponent
 // longer than maxRSAExponentBytes, even, or below 3, which RFC 8017 section 3.1 requires it not to
 // be (3 <= e <= n - 1, and an RSA exponent is odd).
-func jwkToRSAPublicKey(j oauth.Jwk) (*rsa.PublicKey, error) {
+func jwkToRSAPublicKey(j oauth.JWK) (*rsa.PublicKey, error) {
 	if j.Kty != "RSA" {
 		return nil, errs.New("unsupported JWK kty")
 	}

@@ -53,7 +53,7 @@ type ROPCGrantInput struct {
 // SECURITY NOTE: ROPC is deprecated in OAuth 2.1 due to credential exposure risks.
 //
 // Unlike implicit flow, ROPC issues refresh tokens.
-// ROPC refresh tokens store UserId and ClientId directly (no Code entity needed).
+// ROPC refresh tokens store UserID and ClientID directly (no Code entity needed).
 //
 // The response is the token endpoint's one wire shape, as every other grant's is. A struct of
 // its own used to differ only in three omitempty tags, on the access token, token type and
@@ -101,11 +101,11 @@ func (t *TokenIssuer) IssuePasswordGrant(ctx context.Context, settings *record.S
 
 	// The grant's identifier is the jti its first refresh token takes, fixed before the access token
 	// that names it (#676 decision 1).
-	grantId := uuid.New()
+	grantID := uuid.New()
 
 	// Generate access token
 	// nil parent: initial password grant, so the validated User snapshot is the source.
-	accessTokenStr, err := t.generateROPCAccessToken(ctx, nil, settings, input, input.Scope, now, privKey, keyIdentifier, nil, grantId)
+	accessTokenStr, err := t.generateROPCAccessToken(ctx, nil, settings, input, input.Scope, now, privKey, keyIdentifier, nil, grantID)
 	if err != nil {
 		return nil, err
 	}
@@ -115,14 +115,14 @@ func (t *TokenIssuer) IssuePasswordGrant(ctx context.Context, settings *record.S
 	// Generate id_token if openid scope is present
 	scopes := strings.Split(input.Scope, " ")
 	if slices.Contains(scopes, "openid") {
-		idTokenStr, idTokenErr := t.generateROPCIdToken(ctx, nil, settings, input, input.Scope, now, privKey, keyIdentifier)
+		idTokenStr, idTokenErr := t.generateROPCIDToken(ctx, nil, settings, input, input.Scope, now, privKey, keyIdentifier)
 		if idTokenErr != nil {
 			return nil, idTokenErr
 		}
-		response.IdToken = idTokenStr
+		response.IDToken = idTokenStr
 	}
 
-	// The first refresh token, with direct UserId/ClientId (no Code entity needed), written in a
+	// The first refresh token, with direct UserID/ClientID (no Code entity needed), written in a
 	// transaction that first takes the client's row with a locking read, which writes nothing, and
 	// reads the identifier again. A rename of the client revokes its grants in the rename's
 	// transaction, and a password grant has no code for that sweep to mark and, until this row is
@@ -142,7 +142,7 @@ func (t *TokenIssuer) IssuePasswordGrant(ctx context.Context, settings *record.S
 	var refreshToken string
 	var refreshExpiresIn int64
 	err = t.database.RunInTransaction(ctx, func(tx *sql.Tx) error {
-		current, readErr := t.database.GetClientByIdForUpdate(ctx, tx, input.Client.Id)
+		current, readErr := t.database.GetClientByIDForUpdate(ctx, tx, input.Client.ID)
 		if readErr != nil {
 			return readErr
 		}
@@ -150,7 +150,7 @@ func (t *TokenIssuer) IssuePasswordGrant(ctx context.Context, settings *record.S
 			return errs.WithStack(ErrPasswordGrantClientRenamed)
 		}
 		var writeErr error
-		refreshToken, refreshExpiresIn, writeErr = t.generateRefreshTokenForROPC(ctx, tx, settings, input, input.Scope, now, privKey, keyIdentifier, nil, grantId)
+		refreshToken, refreshExpiresIn, writeErr = t.generateRefreshTokenForROPC(ctx, tx, settings, input, input.Scope, now, privKey, keyIdentifier, nil, grantID)
 		return writeErr
 	})
 	if err != nil {

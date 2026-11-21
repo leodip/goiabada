@@ -11,7 +11,7 @@ import (
 
 // brandAssetDatabase is what a brand asset's public answer needs: the asset with its bytes.
 type brandAssetDatabase interface {
-	GetBrandAssetById(ctx context.Context, tx *sql.Tx, assetId int64) (*record.BrandAsset, error)
+	GetBrandAssetByID(ctx context.Context, tx *sql.Tx, assetID int64) (*record.BrandAsset, error)
 }
 
 // HandleBrandAssetGet answers a brand asset's bytes, at brandasset.Route, to anyone, as a static
@@ -28,13 +28,13 @@ type brandAssetDatabase interface {
 // operator's typeface from this server (decision 8). An empty fontOrigin grants nothing.
 func HandleBrandAssetGet(pageRenderer PageRenderer, database brandAssetDatabase, fontOrigin string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		assetId, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-		if err != nil || assetId <= 0 {
+		assetID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+		if err != nil || assetID <= 0 {
 			ResourceNotFound(w, r)
 			return
 		}
 
-		asset, err := database.GetBrandAssetById(r.Context(), nil, assetId)
+		asset, err := database.GetBrandAssetByID(r.Context(), nil, assetID)
 		if err != nil {
 			pageRenderer.InternalServerError(w, r, err)
 			return

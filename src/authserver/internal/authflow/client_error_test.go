@@ -19,7 +19,7 @@ import (
 func TestClientProvenance(t *testing.T) {
 	t.Run("the client the identifier names", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
-		client := &record.Client{Id: 7, ClientIdentifier: "provenance-client"}
+		client := &record.Client{ID: 7, ClientIdentifier: "provenance-client"}
 		ctx := context.Background()
 		database.On("GetClientByClientIdentifier", ctx, mock.Anything, "provenance-client").Return(client, nil).Once()
 

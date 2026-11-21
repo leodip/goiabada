@@ -29,19 +29,19 @@ import (
 // acceptance criterion forbids below a request boundary -- matches nothing, and the strict mock
 // reports an unexpected call rather than letting the case pass.
 
-const propagatedRequestId = "goiabada/req-propagation-1"
+const propagatedRequestID = "goiabada/req-propagation-1"
 
-// requestCarryingId returns a request whose context holds an id nothing else can produce.
-func requestCarryingId(t *testing.T, method, target string) *http.Request {
+// requestCarryingID returns a request whose context holds an id nothing else can produce.
+func requestCarryingID(t *testing.T, method, target string) *http.Request {
 	t.Helper()
 	req := httptest.NewRequest(method, target, nil)
-	return req.WithContext(requestid.NewContext(req.Context(), propagatedRequestId))
+	return req.WithContext(requestid.NewContext(req.Context(), propagatedRequestID))
 }
 
 // theRequestsContext matches only the context belonging to the request under test.
 func theRequestsContext() interface{} {
 	return mock.MatchedBy(func(ctx context.Context) bool {
-		return requestid.FromContext(ctx) == propagatedRequestId
+		return requestid.FromContext(ctx) == propagatedRequestID
 	})
 }
 
@@ -59,13 +59,13 @@ func TestHandleProfilePictureGet_ConsultsTheDatabaseUnderTheRequestsContext(t *t
 	pageRenderer := handlersmocks.NewPageRenderer(t)
 	database := datamocks.NewDatabase(t)
 
-	req := withPathValue(requestCarryingId(t, http.MethodGet, "/userinfo/picture/sub-1"), "subject", "sub-1")
+	req := withPathValue(requestCarryingID(t, http.MethodGet, "/userinfo/picture/sub-1"), "subject", "sub-1")
 	rr := httptest.NewRecorder()
 
-	user := &record.User{Id: 7, Subject: "sub-1"}
+	user := &record.User{ID: 7, Subject: "sub-1"}
 	database.On("GetUserBySubject", theRequestsContext(), mock.Anything, "sub-1").Return(user, nil).Once()
-	database.On("GetUserProfilePictureByUserId", theRequestsContext(), mock.Anything, int64(7)).
-		Return(&record.UserProfilePicture{UserId: 7, ContentType: "image/png", Picture: []byte{1, 2, 3}}, nil).Once()
+	database.On("GetUserProfilePictureByUserID", theRequestsContext(), mock.Anything, int64(7)).
+		Return(&record.UserProfilePicture{UserID: 7, ContentType: "image/png", Picture: []byte{1, 2, 3}}, nil).Once()
 
 	HandleProfilePictureGet(pageRenderer, database).ServeHTTP(rr, req)
 
@@ -81,26 +81,26 @@ func TestHandleProfilePictureGet_RefusedBeforeAnyQuery(t *testing.T) {
 	pageRenderer := handlersmocks.NewPageRenderer(t)
 	database := datamocks.NewDatabase(t)
 
-	req := withPathValue(requestCarryingId(t, http.MethodGet, "/userinfo/picture/"), "subject", "")
+	req := withPathValue(requestCarryingID(t, http.MethodGet, "/userinfo/picture/"), "subject", "")
 	rr := httptest.NewRecorder()
 
 	HandleProfilePictureGet(pageRenderer, database).ServeHTTP(rr, req)
 
 	require.Equal(t, http.StatusNotFound, rr.Code)
 	database.AssertNotCalled(t, "GetUserBySubject", mock.Anything, mock.Anything, mock.Anything)
-	database.AssertNotCalled(t, "GetUserProfilePictureByUserId", mock.Anything, mock.Anything, mock.Anything)
+	database.AssertNotCalled(t, "GetUserProfilePictureByUserID", mock.Anything, mock.Anything, mock.Anything)
 }
 
 // Stage 6 adds the session, token and code half. Two places in this package now change a context
 // hands that did not before: /auth/issue hands the request's own context to the code issuer's
 // port, and the session lookup every ceremony makes is issued under it.
 
-// issueRequestCarryingId is requestWithSessionIdentifier plus the chi request id, so a
+// issueRequestCarryingID is requestWithSessionIdentifier plus the chi request id, so a
 // IssueAuthCodeTx called with anything but this request's context matches nothing.
-func issueRequestCarryingId(t *testing.T, sessionIdentifier string) *http.Request {
+func issueRequestCarryingID(t *testing.T, sessionIdentifier string) *http.Request {
 	t.Helper()
 	req := requestWithSessionIdentifier(t, sessionIdentifier)
-	return req.WithContext(requestid.NewContext(req.Context(), propagatedRequestId))
+	return req.WithContext(requestid.NewContext(req.Context(), propagatedRequestID))
 }
 
 // The accept arm: the code issuer opens the transaction whose acquisition and insert #139 orders
@@ -118,15 +118,15 @@ func TestHandleIssueGet_IssuesUnderTheRequestsContext(t *testing.T) {
 	userSessionManager := handlersmocks.NewUserSessionManager(t)
 	permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-	req := issueRequestCarryingId(t, liveSessionIdentifier)
+	req := issueRequestCarryingID(t, liveSessionIdentifier)
 	rr := httptest.NewRecorder()
 
 	authContext := &ceremony.AuthContext{
-		CeremonyId:   testCeremonyId,
+		CeremonyID:   testCeremonyID,
 		AuthState:    ceremony.AuthStateReadyToIssueCode,
 		Scope:        "openid profile",
-		ClientId:     "test-client",
-		UserId:       123,
+		ClientID:     "test-client",
+		UserID:       123,
 		ResponseMode: "query",
 		ResponseType: "code",
 		RedirectURI:  "https://example.com/callback",
@@ -135,12 +135,12 @@ func TestHandleIssueGet_IssuesUnderTheRequestsContext(t *testing.T) {
 
 	// The session read and the issuer, each matched on THIS request's context.
 	database.On("GetUserSessionBySessionIdentifier", theRequestsContext(), (*sql.Tx)(nil), liveSessionIdentifier).
-		Return(&record.UserSession{Id: 55, SessionIdentifier: liveSessionIdentifier, UserId: 123}, nil)
+		Return(&record.UserSession{ID: 55, SessionIdentifier: liveSessionIdentifier, UserID: 123}, nil)
 	codeIssuer.On("IssueAuthCodeTx", theRequestsContext(), mock.Anything).
-		Return(&record.Code{Id: 1, Code: "test-code", ClientId: 1, RedirectURI: "https://example.com/callback"}, nil)
+		Return(&record.Code{ID: 1, Code: "test-code", ClientID: 1, RedirectURI: "https://example.com/callback"}, nil)
 
 	auditLogger.On("Log", mock.Anything, audit.EventCreatedAuthCode, mock.Anything).Return()
-	ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)
+	ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyID).Return(nil)
 	armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
 	buildIssueGet(issueGetDeps{
@@ -174,15 +174,15 @@ func TestHandleIssueGet_UnusableSessionReachesNoIssuer(t *testing.T) {
 	userSessionManager := handlersmocks.NewUserSessionManager(t)
 	permissionChecker := handlersmocks.NewPermissionChecker(t)
 
-	req := issueRequestCarryingId(t, liveSessionIdentifier)
+	req := issueRequestCarryingID(t, liveSessionIdentifier)
 	rr := httptest.NewRecorder()
 
 	authContext := &ceremony.AuthContext{
-		CeremonyId:   testCeremonyId,
+		CeremonyID:   testCeremonyID,
 		AuthState:    ceremony.AuthStateReadyToIssueCode,
 		Scope:        "openid profile",
-		ClientId:     "test-client",
-		UserId:       123,
+		ClientID:     "test-client",
+		UserID:       123,
 		ResponseMode: "query",
 		ResponseType: "code",
 		RedirectURI:  "https://example.com/callback",
@@ -208,7 +208,7 @@ func TestHandleIssueGet_UnusableSessionReachesNoIssuer(t *testing.T) {
 	}).ServeHTTP(rr, req)
 
 	require.Equal(t, http.StatusFound, rr.Code)
-	assert.Equal(t, testCeremonyId, assertStepLocation(t, rr.Header().Get("Location"), "/auth/level1"),
+	assert.Equal(t, testCeremonyID, assertStepLocation(t, rr.Header().Get("Location"), "/auth/level1"),
 		"the restart names the ceremony it kept")
 	codeIssuer.AssertNotCalled(t, "IssueAuthCodeTx", mock.Anything, mock.Anything)
 }

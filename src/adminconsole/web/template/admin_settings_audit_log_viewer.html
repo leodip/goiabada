@@ -75,17 +75,17 @@
              at a hyphen, and breaks it only when it is wider than the card. */}}
         <td class="cell-wrap" data-label="{{ T $.ctx "adminconsole.admin_settings.audit_log_viewer.col_event" }}">
           <span class="font-mono text-sm wrap-anywhere sm:whitespace-nowrap">{{ range $i, $s := .EventSegments }}{{ if $i }}<wbr>{{ end }}{{ $s }}{{ end }}</span>
-          {{- if .RequestId }}
-          <span class="mt-0.5 block text-sm text-ink-muted">{{ T $.ctx "adminconsole.admin_settings.audit_log_viewer.col_request_id" }}: <a class="text-link inline-block max-w-full font-mono wrap-anywhere" href="/admin/settings/audit-log-viewer?requestId={{ .RequestId }}">{{ .RequestId }}<span class="sr-only"> – {{ T $.ctx "adminconsole.admin_settings.audit_log_viewer.request_events_link" }}</span></a></span>
+          {{- if .RequestID }}
+          <span class="mt-0.5 block text-sm text-ink-muted">{{ T $.ctx "adminconsole.admin_settings.audit_log_viewer.col_request_id" }}: <a class="text-link inline-block max-w-full font-mono wrap-anywhere" href="/admin/settings/audit-log-viewer?requestId={{ .RequestID }}">{{ .RequestID }}<span class="sr-only"> – {{ T $.ctx "adminconsole.admin_settings.audit_log_viewer.request_events_link" }}</span></a></span>
           {{- end }}
           {{- /* The user the event is about and the user whose token made the request, each by id and
                linking to that user's events, which is how a page filtered by a user tells the
                events about them from the ones they made. */}}
-          {{- if .UserId }}
-          <span class="mt-0.5 block text-sm text-ink-muted">{{ T $.ctx "adminconsole.admin_settings.audit_log_viewer.row_user" }}: <a class="text-link inline-block font-mono" href="/admin/settings/audit-log-viewer?userId={{ .UserId }}">{{ .UserId }}<span class="sr-only"> – {{ T $.ctx "adminconsole.admin_settings.audit_log_viewer.user_events_link" }}</span></a></span>
+          {{- if .UserID }}
+          <span class="mt-0.5 block text-sm text-ink-muted">{{ T $.ctx "adminconsole.admin_settings.audit_log_viewer.row_user" }}: <a class="text-link inline-block font-mono" href="/admin/settings/audit-log-viewer?userId={{ .UserID }}">{{ .UserID }}<span class="sr-only"> – {{ T $.ctx "adminconsole.admin_settings.audit_log_viewer.user_events_link" }}</span></a></span>
           {{- end }}
-          {{- if .LoggedInUserId }}
-          <span class="mt-0.5 block text-sm text-ink-muted">{{ T $.ctx "adminconsole.admin_settings.audit_log_viewer.row_acted_by" }}: <a class="text-link inline-block font-mono" href="/admin/settings/audit-log-viewer?userId={{ .LoggedInUserId }}">{{ .LoggedInUserId }}<span class="sr-only"> – {{ T $.ctx "adminconsole.admin_settings.audit_log_viewer.user_events_link" }}</span></a></span>
+          {{- if .LoggedInUserID }}
+          <span class="mt-0.5 block text-sm text-ink-muted">{{ T $.ctx "adminconsole.admin_settings.audit_log_viewer.row_acted_by" }}: <a class="text-link inline-block font-mono" href="/admin/settings/audit-log-viewer?userId={{ .LoggedInUserID }}">{{ .LoggedInUserID }}<span class="sr-only"> – {{ T $.ctx "adminconsole.admin_settings.audit_log_viewer.user_events_link" }}</span></a></span>
           {{- end }}
         </td>
         <td class="cell-wrap" data-label="{{ T $.ctx "adminconsole.admin_settings.audit_log_viewer.col_details" }}">

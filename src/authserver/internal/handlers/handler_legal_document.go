@@ -16,7 +16,7 @@ import (
 // name names, and its versions.
 type legalDocumentPageDatabase interface {
 	GetLegalDocumentByShortName(ctx context.Context, tx *sql.Tx, shortName string) (*record.LegalDocument, error)
-	GetLegalDocumentVersionsByLegalDocumentId(ctx context.Context, tx *sql.Tx, legalDocumentId int64) ([]record.LegalDocumentVersion, error)
+	GetLegalDocumentVersionsByLegalDocumentID(ctx context.Context, tx *sql.Tx, legalDocumentID int64) ([]record.LegalDocumentVersion, error)
 }
 
 // legalDocumentVersionLink is one version the page lists.
@@ -47,7 +47,7 @@ func HandleLegalDocumentGet(pageRenderer PageRenderer, database legalDocumentPag
 			pageRenderer.NotFound(w, r)
 			return
 		}
-		versions, err := database.GetLegalDocumentVersionsByLegalDocumentId(r.Context(), nil, doc.Id)
+		versions, err := database.GetLegalDocumentVersionsByLegalDocumentID(r.Context(), nil, doc.ID)
 		if err != nil {
 			pageRenderer.InternalServerError(w, r, errs.Wrap(err, "unable to read the legal document's versions"))
 			return
@@ -85,13 +85,13 @@ func HandleLegalDocumentGet(pageRenderer PageRenderer, database legalDocumentPag
 			links[i] = legalDocumentVersionLink{Number: v.VersionNumber}
 		}
 
-		ceremonyId := r.URL.Query().Get(ceremony.QueryParameter)
-		if !ceremony.IsWellFormedId(ceremonyId) {
-			ceremonyId = ""
+		ceremonyID := r.URL.Query().Get(ceremony.QueryParameter)
+		if !ceremony.IsWellFormedID(ceremonyID) {
+			ceremonyID = ""
 		}
 
 		bind := map[string]interface{}{
-			"ceremonyId":           ceremonyId,
+			"ceremonyId":           ceremonyID,
 			"shortName":            doc.ShortName,
 			"documentTitle":        shown.Title,
 			"documentHTML":         documentHTML,

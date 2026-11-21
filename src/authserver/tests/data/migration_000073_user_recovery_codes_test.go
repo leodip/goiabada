@@ -80,9 +80,9 @@ func assertUserRecoveryCodesShape(t *testing.T, h *isolatedDB, when string) {
 	assert.Equalf(t, idType[engine], id.Type, "id's type %s", when)
 	assert.Truef(t, id.Generated, "id is generated %s", when)
 
-	userId := shape.column(t, "user_id")
-	assert.Equalf(t, idType[engine], userId.Type, "user_id has the type of the id it names %s", when)
-	assert.Falsef(t, userId.Nullable, "user_id is NOT NULL %s", when)
+	userID := shape.column(t, "user_id")
+	assert.Equalf(t, idType[engine], userID.Type, "user_id has the type of the id it names %s", when)
+	assert.Falsef(t, userID.Nullable, "user_id is NOT NULL %s", when)
 
 	codeHash := shape.column(t, "code_hash")
 	assert.Equalf(t, hashType[engine], codeHash.Type, "code_hash holds a hex SHA-256 %s", when)
@@ -126,22 +126,22 @@ func assertUserRecoveryCodesBehaviour(t *testing.T, h *isolatedDB, when string) 
 	count := func() int64 {
 		var n int64
 		require.NoError(t, h.SQL.QueryRowContext(ctx, fmt.Sprintf(
-			"SELECT COUNT(*) FROM user_recovery_codes WHERE user_id = %d", user.Id)).Scan(&n))
+			"SELECT COUNT(*) FROM user_recovery_codes WHERE user_id = %d", user.ID)).Scan(&n))
 		return n
 	}
 	now := "'2026-10-31 12:00:00'"
 
 	insert := "INSERT INTO user_recovery_codes (user_id, code_hash, created_at) VALUES (%d, '%s', %s)"
 	hash := "c0ffee00c0ffee00c0ffee00c0ffee00c0ffee00c0ffee00c0ffee00c0ffee00"
-	require.NoErrorf(t, exec(insert, user.Id, hash, now), "the first code is accepted %s", when)
-	require.Errorf(t, exec(insert, user.Id, hash, now), "the same code twice in one set is refused by the key %s", when)
-	require.NoErrorf(t, exec(insert, user.Id, "C0FFEE00C0FFEE00C0FFEE00C0FFEE00C0FFEE00C0FFEE00C0FFEE00C0FFEE00", now),
+	require.NoErrorf(t, exec(insert, user.ID, hash, now), "the first code is accepted %s", when)
+	require.Errorf(t, exec(insert, user.ID, hash, now), "the same code twice in one set is refused by the key %s", when)
+	require.NoErrorf(t, exec(insert, user.ID, "C0FFEE00C0FFEE00C0FFEE00C0FFEE00C0FFEE00C0FFEE00C0FFEE00C0FFEE00", now),
 		"the key compares case-sensitively %s", when)
 	assert.Equalf(t, int64(2), count(), "and the refused one wrote nothing %s", when)
-	require.Errorf(t, exec(insert, user.Id+1_000_000, hash, now), "a code of no user is refused %s", when)
-	require.Errorf(t, exec("INSERT INTO user_recovery_codes (user_id, code_hash) VALUES (%d, '%s')", user.Id, "ab"),
+	require.Errorf(t, exec(insert, user.ID+1_000_000, hash, now), "a code of no user is refused %s", when)
+	require.Errorf(t, exec("INSERT INTO user_recovery_codes (user_id, code_hash) VALUES (%d, '%s')", user.ID, "ab"),
 		"a code with no created_at is refused %s", when)
 
-	require.NoError(t, exec("DELETE FROM users WHERE id = %d", user.Id))
+	require.NoError(t, exec("DELETE FROM users WHERE id = %d", user.ID))
 	assert.Equalf(t, int64(0), count(), "deleting the user removed their codes %s", when)
 }

@@ -5,16 +5,16 @@ import (
 )
 
 type UserSessionResponse struct {
-	Id                int64      `json:"id"`
+	ID                int64      `json:"id"`
 	CreatedAt         *time.Time `json:"createdAt"`
 	UpdatedAt         *time.Time `json:"updatedAt"`
 	SessionIdentifier string     `json:"sessionIdentifier"`
 	Started           *time.Time `json:"started"`
 	LastAccessed      *time.Time `json:"lastAccessed"`
 	AuthMethods       string     `json:"authMethods"`
-	AcrLevel          string     `json:"acrLevel"`
+	ACRLevel          string     `json:"acrLevel"`
 	AuthTime          *time.Time `json:"authTime"`
-	IpAddress         string     `json:"ipAddress"`
+	IPAddress         string     `json:"ipAddress"`
 	DeviceName        string     `json:"deviceName"`
 	DeviceType        string     `json:"deviceType"`
 	DeviceOS          string     `json:"deviceOS"`
@@ -22,7 +22,7 @@ type UserSessionResponse struct {
 	// bounded at the writer. No omitempty: a session created before the column existed
 	// carries an empty string, and that is an answer rather than an absence (#281).
 	UserAgent string `json:"userAgent"`
-	UserId    int64  `json:"userId"`
+	UserID    int64  `json:"userId"`
 }
 
 // GetUserSessionResponse carries one session as a session list row carries it, built by the same
@@ -74,7 +74,7 @@ type GetUserSessionsResponse struct {
 // token read the subject, birth date, phone number, postal address and otpEnabled of everyone
 // holding a live session on a client it manages (#373).
 type SessionOwnerResponse struct {
-	Id         int64  `json:"id"`
+	ID         int64  `json:"id"`
 	Email      string `json:"email"`
 	GivenName  string `json:"givenName"`
 	MiddleName string `json:"middleName"`
@@ -111,7 +111,7 @@ type GetClientSessionsResponse struct {
 
 // SessionLoadRequest names the session to read or remove.
 type SessionLoadRequest struct {
-	Id string `json:"id"`
+	ID string `json:"id"`
 }
 
 // SessionLoadResponse is one stored session.
@@ -134,7 +134,7 @@ type SessionLoadResponse struct {
 // the caller can see inside the blob, and only the auth server can turn it into a
 // timestamp, because only the auth server can read the deployment's session settings.
 type SessionWriteRequest struct {
-	Id            string `json:"id"`
+	ID            string `json:"id"`
 	Data          string `json:"data"`
 	Authenticated bool   `json:"authenticated"`
 }
@@ -148,6 +148,6 @@ type SessionWriteResponse struct {
 
 // SessionTouchRequest records that a live session was used.
 type SessionTouchRequest struct {
-	Id            string `json:"id"`
+	ID            string `json:"id"`
 	Authenticated bool   `json:"authenticated"`
 }

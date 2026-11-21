@@ -110,7 +110,7 @@ var nineKinds = []string{
 // nineSecrets is one row of each kind, written through the data layer by one configuration.
 type nineSecrets struct {
 	tag                                               string
-	settingsId, clientId, userId, preRegId, keyPairId int64
+	settingsID, clientID, userID, preRegID, keyPairID int64
 }
 
 // plaintext is what the kind's value of this set opens to.
@@ -135,32 +135,32 @@ func storeNine(t *testing.T, db data.Database, cipher *encryption.DataCipher, st
 	settings.SMTPPasswordEncrypted = seal(kindSMTPPassword)
 	settings.TurnstileSecretKeyEncrypted = seal(kindTurnstileSecretKey)
 	require.NoError(t, db.CreateSettings(ctx, nil, settings))
-	n.settingsId = settings.Id
+	n.settingsID = settings.ID
 
 	client := &record.Client{ClientIdentifier: "c-" + fake.UUID(), ClientSecretEncrypted: seal(kindClientSecret)}
 	require.NoError(t, db.CreateClient(ctx, nil, client))
-	n.clientId = client.Id
+	n.clientID = client.ID
 
 	user := &record.User{
 		Subject: fake.UUID(), Username: fake.Username(), Email: fake.Email(), PasswordHash: "x",
 		EmailVerificationCodeEncrypted: seal(kindEmailCode),
 		OTPSecretEncrypted:             seal(kindOTPSecret),
 		ForgotPasswordCodeEncrypted:    seal(kindForgotPasswordCode),
-		OtpEnrollmentSecretEncrypted:   seal(kindOTPEnrollmentSecret),
+		OTPEnrollmentSecretEncrypted:   seal(kindOTPEnrollmentSecret),
 	}
 	require.NoError(t, db.CreateUser(ctx, nil, user))
-	n.userId = user.Id
+	n.userID = user.ID
 
 	preReg := &record.PreRegistration{
 		Email: fake.Email(), VerificationCodeEncrypted: seal(kindPreRegistrationCode),
 		VerificationCodeHash: codeHashOf(t, fake.UUID()),
 	}
 	require.NoError(t, db.CreatePreRegistration(ctx, nil, preReg))
-	n.preRegId = preReg.Id
+	n.preRegID = preReg.ID
 
 	keyPair := sweepKeyPair(state, seal(kindSigningKey))
 	require.NoError(t, db.CreateKeyPair(ctx, nil, keyPair))
-	n.keyPairId = keyPair.Id
+	n.keyPairID = keyPair.ID
 	return n
 }
 
@@ -175,15 +175,15 @@ func sweepKeyPair(state record.KeyState, privateKey []byte) *record.KeyPair {
 func (n nineSecrets) read(t *testing.T, db data.Database) map[string][]byte {
 	t.Helper()
 	ctx := context.Background()
-	settings, err := db.GetSettingsById(ctx, nil, n.settingsId)
+	settings, err := db.GetSettingsByID(ctx, nil, n.settingsID)
 	require.NoError(t, err)
-	client, err := db.GetClientById(ctx, nil, n.clientId)
+	client, err := db.GetClientByID(ctx, nil, n.clientID)
 	require.NoError(t, err)
-	user, err := db.GetUserById(ctx, nil, n.userId)
+	user, err := db.GetUserByID(ctx, nil, n.userID)
 	require.NoError(t, err)
-	preReg, err := db.GetPreRegistrationById(ctx, nil, n.preRegId)
+	preReg, err := db.GetPreRegistrationByID(ctx, nil, n.preRegID)
 	require.NoError(t, err)
-	keyPair, err := db.GetKeyPairById(ctx, nil, n.keyPairId)
+	keyPair, err := db.GetKeyPairByID(ctx, nil, n.keyPairID)
 	require.NoError(t, err)
 	return map[string][]byte{
 		kindSMTPPassword:        settings.SMTPPasswordEncrypted,
@@ -192,7 +192,7 @@ func (n nineSecrets) read(t *testing.T, db data.Database) map[string][]byte {
 		kindEmailCode:           user.EmailVerificationCodeEncrypted,
 		kindOTPSecret:           user.OTPSecretEncrypted,
 		kindForgotPasswordCode:  user.ForgotPasswordCodeEncrypted,
-		kindOTPEnrollmentSecret: user.OtpEnrollmentSecretEncrypted,
+		kindOTPEnrollmentSecret: user.OTPEnrollmentSecretEncrypted,
 		kindPreRegistrationCode: preReg.VerificationCodeEncrypted,
 		kindSigningKey:          keyPair.PrivateKeyPEM,
 	}
@@ -202,10 +202,10 @@ func (n nineSecrets) read(t *testing.T, db data.Database) map[string][]byte {
 func (n nineSecrets) where(kind string) record.StoredSecret {
 	table, column, _ := strings.Cut(kind, ".")
 	id := map[string]int64{
-		"settings": n.settingsId, "clients": n.clientId, "users": n.userId,
-		"pre_registrations": n.preRegId, "key_pairs": n.keyPairId,
+		"settings": n.settingsID, "clients": n.clientID, "users": n.userID,
+		"pre_registrations": n.preRegID, "key_pairs": n.keyPairID,
 	}[table]
-	return record.StoredSecret{Table: table, Column: column, Id: id}
+	return record.StoredSecret{Table: table, Column: column, ID: id}
 }
 
 // assertNineOpen asserts that cipher opens each of the set's nine values to its own plaintext.
@@ -296,8 +296,8 @@ func TestReencryptStoredSecrets_ReportsAndLeavesWhatNeitherKeyOpens_TheSigningKe
 	}
 	assert.ElementsMatch(t, stringKinds, named[:8], "the stored secrets other than the signing keys come first")
 	assert.ElementsMatch(t, []record.StoredSecret{
-		{Table: "key_pairs", Column: "private_key_pem", Id: nextKeyPair.Id},
-		{Table: "key_pairs", Column: "private_key_pem", Id: previousKeyPair.Id},
+		{Table: "key_pairs", Column: "private_key_pem", ID: nextKeyPair.ID},
+		{Table: "key_pairs", Column: "private_key_pem", ID: previousKeyPair.ID},
 	}, named[8:10], "the next and previous signing keys come after every other stored secret")
 	assert.Equal(t, unreadable.where(kindSigningKey), named[10], "the current signing key comes last of all")
 
@@ -306,11 +306,11 @@ func TestReencryptStoredSecrets_ReportsAndLeavesWhatNeitherKeyOpens_TheSigningKe
 		assert.Truef(t, bytes.Equal(before[kind], after[kind]), "%s neither key opens was rewritten", kind)
 	}
 	for _, keyPair := range []*record.KeyPair{nextKeyPair, previousKeyPair} {
-		stored, getErr := h.DB.GetKeyPairById(ctx, nil, keyPair.Id)
+		stored, getErr := h.DB.GetKeyPairByID(ctx, nil, keyPair.ID)
 		require.NoError(t, getErr)
 		assert.Truef(t, bytes.Equal(keyPair.PrivateKeyPEM, stored.PrivateKeyPEM), "the %s signing key was rewritten", keyPair.State)
 	}
-	got, err := h.DB.GetClientById(ctx, nil, readableClient.Id)
+	got, err := h.DB.GetClientByID(ctx, nil, readableClient.ID)
 	require.NoError(t, err)
 	opened, err := newKeyAlone.Decrypt(got.ClientSecretEncrypted)
 	require.NoError(t, err, "the readable client secret is under the new key")
@@ -369,14 +369,14 @@ func TestReencryptStoredSecrets_ReachesEveryRowAcrossBatches(t *testing.T) {
 		require.NoError(t, err)
 		client := &record.Client{ClientIdentifier: "c-" + fake.UUID(), ClientSecretEncrypted: sealed}
 		require.NoError(t, h.DB.CreateClient(ctx, nil, client))
-		ids = append(ids, client.Id)
+		ids = append(ids, client.ID)
 	}
 
 	report := sweep(t, h.DB)
 
 	assert.Equal(t, record.Reencryption{Reencrypted: clients}, report)
 	for i, id := range ids {
-		client, err := h.DB.GetClientById(ctx, nil, id)
+		client, err := h.DB.GetClientByID(ctx, nil, id)
 		require.NoError(t, err)
 		opened, err := newKeyAlone.Decrypt(client.ClientSecretEncrypted)
 		if assert.NoErrorf(t, err, "client %d is not under the new key", i) {
@@ -397,7 +397,7 @@ func TestReencryptStoredSecrets_InterruptedAndRunAgainFinishes(t *testing.T) {
 
 	// A server holds the user's row, which the sweep reaches after the settings and the client.
 	held := beginTxOn(t, h.DB)
-	require.NoError(t, h.DB.AcquireUserRow(ctx, held, set.userId))
+	require.NoError(t, h.DB.AcquireUserRow(ctx, held, set.userID))
 
 	sweepCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -460,7 +460,7 @@ func runTrailingZeroByteIsAChange(t *testing.T, db data.Database) {
 
 	// A server holds the client's row, so the sweep waits to write it.
 	held := beginTxOn(t, db)
-	require.NoError(t, db.AcquireClientRow(ctx, held, client.Id))
+	require.NoError(t, db.AcquireClientRow(ctx, held, client.ID))
 	type outcome struct {
 		named []record.StoredSecret
 		err   error
@@ -481,7 +481,7 @@ func runTrailingZeroByteIsAChange(t *testing.T, db data.Database) {
 
 	// The server writes the bytes the sweep read with a zero byte after them, and commits.
 	changed := append(append([]byte(nil), sealed...), 0)
-	stored, err := db.GetClientById(ctx, held, client.Id)
+	stored, err := db.GetClientByID(ctx, held, client.ID)
 	require.NoError(t, err)
 	stored.ClientSecretEncrypted = changed
 	require.NoError(t, db.UpdateClient(ctx, held, stored))
@@ -494,10 +494,10 @@ func runTrailingZeroByteIsAChange(t *testing.T, db data.Database) {
 		t.Fatal("the sweep never returned after the server committed")
 	}
 	require.NoError(t, o.err)
-	assert.Contains(t, o.named, record.StoredSecret{Table: "clients", Column: "client_secret_encrypted", Id: client.Id},
+	assert.Contains(t, o.named, record.StoredSecret{Table: "clients", Column: "client_secret_encrypted", ID: client.ID},
 		"the server's bytes open under neither key, and are reported")
 
-	after, err := db.GetClientById(ctx, nil, client.Id)
+	after, err := db.GetClientByID(ctx, nil, client.ID)
 	require.NoError(t, err)
 	assert.Equal(t, changed, after.ClientSecretEncrypted, "the server's bytes are left as the server wrote them")
 }
@@ -629,7 +629,7 @@ func (d *sweepDuring) RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) 
 	return d.Database.RunInTransaction(ctx, fn)
 }
 
-func (d *sweepDuring) TryVerifyUserEmail(ctx context.Context, tx *sql.Tx, userId int64, email string,
+func (d *sweepDuring) TryVerifyUserEmail(ctx context.Context, tx *sql.Tx, userID int64, email string,
 	codeEncrypted []byte) (bool, error) {
 	if d.firesAt(sweepBeforeVerification) {
 		d.sweepToTheEnd()
@@ -637,11 +637,11 @@ func (d *sweepDuring) TryVerifyUserEmail(ctx context.Context, tx *sql.Tx, userId
 			d.gap()
 		}
 	}
-	return d.Database.TryVerifyUserEmail(ctx, tx, userId, email, codeEncrypted)
+	return d.Database.TryVerifyUserEmail(ctx, tx, userID, email, codeEncrypted)
 }
 
-func (d *sweepDuring) AcquireClientRow(ctx context.Context, tx *sql.Tx, clientId int64) error {
-	err := d.Database.AcquireClientRow(ctx, tx, clientId)
+func (d *sweepDuring) AcquireClientRow(ctx context.Context, tx *sql.Tx, clientID int64) error {
+	err := d.Database.AcquireClientRow(ctx, tx, clientID)
 	if err == nil && d.firesAt(sweepWhileAcquireClientRowHolds) {
 		d.sweepAgainstTheHeldRow()
 	}
@@ -656,16 +656,16 @@ func (d *sweepDuring) UpdateClient(ctx context.Context, tx *sql.Tx, client *reco
 	return err
 }
 
-func (d *sweepDuring) SetClientPublic(ctx context.Context, tx *sql.Tx, clientId int64) (bool, error) {
-	changed, err := d.Database.SetClientPublic(ctx, tx, clientId)
+func (d *sweepDuring) SetClientPublic(ctx context.Context, tx *sql.Tx, clientID int64) (bool, error) {
+	changed, err := d.Database.SetClientPublic(ctx, tx, clientID)
 	if err == nil && d.firesAt(sweepWhileSetClientPublicHolds) {
 		d.sweepAgainstTheHeldRow()
 	}
 	return changed, err
 }
 
-func (d *sweepDuring) AcquireSettingsRow(ctx context.Context, tx *sql.Tx, settingsId int64) error {
-	err := d.Database.AcquireSettingsRow(ctx, tx, settingsId)
+func (d *sweepDuring) AcquireSettingsRow(ctx context.Context, tx *sql.Tx, settingsID int64) error {
+	err := d.Database.AcquireSettingsRow(ctx, tx, settingsID)
 	if err == nil && d.firesAt(sweepWhileAcquireSettingsRowHolds) {
 		d.sweepAgainstTheHeldRow()
 	}
@@ -680,7 +680,7 @@ func adminRequest(t *testing.T, method, target string, body any, settings *recor
 	req := httptest.NewRequest(method, target, bytes.NewReader(encoded))
 	req.Header.Set("Content-Type", "application/json")
 	ctx := reqctx.WithSettings(req.Context(), settings)
-	ctx = reqctx.WithValidatedToken(ctx, oauth.JwtToken{Claims: map[string]interface{}{
+	ctx = reqctx.WithValidatedToken(ctx, oauth.JWTToken{Claims: map[string]interface{}{
 		"sub": "an-administrator", "scope": "authserver:manage",
 	}})
 	return req.WithContext(ctx)
@@ -745,15 +745,15 @@ func TestReencryptStoredSecrets_BesideAServerWrite(t *testing.T) {
 	clientPut := func(t *testing.T, db data.Database, client *record.Client, route string, body any,
 		handler func(data.Database) http.HandlerFunc) {
 		t.Helper()
-		req := adminRequest(t, http.MethodPut, "/api/v1/admin/clients/"+strconv.FormatInt(client.Id, 10)+"/"+route,
-			body, &record.Settings{Id: 1})
-		req.SetPathValue("id", strconv.FormatInt(client.Id, 10))
+		req := adminRequest(t, http.MethodPut, "/api/v1/admin/clients/"+strconv.FormatInt(client.ID, 10)+"/"+route,
+			body, &record.Settings{ID: 1})
+		req.SetPathValue("id", strconv.FormatInt(client.ID, 10))
 		rr := httptest.NewRecorder()
 		handler(db).ServeHTTP(rr, req)
 		require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 	}
 	storedClient := func(t *testing.T, client *record.Client) *record.Client {
-		stored, err := h.DB.GetClientById(ctx, nil, client.Id)
+		stored, err := h.DB.GetClientByID(ctx, nil, client.ID)
 		require.NoError(t, err)
 		return stored
 	}
@@ -771,7 +771,7 @@ func TestReencryptStoredSecrets_BesideAServerWrite(t *testing.T) {
 		clientPut(t, db, client, "tokens", api.UpdateClientTokensRequest{
 			TokenExpirationInSeconds:                900,
 			IncludeOpenIDConnectClaimsInAccessToken: record.ThreeStateSettingDefault.String(),
-			IncludeOpenIDConnectClaimsInIdToken:     record.ThreeStateSettingDefault.String(),
+			IncludeOpenIDConnectClaimsInIDToken:     record.ThreeStateSettingDefault.String(),
 		}, func(db data.Database) http.HandlerFunc {
 			return apihandlers.HandleClientTokensPut(db, &countingAuditLogger{})
 		})
@@ -824,7 +824,7 @@ func TestReencryptStoredSecrets_BesideAServerWrite(t *testing.T) {
 		settings.TurnstileSecretKeyEncrypted = secretKey
 		require.NoError(t, h.DB.CreateSettings(ctx, nil, settings))
 		// What the request reads at its start.
-		read, err := h.DB.GetSettingsById(ctx, nil, settings.Id)
+		read, err := h.DB.GetSettingsByID(ctx, nil, settings.ID)
 		require.NoError(t, err)
 		return read
 	}
@@ -833,7 +833,7 @@ func TestReencryptStoredSecrets_BesideAServerWrite(t *testing.T) {
 		rr := httptest.NewRecorder()
 		handler.ServeHTTP(rr, adminRequest(t, http.MethodPut, "/api/v1/admin/settings/"+route, body, settings))
 		require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
-		stored, err := h.DB.GetSettingsById(ctx, nil, settings.Id)
+		stored, err := h.DB.GetSettingsByID(ctx, nil, settings.ID)
 		require.NoError(t, err)
 		return stored
 	}
@@ -910,7 +910,7 @@ func TestReencryptStoredSecrets_ASettingsSaveKeepsACredentialTheSweepRepaired(t 
 		require.NoError(t, err)
 		settings.TurnstileSecretKeyEncrypted = secretKey
 		require.NoError(t, h.DB.CreateSettings(ctx, nil, settings))
-		read, err := h.DB.GetSettingsById(ctx, nil, settings.Id)
+		read, err := h.DB.GetSettingsByID(ctx, nil, settings.ID)
 		require.NoError(t, err)
 		return read
 	}
@@ -919,7 +919,7 @@ func TestReencryptStoredSecrets_ASettingsSaveKeepsACredentialTheSweepRepaired(t 
 		rr := httptest.NewRecorder()
 		handler.ServeHTTP(rr, adminRequest(t, http.MethodPut, "/api/v1/admin/settings/"+route, body, settings))
 		require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
-		stored, err := h.DB.GetSettingsById(ctx, nil, settings.Id)
+		stored, err := h.DB.GetSettingsByID(ctx, nil, settings.ID)
 		require.NoError(t, err)
 		return stored
 	}
@@ -982,8 +982,8 @@ func TestReencryptStoredSecrets_AcrossAnEmailVerification(t *testing.T) {
 		body, err := json.Marshal(api.VerifyAccountEmailRequest{VerificationCode: code})
 		require.NoError(t, err)
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/account/email/verification", bytes.NewReader(body))
-		reqCtx := reqctx.WithSettings(req.Context(), &record.Settings{Id: 1, SMTPEnabled: true})
-		reqCtx = reqctx.WithValidatedToken(reqCtx, oauth.JwtToken{Claims: map[string]interface{}{
+		reqCtx := reqctx.WithSettings(req.Context(), &record.Settings{ID: 1, SMTPEnabled: true})
+		reqCtx = reqctx.WithValidatedToken(reqCtx, oauth.JWTToken{Claims: map[string]interface{}{
 			"sub": user.Subject, "scope": "authserver:manage-account",
 		}})
 		rr := httptest.NewRecorder()
@@ -992,7 +992,7 @@ func TestReencryptStoredSecrets_AcrossAnEmailVerification(t *testing.T) {
 		return rr
 	}
 	storedUser := func(t *testing.T, user *record.User) *record.User {
-		stored, err := h.DB.GetUserById(ctx, nil, user.Id)
+		stored, err := h.DB.GetUserByID(ctx, nil, user.ID)
 		require.NoError(t, err)
 		return stored
 	}
@@ -1022,7 +1022,7 @@ func TestReencryptStoredSecrets_AcrossAnEmailVerification(t *testing.T) {
 		replacement, err := configSwapped.Encrypt("WXYZ6789")
 		require.NoError(t, err)
 		db := &sweepDuring{Database: h.DB, t: t, point: sweepBeforeVerification, gap: func() {
-			stored, storeErr := h.DB.TryStoreEmailVerificationCode(ctx, nil, user.Id, user.Email, replacement,
+			stored, storeErr := h.DB.TryStoreEmailVerificationCode(ctx, nil, user.ID, user.Email, replacement,
 				time.Now().UTC(), time.Now().UTC())
 			require.NoError(t, storeErr)
 			require.True(t, stored, "the new send stored its code")
@@ -1043,7 +1043,7 @@ func TestReencryptStoredSecrets_AcrossAnEmailVerification(t *testing.T) {
 		user := pendingUser(t)
 		moved := fake.Email()
 		db := &sweepDuring{Database: h.DB, t: t, point: sweepBeforeVerification, gap: func() {
-			changed, changeErr := h.DB.TrySetUserEmail(ctx, nil, user.Id, user.Email, false, moved)
+			changed, changeErr := h.DB.TrySetUserEmail(ctx, nil, user.ID, user.Email, false, moved)
 			require.NoError(t, changeErr)
 			require.True(t, changed, "the email change committed")
 		}}

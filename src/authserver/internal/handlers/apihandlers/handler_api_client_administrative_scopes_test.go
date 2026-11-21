@@ -22,8 +22,8 @@ import (
 func serveAllowanceSwitch(t *testing.T, database *datamocks.Database, auditLogger *handlersmocks.AuditLogger,
 	afterWrite func(database *datamocks.Database)) *httptest.ResponseRecorder {
 	t.Helper()
-	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), targetClientId).
-		Return(&record.Client{Id: targetClientId, ClientIdentifier: "allowance-client"}, nil).Once()
+	database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), targetClientID).
+		Return(&record.Client{ID: targetClientID, ClientIdentifier: "allowance-client"}, nil).Once()
 	afterWrite(database)
 	rr := httptest.NewRecorder()
 	r := clientRequest(http.MethodPut, "/api/v1/admin/clients/58/administrative-scopes", `{"allowed":true}`, "authserver:manage")
@@ -37,7 +37,7 @@ func serveAllowanceSwitch(t *testing.T, database *datamocks.Database, auditLogge
 func TestClientAdministrativeScopesPut_ACommittedSwitchIsAuditedWhateverTheAnswerReadsDo(t *testing.T) {
 	readFailure := errors.New("the read after the switch failed")
 	stored := func() *record.Client {
-		return &record.Client{Id: targetClientId, ClientIdentifier: "allowance-client", AdministrativeScopesAllowed: true}
+		return &record.Client{ID: targetClientID, ClientIdentifier: "allowance-client", AdministrativeScopesAllowed: true}
 	}
 	cases := []struct {
 		name       string
@@ -48,7 +48,7 @@ func TestClientAdministrativeScopesPut_ACommittedSwitchIsAuditedWhateverTheAnswe
 			name: "the answer is built",
 			afterWrite: func(database *datamocks.Database) {
 				client := stored()
-				database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), targetClientId).Return(client, nil).Once()
+				database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), targetClientID).Return(client, nil).Once()
 				database.On("ClientLoadRedirectURIs", mock.Anything, (*sql.Tx)(nil), client).Return(nil).Once()
 				database.On("ClientLoadPostLogoutRedirectURIs", mock.Anything, (*sql.Tx)(nil), client).Return(nil).Once()
 				database.On("ClientLoadWebOrigins", mock.Anything, (*sql.Tx)(nil), client).Return(nil).Once()
@@ -58,14 +58,14 @@ func TestClientAdministrativeScopesPut_ACommittedSwitchIsAuditedWhateverTheAnswe
 		{
 			name: "reading the client back fails",
 			afterWrite: func(database *datamocks.Database) {
-				database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), targetClientId).Return(nil, readFailure).Once()
+				database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), targetClientID).Return(nil, readFailure).Once()
 			},
 			status: http.StatusInternalServerError,
 		},
 		{
 			name: "the client is gone when read back",
 			afterWrite: func(database *datamocks.Database) {
-				database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), targetClientId).Return(nil, nil).Once()
+				database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), targetClientID).Return(nil, nil).Once()
 			},
 			status: http.StatusNotFound,
 		},
@@ -73,7 +73,7 @@ func TestClientAdministrativeScopesPut_ACommittedSwitchIsAuditedWhateverTheAnswe
 			name: "loading the redirect URIs fails",
 			afterWrite: func(database *datamocks.Database) {
 				client := stored()
-				database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), targetClientId).Return(client, nil).Once()
+				database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), targetClientID).Return(client, nil).Once()
 				database.On("ClientLoadRedirectURIs", mock.Anything, (*sql.Tx)(nil), client).Return(readFailure).Once()
 			},
 			status: http.StatusInternalServerError,
@@ -82,7 +82,7 @@ func TestClientAdministrativeScopesPut_ACommittedSwitchIsAuditedWhateverTheAnswe
 			name: "loading the web origins fails",
 			afterWrite: func(database *datamocks.Database) {
 				client := stored()
-				database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), targetClientId).Return(client, nil).Once()
+				database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), targetClientID).Return(client, nil).Once()
 				database.On("ClientLoadRedirectURIs", mock.Anything, (*sql.Tx)(nil), client).Return(nil).Once()
 				database.On("ClientLoadPostLogoutRedirectURIs", mock.Anything, (*sql.Tx)(nil), client).Return(nil).Once()
 				database.On("ClientLoadWebOrigins", mock.Anything, (*sql.Tx)(nil), client).Return(readFailure).Once()
@@ -95,7 +95,7 @@ func TestClientAdministrativeScopesPut_ACommittedSwitchIsAuditedWhateverTheAnswe
 			database := datamocks.NewDatabase(t)
 			auditLogger := handlersmocks.NewAuditLogger(t)
 			records := recordLoggedEvents(auditLogger)
-			database.On("SetClientAdministrativeScopesAllowed", mock.Anything, (*sql.Tx)(nil), targetClientId, true).Return(nil).Once()
+			database.On("SetClientAdministrativeScopesAllowed", mock.Anything, (*sql.Tx)(nil), targetClientID, true).Return(nil).Once()
 
 			rr := serveAllowanceSwitch(t, database, auditLogger, c.afterWrite)
 
@@ -103,7 +103,7 @@ func TestClientAdministrativeScopesPut_ACommittedSwitchIsAuditedWhateverTheAnswe
 			require.Len(t, *records, 1, "a committed switch leaves exactly one entry")
 			assert.Equal(t, audit.EventUpdatedClientAdministrativeScopes, (*records)[0].event)
 			assert.Equal(t, map[string]interface{}{
-				"client_id":         targetClientId,
+				"client_id":         targetClientID,
 				"client_identifier": "allowance-client",
 				"allowed":           true,
 				"logged_in_user":    grantCaller,
@@ -116,7 +116,7 @@ func TestClientAdministrativeScopesPut_ACommittedSwitchIsAuditedWhateverTheAnswe
 func TestClientAdministrativeScopesPut_AFailedWriteIsNotAudited(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
-	database.On("SetClientAdministrativeScopesAllowed", mock.Anything, (*sql.Tx)(nil), targetClientId, true).
+	database.On("SetClientAdministrativeScopesAllowed", mock.Anything, (*sql.Tx)(nil), targetClientID, true).
 		Return(errors.New("the write failed")).Once()
 
 	rr := serveAllowanceSwitch(t, database, auditLogger, func(*datamocks.Database) {})

@@ -58,7 +58,7 @@ func implicitAnswerParameters(t *testing.T) []string {
 	err := issueImplicitTokens(rr, req, formPostTemplate{}, "", "https://app.example.com/callback", "af0ifjsldkj",
 		&issuance.ImplicitGrantResponse{
 			AccessToken: "an-access-token",
-			IdToken:     "an-id-token",
+			IDToken:     "an-id-token",
 			TokenType:   "Bearer",
 			ExpiresIn:   300,
 			Scope:       "openid email",
@@ -121,7 +121,7 @@ func passwordRefusals(t *testing.T) []passwordRefusal {
 		t.Fatalf("hashing the password: %v", err)
 	}
 	user := func(edit func(*record.User)) *record.User {
-		u := &record.User{Id: 42, Subject: "f2a3c1e0-0000-4000-8000-000000000042", Email: "user@example.com",
+		u := &record.User{ID: 42, Subject: "f2a3c1e0-0000-4000-8000-000000000042", Email: "user@example.com",
 			Enabled: true, PasswordHash: hash}
 		if edit != nil {
 			edit(u)
@@ -171,11 +171,11 @@ func passwordGrantErrors(t *testing.T) map[string]string {
 	answered := make(map[string]string)
 	for _, refusal := range passwordRefusals(t) {
 		on := !refusal.ropcOff
-		client := &record.Client{Id: 7, ClientIdentifier: "legacy-app", Enabled: true, IsPublic: refusal.public,
+		client := &record.Client{ID: 7, ClientIdentifier: "legacy-app", Enabled: true, IsPublic: refusal.public,
 			ResourceOwnerPasswordCredentialsEnabled: &on}
 		if refusal.level2Mandatory {
 			client.AuthorizationCodeEnabled = true
-			client.DefaultAcrLevel = record.AcrLevel2Mandatory
+			client.DefaultACRLevel = record.ACRLevel2Mandatory
 		}
 		if !refusal.public {
 			client.ClientSecretEncrypted = secret
@@ -184,24 +184,24 @@ func passwordGrantErrors(t *testing.T) map[string]string {
 		database := datamocks.NewDatabase(t)
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "legacy-app").Return(client, nil).Maybe()
 		database.On("GetUserByEmail", mock.Anything, mock.Anything, "user@example.com").Return(refusal.user, nil).Maybe()
-		database.On("GetLegalDocumentClientsByClientId", mock.Anything, mock.Anything, int64(7)).
+		database.On("GetLegalDocumentClientsByClientID", mock.Anything, mock.Anything, int64(7)).
 			Return([]record.LegalDocumentClient{}, nil).Maybe()
 		documents := []record.LegalDocument{}
 		if refusal.legalDocumentOwed {
-			documents = append(documents, record.LegalDocument{Id: 3, ShortName: "terms",
+			documents = append(documents, record.LegalDocument{ID: 3, ShortName: "terms",
 				Kind: record.LegalDocumentKindMustAccept, AppliesToAllApps: true})
 		}
 		database.On("GetAllLegalDocuments", mock.Anything, mock.Anything).Return(documents, nil).Maybe()
-		database.On("GetLegalDocumentVersionsByLegalDocumentId", mock.Anything, mock.Anything, int64(3)).
-			Return([]record.LegalDocumentVersion{{Id: 31, LegalDocumentId: 3, VersionNumber: 1}}, nil).Maybe()
-		database.On("GetLegalDocumentAcceptancesByUserId", mock.Anything, mock.Anything, mock.Anything).
+		database.On("GetLegalDocumentVersionsByLegalDocumentID", mock.Anything, mock.Anything, int64(3)).
+			Return([]record.LegalDocumentVersion{{ID: 31, LegalDocumentID: 3, VersionNumber: 1}}, nil).Maybe()
+		database.On("GetLegalDocumentAcceptancesByUserID", mock.Anything, mock.Anything, mock.Anything).
 			Return([]record.LegalDocumentAcceptance{}, nil).Maybe()
 		database.On("UserLoadPermissions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 		database.On("UserLoadGroups", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 		database.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "product-api").
-			Return(&record.Resource{Id: 3, ResourceIdentifier: "product-api"}, nil).Maybe()
-		database.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(3)).
-			Return([]record.Permission{{Id: 5, PermissionIdentifier: "write", ResourceId: 3}}, nil).Maybe()
+			Return(&record.Resource{ID: 3, ResourceIdentifier: "product-api"}, nil).Maybe()
+		database.On("GetPermissionsByResourceID", mock.Anything, mock.Anything, int64(3)).
+			Return([]record.Permission{{ID: 5, PermissionIdentifier: "write", ResourceID: 3}}, nil).Maybe()
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 

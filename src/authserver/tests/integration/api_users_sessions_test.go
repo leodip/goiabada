@@ -32,7 +32,7 @@ func TestAPIUserSessionsGet_Success(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	// Setup: Create test client (inline createTestClientForSessions)
@@ -49,30 +49,30 @@ func TestAPIUserSessionsGet_Success(t *testing.T) {
 	err = database.CreateClient(context.Background(), nil, testClient)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteClient(context.Background(), nil, testClient.Id)
+		_ = database.DeleteClient(context.Background(), nil, testClient.ID)
 	}()
 
 	// Setup: Create test sessions
-	session1 := createTestUserSession(t, testUser.Id, fake.UUID())
-	session2 := createTestUserSession(t, testUser.Id, fake.UUID())
+	session1 := createTestUserSession(t, testUser.ID, fake.UUID())
+	session2 := createTestUserSession(t, testUser.ID, fake.UUID())
 	defer func() {
-		_ = database.DeleteUserSession(context.Background(), nil, session1.Id)
-		_ = database.DeleteUserSession(context.Background(), nil, session2.Id)
+		_ = database.DeleteUserSession(context.Background(), nil, session1.ID)
+		_ = database.DeleteUserSession(context.Background(), nil, session2.ID)
 	}()
 
 	// Setup: Link sessions to client (inline createTestUserSessionClient)
 	now := time.Now().UTC()
 	sessionClient1 := &record.UserSessionClient{
-		UserSessionId: session1.Id,
-		ClientId:      testClient.Id,
+		UserSessionID: session1.ID,
+		ClientID:      testClient.ID,
 		Started:       now.Add(-time.Hour),
 		LastAccessed:  now.Add(-time.Minute * 5),
 	}
 	err = database.CreateUserSessionClient(context.Background(), nil, sessionClient1)
 	require.NoError(t, err)
 	sessionClient2 := &record.UserSessionClient{
-		UserSessionId: session2.Id,
-		ClientId:      testClient.Id,
+		UserSessionID: session2.ID,
+		ClientID:      testClient.ID,
 		Started:       now.Add(-time.Hour),
 		LastAccessed:  now.Add(-time.Minute * 5),
 	}
@@ -80,7 +80,7 @@ func TestAPIUserSessionsGet_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	// Test: Get user sessions
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/sessions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.ID, 10) + "/sessions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -98,18 +98,18 @@ func TestAPIUserSessionsGet_Success(t *testing.T) {
 
 	// Verify session data structure
 	for _, session := range getResponse.Sessions {
-		assert.Positive(t, session.Id)
+		assert.Positive(t, session.ID)
 		assert.NotEmpty(t, session.SessionIdentifier)
 		require.NotNil(t, session.Started)
 		require.NotNil(t, session.LastAccessed)
-		assert.Equal(t, "192.168.1.100", session.IpAddress)
+		assert.Equal(t, "192.168.1.100", session.IPAddress)
 		assert.Equal(t, "Test Device", session.DeviceName)
 		assert.Equal(t, "computer", session.DeviceType)
 		assert.Equal(t, "linux", session.DeviceOS)
 		// The raw header, byte for byte. The three Device* labels beside it are a parser's
 		// guess; this is what the row actually stored (#281 decision 6).
 		assert.Equal(t, testSessionUserAgent, session.UserAgent)
-		assert.Equal(t, testUser.Id, session.UserId)
+		assert.Equal(t, testUser.ID, session.UserID)
 		assert.Contains(t, session.ClientIdentifiers, testClient.ClientIdentifier)
 	}
 }
@@ -130,11 +130,11 @@ func TestAPIUserSessionsGet_EmptySessions(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	// Test: Get user sessions for user with no sessions
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/sessions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.ID, 10) + "/sessions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -163,13 +163,13 @@ func TestAPIUserSessionsGet_UserNotFound(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
-func TestAPIUserSessionsGet_InvalidId(t *testing.T) {
+func TestAPIUserSessionsGet_InvalidID(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)
 
 	testCases := []struct {
 		name           string
-		userId         string
+		userID         string
 		expectedStatus int
 	}{
 		{"non-numeric ID", "abc", http.StatusBadRequest},
@@ -180,7 +180,7 @@ func TestAPIUserSessionsGet_InvalidId(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + tc.userId + "/sessions"
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + tc.userID + "/sessions"
 			resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -201,15 +201,15 @@ func TestAPIUserSessionsGet_Unauthorized(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	// Test: Request without access token
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/sessions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.ID, 10) + "/sessions"
 	req, err := http.NewRequest("GET", url, nil)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -234,17 +234,17 @@ func TestAPIUserSessionsGet_SessionsWithNoClients(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	// Setup: Create test session without client relationship
-	session := createTestUserSession(t, testUser.Id, fake.UUID())
+	session := createTestUserSession(t, testUser.ID, fake.UUID())
 	defer func() {
-		_ = database.DeleteUserSession(context.Background(), nil, session.Id)
+		_ = database.DeleteUserSession(context.Background(), nil, session.ID)
 	}()
 
 	// Test: Get user sessions
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/sessions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.ID, 10) + "/sessions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -278,14 +278,14 @@ func TestAPIUserSessionDelete_Success(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	// Setup: Create test session
-	session := createTestUserSession(t, testUser.Id, fake.UUID())
+	session := createTestUserSession(t, testUser.ID, fake.UUID())
 
 	// Test: Delete user session
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-sessions/" + strconv.FormatInt(session.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-sessions/" + strconv.FormatInt(session.ID, 10)
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -302,7 +302,7 @@ func TestAPIUserSessionDelete_Success(t *testing.T) {
 	assert.True(t, deleteResponse.Success)
 
 	// Verify session was actually deleted from database
-	deletedSession, err := database.GetUserSessionById(context.Background(), nil, session.Id)
+	deletedSession, err := database.GetUserSessionByID(context.Background(), nil, session.ID)
 	require.NoError(t, err)
 	assert.Nil(t, deletedSession)
 }
@@ -343,7 +343,7 @@ func TestAPIUserSessionDelete_TerminatesTheOfflineGrantsOfThatSession(t *testing
 	require.NoError(t, err)
 	require.NotNil(t, session)
 
-	deleteURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-sessions/" + strconv.FormatInt(session.Id, 10)
+	deleteURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-sessions/" + strconv.FormatInt(session.ID, 10)
 	resp := makeAPIRequest(t, "DELETE", deleteURL, adminToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -370,7 +370,7 @@ type deadSessionCase struct {
 func deadSessionCases(t *testing.T) []deadSessionCase {
 	t.Helper()
 
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
+	settings, err := database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err)
 	idle := time.Duration(settings.UserSessionIdleTimeoutInSeconds) * time.Second
 	lifetime := time.Duration(settings.UserSessionMaxLifetimeInSeconds) * time.Second
@@ -403,7 +403,7 @@ func killGrantSession(t *testing.T, grant *offlineGrant, dead deadSessionCase) *
 func assertDeadSessionNotEnded(t *testing.T, grant *offlineGrant, session *record.UserSession) {
 	t.Helper()
 
-	stored, err := database.GetUserSessionById(context.Background(), nil, session.Id)
+	stored, err := database.GetUserSessionByID(context.Background(), nil, session.ID)
 	require.NoError(t, err)
 	assert.NotNil(t, stored, "the session is left for the sweep, not deleted")
 
@@ -424,7 +424,7 @@ func TestAPIUserSessionDelete_ASessionNoLongerLiveIsNotFound(t *testing.T) {
 			grant := createOfflineGrant(t)
 			session := killGrantSession(t, grant, dead)
 
-			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-sessions/" + strconv.FormatInt(session.Id, 10)
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-sessions/" + strconv.FormatInt(session.ID, 10)
 			resp := makeAPIRequest(t, "DELETE", url, adminToken, nil)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -452,13 +452,13 @@ func TestAPIUserSessionDelete_NotFound(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
-func TestAPIUserSessionDelete_InvalidId(t *testing.T) {
+func TestAPIUserSessionDelete_InvalidID(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)
 
 	testCases := []struct {
 		name           string
-		sessionId      string
+		sessionID      string
 		expectedStatus int
 	}{
 		{"non-numeric ID", "abc", http.StatusBadRequest},
@@ -468,7 +468,7 @@ func TestAPIUserSessionDelete_InvalidId(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-sessions/" + tc.sessionId
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-sessions/" + tc.sessionID
 			resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -489,20 +489,20 @@ func TestAPIUserSessionDelete_Unauthorized(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
-	session := createTestUserSession(t, testUser.Id, fake.UUID())
+	session := createTestUserSession(t, testUser.ID, fake.UUID())
 	defer func() {
-		_ = database.DeleteUserSession(context.Background(), nil, session.Id)
+		_ = database.DeleteUserSession(context.Background(), nil, session.ID)
 	}()
 
 	// Test: Request without access token
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-sessions/" + strconv.FormatInt(session.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-sessions/" + strconv.FormatInt(session.ID, 10)
 	req, err := http.NewRequest("DELETE", url, nil)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -511,7 +511,7 @@ func TestAPIUserSessionDelete_Unauthorized(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 
 	// Verify session was not deleted
-	stillExists, err := database.GetUserSessionById(context.Background(), nil, session.Id)
+	stillExists, err := database.GetUserSessionByID(context.Background(), nil, session.ID)
 	require.NoError(t, err)
 	assert.NotNil(t, stillExists)
 }
@@ -528,16 +528,16 @@ func TestAPIUserSessionDelete_InvalidToken(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
-	session := createTestUserSession(t, testUser.Id, fake.UUID())
+	session := createTestUserSession(t, testUser.ID, fake.UUID())
 	defer func() {
-		_ = database.DeleteUserSession(context.Background(), nil, session.Id)
+		_ = database.DeleteUserSession(context.Background(), nil, session.ID)
 	}()
 
 	// Test: Request with invalid access token
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-sessions/" + strconv.FormatInt(session.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-sessions/" + strconv.FormatInt(session.ID, 10)
 	resp := makeAPIRequest(t, "DELETE", url, "invalid-token", nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -545,7 +545,7 @@ func TestAPIUserSessionDelete_InvalidToken(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 
 	// Verify session was not deleted
-	stillExists, err := database.GetUserSessionById(context.Background(), nil, session.Id)
+	stillExists, err := database.GetUserSessionByID(context.Background(), nil, session.ID)
 	require.NoError(t, err)
 	assert.NotNil(t, stillExists)
 }
@@ -567,7 +567,7 @@ func TestAPIUserSessionsGet_OnlyValidSessions(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	// Setup: Create a valid session (recently accessed)
@@ -576,19 +576,19 @@ func TestAPIUserSessionsGet_OnlyValidSessions(t *testing.T) {
 		Started:           time.Now().UTC().Add(-time.Minute * 30), // Started 30 minutes ago
 		LastAccessed:      time.Now().UTC().Add(-time.Minute * 5),  // Last accessed 5 minutes ago
 		AuthMethods:       "pwd",
-		AcrLevel:          "urn:goiabada:pwd",
+		ACRLevel:          "urn:goiabada:pwd",
 		AuthTime:          time.Now().UTC().Add(-time.Minute * 30),
 		PasswordAuthTime:  time.Now().UTC().Add(-time.Minute * 30),
-		IpAddress:         "192.168.1.100",
+		IPAddress:         "192.168.1.100",
 		DeviceName:        "Valid Session Device",
 		DeviceType:        "computer",
 		DeviceOS:          "linux",
-		UserId:            testUser.Id,
+		UserID:            testUser.ID,
 	}
 	err = database.CreateUserSession(context.Background(), nil, validSession)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUserSession(context.Background(), nil, validSession.Id)
+		_ = database.DeleteUserSession(context.Background(), nil, validSession.ID)
 	}()
 
 	// Setup: Create an expired session (very old last access)
@@ -597,23 +597,23 @@ func TestAPIUserSessionsGet_OnlyValidSessions(t *testing.T) {
 		Started:           time.Now().UTC().Add(-time.Hour * 25), // Started 25 hours ago
 		LastAccessed:      time.Now().UTC().Add(-time.Hour * 24), // Last accessed 24 hours ago (expired)
 		AuthMethods:       "pwd",
-		AcrLevel:          "urn:goiabada:pwd",
+		ACRLevel:          "urn:goiabada:pwd",
 		AuthTime:          time.Now().UTC().Add(-time.Hour * 25),
 		PasswordAuthTime:  time.Now().UTC().Add(-time.Hour * 25),
-		IpAddress:         "192.168.1.100",
+		IPAddress:         "192.168.1.100",
 		DeviceName:        "Expired Session Device",
 		DeviceType:        "computer",
 		DeviceOS:          "linux",
-		UserId:            testUser.Id,
+		UserID:            testUser.ID,
 	}
 	err = database.CreateUserSession(context.Background(), nil, expiredSession)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUserSession(context.Background(), nil, expiredSession.Id)
+		_ = database.DeleteUserSession(context.Background(), nil, expiredSession.ID)
 	}()
 
 	// Test: Get user sessions
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/sessions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.ID, 10) + "/sessions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -636,21 +636,21 @@ func TestAPIUserSessionsGet_OnlyValidSessions(t *testing.T) {
 // itself, not a label derived from it (#281).
 const testSessionUserAgent = "goiabada-integration-fixture/1.0 (raw header)"
 
-func createTestUserSession(t *testing.T, userId int64, sessionIdentifier string) *record.UserSession {
+func createTestUserSession(t *testing.T, userID int64, sessionIdentifier string) *record.UserSession {
 	session := &record.UserSession{
 		SessionIdentifier: sessionIdentifier,
 		Started:           time.Now().UTC().Add(-time.Hour),        // Started 1 hour ago
 		LastAccessed:      time.Now().UTC().Add(-time.Minute * 30), // Last accessed 30 minutes ago
 		AuthMethods:       "pwd",
-		AcrLevel:          "urn:goiabada:pwd",
+		ACRLevel:          "urn:goiabada:pwd",
 		AuthTime:          time.Now().UTC().Add(-time.Hour),
 		PasswordAuthTime:  time.Now().UTC().Add(-time.Hour),
-		IpAddress:         "192.168.1.100",
+		IPAddress:         "192.168.1.100",
 		DeviceName:        "Test Device",
 		DeviceType:        "computer",
 		DeviceOS:          "linux",
 		UserAgent:         testSessionUserAgent,
-		UserId:            userId,
+		UserID:            userID,
 	}
 	err := database.CreateUserSession(context.Background(), nil, session)
 	assert.NoError(t, err)

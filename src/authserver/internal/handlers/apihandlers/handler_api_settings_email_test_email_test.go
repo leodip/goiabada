@@ -42,7 +42,7 @@ func (b *testEmailBrands) GetClientPageBrand(context.Context, *sql.Tx, string) (
 	return &brand, nil
 }
 
-func (b *testEmailBrands) GetBrandAssetsByIds(context.Context, *sql.Tx, []int64) ([]record.BrandAsset, error) {
+func (b *testEmailBrands) GetBrandAssetsByIDs(context.Context, *sql.Tx, []int64) ([]record.BrandAsset, error) {
 	return nil, nil
 }
 
@@ -90,7 +90,7 @@ func TestHandleSettingsEmailSendTestPost_TheTestEmailIsDrawnInTheDefaultBrandInT
 			assert.Equal(t, "admin@example.com", sent.To)
 			assert.Equal(t, tc.subject, sent.Subject)
 
-			doc, err := goquery.NewDocumentFromReader(strings.NewReader(sent.HtmlBody))
+			doc, err := goquery.NewDocumentFromReader(strings.NewReader(sent.HTMLBody))
 			require.NoError(t, err)
 			assert.Equal(t, tc.lang, doc.Find("html").AttrOr("lang", ""), "the body is in the administrator's language")
 			assert.Equal(t, tc.subject, doc.Find("title").Text(), "the title is the subject (#818)")
@@ -101,7 +101,7 @@ func TestHandleSettingsEmailSendTestPost_TheTestEmailIsDrawnInTheDefaultBrandInT
 			assert.Equal(t, "Acme Portal", strings.TrimSpace(doc.Find("body table table td > p").First().Text()),
 				"the app name is drawn above the body, the default brand having no logo")
 			assert.Zero(t, brands.clientReads, "an administrator's email reads no client's brand")
-			assert.NotContains(t, sent.HtmlBody, time.Now().Format("2006"), "the date is the Date header's, not the body's")
+			assert.NotContains(t, sent.HTMLBody, time.Now().Format("2006"), "the date is the Date header's, not the body's")
 			// The SMTP test sends the test email template, and its entry says so and in which
 			// language (#818 decision 13).
 			assert.Equal(t, "test", (*details)["email_template"])

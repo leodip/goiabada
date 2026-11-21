@@ -88,9 +88,9 @@ func refused(err error) error {
 // The key always comes from the database. It used to be a parameter every caller passed as nil, so
 // the one branch that used it was never reached in production (#424).
 func (tp *TokenParser) DecodeAndValidateTokenString(ctx context.Context, token string,
-	withExpirationCheck bool) (*oauth.JwtToken, error) {
+	withExpirationCheck bool) (*oauth.JWTToken, error) {
 
-	result := &oauth.JwtToken{
+	result := &oauth.JWTToken{
 		TokenBase64: token,
 	}
 
@@ -173,21 +173,21 @@ func (tp *TokenParser) DecodeAndValidateTokenString(ctx context.Context, token s
 		// Skip if this is same as current key
 		if parsedPk.Equal(pubKey) {
 			slog.DebugContext(ctx, "skipping a fallback key that is the current one",
-				"index", i, "key_id", kp.Id)
+				"index", i, "key_id", kp.ID)
 			continue
 		}
-		slog.DebugContext(ctx, "trying a fallback key", "index", i, "key_id", kp.Id,
+		slog.DebugContext(ctx, "trying a fallback key", "index", i, "key_id", kp.ID,
 			"state", kp.State, "key_identifier", kp.KeyIdentifier)
 		fallbackParsed, perr2 := tryParse(parsedPk)
 		if perr2 == nil {
 			// success with a fallback key
-			slog.DebugContext(ctx, "parsed the token with a fallback key", "index", i, "key_id", kp.Id)
+			slog.DebugContext(ctx, "parsed the token with a fallback key", "index", i, "key_id", kp.ID)
 			result.Header = fallbackParsed.Header
 			result.Claims = claims
 			return result, nil
 		}
 		slog.DebugContext(ctx, "unable to parse the token with a fallback key",
-			"index", i, "key_id", kp.Id, "error", perr2)
+			"index", i, "key_id", kp.ID, "error", perr2)
 		if !errors.Is(perr2, jwt.ErrTokenSignatureInvalid) {
 			// This key verified the signature, so the failure is the token's own
 			return nil, refused(perr2)

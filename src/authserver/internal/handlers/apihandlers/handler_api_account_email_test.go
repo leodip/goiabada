@@ -56,14 +56,14 @@ func accountEmailPut(t *testing.T, body any) *http.Request {
 	encoded, err := json.Marshal(body)
 	require.NoError(t, err)
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/account/email", bytes.NewReader(encoded))
-	ctx := requestid.NewContext(req.Context(), accountEmailRequestId)
+	ctx := requestid.NewContext(req.Context(), accountEmailRequestID)
 	req = req.WithContext(reqctx.WithSettings(ctx, accountEmailSettings()))
 	return setTokenContextWithClaims(req, map[string]interface{}{"sub": emailTestSubject})
 }
 
-// accountEmailRequestId is the request id accountEmailPut carries, as requestid.Middleware
+// accountEmailRequestID is the request id accountEmailPut carries, as requestid.Middleware
 // puts one on every request.
-const accountEmailRequestId = "req-email-0001"
+const accountEmailRequestID = "req-email-0001"
 
 // accountEmailSettings are the settings middleware.Settings puts on the request, with SMTP on, so
 // every case that expects no notice is asserting it where one could have been sent.
@@ -138,10 +138,10 @@ func accountEmailPutRequest(t *testing.T) *http.Request {
 func stubAccountEmailUpdate(t *testing.T, database *datamocks.Database, updateErr error) {
 	t.Helper()
 	database.On("GetUserBySubject", mock.Anything, mock.Anything, emailTestSubject).
-		Return(&record.User{Id: emailTestUserId, Subject: emailTestSubject, Email: "old@example.com",
+		Return(&record.User{ID: emailTestUserID, Subject: emailTestSubject, Email: "old@example.com",
 			PasswordHash: accountEmailTestPasswordHash(t)}, nil).Twice()
 	database.On("GetUserByEmail", mock.Anything, mock.Anything, emailTestAddress).Return(nil, nil).Once()
-	database.On("TrySetUserEmail", mock.Anything, mock.Anything, emailTestUserId, "old@example.com", false, emailTestAddress).
+	database.On("TrySetUserEmail", mock.Anything, mock.Anything, emailTestUserID, "old@example.com", false, emailTestAddress).
 		Return(updateErr == nil, updateErr).Once()
 }
 
@@ -155,7 +155,7 @@ func TestHandleAccountEmailPut_SavesThroughTheNarrowWrite(t *testing.T) {
 	jobs := &heldJobs{}
 	database.On("GetUserBySubject", mock.Anything, mock.Anything, emailTestSubject).
 		Return(&record.User{
-			Id:                             emailTestUserId,
+			ID:                             emailTestUserID,
 			Subject:                        emailTestSubject,
 			Enabled:                        true,
 			Email:                          "old@example.com",
@@ -166,10 +166,10 @@ func TestHandleAccountEmailPut_SavesThroughTheNarrowWrite(t *testing.T) {
 		}, nil).Twice()
 	database.On("GetUserByEmail", mock.Anything, mock.Anything, "new@example.com").Return(nil, nil).Once()
 	// Conditional on the address and the verified flag the request read.
-	database.On("TrySetUserEmail", mock.Anything, (*sql.Tx)(nil), emailTestUserId, "old@example.com", true, "new@example.com").
+	database.On("TrySetUserEmail", mock.Anything, (*sql.Tx)(nil), emailTestUserID, "old@example.com", true, "new@example.com").
 		Return(true, nil).Once()
 	auditLogger.On("Log", mock.Anything, audit.EventUpdatedOwnEmail, map[string]interface{}{
-		"user_id":        emailTestUserId,
+		"user_id":        emailTestUserID,
 		"logged_in_user": emailTestSubject,
 	}).Return().Once()
 	credentials := &countingCredentials{}
@@ -275,7 +275,7 @@ func TestHandleAccountEmailPut_AWrongPasswordIsRefusedBeforeTheAddressIsLookedAt
 			auditLogger := handlersmocks.NewAuditLogger(t)
 			jobs := &heldJobs{}
 			database.On("GetUserBySubject", mock.Anything, mock.Anything, emailTestSubject).
-				Return(&record.User{Id: emailTestUserId, Subject: emailTestSubject, Email: "old@example.com",
+				Return(&record.User{ID: emailTestUserID, Subject: emailTestSubject, Email: "old@example.com",
 					PasswordHash: accountEmailTestPasswordHash(t)}, nil).Once()
 			credentials := &countingCredentials{}
 
@@ -306,7 +306,7 @@ func TestHandleAccountEmailPut_ResubmittingTheCurrentAddressChangesNothing(t *te
 	jobs := &heldJobs{}
 	database.On("GetUserBySubject", mock.Anything, mock.Anything, emailTestSubject).
 		Return(&record.User{
-			Id:                             emailTestUserId,
+			ID:                             emailTestUserID,
 			Subject:                        emailTestSubject,
 			Enabled:                        true,
 			Email:                          "same@example.com",
@@ -325,7 +325,7 @@ func TestHandleAccountEmailPut_ResubmittingTheCurrentAddressChangesNothing(t *te
 	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 	var resp api.UpdateUserResponse
 	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &resp))
-	assert.Equal(t, emailTestUserId, resp.User.Id)
+	assert.Equal(t, emailTestUserID, resp.User.ID)
 	assert.Equal(t, "same@example.com", resp.User.Email)
 	assert.True(t, resp.User.EmailVerified, "re-saving the address keeps it verified")
 	assert.Equal(t, 0, credentials.failures)
@@ -340,7 +340,7 @@ func TestHandleAccountEmailPut_ResubmittingTheCurrentAddressChangesNothing(t *te
 func changingUser(t *testing.T, locale string) *record.User {
 	t.Helper()
 	return &record.User{
-		Id:            emailTestUserId,
+		ID:            emailTestUserID,
 		Subject:       emailTestSubject,
 		Enabled:       true,
 		GivenName:     "Ana",
@@ -359,7 +359,7 @@ func stubSuccessfulChange(t *testing.T, database *datamocks.Database, auditLogge
 	t.Helper()
 	database.On("GetUserBySubject", mock.Anything, mock.Anything, emailTestSubject).Return(user, nil).Twice()
 	database.On("GetUserByEmail", mock.Anything, mock.Anything, "new@example.com").Return(nil, nil).Once()
-	database.On("TrySetUserEmail", mock.Anything, (*sql.Tx)(nil), emailTestUserId, user.Email, user.EmailVerified, "new@example.com").
+	database.On("TrySetUserEmail", mock.Anything, (*sql.Tx)(nil), emailTestUserID, user.Email, user.EmailVerified, "new@example.com").
 		Return(true, nil).Once()
 	auditLogger.On("Log", mock.Anything, audit.EventUpdatedOwnEmail, mock.Anything).Return().Once()
 }
@@ -440,12 +440,12 @@ func TestHandleAccountEmailPut_TellsThePreviousAddressAfterTheResponse(t *testin
 			require.NotNil(t, sent)
 			assert.Equal(t, "old@example.com", sent.To, "the notice goes to the address the account had")
 			assert.Equal(t, tc.expectSubject, sent.Subject)
-			assert.Equal(t, "<p>rendered notice</p>", sent.HtmlBody)
+			assert.Equal(t, "<p>rendered notice</p>", sent.HTMLBody)
 			assert.Equal(t, tc.renderLocale, renderLocale, "the notice is rendered in the user's locale")
 			assert.Equal(t, tc.expectName, values.Name)
 			assert.Empty(t, values.Link, "the notice carries no link")
 			assert.NotContains(t, strings.ToLower(fmt.Sprintf("%+v", values)), "new@example.com", "the notice must not name the new address")
-			assert.Equal(t, accountEmailRequestId, requestid.FromContext(sendCtx),
+			assert.Equal(t, accountEmailRequestID, requestid.FromContext(sendCtx),
 				"the job's records carry the request's id")
 		})
 	}
@@ -484,7 +484,7 @@ func TestHandleAccountEmailPut_AChangeThatLostTheRowAnswers409AndTellsNobody(t *
 	user := changingUser(t, "en")
 	database.On("GetUserBySubject", mock.Anything, mock.Anything, emailTestSubject).Return(user, nil).Twice()
 	database.On("GetUserByEmail", mock.Anything, mock.Anything, "new@example.com").Return(nil, nil).Once()
-	database.On("TrySetUserEmail", mock.Anything, (*sql.Tx)(nil), emailTestUserId, "old@example.com", true, "new@example.com").
+	database.On("TrySetUserEmail", mock.Anything, (*sql.Tx)(nil), emailTestUserID, "old@example.com", true, "new@example.com").
 		Return(false, nil).Once()
 	credentials := &countingCredentials{}
 
@@ -561,8 +561,8 @@ func TestHandleAccountEmailPut_AFailedNoticeIsAnErrorRecordAndNothingElse(t *tes
 			records := capture.Records()
 			require.Len(t, records, 1, capture.Text())
 			assert.Equal(t, slog.LevelError, records[0].Level)
-			assert.Equal(t, accountEmailRequestId, records[0].Attrs["request_id"])
-			assert.Equal(t, emailTestUserId, records[0].Attrs["user_id"])
+			assert.Equal(t, accountEmailRequestID, records[0].Attrs["request_id"])
+			assert.Equal(t, emailTestUserID, records[0].Attrs["user_id"])
 			assert.NotNil(t, records[0].Attrs["error"])
 			if tc.renderErr != nil {
 				emailSender.AssertNotCalled(t, "SendEmail", mock.Anything, mock.Anything, mock.Anything)

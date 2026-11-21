@@ -81,7 +81,7 @@ func TestMigration000093_BrandPalette(t *testing.T) {
 			require.NoErrorf(t, upErr, "migrate to head on %s", dbType())
 		}
 		for _, p := range predating {
-			brand, err := h.DB.GetBrandById(ctx, nil, p.id)
+			brand, err := h.DB.GetBrandByID(ctx, nil, p.id)
 			require.NoError(t, err)
 			require.NotNilf(t, brand, "[%s] the brand %q is kept on %s", phase, p.name, dbType())
 			assert.Equalf(t, p.name, brand.Name, "[%s] its name", phase)

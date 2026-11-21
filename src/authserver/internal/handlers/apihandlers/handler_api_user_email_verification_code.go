@@ -23,8 +23,8 @@ import (
 // It embeds what the administrative policy reads to judge whether the user is an administrator.
 type userEmailVerificationCodeDatabase interface {
 	userTargetPolicyDatabase
-	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
-	TryIssueEmailVerificationCode(ctx context.Context, tx *sql.Tx, userId int64, email string, codeEncrypted []byte,
+	GetUserByID(ctx context.Context, tx *sql.Tx, userID int64) (*record.User, error)
+	TryIssueEmailVerificationCode(ctx context.Context, tx *sql.Tx, userID int64, email string, codeEncrypted []byte,
 		issuedAt time.Time) (bool, error)
 }
 
@@ -37,19 +37,19 @@ func HandleUserEmailVerificationCodePost(
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Authentication and authorization handled by middleware
 
-		userIdStr := r.PathValue("id")
-		if userIdStr == "" {
+		userIDStr := r.PathValue("id")
+		if userIDStr == "" {
 			writeJSONError(w, "User ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
-		userId, err := strconv.ParseInt(userIdStr, 10, 64)
+		userID, err := strconv.ParseInt(userIDStr, 10, 64)
 		if err != nil {
 			writeJSONError(w, "Invalid user ID", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
-		user, err := database.GetUserById(r.Context(), nil, userId)
+		user, err := database.GetUserByID(r.Context(), nil, userID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -60,7 +60,7 @@ func HandleUserEmailVerificationCodePost(
 		}
 
 		// Only authserver:manage writes to an administrator (#402 decision 1).
-		if !userTargetCeilingAllows(w, r, database, auditLogger, user.Id) {
+		if !userTargetCeilingAllows(w, r, database, auditLogger, user.ID) {
 			return
 		}
 
@@ -75,7 +75,7 @@ func HandleUserEmailVerificationCodePost(
 		// stored only while the account still holds the address read above. Writing back the row as
 		// read also undid a disable, a password change or an OTP change made in between (#471).
 		issuedAt := time.Now().UTC()
-		stored, err := database.TryIssueEmailVerificationCode(r.Context(), nil, user.Id, user.Email, encrypted, issuedAt)
+		stored, err := database.TryIssueEmailVerificationCode(r.Context(), nil, user.ID, user.Email, encrypted, issuedAt)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -92,7 +92,7 @@ func HandleUserEmailVerificationCodePost(
 		}
 
 		auditLogger.Log(r.Context(), audit.EventGeneratedEmailVerificationCode, map[string]interface{}{
-			"user_id":        user.Id,
+			"user_id":        user.ID,
 			"email_digest":   hashutil.HashString(user.Email),
 			"logged_in_user": loggedInUser,
 		})
@@ -101,7 +101,7 @@ func HandleUserEmailVerificationCodePost(
 		response := api.GenerateUserEmailVerificationCodeResponse{
 			VerificationCode:          verificationCode,
 			VerificationCodeExpiresAt: &expiresAt,
-			UserId:                    user.Id,
+			UserID:                    user.ID,
 			Email:                     user.Email,
 		}
 

@@ -5,11 +5,11 @@
 {{end}}
 
 {{define "page"}}
-{{ template "user_header" (args "groups" .user.Id .user.Email .page .query $.ctx) }}
+{{ template "user_header" (args "groups" .user.ID .user.Email .page .query $.ctx) }}
 
 {{/* The groups are drawn as stored; user-groups.js edits them in the page and saves the set
      whole, with the set as drawn, so the server refuses a save from an outdated page (#428). */}}
-<form class="panel" id="groupListForm" novalidate data-save-url="/admin/users/{{ .user.Id }}/groups" data-reload-url="/admin/users/{{ .user.Id }}/groups?page={{ .page }}{{ if .query }}&query={{ .query }}{{ end }}" data-list-key="assignedGroupsIds" data-expected-key="expectedGroupIds"
+<form class="panel" id="groupListForm" novalidate data-save-url="/admin/users/{{ .user.ID }}/groups" data-reload-url="/admin/users/{{ .user.ID }}/groups?page={{ .page }}{{ if .query }}&query={{ .query }}{{ end }}" data-list-key="assignedGroupsIds" data-expected-key="expectedGroupIds"
   data-unchosen="{{ T $.ctx "adminconsole.admin_users.groups.error_select_group" }}" data-duplicate="{{ T $.ctx "adminconsole.admin_users.groups.error_already_in_list" }}"
   data-added="{{ T $.ctx "adminconsole.admin_users.groups.added" }}" data-removed="{{ T $.ctx "adminconsole.admin_users.groups.removed" }}" data-remove-label="{{ T $.ctx "adminconsole.admin_users.groups.remove_label" }}">
   <div class="panel-body stacked">
@@ -28,7 +28,7 @@
         <select class="control" id="groupsSelect" data-group-select aria-describedby="groupsSelect-description groupsSelect-error">
           <option value="">{{ T $.ctx "adminconsole.admin_users.groups.select_group" }}</option>
           {{ range .groupChoices }}
-          <option value="{{ .Id }}" data-group-identifier="{{ .Identifier }}" data-description="{{ .Description }}">{{ .Label }}</option>
+          <option value="{{ .ID }}" data-group-identifier="{{ .Identifier }}" data-description="{{ .Description }}">{{ .Label }}</option>
           {{ end }}
         </select>
         <button class="button" type="button" id="addGroupBtn" data-group-add>{{ T $.ctx "adminconsole.admin_users.groups.grant_button" }}</button>
@@ -48,8 +48,8 @@
           </thead>
           <tbody data-list-rows>
             {{ range .memberships }}
-            <tr data-id="{{ .Id }}">
-              <td class="cell-mono cell-wrap"><a class="text-link" href="/admin/groups/{{ .Id }}/settings">{{ .GroupIdentifier }}</a></td>
+            <tr data-id="{{ .ID }}">
+              <td class="cell-mono cell-wrap"><a class="text-link" href="/admin/groups/{{ .ID }}/settings">{{ .GroupIdentifier }}</a></td>
               <td class="cell-actions"><button class="button button-sm" type="button" data-list-remove>{{ T $.ctx "adminconsole.admin_users.groups.remove_label" }}<span class="sr-only"> {{ .GroupIdentifier }}</span></button></td>
             </tr>
             {{ end }}

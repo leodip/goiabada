@@ -15,15 +15,15 @@ type legalDocumentsListAPI interface {
 }
 
 func HandleListGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient legalDocumentsListAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 

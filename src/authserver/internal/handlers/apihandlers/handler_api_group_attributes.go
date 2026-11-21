@@ -23,10 +23,10 @@ import (
 type groupAttributesDatabase interface {
 	administrativeGroupPolicyDatabase
 	CreateGroupAttribute(ctx context.Context, tx *sql.Tx, groupAttribute *record.GroupAttribute) error
-	DeleteGroupAttribute(ctx context.Context, tx *sql.Tx, groupAttributeId int64) error
-	GetGroupAttributeById(ctx context.Context, tx *sql.Tx, groupAttributeId int64) (*record.GroupAttribute, error)
-	GetGroupAttributesByGroupId(ctx context.Context, tx *sql.Tx, groupId int64) ([]record.GroupAttribute, error)
-	GetGroupById(ctx context.Context, tx *sql.Tx, groupId int64) (*record.Group, error)
+	DeleteGroupAttribute(ctx context.Context, tx *sql.Tx, groupAttributeID int64) error
+	GetGroupAttributeByID(ctx context.Context, tx *sql.Tx, groupAttributeID int64) (*record.GroupAttribute, error)
+	GetGroupAttributesByGroupID(ctx context.Context, tx *sql.Tx, groupID int64) ([]record.GroupAttribute, error)
+	GetGroupByID(ctx context.Context, tx *sql.Tx, groupID int64) (*record.Group, error)
 	UpdateGroupAttribute(ctx context.Context, tx *sql.Tx, groupAttribute *record.GroupAttribute) error
 }
 
@@ -49,7 +49,7 @@ func HandleGroupAttributesGet(
 		}
 
 		// Verify group exists
-		group, err := database.GetGroupById(r.Context(), nil, id)
+		group, err := database.GetGroupByID(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error getting group by ID for attributes"), "group_id", id)
 			return
@@ -60,7 +60,7 @@ func HandleGroupAttributesGet(
 		}
 
 		// Get group attributes
-		attributes, err := database.GetGroupAttributesByGroupId(r.Context(), nil, id)
+		attributes, err := database.GetGroupAttributesByGroupID(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error getting group attributes by group ID"), "group_id", id)
 			return
@@ -103,7 +103,7 @@ func HandleGroupAttributeGet(
 		}
 
 		// Get group attribute
-		attribute, err := database.GetGroupAttributeById(r.Context(), nil, id)
+		attribute, err := database.GetGroupAttributeByID(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error getting group attribute by ID"), "attribute_id", id)
 			return
@@ -144,8 +144,8 @@ func HandleGroupAttributeCreatePost(
 
 		// The group's id rides in the body, so this is no malformed target: it is translated like
 		// the other fields' refusals (#559 decision 1).
-		if createReq.GroupId <= 0 {
-			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeGroupAttributeGroupIdRequired, nil))
+		if createReq.GroupID <= 0 {
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeGroupAttributeGroupIDRequired, nil))
 			return
 		}
 
@@ -169,7 +169,7 @@ func HandleGroupAttributeCreatePost(
 		}
 
 		// Verify group exists
-		group, err := database.GetGroupById(r.Context(), nil, createReq.GroupId)
+		group, err := database.GetGroupByID(r.Context(), nil, createReq.GroupID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -183,26 +183,26 @@ func HandleGroupAttributeCreatePost(
 		groupAttribute := &record.GroupAttribute{
 			Key:                  createReq.Key,
 			Value:                createReq.Value,
-			IncludeInIdToken:     createReq.IncludeInIdToken,
+			IncludeInIDToken:     createReq.IncludeInIDToken,
 			IncludeInAccessToken: createReq.IncludeInAccessToken,
-			GroupId:              createReq.GroupId,
+			GroupID:              createReq.GroupID,
 		}
 
 		// Only authserver:manage writes to an administrative group (#402 decision 1).
-		if !groupTargetCeilingAllows(w, r, database, auditLogger, group.Id) {
+		if !groupTargetCeilingAllows(w, r, database, auditLogger, group.ID) {
 			return
 		}
 
 		err = database.CreateGroupAttribute(r.Context(), nil, groupAttribute)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error creating group attribute"), "group_id", groupAttribute.GroupId, "key", groupAttribute.Key)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error creating group attribute"), "group_id", groupAttribute.GroupID, "key", groupAttribute.Key)
 			return
 		}
 
 		// Audit log
 		auditLogger.Log(r.Context(), audit.EventAddedGroupAttribute, map[string]interface{}{
-			"group_attribute_id": groupAttribute.Id,
-			"group_id":           group.Id,
+			"group_attribute_id": groupAttribute.ID,
+			"group_id":           group.ID,
 			"group_identifier":   group.GroupIdentifier,
 			"logged_in_user":     callerSubject(r),
 		})
@@ -242,7 +242,7 @@ func HandleGroupAttributeUpdatePut(
 		}
 
 		// Get existing attribute
-		attribute, err := database.GetGroupAttributeById(r.Context(), nil, id)
+		attribute, err := database.GetGroupAttributeByID(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error getting group attribute by ID"), "attribute_id", id)
 			return
@@ -285,12 +285,12 @@ func HandleGroupAttributeUpdatePut(
 		}
 
 		// Only authserver:manage writes to an administrative group (#402 decision 1).
-		if !groupTargetCeilingAllows(w, r, database, auditLogger, attribute.GroupId) {
+		if !groupTargetCeilingAllows(w, r, database, auditLogger, attribute.GroupID) {
 			return
 		}
 
 		// Get group for audit log
-		group, err := database.GetGroupById(r.Context(), nil, attribute.GroupId)
+		group, err := database.GetGroupByID(r.Context(), nil, attribute.GroupID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -299,19 +299,19 @@ func HandleGroupAttributeUpdatePut(
 		// Update attribute
 		attribute.Key = updateReq.Key
 		attribute.Value = updateReq.Value
-		attribute.IncludeInIdToken = updateReq.IncludeInIdToken
+		attribute.IncludeInIDToken = updateReq.IncludeInIDToken
 		attribute.IncludeInAccessToken = updateReq.IncludeInAccessToken
 
 		err = database.UpdateGroupAttribute(r.Context(), nil, attribute)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error updating group attribute"), "attribute_id", attribute.Id, "group_id", attribute.GroupId, "key", attribute.Key)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error updating group attribute"), "attribute_id", attribute.ID, "group_id", attribute.GroupID, "key", attribute.Key)
 			return
 		}
 
 		// Audit log
 		auditLogger.Log(r.Context(), audit.EventUpdatedGroupAttribute, map[string]interface{}{
-			"group_attribute_id": attribute.Id,
-			"group_id":           attribute.GroupId,
+			"group_attribute_id": attribute.ID,
+			"group_id":           attribute.GroupID,
 			"group_identifier":   group.GroupIdentifier,
 			"logged_in_user":     callerSubject(r),
 		})
@@ -350,7 +350,7 @@ func HandleGroupAttributeDelete(
 		}
 
 		// Get existing attribute for audit log
-		attribute, err := database.GetGroupAttributeById(r.Context(), nil, id)
+		attribute, err := database.GetGroupAttributeByID(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error getting group attribute by ID"), "attribute_id", id)
 			return
@@ -361,12 +361,12 @@ func HandleGroupAttributeDelete(
 		}
 
 		// Only authserver:manage writes to an administrative group (#402 decision 1).
-		if !groupTargetCeilingAllows(w, r, database, auditLogger, attribute.GroupId) {
+		if !groupTargetCeilingAllows(w, r, database, auditLogger, attribute.GroupID) {
 			return
 		}
 
 		// Get group for audit log
-		group, err := database.GetGroupById(r.Context(), nil, attribute.GroupId)
+		group, err := database.GetGroupByID(r.Context(), nil, attribute.GroupID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -375,14 +375,14 @@ func HandleGroupAttributeDelete(
 		// Delete attribute
 		err = database.DeleteGroupAttribute(r.Context(), nil, id)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error deleting group attribute"), "attribute_id", id, "group_id", attribute.GroupId, "key", attribute.Key)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error deleting group attribute"), "attribute_id", id, "group_id", attribute.GroupID, "key", attribute.Key)
 			return
 		}
 
 		// Audit log
 		auditLogger.Log(r.Context(), audit.EventDeleteGroupAttribute, map[string]interface{}{
 			"group_attribute_id": id,
-			"group_id":           attribute.GroupId,
+			"group_id":           attribute.GroupID,
 			"group_identifier":   group.GroupIdentifier,
 			"logged_in_user":     callerSubject(r),
 		})

@@ -52,7 +52,7 @@ import (
 // chain that registration produced: for the account API that is the debug, bearer-token,
 // scope, user-bound and session guards ahead of the limiter, in their production order.
 // Only two things are supplied rather than performed. The bearer token is placed in the
-// request context in the shape JwtAuthorizationHeaderToContext would leave it, since
+// request context in the shape JWTAuthorizationHeaderToContext would leave it, since
 // signature validation is not what this test claims; and the settings come from the context
 // rather than from middleware.Settings, because initMiddleware is not what is under test.
 //
@@ -80,8 +80,8 @@ const (
 	// The configured issuer, and the client every bearer token these tests present was issued to,
 	// which the session guard reads (#676).
 	routesTestIssuer      = "https://auth.example.com"
-	routesTestAPIClientId = "routes-test-api-client"
-	routesTestAccessJti   = "routes-test-access-jti"
+	routesTestAPIClientID = "routes-test-api-client"
+	routesTestAccessJTI   = "routes-test-access-jti"
 
 	// What the caller submits where a credential is expected. Never the right one: these
 	// tiers count failures, so a correct credential would spend nothing and the budget
@@ -96,7 +96,7 @@ const (
 	registerWindow              = 300 // seconds
 	activateBudget              = 30  // requests per 5 minutes per /64, shared by GET and POST
 	activateWindow              = 300
-	forgotPwdIpBudget           = 20 // requests per 5 minutes per /64
+	forgotPwdIPBudget           = 20 // requests per 5 minutes per /64
 	forgotPwdEmailBudget        = 5  // requests per 5 minutes per address
 	forgotPwdWindow             = 300
 	emailVerificationBudget     = 5 // failures per 15 minutes per token subject
@@ -114,20 +114,20 @@ const (
 	otpBudget                     = 5 // failures per 15 minutes per user id
 	otpWindow                     = 900
 
-	routesTestClientId = "test-client"
+	routesTestClientID = "test-client"
 	// A public client the password grant is enabled for, so a password grant naming it reaches
 	// the password check, and a wrong password spends the failures-only tiers there.
-	routesTestROPCClientId = "ropc-client"
+	routesTestROPCClientID = "ropc-client"
 	// The two per-address password tiers: failures per minute per /64 (#564 decision 2).
-	pwdIpBudget = 30
-	pwdIpWindow = 60
+	pwdIPBudget = 30
+	pwdIPWindow = 60
 	// The per-address ceiling in front of each: every password check per minute per /64 (#564).
-	pwdIpCeiling = 120
+	pwdIPCeiling = 120
 	// The admission tier on the authorization endpoint: every request per minute per /64,
 	// shared by the GET and the POST (#504).
 	authorizeBudget      = 120
 	authorizeWindow      = 60
-	routesTestCeremonyId = "9f1c2c2f-2a0f-4a3b-8b6d-1f0a5c9e7d21"
+	routesTestCeremonyID = "9f1c2c2f-2a0f-4a3b-8b6d-1f0a5c9e7d21"
 	// A well-formed base32 TOTP secret, so the code the OTP case submits is refused for
 	// being wrong rather than for the secret being unreadable.
 	routesTestOTPSecret = "JBSWY3DPEHPK3PXP"
@@ -144,7 +144,7 @@ const (
 // this test's business.
 func routesTestSettings() *record.Settings {
 	return &record.Settings{
-		Id:                         1,
+		ID:                         1,
 		AppName:                    "Goiabada",
 		Issuer:                     routesTestIssuer,
 		SelfRegistrationEnabled:    true,
@@ -202,9 +202,9 @@ func newRoutesTestServerDrawnIn(t *testing.T, configure func(*config.Config), se
 	database := datamocks.NewDatabase(t)
 	// A page reads the default brand; none leaves it automatic, in the built-in colors.
 	database.On("GetDefaultBrand", mock.Anything, mock.Anything).Return(defaultBrand, nil).Maybe()
-	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(routesTestSettings(), nil).Maybe()
+	database.On("GetSettingsByID", mock.Anything, mock.Anything, int64(1)).Return(routesTestSettings(), nil).Maybe()
 	database.On("GetUserBySubject", mock.Anything, mock.Anything, routesTestSubject).Return(&record.User{
-		Id:           1,
+		ID:           1,
 		Enabled:      true,
 		Subject:      routesTestSubject,
 		Email:        "victim@example.com",
@@ -223,19 +223,19 @@ func newRoutesTestServerDrawnIn(t *testing.T, configure func(*config.Config), se
 	// The registration form links the legal documents in effect where it collects the data (#622):
 	// none here, so the form draws without them.
 	database.On("GetAllLegalDocuments", mock.Anything, mock.Anything).Return([]record.LegalDocument{}, nil).Maybe()
-	database.On("GetLegalDocumentClientsByClientId", mock.Anything, mock.Anything, mock.Anything).
+	database.On("GetLegalDocumentClientsByClientID", mock.Anything, mock.Anything, mock.Anything).
 		Return([]record.LegalDocumentClient{}, nil).Maybe()
 	// What the OTP step reads: the user the auth context names, not yet enrolled, and the
 	// client whose branding the form carries.
-	database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).
-		Return(&record.User{Id: 1, Enabled: true, OTPEnabled: false}, nil).Maybe()
-	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, routesTestClientId).
-		Return(&record.Client{Id: 1, ClientIdentifier: routesTestClientId}, nil).Maybe()
+	database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).
+		Return(&record.User{ID: 1, Enabled: true, OTPEnabled: false}, nil).Maybe()
+	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, routesTestClientID).
+		Return(&record.Client{ID: 1, ClientIdentifier: routesTestClientID}, nil).Maybe()
 	database.On("ClientHasLogo", mock.Anything, mock.Anything, int64(1)).Return(false, nil).Maybe()
 	armRoutesTestAPIClient(database)
 	ropcEnabled := true
-	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, routesTestROPCClientId).
-		Return(&record.Client{Id: 2, ClientIdentifier: routesTestROPCClientId, Enabled: true, IsPublic: true,
+	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, routesTestROPCClientID).
+		Return(&record.Client{ID: 2, ClientIdentifier: routesTestROPCClientID, Enabled: true, IsPublic: true,
 			ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled}, nil).Maybe()
 
 	// The limiter on, which initRoutes reads when it builds the limiter.
@@ -289,7 +289,7 @@ func browserForm(method string, target string, body string) *http.Request {
 }
 
 // apiRequest carries a bearer token in the context, in the shape
-// JwtAuthorizationHeaderToContext leaves behind when it decodes a valid one: the scope the
+// JWTAuthorizationHeaderToContext leaves behind when it decodes a valid one: the scope the
 // account API requires, an auth_time claim marking it a user token rather than a
 // client_credentials one, and no sid, so the session check falls back to the generation
 // claim the zero-valued user matches.
@@ -301,7 +301,7 @@ func apiRequest(method string, target string, body string) *http.Request {
 }
 
 // accountAPIToken is the decoded bearer token apiRequest carries.
-func accountAPIToken() oauth.JwtToken {
+func accountAPIToken() oauth.JWTToken {
 	return routesTestAccessToken(jwt.MapClaims{
 		"sub":       routesTestSubject,
 		"scope":     builtin.AuthServerResourceIdentifier + ":" + builtin.ManageAccountPermissionIdentifier,
@@ -310,25 +310,25 @@ func accountAPIToken() oauth.JwtToken {
 }
 
 // routesTestAccessToken is claims as an access token issuance mints since #676: the at+jwt header,
-// routesTestIssuer, routesTestAPIClientId and routesTestAccessJti on top of claims.
-func routesTestAccessToken(claims jwt.MapClaims) oauth.JwtToken {
-	all := jwt.MapClaims{"iss": routesTestIssuer, "client_id": routesTestAPIClientId, "jti": routesTestAccessJti}
+// routesTestIssuer, routesTestAPIClientID and routesTestAccessJTI on top of claims.
+func routesTestAccessToken(claims jwt.MapClaims) oauth.JWTToken {
+	all := jwt.MapClaims{"iss": routesTestIssuer, "client_id": routesTestAPIClientID, "jti": routesTestAccessJTI}
 	for name, value := range claims {
 		all[name] = value
 	}
-	return oauth.JwtToken{Header: map[string]interface{}{"alg": "RS256", "typ": "at+jwt"}, Claims: all}
+	return oauth.JWTToken{Header: map[string]interface{}{"alg": "RS256", "typ": "at+jwt"}, Claims: all}
 }
 
-// armRoutesTestAPIClient has the session guard find routesTestAPIClientId, enabled, and
-// routesTestAccessJti not revoked, which it reads of a token without grant_id (#676).
+// armRoutesTestAPIClient has the session guard find routesTestAPIClientID, enabled, and
+// routesTestAccessJTI not revoked, which it reads of a token without grant_id (#676).
 func armRoutesTestAPIClient(database *datamocks.Database) {
-	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, routesTestAPIClientId).
-		Return(&record.Client{Id: 3, ClientIdentifier: routesTestAPIClientId, Enabled: true}, nil).Maybe()
-	database.On("IsAccessTokenRevoked", mock.Anything, mock.Anything, routesTestAccessJti).Return(false, nil).Maybe()
+	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, routesTestAPIClientID).
+		Return(&record.Client{ID: 3, ClientIdentifier: routesTestAPIClientID, Enabled: true}, nil).Maybe()
+	database.On("IsAccessTokenRevoked", mock.Anything, mock.Anything, routesTestAccessJTI).Return(false, nil).Maybe()
 }
 
 // otpCeremonyCookie mints the session cookie a user part way through the OTP step carries:
-// an auth context at the level 2 state carrying the enrollment secret HandleAuthOtpGet left
+// an auth context at the level 2 state carrying the enrollment secret HandleAuthOTPGet left
 // on it. Written through the ceremony store over the server's own session store, so what the
 // handler reads back is what the store wrote rather than a shape this test invented.
 func otpCeremonyCookie(t *testing.T, s *Server) *http.Cookie {
@@ -339,9 +339,9 @@ func otpCeremonyCookie(t *testing.T, s *Server) *http.Cookie {
 	require.NoError(t, ceremony.NewStore(s.sessionStore, sessionkeys.AuthServerSessionName).AddAuthContext(recorder, r,
 		&ceremony.AuthContext{
 			AuthState:  ceremony.AuthStateLevel2OTP,
-			CeremonyId: routesTestCeremonyId,
-			UserId:     1,
-			ClientId:   routesTestClientId,
+			CeremonyID: routesTestCeremonyID,
+			UserID:     1,
+			ClientID:   routesTestClientID,
 			OTPKeyURL:  routesTestOTPKeyURL,
 		}))
 
@@ -522,7 +522,7 @@ func TestInitRoutes_LimitersAreRegisteredOnTheProductionRoutes(t *testing.T) {
 		shape   rejectShape
 		request func(attempt int) *http.Request
 	}{
-		{"POST /forgot-password", forgotPwdIpBudget, forgotPwdWindow, shapeBrowser, func(attempt int) *http.Request {
+		{"POST /forgot-password", forgotPwdIPBudget, forgotPwdWindow, shapeBrowser, func(attempt int) *http.Request {
 			// A distinct address per request, so the per-email tier of 5 cannot trip and
 			// the refusal below is attributable to the per-IP tier this case names. The
 			// email tier gets its own case further down.
@@ -571,12 +571,12 @@ func TestInitRoutes_LimitersAreRegisteredOnTheProductionRoutes(t *testing.T) {
 	// guess, so the tight account tier of 10 cannot be what refuses.
 	t.Run("POST /auth/pwd is limited", func(t *testing.T) {
 		server := newRoutesTestServer(t)
-		assertRefused(t, exhaust(t, server, pwdIpBudget, pwdGuess(t, server)), pwdIpWindow, shapeBrowser)
+		assertRefused(t, exhaust(t, server, pwdIPBudget, pwdGuess(t, server)), pwdIPWindow, shapeBrowser)
 	})
 
 	t.Run("POST /auth/token is limited", func(t *testing.T) {
 		server := newRoutesTestServer(t)
-		assertRefused(t, exhaust(t, server, pwdIpBudget, ropcGuess), pwdIpWindow, shapeOAuth)
+		assertRefused(t, exhaust(t, server, pwdIPBudget, ropcGuess), pwdIPWindow, shapeOAuth)
 	})
 
 	// The ceiling in front of both counts every check, so it is spent here by checks that charge no
@@ -586,25 +586,25 @@ func TestInitRoutes_LimitersAreRegisteredOnTheProductionRoutes(t *testing.T) {
 		server := newRoutesTestServer(t)
 		cookie := pwdCeremonyCookie(t, server)
 		noPassword := func(attempt int) *http.Request {
-			r := browserForm(http.MethodPost, "/auth/pwd", "ceremonyId="+routesTestCeremonyId+
+			r := browserForm(http.MethodPost, "/auth/pwd", "ceremonyId="+routesTestCeremonyID+
 				"&email=user"+strconv.Itoa(attempt)+"%40example.com&password=")
 			r.AddCookie(cookie)
 			return r
 		}
-		assertRefused(t, exhaust(t, server, pwdIpCeiling, noPassword), pwdIpWindow, shapeBrowser)
+		assertRefused(t, exhaust(t, server, pwdIPCeiling, noPassword), pwdIPWindow, shapeBrowser)
 	})
 
 	t.Run("POST /auth/token has a ceiling on every password grant", func(t *testing.T) {
 		server := newRoutesTestServer(t)
 		noPassword := func(attempt int) *http.Request {
-			return browserForm(http.MethodPost, "/auth/token", "grant_type=password&client_id="+routesTestROPCClientId+
+			return browserForm(http.MethodPost, "/auth/token", "grant_type=password&client_id="+routesTestROPCClientID+
 				"&username=user"+strconv.Itoa(attempt)+"%40example.com")
 		}
-		assertRefused(t, exhaust(t, server, pwdIpCeiling, noPassword), pwdIpWindow, shapeOAuth)
+		assertRefused(t, exhaust(t, server, pwdIPCeiling, noPassword), pwdIPWindow, shapeOAuth)
 	})
 
 	// The last registration, and the only one whose tier is keyed on something the request
-	// cannot carry by itself: LimitOtp reads the user id out of the auth context and counts
+	// cannot carry by itself: LimitOTP reads the user id out of the auth context and counts
 	// failures, so filling it takes a session mid-ceremony and a code the handler rejects.
 	// Driven on the enrollment branch, where the secret being verified comes from the
 	// session rather than from the encrypted column, so the case needs no data cipher.
@@ -615,7 +615,7 @@ func TestInitRoutes_LimitersAreRegisteredOnTheProductionRoutes(t *testing.T) {
 
 		post := func(int) *http.Request {
 			r := browserForm(http.MethodPost, "/auth/otp",
-				"ceremonyId="+routesTestCeremonyId+"&otp="+wrongCode)
+				"ceremonyId="+routesTestCeremonyID+"&otp="+wrongCode)
 			r.AddCookie(cookie)
 			return r
 		}
@@ -932,9 +932,9 @@ func TestInitRoutes_LimitersAreRegisteredOnTheProductionRoutes(t *testing.T) {
 		// separates them, browser against OAuth, and this says the counters are separate
 		// too, which is what decision 7's split of the old composite key rests on.
 		server := newRoutesTestServer(t)
-		assertRefused(t, exhaust(t, server, pwdIpBudget, pwdGuess(t, server)), pwdIpWindow, shapeBrowser)
+		assertRefused(t, exhaust(t, server, pwdIPBudget, pwdGuess(t, server)), pwdIPWindow, shapeBrowser)
 
-		assert.True(t, reachesHandler(server, ropcGuess(pwdIpBudget)),
+		assert.True(t, reachesHandler(server, ropcGuess(pwdIPBudget)),
 			"the ROPC grant keeps its own budget when the password form's is spent")
 	})
 
@@ -945,16 +945,16 @@ func TestInitRoutes_LimitersAreRegisteredOnTheProductionRoutes(t *testing.T) {
 	t.Run("password checks that do not fail spend no per-address budget", func(t *testing.T) {
 		server := newRoutesTestServer(t)
 		cookie := pwdCeremonyCookie(t, server)
-		for i := 0; i < 2*pwdIpBudget; i++ {
-			empty := browserForm(http.MethodPost, "/auth/pwd", "ceremonyId="+routesTestCeremonyId)
+		for i := 0; i < 2*pwdIPBudget; i++ {
+			empty := browserForm(http.MethodPost, "/auth/pwd", "ceremonyId="+routesTestCeremonyID)
 			empty.AddCookie(cookie)
 			require.True(t, reachesHandler(server, empty), "empty sign-in form %d", i+1)
 			require.True(t, reachesHandler(server, browserForm(http.MethodPost, "/auth/token",
-				"grant_type=password&client_id="+routesTestClientId+"&username=user"+strconv.Itoa(i)+
+				"grant_type=password&client_id="+routesTestClientID+"&username=user"+strconv.Itoa(i)+
 					"%40example.com&password="+routesTestWrongPassword)), "unauthenticated password grant %d", i+1)
 		}
-		assertRefused(t, exhaust(t, server, pwdIpBudget, pwdGuess(t, server)), pwdIpWindow, shapeBrowser)
-		assertRefused(t, exhaust(t, server, pwdIpBudget, ropcGuess), pwdIpWindow, shapeOAuth)
+		assertRefused(t, exhaust(t, server, pwdIPBudget, pwdGuess(t, server)), pwdIPWindow, shapeBrowser)
+		assertRefused(t, exhaust(t, server, pwdIPBudget, ropcGuess), pwdIPWindow, shapeOAuth)
 	})
 }
 
@@ -1095,7 +1095,7 @@ func pwdGuess(t *testing.T, s *Server) func(attempt int) *http.Request {
 	t.Helper()
 	cookie := pwdCeremonyCookie(t, s)
 	return func(attempt int) *http.Request {
-		r := browserForm(http.MethodPost, "/auth/pwd", "ceremonyId="+routesTestCeremonyId+
+		r := browserForm(http.MethodPost, "/auth/pwd", "ceremonyId="+routesTestCeremonyID+
 			"&email=user"+strconv.Itoa(attempt)+"%40example.com&password="+routesTestWrongPassword)
 		r.AddCookie(cookie)
 		return r
@@ -1106,7 +1106,7 @@ func pwdGuess(t *testing.T, s *Server) func(attempt int) *http.Request {
 // enabled for, for a distinct account per attempt: answered invalid_grant, which charges the
 // failure.
 func ropcGuess(attempt int) *http.Request {
-	return browserForm(http.MethodPost, "/auth/token", "grant_type=password&client_id="+routesTestROPCClientId+
+	return browserForm(http.MethodPost, "/auth/token", "grant_type=password&client_id="+routesTestROPCClientID+
 		"&username=user"+strconv.Itoa(attempt)+"%40example.com&password="+routesTestWrongPassword)
 }
 
@@ -1120,8 +1120,8 @@ func pwdCeremonyCookie(t *testing.T, s *Server) *http.Cookie {
 	require.NoError(t, ceremony.NewStore(s.sessionStore, sessionkeys.AuthServerSessionName).AddAuthContext(recorder, r,
 		&ceremony.AuthContext{
 			AuthState:  ceremony.AuthStateLevel1Password,
-			CeremonyId: routesTestCeremonyId,
-			ClientId:   routesTestClientId,
+			CeremonyID: routesTestCeremonyID,
+			ClientID:   routesTestClientID,
 		}))
 	cookies := recorder.Result().Cookies()
 	require.Len(t, cookies, 1)
@@ -1151,14 +1151,14 @@ func TestInitRoutes_TheDefaultConfigurationLimitsWhatAnEmailCounts(t *testing.T)
 		// unknown-address branch, which charges the failure as a wrong password does.
 		guess := func(int) *http.Request {
 			r := browserForm(http.MethodPost, "/auth/pwd",
-				"ceremonyId="+routesTestCeremonyId+"&email=victim%40example.com&password="+routesTestWrongPassword)
+				"ceremonyId="+routesTestCeremonyID+"&email=victim%40example.com&password="+routesTestWrongPassword)
 			r.AddCookie(cookie)
 			return r
 		}
 		for i := 0; i < pwdAccountBudget; i++ {
 			rr := serve(server, guess(i))
 			require.Equal(t, http.StatusOK, rr.Code, "guess %d must reach the handler, which answers the form again", i+1)
-			require.Contains(t, rr.Body.String(), routesTestCeremonyId,
+			require.Contains(t, rr.Body.String(), routesTestCeremonyID,
 				"guess %d must be answered by the password form, not refused before it", i+1)
 		}
 		assertRefused(t, serve(server, guess(pwdAccountBudget)), pwdAccountWindow, shapeBrowser)
@@ -1181,7 +1181,7 @@ func TestInitRoutes_TheDefaultConfigurationLimitsWhatAnEmailCounts(t *testing.T)
 		wrongCode := routesTestWrongOTPCode(t)
 
 		assertRefused(t, exhaust(t, server, otpBudget, func(int) *http.Request {
-			r := browserForm(http.MethodPost, "/auth/otp", "ceremonyId="+routesTestCeremonyId+"&otp="+wrongCode)
+			r := browserForm(http.MethodPost, "/auth/otp", "ceremonyId="+routesTestCeremonyID+"&otp="+wrongCode)
 			r.AddCookie(cookie)
 			return r
 		}), otpWindow, shapeBrowser)
@@ -1213,7 +1213,7 @@ func TestInitRoutes_TheDefaultConfigurationLimitsWhatAnEmailCounts(t *testing.T)
 	// fresh account or address each time, so only a per-IP tier could refuse.
 	t.Run("the tiers counted by an address stay off", func(t *testing.T) {
 		server := newDefaultRoutesTestServer(t)
-		for i := 0; i < 2*forgotPwdIpBudget; i++ {
+		for i := 0; i < 2*forgotPwdIPBudget; i++ {
 			require.True(t, reachesHandler(server, browserForm(http.MethodPost, "/forgot-password",
 				"email=user"+strconv.Itoa(i)+"@example.com")), "forgot-password request %d", i+1)
 			require.True(t, reachesHandler(server, registrationOf(i)), "registration %d", i+1)
@@ -1223,7 +1223,7 @@ func TestInitRoutes_TheDefaultConfigurationLimitsWhatAnEmailCounts(t *testing.T)
 			require.True(t, reachesHandler(server, browserRequest(http.MethodGet, "/reset-password")), "reset %d", i+1)
 		}
 		guess := pwdGuess(t, server)
-		for i := 0; i < 2*pwdIpBudget; i++ {
+		for i := 0; i < 2*pwdIPBudget; i++ {
 			require.True(t, reachesHandler(server, guess(i)), "wrong password %d at the sign-in form", i+1)
 			require.True(t, reachesHandler(server, ropcGuess(i)), "wrong password %d through the password grant", i+1)
 		}

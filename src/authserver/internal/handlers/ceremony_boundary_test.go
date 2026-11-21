@@ -31,12 +31,12 @@ const (
 func TestCeremonyBoundary_StepRedirect(t *testing.T) {
 	boundary := NewCeremonyBoundary(nil, nil, nil, otherBaseURL, otherAdminConsoleBaseURL)
 	rr := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/auth/level1?ceremony="+testCeremonyId, nil)
+	req := httptest.NewRequest(http.MethodGet, "/auth/level1?ceremony="+testCeremonyID, nil)
 
-	boundary.stepRedirect(rr, req, "/auth/pwd", &ceremony.AuthContext{CeremonyId: testCeremonyId})
+	boundary.stepRedirect(rr, req, "/auth/pwd", &ceremony.AuthContext{CeremonyID: testCeremonyID})
 
 	assert.Equal(t, http.StatusFound, rr.Code)
-	assert.Equal(t, "https://auth.boundary.test/auth/pwd?ceremony="+testCeremonyId, rr.Header().Get("Location"))
+	assert.Equal(t, "https://auth.boundary.test/auth/pwd?ceremony="+testCeremonyID, rr.Header().Get("Location"))
 }
 
 func TestCeremonyBoundary_LoadAuthContextRedirectsToItsOwnConsole(t *testing.T) {
@@ -59,7 +59,7 @@ func TestCeremonyBoundary_AnswerStepSaveFailure(t *testing.T) {
 		logged := logtest.CaptureSlog(t)
 		pageRenderer := handlersmocks.NewPageRenderer(t)
 		rr := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/auth/level2?ceremony="+testCeremonyId, nil)
+		req := httptest.NewRequest(http.MethodGet, "/auth/level2?ceremony="+testCeremonyID, nil)
 		expectCeremonyNoLongerActive(t, pageRenderer, rr, req)
 
 		testCeremonyBoundary(pageRenderer, nil, nil).answerStepSaveFailure(rr, req,
@@ -73,7 +73,7 @@ func TestCeremonyBoundary_AnswerStepSaveFailure(t *testing.T) {
 	t.Run("any other failure is the 500 carrying that error", func(t *testing.T) {
 		pageRenderer := handlersmocks.NewPageRenderer(t)
 		rr := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/auth/level2?ceremony="+testCeremonyId, nil)
+		req := httptest.NewRequest(http.MethodGet, "/auth/level2?ceremony="+testCeremonyID, nil)
 		pageRenderer.On("InternalServerError", rr, req, assert.AnError).Return().Once()
 
 		testCeremonyBoundary(pageRenderer, nil, nil).answerStepSaveFailure(rr, req, assert.AnError)
@@ -98,7 +98,7 @@ func TestCeremonyBoundary_RejectCeremonyMismatchBoundsTheAuditedAddress(t *testi
 		mock.Anything).Return(nil).Once()
 
 	testCeremonyBoundary(pageRenderer, nil, auditLogger).rejectCeremonyMismatch(rr, req,
-		&ceremony.AuthContext{ClientId: "test-client", AuthState: ceremony.AuthStateLevel1Password})
+		&ceremony.AuthContext{ClientID: "test-client", AuthState: ceremony.AuthStateLevel1Password})
 }
 
 // A "no longer active" page that cannot be rendered is the 500 page, carrying the render's error.
@@ -119,9 +119,9 @@ func TestCeremonyBoundary_BeginStepHandsBackTheRequestsSettings(t *testing.T) {
 	ceremonyStore := handlersmocks.NewCeremonyStore(t)
 	boundary := testCeremonyBoundary(handlersmocks.NewPageRenderer(t), ceremonyStore, handlersmocks.NewAuditLogger(t))
 	settings := &record.Settings{UserSessionIdleTimeoutInSeconds: 1234}
-	req := withSettings(httptest.NewRequest(http.MethodGet, "/auth/level2?ceremony="+testCeremonyId, nil), settings)
+	req := withSettings(httptest.NewRequest(http.MethodGet, "/auth/level2?ceremony="+testCeremonyID, nil), settings)
 	rr := httptest.NewRecorder()
-	stored := &ceremony.AuthContext{CeremonyId: testCeremonyId, AuthState: ceremony.AuthStateRequiresLevel2}
+	stored := &ceremony.AuthContext{CeremonyID: testCeremonyID, AuthState: ceremony.AuthStateRequiresLevel2}
 	ceremonyStore.On("GetAuthContext", req).Return(stored, nil).Once()
 
 	gotSettings, gotContext, ok := boundary.beginStep(rr, req, ceremony.AuthStateRequiresLevel2)
@@ -138,10 +138,10 @@ func TestCeremonyBoundary_BeginStepStopsAtTheStateGate(t *testing.T) {
 	pageRenderer := handlersmocks.NewPageRenderer(t)
 	ceremonyStore := handlersmocks.NewCeremonyStore(t)
 	boundary := testCeremonyBoundary(pageRenderer, ceremonyStore, handlersmocks.NewAuditLogger(t))
-	req := withSessionSettings(httptest.NewRequest(http.MethodGet, "/auth/level2?ceremony="+testCeremonyId, nil))
+	req := withSessionSettings(httptest.NewRequest(http.MethodGet, "/auth/level2?ceremony="+testCeremonyID, nil))
 	rr := httptest.NewRecorder()
 	ceremonyStore.On("GetAuthContext", req).Return(&ceremony.AuthContext{
-		CeremonyId: testCeremonyId, AuthState: ceremony.AuthStateLevel2OTP}, nil).Once()
+		CeremonyID: testCeremonyID, AuthState: ceremony.AuthStateLevel2OTP}, nil).Once()
 	expectAuthStateMismatch(t, pageRenderer, rr, req)
 
 	gotSettings, gotContext, ok := boundary.beginStep(rr, req, ceremony.AuthStateRequiresLevel2)

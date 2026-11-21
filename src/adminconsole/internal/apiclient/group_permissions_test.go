@@ -22,11 +22,11 @@ func TestAuthServerClient_GetGroupPermissionsReturnsTheGroupBesideThePermissions
 	gotPath, _ := recorded()
 	assert.Equal(t, "/api/v1/admin/groups/4/permissions", gotPath)
 
-	assert.Equal(t, int64(4), group.Id)
+	assert.Equal(t, int64(4), group.ID)
 	assert.Equal(t, "admins", group.GroupIdentifier)
 
 	require.Len(t, permissions, 1)
-	assert.Equal(t, int64(9), permissions[0].Id)
+	assert.Equal(t, int64(9), permissions[0].ID)
 	assert.Equal(t, "read", permissions[0].PermissionIdentifier)
 	assert.Equal(t, "api", permissions[0].Resource.ResourceIdentifier)
 }

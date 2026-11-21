@@ -73,45 +73,45 @@ func TestMigration000096_ClientTokenEndpointAuthMethod(t *testing.T) {
 	basic := createAuthMethodClient000096(t, h, false, "client_secret_basic")
 	post := createAuthMethodClient000096(t, h, false, "client_secret_post")
 	either := createAuthMethodClient000096(t, h, false, "")
-	want := map[int64]string{basic.Id: "client_secret_basic", post.Id: "client_secret_post", either.Id: ""}
+	want := map[int64]string{basic.ID: "client_secret_basic", post.ID: "client_secret_post", either.ID: ""}
 
 	for id, w := range want {
-		byId, readErr := h.DB.GetClientById(ctx, nil, id)
+		byID, readErr := h.DB.GetClientByID(ctx, nil, id)
 		require.NoError(t, readErr)
-		require.NotNil(t, byId)
-		assert.Equalf(t, w, byId.TokenEndpointAuthMethod, "GetClientById(%d)", id)
-		byIdentifier, readErr := h.DB.GetClientByClientIdentifier(ctx, nil, byId.ClientIdentifier)
+		require.NotNil(t, byID)
+		assert.Equalf(t, w, byID.TokenEndpointAuthMethod, "GetClientByID(%d)", id)
+		byIdentifier, readErr := h.DB.GetClientByClientIdentifier(ctx, nil, byID.ClientIdentifier)
 		require.NoError(t, readErr)
 		require.NotNil(t, byIdentifier)
-		assert.Equalf(t, w, byIdentifier.TokenEndpointAuthMethod, "GetClientByClientIdentifier(%q)", byId.ClientIdentifier)
+		assert.Equalf(t, w, byIdentifier.TokenEndpointAuthMethod, "GetClientByClientIdentifier(%q)", byID.ClientIdentifier)
 	}
-	byIds, err := h.DB.GetClientsByIds(ctx, nil, []int64{basic.Id, post.Id, either.Id})
+	byIDs, err := h.DB.GetClientsByIDs(ctx, nil, []int64{basic.ID, post.ID, either.ID})
 	require.NoError(t, err)
-	require.Len(t, byIds, 3)
-	for _, c := range byIds {
-		assert.Equalf(t, want[c.Id], c.TokenEndpointAuthMethod, "GetClientsByIds, client %d", c.Id)
+	require.Len(t, byIDs, 3)
+	for _, c := range byIDs {
+		assert.Equalf(t, want[c.ID], c.TokenEndpointAuthMethod, "GetClientsByIDs, client %d", c.ID)
 	}
 	all, err := h.DB.GetAllClients(ctx, nil)
 	require.NoError(t, err)
 	seen := 0
 	for _, c := range all {
-		if w, ok := want[c.Id]; ok {
+		if w, ok := want[c.ID]; ok {
 			seen++
-			assert.Equalf(t, w, c.TokenEndpointAuthMethod, "GetAllClients, client %d", c.Id)
+			assert.Equalf(t, w, c.TokenEndpointAuthMethod, "GetAllClients, client %d", c.ID)
 		}
 	}
 	assert.Equal(t, 3, seen, "GetAllClients answers the three clients")
 
 	// The whole-row save carries it in neither direction: the other client saves write the row
 	// from a copy read earlier in their request, which would write back a method cleared since.
-	carried := map[int64]string{basic.Id: "", post.Id: "client_secret_basic", either.Id: "client_secret_post"}
+	carried := map[int64]string{basic.ID: "", post.ID: "client_secret_basic", either.ID: "client_secret_post"}
 	for id, other := range carried {
-		read, readErr := h.DB.GetClientById(ctx, nil, id)
+		read, readErr := h.DB.GetClientByID(ctx, nil, id)
 		require.NoError(t, readErr)
 		read.TokenEndpointAuthMethod = other
 		read.Description = "rewritten_" + fake.LetterN(6)
 		require.NoError(t, h.DB.UpdateClient(ctx, nil, read))
-		updated, readErr := h.DB.GetClientById(ctx, nil, id)
+		updated, readErr := h.DB.GetClientByID(ctx, nil, id)
 		require.NoError(t, readErr)
 		assert.Equalf(t, want[id], updated.TokenEndpointAuthMethod,
 			"UpdateClient must not write token_endpoint_auth_method: stored %q, the save carried %q", want[id], other)
@@ -120,13 +120,13 @@ func TestMigration000096_ClientTokenEndpointAuthMethod(t *testing.T) {
 
 	// The switch to public clears it in the write that makes the client public, and on that
 	// client alone.
-	becamePublic := makeClientPublic000096(t, h, post.Id)
+	becamePublic := makeClientPublic000096(t, h, post.ID)
 	assert.True(t, becamePublic, "a confidential client switched to public is the transition")
-	switched, err := h.DB.GetClientById(ctx, nil, post.Id)
+	switched, err := h.DB.GetClientByID(ctx, nil, post.ID)
 	require.NoError(t, err)
 	assert.True(t, switched.IsPublic)
 	assert.Empty(t, switched.TokenEndpointAuthMethod, "the switch to public clears the registered method")
-	bystander, err := h.DB.GetClientById(ctx, nil, basic.Id)
+	bystander, err := h.DB.GetClientByID(ctx, nil, basic.ID)
 	require.NoError(t, err)
 	assert.Equal(t, "client_secret_basic", bystander.TokenEndpointAuthMethod, "the client not switched keeps its method")
 
@@ -136,7 +136,7 @@ func TestMigration000096_ClientTokenEndpointAuthMethod(t *testing.T) {
 	switched.ClientSecretEncrypted = []byte("a-new-secret")
 	switched.TokenEndpointAuthMethod = "client_secret_post"
 	require.NoError(t, h.DB.UpdateClient(ctx, nil, switched))
-	back, err := h.DB.GetClientById(ctx, nil, post.Id)
+	back, err := h.DB.GetClientByID(ctx, nil, post.ID)
 	require.NoError(t, err)
 	assert.False(t, back.IsPublic)
 	assert.Empty(t, back.TokenEndpointAuthMethod, "a client switched back to confidential is not held to one method")
@@ -144,8 +144,8 @@ func TestMigration000096_ClientTokenEndpointAuthMethod(t *testing.T) {
 	// A save of a client already public is no transition and writes nothing of it. No writer gives
 	// a public client a method, so the row is made here to show the clearing is the transition's.
 	alreadyPublic := createAuthMethodClient000096(t, h, true, "client_secret_basic")
-	assert.False(t, makeClientPublic000096(t, h, alreadyPublic.Id), "an already-public client is no transition")
-	kept, err := h.DB.GetClientById(ctx, nil, alreadyPublic.Id)
+	assert.False(t, makeClientPublic000096(t, h, alreadyPublic.ID), "an already-public client is no transition")
+	kept, err := h.DB.GetClientByID(ctx, nil, alreadyPublic.ID)
 	require.NoError(t, err)
 	assert.Equal(t, "client_secret_basic", kept.TokenEndpointAuthMethod, "only the transition clears the method")
 
@@ -200,7 +200,7 @@ func createAuthMethodClient000096(t *testing.T, h *isolatedDB, isPublic bool, me
 	t.Helper()
 	client := &record.Client{
 		ClientIdentifier:        "auth_method_" + fake.LetterN(8),
-		DefaultAcrLevel:         record.AcrLevel1,
+		DefaultACRLevel:         record.ACRLevel1,
 		IsPublic:                isPublic,
 		TokenEndpointAuthMethod: method,
 	}
@@ -208,12 +208,12 @@ func createAuthMethodClient000096(t *testing.T, h *isolatedDB, isPublic bool, me
 	return client
 }
 
-func makeClientPublic000096(t *testing.T, h *isolatedDB, clientId int64) bool {
+func makeClientPublic000096(t *testing.T, h *isolatedDB, clientID int64) bool {
 	t.Helper()
 	var becamePublic bool
 	require.NoError(t, h.DB.RunInTransaction(context.Background(), func(tx *sql.Tx) error {
 		var err error
-		becamePublic, err = h.DB.SetClientPublic(context.Background(), tx, clientId)
+		becamePublic, err = h.DB.SetClientPublic(context.Background(), tx, clientID)
 		return err
 	}))
 	return becamePublic

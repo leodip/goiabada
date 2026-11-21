@@ -45,7 +45,7 @@ func TestCutBody_DynamicClientRegistration(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/connect/register", nil)
 		req.Body = cutBody(rr, string(body), limit)
 		req.Header.Set("Content-Type", "application/json")
-		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{Id: 1, DynamicClientRegistrationEnabled: true}))
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{ID: 1, DynamicClientRegistrationEnabled: true}))
 
 		HandleDynamicClientRegistrationPost(database, auditLogger, testDataCipher).ServeHTTP(rr, req)
 		return rr
@@ -87,7 +87,7 @@ func TestCutBody_DynamicClientRegistration(t *testing.T) {
 // checked, which is how the form already treats a body that names no ceremony.
 func TestCutBody_ThePasswordForm(t *testing.T) {
 	form := url.Values{}
-	form.Add(ceremony.IdField, testCeremonyId)
+	form.Add(ceremony.IDField, testCeremonyID)
 	form.Add("email", "test@example.com")
 	form.Add("password", "the password")
 	body := form.Encode()
@@ -101,15 +101,15 @@ func TestCutBody_ThePasswordForm(t *testing.T) {
 		// The real store, whose read of the ceremony the body names is what the cut decides.
 		ceremonyStore, cookies := holdingCeremony(t, &ceremony.AuthContext{
 			AuthState:  ceremony.AuthStateLevel1Password,
-			CeremonyId: testCeremonyId,
-			ClientId:   "test-client",
+			CeremonyID: testCeremonyID,
+			ClientID:   "test-client",
 		})
 
 		rr := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodPost, "/auth/pwd", nil)
 		req.Body = cutBody(rr, body, limit)
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		req = withCookies(req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{Id: 1})), cookies)
+		req = withCookies(req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{ID: 1})), cookies)
 
 		prepare(pageRenderer, auditLogger, database, rr, req)
 

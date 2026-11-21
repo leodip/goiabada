@@ -12,7 +12,7 @@
      nothing. The document's list as stored goes back with the save in expectedClientId, so a save
      from a page another save has outdated is refused. A retired document's apps are read only until
      it is restored. */}}
-<form class="panel" id="appsForm" method="post" action="/admin/legal-documents/{{ .doc.Id }}/apps" novalidate>
+<form class="panel" id="appsForm" method="post" action="/admin/legal-documents/{{ .doc.ID }}/apps" novalidate>
   {{ range .expectedClientIds }}<input type="hidden" name="expectedClientId" value="{{ . }}">{{ end }}
   <div class="panel-body stacked">
     {{ if .error }}
@@ -66,11 +66,11 @@
       {{ if .apps }}
       <div class="check-list" id="appsList">
         {{ range .apps }}
-        <label class="check-row" for="app-{{ .Id }}">
-          <input type="checkbox" id="app-{{ .Id }}" name="clientId" value="{{ .Id }}"{{ if .Selected }} checked{{ end }}{{ if .Description }} aria-describedby="app-{{ .Id }}-hint"{{ end }}>
+        <label class="check-row" for="app-{{ .ID }}">
+          <input type="checkbox" id="app-{{ .ID }}" name="clientId" value="{{ .ID }}"{{ if .Selected }} checked{{ end }}{{ if .Description }} aria-describedby="app-{{ .ID }}-hint"{{ end }}>
           <span class="grid min-w-0 flex-1 gap-0.5">
             <span class="choice-label font-mono">{{ .Identifier }}</span>
-            {{ if .Description }}<span class="field-hint" id="app-{{ .Id }}-hint">{{ .Description }}</span>{{ end }}
+            {{ if .Description }}<span class="field-hint" id="app-{{ .ID }}-hint">{{ .Description }}</span>{{ end }}
           </span>
         </label>
         {{ end }}

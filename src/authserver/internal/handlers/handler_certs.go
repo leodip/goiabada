@@ -30,7 +30,7 @@ func HandleCertsGet(
 
 		// RFC 7517 section 5: the set MUST have a keys member whose value is an array, so a set with
 		// no keys is [] and never null (#714).
-		result := oauth.Jwks{Keys: []oauth.Jwk{}}
+		result := oauth.JWKS{Keys: []oauth.JWK{}}
 
 		var nextKey *record.KeyPair
 		var currentKey *record.KeyPair
@@ -55,33 +55,33 @@ func HandleCertsGet(
 		}
 
 		if nextKey != nil {
-			var publicKeyJwk oauth.Jwk
-			err := json.Unmarshal(nextKey.PublicKeyJWK, &publicKeyJwk)
+			var publicKeyJWK oauth.JWK
+			err := json.Unmarshal(nextKey.PublicKeyJWK, &publicKeyJWK)
 			if err != nil {
 				jsonWriter.JSONError(w, r, err)
 				return
 			}
-			result.Keys = append(result.Keys, publicKeyJwk)
+			result.Keys = append(result.Keys, publicKeyJWK)
 		}
 
 		if currentKey != nil {
-			var publicKeyJwk oauth.Jwk
-			err := json.Unmarshal(currentKey.PublicKeyJWK, &publicKeyJwk)
+			var publicKeyJWK oauth.JWK
+			err := json.Unmarshal(currentKey.PublicKeyJWK, &publicKeyJWK)
 			if err != nil {
 				jsonWriter.JSONError(w, r, err)
 				return
 			}
-			result.Keys = append(result.Keys, publicKeyJwk)
+			result.Keys = append(result.Keys, publicKeyJWK)
 		}
 
 		if previousKey != nil {
-			var publicKeyJwk oauth.Jwk
-			err := json.Unmarshal(previousKey.PublicKeyJWK, &publicKeyJwk)
+			var publicKeyJWK oauth.JWK
+			err := json.Unmarshal(previousKey.PublicKeyJWK, &publicKeyJWK)
 			if err != nil {
 				jsonWriter.JSONError(w, r, err)
 				return
 			}
-			result.Keys = append(result.Keys, publicKeyJwk)
+			result.Keys = append(result.Keys, publicKeyJWK)
 		}
 
 		setMetadataCacheLifetime(w)

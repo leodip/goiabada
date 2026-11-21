@@ -23,26 +23,26 @@ import (
 // only ever echoed after its shape is checked, and a value of any other shape is dropped and never
 // repeated into the page.
 
-// aCeremonyId is an id of the shape ceremony.NewId draws.
-const aCeremonyId = "aBcDeFgHiJkLmNoPqRsTuVwXyZ012345"
+// aCeremonyID is an id of the shape ceremony.NewID draws.
+const aCeremonyID = "aBcDeFgHiJkLmNoPqRsTuVwXyZ012345"
 
 var registrationEchoCases = []struct {
 	name  string
 	query string
 	want  string
 }{
-	{"an id of the right shape is kept", "?ceremony=" + aCeremonyId, aCeremonyId},
+	{"an id of the right shape is kept", "?ceremony=" + aCeremonyID, aCeremonyID},
 	{"an id with every punctuation character of the alphabet is kept", "?ceremony=aB-_.EfGhIjKlMnOpQrStUvWxYz01234", "aB-_.EfGhIjKlMnOpQrStUvWxYz01234"},
 	{"no parameter names no sign-in", "", ""},
 	{"an empty parameter names no sign-in", "?ceremony=", ""},
-	{"one character short is dropped", "?ceremony=" + aCeremonyId[:ceremony.IdLength-1], ""},
-	{"one character over is dropped", "?ceremony=" + aCeremonyId + "x", ""},
+	{"one character short is dropped", "?ceremony=" + aCeremonyID[:ceremony.IDLength-1], ""},
+	{"one character over is dropped", "?ceremony=" + aCeremonyID + "x", ""},
 	{"far over is dropped", "?ceremony=" + strings.Repeat("a", 4096), ""},
-	{"a character outside the alphabet is dropped", "?ceremony=" + aCeremonyId[:ceremony.IdLength-1] + "!", ""},
+	{"a character outside the alphabet is dropped", "?ceremony=" + aCeremonyID[:ceremony.IDLength-1] + "!", ""},
 	{"markup is dropped", "?ceremony=" + url.QueryEscape(`"><script>alert(1)</script>`), ""},
 	{"a URL is dropped", "?ceremony=" + url.QueryEscape("https://evil.example/"+strings.Repeat("a", 10)), ""},
-	{"the form field's name is not the parameter", "?ceremonyId=" + aCeremonyId, ""},
-	{"a repeated parameter reads the first copy", "?ceremony=" + aCeremonyId + "&ceremony=other", aCeremonyId},
+	{"the form field's name is not the parameter", "?ceremonyId=" + aCeremonyID, ""},
+	{"a repeated parameter reads the first copy", "?ceremony=" + aCeremonyID + "&ceremony=other", aCeremonyID},
 }
 
 func TestHandleRegisterGet_EchoesOnlyAWellFormedCeremony(t *testing.T) {

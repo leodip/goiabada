@@ -29,7 +29,7 @@ var brandAssetInfoColumns = columnList{
 // scanBrandAsset reads one row selected with brandAssetColumns.
 func scanBrandAsset(row rowScanner, asset *record.BrandAsset) error {
 	return row.Scan(
-		&asset.Id,
+		&asset.ID,
 		&asset.CreatedAt,
 		&asset.Kind,
 		&asset.ContentType,
@@ -43,7 +43,7 @@ func scanBrandAsset(row rowScanner, asset *record.BrandAsset) error {
 // scanBrandAssetInfo reads one row selected with brandAssetInfoColumns, leaving Content nil.
 func scanBrandAssetInfo(row rowScanner, asset *record.BrandAsset) error {
 	return row.Scan(
-		&asset.Id,
+		&asset.ID,
 		&asset.CreatedAt,
 		&asset.Kind,
 		&asset.ContentType,
@@ -60,7 +60,7 @@ var insertBrandAsset = statement{
 	mssql:    "INSERT INTO brand_assets (created_at, kind, content_type, fingerprint, width, height, content) OUTPUT INSERTED.id VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7)",
 }
 
-var selectBrandAssetById = statement{
+var selectBrandAssetByID = statement{
 	sqlite:   "SELECT " + brandAssetColumns.sqlite + " FROM brand_assets WHERE id = ?",
 	mysql:    "SELECT " + brandAssetColumns.mysql + " FROM brand_assets WHERE id = ?",
 	postgres: "SELECT " + brandAssetColumns.postgres + " FROM brand_assets WHERE id = $1",
@@ -108,23 +108,23 @@ func (d *Database) CreateBrandAsset(ctx context.Context, tx *sql.Tx, asset *reco
 		return err
 	}
 
-	asset.Id = id
+	asset.ID = id
 	return nil
 }
 
-func (d *Database) GetBrandAssetById(ctx context.Context, tx *sql.Tx, assetId int64) (*record.BrandAsset, error) {
-	return queryOne(ctx, d, tx, selectBrandAssetById.text(d.Dialect), []any{assetId}, scanBrandAsset, "brand asset")
+func (d *Database) GetBrandAssetByID(ctx context.Context, tx *sql.Tx, assetID int64) (*record.BrandAsset, error) {
+	return queryOne(ctx, d, tx, selectBrandAssetByID.text(d.Dialect), []any{assetID}, scanBrandAsset, "brand asset")
 }
 
-func (d *Database) GetBrandAssetsByIds(ctx context.Context, tx *sql.Tx, assetIds []int64) ([]record.BrandAsset, error) {
+func (d *Database) GetBrandAssetsByIDs(ctx context.Context, tx *sql.Tx, assetIDs []int64) ([]record.BrandAsset, error) {
 
-	if len(assetIds) == 0 {
+	if len(assetIDs) == 0 {
 		return nil, nil
 	}
 
 	var assets []record.BrandAsset
 
-	err := forEachIdBatch(assetIds, func(batch []int64) error {
+	err := forEachIDBatch(assetIDs, func(batch []int64) error {
 		query := selectBrandAssetInfosWhere.text(d.Dialect) + inList(d.Dialect, "id", 1, len(batch))
 		var err error
 		assets, err = queryAll(ctx, d, tx, assets, query, int64Args(batch), scanBrandAssetInfo, "brand asset")

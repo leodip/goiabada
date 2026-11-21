@@ -17,7 +17,7 @@ import (
 // portugal is the core list's entry for Portugal, written out rather than looked up, so the page is
 // held to the ids and labels a save stores (#563 decision 1).
 var portugal = phonecountries.PhoneCountry{
-	UniqueId:    "PRT_0",
+	UniqueID:    "PRT_0",
 	Alpha2:      "PT",
 	Emoji:       "🇵🇹",
 	CallingCode: "+351",
@@ -39,7 +39,7 @@ func TestHandlePhoneGet_RendersTheCorePhoneCountryListForAUser(t *testing.T) {
 		"GET /api/v1/account/profile": `{"user":{"id":7,"phoneNumberCountryUniqueId":"PRT_0",` +
 			`"phoneNumberCountryCallingCode":"+351","phoneNumber":"912 345 678"}}`,
 	}}.client(t)
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_phone.html").Once()
 
@@ -58,7 +58,7 @@ func TestHandlePhoneGet_RendersTheCorePhoneCountryListForAUser(t *testing.T) {
 // submitted and the same core list to pick from.
 func TestHandlePhonePost_ARefusedSaveKeepsTheCorePhoneCountryList(t *testing.T) {
 	apiClient := manageAccountAuthServer{refuseWrites: true}.client(t)
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_phone.html").Once()
 

@@ -75,7 +75,7 @@ type authenticationTabAPI struct {
 	secretReads  int
 }
 
-func (s *authenticationTabAPI) GetClientById(_ context.Context, _ string, _ int64) (*api.ClientResponse, error) {
+func (s *authenticationTabAPI) GetClientByID(_ context.Context, _ string, _ int64) (*api.ClientResponse, error) {
 	return s.stored, nil
 }
 
@@ -145,7 +145,7 @@ func TestRender_AdminClientAuthentication_ARefusedSaveKeepsTheStoredClient(t *te
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			apiClient := &authenticationTabAPI{
-				stored:       &api.ClientResponse{Id: 7, ClientIdentifier: "portal", IsPublic: tc.storedPublic},
+				stored:       &api.ClientResponse{ID: 7, ClientIdentifier: "portal", IsPublic: tc.storedPublic},
 				storedSecret: storedSecret,
 			}
 
@@ -184,7 +184,7 @@ type groupSettingsTabAPI struct {
 	stored *api.GroupResponse
 }
 
-func (s *groupSettingsTabAPI) GetGroupById(_ context.Context, _ string, _ int64) (*api.GroupResponse, error) {
+func (s *groupSettingsTabAPI) GetGroupByID(_ context.Context, _ string, _ int64) (*api.GroupResponse, error) {
 	return s.stored, nil
 }
 
@@ -196,8 +196,8 @@ func (s *groupSettingsTabAPI) UpdateGroup(_ context.Context, _ string, _ int64,
 // A refused group save draws the title and the original identifier the rename question compares
 // against from the stored group, so a second attempt at the same rename is asked again.
 func TestRender_AdminGroupSettings_ARefusedSaveKeepsTheStoredGroup(t *testing.T) {
-	apiClient := &groupSettingsTabAPI{stored: &api.GroupResponse{Id: 4, GroupIdentifier: "sales",
-		Description: "Sales team", IncludeInIdToken: true, IncludeInAccessToken: true}}
+	apiClient := &groupSettingsTabAPI{stored: &api.GroupResponse{ID: 4, GroupIdentifier: "sales",
+		Description: "Sales team", IncludeInIDToken: true, IncludeInAccessToken: true}}
 
 	out := serveRefusal(t,
 		admingrouphandlers.HandleSettingsPost(render.New(web.TemplateFS(), web.StaticFS()), nil, apiClient, "https://console.example"),
@@ -224,7 +224,7 @@ type resourceSettingsTabAPI struct {
 	stored *api.ResourceResponse
 }
 
-func (s *resourceSettingsTabAPI) GetResourceById(_ context.Context, _ string, _ int64) (*api.ResourceResponse, error) {
+func (s *resourceSettingsTabAPI) GetResourceByID(_ context.Context, _ string, _ int64) (*api.ResourceResponse, error) {
 	return s.stored, nil
 }
 
@@ -236,7 +236,7 @@ func (s *resourceSettingsTabAPI) UpdateResource(_ context.Context, _ string, _ i
 // A refused resource save draws the title and the original identifier the rename question compares
 // against from the stored resource, so a second attempt at the same rename is asked again.
 func TestRender_AdminResourceSettings_ARefusedSaveKeepsTheStoredResource(t *testing.T) {
-	apiClient := &resourceSettingsTabAPI{stored: &api.ResourceResponse{Id: 3, ResourceIdentifier: "billing-api",
+	apiClient := &resourceSettingsTabAPI{stored: &api.ResourceResponse{ID: 3, ResourceIdentifier: "billing-api",
 		Description: "Billing"}}
 
 	out := serveRefusal(t,
@@ -309,11 +309,11 @@ type groupAttributeEditAPI struct {
 	stored *api.GroupAttributeResponse
 }
 
-func (s *groupAttributeEditAPI) GetGroupById(_ context.Context, _ string, _ int64) (*api.GroupResponse, error) {
+func (s *groupAttributeEditAPI) GetGroupByID(_ context.Context, _ string, _ int64) (*api.GroupResponse, error) {
 	return s.group, nil
 }
 
-func (s *groupAttributeEditAPI) GetGroupAttributeById(_ context.Context, _ string, _ int64) (*api.GroupAttributeResponse, error) {
+func (s *groupAttributeEditAPI) GetGroupAttributeByID(_ context.Context, _ string, _ int64) (*api.GroupAttributeResponse, error) {
 	stored := *s.stored
 	return &stored, nil
 }
@@ -329,8 +329,8 @@ func TestRender_AdminGroupAttributeEdit_ARefusedSaveNamesTheStoredKey(t *testing
 	for _, typedKey := range []string{"cost centre", ""} {
 		t.Run("typed "+typedKey, func(t *testing.T) {
 			apiClient := &groupAttributeEditAPI{
-				group:  &api.GroupResponse{Id: 4, GroupIdentifier: "sales"},
-				stored: &api.GroupAttributeResponse{Id: 11, GroupId: 4, Key: "department", Value: "Sales"},
+				group:  &api.GroupResponse{ID: 4, GroupIdentifier: "sales"},
+				stored: &api.GroupAttributeResponse{ID: 11, GroupID: 4, Key: "department", Value: "Sales"},
 			}
 
 			out := serveRefusal(t,
@@ -357,11 +357,11 @@ type userAttributeEditAPI struct {
 	stored *api.UserAttributeResponse
 }
 
-func (s *userAttributeEditAPI) GetUserById(_ context.Context, _ string, _ int64) (*api.UserResponse, error) {
+func (s *userAttributeEditAPI) GetUserByID(_ context.Context, _ string, _ int64) (*api.UserResponse, error) {
 	return s.user, nil
 }
 
-func (s *userAttributeEditAPI) GetUserAttributeById(_ context.Context, _ string, _ int64) (*api.UserAttributeResponse, error) {
+func (s *userAttributeEditAPI) GetUserAttributeByID(_ context.Context, _ string, _ int64) (*api.UserAttributeResponse, error) {
 	stored := *s.stored
 	return &stored, nil
 }
@@ -386,8 +386,8 @@ func TestRender_AdminUserAttributeEdit_ARefusedSaveNamesTheStoredKey(t *testing.
 	for _, tc := range testCases {
 		t.Run("typed "+tc.typedKey, func(t *testing.T) {
 			apiClient := &userAttributeEditAPI{
-				user:   &api.UserResponse{Id: 9, Email: "ana@example.com"},
-				stored: &api.UserAttributeResponse{Id: 12, UserId: 9, Key: "employee-id", Value: "E-100"},
+				user:   &api.UserResponse{ID: 9, Email: "ana@example.com"},
+				stored: &api.UserAttributeResponse{ID: 12, UserID: 9, Key: "employee-id", Value: "E-100"},
 			}
 
 			out := serveRefusal(t,
@@ -422,7 +422,7 @@ func TestRender_TheFirstDrawNamesTheStoredRecord(t *testing.T) {
 		{
 			name: "client authentication",
 			handler: adminclienthandlers.HandleAuthenticationGet(renderer, newRenderSessionStore(t),
-				&authenticationTabAPI{stored: &api.ClientResponse{Id: 7, ClientIdentifier: "portal"}, storedSecret: "s3cret"}),
+				&authenticationTabAPI{stored: &api.ClientResponse{ID: 7, ClientIdentifier: "portal"}, storedSecret: "s3cret"}),
 			target:  "/admin/clients/7/authentication",
 			options: []handlertest.Option{handlertest.WithPathValue("clientId", "7")},
 			want: []string{`<h1 class="page-title" id="page-title">portal</h1>`, `data-stored-checked="false"`,
@@ -431,7 +431,7 @@ func TestRender_TheFirstDrawNamesTheStoredRecord(t *testing.T) {
 		{
 			name: "group settings",
 			handler: admingrouphandlers.HandleSettingsGet(renderer, newRenderSessionStore(t),
-				&groupSettingsTabAPI{stored: &api.GroupResponse{Id: 4, GroupIdentifier: "sales"}}),
+				&groupSettingsTabAPI{stored: &api.GroupResponse{ID: 4, GroupIdentifier: "sales"}}),
 			target:  "/admin/groups/4/settings",
 			options: []handlertest.Option{handlertest.WithPathValue("groupId", "4")},
 			want: []string{`<h1 class="page-title" id="page-title">sales</h1>`, `data-stored-value="sales"`,
@@ -440,7 +440,7 @@ func TestRender_TheFirstDrawNamesTheStoredRecord(t *testing.T) {
 		{
 			name: "resource settings",
 			handler: adminresourcehandlers.HandleSettingsGet(renderer, newRenderSessionStore(t),
-				&resourceSettingsTabAPI{stored: &api.ResourceResponse{Id: 3, ResourceIdentifier: "billing-api"}}),
+				&resourceSettingsTabAPI{stored: &api.ResourceResponse{ID: 3, ResourceIdentifier: "billing-api"}}),
 			target:  "/admin/resources/3/settings",
 			options: []handlertest.Option{handlertest.WithPathValue("resourceId", "3")},
 			want: []string{`<h1 class="page-title" id="page-title">billing-api</h1>`,
@@ -457,8 +457,8 @@ func TestRender_TheFirstDrawNamesTheStoredRecord(t *testing.T) {
 		{
 			name: "group attribute edit",
 			handler: admingrouphandlers.HandleAttributesEditGet(renderer, &groupAttributeEditAPI{
-				group:  &api.GroupResponse{Id: 4, GroupIdentifier: "sales"},
-				stored: &api.GroupAttributeResponse{Id: 11, GroupId: 4, Key: "department"}}),
+				group:  &api.GroupResponse{ID: 4, GroupIdentifier: "sales"},
+				stored: &api.GroupAttributeResponse{ID: 11, GroupID: 4, Key: "department"}}),
 			target: "/admin/groups/4/attributes/edit/11",
 			options: []handlertest.Option{handlertest.WithPathValue("groupId", "4"),
 				handlertest.WithPathValue("attributeId", "11")},
@@ -467,8 +467,8 @@ func TestRender_TheFirstDrawNamesTheStoredRecord(t *testing.T) {
 		{
 			name: "user attribute edit",
 			handler: adminuserhandlers.HandleAttributesEditGet(renderer, &userAttributeEditAPI{
-				user:   &api.UserResponse{Id: 9, Email: "ana@example.com"},
-				stored: &api.UserAttributeResponse{Id: 12, UserId: 9, Key: "employee-id"}}),
+				user:   &api.UserResponse{ID: 9, Email: "ana@example.com"},
+				stored: &api.UserAttributeResponse{ID: 12, UserID: 9, Key: "employee-id"}}),
 			target: "/admin/users/9/attributes/edit/12",
 			options: []handlertest.Option{handlertest.WithPathValue("userId", "9"),
 				handlertest.WithPathValue("attributeId", "12")},

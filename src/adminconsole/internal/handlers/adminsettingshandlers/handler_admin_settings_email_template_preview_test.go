@@ -43,7 +43,7 @@ const (
 		"object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
 )
 
-func brandId(id int64) *int64 { return &id }
+func brandID(id int64) *int64 { return &id }
 
 func previewRequest(target, email, language, body string, options ...handlertest.Option) *http.Request {
 	options = append([]handlertest.Option{handlertest.WithBody(strings.NewReader(body)),
@@ -56,7 +56,7 @@ func previewRequest(target, email, language, body string, options ...handlertest
 // names, and answers the subject and the plain-text part the editor shows beside the frame.
 func TestHandleEmailTemplatePreviewPost_AnswersTheSubjectAndThePlainText(t *testing.T) {
 	fake := &fakeEmailTemplatesAPI{email: passwordResetLink(), preview: &api.PreviewEmailTemplateResponse{
-		Subject: "Mot de passe oublié ?", Html: "<!DOCTYPE html><html><head></head><body>Bonjour Jane Doe</body></html>",
+		Subject: "Mot de passe oublié ?", HTML: "<!DOCTYPE html><html><head></head><body>Bonjour Jane Doe</body></html>",
 		Text: "Bonjour Jane Doe,\n\nhttps://example.invalid/sample-link"}}
 	rec := httptest.NewRecorder()
 
@@ -68,7 +68,7 @@ func TestHandleEmailTemplatePreviewPost_AnswersTheSubjectAndThePlainText(t *test
 	assert.Equal(t, "password_reset_link", fake.previewedEmail)
 	assert.Equal(t, "fr", fake.previewedLang)
 	assert.Equal(t, &api.PreviewEmailTemplateRequest{Subject: "Mot de passe oublié ?", ButtonLabel: "Réinitialiser",
-		Body: "Bonjour {{name}},\r\n\r\n{{link}}\r\n", BrandId: brandId(4)}, fake.previewed)
+		Body: "Bonjour {{name}},\r\n\r\n{{link}}\r\n", BrandID: brandID(4)}, fake.previewed)
 	assert.JSONEq(t, `{"subject":"Mot de passe oublié ?","text":"Bonjour Jane Doe,\n\nhttps://example.invalid/sample-link"}`,
 		rec.Body.String(), "the HTML is the framed route's to answer")
 }
@@ -82,7 +82,7 @@ func TestHandleEmailTemplatePreviewPost_NoBrandIsTheDefaultBrand(t *testing.T) {
 		"/x", "password_reset_link", "fr", `{"subject":"S","body":"{{link}}"}`))
 
 	require.NotNil(t, fake.previewed)
-	assert.Nil(t, fake.previewed.BrandId)
+	assert.Nil(t, fake.previewed.BrandID)
 }
 
 // A text a save would refuse is refused by the preview with the API's sentence, as JSON, which the
@@ -109,8 +109,8 @@ func TestHandleEmailTemplatePreviewPost_ARefusalIsAnsweredAsJSON(t *testing.T) {
 func TestHandleEmailTemplatePreviewFramePost_AnswersTheEmailAsADocumentOfItsOwn(t *testing.T) {
 	const html = "<!DOCTYPE html>\n<html lang=\"fr\">\n\n<head>\n  <meta charset=\"UTF-8\">\n  <title>Mot de passe oublié ?</title>\n</head>\n" +
 		"<body style=\"margin: 0;\"><p>Bonjour Jane Doe,</p><a href=\"https://example.invalid/sample-link\">lien</a></body>\n</html>"
-	fake := &fakeEmailTemplatesAPI{email: passwordResetLink(), preview: &api.PreviewEmailTemplateResponse{Subject: "S", Html: html, Text: "T"}}
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	fake := &fakeEmailTemplatesAPI{email: passwordResetLink(), preview: &api.PreviewEmailTemplateResponse{Subject: "S", HTML: html, Text: "T"}}
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handler := httpmw.SecurityHeaders(false, previewAuthServerOrigin)(
 		HandleEmailTemplatePreviewFramePost(httpHelper, fake, []string{previewAuthServerOrigin}))
@@ -135,7 +135,7 @@ func TestHandleEmailTemplatePreviewFramePost_AnswersTheEmailAsADocumentOfItsOwn(
 	assert.Equal(t, "password_reset_link", fake.previewedEmail)
 	assert.Equal(t, "fr", fake.previewedLang)
 	assert.Equal(t, &api.PreviewEmailTemplateRequest{Subject: "Mot de passe oublié ?", ButtonLabel: "Réinitialiser",
-		Body: "Bonjour {{name}},\r\n\r\n{{link}}", BrandId: brandId(4)}, fake.previewed)
+		Body: "Bonjour {{name}},\r\n\r\n{{link}}", BrandID: brandID(4)}, fake.previewed)
 }
 
 // Every other console answer keeps the console's own headers: the framed route's policy is set on
@@ -158,7 +158,7 @@ func TestHandleEmailTemplatePreviewFramePost_ARefusalLeavesTheFrameEmpty(t *test
 	fake := &fakeEmailTemplatesAPI{email: passwordResetLink(), writeErr: &apiclient.APIError{
 		Code: "handler.email_template.unknown_placeholder", Message: "Le corps utilise {{nom}}.",
 		StatusCode: http.StatusBadRequest, Field: "/body"}}
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	rec := httptest.NewRecorder()
 
@@ -171,7 +171,7 @@ func TestHandleEmailTemplatePreviewFramePost_ARefusalLeavesTheFrameEmpty(t *test
 	assert.Empty(t, rec.Body.String())
 	assert.Equal(t, framePolicy, rec.Header().Get("Content-Security-Policy"))
 	require.NotNil(t, fake.previewed)
-	assert.Nil(t, fake.previewed.BrandId, "no brand chosen is the default brand")
+	assert.Nil(t, fake.previewed.BrandID, "no brand chosen is the default brand")
 }
 
 // Send test email sends the text in the form, saved or not, to the address typed, in the brand
@@ -199,7 +199,7 @@ func TestHandleEmailTemplateSendTestPost_SendsTheTextAndSaysWhereItWent(t *testi
 			assert.Equal(t, "password_reset_link", fake.sentTestEmail)
 			assert.Equal(t, "pt-BR", fake.sentTestLang)
 			assert.Equal(t, &api.SendTestEmailTemplateRequest{To: "jane@example.com", Subject: "Senha", ButtonLabel: "Redefinir",
-				Body: "Olá {{name}},\n\n{{link}}", BrandId: brandId(4)}, fake.sentTest)
+				Body: "Olá {{name}},\n\n{{link}}", BrandID: brandID(4)}, fake.sentTest)
 			var answer map[string]any
 			require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &answer))
 			assert.Equal(t, tc.want, answer["message"])
@@ -227,22 +227,22 @@ func TestHandleEmailTemplateSendTestPost_ARefusalIsAnsweredAsJSON(t *testing.T) 
 func TestHandleEmailTemplateGet_BindsThePreviewAndTheTestSend(t *testing.T) {
 	for _, smtpEnabled := range []bool{true, false} {
 		fake := &fakeEmailTemplatesAPI{email: passwordResetLink(), brands: []api.BrandResponse{
-			{Id: 1, Name: "Goiabada", IsDefault: true}, {Id: 4, Name: "Acme"},
+			{ID: 1, Name: "Goiabada", IsDefault: true}, {ID: 4, Name: "Acme"},
 		}}
-		httpHelper := handlersmocks.NewHttpHelper(t)
+		httpHelper := handlersmocks.NewHTTPHelper(t)
 		handlertest.RefuseInternalServerError(t, httpHelper)
 		handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_email_template.html").Once()
 
 		HandleEmailTemplateGet(httpHelper, newSettingsTestStore(), fake).ServeHTTP(httptest.NewRecorder(),
 			emailTemplateRequest(http.MethodGet, "/admin/settings/email/templates/password_reset_link/fr", "password_reset_link", "fr",
-				handlertest.WithJwtInfo(oauthclient.JwtInfo{
+				handlertest.WithJWTInfo(oauthclient.JWTInfo{
 					TokenResponse: oauth.TokenResponse{AccessToken: handlertest.AccessToken},
-					IdToken:       &oauth.JwtToken{Claims: jwt.MapClaims{"email": "admin@example.com"}},
+					IDToken:       &oauth.JWTToken{Claims: jwt.MapClaims{"email": "admin@example.com"}},
 				}),
 				handlertest.WithSettings(&api.PublicSettingsResponse{AppName: "Test", SMTPEnabled: smtpEnabled})))
 
 		bind := handlertest.Bind(t, httpHelper)
-		assert.Equal(t, []BrandOption{{Id: 1, Name: "Goiabada"}, {Id: 4, Name: "Acme"}}, bind["brands"])
+		assert.Equal(t, []BrandOption{{ID: 1, Name: "Goiabada"}, {ID: 4, Name: "Acme"}}, bind["brands"])
 		assert.Equal(t, "Goiabada", bind["defaultBrandName"])
 		assert.Equal(t, "admin@example.com", bind["testAddress"])
 		assert.Equal(t, smtpEnabled, bind["smtpEnabled"])

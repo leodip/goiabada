@@ -72,8 +72,8 @@ func writeInternalServerError(w http.ResponseWriter, r *http.Request, err error,
 // half, which made it the one 500 here that was invisible in the log and uncorrelated on the wire
 // (#279 decision 7).
 func writeInternalServerErrorWithCode(w http.ResponseWriter, r *http.Request, err error, message, code string) {
-	requestId := apiresponse.LogInternalServerError(r, err)
-	writeJSONError(w, fmt.Sprintf("%s. Request Id: %v", message, requestId), code,
+	requestID := apiresponse.LogInternalServerError(r, err)
+	writeJSONError(w, fmt.Sprintf("%s. Request Id: %v", message, requestID), code,
 		http.StatusInternalServerError)
 }
 
@@ -190,7 +190,7 @@ func refusalAt(refusal *i18n.LocalizedError, tokens ...string) error {
 // callerSubject is the `sub` of the access token this request authenticated with, and it is
 // what an audit row's "logged_in_user" names: the administrator who performed the action.
 //
-// Every handler in this package sits behind JwtAuthorizationHeaderToContext and a scope
+// Every handler in this package sits behind JWTAuthorizationHeaderToContext and a scope
 // middleware, so the token is on the context whenever the request got this far; the empty
 // string is what a caller with no validated token would have recorded anyway, which is the
 // same fallback the admin handlers that read the token inline carry. The account handlers act
@@ -221,16 +221,16 @@ func callerSubject(r *http.Request) string {
 // The subject is reqctx.ValidatedSubject's, trimmed, which is the one the bearer middleware looked
 // the user up by and the per-subject rate limiter counted against, so a handler acts as the user
 // those two checked. Every handler takes it from here rather than reading the token's sub again.
-func accountCaller(w http.ResponseWriter, r *http.Request) (oauth.JwtToken, string, bool) {
+func accountCaller(w http.ResponseWriter, r *http.Request) (oauth.JWTToken, string, bool) {
 	jwtToken, ok := reqctx.ValidatedTokenFrom(r.Context())
 	if !ok {
 		writeInternalServerError(w, r, errs.New("an account API request reached its handler with no validated access token"))
-		return oauth.JwtToken{}, "", false
+		return oauth.JWTToken{}, "", false
 	}
 	subject, ok := reqctx.ValidatedSubject(r.Context())
 	if !ok {
 		writeInternalServerError(w, r, errs.New("an account API request reached its handler with a token whose subject is empty"))
-		return oauth.JwtToken{}, "", false
+		return oauth.JWTToken{}, "", false
 	}
 	return jwtToken, subject, true
 }

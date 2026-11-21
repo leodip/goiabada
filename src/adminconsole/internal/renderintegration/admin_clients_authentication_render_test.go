@@ -14,7 +14,7 @@ import (
 // was generated, marks the secret field, described by the notice, and focuses it, as every other
 // refused field is (#617).
 func TestRender_AdminClientAuthentication_ARefusedSecretFocusesItsField(t *testing.T) {
-	client := adminclienthandlers.ClientAuthentication{ClientId: 7, ClientIdentifier: "portal"}
+	client := adminclienthandlers.ClientAuthentication{ClientID: 7, ClientIdentifier: "portal"}
 
 	out := renderMenuPage(t, "/admin_clients_authentication.html", map[string]interface{}{
 		"client":       client,
@@ -52,7 +52,7 @@ func TestRender_AdminClientAuthentication_NamesTheMethodTheClientIsHeldTo(t *tes
 		{"client_secret_post", heldToPostSentence},
 	} {
 		t.Run(row.held, func(t *testing.T) {
-			client := adminclienthandlers.ClientAuthentication{ClientId: 7, ClientIdentifier: "dcr_a3f9",
+			client := adminclienthandlers.ClientAuthentication{ClientID: 7, ClientIdentifier: "dcr_a3f9",
 				ClientSecret: "s", TokenEndpointAuthMethod: row.held}
 
 			out := renderMenuPageIn(t, "/admin_clients_authentication.html", map[string]interface{}{
@@ -70,10 +70,10 @@ func TestRender_AdminClientAuthentication_NamesTheMethodTheClientIsHeldTo(t *tes
 		name   string
 		client adminclienthandlers.ClientAuthentication
 	}{
-		{"a confidential client held to no method", adminclienthandlers.ClientAuthentication{ClientId: 7,
+		{"a confidential client held to no method", adminclienthandlers.ClientAuthentication{ClientID: 7,
 			ClientIdentifier: "portal", ClientSecret: "s"}},
-		{"a public client", adminclienthandlers.ClientAuthentication{ClientId: 7, ClientIdentifier: "spa", IsPublic: true}},
-		{"a method the auth server does not hold a client to", adminclienthandlers.ClientAuthentication{ClientId: 7,
+		{"a public client", adminclienthandlers.ClientAuthentication{ClientID: 7, ClientIdentifier: "spa", IsPublic: true}},
+		{"a method the auth server does not hold a client to", adminclienthandlers.ClientAuthentication{ClientID: 7,
 			ClientIdentifier: "portal", ClientSecret: "s", TokenEndpointAuthMethod: "private_key_jwt"}},
 	} {
 		t.Run(row.name, func(t *testing.T) {
@@ -89,9 +89,9 @@ func TestRender_AdminClientAuthentication_NamesTheMethodTheClientIsHeldTo(t *tes
 // The line is drawn from the client as stored, so a refused save whose inputs show the submission
 // still names the method the client is held to.
 func TestRender_AdminClientAuthentication_NamesTheStoredMethodOnARefusedSave(t *testing.T) {
-	stored := adminclienthandlers.ClientAuthentication{ClientId: 7, ClientIdentifier: "dcr_a3f9",
+	stored := adminclienthandlers.ClientAuthentication{ClientID: 7, ClientIdentifier: "dcr_a3f9",
 		ClientSecret: "s", TokenEndpointAuthMethod: "client_secret_basic"}
-	submitted := adminclienthandlers.ClientAuthentication{ClientId: 7, ClientIdentifier: "dcr_a3f9", ClientSecret: ""}
+	submitted := adminclienthandlers.ClientAuthentication{ClientID: 7, ClientIdentifier: "dcr_a3f9", ClientSecret: ""}
 
 	out := renderMenuPageIn(t, "/admin_clients_authentication.html", map[string]interface{}{
 		"client": submitted, "storedClient": stored, "error": "The client secret is required.",
@@ -107,7 +107,7 @@ func TestRender_AdminClientAuthentication_TheMethodLineIsInEveryLanguage(t *test
 	for _, locale := range []string{"en", "de", "es", "fr", "it", "pt-BR"} {
 		for _, held := range []string{"client_secret_basic", "client_secret_post"} {
 			t.Run(locale+"/"+held, func(t *testing.T) {
-				client := adminclienthandlers.ClientAuthentication{ClientId: 7, ClientIdentifier: "dcr_a3f9",
+				client := adminclienthandlers.ClientAuthentication{ClientID: 7, ClientIdentifier: "dcr_a3f9",
 					ClientSecret: "s", TokenEndpointAuthMethod: held}
 
 				out := renderMenuPageIn(t, "/admin_clients_authentication.html", map[string]interface{}{

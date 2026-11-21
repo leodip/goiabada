@@ -49,7 +49,7 @@ func HandleConsentGet(
 			// The form names the ceremony that rendered it, and the boundary refuses a submission
 			// naming any other: the checkbox indices mean something only against this ceremony's
 			// scope list (#79).
-			"ceremonyId": authContext.CeremonyId,
+			"ceremonyId": authContext.CeremonyID,
 		}
 
 		err = pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/consent.html", bind)

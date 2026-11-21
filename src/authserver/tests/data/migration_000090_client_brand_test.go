@@ -62,26 +62,26 @@ func TestMigration000090_ClientBrand(t *testing.T) {
 	predating, err := h.DB.GetClientByClientIdentifier(ctx, nil, existing)
 	require.NoError(t, err)
 	require.NotNil(t, predating)
-	assert.Equalf(t, sql.NullInt64{}, predating.BrandId, "2. a client that predates 000090 has no brand of its own on %s", dbType())
+	assert.Equalf(t, sql.NullInt64{}, predating.BrandID, "2. a client that predates 000090 has no brand of its own on %s", dbType())
 	drawnIn, err := h.DB.GetClientPageBrand(ctx, nil, existing)
 	require.NoError(t, err)
 	require.NotNilf(t, drawnIn, "2. a client that predates 000090 is drawn in the default on %s", dbType())
-	assert.Equal(t, def.Id, drawnIn.Id)
+	assert.Equal(t, def.ID, drawnIn.ID)
 	require.NoErrorf(t, h.Migrator.Migrate(ctx, clientBrand000090), "roll back to 000090 on %s", dbType())
 
 	// 3. The brand and the assignment in SQL, for the same reason.
-	otherId := insertBrand000091(t, h, "Other", "dark", "plum")
-	_, err = h.SQL.Exec(fmt.Sprintf("UPDATE clients SET brand_id = %d WHERE id = %d", otherId, predating.Id))
+	otherID := insertBrand000091(t, h, "Other", "dark", "plum")
+	_, err = h.SQL.Exec(fmt.Sprintf("UPDATE clients SET brand_id = %d WHERE id = %d", otherID, predating.ID))
 	require.NoErrorf(t, err, "give the client a brand on %s", dbType())
-	_, err = h.SQL.Exec(fmt.Sprintf("UPDATE clients SET description = 'Previous release' WHERE id = %d", predating.Id))
+	_, err = h.SQL.Exec(fmt.Sprintf("UPDATE clients SET description = 'Previous release' WHERE id = %d", predating.ID))
 	require.NoErrorf(t, err, "save the client as the previous release does on %s", dbType())
-	assert.Equalf(t, sql.NullInt64{Int64: otherId, Valid: true}, clientBrandIdOf(t, h, predating.Id),
+	assert.Equalf(t, sql.NullInt64{Int64: otherID, Valid: true}, clientBrandIDOf(t, h, predating.ID),
 		"3. the previous release's save leaves the client's brand on %s", dbType())
 
 	// 4.
-	_, err = h.SQL.Exec(fmt.Sprintf("DELETE FROM brands WHERE id = %d", otherId))
+	_, err = h.SQL.Exec(fmt.Sprintf("DELETE FROM brands WHERE id = %d", otherID))
 	require.Errorf(t, err, "4. the foreign key refuses deleting a brand a client names on %s", dbType())
-	_, err = h.SQL.Exec(fmt.Sprintf("UPDATE clients SET brand_id = %d WHERE id = %d", otherId+1_000, predating.Id))
+	_, err = h.SQL.Exec(fmt.Sprintf("UPDATE clients SET brand_id = %d WHERE id = %d", otherID+1_000, predating.ID))
 	require.Errorf(t, err, "4. the foreign key refuses a brand_id naming no brand on %s", dbType())
 
 	// 5.
@@ -90,7 +90,7 @@ func TestMigration000090_ClientBrand(t *testing.T) {
 		"5. 000090's down must restore clients to the shape 000089 built on %s", dbType())
 	require.NoErrorf(t, h.Migrator.Migrate(ctx, clientBrand000090), "re-apply 000090 on %s", dbType())
 	assertClientBrandShape000090(t, h, before, "after a down/up round trip")
-	assert.Equalf(t, sql.NullInt64{}, clientBrandIdOf(t, h, predating.Id),
+	assert.Equalf(t, sql.NullInt64{}, clientBrandIDOf(t, h, predating.ID),
 		"5. a round trip leaves the client with no brand of its own on %s", dbType())
 }
 

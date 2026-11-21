@@ -40,7 +40,7 @@ type settingsSectionPut struct {
 // sendConcurrently, it reports every failure here rather than from the request goroutines.
 func sendSettingsSavesAtOnce(t *testing.T, accessToken string, saves []settingsSectionPut) []concurrentResult {
 	t.Helper()
-	client := createHttpClient(t)
+	client := createHTTPClient(t)
 	requests := make([]*http.Request, len(saves))
 	for i, save := range saves {
 		encoded, err := json.Marshal(save.body)
@@ -135,7 +135,7 @@ func TestAPISettingsSections_ConcurrentSavesOfDifferentSectionsAllSurvive(t *tes
 				RefreshTokenOfflineIdleTimeoutInSeconds: start.RefreshTokenOfflineIdleTimeoutInSeconds,
 				RefreshTokenOfflineMaxLifetimeInSeconds: start.RefreshTokenOfflineMaxLifetimeInSeconds,
 				IncludeOpenIDConnectClaimsInAccessToken: start.IncludeOpenIDConnectClaimsInAccessToken,
-				IncludeOpenIDConnectClaimsInIdToken:     start.IncludeOpenIDConnectClaimsInIdToken,
+				IncludeOpenIDConnectClaimsInIDToken:     start.IncludeOpenIDConnectClaimsInIDToken,
 			}},
 			{section: "audit logs", route: "/api/v1/admin/settings/audit-logs", body: api.UpdateSettingsAuditLogsRequest{
 				AuditLogsInConsoleEnabled:  start.AuditLogsInConsoleEnabled,

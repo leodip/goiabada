@@ -31,21 +31,21 @@ func otpStateUser(t *testing.T, otpEnabled bool) *record.User {
 			user.OTPSecretEncrypted = []byte("the-enrolled-seed-" + fake.LetterN(12))
 		}
 	})
-	return reloadUser(t, seeded.Id)
+	return reloadUser(t, seeded.ID)
 }
 
 // disableAndChangePasswordUnder makes the two concurrent changes no OTP write may undo: an
 // administrator's disable and a password change, each through its own narrow write. It returns the
 // hash the change stored.
-func disableAndChangePasswordUnder(t *testing.T, userId int64) string {
+func disableAndChangePasswordUnder(t *testing.T, userID int64) string {
 	t.Helper()
 	ctx := context.Background()
-	disabled, err := database.TrySetUserEnabled(ctx, nil, userId, true, false)
+	disabled, err := database.TrySetUserEnabled(ctx, nil, userID, true, false)
 	if err != nil || !disabled {
 		t.Fatalf("the concurrent disable must take effect: disabled=%v err=%v", disabled, err)
 	}
 	newHash := "changed-under-the-otp-write-" + fake.Password(32)
-	if err = database.SetUserPasswordHash(ctx, nil, userId, newHash); err != nil {
+	if err = database.SetUserPasswordHash(ctx, nil, userID, newHash); err != nil {
 		t.Fatalf("the concurrent password change must take effect: %v", err)
 	}
 	return newHash
@@ -53,15 +53,15 @@ func disableAndChangePasswordUnder(t *testing.T, userId int64) string {
 
 // advanceGenerationUnder moves otp_config_generation on without touching otp_enabled, which is
 // what an enable and a disable landing between the read and the write leave behind.
-func advanceGenerationUnder(t *testing.T, userId int64) {
+func advanceGenerationUnder(t *testing.T, userID int64) {
 	t.Helper()
 	tx, err := database.BeginTransaction(context.Background())
 	if err != nil {
 		t.Fatalf("BeginTransaction: %v", err)
 	}
-	if _, err = database.IncrementUserOtpConfigGeneration(context.Background(), tx, userId); err != nil {
+	if _, err = database.IncrementUserOTPConfigGeneration(context.Background(), tx, userID); err != nil {
 		_ = database.RollbackTransaction(context.Background(), tx)
-		t.Fatalf("IncrementUserOtpConfigGeneration: %v", err)
+		t.Fatalf("IncrementUserOTPConfigGeneration: %v", err)
 	}
 	if err = database.CommitTransaction(context.Background(), tx); err != nil {
 		t.Fatalf("CommitTransaction: %v", err)
@@ -73,16 +73,16 @@ func TestTryEstablishUserOTP(t *testing.T) {
 
 	t.Run("lands while OTP is off at the generation read, and a disable and a password change survive", func(t *testing.T) {
 		read := otpStateUser(t, false)
-		newHash := disableAndChangePasswordUnder(t, read.Id)
-		moved := reloadUser(t, read.Id)
+		newHash := disableAndChangePasswordUnder(t, read.ID)
+		moved := reloadUser(t, read.ID)
 
 		seed := []byte("the-new-seed-" + fake.LetterN(16))
-		established, err := database.TryEstablishUserOTP(ctx, nil, read.Id, read.OtpConfigGeneration, seed)
+		established, err := database.TryEstablishUserOTP(ctx, nil, read.ID, read.OTPConfigGeneration, seed)
 		if err != nil || !established {
 			t.Fatalf("TryEstablishUserOTP: established=%v err=%v, want true and no error", established, err)
 		}
 
-		after := reloadUser(t, read.Id)
+		after := reloadUser(t, read.ID)
 		expected := *moved
 		expected.OTPEnabled = true
 		expected.OTPSecretEncrypted = seed
@@ -93,16 +93,16 @@ func TestTryEstablishUserOTP(t *testing.T) {
 		if after.PasswordHash != newHash {
 			t.Error("the establish put back a password hash replaced under it")
 		}
-		if after.OtpConfigGeneration != moved.OtpConfigGeneration {
-			t.Errorf("OtpConfigGeneration = %d, want %d: the advance is the caller's, in the same transaction",
-				after.OtpConfigGeneration, moved.OtpConfigGeneration)
+		if after.OTPConfigGeneration != moved.OTPConfigGeneration {
+			t.Errorf("OTPConfigGeneration = %d, want %d: the advance is the caller's, in the same transaction",
+				after.OTPConfigGeneration, moved.OTPConfigGeneration)
 		}
 	})
 
 	t.Run("refuses an authenticator already on at the generation read", func(t *testing.T) {
 		read := otpStateUser(t, true)
 
-		established, err := database.TryEstablishUserOTP(ctx, nil, read.Id, read.OtpConfigGeneration,
+		established, err := database.TryEstablishUserOTP(ctx, nil, read.ID, read.OTPConfigGeneration,
 			[]byte("a-second-seed-"+fake.LetterN(16)))
 		if err != nil {
 			t.Fatalf("TryEstablishUserOTP failed: %v", err)
@@ -110,15 +110,15 @@ func TestTryEstablishUserOTP(t *testing.T) {
 		if established {
 			t.Error("a second authenticator was installed over the first")
 		}
-		compareUsers(t, read, reloadUser(t, read.Id))
+		compareUsers(t, read, reloadUser(t, read.ID))
 	})
 
 	t.Run("refuses OTP off at a generation that moved since it was read", func(t *testing.T) {
 		read := otpStateUser(t, false)
-		advanceGenerationUnder(t, read.Id)
-		moved := reloadUser(t, read.Id)
+		advanceGenerationUnder(t, read.ID)
+		moved := reloadUser(t, read.ID)
 
-		established, err := database.TryEstablishUserOTP(ctx, nil, read.Id, read.OtpConfigGeneration,
+		established, err := database.TryEstablishUserOTP(ctx, nil, read.ID, read.OTPConfigGeneration,
 			[]byte("a-stale-seed-"+fake.LetterN(16)))
 		if err != nil {
 			t.Fatalf("TryEstablishUserOTP failed: %v", err)
@@ -126,10 +126,10 @@ func TestTryEstablishUserOTP(t *testing.T) {
 		if established {
 			t.Error("an enrolment read before an enable and a disable landed was installed over them")
 		}
-		after := reloadUser(t, read.Id)
+		after := reloadUser(t, read.ID)
 		compareUsers(t, moved, after)
-		if after.OtpConfigGeneration != moved.OtpConfigGeneration {
-			t.Errorf("OtpConfigGeneration = %d, want %d", after.OtpConfigGeneration, moved.OtpConfigGeneration)
+		if after.OTPConfigGeneration != moved.OTPConfigGeneration {
+			t.Errorf("OTPConfigGeneration = %d, want %d", after.OTPConfigGeneration, moved.OTPConfigGeneration)
 		}
 	})
 
@@ -144,7 +144,7 @@ func TestTryEstablishUserOTP(t *testing.T) {
 			}
 			landed := make([]bool, raceCallers)
 			won := raceOnce(t, raceCallers, func(i int) (bool, error) {
-				established, err := database.TryEstablishUserOTP(ctx, nil, read.Id, read.OtpConfigGeneration, seeds[i])
+				established, err := database.TryEstablishUserOTP(ctx, nil, read.ID, read.OTPConfigGeneration, seeds[i])
 				landed[i] = established
 				return established, err
 			})
@@ -157,7 +157,7 @@ func TestTryEstablishUserOTP(t *testing.T) {
 					winner = i
 				}
 			}
-			if got := reloadUser(t, read.Id).OTPSecretEncrypted; string(got) != string(seeds[winner]) {
+			if got := reloadUser(t, read.ID).OTPSecretEncrypted; string(got) != string(seeds[winner]) {
 				t.Fatalf("round %d: the stored seed is not the winner's", round)
 			}
 		}
@@ -178,15 +178,15 @@ func TestTryRemoveUserOTP(t *testing.T) {
 
 	t.Run("lands while OTP is on at the generation read, and a disable and a password change survive", func(t *testing.T) {
 		read := otpStateUser(t, true)
-		newHash := disableAndChangePasswordUnder(t, read.Id)
-		moved := reloadUser(t, read.Id)
+		newHash := disableAndChangePasswordUnder(t, read.ID)
+		moved := reloadUser(t, read.ID)
 
-		removed, err := database.TryRemoveUserOTP(ctx, nil, read.Id, read.OtpConfigGeneration)
+		removed, err := database.TryRemoveUserOTP(ctx, nil, read.ID, read.OTPConfigGeneration)
 		if err != nil || !removed {
 			t.Fatalf("TryRemoveUserOTP: removed=%v err=%v, want true and no error", removed, err)
 		}
 
-		after := reloadUser(t, read.Id)
+		after := reloadUser(t, read.ID)
 		expected := *moved
 		expected.OTPEnabled = false
 		expected.OTPSecretEncrypted = nil
@@ -200,44 +200,44 @@ func TestTryRemoveUserOTP(t *testing.T) {
 		if after.PasswordHash != newHash {
 			t.Error("the removal put back a password hash replaced under it")
 		}
-		if after.OtpConfigGeneration != moved.OtpConfigGeneration {
-			t.Errorf("OtpConfigGeneration = %d, want %d", after.OtpConfigGeneration, moved.OtpConfigGeneration)
+		if after.OTPConfigGeneration != moved.OTPConfigGeneration {
+			t.Errorf("OTPConfigGeneration = %d, want %d", after.OTPConfigGeneration, moved.OTPConfigGeneration)
 		}
 	})
 
 	t.Run("refuses an authenticator already off at the generation read", func(t *testing.T) {
 		read := otpStateUser(t, false)
 
-		removed, err := database.TryRemoveUserOTP(ctx, nil, read.Id, read.OtpConfigGeneration)
+		removed, err := database.TryRemoveUserOTP(ctx, nil, read.ID, read.OTPConfigGeneration)
 		if err != nil {
 			t.Fatalf("TryRemoveUserOTP failed: %v", err)
 		}
 		if removed {
 			t.Error("a removal reported success on an account with no authenticator")
 		}
-		compareUsers(t, read, reloadUser(t, read.Id))
+		compareUsers(t, read, reloadUser(t, read.ID))
 	})
 
 	t.Run("refuses an authenticator replaced since it was read", func(t *testing.T) {
 		read := otpStateUser(t, true)
 		// The authenticator read was removed and another established in its place: still on,
 		// another seed, the generation moved.
-		replaced := reloadUser(t, read.Id)
+		replaced := reloadUser(t, read.ID)
 		replaced.OTPSecretEncrypted = []byte("the-replacement-seed-" + fake.LetterN(12))
 		if err := database.UpdateUser(ctx, nil, replaced); err != nil {
 			t.Fatalf("Failed to replace the authenticator: %v", err)
 		}
-		advanceGenerationUnder(t, read.Id)
-		moved := reloadUser(t, read.Id)
+		advanceGenerationUnder(t, read.ID)
+		moved := reloadUser(t, read.ID)
 
-		removed, err := database.TryRemoveUserOTP(ctx, nil, read.Id, read.OtpConfigGeneration)
+		removed, err := database.TryRemoveUserOTP(ctx, nil, read.ID, read.OTPConfigGeneration)
 		if err != nil {
 			t.Fatalf("TryRemoveUserOTP failed: %v", err)
 		}
 		if removed {
 			t.Error("a removal read before the authenticator was replaced removed the replacement")
 		}
-		compareUsers(t, moved, reloadUser(t, read.Id))
+		compareUsers(t, moved, reloadUser(t, read.ID))
 	})
 
 	t.Run("of overlapping removals from one read exactly one lands", func(t *testing.T) {
@@ -246,7 +246,7 @@ func TestTryRemoveUserOTP(t *testing.T) {
 		for round := 0; round < raceRounds; round++ {
 			read := otpStateUser(t, true)
 			won := raceOnce(t, raceCallers, func(int) (bool, error) {
-				return database.TryRemoveUserOTP(ctx, nil, read.Id, read.OtpConfigGeneration)
+				return database.TryRemoveUserOTP(ctx, nil, read.ID, read.OTPConfigGeneration)
 			})
 			if won != 1 {
 				t.Fatalf("round %d: %d removals landed from one read, want exactly 1", round, won)
@@ -264,7 +264,7 @@ func TestTryRemoveUserOTP(t *testing.T) {
 // The compare-and-sets inside the operations that own them: a lost one writes nothing else either,
 // so the generation does not advance, a pending enrolment is not cleared and the consumed-step
 // marker is not reset for an authenticator this request did not change.
-func TestOtpCredential_ALostCompareAndSetWritesNothing(t *testing.T) {
+func TestOTPCredential_ALostCompareAndSetWritesNothing(t *testing.T) {
 	ctx := context.Background()
 	const enrolledSeed = "ZP2Z5KXRBAPPHWXEHH65PY5H7EKLVHRZ"
 
@@ -272,19 +272,19 @@ func TestOtpCredential_ALostCompareAndSetWritesNothing(t *testing.T) {
 		read := otpStateUser(t, false)
 		now := time.Now().UTC().Truncate(time.Microsecond)
 		pending := encryptedKeyURL(t, "HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH")
-		installed, err := database.TryInstallPendingOTPEnrollment(ctx, nil, read.Id, pending, now, now.Add(-15*time.Minute))
+		installed, err := database.TryInstallPendingOTPEnrollment(ctx, nil, read.ID, pending, now, now.Add(-15*time.Minute))
 		if err != nil || !installed {
 			t.Fatalf("the pending enrolment must install: installed=%v err=%v", installed, err)
 		}
-		read = reloadUser(t, read.Id)
+		read = reloadUser(t, read.ID)
 
 		// Another enrolment wins from the same read.
-		winning := reloadUser(t, read.Id)
+		winning := reloadUser(t, read.ID)
 		_, _, _, established, err := otpcredential.Establish(ctx, database, dataCipher, winning, enrolledSeed)
 		if err != nil || !established {
 			t.Fatalf("the first enrolment must land: established=%v err=%v", established, err)
 		}
-		won := reloadUser(t, read.Id)
+		won := reloadUser(t, read.ID)
 
 		generation, _, _, established, err := otpcredential.Establish(ctx, database, dataCipher, read, enrolledSeed)
 		if err != nil {
@@ -293,20 +293,20 @@ func TestOtpCredential_ALostCompareAndSetWritesNothing(t *testing.T) {
 		if established || generation != 0 {
 			t.Errorf("the losing enrolment reported established=%v generation=%d, want false and 0", established, generation)
 		}
-		after := reloadUser(t, read.Id)
+		after := reloadUser(t, read.ID)
 		compareUsers(t, won, after)
-		if after.OtpConfigGeneration != won.OtpConfigGeneration {
-			t.Errorf("OtpConfigGeneration = %d, want %d: a lost enrolment must not advance it",
-				after.OtpConfigGeneration, won.OtpConfigGeneration)
+		if after.OTPConfigGeneration != won.OTPConfigGeneration {
+			t.Errorf("OTPConfigGeneration = %d, want %d: a lost enrolment must not advance it",
+				after.OTPConfigGeneration, won.OTPConfigGeneration)
 		}
 	})
 
 	t.Run("establish leaves the pending enrolment when it loses", func(t *testing.T) {
 		read := otpStateUser(t, false)
-		advanceGenerationUnder(t, read.Id)
+		advanceGenerationUnder(t, read.ID)
 		now := time.Now().UTC().Truncate(time.Microsecond)
 		pending := encryptedKeyURL(t, "HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH")
-		installed, err := database.TryInstallPendingOTPEnrollment(ctx, nil, read.Id, pending, now, now.Add(-15*time.Minute))
+		installed, err := database.TryInstallPendingOTPEnrollment(ctx, nil, read.ID, pending, now, now.Add(-15*time.Minute))
 		if err != nil || !installed {
 			t.Fatalf("the pending enrolment must install: installed=%v err=%v", installed, err)
 		}
@@ -315,19 +315,19 @@ func TestOtpCredential_ALostCompareAndSetWritesNothing(t *testing.T) {
 		if err != nil || established {
 			t.Fatalf("Establish from a stale generation: established=%v err=%v, want false and no error", established, err)
 		}
-		if got := reloadUser(t, read.Id).OtpEnrollmentSecretEncrypted; string(got) != string(pending) {
+		if got := reloadUser(t, read.ID).OTPEnrollmentSecretEncrypted; string(got) != string(pending) {
 			t.Error("a lost enrolment cleared a pending enrolment it did not complete")
 		}
 	})
 
 	t.Run("remove", func(t *testing.T) {
 		read := otpStateUser(t, true)
-		consumed, err := database.TryConsumeEnrolledUserOTPStep(ctx, nil, read.Id, 1000, read.OtpConfigGeneration)
+		consumed, err := database.TryConsumeEnrolledUserOTPStep(ctx, nil, read.ID, 1000, read.OTPConfigGeneration)
 		if err != nil || !consumed {
 			t.Fatalf("the step claim must land: consumed=%v err=%v", consumed, err)
 		}
-		advanceGenerationUnder(t, read.Id)
-		moved := reloadUser(t, read.Id)
+		advanceGenerationUnder(t, read.ID)
+		moved := reloadUser(t, read.ID)
 
 		_, removed, err := otpcredential.Remove(ctx, database, read)
 		if err != nil {
@@ -336,11 +336,11 @@ func TestOtpCredential_ALostCompareAndSetWritesNothing(t *testing.T) {
 		if removed {
 			t.Error("a removal read before the authenticator changed reported success")
 		}
-		after := reloadUser(t, read.Id)
+		after := reloadUser(t, read.ID)
 		compareUsers(t, moved, after)
-		if after.OtpConfigGeneration != moved.OtpConfigGeneration {
-			t.Errorf("OtpConfigGeneration = %d, want %d: a lost removal must not advance it",
-				after.OtpConfigGeneration, moved.OtpConfigGeneration)
+		if after.OTPConfigGeneration != moved.OTPConfigGeneration {
+			t.Errorf("OTPConfigGeneration = %d, want %d: a lost removal must not advance it",
+				after.OTPConfigGeneration, moved.OTPConfigGeneration)
 		}
 		if after.LastOTPStep != moved.LastOTPStep {
 			t.Errorf("LastOTPStep = %d, want %d: a lost removal must not reset the marker",

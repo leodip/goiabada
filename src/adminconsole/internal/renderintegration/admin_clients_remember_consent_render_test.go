@@ -41,7 +41,7 @@ func renderClientSettingsIn(t *testing.T, locale string, client, stored admincli
 // administrative scopes and the one Save, with its hint, showing the stored value (#711 decision 8).
 func TestRender_AdminClientSettings_APublicClientShowsRememberConsent(t *testing.T) {
 	for _, remember := range []bool{true, false} {
-		client := adminclienthandlers.ClientSettings{ClientId: 7, ClientIdentifier: "spa", IsPublic: true, RememberConsent: remember}
+		client := adminclienthandlers.ClientSettings{ClientID: 7, ClientIdentifier: "spa", IsPublic: true, RememberConsent: remember}
 		out := renderClientSettingsIn(t, "en", client, client)
 
 		box := rememberConsentRe.FindString(out)
@@ -70,7 +70,7 @@ func TestRender_AdminClientSettings_APublicClientShowsRememberConsent(t *testing
 // A confidential client's tab draws no Remember consent: it is always on for such a client, which
 // proves itself with its secret (#711 decisions 4 and 8).
 func TestRender_AdminClientSettings_AConfidentialClientShowsNoRememberConsent(t *testing.T) {
-	client := adminclienthandlers.ClientSettings{ClientId: 7, ClientIdentifier: "portal", RememberConsent: true}
+	client := adminclienthandlers.ClientSettings{ClientID: 7, ClientIdentifier: "portal", RememberConsent: true}
 	out := renderClientSettingsIn(t, "en", client, client)
 
 	assert.NotContains(t, out, `rememberConsent`)
@@ -84,8 +84,8 @@ func TestRender_AdminClientSettings_AConfidentialClientShowsNoRememberConsent(t 
 // with the box ticked still compares against the stored off, so the second save asks too (#711
 // decision 8).
 func TestRender_AdminClientSettings_TickingRememberConsentAsksFirst(t *testing.T) {
-	typed := adminclienthandlers.ClientSettings{ClientId: 7, ClientIdentifier: "spa", IsPublic: true, RememberConsent: true}
-	stored := adminclienthandlers.ClientSettings{ClientId: 7, ClientIdentifier: "spa", IsPublic: true}
+	typed := adminclienthandlers.ClientSettings{ClientID: 7, ClientIdentifier: "spa", IsPublic: true, RememberConsent: true}
+	stored := adminclienthandlers.ClientSettings{ClientID: 7, ClientIdentifier: "spa", IsPublic: true}
 	out := renderClientSettingsIn(t, "en", typed, stored)
 
 	box := rememberConsentRe.FindString(out)
@@ -97,7 +97,7 @@ func TestRender_AdminClientSettings_TickingRememberConsentAsksFirst(t *testing.T
 		"asked when ticked, against the value as stored")
 	assert.True(t, hasAttr(box, "checked"), "the checkbox keeps what was submitted")
 
-	on := adminclienthandlers.ClientSettings{ClientId: 7, ClientIdentifier: "spa", IsPublic: true, RememberConsent: true}
+	on := adminclienthandlers.ClientSettings{ClientID: 7, ClientIdentifier: "spa", IsPublic: true, RememberConsent: true}
 	assert.Contains(t, rememberConsentRe.FindString(renderClientSettingsIn(t, "en", on, on)), `data-stored-checked="true"`,
 		"a client already remembering consent is asked nothing for keeping it")
 }
@@ -105,7 +105,7 @@ func TestRender_AdminClientSettings_TickingRememberConsentAsksFirst(t *testing.T
 // The checkbox, its hint and its question are in every built-in catalog: drawn in pt-BR, none of
 // them falls back to the English text.
 func TestRender_AdminClientSettings_RememberConsentIsTranslated(t *testing.T) {
-	client := adminclienthandlers.ClientSettings{ClientId: 7, ClientIdentifier: "spa", IsPublic: true}
+	client := adminclienthandlers.ClientSettings{ClientID: 7, ClientIdentifier: "spa", IsPublic: true}
 	for _, locale := range []string{"de", "es", "fr", "it", "pt-BR"} {
 		out := html.UnescapeString(renderClientSettingsIn(t, locale, client, client))
 		require.NotEmpty(t, rememberConsentRe.FindString(out), "%s: the checkbox is drawn", locale)
@@ -118,7 +118,7 @@ func TestRender_AdminClientSettings_RememberConsentIsTranslated(t *testing.T) {
 // The question asked before making a client public says the switch turns Remember consent off
 // (#711 decision 9).
 func TestRender_AdminClientAuthentication_MakingAClientPublicSaysRememberConsentGoesOff(t *testing.T) {
-	client := adminclienthandlers.ClientAuthentication{ClientId: 7, ClientIdentifier: "portal"}
+	client := adminclienthandlers.ClientAuthentication{ClientID: 7, ClientIdentifier: "portal"}
 	out := renderMenuPageIn(t, "/admin_clients_authentication.html", map[string]interface{}{
 		"client": client, "storedClient": client,
 	}, "en", true)

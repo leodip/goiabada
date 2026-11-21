@@ -16,12 +16,12 @@ import (
 
 // resourceSettingsAPI is what the resource settings page needs: the resource, and the write.
 type resourceSettingsAPI interface {
-	GetResourceById(ctx context.Context, accessToken string, resourceId int64) (*api.ResourceResponse, error)
-	UpdateResource(ctx context.Context, accessToken string, resourceId int64, request *api.UpdateResourceRequest) (*api.ResourceResponse, error)
+	GetResourceByID(ctx context.Context, accessToken string, resourceID int64) (*api.ResourceResponse, error)
+	UpdateResource(ctx context.Context, accessToken string, resourceID int64, request *api.UpdateResourceRequest) (*api.ResourceResponse, error)
 }
 
 func HandleSettingsGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient resourceSettingsAPI,
 ) http.HandlerFunc {
@@ -40,13 +40,13 @@ func HandleSettingsGet(
 			return
 		}
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
-		resource, err := apiClient.GetResourceById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		resource, err := apiClient.GetResourceByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -68,7 +68,7 @@ func HandleSettingsGet(
 		}
 
 		bind := map[string]interface{}{
-			"resourceId":            resource.Id,
+			"resourceId":            resource.ID,
 			"storedResource":        resource,
 			"resourceIdentifier":    resource.ResourceIdentifier,
 			"description":           resource.Description,
@@ -85,7 +85,7 @@ func HandleSettingsGet(
 }
 
 func HandleSettingsPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient resourceSettingsAPI,
 	baseURL string,
@@ -105,9 +105,9 @@ func HandleSettingsPost(
 			return
 		}
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
@@ -115,7 +115,7 @@ func HandleSettingsPost(
 		// the page title and the original identifier the rename question compares against standing
 		// for the resource as it is, so the same rename attempted again is asked again (#562
 		// decision 6).
-		resource, err := apiClient.GetResourceById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		resource, err := apiClient.GetResourceByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return

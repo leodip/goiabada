@@ -23,7 +23,7 @@ import (
 type legalDocumentAppsAPI interface {
 	legalDocumentReader
 	GetAllClients(ctx context.Context, accessToken string) ([]api.ClientResponse, error)
-	UpdateLegalDocumentApps(ctx context.Context, accessToken string, legalDocumentId int64, request *api.UpdateLegalDocumentAppsRequest) (*api.LegalDocumentDetailResponse, error)
+	UpdateLegalDocumentApps(ctx context.Context, accessToken string, legalDocumentID int64, request *api.UpdateLegalDocumentAppsRequest) (*api.LegalDocumentDetailResponse, error)
 }
 
 // appsForm is the tab's choice as it is drawn: as stored, or as posted when a save was refused.
@@ -35,7 +35,7 @@ type appsForm struct {
 // storedApps is the document's Applies to as stored.
 func storedApps(doc api.LegalDocumentResponse) appsForm {
 	form := appsForm{allApps: doc.AppliesTo == appliesToAllApps, selected: map[int64]bool{}}
-	for _, id := range doc.ClientIds {
+	for _, id := range doc.ClientIDs {
 		form.selected[id] = true
 	}
 	return form
@@ -43,7 +43,7 @@ func storedApps(doc api.LegalDocumentResponse) appsForm {
 
 // renderApps draws the tab with form in its fields and extra beside them, the flash or the
 // refusal. It reads the apps to offer, answering the request when it cannot.
-func renderApps(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, apiClient legalDocumentAppsAPI, token string,
+func renderApps(httpHelper HTTPHelper, w http.ResponseWriter, r *http.Request, apiClient legalDocumentAppsAPI, token string,
 	detail *api.LegalDocumentDetailResponse, form appsForm, extra map[string]interface{}) {
 	clients, err := apiClient.GetAllClients(r.Context(), token)
 	if err != nil {
@@ -56,22 +56,22 @@ func renderApps(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, a
 			continue
 		}
 		apps = append(apps, appChoice{
-			Id:          client.Id,
+			ID:          client.ID,
 			Identifier:  client.ClientIdentifier,
 			Description: client.Description,
-			Selected:    !form.allApps && form.selected[client.Id],
+			Selected:    !form.allApps && form.selected[client.ID],
 		})
 	}
 	sort.Slice(apps, func(i, j int) bool { return apps[i].Identifier < apps[j].Identifier })
 
 	doc := detail.LegalDocument
-	expected := append([]int64{}, doc.ClientIds...)
+	expected := append([]int64{}, doc.ClientIDs...)
 	bind := map[string]interface{}{
 		"doc":               doc,
 		"allApps":           form.allApps,
 		"apps":              apps,
 		"expectedClientIds": expected,
-		"noApps":            doc.AppliesTo != appliesToAllApps && len(doc.ClientIds) == 0,
+		"noApps":            doc.AppliesTo != appliesToAllApps && len(doc.ClientIDs) == 0,
 	}
 	for k, v := range extra {
 		bind[k] = v
@@ -82,7 +82,7 @@ func renderApps(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, a
 }
 
 func HandleAppsGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient legalDocumentAppsAPI,
 ) http.HandlerFunc {
@@ -108,9 +108,9 @@ func HandleAppsGet(
 	}
 }
 
-// postedIds reads the ids posted under name, in the order posted. A value that is not an id is
+// postedIDs reads the ids posted under name, in the order posted. A value that is not an id is
 // left out: only an edited page sends one.
-func postedIds(r *http.Request, name string) []int64 {
+func postedIDs(r *http.Request, name string) []int64 {
 	ids := []int64{}
 	for _, value := range r.PostForm[name] {
 		if id, err := strconv.ParseInt(value, 10, 64); err == nil {
@@ -122,7 +122,7 @@ func postedIds(r *http.Request, name string) []int64 {
 
 // HandleAppsPost saves the tab's choice. All apps sends no app, whatever boxes were left ticked.
 func HandleAppsPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient legalDocumentAppsAPI,
 	baseURL string,
@@ -146,18 +146,18 @@ func HandleAppsPost(
 		appliesTo := r.PostFormValue("appliesTo")
 		request := &api.UpdateLegalDocumentAppsRequest{
 			AppliesTo:         appliesTo,
-			ClientIds:         []int64{},
-			ExpectedClientIds: postedIds(r, "expectedClientId"),
+			ClientIDs:         []int64{},
+			ExpectedClientIDs: postedIDs(r, "expectedClientId"),
 		}
 		form := appsForm{allApps: appliesTo == appliesToAllApps, selected: map[int64]bool{}}
 		if !form.allApps {
-			request.ClientIds = postedIds(r, "clientId")
-			for _, id := range request.ClientIds {
+			request.ClientIDs = postedIDs(r, "clientId")
+			for _, id := range request.ClientIDs {
 				form.selected[id] = true
 			}
 		}
 
-		_, err := apiClient.UpdateLegalDocumentApps(r.Context(), token, detail.LegalDocument.Id, request)
+		_, err := apiClient.UpdateLegalDocumentApps(r.Context(), token, detail.LegalDocument.ID, request)
 		if err != nil {
 			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
 				renderApps(httpHelper, w, r, apiClient, token, detail, form, map[string]interface{}{"error": message})
@@ -165,7 +165,7 @@ func HandleAppsPost(
 			return
 		}
 
-		pagePath := fmt.Sprintf("/admin/legal-documents/%v/apps", detail.LegalDocument.Id)
+		pagePath := fmt.Sprintf("/admin/legal-documents/%v/apps", detail.LegalDocument.ID)
 		if !setFlash(httpHelper, httpSession, w, r, pagePath, flashAppsSaved, "true") {
 			return
 		}

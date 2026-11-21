@@ -23,10 +23,10 @@ import (
 // an identifier may not name (#151).
 type resourcesDatabase interface {
 	CreateResource(ctx context.Context, tx *sql.Tx, resource *record.Resource) error
-	DeleteResource(ctx context.Context, tx *sql.Tx, resourceId int64) error
+	DeleteResource(ctx context.Context, tx *sql.Tx, resourceID int64) error
 	GetAllResources(ctx context.Context, tx *sql.Tx) ([]record.Resource, error)
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
-	GetResourceById(ctx context.Context, tx *sql.Tx, resourceId int64) (*record.Resource, error)
+	GetResourceByID(ctx context.Context, tx *sql.Tx, resourceID int64) (*record.Resource, error)
 	GetResourceByResourceIdentifier(ctx context.Context, tx *sql.Tx, resourceIdentifier string) (*record.Resource, error)
 	UpdateResource(ctx context.Context, tx *sql.Tx, resource *record.Resource) error
 }
@@ -130,7 +130,7 @@ func HandleResourceCreatePost(
 
 		// Audit log
 		auditLogger.Log(r.Context(), audit.EventCreatedResource, map[string]interface{}{
-			"resource_id":         resource.Id,
+			"resource_id":         resource.ID,
 			"resource_identifier": resource.ResourceIdentifier,
 			"logged_in_user":      callerSubject(r),
 		})
@@ -160,7 +160,7 @@ func HandleResourceGet(
 			return
 		}
 
-		resource, err := database.GetResourceById(r.Context(), nil, id)
+		resource, err := database.GetResourceByID(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error getting resource by ID"), "resource_id", id)
 			return
@@ -196,7 +196,7 @@ func HandleResourceUpdatePut(
 			return
 		}
 
-		resource, err := database.GetResourceById(r.Context(), nil, id)
+		resource, err := database.GetResourceByID(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error getting resource by ID for update"), "resource_id", id)
 			return
@@ -239,10 +239,10 @@ func HandleResourceUpdatePut(
 		// Uniqueness check (excluding this resource)
 		existing, err := database.GetResourceByResourceIdentifier(r.Context(), nil, updateReq.ResourceIdentifier)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error checking resource by identifier for update"), "resource_identifier", updateReq.ResourceIdentifier, "resource_id", resource.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error checking resource by identifier for update"), "resource_identifier", updateReq.ResourceIdentifier, "resource_id", resource.ID)
 			return
 		}
-		if existing != nil && existing.Id != resource.Id {
+		if existing != nil && existing.ID != resource.ID {
 			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeResourceIdentifierInUse, nil))
 			return
 		}
@@ -263,7 +263,7 @@ func HandleResourceUpdatePut(
 		if trimmedResourceIdentifier != resource.ResourceIdentifier {
 			clashingClient, err := database.GetClientByClientIdentifier(r.Context(), nil, trimmedResourceIdentifier)
 			if err != nil {
-				writeInternalServerError(w, r, errs.Wrap(err, "database error checking client by resource identifier for update"), "resource_identifier", updateReq.ResourceIdentifier, "resource_id", resource.Id)
+				writeInternalServerError(w, r, errs.Wrap(err, "database error checking client by resource identifier for update"), "resource_identifier", updateReq.ResourceIdentifier, "resource_id", resource.ID)
 				return
 			}
 			if clashingClient != nil {
@@ -276,13 +276,13 @@ func HandleResourceUpdatePut(
 		resource.Description = strings.TrimSpace(updateReq.Description)
 
 		if err := database.UpdateResource(r.Context(), nil, resource); err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error updating resource"), "resource_id", resource.Id, "resource_identifier", resource.ResourceIdentifier)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error updating resource"), "resource_id", resource.ID, "resource_identifier", resource.ResourceIdentifier)
 			return
 		}
 
 		// Audit
 		auditLogger.Log(r.Context(), audit.EventUpdatedResource, map[string]interface{}{
-			"resource_id":         resource.Id,
+			"resource_id":         resource.ID,
 			"resource_identifier": resource.ResourceIdentifier,
 			"logged_in_user":      callerSubject(r),
 		})
@@ -313,7 +313,7 @@ func HandleResourceDelete(
 			return
 		}
 
-		resource, err := database.GetResourceById(r.Context(), nil, id)
+		resource, err := database.GetResourceByID(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error getting resource by ID for deletion"), "resource_id", id)
 			return
@@ -328,13 +328,13 @@ func HandleResourceDelete(
 			return
 		}
 
-		if err := database.DeleteResource(r.Context(), nil, resource.Id); err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error deleting resource"), "resource_id", resource.Id, "resource_identifier", resource.ResourceIdentifier)
+		if err := database.DeleteResource(r.Context(), nil, resource.ID); err != nil {
+			writeInternalServerError(w, r, errs.Wrap(err, "database error deleting resource"), "resource_id", resource.ID, "resource_identifier", resource.ResourceIdentifier)
 			return
 		}
 
 		auditLogger.Log(r.Context(), audit.EventDeletedResource, map[string]interface{}{
-			"resource_id":         resource.Id,
+			"resource_id":         resource.ID,
 			"resource_identifier": resource.ResourceIdentifier,
 			"logged_in_user":      callerSubject(r),
 		})

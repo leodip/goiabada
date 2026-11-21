@@ -114,8 +114,8 @@ func TestMigration000040_CollationParity(t *testing.T) {
 
 	require.NoErrorf(t, h.Migrator.Migrate(context.Background(), prior), "migrate to %d", prior)
 
-	clientId := seedClient(t, h, "mig40-client")
-	userId := seedUser(t, h, userSeed{Enabled: true, Username: "mig40user", Email: "mig40user@test.local"})
+	clientID := seedClient(t, h, "mig40-client")
+	userID := seedUser(t, h, userSeed{Enabled: true, Username: "mig40user", Email: "mig40user@test.local"})
 
 	before := dumpTables000040(t, h)
 	assertCollations000040(t, h, collationBefore000040, "at "+fmt.Sprint(prior))
@@ -129,7 +129,7 @@ func TestMigration000040_CollationParity(t *testing.T) {
 	assertDatabaseDefault000040(t, h, databaseDefaultAfter000040(), "after apply")
 	assertOnlyCollationMoved000040(t, before, after, "after apply")
 	assertDefaultsAreNamed000040(t, after, "after apply")
-	assertSeededRowsSurvive000040(t, h, clientId, userId, "after apply")
+	assertSeededRowsSurvive000040(t, h, clientID, userID, "after apply")
 
 	require.NoErrorf(t, h.Migrator.Migrate(context.Background(), prior), "roll back 000040")
 
@@ -138,7 +138,7 @@ func TestMigration000040_CollationParity(t *testing.T) {
 	assertDatabaseDefault000040(t, h, databaseDefaultBefore000040(), "after roll back")
 	assertOnlyCollationMoved000040(t, before, down, "after roll back")
 	assertDefaultsAreAutoNamed000040(t, down, "after roll back")
-	assertSeededRowsSurvive000040(t, h, clientId, userId, "after roll back")
+	assertSeededRowsSurvive000040(t, h, clientID, userID, "after roll back")
 
 	require.NoError(t, h.Migrator.Migrate(context.Background(), 40), "re-apply 000040")
 
@@ -147,7 +147,7 @@ func TestMigration000040_CollationParity(t *testing.T) {
 	assertDatabaseDefault000040(t, h, databaseDefaultAfter000040(), "after down/up round trip")
 	assertOnlyCollationMoved000040(t, before, reapplied, "after down/up round trip")
 	assertDefaultsAreNamed000040(t, reapplied, "after down/up round trip")
-	assertSeededRowsSurvive000040(t, h, clientId, userId, "after down/up round trip")
+	assertSeededRowsSurvive000040(t, h, clientID, userID, "after down/up round trip")
 }
 
 // TestMigration000040_DownRefusesACaseVariantPair is decision 7's other half: the down
@@ -172,7 +172,7 @@ func TestMigration000040_DownRefusesACaseVariantPair(t *testing.T) {
 
 	// The pair that could not have existed before this migration. That it can be inserted at
 	// all is the whole of what #283 fixes, so seeding it is also an assertion.
-	dupeId := seedClient(t, h, "Dupe40Client")
+	dupeID := seedClient(t, h, "Dupe40Client")
 	seedClient(t, h, "dupe40client")
 
 	// The catalog shape the refusal must leave exactly as it found it, on SQL Server. Read as
@@ -212,7 +212,7 @@ func TestMigration000040_DownRefusesACaseVariantPair(t *testing.T) {
 	// duplicate, clear the dirty version by hand, run it again. This is the half that a
 	// refusal test asserting only the error message cannot see, and it is the half an
 	// operator is standing in.
-	_, err = h.SQL.Exec(fmt.Sprintf("DELETE FROM clients WHERE id = %d", dupeId))
+	_, err = h.SQL.Exec(fmt.Sprintf("DELETE FROM clients WHERE id = %d", dupeID))
 	require.NoError(t, err, "resolve the duplicate by hand, as the down file says to")
 
 	// By id, not by identifier: on MySQL the clients table may or may not have been converted
@@ -585,18 +585,18 @@ func assertDefaultsAreAutoNamed000040(t *testing.T, shapes map[string]tableShape
 // dump cannot tell ALTER COLUMN apart from DROP COLUMN followed by ADD COLUMN, and on MySQL
 // CONVERT TO CHARACTER SET rewrites every string column of the table in one statement, so the
 // row data is the thing the shape assertions cannot see.
-func assertSeededRowsSurvive000040(t *testing.T, h *isolatedDB, clientId, userId int64, phase string) {
+func assertSeededRowsSurvive000040(t *testing.T, h *isolatedDB, clientID, userID int64, phase string) {
 	t.Helper()
 
 	var identifier string
 	require.NoErrorf(t, h.SQL.QueryRow(fmt.Sprintf(
-		"SELECT client_identifier FROM clients WHERE id = %d", clientId)).Scan(&identifier),
+		"SELECT client_identifier FROM clients WHERE id = %d", clientID)).Scan(&identifier),
 		"[%s] read back the seeded client", phase)
 	assert.Equalf(t, "mig40-client", identifier, "[%s] the seeded client identifier", phase)
 
 	var username, email string
 	require.NoErrorf(t, h.SQL.QueryRow(fmt.Sprintf(
-		"SELECT username, email FROM users WHERE id = %d", userId)).Scan(&username, &email),
+		"SELECT username, email FROM users WHERE id = %d", userID)).Scan(&username, &email),
 		"[%s] read back the seeded user", phase)
 	assert.Equalf(t, "mig40user", username, "[%s] the seeded username", phase)
 	assert.Equalf(t, "mig40user@test.local", email, "[%s] the seeded email", phase)

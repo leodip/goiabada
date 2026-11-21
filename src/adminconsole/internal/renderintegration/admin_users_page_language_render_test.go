@@ -29,8 +29,8 @@ type storedUserAPI struct {
 	refusal      error
 }
 
-func (a *storedUserAPI) GetUserById(_ context.Context, _ string, userId int64) (*api.UserResponse, error) {
-	return &api.UserResponse{Id: userId, Email: "ana@example.com", Locale: "de", PageLanguage: a.pageLanguage}, nil
+func (a *storedUserAPI) GetUserByID(_ context.Context, _ string, userID int64) (*api.UserResponse, error) {
+	return &api.UserResponse{ID: userID, Email: "ana@example.com", Locale: "de", PageLanguage: a.pageLanguage}, nil
 }
 
 func (a *storedUserAPI) UpdateUserProfile(context.Context, string, int64, *api.UpdateUserProfileRequest) (*api.UserResponse, error) {

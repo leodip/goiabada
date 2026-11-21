@@ -67,9 +67,9 @@ func newCredentialEnv(t *testing.T) *credentialEnv {
 	// (#247). Nothing here gets as far as a write.
 	ciphertext, issuedAt := pendingEnrollment(t, otpTestKeyURL, time.Now().UTC())
 	user := &record.User{
-		Id: 91, Enabled: true, PasswordHash: hash, OTPEnabled: false, Email: credentialEmail,
-		OtpEnrollmentSecretEncrypted: ciphertext,
-		OtpEnrollmentIssuedAt:        issuedAt,
+		ID: 91, Enabled: true, PasswordHash: hash, OTPEnabled: false, Email: credentialEmail,
+		OTPEnrollmentSecretEncrypted: ciphertext,
+		OTPEnrollmentIssuedAt:        issuedAt,
 	}
 
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), credentialSubject).Return(user, nil).Maybe()

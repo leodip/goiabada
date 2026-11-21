@@ -81,9 +81,9 @@ func assertAPIAdmitsToken(t *testing.T, target, accessToken string) {
 	require.Equal(t, http.StatusOK, resp.StatusCode, "%s: %s", target, string(body))
 }
 
-func setClientEnabled(t *testing.T, clientId int64, enabled bool) {
+func setClientEnabled(t *testing.T, clientID int64, enabled bool) {
 	t.Helper()
-	client, err := database.GetClientById(context.Background(), nil, clientId)
+	client, err := database.GetClientByID(context.Background(), nil, clientID)
 	require.NoError(t, err)
 	require.NotNil(t, client)
 	client.Enabled = enabled
@@ -103,12 +103,12 @@ func TestRFC9068_AuthorizationCodeGrantAndItsRefreshes(t *testing.T) {
 
 	claims := decodeJWTPayload(t, accessToken)
 	assert.Equal(t, code.Client.ClientIdentifier, claims["client_id"])
-	firstJti := decodeJWTPayload(t, refreshToken)["jti"].(string)
-	assert.Equal(t, firstJti, claims["grant_id"], "the grant is its first refresh token's jti")
-	row, err := database.GetRefreshTokenByJti(context.Background(), nil, firstJti)
+	firstJTI := decodeJWTPayload(t, refreshToken)["jti"].(string)
+	assert.Equal(t, firstJTI, claims["grant_id"], "the grant is its first refresh token's jti")
+	row, err := database.GetRefreshTokenByJTI(context.Background(), nil, firstJTI)
 	require.NoError(t, err)
 	require.NotNil(t, row)
-	assert.Equal(t, firstJti, row.FirstRefreshTokenJti, "the row records the same family")
+	assert.Equal(t, firstJTI, row.FirstRefreshTokenJTI, "the row records the same family")
 
 	for i := 1; i <= 2; i++ {
 		status, refreshed := refreshAuthCodeGrant(t, httpClient, code, clientSecret, refreshToken, "")
@@ -119,8 +119,8 @@ func TestRFC9068_AuthorizationCodeGrantAndItsRefreshes(t *testing.T) {
 		assert.Equal(t, "at+jwt", decodeJWTHeader(t, refreshedAccess)["typ"], "refresh %d", i)
 		refreshedClaims := decodeJWTPayload(t, refreshedAccess)
 		assert.Equal(t, code.Client.ClientIdentifier, refreshedClaims["client_id"], "refresh %d", i)
-		assert.Equal(t, firstJti, refreshedClaims["grant_id"], "refresh %d stays in its grant", i)
-		assert.NotEqual(t, firstJti, decodeJWTPayload(t, refreshToken)["jti"], "refresh %d rotates its refresh token", i)
+		assert.Equal(t, firstJTI, refreshedClaims["grant_id"], "refresh %d stays in its grant", i)
+		assert.NotEqual(t, firstJTI, decodeJWTPayload(t, refreshToken)["jti"], "refresh %d rotates its refresh token", i)
 		assertUserinfoAdmits(t, refreshedAccess, code.User.Subject)
 	}
 }
@@ -131,7 +131,7 @@ func TestRFC9068_PasswordGrantAndItsRefresh(t *testing.T) {
 	password := fake.Password(12)
 	client := createROPCClient(t, clientSecret, false)
 	user := createROPCUser(t, password)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
 	data := postToTokenEndpoint(t, httpClient, appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
 		"grant_type":    {"password"},
@@ -147,13 +147,13 @@ func TestRFC9068_PasswordGrantAndItsRefresh(t *testing.T) {
 	assert.Equal(t, "at+jwt", decodeJWTHeader(t, accessToken)["typ"])
 	claims := decodeJWTPayload(t, accessToken)
 	assert.Equal(t, client.ClientIdentifier, claims["client_id"])
-	firstJti := decodeJWTPayload(t, refreshToken)["jti"]
-	assert.Equal(t, firstJti, claims["grant_id"])
+	firstJTI := decodeJWTPayload(t, refreshToken)["jti"]
+	assert.Equal(t, firstJTI, claims["grant_id"])
 
 	status, refreshed := refreshWithScope(t, httpClient, client.ClientIdentifier, clientSecret, refreshToken, "")
 	require.Equal(t, http.StatusOK, status, "%v", refreshed)
 	refreshedClaims := decodeJWTPayload(t, refreshed["access_token"].(string))
-	assert.Equal(t, firstJti, refreshedClaims["grant_id"])
+	assert.Equal(t, firstJTI, refreshedClaims["grant_id"])
 	assert.Equal(t, client.ClientIdentifier, refreshedClaims["client_id"])
 	assertUserinfoAdmits(t, refreshed["access_token"].(string), user.Subject)
 }
@@ -184,7 +184,7 @@ func TestRFC9068_OfflineAccessNamesTheAuthServer(t *testing.T) {
 		if grant != nil {
 			grant(user)
 		}
-		return postToTokenEndpoint(t, createHttpClient(t), appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
+		return postToTokenEndpoint(t, createHTTPClient(t), appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
 			"grant_type":    {"password"},
 			"client_id":     {client.ClientIdentifier},
 			"client_secret": {clientSecret},
@@ -196,10 +196,10 @@ func TestRFC9068_OfflineAccessNamesTheAuthServer(t *testing.T) {
 
 	t.Run("beside a resource", func(t *testing.T) {
 		resource := "rfc9068-" + strings.ToLower(fake.LetterN(8))
-		permission := createPermissionWithId(t, createResourceWithId(t, resource).Id, "read")
+		permission := createPermissionWithID(t, createResourceWithID(t, resource).ID, "read")
 		scope := "offline_access " + resource + ":read"
 
-		data := passwordGrant(t, scope, func(user *record.User) { assignPermissionToUser(t, user.Id, permission.Id) })
+		data := passwordGrant(t, scope, func(user *record.User) { assignPermissionToUser(t, user.ID, permission.ID) })
 
 		assert.Equal(t, scope, data["scope"])
 		claims := decodeJWTPayload(t, data["access_token"].(string))
@@ -274,10 +274,10 @@ func TestRFC9068_ATokenOfADisabledOrDeletedClientIsRefused(t *testing.T) {
 		accessToken := data["access_token"].(string)
 		assertUserinfoAdmits(t, accessToken, code.User.Subject)
 
-		setClientEnabled(t, code.Client.Id, false)
+		setClientEnabled(t, code.Client.ID, false)
 		assertUserinfoRefuses(t, accessToken, http.StatusUnauthorized, "invalid_token")
 
-		setClientEnabled(t, code.Client.Id, true)
+		setClientEnabled(t, code.Client.ID, true)
 		assertUserinfoAdmits(t, accessToken, code.User.Subject)
 	})
 
@@ -285,7 +285,7 @@ func TestRFC9068_ATokenOfADisabledOrDeletedClientIsRefused(t *testing.T) {
 		_, accessToken, code := getUserAccessTokenAndCodeForAccountScope(t)
 		assertAPIAdmitsToken(t, "/api/v1/account/profile", accessToken)
 
-		setClientEnabled(t, code.Client.Id, false)
+		setClientEnabled(t, code.Client.ID, false)
 		assertAPIRefusesToken(t, "/api/v1/account/profile", accessToken)
 	})
 
@@ -293,10 +293,10 @@ func TestRFC9068_ATokenOfADisabledOrDeletedClientIsRefused(t *testing.T) {
 		accessToken, client := createAdminClientWithToken(t)
 		assertAPIAdmitsToken(t, "/api/v1/admin/resources", accessToken)
 
-		setClientEnabled(t, client.Id, false)
+		setClientEnabled(t, client.ID, false)
 		assertAPIRefusesToken(t, "/api/v1/admin/resources", accessToken)
 
-		setClientEnabled(t, client.Id, true)
+		setClientEnabled(t, client.ID, true)
 		assertAPIAdmitsToken(t, "/api/v1/admin/resources", accessToken)
 	})
 
@@ -305,7 +305,7 @@ func TestRFC9068_ATokenOfADisabledOrDeletedClientIsRefused(t *testing.T) {
 		accessToken := data["access_token"].(string)
 		assertUserinfoAdmits(t, accessToken, code.User.Subject)
 
-		require.NoError(t, database.DeleteClient(context.Background(), nil, code.Client.Id))
+		require.NoError(t, database.DeleteClient(context.Background(), nil, code.Client.ID))
 		assertUserinfoRefuses(t, accessToken, http.StatusUnauthorized, "invalid_token")
 	})
 }

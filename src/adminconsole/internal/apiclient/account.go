@@ -200,7 +200,7 @@ func (c *AuthServerClient) CreateAccountLogoutRequest(ctx context.Context, acces
 
 	// Fallback: redirect response
 	var redirResp api.AccountLogoutRedirectResponse
-	if err := json.Unmarshal(body, &redirResp); err == nil && redirResp.LogoutUrl != "" {
+	if err := json.Unmarshal(body, &redirResp); err == nil && redirResp.LogoutURL != "" {
 		return nil, &redirResp, nil
 	}
 
@@ -224,10 +224,10 @@ func (c *AuthServerClient) GetAccountConnectedClients(ctx context.Context, acces
 
 // DisconnectAccountClient disconnects the current user from a client, ending everything the user
 // holds with it, its stored consent included.
-func (c *AuthServerClient) DisconnectAccountClient(ctx context.Context, accessToken string, clientId int64) error {
+func (c *AuthServerClient) DisconnectAccountClient(ctx context.Context, accessToken string, clientID int64) error {
 	response, err := execute[api.SuccessResponse](ctx, c, accessToken, apiRequest{
 		method:        "DELETE",
-		url:           fmt.Sprintf("%s/api/v1/account/connected-clients/%d", c.baseURL, clientId),
+		url:           fmt.Sprintf("%s/api/v1/account/connected-clients/%d", c.baseURL, clientID),
 		contentType:   contentTypeJSON,
 		successStatus: http.StatusOK,
 	})

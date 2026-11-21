@@ -46,32 +46,32 @@ func TestUpdateRefreshToken_TheKeysAreNotRewritten(t *testing.T) {
 
 	otherClient := createTestClient(t)
 	otherUser := createTestUser(t)
-	otherCode := createTestCode(t, otherClient.Id, otherUser.Id)
+	otherCode := createTestCode(t, otherClient.ID, otherUser.ID)
 
-	require.True(t, original.CodeId.Valid, "the fixture's token descends from a code")
-	require.True(t, original.UserId.Valid, "the fixture's token names a user")
-	require.True(t, original.ClientId.Valid, "the fixture's token names a client")
-	require.NotEqual(t, original.CodeId.Int64, otherCode.Id, "the reassignment has to be a change")
-	require.NotEqual(t, original.UserId.Int64, otherUser.Id, "the reassignment has to be a change")
-	require.NotEqual(t, original.ClientId.Int64, otherClient.Id, "the reassignment has to be a change")
+	require.True(t, original.CodeID.Valid, "the fixture's token descends from a code")
+	require.True(t, original.UserID.Valid, "the fixture's token names a user")
+	require.True(t, original.ClientID.Valid, "the fixture's token names a client")
+	require.NotEqual(t, original.CodeID.Int64, otherCode.ID, "the reassignment has to be a change")
+	require.NotEqual(t, original.UserID.Int64, otherUser.ID, "the reassignment has to be a change")
+	require.NotEqual(t, original.ClientID.Int64, otherClient.ID, "the reassignment has to be a change")
 
-	wasCodeId, wasUserId, wasClientId := original.CodeId, original.UserId, original.ClientId
+	wasCodeID, wasUserID, wasClientID := original.CodeID, original.UserID, original.ClientID
 
-	original.CodeId = sql.NullInt64{Int64: otherCode.Id, Valid: true}
-	original.UserId = sql.NullInt64{Int64: otherUser.Id, Valid: true}
-	original.ClientId = sql.NullInt64{Int64: otherClient.Id, Valid: true}
+	original.CodeID = sql.NullInt64{Int64: otherCode.ID, Valid: true}
+	original.UserID = sql.NullInt64{Int64: otherUser.ID, Valid: true}
+	original.ClientID = sql.NullInt64{Int64: otherClient.ID, Valid: true}
 	original.Scope = "rewritten_" + fake.LetterN(6)
 	original.Revoked = true
 
 	require.NoError(t, database.UpdateRefreshToken(context.Background(), nil, original))
 
-	stored, err := database.GetRefreshTokenById(context.Background(), nil, original.Id)
+	stored, err := database.GetRefreshTokenByID(context.Background(), nil, original.ID)
 	require.NoError(t, err)
 	require.NotNil(t, stored)
 
-	assert.Equal(t, wasCodeId, stored.CodeId, "code_id must not be in the update set")
-	assert.Equal(t, wasUserId, stored.UserId, "user_id must not be in the update set")
-	assert.Equal(t, wasClientId, stored.ClientId, "client_id must not be in the update set")
+	assert.Equal(t, wasCodeID, stored.CodeID, "code_id must not be in the update set")
+	assert.Equal(t, wasUserID, stored.UserID, "user_id must not be in the update set")
+	assert.Equal(t, wasClientID, stored.ClientID, "client_id must not be in the update set")
 
 	// And the ordinary columns still are, which is what makes the three above a targeted exclusion
 	// rather than an update that quietly stopped writing anything.
@@ -83,24 +83,24 @@ func TestUpdateUserSessionClient_TheKeysAreNotRewritten(t *testing.T) {
 	client := createTestClient(t)
 	otherClient := createTestClient(t)
 	user := createTestUser(t)
-	session := createTestUserSession(t, user.Id)
-	otherSession := createTestUserSession(t, user.Id)
+	session := createTestUserSession(t, user.ID)
+	otherSession := createTestUserSession(t, user.ID)
 
-	association := createTestUserSessionClientWithIds(t, session.Id, client.Id)
+	association := createTestUserSessionClientWithIDs(t, session.ID, client.ID)
 
 	moved := time.Now().UTC().Add(time.Hour).Truncate(time.Microsecond)
-	association.ClientId = otherClient.Id
-	association.UserSessionId = otherSession.Id
+	association.ClientID = otherClient.ID
+	association.UserSessionID = otherSession.ID
 	association.LastAccessed = moved
 
 	require.NoError(t, database.UpdateUserSessionClient(context.Background(), nil, association))
 
-	stored, err := database.GetUserSessionClientById(context.Background(), nil, association.Id)
+	stored, err := database.GetUserSessionClientByID(context.Background(), nil, association.ID)
 	require.NoError(t, err)
 	require.NotNil(t, stored)
 
-	assert.Equal(t, client.Id, stored.ClientId, "client_id must not be in the update set")
-	assert.Equal(t, session.Id, stored.UserSessionId, "user_session_id must not be in the update set")
+	assert.Equal(t, client.ID, stored.ClientID, "client_id must not be in the update set")
+	assert.Equal(t, session.ID, stored.UserSessionID, "user_session_id must not be in the update set")
 	assert.WithinDuration(t, moved, stored.LastAccessed, time.Second,
 		"the untagged columns must still be written: last_accessed is the whole reason a bump updates this row")
 }

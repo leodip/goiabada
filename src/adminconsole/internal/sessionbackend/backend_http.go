@@ -102,7 +102,7 @@ func New(baseURL string, tokens TokenSource, rootCAs *x509.CertPool, upstream *u
 
 func (b *httpBackend) Load(ctx context.Context, id string) (*sessionstore.Record, error) {
 	var response api.SessionLoadResponse
-	if err := b.post(ctx, "load", api.SessionLoadRequest{Id: id}, &response); err != nil {
+	if err := b.post(ctx, "load", api.SessionLoadRequest{ID: id}, &response); err != nil {
 		return nil, err
 	}
 
@@ -115,7 +115,7 @@ func (b *httpBackend) Load(ctx context.Context, id string) (*sessionstore.Record
 
 func (b *httpBackend) Create(ctx context.Context, id string, data []byte, authenticated bool) (time.Time, error) {
 	var response api.SessionWriteResponse
-	request := api.SessionWriteRequest{Id: id, Data: string(data), Authenticated: authenticated}
+	request := api.SessionWriteRequest{ID: id, Data: string(data), Authenticated: authenticated}
 	if err := b.post(ctx, "create", request, &response); err != nil {
 		return time.Time{}, err
 	}
@@ -124,7 +124,7 @@ func (b *httpBackend) Create(ctx context.Context, id string, data []byte, authen
 
 func (b *httpBackend) Update(ctx context.Context, id string, data []byte, authenticated bool) (time.Time, error) {
 	var response api.SessionWriteResponse
-	request := api.SessionWriteRequest{Id: id, Data: string(data), Authenticated: authenticated}
+	request := api.SessionWriteRequest{ID: id, Data: string(data), Authenticated: authenticated}
 	if err := b.post(ctx, "update", request, &response); err != nil {
 		return time.Time{}, err
 	}
@@ -133,7 +133,7 @@ func (b *httpBackend) Update(ctx context.Context, id string, data []byte, authen
 
 func (b *httpBackend) Touch(ctx context.Context, id string, authenticated bool) (time.Time, error) {
 	var response api.SessionWriteResponse
-	request := api.SessionTouchRequest{Id: id, Authenticated: authenticated}
+	request := api.SessionTouchRequest{ID: id, Authenticated: authenticated}
 	if err := b.post(ctx, "touch", request, &response); err != nil {
 		return time.Time{}, err
 	}
@@ -141,7 +141,7 @@ func (b *httpBackend) Touch(ctx context.Context, id string, authenticated bool) 
 }
 
 func (b *httpBackend) Delete(ctx context.Context, id string) error {
-	return b.post(ctx, "delete", api.SessionLoadRequest{Id: id}, nil)
+	return b.post(ctx, "delete", api.SessionLoadRequest{ID: id}, nil)
 }
 
 // post sends one operation and decodes a success body into out, which is nil for the

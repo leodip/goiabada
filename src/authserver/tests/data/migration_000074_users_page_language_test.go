@@ -40,20 +40,20 @@ func TestMigration000074_UsersPageLanguage(t *testing.T) {
 
 	// Seeded with raw SQL rather than CreateUser: the Go record already carries PageLanguage, so
 	// an ORM insert at 000073 would name a column that does not exist yet.
-	userId := seedUser(t, h, userSeed{Enabled: true})
+	userID := seedUser(t, h, userSeed{Enabled: true})
 
 	require.NoError(t, h.Migrator.Migrate(ctx, 74), "apply 000074")
 	assertPageLanguageShape000074(t, h, "after apply")
 	assert.ElementsMatch(t, append(append([]string{}, before...), "page_language"), usersColumns000074(t, h),
 		"000074 must add the one column and no other")
-	assert.Empty(t, readPageLanguage000074(t, h, userId), "a users row that predates the column lands on Automatic")
+	assert.Empty(t, readPageLanguage000074(t, h, userID), "a users row that predates the column lands on Automatic")
 
 	require.NoError(t, h.Migrator.Migrate(ctx, 73), "roll back 000074")
 	assert.Equal(t, before, usersColumns000074(t, h), "the down migration must drop page_language and nothing else")
 
 	require.NoError(t, h.Migrator.Migrate(ctx, 74), "re-apply 000074")
 	assertPageLanguageShape000074(t, h, "after down then up")
-	assert.Empty(t, readPageLanguage000074(t, h, userId), "the row after the down/up round trip")
+	assert.Empty(t, readPageLanguage000074(t, h, userID), "the row after the down/up round trip")
 }
 
 func usersColumns000074(t *testing.T, h *isolatedDB) []string {
@@ -66,10 +66,10 @@ func usersColumns000074(t *testing.T, h *isolatedDB) []string {
 	return names
 }
 
-func readPageLanguage000074(t *testing.T, h *isolatedDB, userId int64) string {
+func readPageLanguage000074(t *testing.T, h *isolatedDB, userID int64) string {
 	t.Helper()
 	var pageLanguage string
-	q := fmt.Sprintf("SELECT page_language FROM users WHERE id = %d", userId)
+	q := fmt.Sprintf("SELECT page_language FROM users WHERE id = %d", userID)
 	require.NoError(t, h.SQL.QueryRow(q).Scan(&pageLanguage), "read page_language")
 	return pageLanguage
 }

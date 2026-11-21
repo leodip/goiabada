@@ -29,10 +29,10 @@ func TestAPIUserEmailVerificationCodePost_Success(t *testing.T) {
 	}
 	require.NoError(t, database.CreateUser(context.Background(), nil, user))
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, user.Id)
+		_ = database.DeleteUser(context.Background(), nil, user.ID)
 	}()
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(user.Id, 10) + "/email/verification-code"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(user.ID, 10) + "/email/verification-code"
 	before := time.Now().UTC()
 	resp := makeAPIRequest(t, "POST", url, accessToken, nil)
 	after := time.Now().UTC()
@@ -46,12 +46,12 @@ func TestAPIUserEmailVerificationCodePost_Success(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEmpty(t, body.VerificationCode)
 	assert.NotNil(t, body.VerificationCodeExpiresAt)
-	assert.Equal(t, user.Id, body.UserId)
+	assert.Equal(t, user.ID, body.UserID)
 	assert.Equal(t, user.Email, body.Email)
 	// Issued during the request, and good for five minutes.
 	assert.WithinRange(t, *body.VerificationCodeExpiresAt, before.Add(5*time.Minute), after.Add(5*time.Minute))
 
-	updatedUser, err := database.GetUserById(context.Background(), nil, user.Id)
+	updatedUser, err := database.GetUserByID(context.Background(), nil, user.ID)
 	require.NoError(t, err)
 	assert.NotNil(t, updatedUser.EmailVerificationCodeEncrypted)
 	assert.True(t, updatedUser.EmailVerificationCodeIssuedAt.Valid)
@@ -78,10 +78,10 @@ func TestAPIUserEmailVerificationCodePost_VerifiedUser(t *testing.T) {
 	}
 	require.NoError(t, database.CreateUser(context.Background(), nil, user))
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, user.Id)
+		_ = database.DeleteUser(context.Background(), nil, user.ID)
 	}()
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(user.Id, 10) + "/email/verification-code"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(user.ID, 10) + "/email/verification-code"
 	resp := makeAPIRequest(t, "POST", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -92,10 +92,10 @@ func TestAPIUserEmailVerificationCodePost_VerifiedUser(t *testing.T) {
 	err := json.NewDecoder(resp.Body).Decode(&body)
 	require.NoError(t, err)
 	assert.NotEmpty(t, body.VerificationCode)
-	assert.Equal(t, user.Id, body.UserId)
+	assert.Equal(t, user.ID, body.UserID)
 	assert.Equal(t, user.Email, body.Email)
 
-	updatedUser, err := database.GetUserById(context.Background(), nil, user.Id)
+	updatedUser, err := database.GetUserByID(context.Background(), nil, user.ID)
 	require.NoError(t, err)
 	assert.NotNil(t, updatedUser.EmailVerificationCodeEncrypted)
 	assert.True(t, updatedUser.EmailVerificationCodeIssuedAt.Valid)
@@ -120,7 +120,7 @@ func TestAPIUserEmailVerificationCodePost_NotFound(t *testing.T) {
 	assert.Equal(t, "NOT_FOUND", errResp.ErrorCode)
 }
 
-func TestAPIUserEmailVerificationCodePost_InvalidUserId(t *testing.T) {
+func TestAPIUserEmailVerificationCodePost_InvalidUserID(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/invalid/email/verification-code"
@@ -139,7 +139,7 @@ func TestAPIUserEmailVerificationCodePost_Unauthorized(t *testing.T) {
 	req, err := http.NewRequest("POST", url, nil)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -186,16 +186,16 @@ func TestAPIUserEmailVerificationCodePost_RegeneratesCode(t *testing.T) {
 	}
 	require.NoError(t, database.CreateUser(context.Background(), nil, user))
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, user.Id)
+		_ = database.DeleteUser(context.Background(), nil, user.ID)
 	}()
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(user.Id, 10) + "/email/verification-code"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(user.ID, 10) + "/email/verification-code"
 
 	resp1 := makeAPIRequest(t, "POST", url, accessToken, nil)
 	defer func() { _ = resp1.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp1.StatusCode)
 
-	updated1, err := database.GetUserById(context.Background(), nil, user.Id)
+	updated1, err := database.GetUserByID(context.Background(), nil, user.ID)
 	require.NoError(t, err)
 	assert.True(t, updated1.EmailVerificationCodeIssuedAt.Valid)
 	issuedAt1 := updated1.EmailVerificationCodeIssuedAt.Time
@@ -206,7 +206,7 @@ func TestAPIUserEmailVerificationCodePost_RegeneratesCode(t *testing.T) {
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp2.StatusCode)
 
-	updated2, err := database.GetUserById(context.Background(), nil, user.Id)
+	updated2, err := database.GetUserByID(context.Background(), nil, user.ID)
 	require.NoError(t, err)
 	assert.True(t, updated2.EmailVerificationCodeIssuedAt.Valid)
 	assert.True(t, updated2.EmailVerificationCodeIssuedAt.Time.After(issuedAt1))

@@ -40,7 +40,7 @@ func TestHandleAuthPwdGet(t *testing.T) {
 			auditLogger:   auditLogger,
 		})
 
-		req, err := http.NewRequest("GET", "/auth/pwd?ceremony="+testCeremonyId, nil)
+		req, err := http.NewRequest("GET", "/auth/pwd?ceremony="+testCeremonyID, nil)
 		require.NoError(t, err)
 		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 
@@ -72,14 +72,14 @@ func TestHandleAuthPwdGet(t *testing.T) {
 			auditLogger:   auditLogger,
 		})
 
-		req, err := http.NewRequest("GET", "/auth/pwd?ceremony="+testCeremonyId, nil)
+		req, err := http.NewRequest("GET", "/auth/pwd?ceremony="+testCeremonyID, nil)
 		require.NoError(t, err)
 		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
 
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId: testCeremonyId,
+			CeremonyID: testCeremonyID,
 			AuthState:  ceremony.AuthStateReadyToIssueCode,
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
@@ -109,15 +109,15 @@ func TestHandleAuthPwdGet(t *testing.T) {
 			auditLogger:   auditLogger,
 		})
 
-		req, err := http.NewRequest("GET", "/auth/pwd?ceremony="+testCeremonyId, nil)
+		req, err := http.NewRequest("GET", "/auth/pwd?ceremony="+testCeremonyID, nil)
 		require.NoError(t, err)
 
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
 			AuthState:  ceremony.AuthStateLevel1Password,
-			CeremonyId: testCeremonyId,
-			ClientId:   "my-app",
+			CeremonyID: testCeremonyID,
+			ClientID:   "my-app",
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -173,15 +173,15 @@ func TestHandleAuthPwdGet(t *testing.T) {
 			auditLogger:   auditLogger,
 		})
 
-		req, err := http.NewRequest("GET", "/auth/pwd?ceremony="+testCeremonyId, nil)
+		req, err := http.NewRequest("GET", "/auth/pwd?ceremony="+testCeremonyID, nil)
 		require.NoError(t, err)
 
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId: testCeremonyId,
+			CeremonyID: testCeremonyID,
 			AuthState:  ceremony.AuthStateLevel1Password,
-			ClientId:   "another-app",
+			ClientID:   "another-app",
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -234,15 +234,15 @@ func TestHandleAuthPwdGet(t *testing.T) {
 			auditLogger:   auditLogger,
 		})
 
-		req, err := http.NewRequest("GET", "/auth/pwd?ceremony="+testCeremonyId, nil)
+		req, err := http.NewRequest("GET", "/auth/pwd?ceremony="+testCeremonyID, nil)
 		require.NoError(t, err)
 
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
 			AuthState:  ceremony.AuthStateLevel1Password,
-			CeremonyId: testCeremonyId,
-			ClientId:   "my-app",
+			CeremonyID: testCeremonyID,
+			ClientID:   "my-app",
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -262,7 +262,7 @@ func TestHandleAuthPwdGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		if assert.NotNil(t, rendered) {
-			assert.Equal(t, testCeremonyId, rendered["ceremonyId"])
+			assert.Equal(t, testCeremonyID, rendered["ceremonyId"])
 		}
 
 		pageRenderer.AssertExpectations(t)
@@ -293,8 +293,8 @@ func TestHandleAuthPwd_OffersRegisterOnlyWhileRegistrationIsAvailable(t *testing
 		authContext := func() *ceremony.AuthContext {
 			return &ceremony.AuthContext{
 				AuthState:  ceremony.AuthStateLevel1Password,
-				CeremonyId: testCeremonyId,
-				ClientId:   "my-app",
+				CeremonyID: testCeremonyID,
+				ClientID:   "my-app",
 			}
 		}
 		settings := tc.settings
@@ -310,7 +310,7 @@ func TestHandleAuthPwd_OffersRegisterOnlyWhileRegistrationIsAvailable(t *testing
 				auditLogger:   handlersmocks.NewAuditLogger(t),
 			})
 
-			req, err := http.NewRequest("GET", "/auth/pwd?ceremony="+testCeremonyId, nil)
+			req, err := http.NewRequest("GET", "/auth/pwd?ceremony="+testCeremonyID, nil)
 			require.NoError(t, err)
 			req = req.WithContext(reqctx.WithSettings(req.Context(), settings))
 			rr := httptest.NewRecorder()
@@ -344,7 +344,7 @@ func TestHandleAuthPwd_OffersRegisterOnlyWhileRegistrationIsAvailable(t *testing
 			})
 
 			form := url.Values{}
-			form.Add(ceremony.IdField, testCeremonyId)
+			form.Add(ceremony.IDField, testCeremonyID)
 			form.Add("password", "testpassword")
 			req, err := http.NewRequest("POST", "/auth/pwd", strings.NewReader(form.Encode()))
 			require.NoError(t, err)
@@ -420,7 +420,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		// The ceremony matches, so the state check is what answers. Without an id in the body the
 		// submission would be refused one gate earlier and this case would stop proving anything.
 		form := url.Values{}
-		form.Add(ceremony.IdField, testCeremonyId)
+		form.Add(ceremony.IDField, testCeremonyID)
 		req, _ := http.NewRequest("POST", "/auth/pwd", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{}))
@@ -428,7 +428,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 
 		authContext := &ceremony.AuthContext{
 			AuthState:  ceremony.AuthStateReadyToIssueCode,
-			CeremonyId: testCeremonyId,
+			CeremonyID: testCeremonyID,
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -464,13 +464,13 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		}{
 			{
 				// The defect's own shape: the password screen of the request that was replaced.
-				name: "a different ceremony's id", stored: testCeremonyId,
+				name: "a different ceremony's id", stored: testCeremonyID,
 				submitted: "another-ceremony-0123456789abcde",
 				authState: ceremony.AuthStateLevel1Password,
 			},
 			{
 				// A hand-built body, or a template that lost the hidden input.
-				name: "no ceremony field at all", stored: testCeremonyId,
+				name: "no ceremony field at all", stored: testCeremonyID,
 				submitted: "", authState: ceremony.AuthStateLevel1Password,
 			},
 			{
@@ -483,7 +483,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 			{
 				// The check runs before the AuthState check, so the replaced ceremony's state
 				// produces the 400 mismatch page rather than a 500 naming an internal invariant.
-				name: "a replaced ceremony that has moved on", stored: testCeremonyId,
+				name: "a replaced ceremony that has moved on", stored: testCeremonyID,
 				submitted: "another-ceremony-0123456789abcde",
 				authState: ceremony.AuthStateRequiresConsent,
 			},
@@ -492,8 +492,8 @@ func TestHandleAuthPwdPost(t *testing.T) {
 				// with r.FormValue would let /auth/pwd?ceremonyId=... supply an id the submission
 				// never carried, and a page rendered for no ceremony at all would pass the gate
 				// (#79).
-				name: "the current id in the query alone", stored: testCeremonyId,
-				submitted: testCeremonyId, inQuery: true,
+				name: "the current id in the query alone", stored: testCeremonyID,
+				submitted: testCeremonyID, inQuery: true,
 				authState: ceremony.AuthStateLevel1Password,
 			},
 		}
@@ -519,9 +519,9 @@ func TestHandleAuthPwdPost(t *testing.T) {
 				target := "/auth/pwd"
 				if tc.submitted != "" {
 					if tc.inQuery {
-						target += "?" + url.Values{ceremony.IdField: {tc.submitted}}.Encode()
+						target += "?" + url.Values{ceremony.IDField: {tc.submitted}}.Encode()
 					} else {
-						form.Add(ceremony.IdField, tc.submitted)
+						form.Add(ceremony.IDField, tc.submitted)
 					}
 				}
 				req, _ := http.NewRequest("POST", target, strings.NewReader(form.Encode()))
@@ -531,8 +531,8 @@ func TestHandleAuthPwdPost(t *testing.T) {
 
 				authContext := &ceremony.AuthContext{
 					AuthState:  tc.authState,
-					CeremonyId: tc.stored,
-					ClientId:   "test-client",
+					CeremonyID: tc.stored,
+					ClientID:   "test-client",
 				}
 				ceremonyStore, cookies := holdingCeremony(t, authContext)
 				req = withCookies(req, cookies)
@@ -566,7 +566,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		})
 
 		form := url.Values{}
-		form.Add(ceremony.IdField, testCeremonyId)
+		form.Add(ceremony.IDField, testCeremonyID)
 		form.Add("password", "testpassword")
 		req, _ := http.NewRequest("POST", "/auth/pwd", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
@@ -574,8 +574,8 @@ func TestHandleAuthPwdPost(t *testing.T) {
 
 		authContext := &ceremony.AuthContext{
 			AuthState:  ceremony.AuthStateLevel1Password,
-			CeremonyId: testCeremonyId,
-			ClientId:   "my-app",
+			CeremonyID: testCeremonyID,
+			ClientID:   "my-app",
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -621,7 +621,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		})
 
 		form := url.Values{}
-		form.Add(ceremony.IdField, testCeremonyId)
+		form.Add(ceremony.IDField, testCeremonyID)
 		form.Add("email", "test@example.com")
 		req, _ := http.NewRequest("POST", "/auth/pwd", strings.NewReader(form.Encode()))
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
@@ -629,8 +629,8 @@ func TestHandleAuthPwdPost(t *testing.T) {
 
 		authContext := &ceremony.AuthContext{
 			AuthState:  ceremony.AuthStateLevel1Password,
-			CeremonyId: testCeremonyId,
-			ClientId:   "test-client",
+			CeremonyID: testCeremonyID,
+			ClientID:   "test-client",
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -650,7 +650,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		// retry would name no ceremony and be refused (#79 seam 4).
 		pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_pwd.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 			return data["error"] == "Password is required." && data["errorField"] == "password" &&
-				data["ceremonyId"] == testCeremonyId
+				data["ceremonyId"] == testCeremonyID
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)
@@ -682,7 +682,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		})
 
 		form := url.Values{}
-		form.Add(ceremony.IdField, testCeremonyId)
+		form.Add(ceremony.IDField, testCeremonyID)
 		form.Add("email", "test@example.com")
 		target := "/auth/pwd?" + url.Values{"password": {"testpassword"}}.Encode()
 		req, _ := http.NewRequest("POST", target, strings.NewReader(form.Encode()))
@@ -691,8 +691,8 @@ func TestHandleAuthPwdPost(t *testing.T) {
 
 		authContext := &ceremony.AuthContext{
 			AuthState:  ceremony.AuthStateLevel1Password,
-			CeremonyId: testCeremonyId,
-			ClientId:   "test-client",
+			CeremonyID: testCeremonyID,
+			ClientID:   "test-client",
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -709,7 +709,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 
 		pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_pwd.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 			return data["error"] == "Password is required." && data["errorField"] == "password" &&
-				data["ceremonyId"] == testCeremonyId
+				data["ceremonyId"] == testCeremonyID
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)
@@ -734,7 +734,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		})
 
 		form := url.Values{}
-		form.Add(ceremony.IdField, testCeremonyId)
+		form.Add(ceremony.IDField, testCeremonyID)
 		form.Add("email", "test@example.com")
 		form.Add("password", "testpassword")
 		req, _ := http.NewRequest("POST", "/auth/pwd", strings.NewReader(form.Encode()))
@@ -743,8 +743,8 @@ func TestHandleAuthPwdPost(t *testing.T) {
 
 		authContext := &ceremony.AuthContext{
 			AuthState:  ceremony.AuthStateLevel1Password,
-			CeremonyId: testCeremonyId,
-			ClientId:   "test-client",
+			CeremonyID: testCeremonyID,
+			ClientID:   "test-client",
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -809,7 +809,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		require.NoError(t, err)
 
 		form := url.Values{}
-		form.Add(ceremony.IdField, testCeremonyId)
+		form.Add(ceremony.IDField, testCeremonyID)
 		form.Add("email", "Alice@Example.com")
 		form.Add("password", "a-wrong-password")
 		req, _ := http.NewRequest("POST", "/auth/pwd", strings.NewReader(form.Encode()))
@@ -818,8 +818,8 @@ func TestHandleAuthPwdPost(t *testing.T) {
 
 		authContext := &ceremony.AuthContext{
 			AuthState:  ceremony.AuthStateLevel1Password,
-			CeremonyId: testCeremonyId,
-			ClientId:   "test-client",
+			CeremonyID: testCeremonyID,
+			ClientID:   "test-client",
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
@@ -827,7 +827,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{SMTPEnabled: true}))
 
 		user := &record.User{
-			Id:           31,
+			ID:           31,
 			Email:        "alice@example.com",
 			PasswordHash: passwordHash,
 			Enabled:      true,
@@ -879,7 +879,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		})
 
 		form := url.Values{}
-		form.Add(ceremony.IdField, testCeremonyId)
+		form.Add(ceremony.IDField, testCeremonyID)
 		form.Add("email", "  Bob@Example.com  ")
 		form.Add("password", "testpassword")
 		req, _ := http.NewRequest("POST", "/auth/pwd", strings.NewReader(form.Encode()))
@@ -888,8 +888,8 @@ func TestHandleAuthPwdPost(t *testing.T) {
 
 		authContext := &ceremony.AuthContext{
 			AuthState:  ceremony.AuthStateLevel1Password,
-			CeremonyId: testCeremonyId,
-			ClientId:   "test-client",
+			CeremonyID: testCeremonyID,
+			ClientID:   "test-client",
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -939,7 +939,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		})
 
 		form := url.Values{}
-		form.Add(ceremony.IdField, testCeremonyId)
+		form.Add(ceremony.IDField, testCeremonyID)
 		form.Add("email", "   ")
 		form.Add("password", "testpassword")
 		req, _ := http.NewRequest("POST", "/auth/pwd", strings.NewReader(form.Encode()))
@@ -948,8 +948,8 @@ func TestHandleAuthPwdPost(t *testing.T) {
 
 		authContext := &ceremony.AuthContext{
 			AuthState:  ceremony.AuthStateLevel1Password,
-			CeremonyId: testCeremonyId,
-			ClientId:   "test-client",
+			CeremonyID: testCeremonyID,
+			ClientID:   "test-client",
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -990,7 +990,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		require.NoError(t, err)
 
 		form := url.Values{}
-		form.Add(ceremony.IdField, testCeremonyId)
+		form.Add(ceremony.IDField, testCeremonyID)
 		form.Add("email", "test@example.com")
 		form.Add("password", password)
 		req, _ := http.NewRequest("POST", "/auth/pwd", strings.NewReader(form.Encode()))
@@ -999,8 +999,8 @@ func TestHandleAuthPwdPost(t *testing.T) {
 
 		authContext := &ceremony.AuthContext{
 			AuthState:  ceremony.AuthStateLevel1Password,
-			CeremonyId: testCeremonyId,
-			ClientId:   "test-client",
+			CeremonyID: testCeremonyID,
+			ClientID:   "test-client",
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -1011,7 +1011,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		req = req.WithContext(ctx)
 
 		user := &record.User{
-			Id:           1,
+			ID:           1,
 			Email:        "test@example.com",
 			PasswordHash: passwordHash,
 			Enabled:      true,
@@ -1020,7 +1020,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 			AuthStateGeneration: 7,
 			// The same trick for the OTP configuration generation, and a different number so
 			// the two cannot be crossed (#242).
-			OtpConfigGeneration: 4,
+			OTPConfigGeneration: 4,
 		}
 		database.On("GetUserByEmail", mock.Anything, mock.Anything, "test@example.com").Return(user, nil)
 
@@ -1034,7 +1034,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		// integration case can see that the cookie moved but not that it moved first
 		// (#266 decision 20).
 		authContextSaved := false
-		ceremonyStore.On("RegenerateSession", rr, mock.Anything, testCeremonyId, int64(1)).Return(nil).Once().
+		ceremonyStore.On("RegenerateSession", rr, mock.Anything, testCeremonyID, int64(1)).Return(nil).Once().
 			Run(func(mock.Arguments) {
 				assert.False(t, authContextSaved,
 					"rotation must run before the password-completed auth context is saved: "+
@@ -1047,7 +1047,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		// localizer to the user's stored locale after the password verifies,
 		// onto a fresh *http.Request, so the pointer no longer matches `req`.
 		ceremonyStore.On("SaveAuthContext", rr, mock.Anything, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
-			return ac.UserId == 1 &&
+			return ac.UserID == 1 &&
 				ac.AuthState == ceremony.AuthStateLevel1PasswordCompleted &&
 				ac.AuthMethods == oidc.AuthMethodPassword.String() &&
 				ac.AuthenticatedAt != nil && !ac.AuthenticatedAt.IsZero() &&
@@ -1065,13 +1065,13 @@ func TestHandleAuthPwdPost(t *testing.T) {
 				// reachable bypass, since every ceremony whose target is above level 1 goes
 				// through /auth/level2 and overwrites this, and it is asserted here for that
 				// reason: this is the only place the write is observable at all (#242).
-				ac.OtpConfigGeneration != nil && *ac.OtpConfigGeneration == 4
+				ac.OTPConfigGeneration != nil && *ac.OTPConfigGeneration == 4
 		})).Return(nil).Run(func(mock.Arguments) { authContextSaved = true })
 
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusSeeOther, rr.Code)
-		assert.Equal(t, testBaseURL+"/auth/level1completed?ceremony="+testCeremonyId, rr.Header().Get("Location"))
+		assert.Equal(t, testBaseURL+"/auth/level1completed?ceremony="+testCeremonyID, rr.Header().Get("Location"))
 		assert.True(t, authContextSaved, "the ceremony must still record that the password was accepted")
 
 		pageRenderer.AssertExpectations(t)
@@ -1098,7 +1098,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		require.NoError(t, err)
 
 		form := url.Values{}
-		form.Add(ceremony.IdField, testCeremonyId)
+		form.Add(ceremony.IDField, testCeremonyID)
 		form.Add("email", "test@example.com")
 		form.Add("password", password)
 		req, _ := http.NewRequest("POST", "/auth/pwd", strings.NewReader(form.Encode()))
@@ -1107,19 +1107,19 @@ func TestHandleAuthPwdPost(t *testing.T) {
 
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(&ceremony.AuthContext{
 			AuthState:  ceremony.AuthStateLevel1Password,
-			CeremonyId: testCeremonyId,
-			ClientId:   "test-client",
+			CeremonyID: testCeremonyID,
+			ClientID:   "test-client",
 		}, nil)
 		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{SMTPEnabled: true}))
 
 		database.On("GetUserByEmail", mock.Anything, mock.Anything, "test@example.com").Return(&record.User{
-			Id:           1,
+			ID:           1,
 			Email:        "test@example.com",
 			PasswordHash: passwordHash,
 			Enabled:      true,
 		}, nil)
 		auditLogger.On("Log", mock.Anything, audit.EventAuthSuccessPwd, mock.Anything).Return().Once()
-		ceremonyStore.On("RegenerateSession", rr, mock.Anything, testCeremonyId, int64(1)).Return(nil).Once()
+		ceremonyStore.On("RegenerateSession", rr, mock.Anything, testCeremonyID, int64(1)).Return(nil).Once()
 
 		// mock.Anything for the request, as in the successful case: the handler refines the
 		// localizer onto a fresh *http.Request after the password verifies.
@@ -1158,7 +1158,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		require.NoError(t, err)
 
 		form := url.Values{}
-		form.Add(ceremony.IdField, testCeremonyId)
+		form.Add(ceremony.IDField, testCeremonyID)
 		form.Add("email", "disabled@example.com")
 		form.Add("password", password)
 		req, _ := http.NewRequest("POST", "/auth/pwd", strings.NewReader(form.Encode()))
@@ -1167,8 +1167,8 @@ func TestHandleAuthPwdPost(t *testing.T) {
 
 		authContext := &ceremony.AuthContext{
 			AuthState:  ceremony.AuthStateLevel1Password,
-			CeremonyId: testCeremonyId,
-			ClientId:   "test-client",
+			CeremonyID: testCeremonyID,
+			ClientID:   "test-client",
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -1184,7 +1184,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		req = req.WithContext(ctx)
 
 		disabledUser := &record.User{
-			Id:           2,
+			ID:           2,
 			Email:        "disabled@example.com",
 			PasswordHash: passwordHash,
 			Enabled:      false,
@@ -1231,7 +1231,7 @@ func TestHandleAuthPwdPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 	require.NoError(t, err)
 
 	knownAccount := func() *record.User {
-		return &record.User{Id: 1, Enabled: true, Email: email, PasswordHash: passwordHash}
+		return &record.User{ID: 1, Enabled: true, Email: email, PasswordHash: passwordHash}
 	}
 
 	// newHandler wires one handler and its limiter together, the way routes.go does. The
@@ -1248,8 +1248,8 @@ func TestHandleAuthPwdPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 
 		authContext := &ceremony.AuthContext{
 			AuthState:  ceremony.AuthStateLevel1Password,
-			CeremonyId: testCeremonyId,
-			ClientId:   "test-client",
+			CeremonyID: testCeremonyID,
+			ClientID:   "test-client",
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 		ceremonyStore.On("SaveAuthContext", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
@@ -1277,7 +1277,7 @@ func TestHandleAuthPwdPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 	// post submits one attempt from a fixed host and reports the status.
 	post := func(handler http.Handler, submitted string) int {
 		form := url.Values{}
-		form.Add(ceremony.IdField, testCeremonyId)
+		form.Add(ceremony.IDField, testCeremonyID)
 		form.Add("email", email)
 		form.Add("password", submitted)
 		req, _ := http.NewRequest("POST", "/auth/pwd", strings.NewReader(form.Encode()))

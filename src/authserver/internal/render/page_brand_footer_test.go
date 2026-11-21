@@ -22,13 +22,13 @@ import (
 // decisions 1 to 6), in both layouts the auth server's card pages are drawn in.
 
 // footerBackground is a background image, as stored and read without its bytes.
-var footerBackground = record.BrandAsset{Id: 14, Kind: record.BrandAssetKindBackground, ContentType: "image/webp",
+var footerBackground = record.BrandAsset{ID: 14, Kind: record.BrandAssetKindBackground, ContentType: "image/webp",
 	Fingerprint: "444444444444", Width: 1600, Height: 900}
 
 // footerBrand is the default brand of id 7, on Blueberry, with links and the contact given.
 func footerBrand(links record.BrandFooterLinks, email, url, phone string) *record.Brand {
 	brand := record.NewBrand("Shop", record.BrandAppearanceAuto, "blueberry")
-	brand.Id = 7
+	brand.ID = 7
 	brand.FooterLinks = links
 	brand.SupportEmail = email
 	brand.SupportURL = url
@@ -252,7 +252,7 @@ func TestRender_TheFooterIsOnAPanelOverABackgroundImage(t *testing.T) {
 			t.Run(layout.layout+" "+string(fit), func(t *testing.T) {
 				brand := footerBrand(threeLinks, "", "", "")
 				brand.BackgroundFit = fit
-				brand.BackgroundAssetId = sql.NullInt64{Int64: 14, Valid: true}
+				brand.BackgroundAssetID = sql.NullInt64{Int64: 14, Valid: true}
 				brands := &defaultBrandStub{brand: brand, assets: []record.BrandAsset{footerBackground}}
 
 				footer := readFooter(renderFooterPage(t, layout.layout, layout.page, "en", brands))

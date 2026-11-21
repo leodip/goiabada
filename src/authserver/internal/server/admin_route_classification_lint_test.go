@@ -910,7 +910,7 @@ const adminRouteFixtureRoutes = `package server
 
 func (s *Server) initRoutes() {
 	api.Route("/api/v1/admin", func(r *routing.Router) {
-		r.Use(apiBearer.JwtAuthorizationHeaderToContext())
+		r.Use(apiBearer.JWTAuthorizationHeaderToContext())
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsersRead)).Get("/users/{id}", apihandlers.HandleUserGet(s.database))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/users/{id}/enabled", apihandlers.HandleUserEnabledPut(s.database, auditLogger))
 		r.With(apiBearer.RequireBearerTokenScopeAnyOf(scopesUsers)).Put("/users/{id}/permissions", apihandlers.HandleUserPermissionsPut(s.database, auditLogger))
@@ -957,7 +957,7 @@ func HandleUserGet(database Database) http.HandlerFunc {
 
 func HandleUserEnabledPut(database Database, auditLogger AuditLogger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		user := database.GetUserById(r)
+		user := database.GetUserByID(r)
 		if !userTargetCeilingAllows(w, r) {
 			return
 		}
@@ -1092,8 +1092,8 @@ func TestAdminRouteClassification_Guard_FailsOnAnUnclassifiedWriteThroughAReturn
 // name is not stale.
 func TestAdminRouteClassification_Guard_ReadsTheAdminGroupsOwnRoute(t *testing.T) {
 	root := writeAdminRouteFixture(t, adminRouteFixtureHandlers)
-	routes := strings.Replace(adminRouteFixtureRoutes, "\t\tr.Use(apiBearer.JwtAuthorizationHeaderToContext())\n",
-		"\t\tr.Use(apiBearer.JwtAuthorizationHeaderToContext())\n"+
+	routes := strings.Replace(adminRouteFixtureRoutes, "\t\tr.Use(apiBearer.JWTAuthorizationHeaderToContext())\n",
+		"\t\tr.Use(apiBearer.JWTAuthorizationHeaderToContext())\n"+
 			"\t\tr.Post(\"/\", apihandlers.HandleUserCreatePost(s.database, auditLogger))\n", 1)
 	require.NotEqual(t, adminRouteFixtureRoutes, routes)
 	require.NoError(t, os.WriteFile(filepath.Join(root, filepath.FromSlash(adminRoutesFile)), []byte(routes), 0o600))

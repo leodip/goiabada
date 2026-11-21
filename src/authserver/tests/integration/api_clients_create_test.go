@@ -157,7 +157,7 @@ func TestAPIClientCreate_Unauthorized(t *testing.T) {
 	require.NoError(t, err)
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients"
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(b))
 	require.NoError(t, err)
 	resp, err := httpClient.Do(req)
@@ -348,7 +348,7 @@ func TestAPIClientCreate_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 	assert.NotNil(t, stored)
 	assert.Equal(t, `Tom & Jerry said "hi"`, stored.Description)
 	assert.Equal(t, `AT&T "Wireless"`, stored.DisplayName)
-	_ = database.DeleteClient(context.Background(), nil, stored.Id)
+	_ = database.DeleteClient(context.Background(), nil, stored.ID)
 }
 
 func TestAPIClientCreate_DescriptionOnlyBackwardCompat(t *testing.T) {
@@ -411,10 +411,10 @@ func TestAPIClientCreate_ClashingWithAResourceIdentifier(t *testing.T) {
 
 	identifier := "clash-resource-" + strings.ToLower(fake.LetterN(8))
 	existing := createTestResource(t, identifier, "Holds the identifier")
-	defer func() { _ = database.DeleteResource(context.Background(), nil, existing.Id) }()
+	defer func() { _ = database.DeleteResource(context.Background(), nil, existing.ID) }()
 	defer func() {
 		if stored, err := database.GetClientByClientIdentifier(context.Background(), nil, identifier); err == nil && stored != nil {
-			_ = database.DeleteClient(context.Background(), nil, stored.Id)
+			_ = database.DeleteClient(context.Background(), nil, stored.ID)
 		}
 	}()
 

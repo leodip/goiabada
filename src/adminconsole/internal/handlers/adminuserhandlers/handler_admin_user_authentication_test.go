@@ -15,38 +15,38 @@ import (
 	"github.com/leodip/goiabada/core/api"
 )
 
-// authenticationApiClient answers the user authentication page for a user with two-factor
+// authenticationAPIClient answers the user authentication page for a user with two-factor
 // authentication on, recording the writes in the order they reach it, and refusing the password
 // when refusePassword is set.
-type authenticationApiClient struct {
+type authenticationAPIClient struct {
 	refusePassword bool
 	writes         []string
 }
 
-func (*authenticationApiClient) GetUserById(_ context.Context, _ string, userId int64) (*api.UserResponse, error) {
-	return &api.UserResponse{Id: userId, Email: "someone@example.com", OTPEnabled: true,
+func (*authenticationAPIClient) GetUserByID(_ context.Context, _ string, userID int64) (*api.UserResponse, error) {
+	return &api.UserResponse{ID: userID, Email: "someone@example.com", OTPEnabled: true,
 		OTPAuthenticatorDisabled: true}, nil
 }
 
-func (c *authenticationApiClient) UpdateUserPassword(_ context.Context, _ string, userId int64,
+func (c *authenticationAPIClient) UpdateUserPassword(_ context.Context, _ string, userID int64,
 	_ *api.UpdateUserPasswordRequest) (*api.UserResponse, error) {
 	c.writes = append(c.writes, "password")
 	if c.refusePassword {
 		return nil, &apiclient.APIError{Code: "VALIDATION_ERROR", Message: "The password is too short.",
 			StatusCode: http.StatusBadRequest}
 	}
-	return &api.UserResponse{Id: userId}, nil
+	return &api.UserResponse{ID: userID}, nil
 }
 
-func (c *authenticationApiClient) UpdateUserOTP(_ context.Context, _ string, userId int64,
+func (c *authenticationAPIClient) UpdateUserOTP(_ context.Context, _ string, userID int64,
 	_ *api.UpdateUserOTPRequest) (*api.UserResponse, error) {
 	c.writes = append(c.writes, "otp")
-	return &api.UserResponse{Id: userId}, nil
+	return &api.UserResponse{ID: userID}, nil
 }
 
 // postAuthentication submits the authentication form with a new password and the two-factor switch
 // cleared, which is the way back the console gives for a disabled authenticator (#489).
-func postAuthentication(httpHelper *handlersmocks.HttpHelper, apiClient *authenticationApiClient) *httptest.ResponseRecorder {
+func postAuthentication(httpHelper *handlersmocks.HTTPHelper, apiClient *authenticationAPIClient) *httptest.ResponseRecorder {
 	recorder := httptest.NewRecorder()
 	HandleAuthenticationPost(httpHelper, newFlashTestStore(), apiClient, consoleBaseURL).ServeHTTP(recorder,
 		handlertest.Request(http.MethodPost, "/admin/users/42/authentication",
@@ -58,9 +58,9 @@ func postAuthentication(httpHelper *handlersmocks.HttpHelper, apiClient *authent
 // One save sets the new password before it turns two-factor authentication off, so whoever sent
 // the codes that disabled the authenticator never holds a password that signs in alone.
 func TestHandleAuthenticationPost_SetsThePasswordBeforeTurningTwoFactorOff(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
-	apiClient := &authenticationApiClient{}
+	apiClient := &authenticationAPIClient{}
 
 	recorder := postAuthentication(httpHelper, apiClient)
 
@@ -71,10 +71,10 @@ func TestHandleAuthenticationPost_SetsThePasswordBeforeTurningTwoFactorOff(t *te
 // A refused password leaves two-factor authentication on: the form is drawn again under the
 // refusal, and the switch is not written.
 func TestHandleAuthenticationPost_ARefusedPasswordLeavesTwoFactorOn(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_users_authentication.html").Once()
-	apiClient := &authenticationApiClient{refusePassword: true}
+	apiClient := &authenticationAPIClient{refusePassword: true}
 
 	postAuthentication(httpHelper, apiClient)
 

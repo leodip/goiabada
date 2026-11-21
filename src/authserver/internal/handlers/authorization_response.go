@@ -133,7 +133,7 @@ func encodeResponseParams(params []responseParam) string {
 // query, and the "?" that then carries it is restored explicitly, for the reason given
 // at the end of the body.
 func writeResponseParams(redirectURI string, params []responseParam, reservedNames []string) (string, error) {
-	redirUrl, err := url.Parse(redirectURI)
+	redirURL, err := url.Parse(redirectURI)
 	if err != nil {
 		return "", errs.Wrap(err, "unable to parse redirect URI")
 	}
@@ -146,8 +146,8 @@ func writeResponseParams(redirectURI string, params []responseParam, reservedNam
 	// query really did carry: "?a=1&&b=2" stays that way instead of collapsing to
 	// "?a=1&b=2", which is a different target from the one that was registered and just
 	// matched exactly (#109).
-	if redirUrl.RawQuery != "" {
-		for _, field := range strings.Split(redirUrl.RawQuery, "&") {
+	if redirURL.RawQuery != "" {
+		for _, field := range strings.Split(redirURL.RawQuery, "&") {
 			name := field
 			if i := strings.IndexByte(field, '='); i >= 0 {
 				name = field[:i]
@@ -170,7 +170,7 @@ func writeResponseParams(redirectURI string, params []responseParam, reservedNam
 		fields = append(fields, encodeResponseParams(params))
 	}
 
-	redirUrl.RawQuery = strings.Join(fields, "&")
+	redirURL.RawQuery = strings.Join(fields, "&")
 	// A surviving field list that joins to "" is exactly one empty field, and then the
 	// "?" is the only byte left carrying it. url.URL.String writes that delimiter only
 	// when RawQuery is non-empty or ForceQuery is set, so without this a registered
@@ -178,10 +178,10 @@ func writeResponseParams(redirectURI string, params []responseParam, reservedNam
 	// at all, which is a different target from the one that was registered and just
 	// matched exactly. Zero surviving fields is the opposite case and deliberately
 	// loses the "?": there is nothing left for it to delimit (#146).
-	if len(fields) > 0 && redirUrl.RawQuery == "" {
-		redirUrl.ForceQuery = true
+	if len(fields) > 0 && redirURL.RawQuery == "" {
+		redirURL.ForceQuery = true
 	}
-	return redirUrl.String(), nil
+	return redirURL.String(), nil
 }
 
 // isResponseParamName reports whether name is one of the parameters being written, and so

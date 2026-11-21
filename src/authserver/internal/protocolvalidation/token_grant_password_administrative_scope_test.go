@@ -66,11 +66,11 @@ func TestValidateTokenRequest_ROPC_AdministrativeScope(t *testing.T) {
 
 			passwordHash, err := passwordhash.Hash("correctpassword")
 			require.NoError(t, err)
-			user := &record.User{Id: 7, Email: "user@example.com", PasswordHash: passwordHash, Enabled: true}
+			user := &record.User{ID: 7, Email: "user@example.com", PasswordHash: passwordHash, Enabled: true}
 
 			ropcEnabled := true
 			client := &record.Client{
-				Id:                                      3,
+				ID:                                      3,
 				ClientIdentifier:                        "ropc-client",
 				Enabled:                                 true,
 				IsPublic:                                true,
@@ -86,18 +86,18 @@ func TestValidateTokenRequest_ROPC_AdministrativeScope(t *testing.T) {
 			if tc.granted != "" {
 				builtIns := make([]record.Permission, 0, len(builtin.AuthServerPermissionIdentifiers()))
 				for i, identifier := range builtin.AuthServerPermissionIdentifiers() {
-					builtIns = append(builtIns, record.Permission{Id: int64(40 + i), PermissionIdentifier: identifier, ResourceId: 4})
+					builtIns = append(builtIns, record.Permission{ID: int64(40 + i), PermissionIdentifier: identifier, ResourceID: 4})
 				}
 				mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, builtin.AuthServerResourceIdentifier).
-					Return(&record.Resource{Id: 4, ResourceIdentifier: builtin.AuthServerResourceIdentifier}, nil).Once()
-				mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(4)).Return(builtIns, nil).Once()
+					Return(&record.Resource{ID: 4, ResourceIdentifier: builtin.AuthServerResourceIdentifier}, nil).Once()
+				mockDB.On("GetPermissionsByResourceID", mock.Anything, mock.Anything, int64(4)).Return(builtIns, nil).Once()
 				mockPermissionChecker.On("UserHasScopePermission", mock.Anything, int64(7), tc.granted).Return(true, nil).Once()
 			}
 
 			result, err := validator.ValidateTokenRequest(context.Background(), &record.Settings{ResourceOwnerPasswordCredentialsEnabled: true},
 				&ValidateTokenRequestInput{
 					GrantType: "password",
-					ClientId:  "ropc-client",
+					ClientID:  "ropc-client",
 					Username:  "user@example.com",
 					Password:  "correctpassword",
 					Scope:     tc.scope,
@@ -114,7 +114,7 @@ func TestValidateTokenRequest_ROPC_AdministrativeScope(t *testing.T) {
 			require.ErrorAs(t, err, &refused)
 			assert.Equal(t, tc.wantRefused, refused.Scopes)
 			assert.Same(t, client, refused.Client)
-			assert.Equal(t, int64(7), refused.UserId)
+			assert.Equal(t, int64(7), refused.UserID)
 
 			var customErr *oauth.ErrorDetail
 			require.ErrorAs(t, err, &customErr)

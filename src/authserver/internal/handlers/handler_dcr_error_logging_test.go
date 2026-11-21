@@ -27,7 +27,7 @@ import (
 // primitive's logging half and keeps its own envelope. This case holds both halves at once: the
 // record exists, structured and with the request id, and nothing on the wire moved.
 func TestDCR_AStorageFailureLogsOnceAndKeepsTheRFC7591Envelope(t *testing.T) {
-	const requestId = "req-dcr-1"
+	const requestID = "req-dcr-1"
 
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
@@ -44,8 +44,8 @@ func TestDCR_AStorageFailureLogsOnceAndKeepsTheRFC7591Envelope(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/connect/register", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	ctx := reqctx.WithSettings(req.Context(), &record.Settings{Id: 1, DynamicClientRegistrationEnabled: true})
-	ctx = requestid.NewContext(ctx, requestId)
+	ctx := reqctx.WithSettings(req.Context(), &record.Settings{ID: 1, DynamicClientRegistrationEnabled: true})
+	ctx = requestid.NewContext(ctx, requestID)
 	req = req.WithContext(ctx)
 
 	rr := httptest.NewRecorder()
@@ -64,6 +64,6 @@ func TestDCR_AStorageFailureLogsOnceAndKeepsTheRFC7591Envelope(t *testing.T) {
 	logged := capture.Text()
 	assert.Equal(t, 1, strings.Count(logged, "internal server error"))
 	assert.Contains(t, logged, "the disk is full")
-	assert.Contains(t, logged, "request_id="+requestId)
+	assert.Contains(t, logged, "request_id="+requestID)
 	database.AssertExpectations(t)
 }

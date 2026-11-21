@@ -38,7 +38,7 @@ func saveEmailTemplateEdit(t *testing.T, email, lang string, subject, buttonLabe
 // button's label, and its plain-text part with the reset link named <link>.
 func resetLinkEmailSent(t *testing.T, user *record.User) (subject, button, text string) {
 	t.Helper()
-	requestResetAt(t, createHttpClient(t), appConfig.AuthServer.BaseURL+"/forgot-password", user.Email)
+	requestResetAt(t, createHTTPClient(t), appConfig.AuthServer.BaseURL+"/forgot-password", user.Email)
 	message := onlyMailTo(t, user.Email)
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(message.HTML))
 	require.NoError(t, err)
@@ -52,7 +52,7 @@ func TestEmailTemplateEdits_AreSentInTheRecipientsLanguage(t *testing.T) {
 		saveEmailTemplateEdit(t, "password_reset_link", "en", "Choose a new password for {{app_name}}", "Choose a password",
 			"Hi {{name}}, someone asked to reset your password.\n\n{{button}}\n\nOr open {{link}} within {{expiry}}.")
 		user := resetLinkUser(t, "Ana", "en-GB")
-		settings, err := database.GetSettingsById(context.Background(), nil, 1)
+		settings, err := database.GetSettingsByID(context.Background(), nil, 1)
 		require.NoError(t, err)
 
 		subject, button, text := resetLinkEmailSent(t, user)

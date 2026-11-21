@@ -20,13 +20,13 @@ var auditLogColumns = columnList{
 // scanAuditLog reads one row selected with auditLogColumns.
 func scanAuditLog(row rowScanner, auditLog *record.AuditLog) error {
 	return row.Scan(
-		&auditLog.Id,
+		&auditLog.ID,
 		&auditLog.CreatedAt,
 		&auditLog.AuditEvent,
 		&auditLog.Details,
-		&auditLog.RequestId,
-		&auditLog.UserId,
-		&auditLog.LoggedInUserId,
+		&auditLog.RequestID,
+		&auditLog.UserID,
+		&auditLog.LoggedInUserID,
 	)
 }
 
@@ -103,7 +103,7 @@ var countAuditLogsByEvent = statement{
 	mssql:    "SELECT COUNT(*) FROM audit_logs WHERE audit_event = @p1",
 }
 
-var selectAuditLogsPageByRequestId = statement{
+var selectAuditLogsPageByRequestID = statement{
 	sqlite: "SELECT " + auditLogColumns.sqlite + " FROM audit_logs WHERE request_id = ? " +
 		"ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?",
 	mysql: "SELECT " + auditLogColumns.mysql + " FROM audit_logs WHERE request_id = ? " +
@@ -115,7 +115,7 @@ var selectAuditLogsPageByRequestId = statement{
 		"ORDER BY created_at DESC, id DESC OFFSET @p3 ROWS FETCH NEXT @p2 ROWS ONLY",
 }
 
-var countAuditLogsByRequestId = statement{
+var countAuditLogsByRequestID = statement{
 	sqlite:   "SELECT COUNT(*) FROM audit_logs WHERE request_id = ?",
 	mysql:    "SELECT COUNT(*) FROM audit_logs WHERE request_id = ?",
 	postgres: "SELECT COUNT(*) FROM audit_logs WHERE request_id = $1",
@@ -141,7 +141,7 @@ var countAuditLogsByUser = statement{
 	mssql:    "SELECT COUNT(*) FROM audit_logs WHERE (user_id = @p1 OR logged_in_user_id = @p2)",
 }
 
-var selectAuditLogsPageByEventAndRequestId = statement{
+var selectAuditLogsPageByEventAndRequestID = statement{
 	sqlite: "SELECT " + auditLogColumns.sqlite + " FROM audit_logs WHERE audit_event = ? AND request_id = ? " +
 		"ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?",
 	mysql: "SELECT " + auditLogColumns.mysql + " FROM audit_logs WHERE audit_event = ? AND request_id = ? " +
@@ -153,7 +153,7 @@ var selectAuditLogsPageByEventAndRequestId = statement{
 		"ORDER BY created_at DESC, id DESC OFFSET @p4 ROWS FETCH NEXT @p3 ROWS ONLY",
 }
 
-var countAuditLogsByEventAndRequestId = statement{
+var countAuditLogsByEventAndRequestID = statement{
 	sqlite:   "SELECT COUNT(*) FROM audit_logs WHERE audit_event = ? AND request_id = ?",
 	mysql:    "SELECT COUNT(*) FROM audit_logs WHERE audit_event = ? AND request_id = ?",
 	postgres: "SELECT COUNT(*) FROM audit_logs WHERE audit_event = $1 AND request_id = $2",
@@ -179,7 +179,7 @@ var countAuditLogsByEventAndUser = statement{
 	mssql:    "SELECT COUNT(*) FROM audit_logs WHERE audit_event = @p1 AND (user_id = @p2 OR logged_in_user_id = @p3)",
 }
 
-var selectAuditLogsPageByRequestIdAndUser = statement{
+var selectAuditLogsPageByRequestIDAndUser = statement{
 	sqlite: "SELECT " + auditLogColumns.sqlite + " FROM audit_logs WHERE request_id = ? AND (user_id = ? OR logged_in_user_id = ?) " +
 		"ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?",
 	mysql: "SELECT " + auditLogColumns.mysql + " FROM audit_logs WHERE request_id = ? AND (user_id = ? OR logged_in_user_id = ?) " +
@@ -191,7 +191,7 @@ var selectAuditLogsPageByRequestIdAndUser = statement{
 		"ORDER BY created_at DESC, id DESC OFFSET @p5 ROWS FETCH NEXT @p4 ROWS ONLY",
 }
 
-var countAuditLogsByRequestIdAndUser = statement{
+var countAuditLogsByRequestIDAndUser = statement{
 	sqlite:   "SELECT COUNT(*) FROM audit_logs WHERE request_id = ? AND (user_id = ? OR logged_in_user_id = ?)",
 	mysql:    "SELECT COUNT(*) FROM audit_logs WHERE request_id = ? AND (user_id = ? OR logged_in_user_id = ?)",
 	postgres: "SELECT COUNT(*) FROM audit_logs WHERE request_id = $1 AND (user_id = $2 OR logged_in_user_id = $3)",
@@ -199,7 +199,7 @@ var countAuditLogsByRequestIdAndUser = statement{
 		"WHERE request_id = @p1 AND CAST(request_id AS VARBINARY(512)) = CAST(@p1 AS VARBINARY(512)) AND (user_id = @p2 OR logged_in_user_id = @p3)",
 }
 
-var selectAuditLogsPageByEventRequestIdAndUser = statement{
+var selectAuditLogsPageByEventRequestIDAndUser = statement{
 	sqlite: "SELECT " + auditLogColumns.sqlite + " FROM audit_logs WHERE audit_event = ? AND request_id = ? AND (user_id = ? OR logged_in_user_id = ?) " +
 		"ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?",
 	mysql: "SELECT " + auditLogColumns.mysql + " FROM audit_logs WHERE audit_event = ? AND request_id = ? AND (user_id = ? OR logged_in_user_id = ?) " +
@@ -212,7 +212,7 @@ var selectAuditLogsPageByEventRequestIdAndUser = statement{
 		"ORDER BY created_at DESC, id DESC OFFSET @p6 ROWS FETCH NEXT @p5 ROWS ONLY",
 }
 
-var countAuditLogsByEventRequestIdAndUser = statement{
+var countAuditLogsByEventRequestIDAndUser = statement{
 	sqlite:   "SELECT COUNT(*) FROM audit_logs WHERE audit_event = ? AND request_id = ? AND (user_id = ? OR logged_in_user_id = ?)",
 	mysql:    "SELECT COUNT(*) FROM audit_logs WHERE audit_event = ? AND request_id = ? AND (user_id = ? OR logged_in_user_id = ?)",
 	postgres: "SELECT COUNT(*) FROM audit_logs WHERE audit_event = $1 AND request_id = $2 AND (user_id = $3 OR logged_in_user_id = $4)",
@@ -234,20 +234,20 @@ var selectAuditLogsByUser = statement{
 }
 
 // auditLogsQueries answers the page and the count for the filters given.
-func auditLogsQueries(byEvent, byRequestId, byUser bool) (page statement, count statement) {
+func auditLogsQueries(byEvent, byRequestID, byUser bool) (page statement, count statement) {
 	switch {
-	case byEvent && byRequestId && byUser:
-		return selectAuditLogsPageByEventRequestIdAndUser, countAuditLogsByEventRequestIdAndUser
-	case byEvent && byRequestId:
-		return selectAuditLogsPageByEventAndRequestId, countAuditLogsByEventAndRequestId
+	case byEvent && byRequestID && byUser:
+		return selectAuditLogsPageByEventRequestIDAndUser, countAuditLogsByEventRequestIDAndUser
+	case byEvent && byRequestID:
+		return selectAuditLogsPageByEventAndRequestID, countAuditLogsByEventAndRequestID
 	case byEvent && byUser:
 		return selectAuditLogsPageByEventAndUser, countAuditLogsByEventAndUser
-	case byRequestId && byUser:
-		return selectAuditLogsPageByRequestIdAndUser, countAuditLogsByRequestIdAndUser
+	case byRequestID && byUser:
+		return selectAuditLogsPageByRequestIDAndUser, countAuditLogsByRequestIDAndUser
 	case byEvent:
 		return selectAuditLogsPageByEvent, countAuditLogsByEvent
-	case byRequestId:
-		return selectAuditLogsPageByRequestId, countAuditLogsByRequestId
+	case byRequestID:
+		return selectAuditLogsPageByRequestID, countAuditLogsByRequestID
 	case byUser:
 		return selectAuditLogsPageByUser, countAuditLogsByUser
 	default:
@@ -265,13 +265,13 @@ func (d *Database) CreateAuditLog(ctx context.Context, tx *sql.Tx, auditLog *rec
 	auditLog.CreatedAt = time.Now().UTC()
 
 	id, err := d.insert(ctx, tx, insertAuditLog, "audit log",
-		auditLog.CreatedAt, auditLog.AuditEvent, auditLog.Details, auditLog.RequestId,
-		auditLog.UserId, auditLog.LoggedInUserId)
+		auditLog.CreatedAt, auditLog.AuditEvent, auditLog.Details, auditLog.RequestID,
+		auditLog.UserID, auditLog.LoggedInUserID)
 	if err != nil {
 		return err
 	}
 
-	auditLog.Id = id
+	auditLog.ID = id
 	return nil
 }
 
@@ -290,17 +290,17 @@ func (d *Database) GetAuditLogsPaginated(ctx context.Context, tx *sql.Tx, page i
 
 	offset := PageOffset(page, pageSize)
 
-	pageQuery, countQuery := auditLogsQueries(filter.AuditEvent != "", filter.RequestId != "", filter.UserId != 0)
+	pageQuery, countQuery := auditLogsQueries(filter.AuditEvent != "", filter.RequestID != "", filter.UserID != 0)
 	var filterArgs []any
 	if filter.AuditEvent != "" {
 		filterArgs = append(filterArgs, filter.AuditEvent)
 	}
-	if filter.RequestId != "" {
-		filterArgs = append(filterArgs, filter.RequestId)
+	if filter.RequestID != "" {
+		filterArgs = append(filterArgs, filter.RequestID)
 	}
-	if filter.UserId != 0 {
+	if filter.UserID != 0 {
 		// Once for user_id and once for logged_in_user_id.
-		filterArgs = append(filterArgs, filter.UserId, filter.UserId)
+		filterArgs = append(filterArgs, filter.UserID, filter.UserID)
 	}
 	pageArgs := append(append([]any{}, filterArgs...), pageSize, offset)
 
@@ -322,7 +322,7 @@ func (d *Database) GetAuditLogsPaginated(ctx context.Context, tx *sql.Tx, page i
 		// request's audit entries under another request's id (#328, and see
 		// engineFoldedTheMatch). On SQL Server the statement has already closed the fold, so
 		// this finds nothing to drop there.
-		if filter.RequestId != "" && engineFoldedTheMatch(auditLog.RequestId, filter.RequestId) {
+		if filter.RequestID != "" && engineFoldedTheMatch(auditLog.RequestID, filter.RequestID) {
 			continue
 		}
 		auditLogs = append(auditLogs, auditLog)
@@ -362,8 +362,8 @@ func (d *Database) GetAuditLogsPaginated(ctx context.Context, tx *sql.Tx, page i
 	return auditLogs, total, nil
 }
 
-func (d *Database) GetAuditLogsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.AuditLog, error) {
+func (d *Database) GetAuditLogsByUserID(ctx context.Context, tx *sql.Tx, userID int64) ([]record.AuditLog, error) {
 	// Once for user_id and once for logged_in_user_id.
-	return queryAll(ctx, d, tx, nil, selectAuditLogsByUser.text(d.Dialect), []any{userId, userId},
+	return queryAll(ctx, d, tx, nil, selectAuditLogsByUser.text(d.Dialect), []any{userID, userID},
 		scanAuditLog, "audit log")
 }

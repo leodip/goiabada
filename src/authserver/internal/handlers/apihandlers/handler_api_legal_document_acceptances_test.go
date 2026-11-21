@@ -28,24 +28,24 @@ var (
 // version 1 of "house" (document 8), which is retired. Document 9 comes after both and is never
 // read: every version the user accepted is found by then.
 func expectTwoAcceptances(database *datamocks.Database) {
-	database.On("GetLegalDocumentAcceptancesByUserId", mock.Anything, (*sql.Tx)(nil), int64(42)).
+	database.On("GetLegalDocumentAcceptancesByUserID", mock.Anything, (*sql.Tx)(nil), int64(42)).
 		Return([]record.LegalDocumentAcceptance{
-			{Id: 1, AcceptedAt: acceptancesFirst, UserId: 42, LegalDocumentVersionId: 71},
-			{Id: 2, AcceptedAt: acceptancesSecond, UserId: 42, LegalDocumentVersionId: 81},
+			{ID: 1, AcceptedAt: acceptancesFirst, UserID: 42, LegalDocumentVersionID: 71},
+			{ID: 2, AcceptedAt: acceptancesSecond, UserID: 42, LegalDocumentVersionID: 81},
 		}, nil).Once()
 	database.On("GetAllLegalDocuments", mock.Anything, (*sql.Tx)(nil)).Return([]record.LegalDocument{
-		{Id: 7, ShortName: "terms", Kind: record.LegalDocumentKindMustAccept},
-		{Id: 8, ShortName: "house", Kind: record.LegalDocumentKindMustAccept, RetiredAt: sql.NullTime{Time: acceptancesSecond, Valid: true}},
-		{Id: 9, ShortName: "later", Kind: record.LegalDocumentKindMustAccept},
+		{ID: 7, ShortName: "terms", Kind: record.LegalDocumentKindMustAccept},
+		{ID: 8, ShortName: "house", Kind: record.LegalDocumentKindMustAccept, RetiredAt: sql.NullTime{Time: acceptancesSecond, Valid: true}},
+		{ID: 9, ShortName: "later", Kind: record.LegalDocumentKindMustAccept},
 	}, nil).Once()
-	database.On("GetLegalDocumentVersionsByLegalDocumentId", mock.Anything, (*sql.Tx)(nil), int64(7)).
+	database.On("GetLegalDocumentVersionsByLegalDocumentID", mock.Anything, (*sql.Tx)(nil), int64(7)).
 		Return([]record.LegalDocumentVersion{
-			{Id: 71, PublishedAt: acceptancesPublished, LegalDocumentId: 7, VersionNumber: 1, Title: "Terms"},
-			{Id: 72, PublishedAt: acceptancesPublished, LegalDocumentId: 7, VersionNumber: 2, Title: "Terms, revised"},
+			{ID: 71, PublishedAt: acceptancesPublished, LegalDocumentID: 7, VersionNumber: 1, Title: "Terms"},
+			{ID: 72, PublishedAt: acceptancesPublished, LegalDocumentID: 7, VersionNumber: 2, Title: "Terms, revised"},
 		}, nil).Once()
-	database.On("GetLegalDocumentVersionsByLegalDocumentId", mock.Anything, (*sql.Tx)(nil), int64(8)).
+	database.On("GetLegalDocumentVersionsByLegalDocumentID", mock.Anything, (*sql.Tx)(nil), int64(8)).
 		Return([]record.LegalDocumentVersion{
-			{Id: 81, PublishedAt: acceptancesPublished, LegalDocumentId: 8, VersionNumber: 1, Title: "House rules"},
+			{ID: 81, PublishedAt: acceptancesPublished, LegalDocumentID: 8, VersionNumber: 1, Title: "House rules"},
 		}, nil).Once()
 }
 
@@ -69,7 +69,7 @@ func userAcceptancesRequest(id string) *http.Request {
 func TestHandleAccountLegalDocumentAcceptancesGet_TheCallersAcceptancesTheLatestFirst(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), "the-user").
-		Return(&record.User{Id: 42, Enabled: true}, nil).Once()
+		Return(&record.User{ID: 42, Enabled: true}, nil).Once()
 	expectTwoAcceptances(database)
 
 	rr := httptest.NewRecorder()
@@ -82,8 +82,8 @@ func TestHandleAccountLegalDocumentAcceptancesGet_TheCallersAcceptancesTheLatest
 func TestHandleAccountLegalDocumentAcceptancesGet_NoAcceptancesReadsNoDocuments(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), "the-user").
-		Return(&record.User{Id: 42, Enabled: true}, nil).Once()
-	database.On("GetLegalDocumentAcceptancesByUserId", mock.Anything, (*sql.Tx)(nil), int64(42)).
+		Return(&record.User{ID: 42, Enabled: true}, nil).Once()
+	database.On("GetLegalDocumentAcceptancesByUserID", mock.Anything, (*sql.Tx)(nil), int64(42)).
 		Return([]record.LegalDocumentAcceptance{}, nil).Once()
 
 	rr := httptest.NewRecorder()
@@ -109,8 +109,8 @@ func TestHandleAccountLegalDocumentAcceptancesGet_AnUnknownSubjectIsNotFound(t *
 func TestHandleAccountLegalDocumentAcceptancesGet_AReadFailureIsA500(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), "the-user").
-		Return(&record.User{Id: 42, Enabled: true}, nil).Once()
-	database.On("GetLegalDocumentAcceptancesByUserId", mock.Anything, (*sql.Tx)(nil), int64(42)).
+		Return(&record.User{ID: 42, Enabled: true}, nil).Once()
+	database.On("GetLegalDocumentAcceptancesByUserID", mock.Anything, (*sql.Tx)(nil), int64(42)).
 		Return(nil, assert.AnError).Once()
 
 	rr := httptest.NewRecorder()
@@ -121,7 +121,7 @@ func TestHandleAccountLegalDocumentAcceptancesGet_AReadFailureIsA500(t *testing.
 
 func TestHandleUserLegalDocumentAcceptancesGet_TheUsersAcceptancesTheLatestFirst(t *testing.T) {
 	database := datamocks.NewDatabase(t)
-	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(42)).Return(&record.User{Id: 42}, nil).Once()
+	database.On("GetUserByID", mock.Anything, (*sql.Tx)(nil), int64(42)).Return(&record.User{ID: 42}, nil).Once()
 	expectTwoAcceptances(database)
 
 	rr := httptest.NewRecorder()
@@ -140,23 +140,23 @@ func TestHandleUserLegalDocumentAcceptancesGet_Refusals(t *testing.T) {
 	})
 	t.Run("a user that does not exist", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
-		database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(5)).Return(nil, nil).Once()
+		database.On("GetUserByID", mock.Anything, (*sql.Tx)(nil), int64(5)).Return(nil, nil).Once()
 		rr := httptest.NewRecorder()
 		HandleUserLegalDocumentAcceptancesGet(database, "https://auth.example").ServeHTTP(rr, userAcceptancesRequest("5"))
 		assert.Equal(t, http.StatusNotFound, rr.Code)
 	})
 	t.Run("the user read fails", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
-		database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(5)).Return(nil, assert.AnError).Once()
+		database.On("GetUserByID", mock.Anything, (*sql.Tx)(nil), int64(5)).Return(nil, assert.AnError).Once()
 		rr := httptest.NewRecorder()
 		HandleUserLegalDocumentAcceptancesGet(database, "https://auth.example").ServeHTTP(rr, userAcceptancesRequest("5"))
 		assertJSONInternalServerError(t, rr)
 	})
 	t.Run("an accepted version no document has", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
-		database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(42)).Return(&record.User{Id: 42}, nil).Once()
-		database.On("GetLegalDocumentAcceptancesByUserId", mock.Anything, (*sql.Tx)(nil), int64(42)).
-			Return([]record.LegalDocumentAcceptance{{Id: 1, AcceptedAt: acceptancesFirst, UserId: 42, LegalDocumentVersionId: 99}}, nil).Once()
+		database.On("GetUserByID", mock.Anything, (*sql.Tx)(nil), int64(42)).Return(&record.User{ID: 42}, nil).Once()
+		database.On("GetLegalDocumentAcceptancesByUserID", mock.Anything, (*sql.Tx)(nil), int64(42)).
+			Return([]record.LegalDocumentAcceptance{{ID: 1, AcceptedAt: acceptancesFirst, UserID: 42, LegalDocumentVersionID: 99}}, nil).Once()
 		database.On("GetAllLegalDocuments", mock.Anything, (*sql.Tx)(nil)).Return([]record.LegalDocument{}, nil).Once()
 		rr := httptest.NewRecorder()
 		HandleUserLegalDocumentAcceptancesGet(database, "https://auth.example").ServeHTTP(rr, userAcceptancesRequest("42"))

@@ -17,7 +17,7 @@ type usersAPI interface {
 }
 
 func HandleListGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient usersAPI,
 ) http.HandlerFunc {
 
@@ -31,9 +31,9 @@ func HandleListGet(
 		const pageSize = 10
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 

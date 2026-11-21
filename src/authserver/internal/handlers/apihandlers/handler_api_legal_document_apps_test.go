@@ -24,22 +24,22 @@ import (
 // console's own client, and a client's documents are the ones not retired that apply to all apps or
 // list it.
 
-func links(documentId int64, clientIds ...int64) []record.LegalDocumentClient {
+func links(documentID int64, clientIDs ...int64) []record.LegalDocumentClient {
 	out := []record.LegalDocumentClient{}
-	for i, clientId := range clientIds {
-		out = append(out, record.LegalDocumentClient{Id: int64(900 + i), LegalDocumentId: documentId, ClientId: clientId})
+	for i, clientID := range clientIDs {
+		out = append(out, record.LegalDocumentClient{ID: int64(900 + i), LegalDocumentID: documentID, ClientID: clientID})
 	}
 	return out
 }
 
 func appClient(id int64) *record.Client {
-	return &record.Client{Id: id, ClientIdentifier: "app-" + string(rune('a'+id))}
+	return &record.Client{ID: id, ClientIdentifier: "app-" + string(rune('a'+id))}
 }
 
 // expectClients answers each id with an app of its own.
 func expectClients(database *datamocks.Database, ids ...int64) {
 	for _, id := range ids {
-		database.On("GetClientById", mock.Anything, mock.Anything, id).Return(appClient(id), nil).Maybe()
+		database.On("GetClientByID", mock.Anything, mock.Anything, id).Return(appClient(id), nil).Maybe()
 	}
 }
 
@@ -52,19 +52,19 @@ func TestLegalDocumentApps_SelectedAppsAreSavedWholeAndAudited(t *testing.T) {
 	database.On("AcquireLegalDocumentRow", mock.Anything, legalTx, int64(5)).Return(nil).Once()
 	doc := draftDocument(5)
 	doc.AppliesToAllApps = true
-	database.On("GetLegalDocumentById", mock.Anything, mock.Anything, int64(5)).Return(doc, nil)
+	database.On("GetLegalDocumentByID", mock.Anything, mock.Anything, int64(5)).Return(doc, nil)
 	expectClients(database, 1, 2)
-	database.On("GetLegalDocumentClientsByLegalDocumentId", mock.Anything, legalTx, int64(5)).Return(links(5, 1), nil).Once()
+	database.On("GetLegalDocumentClientsByLegalDocumentID", mock.Anything, legalTx, int64(5)).Return(links(5, 1), nil).Once()
 	var created []int64
 	database.On("CreateLegalDocumentClient", mock.Anything, legalTx, mock.Anything).
 		Run(func(args mock.Arguments) {
 			link := args.Get(2).(*record.LegalDocumentClient)
-			assert.Equal(t, int64(5), link.LegalDocumentId)
-			created = append(created, link.ClientId)
+			assert.Equal(t, int64(5), link.LegalDocumentID)
+			created = append(created, link.ClientID)
 		}).Return(nil)
 	database.On("UpdateLegalDocumentAppliesToAllApps", mock.Anything, legalTx, int64(5), false).Return(nil).Once()
-	database.On("GetLegalDocumentVersionsByLegalDocumentId", mock.Anything, mock.Anything, int64(5)).Return(publishedVersions(5, 1), nil)
-	database.On("GetLegalDocumentClientsByLegalDocumentId", mock.Anything, mock.Anything, int64(5)).Return(links(5, 1, 2), nil)
+	database.On("GetLegalDocumentVersionsByLegalDocumentID", mock.Anything, mock.Anything, int64(5)).Return(publishedVersions(5, 1), nil)
+	database.On("GetLegalDocumentClientsByLegalDocumentID", mock.Anything, mock.Anything, int64(5)).Return(links(5, 1, 2), nil)
 	auditLogger.On("Log", mock.Anything, audit.EventUpdatedLegalDocumentApps, map[string]interface{}{
 		"legal_document_id":  int64(5),
 		"short_name":         "terms",
@@ -93,15 +93,15 @@ func TestLegalDocumentApps_AllAppsClearsTheList(t *testing.T) {
 	database.On("AcquireLegalDocumentRow", mock.Anything, legalTx, int64(5)).Return(nil).Once()
 	doc := draftDocument(5)
 	doc.AppliesToAllApps = false
-	database.On("GetLegalDocumentById", mock.Anything, mock.Anything, int64(5)).Return(doc, nil)
+	database.On("GetLegalDocumentByID", mock.Anything, mock.Anything, int64(5)).Return(doc, nil)
 	stored := links(5, 1, 2)
-	database.On("GetLegalDocumentClientsByLegalDocumentId", mock.Anything, legalTx, int64(5)).Return(stored, nil).Once()
+	database.On("GetLegalDocumentClientsByLegalDocumentID", mock.Anything, legalTx, int64(5)).Return(stored, nil).Once()
 	var deleted []int64
 	database.On("DeleteLegalDocumentClient", mock.Anything, legalTx, mock.Anything).
 		Run(func(args mock.Arguments) { deleted = append(deleted, args.Get(2).(int64)) }).Return(nil)
 	database.On("UpdateLegalDocumentAppliesToAllApps", mock.Anything, legalTx, int64(5), true).Return(nil).Once()
-	database.On("GetLegalDocumentVersionsByLegalDocumentId", mock.Anything, mock.Anything, int64(5)).Return(nil, nil)
-	database.On("GetLegalDocumentClientsByLegalDocumentId", mock.Anything, mock.Anything, int64(5)).Return(nil, nil)
+	database.On("GetLegalDocumentVersionsByLegalDocumentID", mock.Anything, mock.Anything, int64(5)).Return(nil, nil)
+	database.On("GetLegalDocumentClientsByLegalDocumentID", mock.Anything, mock.Anything, int64(5)).Return(nil, nil)
 	auditLogger.On("Log", mock.Anything, audit.EventUpdatedLegalDocumentApps, map[string]interface{}{
 		"legal_document_id":  int64(5),
 		"short_name":         "terms",
@@ -116,7 +116,7 @@ func TestLegalDocumentApps_AllAppsClearsTheList(t *testing.T) {
 	}, "id", "5"))
 
 	require.Equal(t, http.StatusOK, status, "%v", body)
-	assert.ElementsMatch(t, []int64{stored[0].Id, stored[1].Id}, deleted, "every listed app is removed")
+	assert.ElementsMatch(t, []int64{stored[0].ID, stored[1].ID}, deleted, "every listed app is removed")
 	database.AssertNotCalled(t, "CreateLegalDocumentClient", mock.Anything, mock.Anything, mock.Anything)
 	document := body["legalDocument"].(map[string]any)
 	assert.Equal(t, "all_apps", document["appliesTo"])
@@ -132,11 +132,11 @@ func TestLegalDocumentApps_SelectedAppsWithNoAppIsKeptAsSelected(t *testing.T) {
 	database.On("AcquireLegalDocumentRow", mock.Anything, legalTx, int64(5)).Return(nil).Once()
 	doc := draftDocument(5)
 	doc.AppliesToAllApps = false
-	database.On("GetLegalDocumentById", mock.Anything, mock.Anything, int64(5)).Return(doc, nil)
-	database.On("GetLegalDocumentClientsByLegalDocumentId", mock.Anything, legalTx, int64(5)).Return(links(5, 3), nil).Once()
+	database.On("GetLegalDocumentByID", mock.Anything, mock.Anything, int64(5)).Return(doc, nil)
+	database.On("GetLegalDocumentClientsByLegalDocumentID", mock.Anything, legalTx, int64(5)).Return(links(5, 3), nil).Once()
 	database.On("DeleteLegalDocumentClient", mock.Anything, legalTx, int64(900)).Return(nil).Once()
-	database.On("GetLegalDocumentVersionsByLegalDocumentId", mock.Anything, mock.Anything, int64(5)).Return(nil, nil)
-	database.On("GetLegalDocumentClientsByLegalDocumentId", mock.Anything, mock.Anything, int64(5)).Return(nil, nil)
+	database.On("GetLegalDocumentVersionsByLegalDocumentID", mock.Anything, mock.Anything, int64(5)).Return(nil, nil)
+	database.On("GetLegalDocumentClientsByLegalDocumentID", mock.Anything, mock.Anything, int64(5)).Return(nil, nil)
 	auditLogger.On("Log", mock.Anything, audit.EventUpdatedLegalDocumentApps, mock.MatchedBy(func(details map[string]interface{}) bool {
 		return details["applies_to"] == "selected_apps"
 	})).Once()
@@ -153,7 +153,7 @@ func TestLegalDocumentApps_SelectedAppsWithNoAppIsKeptAsSelected(t *testing.T) {
 }
 
 func TestLegalDocumentApps_Refusals(t *testing.T) {
-	adminConsole := &record.Client{Id: 9, ClientIdentifier: builtin.AdminConsoleClientIdentifier}
+	adminConsole := &record.Client{ID: 9, ClientIdentifier: builtin.AdminConsoleClientIdentifier}
 	cases := []struct {
 		name    string
 		body    map[string]any
@@ -183,10 +183,10 @@ func TestLegalDocumentApps_Refusals(t *testing.T) {
 			if c.retired {
 				doc.RetiredAt = sql.NullTime{Time: time.Now(), Valid: true}
 			}
-			database.On("GetLegalDocumentById", mock.Anything, mock.Anything, int64(5)).Return(doc, nil).Maybe()
+			database.On("GetLegalDocumentByID", mock.Anything, mock.Anything, int64(5)).Return(doc, nil).Maybe()
 			expectClients(database, 1)
-			database.On("GetClientById", mock.Anything, mock.Anything, int64(9)).Return(adminConsole, nil).Maybe()
-			database.On("GetClientById", mock.Anything, mock.Anything, int64(404)).Return(nil, nil).Maybe()
+			database.On("GetClientByID", mock.Anything, mock.Anything, int64(9)).Return(adminConsole, nil).Maybe()
+			database.On("GetClientByID", mock.Anything, mock.Anything, int64(404)).Return(nil, nil).Maybe()
 
 			status, body := serveLegal(HandleLegalDocumentAppsPut(database, handlersmocks.NewAuditLogger(t)),
 				legalRequest(t, http.MethodPut, c.body, "id", "5"))
@@ -202,7 +202,7 @@ func TestLegalDocumentApps_Refusals(t *testing.T) {
 
 func TestLegalDocumentApps_AnUnknownDocumentIs404(t *testing.T) {
 	database := datamocks.NewDatabase(t)
-	database.On("GetLegalDocumentById", mock.Anything, mock.Anything, int64(5)).Return(nil, nil).Once()
+	database.On("GetLegalDocumentByID", mock.Anything, mock.Anything, int64(5)).Return(nil, nil).Once()
 
 	status, body := serveLegal(HandleLegalDocumentAppsPut(database, handlersmocks.NewAuditLogger(t)), legalRequest(t, http.MethodPut,
 		map[string]any{"appliesTo": "all_apps", "clientIds": []int64{}, "expectedClientIds": []int64{}}, "id", "5"))
@@ -213,7 +213,7 @@ func TestLegalDocumentApps_AnUnknownDocumentIs404(t *testing.T) {
 
 func TestLegalDocumentApps_AnUnreadableBodyIsABadRequest(t *testing.T) {
 	database := datamocks.NewDatabase(t)
-	database.On("GetLegalDocumentById", mock.Anything, mock.Anything, int64(5)).Return(draftDocument(5), nil).Once()
+	database.On("GetLegalDocumentByID", mock.Anything, mock.Anything, int64(5)).Return(draftDocument(5), nil).Once()
 	req := legalRequest(t, http.MethodPut, nil, "id", "5")
 
 	status, body := serveLegal(HandleLegalDocumentAppsPut(database, handlersmocks.NewAuditLogger(t)), req)
@@ -227,9 +227,9 @@ func TestLegalDocumentApps_AnOutdatedListIsAConflict(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	datamocks.ExpectRunInTransaction(database, legalTx)
 	database.On("AcquireLegalDocumentRow", mock.Anything, legalTx, int64(5)).Return(nil).Once()
-	database.On("GetLegalDocumentById", mock.Anything, mock.Anything, int64(5)).Return(draftDocument(5), nil)
+	database.On("GetLegalDocumentByID", mock.Anything, mock.Anything, int64(5)).Return(draftDocument(5), nil)
 	expectClients(database, 1)
-	database.On("GetLegalDocumentClientsByLegalDocumentId", mock.Anything, legalTx, int64(5)).Return(links(5, 2), nil).Once()
+	database.On("GetLegalDocumentClientsByLegalDocumentID", mock.Anything, legalTx, int64(5)).Return(links(5, 2), nil).Once()
 
 	status, body := serveLegal(HandleLegalDocumentAppsPut(database, handlersmocks.NewAuditLogger(t)), legalRequest(t, http.MethodPut,
 		map[string]any{"appliesTo": "selected_apps", "clientIds": []int64{1}, "expectedClientIds": []int64{}}, "id", "5"))
@@ -246,9 +246,9 @@ func TestLegalDocumentApps_AnAppAddedMeanwhileIsAConflict(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	datamocks.ExpectRunInTransaction(database, legalTx)
 	database.On("AcquireLegalDocumentRow", mock.Anything, legalTx, int64(5)).Return(nil).Once()
-	database.On("GetLegalDocumentById", mock.Anything, mock.Anything, int64(5)).Return(draftDocument(5), nil)
+	database.On("GetLegalDocumentByID", mock.Anything, mock.Anything, int64(5)).Return(draftDocument(5), nil)
 	expectClients(database, 1)
-	database.On("GetLegalDocumentClientsByLegalDocumentId", mock.Anything, legalTx, int64(5)).Return(nil, nil).Once()
+	database.On("GetLegalDocumentClientsByLegalDocumentID", mock.Anything, legalTx, int64(5)).Return(nil, nil).Once()
 	database.On("CreateLegalDocumentClient", mock.Anything, legalTx, mock.Anything).
 		Return(errs.Errorf("insert: %w", data.ErrUniqueViolation)).Once()
 
@@ -264,12 +264,12 @@ func TestLegalDocumentApps_ADocumentRetiredMeanwhileIsRefused(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	datamocks.ExpectRunInTransaction(database, legalTx)
 	database.On("AcquireLegalDocumentRow", mock.Anything, legalTx, int64(5)).Return(nil).Once()
-	database.On("GetLegalDocumentById", mock.Anything, (*sql.Tx)(nil), int64(5)).Return(draftDocument(5), nil).Once()
+	database.On("GetLegalDocumentByID", mock.Anything, (*sql.Tx)(nil), int64(5)).Return(draftDocument(5), nil).Once()
 	retired := draftDocument(5)
 	retired.RetiredAt = sql.NullTime{Time: time.Now(), Valid: true}
-	database.On("GetLegalDocumentById", mock.Anything, legalTx, int64(5)).Return(retired, nil).Once()
+	database.On("GetLegalDocumentByID", mock.Anything, legalTx, int64(5)).Return(retired, nil).Once()
 	expectClients(database, 1)
-	database.On("GetLegalDocumentClientsByLegalDocumentId", mock.Anything, legalTx, int64(5)).Return(nil, nil).Maybe()
+	database.On("GetLegalDocumentClientsByLegalDocumentID", mock.Anything, legalTx, int64(5)).Return(nil, nil).Maybe()
 
 	status, body := serveLegal(HandleLegalDocumentAppsPut(database, handlersmocks.NewAuditLogger(t)), legalRequest(t, http.MethodPut,
 		map[string]any{"appliesTo": "selected_apps", "clientIds": []int64{1}, "expectedClientIds": []int64{}}, "id", "5"))
@@ -288,7 +288,7 @@ func clientDocumentsRequest(t *testing.T, id string) *http.Request {
 
 func TestClientLegalDocuments_TheDocumentsThatApplyToTheClient(t *testing.T) {
 	database := datamocks.NewDatabase(t)
-	database.On("GetClientById", mock.Anything, mock.Anything, int64(4)).Return(appClient(4), nil).Once()
+	database.On("GetClientByID", mock.Anything, mock.Anything, int64(4)).Return(appClient(4), nil).Once()
 
 	allApps := draftDocument(1)
 	allApps.ShortName, allApps.AppliesToAllApps = "privacy", true
@@ -306,12 +306,12 @@ func TestClientLegalDocuments_TheDocumentsThatApplyToTheClient(t *testing.T) {
 	nobody.ShortName = "nobody"
 	database.On("GetAllLegalDocuments", mock.Anything, mock.Anything).
 		Return([]record.LegalDocument{*allApps, *listing, *notListing, *retiredAll, *retiredListing, *nobody}, nil).Once()
-	database.On("GetLegalDocumentClientsByClientId", mock.Anything, mock.Anything, int64(4)).
-		Return([]record.LegalDocumentClient{{Id: 70, LegalDocumentId: 2, ClientId: 4}, {Id: 71, LegalDocumentId: 7, ClientId: 4}}, nil).Once()
-	database.On("GetLegalDocumentVersionsByLegalDocumentId", mock.Anything, mock.Anything, int64(1)).Return(publishedVersions(1, 2), nil)
-	database.On("GetLegalDocumentVersionsByLegalDocumentId", mock.Anything, mock.Anything, int64(2)).Return(nil, nil)
-	database.On("GetLegalDocumentClientsByLegalDocumentId", mock.Anything, mock.Anything, int64(1)).Return(nil, nil)
-	database.On("GetLegalDocumentClientsByLegalDocumentId", mock.Anything, mock.Anything, int64(2)).Return(links(2, 4, 11), nil)
+	database.On("GetLegalDocumentClientsByClientID", mock.Anything, mock.Anything, int64(4)).
+		Return([]record.LegalDocumentClient{{ID: 70, LegalDocumentID: 2, ClientID: 4}, {ID: 71, LegalDocumentID: 7, ClientID: 4}}, nil).Once()
+	database.On("GetLegalDocumentVersionsByLegalDocumentID", mock.Anything, mock.Anything, int64(1)).Return(publishedVersions(1, 2), nil)
+	database.On("GetLegalDocumentVersionsByLegalDocumentID", mock.Anything, mock.Anything, int64(2)).Return(nil, nil)
+	database.On("GetLegalDocumentClientsByLegalDocumentID", mock.Anything, mock.Anything, int64(1)).Return(nil, nil)
+	database.On("GetLegalDocumentClientsByLegalDocumentID", mock.Anything, mock.Anything, int64(2)).Return(links(2, 4, 11), nil)
 
 	status, body := serveLegal(HandleClientLegalDocumentsGet(database), clientDocumentsRequest(t, "4"))
 
@@ -331,9 +331,9 @@ func TestClientLegalDocuments_TheDocumentsThatApplyToTheClient(t *testing.T) {
 
 func TestClientLegalDocuments_NoneIsAnEmptyList(t *testing.T) {
 	database := datamocks.NewDatabase(t)
-	database.On("GetClientById", mock.Anything, mock.Anything, int64(4)).Return(appClient(4), nil).Once()
+	database.On("GetClientByID", mock.Anything, mock.Anything, int64(4)).Return(appClient(4), nil).Once()
 	database.On("GetAllLegalDocuments", mock.Anything, mock.Anything).Return(nil, nil).Once()
-	database.On("GetLegalDocumentClientsByClientId", mock.Anything, mock.Anything, int64(4)).Return(nil, nil).Maybe()
+	database.On("GetLegalDocumentClientsByClientID", mock.Anything, mock.Anything, int64(4)).Return(nil, nil).Maybe()
 
 	rr := httptest.NewRecorder()
 	HandleClientLegalDocumentsGet(database).ServeHTTP(rr, clientDocumentsRequest(t, "4"))
@@ -344,7 +344,7 @@ func TestClientLegalDocuments_NoneIsAnEmptyList(t *testing.T) {
 
 func TestClientLegalDocuments_AnUnknownClientIs404(t *testing.T) {
 	database := datamocks.NewDatabase(t)
-	database.On("GetClientById", mock.Anything, mock.Anything, int64(4)).Return(nil, nil).Once()
+	database.On("GetClientByID", mock.Anything, mock.Anything, int64(4)).Return(nil, nil).Once()
 
 	status, body := serveLegal(HandleClientLegalDocumentsGet(database), clientDocumentsRequest(t, "4"))
 
@@ -352,7 +352,7 @@ func TestClientLegalDocuments_AnUnknownClientIs404(t *testing.T) {
 	assert.Equal(t, "NOT_FOUND", errorCode(body))
 }
 
-func TestClientLegalDocuments_AnInvalidIdIsABadRequest(t *testing.T) {
+func TestClientLegalDocuments_AnInvalidIDIsABadRequest(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 
 	status, body := serveLegal(HandleClientLegalDocumentsGet(database), clientDocumentsRequest(t, "abc"))

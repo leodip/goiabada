@@ -15,10 +15,10 @@ import (
 // exactly this position until it moved here. Adding a field to the persistence row must no longer
 // change the wire (#350).
 type RedirectURIResponse struct {
-	Id        int64      `json:"id"`
+	ID        int64      `json:"id"`
 	CreatedAt *time.Time `json:"createdAt"`
 	URI       string     `json:"uri"`
-	ClientId  int64      `json:"clientId"`
+	ClientID  int64      `json:"clientId"`
 }
 
 // PostLogoutRedirectURIResponse is one of a client's sign-out redirect URIs as this API publishes
@@ -26,23 +26,23 @@ type RedirectURIResponse struct {
 // Connect RP-Initiated Logout 1.0. Its shape is RedirectURIResponse's, so a consumer reads both
 // lists alike, and the type is its own so that neither list's shape can change the other's (#147).
 type PostLogoutRedirectURIResponse struct {
-	Id        int64      `json:"id"`
+	ID        int64      `json:"id"`
 	CreatedAt *time.Time `json:"createdAt"`
 	URI       string     `json:"uri"`
-	ClientId  int64      `json:"clientId"`
+	ClientID  int64      `json:"clientId"`
 }
 
 // WebOriginResponse is a client's allowed web origin as this API publishes it, and is here for the
 // same reason as RedirectURIResponse above (#350).
 type WebOriginResponse struct {
-	Id        int64      `json:"id"`
+	ID        int64      `json:"id"`
 	CreatedAt *time.Time `json:"createdAt"`
 	Origin    string     `json:"origin"`
-	ClientId  int64      `json:"clientId"`
+	ClientID  int64      `json:"clientId"`
 }
 
 type ClientResponse struct {
-	Id               int64      `json:"id"`
+	ID               int64      `json:"id"`
 	CreatedAt        *time.Time `json:"createdAt"`
 	UpdatedAt        *time.Time `json:"updatedAt"`
 	ClientIdentifier string     `json:"clientIdentifier"`
@@ -82,10 +82,10 @@ type ClientResponse struct {
 	// reserved to authserver:manage, changes it; the create request and the settings save carry no
 	// such field, so no caller sets or clears it by accident (#499 decisions 4 and 5).
 	AdministrativeScopesAllowed bool `json:"administrativeScopesAllowed"`
-	// BrandId is the brand the client's pages are drawn in, or null when it has no brand of its
+	// BrandID is the brand the client's pages are drawn in, or null when it has no brand of its
 	// own and follows whichever brand is the default. It changes only through
 	// UpdateClientBrandRequest (#812 decisions 1 and 2).
-	BrandId         *int64 `json:"brandId"`
+	BrandID         *int64 `json:"brandId"`
 	ShowLogo        bool   `json:"showLogo"`
 	ShowDisplayName bool   `json:"showDisplayName"`
 	ShowDescription bool   `json:"showDescription"`
@@ -112,8 +112,8 @@ type ClientResponse struct {
 	RefreshTokenOfflineIdleTimeoutInSeconds int                   `json:"refreshTokenOfflineIdleTimeoutInSeconds"`
 	RefreshTokenOfflineMaxLifetimeInSeconds int                   `json:"refreshTokenOfflineMaxLifetimeInSeconds"`
 	IncludeOpenIDConnectClaimsInAccessToken string                `json:"includeOpenIDConnectClaimsInAccessToken"`
-	IncludeOpenIDConnectClaimsInIdToken     string                `json:"includeOpenIDConnectClaimsInIdToken"`
-	DefaultAcrLevel                         string                `json:"defaultAcrLevel"`
+	IncludeOpenIDConnectClaimsInIDToken     string                `json:"includeOpenIDConnectClaimsInIdToken"`
+	DefaultACRLevel                         string                `json:"defaultAcrLevel"`
 	RedirectURIs                            []RedirectURIResponse `json:"redirectURIs"`
 	// PostLogoutRedirectURIs is the client's sign-out list, null when the answer did not load it
 	// and [] when it is empty, as RedirectURIs is (#147).
@@ -168,7 +168,7 @@ type UpdateClientSettingsRequest struct {
 	ShowDisplayName bool   `json:"showDisplayName"`
 	ShowDescription bool   `json:"showDescription"`
 	ShowWebsiteURL  bool   `json:"showWebsiteUrl"`
-	DefaultAcrLevel string `json:"defaultAcrLevel,omitempty"`
+	DefaultACRLevel string `json:"defaultAcrLevel,omitempty"`
 }
 
 // UpdateClientAuthenticationRequest is used to change a client's
@@ -249,7 +249,7 @@ type UpdateClientTokensRequest struct {
 	RefreshTokenOfflineIdleTimeoutInSeconds int    `json:"refreshTokenOfflineIdleTimeoutInSeconds"`
 	RefreshTokenOfflineMaxLifetimeInSeconds int    `json:"refreshTokenOfflineMaxLifetimeInSeconds"`
 	IncludeOpenIDConnectClaimsInAccessToken string `json:"includeOpenIDConnectClaimsInAccessToken"`
-	IncludeOpenIDConnectClaimsInIdToken     string `json:"includeOpenIDConnectClaimsInIdToken"`
+	IncludeOpenIDConnectClaimsInIDToken     string `json:"includeOpenIDConnectClaimsInIdToken"`
 }
 
 // UpdateClientAdministrativeScopesRequest switches whether a client may request the administrative
@@ -273,7 +273,7 @@ type UpdateClientDPoPRequest struct {
 // then follows when the default changes. The member is required: the auth server refuses a body
 // without it rather than read it as null, so it sees the raw body to tell the two apart.
 type UpdateClientBrandRequest struct {
-	BrandId *int64 `json:"brandId"`
+	BrandID *int64 `json:"brandId"`
 }
 
 type UpdateClientResponse struct {
@@ -283,10 +283,10 @@ type UpdateClientResponse struct {
 // UpdateClientPermissionsRequest is used to replace the full set of
 // permissions assigned to a client. The auth server validates existence
 // of permissions, enforces client constraints, applies add/remove ops,
-// and performs auditing. ExpectedPermissionIds is as on UpdateUserPermissionsRequest (#428).
+// and performs auditing. ExpectedPermissionIDs is as on UpdateUserPermissionsRequest (#428).
 type UpdateClientPermissionsRequest struct {
-	PermissionIds         []int64 `json:"permissionIds"`
-	ExpectedPermissionIds []int64 `json:"expectedPermissionIds"`
+	PermissionIDs         []int64 `json:"permissionIds"`
+	ExpectedPermissionIDs []int64 `json:"expectedPermissionIds"`
 }
 
 type GetClientPermissionsResponse struct {
@@ -295,11 +295,11 @@ type GetClientPermissionsResponse struct {
 }
 
 // UpdateClientIntrospectionResourcesRequest replaces the whole list of resources whose tokens a
-// client may introspect (#676 decision 14). ExpectedResourceIds is the list as the caller last read
+// client may introspect (#676 decision 14). ExpectedResourceIDs is the list as the caller last read
 // it, required as on every list save: [] when it was empty (#428).
 type UpdateClientIntrospectionResourcesRequest struct {
-	ResourceIds         []int64 `json:"resourceIds"`
-	ExpectedResourceIds []int64 `json:"expectedResourceIds"`
+	ResourceIDs         []int64 `json:"resourceIds"`
+	ExpectedResourceIDs []int64 `json:"expectedResourceIds"`
 }
 
 // GetClientIntrospectionResourcesResponse is a client and the resources whose tokens it may

@@ -120,8 +120,8 @@ func TestHandleUserProfilePut_StoresAndAnswersOneSpellingPerName(t *testing.T) {
 			database := datamocks.NewDatabase(t)
 			auditLogger := handlersmocks.NewAuditLogger(t)
 
-			database.On("GetUserById", mock.Anything, mock.Anything, profileTestUserId).
-				Return(&record.User{Id: profileTestUserId, Subject: "sub-42"}, nil).Once()
+			database.On("GetUserByID", mock.Anything, mock.Anything, profileTestUserID).
+				Return(&record.User{ID: profileTestUserID, Subject: "sub-42"}, nil).Once()
 			var stored *record.User
 			database.On("SetUserProfile", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 				Run(func(args mock.Arguments) { stored = args.Get(2).(*record.User) }).
@@ -144,8 +144,8 @@ func TestHandleUserProfilePut_RefusesANameThatComposesToARefusedOne(t *testing.T
 			auditLogger := handlersmocks.NewAuditLogger(t)
 
 			// No write and no audit record are stubbed: the mocks fail the test on either.
-			database.On("GetUserById", mock.Anything, mock.Anything, profileTestUserId).
-				Return(&record.User{Id: profileTestUserId, Subject: "sub-42"}, nil).Once()
+			database.On("GetUserByID", mock.Anything, mock.Anything, profileTestUserID).
+				Return(&record.User{ID: profileTestUserID, Subject: "sub-42"}, nil).Once()
 
 			rr := httptest.NewRecorder()
 			HandleUserProfilePut(database, accountvalidation.NewProfileValidator(database), auditLogger).
@@ -169,7 +169,7 @@ func TestHandleAccountProfilePut_StoresAndAnswersOneSpellingPerName(t *testing.T
 			auditLogger := handlersmocks.NewAuditLogger(t)
 
 			database.On("GetUserBySubject", mock.Anything, mock.Anything, profileTestSubject).
-				Return(&record.User{Id: profileTestUserId, Subject: profileTestSubject}, nil).Once()
+				Return(&record.User{ID: profileTestUserID, Subject: profileTestSubject}, nil).Once()
 			var stored *record.User
 			database.On("SetUserProfile", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 				Run(func(args mock.Arguments) { stored = args.Get(2).(*record.User) }).
@@ -193,7 +193,7 @@ func TestHandleAccountProfilePut_RefusesANameThatComposesToARefusedOne(t *testin
 
 			// No write and no audit record are stubbed: the mocks fail the test on either.
 			database.On("GetUserBySubject", mock.Anything, mock.Anything, profileTestSubject).
-				Return(&record.User{Id: profileTestUserId, Subject: profileTestSubject}, nil).Once()
+				Return(&record.User{ID: profileTestUserID, Subject: profileTestSubject}, nil).Once()
 
 			rr := httptest.NewRecorder()
 			HandleAccountProfilePut(database, accountvalidation.NewProfileValidator(database), auditLogger).
@@ -234,7 +234,7 @@ func TestHandleUserCreatePost_StoresAndAnswersOneSpellingPerName(t *testing.T) {
 			var stored *record.User
 			userCreator.EXPECT().CreateUser(mock.Anything, mock.Anything).
 				RunAndReturn(func(_ context.Context, input *usercreation.Input) (*record.User, error) {
-					stored = &record.User{Id: 7, Email: input.Email, GivenName: input.GivenName,
+					stored = &record.User{ID: 7, Email: input.Email, GivenName: input.GivenName,
 						MiddleName: input.MiddleName, FamilyName: input.FamilyName}
 					return stored, nil
 				}).Once()

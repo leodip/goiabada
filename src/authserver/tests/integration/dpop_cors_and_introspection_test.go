@@ -37,19 +37,19 @@ func createDPoPService(t *testing.T) dpopService {
 	secret := fake.Password(32)
 	encrypted, err := dataCipher.Encrypt(secret)
 	require.NoError(t, err)
-	resource := createResourceWithId(t, "dpop-api-"+fake.LetterN(8))
-	permission := createPermissionWithId(t, resource.Id, "read-"+fake.LetterN(8))
+	resource := createResourceWithID(t, "dpop-api-"+fake.LetterN(8))
+	permission := createPermissionWithID(t, resource.ID, "read-"+fake.LetterN(8))
 	client := &record.Client{
 		ClientIdentifier:         "dpop-service-" + fake.LetterN(8),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
-		DefaultAcrLevel:          record.AcrLevel2Optional,
+		DefaultACRLevel:          record.ACRLevel2Optional,
 		ClientSecretEncrypted:    encrypted,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 	require.NoError(t, database.CreateClientPermission(context.Background(), nil,
-		&record.ClientPermission{ClientId: client.Id, PermissionId: permission.Id}))
+		&record.ClientPermission{ClientID: client.ID, PermissionID: permission.ID}))
 	return dpopService{client: client, secret: secret, resource: resource}
 }
 
@@ -65,7 +65,7 @@ func crossOriginTokenRequest(t *testing.T, service dpopService, origin, proof st
 	req.Header.Set("Origin", origin)
 	req.Header.Set("Sec-Fetch-Site", "cross-site")
 	req.Header.Set("DPoP", proof)
-	resp, err := createHttpClient(t).Do(req)
+	resp, err := createHTTPClient(t).Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	raw, err := io.ReadAll(resp.Body)
@@ -80,7 +80,7 @@ func registerWebOrigin(t *testing.T, client *record.Client) string {
 	t.Helper()
 	origin := "https://dpop-cors-" + strings.ToLower(fake.LetterN(8)) + ".example.com"
 	require.NoError(t, database.CreateWebOrigin(context.Background(), nil, &record.WebOrigin{
-		ClientId: client.Id, Origin: origin,
+		ClientID: client.ID, Origin: origin,
 	}))
 	return origin
 }
@@ -140,7 +140,7 @@ func TestDPoPCORS_AnUnregisteredOriginIsGivenNoPermission(t *testing.T) {
 		req.Header.Set("Origin", unregistered)
 		req.Header.Set("Access-Control-Request-Method", "POST")
 		req.Header.Set("Access-Control-Request-Headers", "content-type,dpop")
-		resp, err := createHttpClient(t).Do(req)
+		resp, err := createHTTPClient(t).Do(req)
 		require.NoError(t, err)
 		defer func() { _ = resp.Body.Close() }()
 

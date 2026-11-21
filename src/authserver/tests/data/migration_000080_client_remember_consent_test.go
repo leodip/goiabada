@@ -93,7 +93,7 @@ func TestMigration000080_ClientRememberConsent(t *testing.T) {
 			RememberConsent:  c.storedAtHead,
 		}
 		require.NoErrorf(t, h.DB.CreateClient(ctx, nil, client), "seed client %s on %s", c.identifier, dbType())
-		ids[i] = client.Id
+		ids[i] = client.ID
 	}
 
 	require.NoErrorf(t, h.Migrator.Migrate(ctx, beforeClientRememberConsent000080), "roll back to 000079 on %s", dbType())
@@ -156,10 +156,10 @@ func assertClientRememberConsentShape000080(t *testing.T, h *isolatedDB, before 
 		"[%s] 000080 must add the one column and touch nothing else of clients on %s", phase, dbType())
 }
 
-func readClientRememberConsent000080(t *testing.T, h *isolatedDB, clientId int64) bool {
+func readClientRememberConsent000080(t *testing.T, h *isolatedDB, clientID int64) bool {
 	t.Helper()
 	var remember bool
-	q := fmt.Sprintf("SELECT remember_consent FROM clients WHERE id = %d", clientId)
+	q := fmt.Sprintf("SELECT remember_consent FROM clients WHERE id = %d", clientID)
 	require.NoErrorf(t, h.SQL.QueryRow(q).Scan(&remember), "read clients.remember_consent on %s", dbType())
 	return remember
 }

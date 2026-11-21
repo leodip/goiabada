@@ -83,16 +83,16 @@ func captureRefreshTokenRow(mockDB *datamocks.Database) *record.RefreshToken {
 
 func sessionBoundCode(now time.Time) *record.Code {
 	return &record.Code{
-		Id:                1,
-		ClientId:          1,
-		UserId:            1,
+		ID:                1,
+		ClientID:          1,
+		UserID:            1,
 		Scope:             "openid product-api:read",
 		AuthenticatedAt:   now.Add(-5 * time.Minute),
 		SessionIdentifier: "session-1",
-		AcrLevel:          record.AcrLevel1,
+		ACRLevel:          record.ACRLevel1,
 		AuthMethods:       "pwd",
-		Client:            record.Client{Id: 1, ClientIdentifier: "web-app"},
-		User:              record.User{Id: 1, Subject: fake.UUID()},
+		Client:            record.Client{ID: 1, ClientIdentifier: "web-app"},
+		User:              record.User{ID: 1, Subject: fake.UUID()},
 	}
 }
 
@@ -108,21 +108,21 @@ func TestRFC9068_AuthorizationCodeGrant(t *testing.T) {
 	mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, code).Return(nil)
 	mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, code).Return(nil)
 	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "session-1").
-		Return(&record.UserSession{Id: 1, UserId: 1, Started: now.Add(-10 * time.Minute)}, nil)
+		Return(&record.UserSession{ID: 1, UserID: 1, Started: now.Add(-10 * time.Minute)}, nil)
 	expectSigningKeyAndUserLoads(t, mockDB)
 	row := captureRefreshTokenRow(mockDB)
 
 	response, err := tokenIssuer.mintAuthorizationCodeTokens(context.Background(), rfc9068Settings(), code, "")
 	require.NoError(t, err)
 
-	assertTokenHeaders(t, response.AccessToken, response.IdToken, response.RefreshToken)
+	assertTokenHeaders(t, response.AccessToken, response.IDToken, response.RefreshToken)
 	accessClaims := verifyAndDecodeToken(t, response.AccessToken, getTestPublicKey(t))
 	refreshClaims := verifyAndDecodeToken(t, response.RefreshToken, getTestPublicKey(t))
 	assert.Equal(t, "web-app", accessClaims["client_id"])
-	require.NotEmpty(t, row.FirstRefreshTokenJti)
-	assert.Equal(t, row.FirstRefreshTokenJti, accessClaims["grant_id"], "the family's identifier")
+	require.NotEmpty(t, row.FirstRefreshTokenJTI)
+	assert.Equal(t, row.FirstRefreshTokenJTI, accessClaims["grant_id"], "the family's identifier")
 	assert.Equal(t, refreshClaims["jti"], accessClaims["grant_id"], "the first refresh token's jti")
-	assert.Equal(t, row.RefreshTokenJti, row.FirstRefreshTokenJti, "the first refresh token starts its family")
+	assert.Equal(t, row.RefreshTokenJTI, row.FirstRefreshTokenJTI, "the first refresh token starts its family")
 }
 
 // A refresh copies the grant's identifier from its parent, whatever the parent's own jti.
@@ -132,9 +132,9 @@ func TestRFC9068_RefreshOfACodeGrant(t *testing.T) {
 	now := time.Now().UTC()
 	code := sessionBoundCode(now)
 	parent := &record.RefreshToken{
-		Id:                   2,
-		RefreshTokenJti:      "parent-jti",
-		FirstRefreshTokenJti: "family-jti",
+		ID:                   2,
+		RefreshTokenJTI:      "parent-jti",
+		FirstRefreshTokenJTI: "family-jti",
 		Scope:                code.Scope,
 		RefreshTokenType:     TokenTypeRefresh.String(),
 	}
@@ -142,18 +142,18 @@ func TestRFC9068_RefreshOfACodeGrant(t *testing.T) {
 	mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, code).Return(nil)
 	mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, code).Return(nil)
 	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "session-1").
-		Return(&record.UserSession{Id: 1, UserId: 1, Started: now.Add(-10 * time.Minute)}, nil)
+		Return(&record.UserSession{ID: 1, UserID: 1, Started: now.Add(-10 * time.Minute)}, nil)
 	expectSigningKeyAndUserLoads(t, mockDB)
 	row := captureRefreshTokenRow(mockDB)
 
 	response, err := tokenIssuer.mintCodeRefreshTokens(context.Background(), nil, rfc9068Settings(), code, parent, "", "")
 	require.NoError(t, err)
 
-	assertTokenHeaders(t, response.AccessToken, response.IdToken, response.RefreshToken)
+	assertTokenHeaders(t, response.AccessToken, response.IDToken, response.RefreshToken)
 	accessClaims := verifyAndDecodeToken(t, response.AccessToken, getTestPublicKey(t))
 	assert.Equal(t, "web-app", accessClaims["client_id"])
 	assert.Equal(t, "family-jti", accessClaims["grant_id"])
-	assert.Equal(t, "family-jti", row.FirstRefreshTokenJti, "the child stays in its parent's family")
+	assert.Equal(t, "family-jti", row.FirstRefreshTokenJTI, "the child stays in its parent's family")
 }
 
 func TestRFC9068_PasswordGrant(t *testing.T) {
@@ -162,20 +162,20 @@ func TestRFC9068_PasswordGrant(t *testing.T) {
 	expectSigningKeyAndUserLoads(t, mockDB)
 	row := captureRefreshTokenRow(mockDB)
 
-	expectPasswordGrantClientRow(mockDB, 3, &record.Client{Id: 3, ClientIdentifier: "legacy-app"})
+	expectPasswordGrantClientRow(mockDB, 3, &record.Client{ID: 3, ClientIdentifier: "legacy-app"})
 	response, err := tokenIssuer.IssuePasswordGrant(context.Background(), rfc9068Settings(), &ROPCGrantInput{
-		Client: &record.Client{Id: 3, ClientIdentifier: "legacy-app"},
-		User:   &record.User{Id: 1, Subject: fake.UUID()},
+		Client: &record.Client{ID: 3, ClientIdentifier: "legacy-app"},
+		User:   &record.User{ID: 1, Subject: fake.UUID()},
 		Scope:  "openid product-api:read",
 	})
 	require.NoError(t, err)
 
-	assertTokenHeaders(t, response.AccessToken, response.IdToken, response.RefreshToken)
+	assertTokenHeaders(t, response.AccessToken, response.IDToken, response.RefreshToken)
 	accessClaims := verifyAndDecodeToken(t, response.AccessToken, getTestPublicKey(t))
 	refreshClaims := verifyAndDecodeToken(t, response.RefreshToken, getTestPublicKey(t))
 	assert.Equal(t, "legacy-app", accessClaims["client_id"])
-	require.NotEmpty(t, row.FirstRefreshTokenJti)
-	assert.Equal(t, row.FirstRefreshTokenJti, accessClaims["grant_id"])
+	require.NotEmpty(t, row.FirstRefreshTokenJTI)
+	assert.Equal(t, row.FirstRefreshTokenJTI, accessClaims["grant_id"])
 	assert.Equal(t, refreshClaims["jti"], accessClaims["grant_id"])
 }
 
@@ -184,15 +184,15 @@ func TestRFC9068_RefreshOfAPasswordGrant(t *testing.T) {
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
 	now := time.Now().UTC()
 	parent := &record.RefreshToken{
-		Id:                   2,
-		RefreshTokenJti:      "parent-jti",
-		FirstRefreshTokenJti: "family-jti",
+		ID:                   2,
+		RefreshTokenJTI:      "parent-jti",
+		FirstRefreshTokenJTI: "family-jti",
 		Scope:                "openid product-api:read",
 		RefreshTokenType:     TokenTypeOffline.String(),
 		MaxLifetime:          sql.NullTime{Time: now.Add(time.Hour), Valid: true},
 		AuthenticatedAt:      sql.NullTime{Time: now.Add(-time.Hour), Valid: true},
-		User:                 record.User{Id: 1, Subject: fake.UUID()},
-		Client:               record.Client{Id: 3, ClientIdentifier: "legacy-app"},
+		User:                 record.User{ID: 1, Subject: fake.UUID()},
+		Client:               record.Client{ID: 3, ClientIdentifier: "legacy-app"},
 	}
 	mockDB.On("RefreshTokenLoadUser", mock.Anything, mock.Anything, parent).Return(nil)
 	mockDB.On("RefreshTokenLoadClient", mock.Anything, mock.Anything, parent).Return(nil)
@@ -202,11 +202,11 @@ func TestRFC9068_RefreshOfAPasswordGrant(t *testing.T) {
 	response, err := tokenIssuer.mintROPCRefreshTokens(context.Background(), nil, rfc9068Settings(), parent, "", "")
 	require.NoError(t, err)
 
-	assertTokenHeaders(t, response.AccessToken, response.IdToken, response.RefreshToken)
+	assertTokenHeaders(t, response.AccessToken, response.IDToken, response.RefreshToken)
 	accessClaims := verifyAndDecodeToken(t, response.AccessToken, getTestPublicKey(t))
 	assert.Equal(t, "legacy-app", accessClaims["client_id"])
 	assert.Equal(t, "family-jti", accessClaims["grant_id"])
-	assert.Equal(t, "family-jti", row.FirstRefreshTokenJti)
+	assert.Equal(t, "family-jti", row.FirstRefreshTokenJTI)
 }
 
 // The client credentials grant issues no refresh token, so its token names no grant.
@@ -218,7 +218,7 @@ func TestRFC9068_ClientCredentialsGrant(t *testing.T) {
 		PrivateKeyPEM: encryptPEM(t, getTestPrivateKey(t)),
 	}, nil)
 
-	response, err := tokenIssuer.IssueClientCredentialsGrant(context.Background(), rfc9068Settings(), &record.Client{Id: 4, ClientIdentifier: "billing-service"}, "product-api:read", "")
+	response, err := tokenIssuer.IssueClientCredentialsGrant(context.Background(), rfc9068Settings(), &record.Client{ID: 4, ClientIdentifier: "billing-service"}, "product-api:read", "")
 
 	require.NoError(t, err)
 
@@ -233,7 +233,7 @@ func TestRFC9068_ClientCredentialsGrant(t *testing.T) {
 func TestRFC9068_ImplicitFlow(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
-	user := &record.User{Id: 1, Subject: fake.UUID()}
+	user := &record.User{ID: 1, Subject: fake.UUID()}
 	mockDB.On("GetCurrentSigningKey", mock.Anything, issueTx).Return(&record.KeyPair{
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, getTestPrivateKey(t)),
@@ -242,10 +242,10 @@ func TestRFC9068_ImplicitFlow(t *testing.T) {
 	mockDB.On("GroupsLoadAttributes", mock.Anything, issueTx, user.Groups).Return(nil)
 	mockDB.On("UserLoadAttributes", mock.Anything, issueTx, user).Return(nil)
 	input := &ImplicitGrantInput{
-		Client:            &record.Client{Id: 5, ClientIdentifier: "old-spa"},
+		Client:            &record.Client{ID: 5, ClientIdentifier: "old-spa"},
 		User:              user,
 		Scope:             "openid",
-		AcrLevel:          record.AcrLevel1,
+		ACRLevel:          record.ACRLevel1,
 		AuthMethods:       "pwd",
 		SessionIdentifier: "session-1",
 		AuthenticatedAt:   time.Now().UTC(),
@@ -255,7 +255,7 @@ func TestRFC9068_ImplicitFlow(t *testing.T) {
 	response, err := tokenIssuer.IssueImplicitTx(context.Background(), rfc9068Settings(), input, true, true)
 	require.NoError(t, err)
 
-	assertTokenHeaders(t, response.AccessToken, response.IdToken, "")
+	assertTokenHeaders(t, response.AccessToken, response.IDToken, "")
 	claims := verifyAndDecodeToken(t, response.AccessToken, getTestPublicKey(t))
 	assert.Equal(t, "old-spa", claims["client_id"])
 	assert.NotContains(t, claims, "grant_id")
@@ -288,7 +288,7 @@ func TestRFC9068_OfflineAccessNamesTheAuthServer(t *testing.T) {
 				User:            &record.User{Subject: fake.UUID()},
 				Client:          &record.Client{ClientIdentifier: "web-app"},
 				Scope:           tc.scope,
-				AcrLevel:        record.AcrLevel1,
+				ACRLevel:        record.ACRLevel1,
 				AuthenticatedAt: now,
 			}
 

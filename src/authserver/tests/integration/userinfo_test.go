@@ -37,7 +37,7 @@ func userinfoPost(t *testing.T, accessToken string) *http.Response {
 	req, err := http.NewRequest("POST", appConfig.AuthServer.BaseURL+"/userinfo", strings.NewReader(form.Encode()))
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	resp, err := createHttpClient(t).Do(req)
+	resp, err := createHTTPClient(t).Do(req)
 	require.NoError(t, err)
 	return resp
 }
@@ -81,11 +81,11 @@ func joinGroupCarriedInAccessToken(t *testing.T, user *record.User) string {
 	t.Helper()
 	group := &record.Group{
 		GroupIdentifier:      "userinfo-group-" + strings.ToLower(fake.LetterN(8)),
-		IncludeInIdToken:     true,
+		IncludeInIDToken:     true,
 		IncludeInAccessToken: true,
 	}
 	require.NoError(t, database.CreateGroup(context.Background(), nil, group))
-	require.NoError(t, database.CreateUserGroup(context.Background(), nil, &record.UserGroup{UserId: user.Id, GroupId: group.Id}))
+	require.NoError(t, database.CreateUserGroup(context.Background(), nil, &record.UserGroup{UserID: user.ID, GroupID: group.ID}))
 	return group.GroupIdentifier
 }
 
@@ -197,7 +197,7 @@ func TestUserinfo_LegacyROPCGrantNamingUserinfo(t *testing.T) {
 	data, _ := ropcTokenResponse(t, "openid", nil)
 	refreshToken := data["refresh_token"].(string)
 
-	row := refreshTokenRowByJti(t, refreshToken)
+	row := refreshTokenRowByJTI(t, refreshToken)
 	row.Scope = "openid authserver:userinfo"
 	require.NoError(t, database.UpdateRefreshToken(context.Background(), nil, row))
 
@@ -278,7 +278,7 @@ func TestUserinfo_EndedSessionIsRefused(t *testing.T) {
 	session, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, code.SessionIdentifier)
 	require.NoError(t, err)
 	require.NotNil(t, session, "the code must be bound to a live session")
-	require.NoError(t, database.DeleteUserSession(context.Background(), nil, session.Id))
+	require.NoError(t, database.DeleteUserSession(context.Background(), nil, session.ID))
 
 	assertUserinfoRefuses(t, accessToken, http.StatusUnauthorized, "invalid_token")
 }

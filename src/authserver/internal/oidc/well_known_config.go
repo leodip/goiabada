@@ -6,7 +6,7 @@ type WellKnownConfig struct {
 	TokenEndpoint                     string   `json:"token_endpoint"`
 	UserInfoEndpoint                  string   `json:"userinfo_endpoint"`
 	EndSessionEndpoint                string   `json:"end_session_endpoint"`
-	JWKsURI                           string   `json:"jwks_uri"`
+	JWKSURI                           string   `json:"jwks_uri"`
 	RegistrationEndpoint              string   `json:"registration_endpoint,omitempty"` // RFC 7591 §4
 	GrantTypesSupported               []string `json:"grant_types_supported"`
 	ResponseTypesSupported            []string `json:"response_types_supported"`
@@ -14,7 +14,7 @@ type WellKnownConfig struct {
 	PromptValuesSupported             []string `json:"prompt_values_supported,omitempty"`  // OIDC Discovery 1.0 §3
 	ACRValuesSupported                []string `json:"acr_values_supported"`
 	SubjectTypesSupported             []string `json:"subject_types_supported"`
-	IdTokenSigningAlgValuesSupported  []string `json:"id_token_signing_alg_values_supported"`
+	IDTokenSigningAlgValuesSupported  []string `json:"id_token_signing_alg_values_supported"`
 	ScopesSupported                   []string `json:"scopes_supported"`
 	ClaimsSupported                   []string `json:"claims_supported"`
 	TokenEndpointAuthMethodsSupported []string `json:"token_endpoint_auth_methods_supported"`

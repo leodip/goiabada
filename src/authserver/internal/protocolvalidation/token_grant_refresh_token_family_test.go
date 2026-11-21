@@ -38,7 +38,7 @@ import (
 func TestValidateTokenRequest_RefreshGrant_ARevokedFamilyIsRefusedBelowTheOtherGates(t *testing.T) {
 	const (
 		clientSecret = "client_secret"
-		familyJti    = "family-jti"
+		familyJTI    = "family-jti"
 	)
 
 	type attempt struct {
@@ -112,33 +112,33 @@ func TestValidateTokenRequest_RefreshGrant_ARevokedFamilyIsRefusedBelowTheOtherG
 				clientSecretEncrypted, err := testDataCipher.Encrypt(clientSecret)
 				require.NoError(t, err)
 				clients := map[string]*record.Client{
-					"client1": {Id: 1, ClientIdentifier: "client1", Enabled: true,
+					"client1": {ID: 1, ClientIdentifier: "client1", Enabled: true,
 						AuthorizationCodeEnabled: true, ClientSecretEncrypted: clientSecretEncrypted},
-					"client2": {Id: 2, ClientIdentifier: "client2", Enabled: true,
+					"client2": {ID: 2, ClientIdentifier: "client2", Enabled: true,
 						AuthorizationCodeEnabled: true, IsPublic: true},
 				}
 
-				user := record.User{Id: 7, Enabled: a.userEnabled, AuthStateGeneration: 3}
+				user := record.User{ID: 7, Enabled: a.userEnabled, AuthStateGeneration: 3}
 				refreshToken := &record.RefreshToken{
-					RefreshTokenJti: "the_jti", FirstRefreshTokenJti: familyJti, AuthStateGeneration: 3, Revoked: a.tokenRevoked,
+					RefreshTokenJTI: "the_jti", FirstRefreshTokenJTI: familyJTI, AuthStateGeneration: 3, Revoked: a.tokenRevoked,
 				}
 				if ropc {
-					refreshToken.ClientId = sql.NullInt64{Int64: 1, Valid: true}
-					refreshToken.UserId = sql.NullInt64{Int64: 7, Valid: true}
+					refreshToken.ClientID = sql.NullInt64{Int64: 1, Valid: true}
+					refreshToken.UserID = sql.NullInt64{Int64: 7, Valid: true}
 					refreshToken.User = user
 					refreshToken.AuthenticatedAt = sql.NullTime{Time: time.Now().UTC().Add(-time.Hour), Valid: true}
 				} else {
-					refreshToken.CodeId = sql.NullInt64{Int64: 11, Valid: true}
-					refreshToken.Code = record.Code{Id: 11, ClientId: 1, UserId: 7, User: user}
+					refreshToken.CodeID = sql.NullInt64{Int64: 11, Valid: true}
+					refreshToken.Code = record.Code{ID: 11, ClientID: 1, UserID: 7, User: user}
 				}
 
 				mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, a.clientIdentifier).
 					Return(clients[a.clientIdentifier], nil).Once()
 				mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "the_refresh_token", true).
-					Return(&oauth.JwtToken{Claims: jwt.MapClaims{"jti": "the_jti", "typ": "Refresh"}}, nil).Maybe()
-				mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "the_jti").Return(refreshToken, nil).Maybe()
+					Return(&oauth.JWTToken{Claims: jwt.MapClaims{"jti": "the_jti", "typ": "Refresh"}}, nil).Maybe()
+				mockDB.On("GetRefreshTokenByJTI", mock.Anything, mock.Anything, "the_jti").Return(refreshToken, nil).Maybe()
 				// The record is asked about by the family's first jti, never the presented token's.
-				mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, familyJti).
+				mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, familyJTI).
 					Return(a.familyRevoked, a.familyLookup).Maybe()
 				// A token bound to no session, which is what a revoked token's row is refused for below.
 				mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "").Return(nil, nil).Maybe()
@@ -153,7 +153,7 @@ func TestValidateTokenRequest_RefreshGrant_ARevokedFamilyIsRefusedBelowTheOtherG
 				grant, err := validator.ValidateTokenRequest(context.Background(), &record.Settings{},
 					&ValidateTokenRequestInput{
 						GrantType:    "refresh_token",
-						ClientId:     a.clientIdentifier,
+						ClientID:     a.clientIdentifier,
 						ClientSecret: a.clientSecret,
 						RefreshToken: "the_refresh_token",
 					})
@@ -165,7 +165,7 @@ func TestValidateTokenRequest_RefreshGrant_ARevokedFamilyIsRefusedBelowTheOtherG
 					require.ErrorIs(t, err, a.familyLookup)
 				}
 				if a.reachesFamily {
-					mockDB.AssertCalled(t, "IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, familyJti)
+					mockDB.AssertCalled(t, "IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, familyJTI)
 				} else {
 					mockDB.AssertNotCalled(t, "IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, mock.Anything)
 				}

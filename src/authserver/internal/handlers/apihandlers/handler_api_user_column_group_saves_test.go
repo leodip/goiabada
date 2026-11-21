@@ -28,7 +28,7 @@ import (
 // request asked for, and answers with them as it always has.
 
 const (
-	columnGroupUserId  = int64(61)
+	columnGroupUserID  = int64(61)
 	columnGroupSubject = "sub-61"
 )
 
@@ -36,7 +36,7 @@ const (
 // requests below replace, and the columns no save may write set to something to undo.
 func columnGroupStoredUser() *record.User {
 	return &record.User{
-		Id:                            columnGroupUserId,
+		ID:                            columnGroupUserID,
 		Subject:                       columnGroupSubject,
 		Enabled:                       true,
 		PasswordHash:                  "the-hash-as-read",
@@ -51,7 +51,7 @@ func columnGroupStoredUser() *record.User {
 		Locale:                        "pt-BR",
 		AddressLine1:                  "1 Before Road",
 		AddressCountry:                "BR",
-		PhoneNumberCountryUniqueId:    "BRA_0",
+		PhoneNumberCountryUniqueID:    "BRA_0",
 		PhoneNumberCountryCallingCode: "+55",
 		PhoneNumber:                   "11 98765 4321",
 		PhoneNumberVerified:           true,
@@ -104,7 +104,7 @@ func requireSavedNarrowly(t *testing.T, database *datamocks.Database, rr *httpte
 	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 	database.AssertNotCalled(t, "UpdateUser", mock.Anything, mock.Anything, mock.Anything)
 	require.NotNil(t, saved, "the narrow write was not reached")
-	assert.Equal(t, columnGroupUserId, saved.Id)
+	assert.Equal(t, columnGroupUserID, saved.ID)
 	var body api.UpdateUserResponse
 	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &body))
 	return body.User
@@ -168,7 +168,7 @@ func TestHandleUserProfilePut_SavesTheProfileColumnsNarrowly(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
-	database.On("GetUserById", mock.Anything, mock.Anything, columnGroupUserId).Return(columnGroupStoredUser(), nil).Once()
+	database.On("GetUserByID", mock.Anything, mock.Anything, columnGroupUserID).Return(columnGroupStoredUser(), nil).Once()
 	expectProfileValidatorReads(database, columnGroupStoredUser())
 	saved, _ := expectProfileSave(database)
 	auditLogger.On("Log", mock.Anything, audit.EventUpdatedUserProfile, mock.Anything).Return().Once()
@@ -223,7 +223,7 @@ func TestHandleUserAddressPut_SavesTheAddressColumnsNarrowly(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
-	database.On("GetUserById", mock.Anything, mock.Anything, columnGroupUserId).Return(columnGroupStoredUser(), nil).Once()
+	database.On("GetUserByID", mock.Anything, mock.Anything, columnGroupUserID).Return(columnGroupStoredUser(), nil).Once()
 	saved := expectNarrowSave(database, "SetUserAddress")
 	auditLogger.On("Log", mock.Anything, audit.EventUpdatedUserAddress, mock.Anything).Return().Once()
 
@@ -241,24 +241,24 @@ func TestPhonePuts_SaveThePhoneColumnsNarrowly(t *testing.T) {
 	type phoneCase struct {
 		name         string
 		number       string
-		countryId    string
+		countryID    string
 		sendVerified bool
 		wantCalling  string
 		wantVerified bool
 	}
 	selfService := []phoneCase{
-		{name: "a number, previously verified", number: "912 345 678", countryId: "PRT_0", wantCalling: "+351"},
-		{name: "a cleared number", number: "", countryId: ""},
+		{name: "a number, previously verified", number: "912 345 678", countryID: "PRT_0", wantCalling: "+351"},
+		{name: "a cleared number", number: "", countryID: ""},
 	}
 	administrator := []phoneCase{
-		{name: "a number sent verified", number: "912 345 678", countryId: "PRT_0", sendVerified: true, wantCalling: "+351", wantVerified: true},
-		{name: "a number sent unverified", number: "912 345 678", countryId: "PRT_0", wantCalling: "+351"},
-		{name: "a cleared number sent verified", number: "", countryId: "", sendVerified: true},
+		{name: "a number sent verified", number: "912 345 678", countryID: "PRT_0", sendVerified: true, wantCalling: "+351", wantVerified: true},
+		{name: "a number sent unverified", number: "912 345 678", countryID: "PRT_0", wantCalling: "+351"},
+		{name: "a cleared number sent verified", number: "", countryID: "", sendVerified: true},
 	}
 
 	assertPhoneSaved := func(t *testing.T, tc phoneCase, saved *record.User, resp api.UserResponse) {
 		t.Helper()
-		assert.Equal(t, tc.countryId, saved.PhoneNumberCountryUniqueId)
+		assert.Equal(t, tc.countryID, saved.PhoneNumberCountryUniqueID)
 		assert.Equal(t, tc.wantCalling, saved.PhoneNumberCountryCallingCode)
 		assert.Equal(t, tc.number, saved.PhoneNumber)
 		assert.Equal(t, tc.wantVerified, saved.PhoneNumberVerified)
@@ -278,7 +278,7 @@ func TestPhonePuts_SaveThePhoneColumnsNarrowly(t *testing.T) {
 			rr := httptest.NewRecorder()
 			HandleAccountPhonePut(database, accountvalidation.NewPhoneValidator(), auditLogger).
 				ServeHTTP(rr, columnGroupSelfServiceRequest(t, "/api/v1/account/phone",
-					api.UpdateAccountPhoneRequest{PhoneCountryUniqueId: tc.countryId, PhoneNumber: tc.number}))
+					api.UpdateAccountPhoneRequest{PhoneCountryUniqueID: tc.countryID, PhoneNumber: tc.number}))
 
 			resp := requireSavedNarrowly(t, database, rr, *saved)
 			assertPhoneSaved(t, tc, *saved, resp)
@@ -290,14 +290,14 @@ func TestPhonePuts_SaveThePhoneColumnsNarrowly(t *testing.T) {
 			database := datamocks.NewDatabase(t)
 			auditLogger := handlersmocks.NewAuditLogger(t)
 
-			database.On("GetUserById", mock.Anything, mock.Anything, columnGroupUserId).Return(columnGroupStoredUser(), nil).Once()
+			database.On("GetUserByID", mock.Anything, mock.Anything, columnGroupUserID).Return(columnGroupStoredUser(), nil).Once()
 			saved := expectNarrowSave(database, "SetUserPhone")
 			auditLogger.On("Log", mock.Anything, audit.EventUpdatedUserPhone, mock.Anything).Return().Once()
 
 			rr := httptest.NewRecorder()
 			HandleUserPhonePut(database, accountvalidation.NewPhoneValidator(), auditLogger).
 				ServeHTTP(rr, columnGroupAdminRequest(t, "/api/v1/admin/users/61/phone", api.UpdateUserPhoneRequest{
-					PhoneCountryUniqueId: tc.countryId, PhoneNumber: tc.number, PhoneNumberVerified: tc.sendVerified,
+					PhoneCountryUniqueID: tc.countryID, PhoneNumber: tc.number, PhoneNumberVerified: tc.sendVerified,
 				}))
 
 			resp := requireSavedNarrowly(t, database, rr, *saved)

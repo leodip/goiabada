@@ -39,38 +39,38 @@ func disconnectLive(session *record.UserSession) bool {
 // tellableClient is the disconnected client with a back-channel logout URI, requiring sid or not,
 // public and self-registered so a delivery that drops either field is caught.
 func tellableClient(sidRequired bool) record.Client {
-	return record.Client{Id: disconnectClientId, ClientIdentifier: "dcr_disconnected", IsPublic: true, CreatedViaDCR: true,
+	return record.Client{ID: disconnectClientID, ClientIdentifier: "dcr_disconnected", IsPublic: true, CreatedViaDCR: true,
 		BackchannelLogoutURI: "https://app.example/bc?x=1", BackchannelLogoutSessionRequired: sidRequired}
 }
 
 // expectTellableClient registers the disconnect's reads of the client and the user, each on the
 // disconnect's transaction.
 func expectTellableClient(db *datamocks.Database, client record.Client) {
-	db.On("GetClientsByIds", mock.Anything, revokeTx, []int64{disconnectClientId}).
+	db.On("GetClientsByIDs", mock.Anything, revokeTx, []int64{disconnectClientID}).
 		Return([]record.Client{client}, nil).Once()
-	db.On("GetUserById", mock.Anything, revokeTx, disconnectUserId).
-		Return(&record.User{Id: disconnectUserId, Subject: disconnectSubject}, nil).Once()
+	db.On("GetUserByID", mock.Anything, revokeTx, disconnectUserID).
+		Return(&record.User{ID: disconnectUserID, Subject: disconnectSubject}, nil).Once()
 }
 
 // expectOneTokenSwept registers a sweep that revokes one live token of one family: a change.
 func expectOneTokenSwept(db *datamocks.Database) {
-	token := &record.RefreshToken{Id: 7, RefreshTokenJti: "rt-live", FirstRefreshTokenJti: "fam-live"}
-	db.On("RevokeUnusedCodesByUserIdAndClientId", mock.Anything, revokeTx, disconnectUserId, disconnectClientId).
+	token := &record.RefreshToken{ID: 7, RefreshTokenJTI: "rt-live", FirstRefreshTokenJTI: "fam-live"}
+	db.On("RevokeUnusedCodesByUserIDAndClientID", mock.Anything, revokeTx, disconnectUserID, disconnectClientID).
 		Return(int64(0), nil).Once()
-	db.On("GetRefreshTokensByUserIdAndClientId", mock.Anything, revokeTx, disconnectUserId, disconnectClientId).
+	db.On("GetRefreshTokensByUserIDAndClientID", mock.Anything, revokeTx, disconnectUserID, disconnectClientID).
 		Return([]*record.RefreshToken{token}, nil).Once()
 	db.On("RecordRefreshTokenFamilyRevoked", mock.Anything, revokeTx, "fam-live", ReasonClientDisconnected).
 		Return(true, nil).Once()
-	db.On("MarkRefreshTokenAsRevoked", mock.Anything, revokeTx, token.Id).Return(true, nil).Once()
+	db.On("MarkRefreshTokenAsRevoked", mock.Anything, revokeTx, token.ID).Return(true, nil).Once()
 }
 
 // disconnectSessions is the user's four sessions, out of id order as the query may answer them.
 func disconnectSessions() []record.UserSession {
 	return []record.UserSession{
-		{Id: 4, UserId: disconnectUserId, SessionIdentifier: disconnectSecondLiveSid},
-		{Id: 3, UserId: disconnectUserId, SessionIdentifier: disconnectExpiredSid},
-		{Id: 2, UserId: disconnectUserId, SessionIdentifier: disconnectLiveSid},
-		{Id: 5, UserId: disconnectUserId, SessionIdentifier: disconnectElsewhereSid},
+		{ID: 4, UserID: disconnectUserID, SessionIdentifier: disconnectSecondLiveSid},
+		{ID: 3, UserID: disconnectUserID, SessionIdentifier: disconnectExpiredSid},
+		{ID: 2, UserID: disconnectUserID, SessionIdentifier: disconnectLiveSid},
+		{ID: 5, UserID: disconnectUserID, SessionIdentifier: disconnectElsewhereSid},
 	}
 }
 
@@ -82,18 +82,18 @@ func TestDisconnectClientTx_TellsTheClientAboutTheUserAlone(t *testing.T) {
 	expectTellableClient(db, tellableClient(false))
 	expectOneTokenSwept(db)
 
-	result, err := DisconnectClientTx(context.Background(), db, disconnectUserId, disconnectClientId, disconnectLive,
+	result, err := DisconnectClientTx(context.Background(), db, disconnectUserID, disconnectClientID, disconnectLive,
 		deletesTheConsent)
 
 	require.NoError(t, err)
 	assert.Equal(t, []backchannel.Delivery{{
-		ClientId: disconnectClientId, ClientIdentifier: "dcr_disconnected", URI: "https://app.example/bc?x=1",
-		IsPublic: true, CreatedViaDCR: true, UserId: disconnectUserId, Subject: disconnectSubject,
+		ClientID: disconnectClientID, ClientIdentifier: "dcr_disconnected", URI: "https://app.example/bc?x=1",
+		IsPublic: true, CreatedViaDCR: true, UserID: disconnectUserID, Subject: disconnectSubject,
 	}}, result.LogoutDeliveries)
 	// One token about every session of the user: the sessions are not read.
-	assertNotAttempted(t, db, "GetUserSessionsByUserId", "GetUserSessionClientsByUserSessionIds")
+	assertNotAttempted(t, db, "GetUserSessionsByUserID", "GetUserSessionClientsByUserSessionIDs")
 	// Read before the disconnect's first write, so the reads hold no row against anyone.
-	assert.Less(t, callIndex(t, db, "GetUserById"), callIndex(t, db, "RevokeUnusedCodesByUserIdAndClientId"))
+	assert.Less(t, callIndex(t, db, "GetUserByID"), callIndex(t, db, "RevokeUnusedCodesByUserIDAndClientID"))
 }
 
 // A client that requires sid is sent one token for each of the user's sessions it is on that is
@@ -103,30 +103,30 @@ func TestDisconnectClientTx_ASidRequiringClientIsToldOfEachValidSessionItIsOn(t 
 	db := datamocks.NewDatabase(t)
 	datamocks.ExpectRunInTransaction(db, revokeTx)
 	expectTellableClient(db, tellableClient(true))
-	db.On("GetUserSessionsByUserId", mock.Anything, revokeTx, disconnectUserId).Return(disconnectSessions(), nil).Once()
+	db.On("GetUserSessionsByUserID", mock.Anything, revokeTx, disconnectUserID).Return(disconnectSessions(), nil).Once()
 	// Only the valid sessions' apps are read, the expired session's not.
-	db.On("GetUserSessionClientsByUserSessionIds", mock.Anything, revokeTx, []int64{2, 4, 5}).
+	db.On("GetUserSessionClientsByUserSessionIDs", mock.Anything, revokeTx, []int64{2, 4, 5}).
 		Return([]record.UserSessionClient{
-			{UserSessionId: 4, ClientId: disconnectClientId},
-			{UserSessionId: 5, ClientId: 999},
-			{UserSessionId: 2, ClientId: 999},
-			{UserSessionId: 2, ClientId: disconnectClientId},
+			{UserSessionID: 4, ClientID: disconnectClientID},
+			{UserSessionID: 5, ClientID: 999},
+			{UserSessionID: 2, ClientID: 999},
+			{UserSessionID: 2, ClientID: disconnectClientID},
 		}, nil).Once()
 	expectOneTokenSwept(db)
 
-	result, err := DisconnectClientTx(context.Background(), db, disconnectUserId, disconnectClientId, disconnectLive,
+	result, err := DisconnectClientTx(context.Background(), db, disconnectUserID, disconnectClientID, disconnectLive,
 		nil)
 
 	require.NoError(t, err)
 	withSession := func(sid string) backchannel.Delivery {
-		return backchannel.Delivery{ClientId: disconnectClientId, ClientIdentifier: "dcr_disconnected",
-			URI: "https://app.example/bc?x=1", IsPublic: true, CreatedViaDCR: true, UserId: disconnectUserId,
+		return backchannel.Delivery{ClientID: disconnectClientID, ClientIdentifier: "dcr_disconnected",
+			URI: "https://app.example/bc?x=1", IsPublic: true, CreatedViaDCR: true, UserID: disconnectUserID,
 			Subject: disconnectSubject, SessionIdentifier: sid}
 	}
 	assert.Equal(t, []backchannel.Delivery{withSession(disconnectLiveSid), withSession(disconnectSecondLiveSid)},
 		result.LogoutDeliveries)
-	assert.Less(t, callIndex(t, db, "GetUserSessionClientsByUserSessionIds"),
-		callIndex(t, db, "RevokeUnusedCodesByUserIdAndClientId"))
+	assert.Less(t, callIndex(t, db, "GetUserSessionClientsByUserSessionIDs"),
+		callIndex(t, db, "RevokeUnusedCodesByUserIDAndClientID"))
 }
 
 // A client that requires sid and is on no valid session of the user is told nothing: on none at
@@ -136,12 +136,12 @@ func TestDisconnectClientTx_ASidRequiringClientOnNoValidSessionIsToldNothing(t *
 		db := datamocks.NewDatabase(t)
 		datamocks.ExpectRunInTransaction(db, revokeTx)
 		expectTellableClient(db, tellableClient(true))
-		db.On("GetUserSessionsByUserId", mock.Anything, revokeTx, disconnectUserId).Return(disconnectSessions(), nil).Once()
-		db.On("GetUserSessionClientsByUserSessionIds", mock.Anything, revokeTx, []int64{2, 4, 5}).
-			Return([]record.UserSessionClient{{UserSessionId: 5, ClientId: 999}}, nil).Once()
+		db.On("GetUserSessionsByUserID", mock.Anything, revokeTx, disconnectUserID).Return(disconnectSessions(), nil).Once()
+		db.On("GetUserSessionClientsByUserSessionIDs", mock.Anything, revokeTx, []int64{2, 4, 5}).
+			Return([]record.UserSessionClient{{UserSessionID: 5, ClientID: 999}}, nil).Once()
 		expectOneTokenSwept(db)
 
-		result, err := DisconnectClientTx(context.Background(), db, disconnectUserId, disconnectClientId, disconnectLive,
+		result, err := DisconnectClientTx(context.Background(), db, disconnectUserID, disconnectClientID, disconnectLive,
 			nil)
 
 		require.NoError(t, err)
@@ -153,16 +153,16 @@ func TestDisconnectClientTx_ASidRequiringClientOnNoValidSessionIsToldNothing(t *
 		db := datamocks.NewDatabase(t)
 		datamocks.ExpectRunInTransaction(db, revokeTx)
 		expectTellableClient(db, tellableClient(true))
-		db.On("GetUserSessionsByUserId", mock.Anything, revokeTx, disconnectUserId).
-			Return([]record.UserSession{{Id: 3, UserId: disconnectUserId, SessionIdentifier: disconnectExpiredSid}}, nil).Once()
+		db.On("GetUserSessionsByUserID", mock.Anything, revokeTx, disconnectUserID).
+			Return([]record.UserSession{{ID: 3, UserID: disconnectUserID, SessionIdentifier: disconnectExpiredSid}}, nil).Once()
 		expectOneTokenSwept(db)
 
-		result, err := DisconnectClientTx(context.Background(), db, disconnectUserId, disconnectClientId, disconnectLive,
+		result, err := DisconnectClientTx(context.Background(), db, disconnectUserID, disconnectClientID, disconnectLive,
 			nil)
 
 		require.NoError(t, err)
 		assert.Empty(t, result.LogoutDeliveries)
-		assertNotAttempted(t, db, "GetUserSessionClientsByUserSessionIds")
+		assertNotAttempted(t, db, "GetUserSessionClientsByUserSessionIDs")
 	})
 
 	t.Run("with no liveness to judge by", func(t *testing.T) {
@@ -171,11 +171,11 @@ func TestDisconnectClientTx_ASidRequiringClientOnNoValidSessionIsToldNothing(t *
 		expectTellableClient(db, tellableClient(true))
 		expectOneTokenSwept(db)
 
-		result, err := DisconnectClientTx(context.Background(), db, disconnectUserId, disconnectClientId, nil, nil)
+		result, err := DisconnectClientTx(context.Background(), db, disconnectUserID, disconnectClientID, nil, nil)
 
 		require.NoError(t, err)
 		assert.Empty(t, result.LogoutDeliveries)
-		assertNotAttempted(t, db, "GetUserSessionsByUserId", "GetUserSessionClientsByUserSessionIds")
+		assertNotAttempted(t, db, "GetUserSessionsByUserID", "GetUserSessionClientsByUserSessionIDs")
 	})
 }
 
@@ -186,22 +186,22 @@ func TestDisconnectClientTx_AClientWithNoLogoutURIIsToldNothing(t *testing.T) {
 		name    string
 		clients []record.Client
 	}{
-		{"no URI", []record.Client{{Id: disconnectClientId, ClientIdentifier: "no-uri", BackchannelLogoutSessionRequired: true}}},
+		{"no URI", []record.Client{{ID: disconnectClientID, ClientIdentifier: "no-uri", BackchannelLogoutSessionRequired: true}}},
 		{"the client gone", []record.Client{}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			db := datamocks.NewDatabase(t)
 			datamocks.ExpectRunInTransaction(db, revokeTx)
-			db.On("GetClientsByIds", mock.Anything, revokeTx, []int64{disconnectClientId}).Return(tc.clients, nil).Once()
+			db.On("GetClientsByIDs", mock.Anything, revokeTx, []int64{disconnectClientID}).Return(tc.clients, nil).Once()
 			expectOneTokenSwept(db)
 
-			result, err := DisconnectClientTx(context.Background(), db, disconnectUserId, disconnectClientId,
+			result, err := DisconnectClientTx(context.Background(), db, disconnectUserID, disconnectClientID,
 				disconnectLive, nil)
 
 			require.NoError(t, err)
 			assert.True(t, result.Changed())
 			assert.Nil(t, result.LogoutDeliveries)
-			assertNotAttempted(t, db, "GetUserById", "GetUserSessionsByUserId")
+			assertNotAttempted(t, db, "GetUserByID", "GetUserSessionsByUserID")
 		})
 	}
 }
@@ -210,12 +210,12 @@ func TestDisconnectClientTx_AClientWithNoLogoutURIIsToldNothing(t *testing.T) {
 func TestDisconnectClientTx_AUserAlreadyGoneTellsNobody(t *testing.T) {
 	db := datamocks.NewDatabase(t)
 	datamocks.ExpectRunInTransaction(db, revokeTx)
-	db.On("GetClientsByIds", mock.Anything, revokeTx, []int64{disconnectClientId}).
+	db.On("GetClientsByIDs", mock.Anything, revokeTx, []int64{disconnectClientID}).
 		Return([]record.Client{tellableClient(false)}, nil).Once()
-	db.On("GetUserById", mock.Anything, revokeTx, disconnectUserId).Return(nil, nil).Once()
+	db.On("GetUserByID", mock.Anything, revokeTx, disconnectUserID).Return(nil, nil).Once()
 	expectOneTokenSwept(db)
 
-	result, err := DisconnectClientTx(context.Background(), db, disconnectUserId, disconnectClientId, disconnectLive, nil)
+	result, err := DisconnectClientTx(context.Background(), db, disconnectUserID, disconnectClientID, disconnectLive, nil)
 
 	require.NoError(t, err)
 	assert.Nil(t, result.LogoutDeliveries)
@@ -227,12 +227,12 @@ func TestDisconnectClientTx_NothingChangedTellsNobody(t *testing.T) {
 	db := datamocks.NewDatabase(t)
 	datamocks.ExpectRunInTransaction(db, revokeTx)
 	expectTellableClient(db, tellableClient(false))
-	db.On("RevokeUnusedCodesByUserIdAndClientId", mock.Anything, revokeTx, disconnectUserId, disconnectClientId).
+	db.On("RevokeUnusedCodesByUserIDAndClientID", mock.Anything, revokeTx, disconnectUserID, disconnectClientID).
 		Return(int64(0), nil).Once()
-	db.On("GetRefreshTokensByUserIdAndClientId", mock.Anything, revokeTx, disconnectUserId, disconnectClientId).
+	db.On("GetRefreshTokensByUserIDAndClientID", mock.Anything, revokeTx, disconnectUserID, disconnectClientID).
 		Return([]*record.RefreshToken{}, nil).Once()
 
-	result, err := DisconnectClientTx(context.Background(), db, disconnectUserId, disconnectClientId, disconnectLive,
+	result, err := DisconnectClientTx(context.Background(), db, disconnectUserID, disconnectClientID, disconnectLive,
 		func(*sql.Tx) (bool, error) { return false, nil })
 
 	require.NoError(t, err)
@@ -249,21 +249,21 @@ func TestDisconnectClientTx_AFailedDeliveryReadFailsTheDisconnect(t *testing.T) 
 		setup func(db *datamocks.Database)
 	}{
 		{"the client read", func(db *datamocks.Database) {
-			db.On("GetClientsByIds", mock.Anything, revokeTx, []int64{disconnectClientId}).Return(nil, boom).Once()
+			db.On("GetClientsByIDs", mock.Anything, revokeTx, []int64{disconnectClientID}).Return(nil, boom).Once()
 		}},
 		{"the user read", func(db *datamocks.Database) {
-			db.On("GetClientsByIds", mock.Anything, revokeTx, []int64{disconnectClientId}).
+			db.On("GetClientsByIDs", mock.Anything, revokeTx, []int64{disconnectClientID}).
 				Return([]record.Client{tellableClient(true)}, nil).Once()
-			db.On("GetUserById", mock.Anything, revokeTx, disconnectUserId).Return(nil, boom).Once()
+			db.On("GetUserByID", mock.Anything, revokeTx, disconnectUserID).Return(nil, boom).Once()
 		}},
 		{"the sessions read", func(db *datamocks.Database) {
 			expectTellableClient(db, tellableClient(true))
-			db.On("GetUserSessionsByUserId", mock.Anything, revokeTx, disconnectUserId).Return(nil, boom).Once()
+			db.On("GetUserSessionsByUserID", mock.Anything, revokeTx, disconnectUserID).Return(nil, boom).Once()
 		}},
 		{"the sessions' apps read", func(db *datamocks.Database) {
 			expectTellableClient(db, tellableClient(true))
-			db.On("GetUserSessionsByUserId", mock.Anything, revokeTx, disconnectUserId).Return(disconnectSessions(), nil).Once()
-			db.On("GetUserSessionClientsByUserSessionIds", mock.Anything, revokeTx, []int64{2, 4, 5}).Return(nil, boom).Once()
+			db.On("GetUserSessionsByUserID", mock.Anything, revokeTx, disconnectUserID).Return(disconnectSessions(), nil).Once()
+			db.On("GetUserSessionClientsByUserSessionIDs", mock.Anything, revokeTx, []int64{2, 4, 5}).Return(nil, boom).Once()
 		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -272,13 +272,13 @@ func TestDisconnectClientTx_AFailedDeliveryReadFailsTheDisconnect(t *testing.T) 
 			tc.setup(db)
 			deleted := false
 
-			result, err := DisconnectClientTx(context.Background(), db, disconnectUserId, disconnectClientId,
+			result, err := DisconnectClientTx(context.Background(), db, disconnectUserID, disconnectClientID,
 				disconnectLive, func(*sql.Tx) (bool, error) { deleted = true; return true, nil })
 
 			require.ErrorIs(t, err, boom)
 			assert.Equal(t, DisconnectResult{}, result)
 			assert.False(t, deleted, "nothing is written after the failed read")
-			assertNotAttempted(t, db, "RevokeUnusedCodesByUserIdAndClientId", "GetRefreshTokensByUserIdAndClientId")
+			assertNotAttempted(t, db, "RevokeUnusedCodesByUserIDAndClientID", "GetRefreshTokensByUserIDAndClientID")
 		})
 	}
 }

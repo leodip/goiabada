@@ -24,10 +24,10 @@ var clientIntrospectionResourceColumns = columnList{
 // scanClientIntrospectionResource reads one row selected with clientIntrospectionResourceColumns.
 func scanClientIntrospectionResource(row rowScanner, link *record.ClientIntrospectionResource) error {
 	return row.Scan(
-		&link.Id,
+		&link.ID,
 		&link.CreatedAt,
-		&link.ClientId,
-		&link.ResourceId,
+		&link.ClientID,
+		&link.ResourceID,
 	)
 }
 
@@ -38,7 +38,7 @@ var insertClientIntrospectionResource = statement{
 	mssql:    "INSERT INTO clients_introspection_resources (created_at, client_id, resource_id) OUTPUT INSERTED.id VALUES (@p1, @p2, @p3)",
 }
 
-var selectClientIntrospectionResourcesByClientId = statement{
+var selectClientIntrospectionResourcesByClientID = statement{
 	sqlite:   "SELECT " + clientIntrospectionResourceColumns.sqlite + " FROM clients_introspection_resources WHERE client_id = ?",
 	mysql:    "SELECT " + clientIntrospectionResourceColumns.mysql + " FROM clients_introspection_resources WHERE client_id = ?",
 	postgres: "SELECT " + clientIntrospectionResourceColumns.postgres + " FROM clients_introspection_resources WHERE client_id = $1",
@@ -52,7 +52,7 @@ var deleteClientIntrospectionResource = statement{
 	mssql:    "DELETE FROM clients_introspection_resources WHERE id = @p1",
 }
 
-var deleteClientIntrospectionResourcesByClientId = statement{
+var deleteClientIntrospectionResourcesByClientID = statement{
 	sqlite:   "DELETE FROM clients_introspection_resources WHERE client_id = ?",
 	mysql:    "DELETE FROM clients_introspection_resources WHERE client_id = ?",
 	postgres: "DELETE FROM clients_introspection_resources WHERE client_id = $1",
@@ -61,11 +61,11 @@ var deleteClientIntrospectionResourcesByClientId = statement{
 
 func (d *Database) CreateClientIntrospectionResource(ctx context.Context, tx *sql.Tx, link *record.ClientIntrospectionResource) error {
 
-	if link.ClientId == 0 {
+	if link.ClientID == 0 {
 		return errs.New("can't create clientIntrospectionResource with client_id 0")
 	}
 
-	if link.ResourceId == 0 {
+	if link.ResourceID == 0 {
 		return errs.New("can't create clientIntrospectionResource with resource_id 0")
 	}
 
@@ -73,24 +73,24 @@ func (d *Database) CreateClientIntrospectionResource(ctx context.Context, tx *sq
 	link.CreatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
 	id, err := d.insert(ctx, tx, insertClientIntrospectionResource, "clientIntrospectionResource",
-		link.CreatedAt, link.ClientId, link.ResourceId)
+		link.CreatedAt, link.ClientID, link.ResourceID)
 	if err != nil {
 		link.CreatedAt = originalCreatedAt
 		return err
 	}
 
-	link.Id = id
+	link.ID = id
 	return nil
 }
 
-func (d *Database) GetClientIntrospectionResourcesByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.ClientIntrospectionResource, error) {
-	return queryAll(ctx, d, tx, nil, selectClientIntrospectionResourcesByClientId.text(d.Dialect), []any{clientId},
+func (d *Database) GetClientIntrospectionResourcesByClientID(ctx context.Context, tx *sql.Tx, clientID int64) ([]record.ClientIntrospectionResource, error) {
+	return queryAll(ctx, d, tx, nil, selectClientIntrospectionResourcesByClientID.text(d.Dialect), []any{clientID},
 		scanClientIntrospectionResource, "clientIntrospectionResource")
 }
 
-func (d *Database) DeleteClientIntrospectionResource(ctx context.Context, tx *sql.Tx, clientIntrospectionResourceId int64) error {
+func (d *Database) DeleteClientIntrospectionResource(ctx context.Context, tx *sql.Tx, clientIntrospectionResourceID int64) error {
 
-	_, err := d.ExecSQL(ctx, tx, deleteClientIntrospectionResource.text(d.Dialect), clientIntrospectionResourceId)
+	_, err := d.ExecSQL(ctx, tx, deleteClientIntrospectionResource.text(d.Dialect), clientIntrospectionResourceID)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete clientIntrospectionResource")
 	}
@@ -98,9 +98,9 @@ func (d *Database) DeleteClientIntrospectionResource(ctx context.Context, tx *sq
 	return nil
 }
 
-func (d *Database) DeleteClientIntrospectionResourcesByClientId(ctx context.Context, tx *sql.Tx, clientId int64) error {
+func (d *Database) DeleteClientIntrospectionResourcesByClientID(ctx context.Context, tx *sql.Tx, clientID int64) error {
 
-	_, err := d.ExecSQL(ctx, tx, deleteClientIntrospectionResourcesByClientId.text(d.Dialect), clientId)
+	_, err := d.ExecSQL(ctx, tx, deleteClientIntrospectionResourcesByClientID.text(d.Dialect), clientID)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete the client's introspection resources")
 	}

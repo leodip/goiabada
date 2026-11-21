@@ -58,13 +58,13 @@ func TestRender_AdminGroupNew_ARefusalKeepsTheSwitchesAsSubmitted(t *testing.T) 
 		name       string
 		form       url.Values
 		wantAccess bool
-		wantId     bool
+		wantID     bool
 	}{
 		{name: "both off", form: url.Values{}},
 		{name: "access token only", form: url.Values{"includeInAccessToken": {"on"}}, wantAccess: true},
-		{name: "ID token only", form: url.Values{"includeInIdToken": {"on"}}, wantId: true},
+		{name: "ID token only", form: url.Values{"includeInIdToken": {"on"}}, wantID: true},
 		{name: "both on", form: url.Values{"includeInAccessToken": {"on"}, "includeInIdToken": {"on"}},
-			wantAccess: true, wantId: true},
+			wantAccess: true, wantID: true},
 	}
 
 	for _, tc := range testCases {
@@ -84,7 +84,7 @@ func TestRender_AdminGroupNew_ARefusalKeepsTheSwitchesAsSubmitted(t *testing.T) 
 			assert.Equal(t, tc.wantAccess, regexp.MustCompile(`\bchecked\b`).MatchString(access), "access token: %s", access)
 			id := groupSwitchRe("includeInIdToken").FindString(out)
 			require.NotEmpty(t, id)
-			assert.Equal(t, tc.wantId, regexp.MustCompile(`\bchecked\b`).MatchString(id), "ID token: %s", id)
+			assert.Equal(t, tc.wantID, regexp.MustCompile(`\bchecked\b`).MatchString(id), "ID token: %s", id)
 		})
 	}
 }
@@ -98,7 +98,7 @@ type profilePageAPI struct {
 	refusal string
 }
 
-func (s *profilePageAPI) GetUserById(_ context.Context, _ string, _ int64) (*api.UserResponse, error) {
+func (s *profilePageAPI) GetUserByID(_ context.Context, _ string, _ int64) (*api.UserResponse, error) {
 	stored := *s.stored
 	return &stored, nil
 }
@@ -157,7 +157,7 @@ func TestRender_ProfilePages_ARefusedDateOfBirthIsDrawnAsTyped(t *testing.T) {
 	const refusal = "A data de nascimento é inválida."
 	born := time.Date(1980, 1, 2, 0, 0, 0, 0, time.UTC)
 	apiClient := &profilePageAPI{
-		stored:  &api.UserResponse{Id: 9, Email: "ana@example.com", GivenName: "Ana", BirthDate: &born},
+		stored:  &api.UserResponse{ID: 9, Email: "ana@example.com", GivenName: "Ana", BirthDate: &born},
 		refusal: refusal,
 	}
 
@@ -193,7 +193,7 @@ func TestRender_ProfilePages_ARefusedDateOfBirthIsDrawnAsTyped(t *testing.T) {
 // The text is drawn escaped, as every other input's value is.
 func TestRender_ProfilePages_ARefusedDateOfBirthIsDrawnEscaped(t *testing.T) {
 	apiClient := &profilePageAPI{
-		stored:  &api.UserResponse{Id: 9, Email: "ana@example.com"},
+		stored:  &api.UserResponse{ID: 9, Email: "ana@example.com"},
 		refusal: "A data de nascimento é inválida.",
 	}
 

@@ -45,14 +45,14 @@ var ErrCodeNotClaimed = errors.New("the authorization code was no longer unused 
 func (t *TokenIssuer) IssueAuthorizationCodeGrant(ctx context.Context, settings *record.Settings,
 	code *record.Code, dpopThumbprint string) (*oauth.TokenResponse, error) {
 
-	claimed, err := t.database.MarkCodeAsUsed(ctx, nil, code.Id)
+	claimed, err := t.database.MarkCodeAsUsed(ctx, nil, code.ID)
 	if err != nil {
 		return nil, err
 	}
 	if !claimed {
 		slog.DebugContext(ctx, "code could not be claimed, rejecting the redemption",
 			"grant_type", oidc.GrantTypeAuthorizationCode.String(),
-			"code_id", code.Id)
+			"code_id", code.ID)
 		return nil, ErrCodeNotClaimed
 	}
 
@@ -106,10 +106,10 @@ func (t *TokenIssuer) mintAuthorizationCodeTokens(ctx context.Context, settings 
 
 	// The grant's identifier is the jti its first refresh token takes, fixed here so the access token
 	// minted before that token can name its grant (#676 decision 1).
-	grantId := uuid.New()
+	grantID := uuid.New()
 
 	// nil parent: this is the initial code exchange, so the code is the authorizing credential.
-	accessTokenStr, err := t.generateAccessToken(ctx, nil, settings, code, code.Scope, now, privKey, keyIdentifier, nil, grantId, dpopThumbprint)
+	accessTokenStr, err := t.generateAccessToken(ctx, nil, settings, code, code.Scope, now, privKey, keyIdentifier, nil, grantID, dpopThumbprint)
 	if err != nil {
 		return nil, err
 	}
@@ -120,16 +120,16 @@ func (t *TokenIssuer) mintAuthorizationCodeTokens(ctx context.Context, settings 
 
 	scopes := strings.Split(code.Scope, " ")
 	if slices.Contains(scopes, "openid") {
-		idTokenStr, idTokenErr := t.generateIdToken(ctx, nil, settings, code, code.Scope, now, privKey, keyIdentifier, nil)
+		idTokenStr, idTokenErr := t.generateIDToken(ctx, nil, settings, code, code.Scope, now, privKey, keyIdentifier, nil)
 		if idTokenErr != nil {
 			return nil, idTokenErr
 		}
-		tokenResponse.IdToken = idTokenStr
+		tokenResponse.IDToken = idTokenStr
 	}
 
 	// refresh_token ----------------------------------------------------------------------
 
-	refreshToken, refreshExpiresIn, err := t.generateRefreshToken(ctx, nil, settings, code, code.Scope, now, privKey, keyIdentifier, nil, grantId,
+	refreshToken, refreshExpiresIn, err := t.generateRefreshToken(ctx, nil, settings, code, code.Scope, now, privKey, keyIdentifier, nil, grantID,
 		dpopThumbprint)
 	if err != nil {
 		if errors.Is(err, errSessionRowGone) {
@@ -140,7 +140,7 @@ func (t *TokenIssuer) mintAuthorizationCodeTokens(ctx context.Context, settings 
 			// any failed mint after the claim (#530).
 			slog.DebugContext(ctx, "code's session is gone, rejecting the redemption",
 				"grant_type", oidc.GrantTypeAuthorizationCode.String(),
-				"code_id", code.Id)
+				"code_id", code.ID)
 			return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant", "Code is invalid.", http.StatusBadRequest)
 		}
 		return nil, err

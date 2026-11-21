@@ -19,13 +19,13 @@ import (
 // Seam 4 for the resource pages (#386 stages 11 and 12). See admingrouphandlers' file of the same
 // name for what this owns and why the context is the assertion.
 //
-// GetResourceById and GetPermissionsByResource record and then succeed rather than refusing,
+// GetResourceByID and GetPermissionsByResource record and then succeed rather than refusing,
 // because most of this package's pages read one or both of them first and everything below would
 // otherwise be unreachable.
 
 type resourceCtxMarkerKey struct{}
 
-type resourceCtxRecordingApiClient struct {
+type resourceCtxRecordingAPIClient struct {
 
 	// permissions is what the resource has. Empty is the arm of the Get that reads every group;
 	// one permission is the arm that asks the auth server to annotate them.
@@ -33,70 +33,70 @@ type resourceCtxRecordingApiClient struct {
 	seen        []context.Context
 }
 
-func (s *resourceCtxRecordingApiClient) record(ctx context.Context) error {
+func (s *resourceCtxRecordingAPIClient) record(ctx context.Context) error {
 	s.seen = append(s.seen, ctx)
 	return errs.New("the auth server refused")
 }
 
-func (s *resourceCtxRecordingApiClient) GetResourceById(ctx context.Context, _ string, resourceId int64) (*api.ResourceResponse, error) {
+func (s *resourceCtxRecordingAPIClient) GetResourceByID(ctx context.Context, _ string, resourceID int64) (*api.ResourceResponse, error) {
 	s.seen = append(s.seen, ctx)
-	return &api.ResourceResponse{Id: resourceId, ResourceIdentifier: "some-resource"}, nil
+	return &api.ResourceResponse{ID: resourceID, ResourceIdentifier: "some-resource"}, nil
 }
 
-func (s *resourceCtxRecordingApiClient) GetPermissionsByResource(ctx context.Context, _ string, _ int64) ([]api.PermissionResponse, error) {
+func (s *resourceCtxRecordingAPIClient) GetPermissionsByResource(ctx context.Context, _ string, _ int64) ([]api.PermissionResponse, error) {
 	s.seen = append(s.seen, ctx)
 	return s.permissions, nil
 }
 
-func (s *resourceCtxRecordingApiClient) GetAllResources(ctx context.Context, _ string) ([]api.ResourceResponse, error) {
+func (s *resourceCtxRecordingAPIClient) GetAllResources(ctx context.Context, _ string) ([]api.ResourceResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *resourceCtxRecordingApiClient) UpdateResource(ctx context.Context, _ string, _ int64, _ *api.UpdateResourceRequest) (*api.ResourceResponse, error) {
+func (s *resourceCtxRecordingAPIClient) UpdateResource(ctx context.Context, _ string, _ int64, _ *api.UpdateResourceRequest) (*api.ResourceResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *resourceCtxRecordingApiClient) DeleteResource(ctx context.Context, _ string, _ int64) error {
+func (s *resourceCtxRecordingAPIClient) DeleteResource(ctx context.Context, _ string, _ int64) error {
 	return s.record(ctx)
 }
 
-func (s *resourceCtxRecordingApiClient) UpdateResourcePermissions(ctx context.Context, _ string, _ int64, _ *api.UpdateResourcePermissionsRequest) error {
+func (s *resourceCtxRecordingAPIClient) UpdateResourcePermissions(ctx context.Context, _ string, _ int64, _ *api.UpdateResourcePermissionsRequest) error {
 	return s.record(ctx)
 }
 
-func (s *resourceCtxRecordingApiClient) GetUsersByPermission(ctx context.Context, _ string, _ int64, _, _ int) ([]api.UserResponse, int, error) {
+func (s *resourceCtxRecordingAPIClient) GetUsersByPermission(ctx context.Context, _ string, _ int64, _, _ int) ([]api.UserResponse, int, error) {
 	return nil, 0, s.record(ctx)
 }
 
-func (s *resourceCtxRecordingApiClient) SearchUsersWithPermissionAnnotation(ctx context.Context, _ string, _ int64, _ string, _, _ int) ([]api.UserWithPermissionResponse, int, error) {
+func (s *resourceCtxRecordingAPIClient) SearchUsersWithPermissionAnnotation(ctx context.Context, _ string, _ int64, _ string, _, _ int) ([]api.UserWithPermissionResponse, int, error) {
 	return nil, 0, s.record(ctx)
 }
 
-func (s *resourceCtxRecordingApiClient) GetUserPermissions(ctx context.Context, _ string, _ int64) (*api.UserResponse, []api.PermissionResponse, error) {
+func (s *resourceCtxRecordingAPIClient) GetUserPermissions(ctx context.Context, _ string, _ int64) (*api.UserResponse, []api.PermissionResponse, error) {
 	return nil, nil, s.record(ctx)
 }
 
-func (s *resourceCtxRecordingApiClient) GetAllGroups(ctx context.Context, _ string) ([]api.GroupResponse, error) {
+func (s *resourceCtxRecordingAPIClient) GetAllGroups(ctx context.Context, _ string) ([]api.GroupResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *resourceCtxRecordingApiClient) SearchGroupsWithPermissionAnnotation(ctx context.Context, _ string, _ int64, _, _ int) ([]api.GroupWithPermissionResponse, int, error) {
+func (s *resourceCtxRecordingAPIClient) SearchGroupsWithPermissionAnnotation(ctx context.Context, _ string, _ int64, _, _ int) ([]api.GroupWithPermissionResponse, int, error) {
 	return nil, 0, s.record(ctx)
 }
 
-func (s *resourceCtxRecordingApiClient) GetGroupPermissions(ctx context.Context, _ string, _ int64) (*api.GroupResponse, []api.PermissionResponse, error) {
+func (s *resourceCtxRecordingAPIClient) GetGroupPermissions(ctx context.Context, _ string, _ int64) (*api.GroupResponse, []api.PermissionResponse, error) {
 	return nil, nil, s.record(ctx)
 }
 
-func (s *resourceCtxRecordingApiClient) CreateResource(ctx context.Context, _ string, _ *api.CreateResourceRequest) (*api.ResourceResponse, error) {
+func (s *resourceCtxRecordingAPIClient) CreateResource(ctx context.Context, _ string, _ *api.CreateResourceRequest) (*api.ResourceResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *resourceCtxRecordingApiClient) UpdateGroupPermissions(ctx context.Context, _ string, _ int64, _ *api.UpdateGroupPermissionsRequest) error {
+func (s *resourceCtxRecordingAPIClient) UpdateGroupPermissions(ctx context.Context, _ string, _ int64, _ *api.UpdateGroupPermissionsRequest) error {
 	return s.record(ctx)
 }
 
-func (s *resourceCtxRecordingApiClient) UpdateUserPermissions(ctx context.Context, _ string, _ int64, _ *api.UpdateUserPermissionsRequest) error {
+func (s *resourceCtxRecordingAPIClient) UpdateUserPermissions(ctx context.Context, _ string, _ int64, _ *api.UpdateUserPermissionsRequest) error {
 	return s.record(ctx)
 }
 
@@ -104,19 +104,19 @@ func TestAdminResourceHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T
 	testCases := []struct {
 		name        string
 		permissions []api.PermissionResponse
-		build       func(httpHelper *handlersmocks.HttpHelper, apiClient *resourceCtxRecordingApiClient) http.HandlerFunc
+		build       func(httpHelper *handlersmocks.HTTPHelper, apiClient *resourceCtxRecordingAPIClient) http.HandlerFunc
 		request     *http.Request
 	}{
 		{
 			name: "HandleListGet",
-			build: func(h *handlersmocks.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *resourceCtxRecordingAPIClient) http.HandlerFunc {
 				return HandleListGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/resources", handlertest.WithAccessToken()),
 		},
 		{
 			name: "HandleSettingsGet",
-			build: func(h *handlersmocks.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *resourceCtxRecordingAPIClient) http.HandlerFunc {
 				return HandleSettingsGet(h, testStore(), c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/resources/3/settings",
@@ -124,7 +124,7 @@ func TestAdminResourceHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T
 		},
 		{
 			name: "HandleDeleteGet",
-			build: func(h *handlersmocks.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *resourceCtxRecordingAPIClient) http.HandlerFunc {
 				return HandleDeleteGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/resources/3/delete",
@@ -132,7 +132,7 @@ func TestAdminResourceHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T
 		},
 		{
 			name: "HandlePermissionsGet",
-			build: func(h *handlersmocks.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *resourceCtxRecordingAPIClient) http.HandlerFunc {
 				return HandlePermissionsGet(h, testStore(), c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/resources/3/permissions",
@@ -140,8 +140,8 @@ func TestAdminResourceHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T
 		},
 		{
 			name:        "HandleUsersWithPermissionGet",
-			permissions: []api.PermissionResponse{{Id: 8, PermissionIdentifier: "read"}},
-			build: func(h *handlersmocks.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
+			permissions: []api.PermissionResponse{{ID: 8, PermissionIdentifier: "read"}},
+			build: func(h *handlersmocks.HTTPHelper, c *resourceCtxRecordingAPIClient) http.HandlerFunc {
 				return HandleUsersWithPermissionGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/resources/3/users-with-permission",
@@ -149,7 +149,7 @@ func TestAdminResourceHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T
 		},
 		{
 			name: "HandleGroupsWithPermissionGet, no permission to annotate",
-			build: func(h *handlersmocks.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *resourceCtxRecordingAPIClient) http.HandlerFunc {
 				return HandleGroupsWithPermissionGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/resources/3/groups-with-permission",
@@ -157,8 +157,8 @@ func TestAdminResourceHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T
 		},
 		{
 			name:        "HandleGroupsWithPermissionGet, one to annotate",
-			permissions: []api.PermissionResponse{{Id: 8, PermissionIdentifier: "read"}},
-			build: func(h *handlersmocks.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
+			permissions: []api.PermissionResponse{{ID: 8, PermissionIdentifier: "read"}},
+			build: func(h *handlersmocks.HTTPHelper, c *resourceCtxRecordingAPIClient) http.HandlerFunc {
 				return HandleGroupsWithPermissionGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/resources/3/groups-with-permission",
@@ -166,7 +166,7 @@ func TestAdminResourceHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T
 		},
 		{
 			name: "HandleGroupsWithPermissionAddPermissionPost",
-			build: func(h *handlersmocks.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *resourceCtxRecordingAPIClient) http.HandlerFunc {
 				return HandleGroupsWithPermissionAddPermissionPost(h, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/resources/3/groups-with-permission/5/add/8",
@@ -175,7 +175,7 @@ func TestAdminResourceHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T
 		},
 		{
 			name: "HandleGroupsWithPermissionRemovePermissionPost",
-			build: func(h *handlersmocks.HttpHelper, c *resourceCtxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *resourceCtxRecordingAPIClient) http.HandlerFunc {
 				return HandleGroupsWithPermissionRemovePermissionPost(h, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/resources/3/groups-with-permission/5/remove/8",
@@ -186,7 +186,7 @@ func TestAdminResourceHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Maybe()
 			httpHelper.On("JSONError", mock.Anything, mock.Anything, mock.Anything).Maybe()
 			httpHelper.On("EncodeJSON", mock.Anything, mock.Anything, mock.Anything).Maybe()
@@ -194,7 +194,7 @@ func TestAdminResourceHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T
 			httpHelper.On("RenderTemplate", mock.Anything, mock.Anything, mock.Anything,
 				mock.Anything, mock.Anything).Return(nil).Maybe()
 
-			apiClient := &resourceCtxRecordingApiClient{permissions: testCase.permissions}
+			apiClient := &resourceCtxRecordingAPIClient{permissions: testCase.permissions}
 
 			marked := testCase.request.WithContext(
 				context.WithValue(testCase.request.Context(), resourceCtxMarkerKey{}, testCase.name))

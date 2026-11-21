@@ -20,7 +20,7 @@ import (
 // HandleClientLogoGet tests
 // =============================================================================
 
-func TestHandleClientLogoGet_NoClientId(t *testing.T) {
+func TestHandleClientLogoGet_NoClientID(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 
 	handler := HandleClientLogoGet(database, testBaseURL)
@@ -38,7 +38,7 @@ func TestHandleClientLogoGet_NoClientId(t *testing.T) {
 	assert.Equal(t, "VALIDATION_ERROR", response["error_code"])
 }
 
-func TestHandleClientLogoGet_InvalidClientId(t *testing.T) {
+func TestHandleClientLogoGet_InvalidClientID(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 
 	handler := HandleClientLogoGet(database, testBaseURL)
@@ -66,7 +66,7 @@ func TestHandleClientLogoGet_ClientNotFound(t *testing.T) {
 	req.SetPathValue("id", "123")
 	rr := httptest.NewRecorder()
 
-	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(nil, nil)
+	database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(nil, nil)
 
 	handler.ServeHTTP(rr, req)
 
@@ -85,13 +85,13 @@ func TestHandleClientLogoGet_HasLogo(t *testing.T) {
 
 	handler := HandleClientLogoGet(database, testBaseURL)
 
-	client := &record.Client{Id: 123, ClientIdentifier: "my-app"}
+	client := &record.Client{ID: 123, ClientIdentifier: "my-app"}
 
 	req, _ := http.NewRequest("GET", "/api/v1/admin/clients/123/logo", nil)
 	req.SetPathValue("id", "123")
 	rr := httptest.NewRecorder()
 
-	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(client, nil)
+	database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(client, nil)
 	database.On("ClientHasLogo", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(true, nil)
 
 	handler.ServeHTTP(rr, req)
@@ -108,13 +108,13 @@ func TestHandleClientLogoGet_NoLogo(t *testing.T) {
 
 	handler := HandleClientLogoGet(database, testBaseURL)
 
-	client := &record.Client{Id: 123, ClientIdentifier: "my-app"}
+	client := &record.Client{ID: 123, ClientIdentifier: "my-app"}
 
 	req, _ := http.NewRequest("GET", "/api/v1/admin/clients/123/logo", nil)
 	req.SetPathValue("id", "123")
 	rr := httptest.NewRecorder()
 
-	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(client, nil)
+	database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(client, nil)
 	database.On("ClientHasLogo", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(false, nil)
 
 	handler.ServeHTTP(rr, req)
@@ -130,7 +130,7 @@ func TestHandleClientLogoGet_NoLogo(t *testing.T) {
 // HandleClientLogoPost tests
 // =============================================================================
 
-func TestHandleClientLogoPost_NoClientId(t *testing.T) {
+func TestHandleClientLogoPost_NoClientID(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
@@ -149,7 +149,7 @@ func TestHandleClientLogoPost_NoClientId(t *testing.T) {
 	assert.Equal(t, "VALIDATION_ERROR", response["error_code"])
 }
 
-func TestHandleClientLogoPost_InvalidClientId(t *testing.T) {
+func TestHandleClientLogoPost_InvalidClientID(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
@@ -181,7 +181,7 @@ func TestHandleClientLogoPost_ClientNotFound(t *testing.T) {
 	req.SetPathValue("id", "123")
 	rr := httptest.NewRecorder()
 
-	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(nil, nil)
+	database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(nil, nil)
 
 	handler.ServeHTTP(rr, req)
 
@@ -201,7 +201,7 @@ func TestHandleClientLogoPost_InvalidImage(t *testing.T) {
 
 	handler := HandleClientLogoPost(database, auditLogger, testBaseURL, testMaxUploadBytes)
 
-	client := &record.Client{Id: 123, ClientIdentifier: "my-app"}
+	client := &record.Client{ID: 123, ClientIdentifier: "my-app"}
 
 	invalidImageData := []byte("not a valid image")
 	req, err := createMultipartRequest("POST", "/api/v1/admin/clients/123/logo", "picture", invalidImageData)
@@ -209,7 +209,7 @@ func TestHandleClientLogoPost_InvalidImage(t *testing.T) {
 	req.SetPathValue("id", "123")
 	rr := httptest.NewRecorder()
 
-	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(client, nil)
+	database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(client, nil)
 
 	handler.ServeHTTP(rr, req)
 
@@ -232,7 +232,7 @@ func TestHandleClientLogoPost_RefusesAnImageOverTheCapItWasHanded(t *testing.T) 
 
 	handler := HandleClientLogoPost(database, auditLogger, testBaseURL, 64)
 
-	client := &record.Client{Id: 123, ClientIdentifier: "my-app"}
+	client := &record.Client{ID: 123, ClientIdentifier: "my-app"}
 
 	pictureData := createTestPNG(100, 100)
 	require.Greater(t, len(pictureData), 64)
@@ -241,7 +241,7 @@ func TestHandleClientLogoPost_RefusesAnImageOverTheCapItWasHanded(t *testing.T) 
 	req.SetPathValue("id", "123")
 	rr := httptest.NewRecorder()
 
-	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(client, nil)
+	database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(client, nil)
 
 	handler.ServeHTTP(rr, req)
 
@@ -259,7 +259,7 @@ func TestHandleClientLogoPost_CreateNew(t *testing.T) {
 
 	handler := HandleClientLogoPost(database, auditLogger, testBaseURL, testMaxUploadBytes)
 
-	client := &record.Client{Id: 123, ClientIdentifier: "my-app"}
+	client := &record.Client{ID: 123, ClientIdentifier: "my-app"}
 	adminSub := "admin-user-sub"
 
 	pictureData := createTestPNG(100, 100)
@@ -269,14 +269,14 @@ func TestHandleClientLogoPost_CreateNew(t *testing.T) {
 	req = setTokenContextWithClaims(req, map[string]interface{}{"scope": "authserver:manage", "sub": adminSub})
 	rr := httptest.NewRecorder()
 
-	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(client, nil)
-	database.On("GetClientLogoByClientId", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(nil, nil)
+	database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(client, nil)
+	database.On("GetClientLogoByClientID", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(nil, nil)
 	database.On("CreateClientLogo", mock.Anything, (*sql.Tx)(nil), mock.MatchedBy(func(cl *record.ClientLogo) bool {
-		return cl.ClientId == int64(123) && cl.ContentType == "image/png"
+		return cl.ClientID == int64(123) && cl.ContentType == "image/png"
 	})).Return(nil)
 
 	auditLogger.On("Log", mock.Anything, audit.EventUpdatedClientLogo, mock.MatchedBy(func(details map[string]interface{}) bool {
-		return details["client_id"] == client.Id && details["logged_in_user"] == adminSub
+		return details["client_id"] == client.ID && details["logged_in_user"] == adminSub
 	})).Return()
 
 	handler.ServeHTTP(rr, req)
@@ -295,10 +295,10 @@ func TestHandleClientLogoPost_UpdateExisting(t *testing.T) {
 
 	handler := HandleClientLogoPost(database, auditLogger, testBaseURL, testMaxUploadBytes)
 
-	client := &record.Client{Id: 123, ClientIdentifier: "my-app"}
+	client := &record.Client{ID: 123, ClientIdentifier: "my-app"}
 	existingLogo := &record.ClientLogo{
-		Id:          1,
-		ClientId:    123,
+		ID:          1,
+		ClientID:    123,
 		Logo:        []byte("old logo data"),
 		ContentType: "image/jpeg",
 	}
@@ -311,14 +311,14 @@ func TestHandleClientLogoPost_UpdateExisting(t *testing.T) {
 	req = setTokenContextWithClaims(req, map[string]interface{}{"scope": "authserver:manage", "sub": adminSub})
 	rr := httptest.NewRecorder()
 
-	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(client, nil)
-	database.On("GetClientLogoByClientId", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(existingLogo, nil)
+	database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(client, nil)
+	database.On("GetClientLogoByClientID", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(existingLogo, nil)
 	database.On("UpdateClientLogo", mock.Anything, (*sql.Tx)(nil), mock.MatchedBy(func(cl *record.ClientLogo) bool {
-		return cl.Id == existingLogo.Id && cl.ContentType == "image/png"
+		return cl.ID == existingLogo.ID && cl.ContentType == "image/png"
 	})).Return(nil)
 
 	auditLogger.On("Log", mock.Anything, audit.EventUpdatedClientLogo, mock.MatchedBy(func(details map[string]interface{}) bool {
-		return details["client_id"] == client.Id && details["logged_in_user"] == adminSub
+		return details["client_id"] == client.ID && details["logged_in_user"] == adminSub
 	})).Return()
 
 	handler.ServeHTTP(rr, req)
@@ -335,7 +335,7 @@ func TestHandleClientLogoPost_UpdateExisting(t *testing.T) {
 // HandleClientLogoDelete tests
 // =============================================================================
 
-func TestHandleClientLogoDelete_NoClientId(t *testing.T) {
+func TestHandleClientLogoDelete_NoClientID(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
@@ -354,7 +354,7 @@ func TestHandleClientLogoDelete_NoClientId(t *testing.T) {
 	assert.Equal(t, "VALIDATION_ERROR", response["error_code"])
 }
 
-func TestHandleClientLogoDelete_InvalidClientId(t *testing.T) {
+func TestHandleClientLogoDelete_InvalidClientID(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
@@ -384,7 +384,7 @@ func TestHandleClientLogoDelete_ClientNotFound(t *testing.T) {
 	req.SetPathValue("id", "123")
 	rr := httptest.NewRecorder()
 
-	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(nil, nil)
+	database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(nil, nil)
 
 	handler.ServeHTTP(rr, req)
 
@@ -404,7 +404,7 @@ func TestHandleClientLogoDelete_Success(t *testing.T) {
 
 	handler := HandleClientLogoDelete(database, auditLogger)
 
-	client := &record.Client{Id: 123, ClientIdentifier: "my-app"}
+	client := &record.Client{ID: 123, ClientIdentifier: "my-app"}
 	adminSub := "admin-user-sub"
 
 	req, _ := http.NewRequest("DELETE", "/api/v1/admin/clients/123/logo", nil)
@@ -412,11 +412,11 @@ func TestHandleClientLogoDelete_Success(t *testing.T) {
 	req = setTokenContextWithClaims(req, map[string]interface{}{"scope": "authserver:manage", "sub": adminSub})
 	rr := httptest.NewRecorder()
 
-	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(client, nil)
+	database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(client, nil)
 	database.On("DeleteClientLogo", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(nil)
 
 	auditLogger.On("Log", mock.Anything, audit.EventDeletedClientLogo, mock.MatchedBy(func(details map[string]interface{}) bool {
-		return details["client_id"] == client.Id && details["logged_in_user"] == adminSub
+		return details["client_id"] == client.ID && details["logged_in_user"] == adminSub
 	})).Return()
 
 	handler.ServeHTTP(rr, req)
@@ -435,15 +435,15 @@ func TestHandleClientLogoDelete_DatabaseError(t *testing.T) {
 
 	handler := HandleClientLogoDelete(database, auditLogger)
 
-	client := &record.Client{Id: 123, ClientIdentifier: "my-app"}
+	client := &record.Client{ID: 123, ClientIdentifier: "my-app"}
 
 	req, _ := http.NewRequest("DELETE", "/api/v1/admin/clients/123/logo", nil)
 	req.SetPathValue("id", "123")
 	rr := httptest.NewRecorder()
 
-	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(client, nil)
+	database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(client, nil)
 	// No token: the target ceiling reads what the client holds, and an ordinary client's write goes on.
-	database.On("GetClientPermissionsByClientId", mock.Anything, (*sql.Tx)(nil), int64(123)).Return([]record.ClientPermission{}, nil).Once()
+	database.On("GetClientPermissionsByClientID", mock.Anything, (*sql.Tx)(nil), int64(123)).Return([]record.ClientPermission{}, nil).Once()
 	database.On("DeleteClientLogo", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(assert.AnError)
 
 	handler.ServeHTTP(rr, req)

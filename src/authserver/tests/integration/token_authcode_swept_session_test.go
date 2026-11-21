@@ -29,11 +29,11 @@ func TestToken_AuthCode_SessionRowSweptBeforeRedemption(t *testing.T) {
 
 	// The sweep. The fixture's user is fresh, so the one session the ceremony left is the
 	// code's own.
-	sessions, err := database.GetUserSessionsByUserId(context.Background(), nil, code.User.Id)
+	sessions, err := database.GetUserSessionsByUserID(context.Background(), nil, code.User.ID)
 	require.NoError(t, err)
 	require.NotEmpty(t, sessions, "the ceremony should have left the user one session to sweep")
 	for _, session := range sessions {
-		err = database.DeleteUserSession(context.Background(), nil, session.Id)
+		err = database.DeleteUserSession(context.Background(), nil, session.ID)
 		require.NoError(t, err)
 	}
 
@@ -56,7 +56,7 @@ func TestToken_AuthCode_SessionRowSweptBeforeRedemption(t *testing.T) {
 	assert.Nil(t, body["refresh_token"])
 
 	// The refusal comes after the claim, so the code is spent, as with any failed mint.
-	storedCode, err := database.GetCodeById(context.Background(), nil, code.Id)
+	storedCode, err := database.GetCodeByID(context.Background(), nil, code.ID)
 	require.NoError(t, err)
 	require.NotNil(t, storedCode)
 	assert.True(t, storedCode.Used, "the refused code should be spent")

@@ -36,10 +36,10 @@ func (r *auditRecorder) Log(_ context.Context, auditEvent string, _ map[string]i
 func expectTheUserUnderItsRow(database *datamocks.Database, before, under *record.User) *datamocks.RunInTransactionStub {
 	database.On("GetUserByEmail", mock.Anything, (*sql.Tx)(nil), "admin@example.com").Return(before, nil)
 	// No settings row tells nobody, which keeps the double to the recovery's own statements.
-	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return((*record.Settings)(nil), nil)
+	database.On("GetSettingsByID", mock.Anything, (*sql.Tx)(nil), int64(1)).Return((*record.Settings)(nil), nil)
 	stub := datamocks.ExpectRunInTransaction(database, recoveryTx)
-	database.On("AcquireUserRow", mock.Anything, recoveryTx, before.Id).Return(nil)
-	database.On("GetUserByIdForUpdate", mock.Anything, recoveryTx, before.Id).Return(under, nil)
+	database.On("AcquireUserRow", mock.Anything, recoveryTx, before.ID).Return(nil)
+	database.On("GetUserByIDForUpdate", mock.Anything, recoveryTx, before.ID).Return(under, nil)
 	return stub
 }
 
@@ -49,7 +49,7 @@ func expectTheUserUnderItsRow(database *datamocks.Database, before, under *recor
 // is not told that no authenticator was enrolled (#498 review F5).
 func TestRun_ARemovalThatLosesItsCompareAndSetCommitsNothing(t *testing.T) {
 	database := datamocks.NewDatabase(t)
-	user := &record.User{Id: 7, Email: "admin@example.com", Enabled: true, OTPEnabled: true, OtpConfigGeneration: 3}
+	user := &record.User{ID: 7, Email: "admin@example.com", Enabled: true, OTPEnabled: true, OTPConfigGeneration: 3}
 	stub := expectTheUserUnderItsRow(database, user, user)
 	database.On("TryRemoveUserOTP", mock.Anything, recoveryTx, int64(7), int64(3)).Return(false, nil)
 	recorder := &auditRecorder{}
@@ -67,7 +67,7 @@ func TestRun_ARemovalThatLosesItsCompareAndSetCommitsNothing(t *testing.T) {
 // authenticator, is a removal with nothing to remove, and the recovery carries on.
 func TestRun_ARemovalWithNothingEnrolledIsNoRefusal(t *testing.T) {
 	database := datamocks.NewDatabase(t)
-	user := &record.User{Id: 7, Email: "admin@example.com", Enabled: true, OTPEnabled: false, OtpConfigGeneration: 3}
+	user := &record.User{ID: 7, Email: "admin@example.com", Enabled: true, OTPEnabled: false, OTPConfigGeneration: 3}
 	stub := expectTheUserUnderItsRow(database, user, user)
 	database.On("TryRemoveUserOTP", mock.Anything, recoveryTx, int64(7), int64(3)).Return(false, nil)
 	// The sweep follows the write; failing its first statement ends the run there, which is as far
@@ -87,7 +87,7 @@ func TestRun_ARemovalWithNothingEnrolledIsNoRefusal(t *testing.T) {
 // the recovery acts on, so a user deleted or disabled after the read before it is refused there,
 // with nothing written.
 func TestRun_TheUserIsDecidedOnUnderItsRow(t *testing.T) {
-	user := &record.User{Id: 7, Email: "admin@example.com", Enabled: true}
+	user := &record.User{ID: 7, Email: "admin@example.com", Enabled: true}
 
 	for _, tc := range []struct {
 		name  string
@@ -95,7 +95,7 @@ func TestRun_TheUserIsDecidedOnUnderItsRow(t *testing.T) {
 		want  string
 	}{
 		{"deleted", nil, "was deleted while the command ran"},
-		{"disabled", &record.User{Id: 7, Email: "admin@example.com", Enabled: false}, "was disabled while the command ran"},
+		{"disabled", &record.User{ID: 7, Email: "admin@example.com", Enabled: false}, "was disabled while the command ran"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
@@ -120,26 +120,26 @@ func TestRun_TheUserIsDecidedOnUnderItsRow(t *testing.T) {
 // make (#301, #498 round 2 F3).
 func TestRun_ADeadlockRerunReportsOnlyTheCommittingAttempt(t *testing.T) {
 	database := datamocks.NewDatabase(t)
-	user := &record.User{Id: 7, Email: "admin@example.com", Enabled: true}
-	const manageId = int64(11)
+	user := &record.User{ID: 7, Email: "admin@example.com", Enabled: true}
+	const manageID = int64(11)
 	database.On("GetUserByEmail", mock.Anything, (*sql.Tx)(nil), "admin@example.com").Return(user, nil)
-	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return((*record.Settings)(nil), nil)
+	database.On("GetSettingsByID", mock.Anything, (*sql.Tx)(nil), int64(1)).Return((*record.Settings)(nil), nil)
 	database.On("GetResourceByResourceIdentifier", mock.Anything, (*sql.Tx)(nil), builtin.AuthServerResourceIdentifier).
-		Return(&record.Resource{Id: 3, ResourceIdentifier: builtin.AuthServerResourceIdentifier}, nil)
-	database.On("GetPermissionsByResourceId", mock.Anything, (*sql.Tx)(nil), int64(3)).
-		Return([]record.Permission{{Id: manageId, PermissionIdentifier: builtin.ManagePermissionIdentifier, ResourceId: 3}}, nil)
+		Return(&record.Resource{ID: 3, ResourceIdentifier: builtin.AuthServerResourceIdentifier}, nil)
+	database.On("GetPermissionsByResourceID", mock.Anything, (*sql.Tx)(nil), int64(3)).
+		Return([]record.Permission{{ID: manageID, PermissionIdentifier: builtin.ManagePermissionIdentifier, ResourceID: 3}}, nil)
 	stub := datamocks.ExpectRunInTransactionRerun(database, recoveryTx)
-	database.On("AcquireManagePermissionRow", mock.Anything, recoveryTx).Return(manageId, nil).Twice()
+	database.On("AcquireManagePermissionRow", mock.Anything, recoveryTx).Return(manageID, nil).Twice()
 	database.On("AcquireUserRow", mock.Anything, recoveryTx, int64(7)).Return(nil).Twice()
-	database.On("GetUserByIdForUpdate", mock.Anything, recoveryTx, int64(7)).Return(user, nil).Twice()
-	database.On("GetUserPermissionsByUserId", mock.Anything, recoveryTx, int64(7)).
+	database.On("GetUserByIDForUpdate", mock.Anything, recoveryTx, int64(7)).Return(user, nil).Twice()
+	database.On("GetUserPermissionsByUserID", mock.Anything, recoveryTx, int64(7)).
 		Return([]record.UserPermission{}, nil).Once()
-	database.On("GetUserPermissionsByUserId", mock.Anything, recoveryTx, int64(7)).
-		Return([]record.UserPermission{{Id: 21, UserId: 7, PermissionId: manageId}}, nil).Once()
+	database.On("GetUserPermissionsByUserID", mock.Anything, recoveryTx, int64(7)).
+		Return([]record.UserPermission{{ID: 21, UserID: 7, PermissionID: manageID}}, nil).Once()
 	database.On("CreateUserPermission", mock.Anything, recoveryTx, mock.Anything).Return(nil).Once()
 	database.On("IncrementUserAuthStateGeneration", mock.Anything, recoveryTx, int64(7)).Return(int64(4), nil).Twice()
-	database.On("GetUserSessionsByUserId", mock.Anything, recoveryTx, int64(7)).Return([]record.UserSession{}, nil).Twice()
-	database.On("GetRefreshTokensByUserId", mock.Anything, recoveryTx, int64(7)).Return([]*record.RefreshToken{}, nil).Twice()
+	database.On("GetUserSessionsByUserID", mock.Anything, recoveryTx, int64(7)).Return([]record.UserSession{}, nil).Twice()
+	database.On("GetRefreshTokensByUserID", mock.Anything, recoveryTx, int64(7)).Return([]*record.RefreshToken{}, nil).Twice()
 	database.On("PromoteRefreshTokenGenerations", mock.Anything, recoveryTx, []int64{}, int64(4)).Return(nil).Twice()
 	recorder := &auditRecorder{}
 

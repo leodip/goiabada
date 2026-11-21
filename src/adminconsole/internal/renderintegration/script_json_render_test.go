@@ -32,7 +32,7 @@ const hostileScriptJSON = `"\u003c/script\u003e\u003csvg onload=alert(1)\u003e \
 func TestRender_AdminSettingsKeysWritesTheKeyListAsEscapedJSON(t *testing.T) {
 	created := time.Date(2026, 9, 16, 12, 0, 0, 0, time.UTC)
 	key := adminsettingshandlers.SettingsKey{
-		Id: 1, CreatedAt: &created, State: "current", KeyIdentifier: hostileScriptValue,
+		ID: 1, CreatedAt: &created, State: "current", KeyIdentifier: hostileScriptValue,
 		Type: "RSA", Algorithm: "RS256",
 		PublicKeyASN1DER: "MIIBIjAN&<>", PublicKeyPEM: hostileScriptValue, PublicKeyJWK: `{"kid":"</script>"}`,
 	}
@@ -50,6 +50,12 @@ func TestRender_AdminSettingsKeysWritesTheKeyListAsEscapedJSON(t *testing.T) {
 	// Escaped once and no more: the list the script reads decodes back to exactly what was bound.
 	m := regexp.MustCompile(`<script type="application/json" id="signing-keys">(\[.*?\])</script>`).FindStringSubmatch(out)
 	require.Len(t, m, 2, "the key list is not in the page's signing-keys data block")
+	// The whole block, every key included, as the page wrote it before #482 respelled the Go
+	// names: the keys are what the page's script reads, so they do not follow a field's Go name
+	// (#482 decision 7).
+	assert.Equal(t, `[{"Id":1,"CreatedAt":"2026-09-16T12:00:00Z","State":"current","KeyIdentifier":`+hostileScriptJSON+
+		`,"Type":"RSA","Algorithm":"RS256","PublicKeyASN1DER":"MIIBIjAN\u0026\u003c\u003e","PublicKeyPEM":`+hostileScriptJSON+
+		`,"PublicKeyJWK":"{\"kid\":\"\u003c/script\u003e\"}"}]`, m[1])
 	var decoded []adminsettingshandlers.SettingsKey
 	require.NoError(t, json.Unmarshal([]byte(m[1]), &decoded))
 	require.Len(t, decoded, 1)
@@ -80,7 +86,7 @@ func TestRender_JSBootstrapWritesCatalogValuesAsEscapedJSON(t *testing.T) {
 			"selectedPhoneCountryUniqueId": "", "phoneNumber": "", "phoneCountries": nil, "savedSuccessfully": false,
 		}},
 		{"/layouts/no_menu_layout.html", "/index.html", map[string]interface{}{
-			"AuthServerBaseUrl": "https://auth.example", "AccountLink": "/account/profile", "AdminLink": "/admin/clients", "IsAuthenticated": false,
+			"AuthServerBaseURL": "https://auth.example", "AccountLink": "/account/profile", "AdminLink": "/admin/clients", "IsAuthenticated": false,
 			"LoggedInUser": "", "LogoutLink": "", "SessionEnded": false,
 		}},
 	}

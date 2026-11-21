@@ -59,7 +59,7 @@
 <h2 class="auth-section-title">{{ T $.ctx "adminconsole.welcome.developers_heading" }}</h2>
 <ul class="link-list">
   <li>
-    <a class="link-row" href="{{ .AuthServerBaseUrl }}/.well-known/openid-configuration">
+    <a class="link-row" href="{{ .AuthServerBaseURL }}/.well-known/openid-configuration">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M4.25 2A2.25 2.25 0 0 0 2 4.25v11.5A2.25 2.25 0 0 0 4.25 18h11.5A2.25 2.25 0 0 0 18 15.75V4.25A2.25 2.25 0 0 0 15.75 2H4.25Zm4.03 6.28a.75.75 0 0 0-1.06-1.06L4.97 9.47a.75.75 0 0 0 0 1.06l2.25 2.25a.75.75 0 0 0 1.06-1.06L6.56 10l1.72-1.72Zm4.5-1.06a.75.75 0 1 0-1.06 1.06L13.44 10l-1.72 1.72a.75.75 0 1 0 1.06 1.06l2.25-2.25a.75.75 0 0 0 0-1.06l-2.25-2.25Z" clip-rule="evenodd"/></svg>
       <span class="link-row-text">
         <span class="link-row-title">{{ T $.ctx "adminconsole.welcome.discovery_card_title" }}</span>
@@ -69,7 +69,7 @@
     </a>
   </li>
   <li>
-    <a class="link-row" href="{{ .AuthServerBaseUrl }}/openapi.yaml">
+    <a class="link-row" href="{{ .AuthServerBaseURL }}/openapi.yaml">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M6.28 5.22a.75.75 0 0 1 0 1.06L2.56 10l3.72 3.72a.75.75 0 0 1-1.06 1.06L.97 10.53a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Zm7.44 0a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L17.44 10l-3.72-3.72a.75.75 0 0 1 0-1.06ZM11.377 2.011a.75.75 0 0 1 .612.867l-2.5 14.5a.75.75 0 0 1-1.478-.255l2.5-14.5a.75.75 0 0 1 .866-.612Z" clip-rule="evenodd"/></svg>
       <span class="link-row-text">
         <span class="link-row-title">{{ T $.ctx "adminconsole.welcome.api_card_title" }}</span>

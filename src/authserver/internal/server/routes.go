@@ -158,8 +158,8 @@ func (s *Server) initRoutes(branches appBranches) {
 	// for authserver (#401). GET and POST are separate registrations: a guard added to only one of
 	// them leaves the other reachable. middleware.NoStore heads both chains, ahead of the guards, so
 	// the claims and every refusal, the bare 401 included, are stored by no cache (#714).
-	protocol.With(middleware.NoStore(), userinfoBearer.JwtAuthorizationHeaderToContext(), userinfoBearer.RequireBearerTokenScope("openid"), userinfoBearer.RequireUserBoundToken(), userinfoBearer.RequireValidSession(s.database)).Get("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger, baseURL, adminConsoleBaseURL))
-	protocol.With(middleware.NoStore(), userinfoBearer.JwtAuthorizationHeaderToContext(), userinfoBearer.RequireBearerTokenScope("openid"), userinfoBearer.RequireUserBoundToken(), userinfoBearer.RequireValidSession(s.database)).Post("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger, baseURL, adminConsoleBaseURL))
+	protocol.With(middleware.NoStore(), userinfoBearer.JWTAuthorizationHeaderToContext(), userinfoBearer.RequireBearerTokenScope("openid"), userinfoBearer.RequireUserBoundToken(), userinfoBearer.RequireValidSession(s.database)).Get("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger, baseURL, adminConsoleBaseURL))
+	protocol.With(middleware.NoStore(), userinfoBearer.JWTAuthorizationHeaderToContext(), userinfoBearer.RequireBearerTokenScope("openid"), userinfoBearer.RequireUserBoundToken(), userinfoBearer.RequireValidSession(s.database)).Post("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger, baseURL, adminConsoleBaseURL))
 	// The OpenAPI document is a read-only file, so it answers HEAD as GET, as every other one does
 	// (#825 decision 4).
 	getAndHead(files, "/openapi.yaml", handlers.HandleOpenAPIGet())
@@ -215,8 +215,8 @@ func (s *Server) initRoutes(branches appBranches) {
 		// verified token is refused before any tier counts it and before any password is compared
 		// (#642 decision 5).
 		steps.With(handlers.RequirePasswordChallenge(ceremonyBoundary, httpHelper, passwordPrompt, s.challengeVerifier), rateLimiter.LimitPwd).Post("/pwd", handlers.HandleAuthPwdPost(ceremonyBoundary, httpHelper, ceremonyStore, rateLimiter, passwordPrompt, authflow.NewPasswordSubmission(s.database, auditLogger)))
-		steps.Get("/otp", handlers.HandleAuthOtpGet(ceremonyBoundary, httpHelper, ceremonyStore, authflow.NewOTPPrompt(s.database, otpSecretGenerator)))
-		steps.With(rateLimiter.LimitOtp).Post("/otp", handlers.HandleAuthOtpPost(ceremonyBoundary, httpHelper, ceremonyStore, rateLimiter, authflow.NewOTPSubmission(s.database, auditLogger, s.dataCipher), notifier))
+		steps.Get("/otp", handlers.HandleAuthOTPGet(ceremonyBoundary, httpHelper, ceremonyStore, authflow.NewOTPPrompt(s.database, otpSecretGenerator)))
+		steps.With(rateLimiter.LimitOTP).Post("/otp", handlers.HandleAuthOTPPost(ceremonyBoundary, httpHelper, ceremonyStore, rateLimiter, authflow.NewOTPSubmission(s.database, auditLogger, s.dataCipher), notifier))
 		// The set of recovery codes an authenticator set up during this sign-in came with, shown once
 		// after the accepted setup code, and the Continue that goes on to /auth/completed (#257
 		// decision 14). It checks no credential, so neither method is behind a limiter.
@@ -266,7 +266,7 @@ func (s *Server) initRoutes(branches appBranches) {
 	// Admin API routes
 	api.Route("/api/v1/admin", func(r *routing.Router) {
 		r.Use(middleware.APIDebug(authServerConfig.DebugAPIRequests))
-		r.Use(apiBearer.JwtAuthorizationHeaderToContext())
+		r.Use(apiBearer.JWTAuthorizationHeaderToContext())
 		r.Use(apiBearer.RequireValidSession(s.database))
 
 		// Scope helper function
@@ -530,7 +530,7 @@ func (s *Server) initRoutes(branches appBranches) {
 	// Account API routes (self-service)
 	api.Route("/api/v1/account", func(r *routing.Router) {
 		r.Use(middleware.APIDebug(authServerConfig.DebugAPIRequests))
-		r.Use(apiBearer.JwtAuthorizationHeaderToContext())
+		r.Use(apiBearer.JWTAuthorizationHeaderToContext())
 		r.Use(apiBearer.RequireBearerTokenScope(builtin.AuthServerResourceIdentifier + ":" + builtin.ManageAccountPermissionIdentifier))
 		// After the scope check, so an insufficient-scope caller still receives the 403 it
 		// receives today. These handlers resolve the acting user from `sub`, which is the
@@ -587,7 +587,7 @@ func (s *Server) initRoutes(branches appBranches) {
 		// account_export tier comes last, so a request either guard refuses spends nothing
 		// (decision 5).
 		r.With(apiBearer.RequireAdminConsoleClient(),
-			apiBearer.RequireRecentAuthentication(accountExportMaxAge, record.AcrLevel2Optional, time.Now),
+			apiBearer.RequireRecentAuthentication(accountExportMaxAge, record.ACRLevel2Optional, time.Now),
 			rateLimiter.LimitAccountExport).Get("/export",
 			apihandlers.HandleAccountExportGet(s.database, auditLogger, baseURL))
 		r.Get("/consents", apihandlers.HandleAccountConsentsGet(s.database))
@@ -635,7 +635,7 @@ func (s *Server) initRoutes(branches appBranches) {
 		// account API uses everywhere, and redacting it would blind the surface this
 		// middleware exists to make debuggable. What is lost is recoverable from the SQL
 		// log, which records the digest rather than the handle (#266).
-		r.Use(apiBearer.JwtAuthorizationHeaderToContext())
+		r.Use(apiBearer.JWTAuthorizationHeaderToContext())
 		// The same token lifecycle as the admin API: a token with the pre-#676 header, from
 		// another issuer, of a disabled or deleted client, or revoked by its jti at
 		// /auth/revoke is refused here too, rather than holding the console's sessions

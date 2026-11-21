@@ -28,9 +28,9 @@ func getSafeStylesheet(t *testing.T, target string, brand *record.Brand, ids []i
 	assets []record.BrandAsset) *httptest.ResponseRecorder {
 	t.Helper()
 	database := datamocks.NewDatabase(t)
-	database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(brand, nil).Once()
+	database.On("GetBrandByID", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(brand, nil).Once()
 	if ids != nil {
-		database.On("GetBrandAssetsByIds", mock.Anything, (*sql.Tx)(nil), ids).Return(assets, nil).Once()
+		database.On("GetBrandAssetsByIDs", mock.Anything, (*sql.Tx)(nil), ids).Return(assets, nil).Once()
 	}
 
 	req := withPathValue(httptest.NewRequest(http.MethodGet, target, nil), "id", "7")
@@ -54,9 +54,9 @@ func allThreeBrand() (*record.Brand, []int64, []record.BrandAsset) {
 	brand.Corners, brand.Font = record.BrandCornersSquare, record.BrandFontUploaded
 	brand.CustomCSS = cardCSS
 	brand.BackgroundFit = "tile"
-	brand.BackgroundAssetId = sql.NullInt64{Int64: 14, Valid: true}
-	brand.RegularFontAssetId = sql.NullInt64{Int64: 15, Valid: true}
-	brand.BoldFontAssetId = sql.NullInt64{Int64: 16, Valid: true}
+	brand.BackgroundAssetID = sql.NullInt64{Int64: 14, Valid: true}
+	brand.RegularFontAssetID = sql.NullInt64{Int64: 15, Valid: true}
+	brand.BoldFontAssetID = sql.NullInt64{Int64: 16, Valid: true}
 	return brand, []int64{14, 15, 16}, []record.BrandAsset{
 		kitAsset(14, record.BrandAssetKindBackground, "0a1b2c3d4e5f"),
 		kitAsset(15, record.BrandAssetKindFont, "aaaaaaaaaaaa"),
@@ -105,7 +105,7 @@ func TestBrandSafeStylesheets_SetAsideTheCSSThePaletteAndTheUploadedFont(t *test
 func TestBrandSafeStylesheets_ABuiltInBrandWithNoneOfTheThreeIsDrawnAsUsual(t *testing.T) {
 	brand := kitBrand("avocado", record.BrandCornersPill, record.BrandFontSerif)
 	brand.BackgroundFit = "tile"
-	brand.BackgroundAssetId = sql.NullInt64{Int64: 14, Valid: true}
+	brand.BackgroundAssetID = sql.NullInt64{Int64: 14, Valid: true}
 	ids := []int64{14}
 	assets := []record.BrandAsset{kitAsset(14, record.BrandAssetKindBackground, "0a1b2c3d4e5f")}
 	want := avocadoStylesheet + "\n" +
@@ -138,7 +138,7 @@ func TestBrandSafeStylesheets_ABuiltInBrandWithNoneOfTheThreeIsDrawnAsUsual(t *t
 func TestBrandSafeStylesheets_ABuiltInBrandKeepsItsColorsAndLosesTheCSSAndTheFont(t *testing.T) {
 	brand := kitBrand("avocado", record.BrandCornersRounded, record.BrandFontUploaded)
 	brand.CustomCSS = cardCSS
-	brand.RegularFontAssetId = sql.NullInt64{Int64: 15, Valid: true}
+	brand.RegularFontAssetID = sql.NullInt64{Int64: 15, Valid: true}
 	ids := []int64{15}
 	assets := []record.BrandAsset{kitAsset(15, record.BrandAssetKindFont, "aaaaaaaaaaaa")}
 

@@ -65,7 +65,7 @@ func TestValidateTokenRequest_AClientRequiringDPoPIsRefusedWithoutAProof(t *test
 			input: ValidateTokenRequestInput{GrantType: "authorization_code", Code: "the_code",
 				RedirectURI: "https://example.com/callback"},
 			arrange: func(mockDB *datamocks.Database, _ *protocolvalidationmocks.TokenParser, client *record.Client) {
-				code := &record.Code{Id: 11, ClientId: client.Id, RedirectURI: "https://example.com/callback",
+				code := &record.Code{ID: 11, ClientID: client.ID, RedirectURI: "https://example.com/callback",
 					CodeChallenge: sql.NullString{String: "challenge", Valid: true}}
 				mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, hashutil.HashString("the_code"), false).Return(code, nil).Once()
 				mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, code).
@@ -105,7 +105,7 @@ func TestValidateTokenRequest_AClientRequiringDPoPIsRefusedWithoutAProof(t *test
 				// A mandatory second factor, which the password grant refuses next, before any
 				// account is looked up.
 				client.AuthorizationCodeEnabled = true
-				client.DefaultAcrLevel = record.AcrLevel2Mandatory
+				client.DefaultACRLevel = record.ACRLevel2Mandatory
 			},
 			afterTheRequirement: wantRefusal{code: "unauthorized_client", status: http.StatusBadRequest,
 				description: "Resource owner password credentials grant is not available for a client whose " +
@@ -133,10 +133,10 @@ func TestValidateTokenRequest_AClientRequiringDPoPIsRefusedWithoutAProof(t *test
 				parser := protocolvalidationmocks.NewTokenParser(t)
 				validator := NewTokenValidator(mockDB, parser, protocolvalidationmocks.NewPermissionChecker(t), testDataCipher)
 
-				client := &record.Client{Id: 1, ClientIdentifier: "requires-dpop", Enabled: true,
+				client := &record.Client{ID: 1, ClientIdentifier: "requires-dpop", Enabled: true,
 					AuthorizationCodeEnabled: true, IsPublic: g.public, DPoPBoundAccessTokens: true}
 				input := g.input
-				input.ClientId = client.ClientIdentifier
+				input.ClientID = client.ClientIdentifier
 				input.DPoPThumbprint = a.thumbprint
 				if !g.public {
 					encrypted, err := testDataCipher.Encrypt(clientSecret)
@@ -194,13 +194,13 @@ func TestValidateTokenRequest_AClientNotRequiringDPoPNeedsNoProof(t *testing.T) 
 	mockDB := datamocks.NewDatabase(t)
 	parser := protocolvalidationmocks.NewTokenParser(t)
 	validator := NewTokenValidator(mockDB, parser, protocolvalidationmocks.NewPermissionChecker(t), testDataCipher)
-	client := &record.Client{Id: 1, ClientIdentifier: "no-dpop", Enabled: true, IsPublic: true}
+	client := &record.Client{ID: 1, ClientIdentifier: "no-dpop", Enabled: true, IsPublic: true}
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "no-dpop").Return(client, nil).Once()
 	parser.On("DecodeAndValidateTokenString", mock.Anything, "the_refresh_token", true).
 		Return(nil, signingkeys.ErrTokenRefused).Once()
 
 	grant, err := validator.ValidateTokenRequest(context.Background(), &record.Settings{},
-		&ValidateTokenRequestInput{GrantType: "refresh_token", ClientId: "no-dpop", RefreshToken: "the_refresh_token"})
+		&ValidateTokenRequestInput{GrantType: "refresh_token", ClientID: "no-dpop", RefreshToken: "the_refresh_token"})
 
 	assert.Nil(t, grant)
 	assertRefusal(t, err, wantRefusal{code: "invalid_grant", description: "The refresh token is invalid.", status: http.StatusBadRequest})

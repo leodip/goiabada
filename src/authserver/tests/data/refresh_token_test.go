@@ -16,7 +16,7 @@ import (
 func TestCreateRefreshToken(t *testing.T) {
 	refreshToken := createTestRefreshToken(t)
 
-	if refreshToken.Id == 0 {
+	if refreshToken.ID == 0 {
 		t.Error("Expected non-zero ID after creation")
 	}
 	if !refreshToken.CreatedAt.Valid || refreshToken.CreatedAt.Time.IsZero() {
@@ -26,7 +26,7 @@ func TestCreateRefreshToken(t *testing.T) {
 		t.Error("Expected UpdatedAt to be set")
 	}
 
-	retrievedRefreshToken, err := database.GetRefreshTokenById(context.Background(), nil, refreshToken.Id)
+	retrievedRefreshToken, err := database.GetRefreshTokenByID(context.Background(), nil, refreshToken.ID)
 	if err != nil {
 		t.Fatalf("Failed to retrieve created refresh token: %v", err)
 	}
@@ -39,13 +39,13 @@ func TestUpdateRefreshToken(t *testing.T) {
 
 	client := createTestClient(t)
 	user := createTestUser(t)
-	updatedCode := createTestCode(t, client.Id, user.Id)
+	updatedCode := createTestCode(t, client.ID, user.ID)
 
-	originalCodeId := refreshToken.CodeId
-	refreshToken.CodeId = sql.NullInt64{Int64: updatedCode.Id, Valid: true}
-	refreshToken.RefreshTokenJti = "updated_jti"
-	refreshToken.PreviousRefreshTokenJti = "previous_jti"
-	refreshToken.FirstRefreshTokenJti = "first_jti"
+	originalCodeID := refreshToken.CodeID
+	refreshToken.CodeID = sql.NullInt64{Int64: updatedCode.ID, Valid: true}
+	refreshToken.RefreshTokenJTI = "updated_jti"
+	refreshToken.PreviousRefreshTokenJTI = "previous_jti"
+	refreshToken.FirstRefreshTokenJTI = "first_jti"
 	refreshToken.SessionIdentifier = "updated_session"
 	refreshToken.RefreshTokenType = "updated_type"
 	refreshToken.Scope = "updated_scope"
@@ -61,7 +61,7 @@ func TestUpdateRefreshToken(t *testing.T) {
 		t.Fatalf("Failed to update refresh token: %v", err)
 	}
 
-	updatedRefreshToken, err := database.GetRefreshTokenById(context.Background(), nil, refreshToken.Id)
+	updatedRefreshToken, err := database.GetRefreshTokenByID(context.Background(), nil, refreshToken.ID)
 	if err != nil {
 		t.Fatalf("Failed to retrieve updated refresh token: %v", err)
 	}
@@ -70,17 +70,17 @@ func TestUpdateRefreshToken(t *testing.T) {
 	// client_id, so this statement leaves the token pointing at the code it descended from. That is
 	// TestUpdateRefreshToken_TheKeysAreNotRewritten's subject, and the reason is a SQL Server
 	// foreign key re-check that put a shared clients lock under every grant sweep (#139).
-	if updatedRefreshToken.CodeId != originalCodeId {
-		t.Errorf("Expected CodeId to stay %v, got %v", originalCodeId, updatedRefreshToken.CodeId)
+	if updatedRefreshToken.CodeID != originalCodeID {
+		t.Errorf("Expected CodeID to stay %v, got %v", originalCodeID, updatedRefreshToken.CodeID)
 	}
-	if updatedRefreshToken.RefreshTokenJti != refreshToken.RefreshTokenJti {
-		t.Errorf("Expected RefreshTokenJti %s, got %s", refreshToken.RefreshTokenJti, updatedRefreshToken.RefreshTokenJti)
+	if updatedRefreshToken.RefreshTokenJTI != refreshToken.RefreshTokenJTI {
+		t.Errorf("Expected RefreshTokenJTI %s, got %s", refreshToken.RefreshTokenJTI, updatedRefreshToken.RefreshTokenJTI)
 	}
-	if updatedRefreshToken.PreviousRefreshTokenJti != refreshToken.PreviousRefreshTokenJti {
-		t.Errorf("Expected PreviousRefreshTokenJti %s, got %s", refreshToken.PreviousRefreshTokenJti, updatedRefreshToken.PreviousRefreshTokenJti)
+	if updatedRefreshToken.PreviousRefreshTokenJTI != refreshToken.PreviousRefreshTokenJTI {
+		t.Errorf("Expected PreviousRefreshTokenJTI %s, got %s", refreshToken.PreviousRefreshTokenJTI, updatedRefreshToken.PreviousRefreshTokenJTI)
 	}
-	if updatedRefreshToken.FirstRefreshTokenJti != refreshToken.FirstRefreshTokenJti {
-		t.Errorf("Expected FirstRefreshTokenJti %s, got %s", refreshToken.FirstRefreshTokenJti, updatedRefreshToken.FirstRefreshTokenJti)
+	if updatedRefreshToken.FirstRefreshTokenJTI != refreshToken.FirstRefreshTokenJTI {
+		t.Errorf("Expected FirstRefreshTokenJTI %s, got %s", refreshToken.FirstRefreshTokenJTI, updatedRefreshToken.FirstRefreshTokenJTI)
 	}
 	if updatedRefreshToken.SessionIdentifier != refreshToken.SessionIdentifier {
 		t.Errorf("Expected SessionIdentifier %s, got %s", refreshToken.SessionIdentifier, updatedRefreshToken.SessionIdentifier)
@@ -109,22 +109,22 @@ func TestUpdateRefreshToken(t *testing.T) {
 	}
 }
 
-func TestGetRefreshTokenById(t *testing.T) {
+func TestGetRefreshTokenByID(t *testing.T) {
 	refreshToken := createTestRefreshToken(t)
 
-	retrievedRefreshToken, err := database.GetRefreshTokenById(context.Background(), nil, refreshToken.Id)
+	retrievedRefreshToken, err := database.GetRefreshTokenByID(context.Background(), nil, refreshToken.ID)
 	if err != nil {
 		t.Fatalf("Failed to get refresh token by ID: %v", err)
 	}
 
 	compareRefreshTokens(t, refreshToken, retrievedRefreshToken)
 
-	nonExistentRefreshToken, err := database.GetRefreshTokenById(context.Background(), nil, 99999)
+	nonExistentRefreshToken, err := database.GetRefreshTokenByID(context.Background(), nil, 99999)
 	if err != nil {
 		t.Errorf("Expected no error for non-existent refresh token, got: %v", err)
 	}
 	if nonExistentRefreshToken != nil {
-		t.Errorf("Expected nil for non-existent refresh token, got a refresh token with ID: %d", nonExistentRefreshToken.Id)
+		t.Errorf("Expected nil for non-existent refresh token, got a refresh token with ID: %d", nonExistentRefreshToken.ID)
 	}
 }
 
@@ -136,8 +136,8 @@ func TestRefreshTokenLoadCode(t *testing.T) {
 		t.Fatalf("Failed to load code for refresh token: %v", err)
 	}
 
-	if refreshToken.Code.Id != refreshToken.CodeId.Int64 {
-		t.Errorf("Expected loaded Code ID to match CodeId, got %d and %d", refreshToken.Code.Id, refreshToken.CodeId.Int64)
+	if refreshToken.Code.ID != refreshToken.CodeID.Int64 {
+		t.Errorf("Expected loaded Code ID to match CodeID, got %d and %d", refreshToken.Code.ID, refreshToken.CodeID.Int64)
 	}
 }
 
@@ -149,13 +149,13 @@ func TestRefreshTokenLoadUser(t *testing.T) {
 		t.Fatalf("Failed to load user for refresh token: %v", err)
 	}
 
-	if refreshToken.User.Id != refreshToken.UserId.Int64 {
-		t.Errorf("Expected loaded User ID to match UserId, got %d and %d", refreshToken.User.Id, refreshToken.UserId.Int64)
+	if refreshToken.User.ID != refreshToken.UserID.Int64 {
+		t.Errorf("Expected loaded User ID to match UserID, got %d and %d", refreshToken.User.ID, refreshToken.UserID.Int64)
 	}
 
-	// Test loading user for refresh token with nil UserId
+	// Test loading user for refresh token with nil UserID
 	refreshTokenNoUser := createTestRefreshToken(t)
-	refreshTokenNoUser.UserId = sql.NullInt64{Valid: false}
+	refreshTokenNoUser.UserID = sql.NullInt64{Valid: false}
 	err = database.UpdateRefreshToken(context.Background(), nil, refreshTokenNoUser)
 	if err != nil {
 		t.Fatalf("Failed to update refresh token: %v", err)
@@ -163,7 +163,7 @@ func TestRefreshTokenLoadUser(t *testing.T) {
 
 	err = database.RefreshTokenLoadUser(context.Background(), nil, refreshTokenNoUser)
 	if err != nil {
-		t.Fatalf("Failed to load user for refresh token with nil UserId: %v", err)
+		t.Fatalf("Failed to load user for refresh token with nil UserID: %v", err)
 	}
 }
 
@@ -175,13 +175,13 @@ func TestRefreshTokenLoadClient(t *testing.T) {
 		t.Fatalf("Failed to load client for refresh token: %v", err)
 	}
 
-	if refreshToken.Client.Id != refreshToken.ClientId.Int64 {
-		t.Errorf("Expected loaded Client ID to match ClientId, got %d and %d", refreshToken.Client.Id, refreshToken.ClientId.Int64)
+	if refreshToken.Client.ID != refreshToken.ClientID.Int64 {
+		t.Errorf("Expected loaded Client ID to match ClientID, got %d and %d", refreshToken.Client.ID, refreshToken.ClientID.Int64)
 	}
 
-	// Test loading client for refresh token with nil ClientId
+	// Test loading client for refresh token with nil ClientID
 	refreshTokenNoClient := createTestRefreshToken(t)
-	refreshTokenNoClient.ClientId = sql.NullInt64{Valid: false}
+	refreshTokenNoClient.ClientID = sql.NullInt64{Valid: false}
 	err = database.UpdateRefreshToken(context.Background(), nil, refreshTokenNoClient)
 	if err != nil {
 		t.Fatalf("Failed to update refresh token: %v", err)
@@ -189,38 +189,38 @@ func TestRefreshTokenLoadClient(t *testing.T) {
 
 	err = database.RefreshTokenLoadClient(context.Background(), nil, refreshTokenNoClient)
 	if err != nil {
-		t.Fatalf("Failed to load client for refresh token with nil ClientId: %v", err)
+		t.Fatalf("Failed to load client for refresh token with nil ClientID: %v", err)
 	}
 }
 
-func TestGetRefreshTokenByJti(t *testing.T) {
+func TestGetRefreshTokenByJTI(t *testing.T) {
 	refreshToken := createTestRefreshToken(t)
 
-	retrievedRefreshToken, err := database.GetRefreshTokenByJti(context.Background(), nil, refreshToken.RefreshTokenJti)
+	retrievedRefreshToken, err := database.GetRefreshTokenByJTI(context.Background(), nil, refreshToken.RefreshTokenJTI)
 	if err != nil {
 		t.Fatalf("Failed to get refresh token by JTI: %v", err)
 	}
 
 	compareRefreshTokens(t, refreshToken, retrievedRefreshToken)
 
-	nonExistentRefreshToken, err := database.GetRefreshTokenByJti(context.Background(), nil, "non_existent_jti")
+	nonExistentRefreshToken, err := database.GetRefreshTokenByJTI(context.Background(), nil, "non_existent_jti")
 	if err != nil {
 		t.Errorf("Expected no error for non-existent refresh token, got: %v", err)
 	}
 	if nonExistentRefreshToken != nil {
-		t.Errorf("Expected nil for non-existent refresh token, got a refresh token with ID: %d", nonExistentRefreshToken.Id)
+		t.Errorf("Expected nil for non-existent refresh token, got a refresh token with ID: %d", nonExistentRefreshToken.ID)
 	}
 }
 
 func TestDeleteRefreshToken(t *testing.T) {
 	refreshToken := createTestRefreshToken(t)
 
-	err := database.DeleteRefreshToken(context.Background(), nil, refreshToken.Id)
+	err := database.DeleteRefreshToken(context.Background(), nil, refreshToken.ID)
 	if err != nil {
 		t.Fatalf("Failed to delete refresh token: %v", err)
 	}
 
-	deletedRefreshToken, err := database.GetRefreshTokenById(context.Background(), nil, refreshToken.Id)
+	deletedRefreshToken, err := database.GetRefreshTokenByID(context.Background(), nil, refreshToken.ID)
 	if err != nil {
 		t.Fatalf("Error while checking for deleted refresh token: %v", err)
 	}
@@ -237,12 +237,12 @@ func TestDeleteRefreshToken(t *testing.T) {
 func createTestRefreshToken(t *testing.T) *record.RefreshToken {
 	client := createTestClient(t)
 	user := createTestUser(t)
-	code := createTestCode(t, client.Id, user.Id)
+	code := createTestCode(t, client.ID, user.ID)
 	refreshToken := &record.RefreshToken{
-		CodeId:            sql.NullInt64{Int64: code.Id, Valid: true},
-		UserId:            sql.NullInt64{Int64: user.Id, Valid: true},
-		ClientId:          sql.NullInt64{Int64: client.Id, Valid: true},
-		RefreshTokenJti:   fake.UUID(),
+		CodeID:            sql.NullInt64{Int64: code.ID, Valid: true},
+		UserID:            sql.NullInt64{Int64: user.ID, Valid: true},
+		ClientID:          sql.NullInt64{Int64: client.ID, Valid: true},
+		RefreshTokenJTI:   fake.UUID(),
 		SessionIdentifier: fake.UUID(),
 		RefreshTokenType:  "Bearer",
 		Scope:             "openid profile",
@@ -259,26 +259,26 @@ func createTestRefreshToken(t *testing.T) *record.RefreshToken {
 }
 
 func compareRefreshTokens(t *testing.T, expected, actual *record.RefreshToken) {
-	if actual.Id != expected.Id {
-		t.Errorf("Expected ID %d, got %d", expected.Id, actual.Id)
+	if actual.ID != expected.ID {
+		t.Errorf("Expected ID %d, got %d", expected.ID, actual.ID)
 	}
-	if actual.CodeId != expected.CodeId {
-		t.Errorf("Expected CodeId %v, got %v", expected.CodeId, actual.CodeId)
+	if actual.CodeID != expected.CodeID {
+		t.Errorf("Expected CodeID %v, got %v", expected.CodeID, actual.CodeID)
 	}
-	if actual.UserId != expected.UserId {
-		t.Errorf("Expected UserId %v, got %v", expected.UserId, actual.UserId)
+	if actual.UserID != expected.UserID {
+		t.Errorf("Expected UserID %v, got %v", expected.UserID, actual.UserID)
 	}
-	if actual.ClientId != expected.ClientId {
-		t.Errorf("Expected ClientId %v, got %v", expected.ClientId, actual.ClientId)
+	if actual.ClientID != expected.ClientID {
+		t.Errorf("Expected ClientID %v, got %v", expected.ClientID, actual.ClientID)
 	}
-	if actual.RefreshTokenJti != expected.RefreshTokenJti {
-		t.Errorf("Expected RefreshTokenJti %s, got %s", expected.RefreshTokenJti, actual.RefreshTokenJti)
+	if actual.RefreshTokenJTI != expected.RefreshTokenJTI {
+		t.Errorf("Expected RefreshTokenJTI %s, got %s", expected.RefreshTokenJTI, actual.RefreshTokenJTI)
 	}
-	if actual.PreviousRefreshTokenJti != expected.PreviousRefreshTokenJti {
-		t.Errorf("Expected PreviousRefreshTokenJti %s, got %s", expected.PreviousRefreshTokenJti, actual.PreviousRefreshTokenJti)
+	if actual.PreviousRefreshTokenJTI != expected.PreviousRefreshTokenJTI {
+		t.Errorf("Expected PreviousRefreshTokenJTI %s, got %s", expected.PreviousRefreshTokenJTI, actual.PreviousRefreshTokenJTI)
 	}
-	if actual.FirstRefreshTokenJti != expected.FirstRefreshTokenJti {
-		t.Errorf("Expected FirstRefreshTokenJti %s, got %s", expected.FirstRefreshTokenJti, actual.FirstRefreshTokenJti)
+	if actual.FirstRefreshTokenJTI != expected.FirstRefreshTokenJTI {
+		t.Errorf("Expected FirstRefreshTokenJTI %s, got %s", expected.FirstRefreshTokenJTI, actual.FirstRefreshTokenJTI)
 	}
 	if actual.SessionIdentifier != expected.SessionIdentifier {
 		t.Errorf("Expected SessionIdentifier %s, got %s", expected.SessionIdentifier, actual.SessionIdentifier)
@@ -307,14 +307,14 @@ func compareRefreshTokens(t *testing.T, expected, actual *record.RefreshToken) {
 	}
 }
 
-func TestGetRefreshTokensByCodeId(t *testing.T) {
+func TestGetRefreshTokensByCodeID(t *testing.T) {
 	client := createTestClient(t)
 	user := createTestUser(t)
-	code := createTestCode(t, client.Id, user.Id)
+	code := createTestCode(t, client.ID, user.ID)
 
 	rt1 := &record.RefreshToken{
-		CodeId:           sql.NullInt64{Int64: code.Id, Valid: true},
-		RefreshTokenJti:  fake.UUID(),
+		CodeID:           sql.NullInt64{Int64: code.ID, Valid: true},
+		RefreshTokenJTI:  fake.UUID(),
 		RefreshTokenType: "Refresh",
 		Scope:            "openid",
 		IssuedAt:         sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
@@ -325,8 +325,8 @@ func TestGetRefreshTokensByCodeId(t *testing.T) {
 	}
 
 	rt2 := &record.RefreshToken{
-		CodeId:           sql.NullInt64{Int64: code.Id, Valid: true},
-		RefreshTokenJti:  fake.UUID(),
+		CodeID:           sql.NullInt64{Int64: code.ID, Valid: true},
+		RefreshTokenJTI:  fake.UUID(),
 		RefreshTokenType: "Offline",
 		Scope:            "openid offline_access",
 		IssuedAt:         sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
@@ -337,10 +337,10 @@ func TestGetRefreshTokensByCodeId(t *testing.T) {
 	}
 
 	// Unrelated refresh token under a different code (must not be returned).
-	otherCode := createTestCode(t, client.Id, user.Id)
+	otherCode := createTestCode(t, client.ID, user.ID)
 	rtOther := &record.RefreshToken{
-		CodeId:           sql.NullInt64{Int64: otherCode.Id, Valid: true},
-		RefreshTokenJti:  fake.UUID(),
+		CodeID:           sql.NullInt64{Int64: otherCode.ID, Valid: true},
+		RefreshTokenJTI:  fake.UUID(),
 		RefreshTokenType: "Refresh",
 		Scope:            "openid",
 		IssuedAt:         sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
@@ -350,25 +350,25 @@ func TestGetRefreshTokensByCodeId(t *testing.T) {
 		t.Fatalf("Failed to create rtOther: %v", err)
 	}
 
-	got, err := database.GetRefreshTokensByCodeId(context.Background(), nil, code.Id)
+	got, err := database.GetRefreshTokensByCodeID(context.Background(), nil, code.ID)
 	if err != nil {
-		t.Fatalf("GetRefreshTokensByCodeId failed: %v", err)
+		t.Fatalf("GetRefreshTokensByCodeID failed: %v", err)
 	}
 	if len(got) != 2 {
-		t.Fatalf("Expected 2 refresh tokens for code %d, got %d", code.Id, len(got))
+		t.Fatalf("Expected 2 refresh tokens for code %d, got %d", code.ID, len(got))
 	}
 	seen := map[string]bool{}
 	for _, rt := range got {
-		seen[rt.RefreshTokenJti] = true
+		seen[rt.RefreshTokenJTI] = true
 	}
-	if !seen[rt1.RefreshTokenJti] || !seen[rt2.RefreshTokenJti] {
+	if !seen[rt1.RefreshTokenJTI] || !seen[rt2.RefreshTokenJTI] {
 		t.Errorf("Expected both rt1 and rt2 to be returned, got: %v", seen)
 	}
 
 	// Unknown code id returns empty.
-	gotEmpty, err := database.GetRefreshTokensByCodeId(context.Background(), nil, 99999999)
+	gotEmpty, err := database.GetRefreshTokensByCodeID(context.Background(), nil, 99999999)
 	if err != nil {
-		t.Fatalf("GetRefreshTokensByCodeId(unknown) failed: %v", err)
+		t.Fatalf("GetRefreshTokensByCodeID(unknown) failed: %v", err)
 	}
 	if len(gotEmpty) != 0 {
 		t.Errorf("Expected empty result for unknown code id, got %d", len(gotEmpty))
@@ -379,25 +379,25 @@ func TestGetRefreshTokensBySessionIdentifier(t *testing.T) {
 	client := createTestClient(t)
 	user := createTestUser(t)
 
-	sessionId := "sess_" + fake.LetterN(12)
+	sessionID := "sess_" + fake.LetterN(12)
 
 	// Two codes share the same session identifier (e.g., user federated to two clients
 	// during the same SSO session, or one online + one offline exchange).
 	codeA := &record.Code{
-		ClientId:            client.Id,
-		UserId:              user.Id,
+		ClientID:            client.ID,
+		UserID:              user.ID,
 		Code:                "code_a_" + fake.LetterN(6),
 		CodeHash:            "hash_a_" + fake.LetterN(6),
 		CodeChallenge:       sql.NullString{String: "challenge_a_" + fake.LetterN(6), Valid: true},
 		CodeChallengeMethod: sql.NullString{String: "S256", Valid: true},
 		RedirectURI:         "https://example.com/callback",
 		Scope:               "openid",
-		IpAddress:           "127.0.0.1",
+		IPAddress:           "127.0.0.1",
 		UserAgent:           "test",
 		ResponseMode:        "query",
 		AuthenticatedAt:     time.Now().UTC().Truncate(time.Microsecond),
-		SessionIdentifier:   sessionId,
-		AcrLevel:            "1",
+		SessionIdentifier:   sessionID,
+		ACRLevel:            "1",
 		AuthMethods:         "pwd",
 		Used:                true,
 	}
@@ -406,20 +406,20 @@ func TestGetRefreshTokensBySessionIdentifier(t *testing.T) {
 	}
 
 	codeB := &record.Code{
-		ClientId:            client.Id,
-		UserId:              user.Id,
+		ClientID:            client.ID,
+		UserID:              user.ID,
 		Code:                "code_b_" + fake.LetterN(6),
 		CodeHash:            "hash_b_" + fake.LetterN(6),
 		CodeChallenge:       sql.NullString{String: "challenge_b_" + fake.LetterN(6), Valid: true},
 		CodeChallengeMethod: sql.NullString{String: "S256", Valid: true},
 		RedirectURI:         "https://example.com/callback",
 		Scope:               "openid offline_access",
-		IpAddress:           "127.0.0.1",
+		IPAddress:           "127.0.0.1",
 		UserAgent:           "test",
 		ResponseMode:        "query",
 		AuthenticatedAt:     time.Now().UTC().Truncate(time.Microsecond),
-		SessionIdentifier:   sessionId,
-		AcrLevel:            "1",
+		SessionIdentifier:   sessionID,
+		ACRLevel:            "1",
 		AuthMethods:         "pwd",
 		Used:                true,
 	}
@@ -429,9 +429,9 @@ func TestGetRefreshTokensBySessionIdentifier(t *testing.T) {
 
 	// Online refresh token (carries session_identifier on the row).
 	rtOnline := &record.RefreshToken{
-		CodeId:            sql.NullInt64{Int64: codeA.Id, Valid: true},
-		RefreshTokenJti:   fake.UUID(),
-		SessionIdentifier: sessionId,
+		CodeID:            sql.NullInt64{Int64: codeA.ID, Valid: true},
+		RefreshTokenJTI:   fake.UUID(),
+		SessionIdentifier: sessionID,
 		RefreshTokenType:  "Refresh",
 		Scope:             "openid",
 		IssuedAt:          sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
@@ -443,8 +443,8 @@ func TestGetRefreshTokensBySessionIdentifier(t *testing.T) {
 
 	// Offline refresh token (empty session_identifier on the row, but its code carries it).
 	rtOffline := &record.RefreshToken{
-		CodeId:           sql.NullInt64{Int64: codeB.Id, Valid: true},
-		RefreshTokenJti:  fake.UUID(),
+		CodeID:           sql.NullInt64{Int64: codeB.ID, Valid: true},
+		RefreshTokenJTI:  fake.UUID(),
 		RefreshTokenType: "Offline",
 		Scope:            "openid offline_access",
 		IssuedAt:         sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
@@ -456,20 +456,20 @@ func TestGetRefreshTokensBySessionIdentifier(t *testing.T) {
 
 	// Unrelated refresh token under a different session must not appear.
 	unrelatedCode := &record.Code{
-		ClientId:            client.Id,
-		UserId:              user.Id,
+		ClientID:            client.ID,
+		UserID:              user.ID,
 		Code:                "code_c_" + fake.LetterN(6),
 		CodeHash:            "hash_c_" + fake.LetterN(6),
 		CodeChallenge:       sql.NullString{String: "challenge_c_" + fake.LetterN(6), Valid: true},
 		CodeChallengeMethod: sql.NullString{String: "S256", Valid: true},
 		RedirectURI:         "https://example.com/callback",
 		Scope:               "openid",
-		IpAddress:           "127.0.0.1",
+		IPAddress:           "127.0.0.1",
 		UserAgent:           "test",
 		ResponseMode:        "query",
 		AuthenticatedAt:     time.Now().UTC().Truncate(time.Microsecond),
 		SessionIdentifier:   "different_" + fake.LetterN(8),
-		AcrLevel:            "1",
+		ACRLevel:            "1",
 		AuthMethods:         "pwd",
 		Used:                true,
 	}
@@ -477,8 +477,8 @@ func TestGetRefreshTokensBySessionIdentifier(t *testing.T) {
 		t.Fatalf("Failed to create unrelatedCode: %v", err)
 	}
 	rtUnrelated := &record.RefreshToken{
-		CodeId:           sql.NullInt64{Int64: unrelatedCode.Id, Valid: true},
-		RefreshTokenJti:  fake.UUID(),
+		CodeID:           sql.NullInt64{Int64: unrelatedCode.ID, Valid: true},
+		RefreshTokenJTI:  fake.UUID(),
 		RefreshTokenType: "Refresh",
 		Scope:            "openid",
 		IssuedAt:         sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
@@ -488,21 +488,21 @@ func TestGetRefreshTokensBySessionIdentifier(t *testing.T) {
 		t.Fatalf("Failed to create rtUnrelated: %v", err)
 	}
 
-	got, err := database.GetRefreshTokensBySessionIdentifier(context.Background(), nil, sessionId)
+	got, err := database.GetRefreshTokensBySessionIdentifier(context.Background(), nil, sessionID)
 	if err != nil {
 		t.Fatalf("GetRefreshTokensBySessionIdentifier failed: %v", err)
 	}
 	if len(got) != 2 {
-		t.Fatalf("Expected 2 refresh tokens for session %s, got %d", sessionId, len(got))
+		t.Fatalf("Expected 2 refresh tokens for session %s, got %d", sessionID, len(got))
 	}
 	seen := map[string]bool{}
 	for _, rt := range got {
-		seen[rt.RefreshTokenJti] = true
+		seen[rt.RefreshTokenJTI] = true
 	}
-	if !seen[rtOnline.RefreshTokenJti] || !seen[rtOffline.RefreshTokenJti] {
+	if !seen[rtOnline.RefreshTokenJTI] || !seen[rtOffline.RefreshTokenJTI] {
 		t.Errorf("Expected both online and offline refresh tokens, got: %v", seen)
 	}
-	if seen[rtUnrelated.RefreshTokenJti] {
+	if seen[rtUnrelated.RefreshTokenJTI] {
 		t.Errorf("Did not expect unrelated refresh token to be returned")
 	}
 
@@ -608,7 +608,7 @@ func TestDeleteExpiredRefreshTokens(t *testing.T) {
 		if err := database.UpdateRefreshToken(context.Background(), nil, rt); err != nil {
 			t.Fatalf("failed to seed %q: %v", tc.name, err)
 		}
-		ids[i] = rt.Id
+		ids[i] = rt.ID
 	}
 
 	// One sweep for the whole table: the cases must not be able to influence each other
@@ -618,7 +618,7 @@ func TestDeleteExpiredRefreshTokens(t *testing.T) {
 	}
 
 	for i, tc := range testCases {
-		row, err := database.GetRefreshTokenById(context.Background(), nil, ids[i])
+		row, err := database.GetRefreshTokenByID(context.Background(), nil, ids[i])
 		if err != nil {
 			t.Fatalf("error checking %q: %v", tc.name, err)
 		}
@@ -643,13 +643,13 @@ func TestUpdateRefreshToken_DoesNotClobberAuthStateGeneration(t *testing.T) {
 	refreshToken := createTestRefreshToken(t)
 
 	refreshToken.AuthStateGeneration = 7
-	refreshToken.Id = 0
-	refreshToken.RefreshTokenJti = fake.UUID()
+	refreshToken.ID = 0
+	refreshToken.RefreshTokenJTI = fake.UUID()
 	if err := database.CreateRefreshToken(context.Background(), nil, refreshToken); err != nil {
 		t.Fatalf("Failed to create refresh token with a generation: %v", err)
 	}
 
-	created, err := database.GetRefreshTokenById(context.Background(), nil, refreshToken.Id)
+	created, err := database.GetRefreshTokenByID(context.Background(), nil, refreshToken.ID)
 	if err != nil {
 		t.Fatalf("Failed to reload created refresh token: %v", err)
 	}
@@ -664,7 +664,7 @@ func TestUpdateRefreshToken_DoesNotClobberAuthStateGeneration(t *testing.T) {
 		t.Fatalf("Failed to update refresh token: %v", updateRefreshTokenErr)
 	}
 
-	after, err := database.GetRefreshTokenById(context.Background(), nil, refreshToken.Id)
+	after, err := database.GetRefreshTokenByID(context.Background(), nil, refreshToken.ID)
 	if err != nil {
 		t.Fatalf("Failed to reload updated refresh token: %v", err)
 	}
@@ -677,7 +677,7 @@ func TestUpdateRefreshToken_DoesNotClobberAuthStateGeneration(t *testing.T) {
 	}
 }
 
-// TestGetRefreshTokensByUserId is the exhaustive owner of this query's linkage-shape
+// TestGetRefreshTokensByUserID is the exhaustive owner of this query's linkage-shape
 // coverage (#106 decision 1). Later stages test their consumers thinly and say so.
 //
 // The shapes exist because a refresh token reaches its user two different ways: through
@@ -691,27 +691,27 @@ func TestUpdateRefreshToken_DoesNotClobberAuthStateGeneration(t *testing.T) {
 // while an offline refresh token lives a year, so it is the normal resting state of an
 // offline grant rather than an edge case, and it is exactly what the issue's own
 // session-walk proposal could not reach.
-func TestGetRefreshTokensByUserId(t *testing.T) {
+func TestGetRefreshTokensByUserID(t *testing.T) {
 	client := createTestClient(t)
 	user := createTestUser(t)
 	otherUser := createTestUser(t)
 
-	newCode := func(sessionId string) *record.Code {
+	newCode := func(sessionID string) *record.Code {
 		code := &record.Code{
-			ClientId:            client.Id,
-			UserId:              user.Id,
+			ClientID:            client.ID,
+			UserID:              user.ID,
 			Code:                "code_" + fake.LetterN(8),
 			CodeHash:            "hash_" + fake.LetterN(8),
 			CodeChallenge:       sql.NullString{String: "chal_" + fake.LetterN(8), Valid: true},
 			CodeChallengeMethod: sql.NullString{String: "S256", Valid: true},
 			RedirectURI:         "https://example.com/callback",
 			Scope:               "openid",
-			IpAddress:           "127.0.0.1",
+			IPAddress:           "127.0.0.1",
 			UserAgent:           "test",
 			ResponseMode:        "query",
 			AuthenticatedAt:     time.Now().UTC().Truncate(time.Microsecond),
-			SessionIdentifier:   sessionId,
-			AcrLevel:            "1",
+			SessionIdentifier:   sessionID,
+			ACRLevel:            "1",
 			AuthMethods:         "pwd",
 			Used:                true,
 		}
@@ -722,7 +722,7 @@ func TestGetRefreshTokensByUserId(t *testing.T) {
 	}
 
 	newToken := func(rt *record.RefreshToken) *record.RefreshToken {
-		rt.RefreshTokenJti = fake.UUID()
+		rt.RefreshTokenJTI = fake.UUID()
 		rt.Scope = "openid"
 		rt.IssuedAt = sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true}
 		rt.ExpiresAt = sql.NullTime{Time: time.Now().UTC().Add(time.Hour).Truncate(time.Microsecond), Valid: true}
@@ -733,10 +733,10 @@ func TestGetRefreshTokensByUserId(t *testing.T) {
 	}
 
 	// Shape 1: session-bound, session still alive.
-	liveSession := createTestUserSession(t, user.Id)
+	liveSession := createTestUserSession(t, user.ID)
 	boundCode := newCode(liveSession.SessionIdentifier)
 	sessionBound := newToken(&record.RefreshToken{
-		CodeId:            sql.NullInt64{Int64: boundCode.Id, Valid: true},
+		CodeID:            sql.NullInt64{Int64: boundCode.ID, Valid: true},
 		SessionIdentifier: liveSession.SessionIdentifier,
 		RefreshTokenType:  "Refresh",
 	})
@@ -745,27 +745,27 @@ func TestGetRefreshTokensByUserId(t *testing.T) {
 	// their own; theirs lives on the code.
 	offlineLiveCode := newCode(liveSession.SessionIdentifier)
 	offlineLive := newToken(&record.RefreshToken{
-		CodeId:           sql.NullInt64{Int64: offlineLiveCode.Id, Valid: true},
+		CodeID:           sql.NullInt64{Int64: offlineLiveCode.ID, Valid: true},
 		RefreshTokenType: "Offline",
 		MaxLifetime:      sql.NullTime{Time: time.Now().UTC().Add(24 * time.Hour).Truncate(time.Microsecond), Valid: true},
 	})
 
 	// Shape 3: offline whose session row is GONE. The decisive row.
-	reapedSession := createTestUserSession(t, user.Id)
+	reapedSession := createTestUserSession(t, user.ID)
 	reapedCode := newCode(reapedSession.SessionIdentifier)
 	offlineReaped := newToken(&record.RefreshToken{
-		CodeId:           sql.NullInt64{Int64: reapedCode.Id, Valid: true},
+		CodeID:           sql.NullInt64{Int64: reapedCode.ID, Valid: true},
 		RefreshTokenType: "Offline",
 		MaxLifetime:      sql.NullTime{Time: time.Now().UTC().Add(24 * time.Hour).Truncate(time.Microsecond), Valid: true},
 	})
-	if err := database.DeleteUserSession(context.Background(), nil, reapedSession.Id); err != nil {
+	if err := database.DeleteUserSession(context.Background(), nil, reapedSession.ID); err != nil {
 		t.Fatalf("Failed to delete the session being reaped: %v", err)
 	}
 
 	// Shape 4: ROPC, linked straight to the user with no code.
 	ropc := newToken(&record.RefreshToken{
-		UserId:           sql.NullInt64{Int64: user.Id, Valid: true},
-		ClientId:         sql.NullInt64{Int64: client.Id, Valid: true},
+		UserID:           sql.NullInt64{Int64: user.ID, Valid: true},
+		ClientID:         sql.NullInt64{Int64: client.ID, Valid: true},
 		RefreshTokenType: "Offline",
 		MaxLifetime:      sql.NullTime{Time: time.Now().UTC().Add(24 * time.Hour).Truncate(time.Microsecond), Valid: true},
 	})
@@ -773,45 +773,45 @@ func TestGetRefreshTokensByUserId(t *testing.T) {
 	// Negative: a token belonging to somebody else, in both linkage shapes. These vary
 	// only the user, so neither can pass with the predicate removed.
 	otherCode := &record.Code{
-		ClientId: client.Id, UserId: otherUser.Id,
+		ClientID: client.ID, UserID: otherUser.ID,
 		Code: "code_o_" + fake.LetterN(8), CodeHash: "hash_o_" + fake.LetterN(8),
 		CodeChallenge: sql.NullString{String: "chal_o", Valid: true}, CodeChallengeMethod: sql.NullString{String: "S256", Valid: true},
-		RedirectURI: "https://example.com/callback", Scope: "openid", IpAddress: "127.0.0.1",
+		RedirectURI: "https://example.com/callback", Scope: "openid", IPAddress: "127.0.0.1",
 		UserAgent: "test", ResponseMode: "query",
 		AuthenticatedAt:   time.Now().UTC().Truncate(time.Microsecond),
-		SessionIdentifier: "sess_o_" + fake.LetterN(8), AcrLevel: "1", AuthMethods: "pwd", Used: true,
+		SessionIdentifier: "sess_o_" + fake.LetterN(8), ACRLevel: "1", AuthMethods: "pwd", Used: true,
 	}
 	if err := database.CreateCode(context.Background(), nil, otherCode); err != nil {
 		t.Fatalf("Failed to create the other user's code: %v", err)
 	}
 	otherViaCode := newToken(&record.RefreshToken{
-		CodeId:           sql.NullInt64{Int64: otherCode.Id, Valid: true},
+		CodeID:           sql.NullInt64{Int64: otherCode.ID, Valid: true},
 		RefreshTokenType: "Refresh",
 	})
 	otherDirect := newToken(&record.RefreshToken{
-		UserId:           sql.NullInt64{Int64: otherUser.Id, Valid: true},
-		ClientId:         sql.NullInt64{Int64: client.Id, Valid: true},
+		UserID:           sql.NullInt64{Int64: otherUser.ID, Valid: true},
+		ClientID:         sql.NullInt64{Int64: client.ID, Valid: true},
 		RefreshTokenType: "Offline",
 	})
 
-	got, err := database.GetRefreshTokensByUserId(context.Background(), nil, user.Id)
+	got, err := database.GetRefreshTokensByUserID(context.Background(), nil, user.ID)
 	if err != nil {
-		t.Fatalf("GetRefreshTokensByUserId failed: %v", err)
+		t.Fatalf("GetRefreshTokensByUserID failed: %v", err)
 	}
 
 	found := make(map[int64]bool, len(got))
 	for _, rt := range got {
-		found[rt.Id] = true
+		found[rt.ID] = true
 	}
 
 	for _, want := range []struct {
 		label string
 		id    int64
 	}{
-		{"session-bound with a live session", sessionBound.Id},
-		{"offline with a live session", offlineLive.Id},
-		{"offline whose session row was reaped", offlineReaped.Id},
-		{"ROPC linked directly to the user", ropc.Id},
+		{"session-bound with a live session", sessionBound.ID},
+		{"offline with a live session", offlineLive.ID},
+		{"offline whose session row was reaped", offlineReaped.ID},
+		{"ROPC linked directly to the user", ropc.ID},
 	} {
 		if !found[want.id] {
 			t.Errorf("missing shape: %s (id %d)", want.label, want.id)
@@ -822,8 +822,8 @@ func TestGetRefreshTokensByUserId(t *testing.T) {
 		label string
 		id    int64
 	}{
-		{"another user's token via a code", otherViaCode.Id},
-		{"another user's ROPC token", otherDirect.Id},
+		{"another user's token via a code", otherViaCode.ID},
+		{"another user's ROPC token", otherDirect.ID},
 	} {
 		if found[unwanted.id] {
 			t.Errorf("returned a token that is not this user's: %s (id %d)", unwanted.label, unwanted.id)
@@ -836,21 +836,21 @@ func TestGetRefreshTokensByUserId(t *testing.T) {
 	}
 }
 
-// TestGetRefreshTokensByUserId_NoTokens covers the empty result, and the zero-id guard.
-func TestGetRefreshTokensByUserId_NoTokens(t *testing.T) {
+// TestGetRefreshTokensByUserID_NoTokens covers the empty result, and the zero-id guard.
+func TestGetRefreshTokensByUserID_NoTokens(t *testing.T) {
 	user := createTestUser(t)
 
-	got, err := database.GetRefreshTokensByUserId(context.Background(), nil, user.Id)
+	got, err := database.GetRefreshTokensByUserID(context.Background(), nil, user.ID)
 	if err != nil {
-		t.Fatalf("GetRefreshTokensByUserId failed: %v", err)
+		t.Fatalf("GetRefreshTokensByUserID failed: %v", err)
 	}
 	if len(got) != 0 {
 		t.Errorf("expected no tokens for a fresh user, got %d", len(got))
 	}
 
-	got, err = database.GetRefreshTokensByUserId(context.Background(), nil, 0)
+	got, err = database.GetRefreshTokensByUserID(context.Background(), nil, 0)
 	if err != nil {
-		t.Fatalf("GetRefreshTokensByUserId(0) should not error: %v", err)
+		t.Fatalf("GetRefreshTokensByUserID(0) should not error: %v", err)
 	}
 	if len(got) != 0 {
 		t.Errorf("expected no tokens for user id 0, got %d", len(got))
@@ -859,23 +859,23 @@ func TestGetRefreshTokensByUserId_NoTokens(t *testing.T) {
 
 // newWithdrawalCode creates a used code of one user with one client, for the consent
 // withdrawal's enumeration tests (#622).
-func newWithdrawalCode(t *testing.T, clientId int64, userId int64) *record.Code {
+func newWithdrawalCode(t *testing.T, clientID int64, userID int64) *record.Code {
 	t.Helper()
 	code := &record.Code{
-		ClientId:            clientId,
-		UserId:              userId,
+		ClientID:            clientID,
+		UserID:              userID,
 		Code:                "code_" + fake.LetterN(8),
 		CodeHash:            "hash_" + fake.LetterN(8),
 		CodeChallenge:       sql.NullString{String: "chal_" + fake.LetterN(8), Valid: true},
 		CodeChallengeMethod: sql.NullString{String: "S256", Valid: true},
 		RedirectURI:         "https://example.com/callback",
 		Scope:               "openid",
-		IpAddress:           "127.0.0.1",
+		IPAddress:           "127.0.0.1",
 		UserAgent:           "test",
 		ResponseMode:        "query",
 		AuthenticatedAt:     time.Now().UTC().Truncate(time.Microsecond),
 		SessionIdentifier:   "sess_" + fake.LetterN(8),
-		AcrLevel:            "1",
+		ACRLevel:            "1",
 		AuthMethods:         "pwd",
 		Used:                true,
 	}
@@ -889,7 +889,7 @@ func newWithdrawalCode(t *testing.T, clientId int64, userId int64) *record.Code 
 // linkage, type, family and revoked flag the caller set.
 func newWithdrawalToken(t *testing.T, rt *record.RefreshToken) *record.RefreshToken {
 	t.Helper()
-	rt.RefreshTokenJti = fake.UUID()
+	rt.RefreshTokenJTI = fake.UUID()
 	rt.Scope = "openid"
 	rt.IssuedAt = sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true}
 	rt.ExpiresAt = sql.NullTime{Time: time.Now().UTC().Add(time.Hour).Truncate(time.Microsecond), Valid: true}
@@ -899,18 +899,18 @@ func newWithdrawalToken(t *testing.T, rt *record.RefreshToken) *record.RefreshTo
 	return rt
 }
 
-// TestGetRefreshTokensByUserIdAndClientId pins the consent withdrawal's enumeration (#622): both
+// TestGetRefreshTokensByUserIDAndClientID pins the consent withdrawal's enumeration (#622): both
 // linkage shapes with the client predicate added to each, revoked rows of both shapes returned
 // beside the live ones, the same user's tokens with another client and another user's tokens with
 // the same client both refused, and no double-counting from the UNION ALL.
-func TestGetRefreshTokensByUserIdAndClientId(t *testing.T) {
+func TestGetRefreshTokensByUserIDAndClientID(t *testing.T) {
 	client := createTestClient(t)
 	otherClient := createTestClient(t)
 	user := createTestUser(t)
 	otherUser := createTestUser(t)
 
-	newCode := func(clientId int64, userId int64) *record.Code {
-		return newWithdrawalCode(t, clientId, userId)
+	newCode := func(clientID int64, userID int64) *record.Code {
+		return newWithdrawalCode(t, clientID, userID)
 	}
 	newToken := func(rt *record.RefreshToken) *record.RefreshToken {
 		return newWithdrawalToken(t, rt)
@@ -919,12 +919,12 @@ func TestGetRefreshTokensByUserIdAndClientId(t *testing.T) {
 	// The two shapes that must match: this user's tokens with THIS client, one through a code
 	// and one linked directly.
 	viaCode := newToken(&record.RefreshToken{
-		CodeId:           sql.NullInt64{Int64: newCode(client.Id, user.Id).Id, Valid: true},
+		CodeID:           sql.NullInt64{Int64: newCode(client.ID, user.ID).ID, Valid: true},
 		RefreshTokenType: "Refresh",
 	})
 	ropc := newToken(&record.RefreshToken{
-		UserId:           sql.NullInt64{Int64: user.Id, Valid: true},
-		ClientId:         sql.NullInt64{Int64: client.Id, Valid: true},
+		UserID:           sql.NullInt64{Int64: user.ID, Valid: true},
+		ClientID:         sql.NullInt64{Int64: client.ID, Valid: true},
 		RefreshTokenType: "Offline",
 		MaxLifetime:      sql.NullTime{Time: time.Now().UTC().Add(24 * time.Hour).Truncate(time.Microsecond), Valid: true},
 	})
@@ -933,58 +933,58 @@ func TestGetRefreshTokensByUserIdAndClientId(t *testing.T) {
 	// withdrawal records the family of every row returned, and a family whose members are all
 	// revoked can still have a child mid-rotation that only the record refuses.
 	revokedViaCode := newToken(&record.RefreshToken{
-		CodeId:               sql.NullInt64{Int64: newCode(client.Id, user.Id).Id, Valid: true},
+		CodeID:               sql.NullInt64{Int64: newCode(client.ID, user.ID).ID, Valid: true},
 		RefreshTokenType:     "Refresh",
-		FirstRefreshTokenJti: "family_" + fake.UUID(),
+		FirstRefreshTokenJTI: "family_" + fake.UUID(),
 		Revoked:              true,
 	})
 	revokedRopc := newToken(&record.RefreshToken{
-		UserId:               sql.NullInt64{Int64: user.Id, Valid: true},
-		ClientId:             sql.NullInt64{Int64: client.Id, Valid: true},
+		UserID:               sql.NullInt64{Int64: user.ID, Valid: true},
+		ClientID:             sql.NullInt64{Int64: client.ID, Valid: true},
 		RefreshTokenType:     "Offline",
-		FirstRefreshTokenJti: "family_" + fake.UUID(),
+		FirstRefreshTokenJTI: "family_" + fake.UUID(),
 		Revoked:              true,
 	})
 
 	// The four that must not, one per branch per predicate, so that removing either predicate
 	// fails here rather than at the withdrawal.
 	otherClientViaCode := newToken(&record.RefreshToken{
-		CodeId:           sql.NullInt64{Int64: newCode(otherClient.Id, user.Id).Id, Valid: true},
+		CodeID:           sql.NullInt64{Int64: newCode(otherClient.ID, user.ID).ID, Valid: true},
 		RefreshTokenType: "Refresh",
 	})
 	otherClientRopc := newToken(&record.RefreshToken{
-		UserId:           sql.NullInt64{Int64: user.Id, Valid: true},
-		ClientId:         sql.NullInt64{Int64: otherClient.Id, Valid: true},
+		UserID:           sql.NullInt64{Int64: user.ID, Valid: true},
+		ClientID:         sql.NullInt64{Int64: otherClient.ID, Valid: true},
 		RefreshTokenType: "Offline",
 	})
 	otherUserViaCode := newToken(&record.RefreshToken{
-		CodeId:           sql.NullInt64{Int64: newCode(client.Id, otherUser.Id).Id, Valid: true},
+		CodeID:           sql.NullInt64{Int64: newCode(client.ID, otherUser.ID).ID, Valid: true},
 		RefreshTokenType: "Refresh",
 	})
 	otherUserRopc := newToken(&record.RefreshToken{
-		UserId:           sql.NullInt64{Int64: otherUser.Id, Valid: true},
-		ClientId:         sql.NullInt64{Int64: client.Id, Valid: true},
+		UserID:           sql.NullInt64{Int64: otherUser.ID, Valid: true},
+		ClientID:         sql.NullInt64{Int64: client.ID, Valid: true},
 		RefreshTokenType: "Offline",
 	})
 
-	got, err := database.GetRefreshTokensByUserIdAndClientId(context.Background(), nil, user.Id, client.Id)
+	got, err := database.GetRefreshTokensByUserIDAndClientID(context.Background(), nil, user.ID, client.ID)
 	if err != nil {
-		t.Fatalf("GetRefreshTokensByUserIdAndClientId failed: %v", err)
+		t.Fatalf("GetRefreshTokensByUserIDAndClientID failed: %v", err)
 	}
 
 	found := make(map[int64]bool, len(got))
 	for _, rt := range got {
-		found[rt.Id] = true
+		found[rt.ID] = true
 	}
 
 	for _, want := range []struct {
 		label string
 		id    int64
 	}{
-		{"the user's auth-code token with this client", viaCode.Id},
-		{"the user's ROPC token with this client", ropc.Id},
-		{"the user's revoked auth-code token with this client", revokedViaCode.Id},
-		{"the user's revoked ROPC token with this client", revokedRopc.Id},
+		{"the user's auth-code token with this client", viaCode.ID},
+		{"the user's ROPC token with this client", ropc.ID},
+		{"the user's revoked auth-code token with this client", revokedViaCode.ID},
+		{"the user's revoked ROPC token with this client", revokedRopc.ID},
 	} {
 		if !found[want.id] {
 			t.Errorf("missing shape: %s (id %d)", want.label, want.id)
@@ -995,10 +995,10 @@ func TestGetRefreshTokensByUserIdAndClientId(t *testing.T) {
 		label string
 		id    int64
 	}{
-		{"the same user's auth-code token with another client", otherClientViaCode.Id},
-		{"the same user's ROPC token with another client", otherClientRopc.Id},
-		{"another user's auth-code token with this client", otherUserViaCode.Id},
-		{"another user's ROPC token with this client", otherUserRopc.Id},
+		{"the same user's auth-code token with another client", otherClientViaCode.ID},
+		{"the same user's ROPC token with another client", otherClientRopc.ID},
+		{"another user's auth-code token with this client", otherUserViaCode.ID},
+		{"another user's ROPC token with this client", otherUserRopc.ID},
 	} {
 		if found[unwanted.id] {
 			t.Errorf("returned a token outside this user and client: %s (id %d)", unwanted.label, unwanted.id)
@@ -1027,37 +1027,37 @@ func TestDisconnectClientTx_RecordsFamiliesWithNoLiveMember(t *testing.T) {
 
 	// A code-descended family rotated once: parent and child both revoked.
 	codeFamily := "family_" + fake.UUID()
-	codeId := sql.NullInt64{Int64: newWithdrawalCode(t, client.Id, user.Id).Id, Valid: true}
+	codeID := sql.NullInt64{Int64: newWithdrawalCode(t, client.ID, user.ID).ID, Valid: true}
 	parent := newWithdrawalToken(t, &record.RefreshToken{
-		CodeId: codeId, RefreshTokenType: "Refresh", FirstRefreshTokenJti: codeFamily, Revoked: true,
+		CodeID: codeID, RefreshTokenType: "Refresh", FirstRefreshTokenJTI: codeFamily, Revoked: true,
 	})
 	newWithdrawalToken(t, &record.RefreshToken{
-		CodeId: codeId, RefreshTokenType: "Refresh", FirstRefreshTokenJti: codeFamily,
-		PreviousRefreshTokenJti: parent.RefreshTokenJti, Revoked: true,
+		CodeID: codeID, RefreshTokenType: "Refresh", FirstRefreshTokenJTI: codeFamily,
+		PreviousRefreshTokenJTI: parent.RefreshTokenJTI, Revoked: true,
 	})
 
 	// A password grant family, its one member revoked.
 	directFamily := "family_" + fake.UUID()
 	newWithdrawalToken(t, &record.RefreshToken{
-		UserId:           sql.NullInt64{Int64: user.Id, Valid: true},
-		ClientId:         sql.NullInt64{Int64: client.Id, Valid: true},
-		RefreshTokenType: "Offline", FirstRefreshTokenJti: directFamily, Revoked: true,
+		UserID:           sql.NullInt64{Int64: user.ID, Valid: true},
+		ClientID:         sql.NullInt64{Int64: client.ID, Valid: true},
+		RefreshTokenType: "Offline", FirstRefreshTokenJTI: directFamily, Revoked: true,
 	})
 
 	// The same user's revoked family with another client, which the withdrawal does not reach.
 	otherClientFamily := "family_" + fake.UUID()
 	newWithdrawalToken(t, &record.RefreshToken{
-		CodeId:           sql.NullInt64{Int64: newWithdrawalCode(t, otherClient.Id, user.Id).Id, Valid: true},
-		RefreshTokenType: "Refresh", FirstRefreshTokenJti: otherClientFamily, Revoked: true,
+		CodeID:           sql.NullInt64{Int64: newWithdrawalCode(t, otherClient.ID, user.ID).ID, Valid: true},
+		RefreshTokenType: "Refresh", FirstRefreshTokenJTI: otherClientFamily, Revoked: true,
 	})
 
-	result, err := revocation.DisconnectClientTx(ctx, database, user.Id, client.Id, nil, nil)
+	result, err := revocation.DisconnectClientTx(ctx, database, user.ID, client.ID, nil, nil)
 	require.NoError(t, err, "DisconnectClientTx")
-	assert.Empty(t, result.RevokedRefreshTokenJtis, "every member was revoked already, so the sweep flips none")
+	assert.Empty(t, result.RevokedRefreshTokenJTIs, "every member was revoked already, so the sweep flips none")
 	assert.Equal(t, 2, result.RecordedFamilyCount, "the call newly recorded both families with this client")
 	assert.True(t, result.Changed())
 
-	again, err := revocation.DisconnectClientTx(ctx, database, user.Id, client.Id, nil, nil)
+	again, err := revocation.DisconnectClientTx(ctx, database, user.ID, client.ID, nil, nil)
 	require.NoError(t, err, "DisconnectClientTx again")
 	assert.Equal(t, 0, again.RecordedFamilyCount, "both families were recorded by the first call")
 	assert.False(t, again.Changed(), "the second call changed nothing: %+v", again)
@@ -1077,38 +1077,38 @@ func TestDisconnectClientTx_RecordsFamiliesWithNoLiveMember(t *testing.T) {
 	}
 }
 
-// TestGetRefreshTokensByUserIdAndClientId_NoTokens covers the empty result and the zero-id
+// TestGetRefreshTokensByUserIDAndClientID_NoTokens covers the empty result and the zero-id
 // guards, one per identifier.
-func TestGetRefreshTokensByUserIdAndClientId_NoTokens(t *testing.T) {
+func TestGetRefreshTokensByUserIDAndClientID_NoTokens(t *testing.T) {
 	user := createTestUser(t)
 	client := createTestClient(t)
 
-	got, err := database.GetRefreshTokensByUserIdAndClientId(context.Background(), nil, user.Id, client.Id)
+	got, err := database.GetRefreshTokensByUserIDAndClientID(context.Background(), nil, user.ID, client.ID)
 	if err != nil {
-		t.Fatalf("GetRefreshTokensByUserIdAndClientId failed: %v", err)
+		t.Fatalf("GetRefreshTokensByUserIDAndClientID failed: %v", err)
 	}
 	if len(got) != 0 {
 		t.Errorf("expected no tokens for a fresh user and client, got %d", len(got))
 	}
 
-	got, err = database.GetRefreshTokensByUserIdAndClientId(context.Background(), nil, 0, client.Id)
+	got, err = database.GetRefreshTokensByUserIDAndClientID(context.Background(), nil, 0, client.ID)
 	if err != nil {
-		t.Fatalf("GetRefreshTokensByUserIdAndClientId(0, client) should not error: %v", err)
+		t.Fatalf("GetRefreshTokensByUserIDAndClientID(0, client) should not error: %v", err)
 	}
 	if len(got) != 0 {
 		t.Errorf("expected no tokens for user id 0, got %d", len(got))
 	}
 
-	got, err = database.GetRefreshTokensByUserIdAndClientId(context.Background(), nil, user.Id, 0)
+	got, err = database.GetRefreshTokensByUserIDAndClientID(context.Background(), nil, user.ID, 0)
 	if err != nil {
-		t.Fatalf("GetRefreshTokensByUserIdAndClientId(user, 0) should not error: %v", err)
+		t.Fatalf("GetRefreshTokensByUserIDAndClientID(user, 0) should not error: %v", err)
 	}
 	if len(got) != 0 {
 		t.Errorf("expected no tokens for client id 0, got %d", len(got))
 	}
 }
 
-// TestGetRefreshTokensByClientId is the exhaustive owner of this query's linkage-shape
+// TestGetRefreshTokensByClientID is the exhaustive owner of this query's linkage-shape
 // coverage (seam 6, #245). The confidential-to-public flip sweeps through it, so a shape
 // the query cannot reach is a grant that survives the flip.
 //
@@ -1121,13 +1121,13 @@ func TestGetRefreshTokensByUserIdAndClientId_NoTokens(t *testing.T) {
 // The ROPC branch is not a formality here. The password arm's entire client
 // authentication block sits under `if !client.IsPublic`, so a public client can use ROPC
 // presenting nothing at all, and its tokens carry no code for the marker to reach.
-func TestGetRefreshTokensByClientId(t *testing.T) {
+func TestGetRefreshTokensByClientID(t *testing.T) {
 	client := createTestClient(t)
 	otherClient := createTestClient(t)
 	user := createTestUser(t)
 
 	newToken := func(rt *record.RefreshToken) *record.RefreshToken {
-		rt.RefreshTokenJti = fake.UUID()
+		rt.RefreshTokenJTI = fake.UUID()
 		rt.Scope = "openid"
 		rt.IssuedAt = sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true}
 		rt.ExpiresAt = sql.NullTime{Time: time.Now().UTC().Add(time.Hour).Truncate(time.Microsecond), Valid: true}
@@ -1139,9 +1139,9 @@ func TestGetRefreshTokensByClientId(t *testing.T) {
 
 	// Shape 1: authorization code flow. The client is on the code; generateRefreshToken
 	// writes code_id and leaves the token's own client_id null.
-	code := createTestCode(t, client.Id, user.Id)
+	code := createTestCode(t, client.ID, user.ID)
 	viaCode := newToken(&record.RefreshToken{
-		CodeId:            sql.NullInt64{Int64: code.Id, Valid: true},
+		CodeID:            sql.NullInt64{Int64: code.ID, Valid: true},
 		SessionIdentifier: code.SessionIdentifier,
 		RefreshTokenType:  "Refresh",
 	})
@@ -1149,43 +1149,43 @@ func TestGetRefreshTokensByClientId(t *testing.T) {
 	// Shape 2: ROPC. generateRefreshTokenForROPC does the reverse, writing user_id and
 	// client_id straight onto the token with no code at all.
 	ropc := newToken(&record.RefreshToken{
-		UserId:           sql.NullInt64{Int64: user.Id, Valid: true},
-		ClientId:         sql.NullInt64{Int64: client.Id, Valid: true},
+		UserID:           sql.NullInt64{Int64: user.ID, Valid: true},
+		ClientID:         sql.NullInt64{Int64: client.ID, Valid: true},
 		RefreshTokenType: "Offline",
 		MaxLifetime:      sql.NullTime{Time: time.Now().UTC().Add(24 * time.Hour).Truncate(time.Microsecond), Valid: true},
 	})
 
 	// Negatives: the same two shapes for a different client. Each varies only the
 	// client, so neither can pass with its branch's predicate removed.
-	otherCode := createTestCode(t, otherClient.Id, user.Id)
+	otherCode := createTestCode(t, otherClient.ID, user.ID)
 	otherViaCode := newToken(&record.RefreshToken{
-		CodeId:            sql.NullInt64{Int64: otherCode.Id, Valid: true},
+		CodeID:            sql.NullInt64{Int64: otherCode.ID, Valid: true},
 		SessionIdentifier: otherCode.SessionIdentifier,
 		RefreshTokenType:  "Refresh",
 	})
 	otherRopc := newToken(&record.RefreshToken{
-		UserId:           sql.NullInt64{Int64: user.Id, Valid: true},
-		ClientId:         sql.NullInt64{Int64: otherClient.Id, Valid: true},
+		UserID:           sql.NullInt64{Int64: user.ID, Valid: true},
+		ClientID:         sql.NullInt64{Int64: otherClient.ID, Valid: true},
 		RefreshTokenType: "Offline",
 		MaxLifetime:      sql.NullTime{Time: time.Now().UTC().Add(24 * time.Hour).Truncate(time.Microsecond), Valid: true},
 	})
 
-	got, err := database.GetRefreshTokensByClientId(context.Background(), nil, client.Id)
+	got, err := database.GetRefreshTokensByClientID(context.Background(), nil, client.ID)
 	if err != nil {
-		t.Fatalf("GetRefreshTokensByClientId failed: %v", err)
+		t.Fatalf("GetRefreshTokensByClientID failed: %v", err)
 	}
 
 	found := make(map[int64]bool, len(got))
 	for _, rt := range got {
-		found[rt.Id] = true
+		found[rt.ID] = true
 	}
 
 	for _, want := range []struct {
 		label string
 		id    int64
 	}{
-		{"authorization code token reached through codes.client_id", viaCode.Id},
-		{"ROPC token reached through refresh_tokens.client_id", ropc.Id},
+		{"authorization code token reached through codes.client_id", viaCode.ID},
+		{"ROPC token reached through refresh_tokens.client_id", ropc.ID},
 	} {
 		if !found[want.id] {
 			t.Errorf("missing shape: %s (id %d)", want.label, want.id)
@@ -1196,8 +1196,8 @@ func TestGetRefreshTokensByClientId(t *testing.T) {
 		label string
 		id    int64
 	}{
-		{"another client's token via a code", otherViaCode.Id},
-		{"another client's ROPC token", otherRopc.Id},
+		{"another client's token via a code", otherViaCode.ID},
+		{"another client's ROPC token", otherRopc.ID},
 	} {
 		if found[unwanted.id] {
 			t.Errorf("returned a token that is not this client's: %s (id %d)", unwanted.label, unwanted.id)
@@ -1212,28 +1212,28 @@ func TestGetRefreshTokensByClientId(t *testing.T) {
 	}
 }
 
-// TestGetRefreshTokensByClientId_NoTokens covers the empty result, and the zero-id guard.
-func TestGetRefreshTokensByClientId_NoTokens(t *testing.T) {
+// TestGetRefreshTokensByClientID_NoTokens covers the empty result, and the zero-id guard.
+func TestGetRefreshTokensByClientID_NoTokens(t *testing.T) {
 	client := createTestClient(t)
 
-	got, err := database.GetRefreshTokensByClientId(context.Background(), nil, client.Id)
+	got, err := database.GetRefreshTokensByClientID(context.Background(), nil, client.ID)
 	if err != nil {
-		t.Fatalf("GetRefreshTokensByClientId failed: %v", err)
+		t.Fatalf("GetRefreshTokensByClientID failed: %v", err)
 	}
 	if len(got) != 0 {
 		t.Errorf("expected no tokens for a fresh client, got %d", len(got))
 	}
 
-	got, err = database.GetRefreshTokensByClientId(context.Background(), nil, 0)
+	got, err = database.GetRefreshTokensByClientID(context.Background(), nil, 0)
 	if err != nil {
-		t.Fatalf("GetRefreshTokensByClientId(0) should not error: %v", err)
+		t.Fatalf("GetRefreshTokensByClientID(0) should not error: %v", err)
 	}
 	if len(got) != 0 {
 		t.Errorf("expected no tokens for client id 0, got %d", len(got))
 	}
 }
 
-// TestGetRefreshTokensByClientId_TransactionAndFailurePath answers the two questions a
+// TestGetRefreshTokensByClientID_TransactionAndFailurePath answers the two questions a
 // mock can never answer about a new data method: does it enlist in the caller's
 // transaction rather than reading through the pool, and does its failure path return an
 // error rather than a benign empty slice.
@@ -1242,7 +1242,7 @@ func TestGetRefreshTokensByClientId_NoTokens(t *testing.T) {
 // write. A read through the pool would miss rows written earlier in that transaction, and
 // a database fault collapsed into (nil, nil) would have the flip commit a sweep that
 // revoked nothing and audit it as a success.
-func TestGetRefreshTokensByClientId_TransactionAndFailurePath(t *testing.T) {
+func TestGetRefreshTokensByClientID_TransactionAndFailurePath(t *testing.T) {
 	client := createTestClient(t)
 	user := createTestUser(t)
 
@@ -1250,29 +1250,29 @@ func TestGetRefreshTokensByClientId_TransactionAndFailurePath(t *testing.T) {
 
 	random := fake.LetterN(6)
 	code := &record.Code{
-		ClientId:            client.Id,
-		UserId:              user.Id,
+		ClientID:            client.ID,
+		UserID:              user.ID,
 		Code:                "txcode_" + random,
 		CodeHash:            "txhash_" + random,
 		CodeChallenge:       sql.NullString{String: "txchal_" + random, Valid: true},
 		CodeChallengeMethod: sql.NullString{String: "S256", Valid: true},
 		RedirectURI:         "https://example.com/callback",
 		Scope:               "openid",
-		IpAddress:           "127.0.0.1",
+		IPAddress:           "127.0.0.1",
 		UserAgent:           "test",
 		ResponseMode:        "query",
 		AuthenticatedAt:     time.Now().UTC().Truncate(time.Microsecond),
 		SessionIdentifier:   "txsess_" + random,
-		AcrLevel:            "1",
+		ACRLevel:            "1",
 		AuthMethods:         "pwd",
 	}
 	if err := database.CreateCode(context.Background(), tx, code); err != nil {
 		t.Fatalf("CreateCode in a transaction: %v", err)
 	}
 	refreshToken := &record.RefreshToken{
-		CodeId:            sql.NullInt64{Int64: code.Id, Valid: true},
+		CodeID:            sql.NullInt64{Int64: code.ID, Valid: true},
 		SessionIdentifier: code.SessionIdentifier,
-		RefreshTokenJti:   fake.UUID(),
+		RefreshTokenJTI:   fake.UUID(),
 		RefreshTokenType:  "Refresh",
 		Scope:             "openid",
 		IssuedAt:          sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
@@ -1284,11 +1284,11 @@ func TestGetRefreshTokensByClientId_TransactionAndFailurePath(t *testing.T) {
 
 	// Neither row is committed, so only a query enlisted in this transaction can see
 	// them. A query through the pool returns nothing here.
-	got, err := database.GetRefreshTokensByClientId(context.Background(), tx, client.Id)
+	got, err := database.GetRefreshTokensByClientID(context.Background(), tx, client.ID)
 	if err != nil {
-		t.Fatalf("GetRefreshTokensByClientId in a transaction returned error: %v", err)
+		t.Fatalf("GetRefreshTokensByClientID in a transaction returned error: %v", err)
 	}
-	if len(got) != 1 || got[0].Id != refreshToken.Id {
+	if len(got) != 1 || got[0].ID != refreshToken.ID {
 		t.Fatalf("expected the transaction's own uncommitted token, got %d rows", len(got))
 	}
 
@@ -1297,7 +1297,7 @@ func TestGetRefreshTokensByClientId_TransactionAndFailurePath(t *testing.T) {
 	}
 
 	// The failure path, forced by the same finished transaction.
-	got, err = database.GetRefreshTokensByClientId(context.Background(), tx, client.Id)
+	got, err = database.GetRefreshTokensByClientID(context.Background(), tx, client.ID)
 	if err == nil {
 		t.Error("a query that cannot run must return an error, not a benign empty slice")
 	}
@@ -1322,25 +1322,25 @@ func TestPromoteRefreshTokenGenerations(t *testing.T) {
 		t.Fatalf("Failed to revoke a token: %v", err)
 	}
 
-	if err := database.PromoteRefreshTokenGenerations(context.Background(), nil, []int64{named.Id, revoked.Id}, 7); err != nil {
+	if err := database.PromoteRefreshTokenGenerations(context.Background(), nil, []int64{named.ID, revoked.ID}, 7); err != nil {
 		t.Fatalf("PromoteRefreshTokenGenerations failed: %v", err)
 	}
 
 	reload := func(id int64) *record.RefreshToken {
-		rt, err := database.GetRefreshTokenById(context.Background(), nil, id)
+		rt, err := database.GetRefreshTokenByID(context.Background(), nil, id)
 		if err != nil {
 			t.Fatalf("Failed to reload refresh token %d: %v", id, err)
 		}
 		return rt
 	}
 
-	if got := reload(named.Id).AuthStateGeneration; got != 7 {
+	if got := reload(named.ID).AuthStateGeneration; got != 7 {
 		t.Errorf("named token generation = %d, want 7", got)
 	}
-	if got := reload(unnamed.Id).AuthStateGeneration; got != 0 {
+	if got := reload(unnamed.ID).AuthStateGeneration; got != 0 {
 		t.Errorf("unnamed token generation = %d, want 0 (promotion must not touch it)", got)
 	}
-	if got := reload(revoked.Id).AuthStateGeneration; got != 0 {
+	if got := reload(revoked.ID).AuthStateGeneration; got != 0 {
 		t.Errorf("revoked token generation = %d, want 0 (already-revoked tokens are skipped)", got)
 	}
 
@@ -1348,7 +1348,7 @@ func TestPromoteRefreshTokenGenerations(t *testing.T) {
 	if err := database.PromoteRefreshTokenGenerations(context.Background(), nil, nil, 9); err != nil {
 		t.Fatalf("PromoteRefreshTokenGenerations with an empty list must be a no-op, got: %v", err)
 	}
-	if got := reload(unnamed.Id).AuthStateGeneration; got != 0 {
+	if got := reload(unnamed.ID).AuthStateGeneration; got != 0 {
 		t.Errorf("after an empty promotion, unnamed generation = %d, want 0", got)
 	}
 }
@@ -1365,7 +1365,7 @@ func TestMarkRefreshTokenAsRevoked(t *testing.T) {
 	}
 
 	// First claim wins: the compare-and-set flips revoked=false -> true.
-	claimed, err := database.MarkRefreshTokenAsRevoked(context.Background(), nil, rt.Id)
+	claimed, err := database.MarkRefreshTokenAsRevoked(context.Background(), nil, rt.ID)
 	if err != nil {
 		t.Fatalf("first MarkRefreshTokenAsRevoked returned error: %v", err)
 	}
@@ -1373,7 +1373,7 @@ func TestMarkRefreshTokenAsRevoked(t *testing.T) {
 		t.Fatalf("first MarkRefreshTokenAsRevoked should claim the token, got claimed=false")
 	}
 
-	reloaded, err := database.GetRefreshTokenById(context.Background(), nil, rt.Id)
+	reloaded, err := database.GetRefreshTokenByID(context.Background(), nil, rt.ID)
 	if err != nil {
 		t.Fatalf("failed to reload refresh token: %v", err)
 	}
@@ -1384,7 +1384,7 @@ func TestMarkRefreshTokenAsRevoked(t *testing.T) {
 	// Second claim loses: the WHERE revoked=false predicate no longer matches. This
 	// is what stops two concurrent presentations of one refresh token from each
 	// minting a token set.
-	claimed, err = database.MarkRefreshTokenAsRevoked(context.Background(), nil, rt.Id)
+	claimed, err = database.MarkRefreshTokenAsRevoked(context.Background(), nil, rt.ID)
 	if err != nil {
 		t.Fatalf("second MarkRefreshTokenAsRevoked returned error: %v", err)
 	}
@@ -1400,7 +1400,7 @@ func TestMarkRefreshTokenAsRevoked(t *testing.T) {
 	if updateRefreshTokenErr := database.UpdateRefreshToken(context.Background(), nil, other); updateRefreshTokenErr != nil {
 		t.Fatalf("failed to revoke a token by another path: %v", updateRefreshTokenErr)
 	}
-	claimed, err = database.MarkRefreshTokenAsRevoked(context.Background(), nil, other.Id)
+	claimed, err = database.MarkRefreshTokenAsRevoked(context.Background(), nil, other.ID)
 	if err != nil {
 		t.Fatalf("MarkRefreshTokenAsRevoked on an externally revoked token returned error: %v", err)
 	}
@@ -1439,11 +1439,11 @@ func TestMarkRefreshTokenAsRevoked(t *testing.T) {
 func TestMarkRefreshTokenAsRevoked_DoesNotClobberAuthStateGeneration(t *testing.T) {
 	rt := createTestRefreshToken(t)
 
-	if err := database.PromoteRefreshTokenGenerations(context.Background(), nil, []int64{rt.Id}, 5); err != nil {
+	if err := database.PromoteRefreshTokenGenerations(context.Background(), nil, []int64{rt.ID}, 5); err != nil {
 		t.Fatalf("failed to set the token's generation: %v", err)
 	}
 
-	claimed, err := database.MarkRefreshTokenAsRevoked(context.Background(), nil, rt.Id)
+	claimed, err := database.MarkRefreshTokenAsRevoked(context.Background(), nil, rt.ID)
 	if err != nil {
 		t.Fatalf("MarkRefreshTokenAsRevoked returned error: %v", err)
 	}
@@ -1451,7 +1451,7 @@ func TestMarkRefreshTokenAsRevoked_DoesNotClobberAuthStateGeneration(t *testing.
 		t.Fatalf("expected to claim a live token")
 	}
 
-	reloaded, err := database.GetRefreshTokenById(context.Background(), nil, rt.Id)
+	reloaded, err := database.GetRefreshTokenByID(context.Background(), nil, rt.ID)
 	if err != nil {
 		t.Fatalf("failed to reload refresh token: %v", err)
 	}
@@ -1464,14 +1464,14 @@ func TestMarkRefreshTokenAsRevoked_DoesNotClobberAuthStateGeneration(t *testing.
 	}
 }
 
-// familyTokenSpec describes one seeded member of a rotation family. A zero CodeId is
+// familyTokenSpec describes one seeded member of a rotation family. A zero CodeID is
 // the ROPC shape: no code at all, with the user and client on the refresh token row
 // itself. That is the shape a code-scoped query would miss entirely.
 type familyTokenSpec struct {
-	FamilyJti         string
-	CodeId            int64
-	UserId            int64
-	ClientId          int64
+	FamilyJTI         string
+	CodeID            int64
+	UserID            int64
+	ClientID          int64
 	SessionIdentifier string
 	Revoked           bool
 }
@@ -1480,8 +1480,8 @@ func seedFamilyToken(t *testing.T, spec familyTokenSpec) *record.RefreshToken {
 	t.Helper()
 
 	rt := &record.RefreshToken{
-		RefreshTokenJti:      fake.UUID(),
-		FirstRefreshTokenJti: spec.FamilyJti,
+		RefreshTokenJTI:      fake.UUID(),
+		FirstRefreshTokenJTI: spec.FamilyJTI,
 		SessionIdentifier:    spec.SessionIdentifier,
 		RefreshTokenType:     "Refresh",
 		Scope:                "openid",
@@ -1489,14 +1489,14 @@ func seedFamilyToken(t *testing.T, spec familyTokenSpec) *record.RefreshToken {
 		ExpiresAt:            sql.NullTime{Time: time.Now().UTC().Add(time.Hour).Truncate(time.Microsecond), Valid: true},
 		Revoked:              spec.Revoked,
 	}
-	if spec.CodeId != 0 {
-		rt.CodeId = sql.NullInt64{Int64: spec.CodeId, Valid: true}
+	if spec.CodeID != 0 {
+		rt.CodeID = sql.NullInt64{Int64: spec.CodeID, Valid: true}
 	}
-	if spec.UserId != 0 {
-		rt.UserId = sql.NullInt64{Int64: spec.UserId, Valid: true}
+	if spec.UserID != 0 {
+		rt.UserID = sql.NullInt64{Int64: spec.UserID, Valid: true}
 	}
-	if spec.ClientId != 0 {
-		rt.ClientId = sql.NullInt64{Int64: spec.ClientId, Valid: true}
+	if spec.ClientID != 0 {
+		rt.ClientID = sql.NullInt64{Int64: spec.ClientID, Valid: true}
 	}
 
 	if err := database.CreateRefreshToken(context.Background(), nil, rt); err != nil {
@@ -1508,25 +1508,25 @@ func seedFamilyToken(t *testing.T, spec familyTokenSpec) *record.RefreshToken {
 // seedCodeOnSession creates a used authorization code bound to a chosen session
 // identifier, so a test can put two independent families on one browser session.
 // createTestCode generates its own session identifier and cannot express that.
-func seedCodeOnSession(t *testing.T, clientId, userId int64, sessionIdentifier string) *record.Code {
+func seedCodeOnSession(t *testing.T, clientID, userID int64, sessionIdentifier string) *record.Code {
 	t.Helper()
 
 	random := fake.LetterN(6)
 	code := &record.Code{
-		ClientId:            clientId,
-		UserId:              userId,
+		ClientID:            clientID,
+		UserID:              userID,
 		Code:                "famcode_" + random,
 		CodeHash:            "famhash_" + random,
 		CodeChallenge:       sql.NullString{String: "famchallenge_" + random, Valid: true},
 		CodeChallengeMethod: sql.NullString{String: "S256", Valid: true},
 		RedirectURI:         "https://example.com/callback",
 		Scope:               "openid",
-		IpAddress:           "127.0.0.1",
+		IPAddress:           "127.0.0.1",
 		UserAgent:           "test",
 		ResponseMode:        "query",
 		AuthenticatedAt:     time.Now().UTC().Truncate(time.Microsecond),
 		SessionIdentifier:   sessionIdentifier,
-		AcrLevel:            "1",
+		ACRLevel:            "1",
 		AuthMethods:         "pwd",
 		Used:                true,
 	}
@@ -1539,7 +1539,7 @@ func seedCodeOnSession(t *testing.T, clientId, userId int64, sessionIdentifier s
 // refreshTokenIsRevoked reloads a row and reports its revoked flag.
 func refreshTokenIsRevoked(t *testing.T, id int64) bool {
 	t.Helper()
-	rt, err := database.GetRefreshTokenById(context.Background(), nil, id)
+	rt, err := database.GetRefreshTokenByID(context.Background(), nil, id)
 	if err != nil {
 		t.Fatalf("failed to reload refresh token %d: %v", id, err)
 	}
@@ -1557,11 +1557,11 @@ func TestRevokeRefreshTokenFamily(t *testing.T) {
 	t.Run("retired parent and live child", func(t *testing.T) {
 		client := createTestClient(t)
 		user := createTestUser(t)
-		code := createTestCode(t, client.Id, user.Id)
+		code := createTestCode(t, client.ID, user.ID)
 		family := fake.UUID()
 
-		parent := seedFamilyToken(t, familyTokenSpec{FamilyJti: family, CodeId: code.Id, Revoked: true})
-		child := seedFamilyToken(t, familyTokenSpec{FamilyJti: family, CodeId: code.Id})
+		parent := seedFamilyToken(t, familyTokenSpec{FamilyJTI: family, CodeID: code.ID, Revoked: true})
+		child := seedFamilyToken(t, familyTokenSpec{FamilyJTI: family, CodeID: code.ID})
 
 		count, err := database.RevokeRefreshTokenFamily(context.Background(), nil, family)
 		if err != nil {
@@ -1570,10 +1570,10 @@ func TestRevokeRefreshTokenFamily(t *testing.T) {
 		if count != 1 {
 			t.Errorf("count = %d, want 1 (only the live child transitions)", count)
 		}
-		if !refreshTokenIsRevoked(t, child.Id) {
+		if !refreshTokenIsRevoked(t, child.ID) {
 			t.Errorf("the live child must be revoked")
 		}
-		if !refreshTokenIsRevoked(t, parent.Id) {
+		if !refreshTokenIsRevoked(t, parent.ID) {
 			t.Errorf("the already-revoked parent must stay revoked")
 		}
 	})
@@ -1583,12 +1583,12 @@ func TestRevokeRefreshTokenFamily(t *testing.T) {
 		// from it. Containment has to cover every branch, not just the newest.
 		client := createTestClient(t)
 		user := createTestUser(t)
-		code := createTestCode(t, client.Id, user.Id)
+		code := createTestCode(t, client.ID, user.ID)
 		family := fake.UUID()
 
-		seedFamilyToken(t, familyTokenSpec{FamilyJti: family, CodeId: code.Id, Revoked: true})
-		childA := seedFamilyToken(t, familyTokenSpec{FamilyJti: family, CodeId: code.Id})
-		childB := seedFamilyToken(t, familyTokenSpec{FamilyJti: family, CodeId: code.Id})
+		seedFamilyToken(t, familyTokenSpec{FamilyJTI: family, CodeID: code.ID, Revoked: true})
+		childA := seedFamilyToken(t, familyTokenSpec{FamilyJTI: family, CodeID: code.ID})
+		childB := seedFamilyToken(t, familyTokenSpec{FamilyJTI: family, CodeID: code.ID})
 
 		count, err := database.RevokeRefreshTokenFamily(context.Background(), nil, family)
 		if err != nil {
@@ -1597,7 +1597,7 @@ func TestRevokeRefreshTokenFamily(t *testing.T) {
 		if count != 2 {
 			t.Errorf("count = %d, want 2 (both forked children transition)", count)
 		}
-		if !refreshTokenIsRevoked(t, childA.Id) || !refreshTokenIsRevoked(t, childB.Id) {
+		if !refreshTokenIsRevoked(t, childA.ID) || !refreshTokenIsRevoked(t, childB.ID) {
 			t.Errorf("both forked children must be revoked")
 		}
 	})
@@ -1607,11 +1607,11 @@ func TestRevokeRefreshTokenFamily(t *testing.T) {
 		// idempotent no-op, not an incident.
 		client := createTestClient(t)
 		user := createTestUser(t)
-		code := createTestCode(t, client.Id, user.Id)
+		code := createTestCode(t, client.ID, user.ID)
 		family := fake.UUID()
 
-		seedFamilyToken(t, familyTokenSpec{FamilyJti: family, CodeId: code.Id, Revoked: true})
-		seedFamilyToken(t, familyTokenSpec{FamilyJti: family, CodeId: code.Id, Revoked: true})
+		seedFamilyToken(t, familyTokenSpec{FamilyJTI: family, CodeID: code.ID, Revoked: true})
+		seedFamilyToken(t, familyTokenSpec{FamilyJTI: family, CodeID: code.ID, Revoked: true})
 
 		count, err := database.RevokeRefreshTokenFamily(context.Background(), nil, family)
 		if err != nil {
@@ -1625,9 +1625,9 @@ func TestRevokeRefreshTokenFamily(t *testing.T) {
 	t.Run("unknown family identifier", func(t *testing.T) {
 		client := createTestClient(t)
 		user := createTestUser(t)
-		code := createTestCode(t, client.Id, user.Id)
+		code := createTestCode(t, client.ID, user.ID)
 
-		bystander := seedFamilyToken(t, familyTokenSpec{FamilyJti: fake.UUID(), CodeId: code.Id})
+		bystander := seedFamilyToken(t, familyTokenSpec{FamilyJTI: fake.UUID(), CodeID: code.ID})
 
 		count, err := database.RevokeRefreshTokenFamily(context.Background(), nil, "no-such-family-"+fake.UUID())
 		if err != nil {
@@ -1636,7 +1636,7 @@ func TestRevokeRefreshTokenFamily(t *testing.T) {
 		if count != 0 {
 			t.Errorf("count = %d, want 0 for an unknown family", count)
 		}
-		if refreshTokenIsRevoked(t, bystander.Id) {
+		if refreshTokenIsRevoked(t, bystander.ID) {
 			t.Errorf("an unrelated live token must not be revoked: the predicate is not a match-all")
 		}
 	})
@@ -1648,22 +1648,22 @@ func TestRevokeRefreshTokenFamily(t *testing.T) {
 		// clients in one SSO session looks like.
 		client := createTestClient(t)
 		user := createTestUser(t)
-		sessionId := "sess_" + fake.LetterN(12)
-		codeA := seedCodeOnSession(t, client.Id, user.Id, sessionId)
-		codeB := seedCodeOnSession(t, client.Id, user.Id, sessionId)
+		sessionID := "sess_" + fake.LetterN(12)
+		codeA := seedCodeOnSession(t, client.ID, user.ID, sessionID)
+		codeB := seedCodeOnSession(t, client.ID, user.ID, sessionID)
 
 		familyA := fake.UUID()
 		familyB := fake.UUID()
 
 		seedFamilyToken(t, familyTokenSpec{
-			FamilyJti: familyA, CodeId: codeA.Id, SessionIdentifier: sessionId, Revoked: true})
+			FamilyJTI: familyA, CodeID: codeA.ID, SessionIdentifier: sessionID, Revoked: true})
 		childA := seedFamilyToken(t, familyTokenSpec{
-			FamilyJti: familyA, CodeId: codeA.Id, SessionIdentifier: sessionId})
+			FamilyJTI: familyA, CodeID: codeA.ID, SessionIdentifier: sessionID})
 
 		parentB := seedFamilyToken(t, familyTokenSpec{
-			FamilyJti: familyB, CodeId: codeB.Id, SessionIdentifier: sessionId})
+			FamilyJTI: familyB, CodeID: codeB.ID, SessionIdentifier: sessionID})
 		childB := seedFamilyToken(t, familyTokenSpec{
-			FamilyJti: familyB, CodeId: codeB.Id, SessionIdentifier: sessionId})
+			FamilyJTI: familyB, CodeID: codeB.ID, SessionIdentifier: sessionID})
 
 		count, err := database.RevokeRefreshTokenFamily(context.Background(), nil, familyA)
 		if err != nil {
@@ -1672,10 +1672,10 @@ func TestRevokeRefreshTokenFamily(t *testing.T) {
 		if count != 1 {
 			t.Errorf("count = %d, want 1 (only family A's live member)", count)
 		}
-		if !refreshTokenIsRevoked(t, childA.Id) {
+		if !refreshTokenIsRevoked(t, childA.ID) {
 			t.Errorf("family A's live member must be revoked")
 		}
-		if refreshTokenIsRevoked(t, parentB.Id) || refreshTokenIsRevoked(t, childB.Id) {
+		if refreshTokenIsRevoked(t, parentB.ID) || refreshTokenIsRevoked(t, childB.ID) {
 			t.Errorf("family B shares the browser session but not the family: it must stay live")
 		}
 	})
@@ -1690,11 +1690,11 @@ func TestRevokeRefreshTokenFamily(t *testing.T) {
 		family := fake.UUID()
 
 		parent := seedFamilyToken(t, familyTokenSpec{
-			FamilyJti: family, UserId: user.Id, ClientId: client.Id, Revoked: true})
+			FamilyJTI: family, UserID: user.ID, ClientID: client.ID, Revoked: true})
 		child := seedFamilyToken(t, familyTokenSpec{
-			FamilyJti: family, UserId: user.Id, ClientId: client.Id})
+			FamilyJTI: family, UserID: user.ID, ClientID: client.ID})
 
-		if parent.CodeId.Valid || child.CodeId.Valid {
+		if parent.CodeID.Valid || child.CodeID.Valid {
 			t.Fatalf("the ROPC fixture must leave code_id NULL")
 		}
 
@@ -1705,7 +1705,7 @@ func TestRevokeRefreshTokenFamily(t *testing.T) {
 		if count != 1 {
 			t.Errorf("count = %d, want 1 (the live ROPC child)", count)
 		}
-		if !refreshTokenIsRevoked(t, child.Id) {
+		if !refreshTokenIsRevoked(t, child.ID) {
 			t.Errorf("the live ROPC child must be revoked")
 		}
 	})
@@ -1720,15 +1720,15 @@ func TestRevokeRefreshTokenFamily(t *testing.T) {
 		// assertion to have anything to protect.
 		client := createTestClient(t)
 		user := createTestUser(t)
-		code := createTestCode(t, client.Id, user.Id)
+		code := createTestCode(t, client.ID, user.ID)
 
-		emptyFamily := seedFamilyToken(t, familyTokenSpec{FamilyJti: "", CodeId: code.Id})
+		emptyFamily := seedFamilyToken(t, familyTokenSpec{FamilyJTI: "", CodeID: code.ID})
 
 		count, err := database.RevokeRefreshTokenFamily(context.Background(), nil, "")
 		if err == nil {
 			t.Errorf("RevokeRefreshTokenFamily(\"\") must return an error, got count=%d", count)
 		}
-		if refreshTokenIsRevoked(t, emptyFamily.Id) {
+		if refreshTokenIsRevoked(t, emptyFamily.ID) {
 			t.Errorf("a live row with an empty family identifier must not be revoked")
 		}
 	})

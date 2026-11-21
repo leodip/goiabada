@@ -24,7 +24,7 @@ import (
 type passwordFormSubmission struct {
 	httpClient *http.Client
 	pwdURL     string
-	ceremonyId string
+	ceremonyID string
 }
 
 // reachPasswordForm starts a code ceremony for a new client and stops at the password form.
@@ -35,15 +35,15 @@ func reachPasswordForm(t *testing.T) *passwordFormSubmission {
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 
-	redirectURI := &record.RedirectURI{ClientId: client.Id, URI: fake.URL()}
+	redirectURI := &record.RedirectURI{ClientID: client.ID, URI: fake.URL()}
 	require.NoError(t, database.CreateRedirectURI(context.Background(), nil, redirectURI))
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Get(appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
@@ -65,7 +65,7 @@ func reachPasswordForm(t *testing.T) *passwordFormSubmission {
 	return &passwordFormSubmission{
 		httpClient: httpClient,
 		pwdURL:     pwdURL,
-		ceremonyId: getCeremonyIdFromPage(t, pwdPage),
+		ceremonyID: getCeremonyIDFromPage(t, pwdPage),
 	}
 }
 
@@ -74,20 +74,20 @@ func reachPasswordForm(t *testing.T) *passwordFormSubmission {
 func (f *passwordFormSubmission) submit(t *testing.T, email, password string) string {
 	t.Helper()
 
-	form := url.Values{"email": {email}, "password": {password}, "ceremonyId": {f.ceremonyId}}
+	form := url.Values{"email": {email}, "password": {password}, "ceremonyId": {f.ceremonyID}}
 	req, err := http.NewRequest(http.MethodPost, f.pwdURL, strings.NewReader(form.Encode()))
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Referer", f.pwdURL)
 	req.Header.Set("Origin", appConfig.AuthServer.BaseURL)
-	requestId := "pwd-" + fake.LetterN(16)
-	req.Header.Set("X-Request-Id", requestId)
+	requestID := "pwd-" + fake.LetterN(16)
+	req.Header.Set("X-Request-Id", requestID)
 
 	resp, err := f.httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode, "a refused sign-in re-renders the form")
-	return requestId
+	return requestID
 }
 
 // sha256Hex is the digest the audit row is expected to carry, computed here rather than through
@@ -100,16 +100,16 @@ func sha256Hex(s string) string {
 func TestAuthFailedPwd_TheTypedAddressIsStoredOnlyAsItsDigest(t *testing.T) {
 	requireDatabaseAuditLogs(t)
 	adminToken, adminClient := createAdminClientWithToken(t)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, adminClient.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, adminClient.ID) })
 
 	t.Run("an address that names no account", func(t *testing.T) {
 		local := "nobody-" + strings.ToLower(fake.LetterN(10))
 		typed := "  " + strings.ToUpper(local) + "@Example.com "
 
-		requestId := reachPasswordForm(t).submit(t, typed, fake.Password(12))
+		requestID := reachPasswordForm(t).submit(t, typed, fake.Password(12))
 
 		assert.Equal(t, []map[string]any{{"email_digest": sha256Hex(local + "@example.com")}},
-			auditRows(t, adminToken, "auth_failed_pwd", requestId))
+			auditRows(t, adminToken, "auth_failed_pwd", requestID))
 	})
 
 	t.Run("a wrong password for an account that exists", func(t *testing.T) {
@@ -122,13 +122,13 @@ func TestAuthFailedPwd_TheTypedAddressIsStoredOnlyAsItsDigest(t *testing.T) {
 			PasswordHash: passwordHashed,
 		}
 		require.NoError(t, database.CreateUser(context.Background(), nil, user))
-		t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.Id) })
+		t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.ID) })
 
-		requestId := reachPasswordForm(t).submit(t, strings.ToUpper(user.Email), "not-"+fake.Password(12))
+		requestID := reachPasswordForm(t).submit(t, strings.ToUpper(user.Email), "not-"+fake.Password(12))
 
 		assert.Equal(t, []map[string]any{{
 			"email_digest": sha256Hex(user.Email),
-			"user_id":      float64(user.Id),
-		}}, auditRows(t, adminToken, "auth_failed_pwd", requestId))
+			"user_id":      float64(user.ID),
+		}}, auditRows(t, adminToken, "auth_failed_pwd", requestID))
 	})
 }

@@ -32,7 +32,7 @@ func TestAPIUserProfilePut_Success(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	// Test: Update user profile
@@ -50,7 +50,7 @@ func TestAPIUserProfilePut_Success(t *testing.T) {
 		Locale:              "en-US",
 	}
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/profile"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.ID, 10) + "/profile"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -76,7 +76,7 @@ func TestAPIUserProfilePut_Success(t *testing.T) {
 	assert.Equal(t, updateReq.Locale, updateResponse.User.Locale)
 
 	// Verify changes were persisted to database
-	updatedUser, err := database.GetUserById(context.Background(), nil, testUser.Id)
+	updatedUser, err := database.GetUserByID(context.Background(), nil, testUser.ID)
 	require.NoError(t, err)
 	assert.NotNil(t, updatedUser)
 	assert.Equal(t, updateReq.Username, updatedUser.Username)
@@ -101,7 +101,7 @@ func TestAPIUserProfilePut_PartialUpdate(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	// Test: Update only some fields
@@ -112,7 +112,7 @@ func TestAPIUserProfilePut_PartialUpdate(t *testing.T) {
 		// Other fields left empty/default
 	}
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/profile"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.ID, 10) + "/profile"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -147,7 +147,7 @@ func TestAPIUserProfilePut_InvalidGender(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	// Test: Update with invalid gender value
@@ -157,7 +157,7 @@ func TestAPIUserProfilePut_InvalidGender(t *testing.T) {
 		Gender:     "invalid_gender", // Invalid gender value
 	}
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/profile"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.ID, 10) + "/profile"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -180,7 +180,7 @@ func TestAPIUserProfilePut_ValidGender(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	testCases := []struct {
@@ -205,7 +205,7 @@ func TestAPIUserProfilePut_ValidGender(t *testing.T) {
 				Gender:     tc.genderValue,
 			}
 
-			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/profile"
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.ID, 10) + "/profile"
 			resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -259,10 +259,10 @@ func TestAPIUserProfilePut_WritesBackWhatGetReturned(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
-	userURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10)
+	userURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.ID, 10)
 	getResp := makeAPIRequest(t, "GET", userURL, accessToken, nil)
 	defer func() { _ = getResp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, getResp.StatusCode)
@@ -277,7 +277,7 @@ func TestAPIUserProfilePut_WritesBackWhatGetReturned(t *testing.T) {
 	require.NoError(t, json.NewDecoder(putResp.Body).Decode(&updated))
 	assert.Equal(t, "female", updated.User.Gender)
 
-	stored, err := database.GetUserById(context.Background(), nil, testUser.Id)
+	stored, err := database.GetUserByID(context.Background(), nil, testUser.ID)
 	require.NoError(t, err)
 	assert.Equal(t, "female", stored.Gender)
 }
@@ -299,7 +299,7 @@ func TestAPIUserProfilePut_NamesWithMarksRoundTripInOneSpelling(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	const (
@@ -309,7 +309,7 @@ func TestAPIUserProfilePut_NamesWithMarksRoundTripInOneSpelling(t *testing.T) {
 		familyName         = "O’Brien" // O’Brien
 	)
 
-	userURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10)
+	userURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.ID, 10)
 	putResp := makeAPIRequest(t, "PUT", userURL+"/profile", accessToken, api.UpdateUserProfileRequest{
 		GivenName:  givenName,
 		MiddleName: middleNameSent,
@@ -332,7 +332,7 @@ func TestAPIUserProfilePut_NamesWithMarksRoundTripInOneSpelling(t *testing.T) {
 	assert.Equal(t, middleNameComposed, got.User.MiddleName)
 	assert.Equal(t, familyName, got.User.FamilyName)
 
-	stored, err := database.GetUserById(context.Background(), nil, testUser.Id)
+	stored, err := database.GetUserByID(context.Background(), nil, testUser.ID)
 	require.NoError(t, err)
 	assert.Equal(t, givenName, stored.GivenName)
 	assert.Equal(t, middleNameComposed, stored.MiddleName)
@@ -346,7 +346,7 @@ func TestAPIUserProfilePut_NamesWithMarksRoundTripInOneSpelling(t *testing.T) {
 // between the code and its redemption.
 func TestAPIUserProfilePut_NicknameFreeTextStoredVerbatim(t *testing.T) {
 	changeSettings(t, func(settings *record.Settings) {
-		settings.IncludeOpenIDConnectClaimsInIdToken = true
+		settings.IncludeOpenIDConnectClaimsInIDToken = true
 	})
 	accessToken, _ := createAdminClientWithToken(t)
 
@@ -354,7 +354,7 @@ func TestAPIUserProfilePut_NicknameFreeTextStoredVerbatim(t *testing.T) {
 		t.Run(nickname, func(t *testing.T) {
 			var updateResponse api.UpdateUserResponse
 			data, code, _, _ := userTokenResponseWithScope(t, "openid profile", func(user *record.User) {
-				url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(user.Id, 10) + "/profile"
+				url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(user.ID, 10) + "/profile"
 				resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateUserProfileRequest{Nickname: nickname})
 				defer func() { _ = resp.Body.Close() }()
 				require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -363,7 +363,7 @@ func TestAPIUserProfilePut_NicknameFreeTextStoredVerbatim(t *testing.T) {
 
 			assert.Equal(t, nickname, updateResponse.User.Nickname)
 
-			stored, err := database.GetUserById(context.Background(), nil, code.User.Id)
+			stored, err := database.GetUserByID(context.Background(), nil, code.User.ID)
 			require.NoError(t, err)
 			assert.Equal(t, nickname, stored.Nickname)
 
@@ -393,7 +393,7 @@ func TestAPIUserProfilePut_NicknameAngleBracketsAndLineBreaksRefused(t *testing.
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	testCases := []struct {
@@ -408,7 +408,7 @@ func TestAPIUserProfilePut_NicknameAngleBracketsAndLineBreaksRefused(t *testing.
 		{"right-to-left override", "\u202Enimda", "validator.profile.nickname_invalid", "Nicknames cannot contain control characters, such as tabs or line breaks."},
 	}
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/profile"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.ID, 10) + "/profile"
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateUserProfileRequest{
@@ -423,7 +423,7 @@ func TestAPIUserProfilePut_NicknameAngleBracketsAndLineBreaksRefused(t *testing.
 			assert.Equal(t, tc.code, errResp.ErrorCode)
 			assert.Equal(t, tc.description, errResp.ErrorDescription)
 
-			unchanged, err := database.GetUserById(context.Background(), nil, testUser.Id)
+			unchanged, err := database.GetUserByID(context.Background(), nil, testUser.ID)
 			require.NoError(t, err)
 			assert.Equal(t, "Grace", unchanged.Nickname)
 			assert.Equal(t, "Test", unchanged.GivenName)
@@ -446,7 +446,7 @@ func TestAPIUserProfilePut_InvalidDateOfBirth(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	// Test: Update with invalid date of birth format
@@ -456,7 +456,7 @@ func TestAPIUserProfilePut_InvalidDateOfBirth(t *testing.T) {
 		DateOfBirth: "invalid-date", // Invalid date format
 	}
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/profile"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.ID, 10) + "/profile"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -482,7 +482,7 @@ func TestAPIUserProfilePut_ZonePairNamingNoRow(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	updateReq := api.UpdateUserProfileRequest{
@@ -492,7 +492,7 @@ func TestAPIUserProfilePut_ZonePairNamingNoRow(t *testing.T) {
 		ZoneInfo:            "Europe/Berlin",
 	}
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/profile"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.ID, 10) + "/profile"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -501,7 +501,7 @@ func TestAPIUserProfilePut_ZonePairNamingNoRow(t *testing.T) {
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&errResp))
 	assert.Equal(t, "Unknown time zone.", errResp.ErrorDescription)
 
-	stored, err := database.GetUserById(context.Background(), nil, testUser.Id)
+	stored, err := database.GetUserByID(context.Background(), nil, testUser.ID)
 	require.NoError(t, err)
 	if assert.NotNil(t, stored) {
 		assert.Equal(t, "United States", stored.ZoneInfoCountryName)
@@ -528,13 +528,13 @@ func TestAPIUserProfilePut_UserNotFound(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
-func TestAPIUserProfilePut_InvalidId(t *testing.T) {
+func TestAPIUserProfilePut_InvalidID(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)
 
 	testCases := []struct {
 		name           string
-		userId         string
+		userID         string
 		expectedStatus int
 	}{
 		{"non-numeric ID", "abc", http.StatusBadRequest},
@@ -550,7 +550,7 @@ func TestAPIUserProfilePut_InvalidId(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + tc.userId + "/profile"
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + tc.userID + "/profile"
 			resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -574,17 +574,17 @@ func TestAPIUserProfilePut_InvalidRequestBody(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	// Test: Invalid JSON
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/profile"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.ID, 10) + "/profile"
 	req, err := http.NewRequest("PUT", url, nil) // No body
 	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -605,15 +605,15 @@ func TestAPIUserProfilePut_Unauthorized(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	// Test: Request without access token
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/profile"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.ID, 10) + "/profile"
 	req, err := http.NewRequest("PUT", url, nil)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -639,7 +639,7 @@ func TestAPIUserAddressPut_Success(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	// Test: Update user address
@@ -652,7 +652,7 @@ func TestAPIUserAddressPut_Success(t *testing.T) {
 		AddressCountry:    "US",
 	}
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/address"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.ID, 10) + "/address"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -674,7 +674,7 @@ func TestAPIUserAddressPut_Success(t *testing.T) {
 	assert.Equal(t, updateReq.AddressCountry, updateResponse.User.AddressCountry)
 
 	// Verify changes were persisted to database
-	updatedUser, err := database.GetUserById(context.Background(), nil, testUser.Id)
+	updatedUser, err := database.GetUserByID(context.Background(), nil, testUser.ID)
 	require.NoError(t, err)
 	assert.NotNil(t, updatedUser)
 	assert.Equal(t, updateReq.AddressLine1, updatedUser.AddressLine1)
@@ -703,7 +703,7 @@ func TestAPIUserAddressPut_PartialAddress(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	// Test: Update only some address fields
@@ -714,7 +714,7 @@ func TestAPIUserAddressPut_PartialAddress(t *testing.T) {
 		// Other fields left empty
 	}
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/address"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.ID, 10) + "/address"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -753,7 +753,7 @@ func TestAPIUserAddressPut_ClearAllFields(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	// Test: Clear all address fields
@@ -761,7 +761,7 @@ func TestAPIUserAddressPut_ClearAllFields(t *testing.T) {
 		// All fields empty
 	}
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/address"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.ID, 10) + "/address"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -800,7 +800,7 @@ func TestAPIUserAddressPut_AngleBracketsRefused(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	updateReq := api.UpdateUserAddressRequest{
@@ -808,7 +808,7 @@ func TestAPIUserAddressPut_AngleBracketsRefused(t *testing.T) {
 		AddressCountry: "US",
 	}
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/address"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.ID, 10) + "/address"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -820,7 +820,7 @@ func TestAPIUserAddressPut_AngleBracketsRefused(t *testing.T) {
 	assert.Equal(t, "Address fields cannot contain the characters < or >.", errResp.ErrorDescription)
 
 	// Assert: Nothing was written
-	unchanged, err := database.GetUserById(context.Background(), nil, testUser.Id)
+	unchanged, err := database.GetUserByID(context.Background(), nil, testUser.ID)
 	require.NoError(t, err)
 	assert.Empty(t, unchanged.AddressLine1)
 }
@@ -843,7 +843,7 @@ func TestAPIUserAddressPut_AmpersandAndQuotesStoredVerbatim(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	line1 := `O'Brien & Sons, "The Mews"`
@@ -852,7 +852,7 @@ func TestAPIUserAddressPut_AmpersandAndQuotesStoredVerbatim(t *testing.T) {
 		AddressCountry: "US",
 	}
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/address"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.ID, 10) + "/address"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -862,7 +862,7 @@ func TestAPIUserAddressPut_AmpersandAndQuotesStoredVerbatim(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, line1, updateResponse.User.AddressLine1)
 
-	stored, err := database.GetUserById(context.Background(), nil, testUser.Id)
+	stored, err := database.GetUserByID(context.Background(), nil, testUser.ID)
 	require.NoError(t, err)
 	assert.Equal(t, line1, stored.AddressLine1)
 }
@@ -884,13 +884,13 @@ func TestAPIUserAddressPut_UserNotFound(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
-func TestAPIUserAddressPut_InvalidId(t *testing.T) {
+func TestAPIUserAddressPut_InvalidID(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)
 
 	testCases := []struct {
 		name           string
-		userId         string
+		userID         string
 		expectedStatus int
 	}{
 		{"non-numeric ID", "abc", http.StatusBadRequest},
@@ -905,7 +905,7 @@ func TestAPIUserAddressPut_InvalidId(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + tc.userId + "/address"
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + tc.userID + "/address"
 			resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -929,17 +929,17 @@ func TestAPIUserAddressPut_InvalidRequestBody(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	// Test: Invalid JSON
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/address"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.ID, 10) + "/address"
 	req, err := http.NewRequest("PUT", url, nil) // No body
 	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -960,15 +960,15 @@ func TestAPIUserAddressPut_Unauthorized(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	// Test: Request without access token
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/address"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.ID, 10) + "/address"
 	req, err := http.NewRequest("PUT", url, nil)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()

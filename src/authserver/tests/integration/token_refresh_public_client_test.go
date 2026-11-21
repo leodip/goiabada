@@ -36,8 +36,8 @@ func challengelessRefreshToken(t *testing.T, clientSecret string) (string, int64
 	require.Empty(t, code.CodeChallenge.String,
 		"the grant must descend from a code bound to no challenge")
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
-	data := postToTokenEndpoint(t, httpClient, destUrl, url.Values{
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
+	data := postToTokenEndpoint(t, httpClient, destURL, url.Values{
 		"grant_type":    {"authorization_code"},
 		"client_id":     {code.Client.ClientIdentifier},
 		"client_secret": {clientSecret},
@@ -47,20 +47,20 @@ func challengelessRefreshToken(t *testing.T, clientSecret string) (string, int64
 	require.Nil(t, data["error"], "unexpected refusal at redemption: %v", data["error_description"])
 	require.NotEmpty(t, data["refresh_token"])
 
-	return data["refresh_token"].(string), code.ClientId, code.Client.ClientIdentifier, destUrl
+	return data["refresh_token"].(string), code.ClientID, code.Client.ClientIdentifier, destURL
 }
 
 // C1. The grant outlives the configuration it was issued under, and this is what catches it.
 func TestToken_Refresh_ChallengelessGrant_RefusedOnceTheClientIsPublic(t *testing.T) {
-	refreshToken, clientId, clientIdentifier, destUrl := challengelessRefreshToken(t, fake.LetterN(32))
+	refreshToken, clientID, clientIdentifier, destURL := challengelessRefreshToken(t, fake.LetterN(32))
 
-	client, err := database.GetClientById(context.Background(), nil, clientId)
+	client, err := database.GetClientByID(context.Background(), nil, clientID)
 	require.NoError(t, err)
 	client.IsPublic = true
 	client.ClientSecretEncrypted = nil
 	require.NoError(t, database.UpdateClient(context.Background(), nil, client))
 
-	data := postToTokenEndpoint(t, createHttpClient(t), destUrl, url.Values{
+	data := postToTokenEndpoint(t, createHTTPClient(t), destURL, url.Values{
 		"grant_type":    {"refresh_token"},
 		"client_id":     {clientIdentifier},
 		"refresh_token": {refreshToken},
@@ -76,9 +76,9 @@ func TestToken_Refresh_ChallengelessGrant_RefusedOnceTheClientIsPublic(t *testin
 // while the client authenticates.
 func TestToken_Refresh_ChallengelessGrant_ConfidentialClientStillRefreshes(t *testing.T) {
 	clientSecret := fake.LetterN(32)
-	refreshToken, _, clientIdentifier, destUrl := challengelessRefreshToken(t, clientSecret)
+	refreshToken, _, clientIdentifier, destURL := challengelessRefreshToken(t, clientSecret)
 
-	data := postToTokenEndpoint(t, createHttpClient(t), destUrl, url.Values{
+	data := postToTokenEndpoint(t, createHTTPClient(t), destURL, url.Values{
 		"grant_type":    {"refresh_token"},
 		"client_id":     {clientIdentifier},
 		"client_secret": {clientSecret},
@@ -101,8 +101,8 @@ func TestToken_Refresh_PublicClient_PresentingASecret_IsRefused(t *testing.T) {
 	httpClient, code := createAuthCode(t, fake.LetterN(32), "openid profile email",
 		authCodeOptions{isPublic: true})
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
-	data := postToTokenEndpoint(t, httpClient, destUrl, url.Values{
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
+	data := postToTokenEndpoint(t, httpClient, destURL, url.Values{
 		"grant_type":    {"authorization_code"},
 		"client_id":     {code.Client.ClientIdentifier},
 		"code":          {code.Code},
@@ -112,7 +112,7 @@ func TestToken_Refresh_PublicClient_PresentingASecret_IsRefused(t *testing.T) {
 	require.Nil(t, data["error"], "unexpected refusal at redemption: %v", data["error_description"])
 	refreshToken := data["refresh_token"].(string)
 
-	data = postToTokenEndpoint(t, httpClient, destUrl, url.Values{
+	data = postToTokenEndpoint(t, httpClient, destURL, url.Values{
 		"grant_type":    {"refresh_token"},
 		"client_id":     {code.Client.ClientIdentifier},
 		"client_secret": {"a-secret-this-client-does-not-have"},

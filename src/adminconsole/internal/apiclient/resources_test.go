@@ -25,10 +25,10 @@ import (
 const resourceBodyFields = `"id":2,"resourceIdentifier":"api","description":"The API",` +
 	`"isSystemLevelResource":true`
 
-func TestAuthServerClient_GetResourceByIdDecodesEveryFieldTheConsoleBinds(t *testing.T) {
+func TestAuthServerClient_GetResourceByIDDecodesEveryFieldTheConsoleBinds(t *testing.T) {
 	client, recorded := serves(t, `{"resource":{`+resourceBodyFields+`}}`)
 
-	resource, err := client.GetResourceById(context.Background(), "an-access-token", 2)
+	resource, err := client.GetResourceByID(context.Background(), "an-access-token", 2)
 	require.NoError(t, err)
 	require.NotNil(t, resource)
 
@@ -36,7 +36,7 @@ func TestAuthServerClient_GetResourceByIdDecodesEveryFieldTheConsoleBinds(t *tes
 	assert.Equal(t, "/api/v1/admin/resources/2", gotPath)
 	assert.Equal(t, "Bearer an-access-token", gotAuthorization)
 
-	assert.Equal(t, int64(2), resource.Id)
+	assert.Equal(t, int64(2), resource.ID)
 	assert.Equal(t, "api", resource.ResourceIdentifier)
 	assert.Equal(t, "The API", resource.Description)
 
@@ -75,7 +75,7 @@ func TestAuthServerClient_CreateResourceDecodesTheCreatedRow(t *testing.T) {
 
 	gotPath, _ := recorded()
 	assert.Equal(t, "/api/v1/admin/resources", gotPath)
-	assert.Equal(t, int64(2), resource.Id)
+	assert.Equal(t, int64(2), resource.ID)
 	assert.Equal(t, "api", resource.ResourceIdentifier)
 }
 

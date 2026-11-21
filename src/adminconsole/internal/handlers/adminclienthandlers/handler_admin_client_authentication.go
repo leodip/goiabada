@@ -18,9 +18,9 @@ import (
 // clientAuthenticationAPI is what the client authentication page needs: the client, its secret,
 // which the client detail does not carry (#403), and its authentication write.
 type clientAuthenticationAPI interface {
-	GetClientById(ctx context.Context, accessToken string, clientId int64) (*api.ClientResponse, error)
-	GetClientSecret(ctx context.Context, accessToken string, clientId int64) (string, error)
-	UpdateClientAuthentication(ctx context.Context, accessToken string, clientId int64, request *api.UpdateClientAuthenticationRequest) (*api.ClientResponse, error)
+	GetClientByID(ctx context.Context, accessToken string, clientID int64) (*api.ClientResponse, error)
+	GetClientSecret(ctx context.Context, accessToken string, clientID int64) (string, error)
+	UpdateClientAuthentication(ctx context.Context, accessToken string, clientID int64, request *api.UpdateClientAuthenticationRequest) (*api.ClientResponse, error)
 }
 
 // ClientAuthentication is what the Authentication tab is drawn from. The tab binds two: "client",
@@ -29,7 +29,7 @@ type clientAuthenticationAPI interface {
 // from. They differ only when a refused save is drawn again, with the inputs keeping what was
 // submitted, so the same change attempted again is asked again (#562 decision 6).
 type ClientAuthentication struct {
-	ClientId            int64
+	ClientID            int64
 	ClientIdentifier    string
 	IsPublic            bool
 	ClientSecret        string
@@ -45,7 +45,7 @@ type ClientAuthentication struct {
 // server answers them.
 func clientAuthenticationFrom(c *api.ClientResponse, clientSecret string) ClientAuthentication {
 	return ClientAuthentication{
-		ClientId:                c.Id,
+		ClientID:                c.ID,
 		ClientIdentifier:        c.ClientIdentifier,
 		IsPublic:                c.IsPublic,
 		ClientSecret:            clientSecret,
@@ -55,7 +55,7 @@ func clientAuthenticationFrom(c *api.ClientResponse, clientSecret string) Client
 }
 
 func HandleAuthenticationGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient clientAuthenticationAPI,
 ) http.HandlerFunc {
@@ -74,12 +74,12 @@ func HandleAuthenticationGet(
 			return
 		}
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
-		client, err := apiClient.GetClientById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		client, err := apiClient.GetClientByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -132,7 +132,7 @@ func HandleAuthenticationGet(
 }
 
 func HandleAuthenticationPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient clientAuthenticationAPI,
 	baseURL string,
@@ -153,12 +153,12 @@ func HandleAuthenticationPost(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
-		client, err := apiClient.GetClientById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		client, err := apiClient.GetClientByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -175,7 +175,7 @@ func HandleAuthenticationPost(
 			storedSecret := ""
 			if !client.IsPublic {
 				var secretErr error
-				storedSecret, secretErr = apiClient.GetClientSecret(r.Context(), jwtInfo.TokenResponse.AccessToken, client.Id)
+				storedSecret, secretErr = apiClient.GetClientSecret(r.Context(), jwtInfo.TokenResponse.AccessToken, client.ID)
 				if secretErr != nil {
 					render.HandleAPIError(httpHelper, w, r, secretErr)
 					return
@@ -222,7 +222,7 @@ func HandleAuthenticationPost(
 		// and in the access log of every proxy in front of the deployment. This route is POST-only
 		// with a separate GET handler rendering the form, so the query was never a submission (#202).
 		adminClientAuthentication := ClientAuthentication{
-			ClientId:            client.Id,
+			ClientID:            client.ID,
 			ClientIdentifier:    client.ClientIdentifier,
 			IsPublic:            isPublic,
 			ClientSecret:        r.PostFormValue("clientSecret"),
@@ -240,7 +240,7 @@ func HandleAuthenticationPost(
 			ClientSecret: adminClientAuthentication.ClientSecret,
 		}
 
-		_, err = apiClient.UpdateClientAuthentication(r.Context(), jwtInfo.TokenResponse.AccessToken, client.Id, req)
+		_, err = apiClient.UpdateClientAuthentication(r.Context(), jwtInfo.TokenResponse.AccessToken, client.ID, req)
 		if err != nil {
 			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
 				renderError(message, render.ErrorField(err, clientAuthenticationErrorFields))
@@ -254,7 +254,7 @@ func HandleAuthenticationPost(
 			return
 		}
 
-		pagePath := fmt.Sprintf("/admin/clients/%v/authentication", client.Id)
+		pagePath := fmt.Sprintf("/admin/clients/%v/authentication", client.ID)
 		sess.SetFlash(pagePath, "savedSuccessfully", "true")
 		err = httpSession.Save(r, w, sess)
 		if err != nil {
@@ -266,7 +266,7 @@ func HandleAuthenticationPost(
 	}
 }
 
-func HandleGenerateNewSecretGet(httpHelper HttpHelper) http.HandlerFunc {
+func HandleGenerateNewSecretGet(httpHelper HTTPHelper) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		newSecret := securerandom.String(60)
 

@@ -77,8 +77,8 @@ func TestMigration000038_NvarcharColumns(t *testing.T) {
 
 	require.NoError(t, h.Migrator.Migrate(context.Background(), 35), "migrate to 000035")
 
-	clientId := seedClient(t, h, "mig38-client")
-	setOidcClaimsSetting000038(t, h, clientId, "on")
+	clientID := seedClient(t, h, "mig38-client")
+	setOIDCClaimsSetting000038(t, h, clientID, "on")
 
 	before := dumpAffectedTables000038(t, h)
 	assertNvarcharColumnTypes000038(t, h, before, "at 000035", func(c int) string { return nvarcharColumns000038[c].before })
@@ -91,7 +91,7 @@ func TestMigration000038_NvarcharColumns(t *testing.T) {
 	after := dumpAffectedTables000038(t, h)
 	assertNvarcharColumnTypes000038(t, h, after, "after apply", func(c int) string { return nvarcharColumns000038[c].after })
 	assertOnlyTheFiveTypesMoved000038(t, before, after, "after apply")
-	assert.Equalf(t, "on", readOidcClaimsSetting000038(t, h, clientId),
+	assert.Equalf(t, "on", readOIDCClaimsSetting000038(t, h, clientID),
 		"after apply, the seeded client's setting must survive the retype")
 	assert.Equal(t, oidcClaimsDefaultConstraint000038, oidcClaimsConstraintName000038(t, h),
 		"after apply, the default constraint must carry the name a later migration can drop it by")
@@ -101,7 +101,7 @@ func TestMigration000038_NvarcharColumns(t *testing.T) {
 	down := dumpAffectedTables000038(t, h)
 	assertNvarcharColumnTypes000038(t, h, down, "after roll back", func(c int) string { return nvarcharColumns000038[c].before })
 	assertOnlyTheFiveTypesMoved000038(t, before, down, "after roll back")
-	assert.Equalf(t, "on", readOidcClaimsSetting000038(t, h, clientId),
+	assert.Equalf(t, "on", readOIDCClaimsSetting000038(t, h, clientID),
 		"after roll back, the seeded client's setting must survive the retype")
 	assert.Truef(t, strings.HasPrefix(oidcClaimsConstraintName000038(t, h), "DF__"),
 		"the down migration must restore an UNNAMED default, so 000035 is the shape 000013 left")
@@ -196,21 +196,21 @@ func oidcClaimsConstraintName000038(t *testing.T, h *isolatedDB) string {
 	return name
 }
 
-func setOidcClaimsSetting000038(t *testing.T, h *isolatedDB, clientId int64, value string) {
+func setOIDCClaimsSetting000038(t *testing.T, h *isolatedDB, clientID int64, value string) {
 	t.Helper()
 
 	_, err := h.SQL.Exec(fmt.Sprintf(
 		`UPDATE clients SET include_open_id_connect_claims_in_id_token = '%s' WHERE id = %d`,
-		value, clientId))
+		value, clientID))
 	require.NoError(t, err, "seed the client's OIDC claims setting")
 }
 
-func readOidcClaimsSetting000038(t *testing.T, h *isolatedDB, clientId int64) string {
+func readOIDCClaimsSetting000038(t *testing.T, h *isolatedDB, clientID int64) string {
 	t.Helper()
 
 	var value string
 	require.NoError(t, h.SQL.QueryRow(fmt.Sprintf(
-		`SELECT include_open_id_connect_claims_in_id_token FROM clients WHERE id = %d`, clientId)).Scan(&value),
+		`SELECT include_open_id_connect_claims_in_id_token FROM clients WHERE id = %d`, clientID)).Scan(&value),
 		"read back the client's OIDC claims setting")
 	return value
 }

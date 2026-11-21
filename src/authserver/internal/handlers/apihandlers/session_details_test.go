@@ -28,19 +28,19 @@ var sessionSettings = &record.Settings{
 	UserSessionMaxLifetimeInSeconds: 604800,
 }
 
-func liveSession(id int64, identifier string, clientIds ...int64) record.UserSession {
+func liveSession(id int64, identifier string, clientIDs ...int64) record.UserSession {
 	now := time.Now().UTC()
 	session := record.UserSession{
-		Id:                id,
+		ID:                id,
 		SessionIdentifier: identifier,
 		Started:           now.Add(-time.Hour),
 		LastAccessed:      now.Add(-time.Minute),
-		UserId:            42,
+		UserID:            42,
 	}
-	for _, clientId := range clientIds {
+	for _, clientID := range clientIDs {
 		session.Clients = append(session.Clients, record.UserSessionClient{
-			UserSessionId: id,
-			ClientId:      clientId,
+			UserSessionID: id,
+			ClientID:      clientID,
 			Started:       now.Add(-time.Hour),
 			LastAccessed:  now.Add(-time.Minute),
 		})
@@ -62,12 +62,12 @@ func TestBuildSessionDetails_LoadsEveryClientInOneQuery(t *testing.T) {
 		liveSession(3, "sid-3", 6),
 	}
 
-	var gotClientIds []int64
-	database.On("GetClientsByIds", mock.Anything, (*sql.Tx)(nil), mock.Anything).
-		Run(func(args mock.Arguments) { gotClientIds = args.Get(2).([]int64) }).
+	var gotClientIDs []int64
+	database.On("GetClientsByIDs", mock.Anything, (*sql.Tx)(nil), mock.Anything).
+		Run(func(args mock.Arguments) { gotClientIDs = args.Get(2).([]int64) }).
 		Return([]record.Client{
-			{Id: 5, ClientIdentifier: "portal"},
-			{Id: 6, ClientIdentifier: "backoffice"},
+			{ID: 5, ClientIdentifier: "portal"},
+			{ID: 6, ClientIdentifier: "backoffice"},
 		}, nil).Once()
 
 	details, err := buildSessionDetails(context.Background(), database, sessions, sessionSettings, "")
@@ -78,8 +78,8 @@ func TestBuildSessionDetails_LoadsEveryClientInOneQuery(t *testing.T) {
 
 	// The union, deduplicated: client 5 is on two sessions and client 6 on two, and asking for
 	// four ids would still answer correctly while costing part of the query it was meant to save.
-	assert.ElementsMatch(t, []int64{5, 6}, gotClientIds)
-	assert.Len(t, gotClientIds, 2)
+	assert.ElementsMatch(t, []int64{5, 6}, gotClientIDs)
+	assert.Len(t, gotClientIDs, 2)
 
 	assert.Equal(t, []string{"portal", "backoffice"}, details[0].ClientIdentifiers)
 	assert.Equal(t, []string{"portal"}, details[1].ClientIdentifiers)
@@ -95,7 +95,7 @@ func TestBuildSessionDetails_NoClientsRunsNoQuery(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, details, 1)
 	assert.Equal(t, []string{}, details[0].ClientIdentifiers)
-	// No GetClientsByIds expectation is registered, so the strict mock fails the test if one is
+	// No GetClientsByIDs expectation is registered, so the strict mock fails the test if one is
 	// made.
 	database.AssertExpectations(t)
 }
@@ -113,21 +113,21 @@ func TestBuildSessionDetails_DropsSessionsThatAreNoLongerValid(t *testing.T) {
 
 	sessions := []record.UserSession{liveSession(1, "sid-live", 5), idle, expired}
 
-	var gotClientIds []int64
-	database.On("GetClientsByIds", mock.Anything, (*sql.Tx)(nil), mock.Anything).
-		Run(func(args mock.Arguments) { gotClientIds = args.Get(2).([]int64) }).
-		Return([]record.Client{{Id: 5, ClientIdentifier: "portal"}}, nil).Once()
+	var gotClientIDs []int64
+	database.On("GetClientsByIDs", mock.Anything, (*sql.Tx)(nil), mock.Anything).
+		Run(func(args mock.Arguments) { gotClientIDs = args.Get(2).([]int64) }).
+		Return([]record.Client{{ID: 5, ClientIdentifier: "portal"}}, nil).Once()
 
 	details, err := buildSessionDetails(context.Background(), database, sessions, sessionSettings, "")
 
 	require.NoError(t, err)
 	require.Len(t, details, 1)
-	assert.Equal(t, int64(1), details[0].Id)
+	assert.Equal(t, int64(1), details[0].ID)
 
 	// Client 9 belongs only to the dropped sessions, so filtering before hydrating is what keeps
 	// it out of the query. Asking for it would be harmless and wasteful, and this is the only
 	// place that could say so.
-	assert.Equal(t, []int64{5}, gotClientIds)
+	assert.Equal(t, []int64{5}, gotClientIDs)
 }
 
 // currentSid reaches the mapper. The mapper owns the comparison; this owns the wiring, which is
@@ -150,7 +150,7 @@ func TestBuildSessionDetails_PassesTheCallersSidThrough(t *testing.T) {
 func TestBuildSessionDetails_SurfacesTheClientQueryError(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 
-	database.On("GetClientsByIds", mock.Anything, (*sql.Tx)(nil), mock.Anything).
+	database.On("GetClientsByIDs", mock.Anything, (*sql.Tx)(nil), mock.Anything).
 		Return(nil, errors.New("connection reset")).Once()
 
 	details, err := buildSessionDetails(context.Background(), database,
@@ -164,11 +164,11 @@ func TestBuildSessionDetails_SurfacesTheClientQueryError(t *testing.T) {
 // A session naming a client with no row is a broken row, and UserSessionClientsLoadClients
 // refused it before this helper replaced that call. Keeping the refusal is deliberate: answering
 // 200 with the client quietly absent from clientIdentifiers would hide it for good.
-func TestBuildSessionDetails_RefusesAClientIdWithNoRow(t *testing.T) {
+func TestBuildSessionDetails_RefusesAClientIDWithNoRow(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 
-	database.On("GetClientsByIds", mock.Anything, (*sql.Tx)(nil), mock.Anything).
-		Return([]record.Client{{Id: 5, ClientIdentifier: "portal"}}, nil).Once()
+	database.On("GetClientsByIDs", mock.Anything, (*sql.Tx)(nil), mock.Anything).
+		Return([]record.Client{{ID: 5, ClientIdentifier: "portal"}}, nil).Once()
 
 	details, err := buildSessionDetails(context.Background(), database,
 		[]record.UserSession{liveSession(1, "sid-1", 5, 99)}, sessionSettings, "")
@@ -199,10 +199,10 @@ func TestBuildSessionDetails_LoadsClientsUnderTheCallersContext(t *testing.T) {
 	ctx := context.WithValue(context.Background(), marker{}, "the caller's own")
 
 	database := datamocks.NewDatabase(t)
-	database.On("GetClientsByIds", mock.MatchedBy(func(got context.Context) bool {
+	database.On("GetClientsByIDs", mock.MatchedBy(func(got context.Context) bool {
 		return got.Value(marker{}) == "the caller's own"
 	}), (*sql.Tx)(nil), mock.Anything).
-		Return([]record.Client{{Id: 5, ClientIdentifier: "portal"}}, nil).Once()
+		Return([]record.Client{{ID: 5, ClientIdentifier: "portal"}}, nil).Once()
 
 	_, err := buildSessionDetails(ctx, database, []record.UserSession{liveSession(1, "sid-1", 5)}, sessionSettings, "")
 

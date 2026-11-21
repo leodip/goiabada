@@ -93,7 +93,7 @@ func postWithAuthorization(handler http.HandlerFunc, path string, form url.Value
 	for _, field := range fields {
 		req.Header.Add("Authorization", field)
 	}
-	req = withSettings(req, &record.Settings{Id: 1})
+	req = withSettings(req, &record.Settings{ID: 1})
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
 	return rr
@@ -228,7 +228,7 @@ func TestClientAuthentication_AnotherSchemeIsIgnored(t *testing.T) {
 func TestClientAuthentication_SpacesAfterBasic(t *testing.T) {
 	encrypted, err := testDataCipher.Encrypt(headerClientSecret)
 	require.NoError(t, err)
-	client := &record.Client{Id: 31, ClientIdentifier: headerClientIdentifier, Enabled: true,
+	client := &record.Client{ID: 31, ClientIdentifier: headerClientIdentifier, Enabled: true,
 		ClientCredentialsEnabled: true, ClientSecretEncrypted: encrypted}
 	credentials := encodedBasic(headerClientIdentifier + ":" + headerClientSecret)
 
@@ -243,7 +243,7 @@ func TestClientAuthentication_SpacesAfterBasic(t *testing.T) {
 			validator := handlersmocks.NewTokenValidator(t)
 			validator.On("ValidateTokenRequest", mock.Anything, mock.Anything,
 				mock.MatchedBy(func(input *protocolvalidation.ValidateTokenRequestInput) bool {
-					return input.ClientId == headerClientIdentifier && input.ClientSecret == headerClientSecret
+					return input.ClientID == headerClientIdentifier && input.ClientSecret == headerClientSecret
 				})).Return(nil, oauth.NewErrorDetailWithHTTPStatus("unauthorized_client", "Stops here.", http.StatusBadRequest)).Once()
 			handler := HandleTokenPost(render.New(nil, nil, nil), datamocks.NewDatabase(t), handlersmocks.NewTokenIssuer(t), validator, handlersmocks.NewAuditLogger(t), noCredentialFailures{}, testTokenMetrics(), &recordingLogoutTokens{}, testTokenProofs())
 

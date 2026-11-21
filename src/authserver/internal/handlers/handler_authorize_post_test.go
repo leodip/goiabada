@@ -93,7 +93,7 @@ func (e *authorizePostEndpoint) parks() **record.AuthorizeRequest {
 func TestHandleAuthorizePost_ParksTheRequestAndAnswersWithA303ToAGet(t *testing.T) {
 	e := newAuthorizePostEndpoint(t)
 	e.validator.On("ValidateClientAndRedirectURI", mock.Anything, &protocolvalidation.ValidateClientAndRedirectURIInput{
-		ClientId: "test-client", RedirectURI: "https://example.com", ResponseType: "code",
+		ClientID: "test-client", RedirectURI: "https://example.com", ResponseType: "code",
 	}).Return(nil).Once()
 	stored := e.parks()
 
@@ -298,7 +298,7 @@ func (e *authorizeEndpoint) consumes(handle string, form url.Values, claimed boo
 	tx := &sql.Tx{}
 	datamocks.ExpectRunInTransaction(e.database, tx)
 	e.database.On("GetAuthorizeRequestByHandleHash", mock.Anything, tx, hashutil.HashString(handle), mock.Anything).
-		Return(&record.AuthorizeRequest{Id: 41, HandleHash: hashutil.HashString(handle), RequestForm: form.Encode(),
+		Return(&record.AuthorizeRequest{ID: 41, HandleHash: hashutil.HashString(handle), RequestForm: form.Encode(),
 			ExpiresAt: time.Now().UTC().Add(time.Minute)}, nil).Once()
 	e.database.On("ClaimAuthorizeRequest", mock.Anything, tx, int64(41)).Return(claimed, nil).Once()
 }
@@ -355,10 +355,10 @@ func TestHandleAuthorizeGet_ARequestHandleRunsTheCeremonyFromTheParkedRequest(t 
 	assertStepLocation(t, rr.Header().Get("Location"), "/auth/level1")
 	e.assertExpectations(t)
 
-	require.NotEmpty(t, direct.CeremonyId)
-	require.NotEmpty(t, replayed.CeremonyId)
-	assert.NotEqual(t, direct.CeremonyId, replayed.CeremonyId, "each ceremony is its own")
-	direct.CeremonyId, replayed.CeremonyId = "", ""
+	require.NotEmpty(t, direct.CeremonyID)
+	require.NotEmpty(t, replayed.CeremonyID)
+	assert.NotEqual(t, direct.CeremonyID, replayed.CeremonyID, "each ceremony is its own")
+	direct.CeremonyID, replayed.CeremonyID = "", ""
 	assert.Equal(t, direct, replayed)
 	assert.Equal(t, parked.Get("state"), replayed.State, "the parked value comes back byte for byte")
 	assert.Equal(t, []string{"pt-BR"}, replayed.UILocales)

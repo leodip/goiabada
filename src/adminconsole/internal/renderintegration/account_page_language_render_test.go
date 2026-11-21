@@ -37,7 +37,7 @@ type storedProfileAPI struct {
 }
 
 func (a *storedProfileAPI) GetAccountProfile(context.Context, string) (*api.UserResponse, error) {
-	return &api.UserResponse{Id: 7, Email: "someone@example.com", Locale: "de", PageLanguage: a.pageLanguage}, nil
+	return &api.UserResponse{ID: 7, Email: "someone@example.com", Locale: "de", PageLanguage: a.pageLanguage}, nil
 }
 
 func (a *storedProfileAPI) UpdateAccountProfile(_ context.Context, _ string,

@@ -138,12 +138,12 @@ func TestNotFound_RenderFailureStillLogsOnce(t *testing.T) {
 	}
 	assert.Contains(t, logged.Error(), "unable to render template")
 
-	requestId, isString := record.Attrs["request_id"].(string)
+	requestID, isString := record.Attrs["request_id"].(string)
 	assert.True(t, isString, "request_id must be a string attribute")
-	assert.Contains(t, w.Body.String(), "Error: "+requestId)
+	assert.Contains(t, w.Body.String(), "Error: "+requestID)
 }
 
-func TestInternalServerError_LogsOnceWithErrorAndRequestId(t *testing.T) {
+func TestInternalServerError_LogsOnceWithErrorAndRequestID(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
 	httpHelper := errorPageHelper()
 
@@ -170,10 +170,10 @@ func TestInternalServerError_LogsOnceWithErrorAndRequestId(t *testing.T) {
 	// The request id on the log line and the one on the page the visitor is looking at have to be
 	// the same string, or the line cannot be found from a user's report, which is the only reason
 	// either of them is written down at all.
-	requestId, isString := record.Attrs["request_id"].(string)
+	requestID, isString := record.Attrs["request_id"].(string)
 	assert.True(t, isString, "request_id must be a string attribute")
-	assert.NotEmpty(t, requestId)
-	assert.Contains(t, w.Body.String(), "Error: "+requestId)
+	assert.NotEmpty(t, requestID)
+	assert.Contains(t, w.Body.String(), "Error: "+requestID)
 }
 
 // The stack is why decision 10 moved WithStack off the call sites and into the writer: a caller
@@ -254,15 +254,15 @@ func TestJSONError_LogsOnceOnTheGenericBranch(t *testing.T) {
 	if _, isError := loggedErrorOf(t, record); !isError {
 		return
 	}
-	requestId, isString := record.Attrs["request_id"].(string)
+	requestID, isString := record.Attrs["request_id"].(string)
 	assert.True(t, isString, "request_id must be a string attribute")
-	assert.NotEmpty(t, requestId)
+	assert.NotEmpty(t, requestID)
 
 	// The same id reaches the client, in the sentence this branch writes.
 	var response map[string]string
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
 	assert.Equal(t, "server_error", response["error"])
-	assert.Contains(t, response["error_description"], requestId)
+	assert.Contains(t, response["error_description"], requestID)
 }
 
 // The branch between the two: an *ErrorDetail carrying no status at all. It is answered 500, and a
@@ -292,16 +292,16 @@ func TestJSONError_ADetailWithNoStatusIsA500ThatStillLogsAndCorrelates(t *testin
 		return
 	}
 
-	requestId, isString := record.Attrs["request_id"].(string)
+	requestID, isString := record.Attrs["request_id"].(string)
 	require.True(t, isString, "request_id must be a string attribute")
-	require.NotEmpty(t, requestId)
+	require.NotEmpty(t, requestID)
 
 	var response map[string]string
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
 	assert.Equal(t, "server_error", response["error"], "the detail's own code still reaches the wire")
 	assert.Contains(t, response["error_description"], "The operation failed.",
 		"and so does its own sentence")
-	assert.Contains(t, response["error_description"], requestId,
+	assert.Contains(t, response["error_description"], requestID,
 		"the id on the wire and the id on the log line have to be the same string")
 }
 
@@ -334,14 +334,14 @@ func TestJSONError_AnExplicit500DetailLogsAndCorrelates(t *testing.T) {
 	if _, isError := loggedErrorOf(t, record); !isError {
 		return
 	}
-	requestId, isString := record.Attrs["request_id"].(string)
+	requestID, isString := record.Attrs["request_id"].(string)
 	require.True(t, isString, "request_id must be a string attribute")
-	require.NotEmpty(t, requestId)
+	require.NotEmpty(t, requestID)
 
 	var response map[string]string
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
 	assert.Equal(t, "server_error", response["error"])
-	assert.Equal(t, "The operation failed. Request Id: "+requestId, response["error_description"],
+	assert.Equal(t, "The operation failed. Request Id: "+requestID, response["error_description"],
 		"the id on the wire and the id on the log line have to be the same string")
 }
 
@@ -375,7 +375,7 @@ func TestJSONError_ConformsTheFinalDescription(t *testing.T) {
 
 	tests := []struct {
 		name            string
-		requestId       string
+		requestID       string
 		err             error
 		wantStatus      int
 		wantCode        string
@@ -383,7 +383,7 @@ func TestJSONError_ConformsTheFinalDescription(t *testing.T) {
 	}{
 		{
 			name:            "the generic branch conforms the adopted request id",
-			requestId:       "caller\U0001F4A3id\"x\\yаб",
+			requestID:       "caller\U0001F4A3id\"x\\yаб",
 			err:             errors.New("malformed form body"),
 			wantStatus:      http.StatusInternalServerError,
 			wantCode:        "server_error",
@@ -391,7 +391,7 @@ func TestJSONError_ConformsTheFinalDescription(t *testing.T) {
 		},
 		{
 			name:      "a chosen 400 detail's description is conformed",
-			requestId: "goiabada/abc123-000042",
+			requestID: "goiabada/abc123-000042",
 			err: oauth.NewErrorDetailWithHTTPStatus("invalid_scope",
 				"Scope \"café\\x\" is not recognised.", http.StatusBadRequest),
 			wantStatus:      http.StatusBadRequest,
@@ -400,7 +400,7 @@ func TestJSONError_ConformsTheFinalDescription(t *testing.T) {
 		},
 		{
 			name:            "a status-less detail is conformed after the request id is appended",
-			requestId:       "id\"1",
+			requestID:       "id\"1",
 			err:             oauth.NewErrorDetail("server_error", "The operation failed."),
 			wantStatus:      http.StatusInternalServerError,
 			wantCode:        "server_error",
@@ -408,7 +408,7 @@ func TestJSONError_ConformsTheFinalDescription(t *testing.T) {
 		},
 		{
 			name:      "a description over 512 bytes is cut to 512",
-			requestId: "goiabada/abc123-000042",
+			requestID: "goiabada/abc123-000042",
 			err: oauth.NewErrorDetailWithHTTPStatus("invalid_request",
 				strings.Repeat("a", 600), http.StatusBadRequest),
 			wantStatus:      http.StatusBadRequest,
@@ -417,7 +417,7 @@ func TestJSONError_ConformsTheFinalDescription(t *testing.T) {
 		},
 		{
 			name:            "a conforming request id passes byte for byte",
-			requestId:       "goiabada/abc123-000042",
+			requestID:       "goiabada/abc123-000042",
 			err:             errors.New("something the endpoint did not expect"),
 			wantStatus:      http.StatusInternalServerError,
 			wantCode:        "server_error",
@@ -428,18 +428,18 @@ func TestJSONError_ConformsTheFinalDescription(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			httpHelper := New(fstest.MapFS{}, nil, nil)
-			var adoptedRequestId string
+			var adoptedRequestID string
 			router := errorRouter(func(w http.ResponseWriter, r *http.Request) {
-				adoptedRequestId = requestid.FromContext(r.Context())
+				adoptedRequestID = requestid.FromContext(r.Context())
 				httpHelper.JSONError(w, r, test.err)
 			})
 
 			req := newRequest("GET", "/", nil)
-			req.Header.Set(requestid.Header, test.requestId)
+			req.Header.Set(requestid.Header, test.requestID)
 			w := httptest.NewRecorder()
 			router.ServeHTTP(w, req)
 
-			require.Equal(t, test.requestId, adoptedRequestId,
+			require.Equal(t, test.requestID, adoptedRequestID,
 				"the request id middleware must adopt the inbound header verbatim, otherwise this row proves nothing")
 
 			assert.Equal(t, test.wantStatus, w.Code)

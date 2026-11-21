@@ -28,19 +28,19 @@ import (
 //
 // HandleAPIErrorWithCallback is what tells them apart, and the three rows below are the three
 // answers it has to give.
-type attributesAddApiClient struct {
+type attributesAddAPIClient struct {
 	err error
 }
 
-func (c *attributesAddApiClient) GetGroupById(_ context.Context, accessToken string, groupId int64) (*api.GroupResponse, error) {
-	return &api.GroupResponse{Id: groupId, GroupIdentifier: "some-group"}, nil
+func (c *attributesAddAPIClient) GetGroupByID(_ context.Context, accessToken string, groupID int64) (*api.GroupResponse, error) {
+	return &api.GroupResponse{ID: groupID, GroupIdentifier: "some-group"}, nil
 }
 
-func (c *attributesAddApiClient) CreateGroupAttribute(_ context.Context, accessToken string, request *api.CreateGroupAttributeRequest) (*api.GroupAttributeResponse, error) {
+func (c *attributesAddAPIClient) CreateGroupAttribute(_ context.Context, accessToken string, request *api.CreateGroupAttributeRequest) (*api.GroupAttributeResponse, error) {
 	return nil, c.err
 }
 
-func TestGroupAttributesAddPost_TellsTheApisStatusesApart(t *testing.T) {
+func TestGroupAttributesAddPost_TellsTheAPIsStatusesApart(t *testing.T) {
 	const (
 		answerRenderForm = "render"
 		answerNotFound   = "not-found"
@@ -83,7 +83,7 @@ func TestGroupAttributesAddPost_TellsTheApisStatusesApart(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			var renderedError any
 			switch testCase.want {
 			case answerRenderForm:
@@ -107,7 +107,7 @@ func TestGroupAttributesAddPost_TellsTheApisStatusesApart(t *testing.T) {
 			)
 
 			HandleAttributesAddPost(httpHelper,
-				&attributesAddApiClient{err: testCase.apiErr}).ServeHTTP(httptest.NewRecorder(), req)
+				&attributesAddAPIClient{err: testCase.apiErr}).ServeHTTP(httptest.NewRecorder(), req)
 
 			httpHelper.AssertExpectations(t)
 			if testCase.want == answerRenderForm {

@@ -25,10 +25,10 @@ type InEffect struct {
 // names, the documents that list it, and a user's acceptances. data.Database satisfies it.
 type Database interface {
 	GetAllLegalDocuments(ctx context.Context, tx *sql.Tx) ([]record.LegalDocument, error)
-	GetLegalDocumentVersionsByLegalDocumentId(ctx context.Context, tx *sql.Tx, legalDocumentId int64) ([]record.LegalDocumentVersion, error)
+	GetLegalDocumentVersionsByLegalDocumentID(ctx context.Context, tx *sql.Tx, legalDocumentID int64) ([]record.LegalDocumentVersion, error)
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
-	GetLegalDocumentClientsByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.LegalDocumentClient, error)
-	GetLegalDocumentAcceptancesByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.LegalDocumentAcceptance, error)
+	GetLegalDocumentClientsByClientID(ctx context.Context, tx *sql.Tx, clientID int64) ([]record.LegalDocumentClient, error)
+	GetLegalDocumentAcceptancesByUserID(ctx context.Context, tx *sql.Tx, userID int64) ([]record.LegalDocumentAcceptance, error)
 }
 
 // Reader reads the documents in effect.
@@ -60,13 +60,13 @@ func (r *Reader) ForClient(ctx context.Context, clientIdentifier string) ([]InEf
 
 // forClientRecord answers the documents in effect that apply to all apps or list client.
 func (r *Reader) forClientRecord(ctx context.Context, client *record.Client) ([]InEffect, error) {
-	links, err := r.database.GetLegalDocumentClientsByClientId(ctx, nil, client.Id)
+	links, err := r.database.GetLegalDocumentClientsByClientID(ctx, nil, client.ID)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to read the legal documents that list the client")
 	}
 	listed := make(map[int64]bool, len(links))
 	for _, link := range links {
-		listed[link.LegalDocumentId] = true
+		listed[link.LegalDocumentID] = true
 	}
 	return r.inEffect(ctx, listed)
 }
@@ -76,7 +76,7 @@ func (r *Reader) forClientRecord(ctx context.Context, client *record.Client) ([]
 // version the user has not accepted. A document accepted once counts for every app it covers, and
 // a new version is owed again. The admin console's own client owes nothing and reads nothing: it
 // also serves My Account, which a user reaches without accepting anything (#622).
-func (r *Reader) Owed(ctx context.Context, client *record.Client, userId int64) ([]InEffect, error) {
+func (r *Reader) Owed(ctx context.Context, client *record.Client, userID int64) ([]InEffect, error) {
 	if client.ClientIdentifier == builtin.AdminConsoleClientIdentifier {
 		return nil, nil
 	}
@@ -94,17 +94,17 @@ func (r *Reader) Owed(ctx context.Context, client *record.Client, userId int64) 
 		return nil, nil
 	}
 
-	acceptances, err := r.database.GetLegalDocumentAcceptancesByUserId(ctx, nil, userId)
+	acceptances, err := r.database.GetLegalDocumentAcceptancesByUserID(ctx, nil, userID)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to read the user's legal document acceptances")
 	}
 	accepted := make(map[int64]bool, len(acceptances))
 	for _, acceptance := range acceptances {
-		accepted[acceptance.LegalDocumentVersionId] = true
+		accepted[acceptance.LegalDocumentVersionID] = true
 	}
 	owed := []InEffect{}
 	for _, doc := range mustAccept {
-		if !accepted[doc.Current.Id] {
+		if !accepted[doc.Current.ID] {
 			owed = append(owed, doc)
 		}
 	}
@@ -121,10 +121,10 @@ func (r *Reader) inEffect(ctx context.Context, listed map[int64]bool) ([]InEffec
 	for _, doc := range docs {
 		// A retired document applies to no app (decision 2), and one set to selected apps applies to
 		// the apps it lists alone, never to all apps, even when it lists none.
-		if doc.IsRetired() || (!doc.AppliesToAllApps && !listed[doc.Id]) {
+		if doc.IsRetired() || (!doc.AppliesToAllApps && !listed[doc.ID]) {
 			continue
 		}
-		versions, err := r.database.GetLegalDocumentVersionsByLegalDocumentId(ctx, nil, doc.Id)
+		versions, err := r.database.GetLegalDocumentVersionsByLegalDocumentID(ctx, nil, doc.ID)
 		if err != nil {
 			return nil, errs.Wrap(err, "unable to read the legal document's versions")
 		}

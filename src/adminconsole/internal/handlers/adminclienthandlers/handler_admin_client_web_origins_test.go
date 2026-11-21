@@ -18,21 +18,21 @@ import (
 	"github.com/leodip/goiabada/core/api"
 )
 
-// stubAllClientsApiClient answers both reads the Web Origins page performs and its write, over
-// stubApiClient next door. The page's port has no GetSettingsGeneral, so a fetch this page should
+// stubAllClientsAPIClient answers both reads the Web Origins page performs and its write, over
+// stubAPIClient next door. The page's port has no GetSettingsGeneral, so a fetch this page should
 // not be making does not compile.
-type stubAllClientsApiClient struct {
-	stubApiClient
+type stubAllClientsAPIClient struct {
+	stubAPIClient
 	allClients []api.ClientResponse
 	// sentWebOrigins is the request the handler handed the API, for the pass-through cases.
 	sentWebOrigins *api.UpdateClientWebOriginsRequest
 }
 
-func (s *stubAllClientsApiClient) GetAllClients(_ context.Context, accessToken string) ([]api.ClientResponse, error) {
+func (s *stubAllClientsAPIClient) GetAllClients(_ context.Context, accessToken string) ([]api.ClientResponse, error) {
 	return s.allClients, nil
 }
 
-func (s *stubAllClientsApiClient) UpdateClientWebOrigins(_ context.Context, accessToken string, clientId int64,
+func (s *stubAllClientsAPIClient) UpdateClientWebOrigins(_ context.Context, accessToken string, clientID int64,
 	request *api.UpdateClientWebOriginsRequest) (*api.ClientResponse, error) {
 	s.sentWebOrigins = request
 	return nil, s.updateErr
@@ -52,35 +52,35 @@ func (s *stubAllClientsApiClient) UpdateClientWebOrigins(_ context.Context, acce
 // case green with the page showing nothing but this client's rows (plan review round 1, finding 3).
 func TestHandleWebOriginsGet_AssemblesTheServerWideList(t *testing.T) {
 
-	httpHelper := &stubHttpHelper{}
-	apiClient := &stubAllClientsApiClient{
-		stubApiClient: stubApiClient{
+	httpHelper := &stubHTTPHelper{}
+	apiClient := &stubAllClientsAPIClient{
+		stubAPIClient: stubAPIClient{
 			client: &api.ClientResponse{
-				Id:               7,
+				ID:               7,
 				ClientIdentifier: "this-app",
 				WebOrigins: []api.WebOriginResponse{
-					{Id: 2, ClientId: 7, Origin: "https://mine-b.example.com"},
-					{Id: 1, ClientId: 7, Origin: "https://mine-a.example.com"},
+					{ID: 2, ClientID: 7, Origin: "https://mine-b.example.com"},
+					{ID: 1, ClientID: 7, Origin: "https://mine-a.example.com"},
 				},
 			},
 		},
 		allClients: []api.ClientResponse{
 			{
-				Id:               7,
+				ID:               7,
 				ClientIdentifier: "this-app",
 				WebOrigins: []api.WebOriginResponse{
-					{Id: 2, ClientId: 7, Origin: "https://mine-b.example.com"},
-					{Id: 1, ClientId: 7, Origin: "https://mine-a.example.com"},
+					{ID: 2, ClientID: 7, Origin: "https://mine-b.example.com"},
+					{ID: 1, ClientID: 7, Origin: "https://mine-a.example.com"},
 				},
 			},
 			{
-				Id:               9,
+				ID:               9,
 				ClientIdentifier: "another-app",
 				WebOrigins: []api.WebOriginResponse{
-					{Id: 3, ClientId: 9, Origin: "https://theirs.example.com"},
+					{ID: 3, ClientID: 9, Origin: "https://theirs.example.com"},
 				},
 			},
-			{Id: 11, ClientIdentifier: "no-origins-app"},
+			{ID: 11, ClientIdentifier: "no-origins-app"},
 		},
 	}
 
@@ -205,7 +205,7 @@ func TestHandleWebOriginsPost_APIRefusalReachesTheBrowser(t *testing.T) {
 
 			// httpSession is nil: both cases return before the session is touched.
 			handler := HandleWebOriginsPost(httpHelper, nil,
-				&stubAllClientsApiClient{stubApiClient: stubApiClient{updateErr: tc.apiErr}})
+				&stubAllClientsAPIClient{stubAPIClient: stubAPIClient{updateErr: tc.apiErr}})
 			handler.ServeHTTP(rec, req)
 
 			assert.Equal(t, tc.wantStatus, rec.Code)
@@ -267,7 +267,7 @@ func TestHandleWebOriginsPost_SendsTheLoadedList(t *testing.T) {
 
 			// The API refuses, so the handler returns before the nil session is touched; the
 			// request it sent is what is under test.
-			stub := &stubAllClientsApiClient{stubApiClient: stubApiClient{
+			stub := &stubAllClientsAPIClient{stubAPIClient: stubAPIClient{
 				updateErr: &apiclient.APIError{Code: "VALIDATION_ERROR", Message: "refused", StatusCode: http.StatusBadRequest}}}
 			HandleWebOriginsPost(httpHelper, nil, stub).ServeHTTP(rec, req)
 

@@ -16,7 +16,7 @@ func TestCreateWebOrigin(t *testing.T) {
 	client := createTestClient(t)
 	webOrigin := &record.WebOrigin{
 		Origin:   "https://example.com",
-		ClientId: client.Id,
+		ClientID: client.ID,
 	}
 
 	err := database.CreateWebOrigin(context.Background(), nil, webOrigin)
@@ -24,14 +24,14 @@ func TestCreateWebOrigin(t *testing.T) {
 		t.Fatalf("Failed to create web origin: %v", err)
 	}
 
-	if webOrigin.Id == 0 {
+	if webOrigin.ID == 0 {
 		t.Error("Expected non-zero ID after creation")
 	}
 	if !webOrigin.CreatedAt.Valid || webOrigin.CreatedAt.Time.IsZero() {
 		t.Error("Expected CreatedAt to be set")
 	}
 
-	retrievedWebOrigin, err := database.GetWebOriginById(context.Background(), nil, webOrigin.Id)
+	retrievedWebOrigin, err := database.GetWebOriginByID(context.Background(), nil, webOrigin.ID)
 	if err != nil {
 		t.Fatalf("Failed to retrieve created web origin: %v", err)
 	}
@@ -39,8 +39,8 @@ func TestCreateWebOrigin(t *testing.T) {
 	if retrievedWebOrigin.Origin != webOrigin.Origin {
 		t.Errorf("Expected Origin %s, got %s", webOrigin.Origin, retrievedWebOrigin.Origin)
 	}
-	if retrievedWebOrigin.ClientId != webOrigin.ClientId {
-		t.Errorf("Expected ClientId %d, got %d", webOrigin.ClientId, retrievedWebOrigin.ClientId)
+	if retrievedWebOrigin.ClientID != webOrigin.ClientID {
+		t.Errorf("Expected ClientID %d, got %d", webOrigin.ClientID, retrievedWebOrigin.ClientID)
 	}
 }
 
@@ -56,48 +56,48 @@ func TestCreateWebOrigin_TheLongestStandardOriginRoundTrips(t *testing.T) {
 	require.Len(t, origin, record.WebOriginMaxBytes)
 
 	client := createTestClient(t)
-	webOrigin := &record.WebOrigin{Origin: origin, ClientId: client.Id}
+	webOrigin := &record.WebOrigin{Origin: origin, ClientID: client.ID}
 
 	err := database.CreateWebOrigin(context.Background(), nil, webOrigin)
 	require.NoError(t, err, "a web origin of %d bytes was refused by the column", record.WebOriginMaxBytes)
 
-	stored, err := database.GetWebOriginById(context.Background(), nil, webOrigin.Id)
+	stored, err := database.GetWebOriginByID(context.Background(), nil, webOrigin.ID)
 	require.NoError(t, err)
 	require.NotNil(t, stored)
 	require.Equal(t, origin, stored.Origin, "the web origin did not round-trip unchanged")
 }
 
-func TestGetWebOriginById(t *testing.T) {
+func TestGetWebOriginByID(t *testing.T) {
 	client := createTestClient(t)
-	webOrigin := createTestWebOrigin(t, client.Id)
+	webOrigin := createTestWebOrigin(t, client.ID)
 
-	retrievedWebOrigin, err := database.GetWebOriginById(context.Background(), nil, webOrigin.Id)
+	retrievedWebOrigin, err := database.GetWebOriginByID(context.Background(), nil, webOrigin.ID)
 	if err != nil {
 		t.Fatalf("Failed to get web origin by ID: %v", err)
 	}
 
-	if retrievedWebOrigin.Id != webOrigin.Id {
-		t.Errorf("Expected ID %d, got %d", webOrigin.Id, retrievedWebOrigin.Id)
+	if retrievedWebOrigin.ID != webOrigin.ID {
+		t.Errorf("Expected ID %d, got %d", webOrigin.ID, retrievedWebOrigin.ID)
 	}
 	if retrievedWebOrigin.Origin != webOrigin.Origin {
 		t.Errorf("Expected Origin %s, got %s", webOrigin.Origin, retrievedWebOrigin.Origin)
 	}
 
-	nonExistentWebOrigin, err := database.GetWebOriginById(context.Background(), nil, 99999)
+	nonExistentWebOrigin, err := database.GetWebOriginByID(context.Background(), nil, 99999)
 	if err != nil {
 		t.Errorf("Expected no error for non-existent web origin, got: %v", err)
 	}
 	if nonExistentWebOrigin != nil {
-		t.Errorf("Expected nil for non-existent web origin, got a web origin with ID: %d", nonExistentWebOrigin.Id)
+		t.Errorf("Expected nil for non-existent web origin, got a web origin with ID: %d", nonExistentWebOrigin.ID)
 	}
 }
 
-func TestGetWebOriginsByClientId(t *testing.T) {
+func TestGetWebOriginsByClientID(t *testing.T) {
 	client := createTestClient(t)
-	webOrigin1 := createTestWebOrigin(t, client.Id)
-	webOrigin2 := createTestWebOrigin(t, client.Id)
+	webOrigin1 := createTestWebOrigin(t, client.ID)
+	webOrigin2 := createTestWebOrigin(t, client.ID)
 
-	webOrigins, err := database.GetWebOriginsByClientId(context.Background(), nil, client.Id)
+	webOrigins, err := database.GetWebOriginsByClientID(context.Background(), nil, client.ID)
 	if err != nil {
 		t.Fatalf("Failed to get web origins by client ID: %v", err)
 	}
@@ -109,16 +109,16 @@ func TestGetWebOriginsByClientId(t *testing.T) {
 	foundWebOrigin1 := false
 	foundWebOrigin2 := false
 	for _, webOrigin := range webOrigins {
-		if webOrigin.Id == webOrigin1.Id {
+		if webOrigin.ID == webOrigin1.ID {
 			foundWebOrigin1 = true
 		}
-		if webOrigin.Id == webOrigin2.Id {
+		if webOrigin.ID == webOrigin2.ID {
 			foundWebOrigin2 = true
 		}
 	}
 
 	if !foundWebOrigin1 || !foundWebOrigin2 {
-		t.Error("Not all created web origins were found in GetWebOriginsByClientId result")
+		t.Error("Not all created web origins were found in GetWebOriginsByClientID result")
 	}
 }
 
@@ -129,7 +129,7 @@ func TestGetAllWebOrigins(t *testing.T) {
 		t.Fatalf("Failed to get existing web origins: %v", err)
 	}
 	for _, webOrigin := range existingWebOrigins {
-		deleteWebOriginErr := database.DeleteWebOrigin(context.Background(), nil, webOrigin.Id)
+		deleteWebOriginErr := database.DeleteWebOrigin(context.Background(), nil, webOrigin.ID)
 		if deleteWebOriginErr != nil {
 			t.Fatalf("Failed to delete existing web origin: %v", deleteWebOriginErr)
 		}
@@ -137,8 +137,8 @@ func TestGetAllWebOrigins(t *testing.T) {
 
 	// Create a client and two web origins for testing
 	client := createTestClient(t)
-	webOrigin1 := createTestWebOrigin(t, client.Id)
-	webOrigin2 := createTestWebOrigin(t, client.Id)
+	webOrigin1 := createTestWebOrigin(t, client.ID)
+	webOrigin2 := createTestWebOrigin(t, client.ID)
 
 	webOrigins, err := database.GetAllWebOrigins(context.Background(), nil)
 	if err != nil {
@@ -152,10 +152,10 @@ func TestGetAllWebOrigins(t *testing.T) {
 	foundWebOrigin1 := false
 	foundWebOrigin2 := false
 	for _, webOrigin := range webOrigins {
-		if webOrigin.Id == webOrigin1.Id {
+		if webOrigin.ID == webOrigin1.ID {
 			foundWebOrigin1 = true
 		}
-		if webOrigin.Id == webOrigin2.Id {
+		if webOrigin.ID == webOrigin2.ID {
 			foundWebOrigin2 = true
 		}
 	}
@@ -167,14 +167,14 @@ func TestGetAllWebOrigins(t *testing.T) {
 
 func TestDeleteWebOrigin(t *testing.T) {
 	client := createTestClient(t)
-	webOrigin := createTestWebOrigin(t, client.Id)
+	webOrigin := createTestWebOrigin(t, client.ID)
 
-	err := database.DeleteWebOrigin(context.Background(), nil, webOrigin.Id)
+	err := database.DeleteWebOrigin(context.Background(), nil, webOrigin.ID)
 	if err != nil {
 		t.Fatalf("Failed to delete web origin: %v", err)
 	}
 
-	deletedWebOrigin, err := database.GetWebOriginById(context.Background(), nil, webOrigin.Id)
+	deletedWebOrigin, err := database.GetWebOriginByID(context.Background(), nil, webOrigin.ID)
 	if err != nil {
 		t.Fatalf("Error while checking for deleted web origin: %v", err)
 	}
@@ -203,7 +203,7 @@ func TestDeleteWebOrigin(t *testing.T) {
 // way.
 func TestWebOriginExists(t *testing.T) {
 	client := createTestClient(t)
-	webOrigin := createTestWebOrigin(t, client.Id)
+	webOrigin := createTestWebOrigin(t, client.ID)
 
 	exists, err := database.WebOriginExists(context.Background(), nil, webOrigin.Origin)
 	if err != nil {
@@ -243,7 +243,7 @@ func TestWebOriginExists_Transaction(t *testing.T) {
 	origin := "https://" + random + ".tx.example.com"
 
 	tx := beginTx(t)
-	webOrigin := &record.WebOrigin{Origin: origin, ClientId: client.Id}
+	webOrigin := &record.WebOrigin{Origin: origin, ClientID: client.ID}
 	if err := database.CreateWebOrigin(context.Background(), tx, webOrigin); err != nil {
 		t.Fatalf("CreateWebOrigin in a transaction: %v", err)
 	}
@@ -310,11 +310,11 @@ func webOriginExistsWithin(t *testing.T, tx *sql.Tx, origin string, within time.
 	}
 }
 
-func createTestWebOrigin(t *testing.T, clientId int64) *record.WebOrigin {
+func createTestWebOrigin(t *testing.T, clientID int64) *record.WebOrigin {
 	random := fake.LetterN(6)
 	webOrigin := &record.WebOrigin{
 		Origin:   "https://" + random + ".example.com",
-		ClientId: clientId,
+		ClientID: clientID,
 	}
 	err := database.CreateWebOrigin(context.Background(), nil, webOrigin)
 	if err != nil {

@@ -94,10 +94,10 @@ func TestUnique_UserEmail(t *testing.T) {
 func TestUnique_CodeHash(t *testing.T) {
 	client := createTestClient(t)
 	user := createTestUser(t)
-	existing := createTestCode(t, client.Id, user.Id)
+	existing := createTestCode(t, client.ID, user.ID)
 
 	duplicate := *existing
-	duplicate.Id = 0
+	duplicate.ID = 0
 	duplicate.Code = "other_" + fake.LetterN(6)
 	err := database.CreateCode(context.Background(), nil, &duplicate)
 	assert.Error(t, err, "two codes must not share a code_hash")
@@ -120,16 +120,16 @@ func TestUnique_KeyPairState(t *testing.T) {
 	assert.Error(t, err, "two key pairs must not share a state")
 }
 
-func TestUnique_RefreshTokenJti(t *testing.T) {
+func TestUnique_RefreshTokenJTI(t *testing.T) {
 	user := createTestUser(t)
 	client := createTestClient(t)
-	existing := createROPCRefreshToken(t, user.Id, client.Id)
+	existing := createROPCRefreshToken(t, user.ID, client.ID)
 
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	duplicate := &record.RefreshToken{
-		UserId:           sql.NullInt64{Int64: user.Id, Valid: true},
-		ClientId:         sql.NullInt64{Int64: client.Id, Valid: true},
-		RefreshTokenJti:  existing.RefreshTokenJti,
+		UserID:           sql.NullInt64{Int64: user.ID, Valid: true},
+		ClientID:         sql.NullInt64{Int64: client.ID, Valid: true},
+		RefreshTokenJTI:  existing.RefreshTokenJTI,
 		RefreshTokenType: "Offline",
 		Scope:            "openid profile",
 		IssuedAt:         sql.NullTime{Time: now, Valid: true},
@@ -142,7 +142,7 @@ func TestUnique_RefreshTokenJti(t *testing.T) {
 
 func TestUnique_UserSessionSessionIdentifier(t *testing.T) {
 	user := createTestUser(t)
-	existing := createTestUserSession(t, user.Id)
+	existing := createTestUserSession(t, user.ID)
 
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	duplicate := &record.UserSession{
@@ -150,10 +150,10 @@ func TestUnique_UserSessionSessionIdentifier(t *testing.T) {
 		Started:           now,
 		LastAccessed:      now,
 		AuthMethods:       "pwd",
-		AcrLevel:          existing.AcrLevel,
+		ACRLevel:          existing.ACRLevel,
 		AuthTime:          now,
 		PasswordAuthTime:  now,
-		UserId:            user.Id,
+		UserID:            user.ID,
 	}
 	err := database.CreateUserSession(context.Background(), nil, duplicate)
 	assert.Error(t, err, "two user sessions must not share a session_identifier")
@@ -163,10 +163,10 @@ func TestUnique_UserSessionSessionIdentifier(t *testing.T) {
 // the column in sqlite, as a named index elsewhere).
 func TestUnique_UserProfilePicturePerUser(t *testing.T) {
 	user := createTestUser(t)
-	createTestUserProfilePicture(t, user.Id)
+	createTestUserProfilePicture(t, user.ID)
 
 	duplicate := &record.UserProfilePicture{
-		UserId:      user.Id,
+		UserID:      user.ID,
 		Picture:     createTestPNG(10, 10),
 		ContentType: "image/png",
 	}
@@ -177,10 +177,10 @@ func TestUnique_UserProfilePicturePerUser(t *testing.T) {
 // One logo per client, same shape as the profile picture above.
 func TestUnique_ClientLogoPerClient(t *testing.T) {
 	client := createTestClient(t)
-	createTestClientLogo(t, client.Id)
+	createTestClientLogo(t, client.ID)
 
 	duplicate := &record.ClientLogo{
-		ClientId:    client.Id,
+		ClientID:    client.ID,
 		Logo:        createTestPNG(10, 10),
 		ContentType: "image/png",
 	}
@@ -200,7 +200,7 @@ func TestUnique_PermissionIdentifierPerResource(t *testing.T) {
 	duplicate := &record.Permission{
 		PermissionIdentifier: existing.PermissionIdentifier,
 		Description:          "Duplicate permission on the same resource",
-		ResourceId:           resource.Id,
+		ResourceID:           resource.ID,
 	}
 	err := database.CreatePermission(context.Background(), nil, duplicate)
 	require.Error(t, err, "a resource must not have two permissions with the same identifier")
@@ -211,11 +211,11 @@ func TestUnique_PermissionIdentifierPerResource(t *testing.T) {
 	onOtherResource := &record.Permission{
 		PermissionIdentifier: existing.PermissionIdentifier,
 		Description:          "Same identifier, different resource",
-		ResourceId:           otherResource.Id,
+		ResourceID:           otherResource.ID,
 	}
 	require.NoError(t, database.CreatePermission(context.Background(), nil, onOtherResource),
 		"the same permission identifier must be allowed on a different resource")
-	assert.NotZero(t, onOtherResource.Id, "expected the permission to be created")
+	assert.NotZero(t, onOtherResource.ID, "expected the permission to be created")
 }
 
 // A rejected duplicate must leave no row behind, so a caller that ignores the

@@ -37,7 +37,7 @@ type refusingEmailAPI struct {
 }
 
 func (*refusingEmailAPI) GetAccountProfile(context.Context, string) (*api.UserResponse, error) {
-	return &api.UserResponse{Id: 7, Email: "someone@example.com"}, nil
+	return &api.UserResponse{ID: 7, Email: "someone@example.com"}, nil
 }
 
 func (a *refusingEmailAPI) UpdateAccountEmail(context.Context, string, *api.UpdateAccountEmailRequest) (*api.UserResponse, error) {

@@ -40,7 +40,7 @@ import (
 // browser rather than any session and is just as fixed: 64 hex characters. So a session still costs
 // one cookie, and a signed-in browser holds exactly the two.
 func TestBrowserSession_CostsExactlyOneSmallCookie(t *testing.T) {
-	httpClient, _, _, _ := createSessionWithAcrLevel1(t)
+	httpClient, _, _, _ := createSessionWithACRLevel1(t)
 
 	cookies := map[string]*http.Cookie{}
 	for _, cookie := range browserCookies(t, httpClient) {
@@ -68,12 +68,12 @@ func TestBrowserSession_CostsExactlyOneSmallCookie(t *testing.T) {
 // prompt=none with no session is the plainest such request, answered login_required. The error
 // still reaches the client.
 func TestBrowserSession_AnAuthorizeAnsweredAtOnceLeavesNoSessionBehind(t *testing.T) {
-	client, redirectUri := createTestClientAndRedirectURI(t)
-	httpClient := createHttpClient(t)
+	client, redirectURI := createTestClientAndRedirectURI(t)
+	httpClient := createHTTPClient(t)
 
 	requestState := fake.LetterN(8)
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + randomCodeChallenge() +
@@ -81,12 +81,12 @@ func TestBrowserSession_AnAuthorizeAnsweredAtOnceLeavesNoSessionBehind(t *testin
 		"&state=" + requestState +
 		"&prompt=none"
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	require.Equal(t, http.StatusFound, resp.StatusCode)
-	errorCode, _, state := getErrorFromUrl(t, resp)
+	errorCode, _, state := getErrorFromURL(t, resp)
 	assert.Equal(t, "login_required", errorCode, "the client is still answered")
 	assert.Equal(t, requestState, state)
 
@@ -114,26 +114,26 @@ func TestBrowserSession_AnAuthorizeAnsweredAtOnceLeavesNoSessionBehind(t *testin
 // afterwards is not signed in, which is that change having actually invalidated the old
 // handle rather than merely issued a new one beside it.
 func TestBrowserSession_IdentifierRotatesAtSignIn(t *testing.T) {
-	client, redirectUri, user, password := newLevel1Actors(t)
+	client, redirectURI, user, password := newLevel1Actors(t)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
-	resp := beginAuthorize(t, httpClient, client, redirectUri)
+	resp := beginAuthorize(t, httpClient, client, redirectURI)
 	defer func() { _ = resp.Body.Close() }()
 
 	// The ceremony saves its auth context before anything is verified, so there is a
 	// browser session here already and it is the one an attacker would have planted.
 	beforeCookie := requireSessionCookie(t, httpClient)
-	beforeId := decodeSessionIdentifier(t, beforeCookie)
+	beforeID := decodeSessionIdentifier(t, beforeCookie)
 
 	completeLevel1(t, httpClient, resp, user.Email, password)
 
-	afterId := decodeSessionIdentifier(t, requireSessionCookie(t, httpClient))
-	assert.NotEqual(t, beforeId, afterId,
+	afterID := decodeSessionIdentifier(t, requireSessionCookie(t, httpClient))
+	assert.NotEqual(t, beforeID, afterID,
 		"the identifier that existed before authentication must not name the session "+
 			"authentication produced")
 
-	assertIdentifierIsNotSignedIn(t, beforeCookie, client, redirectUri)
+	assertIdentifierIsNotSignedIn(t, beforeCookie, client, redirectURI)
 }
 
 // TestBrowserSession_IdentifierRotatesWhenThePasswordIsVerified pins where the replacement
@@ -153,11 +153,11 @@ func TestBrowserSession_IdentifierRotatesAtSignIn(t *testing.T) {
 // it would pass with this rotation deleted, because the one at /auth/completed would cover
 // for it (#266 decision 20).
 func TestBrowserSession_IdentifierRotatesWhenThePasswordIsVerified(t *testing.T) {
-	client, redirectUri, user, password := newLevel1Actors(t)
+	client, redirectURI, user, password := newLevel1Actors(t)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
-	resp := beginAuthorize(t, httpClient, client, redirectUri)
+	resp := beginAuthorize(t, httpClient, client, redirectURI)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation := assertRedirect(t, resp, "/auth/level1")
@@ -171,15 +171,15 @@ func TestBrowserSession_IdentifierRotatesWhenThePasswordIsVerified(t *testing.T)
 	// What the browser carries into the password POST, and what a planting attacker holds
 	// a copy of.
 	plantedCookie := requireSessionCookie(t, httpClient)
-	plantedId := decodeSessionIdentifier(t, plantedCookie)
+	plantedID := decodeSessionIdentifier(t, plantedCookie)
 
 	resp = authenticateWithPassword(t, httpClient, redirectLocation, resp, user.Email, password)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	verifiedLocation := assertRedirect(t, resp, "/auth/level1completed")
 
-	verifiedId := decodeSessionIdentifier(t, requireSessionCookie(t, httpClient))
-	assert.NotEqual(t, plantedId, verifiedId,
+	verifiedID := decodeSessionIdentifier(t, requireSessionCookie(t, httpClient))
+	assert.NotEqual(t, plantedID, verifiedID,
 		"the identifier must be replaced when the password is accepted, not one redirect later")
 
 	// And the replacement invalidated the old handle rather than issuing a new one beside
@@ -187,7 +187,7 @@ func TestBrowserSession_IdentifierRotatesWhenThePasswordIsVerified(t *testing.T)
 	// the victim's password just unlocked: /auth/level1completed finds no auth context
 	// under that identifier and sends it to the account profile, instead of onward to
 	// /auth/completed where the session would have been minted for it.
-	replay := createHttpClient(t)
+	replay := createHTTPClient(t)
 	baseURL, err := url.Parse(appConfig.AuthServer.BaseURL)
 	require.NoError(t, err)
 	replay.Jar.SetCookies(baseURL, []*http.Cookie{plantedCookie})
@@ -213,7 +213,7 @@ func TestBrowserSession_IdentifierRotatesWhenThePasswordIsVerified(t *testing.T)
 // names a session that is already level 2. The handler decides from the pre-bump session
 // and rotates first.
 func TestBrowserSession_IdentifierRotatesAtStepUp(t *testing.T) {
-	level1Client, level1RedirectUri, user, password := newLevel1Actors(t)
+	level1Client, level1RedirectURI, user, password := newLevel1Actors(t)
 
 	// The same person, with an authenticator already enrolled, so the second ceremony is a
 	// step-up on the session the first one created rather than a fresh sign-in.
@@ -222,19 +222,19 @@ func TestBrowserSession_IdentifierRotatesAtStepUp(t *testing.T) {
 	user.OTPEnabled = true
 	require.NoError(t, database.UpdateUser(context.Background(), nil, user))
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
-	resp := beginAuthorize(t, httpClient, level1Client, level1RedirectUri)
+	resp := beginAuthorize(t, httpClient, level1Client, level1RedirectURI)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 	completeLevel1(t, httpClient, resp, user.Email, password)
 
 	level1Cookie := requireSessionCookie(t, httpClient)
-	level1Id := decodeSessionIdentifier(t, level1Cookie)
+	level1ID := decodeSessionIdentifier(t, level1Cookie)
 
 	// A second client, wanting level 2 from the same browser.
-	level2Client, level2RedirectUri := newClientAndRedirectUri(t, record.AcrLevel2Mandatory)
+	level2Client, level2RedirectURI := newClientAndRedirectURI(t, record.ACRLevel2Mandatory)
 
-	resp = beginAuthorize(t, httpClient, level2Client, level2RedirectUri)
+	resp = beginAuthorize(t, httpClient, level2Client, level2RedirectURI)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	// The browser arrives with a valid session, so /auth/authorize skips the password entry
@@ -254,10 +254,10 @@ func TestBrowserSession_IdentifierRotatesAtStepUp(t *testing.T) {
 
 	// Nothing has rotated since the level 1 ceremony ended, so this is still the
 	// identifier the browser was reachable by at level 1.
-	beforeOtpId := decodeSessionIdentifier(t, requireSessionCookie(t, httpClient))
+	beforeOTPID := decodeSessionIdentifier(t, requireSessionCookie(t, httpClient))
 
 	otpCode := otptest.Code(t, otpSecret, time.Now())
-	resp = authenticateWithOtp(t, httpClient, redirectLocation, resp, otpCode)
+	resp = authenticateWithOTP(t, httpClient, redirectLocation, resp, otpCode)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
@@ -268,18 +268,18 @@ func TestBrowserSession_IdentifierRotatesAtStepUp(t *testing.T) {
 	// has not rotated at all, which is what makes the window real. Reading the cookie after
 	// /auth/completed would pass with this rotation deleted, because the step-up rotation
 	// there would cover for it.
-	assert.NotEqual(t, beforeOtpId, decodeSessionIdentifier(t, requireSessionCookie(t, httpClient)),
+	assert.NotEqual(t, beforeOTPID, decodeSessionIdentifier(t, requireSessionCookie(t, httpClient)),
 		"accepting an authenticator code must replace the identifier, not defer it to /auth/completed")
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
 	assertRedirect(t, resp, "/auth/issue")
 
-	steppedUpId := decodeSessionIdentifier(t, requireSessionCookie(t, httpClient))
-	assert.NotEqual(t, level1Id, steppedUpId,
+	steppedUpID := decodeSessionIdentifier(t, requireSessionCookie(t, httpClient))
+	assert.NotEqual(t, level1ID, steppedUpID,
 		"stepping a session up to level 2 must replace the identifier it was reachable by at level 1")
 
-	assertIdentifierIsNotSignedIn(t, level1Cookie, level1Client, level1RedirectUri)
+	assertIdentifierIsNotSignedIn(t, level1Cookie, level1Client, level1RedirectURI)
 }
 
 // TestBrowserSession_LogoutLeavesNoUsableSession is OWASP's "the web application must take
@@ -291,7 +291,7 @@ func TestBrowserSession_IdentifierRotatesAtStepUp(t *testing.T) {
 // Observed the only way a user could: sign in, log out, ask to authorize again, and be
 // asked for the password.
 func TestBrowserSession_LogoutLeavesNoUsableSession(t *testing.T) {
-	httpClient, client, redirectUri, _ := createSessionWithAcrLevel1(t)
+	httpClient, client, redirectURI, _ := createSessionWithACRLevel1(t)
 
 	// The GET renders the consent page, because RP-Initiated Logout 1.0 section 2 makes the
 	// OP ask when no id_token_hint was supplied. The confirming POST is the logout, and it
@@ -304,7 +304,7 @@ func TestBrowserSession_LogoutLeavesNoUsableSession(t *testing.T) {
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
-	resp = beginAuthorize(t, httpClient, client, redirectUri)
+	resp = beginAuthorize(t, httpClient, client, redirectURI)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation := assertRedirect(t, resp, "/auth/level1")
@@ -396,15 +396,15 @@ func decodeSessionIdentifier(t *testing.T, cookie *http.Cookie) string {
 // and checks the server does not treat it as a session. This is the assertion that says a
 // rotation invalidated the old handle rather than issuing a new one beside it.
 func assertIdentifierIsNotSignedIn(t *testing.T, cookie *http.Cookie,
-	client *record.Client, redirectUri *record.RedirectURI) {
+	client *record.Client, redirectURI *record.RedirectURI) {
 	t.Helper()
 
-	replay := createHttpClient(t)
+	replay := createHTTPClient(t)
 	baseURL, err := url.Parse(appConfig.AuthServer.BaseURL)
 	require.NoError(t, err)
 	replay.Jar.SetCookies(baseURL, []*http.Cookie{cookie})
 
-	resp := beginAuthorize(t, replay, client, redirectUri)
+	resp := beginAuthorize(t, replay, client, redirectURI)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation := assertRedirect(t, resp, "/auth/level1")
@@ -419,7 +419,7 @@ func assertIdentifierIsNotSignedIn(t *testing.T, cookie *http.Cookie,
 func newLevel1Actors(t *testing.T) (*record.Client, *record.RedirectURI, *record.User, string) {
 	t.Helper()
 
-	client, redirectUri := newClientAndRedirectUri(t, record.AcrLevel1)
+	client, redirectURI := newClientAndRedirectURI(t, record.ACRLevel1)
 
 	password := fake.Password(8)
 	passwordHashed, err := passwordhash.Hash(password)
@@ -433,10 +433,10 @@ func newLevel1Actors(t *testing.T) (*record.Client, *record.RedirectURI, *record
 	}
 	require.NoError(t, database.CreateUser(context.Background(), nil, user))
 
-	return client, redirectUri, user, password
+	return client, redirectURI, user, password
 }
 
-func newClientAndRedirectUri(t *testing.T, acrLevel record.AcrLevel) (*record.Client, *record.RedirectURI) {
+func newClientAndRedirectURI(t *testing.T, acrLevel record.ACRLevel) (*record.Client, *record.RedirectURI) {
 	t.Helper()
 
 	client := &record.Client{
@@ -444,22 +444,22 @@ func newClientAndRedirectUri(t *testing.T, acrLevel record.AcrLevel) (*record.Cl
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          acrLevel,
+		DefaultACRLevel:          acrLevel,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
 
-	redirectUri := &record.RedirectURI{ClientId: client.Id, URI: fake.URL()}
-	require.NoError(t, database.CreateRedirectURI(context.Background(), nil, redirectUri))
+	redirectURI := &record.RedirectURI{ClientID: client.ID, URI: fake.URL()}
+	require.NoError(t, database.CreateRedirectURI(context.Background(), nil, redirectURI))
 
-	return client, redirectUri
+	return client, redirectURI
 }
 
 func beginAuthorize(t *testing.T, httpClient *http.Client,
-	client *record.Client, redirectUri *record.RedirectURI) *http.Response {
+	client *record.Client, redirectURI *record.RedirectURI) *http.Response {
 	t.Helper()
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + randomCodeChallenge() +
@@ -467,7 +467,7 @@ func beginAuthorize(t *testing.T, httpClient *http.Client,
 		"&state=" + fake.LetterN(8) +
 		"&nonce=" + fake.LetterN(8)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	require.NoError(t, err)
 	return resp
 }

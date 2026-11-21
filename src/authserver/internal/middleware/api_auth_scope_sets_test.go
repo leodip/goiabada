@@ -40,7 +40,7 @@ func TestRequireBearerTokenScopeSetAnyOf_TheUserExportsSets(t *testing.T) {
 		{"", false},
 	} {
 		t.Run(c.scope, func(t *testing.T) {
-			token := oauth.JwtToken{Claims: map[string]interface{}{"scope": c.scope}}
+			token := oauth.JWTToken{Claims: map[string]interface{}{"scope": c.scope}}
 			req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/users/42/export", nil)
 			req = req.WithContext(reqctx.WithBearerToken(req.Context(), token))
 			rr := httptest.NewRecorder()

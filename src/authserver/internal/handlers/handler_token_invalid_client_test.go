@@ -36,7 +36,7 @@ func TestHandleTokenPost_InvalidClientOnTheWire(t *testing.T) {
 	require.NoError(t, err)
 
 	confidential := func(enabled bool) *record.Client {
-		return &record.Client{Id: 7, ClientIdentifier: "the_client", Enabled: enabled,
+		return &record.Client{ID: 7, ClientIdentifier: "the_client", Enabled: enabled,
 			ClientCredentialsEnabled: true, ClientSecretEncrypted: encryptedSecret}
 	}
 

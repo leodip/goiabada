@@ -119,7 +119,7 @@ func TestValidateTokenRequest_CodeGrantAccountStateAfterProof(t *testing.T) {
 				clientSecretEncrypted, err := testDataCipher.Encrypt(clientSecret)
 				require.NoError(t, err)
 				client := &record.Client{
-					Id:                       1,
+					ID:                       1,
 					ClientIdentifier:         "client1",
 					Enabled:                  true,
 					AuthorizationCodeEnabled: true,
@@ -134,9 +134,9 @@ func TestValidateTokenRequest_CodeGrantAccountStateAfterProof(t *testing.T) {
 					RedirectURI:         redirectURI,
 					CodeChallenge:       sql.NullString{String: oauth.GeneratePKCECodeChallenge(verifier), Valid: true},
 					AuthStateGeneration: 3,
-					UserId:              7,
+					UserID:              7,
 					Client:              record.Client{ClientIdentifier: "client1"},
-					User:                record.User{Id: 7, Enabled: true, AuthStateGeneration: 3},
+					User:                record.User{ID: 7, Enabled: true, AuthStateGeneration: 3},
 					CreatedAt:           sql.NullTime{Time: time.Now().UTC(), Valid: true},
 				}
 				switch state {
@@ -158,7 +158,7 @@ func TestValidateTokenRequest_CodeGrantAccountStateAfterProof(t *testing.T) {
 				grant, err := validator.ValidateTokenRequest(context.Background(), &record.Settings{},
 					&ValidateTokenRequestInput{
 						GrantType:    "authorization_code",
-						ClientId:     "client1",
+						ClientID:     "client1",
 						ClientSecret: p.clientSecret,
 						Code:         "valid_code",
 						RedirectURI:  redirectURI,
@@ -240,15 +240,15 @@ func TestValidateTokenRequest_RefreshGrantAccountStateAfterProof(t *testing.T) {
 					require.NoError(t, err)
 					clients := map[string]*record.Client{
 						// The token's own client, confidential.
-						"client1": {Id: 1, ClientIdentifier: "client1", Enabled: true,
+						"client1": {ID: 1, ClientIdentifier: "client1", Enabled: true,
 							AuthorizationCodeEnabled: true, ClientSecretEncrypted: clientSecretEncrypted},
 						// Any public client: it authenticates with nothing, which is what
 						// makes the ownership check the whole of the proof for it.
-						"client2": {Id: 2, ClientIdentifier: "client2", Enabled: true,
+						"client2": {ID: 2, ClientIdentifier: "client2", Enabled: true,
 							AuthorizationCodeEnabled: true, IsPublic: true},
 					}
 
-					user := record.User{Id: 7, Enabled: true, AuthStateGeneration: 3}
+					user := record.User{ID: 7, Enabled: true, AuthStateGeneration: 3}
 					switch state {
 					case stateDisabled:
 						user.Enabled = false
@@ -256,21 +256,21 @@ func TestValidateTokenRequest_RefreshGrantAccountStateAfterProof(t *testing.T) {
 						user.AuthStateGeneration = 4
 					}
 
-					refreshToken := &record.RefreshToken{RefreshTokenJti: "the_jti", AuthStateGeneration: 3}
+					refreshToken := &record.RefreshToken{RefreshTokenJTI: "the_jti", AuthStateGeneration: 3}
 					if ropc {
-						refreshToken.ClientId = sql.NullInt64{Int64: 1, Valid: true}
-						refreshToken.UserId = sql.NullInt64{Int64: 7, Valid: true}
+						refreshToken.ClientID = sql.NullInt64{Int64: 1, Valid: true}
+						refreshToken.UserID = sql.NullInt64{Int64: 7, Valid: true}
 						refreshToken.User = user
 					} else {
-						refreshToken.CodeId = sql.NullInt64{Int64: 11, Valid: true}
-						refreshToken.Code = record.Code{Id: 11, ClientId: 1, UserId: 7, User: user}
+						refreshToken.CodeID = sql.NullInt64{Int64: 11, Valid: true}
+						refreshToken.Code = record.Code{ID: 11, ClientID: 1, UserID: 7, User: user}
 					}
 
 					mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, p.clientIdentifier).
 						Return(clients[p.clientIdentifier], nil).Once()
 					mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "the_refresh_token", true).
-						Return(&oauth.JwtToken{Claims: jwt.MapClaims{"jti": "the_jti", "typ": "Refresh"}}, nil).Maybe()
-					mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "the_jti").Return(refreshToken, nil).Maybe()
+						Return(&oauth.JWTToken{Claims: jwt.MapClaims{"jti": "the_jti", "typ": "Refresh"}}, nil).Maybe()
+					mockDB.On("GetRefreshTokenByJTI", mock.Anything, mock.Anything, "the_jti").Return(refreshToken, nil).Maybe()
 					mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 					if ropc {
 						mockDB.On("RefreshTokenLoadUser", mock.Anything, mock.Anything, refreshToken).Return(nil).Maybe()
@@ -283,7 +283,7 @@ func TestValidateTokenRequest_RefreshGrantAccountStateAfterProof(t *testing.T) {
 					grant, err := validator.ValidateTokenRequest(context.Background(), &record.Settings{},
 						&ValidateTokenRequestInput{
 							GrantType:    "refresh_token",
-							ClientId:     p.clientIdentifier,
+							ClientID:     p.clientIdentifier,
 							ClientSecret: p.clientSecret,
 							RefreshToken: "the_refresh_token",
 						})

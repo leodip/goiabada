@@ -56,7 +56,7 @@ func TestKeepSignedIn_FollowsTheSettingAndUnderLetEachUserChooseTheRecordedAnswe
 
 			require.NoError(t, err)
 			assert.Equal(t, test.want, keep)
-			database.AssertNotCalled(t, "GetSettingsById", mock.Anything, mock.Anything, mock.Anything)
+			database.AssertNotCalled(t, "GetSettingsByID", mock.Anything, mock.Anything, mock.Anything)
 		})
 	}
 }
@@ -66,7 +66,7 @@ func TestKeepSignedIn_FollowsTheSettingAndUnderLetEachUserChooseTheRecordedAnswe
 func TestKeepSignedIn_ReadsTheSettingsRowWithoutARequestValue(t *testing.T) {
 	t.Run("the row's mode decides", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
-		database.EXPECT().GetSettingsById(mock.Anything, (*sql.Tx)(nil), int64(1)).
+		database.EXPECT().GetSettingsByID(mock.Anything, (*sql.Tx)(nil), int64(1)).
 			Return(&record.Settings{KeepSignedIn: record.KeepSignedInNever}, nil)
 
 		keep, err := NewKeepSignedIn(database)(context.Background(),
@@ -79,7 +79,7 @@ func TestKeepSignedIn_ReadsTheSettingsRowWithoutARequestValue(t *testing.T) {
 	t.Run("a failed read is an error", func(t *testing.T) {
 		cause := errors.New("settings failed")
 		database := datamocks.NewDatabase(t)
-		database.EXPECT().GetSettingsById(mock.Anything, (*sql.Tx)(nil), int64(1)).Return(nil, cause)
+		database.EXPECT().GetSettingsByID(mock.Anything, (*sql.Tx)(nil), int64(1)).Return(nil, cause)
 
 		_, err := NewKeepSignedIn(database)(context.Background(), map[string]any{})
 
@@ -88,7 +88,7 @@ func TestKeepSignedIn_ReadsTheSettingsRowWithoutARequestValue(t *testing.T) {
 
 	t.Run("a missing row is an error", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
-		database.EXPECT().GetSettingsById(mock.Anything, (*sql.Tx)(nil), int64(1)).Return(nil, nil)
+		database.EXPECT().GetSettingsByID(mock.Anything, (*sql.Tx)(nil), int64(1)).Return(nil, nil)
 
 		_, err := NewKeepSignedIn(database)(context.Background(), map[string]any{})
 

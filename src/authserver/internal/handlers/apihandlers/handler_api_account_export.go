@@ -57,7 +57,7 @@ func HandleAccountExportGet(database accountExportDatabase, auditLogger AuditLog
 
 		document, err := buildUserExport(r.Context(), database, user, settings, baseURL, time.Now())
 		if err != nil {
-			writeInternalServerError(w, r, err, "user_id", user.Id)
+			writeInternalServerError(w, r, err, "user_id", user.ID)
 			return
 		}
 		if !writeUserExport(w, r, document) {
@@ -65,7 +65,7 @@ func HandleAccountExportGet(database accountExportDatabase, auditLogger AuditLog
 		}
 
 		auditLogger.Log(r.Context(), audit.EventExportedOwnUserData, map[string]interface{}{
-			"user_id":        user.Id,
+			"user_id":        user.ID,
 			"logged_in_user": subject,
 		})
 	}

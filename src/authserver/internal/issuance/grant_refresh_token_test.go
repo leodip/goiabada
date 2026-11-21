@@ -27,7 +27,7 @@ func TestMintCodeRefreshTokens(t *testing.T) {
 		TokenExpirationInSeconds:                600,
 		UserSessionIdleTimeoutInSeconds:         1200, // 20 minutes
 		UserSessionMaxLifetimeInSeconds:         2400, // 40 minutes
-		IncludeOpenIDConnectClaimsInIdToken:     true,
+		IncludeOpenIDConnectClaimsInIDToken:     true,
 		IncludeOpenIDConnectClaimsInAccessToken: true,
 	}
 
@@ -41,23 +41,23 @@ func TestMintCodeRefreshTokens(t *testing.T) {
 	publicKeyBytes := getTestPublicKey(t)
 
 	code := &record.Code{
-		Id:                1,
-		ClientId:          1,
-		UserId:            1,
+		ID:                1,
+		ClientID:          1,
+		UserID:            1,
 		Scope:             "openid profile resource1:read",
 		Nonce:             "test-nonce",
 		AuthenticatedAt:   now.Add(-5 * time.Minute),
 		SessionIdentifier: sessionIdentifier,
-		AcrLevel:          "urn:goiabada:pwd",
+		ACRLevel:          "urn:goiabada:pwd",
 		AuthMethods:       "pwd",
 	}
 	client := &record.Client{
-		Id:                       1,
+		ID:                       1,
 		ClientIdentifier:         "test-client",
 		TokenExpirationInSeconds: 900,
 	}
 	user := &record.User{
-		Id:            1,
+		ID:            1,
 		Subject:       sub,
 		Email:         "test@example.com",
 		EmailVerified: true,
@@ -68,9 +68,9 @@ func TestMintCodeRefreshTokens(t *testing.T) {
 	}
 
 	refreshToken := &record.RefreshToken{
-		Id:                   1,
-		RefreshTokenJti:      "existing-jti",
-		FirstRefreshTokenJti: "first-jti",
+		ID:                   1,
+		RefreshTokenJTI:      "existing-jti",
+		FirstRefreshTokenJTI: "first-jti",
 		MaxLifetime:          sql.NullTime{Time: now.Add(24 * time.Hour), Valid: true},
 		Scope:                "openid profile resource1:read",
 	}
@@ -82,7 +82,7 @@ func TestMintCodeRefreshTokens(t *testing.T) {
 	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, &code.User).Return(nil)
 	mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything, code.User.Groups).Return(nil)
 	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, &code.User).Return(nil)
-	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.Id).Return(false, nil)
+	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.ID).Return(false, nil)
 	var capturedRefreshToken *record.RefreshToken
 	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*record.RefreshToken")).
 		Run(func(args mock.Arguments) {
@@ -95,8 +95,8 @@ func TestMintCodeRefreshTokens(t *testing.T) {
 	}, nil)
 	// Add the missing mock expectation
 	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(&record.UserSession{
-		Id:           1,
-		UserId:       1,
+		ID:           1,
+		UserID:       1,
 		Started:      now.Add(-30 * time.Minute),
 		LastAccessed: now.Add(-5 * time.Minute),
 	}, nil)
@@ -109,19 +109,19 @@ func TestMintCodeRefreshTokens(t *testing.T) {
 	assert.Equal(t, "Bearer", response.TokenType)
 	assert.Equal(t, int64(900), response.ExpiresIn) // client override
 	assert.NotEmpty(t, response.AccessToken)
-	assert.NotEmpty(t, response.IdToken)
+	assert.NotEmpty(t, response.IDToken)
 	assert.NotEmpty(t, response.RefreshToken)
 	assert.Equal(t, "openid profile resource1:read", response.Scope)
 	assertCountdown(t, response.RefreshExpiresIn, 600, now, after, "remaining time based on session max lifetime")
 
-	// validate Id token --------------------------------------------
+	// validate ID token --------------------------------------------
 
-	idClaims := verifyAndDecodeToken(t, response.IdToken, publicKeyBytes)
+	idClaims := verifyAndDecodeToken(t, response.IDToken, publicKeyBytes)
 	assert.Equal(t, settings.Issuer, idClaims["iss"])
 	assert.Equal(t, user.Subject, idClaims["sub"])
 	assert.Equal(t, client.ClientIdentifier, idClaims["aud"])
 	assert.NotContains(t, idClaims, "nonce", "a refreshed ID token has no nonce (OpenID Connect Core 1.0 section 12.2)")
-	assert.Equal(t, code.AcrLevel.String(), idClaims["acr"])
+	assert.Equal(t, code.ACRLevel.String(), idClaims["acr"])
 	assert.ElementsMatch(t, strings.Fields(code.AuthMethods), idClaims["amr"])
 	assert.Equal(t, sessionIdentifier, idClaims["sid"])
 	assertTimeClaimWithinRange(t, idClaims, "auth_time", -300*time.Second, testStart, "auth_time should be 300 seconds ago")
@@ -144,7 +144,7 @@ func TestMintCodeRefreshTokens(t *testing.T) {
 	assert.Equal(t, user.Subject, accessClaims["sub"])
 	assert.ElementsMatch(t, []string{builtin.AuthServerResourceIdentifier, "resource1"}, accessClaims["aud"])
 	assert.NotContains(t, accessClaims, "nonce", "no access token carries the sign-in's nonce")
-	assert.Equal(t, code.AcrLevel.String(), accessClaims["acr"])
+	assert.Equal(t, code.ACRLevel.String(), accessClaims["acr"])
 	assert.ElementsMatch(t, strings.Fields(code.AuthMethods), accessClaims["amr"])
 	assert.Equal(t, sessionIdentifier, accessClaims["sid"])
 	assert.Equal(t, "Bearer", accessClaims["typ"])
@@ -184,11 +184,11 @@ func TestMintCodeRefreshTokens(t *testing.T) {
 	// RFC 6749 Section 6: New refresh token scope MUST be identical to original refresh token's scope
 
 	assert.NotNil(t, capturedRefreshToken)
-	assert.True(t, capturedRefreshToken.CodeId.Valid)
-	assert.Equal(t, code.Id, capturedRefreshToken.CodeId.Int64)
-	assert.NotEmpty(t, capturedRefreshToken.RefreshTokenJti)
-	assert.Equal(t, refreshToken.FirstRefreshTokenJti, capturedRefreshToken.FirstRefreshTokenJti)
-	assert.Equal(t, refreshToken.RefreshTokenJti, capturedRefreshToken.PreviousRefreshTokenJti)
+	assert.True(t, capturedRefreshToken.CodeID.Valid)
+	assert.Equal(t, code.ID, capturedRefreshToken.CodeID.Int64)
+	assert.NotEmpty(t, capturedRefreshToken.RefreshTokenJTI)
+	assert.Equal(t, refreshToken.FirstRefreshTokenJTI, capturedRefreshToken.FirstRefreshTokenJTI)
+	assert.Equal(t, refreshToken.RefreshTokenJTI, capturedRefreshToken.PreviousRefreshTokenJTI)
 	assert.Equal(t, "Refresh", capturedRefreshToken.RefreshTokenType)
 	assert.Equal(t, "openid profile resource1:read", capturedRefreshToken.Scope)
 	assert.Equal(t, sessionIdentifier, capturedRefreshToken.SessionIdentifier)
@@ -203,7 +203,7 @@ func TestMintCodeRefreshTokens(t *testing.T) {
 	mockDB.AssertExpectations(t)
 }
 
-func TestMintCodeRefreshTokens_Offline_NoIdToken(t *testing.T) {
+func TestMintCodeRefreshTokens_Offline_NoIDToken(t *testing.T) {
 	testStart := time.Now().UTC()
 	mockDB := datamocks.NewDatabase(t)
 	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, nil)
@@ -226,25 +226,25 @@ func TestMintCodeRefreshTokens_Offline_NoIdToken(t *testing.T) {
 	publicKeyBytes := getTestPublicKey(t)
 
 	code := &record.Code{
-		Id:                1,
-		ClientId:          1,
-		UserId:            1,
+		ID:                1,
+		ClientID:          1,
+		UserID:            1,
 		Scope:             "openid profile offline_access",
 		Nonce:             "test-nonce-offline",
 		AuthenticatedAt:   now.Add(-10 * time.Minute),
 		SessionIdentifier: sessionIdentifier,
-		AcrLevel:          "urn:goiabada:pwd",
+		ACRLevel:          "urn:goiabada:pwd",
 		AuthMethods:       "pwd",
 	}
 	client := &record.Client{
-		Id:                                      1,
+		ID:                                      1,
 		ClientIdentifier:                        "test-client-offline",
 		TokenExpirationInSeconds:                1200,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 7200,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 172800,
 	}
 	user := &record.User{
-		Id:            1,
+		ID:            1,
 		Subject:       sub,
 		Email:         "test@example.com",
 		EmailVerified: true,
@@ -255,9 +255,9 @@ func TestMintCodeRefreshTokens_Offline_NoIdToken(t *testing.T) {
 	}
 
 	refreshToken := &record.RefreshToken{
-		Id:                   1,
-		RefreshTokenJti:      "existing-jti-offline",
-		FirstRefreshTokenJti: "first-jti-offline",
+		ID:                   1,
+		RefreshTokenJTI:      "existing-jti-offline",
+		FirstRefreshTokenJTI: "first-jti-offline",
 		MaxLifetime:          sql.NullTime{Time: now.Add(48 * time.Hour), Valid: true},
 		Scope:                "openid profile offline_access",
 		// Set explicitly. Without it this fixture was an empty string, which production
@@ -296,7 +296,7 @@ func TestMintCodeRefreshTokens_Offline_NoIdToken(t *testing.T) {
 	assert.Equal(t, "Bearer", response.TokenType)
 	assert.Equal(t, int64(1200), response.ExpiresIn)
 	assert.NotEmpty(t, response.AccessToken)
-	assert.Empty(t, response.IdToken)
+	assert.Empty(t, response.IDToken)
 	assert.NotEmpty(t, response.RefreshToken)
 	assert.Equal(t, "resource1:write offline_access", response.Scope)
 	assert.Equal(t, int64(7200), response.RefreshExpiresIn)
@@ -309,7 +309,7 @@ func TestMintCodeRefreshTokens_Offline_NoIdToken(t *testing.T) {
 	// offline_access names authserver (#676 decision 3).
 	assert.Equal(t, []interface{}{"resource1", "authserver"}, accessClaims["aud"])
 	assert.NotContains(t, accessClaims, "nonce", "no access token carries the sign-in's nonce")
-	assert.Equal(t, code.AcrLevel.String(), accessClaims["acr"])
+	assert.Equal(t, code.ACRLevel.String(), accessClaims["acr"])
 	assert.ElementsMatch(t, strings.Fields(code.AuthMethods), accessClaims["amr"])
 	// Reversed: the parent is genuinely Offline now, so no sid. An offline grant outlives
 	// the browser session, and this is the public entry point proving the suppression is
@@ -349,11 +349,11 @@ func TestMintCodeRefreshTokens_Offline_NoIdToken(t *testing.T) {
 	// RFC 6749 Section 6: New refresh token scope MUST be identical to original refresh token's scope
 
 	assert.NotNil(t, capturedRefreshToken)
-	assert.True(t, capturedRefreshToken.CodeId.Valid)
-	assert.Equal(t, code.Id, capturedRefreshToken.CodeId.Int64)
-	assert.NotEmpty(t, capturedRefreshToken.RefreshTokenJti)
-	assert.Equal(t, refreshToken.FirstRefreshTokenJti, capturedRefreshToken.FirstRefreshTokenJti)
-	assert.Equal(t, refreshToken.RefreshTokenJti, capturedRefreshToken.PreviousRefreshTokenJti)
+	assert.True(t, capturedRefreshToken.CodeID.Valid)
+	assert.Equal(t, code.ID, capturedRefreshToken.CodeID.Int64)
+	assert.NotEmpty(t, capturedRefreshToken.RefreshTokenJTI)
+	assert.Equal(t, refreshToken.FirstRefreshTokenJTI, capturedRefreshToken.FirstRefreshTokenJTI)
+	assert.Equal(t, refreshToken.RefreshTokenJTI, capturedRefreshToken.PreviousRefreshTokenJTI)
 	assert.Equal(t, "Offline", capturedRefreshToken.RefreshTokenType)
 	// The CHILD token inherits the parent's generation, not the code's. Same reason as the
 	// access-token assertion above: this is the seam the helper tables cannot reach.
@@ -394,23 +394,23 @@ func TestMintROPCRefreshTokens(t *testing.T) {
 	userSubject := fake.UUID()
 
 	user := &record.User{
-		Id:        1,
+		ID:        1,
 		Subject:   userSubject,
 		Email:     "ropc@example.com",
 		UpdatedAt: sql.NullTime{Time: now, Valid: true},
 	}
 
 	client := &record.Client{
-		Id:               1,
+		ID:               1,
 		ClientIdentifier: "ropc-client",
 	}
 
 	refreshToken := &record.RefreshToken{
-		Id:                   1,
-		RefreshTokenJti:      "original-jti",
-		FirstRefreshTokenJti: "first-jti",
-		UserId:               sql.NullInt64{Int64: user.Id, Valid: true},
-		ClientId:             sql.NullInt64{Int64: client.Id, Valid: true},
+		ID:                   1,
+		RefreshTokenJTI:      "original-jti",
+		FirstRefreshTokenJTI: "first-jti",
+		UserID:               sql.NullInt64{Int64: user.ID, Valid: true},
+		ClientID:             sql.NullInt64{Int64: client.ID, Valid: true},
 		Scope:                "openid email resource:read",
 		RefreshTokenType:     "Offline",
 		MaxLifetime:          sql.NullTime{Time: now.Add(86400 * time.Second), Valid: true},
@@ -451,7 +451,7 @@ func TestMintROPCRefreshTokens(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, response)
 	assert.NotEmpty(t, response.AccessToken)
-	assert.NotEmpty(t, response.IdToken)
+	assert.NotEmpty(t, response.IDToken)
 	assert.NotEmpty(t, response.RefreshToken)
 	assert.Equal(t, "Bearer", response.TokenType)
 
@@ -471,7 +471,7 @@ func TestMintROPCRefreshTokens(t *testing.T) {
 	assert.NotContains(t, accessClaims, "sid")
 
 	// Verify id token claims
-	idClaims := verifyAndDecodeToken(t, response.IdToken, publicKeyBytes)
+	idClaims := verifyAndDecodeToken(t, response.IDToken, publicKeyBytes)
 	assert.Equal(t, userSubject, idClaims["sub"])
 	assert.Equal(t, "ropc-client", idClaims["aud"])
 	assert.Equal(t, "urn:goiabada:level1", idClaims["acr"])
@@ -518,23 +518,23 @@ func TestMintROPCRefreshTokens_ScopeDowngrade(t *testing.T) {
 	userSubject := fake.UUID()
 
 	user := &record.User{
-		Id:        1,
+		ID:        1,
 		Subject:   userSubject,
 		Email:     "ropc@example.com",
 		UpdatedAt: sql.NullTime{Time: now, Valid: true},
 	}
 
 	client := &record.Client{
-		Id:               1,
+		ID:               1,
 		ClientIdentifier: "ropc-client",
 	}
 
 	refreshToken := &record.RefreshToken{
-		Id:                   1,
-		RefreshTokenJti:      "original-jti",
-		FirstRefreshTokenJti: "first-jti",
-		UserId:               sql.NullInt64{Int64: user.Id, Valid: true},
-		ClientId:             sql.NullInt64{Int64: client.Id, Valid: true},
+		ID:                   1,
+		RefreshTokenJTI:      "original-jti",
+		FirstRefreshTokenJTI: "first-jti",
+		UserID:               sql.NullInt64{Int64: user.ID, Valid: true},
+		ClientID:             sql.NullInt64{Int64: client.ID, Valid: true},
 		AuthenticatedAt:      sql.NullTime{Time: now.Add(-time.Hour), Valid: true},
 		Scope:                "openid email profile resource:read resource:write",
 		RefreshTokenType:     "Offline",
@@ -566,7 +566,7 @@ func TestMintROPCRefreshTokens_ScopeDowngrade(t *testing.T) {
 	assert.Equal(t, "resource:read", accessClaims["scope"])
 
 	// Should not have id_token since openid scope not requested
-	assert.Empty(t, response.IdToken)
+	assert.Empty(t, response.IDToken)
 
 	mockDB.AssertExpectations(t)
 }

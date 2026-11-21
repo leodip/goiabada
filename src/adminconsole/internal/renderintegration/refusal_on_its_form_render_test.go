@@ -112,7 +112,7 @@ func TestRender_AccountEmailVerification_ARefusalIsDrawnWhateverEmailsState(t *t
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			apiClient := &emailVerificationAPI{
-				profile: &api.UserResponse{Id: 11, Email: "someone@example.com", EmailVerified: tc.verified},
+				profile: &api.UserResponse{ID: 11, Email: "someone@example.com", EmailVerified: tc.verified},
 				refusal: tc.refusal,
 			}
 

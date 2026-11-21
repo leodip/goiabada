@@ -261,7 +261,7 @@ func seedUserEmail000047(t *testing.T, h *isolatedDB, n int, raw string) int64 {
 // loudly, at the read this test is about.
 func storedEmail000047(t *testing.T, h *isolatedDB, id int64) string {
 	t.Helper()
-	user, err := h.DB.GetUserById(context.Background(), nil, id)
+	user, err := h.DB.GetUserByID(context.Background(), nil, id)
 	require.NoErrorf(t, err, "read back users.id=%d", id)
 	require.NotNilf(t, user, "users.id=%d is gone; this migration deletes nothing", id)
 	return user.Email

@@ -116,7 +116,7 @@ func TestPasswordSubmission_Refusals(t *testing.T) {
 			// user sets a password, and bcrypt refuses an empty hash without doing any work
 			// (#681 decision 3).
 			name:           "account with no password",
-			user:           &record.User{Id: 31, Email: "alice@example.com", PasswordHash: "", Enabled: true},
+			user:           &record.User{ID: 31, Email: "alice@example.com", PasswordHash: "", Enabled: true},
 			email:          "alice@example.com",
 			password:       "a-guessed-password",
 			verifierAnswer: true,
@@ -129,7 +129,7 @@ func TestPasswordSubmission_Refusals(t *testing.T) {
 		},
 		{
 			name: "wrong password",
-			user: &record.User{Id: 31, Email: "alice@example.com",
+			user: &record.User{ID: 31, Email: "alice@example.com",
 				PasswordHash: "$2a$10$abcdefghijklmnopqrstuuVkFBHFf8f6TBkO6PkS5Lg2Y4LZHn8a2", Enabled: true},
 			email:          "alice@example.com",
 			password:       "a-wrong-password",
@@ -157,8 +157,8 @@ func TestPasswordSubmission_Refusals(t *testing.T) {
 
 			authContext := &ceremony.AuthContext{
 				AuthState:  ceremony.AuthStateLevel1Password,
-				CeremonyId: "ceremony-id",
-				ClientId:   "test-client",
+				CeremonyID: "ceremony-id",
+				ClientID:   "test-client",
 			}
 
 			result, err := operation.Run(context.Background(), browser, authContext, tt.email, tt.password, nil)
@@ -176,7 +176,7 @@ func TestPasswordSubmission_Refusals(t *testing.T) {
 			assert.Zero(t, browser.rotations)
 			assert.Empty(t, browser.saves)
 			assert.Equal(t, ceremony.AuthStateLevel1Password, authContext.AuthState)
-			assert.Zero(t, authContext.UserId)
+			assert.Zero(t, authContext.UserID)
 		})
 	}
 }
@@ -188,14 +188,14 @@ func TestPasswordSubmission_AcceptedWithTheConstructorsVerifier(t *testing.T) {
 	require.NoError(t, err)
 
 	database := &fakePasswordSubmissionDatabase{
-		user: &record.User{Id: 31, Email: "alice@example.com", PasswordHash: passwordHash, Enabled: true, Locale: "fr", PageLanguage: "pt-BR"},
+		user: &record.User{ID: 31, Email: "alice@example.com", PasswordHash: passwordHash, Enabled: true, Locale: "fr", PageLanguage: "pt-BR"},
 	}
 	auditLogger := &fakeAuditLogger{}
 	browser := &fakePasswordSubmissionBrowser{}
 	authContext := &ceremony.AuthContext{
 		AuthState:  ceremony.AuthStateLevel1Password,
-		CeremonyId: "ceremony-id",
-		ClientId:   "test-client",
+		CeremonyID: "ceremony-id",
+		ClientID:   "test-client",
 	}
 
 	result, err := NewPasswordSubmission(database, auditLogger).
@@ -225,10 +225,10 @@ func TestPasswordSubmission_SavesTheKeepMeSignedInAnswerWithThePassword(t *testi
 	for name, answer := range map[string]*bool{"ticked": &ticked, "unticked": &unticked, "no box": nil} {
 		t.Run(name, func(t *testing.T) {
 			database := &fakePasswordSubmissionDatabase{
-				user: &record.User{Id: 31, Email: "alice@example.com", PasswordHash: passwordHash, Enabled: true},
+				user: &record.User{ID: 31, Email: "alice@example.com", PasswordHash: passwordHash, Enabled: true},
 			}
 			browser := &fakePasswordSubmissionBrowser{}
-			authContext := &ceremony.AuthContext{AuthState: ceremony.AuthStateLevel1Password, CeremonyId: "ceremony-id"}
+			authContext := &ceremony.AuthContext{AuthState: ceremony.AuthStateLevel1Password, CeremonyID: "ceremony-id"}
 
 			result, err := NewPasswordSubmission(database, &fakeAuditLogger{}).
 				Run(context.Background(), browser, authContext, "alice@example.com", "the-right-password", answer)

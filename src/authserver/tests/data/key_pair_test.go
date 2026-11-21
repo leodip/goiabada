@@ -15,7 +15,7 @@ import (
 func TestCreateKeyPair(t *testing.T) {
 	keyPair := createKeyPairInState(t, record.KeyStateCurrent.String())
 
-	if keyPair.Id == 0 {
+	if keyPair.ID == 0 {
 		t.Error("Expected non-zero ID after creation")
 	}
 	if !keyPair.CreatedAt.Valid || keyPair.CreatedAt.Time.IsZero() {
@@ -25,7 +25,7 @@ func TestCreateKeyPair(t *testing.T) {
 		t.Error("Expected UpdatedAt to be set")
 	}
 
-	retrievedKeyPair, err := database.GetKeyPairById(context.Background(), nil, keyPair.Id)
+	retrievedKeyPair, err := database.GetKeyPairByID(context.Background(), nil, keyPair.ID)
 	if err != nil {
 		t.Fatalf("Failed to retrieve created key pair: %v", err)
 	}
@@ -50,7 +50,7 @@ func TestUpdateKeyPair(t *testing.T) {
 	keyPair.Algorithm = "ES256"
 	keyPair.PrivateKeyPEM = []byte(fake.Sentence(120))
 	keyPair.PublicKeyPEM = []byte(fake.Sentence(60))
-	keyPair.PublicKeyASN1_DER = []byte(fake.Sentence(40))
+	keyPair.PublicKeyASN1DER = []byte(fake.Sentence(40))
 	keyPair.PublicKeyJWK = []byte(fake.Sentence(50))
 
 	time.Sleep(timestampTick)
@@ -60,7 +60,7 @@ func TestUpdateKeyPair(t *testing.T) {
 		t.Fatalf("Failed to update key pair: %v", err)
 	}
 
-	updatedKeyPair, err := database.GetKeyPairById(context.Background(), nil, keyPair.Id)
+	updatedKeyPair, err := database.GetKeyPairByID(context.Background(), nil, keyPair.ID)
 	if err != nil {
 		t.Fatalf("Failed to retrieve updated key pair: %v", err)
 	}
@@ -84,8 +84,8 @@ func TestUpdateKeyPair(t *testing.T) {
 	if string(updatedKeyPair.PublicKeyPEM) != string(keyPair.PublicKeyPEM) {
 		t.Errorf("Expected PublicKeyPEM %s, got %s", keyPair.PublicKeyPEM, updatedKeyPair.PublicKeyPEM)
 	}
-	if string(updatedKeyPair.PublicKeyASN1_DER) != string(keyPair.PublicKeyASN1_DER) {
-		t.Errorf("Expected PublicKeyASN1_DER %s, got %s", keyPair.PublicKeyASN1_DER, updatedKeyPair.PublicKeyASN1_DER)
+	if string(updatedKeyPair.PublicKeyASN1DER) != string(keyPair.PublicKeyASN1DER) {
+		t.Errorf("Expected PublicKeyASN1DER %s, got %s", keyPair.PublicKeyASN1DER, updatedKeyPair.PublicKeyASN1DER)
 	}
 	if string(updatedKeyPair.PublicKeyJWK) != string(keyPair.PublicKeyJWK) {
 		t.Errorf("Expected PublicKeyJWK %s, got %s", keyPair.PublicKeyJWK, updatedKeyPair.PublicKeyJWK)
@@ -96,22 +96,22 @@ func TestUpdateKeyPair(t *testing.T) {
 	}
 }
 
-func TestGetKeyPairById(t *testing.T) {
+func TestGetKeyPairByID(t *testing.T) {
 	keyPair := createKeyPairInState(t, record.KeyStateCurrent.String())
 
-	retrievedKeyPair, err := database.GetKeyPairById(context.Background(), nil, keyPair.Id)
+	retrievedKeyPair, err := database.GetKeyPairByID(context.Background(), nil, keyPair.ID)
 	if err != nil {
 		t.Fatalf("Failed to get key pair by ID: %v", err)
 	}
 
 	compareKeyPairs(t, keyPair, retrievedKeyPair)
 
-	nonExistentKeyPair, err := database.GetKeyPairById(context.Background(), nil, 99999)
+	nonExistentKeyPair, err := database.GetKeyPairByID(context.Background(), nil, 99999)
 	if err != nil {
 		t.Errorf("Expected no error for non-existent key pair, got: %v", err)
 	}
 	if nonExistentKeyPair != nil {
-		t.Errorf("Expected nil for non-existent key pair, got a key pair with ID: %d", nonExistentKeyPair.Id)
+		t.Errorf("Expected nil for non-existent key pair, got a key pair with ID: %d", nonExistentKeyPair.ID)
 	}
 }
 
@@ -124,7 +124,7 @@ func TestGetAllSigningKeys(t *testing.T) {
 	}
 
 	for _, kp := range keyPairs {
-		deleteKeyPairErr := database.DeleteKeyPair(context.Background(), nil, kp.Id)
+		deleteKeyPairErr := database.DeleteKeyPair(context.Background(), nil, kp.ID)
 		if deleteKeyPairErr != nil {
 			t.Fatalf("Failed to delete key pair: %v", deleteKeyPairErr)
 		}
@@ -150,10 +150,10 @@ func TestGetAllSigningKeys(t *testing.T) {
 	foundKeyPair1 := false
 	foundKeyPair2 := false
 	for _, kp := range keyPairs {
-		if kp.Id == keyPair1.Id {
+		if kp.ID == keyPair1.ID {
 			foundKeyPair1 = true
 		}
-		if kp.Id == keyPair2.Id {
+		if kp.ID == keyPair2.ID {
 			foundKeyPair2 = true
 		}
 	}
@@ -171,7 +171,7 @@ func TestGetCurrentSigningKey(t *testing.T) {
 	}
 
 	for _, kp := range keyPairs {
-		deleteKeyPairErr := database.DeleteKeyPair(context.Background(), nil, kp.Id)
+		deleteKeyPairErr := database.DeleteKeyPair(context.Background(), nil, kp.ID)
 		if deleteKeyPairErr != nil {
 			t.Fatalf("Failed to delete key pair: %v", deleteKeyPairErr)
 		}
@@ -203,12 +203,12 @@ func TestGetCurrentSigningKey(t *testing.T) {
 func TestDeleteKeyPair(t *testing.T) {
 	keyPair := createKeyPairInState(t, record.KeyStateCurrent.String())
 
-	err := database.DeleteKeyPair(context.Background(), nil, keyPair.Id)
+	err := database.DeleteKeyPair(context.Background(), nil, keyPair.ID)
 	if err != nil {
 		t.Fatalf("Failed to delete key pair: %v", err)
 	}
 
-	deletedKeyPair, err := database.GetKeyPairById(context.Background(), nil, keyPair.Id)
+	deletedKeyPair, err := database.GetKeyPairByID(context.Background(), nil, keyPair.ID)
 	if err != nil {
 		t.Fatalf("Error while checking for deleted key pair: %v", err)
 	}
@@ -223,8 +223,8 @@ func TestDeleteKeyPair(t *testing.T) {
 }
 
 func compareKeyPairs(t *testing.T, expected, actual *record.KeyPair) {
-	if actual.Id != expected.Id {
-		t.Errorf("Expected ID %d, got %d", expected.Id, actual.Id)
+	if actual.ID != expected.ID {
+		t.Errorf("Expected ID %d, got %d", expected.ID, actual.ID)
 	}
 	if actual.State != expected.State {
 		t.Errorf("Expected State %s, got %s", expected.State, actual.State)
@@ -244,8 +244,8 @@ func compareKeyPairs(t *testing.T, expected, actual *record.KeyPair) {
 	if string(actual.PublicKeyPEM) != string(expected.PublicKeyPEM) {
 		t.Errorf("Expected PublicKeyPEM %s, got %s", expected.PublicKeyPEM, actual.PublicKeyPEM)
 	}
-	if string(actual.PublicKeyASN1_DER) != string(expected.PublicKeyASN1_DER) {
-		t.Errorf("Expected PublicKeyASN1_DER %s, got %s", expected.PublicKeyASN1_DER, actual.PublicKeyASN1_DER)
+	if string(actual.PublicKeyASN1DER) != string(expected.PublicKeyASN1DER) {
+		t.Errorf("Expected PublicKeyASN1DER %s, got %s", expected.PublicKeyASN1DER, actual.PublicKeyASN1DER)
 	}
 	if string(actual.PublicKeyJWK) != string(expected.PublicKeyJWK) {
 		t.Errorf("Expected PublicKeyJWK %s, got %s", expected.PublicKeyJWK, actual.PublicKeyJWK)
@@ -269,7 +269,7 @@ func clearKeyPairState(t *testing.T, state string) {
 		if kp.State != state {
 			continue
 		}
-		if err := database.DeleteKeyPair(context.Background(), nil, kp.Id); err != nil {
+		if err := database.DeleteKeyPair(context.Background(), nil, kp.ID); err != nil {
 			t.Fatalf("Failed to delete key pair in state %s: %v", state, err)
 		}
 	}
@@ -286,14 +286,14 @@ func createKeyPairInState(t *testing.T, state string) *record.KeyPair {
 	clearKeyPairState(t, state)
 
 	keyPair := &record.KeyPair{
-		State:             state,
-		KeyIdentifier:     fake.UUID(),
-		Type:              "RSA",
-		Algorithm:         "RS256",
-		PrivateKeyPEM:     []byte(fake.Sentence(100)),
-		PublicKeyPEM:      []byte(fake.Sentence(50)),
-		PublicKeyASN1_DER: []byte(fake.Sentence(30)),
-		PublicKeyJWK:      []byte(fake.Sentence(40)),
+		State:            state,
+		KeyIdentifier:    fake.UUID(),
+		Type:             "RSA",
+		Algorithm:        "RS256",
+		PrivateKeyPEM:    []byte(fake.Sentence(100)),
+		PublicKeyPEM:     []byte(fake.Sentence(50)),
+		PublicKeyASN1DER: []byte(fake.Sentence(30)),
+		PublicKeyJWK:     []byte(fake.Sentence(40)),
 	}
 	if err := database.CreateKeyPair(context.Background(), nil, keyPair); err != nil {
 		t.Fatalf("Failed to create test key pair in state %s: %v", state, err)
@@ -308,7 +308,7 @@ func TestUpdateKeyPairState_TransitionsAndReadsBack(t *testing.T) {
 	keyPair := createKeyPairInState(t, current)
 	clearKeyPairState(t, previous)
 
-	moved, err := database.UpdateKeyPairState(context.Background(), nil, keyPair.Id, current, previous)
+	moved, err := database.UpdateKeyPairState(context.Background(), nil, keyPair.ID, current, previous)
 	if err != nil {
 		t.Fatalf("Failed to update key pair state: %v", err)
 	}
@@ -316,7 +316,7 @@ func TestUpdateKeyPairState_TransitionsAndReadsBack(t *testing.T) {
 		t.Fatal("Expected the transition to be made by this call")
 	}
 
-	retrieved, err := database.GetKeyPairById(context.Background(), nil, keyPair.Id)
+	retrieved, err := database.GetKeyPairByID(context.Background(), nil, keyPair.ID)
 	if err != nil {
 		t.Fatalf("Failed to retrieve key pair: %v", err)
 	}
@@ -332,7 +332,7 @@ func TestUpdateKeyPairState_RepeatedCallDoesNotTransition(t *testing.T) {
 	keyPair := createKeyPairInState(t, current)
 	clearKeyPairState(t, previous)
 
-	moved, err := database.UpdateKeyPairState(context.Background(), nil, keyPair.Id, current, previous)
+	moved, err := database.UpdateKeyPairState(context.Background(), nil, keyPair.ID, current, previous)
 	if err != nil {
 		t.Fatalf("Failed to update key pair state: %v", err)
 	}
@@ -343,7 +343,7 @@ func TestUpdateKeyPairState_RepeatedCallDoesNotTransition(t *testing.T) {
 	// The id still matches, so the state = fromState predicate is the only thing that
 	// can reject this. Remove it and the same row transitions twice, which is exactly
 	// what lets a losing rotation act on a snapshot the winner has already moved past.
-	moved, err = database.UpdateKeyPairState(context.Background(), nil, keyPair.Id, current, previous)
+	moved, err = database.UpdateKeyPairState(context.Background(), nil, keyPair.ID, current, previous)
 	if err != nil {
 		t.Fatalf("Expected no error on the repeated call, got: %v", err)
 	}
@@ -362,7 +362,7 @@ func TestUpdateKeyPairState_WrongFromStateDoesNotTransition(t *testing.T) {
 	keyPair := createKeyPairInState(t, next)
 	clearKeyPairState(t, previous)
 
-	moved, err := database.UpdateKeyPairState(context.Background(), nil, keyPair.Id, current, previous)
+	moved, err := database.UpdateKeyPairState(context.Background(), nil, keyPair.ID, current, previous)
 	if err != nil {
 		t.Fatalf("Expected no error, got: %v", err)
 	}
@@ -370,7 +370,7 @@ func TestUpdateKeyPairState_WrongFromStateDoesNotTransition(t *testing.T) {
 		t.Error("Expected no transition for a row that is not in the from-state")
 	}
 
-	retrieved, err := database.GetKeyPairById(context.Background(), nil, keyPair.Id)
+	retrieved, err := database.GetKeyPairByID(context.Background(), nil, keyPair.ID)
 	if err != nil {
 		t.Fatalf("Failed to retrieve key pair: %v", err)
 	}
@@ -379,7 +379,7 @@ func TestUpdateKeyPairState_WrongFromStateDoesNotTransition(t *testing.T) {
 	}
 }
 
-func TestUpdateKeyPairState_MissingIdDoesNotTransition(t *testing.T) {
+func TestUpdateKeyPairState_MissingIDDoesNotTransition(t *testing.T) {
 	moved, err := database.UpdateKeyPairState(context.Background(), nil, 99999,
 		record.KeyStateCurrent.String(), record.KeyStatePrevious.String())
 	if err != nil {
@@ -390,7 +390,7 @@ func TestUpdateKeyPairState_MissingIdDoesNotTransition(t *testing.T) {
 	}
 }
 
-func TestUpdateKeyPairState_ZeroIdIsAnError(t *testing.T) {
+func TestUpdateKeyPairState_ZeroIDIsAnError(t *testing.T) {
 	moved, err := database.UpdateKeyPairState(context.Background(), nil, 0,
 		record.KeyStateCurrent.String(), record.KeyStatePrevious.String())
 	if err == nil {
@@ -413,7 +413,7 @@ func TestUpdateKeyPairState_EnlistsInCallersTransaction(t *testing.T) {
 		t.Fatalf("Failed to begin transaction: %v", err)
 	}
 
-	moved, err := database.UpdateKeyPairState(context.Background(), tx, keyPair.Id, current, previous)
+	moved, err := database.UpdateKeyPairState(context.Background(), tx, keyPair.ID, current, previous)
 	if err != nil {
 		_ = database.RollbackTransaction(context.Background(), tx)
 		t.Fatalf("Failed to update key pair state: %v", err)
@@ -429,7 +429,7 @@ func TestUpdateKeyPairState_EnlistsInCallersTransaction(t *testing.T) {
 
 	// A statement that ignored the caller's tx and used the pool instead would have
 	// committed, and the rollback would not have undone it.
-	retrieved, err := database.GetKeyPairById(context.Background(), nil, keyPair.Id)
+	retrieved, err := database.GetKeyPairByID(context.Background(), nil, keyPair.ID)
 	if err != nil {
 		t.Fatalf("Failed to retrieve key pair: %v", err)
 	}
@@ -468,7 +468,7 @@ func TestUpdateKeyPairState_StorageFailureIsAnError(t *testing.T) {
 		t.Fatalf("Failed to roll back transaction: %v", rollbackErr)
 	}
 
-	moved, err := database.UpdateKeyPairState(context.Background(), tx, keyPair.Id, current, previous)
+	moved, err := database.UpdateKeyPairState(context.Background(), tx, keyPair.ID, current, previous)
 	if err == nil {
 		t.Fatal("Expected an error when the statement could not execute, got nil")
 	}
@@ -478,7 +478,7 @@ func TestUpdateKeyPairState_StorageFailureIsAnError(t *testing.T) {
 
 	// And the row is genuinely untouched, so the error is not reporting a failure
 	// after a transition that happened anyway.
-	retrieved, err := database.GetKeyPairById(context.Background(), nil, keyPair.Id)
+	retrieved, err := database.GetKeyPairByID(context.Background(), nil, keyPair.ID)
 	if err != nil {
 		t.Fatalf("Failed to retrieve key pair: %v", err)
 	}
@@ -510,7 +510,7 @@ func TestUpdateKeyPairState_Concurrent(t *testing.T) {
 	first, err := database.BeginTransaction(ctx)
 	require.NoError(t, err)
 	defer func() { _ = database.RollbackTransaction(ctx, first) }()
-	moved, err := database.UpdateKeyPairState(ctx, first, keyPair.Id, current, previous)
+	moved, err := database.UpdateKeyPairState(ctx, first, keyPair.ID, current, previous)
 	require.NoError(t, err)
 	require.True(t, moved, "the first transition moves the row")
 
@@ -527,7 +527,7 @@ func TestUpdateKeyPairState_Concurrent(t *testing.T) {
 			return outcome{err: beginErr}
 		}
 		reached()
-		moved, updateErr := database.UpdateKeyPairState(ctx, tx, keyPair.Id, current, previous)
+		moved, updateErr := database.UpdateKeyPairState(ctx, tx, keyPair.ID, current, previous)
 		if updateErr != nil {
 			_ = database.RollbackTransaction(ctx, tx)
 			return outcome{err: updateErr}
@@ -542,7 +542,7 @@ func TestUpdateKeyPairState_Concurrent(t *testing.T) {
 	require.NoError(t, got.err, "the loser reports false, not an error")
 	assert.False(t, got.moved, "the row had already moved when the second transition reached it")
 
-	retrieved, err := database.GetKeyPairById(ctx, nil, keyPair.Id)
+	retrieved, err := database.GetKeyPairByID(ctx, nil, keyPair.ID)
 	require.NoError(t, err)
 	assert.Equal(t, previous, retrieved.State, "the row moved once")
 }

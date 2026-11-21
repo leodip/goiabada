@@ -25,13 +25,13 @@ type stubBackchannelLogoutAPI struct {
 	settings  *api.SettingsGeneralResponse
 	updateErr error
 
-	// sent and sentClientId are what the save handed the API, and writes how many saves reached it.
+	// sent and sentClientID are what the save handed the API, and writes how many saves reached it.
 	sent         *api.UpdateClientBackchannelLogoutRequest
-	sentClientId int64
+	sentClientID int64
 	writes       int
 }
 
-func (s *stubBackchannelLogoutAPI) GetClientById(_ context.Context, _ string, _ int64) (*api.ClientResponse, error) {
+func (s *stubBackchannelLogoutAPI) GetClientByID(_ context.Context, _ string, _ int64) (*api.ClientResponse, error) {
 	return s.client, nil
 }
 
@@ -42,11 +42,11 @@ func (s *stubBackchannelLogoutAPI) GetSettingsGeneral(_ context.Context, _ strin
 	return s.settings, nil
 }
 
-func (s *stubBackchannelLogoutAPI) UpdateClientBackchannelLogout(_ context.Context, _ string, clientId int64,
+func (s *stubBackchannelLogoutAPI) UpdateClientBackchannelLogout(_ context.Context, _ string, clientID int64,
 	request *api.UpdateClientBackchannelLogoutRequest) (*api.ClientResponse, error) {
 	s.writes++
 	s.sent = request
-	s.sentClientId = clientId
+	s.sentClientID = clientID
 	if s.updateErr != nil {
 		return nil, s.updateErr
 	}
@@ -56,7 +56,7 @@ func (s *stubBackchannelLogoutAPI) UpdateClientBackchannelLogout(_ context.Conte
 // backchannelLogoutBind serves the tab for client 7 and returns the "client" value it bound.
 func backchannelLogoutBind(t *testing.T, apiClient *stubBackchannelLogoutAPI) reflect.Value {
 	t.Helper()
-	httpHelper := &stubHttpHelper{}
+	httpHelper := &stubHTTPHelper{}
 	req := handlertest.Request(http.MethodGet, "/admin/clients/7/backchannel-logout",
 		handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "7"))
 	HandleBackchannelLogoutGet(httpHelper, newTestSessionStore(), apiClient).ServeHTTP(httptest.NewRecorder(), req)
@@ -68,7 +68,7 @@ func backchannelLogoutBind(t *testing.T, apiClient *stubBackchannelLogoutAPI) re
 
 // postBackchannelLogout posts the tab for client 7 with form, and with query on the URL when given,
 // as an administrator granted scope.
-func postBackchannelLogout(t *testing.T, apiClient *stubBackchannelLogoutAPI, httpHelper *stubHttpHelper,
+func postBackchannelLogout(t *testing.T, apiClient *stubBackchannelLogoutAPI, httpHelper *stubHTTPHelper,
 	form url.Values, query, scope string) *httptest.ResponseRecorder {
 	t.Helper()
 	target := "/admin/clients/7/backchannel-logout"
@@ -76,7 +76,7 @@ func postBackchannelLogout(t *testing.T, apiClient *stubBackchannelLogoutAPI, ht
 		target += "?" + query
 	}
 	req := handlertest.Request(http.MethodPost, target,
-		handlertest.WithJwtInfo(oauthclient.JwtInfo{TokenResponse: oauth.TokenResponse{AccessToken: handlertest.AccessToken, Scope: scope}}),
+		handlertest.WithJWTInfo(oauthclient.JWTInfo{TokenResponse: oauth.TokenResponse{AccessToken: handlertest.AccessToken, Scope: scope}}),
 		handlertest.WithPathValue("clientId", "7"), handlertest.WithForm(form))
 	rec := httptest.NewRecorder()
 	HandleBackchannelLogoutPost(httpHelper, newTestSessionStore(), apiClient, consoleBaseURL).ServeHTTP(rec, req)
@@ -97,12 +97,12 @@ func TestHandleBackchannelLogoutGet_BindsBothSettings(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			client := backchannelLogoutBind(t, &stubBackchannelLogoutAPI{client: &api.ClientResponse{
-				Id: 7, ClientIdentifier: "a-web-app", AuthorizationCodeEnabled: true,
+				ID: 7, ClientIdentifier: "a-web-app", AuthorizationCodeEnabled: true,
 				BackchannelLogoutURI: tc.uri, BackchannelLogoutSessionRequired: tc.sessionRequired}})
 
 			assert.Equal(t, tc.uri, client.FieldByName("BackchannelLogoutURI").String())
 			assert.Equal(t, tc.sessionRequired, client.FieldByName("BackchannelLogoutSessionRequired").Bool())
-			assert.Equal(t, int64(7), client.FieldByName("ClientId").Int())
+			assert.Equal(t, int64(7), client.FieldByName("ClientID").Int())
 			assert.Equal(t, "a-web-app", client.FieldByName("ClientIdentifier").String())
 		})
 	}
@@ -127,7 +127,7 @@ func TestHandleBackchannelLogoutGet_ResolvesTheSignInFlows(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			client := backchannelLogoutBind(t, &stubBackchannelLogoutAPI{
-				client: &api.ClientResponse{Id: 7, ClientIdentifier: "a-client", ClientCredentialsEnabled: true,
+				client: &api.ClientResponse{ID: 7, ClientIdentifier: "a-client", ClientCredentialsEnabled: true,
 					AuthorizationCodeEnabled: tc.authCode, ImplicitGrantEnabled: tc.clientImplicit},
 				settings: &api.SettingsGeneralResponse{ImplicitFlowEnabled: tc.globalImplicit},
 			})
@@ -164,15 +164,15 @@ func TestHandleBackchannelLogoutPost_SendsBothSettings(t *testing.T) {
 			wantURI: "https://app.example.com/bcl"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			apiClient := &stubBackchannelLogoutAPI{client: &api.ClientResponse{Id: 7, ClientIdentifier: "a-web-app",
+			apiClient := &stubBackchannelLogoutAPI{client: &api.ClientResponse{ID: 7, ClientIdentifier: "a-web-app",
 				AuthorizationCodeEnabled: true, BackchannelLogoutURI: "https://old.example.com/bcl", BackchannelLogoutSessionRequired: true}}
-			httpHelper := &stubHttpHelper{}
+			httpHelper := &stubHTTPHelper{}
 
 			rec := postBackchannelLogout(t, apiClient, httpHelper, tc.form, tc.query, manageGrant)
 
 			require.NoError(t, httpHelper.err)
 			require.Equal(t, 1, apiClient.writes, "the save reaches the API once")
-			assert.Equal(t, int64(7), apiClient.sentClientId)
+			assert.Equal(t, int64(7), apiClient.sentClientID)
 			require.NotNil(t, apiClient.sent.BackchannelLogoutURI, "the URI is always sent, so the API never reads a missing one")
 			require.NotNil(t, apiClient.sent.BackchannelLogoutSessionRequired, "and so is the flag")
 			assert.Equal(t, tc.wantURI, *apiClient.sent.BackchannelLogoutURI)
@@ -185,9 +185,9 @@ func TestHandleBackchannelLogoutPost_SendsBothSettings(t *testing.T) {
 
 // A field read from the query is no submission of this form, the URI included.
 func TestHandleBackchannelLogoutPost_ReadsTheURIFromTheBodyAlone(t *testing.T) {
-	apiClient := &stubBackchannelLogoutAPI{client: &api.ClientResponse{Id: 7, ClientIdentifier: "a-web-app", AuthorizationCodeEnabled: true}}
+	apiClient := &stubBackchannelLogoutAPI{client: &api.ClientResponse{ID: 7, ClientIdentifier: "a-web-app", AuthorizationCodeEnabled: true}}
 
-	postBackchannelLogout(t, apiClient, &stubHttpHelper{}, url.Values{}, "backchannelLogoutUri=https://evil.example.com/", manageGrant)
+	postBackchannelLogout(t, apiClient, &stubHTTPHelper{}, url.Values{}, "backchannelLogoutUri=https://evil.example.com/", manageGrant)
 
 	require.Equal(t, 1, apiClient.writes)
 	assert.Empty(t, *apiClient.sent.BackchannelLogoutURI)
@@ -213,10 +213,10 @@ func TestHandleBackchannelLogoutPost_ARefusalMarksItsField(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			const refusal = "The auth server's sentence."
 			apiClient := &stubBackchannelLogoutAPI{
-				client:    &api.ClientResponse{Id: 7, ClientIdentifier: "a-web-app", AuthorizationCodeEnabled: true, BackchannelLogoutURI: "https://stored.example.com/bcl"},
+				client:    &api.ClientResponse{ID: 7, ClientIdentifier: "a-web-app", AuthorizationCodeEnabled: true, BackchannelLogoutURI: "https://stored.example.com/bcl"},
 				updateErr: &apiclient.APIError{Code: tc.code, Message: refusal, StatusCode: tc.status},
 			}
-			httpHelper := &stubHttpHelper{}
+			httpHelper := &stubHTTPHelper{}
 
 			rec := postBackchannelLogout(t, apiClient, httpHelper, url.Values{
 				"backchannelLogoutUri": {"ftp://typed.example.com/bcl"}, "backchannelLogoutSessionRequired": {"on"}}, "", manageGrant)
@@ -240,11 +240,11 @@ func TestHandleBackchannelLogoutPost_ARefusalMarksItsField(t *testing.T) {
 // administrators, or the 500 page another 403 gets.
 func TestHandleBackchannelLogoutPost_TheManageCeilingIsShownOnTheURI(t *testing.T) {
 	apiClient := &stubBackchannelLogoutAPI{
-		client: &api.ClientResponse{Id: 7, ClientIdentifier: "a-web-app", AuthorizationCodeEnabled: true},
+		client: &api.ClientResponse{ID: 7, ClientIdentifier: "a-web-app", AuthorizationCodeEnabled: true},
 		updateErr: &apiclient.APIError{Code: "MANAGE_SCOPE_REQUIRED", StatusCode: http.StatusForbidden,
 			Message: "Only a token with the authserver:manage scope may act on administrators or administrative permissions."},
 	}
-	httpHelper := &stubHttpHelper{}
+	httpHelper := &stubHTTPHelper{}
 
 	rec := postBackchannelLogout(t, apiClient, httpHelper,
 		url.Values{"backchannelLogoutUri": {"http://10.0.0.5/bcl"}}, "", "openid authserver:manage-clients")
@@ -261,10 +261,10 @@ func TestHandleBackchannelLogoutPost_TheManageCeilingIsShownOnTheURI(t *testing.
 // Any other 403 is not this ceiling, and is a server error as on every other tab.
 func TestHandleBackchannelLogoutPost_AnotherForbiddenIsAServerError(t *testing.T) {
 	apiClient := &stubBackchannelLogoutAPI{
-		client:    &api.ClientResponse{Id: 7, ClientIdentifier: "a-web-app", AuthorizationCodeEnabled: true},
+		client:    &api.ClientResponse{ID: 7, ClientIdentifier: "a-web-app", AuthorizationCodeEnabled: true},
 		updateErr: &apiclient.APIError{Code: "INSUFFICIENT_SCOPE", StatusCode: http.StatusForbidden, Message: "Insufficient scope."},
 	}
-	httpHelper := &stubHttpHelper{}
+	httpHelper := &stubHTTPHelper{}
 
 	rec := postBackchannelLogout(t, apiClient, httpHelper, url.Values{"backchannelLogoutUri": {"https://app.example.com/bcl"}}, "", manageGrant)
 

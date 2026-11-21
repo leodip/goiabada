@@ -28,7 +28,7 @@ import (
 // divergence could sit unnoticed.
 func TestToken_UpdatedAt_RidesWithTheProfileScope(t *testing.T) {
 	changeSettings(t, func(settings *record.Settings) {
-		settings.IncludeOpenIDConnectClaimsInIdToken = true
+		settings.IncludeOpenIDConnectClaimsInIDToken = true
 		settings.IncludeOpenIDConnectClaimsInAccessToken = true
 	})
 

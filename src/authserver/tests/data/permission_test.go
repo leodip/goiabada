@@ -14,7 +14,7 @@ func TestCreatePermission(t *testing.T) {
 	permission := &record.Permission{
 		PermissionIdentifier: "test_permission_" + fake.LetterN(6),
 		Description:          "Test Permission",
-		ResourceId:           resource.Id,
+		ResourceID:           resource.ID,
 	}
 
 	err := database.CreatePermission(context.Background(), nil, permission)
@@ -22,7 +22,7 @@ func TestCreatePermission(t *testing.T) {
 		t.Fatalf("Failed to create permission: %v", err)
 	}
 
-	if permission.Id == 0 {
+	if permission.ID == 0 {
 		t.Error("Expected non-zero ID after creation")
 	}
 	if !permission.CreatedAt.Valid || permission.CreatedAt.Time.IsZero() {
@@ -32,7 +32,7 @@ func TestCreatePermission(t *testing.T) {
 		t.Error("Expected UpdatedAt to be set")
 	}
 
-	retrievedPermission, err := database.GetPermissionById(context.Background(), nil, permission.Id)
+	retrievedPermission, err := database.GetPermissionByID(context.Background(), nil, permission.ID)
 	if err != nil {
 		t.Fatalf("Failed to retrieve created permission: %v", err)
 	}
@@ -43,8 +43,8 @@ func TestCreatePermission(t *testing.T) {
 	if retrievedPermission.Description != permission.Description {
 		t.Errorf("Expected Description %s, got %s", permission.Description, retrievedPermission.Description)
 	}
-	if retrievedPermission.ResourceId != permission.ResourceId {
-		t.Errorf("Expected ResourceId %d, got %d", permission.ResourceId, retrievedPermission.ResourceId)
+	if retrievedPermission.ResourceID != permission.ResourceID {
+		t.Errorf("Expected ResourceID %d, got %d", permission.ResourceID, retrievedPermission.ResourceID)
 	}
 }
 
@@ -54,7 +54,7 @@ func TestUpdatePermission(t *testing.T) {
 	permission := createTestPermission(t, resource1)
 
 	permission.Description = "Updated Description"
-	permission.ResourceId = resource2.Id
+	permission.ResourceID = resource2.ID
 
 	time.Sleep(timestampTick)
 
@@ -63,7 +63,7 @@ func TestUpdatePermission(t *testing.T) {
 		t.Fatalf("Failed to update permission: %v", err)
 	}
 
-	updatedPermission, err := database.GetPermissionById(context.Background(), nil, permission.Id)
+	updatedPermission, err := database.GetPermissionByID(context.Background(), nil, permission.ID)
 	if err != nil {
 		t.Fatalf("Failed to retrieve updated permission: %v", err)
 	}
@@ -71,45 +71,45 @@ func TestUpdatePermission(t *testing.T) {
 	if updatedPermission.Description != permission.Description {
 		t.Errorf("Expected Description %s, got %s", permission.Description, updatedPermission.Description)
 	}
-	if updatedPermission.ResourceId != permission.ResourceId {
-		t.Errorf("Expected ResourceId %d, got %d", permission.ResourceId, updatedPermission.ResourceId)
+	if updatedPermission.ResourceID != permission.ResourceID {
+		t.Errorf("Expected ResourceID %d, got %d", permission.ResourceID, updatedPermission.ResourceID)
 	}
 	if !updatedPermission.UpdatedAt.Time.After(updatedPermission.CreatedAt.Time) {
 		t.Error("Expected UpdatedAt to be after CreatedAt")
 	}
 }
 
-func TestGetPermissionById(t *testing.T) {
+func TestGetPermissionByID(t *testing.T) {
 	resource := createTestResource(t)
 	permission := createTestPermission(t, resource)
 
-	retrievedPermission, err := database.GetPermissionById(context.Background(), nil, permission.Id)
+	retrievedPermission, err := database.GetPermissionByID(context.Background(), nil, permission.ID)
 	if err != nil {
 		t.Fatalf("Failed to get permission by ID: %v", err)
 	}
 
-	if retrievedPermission.Id != permission.Id {
-		t.Errorf("Expected ID %d, got %d", permission.Id, retrievedPermission.Id)
+	if retrievedPermission.ID != permission.ID {
+		t.Errorf("Expected ID %d, got %d", permission.ID, retrievedPermission.ID)
 	}
 	if retrievedPermission.PermissionIdentifier != permission.PermissionIdentifier {
 		t.Errorf("Expected PermissionIdentifier %s, got %s", permission.PermissionIdentifier, retrievedPermission.PermissionIdentifier)
 	}
 
-	nonExistentPermission, err := database.GetPermissionById(context.Background(), nil, 99999)
+	nonExistentPermission, err := database.GetPermissionByID(context.Background(), nil, 99999)
 	if err != nil {
 		t.Errorf("Expected no error for non-existent permission, got: %v", err)
 	}
 	if nonExistentPermission != nil {
-		t.Errorf("Expected nil for non-existent permission, got a permission with ID: %d", nonExistentPermission.Id)
+		t.Errorf("Expected nil for non-existent permission, got a permission with ID: %d", nonExistentPermission.ID)
 	}
 }
 
-func TestGetPermissionsByResourceId(t *testing.T) {
+func TestGetPermissionsByResourceID(t *testing.T) {
 	resource := createTestResource(t)
 	permission1 := createTestPermission(t, resource)
 	permission2 := createTestPermission(t, resource)
 
-	permissions, err := database.GetPermissionsByResourceId(context.Background(), nil, resource.Id)
+	permissions, err := database.GetPermissionsByResourceID(context.Background(), nil, resource.ID)
 	if err != nil {
 		t.Fatalf("Failed to get permissions by resource ID: %v", err)
 	}
@@ -121,16 +121,16 @@ func TestGetPermissionsByResourceId(t *testing.T) {
 	foundPermission1 := false
 	foundPermission2 := false
 	for _, p := range permissions {
-		if p.Id == permission1.Id {
+		if p.ID == permission1.ID {
 			foundPermission1 = true
 		}
-		if p.Id == permission2.Id {
+		if p.ID == permission2.ID {
 			foundPermission2 = true
 		}
 	}
 
 	if !foundPermission1 || !foundPermission2 {
-		t.Error("Not all created permissions were found in GetPermissionsByResourceId result")
+		t.Error("Not all created permissions were found in GetPermissionsByResourceID result")
 	}
 }
 
@@ -147,22 +147,22 @@ func TestPermissionsLoadResources(t *testing.T) {
 		t.Fatalf("Failed to load resources for permissions: %v", err)
 	}
 
-	if permissions[0].Resource.Id != resource1.Id {
-		t.Errorf("Expected Resource ID %d for permission 1, got %d", resource1.Id, permissions[0].Resource.Id)
+	if permissions[0].Resource.ID != resource1.ID {
+		t.Errorf("Expected Resource ID %d for permission 1, got %d", resource1.ID, permissions[0].Resource.ID)
 	}
-	if permissions[1].Resource.Id != resource2.Id {
-		t.Errorf("Expected Resource ID %d for permission 2, got %d", resource2.Id, permissions[1].Resource.Id)
+	if permissions[1].Resource.ID != resource2.ID {
+		t.Errorf("Expected Resource ID %d for permission 2, got %d", resource2.ID, permissions[1].Resource.ID)
 	}
 }
 
-func TestGetPermissionsByIds(t *testing.T) {
+func TestGetPermissionsByIDs(t *testing.T) {
 	resource := createTestResource(t)
 	permission1 := createTestPermission(t, resource)
 	permission2 := createTestPermission(t, resource)
 
-	permissionIds := []int64{permission1.Id, permission2.Id}
+	permissionIDs := []int64{permission1.ID, permission2.ID}
 
-	permissions, err := database.GetPermissionsByIds(context.Background(), nil, permissionIds)
+	permissions, err := database.GetPermissionsByIDs(context.Background(), nil, permissionIDs)
 	if err != nil {
 		t.Fatalf("Failed to get permissions by IDs: %v", err)
 	}
@@ -174,16 +174,16 @@ func TestGetPermissionsByIds(t *testing.T) {
 	foundPermission1 := false
 	foundPermission2 := false
 	for _, p := range permissions {
-		if p.Id == permission1.Id {
+		if p.ID == permission1.ID {
 			foundPermission1 = true
 		}
-		if p.Id == permission2.Id {
+		if p.ID == permission2.ID {
 			foundPermission2 = true
 		}
 	}
 
 	if !foundPermission1 || !foundPermission2 {
-		t.Error("Not all requested permissions were found in GetPermissionsByIds result")
+		t.Error("Not all requested permissions were found in GetPermissionsByIDs result")
 	}
 }
 
@@ -191,12 +191,12 @@ func TestDeletePermission(t *testing.T) {
 	resource := createTestResource(t)
 	permission := createTestPermission(t, resource)
 
-	err := database.DeletePermission(context.Background(), nil, permission.Id)
+	err := database.DeletePermission(context.Background(), nil, permission.ID)
 	if err != nil {
 		t.Fatalf("Failed to delete permission: %v", err)
 	}
 
-	deletedPermission, err := database.GetPermissionById(context.Background(), nil, permission.Id)
+	deletedPermission, err := database.GetPermissionByID(context.Background(), nil, permission.ID)
 	if err != nil {
 		t.Fatalf("Error while checking for deleted permission: %v", err)
 	}
@@ -214,7 +214,7 @@ func createTestPermission(t *testing.T, resource *record.Resource) *record.Permi
 	permission := &record.Permission{
 		PermissionIdentifier: "test_permission" + fake.LetterN(6),
 		Description:          "Test Permission",
-		ResourceId:           resource.Id,
+		ResourceID:           resource.ID,
 	}
 	err := database.CreatePermission(context.Background(), nil, permission)
 	if err != nil {

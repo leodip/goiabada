@@ -202,10 +202,10 @@ func TestSharedRefusals_AreInTheRequestsLanguage(t *testing.T) {
 // which the console reads the field off (#617).
 func TestResourceRefusals_AreInTheRequestsLanguage(t *testing.T) {
 	system := func() *record.Resource {
-		return &record.Resource{Id: 1, ResourceIdentifier: builtin.AuthServerResourceIdentifier}
+		return &record.Resource{ID: 1, ResourceIdentifier: builtin.AuthServerResourceIdentifier}
 	}
 	ordinary := func() *record.Resource {
-		return &record.Resource{Id: 5, ResourceIdentifier: "a-resource", Description: "A resource"}
+		return &record.Resource{ID: 5, ResourceIdentifier: "a-resource", Description: "A resource"}
 	}
 	create := func(body string, expect func(database *datamocks.Database)) func(*testing.T, string) *httptest.ResponseRecorder {
 		return func(t *testing.T, acceptLanguage string) *httptest.ResponseRecorder {
@@ -222,12 +222,12 @@ func TestResourceRefusals_AreInTheRequestsLanguage(t *testing.T) {
 	update := func(stored *record.Resource, body string, expect func(database *datamocks.Database)) func(*testing.T, string) *httptest.ResponseRecorder {
 		return func(t *testing.T, acceptLanguage string) *httptest.ResponseRecorder {
 			database := datamocks.NewDatabase(t)
-			database.On("GetResourceById", mock.Anything, (*sql.Tx)(nil), stored.Id).Return(stored, nil).Once()
+			database.On("GetResourceByID", mock.Anything, (*sql.Tx)(nil), stored.ID).Return(stored, nil).Once()
 			if expect != nil {
 				expect(database)
 			}
 			r := httptest.NewRequest(http.MethodPut, "/api/v1/admin/resources/x", strings.NewReader(body))
-			r = inRequestLanguage(withPathValue(r, "id", strconv.FormatInt(stored.Id, 10)), acceptLanguage)
+			r = inRequestLanguage(withPathValue(r, "id", strconv.FormatInt(stored.ID, 10)), acceptLanguage)
 			rr := httptest.NewRecorder()
 			HandleResourceUpdatePut(database, inputvalidation.NewIdentifierValidator(), handlersmocks.NewAuditLogger(t)).ServeHTTP(rr, r)
 			return rr
@@ -269,7 +269,7 @@ func TestResourceRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			name: "create naming a client's identifier",
 			serve: create(`{"resourceIdentifier":"a-resource","description":"d"}`, func(database *datamocks.Database) {
 				database.On("GetResourceByResourceIdentifier", mock.Anything, (*sql.Tx)(nil), "a-resource").Return(nil, nil).Once()
-				database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "a-resource").Return(&record.Client{Id: 8, ClientIdentifier: "a-resource"}, nil).Once()
+				database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "a-resource").Return(&record.Client{ID: 8, ClientIdentifier: "a-resource"}, nil).Once()
 			}),
 			status:     http.StatusBadRequest,
 			code:       "handler.resource.identifier_names_client",
@@ -295,7 +295,7 @@ func TestResourceRefusals_AreInTheRequestsLanguage(t *testing.T) {
 		{
 			name: "update onto another resource's identifier",
 			serve: update(ordinary(), `{"resourceIdentifier":"other-resource","description":"d"}`,
-				identifierHeldBy("other-resource", &record.Resource{Id: 6, ResourceIdentifier: "other-resource"})),
+				identifierHeldBy("other-resource", &record.Resource{ID: 6, ResourceIdentifier: "other-resource"})),
 			status:     http.StatusBadRequest,
 			code:       "handler.resource.identifier_in_use",
 			english:    "The resource identifier is already in use",
@@ -305,7 +305,7 @@ func TestResourceRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			name: "update onto a client's identifier",
 			serve: update(ordinary(), `{"resourceIdentifier":"named-like-a-client","description":"d"}`, func(database *datamocks.Database) {
 				database.On("GetResourceByResourceIdentifier", mock.Anything, (*sql.Tx)(nil), "named-like-a-client").Return(nil, nil).Once()
-				database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "named-like-a-client").Return(&record.Client{Id: 8, ClientIdentifier: "named-like-a-client"}, nil).Once()
+				database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "named-like-a-client").Return(&record.Client{ID: 8, ClientIdentifier: "named-like-a-client"}, nil).Once()
 			}),
 			status:     http.StatusBadRequest,
 			code:       "handler.resource.identifier_names_client",
@@ -324,7 +324,7 @@ func TestResourceRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			name: "delete of the system resource",
 			serve: func(t *testing.T, acceptLanguage string) *httptest.ResponseRecorder {
 				database := datamocks.NewDatabase(t)
-				database.On("GetResourceById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(system(), nil).Once()
+				database.On("GetResourceByID", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(system(), nil).Once()
 				r := httptest.NewRequest(http.MethodDelete, "/api/v1/admin/resources/1", nil)
 				r = inRequestLanguage(withPathValue(r, "id", "1"), acceptLanguage)
 				rr := httptest.NewRecorder()
@@ -349,7 +349,7 @@ func TestResourcePermissionRefusals_AreInTheRequestsLanguage(t *testing.T) {
 
 	builtIns := make([]record.Permission, 0, len(builtin.AuthServerPermissionIdentifiers()))
 	for i, identifier := range builtin.AuthServerPermissionIdentifiers() {
-		builtIns = append(builtIns, record.Permission{Id: int64(40 + i), ResourceId: resourcePermsId, PermissionIdentifier: identifier, Description: identifier})
+		builtIns = append(builtIns, record.Permission{ID: int64(40 + i), ResourceID: resourcePermsID, PermissionIdentifier: identifier, Description: identifier})
 	}
 	manage := -1
 	for i, p := range builtIns {
@@ -381,8 +381,8 @@ func TestResourcePermissionRefusals_AreInTheRequestsLanguage(t *testing.T) {
 		{
 			name: "two entries naming one stored permission",
 			serve: save("a-resource", nil, []api.ResourcePermissionUpsert{
-				{Id: 31, PermissionIdentifier: "read", Description: "Read"},
-				{Id: 31, PermissionIdentifier: "read-again", Description: "Read"},
+				{ID: 31, PermissionIdentifier: "read", Description: "Read"},
+				{ID: 31, PermissionIdentifier: "read-again", Description: "Read"},
 			}, loaded),
 			status:     http.StatusBadRequest,
 			code:       "handler.permission.duplicate_ids",

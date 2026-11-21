@@ -89,11 +89,11 @@ func createHeaderClient(t *testing.T) (*record.Client, string) {
 		ClientIdentifier:         "header-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
-		DefaultAcrLevel:          record.AcrLevel2Optional,
+		DefaultACRLevel:          record.ACRLevel2Optional,
 		ClientSecretEncrypted:    encrypted,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 	return client, secret
 }
 
@@ -106,7 +106,7 @@ func postWithAuthorizationFields(t *testing.T, path string, form url.Values, fie
 	for _, field := range fields {
 		req.Header.Add("Authorization", field)
 	}
-	resp, err := createHttpClient(t).Do(req)
+	resp, err := createHTTPClient(t).Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	body, err := io.ReadAll(resp.Body)

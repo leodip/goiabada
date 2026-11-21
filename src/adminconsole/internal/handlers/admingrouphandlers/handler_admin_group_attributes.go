@@ -13,13 +13,13 @@ import (
 // groupAttributesAPI is what the group attributes page needs: the group, its attributes, and the
 // delete of one.
 type groupAttributesAPI interface {
-	DeleteGroupAttribute(ctx context.Context, accessToken string, attributeId int64) error
-	GetGroupAttributesByGroupId(ctx context.Context, accessToken string, groupId int64) ([]api.GroupAttributeResponse, error)
-	GetGroupById(ctx context.Context, accessToken string, groupId int64) (*api.GroupResponse, error)
+	DeleteGroupAttribute(ctx context.Context, accessToken string, attributeID int64) error
+	GetGroupAttributesByGroupID(ctx context.Context, accessToken string, groupID int64) ([]api.GroupAttributeResponse, error)
+	GetGroupByID(ctx context.Context, accessToken string, groupID int64) (*api.GroupResponse, error)
 }
 
 func HandleAttributesGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient groupAttributesAPI,
 ) http.HandlerFunc {
 
@@ -38,14 +38,14 @@ func HandleAttributesGet(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
 		// Get group via API
-		group, err := apiClient.GetGroupById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		group, err := apiClient.GetGroupByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -56,14 +56,14 @@ func HandleAttributesGet(
 		}
 
 		// Get group attributes via API
-		attributes, err := apiClient.GetGroupAttributesByGroupId(r.Context(), jwtInfo.TokenResponse.AccessToken, group.Id)
+		attributes, err := apiClient.GetGroupAttributesByGroupID(r.Context(), jwtInfo.TokenResponse.AccessToken, group.ID)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
 		bind := map[string]interface{}{
-			"groupId":         group.Id,
+			"groupId":         group.ID,
 			"groupIdentifier": group.GroupIdentifier,
 			"description":     group.Description,
 			"attributes":      attributes,
@@ -78,33 +78,33 @@ func HandleAttributesGet(
 }
 
 func HandleAttributesRemovePost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient groupAttributesAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		attributeIdStr := r.PathValue("attributeId")
-		if len(attributeIdStr) == 0 {
+		attributeIDStr := r.PathValue("attributeId")
+		if len(attributeIDStr) == 0 {
 			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
 
-		attributeId, err := strconv.ParseInt(attributeIdStr, 10, 64)
+		attributeID, err := strconv.ParseInt(attributeIDStr, 10, 64)
 		if err != nil {
 			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JSONError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.JSONError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
 		// Delete group attribute via API (audit logging handled by AuthServer)
-		err = apiClient.DeleteGroupAttribute(r.Context(), jwtInfo.TokenResponse.AccessToken, attributeId)
+		err = apiClient.DeleteGroupAttribute(r.Context(), jwtInfo.TokenResponse.AccessToken, attributeID)
 		if err != nil {
 			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return

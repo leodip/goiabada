@@ -82,7 +82,7 @@ func TestSendEmail_AStalledWriteEndsAtTheCommandLimit(t *testing.T) {
 		Subject: "Test email",
 		// About 1 MiB, many times what the socket buffers between the two ends can hold: the
 		// sender's is fixed at testSocketBuffer, doubled, and the fake's receive buffer is minimal.
-		HtmlBody: strings.Repeat("<p>hello, this line pads the body!</p>\n", 1<<15),
+		HTMLBody: strings.Repeat("<p>hello, this line pads the body!</p>\n", 1<<15),
 	})
 	elapsed := time.Since(started)
 
@@ -149,7 +149,7 @@ func TestSendEmail_ASlowButSteadyBodyIsNotCutByTheCommandLimit(t *testing.T) {
 			result, err := sender.SendEmail(context.Background(), relayConfig(t, "127.0.0.1", port, mode, "", "", "Goiabada"), &SendEmailInput{
 				To:       fixtureRecipient,
 				Subject:  "Test email",
-				HtmlBody: body,
+				HTMLBody: body,
 			})
 			elapsed := time.Since(started)
 
@@ -240,7 +240,7 @@ func TestSendEmail_ACancelledCallerEndsTheSend(t *testing.T) {
 	_, err := sender.SendEmail(ctx, relayConfig(t, "127.0.0.1", port, "none", "", "", "Goiabada"), &SendEmailInput{
 		To:       fixtureRecipient,
 		Subject:  "Test email",
-		HtmlBody: "<p>hello</p>",
+		HTMLBody: "<p>hello</p>",
 	})
 	elapsed := time.Since(started)
 

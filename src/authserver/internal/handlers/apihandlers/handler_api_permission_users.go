@@ -15,8 +15,8 @@ import (
 // permissionUsersDatabase is what the permission holders endpoint needs: the permission, and one
 // page of the users holding it.
 type permissionUsersDatabase interface {
-	GetPermissionById(ctx context.Context, tx *sql.Tx, permissionId int64) (*record.Permission, error)
-	GetUsersByPermissionIdPaginated(ctx context.Context, tx *sql.Tx, permissionId int64, page int, pageSize int) ([]record.User, int, error)
+	GetPermissionByID(ctx context.Context, tx *sql.Tx, permissionID int64) (*record.Permission, error)
+	GetUsersByPermissionIDPaginated(ctx context.Context, tx *sql.Tx, permissionID int64, page int, pageSize int) ([]record.User, int, error)
 }
 
 // HandlePermissionUsersGet
@@ -31,15 +31,15 @@ func HandlePermissionUsersGet(
 			writeJSONError(w, "Permission ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
-		permissionId, err := strconv.ParseInt(permStr, 10, 64)
+		permissionID, err := strconv.ParseInt(permStr, 10, 64)
 		if err != nil {
 			writeJSONError(w, "Invalid permission ID format", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
-		perm, err := database.GetPermissionById(r.Context(), nil, permissionId)
+		perm, err := database.GetPermissionByID(r.Context(), nil, permissionID)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "error getting permission by ID for users listing"), "permission_id", permissionId)
+			writeInternalServerError(w, r, errs.Wrap(err, "error getting permission by ID for users listing"), "permission_id", permissionID)
 			return
 		}
 		if perm == nil {
@@ -61,9 +61,9 @@ func HandlePermissionUsersGet(
 			}
 		}
 
-		users, total, err := database.GetUsersByPermissionIdPaginated(r.Context(), nil, permissionId, page, size)
+		users, total, err := database.GetUsersByPermissionIDPaginated(r.Context(), nil, permissionID, page, size)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "error getting users by permission paginated"), "permission_id", permissionId, "page", page, "size", size)
+			writeInternalServerError(w, r, errs.Wrap(err, "error getting users by permission paginated"), "permission_id", permissionID, "page", page, "size", size)
 			return
 		}
 

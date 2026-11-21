@@ -19,7 +19,7 @@ refuses such calls.
   the shared implementation's file for its resource, and the handle's `Dialect` field
   (`data.Dialect`) picks the version that runs, so the text in the source is the text the engine
   receives. `TestStatements_EveryEngineHasItsVersion` refuses one missing a version; an IN list is
-  written by `inList`, inside `forEachIdBatch` (#644)
+  written by `inList`, inside `forEachIDBatch` (#644)
 - Each record's read column list and whole-row INSERT and UPDATE are written out per engine in
   `commondb/`, with a shared explicit scan function. The `db`, `fieldtag` and `fieldopt` tags stay
   on the records as the column contract: a `dont-update` column is protected by its absence from the
@@ -64,17 +64,17 @@ Preserve the row locks that make security decisions atomic:
   The termination reads the apps with `GetCommittedUserSessionClients`, which takes `FOR SHARE` on
   MySQL, so it sees the app that sign-in added (see "MySQL snapshots" above).
   A credential change and a user's deletion that tell apps take each of the user's session rows
-  this way, in id order, after the user's row: the deletion takes it with `GetUserByIdForUpdate`.
+  this way, in id order, after the user's row: the deletion takes it with `GetUserByIDForUpdate`.
 - On MySQL, both deletions of a user, the administrator's and the account's own, and the
   administrator's disable make no ordinary read before they hold the user's row: the sessions and
   refresh tokens they read after the wait must include what a sign-in committed during it (#796).
   They open with the administrators' lock, `AcquireManagePermissionRow`, whose read of its row is
-  `FOR SHARE` on MySQL for this reason, then take the user's row with `GetUserByIdForUpdate` before
+  `FOR SHARE` on MySQL for this reason, then take the user's row with `GetUserByIDForUpdate` before
   reading the user's grants. On PostgreSQL the disable's lookup also makes it wait for a sign-in
   inserting a session, which holds a key-share lock on the user's row, so it ends that session too.
 - A disconnect (`revocation.DisconnectClientTx`) reads the client and the user's sessions before it
   sweeps, which on MySQL fixes the snapshot. So it reads the consent it deletes with
-  `GetConsentByUserIdAndClientIdForUpdate`, and `GetRefreshTokensByUserIdAndClientId` is a
+  `GetConsentByUserIDAndClientIDForUpdate`, and `GetRefreshTokensByUserIDAndClientID` is a
   `FOR UPDATE` read on MySQL, of the tokens and the codes it joins through: a grant or a consent
   committed after the first read is ended too. It and the hinted sign-out flip tokens with
   `MarkRefreshTokenAsRevoked` and report only the rows they moved, so two overlapping calls never
@@ -86,7 +86,7 @@ Preserve the row locks that make security decisions atomic:
   it to a session or issuing it. Authenticator removal takes that row first and lowers sessions in
   the same transaction, so a removed authenticator's code cannot subsequently be bound or issued
   (#542).
-- A credential change that emails the user reads the user's row with `GetUserByIdForUpdate` in the
+- A credential change that emails the user reads the user's row with `GetUserByIDForUpdate` in the
   change's own transaction and addresses the notice to that row, not to a read from before it
   (#724). A password write and a new set of recovery codes read it first; the authenticator's
   establish, removal and disabling count read it after their write to that row; a recovery code's
@@ -122,22 +122,22 @@ shows it on MySQL, PostgreSQL and SQL Server. A row lock is for one row read, de
 back with a security consequence, which today means #245's public/confidential switch
 (`AcquireClientRow`), #710's change of a client's identifier (`AcquireClientRow`):
 `SetClientIdentifier`, the column's one writer after creation, reads the identifier with
-`GetClientByIdForUpdate` and writes only one that differs byte for byte, reporting whether it did,
+`GetClientByIDForUpdate` and writes only one that differs byte for byte, reporting whether it did,
 so an unchanged identifier leaves the row and its `updated_at` alone, and the settings save decides
 the identifier checks it owes against the row it read under it, and on that answer revokes the
 client's grants in the same transaction, through `revocation.RevokeClientGrantsTx`; `UpdateClient`
 leaves the column alone (`dont-update`), and `client_identifier_test.go` shows two renames meeting
 on every engine and on SQL Server with READ_COMMITTED_SNAPSHOT on (`rcsi_test.go`'s fixture). The
-initial password grant reads the client with `GetClientByIdForUpdate`, a locking read that writes
+initial password grant reads the client with `GetClientByIDForUpdate`, a locking read that writes
 nothing, before it inserts its first refresh token, so it and a rename serialize on the row
 (`password_grant_rename_ordering_test.go`). Code issuance reads its client's row again with
-`GetClientByIdForShare` before inserting the code, a shared lock that a rename or a deletion waits
+`GetClientByIDForShare` before inserting the code, a shared lock that a rename or a deletion waits
 for and that waits for theirs, and refuses when the identifier is no longer the one it looked up
 (`code_issuance_rename_ordering_test.go`); on MySQL, PostgreSQL and SQL Server two issuances' reads
 of one client's row do not wait for each other, and on SQLite the read is plain, its one connection
 running one transaction at a time. A client's deletion (`DeleteClient`) takes no row ahead of its
 statements (#301), and reads the identifier it records in `deleted_clients` with
-`GetClientByIdForUpdate` just before its DELETE, which takes that row anyway: a rename committed
+`GetClientByIDForUpdate` just before its DELETE, which takes that row anyway: a rename committed
 meanwhile is waited for, and the deletion records the identifier the row held when it was deleted,
 not one it gave up. Holding the row, it sweeps the client's refresh tokens again, since an initial
 password grant it waited for has committed a token its first sweep could not see
@@ -215,8 +215,8 @@ write checks its slots' assets before it writes, so a sweep deleting one in betw
 on the same foreign key. The handler then reads the slots' assets again and answers the slot whose
 asset is gone with that slot's refusal; a write that fails while every asset is still stored stays a
 500. Reading a brand for a page reads
-its assets with `GetBrandAssetsByIds`, which leaves out the bytes; only the public asset route reads
-them, with `GetBrandAssetById`.
+its assets with `GetBrandAssetsByIDs`, which leaves out the bytes; only the public asset route reads
+them, with `GetBrandAssetByID`.
 
 ## A brand's footer links and contact
 

@@ -10,6 +10,6 @@ import "time"
 // There is no id: the jti is the key, and a token is revoked once. ExpiresAt is the token's own
 // exp, past which the row has nothing left to refuse and the background worker deletes it.
 type RevokedAccessToken struct {
-	Jti       string    `db:"jti"`
+	JTI       string    `db:"jti"`
 	ExpiresAt time.Time `db:"expires_at"`
 }

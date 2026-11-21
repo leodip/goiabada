@@ -61,7 +61,7 @@ func TestInitRoutes_EmailChangeNoticeIsSelfServiceOnly(t *testing.T) {
 
 		database := datamocks.NewDatabase(t)
 		database.On("GetUserBySubject", mock.Anything, mock.Anything, routesTestSubject).Return(&record.User{
-			Id:            1,
+			ID:            1,
 			Enabled:       true,
 			Subject:       routesTestSubject,
 			Email:         previousEmail,
@@ -72,7 +72,7 @@ func TestInitRoutes_EmailChangeNoticeIsSelfServiceOnly(t *testing.T) {
 		database.On("TrySetUserEmail", mock.Anything, mock.Anything, int64(1), previousEmail, true, newEmail).Return(true, nil).Once()
 		// The notice is drawn in the brand of the client the token names, as an email sent through the
 		// account API is: that client is on the default, here none (#817 decision 1).
-		database.On("GetClientPageBrand", mock.Anything, mock.Anything, routesTestAPIClientId).Return((*record.Brand)(nil), nil).Once()
+		database.On("GetClientPageBrand", mock.Anything, mock.Anything, routesTestAPIClientID).Return((*record.Brand)(nil), nil).Once()
 		database.On("GetDefaultBrand", mock.Anything, mock.Anything).Return((*record.Brand)(nil), nil).Once()
 		// It is sent with the notice's edit in its recipient's language, here none (#818).
 		database.On("GetEmailTemplate", mock.Anything, mock.Anything, "email_address_changed", "en").Return((*record.EmailTemplate)(nil), nil).Once()
@@ -90,20 +90,20 @@ func TestInitRoutes_EmailChangeNoticeIsSelfServiceOnly(t *testing.T) {
 		capture := newSMTPCapture(t)
 
 		database := datamocks.NewDatabase(t)
-		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&record.User{
-			Id:      1,
+		database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(&record.User{
+			ID:      1,
 			Enabled: true,
 			Subject: routesTestSubject,
 			Email:   previousEmail,
 		}, nil)
 		database.On("GetUserBySubject", mock.Anything, mock.Anything, routesTestSubject).Return(&record.User{
-			Id:      1,
+			ID:      1,
 			Subject: routesTestSubject,
 			Email:   previousEmail,
 		}, nil)
 		database.On("GetUserByEmail", mock.Anything, mock.Anything, newEmail).Return((*record.User)(nil), nil)
 		database.On("SetUserEmail", mock.Anything, mock.Anything, mock.MatchedBy(func(user *record.User) bool {
-			return user.Id == 1 && user.Email == newEmail
+			return user.ID == 1 && user.Email == newEmail
 		})).Return(nil).Once()
 		s := newServer(t, database)
 
@@ -186,7 +186,7 @@ func TestInitRoutes_ConcurrentEmailChangesNotifyThePreviousAddressOnce(t *testin
 	require.NoError(t, err)
 
 	var mu sync.Mutex
-	row := record.User{Id: 1, Enabled: true, Subject: routesTestSubject, Email: previousEmail,
+	row := record.User{ID: 1, Enabled: true, Subject: routesTestSubject, Email: previousEmail,
 		EmailVerified: true, PasswordHash: passwordHash}
 
 	arrived := 0
@@ -203,7 +203,7 @@ func TestInitRoutes_ConcurrentEmailChangesNotifyThePreviousAddressOnce(t *testin
 	database.On("GetUserByEmail", mock.Anything, mock.Anything, mock.Anything).Return((*record.User)(nil), nil).Maybe()
 	// The one notice is drawn in the brand of the token's client, which is on the default, here none
 	// (#817 decision 1).
-	database.On("GetClientPageBrand", mock.Anything, mock.Anything, routesTestAPIClientId).Return((*record.Brand)(nil), nil).Once()
+	database.On("GetClientPageBrand", mock.Anything, mock.Anything, routesTestAPIClientID).Return((*record.Brand)(nil), nil).Once()
 	database.On("GetDefaultBrand", mock.Anything, mock.Anything).Return((*record.Brand)(nil), nil).Once()
 	// It is sent with the notice's edit in its recipient's language, here none (#818).
 	database.On("GetEmailTemplate", mock.Anything, mock.Anything, "email_address_changed", "en").Return((*record.EmailTemplate)(nil), nil).Once()

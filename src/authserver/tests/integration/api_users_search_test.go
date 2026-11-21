@@ -28,7 +28,7 @@ func TestAPIUsersSearch_Success(t *testing.T) {
 	// Debug: Verify test users were created
 	t.Logf("Created %d test users with suffix '%s':", len(testUsers), uniqueSuffix)
 	for _, user := range testUsers {
-		t.Logf("  - %s '%s' (ID: %d, Enabled: %t)", user.Email, user.GivenName, user.Id, user.Enabled)
+		t.Logf("  - %s '%s' (ID: %d, Enabled: %t)", user.Email, user.GivenName, user.ID, user.Enabled)
 	}
 
 	// Test: Search using query parameter to find our specific test users
@@ -60,7 +60,7 @@ func TestAPIUsersSearch_Success(t *testing.T) {
 		if _, exists := expectedEmails[user.Email]; exists {
 			expectedEmails[user.Email] = true
 			t.Logf("Found test user: %s '%s' (ID: %d, Enabled: %t)",
-				user.Email, user.GivenName, user.Id, user.Enabled)
+				user.Email, user.GivenName, user.ID, user.Enabled)
 		}
 	}
 
@@ -91,12 +91,12 @@ func TestAPIUsersSearch_WithQuery(t *testing.T) {
 	require.NoError(t, err)
 
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, user1.Id)
+		_ = database.DeleteUser(context.Background(), nil, user1.ID)
 	}()
 
 	// Debug: Verify test user was created
 	t.Logf("Created test user: %s '%s %s' (ID: %d, Enabled: %t)",
-		user1.Email, user1.GivenName, user1.FamilyName, user1.Id, user1.Enabled)
+		user1.Email, user1.GivenName, user1.FamilyName, user1.ID, user1.Enabled)
 
 	// Test: Search with specific query that should match our user
 	searchQuery := "uniquejohn" + uniqueSuffix
@@ -123,7 +123,7 @@ func TestAPIUsersSearch_WithQuery(t *testing.T) {
 	t.Logf("Search results:")
 	for i, user := range searchResponse.Users {
 		t.Logf("  [%d] ID: %d, Email: %s, GivenName: %s, FamilyName: %s, Enabled: %t",
-			i, user.Id, user.Email, user.GivenName, user.FamilyName, user.Enabled)
+			i, user.ID, user.Email, user.GivenName, user.FamilyName, user.Enabled)
 	}
 
 	// Check if our test user is in results
@@ -173,7 +173,7 @@ func TestAPIUsersSearch_Unauthorized(t *testing.T) {
 	req, err := http.NewRequest("GET", url, nil)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -481,7 +481,7 @@ func createTestUsersWithSuffix(t *testing.T, suffix string) []*record.User {
 // TestAPIUsersSearch_FixtureIsIndependentAcrossCalls is the regression guard for
 // the defect createTestUsersWithSuffix replaced: two callers of the search
 // fixture overlapping in the database used to collide on three fixed addresses,
-// and the collision then cascaded, because a failed insert leaves Id == 0 and
+// and the collision then cascaded, because a failed insert leaves ID == 0 and
 // the cleanup that followed deleted nothing while saying nothing.
 //
 // It builds the fixture twice with no cleanup in between, which is the shape a
@@ -498,10 +498,10 @@ func TestAPIUsersSearch_FixtureIsIndependentAcrossCalls(t *testing.T) {
 	ids := make(map[int64]bool)
 	emails := make(map[string]bool)
 	for _, user := range append(append([]*record.User{}, first...), second...) {
-		require.NotZero(t, user.Id, "every fixture user must have been inserted")
-		assert.False(t, ids[user.Id], "user id %d was handed out twice", user.Id)
+		require.NotZero(t, user.ID, "every fixture user must have been inserted")
+		assert.False(t, ids[user.ID], "user id %d was handed out twice", user.ID)
 		assert.False(t, emails[user.Email], "address %q was handed out twice", user.Email)
-		ids[user.Id] = true
+		ids[user.ID] = true
 		emails[user.Email] = true
 	}
 	assert.Len(t, ids, 6, "two calls of the fixture must produce six distinct users")

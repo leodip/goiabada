@@ -42,17 +42,17 @@ import (
 type signInsHeld struct {
 	held      map[string]*ceremony.AuthContext
 	steps     []string
-	rotatedId string
+	rotatedID string
 	rotatedTo int64
 	saved     *ceremony.AuthContext
 	rotateErr error
 }
 
-func (s *signInsHeld) HeldAuthContext(_ *http.Request, ceremonyId string) (*ceremony.AuthContext, error) {
+func (s *signInsHeld) HeldAuthContext(_ *http.Request, ceremonyID string) (*ceremony.AuthContext, error) {
 	if len(s.held) == 0 {
 		return nil, ceremony.ErrNoAuthContext
 	}
-	authContext, ok := s.held[ceremonyId]
+	authContext, ok := s.held[ceremonyID]
 	if !ok {
 		return nil, errs.WithStack(ceremony.ErrCeremonyNotHeld)
 	}
@@ -60,9 +60,9 @@ func (s *signInsHeld) HeldAuthContext(_ *http.Request, ceremonyId string) (*cere
 	return &held, nil
 }
 
-func (s *signInsHeld) RegenerateSession(_ http.ResponseWriter, _ *http.Request, ceremonyId string, userId int64) error {
+func (s *signInsHeld) RegenerateSession(_ http.ResponseWriter, _ *http.Request, ceremonyID string, userID int64) error {
 	s.steps = append(s.steps, "rotate")
-	s.rotatedId, s.rotatedTo = ceremonyId, userId
+	s.rotatedID, s.rotatedTo = ceremonyID, userID
 	return s.rotateErr
 }
 
@@ -75,16 +75,16 @@ func (s *signInsHeld) SaveAuthContext(_ http.ResponseWriter, _ *http.Request, au
 
 // atThePasswordStep is a sign-in for an app, at the step whose page has the Create an account link.
 func atThePasswordStep() *ceremony.AuthContext {
-	return &ceremony.AuthContext{CeremonyId: aCeremonyId, ClientId: "shop", AuthState: ceremony.AuthStateLevel1Password}
+	return &ceremony.AuthContext{CeremonyID: aCeremonyID, ClientID: "shop", AuthState: ceremony.AuthStateLevel1Password}
 }
 
 // continuedSignIn is where a carried-on sign-in is sent: its next step after the password, naming it.
-const continuedSignIn = testBaseURL + "/auth/level1completed?ceremony=" + aCeremonyId
+const continuedSignIn = testBaseURL + "/auth/level1completed?ceremony=" + aCeremonyID
 
 const (
 	newAccountEmail    = "newcomer@example.com"
 	newAccountPassword = "Str0ngP4ss!"
-	newAccountId       = int64(57)
+	newAccountID       = int64(57)
 )
 
 // assertCarriedOn holds the sign-in to having been carried on for the new account: rotated, then
@@ -92,13 +92,13 @@ const (
 func assertCarriedOn(t *testing.T, signIns *signInsHeld) {
 	t.Helper()
 	assert.Equal(t, []string{"rotate", "save"}, signIns.steps, "the identifier is rotated before the save")
-	assert.Equal(t, aCeremonyId, signIns.rotatedId)
-	assert.Equal(t, newAccountId, signIns.rotatedTo)
+	assert.Equal(t, aCeremonyID, signIns.rotatedID)
+	assert.Equal(t, newAccountID, signIns.rotatedTo)
 	require.NotNil(t, signIns.saved)
 	assert.Equal(t, ceremony.AuthStateLevel1PasswordCompleted, signIns.saved.AuthState)
-	assert.Equal(t, newAccountId, signIns.saved.UserId)
+	assert.Equal(t, newAccountID, signIns.saved.UserID)
 	assert.True(t, signIns.saved.Level1AuthCompleted)
-	assert.Equal(t, "shop", signIns.saved.ClientId)
+	assert.Equal(t, "shop", signIns.saved.ClientID)
 }
 
 // registerWithoutVerification is the register form submitted with a password, at the URL the
@@ -133,7 +133,7 @@ func newRegistration(t *testing.T, signIns *signInsHeld) *registration {
 	passwordValidator.On("ValidatePassword", mock.Anything, newAccountPassword, mock.Anything).Return(nil).Once()
 	userCreator.On("CreateUser", mock.Anything, mock.MatchedBy(func(input *usercreation.Input) bool {
 		return input.Email == newAccountEmail
-	})).Return(&record.User{Id: newAccountId, Email: newAccountEmail, Enabled: true}, nil).Once()
+	})).Return(&record.User{ID: newAccountID, Email: newAccountEmail, Enabled: true}, nil).Once()
 	r.auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		r.audited = append(r.audited, args.String(1))
 	}).Return()
@@ -145,11 +145,11 @@ func newRegistration(t *testing.T, signIns *signInsHeld) *registration {
 }
 
 func TestHandleRegisterPost_CarriesOnTheSignInTheCreateAnAccountLinkNamed(t *testing.T) {
-	signIns := &signInsHeld{held: map[string]*ceremony.AuthContext{aCeremonyId: atThePasswordStep()}}
+	signIns := &signInsHeld{held: map[string]*ceremony.AuthContext{aCeremonyID: atThePasswordStep()}}
 	r := newRegistration(t, signIns)
 
 	rr := httptest.NewRecorder()
-	r.handler.ServeHTTP(rr, registerWithoutVerification("?ceremony="+aCeremonyId))
+	r.handler.ServeHTTP(rr, registerWithoutVerification("?ceremony="+aCeremonyID))
 
 	assert.Equal(t, http.StatusSeeOther, rr.Code)
 	assert.Equal(t, continuedSignIn, rr.Header().Get("Location"))
@@ -172,14 +172,14 @@ func TestHandleRegisterPost_KeepsTodaysPageWhenNoSignInIsCarriedOn(t *testing.T)
 		wantSteps []string
 	}{
 		{"registration that did not start from a sign-in", "",
-			map[string]*ceremony.AuthContext{aCeremonyId: atThePasswordStep()}, nil, nil},
-		{"a sign-in the browser does not hold", "?ceremony=" + aCeremonyId,
+			map[string]*ceremony.AuthContext{aCeremonyID: atThePasswordStep()}, nil, nil},
+		{"a sign-in the browser does not hold", "?ceremony=" + aCeremonyID,
 			map[string]*ceremony.AuthContext{"another-sign-in-0123456789abcdef": atThePasswordStep()}, nil, nil},
-		{"a browser holding no sign-in", "?ceremony=" + aCeremonyId, nil, nil, nil},
-		{"a sign-in that has moved past the password step", "?ceremony=" + aCeremonyId,
-			map[string]*ceremony.AuthContext{aCeremonyId: pastThePassword}, nil, nil},
-		{"a sign-in the browser lost meanwhile", "?ceremony=" + aCeremonyId,
-			map[string]*ceremony.AuthContext{aCeremonyId: atThePasswordStep()},
+		{"a browser holding no sign-in", "?ceremony=" + aCeremonyID, nil, nil, nil},
+		{"a sign-in that has moved past the password step", "?ceremony=" + aCeremonyID,
+			map[string]*ceremony.AuthContext{aCeremonyID: pastThePassword}, nil, nil},
+		{"a sign-in the browser lost meanwhile", "?ceremony=" + aCeremonyID,
+			map[string]*ceremony.AuthContext{aCeremonyID: atThePasswordStep()},
 			errs.WithStack(ceremony.ErrCeremonyReplaced), []string{"rotate"}},
 	}
 	for _, tc := range tests {
@@ -209,8 +209,8 @@ func TestHandleRegisterPost_WithVerificationTheLinkCarriesTheSignIn(t *testing.T
 		query    string
 		wantLink func(code string) string
 	}{
-		{"the sign-in the Create an account link named", "?ceremony=" + aCeremonyId, func(code string) string {
-			return testBaseURL + "/account/activate?ceremony=" + aCeremonyId + "&code=" + code
+		{"the sign-in the Create an account link named", "?ceremony=" + aCeremonyID, func(code string) string {
+			return testBaseURL + "/account/activate?ceremony=" + aCeremonyID + "&code=" + code
 		}},
 		{"no sign-in", "", func(code string) string {
 			return testBaseURL + "/account/activate?code=" + code
@@ -261,7 +261,7 @@ func TestHandleActivateGet_TheLinkFollowedKeepsTheSignIn(t *testing.T) {
 		ceremony     string
 		wantLocation string
 	}{
-		{"a sign-in's id", aCeremonyId, emaillinks.AccountActivatePath + "?ceremony=" + aCeremonyId},
+		{"a sign-in's id", aCeremonyID, emaillinks.AccountActivatePath + "?ceremony=" + aCeremonyID},
 		{"a value that is not one", "not-an-id", emaillinks.AccountActivatePath},
 	}
 	for _, tc := range tests {
@@ -325,7 +325,7 @@ func newActivation(t *testing.T, signIns *signInsHeld) *activation {
 	datamocks.ExpectRunInTransaction(database, activationTx, func(string) {})
 	database.On("DeletePreRegistrationHoldingCode", mock.Anything, activationTx, int64(7), codeHash).Return(true, nil).Once()
 	userCreator.On("CreateUserInTransaction", mock.Anything, activationTx, mock.Anything).
-		Return(&record.User{Id: newAccountId, Email: activateTestEmail, Enabled: true, EmailVerified: true}, nil).Once()
+		Return(&record.User{ID: newAccountID, Email: activateTestEmail, Enabled: true, EmailVerified: true}, nil).Once()
 	auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		a.audited = append(a.audited, args.String(1))
 	}).Return()
@@ -336,11 +336,11 @@ func newActivation(t *testing.T, signIns *signInsHeld) *activation {
 }
 
 func TestHandleActivatePost_CarriesOnTheSignInTheLinkNamed(t *testing.T) {
-	signIns := &signInsHeld{held: map[string]*ceremony.AuthContext{aCeremonyId: atThePasswordStep()}}
+	signIns := &signInsHeld{held: map[string]*ceremony.AuthContext{aCeremonyID: atThePasswordStep()}}
 	a := newActivation(t, signIns)
 
 	rr := httptest.NewRecorder()
-	sent := postActivationTo(t, a.store, "?ceremony="+aCeremonyId, 7, a.codeHash)
+	sent := postActivationTo(t, a.store, "?ceremony="+aCeremonyID, 7, a.codeHash)
 	a.handler.ServeHTTP(rr, sent)
 
 	assert.Equal(t, http.StatusSeeOther, rr.Code)
@@ -368,16 +368,16 @@ func TestHandleActivatePost_ActivatesWhereTheSignInIsNotHeld(t *testing.T) {
 		rotateErr       error
 		wantReturnToApp bool
 	}{
-		{"a link opened in another browser", "?ceremony=" + aCeremonyId, nil, nil, true},
-		{"a sign-in this browser no longer holds", "?ceremony=" + aCeremonyId,
+		{"a link opened in another browser", "?ceremony=" + aCeremonyID, nil, nil, true},
+		{"a sign-in this browser no longer holds", "?ceremony=" + aCeremonyID,
 			map[string]*ceremony.AuthContext{"another-sign-in-0123456789abcdef": atThePasswordStep()}, nil, true},
-		{"a sign-in that has moved past the password step", "?ceremony=" + aCeremonyId,
-			map[string]*ceremony.AuthContext{aCeremonyId: pastThePassword}, nil, true},
-		{"a sign-in the browser lost meanwhile", "?ceremony=" + aCeremonyId,
-			map[string]*ceremony.AuthContext{aCeremonyId: atThePasswordStep()},
+		{"a sign-in that has moved past the password step", "?ceremony=" + aCeremonyID,
+			map[string]*ceremony.AuthContext{aCeremonyID: pastThePassword}, nil, true},
+		{"a sign-in the browser lost meanwhile", "?ceremony=" + aCeremonyID,
+			map[string]*ceremony.AuthContext{aCeremonyID: atThePasswordStep()},
 			errs.WithStack(ceremony.ErrCeremonyReplaced), true},
 		{"registration that did not start from a sign-in", "",
-			map[string]*ceremony.AuthContext{aCeremonyId: atThePasswordStep()}, nil, false},
+			map[string]*ceremony.AuthContext{aCeremonyID: atThePasswordStep()}, nil, false},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

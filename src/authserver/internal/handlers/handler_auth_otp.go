@@ -24,12 +24,12 @@ const (
 	recoveryCodeField         = "recoveryCode"
 )
 
-// HandleAuthOtpGet is GET /auth/otp, which accepts level2_otp and renders the form
+// HandleAuthOTPGet is GET /auth/otp, which accepts level2_otp and renders the form
 // authflow.OTPPrompt prepared: the code form for a user with an authenticator, or the recovery-code
 // form in its place when the request asks for it, and the enrolment form, with its QR code and
 // secret, for a user without one, whatever the request asks: a user with no authenticator has no
 // recovery codes (#257 decision 7).
-func HandleAuthOtpGet(
+func HandleAuthOTPGet(
 	boundary *CeremonyBoundary,
 	pageRenderer PageRenderer,
 	ceremonyStore CeremonyStore,
@@ -81,7 +81,7 @@ type AccountNotifier interface {
 	SendRecoveryCodeUsed(r *http.Request, to accountnotice.Recipient, remaining int)
 }
 
-// HandleAuthOtpPost is POST /auth/otp, which accepts level2_otp. It reads the code from the
+// HandleAuthOTPPost is POST /auth/otp, which accepts level2_otp. It reads the code from the
 // submitted body and runs authflow.OTPSubmission on it, then answers what it did: the form again
 // beside a refusal, which for a code from the next step says to check the device's time (#142), the
 // lost-enrolment page, or the redirect to /auth/completed. An authenticator set up by the
@@ -95,7 +95,7 @@ type AccountNotifier interface {
 // The boundary refuses a submission naming another ceremony before the state gate and before the
 // code is looked at, so an OTP form left open in another tab gets the "no longer active" page and
 // spends no step of a code the current ceremony still needs (#79, #111 decision 3).
-func HandleAuthOtpPost(
+func HandleAuthOTPPost(
 	boundary *CeremonyBoundary,
 	pageRenderer PageRenderer,
 	ceremonyStore CeremonyStore,
@@ -137,15 +137,15 @@ func HandleAuthOtpPost(
 
 		switch result.Answer {
 		case authflow.OTPAccountDisabled:
-			renderRefusal(i18n.ErrCodeOtpAccountDisabled)
+			renderRefusal(i18n.ErrCodeOTPAccountDisabled)
 		case authflow.OTPEnrolmentLost:
 			answerLostEnrolment(w, r, boundary, pageRenderer, result.SaveErr)
 		case authflow.OTPCodeMissing:
-			renderRefusal(i18n.ErrCodeOtpCodeRequired)
+			renderRefusal(i18n.ErrCodeOTPCodeRequired)
 		case authflow.OTPRefused:
-			renderRefusal(i18n.ErrCodeOtpIncorrectCode)
+			renderRefusal(i18n.ErrCodeOTPIncorrectCode)
 		case authflow.OTPClockAhead:
-			renderRefusal(errcode.OtpClockAhead)
+			renderRefusal(errcode.OTPClockAhead)
 		case authflow.OTPAccepted:
 			boundary.redirectAfterSave(w, r, authContext, result.NextStep, result.SaveErr)
 		}
@@ -172,7 +172,7 @@ func sendOTPNotice(r *http.Request, notifier AccountNotifier, result authflow.OT
 	}
 }
 
-// answerRecoveryCode is HandleAuthOtpPost's recovery-code arm: it runs
+// answerRecoveryCode is HandleAuthOTPPost's recovery-code arm: it runs
 // OTPSubmission.RunRecoveryCode on the code and answers what it did, drawing the recovery-code form
 // again beside a refusal, and then hands a code that signed in to notifier (#737).
 func answerRecoveryCode(w http.ResponseWriter, r *http.Request, boundary *CeremonyBoundary,
@@ -197,13 +197,13 @@ func answerRecoveryCode(w http.ResponseWriter, r *http.Request, boundary *Ceremo
 
 	switch result.Answer {
 	case authflow.OTPAccountDisabled:
-		renderRefusal(i18n.ErrCodeOtpAccountDisabled)
+		renderRefusal(i18n.ErrCodeOTPAccountDisabled)
 	case authflow.OTPEnrolmentLost:
 		answerLostEnrolment(w, r, boundary, pageRenderer, result.SaveErr)
 	case authflow.OTPRecoveryCodeMissing:
-		renderRefusal(errcode.OtpRecoveryCodeRequired)
+		renderRefusal(errcode.OTPRecoveryCodeRequired)
 	case authflow.OTPRecoveryCodeRefused:
-		renderRefusal(errcode.OtpIncorrectRecoveryCode)
+		renderRefusal(errcode.OTPIncorrectRecoveryCode)
 	case authflow.OTPAccepted:
 		boundary.redirectAfterSave(w, r, authContext, result.NextStep, result.SaveErr)
 	}
@@ -219,7 +219,7 @@ func otpFormBind(authContext *ceremony.AuthContext, displayInfo *authflow.Client
 
 	return map[string]interface{}{
 		"error":                   message,
-		"ceremonyId":              authContext.CeremonyId,
+		"ceremonyId":              authContext.CeremonyID,
 		"layoutShowClientSection": displayInfo.ShowSection,
 		"layoutClientName":        displayInfo.ClientName,
 		"layoutHasClientLogo":     displayInfo.HasLogo,

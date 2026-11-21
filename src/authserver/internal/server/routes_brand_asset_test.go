@@ -25,13 +25,13 @@ import (
 // A font's grant names the origin of the configured admin console base URL, as a browser sends it
 // in Origin: scheme, host and port, without the path (decision 8).
 func TestRegisterRoutes_ABrandAssetCarriesNoBrowserSessionAndGrantsAFontToTheConsole(t *testing.T) {
-	font := record.BrandAsset{Id: 31, Kind: record.BrandAssetKindFont, ContentType: "font/woff2",
+	font := record.BrandAsset{ID: 31, Kind: record.BrandAssetKindFont, ContentType: "font/woff2",
 		Fingerprint: "00112233aabb", Content: []byte("wOF2-bytes")}
 	for _, method := range []string{http.MethodGet, http.MethodHead} {
 		t.Run(method, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
 			database.On("PoolStats").Return(testPoolStats).Maybe()
-			database.On("GetBrandAssetById", mock.Anything, mock.Anything, int64(31)).Return(&font, nil).Once()
+			database.On("GetBrandAssetByID", mock.Anything, mock.Anything, int64(31)).Return(&font, nil).Once()
 			cfg := &config.Config{}
 			cfg.AuthServer.ProfilePictureMaxSizeBytes = testProfilePictureMaxSizeBytes
 			cfg.AdminConsole.BaseURL = "https://Console.Example.com:8443/admin/"

@@ -192,8 +192,8 @@ func TestValidateScopes_BoundIsInBytesAndComesBeforeAnyLookup(t *testing.T) {
 
 		mockDB := datamocks.NewDatabase(t)
 		mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "r").
-			Return(&record.Resource{Id: 1, ResourceIdentifier: "r"}, nil)
-		mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(1)).Return(permissionList, nil)
+			Return(&record.Resource{ID: 1, ResourceIdentifier: "r"}, nil)
+		mockDB.On("GetPermissionsByResourceID", mock.Anything, mock.Anything, int64(1)).Return(permissionList, nil)
 
 		assert.NoError(t, NewAuthorizeValidator(mockDB).ValidateScopes(context.Background(), scope))
 	})
@@ -265,10 +265,10 @@ func TestValidateTokenRequest_ROPC_ScopeBound(t *testing.T) {
 
 		passwordHash, err := passwordhash.Hash("correctpassword")
 		require.NoError(t, err)
-		user := &record.User{Id: 1, Email: "user@example.com", PasswordHash: passwordHash, Enabled: true}
+		user := &record.User{ID: 1, Email: "user@example.com", PasswordHash: passwordHash, Enabled: true}
 		ropcEnabled := true
 		client := &record.Client{
-			Id: 1, ClientIdentifier: "ropc-client", Enabled: true, IsPublic: true,
+			ID: 1, ClientIdentifier: "ropc-client", Enabled: true, IsPublic: true,
 			ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled,
 		}
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "ropc-client").Return(client, nil).Once()
@@ -277,7 +277,7 @@ func TestValidateTokenRequest_ROPC_ScopeBound(t *testing.T) {
 	}
 	request := func(password, scope string) *ValidateTokenRequestInput {
 		return &ValidateTokenRequestInput{
-			GrantType: "password", ClientId: "ropc-client", Username: "user@example.com",
+			GrantType: "password", ClientID: "ropc-client", Username: "user@example.com",
 			Password: password, Scope: scope,
 		}
 	}

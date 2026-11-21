@@ -35,7 +35,7 @@ import (
 // noBumps is the session port a rotation bumps through, which these cases do not exercise.
 type noBumps struct{}
 
-func (noBumps) BumpUserSession(context.Context, string, int64, string, record.AcrLevel, string) (*record.UserSession, error) {
+func (noBumps) BumpUserSession(context.Context, string, int64, string, record.ACRLevel, string) (*record.UserSession, error) {
 	return nil, nil
 }
 
@@ -109,7 +109,7 @@ type family struct {
 	live *record.RefreshToken
 }
 
-func (f *family) firstJti() string { return f.replayed.RefreshTokenJti }
+func (f *family) firstJTI() string { return f.replayed.RefreshTokenJTI }
 
 func newFamily(t *testing.T, db data.Database, ropc bool) *family {
 	t.Helper()
@@ -129,33 +129,33 @@ func newFamilyOfShape(t *testing.T, db data.Database, shape familyShape) *family
 	f := &family{ropc: ropc, offline: shape == offlineFamily, client: client, user: user}
 
 	now := time.Now().UTC().Truncate(time.Microsecond)
-	firstJti := fake.UUID()
+	firstJTI := fake.UUID()
 	row := func(jti string, revoked bool) *record.RefreshToken {
 		token := &record.RefreshToken{
-			RefreshTokenJti:      jti,
-			FirstRefreshTokenJti: firstJti,
+			RefreshTokenJTI:      jti,
+			FirstRefreshTokenJTI: firstJTI,
 			Revoked:              revoked,
 			Scope:                "openid profile",
 			IssuedAt:             sql.NullTime{Time: now, Valid: true},
 			ExpiresAt:            sql.NullTime{Time: now.Add(time.Hour), Valid: true},
 			MaxLifetime:          sql.NullTime{Time: now.Add(24 * time.Hour), Valid: true},
 		}
-		if jti != firstJti {
-			token.PreviousRefreshTokenJti = firstJti
+		if jti != firstJTI {
+			token.PreviousRefreshTokenJTI = firstJTI
 		}
 		switch {
 		case ropc:
-			token.UserId = sql.NullInt64{Int64: user.Id, Valid: true}
-			token.ClientId = sql.NullInt64{Int64: client.Id, Valid: true}
+			token.UserID = sql.NullInt64{Int64: user.ID, Valid: true}
+			token.ClientID = sql.NullInt64{Int64: client.ID, Valid: true}
 			token.RefreshTokenType = "Offline"
 			token.AuthenticatedAt = sql.NullTime{Time: now.Add(-time.Hour), Valid: true}
 		case f.offline:
 			// An offline grant's token names no session of its own: the one it came from is on its code.
-			token.CodeId = sql.NullInt64{Int64: f.code.Id, Valid: true}
+			token.CodeID = sql.NullInt64{Int64: f.code.ID, Valid: true}
 			token.RefreshTokenType = "Offline"
 			token.Scope = "openid profile offline_access"
 		default:
-			token.CodeId = sql.NullInt64{Int64: f.code.Id, Valid: true}
+			token.CodeID = sql.NullInt64{Int64: f.code.ID, Valid: true}
 			token.SessionIdentifier = f.code.SessionIdentifier
 			token.RefreshTokenType = "Refresh"
 		}
@@ -164,14 +164,14 @@ func newFamilyOfShape(t *testing.T, db data.Database, shape familyShape) *family
 	}
 
 	if !ropc {
-		session := createTestUserSessionOn(t, db, user.Id)
-		f.code = createTestCodeInSessionOn(t, db, client.Id, user.Id, session.SessionIdentifier)
+		session := createTestUserSessionOn(t, db, user.ID)
+		f.code = createTestCodeInSessionOn(t, db, client.ID, user.ID, session.SessionIdentifier)
 		if f.offline {
 			f.code.Scope = "openid profile offline_access"
 			require.NoError(t, db.UpdateCode(context.Background(), nil, f.code))
 		}
 	}
-	f.replayed = row(firstJti, true)
+	f.replayed = row(firstJTI, true)
 	f.live = row(fake.UUID(), false)
 	return f
 }
@@ -182,7 +182,7 @@ func newFamilyOfShape(t *testing.T, db data.Database, shape familyShape) *family
 func (f *family) presenting(t *testing.T, db data.Database, jti string) *issuance.RefreshTokenGrantInput {
 	t.Helper()
 
-	token, err := db.GetRefreshTokenByJti(context.Background(), nil, jti)
+	token, err := db.GetRefreshTokenByJTI(context.Background(), nil, jti)
 	require.NoError(t, err)
 	require.NotNil(t, token)
 	if !f.ropc {
@@ -207,9 +207,9 @@ func (f *family) members(t *testing.T, db data.Database) int {
 	var tokens []*record.RefreshToken
 	var err error
 	if f.ropc {
-		tokens, err = db.GetRefreshTokensByUserId(context.Background(), nil, f.user.Id)
+		tokens, err = db.GetRefreshTokensByUserID(context.Background(), nil, f.user.ID)
 	} else {
-		tokens, err = db.GetRefreshTokensByCodeId(context.Background(), nil, f.code.Id)
+		tokens, err = db.GetRefreshTokensByCodeID(context.Background(), nil, f.code.ID)
 	}
 	require.NoError(t, err)
 	return len(tokens)
@@ -218,7 +218,7 @@ func (f *family) members(t *testing.T, db data.Database) int {
 func childOf(t *testing.T, db data.Database, response string) *record.RefreshToken {
 	t.Helper()
 
-	child, err := db.GetRefreshTokenByJti(context.Background(), nil, claimsOf(t, response)["jti"].(string))
+	child, err := db.GetRefreshTokenByJTI(context.Background(), nil, claimsOf(t, response)["jti"].(string))
 	require.NoError(t, err)
 	require.NotNil(t, child, "the rotation's child was inserted")
 	return child
@@ -231,7 +231,7 @@ func childOf(t *testing.T, db data.Database, response string) *record.RefreshTok
 func (f *family) requireUnredeemable(t *testing.T, db data.Database, child *record.RefreshToken) {
 	t.Helper()
 
-	presented := f.presenting(t, db, child.RefreshTokenJti)
+	presented := f.presenting(t, db, child.RefreshTokenJTI)
 	_, _, err := refreshIssuerOn(db).IssueRefreshTokenGrant(context.Background(), rotationSettings(), presented)
 
 	var replayed *issuance.RefreshTokenReplayedError
@@ -278,7 +278,7 @@ func startRotation(t *testing.T, ctx context.Context, f *family, pause *pausingI
 	t.Helper()
 
 	outcome := make(chan rotationResult, 1)
-	input := f.presenting(t, pause, f.live.RefreshTokenJti)
+	input := f.presenting(t, pause, f.live.RefreshTokenJTI)
 	go func() {
 		response, _, err := refreshIssuerOn(pause).IssueRefreshTokenGrant(ctx, rotationSettings(), input)
 		result := rotationResult{err: err}
@@ -335,7 +335,7 @@ func TestRefreshRotation_AContainmentBetweenTheClaimAndTheInsertLeavesAChildThat
 			f := newFamily(t, database, ropc)
 			// Read before the rotation holds anything: a read on the package's handle while the
 			// rotation's transaction holds SQLite's one write lock is not what this case measures.
-			replayInput := f.presenting(t, database, f.replayed.RefreshTokenJti)
+			replayInput := f.presenting(t, database, f.replayed.RefreshTokenJTI)
 			pause := newPausingInserts(t, database)
 			tx, rotation := startRotation(t, ctx, f, pause)
 
@@ -355,7 +355,7 @@ func TestRefreshRotation_AContainmentBetweenTheClaimAndTheInsertLeavesAChildThat
 			require.ErrorAs(t, containment.await(t), &replayed, "the replay is refused as a replay once it resumes")
 			assert.True(t, replayed.FamilyRecorded, "this containment wrote the family's record")
 
-			recorded, err := database.IsRefreshTokenFamilyRevoked(context.Background(), nil, f.firstJti())
+			recorded, err := database.IsRefreshTokenFamilyRevoked(context.Background(), nil, f.firstJTI())
 			require.NoError(t, err)
 			assert.True(t, recorded, "the family is recorded")
 
@@ -388,7 +388,7 @@ func TestRefreshRotation_AClientMadePublicBetweenTheClaimAndTheInsertLeavesAChil
 
 			flip := goBlocked(t, "the client's revocation", tx, func(reached func()) error {
 				reached()
-				_, err := revocation.RevokeClientGrantsTx(ctx, other, f.client.Id, revocation.ReasonClientBecamePublic, func(*sql.Tx) (bool, error) { return true, nil })
+				_, err := revocation.RevokeClientGrantsTx(ctx, other, f.client.ID, revocation.ReasonClientBecamePublic, func(*sql.Tx) (bool, error) { return true, nil })
 				return err
 			})
 			flip.requireBlocked(t)
@@ -398,7 +398,7 @@ func TestRefreshRotation_AClientMadePublicBetweenTheClaimAndTheInsertLeavesAChil
 			result := <-rotation
 			require.NoError(t, flip.await(t), "the revocation commits, rerun once if the engine chose it as a deadlock victim")
 
-			recorded, err := database.IsRefreshTokenFamilyRevoked(context.Background(), nil, f.firstJti())
+			recorded, err := database.IsRefreshTokenFamilyRevoked(context.Background(), nil, f.firstJTI())
 			require.NoError(t, err)
 			assert.True(t, recorded, "the flip recorded the family although one of its members was mid-rotation")
 
@@ -460,10 +460,10 @@ func TestRefreshRotation_ASessionRevocationBetweenTheClaimAndTheInsertEndsTheNew
 			result := <-rotation
 			require.NoError(t, revoking.await(t), "the revocation commits, rerun once if the engine chose it as a deadlock victim")
 
-			recorded, err := database.IsRefreshTokenFamilyRevoked(context.Background(), nil, f.firstJti())
+			recorded, err := database.IsRefreshTokenFamilyRevoked(context.Background(), nil, f.firstJTI())
 			require.NoError(t, err)
 			assert.True(t, recorded, "the revocation recorded the family although one of its members was mid-rotation")
-			live, err := database.IsRefreshTokenFamilyLive(context.Background(), nil, f.firstJti())
+			live, err := database.IsRefreshTokenFamilyLive(context.Background(), nil, f.firstJTI())
 			require.NoError(t, err)
 			assert.False(t, live, "the grant is dead")
 
@@ -498,15 +498,15 @@ func TestRefreshRotation_ARecordedFamilyRollsTheRotationBack(t *testing.T) {
 			defer cancel()
 
 			f := newFamily(t, database, ropc)
-			written, err := database.RecordRefreshTokenFamilyRevoked(ctx, nil, f.firstJti(), "test_family_record")
+			written, err := database.RecordRefreshTokenFamilyRevoked(ctx, nil, f.firstJTI(), "test_family_record")
 			require.NoError(t, err)
 			require.True(t, written)
 
 			_, _, err = refreshIssuerOn(database).IssueRefreshTokenGrant(ctx, rotationSettings(),
-				f.presenting(t, database, f.live.RefreshTokenJti))
+				f.presenting(t, database, f.live.RefreshTokenJTI))
 
 			require.ErrorIs(t, err, issuance.ErrRefreshFamilyRevoked)
-			assertTokenRevoked(t, f.live.Id, false, "the presented token: the claim rolled back with the rotation")
+			assertTokenRevoked(t, f.live.ID, false, "the presented token: the claim rolled back with the rotation")
 			assert.Equal(t, 2, f.members(t, database), "no child was inserted")
 		})
 	}
@@ -527,19 +527,19 @@ func TestRefreshRotation_AContainmentAfterTheRotationRevokesTheChild(t *testing.
 
 			f := newFamily(t, database, ropc)
 			response, _, err := refreshIssuerOn(database).IssueRefreshTokenGrant(ctx, rotationSettings(),
-				f.presenting(t, database, f.live.RefreshTokenJti))
+				f.presenting(t, database, f.live.RefreshTokenJTI))
 			require.NoError(t, err)
 			child := childOf(t, database, response.RefreshToken)
 
 			_, _, err = refreshIssuerOn(database).IssueRefreshTokenGrant(ctx, rotationSettings(),
-				f.presenting(t, database, f.replayed.RefreshTokenJti))
+				f.presenting(t, database, f.replayed.RefreshTokenJTI))
 
 			var replayed *issuance.RefreshTokenReplayedError
 			require.ErrorAs(t, err, &replayed)
 			assert.Equal(t, int64(1), replayed.FamilyRevokedCount, "the child is the one live member")
 			assert.True(t, replayed.FamilyRecorded)
-			assertTokenRevoked(t, child.Id, true, "the child the containment swept")
-			assertTokenRevoked(t, f.live.Id, true, "the parent the rotation claimed")
+			assertTokenRevoked(t, child.ID, true, "the child the containment swept")
+			assertTokenRevoked(t, f.live.ID, true, "the parent the rotation claimed")
 			f.requireUnredeemable(t, database, child)
 		})
 	}
@@ -555,7 +555,7 @@ func TestRefreshRotation_ASecondContainmentIsANoOp(t *testing.T) {
 	f := newFamily(t, database, false)
 	for attempt := 1; attempt <= 2; attempt++ {
 		_, _, err := refreshIssuerOn(database).IssueRefreshTokenGrant(ctx, rotationSettings(),
-			f.presenting(t, database, f.replayed.RefreshTokenJti))
+			f.presenting(t, database, f.replayed.RefreshTokenJTI))
 
 		var replayed *issuance.RefreshTokenReplayedError
 		require.ErrorAs(t, err, &replayed)
@@ -587,15 +587,15 @@ func TestRefreshRotation_KeepsThePictureInBothTokens(t *testing.T) {
 			defer cancel()
 
 			f := newFamily(t, database, ropc)
-			withProfilePictureOn(t, database, f.user.Id)
+			withProfilePictureOn(t, database, f.user.ID)
 
 			response, _, err := refreshIssuerOn(database).IssueRefreshTokenGrant(ctx, rotationSettings(),
-				f.presenting(t, database, f.live.RefreshTokenJti))
+				f.presenting(t, database, f.live.RefreshTokenJTI))
 			require.NoError(t, err, "the rotation completes within its deadline, on this engine's connection model")
 
 			want := implicitTestBaseURL + "/userinfo/picture/" + f.user.Subject
 			assert.Equal(t, want, claimsOf(t, response.AccessToken)["picture"], "the access token carries the picture")
-			assert.Equal(t, want, claimsOf(t, response.IdToken)["picture"], "the ID token carries the picture")
+			assert.Equal(t, want, claimsOf(t, response.IDToken)["picture"], "the ID token carries the picture")
 		})
 	}
 }

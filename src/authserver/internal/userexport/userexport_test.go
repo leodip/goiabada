@@ -33,7 +33,7 @@ func exportedUser() *record.User {
 		return sql.NullTime{Time: t, Valid: true}
 	}
 	return &record.User{
-		Id:                             42,
+		ID:                             42,
 		CreatedAt:                      at("2025-01-02T03:04:05Z"),
 		UpdatedAt:                      at("2026-10-01T12:00:00Z"),
 		Enabled:                        true,
@@ -54,7 +54,7 @@ func exportedUser() *record.User {
 		Locale:                         "pt-BR",
 		PageLanguage:                   "pt",
 		BirthDate:                      at("1990-05-17T00:00:00Z"),
-		PhoneNumberCountryUniqueId:     "BRA_0",
+		PhoneNumberCountryUniqueID:     "BRA_0",
 		PhoneNumberCountryCallingCode:  "+55",
 		PhoneNumber:                    "11 91234-5678",
 		PhoneNumberVerified:            true,
@@ -162,7 +162,7 @@ func TestBuild_ExportedAtIsWrittenInUTC(t *testing.T) {
 // answers them, and an empty list is [] rather than null, so a reader never tells "none" from
 // "not read".
 func TestBuild_AnEmptyListIsNeverNull(t *testing.T) {
-	document, err := Build(&record.User{Id: 7, Subject: "s", Email: "e@example.com"}, Parts{}, "https://auth.example.com",
+	document, err := Build(&record.User{ID: 7, Subject: "s", Email: "e@example.com"}, Parts{}, "https://auth.example.com",
 		time.Date(2026, 11, 5, 0, 0, 0, 0, time.UTC))
 	require.NoError(t, err)
 
@@ -203,11 +203,11 @@ func TestBuild_CarriesNoSecret(t *testing.T) {
 }
 
 // The file is named user-<id>-<date>.json, the date being exportedAt's in UTC (decision 6).
-func TestFileName_IsTheUserIdAndTheUTCDate(t *testing.T) {
+func TestFileName_IsTheUserIDAndTheUTCDate(t *testing.T) {
 	saoPaulo := time.FixedZone("BRT", -3*60*60)
 	for _, c := range []struct {
 		name       string
-		userId     int64
+		userID     int64
 		exportedAt time.Time
 		want       string
 	}{
@@ -216,7 +216,7 @@ func TestFileName_IsTheUserIdAndTheUTCDate(t *testing.T) {
 		{"a single-digit month and day", 1, time.Date(2026, 3, 4, 0, 0, 0, 0, time.UTC), "user-1-2026-03-04.json"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			assert.Equal(t, c.want, FileName(c.userId, c.exportedAt))
+			assert.Equal(t, c.want, FileName(c.userID, c.exportedAt))
 		})
 	}
 }
@@ -227,36 +227,36 @@ func TestFileName_IsTheUserIdAndTheUTCDate(t *testing.T) {
 func releasedAttributesParts() Parts {
 	return Parts{
 		Attributes: []api.UserAttributeResponse{
-			{Id: 13, Key: "both_flags", Value: "b", IncludeInIdToken: true, IncludeInAccessToken: true, UserId: 42},
-			{Id: 12, Key: "access_token_only", Value: "a", IncludeInAccessToken: true, UserId: 42},
-			{Id: 11, Key: "id_token_only", Value: "i", IncludeInIdToken: true, UserId: 42},
-			{Id: 10, Key: "administrators_note", Value: "slow to answer email", UserId: 42},
+			{ID: 13, Key: "both_flags", Value: "b", IncludeInIDToken: true, IncludeInAccessToken: true, UserID: 42},
+			{ID: 12, Key: "access_token_only", Value: "a", IncludeInAccessToken: true, UserID: 42},
+			{ID: 11, Key: "id_token_only", Value: "i", IncludeInIDToken: true, UserID: 42},
+			{ID: 10, Key: "administrators_note", Value: "slow to answer email", UserID: 42},
 		},
 		Groups: []api.UserExportGroupResponse{
 			{
-				GroupResponse: api.GroupResponse{Id: 5, GroupIdentifier: "sales", Description: "Sales team"},
+				GroupResponse: api.GroupResponse{ID: 5, GroupIdentifier: "sales", Description: "Sales team"},
 				Attributes: []api.GroupAttributeResponse{
-					{Id: 33, Key: "group_both_flags", Value: "gb", IncludeInIdToken: true, IncludeInAccessToken: true, GroupId: 5},
-					{Id: 32, Key: "group_access_token_only", Value: "ga", IncludeInAccessToken: true, GroupId: 5},
-					{Id: 31, Key: "group_id_token_only", Value: "gi", IncludeInIdToken: true, GroupId: 5},
-					{Id: 30, Key: "group_note", Value: "under review", GroupId: 5},
+					{ID: 33, Key: "group_both_flags", Value: "gb", IncludeInIDToken: true, IncludeInAccessToken: true, GroupID: 5},
+					{ID: 32, Key: "group_access_token_only", Value: "ga", IncludeInAccessToken: true, GroupID: 5},
+					{ID: 31, Key: "group_id_token_only", Value: "gi", IncludeInIDToken: true, GroupID: 5},
+					{ID: 30, Key: "group_note", Value: "under review", GroupID: 5},
 				},
 				Permissions: []api.PermissionResponse{
-					{Id: 20, PermissionIdentifier: "orders:read", Description: "Read orders", ResourceId: 3,
-						Resource: api.ResourceResponse{Id: 3, ResourceIdentifier: "orders-api", Description: "Orders API"}},
+					{ID: 20, PermissionIdentifier: "orders:read", Description: "Read orders", ResourceID: 3,
+						Resource: api.ResourceResponse{ID: 3, ResourceIdentifier: "orders-api", Description: "Orders API"}},
 				},
 			},
 			{
-				GroupResponse: api.GroupResponse{Id: 8, GroupIdentifier: "auditors", Description: "Auditors"},
+				GroupResponse: api.GroupResponse{ID: 8, GroupIdentifier: "auditors", Description: "Auditors"},
 				Attributes: []api.GroupAttributeResponse{
-					{Id: 34, Key: "auditors_note", Value: "temporary", GroupId: 8},
+					{ID: 34, Key: "auditors_note", Value: "temporary", GroupID: 8},
 				},
 				Permissions: []api.PermissionResponse{},
 			},
 		},
 		Permissions: []api.PermissionResponse{
-			{Id: 22, PermissionIdentifier: "orders:export", Description: "Export orders", ResourceId: 3,
-				Resource: api.ResourceResponse{Id: 3, ResourceIdentifier: "orders-api", Description: "Orders API"}},
+			{ID: 22, PermissionIdentifier: "orders:export", Description: "Export orders", ResourceID: 3,
+				Resource: api.ResourceResponse{ID: 3, ResourceIdentifier: "orders-api", Description: "Orders API"}},
 		},
 	}
 }

@@ -38,7 +38,7 @@ func sendJSONWithProof(t *testing.T, method, path, token, proof string, body any
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "DPoP "+token)
 	req.Header.Set("DPoP", proof)
-	resp, err := createHttpClient(t).Do(req)
+	resp, err := createHTTPClient(t).Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	answer := resourceAnswer{status: resp.StatusCode, challenge: resp.Header.Values("WWW-Authenticate"), header: resp.Header}
@@ -82,11 +82,11 @@ func TestDPoPResources_AHandlersSessionRefusalSpendsTheProof(t *testing.T) {
 	const path = "/api/v1/account/logout-request"
 	const redirect = "https://client.example.com/dpop-signed-out"
 	require.NoError(t, database.CreatePostLogoutRedirectURI(context.Background(), nil,
-		&record.PostLogoutRedirectURI{ClientId: u.client.Id, URI: redirect}))
+		&record.PostLogoutRedirectURI{ClientID: u.client.ID, URI: redirect}))
 	proof := key.ResourceProof(t, http.MethodPost, resourceURL(path), time.Now(), token)
 
 	refused := sendJSONWithProof(t, http.MethodPost, path, token, proof, api.AccountLogoutRequest{
-		ClientIdentifier: u.client.ClientIdentifier, PostLogoutRedirectUri: redirect,
+		ClientIdentifier: u.client.ClientIdentifier, PostLogoutRedirectURI: redirect,
 	})
 
 	require.Equal(t, http.StatusUnauthorized, refused.status, "%v", refused.body)

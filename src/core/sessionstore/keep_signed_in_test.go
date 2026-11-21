@@ -239,7 +239,7 @@ func TestServerSideStore_ARefreshOfASessionTheRuleDoesNotKeepSendsACookieThatEnd
 	require.NoError(t, err)
 	store.now = func() time.Time { return refreshTestNow }
 	cookie := saveNew(t, store, signedInValues())
-	id := decodeCookieId(t, store, cookie)
+	id := decodeCookieID(t, store, cookie)
 	backend.rows[id].LastAccessed = refreshTestNow.Add(-time.Minute)
 	backend.expiresAt = refreshTestNow.Add(2 * time.Hour)
 
@@ -249,7 +249,7 @@ func TestServerSideStore_ARefreshOfASessionTheRuleDoesNotKeepSendsACookieThatEnd
 	assert.Equal(t, 1, backend.touches, "the stale row is touched")
 	require.Len(t, cookies, 1, "and the cookie is sent again")
 	assertEndsWithTheBrowser(t, cookies[0])
-	assert.Equal(t, id, decodeCookieId(t, store, cookies[0]), "naming the same session")
+	assert.Equal(t, id, decodeCookieID(t, store, cookies[0]), "naming the same session")
 }
 
 // A browser holds a cookie that outlives it, written while the rule kept its session, and the rule
@@ -266,7 +266,7 @@ func TestServerSideStore_ARefreshReplacesACookieThatOutlivesTheBrowserOnceTheRul
 	store.now = func() time.Time { return refreshTestNow }
 	cookie := saveNew(t, store, signedInValues())
 	require.Equal(t, 60, cookie.MaxAge, "written while the rule keeps it, the cookie outlives the browser")
-	id := decodeCookieId(t, store, cookie)
+	id := decodeCookieID(t, store, cookie)
 
 	keep = false
 	backend.rows[id].LastAccessed = refreshTestNow.Add(-time.Minute)
@@ -301,7 +301,7 @@ func TestServerSideStore_ARefreshAsksTheRuleAboutTheSessionsValues(t *testing.T)
 		t.Run(name, func(t *testing.T) {
 			backend.expiresAt = refreshTestNow.Add(time.Minute)
 			cookie := saveNew(t, store, test.values)
-			id := decodeCookieId(t, store, cookie)
+			id := decodeCookieID(t, store, cookie)
 			backend.rows[id].LastAccessed = refreshTestNow.Add(-time.Minute)
 			backend.expiresAt = refreshTestNow.Add(2 * time.Hour)
 

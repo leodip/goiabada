@@ -19,7 +19,7 @@ type Options struct {
 	Domain   string
 	MaxAge   int
 	Secure   bool
-	HttpOnly bool
+	HTTPOnly bool
 	SameSite http.SameSite
 }
 

@@ -54,26 +54,26 @@ func (_m *TokenParser) EXPECT() *TokenParser_Expecter {
 }
 
 // DecodeAndValidateRefreshResponse provides a mock function for the type TokenParser
-func (_mock *TokenParser) DecodeAndValidateRefreshResponse(ctx context.Context, tokenResponse *oauth.TokenResponse, previous *oauth.JwtToken) (*oauthclient.JwtInfo, error) {
+func (_mock *TokenParser) DecodeAndValidateRefreshResponse(ctx context.Context, tokenResponse *oauth.TokenResponse, previous *oauth.JWTToken) (*oauthclient.JWTInfo, error) {
 	ret := _mock.Called(ctx, tokenResponse, previous)
 
 	if len(ret) == 0 {
 		panic("no return value specified for DecodeAndValidateRefreshResponse")
 	}
 
-	var r0 *oauthclient.JwtInfo
+	var r0 *oauthclient.JWTInfo
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *oauth.TokenResponse, *oauth.JwtToken) (*oauthclient.JwtInfo, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *oauth.TokenResponse, *oauth.JWTToken) (*oauthclient.JWTInfo, error)); ok {
 		return returnFunc(ctx, tokenResponse, previous)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *oauth.TokenResponse, *oauth.JwtToken) *oauthclient.JwtInfo); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *oauth.TokenResponse, *oauth.JWTToken) *oauthclient.JWTInfo); ok {
 		r0 = returnFunc(ctx, tokenResponse, previous)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*oauthclient.JwtInfo)
+			r0 = ret.Get(0).(*oauthclient.JWTInfo)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, *oauth.TokenResponse, *oauth.JwtToken) error); ok {
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *oauth.TokenResponse, *oauth.JWTToken) error); ok {
 		r1 = returnFunc(ctx, tokenResponse, previous)
 	} else {
 		r1 = ret.Error(1)
@@ -89,12 +89,12 @@ type TokenParser_DecodeAndValidateRefreshResponse_Call struct {
 // DecodeAndValidateRefreshResponse is a helper method to define mock.On call
 //   - ctx context.Context
 //   - tokenResponse *oauth.TokenResponse
-//   - previous *oauth.JwtToken
+//   - previous *oauth.JWTToken
 func (_e *TokenParser_Expecter) DecodeAndValidateRefreshResponse(ctx any, tokenResponse any, previous any) *TokenParser_DecodeAndValidateRefreshResponse_Call {
 	return &TokenParser_DecodeAndValidateRefreshResponse_Call{Call: _e.mock.On("DecodeAndValidateRefreshResponse", ctx, tokenResponse, previous)}
 }
 
-func (_c *TokenParser_DecodeAndValidateRefreshResponse_Call) Run(run func(ctx context.Context, tokenResponse *oauth.TokenResponse, previous *oauth.JwtToken)) *TokenParser_DecodeAndValidateRefreshResponse_Call {
+func (_c *TokenParser_DecodeAndValidateRefreshResponse_Call) Run(run func(ctx context.Context, tokenResponse *oauth.TokenResponse, previous *oauth.JWTToken)) *TokenParser_DecodeAndValidateRefreshResponse_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -104,9 +104,9 @@ func (_c *TokenParser_DecodeAndValidateRefreshResponse_Call) Run(run func(ctx co
 		if args[1] != nil {
 			arg1 = args[1].(*oauth.TokenResponse)
 		}
-		var arg2 *oauth.JwtToken
+		var arg2 *oauth.JWTToken
 		if args[2] != nil {
-			arg2 = args[2].(*oauth.JwtToken)
+			arg2 = args[2].(*oauth.JWTToken)
 		}
 		run(
 			arg0,
@@ -117,34 +117,34 @@ func (_c *TokenParser_DecodeAndValidateRefreshResponse_Call) Run(run func(ctx co
 	return _c
 }
 
-func (_c *TokenParser_DecodeAndValidateRefreshResponse_Call) Return(jwtInfo *oauthclient.JwtInfo, err error) *TokenParser_DecodeAndValidateRefreshResponse_Call {
-	_c.Call.Return(jwtInfo, err)
+func (_c *TokenParser_DecodeAndValidateRefreshResponse_Call) Return(jWTInfo *oauthclient.JWTInfo, err error) *TokenParser_DecodeAndValidateRefreshResponse_Call {
+	_c.Call.Return(jWTInfo, err)
 	return _c
 }
 
-func (_c *TokenParser_DecodeAndValidateRefreshResponse_Call) RunAndReturn(run func(ctx context.Context, tokenResponse *oauth.TokenResponse, previous *oauth.JwtToken) (*oauthclient.JwtInfo, error)) *TokenParser_DecodeAndValidateRefreshResponse_Call {
+func (_c *TokenParser_DecodeAndValidateRefreshResponse_Call) RunAndReturn(run func(ctx context.Context, tokenResponse *oauth.TokenResponse, previous *oauth.JWTToken) (*oauthclient.JWTInfo, error)) *TokenParser_DecodeAndValidateRefreshResponse_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // DecodeAndValidateStoredIDToken provides a mock function for the type TokenParser
-func (_mock *TokenParser) DecodeAndValidateStoredIDToken(ctx context.Context, raw string) (*oauth.JwtToken, error) {
+func (_mock *TokenParser) DecodeAndValidateStoredIDToken(ctx context.Context, raw string) (*oauth.JWTToken, error) {
 	ret := _mock.Called(ctx, raw)
 
 	if len(ret) == 0 {
 		panic("no return value specified for DecodeAndValidateStoredIDToken")
 	}
 
-	var r0 *oauth.JwtToken
+	var r0 *oauth.JWTToken
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (*oauth.JwtToken, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (*oauth.JWTToken, error)); ok {
 		return returnFunc(ctx, raw)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) *oauth.JwtToken); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) *oauth.JWTToken); ok {
 		r0 = returnFunc(ctx, raw)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*oauth.JwtToken)
+			r0 = ret.Get(0).(*oauth.JWTToken)
 		}
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
@@ -185,12 +185,12 @@ func (_c *TokenParser_DecodeAndValidateStoredIDToken_Call) Run(run func(ctx cont
 	return _c
 }
 
-func (_c *TokenParser_DecodeAndValidateStoredIDToken_Call) Return(jwtToken *oauth.JwtToken, err error) *TokenParser_DecodeAndValidateStoredIDToken_Call {
-	_c.Call.Return(jwtToken, err)
+func (_c *TokenParser_DecodeAndValidateStoredIDToken_Call) Return(jWTToken *oauth.JWTToken, err error) *TokenParser_DecodeAndValidateStoredIDToken_Call {
+	_c.Call.Return(jWTToken, err)
 	return _c
 }
 
-func (_c *TokenParser_DecodeAndValidateStoredIDToken_Call) RunAndReturn(run func(ctx context.Context, raw string) (*oauth.JwtToken, error)) *TokenParser_DecodeAndValidateStoredIDToken_Call {
+func (_c *TokenParser_DecodeAndValidateStoredIDToken_Call) RunAndReturn(run func(ctx context.Context, raw string) (*oauth.JWTToken, error)) *TokenParser_DecodeAndValidateStoredIDToken_Call {
 	_c.Call.Return(run)
 	return _c
 }

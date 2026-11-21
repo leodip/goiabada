@@ -47,7 +47,7 @@ const registeredQueryStateEscaped = "csrf+a%2Bb%2Fc%3D"
 func TestAuthorize_RegisteredQuery_SuccessRedirectCarriesOneState(t *testing.T) {
 	client, user, password := newRegisteredQueryClient(t)
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(registeredQueryRedirectURI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -56,9 +56,9 @@ func TestAuthorize_RegisteredQuery_SuccessRedirectCarriesOneState(t *testing.T) 
 		"&state=" + url.QueryEscape(registeredQueryState) +
 		"&nonce=" + fake.LetterN(8)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	require.NoError(t, err)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
@@ -112,7 +112,7 @@ func TestAuthorize_RegisteredQuery_SuccessRedirectCarriesOneState(t *testing.T) 
 func TestAuthorize_RegisteredQuery_ErrorRedirectCarriesOneState(t *testing.T) {
 	client, _, _ := newRegisteredQueryClient(t)
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(registeredQueryRedirectURI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -124,9 +124,9 @@ func TestAuthorize_RegisteredQuery_ErrorRedirectCarriesOneState(t *testing.T) {
 
 	// A fresh cookie jar, so this request carries no session and the silent authentication cannot
 	// succeed.
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -153,13 +153,13 @@ func newRegisteredQueryClient(t *testing.T) (*record.Client, *record.User, strin
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	require.NoError(t, err)
 
 	err = database.CreateRedirectURI(context.Background(), nil, &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      registeredQueryRedirectURI,
 	})
 	require.NoError(t, err)

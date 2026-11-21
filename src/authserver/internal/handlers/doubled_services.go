@@ -15,18 +15,18 @@ import (
 // handlers/mocks. The handler tests build every operation from those doubles, so one expectation
 // set on, say, UserSessionManager is what /auth/authorize, /auth/level1completed, /auth/completed
 // and /auth/issue all meet. A method added to an authflow port that the concrete service has is
-// added here too, or the doubles cannot satisfy that port. OtpSecretGenerator's double also stands
+// added here too, or the doubles cannot satisfy that port. OTPSecretGenerator's double also stands
 // in for apihandlers' port of the same name, structurally.
 
-// OtpSecretGenerator mints a TOTP enrolment key and its otpauth URL. *otp.KeyGenerator satisfies it.
-type OtpSecretGenerator interface {
+// OTPSecretGenerator mints a TOTP enrolment key and its otpauth URL. *otp.KeyGenerator satisfies it.
+type OTPSecretGenerator interface {
 	GenerateKeyURL(email string, appName string) (string, error)
 }
 
 // ImplicitTokenIssuer issues the implicit grant's tokens, signed in a transaction that takes the
 // session row first (#197). *issuance.TokenIssuer satisfies it.
 type ImplicitTokenIssuer interface {
-	IssueImplicitTx(ctx context.Context, settings *record.Settings, input *issuance.ImplicitGrantInput, issueAccessToken bool, issueIdToken bool) (*issuance.ImplicitGrantResponse, error)
+	IssueImplicitTx(ctx context.Context, settings *record.Settings, input *issuance.ImplicitGrantInput, issueAccessToken bool, issueIDToken bool) (*issuance.ImplicitGrantResponse, error)
 }
 
 // AuthorizeValidator validates an authorization request. *protocolvalidation.AuthorizeValidator
@@ -54,7 +54,7 @@ type UserSessionManager interface {
 	// StartNewUserSession creates the create arm's session in one transaction and answers it with
 	// the rows it removed. It writes nothing to the browser: the caller binds the session to the
 	// browser session after it returns, and abandons it when that fails.
-	StartNewUserSession(ctx context.Context, clientId int64, authentication usersession.Authentication,
+	StartNewUserSession(ctx context.Context, clientID int64, authentication usersession.Authentication,
 		authStateGeneration int64, otpConfigGeneration *int64, device usersession.Device, ipAddress string,
 		replacing *record.UserSession, limits usersession.SessionLimits) (*record.UserSession, []usersession.Removal, error)
 	// AbandonUserSession deletes a session StartNewUserSession committed when binding it to the
@@ -63,12 +63,12 @@ type UserSessionManager interface {
 	// BumpUserSession updates an existing session's last accessed time and client list, and raises
 	// its ACR and adds its methods, never lowering either (#537). A non-empty ipAddress replaces the
 	// session's recorded address; empty leaves it.
-	BumpUserSession(ctx context.Context, sessionIdentifier string, clientId int64,
-		authMethods string, acrLevel record.AcrLevel, ipAddress string) (*record.UserSession, error)
+	BumpUserSession(ctx context.Context, sessionIdentifier string, clientID int64,
+		authMethods string, acrLevel record.ACRLevel, ipAddress string) (*record.UserSession, error)
 	// BindUserSession is BumpUserSession for a completed sign-in: under the session's row lock, it
 	// checks the sign-in's one-time code claim on the user, raises the session or, with replace,
 	// writes the sign-in's authentication over it, and sets its auth_time (#542).
-	BindUserSession(ctx context.Context, sessionIdentifier string, clientId int64,
+	BindUserSession(ctx context.Context, sessionIdentifier string, clientID int64,
 		authentication usersession.Authentication, replace bool, ipAddress string) (*record.UserSession, error)
 	// AuthenticationIsStale answers, without locking or writing, whether BindUserSession would
 	// refuse authentication as older than the session's (#538), so the reuse arm can refuse before

@@ -25,11 +25,11 @@ import (
 
 // privacyNotice is a published document for information, at version 2.
 func privacyNotice() (*record.LegalDocument, []record.LegalDocumentVersion) {
-	return &record.LegalDocument{Id: 9, ShortName: "privacy", Kind: record.LegalDocumentKindForInformation},
+	return &record.LegalDocument{ID: 9, ShortName: "privacy", Kind: record.LegalDocumentKindForInformation},
 		[]record.LegalDocumentVersion{
-			{LegalDocumentId: 9, VersionNumber: 1, Title: "Privacy notice", Markdown: "We keep your **email**.",
+			{LegalDocumentID: 9, VersionNumber: 1, Title: "Privacy notice", Markdown: "We keep your **email**.",
 				PublishedAt: time.Date(2026, 3, 4, 23, 30, 0, 0, time.UTC)},
-			{LegalDocumentId: 9, VersionNumber: 2, Title: "Privacy notice, revised", Markdown: "We keep your *address*.",
+			{LegalDocumentID: 9, VersionNumber: 2, Title: "Privacy notice, revised", Markdown: "We keep your *address*.",
 				PublishedAt: time.Date(2026, 10, 1, 8, 0, 0, 0, time.UTC)},
 		}
 }
@@ -59,7 +59,7 @@ func servedBindFor(t *testing.T, doc *record.LegalDocument, versions []record.Le
 	t.Helper()
 	database := datamocks.NewDatabase(t)
 	database.EXPECT().GetLegalDocumentByShortName(mock.Anything, (*sql.Tx)(nil), doc.ShortName).Return(doc, nil)
-	database.EXPECT().GetLegalDocumentVersionsByLegalDocumentId(mock.Anything, (*sql.Tx)(nil), doc.Id).Return(versions, nil)
+	database.EXPECT().GetLegalDocumentVersionsByLegalDocumentID(mock.Anything, (*sql.Tx)(nil), doc.ID).Return(versions, nil)
 	pageRenderer := handlersmocks.NewPageRenderer(t)
 	var bind map[string]interface{}
 	pageRenderer.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/no_menu_layout.html", "/legal_document.html", mock.Anything).
@@ -90,7 +90,7 @@ func TestHandleLegalDocumentGet_TheCurrentVersion(t *testing.T) {
 // too, so each is drawn in the brand LinkedSignInPageClient draws the page in (#812). An id of the
 // wrong shape is not echoed, and a page naming none binds none.
 func TestHandleLegalDocumentGet_TheSignInItsURLNamesIsCarriedOnItsLinks(t *testing.T) {
-	signIn := ceremony.NewId()
+	signIn := ceremony.NewID()
 	for _, tc := range []struct {
 		name  string
 		query string
@@ -145,7 +145,7 @@ func TestHandleLegalDocumentGet_WhatIsNotPublishedIsNotFound(t *testing.T) {
 		{"an unknown short name", nil, nil, ""},
 		{"a retired document", retired, retiredVersions, ""},
 		{"a retired document's version", retired, retiredVersions, "1"},
-		{"a document never published", &record.LegalDocument{Id: 9, ShortName: "privacy"}, []record.LegalDocumentVersion{}, ""},
+		{"a document never published", &record.LegalDocument{ID: 9, ShortName: "privacy"}, []record.LegalDocumentVersion{}, ""},
 		{"a version not published yet", doc, versions, "3"},
 		{"version 0", doc, versions, "0"},
 		{"a version with a leading zero", doc, versions, "01"},
@@ -156,7 +156,7 @@ func TestHandleLegalDocumentGet_WhatIsNotPublishedIsNotFound(t *testing.T) {
 			database := datamocks.NewDatabase(t)
 			database.EXPECT().GetLegalDocumentByShortName(mock.Anything, (*sql.Tx)(nil), "privacy").Return(tc.doc, nil)
 			if tc.doc != nil && !tc.doc.IsRetired() {
-				database.EXPECT().GetLegalDocumentVersionsByLegalDocumentId(mock.Anything, (*sql.Tx)(nil), int64(9)).Return(tc.versions, nil)
+				database.EXPECT().GetLegalDocumentVersionsByLegalDocumentID(mock.Anything, (*sql.Tx)(nil), int64(9)).Return(tc.versions, nil)
 			}
 			pageRenderer := handlersmocks.NewPageRenderer(t)
 			pageRenderer.On("NotFound", mock.Anything, mock.Anything).Return().Once()
@@ -175,7 +175,7 @@ func TestHandleLegalDocumentGet_AFailedReadIsTheErrorPage(t *testing.T) {
 		},
 		"its versions": func(database *datamocks.Database) {
 			database.EXPECT().GetLegalDocumentByShortName(mock.Anything, (*sql.Tx)(nil), "privacy").Return(doc, nil)
-			database.EXPECT().GetLegalDocumentVersionsByLegalDocumentId(mock.Anything, (*sql.Tx)(nil), int64(9)).Return(nil, failure)
+			database.EXPECT().GetLegalDocumentVersionsByLegalDocumentID(mock.Anything, (*sql.Tx)(nil), int64(9)).Return(nil, failure)
 		},
 	} {
 		t.Run(name, func(t *testing.T) {

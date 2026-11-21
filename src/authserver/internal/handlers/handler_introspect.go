@@ -26,8 +26,8 @@ import (
 type introspectDatabase interface {
 	liveness.Database
 	liveness.RefreshDatabase
-	GetClientIntrospectionResourcesByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.ClientIntrospectionResource, error)
-	GetResourcesByIds(ctx context.Context, tx *sql.Tx, resourceIds []int64) ([]record.Resource, error)
+	GetClientIntrospectionResourcesByClientID(ctx context.Context, tx *sql.Tx, clientID int64) ([]record.ClientIntrospectionResource, error)
+	GetResourcesByIDs(ctx context.Context, tx *sql.Tx, resourceIDs []int64) ([]record.Resource, error)
 }
 
 // introspectRequestParameters are every form parameter the introspection endpoint reads, and so every
@@ -41,14 +41,14 @@ var introspectRequestParameters = []string{"token", "client_id", "client_secret"
 type introspection struct {
 	Active    bool        `json:"active"`
 	Scope     string      `json:"scope,omitempty"`
-	ClientId  string      `json:"client_id,omitempty"`
+	ClientID  string      `json:"client_id,omitempty"`
 	Subject   string      `json:"sub,omitempty"`
 	Audience  interface{} `json:"aud,omitempty"`
 	Issuer    string      `json:"iss,omitempty"`
 	ExpiresAt int64       `json:"exp,omitempty"`
 	IssuedAt  int64       `json:"iat,omitempty"`
 	NotBefore int64       `json:"nbf,omitempty"`
-	Jti       string      `json:"jti,omitempty"`
+	JTI       string      `json:"jti,omitempty"`
 	TokenType string      `json:"token_type,omitempty"`
 	// Confirmation is a bound access token's cnf, the proof key's thumbprint as jkt (RFC 9449
 	// section 6.2), and absent for every other token.
@@ -193,7 +193,7 @@ func (e introspectionEndpoint) serve(w http.ResponseWriter, r *http.Request) {
 // introspectAccessToken answers an access token the access-token check has judged: active when it is
 // live and its aud names a resource on the caller's list.
 func (e introspectionEndpoint) introspectAccessToken(w http.ResponseWriter, r *http.Request, client *record.Client,
-	token oauth.JwtToken, verdict liveness.Verdict) {
+	token oauth.JWTToken, verdict liveness.Verdict) {
 
 	if !verdict.Live() {
 		e.inactive(w, r)
@@ -217,14 +217,14 @@ func (e introspectionEndpoint) introspectAccessToken(w http.ResponseWriter, r *h
 	answer := introspection{
 		Active:    true,
 		Scope:     token.StringClaim("scope"),
-		ClientId:  token.StringClaim("client_id"),
+		ClientID:  token.StringClaim("client_id"),
 		Subject:   token.StringClaim("sub"),
 		Audience:  token.Claims["aud"],
 		Issuer:    token.StringClaim("iss"),
 		ExpiresAt: numericDateClaim(token, "exp"),
 		IssuedAt:  numericDateClaim(token, "iat"),
 		NotBefore: numericDateClaim(token, "nbf"),
-		Jti:       token.StringClaim("jti"),
+		JTI:       token.StringClaim("jti"),
 	}
 	thumbprint := issuance.AccessTokenThumbprint(token)
 	answer.TokenType = issuance.ResponseTokenType(thumbprint)
@@ -237,19 +237,19 @@ func (e introspectionEndpoint) introspectAccessToken(w http.ResponseWriter, r *h
 // listsAnAudience reports whether the token's aud names a resource on the client's introspection
 // resources (decision 5). A resource identifier is compared exactly, as aud's StringOrURI values are
 // (RFC 7519 section 4.1.3).
-func (e introspectionEndpoint) listsAnAudience(ctx context.Context, client *record.Client, token oauth.JwtToken) (bool, error) {
-	links, err := e.database.GetClientIntrospectionResourcesByClientId(ctx, nil, client.Id)
+func (e introspectionEndpoint) listsAnAudience(ctx context.Context, client *record.Client, token oauth.JWTToken) (bool, error) {
+	links, err := e.database.GetClientIntrospectionResourcesByClientID(ctx, nil, client.ID)
 	if err != nil {
 		return false, errs.Wrap(err, "failed to load the caller's introspection resources")
 	}
 	if len(links) == 0 {
 		return false, nil
 	}
-	resourceIds := make([]int64, 0, len(links))
+	resourceIDs := make([]int64, 0, len(links))
 	for _, link := range links {
-		resourceIds = append(resourceIds, link.ResourceId)
+		resourceIDs = append(resourceIDs, link.ResourceID)
 	}
-	resources, err := e.database.GetResourcesByIds(ctx, nil, resourceIds)
+	resources, err := e.database.GetResourcesByIDs(ctx, nil, resourceIDs)
 	if err != nil {
 		return false, errs.Wrap(err, "failed to load the caller's introspection resources")
 	}
@@ -272,7 +272,7 @@ func (e introspectionEndpoint) listsAnAudience(ctx context.Context, client *reco
 // it does not own. The check reads no client: the caller is the token's own, which client
 // authentication found to exist and be enabled.
 func (e introspectionEndpoint) introspectRefreshToken(w http.ResponseWriter, r *http.Request, client *record.Client,
-	token oauth.JwtToken, settings *record.Settings, now time.Time) {
+	token oauth.JWTToken, settings *record.Settings, now time.Time) {
 
 	ctx := r.Context()
 	stored, err := liveness.FindRefreshToken(ctx, e.database, token)
@@ -280,7 +280,7 @@ func (e introspectionEndpoint) introspectRefreshToken(w http.ResponseWriter, r *
 		e.fault(w, r, err)
 		return
 	}
-	if stored == nil || stored.ClientId != client.Id {
+	if stored == nil || stored.ClientID != client.ID {
 		e.inactive(w, r)
 		return
 	}
@@ -304,17 +304,17 @@ func (e introspectionEndpoint) introspectRefreshToken(w http.ResponseWriter, r *
 	e.active(w, r, introspection{
 		Active:    true,
 		Scope:     token.StringClaim("scope"),
-		ClientId:  client.ClientIdentifier,
+		ClientID:  client.ClientIdentifier,
 		Subject:   token.StringClaim("sub"),
 		Issuer:    token.StringClaim("iss"),
 		ExpiresAt: numericDateClaim(token, "exp"),
 		IssuedAt:  numericDateClaim(token, "iat"),
-		Jti:       token.StringClaim("jti"),
+		JTI:       token.StringClaim("jti"),
 	})
 }
 
 // tokenAudiences reads aud, a single string or an array of them (RFC 7519 section 4.1.3).
-func tokenAudiences(token oauth.JwtToken) []string {
+func tokenAudiences(token oauth.JWTToken) []string {
 	switch aud := token.Claims["aud"].(type) {
 	case string:
 		return []string{aud}
@@ -332,7 +332,7 @@ func tokenAudiences(token oauth.JwtToken) []string {
 
 // numericDateClaim reads a NumericDate claim as seconds, or 0, which the answer omits, when the token
 // carries none.
-func numericDateClaim(token oauth.JwtToken, name string) int64 {
+func numericDateClaim(token oauth.JWTToken, name string) int64 {
 	seconds, _ := token.Claims[name].(float64)
 	return int64(seconds)
 }

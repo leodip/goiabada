@@ -26,22 +26,22 @@ var revokeTx = &sql.Tx{}
 // It also proves the transaction is real: the helper hands the body a non-nil tx, so every
 // nested call is asserted to receive that exact pointer. A nil one would be rejected by
 // revocation.RevokeUserAuthState's precondition.
-func stubRevocationSweepTx(database *datamocks.Database, userId int64, newGeneration int64) {
+func stubRevocationSweepTx(database *datamocks.Database, userID int64, newGeneration int64) {
 	datamocks.ExpectRunInTransaction(database, revokeTx)
-	database.On("IncrementUserAuthStateGeneration", mock.Anything, revokeTx, userId).
+	database.On("IncrementUserAuthStateGeneration", mock.Anything, revokeTx, userID).
 		Return(newGeneration, nil).Once()
-	database.On("GetRefreshTokensByUserId", mock.Anything, revokeTx, userId).
+	database.On("GetRefreshTokensByUserID", mock.Anything, revokeTx, userID).
 		Return([]*record.RefreshToken{}, nil).Once()
 	database.On("PromoteRefreshTokenGenerations", mock.Anything, revokeTx, []int64{}, newGeneration).
 		Return(nil).Once()
-	database.On("GetUserSessionsByUserId", mock.Anything, revokeTx, userId).
+	database.On("GetUserSessionsByUserID", mock.Anything, revokeTx, userID).
 		Return([]record.UserSession{}, nil).Once()
 }
 
 // stubResetRowRead stubs the reset claim's first two statements: the user's row taken, and read
 // under that hold, holding the verification state given.
-func stubResetRowRead(database *datamocks.Database, userId int64, emailVerified bool) {
-	database.On("AcquireUserRow", mock.Anything, revokeTx, userId).Return(nil).Once()
-	database.On("GetUserById", mock.Anything, revokeTx, userId).
-		Return(&record.User{Id: userId, Enabled: true, EmailVerified: emailVerified}, nil).Once()
+func stubResetRowRead(database *datamocks.Database, userID int64, emailVerified bool) {
+	database.On("AcquireUserRow", mock.Anything, revokeTx, userID).Return(nil).Once()
+	database.On("GetUserByID", mock.Anything, revokeTx, userID).
+		Return(&record.User{ID: userID, Enabled: true, EmailVerified: emailVerified}, nil).Once()
 }

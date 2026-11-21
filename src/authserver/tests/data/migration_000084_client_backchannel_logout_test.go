@@ -35,7 +35,7 @@ var columns000084 = []string{"backchannel_logout_uri", "backchannel_logout_sessi
 //     type and collation of post_logout_redirect_uris.uri on the same engine, the 2048-wide URI it
 //     is bounded like; the flag defaults to false, with remember_consent's type and default.
 //  2. A client written without them reads back neither, and one written with them reads them back
-//     byte for byte through CreateClient and GetClientById, at 2048 bytes. SetClientBackchannelLogout
+//     byte for byte through CreateClient and GetClientByID, at 2048 bytes. SetClientBackchannelLogout
 //     changes both on the one client, and the whole-row UpdateClient writes neither.
 //  3. The down migration restores clients to exactly the shape 000083 built, and 000084 applies
 //     again after it.
@@ -67,9 +67,9 @@ func TestMigration000084_ClientBackchannelLogout(t *testing.T) {
 		require.NoError(t, err, "migrate to head for the round trips")
 	}
 
-	without := &record.Client{ClientIdentifier: "no-backchannel-" + fake.LetterN(6), DefaultAcrLevel: record.AcrLevel1}
+	without := &record.Client{ClientIdentifier: "no-backchannel-" + fake.LetterN(6), DefaultACRLevel: record.ACRLevel1}
 	require.NoError(t, h.DB.CreateClient(ctx, nil, without))
-	read, err := h.DB.GetClientById(ctx, nil, without.Id)
+	read, err := h.DB.GetClientByID(ctx, nil, without.ID)
 	require.NoError(t, err)
 	require.NotNil(t, read)
 	assert.Empty(t, read.BackchannelLogoutURI, "a client written without a back-channel logout URI reads back none")
@@ -80,12 +80,12 @@ func TestMigration000084_ClientBackchannelLogout(t *testing.T) {
 	uri := prefix + strings.Repeat("y", 2048-len(prefix))
 	with := &record.Client{
 		ClientIdentifier:                 "with-backchannel-" + fake.LetterN(6),
-		DefaultAcrLevel:                  record.AcrLevel1,
+		DefaultACRLevel:                  record.ACRLevel1,
 		BackchannelLogoutURI:             uri,
 		BackchannelLogoutSessionRequired: true,
 	}
 	require.NoError(t, h.DB.CreateClient(ctx, nil, with))
-	read, err = h.DB.GetClientById(ctx, nil, with.Id)
+	read, err = h.DB.GetClientByID(ctx, nil, with.ID)
 	require.NoError(t, err)
 	require.NotNil(t, read)
 	assert.Equal(t, uri, read.BackchannelLogoutURI)
@@ -96,21 +96,21 @@ func TestMigration000084_ClientBackchannelLogout(t *testing.T) {
 	read.BackchannelLogoutSessionRequired = false
 	read.Description = "rewritten-" + fake.LetterN(6)
 	require.NoError(t, h.DB.UpdateClient(ctx, nil, read))
-	updated, err := h.DB.GetClientById(ctx, nil, with.Id)
+	updated, err := h.DB.GetClientByID(ctx, nil, with.ID)
 	require.NoError(t, err)
 	assert.Equal(t, uri, updated.BackchannelLogoutURI, "UpdateClient must not write backchannel_logout_uri")
 	assert.True(t, updated.BackchannelLogoutSessionRequired, "UpdateClient must not write backchannel_logout_session_required")
 	assert.Equal(t, read.Description, updated.Description, "and still writes the ordinary columns")
 
 	// The setter changes both on its client, and leaves the other client alone.
-	require.NoError(t, h.DB.SetClientBackchannelLogout(ctx, nil, without.Id, "https://other.example.com/bcl", true))
-	require.NoError(t, h.DB.SetClientBackchannelLogout(ctx, nil, with.Id, "", false))
-	cleared, err := h.DB.GetClientById(ctx, nil, with.Id)
+	require.NoError(t, h.DB.SetClientBackchannelLogout(ctx, nil, without.ID, "https://other.example.com/bcl", true))
+	require.NoError(t, h.DB.SetClientBackchannelLogout(ctx, nil, with.ID, "", false))
+	cleared, err := h.DB.GetClientByID(ctx, nil, with.ID)
 	require.NoError(t, err)
 	assert.Empty(t, cleared.BackchannelLogoutURI, "SetClientBackchannelLogout clears the URI")
 	assert.False(t, cleared.BackchannelLogoutSessionRequired, "SetClientBackchannelLogout turns the flag off")
 	assert.Equal(t, updated.Description, cleared.Description, "SetClientBackchannelLogout writes nothing else")
-	other, err := h.DB.GetClientById(ctx, nil, without.Id)
+	other, err := h.DB.GetClientByID(ctx, nil, without.ID)
 	require.NoError(t, err)
 	assert.Equal(t, "https://other.example.com/bcl", other.BackchannelLogoutURI)
 	assert.True(t, other.BackchannelLogoutSessionRequired)

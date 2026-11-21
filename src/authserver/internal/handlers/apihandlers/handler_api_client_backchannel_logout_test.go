@@ -52,13 +52,13 @@ func serveBackchannelLogoutSave(t *testing.T, database *datamocks.Database, audi
 // confidentialCodeFlowClient is client 7, confidential, with its authorization code flow on and
 // the back-channel logout URI given.
 func confidentialCodeFlowClient(uri string) *record.Client {
-	return &record.Client{Id: 7, ClientIdentifier: "an-app", AuthorizationCodeEnabled: true, BackchannelLogoutURI: uri}
+	return &record.Client{ID: 7, ClientIdentifier: "an-app", AuthorizationCodeEnabled: true, BackchannelLogoutURI: uri}
 }
 
 // expectOrdinaryClient registers the read the target ceiling makes for a caller without
 // authserver:manage: client 7 holds no permission, so it is no administrator.
 func expectOrdinaryClient(database *datamocks.Database) {
-	database.On("GetClientPermissionsByClientId", mock.Anything, (*sql.Tx)(nil), int64(7)).Return([]record.ClientPermission{}, nil).Once()
+	database.On("GetClientPermissionsByClientID", mock.Anything, (*sql.Tx)(nil), int64(7)).Return([]record.ClientPermission{}, nil).Once()
 }
 
 // expectTheRowUnderTheLock registers the acquisition of client 7's row on tx and the read after it,
@@ -66,7 +66,7 @@ func expectOrdinaryClient(database *datamocks.Database) {
 func expectTheRowUnderTheLock(database *datamocks.Database, row *record.Client, note func(string)) {
 	database.On("AcquireClientRow", mock.Anything, clientUpdateTx, int64(7)).
 		Run(func(mock.Arguments) { note("acquire") }).Return(nil).Once()
-	database.On("GetClientById", mock.Anything, clientUpdateTx, int64(7)).
+	database.On("GetClientByID", mock.Anything, clientUpdateTx, int64(7)).
 		Run(func(mock.Arguments) { note("read") }).Return(row, nil).Once()
 }
 
@@ -87,7 +87,7 @@ func TestHandleClientBackchannelLogoutPut_WritesUnderTheClientsRowAndAuditsAfter
 	var order []string
 	note := func(edge string) { order = append(order, edge) }
 
-	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(confidentialCodeFlowClient(""), nil).Once()
+	database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(confidentialCodeFlowClient(""), nil).Once()
 	stub := datamocks.ExpectRunInTransaction(database, clientUpdateTx, note)
 	expectTheRowUnderTheLock(database, confidentialCodeFlowClient(""), note)
 	database.On("SetClientBackchannelLogout", mock.Anything, clientUpdateTx, int64(7), "http://app.internal:3000/bcl?tenant=a", true).
@@ -125,7 +125,7 @@ func TestHandleClientBackchannelLogoutPut_AClientMadePublicUnderTheRowIsRefusedH
 	var order []string
 	note := func(edge string) { order = append(order, edge) }
 
-	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(confidentialCodeFlowClient(""), nil).Once()
+	database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(confidentialCodeFlowClient(""), nil).Once()
 	datamocks.ExpectRunInTransaction(database, clientUpdateTx, note)
 	madePublic := confidentialCodeFlowClient("")
 	madePublic.IsPublic = true
@@ -157,7 +157,7 @@ func TestHandleClientBackchannelLogoutPut_AClientThatRegisteredItselfTakesHTTPSO
 		t.Run(name+" refused http", func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
 			auditLogger := handlersmocks.NewAuditLogger(t)
-			database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(selfRegistered(public), nil).Once()
+			database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(selfRegistered(public), nil).Once()
 
 			rr := serveBackchannelLogoutSave(t, database, auditLogger, manageScopeClaim,
 				backchannelLogoutBody(t, "http://app.internal:3000/bcl", false))
@@ -174,7 +174,7 @@ func TestHandleClientBackchannelLogoutPut_AClientThatRegisteredItselfTakesHTTPSO
 	t.Run("https admitted", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(selfRegistered(false), nil).Once()
+		database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(selfRegistered(false), nil).Once()
 		datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 		expectTheRowUnderTheLock(database, selfRegistered(false), func(string) {})
 		database.On("SetClientBackchannelLogout", mock.Anything, clientUpdateTx, int64(7), "https://app.example.com/bcl", false).Return(nil).Once()
@@ -212,7 +212,7 @@ func TestHandleClientBackchannelLogoutPut_OnlyManageSetsOrChangesTheURI(t *testi
 			database := datamocks.NewDatabase(t)
 			auditLogger := handlersmocks.NewAuditLogger(t)
 			records := recordLoggedEvents(auditLogger)
-			database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(confidentialCodeFlowClient(tc.stored), nil).Once()
+			database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(confidentialCodeFlowClient(tc.stored), nil).Once()
 			expectOrdinaryClient(database)
 
 			rr := serveBackchannelLogoutSave(t, database, auditLogger, tc.scope, backchannelLogoutBody(t, tc.wanted, false))
@@ -250,7 +250,7 @@ func TestHandleClientBackchannelLogoutPut_OnlyManageSetsOrChangesTheURI(t *testi
 		t.Run(tc.name, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
 			auditLogger := handlersmocks.NewAuditLogger(t)
-			database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(confidentialCodeFlowClient(tc.stored), nil).Once()
+			database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(confidentialCodeFlowClient(tc.stored), nil).Once()
 			if tc.scope != manageScopeClaim {
 				expectOrdinaryClient(database)
 			}
@@ -282,7 +282,7 @@ func TestHandleClientBackchannelLogoutPut_AURIChangedUnderTheRowMeetsTheCeilingB
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		var order []string
 		note := func(edge string) { order = append(order, edge) }
-		database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(confidentialCodeFlowClient(loaded), nil).Once()
+		database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(confidentialCodeFlowClient(loaded), nil).Once()
 		expectOrdinaryClient(database)
 		datamocks.ExpectRunInTransaction(database, clientUpdateTx, note)
 		expectTheRowUnderTheLock(database, confidentialCodeFlowClient(changedMeanwhile), note)
@@ -313,7 +313,7 @@ func TestHandleClientBackchannelLogoutPut_AURIChangedUnderTheRowMeetsTheCeilingB
 	t.Run("manage-clients clearing it", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(confidentialCodeFlowClient(loaded), nil).Once()
+		database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(confidentialCodeFlowClient(loaded), nil).Once()
 		expectOrdinaryClient(database)
 		datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 		expectTheRowUnderTheLock(database, confidentialCodeFlowClient(changedMeanwhile), func(string) {})
@@ -329,7 +329,7 @@ func TestHandleClientBackchannelLogoutPut_AURIChangedUnderTheRowMeetsTheCeilingB
 	t.Run("manage", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
-		database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(confidentialCodeFlowClient(loaded), nil).Once()
+		database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(confidentialCodeFlowClient(loaded), nil).Once()
 		datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 		expectTheRowUnderTheLock(database, confidentialCodeFlowClient(changedMeanwhile), func(string) {})
 		database.On("SetClientBackchannelLogout", mock.Anything, clientUpdateTx, int64(7), loaded, true).Return(nil).Once()
@@ -350,7 +350,7 @@ func TestHandleClientBackchannelLogoutPut_AnAdministratorClientMeetsTheTargetCei
 	records := recordLoggedEvents(auditLogger)
 	console := confidentialCodeFlowClient("")
 	console.AdministrativeScopesAllowed = true
-	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(console, nil).Once()
+	database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(console, nil).Once()
 
 	rr := serveBackchannelLogoutSave(t, database, auditLogger, manageClientsScopeClaim, backchannelLogoutBody(t, "", true))
 

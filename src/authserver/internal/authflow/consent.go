@@ -20,8 +20,8 @@ type consentPromptDatabase interface {
 	clientDisplayDatabase
 
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
-	GetConsentByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (*record.UserConsent, error)
-	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	GetConsentByUserIDAndClientID(ctx context.Context, tx *sql.Tx, userID int64, clientID int64) (*record.UserConsent, error)
+	GetUserByID(ctx context.Context, tx *sql.Tx, userID int64) (*record.User, error)
 }
 
 // ConsentPrompt is GET /auth/consent, reached in requires_consent: it shows the consent screen, or
@@ -85,7 +85,7 @@ type ConsentPromptResult struct {
 func (o *ConsentPrompt) Run(ctx context.Context, browser stepSaver,
 	authContext *ceremony.AuthContext) (ConsentPromptResult, error) {
 
-	user, err := o.database.GetUserById(ctx, nil, authContext.UserId)
+	user, err := o.database.GetUserByID(ctx, nil, authContext.UserID)
 	if err != nil {
 		return ConsentPromptResult{}, err
 	}
@@ -93,7 +93,7 @@ func (o *ConsentPrompt) Run(ctx context.Context, browser stepSaver,
 		return ConsentPromptResult{}, errs.New("user not found")
 	}
 
-	client, err := o.database.GetClientByClientIdentifier(ctx, nil, authContext.ClientId)
+	client, err := o.database.GetClientByClientIdentifier(ctx, nil, authContext.ClientID)
 	if err != nil {
 		return ConsentPromptResult{}, err
 	}
@@ -101,7 +101,7 @@ func (o *ConsentPrompt) Run(ctx context.Context, browser stepSaver,
 		return ConsentPromptResult{}, errs.New("client not found")
 	}
 
-	consent, err := o.database.GetConsentByUserIdAndClientId(ctx, nil, user.Id, client.Id)
+	consent, err := o.database.GetConsentByUserIDAndClientID(ctx, nil, user.ID, client.ID)
 	if err != nil {
 		return ConsentPromptResult{}, err
 	}
@@ -141,7 +141,7 @@ type consentSubmissionDatabase interface {
 	userconsent.Database
 
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
-	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	GetUserByID(ctx context.Context, tx *sql.Tx, userID int64) (*record.User, error)
 }
 
 // consentSubmissionBrowser is the two browser-session writes ConsentSubmission makes: the save that
@@ -221,7 +221,7 @@ func (o *ConsentSubmission) Run(ctx context.Context, browser consentSubmissionBr
 	for need != consentSubmissionFactNone {
 		if need == consentSubmissionFactHeldScope {
 			var err error
-			client, err = o.database.GetClientByClientIdentifier(ctx, nil, authContext.ClientId)
+			client, err = o.database.GetClientByClientIdentifier(ctx, nil, authContext.ClientID)
 			if err != nil {
 				return ConsentSubmissionResult{}, err
 			}
@@ -229,7 +229,7 @@ func (o *ConsentSubmission) Run(ctx context.Context, browser consentSubmissionBr
 				return ConsentSubmissionResult{}, errs.New("client not found")
 			}
 
-			user, err = o.database.GetUserById(ctx, nil, authContext.UserId)
+			user, err = o.database.GetUserByID(ctx, nil, authContext.UserID)
 			if err != nil {
 				return ConsentSubmissionResult{}, err
 			}
@@ -249,16 +249,16 @@ func (o *ConsentSubmission) Run(ctx context.Context, browser consentSubmissionBr
 	switch answer {
 	case consentSubmissionDeclined, consentSubmissionNothingTicked:
 		// No request reaches both this read and the load above (#108).
-		refusedClient := clientProvenance(ctx, o.database, authContext.ClientId)
+		refusedClient := clientProvenance(ctx, o.database, authContext.ClientID)
 		return ConsentSubmissionResult{
 			ClientError: &ClientError{Client: refusedClient, Code: "access_denied",
 				Description: "The user did not provide consent"},
-			ClearErr: browser.ClearAuthContext(authContext.CeremonyId),
+			ClearErr: browser.ClearAuthContext(authContext.CeremonyID),
 		}, nil
 	case consentSubmissionNothingHeld:
 		slog.WarnContext(ctx, "the consented selection holds no permission the user still has, so no consent is recorded",
-			"user_id", user.Id,
-			"client_identifier", authContext.ClientId)
+			"user_id", user.ID,
+			"client_identifier", authContext.ClientID)
 
 		// Worded apart from the refusal above, which answers the user's own choice: an administrator
 		// emptied this selection. The wording and the error code are /auth/completed's for the same
@@ -267,20 +267,20 @@ func (o *ConsentSubmission) Run(ctx context.Context, browser consentSubmissionBr
 		return ConsentSubmissionResult{
 			ClientError: &ClientError{Client: client, Code: "access_denied",
 				Description: "The user is not authorized to access any of the requested scopes"},
-			ClearErr: browser.ClearAuthContext(authContext.CeremonyId),
+			ClearErr: browser.ClearAuthContext(authContext.CeremonyID),
 		}, nil
 	}
 
-	consent, err := userconsent.Record(ctx, o.database, user.Id, client.Id, *facts.heldScope)
+	consent, err := userconsent.Record(ctx, o.database, user.ID, client.ID, *facts.heldScope)
 	if err != nil {
 		return ConsentSubmissionResult{}, err
 	}
 	authContext.ConsentedScope = consent.Scope
 
 	o.auditLogger.Log(ctx, audit.EventSavedConsent, map[string]interface{}{
-		"user_id":    consent.UserId,
-		"client_id":  consent.ClientId,
-		"consent_id": consent.Id,
+		"user_id":    consent.UserID,
+		"client_id":  consent.ClientID,
+		"consent_id": consent.ID,
 	})
 
 	authContext.AuthState = ceremony.AuthStateReadyToIssueCode

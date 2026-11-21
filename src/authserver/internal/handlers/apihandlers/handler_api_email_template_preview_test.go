@@ -39,8 +39,8 @@ const (
 	sampleCodesLeft = "3"
 )
 
-// chosenBrandId is the brand a request chooses, which datamocks answers as a dark Plum brand.
-const chosenBrandId = int64(7)
+// chosenBrandID is the brand a request chooses, which datamocks answers as a dark Plum brand.
+const chosenBrandID = int64(7)
 
 // previewBrands is the renderer's brand reader: a light Plum default brand.
 func previewBrands() *testEmailBrands {
@@ -52,12 +52,12 @@ func sampleRenderer() *render.Renderer {
 	return render.New(web.TemplateFS(), web.StaticFS(), previewBrands())
 }
 
-// darkBrandDatabase answers chosenBrandId as a dark Plum brand.
+// darkBrandDatabase answers chosenBrandID as a dark Plum brand.
 func darkBrandDatabase(t *testing.T) *datamocks.Database {
 	database := datamocks.NewDatabase(t)
 	dark := record.NewBrand("Night", record.BrandAppearanceDark, "plum")
-	dark.Id = chosenBrandId
-	database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), chosenBrandId).Return(&dark, nil).Maybe()
+	dark.ID = chosenBrandID
+	database.On("GetBrandByID", mock.Anything, (*sql.Tx)(nil), chosenBrandID).Return(&dark, nil).Maybe()
 	return database
 }
 
@@ -154,7 +154,7 @@ func TestEmailTemplatePreview_EachEmailsSampleValues(t *testing.T) {
 // The preview is drawn in the brand the request chooses, and in the default brand without one.
 func TestEmailTemplatePreview_IsDrawnInTheChosenBrand(t *testing.T) {
 	r := sampleRequest(t, "authserver:admin-read", "otp_enabled", "en", "", acmeSettings(), map[string]any{
-		"subject": "Two-factor on", "body": "Hello {{name}}.", "brandId": chosenBrandId,
+		"subject": "Two-factor on", "body": "Hello {{name}}.", "brandId": chosenBrandID,
 	})
 
 	rr, body := serveJSON(t, HandleEmailTemplatePreviewPost(darkBrandDatabase(t), sampleRenderer()), r)
@@ -167,7 +167,7 @@ func TestEmailTemplatePreview_IsDrawnInTheChosenBrand(t *testing.T) {
 
 func TestEmailTemplatePreview_AnUnknownBrandIsA400(t *testing.T) {
 	database := datamocks.NewDatabase(t)
-	database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(99)).Return(nil, nil)
+	database.On("GetBrandByID", mock.Anything, (*sql.Tx)(nil), int64(99)).Return(nil, nil)
 	r := sampleRequest(t, "authserver:admin-read", "otp_enabled", "en", "", acmeSettings(), map[string]any{
 		"subject": "Two-factor on", "body": "Hello {{name}}.", "brandId": 99,
 	})
@@ -182,9 +182,9 @@ func TestEmailTemplatePreview_AnUnknownBrandIsA400(t *testing.T) {
 
 func TestEmailTemplatePreview_ABrandThatCannotBeReadIsA500(t *testing.T) {
 	database := datamocks.NewDatabase(t)
-	database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), chosenBrandId).Return(nil, errs.New("database down"))
+	database.On("GetBrandByID", mock.Anything, (*sql.Tx)(nil), chosenBrandID).Return(nil, errs.New("database down"))
 	r := sampleRequest(t, "authserver:admin-read", "otp_enabled", "en", "", acmeSettings(), map[string]any{
-		"subject": "Two-factor on", "body": "Hello {{name}}.", "brandId": chosenBrandId,
+		"subject": "Two-factor on", "body": "Hello {{name}}.", "brandId": chosenBrandID,
 	})
 
 	rr, _ := serveJSON(t, HandleEmailTemplatePreviewPost(database, sampleRenderer()), r)
@@ -354,7 +354,7 @@ func TestEmailTemplateSendTest_SendsTheTextToTheAddress(t *testing.T) {
 		"subject":     "Nuova password per {{app_name}}",
 		"buttonLabel": "Cambia",
 		"body":        "Ciao {{name}}, il link vale {{expiry}}: {{link}}\n\n{{button}}",
-		"brandId":     chosenBrandId,
+		"brandId":     chosenBrandID,
 	})
 	rr, _ := serveJSON(t, sendTestHandler(database, emailSender, auditLogger), r)
 
@@ -363,7 +363,7 @@ func TestEmailTemplateSendTest_SendsTheTextToTheAddress(t *testing.T) {
 	require.NotNil(t, sent)
 	assert.Equal(t, "Ana.Lima@Example.COM", sent.To)
 	assert.Equal(t, "Nuova password per Acme Portal", sent.Subject)
-	doc := htmlDoc(t, sent.HtmlBody)
+	doc := htmlDoc(t, sent.HTMLBody)
 	assert.Equal(t, "it", doc.Find("html").AttrOr("lang", ""))
 	assert.Equal(t, "dark", doc.Find(`meta[name="color-scheme"]`).AttrOr("content", ""))
 	assert.Equal(t, "Ciao "+sampleName+", il link vale 5 minuti: "+sampleLink, strings.TrimSpace(doc.Find("main p").First().Text()))
@@ -396,7 +396,7 @@ func TestEmailTemplateSendTest_TheFooterIsInTheLanguageEdited(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 	require.NotNil(t, sent)
-	assertGermanFooter(t, sent.HtmlBody)
+	assertGermanFooter(t, sent.HTMLBody)
 }
 
 // Sending text nobody has saved to an address someone typed takes the scope a save takes (#818
@@ -462,7 +462,7 @@ func TestEmailTemplateSendTest_Refusals(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
-			database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(99)).Return(nil, nil).Maybe()
+			database.On("GetBrandByID", mock.Anything, (*sql.Tx)(nil), int64(99)).Return(nil, nil).Maybe()
 			r := sampleRequest(t, "authserver:manage", "otp_enabled", "en", "", acmeSettings(), tc.request)
 
 			rr, body := serveJSON(t, sendTestHandler(database, accounthandlersmocks.NewEmailSender(t), handlersmocks.NewAuditLogger(t)), r)

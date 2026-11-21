@@ -35,13 +35,13 @@ type defaultBrandStub struct {
 	assetErr error
 }
 
-func (s *defaultBrandStub) GetBrandAssetsByIds(_ context.Context, _ *sql.Tx, ids []int64) ([]record.BrandAsset, error) {
+func (s *defaultBrandStub) GetBrandAssetsByIDs(_ context.Context, _ *sql.Tx, ids []int64) ([]record.BrandAsset, error) {
 	if s.assetErr != nil {
 		return nil, s.assetErr
 	}
 	var found []record.BrandAsset
 	for _, asset := range s.assets {
-		if slices.Contains(ids, asset.Id) {
+		if slices.Contains(ids, asset.ID) {
 			found = append(found, asset)
 		}
 	}
@@ -86,12 +86,12 @@ func readPageHead(t *testing.T, page string) pageHead {
 
 // brandStylesheetHref is the link a page draws a brand on theme with: the brand's own stylesheet
 // route, named by the fingerprint the stylesheet is served as current under.
-func brandStylesheetHref(t *testing.T, brandId string, theme string) string {
+func brandStylesheetHref(t *testing.T, brandID string, theme string) string {
 	t.Helper()
 	stylesheet, ok := brandthemes.StylesheetOf(theme)
 	require.True(t, ok, theme)
 	require.Regexp(t, `^[0-9a-f]{12}$`, stylesheet.Fingerprint)
-	return "/brand/" + brandId + "/stylesheet.css?v=" + stylesheet.Fingerprint
+	return "/brand/" + brandID + "/stylesheet.css?v=" + stylesheet.Fingerprint
 }
 
 // Both layouts are drawn in the default brand: the html element carries data-theme for a light or
@@ -111,21 +111,21 @@ func TestRender_LayoutsAreDrawnInTheDefaultBrand(t *testing.T) {
 		}{
 			{
 				name:            "a dark brand",
-				brand:           &record.Brand{Id: 7, Name: "Night", Appearance: record.BrandAppearanceDark, Theme: "plum"},
+				brand:           &record.Brand{ID: 7, Name: "Night", Appearance: record.BrandAppearanceDark, Theme: "plum"},
 				wantDataTheme:   "dark",
 				wantColorScheme: "dark",
 				wantBrandHref:   func(t *testing.T) string { return brandStylesheetHref(t, "7", "plum") },
 			},
 			{
 				name:            "a light brand",
-				brand:           &record.Brand{Id: 12, Name: "Day", Appearance: record.BrandAppearanceLight, Theme: "avocado"},
+				brand:           &record.Brand{ID: 12, Name: "Day", Appearance: record.BrandAppearanceLight, Theme: "avocado"},
 				wantDataTheme:   "light",
 				wantColorScheme: "light",
 				wantBrandHref:   func(t *testing.T) string { return brandStylesheetHref(t, "12", "avocado") },
 			},
 			{
 				name:            "an automatic brand on Blueberry",
-				brand:           &record.Brand{Id: 1, Name: "Default", Appearance: record.BrandAppearanceAuto, Theme: "blueberry"},
+				brand:           &record.Brand{ID: 1, Name: "Default", Appearance: record.BrandAppearanceAuto, Theme: "blueberry"},
 				wantColorScheme: "light dark",
 				wantBrandHref:   func(t *testing.T) string { return brandStylesheetHref(t, "1", "blueberry") },
 			},
@@ -171,7 +171,7 @@ func TestRender_APageWithNoReadableBrandIsStillDrawn(t *testing.T) {
 			{name: "a failed read", brands: &defaultBrandStub{err: errs.New("the database went away")},
 				wantLog: "unable to read the default brand"},
 			{name: "a theme none of the built-in ones",
-				brands:  &defaultBrandStub{brand: &record.Brand{Id: 3, Name: "Odd", Appearance: record.BrandAppearanceDark, Theme: "mango"}},
+				brands:  &defaultBrandStub{brand: &record.Brand{ID: 3, Name: "Odd", Appearance: record.BrandAppearanceDark, Theme: "mango"}},
 				wantLog: "unable to link the brand's stylesheet"},
 		} {
 			t.Run(layout.layout+" "+tc.name, func(t *testing.T) {
@@ -210,7 +210,7 @@ func TestRender_APageWithNoReadableBrandIsStillDrawn(t *testing.T) {
 func TestRender_AnEmailReadsItsBrandForItsFrameAlone(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{AppName: "Test"}))
-	brands := &defaultBrandStub{brand: &record.Brand{Id: 7, Appearance: record.BrandAppearanceDark, Theme: "plum"}}
+	brands := &defaultBrandStub{brand: &record.Brand{ID: 7, Appearance: record.BrandAppearanceDark, Theme: "plum"}}
 
 	message, err := New(web.TemplateFS(), web.StaticFS(), brands).RenderEmail(req, emailtemplate.PasswordChanged,
 		emailtemplate.Values{Name: "Ana"})
@@ -228,8 +228,8 @@ func TestRender_AnEmailReadsItsBrandForItsFrameAlone(t *testing.T) {
 // cannot be read still draws the page, automatic in main.css's colors, and the fault is logged
 // (#812, as #810 decided for the default brand).
 func TestRender_APageForAClientIsDrawnInTheClientsBrand(t *testing.T) {
-	night := &record.Brand{Id: 7, Name: "Night", Appearance: record.BrandAppearanceDark, Theme: "plum"}
-	day := &record.Brand{Id: 12, Name: "Day", Appearance: record.BrandAppearanceLight, Theme: "avocado"}
+	night := &record.Brand{ID: 7, Name: "Night", Appearance: record.BrandAppearanceDark, Theme: "plum"}
+	day := &record.Brand{ID: 12, Name: "Day", Appearance: record.BrandAppearanceLight, Theme: "avocado"}
 
 	for _, tc := range []struct {
 		name            string
@@ -322,7 +322,7 @@ func TestRender_APageForAClientIsDrawnInTheClientsBrand(t *testing.T) {
 // console's admin pages (#813 decision 9). Each path names its own route and its own contents.
 func TestClientPageBrand_NamesTheFullAndTheColorsOnlyStylesheets(t *testing.T) {
 	brand := record.NewBrand("Shop", record.BrandAppearanceAuto, "avocado")
-	brand.Id = 7
+	brand.ID = 7
 	brand.Corners = record.BrandCornersSquare
 	brand.Font = record.BrandFontSerif
 	avocado, ok := brandthemes.StylesheetOf("avocado")

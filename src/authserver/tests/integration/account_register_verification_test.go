@@ -47,9 +47,9 @@ func registerPage(t *testing.T, client *http.Client, email string) string {
 }
 
 // disableAccount disables an account as an administrator would.
-func disableAccount(t *testing.T, userId int64) {
+func disableAccount(t *testing.T, userID int64) {
 	t.Helper()
-	flipped, err := database.TrySetUserEnabled(context.Background(), nil, userId, true, false)
+	flipped, err := database.TrySetUserEnabled(context.Background(), nil, userID, true, false)
 	require.NoError(t, err)
 	require.True(t, flipped)
 }
@@ -83,7 +83,7 @@ func awaitRequestedRegistrationRecords(t *testing.T, address string, count int) 
 			var details map[string]interface{}
 			require.NoError(t, json.Unmarshal([]byte(entry.Details), &details))
 			if details["email_digest"] == digest {
-				assert.NotEmpty(t, entry.RequestId, "the record carries the request's id")
+				assert.NotEmpty(t, entry.RequestID, "the record carries the request's id")
 				records = append(records, details)
 			}
 		}
@@ -127,10 +127,10 @@ func TestSelfRegister_WithVerificationEveryAddressGetsTheSamePage(t *testing.T) 
 
 	disabledEmail := registerAddress()
 	disabled, _ := createResetTestUser(t, disabledEmail)
-	disableAccount(t, disabled.Id)
+	disableAccount(t, disabled.ID)
 
 	pendingEmail := registerAddress()
-	client := createHttpClient(t)
+	client := createHTTPClient(t)
 	loadRegisterPage(t, client)
 	registerPage(t, client, pendingEmail)
 	require.Len(t, awaitActivationLinks(t, pendingEmail, 1), 1, "the pending address's first registration is sent its link")
@@ -160,7 +160,7 @@ func TestSelfRegister_WithVerificationEveryAddressGetsTheSamePage(t *testing.T) 
 		require.Len(t, messages, 1)
 		message := messages[0]
 
-		settings, err := database.GetSettingsById(context.Background(), nil, 1)
+		settings, err := database.GetSettingsByID(context.Background(), nil, 1)
 		require.NoError(t, err)
 		forgotPasswordURL := appConfig.AuthServer.BaseURL + "/forgot-password"
 
@@ -209,7 +209,7 @@ func TestSelfRegister_WithVerificationTheNoticeIsInTheAccountsLocale(t *testing.
 	user.Locale = "pt-BR"
 	require.NoError(t, database.UpdateUser(context.Background(), nil, user))
 
-	client := createHttpClient(t)
+	client := createHTTPClient(t)
 	loadRegisterPage(t, client)
 	registerPage(t, client, email)
 
@@ -238,9 +238,9 @@ func TestSelfRegister_WithVerificationEveryRequestIsAuditedOnce(t *testing.T) {
 
 	disabledEmail := registerAddress()
 	disabled, _ := createResetTestUser(t, disabledEmail)
-	disableAccount(t, disabled.Id)
+	disableAccount(t, disabled.ID)
 
-	client := createHttpClient(t)
+	client := createHTTPClient(t)
 	loadRegisterPage(t, client)
 	for _, address := range []string{newAddress, verifiedEmail, unverifiedEmail, disabledEmail} {
 		registerPage(t, client, address)
@@ -258,14 +258,14 @@ func TestSelfRegister_WithVerificationEveryRequestIsAuditedOnce(t *testing.T) {
 	for _, tc := range []struct {
 		name              string
 		address           string
-		userId            int64
-		preRegistrationId int64
+		userID            int64
+		preRegistrationID int64
 		outcome           string
 	}{
-		{name: "a new address", address: newAddress, preRegistrationId: preRegistration.Id, outcome: "link_issued"},
-		{name: "a verified, enabled account", address: verifiedEmail, userId: verified.Id, outcome: "notice_issued"},
-		{name: "an unverified account", address: unverifiedEmail, userId: unverified.Id, outcome: "unverified_address"},
-		{name: "a disabled account", address: disabledEmail, userId: disabled.Id, outcome: "account_disabled"},
+		{name: "a new address", address: newAddress, preRegistrationID: preRegistration.ID, outcome: "link_issued"},
+		{name: "a verified, enabled account", address: verifiedEmail, userID: verified.ID, outcome: "notice_issued"},
+		{name: "an unverified account", address: unverifiedEmail, userID: unverified.ID, outcome: "unverified_address"},
+		{name: "a disabled account", address: disabledEmail, userID: disabled.ID, outcome: "account_disabled"},
 		{name: "a malformed address", address: malformed, outcome: "invalid_address"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -275,15 +275,15 @@ func TestSelfRegister_WithVerificationEveryRequestIsAuditedOnce(t *testing.T) {
 
 			assert.Equal(t, tc.outcome, details["outcome"])
 			assert.NotEmpty(t, details["ip"])
-			if tc.userId == 0 {
+			if tc.userID == 0 {
 				assert.NotContains(t, details, "user_id", "no account matched, so none is named")
 			} else {
-				assert.InDelta(t, float64(tc.userId), details["user_id"], 0)
+				assert.InDelta(t, float64(tc.userID), details["user_id"], 0)
 			}
-			if tc.preRegistrationId == 0 {
+			if tc.preRegistrationID == 0 {
 				assert.NotContains(t, details, "pre_registration_id")
 			} else {
-				assert.InDelta(t, float64(tc.preRegistrationId), details["pre_registration_id"], 0)
+				assert.InDelta(t, float64(tc.preRegistrationID), details["pre_registration_id"], 0)
 			}
 			for key, value := range details {
 				assert.NotContains(t, strings.ToLower(fmt.Sprint(value)), tc.address,
@@ -309,7 +309,7 @@ func TestSelfRegister_WithVerificationAnswersBeforeTheMailIsSent(t *testing.T) {
 	})
 
 	email := registerAddress()
-	client := createHttpClient(t)
+	client := createHTTPClient(t)
 	loadRegisterPage(t, client)
 
 	start := time.Now()

@@ -43,7 +43,7 @@ func newHTTPSRoutingTestServer(t *testing.T, database *datamocks.Database) *Serv
 	cfg := &config.Config{}
 	cfg.AuthServer.BaseURL = "https://auth.test"
 	cfg.AuthServer.ProfilePictureMaxSizeBytes = testProfilePictureMaxSizeBytes
-	cfg.AuthServer.LogHttpRequests = true
+	cfg.AuthServer.LogHTTPRequests = true
 
 	s := NewServer(routing.New(), database, newTestSessionStore(), nil, nil, cfg, testTokenProofs(t))
 	s.registerRoutes()
@@ -87,7 +87,7 @@ func TestRegisterRoutes_APreflightCarriesTheSecurityHeaders(t *testing.T) {
 
 // A preflight leaves the request log's record, under the request id it arrived with, and so does
 // the record of an origin lookup that failed (#715 decision 8). No answer carries the id.
-func TestRegisterRoutes_APreflightIsLoggedUnderItsRequestId(t *testing.T) {
+func TestRegisterRoutes_APreflightIsLoggedUnderItsRequestID(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	database.On("WebOriginExists", mock.Anything, mock.Anything, "https://registered.example").
 		Return(false, errors.New("the database is down")).Once()

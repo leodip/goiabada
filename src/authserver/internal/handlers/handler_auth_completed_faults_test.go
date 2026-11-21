@@ -68,7 +68,7 @@ func newCompletedFixtureWith(t *testing.T, authContext *ceremony.AuthContext, le
 		permissionChecker:  f.permissionChecker,
 		legalDocuments:     legalDocuments,
 	})
-	req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
+	req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyID, nil)
 	req = withSessionSettings(req)
 	f.req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), completedSessionIdentifier))
 	f.ceremonyStore.On("GetAuthContext", f.req).Return(authContext, nil).Once()
@@ -79,10 +79,10 @@ func newCompletedFixtureWith(t *testing.T, authContext *ceremony.AuthContext, le
 // credential, and its user is user 1.
 func ssoCeremony(scope string) *ceremony.AuthContext {
 	return &ceremony.AuthContext{
-		CeremonyId: testCeremonyId,
+		CeremonyID: testCeremonyID,
 		AuthState:  ceremony.AuthStateAuthenticationCompleted,
-		ClientId:   "test-client",
-		UserId:     1,
+		ClientID:   "test-client",
+		UserID:     1,
 		Scope:      scope,
 	}
 }
@@ -90,13 +90,13 @@ func ssoCeremony(scope string) *ceremony.AuthContext {
 // expectReusableSession arms the reads of an SSO pass up to the decision: user 1's level 1 session,
 // valid, and a level 1 client. It answers the session.
 func (f *completedFixture) expectReusableSession(clientIdentifier string) *record.UserSession {
-	userSession := &record.UserSession{Id: 9, UserId: 1, AcrLevel: record.AcrLevel1,
+	userSession := &record.UserSession{ID: 9, UserID: 1, ACRLevel: record.ACRLevel1,
 		AuthTime: time.Date(2026, 10, 14, 8, 0, 0, 0, time.UTC)}
 	f.database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, completedSessionIdentifier).
 		Return(userSession, nil).Once()
 	f.database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil).Once()
 	f.database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
-		Return(&record.Client{Id: 1, ClientIdentifier: clientIdentifier, DefaultAcrLevel: record.AcrLevel1}, nil).Once()
+		Return(&record.Client{ID: 1, ClientIdentifier: clientIdentifier, DefaultACRLevel: record.ACRLevel1}, nil).Once()
 	f.userSessionManager.On("HasValidUserSession", userSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds,
 		mock.AnythingOfType("*int64")).Return(true).Once()
 	return userSession
@@ -105,10 +105,10 @@ func (f *completedFixture) expectReusableSession(clientIdentifier string) *recor
 // expectBoundSSO arms the rest of the reuse arm for an SSO pass of an enabled user 1: the user read
 // and the bind, which answers bound, and the audit record of the bump.
 func (f *completedFixture) expectBoundSSO(bound *record.UserSession) *record.User {
-	user := &record.User{Id: 1, Enabled: true}
-	f.database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil).Once()
+	user := &record.User{ID: 1, Enabled: true}
+	f.database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(user, nil).Once()
 	f.userSessionManager.On("BindUserSession", mock.Anything, completedSessionIdentifier, int64(1),
-		boundWith("", record.AcrLevel1), false, mock.Anything).Return(bound, nil).Once()
+		boundWith("", record.ACRLevel1), false, mock.Anything).Return(bound, nil).Once()
 	f.auditLogger.On("Log", mock.Anything, audit.EventBumpedUserSession, mock.Anything).Return().Once()
 	return user
 }
@@ -131,7 +131,7 @@ func TestMissingSettings_AuthCompletedAnswersBeforeReadingItsCeremony(t *testing
 	database := datamocks.NewDatabase(t)
 	userSessionManager := handlersmocks.NewUserSessionManager(t)
 
-	req := httptest.NewRequest(http.MethodGet, "/auth/completed?ceremony="+testCeremonyId, nil)
+	req := httptest.NewRequest(http.MethodGet, "/auth/completed?ceremony="+testCeremonyID, nil)
 	rr := httptest.NewRecorder()
 	pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(isErrNoSettings)).Return().Once()
 
@@ -173,7 +173,7 @@ func TestHandleAuthCompletedGet_ALoadFailingBeforeTheDecisionAnswers500(t *testi
 
 	t.Run("the session's user", func(t *testing.T) {
 		f := newCompletedFixture(t, ssoCeremony("openid"))
-		userSession := &record.UserSession{Id: 9, UserId: 1}
+		userSession := &record.UserSession{ID: 9, UserID: 1}
 		f.database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, completedSessionIdentifier).
 			Return(userSession, nil).Once()
 		f.database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(failure).Once()
@@ -188,7 +188,7 @@ func TestHandleAuthCompletedGet_ALoadFailingBeforeTheDecisionAnswers500(t *testi
 
 	t.Run("the client", func(t *testing.T) {
 		f := newCompletedFixture(t, ssoCeremony("openid"))
-		userSession := &record.UserSession{Id: 9, UserId: 1}
+		userSession := &record.UserSession{ID: 9, UserID: 1}
 		f.database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, completedSessionIdentifier).
 			Return(userSession, nil).Once()
 		f.database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil).Once()
@@ -205,7 +205,7 @@ func TestHandleAuthCompletedGet_ALoadFailingBeforeTheDecisionAnswers500(t *testi
 	t.Run("the ceremony's user", func(t *testing.T) {
 		f := newCompletedFixture(t, ssoCeremony("openid"))
 		f.expectReusableSession("test-client")
-		f.database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(nil, failure).Once()
+		f.database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(nil, failure).Once()
 		f.expect500(failure)
 
 		f.handler.ServeHTTP(f.rr, f.req)
@@ -228,7 +228,7 @@ func TestHandleAuthCompletedGet_AFailureAfterTheBindAnswers500(t *testing.T) {
 		f := newCompletedFixture(t, ssoCeremony("openid"))
 		userSession := f.expectReusableSession("test-client")
 		bound := *userSession
-		bound.AcrLevel = "urn:goiabada:no-such-level"
+		bound.ACRLevel = "urn:goiabada:no-such-level"
 		f.expectBoundSSO(&bound)
 		f.expect500(mock.MatchedBy(func(err error) bool { return err != nil }))
 
@@ -251,7 +251,7 @@ func TestHandleAuthCompletedGet_AFailureAfterTheBindAnswers500(t *testing.T) {
 		f.handler.ServeHTTP(f.rr, f.req)
 
 		f.pageRenderer.AssertExpectations(t)
-		f.database.AssertNotCalled(t, "GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, mock.Anything,
+		f.database.AssertNotCalled(t, "GetConsentByUserIDAndClientID", mock.Anything, mock.Anything, mock.Anything,
 			mock.Anything)
 		f.assertNothingSaved(t)
 	})
@@ -263,7 +263,7 @@ func TestHandleAuthCompletedGet_AFailureAfterTheBindAnswers500(t *testing.T) {
 		user := f.expectBoundSSO(userSession)
 		f.permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, scope, user).
 			Return(scope, nil).Once()
-		f.database.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(1), int64(1)).
+		f.database.On("GetConsentByUserIDAndClientID", mock.Anything, mock.Anything, int64(1), int64(1)).
 			Return(nil, failure).Once()
 		f.expect500(failure)
 
@@ -315,7 +315,7 @@ func TestHandleAuthCompletedGet_TheStoredConsentDecidesAManageAccountScope(t *te
 			user := f.expectBoundSSO(userSession)
 			f.permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, scope, user).
 				Return(scope, nil).Once()
-			f.database.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(1), int64(1)).
+			f.database.On("GetConsentByUserIDAndClientID", mock.Anything, mock.Anything, int64(1), int64(1)).
 				Return(tc.consent, nil).Once()
 			f.ceremonyStore.On("SaveAuthContext", f.rr, f.req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 				return ac.AuthState == tc.wantState
@@ -324,7 +324,7 @@ func TestHandleAuthCompletedGet_TheStoredConsentDecidesAManageAccountScope(t *te
 			f.handler.ServeHTTP(f.rr, f.req)
 
 			assert.Equal(t, http.StatusFound, f.rr.Code)
-			assert.Equal(t, testBaseURL+tc.wantStep+"?ceremony="+testCeremonyId, f.rr.Header().Get("Location"))
+			assert.Equal(t, testBaseURL+tc.wantStep+"?ceremony="+testCeremonyID, f.rr.Header().Get("Location"))
 			f.ceremonyStore.AssertExpectations(t)
 			f.database.AssertExpectations(t)
 		})
@@ -342,8 +342,8 @@ func TestHandleAuthCompletedGet_TheStoredConsentDecidesAManageAccountScope(t *te
 
 		f.handler.ServeHTTP(f.rr, f.req)
 
-		assert.Equal(t, testBaseURL+"/auth/issue?ceremony="+testCeremonyId, f.rr.Header().Get("Location"))
-		f.database.AssertNotCalled(t, "GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, mock.Anything,
+		assert.Equal(t, testBaseURL+"/auth/issue?ceremony="+testCeremonyID, f.rr.Header().Get("Location"))
+		f.database.AssertNotCalled(t, "GetConsentByUserIDAndClientID", mock.Anything, mock.Anything, mock.Anything,
 			mock.Anything)
 	})
 }
@@ -379,10 +379,10 @@ func TestHandleAuthCompletedGet_ABoundSessionWithNoAuthTimeIsRefused(t *testing.
 	t.Run("create arm", func(t *testing.T) {
 		passwordAt := time.Date(2026, 10, 14, 8, 30, 0, 0, time.UTC)
 		authContext := &ceremony.AuthContext{
-			CeremonyId:          testCeremonyId,
+			CeremonyID:          testCeremonyID,
 			AuthState:           ceremony.AuthStateAuthenticationCompleted,
-			ClientId:            "test-client",
-			UserId:              1,
+			ClientID:            "test-client",
+			UserID:              1,
 			Scope:               "openid",
 			AuthMethods:         "pwd",
 			AuthenticatedAt:     &passwordAt,
@@ -394,17 +394,17 @@ func TestHandleAuthCompletedGet_ABoundSessionWithNoAuthTimeIsRefused(t *testing.
 			Return(nil, nil).Once()
 		f.database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*record.UserSession)(nil)).Return(nil).Once()
 		f.database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
-			Return(&record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: record.AcrLevel1}, nil).Once()
+			Return(&record.Client{ID: 1, ClientIdentifier: "test-client", DefaultACRLevel: record.ACRLevel1}, nil).Once()
 		f.userSessionManager.On("HasValidUserSession", (*record.UserSession)(nil), testIdleTimeoutInSeconds,
 			testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(false).Once()
-		f.database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).
-			Return(&record.User{Id: 1, Enabled: true}, nil).Once()
+		f.database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).
+			Return(&record.User{ID: 1, Enabled: true}, nil).Once()
 		expectCeremonyConfirmed(f.ceremonyStore, f.rr, f.req)
-		started := &record.UserSession{Id: 12, SessionIdentifier: "new-session-of-user-1", UserId: 1, AcrLevel: record.AcrLevel1,
+		started := &record.UserSession{ID: 12, SessionIdentifier: "new-session-of-user-1", UserID: 1, ACRLevel: record.ACRLevel1,
 			Started: time.Date(2026, 10, 14, 8, 31, 0, 0, time.UTC)}
 		var minted string
 		f.userSessionManager.On("StartNewUserSession", theContextOf(f.req), int64(1),
-			signedInAs(int64(1), "pwd", record.AcrLevel1, &passwordAt), int64(0), (*int64)(nil), aNewDeviceOf(f.req, &minted), "",
+			signedInAs(int64(1), "pwd", record.ACRLevel1, &passwordAt), int64(0), (*int64)(nil), aNewDeviceOf(f.req, &minted), "",
 			(*record.UserSession)(nil), testSessionLimits).Return(started, nil, nil).Once()
 		expectNewSessionBound(f.ceremonyStore, f.rr, f.req, 1, "new-session-of-user-1")
 		f.auditLogger.On("Log", mock.Anything, audit.EventStartedNewUserSession, mock.Anything).Return().Once()

@@ -25,7 +25,7 @@ type settingsKeysAPI interface {
 // structurally identical copy of the one that produces it, so it only ever reordered a list already
 // in that order. Restoring it would make the page's order the console's claim rather than the API's,
 // and would go stale the moment the API's changed (#385).
-func renderKeys(httpHelper HttpHelper, apiClient settingsKeysAPI, w http.ResponseWriter, r *http.Request,
+func renderKeys(httpHelper HTTPHelper, apiClient settingsKeysAPI, w http.ResponseWriter, r *http.Request,
 	accessToken string, bind map[string]interface{}) {
 
 	apiKeys, err := apiClient.GetSettingsKeys(r.Context(), accessToken)
@@ -40,7 +40,7 @@ func renderKeys(httpHelper HttpHelper, apiClient settingsKeysAPI, w http.Respons
 		hasPreviousKey = hasPreviousKey || k.State == "previous"
 		// API already returns state/type/algorithm and public key encodings
 		keys = append(keys, SettingsKey{
-			Id: k.Id,
+			ID: k.ID,
 			// The instant, formatted by the page in the viewer's locale (#373).
 			CreatedAt:        k.CreatedAt,
 			State:            k.State,
@@ -63,7 +63,7 @@ func renderKeys(httpHelper HttpHelper, apiClient settingsKeysAPI, w http.Respons
 }
 
 func HandleKeysGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient settingsKeysAPI,
 ) http.HandlerFunc {
@@ -71,9 +71,9 @@ func HandleKeysGet(
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
@@ -104,7 +104,7 @@ func HandleKeysGet(
 // (#251), or a commit whose outcome is unknown, which may have rotated, and whose sentence asks the
 // administrator to check the keys the page draws beside it (#371).
 func HandleKeysRotatePost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient settingsKeysAPI,
 	baseURL string,
@@ -113,9 +113,9 @@ func HandleKeysRotatePost(
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
@@ -147,7 +147,7 @@ func HandleKeysRotatePost(
 }
 
 func HandleKeysRevokePost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient settingsKeysAPI,
 ) http.HandlerFunc {
 
@@ -167,9 +167,9 @@ func HandleKeysRevokePost(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JSONError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.JSONError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 

@@ -17,7 +17,7 @@ func TestAPISettingsTokensGet_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Read current settings from DB for comparison
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
+	settings, err := database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err)
 	assert.NotNil(t, settings)
 
@@ -36,7 +36,7 @@ func TestAPISettingsTokensGet_Success(t *testing.T) {
 	assert.Equal(t, settings.RefreshTokenOfflineIdleTimeoutInSeconds, body.RefreshTokenOfflineIdleTimeoutInSeconds)
 	assert.Equal(t, settings.RefreshTokenOfflineMaxLifetimeInSeconds, body.RefreshTokenOfflineMaxLifetimeInSeconds)
 	assert.Equal(t, settings.IncludeOpenIDConnectClaimsInAccessToken, body.IncludeOpenIDConnectClaimsInAccessToken)
-	assert.Equal(t, settings.IncludeOpenIDConnectClaimsInIdToken, body.IncludeOpenIDConnectClaimsInIdToken)
+	assert.Equal(t, settings.IncludeOpenIDConnectClaimsInIDToken, body.IncludeOpenIDConnectClaimsInIDToken)
 }
 
 // PUT /api/v1/admin/settings/tokens - success
@@ -49,7 +49,7 @@ func TestAPISettingsTokensPut_Success(t *testing.T) {
 		RefreshTokenOfflineIdleTimeoutInSeconds: 3600,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 7200,
 		IncludeOpenIDConnectClaimsInAccessToken: true,
-		IncludeOpenIDConnectClaimsInIdToken:     false,
+		IncludeOpenIDConnectClaimsInIDToken:     false,
 	}
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/tokens"
@@ -67,16 +67,16 @@ func TestAPISettingsTokensPut_Success(t *testing.T) {
 	assert.Equal(t, req.RefreshTokenOfflineIdleTimeoutInSeconds, body.RefreshTokenOfflineIdleTimeoutInSeconds)
 	assert.Equal(t, req.RefreshTokenOfflineMaxLifetimeInSeconds, body.RefreshTokenOfflineMaxLifetimeInSeconds)
 	assert.Equal(t, req.IncludeOpenIDConnectClaimsInAccessToken, body.IncludeOpenIDConnectClaimsInAccessToken)
-	assert.Equal(t, req.IncludeOpenIDConnectClaimsInIdToken, body.IncludeOpenIDConnectClaimsInIdToken)
+	assert.Equal(t, req.IncludeOpenIDConnectClaimsInIDToken, body.IncludeOpenIDConnectClaimsInIDToken)
 
 	// Verify DB persisted
-	settings, err2 := database.GetSettingsById(context.Background(), nil, 1)
+	settings, err2 := database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err2)
 	assert.Equal(t, req.TokenExpirationInSeconds, settings.TokenExpirationInSeconds)
 	assert.Equal(t, req.RefreshTokenOfflineIdleTimeoutInSeconds, settings.RefreshTokenOfflineIdleTimeoutInSeconds)
 	assert.Equal(t, req.RefreshTokenOfflineMaxLifetimeInSeconds, settings.RefreshTokenOfflineMaxLifetimeInSeconds)
 	assert.Equal(t, req.IncludeOpenIDConnectClaimsInAccessToken, settings.IncludeOpenIDConnectClaimsInAccessToken)
-	assert.Equal(t, req.IncludeOpenIDConnectClaimsInIdToken, settings.IncludeOpenIDConnectClaimsInIdToken)
+	assert.Equal(t, req.IncludeOpenIDConnectClaimsInIDToken, settings.IncludeOpenIDConnectClaimsInIDToken)
 }
 
 // PUT /api/v1/admin/settings/tokens - validation errors
@@ -91,7 +91,7 @@ func TestAPISettingsTokensPut_ValidationErrors(t *testing.T) {
 		RefreshTokenOfflineIdleTimeoutInSeconds: 1,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 2,
 		IncludeOpenIDConnectClaimsInAccessToken: false,
-		IncludeOpenIDConnectClaimsInIdToken:     true,
+		IncludeOpenIDConnectClaimsInIDToken:     true,
 	})
 	defer func() { _ = resp1.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp1.StatusCode)
@@ -105,7 +105,7 @@ func TestAPISettingsTokensPut_ValidationErrors(t *testing.T) {
 		RefreshTokenOfflineIdleTimeoutInSeconds: 1,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 2,
 		IncludeOpenIDConnectClaimsInAccessToken: false,
-		IncludeOpenIDConnectClaimsInIdToken:     true,
+		IncludeOpenIDConnectClaimsInIDToken:     true,
 	})
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
@@ -119,7 +119,7 @@ func TestAPISettingsTokensPut_ValidationErrors(t *testing.T) {
 		RefreshTokenOfflineIdleTimeoutInSeconds: 0,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 2,
 		IncludeOpenIDConnectClaimsInAccessToken: false,
-		IncludeOpenIDConnectClaimsInIdToken:     true,
+		IncludeOpenIDConnectClaimsInIDToken:     true,
 	})
 	defer func() { _ = resp3.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp3.StatusCode)
@@ -133,7 +133,7 @@ func TestAPISettingsTokensPut_ValidationErrors(t *testing.T) {
 		RefreshTokenOfflineIdleTimeoutInSeconds: 160000001,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 160000001,
 		IncludeOpenIDConnectClaimsInAccessToken: false,
-		IncludeOpenIDConnectClaimsInIdToken:     true,
+		IncludeOpenIDConnectClaimsInIDToken:     true,
 	})
 	defer func() { _ = resp4.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp4.StatusCode)
@@ -147,7 +147,7 @@ func TestAPISettingsTokensPut_ValidationErrors(t *testing.T) {
 		RefreshTokenOfflineIdleTimeoutInSeconds: 1,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 0,
 		IncludeOpenIDConnectClaimsInAccessToken: false,
-		IncludeOpenIDConnectClaimsInIdToken:     true,
+		IncludeOpenIDConnectClaimsInIDToken:     true,
 	})
 	defer func() { _ = resp5.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp5.StatusCode)
@@ -161,7 +161,7 @@ func TestAPISettingsTokensPut_ValidationErrors(t *testing.T) {
 		RefreshTokenOfflineIdleTimeoutInSeconds: 1,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 160000001,
 		IncludeOpenIDConnectClaimsInAccessToken: false,
-		IncludeOpenIDConnectClaimsInIdToken:     true,
+		IncludeOpenIDConnectClaimsInIDToken:     true,
 	})
 	defer func() { _ = resp6.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp6.StatusCode)
@@ -175,7 +175,7 @@ func TestAPISettingsTokensPut_ValidationErrors(t *testing.T) {
 		RefreshTokenOfflineIdleTimeoutInSeconds: 11,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 10,
 		IncludeOpenIDConnectClaimsInAccessToken: false,
-		IncludeOpenIDConnectClaimsInIdToken:     true,
+		IncludeOpenIDConnectClaimsInIDToken:     true,
 	})
 	defer func() { _ = resp7.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp7.StatusCode)
@@ -194,7 +194,7 @@ func TestAPISettingsTokens_InvalidRequestBodyAndUnauthorized(t *testing.T) {
 	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -221,7 +221,7 @@ func TestAPISettingsTokens_UnauthorizedAndScope(t *testing.T) {
 	// No token - GET
 	req, err := http.NewRequest("GET", url, nil)
 	require.NoError(t, err)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()

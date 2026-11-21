@@ -85,7 +85,7 @@ func TestMigration000059_DropPhoneVerificationCode(t *testing.T) {
 	encryptedSeed, err := dataCipher.Encrypt(seed)
 	require.NoError(t, err, "the process cipher is initialized in TestMain")
 	email := "mig59-" + fake.UUID() + "@example.com"
-	user := &record.User{Id: seedUser(t, h, userSeed{
+	user := &record.User{ID: seedUser(t, h, userSeed{
 		Enabled:            true,
 		Subject:            fake.UUID(),
 		Username:           "mig59user",
@@ -97,11 +97,11 @@ func TestMigration000059_DropPhoneVerificationCode(t *testing.T) {
 
 	_, err = h.SQL.Exec(fmt.Sprintf(
 		`UPDATE users SET phone_number_verification_code_encrypted = %s, phone_number_verification_code_issued_at = %s WHERE id = %d`,
-		placeholder000059(1), placeholder000059(2), user.Id),
+		placeholder000059(1), placeholder000059(2), user.ID),
 		[]byte("a-stale-phone-code-ciphertext"), time.Now().UTC().Truncate(time.Second))
 	require.NoErrorf(t, err, "fill the two phone verification columns at 000058 on %s", dbType())
 	for _, col := range phoneVerificationCodeColumns000059 {
-		require.Falsef(t, columnIsNull000059(t, h, col, user.Id),
+		require.Falsef(t, columnIsNull000059(t, h, col, user.ID),
 			"the seed must leave users.%s holding a value on %s, or the roll back's NULL proves nothing", col, dbType())
 	}
 
@@ -127,9 +127,9 @@ func TestMigration000059_DropPhoneVerificationCode(t *testing.T) {
 	// migration adds to users, for a reason this migration does not own (#510). The two dropped
 	// columns stay dropped on the way.
 	require.NoErrorf(t, h.Migrator.Up(ctx), "migrate to head on %s", dbType())
-	got, err := h.DB.GetUserById(ctx, nil, user.Id)
-	require.NoErrorf(t, err, "read users.id=%d back after the drop on %s", user.Id, dbType())
-	require.NotNilf(t, got, "users.id=%d is gone on %s; this migration deletes no rows", user.Id, dbType())
+	got, err := h.DB.GetUserByID(ctx, nil, user.ID)
+	require.NoErrorf(t, err, "read users.id=%d back after the drop on %s", user.ID, dbType())
+	require.NotNilf(t, got, "users.id=%d is gone on %s; this migration deletes no rows", user.ID, dbType())
 	assert.Equal(t, user.Email, got.Email)
 	assert.Equal(t, "a-stored-password-hash", got.PasswordHash)
 	assert.True(t, got.OTPEnabled)
@@ -146,14 +146,14 @@ func TestMigration000059_DropPhoneVerificationCode(t *testing.T) {
 		"000059's down must restore users to the shape 000058 built on %s: both columns' type, "+
 			"nullability and collation, no default, and every index", dbType())
 	for _, col := range phoneVerificationCodeColumns000059 {
-		assert.Truef(t, columnIsNull000059(t, h, col, user.Id),
+		assert.Truef(t, columnIsNull000059(t, h, col, user.ID),
 			"000059's down restores the shape, never the values: users.%s reads NULL on %s", col, dbType())
 	}
 
 	// In SQL: the database is at 000058, below head, where the ORM's read is not this test's to make.
 	var rolledBackEmail string
-	require.NoErrorf(t, h.SQL.QueryRowContext(ctx, fmt.Sprintf("SELECT email FROM users WHERE id = %d", user.Id)).Scan(&rolledBackEmail),
-		"the roll back must keep users.id=%d on %s", user.Id, dbType())
+	require.NoErrorf(t, h.SQL.QueryRowContext(ctx, fmt.Sprintf("SELECT email FROM users WHERE id = %d", user.ID)).Scan(&rolledBackEmail),
+		"the roll back must keep users.id=%d on %s", user.ID, dbType())
 	assert.Equal(t, user.Email, rolledBackEmail)
 
 	// 4. Forward again, which is what an operator who rolled back and retried does.
@@ -180,10 +180,10 @@ func placeholder000059(n int) string {
 	}
 }
 
-func columnIsNull000059(t *testing.T, h *isolatedDB, col string, userId int64) bool {
+func columnIsNull000059(t *testing.T, h *isolatedDB, col string, userID int64) bool {
 	t.Helper()
 	var isNull int
-	q := fmt.Sprintf("SELECT CASE WHEN %s IS NULL THEN 1 ELSE 0 END FROM users WHERE id = %d", col, userId)
+	q := fmt.Sprintf("SELECT CASE WHEN %s IS NULL THEN 1 ELSE 0 END FROM users WHERE id = %d", col, userID)
 	require.NoErrorf(t, h.SQL.QueryRow(q).Scan(&isNull), "read users.%s on %s", col, dbType())
 	return isNull == 1
 }

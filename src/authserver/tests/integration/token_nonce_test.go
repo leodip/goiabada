@@ -17,8 +17,8 @@ func TestToken_Nonce_OnlyInTheIDTokenOfTheCodeExchange(t *testing.T) {
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile")
 	require.NotEmpty(t, code.Nonce, "the authorization request sent a nonce")
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
-	exchanged := postToTokenEndpointWithBasicAuth(t, httpClient, destUrl, url.Values{
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
+	exchanged := postToTokenEndpointWithBasicAuth(t, httpClient, destURL, url.Values{
 		"grant_type":    {"authorization_code"},
 		"code":          {code.Code},
 		"redirect_uri":  {code.RedirectURI},
@@ -34,16 +34,16 @@ func TestToken_Nonce_OnlyInTheIDTokenOfTheCodeExchange(t *testing.T) {
 
 	refreshToken, ok := exchanged["refresh_token"].(string)
 	require.True(t, ok, "the code exchange issues a refresh token: %v", exchanged)
-	refreshed := postToTokenEndpointWithBasicAuth(t, httpClient, destUrl, url.Values{
+	refreshed := postToTokenEndpointWithBasicAuth(t, httpClient, destURL, url.Values{
 		"grant_type":    {"refresh_token"},
 		"refresh_token": {refreshToken},
 	}, code.Client.ClientIdentifier, clientSecret)
 
-	refreshedIdToken, ok := refreshed["id_token"].(string)
+	refreshedIDToken, ok := refreshed["id_token"].(string)
 	require.True(t, ok, "the refresh issues an ID token: %v", refreshed)
-	refreshedIdClaims := decodeJWTPayload(t, refreshedIdToken)
-	assert.Equal(t, code.Client.ClientIdentifier, refreshedIdClaims["aud"], "the refreshed ID token is the client's")
-	assert.NotContains(t, refreshedIdClaims, "nonce", "a refreshed ID token has no nonce")
+	refreshedIDClaims := decodeJWTPayload(t, refreshedIDToken)
+	assert.Equal(t, code.Client.ClientIdentifier, refreshedIDClaims["aud"], "the refreshed ID token is the client's")
+	assert.NotContains(t, refreshedIDClaims, "nonce", "a refreshed ID token has no nonce")
 	refreshedAccessToken, ok := refreshed["access_token"].(string)
 	require.True(t, ok, "the refresh issues an access token: %v", refreshed)
 	assert.NotContains(t, decodeJWTPayload(t, refreshedAccessToken), "nonce", "a refreshed access token has no nonce")

@@ -61,7 +61,7 @@ func (f accountForm) post(t *testing.T, values url.Values, token string) *http.R
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Referer", target)
 	req.Header.Set("Origin", appConfig.AuthServer.BaseURL)
-	resp, err := createHttpClient(t).Do(req)
+	resp, err := createHTTPClient(t).Do(req)
 	require.NoError(t, err)
 	return resp
 }
@@ -109,7 +109,7 @@ func assertReached(t *testing.T, f accountForm, resp *http.Response, email strin
 		user, err := database.GetUserByEmail(context.Background(), nil, email)
 		require.NoError(t, err)
 		if assert.NotNil(t, user, "the account was created") {
-			t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.Id) })
+			t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.ID) })
 		}
 		return
 	}
@@ -133,7 +133,7 @@ func TestAccountFormsTurnstile_TheFormCarriesTheWidgetUnderTheWidenedPolicy(t *t
 			f.open(t)
 			turnOnTurnstile(t, turnstileAlwaysPassSecretKey)
 
-			resp := loadPage(t, createHttpClient(t), appConfig.AuthServer.BaseURL+f.path)
+			resp := loadPage(t, createHTTPClient(t), appConfig.AuthServer.BaseURL+f.path)
 			defer func() { _ = resp.Body.Close() }()
 
 			require.Equal(t, http.StatusOK, resp.StatusCode)

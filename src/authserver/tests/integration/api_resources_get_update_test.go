@@ -20,9 +20,9 @@ func TestAPIResourceGet_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	res := createTestResource(t, "api-test-get-resource-"+fake.LetterN(6), "Get Resource")
-	defer func() { _ = database.DeleteResource(context.Background(), nil, res.Id) }()
+	defer func() { _ = database.DeleteResource(context.Background(), nil, res.ID) }()
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.ID, 10)
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -33,12 +33,12 @@ func TestAPIResourceGet_Success(t *testing.T) {
 	err := json.NewDecoder(resp.Body).Decode(&getResp)
 	require.NoError(t, err)
 
-	assert.Equal(t, res.Id, getResp.Resource.Id)
+	assert.Equal(t, res.ID, getResp.Resource.ID)
 	assert.Equal(t, res.ResourceIdentifier, getResp.Resource.ResourceIdentifier)
 	assert.Equal(t, res.Description, getResp.Resource.Description)
 }
 
-func TestAPIResourceGet_NotFoundAndInvalidId(t *testing.T) {
+func TestAPIResourceGet_NotFoundAndInvalidID(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Not found
@@ -71,7 +71,7 @@ func TestAPIResourceGet_UnauthorizedAndScope(t *testing.T) {
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/1"
 	req, err := http.NewRequest("GET", url, nil)
 	require.NoError(t, err)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -94,13 +94,13 @@ func TestAPIResourceUpdatePut_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	res := createTestResource(t, "api-test-update-resource-"+fake.LetterN(6), "Original")
-	defer func() { _ = database.DeleteResource(context.Background(), nil, res.Id) }()
+	defer func() { _ = database.DeleteResource(context.Background(), nil, res.ID) }()
 
 	updateReq := api.UpdateResourceRequest{
 		ResourceIdentifier: "updated-resource-" + fake.LetterN(6),
 		Description:        "  Updated desc  ",
 	}
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.ID, 10)
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -111,12 +111,12 @@ func TestAPIResourceUpdatePut_Success(t *testing.T) {
 	err := json.NewDecoder(resp.Body).Decode(&updResp)
 	require.NoError(t, err)
 
-	assert.Equal(t, res.Id, updResp.Resource.Id)
+	assert.Equal(t, res.ID, updResp.Resource.ID)
 	assert.Equal(t, updateReq.ResourceIdentifier, updResp.Resource.ResourceIdentifier)
 	assert.Equal(t, "Updated desc", updResp.Resource.Description)
 
 	// Verify DB persisted
-	stored, err := database.GetResourceById(context.Background(), nil, res.Id)
+	stored, err := database.GetResourceByID(context.Background(), nil, res.ID)
 	require.NoError(t, err)
 	assert.NotNil(t, stored)
 	assert.Equal(t, updateReq.ResourceIdentifier, stored.ResourceIdentifier)
@@ -130,11 +130,11 @@ func TestAPIResourceUpdatePut_OntoAClientIdentifier(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	client := createTestClientUnique(t, true)
-	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.ID) }()
 	res := createTestResource(t, "api-test-clash-res-"+fake.LetterN(6), "desc")
-	defer func() { _ = database.DeleteResource(context.Background(), nil, res.Id) }()
+	defer func() { _ = database.DeleteResource(context.Background(), nil, res.ID) }()
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.ID, 10)
 	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateResourceRequest{
 		ResourceIdentifier: client.ClientIdentifier,
 		Description:        "Rename onto the client's identifier",
@@ -156,11 +156,11 @@ func TestAPIResourceUpdatePut_UnchangedIdentifierNamingAClient(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	client := createTestClientUnique(t, true)
-	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.ID) }()
 	res := createTestResource(t, client.ClientIdentifier, "desc")
-	defer func() { _ = database.DeleteResource(context.Background(), nil, res.Id) }()
+	defer func() { _ = database.DeleteResource(context.Background(), nil, res.ID) }()
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.ID, 10)
 	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateResourceRequest{
 		ResourceIdentifier: client.ClientIdentifier, // unchanged, though it names the client above
 		Description:        "Still editable",
@@ -176,10 +176,10 @@ func TestAPIResourceUpdatePut_UnchangedIdentifierNamingAClient(t *testing.T) {
 func TestAPIResourceUpdatePut_ValidationErrors(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 	res := createTestResource(t, "api-test-update-val-"+fake.LetterN(6), "desc")
-	defer func() { _ = database.DeleteResource(context.Background(), nil, res.Id) }()
+	defer func() { _ = database.DeleteResource(context.Background(), nil, res.ID) }()
 
 	// Empty identifier
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.ID, 10)
 	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateResourceRequest{ResourceIdentifier: "", Description: "x"})
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -211,11 +211,11 @@ func TestAPIResourceUpdatePut_DuplicateIdentifier(t *testing.T) {
 	res1 := createTestResource(t, "api-test-dup1-"+fake.LetterN(6), "desc")
 	res2 := createTestResource(t, "api-test-dup2-"+fake.LetterN(6), "desc")
 	defer func() {
-		_ = database.DeleteResource(context.Background(), nil, res1.Id)
-		_ = database.DeleteResource(context.Background(), nil, res2.Id)
+		_ = database.DeleteResource(context.Background(), nil, res1.ID)
+		_ = database.DeleteResource(context.Background(), nil, res2.ID)
 	}()
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res2.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res2.ID, 10)
 	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateResourceRequest{ResourceIdentifier: res1.ResourceIdentifier, Description: "x"})
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -234,7 +234,7 @@ func TestAPIResourceUpdatePut_SystemLevelResourceAllowed(t *testing.T) {
 	assert.NotNil(t, sysRes)
 
 	// Update with same identifier (should succeed)
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.ID, 10)
 	newDesc := "Updated authserver description"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateResourceRequest{
 		ResourceIdentifier: sysRes.ResourceIdentifier, // Keep same identifier
@@ -259,7 +259,7 @@ func TestAPIResourceUpdatePut_SystemLevelResourceIdentifierChangeBlocked(t *test
 	assert.NotNil(t, sysRes)
 
 	// Attempt to change identifier (should fail)
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.ID, 10)
 	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateResourceRequest{
 		ResourceIdentifier: "different-resource-identifier",
 		Description:        sysRes.Description,
@@ -274,7 +274,7 @@ func TestAPIResourceUpdatePut_SystemLevelResourceIdentifierChangeBlocked(t *test
 	assert.Equal(t, "handler.resource.system_level_identifier_fixed", errResp.ErrorCode)
 }
 
-func TestAPIResourceUpdatePut_InvalidIdAndBody(t *testing.T) {
+func TestAPIResourceUpdatePut_InvalidIDAndBody(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Invalid ID
@@ -299,7 +299,7 @@ func TestAPIResourceUpdatePut_InvalidIdAndBody(t *testing.T) {
 	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -309,14 +309,14 @@ func TestAPIResourceUpdatePut_InvalidIdAndBody(t *testing.T) {
 func TestAPIResourceUpdatePut_UnauthorizedAndScope(t *testing.T) {
 	// Prepare a test resource to reference
 	res := createTestResource(t, "api-test-update-unauth-"+fake.LetterN(6), "desc")
-	defer func() { _ = database.DeleteResource(context.Background(), nil, res.Id) }()
+	defer func() { _ = database.DeleteResource(context.Background(), nil, res.ID) }()
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.ID, 10)
 
 	// No token
 	req, err := http.NewRequest("PUT", url, nil)
 	require.NoError(t, err)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -340,13 +340,13 @@ func TestAPIResourceUpdatePut_AngleBracketsRejected(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	res := createTestResource(t, "api-test-update-angle-"+fake.LetterN(6), "Original")
-	defer func() { _ = database.DeleteResource(context.Background(), nil, res.Id) }()
+	defer func() { _ = database.DeleteResource(context.Background(), nil, res.ID) }()
 
 	updateReq := api.UpdateResourceRequest{
 		ResourceIdentifier: res.ResourceIdentifier,
 		Description:        "x > y",
 	}
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.ID, 10)
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -357,7 +357,7 @@ func TestAPIResourceUpdatePut_AngleBracketsRejected(t *testing.T) {
 
 	// The old sanitizer rewrote a bare ">" to the literal "&gt;" and stored it; nothing is stored
 	// now.
-	stored, err := database.GetResourceById(context.Background(), nil, res.Id)
+	stored, err := database.GetResourceByID(context.Background(), nil, res.ID)
 	require.NoError(t, err)
 	assert.Equal(t, "Original", stored.Description)
 }
@@ -367,19 +367,19 @@ func TestAPIResourceUpdatePut_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	res := createTestResource(t, "api-test-update-verbatim-"+fake.LetterN(6), "Original")
-	defer func() { _ = database.DeleteResource(context.Background(), nil, res.Id) }()
+	defer func() { _ = database.DeleteResource(context.Background(), nil, res.ID) }()
 
 	updateReq := api.UpdateResourceRequest{
 		ResourceIdentifier: res.ResourceIdentifier,
 		Description:        `Tom & Jerry said "hi"`,
 	}
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.ID, 10)
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-	stored, err := database.GetResourceById(context.Background(), nil, res.Id)
+	stored, err := database.GetResourceByID(context.Background(), nil, res.ID)
 	require.NoError(t, err)
 	assert.Equal(t, `Tom & Jerry said "hi"`, stored.Description)
 }

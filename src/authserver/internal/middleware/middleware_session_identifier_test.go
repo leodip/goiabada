@@ -119,7 +119,7 @@ func TestSessionIdentifier(t *testing.T) {
 		var present, userPresent bool
 		middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			_, present = reqctx.SessionIdentifierFrom(r.Context())
-			_, userPresent = reqctx.SessionUserIdFrom(r.Context())
+			_, userPresent = reqctx.SessionUserIDFrom(r.Context())
 		})).ServeHTTP(rr, req)
 
 		assert.False(t, present)
@@ -133,7 +133,7 @@ func TestSessionIdentifier(t *testing.T) {
 		cookies := seedBrowserSession(t, store, map[string]any{sessionkeys.SessionIdentifier: "valid-session-id"})
 
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "valid-session-id").
-			Return(&record.UserSession{UserId: 42}, nil).Once()
+			Return(&record.UserSession{UserID: 42}, nil).Once()
 
 		middleware := SessionIdentifier(store, mockDB, PageFaults())
 
@@ -141,17 +141,17 @@ func TestSessionIdentifier(t *testing.T) {
 
 		var contextSessionIdentifier string
 		var present bool
-		var contextUserId int64
+		var contextUserID int64
 		var userPresent bool
 		middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			contextSessionIdentifier, present = reqctx.SessionIdentifierFrom(r.Context())
-			contextUserId, userPresent = reqctx.SessionUserIdFrom(r.Context())
+			contextUserID, userPresent = reqctx.SessionUserIDFrom(r.Context())
 		})).ServeHTTP(rr, browserRequest(cookies))
 
 		assert.True(t, present)
 		assert.Equal(t, "valid-session-id", contextSessionIdentifier)
 		assert.True(t, userPresent, "the session's user rides with its identifier, so it is not read again")
-		assert.Equal(t, int64(42), contextUserId)
+		assert.Equal(t, int64(42), contextUserID)
 		assert.Equal(t, "valid-session-id", storedBrowserSession(t, store, cookies)[sessionkeys.SessionIdentifier])
 	})
 

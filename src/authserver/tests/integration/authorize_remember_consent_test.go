@@ -42,7 +42,7 @@ func newRememberConsentFixture(t *testing.T, isPublic, consentRequired, remember
 		IsPublic:                 isPublic,
 		ConsentRequired:          consentRequired,
 		RememberConsent:          remember,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 	}
 	var clientSecret string
 	if isPublic {
@@ -55,29 +55,29 @@ func newRememberConsentFixture(t *testing.T, isPublic, consentRequired, remember
 		client.ClientSecretEncrypted = encrypted
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 	require.NoError(t, database.CreateRedirectURI(context.Background(), nil,
-		&record.RedirectURI{ClientId: client.Id, URI: manageAccountRedirectURI}))
+		&record.RedirectURI{ClientID: client.ID, URI: manageAccountRedirectURI}))
 
 	password := fake.Password(10)
 	passwordHashed, err := passwordhash.Hash(password)
 	require.NoError(t, err)
 	user := &record.User{Subject: fake.UUID(), Enabled: true, Email: fake.Email(), PasswordHash: passwordHashed}
 	require.NoError(t, database.CreateUser(context.Background(), nil, user))
-	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.Id) })
-	assignPermissionToUser(t, user.Id, authServerPermissionId(t, builtin.ManageAccountPermissionIdentifier))
+	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.ID) })
+	assignPermissionToUser(t, user.ID, authServerPermissionID(t, builtin.ManageAccountPermissionIdentifier))
 
 	return &manageAccountConsentFixture{
-		client: client, clientSecret: clientSecret, user: user, password: password, browser: createHttpClient(t),
+		client: client, clientSecret: clientSecret, user: user, password: password, browser: createHTTPClient(t),
 	}
 }
 
 // signInToConsentScreen signs the user in at the fixture's browser, which holds no session, through
-// destUrl, and answers the consent screen's URL and the rendered page.
-func signInToConsentScreen(t *testing.T, f *manageAccountConsentFixture, destUrl string) (string, *http.Response) {
+// destURL, and answers the consent screen's URL and the rendered page.
+func signInToConsentScreen(t *testing.T, f *manageAccountConsentFixture, destURL string) (string, *http.Response) {
 	t.Helper()
 
-	resp, err := f.browser.Get(destUrl)
+	resp, err := f.browser.Get(destURL)
 	require.NoError(t, err)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 	location := assertRedirect(t, resp, "/auth/level1")
@@ -120,7 +120,7 @@ func approve(t *testing.T, f *manageAccountConsentFixture, consentURL string, pa
 func redeemPublic(t *testing.T, f *manageAccountConsentFixture, issueResponse *http.Response) (map[string]interface{}, *record.Code) {
 	t.Helper()
 
-	codeVal, state := getCodeAndStateFromUrl(t, issueResponse)
+	codeVal, state := getCodeAndStateFromURL(t, issueResponse)
 	assert.Equal(t, manageAccountState, state)
 	code := loadCodeFromDatabase(t, codeVal)
 	data := postToTokenEndpoint(t, f.browser, appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
@@ -134,13 +134,13 @@ func redeemPublic(t *testing.T, f *manageAccountConsentFixture, issueResponse *h
 	return data, code
 }
 
-// toIssueSkippingTheScreen follows destUrl from a signed-in browser for a client that asks users for
+// toIssueSkippingTheScreen follows destURL from a signed-in browser for a client that asks users for
 // consent: /auth/completed sends it to the consent step, which skips the screen and goes on to
 // /auth/issue, whose response it answers.
-func toIssueSkippingTheScreen(t *testing.T, f *manageAccountConsentFixture, destUrl string) *http.Response {
+func toIssueSkippingTheScreen(t *testing.T, f *manageAccountConsentFixture, destURL string) *http.Response {
 	t.Helper()
 
-	resp := f.toCompleted(t, destUrl)
+	resp := f.toCompleted(t, destURL)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 	location := assertRedirect(t, resp, "/auth/consent")
 	resp = loadPage(t, f.browser, location)
@@ -149,11 +149,11 @@ func toIssueSkippingTheScreen(t *testing.T, f *manageAccountConsentFixture, dest
 	return loadPage(t, f.browser, location)
 }
 
-// silently sends destUrl with prompt=none from the fixture's signed-in browser and answers the
+// silently sends destURL with prompt=none from the fixture's signed-in browser and answers the
 // response.
-func silently(t *testing.T, f *manageAccountConsentFixture, destUrl string) *http.Response {
+func silently(t *testing.T, f *manageAccountConsentFixture, destURL string) *http.Response {
 	t.Helper()
-	resp, err := f.browser.Get(destUrl + "&prompt=none")
+	resp, err := f.browser.Get(destURL + "&prompt=none")
 	require.NoError(t, err)
 	return resp
 }
@@ -185,7 +185,7 @@ func TestAuthorize_RememberConsent_APublicClientShowsTheScreenAfterEveryScopeWas
 		assertAnswered(t, resp, "consent_required", rememberConsentDescription)
 	})
 
-	require.NoError(t, database.SetClientRememberConsent(context.Background(), nil, f.client.Id, true))
+	require.NoError(t, database.SetClientRememberConsent(context.Background(), nil, f.client.ID, true))
 
 	t.Run("with Remember consent on, the second sign-in skips the screen", func(t *testing.T) {
 		resp := toIssueSkippingTheScreen(t, f, link)

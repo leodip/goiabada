@@ -20,9 +20,9 @@ import (
 type clientSessionsDatabase interface {
 	sessionDetailsDatabase
 
-	GetClientById(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error)
-	GetUserSessionsByClientIdPaginated(ctx context.Context, tx *sql.Tx, clientId int64, page int, pageSize int) ([]record.UserSession, int, error)
-	GetUsersByIds(ctx context.Context, tx *sql.Tx, userIds []int64) (map[int64]record.User, error)
+	GetClientByID(ctx context.Context, tx *sql.Tx, clientID int64) (*record.Client, error)
+	GetUserSessionsByClientIDPaginated(ctx context.Context, tx *sql.Tx, clientID int64, page int, pageSize int) ([]record.UserSession, int, error)
+	GetUsersByIDs(ctx context.Context, tx *sql.Tx, userIDs []int64) (map[int64]record.User, error)
 	UserSessionsLoadClients(ctx context.Context, tx *sql.Tx, userSessions []record.UserSession) error
 }
 
@@ -46,14 +46,14 @@ func HandleClientSessionsGet(
 			writeJSONError(w, "Client ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
-		clientId, err := strconv.ParseInt(idStr, 10, 64)
+		clientID, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			writeJSONError(w, "Invalid client ID format", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
 		// Ensure client exists
-		client, err := database.GetClientById(r.Context(), nil, clientId)
+		client, err := database.GetClientByID(r.Context(), nil, clientID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -81,7 +81,7 @@ func HandleClientSessionsGet(
 		}
 
 		// Fetch sessions linked to the client
-		userSessions, _, err := database.GetUserSessionsByClientIdPaginated(r.Context(), nil, client.Id, page, size)
+		userSessions, _, err := database.GetUserSessionsByClientIDPaginated(r.Context(), nil, client.ID, page, size)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -142,28 +142,28 @@ func HandleClientSessionsGet(
 // is a non-null foreign key, so an unresolvable one is a broken row and a page rendering a blank
 // email in its place would hide it.
 func sessionOwners(ctx context.Context, database clientSessionsDatabase, sessions []api.UserSessionDetailResponse) ([]api.SessionOwnerResponse, error) {
-	userIds := make([]int64, 0, len(sessions))
+	userIDs := make([]int64, 0, len(sessions))
 	seen := make(map[int64]bool, len(sessions))
 	for _, session := range sessions {
-		if !seen[session.UserId] {
-			seen[session.UserId] = true
-			userIds = append(userIds, session.UserId)
+		if !seen[session.UserID] {
+			seen[session.UserID] = true
+			userIDs = append(userIDs, session.UserID)
 		}
 	}
-	if len(userIds) == 0 {
+	if len(userIDs) == 0 {
 		return []api.SessionOwnerResponse{}, nil
 	}
 
-	usersById, err := database.GetUsersByIds(ctx, nil, userIds)
+	usersByID, err := database.GetUsersByIDs(ctx, nil, userIDs)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to get users by ids")
 	}
 
-	ordered := make([]record.User, 0, len(userIds))
-	for _, userId := range userIds {
-		user, ok := usersById[userId]
+	ordered := make([]record.User, 0, len(userIDs))
+	for _, userID := range userIDs {
+		user, ok := usersByID[userID]
 		if !ok {
-			return nil, errs.Errorf("user with id %d not found", userId)
+			return nil, errs.Errorf("user with id %d not found", userID)
 		}
 		ordered = append(ordered, user)
 	}

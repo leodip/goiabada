@@ -42,10 +42,10 @@ func TestHandleUserSessionGet_AnswersTheListRowWithTheCallersSid(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 
 	session := liveSession(100, "sid-mine", 5)
-	database.On("GetUserSessionById", mock.Anything, (*sql.Tx)(nil), int64(100)).Return(&session, nil).Once()
+	database.On("GetUserSessionByID", mock.Anything, (*sql.Tx)(nil), int64(100)).Return(&session, nil).Once()
 	database.On("UserSessionsLoadClients", mock.Anything, (*sql.Tx)(nil), []record.UserSession{session}).Return(nil).Once()
-	database.On("GetClientsByIds", mock.Anything, (*sql.Tx)(nil), []int64{5}).
-		Return([]record.Client{{Id: 5, ClientIdentifier: "portal"}}, nil).Once()
+	database.On("GetClientsByIDs", mock.Anything, (*sql.Tx)(nil), []int64{5}).
+		Return([]record.Client{{ID: 5, ClientIdentifier: "portal"}}, nil).Once()
 
 	rr := httptest.NewRecorder()
 	HandleUserSessionGet(database).ServeHTTP(rr, userSessionGetRequest("100", "sid-mine"))
@@ -53,9 +53,9 @@ func TestHandleUserSessionGet_AnswersTheListRowWithTheCallersSid(t *testing.T) {
 	require.Equal(t, http.StatusOK, rr.Code)
 	var out api.GetUserSessionResponse
 	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &out))
-	assert.Equal(t, int64(100), out.Session.Id)
+	assert.Equal(t, int64(100), out.Session.ID)
 	assert.Equal(t, "sid-mine", out.Session.SessionIdentifier)
-	assert.Equal(t, int64(42), out.Session.UserId)
+	assert.Equal(t, int64(42), out.Session.UserID)
 	assert.True(t, out.Session.IsCurrent, "the token's sid names this session")
 	assert.Equal(t, []string{"portal"}, out.Session.ClientIdentifiers)
 	require.Len(t, out.Session.Clients, 1)
@@ -69,7 +69,7 @@ func TestHandleUserSessionGet_NoSidOnTheTokenIsNotCurrent(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 
 	session := liveSession(100, "sid-someone")
-	database.On("GetUserSessionById", mock.Anything, (*sql.Tx)(nil), int64(100)).Return(&session, nil).Once()
+	database.On("GetUserSessionByID", mock.Anything, (*sql.Tx)(nil), int64(100)).Return(&session, nil).Once()
 	database.On("UserSessionsLoadClients", mock.Anything, (*sql.Tx)(nil), []record.UserSession{session}).Return(nil).Once()
 
 	rr := httptest.NewRecorder()
@@ -94,7 +94,7 @@ func TestHandleUserSessionGet_ASessionNoLongerLiveIsNotFound(t *testing.T) {
 	for name, session := range map[string]record.UserSession{"past the idle timeout": idle, "past the maximum lifetime": old} {
 		t.Run(name, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
-			database.On("GetUserSessionById", mock.Anything, (*sql.Tx)(nil), int64(100)).Return(&session, nil).Once()
+			database.On("GetUserSessionByID", mock.Anything, (*sql.Tx)(nil), int64(100)).Return(&session, nil).Once()
 			database.On("UserSessionsLoadClients", mock.Anything, (*sql.Tx)(nil), []record.UserSession{session}).Return(nil).Once()
 
 			rr := httptest.NewRecorder()
@@ -102,16 +102,16 @@ func TestHandleUserSessionGet_ASessionNoLongerLiveIsNotFound(t *testing.T) {
 
 			require.Equal(t, http.StatusNotFound, rr.Code)
 			assert.Equal(t, "NOT_FOUND", decodeAPIError(t, rr))
-			// No GetClientsByIds expectation is registered, so the strict mock fails the test if
+			// No GetClientsByIDs expectation is registered, so the strict mock fails the test if
 			// the clients of a dead session are read.
 			database.AssertExpectations(t)
 		})
 	}
 }
 
-func TestHandleUserSessionGet_AnIdNamingNoSessionIsNotFound(t *testing.T) {
+func TestHandleUserSessionGet_AnIDNamingNoSessionIsNotFound(t *testing.T) {
 	database := datamocks.NewDatabase(t)
-	database.On("GetUserSessionById", mock.Anything, (*sql.Tx)(nil), int64(99999)).Return(nil, nil).Once()
+	database.On("GetUserSessionByID", mock.Anything, (*sql.Tx)(nil), int64(99999)).Return(nil, nil).Once()
 
 	rr := httptest.NewRecorder()
 	HandleUserSessionGet(database).ServeHTTP(rr, userSessionGetRequest("99999", ""))

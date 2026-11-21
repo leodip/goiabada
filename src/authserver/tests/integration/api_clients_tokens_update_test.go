@@ -19,17 +19,17 @@ func TestAPIClientTokensPut_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	client := createTestClientUnique(t, true)
-	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.ID) }()
 
 	req := api.UpdateClientTokensRequest{
 		TokenExpirationInSeconds:                3600,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 1000,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 2000,
 		IncludeOpenIDConnectClaimsInAccessToken: "on",
-		IncludeOpenIDConnectClaimsInIdToken:     "off",
+		IncludeOpenIDConnectClaimsInIDToken:     "off",
 	}
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/tokens"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.ID, 10) + "/tokens"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, req)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -44,25 +44,25 @@ func TestAPIClientTokensPut_Success(t *testing.T) {
 	assert.Equal(t, req.RefreshTokenOfflineIdleTimeoutInSeconds, updateResp.Client.RefreshTokenOfflineIdleTimeoutInSeconds)
 	assert.Equal(t, req.RefreshTokenOfflineMaxLifetimeInSeconds, updateResp.Client.RefreshTokenOfflineMaxLifetimeInSeconds)
 	assert.Equal(t, req.IncludeOpenIDConnectClaimsInAccessToken, updateResp.Client.IncludeOpenIDConnectClaimsInAccessToken)
-	assert.Equal(t, req.IncludeOpenIDConnectClaimsInIdToken, updateResp.Client.IncludeOpenIDConnectClaimsInIdToken)
+	assert.Equal(t, req.IncludeOpenIDConnectClaimsInIDToken, updateResp.Client.IncludeOpenIDConnectClaimsInIDToken)
 
-	refreshed, err2 := database.GetClientById(context.Background(), nil, client.Id)
+	refreshed, err2 := database.GetClientByID(context.Background(), nil, client.ID)
 	require.NoError(t, err2)
 	assert.NotNil(t, refreshed)
 	assert.Equal(t, req.TokenExpirationInSeconds, refreshed.TokenExpirationInSeconds)
 	assert.Equal(t, req.RefreshTokenOfflineIdleTimeoutInSeconds, refreshed.RefreshTokenOfflineIdleTimeoutInSeconds)
 	assert.Equal(t, req.RefreshTokenOfflineMaxLifetimeInSeconds, refreshed.RefreshTokenOfflineMaxLifetimeInSeconds)
 	assert.Equal(t, req.IncludeOpenIDConnectClaimsInAccessToken, refreshed.IncludeOpenIDConnectClaimsInAccessToken)
-	assert.Equal(t, req.IncludeOpenIDConnectClaimsInIdToken, refreshed.IncludeOpenIDConnectClaimsInIdToken)
+	assert.Equal(t, req.IncludeOpenIDConnectClaimsInIDToken, refreshed.IncludeOpenIDConnectClaimsInIDToken)
 }
 
 func TestAPIClientTokensPut_ValidationErrors(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	client := createTestClientUnique(t, true)
-	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.ID) }()
 
-	baseURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/tokens"
+	baseURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.ID, 10) + "/tokens"
 
 	// Too large values
 	tooLarge := 160000001
@@ -71,13 +71,13 @@ func TestAPIClientTokensPut_ValidationErrors(t *testing.T) {
 		req  api.UpdateClientTokensRequest
 		want string
 	}{
-		{"token_exp_too_large", api.UpdateClientTokensRequest{TokenExpirationInSeconds: tooLarge, RefreshTokenOfflineIdleTimeoutInSeconds: 1, RefreshTokenOfflineMaxLifetimeInSeconds: 2, IncludeOpenIDConnectClaimsInAccessToken: "default", IncludeOpenIDConnectClaimsInIdToken: "default"}, "Token lifetime must be between 0 and"},
-		{"idle_too_large", api.UpdateClientTokensRequest{TokenExpirationInSeconds: 1, RefreshTokenOfflineIdleTimeoutInSeconds: tooLarge, RefreshTokenOfflineMaxLifetimeInSeconds: tooLarge, IncludeOpenIDConnectClaimsInAccessToken: "default", IncludeOpenIDConnectClaimsInIdToken: "default"}, "Offline idle timeout must be between 0 and"},
-		{"maxlife_too_large", api.UpdateClientTokensRequest{TokenExpirationInSeconds: 1, RefreshTokenOfflineIdleTimeoutInSeconds: 1, RefreshTokenOfflineMaxLifetimeInSeconds: tooLarge, IncludeOpenIDConnectClaimsInAccessToken: "default", IncludeOpenIDConnectClaimsInIdToken: "default"}, "Offline maximum lifetime must be between 0 and"},
-		{"idle_gt_maxlife", api.UpdateClientTokensRequest{TokenExpirationInSeconds: 1, RefreshTokenOfflineIdleTimeoutInSeconds: 5, RefreshTokenOfflineMaxLifetimeInSeconds: 4, IncludeOpenIDConnectClaimsInAccessToken: "default", IncludeOpenIDConnectClaimsInIdToken: "default"}, "idle timeout can't be longer than the offline maximum lifetime"},
-		{"invalid_three_state_access", api.UpdateClientTokensRequest{TokenExpirationInSeconds: 1, RefreshTokenOfflineIdleTimeoutInSeconds: 1, RefreshTokenOfflineMaxLifetimeInSeconds: 2, IncludeOpenIDConnectClaimsInAccessToken: "invalid", IncludeOpenIDConnectClaimsInIdToken: "default"}, "Invalid value for includeOpenIDConnectClaimsInAccessToken"},
-		{"invalid_three_state_id", api.UpdateClientTokensRequest{TokenExpirationInSeconds: 1, RefreshTokenOfflineIdleTimeoutInSeconds: 1, RefreshTokenOfflineMaxLifetimeInSeconds: 2, IncludeOpenIDConnectClaimsInAccessToken: "default", IncludeOpenIDConnectClaimsInIdToken: "invalid"}, "Invalid value for includeOpenIDConnectClaimsInIdToken"},
-		{"negatives_rejected", api.UpdateClientTokensRequest{TokenExpirationInSeconds: -1, RefreshTokenOfflineIdleTimeoutInSeconds: -1, RefreshTokenOfflineMaxLifetimeInSeconds: -1, IncludeOpenIDConnectClaimsInAccessToken: "default", IncludeOpenIDConnectClaimsInIdToken: "default"}, "must be between 0 and"},
+		{"token_exp_too_large", api.UpdateClientTokensRequest{TokenExpirationInSeconds: tooLarge, RefreshTokenOfflineIdleTimeoutInSeconds: 1, RefreshTokenOfflineMaxLifetimeInSeconds: 2, IncludeOpenIDConnectClaimsInAccessToken: "default", IncludeOpenIDConnectClaimsInIDToken: "default"}, "Token lifetime must be between 0 and"},
+		{"idle_too_large", api.UpdateClientTokensRequest{TokenExpirationInSeconds: 1, RefreshTokenOfflineIdleTimeoutInSeconds: tooLarge, RefreshTokenOfflineMaxLifetimeInSeconds: tooLarge, IncludeOpenIDConnectClaimsInAccessToken: "default", IncludeOpenIDConnectClaimsInIDToken: "default"}, "Offline idle timeout must be between 0 and"},
+		{"maxlife_too_large", api.UpdateClientTokensRequest{TokenExpirationInSeconds: 1, RefreshTokenOfflineIdleTimeoutInSeconds: 1, RefreshTokenOfflineMaxLifetimeInSeconds: tooLarge, IncludeOpenIDConnectClaimsInAccessToken: "default", IncludeOpenIDConnectClaimsInIDToken: "default"}, "Offline maximum lifetime must be between 0 and"},
+		{"idle_gt_maxlife", api.UpdateClientTokensRequest{TokenExpirationInSeconds: 1, RefreshTokenOfflineIdleTimeoutInSeconds: 5, RefreshTokenOfflineMaxLifetimeInSeconds: 4, IncludeOpenIDConnectClaimsInAccessToken: "default", IncludeOpenIDConnectClaimsInIDToken: "default"}, "idle timeout can't be longer than the offline maximum lifetime"},
+		{"invalid_three_state_access", api.UpdateClientTokensRequest{TokenExpirationInSeconds: 1, RefreshTokenOfflineIdleTimeoutInSeconds: 1, RefreshTokenOfflineMaxLifetimeInSeconds: 2, IncludeOpenIDConnectClaimsInAccessToken: "invalid", IncludeOpenIDConnectClaimsInIDToken: "default"}, "Invalid value for includeOpenIDConnectClaimsInAccessToken"},
+		{"invalid_three_state_id", api.UpdateClientTokensRequest{TokenExpirationInSeconds: 1, RefreshTokenOfflineIdleTimeoutInSeconds: 1, RefreshTokenOfflineMaxLifetimeInSeconds: 2, IncludeOpenIDConnectClaimsInAccessToken: "default", IncludeOpenIDConnectClaimsInIDToken: "invalid"}, "Invalid value for includeOpenIDConnectClaimsInIdToken"},
+		{"negatives_rejected", api.UpdateClientTokensRequest{TokenExpirationInSeconds: -1, RefreshTokenOfflineIdleTimeoutInSeconds: -1, RefreshTokenOfflineMaxLifetimeInSeconds: -1, IncludeOpenIDConnectClaimsInAccessToken: "default", IncludeOpenIDConnectClaimsInIDToken: "default"}, "must be between 0 and"},
 	}
 
 	for _, tc := range cases {
@@ -97,12 +97,12 @@ func TestAPIClientTokensPut_ValidationErrors(t *testing.T) {
 	}
 }
 
-func TestAPIClientTokensPut_NotFoundAndInvalidId(t *testing.T) {
+func TestAPIClientTokensPut_NotFoundAndInvalidID(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Not found
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/999999/tokens"
-	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateClientTokensRequest{TokenExpirationInSeconds: 1, RefreshTokenOfflineIdleTimeoutInSeconds: 1, RefreshTokenOfflineMaxLifetimeInSeconds: 2, IncludeOpenIDConnectClaimsInAccessToken: "default", IncludeOpenIDConnectClaimsInIdToken: "default"})
+	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateClientTokensRequest{TokenExpirationInSeconds: 1, RefreshTokenOfflineIdleTimeoutInSeconds: 1, RefreshTokenOfflineMaxLifetimeInSeconds: 2, IncludeOpenIDConnectClaimsInAccessToken: "default", IncludeOpenIDConnectClaimsInIDToken: "default"})
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 	var body map[string]interface{}
@@ -114,7 +114,7 @@ func TestAPIClientTokensPut_NotFoundAndInvalidId(t *testing.T) {
 
 	// Invalid id format
 	badURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/abc/tokens"
-	resp2 := makeAPIRequest(t, "PUT", badURL, accessToken, api.UpdateClientTokensRequest{TokenExpirationInSeconds: 1, RefreshTokenOfflineIdleTimeoutInSeconds: 1, RefreshTokenOfflineMaxLifetimeInSeconds: 2, IncludeOpenIDConnectClaimsInAccessToken: "default", IncludeOpenIDConnectClaimsInIdToken: "default"})
+	resp2 := makeAPIRequest(t, "PUT", badURL, accessToken, api.UpdateClientTokensRequest{TokenExpirationInSeconds: 1, RefreshTokenOfflineIdleTimeoutInSeconds: 1, RefreshTokenOfflineMaxLifetimeInSeconds: 2, IncludeOpenIDConnectClaimsInAccessToken: "default", IncludeOpenIDConnectClaimsInIDToken: "default"})
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
 	var body2 map[string]interface{}
@@ -137,20 +137,20 @@ func TestAPIClientTokensPut_SystemLevelClientAllowed(t *testing.T) {
 	err := json.NewDecoder(resp.Body).Decode(&listResp)
 	require.NoError(t, err)
 
-	var sysId int64
+	var sysID int64
 	for _, c := range listResp.Clients {
 		if c.ClientIdentifier == builtin.AdminConsoleClientIdentifier {
-			sysId = c.Id
+			sysID = c.ID
 			break
 		}
 	}
-	if sysId == 0 {
+	if sysID == 0 {
 		t.Skip("system-level client not found")
 	}
 
 	// Every test in this tier shares the console client, and the values below would leave it issuing
 	// one-second tokens, so its settings go back as they were.
-	clientURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysId, 10)
+	clientURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysID, 10)
 	getResp := makeAPIRequest(t, "GET", clientURL, accessToken, nil)
 	defer func() { _ = getResp.Body.Close() }()
 	require.Equal(t, http.StatusOK, getResp.StatusCode)
@@ -162,7 +162,7 @@ func TestAPIClientTokensPut_SystemLevelClientAllowed(t *testing.T) {
 			RefreshTokenOfflineIdleTimeoutInSeconds: seeded.Client.RefreshTokenOfflineIdleTimeoutInSeconds,
 			RefreshTokenOfflineMaxLifetimeInSeconds: seeded.Client.RefreshTokenOfflineMaxLifetimeInSeconds,
 			IncludeOpenIDConnectClaimsInAccessToken: seeded.Client.IncludeOpenIDConnectClaimsInAccessToken,
-			IncludeOpenIDConnectClaimsInIdToken:     seeded.Client.IncludeOpenIDConnectClaimsInIdToken,
+			IncludeOpenIDConnectClaimsInIDToken:     seeded.Client.IncludeOpenIDConnectClaimsInIDToken,
 		})
 		defer func() { _ = restore.Body.Close() }()
 		assert.Equal(t, http.StatusOK, restore.StatusCode)
@@ -170,7 +170,7 @@ func TestAPIClientTokensPut_SystemLevelClientAllowed(t *testing.T) {
 
 	// Update token settings (should succeed)
 	url := clientURL + "/tokens"
-	resp2 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateClientTokensRequest{TokenExpirationInSeconds: 1, RefreshTokenOfflineIdleTimeoutInSeconds: 1, RefreshTokenOfflineMaxLifetimeInSeconds: 2, IncludeOpenIDConnectClaimsInAccessToken: "default", IncludeOpenIDConnectClaimsInIdToken: "default"})
+	resp2 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateClientTokensRequest{TokenExpirationInSeconds: 1, RefreshTokenOfflineIdleTimeoutInSeconds: 1, RefreshTokenOfflineMaxLifetimeInSeconds: 2, IncludeOpenIDConnectClaimsInAccessToken: "default", IncludeOpenIDConnectClaimsInIDToken: "default"})
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp2.StatusCode)
 }
@@ -179,16 +179,16 @@ func TestAPIClientTokensPut_InvalidRequestBodyAndUnauthorized(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	client := createTestClientUnique(t, true)
-	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.ID) }()
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/tokens"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.ID, 10) + "/tokens"
 
 	// Invalid body (nil/empty)
 	req, err := http.NewRequest("PUT", url, nil)
 	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -215,9 +215,9 @@ func TestAPIClientTokensPut_InsufficientScope(t *testing.T) {
 
 	// Create a target client to attempt updating
 	target := createTestClientUnique(t, true)
-	defer func() { _ = database.DeleteClient(context.Background(), nil, target.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, target.ID) }()
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(target.Id, 10) + "/tokens"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(target.ID, 10) + "/tokens"
 	reqBody := api.UpdateClientTokensRequest{TokenExpirationInSeconds: 1, RefreshTokenOfflineIdleTimeoutInSeconds: 1, RefreshTokenOfflineMaxLifetimeInSeconds: 2, IncludeOpenIDConnectClaimsInAccessToken: "default"}
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()

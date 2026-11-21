@@ -32,7 +32,7 @@ import (
 
 // emailTemplateBrandReader is what a preview and a test send read the brand they are drawn in from.
 type emailTemplateBrandReader interface {
-	GetBrandById(ctx context.Context, tx *sql.Tx, brandId int64) (*record.Brand, error)
+	GetBrandByID(ctx context.Context, tx *sql.Tx, brandID int64) (*record.Brand, error)
 }
 
 // emailTemplateSampleRenderer draws an email in a language with a text nobody may have saved, in a
@@ -86,18 +86,18 @@ type emailTemplateSample struct {
 // does, and reads the brand brandId names, answering the request with a 400 when the text breaks a
 // rule or the brand is not there.
 func checkEmailTemplateSample(w http.ResponseWriter, r *http.Request, database emailTemplateBrandReader,
-	email *emailtemplate.Email, lang string, subject, buttonLabel, body string, brandId *int64) (*emailTemplateSample, bool) {
+	email *emailtemplate.Email, lang string, subject, buttonLabel, body string, brandID *int64) (*emailTemplateSample, bool) {
 	text := emailtemplate.Text{Subject: subject, ButtonLabel: buttonLabel, Body: normalizeLineBreaks(body)}
 	if problems := email.Check(text); len(problems) > 0 {
 		writeValidationError(w, r, emailTemplateRefusalAt(email, problems[0]))
 		return nil, false
 	}
 	sample := &emailTemplateSample{email: email, lang: lang, text: text}
-	if brandId != nil {
-		brand, err := database.GetBrandById(r.Context(), nil, *brandId)
+	if brandID != nil {
+		brand, err := database.GetBrandByID(r.Context(), nil, *brandID)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error getting the brand of an email template sample"),
-				"brand_id", *brandId)
+				"brand_id", *brandID)
 			return nil, false
 		}
 		if brand == nil {
@@ -132,7 +132,7 @@ func HandleEmailTemplatePreviewPost(database emailTemplateBrandReader, renderer 
 			writeJSONError(w, "Invalid request body", "INVALID_REQUEST_BODY", http.StatusBadRequest)
 			return
 		}
-		sample, ok := checkEmailTemplateSample(w, r, database, email, lang, req.Subject, req.ButtonLabel, req.Body, req.BrandId)
+		sample, ok := checkEmailTemplateSample(w, r, database, email, lang, req.Subject, req.ButtonLabel, req.Body, req.BrandID)
 		if !ok {
 			return
 		}
@@ -148,7 +148,7 @@ func HandleEmailTemplatePreviewPost(database emailTemplateBrandReader, renderer 
 				"email_template", email.ID, "language", lang)
 			return
 		}
-		writeJSON(w, r, http.StatusOK, api.PreviewEmailTemplateResponse{Subject: message.Subject, Html: message.HTML, Text: text})
+		writeJSON(w, r, http.StatusOK, api.PreviewEmailTemplateResponse{Subject: message.Subject, HTML: message.HTML, Text: text})
 	}
 }
 
@@ -192,7 +192,7 @@ func HandleEmailTemplateSendTestPost(
 			writeValidationError(w, r, err)
 			return
 		}
-		sample, ok := checkEmailTemplateSample(w, r, database, email, lang, req.Subject, req.ButtonLabel, req.Body, req.BrandId)
+		sample, ok := checkEmailTemplateSample(w, r, database, email, lang, req.Subject, req.ButtonLabel, req.Body, req.BrandID)
 		if !ok {
 			return
 		}
@@ -207,7 +207,7 @@ func HandleEmailTemplateSendTestPost(
 			writeInternalServerError(w, r, err, "email_template", email.ID, "language", lang)
 			return
 		}
-		input := &emaildelivery.SendEmailInput{To: req.To, Subject: message.Subject, HtmlBody: message.HTML}
+		input := &emaildelivery.SendEmailInput{To: req.To, Subject: message.Subject, HTMLBody: message.HTML}
 		// As for the SMTP test, a failure answers the fixed message of its kind and the error, which
 		// carries addresses and the server's own replies, goes to the log (#410 decision 5).
 		result, err := emailSender.SendEmail(r.Context(), emaildelivery.SMTPConfigFromSettings(settings), input)

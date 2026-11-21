@@ -14,8 +14,8 @@
 //     own. That is Mapper.BaseURL, the auth server's, which serves the picture, and
 //     Mapper.AdminConsoleBaseURL, the admin console's, which serves the user's profile page.
 //   - which of a group's or an attribute's two include flags decides. /userinfo reads
-//     IncludeInIdToken at all three of its filter sites; issuance reads IncludeInAccessToken in
-//     the access token and IncludeInIdToken in the ID token. That is Mapper.Inclusion.
+//     IncludeInIDToken at all three of its filter sites; issuance reads IncludeInAccessToken in
+//     the access token and IncludeInIDToken in the ID token. That is Mapper.Inclusion.
 //
 // updated_at is not an input: every site writes it under the profile scope alone, which is the
 // scope OIDC Core 5.4 lists it under and the scope this repository's documentation assigns it to,
@@ -52,7 +52,7 @@ import (
 // Both callers already hold a port carrying this method and hand it on unchanged, so neither
 // changes which database it reads.
 type Database interface {
-	UserHasProfilePicture(ctx context.Context, tx *sql.Tx, userId int64) (bool, error)
+	UserHasProfilePicture(ctx context.Context, tx *sql.Tx, userID int64) (bool, error)
 }
 
 // Inclusion names which of the two include flags a group or an attribute is filtered by. The zero
@@ -61,8 +61,8 @@ type Database interface {
 type Inclusion int
 
 const (
-	// InclusionIdToken filters on include_in_id_token.
-	InclusionIdToken Inclusion = iota
+	// InclusionIDToken filters on include_in_id_token.
+	InclusionIDToken Inclusion = iota
 	// InclusionAccessToken filters on include_in_access_token.
 	InclusionAccessToken
 )
@@ -71,21 +71,21 @@ func (i Inclusion) includesGroup(group record.Group) bool {
 	if i == InclusionAccessToken {
 		return group.IncludeInAccessToken
 	}
-	return group.IncludeInIdToken
+	return group.IncludeInIDToken
 }
 
 func (i Inclusion) includesUserAttribute(attribute record.UserAttribute) bool {
 	if i == InclusionAccessToken {
 		return attribute.IncludeInAccessToken
 	}
-	return attribute.IncludeInIdToken
+	return attribute.IncludeInIDToken
 }
 
 func (i Inclusion) includesGroupAttribute(attribute record.GroupAttribute) bool {
 	if i == InclusionAccessToken {
 		return attribute.IncludeInAccessToken
 	}
-	return attribute.IncludeInIdToken
+	return attribute.IncludeInIDToken
 }
 
 // Mapper writes OIDC claims from a stored user row. Its fields are the port and the two
@@ -135,7 +135,7 @@ func (m Mapper) AddOpenIDConnectClaims(ctx context.Context, tx *sql.Tx, claims j
 		addClaimIfNotEmpty(claims, "zoneinfo", user.ZoneInfo)
 		addClaimIfNotEmpty(claims, "locale", user.Locale)
 
-		hasPicture, err := m.Database.UserHasProfilePicture(ctx, tx, user.Id)
+		hasPicture, err := m.Database.UserHasProfilePicture(ctx, tx, user.ID)
 		if err == nil && hasPicture {
 			claims["picture"] = fmt.Sprintf("%v/userinfo/picture/%v", m.BaseURL, user.Subject)
 		}

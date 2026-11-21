@@ -19,13 +19,13 @@ import (
 // =============================================================================
 
 func TestPromptNone_MaxAge0_ReturnsLoginRequired(t *testing.T) {
-	httpClient, client, redirectUri, _ := createSessionWithAcrLevel1(t)
+	httpClient, client, redirectURI, _ := createSessionWithACRLevel1(t)
 
 	requestState := fake.LetterN(8)
 	requestCodeChallenge := randomCodeChallenge()
 	// max_age=0 means authentication must have JUST happened, which it hasn't
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -34,7 +34,7 @@ func TestPromptNone_MaxAge0_ReturnsLoginRequired(t *testing.T) {
 		"&prompt=none" +
 		"&max_age=0"
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,7 +42,7 @@ func TestPromptNone_MaxAge0_ReturnsLoginRequired(t *testing.T) {
 
 	assert.Equal(t, http.StatusFound, resp.StatusCode)
 
-	errorCode, _, state := getErrorFromUrl(t, resp)
+	errorCode, _, state := getErrorFromURL(t, resp)
 
 	assert.Equal(t, "login_required", errorCode)
 	assert.Equal(t, requestState, state)
@@ -54,14 +54,14 @@ func TestPromptNone_MaxAge0_ReturnsLoginRequired(t *testing.T) {
 // once, per #213's rule. Before #243 the value was parsed with strconv.Atoi and a failure
 // dropped, so "abc" silently constrained nothing and the silent request below was issued a code.
 func TestAuthorize_MalformedMaxAge_ReturnsInvalidRequest(t *testing.T) {
-	httpClient, client, redirectUri, _ := createSessionWithAcrLevel1(t)
+	httpClient, client, redirectURI, _ := createSessionWithACRLevel1(t)
 
 	for _, prompt := range []string{"&prompt=none", ""} {
 		for _, maxAge := range []string{"abc", "-1", "+5"} {
 			t.Run("max_age="+maxAge+prompt, func(t *testing.T) {
 				requestState := fake.LetterN(8)
-				destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-					"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+				destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+					"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 					"&response_type=code" +
 					"&code_challenge_method=S256" +
 					"&code_challenge=" + randomCodeChallenge() +
@@ -70,7 +70,7 @@ func TestAuthorize_MalformedMaxAge_ReturnsInvalidRequest(t *testing.T) {
 					"&max_age=" + url.QueryEscape(maxAge) +
 					prompt
 
-				resp, err := httpClient.Get(destUrl)
+				resp, err := httpClient.Get(destURL)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -78,7 +78,7 @@ func TestAuthorize_MalformedMaxAge_ReturnsInvalidRequest(t *testing.T) {
 
 				assert.Equal(t, http.StatusFound, resp.StatusCode)
 
-				errorCode, errorDescription, state := getErrorFromUrl(t, resp)
+				errorCode, errorDescription, state := getErrorFromURL(t, resp)
 				assert.Equal(t, "invalid_request", errorCode)
 				assert.Equal(t, "The max_age parameter must be a non-negative integer.", errorDescription)
 				assert.Equal(t, requestState, state)
@@ -87,9 +87,9 @@ func TestAuthorize_MalformedMaxAge_ReturnsInvalidRequest(t *testing.T) {
 	}
 }
 
-func TestPromptNone_AcrStepUpNeeded_ReturnsInteractionRequired(t *testing.T) {
+func TestPromptNone_ACRStepUpNeeded_ReturnsInteractionRequired(t *testing.T) {
 	// Create session at level1
-	httpClient, client, redirectUri, user := createSessionWithAcrLevel1(t)
+	httpClient, client, redirectURI, user := createSessionWithACRLevel1(t)
 
 	// Enable OTP for user so level2_optional would require interaction
 	otpSecret := newOTPSecretForTest(t, user.Email)
@@ -103,17 +103,17 @@ func TestPromptNone_AcrStepUpNeeded_ReturnsInteractionRequired(t *testing.T) {
 	requestState := fake.LetterN(8)
 	requestCodeChallenge := randomCodeChallenge()
 	// Request level2_optional with existing level1 session - requires step-up
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
 		"&scope=" + url.QueryEscape("openid profile") +
 		"&state=" + requestState +
 		"&prompt=none" +
-		"&acr_values=" + record.AcrLevel2Optional.String()
+		"&acr_values=" + record.ACRLevel2Optional.String()
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -121,15 +121,15 @@ func TestPromptNone_AcrStepUpNeeded_ReturnsInteractionRequired(t *testing.T) {
 
 	assert.Equal(t, http.StatusFound, resp.StatusCode)
 
-	errorCode, _, state := getErrorFromUrl(t, resp)
+	errorCode, _, state := getErrorFromURL(t, resp)
 
 	assert.Equal(t, "interaction_required", errorCode)
 	assert.Equal(t, requestState, state)
 }
 
-func TestPromptNone_OtpEnrollmentNeeded_ReturnsInteractionRequired(t *testing.T) {
+func TestPromptNone_OTPEnrollmentNeeded_ReturnsInteractionRequired(t *testing.T) {
 	// Create session at level1, user has NO OTP
-	httpClient, client, redirectUri, user := createSessionWithAcrLevel1(t)
+	httpClient, client, redirectURI, user := createSessionWithACRLevel1(t)
 
 	// Ensure user does NOT have OTP enabled
 	user.OTPEnabled = false
@@ -141,17 +141,17 @@ func TestPromptNone_OtpEnrollmentNeeded_ReturnsInteractionRequired(t *testing.T)
 	requestState := fake.LetterN(8)
 	requestCodeChallenge := randomCodeChallenge()
 	// Request level2_mandatory - requires OTP enrollment (interaction)
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
 		"&scope=" + url.QueryEscape("openid profile") +
 		"&state=" + requestState +
 		"&prompt=none" +
-		"&acr_values=" + record.AcrLevel2Mandatory.String()
+		"&acr_values=" + record.ACRLevel2Mandatory.String()
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -159,14 +159,14 @@ func TestPromptNone_OtpEnrollmentNeeded_ReturnsInteractionRequired(t *testing.T)
 
 	assert.Equal(t, http.StatusFound, resp.StatusCode)
 
-	errorCode, _, state := getErrorFromUrl(t, resp)
+	errorCode, _, state := getErrorFromURL(t, resp)
 
 	assert.Equal(t, "interaction_required", errorCode)
 	assert.Equal(t, requestState, state)
 }
 
 func TestPromptNone_UserDisabled_ReturnsAccessDenied(t *testing.T) {
-	httpClient, client, redirectUri, user := createSessionWithAcrLevel1(t)
+	httpClient, client, redirectURI, user := createSessionWithACRLevel1(t)
 
 	// Disable the user after session was created
 	user.Enabled = false
@@ -177,8 +177,8 @@ func TestPromptNone_UserDisabled_ReturnsAccessDenied(t *testing.T) {
 
 	requestState := fake.LetterN(8)
 	requestCodeChallenge := randomCodeChallenge()
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -186,7 +186,7 @@ func TestPromptNone_UserDisabled_ReturnsAccessDenied(t *testing.T) {
 		"&state=" + requestState +
 		"&prompt=none"
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -194,7 +194,7 @@ func TestPromptNone_UserDisabled_ReturnsAccessDenied(t *testing.T) {
 
 	assert.Equal(t, http.StatusFound, resp.StatusCode)
 
-	errorCode, _, state := getErrorFromUrl(t, resp)
+	errorCode, _, state := getErrorFromURL(t, resp)
 
 	assert.Equal(t, "access_denied", errorCode)
 	assert.Equal(t, requestState, state)
@@ -207,18 +207,18 @@ func TestPromptNone_ConsentRequired_ReturnsConsentRequired(t *testing.T) {
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true, // Consent required
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+	redirectURI := &record.RedirectURI{
+		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -242,13 +242,13 @@ func TestPromptNone_ConsentRequired_ReturnsConsentRequired(t *testing.T) {
 	}
 
 	// Create session first (normal flow, will ask for consent)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 	requestCodeChallenge := randomCodeChallenge()
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -256,7 +256,7 @@ func TestPromptNone_ConsentRequired_ReturnsConsentRequired(t *testing.T) {
 		"&state=" + requestState +
 		"&nonce=" + requestNonce
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -288,8 +288,8 @@ func TestPromptNone_ConsentRequired_ReturnsConsentRequired(t *testing.T) {
 	// Now try prompt=none - should fail because no consent exists
 	requestState2 := fake.LetterN(8)
 	requestCodeChallenge2 := randomCodeChallenge()
-	destUrl2 := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL2 := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge2 +
@@ -297,7 +297,7 @@ func TestPromptNone_ConsentRequired_ReturnsConsentRequired(t *testing.T) {
 		"&state=" + requestState2 +
 		"&prompt=none"
 
-	resp2, err := httpClient.Get(destUrl2)
+	resp2, err := httpClient.Get(destURL2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -305,7 +305,7 @@ func TestPromptNone_ConsentRequired_ReturnsConsentRequired(t *testing.T) {
 
 	assert.Equal(t, http.StatusFound, resp2.StatusCode)
 
-	errorCode, _, state := getErrorFromUrl(t, resp2)
+	errorCode, _, state := getErrorFromURL(t, resp2)
 
 	assert.Equal(t, "consent_required", errorCode)
 	assert.Equal(t, requestState2, state)
@@ -336,14 +336,14 @@ func walkDCRClientToConsentScreen(t *testing.T, clientName string) (*http.Client
 
 	client := registerDCRClient(t, clientName, "https://dcr-app.example.com/callback")
 
-	redirectURIs, err := database.GetRedirectURIsByClientId(context.Background(), nil, client.Id)
+	redirectURIs, err := database.GetRedirectURIsByClientID(context.Background(), nil, client.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(redirectURIs) != 1 {
 		t.Fatalf("expected exactly one redirect URI, got %d", len(redirectURIs))
 	}
-	redirectUri := &redirectURIs[0]
+	redirectURI := &redirectURIs[0]
 
 	password := fake.Password(8)
 	passwordHashed, err := passwordhash.Hash(password)
@@ -362,9 +362,9 @@ func walkDCRClientToConsentScreen(t *testing.T, clientName string) (*http.Client
 		t.Fatal(err)
 	}
 
-	httpClient := createHttpClient(t)
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	httpClient := createHTTPClient(t)
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + randomCodeChallenge() +
@@ -372,7 +372,7 @@ func walkDCRClientToConsentScreen(t *testing.T, clientName string) (*http.Client
 		"&state=" + fake.LetterN(8) +
 		"&nonce=" + fake.LetterN(8)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -405,7 +405,7 @@ func walkDCRClientToConsentScreen(t *testing.T, clientName string) (*http.Client
 
 	consentLocation := assertRedirect(t, resp, "/auth/consent")
 
-	return httpClient, client, redirectUri, user, consentLocation
+	return httpClient, client, redirectURI, user, consentLocation
 }
 
 // TestPromptNone_DCRClient_NoConsent_RedirectIsWithheld is where the flip and decision 15 meet, and
@@ -424,11 +424,11 @@ func walkDCRClientToConsentScreen(t *testing.T, clientName string) (*http.Client
 func TestPromptNone_DCRClient_NoConsent_RedirectIsWithheld(t *testing.T) {
 	enableDCR(t)
 
-	httpClient, client, redirectUri, _, _ := walkDCRClientToConsentScreen(t, "Silent Renewal Client")
+	httpClient, client, redirectURI, _, _ := walkDCRClientToConsentScreen(t, "Silent Renewal Client")
 
 	// The session exists and is valid; the only thing missing is a consent row.
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + randomCodeChallenge() +
@@ -436,13 +436,13 @@ func TestPromptNone_DCRClient_NoConsent_RedirectIsWithheld(t *testing.T) {
 		"&state=" + fake.LetterN(8) +
 		"&prompt=none"
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	parsedRedirect, err := url.Parse(redirectUri.URI)
+	parsedRedirect, err := url.Parse(redirectURI.URI)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -452,11 +452,11 @@ func TestPromptNone_DCRClient_NoConsent_RedirectIsWithheld(t *testing.T) {
 func TestPromptNone_DCRClient_ConsentExists_Success(t *testing.T) {
 	enableDCR(t)
 
-	httpClient, client, redirectUri, user, _ := walkDCRClientToConsentScreen(t, "Silent Renewal Client")
+	httpClient, client, redirectURI, user, _ := walkDCRClientToConsentScreen(t, "Silent Renewal Client")
 
 	consent := &record.UserConsent{
-		UserId:    user.Id,
-		ClientId:  client.Id,
+		UserID:    user.ID,
+		ClientID:  client.ID,
 		Scope:     "openid profile",
 		GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
 	}
@@ -466,8 +466,8 @@ func TestPromptNone_DCRClient_ConsentExists_Success(t *testing.T) {
 	}
 
 	requestState := fake.LetterN(8)
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + randomCodeChallenge() +
@@ -476,7 +476,7 @@ func TestPromptNone_DCRClient_ConsentExists_Success(t *testing.T) {
 		"&nonce=" + fake.LetterN(8) +
 		"&prompt=none"
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -498,7 +498,7 @@ func TestPromptNone_DCRClient_ConsentExists_Success(t *testing.T) {
 	assert.Empty(t, redirectURL.Query().Get("error"), "error should not be present")
 
 	code := loadCodeFromDatabase(t, codeVal)
-	assert.Equal(t, user.Id, code.User.Id)
+	assert.Equal(t, user.ID, code.User.ID)
 }
 
 // =============================================================================
@@ -507,15 +507,15 @@ func TestPromptNone_DCRClient_ConsentExists_Success(t *testing.T) {
 
 func TestPromptNone_MaxAgeSatisfied_Success(t *testing.T) {
 	// Create session - it will be very recent
-	httpClient, client, redirectUri, user := createSessionWithAcrLevel1(t)
+	httpClient, client, redirectURI, user := createSessionWithACRLevel1(t)
 
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 	requestCodeChallenge := randomCodeChallenge()
 
 	// max_age=600 (10 minutes) should be satisfied by a session created just now
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -525,7 +525,7 @@ func TestPromptNone_MaxAgeSatisfied_Success(t *testing.T) {
 		"&prompt=none" +
 		"&max_age=600"
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -553,12 +553,12 @@ func TestPromptNone_MaxAgeSatisfied_Success(t *testing.T) {
 
 	// Verify code belongs to the user
 	code := loadCodeFromDatabase(t, codeVal)
-	assert.Equal(t, user.Id, code.User.Id)
+	assert.Equal(t, user.ID, code.User.ID)
 }
 
-func TestPromptNone_OtpOptionalNoOtp_ReturnsInteractionRequired(t *testing.T) {
+func TestPromptNone_OTPOptionalNoOTP_ReturnsInteractionRequired(t *testing.T) {
 	// Create session at level1, user has NO OTP
-	httpClient, client, redirectUri, user := createSessionWithAcrLevel1(t)
+	httpClient, client, redirectURI, user := createSessionWithACRLevel1(t)
 
 	// Ensure user does NOT have OTP enabled
 	user.OTPEnabled = false
@@ -572,17 +572,17 @@ func TestPromptNone_OtpOptionalNoOtp_ReturnsInteractionRequired(t *testing.T) {
 
 	// Request level2_optional with session at level1 - this is an ACR step-up
 	// Even though user has no OTP, prompt=none cannot silently step up ACR levels
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
 		"&scope=" + url.QueryEscape("openid profile") +
 		"&state=" + requestState +
 		"&prompt=none" +
-		"&acr_values=" + record.AcrLevel2Optional.String()
+		"&acr_values=" + record.ACRLevel2Optional.String()
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -590,7 +590,7 @@ func TestPromptNone_OtpOptionalNoOtp_ReturnsInteractionRequired(t *testing.T) {
 
 	assert.Equal(t, http.StatusFound, resp.StatusCode)
 
-	errorCode, _, state := getErrorFromUrl(t, resp)
+	errorCode, _, state := getErrorFromURL(t, resp)
 
 	// ACR step-up always requires interaction, even if user has no OTP
 	assert.Equal(t, "interaction_required", errorCode)
@@ -610,8 +610,8 @@ func TestPromptNone_OtpOptionalNoOtp_ReturnsInteractionRequired(t *testing.T) {
 // else. Step 5 only refuses a level2_MANDATORY target for a user with no authenticator, so nothing
 // before step 6 objects, and without the counter this session would keep obtaining tokens stamped
 // acr: urn:goiabada:level2_optional with amr: ["pwd"] for a user who now has one.
-func TestPromptNone_OtpConfigChanged_ReturnsInteractionRequired(t *testing.T) {
-	httpClient, client, redirectUri, user := createSessionWithAcrLevel2Optional(t)
+func TestPromptNone_OTPConfigChanged_ReturnsInteractionRequired(t *testing.T) {
+	httpClient, client, redirectURI, user := createSessionWithACRLevel2Optional(t)
 
 	// Enable OTP for user
 	otpSecret := newOTPSecretForTest(t, user.Email)
@@ -623,28 +623,28 @@ func TestPromptNone_OtpConfigChanged_ReturnsInteractionRequired(t *testing.T) {
 	}
 
 	// Move the user's OTP configuration generation, leaving the session's snapshot behind it.
-	userSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	userSessions, err := database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	assert.Len(t, userSessions, 1)
 
-	advanceOtpConfigGeneration(t, user.Id)
+	advanceOTPConfigGeneration(t, user.ID)
 
 	requestState := fake.LetterN(8)
 	requestCodeChallenge := randomCodeChallenge()
 	// Request level2_optional - should require interaction because OTP config changed
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
 		"&scope=" + url.QueryEscape("openid profile") +
 		"&state=" + requestState +
 		"&prompt=none" +
-		"&acr_values=" + record.AcrLevel2Optional.String()
+		"&acr_values=" + record.ACRLevel2Optional.String()
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -652,13 +652,13 @@ func TestPromptNone_OtpConfigChanged_ReturnsInteractionRequired(t *testing.T) {
 
 	assert.Equal(t, http.StatusFound, resp.StatusCode)
 
-	errorCode, _, state := getErrorFromUrl(t, resp)
+	errorCode, _, state := getErrorFromURL(t, resp)
 
 	assert.Equal(t, "interaction_required", errorCode)
 	assert.Equal(t, requestState, state)
 }
 
-// TestPromptNone_OtpConfigChanged_RefusalWritesNothing is the case that distinguishes the counter
+// TestPromptNone_OTPConfigChanged_RefusalWritesNothing is the case that distinguishes the counter
 // from the boolean it replaced, and it was unobservable before #242.
 //
 // This reader has never cleared anything, so the boolean would have survived a refusal here too;
@@ -669,10 +669,10 @@ func TestPromptNone_OtpConfigChanged_ReturnsInteractionRequired(t *testing.T) {
 //
 // Two requests rather than one, on the same jar and session. The second is what fails if any reader
 // ever starts consuming the signal again.
-func TestPromptNone_OtpConfigChanged_RefusalWritesNothing(t *testing.T) {
+func TestPromptNone_OTPConfigChanged_RefusalWritesNothing(t *testing.T) {
 	// level2_optional rather than level1, for the reason the case above gives: a level1 session is
 	// refused by the ACR check before the counter is ever consulted.
-	httpClient, client, redirectUri, user := createSessionWithAcrLevel2Optional(t)
+	httpClient, client, redirectURI, user := createSessionWithACRLevel2Optional(t)
 
 	otpSecret := newOTPSecretForTest(t, user.Email)
 	user.OTPEnabled = true
@@ -681,35 +681,35 @@ func TestPromptNone_OtpConfigChanged_RefusalWritesNothing(t *testing.T) {
 		t.Fatal(updateUserErr)
 	}
 
-	advanceOtpConfigGeneration(t, user.Id)
+	advanceOTPConfigGeneration(t, user.ID)
 
-	userSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	userSessions, err := database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	assert.Len(t, userSessions, 1)
-	snapshotBefore := userSessions[0].OtpConfigGeneration
+	snapshotBefore := userSessions[0].OTPConfigGeneration
 
 	silentRequest := func() string {
 		requestState := fake.LetterN(8)
-		destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-			"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+		destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+			"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 			"&response_type=code" +
 			"&code_challenge_method=S256" +
 			"&code_challenge=" + randomCodeChallenge() +
 			"&scope=" + url.QueryEscape("openid profile") +
 			"&state=" + requestState +
 			"&prompt=none" +
-			"&acr_values=" + record.AcrLevel2Optional.String()
+			"&acr_values=" + record.ACRLevel2Optional.String()
 
-		resp, getErr := httpClient.Get(destUrl)
+		resp, getErr := httpClient.Get(destURL)
 		if getErr != nil {
 			t.Fatal(getErr)
 		}
 		defer func() { _ = resp.Body.Close() }()
 
 		assert.Equal(t, http.StatusFound, resp.StatusCode)
-		errorCode, _, state := getErrorFromUrl(t, resp)
+		errorCode, _, state := getErrorFromURL(t, resp)
 		assert.Equal(t, requestState, state)
 		return errorCode
 	}
@@ -720,35 +720,35 @@ func TestPromptNone_OtpConfigChanged_RefusalWritesNothing(t *testing.T) {
 		"and so must an identical second one. A refusal is a read: no interaction happened, so "+
 			"nothing may be discharged by it")
 
-	after, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	after, err := database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	assert.Len(t, after, 1)
-	assert.Equal(t, snapshotBefore, after[0].OtpConfigGeneration,
+	assert.Equal(t, snapshotBefore, after[0].OTPConfigGeneration,
 		"the refusals must not have moved the session's snapshot")
 }
 
-func TestPromptNone_OtpConfigChangedLevel1Target_Success(t *testing.T) {
+func TestPromptNone_OTPConfigChangedLevel1Target_Success(t *testing.T) {
 	// Create session at level1
-	httpClient, client, redirectUri, user := createSessionWithAcrLevel1(t)
+	httpClient, client, redirectURI, user := createSessionWithACRLevel1(t)
 
 	// Move the user's OTP configuration generation, leaving the session's snapshot behind it.
-	userSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	userSessions, err := database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	assert.Len(t, userSessions, 1)
 
-	advanceOtpConfigGeneration(t, user.Id)
+	advanceOTPConfigGeneration(t, user.ID)
 
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 	requestCodeChallenge := randomCodeChallenge()
 
 	// Request level1 - the OTP config changed flag should be irrelevant
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -756,9 +756,9 @@ func TestPromptNone_OtpConfigChangedLevel1Target_Success(t *testing.T) {
 		"&state=" + requestState +
 		"&nonce=" + requestNonce +
 		"&prompt=none" +
-		"&acr_values=" + record.AcrLevel1.String()
+		"&acr_values=" + record.ACRLevel1.String()
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -784,21 +784,21 @@ func TestPromptNone_OtpConfigChangedLevel1Target_Success(t *testing.T) {
 	assert.Empty(t, errorVal, "error should not be present")
 
 	code := loadCodeFromDatabase(t, codeVal)
-	assert.Equal(t, user.Id, code.User.Id)
+	assert.Equal(t, user.ID, code.User.ID)
 }
 
 func TestPromptNone_ConsentExists_Success(t *testing.T) {
 	// Use a client that does NOT require consent (ConsentRequired=false)
 	// This tests that prompt=none works with a valid session when no consent is needed
-	httpClient, client, redirectUri, user := createSessionWithAcrLevel1(t)
+	httpClient, client, redirectURI, user := createSessionWithACRLevel1(t)
 
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 	requestCodeChallenge := randomCodeChallenge()
 
 	// prompt=none with valid session and client that doesn't require consent
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -807,7 +807,7 @@ func TestPromptNone_ConsentExists_Success(t *testing.T) {
 		"&nonce=" + requestNonce +
 		"&prompt=none"
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -834,14 +834,14 @@ func TestPromptNone_ConsentExists_Success(t *testing.T) {
 
 	// Verify code belongs to correct user
 	code := loadCodeFromDatabase(t, codeVal)
-	assert.Equal(t, user.Id, code.User.Id)
+	assert.Equal(t, user.ID, code.User.ID)
 }
 
 func TestPromptNone_SessionBumped_Success(t *testing.T) {
-	httpClient, client, redirectUri, user := createSessionWithAcrLevel1(t)
+	httpClient, client, redirectURI, user := createSessionWithACRLevel1(t)
 
 	// Get original LastAccessed
-	userSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	userSessions, err := database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -855,8 +855,8 @@ func TestPromptNone_SessionBumped_Success(t *testing.T) {
 	requestNonce := fake.LetterN(8)
 	requestCodeChallenge := randomCodeChallenge()
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -865,7 +865,7 @@ func TestPromptNone_SessionBumped_Success(t *testing.T) {
 		"&nonce=" + requestNonce +
 		"&prompt=none"
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -887,7 +887,7 @@ func TestPromptNone_SessionBumped_Success(t *testing.T) {
 	assert.NotEmpty(t, codeVal, "code should be present")
 
 	// Check that session was bumped
-	userSessions, err = database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	userSessions, err = database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -909,18 +909,18 @@ func TestPromptNone_FullConsentCoverage(t *testing.T) {
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+	redirectURI := &record.RedirectURI{
+		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -944,8 +944,8 @@ func TestPromptNone_FullConsentCoverage(t *testing.T) {
 
 	// Create consent that covers MORE than what we'll request
 	consent := &record.UserConsent{
-		UserId:    user.Id,
-		ClientId:  client.Id,
+		UserID:    user.ID,
+		ClientID:  client.ID,
 		Scope:     "openid profile email", // Covers openid profile
 		GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
 	}
@@ -955,13 +955,13 @@ func TestPromptNone_FullConsentCoverage(t *testing.T) {
 	}
 
 	// Create session
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -969,7 +969,7 @@ func TestPromptNone_FullConsentCoverage(t *testing.T) {
 		"&state=" + requestState +
 		"&nonce=" + requestNonce
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1005,15 +1005,15 @@ func TestPromptNone_FullConsentCoverage(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	_, _ = getCodeAndStateFromUrl(t, resp)
+	_, _ = getCodeAndStateFromURL(t, resp)
 
 	// Now prompt=none should work since consent covers requested scopes
 	requestState2 := fake.LetterN(8)
 	requestNonce2 := fake.LetterN(8)
 	requestCodeChallenge2 := randomCodeChallenge()
 
-	destUrl2 := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL2 := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge2 +
@@ -1022,7 +1022,7 @@ func TestPromptNone_FullConsentCoverage(t *testing.T) {
 		"&nonce=" + requestNonce2 +
 		"&prompt=none"
 
-	resp2, err := httpClient.Get(destUrl2)
+	resp2, err := httpClient.Get(destURL2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1053,18 +1053,18 @@ func TestPromptNone_PartialConsentCoverage(t *testing.T) {
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+	redirectURI := &record.RedirectURI{
+		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1088,8 +1088,8 @@ func TestPromptNone_PartialConsentCoverage(t *testing.T) {
 
 	// Create consent for only openid (partial coverage)
 	consent := &record.UserConsent{
-		UserId:    user.Id,
-		ClientId:  client.Id,
+		UserID:    user.ID,
+		ClientID:  client.ID,
 		Scope:     "openid", // Only openid, not profile
 		GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
 	}
@@ -1099,13 +1099,13 @@ func TestPromptNone_PartialConsentCoverage(t *testing.T) {
 	}
 
 	// Create session
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -1113,7 +1113,7 @@ func TestPromptNone_PartialConsentCoverage(t *testing.T) {
 		"&state=" + requestState +
 		"&nonce=" + requestNonce
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1146,8 +1146,8 @@ func TestPromptNone_PartialConsentCoverage(t *testing.T) {
 	requestState2 := fake.LetterN(8)
 	requestCodeChallenge2 := randomCodeChallenge()
 
-	destUrl2 := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL2 := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge2 +
@@ -1155,7 +1155,7 @@ func TestPromptNone_PartialConsentCoverage(t *testing.T) {
 		"&state=" + requestState2 +
 		"&prompt=none"
 
-	resp2, err := httpClient.Get(destUrl2)
+	resp2, err := httpClient.Get(destURL2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1163,7 +1163,7 @@ func TestPromptNone_PartialConsentCoverage(t *testing.T) {
 
 	assert.Equal(t, http.StatusFound, resp2.StatusCode)
 
-	errorCode, _, state := getErrorFromUrl(t, resp2)
+	errorCode, _, state := getErrorFromURL(t, resp2)
 
 	assert.Equal(t, "consent_required", errorCode)
 	assert.Equal(t, requestState2, state)
@@ -1176,18 +1176,18 @@ func TestPromptNone_OfflineAccessNotInConsent(t *testing.T) {
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+	redirectURI := &record.RedirectURI{
+		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1211,8 +1211,8 @@ func TestPromptNone_OfflineAccessNotInConsent(t *testing.T) {
 
 	// Create consent WITHOUT offline_access
 	consent := &record.UserConsent{
-		UserId:    user.Id,
-		ClientId:  client.Id,
+		UserID:    user.ID,
+		ClientID:  client.ID,
 		Scope:     "openid profile",
 		GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
 	}
@@ -1222,13 +1222,13 @@ func TestPromptNone_OfflineAccessNotInConsent(t *testing.T) {
 	}
 
 	// Create session first (without requesting offline_access)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -1236,7 +1236,7 @@ func TestPromptNone_OfflineAccessNotInConsent(t *testing.T) {
 		"&state=" + requestState +
 		"&nonce=" + requestNonce
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1272,14 +1272,14 @@ func TestPromptNone_OfflineAccessNotInConsent(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	_, _ = getCodeAndStateFromUrl(t, resp)
+	_, _ = getCodeAndStateFromURL(t, resp)
 
 	// Now request with offline_access - should fail since not consented
 	requestState2 := fake.LetterN(8)
 	requestCodeChallenge2 := randomCodeChallenge()
 
-	destUrl2 := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL2 := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge2 +
@@ -1287,7 +1287,7 @@ func TestPromptNone_OfflineAccessNotInConsent(t *testing.T) {
 		"&state=" + requestState2 +
 		"&prompt=none"
 
-	resp2, err := httpClient.Get(destUrl2)
+	resp2, err := httpClient.Get(destURL2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1295,7 +1295,7 @@ func TestPromptNone_OfflineAccessNotInConsent(t *testing.T) {
 
 	assert.Equal(t, http.StatusFound, resp2.StatusCode)
 
-	errorCode, _, state := getErrorFromUrl(t, resp2)
+	errorCode, _, state := getErrorFromURL(t, resp2)
 
 	assert.Equal(t, "consent_required", errorCode)
 	assert.Equal(t, requestState2, state)
@@ -1308,18 +1308,18 @@ func TestPromptNone_OfflineAccessInConsent(t *testing.T) {
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+	redirectURI := &record.RedirectURI{
+		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1343,8 +1343,8 @@ func TestPromptNone_OfflineAccessInConsent(t *testing.T) {
 
 	// Create consent WITH offline_access
 	consent := &record.UserConsent{
-		UserId:    user.Id,
-		ClientId:  client.Id,
+		UserID:    user.ID,
+		ClientID:  client.ID,
 		Scope:     "openid profile offline_access",
 		GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
 	}
@@ -1354,13 +1354,13 @@ func TestPromptNone_OfflineAccessInConsent(t *testing.T) {
 	}
 
 	// Create session
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -1368,7 +1368,7 @@ func TestPromptNone_OfflineAccessInConsent(t *testing.T) {
 		"&state=" + requestState +
 		"&nonce=" + requestNonce
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1404,15 +1404,15 @@ func TestPromptNone_OfflineAccessInConsent(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	_, _ = getCodeAndStateFromUrl(t, resp)
+	_, _ = getCodeAndStateFromURL(t, resp)
 
 	// Now request with offline_access - should succeed since consented
 	requestState2 := fake.LetterN(8)
 	requestNonce2 := fake.LetterN(8)
 	requestCodeChallenge2 := randomCodeChallenge()
 
-	destUrl2 := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL2 := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge2 +
@@ -1421,7 +1421,7 @@ func TestPromptNone_OfflineAccessInConsent(t *testing.T) {
 		"&nonce=" + requestNonce2 +
 		"&prompt=none"
 
-	resp2, err := httpClient.Get(destUrl2)
+	resp2, err := httpClient.Get(destURL2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1452,18 +1452,18 @@ func TestPromptNone_RequestSubsetOfConsent(t *testing.T) {
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+	redirectURI := &record.RedirectURI{
+		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1487,8 +1487,8 @@ func TestPromptNone_RequestSubsetOfConsent(t *testing.T) {
 
 	// Create consent for more scopes than we'll request
 	consent := &record.UserConsent{
-		UserId:    user.Id,
-		ClientId:  client.Id,
+		UserID:    user.ID,
+		ClientID:  client.ID,
 		Scope:     "openid profile email address phone",
 		GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
 	}
@@ -1498,13 +1498,13 @@ func TestPromptNone_RequestSubsetOfConsent(t *testing.T) {
 	}
 
 	// Create session
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -1512,7 +1512,7 @@ func TestPromptNone_RequestSubsetOfConsent(t *testing.T) {
 		"&state=" + requestState +
 		"&nonce=" + requestNonce
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1549,15 +1549,15 @@ func TestPromptNone_RequestSubsetOfConsent(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	_, _ = getCodeAndStateFromUrl(t, resp)
+	_, _ = getCodeAndStateFromURL(t, resp)
 
 	// Now request only openid with prompt=none - should succeed
 	requestState2 := fake.LetterN(8)
 	requestNonce2 := fake.LetterN(8)
 	requestCodeChallenge2 := randomCodeChallenge()
 
-	destUrl2 := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL2 := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge2 +
@@ -1566,7 +1566,7 @@ func TestPromptNone_RequestSubsetOfConsent(t *testing.T) {
 		"&nonce=" + requestNonce2 +
 		"&prompt=none"
 
-	resp2, err := httpClient.Get(destUrl2)
+	resp2, err := httpClient.Get(destURL2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1599,9 +1599,9 @@ func TestPromptNone_RequestSubsetOfConsent(t *testing.T) {
 func TestPromptNone_EffectiveScopesEmpty_ReturnsAccessDenied(t *testing.T) {
 	// Create a resource and permission
 	resource := createResource(t)
-	permission := createPermission(t, resource.Id)
+	permission := createPermission(t, resource.ID)
 
-	client, redirectUri := createTestClientAndRedirectURI(t)
+	client, redirectURI := createTestClientAndRedirectURI(t)
 
 	password := fake.Password(8)
 	passwordHashed, err := passwordhash.Hash(password)
@@ -1621,13 +1621,13 @@ func TestPromptNone_EffectiveScopesEmpty_ReturnsAccessDenied(t *testing.T) {
 	}
 	// Note: user does NOT have the permission assigned
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	requestState := fake.LetterN(8)
 	requestCodeChallenge := randomCodeChallenge()
 
 	// First, create a session by logging in with openid scope
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -1635,7 +1635,7 @@ func TestPromptNone_EffectiveScopesEmpty_ReturnsAccessDenied(t *testing.T) {
 		"&state=" + requestState +
 		"&nonce=" + fake.LetterN(8)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1664,15 +1664,15 @@ func TestPromptNone_EffectiveScopesEmpty_ReturnsAccessDenied(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	_, _ = getCodeAndStateFromUrl(t, resp)
+	_, _ = getCodeAndStateFromURL(t, resp)
 
 	// Now use prompt=none requesting ONLY the custom scope (no openid)
 	// The user does NOT have the permission, so effective scope will be empty
 	customScope := resource.ResourceIdentifier + ":" + permission.PermissionIdentifier
 	requestState2 := fake.LetterN(8)
 
-	destUrl2 := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL2 := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + randomCodeChallenge() +
@@ -1680,13 +1680,13 @@ func TestPromptNone_EffectiveScopesEmpty_ReturnsAccessDenied(t *testing.T) {
 		"&state=" + requestState2 +
 		"&prompt=none"
 
-	resp2, err := httpClient.Get(destUrl2)
+	resp2, err := httpClient.Get(destURL2)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = resp2.Body.Close() }()
 
-	errorCode, _, state := getErrorFromUrl(t, resp2)
+	errorCode, _, state := getErrorFromURL(t, resp2)
 	assert.Equal(t, "access_denied", errorCode)
 	assert.Equal(t, requestState2, state)
 }
@@ -1694,13 +1694,13 @@ func TestPromptNone_EffectiveScopesEmpty_ReturnsAccessDenied(t *testing.T) {
 // TestPromptNone_InvalidScope verifies that an invalid scope format returns invalid_scope
 // error via redirect (scope validation happens before prompt=none logic).
 func TestPromptNone_InvalidScope(t *testing.T) {
-	client, redirectUri := createTestClientAndRedirectURI(t)
+	client, redirectURI := createTestClientAndRedirectURI(t)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	requestState := fake.LetterN(8)
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + randomCodeChallenge() +
@@ -1708,18 +1708,18 @@ func TestPromptNone_InvalidScope(t *testing.T) {
 		"&state=" + requestState +
 		"&prompt=none"
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	errorCode, _, state := getErrorFromUrl(t, resp)
+	errorCode, _, state := getErrorFromURL(t, resp)
 	assert.Equal(t, "invalid_scope", errorCode)
 	assert.Equal(t, requestState, state)
 }
 
-// advanceOtpConfigGeneration moves a user's OTP configuration generation without going through an
+// advanceOTPConfigGeneration moves a user's OTP configuration generation without going through an
 // enable or disable handler, which is what the production sites do inside their own transactions.
 // Standing in for them here rather than calling one: these cases are about what the READERS do with
 // a session whose snapshot is behind, and driving a real enable would also change otp_enabled and
@@ -1728,7 +1728,7 @@ func TestPromptNone_InvalidScope(t *testing.T) {
 // It is the counter-era replacement for `userSession.Level2AuthConfigHasChanged = true` followed by
 // UpdateUserSession, which is what these cases used to do. The difference is the point: the flag was
 // per session and this is per user, so one call puts EVERY session of the user behind (#242).
-func advanceOtpConfigGeneration(t *testing.T, userId int64) {
+func advanceOTPConfigGeneration(t *testing.T, userID int64) {
 	t.Helper()
 
 	tx, err := database.BeginTransaction(context.Background())
@@ -1737,7 +1737,7 @@ func advanceOtpConfigGeneration(t *testing.T, userId int64) {
 	}
 	defer func() { _ = database.RollbackTransaction(context.Background(), tx) }()
 
-	if _, err := database.IncrementUserOtpConfigGeneration(context.Background(), tx, userId); err != nil {
+	if _, err := database.IncrementUserOTPConfigGeneration(context.Background(), tx, userID); err != nil {
 		t.Fatal(err)
 	}
 	if err := database.CommitTransaction(context.Background(), tx); err != nil {

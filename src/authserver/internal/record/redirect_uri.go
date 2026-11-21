@@ -20,8 +20,8 @@ const RedirectURIMaxBytes = 2048
 const RedirectURIsMaxPerClient = 60
 
 type RedirectURI struct {
-	Id        int64        `db:"id" fieldtag:"pk"`
+	ID        int64        `db:"id" fieldtag:"pk"`
 	CreatedAt sql.NullTime `db:"created_at" fieldtag:"dont-update"`
 	URI       string       `db:"uri"`
-	ClientId  int64        `db:"client_id"`
+	ClientID  int64        `db:"client_id"`
 }

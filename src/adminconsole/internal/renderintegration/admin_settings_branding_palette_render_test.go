@@ -41,7 +41,7 @@ func renderPaletteForm(t *testing.T, locale, theme, appearance string, palette a
 	t.Helper()
 	bind := map[string]interface{}{
 		"isNew":           false,
-		"storedBrand":     api.BrandResponse{Id: 8, Name: "Custom", Appearance: appearance, Theme: theme},
+		"storedBrand":     api.BrandResponse{ID: 8, Name: "Custom", Appearance: appearance, Theme: theme},
 		"brand":           adminsettingshandlers.BrandForm{Name: "Custom", Appearance: appearance, Theme: theme},
 		"brandThemes":     renderThemes,
 		"appearanceTheme": renderThemes[0],

@@ -12,10 +12,10 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 )
 
-// stepUpAcrValues is the level the download asks for, which the refusal names in its acr_values:
+// stepUpACRValues is the level the download asks for, which the refusal names in its acr_values:
 // the password, and the code from a user who has set up two-factor authentication. Sent as the
 // sign-in's acr_values, it raises the console client's configured level and never lowers it.
-const stepUpAcrValues = "urn:goiabada:level2_optional"
+const stepUpACRValues = "urn:goiabada:level2_optional"
 
 // signedInAgainParam is the query parameter the sign-in brings the browser back to the page with,
 // set to 1, which draws the notice to press the button again.
@@ -35,7 +35,7 @@ type stepUpSignIn interface {
 // HandleDataGet draws the Your data page: what the file holds, that an older sign-in is asked to
 // sign in again first, and Download my data (#782 decision 6). Back from that sign-in, the page
 // says to press the button again.
-func HandleDataGet(httpHelper HttpHelper) http.HandlerFunc {
+func HandleDataGet(httpHelper HTTPHelper) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		renderDataPage(httpHelper, w, r, map[string]interface{}{
 			"signedInAgain": r.URL.Query().Get(signedInAgainParam) == "1",
@@ -58,7 +58,7 @@ func HandleDataGet(httpHelper HttpHelper) http.HandlerFunc {
 // the page with the console's rate-limit sentence. Any other failure goes to the API error
 // classifier, so any other 401 still ends the session.
 func HandleDataPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient accountDataAPI,
 	signIn stepUpSignIn,
 	signInScope string,
@@ -68,9 +68,9 @@ func HandleDataPost(
 	return func(w http.ResponseWriter, r *http.Request) {
 		render.LiftExportWriteDeadline(w, r)
 
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
@@ -79,7 +79,7 @@ func HandleDataPost(
 			if render.IsStepUpRequired(err) {
 				redirectBack := baseURL + "/account/data?" + signedInAgainParam + "=1"
 				signInErr := signIn.RedirToAuthorizeWith(w, r, builtin.AdminConsoleClientIdentifier, signInScope, redirectBack,
-					oauthclient.SignInOptions{Prompt: "login", AcrValues: stepUpAcrValues})
+					oauthclient.SignInOptions{Prompt: "login", ACRValues: stepUpACRValues})
 				if signInErr != nil {
 					httpHelper.InternalServerError(w, r, errs.Wrap(signInErr, "unable to send the browser to sign in again for the download"))
 				}
@@ -99,7 +99,7 @@ func HandleDataPost(
 	}
 }
 
-func renderDataPage(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, bind map[string]interface{}) {
+func renderDataPage(httpHelper HTTPHelper, w http.ResponseWriter, r *http.Request, bind map[string]interface{}) {
 	if err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_data.html", bind); err != nil {
 		httpHelper.InternalServerError(w, r, err)
 	}

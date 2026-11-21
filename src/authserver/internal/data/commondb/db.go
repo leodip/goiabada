@@ -57,14 +57,14 @@ type Database struct {
 	// (#279).
 	IsUniqueViolation func(error) bool
 
-	// ExplicitIdInsertSQL answers the statements an INSERT naming its own id needs around it on
+	// ExplicitIDInsertSQL answers the statements an INSERT naming its own id needs around it on
 	// table, run on the same transaction. Each dialect that needs any sets it in its constructor:
 	// SQL Server refuses an explicit identity value unless IDENTITY_INSERT is on for the table,
 	// and PostgreSQL's serial sequence does not move past an id it did not hand out, so the next
 	// insert through it would collide. Left nil, the insert runs alone, which is what SQLite and
 	// MySQL do, since both advance their counters past an explicit id. CreateInitialSettings is
 	// the only consumer (#424 decision 14).
-	ExplicitIdInsertSQL func(table string) (before []string, after []string)
+	ExplicitIDInsertSQL func(table string) (before []string, after []string)
 
 	// sleep is the pause between attempts, set by New to waitOrCancel. It is a field rather than
 	// a call so a test can record the durations REQUESTED rather than time the wall clock, where a
@@ -533,15 +533,15 @@ func (d *Database) QuerySQL(ctx context.Context, tx *sql.Tx, sql string, args ..
 func (d *Database) insert(ctx context.Context, tx *sql.Tx, s statement, noun string, args ...any) (int64, error) {
 	switch d.Dialect {
 	case data.Postgres, data.MSSQL:
-		return d.insertReadingReturnedId(ctx, tx, s.text(d.Dialect), noun, args)
+		return d.insertReadingReturnedID(ctx, tx, s.text(d.Dialect), noun, args)
 	default:
-		return d.insertReadingLastInsertId(ctx, tx, s.text(d.Dialect), noun, args)
+		return d.insertReadingLastInsertID(ctx, tx, s.text(d.Dialect), noun, args)
 	}
 }
 
-// insertReadingLastInsertId is the SQLite and MySQL arm: the insert runs as a statement and the
+// insertReadingLastInsertID is the SQLite and MySQL arm: the insert runs as a statement and the
 // id is what the driver reports for it.
-func (d *Database) insertReadingLastInsertId(ctx context.Context, tx *sql.Tx,
+func (d *Database) insertReadingLastInsertID(ctx context.Context, tx *sql.Tx,
 	statement string, noun string, args []any) (int64, error) {
 
 	result, err := d.ExecSQL(ctx, tx, statement, args...)
@@ -556,7 +556,7 @@ func (d *Database) insertReadingLastInsertId(ctx context.Context, tx *sql.Tx,
 	return id, nil
 }
 
-// insertReadingReturnedId is the PostgreSQL and SQL Server arm: the insert runs as a query and
+// insertReadingReturnedID is the PostgreSQL and SQL Server arm: the insert runs as a query and
 // the id is the one row it answers with.
 //
 // THE DEFERRED VIOLATION is why it ends the way it does. pgx and go-mssqldb can both report a
@@ -566,7 +566,7 @@ func (d *Database) insertReadingLastInsertId(ctx context.Context, tx *sql.Tx,
 // would be unreachable on exactly the two engines that take this arm. It goes through
 // wrapSQLError rather than errs.Wrap for that reason; the failure QuerySQL itself returns has
 // already been through wrapSQLError (#279).
-func (d *Database) insertReadingReturnedId(ctx context.Context, tx *sql.Tx,
+func (d *Database) insertReadingReturnedID(ctx context.Context, tx *sql.Tx,
 	statement string, noun string, args []any) (int64, error) {
 
 	rows, err := d.QuerySQL(ctx, tx, statement, args...)
@@ -595,7 +595,7 @@ func (d *Database) PoolStats() sql.DBStats {
 }
 
 func (d *Database) IsEmpty(ctx context.Context) (bool, error) {
-	settings, err := d.GetSettingsById(ctx, nil, initialSettingsId)
+	settings, err := d.GetSettingsByID(ctx, nil, initialSettingsID)
 	if err != nil {
 		return false, errs.Wrap(err, "failed to check if database is empty")
 	}

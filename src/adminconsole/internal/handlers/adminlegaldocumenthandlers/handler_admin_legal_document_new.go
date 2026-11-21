@@ -12,7 +12,7 @@ import (
 )
 
 func HandleNewGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -40,16 +40,16 @@ type legalDocumentNewAPI interface {
 // HandleNewPost creates the document holding an empty draft, and opens that draft, where its text
 // is written beside the preview.
 func HandleNewPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient legalDocumentNewAPI,
 	baseURL string,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
@@ -83,6 +83,6 @@ func HandleNewPost(
 			return
 		}
 
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/legal-documents/%v/draft", baseURL, created.LegalDocument.Id), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("%v/admin/legal-documents/%v/draft", baseURL, created.LegalDocument.ID), http.StatusFound)
 	}
 }

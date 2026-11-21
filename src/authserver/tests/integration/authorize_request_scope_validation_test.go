@@ -25,22 +25,22 @@ func TestAuthorize_ValidateRequest_ResponseTypeIsMissing(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+	redirectURI := &record.RedirectURI{
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + redirectUri.URI
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + redirectURI.URI
 
-	httpClient := createAuthenticatedHttpClient(t)
+	httpClient := createAuthenticatedHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -71,22 +71,22 @@ func TestAuthorize_ValidateRequest_ResponseTypeIsInvalid(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+	redirectURI := &record.RedirectURI{
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + redirectUri.URI + "&response_type=invalid"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + redirectURI.URI + "&response_type=invalid"
 
-	httpClient := createAuthenticatedHttpClient(t)
+	httpClient := createAuthenticatedHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -119,22 +119,22 @@ func TestAuthorize_ValidateRequest_CodeChallengeMethodIsMissing(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+	redirectURI := &record.RedirectURI{
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + redirectUri.URI + "&response_type=code"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + redirectURI.URI + "&response_type=code"
 
-	httpClient := createAuthenticatedHttpClient(t)
+	httpClient := createAuthenticatedHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -167,22 +167,22 @@ func TestAuthorize_ValidateRequest_CodeChallengeMethodIsInvalid(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+	redirectURI := &record.RedirectURI{
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + redirectUri.URI + "&response_type=code" + "&code_challenge_method=invalid"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + redirectURI.URI + "&response_type=code" + "&code_challenge_method=invalid"
 
-	httpClient := createAuthenticatedHttpClient(t)
+	httpClient := createAuthenticatedHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -215,22 +215,22 @@ func TestAuthorize_ValidateRequest_CodeChallengeIsMissing(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+	redirectURI := &record.RedirectURI{
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + redirectUri.URI + "&response_type=code" + "&code_challenge_method=S256"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + redirectURI.URI + "&response_type=code" + "&code_challenge_method=S256"
 
-	httpClient := createAuthenticatedHttpClient(t)
+	httpClient := createAuthenticatedHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -274,23 +274,23 @@ func TestAuthorize_ValidateRequest_CodeChallengeInvalid(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		redirectUri := &record.RedirectURI{
-			ClientId: client.Id,
+		redirectURI := &record.RedirectURI{
+			ClientID: client.ID,
 			URI:      fake.URL(),
 		}
 
-		err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+		err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-			"&redirect_uri=" + redirectUri.URI + "&response_type=code" + "&code_challenge_method=S256" +
+		destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+			"&redirect_uri=" + redirectURI.URI + "&response_type=code" + "&code_challenge_method=S256" +
 			"&code_challenge=" + testCase.codeChallenge
 
-		httpClient := createAuthenticatedHttpClient(t)
+		httpClient := createAuthenticatedHTTPClient(t)
 
-		resp, err := httpClient.Get(destUrl)
+		resp, err := httpClient.Get(destURL)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -333,26 +333,26 @@ func TestAuthorize_ValidateRequest_InvalidResponseMode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+	redirectURI := &record.RedirectURI{
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + redirectUri.URI +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + redirectURI.URI +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + randomCodeChallenge() +
 		"&response_mode=invalid"
 
-	httpClient := createAuthenticatedHttpClient(t)
+	httpClient := createAuthenticatedHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -392,18 +392,18 @@ func TestAuthorize_ValidateRequest_InvalidResponseMode_NoSessionIsNotAskedToLogI
 		t.Fatal(err)
 	}
 
-	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+	redirectURI := &record.RedirectURI{
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + redirectUri.URI +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + redirectURI.URI +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + randomCodeChallenge() +
@@ -411,9 +411,9 @@ func TestAuthorize_ValidateRequest_InvalidResponseMode_NoSessionIsNotAskedToLogI
 
 	// Cookieless: no session, and no prompt parameter, which is the combination every other
 	// validation failure defers.
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -451,27 +451,27 @@ func TestAuthorize_ValidateRequest_InvalidResponseMode_RendersInTheRequestedLoca
 		t.Fatal(err)
 	}
 
-	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+	redirectURI := &record.RedirectURI{
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + redirectUri.URI +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + redirectURI.URI +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + randomCodeChallenge() +
 		"&response_mode=invalid" +
 		"&ui_locales=pt-BR"
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -501,27 +501,27 @@ func TestAuthorize_ValidateRequest_QueryResponseMode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+	redirectURI := &record.RedirectURI{
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + redirectUri.URI +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + redirectURI.URI +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + randomCodeChallenge() +
 		"&response_mode=query" +
 		"&scope=invalid_scope" // to prevent full authorize execution
 
-	httpClient := createAuthenticatedHttpClient(t)
+	httpClient := createAuthenticatedHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -553,27 +553,27 @@ func TestAuthorize_ValidateRequest_FragmentResponseMode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+	redirectURI := &record.RedirectURI{
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + redirectUri.URI +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + redirectURI.URI +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + randomCodeChallenge() +
 		"&response_mode=fragment" +
 		"&scope=invalid_scope" // to prevent full authorize execution
 
-	httpClient := createAuthenticatedHttpClient(t)
+	httpClient := createAuthenticatedHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -606,27 +606,27 @@ func TestAuthorize_ValidateRequest_FormPostResponseMode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+	redirectURI := &record.RedirectURI{
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + redirectUri.URI +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + redirectURI.URI +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + randomCodeChallenge() +
 		"&response_mode=form_post" +
 		"&scope=invalid_scope" // to prevent full authorize execution
 
-	httpClient := createAuthenticatedHttpClient(t)
+	httpClient := createAuthenticatedHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -641,7 +641,7 @@ func TestAuthorize_ValidateRequest_FormPostResponseMode(t *testing.T) {
 
 	formAction, exists := doc.Find("form").Attr("action")
 	assert.True(t, exists, "Form action should exist")
-	assert.Equal(t, redirectUri.URI, formAction, "Form action should match redirect URI")
+	assert.Equal(t, redirectURI.URI, formAction, "Form action should match redirect URI")
 
 	errorValue := doc.Find("input[name='error']").AttrOr("value", "")
 	assert.Equal(t, "invalid_scope", errorValue, "Error value should be 'invalid_scope'")
@@ -662,25 +662,25 @@ func TestAuthorize_ValidateScopes_ScopeIsMissing(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+	redirectURI := &record.RedirectURI{
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + redirectUri.URI +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + redirectURI.URI +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + randomCodeChallenge()
 
-	httpClient := createAuthenticatedHttpClient(t)
+	httpClient := createAuthenticatedHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -713,30 +713,30 @@ func TestAuthorize_ValidateScopes_UserinfoIsAnUnknownPermission(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+	redirectURI := &record.RedirectURI{
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	baseUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/"
+	baseURL := appConfig.AuthServer.BaseURL + "/auth/authorize/"
 	params := url.Values{}
 	params.Add("client_id", client.ClientIdentifier)
-	params.Add("redirect_uri", redirectUri.URI)
+	params.Add("redirect_uri", redirectURI.URI)
 	params.Add("response_type", "code")
 	params.Add("code_challenge_method", "S256")
 	params.Add("code_challenge", randomCodeChallenge())
 	params.Add("scope", "openid profile authserver:userinfo")
 
-	destUrl := baseUrl + "?" + params.Encode()
+	destURL := baseURL + "?" + params.Encode()
 
-	httpClient := createAuthenticatedHttpClient(t)
+	httpClient := createAuthenticatedHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -768,12 +768,12 @@ func TestAuthorize_ValidateScopes_InvalidScope(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+	redirectURI := &record.RedirectURI{
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -794,16 +794,16 @@ func TestAuthorize_ValidateScopes_InvalidScope(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-				"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+			destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+				"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 				"&response_type=code" +
 				"&code_challenge_method=S256" +
 				"&code_challenge=" + randomCodeChallenge() +
 				"&scope=" + url.QueryEscape(tc.scope)
 
-			httpClient := createAuthenticatedHttpClient(t)
+			httpClient := createAuthenticatedHTTPClient(t)
 
-			resp, err := httpClient.Get(destUrl)
+			resp, err := httpClient.Get(destURL)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -837,12 +837,12 @@ func TestAuthorize_ValidateScopes_ResourceDoesNotExist(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+	redirectURI := &record.RedirectURI{
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -850,16 +850,16 @@ func TestAuthorize_ValidateScopes_ResourceDoesNotExist(t *testing.T) {
 	nonExistentResource := "non_existent_resource"
 	scope := fmt.Sprintf("%s:read", nonExistentResource)
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + randomCodeChallenge() +
 		"&scope=" + url.QueryEscape(scope)
 
-	httpClient := createAuthenticatedHttpClient(t)
+	httpClient := createAuthenticatedHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -891,12 +891,12 @@ func TestAuthorize_ValidateScopes_ResourceDoesNotHavePermissionAssociated(t *tes
 		t.Fatal(err)
 	}
 
-	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+	redirectURI := &record.RedirectURI{
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -914,16 +914,16 @@ func TestAuthorize_ValidateScopes_ResourceDoesNotHavePermissionAssociated(t *tes
 	nonExistentPermission := "non_existent_permission"
 	scope := fmt.Sprintf("%s:%s", resource.ResourceIdentifier, nonExistentPermission)
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + randomCodeChallenge() +
 		"&scope=" + url.QueryEscape(scope)
 
-	httpClient := createAuthenticatedHttpClient(t)
+	httpClient := createAuthenticatedHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -962,17 +962,17 @@ func TestAuthorize_ValidateScopes_ResourceDoesNotHavePermissionAssociated(t *tes
 // once #213 moves them: written cookieless, this row would be one more test for the ordering change
 // to retrofit, and it would be retrofitted by the very change it exists to be independent of.
 func TestAuthorize_ValidateScopes_EmojiScope_FormPostDescriptionIsConformed(t *testing.T) {
-	httpClient, client, redirectUri, _ := createSessionWithAcrLevel1(t)
+	httpClient, client, redirectURI, _ := createSessionWithACRLevel1(t)
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + randomCodeChallenge() +
 		"&response_mode=form_post" +
 		"&scope=" + url.QueryEscape("emoji💣scope")
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}

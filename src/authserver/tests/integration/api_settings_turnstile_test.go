@@ -54,15 +54,15 @@ func turnstileSettingsAnswer(t *testing.T, resp *http.Response) api.SettingsTurn
 // putTurnstile saves body as accessToken and answers the response and its request id.
 func putTurnstile(t *testing.T, accessToken string, body any) (*http.Response, string) {
 	t.Helper()
-	resp, requestId := sendAdmin(t, accessToken, http.MethodPut, turnstileSettingsPath, body)
+	resp, requestID := sendAdmin(t, accessToken, http.MethodPut, turnstileSettingsPath, body)
 	t.Cleanup(func() { _ = resp.Body.Close() })
-	return resp, requestId
+	return resp, requestID
 }
 
 // storedTurnstile is the settings row as stored.
 func storedTurnstile(t *testing.T) *record.Settings {
 	t.Helper()
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
+	settings, err := database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err)
 	require.NotNil(t, settings)
 	return settings
@@ -274,12 +274,12 @@ func TestAPISettingsTurnstilePut_TheEventRecordsTheSaveWithoutTheSecretKey(t *te
 	})
 	accessToken, adminClient := createAdminClientWithToken(t)
 
-	resp, requestId := putTurnstile(t, accessToken, api.UpdateSettingsTurnstileRequest{
+	resp, requestID := putTurnstile(t, accessToken, api.UpdateSettingsTurnstileRequest{
 		TurnstileEnabled: true, TurnstileSiteKey: turnstilePassingSiteKey, TurnstileSecretKey: turnstilePassingSecretKey,
 	})
 	turnstileSettingsAnswer(t, resp)
 
-	rows := auditRows(t, accessToken, "updated_turnstile_settings", requestId)
+	rows := auditRows(t, accessToken, "updated_turnstile_settings", requestID)
 	assert.Equal(t, []map[string]any{{
 		"logged_in_user": adminClient.ClientIdentifier,
 		"old": map[string]any{
@@ -294,7 +294,7 @@ func TestAPISettingsTurnstilePut_TheEventRecordsTheSaveWithoutTheSecretKey(t *te
 		},
 	}}, rows)
 
-	logs, listResp := getAuditLogs(t, accessToken, "requestId="+requestId)
+	logs, listResp := getAuditLogs(t, accessToken, "requestId="+requestID)
 	defer func() { _ = listResp.Body.Close() }()
 	for _, entry := range logs.AuditLogs {
 		assert.NotContains(t, entry.Details, turnstilePassingSecretKey, "no event of the save carries the secret key")
@@ -324,7 +324,7 @@ func TestAPISettingsTurnstile_TakesTheSettingsScopes(t *testing.T) {
 	for _, method := range []string{http.MethodGet, http.MethodPut} {
 		req, err := http.NewRequest(method, appConfig.AuthServer.BaseURL+turnstileSettingsPath, nil)
 		require.NoError(t, err)
-		noToken, err := createHttpClient(t).Do(req)
+		noToken, err := createHTTPClient(t).Do(req)
 		require.NoError(t, err)
 		_ = noToken.Body.Close()
 		assert.Equal(t, http.StatusUnauthorized, noToken.StatusCode, method)

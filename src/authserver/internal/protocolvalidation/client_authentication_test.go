@@ -193,7 +193,7 @@ func TestValidateTokenRequest_ClientAuthentication(t *testing.T) {
 				encryptedSecret, err := testDataCipher.Encrypt(theSecret)
 				require.NoError(t, err)
 				client := &record.Client{
-					Id:                      7,
+					ID:                      7,
 					ClientIdentifier:        "the_client",
 					Enabled:                 true,
 					IsPublic:                r.isPublic,
@@ -202,7 +202,7 @@ func TestValidateTokenRequest_ClientAuthentication(t *testing.T) {
 				}
 				input := &ValidateTokenRequestInput{
 					GrantType:        f.grant,
-					ClientId:         "the_client",
+					ClientID:         "the_client",
 					ClientSecret:     r.secret,
 					ClientAuthMethod: r.method,
 				}
@@ -296,7 +296,7 @@ func TestValidateTokenRequest_PreludeInvalidClient(t *testing.T) {
 				mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "the_client").Return(r.client, nil).Once()
 
 				result, err := validator.ValidateTokenRequest(context.Background(), &record.Settings{},
-					&ValidateTokenRequestInput{GrantType: grant, ClientId: "the_client", ClientSecret: "a_secret"})
+					&ValidateTokenRequestInput{GrantType: grant, ClientID: "the_client", ClientSecret: "a_secret"})
 
 				assert.Nil(t, result)
 				var detail *oauth.ErrorDetail

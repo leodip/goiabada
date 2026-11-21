@@ -30,7 +30,7 @@ type tokenGenerationInput struct {
 	Scope string
 
 	// Authentication context
-	AcrLevel        record.AcrLevel // e.g., record.AcrLevel1, record.AcrLevel2Optional
+	ACRLevel        record.ACRLevel // e.g., record.ACRLevel1, record.ACRLevel2Optional
 	AuthMethods     []string        // e.g., ["pwd"], ["pwd", "otp"]
 	AuthenticatedAt time.Time
 
@@ -48,10 +48,10 @@ type tokenGenerationInput struct {
 	// correct source differs per flow and reading the convenient one is the bug decision
 	// 13 of #106 exists to prevent.
 	AuthStateGeneration int64
-	// GrantId is the grant_id claim of the access token: the identifier the grant's refresh token
+	// GrantID is the grant_id claim of the access token: the identifier the grant's refresh token
 	// family shares, its first refresh token's jti (#676 decision 1). Empty for a flow that issues
 	// no refresh token, the implicit flow, whose access token names no grant.
-	GrantId string
+	GrantID string
 	// DPoPThumbprint is the RFC 7638 thumbprint of the key the request's DPoP proof was signed with,
 	// written to the access token as cnf.jkt (RFC 9449 section 6.1). Empty for a bearer token, and
 	// so for every implicit-flow token, which no proof accompanies.
@@ -76,18 +76,18 @@ type tokenGenerationInput struct {
 // tx is the transaction the grant runs in, nil for one that runs in none, as generateAccessTokenCore
 // states. A refresh hands over the one its rotation runs in (#132, #437).
 //
-// grantId is the grant's identifier, which the caller fixes before the access token is minted: on
+// grantID is the grant's identifier, which the caller fixes before the access token is minted: on
 // the code exchange the jti the first refresh token is about to take, on a refresh the parent's
-// FirstRefreshTokenJti (#676 decision 1).
+// FirstRefreshTokenJTI (#676 decision 1).
 //
 // dpopThumbprint binds the access token to the request's proof key, empty for a bearer token.
 func (t *TokenIssuer) generateAccessToken(ctx context.Context, tx *sql.Tx, settings *record.Settings, code *record.Code, scope string,
 	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string,
-	parentRefreshToken *record.RefreshToken, grantId string, dpopThumbprint string) (string, error) {
+	parentRefreshToken *record.RefreshToken, grantID string, dpopThumbprint string) (string, error) {
 
 	input := t.createTokenInputFromCode(code)
 	input.Scope = scope // Use the provided scope (may differ from code.Scope for refresh)
-	input.GrantId = grantId
+	input.GrantID = grantID
 	input.DPoPThumbprint = dpopThumbprint
 
 	if parentRefreshToken == nil {
@@ -101,10 +101,10 @@ func (t *TokenIssuer) generateAccessToken(ctx context.Context, tx *sql.Tx, setti
 	return t.generateAccessTokenCore(ctx, tx, settings, input, now, signingKey, keyIdentifier)
 }
 
-// generateIdToken builds an ID token for the authorization code flow. parentRefreshToken is nil on
+// generateIDToken builds an ID token for the authorization code flow. parentRefreshToken is nil on
 // the code exchange, the sign-in, whose ID token carries the code's nonce, and set when refreshing,
 // whose ID token has none (OpenID Connect Core 1.0 section 12.2, #710 decision 6).
-func (t *TokenIssuer) generateIdToken(ctx context.Context, tx *sql.Tx, settings *record.Settings, code *record.Code, scope string,
+func (t *TokenIssuer) generateIDToken(ctx context.Context, tx *sql.Tx, settings *record.Settings, code *record.Code, scope string,
 	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string, parentRefreshToken *record.RefreshToken) (string, error) {
 
 	input := t.createTokenInputFromCode(code)
@@ -112,7 +112,7 @@ func (t *TokenIssuer) generateIdToken(ctx context.Context, tx *sql.Tx, settings 
 	if parentRefreshToken != nil {
 		input.Nonce = ""
 	}
-	return t.generateIdTokenCore(ctx, tx, settings, input, now, signingKey, keyIdentifier)
+	return t.generateIDTokenCore(ctx, tx, settings, input, now, signingKey, keyIdentifier)
 }
 
 // claimMapper builds the user-claims mapper for one token type. The fields after the port are
@@ -159,11 +159,11 @@ func (t *TokenIssuer) generateAccessTokenCore(ctx context.Context, tx *sql.Tx, s
 
 	// The claims of the user's sign-in. Those every access token carries are finishAccessToken's.
 	claims["sub"] = input.User.Subject
-	if input.GrantId != "" {
-		claims["grant_id"] = input.GrantId
+	if input.GrantID != "" {
+		claims["grant_id"] = input.GrantID
 	}
 	claims["auth_time"] = input.AuthenticatedAt.Unix()
-	claims["acr"] = input.AcrLevel.String()
+	claims["acr"] = input.ACRLevel.String()
 	// Omit amr rather than signing an empty array. OIDC Core 1.0 section 2 makes amr OPTIONAL, so
 	// absent says nothing about how the user authenticated, where "amr": [] positively asserts that
 	// no method was used. Reinstating the unconditional assignment would sign that false claim for
@@ -260,7 +260,7 @@ func finishAccessToken(claims jwt.MapClaims, settings *record.Settings, client *
 
 	claims["iss"] = settings.Issuer
 	claims["client_id"] = client.ClientIdentifier
-	claims["client_internal_id"] = client.Id
+	claims["client_internal_id"] = client.ID
 	claims["iat"] = now.Unix()
 	claims["nbf"] = now.Unix()
 	claims["jti"] = uuid.New()
@@ -281,10 +281,10 @@ func finishAccessToken(claims jwt.MapClaims, settings *record.Settings, client *
 	return accessToken, nil
 }
 
-// generateIdTokenCore creates an id_token using the unified tokenGenerationInput.
+// generateIDTokenCore creates an id_token using the unified tokenGenerationInput.
 // This is the single implementation used by all OAuth flows (auth code, implicit, ROPC). tx is
 // generateAccessTokenCore's.
-func (t *TokenIssuer) generateIdTokenCore(ctx context.Context, tx *sql.Tx, settings *record.Settings, input *tokenGenerationInput,
+func (t *TokenIssuer) generateIDTokenCore(ctx context.Context, tx *sql.Tx, settings *record.Settings, input *tokenGenerationInput,
 	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string) (string, error) {
 
 	claims := make(jwt.MapClaims)
@@ -296,7 +296,7 @@ func (t *TokenIssuer) generateIdTokenCore(ctx context.Context, tx *sql.Tx, setti
 	claims["nbf"] = now.Unix()
 	claims["auth_time"] = input.AuthenticatedAt.Unix()
 	claims["jti"] = uuid.New()
-	claims["acr"] = input.AcrLevel.String()
+	claims["acr"] = input.ACRLevel.String()
 	// Omitted when no method was recorded, for the reason given in generateAccessTokenCore (#240).
 	if len(input.AuthMethods) > 0 {
 		claims["amr"] = input.AuthMethods
@@ -330,19 +330,19 @@ func (t *TokenIssuer) generateIdTokenCore(ctx context.Context, tx *sql.Tx, setti
 	// OpenID Connect claims in ID token (if enabled)
 	// Per OIDC Core 5.4, scope claims (email, profile, etc.) MAY be in ID tokens
 	// but SHOULD be available from /userinfo endpoint for strict conformance.
-	includeOpenIDConnectClaimsInIdToken := settings.IncludeOpenIDConnectClaimsInIdToken
-	if input.Client.IncludeOpenIDConnectClaimsInIdToken == record.ThreeStateSettingOn.String() ||
-		input.Client.IncludeOpenIDConnectClaimsInIdToken == record.ThreeStateSettingOff.String() {
-		includeOpenIDConnectClaimsInIdToken = input.Client.IncludeOpenIDConnectClaimsInIdToken == record.ThreeStateSettingOn.String()
+	includeOpenIDConnectClaimsInIDToken := settings.IncludeOpenIDConnectClaimsInIDToken
+	if input.Client.IncludeOpenIDConnectClaimsInIDToken == record.ThreeStateSettingOn.String() ||
+		input.Client.IncludeOpenIDConnectClaimsInIDToken == record.ThreeStateSettingOff.String() {
+		includeOpenIDConnectClaimsInIDToken = input.Client.IncludeOpenIDConnectClaimsInIDToken == record.ThreeStateSettingOn.String()
 	}
 
-	mapper := t.claimMapper(userclaims.InclusionIdToken)
+	mapper := t.claimMapper(userclaims.InclusionIDToken)
 
-	if includeOpenIDConnectClaimsInIdToken {
+	if includeOpenIDConnectClaimsInIDToken {
 		mapper.AddOpenIDConnectClaims(ctx, tx, claims, input.User, scopes)
 	}
 
-	// groups and attributes (using the IncludeInIdToken filter), outside the OIDC claim setting
+	// groups and attributes (using the IncludeInIDToken filter), outside the OIDC claim setting
 	// above, as they are in the access token.
 	mapper.AddGroupClaims(claims, input.User, scopes)
 	mapper.AddAttributeClaims(claims, input.User, scopes)
@@ -363,7 +363,7 @@ func (t *TokenIssuer) createTokenInputFromCode(code *record.Code) *tokenGenerati
 		User:              &code.User,
 		Client:            &code.Client,
 		Scope:             code.Scope,
-		AcrLevel:          code.AcrLevel,
+		ACRLevel:          code.ACRLevel,
 		AuthMethods:       authMethodsToArray(code.AuthMethods),
 		AuthenticatedAt:   code.AuthenticatedAt,
 		SessionIdentifier: code.SessionIdentifier,
@@ -378,7 +378,7 @@ func (t *TokenIssuer) createTokenInputFromImplicit(input *ImplicitGrantInput) *t
 		User:              input.User,
 		Client:            input.Client,
 		Scope:             input.Scope,
-		AcrLevel:          input.AcrLevel,
+		ACRLevel:          input.ACRLevel,
 		AuthMethods:       authMethodsToArray(input.AuthMethods),
 		AuthenticatedAt:   input.AuthenticatedAt,
 		SessionIdentifier: input.SessionIdentifier,
@@ -404,7 +404,7 @@ func (t *TokenIssuer) createTokenInputFromROPC(input *ROPCGrantInput) *tokenGene
 		User:              input.User,
 		Client:            input.Client,
 		Scope:             input.Scope,
-		AcrLevel:          record.AcrLevel1,
+		ACRLevel:          record.ACRLevel1,
 		AuthMethods:       []string{oidc.AuthMethodPassword.String()},
 		AuthenticatedAt:   input.AuthenticatedAt,
 		SessionIdentifier: "", // ROPC is sessionless: see ROPCGrantInput
@@ -430,15 +430,15 @@ func (t *TokenIssuer) calculateAtHash(accessToken string) string {
 // the user: reading that reloaded user would stamp a grant authenticated under an older
 // generation with the current one, laundering it forward (#106 decision 13).
 //
-// ROPC grants are always offline, so no access token here ever carries sid. grantId is
+// ROPC grants are always offline, so no access token here ever carries sid. grantID is
 // generateAccessToken's.
 func (t *TokenIssuer) generateROPCAccessToken(ctx context.Context, tx *sql.Tx, settings *record.Settings, input *ROPCGrantInput, scope string,
 	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string,
-	parentRefreshToken *record.RefreshToken, grantId string) (string, error) {
+	parentRefreshToken *record.RefreshToken, grantID string) (string, error) {
 
 	tokenInput := t.createTokenInputFromROPC(input)
 	tokenInput.Scope = scope // Use the provided scope
-	tokenInput.GrantId = grantId
+	tokenInput.GrantID = grantID
 	tokenInput.GrantIsOffline = true
 
 	if parentRefreshToken == nil {
@@ -450,13 +450,13 @@ func (t *TokenIssuer) generateROPCAccessToken(ctx context.Context, tx *sql.Tx, s
 	return t.generateAccessTokenCore(ctx, tx, settings, tokenInput, now, signingKey, keyIdentifier)
 }
 
-// generateROPCIdToken creates an id_token for ROPC flow.
-func (t *TokenIssuer) generateROPCIdToken(ctx context.Context, tx *sql.Tx, settings *record.Settings, input *ROPCGrantInput, scope string,
+// generateROPCIDToken creates an id_token for ROPC flow.
+func (t *TokenIssuer) generateROPCIDToken(ctx context.Context, tx *sql.Tx, settings *record.Settings, input *ROPCGrantInput, scope string,
 	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string) (string, error) {
 
 	tokenInput := t.createTokenInputFromROPC(input)
 	tokenInput.Scope = scope // Use the provided scope
-	return t.generateIdTokenCore(ctx, tx, settings, tokenInput, now, signingKey, keyIdentifier)
+	return t.generateIDTokenCore(ctx, tx, settings, tokenInput, now, signingKey, keyIdentifier)
 }
 
 // authMethodsToArray converts a space-separated auth methods string to a JSON array

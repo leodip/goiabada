@@ -54,7 +54,7 @@ func TestAuthServerClient_GetEmailTemplateDecodesEveryFieldTheEditorBinds(t *tes
 	assert.Equal(t, "/api/v1/admin/email-templates/password_reset_link", gotPath)
 	assert.Equal(t, "Bearer an-access-token", gotAuthorization)
 
-	assert.Equal(t, "password_reset_link", email.Id)
+	assert.Equal(t, "password_reset_link", email.ID)
 	assert.True(t, email.HasButton)
 	assert.Equal(t, []api.EmailTemplatePlaceholderResponse{
 		{Name: "app_name", Required: false, InSubject: true},
@@ -86,7 +86,7 @@ func TestAuthServerClient_GetEmailTemplatesDecodesEachEmailsLanguages(t *testing
 
 	gotPath, _ := recorded()
 	assert.Equal(t, "/api/v1/admin/email-templates", gotPath)
-	assert.Equal(t, []api.EmailTemplateSummaryResponse{{Id: "welcome", Languages: []api.EmailTemplateLanguageStatusResponse{
+	assert.Equal(t, []api.EmailTemplateSummaryResponse{{ID: "welcome", Languages: []api.EmailTemplateLanguageStatusResponse{
 		{Language: "en", Status: "default"}, {Language: "de", Status: "invalid"},
 	}}}, emails)
 }

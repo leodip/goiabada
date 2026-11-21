@@ -58,8 +58,8 @@ type BrandRow struct {
 //
 // FooterLinks are the form's three rows (#814 decision 11): the links in their order, then the empty
 // rows, so a refusal naming a link by its index, and its sentence by its number, names the row of that
-// number. SupportEmail, SupportUrl and SupportPhone are the contact's three fields, as stored or as
-// sent. CustomCss is the brand's custom CSS (#816), as stored or exactly as sent.
+// number. SupportEmail, SupportURL and SupportPhone are the contact's three fields, as stored or as
+// sent. CustomCSS is the brand's custom CSS (#816), as stored or exactly as sent.
 type BrandForm struct {
 	Name          string
 	Appearance    string
@@ -78,10 +78,10 @@ type BrandForm struct {
 
 	FooterLinks  [brandFooterRows]BrandFooterLinkRow
 	SupportEmail string
-	SupportUrl   string
+	SupportURL   string
 	SupportPhone string
 
-	CustomCss string
+	CustomCSS string
 }
 
 // brandFooterRows is how many footer link rows the form draws: as many as a brand has links at most
@@ -93,13 +93,13 @@ const brandFooterRows = 3
 // empty is no link.
 type BrandFooterLinkRow struct {
 	Label  string
-	Url    string
+	URL    string
 	Labels map[string]string
 }
 
 // empty reports whether the row holds nothing: no label, no URL and no language label.
 func (row BrandFooterLinkRow) empty() bool {
-	return row.Label == "" && row.Url == "" && len(row.Labels) == 0
+	return row.Label == "" && row.URL == "" && len(row.Labels) == 0
 }
 
 // FooterLanguage is one of the built-in languages a footer link has a label of its own in: its tag,
@@ -393,9 +393,9 @@ func brandFormFrom(r *http.Request) BrandForm {
 		HideAppName:   r.PostFormValue("hideAppName") == "on",
 		FooterLinks:   footerRowsFrom(r),
 		SupportEmail:  strings.TrimSpace(r.PostFormValue("supportEmail")),
-		SupportUrl:    strings.TrimSpace(r.PostFormValue("supportUrl")),
+		SupportURL:    strings.TrimSpace(r.PostFormValue("supportUrl")),
 		SupportPhone:  strings.TrimSpace(r.PostFormValue("supportPhone")),
-		CustomCss:     r.PostFormValue("customCss"),
+		CustomCSS:     r.PostFormValue("customCss"),
 	}
 }
 
@@ -409,7 +409,7 @@ func footerRowsFrom(r *http.Request) [brandFooterRows]BrandFooterLinkRow {
 		prefix := "footerLinks-" + strconv.Itoa(i) + "-"
 		row := BrandFooterLinkRow{
 			Label: strings.TrimSpace(r.PostFormValue(prefix + "label")),
-			Url:   strings.TrimSpace(r.PostFormValue(prefix + "url")),
+			URL:   strings.TrimSpace(r.PostFormValue(prefix + "url")),
 		}
 		for _, language := range brandFooterLanguages() {
 			if label := strings.TrimSpace(r.PostFormValue(prefix + "labels-" + language.Tag)); label != "" {
@@ -437,7 +437,7 @@ func (f *BrandForm) footerLinks() []api.BrandFooterLink {
 		if row.empty() {
 			continue
 		}
-		links = append(links, api.BrandFooterLink{Url: row.Url, Label: row.Label, Labels: row.Labels})
+		links = append(links, api.BrandFooterLink{URL: row.URL, Label: row.Label, Labels: row.Labels})
 	}
 	return links
 }
@@ -450,7 +450,7 @@ func footerRowsOf(links []api.BrandFooterLinkResponse) [brandFooterRows]BrandFoo
 		if i == brandFooterRows {
 			break
 		}
-		row := BrandFooterLinkRow{Label: link.Label, Url: link.Url}
+		row := BrandFooterLinkRow{Label: link.Label, URL: link.URL}
 		if len(link.Labels) > 0 {
 			row.Labels = link.Labels
 		}
@@ -459,15 +459,15 @@ func footerRowsOf(links []api.BrandFooterLinkResponse) [brandFooterRows]BrandFoo
 	return rows
 }
 
-// brandSlotIds are the asset ids the form's slots hold, by slot, nil for an empty one.
-type brandSlotIds map[string]*int64
+// brandSlotIDs are the asset ids the form's slots hold, by slot, nil for an empty one.
+type brandSlotIDs map[string]*int64
 
-// brandSlotIdsFrom reads the form's slots, each the id of the asset it names, which the editor sets
+// brandSlotIDsFrom reads the form's slots, each the id of the asset it names, which the editor sets
 // when a file is uploaded and empties when it is removed. A slot holding no number, which the editor
 // never sends, names asset 0, which no store holds, so the admin API refuses it at its field rather
 // than the slot being emptied without a word.
-func brandSlotIdsFrom(r *http.Request) brandSlotIds {
-	ids := brandSlotIds{}
+func brandSlotIDsFrom(r *http.Request) brandSlotIDs {
+	ids := brandSlotIDs{}
 	for _, name := range brandSlots {
 		value := strings.TrimSpace(r.PostFormValue(name))
 		if value == "" {
@@ -483,31 +483,31 @@ func brandSlotIdsFrom(r *http.Request) brandSlotIds {
 }
 
 // ref names the asset slot holds, as a brand's write names it, or none for an empty slot.
-func (ids brandSlotIds) ref(slot string) *api.BrandAssetRef {
+func (ids brandSlotIDs) ref(slot string) *api.BrandAssetRef {
 	if id := ids[slot]; id != nil {
-		return &api.BrandAssetRef{Id: *id}
+		return &api.BrandAssetRef{ID: *id}
 	}
 	return nil
 }
 
 // brandAssetReadAPI is what a refused form needs to draw its slots again: each asset read by its id.
 type brandAssetReadAPI interface {
-	GetBrandAssetById(ctx context.Context, accessToken string, assetId int64) (*api.BrandAssetResponse, error)
+	GetBrandAssetByID(ctx context.Context, accessToken string, assetID int64) (*api.BrandAssetResponse, error)
 }
 
 // readFormSlots fills form's slots with the assets ids names, as a refused form is drawn again: each
 // read by its id, attached to a brand or not. An asset the admin API no longer holds, swept or never
 // stored, leaves its slot empty, for the refusal at its field to be answered with a new upload. Any
 // other failed read is answered with the page that says why.
-func readFormSlots(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, apiClient brandAssetReadAPI,
-	token string, ids brandSlotIds, form *BrandForm) bool {
+func readFormSlots(httpHelper HTTPHelper, w http.ResponseWriter, r *http.Request, apiClient brandAssetReadAPI,
+	token string, ids brandSlotIDs, form *BrandForm) bool {
 
 	for _, name := range brandSlots {
 		id := ids[name]
 		if id == nil {
 			continue
 		}
-		asset, err := apiClient.GetBrandAssetById(r.Context(), token, *id)
+		asset, err := apiClient.GetBrandAssetByID(r.Context(), token, *id)
 		if err != nil {
 			var apiErr *apiclient.APIError
 			if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound {
@@ -521,9 +521,9 @@ func readFormSlots(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request
 	return true
 }
 
-// brandIdFrom reads the brand's id from the path, answering the 404 page for one that is not a
+// brandIDFrom reads the brand's id from the path, answering the 404 page for one that is not a
 // number.
-func brandIdFrom(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request) (int64, bool) {
+func brandIDFrom(httpHelper HTTPHelper, w http.ResponseWriter, r *http.Request) (int64, bool) {
 	id, err := strconv.ParseInt(r.PathValue("brandId"), 10, 64)
 	if err != nil {
 		httpHelper.NotFound(w, r)
@@ -532,10 +532,10 @@ func brandIdFrom(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request) 
 	return id, true
 }
 
-func accessTokenFrom(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request) (string, bool) {
-	jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+func accessTokenFrom(httpHelper HTTPHelper, w http.ResponseWriter, r *http.Request) (string, bool) {
+	jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 	if !ok {
-		httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+		httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 		return "", false
 	}
 	return jwtInfo.TokenResponse.AccessToken, true
@@ -543,7 +543,7 @@ func accessTokenFrom(httpHelper HttpHelper, w http.ResponseWriter, r *http.Reque
 
 // renderBrandForm draws the brand form, new or of a stored brand, with the theme cards and the kit's
 // upload fields, and hands the preview what each theme, corner shape, font family and fit draws.
-func renderBrandForm(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, form BrandForm,
+func renderBrandForm(httpHelper HTTPHelper, w http.ResponseWriter, r *http.Request, form BrandForm,
 	palette BrandPaletteForm, themes []api.BrandThemeResponse, extra map[string]interface{}) {
 
 	options := brandThemeOptions(r.Context(), themes)
@@ -574,7 +574,7 @@ type brandingListAPI interface {
 }
 
 func HandleBrandingGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient brandingListAPI,
 ) http.HandlerFunc {
 
@@ -620,7 +620,7 @@ type brandNewAPI interface {
 // HandleBrandNewGet draws a new brand automatic, on the first theme the auth server lists, which is
 // the built-in one.
 func HandleBrandNewGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient brandThemesAPI,
 ) http.HandlerFunc {
 
@@ -645,7 +645,7 @@ func HandleBrandNewGet(
 }
 
 func HandleBrandNewPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient brandNewAPI,
 	settingsCache SettingsInvalidator,
 	baseURL string,
@@ -666,7 +666,7 @@ func HandleBrandNewPost(
 		// The slots name the files uploaded in this form, which Create attaches (#813 decision 1).
 		form := brandFormFrom(r)
 		palette := brandPaletteFormFrom(r, nil)
-		ids := brandSlotIdsFrom(r)
+		ids := brandSlotIDsFrom(r)
 		_, err = apiClient.CreateBrand(r.Context(), token, &api.CreateBrandRequest{
 			Name:          form.Name,
 			Appearance:    form.Appearance,
@@ -683,10 +683,10 @@ func HandleBrandNewPost(
 			BoldFont:      ids.ref("boldFont"),
 			FooterLinks:   form.footerLinks(),
 			SupportEmail:  form.SupportEmail,
-			SupportUrl:    form.SupportUrl,
+			SupportURL:    form.SupportURL,
 			SupportPhone:  form.SupportPhone,
 			Palette:       palette.request(form.Theme),
-			CustomCss:     form.CustomCss,
+			CustomCSS:     form.CustomCSS,
 		})
 		if err != nil {
 			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
@@ -710,7 +710,7 @@ func HandleBrandNewPost(
 // brandEditReadAPI is what a brand's page needs to be drawn: the brand and the themes.
 type brandEditReadAPI interface {
 	brandThemesAPI
-	GetBrandById(ctx context.Context, accessToken string, brandId int64) (*api.BrandResponse, error)
+	GetBrandByID(ctx context.Context, accessToken string, brandID int64) (*api.BrandResponse, error)
 }
 
 // brandEditAPI is what a brand's page needs to be saved: what it is drawn with, the uploaded files a
@@ -718,15 +718,15 @@ type brandEditReadAPI interface {
 type brandEditAPI interface {
 	brandEditReadAPI
 	brandAssetReadAPI
-	UpdateBrand(ctx context.Context, accessToken string, brandId int64, request *api.UpdateBrandRequest) (*api.BrandResponse, error)
+	UpdateBrand(ctx context.Context, accessToken string, brandID int64, request *api.UpdateBrandRequest) (*api.BrandResponse, error)
 }
 
 // readBrandPage reads what a brand's page is drawn with, answering the page that says why when it
 // cannot.
-func readBrandPage(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, apiClient brandEditReadAPI,
+func readBrandPage(httpHelper HTTPHelper, w http.ResponseWriter, r *http.Request, apiClient brandEditReadAPI,
 	token string, id int64) (*api.BrandResponse, []api.BrandThemeResponse, bool) {
 
-	brand, err := apiClient.GetBrandById(r.Context(), token, id)
+	brand, err := apiClient.GetBrandByID(r.Context(), token, id)
 	if err != nil {
 		render.HandleAPIError(httpHelper, w, r, err)
 		return nil, nil, false
@@ -744,13 +744,13 @@ func readBrandPage(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request
 // brand's page lists its failing contrast pairs, as the read answers them (#815 decision 9), which
 // is how a save's warnings are shown after the redirect back here.
 func HandleBrandGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient brandEditReadAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		id, ok := brandIdFrom(httpHelper, w, r)
+		id, ok := brandIDFrom(httpHelper, w, r)
 		if !ok {
 			return
 		}
@@ -782,7 +782,7 @@ func HandleBrandGet(
 			Logo: brand.Logo, DarkLogo: brand.DarkLogo, Favicon: brand.Favicon, Background: brand.Background,
 			RegularFont: brand.RegularFont, BoldFont: brand.BoldFont,
 			FooterLinks: footerRowsOf(brand.FooterLinks), SupportEmail: brand.SupportEmail,
-			SupportUrl: brand.SupportUrl, SupportPhone: brand.SupportPhone, CustomCss: brand.CustomCss}
+			SupportURL: brand.SupportURL, SupportPhone: brand.SupportPhone, CustomCSS: brand.CustomCSS}
 		renderBrandForm(httpHelper, w, r, form, brandPaletteFormOf(brand, themes, brand.Theme), themes, map[string]interface{}{
 			"isNew":             false,
 			"storedBrand":       *brand,
@@ -795,7 +795,7 @@ func HandleBrandGet(
 }
 
 func HandleBrandPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient brandEditAPI,
 	settingsCache SettingsInvalidator,
@@ -803,7 +803,7 @@ func HandleBrandPost(
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		id, ok := brandIdFrom(httpHelper, w, r)
+		id, ok := brandIDFrom(httpHelper, w, r)
 		if !ok {
 			return
 		}
@@ -822,7 +822,7 @@ func HandleBrandPost(
 		// form holds them.
 		form := brandFormFrom(r)
 		palette := brandPaletteFormFrom(r, brand)
-		ids := brandSlotIdsFrom(r)
+		ids := brandSlotIDsFrom(r)
 		_, err := apiClient.UpdateBrand(r.Context(), token, id, &api.UpdateBrandRequest{
 			Name:          form.Name,
 			Appearance:    form.Appearance,
@@ -839,10 +839,10 @@ func HandleBrandPost(
 			BoldFont:      ids.ref("boldFont"),
 			FooterLinks:   form.footerLinks(),
 			SupportEmail:  form.SupportEmail,
-			SupportUrl:    form.SupportUrl,
+			SupportURL:    form.SupportURL,
 			SupportPhone:  form.SupportPhone,
 			Palette:       palette.request(form.Theme),
-			CustomCss:     form.CustomCss,
+			CustomCSS:     form.CustomCSS,
 		})
 		if err != nil {
 			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
@@ -866,7 +866,7 @@ func HandleBrandPost(
 }
 
 // redirectToBrandWithFlash goes back to the brand's page, which says once what flash names.
-func redirectToBrandWithFlash(httpHelper HttpHelper, httpSession sessionstore.Store, w http.ResponseWriter,
+func redirectToBrandWithFlash(httpHelper HTTPHelper, httpSession sessionstore.Store, w http.ResponseWriter,
 	r *http.Request, baseURL string, id int64, flash string) {
 
 	sess, err := httpSession.Get(r, builtin.AdminConsoleSessionName)
@@ -886,13 +886,13 @@ func redirectToBrandWithFlash(httpHelper HttpHelper, httpSession sessionstore.St
 
 // brandMakeDefaultAPI is what Make default needs: the write.
 type brandMakeDefaultAPI interface {
-	MakeBrandDefault(ctx context.Context, accessToken string, brandId int64) (*api.BrandResponse, error)
+	MakeBrandDefault(ctx context.Context, accessToken string, brandID int64) (*api.BrandResponse, error)
 }
 
 // HandleBrandMakeDefaultPost makes a brand the default, which draws in it at once every client with
 // no brand of its own, and the pages that belong to no client.
 func HandleBrandMakeDefaultPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient brandMakeDefaultAPI,
 	settingsCache SettingsInvalidator,
@@ -900,7 +900,7 @@ func HandleBrandMakeDefaultPost(
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		id, ok := brandIdFrom(httpHelper, w, r)
+		id, ok := brandIDFrom(httpHelper, w, r)
 		if !ok {
 			return
 		}
@@ -923,14 +923,14 @@ func HandleBrandMakeDefaultPost(
 // and the deletion.
 type brandDeleteAPI interface {
 	GetAllBrands(ctx context.Context, accessToken string) ([]api.BrandResponse, error)
-	GetBrandById(ctx context.Context, accessToken string, brandId int64) (*api.BrandResponse, error)
-	DeleteBrand(ctx context.Context, accessToken string, brandId int64) error
+	GetBrandByID(ctx context.Context, accessToken string, brandID int64) (*api.BrandResponse, error)
+	DeleteBrand(ctx context.Context, accessToken string, brandID int64) error
 }
 
 // renderBrandDelete draws the delete confirmation. For a brand that is not the default it says how
 // many clients use it and, when any does, names the default brand they will move to, read from the
 // brands the auth server marks it among.
-func renderBrandDelete(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, apiClient brandDeleteAPI,
+func renderBrandDelete(httpHelper HTTPHelper, w http.ResponseWriter, r *http.Request, apiClient brandDeleteAPI,
 	token string, brand api.BrandResponse, message string) {
 
 	bind := map[string]interface{}{
@@ -963,12 +963,12 @@ func renderBrandDelete(httpHelper HttpHelper, w http.ResponseWriter, r *http.Req
 // HandleBrandDeleteGet draws the delete confirmation, which for the default brand says it cannot
 // be deleted.
 func HandleBrandDeleteGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient brandDeleteAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		id, ok := brandIdFrom(httpHelper, w, r)
+		id, ok := brandIDFrom(httpHelper, w, r)
 		if !ok {
 			return
 		}
@@ -977,7 +977,7 @@ func HandleBrandDeleteGet(
 			return
 		}
 
-		brand, err := apiClient.GetBrandById(r.Context(), token, id)
+		brand, err := apiClient.GetBrandByID(r.Context(), token, id)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -991,14 +991,14 @@ func HandleBrandDeleteGet(
 // the default under the settings row's lock, so a brand made the default after the page was drawn
 // is refused there, and the page says so.
 func HandleBrandDeletePost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient brandDeleteAPI,
 	settingsCache SettingsInvalidator,
 	baseURL string,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		id, ok := brandIdFrom(httpHelper, w, r)
+		id, ok := brandIDFrom(httpHelper, w, r)
 		if !ok {
 			return
 		}
@@ -1007,7 +1007,7 @@ func HandleBrandDeletePost(
 			return
 		}
 
-		brand, err := apiClient.GetBrandById(r.Context(), token, id)
+		brand, err := apiClient.GetBrandByID(r.Context(), token, id)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return

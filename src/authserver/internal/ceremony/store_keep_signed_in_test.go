@@ -25,8 +25,8 @@ func signedInStep(t *testing.T, ceremonyStore *Store, store *sessionstore.Server
 
 	t.Helper()
 	values := map[string]any{
-		sessionkeys.AuthContexts: heldJSON(t, &AuthContext{CeremonyId: ceremonyA, ClientId: "client-a",
-			UserId: userA, AuthState: AuthStateAuthenticationCompleted}),
+		sessionkeys.AuthContexts: heldJSON(t, &AuthContext{CeremonyID: ceremonyA, ClientID: "client-a",
+			UserID: userA, AuthState: AuthStateAuthenticationCompleted}),
 		sessionkeys.SessionIdentifier: "the-earlier-user-session",
 	}
 	if earlier != nil {
@@ -37,7 +37,7 @@ func signedInStep(t *testing.T, ceremonyStore *Store, store *sessionstore.Server
 	stepReq := namingRequest(http.MethodGet, cookies, ceremonyA, "")
 	loaded, err := ceremonyStore.GetAuthContext(stepReq)
 	require.NoError(t, err)
-	require.Equal(t, ceremonyA, loaded.CeremonyId)
+	require.Equal(t, ceremonyA, loaded.CeremonyID)
 	return cookies, stepReq
 }
 
@@ -185,8 +185,8 @@ func stampedStep(t *testing.T, ceremonyStore *Store, store *sessionstore.ServerS
 
 	t.Helper()
 	values := map[string]any{
-		sessionkeys.AuthContexts: heldJSON(t, &AuthContext{CeremonyId: ceremonyA, ClientId: "client-a",
-			UserId: userA, AuthState: AuthStateAuthenticationCompleted, PasswordVerifiedAt: passwordAt}),
+		sessionkeys.AuthContexts: heldJSON(t, &AuthContext{CeremonyID: ceremonyA, ClientID: "client-a",
+			UserID: userA, AuthState: AuthStateAuthenticationCompleted, PasswordVerifiedAt: passwordAt}),
 		sessionkeys.SessionIdentifier: "the-earlier-user-session",
 	}
 	if earlier != nil {

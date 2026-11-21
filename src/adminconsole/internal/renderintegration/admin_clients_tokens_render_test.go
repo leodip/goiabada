@@ -37,7 +37,7 @@ type tokensTabAPI struct {
 	dpopRefusal string
 }
 
-func (s *tokensTabAPI) GetClientById(_ context.Context, _ string, _ int64) (*api.ClientResponse, error) {
+func (s *tokensTabAPI) GetClientByID(_ context.Context, _ string, _ int64) (*api.ClientResponse, error) {
 	return s.stored, nil
 }
 
@@ -45,7 +45,7 @@ func (s *tokensTabAPI) GetClientById(_ context.Context, _ string, _ int64) (*api
 // left out of the access token, and an hour's token lifetime.
 func (s *tokensTabAPI) GetSettingsTokens(_ context.Context, _ string) (*api.SettingsTokensResponse, error) {
 	return &api.SettingsTokensResponse{TokenExpirationInSeconds: 3600, RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
-		RefreshTokenOfflineMaxLifetimeInSeconds: 2592000, IncludeOpenIDConnectClaimsInIdToken: true}, nil
+		RefreshTokenOfflineMaxLifetimeInSeconds: 2592000, IncludeOpenIDConnectClaimsInIDToken: true}, nil
 }
 
 func (s *tokensTabAPI) UpdateClientTokens(_ context.Context, _ string, _ int64,
@@ -67,12 +67,12 @@ func (s *tokensTabAPI) UpdateClientDPoP(_ context.Context, _ string, _ int64,
 // storedTokensClient is the client as stored: every duration a number, and the two OpenID Connect
 // claims choices each a different one of the three values.
 func storedTokensClient() *api.ClientResponse {
-	return &api.ClientResponse{Id: 7, ClientIdentifier: "portal", Enabled: true,
+	return &api.ClientResponse{ID: 7, ClientIdentifier: "portal", Enabled: true,
 		TokenExpirationInSeconds:                300,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 3600,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 86400,
 		IncludeOpenIDConnectClaimsInAccessToken: "default",
-		IncludeOpenIDConnectClaimsInIdToken:     "on",
+		IncludeOpenIDConnectClaimsInIDToken:     "on",
 	}
 }
 

@@ -12,11 +12,11 @@ import (
 // heldCeremonies is the sign-ins a test's browser holds, by ceremony id.
 type heldCeremonies map[string]*ceremony.AuthContext
 
-func (h heldCeremonies) HeldAuthContext(_ *http.Request, ceremonyId string) (*ceremony.AuthContext, error) {
+func (h heldCeremonies) HeldAuthContext(_ *http.Request, ceremonyID string) (*ceremony.AuthContext, error) {
 	if len(h) == 0 {
 		return nil, ceremony.ErrNoAuthContext
 	}
-	authContext, ok := h[ceremonyId]
+	authContext, ok := h[ceremonyID]
 	if !ok {
 		return nil, ceremony.ErrCeremonyNotHeld
 	}

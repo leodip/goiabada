@@ -19,12 +19,12 @@ import (
 // set.
 type userGroupsAPI interface {
 	GetAllGroups(ctx context.Context, accessToken string) ([]api.GroupResponse, error)
-	GetUserGroups(ctx context.Context, accessToken string, userId int64) (*api.UserResponse, []api.GroupResponse, error)
-	UpdateUserGroups(ctx context.Context, accessToken string, userId int64, request *api.UpdateUserGroupsRequest) (*api.UserResponse, []api.GroupResponse, error)
+	GetUserGroups(ctx context.Context, accessToken string, userID int64) (*api.UserResponse, []api.GroupResponse, error)
+	UpdateUserGroups(ctx context.Context, accessToken string, userID int64, request *api.UpdateUserGroupsRequest) (*api.UserResponse, []api.GroupResponse, error)
 }
 
 func HandleGroupsGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient userGroupsAPI,
 ) http.HandlerFunc {
@@ -44,9 +44,9 @@ func HandleGroupsGet(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
@@ -60,7 +60,7 @@ func HandleGroupsGet(
 		// The groups the user belongs to, in the order the tab lists them: by identifier.
 		memberships := make([]groupMembership, 0, len(userGroups))
 		for _, grp := range userGroups {
-			memberships = append(memberships, groupMembership{Id: grp.Id, GroupIdentifier: grp.GroupIdentifier})
+			memberships = append(memberships, groupMembership{ID: grp.ID, GroupIdentifier: grp.GroupIdentifier})
 		}
 		sort.Slice(memberships, func(i, j int) bool {
 			return memberships[i].GroupIdentifier < memberships[j].GroupIdentifier
@@ -106,7 +106,7 @@ func HandleGroupsGet(
 }
 
 func HandleGroupsPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient userGroupsAPI,
 ) http.HandlerFunc {
@@ -126,9 +126,9 @@ func HandleGroupsPost(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JSONError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.JSONError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
@@ -147,8 +147,8 @@ func HandleGroupsPost(
 
 		// Create API request for updating user groups
 		request := &api.UpdateUserGroupsRequest{
-			GroupIds:         data.AssignedGroupsIds,
-			ExpectedGroupIds: data.ExpectedGroupIds,
+			GroupIDs:         data.AssignedGroupsIDs,
+			ExpectedGroupIDs: data.ExpectedGroupIDs,
 		}
 
 		// Call API to update user groups (this handles all the business logic including audit logging)

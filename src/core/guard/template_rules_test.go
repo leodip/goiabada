@@ -78,13 +78,13 @@ func TestTemplates_TheTitleTable(t *testing.T) {
 	assert.Equal(t, 7, n)
 }
 
-// TestTemplates_TheCsrfFieldTable holds the csrfField rule: the spelling anywhere in a template is
+// TestTemplates_TheCSRFFieldTable holds the csrfField rule: the spelling anywhere in a template is
 // rejected, in an action or not, and nothing else is.
 //
 // The "spelled around" row is the boundary the guard's own comment claims, asserted rather than
 // stated: an escape that reads the same runtime key is not found. A row that changes it is a change
 // to the guard, not a bug in the fixture.
-func TestTemplates_TheCsrfFieldTable(t *testing.T) {
+func TestTemplates_TheCSRFFieldTable(t *testing.T) {
 	fsys := fstest.MapFS{
 		// Rejected: the spelling, however it is reached.
 		"template/action.html":  {Data: []byte(`<form>{{ .csrfField }}</form>`)},
@@ -96,7 +96,7 @@ func TestTemplates_TheCsrfFieldTable(t *testing.T) {
 		"template/similar.html": {Data: []byte(`<input name="csrfToken">`)},
 	}
 
-	found, n := runRule(t, fsys, findCsrfField)
+	found, n := runRule(t, fsys, findCSRFField)
 
 	assert.Equal(t, []string{
 		"template/action.html",
@@ -106,7 +106,7 @@ func TestTemplates_TheCsrfFieldTable(t *testing.T) {
 	assert.Equal(t, 6, n)
 }
 
-// TestTemplates_TheHtmlLangTable holds the hardcoded-lang rule, which is scoped by path: only under a
+// TestTemplates_TheHTMLLangTable holds the hardcoded-lang rule, which is scoped by path: only under a
 // layouts/ directory. An email layout is held to it like any other: the bodies are per-locale sibling
 // files, but the one layout they are drawn in is shared, so a hardcoded "en" marked every pt-BR email
 // English (#645 decision 10).
@@ -116,7 +116,7 @@ func TestTemplates_TheCsrfFieldTable(t *testing.T) {
 // copies drew it before this lift and the lift does not move it: "en" is the value a copied layout
 // actually carries, and widening to any literal lang would need the locale-driven spelling
 // enumerated instead, which is a different rule.
-func TestTemplates_TheHtmlLangTable(t *testing.T) {
+func TestTemplates_TheHTMLLangTable(t *testing.T) {
 	hardcoded := []byte(`<html lang="en" class="h-full">`)
 	driven := []byte(`<html lang="{{ Lang $.ctx }}" class="h-full">`)
 
@@ -280,12 +280,12 @@ func TestTemplates_TheGuardsFailOnATreeThatBreaksEachRule(t *testing.T) {
 	assert.Contains(t, title.Text(), "<b>Users</b>")
 	assert.Contains(t, title.Text(), "renders literally in <title>")
 
-	csrf := Run(func(r Reporter) { assertTemplatesNoCsrfField(r, fsys, "template") })
+	csrf := Run(func(r Reporter) { assertTemplatesNoCSRFField(r, fsys, "template") })
 	require.True(t, csrf.Failed(), "a csrfField occurrence passed the guard")
 	assert.Contains(t, csrf.Text(), "template/page.html")
 	assert.Contains(t, csrf.Text(), "#155")
 
-	lang := Run(func(r Reporter) { assertTemplatesHtmlLangNotHardcoded(r, fsys, "template") })
+	lang := Run(func(r Reporter) { assertTemplatesHTMLLangNotHardcoded(r, fsys, "template") })
 	require.True(t, lang.Failed(), "a hardcoded lang attribute passed the guard")
 	assert.Contains(t, lang.Text(), "template/layouts/base.html")
 	assert.Contains(t, lang.Text(), "template/layouts/email_layout.html")
@@ -310,9 +310,9 @@ func TestTemplates_TheGuardsPassACleanTree(t *testing.T) {
 
 	for name, guard := range map[string]func(Reporter, fstest.MapFS, string){
 		"title": func(r Reporter, f fstest.MapFS, root string) { assertTemplatesNoHTMLInTitle(r, f, root) },
-		"csrf":  func(r Reporter, f fstest.MapFS, root string) { assertTemplatesNoCsrfField(r, f, root) },
+		"csrf":  func(r Reporter, f fstest.MapFS, root string) { assertTemplatesNoCSRFField(r, f, root) },
 		"lang": func(r Reporter, f fstest.MapFS, root string) {
-			assertTemplatesHtmlLangNotHardcoded(r, f, root)
+			assertTemplatesHTMLLangNotHardcoded(r, f, root)
 		},
 		"newTab": func(r Reporter, f fstest.MapFS, root string) {
 			assertTemplatesNewTabLinksSaySo(r, f, root)
@@ -351,7 +351,7 @@ func TestTemplates_AWalkThatReachesNothingFailsEveryGuard(t *testing.T) {
 func TestTemplates_AMissingRootIsFatalRatherThanEmpty(t *testing.T) {
 	fsys := fstest.MapFS{"static/app.css": {Data: []byte("body{}")}}
 
-	report := Run(func(r Reporter) { assertTemplatesNoCsrfField(r, fsys, "template") })
+	report := Run(func(r Reporter) { assertTemplatesNoCSRFField(r, fsys, "template") })
 
 	require.True(t, report.Stopped)
 	assert.Contains(t, report.Fatal, "walking templates under template")

@@ -21,7 +21,7 @@ func (m *BearerToken) RequireBearerTokenScope(requiredScope string) func(http.Ha
 // RequireBearerTokenScopeAnyOf requires a bearer token carrying ANY of requiredScopes (OR logic).
 //
 // No token in the context is a request that presented no bearer credential, since
-// JwtAuthorizationHeaderToContext has already refused every presented token it did not store. It
+// JWTAuthorizationHeaderToContext has already refused every presented token it did not store. It
 // is answered 401 with challenges that carry no error: RFC 6750 section 3.1, a request lacking any
 // authentication information SHOULD NOT be told an error code (#435).
 func (m *BearerToken) RequireBearerTokenScopeAnyOf(requiredScopes []string) func(http.Handler) http.Handler {
@@ -72,7 +72,7 @@ func (m *BearerToken) RequireBearerTokenScopeAnyOf(requiredScopes []string) func
 // the client_credentials claim set is built separately and never contains it.
 //
 // What reaches it is an access token issued for authserver, a user's or a client's:
-// JwtAuthorizationHeaderToContext stores a token in this context key only after
+// JWTAuthorizationHeaderToContext stores a token in this context key only after
 // DecodeAndValidateTokenString succeeds and only when its typ is Bearer and its aud names
 // authserver, so refresh and ID tokens never get here (#401), and this guard's one question
 // is which of the two access-token kinds it holds.
@@ -132,10 +132,10 @@ func (m *BearerToken) RequireUserBoundToken() func(http.Handler) http.Handler {
 // check finds no user to check anything about. The middleware also passes through when the request has no bearer token at all, since
 // enforcing "must be authenticated" belongs to a scope middleware running alongside this one.
 //
-// A live user's token puts that user's id on the context with reqctx.WithActingUserId, the user
+// A live user's token puts that user's id on the context with reqctx.WithActingUserID, the user
 // the check has just read, so the audit logger records who acted without reading the user again.
 //
-// Reads reqctx.BearerTokenFrom (set by JwtAuthorizationHeaderToContext),
+// Reads reqctx.BearerTokenFrom (set by JWTAuthorizationHeaderToContext),
 // not reqctx.ValidatedTokenFrom, so it works regardless of whether a scope
 // middleware ran first.
 func (m *BearerToken) RequireValidSession(database liveness.Database) func(http.Handler) http.Handler {
@@ -170,7 +170,7 @@ func (m *BearerToken) RequireValidSession(database liveness.Database) func(http.
 				// audit logger records as its logged_in_user_id; a client credentials token has
 				// none (#780 decision 2).
 				if verdict.User != nil {
-					r = r.WithContext(reqctx.WithActingUserId(r.Context(), verdict.User.Id))
+					r = r.WithContext(reqctx.WithActingUserID(r.Context(), verdict.User.ID))
 				}
 				next.ServeHTTP(w, r)
 				return
@@ -211,25 +211,25 @@ func (m *BearerToken) RequireValidSession(database liveness.Database) func(http.
 			case liveness.UserNotFound:
 				slog.WarnContext(r.Context(), "rejecting bearer token: subject does not resolve to a user")
 			case liveness.UserDisabled:
-				slog.WarnContext(r.Context(), "rejecting bearer token: user account is disabled", "user_id", verdict.User.Id)
+				slog.WarnContext(r.Context(), "rejecting bearer token: user account is disabled", "user_id", verdict.User.ID)
 			case liveness.TokenGenerationSuperseded:
 				slog.WarnContext(r.Context(), "rejecting bearer token: superseded authentication generation",
-					"user_id", verdict.User.Id)
+					"user_id", verdict.User.ID)
 			case liveness.SessionNotFound:
 				slog.WarnContext(r.Context(), "rejecting bearer token: underlying user session has been terminated",
 					"session_identifier", sid)
 			case liveness.SessionOfAnotherUser:
 				slog.WarnContext(r.Context(), "rejecting bearer token: session belongs to a different user",
-					"session_identifier", sid, "session_id", verdict.Session.Id,
-					"session_user_id", verdict.Session.UserId, "user_id", verdict.User.Id)
+					"session_identifier", sid, "session_id", verdict.Session.ID,
+					"session_user_id", verdict.Session.UserID, "user_id", verdict.User.ID)
 			case liveness.SessionExpired:
 				slog.WarnContext(r.Context(), "rejecting bearer token: underlying user session has expired",
-					"session_identifier", sid, "session_id", verdict.Session.Id)
+					"session_identifier", sid, "session_id", verdict.Session.ID)
 				m.refusals.invalidToken(w, r, "Session has expired", schemesOf(r.Context()))
 				return
 			case liveness.SessionGenerationSuperseded:
 				slog.WarnContext(r.Context(), "rejecting bearer token: session is on a superseded authentication generation",
-					"session_identifier", sid, "session_id", verdict.Session.Id, "user_id", verdict.User.Id)
+					"session_identifier", sid, "session_id", verdict.Session.ID, "user_id", verdict.User.ID)
 			default:
 				slog.WarnContext(r.Context(), "rejecting bearer token: liveness check refused it", "refusal", int(verdict.Refusal))
 			}
@@ -245,8 +245,8 @@ func (m *BearerToken) RequireValidSession(database liveness.Database) func(http.
 // sign-in, the recover command and a client credentials token answer none (#780 decision 2).
 type ActingUser struct{}
 
-func (ActingUser) ActingUserId(ctx context.Context) (int64, bool) {
-	return reqctx.ActingUserIdFrom(ctx)
+func (ActingUser) ActingUserID(ctx context.Context) (int64, bool) {
+	return reqctx.ActingUserIDFrom(ctx)
 }
 
 // RequireAdminConsoleClient admits only an access token issued to the admin console's own client,
@@ -327,7 +327,7 @@ func (m *BearerToken) RequireBearerTokenScopeSetAnyOf(requiredScopeSets [][]stri
 }
 
 // holdsEveryScopeOfASet reports whether the token carries every scope of at least one set.
-func holdsEveryScopeOfASet(jwtToken oauth.JwtToken, sets [][]string) bool {
+func holdsEveryScopeOfASet(jwtToken oauth.JWTToken, sets [][]string) bool {
 	for _, set := range sets {
 		holdsAll := true
 		for _, scope := range set {

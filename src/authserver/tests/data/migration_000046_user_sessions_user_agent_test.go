@@ -57,8 +57,8 @@ func TestMigration000046_UserSessionsUserAgent(t *testing.T) {
 
 	// Decision 7's legacy row, seeded exactly as a pre-upgrade row arrives: a session written by
 	// a binary that did not know the column, which the migration defaults rather than backfills.
-	userId := seedUser000046(t, h)
-	legacy := seedSessionWithoutUserAgent000046(t, h, userId)
+	userID := seedUser000046(t, h)
+	legacy := seedSessionWithoutUserAgent000046(t, h, userID)
 
 	assert.Empty(t, userAgentOf000046(t, h, legacy),
 		"a row inserted without user_agent must read back empty: that is what leaves a legacy row sweepable only by another header-less client")
@@ -69,14 +69,14 @@ func TestMigration000046_UserSessionsUserAgent(t *testing.T) {
 	if err := h.Migrator.Up(context.Background()); err != nil && !errors.Is(err, migrator.ErrNoChange) {
 		require.NoError(t, err, "migrate to head for the round trips")
 	}
-	assertUserAgentRoundTrip000046(t, h, userId, "512 ASCII bytes", strings.Repeat("a", 512))
+	assertUserAgentRoundTrip000046(t, h, userID, "512 ASCII bytes", strings.Repeat("a", 512))
 
 	// 128 emoji, 4 bytes each. The rune count is asserted beside the byte length so a later edit
 	// to the literal cannot quietly turn this into a second ASCII case.
 	fourByteRunes := strings.Repeat("\U0001F600", 128)
 	require.Len(t, fourByteRunes, 512, "the 4-byte-rune fixture must be exactly 512 bytes")
 	require.Equal(t, 128, utf8.RuneCountInString(fourByteRunes), "512 bytes of 4-byte runes is 128 runes")
-	assertUserAgentRoundTrip000046(t, h, userId, "512 bytes of 4-byte runes", fourByteRunes)
+	assertUserAgentRoundTrip000046(t, h, userID, "512 bytes of 4-byte runes", fourByteRunes)
 
 	require.NoError(t, h.Migrator.Migrate(context.Background(), 45), "roll back 000046")
 	_, exists = columnNames000046(dumpTable(t, h, "user_sessions"))["user_agent"]
@@ -118,7 +118,7 @@ func assertUserAgentColumn000046(t *testing.T, h *isolatedDB, phase string) {
 // GetUserSessionBySessionIdentifier, which is the path StartNewUserSession uses. Byte for byte: a
 // value silently truncated or re-encoded by the driver would still be a string of the right shape,
 // and the sweep compares these for equality.
-func assertUserAgentRoundTrip000046(t *testing.T, h *isolatedDB, userId int64, name, userAgent string) {
+func assertUserAgentRoundTrip000046(t *testing.T, h *isolatedDB, userID int64, name, userAgent string) {
 	t.Helper()
 
 	t.Run(name, func(t *testing.T) {
@@ -130,15 +130,15 @@ func assertUserAgentRoundTrip000046(t *testing.T, h *isolatedDB, userId int64, n
 			Started:           now,
 			LastAccessed:      now,
 			AuthMethods:       "pwd",
-			AcrLevel:          "urn:goiabada:level1",
+			ACRLevel:          "urn:goiabada:level1",
 			AuthTime:          now,
 			PasswordAuthTime:  now,
-			IpAddress:         "127.0.0.1",
+			IPAddress:         "127.0.0.1",
 			DeviceName:        "device",
 			DeviceType:        "Desktop",
 			DeviceOS:          "Linux",
 			UserAgent:         userAgent,
-			UserId:            userId,
+			UserID:            userID,
 		}
 		require.NoErrorf(t, h.DB.CreateUserSession(context.Background(), nil, session), "create a session carrying %s", name)
 
@@ -202,7 +202,7 @@ func seedUser000046(t *testing.T, h *isolatedDB) int64 {
 // column, so only a hand-written statement can stand in for a row a pre-upgrade binary wrote.
 //
 // The datetime literal is one string for all four engines, per seedPreMigration000031Session.
-func seedSessionWithoutUserAgent000046(t *testing.T, h *isolatedDB, userId int64) string {
+func seedSessionWithoutUserAgent000046(t *testing.T, h *isolatedDB, userID int64) string {
 	t.Helper()
 
 	const ts = "'2026-01-01 00:00:00'"
@@ -212,7 +212,7 @@ func seedSessionWithoutUserAgent000046(t *testing.T, h *isolatedDB, userId int64
 		 ip_address, device_name, device_type, device_os, user_id)
 		VALUES ('%s', %s, %s, 'pwd', 'urn:goiabada:level1', %s,
 		 '127.0.0.1', 'device', 'Desktop', 'Linux', %d)`,
-		identifier, ts, ts, ts, userId)
+		identifier, ts, ts, ts, userID)
 	_, err := h.SQL.Exec(q)
 	require.NoError(t, err, "seed a session with no user_agent, as a pre-upgrade binary wrote it")
 	return identifier

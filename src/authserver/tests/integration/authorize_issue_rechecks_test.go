@@ -71,17 +71,17 @@ func disableTheUser(t *testing.T, parked *parkedCeremony) {
 func moveTheGenerationOn(t *testing.T, parked *parkedCeremony) {
 	tx, err := database.BeginTransaction(context.Background())
 	require.NoError(t, err)
-	_, err = database.IncrementUserAuthStateGeneration(context.Background(), tx, parked.user.Id)
+	_, err = database.IncrementUserAuthStateGeneration(context.Background(), tx, parked.user.ID)
 	require.NoError(t, err)
 	require.NoError(t, database.CommitTransaction(context.Background(), tx))
 }
 
 func endTheSession(t *testing.T, parked *parkedCeremony) {
-	sessions, err := database.GetUserSessionsByUserId(context.Background(), nil, parked.user.Id)
+	sessions, err := database.GetUserSessionsByUserID(context.Background(), nil, parked.user.ID)
 	require.NoError(t, err)
 	require.NotEmpty(t, sessions, "the ceremony created a session before the consent")
 	for _, session := range sessions {
-		require.NoError(t, database.DeleteUserSession(context.Background(), nil, session.Id))
+		require.NoError(t, database.DeleteUserSession(context.Background(), nil, session.ID))
 	}
 }
 
@@ -248,13 +248,13 @@ func TestIssue_ACeremonyWithNothingChangedStillIssues(t *testing.T) {
 func TestIssue_AnImplicitSignInKeepsThePictureClaim(t *testing.T) {
 	changeSettings(t, func(settings *record.Settings) {
 		settings.IncludeOpenIDConnectClaimsInAccessToken = true
-		settings.IncludeOpenIDConnectClaimsInIdToken = true
+		settings.IncludeOpenIDConnectClaimsInIDToken = true
 	})
 
 	parked := parkCeremonyOnConsentScreen(t, "id_token token", "openid profile", fake.LetterN(32), testCodeVerifier, nil)
 	defer func() { _ = parked.consentPage.Body.Close() }()
 	require.NoError(t, database.CreateUserProfilePicture(context.Background(), nil, &record.UserProfilePicture{
-		UserId:      parked.user.Id,
+		UserID:      parked.user.ID,
 		Picture:     createTestPNGImage(64, 64),
 		ContentType: "image/png",
 	}))

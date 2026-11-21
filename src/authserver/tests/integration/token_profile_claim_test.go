@@ -19,7 +19,7 @@ import (
 // deployment's.
 func TestToken_Profile_IsTheAdminConsolesProfilePage(t *testing.T) {
 	changeSettings(t, func(settings *record.Settings) {
-		settings.IncludeOpenIDConnectClaimsInIdToken = true
+		settings.IncludeOpenIDConnectClaimsInIDToken = true
 		settings.IncludeOpenIDConnectClaimsInAccessToken = true
 	})
 	want := appConfig.AdminConsole.BaseURL + "/account/profile"

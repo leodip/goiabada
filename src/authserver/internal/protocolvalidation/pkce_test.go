@@ -230,7 +230,7 @@ func TestValidateTokenRequest_CodeVerifierGrammar(t *testing.T) {
 		clientSecretEncrypted, err := testDataCipher.Encrypt(clientSecret)
 		require.NoError(t, err)
 		client := &record.Client{
-			Id: 1, ClientIdentifier: "client1", Enabled: true, AuthorizationCodeEnabled: true,
+			ID: 1, ClientIdentifier: "client1", Enabled: true, AuthorizationCodeEnabled: true,
 			ClientSecretEncrypted: clientSecretEncrypted,
 		}
 		codeEntity := &record.Code{
@@ -238,9 +238,9 @@ func TestValidateTokenRequest_CodeVerifierGrammar(t *testing.T) {
 			RedirectURI:         redirectURI,
 			CodeChallenge:       sql.NullString{String: oauth.GeneratePKCECodeChallenge(testCodeVerifier), Valid: true},
 			AuthStateGeneration: 3,
-			UserId:              7,
+			UserID:              7,
 			Client:              record.Client{ClientIdentifier: "client1"},
-			User:                record.User{Id: 7, Enabled: enabled, AuthStateGeneration: 3},
+			User:                record.User{ID: 7, Enabled: enabled, AuthStateGeneration: 3},
 			CreatedAt:           sql.NullTime{Time: time.Now().UTC(), Valid: true},
 		}
 
@@ -253,7 +253,7 @@ func TestValidateTokenRequest_CodeVerifierGrammar(t *testing.T) {
 
 		return validator.ValidateTokenRequest(context.Background(), &record.Settings{}, &ValidateTokenRequestInput{
 			GrantType:    "authorization_code",
-			ClientId:     "client1",
+			ClientID:     "client1",
 			ClientSecret: secret,
 			Code:         "valid_code",
 			RedirectURI:  redirectURI,
@@ -330,17 +330,17 @@ func TestValidateTokenRequest_MalformedVerifierOnAReusedCodeDoesNotCascade(t *te
 	validator := NewTokenValidator(mockDB, protocolvalidationmocks.NewTokenParser(t),
 		protocolvalidationmocks.NewPermissionChecker(t), testDataCipher)
 
-	client := &record.Client{Id: 1, ClientIdentifier: "client1", Enabled: true, AuthorizationCodeEnabled: true, IsPublic: true}
+	client := &record.Client{ID: 1, ClientIdentifier: "client1", Enabled: true, AuthorizationCodeEnabled: true, IsPublic: true}
 	// A code already redeemed, so the retry lookup with used=true finds it. It is older than the
 	// expiry window, which shows the grammar refusal is read above that check too.
 	codeEntity := &record.Code{
-		Id:                42,
+		ID:                42,
 		CodeHash:          "hash_of_reused_code",
 		RedirectURI:       "https://example.com/callback",
-		ClientId:          client.Id,
+		ClientID:          client.ID,
 		Client:            *client,
-		UserId:            1,
-		User:              record.User{Id: 1, Enabled: true},
+		UserID:            1,
+		User:              record.User{ID: 1, Enabled: true},
 		CodeChallenge:     sql.NullString{String: oauth.GeneratePKCECodeChallenge(testCodeVerifier), Valid: true},
 		CreatedAt:         sql.NullTime{Time: time.Now().UTC().Add(-10 * time.Minute), Valid: true},
 		SessionIdentifier: "session-abc",
@@ -354,7 +354,7 @@ func TestValidateTokenRequest_MalformedVerifierOnAReusedCodeDoesNotCascade(t *te
 
 	_, err := validator.ValidateTokenRequest(context.Background(), &record.Settings{}, &ValidateTokenRequestInput{
 		GrantType:    "authorization_code",
-		ClientId:     "client1",
+		ClientID:     "client1",
 		Code:         "reused_code",
 		RedirectURI:  "https://example.com/callback",
 		CodeVerifier: testCodeVerifier[:42],

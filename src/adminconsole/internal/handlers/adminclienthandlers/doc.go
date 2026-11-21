@@ -7,7 +7,7 @@
 // A handler answers a page or JSON, never both, and passes an admin API failure to render's
 // classifiers. A save replacing a list, the redirect URIs, sign-out redirect URIs, web origins and
 // permissions, sends the list as the page loaded it, so the API refuses it when another save got
-// there first (#428). HttpHelper is declared here rather than imported from the parent handlers
+// there first (#428). HTTPHelper is declared here rather than imported from the parent handlers
 // package, and each handler names the API methods it calls in an unexported port beside it (#386,
 // #440).
 package adminclienthandlers

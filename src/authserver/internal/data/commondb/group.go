@@ -21,12 +21,12 @@ var groupColumns = columnList{
 // scanGroup reads one row selected with groupColumns.
 func scanGroup(row rowScanner, group *record.Group) error {
 	return row.Scan(
-		&group.Id,
+		&group.ID,
 		&group.CreatedAt,
 		&group.UpdatedAt,
 		&group.GroupIdentifier,
 		&group.Description,
-		&group.IncludeInIdToken,
+		&group.IncludeInIDToken,
 		&group.IncludeInAccessToken,
 	)
 }
@@ -54,7 +54,7 @@ var updateGroup = statement{
 		`include_in_access_token = @p5 WHERE id = @p6`,
 }
 
-var selectGroupById = statement{
+var selectGroupByID = statement{
 	sqlite:   "SELECT " + groupColumns.sqlite + ` FROM "groups" WHERE id = ?`,
 	mysql:    "SELECT " + groupColumns.mysql + " FROM `groups` WHERE id = ?",
 	postgres: "SELECT " + groupColumns.postgres + ` FROM "groups" WHERE id = $1`,
@@ -152,7 +152,7 @@ func (d *Database) CreateGroup(ctx context.Context, tx *sql.Tx, group *record.Gr
 	group.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
 	id, err := d.insert(ctx, tx, insertGroup, "group",
-		group.CreatedAt, group.UpdatedAt, group.GroupIdentifier, group.Description, group.IncludeInIdToken,
+		group.CreatedAt, group.UpdatedAt, group.GroupIdentifier, group.Description, group.IncludeInIDToken,
 		group.IncludeInAccessToken)
 	if err != nil {
 		group.CreatedAt = originalCreatedAt
@@ -160,13 +160,13 @@ func (d *Database) CreateGroup(ctx context.Context, tx *sql.Tx, group *record.Gr
 		return err
 	}
 
-	group.Id = id
+	group.ID = id
 	return nil
 }
 
 func (d *Database) UpdateGroup(ctx context.Context, tx *sql.Tx, group *record.Group) error {
 
-	if group.Id == 0 {
+	if group.ID == 0 {
 		return errs.New("can't update group with id 0")
 	}
 
@@ -174,8 +174,8 @@ func (d *Database) UpdateGroup(ctx context.Context, tx *sql.Tx, group *record.Gr
 	group.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
 	_, err := d.ExecSQL(ctx, tx, updateGroup.text(d.Dialect),
-		group.UpdatedAt, group.GroupIdentifier, group.Description, group.IncludeInIdToken, group.IncludeInAccessToken,
-		group.Id)
+		group.UpdatedAt, group.GroupIdentifier, group.Description, group.IncludeInIDToken, group.IncludeInAccessToken,
+		group.ID)
 	if err != nil {
 		group.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update group")
@@ -184,19 +184,19 @@ func (d *Database) UpdateGroup(ctx context.Context, tx *sql.Tx, group *record.Gr
 	return nil
 }
 
-func (d *Database) GetGroupById(ctx context.Context, tx *sql.Tx, groupId int64) (*record.Group, error) {
-	return queryOne(ctx, d, tx, selectGroupById.text(d.Dialect), []any{groupId}, scanGroup, "group")
+func (d *Database) GetGroupByID(ctx context.Context, tx *sql.Tx, groupID int64) (*record.Group, error) {
+	return queryOne(ctx, d, tx, selectGroupByID.text(d.Dialect), []any{groupID}, scanGroup, "group")
 }
 
-func (d *Database) GetGroupsByIds(ctx context.Context, tx *sql.Tx, groupIds []int64) ([]record.Group, error) {
+func (d *Database) GetGroupsByIDs(ctx context.Context, tx *sql.Tx, groupIDs []int64) ([]record.Group, error) {
 
-	if len(groupIds) == 0 {
+	if len(groupIDs) == 0 {
 		return nil, nil
 	}
 
 	var groups []record.Group
 
-	err := forEachIdBatch(groupIds, func(batch []int64) error {
+	err := forEachIDBatch(groupIDs, func(batch []int64) error {
 		query := selectGroupsWhere.text(d.Dialect) + inList(d.Dialect, "id", 1, len(batch))
 		var err error
 		groups, err = queryAll(ctx, d, tx, groups, query, int64Args(batch), scanGroup, "group")
@@ -215,17 +215,17 @@ func (d *Database) GroupLoadPermissions(ctx context.Context, tx *sql.Tx, group *
 		return nil
 	}
 
-	groupPermissions, err := d.GetGroupPermissionsByGroupIds(ctx, tx, []int64{group.Id})
+	groupPermissions, err := d.GetGroupPermissionsByGroupIDs(ctx, tx, []int64{group.ID})
 	if err != nil {
 		return errs.Wrap(err, "unable to get group permissions")
 	}
 
-	permissionIds := make([]int64, len(groupPermissions))
+	permissionIDs := make([]int64, len(groupPermissions))
 	for i, groupPermission := range groupPermissions {
-		permissionIds[i] = groupPermission.PermissionId
+		permissionIDs[i] = groupPermission.PermissionID
 	}
 
-	permissions, err := d.GetPermissionsByIds(ctx, tx, permissionIds)
+	permissions, err := d.GetPermissionsByIDs(ctx, tx, permissionIDs)
 	if err != nil {
 		return errs.Wrap(err, "unable to get permissions")
 	}
@@ -242,40 +242,40 @@ func (d *Database) GroupsLoadPermissions(ctx context.Context, tx *sql.Tx, groups
 		return nil
 	}
 
-	groupIds := make([]int64, len(groups))
+	groupIDs := make([]int64, len(groups))
 	for i, group := range groups {
-		groupIds[i] = group.Id
+		groupIDs[i] = group.ID
 	}
 
-	groupPermissions, err := d.GetGroupPermissionsByGroupIds(ctx, tx, groupIds)
+	groupPermissions, err := d.GetGroupPermissionsByGroupIDs(ctx, tx, groupIDs)
 	if err != nil {
 		return errs.Wrap(err, "unable to get group permissions")
 	}
 
-	permissionIds := make([]int64, len(groupPermissions))
+	permissionIDs := make([]int64, len(groupPermissions))
 	for i, groupPermission := range groupPermissions {
-		permissionIds[i] = groupPermission.PermissionId
+		permissionIDs[i] = groupPermission.PermissionID
 	}
 
-	permissions, err := d.GetPermissionsByIds(ctx, tx, permissionIds)
+	permissions, err := d.GetPermissionsByIDs(ctx, tx, permissionIDs)
 	if err != nil {
 		return errs.Wrap(err, "unable to get permissions")
 	}
 
 	permissionsMap := make(map[int64]record.Permission)
 	for _, permission := range permissions {
-		permissionsMap[permission.Id] = permission
+		permissionsMap[permission.ID] = permission
 	}
 
 	groupPermissionsMap := make(map[int64][]record.GroupPermission)
 	for _, groupPermission := range groupPermissions {
-		groupPermissionsMap[groupPermission.GroupId] = append(groupPermissionsMap[groupPermission.GroupId], groupPermission)
+		groupPermissionsMap[groupPermission.GroupID] = append(groupPermissionsMap[groupPermission.GroupID], groupPermission)
 	}
 
 	for i, group := range groups {
-		group.Permissions = make([]record.Permission, len(groupPermissionsMap[group.Id]))
-		for j, groupPermission := range groupPermissionsMap[group.Id] {
-			group.Permissions[j] = permissionsMap[groupPermission.PermissionId]
+		group.Permissions = make([]record.Permission, len(groupPermissionsMap[group.ID]))
+		for j, groupPermission := range groupPermissionsMap[group.ID] {
+			group.Permissions[j] = permissionsMap[groupPermission.PermissionID]
 		}
 		groups[i] = group
 	}
@@ -289,23 +289,23 @@ func (d *Database) GroupsLoadAttributes(ctx context.Context, tx *sql.Tx, groups 
 		return nil
 	}
 
-	groupIds := make([]int64, len(groups))
+	groupIDs := make([]int64, len(groups))
 	for i, group := range groups {
-		groupIds[i] = group.Id
+		groupIDs[i] = group.ID
 	}
 
-	groupAttributes, err := d.GetGroupAttributesByGroupIds(ctx, tx, groupIds)
+	groupAttributes, err := d.GetGroupAttributesByGroupIDs(ctx, tx, groupIDs)
 	if err != nil {
 		return errs.Wrap(err, "unable to get group attributes")
 	}
 
 	groupAttributesMap := make(map[int64][]record.GroupAttribute)
 	for _, groupAttribute := range groupAttributes {
-		groupAttributesMap[groupAttribute.GroupId] = append(groupAttributesMap[groupAttribute.GroupId], groupAttribute)
+		groupAttributesMap[groupAttribute.GroupID] = append(groupAttributesMap[groupAttribute.GroupID], groupAttribute)
 	}
 
 	for i, group := range groups {
-		group.Attributes = groupAttributesMap[group.Id]
+		group.Attributes = groupAttributesMap[group.ID]
 		groups[i] = group
 	}
 
@@ -367,8 +367,8 @@ func (d *Database) GetAllGroupsPaginated(ctx context.Context, tx *sql.Tx, page i
 	return groups, total, nil
 }
 
-func (d *Database) GetGroupMembersPaginated(ctx context.Context, tx *sql.Tx, groupId int64, page int, pageSize int) ([]record.User, int, error) {
-	if groupId <= 0 {
+func (d *Database) GetGroupMembersPaginated(ctx context.Context, tx *sql.Tx, groupID int64, page int, pageSize int) ([]record.User, int, error) {
+	if groupID <= 0 {
 		return nil, 0, errs.New("group id must be greater than 0")
 	}
 
@@ -381,12 +381,12 @@ func (d *Database) GetGroupMembersPaginated(ctx context.Context, tx *sql.Tx, gro
 	}
 
 	users, err := queryAll(ctx, d, tx, nil, selectGroupMembersPage.text(d.Dialect),
-		[]any{groupId, pageSize, PageOffset(page, pageSize)}, scanUser, "user")
+		[]any{groupID, pageSize, PageOffset(page, pageSize)}, scanUser, "user")
 	if err != nil {
 		return nil, 0, err
 	}
 
-	rows, err := d.QuerySQL(ctx, tx, countGroupMembersJoined.text(d.Dialect), groupId)
+	rows, err := d.QuerySQL(ctx, tx, countGroupMembersJoined.text(d.Dialect), groupID)
 	if err != nil {
 		return nil, 0, errs.Wrap(err, "unable to query database")
 	}
@@ -406,12 +406,12 @@ func (d *Database) GetGroupMembersPaginated(ctx context.Context, tx *sql.Tx, gro
 	return users, total, nil
 }
 
-func (d *Database) CountGroupMembers(ctx context.Context, tx *sql.Tx, groupId int64) (int, error) {
-	if groupId <= 0 {
+func (d *Database) CountGroupMembers(ctx context.Context, tx *sql.Tx, groupID int64) (int, error) {
+	if groupID <= 0 {
 		return 0, errs.New("group id must be greater than 0")
 	}
 
-	rows, err := d.QuerySQL(ctx, tx, countGroupMembers.text(d.Dialect), groupId)
+	rows, err := d.QuerySQL(ctx, tx, countGroupMembers.text(d.Dialect), groupID)
 	if err != nil {
 		return 0, errs.Wrap(err, "unable to query database")
 	}
@@ -432,9 +432,9 @@ func (d *Database) CountGroupMembers(ctx context.Context, tx *sql.Tx, groupId in
 	return 0, nil
 }
 
-func (d *Database) DeleteGroup(ctx context.Context, tx *sql.Tx, groupId int64) error {
+func (d *Database) DeleteGroup(ctx context.Context, tx *sql.Tx, groupID int64) error {
 
-	_, err := d.ExecSQL(ctx, tx, deleteGroup.text(d.Dialect), groupId)
+	_, err := d.ExecSQL(ctx, tx, deleteGroup.text(d.Dialect), groupID)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete group")
 	}

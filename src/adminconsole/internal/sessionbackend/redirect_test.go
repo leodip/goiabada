@@ -25,7 +25,7 @@ func TestHTTPBackend_RefusesARedirect(t *testing.T) {
 			})
 			backend := New(stub.server.URL, newStubTokens(), nil, nil)
 
-			_, err := backend.Load(context.Background(), httpTestSessionId)
+			_, err := backend.Load(context.Background(), httpTestSessionID)
 
 			require.Error(t, err)
 			require.NotErrorIs(t, err, sessionstore.ErrNotFound, "a redirect is not a session that is gone")

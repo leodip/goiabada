@@ -20,7 +20,7 @@ import (
 // registered now, for the registration gate, and the brand its form_post page is drawn in.
 // data.Database satisfies it.
 type clientErrorDatabase interface {
-	GetRedirectURIsByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.RedirectURI, error)
+	GetRedirectURIsByClientID(ctx context.Context, tx *sql.Tx, clientID int64) ([]record.RedirectURI, error)
 	render.PageBrandReader
 }
 
@@ -197,7 +197,7 @@ func (rsp *ClientErrorResponder) RedirectWillBeEmitted(ctx context.Context, clie
 		return false
 	}
 
-	redirectURIs, err := rsp.database.GetRedirectURIsByClientId(ctx, nil, client.Id)
+	redirectURIs, err := rsp.database.GetRedirectURIsByClientID(ctx, nil, client.ID)
 	if err != nil {
 		// The client identifier is a bounded stored value and is safe to log; the URI is not (#159).
 		slog.ErrorContext(ctx, "unable to load the client's redirect URIs while answering it with an error, withholding the redirect",

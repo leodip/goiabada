@@ -34,7 +34,7 @@ import (
 // does not verify, carrying the parser's refused mark.
 type chainParser struct{}
 
-func (chainParser) DecodeAndValidateTokenString(_ context.Context, token string, _ bool) (*oauth.JwtToken, error) {
+func (chainParser) DecodeAndValidateTokenString(_ context.Context, token string, _ bool) (*oauth.JWTToken, error) {
 	claims := map[string]interface{}{"typ": "Bearer", "aud": "authserver", "sub": "u1", "auth_time": float64(1)}
 	switch token {
 	case "good":
@@ -53,7 +53,7 @@ func (chainParser) DecodeAndValidateTokenString(_ context.Context, token string,
 	default:
 		return nil, fmt.Errorf("the token does not verify: %w", signingkeys.ErrTokenRefused)
 	}
-	return &oauth.JwtToken{TokenBase64: token, Claims: claims}, nil
+	return &oauth.JWTToken{TokenBase64: token, Claims: claims}, nil
 }
 
 // chainSurface is one of the two guard sets routes.go builds.
@@ -223,7 +223,7 @@ func TestBearerGuardChain_RFC6750OnEachSurface(t *testing.T) {
 		for _, tc := range tests {
 			t.Run(surface.name+"/"+tc.name, func(t *testing.T) {
 				guards := surface.build()
-				chain := guards.JwtAuthorizationHeaderToContext()(
+				chain := guards.JWTAuthorizationHeaderToContext()(
 					guards.RequireBearerTokenScope("openid")(guards.RequireUserBoundToken()(http.HandlerFunc(
 						func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte("admitted")) }))))
 
@@ -275,7 +275,7 @@ func TestBearerGuardChain_AParserFaultOnEachSurface(t *testing.T) {
 		t.Run(surface.name, func(t *testing.T) {
 			logs := logtest.CaptureSlog(t)
 			guards := surface.build()
-			chain := guards.JwtAuthorizationHeaderToContext()(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+			chain := guards.JWTAuthorizationHeaderToContext()(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 				t.Error("a token the parser could not check must not reach the handler")
 			}))
 
@@ -301,7 +301,7 @@ func TestBearerGuardChain_AParserFaultOnEachSurface(t *testing.T) {
 
 // userSessionToken is a user token the session guard reads: auth_time present and a sid, presented
 // as issued.
-func userSessionToken() oauth.JwtToken {
+func userSessionToken() oauth.JWTToken {
 	return issuedAccessToken(map[string]interface{}{
 		"sub": "u1", "auth_time": float64(1), "sid": "sid-1", "scope": "openid",
 	})
@@ -345,7 +345,7 @@ func TestBearerGuardChain_SessionRefusalsOnEachSurface(t *testing.T) {
 				mockDB := datamocks.NewDatabase(t)
 				armGuardClient(mockDB)
 				mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "u1").
-					Return(&record.User{Id: 7, Enabled: true}, nil)
+					Return(&record.User{ID: 7, Enabled: true}, nil)
 				mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "sid-1").
 					Return(nil, errors.New("the database is down"))
 

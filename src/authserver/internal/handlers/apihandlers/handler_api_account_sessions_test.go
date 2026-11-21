@@ -29,9 +29,9 @@ import (
 
 // accountSessionDeleteRequest builds the DELETE with the path value, the settings its liveness
 // rule reads, and the validated token the handler reads.
-func accountSessionDeleteRequest(sessionId string, subject string) *http.Request {
-	req := httptest.NewRequest(http.MethodDelete, "/api/v1/account/sessions/"+sessionId, nil)
-	req.SetPathValue("id", sessionId)
+func accountSessionDeleteRequest(sessionID string, subject string) *http.Request {
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/account/sessions/"+sessionID, nil)
+	req.SetPathValue("id", sessionID)
 	req = req.WithContext(reqctx.WithSettings(req.Context(), sessionSettings))
 	return setTokenContextWithClaims(req, map[string]interface{}{"sub": subject})
 }
@@ -51,13 +51,13 @@ func TestHandleAccountSessionDelete_TerminatesAndAuditsBothEvents(t *testing.T) 
 			database := datamocks.NewDatabase(t)
 			auditLogger := handlersmocks.NewAuditLogger(t)
 
-			user := &record.User{Id: 42, Enabled: true}
+			user := &record.User{ID: 42, Enabled: true}
 			userSession := liveSessionOf(100, "sid-own", 42)
 
-			database.On("GetUserSessionById", mock.Anything, (*sql.Tx)(nil), int64(100)).Return(userSession, nil).Once()
+			database.On("GetUserSessionByID", mock.Anything, (*sql.Tx)(nil), int64(100)).Return(userSession, nil).Once()
 			database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).Return(user, nil).Once()
 			stubTermination(database, userSession, 1, []*record.RefreshToken{
-				{Id: 1, RefreshTokenJti: "rt-live"},
+				{ID: 1, RefreshTokenJTI: "rt-live"},
 			})
 
 			var deletedPayload map[string]interface{}
@@ -115,10 +115,10 @@ func TestHandleAccountSessionDelete_ForbiddenDoesNotTerminate(t *testing.T) {
 
 	const subject = "the-user"
 	// The session belongs to user 7; the caller is user 42.
-	database.On("GetUserSessionById", mock.Anything, (*sql.Tx)(nil), int64(100)).
+	database.On("GetUserSessionByID", mock.Anything, (*sql.Tx)(nil), int64(100)).
 		Return(liveSessionOf(100, "sid-someone-else", 7), nil).Once()
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).
-		Return(&record.User{Id: 42, Enabled: true}, nil).Once()
+		Return(&record.User{ID: 42, Enabled: true}, nil).Once()
 
 	rr := httptest.NewRecorder()
 	handler := HandleAccountSessionDelete(database, auditLogger, &recordingLogoutTokens{})
@@ -140,10 +140,10 @@ func TestHandleAccountSessionDelete_TerminationFailureIsA500(t *testing.T) {
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	const subject = "the-user"
-	database.On("GetUserSessionById", mock.Anything, (*sql.Tx)(nil), int64(100)).
+	database.On("GetUserSessionByID", mock.Anything, (*sql.Tx)(nil), int64(100)).
 		Return(liveSessionOf(100, "sid-own", 42), nil).Once()
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).
-		Return(&record.User{Id: 42, Enabled: true}, nil).Once()
+		Return(&record.User{ID: 42, Enabled: true}, nil).Once()
 	// The deletion, which since #139 is the first write inside the termination transaction, after
 	// the read of the session's apps (#784).
 	stub := stubTerminationOpening(database, liveSessionOf(100, "sid-own", 42))
@@ -171,9 +171,9 @@ func TestHandleAccountSessionDelete_AnOwnSessionNoLongerLiveIsNotFound(t *testin
 			database := datamocks.NewDatabase(t)
 			auditLogger := handlersmocks.NewAuditLogger(t)
 
-			database.On("GetUserSessionById", mock.Anything, (*sql.Tx)(nil), int64(100)).Return(session, nil).Once()
+			database.On("GetUserSessionByID", mock.Anything, (*sql.Tx)(nil), int64(100)).Return(session, nil).Once()
 			database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).
-				Return(&record.User{Id: 42, Enabled: true}, nil).Once()
+				Return(&record.User{ID: 42, Enabled: true}, nil).Once()
 
 			rr := httptest.NewRecorder()
 			HandleAccountSessionDelete(database, auditLogger, &recordingLogoutTokens{}).ServeHTTP(rr, accountSessionDeleteRequest("100", subject))
@@ -196,9 +196,9 @@ func TestHandleAccountSessionDelete_AnotherUsersDeadSessionIsForbidden(t *testin
 			database := datamocks.NewDatabase(t)
 			auditLogger := handlersmocks.NewAuditLogger(t)
 
-			database.On("GetUserSessionById", mock.Anything, (*sql.Tx)(nil), int64(100)).Return(session, nil).Once()
+			database.On("GetUserSessionByID", mock.Anything, (*sql.Tx)(nil), int64(100)).Return(session, nil).Once()
 			database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).
-				Return(&record.User{Id: 42, Enabled: true}, nil).Once()
+				Return(&record.User{ID: 42, Enabled: true}, nil).Once()
 
 			rr := httptest.NewRecorder()
 			HandleAccountSessionDelete(database, auditLogger, &recordingLogoutTokens{}).ServeHTTP(rr, accountSessionDeleteRequest("100", subject))

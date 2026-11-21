@@ -25,7 +25,7 @@ const (
 // The email and the language are the row's key and dont-update: a save of the same two replaces
 // the fields of the row already there, and never moves a row to another email or language.
 type EmailTemplate struct {
-	Id            int64          `db:"id" fieldtag:"pk"`
+	ID            int64          `db:"id" fieldtag:"pk"`
 	CreatedAt     sql.NullTime   `db:"created_at" fieldtag:"dont-update"`
 	UpdatedAt     sql.NullTime   `db:"updated_at"`
 	EmailTemplate string         `db:"email_template" fieldtag:"dont-update"`

@@ -70,10 +70,10 @@ func TestRender_AdminClientDelete_ARefusalDrawsTheDeletePageAgain(t *testing.T) 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			apiClient := &deletePageAPI{
-				stored: &api.ClientResponse{Id: 7, ClientIdentifier: "portal", Description: "The customer portal",
+				stored: &api.ClientResponse{ID: 7, ClientIdentifier: "portal", Description: "The customer portal",
 					Enabled: true, AuthorizationCodeEnabled: true},
-				perms: []api.PermissionResponse{{Id: 3, PermissionIdentifier: "read",
-					Resource: api.ResourceResponse{Id: 2, ResourceIdentifier: "orders"}}},
+				perms: []api.PermissionResponse{{ID: 3, PermissionIdentifier: "read",
+					Resource: api.ResourceResponse{ID: 2, ResourceIdentifier: "orders"}}},
 			}
 			renderer := render.New(web.TemplateFS(), web.StaticFS())
 

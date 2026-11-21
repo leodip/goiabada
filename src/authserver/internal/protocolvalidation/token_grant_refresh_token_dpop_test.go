@@ -106,7 +106,7 @@ func TestValidateTokenRequest_RefreshGrant_ABoundTokenNeedsAProofByItsKey(t *tes
 						validator := NewTokenValidator(mockDB, mockTokenParser,
 							protocolvalidationmocks.NewPermissionChecker(t), testDataCipher)
 
-						owner := &record.Client{Id: 1, ClientIdentifier: "owner", Enabled: true, AuthorizationCodeEnabled: true, IsPublic: public}
+						owner := &record.Client{ID: 1, ClientIdentifier: "owner", Enabled: true, AuthorizationCodeEnabled: true, IsPublic: public}
 						secret := ""
 						if !public {
 							encrypted, err := testDataCipher.Encrypt(clientSecret)
@@ -119,7 +119,7 @@ func TestValidateTokenRequest_RefreshGrant_ABoundTokenNeedsAProofByItsKey(t *tes
 						}
 						clients := map[string]*record.Client{
 							"owner":    owner,
-							"stranger": {Id: 2, ClientIdentifier: "stranger", Enabled: true, AuthorizationCodeEnabled: true, IsPublic: true},
+							"stranger": {ID: 2, ClientIdentifier: "stranger", Enabled: true, AuthorizationCodeEnabled: true, IsPublic: true},
 						}
 						clientIdentifier := "owner"
 						if a.clientIdentifier != "" {
@@ -127,30 +127,30 @@ func TestValidateTokenRequest_RefreshGrant_ABoundTokenNeedsAProofByItsKey(t *tes
 							secret = ""
 						}
 
-						user := record.User{Id: 7, Enabled: false, AuthStateGeneration: 3}
+						user := record.User{ID: 7, Enabled: false, AuthStateGeneration: 3}
 						refreshToken := &record.RefreshToken{
-							Id: 21, RefreshTokenJti: "the_jti", FirstRefreshTokenJti: "family-jti", AuthStateGeneration: 3,
+							ID: 21, RefreshTokenJTI: "the_jti", FirstRefreshTokenJTI: "family-jti", AuthStateGeneration: 3,
 							Revoked: a.tokenRevoked,
 						}
 						if a.binding != "" {
 							refreshToken.DPoPJkt = sql.NullString{String: a.binding, Valid: true}
 						}
 						if ropc {
-							refreshToken.ClientId = sql.NullInt64{Int64: 1, Valid: true}
-							refreshToken.UserId = sql.NullInt64{Int64: 7, Valid: true}
+							refreshToken.ClientID = sql.NullInt64{Int64: 1, Valid: true}
+							refreshToken.UserID = sql.NullInt64{Int64: 7, Valid: true}
 							refreshToken.User = user
 							refreshToken.AuthenticatedAt = sql.NullTime{Time: time.Now().UTC().Add(-time.Hour), Valid: true}
 						} else {
-							refreshToken.CodeId = sql.NullInt64{Int64: 11, Valid: true}
-							refreshToken.Code = record.Code{Id: 11, ClientId: 1, UserId: 7, User: user,
+							refreshToken.CodeID = sql.NullInt64{Int64: 11, Valid: true}
+							refreshToken.Code = record.Code{ID: 11, ClientID: 1, UserID: 7, User: user,
 								CodeChallenge: sql.NullString{String: "challenge", Valid: true}}
 						}
 
 						mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, clientIdentifier).
 							Return(clients[clientIdentifier], nil).Once()
 						mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "the_refresh_token", true).
-							Return(&oauth.JwtToken{Claims: jwt.MapClaims{"jti": "the_jti", "typ": "Refresh"}}, nil).Maybe()
-						mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "the_jti").Return(refreshToken, nil).Maybe()
+							Return(&oauth.JWTToken{Claims: jwt.MapClaims{"jti": "the_jti", "typ": "Refresh"}}, nil).Maybe()
+						mockDB.On("GetRefreshTokenByJTI", mock.Anything, mock.Anything, "the_jti").Return(refreshToken, nil).Maybe()
 						if ropc {
 							mockDB.On("RefreshTokenLoadUser", mock.Anything, mock.Anything, refreshToken).Return(nil).Maybe()
 							mockDB.On("RefreshTokenLoadClient", mock.Anything, mock.Anything, refreshToken).Return(nil).Maybe()
@@ -163,7 +163,7 @@ func TestValidateTokenRequest_RefreshGrant_ABoundTokenNeedsAProofByItsKey(t *tes
 						grant, err := validator.ValidateTokenRequest(context.Background(), &record.Settings{},
 							&ValidateTokenRequestInput{
 								GrantType:      "refresh_token",
-								ClientId:       clientIdentifier,
+								ClientID:       clientIdentifier,
 								ClientSecret:   secret,
 								RefreshToken:   "the_refresh_token",
 								DPoPThumbprint: a.thumbprint,

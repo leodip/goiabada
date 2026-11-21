@@ -27,7 +27,7 @@ func TestToken_Refresh_ClientSecretBasic_Success(t *testing.T) {
 	clientSecret := fake.Password(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	// First, get tokens using Basic auth
 	formData := url.Values{
@@ -37,7 +37,7 @@ func TestToken_Refresh_ClientSecretBasic_Success(t *testing.T) {
 		"code_verifier": {testCodeVerifier},
 	}
 
-	data := postToTokenEndpointWithBasicAuth(t, httpClient, destUrl, formData, code.Client.ClientIdentifier, clientSecret)
+	data := postToTokenEndpointWithBasicAuth(t, httpClient, destURL, formData, code.Client.ClientIdentifier, clientSecret)
 
 	assert.NotNil(t, data["refresh_token"])
 	refreshToken := data["refresh_token"].(string)
@@ -48,7 +48,7 @@ func TestToken_Refresh_ClientSecretBasic_Success(t *testing.T) {
 		"refresh_token": {refreshToken},
 	}
 
-	data = postToTokenEndpointWithBasicAuth(t, httpClient, destUrl, formData, code.Client.ClientIdentifier, clientSecret)
+	data = postToTokenEndpointWithBasicAuth(t, httpClient, destURL, formData, code.Client.ClientIdentifier, clientSecret)
 
 	assert.NotNil(t, data["access_token"])
 	assert.NotNil(t, data["refresh_token"])
@@ -60,7 +60,7 @@ func TestToken_Refresh_ClientSecretBasic_WrongSecret(t *testing.T) {
 	clientSecret := fake.Password(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	// First, get tokens using Basic auth
 	formData := url.Values{
@@ -70,7 +70,7 @@ func TestToken_Refresh_ClientSecretBasic_WrongSecret(t *testing.T) {
 		"code_verifier": {testCodeVerifier},
 	}
 
-	data := postToTokenEndpointWithBasicAuth(t, httpClient, destUrl, formData, code.Client.ClientIdentifier, clientSecret)
+	data := postToTokenEndpointWithBasicAuth(t, httpClient, destURL, formData, code.Client.ClientIdentifier, clientSecret)
 
 	assert.NotNil(t, data["refresh_token"])
 	refreshToken := data["refresh_token"].(string)
@@ -81,7 +81,7 @@ func TestToken_Refresh_ClientSecretBasic_WrongSecret(t *testing.T) {
 		"refresh_token": {refreshToken},
 	}
 
-	data = postToTokenEndpointWithBasicAuth(t, httpClient, destUrl, formData, code.Client.ClientIdentifier, "wrong_secret")
+	data = postToTokenEndpointWithBasicAuth(t, httpClient, destURL, formData, code.Client.ClientIdentifier, "wrong_secret")
 
 	// RFC 6749 Section 5.2: invalid_client for failed client authentication
 	assert.Equal(t, "invalid_client", data["error"])
@@ -89,7 +89,7 @@ func TestToken_Refresh_ClientSecretBasic_WrongSecret(t *testing.T) {
 }
 
 func TestToken_Refresh_ClientSecretIsMissing(t *testing.T) {
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
@@ -99,7 +99,7 @@ func TestToken_Refresh_ClientSecretIsMissing(t *testing.T) {
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
-		DefaultAcrLevel:          record.AcrLevel2Optional,
+		DefaultACRLevel:          record.ACRLevel2Optional,
 		IsPublic:                 false,
 		AuthorizationCodeEnabled: true,
 		ClientSecretEncrypted:    clientSecretEncrypted,
@@ -107,13 +107,13 @@ func TestToken_Refresh_ClientSecretIsMissing(t *testing.T) {
 	err = database.CreateClient(context.Background(), nil, client)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
 	formData := url.Values{
 		"grant_type": {"refresh_token"},
 		"client_id":  {client.ClientIdentifier},
 	}
-	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destURL, formData)
 
 	// RFC 6749 Section 5.2: invalid_client for missing client credentials
 	assert.Equal(t, "invalid_client", data["error"])
@@ -125,7 +125,7 @@ func TestToken_Refresh_ClientAuthFailed(t *testing.T) {
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
 	// Get the token using the authorization code
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	formData := url.Values{
 		"grant_type":    {"authorization_code"},
@@ -136,7 +136,7 @@ func TestToken_Refresh_ClientAuthFailed(t *testing.T) {
 		"client_secret": {clientSecret},
 	}
 
-	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destURL, formData)
 
 	assert.NotNil(t, data["refresh_token"])
 	refreshToken := data["refresh_token"].(string)
@@ -149,7 +149,7 @@ func TestToken_Refresh_ClientAuthFailed(t *testing.T) {
 		"client_secret": {"incorrect_secret"},
 	}
 
-	data = postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data = postToTokenEndpoint(t, httpClient, destURL, formData)
 
 	// RFC 6749 Section 5.2: invalid_client for failed client authentication
 	assert.Equal(t, "invalid_client", data["error"])
@@ -160,7 +160,7 @@ func TestToken_Refresh_MissingRefreshToken(t *testing.T) {
 	clientSecret := fake.Password(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	// First, get a valid refresh token
 	formData := url.Values{
@@ -172,7 +172,7 @@ func TestToken_Refresh_MissingRefreshToken(t *testing.T) {
 		"client_secret": {clientSecret},
 	}
 
-	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destURL, formData)
 
 	assert.NotNil(t, data["refresh_token"])
 
@@ -183,7 +183,7 @@ func TestToken_Refresh_MissingRefreshToken(t *testing.T) {
 		"client_secret": {clientSecret},
 	}
 
-	data = postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data = postToTokenEndpoint(t, httpClient, destURL, formData)
 
 	assert.Equal(t, "invalid_request", data["error"])
 	assert.Equal(t, "Missing required refresh_token parameter.", data["error_description"])
@@ -193,7 +193,7 @@ func TestToken_Refresh_TokenWithBadSignature(t *testing.T) {
 	clientSecret := fake.Password(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	// First, get a valid refresh token
 	formData := url.Values{
@@ -205,7 +205,7 @@ func TestToken_Refresh_TokenWithBadSignature(t *testing.T) {
 		"client_secret": {clientSecret},
 	}
 
-	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destURL, formData)
 
 	assert.NotNil(t, data["refresh_token"])
 	validRefreshToken := data["refresh_token"].(string)
@@ -270,12 +270,12 @@ func TestToken_Refresh_MalformedToken(t *testing.T) {
 }
 
 func TestToken_Refresh_TokenExpired(t *testing.T) {
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token"
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
 	clientSecret := fake.Password(32)
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
+	settings, err := database.GetSettingsByID(context.Background(), nil, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -286,7 +286,7 @@ func TestToken_Refresh_TokenExpired(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 		IsPublic:                 false,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          record.AcrLevel2Optional,
+		DefaultACRLevel:          record.ACRLevel2Optional,
 	}
 
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
@@ -332,7 +332,7 @@ func TestToken_Refresh_TokenExpired(t *testing.T) {
 		"client_secret": {clientSecret},
 		"refresh_token": {refreshToken},
 	}
-	status, respData, err := concurrentTokenPost(httpClient, destUrl, formData)
+	status, respData, err := concurrentTokenPost(httpClient, destURL, formData)
 	require.NoError(t, err)
 
 	// Expiry is named, since the signature verified before the parser read exp (#680)
@@ -345,7 +345,7 @@ func TestToken_Refresh_WrongClient(t *testing.T) {
 	clientSecret := fake.Password(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	// First, get a valid refresh token
 	formData := url.Values{
@@ -357,7 +357,7 @@ func TestToken_Refresh_WrongClient(t *testing.T) {
 		"client_secret": {clientSecret},
 	}
 
-	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destURL, formData)
 
 	assert.NotNil(t, data["refresh_token"])
 	refreshToken := data["refresh_token"].(string)
@@ -373,7 +373,7 @@ func TestToken_Refresh_WrongClient(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 		IsPublic:                 false,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          record.AcrLevel2Optional,
+		DefaultACRLevel:          record.ACRLevel2Optional,
 		ClientSecretEncrypted:    wrongClientSecretEncrypted,
 	}
 	err = database.CreateClient(context.Background(), nil, wrongClient)
@@ -387,7 +387,7 @@ func TestToken_Refresh_WrongClient(t *testing.T) {
 		"client_secret": {wrongClientSecret},
 	}
 
-	data = postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data = postToTokenEndpoint(t, httpClient, destURL, formData)
 
 	assert.Equal(t, "invalid_grant", data["error"])
 	assert.Equal(t, "The refresh token is invalid because it does not belong to the client.", data["error_description"])
@@ -397,7 +397,7 @@ func TestToken_Refresh_WithAdditionalScope(t *testing.T) {
 	clientSecret := fake.Password(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	// First, get the initial access token and refresh token
 	formData := url.Values{
@@ -409,7 +409,7 @@ func TestToken_Refresh_WithAdditionalScope(t *testing.T) {
 		"client_secret": {clientSecret},
 	}
 
-	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destURL, formData)
 
 	assert.NotNil(t, data["refresh_token"])
 	refreshToken := data["refresh_token"].(string)
@@ -417,11 +417,11 @@ func TestToken_Refresh_WithAdditionalScope(t *testing.T) {
 	// Create a new resource and permission with randomized identifiers
 	resourceIdentifier := "additional-resource-" + fake.LetterN(8)
 	permissionIdentifier := "read-" + fake.LetterN(8)
-	resource := createResourceWithId(t, resourceIdentifier)
-	permission := createPermissionWithId(t, resource.Id, permissionIdentifier)
+	resource := createResourceWithID(t, resourceIdentifier)
+	permission := createPermissionWithID(t, resource.ID, permissionIdentifier)
 
 	// Assign the new permission to the user
-	assignPermissionToUser(t, code.UserId, permission.Id)
+	assignPermissionToUser(t, code.UserID, permission.ID)
 
 	// Now, attempt to refresh the token with an additional scope
 	newScope := fmt.Sprintf("%s:%s", resourceIdentifier, permissionIdentifier)
@@ -433,7 +433,7 @@ func TestToken_Refresh_WithAdditionalScope(t *testing.T) {
 		"scope":         {"openid profile email " + newScope},
 	}
 
-	data = postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data = postToTokenEndpoint(t, httpClient, destURL, formData)
 
 	// Check that the request was denied due to the additional scope. invalid_scope since #425:
 	// the request exceeds the grant, which RFC 6749 section 5.2 names invalid_scope for.
@@ -442,7 +442,7 @@ func TestToken_Refresh_WithAdditionalScope(t *testing.T) {
 
 	// Now, try again with only the original scopes
 	formData.Set("scope", "openid profile email")
-	data = postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data = postToTokenEndpoint(t, httpClient, destURL, formData)
 
 	// This time, the refresh should be successful
 	assert.NotNil(t, data["access_token"])
@@ -465,18 +465,18 @@ func TestToken_Refresh_ConsentRemoved(t *testing.T) {
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 	err = database.CreateClient(context.Background(), nil, client)
 	require.NoError(t, err)
 
 	// Create a redirect URI for the client
-	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+	redirectURI := &record.RedirectURI{
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	require.NoError(t, err)
 
 	// Create a user
@@ -494,16 +494,16 @@ func TestToken_Refresh_ConsentRemoved(t *testing.T) {
 
 	// Create a resource and permission, and assign it to the user
 	resource := createResource(t)
-	permission := createPermission(t, resource.Id)
-	assignPermissionToUser(t, user.Id, permission.Id)
+	permission := createPermission(t, resource.ID)
+	assignPermissionToUser(t, user.ID, permission.ID)
 
 	// Set up the request scope
 	requestScope := "openid profile email " + resource.ResourceIdentifier + ":" + permission.PermissionIdentifier
 
 	// Start the authorization flow
-	httpClient := createHttpClient(t)
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	httpClient := createHTTPClient(t)
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + oauth.GeneratePKCECodeChallenge(testCodeVerifier) +
@@ -511,7 +511,7 @@ func TestToken_Refresh_ConsentRemoved(t *testing.T) {
 		"&state=" + fake.LetterN(8) +
 		"&nonce=" + fake.LetterN(8)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	require.NoError(t, err)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
@@ -548,30 +548,30 @@ func TestToken_Refresh_ConsentRemoved(t *testing.T) {
 	defer func() { _ = resp.Body.Close() }()
 
 	// Get the authorization code
-	codeVal, _ := getCodeAndStateFromUrl(t, resp)
+	codeVal, _ := getCodeAndStateFromURL(t, resp)
 
 	// Exchange the code for tokens
-	tokenUrl := appConfig.AuthServer.BaseURL + "/auth/token"
+	tokenURL := appConfig.AuthServer.BaseURL + "/auth/token"
 	formData := url.Values{
 		"grant_type":    {"authorization_code"},
 		"code":          {codeVal},
-		"redirect_uri":  {redirectUri.URI},
+		"redirect_uri":  {redirectURI.URI},
 		"client_id":     {client.ClientIdentifier},
 		"code_verifier": {testCodeVerifier},
 		"client_secret": {clientSecret},
 	}
 
-	tokenResp := postToTokenEndpoint(t, httpClient, tokenUrl, formData)
+	tokenResp := postToTokenEndpoint(t, httpClient, tokenURL, formData)
 
 	assert.NotNil(t, tokenResp["refresh_token"])
 	refreshToken := tokenResp["refresh_token"].(string)
 
 	// Remove the consent
-	consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, client.Id)
+	consent, err := database.GetConsentByUserIDAndClientID(context.Background(), nil, user.ID, client.ID)
 	require.NoError(t, err)
 	assert.NotNil(t, consent)
 
-	_, err = database.DeleteUserConsent(context.Background(), nil, consent.Id)
+	_, err = database.DeleteUserConsent(context.Background(), nil, consent.ID)
 	require.NoError(t, err)
 
 	// Attempt to use the refresh token
@@ -582,7 +582,7 @@ func TestToken_Refresh_ConsentRemoved(t *testing.T) {
 		"client_secret": {clientSecret},
 	}
 
-	refreshResp := postToTokenEndpoint(t, httpClient, tokenUrl, formData)
+	refreshResp := postToTokenEndpoint(t, httpClient, tokenURL, formData)
 
 	// Assert that the request failed due to removed consent
 	assert.Equal(t, "invalid_grant", refreshResp["error"])
@@ -599,17 +599,17 @@ func TestToken_Refresh_ConsentDoesNotIncludeScope(t *testing.T) {
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 	err = database.CreateClient(context.Background(), nil, client)
 	require.NoError(t, err)
 
-	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+	redirectURI := &record.RedirectURI{
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	require.NoError(t, err)
 
 	password := fake.Password(8)
@@ -625,16 +625,16 @@ func TestToken_Refresh_ConsentDoesNotIncludeScope(t *testing.T) {
 	require.NoError(t, err)
 
 	resource := createResource(t)
-	permission := createPermission(t, resource.Id)
-	assignPermissionToUser(t, user.Id, permission.Id)
+	permission := createPermission(t, resource.ID)
+	assignPermissionToUser(t, user.ID, permission.ID)
 
 	initialScope := "openid profile email"
 	additionalScope := resource.ResourceIdentifier + ":" + permission.PermissionIdentifier
 	fullScope := initialScope + " " + additionalScope
 
-	httpClient := createHttpClient(t)
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	httpClient := createHTTPClient(t)
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + oauth.GeneratePKCECodeChallenge(testCodeVerifier) +
@@ -642,7 +642,7 @@ func TestToken_Refresh_ConsentDoesNotIncludeScope(t *testing.T) {
 		"&state=" + fake.LetterN(8) +
 		"&nonce=" + fake.LetterN(8)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	require.NoError(t, err)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
@@ -676,19 +676,19 @@ func TestToken_Refresh_ConsentDoesNotIncludeScope(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	codeVal, _ := getCodeAndStateFromUrl(t, resp)
+	codeVal, _ := getCodeAndStateFromURL(t, resp)
 
-	tokenUrl := appConfig.AuthServer.BaseURL + "/auth/token"
+	tokenURL := appConfig.AuthServer.BaseURL + "/auth/token"
 	formData := url.Values{
 		"grant_type":    {"authorization_code"},
 		"code":          {codeVal},
-		"redirect_uri":  {redirectUri.URI},
+		"redirect_uri":  {redirectURI.URI},
 		"client_id":     {client.ClientIdentifier},
 		"code_verifier": {testCodeVerifier},
 		"client_secret": {clientSecret},
 	}
 
-	tokenResp := postToTokenEndpoint(t, httpClient, tokenUrl, formData)
+	tokenResp := postToTokenEndpoint(t, httpClient, tokenURL, formData)
 
 	assert.NotNil(t, tokenResp["refresh_token"])
 	refreshToken := tokenResp["refresh_token"].(string)
@@ -701,7 +701,7 @@ func TestToken_Refresh_ConsentDoesNotIncludeScope(t *testing.T) {
 		"scope":         {fullScope}, // Request the full scope including the additional resource permission
 	}
 
-	refreshResp := postToTokenEndpoint(t, httpClient, tokenUrl, formData)
+	refreshResp := postToTokenEndpoint(t, httpClient, tokenURL, formData)
 
 	// invalid_scope since #425, for the reason TestToken_Refresh_WithAdditionalScope gives.
 	assert.Equal(t, "invalid_scope", refreshResp["error"])
@@ -714,7 +714,7 @@ func TestToken_Refresh_TokenMarkedAsUsed(t *testing.T) {
 	clientSecret := fake.Password(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	// First, exchange the authorization code for tokens
 	formData := url.Values{
@@ -726,7 +726,7 @@ func TestToken_Refresh_TokenMarkedAsUsed(t *testing.T) {
 		"client_secret": {clientSecret},
 	}
 
-	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destURL, formData)
 
 	assert.NotNil(t, data["refresh_token"])
 	refreshToken := data["refresh_token"].(string)
@@ -739,7 +739,7 @@ func TestToken_Refresh_TokenMarkedAsUsed(t *testing.T) {
 		"client_secret": {clientSecret},
 	}
 
-	data = postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data = postToTokenEndpoint(t, httpClient, destURL, formData)
 
 	// Verify that the refresh operation was successful
 	assert.NotNil(t, data["access_token"])
@@ -770,13 +770,13 @@ func TestToken_Refresh_TokenMarkedAsUsed(t *testing.T) {
 	}
 
 	// Verify that the original refresh token is now marked as used (revoked)
-	revokedRefreshToken, err := database.GetRefreshTokenByJti(context.Background(), nil, jti)
+	revokedRefreshToken, err := database.GetRefreshTokenByJTI(context.Background(), nil, jti)
 	require.NoError(t, err)
 	assert.NotNil(t, revokedRefreshToken)
 	assert.True(t, revokedRefreshToken.Revoked, "The original refresh token should be marked as revoked after use")
 
 	// Attempt to use the same refresh token again, which should fail
-	data = postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data = postToTokenEndpoint(t, httpClient, destURL, formData)
 
 	assert.Equal(t, "invalid_grant", data["error"])
 	assert.Equal(t, "This refresh token has been revoked.", data["error_description"])
@@ -802,10 +802,10 @@ func TestToken_Refresh_MissingRowIsInvalidGrant(t *testing.T) {
 	refreshToken := exchangeAuthCode(t, httpClient, code.Client.ClientIdentifier, clientSecret,
 		code.Code, code.RedirectURI, testCodeVerifier)
 
-	row := refreshTokenRowByJti(t, refreshToken)
-	require.NoError(t, database.DeleteRefreshToken(context.Background(), nil, row.Id))
+	row := refreshTokenRowByJTI(t, refreshToken)
+	require.NoError(t, database.DeleteRefreshToken(context.Background(), nil, row.ID))
 
-	gone, err := database.GetRefreshTokenByJti(context.Background(), nil, refreshTokenJti(t, refreshToken))
+	gone, err := database.GetRefreshTokenByJTI(context.Background(), nil, refreshTokenJTI(t, refreshToken))
 	require.NoError(t, err)
 	require.Nil(t, gone, "the fixture must actually remove the row")
 

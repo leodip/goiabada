@@ -38,7 +38,7 @@ func recoveryCodesUser(t *testing.T) *record.User {
 	t.Helper()
 	hash, err := passwordhash.Hash(recoveryCodesPassword)
 	require.NoError(t, err)
-	return &record.User{Id: 81, Enabled: true, PasswordHash: hash, OTPEnabled: true, OtpConfigGeneration: 4}
+	return &record.User{ID: 81, Enabled: true, PasswordHash: hash, OTPEnabled: true, OTPConfigGeneration: 4}
 }
 
 func recoveryCodesGetRequest(t *testing.T) *http.Request {
@@ -60,7 +60,7 @@ func TestHandleAccountRecoveryCodesGet_AnswersHowManyAreUnused(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	user := recoveryCodesUser(t)
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), recoveryCodesSubject).Return(user, nil).Once()
-	database.On("CountUnusedUserRecoveryCodes", mock.Anything, (*sql.Tx)(nil), user.Id).Return(7, nil).Once()
+	database.On("CountUnusedUserRecoveryCodes", mock.Anything, (*sql.Tx)(nil), user.ID).Return(7, nil).Once()
 
 	rr := httptest.NewRecorder()
 	HandleAccountRecoveryCodesGet(database).ServeHTTP(rr, recoveryCodesGetRequest(t))
@@ -74,7 +74,7 @@ func TestHandleAccountRecoveryCodesGet_NoneLeftIsZero(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	user := recoveryCodesUser(t)
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), recoveryCodesSubject).Return(user, nil).Once()
-	database.On("CountUnusedUserRecoveryCodes", mock.Anything, (*sql.Tx)(nil), user.Id).Return(0, nil).Once()
+	database.On("CountUnusedUserRecoveryCodes", mock.Anything, (*sql.Tx)(nil), user.ID).Return(0, nil).Once()
 
 	rr := httptest.NewRecorder()
 	HandleAccountRecoveryCodesGet(database).ServeHTTP(rr, recoveryCodesGetRequest(t))
@@ -104,16 +104,16 @@ func TestHandleAccountRecoveryCodesPost_ReplacesTheSetAndAnswersItOnce(t *testin
 
 	var calls []string
 	datamocks.ExpectRunInTransaction(database, recoveryCodesTx, func(edge string) { calls = append(calls, edge) })
-	database.On("GetUserByIdForUpdate", mock.Anything, recoveryCodesTx, user.Id).Return(user, nil).
+	database.On("GetUserByIDForUpdate", mock.Anything, recoveryCodesTx, user.ID).Return(user, nil).
 		Run(func(mock.Arguments) { calls = append(calls, "lock") }).Once()
 	var stored []string
-	database.On("ReplaceUserRecoveryCodes", mock.Anything, recoveryCodesTx, user.Id, mock.Anything).Return(nil).
+	database.On("ReplaceUserRecoveryCodes", mock.Anything, recoveryCodesTx, user.ID, mock.Anything).Return(nil).
 		Run(func(args mock.Arguments) {
 			stored = args.Get(3).([]string)
 			calls = append(calls, "replace")
 		}).Once()
 	auditLogger.On("Log", mock.Anything, audit.EventRecoveryCodesCreated, map[string]interface{}{
-		"user_id":        user.Id,
+		"user_id":        user.ID,
 		"logged_in_user": recoveryCodesSubject,
 	}).Return().Run(func(mock.Arguments) { calls = append(calls, "audit") }).Once()
 
@@ -201,7 +201,7 @@ func TestHandleAccountRecoveryCodesPost_AnAuthenticatorRemovedMeanwhileStoresNot
 	datamocks.ExpectRunInTransaction(database, recoveryCodesTx)
 	removed := *user
 	removed.OTPEnabled = false
-	database.On("GetUserByIdForUpdate", mock.Anything, recoveryCodesTx, user.Id).Return(&removed, nil).Once()
+	database.On("GetUserByIDForUpdate", mock.Anything, recoveryCodesTx, user.ID).Return(&removed, nil).Once()
 
 	rr := httptest.NewRecorder()
 	HandleAccountRecoveryCodesPost(database, auditLogger, &countingCredentials{}, heldNotifier(t, &heldJobs{})).

@@ -68,7 +68,7 @@ func footerOf(ctx context.Context, brand *api.PublicBrandResponse) *PageFooter {
 	}
 	for _, link := range brand.FooterLinks {
 		footer.Links = append(footer.Links, PageFooterLink{
-			URL:   link.Url,
+			URL:   link.URL,
 			Label: brandkit.FooterLinkLabel(link.Label, link.Labels, lang),
 		})
 	}

@@ -69,14 +69,14 @@ func TestHandleClientLogoGet_NoLogo(t *testing.T) {
 
 	handler := HandleClientLogoGet(pageRenderer, database)
 
-	client := &record.Client{Id: 123, ClientIdentifier: "my-app"}
+	client := &record.Client{ID: 123, ClientIdentifier: "my-app"}
 
 	req, _ := http.NewRequest("GET", "/client/logo/my-app", nil)
 	req.SetPathValue("clientIdentifier", "my-app")
 	rr := httptest.NewRecorder()
 
 	database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "my-app").Return(client, nil)
-	database.On("GetClientLogoByClientId", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(nil, nil)
+	database.On("GetClientLogoByClientID", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(nil, nil)
 
 	handler.ServeHTTP(rr, req)
 
@@ -91,10 +91,10 @@ func TestHandleClientLogoGet_Success(t *testing.T) {
 	handler := HandleClientLogoGet(pageRenderer, database)
 
 	logoData := createTestLogoData(100, 100)
-	client := &record.Client{Id: 123, ClientIdentifier: "my-app"}
+	client := &record.Client{ID: 123, ClientIdentifier: "my-app"}
 	clientLogo := &record.ClientLogo{
-		Id:          1,
-		ClientId:    123,
+		ID:          1,
+		ClientID:    123,
 		Logo:        logoData,
 		ContentType: "image/png",
 	}
@@ -104,7 +104,7 @@ func TestHandleClientLogoGet_Success(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "my-app").Return(client, nil)
-	database.On("GetClientLogoByClientId", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(clientLogo, nil)
+	database.On("GetClientLogoByClientID", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(clientLogo, nil)
 
 	handler.ServeHTTP(rr, req)
 
@@ -128,15 +128,15 @@ func TestHandleClientLogoGet_ServedWhileTheClientIsDisabledAndItsLogoHidden(t *t
 	handler := HandleClientLogoGet(pageRenderer, database)
 
 	logoData := createTestLogoData(100, 100)
-	client := &record.Client{Id: 123, ClientIdentifier: "my-app", Enabled: false, ShowLogo: false}
-	clientLogo := &record.ClientLogo{Id: 1, ClientId: 123, Logo: logoData, ContentType: "image/png"}
+	client := &record.Client{ID: 123, ClientIdentifier: "my-app", Enabled: false, ShowLogo: false}
+	clientLogo := &record.ClientLogo{ID: 1, ClientID: 123, Logo: logoData, ContentType: "image/png"}
 
 	req, _ := http.NewRequest("GET", "/client/logo/my-app", nil)
 	req.SetPathValue("clientIdentifier", "my-app")
 	rr := httptest.NewRecorder()
 
 	database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "my-app").Return(client, nil)
-	database.On("GetClientLogoByClientId", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(clientLogo, nil)
+	database.On("GetClientLogoByClientID", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(clientLogo, nil)
 
 	handler.ServeHTTP(rr, req)
 
@@ -151,10 +151,10 @@ func TestHandleClientLogoGet_ETagMatch_304(t *testing.T) {
 	handler := HandleClientLogoGet(pageRenderer, database)
 
 	logoData := createTestLogoData(100, 100)
-	client := &record.Client{Id: 123, ClientIdentifier: "my-app"}
+	client := &record.Client{ID: 123, ClientIdentifier: "my-app"}
 	clientLogo := &record.ClientLogo{
-		Id:          1,
-		ClientId:    123,
+		ID:          1,
+		ClientID:    123,
 		Logo:        logoData,
 		ContentType: "image/png",
 	}
@@ -169,7 +169,7 @@ func TestHandleClientLogoGet_ETagMatch_304(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "my-app").Return(client, nil)
-	database.On("GetClientLogoByClientId", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(clientLogo, nil)
+	database.On("GetClientLogoByClientID", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(clientLogo, nil)
 
 	handler.ServeHTTP(rr, req)
 
@@ -187,10 +187,10 @@ func TestHandleClientLogoGet_ETagMismatch_200(t *testing.T) {
 	handler := HandleClientLogoGet(pageRenderer, database)
 
 	logoData := createTestLogoData(100, 100)
-	client := &record.Client{Id: 123, ClientIdentifier: "my-app"}
+	client := &record.Client{ID: 123, ClientIdentifier: "my-app"}
 	clientLogo := &record.ClientLogo{
-		Id:          1,
-		ClientId:    123,
+		ID:          1,
+		ClientID:    123,
 		Logo:        logoData,
 		ContentType: "image/png",
 	}
@@ -201,7 +201,7 @@ func TestHandleClientLogoGet_ETagMismatch_200(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "my-app").Return(client, nil)
-	database.On("GetClientLogoByClientId", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(clientLogo, nil)
+	database.On("GetClientLogoByClientID", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(clientLogo, nil)
 
 	handler.ServeHTTP(rr, req)
 
@@ -218,10 +218,10 @@ func TestHandleClientLogoGet_WeakETagMatch_304(t *testing.T) {
 	handler := HandleClientLogoGet(pageRenderer, database)
 
 	logoData := createTestLogoData(100, 100)
-	client := &record.Client{Id: 123, ClientIdentifier: "my-app"}
+	client := &record.Client{ID: 123, ClientIdentifier: "my-app"}
 	clientLogo := &record.ClientLogo{
-		Id:          1,
-		ClientId:    123,
+		ID:          1,
+		ClientID:    123,
 		Logo:        logoData,
 		ContentType: "image/png",
 	}
@@ -237,7 +237,7 @@ func TestHandleClientLogoGet_WeakETagMatch_304(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "my-app").Return(client, nil)
-	database.On("GetClientLogoByClientId", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(clientLogo, nil)
+	database.On("GetClientLogoByClientID", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(clientLogo, nil)
 
 	handler.ServeHTTP(rr, req)
 
@@ -253,10 +253,10 @@ func TestHandleClientLogoGet_MultipleETags_304(t *testing.T) {
 	handler := HandleClientLogoGet(pageRenderer, database)
 
 	logoData := createTestLogoData(100, 100)
-	client := &record.Client{Id: 123, ClientIdentifier: "my-app"}
+	client := &record.Client{ID: 123, ClientIdentifier: "my-app"}
 	clientLogo := &record.ClientLogo{
-		Id:          1,
-		ClientId:    123,
+		ID:          1,
+		ClientID:    123,
 		Logo:        logoData,
 		ContentType: "image/png",
 	}
@@ -272,7 +272,7 @@ func TestHandleClientLogoGet_MultipleETags_304(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "my-app").Return(client, nil)
-	database.On("GetClientLogoByClientId", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(clientLogo, nil)
+	database.On("GetClientLogoByClientID", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(clientLogo, nil)
 
 	handler.ServeHTTP(rr, req)
 
@@ -288,10 +288,10 @@ func TestHandleClientLogoGet_StarETag_304(t *testing.T) {
 	handler := HandleClientLogoGet(pageRenderer, database)
 
 	logoData := createTestLogoData(100, 100)
-	client := &record.Client{Id: 123, ClientIdentifier: "my-app"}
+	client := &record.Client{ID: 123, ClientIdentifier: "my-app"}
 	clientLogo := &record.ClientLogo{
-		Id:          1,
-		ClientId:    123,
+		ID:          1,
+		ClientID:    123,
 		Logo:        logoData,
 		ContentType: "image/png",
 	}
@@ -302,7 +302,7 @@ func TestHandleClientLogoGet_StarETag_304(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "my-app").Return(client, nil)
-	database.On("GetClientLogoByClientId", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(clientLogo, nil)
+	database.On("GetClientLogoByClientID", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(clientLogo, nil)
 
 	handler.ServeHTTP(rr, req)
 

@@ -41,7 +41,7 @@ func TestAPIUserCreatePost_TheSetupEmailLinkSetsThePassword(t *testing.T) {
 	var created api.CreateUserResponse
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&created))
 	_ = resp.Body.Close()
-	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, created.User.Id) })
+	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, created.User.ID) })
 
 	link := latestResetLink(t, email)
 	parsed, err := url.Parse(link)
@@ -49,7 +49,7 @@ func TestAPIUserCreatePost_TheSetupEmailLinkSetsThePassword(t *testing.T) {
 	code := parsed.Query().Get("code")
 	require.NotEmpty(t, code)
 
-	stored, err := database.GetUserById(context.Background(), nil, created.User.Id)
+	stored, err := database.GetUserByID(context.Background(), nil, created.User.ID)
 	require.NoError(t, err)
 	require.NotNil(t, stored)
 	assert.Equal(t, hashutil.HashString(code), stored.ForgotPasswordCodeHash,
@@ -57,18 +57,18 @@ func TestAPIUserCreatePost_TheSetupEmailLinkSetsThePassword(t *testing.T) {
 	assert.True(t, stored.ForgotPasswordCodeIssuedAt.Valid)
 	assert.Empty(t, stored.PasswordHash, "the account is created with no password, for the link to set")
 
-	client := createHttpClient(t)
+	client := createHTTPClient(t)
 	cleanURL := followResetLink(t, client, link)
-	continuationId := loadResetForm(t, client, cleanURL)
+	continuationID := loadResetForm(t, client, cleanURL)
 
 	newPassword := fake.Password(20)
-	resp = postCleanReset(t, client, cleanURL, newPassword, continuationId)
+	resp = postCleanReset(t, client, cleanURL, newPassword, continuationID)
 	body := bodyString(t, resp)
 	_ = resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	assert.Contains(t, body, resetSucceededText)
 
-	assert.True(t, passwordhash.Verify(passwordHashOf(t, created.User.Id), newPassword),
+	assert.True(t, passwordhash.Verify(passwordHashOf(t, created.User.ID), newPassword),
 		"the setup link must set the new account's password")
 }
 
@@ -83,7 +83,7 @@ func createUserMembers(t *testing.T, req api.CreateUserAdminRequest) (int, map[s
 	defer func() { _ = resp.Body.Close() }()
 	t.Cleanup(func() {
 		if created, err := database.GetUserByEmail(context.Background(), nil, req.Email); err == nil && created != nil {
-			_ = database.DeleteUser(context.Background(), nil, created.Id)
+			_ = database.DeleteUser(context.Background(), nil, created.ID)
 		}
 	})
 
@@ -150,7 +150,7 @@ func TestAPIUserCreatePost_ASetupEmailThatCannotBeSentAnswersTheUser(t *testing.
 	stored, err := database.GetUserByEmail(context.Background(), nil, email)
 	require.NoError(t, err)
 	require.NotNil(t, stored, "the user is created although its email was not sent")
-	assert.Equal(t, answered.Id, stored.Id)
+	assert.Equal(t, answered.ID, stored.ID)
 	assert.NotEmpty(t, stored.ForgotPasswordCodeHash, "the setup code is stored as when the email goes out")
 }
 

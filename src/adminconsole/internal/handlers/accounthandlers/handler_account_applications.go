@@ -14,20 +14,20 @@ import (
 // disconnect of one (#135 decisions 2 and 7).
 type accountApplicationsAPI interface {
 	GetAccountConnectedClients(ctx context.Context, accessToken string) ([]api.ConnectedClientResponse, error)
-	DisconnectAccountClient(ctx context.Context, accessToken string, clientId int64) error
+	DisconnectAccountClient(ctx context.Context, accessToken string, clientID int64) error
 }
 
 // HandleApplicationsGet draws the Applications page: every client the user is connected to, in the
 // API's order.
 func HandleApplicationsGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient accountApplicationsAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
@@ -53,28 +53,28 @@ func HandleApplicationsGet(
 // for row-actions.js. The page offers no button for the console itself (decision 5), and the
 // auth server answers whether there was anything to end.
 func HandleApplicationsDisconnectPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient accountApplicationsAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JSONError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.JSONError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
 		// The id decodes straight into an int64, so a fraction is refused rather than truncated
 		// and a large id is not rounded to a neighbour's: either could name another client.
 		var data struct {
-			ClientId int64 `json:"clientId"`
+			ClientID int64 `json:"clientId"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&data); err != nil || data.ClientId <= 0 {
+		if err := json.NewDecoder(r.Body).Decode(&data); err != nil || data.ClientID <= 0 {
 			render.JSONBadRequestBody(httpHelper, w, r)
 			return
 		}
 
-		if err := apiClient.DisconnectAccountClient(r.Context(), jwtInfo.TokenResponse.AccessToken, data.ClientId); err != nil {
+		if err := apiClient.DisconnectAccountClient(r.Context(), jwtInfo.TokenResponse.AccessToken, data.ClientID); err != nil {
 			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
 		}

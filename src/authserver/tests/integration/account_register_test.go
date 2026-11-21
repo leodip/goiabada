@@ -34,8 +34,8 @@ func setRegSettings(t *testing.T, selfRegEnabled, requiresVerify, smtpEnabled bo
 // (#155) and the page load stayed: a POST test whose form does not render is testing nothing, and
 // this is the only assertion in this file that the GET binding works at all.
 func loadRegisterPage(t *testing.T, client *http.Client) {
-	destUrl := appConfig.AuthServer.BaseURL + "/account/register"
-	resp := loadPage(t, client, destUrl)
+	destURL := appConfig.AuthServer.BaseURL + "/account/register"
+	resp := loadPage(t, client, destURL)
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200 from /account/register, got %d", resp.StatusCode)
@@ -43,7 +43,7 @@ func loadRegisterPage(t *testing.T, client *http.Client) {
 }
 
 func postRegister(t *testing.T, client *http.Client, email, password, confirm string) *http.Response {
-	destUrl := appConfig.AuthServer.BaseURL + "/account/register"
+	destURL := appConfig.AuthServer.BaseURL + "/account/register"
 	formData := url.Values{
 		"email":                {email},
 		"password":             {password},
@@ -51,10 +51,10 @@ func postRegister(t *testing.T, client *http.Client, email, password, confirm st
 	}
 	// require, not assert: returning a nil response here would surface as a
 	// SIGSEGV in the caller instead of the real connectivity error.
-	req, err := http.NewRequest("POST", destUrl, strings.NewReader(formData.Encode()))
+	req, err := http.NewRequest("POST", destURL, strings.NewReader(formData.Encode()))
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("Referer", destUrl)
+	req.Header.Set("Referer", destURL)
 	req.Header.Set("Origin", appConfig.AuthServer.BaseURL)
 	resp, err := client.Do(req)
 	require.NoError(t, err)
@@ -65,11 +65,11 @@ func postRegister(t *testing.T, client *http.Client, email, password, confirm st
 // address alone: the password is chosen from the emailed link (#207 decision 1).
 func postRegisterAddress(t *testing.T, client *http.Client, email string) *http.Response {
 	t.Helper()
-	destUrl := appConfig.AuthServer.BaseURL + "/account/register"
-	req, err := http.NewRequest("POST", destUrl, strings.NewReader(url.Values{"email": {email}}.Encode()))
+	destURL := appConfig.AuthServer.BaseURL + "/account/register"
+	req, err := http.NewRequest("POST", destURL, strings.NewReader(url.Values{"email": {email}}.Encode()))
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("Referer", destUrl)
+	req.Header.Set("Referer", destURL)
 	req.Header.Set("Origin", appConfig.AuthServer.BaseURL)
 	resp, err := client.Do(req)
 	require.NoError(t, err)
@@ -87,7 +87,7 @@ func bodyString(t *testing.T, resp *http.Response) string {
 func TestSelfRegister_GetPage_Disabled(t *testing.T) {
 	setRegSettings(t, false, false, true)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp := loadPage(t, httpClient, appConfig.AuthServer.BaseURL+"/account/register")
 	defer func() { _ = resp.Body.Close() }()
 
@@ -103,7 +103,7 @@ func TestSelfRegister_GetPage_Disabled(t *testing.T) {
 // TestSelfRegister_Post_SMTPEnabled_RequiresVerification_FullFlow.
 func TestSelfRegister_RefusedWhileItRequiresVerificationAndEmailIsOff(t *testing.T) {
 	setRegSettings(t, true, true, false)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
 	page := loadPage(t, httpClient, appConfig.AuthServer.BaseURL+"/account/register")
 	_ = page.Body.Close()
@@ -140,7 +140,7 @@ func TestSelfRegister_RefusedWhileItRequiresVerificationAndEmailIsOff(t *testing
 func TestSelfRegister_GetPage_Enabled(t *testing.T) {
 	setRegSettings(t, true, false, false)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp := loadPage(t, httpClient, appConfig.AuthServer.BaseURL+"/account/register")
 	defer func() { _ = resp.Body.Close() }()
 
@@ -154,7 +154,7 @@ func TestSelfRegister_GetPage_WithVerification_AsksForTheAddressAlone(t *testing
 	useMailpitSMTP(t)
 
 	setRegSettings(t, true, true, true)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp := loadPage(t, httpClient, appConfig.AuthServer.BaseURL+"/account/register")
 	body := bodyString(t, resp)
 	_ = resp.Body.Close()
@@ -183,7 +183,7 @@ func TestSelfRegister_GetPage_WithVerification_AsksForTheAddressAlone(t *testing
 func TestSelfRegister_Post_SMTPDisabled_RendersSuccessPage(t *testing.T) {
 	setRegSettings(t, true, false, false)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	loadRegisterPage(t, httpClient)
 
 	email := fake.Email()
@@ -217,7 +217,7 @@ func TestSelfRegister_Post_SMTPDisabled_RendersSuccessPage(t *testing.T) {
 func TestSelfRegister_Post_SMTPEnabled_NoVerification_RendersSuccess(t *testing.T) {
 	setRegSettings(t, true, false, true)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	loadRegisterPage(t, httpClient)
 
 	email := fake.Email()
@@ -253,7 +253,7 @@ func TestSelfRegister_Post_AddressLengths(t *testing.T) {
 		{"a local part of 64 characters", uniqueLocalPartOfLength(64) + "@example.com"},
 	} {
 		t.Run(tc.name+" registers", func(t *testing.T) {
-			httpClient := createHttpClient(t)
+			httpClient := createHTTPClient(t)
 			loadRegisterPage(t, httpClient)
 
 			password := fake.Password(20)
@@ -265,7 +265,7 @@ func TestSelfRegister_Post_AddressLengths(t *testing.T) {
 			user, err := database.GetUserByEmail(context.Background(), nil, tc.email)
 			require.NoError(t, err)
 			require.NotNil(t, user)
-			t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.Id) })
+			t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.ID) })
 			assert.Equal(t, tc.email, user.Email)
 		})
 	}
@@ -275,7 +275,7 @@ func TestSelfRegister_Post_AddressLengths(t *testing.T) {
 		{"a local part of 65 characters", uniqueLocalPartOfLength(65) + "@example.com", "Please enter a valid email address."},
 	} {
 		t.Run(tc.name+" is refused", func(t *testing.T) {
-			httpClient := createHttpClient(t)
+			httpClient := createHTTPClient(t)
 			loadRegisterPage(t, httpClient)
 
 			password := fake.Password(20)
@@ -383,19 +383,19 @@ func loadActivationForm(t *testing.T, client *http.Client, cleanURL string, emai
 	assert.Contains(t, body, `name="password"`)
 	assert.Contains(t, body, `name="passwordConfirmation"`)
 	assert.Contains(t, body, "Create account")
-	return continuationIdIn(t, body)
+	return continuationIDIn(t, body)
 }
 
 // postActivation submits the form to the clean URL, which is where the template's empty action
 // sends it.
 func postActivation(t *testing.T, client *http.Client, cleanURL, password, confirmation,
-	continuationId string) *http.Response {
+	continuationID string) *http.Response {
 	t.Helper()
 
 	form := url.Values{
 		"password":             {password},
 		"passwordConfirmation": {confirmation},
-		"continuationId":       {continuationId},
+		"continuationId":       {continuationID},
 	}
 	req, err := http.NewRequest("POST", cleanURL, strings.NewReader(form.Encode()))
 	require.NoError(t, err)
@@ -413,7 +413,7 @@ func postActivation(t *testing.T, client *http.Client, cleanURL, password, confi
 func registerAndFollowLink(t *testing.T, email string) (*http.Client, string) {
 	t.Helper()
 
-	browser := createHttpClient(t)
+	browser := createHTTPClient(t)
 	loadRegisterPage(t, browser)
 
 	resp := postRegisterAddress(t, browser, email)
@@ -433,7 +433,7 @@ func TestSelfRegister_Post_SMTPEnabled_RequiresVerification_FullFlow(t *testing.
 	useMailpitSMTP(t)
 	setRegSettings(t, true, true, true)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	loadRegisterPage(t, httpClient)
 
 	email := registerPlusAddress()
@@ -465,14 +465,14 @@ func TestSelfRegister_Post_SMTPEnabled_RequiresVerification_FullFlow(t *testing.
 	assert.Equal(t, expectedHash, preReg.VerificationCodeHash)
 
 	cleanURL := followActivationLink(t, httpClient, link)
-	continuationId := loadActivationForm(t, httpClient, cleanURL, email)
+	continuationID := loadActivationForm(t, httpClient, cleanURL, email)
 
 	user, err = database.GetUserByEmail(context.Background(), nil, email)
 	require.NoError(t, err)
 	assert.Nil(t, user, "rendering the password form must create nothing")
 
 	const chosenPassword = "Chosen-At-Activation-1!"
-	activateResp := postActivation(t, httpClient, cleanURL, chosenPassword, chosenPassword, continuationId)
+	activateResp := postActivation(t, httpClient, cleanURL, chosenPassword, chosenPassword, continuationID)
 	defer func() { _ = activateResp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, activateResp.StatusCode)
@@ -500,7 +500,7 @@ func TestSelfRegister_TheActivationMailSaysThePasswordIsChosenFromTheLink(t *tes
 	setRegSettings(t, true, true, true)
 
 	email := registerPlusAddress()
-	browser := createHttpClient(t)
+	browser := createHTTPClient(t)
 	loadRegisterPage(t, browser)
 	resp := postRegisterAddress(t, browser, email)
 	_ = resp.Body.Close()
@@ -510,7 +510,7 @@ func TestSelfRegister_TheActivationMailSaysThePasswordIsChosenFromTheLink(t *tes
 	require.Len(t, messages, 1)
 	message := messages[0]
 
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
+	settings, err := database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err)
 
 	assert.Equal(t, "Activate your account", message.Subject)
@@ -539,10 +539,10 @@ func TestSelfRegister_FetchingTheLinkCreatesNoAccount(t *testing.T) {
 	assert.NotNil(t, preReg, "the pending registration must survive a fetch")
 
 	// The recipient, in a browser of their own, still completes it.
-	recipient := createHttpClient(t)
+	recipient := createHTTPClient(t)
 	recipientCleanURL := followActivationLink(t, recipient, latestActivationLink(t, email))
-	continuationId := loadActivationForm(t, recipient, recipientCleanURL, email)
-	activateResp := postActivation(t, recipient, recipientCleanURL, "Recipient-Chose-1!", "Recipient-Chose-1!", continuationId)
+	continuationID := loadActivationForm(t, recipient, recipientCleanURL, email)
+	activateResp := postActivation(t, recipient, recipientCleanURL, "Recipient-Chose-1!", "Recipient-Chose-1!", continuationID)
 	body := bodyString(t, activateResp)
 	_ = activateResp.Body.Close()
 	require.Contains(t, body, activationSucceededText)
@@ -561,22 +561,22 @@ func TestSelfRegister_ActivationRedrawsTheFormForAMismatchedConfirmation(t *test
 
 	email := registerPlusAddress()
 	browser, cleanURL := registerAndFollowLink(t, email)
-	continuationId := loadActivationForm(t, browser, cleanURL, email)
+	continuationID := loadActivationForm(t, browser, cleanURL, email)
 
-	resp := postActivation(t, browser, cleanURL, "Chosen-At-Activation-1!", "Something-Else-1!", continuationId)
+	resp := postActivation(t, browser, cleanURL, "Chosen-At-Activation-1!", "Something-Else-1!", continuationID)
 	body := bodyString(t, resp)
 	_ = resp.Body.Close()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	assert.Contains(t, body, activationFormTitle)
 	assert.Contains(t, html.UnescapeString(body), "The passwords don't match.")
-	assert.Equal(t, continuationId, continuationIdIn(t, body), "the redraw must carry the continuation back")
+	assert.Equal(t, continuationID, continuationIDIn(t, body), "the redraw must carry the continuation back")
 
 	user, err := database.GetUserByEmail(context.Background(), nil, email)
 	require.NoError(t, err)
 	assert.Nil(t, user, "a refused password must create nothing")
 
-	resp = postActivation(t, browser, cleanURL, "Chosen-At-Activation-1!", "Chosen-At-Activation-1!", continuationId)
+	resp = postActivation(t, browser, cleanURL, "Chosen-At-Activation-1!", "Chosen-At-Activation-1!", continuationID)
 	body = bodyString(t, resp)
 	_ = resp.Body.Close()
 	assert.Contains(t, body, activationSucceededText)
@@ -592,13 +592,13 @@ func TestSelfRegister_ReplayedMarkerAfterActivationIsRefused(t *testing.T) {
 
 	email := registerPlusAddress()
 	httpClient, cleanURL := registerAndFollowLink(t, email)
-	continuationId := loadActivationForm(t, httpClient, cleanURL, email)
+	continuationID := loadActivationForm(t, httpClient, cleanURL, email)
 
 	// Taken while the marker is still live and usable.
 	captured := capturedSessionCookies(t, httpClient)
 
 	password := fake.Password(20)
-	activateResp := postActivation(t, httpClient, cleanURL, password, password, continuationId)
+	activateResp := postActivation(t, httpClient, cleanURL, password, password, continuationID)
 	activationBody := bodyString(t, activateResp)
 	_ = activateResp.Body.Close()
 	require.Contains(t, activationBody, activationSucceededText)
@@ -607,7 +607,7 @@ func TestSelfRegister_ReplayedMarkerAfterActivationIsRefused(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, activated)
 
-	replayResp := postActivation(t, clientCarrying(t, captured), cleanURL, "Attacker123!", "Attacker123!", continuationId)
+	replayResp := postActivation(t, clientCarrying(t, captured), cleanURL, "Attacker123!", "Attacker123!", continuationID)
 	replayBody := bodyString(t, replayResp)
 	_ = replayResp.Body.Close()
 
@@ -619,7 +619,7 @@ func TestSelfRegister_ReplayedMarkerAfterActivationIsRefused(t *testing.T) {
 	after, err := database.GetUserByEmail(context.Background(), nil, email)
 	require.NoError(t, err)
 	require.NotNil(t, after)
-	assert.Equal(t, activated.Id, after.Id,
+	assert.Equal(t, activated.ID, after.ID,
 		"a replayed submission must not create a second account")
 	assert.Equal(t, activated.PasswordHash, after.PasswordHash,
 		"a replayed submission must not change the password")
@@ -633,7 +633,7 @@ func TestSelfRegister_ALinkMailedBeforeEmailWasTurnedOffStillActivates(t *testin
 	setRegSettings(t, true, true, true)
 
 	email := registerPlusAddress()
-	browser := createHttpClient(t)
+	browser := createHTTPClient(t)
 	loadRegisterPage(t, browser)
 	resp := postRegisterAddress(t, browser, email)
 	_ = resp.Body.Close()
@@ -641,7 +641,7 @@ func TestSelfRegister_ALinkMailedBeforeEmailWasTurnedOffStillActivates(t *testin
 	link := latestActivationLink(t, email)
 
 	// While registration is available the register-again page links to the form.
-	unknown := loadPage(t, createHttpClient(t), appConfig.AuthServer.BaseURL+"/account/activate?code=unknown")
+	unknown := loadPage(t, createHTTPClient(t), appConfig.AuthServer.BaseURL+"/account/activate?code=unknown")
 	defer func() { _ = unknown.Body.Close() }()
 	require.Equal(t, http.StatusOK, unknown.StatusCode)
 	assert.Equal(t, 1, parseHTMLResponse(t, unknown).Find(`a[href^="/account/register"]`).Length(),
@@ -654,10 +654,10 @@ func TestSelfRegister_ALinkMailedBeforeEmailWasTurnedOffStillActivates(t *testin
 	require.Equal(t, http.StatusNotFound, refused.StatusCode, "registration is unavailable now")
 
 	cleanURL := followActivationLink(t, browser, link)
-	continuationId := loadActivationForm(t, browser, cleanURL, email)
+	continuationID := loadActivationForm(t, browser, cleanURL, email)
 
 	const chosenPassword = "Chosen-At-Activation-1!"
-	activateResp := postActivation(t, browser, cleanURL, chosenPassword, chosenPassword, continuationId)
+	activateResp := postActivation(t, browser, cleanURL, chosenPassword, chosenPassword, continuationID)
 	activationBody := bodyString(t, activateResp)
 	_ = activateResp.Body.Close()
 	assert.Equal(t, http.StatusOK, activateResp.StatusCode)
@@ -671,7 +671,7 @@ func TestSelfRegister_ALinkMailedBeforeEmailWasTurnedOffStillActivates(t *testin
 
 	// Followed again, the spent link lands on the register-again page, which leaves out the link
 	// to a form that answers not-found.
-	spent := loadPage(t, createHttpClient(t), link)
+	spent := loadPage(t, createHTTPClient(t), link)
 	defer func() { _ = spent.Body.Close() }()
 	require.Equal(t, http.StatusOK, spent.StatusCode)
 	doc := parseHTMLResponse(t, spent)
@@ -686,7 +686,7 @@ func TestSelfRegister_ASecondLinkDoesNotRetargetTheRedirectInFlight(t *testing.T
 	useMailpitSMTP(t)
 	setRegSettings(t, true, true, true)
 
-	browser := createHttpClient(t)
+	browser := createHTTPClient(t)
 	loadRegisterPage(t, browser)
 
 	firstEmail := registerPlusAddress()
@@ -695,7 +695,7 @@ func TestSelfRegister_ASecondLinkDoesNotRetargetTheRedirectInFlight(t *testing.T
 	require.Equal(t, http.StatusOK, firstResp.StatusCode)
 
 	// A second registration, made from somewhere else entirely.
-	elsewhere := createHttpClient(t)
+	elsewhere := createHTTPClient(t)
 	loadRegisterPage(t, elsewhere)
 
 	secondEmail := registerPlusAddress()
@@ -716,9 +716,9 @@ func TestSelfRegister_ASecondLinkDoesNotRetargetTheRedirectInFlight(t *testing.T
 	assert.Contains(t, steeredBody, activationExpiredText)
 
 	// The redirect in flight renders the form for, and activates, the registration that produced it.
-	continuationId := loadActivationForm(t, browser, cleanURL, firstEmail)
+	continuationID := loadActivationForm(t, browser, cleanURL, firstEmail)
 	password := fake.Password(20)
-	activateResp := postActivation(t, browser, cleanURL, password, password, continuationId)
+	activateResp := postActivation(t, browser, cleanURL, password, password, continuationID)
 	activationBody := bodyString(t, activateResp)
 	_ = activateResp.Body.Close()
 	require.Contains(t, activationBody, activationSucceededText)
@@ -778,18 +778,18 @@ func TestSelfRegister_ActivationIsRefusedForAnAddressThatHasAnAccount(t *testing
 		after, err := database.GetUserByEmail(context.Background(), nil, email)
 		require.NoError(t, err)
 		require.NotNil(t, after)
-		assert.Equal(t, existing.Id, after.Id)
+		assert.Equal(t, existing.ID, after.ID)
 		assert.Equal(t, "irrelevant", after.PasswordHash, "the existing account is untouched")
 	})
 
 	t.Run("at the POST", func(t *testing.T) {
 		email := registerPlusAddress()
 		browser, cleanURL := registerAndFollowLink(t, email)
-		continuationId := loadActivationForm(t, browser, cleanURL, email)
+		continuationID := loadActivationForm(t, browser, cleanURL, email)
 		existing := createAccountAt(t, email)
 
 		password := fake.Password(20)
-		resp := postActivation(t, browser, cleanURL, password, password, continuationId)
+		resp := postActivation(t, browser, cleanURL, password, password, continuationID)
 		body := bodyString(t, resp)
 		_ = resp.Body.Close()
 
@@ -804,7 +804,7 @@ func TestSelfRegister_ActivationIsRefusedForAnAddressThatHasAnAccount(t *testing
 		after, err := database.GetUserByEmail(context.Background(), nil, email)
 		require.NoError(t, err)
 		require.NotNil(t, after)
-		assert.Equal(t, existing.Id, after.Id)
+		assert.Equal(t, existing.ID, after.ID)
 		assert.Equal(t, "irrelevant", after.PasswordHash, "the existing account is untouched")
 	})
 }
@@ -814,7 +814,7 @@ func TestSelfRegister_ActivationIsRefusedForAnAddressThatHasAnAccount(t *testing
 func TestSelfRegister_Post_Disabled_ReturnsError(t *testing.T) {
 	setRegSettings(t, true, false, false)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	loadRegisterPage(t, httpClient)
 
 	setRegSettings(t, false, false, false)
@@ -839,7 +839,7 @@ func TestSelfRegister_Post_DuplicateEmail(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, existing)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	loadRegisterPage(t, httpClient)
 
 	password := fake.Password(20)
@@ -859,7 +859,7 @@ func TestSelfRegister_Post_DuplicatePreRegistration(t *testing.T) {
 	requireDatabaseAuditLogs(t)
 	setRegSettings(t, true, true, true)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	loadRegisterPage(t, httpClient)
 
 	email := registerPlusAddress()
@@ -891,7 +891,7 @@ func TestSelfRegister_Post_DuplicatePreRegistration(t *testing.T) {
 	after, err := database.GetPreRegistrationByEmail(context.Background(), nil, email)
 	require.NoError(t, err)
 	require.NotNil(t, after)
-	assert.Equal(t, preReg.Id, after.Id, "the pending registration is untouched")
+	assert.Equal(t, preReg.ID, after.ID, "the pending registration is untouched")
 	assert.Equal(t, preReg.VerificationCodeHash, after.VerificationCodeHash)
 }
 
@@ -900,7 +900,7 @@ func TestSelfRegister_Post_DuplicatePreRegistration(t *testing.T) {
 func TestSelfRegister_Post_PasswordMismatch(t *testing.T) {
 	setRegSettings(t, true, false, false)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	loadRegisterPage(t, httpClient)
 
 	email := fake.Email()

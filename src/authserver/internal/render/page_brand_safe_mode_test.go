@@ -32,7 +32,7 @@ func safeModeBrand() *record.Brand {
 		light[token] = "#777777"
 	}
 	brand := record.NewBrand("Night", record.BrandAppearanceDark, record.BrandThemeCustom)
-	brand.Id = 7
+	brand.ID = 7
 	brand.Palette = &record.BrandPalette{Mode: record.BrandPaletteModeAdvanced, Light: light, Dark: maps.Clone(light)}
 	brand.CustomCSS = ".auth-card { border-width: 3px; }"
 	brand.SupportEmail = "help@example.com"
@@ -125,7 +125,7 @@ func TestRender_APageInSafeModeLinksTheSafeStylesheet(t *testing.T) {
 func TestRender_ASafeSignInIsDrawnInItsClientsSafeStylesheet(t *testing.T) {
 	client := safeModeBrand()
 	_, safe := safeLinks(t, client)
-	defaultBrand := &record.Brand{Id: 3, Name: "Default", Appearance: record.BrandAppearanceLight, Theme: "plum"}
+	defaultBrand := &record.Brand{ID: 3, Name: "Default", Appearance: record.BrandAppearanceLight, Theme: "plum"}
 
 	ctx := reqctx.WithPageClient(context.Background(), &reqctx.PageClient{})
 	reqctx.NamePageClient(ctx, "app-1")

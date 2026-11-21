@@ -16,7 +16,7 @@ import (
 // connectedClientsBind is the user's Connected clients tab bind for user 7 with the clients named.
 func connectedClientsBind(clients []render.ConnectedClientInfo) map[string]interface{} {
 	return map[string]interface{}{
-		"user":    &api.UserResponse{Id: 7, Email: "someone@example.com"},
+		"user":    &api.UserResponse{ID: 7, Email: "someone@example.com"},
 		"clients": clients,
 		"page":    "1",
 		"query":   "",
@@ -29,9 +29,9 @@ func connectedClientsBind(clients []render.ConnectedClientInfo) map[string]inter
 // alone (#135 decision 7). The consent cell says when consent was given, or that none was asked.
 func TestRender_UserConnectedClientsTabLabelsEachScopeListItHas(t *testing.T) {
 	out := renderMenuPageIn(t, "/admin_users_connected_clients.html", connectedClientsBind([]render.ConnectedClientInfo{
-		{ClientId: 1, Client: "consent-only", HasConsent: true, ConsentScope: "openid email"},
-		{ClientId: 2, Client: "grants-only", GrantScope: "openid profile"},
-		{ClientId: 3, Client: "both", HasConsent: true, ConsentScope: "openid", GrantScope: "openid offline_access"},
+		{ClientID: 1, Client: "consent-only", HasConsent: true, ConsentScope: "openid email"},
+		{ClientID: 2, Client: "grants-only", GrantScope: "openid profile"},
+		{ClientID: 3, Client: "both", HasConsent: true, ConsentScope: "openid", GrantScope: "openid offline_access"},
 	}), "en", true)
 	rows := applicationRows(t, out)
 	require.Len(t, rows, 3)
@@ -65,9 +65,9 @@ func TestRender_UserConnectedClientsTabLabelsEachScopeListItHas(t *testing.T) {
 // description once under the identifier.
 func TestRender_UserConnectedClientsTabNamesEachClient(t *testing.T) {
 	out := renderMenuPageIn(t, "/admin_users_connected_clients.html", connectedClientsBind([]render.ConnectedClientInfo{
-		{ClientId: 1, Client: "review-calendar", ClientName: "Review calendar", ClientDescription: "Team calendar", GrantScope: "openid"},
-		{ClientId: 2, Client: "portal", ClientName: "portal", GrantScope: "openid"},
-		{ClientId: 3, Client: "dcr_a3f9", ClientName: "Payroll Portal", ClientNameUnverified: true,
+		{ClientID: 1, Client: "review-calendar", ClientName: "Review calendar", ClientDescription: "Team calendar", GrantScope: "openid"},
+		{ClientID: 2, Client: "portal", ClientName: "portal", GrantScope: "openid"},
+		{ClientID: 3, Client: "dcr_a3f9", ClientName: "Payroll Portal", ClientNameUnverified: true,
 			ClientDescription: "Payroll Portal", GrantScope: "openid"},
 	}), "en", true)
 	rows := applicationRows(t, out)
@@ -103,7 +103,7 @@ func scopeItems(fragment string) []string {
 // through a row's lists hears which is which.
 func TestRender_UserConnectedClientsTabNamesEachScopeListByItsLabel(t *testing.T) {
 	out := renderMenuPageIn(t, "/admin_users_connected_clients.html", connectedClientsBind([]render.ConnectedClientInfo{
-		{ClientId: 3, Client: "both", HasConsent: true, ConsentScope: "openid", GrantScope: "openid"},
+		{ClientID: 3, Client: "both", HasConsent: true, ConsentScope: "openid", GrantScope: "openid"},
 	}), "en", true)
 
 	for _, label := range []string{"Consented to", "Holds now"} {
@@ -119,8 +119,8 @@ func TestRender_UserConnectedClientsTabNamesEachScopeListByItsLabel(t *testing.T
 // page's user in its route and the row's client in its body.
 func TestRender_UserConnectedClientsTabTagsTheCurrentClientInPlaceOfDisconnect(t *testing.T) {
 	out := renderMenuPageIn(t, "/admin_users_connected_clients.html", connectedClientsBind([]render.ConnectedClientInfo{
-		{ClientId: 1, Client: "admin-console-client", GrantScope: "openid", IsCurrent: true},
-		{ClientId: 2, Client: "portal", GrantScope: "openid"},
+		{ClientID: 1, Client: "admin-console-client", GrantScope: "openid", IsCurrent: true},
+		{ClientID: 2, Client: "portal", GrantScope: "openid"},
 	}), "en", true)
 	rows := applicationRows(t, out)
 	require.Len(t, rows, 2)
@@ -137,7 +137,7 @@ func TestRender_UserConnectedClientsTabTagsTheCurrentClientInPlaceOfDisconnect(t
 // decision 7). The administrator's page names the client by its identifier.
 func TestRender_UserConnectedClientsTabConfirmationSaysWhatADisconnectDoes(t *testing.T) {
 	out := renderMenuPageIn(t, "/admin_users_connected_clients.html", connectedClientsBind([]render.ConnectedClientInfo{
-		{ClientId: 2, Client: "portal", ClientName: "Customer portal", GrantScope: "openid"},
+		{ClientID: 2, Client: "portal", ClientName: "Customer portal", GrantScope: "openid"},
 	}), "en", true)
 
 	confirms := regexp.MustCompile(`data-confirm="([^"]*)"`).FindAllStringSubmatch(out, -1)

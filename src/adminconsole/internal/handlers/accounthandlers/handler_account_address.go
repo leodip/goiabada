@@ -22,7 +22,7 @@ type accountAddressAPI interface {
 }
 
 func HandleAddressGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient accountAddressAPI,
 ) http.HandlerFunc {
@@ -35,9 +35,9 @@ func HandleAddressGet(
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		// Get JWT info to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
@@ -94,7 +94,7 @@ func HandleAddressGet(
 }
 
 func HandleAddressPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient accountAddressAPI,
 	baseURL string,
@@ -107,9 +107,9 @@ func HandleAddressPost(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get access token and current profile for potential error render
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 

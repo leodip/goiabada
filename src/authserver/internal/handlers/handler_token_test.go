@@ -81,7 +81,7 @@ func TestHandleTokenPost(t *testing.T) {
 			refused := oauth.NewErrorDetailWithHTTPStatus("invalid_client", "Client authentication failed.", http.StatusUnauthorized)
 			tokenValidator := handlersmocks.NewTokenValidator(t)
 			tokenValidator.On("ValidateTokenRequest", mock.Anything, mock.Anything, mock.MatchedBy(func(input *protocolvalidation.ValidateTokenRequestInput) bool {
-				return input.GrantType == "client_credentials" && input.ClientId == "a-client" && input.ClientSecret == "a-secret"
+				return input.GrantType == "client_credentials" && input.ClientID == "a-client" && input.ClientSecret == "a-secret"
 			})).Return(nil, refused).Once()
 			jsonWriter := handlersmocks.NewJSONWriter(t)
 
@@ -117,7 +117,7 @@ func TestHandleTokenPost(t *testing.T) {
 			req, _ := http.NewRequest("POST", "/token",
 				http.MaxBytesReader(rr, io.NopCloser(strings.NewReader(form)), int64(len(form)-1)))
 			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-			req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{Id: 1}))
+			req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{ID: 1}))
 			require.Error(t, req.ParseForm(), "the limiter's parse fails")
 
 			jsonWriter.On("JSONError", rr, req, mock.MatchedBy(func(err error) bool {
@@ -188,7 +188,7 @@ func TestHandleTokenPost(t *testing.T) {
 
 	t.Run("Authorization_code: an issuer failure is answered as it arrived", func(t *testing.T) {
 		endpoint := newTokenEndpoint(t)
-		code := &record.Code{Id: 1}
+		code := &record.Code{ID: 1}
 		endpoint.validates(&protocolvalidation.AuthorizationCodeGrant{Code: code})
 
 		failure := oauth.NewErrorDetailWithHTTPStatus("server_error", "Failed to generate token", http.StatusInternalServerError)
@@ -203,7 +203,7 @@ func TestHandleTokenPost(t *testing.T) {
 
 	t.Run("Authorization_code successful flow", func(t *testing.T) {
 		endpoint := newTokenEndpoint(t)
-		code := &record.Code{Id: 1, ClientId: 3, UserId: 7}
+		code := &record.Code{ID: 1, ClientID: 3, UserID: 7}
 		requestSettings := &record.Settings{Issuer: "https://issuer.example"}
 		endpoint.settings = requestSettings
 		endpoint.validates(&protocolvalidation.AuthorizationCodeGrant{Code: code})
@@ -231,14 +231,14 @@ func TestHandleTokenPost(t *testing.T) {
 		endpoint := newTokenEndpoint(t)
 		requestSettings := &record.Settings{Issuer: "https://issuer.example"}
 		endpoint.settings = requestSettings
-		client := &record.Client{Id: 1, ClientIdentifier: "test_client"}
+		client := &record.Client{ID: 1, ClientIdentifier: "test_client"}
 		endpoint.validates(&protocolvalidation.ClientCredentialsGrant{Client: client, Scope: "test_scope"})
 
 		tokenResponse := &oauth.TokenResponse{AccessToken: "access_token", TokenType: "Bearer", ExpiresIn: 3600}
 		endpoint.issuer.On("IssueClientCredentialsGrant", mock.Anything, theseSettings(requestSettings), client, "test_scope", "").
 			Return(tokenResponse, nil).Once()
 		endpoint.auditLogger.On("Log", mock.Anything, audit.EventTokenIssuedClientCredentialsResponse, map[string]interface{}{
-			"client_id": client.Id,
+			"client_id": client.ID,
 			"scope":     "test_scope",
 		}).Return().Once()
 		endpoint.jsonWriter.On("EncodeJSON", mock.Anything, mock.Anything, tokenResponse).Return().Once()
@@ -252,7 +252,7 @@ func TestHandleTokenPost(t *testing.T) {
 
 	t.Run("Client_credentials: an issuer failure is answered, and nothing is audited", func(t *testing.T) {
 		endpoint := newTokenEndpoint(t)
-		client := &record.Client{Id: 1, ClientIdentifier: "test_client"}
+		client := &record.Client{ID: 1, ClientIdentifier: "test_client"}
 		endpoint.validates(&protocolvalidation.ClientCredentialsGrant{Client: client, Scope: "test_scope"})
 
 		failure := errs.New("signing key unavailable")
@@ -269,8 +269,8 @@ func TestHandleTokenPost(t *testing.T) {
 	t.Run("Password: an issuer failure is answered, and nothing is audited", func(t *testing.T) {
 		endpoint := newTokenEndpoint(t)
 		grant := &protocolvalidation.PasswordGrant{
-			Client: &record.Client{Id: 1, ClientIdentifier: "test_client"},
-			User:   &record.User{Id: 42},
+			Client: &record.Client{ID: 1, ClientIdentifier: "test_client"},
+			User:   &record.User{ID: 42},
 			Scope:  "openid",
 		}
 		endpoint.validates(grant)
@@ -292,8 +292,8 @@ func TestHandleTokenPost(t *testing.T) {
 	t.Run("Password: a client renamed before the grant is answered invalid_client", func(t *testing.T) {
 		endpoint := newTokenEndpoint(t)
 		grant := &protocolvalidation.PasswordGrant{
-			Client: &record.Client{Id: 1, ClientIdentifier: "test_client"},
-			User:   &record.User{Id: 42},
+			Client: &record.Client{ID: 1, ClientIdentifier: "test_client"},
+			User:   &record.User{ID: 42},
 			Scope:  "openid",
 		}
 		endpoint.validates(grant)
@@ -317,8 +317,8 @@ func TestHandleTokenPost(t *testing.T) {
 	t.Run("Password successful flow", func(t *testing.T) {
 		endpoint := newTokenEndpoint(t)
 		grant := &protocolvalidation.PasswordGrant{
-			Client: &record.Client{Id: 1, ClientIdentifier: "test_client"},
-			User:   &record.User{Id: 42},
+			Client: &record.Client{ID: 1, ClientIdentifier: "test_client"},
+			User:   &record.User{ID: 42},
 			Scope:  "openid",
 		}
 		endpoint.validates(grant)
@@ -388,18 +388,18 @@ func TestHandleTokenPost(t *testing.T) {
 
 		tokenResponse := &oauth.TokenResponse{AccessToken: "new_access_token", RefreshToken: "new_refresh_token", TokenType: "Bearer", ExpiresIn: 3600}
 		endpoint.issuer.On("IssueRefreshTokenGrant", mock.Anything, mock.Anything, mock.Anything).
-			Return(tokenResponse, &issuance.RefreshOutcome{BumpedSession: &record.UserSession{Id: 1, UserId: 456}}, nil).Once()
+			Return(tokenResponse, &issuance.RefreshOutcome{BumpedSession: &record.UserSession{ID: 1, UserID: 456}}, nil).Once()
 
 		var order []string
 		endpoint.auditLogger.On("Log", mock.Anything, audit.EventBumpedUserSession, map[string]interface{}{
 			"user_id":   int64(456),
-			"client_id": grant.RefreshToken.Code.ClientId,
+			"client_id": grant.RefreshToken.Code.ClientID,
 		}).Run(func(mock.Arguments) { order = append(order, audit.EventBumpedUserSession) }).Return().Once()
 		endpoint.auditLogger.On("Log", mock.Anything, audit.EventTokenIssuedRefreshTokenResponse, map[string]interface{}{
-			"code_id":           grant.RefreshToken.Code.Id,
+			"code_id":           grant.RefreshToken.Code.ID,
 			"user_id":           int64(456),
 			"client_id":         int64(123),
-			"refresh_token_jti": grant.RefreshToken.RefreshTokenJti,
+			"refresh_token_jti": grant.RefreshToken.RefreshTokenJTI,
 			"flow":              "auth_code",
 		}).Run(func(mock.Arguments) { order = append(order, audit.EventTokenIssuedRefreshTokenResponse) }).Return().Once()
 		endpoint.jsonWriter.On("EncodeJSON", mock.Anything, mock.Anything, tokenResponse).Return().Once()
@@ -422,10 +422,10 @@ func TestHandleTokenPost(t *testing.T) {
 			Return(tokenResponse, &issuance.RefreshOutcome{}, nil).Once()
 		// The strict double refuses any other Log call, the bump's included.
 		endpoint.auditLogger.On("Log", mock.Anything, audit.EventTokenIssuedRefreshTokenResponse, map[string]interface{}{
-			"code_id":           grant.RefreshToken.Code.Id,
+			"code_id":           grant.RefreshToken.Code.ID,
 			"user_id":           int64(456),
 			"client_id":         int64(123),
-			"refresh_token_jti": grant.RefreshToken.RefreshTokenJti,
+			"refresh_token_jti": grant.RefreshToken.RefreshTokenJTI,
 			"flow":              "auth_code",
 		}).Return().Once()
 		endpoint.jsonWriter.On("EncodeJSON", mock.Anything, mock.Anything, tokenResponse).Return().Once()
@@ -446,9 +446,9 @@ func TestHandleTokenPost(t *testing.T) {
 		endpoint.issuer.On("IssueRefreshTokenGrant", mock.Anything, mock.Anything, mock.Anything).
 			Return(tokenResponse, &issuance.RefreshOutcome{}, nil).Once()
 		endpoint.auditLogger.On("Log", mock.Anything, audit.EventTokenIssuedRefreshTokenResponse, map[string]interface{}{
-			"user_id":           grant.RefreshToken.UserId.Int64,
-			"client_id":         grant.RefreshToken.ClientId.Int64,
-			"refresh_token_jti": grant.RefreshToken.RefreshTokenJti,
+			"user_id":           grant.RefreshToken.UserID.Int64,
+			"client_id":         grant.RefreshToken.ClientID.Int64,
+			"refresh_token_jti": grant.RefreshToken.RefreshTokenJTI,
 			"flow":              "ropc",
 		}).Return().Once()
 		endpoint.jsonWriter.On("EncodeJSON", mock.Anything, mock.Anything, tokenResponse).Return().Once()
@@ -565,15 +565,15 @@ func (e *tokenEndpoint) assertExpectations(t *testing.T) {
 // the validator read.
 func codeRefreshGrant(revoked bool) *protocolvalidation.RefreshTokenGrant {
 	return &protocolvalidation.RefreshTokenGrant{
-		Client: &record.Client{Id: 123, ClientIdentifier: "test_client", AuthorizationCodeEnabled: true},
+		Client: &record.Client{ID: 123, ClientIdentifier: "test_client", AuthorizationCodeEnabled: true},
 		RefreshToken: &record.RefreshToken{
-			Id:                   1,
+			ID:                   1,
 			Revoked:              revoked,
-			RefreshTokenJti:      "jti-presented",
-			FirstRefreshTokenJti: "jti-family",
+			RefreshTokenJTI:      "jti-presented",
+			FirstRefreshTokenJTI: "jti-family",
 			SessionIdentifier:    "sid-1",
-			CodeId:               sql.NullInt64{Int64: 789, Valid: true},
-			Code:                 record.Code{Id: 789, ClientId: 123, UserId: 456},
+			CodeID:               sql.NullInt64{Int64: 789, Valid: true},
+			Code:                 record.Code{ID: 789, ClientID: 123, UserID: 456},
 		},
 	}
 }
@@ -582,14 +582,14 @@ func codeRefreshGrant(revoked bool) *protocolvalidation.RefreshTokenGrant {
 // client are on the token row.
 func ropcRefreshGrant(revoked bool) *protocolvalidation.RefreshTokenGrant {
 	return &protocolvalidation.RefreshTokenGrant{
-		Client: &record.Client{Id: 123, ClientIdentifier: "test_client"},
+		Client: &record.Client{ID: 123, ClientIdentifier: "test_client"},
 		RefreshToken: &record.RefreshToken{
-			Id:                   1,
+			ID:                   1,
 			Revoked:              revoked,
-			RefreshTokenJti:      "jti-presented",
-			FirstRefreshTokenJti: "jti-family",
-			UserId:               sql.NullInt64{Int64: 456, Valid: true},
-			ClientId:             sql.NullInt64{Int64: 123, Valid: true},
+			RefreshTokenJTI:      "jti-presented",
+			FirstRefreshTokenJTI: "jti-family",
+			UserID:               sql.NullInt64{Int64: 456, Valid: true},
+			ClientID:             sql.NullInt64{Int64: 123, Valid: true},
 		},
 		IsROPC: true,
 	}
@@ -617,9 +617,9 @@ func TestHandleTokenPost_AuthCodeReuse_RevokeFailureReturns500(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	reusedCode := &record.Code{
-		Id:                42,
-		ClientId:          7,
-		UserId:            13,
+		ID:                42,
+		ClientID:          7,
+		UserID:            13,
 		SessionIdentifier: "sid-reused",
 	}
 	reuseErr := &protocolvalidation.AuthCodeReusedError{
@@ -656,7 +656,7 @@ func TestHandleTokenPost_AuthCodeReuse_RevokeFailureReturns500(t *testing.T) {
 	database.AssertExpectations(t)
 
 	// Audit log must NOT fire when revocation fails: it is reserved for the
-	// post-commit success path where revokedJtis are real.
+	// post-commit success path where revokedJTIs are real.
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 	// invalid_grant response must NOT be sent: the client gets 500 instead.
 	// The one JSONError call is the 500 matched above; a second would be the invalid_grant.
@@ -684,7 +684,7 @@ func TestHandleTokenPost_AuthCodeReuse_BeginTransactionFailureReturns500(t *test
 	reuseErr := &protocolvalidation.AuthCodeReusedError{
 		Detail: oauth.NewErrorDetailWithHTTPStatus("invalid_grant", "Code is invalid.", http.StatusBadRequest),
 		Code: &record.Code{
-			Id:                7,
+			ID:                7,
 			SessionIdentifier: "sid-reused",
 		},
 	}
@@ -730,7 +730,7 @@ func TestHandleTokenPost_AuthCodeReuse_AuditsAfterTheCommit(t *testing.T) {
 
 	reuseErr := &protocolvalidation.AuthCodeReusedError{
 		Detail: oauth.NewErrorDetailWithHTTPStatus("invalid_grant", "Code is invalid.", http.StatusBadRequest),
-		Code:   &record.Code{Id: 42, ClientId: 7, UserId: 13, SessionIdentifier: "sid-reused"},
+		Code:   &record.Code{ID: 42, ClientID: 7, UserID: 13, SessionIdentifier: "sid-reused"},
 	}
 	tokenValidator.On("ValidateTokenRequest", req.Context(), mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
 		Return(nil, reuseErr)
@@ -739,14 +739,14 @@ func TestHandleTokenPost_AuthCodeReuse_AuditsAfterTheCommit(t *testing.T) {
 	note := func(what string) func(mock.Arguments) {
 		return func(mock.Arguments) { order = append(order, what) }
 	}
-	token := &record.RefreshToken{Id: 1, RefreshTokenJti: "rt-1"}
+	token := &record.RefreshToken{ID: 1, RefreshTokenJTI: "rt-1"}
 	datamocks.ExpectRunInTransaction(database, revokeTx, func(edge string) { order = append(order, edge) })
 	database.On("AcquireUserSessionRow", mock.Anything, revokeTx, "sid-reused").Return(true, nil).Once()
 	database.On("GetRefreshTokensBySessionIdentifier", mock.Anything, revokeTx, "sid-reused").
 		Return([]*record.RefreshToken{token}, nil).Once()
 	database.On("UpdateRefreshToken", mock.Anything, revokeTx, token).Run(note("revoke")).Return(nil).Once()
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, revokeTx, "sid-reused").
-		Return(&record.UserSession{Id: 9, SessionIdentifier: "sid-reused"}, nil).Once()
+		Return(&record.UserSession{ID: 9, SessionIdentifier: "sid-reused"}, nil).Once()
 	database.On("DeleteUserSession", mock.Anything, revokeTx, int64(9)).Return(nil).Once()
 
 	var audited map[string]interface{}
@@ -775,7 +775,7 @@ func TestHandleTokenPost_AuthCodeReuse_AuditsAfterTheCommit(t *testing.T) {
 // by the sequential-reuse path (covered by the integration CodeReuse_* tests).
 func TestHandleTokenPost_AuthCode_ConcurrentDoubleSpendLoses(t *testing.T) {
 	endpoint := newTokenEndpoint(t)
-	racedCode := &record.Code{Id: 42, ClientId: 7, UserId: 13, SessionIdentifier: "sid-raced"}
+	racedCode := &record.Code{ID: 42, ClientID: 7, UserID: 13, SessionIdentifier: "sid-raced"}
 	endpoint.validates(&protocolvalidation.AuthorizationCodeGrant{Code: racedCode})
 
 	endpoint.issuer.On("IssueAuthorizationCodeGrant", mock.Anything, mock.Anything, racedCode, "").
@@ -830,8 +830,8 @@ func TestHandleTokenPost_Refresh_ConcurrentDoubleSpendLoses(t *testing.T) {
 //
 // Both linkage shapes are run against the same expectations on purpose. A security-event
 // consumer must not need flow-specific logic to identify the client and user, which is
-// where this departs from EventTokenIssuedRefreshTokenResponse (codeId on one shape,
-// userId/clientId on the other).
+// where this departs from EventTokenIssuedRefreshTokenResponse (codeID on one shape,
+// userID/clientID on the other).
 //
 // The exact-key assertion is what pins the two negative requirements from decision 8: the
 // payload carries neither the presented refresh token itself nor a list of revoked JTIs.
@@ -842,10 +842,10 @@ func TestHandleTokenPost_Refresh_ConcurrentDoubleSpendLoses(t *testing.T) {
 // is the issuer's: issuance's TestIssueRefreshTokenGrant_AReplayContainsItsFamilyAndGoesNoFurther.
 func TestHandleTokenPost_Refresh_Replay_AuditsContainment(t *testing.T) {
 	const (
-		presentedJti = "jti-presented"
-		familyJti    = "jti-family"
-		clientId     = int64(123)
-		userId       = int64(456)
+		presentedJTI = "jti-presented"
+		familyJTI    = "jti-family"
+		clientID     = int64(123)
+		userID       = int64(456)
 	)
 
 	testCases := []struct {
@@ -887,11 +887,11 @@ func TestHandleTokenPost_Refresh_Replay_AuditsContainment(t *testing.T) {
 
 			require.Len(t, logged, 1, "exactly one replay event must be emitted")
 			assert.Equal(t, map[string]interface{}{
-				"presented_refresh_token_jti": presentedJti,
-				"first_refresh_token_jti":     familyJti,
+				"presented_refresh_token_jti": presentedJTI,
+				"first_refresh_token_jti":     familyJTI,
 				"revoked_count":               int64(2),
-				"client_id":                   clientId,
-				"user_id":                     userId,
+				"client_id":                   clientID,
+				"user_id":                     userID,
 				"flow":                        tc.wantFlow,
 			}, logged[0], "the replay payload must carry exactly these six fields")
 		})
@@ -1263,7 +1263,7 @@ func TestHandleTokenPost_ScopeDenialAudit(t *testing.T) {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
-		mockClient := &record.Client{Id: 42, ClientIdentifier: "test_client"}
+		mockClient := &record.Client{ID: 42, ClientIdentifier: "test_client"}
 		tokenValidator.On("ValidateTokenRequest", req.Context(), mock.Anything,
 			mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
 			Return(&protocolvalidation.ClientCredentialsGrant{Client: mockClient, Scope: "billing-api:read"}, nil)
@@ -1274,8 +1274,8 @@ func TestHandleTokenPost_ScopeDenialAudit(t *testing.T) {
 
 		auditLogger.On("Log", mock.Anything, audit.EventTokenIssuedClientCredentialsResponse, mock.MatchedBy(
 			func(details map[string]interface{}) bool {
-				clientId, ok := details["client_id"].(int64)
-				return ok && clientId == mockClient.Id && details["scope"] == "billing-api:read"
+				clientID, ok := details["client_id"].(int64)
+				return ok && clientID == mockClient.ID && details["scope"] == "billing-api:read"
 			})).Return()
 
 		jsonWriter.On("EncodeJSON", rr, req, tokenResponse).Return()
@@ -1325,8 +1325,8 @@ func TestHandleTokenPost_ROPC_IgnoresBrowserSession(t *testing.T) {
 	req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), "some-other-users-browser-session"))
 	rr := httptest.NewRecorder()
 
-	client := &record.Client{Id: 1, ClientIdentifier: "test_client"}
-	user := &record.User{Id: 42, Subject: fake.UUID(), AuthStateGeneration: 7}
+	client := &record.Client{ID: 1, ClientIdentifier: "test_client"}
+	user := &record.User{ID: 42, Subject: fake.UUID(), AuthStateGeneration: 7}
 
 	tokenValidator.On("ValidateTokenRequest", mock.Anything, mock.Anything,
 		mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
@@ -1425,8 +1425,8 @@ func TestHandleTokenPost_ROPC_SpendsTheLimiterBudgetOnInvalidGrantOnly(t *testin
 				Return(nil, failure)
 			jsonWriter.On("JSONError", mock.Anything, mock.Anything, mock.Anything).Return()
 		} else {
-			client := &record.Client{Id: 1, ClientIdentifier: "app"}
-			user := &record.User{Id: 42, Subject: fake.UUID()}
+			client := &record.Client{ID: 1, ClientIdentifier: "app"}
+			user := &record.User{ID: 42, Subject: fake.UUID()}
 			tokenValidator.On("ValidateTokenRequest", mock.Anything, mock.Anything, mock.Anything).
 				Return(&protocolvalidation.PasswordGrant{Client: client, User: user, Scope: "openid"}, nil)
 			tokenIssuer.On("IssuePasswordGrant", mock.Anything, mock.Anything, mock.Anything).
@@ -1520,7 +1520,7 @@ func TestHandleTokenPost_ROPC_SpendsTheLimiterBudgetOnInvalidGrantOnly(t *testin
 	// the account, and the wrapper must not hide the detail from it (#137).
 	t.Run("a disabled user spends the budget and emits both user_disabled and ropc_auth_failed", func(t *testing.T) {
 		disabled := &protocolvalidation.UserDisabledError{Detail: oauth.NewErrorDetailWithHTTPStatus(
-			"invalid_grant", "The user account is disabled.", http.StatusBadRequest), UserId: 42}
+			"invalid_grant", "The user account is disabled.", http.StatusBadRequest), UserID: 42}
 		assert.True(t, spends(t, disabled), "a disabled user's refusal compared the password, so it is charged")
 
 		handler, auditLogger := newHandler(t, disabled)

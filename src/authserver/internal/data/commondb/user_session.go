@@ -42,25 +42,25 @@ var userSessionColumns = columnList{
 // scanUserSession reads one row selected with userSessionColumns.
 func scanUserSession(row rowScanner, userSession *record.UserSession) error {
 	return row.Scan(
-		&userSession.Id,
+		&userSession.ID,
 		&userSession.CreatedAt,
 		&userSession.UpdatedAt,
 		&userSession.SessionIdentifier,
 		&userSession.Started,
 		&userSession.LastAccessed,
 		&userSession.AuthMethods,
-		&userSession.AcrLevel,
+		&userSession.ACRLevel,
 		&userSession.AuthTime,
 		&userSession.PasswordAuthTime,
-		&userSession.IpAddress,
+		&userSession.IPAddress,
 		&userSession.DeviceName,
 		&userSession.DeviceType,
 		&userSession.DeviceOS,
 		&userSession.UserAgent,
-		&userSession.DeviceId,
+		&userSession.DeviceID,
 		&userSession.AuthStateGeneration,
-		&userSession.OtpConfigGeneration,
-		&userSession.UserId,
+		&userSession.OTPConfigGeneration,
+		&userSession.UserID,
 	)
 }
 
@@ -107,7 +107,7 @@ var updateUserSession = statement{
 		"device_id = @p14 WHERE id = @p15",
 }
 
-var selectUserSessionById = statement{
+var selectUserSessionByID = statement{
 	sqlite:   "SELECT " + userSessionColumns.sqlite + " FROM user_sessions WHERE id = ?",
 	mysql:    "SELECT " + userSessionColumns.mysql + " FROM user_sessions WHERE id = ?",
 	postgres: "SELECT " + userSessionColumns.postgres + " FROM user_sessions WHERE id = $1",
@@ -121,20 +121,20 @@ var selectUserSessionBySessionIdentifier = statement{
 	mssql:    "SELECT " + userSessionColumns.mssql + " FROM user_sessions WHERE session_identifier = @p1",
 }
 
-var selectUserSessionsByUserId = statement{
+var selectUserSessionsByUserID = statement{
 	sqlite:   "SELECT " + userSessionColumns.sqlite + " FROM user_sessions WHERE user_id = ?",
 	mysql:    "SELECT " + userSessionColumns.mysql + " FROM user_sessions WHERE user_id = ?",
 	postgres: "SELECT " + userSessionColumns.postgres + " FROM user_sessions WHERE user_id = $1",
 	mssql:    "SELECT " + userSessionColumns.mssql + " FROM user_sessions WHERE user_id = @p1",
 }
 
-// selectUserSessionsByClientIdPage binds the client id, the page size, then the offset; SQL Server
+// selectUserSessionsByClientIDPage binds the client id, the page size, then the offset; SQL Server
 // reads the two in the other order, OFFSET before FETCH NEXT.
 //
 // last_accessed does not order the rows totally: two sessions touched in the same instant tie, and
 // paging over a non-total order can repeat one session on the next page and skip another. The id
 // breaks the tie. See SearchUsersPaginated in user.go for the full reason (#112).
-var selectUserSessionsByClientIdPage = statement{
+var selectUserSessionsByClientIDPage = statement{
 	sqlite: "SELECT " + userSessionColumns.sqlite + " FROM user_sessions " +
 		"INNER JOIN user_session_clients ON user_sessions.id = user_session_clients.user_session_id " +
 		"WHERE user_session_clients.client_id = ? " +
@@ -153,9 +153,9 @@ var selectUserSessionsByClientIdPage = statement{
 		"ORDER BY user_sessions.last_accessed DESC, user_sessions.id DESC OFFSET @p3 ROWS FETCH NEXT @p2 ROWS ONLY",
 }
 
-// countUserSessionsByClientId counts the rows selectUserSessionsByClientIdPage pages through, over
+// countUserSessionsByClientID counts the rows selectUserSessionsByClientIDPage pages through, over
 // the same join.
-var countUserSessionsByClientId = statement{
+var countUserSessionsByClientID = statement{
 	sqlite: "SELECT count(*) FROM user_sessions " +
 		"INNER JOIN user_session_clients ON user_sessions.id = user_session_clients.user_session_id " +
 		"WHERE user_session_clients.client_id = ?",
@@ -207,8 +207,8 @@ var promoteUserSessionGeneration = statement{
 	mssql:    "UPDATE user_sessions SET auth_state_generation = @p1, updated_at = @p2 WHERE id = @p3",
 }
 
-// promoteUserSessionOtpConfigGeneration binds the generation, updated_at, then the id.
-var promoteUserSessionOtpConfigGeneration = statement{
+// promoteUserSessionOTPConfigGeneration binds the generation, updated_at, then the id.
+var promoteUserSessionOTPConfigGeneration = statement{
 	sqlite:   "UPDATE user_sessions SET otp_config_generation = ?, updated_at = ? WHERE id = ?",
 	mysql:    "UPDATE user_sessions SET otp_config_generation = ?, updated_at = ? WHERE id = ?",
 	postgres: "UPDATE user_sessions SET otp_config_generation = $1, updated_at = $2 WHERE id = $3",
@@ -239,7 +239,7 @@ var lowerUserSessionsToPassword = statement{
 
 func (d *Database) CreateUserSession(ctx context.Context, tx *sql.Tx, userSession *record.UserSession) error {
 
-	if userSession.UserId == 0 {
+	if userSession.UserID == 0 {
 		return errs.New("user id must be greater than 0")
 	}
 
@@ -252,23 +252,23 @@ func (d *Database) CreateUserSession(ctx context.Context, tx *sql.Tx, userSessio
 
 	id, err := d.insert(ctx, tx, insertUserSession, "userSession",
 		userSession.CreatedAt, userSession.UpdatedAt, userSession.SessionIdentifier, userSession.Started,
-		userSession.LastAccessed, userSession.AuthMethods, userSession.AcrLevel, userSession.AuthTime,
-		userSession.PasswordAuthTime, userSession.IpAddress, userSession.DeviceName, userSession.DeviceType,
-		userSession.DeviceOS, userSession.UserAgent, userSession.DeviceId, userSession.AuthStateGeneration,
-		userSession.OtpConfigGeneration, userSession.UserId)
+		userSession.LastAccessed, userSession.AuthMethods, userSession.ACRLevel, userSession.AuthTime,
+		userSession.PasswordAuthTime, userSession.IPAddress, userSession.DeviceName, userSession.DeviceType,
+		userSession.DeviceOS, userSession.UserAgent, userSession.DeviceID, userSession.AuthStateGeneration,
+		userSession.OTPConfigGeneration, userSession.UserID)
 	if err != nil {
 		userSession.CreatedAt = originalCreatedAt
 		userSession.UpdatedAt = originalUpdatedAt
 		return err
 	}
 
-	userSession.Id = id
+	userSession.ID = id
 	return nil
 }
 
 func (d *Database) UpdateUserSession(ctx context.Context, tx *sql.Tx, userSession *record.UserSession) error {
 
-	if userSession.Id == 0 {
+	if userSession.ID == 0 {
 		return errs.New("can't update userSession with id 0")
 	}
 
@@ -277,9 +277,9 @@ func (d *Database) UpdateUserSession(ctx context.Context, tx *sql.Tx, userSessio
 
 	_, err := d.ExecSQL(ctx, tx, updateUserSession.text(d.Dialect),
 		userSession.UpdatedAt, userSession.SessionIdentifier, userSession.Started, userSession.LastAccessed,
-		userSession.AuthMethods, userSession.AcrLevel, userSession.AuthTime, userSession.PasswordAuthTime,
-		userSession.IpAddress, userSession.DeviceName, userSession.DeviceType, userSession.DeviceOS,
-		userSession.UserAgent, userSession.DeviceId, userSession.Id)
+		userSession.AuthMethods, userSession.ACRLevel, userSession.AuthTime, userSession.PasswordAuthTime,
+		userSession.IPAddress, userSession.DeviceName, userSession.DeviceType, userSession.DeviceOS,
+		userSession.UserAgent, userSession.DeviceID, userSession.ID)
 	if err != nil {
 		userSession.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update userSession")
@@ -288,8 +288,8 @@ func (d *Database) UpdateUserSession(ctx context.Context, tx *sql.Tx, userSessio
 	return nil
 }
 
-func (d *Database) GetUserSessionById(ctx context.Context, tx *sql.Tx, userSessionId int64) (*record.UserSession, error) {
-	return queryOne(ctx, d, tx, selectUserSessionById.text(d.Dialect), []any{userSessionId},
+func (d *Database) GetUserSessionByID(ctx context.Context, tx *sql.Tx, userSessionID int64) (*record.UserSession, error) {
+	return queryOne(ctx, d, tx, selectUserSessionByID.text(d.Dialect), []any{userSessionID},
 		scanUserSession, "userSession")
 }
 
@@ -303,8 +303,8 @@ func (d *Database) GetUserSessionBySessionIdentifier(ctx context.Context, tx *sq
 		scanUserSession, "userSession")
 }
 
-func (d *Database) GetUserSessionsByClientIdPaginated(ctx context.Context, tx *sql.Tx, clientId int64, page int, pageSize int) ([]record.UserSession, int, error) {
-	if clientId <= 0 {
+func (d *Database) GetUserSessionsByClientIDPaginated(ctx context.Context, tx *sql.Tx, clientID int64, page int, pageSize int) ([]record.UserSession, int, error) {
+	if clientID <= 0 {
 		return nil, 0, errs.New("client id must be greater than 0")
 	}
 
@@ -316,13 +316,13 @@ func (d *Database) GetUserSessionsByClientIdPaginated(ctx context.Context, tx *s
 		pageSize = 10
 	}
 
-	userSessions, err := queryAll(ctx, d, tx, nil, selectUserSessionsByClientIdPage.text(d.Dialect),
-		[]any{clientId, pageSize, PageOffset(page, pageSize)}, scanUserSession, "userSession")
+	userSessions, err := queryAll(ctx, d, tx, nil, selectUserSessionsByClientIDPage.text(d.Dialect),
+		[]any{clientID, pageSize, PageOffset(page, pageSize)}, scanUserSession, "userSession")
 	if err != nil {
 		return nil, 0, err
 	}
 
-	rows, err := d.QuerySQL(ctx, tx, countUserSessionsByClientId.text(d.Dialect), clientId)
+	rows, err := d.QuerySQL(ctx, tx, countUserSessionsByClientID.text(d.Dialect), clientID)
 	if err != nil {
 		return nil, 0, errs.Wrap(err, "unable to query database")
 	}
@@ -348,25 +348,25 @@ func (d *Database) UserSessionsLoadUsers(ctx context.Context, tx *sql.Tx, userSe
 		return nil
 	}
 
-	userIds := make([]int64, 0, len(userSessions))
+	userIDs := make([]int64, 0, len(userSessions))
 	for _, userSession := range userSessions {
-		userIds = append(userIds, userSession.UserId)
+		userIDs = append(userIDs, userSession.UserID)
 	}
 
-	users, err := d.GetUsersByIds(ctx, tx, userIds)
+	users, err := d.GetUsersByIDs(ctx, tx, userIDs)
 	if err != nil {
 		return errs.Wrap(err, "unable to load users")
 	}
 
-	usersById := make(map[int64]record.User)
+	usersByID := make(map[int64]record.User)
 	for _, user := range users {
-		usersById[user.Id] = user
+		usersByID[user.ID] = user
 	}
 
 	for i, userSession := range userSessions {
-		user, ok := usersById[userSession.UserId]
+		user, ok := usersByID[userSession.UserID]
 		if !ok {
-			return errs.Errorf("unable to find user with id %v", userSession.Id)
+			return errs.Errorf("unable to find user with id %v", userSession.ID)
 		}
 		userSessions[i].User = user
 	}
@@ -379,23 +379,23 @@ func (d *Database) UserSessionsLoadClients(ctx context.Context, tx *sql.Tx, user
 		return nil
 	}
 
-	userSessionIds := make([]int64, 0, len(userSessions))
+	userSessionIDs := make([]int64, 0, len(userSessions))
 	for _, userSession := range userSessions {
-		userSessionIds = append(userSessionIds, userSession.Id)
+		userSessionIDs = append(userSessionIDs, userSession.ID)
 	}
 
-	userSessionClients, err := d.GetUserSessionClientsByUserSessionIds(ctx, tx, userSessionIds)
+	userSessionClients, err := d.GetUserSessionClientsByUserSessionIDs(ctx, tx, userSessionIDs)
 	if err != nil {
 		return errs.Wrap(err, "unable to load userSessionClients")
 	}
 
-	userSessionClientsByUserSessionId := make(map[int64][]record.UserSessionClient)
+	userSessionClientsByUserSessionID := make(map[int64][]record.UserSessionClient)
 	for _, userSessionClient := range userSessionClients {
-		userSessionClientsByUserSessionId[userSessionClient.UserSessionId] = append(userSessionClientsByUserSessionId[userSessionClient.UserSessionId], userSessionClient)
+		userSessionClientsByUserSessionID[userSessionClient.UserSessionID] = append(userSessionClientsByUserSessionID[userSessionClient.UserSessionID], userSessionClient)
 	}
 
 	for i, userSession := range userSessions {
-		userSessions[i].Clients = userSessionClientsByUserSessionId[userSession.Id]
+		userSessions[i].Clients = userSessionClientsByUserSessionID[userSession.ID]
 	}
 
 	return nil
@@ -407,7 +407,7 @@ func (d *Database) UserSessionLoadClients(ctx context.Context, tx *sql.Tx, userS
 		return nil
 	}
 
-	userSessionClients, err := d.GetUserSessionClientsByUserSessionId(ctx, tx, userSession.Id)
+	userSessionClients, err := d.GetUserSessionClientsByUserSessionID(ctx, tx, userSession.ID)
 	if err != nil {
 		return errs.Wrap(err, "unable to load userSessionClients")
 	}
@@ -423,7 +423,7 @@ func (d *Database) UserSessionLoadUser(ctx context.Context, tx *sql.Tx, userSess
 		return nil
 	}
 
-	user, err := d.GetUserById(ctx, tx, userSession.UserId)
+	user, err := d.GetUserByID(ctx, tx, userSession.UserID)
 	if err != nil {
 		return errs.Wrap(err, "unable to load user")
 	}
@@ -434,14 +434,14 @@ func (d *Database) UserSessionLoadUser(ctx context.Context, tx *sql.Tx, userSess
 	return nil
 }
 
-func (d *Database) GetUserSessionsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserSession, error) {
-	return queryAll(ctx, d, tx, nil, selectUserSessionsByUserId.text(d.Dialect), []any{userId},
+func (d *Database) GetUserSessionsByUserID(ctx context.Context, tx *sql.Tx, userID int64) ([]record.UserSession, error) {
+	return queryAll(ctx, d, tx, nil, selectUserSessionsByUserID.text(d.Dialect), []any{userID},
 		scanUserSession, "userSession")
 }
 
-func (d *Database) DeleteUserSession(ctx context.Context, tx *sql.Tx, userSessionId int64) error {
+func (d *Database) DeleteUserSession(ctx context.Context, tx *sql.Tx, userSessionID int64) error {
 
-	_, err := d.ExecSQL(ctx, tx, deleteUserSession.text(d.Dialect), userSessionId)
+	_, err := d.ExecSQL(ctx, tx, deleteUserSession.text(d.Dialect), userSessionID)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete userSession")
 	}
@@ -523,14 +523,14 @@ func (d *Database) DeleteExpiredSessions(ctx context.Context, tx *sql.Tx, maxLif
 // session this promotion exists to serve: BumpUserSession writes the whole row on
 // every request, so if the column were in the ordinary update set the first bump after
 // a password change would undo the promotion and sign the user out. (#106)
-func (d *Database) PromoteUserSessionGeneration(ctx context.Context, tx *sql.Tx, userSessionId int64, generation int64) error {
+func (d *Database) PromoteUserSessionGeneration(ctx context.Context, tx *sql.Tx, userSessionID int64, generation int64) error {
 
-	if userSessionId == 0 {
+	if userSessionID == 0 {
 		return errs.New("can't promote the generation of user session with id 0")
 	}
 
 	result, err := d.ExecSQL(ctx, tx, promoteUserSessionGeneration.text(d.Dialect),
-		generation, time.Now().UTC(), userSessionId)
+		generation, time.Now().UTC(), userSessionID)
 	if err != nil {
 		return errs.Wrap(err, "unable to promote user session generation")
 	}
@@ -550,7 +550,7 @@ func (d *Database) PromoteUserSessionGeneration(ctx context.Context, tx *sql.Tx,
 	return nil
 }
 
-// PromoteUserSessionOtpConfigGeneration records that this session has satisfied the level
+// PromoteUserSessionOTPConfigGeneration records that this session has satisfied the level
 // 2 question against the given OTP configuration generation, so it stops owing a
 // re-prompt until the user's counter moves again.
 //
@@ -562,14 +562,14 @@ func (d *Database) PromoteUserSessionGeneration(ctx context.Context, tx *sql.Tx,
 // Called from /auth/completed and nowhere else, with a value captured earlier in the
 // ceremony. Reading the counter live here instead would launder an authenticator change
 // that landed after the ceremony asked its level 2 question (#242, #106 decision 11).
-func (d *Database) PromoteUserSessionOtpConfigGeneration(ctx context.Context, tx *sql.Tx, userSessionId int64, generation int64) error {
+func (d *Database) PromoteUserSessionOTPConfigGeneration(ctx context.Context, tx *sql.Tx, userSessionID int64, generation int64) error {
 
-	if userSessionId == 0 {
+	if userSessionID == 0 {
 		return errs.New("can't promote the otp config generation of user session with id 0")
 	}
 
-	result, err := d.ExecSQL(ctx, tx, promoteUserSessionOtpConfigGeneration.text(d.Dialect),
-		generation, time.Now().UTC(), userSessionId)
+	result, err := d.ExecSQL(ctx, tx, promoteUserSessionOTPConfigGeneration.text(d.Dialect),
+		generation, time.Now().UTC(), userSessionID)
 	if err != nil {
 		return errs.Wrap(err, "unable to promote user session otp config generation")
 	}
@@ -588,7 +588,7 @@ func (d *Database) PromoteUserSessionOtpConfigGeneration(ctx context.Context, tx
 	return nil
 }
 
-// LowerUserSessionsToPassword lowers every session of userId that claims more than a password to
+// LowerUserSessionsToPassword lowers every session of userID that claims more than a password to
 // what the password alone reached, when the user's authenticator is removed: auth_methods becomes
 // passwordMethods, a level2_mandatory session becomes level2_optional, the level a user with no
 // authenticator reaches with a password, and auth_time becomes password_auth_time, the time the
@@ -608,18 +608,18 @@ func (d *Database) PromoteUserSessionOtpConfigGeneration(ctx context.Context, tx
 // claiming no code is passed over even while a sign-in is writing a code onto it. That sign-in holds
 // the user's row, though, which it takes to check its claim (otpcredential.OTPClaim.Recheck), and
 // the removal this runs in took the user's row first, so the two never overlap.
-func (d *Database) LowerUserSessionsToPassword(ctx context.Context, tx *sql.Tx, userId int64, passwordMethods string) error {
+func (d *Database) LowerUserSessionsToPassword(ctx context.Context, tx *sql.Tx, userID int64, passwordMethods string) error {
 
-	if userId == 0 {
+	if userID == 0 {
 		return errs.New("can't lower the user sessions of user id 0")
 	}
 	if passwordMethods == "" {
 		return errs.New("can't lower user sessions to no authentication method")
 	}
 
-	mandatory, optional := record.AcrLevel2Mandatory.String(), record.AcrLevel2Optional.String()
+	mandatory, optional := record.ACRLevel2Mandatory.String(), record.ACRLevel2Optional.String()
 	if _, err := d.ExecSQL(ctx, tx, lowerUserSessionsToPassword.text(d.Dialect),
-		passwordMethods, mandatory, optional, time.Now().UTC(), userId, passwordMethods, mandatory); err != nil {
+		passwordMethods, mandatory, optional, time.Now().UTC(), userID, passwordMethods, mandatory); err != nil {
 		return errs.Wrap(err, "unable to lower user sessions")
 	}
 	return nil

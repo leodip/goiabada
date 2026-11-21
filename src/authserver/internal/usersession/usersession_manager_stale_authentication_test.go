@@ -38,8 +38,8 @@ func TestBindUserSession_AnOlderStepUpDoesNotRaiseTheSessionOverANewerSignIn(t *
 
 	// The row the transaction locked already describes the newer sign-in.
 	session := bumpedSession()
-	session.AcrLevel, session.AuthMethods, session.AuthTime, session.PasswordAuthTime =
-		record.AcrLevel1, "pwd", newer, newer
+	session.ACRLevel, session.AuthMethods, session.AuthTime, session.PasswordAuthTime =
+		record.ACRLevel1, "pwd", newer, newer
 
 	datamocks.ExpectRunInTransaction(database, txSentinel)
 	database.On("AcquireUserSessionRow", mock.Anything, txSentinel, bumpSessionIdentifier).Return(true, nil).Once()
@@ -48,7 +48,7 @@ func TestBindUserSession_AnOlderStepUpDoesNotRaiseTheSessionOverANewerSignIn(t *
 	// The step-up ceremony accepted its code before the newer sign-in's password.
 	olderInstant := older
 	result, err := manager.BindUserSession(context.Background(), bumpSessionIdentifier, 456, Authentication{
-		UserId: 123, AuthMethods: "pwd otp", AcrLevel: record.AcrLevel2Mandatory,
+		UserID: 123, AuthMethods: "pwd otp", ACRLevel: record.ACRLevel2Mandatory,
 		AuthTime: &olderInstant,
 	}, false, "")
 
@@ -74,8 +74,8 @@ func TestBindUserSession_AnOlderReplaceDoesNotWriteOverANewerSignIn(t *testing.T
 	older := newer.Add(-2 * time.Minute)
 
 	session := bumpedSession()
-	session.AcrLevel, session.AuthMethods, session.AuthTime, session.PasswordAuthTime =
-		record.AcrLevel2Mandatory, "pwd otp", newer, newer
+	session.ACRLevel, session.AuthMethods, session.AuthTime, session.PasswordAuthTime =
+		record.ACRLevel2Mandatory, "pwd otp", newer, newer
 
 	datamocks.ExpectRunInTransaction(database, txSentinel)
 	database.On("AcquireUserSessionRow", mock.Anything, txSentinel, bumpSessionIdentifier).Return(true, nil).Once()
@@ -83,7 +83,7 @@ func TestBindUserSession_AnOlderReplaceDoesNotWriteOverANewerSignIn(t *testing.T
 
 	olderInstant := older
 	result, err := manager.BindUserSession(context.Background(), bumpSessionIdentifier, 456, Authentication{
-		UserId: 123, AuthMethods: "pwd", AcrLevel: record.AcrLevel1,
+		UserID: 123, AuthMethods: "pwd", ACRLevel: record.ACRLevel1,
 		AuthTime: &olderInstant, PasswordAuthTime: &olderInstant,
 	}, true, "")
 
@@ -110,20 +110,20 @@ func TestBindUserSession_ANewerSignInStillBindsAndAnEqualInstantIsCurrent(t *tes
 		instant   time.Time
 		replace   bool
 		methods   string
-		level     record.AcrLevel
-		wantLevel record.AcrLevel
+		level     record.ACRLevel
+		wantLevel record.ACRLevel
 	}{
-		{"a newer step-up raises the session", newer, false, "pwd otp", record.AcrLevel2Mandatory, record.AcrLevel2Mandatory},
-		{"a newer replace writes its own authentication", newer, true, "pwd", record.AcrLevel1, record.AcrLevel1},
-		{"an equal instant is current, not stale", older, false, "pwd", record.AcrLevel1, record.AcrLevel1},
+		{"a newer step-up raises the session", newer, false, "pwd otp", record.ACRLevel2Mandatory, record.ACRLevel2Mandatory},
+		{"a newer replace writes its own authentication", newer, true, "pwd", record.ACRLevel1, record.ACRLevel1},
+		{"an equal instant is current, not stale", older, false, "pwd", record.ACRLevel1, record.ACRLevel1},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
 			manager := &Manager{database: database}
 
 			session := bumpedSession()
-			session.AcrLevel, session.AuthMethods, session.AuthTime, session.PasswordAuthTime =
-				record.AcrLevel1, "pwd", older, older
+			session.ACRLevel, session.AuthMethods, session.AuthTime, session.PasswordAuthTime =
+				record.ACRLevel1, "pwd", older, older
 
 			datamocks.ExpectRunInTransaction(database, txSentinel)
 			database.On("AcquireUserSessionRow", mock.Anything, txSentinel, bumpSessionIdentifier).Return(true, nil).Once()
@@ -134,7 +134,7 @@ func TestBindUserSession_ANewerSignInStillBindsAndAnEqualInstantIsCurrent(t *tes
 
 			instant := tc.instant
 			auth := Authentication{
-				UserId: 123, AuthMethods: tc.methods, AcrLevel: tc.level,
+				UserID: 123, AuthMethods: tc.methods, ACRLevel: tc.level,
 				AuthTime: &instant,
 			}
 			if tc.replace {
@@ -145,7 +145,7 @@ func TestBindUserSession_ANewerSignInStillBindsAndAnEqualInstantIsCurrent(t *tes
 
 			require.NoError(t, err)
 			require.NotNil(t, result)
-			assert.Equal(t, tc.wantLevel, result.AcrLevel)
+			assert.Equal(t, tc.wantLevel, result.ACRLevel)
 			assert.Equal(t, tc.instant, result.AuthTime)
 			database.AssertExpectations(t)
 		})
@@ -166,9 +166,9 @@ func TestBindUserSession_NoAuthTimeTakesAnyInstantAndACarrylessBumpIsNeverStale(
 		auth Authentication
 	}{
 		{"a legacy row with no auth_time takes any instant",
-			Authentication{UserId: 123, AuthMethods: "pwd otp", AcrLevel: record.AcrLevel2Mandatory, AuthTime: &staleInstant}},
+			Authentication{UserID: 123, AuthMethods: "pwd otp", ACRLevel: record.ACRLevel2Mandatory, AuthTime: &staleInstant}},
 		{"a carryless bump that adopted nothing is never stale",
-			Authentication{UserId: 123, AuthMethods: "pwd", AcrLevel: record.AcrLevel1}},
+			Authentication{UserID: 123, AuthMethods: "pwd", ACRLevel: record.ACRLevel1}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
@@ -228,8 +228,8 @@ func TestBindUserSession_AnSSOBindWhoseSessionMovedIsRefused(t *testing.T) {
 			manager := &Manager{database: database}
 
 			session := bumpedSession()
-			session.AcrLevel, session.AuthMethods, session.AuthTime, session.PasswordAuthTime =
-				record.AcrLevel1, "pwd", tc.sessionAuthTime, tc.sessionAuthTime
+			session.ACRLevel, session.AuthMethods, session.AuthTime, session.PasswordAuthTime =
+				record.ACRLevel1, "pwd", tc.sessionAuthTime, tc.sessionAuthTime
 
 			datamocks.ExpectRunInTransaction(database, txSentinel)
 			database.On("AcquireUserSessionRow", mock.Anything, txSentinel, bumpSessionIdentifier).Return(true, nil).Once()
@@ -245,7 +245,7 @@ func TestBindUserSession_AnSSOBindWhoseSessionMovedIsRefused(t *testing.T) {
 			// instant it adopted them at, with the instant of a code it entered when it stepped up.
 			adoptedInstant := tc.adopted
 			result, err := manager.BindUserSession(context.Background(), bumpSessionIdentifier, 456,
-				Authentication{UserId: 123, AuthMethods: "pwd otp", AcrLevel: record.AcrLevel2Mandatory,
+				Authentication{UserID: 123, AuthMethods: "pwd otp", ACRLevel: record.ACRLevel2Mandatory,
 					AuthTime: tc.ownInstant, AdoptedAuthTime: &adoptedInstant}, false, "")
 
 			if tc.wantStale {
@@ -324,8 +324,8 @@ func TestAuthenticationIsStale_AsksTheRuleOfTheRowAsItIsNow(t *testing.T) {
 		readErr   error
 		wantStale bool
 	}{
-		{"a row a newer sign-in has reached is stale", &record.UserSession{UserId: 123, AuthTime: moved}, nil, true},
-		{"a row that still holds the adopted instant is not", &record.UserSession{UserId: 123, AuthTime: adopted}, nil, false},
+		{"a row a newer sign-in has reached is stale", &record.UserSession{UserID: 123, AuthTime: moved}, nil, true},
+		{"a row that still holds the adopted instant is not", &record.UserSession{UserID: 123, AuthTime: adopted}, nil, false},
 		{"a session that is gone is not stale here", nil, nil, false},
 		{"a failed read is returned", nil, readFailure, false},
 	} {
@@ -338,7 +338,7 @@ func TestAuthenticationIsStale_AsksTheRuleOfTheRowAsItIsNow(t *testing.T) {
 
 			adoptedInstant := adopted
 			stale, err := manager.AuthenticationIsStale(context.Background(), bumpSessionIdentifier,
-				Authentication{UserId: 123, AuthMethods: "pwd otp", AdoptedAuthTime: &adoptedInstant})
+				Authentication{UserID: 123, AuthMethods: "pwd otp", AdoptedAuthTime: &adoptedInstant})
 
 			if tc.readErr != nil {
 				require.ErrorIs(t, err, readFailure)

@@ -113,32 +113,32 @@ func assertClientsIntrospectionResourcesBehaviour(t *testing.T, h *isolatedDB, w
 	newResource := func() int64 {
 		resource := &record.Resource{ResourceIdentifier: "intro-resource-" + fake.LetterN(8)}
 		require.NoError(t, h.DB.CreateResource(ctx, nil, resource), "CreateResource")
-		return resource.Id
+		return resource.ID
 	}
 	// Seeded in SQL: the data layer writes every column the record carries at head, which a
 	// database at 000069 lacks (migration_seed_sql_test.go).
-	client := &record.Client{Id: seedClient(t, h, "intro-client-"+fake.LetterN(8))}
-	resourceId := newResource()
+	client := &record.Client{ID: seedClient(t, h, "intro-client-"+fake.LetterN(8))}
+	resourceID := newResource()
 	count := func() int64 {
 		var n int64
 		require.NoError(t, h.SQL.QueryRowContext(ctx, fmt.Sprintf(
-			"SELECT COUNT(*) FROM clients_introspection_resources WHERE client_id = %d", client.Id)).Scan(&n))
+			"SELECT COUNT(*) FROM clients_introspection_resources WHERE client_id = %d", client.ID)).Scan(&n))
 		return n
 	}
 
 	link := "INSERT INTO clients_introspection_resources (client_id, resource_id) VALUES (%d, %d)"
-	require.NoErrorf(t, exec(link, client.Id, resourceId), "the first link is accepted %s", when)
-	require.Errorf(t, exec(link, client.Id, resourceId), "a second link of the pair is refused by the key %s", when)
+	require.NoErrorf(t, exec(link, client.ID, resourceID), "the first link is accepted %s", when)
+	require.Errorf(t, exec(link, client.ID, resourceID), "a second link of the pair is refused by the key %s", when)
 	assert.Equalf(t, int64(1), count(), "and writes nothing %s", when)
-	require.Errorf(t, exec(link, client.Id, resourceId+1_000_000), "a link to no resource is refused %s", when)
+	require.Errorf(t, exec(link, client.ID, resourceID+1_000_000), "a link to no resource is refused %s", when)
 
-	require.NoError(t, exec("DELETE FROM resources WHERE id = %d", resourceId))
+	require.NoError(t, exec("DELETE FROM resources WHERE id = %d", resourceID))
 	assert.Equalf(t, int64(0), count(), "deleting the resource removed the link %s", when)
 
-	resourceId = newResource()
-	require.NoError(t, exec(link, client.Id, resourceId))
-	require.NoError(t, exec("DELETE FROM clients WHERE id = %d", client.Id))
+	resourceID = newResource()
+	require.NoError(t, exec(link, client.ID, resourceID))
+	require.NoError(t, exec("DELETE FROM clients WHERE id = %d", client.ID))
 	assert.Equalf(t, int64(0), count(), "deleting the client removed the link %s", when)
 
-	require.NoError(t, exec("DELETE FROM resources WHERE id = %d", resourceId))
+	require.NoError(t, exec("DELETE FROM resources WHERE id = %d", resourceID))
 }

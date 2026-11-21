@@ -41,7 +41,7 @@ func TestInitMiddleware_CSRFPolicy(t *testing.T) {
 		name string
 		path string
 		body string
-		// mounted says whether newCsrfTestServer registers a handler for this path, mirroring
+		// mounted says whether newCSRFTestServer registers a handler for this path, mirroring
 		// whether the real binary mounts it. It decides only what the same-origin control expects.
 		mounted    bool
 		wantStatus int
@@ -99,7 +99,7 @@ func TestInitMiddleware_CSRFPolicy(t *testing.T) {
 			req.Header.Set("Sec-Fetch-Site", "cross-site")
 
 			rr := httptest.NewRecorder()
-			newCsrfTestServer(t).router.ServeHTTP(rr, req)
+			newCSRFTestServer(t).router.ServeHTTP(rr, req)
 
 			if rr.Code != tt.wantStatus {
 				t.Fatalf("cross-site POST %s: got status %d, want %d", tt.path, rr.Code, tt.wantStatus)
@@ -132,7 +132,7 @@ func TestInitMiddleware_CSRFPolicy(t *testing.T) {
 			req.Header.Set("Sec-Fetch-Site", "same-origin")
 
 			rr := httptest.NewRecorder()
-			newCsrfTestServer(t).router.ServeHTTP(rr, req)
+			newCSRFTestServer(t).router.ServeHTTP(rr, req)
 
 			want := http.StatusOK
 			if !tt.mounted {
@@ -145,7 +145,7 @@ func TestInitMiddleware_CSRFPolicy(t *testing.T) {
 	}
 }
 
-// newCsrfTestServer builds the real chain through initMiddleware and registers probe handlers on
+// newCSRFTestServer builds the real chain through initMiddleware and registers probe handlers on
 // the root branch for the routes under test.
 //
 // Root branch rather than the application branch on purpose: CSRF is mounted on the root, and the
@@ -153,7 +153,7 @@ func TestInitMiddleware_CSRFPolicy(t *testing.T) {
 // those instead. The route set therefore stands in for initRoutes rather than being it, and the
 // stand-in is faithful in the one way that matters here: /auth/callback is absent, because the auth
 // server does not mount it, which is what the unmounted claim is about.
-func newCsrfTestServer(t *testing.T) *Server {
+func newCSRFTestServer(t *testing.T) *Server {
 	t.Helper()
 
 	database := datamocks.NewDatabase(t)

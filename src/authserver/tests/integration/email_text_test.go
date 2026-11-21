@@ -30,7 +30,7 @@ func TestEmails_AreSentWithTheirTextTheActionLinkFirst(t *testing.T) {
 
 	status, answer, _ := brandCall(t, accessToken, http.MethodPost, brandsPath, brandBody(map[string]any{
 		"name": brandName("Text"), "appearance": "light", "theme": "avocado",
-		"logo":         map[string]any{"id": logo.Id},
+		"logo":         map[string]any{"id": logo.ID},
 		"footerLinks":  []any{map[string]any{"url": "https://acme.example/privacy", "label": "Privacy"}},
 		"supportEmail": "help@acme.example",
 	}))
@@ -41,12 +41,12 @@ func TestEmails_AreSentWithTheirTextTheActionLinkFirst(t *testing.T) {
 	require.Equal(t, http.StatusOK, status, "%v", answer)
 
 	user, _ := createResetTestUser(t, plusAddress())
-	requestResetAt(t, createHttpClient(t), appConfig.AuthServer.BaseURL+"/forgot-password", user.Email)
+	requestResetAt(t, createHTTPClient(t), appConfig.AuthServer.BaseURL+"/forgot-password", user.Email)
 	message := onlyMailTo(t, user.Email)
 	text := strings.ReplaceAll(message.Text, "\r\n", "\n")
 
-	require.Contains(t, message.HTML, `src="`+logo.Url+`"`, "the HTML draws the brand's logo")
-	assert.NotContains(t, text, logo.Url, "the text draws nothing of the brand")
+	require.Contains(t, message.HTML, `src="`+logo.URL+`"`, "the HTML draws the brand's logo")
+	assert.NotContains(t, text, logo.URL, "the text draws nothing of the brand")
 
 	links := textLinkPattern.FindAllString(text, -1)
 	require.Len(t, links, 2, "the reset link once, the button not repeated, then the footer link:\n%s", text)

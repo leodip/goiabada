@@ -46,9 +46,9 @@ const (
 	deletionSubject      = "the-deleting-subject"
 	deletionPassword     = "D3lete!Me-now"
 	deletionAddress      = "rui.costa@example.com"
-	deletionRequestId    = "req-deletion-0001"
+	deletionRequestID    = "req-deletion-0001"
 	deletionRecoveryCode = "abcd-efgh-jkmn-pqrs-tvwx-yz01"
-	deletionUserId       = int64(91)
+	deletionUserID       = int64(91)
 )
 
 // deletionCheckTx is the early check's transaction and deletionTx the deletion's. Distinct and not
@@ -65,7 +65,7 @@ func deletionUser(t *testing.T) *record.User {
 	hash, err := passwordhash.Hash(deletionPassword)
 	require.NoError(t, err)
 	return &record.User{
-		Id: deletionUserId, Subject: deletionSubject, Enabled: true,
+		ID: deletionUserID, Subject: deletionSubject, Enabled: true,
 		GivenName: "Rui", FamilyName: "Costa", Email: deletionAddress, EmailVerified: true,
 		PasswordHash: hash,
 	}
@@ -79,7 +79,7 @@ func enrolledDeletionUser(t *testing.T) *record.User {
 	require.NoError(t, err)
 	user.OTPEnabled = true
 	user.OTPSecretEncrypted = secret
-	user.OtpConfigGeneration = 6
+	user.OTPConfigGeneration = 6
 	return user
 }
 
@@ -100,7 +100,7 @@ func deletionRequest(t *testing.T, settings *record.Settings, body map[string]st
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/account/deletion", bytes.NewReader(encoded))
 	req.Header.Set("Content-Type", "application/json")
 	req = setTokenContextWithClaims(req, map[string]interface{}{"sub": deletionSubject})
-	ctx := requestid.NewContext(req.Context(), deletionRequestId)
+	ctx := requestid.NewContext(req.Context(), deletionRequestID)
 	return req.WithContext(reqctx.WithSettings(ctx, settings))
 }
 
@@ -157,13 +157,13 @@ func (f *deletionFixture) expectCaller(user *record.User) {
 // grant when holdsManage, else no grant and no group.
 func (f *deletionFixture) expectGuardReads(tx *sql.Tx, holdsManage bool) {
 	if holdsManage {
-		f.database.On("GetUserPermissionByUserIdAndPermissionId", mock.Anything, tx, deletionUserId, permManage).
-			Return(&record.UserPermission{UserId: deletionUserId, PermissionId: permManage}, nil).Once()
+		f.database.On("GetUserPermissionByUserIDAndPermissionID", mock.Anything, tx, deletionUserID, permManage).
+			Return(&record.UserPermission{UserID: deletionUserID, PermissionID: permManage}, nil).Once()
 		return
 	}
-	f.database.On("GetUserPermissionByUserIdAndPermissionId", mock.Anything, tx, deletionUserId, permManage).
+	f.database.On("GetUserPermissionByUserIDAndPermissionID", mock.Anything, tx, deletionUserID, permManage).
 		Return((*record.UserPermission)(nil), nil).Once()
-	f.database.On("GetUserGroupsByUserId", mock.Anything, tx, deletionUserId).Return([]record.UserGroup{}, nil).Once()
+	f.database.On("GetUserGroupsByUserID", mock.Anything, tx, deletionUserID).Return([]record.UserGroup{}, nil).Once()
 }
 
 // expectEarlyCheck answers the last-administrator check made before any credential, in a
@@ -185,16 +185,16 @@ func (f *deletionFixture) expectEarlyCheck(holdsManage bool, holders int) *datam
 func (f *deletionFixture) expectDeletionOpened(current *record.User, note ...func(string)) *datamocks.RunInTransactionStub {
 	stub := datamocks.ExpectRunInTransaction(f.database, deletionTx, note...)
 	expectAdministratorsLock(f.database, deletionTx)
-	f.database.On("GetUserByIdForUpdate", mock.Anything, deletionTx, deletionUserId).Return(current, nil).Once()
+	f.database.On("GetUserByIDForUpdate", mock.Anything, deletionTx, deletionUserID).Return(current, nil).Once()
 	return stub
 }
 
 // expectDeletionTellsNoApp answers the reads, on the deletion's transaction before the delete, that
 // name the apps the deletion tells (#784 decision 3): the user has no session and no grant.
 func (f *deletionFixture) expectDeletionTellsNoApp() {
-	f.database.On("GetUserSessionsByUserId", mock.Anything, deletionTx, deletionUserId).
+	f.database.On("GetUserSessionsByUserID", mock.Anything, deletionTx, deletionUserID).
 		Return([]record.UserSession{}, nil).Once()
-	f.database.On("GetUsableRefreshTokenClientIdsByUserId", mock.Anything, deletionTx, deletionUserId, mock.Anything).
+	f.database.On("GetUsableRefreshTokenClientIDsByUserID", mock.Anything, deletionTx, deletionUserID, mock.Anything).
 		Return([]int64{}, nil).Once()
 }
 
@@ -202,14 +202,14 @@ func (f *deletionFixture) expectDeletionTellsNoApp() {
 func (f *deletionFixture) expectDeletionCompleted(note ...func(string)) {
 	f.expectGuardReads(deletionTx, false)
 	f.expectDeletionTellsNoApp()
-	f.database.On("DeleteUser", mock.Anything, deletionTx, deletionUserId).Return(nil).
+	f.database.On("DeleteUser", mock.Anything, deletionTx, deletionUserID).Return(nil).
 		Run(func(mock.Arguments) {
 			for _, n := range note {
 				n("delete")
 			}
 		}).Once()
 	f.auditLogger.On("Log", mock.Anything, audit.EventDeletedOwnAccount, map[string]interface{}{
-		"user_id":        deletionUserId,
+		"user_id":        deletionUserID,
 		"logged_in_user": deletionSubject,
 	}).Return().Run(func(mock.Arguments) {
 		for _, n := range note {
@@ -346,13 +346,13 @@ func TestHandleAccountDeletionPost_DeletesWithAnAuthenticatorCode(t *testing.T) 
 	f.expectEarlyCheck(false, 0)
 	// The code is claimed against the authenticator it was checked against: the generation read
 	// with the seed.
-	f.database.On("TryConsumeEnrolledUserOTPStep", mock.Anything, (*sql.Tx)(nil), deletionUserId, mock.Anything,
-		user.OtpConfigGeneration).Return(true, nil).Once()
+	f.database.On("TryConsumeEnrolledUserOTPStep", mock.Anything, (*sql.Tx)(nil), deletionUserID, mock.Anything,
+		user.OTPConfigGeneration).Return(true, nil).Once()
 	stub := f.expectDeletionOpened(user)
 	f.expectDeletionCompleted()
 
 	rr := f.serve(deletionRequest(t, deletionSettings(), map[string]string{
-		"password": deletionPassword, "otpCode": currentOtpCode(t)}))
+		"password": deletionPassword, "otpCode": currentOTPCode(t)}))
 
 	f.assertDeleted(t, rr, stub)
 	assert.Zero(t, f.credentials.failures)
@@ -370,7 +370,7 @@ func TestHandleAccountDeletionPost_DeletesWithARecoveryCode(t *testing.T) {
 	var order []string
 	note := func(edge string) { order = append(order, edge) }
 	stub := f.expectDeletionOpened(user, note)
-	f.database.On("TryUseUserRecoveryCode", mock.Anything, deletionTx, deletionUserId,
+	f.database.On("TryUseUserRecoveryCode", mock.Anything, deletionTx, deletionUserID,
 		otpcredential.HashRecoveryCode(deletionRecoveryCode)).Return(true, nil).
 		Run(func(mock.Arguments) { order = append(order, "claim") }).Once()
 	f.expectDeletionCompleted(note)
@@ -395,7 +395,7 @@ func TestHandleAccountDeletionPost_AnAdministratorDeletesWhileAnotherRemains(t *
 	f.expectGuardReads(deletionTx, true)
 	expectHoldersCounted(f.database, deletionTx, 2, 1)
 	f.expectDeletionTellsNoApp()
-	f.database.On("DeleteUser", mock.Anything, deletionTx, deletionUserId).Return(nil).Once()
+	f.database.On("DeleteUser", mock.Anything, deletionTx, deletionUserID).Return(nil).Once()
 	f.auditLogger.On("Log", mock.Anything, audit.EventDeletedOwnAccount, mock.Anything).Return().Once()
 
 	rr := f.serve(deletionRequest(t, deletionSettings(), map[string]string{"password": deletionPassword}))
@@ -449,7 +449,7 @@ func TestHandleAccountDeletionPost_RefusesInDecisionThreesOrder(t *testing.T) {
 		{
 			name: "a wrong password, before the code",
 			body: func(t *testing.T) map[string]string {
-				return map[string]string{"password": "Wr0ng!pass", "otpCode": currentOtpCode(t)}
+				return map[string]string{"password": "Wr0ng!pass", "otpCode": currentOTPCode(t)}
 			},
 			arrange: func(t *testing.T, f *deletionFixture) {
 				f.expectCaller(enrolledDeletionUser(t))
@@ -479,31 +479,31 @@ func TestHandleAccountDeletionPost_RefusesInDecisionThreesOrder(t *testing.T) {
 				f.expectEarlyCheck(false, 0)
 				countTx := &sql.Tx{}
 				datamocks.ExpectRunInTransaction(f.database, countTx)
-				f.database.On("IncrementUserOtpConsecutiveFailures", mock.Anything, countTx, deletionUserId,
-					user.OtpConfigGeneration).Return(false, nil).Once()
+				f.database.On("IncrementUserOTPConsecutiveFailures", mock.Anything, countTx, deletionUserID,
+					user.OTPConfigGeneration).Return(false, nil).Once()
 			},
 			status: http.StatusBadRequest, code: "INVALID_OTP_CODE", description: wrongCode, failures: 1,
 		},
 		{
 			name: "a replayed authenticator code is answered as a wrong one, and audited",
 			body: func(t *testing.T) map[string]string {
-				return map[string]string{"password": deletionPassword, "otpCode": currentOtpCode(t)}
+				return map[string]string{"password": deletionPassword, "otpCode": currentOTPCode(t)}
 			},
 			arrange: func(t *testing.T, f *deletionFixture) {
 				user := enrolledDeletionUser(t)
 				f.expectCaller(user)
 				f.expectEarlyCheck(false, 0)
-				f.database.On("TryConsumeEnrolledUserOTPStep", mock.Anything, (*sql.Tx)(nil), deletionUserId,
-					mock.Anything, user.OtpConfigGeneration).Return(false, nil).Once()
+				f.database.On("TryConsumeEnrolledUserOTPStep", mock.Anything, (*sql.Tx)(nil), deletionUserID,
+					mock.Anything, user.OTPConfigGeneration).Return(false, nil).Once()
 				countTx := &sql.Tx{}
 				datamocks.ExpectRunInTransaction(f.database, countTx)
-				f.database.On("IncrementUserOtpConsecutiveFailures", mock.Anything, countTx, deletionUserId,
-					user.OtpConfigGeneration).Return(false, nil).Once()
+				f.database.On("IncrementUserOTPConsecutiveFailures", mock.Anything, countTx, deletionUserID,
+					user.OTPConfigGeneration).Return(false, nil).Once()
 				// The refused claim's re-read finds the account still there, so it is a replay.
-				f.database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), deletionUserId).Return(user, nil).Once()
+				f.database.On("GetUserByID", mock.Anything, (*sql.Tx)(nil), deletionUserID).Return(user, nil).Once()
 				f.auditLogger.On("Log", mock.Anything, audit.EventOTPCodeReplayDetected, mock.MatchedBy(
 					func(details map[string]interface{}) bool {
-						return details["user_id"] == deletionUserId && details["logged_in_user"] == deletionSubject &&
+						return details["user_id"] == deletionUserID && details["logged_in_user"] == deletionSubject &&
 							details["step"] != nil
 					})).Return().Once()
 			},
@@ -514,19 +514,19 @@ func TestHandleAccountDeletionPost_RefusesInDecisionThreesOrder(t *testing.T) {
 			// no replay, and the 404 a request a moment later would get (#796 decision 3).
 			name: "a code claimed on an account deleted meanwhile answers 404, spending and auditing nothing",
 			body: func(t *testing.T) map[string]string {
-				return map[string]string{"password": deletionPassword, "otpCode": currentOtpCode(t)}
+				return map[string]string{"password": deletionPassword, "otpCode": currentOTPCode(t)}
 			},
 			arrange: func(t *testing.T, f *deletionFixture) {
 				user := enrolledDeletionUser(t)
 				f.expectCaller(user)
 				f.expectEarlyCheck(false, 0)
-				f.database.On("TryConsumeEnrolledUserOTPStep", mock.Anything, (*sql.Tx)(nil), deletionUserId,
-					mock.Anything, user.OtpConfigGeneration).Return(false, nil).Once()
+				f.database.On("TryConsumeEnrolledUserOTPStep", mock.Anything, (*sql.Tx)(nil), deletionUserID,
+					mock.Anything, user.OTPConfigGeneration).Return(false, nil).Once()
 				countTx := &sql.Tx{}
 				datamocks.ExpectRunInTransaction(f.database, countTx)
-				f.database.On("IncrementUserOtpConsecutiveFailures", mock.Anything, countTx, deletionUserId,
-					user.OtpConfigGeneration).Return(false, nil).Once()
-				f.database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), deletionUserId).
+				f.database.On("IncrementUserOTPConsecutiveFailures", mock.Anything, countTx, deletionUserID,
+					user.OTPConfigGeneration).Return(false, nil).Once()
+				f.database.On("GetUserByID", mock.Anything, (*sql.Tx)(nil), deletionUserID).
 					Return((*record.User)(nil), nil).Once()
 			},
 			status: http.StatusNotFound, code: "NOT_FOUND", description: "User not found",
@@ -539,8 +539,8 @@ func TestHandleAccountDeletionPost_RefusesInDecisionThreesOrder(t *testing.T) {
 			arrange: func(t *testing.T, f *deletionFixture) {
 				f.expectCaller(enrolledDeletionUser(t))
 				f.expectEarlyCheck(false, 0)
-				f.auditLogger.On("Log", mock.Anything, audit.EventAuthFailedOtp, map[string]interface{}{
-					"user_id": deletionUserId, "logged_in_user": deletionSubject, "reason": audit.AuthFailedOtpClockAhead,
+				f.auditLogger.On("Log", mock.Anything, audit.EventAuthFailedOTP, map[string]interface{}{
+					"user_id": deletionUserID, "logged_in_user": deletionSubject, "reason": audit.AuthFailedOTPClockAhead,
 				}).Return().Once()
 			},
 			status: http.StatusBadRequest, code: "OTP_CLOCK_AHEAD", description: clockAhead,
@@ -611,13 +611,13 @@ func TestHandleAccountDeletionPost_AWrongOrUsedRecoveryCodeIsRefused(t *testing.
 			f.expectEarlyCheck(false, 0)
 			stub := f.expectDeletionOpened(user)
 			codeHash := otpcredential.HashRecoveryCode(deletionRecoveryCode)
-			f.database.On("TryUseUserRecoveryCode", mock.Anything, deletionTx, deletionUserId, codeHash).
+			f.database.On("TryUseUserRecoveryCode", mock.Anything, deletionTx, deletionUserID, codeHash).
 				Return(false, nil).Once()
-			f.database.On("UserRecoveryCodeExists", mock.Anything, (*sql.Tx)(nil), deletionUserId, codeHash).
+			f.database.On("UserRecoveryCodeExists", mock.Anything, (*sql.Tx)(nil), deletionUserID, codeHash).
 				Return(tc.used, nil).Once()
 			if tc.used {
 				f.auditLogger.On("Log", mock.Anything, audit.EventRecoveryCodeReplayDetected, map[string]interface{}{
-					"user_id": deletionUserId, "logged_in_user": deletionSubject,
+					"user_id": deletionUserID, "logged_in_user": deletionSubject,
 				}).Return().Once()
 			}
 
@@ -643,12 +643,12 @@ func TestHandleAccountDeletionPost_TheLastAdministratorUnderTheLockIsRefused(t *
 	f.expectCaller(user)
 	f.expectEarlyCheck(true, 2)
 	stub := f.expectDeletionOpened(user)
-	f.database.On("TryUseUserRecoveryCode", mock.Anything, deletionTx, deletionUserId,
+	f.database.On("TryUseUserRecoveryCode", mock.Anything, deletionTx, deletionUserID,
 		otpcredential.HashRecoveryCode(deletionRecoveryCode)).Return(true, nil).Once()
 	f.expectGuardReads(deletionTx, true)
 	expectHoldersCounted(f.database, deletionTx, 1, 0)
 	f.expectDeletionTellsNoApp()
-	f.database.On("DeleteUser", mock.Anything, deletionTx, deletionUserId).Return(nil).Once()
+	f.database.On("DeleteUser", mock.Anything, deletionTx, deletionUserID).Return(nil).Once()
 
 	rr := f.serve(deletionRequest(t, deletionSettings(), map[string]string{
 		"password": deletionPassword, "recoveryCode": deletionRecoveryCode}))
@@ -692,7 +692,7 @@ func TestHandleAccountDeletionPost_ARolledBackDeletionTellsNobody(t *testing.T) 
 	stub := f.expectDeletionOpened(user)
 	f.expectGuardReads(deletionTx, false)
 	f.expectDeletionTellsNoApp()
-	f.database.On("DeleteUser", mock.Anything, deletionTx, deletionUserId).Return(errors.New("delete failed")).Once()
+	f.database.On("DeleteUser", mock.Anything, deletionTx, deletionUserID).Return(errors.New("delete failed")).Once()
 
 	rr := f.serve(deletionRequest(t, deletionSettings(), map[string]string{"password": deletionPassword}))
 
@@ -716,13 +716,13 @@ func TestHandleAccountDeletionPost_TellsTheAppsThatKnewTheUser(t *testing.T) {
 	f.logoutTokens.note = note
 	stub := f.expectDeletionOpened(user, note)
 	f.expectGuardReads(deletionTx, false)
-	app := record.Client{Id: 31, ClientIdentifier: "the-app", BackchannelLogoutURI: "https://app.example.com/bcl"}
-	f.database.On("GetUserSessionsByUserId", mock.Anything, deletionTx, deletionUserId).
+	app := record.Client{ID: 31, ClientIdentifier: "the-app", BackchannelLogoutURI: "https://app.example.com/bcl"}
+	f.database.On("GetUserSessionsByUserID", mock.Anything, deletionTx, deletionUserID).
 		Return([]record.UserSession{}, nil).Once()
-	f.database.On("GetUsableRefreshTokenClientIdsByUserId", mock.Anything, deletionTx, deletionUserId, mock.Anything).
-		Return([]int64{app.Id}, nil).Run(func(mock.Arguments) { note("read the apps") }).Once()
-	f.database.On("GetClientsByIds", mock.Anything, deletionTx, []int64{app.Id}).Return([]record.Client{app}, nil).Once()
-	f.database.On("DeleteUser", mock.Anything, deletionTx, deletionUserId).Return(nil).
+	f.database.On("GetUsableRefreshTokenClientIDsByUserID", mock.Anything, deletionTx, deletionUserID, mock.Anything).
+		Return([]int64{app.ID}, nil).Run(func(mock.Arguments) { note("read the apps") }).Once()
+	f.database.On("GetClientsByIDs", mock.Anything, deletionTx, []int64{app.ID}).Return([]record.Client{app}, nil).Once()
+	f.database.On("DeleteUser", mock.Anything, deletionTx, deletionUserID).Return(nil).
 		Run(func(mock.Arguments) { note("delete") }).Once()
 	f.auditLogger.On("Log", mock.Anything, audit.EventDeletedOwnAccount, mock.Anything).Return().
 		Run(func(mock.Arguments) { note("audit") }).Once()
@@ -735,8 +735,8 @@ func TestHandleAccountDeletionPost_TellsTheAppsThatKnewTheUser(t *testing.T) {
 	assert.Equal(t, []string{"begin", "read the apps", "delete", "commit", "audit", "send"}, order,
 		"the apps are read before the delete and told after the commit")
 	assert.Equal(t, [][]backchannel.Delivery{{{
-		ClientId: app.Id, ClientIdentifier: app.ClientIdentifier, URI: app.BackchannelLogoutURI,
-		UserId: deletionUserId, Subject: deletionSubject,
+		ClientID: app.ID, ClientIdentifier: app.ClientIdentifier, URI: app.BackchannelLogoutURI,
+		UserID: deletionUserID, Subject: deletionSubject,
 	}}}, f.logoutTokens.sent, "one token naming the user and no session")
 	assert.Equal(t, settings.Issuer, f.logoutTokens.issuer)
 }
@@ -750,11 +750,11 @@ func TestHandleAccountDeletionPost_TheCodeThatDisablesTheAuthenticatorIsTold(t *
 	f.expectEarlyCheck(false, 0)
 	countTx := &sql.Tx{}
 	datamocks.ExpectRunInTransaction(f.database, countTx)
-	f.database.On("IncrementUserOtpConsecutiveFailures", mock.Anything, countTx, deletionUserId,
-		user.OtpConfigGeneration).Return(true, nil).Once()
-	f.database.On("GetUserByIdForUpdate", mock.Anything, countTx, deletionUserId).Return(user, nil).Once()
+	f.database.On("IncrementUserOTPConsecutiveFailures", mock.Anything, countTx, deletionUserID,
+		user.OTPConfigGeneration).Return(true, nil).Once()
+	f.database.On("GetUserByIDForUpdate", mock.Anything, countTx, deletionUserID).Return(user, nil).Once()
 	f.auditLogger.On("Log", mock.Anything, audit.EventOTPAuthenticatorDisabled, map[string]interface{}{
-		"user_id": deletionUserId, "logged_in_user": deletionSubject,
+		"user_id": deletionUserID, "logged_in_user": deletionSubject,
 	}).Return().Once()
 
 	rr := f.serve(deletionRequest(t, deletionSettings(), map[string]string{
@@ -786,22 +786,22 @@ func TestHandleAccountDeletionPost_TheReplayThatDisablesTheAuthenticatorIsTold(t
 			user := enrolledDeletionUser(t)
 			f.expectCaller(user)
 			f.expectEarlyCheck(false, 0)
-			f.database.On("TryConsumeEnrolledUserOTPStep", mock.Anything, (*sql.Tx)(nil), deletionUserId,
-				mock.Anything, user.OtpConfigGeneration).Return(false, nil).Once()
+			f.database.On("TryConsumeEnrolledUserOTPStep", mock.Anything, (*sql.Tx)(nil), deletionUserID,
+				mock.Anything, user.OTPConfigGeneration).Return(false, nil).Once()
 			countTx := &sql.Tx{}
 			datamocks.ExpectRunInTransaction(f.database, countTx)
-			f.database.On("IncrementUserOtpConsecutiveFailures", mock.Anything, countTx, deletionUserId,
-				user.OtpConfigGeneration).Return(true, nil).Once()
-			f.database.On("GetUserByIdForUpdate", mock.Anything, countTx, deletionUserId).Return(user, nil).Once()
-			f.database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), deletionUserId).
+			f.database.On("IncrementUserOTPConsecutiveFailures", mock.Anything, countTx, deletionUserID,
+				user.OTPConfigGeneration).Return(true, nil).Once()
+			f.database.On("GetUserByIDForUpdate", mock.Anything, countTx, deletionUserID).Return(user, nil).Once()
+			f.database.On("GetUserByID", mock.Anything, (*sql.Tx)(nil), deletionUserID).
 				Return(tc.reread, tc.readErr).Maybe()
 			f.auditLogger.On("Log", mock.Anything, audit.EventOTPCodeReplayDetected, mock.Anything).Return().Once()
 			f.auditLogger.On("Log", mock.Anything, audit.EventOTPAuthenticatorDisabled, map[string]interface{}{
-				"user_id": deletionUserId, "logged_in_user": deletionSubject,
+				"user_id": deletionUserID, "logged_in_user": deletionSubject,
 			}).Return().Once()
 
 			rr := f.serve(deletionRequest(t, deletionSettings(), map[string]string{
-				"password": deletionPassword, "otpCode": currentOtpCode(t)}))
+				"password": deletionPassword, "otpCode": currentOTPCode(t)}))
 
 			require.Equal(t, http.StatusBadRequest, rr.Code, rr.Body.String())
 			assert.Equal(t, "INVALID_OTP_CODE", errorCodeOf(t, rr))
@@ -845,17 +845,17 @@ func TestHandleAccountDeletionPost_AnAuthenticatorReplacedMeanwhileIsRefused(t *
 	user := enrolledDeletionUser(t)
 	f.expectCaller(user)
 	f.expectEarlyCheck(false, 0)
-	f.database.On("TryConsumeEnrolledUserOTPStep", mock.Anything, (*sql.Tx)(nil), deletionUserId, mock.Anything,
-		user.OtpConfigGeneration).Return(true, nil).Once()
+	f.database.On("TryConsumeEnrolledUserOTPStep", mock.Anything, (*sql.Tx)(nil), deletionUserID, mock.Anything,
+		user.OTPConfigGeneration).Return(true, nil).Once()
 	current := *user
-	current.OtpConfigGeneration = 8
+	current.OTPConfigGeneration = 8
 	var err error
 	current.OTPSecretEncrypted, err = testDataCipher.Encrypt("JBSWY3DPEHPK3PXP")
 	require.NoError(t, err)
 	stub := f.expectDeletionOpened(&current)
 
 	rr := f.serve(deletionRequest(t, deletionSettings(), map[string]string{
-		"password": deletionPassword, "otpCode": currentOtpCode(t)}))
+		"password": deletionPassword, "otpCode": currentOTPCode(t)}))
 
 	require.Equal(t, http.StatusBadRequest, rr.Code, rr.Body.String())
 	assert.Equal(t, "INVALID_OTP_CODE", errorCodeOf(t, rr))
@@ -872,17 +872,17 @@ func TestHandleAccountDeletionPost_TwoFactorRemovedMeanwhileStillDeletes(t *test
 	user := enrolledDeletionUser(t)
 	f.expectCaller(user)
 	f.expectEarlyCheck(false, 0)
-	f.database.On("TryConsumeEnrolledUserOTPStep", mock.Anything, (*sql.Tx)(nil), deletionUserId, mock.Anything,
-		user.OtpConfigGeneration).Return(true, nil).Once()
+	f.database.On("TryConsumeEnrolledUserOTPStep", mock.Anything, (*sql.Tx)(nil), deletionUserID, mock.Anything,
+		user.OTPConfigGeneration).Return(true, nil).Once()
 	current := *user
 	current.OTPEnabled = false
 	current.OTPSecretEncrypted = nil
-	current.OtpConfigGeneration = 7
+	current.OTPConfigGeneration = 7
 	stub := f.expectDeletionOpened(&current)
 	f.expectDeletionCompleted()
 
 	rr := f.serve(deletionRequest(t, deletionSettings(), map[string]string{
-		"password": deletionPassword, "otpCode": currentOtpCode(t)}))
+		"password": deletionPassword, "otpCode": currentOTPCode(t)}))
 
 	f.assertDeleted(t, rr, stub)
 }

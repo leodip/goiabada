@@ -25,7 +25,7 @@ import (
 func staleSignedInBrowserSession(t *testing.T) (*http.Cookie, string, *record.Client) {
 	t.Helper()
 
-	httpClient, client, _, _ := createSessionWithAcrLevel1(t)
+	httpClient, client, _, _ := createSessionWithACRLevel1(t)
 	cookie := requireSessionCookie(t, httpClient)
 	hash := hashutil.HashString(decodeSessionIdentifier(t, cookie))
 
@@ -40,7 +40,7 @@ func staleSignedInBrowserSession(t *testing.T) (*http.Cookie, string, *record.Cl
 // readBrowserSessionRow reads the row the hash names, which must be live.
 func readBrowserSessionRow(t *testing.T, hash string) *record.BrowserSession {
 	t.Helper()
-	row, err := database.GetBrowserSessionByOwnerAndSessionIdHash(context.Background(), nil,
+	row, err := database.GetBrowserSessionByOwnerAndSessionIDHash(context.Background(), nil,
 		sessionkeys.AuthServerSessionName, hash, time.Now().UTC())
 	require.NoError(t, err)
 	require.NotNil(t, row, "the browser session is live")
@@ -54,7 +54,7 @@ func getWithSessionCookie(t *testing.T, target string, cookie *http.Cookie) *htt
 	req, err := http.NewRequest(http.MethodGet, target, nil)
 	require.NoError(t, err)
 	req.AddCookie(&http.Cookie{Name: cookie.Name, Value: cookie.Value})
-	resp, err := createHttpClient(t).Do(req)
+	resp, err := createHTTPClient(t).Do(req)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = resp.Body.Close() })
 	return resp
@@ -96,9 +96,9 @@ func TestSessionRefresh_APageRequestSendsASignInInProgressItsCookieWithTheRowsNe
 	for _, mode := range keepSignedInModes {
 		t.Run(string(mode), func(t *testing.T) {
 			setKeepSignedIn(t, mode)
-			client, redirectUri := newClientAndRedirectUri(t, record.AcrLevel1)
-			httpClient := createHttpClient(t)
-			_ = beginAuthorize(t, httpClient, client, redirectUri).Body.Close()
+			client, redirectURI := newClientAndRedirectURI(t, record.ACRLevel1)
+			httpClient := createHTTPClient(t)
+			_ = beginAuthorize(t, httpClient, client, redirectURI).Body.Close()
 			cookie := requireSessionCookie(t, httpClient)
 			hash := hashutil.HashString(decodeSessionIdentifier(t, cookie))
 			now := time.Now().UTC()
@@ -136,7 +136,7 @@ func TestSessionRefresh_APageRequestSendsASignInInProgressItsCookieWithTheRowsNe
 func TestSessionRefresh_ACacheableAnswerSendsNoCookieAndLeavesTheRowAlone(t *testing.T) {
 	cookie, hash, client := staleSignedInBrowserSession(t)
 	require.NoError(t, database.CreateClientLogo(context.Background(), nil, &record.ClientLogo{
-		ClientId: client.Id, Logo: createTestPNGImage(16, 16), ContentType: "image/png",
+		ClientID: client.ID, Logo: createTestPNGImage(16, 16), ContentType: "image/png",
 	}))
 	staleRow := readBrowserSessionRow(t, hash)
 

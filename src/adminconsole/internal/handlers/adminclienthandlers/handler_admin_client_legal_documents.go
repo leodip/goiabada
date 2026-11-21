@@ -17,11 +17,11 @@ import (
 // clientLegalDocumentsAPI is what the tab needs: the client and the documents that apply to it, in
 // one read.
 type clientLegalDocumentsAPI interface {
-	GetClientLegalDocuments(ctx context.Context, accessToken string, clientId int64) (*api.GetClientLegalDocumentsResponse, error)
+	GetClientLegalDocuments(ctx context.Context, accessToken string, clientID int64) (*api.GetClientLegalDocumentsResponse, error)
 }
 
 func HandleLegalDocumentsGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient clientLegalDocumentsAPI,
 ) http.HandlerFunc {
 
@@ -32,9 +32,9 @@ func HandleLegalDocumentsGet(
 			httpHelper.NotFound(w, r)
 			return
 		}
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 

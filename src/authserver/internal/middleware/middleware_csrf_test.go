@@ -9,14 +9,14 @@ import (
 	"testing"
 )
 
-// TestLogoutIdTokenHintPresent is the exhaustive table for the auth server's one conditional CSRF
+// TestLogoutIDTokenHintPresent is the exhaustive table for the auth server's one conditional CSRF
 // exemption. It lived in src/core/middleware until #385 moved the predicate here with the policy
 // that names it; core keeps the matching mechanism and its own table is over fixture paths now,
 // because core no longer declares a route.
 //
 // Every row is a POST unless it says otherwise, and each negative row names the gate meant to
 // reject it: the method check, the exact-path binding the policy supplies, or the parameter lookup.
-func TestLogoutIdTokenHintPresent(t *testing.T) {
+func TestLogoutIDTokenHintPresent(t *testing.T) {
 	tests := []struct {
 		name string
 		// method defaults to POST.
@@ -80,14 +80,14 @@ func TestLogoutIdTokenHintPresent(t *testing.T) {
 				req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 			}
 
-			if got := LogoutIdTokenHintPresent(req); got != tt.want {
-				t.Errorf("LogoutIdTokenHintPresent = %v, want %v", got, tt.want)
+			if got := LogoutIDTokenHintPresent(req); got != tt.want {
+				t.Errorf("LogoutIDTokenHintPresent = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
 
-// TestLogoutIdTokenHintPresent_LeavesTheBodyForTheHandler is the case #109 decision 9 names as the
+// TestLogoutIDTokenHintPresent_LeavesTheBodyForTheHandler is the case #109 decision 9 names as the
 // thing that has to be pinned: looking for the hint in a POST body means parsing the form in
 // middleware, and a form parse consumes the request body.
 //
@@ -96,7 +96,7 @@ func TestLogoutIdTokenHintPresent(t *testing.T) {
 // see a request with no ui_locales, no state and no post_logout_redirect_uri, which is a page in
 // the wrong language and a redirect that silently does not happen, so this asserts the siblings and
 // not only the hint itself.
-func TestLogoutIdTokenHintPresent_LeavesTheBodyForTheHandler(t *testing.T) {
+func TestLogoutIDTokenHintPresent_LeavesTheBodyForTheHandler(t *testing.T) {
 	body := url.Values{
 		"id_token_hint":            {"a.b.c"},
 		"post_logout_redirect_uri": {"https://rp.example/bye"},
@@ -107,7 +107,7 @@ func TestLogoutIdTokenHintPresent_LeavesTheBodyForTheHandler(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/auth/logout", strings.NewReader(body.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	if !LogoutIdTokenHintPresent(req) {
+	if !LogoutIDTokenHintPresent(req) {
 		t.Fatal("a POST carrying an id_token_hint in its body must be exempted")
 	}
 
@@ -118,18 +118,18 @@ func TestLogoutIdTokenHintPresent_LeavesTheBodyForTheHandler(t *testing.T) {
 	}
 }
 
-// TestLogoutIdTokenHintPresent_DoesNotParseTheBodyWhenTheQueryAnswers is the other half of the
+// TestLogoutIDTokenHintPresent_DoesNotParseTheBodyWhenTheQueryAnswers is the other half of the
 // doc's claim that a hint in the query costs no parse. Without it, the ordering inside the shared
 // extractor could be reversed and nothing here would notice.
 //
 // A body the form parser would reject outright is what makes the claim observable: if the predicate
 // parsed it, r.PostForm would be populated with junk rather than left nil.
-func TestLogoutIdTokenHintPresent_DoesNotParseTheBodyWhenTheQueryAnswers(t *testing.T) {
+func TestLogoutIDTokenHintPresent_DoesNotParseTheBodyWhenTheQueryAnswers(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/auth/logout?id_token_hint=abc",
 		strings.NewReader("this-is-not-a-form"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	if !LogoutIdTokenHintPresent(req) {
+	if !LogoutIDTokenHintPresent(req) {
 		t.Fatal("a hint in the query must be enough")
 	}
 	if req.PostForm != nil {

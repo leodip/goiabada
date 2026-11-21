@@ -68,13 +68,13 @@ func TestAdminSettingsSaves_InvalidateTheCacheOnlyWhenTheSaveIsAccepted(t *testi
 		name     string
 		template string
 		form     url.Values
-		build    func(h *handlersmocks.HttpHelper, c settingsSaveAPI, cache SettingsInvalidator) http.HandlerFunc
+		build    func(h *handlersmocks.HTTPHelper, c settingsSaveAPI, cache SettingsInvalidator) http.HandlerFunc
 	}{
 		{
 			name:     "HandleGeneralPost",
 			template: "/admin_settings_general.html",
 			form:     url.Values{"appName": {"Goiabada"}, "issuer": {"https://issuer.example"}},
-			build: func(h *handlersmocks.HttpHelper, c settingsSaveAPI, cache SettingsInvalidator) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c settingsSaveAPI, cache SettingsInvalidator) http.HandlerFunc {
 				return HandleGeneralPost(h, newSettingsTestStore(), c, cache, consoleBaseURL)
 			},
 		},
@@ -82,7 +82,7 @@ func TestAdminSettingsSaves_InvalidateTheCacheOnlyWhenTheSaveIsAccepted(t *testi
 			name:     "HandleEmailPost",
 			template: "/admin_settings_email.html",
 			form:     url.Values{"hostOrIP": {"smtp.example.com"}, "port": {"587"}},
-			build: func(h *handlersmocks.HttpHelper, c settingsSaveAPI, cache SettingsInvalidator) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c settingsSaveAPI, cache SettingsInvalidator) http.HandlerFunc {
 				return HandleEmailPost(h, newSettingsTestStore(), c, cache, consoleBaseURL)
 			},
 		},
@@ -90,7 +90,7 @@ func TestAdminSettingsSaves_InvalidateTheCacheOnlyWhenTheSaveIsAccepted(t *testi
 
 	for _, hc := range handlerCases {
 		t.Run(hc.name+", accepted", func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 			cache := &invalidationRecorder{}
 			w := httptest.NewRecorder()
@@ -104,7 +104,7 @@ func TestAdminSettingsSaves_InvalidateTheCacheOnlyWhenTheSaveIsAccepted(t *testi
 		})
 
 		t.Run(hc.name+", refused", func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 			handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", hc.template).Once()
 			cache := &invalidationRecorder{}

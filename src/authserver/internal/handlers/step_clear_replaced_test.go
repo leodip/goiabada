@@ -39,7 +39,7 @@ import (
 func expectStepClearReplaced(t *testing.T, ceremonyStore *handlersmocks.CeremonyStore,
 	pageRenderer *handlersmocks.PageRenderer, rr *httptest.ResponseRecorder, req *http.Request) {
 	t.Helper()
-	ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(ceremony.ErrCeremonyReplaced).Once()
+	ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyID).Return(ceremony.ErrCeremonyReplaced).Once()
 	expectCeremonyNoLongerActive(t, pageRenderer, rr, req)
 }
 
@@ -64,14 +64,14 @@ func TestAnswerClientAfterStepClear_AReplacedCeremonyAnswersNoLongerActive(t *te
 	pageRenderer := handlersmocks.NewPageRenderer(t)
 	ceremonyStore := handlersmocks.NewCeremonyStore(t)
 	rr := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/auth/consent?ceremony="+testCeremonyId, nil)
+	req := httptest.NewRequest(http.MethodGet, "/auth/consent?ceremony="+testCeremonyID, nil)
 	expectStepClearReplaced(t, ceremonyStore, pageRenderer, rr, req)
 	logged := logtest.CaptureSlog(t)
 
 	answerClientAfterStepClear(rr, req, testCeremonyBoundary(pageRenderer, ceremonyStore, nil), testClientErrorResponder(datamocks.NewDatabase(t), pageRenderer, nil),
 		testRedirectError("access_denied", "The user did not provide consent", "query",
 			"https://legit.example/cb", "abc123", "code"),
-		ceremonyStore.ClearAuthContext(rr, req, testCeremonyId))
+		ceremonyStore.ClearAuthContext(rr, req, testCeremonyID))
 
 	assertAnsweredNoLongerActive(t, rr)
 	assertReplacedAnsweredAtWarn(t, logged)
@@ -94,12 +94,12 @@ func TestHandleAuthLevel1CompletedGet_AParkedErrorOfAReplacedCeremonyAnswersNoLo
 		auditLogger:        handlersmocks.NewAuditLogger(t),
 	})
 
-	req := withSessionSettings(httptest.NewRequest(http.MethodGet, "/auth/level1completed?ceremony="+testCeremonyId, nil))
+	req := withSessionSettings(httptest.NewRequest(http.MethodGet, "/auth/level1completed?ceremony="+testCeremonyID, nil))
 	rr := httptest.NewRecorder()
 	ceremonyStore.On("GetAuthContext", req).Return(&ceremony.AuthContext{
-		CeremonyId:               testCeremonyId,
+		CeremonyID:               testCeremonyID,
 		AuthState:                ceremony.AuthStateLevel1PasswordCompleted,
-		ClientId:                 "test-client",
+		ClientID:                 "test-client",
 		RedirectURI:              "https://legit.example/cb",
 		ResponseType:             "code",
 		State:                    "abc123",
@@ -107,7 +107,7 @@ func TestHandleAuthLevel1CompletedGet_AParkedErrorOfAReplacedCeremonyAnswersNoLo
 		DeferredErrorDescription: "Invalid scope format: 'bogus'.",
 	}, nil)
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
-		&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil).Once()
+		&record.Client{ID: 1, ClientIdentifier: "test-client"}, nil).Once()
 	expectStepClearReplaced(t, ceremonyStore, pageRenderer, rr, req)
 	logged := logtest.CaptureSlog(t)
 
@@ -117,7 +117,7 @@ func TestHandleAuthLevel1CompletedGet_AParkedErrorOfAReplacedCeremonyAnswersNoLo
 	assertReplacedAnsweredAtWarn(t, logged)
 	pageRenderer.AssertExpectations(t)
 	ceremonyStore.AssertExpectations(t)
-	database.AssertNotCalled(t, "GetRedirectURIsByClientId", mock.Anything, mock.Anything, int64(1))
+	database.AssertNotCalled(t, "GetRedirectURIsByClientID", mock.Anything, mock.Anything, int64(1))
 }
 
 // lastComparisonBackend is the in-memory backend with a turn for the test before every conditional
@@ -153,9 +153,9 @@ func TestAnswerClientAfterStepClear_ACeremonyReplacedAtTheLastAttemptAnswersNoLo
 
 	seed := httptest.NewRecorder()
 	require.NoError(t, ceremonyStore.AddAuthContext(seed, httptest.NewRequest(http.MethodGet, "/auth/authorize", nil),
-		&ceremony.AuthContext{CeremonyId: testCeremonyId, AuthState: ceremony.AuthStateRequiresConsent}))
+		&ceremony.AuthContext{CeremonyID: testCeremonyID, AuthState: ceremony.AuthStateRequiresConsent}))
 	cookies := seed.Result().Cookies()
-	req := withCookies(httptest.NewRequest(http.MethodGet, "/auth/consent?ceremony="+testCeremonyId, nil), cookies)
+	req := withCookies(httptest.NewRequest(http.MethodGet, "/auth/consent?ceremony="+testCeremonyID, nil), cookies)
 	_, err = ceremonyStore.GetAuthContext(req)
 	require.NoError(t, err)
 
@@ -173,7 +173,7 @@ func TestAnswerClientAfterStepClear_ACeremonyReplacedAtTheLastAttemptAnswersNoLo
 			pushing = true
 			for _, id := range newer {
 				require.NoError(t, ceremonyStore.AddAuthContext(httptest.NewRecorder(), other,
-					&ceremony.AuthContext{CeremonyId: id, AuthState: ceremony.AuthStateRequiresLevel1}))
+					&ceremony.AuthContext{CeremonyID: id, AuthState: ceremony.AuthStateRequiresLevel1}))
 			}
 			pushing = false
 			return
@@ -192,7 +192,7 @@ func TestAnswerClientAfterStepClear_ACeremonyReplacedAtTheLastAttemptAnswersNoLo
 	answerClientAfterStepClear(rr, req, testCeremonyBoundary(pageRenderer, ceremonyStore, nil), testClientErrorResponder(datamocks.NewDatabase(t), pageRenderer, nil),
 		testRedirectError("access_denied", "The user did not provide consent", "query",
 			"https://legit.example/cb", "state-a", "code"),
-		ceremonyStore.ClearAuthContext(rr, req, testCeremonyId))
+		ceremonyStore.ClearAuthContext(rr, req, testCeremonyID))
 
 	assert.Equal(t, 3, comparisons)
 	assertAnsweredNoLongerActive(t, rr)
@@ -265,7 +265,7 @@ func TestHandleIssueGet_WhatIsMintedForAReplacedCeremonyIsNotDelivered(t *testin
 	t.Run("a code", func(t *testing.T) {
 		f := newRecheckFixture(t, "code", "")
 		f.codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.Anything).
-			Return(&record.Code{Id: 1, Code: "the-code", ClientId: 1, RedirectURI: "https://example.com/callback",
+			Return(&record.Code{ID: 1, Code: "the-code", ClientID: 1, RedirectURI: "https://example.com/callback",
 				State: "test-state"}, nil).Once()
 		f.auditLogger.On("Log", mock.Anything, audit.EventCreatedAuthCode, mock.Anything).Return().Once()
 		expectStepClearReplaced(t, f.ceremonyStore, f.pageRenderer, f.rr, f.req)
@@ -298,13 +298,13 @@ func TestHandleIssueGet_WhatIsMintedForAReplacedCeremonyIsNotDelivered(t *testin
 // The lost-enrolment ending answers the "no longer active" page, not its own 409, when the browser
 // has moved on to another ceremony: the sign-in the user is in is not the one whose authenticator
 // changed.
-func TestHandleAuthOtpPost_AnEnrolmentEndingForAReplacedCeremonyAnswersNoLongerActive(t *testing.T) {
+func TestHandleAuthOTPPost_AnEnrolmentEndingForAReplacedCeremonyAnswersNoLongerActive(t *testing.T) {
 	pageRenderer := handlersmocks.NewPageRenderer(t)
 	ceremonyStore := handlersmocks.NewCeremonyStore(t)
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
-	handler := buildAuthOtpPost(authOtpPostDeps{
+	handler := buildAuthOTPPost(authOTPPostDeps{
 		pageRenderer:  pageRenderer,
 		ceremonyStore: ceremonyStore,
 		database:      database,
@@ -315,7 +315,7 @@ func TestHandleAuthOtpPost_AnEnrolmentEndingForAReplacedCeremonyAnswersNoLongerA
 	otpCode := otptest.Code(t, otpSecret, time.Now())
 
 	form := url.Values{}
-	form.Add(ceremony.IdField, testCeremonyId)
+	form.Add(ceremony.IDField, testCeremonyID)
 	form.Add("otp", otpCode)
 	req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
@@ -324,14 +324,14 @@ func TestHandleAuthOtpPost_AnEnrolmentEndingForAReplacedCeremonyAnswersNoLongerA
 
 	ceremonyStore.On("GetAuthContext", mock.Anything).Return(&ceremony.AuthContext{
 		AuthState:  ceremony.AuthStateLevel2OTP,
-		CeremonyId: testCeremonyId,
-		UserId:     1,
-		ClientId:   "test-client",
+		CeremonyID: testCeremonyID,
+		UserID:     1,
+		ClientID:   "test-client",
 		OTPKeyURL:  otpTestKeyURL(otpSecret),
 	}, nil)
 	// The account has an authenticator now, set up after this ceremony rendered its enrolment.
-	database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).
-		Return(&record.User{Id: 1, Enabled: true, OTPEnabled: true, OtpConfigGeneration: 4}, nil)
+	database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).
+		Return(&record.User{ID: 1, Enabled: true, OTPEnabled: true, OTPConfigGeneration: 4}, nil)
 	expectStepClearReplaced(t, ceremonyStore, pageRenderer, rr, req)
 
 	handler.ServeHTTP(rr, req)

@@ -24,40 +24,40 @@ import (
 // JWT middleware holds, and a 500 from the API is a server fault: both stay 500, and a sweep that
 // turned every InternalServerError in this file into a NotFound would fail here.
 //
-// notFoundClientApiClient answers the one call the handler makes before it decides. The rest of the
+// notFoundClientAPIClient answers the one call the handler makes before it decides. The rest of the
 // ports it is passed to panic, rather than return a helpful zero value.
-type notFoundClientApiClient struct {
+type notFoundClientAPIClient struct {
 	entity *api.ClientResponse
 	err    error
 }
 
-func (c *notFoundClientApiClient) GetClientById(_ context.Context, accessToken string, id int64) (*api.ClientResponse, error) {
+func (c *notFoundClientAPIClient) GetClientByID(_ context.Context, accessToken string, id int64) (*api.ClientResponse, error) {
 	return c.entity, c.err
 }
 
-// The rest of the ports notFoundClientApiClient is passed to, which no test here reaches.
+// The rest of the ports notFoundClientAPIClient is passed to, which no test here reaches.
 
-func (*notFoundClientApiClient) UpdateClient(context.Context, string, int64, *api.UpdateClientSettingsRequest) (*api.ClientResponse, error) {
+func (*notFoundClientAPIClient) UpdateClient(context.Context, string, int64, *api.UpdateClientSettingsRequest) (*api.ClientResponse, error) {
 	panic("unexpected call to UpdateClient")
 }
 
-func (*notFoundClientApiClient) GetAllBrands(context.Context, string) ([]api.BrandResponse, error) {
+func (*notFoundClientAPIClient) GetAllBrands(context.Context, string) ([]api.BrandResponse, error) {
 	panic("GetAllBrands is not part of this test")
 }
 
-func (*notFoundClientApiClient) UpdateClientBrand(context.Context, string, int64, *api.UpdateClientBrandRequest) (*api.ClientResponse, error) {
+func (*notFoundClientAPIClient) UpdateClientBrand(context.Context, string, int64, *api.UpdateClientBrandRequest) (*api.ClientResponse, error) {
 	panic("UpdateClientBrand is not part of this test")
 }
 
-func (*notFoundClientApiClient) UpdateClientAdministrativeScopes(context.Context, string, int64, *api.UpdateClientAdministrativeScopesRequest) (*api.ClientResponse, error) {
+func (*notFoundClientAPIClient) UpdateClientAdministrativeScopes(context.Context, string, int64, *api.UpdateClientAdministrativeScopesRequest) (*api.ClientResponse, error) {
 	panic("UpdateClientAdministrativeScopes is not part of this test")
 }
 
-func TestClient_StaleOrMalformedUrlAnswers404(t *testing.T) {
+func TestClient_StaleOrMalformedURLAnswers404(t *testing.T) {
 	const pathValueName = "clientId"
 
 	// present, gone and broken stand for the three answers the API can give this handler.
-	present := &api.ClientResponse{Id: 42}
+	present := &api.ClientResponse{ID: 42}
 	gone := &apiclient.APIError{Code: "NOT_FOUND", Message: "Client not found", StatusCode: http.StatusNotFound}
 	broken := &apiclient.APIError{Code: "INTERNAL_SERVER_ERROR", Message: "the database is on fire", StatusCode: http.StatusInternalServerError}
 
@@ -67,7 +67,7 @@ func TestClient_StaleOrMalformedUrlAnswers404(t *testing.T) {
 		// the router never bound, which is how an unbound parameter reads from r.PathValue.
 		target       string
 		id           string
-		withJwt      bool
+		withJWT      bool
 		entity       *api.ClientResponse
 		apiErr       error
 		wantNotFound bool
@@ -76,14 +76,14 @@ func TestClient_StaleOrMalformedUrlAnswers404(t *testing.T) {
 			name:         "an id that does not parse",
 			target:       "/admin/clients/not-a-number/settings",
 			id:           "not-a-number",
-			withJwt:      true,
+			withJWT:      true,
 			entity:       present,
 			wantNotFound: true,
 		},
 		{
 			name:         "an id the router never bound",
 			target:       "/admin/clients/42/settings",
-			withJwt:      true,
+			withJWT:      true,
 			entity:       present,
 			wantNotFound: true,
 		},
@@ -91,7 +91,7 @@ func TestClient_StaleOrMalformedUrlAnswers404(t *testing.T) {
 			name:         "an entity the API says is gone",
 			target:       "/admin/clients/42/settings",
 			id:           "42",
-			withJwt:      true,
+			withJWT:      true,
 			apiErr:       gone,
 			wantNotFound: true,
 		},
@@ -99,28 +99,28 @@ func TestClient_StaleOrMalformedUrlAnswers404(t *testing.T) {
 			name:         "an entity the API returns as nil without an error",
 			target:       "/admin/clients/42/settings",
 			id:           "42",
-			withJwt:      true,
+			withJWT:      true,
 			wantNotFound: true,
 		},
 		{
 			name:    "no JWT info in context, which is a middleware invariant and stays a 500",
 			target:  "/admin/clients/42/settings",
 			id:      "42",
-			withJwt: false,
+			withJWT: false,
 			entity:  present,
 		},
 		{
 			name:    "a 500 from the API, which is a server fault and stays a 500",
 			target:  "/admin/clients/42/settings",
 			id:      "42",
-			withJwt: true,
+			withJWT: true,
 			apiErr:  broken,
 		},
 	}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			if testCase.wantNotFound {
 				httpHelper.On("NotFound", mock.Anything, mock.Anything).Return().Once()
 			} else {
@@ -129,7 +129,7 @@ func TestClient_StaleOrMalformedUrlAnswers404(t *testing.T) {
 			}
 
 			var opts []handlertest.Option
-			if testCase.withJwt {
+			if testCase.withJWT {
 				opts = append(opts, handlertest.WithAccessToken())
 			}
 			if testCase.id != "" {
@@ -137,7 +137,7 @@ func TestClient_StaleOrMalformedUrlAnswers404(t *testing.T) {
 			}
 			req := handlertest.Request(http.MethodGet, testCase.target, opts...)
 
-			apiClient := &notFoundClientApiClient{entity: testCase.entity, err: testCase.apiErr}
+			apiClient := &notFoundClientAPIClient{entity: testCase.entity, err: testCase.apiErr}
 			handler := HandleSettingsGet(httpHelper, nil, apiClient)
 			w := httptest.NewRecorder()
 

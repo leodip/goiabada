@@ -105,7 +105,7 @@ func HandleTokenPost(
 
 		var dpopThumbprint string
 		if proof != nil {
-			if err := proofs.recordTokenProof(r, proof, input.ClientId); err != nil {
+			if err := proofs.recordTokenProof(r, proof, input.ClientID); err != nil {
 				responder.refuse(w, r, input.GrantType, err)
 				return
 			}
@@ -166,7 +166,7 @@ func parseTokenRequest(r *http.Request) (*protocolvalidation.ValidateTokenReques
 	}
 
 	// Extract client credentials - supports both client_secret_basic and client_secret_post
-	clientId, clientSecret, method, err := extractClientCredentials(r)
+	clientID, clientSecret, method, err := extractClientCredentials(r)
 	if err != nil {
 		// Basic credentials that cannot be read or name no client are an invalid_client naming no
 		// client, logged as every one is.
@@ -222,7 +222,7 @@ func parseTokenRequest(r *http.Request) (*protocolvalidation.ValidateTokenReques
 		Code:             r.PostForm.Get("code"),
 		RedirectURI:      r.PostForm.Get("redirect_uri"),
 		CodeVerifier:     r.PostForm.Get("code_verifier"),
-		ClientId:         clientId,
+		ClientID:         clientID,
 		ClientSecret:     clientSecret,
 		ClientAuthMethod: method,
 		Scope:            normalizedScope,
@@ -274,8 +274,8 @@ func auditTokenRefusal(r *http.Request, settings *record.Settings, database revo
 	var userDisabled *protocolvalidation.UserDisabledError
 	if errors.As(err, &userDisabled) {
 		auditLogger.Log(r.Context(), audit.EventUserDisabled, map[string]interface{}{
-			"client_identifier": input.ClientId,
-			"user_id":           userDisabled.UserId,
+			"client_identifier": input.ClientID,
+			"user_id":           userDisabled.UserID,
 		})
 	}
 
@@ -287,7 +287,7 @@ func auditTokenRefusal(r *http.Request, settings *record.Settings, database revo
 	var administrativeScopeRefused *protocolvalidation.AdministrativeScopeRefusedError
 	if errors.As(err, &administrativeScopeRefused) {
 		protocolvalidation.LogAdministrativeScopeRefused(r.Context(), auditLogger, administrativeScopeRefused.Client,
-			administrativeScopeRefused.Scopes, input.GrantType.String(), administrativeScopeRefused.UserId)
+			administrativeScopeRefused.Scopes, input.GrantType.String(), administrativeScopeRefused.UserID)
 	}
 
 	// The redemption half of #241's registration boundary. The validator refuses an
@@ -305,7 +305,7 @@ func auditTokenRefusal(r *http.Request, settings *record.Settings, database revo
 	// asserted.
 	if errors.Is(err, protocolvalidation.ErrCodeRedirectURIDeregistered) {
 		auditLogger.Log(r.Context(), audit.EventRedemptionRefusedRedirectURI, map[string]interface{}{
-			"client_identifier": input.ClientId,
+			"client_identifier": input.ClientID,
 		})
 	}
 
@@ -392,7 +392,7 @@ func auditTokenRefusal(r *http.Request, settings *record.Settings, database revo
 			// EventTokenScopeDenied gives: the validator discards the client model on
 			// failure. A public client's identifier is caller-supplied, so read it as
 			// the client the caller named rather than as proof of who called.
-			"client_identifier": input.ClientId,
+			"client_identifier": input.ClientID,
 		})
 	}
 
@@ -401,7 +401,7 @@ func auditTokenRefusal(r *http.Request, settings *record.Settings, database revo
 			// client_identifier, the string from the request, and no client_id, the client's
 			// row id: the validator discards the client model on failure. See the constant's
 			// doc comment for what this attests to per grant type.
-			"client_identifier": input.ClientId,
+			"client_identifier": input.ClientID,
 			"grant_type":        input.GrantType.String(),
 			"scope":             input.Scope,
 		})
@@ -409,7 +409,7 @@ func auditTokenRefusal(r *http.Request, settings *record.Settings, database revo
 
 	// A client that could not be authenticated: a Warn record, and no audit event, for the reason
 	// the scope denial above gives for its prelude.
-	atTokenEndpoint.logClientAuthenticationRefusal(r, input.ClientId, err)
+	atTokenEndpoint.logClientAuthenticationRefusal(r, input.ClientID, err)
 
 	return err
 }

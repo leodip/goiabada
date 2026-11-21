@@ -36,7 +36,7 @@ type clientsDatabase interface {
 	revocation.Database
 	clientTargetPolicyDatabase
 
-	AcquireClientRow(ctx context.Context, tx *sql.Tx, clientId int64) error
+	AcquireClientRow(ctx context.Context, tx *sql.Tx, clientID int64) error
 	ClientLoadRedirectURIs(ctx context.Context, tx *sql.Tx, client *record.Client) error
 	ClientLoadPostLogoutRedirectURIs(ctx context.Context, tx *sql.Tx, client *record.Client) error
 	ClientLoadWebOrigins(ctx context.Context, tx *sql.Tx, client *record.Client) error
@@ -44,23 +44,23 @@ type clientsDatabase interface {
 	CreatePostLogoutRedirectURI(ctx context.Context, tx *sql.Tx, postLogoutRedirectURI *record.PostLogoutRedirectURI) error
 	CreateRedirectURI(ctx context.Context, tx *sql.Tx, redirectURI *record.RedirectURI) error
 	CreateWebOrigin(ctx context.Context, tx *sql.Tx, webOrigin *record.WebOrigin) error
-	DeleteClient(ctx context.Context, tx *sql.Tx, clientId int64) error
-	DeleteClientIntrospectionResourcesByClientId(ctx context.Context, tx *sql.Tx, clientId int64) error
-	DeletePostLogoutRedirectURI(ctx context.Context, tx *sql.Tx, postLogoutRedirectURIId int64) error
-	DeleteRedirectURI(ctx context.Context, tx *sql.Tx, redirectURIId int64) error
-	DeleteWebOrigin(ctx context.Context, tx *sql.Tx, webOriginId int64) error
+	DeleteClient(ctx context.Context, tx *sql.Tx, clientID int64) error
+	DeleteClientIntrospectionResourcesByClientID(ctx context.Context, tx *sql.Tx, clientID int64) error
+	DeletePostLogoutRedirectURI(ctx context.Context, tx *sql.Tx, postLogoutRedirectURIID int64) error
+	DeleteRedirectURI(ctx context.Context, tx *sql.Tx, redirectURIID int64) error
+	DeleteWebOrigin(ctx context.Context, tx *sql.Tx, webOriginID int64) error
 	GetAllClients(ctx context.Context, tx *sql.Tx) ([]record.Client, error)
-	GetClientIntrospectionResourcesByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]record.ClientIntrospectionResource, error)
+	GetClientIntrospectionResourcesByClientID(ctx context.Context, tx *sql.Tx, clientID int64) ([]record.ClientIntrospectionResource, error)
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
-	GetClientById(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error)
+	GetClientByID(ctx context.Context, tx *sql.Tx, clientID int64) (*record.Client, error)
 	GetResourceByResourceIdentifier(ctx context.Context, tx *sql.Tx, resourceIdentifier string) (*record.Resource, error)
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
-	SetClientAdministrativeScopesAllowed(ctx context.Context, tx *sql.Tx, clientId int64, allowed bool) error
-	SetClientPublic(ctx context.Context, tx *sql.Tx, clientId int64) (bool, error)
-	SetClientRememberConsent(ctx context.Context, tx *sql.Tx, clientId int64, remember bool) error
-	SetClientBackchannelLogout(ctx context.Context, tx *sql.Tx, clientId int64, uri string, sessionRequired bool) error
-	SetClientDPoPBoundAccessTokens(ctx context.Context, tx *sql.Tx, clientId int64, required bool) error
-	SetClientIdentifier(ctx context.Context, tx *sql.Tx, clientId int64, clientIdentifier string) (bool, error)
+	SetClientAdministrativeScopesAllowed(ctx context.Context, tx *sql.Tx, clientID int64, allowed bool) error
+	SetClientPublic(ctx context.Context, tx *sql.Tx, clientID int64) (bool, error)
+	SetClientRememberConsent(ctx context.Context, tx *sql.Tx, clientID int64, remember bool) error
+	SetClientBackchannelLogout(ctx context.Context, tx *sql.Tx, clientID int64, uri string, sessionRequired bool) error
+	SetClientDPoPBoundAccessTokens(ctx context.Context, tx *sql.Tx, clientID int64, required bool) error
+	SetClientIdentifier(ctx context.Context, tx *sql.Tx, clientID int64, clientIdentifier string) (bool, error)
 	UpdateClient(ctx context.Context, tx *sql.Tx, client *record.Client) error
 }
 
@@ -183,7 +183,7 @@ func saveClientNotOwningAuthenticationMode(ctx context.Context, database clients
 	}
 
 	var rename clientRename
-	result, err := revocation.RevokeClientGrantsTx(ctx, database, client.Id, revocation.ReasonClientIdentifierChanged,
+	result, err := revocation.RevokeClientGrantsTx(ctx, database, client.ID, revocation.ReasonClientIdentifierChanged,
 		func(tx *sql.Tx) (bool, error) {
 			renamed, err := writeClientNotOwningAuthenticationMode(ctx, database, tx, client, settings, loadedPublic)
 			rename.renamed = renamed
@@ -201,11 +201,11 @@ func saveClientNotOwningAuthenticationMode(ctx context.Context, database clients
 // identifier, false for every other save.
 func writeClientNotOwningAuthenticationMode(ctx context.Context, database clientsDatabase, tx *sql.Tx,
 	client *record.Client, settings *clientSettingsSave, loadedPublic bool) (bool, error) {
-	if err := database.AcquireClientRow(ctx, tx, client.Id); err != nil {
+	if err := database.AcquireClientRow(ctx, tx, client.ID); err != nil {
 		return false, err
 	}
 
-	current, err := database.GetClientById(ctx, tx, client.Id)
+	current, err := database.GetClientByID(ctx, tx, client.ID)
 	if err != nil {
 		return false, err
 	}
@@ -214,7 +214,7 @@ func writeClientNotOwningAuthenticationMode(ctx context.Context, database client
 	}
 
 	if settings != nil && settings.identifier != current.ClientIdentifier {
-		if err = checkClientIdentifierChange(ctx, database, tx, settings.identifierValidator, settings.identifier, client.Id); err != nil {
+		if err = checkClientIdentifierChange(ctx, database, tx, settings.identifierValidator, settings.identifier, client.ID); err != nil {
 			return false, err
 		}
 	}
@@ -243,7 +243,7 @@ func writeClientNotOwningAuthenticationMode(ctx context.Context, database client
 	if settings != nil {
 		// The write decides, under the row's lock, whether the identifier changes, and so whether
 		// the client's grants are revoked; either way the row now holds the one submitted.
-		renamed, err = database.SetClientIdentifier(ctx, tx, client.Id, settings.identifier)
+		renamed, err = database.SetClientIdentifier(ctx, tx, client.ID, settings.identifier)
 		if err != nil {
 			return false, err
 		}
@@ -277,7 +277,7 @@ func writeSettingsRememberConsent(ctx context.Context, database clientsDatabase,
 	default:
 		return nil
 	}
-	if err := database.SetClientRememberConsent(ctx, tx, client.Id, remember); err != nil {
+	if err := database.SetClientRememberConsent(ctx, tx, client.ID, remember); err != nil {
 		return err
 	}
 	client.RememberConsent = remember
@@ -289,7 +289,7 @@ func writeSettingsRememberConsent(ctx context.Context, database clientsDatabase,
 // refusal is the *i18n.LocalizedError the save answers; a failed lookup is an error, never read as
 // "no clash".
 func checkClientIdentifierChange(ctx context.Context, database clientsDatabase, tx *sql.Tx,
-	validator *inputvalidation.IdentifierValidator, identifier string, clientId int64) error {
+	validator *inputvalidation.IdentifierValidator, identifier string, clientID int64) error {
 
 	if err := validator.Validate(identifier, true); err != nil {
 		return err
@@ -299,7 +299,7 @@ func checkClientIdentifierChange(ctx context.Context, database clientsDatabase, 
 	if err != nil {
 		return errs.Wrap(err, "database error checking client existence by identifier for update")
 	}
-	if existingClient != nil && existingClient.Id != clientId {
+	if existingClient != nil && existingClient.ID != clientID {
 		return i18n.NewLocalizedError(i18n.ErrCodeClientIdentifierInUse, nil)
 	}
 
@@ -330,19 +330,19 @@ func HandleClientsGet(
 		for i := range clients {
 			err = database.ClientLoadRedirectURIs(r.Context(), nil, &clients[i])
 			if err != nil {
-				writeInternalServerError(w, r, errs.Wrap(err, "database error loading client redirect URIs"), "client_id", clients[i].Id)
+				writeInternalServerError(w, r, errs.Wrap(err, "database error loading client redirect URIs"), "client_id", clients[i].ID)
 				return
 			}
 
 			err = database.ClientLoadPostLogoutRedirectURIs(r.Context(), nil, &clients[i])
 			if err != nil {
-				writeInternalServerError(w, r, errs.Wrap(err, "database error loading client sign-out redirect URIs"), "client_id", clients[i].Id)
+				writeInternalServerError(w, r, errs.Wrap(err, "database error loading client sign-out redirect URIs"), "client_id", clients[i].ID)
 				return
 			}
 
 			err = database.ClientLoadWebOrigins(r.Context(), nil, &clients[i])
 			if err != nil {
-				writeInternalServerError(w, r, errs.Wrap(err, "database error loading client web origins"), "client_id", clients[i].Id)
+				writeInternalServerError(w, r, errs.Wrap(err, "database error loading client web origins"), "client_id", clients[i].ID)
 				return
 			}
 		}
@@ -379,7 +379,7 @@ func HandleClientGet(
 			return
 		}
 
-		client, err := database.GetClientById(r.Context(), nil, id)
+		client, err := database.GetClientByID(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error getting client by ID"), "client_id", id)
 			return
@@ -393,19 +393,19 @@ func HandleClientGet(
 		// Load the redirect URIs, sign-out redirect URIs and web origins
 		err = database.ClientLoadRedirectURIs(r.Context(), nil, client)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client redirect URIs"), "client_id", client.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client redirect URIs"), "client_id", client.ID)
 			return
 		}
 
 		err = database.ClientLoadPostLogoutRedirectURIs(r.Context(), nil, client)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client sign-out redirect URIs"), "client_id", client.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client sign-out redirect URIs"), "client_id", client.ID)
 			return
 		}
 
 		err = database.ClientLoadWebOrigins(r.Context(), nil, client)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client web origins"), "client_id", client.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client web origins"), "client_id", client.ID)
 			return
 		}
 
@@ -441,7 +441,7 @@ func HandleClientSecretGet(
 			return
 		}
 
-		client, err := database.GetClientById(r.Context(), nil, id)
+		client, err := database.GetClientByID(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error getting client by ID"), "client_id", id)
 			return
@@ -462,11 +462,11 @@ func HandleClientSecretGet(
 		if client.ClientSecretEncrypted != nil {
 			response.ClientSecret, err = dataCipher.Decrypt(client.ClientSecretEncrypted)
 			if err != nil {
-				writeInternalServerError(w, r, errs.Wrap(err, "unable to decrypt client secret"), "client_id", client.Id)
+				writeInternalServerError(w, r, errs.Wrap(err, "unable to decrypt client secret"), "client_id", client.ID)
 				return
 			}
 			auditLogger.Log(r.Context(), audit.EventViewedClientSecret, map[string]interface{}{
-				"client_id":         client.Id,
+				"client_id":         client.ID,
 				"client_identifier": client.ClientIdentifier,
 				"logged_in_user":    callerSubject(r),
 			})
@@ -496,7 +496,7 @@ func HandleClientDelete(
 			return
 		}
 
-		client, err := database.GetClientById(r.Context(), nil, id)
+		client, err := database.GetClientByID(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error getting client by ID for deletion"), "client_id", id)
 			return
@@ -516,13 +516,13 @@ func HandleClientDelete(
 			return
 		}
 
-		if err := database.DeleteClient(r.Context(), nil, client.Id); err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error deleting client"), "client_id", client.Id, "client_identifier", client.ClientIdentifier)
+		if err := database.DeleteClient(r.Context(), nil, client.ID); err != nil {
+			writeInternalServerError(w, r, errs.Wrap(err, "database error deleting client"), "client_id", client.ID, "client_identifier", client.ClientIdentifier)
 			return
 		}
 
 		auditLogger.Log(r.Context(), audit.EventDeletedClient, map[string]interface{}{
-			"client_id":         client.Id,
+			"client_id":         client.ID,
 			"client_identifier": client.ClientIdentifier,
 			"logged_in_user":    callerSubject(r),
 		})
@@ -633,11 +633,11 @@ func HandleClientCreatePost(
 			// remembers consent (#711 decision 4).
 			RememberConsent:                         true,
 			Enabled:                                 true,
-			DefaultAcrLevel:                         record.AcrLevel2Optional,
+			DefaultACRLevel:                         record.ACRLevel2Optional,
 			AuthorizationCodeEnabled:                req.AuthorizationCodeEnabled,
 			ClientCredentialsEnabled:                req.ClientCredentialsEnabled,
 			IncludeOpenIDConnectClaimsInAccessToken: record.ThreeStateSettingDefault.String(),
-			IncludeOpenIDConnectClaimsInIdToken:     record.ThreeStateSettingDefault.String(),
+			IncludeOpenIDConnectClaimsInIDToken:     record.ThreeStateSettingDefault.String(),
 		}
 
 		if err := database.CreateClient(r.Context(), nil, client); err != nil {
@@ -647,22 +647,22 @@ func HandleClientCreatePost(
 
 		// Audit log
 		auditLogger.Log(r.Context(), audit.EventCreatedClient, map[string]interface{}{
-			"client_id":         client.Id,
+			"client_id":         client.ID,
 			"client_identifier": client.ClientIdentifier,
 			"logged_in_user":    callerSubject(r),
 		})
 
 		// Load related fields for response consistency (fail if these operations fail)
 		if err := database.ClientLoadRedirectURIs(r.Context(), nil, client); err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client redirect URIs after create"), "client_id", client.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client redirect URIs after create"), "client_id", client.ID)
 			return
 		}
 		if err := database.ClientLoadPostLogoutRedirectURIs(r.Context(), nil, client); err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client sign-out redirect URIs after create"), "client_id", client.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client sign-out redirect URIs after create"), "client_id", client.ID)
 			return
 		}
 		if err := database.ClientLoadWebOrigins(r.Context(), nil, client); err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client web origins after create"), "client_id", client.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client web origins after create"), "client_id", client.ID)
 			return
 		}
 
@@ -694,7 +694,7 @@ func HandleClientUpdatePut(
 			return
 		}
 
-		client, err := database.GetClientById(r.Context(), nil, id)
+		client, err := database.GetClientByID(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error getting client by ID for update"), "client_id", id)
 			return
@@ -781,8 +781,8 @@ func HandleClientUpdatePut(
 		// before that check existed, editable everywhere else on this form (#151).
 
 		// ACR level validation depending on AuthorizationCodeEnabled
-		if !client.AuthorizationCodeEnabled && strings.TrimSpace(updateReq.DefaultAcrLevel) != "" {
-			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientDefaultAcrNotApplicable, nil))
+		if !client.AuthorizationCodeEnabled && strings.TrimSpace(updateReq.DefaultACRLevel) != "" {
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientDefaultACRNotApplicable, nil))
 			return
 		}
 
@@ -831,13 +831,13 @@ func HandleClientUpdatePut(
 		client.ShowDescription = updateReq.ShowDescription
 		client.ShowWebsiteURL = updateReq.ShowWebsiteURL
 
-		if client.AuthorizationCodeEnabled && strings.TrimSpace(updateReq.DefaultAcrLevel) != "" {
-			acrLevel, err := record.AcrLevelFromString(updateReq.DefaultAcrLevel)
+		if client.AuthorizationCodeEnabled && strings.TrimSpace(updateReq.DefaultACRLevel) != "" {
+			acrLevel, err := record.ACRLevelFromString(updateReq.DefaultACRLevel)
 			if err != nil {
-				writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientDefaultAcrInvalid, nil))
+				writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientDefaultACRInvalid, nil))
 				return
 			}
-			client.DefaultAcrLevel = acrLevel
+			client.DefaultACRLevel = acrLevel
 		}
 
 		// Only authserver:manage writes to an administrator client (#402 decision 1).
@@ -857,7 +857,7 @@ func HandleClientUpdatePut(
 				writeValidationError(w, r, refusal)
 				return
 			}
-			writeInternalServerError(w, r, errs.Wrap(saveErr, "database error updating client"), "client_id", client.Id, "client_identifier", client.ClientIdentifier)
+			writeInternalServerError(w, r, errs.Wrap(saveErr, "database error updating client"), "client_id", client.ID, "client_identifier", client.ClientIdentifier)
 			return
 		}
 
@@ -866,25 +866,25 @@ func HandleClientUpdatePut(
 		// client's grants in that transaction, and is recorded so for every rename, also one that
 		// found nothing to revoke (#710 decision 5).
 		if rename.renamed {
-			revocation.LogRevokedClientGrants(r.Context(), auditLogger, client.Id,
+			revocation.LogRevokedClientGrants(r.Context(), auditLogger, client.ID,
 				revocation.ReasonClientIdentifierChanged, callerSubject(r), rename.result)
 		}
 		auditLogger.Log(r.Context(), audit.EventUpdatedClientSettings, map[string]interface{}{
-			"client_id":      client.Id,
+			"client_id":      client.ID,
 			"logged_in_user": callerSubject(r),
 		})
 
 		// Load related fields for response consistency
 		if err := database.ClientLoadRedirectURIs(r.Context(), nil, client); err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client redirect URIs after update"), "client_id", client.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client redirect URIs after update"), "client_id", client.ID)
 			return
 		}
 		if err := database.ClientLoadPostLogoutRedirectURIs(r.Context(), nil, client); err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client sign-out redirect URIs after update"), "client_id", client.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client sign-out redirect URIs after update"), "client_id", client.ID)
 			return
 		}
 		if err := database.ClientLoadWebOrigins(r.Context(), nil, client); err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client web origins after update"), "client_id", client.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client web origins after update"), "client_id", client.ID)
 			return
 		}
 
@@ -916,7 +916,7 @@ func HandleClientAuthenticationPut(
 			return
 		}
 
-		client, err := database.GetClientById(r.Context(), nil, id)
+		client, err := database.GetClientByID(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error getting client by ID for authentication update"), "client_id", id)
 			return
@@ -948,7 +948,7 @@ func HandleClientAuthenticationPut(
 
 			enc, err := dataCipher.Encrypt(req.ClientSecret)
 			if err != nil {
-				writeInternalServerError(w, r, errs.Wrap(err, "failed to encrypt client secret"), "client_id", client.Id)
+				writeInternalServerError(w, r, errs.Wrap(err, "failed to encrypt client secret"), "client_id", client.ID)
 				return
 			}
 			client.IsPublic = false
@@ -984,9 +984,9 @@ func HandleClientAuthenticationPut(
 		// review finding 1, decision 17).
 		if req.IsPublic {
 			var becamePublic bool
-			result, err := revocation.RevokeClientGrantsTx(r.Context(), database, client.Id, revocation.ReasonClientBecamePublic, func(tx *sql.Tx) (bool, error) {
+			result, err := revocation.RevokeClientGrantsTx(r.Context(), database, client.ID, revocation.ReasonClientBecamePublic, func(tx *sql.Tx) (bool, error) {
 				var err error
-				becamePublic, err = database.SetClientPublic(r.Context(), tx, client.Id)
+				becamePublic, err = database.SetClientPublic(r.Context(), tx, client.ID)
 				if err != nil {
 					return false, err
 				}
@@ -995,7 +995,7 @@ func HandleClientAuthenticationPut(
 				// reads the client under that row, so none can leave a public client holding one
 				// (#676 decision 14). Run on every save to public, as the list of a client already
 				// public is empty, and clearing an empty list writes nothing.
-				if err := database.DeleteClientIntrospectionResourcesByClientId(r.Context(), tx, client.Id); err != nil {
+				if err := database.DeleteClientIntrospectionResourcesByClientID(r.Context(), tx, client.ID); err != nil {
 					return false, err
 				}
 				if err := database.UpdateClient(r.Context(), tx, client); err != nil {
@@ -1007,7 +1007,7 @@ func HandleClientAuthenticationPut(
 				// request, which may predate another save's switch (#711 decision 5). The same holds
 				// for the token_endpoint_auth_method a self-registered client is held to, which
 				// SetClientPublic cleared and UpdateClient never writes (#708 decision 5).
-				current, readErr := database.GetClientById(r.Context(), tx, client.Id)
+				current, readErr := database.GetClientByID(r.Context(), tx, client.ID)
 				if readErr != nil {
 					return false, readErr
 				}
@@ -1022,13 +1022,13 @@ func HandleClientAuthenticationPut(
 				return becamePublic, nil
 			})
 			if err != nil {
-				writeInternalServerError(w, r, errs.Wrap(err, "database error updating client authentication"), "client_id", client.Id)
+				writeInternalServerError(w, r, errs.Wrap(err, "database error updating client authentication"), "client_id", client.ID)
 				return
 			}
 			// Only a write that really performed the transition gets the event. A save of an
 			// already-public client revoked nothing and must not claim to.
 			if becamePublic {
-				revocation.LogRevokedClientGrants(r.Context(), auditLogger, client.Id,
+				revocation.LogRevokedClientGrants(r.Context(), auditLogger, client.ID,
 					revocation.ReasonClientBecamePublic, callerSubject(r), result)
 			}
 		} else {
@@ -1042,14 +1042,14 @@ func HandleClientAuthenticationPut(
 				if err := database.UpdateClient(r.Context(), tx, client); err != nil {
 					return err
 				}
-				if err := database.SetClientRememberConsent(r.Context(), tx, client.Id, true); err != nil {
+				if err := database.SetClientRememberConsent(r.Context(), tx, client.ID, true); err != nil {
 					return err
 				}
 				// UpdateClient never writes the token_endpoint_auth_method a self-registered client
 				// is held to, and a switch to public committed after the load at the top of the
 				// request cleared it. The answer reads it from the row the writes above hold rather
 				// than from that copy (#708 decision 5).
-				current, err := database.GetClientById(r.Context(), tx, client.Id)
+				current, err := database.GetClientByID(r.Context(), tx, client.ID)
 				if err != nil {
 					return err
 				}
@@ -1062,7 +1062,7 @@ func HandleClientAuthenticationPut(
 				return nil
 			})
 			if err != nil {
-				writeInternalServerError(w, r, errs.Wrap(err, "database error updating client authentication"), "client_id", client.Id)
+				writeInternalServerError(w, r, errs.Wrap(err, "database error updating client authentication"), "client_id", client.ID)
 				return
 			}
 			client.RememberConsent = true
@@ -1071,21 +1071,21 @@ func HandleClientAuthenticationPut(
 		// Either branch has committed its write by here: it is recorded now, before the reads
 		// building the answer, whose failure answers 500 but does not undo the change.
 		auditLogger.Log(r.Context(), audit.EventUpdatedClientAuthentication, map[string]interface{}{
-			"client_id":      client.Id,
+			"client_id":      client.ID,
 			"logged_in_user": callerSubject(r),
 		})
 
 		// Load related fields for response consistency
 		if err := database.ClientLoadRedirectURIs(r.Context(), nil, client); err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client redirect URIs after auth update"), "client_id", client.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client redirect URIs after auth update"), "client_id", client.ID)
 			return
 		}
 		if err := database.ClientLoadPostLogoutRedirectURIs(r.Context(), nil, client); err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client sign-out redirect URIs after auth update"), "client_id", client.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client sign-out redirect URIs after auth update"), "client_id", client.ID)
 			return
 		}
 		if err := database.ClientLoadWebOrigins(r.Context(), nil, client); err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client web origins after auth update"), "client_id", client.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client web origins after auth update"), "client_id", client.ID)
 			return
 		}
 
@@ -1117,7 +1117,7 @@ func HandleClientAdministrativeScopesPut(
 			return
 		}
 
-		client, err := database.GetClientById(r.Context(), nil, id)
+		client, err := database.GetClientByID(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error getting client by ID for administrative scopes update"), "client_id", id)
 			return
@@ -1150,22 +1150,22 @@ func HandleClientAdministrativeScopesPut(
 			return
 		}
 
-		if err = database.SetClientAdministrativeScopesAllowed(r.Context(), nil, client.Id, allowed); err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error updating client administrative scopes allowance"), "client_id", client.Id)
+		if err = database.SetClientAdministrativeScopesAllowed(r.Context(), nil, client.ID, allowed); err != nil {
+			writeInternalServerError(w, r, errs.Wrap(err, "database error updating client administrative scopes allowance"), "client_id", client.ID)
 			return
 		}
 
 		// The write ran outside any transaction, so it has committed: it is recorded now, before the
 		// reads building the answer, whose failure answers 500 but does not undo the switch.
 		auditLogger.Log(r.Context(), audit.EventUpdatedClientAdministrativeScopes, map[string]interface{}{
-			"client_id":         client.Id,
+			"client_id":         client.ID,
 			"client_identifier": client.ClientIdentifier,
 			"allowed":           allowed,
 			"logged_in_user":    callerSubject(r),
 		})
 
 		// The answer is the row as stored, read back after the write.
-		client, err = database.GetClientById(r.Context(), nil, id)
+		client, err = database.GetClientByID(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error getting client after administrative scopes update"), "client_id", id)
 			return
@@ -1175,15 +1175,15 @@ func HandleClientAdministrativeScopesPut(
 			return
 		}
 		if err = database.ClientLoadRedirectURIs(r.Context(), nil, client); err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client redirect URIs after administrative scopes update"), "client_id", client.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client redirect URIs after administrative scopes update"), "client_id", client.ID)
 			return
 		}
 		if err = database.ClientLoadPostLogoutRedirectURIs(r.Context(), nil, client); err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client sign-out redirect URIs after administrative scopes update"), "client_id", client.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client sign-out redirect URIs after administrative scopes update"), "client_id", client.ID)
 			return
 		}
 		if err = database.ClientLoadWebOrigins(r.Context(), nil, client); err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client web origins after administrative scopes update"), "client_id", client.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client web origins after administrative scopes update"), "client_id", client.ID)
 			return
 		}
 
@@ -1227,7 +1227,7 @@ func HandleClientOAuth2FlowsPut(
 			return
 		}
 
-		client, err := database.GetClientById(r.Context(), nil, id)
+		client, err := database.GetClientByID(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error getting client by ID for oauth2 flows update"), "client_id", id)
 			return
@@ -1262,28 +1262,28 @@ func HandleClientOAuth2FlowsPut(
 		// credentials on and PKCE off, which is the state this whole change exists to make
 		// unreachable (#245, final review finding 1).
 		if err := updateClientNotOwningAuthenticationMode(r.Context(), database, client, nil); err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error updating client OAuth2 flows"), "client_id", client.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error updating client OAuth2 flows"), "client_id", client.ID)
 			return
 		}
 
 		// The write's transaction has committed: it is recorded now, before the reads building the
 		// answer, whose failure answers 500 but does not undo the change.
 		auditLogger.Log(r.Context(), audit.EventUpdatedClientOAuth2Flows, map[string]interface{}{
-			"client_id":      client.Id,
+			"client_id":      client.ID,
 			"logged_in_user": callerSubject(r),
 		})
 
 		// Load related fields for response consistency
 		if err := database.ClientLoadRedirectURIs(r.Context(), nil, client); err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client redirect URIs after oauth2 flows update"), "client_id", client.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client redirect URIs after oauth2 flows update"), "client_id", client.ID)
 			return
 		}
 		if err := database.ClientLoadPostLogoutRedirectURIs(r.Context(), nil, client); err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client sign-out redirect URIs after oauth2 flows update"), "client_id", client.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client sign-out redirect URIs after oauth2 flows update"), "client_id", client.ID)
 			return
 		}
 		if err := database.ClientLoadWebOrigins(r.Context(), nil, client); err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client web origins after oauth2 flows update"), "client_id", client.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client web origins after oauth2 flows update"), "client_id", client.ID)
 			return
 		}
 
@@ -1312,7 +1312,7 @@ func HandleClientRedirectURIsPut(
 			return
 		}
 
-		client, err := database.GetClientById(r.Context(), nil, id)
+		client, err := database.GetClientByID(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error getting client by ID for redirect URIs update"), "client_id", id)
 			return
@@ -1371,7 +1371,7 @@ func HandleClientRedirectURIsPut(
 		}
 
 		redirectURIKey := func(ru record.RedirectURI) string { return strings.TrimSpace(ru.URI) }
-		redirectURIId := func(ru record.RedirectURI) int64 { return ru.Id }
+		redirectURIID := func(ru record.RedirectURI) int64 { return ru.ID }
 
 		// One transaction, so a failure part way through commits nothing and the 500 is true: an
 		// administrator removing a compromised callback and adding its replacement ends with both
@@ -1392,41 +1392,41 @@ func HandleClientRedirectURIsPut(
 				return errListChanged
 			}
 
-			insert, remove := replaceSet(client.RedirectURIs, redirectURIKey, redirectURIId, normalized)
+			insert, remove := replaceSet(client.RedirectURIs, redirectURIKey, redirectURIID, normalized)
 			for _, rid := range remove {
 				if deleteErr := database.DeleteRedirectURI(r.Context(), tx, rid); deleteErr != nil {
 					return errs.Wrapf(deleteErr, "database error deleting redirect URI %d", rid)
 				}
 			}
 			for _, uri := range insert {
-				if createErr := database.CreateRedirectURI(r.Context(), tx, &record.RedirectURI{ClientId: client.Id, URI: uri}); createErr != nil {
+				if createErr := database.CreateRedirectURI(r.Context(), tx, &record.RedirectURI{ClientID: client.ID, URI: uri}); createErr != nil {
 					return errs.Wrap(createErr, "database error creating redirect URI")
 				}
 			}
 			return nil
 		})
 		if err != nil {
-			writeListSaveFailure(w, r, err, "client_id", client.Id)
+			writeListSaveFailure(w, r, err, "client_id", client.ID)
 			return
 		}
 
 		// Audit, once the save has committed.
 		auditLogger.Log(r.Context(), audit.EventUpdatedRedirectURIs, map[string]interface{}{
-			"client_id":      client.Id,
+			"client_id":      client.ID,
 			"logged_in_user": callerSubject(r),
 		})
 
 		// Reload related fields for response consistency
 		if err := database.ClientLoadRedirectURIs(r.Context(), nil, client); err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client redirect URIs after update"), "client_id", client.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client redirect URIs after update"), "client_id", client.ID)
 			return
 		}
 		if err := database.ClientLoadPostLogoutRedirectURIs(r.Context(), nil, client); err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client sign-out redirect URIs after update"), "client_id", client.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client sign-out redirect URIs after update"), "client_id", client.ID)
 			return
 		}
 		if err := database.ClientLoadWebOrigins(r.Context(), nil, client); err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client web origins after redirect URIs update"), "client_id", client.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client web origins after redirect URIs update"), "client_id", client.ID)
 			return
 		}
 
@@ -1456,7 +1456,7 @@ func HandleClientWebOriginsPut(
 			return
 		}
 
-		client, err := database.GetClientById(r.Context(), nil, id)
+		client, err := database.GetClientByID(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error getting client by ID for web origins update"), "client_id", id)
 			return
@@ -1547,7 +1547,7 @@ func HandleClientWebOriginsPut(
 		// The stored value is already canonical, migration 000034 having repaired the rows
 		// written before this endpoint canonicalized, so it is keyed as it stands (#250).
 		webOriginKey := func(wo record.WebOrigin) string { return wo.Origin }
-		webOriginId := func(wo record.WebOrigin) int64 { return wo.Id }
+		webOriginID := func(wo record.WebOrigin) int64 { return wo.ID }
 
 		// One transaction, so a failure part way through commits nothing and the 500 is true: an
 		// administrator removing a compromised origin and adding its replacement ends with both
@@ -1570,41 +1570,41 @@ func HandleClientWebOriginsPut(
 				return errListChanged
 			}
 
-			insert, remove := replaceSet(client.WebOrigins, webOriginKey, webOriginId, normalized)
+			insert, remove := replaceSet(client.WebOrigins, webOriginKey, webOriginID, normalized)
 			for _, wid := range remove {
 				if deleteErr := database.DeleteWebOrigin(r.Context(), tx, wid); deleteErr != nil {
 					return errs.Wrapf(deleteErr, "database error deleting web origin %d", wid)
 				}
 			}
 			for _, origin := range insert {
-				if createErr := database.CreateWebOrigin(r.Context(), tx, &record.WebOrigin{ClientId: client.Id, Origin: origin}); createErr != nil {
+				if createErr := database.CreateWebOrigin(r.Context(), tx, &record.WebOrigin{ClientID: client.ID, Origin: origin}); createErr != nil {
 					return errs.Wrapf(createErr, "database error creating web origin %s", origin)
 				}
 			}
 			return nil
 		})
 		if err != nil {
-			writeListSaveFailure(w, r, err, "client_id", client.Id)
+			writeListSaveFailure(w, r, err, "client_id", client.ID)
 			return
 		}
 
 		// Audit, once the save has committed.
 		auditLogger.Log(r.Context(), audit.EventUpdatedWebOrigins, map[string]interface{}{
-			"client_id":      client.Id,
+			"client_id":      client.ID,
 			"logged_in_user": callerSubject(r),
 		})
 
 		// Reload related fields for response consistency
 		if err := database.ClientLoadRedirectURIs(r.Context(), nil, client); err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client redirect URIs after web origins update"), "client_id", client.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client redirect URIs after web origins update"), "client_id", client.ID)
 			return
 		}
 		if err := database.ClientLoadPostLogoutRedirectURIs(r.Context(), nil, client); err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client sign-out redirect URIs after web origins update"), "client_id", client.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client sign-out redirect URIs after web origins update"), "client_id", client.ID)
 			return
 		}
 		if err := database.ClientLoadWebOrigins(r.Context(), nil, client); err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client web origins after update"), "client_id", client.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client web origins after update"), "client_id", client.ID)
 			return
 		}
 
@@ -1632,7 +1632,7 @@ func HandleClientTokensPut(
 			return
 		}
 
-		client, err := database.GetClientById(r.Context(), nil, id)
+		client, err := database.GetClientByID(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error getting client by ID for tokens update"), "client_id", id)
 			return
@@ -1677,9 +1677,9 @@ func HandleClientTokensPut(
 			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientTokensIncludeClaimsInAccessTokenInvalid, nil))
 			return
 		}
-		includeClaimsInIdToken, err := record.ThreeStateSettingFromString(strings.TrimSpace(req.IncludeOpenIDConnectClaimsInIdToken))
+		includeClaimsInIDToken, err := record.ThreeStateSettingFromString(strings.TrimSpace(req.IncludeOpenIDConnectClaimsInIDToken))
 		if err != nil {
-			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientTokensIncludeClaimsInIdTokenInvalid, nil))
+			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodeClientTokensIncludeClaimsInIDTokenInvalid, nil))
 			return
 		}
 
@@ -1688,7 +1688,7 @@ func HandleClientTokensPut(
 		client.RefreshTokenOfflineIdleTimeoutInSeconds = req.RefreshTokenOfflineIdleTimeoutInSeconds
 		client.RefreshTokenOfflineMaxLifetimeInSeconds = req.RefreshTokenOfflineMaxLifetimeInSeconds
 		client.IncludeOpenIDConnectClaimsInAccessToken = includeClaimsInAccessToken.String()
-		client.IncludeOpenIDConnectClaimsInIdToken = includeClaimsInIdToken.String()
+		client.IncludeOpenIDConnectClaimsInIDToken = includeClaimsInIDToken.String()
 
 		// Only authserver:manage writes to an administrator client (#402 decision 1).
 		if !clientTargetCeilingAllows(w, r, database, auditLogger, client) {
@@ -1696,28 +1696,28 @@ func HandleClientTokensPut(
 		}
 
 		if err := updateClientNotOwningAuthenticationMode(r.Context(), database, client, nil); err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error updating client tokens"), "client_id", client.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error updating client tokens"), "client_id", client.ID)
 			return
 		}
 
 		// The write's transaction has committed: it is recorded now, before the reads building the
 		// answer, whose failure answers 500 but does not undo the change.
 		auditLogger.Log(r.Context(), audit.EventUpdatedClientTokens, map[string]interface{}{
-			"client_id":      client.Id,
+			"client_id":      client.ID,
 			"logged_in_user": callerSubject(r),
 		})
 
 		// Reload related fields for response consistency
 		if err := database.ClientLoadRedirectURIs(r.Context(), nil, client); err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client redirect URIs after tokens update"), "client_id", client.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client redirect URIs after tokens update"), "client_id", client.ID)
 			return
 		}
 		if err := database.ClientLoadPostLogoutRedirectURIs(r.Context(), nil, client); err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client sign-out redirect URIs after tokens update"), "client_id", client.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client sign-out redirect URIs after tokens update"), "client_id", client.ID)
 			return
 		}
 		if err := database.ClientLoadWebOrigins(r.Context(), nil, client); err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client web origins after tokens update"), "client_id", client.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client web origins after tokens update"), "client_id", client.ID)
 			return
 		}
 

@@ -15,8 +15,8 @@ import (
 
 func legalDocumentAt(id int64, shortName, kind, title string, version int) api.LegalDocumentResponse {
 	published := time.Date(2026, 10, 20, 12, 30, 0, 0, time.UTC)
-	doc := api.LegalDocumentResponse{Id: id, ShortName: shortName, Kind: kind, Title: title, CurrentVersion: version,
-		AppliesTo: "all_apps", ClientIds: []int64{}}
+	doc := api.LegalDocumentResponse{ID: id, ShortName: shortName, Kind: kind, Title: title, CurrentVersion: version,
+		AppliesTo: "all_apps", ClientIDs: []int64{}}
 	if version > 0 {
 		doc.PublishedAt = &published
 	}
@@ -216,7 +216,7 @@ func TestRender_AdminLegalDocumentDelete(t *testing.T) {
 // which applies to nobody. A retired document applies to no app anyway, so it is not flagged.
 func TestRender_AdminLegalDocumentsAppliesTo(t *testing.T) {
 	selected := legalDocumentAt(7, "shop-terms", "must_accept", "Termos da loja", 1)
-	selected.AppliesTo, selected.ClientIds = "selected_apps", []int64{4}
+	selected.AppliesTo, selected.ClientIDs = "selected_apps", []int64{4}
 	none := legalDocumentAt(8, "nobody", "must_accept", "Ninguém", 1)
 	none.AppliesTo = "selected_apps"
 	retiredNone := legalDocumentAt(9, "old", "must_accept", "Antigo", 1)
@@ -239,19 +239,19 @@ func TestRender_AdminLegalDocumentsAppliesTo(t *testing.T) {
 func TestRender_AdminLegalDocumentApps(t *testing.T) {
 	bind := func(doc api.LegalDocumentResponse, allApps bool, apps []map[string]any) map[string]interface{} {
 		type appChoice struct {
-			Id          int64
+			ID          int64
 			Identifier  string
 			Description string
 			Selected    bool
 		}
 		choices := []appChoice{}
 		for _, a := range apps {
-			choices = append(choices, appChoice{Id: a["id"].(int64), Identifier: a["identifier"].(string),
+			choices = append(choices, appChoice{ID: a["id"].(int64), Identifier: a["identifier"].(string),
 				Description: a["description"].(string), Selected: a["selected"].(bool)})
 		}
 		return map[string]interface{}{
-			"doc": doc, "allApps": allApps, "apps": choices, "expectedClientIds": doc.ClientIds,
-			"noApps": doc.AppliesTo != "all_apps" && len(doc.ClientIds) == 0,
+			"doc": doc, "allApps": allApps, "apps": choices, "expectedClientIds": doc.ClientIDs,
+			"noApps": doc.AppliesTo != "all_apps" && len(doc.ClientIDs) == 0,
 		}
 	}
 	shop := map[string]any{"id": int64(4), "identifier": "shop", "description": "A loja", "selected": true}
@@ -259,7 +259,7 @@ func TestRender_AdminLegalDocumentApps(t *testing.T) {
 
 	t.Run("selected apps", func(t *testing.T) {
 		doc := legalDocumentAt(7, "terms-of-use", "must_accept", "Termos de uso", 2)
-		doc.AppliesTo, doc.ClientIds = "selected_apps", []int64{4}
+		doc.AppliesTo, doc.ClientIDs = "selected_apps", []int64{4}
 		out := renderMenuPage(t, "/admin_legal_documents_apps.html", bind(doc, false, []map[string]any{blog, shop}))
 
 		assert.Contains(t, out, `href="/admin/legal-documents/7/apps" aria-current="page">Aplica-se a</a>`, "the tab is current")
@@ -315,11 +315,11 @@ func TestRender_AdminLegalDocumentApps(t *testing.T) {
 // A client's Legal documents tab lists, read only, the documents that apply to it.
 func TestRender_AdminClientLegalDocuments(t *testing.T) {
 	selected := legalDocumentAt(8, "shop-terms", "must_accept", "Termos da loja", 0)
-	selected.AppliesTo, selected.ClientIds = "selected_apps", []int64{3}
+	selected.AppliesTo, selected.ClientIDs = "selected_apps", []int64{3}
 
 	t.Run("an app", func(t *testing.T) {
 		out := renderMenuPage(t, "/admin_clients_legal_documents.html", map[string]interface{}{
-			"client": &api.ClientResponse{Id: 3, ClientIdentifier: "shop"},
+			"client": &api.ClientResponse{ID: 3, ClientIdentifier: "shop"},
 			"legalDocuments": []api.LegalDocumentResponse{
 				legalDocumentAt(7, "privacy", "for_information", "Aviso de privacidade", 1), selected,
 			},
@@ -336,7 +336,7 @@ func TestRender_AdminClientLegalDocuments(t *testing.T) {
 
 	t.Run("none", func(t *testing.T) {
 		out := renderMenuPage(t, "/admin_clients_legal_documents.html", map[string]interface{}{
-			"client":         &api.ClientResponse{Id: 3, ClientIdentifier: "shop"},
+			"client":         &api.ClientResponse{ID: 3, ClientIdentifier: "shop"},
 			"legalDocuments": []api.LegalDocumentResponse{},
 		})
 
@@ -345,7 +345,7 @@ func TestRender_AdminClientLegalDocuments(t *testing.T) {
 
 	t.Run("the admin console's own client", func(t *testing.T) {
 		out := renderMenuPage(t, "/admin_clients_legal_documents.html", map[string]interface{}{
-			"client":         &api.ClientResponse{Id: 1, ClientIdentifier: "admin-console-client", IsSystemLevelClient: true},
+			"client":         &api.ClientResponse{ID: 1, ClientIdentifier: "admin-console-client", IsSystemLevelClient: true},
 			"legalDocuments": []api.LegalDocumentResponse{legalDocumentAt(7, "privacy", "for_information", "Aviso de privacidade", 1)},
 		})
 

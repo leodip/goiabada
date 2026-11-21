@@ -90,7 +90,7 @@ func TestAPIAuditEventTypes_UnauthorizedAndScope(t *testing.T) {
 	// No token
 	req, err := http.NewRequest("GET", url, nil)
 	require.NoError(t, err)
-	resp, err := createHttpClient(t).Do(req)
+	resp, err := createHTTPClient(t).Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)

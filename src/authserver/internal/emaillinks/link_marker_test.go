@@ -125,7 +125,7 @@ func TestSaveAndGetLinkMarker(t *testing.T) {
 	assert.Empty(t, rejection)
 	require.NotNil(t, marker)
 	assert.Equal(t, LinkMarkerFlowResetPassword, marker.Flow)
-	assert.Equal(t, int64(42), marker.Id)
+	assert.Equal(t, int64(42), marker.ID)
 	// The code hash is what makes the marker single-use: the consuming handler
 	// re-resolves it, so a marker naming a hash that is no longer outstanding buys
 	// nothing.
@@ -135,12 +135,12 @@ func TestSaveAndGetLinkMarker(t *testing.T) {
 	assert.False(t, marker.ExpiresAt.After(after.Add(linkMarkerLifetime)))
 	// The continuation id is what the reset form carries back, so an empty one would make
 	// every submission of that form refused.
-	assert.Len(t, marker.ContinuationId, continuationIdLength)
+	assert.Len(t, marker.ContinuationID, continuationIDLength)
 }
 
 // Two continuations must not share an id, or naming one would name the other and the
 // binding would refuse nothing.
-func TestSaveLinkMarkerIssuesADistinctContinuationId(t *testing.T) {
+func TestSaveLinkMarkerIssuesADistinctContinuationID(t *testing.T) {
 	ids := map[string]bool{}
 
 	for i := 0; i < 8; i++ {
@@ -155,8 +155,8 @@ func TestSaveLinkMarkerIssuesADistinctContinuationId(t *testing.T) {
 		require.Empty(t, rejection)
 		require.NotNil(t, marker)
 
-		assert.False(t, ids[marker.ContinuationId], "continuation id %q was issued twice", marker.ContinuationId)
-		ids[marker.ContinuationId] = true
+		assert.False(t, ids[marker.ContinuationID], "continuation id %q was issued twice", marker.ContinuationID)
+		ids[marker.ContinuationID] = true
 	}
 }
 
@@ -188,7 +188,7 @@ func TestSaveLinkMarkerRefusesASecondLiveContinuation(t *testing.T) {
 	require.Empty(t, rejection)
 	require.NotNil(t, marker)
 	assert.Equal(t, "hash-a", marker.CodeHash)
-	assert.Equal(t, int64(42), marker.Id)
+	assert.Equal(t, int64(42), marker.ID)
 }
 
 // The same link followed twice is one continuation, not two, and gets a fresh window. The
@@ -200,10 +200,10 @@ func TestSaveLinkMarkerRefreshesTheSameContinuation(t *testing.T) {
 
 	req := writeRawMarker(t, store, marshalMarker(t, &LinkMarker{
 		Flow:           LinkMarkerFlowResetPassword,
-		Id:             42,
+		ID:             42,
 		CodeHash:       "hash-a",
 		ExpiresAt:      time.Now().UTC().Add(time.Minute),
-		ContinuationId: "the-continuation-id",
+		ContinuationID: "the-continuation-id",
 	}))
 
 	rr := httptest.NewRecorder()
@@ -219,7 +219,7 @@ func TestSaveLinkMarkerRefreshesTheSameContinuation(t *testing.T) {
 		"following the same link again must refresh the window rather than keep the old one")
 	// The id survives, because a form that link already rendered is this same
 	// continuation. Rotating it here would refuse a legitimate submit.
-	assert.Equal(t, "the-continuation-id", marker.ContinuationId)
+	assert.Equal(t, "the-continuation-id", marker.ContinuationID)
 }
 
 // An expired marker is replaceable, which is what bounds the refusal: nobody is locked out
@@ -239,8 +239,8 @@ func TestSaveLinkMarkerReplacesAnExpiredMarker(t *testing.T) {
 	assert.Equal(t, "hash-b", marker.CodeHash)
 	// A different continuation, so a different id: a form rendered from the marker that
 	// expired must not be accepted against this one.
-	assert.NotEqual(t, "the-expired-continuation-id", marker.ContinuationId)
-	assert.Len(t, marker.ContinuationId, continuationIdLength)
+	assert.NotEqual(t, "the-expired-continuation-id", marker.ContinuationID)
+	assert.Len(t, marker.ContinuationID, continuationIDLength)
 }
 
 // A live marker of the OTHER flow is not replaceable either, and scoping the rule to one
@@ -304,7 +304,7 @@ func TestSaveLinkMarkerAlternatingFlowsCannotBridgeBackIntoTheFirst(t *testing.T
 	require.Empty(t, rejection)
 	require.NotNil(t, marker)
 	assert.Equal(t, "hash-a", marker.CodeHash, "the original continuation must still own the session")
-	assert.Equal(t, int64(42), marker.Id)
+	assert.Equal(t, int64(42), marker.ID)
 }
 
 // expiredResetMarker is a reset marker already past its window, which SaveLinkMarker cannot
@@ -313,10 +313,10 @@ func expiredResetMarker(t *testing.T, codeHash string) string {
 	t.Helper()
 	return marshalMarker(t, &LinkMarker{
 		Flow:           LinkMarkerFlowResetPassword,
-		Id:             42,
+		ID:             42,
 		CodeHash:       codeHash,
 		ExpiresAt:      time.Now().UTC().Add(-time.Second),
-		ContinuationId: "the-expired-continuation-id",
+		ContinuationID: "the-expired-continuation-id",
 	})
 }
 
@@ -355,7 +355,7 @@ func TestGetLinkMarkerExpired(t *testing.T) {
 
 	req := writeRawMarker(t, store, marshalMarker(t, &LinkMarker{
 		Flow:      LinkMarkerFlowResetPassword,
-		Id:        42,
+		ID:        42,
 		CodeHash:  "the-code-hash",
 		ExpiresAt: time.Now().UTC().Add(-time.Second),
 	}))
@@ -374,7 +374,7 @@ func TestGetLinkMarkerWrongFlowBeatsExpired(t *testing.T) {
 
 	req := writeRawMarker(t, store, marshalMarker(t, &LinkMarker{
 		Flow:      LinkMarkerFlowAccountActivate,
-		Id:        7,
+		ID:        7,
 		CodeHash:  "the-code-hash",
 		ExpiresAt: time.Now().UTC().Add(-time.Second),
 	}))
@@ -419,7 +419,7 @@ func TestClearLinkMarker(t *testing.T) {
 	clearReq := requestCarrying(t, rr)
 	consumed := consumeMarker(t, store, clearReq, LinkMarkerFlowResetPassword)
 	clearRr := httptest.NewRecorder()
-	require.NoError(t, ClearLinkMarker(store, clearRr, clearReq, consumed.ContinuationId))
+	require.NoError(t, ClearLinkMarker(store, clearRr, clearReq, consumed.ContinuationID))
 
 	marker, rejection, err := GetLinkMarker(store, requestCarrying(t, clearRr), LinkMarkerFlowResetPassword)
 
@@ -450,7 +450,7 @@ func TestClearedLinkMarkerDoesNotSurviveInACapturedCookie(t *testing.T) {
 	clearReq := requestCarrying(t, rr)
 	consumed := consumeMarker(t, store, clearReq, LinkMarkerFlowResetPassword)
 	clearRr := httptest.NewRecorder()
-	require.NoError(t, ClearLinkMarker(store, clearRr, clearReq, consumed.ContinuationId))
+	require.NoError(t, ClearLinkMarker(store, clearRr, clearReq, consumed.ContinuationID))
 
 	// The browser now holds the cleared cookies, and refuses.
 	_, rejection, err := GetLinkMarker(store, requestCarrying(t, clearRr), LinkMarkerFlowResetPassword)

@@ -45,7 +45,7 @@ var jsBootstrapKeys = []string{
 	"js.combobox.results",
 }
 
-// addUrlParam is the template function that appends one query parameter to a URL. It is one of two
+// addURLParam is the template function that appends one query parameter to a URL. It is one of two
 // closures of templateFuncMap lifted to a name, because html/template calls a function with no
 // context and its record therefore carries no request_id: core/guard's slogPlainSites lists it by
 // this name as the reason a plain slog call stands in a request-path package (#320).
@@ -54,21 +54,21 @@ var jsBootstrapKeys = []string{
 // core/stringutil.ConvertToString, exported for this one caller and writing its plain record
 // lawfully only because core/stringutil sat outside the request-path scope of the day. Moving it
 // in with its caller cost it a slogPlainSites row and retired that exemption by directory (#385).
-func addUrlParam(u string, k string, v interface{}) string {
-	parsedUrl, err := url.Parse(u)
+func addURLParam(u string, k string, v interface{}) string {
+	parsedURL, err := url.Parse(u)
 	if err != nil {
 		slog.Warn("unable to parse url", "url", u)
 		return u
 	}
-	query := parsedUrl.Query()
+	query := parsedURL.Query()
 
 	query.Add(k, convertToString(v))
-	parsedUrl.RawQuery = query.Encode()
-	return parsedUrl.String()
+	parsedURL.RawQuery = query.Encode()
+	return parsedURL.String()
 }
 
 // convertToString renders a template's bind value as the string a query parameter carries. Only
-// addUrlParam calls it, which is why it is unexported and why it lives beside it: it was
+// addURLParam calls it, which is why it is unexported and why it lives beside it: it was
 // core/stringutil.ConvertToString, and core published it for this one caller (#385).
 func convertToString(v interface{}) string {
 	switch val := v.(type) {
@@ -228,7 +228,7 @@ var templateFuncMap = template.FuncMap{
 	"concat": func(parts ...string) string {
 		return strings.Join(parts, "")
 	},
-	"addUrlParam": addUrlParam,
+	"addURLParam": addURLParam,
 	"versionComment": func() template.HTML {
 		//nolint:gosec // G203: build-time constants stamped by the linker, never request input
 		return template.HTML("<!-- version: " + buildinfo.Version + "; build date: " + buildinfo.BuildDate + "; git commit: " + buildinfo.GitCommit + "-->")

@@ -67,9 +67,9 @@ func expectRenderedCodeInvalid(pageRenderer *handlersmocks.PageRenderer, wantSta
 //
 // It also pins the payload's shape, which changed with #112: the client IP is always
 // present, no address appears anywhere, and userId appears only on the branches where the
-// lookup actually resolved a user. Pass wantUserId 0 to require the key is ABSENT rather
+// lookup actually resolved a user. Pass wantUserID 0 to require the key is ABSENT rather
 // than zero, since a payload naming user 0 asserts a row that does not exist.
-func expectAuditFailedCode(auditLogger *handlersmocks.AuditLogger, wantReason string, wantUserId int64) {
+func expectAuditFailedCode(auditLogger *handlersmocks.AuditLogger, wantReason string, wantUserID int64) {
 	auditLogger.On("Log", mock.Anything, audit.EventFailedResetPasswordCode,
 		mock.MatchedBy(func(details map[string]interface{}) bool {
 			if details["reason"] != wantReason || details["ip"] != testClientIP {
@@ -80,11 +80,11 @@ func expectAuditFailedCode(auditLogger *handlersmocks.AuditLogger, wantReason st
 			if _, present := details["email"]; present {
 				return false
 			}
-			userId, present := details["user_id"]
-			if wantUserId == 0 {
+			userID, present := details["user_id"]
+			if wantUserID == 0 {
 				return !present
 			}
-			return present && userId == wantUserId
+			return present && userID == wantUserID
 		}),
 	).Return().Once()
 }
@@ -119,12 +119,12 @@ func newResetPost(target string, body io.Reader) *http.Request {
 // is the clean one.
 // continuationId is the hidden field the rendered form carries; pass "" for the states
 // that never reach the check, and a wrong value for the retarget cases.
-func postResetRequest(password, passwordConfirmation, continuationId string) *http.Request {
+func postResetRequest(password, passwordConfirmation, continuationID string) *http.Request {
 	form := url.Values{}
 	form.Set("password", password)
 	form.Set("passwordConfirmation", passwordConfirmation)
-	if continuationId != "" {
-		form.Set(continuationIdField, continuationId)
+	if continuationID != "" {
+		form.Set(continuationIDField, continuationID)
 	}
 
 	req := newResetPost(emaillinks.ResetPasswordPath, strings.NewReader(form.Encode()))
@@ -156,7 +156,7 @@ func postWithMarker(t *testing.T, store *sessionstore.ConditionalStore, password
 	require.Empty(t, rejection)
 	require.NotNil(t, marker)
 
-	req := postResetRequest(password, passwordConfirmation, marker.ContinuationId)
+	req := postResetRequest(password, passwordConfirmation, marker.ContinuationID)
 	for _, c := range rr.Result().Cookies() {
 		req.AddCookie(c)
 	}
@@ -169,10 +169,10 @@ func postWithMarker(t *testing.T, store *sessionstore.ConditionalStore, password
 // is the whole assertion: r.FormValue merges the query behind the body, so it would set a
 // password taken from a URL, where it reaches history, Referer and every proxy log in front
 // of the deployment (#202).
-func postResetWithCredentialsInQuery(password, passwordConfirmation, continuationId string) *http.Request {
+func postResetWithCredentialsInQuery(password, passwordConfirmation, continuationID string) *http.Request {
 	form := url.Values{}
-	if continuationId != "" {
-		form.Set(continuationIdField, continuationId)
+	if continuationID != "" {
+		form.Set(continuationIDField, continuationID)
 	}
 
 	query := url.Values{}
@@ -208,13 +208,13 @@ func postWithMarkerContinuationInQuery(t *testing.T, store *sessionstore.Conditi
 	require.NoError(t, err)
 	require.Empty(t, rejection)
 	require.NotNil(t, marker)
-	require.NotEmpty(t, marker.ContinuationId)
+	require.NotEmpty(t, marker.ContinuationID)
 
 	form := url.Values{}
 	form.Set("password", password)
 	form.Set("passwordConfirmation", passwordConfirmation)
 
-	query := url.Values{continuationIdField: {marker.ContinuationId}}
+	query := url.Values{continuationIDField: {marker.ContinuationID}}
 	req := newResetPost(emaillinks.ResetPasswordPath+"?"+query.Encode(),
 		strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -230,11 +230,11 @@ func postWithMarkerContinuationInQuery(t *testing.T, store *sessionstore.Conditi
 // compared, so nothing about its answer depends on how the confirmation was read. With the
 // password present the handler gets that far, and body-only the confirmation is empty and
 // cannot match (#202).
-func postResetWithConfirmationInQuery(password, passwordConfirmation, continuationId string) *http.Request {
+func postResetWithConfirmationInQuery(password, passwordConfirmation, continuationID string) *http.Request {
 	form := url.Values{}
 	form.Set("password", password)
-	if continuationId != "" {
-		form.Set(continuationIdField, continuationId)
+	if continuationID != "" {
+		form.Set(continuationIDField, continuationID)
 	}
 
 	query := url.Values{}
@@ -251,12 +251,12 @@ func postResetWithConfirmationInQuery(password, passwordConfirmation, continuati
 // after a rejection echoes the id back, and it has to echo nothing here. The id is what the
 // next submission is checked against, so echoing one a URL supplied would let a link decide
 // the continuation the user's next post carries (#202, decision 3).
-func postResetWithContinuationInQuery(password, passwordConfirmation, continuationId string) *http.Request {
+func postResetWithContinuationInQuery(password, passwordConfirmation, continuationID string) *http.Request {
 	form := url.Values{}
 	form.Set("password", password)
 	form.Set("passwordConfirmation", passwordConfirmation)
 
-	query := url.Values{continuationIdField: {continuationId}}
+	query := url.Values{continuationIDField: {continuationID}}
 	req := newResetPost(emaillinks.ResetPasswordPath+"?"+query.Encode(),
 		strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -284,7 +284,7 @@ func userWithCode(t *testing.T, id int64, code string, issuedAt time.Time) (*rec
 	codeHash := hashutil.HashString(code)
 
 	return &record.User{
-		Id:      id,
+		ID:      id,
 		Enabled: true,
 		Email:   "test@example.com",
 		// A password, so the code is a reset's, with forgotPasswordCodeLifetime; an account with none
@@ -330,7 +330,7 @@ func TestHandleResetPasswordGet_LinkFollowed(t *testing.T) {
 		require.Empty(t, rejection)
 		require.NotNil(t, marker)
 		assert.Equal(t, codeHash, marker.CodeHash)
-		assert.Equal(t, int64(1), marker.Id)
+		assert.Equal(t, int64(1), marker.ID)
 
 		database.AssertExpectations(t)
 	})
@@ -341,7 +341,7 @@ func TestHandleResetPasswordGet_LinkFollowed(t *testing.T) {
 		name       string
 		arrange    func(t *testing.T, database *datamocks.Database)
 		wantReason string
-		wantUserId int64
+		wantUserID int64
 	}{
 		{
 			name: "a code matching no outstanding reset",
@@ -370,7 +370,7 @@ func TestHandleResetPasswordGet_LinkFollowed(t *testing.T) {
 			arrange: func(t *testing.T, database *datamocks.Database) {
 				codeHash := hashutil.HashString(code)
 				database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
-					Return(&record.User{Id: 1, ForgotPasswordCodeHash: codeHash}, nil).Once()
+					Return(&record.User{ID: 1, ForgotPasswordCodeHash: codeHash}, nil).Once()
 			},
 			wantReason: auditReasonUnknownCode,
 		},
@@ -384,7 +384,7 @@ func TestHandleResetPasswordGet_LinkFollowed(t *testing.T) {
 					Return(user, nil).Once()
 			},
 			wantReason: auditReasonCodeExpired,
-			wantUserId: 42,
+			wantUserID: 42,
 		},
 	}
 
@@ -396,7 +396,7 @@ func TestHandleResetPasswordGet_LinkFollowed(t *testing.T) {
 			store := newMarkerTestStore()
 
 			tc.arrange(t, database)
-			expectAuditFailedCode(auditLogger, tc.wantReason, tc.wantUserId)
+			expectAuditFailedCode(auditLogger, tc.wantReason, tc.wantUserID)
 			expectRenderedCodeInvalid(pageRenderer, 0)
 
 			handler := HandleResetPasswordGet(pageRenderer, store, database, auditLogger, testDataCipher)
@@ -453,7 +453,7 @@ func TestHandleResetPasswordGet_SecondLinkWhileOneIsInFlight(t *testing.T) {
 	require.Empty(t, rejection)
 	require.NotNil(t, marker)
 	assert.Equal(t, "the-first-hash", marker.CodeHash)
-	assert.Equal(t, int64(42), marker.Id)
+	assert.Equal(t, int64(42), marker.ID)
 
 	pageRenderer.AssertExpectations(t)
 	database.AssertExpectations(t)
@@ -558,7 +558,7 @@ func TestHandleResetPasswordGet_Clean(t *testing.T) {
 		store := newMarkerTestStore()
 
 		database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
-			Return(&record.User{Id: 1, Enabled: true}, nil).Once()
+			Return(&record.User{ID: 1, Enabled: true}, nil).Once()
 		handler := HandleResetPasswordGet(pageRenderer, store, database, auditLogger, testDataCipher)
 		req := withMarker(t, store, resetCleanGetRequest(), emaillinks.LinkMarkerFlowResetPassword, 1, codeHash)
 
@@ -567,7 +567,7 @@ func TestHandleResetPasswordGet_Clean(t *testing.T) {
 		marker, rejection, err := emaillinks.GetLinkMarker(store, req, emaillinks.LinkMarkerFlowResetPassword)
 		require.NoError(t, err)
 		require.Empty(t, rejection)
-		require.NotEmpty(t, marker.ContinuationId)
+		require.NotEmpty(t, marker.ContinuationID)
 
 		pageRenderer.On("RenderTemplate",
 			mock.Anything, mock.Anything,
@@ -579,7 +579,7 @@ func TestHandleResetPasswordGet_Clean(t *testing.T) {
 				}
 				// The form must carry the continuation back, or every submission of it is
 				// refused by the check the POST applies.
-				return data["continuationId"] == marker.ContinuationId
+				return data["continuationId"] == marker.ContinuationID
 			}),
 		).Return(nil).Once()
 
@@ -661,7 +661,7 @@ func assertCleanGetRefused(t *testing.T, wantReason string,
 // It also requires the continuation id to come back, which is not incidental: a mistyped
 // confirmation re-renders the form, and a re-render that dropped the hidden field would
 // make the user's next submission refused with no way to recover but the emailed link.
-func expectRenderedFormError(pageRenderer *handlersmocks.PageRenderer, wantContinuationId string) {
+func expectRenderedFormError(pageRenderer *handlersmocks.PageRenderer, wantContinuationID string) {
 	pageRenderer.On("RenderTemplate",
 		mock.Anything,
 		mock.Anything,
@@ -669,7 +669,7 @@ func expectRenderedFormError(pageRenderer *handlersmocks.PageRenderer, wantConti
 		"/reset_password.html",
 		mock.MatchedBy(func(data map[string]interface{}) bool {
 			msg, ok := data["error"].(string)
-			return ok && msg != "" && data["continuationId"] == wantContinuationId
+			return ok && msg != "" && data["continuationId"] == wantContinuationID
 		}),
 	).Return(nil).Once()
 }
@@ -679,7 +679,7 @@ func TestHandleResetPasswordPost_PasswordFieldRejections(t *testing.T) {
 	// resolved before the password is read (#404 decision 2), and nothing past the lookup
 	// reaches the database, which NewDatabase(t) enforces. The continuation id the form
 	// carried is not the marker's: the field checks answer before it is compared.
-	const continuationId = "the-continuation-the-form-carried"
+	const continuationID = "the-continuation-the-form-carried"
 	const codeHash = "the-code-hash"
 
 	testCases := []struct {
@@ -689,29 +689,29 @@ func TestHandleResetPasswordPost_PasswordFieldRejections(t *testing.T) {
 		// build assembles the submission. nil is postResetRequest, the ordinary body-only
 		// post; each variant moves one field into the request target, which has to be
 		// answered exactly as though that field had been left out (#202).
-		build func(password, passwordConfirmation, continuationId string) *http.Request
-		// wantEchoedContinuationId is the hidden value the rerendered form has to carry
+		build func(password, passwordConfirmation, continuationID string) *http.Request
+		// wantEchoedContinuationID is the hidden value the rerendered form has to carry
 		// back, which is whatever the body submitted. Empty only where the body submitted
 		// none.
-		wantEchoedContinuationId string
+		wantEchoedContinuationID string
 		arrange                  func(passwordValidator *accounthandlersmocks.PasswordValidator)
 	}{
 		{
 			name:     "empty password",
 			password: "", passwordConfirmation: "",
-			wantEchoedContinuationId: continuationId,
+			wantEchoedContinuationID: continuationID,
 			arrange:                  func(passwordValidator *accounthandlersmocks.PasswordValidator) {},
 		},
 		{
 			name:     "confirmation mismatch",
 			password: "Str0ngP4ss!", passwordConfirmation: "Different1!",
-			wantEchoedContinuationId: continuationId,
+			wantEchoedContinuationID: continuationID,
 			arrange:                  func(passwordValidator *accounthandlersmocks.PasswordValidator) {},
 		},
 		{
 			name:     "the validator refuses the password",
 			password: "weak", passwordConfirmation: "weak",
-			wantEchoedContinuationId: continuationId,
+			wantEchoedContinuationID: continuationID,
 			arrange: func(passwordValidator *accounthandlersmocks.PasswordValidator) {
 				passwordValidator.On("ValidatePassword", resetPasswordSettings.PasswordPolicy, "weak", mock.Anything).
 					Return(errors.New("too weak")).Once()
@@ -725,7 +725,7 @@ func TestHandleResetPasswordPost_PasswordFieldRejections(t *testing.T) {
 			name:     "the credentials are in the query alone",
 			password: "Str0ngP4ss!", passwordConfirmation: "Str0ngP4ss!",
 			build:                    postResetWithCredentialsInQuery,
-			wantEchoedContinuationId: continuationId,
+			wantEchoedContinuationID: continuationID,
 			arrange:                  func(passwordValidator *accounthandlersmocks.PasswordValidator) {},
 		},
 		{
@@ -738,7 +738,7 @@ func TestHandleResetPasswordPost_PasswordFieldRejections(t *testing.T) {
 			name:     "the confirmation is in the query alone",
 			password: "Str0ngP4ss!", passwordConfirmation: "Str0ngP4ss!",
 			build:                    postResetWithConfirmationInQuery,
-			wantEchoedContinuationId: continuationId,
+			wantEchoedContinuationID: continuationID,
 			arrange:                  func(passwordValidator *accounthandlersmocks.PasswordValidator) {},
 		},
 		{
@@ -749,7 +749,7 @@ func TestHandleResetPasswordPost_PasswordFieldRejections(t *testing.T) {
 			name:     "the continuation id is in the query alone",
 			password: "", passwordConfirmation: "",
 			build:                    postResetWithContinuationInQuery,
-			wantEchoedContinuationId: "",
+			wantEchoedContinuationID: "",
 			arrange:                  func(passwordValidator *accounthandlersmocks.PasswordValidator) {},
 		},
 	}
@@ -764,8 +764,8 @@ func TestHandleResetPasswordPost_PasswordFieldRejections(t *testing.T) {
 
 			tc.arrange(passwordValidator)
 			database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
-				Return(&record.User{Id: 1, Enabled: true}, nil).Once()
-			expectRenderedFormError(pageRenderer, tc.wantEchoedContinuationId)
+				Return(&record.User{ID: 1, Enabled: true}, nil).Once()
+			expectRenderedFormError(pageRenderer, tc.wantEchoedContinuationID)
 
 			build := tc.build
 			if build == nil {
@@ -774,7 +774,7 @@ func TestHandleResetPasswordPost_PasswordFieldRejections(t *testing.T) {
 
 			handler := HandleResetPasswordPost(pageRenderer, store, heldCeremonies{}, database, passwordValidator, auditLogger, testBaseURL, testAdminConsoleBaseURL, heldResetNotifier(t, pageRenderer), &recordingLogoutTokens{})
 			handler.ServeHTTP(httptest.NewRecorder(),
-				withMarker(t, store, build(tc.password, tc.passwordConfirmation, continuationId),
+				withMarker(t, store, build(tc.password, tc.passwordConfirmation, continuationID),
 					emaillinks.LinkMarkerFlowResetPassword, 1, codeHash))
 
 			pageRenderer.AssertExpectations(t)
@@ -796,9 +796,9 @@ func TestHandleResetPasswordPost_MarkerRejectionsDoNotChangeThePassword(t *testi
 		// wantReason is the cause recorded in the audit entry. The response is the
 		// same either way, so this is the only place the difference shows.
 		wantReason string
-		// wantUserId is 0 where nothing about the request established an account, and the
+		// wantUserID is 0 where nothing about the request established an account, and the
 		// resolved id where the marker did resolve one before the rejection.
-		wantUserId int64
+		wantUserID int64
 		// validated is a rejection that comes after the password checks: the continuation id
 		// is compared once the submission is known to be a password worth setting, while the
 		// marker itself is resolved before the password is read.
@@ -846,11 +846,11 @@ func TestHandleResetPasswordPost_MarkerRejectionsDoNotChangeThePassword(t *testi
 		{
 			name:       "the form names a continuation the session has moved on from",
 			wantReason: auditReasonContinuationMismatch,
-			wantUserId: 1,
+			wantUserID: 1,
 			validated:  true,
 			arrange: func(t *testing.T, store *sessionstore.ConditionalStore, database *datamocks.Database) *http.Request {
 				database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
-					Return(&record.User{Id: 1, Enabled: true}, nil).Once()
+					Return(&record.User{ID: 1, Enabled: true}, nil).Once()
 				return withMarker(t, store,
 					postResetRequest(newPassword, newPassword, "a-continuation-that-is-gone"),
 					emaillinks.LinkMarkerFlowResetPassword, 1, codeHash)
@@ -859,11 +859,11 @@ func TestHandleResetPasswordPost_MarkerRejectionsDoNotChangeThePassword(t *testi
 		{
 			name:       "the form names no continuation at all",
 			wantReason: auditReasonContinuationMismatch,
-			wantUserId: 1,
+			wantUserID: 1,
 			validated:  true,
 			arrange: func(t *testing.T, store *sessionstore.ConditionalStore, database *datamocks.Database) *http.Request {
 				database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
-					Return(&record.User{Id: 1, Enabled: true}, nil).Once()
+					Return(&record.User{ID: 1, Enabled: true}, nil).Once()
 				return withMarker(t, store, postResetRequest(newPassword, newPassword, ""),
 					emaillinks.LinkMarkerFlowResetPassword, 1, codeHash)
 			},
@@ -875,11 +875,11 @@ func TestHandleResetPasswordPost_MarkerRejectionsDoNotChangeThePassword(t *testi
 		{
 			name:       "the form names the live continuation in the query alone",
 			wantReason: auditReasonContinuationMismatch,
-			wantUserId: 1,
+			wantUserID: 1,
 			validated:  true,
 			arrange: func(t *testing.T, store *sessionstore.ConditionalStore, database *datamocks.Database) *http.Request {
 				database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
-					Return(&record.User{Id: 1, Enabled: true}, nil).Once()
+					Return(&record.User{ID: 1, Enabled: true}, nil).Once()
 				return postWithMarkerContinuationInQuery(t, store, newPassword, newPassword,
 					emaillinks.LinkMarkerFlowResetPassword, 1, codeHash)
 			},
@@ -890,15 +890,15 @@ func TestHandleResetPasswordPost_MarkerRejectionsDoNotChangeThePassword(t *testi
 		{
 			name:       "the marker itself carries no continuation id",
 			wantReason: auditReasonContinuationMismatch,
-			wantUserId: 1,
+			wantUserID: 1,
 			validated:  true,
 			arrange: func(t *testing.T, store *sessionstore.ConditionalStore, database *datamocks.Database) *http.Request {
 				database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
-					Return(&record.User{Id: 1, Enabled: true}, nil).Once()
+					Return(&record.User{ID: 1, Enabled: true}, nil).Once()
 				return withRawMarker(t, store, postResetRequest(newPassword, newPassword, ""),
 					marshalMarker(t, &emaillinks.LinkMarker{
 						Flow:     emaillinks.LinkMarkerFlowResetPassword,
-						Id:       1,
+						ID:       1,
 						CodeHash: codeHash,
 						// A minute rather than emaillinks's own lifetime, which stays
 						// unexported: all this case needs is a marker that is still
@@ -921,7 +921,7 @@ func TestHandleResetPasswordPost_MarkerRejectionsDoNotChangeThePassword(t *testi
 				passwordValidator.On("ValidatePassword", resetPasswordSettings.PasswordPolicy, newPassword, mock.Anything).Return(nil).Once()
 			}
 			req := tc.arrange(t, store, database)
-			expectAuditFailedCode(auditLogger, tc.wantReason, tc.wantUserId)
+			expectAuditFailedCode(auditLogger, tc.wantReason, tc.wantUserID)
 			expectRenderedCodeInvalid(pageRenderer, http.StatusBadRequest)
 
 			handler := HandleResetPasswordPost(pageRenderer, store, heldCeremonies{}, database, passwordValidator, auditLogger, testBaseURL, testAdminConsoleBaseURL, heldResetNotifier(t, pageRenderer), &recordingLogoutTokens{})
@@ -947,7 +947,7 @@ func TestHandleResetPasswordPost_HappyPath(t *testing.T) {
 
 	// Verified, as every address a forgot-password link goes to is, so the reset writes no
 	// verified_email entry: the strict audit mock refuses one.
-	user := &record.User{Id: 1, Enabled: true, Email: "test@example.com", Username: "janedoe", EmailVerified: true, PasswordHash: "the-previous-hash"}
+	user := &record.User{ID: 1, Enabled: true, Email: "test@example.com", Username: "janedoe", EmailVerified: true, PasswordHash: "the-previous-hash"}
 
 	// The words the password is held to are the user the link names and the request's app name
 	// (#550 decision 6).
@@ -1023,7 +1023,7 @@ func TestHandleResetPasswordPost_TheAdministratorsLinkVerifiesTheAddress(t *test
 
 	// The row the handler loaded before the transaction says verified, stale: an administrator
 	// unverified the address since, which the transaction's own read, under the user's row, sees.
-	user := &record.User{Id: 1, Enabled: true, Email: "new@example.com", EmailVerified: true}
+	user := &record.User{ID: 1, Enabled: true, Email: "new@example.com", EmailVerified: true}
 
 	passwordValidator.On("ValidatePassword", resetPasswordSettings.PasswordPolicy, newPassword, mock.Anything).Return(nil).Once()
 	database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(user, nil).Once()
@@ -1066,7 +1066,7 @@ func TestHandleResetPasswordPost_AnAddressVerifiedMeanwhileIsNotAuditedTwice(t *
 	const codeHash = "the-code-hash"
 	const newPassword = "Str0ngP4ss!"
 
-	user := &record.User{Id: 1, Enabled: true, Email: "new@example.com", EmailVerified: false}
+	user := &record.User{ID: 1, Enabled: true, Email: "new@example.com", EmailVerified: false}
 	passwordValidator.On("ValidatePassword", resetPasswordSettings.PasswordPolicy, newPassword, mock.Anything).Return(nil).Once()
 	database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(user, nil).Once()
 	stubResetRowRead(database, 1, true)
@@ -1143,7 +1143,7 @@ func TestResetPassword_ADisabledAccountIsRefusedAtEveryStep(t *testing.T) {
 		store := newMarkerTestStore()
 
 		database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
-			Return(&record.User{Id: 42, Enabled: false}, nil).Once()
+			Return(&record.User{ID: 42, Enabled: false}, nil).Once()
 		expectAuditFailedCode(auditLogger, auditReasonAccountDisabled, 42)
 		expectRenderedCodeInvalid(pageRenderer, 0)
 
@@ -1176,7 +1176,7 @@ func TestResetPassword_ADisabledAccountIsRefusedAtEveryStep(t *testing.T) {
 			store := newMarkerTestStore()
 
 			database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
-				Return(&record.User{Id: 42, Enabled: false}, nil).Once()
+				Return(&record.User{ID: 42, Enabled: false}, nil).Once()
 			expectAuditFailedCode(auditLogger, auditReasonAccountDisabled, 42)
 			expectRenderedCodeInvalid(pageRenderer, http.StatusBadRequest)
 
@@ -1211,7 +1211,7 @@ func TestHandleResetPasswordPost_ClaimLost(t *testing.T) {
 
 	passwordValidator.On("ValidatePassword", resetPasswordSettings.PasswordPolicy, newPassword, mock.Anything).Return(nil).Once()
 	database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
-		Return(&record.User{Id: 1, Enabled: true}, nil).Once()
+		Return(&record.User{ID: 1, Enabled: true}, nil).Once()
 	stub := datamocks.ExpectRunInTransaction(database, revokeTx)
 	stubResetRowRead(database, 1, true)
 	database.On("TryConsumeForgotPasswordCode", mock.Anything, revokeTx, int64(1), codeHash, mock.Anything).
@@ -1253,7 +1253,7 @@ func TestHandleResetPasswordPost_ClaimFails(t *testing.T) {
 
 	passwordValidator.On("ValidatePassword", resetPasswordSettings.PasswordPolicy, "Str0ngP4ss!", mock.Anything).Return(nil).Once()
 	database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
-		Return(&record.User{Id: 1, Enabled: true}, nil).Once()
+		Return(&record.User{ID: 1, Enabled: true}, nil).Once()
 	stub := datamocks.ExpectRunInTransaction(database, revokeTx)
 	stubResetRowRead(database, 1, true)
 	database.On("TryConsumeForgotPasswordCode", mock.Anything, revokeTx, int64(1), codeHash, mock.Anything).
@@ -1317,9 +1317,9 @@ func TestHandleResetPasswordPost_TransactionFailureHandling(t *testing.T) {
 			arrange: func(database *datamocks.Database) {
 				database.On("IncrementUserAuthStateGeneration", mock.Anything, revokeTx, int64(1)).
 					Return(int64(4), nil).Once()
-				database.On("GetUserSessionsByUserId", mock.Anything, revokeTx, int64(1)).
+				database.On("GetUserSessionsByUserID", mock.Anything, revokeTx, int64(1)).
 					Return([]record.UserSession{}, nil).Once()
-				database.On("GetRefreshTokensByUserId", mock.Anything, revokeTx, int64(1)).
+				database.On("GetRefreshTokensByUserID", mock.Anything, revokeTx, int64(1)).
 					Return(nil, errors.New("discovery failed")).Once()
 			},
 		},
@@ -1328,13 +1328,13 @@ func TestHandleResetPasswordPost_TransactionFailureHandling(t *testing.T) {
 			// revoke a subset, which is the half-applied state decision 5 exists to prevent.
 			label: "sweep fails midway through revocation",
 			arrange: func(database *datamocks.Database) {
-				first := &record.RefreshToken{Id: 1, RefreshTokenJti: "rt-1"}
-				second := &record.RefreshToken{Id: 2, RefreshTokenJti: "rt-2"}
+				first := &record.RefreshToken{ID: 1, RefreshTokenJTI: "rt-1"}
+				second := &record.RefreshToken{ID: 2, RefreshTokenJTI: "rt-2"}
 				database.On("IncrementUserAuthStateGeneration", mock.Anything, revokeTx, int64(1)).
 					Return(int64(4), nil).Once()
-				database.On("GetUserSessionsByUserId", mock.Anything, revokeTx, int64(1)).
+				database.On("GetUserSessionsByUserID", mock.Anything, revokeTx, int64(1)).
 					Return([]record.UserSession{}, nil).Once()
-				database.On("GetRefreshTokensByUserId", mock.Anything, revokeTx, int64(1)).
+				database.On("GetRefreshTokensByUserID", mock.Anything, revokeTx, int64(1)).
 					Return([]*record.RefreshToken{first, second}, nil).Once()
 				database.On("UpdateRefreshToken", mock.Anything, revokeTx, first).Return(nil).Once()
 				database.On("UpdateRefreshToken", mock.Anything, revokeTx, second).
@@ -1350,9 +1350,9 @@ func TestHandleResetPasswordPost_TransactionFailureHandling(t *testing.T) {
 			arrange: func(database *datamocks.Database) {
 				database.On("IncrementUserAuthStateGeneration", mock.Anything, revokeTx, int64(1)).
 					Return(int64(4), nil).Once()
-				database.On("GetUserSessionsByUserId", mock.Anything, revokeTx, int64(1)).
+				database.On("GetUserSessionsByUserID", mock.Anything, revokeTx, int64(1)).
 					Return([]record.UserSession{}, nil).Once()
-				database.On("GetRefreshTokensByUserId", mock.Anything, revokeTx, int64(1)).
+				database.On("GetRefreshTokensByUserID", mock.Anything, revokeTx, int64(1)).
 					Return([]*record.RefreshToken{}, nil).Once()
 				database.On("PromoteRefreshTokenGenerations", mock.Anything, revokeTx, []int64{}, int64(4)).
 					Return(nil).Once()
@@ -1369,7 +1369,7 @@ func TestHandleResetPasswordPost_TransactionFailureHandling(t *testing.T) {
 
 			passwordValidator.On("ValidatePassword", resetPasswordSettings.PasswordPolicy, newPassword, mock.Anything).Return(nil).Once()
 			database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
-				Return(&record.User{Id: 1, Enabled: true}, nil).Once()
+				Return(&record.User{ID: 1, Enabled: true}, nil).Once()
 			if tc.commitFails {
 				datamocks.ExpectRunInTransactionThenFail(database, revokeTx, errors.New("commit failed"))
 			} else {
@@ -1613,7 +1613,7 @@ func TestResetPassword_LinkFailuresAreIndistinguishable(t *testing.T) {
 				store := newMarkerTestStore()
 				passwordValidator.On("ValidatePassword", resetPasswordSettings.PasswordPolicy, newPassword, mock.Anything).Return(nil).Once()
 				database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
-					Return(&record.User{Id: 1, Enabled: true}, nil).Once()
+					Return(&record.User{ID: 1, Enabled: true}, nil).Once()
 				expectAuditFailedCode(auditLogger, auditReasonContinuationMismatch, 1)
 				bind := captureResetRender(t, pageRenderer)
 				handler := HandleResetPasswordPost(pageRenderer, store, heldCeremonies{}, database, passwordValidator, auditLogger, testBaseURL, testAdminConsoleBaseURL, heldResetNotifier(t, pageRenderer), &recordingLogoutTokens{})
@@ -1635,7 +1635,7 @@ func TestResetPassword_LinkFailuresAreIndistinguishable(t *testing.T) {
 				store := newMarkerTestStore()
 				passwordValidator.On("ValidatePassword", resetPasswordSettings.PasswordPolicy, newPassword, mock.Anything).Return(nil).Once()
 				database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
-					Return(&record.User{Id: 1, Enabled: true}, nil).Once()
+					Return(&record.User{ID: 1, Enabled: true}, nil).Once()
 				datamocks.ExpectRunInTransaction(database, revokeTx)
 				stubResetRowRead(database, 1, true)
 				database.On("TryConsumeForgotPasswordCode", mock.Anything, revokeTx, int64(1), codeHash, mock.Anything).
@@ -1676,7 +1676,7 @@ func TestResetPassword_LinkFailuresAreIndistinguishable(t *testing.T) {
 				auditLogger := handlersmocks.NewAuditLogger(t)
 				store := newMarkerTestStore()
 				database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
-					Return(&record.User{Id: 1, Enabled: false}, nil).Once()
+					Return(&record.User{ID: 1, Enabled: false}, nil).Once()
 				expectAuditFailedCode(auditLogger, auditReasonAccountDisabled, 1)
 				bind := captureResetRender(t, pageRenderer)
 				handler := HandleResetPasswordGet(pageRenderer, store, database, auditLogger, testDataCipher)
@@ -1695,7 +1695,7 @@ func TestResetPassword_LinkFailuresAreIndistinguishable(t *testing.T) {
 				auditLogger := handlersmocks.NewAuditLogger(t)
 				store := newMarkerTestStore()
 				database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
-					Return(&record.User{Id: 1, Enabled: false}, nil).Once()
+					Return(&record.User{ID: 1, Enabled: false}, nil).Once()
 				expectAuditFailedCode(auditLogger, auditReasonAccountDisabled, 1)
 				bind := captureResetRender(t, pageRenderer)
 				handler := HandleResetPasswordPost(pageRenderer, store, heldCeremonies{}, database, passwordValidator, auditLogger, testBaseURL, testAdminConsoleBaseURL, heldResetNotifier(t, pageRenderer), &recordingLogoutTokens{})
@@ -1744,7 +1744,7 @@ func TestResetPassword_GenuineFaultsStayInternalServerErrors(t *testing.T) {
 
 		codeHash := hashutil.HashString(code)
 		user := &record.User{
-			Id: 1, Email: "test@example.com",
+			ID: 1, Email: "test@example.com",
 			ForgotPasswordCodeEncrypted: []byte("not-valid-ciphertext"),
 			ForgotPasswordCodeHash:      codeHash,
 			ForgotPasswordCodeIssuedAt:  sql.NullTime{Time: time.Now().UTC(), Valid: true},
@@ -1861,16 +1861,16 @@ func TestRenderResetPasswordCodeInvalid_RenderFailureFallsBackToInternalServerEr
 // submission, for its Request a new link to carry on; an id of the wrong shape, or none, names
 // nothing. Neither request is read against the browser: no marker and no sign-in is held (#812).
 func TestRenderResetPasswordCodeInvalid_NamesTheSignInTheURLNames(t *testing.T) {
-	const ceremonyId = "aBcDeFgHiJkLmNoPqRsTuVwXyZ012345"
+	const ceremonyID = "aBcDeFgHiJkLmNoPqRsTuVwXyZ012345"
 	const unknownCode = "a-code-matching-nothing"
 	for _, tc := range []struct {
 		name   string
 		query  string
-		wantId string
+		wantID string
 	}{
-		{name: "a sign-in named", query: "ceremony=" + ceremonyId, wantId: ceremonyId},
-		{name: "an id of the wrong shape", query: "ceremony=" + ceremonyId + "x", wantId: ""},
-		{name: "none", query: "", wantId: ""},
+		{name: "a sign-in named", query: "ceremony=" + ceremonyID, wantID: ceremonyID},
+		{name: "an id of the wrong shape", query: "ceremony=" + ceremonyID + "x", wantID: ""},
+		{name: "none", query: "", wantID: ""},
 	} {
 		t.Run(tc.name+", the first hop", func(t *testing.T) {
 			pageRenderer := handlersmocks.NewPageRenderer(t)
@@ -1889,7 +1889,7 @@ func TestRenderResetPasswordCodeInvalid_NamesTheSignInTheURLNames(t *testing.T) 
 				ServeHTTP(httptest.NewRecorder(), req)
 
 			assert.Equal(t, true, (*bind)["codeInvalidOrExpired"])
-			assert.Equal(t, tc.wantId, (*bind)["ceremonyId"])
+			assert.Equal(t, tc.wantID, (*bind)["ceremonyId"])
 		})
 
 		t.Run(tc.name+", the form", func(t *testing.T) {
@@ -1906,7 +1906,7 @@ func TestRenderResetPasswordCodeInvalid_NamesTheSignInTheURLNames(t *testing.T) 
 
 			assert.Equal(t, true, (*bind)["codeInvalidOrExpired"])
 			assert.Equal(t, http.StatusBadRequest, (*bind)["_httpStatus"])
-			assert.Equal(t, tc.wantId, (*bind)["ceremonyId"])
+			assert.Equal(t, tc.wantID, (*bind)["ceremonyId"])
 		})
 	}
 }
@@ -1914,7 +1914,7 @@ func TestRenderResetPasswordCodeInvalid_NamesTheSignInTheURLNames(t *testing.T) 
 // The audit payload is what an administrator watching for probing reads, and #112 replaced
 // every field in it. These pin the shape directly rather than only through the handlers.
 func TestAuditFailedResetPasswordCode(t *testing.T) {
-	capture := func(t *testing.T, r *http.Request, userId int64, reason string) map[string]interface{} {
+	capture := func(t *testing.T, r *http.Request, userID int64, reason string) map[string]interface{} {
 		t.Helper()
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		var captured map[string]interface{}
@@ -1923,7 +1923,7 @@ func TestAuditFailedResetPasswordCode(t *testing.T) {
 				captured = args.Get(2).(map[string]interface{})
 			}).Return().Once()
 
-		auditFailedResetPasswordCode(auditLogger, r, userId, reason)
+		auditFailedResetPasswordCode(auditLogger, r, userID, reason)
 		return captured
 	}
 

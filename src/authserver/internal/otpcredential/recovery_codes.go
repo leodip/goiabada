@@ -122,10 +122,10 @@ type RecoveryCodeResult struct {
 // RecoveryCodeDatabase is what UseRecoveryCode reads and writes. data.Database satisfies it.
 type RecoveryCodeDatabase interface {
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
-	GetUserByIdForUpdate(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
-	TryUseUserRecoveryCode(ctx context.Context, tx *sql.Tx, userId int64, codeHash string) (bool, error)
-	UserRecoveryCodeExists(ctx context.Context, tx *sql.Tx, userId int64, codeHash string) (bool, error)
-	CountUnusedUserRecoveryCodes(ctx context.Context, tx *sql.Tx, userId int64) (int, error)
+	GetUserByIDForUpdate(ctx context.Context, tx *sql.Tx, userID int64) (*record.User, error)
+	TryUseUserRecoveryCode(ctx context.Context, tx *sql.Tx, userID int64, codeHash string) (bool, error)
+	UserRecoveryCodeExists(ctx context.Context, tx *sql.Tx, userID int64, codeHash string) (bool, error)
+	CountUnusedUserRecoveryCodes(ctx context.Context, tx *sql.Tx, userID int64) (int, error)
 }
 
 // UseRecoveryCode checks a recovery code, as the user typed it, against user's set and claims it:
@@ -164,20 +164,20 @@ func UseRecoveryCode(ctx context.Context, db RecoveryCodeDatabase, user *record.
 	err := db.RunInTransaction(ctx, func(tx *sql.Tx) error {
 		used, remaining, current = false, 0, nil
 		var txErr error
-		if current, txErr = db.GetUserByIdForUpdate(ctx, tx, user.Id); txErr != nil {
+		if current, txErr = db.GetUserByIDForUpdate(ctx, tx, user.ID); txErr != nil {
 			return txErr
 		}
-		if used, txErr = db.TryUseUserRecoveryCode(ctx, tx, user.Id, codeHash); txErr != nil || !used {
+		if used, txErr = db.TryUseUserRecoveryCode(ctx, tx, user.ID, codeHash); txErr != nil || !used {
 			return txErr
 		}
-		remaining, txErr = db.CountUnusedUserRecoveryCodes(ctx, tx, user.Id)
+		remaining, txErr = db.CountUnusedUserRecoveryCodes(ctx, tx, user.ID)
 		return txErr
 	})
 	if err != nil {
 		return RecoveryCodeResult{}, err
 	}
 	if !used {
-		exists, lookupErr := db.UserRecoveryCodeExists(ctx, nil, user.Id, codeHash)
+		exists, lookupErr := db.UserRecoveryCodeExists(ctx, nil, user.ID, codeHash)
 		if lookupErr != nil {
 			return RecoveryCodeResult{}, lookupErr
 		}
@@ -199,8 +199,8 @@ func IsBlankRecoveryCode(code string) bool {
 // satisfies it.
 type ReplaceRecoveryCodesDatabase interface {
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
-	GetUserByIdForUpdate(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
-	ReplaceUserRecoveryCodes(ctx context.Context, tx *sql.Tx, userId int64, codeHashes []string) error
+	GetUserByIDForUpdate(ctx context.Context, tx *sql.Tx, userID int64) (*record.User, error)
+	ReplaceUserRecoveryCodes(ctx context.Context, tx *sql.Tx, userID int64, codeHashes []string) error
 }
 
 // ReplaceRecoveryCodes gives the user a new set of recovery codes, which replaces the set they had,
@@ -229,14 +229,14 @@ func ReplaceRecoveryCodes(ctx context.Context, db ReplaceRecoveryCodesDatabase, 
 	err = db.RunInTransaction(ctx, func(tx *sql.Tx) error {
 		replaced = false
 		var readErr error
-		current, readErr = db.GetUserByIdForUpdate(ctx, tx, user.Id)
+		current, readErr = db.GetUserByIDForUpdate(ctx, tx, user.ID)
 		if readErr != nil {
 			return readErr
 		}
 		if current == nil || !current.OTPEnabled {
 			return nil
 		}
-		if writeErr := db.ReplaceUserRecoveryCodes(ctx, tx, user.Id, codeHashes); writeErr != nil {
+		if writeErr := db.ReplaceUserRecoveryCodes(ctx, tx, user.ID, codeHashes); writeErr != nil {
 			return writeErr
 		}
 		replaced = true

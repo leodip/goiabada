@@ -68,14 +68,14 @@ const (
 // Genuine server faults must NOT come here: a stored code that will not decrypt, a database
 // failure and a session store that cannot be read stay InternalServerError.
 func refuseActivationLink(pageRenderer PageRenderer, auditLogger AuditLogger, w http.ResponseWriter,
-	r *http.Request, preRegistrationId int64, reason string, httpStatus int) {
+	r *http.Request, preRegistrationID int64, reason string, httpStatus int) {
 
 	details := map[string]interface{}{
 		"ip":     auditedClientIP(r),
 		"reason": reason,
 	}
-	if preRegistrationId != 0 {
-		details["pre_registration_id"] = preRegistrationId
+	if preRegistrationID != 0 {
+		details["pre_registration_id"] = preRegistrationID
 	}
 
 	auditLogger.Log(r.Context(), audit.EventFailedAccountActivationCode, details)
@@ -125,8 +125,8 @@ func renderActivationLinkExpired(pageRenderer PageRenderer, w http.ResponseWrite
 // accountActivateDatabase is what the self-registration activation pages need: the pre-
 // registration they consume, and the account its address may have gained meanwhile.
 type accountActivateDatabase interface {
-	DeletePreRegistration(ctx context.Context, tx *sql.Tx, preRegistrationId int64) error
-	DeletePreRegistrationHoldingCode(ctx context.Context, tx *sql.Tx, preRegistrationId int64, codeHash string) (bool, error)
+	DeletePreRegistration(ctx context.Context, tx *sql.Tx, preRegistrationID int64) error
+	DeletePreRegistrationHoldingCode(ctx context.Context, tx *sql.Tx, preRegistrationID int64, codeHash string) (bool, error)
 	GetPreRegistrationByVerificationCodeHash(ctx context.Context, tx *sql.Tx, codeHash string) (*record.PreRegistration, error)
 	GetUserByEmail(ctx context.Context, tx *sql.Tx, email string) (*record.User, error)
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
@@ -198,7 +198,7 @@ func HandleActivateGet(
 		// marker that produced it once the session moves on, as the reset form's does.
 		bind := map[string]interface{}{
 			"email":          preRegistration.Email,
-			"continuationId": marker.ContinuationId,
+			"continuationId": marker.ContinuationID,
 			"passwordRules":  passwordRulesHint(r),
 		}
 
@@ -244,7 +244,7 @@ func handleActivationLinkFollowed(pageRenderer PageRenderer, httpSession linkMar
 	// differing byte (#207 decision 12). Reachable only through a SHA-256 collision now that the
 	// row is located by hash, and kept so the comparison stays load-bearing rather than
 	// decorative. Answered as an unknown code, as the reset twin answers its own mismatch, and
-	// with no preRegistrationId for the reason it gives: nothing about the row is established.
+	// with no preRegistrationID for the reason it gives: nothing about the row is established.
 	if !emailedCodeMatches(verificationCode, code) {
 		refuseActivationLink(pageRenderer, auditLogger, w, r, 0, activationReasonUnknownCode, 0)
 		return
@@ -257,12 +257,12 @@ func handleActivationLinkFollowed(pageRenderer PageRenderer, httpSession linkMar
 		// alone would take the fresh link with it (#207 decision 6). Either way this link is
 		// refused alike, so whether the delete took effect is not looked at.
 		if _, deletePreRegistrationErr := database.DeletePreRegistrationHoldingCode(r.Context(), nil,
-			preRegistration.Id, codeHash); deletePreRegistrationErr != nil {
+			preRegistration.ID, codeHash); deletePreRegistrationErr != nil {
 			pageRenderer.InternalServerError(w, r, deletePreRegistrationErr)
 			return
 		}
 
-		refuseActivationLink(pageRenderer, auditLogger, w, r, preRegistration.Id, activationReasonCodeExpired, 0)
+		refuseActivationLink(pageRenderer, auditLogger, w, r, preRegistration.ID, activationReasonCodeExpired, 0)
 		return
 	}
 
@@ -270,7 +270,7 @@ func handleActivationLinkFollowed(pageRenderer PageRenderer, httpSession linkMar
 	// durable id alone would still resolve after the row was deleted, where the hash stops
 	// resolving the moment the activation completes. See resolveActivationMarker.
 	rejection, err := emaillinks.SaveLinkMarker(httpSession, w, r, emaillinks.LinkMarkerFlowAccountActivate,
-		preRegistration.Id, codeHash)
+		preRegistration.ID, codeHash)
 	if err != nil {
 		pageRenderer.InternalServerError(w, r, err)
 		return
@@ -283,7 +283,7 @@ func handleActivationLinkFollowed(pageRenderer PageRenderer, httpSession linkMar
 	// naming this link's pre-registration, which resolved; the one holding the live marker is not
 	// named.
 	if rejection != "" {
-		refuseActivationLink(pageRenderer, auditLogger, w, r, preRegistration.Id, string(rejection), 0)
+		refuseActivationLink(pageRenderer, auditLogger, w, r, preRegistration.ID, string(rejection), 0)
 		return
 	}
 
@@ -292,7 +292,7 @@ func handleActivationLinkFollowed(pageRenderer PageRenderer, httpSession linkMar
 	// link names, when it names one of the right shape, stays on it, where the form posts it back
 	// (#622 decision 9): it is not a credential, and the password page's own URL carries it.
 	//nolint:gosec // G710: a fixed path, and an id whose shape is checked, encoded as its query
-	http.Redirect(w, r, emaillinks.AccountActivateContinuation(registrationCeremonyId(r)), http.StatusSeeOther)
+	http.Redirect(w, r, emaillinks.AccountActivateContinuation(registrationCeremonyID(r)), http.StatusSeeOther)
 }
 
 // isVerificationCodeExpired reports whether the activation code issued for this
@@ -327,13 +327,13 @@ func resolveActivationMarker(pageRenderer PageRenderer, httpSession linkMarkerSe
 		return nil, nil
 	}
 	if rejection != "" {
-		// No preRegistrationId: a rejected marker was not resolved against any row, and the id
+		// No preRegistrationID: a rejected marker was not resolved against any row, and the id
 		// it carries is a label rather than something this request established.
 		refuseActivationLink(pageRenderer, auditLogger, w, r, 0, string(rejection), httpStatus)
 		return nil, nil
 	}
 
-	// The resolved row is the authority for which registration this is, not marker.Id: the
+	// The resolved row is the authority for which registration this is, not marker.ID: the
 	// marker travels in a cookie, so the id it carries is a label rather than something this
 	// request established.
 	preRegistration, err := database.GetPreRegistrationByVerificationCodeHash(r.Context(), nil, marker.CodeHash)
@@ -352,7 +352,7 @@ func resolveActivationMarker(pageRenderer PageRenderer, httpSession linkMarkerSe
 		return nil, nil
 	}
 	if user != nil {
-		refuseActivationAddressTaken(pageRenderer, database, auditLogger, w, r, preRegistration.Id, httpStatus)
+		refuseActivationAddressTaken(pageRenderer, database, auditLogger, w, r, preRegistration.ID, httpStatus)
 		return nil, nil
 	}
 
@@ -364,14 +364,14 @@ func resolveActivationMarker(pageRenderer PageRenderer, httpSession linkMarkerSe
 // registration tells an address that has an account (#207 decision 10). A delete that fails is a
 // server fault, answered as one, as the expired code's delete on the first hop is.
 func refuseActivationAddressTaken(pageRenderer PageRenderer, database accountActivateDatabase,
-	auditLogger AuditLogger, w http.ResponseWriter, r *http.Request, preRegistrationId int64, httpStatus int) {
+	auditLogger AuditLogger, w http.ResponseWriter, r *http.Request, preRegistrationID int64, httpStatus int) {
 
-	if err := database.DeletePreRegistration(r.Context(), nil, preRegistrationId); err != nil {
+	if err := database.DeletePreRegistration(r.Context(), nil, preRegistrationID); err != nil {
 		pageRenderer.InternalServerError(w, r, err)
 		return
 	}
 
-	refuseActivationLink(pageRenderer, auditLogger, w, r, preRegistrationId, activationReasonAddressTaken, httpStatus)
+	refuseActivationLink(pageRenderer, auditLogger, w, r, preRegistrationID, activationReasonAddressTaken, httpStatus)
 }
 
 // HandleActivatePost is the "choose your password" form's submission, and the one request that
@@ -449,7 +449,7 @@ func HandleActivatePost(
 				// Echoed from the submission rather than read from the marker, because these
 				// rejections happen before the continuation is checked against it, as the reset
 				// form echoes it: a mistyped confirmation must not cost the continuation.
-				"continuationId": r.PostFormValue(continuationIdField),
+				"continuationId": r.PostFormValue(continuationIDField),
 			}
 
 			err := pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/account_activate_password.html", bind)
@@ -495,8 +495,8 @@ func HandleActivatePost(
 		// The form names the marker that rendered it. Reachable whenever the session's marker
 		// changed between the rendering and the submit, which the reset POST describes. The
 		// pending registration audited is the marker's, which resolved.
-		if !continuationMatches(marker.ContinuationId, r.PostFormValue(continuationIdField)) {
-			refuseActivationLink(pageRenderer, auditLogger, w, r, preRegistration.Id,
+		if !continuationMatches(marker.ContinuationID, r.PostFormValue(continuationIDField)) {
+			refuseActivationLink(pageRenderer, auditLogger, w, r, preRegistration.ID,
 				activationReasonContinuationMismatch, http.StatusBadRequest)
 			return
 		}
@@ -524,7 +524,7 @@ func HandleActivatePost(
 			// so a replayed copy lands on the refusal page. Fenced by the code the marker
 			// resolved, so a row deleted or replaced since the lookup declines, and the account
 			// inserted above rolls back with the refusal.
-			consumed, consumeErr := database.DeletePreRegistrationHoldingCode(r.Context(), tx, preRegistration.Id,
+			consumed, consumeErr := database.DeletePreRegistrationHoldingCode(r.Context(), tx, preRegistration.ID,
 				preRegistration.VerificationCodeHash)
 			if consumeErr != nil {
 				return consumeErr
@@ -542,7 +542,7 @@ func HandleActivatePost(
 			return
 		}
 		if errors.Is(err, data.ErrUniqueViolation) {
-			refuseActivationAddressTaken(pageRenderer, database, auditLogger, w, r, preRegistration.Id, http.StatusBadRequest)
+			refuseActivationAddressTaken(pageRenderer, database, auditLogger, w, r, preRegistration.ID, http.StatusBadRequest)
 			return
 		}
 		if err != nil {
@@ -554,24 +554,24 @@ func HandleActivatePost(
 		// no address once the account is deleted (#779 decision 1).
 		emailDigest := hashutil.HashString(createdUser.Email)
 		auditLogger.Log(r.Context(), audit.EventCreatedUser, map[string]interface{}{
-			"user_id":      createdUser.Id,
+			"user_id":      createdUser.ID,
 			"email_digest": emailDigest,
 		})
 		auditLogger.Log(r.Context(), audit.EventActivatedAccount, map[string]interface{}{
-			"user_id":      createdUser.Id,
+			"user_id":      createdUser.ID,
 			"email_digest": emailDigest,
 		})
 
 		// Hygiene, and not the thing that makes the marker single-use: the deletion above is. A
 		// failure here is logged rather than answered with a 500, because the account has already
 		// been created and telling the caller the activation failed would be false.
-		if clearLinkMarkerErr := emaillinks.ClearLinkMarker(httpSession, w, r, marker.ContinuationId); clearLinkMarkerErr != nil {
+		if clearLinkMarkerErr := emaillinks.ClearLinkMarker(httpSession, w, r, marker.ContinuationID); clearLinkMarkerErr != nil {
 			slog.ErrorContext(r.Context(), "unable to clear the account activation link marker after a completed activation",
-				"user_id", createdUser.Id, "error", clearLinkMarkerErr)
+				"user_id", createdUser.ID, "error", clearLinkMarkerErr)
 		}
 
-		ceremonyId := registrationCeremonyId(r)
-		if carryOnSignIn(w, r, ceremonies, proof, baseURL, ceremonyId, createdUser) {
+		ceremonyID := registrationCeremonyID(r)
+		if carryOnSignIn(w, r, ceremonies, proof, baseURL, ceremonyID, createdUser) {
 			return
 		}
 
@@ -580,7 +580,7 @@ func HandleActivatePost(
 			"adminConsoleBaseUrl": adminConsoleBaseURL,
 			// The registration came from an app's sign-in this browser does not hold: opened in
 			// another browser, or after that sign-in ended. The person goes back to the app.
-			"returnToApp": ceremonyId != "",
+			"returnToApp": ceremonyID != "",
 		}
 
 		err = pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/account_register_activation_result.html", bind)

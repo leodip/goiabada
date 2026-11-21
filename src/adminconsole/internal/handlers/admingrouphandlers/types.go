@@ -5,15 +5,17 @@ import (
 	"github.com/leodip/goiabada/core/i18n"
 )
 
+// UserResult is one user the member search found, as the add-members script reads it. Each field
+// declares the key the script reads, so a field is respelled without moving its key (#482 decision 7).
 type UserResult struct {
-	Id           int64
-	Subject      string
-	Username     string
-	Email        string
-	GivenName    string
-	MiddleName   string
-	FamilyName   string
-	AddedToGroup bool
+	ID           int64  `json:"Id"`
+	Subject      string `json:"Subject"`
+	Username     string `json:"Username"`
+	Email        string `json:"Email"`
+	GivenName    string `json:"GivenName"`
+	MiddleName   string `json:"MiddleName"`
+	FamilyName   string `json:"FamilyName"`
+	AddedToGroup bool   `json:"AddedToGroup"`
 }
 
 type SearchResult struct {
@@ -28,17 +30,17 @@ type PageResult struct {
 }
 
 type PermissionsPostInput struct {
-	GroupId                int64   `json:"groupId"`
-	AssignedPermissionsIds []int64 `json:"assignedPermissionsIds"`
-	// ExpectedPermissionIds is the set as the page loaded it, passed through unchanged so the auth
+	GroupID                int64   `json:"groupId"`
+	AssignedPermissionsIDs []int64 `json:"assignedPermissionsIds"`
+	// ExpectedPermissionIDs is the set as the page loaded it, passed through unchanged so the auth
 	// server can refuse a save from an outdated page (#428).
-	ExpectedPermissionIds []int64 `json:"expectedPermissionIds"`
+	ExpectedPermissionIDs []int64 `json:"expectedPermissionIds"`
 }
 
 // grantedPermission is a permission a group holds, as the group's permissions tab lists it: the
 // permission's id, which the save sends, and its scope, resource:permission, which the row shows.
 type grantedPermission struct {
-	Id    int64
+	ID    int64
 	Scope string
 }
 

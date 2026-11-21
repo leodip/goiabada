@@ -169,7 +169,7 @@ func renderEmailHTML(t *testing.T, ctx context.Context, renderer *Renderer) stri
 // themedBrand is the default brand of id 7 on theme, in appearance, with the seeded kit.
 func themedBrand(appearance record.BrandAppearance, theme string) *record.Brand {
 	brand := record.NewBrand("Shop", appearance, theme)
-	brand.Id = 7
+	brand.ID = 7
 	return &brand
 }
 
@@ -225,9 +225,9 @@ func TestRender_AnEmailIsDrawnInItsBrandsCornersAndFont(t *testing.T) {
 			brand := themedBrand(record.BrandAppearanceLight, "plum")
 			brand.Corners = tc.corners
 			brand.Font = tc.font
-			brand.RegularFontAssetId = sql.NullInt64{Int64: 21, Valid: true}
+			brand.RegularFontAssetID = sql.NullInt64{Int64: 21, Valid: true}
 			brands := &defaultBrandStub{brand: brand, assets: []record.BrandAsset{
-				{Id: 21, Kind: record.BrandAssetKindFont, ContentType: "font/woff2", Fingerprint: "212121212121"},
+				{ID: 21, Kind: record.BrandAssetKindFont, ContentType: "font/woff2", Fingerprint: "212121212121"},
 			}}
 
 			email := renderBrandedEmail(t, context.Background(), brands)
@@ -300,7 +300,7 @@ func TestRender_AnEmailDrawsALargeLogoScaledToFit(t *testing.T) {
 	} {
 		brand := kitPageBrand(record.BrandAppearanceLight, true, false, false, false)
 		brands := &defaultBrandStub{brand: brand, assets: []record.BrandAsset{
-			{Id: 11, Kind: record.BrandAssetKindLogo, ContentType: "image/png", Fingerprint: "111111111111", Width: tc.width, Height: tc.height},
+			{ID: 11, Kind: record.BrandAssetKindLogo, ContentType: "image/png", Fingerprint: "111111111111", Width: tc.width, Height: tc.height},
 		}}
 
 		email := renderBrandedEmail(t, context.Background(), brands)
@@ -338,9 +338,9 @@ func TestRender_AnEmailInSafeModeIsDrawnInBlueberryInPlaceOfACustomPalette(t *te
 
 	custom := func(appearance record.BrandAppearance) *record.Brand {
 		brand := paletteBrand(appearance)
-		brand.Id = 7
+		brand.ID = 7
 		brand.Corners = record.BrandCornersPill
-		brand.LogoAssetId = sql.NullInt64{Int64: 11, Valid: true}
+		brand.LogoAssetID = sql.NullInt64{Int64: 11, Valid: true}
 		return brand
 	}
 	for _, tc := range []struct {

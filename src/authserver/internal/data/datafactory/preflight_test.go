@@ -19,14 +19,14 @@ import (
 // Every hazard case below varies exactly one thing from this, which is what makes the passing
 // cases load-bearing: a check that refused everything would satisfy the refusals on its own.
 func row(id int64, email string) record.EmailCaseRow {
-	return record.EmailCaseRow{Id: id, Email: email, EngineLowered: strings.ToLower(email)}
+	return record.EmailCaseRow{ID: id, Email: email, EngineLowered: strings.ToLower(email)}
 }
 
 // divergentRow is a row this engine's LOWER() does not reduce the way Go does: it is what SQLite
 // answers for any non-ASCII uppercase letter and what SQL Server answers for U+1E9E and U+212A,
 // and the reason the check compares rather than carrying a character list.
 func divergentRow(id int64, email string, engineLowered string) record.EmailCaseRow {
-	return record.EmailCaseRow{Id: id, Email: email, EngineLowered: engineLowered}
+	return record.EmailCaseRow{ID: id, Email: email, EngineLowered: engineLowered}
 }
 
 // TestCheckEmailCaseBeforeMigrating_Skips pins the three states in which the check reads nothing

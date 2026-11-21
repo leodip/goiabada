@@ -59,7 +59,7 @@ func turnstileUser(t *testing.T, password string) *record.User {
 	require.NoError(t, err)
 	user := &record.User{Subject: fake.UUID(), Enabled: true, Email: strings.ToLower(fake.Email()), PasswordHash: hashed}
 	require.NoError(t, database.CreateUser(context.Background(), nil, user))
-	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.Id) })
+	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.ID) })
 	return user
 }
 
@@ -67,7 +67,7 @@ func turnstileUser(t *testing.T, password string) *record.User {
 // request id of its own, and returns the response, whose body the caller closes, and that id.
 func (f *passwordFormSubmission) submitWithToken(t *testing.T, email, password, token string) (*http.Response, string) {
 	t.Helper()
-	form := url.Values{"email": {email}, "password": {password}, "ceremonyId": {f.ceremonyId}}
+	form := url.Values{"email": {email}, "password": {password}, "ceremonyId": {f.ceremonyID}}
 	if token != "" {
 		form.Set("cf-turnstile-response", token)
 	}
@@ -76,12 +76,12 @@ func (f *passwordFormSubmission) submitWithToken(t *testing.T, email, password, 
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Referer", f.pwdURL)
 	req.Header.Set("Origin", appConfig.AuthServer.BaseURL)
-	requestId := "turnstile-" + fake.LetterN(16)
-	req.Header.Set("X-Request-Id", requestId)
+	requestID := "turnstile-" + fake.LetterN(16)
+	req.Header.Set("X-Request-Id", requestID)
 
 	resp, err := f.httpClient.Do(req)
 	require.NoError(t, err)
-	return resp, requestId
+	return resp, requestID
 }
 
 // challengeCount is the counter's value for the sign-in form and outcome, at this scrape.
@@ -149,7 +149,7 @@ func TestAuthPwdTurnstile_TheAlwaysPassSecretKeyLetsTheSignInProceed(t *testing.
 func TestAuthPwdTurnstile_AVerdictAgainstTheTokenIsRefusedBeforeThePassword(t *testing.T) {
 	requireDatabaseAuditLogs(t)
 	adminToken, adminClient := createAdminClientWithToken(t)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, adminClient.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, adminClient.ID) })
 
 	for _, tt := range []struct{ name, secretKey string }{
 		{"always fail", turnstileAlwaysFailSecretKey},
@@ -160,16 +160,16 @@ func TestAuthPwdTurnstile_AVerdictAgainstTheTokenIsRefusedBeforeThePassword(t *t
 			user := turnstileUser(t, "the right password 2")
 			refused := challengeCount(t, "refused")
 
-			wrong, requestId := reachPasswordForm(t).submitWithToken(t, strings.ToUpper(user.Email), "a wrong password", turnstileDummyToken)
+			wrong, requestID := reachPasswordForm(t).submitWithToken(t, strings.ToUpper(user.Email), "a wrong password", turnstileDummyToken)
 			defer func() { _ = wrong.Body.Close() }()
 			assertChallengeRefusal(t, wrong, user.Email)
-			assert.Empty(t, auditRows(t, adminToken, "auth_failed_pwd", requestId),
+			assert.Empty(t, auditRows(t, adminToken, "auth_failed_pwd", requestID),
 				"no password compared, so no failure recorded and no budget spent")
 
-			right, requestId := reachPasswordForm(t).submitWithToken(t, user.Email, "the right password 2", turnstileDummyToken)
+			right, requestID := reachPasswordForm(t).submitWithToken(t, user.Email, "the right password 2", turnstileDummyToken)
 			defer func() { _ = right.Body.Close() }()
 			assertChallengeRefusal(t, right, user.Email)
-			assert.Empty(t, auditRows(t, adminToken, "auth_success_pwd", requestId))
+			assert.Empty(t, auditRows(t, adminToken, "auth_success_pwd", requestID))
 
 			assert.Equal(t, refused+2, challengeCount(t, "refused"))
 		})

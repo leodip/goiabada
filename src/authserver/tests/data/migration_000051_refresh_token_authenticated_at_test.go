@@ -70,8 +70,8 @@ func seedPreMigration000051ROPCRefreshToken(t *testing.T, h *isolatedDB) string 
 	t.Helper()
 	random := fake.LetterN(6)
 
-	clientId := seedClient(t, h, "mig51_client_"+random)
-	userId := seedUser(t, h, userSeed{Enabled: true, Subject: fake.UUID(), Username: "mig51_" + random})
+	clientID := seedClient(t, h, "mig51_client_"+random)
+	userID := seedUser(t, h, userSeed{Enabled: true, Subject: fake.UUID(), Username: "mig51_" + random})
 
 	falseLit, _ := boolLiterals000031()
 	jti := fake.UUID()
@@ -79,7 +79,7 @@ func seedPreMigration000051ROPCRefreshToken(t *testing.T, h *isolatedDB) string 
 		(user_id, client_id, refresh_token_jti, previous_refresh_token_jti, first_refresh_token_jti,
 		 session_identifier, refresh_token_type, scope, revoked)
 		VALUES (%d, %d, '%s', '', '%s', '', 'Offline', 'openid', %s)`,
-		userId, clientId, jti, jti, falseLit)
+		userID, clientID, jti, jti, falseLit)
 	_, err := h.SQL.Exec(q)
 	require.NoError(t, err, "seed a pre-000051 ROPC refresh token")
 	return jti
@@ -100,14 +100,14 @@ func assertAuthenticatedAtShape000051(t *testing.T, h *isolatedDB, phase string)
 func assertSeededTokenHasNoInstant000051(t *testing.T, h *isolatedDB, jti string, phase string) {
 	t.Helper()
 	var authenticatedAt sql.NullTime
-	var userId sql.NullInt64
+	var userID sql.NullInt64
 	var tokenType string
 	err := h.SQL.QueryRowContext(context.Background(), fmt.Sprintf(
 		"SELECT authenticated_at, user_id, refresh_token_type FROM refresh_tokens WHERE refresh_token_jti = '%s'", jti)).
-		Scan(&authenticatedAt, &userId, &tokenType)
+		Scan(&authenticatedAt, &userID, &tokenType)
 	require.NoErrorf(t, err, "[%s] read the seeded refresh token", phase)
 	assert.Falsef(t, authenticatedAt.Valid, "[%s] a pre-000051 token must read no instant, got %v",
 		phase, authenticatedAt)
-	assert.Truef(t, userId.Valid, "[%s] the rest of the row must survive", phase)
+	assert.Truef(t, userID.Valid, "[%s] the rest of the row must survive", phase)
 	assert.Equalf(t, "Offline", tokenType, "[%s] the rest of the row must survive", phase)
 }

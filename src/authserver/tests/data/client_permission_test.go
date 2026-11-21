@@ -34,7 +34,7 @@ func TestCreateClientPermission(t *testing.T) {
 	permission := &record.Permission{
 		PermissionIdentifier: "test_permission_" + fake.LetterN(6),
 		Description:          "Test Permission",
-		ResourceId:           resource.Id,
+		ResourceID:           resource.ID,
 	}
 	err = database.CreatePermission(context.Background(), nil, permission)
 	if err != nil {
@@ -43,14 +43,14 @@ func TestCreateClientPermission(t *testing.T) {
 
 	// Test case 1: Successfully create a client permission
 	clientPermission := &record.ClientPermission{
-		ClientId:     client.Id,
-		PermissionId: permission.Id,
+		ClientID:     client.ID,
+		PermissionID: permission.ID,
 	}
 	err = database.CreateClientPermission(context.Background(), nil, clientPermission)
 	if err != nil {
 		t.Fatalf("Failed to create client permission: %v", err)
 	}
-	if clientPermission.Id == 0 {
+	if clientPermission.ID == 0 {
 		t.Error("Expected client permission ID to be set, got 0")
 	}
 	if !clientPermission.CreatedAt.Valid {
@@ -62,8 +62,8 @@ func TestCreateClientPermission(t *testing.T) {
 
 	// Test case 2: Attempt to create a client permission with invalid client ID
 	invalidClientPermission := &record.ClientPermission{
-		ClientId:     0,
-		PermissionId: permission.Id,
+		ClientID:     0,
+		PermissionID: permission.ID,
 	}
 	err = database.CreateClientPermission(context.Background(), nil, invalidClientPermission)
 	if err == nil {
@@ -72,8 +72,8 @@ func TestCreateClientPermission(t *testing.T) {
 
 	// Test case 3: Attempt to create a client permission with invalid permission ID
 	invalidPermissionClientPermission := &record.ClientPermission{
-		ClientId:     client.Id,
-		PermissionId: 0,
+		ClientID:     client.ID,
+		PermissionID: 0,
 	}
 	err = database.CreateClientPermission(context.Background(), nil, invalidPermissionClientPermission)
 	if err == nil {
@@ -81,18 +81,18 @@ func TestCreateClientPermission(t *testing.T) {
 	}
 
 	// Test case 4: Verify the created client permission
-	createdClientPermission, err := database.GetClientPermissionByClientIdAndPermissionId(context.Background(), nil, client.Id, permission.Id)
+	createdClientPermission, err := database.GetClientPermissionByClientIDAndPermissionID(context.Background(), nil, client.ID, permission.ID)
 	if err != nil {
 		t.Fatalf("Failed to retrieve created client permission: %v", err)
 	}
 	if createdClientPermission == nil {
 		t.Fatal("Expected to retrieve created client permission, got nil")
 	}
-	if createdClientPermission.ClientId != client.Id {
-		t.Errorf("Expected ClientId %d, got %d", client.Id, createdClientPermission.ClientId)
+	if createdClientPermission.ClientID != client.ID {
+		t.Errorf("Expected ClientID %d, got %d", client.ID, createdClientPermission.ClientID)
 	}
-	if createdClientPermission.PermissionId != permission.Id {
-		t.Errorf("Expected PermissionId %d, got %d", permission.Id, createdClientPermission.PermissionId)
+	if createdClientPermission.PermissionID != permission.ID {
+		t.Errorf("Expected PermissionID %d, got %d", permission.ID, createdClientPermission.PermissionID)
 	}
 }
 
@@ -131,7 +131,7 @@ func TestUpdateClientPermission(t *testing.T) {
 	permission := &record.Permission{
 		PermissionIdentifier: "test_permission_" + fake.LetterN(6),
 		Description:          "Test Permission",
-		ResourceId:           resource.Id,
+		ResourceID:           resource.ID,
 	}
 	err = database.CreatePermission(context.Background(), nil, permission)
 	if err != nil {
@@ -142,7 +142,7 @@ func TestUpdateClientPermission(t *testing.T) {
 	newPermission := &record.Permission{
 		PermissionIdentifier: "new_test_permission_" + fake.LetterN(6),
 		Description:          "New Test Permission",
-		ResourceId:           resource.Id,
+		ResourceID:           resource.ID,
 	}
 	err = database.CreatePermission(context.Background(), nil, newPermission)
 	if err != nil {
@@ -151,8 +151,8 @@ func TestUpdateClientPermission(t *testing.T) {
 
 	// Create a client permission for testing
 	clientPermission := &record.ClientPermission{
-		ClientId:     client.Id,
-		PermissionId: permission.Id,
+		ClientID:     client.ID,
+		PermissionID: permission.ID,
 	}
 	err = database.CreateClientPermission(context.Background(), nil, clientPermission)
 	if err != nil {
@@ -161,23 +161,23 @@ func TestUpdateClientPermission(t *testing.T) {
 
 	// Test case 1: Successfully update a client permission
 	time.Sleep(timestampTick) // Ensure some time passes before update
-	clientPermission.ClientId = newClient.Id
-	clientPermission.PermissionId = newPermission.Id
+	clientPermission.ClientID = newClient.ID
+	clientPermission.PermissionID = newPermission.ID
 	err = database.UpdateClientPermission(context.Background(), nil, clientPermission)
 	if err != nil {
 		t.Fatalf("Failed to update client permission: %v", err)
 	}
 
-	updatedClientPermission, err := database.GetClientPermissionById(context.Background(), nil, clientPermission.Id)
+	updatedClientPermission, err := database.GetClientPermissionByID(context.Background(), nil, clientPermission.ID)
 	if err != nil {
 		t.Fatalf("Failed to retrieve updated client permission: %v", err)
 	}
 
-	if updatedClientPermission.ClientId != newClient.Id {
-		t.Errorf("Expected ClientId to be updated to %d, got %d", newClient.Id, updatedClientPermission.ClientId)
+	if updatedClientPermission.ClientID != newClient.ID {
+		t.Errorf("Expected ClientID to be updated to %d, got %d", newClient.ID, updatedClientPermission.ClientID)
 	}
-	if updatedClientPermission.PermissionId != newPermission.Id {
-		t.Errorf("Expected PermissionId to be updated to %d, got %d", newPermission.Id, updatedClientPermission.PermissionId)
+	if updatedClientPermission.PermissionID != newPermission.ID {
+		t.Errorf("Expected PermissionID to be updated to %d, got %d", newPermission.ID, updatedClientPermission.PermissionID)
 	}
 	if !updatedClientPermission.UpdatedAt.Time.After(clientPermission.CreatedAt.Time) {
 		t.Error("Expected UpdatedAt to be after CreatedAt")
@@ -185,7 +185,7 @@ func TestUpdateClientPermission(t *testing.T) {
 
 	// Test case 2: Attempt to update a client permission with invalid ID
 	invalidClientPermission := &record.ClientPermission{
-		Id: 0,
+		ID: 0,
 	}
 	err = database.UpdateClientPermission(context.Background(), nil, invalidClientPermission)
 	if err == nil {
@@ -193,7 +193,7 @@ func TestUpdateClientPermission(t *testing.T) {
 	}
 }
 
-func TestGetClientPermissionById(t *testing.T) {
+func TestGetClientPermissionByID(t *testing.T) {
 	// Create a client for testing
 	client := &record.Client{
 		ClientIdentifier: "test_client_" + fake.LetterN(6),
@@ -218,7 +218,7 @@ func TestGetClientPermissionById(t *testing.T) {
 	permission := &record.Permission{
 		PermissionIdentifier: "test_permission_" + fake.LetterN(6),
 		Description:          "Test Permission",
-		ResourceId:           resource.Id,
+		ResourceID:           resource.ID,
 	}
 	err = database.CreatePermission(context.Background(), nil, permission)
 	if err != nil {
@@ -227,8 +227,8 @@ func TestGetClientPermissionById(t *testing.T) {
 
 	// Create a client permission for testing
 	clientPermission := &record.ClientPermission{
-		ClientId:     client.Id,
-		PermissionId: permission.Id,
+		ClientID:     client.ID,
+		PermissionID: permission.ID,
 	}
 	err = database.CreateClientPermission(context.Background(), nil, clientPermission)
 	if err != nil {
@@ -236,25 +236,25 @@ func TestGetClientPermissionById(t *testing.T) {
 	}
 
 	// Test case 1: Successfully retrieve an existing client permission
-	retrievedClientPermission, err := database.GetClientPermissionById(context.Background(), nil, clientPermission.Id)
+	retrievedClientPermission, err := database.GetClientPermissionByID(context.Background(), nil, clientPermission.ID)
 	if err != nil {
 		t.Fatalf("Failed to retrieve client permission: %v", err)
 	}
 	if retrievedClientPermission == nil {
 		t.Fatal("Expected to retrieve client permission, got nil")
 	}
-	if retrievedClientPermission.Id != clientPermission.Id {
-		t.Errorf("Expected client permission ID %d, got %d", clientPermission.Id, retrievedClientPermission.Id)
+	if retrievedClientPermission.ID != clientPermission.ID {
+		t.Errorf("Expected client permission ID %d, got %d", clientPermission.ID, retrievedClientPermission.ID)
 	}
-	if retrievedClientPermission.ClientId != client.Id {
-		t.Errorf("Expected ClientId %d, got %d", client.Id, retrievedClientPermission.ClientId)
+	if retrievedClientPermission.ClientID != client.ID {
+		t.Errorf("Expected ClientID %d, got %d", client.ID, retrievedClientPermission.ClientID)
 	}
-	if retrievedClientPermission.PermissionId != permission.Id {
-		t.Errorf("Expected PermissionId %d, got %d", permission.Id, retrievedClientPermission.PermissionId)
+	if retrievedClientPermission.PermissionID != permission.ID {
+		t.Errorf("Expected PermissionID %d, got %d", permission.ID, retrievedClientPermission.PermissionID)
 	}
 
 	// Test case 2: Attempt to retrieve a non-existent client permission
-	nonExistentPermission, err := database.GetClientPermissionById(context.Background(), nil, clientPermission.Id+1000)
+	nonExistentPermission, err := database.GetClientPermissionByID(context.Background(), nil, clientPermission.ID+1000)
 	if err != nil {
 		t.Fatalf("Unexpected error when retrieving non-existent client permission: %v", err)
 	}
@@ -263,7 +263,7 @@ func TestGetClientPermissionById(t *testing.T) {
 	}
 
 	// Test case 3: Attempt to retrieve a client permission with an invalid ID (0)
-	invalidPermission, err := database.GetClientPermissionById(context.Background(), nil, 0)
+	invalidPermission, err := database.GetClientPermissionByID(context.Background(), nil, 0)
 	if err != nil {
 		t.Fatalf("Unexpected error when retrieving client permission with invalid ID: %v", err)
 	}
@@ -272,7 +272,7 @@ func TestGetClientPermissionById(t *testing.T) {
 	}
 }
 
-func TestGetClientPermissionByClientIdAndPermissionId(t *testing.T) {
+func TestGetClientPermissionByClientIDAndPermissionID(t *testing.T) {
 	// Create a client for testing
 	client := &record.Client{
 		ClientIdentifier: "test_client_" + fake.LetterN(6),
@@ -297,7 +297,7 @@ func TestGetClientPermissionByClientIdAndPermissionId(t *testing.T) {
 	permission := &record.Permission{
 		PermissionIdentifier: "test_permission_" + fake.LetterN(6),
 		Description:          "Test Permission",
-		ResourceId:           resource.Id,
+		ResourceID:           resource.ID,
 	}
 	err = database.CreatePermission(context.Background(), nil, permission)
 	if err != nil {
@@ -306,8 +306,8 @@ func TestGetClientPermissionByClientIdAndPermissionId(t *testing.T) {
 
 	// Create a client permission for testing
 	clientPermission := &record.ClientPermission{
-		ClientId:     client.Id,
-		PermissionId: permission.Id,
+		ClientID:     client.ID,
+		PermissionID: permission.ID,
 	}
 	err = database.CreateClientPermission(context.Background(), nil, clientPermission)
 	if err != nil {
@@ -315,25 +315,25 @@ func TestGetClientPermissionByClientIdAndPermissionId(t *testing.T) {
 	}
 
 	// Test case 1: Successfully retrieve an existing client permission
-	retrievedClientPermission, err := database.GetClientPermissionByClientIdAndPermissionId(context.Background(), nil, client.Id, permission.Id)
+	retrievedClientPermission, err := database.GetClientPermissionByClientIDAndPermissionID(context.Background(), nil, client.ID, permission.ID)
 	if err != nil {
 		t.Fatalf("Failed to retrieve client permission: %v", err)
 	}
 	if retrievedClientPermission == nil {
 		t.Fatal("Expected to retrieve client permission, got nil")
 	}
-	if retrievedClientPermission.Id != clientPermission.Id {
-		t.Errorf("Expected client permission ID %d, got %d", clientPermission.Id, retrievedClientPermission.Id)
+	if retrievedClientPermission.ID != clientPermission.ID {
+		t.Errorf("Expected client permission ID %d, got %d", clientPermission.ID, retrievedClientPermission.ID)
 	}
-	if retrievedClientPermission.ClientId != client.Id {
-		t.Errorf("Expected ClientId %d, got %d", client.Id, retrievedClientPermission.ClientId)
+	if retrievedClientPermission.ClientID != client.ID {
+		t.Errorf("Expected ClientID %d, got %d", client.ID, retrievedClientPermission.ClientID)
 	}
-	if retrievedClientPermission.PermissionId != permission.Id {
-		t.Errorf("Expected PermissionId %d, got %d", permission.Id, retrievedClientPermission.PermissionId)
+	if retrievedClientPermission.PermissionID != permission.ID {
+		t.Errorf("Expected PermissionID %d, got %d", permission.ID, retrievedClientPermission.PermissionID)
 	}
 
 	// Test case 2: Attempt to retrieve a non-existent client permission
-	nonExistentPermission, err := database.GetClientPermissionByClientIdAndPermissionId(context.Background(), nil, client.Id+1000, permission.Id+1000)
+	nonExistentPermission, err := database.GetClientPermissionByClientIDAndPermissionID(context.Background(), nil, client.ID+1000, permission.ID+1000)
 	if err != nil {
 		t.Fatalf("Unexpected error when retrieving non-existent client permission: %v", err)
 	}
@@ -342,7 +342,7 @@ func TestGetClientPermissionByClientIdAndPermissionId(t *testing.T) {
 	}
 }
 
-func TestGetClientPermissionsByClientId(t *testing.T) {
+func TestGetClientPermissionsByClientID(t *testing.T) {
 	// Create a client for testing
 	client := &record.Client{
 		ClientIdentifier: "test_client_" + fake.LetterN(6),
@@ -369,7 +369,7 @@ func TestGetClientPermissionsByClientId(t *testing.T) {
 		permissions[i] = &record.Permission{
 			PermissionIdentifier: "test_permission_" + fake.LetterN(6),
 			Description:          "Test Permission " + strconv.Itoa(i+1),
-			ResourceId:           resource.Id,
+			ResourceID:           resource.ID,
 		}
 		err = database.CreatePermission(context.Background(), nil, permissions[i])
 		if err != nil {
@@ -380,8 +380,8 @@ func TestGetClientPermissionsByClientId(t *testing.T) {
 	// Create client permissions for testing
 	for _, perm := range permissions {
 		clientPermission := &record.ClientPermission{
-			ClientId:     client.Id,
-			PermissionId: perm.Id,
+			ClientID:     client.ID,
+			PermissionID: perm.ID,
 		}
 		err = database.CreateClientPermission(context.Background(), nil, clientPermission)
 		if err != nil {
@@ -390,7 +390,7 @@ func TestGetClientPermissionsByClientId(t *testing.T) {
 	}
 
 	// Test case 1: Successfully retrieve all client permissions for a client
-	retrievedClientPermissions, err := database.GetClientPermissionsByClientId(context.Background(), nil, client.Id)
+	retrievedClientPermissions, err := database.GetClientPermissionsByClientID(context.Background(), nil, client.ID)
 	if err != nil {
 		t.Fatalf("Failed to retrieve client permissions: %v", err)
 	}
@@ -398,13 +398,13 @@ func TestGetClientPermissionsByClientId(t *testing.T) {
 		t.Errorf("Expected to retrieve 3 client permissions, got %d", len(retrievedClientPermissions))
 	}
 	for _, cp := range retrievedClientPermissions {
-		if cp.ClientId != client.Id {
-			t.Errorf("Expected ClientId %d, got %d", client.Id, cp.ClientId)
+		if cp.ClientID != client.ID {
+			t.Errorf("Expected ClientID %d, got %d", client.ID, cp.ClientID)
 		}
 	}
 
 	// Test case 2: Attempt to retrieve client permissions for a non-existent client
-	nonExistentClientPermissions, err := database.GetClientPermissionsByClientId(context.Background(), nil, client.Id+1000)
+	nonExistentClientPermissions, err := database.GetClientPermissionsByClientID(context.Background(), nil, client.ID+1000)
 	if err != nil {
 		t.Fatalf("Unexpected error when retrieving client permissions for non-existent client: %v", err)
 	}
@@ -438,7 +438,7 @@ func TestDeleteClientPermission(t *testing.T) {
 	permission := &record.Permission{
 		PermissionIdentifier: "test_permission_" + fake.LetterN(6),
 		Description:          "Test Permission",
-		ResourceId:           resource.Id,
+		ResourceID:           resource.ID,
 	}
 	err = database.CreatePermission(context.Background(), nil, permission)
 	if err != nil {
@@ -447,8 +447,8 @@ func TestDeleteClientPermission(t *testing.T) {
 
 	// Create a client permission for testing
 	clientPermission := &record.ClientPermission{
-		ClientId:     client.Id,
-		PermissionId: permission.Id,
+		ClientID:     client.ID,
+		PermissionID: permission.ID,
 	}
 	err = database.CreateClientPermission(context.Background(), nil, clientPermission)
 	if err != nil {
@@ -456,13 +456,13 @@ func TestDeleteClientPermission(t *testing.T) {
 	}
 
 	// Test case 1: Successfully delete an existing client permission
-	err = database.DeleteClientPermission(context.Background(), nil, clientPermission.Id)
+	err = database.DeleteClientPermission(context.Background(), nil, clientPermission.ID)
 	if err != nil {
 		t.Fatalf("Failed to delete client permission: %v", err)
 	}
 
 	// Verify that the client permission has been deleted
-	deletedClientPermission, err := database.GetClientPermissionById(context.Background(), nil, clientPermission.Id)
+	deletedClientPermission, err := database.GetClientPermissionByID(context.Background(), nil, clientPermission.ID)
 	if err != nil {
 		t.Fatalf("Unexpected error when retrieving deleted client permission: %v", err)
 	}
@@ -471,7 +471,7 @@ func TestDeleteClientPermission(t *testing.T) {
 	}
 
 	// Test case 2: Attempt to delete a non-existent client permission
-	err = database.DeleteClientPermission(context.Background(), nil, clientPermission.Id+1000)
+	err = database.DeleteClientPermission(context.Background(), nil, clientPermission.ID+1000)
 	if err != nil {
 		t.Fatalf("Unexpected error when deleting non-existent client permission: %v", err)
 	}

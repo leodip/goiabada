@@ -56,8 +56,8 @@ func TestPublicSettings_Success(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	handler := HandlePublicSettingsGet(database, publicSettingsBaseURL)
 
-	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{
-		Id:          1,
+	database.On("GetSettingsByID", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{
+		ID:          1,
 		AppName:     "Goiabada Test",
 		SMTPEnabled: true,
 		Issuer:      "https://issuer.example",
@@ -94,17 +94,17 @@ func TestPublicSettings_CarriesTheConsoleClientsBrand(t *testing.T) {
 		wantAppearance string
 		wantPath       string
 	}{
-		{"a dark brand", pill(record.Brand{Id: 7, Name: "Night", Appearance: record.BrandAppearanceDark, Theme: "plum"}),
+		{"a dark brand", pill(record.Brand{ID: 7, Name: "Night", Appearance: record.BrandAppearanceDark, Theme: "plum"}),
 			"dark", "/brand/7/"},
-		{"a light brand", pill(record.Brand{Id: 12, Name: "Day", Appearance: record.BrandAppearanceLight, Theme: "avocado"}),
+		{"a light brand", pill(record.Brand{ID: 12, Name: "Day", Appearance: record.BrandAppearanceLight, Theme: "avocado"}),
 			"light", "/brand/12/"},
-		{"an automatic brand on Blueberry", pill(record.Brand{Id: 1, Name: "Default", Appearance: record.BrandAppearanceAuto, Theme: "blueberry"}),
+		{"an automatic brand on Blueberry", pill(record.Brand{ID: 1, Name: "Default", Appearance: record.BrandAppearanceAuto, Theme: "blueberry"}),
 			"auto", "/brand/1/"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
-			database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{
-				Id: 1, AppName: "Goiabada",
+			database.On("GetSettingsByID", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{
+				ID: 1, AppName: "Goiabada",
 			}, nil).Once()
 			expectConsoleClientBrand(database, tc.brand, nil)
 
@@ -140,7 +140,7 @@ func TestPublicSettings_CarriesTheConsoleClientsBrand(t *testing.T) {
 // the admin console follows the switch with no state of its own.
 func TestPublicSettings_CarriesTheSafeStylesheetsAndTheSwitch(t *testing.T) {
 	brand := record.NewBrand("Night", record.BrandAppearanceDark, record.BrandThemeCustom)
-	brand.Id = 7
+	brand.ID = 7
 	brand.Palette = &record.BrandPalette{Mode: record.BrandPaletteModeAdvanced, Light: customLight, Dark: customDark}
 	brand.CustomCSS = cardCSS
 	safeFull := "/brand/7/safe-stylesheet.css?v=" + fingerprintOf(blueberryStylesheet)
@@ -159,7 +159,7 @@ func TestPublicSettings_CarriesTheSafeStylesheetsAndTheSwitch(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
-			database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{Id: 1, AppName: "Goiabada"}, nil).Once()
+			database.On("GetSettingsByID", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{ID: 1, AppName: "Goiabada"}, nil).Once()
 			expectConsoleClientBrand(database, &brand, nil)
 			req := httptest.NewRequest("GET", "/api/public/settings", nil)
 			if tc.switchOn {
@@ -190,22 +190,22 @@ func TestPublicSettings_CarriesTheSafeStylesheetsAndTheSwitch(t *testing.T) {
 // stylesheet the brand's files draw.
 func TestPublicSettings_CarriesTheBrandsLogosFaviconAndSwitch(t *testing.T) {
 	brand := record.NewBrand("Night", record.BrandAppearanceDark, "plum")
-	brand.Id = 7
+	brand.ID = 7
 	brand.HideAppName = true
-	brand.LogoAssetId = sql.NullInt64{Int64: 11, Valid: true}
-	brand.DarkLogoAssetId = sql.NullInt64{Int64: 12, Valid: true}
-	brand.FaviconAssetId = sql.NullInt64{Int64: 13, Valid: true}
-	brand.BackgroundAssetId = sql.NullInt64{Int64: 14, Valid: true}
+	brand.LogoAssetID = sql.NullInt64{Int64: 11, Valid: true}
+	brand.DarkLogoAssetID = sql.NullInt64{Int64: 12, Valid: true}
+	brand.FaviconAssetID = sql.NullInt64{Int64: 13, Valid: true}
+	brand.BackgroundAssetID = sql.NullInt64{Int64: 14, Valid: true}
 	assets := []record.BrandAsset{
-		{Id: 14, Kind: record.BrandAssetKindBackground, Fingerprint: "444444444444"},
-		{Id: 13, Kind: record.BrandAssetKindFavicon, Fingerprint: "333333333333"},
-		{Id: 12, Kind: record.BrandAssetKindLogo, Fingerprint: "222222222222"},
-		{Id: 11, Kind: record.BrandAssetKindLogo, Fingerprint: "111111111111"},
+		{ID: 14, Kind: record.BrandAssetKindBackground, Fingerprint: "444444444444"},
+		{ID: 13, Kind: record.BrandAssetKindFavicon, Fingerprint: "333333333333"},
+		{ID: 12, Kind: record.BrandAssetKindLogo, Fingerprint: "222222222222"},
+		{ID: 11, Kind: record.BrandAssetKindLogo, Fingerprint: "111111111111"},
 	}
 	database := datamocks.NewDatabase(t)
-	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{Id: 1, AppName: "Goiabada"}, nil).Once()
+	database.On("GetSettingsByID", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{ID: 1, AppName: "Goiabada"}, nil).Once()
 	expectConsoleClientBrand(database, &brand, nil)
-	database.On("GetBrandAssetsByIds", mock.Anything, (*sql.Tx)(nil), []int64{11, 12, 13, 14}).Return(assets, nil).Once()
+	database.On("GetBrandAssetsByIDs", mock.Anything, (*sql.Tx)(nil), []int64{11, 12, 13, 14}).Return(assets, nil).Once()
 
 	recorder := httptest.NewRecorder()
 	HandlePublicSettingsGet(database, publicSettingsBaseURL).ServeHTTP(recorder, httptest.NewRequest("GET", "/api/public/settings", nil))
@@ -225,11 +225,11 @@ func TestPublicSettings_CarriesTheBrandsLogosFaviconAndSwitch(t *testing.T) {
 	assert.Equal(t, publicSettingsBaseURL+"/brand/7/stylesheet.css?v="+full.Fingerprint, body.Brand["stylesheetUrl"])
 
 	// Without a logo the switch has no effect, and the empty slots are left out.
-	brand.LogoAssetId, brand.DarkLogoAssetId, brand.BackgroundAssetId = sql.NullInt64{}, sql.NullInt64{}, sql.NullInt64{}
+	brand.LogoAssetID, brand.DarkLogoAssetID, brand.BackgroundAssetID = sql.NullInt64{}, sql.NullInt64{}, sql.NullInt64{}
 	database = datamocks.NewDatabase(t)
-	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{Id: 1, AppName: "Goiabada"}, nil).Once()
+	database.On("GetSettingsByID", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{ID: 1, AppName: "Goiabada"}, nil).Once()
 	expectConsoleClientBrand(database, &brand, nil)
-	database.On("GetBrandAssetsByIds", mock.Anything, (*sql.Tx)(nil), []int64{13}).Return(assets[1:2], nil).Once()
+	database.On("GetBrandAssetsByIDs", mock.Anything, (*sql.Tx)(nil), []int64{13}).Return(assets[1:2], nil).Once()
 
 	recorder = httptest.NewRecorder()
 	HandlePublicSettingsGet(database, publicSettingsBaseURL).ServeHTTP(recorder, httptest.NewRequest("GET", "/api/public/settings", nil))
@@ -249,7 +249,7 @@ func TestPublicSettings_CarriesTheBrandsLogosFaviconAndSwitch(t *testing.T) {
 // all four, [] for no links, {} for a link with no labels and "" for an unset value (#814 decision 9).
 func TestPublicSettings_CarriesTheBrandsFooterLinksAndContact(t *testing.T) {
 	brand := record.NewBrand("Night", record.BrandAppearanceDark, "plum")
-	brand.Id = 7
+	brand.ID = 7
 	brand.FooterLinks = record.BrandFooterLinks{
 		{URL: "https://acme.example/privacy", Label: "Privacy", Labels: map[string]string{"de": "Datenschutz", "pt-BR": "Privacidade"}},
 		{URL: "https://status.acme.example/", Label: "Status"},
@@ -257,7 +257,7 @@ func TestPublicSettings_CarriesTheBrandsFooterLinksAndContact(t *testing.T) {
 	brand.SupportEmail = "help@acme.example"
 	brand.SupportPhone = "+442079460958"
 	database := datamocks.NewDatabase(t)
-	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{Id: 1, AppName: "Goiabada"}, nil).Once()
+	database.On("GetSettingsByID", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{ID: 1, AppName: "Goiabada"}, nil).Once()
 	expectConsoleClientBrand(database, &brand, nil)
 
 	recorder := httptest.NewRecorder()
@@ -280,12 +280,12 @@ func TestPublicSettings_CarriesTheBrandsFooterLinksAndContact(t *testing.T) {
 // default brand.
 func TestPublicSettings_CarriesTheDefaultBrandWithoutTheConsoleClient(t *testing.T) {
 	database := datamocks.NewDatabase(t)
-	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{
-		Id: 1, AppName: "Goiabada",
+	database.On("GetSettingsByID", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{
+		ID: 1, AppName: "Goiabada",
 	}, nil).Once()
 	expectConsoleClientBrand(database, nil, nil)
 	database.On("GetDefaultBrand", mock.Anything, (*sql.Tx)(nil)).Return(&record.Brand{
-		Id: 9, Name: "Default", Appearance: record.BrandAppearanceDark, Theme: "plum",
+		ID: 9, Name: "Default", Appearance: record.BrandAppearanceDark, Theme: "plum",
 	}, nil).Once()
 
 	recorder := httptest.NewRecorder()
@@ -320,14 +320,14 @@ func TestPublicSettings_AnswersNoBrandWhenTheBrandCannotBeRead(t *testing.T) {
 		{name: "a failed read of the default brand", readsDefault: true, defaultErr: errors.New("the database went away"),
 			wantLog: "unable to read the default brand"},
 		{name: "a theme none of the built-in ones",
-			consoleBrand: &record.Brand{Id: 3, Name: "Odd", Appearance: record.BrandAppearanceDark, Theme: "mango"},
+			consoleBrand: &record.Brand{ID: 3, Name: "Odd", Appearance: record.BrandAppearanceDark, Theme: "mango"},
 			wantLog:      "unable to link the brand's stylesheet"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			logs := logtest.CaptureSlog(t)
 			database := datamocks.NewDatabase(t)
-			database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{
-				Id: 1, AppName: "Goiabada", Issuer: "https://issuer.example",
+			database.On("GetSettingsByID", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{
+				ID: 1, AppName: "Goiabada", Issuer: "https://issuer.example",
 			}, nil).Once()
 			expectConsoleClientBrand(database, tc.consoleBrand, tc.consoleErr)
 			if tc.readsDefault {
@@ -374,8 +374,8 @@ func TestPublicSettings_CarriesTheStoredPolicysRules(t *testing.T) {
 	} {
 		t.Run(tc.policy.String(), func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
-			database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{
-				Id: 1, AppName: "Goiabada", PasswordPolicy: tc.policy,
+			database.On("GetSettingsByID", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{
+				ID: 1, AppName: "Goiabada", PasswordPolicy: tc.policy,
 			}, nil).Once()
 			expectNoDefaultBrand(database)
 
@@ -395,8 +395,8 @@ func TestPublicSettings_CarriesTheStoredPolicysRules(t *testing.T) {
 func TestPublicSettings_CarriesAccountDeletionEnabled(t *testing.T) {
 	for _, stored := range []bool{true, false} {
 		database := datamocks.NewDatabase(t)
-		database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{
-			Id: 1, AppName: "Goiabada", AccountDeletionEnabled: stored,
+		database.On("GetSettingsByID", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{
+			ID: 1, AppName: "Goiabada", AccountDeletionEnabled: stored,
 		}, nil).Once()
 		expectNoDefaultBrand(database)
 
@@ -414,7 +414,7 @@ func TestPublicSettings_DatabaseError(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	handler := HandlePublicSettingsGet(database, publicSettingsBaseURL)
 
-	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).
+	database.On("GetSettingsByID", mock.Anything, (*sql.Tx)(nil), int64(1)).
 		Return(nil, errors.New("database is down")).Once()
 
 	recorder := httptest.NewRecorder()
@@ -427,14 +427,14 @@ func TestPublicSettings_DatabaseError(t *testing.T) {
 	assert.Contains(t, recorder.Body.String(), "INTERNAL_SERVER_ERROR")
 }
 
-// GetSettingsById returns (nil, nil) when the row is absent. Without a nil guard
+// GetSettingsByID returns (nil, nil) when the row is absent. Without a nil guard
 // the handler dereferenced it, which panicked an endpoint reachable without any
 // authentication.
 func TestPublicSettings_MissingSettingsRowDoesNotPanic(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	handler := HandlePublicSettingsGet(database, publicSettingsBaseURL)
 
-	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(nil, nil).Once()
+	database.On("GetSettingsByID", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(nil, nil).Once()
 
 	recorder := httptest.NewRecorder()
 	assert.NotPanics(t, func() {
@@ -470,8 +470,8 @@ func TestPublicSettings_EncodeFailure(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	handler := HandlePublicSettingsGet(database, publicSettingsBaseURL)
 
-	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{
-		Id: 1, AppName: "Goiabada",
+	database.On("GetSettingsByID", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{
+		ID: 1, AppName: "Goiabada",
 	}, nil).Once()
 	expectNoDefaultBrand(database)
 
@@ -553,7 +553,7 @@ var publicBrandAllowedFields = map[string]string{
 // publicBrandFooterLinkAllowedFields is the complete set of fields a footer link carries: its URL,
 // its fallback label and its label per language, all of which its sign-in pages draw.
 var publicBrandFooterLinkAllowedFields = map[string]string{
-	"Url":    "url",
+	"URL":    "url",
 	"Label":  "label",
 	"Labels": "labels",
 }
@@ -599,7 +599,7 @@ func TestPublicSettings_DoesNotLeakSensitiveSettings(t *testing.T) {
 	turnstileSecretKey := []byte("SENTINEL-turnstile-secret-key-encrypted")
 
 	settings := &record.Settings{
-		Id:                          1,
+		ID:                          1,
 		AppName:                     "Goiabada Test",
 		SMTPEnabled:                 true,
 		AESEncryptionKeyLegacy:      aesKey,
@@ -615,10 +615,10 @@ func TestPublicSettings_DoesNotLeakSensitiveSettings(t *testing.T) {
 		TurnstileSecretKeyEncrypted: turnstileSecretKey,
 	}
 
-	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(settings, nil).Once()
+	database.On("GetSettingsByID", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(settings, nil).Once()
 	// The brand's name is not one of its public fields.
 	expectConsoleClientBrand(database, &record.Brand{
-		Id: 4, Name: "SENTINEL-brand-name", Appearance: record.BrandAppearanceLight, Theme: "guava",
+		ID: 4, Name: "SENTINEL-brand-name", Appearance: record.BrandAppearanceLight, Theme: "guava",
 	}, nil)
 
 	recorder := httptest.NewRecorder()

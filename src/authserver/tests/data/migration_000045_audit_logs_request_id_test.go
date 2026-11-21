@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestMigration000045_AuditLogsRequestId is the storage half of #328 as a test: audit_logs gains
+// TestMigration000045_AuditLogsRequestID is the storage half of #328 as a test: audit_logs gains
 // request_id, NOT NULL with an empty-string default and indexed, on all four engines. It runs
 // against an ISOLATED database of the configured dialect (see migration_testdb_helper_test.go).
 //
@@ -34,21 +34,21 @@ import (
 //
 // Run per dialect via: ./run-tests.sh --type data --db <sqlite|mysql|postgres|mssql>
 //
-//	--run TestMigration000045_AuditLogsRequestId
-func TestMigration000045_AuditLogsRequestId(t *testing.T) {
+//	--run TestMigration000045_AuditLogsRequestID
+func TestMigration000045_AuditLogsRequestID(t *testing.T) {
 	t.Parallel()
 
 	h := newIsolatedDB(t)
 
 	require.NoError(t, h.Migrator.Migrate(context.Background(), 44), "migrate to 000044")
 
-	assert.Falsef(t, auditLogsHasRequestId000045(t, h),
+	assert.Falsef(t, auditLogsHasRequestID000045(t, h),
 		"audit_logs must not carry request_id at 000044 on %s", dbType())
 	assert.Falsef(t, describeIndex(t, h, "audit_logs", "idx_audit_logs_request_id").Exists,
 		"the index must not exist at 000044 on %s", dbType())
 
 	// A row from before the column, which is every row in an existing deployment.
-	seedAuditLogWithoutRequestId000045(t, h, "written-at-000044")
+	seedAuditLogWithoutRequestID000045(t, h, "written-at-000044")
 
 	require.NoError(t, h.Migrator.Migrate(context.Background(), 45), "apply 000045")
 
@@ -65,30 +65,30 @@ func TestMigration000045_AuditLogsRequestId(t *testing.T) {
 	assert.Equalf(t, []string{"request_id"}, index.Columns,
 		"the index is keyed on request_id alone on %s", dbType())
 
-	assert.Emptyf(t, readRequestId000045(t, h, "written-at-000044"),
+	assert.Emptyf(t, readRequestID000045(t, h, "written-at-000044"),
 		"a row written before the column must read '' on %s, which is what the viewer shows as no request", dbType())
 
-	seedAuditLogWithoutRequestId000045(t, h, "omitting-at-000045")
-	assert.Emptyf(t, readRequestId000045(t, h, "omitting-at-000045"),
+	seedAuditLogWithoutRequestID000045(t, h, "omitting-at-000045")
+	assert.Emptyf(t, readRequestID000045(t, h, "omitting-at-000045"),
 		"an insert that names no request_id must be accepted and default to '' on %s", dbType())
 
 	require.NoError(t, h.Migrator.Migrate(context.Background(), 44), "roll back 000045")
-	assert.Falsef(t, auditLogsHasRequestId000045(t, h),
+	assert.Falsef(t, auditLogsHasRequestID000045(t, h),
 		"the column must be gone after rolling back to 000044 on %s", dbType())
 	assert.Falsef(t, describeIndex(t, h, "audit_logs", "idx_audit_logs_request_id").Exists,
 		"the index must be gone after rolling back to 000044 on %s", dbType())
 
 	require.NoError(t, h.Migrator.Migrate(context.Background(), 45), "re-apply 000045")
-	assert.Truef(t, auditLogsHasRequestId000045(t, h),
+	assert.Truef(t, auditLogsHasRequestID000045(t, h),
 		"the column must return after a down/up round trip on %s", dbType())
 	assert.Truef(t, describeIndex(t, h, "audit_logs", "idx_audit_logs_request_id").Exists,
 		"the index must return after a down/up round trip on %s", dbType())
 }
 
-// auditLogsHasRequestId000045 reads the catalog rather than attempting a statement, because the
+// auditLogsHasRequestID000045 reads the catalog rather than attempting a statement, because the
 // question is whether the column exists and dumpTable's column accessor fails the test when it
 // does not.
-func auditLogsHasRequestId000045(t *testing.T, h *isolatedDB) bool {
+func auditLogsHasRequestID000045(t *testing.T, h *isolatedDB) bool {
 	t.Helper()
 
 	for _, c := range dumpTable(t, h, "audit_logs").Columns {
@@ -99,11 +99,11 @@ func auditLogsHasRequestId000045(t *testing.T, h *isolatedDB) bool {
 	return false
 }
 
-// seedAuditLogWithoutRequestId000045 inserts a row naming created_at, audit_event and details and
+// seedAuditLogWithoutRequestID000045 inserts a row naming created_at, audit_event and details and
 // nothing else, which is what an insert written before this migration looks like. Literals rather
 // than placeholders because the dialects disagree on placeholder syntax and every value here is
 // test-controlled, following insertAuditLogWithoutDetails000037.
-func seedAuditLogWithoutRequestId000045(t *testing.T, h *isolatedDB, event string) {
+func seedAuditLogWithoutRequestID000045(t *testing.T, h *isolatedDB, event string) {
 	t.Helper()
 
 	_, err := h.SQL.Exec(fmt.Sprintf(
@@ -111,12 +111,12 @@ func seedAuditLogWithoutRequestId000045(t *testing.T, h *isolatedDB, event strin
 	require.NoErrorf(t, err, "insert audit event %s on %s", event, dbType())
 }
 
-func readRequestId000045(t *testing.T, h *isolatedDB, event string) string {
+func readRequestID000045(t *testing.T, h *isolatedDB, event string) string {
 	t.Helper()
 
-	var requestId string
+	var requestID string
 	require.NoErrorf(t, h.SQL.QueryRow(fmt.Sprintf(
-		`SELECT request_id FROM audit_logs WHERE audit_event = '%s'`, event)).Scan(&requestId),
+		`SELECT request_id FROM audit_logs WHERE audit_event = '%s'`, event)).Scan(&requestID),
 		"read back request_id for audit event %s on %s", event, dbType())
-	return requestId
+	return requestID
 }

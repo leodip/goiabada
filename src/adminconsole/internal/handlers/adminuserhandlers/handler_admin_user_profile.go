@@ -19,12 +19,12 @@ import (
 
 // userProfileAPI is what the user profile page needs: the user, and the profile write.
 type userProfileAPI interface {
-	GetUserById(ctx context.Context, accessToken string, userId int64) (*api.UserResponse, error)
-	UpdateUserProfile(ctx context.Context, accessToken string, userId int64, request *api.UpdateUserProfileRequest) (*api.UserResponse, error)
+	GetUserByID(ctx context.Context, accessToken string, userID int64) (*api.UserResponse, error)
+	UpdateUserProfile(ctx context.Context, accessToken string, userID int64, request *api.UpdateUserProfileRequest) (*api.UserResponse, error)
 }
 
 func HandleProfileGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient userProfileAPI,
 ) http.HandlerFunc {
@@ -46,13 +46,13 @@ func HandleProfileGet(
 			return
 		}
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
-		user, err := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		user, err := apiClient.GetUserByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -97,7 +97,7 @@ func HandleProfileGet(
 }
 
 func HandleProfilePost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient userProfileAPI,
 	baseURL string,
@@ -121,9 +121,9 @@ func HandleProfilePost(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
@@ -139,7 +139,7 @@ func HandleProfilePost(
 			// Handle validation errors by showing them in the form
 			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(errorMessage string) {
 				// Get formUser data for form display
-				formUser, userErr := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+				formUser, userErr := apiClient.GetUserByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 				if userErr != nil {
 					render.HandleAPIError(httpHelper, w, r, userErr)
 					return
@@ -177,12 +177,12 @@ func HandleProfilePost(
 			return
 		}
 
-		pagePath := fmt.Sprintf("/admin/users/%v/profile", user.Id)
+		pagePath := fmt.Sprintf("/admin/users/%v/profile", user.ID)
 		sess.SetFlash(pagePath, "savedSuccessfully", "true")
 		// An administrator who saved their own profile sees the page language the API stored on the
 		// next page, as a save in Account > Profile does; an edit of another user leaves the console's
 		// copy alone (#631 decision 7).
-		if signedInSubject(jwtInfo.IdToken) == user.Subject && user.Subject != "" {
+		if signedInSubject(jwtInfo.IDToken) == user.Subject && user.Subject != "" {
 			sess.Values[sessionkeys.PageLanguage] = user.PageLanguage
 		}
 		err = httpSession.Save(r, w, sess)
@@ -199,7 +199,7 @@ func HandleProfilePost(
 
 // signedInSubject is the subject of the console's verified ID token, the signed-in user, or empty
 // when the session holds no ID token.
-func signedInSubject(idToken *oauth.JwtToken) string {
+func signedInSubject(idToken *oauth.JWTToken) string {
 	if idToken == nil {
 		return ""
 	}

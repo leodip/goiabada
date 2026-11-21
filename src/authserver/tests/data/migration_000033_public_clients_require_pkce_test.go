@@ -126,7 +126,7 @@ func TestMigration000033_PublicClientsRequirePKCE(t *testing.T) {
 			PKCERequired:     c.seeded,
 		}
 		require.NoErrorf(t, h.DB.CreateClient(context.Background(), nil, client), "seed client %s", c.name)
-		ids[i] = client.Id
+		ids[i] = client.ID
 	}
 
 	// 1. The down is a no-op: it must not error, and the seeded values must survive it. This
@@ -155,10 +155,10 @@ func TestMigration000033_PublicClientsRequirePKCE(t *testing.T) {
 // all four engines and NULL is a distinct state from false, meaning "inherit the global
 // setting", so scanning into a plain bool would collapse the two rows this test exists to
 // tell apart.
-func readPKCERequired000033(t *testing.T, h *isolatedDB, clientId int64) sql.NullBool {
+func readPKCERequired000033(t *testing.T, h *isolatedDB, clientID int64) sql.NullBool {
 	t.Helper()
 	var pkceRequired sql.NullBool
-	q := fmt.Sprintf("SELECT pkce_required FROM clients WHERE id = %d", clientId)
+	q := fmt.Sprintf("SELECT pkce_required FROM clients WHERE id = %d", clientID)
 	require.NoError(t, h.SQL.QueryRow(q).Scan(&pkceRequired), "read clients.pkce_required")
 	return pkceRequired
 }

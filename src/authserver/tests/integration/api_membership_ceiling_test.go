@@ -32,20 +32,20 @@ func newMembershipUser(t *testing.T) int64 {
 	t.Helper()
 	user := &record.User{Subject: fake.UUID(), Enabled: true, Email: uniqueEmail("ceiling@members.test"), GivenName: "Member"}
 	require.NoError(t, database.CreateUser(context.Background(), nil, user))
-	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.Id) })
-	return user.Id
+	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.ID) })
+	return user.ID
 }
 
 // newGroupHolding is a fresh group granted the given permissions.
-func newGroupHolding(t *testing.T, permissionIds ...int64) int64 {
+func newGroupHolding(t *testing.T, permissionIDs ...int64) int64 {
 	t.Helper()
 	group := createTestGroup(t)
-	t.Cleanup(func() { _ = database.DeleteGroup(context.Background(), nil, group.Id) })
-	for _, permissionId := range permissionIds {
+	t.Cleanup(func() { _ = database.DeleteGroup(context.Background(), nil, group.ID) })
+	for _, permissionID := range permissionIDs {
 		require.NoError(t, database.CreateGroupPermission(context.Background(), nil,
-			&record.GroupPermission{GroupId: group.Id, PermissionId: permissionId}))
+			&record.GroupPermission{GroupID: group.ID, PermissionID: permissionID}))
 	}
-	return group.Id
+	return group.ID
 }
 
 // ordinaryGroup is a fresh group holding manage-account and an operator's custom authserver
@@ -54,26 +54,26 @@ func ordinaryGroup(t *testing.T) int64 {
 	t.Helper()
 	authServer, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
 	require.NoError(t, err)
-	custom := createTestPermission(t, authServer.Id, "members-custom-"+strings.ToLower(fake.LetterN(6)), "An operator's own permission")
-	t.Cleanup(func() { _ = database.DeletePermission(context.Background(), nil, custom.Id) })
-	return newGroupHolding(t, authServerPermissionId(t, builtin.ManageAccountPermissionIdentifier), custom.Id)
+	custom := createTestPermission(t, authServer.ID, "members-custom-"+strings.ToLower(fake.LetterN(6)), "An operator's own permission")
+	t.Cleanup(func() { _ = database.DeletePermission(context.Background(), nil, custom.ID) })
+	return newGroupHolding(t, authServerPermissionID(t, builtin.ManageAccountPermissionIdentifier), custom.ID)
 }
 
-func joinGroup(t *testing.T, userId, groupId int64) {
+func joinGroup(t *testing.T, userID, groupID int64) {
 	t.Helper()
-	require.NoError(t, database.CreateUserGroup(context.Background(), nil, &record.UserGroup{UserId: userId, GroupId: groupId}))
+	require.NoError(t, database.CreateUserGroup(context.Background(), nil, &record.UserGroup{UserID: userID, GroupID: groupID}))
 }
 
-func memberOf(t *testing.T, userId, groupId int64) bool {
+func memberOf(t *testing.T, userID, groupID int64) bool {
 	t.Helper()
-	membership, err := database.GetUserGroupByUserIdAndGroupId(context.Background(), nil, userId, groupId)
+	membership, err := database.GetUserGroupByUserIDAndGroupID(context.Background(), nil, userID, groupID)
 	require.NoError(t, err)
 	return membership != nil
 }
 
-func groupExists(t *testing.T, groupId int64) bool {
+func groupExists(t *testing.T, groupID int64) bool {
 	t.Helper()
-	group, err := database.GetGroupById(context.Background(), nil, groupId)
+	group, err := database.GetGroupByID(context.Background(), nil, groupID)
 	require.NoError(t, err)
 	return group != nil
 }
@@ -94,12 +94,12 @@ func sendAdmin(t *testing.T, accessToken, method, path string, body any) (*http.
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
-	requestId := "members-" + fake.LetterN(16)
-	req.Header.Set("X-Request-Id", requestId)
+	requestID := "members-" + fake.LetterN(16)
+	req.Header.Set("X-Request-Id", requestID)
 
-	resp, err := createHttpClient(t).Do(req)
+	resp, err := createHTTPClient(t).Do(req)
 	require.NoError(t, err)
-	return resp, requestId
+	return resp, requestID
 }
 
 // membershipCeilingChange is one of the five writes the ceiling guards.
@@ -108,19 +108,19 @@ type membershipCeilingChange struct {
 	method string
 	route  string
 	// prepare puts the state the write changes in place: the user in the group, for a removal.
-	prepare func(t *testing.T, userId, groupId int64)
-	send    func(t *testing.T, token string, userId, groupId int64) (*http.Response, string)
+	prepare func(t *testing.T, userID, groupID int64)
+	send    func(t *testing.T, token string, userID, groupID int64) (*http.Response, string)
 	// done reports whether the write's effect is in the store.
-	done func(t *testing.T, userId, groupId int64) bool
+	done func(t *testing.T, userID, groupID int64) bool
 	// targetKind is the target a refusal names: the user whose memberships change, or the group.
 	targetKind string
 }
 
-func (c membershipCeilingChange) targetId(userId, groupId int64) int64 {
+func (c membershipCeilingChange) targetID(userID, groupID int64) int64 {
 	if c.targetKind == "group" {
-		return groupId
+		return groupID
 	}
-	return userId
+	return userID
 }
 
 var membershipCeilingChanges = []membershipCeilingChange{
@@ -128,10 +128,10 @@ var membershipCeilingChanges = []membershipCeilingChange{
 		name:    "PUT users groups joining",
 		method:  http.MethodPut,
 		route:   "/api/v1/admin/users/{id}/groups",
-		prepare: func(t *testing.T, userId, groupId int64) {},
-		send: func(t *testing.T, token string, userId, groupId int64) (*http.Response, string) {
-			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/users/%d/groups", userId),
-				map[string]any{"groupIds": []int64{groupId}, "expectedGroupIds": []int64{}})
+		prepare: func(t *testing.T, userID, groupID int64) {},
+		send: func(t *testing.T, token string, userID, groupID int64) (*http.Response, string) {
+			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/users/%d/groups", userID),
+				map[string]any{"groupIds": []int64{groupID}, "expectedGroupIds": []int64{}})
 		},
 		done:       memberOf,
 		targetKind: "user",
@@ -141,21 +141,21 @@ var membershipCeilingChanges = []membershipCeilingChange{
 		method:  http.MethodPut,
 		route:   "/api/v1/admin/users/{id}/groups",
 		prepare: joinGroup,
-		send: func(t *testing.T, token string, userId, groupId int64) (*http.Response, string) {
-			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/users/%d/groups", userId),
-				map[string]any{"groupIds": []int64{}, "expectedGroupIds": []int64{groupId}})
+		send: func(t *testing.T, token string, userID, groupID int64) (*http.Response, string) {
+			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/users/%d/groups", userID),
+				map[string]any{"groupIds": []int64{}, "expectedGroupIds": []int64{groupID}})
 		},
-		done:       func(t *testing.T, userId, groupId int64) bool { return !memberOf(t, userId, groupId) },
+		done:       func(t *testing.T, userID, groupID int64) bool { return !memberOf(t, userID, groupID) },
 		targetKind: "user",
 	},
 	{
 		name:    "POST group members",
 		method:  http.MethodPost,
 		route:   "/api/v1/admin/groups/{id}/members",
-		prepare: func(t *testing.T, userId, groupId int64) {},
-		send: func(t *testing.T, token string, userId, groupId int64) (*http.Response, string) {
-			return sendAdmin(t, token, http.MethodPost, fmt.Sprintf("/api/v1/admin/groups/%d/members", groupId),
-				map[string]any{"userId": userId})
+		prepare: func(t *testing.T, userID, groupID int64) {},
+		send: func(t *testing.T, token string, userID, groupID int64) (*http.Response, string) {
+			return sendAdmin(t, token, http.MethodPost, fmt.Sprintf("/api/v1/admin/groups/%d/members", groupID),
+				map[string]any{"userId": userID})
 		},
 		done:       memberOf,
 		targetKind: "user",
@@ -165,21 +165,21 @@ var membershipCeilingChanges = []membershipCeilingChange{
 		method:  http.MethodDelete,
 		route:   "/api/v1/admin/groups/{id}/members/{userId}",
 		prepare: joinGroup,
-		send: func(t *testing.T, token string, userId, groupId int64) (*http.Response, string) {
-			return sendAdmin(t, token, http.MethodDelete, fmt.Sprintf("/api/v1/admin/groups/%d/members/%d", groupId, userId), nil)
+		send: func(t *testing.T, token string, userID, groupID int64) (*http.Response, string) {
+			return sendAdmin(t, token, http.MethodDelete, fmt.Sprintf("/api/v1/admin/groups/%d/members/%d", groupID, userID), nil)
 		},
-		done:       func(t *testing.T, userId, groupId int64) bool { return !memberOf(t, userId, groupId) },
+		done:       func(t *testing.T, userID, groupID int64) bool { return !memberOf(t, userID, groupID) },
 		targetKind: "user",
 	},
 	{
 		name:    "DELETE group",
 		method:  http.MethodDelete,
 		route:   "/api/v1/admin/groups/{id}",
-		prepare: func(t *testing.T, userId, groupId int64) {},
-		send: func(t *testing.T, token string, userId, groupId int64) (*http.Response, string) {
-			return sendAdmin(t, token, http.MethodDelete, fmt.Sprintf("/api/v1/admin/groups/%d", groupId), nil)
+		prepare: func(t *testing.T, userID, groupID int64) {},
+		send: func(t *testing.T, token string, userID, groupID int64) (*http.Response, string) {
+			return sendAdmin(t, token, http.MethodDelete, fmt.Sprintf("/api/v1/admin/groups/%d", groupID), nil)
 		},
-		done:       func(t *testing.T, userId, groupId int64) bool { return !groupExists(t, groupId) },
+		done:       func(t *testing.T, userID, groupID int64) bool { return !groupExists(t, groupID) },
 		targetKind: "group",
 	},
 }
@@ -188,18 +188,18 @@ func TestMembershipCeiling_AGranularTokenCannotMoveAUserThroughAnAdministrativeG
 	requireDatabaseAuditLogs(t)
 	manageToken, _ := createAdminClientWithToken(t)
 	granularToken, caller := createClientWithGranularScope(t, builtin.ManageUsersPermissionIdentifier)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.ID) })
 
 	for _, change := range membershipCeilingChanges {
 		for _, identifier := range administrativePermissionIdentifiers {
 			t.Run(change.name+"/"+identifier, func(t *testing.T) {
-				userId := newMembershipUser(t)
-				administrative := authServerPermissionId(t, identifier)
+				userID := newMembershipUser(t)
+				administrative := authServerPermissionID(t, identifier)
 				// Beside an ordinary permission the group also holds, which the refusal does not name.
-				groupId := newGroupHolding(t, administrative, authServerPermissionId(t, builtin.ManageAccountPermissionIdentifier))
-				change.prepare(t, userId, groupId)
+				groupID := newGroupHolding(t, administrative, authServerPermissionID(t, builtin.ManageAccountPermissionIdentifier))
+				change.prepare(t, userID, groupID)
 
-				resp, requestId := change.send(t, granularToken, userId, groupId)
+				resp, requestID := change.send(t, granularToken, userID, groupID)
 				defer func() { _ = resp.Body.Close() }()
 
 				assert.Equal(t, http.StatusForbidden, resp.StatusCode)
@@ -215,9 +215,9 @@ func TestMembershipCeiling_AGranularTokenCannotMoveAUserThroughAnAdministrativeG
 				assert.Contains(t, challenge, `error="insufficient_scope"`)
 				assert.Contains(t, challenge, `scope="authserver:manage"`)
 
-				assert.False(t, change.done(t, userId, groupId), "the refused request changed nothing")
+				assert.False(t, change.done(t, userID, groupID), "the refused request changed nothing")
 
-				rows := refusalRows(t, manageToken, requestId)
+				rows := refusalRows(t, manageToken, requestID)
 				require.Len(t, rows, 1, "exactly one administrator_change_refused row for the refused request")
 				row := rows[0]
 				assert.Equal(t, caller.ClientIdentifier, row["logged_in_user"], "the caller is the token's sub")
@@ -225,11 +225,11 @@ func TestMembershipCeiling_AGranularTokenCannotMoveAUserThroughAnAdministrativeG
 				assert.Equal(t, change.route, row["route"])
 				assert.Equal(t, "grant", row["ceiling"])
 				assert.Equal(t, change.targetKind, row["target_kind"])
-				assert.InDelta(t, float64(change.targetId(userId, groupId)), row["target_id"], 0)
-				assertUserIdNamesAUserTarget(t, row, change.targetKind, change.targetId(userId, groupId))
+				assert.InDelta(t, float64(change.targetID(userID, groupID)), row["target_id"], 0)
+				assertUserIDNamesAUserTarget(t, row, change.targetKind, change.targetID(userID, groupID))
 				assert.Equal(t, []any{float64(administrative)}, row["permission_ids"], "the administrative permission the group holds")
 				if change.targetKind == "user" {
-					assert.Equal(t, []any{float64(groupId)}, row["group_ids"], "the group whose membership was refused")
+					assert.Equal(t, []any{float64(groupID)}, row["group_ids"], "the group whose membership was refused")
 				} else {
 					assert.NotContains(t, row, "group_ids")
 				}
@@ -242,21 +242,21 @@ func TestMembershipCeiling_AGranularTokenStillChangesOrdinaryGroups(t *testing.T
 	requireDatabaseAuditLogs(t)
 	manageToken, _ := createAdminClientWithToken(t)
 	granularToken, caller := createClientWithGranularScope(t, builtin.ManageUsersPermissionIdentifier)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.ID) })
 
 	for _, change := range membershipCeilingChanges {
 		t.Run(change.name, func(t *testing.T) {
-			userId := newMembershipUser(t)
-			groupId := ordinaryGroup(t)
-			change.prepare(t, userId, groupId)
+			userID := newMembershipUser(t)
+			groupID := ordinaryGroup(t)
+			change.prepare(t, userID, groupID)
 
-			resp, requestId := change.send(t, granularToken, userId, groupId)
+			resp, requestID := change.send(t, granularToken, userID, groupID)
 			body, _ := io.ReadAll(resp.Body)
 			_ = resp.Body.Close()
 
 			assert.Less(t, resp.StatusCode, 300, "manage-account and a custom authserver permission are not administrative: %s", body)
-			assert.True(t, change.done(t, userId, groupId))
-			assert.Empty(t, refusalRows(t, manageToken, requestId))
+			assert.True(t, change.done(t, userID, groupID))
+			assert.Empty(t, refusalRows(t, manageToken, requestID))
 		})
 	}
 }
@@ -267,17 +267,17 @@ func TestMembershipCeiling_AManageTokenChangesAdministrativeGroups(t *testing.T)
 
 	for _, change := range membershipCeilingChanges {
 		t.Run(change.name, func(t *testing.T) {
-			userId := newMembershipUser(t)
-			groupId := newGroupHolding(t, authServerPermissionId(t, builtin.ManagePermissionIdentifier))
-			change.prepare(t, userId, groupId)
+			userID := newMembershipUser(t)
+			groupID := newGroupHolding(t, authServerPermissionID(t, builtin.ManagePermissionIdentifier))
+			change.prepare(t, userID, groupID)
 
-			resp, requestId := change.send(t, manageToken, userId, groupId)
+			resp, requestID := change.send(t, manageToken, userID, groupID)
 			body, _ := io.ReadAll(resp.Body)
 			_ = resp.Body.Close()
 
 			assert.Less(t, resp.StatusCode, 300, string(body))
-			assert.True(t, change.done(t, userId, groupId))
-			assert.Empty(t, refusalRows(t, manageToken, requestId))
+			assert.True(t, change.done(t, userID, groupID))
+			assert.Empty(t, refusalRows(t, manageToken, requestID))
 		})
 	}
 }

@@ -19,7 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func getUserAccessTokenWithAccountScope_Email(t *testing.T) (string, *record.User) {
+func getUserAccessTokenWithAccountScopeEmail(t *testing.T) (string, *record.User) {
 	scope := "openid profile email " + builtin.AuthServerResourceIdentifier + ":" + builtin.ManageAccountPermissionIdentifier
 	return createUserAccessTokenWithScope(t, scope)
 }
@@ -34,13 +34,13 @@ func givePassword(t *testing.T, user *record.User, password string) {
 	t.Helper()
 	hash, err := passwordhash.Hash(password)
 	require.NoError(t, err)
-	require.NoError(t, database.SetUserPasswordHash(context.Background(), nil, user.Id, hash))
+	require.NoError(t, database.SetUserPasswordHash(context.Background(), nil, user.ID, hash))
 }
 
 // accountEmailUserWithPassword is a user holding an account-scoped token and a known password.
 func accountEmailUserWithPassword(t *testing.T) (string, *record.User) {
 	t.Helper()
-	accessToken, user := getUserAccessTokenWithAccountScope_Email(t)
+	accessToken, user := getUserAccessTokenWithAccountScopeEmail(t)
 	givePassword(t, user, accountEmailPassword)
 	return accessToken, user
 }
@@ -66,12 +66,12 @@ func TestAPIAccountEmailPut_Success(t *testing.T) {
 	var updateResp api.UpdateUserResponse
 	err := json.NewDecoder(resp.Body).Decode(&updateResp)
 	require.NoError(t, err)
-	assert.Equal(t, u.Id, updateResp.User.Id)
+	assert.Equal(t, u.ID, updateResp.User.ID)
 	assert.Equal(t, newEmail, updateResp.User.Email)
 	assert.False(t, updateResp.User.EmailVerified)
 
 	// Verify persisted changes
-	updatedUser, err := database.GetUserById(context.Background(), nil, u.Id)
+	updatedUser, err := database.GetUserByID(context.Background(), nil, u.ID)
 	require.NoError(t, err)
 	assert.NotNil(t, updatedUser)
 	assert.Equal(t, newEmail, updatedUser.Email)
@@ -134,7 +134,7 @@ func TestAPIAccountEmailPut_AnAddressAtTheLimits(t *testing.T) {
 			body, _ := io.ReadAll(resp.Body)
 			require.Equal(t, http.StatusOK, resp.StatusCode, string(body))
 
-			updatedUser, err := database.GetUserById(context.Background(), nil, u.Id)
+			updatedUser, err := database.GetUserByID(context.Background(), nil, u.ID)
 			require.NoError(t, err)
 			require.NotNil(t, updatedUser)
 			assert.Equal(t, newEmail, updatedUser.Email)
@@ -150,7 +150,7 @@ func TestAPIAccountEmailPut_EmailAlreadyExists(t *testing.T) {
 	otherUser := &record.User{Email: otherEmail, Enabled: true, Subject: fake.UUID()}
 	err := database.CreateUser(context.Background(), nil, otherUser)
 	require.NoError(t, err)
-	defer func() { _ = database.DeleteUser(context.Background(), nil, otherUser.Id) }()
+	defer func() { _ = database.DeleteUser(context.Background(), nil, otherUser.ID) }()
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/email"
 	resp := makeAPIRequest(t, "PUT", url, accessToken,
@@ -168,7 +168,7 @@ func TestAPIAccountEmailPut_UnauthorizedAndScope(t *testing.T) {
 	// No token
 	req, err := http.NewRequest("PUT", url, nil)
 	require.NoError(t, err)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -187,7 +187,7 @@ func TestAPIAccountEmailPut_UnauthorizedAndScope(t *testing.T) {
 }
 
 func TestAPIAccountEmailPut_InvalidRequestBody(t *testing.T) {
-	accessToken, _ := getUserAccessTokenWithAccountScope_Email(t)
+	accessToken, _ := getUserAccessTokenWithAccountScopeEmail(t)
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/email"
 
 	// Invalid JSON (no body)
@@ -195,7 +195,7 @@ func TestAPIAccountEmailPut_InvalidRequestBody(t *testing.T) {
 	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -215,7 +215,7 @@ func TestAPIAccountEmailPut_AWrongPasswordIsRefusedAndChangesNothing(t *testing.
 	otherEmail := "existing_" + strings.ToLower(fake.LetterN(6)) + "@example.com"
 	otherUser := &record.User{Email: otherEmail, Enabled: true, Subject: fake.UUID()}
 	require.NoError(t, database.CreateUser(context.Background(), nil, otherUser))
-	defer func() { _ = database.DeleteUser(context.Background(), nil, otherUser.Id) }()
+	defer func() { _ = database.DeleteUser(context.Background(), nil, otherUser.ID) }()
 
 	for _, address := range []string{strings.ToLower(fake.LetterN(8)) + "@example.com", otherEmail, "invalid-email"} {
 		resp := makeAPIRequest(t, "PUT", url, accessToken,
@@ -229,7 +229,7 @@ func TestAPIAccountEmailPut_AWrongPasswordIsRefusedAndChangesNothing(t *testing.
 		assert.Equal(t, "That password isn't right. Try again.", errResp.ErrorDescription, address)
 	}
 
-	persisted, err := database.GetUserById(context.Background(), nil, u.Id)
+	persisted, err := database.GetUserByID(context.Background(), nil, u.ID)
 	require.NoError(t, err)
 	assert.Equal(t, u.Email, persisted.Email, "a refused change writes nothing")
 }
@@ -255,7 +255,7 @@ func TestAPIAccountEmailPut_ABlankPasswordIsAValidationError(t *testing.T) {
 		assert.Equal(t, "Current password is required.", errResp.ErrorDescription)
 	}
 
-	persisted, err := database.GetUserById(context.Background(), nil, u.Id)
+	persisted, err := database.GetUserByID(context.Background(), nil, u.ID)
 	require.NoError(t, err)
 	assert.Equal(t, u.Email, persisted.Email, "a refused change writes nothing")
 }
@@ -265,11 +265,11 @@ func TestAPIAccountEmailPut_ABlankPasswordIsAValidationError(t *testing.T) {
 // user as stored and writes nothing, so the verified flag survives.
 func TestAPIAccountEmailPut_ResubmittingTheCurrentAddressKeepsItVerified(t *testing.T) {
 	accessToken, u := accountEmailUserWithPassword(t)
-	verified, err := database.GetUserById(context.Background(), nil, u.Id)
+	verified, err := database.GetUserByID(context.Background(), nil, u.ID)
 	require.NoError(t, err)
 	verified.EmailVerified = true
 	require.NoError(t, database.UpdateUser(context.Background(), nil, verified))
-	before, err := database.GetUserById(context.Background(), nil, u.Id)
+	before, err := database.GetUserByID(context.Background(), nil, u.ID)
 	require.NoError(t, err)
 	require.True(t, before.EmailVerified)
 
@@ -284,7 +284,7 @@ func TestAPIAccountEmailPut_ResubmittingTheCurrentAddressKeepsItVerified(t *test
 	assert.Equal(t, before.Email, updateResp.User.Email)
 	assert.True(t, updateResp.User.EmailVerified)
 
-	after, err := database.GetUserById(context.Background(), nil, u.Id)
+	after, err := database.GetUserByID(context.Background(), nil, u.ID)
 	require.NoError(t, err)
 	assert.Equal(t, before.Email, after.Email)
 	assert.True(t, after.EmailVerified, "re-saving the address must not clear its verified flag")
@@ -337,7 +337,7 @@ func TestAPIAccountEmailPut_TellsThePreviousAddress(t *testing.T) {
 	} {
 		t.Run(tc.locale, func(t *testing.T) {
 			accessToken, u := accountEmailUserWithPassword(t)
-			stored, err := database.GetUserById(context.Background(), nil, u.Id)
+			stored, err := database.GetUserByID(context.Background(), nil, u.ID)
 			require.NoError(t, err)
 			stored.Locale = tc.locale
 			stored.EmailVerified = true
@@ -378,7 +378,7 @@ func TestAPIAccountEmailPut_SendsNoNoticeToAnUnverifiedAddress(t *testing.T) {
 	useMailpitSMTP(t)
 
 	accessToken, u := accountEmailUserWithPassword(t)
-	stored, err := database.GetUserById(context.Background(), nil, u.Id)
+	stored, err := database.GetUserByID(context.Background(), nil, u.ID)
 	require.NoError(t, err)
 	stored.EmailVerified = true
 	require.NoError(t, database.UpdateUser(context.Background(), nil, stored))

@@ -39,21 +39,21 @@ const jwtLike = "eyJhbGciOiJSUzI1NiIsImtpZCI6IlBST0JFIn0." +
 // newLoggerTestServer builds a Server by hand, runs the real initMiddleware, and registers one
 // handler that answers 200 and records that it ran.
 //
-// The database is a mock with GetSettingsById stubbed, which middleware.Settings calls on every
+// The database is a mock with GetSettingsByID stubbed, which middleware.Settings calls on every
 // request. middleware.CORS also holds the database but needs no stub: it looks an origin up only
 // for a request carrying an Origin header, and these send none. That is enforced
 // rather than assumed, since datamocks.NewDatabase(t) fails the test on any call nobody expected.
-func newLoggerTestServer(t *testing.T, logHttpRequests bool, handlerRan *bool) *Server {
+func newLoggerTestServer(t *testing.T, logHTTPRequests bool, handlerRan *bool) *Server {
 	t.Helper()
 
 	database := datamocks.NewDatabase(t)
 	// A page reads the default brand; none leaves it automatic, in the built-in colors.
 	database.On("GetDefaultBrand", mock.Anything, mock.Anything).Return(nil, nil).Maybe()
-	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{Id: 1}, nil)
+	database.On("GetSettingsByID", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&record.Settings{ID: 1}, nil)
 
 	// The flag initMiddleware reads when it mounts the request logger.
 	cfg := &config.Config{}
-	cfg.AuthServer.LogHttpRequests = logHttpRequests
+	cfg.AuthServer.LogHTTPRequests = logHTTPRequests
 
 	s := &Server{
 		router:       routing.New(),

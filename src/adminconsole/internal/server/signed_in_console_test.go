@@ -2,7 +2,6 @@ package server
 
 import (
 	"crypto/x509"
-	"encoding/gob"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -75,8 +74,8 @@ func newSignedInConsoleServedBy(t *testing.T, scope string, adminAPI http.Handle
 			}
 			_, _ = w.Write([]byte(settings + `}`))
 		case "/certs":
-			assert.NoError(t, json.NewEncoder(w).Encode(oauth.Jwks{
-				Keys: []oauth.Jwk{oauthclienttest.JwkFromPublicKey("key-1", &signing.PublicKey)}}))
+			assert.NoError(t, json.NewEncoder(w).Encode(oauth.JWKS{
+				Keys: []oauth.JWK{oauthclienttest.JWKFromPublicKey("key-1", &signing.PublicKey)}}))
 		default:
 			adminAPI(w, r)
 		}
@@ -100,16 +99,16 @@ func newSignedInConsoleServedBy(t *testing.T, scope string, adminAPI http.Handle
 
 	claims := oauthclienttest.ValidClaims()
 	claims["aud"] = builtin.AdminConsoleClientIdentifier
-	gob.Register(oauth.TokenResponse{})
+	sessionkeys.RegisterStoredTokenResponse()
 	seed := httptest.NewRequest(http.MethodGet, "/", nil)
 	sess, err := store.Get(seed, builtin.AdminConsoleSessionName)
 	require.NoError(t, err)
-	sess.Values[sessionkeys.JWT] = oauth.TokenResponse{
+	sess.Values[sessionkeys.JWT] = sessionkeys.StoreTokenResponse(oauth.TokenResponse{
 		AccessToken: "an-access-token",
-		IdToken:     oauthclienttest.SignRS256(t, signing, "key-1", claims),
+		IDToken:     oauthclienttest.SignRS256(t, signing, "key-1", claims),
 		TokenType:   "Bearer",
 		Scope:       scope,
-	}
+	})
 	sess.Values[sessionkeys.JWTExpiresAt] = time.Now().Add(time.Hour).Unix()
 	saved := httptest.NewRecorder()
 	require.NoError(t, store.Save(seed, saved, sess))

@@ -327,8 +327,8 @@ func NewRateLimiter(store any) *RateLimiter {
 		store: store,
 		pwdAccount: newAccountTiers(failure("pwd_account_net", countedByIPAndAccount, 10, 15*time.Minute),
 			failure("pwd_account", countedByAccount, 100, 60*time.Minute)),
-		pwdIp: failureInProcess("pwd_ip", countedByIP, "ip", 30, time.Minute),
-		forgotPwdIp: request("forgot_pwd_ip", countedByIP, "ip", 20, 5*time.Minute),
+		pwdIP: failureInProcess("pwd_ip", countedByIP, "ip", 30, time.Minute),
+		forgotPwdIP: request("forgot_pwd_ip", countedByIP, "ip", 20, 5*time.Minute),
 		otp:   failure("otp", countedBySigningInUser, 5, 15*time.Minute),
 		dcr:   request("dcr", countedByIP, "ip", 10, 2*time.Hour),
 	}
@@ -336,15 +336,15 @@ func NewRateLimiter(store any) *RateLimiter {
 }
 
 func (m *RateLimiter) LimitPwd(next any) any {
-	_ = m.pwdIp
+	_ = m.pwdIP
 	_ = m.pwdAccount
 	_ = m.store
 	return next
 }
 
-func (m *RateLimiter) LimitForgotPwd(next any) any { _ = m.forgotPwdIp; return next }
+func (m *RateLimiter) LimitForgotPwd(next any) any { _ = m.forgotPwdIP; return next }
 
-func (rl *RateLimiter) LimitOtp(next any) any { return rl.limitFailures(next, rl.otp) }
+func (rl *RateLimiter) LimitOTP(next any) any { return rl.limitFailures(next, rl.otp) }
 
 func (m *RateLimiter) limitFailures(next any, t *failureTier) any { _ = m.dcr; return next }
 
@@ -369,7 +369,7 @@ func (m *RateLimiter) LimitDCR(next any) any { return m.limitFailures(next, m.dc
 	wantMethods := map[string][]string{
 		"LimitPwd":       {"pwd_ip", "pwd_account_net", "pwd_account"},
 		"LimitForgotPwd": {"forgot_pwd_ip"},
-		"LimitOtp":       {"otp"},
+		"LimitOTP":       {"otp"},
 		"LimitDCR":       {"dcr"},
 	}
 	if !reflect.DeepEqual(read.methods, wantMethods) {
@@ -393,7 +393,7 @@ func TestRateLimiterSourceTiers_RefusesWhatItCannotRead(t *testing.T) {
 func NewRateLimiter() *RateLimiter {
 	return &RateLimiter{otp: failure("otp", countedBySigningInUser, 5, otpWindow)}
 }
-func (m *RateLimiter) LimitOtp(next any) any { _ = m.otp; return next }
+func (m *RateLimiter) LimitOTP(next any) any { _ = m.otp; return next }
 `,
 			want: "cannot read the window of the tier otp: otpWindow",
 		},
@@ -428,7 +428,7 @@ func NewRateLimiter() *RateLimiter {
 			name: "a tier counted in the process built with no key field",
 			src: `package middleware
 func NewRateLimiter() *RateLimiter {
-	return &RateLimiter{pwdIp: failureInProcess("pwd_ip", countedByIP, 30, time.Minute)}
+	return &RateLimiter{pwdIP: failureInProcess("pwd_ip", countedByIP, 30, time.Minute)}
 }
 `,
 			want: "failureInProcess is called with 4 arguments, want 5",
@@ -439,9 +439,9 @@ func NewRateLimiter() *RateLimiter {
 func NewRateLimiter() *RateLimiter {
 	return &RateLimiter{otp: failure("otp", countedBySigningInUser, 5, time.Minute)}
 }
-func (m *RateLimiter) LimitOtp(next any) any { return next }
+func (m *RateLimiter) LimitOTP(next any) any { return next }
 `,
-			want: "LimitOtp reaches no tier",
+			want: "LimitOTP reaches no tier",
 		},
 		{
 			name: "no constructor",

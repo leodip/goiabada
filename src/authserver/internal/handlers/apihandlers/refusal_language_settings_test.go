@@ -321,7 +321,7 @@ func TestSettingsKeysRefusals_AreInTheRequestsLanguage(t *testing.T) {
 	revoke := func(stored *record.KeyPair) func(*testing.T, string) *httptest.ResponseRecorder {
 		return func(t *testing.T, acceptLanguage string) *httptest.ResponseRecorder {
 			database := datamocks.NewDatabase(t)
-			database.On("GetKeyPairById", mock.Anything, (*sql.Tx)(nil), int64(5)).Return(stored, nil).Once()
+			database.On("GetKeyPairByID", mock.Anything, (*sql.Tx)(nil), int64(5)).Return(stored, nil).Once()
 			r := httptest.NewRequest(http.MethodDelete, "/api/v1/admin/settings/keys/5", nil)
 			r.SetPathValue("id", "5")
 			r = setTokenContextWithClaims(r, map[string]interface{}{"scope": "authserver:manage", "sub": grantCaller})
@@ -378,9 +378,9 @@ func TestSettingsKeysRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			status: http.StatusConflict,
 			code:   "ROTATION_OUTCOME_UNKNOWN",
 			english: "The key rotation may or may not have happened. Check the signing keys before you rotate again. " +
-				"Request Id: " + rotateKeysRequestId,
+				"Request Id: " + rotateKeysRequestID,
 			portuguese: "A rotação de chaves pode ou não ter acontecido. Verifique as chaves de assinatura antes de rotacionar novamente. " +
-				"ID da requisição: " + rotateKeysRequestId,
+				"ID da requisição: " + rotateKeysRequestID,
 		},
 		{
 			name:       "a key another administrator revoked",

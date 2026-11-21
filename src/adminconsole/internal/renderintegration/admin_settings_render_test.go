@@ -14,7 +14,7 @@ import (
 )
 
 // TestRender_AdminSettingsAuditLogViewer is seam 8's rendering half (#328). The page test
-// above the handler drives a mocked HttpHelper and therefore renders nothing, so the things that
+// above the handler drives a mocked HTTPHelper and therefore renders nothing, so the things that
 // can only go wrong in HTML are proved here: each event names its request id and links to that
 // request's events, an entry written off a request names none, the details are drawn as keys and
 // values with their markup escaped, and an id is escaped wherever it is echoed, in a row's link
@@ -23,12 +23,12 @@ import (
 func TestRender_AdminSettingsAuditLogViewer(t *testing.T) {
 	auditWritten := time.Date(2026, 9, 12, 10, 0, 0, 0, time.UTC)
 	logs := []api.AuditLogResponse{
-		{Id: 1, CreatedAt: auditWritten, AuditEvent: "user_login",
-			Details: `{"email":"alice@example.com","name":"<b>x</b>"}`, RequestId: "host/Ppg6bHPK5f-000012"},
-		{Id: 2, CreatedAt: auditWritten.Add(time.Second), AuditEvent: "revoked_user_auth_state",
-			Details: `{}`, RequestId: ""},
-		{Id: 3, CreatedAt: auditWritten.Add(2 * time.Second), AuditEvent: "user_login",
-			Details: `{}`, RequestId: `x"><b>y</b>&page=9`},
+		{ID: 1, CreatedAt: auditWritten, AuditEvent: "user_login",
+			Details: `{"email":"alice@example.com","name":"<b>x</b>"}`, RequestID: "host/Ppg6bHPK5f-000012"},
+		{ID: 2, CreatedAt: auditWritten.Add(time.Second), AuditEvent: "revoked_user_auth_state",
+			Details: `{}`, RequestID: ""},
+		{ID: 3, CreatedAt: auditWritten.Add(2 * time.Second), AuditEvent: "user_login",
+			Details: `{}`, RequestID: `x"><b>y</b>&page=9`},
 	}
 	rows := []adminsettingshandlers.AuditLogRow{
 		{AuditLogResponse: logs[0], DetailsParsed: true, DetailPairs: []adminsettingshandlers.AuditLogDetail{
@@ -45,7 +45,7 @@ func TestRender_AdminSettingsAuditLogViewer(t *testing.T) {
 			Page:       4,
 			PageSize:   20,
 			AuditEvent: "user_login",
-			RequestId:  `"><script>alert(1)</script>`,
+			RequestID:  `"><script>alert(1)</script>`,
 		},
 		"paginator":         pagination.New(73, 20, 4, 5),
 		"selectedEvent":     "user_login",
@@ -127,7 +127,7 @@ func TestRender_AdminSettingsKeysLocalizesTheCreatedAtCell(t *testing.T) {
 
 	out := renderMenuPage(t, "/admin_settings_keys.html", map[string]interface{}{
 		"keys": []adminsettingshandlers.SettingsKey{{
-			Id: 1, CreatedAt: &created, State: "current", KeyIdentifier: "key-1",
+			ID: 1, CreatedAt: &created, State: "current", KeyIdentifier: "key-1",
 			Type: "RSA", Algorithm: "RS256",
 		}},
 	})
@@ -145,10 +145,10 @@ func int64Ptr(v int64) *int64 { return &v }
 func TestRender_AdminSettingsAuditLogViewerNamesEachRowsUsers(t *testing.T) {
 	at := time.Date(2026, 9, 12, 10, 0, 0, 0, time.UTC)
 	logs := []api.AuditLogResponse{
-		{Id: 1, CreatedAt: at, AuditEvent: "updated_user_profile", Details: `{}`,
-			UserId: int64Ptr(42), LoggedInUserId: int64Ptr(7)},
-		{Id: 2, CreatedAt: at, AuditEvent: "user_login", Details: `{}`, UserId: int64Ptr(42)},
-		{Id: 3, CreatedAt: at, AuditEvent: "client_created", Details: `{}`},
+		{ID: 1, CreatedAt: at, AuditEvent: "updated_user_profile", Details: `{}`,
+			UserID: int64Ptr(42), LoggedInUserID: int64Ptr(7)},
+		{ID: 2, CreatedAt: at, AuditEvent: "user_login", Details: `{}`, UserID: int64Ptr(42)},
+		{ID: 3, CreatedAt: at, AuditEvent: "client_created", Details: `{}`},
 	}
 	rows := make([]adminsettingshandlers.AuditLogRow, 0, len(logs))
 	for _, entry := range logs {
@@ -157,7 +157,7 @@ func TestRender_AdminSettingsAuditLogViewerNamesEachRowsUsers(t *testing.T) {
 
 	out := renderMenuPage(t, "/admin_settings_audit_log_viewer.html", map[string]interface{}{
 		"pageResult": adminsettingshandlers.AuditLogsPageResult{
-			AuditLogs: logs, Rows: rows, Total: 3, Page: 1, PageSize: 20, UserId: "42",
+			AuditLogs: logs, Rows: rows, Total: 3, Page: 1, PageSize: 20, UserID: "42",
 		},
 		"paginator":           pagination.New(3, 20, 1, 5),
 		"selectedEvent":       "",
@@ -184,7 +184,7 @@ func TestRender_AdminSettingsAuditLogViewerNamesEachRowsUsers(t *testing.T) {
 // With the user filter alone set and nothing found, the page says no event matches the filters.
 func TestRender_AdminSettingsAuditLogViewerUserFilterFindsNothing(t *testing.T) {
 	out := renderMenuPage(t, "/admin_settings_audit_log_viewer.html", map[string]interface{}{
-		"pageResult":          adminsettingshandlers.AuditLogsPageResult{Page: 1, PageSize: 20, UserId: "42"},
+		"pageResult":          adminsettingshandlers.AuditLogsPageResult{Page: 1, PageSize: 20, UserID: "42"},
 		"paginator":           pagination.New(0, 20, 1, 5),
 		"selectedEvent":       "",
 		"selectedRequestId":   "",
@@ -200,9 +200,9 @@ func TestRender_AdminSettingsAuditLogViewerUserFilterFindsNothing(t *testing.T) 
 // A User id that is not a positive whole number is the box's error: the box is marked invalid,
 // described by the error and focused, keeps what was typed, escaped, and the page lists nothing,
 // not even the empty state, since no filter was applied.
-func TestRender_AdminSettingsAuditLogViewerRefusedUserId(t *testing.T) {
+func TestRender_AdminSettingsAuditLogViewerRefusedUserID(t *testing.T) {
 	out := renderMenuPage(t, "/admin_settings_audit_log_viewer.html", map[string]interface{}{
-		"pageResult":          adminsettingshandlers.AuditLogsPageResult{Page: 1, PageSize: 20, UserId: `"><b>x</b>`},
+		"pageResult":          adminsettingshandlers.AuditLogsPageResult{Page: 1, PageSize: 20, UserID: `"><b>x</b>`},
 		"paginator":           pagination.New(0, 20, 1, 5),
 		"selectedEvent":       "",
 		"selectedRequestId":   "",

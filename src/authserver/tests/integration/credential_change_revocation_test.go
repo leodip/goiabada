@@ -85,7 +85,7 @@ func (g *offlineGrant) codeFromSameSession(t *testing.T, scope string, codeVerif
 
 	location := assertRedirect(t, resp, "/auth/issue")
 	resp = loadPage(t, g.httpClient, location)
-	code, _ := getCodeAndStateFromUrl(t, resp)
+	code, _ := getCodeAndStateFromURL(t, resp)
 	_ = resp.Body.Close()
 	require.NotEmpty(t, code, "expected a code from the SSO path")
 	return code
@@ -104,7 +104,7 @@ func (g *offlineGrant) codeFromSameSession(t *testing.T, scope string, codeVerif
 func secondSessionFor(t *testing.T, grant *offlineGrant, password string) (string, string) {
 	t.Helper()
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	const codeVerifier = testCodeVerifier + "-second-device"
 	scope := "openid " +
 		builtin.AuthServerResourceIdentifier + ":" + builtin.ManageAccountPermissionIdentifier
@@ -143,7 +143,7 @@ func secondSessionFor(t *testing.T, grant *offlineGrant, password string) (strin
 
 	location = assertRedirect(t, resp, "/auth/issue")
 	resp = loadPage(t, httpClient, location)
-	code, _ := getCodeAndStateFromUrl(t, resp)
+	code, _ := getCodeAndStateFromURL(t, resp)
 	_ = resp.Body.Close()
 	require.NotEmpty(t, code)
 
@@ -181,7 +181,7 @@ func secondSessionFor(t *testing.T, grant *offlineGrant, password string) (strin
 func secondOfflineGrantForSameUser(t *testing.T, base *offlineGrant, password string) *offlineGrant {
 	t.Helper()
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	const codeVerifier = testCodeVerifier + "-second-offline"
 	scope := "openid offline_access " +
 		builtin.AuthServerResourceIdentifier + ":" + builtin.ManageAccountPermissionIdentifier
@@ -229,7 +229,7 @@ func secondOfflineGrantForSameUser(t *testing.T, base *offlineGrant, password st
 
 	location = assertRedirect(t, resp, "/auth/issue")
 	resp = loadPage(t, httpClient, location)
-	code, _ := getCodeAndStateFromUrl(t, resp)
+	code, _ := getCodeAndStateFromURL(t, resp)
 	_ = resp.Body.Close()
 	require.NotEmpty(t, code)
 
@@ -304,16 +304,16 @@ func createOfflineGrant(t *testing.T) *offlineGrant {
 		// (one without offline_access) skip consent and SSO straight through, which is how the
 		// session-bound bearer below is obtained.
 		ConsentRequired:                         false,
-		DefaultAcrLevel:                         record.AcrLevel1,
+		DefaultACRLevel:                         record.ACRLevel1,
 		TokenExpirationInSeconds:                300,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 3600,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 86400,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
 
-	redirectURI := &record.RedirectURI{ClientId: client.Id, URI: "https://example.com/callback"}
+	redirectURI := &record.RedirectURI{ClientID: client.ID, URI: "https://example.com/callback"}
 	require.NoError(t, database.CreateRedirectURI(context.Background(), nil, redirectURI))
-	signOutRedirectURI := &record.PostLogoutRedirectURI{ClientId: client.Id, URI: "https://example.com/signed-out"}
+	signOutRedirectURI := &record.PostLogoutRedirectURI{ClientID: client.ID, URI: "https://example.com/signed-out"}
 	require.NoError(t, database.CreatePostLogoutRedirectURI(context.Background(), nil, signOutRedirectURI))
 
 	password := fake.Password(12)
@@ -332,11 +332,11 @@ func createOfflineGrant(t *testing.T) *offlineGrant {
 	// below, and it is not a permission (#449).
 	authserverResource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
 	require.NoError(t, err)
-	permissions, err := database.GetPermissionsByResourceId(context.Background(), nil, authserverResource.Id)
+	permissions, err := database.GetPermissionsByResourceID(context.Background(), nil, authserverResource.ID)
 	require.NoError(t, err)
 	for i := range permissions {
 		if permissions[i].PermissionIdentifier == builtin.ManageAccountPermissionIdentifier {
-			assignPermissionToUser(t, user.Id, permissions[i].Id)
+			assignPermissionToUser(t, user.ID, permissions[i].ID)
 			break
 		}
 	}
@@ -344,7 +344,7 @@ func createOfflineGrant(t *testing.T) *offlineGrant {
 	scope := "openid offline_access " +
 		builtin.AuthServerResourceIdentifier + ":" + builtin.ManageAccountPermissionIdentifier
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	codeVerifier := testCodeVerifier
 	codeChallenge := oauth.GeneratePKCECodeChallenge(codeVerifier)
 
@@ -393,7 +393,7 @@ func createOfflineGrant(t *testing.T) *offlineGrant {
 
 	location = assertRedirect(t, resp, "/auth/issue")
 	resp = loadPage(t, httpClient, location)
-	code, _ := getCodeAndStateFromUrl(t, resp)
+	code, _ := getCodeAndStateFromURL(t, resp)
 	_ = resp.Body.Close()
 	require.NotEmpty(t, code)
 
@@ -436,7 +436,7 @@ func createOfflineGrant(t *testing.T) *offlineGrant {
 // refresh presents the grant's refresh token and returns the raw token endpoint response.
 func (g *offlineGrant) refresh(t *testing.T) map[string]interface{} {
 	t.Helper()
-	return postToTokenEndpoint(t, createHttpClient(t), appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
+	return postToTokenEndpoint(t, createHTTPClient(t), appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
 		"grant_type":    {"refresh_token"},
 		"client_id":     {g.client.ClientIdentifier},
 		"client_secret": {g.clientSecret},
@@ -460,14 +460,14 @@ func resetPasswordFor(t *testing.T, user *record.User, newPassword string) {
 	require.NoError(t, err)
 	codeHash := hashutil.HashString(code)
 
-	fresh, err := database.GetUserById(context.Background(), nil, user.Id)
+	fresh, err := database.GetUserByID(context.Background(), nil, user.ID)
 	require.NoError(t, err)
 	fresh.ForgotPasswordCodeEncrypted = encrypted
 	fresh.ForgotPasswordCodeHash = codeHash
 	fresh.ForgotPasswordCodeIssuedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 	require.NoError(t, database.UpdateUser(context.Background(), nil, fresh))
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	cleanURL := followResetLink(t, httpClient, emaillinks.ResetPasswordLink(appConfig.AuthServer.BaseURL, code, ""))
 
 	// The form is rendered first, because the submission has to carry the continuation id
@@ -480,7 +480,7 @@ func resetPasswordFor(t *testing.T, user *record.User, newPassword string) {
 
 	// Confirm the reset landed, so a later assertion cannot pass because the reset silently
 	// failed and left everything untouched.
-	after, err := database.GetUserById(context.Background(), nil, user.Id)
+	after, err := database.GetUserByID(context.Background(), nil, user.ID)
 	require.NoError(t, err)
 	require.True(t, passwordhash.Verify(after.PasswordHash, newPassword),
 		"the reset must have replaced the password hash")
@@ -498,9 +498,9 @@ func claimString(t *testing.T, token string, claim string) string {
 	return value
 }
 
-func generationOf(t *testing.T, userId int64) int64 {
+func generationOf(t *testing.T, userID int64) int64 {
 	t.Helper()
-	user, err := database.GetUserById(context.Background(), nil, userId)
+	user, err := database.GetUserByID(context.Background(), nil, userID)
 	require.NoError(t, err)
 	require.NotNil(t, user)
 	return user.AuthStateGeneration
@@ -525,11 +525,11 @@ func TestCredentialChange_OfflineGrantWithNoSessionStopsRefreshing(t *testing.T)
 	session, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, grant.sessionIdentifier)
 	require.NoError(t, err)
 	require.NotNil(t, session)
-	require.NoError(t, database.DeleteUserSession(context.Background(), nil, session.Id))
+	require.NoError(t, database.DeleteUserSession(context.Background(), nil, session.ID))
 
-	before := generationOf(t, grant.user.Id)
+	before := generationOf(t, grant.user.ID)
 	resetPasswordFor(t, grant.user, fake.Password(20))
-	assert.Equal(t, before+1, generationOf(t, grant.user.Id),
+	assert.Equal(t, before+1, generationOf(t, grant.user.ID),
 		"the reset must advance the generation")
 
 	after := grant.refresh(t)
@@ -555,7 +555,7 @@ func TestCredentialChange_ROPCGrantStopsRefreshing(t *testing.T) {
 	require.True(t, ok)
 
 	refreshOnce := func(token string) map[string]interface{} {
-		return postToTokenEndpoint(t, createHttpClient(t), appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
+		return postToTokenEndpoint(t, createHTTPClient(t), appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
 			"grant_type":    {"refresh_token"},
 			"client_id":     {creds.clientIdentifier},
 			"client_secret": {creds.clientSecret},
@@ -571,9 +571,9 @@ func TestCredentialChange_ROPCGrantStopsRefreshing(t *testing.T) {
 
 	// The child is live at this point. Without this assertion the test below could not tell a
 	// generation rejection from a revoked-token rejection.
-	childJti := claimString(t, child, "jti")
-	require.NotEmpty(t, childJti)
-	childRow, err := database.GetRefreshTokenByJti(context.Background(), nil, childJti)
+	childJTI := claimString(t, child, "jti")
+	require.NotEmpty(t, childJTI)
+	childRow, err := database.GetRefreshTokenByJTI(context.Background(), nil, childJTI)
 	require.NoError(t, err)
 	require.NotNil(t, childRow)
 	require.False(t, childRow.Revoked, "the child must be unspent before the reset")
@@ -609,7 +609,7 @@ func TestCredentialChange_SelfServicePreservesTheCallersSession(t *testing.T) {
 
 	// Set the known current password first, so the second login below can use it.
 	current := "Curr3ntP4ss!"
-	fresh, err := database.GetUserById(context.Background(), nil, grant.user.Id)
+	fresh, err := database.GetUserByID(context.Background(), nil, grant.user.ID)
 	require.NoError(t, err)
 	setUserPassword(t, fresh, current)
 
@@ -652,7 +652,7 @@ func TestCredentialChange_SelfServicePreservesTheCallersSession(t *testing.T) {
 	session, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, grant.sessionIdentifier)
 	require.NoError(t, err)
 	require.NotNil(t, session, "the caller's session must not be deleted")
-	assert.Equal(t, generationOf(t, grant.user.Id), session.AuthStateGeneration,
+	assert.Equal(t, generationOf(t, grant.user.ID), session.AuthStateGeneration,
 		"the preserved session must be promoted to the new generation")
 
 	// TERMINATED: the same user's other session. This is the half the plan calls central.
@@ -732,7 +732,7 @@ func TestCredentialChange_DisabledUserSidlessTokenIsRejectedImmediately(t *testi
 	_ = resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode, "the token should work while the user is enabled")
 
-	transitioned, err := database.TrySetUserEnabled(context.Background(), nil, user.Id, true, false)
+	transitioned, err := database.TrySetUserEnabled(context.Background(), nil, user.ID, true, false)
 	require.NoError(t, err)
 	require.True(t, transitioned)
 
@@ -759,7 +759,7 @@ func TestCredentialChange_OfflineTokenWorksAfterSessionDeletion(t *testing.T) {
 	session, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, grant.sessionIdentifier)
 	require.NoError(t, err)
 	require.NotNil(t, session)
-	require.NoError(t, database.DeleteUserSession(context.Background(), nil, session.Id))
+	require.NoError(t, database.DeleteUserSession(context.Background(), nil, session.ID))
 
 	resp := makeAPIRequest(t, "GET", appConfig.AuthServer.BaseURL+"/userinfo", grant.accessToken, nil)
 	body, _ := io.ReadAll(resp.Body)
@@ -828,7 +828,7 @@ func TestCredentialChange_PreservedFamilyKeepsRotating(t *testing.T) {
 		"the second grant must be session-bound to the ceremony's session")
 
 	current := "Curr3ntP4ss!"
-	fresh, err := database.GetUserById(context.Background(), nil, grant.user.Id)
+	fresh, err := database.GetUserByID(context.Background(), nil, grant.user.ID)
 	require.NoError(t, err)
 	setUserPassword(t, fresh, current)
 
@@ -841,18 +841,18 @@ func TestCredentialChange_PreservedFamilyKeepsRotating(t *testing.T) {
 	_ = resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode, "password change should succeed: %s", string(body))
 
-	generation := generationOf(t, grant.user.Id)
+	generation := generationOf(t, grant.user.ID)
 
 	// Rotate the preserved family. This is the write that could regress the promotion.
 	rotated := grant.refresh(t)
 	require.NotEmpty(t, rotated["access_token"], "the preserved family must still rotate: %v", rotated)
-	childJwt := rotated["refresh_token"].(string)
+	childJWT := rotated["refresh_token"].(string)
 
 	// The child row must carry the new generation, read from the database rather than inferred.
-	childJti := claimString(t, childJwt, "jti")
-	require.NotEmpty(t, childJti)
+	childJTI := claimString(t, childJWT, "jti")
+	require.NotEmpty(t, childJTI)
 
-	child, err := database.GetRefreshTokenByJti(context.Background(), nil, childJti)
+	child, err := database.GetRefreshTokenByJTI(context.Background(), nil, childJTI)
 	require.NoError(t, err)
 	require.NotNil(t, child)
 	assert.Equal(t, generation, child.AuthStateGeneration,
@@ -860,8 +860,8 @@ func TestCredentialChange_PreservedFamilyKeepsRotating(t *testing.T) {
 
 	// The parent was promoted by the sweep and then revoked by the rotation, which is the
 	// expected end state for a rotated family member.
-	parentJti := claimString(t, grant.refreshToken, "jti")
-	parent, err := database.GetRefreshTokenByJti(context.Background(), nil, parentJti)
+	parentJTI := claimString(t, grant.refreshToken, "jti")
+	parent, err := database.GetRefreshTokenByJTI(context.Background(), nil, parentJTI)
 	require.NoError(t, err)
 	require.NotNil(t, parent)
 	assert.Equal(t, generation, parent.AuthStateGeneration,
@@ -869,7 +869,7 @@ func TestCredentialChange_PreservedFamilyKeepsRotating(t *testing.T) {
 	assert.True(t, parent.Revoked, "the parent must be revoked by rotation")
 
 	// The child works, which is the user-visible consequence of all of the above.
-	grant.refreshToken = childJwt
+	grant.refreshToken = childJWT
 	again := grant.refresh(t)
 	assert.NotEmpty(t, again["access_token"],
 		"the child of a preserved family must itself be usable: %v", again)
@@ -894,13 +894,13 @@ func TestCredentialChange_ResidualRacingChildIsFailClosed(t *testing.T) {
 	require.NotEmpty(t, first["access_token"], "refresh should work initially: %v", first)
 	grant.refreshToken = first["refresh_token"].(string)
 
-	beforeGeneration := generationOf(t, grant.user.Id)
+	beforeGeneration := generationOf(t, grant.user.ID)
 	resetPasswordFor(t, grant.user, fake.Password(20))
-	afterGeneration := generationOf(t, grant.user.Id)
+	afterGeneration := generationOf(t, grant.user.ID)
 	require.Equal(t, beforeGeneration+1, afterGeneration)
 
 	jti := claimString(t, grant.refreshToken, "jti")
-	row, err := database.GetRefreshTokenByJti(context.Background(), nil, jti)
+	row, err := database.GetRefreshTokenByJTI(context.Background(), nil, jti)
 	require.NoError(t, err)
 	require.NotNil(t, row)
 	require.True(t, row.Revoked, "the sweep should have revoked it")
@@ -911,9 +911,9 @@ func TestCredentialChange_ResidualRacingChildIsFailClosed(t *testing.T) {
 	// path.
 	row.Revoked = false
 	require.NoError(t, database.UpdateRefreshToken(context.Background(), nil, row))
-	require.NoError(t, database.PromoteRefreshTokenGenerations(context.Background(), nil, []int64{row.Id}, beforeGeneration))
+	require.NoError(t, database.PromoteRefreshTokenGenerations(context.Background(), nil, []int64{row.ID}, beforeGeneration))
 
-	check, err := database.GetRefreshTokenByJti(context.Background(), nil, jti)
+	check, err := database.GetRefreshTokenByJTI(context.Background(), nil, jti)
 	require.NoError(t, err)
 	require.False(t, check.Revoked, "the fixture must be unrevoked, or the rejection proves nothing")
 	require.Equal(t, beforeGeneration, check.AuthStateGeneration,

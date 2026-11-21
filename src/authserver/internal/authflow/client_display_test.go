@@ -16,7 +16,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 
 		client := &record.Client{
-			Id:               1,
+			ID:               1,
 			ClientIdentifier: "my-client",
 			DisplayName:      "My Awesome App",
 			ShowDisplayName:  true,
@@ -38,7 +38,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 
 		client := &record.Client{
-			Id:               1,
+			ID:               1,
 			ClientIdentifier: "my-client",
 			DisplayName:      "",
 			ShowDisplayName:  true,
@@ -60,7 +60,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 
 		client := &record.Client{
-			Id:               1,
+			ID:               1,
 			ClientIdentifier: "my-client",
 			DisplayName:      "My Awesome App",
 			ShowDisplayName:  false,
@@ -82,7 +82,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 
 		client := &record.Client{
-			Id:               1,
+			ID:               1,
 			ClientIdentifier: "my-client",
 			ShowLogo:         true,
 		}
@@ -105,7 +105,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 
 		client := &record.Client{
-			Id:               1,
+			ID:               1,
 			ClientIdentifier: "my-client",
 			ShowLogo:         true,
 		}
@@ -128,7 +128,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 
 		client := &record.Client{
-			Id:               1,
+			ID:               1,
 			ClientIdentifier: "my-client",
 			ShowLogo:         false,
 		}
@@ -149,7 +149,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 
 		client := &record.Client{
-			Id:               1,
+			ID:               1,
 			ClientIdentifier: "my-client",
 			Description:      "This is a great app",
 			ShowDescription:  true,
@@ -171,7 +171,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 
 		client := &record.Client{
-			Id:               1,
+			ID:               1,
 			ClientIdentifier: "my-client",
 			Description:      "",
 			ShowDescription:  true,
@@ -193,7 +193,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 
 		client := &record.Client{
-			Id:               1,
+			ID:               1,
 			ClientIdentifier: "my-client",
 			Description:      "This is a great app",
 			ShowDescription:  false,
@@ -215,7 +215,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 
 		client := &record.Client{
-			Id:               1,
+			ID:               1,
 			ClientIdentifier: "my-client",
 			WebsiteURL:       "https://example.com",
 			ShowWebsiteURL:   true,
@@ -237,7 +237,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 
 		client := &record.Client{
-			Id:               1,
+			ID:               1,
 			ClientIdentifier: "my-client",
 			WebsiteURL:       "",
 			ShowWebsiteURL:   true,
@@ -259,7 +259,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 
 		client := &record.Client{
-			Id:               1,
+			ID:               1,
 			ClientIdentifier: "my-client",
 			WebsiteURL:       "https://example.com",
 			ShowWebsiteURL:   false,
@@ -281,7 +281,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 
 		client := &record.Client{
-			Id:               1,
+			ID:               1,
 			ClientIdentifier: "my-client",
 			DisplayName:      "My Awesome App",
 			Description:      "This is a great app",
@@ -310,7 +310,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 
 		client := &record.Client{
-			Id:               1,
+			ID:               1,
 			ClientIdentifier: "my-client",
 			DisplayName:      "My Awesome App",
 			Description:      "This is a great app",
@@ -337,7 +337,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 
 		client := &record.Client{
-			Id:               1,
+			ID:               1,
 			ClientIdentifier: "dcr_a3f9e1b2",
 			Description:      "Payroll Portal",
 			CreatedViaDCR:    true,
@@ -357,7 +357,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 
 		client := &record.Client{
-			Id:               1,
+			ID:               1,
 			ClientIdentifier: "my-client",
 			ShowLogo:         true,
 		}

@@ -18,8 +18,8 @@ var errNoSuchResource = errors.New("the URL names no resource")
 // resourceAndPermissionsReader is the two reads every users-with-permission and
 // groups-with-permission handler starts from.
 type resourceAndPermissionsReader interface {
-	GetResourceById(ctx context.Context, accessToken string, resourceId int64) (*api.ResourceResponse, error)
-	GetPermissionsByResource(ctx context.Context, accessToken string, resourceId int64) ([]api.PermissionResponse, error)
+	GetResourceByID(ctx context.Context, accessToken string, resourceID int64) (*api.ResourceResponse, error)
+	GetPermissionsByResource(ctx context.Context, accessToken string, resourceID int64) ([]api.PermissionResponse, error)
 }
 
 // resourcePermissions is what those handlers read before anything of their own: the resource the
@@ -32,21 +32,21 @@ type resourcePermissions struct {
 
 // loadResourcePermissions is the preamble the eight handlers in the users-with-permission and
 // groups-with-permission files used to repeat (#440). It writes no response: it hands back
-// errNoSuchResource, reqctx.ErrNoJwtInfo or the API's error, and each caller answers it through
+// errNoSuchResource, reqctx.ErrNoJWTInfo or the API's error, and each caller answers it through
 // its own writers, so a JSON handler's every branch is still visibly JSON.
 func loadResourcePermissions(r *http.Request, apiClient resourceAndPermissionsReader) (resourcePermissions, error) {
-	resourceId, err := strconv.ParseInt(r.PathValue("resourceId"), 10, 64)
+	resourceID, err := strconv.ParseInt(r.PathValue("resourceId"), 10, 64)
 	if err != nil {
 		return resourcePermissions{}, errNoSuchResource
 	}
 
-	jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+	jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 	if !ok {
-		return resourcePermissions{}, reqctx.ErrNoJwtInfo
+		return resourcePermissions{}, reqctx.ErrNoJWTInfo
 	}
 	accessToken := jwtInfo.TokenResponse.AccessToken
 
-	resource, err := apiClient.GetResourceById(r.Context(), accessToken, resourceId)
+	resource, err := apiClient.GetResourceByID(r.Context(), accessToken, resourceID)
 	if err != nil {
 		return resourcePermissions{}, err
 	}
@@ -54,7 +54,7 @@ func loadResourcePermissions(r *http.Request, apiClient resourceAndPermissionsRe
 		return resourcePermissions{}, errNoSuchResource
 	}
 
-	permissions, err := apiClient.GetPermissionsByResource(r.Context(), accessToken, resource.Id)
+	permissions, err := apiClient.GetPermissionsByResource(r.Context(), accessToken, resource.ID)
 	if err != nil {
 		return resourcePermissions{}, err
 	}

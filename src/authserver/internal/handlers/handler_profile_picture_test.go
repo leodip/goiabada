@@ -25,15 +25,15 @@ func TestHandleProfilePictureGet_Success(t *testing.T) {
 	handler := HandleProfilePictureGet(pageRenderer, database)
 
 	pictureData := createTestLogoData(64, 64)
-	user := &record.User{Id: 42, Subject: "2bd9ff17-7cb1-4c11-8d6d-6a3e1a0f5a6b", Enabled: true}
-	picture := &record.UserProfilePicture{Id: 1, UserId: 42, Picture: pictureData, ContentType: "image/png"}
+	user := &record.User{ID: 42, Subject: "2bd9ff17-7cb1-4c11-8d6d-6a3e1a0f5a6b", Enabled: true}
+	picture := &record.UserProfilePicture{ID: 1, UserID: 42, Picture: pictureData, ContentType: "image/png"}
 
 	req, _ := http.NewRequest("GET", "/userinfo/picture/"+user.Subject, nil)
 	req.SetPathValue("subject", user.Subject)
 	rr := httptest.NewRecorder()
 
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), user.Subject).Return(user, nil)
-	database.On("GetUserProfilePictureByUserId", mock.Anything, (*sql.Tx)(nil), int64(42)).Return(picture, nil)
+	database.On("GetUserProfilePictureByUserID", mock.Anything, (*sql.Tx)(nil), int64(42)).Return(picture, nil)
 
 	handler.ServeHTTP(rr, req)
 
@@ -54,15 +54,15 @@ func TestHandleProfilePictureGet_ServedWhileTheUserIsDisabled(t *testing.T) {
 	handler := HandleProfilePictureGet(pageRenderer, database)
 
 	pictureData := createTestLogoData(64, 64)
-	user := &record.User{Id: 42, Subject: "2bd9ff17-7cb1-4c11-8d6d-6a3e1a0f5a6b", Enabled: false}
-	picture := &record.UserProfilePicture{Id: 1, UserId: 42, Picture: pictureData, ContentType: "image/png"}
+	user := &record.User{ID: 42, Subject: "2bd9ff17-7cb1-4c11-8d6d-6a3e1a0f5a6b", Enabled: false}
+	picture := &record.UserProfilePicture{ID: 1, UserID: 42, Picture: pictureData, ContentType: "image/png"}
 
 	req, _ := http.NewRequest("GET", "/userinfo/picture/"+user.Subject, nil)
 	req.SetPathValue("subject", user.Subject)
 	rr := httptest.NewRecorder()
 
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), user.Subject).Return(user, nil)
-	database.On("GetUserProfilePictureByUserId", mock.Anything, (*sql.Tx)(nil), int64(42)).Return(picture, nil)
+	database.On("GetUserProfilePictureByUserID", mock.Anything, (*sql.Tx)(nil), int64(42)).Return(picture, nil)
 
 	handler.ServeHTTP(rr, req)
 
@@ -107,14 +107,14 @@ func TestHandleProfilePictureGet_NoPicture(t *testing.T) {
 
 	handler := HandleProfilePictureGet(pageRenderer, database)
 
-	user := &record.User{Id: 42, Subject: "2bd9ff17-7cb1-4c11-8d6d-6a3e1a0f5a6b", Enabled: true}
+	user := &record.User{ID: 42, Subject: "2bd9ff17-7cb1-4c11-8d6d-6a3e1a0f5a6b", Enabled: true}
 
 	req, _ := http.NewRequest("GET", "/userinfo/picture/"+user.Subject, nil)
 	req.SetPathValue("subject", user.Subject)
 	rr := httptest.NewRecorder()
 
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), user.Subject).Return(user, nil)
-	database.On("GetUserProfilePictureByUserId", mock.Anything, (*sql.Tx)(nil), int64(42)).Return(nil, nil)
+	database.On("GetUserProfilePictureByUserID", mock.Anything, (*sql.Tx)(nil), int64(42)).Return(nil, nil)
 
 	handler.ServeHTTP(rr, req)
 

@@ -64,7 +64,7 @@ func createImplicitFlowClient(t *testing.T, implicitEnabled *bool) (*record.Clie
 		AuthorizationCodeEnabled: false, // Disable auth code to test implicit-only
 		ImplicitGrantEnabled:     implicitEnabled,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -72,17 +72,17 @@ func createImplicitFlowClient(t *testing.T, implicitEnabled *bool) (*record.Clie
 		t.Fatal(err)
 	}
 
-	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+	redirectURI := &record.RedirectURI{
+		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
 
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	return client, redirectUri
+	return client, redirectURI
 }
 
 // createTestUser creates a user for testing
@@ -113,21 +113,21 @@ func TestImplicitFlow_TokenResponseType(t *testing.T) {
 	// Enable implicit flow globally for this test
 	changeSettings(t, func(settings *record.Settings) { settings.ImplicitFlowEnabled = true })
 
-	client, redirectUri := createImplicitFlowClient(t, nil)
+	client, redirectURI := createImplicitFlowClient(t, nil)
 	user, password := createTestUserForImplicit(t)
 
 	requestState := fake.LetterN(16)
 	requestScope := "openid"
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=token" +
 		"&scope=" + url.QueryEscape(requestScope) +
 		"&state=" + requestState
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -160,7 +160,7 @@ func TestImplicitFlow_TokenResponseType(t *testing.T) {
 	// Verify redirect to client with tokens in fragment
 	assert.Equal(t, http.StatusFound, resp.StatusCode)
 	location := resp.Header.Get("Location")
-	assert.True(t, strings.HasPrefix(location, redirectUri.URI+"#"), "Should redirect to client with fragment")
+	assert.True(t, strings.HasPrefix(location, redirectURI.URI+"#"), "Should redirect to client with fragment")
 
 	tokens := getTokensFromFragment(t, resp)
 
@@ -184,27 +184,27 @@ func TestImplicitFlow_TokenResponseType(t *testing.T) {
 	assertUserinfoAdmits(t, tokens["access_token"], user.Subject)
 }
 
-// TestImplicitFlow_IdTokenResponseType tests implicit flow with response_type=id_token
-func TestImplicitFlow_IdTokenResponseType(t *testing.T) {
+// TestImplicitFlow_IDTokenResponseType tests implicit flow with response_type=id_token
+func TestImplicitFlow_IDTokenResponseType(t *testing.T) {
 	changeSettings(t, func(settings *record.Settings) { settings.ImplicitFlowEnabled = true })
 
-	client, redirectUri := createImplicitFlowClient(t, nil)
+	client, redirectURI := createImplicitFlowClient(t, nil)
 	user, password := createTestUserForImplicit(t)
 
 	requestState := fake.LetterN(16)
 	requestNonce := fake.LetterN(16) // Required for id_token
 	requestScope := "openid"
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=id_token" +
 		"&scope=" + url.QueryEscape(requestScope) +
 		"&state=" + requestState +
 		"&nonce=" + requestNonce
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -236,7 +236,7 @@ func TestImplicitFlow_IdTokenResponseType(t *testing.T) {
 
 	assert.Equal(t, http.StatusFound, resp.StatusCode)
 	location := resp.Header.Get("Location")
-	assert.True(t, strings.HasPrefix(location, redirectUri.URI+"#"), "Should redirect to client with fragment")
+	assert.True(t, strings.HasPrefix(location, redirectURI.URI+"#"), "Should redirect to client with fragment")
 
 	tokens := getTokensFromFragment(t, resp)
 
@@ -259,27 +259,27 @@ func TestImplicitFlow_IdTokenResponseType(t *testing.T) {
 	assert.Contains(t, string(payload), user.Subject, "id_token should contain user subject")
 }
 
-// TestImplicitFlow_IdTokenTokenResponseType tests implicit flow with response_type=id_token token
-func TestImplicitFlow_IdTokenTokenResponseType(t *testing.T) {
+// TestImplicitFlow_IDTokenTokenResponseType tests implicit flow with response_type=id_token token
+func TestImplicitFlow_IDTokenTokenResponseType(t *testing.T) {
 	changeSettings(t, func(settings *record.Settings) { settings.ImplicitFlowEnabled = true })
 
-	client, redirectUri := createImplicitFlowClient(t, nil)
+	client, redirectURI := createImplicitFlowClient(t, nil)
 	user, password := createTestUserForImplicit(t)
 
 	requestState := fake.LetterN(16)
 	requestNonce := fake.LetterN(16)
 	requestScope := "openid profile email"
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=" + url.QueryEscape("id_token token") +
 		"&scope=" + url.QueryEscape(requestScope) +
 		"&state=" + requestState +
 		"&nonce=" + requestNonce
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -311,7 +311,7 @@ func TestImplicitFlow_IdTokenTokenResponseType(t *testing.T) {
 
 	assert.Equal(t, http.StatusFound, resp.StatusCode)
 	location := resp.Header.Get("Location")
-	assert.True(t, strings.HasPrefix(location, redirectUri.URI+"#"), "Should redirect to client with fragment")
+	assert.True(t, strings.HasPrefix(location, redirectURI.URI+"#"), "Should redirect to client with fragment")
 
 	tokens := getTokensFromFragment(t, resp)
 
@@ -337,19 +337,19 @@ func TestImplicitFlow_IdTokenTokenResponseType(t *testing.T) {
 func TestImplicitFlow_Disabled_GlobalSetting(t *testing.T) {
 	changeSettings(t, func(settings *record.Settings) { settings.ImplicitFlowEnabled = false })
 
-	client, redirectUri := createImplicitFlowClient(t, nil) // nil means inherit from global
+	client, redirectURI := createImplicitFlowClient(t, nil) // nil means inherit from global
 
 	requestState := fake.LetterN(16)
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=token" +
 		"&scope=openid" +
 		"&state=" + requestState
 
-	httpClient := createAuthenticatedHttpClient(t)
+	httpClient := createAuthenticatedHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -371,20 +371,20 @@ func TestImplicitFlow_ClientOverride_Enabled(t *testing.T) {
 
 	// Create client with explicit enable
 	implicitEnabled := true
-	client, redirectUri := createImplicitFlowClient(t, &implicitEnabled)
+	client, redirectURI := createImplicitFlowClient(t, &implicitEnabled)
 	user, password := createTestUserForImplicit(t)
 
 	requestState := fake.LetterN(16)
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=token" +
 		"&scope=openid" +
 		"&state=" + requestState
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -426,19 +426,19 @@ func TestImplicitFlow_ClientOverride_Disabled(t *testing.T) {
 
 	// Create client with explicit disable
 	implicitDisabled := false
-	client, redirectUri := createImplicitFlowClient(t, &implicitDisabled)
+	client, redirectURI := createImplicitFlowClient(t, &implicitDisabled)
 
 	requestState := fake.LetterN(16)
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=token" +
 		"&scope=openid" +
 		"&state=" + requestState
 
-	httpClient := createAuthenticatedHttpClient(t)
+	httpClient := createAuthenticatedHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -451,24 +451,24 @@ func TestImplicitFlow_ClientOverride_Disabled(t *testing.T) {
 	assert.Equal(t, "unauthorized_client", errorCode)
 }
 
-// TestImplicitFlow_MissingNonce_IdToken tests that nonce is required for id_token
-func TestImplicitFlow_MissingNonce_IdToken(t *testing.T) {
+// TestImplicitFlow_MissingNonce_IDToken tests that nonce is required for id_token
+func TestImplicitFlow_MissingNonce_IDToken(t *testing.T) {
 	changeSettings(t, func(settings *record.Settings) { settings.ImplicitFlowEnabled = true })
 
-	client, redirectUri := createImplicitFlowClient(t, nil)
+	client, redirectURI := createImplicitFlowClient(t, nil)
 
 	requestState := fake.LetterN(16)
 
 	// No nonce parameter
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=id_token" +
 		"&scope=openid" +
 		"&state=" + requestState
 
-	httpClient := createAuthenticatedHttpClient(t)
+	httpClient := createAuthenticatedHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -481,26 +481,26 @@ func TestImplicitFlow_MissingNonce_IdToken(t *testing.T) {
 	assert.Contains(t, strings.ToLower(errorDescription), "nonce")
 }
 
-// TestImplicitFlow_MissingOpenIdScope_IdToken tests that openid scope is required for id_token
-func TestImplicitFlow_MissingOpenIdScope_IdToken(t *testing.T) {
+// TestImplicitFlow_MissingOpenIDScope_IDToken tests that openid scope is required for id_token
+func TestImplicitFlow_MissingOpenIDScope_IDToken(t *testing.T) {
 	changeSettings(t, func(settings *record.Settings) { settings.ImplicitFlowEnabled = true })
 
-	client, redirectUri := createImplicitFlowClient(t, nil)
+	client, redirectURI := createImplicitFlowClient(t, nil)
 
 	requestState := fake.LetterN(16)
 	requestNonce := fake.LetterN(16)
 
 	// No openid scope
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=id_token" +
 		"&scope=profile" +
 		"&state=" + requestState +
 		"&nonce=" + requestNonce
 
-	httpClient := createAuthenticatedHttpClient(t)
+	httpClient := createAuthenticatedHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -524,30 +524,30 @@ func TestImplicitFlow_UnsupportedResponseType_HybridFlow(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 		ImplicitGrantEnabled:     nil,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	require.NoError(t, err)
 
-	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+	redirectURI := &record.RedirectURI{
+		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	require.NoError(t, err)
 
 	requestState := fake.LetterN(16)
 
 	// Try hybrid flow: code token
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=" + url.QueryEscape("code token") +
 		"&scope=openid" +
 		"&state=" + requestState
 
-	httpClient := createAuthenticatedHttpClient(t)
+	httpClient := createAuthenticatedHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -558,9 +558,9 @@ func TestImplicitFlow_UnsupportedResponseType_HybridFlow(t *testing.T) {
 	location := resp.Header.Get("Location")
 
 	// Hybrid flow uses query for errors (since it contains code)
-	parsedUrl, err := url.Parse(location)
+	parsedURL, err := url.Parse(location)
 	require.NoError(t, err)
-	errorCode := parsedUrl.Query().Get("error")
+	errorCode := parsedURL.Query().Get("error")
 	assert.Equal(t, "unsupported_response_type", errorCode)
 }
 
@@ -568,21 +568,21 @@ func TestImplicitFlow_UnsupportedResponseType_HybridFlow(t *testing.T) {
 func TestImplicitFlow_ValidateAccessToken(t *testing.T) {
 	changeSettings(t, func(settings *record.Settings) { settings.ImplicitFlowEnabled = true })
 
-	client, redirectUri := createImplicitFlowClient(t, nil)
+	client, redirectURI := createImplicitFlowClient(t, nil)
 	user, password := createTestUserForImplicit(t)
 
 	requestState := fake.LetterN(16)
 	requestScope := "openid profile"
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=token" +
 		"&scope=" + url.QueryEscape(requestScope) +
 		"&state=" + requestState
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -631,8 +631,8 @@ func TestImplicitFlow_ValidateAccessToken(t *testing.T) {
 	assert.NotEmpty(t, claims["exp"])
 
 	// Use access token to call userinfo endpoint
-	userinfoUrl := appConfig.AuthServer.BaseURL + "/userinfo"
-	req, err := http.NewRequest("GET", userinfoUrl, nil)
+	userinfoURL := appConfig.AuthServer.BaseURL + "/userinfo"
+	req, err := http.NewRequest("GET", userinfoURL, nil)
 	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 
@@ -647,21 +647,21 @@ func TestImplicitFlow_ValidateAccessToken(t *testing.T) {
 func TestImplicitFlow_ErrorInFragment(t *testing.T) {
 	changeSettings(t, func(settings *record.Settings) { settings.ImplicitFlowEnabled = true })
 
-	client, redirectUri := createImplicitFlowClient(t, nil)
+	client, redirectURI := createImplicitFlowClient(t, nil)
 
 	requestState := fake.LetterN(16)
 
 	// Missing openid scope for id_token - should return error in fragment
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=id_token" +
 		"&scope=profile" +
 		"&state=" + requestState +
 		"&nonce=test-nonce"
 
-	httpClient := createAuthenticatedHttpClient(t)
+	httpClient := createAuthenticatedHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -672,14 +672,14 @@ func TestImplicitFlow_ErrorInFragment(t *testing.T) {
 	location := resp.Header.Get("Location")
 
 	// Verify error is in fragment (not query)
-	parsedUrl, err := url.Parse(location)
+	parsedURL, err := url.Parse(location)
 	require.NoError(t, err)
 
 	// Query should be empty for implicit flow errors
-	assert.Empty(t, parsedUrl.Query().Get("error"), "error should NOT be in query for implicit flow")
+	assert.Empty(t, parsedURL.Query().Get("error"), "error should NOT be in query for implicit flow")
 
 	// Fragment should contain error
-	assert.NotEmpty(t, parsedUrl.Fragment, "error should be in fragment for implicit flow")
+	assert.NotEmpty(t, parsedURL.Fragment, "error should be in fragment for implicit flow")
 	errorCode, _, _ := getErrorFromFragment(t, resp)
 	assert.NotEmpty(t, errorCode, "error code should be present in fragment")
 }
@@ -695,38 +695,38 @@ func TestImplicitFlow_WithResourcePermissions(t *testing.T) {
 		AuthorizationCodeEnabled: false,
 		ImplicitGrantEnabled:     nil,
 		ConsentRequired:          true, // Consent required
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	require.NoError(t, err)
 
-	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+	redirectURI := &record.RedirectURI{
+		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	require.NoError(t, err)
 
 	user, password := createTestUserForImplicit(t)
 
 	// Create resource and permission to trigger consent
 	resource := createResource(t)
-	permission := createPermission(t, resource.Id)
-	assignPermissionToUser(t, user.Id, permission.Id)
+	permission := createPermission(t, resource.ID)
+	assignPermissionToUser(t, user.ID, permission.ID)
 
 	requestState := fake.LetterN(16)
 	// Include resource permission in scope
 	requestScope := "openid profile " + resource.ResourceIdentifier + ":" + permission.PermissionIdentifier
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=token" +
 		"&scope=" + url.QueryEscape(requestScope) +
 		"&state=" + requestState
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -776,23 +776,23 @@ func TestImplicitFlow_WithResourcePermissions(t *testing.T) {
 func TestImplicitFlow_AtHashValidation(t *testing.T) {
 	changeSettings(t, func(settings *record.Settings) { settings.ImplicitFlowEnabled = true })
 
-	client, redirectUri := createImplicitFlowClient(t, nil)
+	client, redirectURI := createImplicitFlowClient(t, nil)
 	user, password := createTestUserForImplicit(t)
 
 	requestState := fake.LetterN(16)
 	requestNonce := fake.LetterN(16)
 	requestScope := "openid"
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=" + url.QueryEscape("id_token token") +
 		"&scope=" + url.QueryEscape(requestScope) +
 		"&state=" + requestState +
 		"&nonce=" + requestNonce
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -861,7 +861,7 @@ func TestImplicitFlow_AtHashValidation(t *testing.T) {
 func TestImplicitFlow_NoRefreshTokenInResponse(t *testing.T) {
 	changeSettings(t, func(settings *record.Settings) { settings.ImplicitFlowEnabled = true })
 
-	client, redirectUri := createImplicitFlowClient(t, nil)
+	client, redirectURI := createImplicitFlowClient(t, nil)
 	user, password := createTestUserForImplicit(t)
 
 	requestState := fake.LetterN(16)
@@ -869,16 +869,16 @@ func TestImplicitFlow_NoRefreshTokenInResponse(t *testing.T) {
 	// Request multiple scopes to verify no refresh token is issued
 	requestScope := "openid profile email"
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=" + url.QueryEscape("id_token token") +
 		"&scope=" + url.QueryEscape(requestScope) +
 		"&state=" + requestState +
 		"&nonce=" + requestNonce
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -934,18 +934,18 @@ func TestImplicitFlow_StatePreservation(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			client, redirectUri := createImplicitFlowClient(t, nil)
+			client, redirectURI := createImplicitFlowClient(t, nil)
 			user, password := createTestUserForImplicit(t)
 
-			destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-				"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+			destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+				"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 				"&response_type=token" +
 				"&scope=openid" +
 				"&state=" + url.QueryEscape(tc.state)
 
-			httpClient := createHttpClient(t)
+			httpClient := createHTTPClient(t)
 
-			resp, err := httpClient.Get(destUrl)
+			resp, err := httpClient.Get(destURL)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -985,18 +985,18 @@ func TestImplicitFlow_StatePreservation(t *testing.T) {
 func TestImplicitFlow_EmptyState(t *testing.T) {
 	changeSettings(t, func(settings *record.Settings) { settings.ImplicitFlowEnabled = true })
 
-	client, redirectUri := createImplicitFlowClient(t, nil)
+	client, redirectURI := createImplicitFlowClient(t, nil)
 	user, password := createTestUserForImplicit(t)
 
 	// No state parameter
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=token" +
 		"&scope=openid"
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1033,26 +1033,26 @@ func TestImplicitFlow_EmptyState(t *testing.T) {
 	assert.Empty(t, tokens["state"])
 }
 
-// TestImplicitFlow_NonceInIdToken tests that nonce is correctly included in id_token
-func TestImplicitFlow_NonceInIdToken(t *testing.T) {
+// TestImplicitFlow_NonceInIDToken tests that nonce is correctly included in id_token
+func TestImplicitFlow_NonceInIDToken(t *testing.T) {
 	changeSettings(t, func(settings *record.Settings) { settings.ImplicitFlowEnabled = true })
 
-	client, redirectUri := createImplicitFlowClient(t, nil)
+	client, redirectURI := createImplicitFlowClient(t, nil)
 	user, password := createTestUserForImplicit(t)
 
 	requestNonce := "unique-nonce-" + fake.LetterN(16)
 	requestState := fake.LetterN(16)
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=id_token" +
 		"&scope=openid" +
 		"&state=" + requestState +
 		"&nonce=" + requestNonce
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1099,22 +1099,22 @@ func TestImplicitFlow_NonceInIdToken(t *testing.T) {
 func TestImplicitFlow_AudienceInTokens(t *testing.T) {
 	changeSettings(t, func(settings *record.Settings) { settings.ImplicitFlowEnabled = true })
 
-	client, redirectUri := createImplicitFlowClient(t, nil)
+	client, redirectURI := createImplicitFlowClient(t, nil)
 	user, password := createTestUserForImplicit(t)
 
 	requestNonce := fake.LetterN(16)
 	requestState := fake.LetterN(16)
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=" + url.QueryEscape("id_token token") +
 		"&scope=openid" +
 		"&state=" + requestState +
 		"&nonce=" + requestNonce
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1176,16 +1176,16 @@ func TestImplicitFlow_AuthCodeFlowClient_CanAlsoUseImplicit(t *testing.T) {
 		AuthorizationCodeEnabled: true, // Auth code enabled
 		ImplicitGrantEnabled:     nil,  // Inherit from global (enabled)
 		ConsentRequired:          false,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	require.NoError(t, err)
 
-	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+	redirectURI := &record.RedirectURI{
+		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	require.NoError(t, err)
 
 	user, password := createTestUserForImplicit(t)
@@ -1193,15 +1193,15 @@ func TestImplicitFlow_AuthCodeFlowClient_CanAlsoUseImplicit(t *testing.T) {
 	requestState := fake.LetterN(16)
 
 	// Use implicit flow with this client
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=token" +
 		"&scope=openid" +
 		"&state=" + requestState
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}

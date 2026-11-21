@@ -15,13 +15,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func getUserAccessTokenWithAccountScope_Address(t *testing.T) (string, *record.User) {
+func getUserAccessTokenWithAccountScopeAddress(t *testing.T) (string, *record.User) {
 	scope := "openid profile email " + builtin.AuthServerResourceIdentifier + ":" + builtin.ManageAccountPermissionIdentifier
 	return createUserAccessTokenWithScope(t, scope)
 }
 
 func TestAPIAccountAddressPut_Success(t *testing.T) {
-	accessToken, u := getUserAccessTokenWithAccountScope_Address(t)
+	accessToken, u := getUserAccessTokenWithAccountScopeAddress(t)
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/address"
 	reqBody := api.UpdateUserAddressRequest{
@@ -44,7 +44,7 @@ func TestAPIAccountAddressPut_Success(t *testing.T) {
 	var updateResp api.UpdateUserResponse
 	err := json.NewDecoder(resp.Body).Decode(&updateResp)
 	require.NoError(t, err)
-	assert.Equal(t, u.Id, updateResp.User.Id)
+	assert.Equal(t, u.ID, updateResp.User.ID)
 	assert.Equal(t, reqBody.AddressLine1, updateResp.User.AddressLine1)
 	assert.Equal(t, reqBody.AddressLine2, updateResp.User.AddressLine2)
 	assert.Equal(t, reqBody.AddressLocality, updateResp.User.AddressLocality)
@@ -53,7 +53,7 @@ func TestAPIAccountAddressPut_Success(t *testing.T) {
 	assert.Equal(t, reqBody.AddressCountry, updateResp.User.AddressCountry)
 
 	// Verify persisted changes
-	updatedUser, err := database.GetUserById(context.Background(), nil, u.Id)
+	updatedUser, err := database.GetUserByID(context.Background(), nil, u.ID)
 	require.NoError(t, err)
 	assert.NotNil(t, updatedUser)
 	assert.Equal(t, reqBody.AddressLine1, updatedUser.AddressLine1)
@@ -65,7 +65,7 @@ func TestAPIAccountAddressPut_Success(t *testing.T) {
 }
 
 func TestAPIAccountAddressPut_PartialAddress(t *testing.T) {
-	accessToken, _ := getUserAccessTokenWithAccountScope_Address(t)
+	accessToken, _ := getUserAccessTokenWithAccountScopeAddress(t)
 
 	// Update only some fields; unspecified fields should be cleared to empty
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/address"
@@ -90,7 +90,7 @@ func TestAPIAccountAddressPut_PartialAddress(t *testing.T) {
 }
 
 func TestAPIAccountAddressPut_ClearAllFields(t *testing.T) {
-	accessToken, _ := getUserAccessTokenWithAccountScope_Address(t)
+	accessToken, _ := getUserAccessTokenWithAccountScopeAddress(t)
 
 	// Clear all address fields by sending empty values
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/address"
@@ -111,7 +111,7 @@ func TestAPIAccountAddressPut_ClearAllFields(t *testing.T) {
 }
 
 func TestAPIAccountAddressPut_ValidationErrors(t *testing.T) {
-	accessToken, _ := getUserAccessTokenWithAccountScope_Address(t)
+	accessToken, _ := getUserAccessTokenWithAccountScopeAddress(t)
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/address"
 
 	// AddressLine1 too long (>60)
@@ -168,7 +168,7 @@ func TestAPIAccountAddressPut_ValidationErrors(t *testing.T) {
 // Angle brackets are refused rather than stripped (#275): the endpoint answers
 // 400 with the address validator's code, and nothing reaches the row.
 func TestAPIAccountAddressPut_AngleBracketsRefused(t *testing.T) {
-	accessToken, _ := getUserAccessTokenWithAccountScope_Address(t)
+	accessToken, _ := getUserAccessTokenWithAccountScopeAddress(t)
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/address"
 
 	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateUserAddressRequest{
@@ -188,7 +188,7 @@ func TestAPIAccountAddressPut_AngleBracketsRefused(t *testing.T) {
 // ampersand, an apostrophe and quotes comes back byte for byte as it was sent,
 // which is the property that replaces the sanitizer's rewriting.
 func TestAPIAccountAddressPut_AmpersandAndQuotesStoredVerbatim(t *testing.T) {
-	accessToken, _ := getUserAccessTokenWithAccountScope_Address(t)
+	accessToken, _ := getUserAccessTokenWithAccountScopeAddress(t)
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/address"
 
 	line1 := `O'Brien & Sons, "The Mews"`
@@ -211,7 +211,7 @@ func TestAPIAccountAddressPut_UnauthorizedAndScope(t *testing.T) {
 	// No token
 	req, err := http.NewRequest("PUT", url, nil)
 	require.NoError(t, err)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -237,7 +237,7 @@ func TestAPIAccountAddressPut_UnauthorizedAndScope(t *testing.T) {
 }
 
 func TestAPIAccountAddressPut_InvalidRequestBody(t *testing.T) {
-	accessToken, _ := getUserAccessTokenWithAccountScope_Address(t)
+	accessToken, _ := getUserAccessTokenWithAccountScopeAddress(t)
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/address"
 
 	// Invalid JSON (no body)
@@ -245,7 +245,7 @@ func TestAPIAccountAddressPut_InvalidRequestBody(t *testing.T) {
 	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()

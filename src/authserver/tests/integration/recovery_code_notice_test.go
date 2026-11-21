@@ -33,12 +33,12 @@ const (
 func enrolledNoticeUser(t *testing.T, locale string, verified bool) (*record.Client, *record.RedirectURI,
 	*record.User, string, string, []string) {
 	t.Helper()
-	client, redirectUri, user, password, secret := createLevel2MandatoryUser(t, true)
+	client, redirectURI, user, password, secret := createLevel2MandatoryUser(t, true)
 	user.Email = plusAddress()
 	user.EmailVerified = verified
 	user.Locale = locale
 	require.NoError(t, database.UpdateUser(context.Background(), nil, user))
-	return client, redirectUri, user, password, secret, giveRecoveryCodes(t, user.Id)
+	return client, redirectURI, user, password, secret, giveRecoveryCodes(t, user.ID)
 }
 
 // assertNoCodeIn asserts that none of codes appears in the message.
@@ -65,9 +65,9 @@ func TestRecoveryCode_SigningInTellsTheUserHowManyCodesAreLeft(t *testing.T) {
 			"Si aún tienes la aplicación, obtén allí un nuevo conjunto de códigos de recuperación, para poder iniciar sesión si la pierdes."},
 	} {
 		t.Run(tc.locale, func(t *testing.T) {
-			client, redirectUri, user, password, _, codes := enrolledNoticeUser(t, tc.locale, true)
+			client, redirectURI, user, password, _, codes := enrolledNoticeUser(t, tc.locale, true)
 
-			_, resp, _ := recoveryCodeSignInTo(t, client, redirectUri, user, password, codes[0])
+			_, resp, _ := recoveryCodeSignInTo(t, client, redirectURI, user, password, codes[0])
 			assertRedirect(t, resp, "/auth/completed")
 			_ = resp.Body.Close()
 
@@ -90,14 +90,14 @@ func TestRecoveryCode_SigningInTellsTheUserHowManyCodesAreLeft(t *testing.T) {
 func TestRecoveryCode_SigningInWithTheLastCodeSaysNoneAreLeft(t *testing.T) {
 	useMailpitSMTP(t)
 
-	client, redirectUri, user, password, _, codes := enrolledNoticeUser(t, "en", true)
+	client, redirectURI, user, password, _, codes := enrolledNoticeUser(t, "en", true)
 	user.GivenName, user.MiddleName, user.FamilyName = "", "", ""
 	require.NoError(t, database.UpdateUser(context.Background(), nil, user))
 	for _, code := range codes[1:] {
-		require.True(t, claimRecoveryCodeForTest(t, user.Id, code))
+		require.True(t, claimRecoveryCodeForTest(t, user.ID, code))
 	}
 
-	_, resp, _ := recoveryCodeSignInTo(t, client, redirectUri, user, password, codes[0])
+	_, resp, _ := recoveryCodeSignInTo(t, client, redirectURI, user, password, codes[0])
 	assertRedirect(t, resp, "/auth/completed")
 	_ = resp.Body.Close()
 
@@ -115,8 +115,8 @@ func TestRecoveryCode_SigningInWithTheLastCodeSaysNoneAreLeft(t *testing.T) {
 func TestRecoveryCode_SendsNothingWhereNoneMayGo(t *testing.T) {
 	useMailpitSMTP(t)
 
-	client, redirectUri, refusedUser, refusedPassword, _, _ := enrolledNoticeUser(t, "en", true)
-	_, resp, _ := recoveryCodeSignInTo(t, client, redirectUri, refusedUser, refusedPassword, "0000-0000-0000-0000-0000-0000")
+	client, redirectURI, refusedUser, refusedPassword, _, _ := enrolledNoticeUser(t, "en", true)
+	_, resp, _ := recoveryCodeSignInTo(t, client, redirectURI, refusedUser, refusedPassword, "0000-0000-0000-0000-0000-0000")
 	assertRecoveryCodeRefused(t, resp)
 
 	unverifiedClient, unverifiedRedirect, unverified, unverifiedPassword, _, unverifiedCodes := enrolledNoticeUser(t, "en", false)
@@ -198,7 +198,7 @@ func TestAPIAccountRecoveryCodesPost_SendsNothingWhereNoneMayGo(t *testing.T) {
 // after it, against an authenticator already disabled, tells nothing more. The recovery-code
 // sign-in the notice points to comes after, and its own notice shows the mail that went before it
 // has arrived.
-func TestAuthOtp_TheRefusalThatDisablesTheAuthenticatorTellsTheUserOnce(t *testing.T) {
+func TestAuthOTP_TheRefusalThatDisablesTheAuthenticatorTellsTheUserOnce(t *testing.T) {
 	useMailpitSMTP(t)
 
 	for _, tc := range []struct {
@@ -212,27 +212,27 @@ func TestAuthOtp_TheRefusalThatDisablesTheAuthenticatorTellsTheUserOnce(t *testi
 			"Un code de récupération a été utilisé pour vous connecter", "Connectez-vous avec l’un de vos codes de récupération"},
 	} {
 		t.Run(tc.locale, func(t *testing.T) {
-			client, redirectUri, user, password, secret, codes := enrolledNoticeUser(t, tc.locale, true)
+			client, redirectURI, user, password, secret, codes := enrolledNoticeUser(t, tc.locale, true)
 			// Seeded one short of the limit through the count's own statement, since reaching it
 			// through the form would take 99 refusals behind the otp rate tier.
-			for i := 0; i < record.OtpConsecutiveFailureLimit-1; i++ {
-				disabled, err := database.IncrementUserOtpConsecutiveFailures(context.Background(), nil, user.Id,
-					user.OtpConfigGeneration)
+			for i := 0; i < record.OTPConsecutiveFailureLimit-1; i++ {
+				disabled, err := database.IncrementUserOTPConsecutiveFailures(context.Background(), nil, user.ID,
+					user.OTPConfigGeneration)
 				require.NoError(t, err)
 				require.False(t, disabled)
 			}
 
-			httpClient, otpPage, otpUrl := startOtpCeremony(t, client, redirectUri, user, password, "")
+			httpClient, otpPage, otpURL := startOTPCeremony(t, client, redirectURI, user, password, "")
 			right := otptest.Code(t, secret, time.Now())
-			refused := authenticateWithOtp(t, httpClient, otpUrl, otpPage, wrongCodeBeside(right))
+			refused := authenticateWithOTP(t, httpClient, otpURL, otpPage, wrongCodeBeside(right))
 			_ = otpPage.Body.Close()
-			assertOtpRefused(t, refused)
-			refusedAgain := authenticateWithOtp(t, httpClient, otpUrl, refused, right)
+			assertOTPRefused(t, refused)
+			refusedAgain := authenticateWithOTP(t, httpClient, otpURL, refused, right)
 			_ = refused.Body.Close()
-			assertOtpRefused(t, refusedAgain)
+			assertOTPRefused(t, refusedAgain)
 			_ = refusedAgain.Body.Close()
 
-			_, resp, _ := recoveryCodeSignInTo(t, client, redirectUri, user, password, codes[0])
+			_, resp, _ := recoveryCodeSignInTo(t, client, redirectURI, user, password, codes[0])
 			assertRedirect(t, resp, "/auth/completed")
 			_ = resp.Body.Close()
 			require.Len(t, awaitMailWithSubject(t, user.Email, tc.recoverySignIn, 1), 1,

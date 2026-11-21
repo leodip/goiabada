@@ -45,10 +45,10 @@ import (
 // production never runs.
 var rotateTx = &sql.Tx{}
 
-// signingKey builds a key_pairs row in the given state. Only Id and State matter here: nothing in
+// signingKey builds a key_pairs row in the given state. Only ID and State matter here: nothing in
 // this file reads key material.
 func signingKey(id int64, state record.KeyState) record.KeyPair {
-	return record.KeyPair{Id: id, State: state.String(), Type: "RSA", Algorithm: "RS256"}
+	return record.KeyPair{ID: id, State: state.String(), Type: "RSA", Algorithm: "RS256"}
 }
 
 // stubRotateRead registers the transaction the rotator opens through RunInTransaction and the
@@ -61,13 +61,13 @@ func stubRotateRead(database *datamocks.Database, keys []record.KeyPair) *datamo
 	return stub
 }
 
-// rotateKeysRequestId is the request id for these rows: the attribute the request logger writes,
+// rotateKeysRequestID is the request id for these rows: the attribute the request logger writes,
 // and therefore the one a 500's log record and its body have to agree on.
-const rotateKeysRequestId = "req-rotate-keys"
+const rotateKeysRequestID = "req-rotate-keys"
 
 func rotateRequest() *http.Request {
 	r := httptest.NewRequest(http.MethodPost, "/api/v1/admin/settings/keys/rotate", nil)
-	r = r.WithContext(requestid.NewContext(r.Context(), rotateKeysRequestId))
+	r = r.WithContext(requestid.NewContext(r.Context(), rotateKeysRequestID))
 	// The validated bearer token the chain puts on the context, which is where the audit
 	// payload's "logged_in_user" comes from. It used to come from a mocked
 	// AuthHelper.GetLoggedInSubject, which is why nothing here noticed the real accessor read a
@@ -175,10 +175,10 @@ func TestHandleSettingsKeysRotatePost_KeySetIncomplete(t *testing.T) {
 	// once, with its stack, and names on the wire the request id an operator finds that record by.
 	assert.Equal(t, 1, strings.Count(logged, "level=ERROR"), "one record, not none and not two")
 	assert.Contains(t, logged, "msg=\"internal server error\"")
-	assert.Contains(t, logged, "request_id="+rotateKeysRequestId)
+	assert.Contains(t, logged, "request_id="+rotateKeysRequestID)
 	assert.Contains(t, logged, "handler_api_settings_keys.go",
 		"slog's text handler prints an error value with %+v, so the stack rides in the record")
-	assert.Contains(t, body.ErrorDescription, rotateKeysRequestId,
+	assert.Contains(t, body.ErrorDescription, rotateKeysRequestID,
 		"the id on the wire and the id in the log have to be the same string")
 
 	require.Error(t, stub.BodyErr, "the refusal reached the helper, which rolls back")
@@ -227,11 +227,11 @@ func TestHandleSettingsKeysRotatePost_CommitOutcomeUnknown(t *testing.T) {
 	body := decodeErrorBody(t, rr)
 	assert.Equal(t, "ROTATION_OUTCOME_UNKNOWN", body.ErrorCode)
 	assert.Equal(t, "The key rotation may or may not have happened. Check the signing keys before you rotate again. "+
-		"Request Id: "+rotateKeysRequestId, body.ErrorDescription,
+		"Request Id: "+rotateKeysRequestID, body.ErrorDescription,
 		"the id on the wire and the id in the log have to be the same string")
 
 	assert.Equal(t, 1, strings.Count(logged, "level=ERROR"), "one record, not none and not two")
-	assert.Contains(t, logged, "request_id="+rotateKeysRequestId)
+	assert.Contains(t, logged, "request_id="+rotateKeysRequestID)
 	assert.Contains(t, logged, "connection reset by peer", "the driver's error is what the operator needs")
 	assert.Contains(t, logged, "unable to rotate the signing keys")
 	// auditLogger has no expectation at all, which NewAuditLogger's cleanup turns into a failure

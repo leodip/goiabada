@@ -35,11 +35,11 @@ func resetEmailTemplateWhenDone(t *testing.T, email, lang string) {
 // emailTemplateCall sends one admin API request and decodes its JSON answer.
 func emailTemplateCall(t *testing.T, accessToken, method, path string, body any) (int, map[string]any, string) {
 	t.Helper()
-	resp, requestId := sendAdmin(t, accessToken, method, path, body)
+	resp, requestID := sendAdmin(t, accessToken, method, path, body)
 	defer func() { _ = resp.Body.Close() }()
 	var answer map[string]any
 	_ = json.NewDecoder(resp.Body).Decode(&answer)
-	return resp.StatusCode, answer, requestId
+	return resp.StatusCode, answer, requestID
 }
 
 // emailTemplateLanguage is lang of the read of email.
@@ -80,7 +80,7 @@ func TestAPIEmailTemplates_ASavedEditIsSentAndAResetRestoresTheBuiltInText(t *te
 	useMailpitSMTP(t)
 	manageToken, _ := createAdminClientWithToken(t)
 	resetEmailTemplateWhenDone(t, "password_reset_link", "en")
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
+	settings, err := database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err)
 
 	status, body, _ := emailTemplateCall(t, manageToken, http.MethodPut, emailTemplatesPath+"/password_reset_link/en", map[string]any{
@@ -193,7 +193,7 @@ func TestAPIEmailTemplates_SimultaneousFirstSavesBothSucceed(t *testing.T) {
 			requests[i].Header.Set("Authorization", "Bearer "+manageToken)
 			requests[i].Header.Set("Content-Type", "application/json")
 		}
-		client := createHttpClient(t)
+		client := createHTTPClient(t)
 		statuses := make([]int, len(requests))
 		failures := make([]error, len(requests))
 		var wg sync.WaitGroup
@@ -245,7 +245,7 @@ func TestAPIEmailTemplates_ARefusalNamesThePlaceholderInTheCallersLanguage(t *te
 	req.Header.Set("Authorization", "Bearer "+manageToken)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept-Language", "pt-BR")
-	resp, err := createHttpClient(t).Do(req)
+	resp, err := createHTTPClient(t).Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	var translated map[string]any
@@ -304,20 +304,20 @@ func TestAPIEmailTemplates_TheScopes(t *testing.T) {
 	} {
 		t.Run(c.permission, func(t *testing.T) {
 			token, client := createClientWithGranularScope(t, c.permission)
-			t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+			t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 
 			for _, path := range reads {
 				status, _, _ := emailTemplateCall(t, token, http.MethodGet, path, nil)
 				assert.Equalf(t, c.read, status, "GET %s", path)
 			}
 			for _, w := range writes {
-				status, body, requestId := emailTemplateCall(t, token, w.method, writePath, w.body)
+				status, body, requestID := emailTemplateCall(t, token, w.method, writePath, w.body)
 				assert.Equalf(t, http.StatusForbidden, status, "%s %s", w.method, writePath)
 				assert.Equalf(t, c.writeCode, body["error_code"], "%s %s", w.method, writePath)
 				if c.writeCode != "MANAGE_SCOPE_REQUIRED" {
 					continue
 				}
-				rows := refusalRows(t, manageToken, requestId)
+				rows := refusalRows(t, manageToken, requestID)
 				require.Lenf(t, rows, 1, "%s: one administrator_change_refused row", w.method)
 				assert.Equal(t, "settings", rows[0]["ceiling"])
 				assert.Equal(t, w.method, rows[0]["method"])
@@ -338,39 +338,39 @@ func TestAPIEmailTemplates_ChangesAreAudited(t *testing.T) {
 	resetEmailTemplateWhenDone(t, "otp_enabled", "fr")
 	const path = emailTemplatesPath + "/otp_enabled/fr"
 
-	status, body, requestId := emailTemplateCall(t, accessToken, http.MethodPut, path, map[string]any{
+	status, body, requestID := emailTemplateCall(t, accessToken, http.MethodPut, path, map[string]any{
 		"subject": "Authentification à deux facteurs activée", "body": "Bonjour {{name}}, c'est fait.",
 	})
 	require.Equal(t, http.StatusOK, status, "save: %v", body)
 	assert.Equal(t, []map[string]any{{
 		"email_template": "otp_enabled", "language": "fr", "edited_fields": []any{"subject", "body"}, "logged_in_user": who,
-	}}, auditRows(t, accessToken, "updated_email_template", requestId))
+	}}, auditRows(t, accessToken, "updated_email_template", requestID))
 
 	// Saving the built-in text back removes the edit, and is recorded as a reset.
 	builtIn := emailTemplateLanguage(t, accessToken, "otp_enabled", "fr")["builtInText"].(map[string]any)
-	status, body, requestId = emailTemplateCall(t, accessToken, http.MethodPut, path, map[string]any{
+	status, body, requestID = emailTemplateCall(t, accessToken, http.MethodPut, path, map[string]any{
 		"subject": builtIn["subject"], "body": builtIn["body"],
 	})
 	require.Equal(t, http.StatusOK, status, "save: %v", body)
 	assert.Equal(t, "default", body["status"])
-	assert.Empty(t, auditRows(t, accessToken, "updated_email_template", requestId))
+	assert.Empty(t, auditRows(t, accessToken, "updated_email_template", requestID))
 	assert.Equal(t, []map[string]any{{"email_template": "otp_enabled", "language": "fr", "logged_in_user": who}},
-		auditRows(t, accessToken, "reset_email_template", requestId))
+		auditRows(t, accessToken, "reset_email_template", requestID))
 
 	// A reset with no edit records nothing.
-	resp, requestId := sendAdmin(t, accessToken, http.MethodDelete, path, nil)
+	resp, requestID := sendAdmin(t, accessToken, http.MethodDelete, path, nil)
 	_ = resp.Body.Close()
 	require.Equal(t, http.StatusNoContent, resp.StatusCode)
-	assert.Empty(t, auditRows(t, accessToken, "reset_email_template", requestId))
+	assert.Empty(t, auditRows(t, accessToken, "reset_email_template", requestID))
 
 	// A reset of an edit records one.
 	status, body, _ = emailTemplateCall(t, accessToken, http.MethodPut, path, map[string]any{
 		"subject": "Activée", "body": builtIn["body"],
 	})
 	require.Equal(t, http.StatusOK, status, "save: %v", body)
-	resp, requestId = sendAdmin(t, accessToken, http.MethodDelete, path, nil)
+	resp, requestID = sendAdmin(t, accessToken, http.MethodDelete, path, nil)
 	_ = resp.Body.Close()
 	require.Equal(t, http.StatusNoContent, resp.StatusCode)
 	assert.Equal(t, []map[string]any{{"email_template": "otp_enabled", "language": "fr", "logged_in_user": who}},
-		auditRows(t, accessToken, "reset_email_template", requestId))
+		auditRows(t, accessToken, "reset_email_template", requestID))
 }

@@ -36,7 +36,7 @@ type switchesSource interface {
 // the session guard put on the context once it found the token live, so recording who acted costs
 // no read (#780 decision 2); false means no user's token made the request.
 type actingUserSource interface {
-	ActingUserId(ctx context.Context) (int64, bool)
+	ActingUserID(ctx context.Context) (int64, bool)
 }
 
 // auditWriteTimeout bounds the switches read and the audit insert once Log has detached them from
@@ -124,10 +124,10 @@ func (al *Logger) Log(ctx context.Context, auditEvent string, details map[string
 			// the log disagree on precisely the ids an attacker chose, which is the case the
 			// correlation has to survive (#328). An empty context yields "", which is what a row
 			// written off a request carries.
-			RequestId: logging.FieldForLog(requestid.FromContext(ctx)),
+			RequestID: logging.FieldForLog(requestid.FromContext(ctx)),
 			// The two user columns, filled here so no call site has to remember them (#780).
-			UserId:         userIdOf(details),
-			LoggedInUserId: al.loggedInUserId(ctx),
+			UserID:         userIDOf(details),
+			LoggedInUserID: al.loggedInUserID(ctx),
 			// CreatedAt set by CreateAuditLog
 		}
 
@@ -139,36 +139,36 @@ func (al *Logger) Log(ctx context.Context, auditEvent string, details map[string
 	}
 }
 
-// userIdOf is the user an event is about: its details' user_id, the one key every event about a
+// userIDOf is the user an event is about: its details' user_id, the one key every event about a
 // user names them by. A payload with no user_id, or one naming user 0 or below, which is no row,
 // leaves the column NULL; so does a value that is not an integer, which cannot be a row id. The
 // call sites write a user's int64 id; int is read too, so a site passing an untyped constant is
 // not silently left out of a user's filter.
-func userIdOf(details map[string]interface{}) sql.NullInt64 {
-	var userId int64
+func userIDOf(details map[string]interface{}) sql.NullInt64 {
+	var userID int64
 	switch v := details["user_id"].(type) {
 	case int64:
-		userId = v
+		userID = v
 	case int:
-		userId = int64(v)
+		userID = int64(v)
 	default:
 		return sql.NullInt64{}
 	}
-	if userId <= 0 {
+	if userID <= 0 {
 		return sql.NullInt64{}
 	}
-	return sql.NullInt64{Int64: userId, Valid: true}
+	return sql.NullInt64{Int64: userID, Valid: true}
 }
 
-// loggedInUserId is the user whose access token made the request, NULL when none did or when the
+// loggedInUserID is the user whose access token made the request, NULL when none did or when the
 // logger was built without the port.
-func (al *Logger) loggedInUserId(ctx context.Context) sql.NullInt64 {
+func (al *Logger) loggedInUserID(ctx context.Context) sql.NullInt64 {
 	if al.actingUser == nil {
 		return sql.NullInt64{}
 	}
-	userId, ok := al.actingUser.ActingUserId(ctx)
+	userID, ok := al.actingUser.ActingUserID(ctx)
 	if !ok {
 		return sql.NullInt64{}
 	}
-	return sql.NullInt64{Int64: userId, Valid: true}
+	return sql.NullInt64{Int64: userID, Valid: true}
 }

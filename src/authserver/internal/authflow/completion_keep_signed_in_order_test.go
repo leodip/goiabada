@@ -93,7 +93,7 @@ func TestBindReusedSession_AnOlderCompletionLeavesTheNewerPasswordEntrysAnswer(t
 			olderAt := time.Now().UTC().Add(-2 * time.Minute).Truncate(time.Second)
 			newerAt := olderAt.Add(time.Minute)
 			completed := func(id string, at time.Time, answer *bool) *ceremony.AuthContext {
-				return &ceremony.AuthContext{CeremonyId: id, ClientId: "the-client", UserId: 1,
+				return &ceremony.AuthContext{CeremonyID: id, ClientID: "the-client", UserID: 1,
 					AuthState: ceremony.AuthStateAuthenticationCompleted, AuthMethods: "pwd",
 					Level1AuthCompleted: true, AuthenticatedAt: &at, PasswordVerifiedAt: &at, KeepSignedIn: answer}
 			}
@@ -123,9 +123,9 @@ func TestBindReusedSession_AnOlderCompletionLeavesTheNewerPasswordEntrysAnswer(t
 			tx := &sql.Tx{}
 			datamocks.ExpectRunInTransaction(database, tx)
 			datamocks.ExpectRunInTransaction(database, tx)
-			row := record.UserSession{Id: 1, UserId: 1, SessionIdentifier: "the-user-session",
-				AcrLevel: record.AcrLevel1, AuthMethods: "pwd", AuthTime: olderAt.Add(-time.Hour),
-				Clients: []record.UserSessionClient{{Id: 1, ClientId: 1, UserSessionId: 1}}}
+			row := record.UserSession{ID: 1, UserID: 1, SessionIdentifier: "the-user-session",
+				ACRLevel: record.ACRLevel1, AuthMethods: "pwd", AuthTime: olderAt.Add(-time.Hour),
+				Clients: []record.UserSessionClient{{ID: 1, ClientID: 1, UserSessionID: 1}}}
 			database.On("AcquireUserSessionRow", mock.Anything, tx, "the-user-session").Return(true, nil)
 			database.On("GetUserSessionBySessionIdentifier", mock.Anything, tx, "the-user-session").
 				Return(func(context.Context, *sql.Tx, string) *record.UserSession { copied := row; return &copied }, nil)
@@ -139,15 +139,15 @@ func TestBindReusedSession_AnOlderCompletionLeavesTheNewerPasswordEntrysAnswer(t
 			audit := &afterBindAudit{}
 			op := &Completion{sessions: usersession.NewManager(database), auditLogger: audit}
 			plan := reuseSession(false, true, true, false)
-			client := &record.Client{Id: 1}
+			client := &record.Client{ID: 1}
 			newerBrowser := browser()
 			audit.afterBind = func() {
 				_, bindErr := op.bindReusedSession(context.Background(), newerBrowser, plan, newer, client,
-					"the-user-session", record.AcrLevel1, "")
+					"the-user-session", record.ACRLevel1, "")
 				require.NoError(t, bindErr)
 			}
 			_, err = op.bindReusedSession(context.Background(), browser(), plan, older, client,
-				"the-user-session", record.AcrLevel1, "")
+				"the-user-session", record.ACRLevel1, "")
 			require.NoError(t, err)
 			require.True(t, row.AuthTime.Equal(newerAt), "the session row holds the newer authentication")
 

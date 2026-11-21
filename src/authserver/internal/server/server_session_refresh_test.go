@@ -55,10 +55,10 @@ func TestInitMiddleware_OnlyThePageBranchRefreshesTheSessionAndSendsItsCookie(t 
 	database := datamocks.NewDatabase(t)
 	// A page reads the default brand; none leaves it automatic, in the built-in colors.
 	database.On("GetDefaultBrand", mock.Anything, mock.Anything).Return(nil, nil).Maybe()
-	database.On("GetSettingsById", mock.Anything, nilTx, int64(1)).Return(&record.Settings{Id: 1}, nil).Maybe()
+	database.On("GetSettingsByID", mock.Anything, nilTx, int64(1)).Return(&record.Settings{ID: 1}, nil).Maybe()
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "the-user-session").
-		Return(&record.UserSession{Id: 1, UserId: 1, SessionIdentifier: "the-user-session"}, nil).Maybe()
-	database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&record.User{Id: 1}, nil).Maybe()
+		Return(&record.UserSession{ID: 1, UserID: 1, SessionIdentifier: "the-user-session"}, nil).Maybe()
+	database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(&record.User{ID: 1}, nil).Maybe()
 
 	backend := &staleBackend{MemoryBackend: sessiontest.NewMemoryBackend()}
 	s := newStaticBranchTestServer(database)
@@ -120,9 +120,9 @@ func TestInitMiddleware_OnlyThePageBranchRefreshesTheSessionAndSendsItsCookie(t 
 	}
 	assert.Equal(t, 1, backend.touches, "the page request touches the stale session")
 	require.Len(t, cookies, 1, "and sends its cookie again")
-	reissuedId, err := s.sessionStore.OpenCookie(sessionkeys.AuthServerSessionName, cookies[0].Value)
+	reissuedID, err := s.sessionStore.OpenCookie(sessionkeys.AuthServerSessionName, cookies[0].Value)
 	require.NoError(t, err)
-	assert.Equal(t, id, reissuedId, "naming the same session")
+	assert.Equal(t, id, reissuedID, "naming the same session")
 	row, err := backend.MemoryBackend.Load(context.Background(), id)
 	require.NoError(t, err)
 	assert.InDelta(t, time.Until(row.ExpiresAt).Seconds(), cookies[0].MaxAge, 2,
@@ -139,8 +139,8 @@ func TestInitMiddleware_OnlyThePageBranchRefreshesTheSessionAndSendsItsCookie(t 
 func TestRegisterRoutes_EveryPageBranchAnswerCarryingARefreshedCookieIsNoStore(t *testing.T) {
 	database := newRoutingDatabase(t)
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "the-user-session").
-		Return(&record.UserSession{Id: 1, UserId: 1, SessionIdentifier: "the-user-session"}, nil).Maybe()
-	database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&record.User{Id: 1}, nil).Maybe()
+		Return(&record.UserSession{ID: 1, UserID: 1, SessionIdentifier: "the-user-session"}, nil).Maybe()
+	database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(&record.User{ID: 1}, nil).Maybe()
 
 	backend := &staleBackend{MemoryBackend: sessiontest.NewMemoryBackend()}
 	s := newStaticBranchTestServer(database)

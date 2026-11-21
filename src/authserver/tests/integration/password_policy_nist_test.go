@@ -34,7 +34,7 @@ func TestAPISettingsGeneralPut_AcceptsAndReturnsNist(t *testing.T) {
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&saved))
 	assert.Equal(t, "nist", saved.PasswordPolicy)
 
-	stored, err := database.GetSettingsById(context.Background(), nil, 1)
+	stored, err := database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err)
 	assert.Equal(t, record.PasswordPolicy(4), stored.PasswordPolicy, "nist is stored as 4")
 
@@ -86,7 +86,7 @@ func TestAPIUserCreatePost_HoldsThePasswordToNist(t *testing.T) {
 		require.Equal(t, http.StatusCreated, resp.StatusCode)
 		var created api.CreateUserResponse
 		require.NoError(t, json.NewDecoder(resp.Body).Decode(&created))
-		t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, created.User.Id) })
+		t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, created.User.ID) })
 	})
 }
 

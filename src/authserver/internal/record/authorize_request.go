@@ -10,7 +10,7 @@ import (
 // browser's own session, and consumed by the GET, which carries the browser's cookie and runs the
 // ceremony from what the row held.
 type AuthorizeRequest struct {
-	Id        int64        `db:"id" fieldtag:"pk"`
+	ID        int64        `db:"id" fieldtag:"pk"`
 	CreatedAt sql.NullTime `db:"created_at" fieldtag:"dont-update"`
 	UpdatedAt sql.NullTime `db:"updated_at"`
 	// Handle is the plaintext handle. It has a field so a caller can carry it between generating it

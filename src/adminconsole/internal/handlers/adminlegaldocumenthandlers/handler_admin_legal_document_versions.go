@@ -13,7 +13,7 @@ import (
 // HandleVersionsGet lists the document's published versions, the first first, saying what the
 // write that redirected here did: a publish, a retirement or a restoration.
 func HandleVersionsGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient legalDocumentReader,
 ) http.HandlerFunc {
@@ -45,19 +45,19 @@ func HandleVersionsGet(
 
 // legalDocumentVersionAPI is what one version's page needs: the version with its text.
 type legalDocumentVersionAPI interface {
-	GetLegalDocumentVersion(ctx context.Context, accessToken string, legalDocumentId int64, version int) (*api.GetLegalDocumentVersionResponse, error)
+	GetLegalDocumentVersion(ctx context.Context, accessToken string, legalDocumentID int64, version int) (*api.GetLegalDocumentVersionResponse, error)
 }
 
 // HandleVersionGet shows one published version's text, a retired document's included, rendered as
 // its public page renders it, with the Markdown it was written in.
 func HandleVersionGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient legalDocumentVersionAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		id, ok := legalDocumentId(r)
+		id, ok := legalDocumentID(r)
 		if !ok {
 			httpHelper.NotFound(w, r)
 			return

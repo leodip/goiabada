@@ -20,11 +20,11 @@ func TestSessionInfos_CarriesEveryFieldTheRowRenders(t *testing.T) {
 
 	got := SessionInfos([]api.UserSessionDetailResponse{{
 		UserSessionResponse: api.UserSessionResponse{
-			Id:                41,
+			ID:                41,
 			SessionIdentifier: "sid-41",
 			Started:           &started,
 			LastAccessed:      &lastAccessed,
-			IpAddress:         "203.0.113.9",
+			IPAddress:         "203.0.113.9",
 			DeviceName:        "Firefox 131",
 			DeviceType:        "Desktop",
 			DeviceOS:          "Linux",
@@ -40,11 +40,11 @@ func TestSessionInfos_CarriesEveryFieldTheRowRenders(t *testing.T) {
 
 	require.Len(t, got, 1)
 	assert.Equal(t, SessionInfo{
-		UserSessionId: 41,
+		UserSessionID: 41,
 		IsCurrent:     true,
 		Started:       &started,
 		LastAccessed:  &lastAccessed,
-		IpAddress:     "203.0.113.9",
+		IPAddress:     "203.0.113.9",
 		DeviceName:    "Firefox 131",
 		DeviceType:    "Desktop",
 		DeviceOS:      "Linux",
@@ -64,7 +64,7 @@ func TestSessionInfos_ThisDeviceFirstThenMostRecentlyActive(t *testing.T) {
 	}
 	session := func(id int64, lastAccessed *time.Time, current bool) api.UserSessionDetailResponse {
 		return api.UserSessionDetailResponse{
-			UserSessionResponse: api.UserSessionResponse{Id: id, LastAccessed: lastAccessed},
+			UserSessionResponse: api.UserSessionResponse{ID: id, LastAccessed: lastAccessed},
 			IsCurrent:           current,
 		}
 	}
@@ -80,7 +80,7 @@ func TestSessionInfos_ThisDeviceFirstThenMostRecentlyActive(t *testing.T) {
 
 	ids := make([]int64, 0, len(got))
 	for _, s := range got {
-		ids = append(ids, s.UserSessionId)
+		ids = append(ids, s.UserSessionID)
 	}
 	assert.Equal(t, []int64{4, 3, 7, 5, 9, 8}, ids)
 }
@@ -101,24 +101,24 @@ func TestConnectedClientInfos_CarriesEveryFieldTheRowRendersInTheAPIsOrder(t *te
 
 	got := ConnectedClientInfos([]api.ConnectedClientResponse{
 		{
-			ClientId:          100,
+			ClientID:          100,
 			ClientIdentifier:  "billing",
 			ClientName:        "Billing",
 			ClientDescription: "The billing app",
-			Consent:           &api.ConnectedClientConsentResponse{Id: 9, Scope: "openid profile", GrantedAt: &grantedAt},
+			Consent:           &api.ConnectedClientConsentResponse{ID: 9, Scope: "openid profile", GrantedAt: &grantedAt},
 			GrantScope:        "openid profile email",
 		},
-		{ClientId: 7, ClientIdentifier: "dcr_a3f9", ClientName: "Reports", ClientNameUnverified: true, GrantScope: "openid"},
+		{ClientID: 7, ClientIdentifier: "dcr_a3f9", ClientName: "Reports", ClientNameUnverified: true, GrantScope: "openid"},
 		// A consent that recorded no time is still a consent.
-		{ClientId: 3, ClientIdentifier: "admin-console", ClientName: "Admin console", IsCurrent: true,
-			Consent: &api.ConnectedClientConsentResponse{Id: 2, Scope: "openid"}},
+		{ClientID: 3, ClientIdentifier: "admin-console", ClientName: "Admin console", IsCurrent: true,
+			Consent: &api.ConnectedClientConsentResponse{ID: 2, Scope: "openid"}},
 	})
 
 	assert.Equal(t, []ConnectedClientInfo{
-		{ClientId: 100, Client: "billing", ClientName: "Billing", ClientDescription: "The billing app",
+		{ClientID: 100, Client: "billing", ClientName: "Billing", ClientDescription: "The billing app",
 			HasConsent: true, ConsentScope: "openid profile", GrantedAt: &grantedAt, GrantScope: "openid profile email"},
-		{ClientId: 7, Client: "dcr_a3f9", ClientName: "Reports", ClientNameUnverified: true, GrantScope: "openid"},
-		{ClientId: 3, Client: "admin-console", ClientName: "Admin console", HasConsent: true, ConsentScope: "openid",
+		{ClientID: 7, Client: "dcr_a3f9", ClientName: "Reports", ClientNameUnverified: true, GrantScope: "openid"},
+		{ClientID: 3, Client: "admin-console", ClientName: "Admin console", HasConsent: true, ConsentScope: "openid",
 			IsCurrent: true},
 	}, got)
 }

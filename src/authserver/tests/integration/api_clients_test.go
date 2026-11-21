@@ -55,7 +55,7 @@ func TestAPIClientsGet_Unauthorized(t *testing.T) {
 	req, err := http.NewRequest("GET", url, nil)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -79,10 +79,10 @@ func TestAPIClientGet_Success(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEmpty(t, getResponse.Clients, "Should have at least one client")
 
-	clientId := getResponse.Clients[0].Id
+	clientID := getResponse.Clients[0].ID
 
 	// Test: Get specific client
-	url = appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10)
+	url = appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientID, 10)
 	resp = makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -96,7 +96,7 @@ func TestAPIClientGet_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	// Assert: Should return the correct client
-	assert.Equal(t, clientId, getClientResponse.Client.Id)
+	assert.Equal(t, clientID, getClientResponse.Client.ID)
 	assert.NotEmpty(t, getClientResponse.Client.ClientIdentifier)
 
 	// Note: Client secret will be included in detail API for confidential clients
@@ -116,13 +116,13 @@ func TestAPIClientGet_NotFound(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
-func TestAPIClientGet_InvalidId(t *testing.T) {
+func TestAPIClientGet_InvalidID(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)
 
 	testCases := []struct {
 		name           string
-		clientId       string
+		clientID       string
 		expectedStatus int
 	}{
 		{"non-numeric ID", "abc", http.StatusBadRequest},
@@ -131,7 +131,7 @@ func TestAPIClientGet_InvalidId(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + tc.clientId
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + tc.clientID
 			resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -140,7 +140,7 @@ func TestAPIClientGet_InvalidId(t *testing.T) {
 	}
 }
 
-func TestAPIClientGet_EmptyId(t *testing.T) {
+func TestAPIClientGet_EmptyID(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)
 
@@ -161,7 +161,7 @@ func TestAPIClientGet_Unauthorized(t *testing.T) {
 	req, err := http.NewRequest("GET", url, nil)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()

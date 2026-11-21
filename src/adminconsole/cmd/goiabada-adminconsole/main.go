@@ -22,7 +22,6 @@ package main
 
 import (
 	"context"
-	"encoding/gob"
 	"errors"
 	"flag"
 	"fmt"
@@ -49,7 +48,6 @@ import (
 	"github.com/leodip/goiabada/core/localzone"
 	"github.com/leodip/goiabada/core/logging"
 	"github.com/leodip/goiabada/core/metrics"
-	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/routing"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
@@ -188,13 +186,14 @@ func run() int {
 	slog.Info("current working directory", "directory", dir)
 
 	// The admin console keeps the token response in its session, and session.Values is a
-	// map[interface{}]interface{}, so gob has to be told the concrete type before it can
-	// decode one back. This registration is live: handler_auth_callback.go writes the value
-	// and internal/middleware reads it. The auth server had the same two lines and encoded no
-	// such value, so they went with #338; the name this call registers is pinned by
-	// TestTokenResponse_GobSessionIdentity in core/oauth, because it is written into every
-	// session in flight and an administrator whose session cannot be decoded is signed out.
-	gob.Register(oauth.TokenResponse{})
+	// map[string]any, so gob has to be told the concrete type before it can decode one back.
+	// This registration is live: handler_auth_callback.go writes the value and
+	// internal/middleware reads it, both as sessionkeys.StoredTokenResponse, registered under the
+	// name core/oauth.TokenResponse was registered under when the session stored it. That name and
+	// the shape's field names are written into every session in flight, and an administrator whose
+	// session cannot be decoded is signed out; sessionkeys' tests pin both, against a session
+	// written before the shape existed and against the previous binary's read (#338, #482).
+	sessionkeys.RegisterStoredTokenResponse()
 
 	now := time.Now()
 	slog.Info("process clock",
@@ -308,8 +307,8 @@ var healthcheckListeners = healthcheck.Listeners{
 	CertFile:         "GOIABADA_ADMINCONSOLE_CERTFILE",
 	KeyFile:          "GOIABADA_ADMINCONSOLE_KEYFILE",
 	DefaultHost:      config.DefaultListenHost,
-	DefaultHTTPPort:  config.DefaultListenPortHttp,
-	DefaultHTTPSPort: config.DefaultListenPortHttps,
+	DefaultHTTPPort:  config.DefaultListenPortHTTP,
+	DefaultHTTPSPort: config.DefaultListenPortHTTPS,
 }
 
 // dispatch refuses the positional arguments the flag parse leaves, since the console's flags take no

@@ -22,7 +22,7 @@ var emailTemplateColumns = columnList{
 // scanEmailTemplate reads one row selected with emailTemplateColumns.
 func scanEmailTemplate(row rowScanner, edit *record.EmailTemplate) error {
 	return row.Scan(
-		&edit.Id,
+		&edit.ID,
 		&edit.CreatedAt,
 		&edit.UpdatedAt,
 		&edit.EmailTemplate,
@@ -137,9 +137,9 @@ func (d *Database) SaveEmailTemplate(ctx context.Context, tx *sql.Tx, edit *reco
 	var err error
 	if d.Dialect == data.MySQL {
 		args = append(args, edit.UpdatedAt, edit.Subject, edit.ButtonLabel, edit.Body)
-		id, err = d.insertReadingLastInsertId(ctx, tx, saveEmailTemplate.text(d.Dialect), "email template", args)
+		id, err = d.insertReadingLastInsertID(ctx, tx, saveEmailTemplate.text(d.Dialect), "email template", args)
 	} else {
-		id, err = d.insertReadingReturnedId(ctx, tx, saveEmailTemplate.text(d.Dialect), "email template", args)
+		id, err = d.insertReadingReturnedID(ctx, tx, saveEmailTemplate.text(d.Dialect), "email template", args)
 	}
 	if err != nil {
 		edit.CreatedAt = originalCreatedAt
@@ -147,7 +147,7 @@ func (d *Database) SaveEmailTemplate(ctx context.Context, tx *sql.Tx, edit *reco
 		return err
 	}
 
-	edit.Id = id
+	edit.ID = id
 	return nil
 }
 

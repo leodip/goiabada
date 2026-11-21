@@ -21,8 +21,8 @@ type signInBrowser struct {
 }
 
 // RegenerateSession is ceremony.Store.RegenerateSession on this request.
-func (b *signInBrowser) RegenerateSession(ceremonyId string, userId int64) error {
-	return b.ceremonies.RegenerateSession(b.w, b.r, ceremonyId, userId)
+func (b *signInBrowser) RegenerateSession(ceremonyID string, userID int64) error {
+	return b.ceremonies.RegenerateSession(b.w, b.r, ceremonyID, userID)
 }
 
 // SaveAuthContext is ceremony.Store.SaveAuthContext on this request.
@@ -32,8 +32,8 @@ func (b *signInBrowser) SaveAuthContext(authContext *ceremony.AuthContext) error
 
 // carryOnSignIn signs a user who has just registered, activated their account, or reset their
 // password, into the sign-in that started it, and sends the browser on to its next step (#622
-// decision 9, #812 decision 10). ceremonyId is the sign-in the password page's Create an account or
-// Forgot password? link named, from the page's URL (registrationCeremonyId), or empty for a page
+// decision 9, #812 decision 10). ceremonyID is the sign-in the password page's Create an account or
+// Forgot password? link named, from the page's URL (registrationCeremonyID), or empty for a page
 // reached from anywhere else. user is the account with the password the user just chose: the one
 // just created, or the one a reset just changed (carryOnReset).
 //
@@ -49,12 +49,12 @@ func (b *signInBrowser) SaveAuthContext(authContext *ceremony.AuthContext) error
 // here is no reason to answer that the registration failed: the caller answers its own page, which
 // tells the user what to do next.
 func carryOnSignIn(w http.ResponseWriter, r *http.Request, ceremonies signInCeremonies,
-	proof *authflow.PasswordProof, baseURL string, ceremonyId string, user *record.User) bool {
+	proof *authflow.PasswordProof, baseURL string, ceremonyID string, user *record.User) bool {
 
-	if ceremonyId == "" {
+	if ceremonyID == "" {
 		return false
 	}
-	authContext, err := ceremonies.HeldAuthContext(r, ceremonyId)
+	authContext, err := ceremonies.HeldAuthContext(r, ceremonyID)
 	if errors.Is(err, ceremony.ErrNoAuthContext) || errors.Is(err, ceremony.ErrCeremonyNotHeld) {
 		return false
 	}
@@ -78,7 +78,7 @@ func carryOnSignIn(w http.ResponseWriter, r *http.Request, ceremonies signInCere
 
 	// 303, as every redirect answering a POST of the sign-in is: the browser follows with a GET and
 	// sends the form's body, the password among it, nowhere (RFC 9700 section 4.12).
-	next := baseURL + result.NextStep + "?" + url.Values{ceremony.QueryParameter: {authContext.CeremonyId}}.Encode()
+	next := baseURL + result.NextStep + "?" + url.Values{ceremony.QueryParameter: {authContext.CeremonyID}}.Encode()
 	http.Redirect(w, r, next, http.StatusSeeOther)
 	return true
 }

@@ -37,19 +37,19 @@ func newHolder(t *testing.T, db data.Database, enabled bool) *record.User {
 	return user
 }
 
-func grantToUser(t *testing.T, db data.Database, userId, permissionId int64) {
+func grantToUser(t *testing.T, db data.Database, userID, permissionID int64) {
 	t.Helper()
-	require.NoError(t, db.CreateUserPermission(context.Background(), nil, &record.UserPermission{UserId: userId, PermissionId: permissionId}))
+	require.NoError(t, db.CreateUserPermission(context.Background(), nil, &record.UserPermission{UserID: userID, PermissionID: permissionID}))
 }
 
-func grantToGroup(t *testing.T, db data.Database, groupId, permissionId int64) {
+func grantToGroup(t *testing.T, db data.Database, groupID, permissionID int64) {
 	t.Helper()
-	require.NoError(t, db.CreateGroupPermission(context.Background(), nil, &record.GroupPermission{GroupId: groupId, PermissionId: permissionId}))
+	require.NoError(t, db.CreateGroupPermission(context.Background(), nil, &record.GroupPermission{GroupID: groupID, PermissionID: permissionID}))
 }
 
-func joinGroup(t *testing.T, db data.Database, userId, groupId int64) {
+func joinGroup(t *testing.T, db data.Database, userID, groupID int64) {
 	t.Helper()
-	require.NoError(t, db.CreateUserGroup(context.Background(), nil, &record.UserGroup{UserId: userId, GroupId: groupId}))
+	require.NoError(t, db.CreateUserGroup(context.Background(), nil, &record.UserGroup{UserID: userID, GroupID: groupID}))
 }
 
 // What the guard counts: the enabled users holding the permission, directly or through any of
@@ -62,46 +62,46 @@ func TestCountEnabledUsersHoldingPermission(t *testing.T) {
 	other := createTestPermission(t, resource)
 
 	giving := createTestGroup(t)
-	grantToGroup(t, database, giving.Id, held.Id)
+	grantToGroup(t, database, giving.ID, held.ID)
 	ordinary := createTestGroup(t)
-	grantToGroup(t, database, ordinary.Id, other.Id)
+	grantToGroup(t, database, ordinary.ID, other.ID)
 
 	direct := newHolder(t, database, true)
-	grantToUser(t, database, direct.Id, held.Id)
+	grantToUser(t, database, direct.ID, held.ID)
 
 	throughGroup := newHolder(t, database, true)
-	joinGroup(t, database, throughGroup.Id, giving.Id)
+	joinGroup(t, database, throughGroup.ID, giving.ID)
 
 	both := newHolder(t, database, true)
-	grantToUser(t, database, both.Id, held.Id)
-	joinGroup(t, database, both.Id, giving.Id)
+	grantToUser(t, database, both.ID, held.ID)
+	joinGroup(t, database, both.ID, giving.ID)
 
 	disabledDirect := newHolder(t, database, false)
-	grantToUser(t, database, disabledDirect.Id, held.Id)
+	grantToUser(t, database, disabledDirect.ID, held.ID)
 
 	disabledThroughGroup := newHolder(t, database, false)
-	joinGroup(t, database, disabledThroughGroup.Id, giving.Id)
+	joinGroup(t, database, disabledThroughGroup.ID, giving.ID)
 
 	holdsAnotherPermission := newHolder(t, database, true)
-	grantToUser(t, database, holdsAnotherPermission.Id, other.Id)
-	joinGroup(t, database, holdsAnotherPermission.Id, ordinary.Id)
+	grantToUser(t, database, holdsAnotherPermission.ID, other.ID)
+	joinGroup(t, database, holdsAnotherPermission.ID, ordinary.ID)
 
-	count, err := database.CountEnabledUsersHoldingPermission(ctx, nil, held.Id)
+	count, err := database.CountEnabledUsersHoldingPermission(ctx, nil, held.ID)
 	require.NoError(t, err)
 	assert.Equal(t, 3, count, "direct, through the group, and both counted once; the disabled and the other permission's holders not at all")
 
 	t.Run("on a transaction, the count reads the transaction's own writes", func(t *testing.T) {
 		tx := beginTx(t)
-		directGrant, err := database.GetUserPermissionByUserIdAndPermissionId(ctx, tx, direct.Id, held.Id)
+		directGrant, err := database.GetUserPermissionByUserIDAndPermissionID(ctx, tx, direct.ID, held.ID)
 		require.NoError(t, err)
 		require.NotNil(t, directGrant)
-		require.NoError(t, database.DeleteUserPermission(ctx, tx, directGrant.Id))
-		membership, err := database.GetUserGroupByUserIdAndGroupId(ctx, tx, both.Id, giving.Id)
+		require.NoError(t, database.DeleteUserPermission(ctx, tx, directGrant.ID))
+		membership, err := database.GetUserGroupByUserIDAndGroupID(ctx, tx, both.ID, giving.ID)
 		require.NoError(t, err)
 		require.NotNil(t, membership)
-		require.NoError(t, database.DeleteUserGroup(ctx, tx, membership.Id))
+		require.NoError(t, database.DeleteUserGroup(ctx, tx, membership.ID))
 
-		count, err := database.CountEnabledUsersHoldingPermission(ctx, tx, held.Id)
+		count, err := database.CountEnabledUsersHoldingPermission(ctx, tx, held.ID)
 		require.NoError(t, err)
 		assert.Equal(t, 2, count, "direct lost its only grant; both still holds it directly")
 		require.NoError(t, database.RollbackTransaction(ctx, tx))
@@ -109,13 +109,13 @@ func TestCountEnabledUsersHoldingPermission(t *testing.T) {
 
 	t.Run("a permission nobody holds counts zero", func(t *testing.T) {
 		nobody := createTestPermission(t, resource)
-		count, err := database.CountEnabledUsersHoldingPermission(ctx, nil, nobody.Id)
+		count, err := database.CountEnabledUsersHoldingPermission(ctx, nil, nobody.ID)
 		require.NoError(t, err)
 		assert.Zero(t, count)
 	})
 
 	t.Run("an already cancelled context is refused, not a count of zero", func(t *testing.T) {
-		_, err := database.CountEnabledUsersHoldingPermission(cancelled(), nil, held.Id)
+		_, err := database.CountEnabledUsersHoldingPermission(cancelled(), nil, held.ID)
 		require.Error(t, err)
 		assert.ErrorIs(t, err, context.Canceled)
 	})
@@ -131,16 +131,16 @@ type parkedAfterTheRemovalCounted struct {
 	deleted bool
 }
 
-func (d *parkedAfterTheRemovalCounted) DeleteUser(ctx context.Context, tx *sql.Tx, userId int64) error {
-	err := d.Database.DeleteUser(ctx, tx, userId)
+func (d *parkedAfterTheRemovalCounted) DeleteUser(ctx context.Context, tx *sql.Tx, userID int64) error {
+	err := d.Database.DeleteUser(ctx, tx, userID)
 	if tx != nil {
 		d.deleted = true
 	}
 	return err
 }
 
-func (d *parkedAfterTheRemovalCounted) CountEnabledUsersHoldingPermission(ctx context.Context, tx *sql.Tx, permissionId int64) (int, error) {
-	count, err := d.Database.CountEnabledUsersHoldingPermission(ctx, tx, permissionId)
+func (d *parkedAfterTheRemovalCounted) CountEnabledUsersHoldingPermission(ctx context.Context, tx *sql.Tx, permissionID int64) (int, error) {
+	count, err := d.Database.CountEnabledUsersHoldingPermission(ctx, tx, permissionID)
 	if tx != nil && d.deleted {
 		d.b.arriveBefore(tx)
 	}
@@ -157,8 +157,8 @@ func serveAsManage(handler http.HandlerFunc, method, target string, params map[s
 	for key, value := range params {
 		req.SetPathValue(key, value)
 	}
-	ctx := reqctx.WithSettings(req.Context(), &record.Settings{Id: 1})
-	ctx = reqctx.WithValidatedToken(ctx, oauth.JwtToken{Claims: map[string]interface{}{
+	ctx := reqctx.WithSettings(req.Context(), &record.Settings{ID: 1})
+	ctx = reqctx.WithValidatedToken(ctx, oauth.JWTToken{Claims: map[string]interface{}{
 		"sub":   "last-administrator-test",
 		"scope": builtin.AuthServerResourceIdentifier + ":" + builtin.ManagePermissionIdentifier,
 	}})
@@ -192,34 +192,34 @@ func TestLastAdministrator_TwoConcurrentRemovalsOfTheLastTwoEndWithOneRefused(t 
 
 	resource := &record.Resource{ResourceIdentifier: builtin.AuthServerResourceIdentifier, Description: "Authorization server (system-level)"}
 	require.NoError(t, h.DB.CreateResource(ctx, nil, resource))
-	manage := &record.Permission{PermissionIdentifier: builtin.ManagePermissionIdentifier, Description: "Manage the authorization server", ResourceId: resource.Id}
+	manage := &record.Permission{PermissionIdentifier: builtin.ManagePermissionIdentifier, Description: "Manage the authorization server", ResourceID: resource.ID}
 	require.NoError(t, h.DB.CreatePermission(ctx, nil, manage))
 
 	a := newHolder(t, h.DB, true)
-	grantToUser(t, h.DB, a.Id, manage.Id)
+	grantToUser(t, h.DB, a.ID, manage.ID)
 	b := newHolder(t, h.DB, true)
 	admins := &record.Group{GroupIdentifier: "admins-" + fake.LetterN(6), Description: "Administrators"}
 	require.NoError(t, h.DB.CreateGroup(ctx, nil, admins))
-	grantToGroup(t, h.DB, admins.Id, manage.Id)
-	joinGroup(t, h.DB, b.Id, admins.Id)
+	grantToGroup(t, h.DB, admins.ID, manage.ID)
+	joinGroup(t, h.DB, b.ID, admins.ID)
 
 	auditLogger := &countingAuditLogger{}
 	parked := newBarrier(t, "the deletion of administrator A")
 	first := make(chan *httptest.ResponseRecorder, 1)
 	go func() {
-		aId := strconv.FormatInt(a.Id, 10)
+		aID := strconv.FormatInt(a.ID, 10)
 		first <- serveAsManage(apihandlers.HandleUserDelete(&parkedAfterTheRemovalCounted{Database: h.DB, b: parked}, auditLogger, noNotices{}, noLogoutTokens{}),
-			http.MethodDelete, "/api/v1/admin/users/"+aId, map[string]string{"id": aId}, nil)
+			http.MethodDelete, "/api/v1/admin/users/"+aID, map[string]string{"id": aID}, nil)
 	}()
 	holder := parked.awaitParked(t)
 
 	disable, err := json.Marshal(map[string]bool{"enabled": false})
 	require.NoError(t, err)
 	second := goBlocked(t, "the disabling of administrator B", holder, func(reached func()) *httptest.ResponseRecorder {
-		bId := strconv.FormatInt(b.Id, 10)
+		bID := strconv.FormatInt(b.ID, 10)
 		reached()
 		return serveAsManage(apihandlers.HandleUserEnabledPut(h.DB, auditLogger, noLogoutTokens{}),
-			http.MethodPut, "/api/v1/admin/users/"+bId+"/enabled", map[string]string{"id": bId}, disable)
+			http.MethodPut, "/api/v1/admin/users/"+bID+"/enabled", map[string]string{"id": bID}, disable)
 	})
 	second.requireBlocked(t)
 	second.requireStillWaiting(t)
@@ -237,14 +237,14 @@ func TestLastAdministrator_TwoConcurrentRemovalsOfTheLastTwoEndWithOneRefused(t 
 	require.NoError(t, json.Unmarshal(secondRR.Body.Bytes(), &envelope))
 	assert.Equal(t, "LAST_ADMINISTRATOR", envelope.ErrorCode)
 
-	gone, err := h.DB.GetUserById(ctx, nil, a.Id)
+	gone, err := h.DB.GetUserByID(ctx, nil, a.ID)
 	require.NoError(t, err)
 	assert.Nil(t, gone, "A's deletion committed")
-	kept, err := h.DB.GetUserById(ctx, nil, b.Id)
+	kept, err := h.DB.GetUserByID(ctx, nil, b.ID)
 	require.NoError(t, err)
 	require.NotNil(t, kept)
 	assert.True(t, kept.Enabled, "B's disable was rolled back")
-	count, err := h.DB.CountEnabledUsersHoldingPermission(ctx, nil, manage.Id)
+	count, err := h.DB.CountEnabledUsersHoldingPermission(ctx, nil, manage.ID)
 	require.NoError(t, err)
 	assert.Equal(t, 1, count, "one administrator remains")
 }

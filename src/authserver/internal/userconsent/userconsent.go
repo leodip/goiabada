@@ -27,7 +27,7 @@ import (
 // package's own port and the consent handler's port embeds it to hand the capability on (#387).
 type Database interface {
 	CreateUserConsent(ctx context.Context, tx *sql.Tx, userConsent *record.UserConsent) error
-	GetConsentByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (*record.UserConsent, error)
+	GetConsentByUserIDAndClientID(ctx context.Context, tx *sql.Tx, userID int64, clientID int64) (*record.UserConsent, error)
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 	UpdateUserConsent(ctx context.Context, tx *sql.Tx, userConsent *record.UserConsent) error
 }
@@ -46,21 +46,21 @@ type Database interface {
 // the transaction it ran in, so the loser rolls back and runs again (data.RunInTransactionRetryingConflict).
 // The second attempt reads the row the winner committed and rewrites it, which is what a save that
 // had arrived a moment later would have done: the last writer's scope is the one that stays (#249).
-func Record(ctx context.Context, db Database, userId, clientId int64, scope string) (*record.UserConsent, error) {
+func Record(ctx context.Context, db Database, userID, clientID int64, scope string) (*record.UserConsent, error) {
 	var saved *record.UserConsent
 	err := data.RunInTransactionRetryingConflict(ctx, db, func(tx *sql.Tx) error {
-		consent, err := db.GetConsentByUserIdAndClientId(ctx, tx, userId, clientId)
+		consent, err := db.GetConsentByUserIDAndClientID(ctx, tx, userID, clientID)
 		if err != nil {
 			return err
 		}
 
 		if consent == nil {
-			consent = &record.UserConsent{UserId: userId, ClientId: clientId}
+			consent = &record.UserConsent{UserID: userID, ClientID: clientID}
 		}
 		consent.Scope = scope
 		consent.GrantedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
-		if consent.Id > 0 {
+		if consent.ID > 0 {
 			err = db.UpdateUserConsent(ctx, tx, consent)
 		} else {
 			err = db.CreateUserConsent(ctx, tx, consent)

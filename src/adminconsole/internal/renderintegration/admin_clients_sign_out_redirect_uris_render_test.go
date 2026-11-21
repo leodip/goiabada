@@ -16,7 +16,7 @@ const signOutListTab = `<a class="tab-item" href="/admin/clients/7/sign-out-redi
 // Every tab of a client links to its Sign-out redirect URIs tab, right after Redirect URIs and before
 // Web origins, and marks it current on its own page only (#147 decision 6).
 func TestRender_AdminClientTabs_SignOutRedirectURIsFollowsRedirectURIs(t *testing.T) {
-	pages := &clientPagesAPI{client: &api.ClientResponse{Id: 7, ClientIdentifier: "a-web-app", AuthorizationCodeEnabled: true}}
+	pages := &clientPagesAPI{client: &api.ClientResponse{ID: 7, ClientIdentifier: "a-web-app", AuthorizationCodeEnabled: true}}
 	for tab, handler := range clientTabs(t, pages) {
 		t.Run(tab, func(t *testing.T) {
 			out := serveClientTab(t, handler, tab, "en")
@@ -42,13 +42,13 @@ func TestRender_AdminClientTabs_SignOutRedirectURIsFollowsRedirectURIs(t *testin
 // redirect URIs.
 func TestRender_AdminClientSignOutRedirectURIs_AClientThatRedirects(t *testing.T) {
 	pages := &clientPagesAPI{client: &api.ClientResponse{
-		Id:                       7,
+		ID:                       7,
 		ClientIdentifier:         "a-web-app",
 		AuthorizationCodeEnabled: true,
-		RedirectURIs:             []api.RedirectURIResponse{{Id: 1, URI: "https://app.example.com/callback"}},
+		RedirectURIs:             []api.RedirectURIResponse{{ID: 1, URI: "https://app.example.com/callback"}},
 		PostLogoutRedirectURIs: []api.PostLogoutRedirectURIResponse{
-			{Id: 3, URI: "https://app.example.com/signed-out"},
-			{Id: 2, URI: "https://app.example.com/bye?state=fixed&x=1"},
+			{ID: 3, URI: "https://app.example.com/signed-out"},
+			{ID: 2, URI: "https://app.example.com/bye?state=fixed&x=1"},
 		},
 	}}
 
@@ -76,7 +76,7 @@ func TestRender_AdminClientSignOutRedirectURIs_AClientThatRedirects(t *testing.T
 
 // An empty list says so, with the table hidden.
 func TestRender_AdminClientSignOutRedirectURIs_AnEmptyList(t *testing.T) {
-	pages := &clientPagesAPI{client: &api.ClientResponse{Id: 7, ClientIdentifier: "a-web-app", AuthorizationCodeEnabled: true}}
+	pages := &clientPagesAPI{client: &api.ClientResponse{ID: 7, ClientIdentifier: "a-web-app", AuthorizationCodeEnabled: true}}
 
 	out := serveClientTab(t, clientTabs(t, pages)["sign-out-redirect-uris"], "sign-out-redirect-uris", "en")
 
@@ -87,7 +87,7 @@ func TestRender_AdminClientSignOutRedirectURIs_AnEmptyList(t *testing.T) {
 // A client with neither the authorization code flow nor the implicit flow has no sign-out to return
 // from: the tab shows the notice instead of the list, and loads no script.
 func TestRender_AdminClientSignOutRedirectURIs_AClientWithoutARedirectFlow(t *testing.T) {
-	pages := &clientPagesAPI{client: &api.ClientResponse{Id: 7, ClientIdentifier: "a-service", ClientCredentialsEnabled: true}}
+	pages := &clientPagesAPI{client: &api.ClientResponse{ID: 7, ClientIdentifier: "a-service", ClientCredentialsEnabled: true}}
 
 	out := serveClientTab(t, clientTabs(t, pages)["sign-out-redirect-uris"], "sign-out-redirect-uris", "en")
 
@@ -99,7 +99,7 @@ func TestRender_AdminClientSignOutRedirectURIs_AClientWithoutARedirectFlow(t *te
 
 // Saving the admin console's own client asks first, with the warning every save of it carries.
 func TestRender_AdminClientSignOutRedirectURIs_TheSystemClientAsksBeforeSaving(t *testing.T) {
-	pages := &clientPagesAPI{client: &api.ClientResponse{Id: 7, ClientIdentifier: "admin-console-client", AuthorizationCodeEnabled: true, IsSystemLevelClient: true}}
+	pages := &clientPagesAPI{client: &api.ClientResponse{ID: 7, ClientIdentifier: "admin-console-client", AuthorizationCodeEnabled: true, IsSystemLevelClient: true}}
 
 	out := serveClientTab(t, clientTabs(t, pages)["sign-out-redirect-uris"], "sign-out-redirect-uris", "en")
 
@@ -113,10 +113,10 @@ func TestRender_AdminClientSignOutRedirectURIs_InEveryLocale(t *testing.T) {
 	leakedKey := regexp.MustCompile(`adminconsole\.[a-z_.]+`)
 	for _, locale := range []string{"en", "de", "es", "fr", "it", "pt-BR"} {
 		for _, client := range []*api.ClientResponse{
-			{Id: 7, ClientIdentifier: "a-web-app", AuthorizationCodeEnabled: true,
-				PostLogoutRedirectURIs: []api.PostLogoutRedirectURIResponse{{Id: 1, URI: "https://app.example.com/signed-out"}}},
-			{Id: 7, ClientIdentifier: "a-web-app", AuthorizationCodeEnabled: true},
-			{Id: 7, ClientIdentifier: "a-service", ClientCredentialsEnabled: true},
+			{ID: 7, ClientIdentifier: "a-web-app", AuthorizationCodeEnabled: true,
+				PostLogoutRedirectURIs: []api.PostLogoutRedirectURIResponse{{ID: 1, URI: "https://app.example.com/signed-out"}}},
+			{ID: 7, ClientIdentifier: "a-web-app", AuthorizationCodeEnabled: true},
+			{ID: 7, ClientIdentifier: "a-service", ClientCredentialsEnabled: true},
 		} {
 			pages := &clientPagesAPI{client: client}
 			out := serveClientTab(t, clientTabs(t, pages)["sign-out-redirect-uris"], "sign-out-redirect-uris", locale)

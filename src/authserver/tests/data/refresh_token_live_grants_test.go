@@ -35,10 +35,10 @@ type liveGrantToken struct {
 func (f liveGrantFixture) write(token liveGrantToken) int64 {
 	f.t.Helper()
 	// A rotated member of its family, so the family's identifier is not the token's own.
-	firstJti := fake.UUID()
+	firstJTI := fake.UUID()
 	rt := &record.RefreshToken{
-		RefreshTokenJti:      fake.UUID(),
-		FirstRefreshTokenJti: firstJti,
+		RefreshTokenJTI:      fake.UUID(),
+		FirstRefreshTokenJTI: firstJTI,
 		RefreshTokenType:     "Refresh",
 		Scope:                token.scope,
 		IssuedAt:             sql.NullTime{Time: f.now.Add(-2 * time.Hour), Valid: true},
@@ -49,46 +49,46 @@ func (f liveGrantFixture) write(token liveGrantToken) int64 {
 	}
 	if token.viaCode {
 		code := &record.Code{
-			ClientId: token.client.Id, UserId: token.owner.Id,
+			ClientID: token.client.ID, UserID: token.owner.ID,
 			Code: "code_" + fake.LetterN(8), CodeHash: "hash_" + fake.LetterN(8),
 			CodeChallenge:       sql.NullString{String: "chal_" + fake.LetterN(8), Valid: true},
 			CodeChallengeMethod: sql.NullString{String: "S256", Valid: true},
-			RedirectURI:         "https://example.com/callback", Scope: token.scope, IpAddress: "127.0.0.1",
+			RedirectURI:         "https://example.com/callback", Scope: token.scope, IPAddress: "127.0.0.1",
 			UserAgent: "test", ResponseMode: "query", AuthenticatedAt: f.now,
-			SessionIdentifier: "sess_" + fake.LetterN(8), AcrLevel: "1", AuthMethods: "pwd", Used: true,
+			SessionIdentifier: "sess_" + fake.LetterN(8), ACRLevel: "1", AuthMethods: "pwd", Used: true,
 		}
 		if err := database.CreateCode(context.Background(), nil, code); err != nil {
 			f.t.Fatalf("Failed to create code: %v", err)
 		}
-		rt.CodeId = sql.NullInt64{Int64: code.Id, Valid: true}
+		rt.CodeID = sql.NullInt64{Int64: code.ID, Valid: true}
 	} else {
-		rt.UserId = sql.NullInt64{Int64: token.owner.Id, Valid: true}
-		rt.ClientId = sql.NullInt64{Int64: token.client.Id, Valid: true}
+		rt.UserID = sql.NullInt64{Int64: token.owner.ID, Valid: true}
+		rt.ClientID = sql.NullInt64{Int64: token.client.ID, Valid: true}
 	}
 	if err := database.CreateRefreshToken(context.Background(), nil, rt); err != nil {
 		f.t.Fatalf("Failed to create refresh token: %v", err)
 	}
 	if token.familyRecorded {
-		if _, err := database.RecordRefreshTokenFamilyRevoked(context.Background(), nil, firstJti, "test"); err != nil {
+		if _, err := database.RecordRefreshTokenFamilyRevoked(context.Background(), nil, firstJTI, "test"); err != nil {
 			f.t.Fatalf("Failed to record the family: %v", err)
 		}
 	}
-	return rt.Id
+	return rt.ID
 }
 
 // sortedLiveGrants orders the rows by refresh token id, so two reads compare as lists.
 func sortedLiveGrants(grants []record.LiveGrant) []record.LiveGrant {
 	sorted := append([]record.LiveGrant(nil), grants...)
-	sort.Slice(sorted, func(i, j int) bool { return sorted[i].RefreshTokenId < sorted[j].RefreshTokenId })
+	sort.Slice(sorted, func(i, j int) bool { return sorted[i].RefreshTokenID < sorted[j].RefreshTokenID })
 	return sorted
 }
 
-// TestGetLiveGrantsByUserId: one row for each live refresh token a user holds, naming its client
+// TestGetLiveGrantsByUserID: one row for each live refresh token a user holds, naming its client
 // and the scope it records, through either linkage shape: the code's client for an
 // authorization-code token, the token's own for a password grant. A live token is one whose row is
 // not revoked, whose expiry is set and after the instant, and whose rotation family has no
 // revocation record (#135 decision 4). Another user's tokens are not the user's.
-func TestGetLiveGrantsByUserId(t *testing.T) {
+func TestGetLiveGrantsByUserID(t *testing.T) {
 	user := createTestUser(t)
 	otherUser := createTestUser(t)
 	now := time.Now().UTC().Truncate(time.Microsecond)
@@ -105,10 +105,10 @@ func TestGetLiveGrantsByUserId(t *testing.T) {
 	recorded := createTestClient(t)
 	othersOnly := createTestClient(t)
 
-	viaCodeId := f.write(liveGrantToken{owner: user, client: viaCode, viaCode: true, scope: "openid profile", expiresAt: &later})
-	directId := f.write(liveGrantToken{owner: user, client: direct, scope: "openid email", expiresAt: &later})
-	twoGrantsCodeId := f.write(liveGrantToken{owner: user, client: twoGrants, viaCode: true, scope: "openid", expiresAt: &later})
-	twoGrantsDirectId := f.write(liveGrantToken{owner: user, client: twoGrants, scope: "openid offline_access", expiresAt: &later})
+	viaCodeID := f.write(liveGrantToken{owner: user, client: viaCode, viaCode: true, scope: "openid profile", expiresAt: &later})
+	directID := f.write(liveGrantToken{owner: user, client: direct, scope: "openid email", expiresAt: &later})
+	twoGrantsCodeID := f.write(liveGrantToken{owner: user, client: twoGrants, viaCode: true, scope: "openid", expiresAt: &later})
+	twoGrantsDirectID := f.write(liveGrantToken{owner: user, client: twoGrants, scope: "openid offline_access", expiresAt: &later})
 	for _, viaCodeShape := range []bool{true, false} {
 		f.write(liveGrantToken{owner: user, client: revoked, viaCode: viaCodeShape, scope: "openid", revoked: true, expiresAt: &later})
 		f.write(liveGrantToken{owner: user, client: expired, viaCode: viaCodeShape, scope: "openid", expiresAt: &earlier})
@@ -118,21 +118,21 @@ func TestGetLiveGrantsByUserId(t *testing.T) {
 	}
 
 	want := sortedLiveGrants([]record.LiveGrant{
-		{RefreshTokenId: viaCodeId, ClientId: viaCode.Id, Scope: "openid profile"},
-		{RefreshTokenId: directId, ClientId: direct.Id, Scope: "openid email"},
-		{RefreshTokenId: twoGrantsCodeId, ClientId: twoGrants.Id, Scope: "openid"},
-		{RefreshTokenId: twoGrantsDirectId, ClientId: twoGrants.Id, Scope: "openid offline_access"},
+		{RefreshTokenID: viaCodeID, ClientID: viaCode.ID, Scope: "openid profile"},
+		{RefreshTokenID: directID, ClientID: direct.ID, Scope: "openid email"},
+		{RefreshTokenID: twoGrantsCodeID, ClientID: twoGrants.ID, Scope: "openid"},
+		{RefreshTokenID: twoGrantsDirectID, ClientID: twoGrants.ID, Scope: "openid offline_access"},
 	})
 
-	got, err := database.GetLiveGrantsByUserId(context.Background(), nil, user.Id, now)
+	got, err := database.GetLiveGrantsByUserID(context.Background(), nil, user.ID, now)
 	if err != nil {
-		t.Fatalf("GetLiveGrantsByUserId failed: %v", err)
+		t.Fatalf("GetLiveGrantsByUserID failed: %v", err)
 	}
 	assertLiveGrants(t, want, got)
 
 	// Inside a transaction too.
 	err = database.RunInTransaction(context.Background(), func(tx *sql.Tx) error {
-		inTx, txErr := database.GetLiveGrantsByUserId(context.Background(), tx, user.Id, now)
+		inTx, txErr := database.GetLiveGrantsByUserID(context.Background(), tx, user.ID, now)
 		if txErr != nil {
 			return txErr
 		}
@@ -144,35 +144,35 @@ func TestGetLiveGrantsByUserId(t *testing.T) {
 	}
 
 	// The instant decides expiry: judged two hours on, every token has expired.
-	got, err = database.GetLiveGrantsByUserId(context.Background(), nil, user.Id, now.Add(2*time.Hour))
+	got, err = database.GetLiveGrantsByUserID(context.Background(), nil, user.ID, now.Add(2*time.Hour))
 	if err != nil {
-		t.Fatalf("GetLiveGrantsByUserId failed: %v", err)
+		t.Fatalf("GetLiveGrantsByUserID failed: %v", err)
 	}
 	if len(got) != 0 {
 		t.Errorf("expected no live grant once every token expired, got %v", got)
 	}
 
 	// The other user holds the two live tokens with othersOnly, and nothing of the user's.
-	got, err = database.GetLiveGrantsByUserId(context.Background(), nil, otherUser.Id, now)
+	got, err = database.GetLiveGrantsByUserID(context.Background(), nil, otherUser.ID, now)
 	if err != nil {
-		t.Fatalf("GetLiveGrantsByUserId failed: %v", err)
+		t.Fatalf("GetLiveGrantsByUserID failed: %v", err)
 	}
-	if len(got) != 2 || got[0].ClientId != othersOnly.Id || got[1].ClientId != othersOnly.Id {
-		t.Errorf("expected the other user's two tokens with client %d, got %v", othersOnly.Id, got)
+	if len(got) != 2 || got[0].ClientID != othersOnly.ID || got[1].ClientID != othersOnly.ID {
+		t.Errorf("expected the other user's two tokens with client %d, got %v", othersOnly.ID, got)
 	}
 }
 
-// TestGetLiveGrantsByUserId_NoTokens: a user with no refresh token, and the zero id, hold no live
+// TestGetLiveGrantsByUserID_NoTokens: a user with no refresh token, and the zero id, hold no live
 // grant.
-func TestGetLiveGrantsByUserId_NoTokens(t *testing.T) {
+func TestGetLiveGrantsByUserID_NoTokens(t *testing.T) {
 	user := createTestUser(t)
-	for _, userId := range []int64{user.Id, 0} {
-		got, err := database.GetLiveGrantsByUserId(context.Background(), nil, userId, time.Now().UTC())
+	for _, userID := range []int64{user.ID, 0} {
+		got, err := database.GetLiveGrantsByUserID(context.Background(), nil, userID, time.Now().UTC())
 		if err != nil {
-			t.Fatalf("GetLiveGrantsByUserId(%d) failed: %v", userId, err)
+			t.Fatalf("GetLiveGrantsByUserID(%d) failed: %v", userID, err)
 		}
 		if len(got) != 0 {
-			t.Errorf("expected no live grant for user %d, got %v", userId, got)
+			t.Errorf("expected no live grant for user %d, got %v", userID, got)
 		}
 	}
 }

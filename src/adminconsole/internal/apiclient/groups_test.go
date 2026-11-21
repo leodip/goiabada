@@ -33,10 +33,10 @@ const groupBodyFields = `
 // carry one. It is a field on the response now, filled by the same handler from the same query, so
 // a method that answered the group but dropped the count would leave the delete confirmation
 // offering to delete a group it says has no members.
-func TestAuthServerClient_GetGroupByIdDecodesEveryFieldTheGroupPagesBind(t *testing.T) {
+func TestAuthServerClient_GetGroupByIDDecodesEveryFieldTheGroupPagesBind(t *testing.T) {
 	client, recorded := serves(t, `{"group":{`+groupBodyFields+`}}`)
 
-	group, err := client.GetGroupById(context.Background(), "an-access-token", 4)
+	group, err := client.GetGroupByID(context.Background(), "an-access-token", 4)
 	require.NoError(t, err)
 	require.NotNil(t, group)
 
@@ -44,10 +44,10 @@ func TestAuthServerClient_GetGroupByIdDecodesEveryFieldTheGroupPagesBind(t *test
 	assert.Equal(t, "/api/v1/admin/groups/4", gotPath)
 	assert.Equal(t, "Bearer an-access-token", gotAuthorization)
 
-	assert.Equal(t, int64(4), group.Id)
+	assert.Equal(t, int64(4), group.ID)
 	assert.Equal(t, "admins", group.GroupIdentifier)
 	assert.Equal(t, "Administrators", group.Description)
-	assert.True(t, group.IncludeInIdToken)
+	assert.True(t, group.IncludeInIDToken)
 	assert.False(t, group.IncludeInAccessToken)
 	assert.Equal(t, 17, group.MemberCount, "the member count is a field on the group, not a return beside it")
 
@@ -71,7 +71,7 @@ func TestAuthServerClient_GetAllGroupsDecodesEachRowsMemberCount(t *testing.T) {
 	require.Len(t, groups, 2)
 	assert.Equal(t, "admins", groups[0].GroupIdentifier)
 	assert.Equal(t, 17, groups[0].MemberCount)
-	assert.Equal(t, int64(5), groups[1].Id)
+	assert.Equal(t, int64(5), groups[1].ID)
 	assert.Equal(t, "site-viewers", groups[1].GroupIdentifier)
 	assert.Equal(t, "Viewers", groups[1].Description)
 	assert.Equal(t, 3, groups[1].MemberCount)
@@ -89,11 +89,11 @@ func TestAuthServerClient_GetUserGroupsReturnsTheUserAndTheMemberships(t *testin
 	assert.Equal(t, "/api/v1/admin/users/42/groups", gotPath)
 
 	require.NotNil(t, user)
-	assert.Equal(t, int64(42), user.Id)
+	assert.Equal(t, int64(42), user.ID)
 	assert.Equal(t, "jane@example.com", user.Email)
 
 	require.Len(t, groups, 1)
-	assert.Equal(t, int64(4), groups[0].Id)
+	assert.Equal(t, int64(4), groups[0].ID)
 	assert.Equal(t, "admins", groups[0].GroupIdentifier)
 }
 
@@ -107,7 +107,7 @@ func TestAuthServerClient_UpdateUserGroupsReturnsTheMembershipsItSaved(t *testin
 	assert.Equal(t, "/api/v1/admin/users/42/groups", gotPath)
 
 	require.NotNil(t, user)
-	assert.Equal(t, int64(42), user.Id)
+	assert.Equal(t, int64(42), user.ID)
 	require.Len(t, groups, 1)
 	assert.Equal(t, "admins", groups[0].GroupIdentifier)
 }
@@ -125,7 +125,7 @@ func TestAuthServerClient_CreateAndUpdateGroupReturnTheSavedGroup(t *testing.T) 
 
 		gotPath, _ := recorded()
 		assert.Equal(t, "/api/v1/admin/groups", gotPath)
-		assert.Equal(t, int64(4), group.Id)
+		assert.Equal(t, int64(4), group.ID)
 		assert.Equal(t, "admins", group.GroupIdentifier)
 	})
 
@@ -138,8 +138,8 @@ func TestAuthServerClient_CreateAndUpdateGroupReturnTheSavedGroup(t *testing.T) 
 
 		gotPath, _ := recorded()
 		assert.Equal(t, "/api/v1/admin/groups/4", gotPath)
-		assert.Equal(t, int64(4), group.Id)
-		assert.True(t, group.IncludeInIdToken)
+		assert.Equal(t, int64(4), group.ID)
+		assert.True(t, group.IncludeInIDToken)
 		assert.False(t, group.IncludeInAccessToken)
 	})
 }

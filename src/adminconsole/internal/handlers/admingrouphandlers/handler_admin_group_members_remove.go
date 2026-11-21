@@ -11,11 +11,11 @@ import (
 
 // groupMembersRemoveAPI is what the remove member endpoint needs: the one write it makes.
 type groupMembersRemoveAPI interface {
-	RemoveUserFromGroup(ctx context.Context, accessToken string, groupId int64, userId int64) error
+	RemoveUserFromGroup(ctx context.Context, accessToken string, groupID int64, userID int64) error
 }
 
 func HandleMembersRemoveUserPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient groupMembersRemoveAPI,
 ) http.HandlerFunc {
 
@@ -33,26 +33,26 @@ func HandleMembersRemoveUserPost(
 			return
 		}
 
-		userIdStr := r.PathValue("userId")
-		if len(userIdStr) == 0 {
+		userIDStr := r.PathValue("userId")
+		if len(userIDStr) == 0 {
 			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
 
-		userId, err := strconv.ParseInt(userIdStr, 10, 64)
+		userID, err := strconv.ParseInt(userIDStr, 10, 64)
 		if err != nil {
 			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JSONError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.JSONError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
-		err = apiClient.RemoveUserFromGroup(r.Context(), jwtInfo.TokenResponse.AccessToken, id, userId)
+		err = apiClient.RemoveUserFromGroup(r.Context(), jwtInfo.TokenResponse.AccessToken, id, userID)
 		if err != nil {
 			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return

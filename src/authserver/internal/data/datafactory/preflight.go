@@ -104,7 +104,7 @@ func findEmailCaseCollisions(rows []record.EmailCaseRow) [][]record.EmailCaseRow
 	groups := make([][]record.EmailCaseRow, 0, len(lowered))
 	for _, key := range lowered {
 		group := byLowered[key]
-		sort.Slice(group, func(i, j int) bool { return group[i].Id < group[j].Id })
+		sort.Slice(group, func(i, j int) bool { return group[i].ID < group[j].ID })
 		groups = append(groups, group)
 	}
 	return groups
@@ -126,7 +126,7 @@ func findEnginesLowerDisagreements(rows []record.EmailCaseRow) []record.EmailCas
 			found = append(found, row)
 		}
 	}
-	sort.Slice(found, func(i, j int) bool { return found[i].Id < found[j].Id })
+	sort.Slice(found, func(i, j int) bool { return found[i].ID < found[j].ID })
 	return found
 }
 
@@ -151,7 +151,7 @@ func describeEmailCaseHazards(collisions [][]record.EmailCaseRow, unreachable []
 		for _, group := range collisions {
 			fmt.Fprintf(&b, "\n  %q is held by:", strings.ToLower(group[0].Email))
 			for _, row := range group {
-				fmt.Fprintf(&b, "\n    users.id=%d email=%q", row.Id, row.Email)
+				fmt.Fprintf(&b, "\n    users.id=%d email=%q", row.ID, row.Email)
 			}
 		}
 	}
@@ -162,7 +162,7 @@ func describeEmailCaseHazards(collisions [][]record.EmailCaseRow, unreachable []
 			"every sign-in path. Lowercase them by hand, then start again:")
 		for _, row := range unreachable {
 			fmt.Fprintf(&b, "\n  users.id=%d email=%q, engine LOWER() gives %q, Goiabada needs %q",
-				row.Id, row.Email, row.EngineLowered, strings.ToLower(row.Email))
+				row.ID, row.Email, row.EngineLowered, strings.ToLower(row.Email))
 		}
 	}
 

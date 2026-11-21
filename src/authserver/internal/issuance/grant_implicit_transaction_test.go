@@ -53,13 +53,13 @@ func newImplicitFixture(t *testing.T) *implicitFixture {
 			Issuer:                                  "https://test-issuer.com",
 			TokenExpirationInSeconds:                600,
 			IncludeOpenIDConnectClaimsInAccessToken: true,
-			IncludeOpenIDConnectClaimsInIdToken:     true,
+			IncludeOpenIDConnectClaimsInIDToken:     true,
 		},
 		input: &ImplicitGrantInput{
-			Client:              &record.Client{Id: 1, ClientIdentifier: "implicit-client"},
-			User:                &record.User{Id: 7, Subject: fake.UUID(), Username: "implicituser", Groups: []record.Group{}},
+			Client:              &record.Client{ID: 1, ClientIdentifier: "implicit-client"},
+			User:                &record.User{ID: 7, Subject: fake.UUID(), Username: "implicituser", Groups: []record.Group{}},
 			Scope:               "openid profile",
-			AcrLevel:            record.AcrLevel1,
+			ACRLevel:            record.ACRLevel1,
 			AuthMethods:         "pwd",
 			SessionIdentifier:   "sid-implicit",
 			Nonce:               "implicit-nonce",
@@ -80,7 +80,7 @@ func (f *implicitFixture) expectEveryRead(order *[]string, hasPicture bool) {
 	f.mockDB.On("UserLoadGroups", mock.Anything, issueTx, f.input.User).Run(note("groups")).Return(nil).Once()
 	f.mockDB.On("GroupsLoadAttributes", mock.Anything, issueTx, f.input.User.Groups).Run(note("group attributes")).Return(nil).Once()
 	f.mockDB.On("UserLoadAttributes", mock.Anything, issueTx, f.input.User).Run(note("user attributes")).Return(nil).Once()
-	f.mockDB.On("UserHasProfilePicture", mock.Anything, issueTx, f.input.User.Id).Run(note("picture")).Return(hasPicture, nil).Twice()
+	f.mockDB.On("UserHasProfilePicture", mock.Anything, issueTx, f.input.User.ID).Run(note("picture")).Return(hasPicture, nil).Twice()
 }
 
 // The whole sequence, in order, on one transaction: begin, the session row, then every read the
@@ -123,7 +123,7 @@ func TestIssueImplicitTx_KeepsThePictureInBothTokens(t *testing.T) {
 	publicKey := getTestPublicKey(t)
 	want := implicitBaseURL + "/userinfo/picture/" + f.input.User.Subject
 	assert.Equal(t, want, verifyAndDecodeToken(t, response.AccessToken, publicKey)["picture"], "access token")
-	assert.Equal(t, want, verifyAndDecodeToken(t, response.IdToken, publicKey)["picture"], "ID token")
+	assert.Equal(t, want, verifyAndDecodeToken(t, response.IDToken, publicKey)["picture"], "ID token")
 }
 
 // A user with no picture gets no claim, so the case above is about the lookup and not about the
@@ -140,7 +140,7 @@ func TestIssueImplicitTx_NoPictureNoClaim(t *testing.T) {
 
 	publicKey := getTestPublicKey(t)
 	assert.NotContains(t, verifyAndDecodeToken(t, response.AccessToken, publicKey), "picture")
-	assert.NotContains(t, verifyAndDecodeToken(t, response.IdToken, publicKey), "picture")
+	assert.NotContains(t, verifyAndDecodeToken(t, response.IDToken, publicKey), "picture")
 }
 
 // No row is the answer decision 16 gives an ended session, and nothing after the acquisition may
@@ -276,14 +276,14 @@ func TestIssueImplicitTx_ARerunBodySignsAgainFromScratch(t *testing.T) {
 	f.mockDB.On("UserLoadGroups", mock.Anything, issueTx, mock.Anything).Return(nil).Twice()
 	f.mockDB.On("GroupsLoadAttributes", mock.Anything, issueTx, mock.Anything).Return(nil).Twice()
 	f.mockDB.On("UserLoadAttributes", mock.Anything, issueTx, mock.Anything).Return(nil).Twice()
-	f.mockDB.On("UserHasProfilePicture", mock.Anything, issueTx, f.input.User.Id).Return(false, nil).Times(4)
+	f.mockDB.On("UserHasProfilePicture", mock.Anything, issueTx, f.input.User.ID).Return(false, nil).Times(4)
 
 	response, err := f.issuer.IssueImplicitTx(context.Background(), f.settings, f.input, true, true)
 
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	assert.NotEmpty(t, response.AccessToken)
-	assert.NotEmpty(t, response.IdToken)
+	assert.NotEmpty(t, response.IDToken)
 }
 
 // IssueImplicit is the form the data tier holds open across a termination, and like IssueAuthCode it
@@ -320,7 +320,7 @@ func TestIssueImplicitTx_SignsWhatTheInputSays(t *testing.T) {
 
 	publicKey := getTestPublicKey(t)
 	access := verifyAndDecodeToken(t, response.AccessToken, publicKey)
-	id := verifyAndDecodeToken(t, response.IdToken, publicKey)
+	id := verifyAndDecodeToken(t, response.IDToken, publicKey)
 	assert.Equal(t, "sid-implicit", access["sid"])
 	assert.Equal(t, "sid-implicit", id["sid"])
 	assert.EqualValues(t, 3, access["auth_state_generation"])

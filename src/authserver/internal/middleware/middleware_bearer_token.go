@@ -25,7 +25,7 @@ import (
 // it. Declared as the shape used rather than the whole parser, which is what the
 // neighbouring ports in this package already do (#385).
 type tokenParser interface {
-	DecodeAndValidateTokenString(ctx context.Context, token string, withExpirationCheck bool) (*oauth.JwtToken, error)
+	DecodeAndValidateTokenString(ctx context.Context, token string, withExpirationCheck bool) (*oauth.JWTToken, error)
 }
 
 // BearerToken is the bearer guard set for one surface: the parse guard, the scope guards,
@@ -97,7 +97,7 @@ const invalidTokenDescription = "The access token is invalid."
 // how mime.ParseMediaType returns every spelling of it.
 const formMediaType = "application/x-www-form-urlencoded"
 
-// JwtAuthorizationHeaderToContext is the one place that decides whether a bearer credential was
+// JWTAuthorizationHeaderToContext is the one place that decides whether a bearer credential was
 // presented, and it decides it for every guard behind it. Three methods carry one: RFC 6750 section
 // 2.1's Authorization header with the Bearer scheme; RFC 9449 section 7.1's Authorization header
 // with the DPoP scheme, beside a DPoP proof; and, for a POST with a form-encoded body, RFC 6750
@@ -152,7 +152,7 @@ const formMediaType = "application/x-www-form-urlencoded"
 //     context; the scope guard behind it answers the challenges with no error.
 //
 // A validated token is stored with reqctx.WithBearerToken, which every guard behind this reads.
-func (m *BearerToken) JwtAuthorizationHeaderToContext() func(http.Handler) http.Handler {
+func (m *BearerToken) JWTAuthorizationHeaderToContext() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			authorizations := r.Header.Values("Authorization")
@@ -250,7 +250,7 @@ func (m *BearerToken) JwtAuthorizationHeaderToContext() func(http.Handler) http.
 // proof with every request, a corrected one included. A proof recorded before, by this instance or
 // another sharing the database, is a replay, 401 invalid_dpop_proof with a Warn record. A store
 // that cannot answer is the surface's 500: the request never goes ahead unchecked.
-func (m *BearerToken) dpopProof(w http.ResponseWriter, r *http.Request, token *oauth.JwtToken, tokenStr, boundTo string) (*dpop.Proof, bool) {
+func (m *BearerToken) dpopProof(w http.ResponseWriter, r *http.Request, token *oauth.JWTToken, tokenStr, boundTo string) (*dpop.Proof, bool) {
 	if m.proofs.Checker == nil || m.proofs.Replays == nil {
 		m.refusals.internalError(w, r, errs.New("the DPoP proof checker or replay store is not configured for this surface"), "")
 		return nil, false
@@ -378,7 +378,7 @@ func bearerTokenFromForm(r *http.Request) (token string, present bool, repeated 
 //
 // A refused token is answered exactly as a token that does not parse, which is what #401 asks for:
 // 401 invalid_token since #435, where both used to read as a missing token.
-func isAccessTokenForAuthServer(ctx context.Context, token *oauth.JwtToken) bool {
+func isAccessTokenForAuthServer(ctx context.Context, token *oauth.JWTToken) bool {
 	if typ := token.StringClaim("typ"); typ != issuance.TokenTypeBearer.String() {
 		slog.WarnContext(ctx, "rejecting bearer token: not an access token", "typ", typ)
 		return false

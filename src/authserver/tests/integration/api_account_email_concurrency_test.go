@@ -36,7 +36,7 @@ type concurrentResult struct {
 // goroutine; every failure is returned and reported here instead.
 func sendConcurrently(t *testing.T, n int, method, url, accessToken string, body func(i int) any) []concurrentResult {
 	t.Helper()
-	client := createHttpClient(t)
+	client := createHTTPClient(t)
 	requests := make([]*http.Request, n)
 	for i := range requests {
 		encoded, err := json.Marshal(body(i))
@@ -81,10 +81,10 @@ func sendConcurrently(t *testing.T, n int, method, url, accessToken string, body
 // sent has been, and the count read from Mailpit is exact.
 func TestAPIAccountEmailVerificationSend_ConcurrentSendsMailOneCode(t *testing.T) {
 	useMailpitSMTP(t)
-	accessToken, u := getUserAccessTokenWithAccountScope_EmailVerification(t)
+	accessToken, u := getUserAccessTokenWithAccountScopeEmailVerification(t)
 
 	// A fresh address no other test mails, unverified, with no code ever issued.
-	stored, err := database.GetUserById(context.Background(), nil, u.Id)
+	stored, err := database.GetUserByID(context.Background(), nil, u.ID)
 	require.NoError(t, err)
 	stored.Email = "concurrent.send." + strings.ToLower(fake.LetterN(12)) + "@example.com"
 	stored.EmailVerified = false
@@ -137,7 +137,7 @@ func TestAPIAccountEmailPut_ConcurrentChangesNotifyThePreviousAddressOnce(t *tes
 	useMailpitSMTP(t)
 	accessToken, u := accountEmailUserWithPassword(t)
 
-	stored, err := database.GetUserById(context.Background(), nil, u.Id)
+	stored, err := database.GetUserByID(context.Background(), nil, u.ID)
 	require.NoError(t, err)
 	previous := "concurrent.change." + strings.ToLower(fake.LetterN(12)) + "@example.com"
 	stored.Email = previous
@@ -173,7 +173,7 @@ func TestAPIAccountEmailPut_ConcurrentChangesNotifyThePreviousAddressOnce(t *tes
 	}
 	require.GreaterOrEqual(t, changed, 1, "at least one change is made")
 
-	after, err := database.GetUserById(context.Background(), nil, u.Id)
+	after, err := database.GetUserByID(context.Background(), nil, u.ID)
 	require.NoError(t, err)
 	assert.Contains(t, newEmails, after.Email, "the account holds one of the requested addresses")
 	assert.False(t, after.EmailVerified)

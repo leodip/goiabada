@@ -116,7 +116,7 @@ func challenged(r *http.Request) *http.Request {
 // signInForm is a submission of the sign-in form inside the ceremony cookie holds, carrying token
 // in cf-turnstile-response, under the challenge's settings.
 func signInForm(cookie *http.Cookie, email, password, token string) *http.Request {
-	form := url.Values{"ceremonyId": {routesTestCeremonyId}, "email": {email}, "password": {password}}
+	form := url.Values{"ceremonyId": {routesTestCeremonyID}, "email": {email}, "password": {password}}
 	if token != "" {
 		form.Set(turnstile.ResponseField, token)
 	}
@@ -167,7 +167,7 @@ func TestTurnstileChallenge_ARefusedSignInRedrawsTheFormAndSpendsNothing(t *test
 	// Past every tier of the sign-in form's limiter, counted by the client's block and by the
 	// address typed alike: the ceiling of 120 checks a minute, pwd_ip's 30 failures, pwd_account_net's
 	// 10 and pwd_account's 100. Then, the challenge passing, each tier still has its whole budget.
-	const refusals = 2 * pwdIpCeiling
+	const refusals = 2 * pwdIPCeiling
 
 	t.Run("the address's tiers are whole after the refusals", func(t *testing.T) {
 		server, verifier := newTurnstileRoutesTestServer(t, turnstile.Refused)
@@ -196,7 +196,7 @@ func TestTurnstileChallenge_ARefusedSignInRedrawsTheFormAndSpendsNothing(t *test
 		}
 
 		verifier.answer(turnstile.Passed)
-		assertRefused(t, exhaust(t, server, pwdIpBudget, guess), pwdIpWindow, shapeBrowser)
+		assertRefused(t, exhaust(t, server, pwdIPBudget, guess), pwdIPWindow, shapeBrowser)
 	})
 
 	t.Run("the client block's ceiling on every check is whole after the refusals", func(t *testing.T) {
@@ -210,7 +210,7 @@ func TestTurnstileChallenge_ARefusedSignInRedrawsTheFormAndSpendsNothing(t *test
 		}
 
 		verifier.answer(turnstile.Passed)
-		assertRefused(t, exhaust(t, server, pwdIpCeiling, noPassword), pwdIpWindow, shapeBrowser)
+		assertRefused(t, exhaust(t, server, pwdIPCeiling, noPassword), pwdIPWindow, shapeBrowser)
 	})
 }
 
@@ -221,7 +221,7 @@ func TestTurnstileChallenge_ARefusalRedrawsTheKeepMeSignedInBoxAsLeft(t *testing
 		t.Run(map[bool]string{true: "ticked", false: "unticked"}[tick], func(t *testing.T) {
 			server, _ := newTurnstileRoutesTestServer(t, turnstile.Refused)
 			cookie := pwdCeremonyCookie(t, server)
-			form := url.Values{"ceremonyId": {routesTestCeremonyId}, "email": {"victim@example.com"},
+			form := url.Values{"ceremonyId": {routesTestCeremonyID}, "email": {"victim@example.com"},
 				"password": {"the account's real password"}, turnstile.ResponseField: {turnstileTestToken}}
 			if tick {
 				form.Set("keepSignedIn", "true")
@@ -316,7 +316,7 @@ func TestTurnstileChallenge_OffChangesNothing(t *testing.T) {
 		return r.WithContext(reqctx.WithSettings(r.Context(), settings))
 	}
 
-	get := off(browserRequest(http.MethodGet, "/auth/pwd?ceremony="+routesTestCeremonyId))
+	get := off(browserRequest(http.MethodGet, "/auth/pwd?ceremony="+routesTestCeremonyID))
 	get.AddCookie(cookie)
 	post := off(signInForm(cookie, "victim@example.com", routesTestWrongPassword, ""))
 
@@ -338,7 +338,7 @@ func TestTurnstileChallenge_TheFormCarriesTheWidgetAndOnlyItsPagesAdmitCloudflar
 	server, _ := newTurnstileRoutesTestServer(t, turnstile.Refused)
 	cookie := pwdCeremonyCookie(t, server)
 
-	get := challenged(browserRequest(http.MethodGet, "/auth/pwd?ceremony="+routesTestCeremonyId))
+	get := challenged(browserRequest(http.MethodGet, "/auth/pwd?ceremony="+routesTestCeremonyID))
 	get.AddCookie(cookie)
 	rr := serveSecured(server, get)
 
@@ -360,7 +360,7 @@ func TestTurnstileChallenge_TheFormCarriesTheWidgetAndOnlyItsPagesAdmitCloudflar
 	assert.Empty(t, strings.TrimSpace(script.Text()), "a script with no body, which the policy allows from its origin")
 
 	t.Run("in the page's language", func(t *testing.T) {
-		r := challenged(browserRequest(http.MethodGet, "/auth/pwd?ceremony="+routesTestCeremonyId))
+		r := challenged(browserRequest(http.MethodGet, "/auth/pwd?ceremony="+routesTestCeremonyID))
 		r.Header.Set("Accept-Language", "pt-BR")
 		r.AddCookie(cookie)
 		doc, err := goquery.NewDocumentFromReader(strings.NewReader(serve(server, r).Body.String()))
@@ -369,7 +369,7 @@ func TestTurnstileChallenge_TheFormCarriesTheWidgetAndOnlyItsPagesAdmitCloudflar
 	})
 
 	t.Run("another page keeps today's policy", func(t *testing.T) {
-		r := challenged(browserRequest(http.MethodGet, "/auth/otp?ceremony="+routesTestCeremonyId))
+		r := challenged(browserRequest(http.MethodGet, "/auth/otp?ceremony="+routesTestCeremonyID))
 		r.AddCookie(otpCeremonyCookie(t, server))
 		rr := serveSecured(server, r)
 		require.Equal(t, http.StatusOK, rr.Code)
@@ -401,7 +401,7 @@ func TestTurnstileChallenge_AFormThatFailsToRenderIsReplacedUnderTodaysPolicy(t 
 		request  func(*Server) *http.Request
 	}{
 		{"sign-in", "auth_pwd.html", func(s *Server) *http.Request {
-			r := challenged(browserRequest(http.MethodGet, "/auth/pwd?ceremony="+routesTestCeremonyId))
+			r := challenged(browserRequest(http.MethodGet, "/auth/pwd?ceremony="+routesTestCeremonyID))
 			r.AddCookie(pwdCeremonyCookie(t, s))
 			return r
 		}},

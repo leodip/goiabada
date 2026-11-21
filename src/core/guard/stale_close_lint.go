@@ -18,7 +18,7 @@ import (
 //
 // A defer statement hands the closure the variable, not the value. The shape #591 measured:
 //
-//	resp, err := httpClient.Get(destUrl)
+//	resp, err := httpClient.Get(destURL)
 //	require.NoError(t, err)
 //	defer func() { _ = resp.Body.Close() }()
 //	redirectLocation := assertRedirect(t, resp, "/auth/level1")

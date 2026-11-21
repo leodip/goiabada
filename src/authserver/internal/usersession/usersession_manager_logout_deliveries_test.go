@@ -26,8 +26,8 @@ import (
 func deliveryMocks(t *testing.T) *startSessionMocks {
 	t.Helper()
 	db := datamocks.NewDatabase(t)
-	db.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(123)).
-		Return(&record.User{Id: 123, Subject: "subject-123"}, nil).Once()
+	db.On("GetUserByID", mock.Anything, (*sql.Tx)(nil), int64(123)).
+		Return(&record.User{ID: 123, Subject: "subject-123"}, nil).Once()
 	return &startSessionMocks{db: db, manager: &Manager{database: db}}
 }
 
@@ -39,20 +39,20 @@ func (m *startSessionMocks) appsOn(session record.UserSession, held bool) {
 		return
 	}
 	clients := []record.UserSessionClient{
-		{Id: 1, UserSessionId: session.Id, ClientId: 51,
-			Client: record.Client{Id: 51, ClientIdentifier: "told-app", BackchannelLogoutURI: "https://told.example/bcl"}},
-		{Id: 2, UserSessionId: session.Id, ClientId: 52, Client: record.Client{Id: 52, ClientIdentifier: "untold-app"}},
+		{ID: 1, UserSessionID: session.ID, ClientID: 51,
+			Client: record.Client{ID: 51, ClientIdentifier: "told-app", BackchannelLogoutURI: "https://told.example/bcl"}},
+		{ID: 2, UserSessionID: session.ID, ClientID: 52, Client: record.Client{ID: 52, ClientIdentifier: "untold-app"}},
 	}
-	m.db.On("GetCommittedUserSessionClients", mock.Anything, txSentinel, session.Id).Return(clients, nil).Once()
+	m.db.On("GetCommittedUserSessionClients", mock.Anything, txSentinel, session.ID).Return(clients, nil).Once()
 }
 
 // toldApp is the one delivery a removed live session sends.
 func toldApp(session record.UserSession) []backchannel.Delivery {
 	return []backchannel.Delivery{{
-		ClientId:          51,
+		ClientID:          51,
 		ClientIdentifier:  "told-app",
 		URI:               "https://told.example/bcl",
-		UserId:            123,
+		UserID:            123,
 		Subject:           "subject-123",
 		SessionIdentifier: session.SessionIdentifier,
 	}}
@@ -60,9 +60,9 @@ func toldApp(session record.UserSession) []backchannel.Delivery {
 
 func TestStartNewUserSession_ALiveRemovedSessionTellsItsApps(t *testing.T) {
 	limits := capLimits(2)
-	live := func(id int64, deviceId string) record.UserSession {
+	live := func(id int64, deviceID string) record.UserSession {
 		session := otherBrowser(id, 2*time.Hour, 10*time.Minute)
-		session.DeviceId = deviceId
+		session.DeviceID = deviceID
 		return session
 	}
 
@@ -74,17 +74,17 @@ func TestStartNewUserSession_ALiveRemovedSessionTellsItsApps(t *testing.T) {
 	}{
 		{
 			name:     "the same device's",
-			existing: []record.UserSession{live(42, thisDeviceId)},
+			existing: []record.UserSession{live(42, thisDeviceID)},
 			reason:   "same_device",
 		},
 		{
 			name:     "over the cap",
-			existing: []record.UserSession{live(42, otherDeviceId), live(43, otherDeviceId)},
+			existing: []record.UserSession{live(42, otherDeviceID), live(43, otherDeviceID)},
 			reason:   "session_cap",
 		},
 		{
 			name:      "replaced by the sign-in, still valid by the settings",
-			existing:  []record.UserSession{live(42, otherDeviceId)},
+			existing:  []record.UserSession{live(42, otherDeviceID)},
 			replacing: func(existing []record.UserSession) *record.UserSession { return &existing[0] },
 			reason:    "replaced_by_sign_in",
 		},
@@ -98,14 +98,14 @@ func TestStartNewUserSession_ALiveRemovedSessionTellsItsApps(t *testing.T) {
 			// so the lower id.
 			removedSession := tc.existing[0]
 			m.appsOn(removedSession, true)
-			m.db.On("DeleteUserSession", mock.Anything, txSentinel, removedSession.Id).Return(nil).Once()
+			m.db.On("DeleteUserSession", mock.Anything, txSentinel, removedSession.ID).Return(nil).Once()
 			var replacing *record.UserSession
 			if tc.replacing != nil {
 				replacing = tc.replacing(tc.existing)
 			}
 
 			_, removed, err := m.manager.StartNewUserSession(context.Background(), 7,
-				authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, thisBrowser(),
+				authenticationOf(123, "pwd", record.ACRLevel1, someCredentialInstant()), 0, nil, thisBrowser(),
 				"192.168.1.50", replacing, limits)
 
 			require.NoError(t, err)
@@ -121,7 +121,7 @@ func TestStartNewUserSession_ALiveRemovedSessionTellsItsApps(t *testing.T) {
 func TestStartNewUserSession_AnExpiredRemovedSessionTellsNobody(t *testing.T) {
 	limits := capLimits(2)
 	idle := otherBrowser(42, 3*time.Hour, 2*time.Hour)
-	idle.DeviceId = thisDeviceId
+	idle.DeviceID = thisDeviceID
 	pastLifetime := otherBrowser(43, 25*time.Hour, time.Minute)
 	keptValid := otherBrowser(44, time.Hour, 5*time.Minute)
 
@@ -131,13 +131,13 @@ func TestStartNewUserSession_AnExpiredRemovedSessionTellsNobody(t *testing.T) {
 	m.db.On("DeleteUserSession", mock.Anything, txSentinel, int64(43)).Return(nil).Once()
 
 	_, removed, err := m.manager.StartNewUserSession(context.Background(), 7,
-		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, thisBrowser(),
+		authenticationOf(123, "pwd", record.ACRLevel1, someCredentialInstant()), 0, nil, thisBrowser(),
 		"192.168.1.50", nil, limits)
 
 	require.NoError(t, err)
 	assert.Equal(t, map[int64]string{42: "same_device", 43: "session_cap"}, removedReasons(removed))
 	for _, removal := range removed {
-		assert.Nil(t, removal.LogoutDeliveries, "session %d", removal.Session.Id)
+		assert.Nil(t, removal.LogoutDeliveries, "session %d", removal.Session.ID)
 	}
 }
 
@@ -145,7 +145,7 @@ func TestStartNewUserSession_AnExpiredRemovedSessionTellsNobody(t *testing.T) {
 // tells them.
 func TestStartNewUserSession_ARemovedSessionAlreadyGoneTellsNobody(t *testing.T) {
 	gone := otherBrowser(42, time.Hour, time.Minute)
-	gone.DeviceId = thisDeviceId
+	gone.DeviceID = thisDeviceID
 
 	m := deliveryMocks(t)
 	m.expectPersistThroughCommit(123, []record.UserSession{gone})
@@ -153,7 +153,7 @@ func TestStartNewUserSession_ARemovedSessionAlreadyGoneTellsNobody(t *testing.T)
 	m.db.On("DeleteUserSession", mock.Anything, txSentinel, int64(42)).Return(nil).Once()
 
 	_, removed, err := m.manager.StartNewUserSession(context.Background(), 7,
-		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, thisBrowser(),
+		authenticationOf(123, "pwd", record.ACRLevel1, someCredentialInstant()), 0, nil, thisBrowser(),
 		"192.168.1.50", nil, capLimits(0))
 
 	require.NoError(t, err)
@@ -165,11 +165,11 @@ func TestStartNewUserSession_ARemovedSessionAlreadyGoneTellsNobody(t *testing.T)
 func TestStartNewUserSession_AFailedSubjectReadCreatesNothing(t *testing.T) {
 	db := datamocks.NewDatabase(t)
 	dbErr := errors.New("users unreadable")
-	db.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(nil, dbErr).Once()
+	db.On("GetUserByID", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(nil, dbErr).Once()
 	manager := &Manager{database: db}
 
 	session, removed, err := manager.StartNewUserSession(context.Background(), 7,
-		authenticationOf(123, "pwd", record.AcrLevel1, someCredentialInstant()), 0, nil, thisBrowser(),
+		authenticationOf(123, "pwd", record.ACRLevel1, someCredentialInstant()), 0, nil, thisBrowser(),
 		"192.168.1.50", nil, capLimits(0))
 
 	require.ErrorIs(t, err, dbErr)

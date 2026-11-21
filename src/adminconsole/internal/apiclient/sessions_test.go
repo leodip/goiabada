@@ -14,8 +14,8 @@ import (
 
 // Seam "the client" (#373).
 //
-// The console reaches the auth server's three session lists through GetUserSessionsByUserId,
-// GetClientSessionsByClientId and GetAccountSessions, and none of the three had ever had its
+// The console reaches the auth server's three session lists through GetUserSessionsByUserID,
+// GetClientSessionsByClientID and GetAccountSessions, and none of the three had ever had its
 // real request path executed: the console's handler tests reach them only through hand-written
 // stubs returning canned structs, so the URL each builds and the json.Unmarshal each performs
 // ran nowhere. That decode is the one place a json tag renamed in core/api shows up as an empty
@@ -54,7 +54,7 @@ const sessionBodyFields = `
 	"clientIdentifiers": ["portal", "backoffice"]`
 
 // servesSessions is `serves` with the whole request target recorded rather than the path alone,
-// because GetClientSessionsByClientId assembles a query string by hand and that assembly is
+// because GetClientSessionsByClientID assembles a query string by hand and that assembly is
 // half of what this file covers. It is a second helper rather than a widened `serves` because
 // that one has eleven callers, every one of them asserting against a path.
 func servesSessions(t *testing.T, body string) (*AuthServerClient, func() (string, string)) {
@@ -81,21 +81,21 @@ type sessionListMethod struct {
 func sessionListMethods() []sessionListMethod {
 	return []sessionListMethod{
 		{
-			name:    "GetUserSessionsByUserId",
+			name:    "GetUserSessionsByUserID",
 			wantURI: "/api/v1/admin/users/42/sessions",
 			call: func(c *AuthServerClient) ([]api.UserSessionDetailResponse, error) {
-				return c.GetUserSessionsByUserId(context.Background(), "an-access-token", 42)
+				return c.GetUserSessionsByUserID(context.Background(), "an-access-token", 42)
 			},
 		},
 		{
-			name:    "GetClientSessionsByClientId",
+			name:    "GetClientSessionsByClientID",
 			wantURI: "/api/v1/admin/clients/7/sessions?page=2&size=10",
 			call: func(c *AuthServerClient) ([]api.UserSessionDetailResponse, error) {
 				// The only one of the three answering an envelope rather than a bare list:
 				// its sessions span users, so it carries their owners too. The users half is
 				// decoded by its own case below, because the table's other two methods have
 				// no such field to assert (#373).
-				resp, err := c.GetClientSessionsByClientId(context.Background(), "an-access-token", 7, 2, 10)
+				resp, err := c.GetClientSessionsByClientID(context.Background(), "an-access-token", 7, 2, 10)
 				if err != nil {
 					return nil, err
 				}
@@ -126,16 +126,16 @@ func TestAuthServerClient_SessionListsDecodeEveryFieldTheConsoleBinds(t *testing
 			assert.Equal(t, "Bearer an-access-token", gotAuthorization)
 
 			session := sessions[0]
-			assert.Equal(t, int64(7), session.Id)
+			assert.Equal(t, int64(7), session.ID)
 			assert.Equal(t, "a-session-identifier", session.SessionIdentifier)
 			require.NotNil(t, session.Started)
 			assert.Equal(t, time.Date(2026, time.January, 2, 3, 4, 5, 0, time.UTC), session.Started.UTC())
 			assert.Nil(t, session.LastAccessed)
-			assert.Equal(t, "203.0.113.7", session.IpAddress)
+			assert.Equal(t, "203.0.113.7", session.IPAddress)
 			assert.Equal(t, "Chrome 120", session.DeviceName)
 			assert.Equal(t, "Desktop", session.DeviceType)
 			assert.Equal(t, "Linux", session.DeviceOS)
-			assert.Equal(t, int64(42), session.UserId)
+			assert.Equal(t, int64(42), session.UserID)
 			assert.True(t, session.IsCurrent)
 			assert.Equal(t, []string{"portal", "backoffice"}, session.ClientIdentifiers)
 
@@ -165,11 +165,11 @@ func TestAuthServerClient_SessionListsAcceptALegacyEmptyUserAgent(t *testing.T) 
 	}
 }
 
-// GetClientSessionsByClientId assembles its query string by hand, `q := "?"` then `q += "&"`,
+// GetClientSessionsByClientID assembles its query string by hand, `q := "?"` then `q += "&"`,
 // and had no test at all. The neither case is the one that must produce a request target with
 // no `?` in it: an absent query is what leaves the endpoint free to apply its own defaults,
 // where `?page=0&size=0` would be asking it for page zero of nothing.
-func TestAuthServerClient_GetClientSessionsByClientIdBuildsThePaginationQuery(t *testing.T) {
+func TestAuthServerClient_GetClientSessionsByClientIDBuildsThePaginationQuery(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
 		page    int
@@ -184,7 +184,7 @@ func TestAuthServerClient_GetClientSessionsByClientIdBuildsThePaginationQuery(t 
 		t.Run(tc.name, func(t *testing.T) {
 			client, recorded := servesSessions(t, `{"sessions":[]}`)
 
-			_, err := client.GetClientSessionsByClientId(context.Background(), "an-access-token", 7, tc.page, tc.size)
+			_, err := client.GetClientSessionsByClientID(context.Background(), "an-access-token", 7, tc.page, tc.size)
 			require.NoError(t, err)
 
 			gotURI, _ := recorded()
@@ -206,21 +206,21 @@ func TestAuthServerClient_ClientSessionsDecodeTheOwnersArray(t *testing.T) {
 		{"id":43,"email":"sam@example.com","givenName":"Sam","middleName":"","familyName":"Reed",
 		 "somethingAddedLater":"ignored"}]}`)
 
-	resp, err := client.GetClientSessionsByClientId(context.Background(), "an-access-token", 7, 1, 50)
+	resp, err := client.GetClientSessionsByClientID(context.Background(), "an-access-token", 7, 1, 50)
 	require.NoError(t, err)
 	require.Len(t, resp.Sessions, 1)
 	require.Len(t, resp.Users, 2)
 
 	assert.Equal(t, api.SessionOwnerResponse{
-		Id: 42, Email: "jane@example.com", GivenName: "Jane", MiddleName: "Q", FamilyName: "Doe",
+		ID: 42, Email: "jane@example.com", GivenName: "Jane", MiddleName: "Q", FamilyName: "Doe",
 	}, resp.Users[0])
 	assert.Equal(t, api.SessionOwnerResponse{
-		Id: 43, Email: "sam@example.com", GivenName: "Sam", FamilyName: "Reed",
+		ID: 43, Email: "sam@example.com", GivenName: "Sam", FamilyName: "Reed",
 	}, resp.Users[1])
 
 	// The array is what the session's userId resolves against, which is the whole reason it is
 	// on the response.
-	assert.Equal(t, int64(42), resp.Sessions[0].UserId)
+	assert.Equal(t, int64(42), resp.Sessions[0].UserID)
 }
 
 // An endpoint that sent no users at all, which is what a body from before this field existed
@@ -229,7 +229,7 @@ func TestAuthServerClient_ClientSessionsDecodeTheOwnersArray(t *testing.T) {
 func TestAuthServerClient_ClientSessionsAcceptAnAbsentUsersArray(t *testing.T) {
 	client, _ := servesSessions(t, `{"sessions":[{`+sessionBodyFields+`}]}`)
 
-	resp, err := client.GetClientSessionsByClientId(context.Background(), "an-access-token", 7, 1, 50)
+	resp, err := client.GetClientSessionsByClientID(context.Background(), "an-access-token", 7, 1, 50)
 	require.NoError(t, err)
 	require.Len(t, resp.Sessions, 1)
 	assert.Empty(t, resp.Users)
@@ -245,9 +245,9 @@ func TestAuthServerClient_ASessionDeleteRefusesASuccessFalseBody(t *testing.T) {
 		call func(c *AuthServerClient) error
 	}{
 		{
-			name: "DeleteUserSessionById",
+			name: "DeleteUserSessionByID",
 			call: func(c *AuthServerClient) error {
-				return c.DeleteUserSessionById(context.Background(), "an-access-token", 31)
+				return c.DeleteUserSessionByID(context.Background(), "an-access-token", 31)
 			},
 		},
 		{

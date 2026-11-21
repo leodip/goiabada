@@ -41,10 +41,10 @@ func assertCeremonyNoLongerActive(t *testing.T, resp *http.Response, what string
 // walkToPasswordPage starts one authorization request on the caller's browser and follows it to its
 // login screen. It returns the screen's URL, which names the ceremony, and the screen itself.
 func walkToPasswordPage(t *testing.T, httpClient *http.Client, client *record.Client,
-	redirectUri *record.RedirectURI, state string) (string, *http.Response) {
+	redirectURI *record.RedirectURI, state string) (string, *http.Response) {
 	t.Helper()
 
-	resp, err := httpClient.Get(authorizeUrlFor(client, redirectUri, "openid profile", state))
+	resp, err := httpClient.Get(authorizeURLFor(client, redirectURI, "openid profile", state))
 	require.NoError(t, err)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
@@ -61,47 +61,47 @@ func walkToPasswordPage(t *testing.T, httpClient *http.Client, client *record.Cl
 // 2). Tab A then loads a step and gets the "no longer active" page, and the five newer sign-ins are
 // untouched: the first of them, the one least recently moved now, still finishes.
 func TestAuthorize_APageOfASignInPushedOutByFiveNewerIsRefusedAtItsNextStep(t *testing.T) {
-	clientA, redirectUriA := createConsentClient(t)
-	clientB, redirectUriB := createLevel1Client(t, false)
+	clientA, redirectURIA := createConsentClient(t)
+	clientB, redirectURIB := createLevel1Client(t, false)
 	user, password := createCeremonyUser(t)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
-	pwdUrlA, pwdPageA := walkToPasswordPage(t, httpClient, clientA, redirectUriA, fake.LetterN(8))
+	pwdURLA, pwdPageA := walkToPasswordPage(t, httpClient, clientA, redirectURIA, fake.LetterN(8))
 	defer func() { _ = pwdPageA.Body.Close() }()
 	assert.Equal(t, http.StatusOK, pwdPageA.StatusCode)
 
 	stateB := fake.LetterN(8)
-	pwdUrlB, pwdPageB := walkToPasswordPage(t, httpClient, clientB, redirectUriB, stateB)
+	pwdURLB, pwdPageB := walkToPasswordPage(t, httpClient, clientB, redirectURIB, stateB)
 	defer func() { _ = pwdPageB.Body.Close() }()
 	assert.Equal(t, http.StatusOK, pwdPageB.StatusCode)
 
 	// With four more sign-ins, A's is the sixth from the latest.
 	for i := 0; i < 4; i++ {
-		_, page := walkToPasswordPage(t, httpClient, clientB, redirectUriB, fake.LetterN(8))
+		_, page := walkToPasswordPage(t, httpClient, clientB, redirectURIB, fake.LetterN(8))
 		_ = page.Body.Close()
 	}
 
 	// Tab A reloads its own login screen. It names A's ceremony, which the browser no longer holds.
-	reload := loadPage(t, httpClient, pwdUrlA)
+	reload := loadPage(t, httpClient, pwdURLA)
 	defer func() { _ = reload.Body.Close() }()
 	assertCeremonyNoLongerActive(t, reload, "a page load of the pushed-out sign-in")
 
 	// And it does not get to the step after either, which is the load a tab that followed a redirect
 	// makes. Reached by the URL it would have been sent to, naming its own ceremony.
-	next := loadPage(t, httpClient, stepURLOfTheSameCeremony(t, pwdUrlA, "/auth/level1completed"))
+	next := loadPage(t, httpClient, stepURLOfTheSameCeremony(t, pwdURLA, "/auth/level1completed"))
 	defer func() { _ = next.Body.Close() }()
 	assertCeremonyNoLongerActive(t, next, "the step after the login of the pushed-out sign-in")
 
 	// Nor does its form, submitted with the right password.
-	submitted := authenticateWithPassword(t, httpClient, pwdUrlA, pwdPageA, user.Email, password)
+	submitted := authenticateWithPassword(t, httpClient, pwdURLA, pwdPageA, user.Email, password)
 	defer func() { _ = submitted.Body.Close() }()
 	assertCeremonyNoLongerActive(t, submitted, "the login form of the pushed-out sign-in")
-	assertNothingWasCompleted(t, user.Id)
+	assertNothingWasCompleted(t, user.ID)
 
 	// B's sign-in, the oldest of the five newer ones, was not disturbed by any of it: its own screen
 	// signs in and receives its code.
-	resp := authenticateWithPassword(t, httpClient, pwdUrlB, pwdPageB, user.Email, password)
+	resp := authenticateWithPassword(t, httpClient, pwdURLB, pwdPageB, user.Email, password)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	location := assertRedirect(t, resp, "/auth/level1completed")
@@ -112,31 +112,31 @@ func TestAuthorize_APageOfASignInPushedOutByFiveNewerIsRefusedAtItsNextStep(t *t
 	resp = loadPage(t, httpClient, location)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
-	assertCodeFor(t, httpClient, assertRedirect(t, resp, "/auth/issue"), clientB, redirectUriB, stateB)
+	assertCodeFor(t, httpClient, assertRedirect(t, resp, "/auth/issue"), clientB, redirectURIB, stateB)
 }
 
 // TestAuthorize_AStepOfASignInHeldBesideANewerOneFinishes: tab A's sign-in is at its login screen
 // when tab B's starts in the same browser. Tab A reloads its screen, signs in and receives its own
 // code: a newer sign-in no longer ends one in progress (#246).
 func TestAuthorize_AStepOfASignInHeldBesideANewerOneFinishes(t *testing.T) {
-	clientA, redirectUriA := createLevel1Client(t, false)
-	clientB, redirectUriB := createLevel1Client(t, false)
+	clientA, redirectURIA := createLevel1Client(t, false)
+	clientB, redirectURIB := createLevel1Client(t, false)
 	user, password := createCeremonyUser(t)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
 	stateA := fake.LetterN(8)
-	pwdUrlA, pwdPageA := walkToPasswordPage(t, httpClient, clientA, redirectUriA, stateA)
+	pwdURLA, pwdPageA := walkToPasswordPage(t, httpClient, clientA, redirectURIA, stateA)
 	_ = pwdPageA.Body.Close()
 
-	_, pwdPageB := walkToPasswordPage(t, httpClient, clientB, redirectUriB, fake.LetterN(8))
+	_, pwdPageB := walkToPasswordPage(t, httpClient, clientB, redirectURIB, fake.LetterN(8))
 	_ = pwdPageB.Body.Close()
 
-	reload := loadPage(t, httpClient, pwdUrlA)
+	reload := loadPage(t, httpClient, pwdURLA)
 	defer func() { _ = reload.Body.Close() }()
 	require.Equal(t, http.StatusOK, reload.StatusCode, "tab A's own login screen still loads")
 
-	resp := authenticateWithPassword(t, httpClient, pwdUrlA, reload, user.Email, password)
+	resp := authenticateWithPassword(t, httpClient, pwdURLA, reload, user.Email, password)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	location := assertRedirect(t, resp, "/auth/level1completed")
@@ -147,7 +147,7 @@ func TestAuthorize_AStepOfASignInHeldBesideANewerOneFinishes(t *testing.T) {
 	resp = loadPage(t, httpClient, location)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
-	assertCodeFor(t, httpClient, assertRedirect(t, resp, "/auth/issue"), clientA, redirectUriA, stateA)
+	assertCodeFor(t, httpClient, assertRedirect(t, resp, "/auth/issue"), clientA, redirectURIA, stateA)
 }
 
 // TestAuthorize_AStepThatNamesNoCeremonyOrAnotherIsRefused is every way a step's URL can fail to name
@@ -156,13 +156,13 @@ func TestAuthorize_AStepOfASignInHeldBesideANewerOneFinishes(t *testing.T) {
 // well-formed id from nowhere. The URL that works, last, shows the stored ceremony was never
 // disturbed by any of them.
 func TestAuthorize_AStepThatNamesNoCeremonyOrAnotherIsRefused(t *testing.T) {
-	client, redirectUri := createLevel1Client(t, false)
+	client, redirectURI := createLevel1Client(t, false)
 
-	httpClient := createHttpClient(t)
-	pwdUrl, pwdPage := walkToPasswordPage(t, httpClient, client, redirectUri, fake.LetterN(8))
+	httpClient := createHTTPClient(t)
+	pwdURL, pwdPage := walkToPasswordPage(t, httpClient, client, redirectURI, fake.LetterN(8))
 	defer func() { _ = pwdPage.Body.Close() }()
 
-	ceremonyId := getCeremonyIdFromPage(t, pwdPage)
+	ceremonyID := getCeremonyIDFromPage(t, pwdPage)
 	base := appConfig.AuthServer.BaseURL + "/auth/pwd"
 
 	testCases := []struct {
@@ -171,10 +171,10 @@ func TestAuthorize_AStepThatNamesNoCeremonyOrAnotherIsRefused(t *testing.T) {
 	}{
 		{"no parameter at all, a hand-typed address", base},
 		{"the parameter present and empty", base + "?" + ceremony.QueryParameter + "="},
-		{"another ceremony's id", base + "?" + ceremony.QueryParameter + "=" + ceremony.NewId()},
-		{"the stored id one character short", base + "?" + ceremony.QueryParameter + "=" + ceremonyId[:len(ceremonyId)-1]},
-		{"the stored id and more", base + "?" + ceremony.QueryParameter + "=" + ceremonyId + "x"},
-		{"the form field's name in place of the parameter", base + "?ceremonyId=" + url.QueryEscape(ceremonyId)},
+		{"another ceremony's id", base + "?" + ceremony.QueryParameter + "=" + ceremony.NewID()},
+		{"the stored id one character short", base + "?" + ceremony.QueryParameter + "=" + ceremonyID[:len(ceremonyID)-1]},
+		{"the stored id and more", base + "?" + ceremony.QueryParameter + "=" + ceremonyID + "x"},
+		{"the form field's name in place of the parameter", base + "?ceremonyId=" + url.QueryEscape(ceremonyID)},
 	}
 
 	for _, tc := range testCases {
@@ -187,11 +187,11 @@ func TestAuthorize_AStepThatNamesNoCeremonyOrAnotherIsRefused(t *testing.T) {
 	}
 
 	t.Run("the URL the redirect built still works", func(t *testing.T) {
-		resp := loadPage(t, httpClient, pwdUrl)
+		resp := loadPage(t, httpClient, pwdURL)
 		defer func() { _ = resp.Body.Close() }()
 
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
-		assert.Equal(t, ceremonyId, getCeremonyIdFromPage(t, resp))
+		assert.Equal(t, ceremonyID, getCeremonyIDFromPage(t, resp))
 	})
 }
 
@@ -214,16 +214,16 @@ func TestAuthorize_ThePasswordPageOffersRegisterOnlyWhileRegistrationIsAvailable
 		t.Run(tc.name, func(t *testing.T) {
 			setRegSettings(t, tc.selfRegistration, tc.verification, tc.email)
 
-			client, redirectUri := createLevel1Client(t, false)
-			httpClient := createHttpClient(t)
-			pwdUrl, pwdPage := walkToPasswordPage(t, httpClient, client, redirectUri, fake.LetterN(8))
+			client, redirectURI := createLevel1Client(t, false)
+			httpClient := createHTTPClient(t)
+			pwdURL, pwdPage := walkToPasswordPage(t, httpClient, client, redirectURI, fake.LetterN(8))
 			defer func() { _ = pwdPage.Body.Close() }()
 			require.Equal(t, http.StatusOK, pwdPage.StatusCode)
 
 			links := parseHTMLResponse(t, pwdPage).Find(`a[href^="/account/register"]`).Length()
 			assert.Equal(t, map[bool]int{true: 1, false: 0}[tc.want], links, "Register links on the password page")
 
-			refused := authenticateWithPassword(t, httpClient, pwdUrl, pwdPage, fake.Email(), fake.LetterN(16))
+			refused := authenticateWithPassword(t, httpClient, pwdURL, pwdPage, fake.Email(), fake.LetterN(16))
 			defer func() { _ = refused.Body.Close() }()
 			require.Equal(t, http.StatusOK, refused.StatusCode, "a refused password re-renders the form")
 
@@ -242,18 +242,18 @@ func TestAuthorize_ThePasswordPageOffersRegisterOnlyWhileRegistrationIsAvailable
 func TestAuthorize_TheRegistrationLinksCarryTheSignInThroughAndBack(t *testing.T) {
 	setRegSettings(t, true, false, false)
 
-	client, redirectUri := createLevel1Client(t, false)
-	httpClient := createHttpClient(t)
-	_, pwdPage := walkToPasswordPage(t, httpClient, client, redirectUri, fake.LetterN(8))
+	client, redirectURI := createLevel1Client(t, false)
+	httpClient := createHTTPClient(t)
+	_, pwdPage := walkToPasswordPage(t, httpClient, client, redirectURI, fake.LetterN(8))
 	defer func() { _ = pwdPage.Body.Close() }()
 	require.Equal(t, http.StatusOK, pwdPage.StatusCode)
 
-	ceremonyId := getCeremonyIdFromPage(t, pwdPage)
+	ceremonyID := getCeremonyIDFromPage(t, pwdPage)
 
 	// The password page's link names the sign-in it belongs to.
 	registerLink, ok := parseHTMLResponse(t, pwdPage).Find(`a[href^="/account/register"]`).Attr("href")
 	require.True(t, ok, "the password page links to registration")
-	assert.Equal(t, "/account/register?"+url.Values{ceremony.QueryParameter: {ceremonyId}}.Encode(), registerLink)
+	assert.Equal(t, "/account/register?"+url.Values{ceremony.QueryParameter: {ceremonyID}}.Encode(), registerLink)
 
 	// Followed, the registration page's "Sign in" link names it too.
 	registerPage := loadPage(t, httpClient, appConfig.AuthServer.BaseURL+registerLink)
@@ -262,13 +262,13 @@ func TestAuthorize_TheRegistrationLinksCarryTheSignInThroughAndBack(t *testing.T
 
 	signInLink, ok := parseHTMLResponse(t, registerPage).Find(`a[href^="/auth/pwd"]`).Attr("href")
 	require.True(t, ok, "the registration page links back to the sign-in")
-	assert.Equal(t, "/auth/pwd?"+url.Values{ceremony.QueryParameter: {ceremonyId}}.Encode(), signInLink)
+	assert.Equal(t, "/auth/pwd?"+url.Values{ceremony.QueryParameter: {ceremonyID}}.Encode(), signInLink)
 
 	// And followed, it is the same sign-in's password form.
 	back := loadPage(t, httpClient, appConfig.AuthServer.BaseURL+signInLink)
 	defer func() { _ = back.Body.Close() }()
 	assert.Equal(t, http.StatusOK, back.StatusCode)
-	assert.Equal(t, ceremonyId, getCeremonyIdFromPage(t, back), "the same sign-in, not a new one")
+	assert.Equal(t, ceremonyID, getCeremonyIDFromPage(t, back), "the same sign-in, not a new one")
 
 	// consoleSignIn asserts the page links no step of the auth server's sign-in, and links Sign in to
 	// the console's account page instead.
@@ -291,8 +291,8 @@ func TestAuthorize_TheRegistrationLinksCarryTheSignInThroughAndBack(t *testing.T
 	})
 
 	for name, value := range map[string]string{
-		"an id of the wrong length":      ceremonyId + "x",
-		"an id with a foreign character": ceremonyId[:len(ceremonyId)-1] + "!",
+		"an id of the wrong length":      ceremonyID + "x",
+		"an id with a foreign character": ceremonyID[:len(ceremonyID)-1] + "!",
 		"markup":                         `"><script>alert(1)</script>`,
 	} {
 		t.Run("the registration page drops "+name, func(t *testing.T) {

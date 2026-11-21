@@ -74,10 +74,10 @@ func TestResetPasswordLink(t *testing.T) {
 // A registration from an app's sign-in mails a link that names the sign-in too, which the first
 // hop keeps when it drops the code (#622 decision 9).
 func TestAccountActivateLink_CarriesTheSignIn(t *testing.T) {
-	const ceremonyId = "aBcDeFgHiJkLmNoPqRsTuVwXyZ012345"
-	assert.Equal(t, "https://auth.example.com/account/activate?ceremony="+ceremonyId+"&code=abc123",
-		AccountActivateLink(testBaseURL, "abc123", ceremonyId))
-	assert.Equal(t, "/account/activate?ceremony="+ceremonyId, AccountActivateContinuation(ceremonyId))
+	const ceremonyID = "aBcDeFgHiJkLmNoPqRsTuVwXyZ012345"
+	assert.Equal(t, "https://auth.example.com/account/activate?ceremony="+ceremonyID+"&code=abc123",
+		AccountActivateLink(testBaseURL, "abc123", ceremonyID))
+	assert.Equal(t, "/account/activate?ceremony="+ceremonyID, AccountActivateContinuation(ceremonyID))
 	assert.Equal(t, "/account/activate", AccountActivateContinuation(""))
 }
 
@@ -85,11 +85,11 @@ func TestAccountActivateLink_CarriesTheSignIn(t *testing.T) {
 // which the first hop keeps when it drops the code; a request naming none, and the setup link, carry
 // the code alone (#812 decision 9).
 func TestResetPasswordLink_CarriesTheSignIn(t *testing.T) {
-	const ceremonyId = "aBcDeFgHiJkLmNoPqRsTuVwXyZ012345"
-	assert.Equal(t, "https://auth.example.com/reset-password?ceremony="+ceremonyId+"&code=abc123",
-		ResetPasswordLink(testBaseURL, "abc123", ceremonyId))
+	const ceremonyID = "aBcDeFgHiJkLmNoPqRsTuVwXyZ012345"
+	assert.Equal(t, "https://auth.example.com/reset-password?ceremony="+ceremonyID+"&code=abc123",
+		ResetPasswordLink(testBaseURL, "abc123", ceremonyID))
 	assert.Equal(t, "https://auth.example.com/reset-password?code=abc123", ResetPasswordLink(testBaseURL, "abc123", ""))
-	assert.Equal(t, "/reset-password?ceremony="+ceremonyId, ResetPasswordContinuation(ceremonyId))
+	assert.Equal(t, "/reset-password?ceremony="+ceremonyID, ResetPasswordContinuation(ceremonyID))
 	assert.Equal(t, "/reset-password", ResetPasswordContinuation(""))
 }
 

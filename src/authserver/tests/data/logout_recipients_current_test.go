@@ -37,8 +37,8 @@ type joinBeforeTheSessionLockDatabase struct {
 	join func() error
 }
 
-func (d *joinBeforeTheSessionLockDatabase) GetUserSessionsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserSession, error) {
-	sessions, err := d.Database.GetUserSessionsByUserId(ctx, tx, userId)
+func (d *joinBeforeTheSessionLockDatabase) GetUserSessionsByUserID(ctx context.Context, tx *sql.Tx, userID int64) ([]record.UserSession, error) {
+	sessions, err := d.Database.GetUserSessionsByUserID(ctx, tx, userID)
 	if err == nil && d.join != nil {
 		join := d.join
 		d.join = nil
@@ -65,13 +65,13 @@ func newRecipientsRace(t *testing.T, ctx context.Context, sessionRequired bool) 
 	}
 	other := secondDatabase(t)
 	race := &recipientsRace{user: createTestUser(t), first: createTestClient(t), joined: createTestClient(t)}
-	require.NoError(t, database.SetClientBackchannelLogout(ctx, nil, race.first.Id, "https://first.example/backchannel", sessionRequired))
-	race.session = createTestUserSessionWithClient(t, race.user.Id, race.first.Id)
+	require.NoError(t, database.SetClientBackchannelLogout(ctx, nil, race.first.ID, "https://first.example/backchannel", sessionRequired))
+	race.session = createTestUserSessionWithClient(t, race.user.ID, race.first.ID)
 	race.db = &joinBeforeTheSessionLockDatabase{Database: database, join: func() error {
-		if err := other.SetClientBackchannelLogout(ctx, nil, race.joined.Id, "https://joined.example/backchannel", sessionRequired); err != nil {
+		if err := other.SetClientBackchannelLogout(ctx, nil, race.joined.ID, "https://joined.example/backchannel", sessionRequired); err != nil {
 			return err
 		}
-		_, err := usersession.NewManager(other).BumpUserSession(ctx, race.session.SessionIdentifier, race.joined.Id, "", "", "")
+		_, err := usersession.NewManager(other).BumpUserSession(ctx, race.session.SessionIdentifier, race.joined.ID, "", "", "")
 		return err
 	}}
 	return race
@@ -84,14 +84,14 @@ func (race *recipientsRace) requireBothTold(t *testing.T, deliveries []backchann
 	require.Nil(t, race.db.join, "the join ran inside the end")
 	told := map[int64]backchannel.Delivery{}
 	for _, delivery := range deliveries {
-		told[delivery.ClientId] = delivery
+		told[delivery.ClientID] = delivery
 	}
 	require.Len(t, told, 2, "the app on the session and the app that joined it before it was taken")
-	require.Contains(t, told, race.first.Id)
-	require.Contains(t, told, race.joined.Id)
-	require.Equal(t, "https://joined.example/backchannel", told[race.joined.Id].URI,
+	require.Contains(t, told, race.first.ID)
+	require.Contains(t, told, race.joined.ID)
+	require.Equal(t, "https://joined.example/backchannel", told[race.joined.ID].URI,
 		"the joined app's URI as committed before the session was taken")
-	require.Equal(t, sid, told[race.joined.Id].SessionIdentifier)
+	require.Equal(t, sid, told[race.joined.ID].SessionIdentifier)
 	require.Len(t, deliveries, 2)
 }
 
@@ -100,7 +100,7 @@ func TestLogoutRecipients_AUserWideRevocationTellsAnAppThatJoinedBeforeTheSessio
 	defer cancel()
 	race := newRecipientsRace(t, ctx, true)
 
-	result, err := revocation.RevokeUserAuthStateTx(ctx, race.db, race.user.Id, "", revocation.LogoutNotice{
+	result, err := revocation.RevokeUserAuthStateTx(ctx, race.db, race.user.ID, "", revocation.LogoutNotice{
 		Subject: race.user.Subject, UserWide: true, Live: revocation.LiveUnder(3600, 86400),
 	}, func(*sql.Tx) error { return nil })
 
@@ -112,9 +112,9 @@ func TestLogoutRecipients_ASessionSpecificRevocationTellsAnAppThatJoinedBeforeTh
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	race := newRecipientsRace(t, ctx, false)
-	kept := createTestUserSessionWithClient(t, race.user.Id, race.first.Id)
+	kept := createTestUserSessionWithClient(t, race.user.ID, race.first.ID)
 
-	result, err := revocation.RevokeUserAuthStateTx(ctx, race.db, race.user.Id, kept.SessionIdentifier, revocation.LogoutNotice{
+	result, err := revocation.RevokeUserAuthStateTx(ctx, race.db, race.user.ID, kept.SessionIdentifier, revocation.LogoutNotice{
 		Subject: race.user.Subject, Live: revocation.LiveUnder(3600, 86400),
 	}, func(*sql.Tx) error { return nil })
 
@@ -142,7 +142,7 @@ func TestLogoutRecipients_AUserDeletionTellsAnAppThatJoinedBeforeTheSessionLock(
 	managePermissionRow(t)
 
 	sender := &recordedLogoutTokens{}
-	id := strconv.FormatInt(race.user.Id, 10)
+	id := strconv.FormatInt(race.user.ID, 10)
 	rr := serveUserWrite(ctx, apihandlers.HandleUserDelete(race.db, &countingAuditLogger{}, noNotices{}, sender),
 		http.MethodDelete, "/api/v1/admin/users/"+id, map[string]string{"id": id}, nil,
 		"logout-recipients-test", builtin.AuthServerResourceIdentifier+":"+builtin.ManagePermissionIdentifier)
@@ -198,11 +198,11 @@ func TestLogoutRecipients_ADisableAndASessionBindResolveTheirPostgreSQLDeadlock(
 	managePermissionRow(t)
 	race := newRecipientsRace(t, ctx, true)
 	if !race.user.Enabled {
-		enabled, err := database.TrySetUserEnabled(ctx, nil, race.user.Id, false, true)
+		enabled, err := database.TrySetUserEnabled(ctx, nil, race.user.ID, false, true)
 		require.NoError(t, err)
 		require.True(t, enabled)
 	}
-	require.NoError(t, database.SetClientBackchannelLogout(ctx, nil, race.joined.Id, "https://joined.example/backchannel", true))
+	require.NoError(t, database.SetClientBackchannelLogout(ctx, nil, race.joined.ID, "https://joined.example/backchannel", true))
 
 	// The bind holds the session's row and waits, before writing it back, until the disable holds
 	// the user's row and comes to take the session's.
@@ -226,7 +226,7 @@ func TestLogoutRecipients_ADisableAndASessionBindResolveTheirPostgreSQLDeadlock(
 		}}
 	bindDone := make(chan error, 1)
 	go func() {
-		_, err := usersession.NewManager(bindDB).BumpUserSession(ctx, race.session.SessionIdentifier, race.joined.Id, "", "", "")
+		_, err := usersession.NewManager(bindDB).BumpUserSession(ctx, race.session.SessionIdentifier, race.joined.ID, "", "", "")
 		bindDone <- err
 	}()
 	select {
@@ -238,7 +238,7 @@ func TestLogoutRecipients_ADisableAndASessionBindResolveTheirPostgreSQLDeadlock(
 	}
 
 	sender := &recordedLogoutTokens{}
-	id := strconv.FormatInt(race.user.Id, 10)
+	id := strconv.FormatInt(race.user.ID, 10)
 	rr := serveUserWrite(ctx, apihandlers.HandleUserEnabledPut(disableDB, &countingAuditLogger{}, sender),
 		http.MethodPut, "/api/v1/admin/users/"+id+"/enabled", map[string]string{"id": id},
 		[]byte(`{"enabled":false}`), "disable-bind-deadlock-test",
@@ -254,22 +254,22 @@ func TestLogoutRecipients_ADisableAndASessionBindResolveTheirPostgreSQLDeadlock(
 	require.Equal(t, int32(3), disableDB.attempts.Load()+bindDB.attempts.Load(),
 		"the deadlock's victim ran a second attempt, and each transaction otherwise one (disable %d, bind %d)",
 		disableDB.attempts.Load(), bindDB.attempts.Load())
-	disabled, err := database.GetUserById(ctx, nil, race.user.Id)
+	disabled, err := database.GetUserByID(ctx, nil, race.user.ID)
 	require.NoError(t, err)
 	require.NotNil(t, disabled)
 	require.False(t, disabled.Enabled, "the user is disabled")
-	left, err := database.GetUserSessionById(ctx, nil, race.session.Id)
+	left, err := database.GetUserSessionByID(ctx, nil, race.session.ID)
 	require.NoError(t, err)
 	require.Nil(t, left, "the disable ended the session")
 
-	told := sender.toldClientIds()
-	require.True(t, told[race.first.Id], "the app already on the session is told")
+	told := sender.toldClientIDs()
+	require.True(t, told[race.first.ID], "the app already on the session is told")
 	if bindDB.attempts.Load() == 1 {
 		require.NoError(t, bindErr, "the disable was the victim, and the bind committed")
-		require.True(t, told[race.joined.Id], "the app whose bind committed before the disable's rerun is told")
+		require.True(t, told[race.joined.ID], "the app whose bind committed before the disable's rerun is told")
 	} else {
 		require.ErrorContains(t, bindErr, "user session is nil", "the bind was the victim, and its rerun finds the session gone")
-		require.False(t, told[race.joined.Id], "the bind never committed, so its app is not on the session")
+		require.False(t, told[race.joined.ID], "the bind never committed, so its app is not on the session")
 	}
 }
 
@@ -287,8 +287,8 @@ func TestLogoutRecipients_ASignInRemovalTellsAnAppThatJoinedBeforeTheSessionLock
 	signingIn := createTestClient(t)
 
 	now := time.Now().UTC()
-	_, removed, err := usersession.NewManager(race.db).StartNewUserSession(ctx, signingIn.Id, usersession.Authentication{
-		UserId: race.user.Id, AuthMethods: "pwd", AcrLevel: record.AcrLevel1,
+	_, removed, err := usersession.NewManager(race.db).StartNewUserSession(ctx, signingIn.ID, usersession.Authentication{
+		UserID: race.user.ID, AuthMethods: "pwd", ACRLevel: record.ACRLevel1,
 		AuthTime: &now, PasswordAuthTime: &now,
 	}, race.user.AuthStateGeneration, nil, usersession.Device{Identifier: "recipients-new-device", New: true}, "127.0.0.1",
 		race.session, usersession.SessionLimits{IdleTimeoutInSeconds: 3600, MaxLifetimeInSeconds: 86400, MaxSessionsPerUser: 100})
@@ -325,9 +325,9 @@ func TestLogoutRecipients_AHintedSignOutByTheLastAppKeepsASessionAnAppJoinedBefo
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	user, hinted, joined := createTestUser(t), createTestClient(t), createTestClient(t)
-	session := createTestUserSessionWithClient(t, user.Id, hinted.Id)
+	session := createTestUserSessionWithClient(t, user.ID, hinted.ID)
 	db := &joinBeforeTheTransactionDatabase{Database: database, join: func() error {
-		_, err := usersession.NewManager(database).BumpUserSession(ctx, session.SessionIdentifier, joined.Id, "", "", "")
+		_, err := usersession.NewManager(database).BumpUserSession(ctx, session.SessionIdentifier, joined.ID, "", "", "")
 		return err
 	}}
 
@@ -336,14 +336,14 @@ func TestLogoutRecipients_AHintedSignOutByTheLastAppKeepsASessionAnAppJoinedBefo
 	require.NoError(t, err)
 	require.Nil(t, db.join, "the join ran as the end opened its transaction")
 	require.NotNil(t, end.Ended, "the hinted app's part ended")
-	require.Equal(t, hinted.Id, end.Ended.ClientId)
+	require.Equal(t, hinted.ID, end.Ended.ClientID)
 	require.False(t, end.SessionDeleted, "the app that joined keeps the session")
 
 	kept, err := database.GetUserSessionBySessionIdentifier(ctx, nil, session.SessionIdentifier)
 	require.NoError(t, err)
 	require.NotNil(t, kept, "the session stays")
-	apps, err := database.GetUserSessionClientsByUserSessionId(ctx, nil, session.Id)
+	apps, err := database.GetUserSessionClientsByUserSessionID(ctx, nil, session.ID)
 	require.NoError(t, err)
 	require.Len(t, apps, 1)
-	require.Equal(t, joined.Id, apps[0].ClientId, "with the app that joined, and without the hinted one")
+	require.Equal(t, joined.ID, apps[0].ClientID, "with the app that joined, and without the hinted one")
 }

@@ -24,7 +24,7 @@ type ClientDisplayInfo struct {
 // clientDisplayDatabase is the read getClientDisplayInfo makes: whether the client has a logo to
 // show. data.Database satisfies it.
 type clientDisplayDatabase interface {
-	ClientHasLogo(ctx context.Context, tx *sql.Tx, clientId int64) (bool, error)
+	ClientHasLogo(ctx context.Context, tx *sql.Tx, clientID int64) (bool, error)
 }
 
 // ceremonyClientDisplayDatabase is what loadClientDisplay reads: the ceremony's client, and whether
@@ -42,7 +42,7 @@ type ceremonyClientDisplayDatabase interface {
 func loadClientDisplay(ctx context.Context, database ceremonyClientDisplayDatabase,
 	authContext *ceremony.AuthContext) (*ClientDisplayInfo, error) {
 
-	client, err := database.GetClientByClientIdentifier(ctx, nil, authContext.ClientId)
+	client, err := database.GetClientByClientIdentifier(ctx, nil, authContext.ClientID)
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +65,7 @@ func getClientDisplayInfo(ctx context.Context, database clientDisplayDatabase, c
 	}
 
 	if client.ShowLogo {
-		hasLogo, err := database.ClientHasLogo(ctx, nil, client.Id)
+		hasLogo, err := database.ClientHasLogo(ctx, nil, client.ID)
 		if err != nil {
 			slog.WarnContext(ctx, "unable to check whether the client has a logo, defaulting to false",
 				"client_identifier", client.ClientIdentifier, "error", err)

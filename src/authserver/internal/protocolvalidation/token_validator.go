@@ -20,11 +20,11 @@ import (
 )
 
 type PermissionChecker interface {
-	UserHasScopePermission(ctx context.Context, userId int64, scope string) (bool, error)
+	UserHasScopePermission(ctx context.Context, userID int64, scope string) (bool, error)
 }
 
 type TokenParser interface {
-	DecodeAndValidateTokenString(ctx context.Context, token string, withExpirationCheck bool) (*oauth.JwtToken, error)
+	DecodeAndValidateTokenString(ctx context.Context, token string, withExpirationCheck bool) (*oauth.JWTToken, error)
 }
 
 // tokenValidatorDatabase is what the token request validator needs: the client, the grant being
@@ -41,7 +41,7 @@ type tokenValidatorDatabase interface {
 	CodeLoadUser(ctx context.Context, tx *sql.Tx, code *record.Code) error
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
 	GetCodeByCodeHash(ctx context.Context, tx *sql.Tx, codeHash string, used bool) (*record.Code, error)
-	GetConsentByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (*record.UserConsent, error)
+	GetConsentByUserIDAndClientID(ctx context.Context, tx *sql.Tx, userID int64, clientID int64) (*record.UserConsent, error)
 	GetUserByEmail(ctx context.Context, tx *sql.Tx, email string) (*record.User, error)
 	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error)
 	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
@@ -82,7 +82,7 @@ type ValidateTokenRequestInput struct {
 	Code         string
 	RedirectURI  string
 	CodeVerifier string
-	ClientId     string
+	ClientID     string
 	ClientSecret string
 	// ClientAuthMethod is how the request presented ClientSecret, which a client that registered
 	// itself is held to (#708).
@@ -114,7 +114,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, settings *r
 
 	// A missing client_id, an unknown client and a disabled one, each answered before the grant is
 	// looked at; the client's secret is checked later, by the grant.
-	client, err := val.clients.FindClient(ctx, input.ClientId)
+	client, err := val.clients.FindClient(ctx, input.ClientID)
 	if err != nil {
 		return nil, err
 	}

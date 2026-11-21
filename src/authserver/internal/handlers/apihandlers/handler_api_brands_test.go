@@ -42,7 +42,7 @@ func brandRequest(t *testing.T, method string, body any, pathValues ...string) *
 		reader = bytes.NewReader(b)
 	}
 	req := httptest.NewRequest(method, "/api/v1/admin/brands", reader)
-	req = req.WithContext(reqctx.WithValidatedToken(req.Context(), oauth.JwtToken{Claims: map[string]any{"sub": brandCaller}}))
+	req = req.WithContext(reqctx.WithValidatedToken(req.Context(), oauth.JWTToken{Claims: map[string]any{"sub": brandCaller}}))
 	for i := 0; i+1 < len(pathValues); i += 2 {
 		req.SetPathValue(pathValues[i], pathValues[i+1])
 	}
@@ -63,7 +63,7 @@ var brandTime = time.Date(2026, 11, 9, 12, 0, 0, 0, time.UTC)
 // existing brand: rounded, System UI, cover, the app name shown and every slot empty.
 func storedBrand(id int64, name string, appearance record.BrandAppearance, theme string) *record.Brand {
 	return &record.Brand{
-		Id:            id,
+		ID:            id,
 		CreatedAt:     sql.NullTime{Time: brandTime, Valid: true},
 		UpdatedAt:     sql.NullTime{Time: brandTime, Valid: true},
 		Name:          name,
@@ -233,7 +233,7 @@ func TestBrandWrites_AFailureOtherThanATakenNameIsAServerError(t *testing.T) {
 	})
 	t.Run("update", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
-		database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(3)).
+		database.On("GetBrandByID", mock.Anything, (*sql.Tx)(nil), int64(3)).
 			Return(storedBrand(3, "Acme", record.BrandAppearanceDark, "plum"), nil).Once()
 		database.On("UpdateBrand", mock.Anything, (*sql.Tx)(nil), mock.Anything).Return(errs.New("connection reset")).Once()
 
@@ -251,7 +251,7 @@ func TestBrandCreate_StoresTheTrimmedNameAndAudits(t *testing.T) {
 	database.On("CreateBrand", mock.Anything, (*sql.Tx)(nil), mock.Anything).Run(func(args mock.Arguments) {
 		brand := args.Get(2).(*record.Brand)
 		stored = *brand
-		brand.Id = 7
+		brand.ID = 7
 		brand.CreatedAt = sql.NullTime{Time: brandTime, Valid: true}
 		brand.UpdatedAt = sql.NullTime{Time: brandTime, Valid: true}
 	}).Return(nil).Once()
@@ -362,7 +362,7 @@ func TestBrandCreate_AnUnreadableBodyIsRefused(t *testing.T) {
 func TestBrandGet(t *testing.T) {
 	t.Run("a brand that is not the default", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
-		database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(3)).
+		database.On("GetBrandByID", mock.Anything, (*sql.Tx)(nil), int64(3)).
 			Return(storedBrand(3, "Acme", record.BrandAppearanceDark, "plum"), nil).Once()
 		database.On("GetDefaultBrand", mock.Anything, (*sql.Tx)(nil)).
 			Return(storedBrand(1, "Default", record.BrandAppearanceAuto, "blueberry"), nil).Once()
@@ -385,7 +385,7 @@ func TestBrandGet(t *testing.T) {
 	})
 	t.Run("the default brand", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
-		database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(1)).
+		database.On("GetBrandByID", mock.Anything, (*sql.Tx)(nil), int64(1)).
 			Return(storedBrand(1, "Default", record.BrandAppearanceAuto, "blueberry"), nil).Once()
 		database.On("GetDefaultBrand", mock.Anything, (*sql.Tx)(nil)).
 			Return(storedBrand(1, "Default", record.BrandAppearanceAuto, "blueberry"), nil).Once()
@@ -399,7 +399,7 @@ func TestBrandGet(t *testing.T) {
 	})
 	t.Run("a brand no client is drawn in", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
-		database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(3)).
+		database.On("GetBrandByID", mock.Anything, (*sql.Tx)(nil), int64(3)).
 			Return(storedBrand(3, "Acme", record.BrandAppearanceDark, "plum"), nil).Once()
 		database.On("GetDefaultBrand", mock.Anything, (*sql.Tx)(nil)).
 			Return(storedBrand(1, "Default", record.BrandAppearanceAuto, "blueberry"), nil).Once()
@@ -412,7 +412,7 @@ func TestBrandGet(t *testing.T) {
 	})
 	t.Run("a count that cannot be read fails the answer", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
-		database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(3)).
+		database.On("GetBrandByID", mock.Anything, (*sql.Tx)(nil), int64(3)).
 			Return(storedBrand(3, "Acme", record.BrandAppearanceDark, "plum"), nil).Once()
 		database.On("GetDefaultBrand", mock.Anything, (*sql.Tx)(nil)).
 			Return(storedBrand(1, "Default", record.BrandAppearanceAuto, "blueberry"), nil).Once()
@@ -425,7 +425,7 @@ func TestBrandGet(t *testing.T) {
 	})
 	t.Run("an unknown brand", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
-		database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(99)).Return(nil, nil).Once()
+		database.On("GetBrandByID", mock.Anything, (*sql.Tx)(nil), int64(99)).Return(nil, nil).Once()
 
 		status, body := serveBrand(HandleBrandGet(database, brandBaseURL), brandRequest(t, http.MethodGet, nil, "id", "99"))
 
@@ -450,7 +450,7 @@ func TestBrandUpdate_Refusals(t *testing.T) {
 	for _, c := range brandFieldRefusals {
 		t.Run(c.name, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
-			database.On("GetBrandById", mock.Anything, mock.Anything, int64(3)).
+			database.On("GetBrandByID", mock.Anything, mock.Anything, int64(3)).
 				Return(storedBrand(3, "Acme", record.BrandAppearanceDark, "plum"), nil).Maybe()
 			body := validBrandBody()
 			c.edit(body)
@@ -467,7 +467,7 @@ func TestBrandUpdate_Refusals(t *testing.T) {
 
 func TestBrandUpdate_AnUnknownBrandIsNotFound(t *testing.T) {
 	database := datamocks.NewDatabase(t)
-	database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(99)).Return(nil, nil).Once()
+	database.On("GetBrandByID", mock.Anything, (*sql.Tx)(nil), int64(99)).Return(nil, nil).Once()
 
 	status, body := serveBrand(HandleBrandUpdatePut(database, handlersmocks.NewAuditLogger(t), brandBaseURL),
 		brandRequest(t, http.MethodPut, validBrandBody(), "id", "99"))
@@ -490,7 +490,7 @@ func TestBrandUpdate_AnUnreadableBodyIsRefused(t *testing.T) {
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
-			database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(3)).
+			database.On("GetBrandByID", mock.Anything, (*sql.Tx)(nil), int64(3)).
 				Return(storedBrand(3, "Acme", record.BrandAppearanceDark, "plum"), nil).Once()
 			req := brandRequest(t, http.MethodPut, c.body, "id", "3")
 			if c.body == nil {
@@ -508,7 +508,7 @@ func TestBrandUpdate_AnUnreadableBodyIsRefused(t *testing.T) {
 
 func TestBrandUpdate_ANameAnotherBrandHoldsIsRefused(t *testing.T) {
 	database := datamocks.NewDatabase(t)
-	database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(3)).
+	database.On("GetBrandByID", mock.Anything, (*sql.Tx)(nil), int64(3)).
 		Return(storedBrand(3, "Acme", record.BrandAppearanceDark, "plum"), nil).Once()
 	database.On("UpdateBrand", mock.Anything, (*sql.Tx)(nil), mock.Anything).
 		Return(errs.Wrap(data.ErrUniqueViolation, "unable to update brand")).Once()
@@ -525,7 +525,7 @@ func TestBrandUpdate_ReplacesEveryFieldAndAudits(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	stored := storedBrand(1, "Default", record.BrandAppearanceAuto, "blueberry")
 	stored.HideAppName = true
-	database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(stored, nil).Once()
+	database.On("GetBrandByID", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(stored, nil).Once()
 	var written record.Brand
 	database.On("UpdateBrand", mock.Anything, (*sql.Tx)(nil), mock.Anything).Run(func(args mock.Arguments) {
 		written = *args.Get(2).(*record.Brand)
@@ -547,7 +547,7 @@ func TestBrandUpdate_ReplacesEveryFieldAndAudits(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, status)
 	assert.Equal(t, record.Brand{
-		Id: 1, CreatedAt: stored.CreatedAt, UpdatedAt: stored.UpdatedAt,
+		ID: 1, CreatedAt: stored.CreatedAt, UpdatedAt: stored.UpdatedAt,
 		Name: "House", Appearance: record.BrandAppearanceLight, Theme: "guava",
 		Corners: "pill", Font: "humanist", BackgroundFit: "contain", HideAppName: false,
 	}, written)
@@ -566,12 +566,12 @@ func TestBrandUpdate_ReplacesEveryFieldAndAudits(t *testing.T) {
 func storedKitBrand() *record.Brand {
 	stored := storedBrand(4, "Acme", record.BrandAppearanceDark, "plum")
 	stored.Corners, stored.Font, stored.BackgroundFit, stored.HideAppName = "pill", "uploaded", "tile", true
-	stored.LogoAssetId = sql.NullInt64{Int64: 11, Valid: true}
-	stored.DarkLogoAssetId = sql.NullInt64{Int64: 12, Valid: true}
-	stored.FaviconAssetId = sql.NullInt64{Int64: 13, Valid: true}
-	stored.BackgroundAssetId = sql.NullInt64{Int64: 14, Valid: true}
-	stored.RegularFontAssetId = sql.NullInt64{Int64: 15, Valid: true}
-	stored.BoldFontAssetId = sql.NullInt64{Int64: 16, Valid: true}
+	stored.LogoAssetID = sql.NullInt64{Int64: 11, Valid: true}
+	stored.DarkLogoAssetID = sql.NullInt64{Int64: 12, Valid: true}
+	stored.FaviconAssetID = sql.NullInt64{Int64: 13, Valid: true}
+	stored.BackgroundAssetID = sql.NullInt64{Int64: 14, Valid: true}
+	stored.RegularFontAssetID = sql.NullInt64{Int64: 15, Valid: true}
+	stored.BoldFontAssetID = sql.NullInt64{Int64: 16, Valid: true}
 	return stored
 }
 
@@ -580,7 +580,7 @@ func storedKitBrand() *record.Brand {
 // holds after the save, by asset id, and leaves an empty one out.
 func TestBrandUpdate_ReplacesTheSlots(t *testing.T) {
 	database := datamocks.NewDatabase(t)
-	database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(4)).Return(storedKitBrand(), nil).Once()
+	database.On("GetBrandByID", mock.Anything, (*sql.Tx)(nil), int64(4)).Return(storedKitBrand(), nil).Once()
 	expectBrandAssets(database)
 	var written record.Brand
 	database.On("UpdateBrand", mock.Anything, (*sql.Tx)(nil), mock.Anything).Run(func(args mock.Arguments) {
@@ -604,8 +604,8 @@ func TestBrandUpdate_ReplacesTheSlots(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, status, "%v", body)
 	assert.Equal(t, []sql.NullInt64{{Int64: 21, Valid: true}, {}, {}, {Int64: 23, Valid: true}, {}, {}},
-		[]sql.NullInt64{written.LogoAssetId, written.DarkLogoAssetId, written.FaviconAssetId,
-			written.BackgroundAssetId, written.RegularFontAssetId, written.BoldFontAssetId})
+		[]sql.NullInt64{written.LogoAssetID, written.DarkLogoAssetID, written.FaviconAssetID,
+			written.BackgroundAssetID, written.RegularFontAssetID, written.BoldFontAssetID})
 	assert.InDelta(t, 21, brandAt(body, "brand", "logo", "id"), 0)
 	assert.Nil(t, brandAt(body, "brand", "darkLogo"))
 	assert.Nil(t, brandAt(body, "brand", "favicon"))
@@ -618,7 +618,7 @@ func TestBrandUpdate_ReplacesTheSlots(t *testing.T) {
 // slots included: each slot answers the id a write names it by (#813 decision 10).
 func TestBrandUpdate_ABrandReadAndWrittenBackIsUnchanged(t *testing.T) {
 	database := datamocks.NewDatabase(t)
-	database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(4)).Return(storedKitBrand(), nil).Twice()
+	database.On("GetBrandByID", mock.Anything, (*sql.Tx)(nil), int64(4)).Return(storedKitBrand(), nil).Twice()
 	expectBrandAssets(database)
 	database.On("GetDefaultBrand", mock.Anything, (*sql.Tx)(nil)).
 		Return(storedBrand(1, "Default", record.BrandAppearanceAuto, "blueberry"), nil).Twice()
@@ -652,7 +652,7 @@ func TestBrandUpdate_TheUploadedFontWithoutARegularFileIsRefused(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
-			database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(4)).Return(storedKitBrand(), nil).Once()
+			database.On("GetBrandByID", mock.Anything, (*sql.Tx)(nil), int64(4)).Return(storedKitBrand(), nil).Once()
 			expectBrandAssets(database).Maybe()
 			body := validBrandBody()
 			body["font"] = "uploaded"
@@ -672,7 +672,7 @@ func TestBrandUpdate_TheUploadedFontWithoutARegularFileIsRefused(t *testing.T) {
 
 func TestBrandDelete_TheDefaultIsRefused(t *testing.T) {
 	database := datamocks.NewDatabase(t)
-	database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(1)).
+	database.On("GetBrandByID", mock.Anything, (*sql.Tx)(nil), int64(1)).
 		Return(storedBrand(1, "Default", record.BrandAppearanceAuto, "blueberry"), nil).Once()
 	datamocks.ExpectRunInTransaction(database, brandTx)
 	database.On("DeleteBrand", mock.Anything, brandTx, int64(1)).
@@ -688,7 +688,7 @@ func TestBrandDelete_TheDefaultIsRefused(t *testing.T) {
 func TestBrandDelete_AnUnknownBrandIsNotFound(t *testing.T) {
 	t.Run("gone before the request", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
-		database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(99)).Return(nil, nil).Once()
+		database.On("GetBrandByID", mock.Anything, (*sql.Tx)(nil), int64(99)).Return(nil, nil).Once()
 
 		status, body := serveBrand(HandleBrandDelete(database, handlersmocks.NewAuditLogger(t)),
 			brandRequest(t, http.MethodDelete, nil, "id", "99"))
@@ -699,7 +699,7 @@ func TestBrandDelete_AnUnknownBrandIsNotFound(t *testing.T) {
 	})
 	t.Run("deleted by another request meanwhile", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
-		database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(3)).
+		database.On("GetBrandByID", mock.Anything, (*sql.Tx)(nil), int64(3)).
 			Return(storedBrand(3, "Acme", record.BrandAppearanceDark, "plum"), nil).Once()
 		datamocks.ExpectRunInTransaction(database, brandTx)
 		database.On("DeleteBrand", mock.Anything, brandTx, int64(3)).Return(0, errs.WithStack(data.ErrBrandNotFound)).Once()
@@ -714,7 +714,7 @@ func TestBrandDelete_AnUnknownBrandIsNotFound(t *testing.T) {
 
 func TestBrandDelete_DeletesUnderTheTransactionAndAudits(t *testing.T) {
 	database := datamocks.NewDatabase(t)
-	database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(3)).
+	database.On("GetBrandByID", mock.Anything, (*sql.Tx)(nil), int64(3)).
 		Return(storedBrand(3, "Acme", record.BrandAppearanceDark, "plum"), nil).Once()
 	datamocks.ExpectRunInTransaction(database, brandTx)
 	// The deletion moved three clients to the default brand.
@@ -736,9 +736,9 @@ func TestBrandMakeDefault_MovesTheDefaultAndAuditsBothBrands(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	datamocks.ExpectRunInTransaction(database, brandTx)
 	database.On("MakeBrandDefault", mock.Anything, brandTx, int64(3)).Return(int64(1), nil).Once()
-	database.On("GetBrandById", mock.Anything, brandTx, int64(3)).
+	database.On("GetBrandByID", mock.Anything, brandTx, int64(3)).
 		Return(storedBrand(3, "Acme", record.BrandAppearanceDark, "plum"), nil).Once()
-	database.On("GetBrandById", mock.Anything, brandTx, int64(1)).
+	database.On("GetBrandByID", mock.Anything, brandTx, int64(1)).
 		Return(storedBrand(1, "Default", record.BrandAppearanceAuto, "blueberry"), nil).Once()
 	database.On("CountClientsPerBrand", mock.Anything, brandTx).Return(map[int64]int{1: 1, 3: 8}, nil).Once()
 	auditLogger := handlersmocks.NewAuditLogger(t)
@@ -768,7 +768,7 @@ func TestBrandMakeDefault_TheDefaultAlreadyRecordsNothing(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	datamocks.ExpectRunInTransaction(database, brandTx)
 	database.On("MakeBrandDefault", mock.Anything, brandTx, int64(1)).Return(int64(1), nil).Once()
-	database.On("GetBrandById", mock.Anything, brandTx, int64(1)).
+	database.On("GetBrandByID", mock.Anything, brandTx, int64(1)).
 		Return(storedBrand(1, "Default", record.BrandAppearanceAuto, "blueberry"), nil).Once()
 	database.On("CountClientsPerBrand", mock.Anything, brandTx).Return(map[int64]int{1: 4}, nil).Once()
 

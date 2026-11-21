@@ -33,7 +33,7 @@ var grantsTx = &sql.Tx{}
 // grantRow is a stored grant row, whichever table it is read from.
 type grantRow struct {
 	id           int64
-	permissionId int64
+	permissionID int64
 }
 
 // grantSave describes one of the three saves to the shared cases.
@@ -49,7 +49,7 @@ type grantSave struct {
 	createMethod string
 	deleteMethod string
 	// created is the owner id and permission id of the row the save handed its create method.
-	created      func(arg any) (ownerId int64, permissionId int64)
+	created      func(arg any) (ownerID int64, permissionID int64)
 	addedEvent   string
 	deletedEvent string
 	// consolidatedEvent, when set, is the one event the save emits for the whole save in place of
@@ -64,20 +64,20 @@ type grantSave struct {
 	body                func(t *testing.T, wanted, expected []int64) string
 }
 
-const grantOwnerId = int64(5)
+const grantOwnerID = int64(5)
 
 var grantSaves = []grantSave{
 	{
 		name:       "user permissions",
 		kind:       "user",
 		path:       "/api/v1/admin/users/5/permissions",
-		ownerRead:  "GetUserById",
-		owner:      &record.User{Id: grantOwnerId},
-		readMethod: "GetUserPermissionsByUserId",
+		ownerRead:  "GetUserByID",
+		owner:      &record.User{ID: grantOwnerID},
+		readMethod: "GetUserPermissionsByUserID",
 		storedRows: func(rows []grantRow) any {
 			out := make([]record.UserPermission, 0, len(rows))
 			for _, r := range rows {
-				out = append(out, record.UserPermission{Id: r.id, UserId: grantOwnerId, PermissionId: r.permissionId})
+				out = append(out, record.UserPermission{ID: r.id, UserID: grantOwnerID, PermissionID: r.permissionID})
 			}
 			return out
 		},
@@ -85,7 +85,7 @@ var grantSaves = []grantSave{
 		deleteMethod: "DeleteUserPermission",
 		created: func(arg any) (int64, int64) {
 			up := arg.(*record.UserPermission)
-			return up.UserId, up.PermissionId
+			return up.UserID, up.PermissionID
 		},
 		addedEvent:          audit.EventAddedUserPermission,
 		deletedEvent:        audit.EventDeletedUserPermission,
@@ -96,7 +96,7 @@ var grantSaves = []grantSave{
 		},
 		body: func(t *testing.T, wanted, expected []int64) string {
 			t.Helper()
-			body, err := json.Marshal(map[string]any{"permissionIds": wanted, "expectedPermissionIds": expected})
+			body, err := json.Marshal(map[string]any{"permissionIDs": wanted, "expectedPermissionIds": expected})
 			require.NoError(t, err)
 			return string(body)
 		},
@@ -105,13 +105,13 @@ var grantSaves = []grantSave{
 		name:       "group permissions",
 		kind:       "group",
 		path:       "/api/v1/admin/groups/5/permissions",
-		ownerRead:  "GetGroupById",
-		owner:      &record.Group{Id: grantOwnerId, GroupIdentifier: "admins"},
-		readMethod: "GetGroupPermissionsByGroupId",
+		ownerRead:  "GetGroupByID",
+		owner:      &record.Group{ID: grantOwnerID, GroupIdentifier: "admins"},
+		readMethod: "GetGroupPermissionsByGroupID",
 		storedRows: func(rows []grantRow) any {
 			out := make([]record.GroupPermission, 0, len(rows))
 			for _, r := range rows {
-				out = append(out, record.GroupPermission{Id: r.id, GroupId: grantOwnerId, PermissionId: r.permissionId})
+				out = append(out, record.GroupPermission{ID: r.id, GroupID: grantOwnerID, PermissionID: r.permissionID})
 			}
 			return out
 		},
@@ -119,7 +119,7 @@ var grantSaves = []grantSave{
 		deleteMethod: "DeleteGroupPermission",
 		created: func(arg any) (int64, int64) {
 			gp := arg.(*record.GroupPermission)
-			return gp.GroupId, gp.PermissionId
+			return gp.GroupID, gp.PermissionID
 		},
 		addedEvent:          audit.EventAddedGroupPermission,
 		deletedEvent:        audit.EventDeletedGroupPermission,
@@ -130,7 +130,7 @@ var grantSaves = []grantSave{
 		},
 		body: func(t *testing.T, wanted, expected []int64) string {
 			t.Helper()
-			body, err := json.Marshal(map[string]any{"permissionIds": wanted, "expectedPermissionIds": expected})
+			body, err := json.Marshal(map[string]any{"permissionIDs": wanted, "expectedPermissionIds": expected})
 			require.NoError(t, err)
 			return string(body)
 		},
@@ -139,15 +139,15 @@ var grantSaves = []grantSave{
 		name:      "client permissions",
 		kind:      "client",
 		path:      "/api/v1/admin/clients/5/permissions",
-		ownerRead: "GetClientById",
+		ownerRead: "GetClientByID",
 		// Client permissions are configurable only with the client credentials flow enabled;
 		// handler_api_client_permissions_test.go owns the refusal when it is not.
-		owner:      &record.Client{Id: grantOwnerId, ClientIdentifier: "a-service", ClientCredentialsEnabled: true},
-		readMethod: "GetClientPermissionsByClientId",
+		owner:      &record.Client{ID: grantOwnerID, ClientIdentifier: "a-service", ClientCredentialsEnabled: true},
+		readMethod: "GetClientPermissionsByClientID",
 		storedRows: func(rows []grantRow) any {
 			out := make([]record.ClientPermission, 0, len(rows))
 			for _, r := range rows {
-				out = append(out, record.ClientPermission{Id: r.id, ClientId: grantOwnerId, PermissionId: r.permissionId})
+				out = append(out, record.ClientPermission{ID: r.id, ClientID: grantOwnerID, PermissionID: r.permissionID})
 			}
 			return out
 		},
@@ -155,7 +155,7 @@ var grantSaves = []grantSave{
 		deleteMethod: "DeleteClientPermission",
 		created: func(arg any) (int64, int64) {
 			cp := arg.(*record.ClientPermission)
-			return cp.ClientId, cp.PermissionId
+			return cp.ClientID, cp.PermissionID
 		},
 		consolidatedEvent: audit.EventUpdatedClientPermissions,
 		ownerKey:          "client_id",
@@ -164,7 +164,7 @@ var grantSaves = []grantSave{
 		},
 		body: func(t *testing.T, wanted, expected []int64) string {
 			t.Helper()
-			body, err := json.Marshal(map[string]any{"permissionIds": wanted, "expectedPermissionIds": expected})
+			body, err := json.Marshal(map[string]any{"permissionIDs": wanted, "expectedPermissionIds": expected})
 			require.NoError(t, err)
 			return string(body)
 		},
@@ -199,15 +199,15 @@ const grantCaller = "the-calling-client"
 
 // expectOwner registers the owner read the save makes before it validates.
 func (s grantSave) expectOwner(database *datamocks.Database) {
-	database.On(s.ownerRead, mock.Anything, (*sql.Tx)(nil), grantOwnerId).Return(s.owner, nil).Once()
+	database.On(s.ownerRead, mock.Anything, (*sql.Tx)(nil), grantOwnerID).Return(s.owner, nil).Once()
 }
 
 // expectPermissionsExist registers the validation read of each wanted permission, outside the
 // transaction.
-func expectPermissionsExist(database *datamocks.Database, permissionIds ...int64) {
-	for _, id := range permissionIds {
-		database.On("GetPermissionById", mock.Anything, (*sql.Tx)(nil), id).
-			Return(&record.Permission{Id: id, PermissionIdentifier: "p"}, nil).Once()
+func expectPermissionsExist(database *datamocks.Database, permissionIDs ...int64) {
+	for _, id := range permissionIDs {
+		database.On("GetPermissionByID", mock.Anything, (*sql.Tx)(nil), id).
+			Return(&record.Permission{ID: id, PermissionIdentifier: "p"}, nil).Once()
 	}
 }
 
@@ -216,7 +216,7 @@ func expectPermissionsExist(database *datamocks.Database, permissionIds ...int64
 // revoke is manage, so the guard counts nothing.
 func (s grantSave) expectStored(database *datamocks.Database, rows ...grantRow) {
 	s.expectLock(database)
-	database.On(s.readMethod, mock.Anything, grantsTx, grantOwnerId).Return(s.storedRows(rows), nil).Once()
+	database.On(s.readMethod, mock.Anything, grantsTx, grantOwnerID).Return(s.storedRows(rows), nil).Once()
 }
 
 // expectLock registers the administrators' lock on the save's transaction, for a save that takes it.
@@ -231,8 +231,8 @@ func (s grantSave) expectLock(database *datamocks.Database) {
 type auditRecord string
 
 // audited is the record of one event naming one permission.
-func audited(event string, permissionId int64) auditRecord {
-	return auditRecord(fmt.Sprintf("%s %d", event, permissionId))
+func audited(event string, permissionID int64) auditRecord {
+	return auditRecord(fmt.Sprintf("%s %d", event, permissionID))
 }
 
 // wantAudits is the events a committed save owes for the grants it made and withdrew: one per
@@ -258,7 +258,7 @@ func (s grantSave) recordAudits(t *testing.T, auditLogger *handlersmocks.AuditLo
 	auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
 			details := args.Get(2).(map[string]interface{})
-			assert.Equal(t, grantOwnerId, details[s.ownerKey])
+			assert.Equal(t, grantOwnerID, details[s.ownerKey])
 			assert.Contains(t, details, "logged_in_user")
 			if s.consolidatedEvent != "" {
 				assert.NotContains(t, details, "permission_id")
@@ -288,7 +288,7 @@ func TestGrantListSaves_SaveTheExactPlanInOneTransaction(t *testing.T) {
 			expectAuthServerPermissions(database)
 			var order []string
 			stub := datamocks.ExpectRunInTransaction(database, grantsTx, func(edge string) { order = append(order, edge) })
-			save.expectStored(database, grantRow{id: 21, permissionId: 3}, grantRow{id: 22, permissionId: 4})
+			save.expectStored(database, grantRow{id: 21, permissionID: 3}, grantRow{id: 22, permissionID: 4})
 			var deleted []int64
 			database.On(save.deleteMethod, mock.Anything, grantsTx, mock.Anything).
 				Run(func(args mock.Arguments) {
@@ -298,9 +298,9 @@ func TestGrantListSaves_SaveTheExactPlanInOneTransaction(t *testing.T) {
 			var granted []int64
 			database.On(save.createMethod, mock.Anything, grantsTx, mock.Anything).
 				Run(func(args mock.Arguments) {
-					ownerId, permissionId := save.created(args.Get(2))
-					assert.Equal(t, grantOwnerId, ownerId)
-					granted = append(granted, permissionId)
+					ownerID, permissionID := save.created(args.Get(2))
+					assert.Equal(t, grantOwnerID, ownerID)
+					granted = append(granted, permissionID)
 					order = append(order, "insert")
 				}).Return(nil).Once()
 			records := save.recordAudits(t, auditLogger, &order)
@@ -339,8 +339,8 @@ func TestGrantListSaves_AStoredDuplicateIsRemovedWithItsOriginal(t *testing.T) {
 			expectAuthServerPermissions(database)
 			datamocks.ExpectRunInTransaction(database, grantsTx)
 			save.expectStored(database,
-				grantRow{id: 21, permissionId: 3}, grantRow{id: 22, permissionId: 3},
-				grantRow{id: 23, permissionId: 4}, grantRow{id: 24, permissionId: 4},
+				grantRow{id: 21, permissionID: 3}, grantRow{id: 22, permissionID: 3},
+				grantRow{id: 23, permissionID: 4}, grantRow{id: 24, permissionID: 4},
 			)
 			var deleted []int64
 			database.On(save.deleteMethod, mock.Anything, grantsTx, mock.Anything).
@@ -373,7 +373,7 @@ func TestGrantListSaves_AFailedWriteCommitsNothing(t *testing.T) {
 			expectPermissionsExist(database, 6)
 			expectAuthServerPermissions(database)
 			stub := datamocks.ExpectRunInTransaction(database, grantsTx)
-			save.expectStored(database, grantRow{id: 21, permissionId: 3})
+			save.expectStored(database, grantRow{id: 21, permissionID: 3})
 			database.On(save.deleteMethod, mock.Anything, grantsTx, int64(21)).Return(nil).Once()
 			diskFull := errors.New("the disk is full")
 			database.On(save.createMethod, mock.Anything, grantsTx, mock.Anything).Return(diskFull).Once()
@@ -418,7 +418,7 @@ func TestGrantListSaves_AFailedLoadIsAnsweredAsALoadFailure(t *testing.T) {
 				stub := datamocks.ExpectRunInTransaction(database, grantsTx)
 				save.expectLock(database)
 				loadErr := errors.New("the read failed")
-				database.On(save.readMethod, mock.Anything, grantsTx, grantOwnerId).Return(nil, loadErr).Once()
+				database.On(save.readMethod, mock.Anything, grantsTx, grantOwnerID).Return(nil, loadErr).Once()
 
 				rr := save.serve(database, auditLogger, save.body(t, variant.wanted, variant.expected))
 
@@ -467,8 +467,8 @@ func TestGrantListSaves_ARerunAttemptAnswersAndAuditsOnce(t *testing.T) {
 			if save.locksAdministrators {
 				database.On("AcquireManagePermissionRow", mock.Anything, grantsTx).Return(permManage, nil).Twice()
 			}
-			database.On(save.readMethod, mock.Anything, grantsTx, grantOwnerId).
-				Return(save.storedRows([]grantRow{{id: 21, permissionId: 3}}), nil).Twice()
+			database.On(save.readMethod, mock.Anything, grantsTx, grantOwnerID).
+				Return(save.storedRows([]grantRow{{id: 21, permissionID: 3}}), nil).Twice()
 			database.On(save.deleteMethod, mock.Anything, grantsTx, int64(21)).Return(nil).Twice()
 			// The first insert is the deadlock victim; the second lands.
 			database.On(save.createMethod, mock.Anything, grantsTx, mock.Anything).Return(deadlock).Once()
@@ -522,7 +522,7 @@ func TestGrantListSaves_AnOutdatedLoadedListIsRefused(t *testing.T) {
 			expectAuthServerPermissions(database)
 			stub := datamocks.ExpectRunInTransaction(database, grantsTx)
 			// Permission 3 was revoked by another save after this caller loaded {3, 4}.
-			save.expectStored(database, grantRow{id: 22, permissionId: 4})
+			save.expectStored(database, grantRow{id: 22, permissionID: 4})
 
 			rr := save.serve(database, auditLogger, save.body(t, []int64{3, 4, 6}, []int64{3, 4}))
 
@@ -545,7 +545,7 @@ func TestGrantListSaves_ALoadedListEqualAsASetProceeds(t *testing.T) {
 		stored   []grantRow
 		expected []int64
 	}{
-		{name: "another order and a repeat", stored: []grantRow{{id: 21, permissionId: 3}, {id: 22, permissionId: 4}}, expected: []int64{4, 3, 4}},
+		{name: "another order and a repeat", stored: []grantRow{{id: 21, permissionID: 3}, {id: 22, permissionID: 4}}, expected: []int64{4, 3, 4}},
 		{name: "an empty loaded list against no stored grants", stored: nil, expected: []int64{}},
 	}
 
@@ -620,7 +620,7 @@ func TestGrantListSaves_ARefusedSaveNeverOpensTheTransaction(t *testing.T) {
 
 				save.expectOwner(database)
 				if variant.missing != 0 {
-					database.On("GetPermissionById", mock.Anything, (*sql.Tx)(nil), variant.missing).
+					database.On("GetPermissionByID", mock.Anything, (*sql.Tx)(nil), variant.missing).
 						Return((*record.Permission)(nil), nil).Once()
 				}
 
@@ -641,7 +641,7 @@ func TestGrantListSaves_ARefusedSaveNeverOpensTheTransaction(t *testing.T) {
 // A repeated id in the request is validated once, granted once and audited once. The group and
 // client saves always deduplicated; the user save did not, and stored the repeat as two grant rows, one of which
 // a later revocation left in force (#406).
-func TestGrantListSaves_ARepeatedIdIsGrantedOnce(t *testing.T) {
+func TestGrantListSaves_ARepeatedIDIsGrantedOnce(t *testing.T) {
 	for _, save := range grantSaves {
 		t.Run(save.name, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)

@@ -46,7 +46,7 @@ func TestTokenDPoP_TheProofIsRecordedUntilItsNonceExpiresAndTheGrace(t *testing.
 	key := dpoptest.RFC7517Key(t)
 	e := newDPoPTokenEndpoint(t, dpopPublicBaseURL, dpopSessionKey)
 	nonce := e.freshNonce(t) // minted at dpopNow
-	client := &record.Client{Id: 1}
+	client := &record.Client{ID: 1}
 	e.validator.On("ValidateTokenRequest", mock.Anything, mock.Anything, mock.Anything).
 		Return(&protocolvalidation.ClientCredentialsGrant{Client: client, Scope: "r:p"}, nil).Once()
 	e.database.On("RecordDPoPProof", mock.Anything, (*sql.Tx)(nil), usedOnceReplayKey, dpopNow.Add(15*time.Minute)).
@@ -69,7 +69,7 @@ func TestTokenDPoP_AReplayedProofIsRefusedInvalidDPoPProof(t *testing.T) {
 	e := newDPoPTokenEndpoint(t, dpopPublicBaseURL, dpopSessionKey)
 	nonce := e.freshNonce(t)
 	e.validator.On("ValidateTokenRequest", mock.Anything, mock.Anything, mock.Anything).
-		Return(&protocolvalidation.ClientCredentialsGrant{Client: &record.Client{Id: 1}, Scope: "r:p"}, nil).Once()
+		Return(&protocolvalidation.ClientCredentialsGrant{Client: &record.Client{ID: 1}, Scope: "r:p"}, nil).Once()
 	e.database.On("RecordDPoPProof", mock.Anything, (*sql.Tx)(nil), usedOnceReplayKey, mock.Anything).
 		Return(false, nil).Once()
 	logged := logtest.CaptureSlog(t)
@@ -95,7 +95,7 @@ func TestTokenDPoP_AStoreThatCannotAnswerIsAServerError(t *testing.T) {
 	e := newDPoPTokenEndpoint(t, dpopPublicBaseURL, dpopSessionKey)
 	nonce := e.freshNonce(t)
 	e.validator.On("ValidateTokenRequest", mock.Anything, mock.Anything, mock.Anything).
-		Return(&protocolvalidation.ClientCredentialsGrant{Client: &record.Client{Id: 1}, Scope: "r:p"}, nil).Once()
+		Return(&protocolvalidation.ClientCredentialsGrant{Client: &record.Client{ID: 1}, Scope: "r:p"}, nil).Once()
 	e.database.On("RecordDPoPProof", mock.Anything, (*sql.Tx)(nil), mock.Anything, mock.Anything).
 		Return(false, errs.New("the database went away")).Once()
 
@@ -156,7 +156,7 @@ func TestTokenDPoP_TheNonceIsJudgedAgainAtTheRecordPoint(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			e := newDPoPTokenEndpoint(t, dpopPublicBaseURL, dpopSessionKey)
 			nonce := e.freshNonce(t) // minted at dpopNow
-			client := &record.Client{Id: 1}
+			client := &record.Client{ID: 1}
 			e.validator.On("ValidateTokenRequest", mock.Anything, mock.Anything, mock.Anything).
 				Run(func(mock.Arguments) { e.now = tc.recordAt }). // the clock moves on during validation
 				Return(&protocolvalidation.ClientCredentialsGrant{Client: client, Scope: "r:p"}, nil).Once()

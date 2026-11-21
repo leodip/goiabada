@@ -780,7 +780,7 @@ func TestHandleRegisterPost(t *testing.T) {
 
 		userCreator.On("CreateUser", mock.Anything, mock.MatchedBy(func(input *usercreation.Input) bool {
 			return input.Email == "test@example.com" && !input.EmailVerified
-		})).Return(&record.User{Id: 12, Email: "test@example.com"}, nil)
+		})).Return(&record.User{ID: 12, Email: "test@example.com"}, nil)
 
 		var createdDetails map[string]interface{}
 		auditLogger.On("Log", mock.Anything, audit.EventCreatedUser, mock.Anything).
@@ -788,8 +788,8 @@ func TestHandleRegisterPost(t *testing.T) {
 			Return().Once()
 
 		pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register_success.html", mock.MatchedBy(func(data map[string]interface{}) bool {
-			adminConsoleBaseUrl, ok := data["adminConsoleBaseUrl"].(string)
-			return ok && adminConsoleBaseUrl == testAdminConsoleBaseURL
+			adminConsoleBaseURL, ok := data["adminConsoleBaseUrl"].(string)
+			return ok && adminConsoleBaseURL == testAdminConsoleBaseURL
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)
@@ -859,7 +859,7 @@ func TestHandleRegisterPost(t *testing.T) {
 
 		userCreator.On("CreateUser", mock.Anything, mock.MatchedBy(func(input *usercreation.Input) bool {
 			return input.Email == "test@example.com" && !input.EmailVerified
-		})).Return(&record.User{Id: 12, Email: "test@example.com"}, nil)
+		})).Return(&record.User{ID: 12, Email: "test@example.com"}, nil)
 
 		var createdDetails map[string]interface{}
 		auditLogger.On("Log", mock.Anything, audit.EventCreatedUser, mock.Anything).
@@ -876,8 +876,8 @@ func TestHandleRegisterPost(t *testing.T) {
 			})).Return(emaildelivery.SendResult{}, nil)
 
 		pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register_success.html", mock.MatchedBy(func(data map[string]interface{}) bool {
-			adminConsoleBaseUrl, ok := data["adminConsoleBaseUrl"].(string)
-			return ok && adminConsoleBaseUrl == testAdminConsoleBaseURL
+			adminConsoleBaseURL, ok := data["adminConsoleBaseUrl"].(string)
+			return ok && adminConsoleBaseURL == testAdminConsoleBaseURL
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)

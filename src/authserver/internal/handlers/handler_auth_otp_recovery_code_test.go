@@ -47,7 +47,7 @@ func recoveryCodeHashForTest(normalized string) string {
 
 func recoveryCodePostRequest(code string) *http.Request {
 	form := url.Values{}
-	form.Add(ceremony.IdField, testCeremonyId)
+	form.Add(ceremony.IDField, testCeremonyID)
 	form.Add("recoveryCode", code)
 	req := httptest.NewRequest(http.MethodPost, "/auth/otp", strings.NewReader(form.Encode()))
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
@@ -57,31 +57,31 @@ func recoveryCodePostRequest(code string) *http.Request {
 // enrolledUserForRecovery is a user with an authenticator at generation 3.
 func enrolledUserForRecovery(t *testing.T) *record.User {
 	return &record.User{
-		Id:                  1,
+		ID:                  1,
 		Enabled:             true,
 		OTPEnabled:          true,
 		OTPSecretEncrypted:  encryptOTPForTest(t, otpTestMintedSecret(t)),
-		OtpConfigGeneration: 3,
+		OTPConfigGeneration: 3,
 	}
 }
 
 // The code form for a user with an authenticator links to the recovery-code form, and the link
 // asks for it on this same step: GET /auth/otp with form=recovery-code renders it, naming the
 // ceremony as every form of the step does.
-func TestHandleAuthOtpGet_TheRecoveryCodeForm(t *testing.T) {
-	m := newOtpStepMocks(t)
-	authContext := m.armOtpCeremony("")
-	m.armUser(&record.User{Id: 1, Enabled: true, OTPEnabled: true})
+func TestHandleAuthOTPGet_TheRecoveryCodeForm(t *testing.T) {
+	m := newOTPStepMocks(t)
+	authContext := m.armOTPCeremony("")
+	m.armUser(&record.User{ID: 1, Enabled: true, OTPEnabled: true})
 	m.armClient()
 	m.ceremonyStore.On("SaveAuthContext", mock.Anything, mock.Anything, authContext).Return(nil).Once()
 
-	req := httptest.NewRequest(http.MethodGet, "/auth/otp?ceremony="+testCeremonyId+"&form=recovery-code", nil)
+	req := httptest.NewRequest(http.MethodGet, "/auth/otp?ceremony="+testCeremonyID+"&form=recovery-code", nil)
 	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{AppName: "TestApp"}))
 	rr := httptest.NewRecorder()
 
 	m.pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_otp_recovery_code.html",
 		mock.MatchedBy(func(bind map[string]interface{}) bool {
-			return bind["ceremonyId"] == testCeremonyId && bind["error"] == nil
+			return bind["ceremonyId"] == testCeremonyID && bind["error"] == nil
 		})).Return(nil).Once()
 
 	m.get().ServeHTTP(rr, req)
@@ -91,14 +91,14 @@ func TestHandleAuthOtpGet_TheRecoveryCodeForm(t *testing.T) {
 
 // A user with no authenticator has no codes, so the parameter changes nothing for them: they get
 // the setup form, which links to no recovery-code form (decision 7).
-func TestHandleAuthOtpGet_TheRecoveryCodeFormIsNeverTheSetupForm(t *testing.T) {
-	m := newOtpStepMocks(t)
-	m.armOtpCeremony(otpTestKeyURL(otpTestMintedSecret(t)))
-	m.armUser(&record.User{Id: 1, Enabled: true, Email: "user@example.com"})
+func TestHandleAuthOTPGet_TheRecoveryCodeFormIsNeverTheSetupForm(t *testing.T) {
+	m := newOTPStepMocks(t)
+	m.armOTPCeremony(otpTestKeyURL(otpTestMintedSecret(t)))
+	m.armUser(&record.User{ID: 1, Enabled: true, Email: "user@example.com"})
 	m.armClient()
 	m.ceremonyStore.On("SaveAuthContext", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
-	req := httptest.NewRequest(http.MethodGet, "/auth/otp?ceremony="+testCeremonyId+"&form=recovery-code", nil)
+	req := httptest.NewRequest(http.MethodGet, "/auth/otp?ceremony="+testCeremonyID+"&form=recovery-code", nil)
 	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{AppName: "TestApp"}))
 	rr := httptest.NewRecorder()
 
@@ -116,15 +116,15 @@ func TestHandleAuthOtpGet_TheRecoveryCodeFormIsNeverTheSetupForm(t *testing.T) {
 // /auth/completed with no extra page (decision 7). The audit record says how many unused codes are
 // left, never the code (decision 10). The mocks carry no step claim and no consecutive-failure
 // write, so touching the authenticator fails the case.
-func TestHandleAuthOtpPost_AnAcceptedRecoveryCodeSignsIn(t *testing.T) {
+func TestHandleAuthOTPPost_AnAcceptedRecoveryCodeSignsIn(t *testing.T) {
 	logged := logtest.CaptureSlog(t)
-	m := newOtpStepMocks(t)
-	authContext := m.armOtpCeremony("")
+	m := newOTPStepMocks(t)
+	authContext := m.armOTPCeremony("")
 	authContext.AuthMethods = "pwd"
 	m.armUser(enrolledUserForRecovery(t))
 
 	expectOTPWriteTransactions(m.database)
-	expectUserRowLocked(m.database, &record.User{Id: 1})
+	expectUserRowLocked(m.database, &record.User{ID: 1})
 	m.database.On("TryUseUserRecoveryCode", mock.Anything, mock.Anything, int64(1),
 		recoveryCodeHashForTest(recoveryCodeNormalized)).Return(true, nil).Once()
 	m.database.On("CountUnusedUserRecoveryCodes", mock.Anything, mock.Anything, int64(1)).Return(9, nil).Once()
@@ -137,14 +137,14 @@ func TestHandleAuthOtpPost_AnAcceptedRecoveryCodeSignsIn(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	saved := false
-	m.ceremonyStore.On("RegenerateSession", rr, req, testCeremonyId, int64(1)).Return(nil).Once().
+	m.ceremonyStore.On("RegenerateSession", rr, req, testCeremonyID, int64(1)).Return(nil).Once().
 		Run(func(mock.Arguments) {
 			assert.False(t, saved, "rotation must run before the auth context recording the code is saved")
 		})
 	m.ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 		return ac.AuthState == ceremony.AuthStateAuthenticationCompleted &&
 			ac.AuthMethods == "pwd recovery_code" &&
-			ac.OtpClaimGeneration != nil && *ac.OtpClaimGeneration == 3 &&
+			ac.OTPClaimGeneration != nil && *ac.OTPClaimGeneration == 3 &&
 			ac.AuthenticatedAt != nil && !ac.AuthenticatedAt.IsZero() &&
 			!ac.Level1AuthCompleted
 	})).Return(nil).Once().Run(func(mock.Arguments) { saved = true })
@@ -152,7 +152,7 @@ func TestHandleAuthOtpPost_AnAcceptedRecoveryCodeSignsIn(t *testing.T) {
 	m.post().ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusSeeOther, rr.Code)
-	assert.Equal(t, testBaseURL+"/auth/completed?ceremony="+testCeremonyId, rr.Header().Get("Location"))
+	assert.Equal(t, testBaseURL+"/auth/completed?ceremony="+testCeremonyID, rr.Header().Get("Location"))
 	assert.True(t, saved)
 	assert.True(t, authContext.ClaimsOTP(), "a recovery code is a claim the authenticator backs, as a code is")
 	assertNoRecoveryCodeLogged(t, logged)
@@ -163,41 +163,41 @@ func TestHandleAuthOtpPost_AnAcceptedRecoveryCodeSignsIn(t *testing.T) {
 // An authenticator disabled after 100 wrong codes still lets a recovery code in, which is the
 // self-service way out of the disable, and the count stays where it is: neither a correct
 // recovery code nor a wrong one moves it (decision 6). The strict mocks hold both: neither
-// IncrementUserOtpConsecutiveFailures nor any clear is armed.
-func TestHandleAuthOtpPost_ARecoveryCodeWorksWhileTheAuthenticatorIsDisabled(t *testing.T) {
+// IncrementUserOTPConsecutiveFailures nor any clear is armed.
+func TestHandleAuthOTPPost_ARecoveryCodeWorksWhileTheAuthenticatorIsDisabled(t *testing.T) {
 	t.Run("a correct code signs in", func(t *testing.T) {
-		m := newOtpStepMocks(t)
-		m.armOtpCeremony("")
+		m := newOTPStepMocks(t)
+		m.armOTPCeremony("")
 		user := enrolledUserForRecovery(t)
-		user.OtpConsecutiveFailures = record.OtpConsecutiveFailureLimit
+		user.OTPConsecutiveFailures = record.OTPConsecutiveFailureLimit
 		m.armUser(user)
 
 		expectOTPWriteTransactions(m.database)
-		expectUserRowLocked(m.database, &record.User{Id: 1})
+		expectUserRowLocked(m.database, &record.User{ID: 1})
 		m.database.On("TryUseUserRecoveryCode", mock.Anything, mock.Anything, int64(1), mock.Anything).
 			Return(true, nil).Once()
 		m.database.On("CountUnusedUserRecoveryCodes", mock.Anything, mock.Anything, int64(1)).Return(4, nil).Once()
 		m.auditLogger.On("Log", mock.Anything, audit.EventAuthSuccessRecoveryCode, mock.Anything).Return().Once()
-		m.ceremonyStore.On("RegenerateSession", mock.Anything, mock.Anything, testCeremonyId, int64(1)).Return(nil).Once()
+		m.ceremonyStore.On("RegenerateSession", mock.Anything, mock.Anything, testCeremonyID, int64(1)).Return(nil).Once()
 		m.ceremonyStore.On("SaveAuthContext", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 		rr := httptest.NewRecorder()
 		m.post().ServeHTTP(rr, recoveryCodePostRequest(recoveryCodeTyped))
 
 		assert.Equal(t, http.StatusSeeOther, rr.Code)
-		assert.EqualValues(t, record.OtpConsecutiveFailureLimit, user.OtpConsecutiveFailures)
+		assert.EqualValues(t, record.OTPConsecutiveFailureLimit, user.OTPConsecutiveFailures)
 	})
 
 	t.Run("a wrong code is refused and counts nothing against the authenticator", func(t *testing.T) {
-		m := newOtpStepMocks(t)
-		m.armOtpCeremony("")
+		m := newOTPStepMocks(t)
+		m.armOTPCeremony("")
 		user := enrolledUserForRecovery(t)
-		user.OtpConsecutiveFailures = 7
+		user.OTPConsecutiveFailures = 7
 		m.armUser(user)
 		m.armClient()
 
 		expectOTPWriteTransactions(m.database)
-		expectUserRowLocked(m.database, &record.User{Id: 1})
+		expectUserRowLocked(m.database, &record.User{ID: 1})
 		m.database.On("TryUseUserRecoveryCode", mock.Anything, mock.Anything, int64(1), mock.Anything).
 			Return(false, nil).Once()
 		m.database.On("UserRecoveryCodeExists", mock.Anything, mock.Anything, int64(1), mock.Anything).
@@ -211,7 +211,7 @@ func TestHandleAuthOtpPost_ARecoveryCodeWorksWhileTheAuthenticatorIsDisabled(t *
 
 		m.post().ServeHTTP(rr, req)
 
-		m.database.AssertNotCalled(t, "IncrementUserOtpConsecutiveFailures",
+		m.database.AssertNotCalled(t, "IncrementUserOTPConsecutiveFailures",
 			mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 		m.pageRenderer.AssertExpectations(t)
 	})
@@ -221,7 +221,7 @@ func TestHandleAuthOtpPost_ARecoveryCodeWorksWhileTheAuthenticatorIsDisabled(t *
 // code that was never in the set, one of a replaced set and one already used, so the submitter
 // cannot tell which it was (decision 6). Only a used code of the current set is audited as a
 // replay, beside the failure, and before it (decision 10). Nothing is saved.
-func TestHandleAuthOtpPost_ARefusedRecoveryCode(t *testing.T) {
+func TestHandleAuthOTPPost_ARefusedRecoveryCode(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		// exists is whether the user's current set holds the code, used: false for a wrong code
@@ -233,14 +233,14 @@ func TestHandleAuthOtpPost_ARefusedRecoveryCode(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			logged := logtest.CaptureSlog(t)
-			m := newOtpStepMocks(t)
-			m.armOtpCeremony("")
+			m := newOTPStepMocks(t)
+			m.armOTPCeremony("")
 			m.armUser(enrolledUserForRecovery(t))
 			m.armClient()
 
 			hash := recoveryCodeHashForTest(recoveryCodeNormalized)
 			expectOTPWriteTransactions(m.database)
-			expectUserRowLocked(m.database, &record.User{Id: 1})
+			expectUserRowLocked(m.database, &record.User{ID: 1})
 			m.database.On("TryUseUserRecoveryCode", mock.Anything, mock.Anything, int64(1), hash).
 				Return(false, nil).Once()
 			m.database.On("UserRecoveryCodeExists", mock.Anything, mock.Anything, int64(1), hash).
@@ -261,7 +261,7 @@ func TestHandleAuthOtpPost_ARefusedRecoveryCode(t *testing.T) {
 			rr := httptest.NewRecorder()
 			m.pageRenderer.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_otp_recovery_code.html",
 				mock.MatchedBy(func(bind map[string]interface{}) bool {
-					return bind["error"] == incorrectRecoveryCodeMessage && bind["ceremonyId"] == testCeremonyId
+					return bind["error"] == incorrectRecoveryCodeMessage && bind["ceremonyId"] == testCeremonyID
 				})).Return(nil).Once()
 
 			m.post().ServeHTTP(rr, req)
@@ -281,10 +281,10 @@ func TestHandleAuthOtpPost_ARefusedRecoveryCode(t *testing.T) {
 
 // A blank recovery-code form is asked for a code, on the recovery-code form, and nothing is looked
 // up, charged or audited.
-func TestHandleAuthOtpPost_ABlankRecoveryCodeIsAskedForOne(t *testing.T) {
+func TestHandleAuthOTPPost_ABlankRecoveryCodeIsAskedForOne(t *testing.T) {
 	for _, blank := range []string{"", "  - -  "} {
-		m := newOtpStepMocks(t)
-		m.armOtpCeremony("")
+		m := newOTPStepMocks(t)
+		m.armOTPCeremony("")
 		m.armUser(enrolledUserForRecovery(t))
 		m.armClient()
 
@@ -304,10 +304,10 @@ func TestHandleAuthOtpPost_ABlankRecoveryCodeIsAskedForOne(t *testing.T) {
 
 // A user with no authenticator has no recovery codes, so a recovery code posted for them is a
 // wrong one, refused without a lookup: the setup form offers no recovery-code form (decision 7).
-func TestHandleAuthOtpPost_ARecoveryCodeForAUserWithNoAuthenticatorIsRefused(t *testing.T) {
-	m := newOtpStepMocks(t)
-	m.armOtpCeremony("")
-	m.armUser(&record.User{Id: 1, Enabled: true, OtpConfigGeneration: 2})
+func TestHandleAuthOTPPost_ARecoveryCodeForAUserWithNoAuthenticatorIsRefused(t *testing.T) {
+	m := newOTPStepMocks(t)
+	m.armOTPCeremony("")
+	m.armUser(&record.User{ID: 1, Enabled: true, OTPConfigGeneration: 2})
 	m.armClient()
 	m.auditLogger.On("Log", mock.Anything, audit.EventAuthFailedRecoveryCode, map[string]interface{}{
 		"user_id": int64(1),
@@ -329,9 +329,9 @@ func TestHandleAuthOtpPost_ARecoveryCodeForAUserWithNoAuthenticatorIsRefused(t *
 
 // A disabled account is answered on the recovery-code form as on the code form, before any code is
 // looked at.
-func TestHandleAuthOtpPost_ARecoveryCodeForADisabledAccount(t *testing.T) {
-	m := newOtpStepMocks(t)
-	m.armOtpCeremony("")
+func TestHandleAuthOTPPost_ARecoveryCodeForADisabledAccount(t *testing.T) {
+	m := newOTPStepMocks(t)
+	m.armOTPCeremony("")
 	user := enrolledUserForRecovery(t)
 	user.Enabled = false
 	m.armUser(user)
@@ -353,9 +353,9 @@ func TestHandleAuthOtpPost_ARecoveryCodeForADisabledAccount(t *testing.T) {
 
 // Wrong and used recovery codes spend the otp tier's budget, the one authenticator codes spend, so
 // alternating between the two buys no extra guesses; a correct one spends nothing (decision 6).
-// Driven through a real limiter for the reason TestHandleAuthOtpPost_SpendsTheLimiterBudgetOnFailuresOnly
+// Driven through a real limiter for the reason TestHandleAuthOTPPost_SpendsTheLimiterBudgetOnFailuresOnly
 // gives.
-func TestHandleAuthOtpPost_RecoveryCodesSpendTheOtpBudgetOnFailuresOnly(t *testing.T) {
+func TestHandleAuthOTPPost_RecoveryCodesSpendTheOTPBudgetOnFailuresOnly(t *testing.T) {
 	const budget = 5
 
 	newHandler := func(t *testing.T, used bool, exists bool) (http.Handler, *ceremony.AuthContext) {
@@ -366,18 +366,18 @@ func TestHandleAuthOtpPost_RecoveryCodesSpendTheOtpBudgetOnFailuresOnly(t *testi
 
 		authContext := &ceremony.AuthContext{
 			AuthState:  ceremony.AuthStateLevel2OTP,
-			CeremonyId: testCeremonyId,
-			UserId:     1,
-			ClientId:   "test-client",
+			CeremonyID: testCeremonyID,
+			UserID:     1,
+			ClientID:   "test-client",
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 		ceremonyStore.On("SaveAuthContext", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 		ceremonyStore.On("RegenerateSession", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
-		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(enrolledUserForRecovery(t), nil)
+		database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(enrolledUserForRecovery(t), nil)
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
 			Return(&record.Client{ClientIdentifier: "test-client"}, nil).Maybe()
 		expectOTPWriteTransactions(database)
-		expectUserRowLocked(database, &record.User{Id: 1})
+		expectUserRowLocked(database, &record.User{ID: 1})
 		database.On("TryUseUserRecoveryCode", mock.Anything, mock.Anything, int64(1), mock.Anything).Return(used, nil)
 		database.On("UserRecoveryCodeExists", mock.Anything, mock.Anything, int64(1), mock.Anything).
 			Return(exists, nil).Maybe()
@@ -387,14 +387,14 @@ func TestHandleAuthOtpPost_RecoveryCodesSpendTheOtpBudgetOnFailuresOnly(t *testi
 			"/auth_otp_recovery_code.html", mock.Anything).Return(nil).Maybe()
 
 		rateLimiter := newTestRateLimiter(ceremonyStore)
-		handler := buildAuthOtpPost(authOtpPostDeps{
+		handler := buildAuthOTPPost(authOTPPostDeps{
 			pageRenderer:       pageRenderer,
 			ceremonyStore:      ceremonyStore,
 			database:           database,
 			auditLogger:        auditLogger,
 			credentialFailures: rateLimiter,
 		})
-		return rateLimiter.LimitOtp(handler), authContext
+		return rateLimiter.LimitOTP(handler), authContext
 	}
 
 	post := func(handler http.Handler) int {

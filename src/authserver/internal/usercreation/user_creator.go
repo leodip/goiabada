@@ -19,7 +19,7 @@ import (
 type userCreatorDatabase interface {
 	CreateUser(ctx context.Context, tx *sql.Tx, user *record.User) error
 	CreateUserPermission(ctx context.Context, tx *sql.Tx, userPermission *record.UserPermission) error
-	GetPermissionsByResourceId(ctx context.Context, tx *sql.Tx, resourceId int64) ([]record.Permission, error)
+	GetPermissionsByResourceID(ctx context.Context, tx *sql.Tx, resourceID int64) ([]record.Permission, error)
 	GetResourceByResourceIdentifier(ctx context.Context, tx *sql.Tx, resourceIdentifier string) (*record.Resource, error)
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 }
@@ -125,7 +125,7 @@ func (uc *Creator) newUser(ctx context.Context, tx *sql.Tx, input *Input) (*reco
 		return nil, errs.Errorf("unable to find the %v resource", builtin.AuthServerResourceIdentifier)
 	}
 
-	permissions, err := uc.database.GetPermissionsByResourceId(ctx, tx, authServerResource.Id)
+	permissions, err := uc.database.GetPermissionsByResourceID(ctx, tx, authServerResource.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -157,8 +157,8 @@ func (uc *Creator) insertUser(ctx context.Context, tx *sql.Tx, user *record.User
 
 	for _, permission := range user.Permissions {
 		err := uc.database.CreateUserPermission(ctx, tx, &record.UserPermission{
-			UserId:       user.Id,
-			PermissionId: permission.Id,
+			UserID:       user.ID,
+			PermissionID: permission.ID,
 		})
 		if err != nil {
 			return err

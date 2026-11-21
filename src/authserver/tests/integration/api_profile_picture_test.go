@@ -52,7 +52,7 @@ func makeMultipartRequest(t *testing.T, method, url, accessToken, fieldName stri
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 
@@ -103,7 +103,7 @@ func TestAPIAccountProfilePictureGet_Unauthorized(t *testing.T) {
 	// No token
 	req, err := http.NewRequest("GET", url, nil)
 	require.NoError(t, err)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -200,7 +200,7 @@ func TestAPIAccountProfilePicturePost_Unauthorized(t *testing.T) {
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -259,7 +259,7 @@ func TestAPIAccountProfilePictureDelete_Unauthorized(t *testing.T) {
 
 	req, err := http.NewRequest("DELETE", url, nil)
 	require.NoError(t, err)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -274,7 +274,7 @@ func TestAPIUserProfilePictureGet_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 	user := createTestUserForProfilePicture(t)
 
-	url := fmt.Sprintf("%s/api/v1/admin/users/%d/profile-picture", appConfig.AuthServer.BaseURL, user.Id)
+	url := fmt.Sprintf("%s/api/v1/admin/users/%d/profile-picture", appConfig.AuthServer.BaseURL, user.ID)
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -296,7 +296,7 @@ func TestAPIUserProfilePictureGet_UserNotFound(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
-func TestAPIUserProfilePictureGet_InvalidUserId(t *testing.T) {
+func TestAPIUserProfilePictureGet_InvalidUserID(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	url := fmt.Sprintf("%s/api/v1/admin/users/invalid/profile-picture", appConfig.AuthServer.BaseURL)
@@ -310,7 +310,7 @@ func TestAPIUserProfilePicturePost_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 	user := createTestUserForProfilePicture(t)
 
-	url := fmt.Sprintf("%s/api/v1/admin/users/%d/profile-picture", appConfig.AuthServer.BaseURL, user.Id)
+	url := fmt.Sprintf("%s/api/v1/admin/users/%d/profile-picture", appConfig.AuthServer.BaseURL, user.ID)
 	pictureData := createTestPNGImage(100, 100)
 	resp := makeMultipartRequest(t, "POST", url, accessToken, "picture", pictureData, "picture.png")
 	defer func() { _ = resp.Body.Close() }()
@@ -348,7 +348,7 @@ func TestAPIUserProfilePicturePost_InvalidImage(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 	user := createTestUserForProfilePicture(t)
 
-	url := fmt.Sprintf("%s/api/v1/admin/users/%d/profile-picture", appConfig.AuthServer.BaseURL, user.Id)
+	url := fmt.Sprintf("%s/api/v1/admin/users/%d/profile-picture", appConfig.AuthServer.BaseURL, user.ID)
 	invalidData := []byte("not a valid image")
 	resp := makeMultipartRequest(t, "POST", url, accessToken, "picture", invalidData, "invalid.png")
 	defer func() { _ = resp.Body.Close() }()
@@ -365,7 +365,7 @@ func TestAPIUserProfilePictureDelete_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 	user := createTestUserForProfilePicture(t)
 
-	url := fmt.Sprintf("%s/api/v1/admin/users/%d/profile-picture", appConfig.AuthServer.BaseURL, user.Id)
+	url := fmt.Sprintf("%s/api/v1/admin/users/%d/profile-picture", appConfig.AuthServer.BaseURL, user.ID)
 
 	// First upload a picture
 	pictureData := createTestPNGImage(100, 100)
@@ -409,16 +409,16 @@ func TestUserinfoPicture_Success(t *testing.T) {
 	// Create a user and upload a profile picture using the account API
 	accessToken, user := getUserAccessTokenWithAccountScope(t)
 
-	accountUrl := appConfig.AuthServer.BaseURL + "/api/v1/account/profile-picture"
+	accountURL := appConfig.AuthServer.BaseURL + "/api/v1/account/profile-picture"
 	pictureData := createTestPNGImage(100, 100)
-	uploadResp := makeMultipartRequest(t, "POST", accountUrl, accessToken, "picture", pictureData, "picture.png")
+	uploadResp := makeMultipartRequest(t, "POST", accountURL, accessToken, "picture", pictureData, "picture.png")
 	defer func() { _ = uploadResp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, uploadResp.StatusCode)
 
 	// Now fetch the picture via the userinfo/picture endpoint (no auth required)
-	pictureUrl := fmt.Sprintf("%s/userinfo/picture/%s", appConfig.AuthServer.BaseURL, user.Subject)
-	httpClient := createHttpClient(t)
-	req, err := http.NewRequest("GET", pictureUrl, nil)
+	pictureURL := fmt.Sprintf("%s/userinfo/picture/%s", appConfig.AuthServer.BaseURL, user.Subject)
+	httpClient := createHTTPClient(t)
+	req, err := http.NewRequest("GET", pictureURL, nil)
 	require.NoError(t, err)
 
 	resp, err := httpClient.Do(req)
@@ -440,10 +440,10 @@ func TestUserinfoPicture_Success(t *testing.T) {
 func TestUserinfoPicture_NotFound(t *testing.T) {
 	// Use a random UUID that doesn't exist
 	randomUUID := fake.UUID()
-	pictureUrl := fmt.Sprintf("%s/userinfo/picture/%s", appConfig.AuthServer.BaseURL, randomUUID)
+	pictureURL := fmt.Sprintf("%s/userinfo/picture/%s", appConfig.AuthServer.BaseURL, randomUUID)
 
-	httpClient := createHttpClient(t)
-	req, err := http.NewRequest("GET", pictureUrl, nil)
+	httpClient := createHTTPClient(t)
+	req, err := http.NewRequest("GET", pictureURL, nil)
 	require.NoError(t, err)
 
 	resp, err := httpClient.Do(req)
@@ -454,10 +454,10 @@ func TestUserinfoPicture_NotFound(t *testing.T) {
 }
 
 func TestUserinfoPicture_InvalidSubject(t *testing.T) {
-	pictureUrl := fmt.Sprintf("%s/userinfo/picture/invalid-uuid", appConfig.AuthServer.BaseURL)
+	pictureURL := fmt.Sprintf("%s/userinfo/picture/invalid-uuid", appConfig.AuthServer.BaseURL)
 
-	httpClient := createHttpClient(t)
-	req, err := http.NewRequest("GET", pictureUrl, nil)
+	httpClient := createHTTPClient(t)
+	req, err := http.NewRequest("GET", pictureURL, nil)
 	require.NoError(t, err)
 
 	resp, err := httpClient.Do(req)
@@ -472,10 +472,10 @@ func TestUserinfoPicture_UserHasNoPicture(t *testing.T) {
 	// Create a user without a profile picture
 	user := createTestUserForProfilePicture(t)
 
-	pictureUrl := fmt.Sprintf("%s/userinfo/picture/%s", appConfig.AuthServer.BaseURL, user.Subject)
+	pictureURL := fmt.Sprintf("%s/userinfo/picture/%s", appConfig.AuthServer.BaseURL, user.Subject)
 
-	httpClient := createHttpClient(t)
-	req, err := http.NewRequest("GET", pictureUrl, nil)
+	httpClient := createHTTPClient(t)
+	req, err := http.NewRequest("GET", pictureURL, nil)
 	require.NoError(t, err)
 
 	resp, err := httpClient.Do(req)
@@ -489,16 +489,16 @@ func TestUserinfoPicture_CacheHeaders(t *testing.T) {
 	// Create a user and upload a profile picture
 	accessToken, user := getUserAccessTokenWithAccountScope(t)
 
-	accountUrl := appConfig.AuthServer.BaseURL + "/api/v1/account/profile-picture"
+	accountURL := appConfig.AuthServer.BaseURL + "/api/v1/account/profile-picture"
 	pictureData := createTestPNGImage(100, 100)
-	uploadResp := makeMultipartRequest(t, "POST", accountUrl, accessToken, "picture", pictureData, "picture.png")
+	uploadResp := makeMultipartRequest(t, "POST", accountURL, accessToken, "picture", pictureData, "picture.png")
 	defer func() { _ = uploadResp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, uploadResp.StatusCode)
 
 	// Fetch the picture and check cache headers
-	pictureUrl := fmt.Sprintf("%s/userinfo/picture/%s", appConfig.AuthServer.BaseURL, user.Subject)
-	httpClient := createHttpClient(t)
-	req, err := http.NewRequest("GET", pictureUrl, nil)
+	pictureURL := fmt.Sprintf("%s/userinfo/picture/%s", appConfig.AuthServer.BaseURL, user.Subject)
+	httpClient := createHTTPClient(t)
+	req, err := http.NewRequest("GET", pictureURL, nil)
 	require.NoError(t, err)
 
 	resp, err := httpClient.Do(req)
@@ -521,10 +521,10 @@ func TestUserinfoPicture_CacheHeaders(t *testing.T) {
 func TestProfilePicture_FullWorkflow(t *testing.T) {
 	// 1. Create user and get access token
 	accessToken, user := getUserAccessTokenWithAccountScope(t)
-	accountUrl := appConfig.AuthServer.BaseURL + "/api/v1/account/profile-picture"
+	accountURL := appConfig.AuthServer.BaseURL + "/api/v1/account/profile-picture"
 
 	// 2. Verify no picture initially
-	getResp1 := makeAPIRequest(t, "GET", accountUrl, accessToken, nil)
+	getResp1 := makeAPIRequest(t, "GET", accountURL, accessToken, nil)
 	defer func() { _ = getResp1.Body.Close() }()
 	var getResponse1 map[string]interface{}
 	_ = json.NewDecoder(getResp1.Body).Decode(&getResponse1)
@@ -532,21 +532,21 @@ func TestProfilePicture_FullWorkflow(t *testing.T) {
 
 	// 3. Upload a picture
 	pictureData := createTestPNGImage(150, 150)
-	uploadResp := makeMultipartRequest(t, "POST", accountUrl, accessToken, "picture", pictureData, "profile.png")
+	uploadResp := makeMultipartRequest(t, "POST", accountURL, accessToken, "picture", pictureData, "profile.png")
 	defer func() { _ = uploadResp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, uploadResp.StatusCode)
 
 	// 4. Verify picture exists via account API
-	getResp2 := makeAPIRequest(t, "GET", accountUrl, accessToken, nil)
+	getResp2 := makeAPIRequest(t, "GET", accountURL, accessToken, nil)
 	defer func() { _ = getResp2.Body.Close() }()
 	var getResponse2 map[string]interface{}
 	_ = json.NewDecoder(getResp2.Body).Decode(&getResponse2)
 	assert.True(t, getResponse2["hasPicture"].(bool))
 
 	// 5. Fetch the actual picture via public endpoint
-	pictureUrl := fmt.Sprintf("%s/userinfo/picture/%s", appConfig.AuthServer.BaseURL, user.Subject)
-	httpClient := createHttpClient(t)
-	pictureResp, err := httpClient.Get(pictureUrl)
+	pictureURL := fmt.Sprintf("%s/userinfo/picture/%s", appConfig.AuthServer.BaseURL, user.Subject)
+	httpClient := createHTTPClient(t)
+	pictureResp, err := httpClient.Get(pictureURL)
 	require.NoError(t, err)
 	defer func() { _ = pictureResp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, pictureResp.StatusCode)
@@ -554,24 +554,24 @@ func TestProfilePicture_FullWorkflow(t *testing.T) {
 
 	// 6. Update the picture
 	newPictureData := createTestPNGImage(200, 200)
-	updateResp := makeMultipartRequest(t, "POST", accountUrl, accessToken, "picture", newPictureData, "new_profile.png")
+	updateResp := makeMultipartRequest(t, "POST", accountURL, accessToken, "picture", newPictureData, "new_profile.png")
 	defer func() { _ = updateResp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, updateResp.StatusCode)
 
 	// 7. Delete the picture
-	deleteResp := makeAPIRequest(t, "DELETE", accountUrl, accessToken, nil)
+	deleteResp := makeAPIRequest(t, "DELETE", accountURL, accessToken, nil)
 	defer func() { _ = deleteResp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, deleteResp.StatusCode)
 
 	// 8. Verify picture no longer exists
-	getResp3 := makeAPIRequest(t, "GET", accountUrl, accessToken, nil)
+	getResp3 := makeAPIRequest(t, "GET", accountURL, accessToken, nil)
 	defer func() { _ = getResp3.Body.Close() }()
 	var getResponse3 map[string]interface{}
 	_ = json.NewDecoder(getResp3.Body).Decode(&getResponse3)
 	assert.False(t, getResponse3["hasPicture"].(bool))
 
 	// 9. Verify public endpoint returns 404
-	pictureResp2, err := httpClient.Get(pictureUrl)
+	pictureResp2, err := httpClient.Get(pictureURL)
 	require.NoError(t, err)
 	defer func() { _ = pictureResp2.Body.Close() }()
 	assert.Equal(t, http.StatusNotFound, pictureResp2.StatusCode)

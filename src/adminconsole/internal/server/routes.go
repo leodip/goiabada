@@ -48,7 +48,7 @@ func (s *Server) initRoutes(root *routing.Router) http.Handler {
 	authHelper := oauthclient.NewAuthHelper(s.sessionStore, baseURL, s.cfg.AuthServer.BaseURL, reqctx.SafeModeFrom)
 
 	// Initialize middleware
-	middlewareJwt := middleware.NewJWT(
+	middlewareJWT := middleware.NewJWT(
 		s.sessionStore,
 		s.sessionStore,
 		builtin.AdminConsoleSessionName,
@@ -59,10 +59,10 @@ func (s *Server) initRoutes(root *routing.Router) http.Handler {
 		baseURL,
 		builtin.AdminConsoleClientIdentifier,
 	)
-	jwtSessionHandler := middlewareJwt.SessionHandler()
-	requiresAdminScope := middlewareJwt.RequiresScope([]string{fmt.Sprintf("%v:%v", builtin.AuthServerResourceIdentifier, builtin.ManagePermissionIdentifier)})
+	jwtSessionHandler := middlewareJWT.SessionHandler()
+	requiresAdminScope := middlewareJWT.RequiresScope([]string{fmt.Sprintf("%v:%v", builtin.AuthServerResourceIdentifier, builtin.ManagePermissionIdentifier)})
 	accountScopes := []string{fmt.Sprintf("%v:%v", builtin.AuthServerResourceIdentifier, builtin.ManageAccountPermissionIdentifier)}
-	requiresAccountScope := middlewareJwt.RequiresScope(accountScopes)
+	requiresAccountScope := middlewareJWT.RequiresScope(accountScopes)
 	// The user's page language sits inside each authenticated chain right after
 	// SessionHandler, which says whether anyone is signed in. It reads the session's
 	// copy of the choice, which the sign-in and the profile page write, and draws the
@@ -164,8 +164,8 @@ func (s *Server) initRoutes(root *routing.Router) http.Handler {
 		r.Post("/phone", accounthandlers.HandlePhonePost(httpHelper, s.sessionStore, apiClient, baseURL))
 		r.Get("/change-password", accounthandlers.HandleChangePasswordGet(httpHelper, s.sessionStore, apiClient))
 		r.Post("/change-password", accounthandlers.HandleChangePasswordPost(httpHelper, s.sessionStore, apiClient, baseURL))
-		r.Get("/otp", accounthandlers.HandleOtpGet(httpHelper, apiClient))
-		r.Post("/otp", accounthandlers.HandleOtpPost(httpHelper, apiClient, baseURL))
+		r.Get("/otp", accounthandlers.HandleOTPGet(httpHelper, apiClient))
+		r.Post("/otp", accounthandlers.HandleOTPPost(httpHelper, apiClient, baseURL))
 		r.Get("/applications", accounthandlers.HandleApplicationsGet(httpHelper, apiClient))
 		r.Post("/applications", accounthandlers.HandleApplicationsDisconnectPost(httpHelper, apiClient))
 		r.Get("/legal-documents", accounthandlers.HandleLegalDocumentsGet(httpHelper, apiClient))
@@ -175,7 +175,7 @@ func (s *Server) initRoutes(root *routing.Router) http.Handler {
 		// pages' own sign-in again, asking for what that sign-in asks for (#782 decision 1).
 		r.Get("/data", accounthandlers.HandleDataGet(httpHelper))
 		r.Post("/data", accounthandlers.HandleDataPost(httpHelper, apiClient, authHelper,
-			middlewareJwt.SignInScope(accountScopes), baseURL))
+			middlewareJWT.SignInScope(accountScopes), baseURL))
 		r.Get("/delete", accounthandlers.HandleDeleteAccountGet(httpHelper, apiClient))
 		r.Post("/delete", accounthandlers.HandleDeleteAccountPost(httpHelper, s.sessionStore, apiClient, baseURL))
 

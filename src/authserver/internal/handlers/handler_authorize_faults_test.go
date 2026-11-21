@@ -58,7 +58,7 @@ func newAuthorizeFaultEndpoint(t *testing.T, query string) *authorizeFaultEndpoi
 		"&redirect_uri=https%3A%2F%2Fexample.com%2Fcb&response_type=code&"+query, nil)
 	ctx := reqctx.WithSettings(req.Context(), &record.Settings{Issuer: "https://test-issuer.com"})
 	ctx = reqctx.WithSessionIdentifier(ctx, "session-1")
-	ctx = requestid.NewContext(ctx, propagatedRequestId)
+	ctx = requestid.NewContext(ctx, propagatedRequestID)
 	e.req = req.WithContext(ctx)
 	e.rr = httptest.NewRecorder()
 
@@ -94,7 +94,7 @@ func TestHandleAuthorizeGet_AFaultLoadingTheClientIsA500(t *testing.T) {
 		e.handler.ServeHTTP(e.rr, e.req)
 
 		e.assertNothingAnswered(t)
-		e.database.AssertNotCalled(t, "GetRedirectURIsByClientId", mock.Anything, mock.Anything, mock.Anything)
+		e.database.AssertNotCalled(t, "GetRedirectURIsByClientID", mock.Anything, mock.Anything, mock.Anything)
 		e.database.AssertNotCalled(t, "GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything)
 	})
 
@@ -109,7 +109,7 @@ func TestHandleAuthorizeGet_AFaultLoadingTheClientIsA500(t *testing.T) {
 		e.handler.ServeHTTP(e.rr, e.req)
 
 		e.assertNothingAnswered(t)
-		e.database.AssertNotCalled(t, "GetRedirectURIsByClientId", mock.Anything, mock.Anything, mock.Anything)
+		e.database.AssertNotCalled(t, "GetRedirectURIsByClientID", mock.Anything, mock.Anything, mock.Anything)
 		e.database.AssertNotCalled(t, "GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything)
 	})
 }
@@ -119,7 +119,7 @@ func TestHandleAuthorizeGet_AFaultLoadingTheClientIsA500(t *testing.T) {
 func TestHandleAuthorizeGet_AValidatorFaultIsA500NotARefusal(t *testing.T) {
 	e := newAuthorizeFaultEndpoint(t, "scope=openid&prompt=none")
 	e.database.On("GetClientByClientIdentifier", theRequestsContext(), mock.Anything, "test-client").
-		Return(&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil).Once()
+		Return(&record.Client{ID: 1, ClientIdentifier: "test-client"}, nil).Once()
 	fault := errors.New("the database is unavailable")
 	e.authorizeValidator.On("ValidateUnsupportedRequestParameters",
 		mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil).Once()
@@ -141,9 +141,9 @@ func TestHandleAuthorizeGet_AValidatorFaultIsA500NotARefusal(t *testing.T) {
 func TestHandleAuthorizeGet_AFaultLoadingTheSessionsUserIsA500(t *testing.T) {
 	e := newAuthorizeFaultEndpoint(t, "scope=openid")
 	e.database.On("GetClientByClientIdentifier", theRequestsContext(), mock.Anything, "test-client").
-		Return(&record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: record.AcrLevel1}, nil).Once()
+		Return(&record.Client{ID: 1, ClientIdentifier: "test-client", DefaultACRLevel: record.ACRLevel1}, nil).Once()
 	stubRegisteredRedirectURI(e.database, "https://example.com/cb")
-	userSession := &record.UserSession{Id: 1, UserId: 7, SessionIdentifier: "session-1"}
+	userSession := &record.UserSession{ID: 1, UserID: 7, SessionIdentifier: "session-1"}
 	e.database.On("GetUserSessionBySessionIdentifier", theRequestsContext(), mock.Anything, "session-1").
 		Return(userSession, nil).Once()
 	e.userSessionManager.On("HasValidUserSession", userSession, mock.AnythingOfType("int"),
@@ -170,7 +170,7 @@ func TestHandleAuthorizeGet_AFaultLoadingTheSessionsUserIsA500(t *testing.T) {
 func TestHandleAuthorizeGet_AFaultReadingTheSessionForAnAdministrativeRefusalIsA500(t *testing.T) {
 	e := newAuthorizeFaultEndpoint(t, "scope="+url.QueryEscape("openid authserver:manage")+"&prompt=none")
 	e.database.On("GetClientByClientIdentifier", theRequestsContext(), mock.Anything, "test-client").
-		Return(&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil).Once()
+		Return(&record.Client{ID: 1, ClientIdentifier: "test-client"}, nil).Once()
 	e.authorizeValidator.On("ValidateUnsupportedRequestParameters",
 		mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil).Once()
 	e.authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).

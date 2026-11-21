@@ -1,7 +1,9 @@
 package ceremony
 
 import (
+	"bytes"
 	"encoding/json"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -14,8 +16,9 @@ import (
 // core/oauthprovider, captured from that tree before #339 moved it. They are the wire format of an
 // in-flight ceremony: Store.SaveAuthContext marshals this struct to JSON and puts the string in
 // the session, so a ceremony that began on the old binary is decoded by the new one, and
-// the field names below are the whole of the contract between them. AuthContext carries no json
-// tags, so every field serializes under its Go name and renaming one is a silent break.
+// the keys below are the whole of the contract between them. Each field declares its key with a json
+// tag, which is the Go name the field had when these were captured, so a field is respelled without
+// moving its key; TestAuthContextWire_EveryFieldDeclaresItsKey holds every field to one (#482).
 //
 // Both predate RequestedScope (#436), so they are now the decode side only: what a ceremony in
 // flight across that deploy carries. RequestedScope decodes from them as "", and re-encoding
@@ -23,13 +26,13 @@ import (
 const populatedAuthContextJSON = `{"ClientId":"client-one","RedirectURI":"https://rp.example/cb","ResponseType":"code","CodeChallengeMethod":"S256","CodeChallenge":"challenge","ResponseMode":"query","Scope":"openid profile","ConsentedScope":"openid","MaxAge":"300","AcrValuesFromAuthorizeRequest":"urn:goiabada:level2_optional","State":"state-value","Nonce":"nonce-value","UserAgent":"probe/1.0","IpAddress":"203.0.113.7","AcrLevel":"urn:goiabada:level1","AuthMethods":"pwd otp","UserId":42,"AuthState":"ready_to_issue_code","Prompt":"consent","AuthenticatedAt":"2026-09-15T12:34:56Z","IdTokenHintSub":"sub-value","Level1AuthCompleted":true,"AuthStateGeneration":3,"OtpConfigGeneration":7,"OTPKeyURL":"otpauth://totp/x","CeremonyId":"ceremony-1","UILocales":["pt-BR","en"],"DeferredErrorCode":"invalid_scope","DeferredErrorDescription":"bad scope","TargetAcrLevel":"urn:goiabada:level2_mandatory"}`
 
 // No field carries omitempty, so every key is present even on a zero value. That is what makes
-// the zero literal worth its place: a json tag added to any field shows up here, where the
-// populated literal alone could be satisfied by a tag whose name happened to match.
+// the zero literal worth its place: a tag that renamed a key or added omitempty to any field shows
+// up here, where the populated literal alone could miss a key whose value was empty.
 const zeroAuthContextJSON = `{"ClientId":"","RedirectURI":"","ResponseType":"","CodeChallengeMethod":"","CodeChallenge":"","ResponseMode":"","Scope":"","ConsentedScope":"","MaxAge":"","AcrValuesFromAuthorizeRequest":"","State":"","Nonce":"","UserAgent":"","IpAddress":"","AcrLevel":"","AuthMethods":"","UserId":0,"AuthState":"","Prompt":"","AuthenticatedAt":null,"IdTokenHintSub":"","Level1AuthCompleted":false,"AuthStateGeneration":0,"OtpConfigGeneration":null,"OTPKeyURL":"","CeremonyId":"","UILocales":null,"DeferredErrorCode":"","DeferredErrorDescription":"","TargetAcrLevel":""}`
 
 // The two literals above as this binary writes them back: identical but for the keys of the fields
 // declared after them, appended last in the order the struct declares them: RequestedScope (#436),
-// PasswordVerifiedAt and OtpClaimGeneration (#542), AdoptedSessionAuthTime (#538), RecoveryCodes
+// PasswordVerifiedAt and OTPClaimGeneration (#542), AdoptedSessionAuthTime (#538), RecoveryCodes
 // (#257), KeepSignedIn (#743), DPoPJkt (#42) and SafeMode (#816). A key
 // anywhere else would mean a field had moved.
 const populatedAuthContextJSONReencoded = `{"ClientId":"client-one","RedirectURI":"https://rp.example/cb","ResponseType":"code","CodeChallengeMethod":"S256","CodeChallenge":"challenge","ResponseMode":"query","Scope":"openid profile","ConsentedScope":"openid","MaxAge":"300","AcrValuesFromAuthorizeRequest":"urn:goiabada:level2_optional","State":"state-value","Nonce":"nonce-value","UserAgent":"probe/1.0","IpAddress":"203.0.113.7","AcrLevel":"urn:goiabada:level1","AuthMethods":"pwd otp","UserId":42,"AuthState":"ready_to_issue_code","Prompt":"consent","AuthenticatedAt":"2026-09-15T12:34:56Z","IdTokenHintSub":"sub-value","Level1AuthCompleted":true,"AuthStateGeneration":3,"OtpConfigGeneration":7,"OTPKeyURL":"otpauth://totp/x","CeremonyId":"ceremony-1","UILocales":["pt-BR","en"],"DeferredErrorCode":"invalid_scope","DeferredErrorDescription":"bad scope","TargetAcrLevel":"urn:goiabada:level2_mandatory","RequestedScope":"","PasswordVerifiedAt":null,"OtpClaimGeneration":null,"AdoptedSessionAuthTime":null,"RecoveryCodes":null,"KeepSignedIn":null,"DPoPJkt":"","SafeMode":false}`
@@ -45,7 +48,7 @@ func populatedAuthContext() AuthContext {
 	authenticatedAt := time.Date(2026, 9, 15, 12, 34, 56, 0, time.UTC)
 	otpConfigGeneration := int64(7)
 	return AuthContext{
-		ClientId:                      "client-one",
+		ClientID:                      "client-one",
 		RedirectURI:                   "https://rp.example/cb",
 		ResponseType:                  "code",
 		CodeChallengeMethod:           "S256",
@@ -54,27 +57,27 @@ func populatedAuthContext() AuthContext {
 		Scope:                         "openid profile",
 		ConsentedScope:                "openid",
 		MaxAge:                        "300",
-		AcrValuesFromAuthorizeRequest: "urn:goiabada:level2_optional",
+		ACRValuesFromAuthorizeRequest: "urn:goiabada:level2_optional",
 		State:                         "state-value",
 		Nonce:                         "nonce-value",
 		UserAgent:                     "probe/1.0",
-		IpAddress:                     "203.0.113.7",
-		AcrLevel:                      "urn:goiabada:level1",
+		IPAddress:                     "203.0.113.7",
+		ACRLevel:                      "urn:goiabada:level1",
 		AuthMethods:                   "pwd otp",
-		UserId:                        42,
+		UserID:                        42,
 		AuthState:                     AuthStateReadyToIssueCode,
 		Prompt:                        "consent",
 		AuthenticatedAt:               &authenticatedAt,
-		IdTokenHintSub:                "sub-value",
+		IDTokenHintSub:                "sub-value",
 		Level1AuthCompleted:           true,
 		AuthStateGeneration:           3,
-		OtpConfigGeneration:           &otpConfigGeneration,
+		OTPConfigGeneration:           &otpConfigGeneration,
 		OTPKeyURL:                     "otpauth://totp/x",
-		CeremonyId:                    "ceremony-1",
+		CeremonyID:                    "ceremony-1",
 		UILocales:                     []string{"pt-BR", "en"},
 		DeferredErrorCode:             "invalid_scope",
 		DeferredErrorDescription:      "bad scope",
-		TargetAcrLevel:                "urn:goiabada:level2_mandatory",
+		TargetACRLevel:                "urn:goiabada:level2_mandatory",
 	}
 }
 
@@ -155,4 +158,33 @@ func TestAuthContextWire_RequestedScopeRoundTrip(t *testing.T) {
 	encoded, err := json.Marshal(&got)
 	require.NoError(t, err)
 	assert.Equal(t, requestedScopeAuthContextJSON, string(encoded))
+}
+
+// TestAuthContextWire_EveryFieldDeclaresItsKey holds every field to an explicit json tag naming the
+// key the Reencoded literal carries for it, in the order the struct declares them, and with no
+// option. The round trips above prove the bytes; this proves they no longer rest on the Go field
+// names, so respelling a field cannot change the key a ceremony in flight is stored under (#482
+// decision 5). A field added without a tag fails here before anyone has to notice the key.
+func TestAuthContextWire_EveryFieldDeclaresItsKey(t *testing.T) {
+	decoder := json.NewDecoder(bytes.NewReader([]byte(zeroAuthContextJSONReencoded)))
+	var stored []string
+	_, err := decoder.Token()
+	require.NoError(t, err)
+	for decoder.More() {
+		key, err := decoder.Token()
+		require.NoError(t, err)
+		stored = append(stored, key.(string))
+		var value json.RawMessage
+		require.NoError(t, decoder.Decode(&value))
+	}
+
+	contextType := reflect.TypeOf(AuthContext{})
+	declared := make([]string, 0, contextType.NumField())
+	for i := range contextType.NumField() {
+		field := contextType.Field(i)
+		tag, ok := field.Tag.Lookup("json")
+		assert.True(t, ok, "AuthContext.%s declares no json tag, so its Go name is its stored key", field.Name)
+		declared = append(declared, tag)
+	}
+	assert.Equal(t, stored, declared)
 }

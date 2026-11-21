@@ -25,11 +25,11 @@ import (
 type connectedClientsDatabase interface {
 	revocation.Database
 
-	DeleteUserConsent(ctx context.Context, tx *sql.Tx, userConsentId int64) (bool, error)
-	GetClientById(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error)
-	GetConsentByUserIdAndClientIdForUpdate(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (*record.UserConsent, error)
-	GetConsentsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserConsent, error)
-	GetLiveGrantsByUserId(ctx context.Context, tx *sql.Tx, userId int64, now time.Time) ([]record.LiveGrant, error)
+	DeleteUserConsent(ctx context.Context, tx *sql.Tx, userConsentID int64) (bool, error)
+	GetClientByID(ctx context.Context, tx *sql.Tx, clientID int64) (*record.Client, error)
+	GetConsentByUserIDAndClientIDForUpdate(ctx context.Context, tx *sql.Tx, userID int64, clientID int64) (*record.UserConsent, error)
+	GetConsentsByUserID(ctx context.Context, tx *sql.Tx, userID int64) ([]record.UserConsent, error)
+	GetLiveGrantsByUserID(ctx context.Context, tx *sql.Tx, userID int64, now time.Time) ([]record.LiveGrant, error)
 }
 
 // accountConnectedClientsDatabase is what the account's connected clients need: the caller, beside
@@ -53,69 +53,69 @@ type connectedClient struct {
 // that is only on one of the user's sessions is not one, since a disconnect leaves those rows. Each
 // client's grant scope is the scopes its live refresh tokens record, in the order they first appear
 // across the tokens taken oldest first, each once.
-func connectedClientsOf(ctx context.Context, database connectedClientsDatabase, userId int64,
+func connectedClientsOf(ctx context.Context, database connectedClientsDatabase, userID int64,
 	now time.Time) ([]connectedClient, error) {
 
-	consents, err := database.GetConsentsByUserId(ctx, nil, userId)
+	consents, err := database.GetConsentsByUserID(ctx, nil, userID)
 	if err != nil {
 		return nil, err
 	}
-	grants, err := database.GetLiveGrantsByUserId(ctx, nil, userId, now)
+	grants, err := database.GetLiveGrantsByUserID(ctx, nil, userID, now)
 	if err != nil {
 		return nil, err
 	}
 
 	consentOf := map[int64]*record.UserConsent{}
 	for i := range consents {
-		if _, seen := consentOf[consents[i].ClientId]; !seen {
-			consentOf[consents[i].ClientId] = &consents[i]
+		if _, seen := consentOf[consents[i].ClientID]; !seen {
+			consentOf[consents[i].ClientID] = &consents[i]
 		}
 	}
-	sort.Slice(grants, func(i, j int) bool { return grants[i].RefreshTokenId < grants[j].RefreshTokenId })
+	sort.Slice(grants, func(i, j int) bool { return grants[i].RefreshTokenID < grants[j].RefreshTokenID })
 	scopesOf := map[int64][]string{}
 	for _, grant := range grants {
 		for _, scope := range strings.Fields(grant.Scope) {
-			if !slices.Contains(scopesOf[grant.ClientId], scope) {
-				scopesOf[grant.ClientId] = append(scopesOf[grant.ClientId], scope)
+			if !slices.Contains(scopesOf[grant.ClientID], scope) {
+				scopesOf[grant.ClientID] = append(scopesOf[grant.ClientID], scope)
 			}
 		}
-		if _, listed := scopesOf[grant.ClientId]; !listed {
+		if _, listed := scopesOf[grant.ClientID]; !listed {
 			// A live grant recording no scope still connects its client.
-			scopesOf[grant.ClientId] = []string{}
+			scopesOf[grant.ClientID] = []string{}
 		}
 	}
 
-	clientIds := make([]int64, 0, len(consentOf)+len(scopesOf))
-	for clientId := range consentOf {
-		clientIds = append(clientIds, clientId)
+	clientIDs := make([]int64, 0, len(consentOf)+len(scopesOf))
+	for clientID := range consentOf {
+		clientIDs = append(clientIDs, clientID)
 	}
-	for clientId := range scopesOf {
-		if _, withConsent := consentOf[clientId]; !withConsent {
-			clientIds = append(clientIds, clientId)
+	for clientID := range scopesOf {
+		if _, withConsent := consentOf[clientID]; !withConsent {
+			clientIDs = append(clientIDs, clientID)
 		}
 	}
-	sort.Slice(clientIds, func(i, j int) bool { return clientIds[i] < clientIds[j] })
+	sort.Slice(clientIDs, func(i, j int) bool { return clientIDs[i] < clientIDs[j] })
 
-	clients, err := database.GetClientsByIds(ctx, nil, clientIds)
+	clients, err := database.GetClientsByIDs(ctx, nil, clientIDs)
 	if err != nil {
 		return nil, err
 	}
 	clientOf := map[int64]*record.Client{}
 	for i := range clients {
-		clientOf[clients[i].Id] = &clients[i]
+		clientOf[clients[i].ID] = &clients[i]
 	}
 
-	connected := make([]connectedClient, 0, len(clientIds))
-	for _, clientId := range clientIds {
-		client, found := clientOf[clientId]
+	connected := make([]connectedClient, 0, len(clientIDs))
+	for _, clientID := range clientIDs {
+		client, found := clientOf[clientID]
 		if !found {
 			// Deleted between the reads: its consents and tokens went with it.
 			continue
 		}
 		connected = append(connected, connectedClient{
 			client:     client,
-			consent:    consentOf[clientId],
-			grantScope: strings.Join(scopesOf[clientId], " "),
+			consent:    consentOf[clientID],
+			grantScope: strings.Join(scopesOf[clientID], " "),
 		})
 	}
 	return connected, nil
@@ -125,28 +125,28 @@ func connectedClientsOf(ctx context.Context, database connectedClientsDatabase, 
 // operation a consent withdrawal runs, deleting the user's consent to the client when there is one
 // (#135 decisions 1 and 2). It answers what the transaction changed and the id of the consent it
 // deleted, zero when it deleted none.
-func disconnectClient(ctx context.Context, database connectedClientsDatabase, userId int64, clientId int64,
+func disconnectClient(ctx context.Context, database connectedClientsDatabase, userID int64, clientID int64,
 	settings *record.Settings) (revocation.DisconnectResult, int64, error) {
 
 	// The consent is read inside the transaction, with a locking read, so a consent given between
 	// the request's reads and its sweep is deleted with the rest: on MySQL an ordinary read would
 	// answer the snapshot the transaction's earlier read of the client fixed (#135 decision 1). The
 	// body can run again after a deadlock, so the id is set afresh on each attempt.
-	var consentId int64
-	result, err := revocation.DisconnectClientTx(ctx, database, userId, clientId,
+	var consentID int64
+	result, err := revocation.DisconnectClientTx(ctx, database, userID, clientID,
 		sessionLive(settings), func(tx *sql.Tx) (bool, error) {
-			consentId = 0
-			consent, getErr := database.GetConsentByUserIdAndClientIdForUpdate(ctx, tx, userId, clientId)
+			consentID = 0
+			consent, getErr := database.GetConsentByUserIDAndClientIDForUpdate(ctx, tx, userID, clientID)
 			if getErr != nil || consent == nil {
 				return false, getErr
 			}
-			consentId = consent.Id
-			return database.DeleteUserConsent(ctx, tx, consent.Id)
+			consentID = consent.ID
+			return database.DeleteUserConsent(ctx, tx, consent.ID)
 		})
 	if err != nil || !result.ConsentDeleted {
-		consentId = 0
+		consentID = 0
 	}
-	return result, consentId, err
+	return result, consentID, err
 }
 
 // GET /api/v1/account/connected-clients
@@ -173,7 +173,7 @@ func HandleAccountConnectedClientsGet(
 			return
 		}
 
-		connected, err := connectedClientsOf(r.Context(), database, user.Id, time.Now().UTC())
+		connected, err := connectedClientsOf(r.Context(), database, user.ID, time.Now().UTC())
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -222,13 +222,13 @@ func HandleAccountConnectedClientDelete(
 			writeJSONError(w, "Client ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
-		clientId, err := strconv.ParseInt(idStr, 10, 64)
+		clientID, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			writeJSONError(w, "Invalid client ID format", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
-		client, err := database.GetClientById(r.Context(), nil, clientId)
+		client, err := database.GetClientByID(r.Context(), nil, clientID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -244,7 +244,7 @@ func HandleAccountConnectedClientDelete(
 			return
 		}
 
-		result, consentId, err := disconnectClient(r.Context(), database, user.Id, client.Id, settings)
+		result, consentID, err := disconnectClient(r.Context(), database, user.ID, client.ID, settings)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -259,12 +259,12 @@ func HandleAccountConnectedClientDelete(
 
 		if result.ConsentDeleted {
 			auditLogger.Log(r.Context(), audit.EventDeletedOwnUserConsent, map[string]interface{}{
-				"user_id":        user.Id,
-				"consent_id":     consentId,
+				"user_id":        user.ID,
+				"consent_id":     consentID,
 				"logged_in_user": subject,
 			})
 		}
-		revocation.LogDisconnectedClient(r.Context(), auditLogger, user.Id, client.Id, subject, result)
+		revocation.LogDisconnectedClient(r.Context(), auditLogger, user.ID, client.ID, subject, result)
 		logoutTokens.Send(r.Context(), settings.Issuer, result.LogoutDeliveries)
 
 		writeJSON(w, r, http.StatusOK, api.SuccessResponse{Success: true})

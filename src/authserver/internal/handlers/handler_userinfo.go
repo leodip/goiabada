@@ -22,7 +22,7 @@ import (
 type userinfoDatabase interface {
 	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error)
 	GroupsLoadAttributes(ctx context.Context, tx *sql.Tx, groups []record.Group) error
-	UserHasProfilePicture(ctx context.Context, tx *sql.Tx, userId int64) (bool, error)
+	UserHasProfilePicture(ctx context.Context, tx *sql.Tx, userID int64) (bool, error)
 	UserLoadAttributes(ctx context.Context, tx *sql.Tx, user *record.User) error
 	UserLoadGroups(ctx context.Context, tx *sql.Tx, user *record.User) error
 }
@@ -69,7 +69,7 @@ func HandleUserInfoGetPost(
 
 		if !user.Enabled {
 			auditLogger.Log(r.Context(), audit.EventUserDisabled, map[string]interface{}{
-				"user_id": user.Id,
+				"user_id": user.ID,
 			})
 
 			// 401 invalid_token, for the reason the not-found branch above gives: the
@@ -100,7 +100,7 @@ func HandleUserInfoGetPost(
 		claims := make(jwt.MapClaims)
 		claims["sub"] = user.Subject
 
-		// The same split JwtToken.HasScope performs internally, done once: a missing or
+		// The same split JWTToken.HasScope performs internally, done once: a missing or
 		// non-string scope claim yields one empty element, which matches nothing, exactly as
 		// HasScope answers false for everything in that case.
 		scopes := strings.Split(jwtToken.StringClaim("scope"), " ")
@@ -116,7 +116,7 @@ func HandleUserInfoGetPost(
 			Database:            database,
 			BaseURL:             baseURL,
 			AdminConsoleBaseURL: adminConsoleBaseURL,
-			Inclusion:           userclaims.InclusionIdToken,
+			Inclusion:           userclaims.InclusionIDToken,
 		}
 		mapper.AddOpenIDConnectClaims(r.Context(), nil, claims, user, scopes)
 		mapper.AddGroupClaims(claims, user, scopes)

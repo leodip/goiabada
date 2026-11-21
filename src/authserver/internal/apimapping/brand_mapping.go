@@ -25,7 +25,7 @@ func ToBrandResponse(brand *record.Brand, slots brandasset.Slots, baseURL string
 		return &answer
 	}
 	resp := api.BrandResponse{
-		Id:            brand.Id,
+		ID:            brand.ID,
 		Name:          brand.Name,
 		Appearance:    string(brand.Appearance),
 		Theme:         brand.Theme,
@@ -41,10 +41,10 @@ func ToBrandResponse(brand *record.Brand, slots brandasset.Slots, baseURL string
 		BoldFont:      slot(slots.BoldFont),
 		FooterLinks:   ToBrandFooterLinkResponses(brand.FooterLinks),
 		SupportEmail:  brand.SupportEmail,
-		SupportUrl:    brand.SupportURL,
+		SupportURL:    brand.SupportURL,
 		SupportPhone:  brand.SupportPhone,
 		Palette:       ToBrandPalette(brand),
-		CustomCss:     brand.CustomCSS,
+		CustomCSS:     brand.CustomCSS,
 		IsDefault:     isDefault,
 		ClientCount:   clientCount,
 	}
@@ -70,7 +70,7 @@ func ToBrandFooterLinkResponses(links record.BrandFooterLinks) []api.BrandFooter
 		if labels == nil {
 			labels = map[string]string{}
 		}
-		responses = append(responses, api.BrandFooterLinkResponse{Url: link.URL, Label: link.Label, Labels: labels})
+		responses = append(responses, api.BrandFooterLinkResponse{URL: link.URL, Label: link.Label, Labels: labels})
 	}
 	return responses
 }
@@ -92,9 +92,9 @@ func ToBrandThemeResponses(presets []brandthemes.Preset) []api.BrandThemeRespons
 // absolute on baseURL.
 func ToBrandAssetResponse(asset *record.BrandAsset, baseURL string) api.BrandAssetResponse {
 	return api.BrandAssetResponse{
-		Id:          asset.Id,
+		ID:          asset.ID,
 		Kind:        string(asset.Kind),
-		Url:         baseURL + brandasset.Path(asset),
+		URL:         baseURL + brandasset.Path(asset),
 		ContentType: asset.ContentType,
 		Width:       asset.Width,
 		Height:      asset.Height,

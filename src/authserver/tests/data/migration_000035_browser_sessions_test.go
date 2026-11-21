@@ -81,11 +81,11 @@ func TestMigration000035_GuardedInsertsAreIdempotent(t *testing.T) {
 	h := newIsolatedDB(t)
 
 	require.NoError(t, h.Migrator.Migrate(context.Background(), 34), "migrate to 000034")
-	resourceId, clientId := seedInstallation000035(t, h)
+	resourceID, clientID := seedInstallation000035(t, h)
 
 	// The end state 000035 produces, already present before it runs.
-	permissionId := seedBrowserSessionsPermission000035(t, h, resourceId)
-	seedClientPermission(t, h, clientId, permissionId)
+	permissionID := seedBrowserSessionsPermission000035(t, h, resourceID)
+	seedClientPermission(t, h, clientID, permissionID)
 
 	require.Equal(t, 1, countBrowserSessionsPermission000035(t, h), "fixture: one permission")
 	require.Equal(t, 1, countBrowserSessionsGrant000035(t, h), "fixture: one grant")
@@ -130,14 +130,14 @@ func TestMigration000035_StripsWiderGrantsFromTheAdminConsoleClient(t *testing.T
 	h := newIsolatedDB(t)
 
 	require.NoError(t, h.Migrator.Migrate(context.Background(), 34), "migrate to 000034")
-	resourceId, clientId := seedInstallation000035(t, h)
+	resourceID, clientID := seedInstallation000035(t, h)
 
-	managePermissionId := seedPermission(t, h, resourceId, "manage",
+	managePermissionID := seedPermission(t, h, resourceID, "manage",
 		"Manage the authorization server")
-	seedClientPermission(t, h, clientId, managePermissionId)
+	seedClientPermission(t, h, clientID, managePermissionID)
 
-	otherClientId := seedClient(t, h, "some-other-client")
-	seedClientPermission(t, h, otherClientId, managePermissionId)
+	otherClientID := seedClient(t, h, "some-other-client")
+	seedClientPermission(t, h, otherClientID, managePermissionID)
 
 	require.Equal(t, 1, countGrantsForClient000035(t, h, "admin-console-client"),
 		"fixture: the admin console client starts holding the wide grant and nothing else")
@@ -199,27 +199,27 @@ func TestMigration000035_StripsBrowserSessionsGrantsFromEveryOtherPrincipal(t *t
 	h := newIsolatedDB(t)
 
 	require.NoError(t, h.Migrator.Migrate(context.Background(), 34), "migrate to 000034")
-	resourceId, _ := seedInstallation000035(t, h)
+	resourceID, _ := seedInstallation000035(t, h)
 
 	// The administrator's own permission of that name, made before this release existed.
 	// The guarded INSERT adopts it rather than creating a second one.
-	browserSessionsId := seedBrowserSessionsPermission000035(t, h, resourceId)
+	browserSessionsID := seedBrowserSessionsPermission000035(t, h, resourceID)
 
 	// A second permission on the same resource that nothing in the migration names, held by
 	// the same three principals. Nothing may touch it.
-	manageId := seedPermission(t, h, resourceId, "manage", "Manage the authorization server")
+	manageID := seedPermission(t, h, resourceID, "manage", "Manage the authorization server")
 
-	otherClientId := seedClient(t, h, "some-other-client")
-	seedClientPermission(t, h, otherClientId, browserSessionsId)
-	seedClientPermission(t, h, otherClientId, manageId)
+	otherClientID := seedClient(t, h, "some-other-client")
+	seedClientPermission(t, h, otherClientID, browserSessionsID)
+	seedClientPermission(t, h, otherClientID, manageID)
 
-	userId := seedUser(t, h, userSeed{Enabled: true, Username: "mig35-holder"})
-	seedUserPermission(t, h, userId, browserSessionsId)
-	seedUserPermission(t, h, userId, manageId)
+	userID := seedUser(t, h, userSeed{Enabled: true, Username: "mig35-holder"})
+	seedUserPermission(t, h, userID, browserSessionsID)
+	seedUserPermission(t, h, userID, manageID)
 
-	groupId := seedGroup(t, h, "mig35-holders", "")
-	seedGroupPermission(t, h, groupId, browserSessionsId)
-	seedGroupPermission(t, h, groupId, manageId)
+	groupID := seedGroup(t, h, "mig35-holders", "")
+	seedGroupPermission(t, h, groupID, browserSessionsID)
+	seedGroupPermission(t, h, groupID, manageID)
 
 	require.Equal(t, 1, countGrantOfPermission000035(t, h, "some-other-client", "browser-sessions"),
 		"fixture: another client holds the administrator's browser-sessions permission")
@@ -292,7 +292,7 @@ func assertAfter000035(t *testing.T, h *isolatedDB, when string) {
 // seedInstallation000035 builds the 000034 fixture the guarded inserts need to match:
 // an authserver resource and an admin-console-client with client_credentials_enabled off,
 // which is what every installation predating this migration carries.
-func seedInstallation000035(t *testing.T, h *isolatedDB) (resourceId, clientId int64) {
+func seedInstallation000035(t *testing.T, h *isolatedDB) (resourceID, clientID int64) {
 	t.Helper()
 
 	_, err := h.SQL.Exec(fmt.Sprintf(
@@ -300,21 +300,21 @@ func seedInstallation000035(t *testing.T, h *isolatedDB) (resourceId, clientId i
 		"Authorization server (system-level)"))
 	require.NoError(t, err, "seed the authserver resource")
 	require.NoError(t, h.SQL.QueryRow(
-		`SELECT id FROM resources WHERE resource_identifier = 'authserver'`).Scan(&resourceId),
+		`SELECT id FROM resources WHERE resource_identifier = 'authserver'`).Scan(&resourceID),
 		"read back the seeded resource id")
 
-	clientId = seedClient(t, h, "admin-console-client")
+	clientID = seedClient(t, h, "admin-console-client")
 
 	require.False(t, clientCredentialsEnabled000035(t, h),
 		"the fixture must start with client_credentials_enabled off, or the migration's UPDATE "+
 			"would be asserted against a value it did not set")
 
-	return resourceId, clientId
+	return resourceID, clientID
 }
 
-func seedBrowserSessionsPermission000035(t *testing.T, h *isolatedDB, resourceId int64) int64 {
+func seedBrowserSessionsPermission000035(t *testing.T, h *isolatedDB, resourceID int64) int64 {
 	t.Helper()
-	return seedPermission(t, h, resourceId, "browser-sessions",
+	return seedPermission(t, h, resourceID, "browser-sessions",
 		"Read and write admin console browser sessions")
 }
 

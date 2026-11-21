@@ -22,15 +22,15 @@ import (
 func appForLegalDocuments(t *testing.T) *record.Client {
 	t.Helper()
 	client := createTestClient(t, "legal-app-"+strings.ToLower(fake.LetterN(10)))
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 	return client
 }
 
 // setApps sends a document's Applies to and answers the status and body.
-func setApps(t *testing.T, accessToken string, id int64, appliesTo string, clientIds, expected []int64) (int, map[string]any) {
+func setApps(t *testing.T, accessToken string, id int64, appliesTo string, clientIDs, expected []int64) (int, map[string]any) {
 	t.Helper()
 	status, body, _ := legalCall(t, accessToken, http.MethodPut, legalPath(id, "/apps"), map[string]any{
-		"appliesTo": appliesTo, "clientIds": clientIds, "expectedClientIds": expected,
+		"appliesTo": appliesTo, "clientIds": clientIDs, "expectedClientIds": expected,
 	})
 	return status, body
 }
@@ -61,12 +61,12 @@ func TestAPILegalDocumentApps_AllAppsByDefaultThenSelectedAppsAndBack(t *testing
 	assert.Equal(t, "all_apps", all, "a new document applies to all apps")
 	assert.Equal(t, []any{}, clients)
 
-	status, body := setApps(t, accessToken, id, "selected_apps", []int64{first.Id, second.Id}, []int64{})
+	status, body := setApps(t, accessToken, id, "selected_apps", []int64{first.ID, second.ID}, []int64{})
 	require.Equal(t, http.StatusOK, status, "%v", body)
 	assert.Equal(t, "selected_apps", body["legalDocument"].(map[string]any)["appliesTo"])
 	all, clients = appliesTo(t, accessToken, id)
 	assert.Equal(t, "selected_apps", all)
-	assert.ElementsMatch(t, ids(first.Id, second.Id), clients)
+	assert.ElementsMatch(t, ids(first.ID, second.ID), clients)
 
 	// The list shows it too, which is where a document with no apps is flagged.
 	status, list, _ := legalCall(t, accessToken, http.MethodGet, legalDocumentsPath, nil)
@@ -79,21 +79,21 @@ func TestAPILegalDocumentApps_AllAppsByDefaultThenSelectedAppsAndBack(t *testing
 	}
 	require.NotNil(t, listed, "the document is listed")
 	assert.Equal(t, "selected_apps", listed["appliesTo"])
-	assert.ElementsMatch(t, ids(first.Id, second.Id), listed["clientIds"])
+	assert.ElementsMatch(t, ids(first.ID, second.ID), listed["clientIds"])
 
-	status, body = setApps(t, accessToken, id, "selected_apps", []int64{second.Id}, []int64{second.Id, first.Id})
+	status, body = setApps(t, accessToken, id, "selected_apps", []int64{second.ID}, []int64{second.ID, first.ID})
 	require.Equal(t, http.StatusOK, status, "%v", body)
 	_, clients = appliesTo(t, accessToken, id)
-	assert.Equal(t, ids(second.Id), clients, "the app left out is removed")
+	assert.Equal(t, ids(second.ID), clients, "the app left out is removed")
 
 	// A save from a page read before the last one is refused, with nothing written.
-	status, body = setApps(t, accessToken, id, "selected_apps", []int64{first.Id}, []int64{first.Id, second.Id})
+	status, body = setApps(t, accessToken, id, "selected_apps", []int64{first.ID}, []int64{first.ID, second.ID})
 	assert.Equal(t, http.StatusConflict, status)
 	assert.Equal(t, "CONCURRENT_UPDATE", body["error_code"])
 	_, clients = appliesTo(t, accessToken, id)
-	assert.Equal(t, ids(second.Id), clients, "the refused save wrote nothing")
+	assert.Equal(t, ids(second.ID), clients, "the refused save wrote nothing")
 
-	status, body = setApps(t, accessToken, id, "all_apps", []int64{}, []int64{second.Id})
+	status, body = setApps(t, accessToken, id, "all_apps", []int64{}, []int64{second.ID})
 	require.Equal(t, http.StatusOK, status, "%v", body)
 	all, clients = appliesTo(t, accessToken, id)
 	assert.Equal(t, "all_apps", all)
@@ -111,18 +111,18 @@ func TestAPILegalDocumentApps_Refusals(t *testing.T) {
 	cases := []struct {
 		name      string
 		appliesTo string
-		clientIds []int64
+		clientIDs []int64
 		status    int
 		code      string
 	}{
-		{"the admin console's own client", "selected_apps", []int64{app.Id, adminConsole.Id}, http.StatusBadRequest, "handler.legal_document.admin_console_client"},
-		{"an app that does not exist", "selected_apps", []int64{app.Id + 1_000_000}, http.StatusNotFound, "NOT_FOUND"},
-		{"apps with all apps", "all_apps", []int64{app.Id}, http.StatusBadRequest, "handler.legal_document.apps_with_all_apps"},
+		{"the admin console's own client", "selected_apps", []int64{app.ID, adminConsole.ID}, http.StatusBadRequest, "handler.legal_document.admin_console_client"},
+		{"an app that does not exist", "selected_apps", []int64{app.ID + 1_000_000}, http.StatusNotFound, "NOT_FOUND"},
+		{"apps with all apps", "all_apps", []int64{app.ID}, http.StatusBadRequest, "handler.legal_document.apps_with_all_apps"},
 		{"an unknown applies to", "every_app", []int64{}, http.StatusBadRequest, "handler.legal_document.applies_to_invalid"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			status, body := setApps(t, accessToken, id, c.appliesTo, c.clientIds, []int64{})
+			status, body := setApps(t, accessToken, id, c.appliesTo, c.clientIDs, []int64{})
 			assert.Equal(t, c.status, status)
 			assert.Equal(t, c.code, body["error_code"])
 			all, clients := appliesTo(t, accessToken, id)
@@ -132,7 +132,7 @@ func TestAPILegalDocumentApps_Refusals(t *testing.T) {
 	}
 
 	status, body, _ := legalCall(t, accessToken, http.MethodPut, legalPath(id, "/apps"), map[string]any{
-		"appliesTo": "selected_apps", "clientIds": []int64{app.Id},
+		"appliesTo": "selected_apps", "clientIds": []int64{app.ID},
 	})
 	assert.Equal(t, http.StatusBadRequest, status, "the list as loaded is required")
 	assert.Equal(t, "VALIDATION_ERROR", body["error_code"])
@@ -149,32 +149,32 @@ func TestAPILegalDocumentApps_DeletingAnAppLeavesTheDocumentOnItsOtherApps(t *te
 	both := createLegalDocumentOverAPI(t, accessToken, "must_accept", legalShortName("apps-both"), "Terms", "Text")
 	only := createLegalDocumentOverAPI(t, accessToken, "for_information", legalShortName("apps-only"), "Privacy", "Text")
 	deleted, kept := appForLegalDocuments(t), appForLegalDocuments(t)
-	status, body := setApps(t, accessToken, both, "selected_apps", []int64{deleted.Id, kept.Id}, []int64{})
+	status, body := setApps(t, accessToken, both, "selected_apps", []int64{deleted.ID, kept.ID}, []int64{})
 	require.Equal(t, http.StatusOK, status, "%v", body)
-	status, body = setApps(t, accessToken, only, "selected_apps", []int64{deleted.Id}, []int64{})
+	status, body = setApps(t, accessToken, only, "selected_apps", []int64{deleted.ID}, []int64{})
 	require.Equal(t, http.StatusOK, status, "%v", body)
 
-	status, body, _ = legalCall(t, accessToken, http.MethodDelete, fmt.Sprintf("/api/v1/admin/clients/%d", deleted.Id), nil)
+	status, body, _ = legalCall(t, accessToken, http.MethodDelete, fmt.Sprintf("/api/v1/admin/clients/%d", deleted.ID), nil)
 	require.Equal(t, http.StatusOK, status, "%v", body)
 
 	all, clients := appliesTo(t, accessToken, both)
 	assert.Equal(t, "selected_apps", all)
-	assert.Equal(t, ids(kept.Id), clients, "the document keeps its other app")
+	assert.Equal(t, ids(kept.ID), clients, "the document keeps its other app")
 	all, clients = appliesTo(t, accessToken, only)
 	assert.Equal(t, "selected_apps", all, "a document left with no apps is still selected apps")
 	assert.Equal(t, []any{}, clients, "and lists none, so it applies to nobody")
 }
 
-func clientLegalDocumentsPath(clientId int64) string {
-	return fmt.Sprintf("/api/v1/admin/clients/%d/legal-documents", clientId)
+func clientLegalDocumentsPath(clientID int64) string {
+	return fmt.Sprintf("/api/v1/admin/clients/%d/legal-documents", clientID)
 }
 
-// clientDocumentIds reads a client's documents and answers their ids, failing on anything but 200.
-func clientDocumentIds(t *testing.T, accessToken string, clientId int64) map[int64]map[string]any {
+// clientDocumentIDs reads a client's documents and answers their ids, failing on anything but 200.
+func clientDocumentIDs(t *testing.T, accessToken string, clientID int64) map[int64]map[string]any {
 	t.Helper()
-	status, body, _ := legalCall(t, accessToken, http.MethodGet, clientLegalDocumentsPath(clientId), nil)
+	status, body, _ := legalCall(t, accessToken, http.MethodGet, clientLegalDocumentsPath(clientID), nil)
 	require.Equal(t, http.StatusOK, status, "%v", body)
-	assert.InDelta(t, clientId, body["client"].(map[string]any)["id"], 0)
+	assert.InDelta(t, clientID, body["client"].(map[string]any)["id"], 0)
 	out := map[int64]map[string]any{}
 	for _, d := range body["legalDocuments"].([]any) {
 		doc := d.(map[string]any)
@@ -193,8 +193,8 @@ func TestAPIClientLegalDocuments_TheDocumentsThatApplyToTheClient(t *testing.T) 
 	listing := createLegalDocumentOverAPI(t, accessToken, "must_accept", legalShortName("client-listing"), "Terms", "Text")
 	notListing := createLegalDocumentOverAPI(t, accessToken, "must_accept", legalShortName("client-other"), "Terms", "Text")
 	retired := createLegalDocumentOverAPI(t, accessToken, "must_accept", legalShortName("client-retired"), "Terms", "Text")
-	for doc, clientId := range map[int64]int64{listing: app.Id, notListing: other.Id, retired: app.Id} {
-		status, body := setApps(t, accessToken, doc, "selected_apps", []int64{clientId}, []int64{})
+	for doc, clientID := range map[int64]int64{listing: app.ID, notListing: other.ID, retired: app.ID} {
+		status, body := setApps(t, accessToken, doc, "selected_apps", []int64{clientID}, []int64{})
 		require.Equal(t, http.StatusOK, status, "%v", body)
 	}
 	status, body, _ := legalCall(t, accessToken, http.MethodPost, legalPath(retired, "/publish"), nil)
@@ -202,21 +202,21 @@ func TestAPIClientLegalDocuments_TheDocumentsThatApplyToTheClient(t *testing.T) 
 	status, body, _ = legalCall(t, accessToken, http.MethodPost, legalPath(retired, "/retire"), nil)
 	require.Equal(t, http.StatusOK, status, "%v", body)
 
-	docs := clientDocumentIds(t, accessToken, app.Id)
+	docs := clientDocumentIDs(t, accessToken, app.ID)
 	require.Contains(t, docs, allApps, "a document for all apps applies to the client")
 	require.Contains(t, docs, listing, "a document listing the client applies to it")
 	assert.NotContains(t, docs, notListing, "a document listing another app does not")
 	assert.NotContains(t, docs, retired, "a retired document applies to no app")
 	assert.Equal(t, "all_apps", docs[allApps]["appliesTo"])
 	assert.Equal(t, "selected_apps", docs[listing]["appliesTo"])
-	assert.Equal(t, ids(app.Id), docs[listing]["clientIds"])
+	assert.Equal(t, ids(app.ID), docs[listing]["clientIds"])
 
-	otherDocs := clientDocumentIds(t, accessToken, other.Id)
+	otherDocs := clientDocumentIDs(t, accessToken, other.ID)
 	assert.Contains(t, otherDocs, notListing)
 	assert.Contains(t, otherDocs, allApps)
 	assert.NotContains(t, otherDocs, listing)
 
-	status, body, _ = legalCall(t, accessToken, http.MethodGet, clientLegalDocumentsPath(app.Id+1_000_000), nil)
+	status, body, _ = legalCall(t, accessToken, http.MethodGet, clientLegalDocumentsPath(app.ID+1_000_000), nil)
 	assert.Equal(t, http.StatusNotFound, status)
 	assert.Equal(t, "NOT_FOUND", body["error_code"])
 }
@@ -240,7 +240,7 @@ func TestAPILegalDocumentApps_TheScopesOfEachRoute(t *testing.T) {
 	} {
 		t.Run(c.permission, func(t *testing.T) {
 			token, client := createClientWithGranularScope(t, c.permission)
-			t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+			t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 
 			status, body := setApps(t, token, id, "all_apps", []int64{}, []int64{})
 			if c.write {
@@ -250,7 +250,7 @@ func TestAPILegalDocumentApps_TheScopesOfEachRoute(t *testing.T) {
 				assert.Equal(t, "INSUFFICIENT_SCOPE", body["error_code"])
 			}
 
-			status, body, _ = legalCall(t, token, http.MethodGet, clientLegalDocumentsPath(app.Id), nil)
+			status, body, _ = legalCall(t, token, http.MethodGet, clientLegalDocumentsPath(app.ID), nil)
 			assert.Equal(t, c.read, status, "%v", body)
 		})
 	}
@@ -263,26 +263,26 @@ func TestAPILegalDocumentApps_ChangesAreAudited(t *testing.T) {
 	id := createLegalDocumentOverAPI(t, accessToken, "must_accept", shortName, "Terms", "Text")
 	first, second := appForLegalDocuments(t), appForLegalDocuments(t)
 
-	_, _, requestId := legalCall(t, accessToken, http.MethodPut, legalPath(id, "/apps"), map[string]any{
-		"appliesTo": "selected_apps", "clientIds": []int64{first.Id, second.Id}, "expectedClientIds": []int64{},
+	_, _, requestID := legalCall(t, accessToken, http.MethodPut, legalPath(id, "/apps"), map[string]any{
+		"appliesTo": "selected_apps", "clientIds": []int64{first.ID, second.ID}, "expectedClientIds": []int64{},
 	})
 	assert.Equal(t, []map[string]any{{
 		"legal_document_id": float64(id), "short_name": shortName, "applies_to": "selected_apps",
-		"added_client_ids": ids(first.Id, second.Id), "removed_client_ids": []any{}, "logged_in_user": caller.ClientIdentifier,
-	}}, auditRows(t, accessToken, "updated_legal_document_apps", requestId))
+		"added_client_ids": ids(first.ID, second.ID), "removed_client_ids": []any{}, "logged_in_user": caller.ClientIdentifier,
+	}}, auditRows(t, accessToken, "updated_legal_document_apps", requestID))
 
-	_, _, requestId = legalCall(t, accessToken, http.MethodPut, legalPath(id, "/apps"), map[string]any{
-		"appliesTo": "all_apps", "clientIds": []int64{}, "expectedClientIds": []int64{first.Id, second.Id},
+	_, _, requestID = legalCall(t, accessToken, http.MethodPut, legalPath(id, "/apps"), map[string]any{
+		"appliesTo": "all_apps", "clientIds": []int64{}, "expectedClientIds": []int64{first.ID, second.ID},
 	})
-	rows := auditRows(t, accessToken, "updated_legal_document_apps", requestId)
+	rows := auditRows(t, accessToken, "updated_legal_document_apps", requestID)
 	require.Len(t, rows, 1)
 	assert.Equal(t, "all_apps", rows[0]["applies_to"])
 	assert.Equal(t, []any{}, rows[0]["added_client_ids"])
-	assert.ElementsMatch(t, ids(first.Id, second.Id), rows[0]["removed_client_ids"])
+	assert.ElementsMatch(t, ids(first.ID, second.ID), rows[0]["removed_client_ids"])
 
 	// A refused change writes nothing.
-	_, _, requestId = legalCall(t, accessToken, http.MethodPut, legalPath(id, "/apps"), map[string]any{
-		"appliesTo": "selected_apps", "clientIds": []int64{first.Id}, "expectedClientIds": []int64{first.Id},
+	_, _, requestID = legalCall(t, accessToken, http.MethodPut, legalPath(id, "/apps"), map[string]any{
+		"appliesTo": "selected_apps", "clientIds": []int64{first.ID}, "expectedClientIds": []int64{first.ID},
 	})
-	assert.Empty(t, auditRows(t, accessToken, "updated_legal_document_apps", requestId))
+	assert.Empty(t, auditRows(t, accessToken, "updated_legal_document_apps", requestID))
 }

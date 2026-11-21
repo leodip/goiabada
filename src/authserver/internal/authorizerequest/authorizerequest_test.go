@@ -24,7 +24,7 @@ var tx = &sql.Tx{}
 // holding form.
 func parkedRow(id int64, handle string, form url.Values) *record.AuthorizeRequest {
 	return &record.AuthorizeRequest{
-		Id:          id,
+		ID:          id,
 		HandleHash:  hashutil.HashString(handle),
 		RequestForm: form.Encode(),
 		ExpiresAt:   time.Now().UTC().Add(Lifetime),
@@ -147,7 +147,7 @@ func TestConsume_AMalformedHandleReadsNothing(t *testing.T) {
 	}
 }
 
-func TestConsume_TheWinnerGetsTheFormAndTheRowIsClaimedByItsId(t *testing.T) {
+func TestConsume_TheWinnerGetsTheFormAndTheRowIsClaimedByItsID(t *testing.T) {
 	handle := strings.Repeat("A", 43)
 	form := url.Values{"client_id": {"c"}, "state": {"one", "two"}, "nonce": {"a&b=c;d%e+f"}}
 
@@ -282,7 +282,7 @@ func TestConsume_ARerunAfterADeadlockStartsFromWhatTheDatabaseHoldsNow(t *testin
 // repeating a 500.
 func TestConsume_ARowThatDoesNotParseIsClaimedAndRefused(t *testing.T) {
 	handle := strings.Repeat("A", 43)
-	corrupt := &record.AuthorizeRequest{Id: 41, HandleHash: hashutil.HashString(handle), RequestForm: "client_id=%zz"}
+	corrupt := &record.AuthorizeRequest{ID: 41, HandleHash: hashutil.HashString(handle), RequestForm: "client_id=%zz"}
 
 	db := datamocks.NewDatabase(t)
 	datamocks.ExpectRunInTransaction(db, tx)

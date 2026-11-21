@@ -22,7 +22,7 @@ import (
 type issuanceDatabase interface {
 	ClientLoadRedirectURIs(ctx context.Context, tx *sql.Tx, client *record.Client) error
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
-	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	GetUserByID(ctx context.Context, tx *sql.Tx, userID int64) (*record.User, error)
 	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
 }
 
@@ -38,7 +38,7 @@ type codeIssuer interface {
 // *issuance.TokenIssuer satisfies it.
 type implicitTokenIssuer interface {
 	IssueImplicitTx(ctx context.Context, settings *record.Settings, input *issuance.ImplicitGrantInput,
-		issueAccessToken bool, issueIdToken bool) (*issuance.ImplicitGrantResponse, error)
+		issueAccessToken bool, issueIDToken bool) (*issuance.ImplicitGrantResponse, error)
 }
 
 // issuedTokens counts the tokens issued by grant type. *tokenmetrics.Recorder satisfies it.
@@ -138,11 +138,11 @@ func (o *Issuance) Run(ctx context.Context, browser issuanceBrowser, settings *r
 	facts := issuanceFacts{
 		redirectURI:              authContext.RedirectURI,
 		responseType:             authContext.ResponseType,
-		hintSubject:              authContext.IdTokenHintSub,
+		hintSubject:              authContext.IDTokenHintSub,
 		authStateGeneration:      authContext.AuthStateGeneration,
 		otpClaim:                 otpClaimOf(authContext),
 		sessionIdentifierPresent: sessionIdentifier != "",
-		acrLevel:                 authContext.AcrLevel,
+		acrLevel:                 authContext.ACRLevel,
 		authMethods:              authContext.AuthMethods,
 	}
 
@@ -159,7 +159,7 @@ func (o *Issuance) Run(ctx context.Context, browser issuanceBrowser, settings *r
 	for need != issuanceFactNone {
 		switch need {
 		case issuanceFactRegistration:
-			loaded, err := o.database.GetClientByClientIdentifier(ctx, nil, authContext.ClientId)
+			loaded, err := o.database.GetClientByClientIdentifier(ctx, nil, authContext.ClientID)
 			if err != nil {
 				return IssuanceResult{}, err
 			}
@@ -191,7 +191,7 @@ func (o *Issuance) Run(ctx context.Context, browser issuanceBrowser, settings *r
 			}
 
 		case issuanceFactUser:
-			user, err := o.database.GetUserById(ctx, nil, authContext.UserId)
+			user, err := o.database.GetUserByID(ctx, nil, authContext.UserID)
 			if err != nil {
 				return IssuanceResult{}, err
 			}
@@ -240,19 +240,19 @@ func (o *Issuance) Run(ctx context.Context, browser issuanceBrowser, settings *r
 		// is what tells the operator which client to move to https (#590 decision 7). The URI is not
 		// logged, as at the authorization endpoint (#159).
 		slog.WarnContext(ctx, "the redirect URI this ceremony would be answered at uses plain http off the loopback interface, so nothing is issued and nothing is emitted",
-			"client_identifier", authContext.ClientId)
+			"client_identifier", authContext.ClientID)
 		return IssuanceResult{
 			InsecureRedirect: true,
 			Client:           client,
-			ClearErr:         browser.ClearAuthContext(authContext.CeremonyId),
+			ClearErr:         browser.ClearAuthContext(authContext.CeremonyID),
 		}, nil
 
 	case issuanceRefuseClientDisabled:
 		slog.WarnContext(ctx, "the client this ceremony is issuing for has been disabled, so nothing is issued and nothing is emitted",
-			"client_identifier", authContext.ClientId)
+			"client_identifier", authContext.ClientID)
 		return IssuanceResult{
 			ClientDisabled: true,
-			ClearErr:       browser.ClearAuthContext(authContext.CeremonyId),
+			ClearErr:       browser.ClearAuthContext(authContext.CeremonyID),
 		}, nil
 
 	case issuanceRefuseImplicitDisabled:
@@ -268,14 +268,14 @@ func (o *Issuance) Run(ctx context.Context, browser issuanceBrowser, settings *r
 		// Somebody has authenticated by now, so the refusal is recorded against the ceremony's user
 		// (#499 decisions 7 and 9).
 		protocolvalidation.LogAdministrativeScopeRefused(ctx, o.auditLogger, client, facts.refusedAdministrativeScopes,
-			"issue", authContext.UserId)
+			"issue", authContext.UserID)
 		return answerClient(browser, authContext, client, "invalid_scope",
 			protocolvalidation.AdministrativeScopeRefusal(facts.refusedAdministrativeScopes).Description()), nil
 
 	case issuanceRefuseUserDisabled:
 		// The event and the answer Completion gives the same condition.
 		o.auditLogger.Log(ctx, audit.EventUserDisabled, map[string]interface{}{
-			"user_id": facts.user.Id,
+			"user_id": facts.user.ID,
 		})
 		return answerClient(browser, authContext, client, "access_denied", userDisabledDescription), nil
 
@@ -288,16 +288,16 @@ func (o *Issuance) Run(ctx context.Context, browser issuanceBrowser, settings *r
 			sessionIdentifier), nil
 
 	case issuanceUserMissing:
-		return IssuanceResult{}, errs.Errorf("user %v not found", authContext.UserId)
+		return IssuanceResult{}, errs.Errorf("user %v not found", authContext.UserID)
 
 	case issuanceRefuseScopeDenied:
 		slog.WarnContext(ctx, "the user holds none of the permissions behind the scopes this ceremony would grant, so nothing is issued",
-			"user_id", authContext.UserId,
-			"client_identifier", authContext.ClientId)
+			"user_id", authContext.UserID,
+			"client_identifier", authContext.ClientID)
 		o.auditLogger.Log(ctx, audit.EventIssuanceRefusedScopeDenied, map[string]interface{}{
-			"user_id":           authContext.UserId,
-			"client_id":         client.Id,
-			"client_identifier": authContext.ClientId,
+			"user_id":           authContext.UserID,
+			"client_id":         client.ID,
+			"client_identifier": authContext.ClientID,
 		})
 		// Completion's wording and code for the same condition.
 		return answerClient(browser, authContext, client, "access_denied",
@@ -333,7 +333,7 @@ func answerClient(browser ceremonyClearer, authContext *ceremony.AuthContext, cl
 
 	return IssuanceResult{
 		ClientError: &ClientError{Client: client, Code: code, Description: description},
-		ClearErr:    browser.ClearAuthContext(authContext.CeremonyId),
+		ClearErr:    browser.ClearAuthContext(authContext.CeremonyID),
 	}
 }
 
@@ -345,22 +345,22 @@ func (o *Issuance) refuseUnregisteredRedirect(ctx context.Context, browser cerem
 	authContext *ceremony.AuthContext, client *record.Client) IssuanceResult {
 
 	slog.WarnContext(ctx, "the redirect URI this ceremony would be answered at is no longer registered on the client, so nothing is issued and nothing is emitted",
-		"client_identifier", authContext.ClientId)
+		"client_identifier", authContext.ClientID)
 
 	details := map[string]interface{}{
-		"user_id":           authContext.UserId,
-		"client_identifier": authContext.ClientId,
+		"user_id":           authContext.UserID,
+		"client_identifier": authContext.ClientID,
 	}
 	// Absent rather than zero for a client that no longer exists: client 0 names no row.
 	if client != nil {
-		details["client_id"] = client.Id
+		details["client_id"] = client.ID
 	}
 	o.auditLogger.Log(ctx, audit.EventIssuanceRefusedRedirectURI, details)
 
 	return IssuanceResult{
 		UnregisteredRedirect: true,
 		Client:               client,
-		ClearErr:             browser.ClearAuthContext(authContext.CeremonyId),
+		ClearErr:             browser.ClearAuthContext(authContext.CeremonyID),
 	}
 }
 
@@ -371,7 +371,7 @@ func refuseFlowDisabled(ctx context.Context, browser ceremonyClearer, authContex
 	client *record.Client, description string) IssuanceResult {
 
 	slog.WarnContext(ctx, "the client is no longer allowed the flow this ceremony is for, so nothing is issued",
-		"client_identifier", authContext.ClientId,
+		"client_identifier", authContext.ClientID,
 		"response_type", authContext.ResponseType)
 	return answerClient(browser, authContext, client, "unauthorized_client", description)
 }
@@ -396,9 +396,9 @@ func (o *Issuance) refuseUnusableSession(ctx context.Context, browser issuanceBr
 
 	if shape == sessionExpired {
 		o.auditLogger.Log(ctx, audit.EventIssuanceRefusedSessionInvalid, map[string]interface{}{
-			"user_id":            authContext.UserId,
-			"client_id":          client.Id,
-			"client_identifier":  authContext.ClientId,
+			"user_id":            authContext.UserID,
+			"client_id":          client.ID,
+			"client_identifier":  authContext.ClientID,
 			"session_identifier": sessionIdentifier,
 		})
 	}
@@ -408,22 +408,22 @@ func (o *Issuance) refuseUnusableSession(ctx context.Context, browser issuanceBr
 		case sessionForeign:
 			slog.WarnContext(ctx, "the session in this browser belongs to a different user, returning login_required instead of binding this silent ceremony to it",
 				"session_identifier", sessionIdentifier,
-				"session_user_id", ambientSession.UserId,
-				"ceremony_user_id", authContext.UserId)
+				"session_user_id", ambientSession.UserID,
+				"ceremony_user_id", authContext.UserID)
 		case sessionExpired:
 			slog.WarnContext(ctx, "the session backing this silent ceremony is no longer within its idle timeout or maximum lifetime, returning login_required instead of issuing a code",
 				"session_identifier", sessionIdentifier,
-				"session_user_id", ambientSession.UserId)
+				"session_user_id", ambientSession.UserID)
 		case sessionGenerationStale:
 			slog.WarnContext(ctx, "the user's authentication generation has moved on since this silent ceremony authenticated, returning login_required instead of issuing anything",
-				"ceremony_user_id", authContext.UserId)
+				"ceremony_user_id", authContext.UserID)
 		case sessionAuthenticatorRemoved:
 			slog.WarnContext(ctx, "this silent ceremony names a one-time code and the user no longer has an authenticator, returning login_required instead of issuing anything",
-				"ceremony_user_id", authContext.UserId)
+				"ceremony_user_id", authContext.UserID)
 		case sessionLevelUnearned:
 			slog.WarnContext(ctx, "this silent ceremony's level claims a second factor its methods do not name, returning login_required instead of issuing anything",
-				"ceremony_user_id", authContext.UserId,
-				"acr_level", authContext.AcrLevel.String(),
+				"ceremony_user_id", authContext.UserID,
+				"acr_level", authContext.ACRLevel.String(),
 				"auth_methods", authContext.AuthMethods)
 		default:
 			slog.WarnContext(ctx, "the session backing this silent ceremony is gone, returning login_required instead of issuing a code",
@@ -436,22 +436,22 @@ func (o *Issuance) refuseUnusableSession(ctx context.Context, browser issuanceBr
 	case sessionForeign:
 		slog.WarnContext(ctx, "the session in this browser belongs to a different user, restarting level 1 instead of binding this ceremony to it",
 			"session_identifier", sessionIdentifier,
-			"session_user_id", ambientSession.UserId,
-			"ceremony_user_id", authContext.UserId)
+			"session_user_id", ambientSession.UserID,
+			"ceremony_user_id", authContext.UserID)
 	case sessionExpired:
 		slog.WarnContext(ctx, "the session backing this ceremony is no longer within its idle timeout or maximum lifetime, restarting level 1 instead of issuing a code",
 			"session_identifier", sessionIdentifier,
-			"session_user_id", ambientSession.UserId)
+			"session_user_id", ambientSession.UserID)
 	case sessionGenerationStale:
 		slog.WarnContext(ctx, "the user's authentication generation has moved on since this ceremony authenticated, restarting level 1 instead of issuing anything",
-			"ceremony_user_id", authContext.UserId)
+			"ceremony_user_id", authContext.UserID)
 	case sessionAuthenticatorRemoved:
 		slog.WarnContext(ctx, "this ceremony names a one-time code and the user no longer has an authenticator, restarting level 1 instead of issuing anything",
-			"ceremony_user_id", authContext.UserId)
+			"ceremony_user_id", authContext.UserID)
 	case sessionLevelUnearned:
 		slog.WarnContext(ctx, "this ceremony's level claims a second factor its methods do not name, restarting level 1 instead of issuing anything",
-			"ceremony_user_id", authContext.UserId,
-			"acr_level", authContext.AcrLevel.String(),
+			"ceremony_user_id", authContext.UserID,
+			"acr_level", authContext.ACRLevel.String(),
 			"auth_methods", authContext.AuthMethods)
 	default:
 		slog.WarnContext(ctx, "the session backing this ceremony is gone, restarting level 1 instead of issuing a code",
@@ -483,7 +483,7 @@ func (o *Issuance) issueCode(ctx context.Context, browser issuanceBrowser, authC
 	}
 	if errors.Is(err, issuance.ErrIssuingClientGone) {
 		slog.WarnContext(ctx, "the client this ceremony is issuing for no longer exists under the identifier it named, refusing to issue a code",
-			"client_identifier", authContext.ClientId,
+			"client_identifier", authContext.ClientID,
 			"session_identifier", sessionIdentifier)
 	}
 	if errors.Is(err, issuance.ErrIssuingSessionGone) || errors.Is(err, issuance.ErrIssuingClientGone) {
@@ -495,12 +495,12 @@ func (o *Issuance) issueCode(ctx context.Context, browser issuanceBrowser, authC
 	}
 
 	o.auditLogger.Log(ctx, audit.EventCreatedAuthCode, map[string]interface{}{
-		"user_id":   input.UserId,
-		"client_id": code.ClientId,
-		"code_id":   code.Id,
+		"user_id":   input.UserID,
+		"client_id": code.ClientID,
+		"code_id":   code.ID,
 	})
 
-	return IssuanceResult{Code: code, ClearErr: browser.ClearAuthContext(authContext.CeremonyId)}, nil
+	return IssuanceResult{Code: code, ClearErr: browser.ClearAuthContext(authContext.CeremonyID)}, nil
 }
 
 // newCreateCodeInput copies the fields an authorization code is written from off the ceremony, with
@@ -508,7 +508,7 @@ func (o *Issuance) issueCode(ctx context.Context, browser issuanceBrowser, authC
 // does not read (#437).
 func newCreateCodeInput(authContext *ceremony.AuthContext, sessionIdentifier string) *issuance.CreateCodeInput {
 	return &issuance.CreateCodeInput{
-		ClientId:            authContext.ClientId,
+		ClientID:            authContext.ClientID,
 		RedirectURI:         authContext.RedirectURI,
 		ResponseMode:        authContext.ResponseMode,
 		Scope:               authContext.Scope,
@@ -518,9 +518,9 @@ func newCreateCodeInput(authContext *ceremony.AuthContext, sessionIdentifier str
 		State:               authContext.State,
 		Nonce:               authContext.Nonce,
 		UserAgent:           authContext.UserAgent,
-		IpAddress:           authContext.IpAddress,
-		UserId:              authContext.UserId,
-		AcrLevel:            authContext.AcrLevel,
+		IPAddress:           authContext.IPAddress,
+		UserID:              authContext.UserID,
+		ACRLevel:            authContext.ACRLevel,
 		AuthMethods:         authContext.AuthMethods,
 		AuthenticatedAt:     authContext.AuthenticatedAt,
 		AuthStateGeneration: authContext.AuthStateGeneration,
@@ -549,26 +549,26 @@ func (o *Issuance) issueImplicit(ctx context.Context, browser issuanceBrowser, s
 
 	if authContext.AuthenticatedAt == nil || authContext.AuthenticatedAt.IsZero() {
 		return IssuanceResult{}, errs.Errorf("the ceremony for user %v has no auth time to issue the implicit grant with",
-			authContext.UserId)
+			authContext.UserID)
 	}
 
 	rtInfo := protocolvalidation.ParseResponseType(authContext.ResponseType)
 	issueAccessToken := rtInfo.HasToken
-	issueIdToken := rtInfo.HasIdToken
+	issueIDToken := rtInfo.HasIDToken
 	scope := issuerScope(authContext)
 
 	tokens, err := o.tokens.IssueImplicitTx(ctx, settings, &issuance.ImplicitGrantInput{
 		Client:              client,
 		User:                user,
 		Scope:               scope,
-		AcrLevel:            authContext.AcrLevel,
+		ACRLevel:            authContext.ACRLevel,
 		AuthMethods:         authContext.AuthMethods,
 		SessionIdentifier:   sessionIdentifier,
 		Nonce:               authContext.Nonce,
 		AuthenticatedAt:     *authContext.AuthenticatedAt,
 		AuthStateGeneration: authContext.AuthStateGeneration,
 		OTPClaim:            otpClaimOf(authContext),
-	}, issueAccessToken, issueIdToken)
+	}, issueAccessToken, issueIDToken)
 	if errors.Is(err, otpcredential.ErrAuthenticatorRemoved) {
 		return o.refuseUnusableSession(ctx, browser, sessionAuthenticatorRemoved, authContext, client, ambientSession,
 			sessionIdentifier), nil
@@ -582,14 +582,14 @@ func (o *Issuance) issueImplicit(ctx context.Context, browser issuanceBrowser, s
 	}
 
 	o.auditLogger.Log(ctx, audit.EventTokenIssuedImplicitResponse, map[string]interface{}{
-		"user_id":            user.Id,
-		"client_id":          client.Id,
+		"user_id":            user.ID,
+		"client_id":          client.ID,
 		"scope":              scope,
 		"response_type":      authContext.ResponseType,
 		"issue_access_token": issueAccessToken,
-		"issue_id_token":     issueIdToken,
+		"issue_id_token":     issueIDToken,
 	})
 	o.issuedTokens.Issued(oidc.GrantTypeImplicit)
 
-	return IssuanceResult{Tokens: tokens, ClearErr: browser.ClearAuthContext(authContext.CeremonyId)}, nil
+	return IssuanceResult{Tokens: tokens, ClearErr: browser.ClearAuthContext(authContext.CeremonyID)}, nil
 }

@@ -138,12 +138,12 @@ func TestNotFound_RenderFailureStillLogsOnce(t *testing.T) {
 	}
 	assert.Contains(t, logged.Error(), "unable to render template")
 
-	requestId, isString := record.Attrs["request_id"].(string)
+	requestID, isString := record.Attrs["request_id"].(string)
 	assert.True(t, isString, "request_id must be a string attribute")
-	assert.Contains(t, w.Body.String(), "Error: "+requestId)
+	assert.Contains(t, w.Body.String(), "Error: "+requestID)
 }
 
-func TestInternalServerError_LogsOnceWithErrorAndRequestId(t *testing.T) {
+func TestInternalServerError_LogsOnceWithErrorAndRequestID(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
 	httpHelper := errorPageHelper()
 
@@ -170,10 +170,10 @@ func TestInternalServerError_LogsOnceWithErrorAndRequestId(t *testing.T) {
 	// The request id on the log line and the one on the page the visitor is looking at have to be
 	// the same string, or the line cannot be found from a user's report, which is the only reason
 	// either of them is written down at all.
-	requestId, isString := record.Attrs["request_id"].(string)
+	requestID, isString := record.Attrs["request_id"].(string)
 	assert.True(t, isString, "request_id must be a string attribute")
-	assert.NotEmpty(t, requestId)
-	assert.Contains(t, w.Body.String(), "Error: "+requestId)
+	assert.NotEmpty(t, requestID)
+	assert.Contains(t, w.Body.String(), "Error: "+requestID)
 }
 
 // The stack is why decision 10 moved WithStack off the call sites and into the writer: a caller
@@ -254,15 +254,15 @@ func TestJSONError_LogsOnceOnTheGenericBranch(t *testing.T) {
 	if _, isError := loggedErrorOf(t, record); !isError {
 		return
 	}
-	requestId, isString := record.Attrs["request_id"].(string)
+	requestID, isString := record.Attrs["request_id"].(string)
 	assert.True(t, isString, "request_id must be a string attribute")
-	assert.NotEmpty(t, requestId)
+	assert.NotEmpty(t, requestID)
 
 	// The same id reaches the client, in the sentence this branch writes.
 	var response map[string]string
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
 	assert.Equal(t, "server_error", response["error"])
-	assert.Contains(t, response["error_description"], requestId)
+	assert.Contains(t, response["error_description"], requestID)
 }
 
 // The branch between the two: an *ErrorDetail carrying no status at all. It is answered 500, and a
@@ -292,16 +292,16 @@ func TestJSONError_ADetailWithNoStatusIsA500ThatStillLogsAndCorrelates(t *testin
 		return
 	}
 
-	requestId, isString := record.Attrs["request_id"].(string)
+	requestID, isString := record.Attrs["request_id"].(string)
 	require.True(t, isString, "request_id must be a string attribute")
-	require.NotEmpty(t, requestId)
+	require.NotEmpty(t, requestID)
 
 	var response map[string]string
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
 	assert.Equal(t, "server_error", response["error"], "the detail's own code still reaches the wire")
 	assert.Contains(t, response["error_description"], "The operation failed.",
 		"and so does its own sentence")
-	assert.Contains(t, response["error_description"], requestId,
+	assert.Contains(t, response["error_description"], requestID,
 		"the id on the wire and the id on the log line have to be the same string")
 }
 
@@ -334,14 +334,14 @@ func TestJSONError_AnExplicit500DetailLogsAndCorrelates(t *testing.T) {
 	if _, isError := loggedErrorOf(t, record); !isError {
 		return
 	}
-	requestId, isString := record.Attrs["request_id"].(string)
+	requestID, isString := record.Attrs["request_id"].(string)
 	require.True(t, isString, "request_id must be a string attribute")
-	require.NotEmpty(t, requestId)
+	require.NotEmpty(t, requestID)
 
 	var response map[string]string
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
 	assert.Equal(t, "server_error", response["error"])
-	assert.Equal(t, "The operation failed. Request Id: "+requestId, response["error_description"],
+	assert.Equal(t, "The operation failed. Request Id: "+requestID, response["error_description"],
 		"the id on the wire and the id on the log line have to be the same string")
 }
 

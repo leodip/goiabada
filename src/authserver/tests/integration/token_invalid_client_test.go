@@ -23,21 +23,21 @@ type tokenRefusal struct {
 	body      map[string]interface{}
 }
 
-// postTokenRequest posts form to the token endpoint, with clientId and clientSecret in the
+// postTokenRequest posts form to the token endpoint, with clientID and clientSecret in the
 // Authorization header when basic is set, and returns the refusal as received.
-func postTokenRequest(t *testing.T, form url.Values, basic bool, clientId, clientSecret string) tokenRefusal {
+func postTokenRequest(t *testing.T, form url.Values, basic bool, clientID, clientSecret string) tokenRefusal {
 	t.Helper()
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
-	req, err := http.NewRequest("POST", destUrl, strings.NewReader(form.Encode()))
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
+	req, err := http.NewRequest("POST", destURL, strings.NewReader(form.Encode()))
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("Referer", destUrl)
+	req.Header.Set("Referer", destURL)
 	req.Header.Set("Origin", appConfig.AuthServer.BaseURL)
 	if basic {
-		req.SetBasicAuth(clientId, clientSecret)
+		req.SetBasicAuth(clientID, clientSecret)
 	}
 
-	resp, err := createHttpClient(t).Do(req)
+	resp, err := createHTTPClient(t).Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	raw, err := io.ReadAll(resp.Body)
@@ -64,7 +64,7 @@ func TestToken_InvalidClient_OneShapeOverBothTransports(t *testing.T) {
 			ClientIdentifier:         "invalid-client-" + fake.LetterN(8),
 			Enabled:                  enabled,
 			ClientCredentialsEnabled: true,
-			DefaultAcrLevel:          record.AcrLevel2Optional,
+			DefaultACRLevel:          record.ACRLevel2Optional,
 			ClientSecretEncrypted:    clientSecretEncrypted,
 		}
 		require.NoError(t, database.CreateClient(context.Background(), nil, client))
@@ -75,7 +75,7 @@ func TestToken_InvalidClient_OneShapeOverBothTransports(t *testing.T) {
 
 	rows := []struct {
 		name        string
-		clientId    string
+		clientID    string
 		secret      string
 		description string
 	}{
@@ -96,13 +96,13 @@ func TestToken_InvalidClient_OneShapeOverBothTransports(t *testing.T) {
 			t.Run(r.name+", "+transport, func(t *testing.T) {
 				form := url.Values{"grant_type": {"client_credentials"}}
 				if !basic {
-					form.Set("client_id", r.clientId)
+					form.Set("client_id", r.clientID)
 					if r.secret != "" {
 						form.Set("client_secret", r.secret)
 					}
 				}
 
-				got := postTokenRequest(t, form, basic, r.clientId, r.secret)
+				got := postTokenRequest(t, form, basic, r.clientID, r.secret)
 
 				assert.Equal(t, http.StatusUnauthorized, got.status)
 				assert.Equal(t, `Basic realm="goiabada"`, got.challenge)

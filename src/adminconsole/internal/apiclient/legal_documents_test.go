@@ -40,10 +40,10 @@ const legalDocumentDetailBody = `{
 
 // The editor reads the document, its draft and its versions out of one answer: a decode that
 // dropped the draft would open the editor on the published text and lose the administrator's work.
-func TestAuthServerClient_GetLegalDocumentByIdDecodesTheDocumentItsDraftAndItsVersions(t *testing.T) {
+func TestAuthServerClient_GetLegalDocumentByIDDecodesTheDocumentItsDraftAndItsVersions(t *testing.T) {
 	client, recorded := serves(t, legalDocumentDetailBody)
 
-	detail, err := client.GetLegalDocumentById(context.Background(), "an-access-token", 7)
+	detail, err := client.GetLegalDocumentByID(context.Background(), "an-access-token", 7)
 	require.NoError(t, err)
 
 	gotPath, gotAuthorization := recorded()
@@ -51,7 +51,7 @@ func TestAuthServerClient_GetLegalDocumentByIdDecodesTheDocumentItsDraftAndItsVe
 	assert.Equal(t, "Bearer an-access-token", gotAuthorization)
 
 	doc := detail.LegalDocument
-	assert.Equal(t, int64(7), doc.Id)
+	assert.Equal(t, int64(7), doc.ID)
 	assert.Equal(t, "terms-of-use", doc.ShortName)
 	assert.Equal(t, "must_accept", doc.Kind)
 	assert.Equal(t, "Terms of use", doc.Title)
@@ -62,7 +62,7 @@ func TestAuthServerClient_GetLegalDocumentByIdDecodesTheDocumentItsDraftAndItsVe
 	assert.False(t, doc.Retired)
 	assert.Nil(t, doc.RetiredAt)
 	assert.Equal(t, "selected_apps", doc.AppliesTo)
-	assert.Equal(t, []int64{3, 5}, doc.ClientIds)
+	assert.Equal(t, []int64{3, 5}, doc.ClientIDs)
 
 	require.NotNil(t, detail.Draft)
 	assert.Equal(t, "Terms of use (2027)", detail.Draft.Title)
@@ -78,12 +78,12 @@ func TestAuthServerClient_GetLegalDocumentByIdDecodesTheDocumentItsDraftAndItsVe
 
 // A document with no draft answers draft null, which must reach the editor as nil, the sign that it
 // opens on the current version's text.
-func TestAuthServerClient_GetLegalDocumentByIdDecodesANullDraftAsNil(t *testing.T) {
+func TestAuthServerClient_GetLegalDocumentByIDDecodesANullDraftAsNil(t *testing.T) {
 	client, _ := serves(t, `{"legalDocument":{"id":7,"shortName":"privacy","kind":"for_information",`+
 		`"currentVersion":1,"hasDraft":false,"retired":true,"retiredAt":"2026-10-30T10:00:00Z"},"draft":null,`+
 		`"versions":[{"version":1,"title":"Privacy notice","publishedAt":"2026-10-02T08:00:00Z"}]}`)
 
-	detail, err := client.GetLegalDocumentById(context.Background(), "an-access-token", 7)
+	detail, err := client.GetLegalDocumentByID(context.Background(), "an-access-token", 7)
 	require.NoError(t, err)
 
 	assert.Nil(t, detail.Draft)
@@ -108,7 +108,7 @@ func TestAuthServerClient_GetAllLegalDocumentsDecodesEachRow(t *testing.T) {
 	require.Len(t, docs, 2)
 	assert.Equal(t, "terms-of-use", docs[0].ShortName)
 	assert.Equal(t, 2, docs[0].CurrentVersion)
-	assert.Equal(t, int64(8), docs[1].Id)
+	assert.Equal(t, int64(8), docs[1].ID)
 	assert.Equal(t, "privacy", docs[1].ShortName)
 	assert.Equal(t, "for_information", docs[1].Kind)
 	assert.Equal(t, "Privacy notice", docs[1].Title)
@@ -155,7 +155,7 @@ func TestAuthServerClient_CreateLegalDocumentDecodesTheNewDocument(t *testing.T)
 	detail, err := client.CreateLegalDocument(context.Background(), "an-access-token", charCreateLegalDocument)
 	require.NoError(t, err)
 
-	assert.Equal(t, int64(9), detail.LegalDocument.Id)
+	assert.Equal(t, int64(9), detail.LegalDocument.ID)
 	assert.Equal(t, "cookies", detail.LegalDocument.ShortName)
 	require.NotNil(t, detail.Draft)
 	assert.Equal(t, "Cookies", detail.Draft.Title)
@@ -175,15 +175,15 @@ func TestAuthServerClient_GetClientLegalDocumentsDecodesTheClientAndItsDocuments
 	gotPath, gotAuthorization := recorded()
 	assert.Equal(t, "/api/v1/admin/clients/42/legal-documents", gotPath)
 	assert.Equal(t, "Bearer an-access-token", gotAuthorization)
-	assert.Equal(t, int64(42), got.Client.Id)
+	assert.Equal(t, int64(42), got.Client.ID)
 	assert.Equal(t, "shop", got.Client.ClientIdentifier)
 	assert.True(t, got.Client.IsPublic)
 	require.Len(t, got.LegalDocuments, 2)
 	assert.Equal(t, "privacy", got.LegalDocuments[0].ShortName)
 	assert.Equal(t, "all_apps", got.LegalDocuments[0].AppliesTo)
-	assert.Equal(t, []int64{}, got.LegalDocuments[0].ClientIds)
-	assert.Equal(t, int64(8), got.LegalDocuments[1].Id)
+	assert.Equal(t, []int64{}, got.LegalDocuments[0].ClientIDs)
+	assert.Equal(t, int64(8), got.LegalDocuments[1].ID)
 	assert.Equal(t, "must_accept", got.LegalDocuments[1].Kind)
 	assert.Equal(t, "selected_apps", got.LegalDocuments[1].AppliesTo)
-	assert.Equal(t, []int64{42, 43}, got.LegalDocuments[1].ClientIds)
+	assert.Equal(t, []int64{42, 43}, got.LegalDocuments[1].ClientIDs)
 }

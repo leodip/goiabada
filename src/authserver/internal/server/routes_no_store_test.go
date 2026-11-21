@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestRegisterRoutes_EveryApiRouteRefusesToBeStored is goal 5 of #247, and it is the reason this seam
+// TestRegisterRoutes_EveryAPIRouteRefusesToBeStored is goal 5 of #247, and it is the reason this seam
 // exists rather than a pair of spot checks: the route set comes from the router, so a route or a
 // whole group added under /api/v1/ later is covered without this file being edited.
 //
@@ -38,10 +38,10 @@ import (
 // WHAT THIS DOES NOT OWN, and must not be described as owning (decision 16). A CORS preflight is
 // answered 200 by middleware.CORS at the root, ahead of every branch, and ships with neither header
 // field; it carries no credential, so RFC 6749 section 5.1 does not reach it. The JSON 500 a fault in
-// front of the groups answers is TestRegisterRoutes_AnApiFaultInFrontOfTheGroupsIsNoStore's.
+// front of the groups answers is TestRegisterRoutes_AnAPIFaultInFrontOfTheGroupsIsNoStore's.
 // This test is exhaustive over the routes the router registers, and it is not exhaustive over the
 // API's whole response surface.
-func TestRegisterRoutes_EveryApiRouteRefusesToBeStored(t *testing.T) {
+func TestRegisterRoutes_EveryAPIRouteRefusesToBeStored(t *testing.T) {
 	s := newRoutingTestServer(t, newRoutingDatabase(t))
 
 	type apiRoute struct {
@@ -130,13 +130,13 @@ func TestRegisterRoutes_EveryApiRouteRefusesToBeStored(t *testing.T) {
 	}
 }
 
-// TestRegisterRoutes_AnApiFaultInFrontOfTheGroupsIsNoStore: a settings read that fails, and a panic
+// TestRegisterRoutes_AnAPIFaultInFrontOfTheGroupsIsNoStore: a settings read that fails, and a panic
 // in it, stop every request on the API branch before its group's middleware, and the JSON 500 either
 // answers is no-store, as every other answer of the API is (#825). The routes come from the router,
 // as in the sweep above, the public settings among them.
-func TestRegisterRoutes_AnApiFaultInFrontOfTheGroupsIsNoStore(t *testing.T) {
+func TestRegisterRoutes_AnAPIFaultInFrontOfTheGroupsIsNoStore(t *testing.T) {
 	failing := datamocks.NewDatabase(t)
-	failing.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).
+	failing.On("GetSettingsByID", mock.Anything, mock.Anything, int64(1)).
 		Return(nil, errors.New("the settings row could not be read"))
 
 	for _, fault := range []struct {

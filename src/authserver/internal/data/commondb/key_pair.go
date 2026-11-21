@@ -27,7 +27,7 @@ var keyPairColumns = columnList{
 // scanKeyPair reads one row selected with keyPairColumns.
 func scanKeyPair(row rowScanner, keyPair *record.KeyPair) error {
 	return row.Scan(
-		&keyPair.Id,
+		&keyPair.ID,
 		&keyPair.CreatedAt,
 		&keyPair.UpdatedAt,
 		&keyPair.State,
@@ -36,7 +36,7 @@ func scanKeyPair(row rowScanner, keyPair *record.KeyPair) error {
 		&keyPair.Algorithm,
 		&keyPair.PrivateKeyPEM,
 		&keyPair.PublicKeyPEM,
-		&keyPair.PublicKeyASN1_DER,
+		&keyPair.PublicKeyASN1DER,
 		&keyPair.PublicKeyJWK,
 	)
 }
@@ -79,7 +79,7 @@ var updateKeyPairState = statement{
 	mssql:    "UPDATE key_pairs SET state = @p1, updated_at = @p2 WHERE id = @p3 AND state = @p4",
 }
 
-var selectKeyPairById = statement{
+var selectKeyPairByID = statement{
 	sqlite:   "SELECT " + keyPairColumns.sqlite + " FROM key_pairs WHERE id = ?",
 	mysql:    "SELECT " + keyPairColumns.mysql + " FROM key_pairs WHERE id = ?",
 	postgres: "SELECT " + keyPairColumns.postgres + " FROM key_pairs WHERE id = $1",
@@ -118,7 +118,7 @@ func (d *Database) CreateKeyPair(ctx context.Context, tx *sql.Tx, keyPair *recor
 
 	id, err := d.insert(ctx, tx, insertKeyPair, "keyPair",
 		keyPair.CreatedAt, keyPair.UpdatedAt, keyPair.State, keyPair.KeyIdentifier, keyPair.Type,
-		keyPair.Algorithm, keyPair.PrivateKeyPEM, keyPair.PublicKeyPEM, keyPair.PublicKeyASN1_DER,
+		keyPair.Algorithm, keyPair.PrivateKeyPEM, keyPair.PublicKeyPEM, keyPair.PublicKeyASN1DER,
 		keyPair.PublicKeyJWK)
 	if err != nil {
 		keyPair.CreatedAt = originalCreatedAt
@@ -126,13 +126,13 @@ func (d *Database) CreateKeyPair(ctx context.Context, tx *sql.Tx, keyPair *recor
 		return err
 	}
 
-	keyPair.Id = id
+	keyPair.ID = id
 	return nil
 }
 
 func (d *Database) UpdateKeyPair(ctx context.Context, tx *sql.Tx, keyPair *record.KeyPair) error {
 
-	if keyPair.Id == 0 {
+	if keyPair.ID == 0 {
 		return errs.New("can't update keyPair with id 0")
 	}
 
@@ -141,8 +141,8 @@ func (d *Database) UpdateKeyPair(ctx context.Context, tx *sql.Tx, keyPair *recor
 
 	_, err := d.ExecSQL(ctx, tx, updateKeyPair.text(d.Dialect),
 		keyPair.UpdatedAt, keyPair.State, keyPair.KeyIdentifier, keyPair.Type, keyPair.Algorithm,
-		keyPair.PrivateKeyPEM, keyPair.PublicKeyPEM, keyPair.PublicKeyASN1_DER, keyPair.PublicKeyJWK,
-		keyPair.Id)
+		keyPair.PrivateKeyPEM, keyPair.PublicKeyPEM, keyPair.PublicKeyASN1DER, keyPair.PublicKeyJWK,
+		keyPair.ID)
 	if err != nil {
 		keyPair.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update keyPair")
@@ -155,14 +155,14 @@ func (d *Database) UpdateKeyPair(ctx context.Context, tx *sql.Tx, keyPair *recor
 // is the one that made the transition. The state predicate is what makes it a compare-and-set:
 // without it two concurrent rotations both write the snapshot they read, and the loser deletes
 // the previous key the winner had just demoted, retiring every token that key signed (#251).
-func (d *Database) UpdateKeyPairState(ctx context.Context, tx *sql.Tx, keyPairId int64, fromState string,
+func (d *Database) UpdateKeyPairState(ctx context.Context, tx *sql.Tx, keyPairID int64, fromState string,
 	toState string) (bool, error) {
 
-	if keyPairId == 0 {
+	if keyPairID == 0 {
 		return false, errs.New("can't update the state of a keyPair with id 0")
 	}
 
-	result, err := d.ExecSQL(ctx, tx, updateKeyPairState.text(d.Dialect), toState, time.Now().UTC(), keyPairId, fromState)
+	result, err := d.ExecSQL(ctx, tx, updateKeyPairState.text(d.Dialect), toState, time.Now().UTC(), keyPairID, fromState)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to update keyPair state")
 	}
@@ -175,8 +175,8 @@ func (d *Database) UpdateKeyPairState(ctx context.Context, tx *sql.Tx, keyPairId
 	return rowsAffected == 1, nil
 }
 
-func (d *Database) GetKeyPairById(ctx context.Context, tx *sql.Tx, keyPairId int64) (*record.KeyPair, error) {
-	return queryOne(ctx, d, tx, selectKeyPairById.text(d.Dialect), []any{keyPairId}, scanKeyPair, "keyPair")
+func (d *Database) GetKeyPairByID(ctx context.Context, tx *sql.Tx, keyPairID int64) (*record.KeyPair, error) {
+	return queryOne(ctx, d, tx, selectKeyPairByID.text(d.Dialect), []any{keyPairID}, scanKeyPair, "keyPair")
 }
 
 func (d *Database) GetAllSigningKeys(ctx context.Context, tx *sql.Tx) ([]record.KeyPair, error) {
@@ -203,9 +203,9 @@ func (d *Database) GetCurrentSigningKey(ctx context.Context, tx *sql.Tx) (*recor
 	return keyPair, nil
 }
 
-func (d *Database) DeleteKeyPair(ctx context.Context, tx *sql.Tx, keyPairId int64) error {
+func (d *Database) DeleteKeyPair(ctx context.Context, tx *sql.Tx, keyPairID int64) error {
 
-	_, err := d.ExecSQL(ctx, tx, deleteKeyPair.text(d.Dialect), keyPairId)
+	_, err := d.ExecSQL(ctx, tx, deleteKeyPair.text(d.Dialect), keyPairID)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete keyPair")
 	}

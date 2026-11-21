@@ -51,17 +51,17 @@ func TestCreateAuthCode(t *testing.T) {
 	codeIssuer := NewCodeIssuer(mockDB)
 
 	testClient := &record.Client{
-		Id:               1,
+		ID:               1,
 		ClientIdentifier: "test-client",
 	}
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(testClient, nil)
-	mockDB.On("GetClientByIdForShare", mock.Anything, mock.Anything, testClient.Id).Return(testClient, nil)
+	mockDB.On("GetClientByIDForShare", mock.Anything, mock.Anything, testClient.ID).Return(testClient, nil)
 	mockDB.On("CreateCode", mock.Anything, mock.Anything, mock.AnythingOfType("*record.Code")).Return(nil)
 
 	input := &CreateCodeInput{
-		ClientId:            "test-client",
-		UserId:              123,
+		ClientID:            "test-client",
+		UserID:              123,
 		ConsentedScope:      "openid profile",
 		Scope:               "openid profile email",
 		CodeChallenge:       "challenge",
@@ -71,8 +71,8 @@ func TestCreateAuthCode(t *testing.T) {
 		Nonce:               "nonce456",
 		UserAgent:           "Mozilla/5.0",
 		ResponseMode:        "query",
-		IpAddress:           "127.0.0.1",
-		AcrLevel:            record.AcrLevel1,
+		IPAddress:           "127.0.0.1",
+		ACRLevel:            record.ACRLevel1,
 		AuthMethods:         "pwd",
 		AuthenticatedAt:     codeAuthTime(),
 		SessionIdentifier:   "session123",
@@ -82,8 +82,8 @@ func TestCreateAuthCode(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.NotNil(t, code)
-	assert.Equal(t, testClient.Id, code.ClientId)
-	assert.Equal(t, input.UserId, code.UserId)
+	assert.Equal(t, testClient.ID, code.ClientID)
+	assert.Equal(t, input.UserID, code.UserID)
 	assert.Equal(t, input.ConsentedScope, code.Scope)
 	assert.Equal(t, input.CodeChallenge, code.CodeChallenge.String)
 	assert.Equal(t, input.CodeChallengeMethod, code.CodeChallengeMethod.String)
@@ -92,8 +92,8 @@ func TestCreateAuthCode(t *testing.T) {
 	assert.Equal(t, input.Nonce, code.Nonce)
 	assert.Equal(t, input.UserAgent, code.UserAgent)
 	assert.Equal(t, input.ResponseMode, code.ResponseMode)
-	assert.Equal(t, input.IpAddress, code.IpAddress)
-	assert.Equal(t, input.AcrLevel, code.AcrLevel)
+	assert.Equal(t, input.IPAddress, code.IPAddress)
+	assert.Equal(t, input.ACRLevel, code.ACRLevel)
 	assert.Equal(t, input.AuthMethods, code.AuthMethods)
 	assert.Equal(t, input.SessionIdentifier, code.SessionIdentifier)
 	assert.False(t, code.Used)
@@ -119,15 +119,15 @@ func TestCreateAuthCode_WritesTheDPoPJkt(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mockDB := datamocks.NewDatabase(t)
 			mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
-				Return(&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
-			mockDB.On("GetClientByIdForShare", mock.Anything, mock.Anything, int64(1)).
-				Return(&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
+				Return(&record.Client{ID: 1, ClientIdentifier: "test-client"}, nil)
+			mockDB.On("GetClientByIDForShare", mock.Anything, mock.Anything, int64(1)).
+				Return(&record.Client{ID: 1, ClientIdentifier: "test-client"}, nil)
 			var written *record.Code
 			mockDB.On("CreateCode", mock.Anything, mock.Anything, mock.AnythingOfType("*record.Code")).
 				Run(func(args mock.Arguments) { written = args.Get(2).(*record.Code) }).Return(nil)
 
 			_, err := NewCodeIssuer(mockDB).createAuthCode(context.Background(), nil, &CreateCodeInput{
-				ClientId: "test-client", UserId: 123, Scope: "openid", RedirectURI: "https://example.com/callback",
+				ClientID: "test-client", UserID: 123, Scope: "openid", RedirectURI: "https://example.com/callback",
 				AuthenticatedAt: codeAuthTime(), SessionIdentifier: "session123", DPoPJkt: tc.dpopJkt,
 			})
 
@@ -182,9 +182,9 @@ func TestCreateAuthCode_BoundsTheUserAgent(t *testing.T) {
 			codeIssuer := NewCodeIssuer(mockDB)
 
 			mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
-				&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
-			mockDB.On("GetClientByIdForShare", mock.Anything, mock.Anything, int64(1)).Return(
-				&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
+				&record.Client{ID: 1, ClientIdentifier: "test-client"}, nil)
+			mockDB.On("GetClientByIDForShare", mock.Anything, mock.Anything, int64(1)).Return(
+				&record.Client{ID: 1, ClientIdentifier: "test-client"}, nil)
 
 			var persisted string
 			mockDB.On("CreateCode", mock.Anything, mock.Anything, mock.AnythingOfType("*record.Code")).Run(
@@ -193,15 +193,15 @@ func TestCreateAuthCode_BoundsTheUserAgent(t *testing.T) {
 				}).Return(nil)
 
 			_, err := codeIssuer.createAuthCode(context.Background(), nil, &CreateCodeInput{
-				ClientId:          "test-client",
-				UserId:            123,
+				ClientID:          "test-client",
+				UserID:            123,
 				ConsentedScope:    "openid",
 				Scope:             "openid",
 				RedirectURI:       "https://example.com/callback",
 				UserAgent:         tc.userAgent,
 				ResponseMode:      "query",
-				IpAddress:         "127.0.0.1",
-				AcrLevel:          record.AcrLevel1,
+				IPAddress:         "127.0.0.1",
+				ACRLevel:          record.ACRLevel1,
 				AuthMethods:       "pwd",
 				AuthenticatedAt:   codeAuthTime(),
 				SessionIdentifier: "session123",
@@ -221,17 +221,17 @@ func TestCreateAuthCode_DefaultResponseMode(t *testing.T) {
 	codeIssuer := NewCodeIssuer(mockDB)
 
 	testClient := &record.Client{
-		Id:               1,
+		ID:               1,
 		ClientIdentifier: "test-client",
 	}
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(testClient, nil)
-	mockDB.On("GetClientByIdForShare", mock.Anything, mock.Anything, testClient.Id).Return(testClient, nil)
+	mockDB.On("GetClientByIDForShare", mock.Anything, mock.Anything, testClient.ID).Return(testClient, nil)
 	mockDB.On("CreateCode", mock.Anything, mock.Anything, mock.AnythingOfType("*record.Code")).Return(nil)
 
 	input := &CreateCodeInput{
-		ClientId: "test-client",
-		UserId:   123,
+		ClientID: "test-client",
+		UserID:   123,
 		// ResponseMode is intentionally left empty
 		AuthenticatedAt:   codeAuthTime(),
 		SessionIdentifier: "session123",
@@ -251,12 +251,12 @@ func TestCreateAuthCode_ScopeHandling(t *testing.T) {
 	codeIssuer := NewCodeIssuer(mockDB)
 
 	testClient := &record.Client{
-		Id:               1,
+		ID:               1,
 		ClientIdentifier: "test-client",
 	}
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(testClient, nil)
-	mockDB.On("GetClientByIdForShare", mock.Anything, mock.Anything, testClient.Id).Return(testClient, nil)
+	mockDB.On("GetClientByIDForShare", mock.Anything, mock.Anything, testClient.ID).Return(testClient, nil)
 	mockDB.On("CreateCode", mock.Anything, mock.Anything, mock.AnythingOfType("*record.Code")).Return(nil)
 
 	testCases := []struct {
@@ -288,8 +288,8 @@ func TestCreateAuthCode_ScopeHandling(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			input := &CreateCodeInput{
-				ClientId:          "test-client",
-				UserId:            123,
+				ClientID:          "test-client",
+				UserID:            123,
 				ConsentedScope:    tc.consentedScope,
 				Scope:             tc.scope,
 				AuthenticatedAt:   codeAuthTime(),
@@ -312,17 +312,17 @@ func TestCreateAuthCode_DatabaseError(t *testing.T) {
 	codeIssuer := NewCodeIssuer(mockDB)
 
 	testClient := &record.Client{
-		Id:               1,
+		ID:               1,
 		ClientIdentifier: "test-client",
 	}
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(testClient, nil)
-	mockDB.On("GetClientByIdForShare", mock.Anything, mock.Anything, testClient.Id).Return(testClient, nil)
+	mockDB.On("GetClientByIDForShare", mock.Anything, mock.Anything, testClient.ID).Return(testClient, nil)
 	mockDB.On("CreateCode", mock.Anything, mock.Anything, mock.AnythingOfType("*record.Code")).Return(errors.New("database error"))
 
 	input := &CreateCodeInput{
-		ClientId:          "test-client",
-		UserId:            123,
+		ClientID:          "test-client",
+		UserID:            123,
 		AuthenticatedAt:   codeAuthTime(),
 		SessionIdentifier: "session123",
 	}
@@ -340,7 +340,7 @@ func TestCreateAuthCode_DatabaseError(t *testing.T) {
 // changed its reachability.
 //
 // The client this ceremony started against can be deleted while the ceremony is in flight, and
-// the lookup here then returns nil, which the line building the code dereferenced for client.Id.
+// the lookup here then returns nil, which the line building the code dereferenced for client.ID.
 // That was a narrow race before; since #139 issuance takes a SHARED lock on the client row, so a
 // deletion that got there first makes this transaction WAIT and then proceed into this lookup,
 // and the panic becomes the reliable outcome of losing that race rather than an unlucky one.
@@ -358,7 +358,7 @@ func TestCreateAuthCode_RefusesAMissingClient(t *testing.T) {
 		Return((*record.Client)(nil), nil)
 
 	code, err := codeIssuer.createAuthCode(context.Background(), nil, &CreateCodeInput{
-		ClientId: "deleted-client", UserId: 123,
+		ClientID: "deleted-client", UserID: 123,
 		SessionIdentifier: "session123",
 	})
 
@@ -378,7 +378,7 @@ func TestCreateAuthCode_RefusesAMissingClient(t *testing.T) {
 // client that is gone, and nothing is written, so no code is left redeemable under the identifier
 // the rename gave (#866). A failure of the read is a failure, not a refusal.
 func TestCreateAuthCode_DecidesOnTheClientRowItHolds(t *testing.T) {
-	looked := &record.Client{Id: 7, ClientIdentifier: "test-client"}
+	looked := &record.Client{ID: 7, ClientIdentifier: "test-client"}
 	boom := errors.New("lock wait failed")
 
 	for _, tc := range []struct {
@@ -387,17 +387,17 @@ func TestCreateAuthCode_DecidesOnTheClientRowItHolds(t *testing.T) {
 		heldErr error
 		refused bool
 	}{
-		{name: "renamed while issuance waited", held: &record.Client{Id: 7, ClientIdentifier: "renamed-client"}, refused: true},
+		{name: "renamed while issuance waited", held: &record.Client{ID: 7, ClientIdentifier: "renamed-client"}, refused: true},
 		{name: "deleted while issuance waited", held: nil, refused: true},
 		{name: "the read fails", heldErr: boom},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			mockDB := datamocks.NewDatabase(t)
 			mockDB.On("GetClientByClientIdentifier", mock.Anything, issueTx, "test-client").Return(looked, nil).Once()
-			mockDB.On("GetClientByIdForShare", mock.Anything, issueTx, looked.Id).Return(tc.held, tc.heldErr).Once()
+			mockDB.On("GetClientByIDForShare", mock.Anything, issueTx, looked.ID).Return(tc.held, tc.heldErr).Once()
 
 			code, err := NewCodeIssuer(mockDB).createAuthCode(context.Background(), issueTx, &CreateCodeInput{
-				ClientId: "test-client", UserId: 123, SessionIdentifier: "session123",
+				ClientID: "test-client", UserID: 123, SessionIdentifier: "session123",
 			})
 
 			if tc.refused {
@@ -420,11 +420,11 @@ const issueSid = "sid-issuing"
 
 func issueCodeInput() *CreateCodeInput {
 	return &CreateCodeInput{
-		ClientId:          "test-client",
-		UserId:            123,
+		ClientID:          "test-client",
+		UserID:            123,
 		Scope:             "openid profile",
 		RedirectURI:       "https://example.com/callback",
-		AcrLevel:          record.AcrLevel1,
+		ACRLevel:          record.ACRLevel1,
 		AuthMethods:       "pwd",
 		AuthenticatedAt:   codeAuthTime(),
 		SessionIdentifier: issueSid,
@@ -449,9 +449,9 @@ func TestIssueAuthCodeTx_TakesTheSessionRowBeforeTheInsert(t *testing.T) {
 	datamocks.ExpectRunInTransaction(mockDB, issueTx, func(edge string) { order = append(order, edge) })
 	mockDB.On("AcquireUserSessionRow", mock.Anything, issueTx, issueSid).Run(note("session row")).Return(true, nil).Once()
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, issueTx, "test-client").Run(note("client")).
-		Return(&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil).Once()
-	mockDB.On("GetClientByIdForShare", mock.Anything, issueTx, int64(1)).Run(note("client lock")).
-		Return(&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil).Once()
+		Return(&record.Client{ID: 1, ClientIdentifier: "test-client"}, nil).Once()
+	mockDB.On("GetClientByIDForShare", mock.Anything, issueTx, int64(1)).Run(note("client lock")).
+		Return(&record.Client{ID: 1, ClientIdentifier: "test-client"}, nil).Once()
 	mockDB.On("CreateCode", mock.Anything, issueTx, mock.AnythingOfType("*record.Code")).Run(note("insert")).
 		Return(nil).Once()
 
@@ -591,9 +591,9 @@ func TestIssueAuthCodeTx_FailuresAreNotRefusals(t *testing.T) {
 		datamocks.ExpectRunInTransactionThenFail(mockDB, issueTx, boom)
 		mockDB.On("AcquireUserSessionRow", mock.Anything, issueTx, issueSid).Return(true, nil).Once()
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, issueTx, "test-client").
-			Return(&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil).Once()
-		mockDB.On("GetClientByIdForShare", mock.Anything, issueTx, int64(1)).
-			Return(&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil).Once()
+			Return(&record.Client{ID: 1, ClientIdentifier: "test-client"}, nil).Once()
+		mockDB.On("GetClientByIDForShare", mock.Anything, issueTx, int64(1)).
+			Return(&record.Client{ID: 1, ClientIdentifier: "test-client"}, nil).Once()
 		mockDB.On("CreateCode", mock.Anything, issueTx, mock.AnythingOfType("*record.Code")).Return(nil).Once()
 
 		code, err := NewCodeIssuer(mockDB).IssueAuthCodeTx(context.Background(), issueCodeInput())
@@ -612,9 +612,9 @@ func TestIssueAuthCodeTx_ARerunReturnsTheCommittingAttemptsCode(t *testing.T) {
 	datamocks.ExpectRunInTransactionRerun(mockDB, issueTx)
 	mockDB.On("AcquireUserSessionRow", mock.Anything, issueTx, issueSid).Return(true, nil).Twice()
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, issueTx, "test-client").
-		Return(&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil).Twice()
-	mockDB.On("GetClientByIdForShare", mock.Anything, issueTx, int64(1)).
-		Return(&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil).Twice()
+		Return(&record.Client{ID: 1, ClientIdentifier: "test-client"}, nil).Twice()
+	mockDB.On("GetClientByIDForShare", mock.Anything, issueTx, int64(1)).
+		Return(&record.Client{ID: 1, ClientIdentifier: "test-client"}, nil).Twice()
 	var inserted []*record.Code
 	mockDB.On("CreateCode", mock.Anything, issueTx, mock.AnythingOfType("*record.Code")).
 		Run(func(args mock.Arguments) { inserted = append(inserted, args.Get(2).(*record.Code)) }).

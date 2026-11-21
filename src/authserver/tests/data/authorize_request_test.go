@@ -44,7 +44,7 @@ func createTestAuthorizeRequest(t *testing.T, now time.Time, ttl time.Duration) 
 	t.Helper()
 	ar := newAuthorizeRequest(now, ttl)
 	require.NoError(t, database.CreateAuthorizeRequest(context.Background(), nil, ar), "CreateAuthorizeRequest")
-	require.NotZero(t, ar.Id, "CreateAuthorizeRequest must report the id it inserted")
+	require.NotZero(t, ar.ID, "CreateAuthorizeRequest must report the id it inserted")
 	return ar
 }
 
@@ -79,13 +79,13 @@ func TestAuthorizeRequest_CreateAndLoad(t *testing.T) {
 	require.Greater(t, len(ar.RequestForm), 65535, "the fixture must exceed MySQL's TEXT ceiling")
 
 	require.NoError(t, database.CreateAuthorizeRequest(context.Background(), nil, ar), "CreateAuthorizeRequest")
-	require.NotZero(t, ar.Id)
+	require.NotZero(t, ar.ID)
 
 	loaded, err := database.GetAuthorizeRequestByHandleHash(context.Background(), nil, ar.HandleHash, now)
 	require.NoError(t, err, "GetAuthorizeRequestByHandleHash")
 	require.NotNil(t, loaded, "a live request must be found")
 
-	assert.Equal(t, ar.Id, loaded.Id)
+	assert.Equal(t, ar.ID, loaded.ID)
 	assert.Equal(t, ar.HandleHash, loaded.HandleHash)
 	assert.Equal(t, ar.RequestForm, loaded.RequestForm, "the form must round-trip whole, past 64 KiB")
 	assert.WithinDuration(t, ar.ExpiresAt, loaded.ExpiresAt, time.Second)
@@ -109,7 +109,7 @@ func TestAuthorizeRequest_ColumnHoldsTheHashAndNeverTheHandle(t *testing.T) {
 
 	var hash, form string
 	require.NoError(t, rawSQLHandle(t).QueryRow(
-		fmt.Sprintf("SELECT handle_hash, request_form FROM authorize_requests WHERE id = %d", ar.Id)).Scan(&hash, &form))
+		fmt.Sprintf("SELECT handle_hash, request_form FROM authorize_requests WHERE id = %d", ar.ID)).Scan(&hash, &form))
 
 	assert.Equal(t, sha256Hex(ar.Handle), hash, "the column holds the digest of the handle")
 	assert.NotContains(t, hash, ar.Handle)
@@ -142,13 +142,13 @@ func TestAuthorizeRequest_ExpiryIsDecidedByTheRead(t *testing.T) {
 			require.NoError(t, err)
 			if tc.found {
 				require.NotNil(t, loaded)
-				assert.Equal(t, ar.Id, loaded.Id)
+				assert.Equal(t, ar.ID, loaded.ID)
 			} else {
 				assert.Nil(t, loaded, "an expired request must read as absent")
 			}
 		})
 	}
-	assert.True(t, authorizeRequestExists(t, ar.Id), "the row is still there: expiry is the read's rule, the sweep's job is disk")
+	assert.True(t, authorizeRequestExists(t, ar.ID), "the row is still there: expiry is the read's rule, the sweep's job is disk")
 }
 
 // A handle's digest is compared as exactly what it is. The columns are pinned case-sensitive, and
@@ -199,7 +199,7 @@ func TestAuthorizeRequest_TheHandleHashIsUnique(t *testing.T) {
 
 	require.Error(t, err, "two rows for one handle would let one link run two ceremonies")
 	require.ErrorIs(t, err, data.ErrUniqueViolation, "and the engine's refusal must reach the caller classified: %v", err)
-	assert.Zero(t, duplicate.Id, "a refused insert reports no id")
+	assert.Zero(t, duplicate.ID, "a refused insert reports no id")
 	assert.False(t, duplicate.CreatedAt.Valid, "and leaves the model as it found it")
 }
 
@@ -211,12 +211,12 @@ func TestAuthorizeRequest_OnlyTheFirstClaimWins(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	ar := createTestAuthorizeRequest(t, now, time.Hour)
 
-	first, err := database.ClaimAuthorizeRequest(context.Background(), nil, ar.Id)
+	first, err := database.ClaimAuthorizeRequest(context.Background(), nil, ar.ID)
 	require.NoError(t, err)
 	assert.True(t, first, "the first claim deletes the row")
-	assert.False(t, authorizeRequestExists(t, ar.Id))
+	assert.False(t, authorizeRequestExists(t, ar.ID))
 
-	second, err := database.ClaimAuthorizeRequest(context.Background(), nil, ar.Id)
+	second, err := database.ClaimAuthorizeRequest(context.Background(), nil, ar.ID)
 	require.NoError(t, err, "a claim of a row that is gone is not an error")
 	assert.False(t, second, "and it must not report a win: this is what keeps a link from running twice")
 
@@ -224,7 +224,7 @@ func TestAuthorizeRequest_OnlyTheFirstClaimWins(t *testing.T) {
 	require.NoError(t, err)
 	assert.Nil(t, gone)
 
-	unknown, err := database.ClaimAuthorizeRequest(context.Background(), nil, ar.Id+1_000_000)
+	unknown, err := database.ClaimAuthorizeRequest(context.Background(), nil, ar.ID+1_000_000)
 	require.NoError(t, err)
 	assert.False(t, unknown)
 }
@@ -234,11 +234,11 @@ func TestAuthorizeRequest_AClaimOnlyTouchesItsOwnRow(t *testing.T) {
 	mine := createTestAuthorizeRequest(t, now, time.Hour)
 	theirs := createTestAuthorizeRequest(t, now, time.Hour)
 
-	won, err := database.ClaimAuthorizeRequest(context.Background(), nil, mine.Id)
+	won, err := database.ClaimAuthorizeRequest(context.Background(), nil, mine.ID)
 	require.NoError(t, err)
 	require.True(t, won)
 
-	assert.True(t, authorizeRequestExists(t, theirs.Id), "another request's row must survive the claim")
+	assert.True(t, authorizeRequestExists(t, theirs.ID), "another request's row must survive the claim")
 	stillThere, err := database.GetAuthorizeRequestByHandleHash(context.Background(), nil, theirs.HandleHash, now)
 	require.NoError(t, err)
 	assert.NotNil(t, stillThere)
@@ -254,14 +254,14 @@ func TestAuthorizeRequest_TheSweepRemovesExpiredRowsAndNothingElse(t *testing.T)
 
 	require.NoError(t, database.DeleteExpiredAuthorizeRequests(context.Background(), nil, now))
 
-	assert.False(t, authorizeRequestExists(t, expired.Id), "an expired row is swept")
-	assert.True(t, authorizeRequestExists(t, atTheBoundary.Id),
+	assert.False(t, authorizeRequestExists(t, expired.ID), "an expired row is swept")
+	assert.True(t, authorizeRequestExists(t, atTheBoundary.ID),
 		"a row whose deadline is the sweep's cutoff is kept: the read already refuses it, and the next sweep has it")
-	assert.True(t, authorizeRequestExists(t, live.Id), "a live row is never swept")
+	assert.True(t, authorizeRequestExists(t, live.ID), "a live row is never swept")
 
 	require.NoError(t, database.DeleteExpiredAuthorizeRequests(context.Background(), nil, now.Add(time.Microsecond)))
-	assert.False(t, authorizeRequestExists(t, atTheBoundary.Id))
-	assert.True(t, authorizeRequestExists(t, live.Id))
+	assert.False(t, authorizeRequestExists(t, atTheBoundary.ID))
+	assert.True(t, authorizeRequestExists(t, live.ID))
 
 	// Sweeping nothing is not an error.
 	require.NoError(t, database.DeleteExpiredAuthorizeRequests(context.Background(), nil, now))
@@ -283,7 +283,7 @@ func TestAuthorizeRequest_MethodsEnlistInTheCallersTransaction(t *testing.T) {
 		require.NoError(t, database.CreateAuthorizeRequest(context.Background(), tx, ar))
 		require.NoError(t, database.RollbackTransaction(context.Background(), tx))
 
-		assert.False(t, authorizeRequestExists(t, ar.Id))
+		assert.False(t, authorizeRequestExists(t, ar.ID))
 		loaded, err := database.GetAuthorizeRequestByHandleHash(context.Background(), nil, ar.HandleHash, now)
 		require.NoError(t, err)
 		assert.Nil(t, loaded)
@@ -295,13 +295,13 @@ func TestAuthorizeRequest_MethodsEnlistInTheCallersTransaction(t *testing.T) {
 		tx, err := database.BeginTransaction(context.Background())
 		require.NoError(t, err)
 		defer func() { _ = database.RollbackTransaction(context.Background(), tx) }()
-		won, err := database.ClaimAuthorizeRequest(context.Background(), tx, ar.Id)
+		won, err := database.ClaimAuthorizeRequest(context.Background(), tx, ar.ID)
 		require.NoError(t, err)
 		require.True(t, won)
 		require.NoError(t, database.RollbackTransaction(context.Background(), tx))
 
-		assert.True(t, authorizeRequestExists(t, ar.Id))
-		again, err := database.ClaimAuthorizeRequest(context.Background(), nil, ar.Id)
+		assert.True(t, authorizeRequestExists(t, ar.ID))
+		again, err := database.ClaimAuthorizeRequest(context.Background(), nil, ar.ID)
 		require.NoError(t, err)
 		assert.True(t, again, "the rolled back claim never happened, so the next consumer still wins")
 	})
@@ -312,12 +312,12 @@ func TestAuthorizeRequest_MethodsEnlistInTheCallersTransaction(t *testing.T) {
 		tx, err := database.BeginTransaction(context.Background())
 		require.NoError(t, err)
 		defer func() { _ = database.RollbackTransaction(context.Background(), tx) }()
-		won, err := database.ClaimAuthorizeRequest(context.Background(), tx, ar.Id)
+		won, err := database.ClaimAuthorizeRequest(context.Background(), tx, ar.ID)
 		require.NoError(t, err)
 		require.True(t, won)
 		require.NoError(t, database.CommitTransaction(context.Background(), tx))
 
-		assert.False(t, authorizeRequestExists(t, ar.Id))
+		assert.False(t, authorizeRequestExists(t, ar.ID))
 	})
 }
 
@@ -354,7 +354,7 @@ func TestAuthorizeRequest_TwoOverlappingConsumersHaveExactlyOneWinner(t *testing
 	require.NotNil(t, readBySecond, "the second consumer read it too, before the first claimed it")
 
 	// The first claims and holds the row's lock until it commits.
-	won, err := database.ClaimAuthorizeRequest(context.Background(), first, readByFirst.Id)
+	won, err := database.ClaimAuthorizeRequest(context.Background(), first, readByFirst.ID)
 	require.NoError(t, err)
 	require.True(t, won, "the first claim deletes the row")
 
@@ -364,7 +364,7 @@ func TestAuthorizeRequest_TwoOverlappingConsumersHaveExactlyOneWinner(t *testing
 	}
 	waiting := goBlocked(t, "the second consumer's claim", first, func(reached func()) claimOutcome {
 		reached()
-		claimed, claimErr := other.ClaimAuthorizeRequest(context.Background(), second, readBySecond.Id)
+		claimed, claimErr := other.ClaimAuthorizeRequest(context.Background(), second, readBySecond.ID)
 		return claimOutcome{won: claimed, err: claimErr}
 	})
 	waiting.requireBlocked(t)
@@ -379,7 +379,7 @@ func TestAuthorizeRequest_TwoOverlappingConsumersHaveExactlyOneWinner(t *testing
 	// returns nil. The check below reads through the pool, and SQL Server keeps the ghost of the
 	// deleted row locked for the transaction that waited on it until that transaction ends.
 	require.NoError(t, other.CommitTransaction(context.Background(), second), "committing the loser")
-	assert.False(t, authorizeRequestExists(t, ar.Id))
+	assert.False(t, authorizeRequestExists(t, ar.ID))
 }
 
 // The two operations the handlers call, on the real engines: what Park writes Consume reads back

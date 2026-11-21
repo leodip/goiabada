@@ -18,7 +18,7 @@ func TestAll_SpotChecks(t *testing.T) {
 		"pt-BR": "Portuguese (Brazil)",
 	} {
 		t.Run(id, func(t *testing.T) {
-			assert.Contains(t, all, Locale{Id: id, Name: name})
+			assert.Contains(t, all, Locale{ID: id, Name: name})
 		})
 	}
 }
@@ -29,41 +29,41 @@ func TestAll_Count(t *testing.T) {
 	assert.Len(t, All(), 563)
 }
 
-func TestAll_UniqueIds(t *testing.T) {
+func TestAll_UniqueIDs(t *testing.T) {
 	seen := make(map[string]bool)
 	for _, l := range All() {
-		if seen[l.Id] {
-			t.Errorf("duplicate Id %q", l.Id)
+		if seen[l.ID] {
+			t.Errorf("duplicate ID %q", l.ID)
 		}
-		seen[l.Id] = true
+		seen[l.ID] = true
 	}
 }
 
 func TestAll_NonEmptyFields(t *testing.T) {
 	for i, l := range All() {
-		if l.Id == "" {
-			t.Errorf("entry %d has an empty Id", i)
+		if l.ID == "" {
+			t.Errorf("entry %d has an empty ID", i)
 		}
 		if l.Name == "" {
-			t.Errorf("entry %d (%q) has an empty Name", i, l.Id)
+			t.Errorf("entry %d (%q) has an empty Name", i, l.ID)
 		}
 	}
 }
 
-// TestAll_ParseAsBCP47 holds every Id to being a well-formed BCP 47 tag, which is what the OIDC
+// TestAll_ParseAsBCP47 holds every ID to being a well-formed BCP 47 tag, which is what the OIDC
 // locale claim carries (OIDC Core 1.0 section 5.1). It also pins which ids are deprecated: those
 // four canonicalize to another tag and stay only because stored profiles may hold them, so a new
 // deprecated id is a finding rather than something to add here.
 func TestAll_ParseAsBCP47(t *testing.T) {
 	var deprecated []string
 	for _, l := range All() {
-		tag, err := language.Parse(l.Id)
+		tag, err := language.Parse(l.ID)
 		if err != nil {
-			t.Errorf("Id %q is not a BCP 47 tag: %v", l.Id, err)
+			t.Errorf("ID %q is not a BCP 47 tag: %v", l.ID, err)
 			continue
 		}
-		if tag.String() != l.Id {
-			deprecated = append(deprecated, l.Id)
+		if tag.String() != l.ID {
+			deprecated = append(deprecated, l.ID)
 		}
 	}
 	assert.ElementsMatch(t, []string{"sh", "sh-BA", "tl", "tl-PH"}, deprecated)
@@ -75,7 +75,7 @@ func TestAll_Isolation(t *testing.T) {
 	slices.Reverse(first)
 
 	second := All()
-	assert.Equal(t, Locale{Id: "af", Name: "Afrikaans"}, second[0])
+	assert.Equal(t, Locale{ID: "af", Name: "Afrikaans"}, second[0])
 	assert.NotEqual(t, first[0], second[0])
 }
 
@@ -86,12 +86,12 @@ func TestByID_EqualsScan(t *testing.T) {
 		t.Fatal("All() returned no locales")
 	}
 	for _, want := range all {
-		got, ok := ByID(want.Id)
+		got, ok := ByID(want.ID)
 		if !ok {
-			t.Errorf("ByID(%q) not found", want.Id)
+			t.Errorf("ByID(%q) not found", want.ID)
 			continue
 		}
-		assert.Equalf(t, want, got, "ByID(%q)", want.Id)
+		assert.Equalf(t, want, got, "ByID(%q)", want.ID)
 	}
 }
 

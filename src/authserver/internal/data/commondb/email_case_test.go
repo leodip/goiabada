@@ -44,10 +44,10 @@ func TestScanEmailCase_ReadsEveryRowAsStoredAndAsTheEngineLoweredIt(t *testing.T
 
 	require.NoError(t, err)
 	require.Len(t, rows, 2)
-	assert.Equal(t, int64(1), rows[0].Id)
+	assert.Equal(t, int64(1), rows[0].ID)
 	assert.Equal(t, "Alice@x.com", rows[0].Email)
 	assert.Equal(t, "alice@x.com", rows[0].EngineLowered)
-	assert.Equal(t, int64(2), rows[1].Id)
+	assert.Equal(t, int64(2), rows[1].ID)
 	assert.Equal(t, "bob@x.com", rows[1].Email)
 	assert.Equal(t, "bob@x.com", rows[1].EngineLowered)
 

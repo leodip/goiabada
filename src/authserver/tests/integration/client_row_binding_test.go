@@ -29,7 +29,7 @@ func createOlderClient(t *testing.T) *record.Client {
 		Enabled:          true,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 	return client
 }
 
@@ -40,22 +40,22 @@ func assertNamesClientRow(t *testing.T, accessToken string, client *record.Clien
 	require.Equal(t, client.ClientIdentifier, claims["client_id"])
 	clientInternalID, ok := claims["client_internal_id"].(float64)
 	require.True(t, ok, "the token carries client_internal_id as a number")
-	require.Equal(t, client.Id, int64(clientInternalID), "the token names its client's row")
+	require.Equal(t, client.ID, int64(clientInternalID), "the token names its client's row")
 }
 
 func TestClientRowBinding_AClientCredentialsTokenIsRefusedOnceAnOlderClientTakesItsIdentifier(t *testing.T) {
 	manager, _ := createAdminClientWithToken(t)
 	older := createOlderClient(t)
 	accessToken, original, _ := createAdminClientWithTokenAndSecret(t)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, original.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, original.ID) })
 	observer := authserverAPI(t)
 	const target = "/api/v1/admin/resources"
 	assertNamesClientRow(t, accessToken, original)
 	assertAPIAdmitsToken(t, target, accessToken)
 	assertActive(t, observer.introspect(t, accessToken))
 
-	saveClientSettings(t, manager, original.Id, renamedIdentifier())
-	saveClientSettings(t, manager, older.Id, original.ClientIdentifier)
+	saveClientSettings(t, manager, original.ID, renamedIdentifier())
+	saveClientSettings(t, manager, older.ID, original.ClientIdentifier)
 
 	assertAPIRefusesToken(t, target, accessToken)
 	assertInactive(t, observer.introspect(t, accessToken))
@@ -64,14 +64,14 @@ func TestClientRowBinding_AClientCredentialsTokenIsRefusedOnceAnOlderClientTakes
 func TestClientRowBinding_AClientCredentialsTokenIsRefusedOnceANewClientTakesItsIdentifier(t *testing.T) {
 	manager, _ := createAdminClientWithToken(t)
 	accessToken, original, _ := createAdminClientWithTokenAndSecret(t)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, original.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, original.ID) })
 	observer := authserverAPI(t)
 	const target = "/api/v1/admin/resources"
 	assertNamesClientRow(t, accessToken, original)
 	assertAPIAdmitsToken(t, target, accessToken)
 	assertActive(t, observer.introspect(t, accessToken))
 
-	saveClientSettings(t, manager, original.Id, renamedIdentifier())
+	saveClientSettings(t, manager, original.ID, renamedIdentifier())
 	recreateThroughAdminAPI(t, manager, original)
 
 	assertAPIRefusesToken(t, target, accessToken)
@@ -85,11 +85,11 @@ func TestClientRowBinding_AnImplicitFlowTokenIsRefusedOnceAnOlderClientTakesItsI
 	enableImplicitFlowGlobally(t)
 	older := createOlderClient(t)
 	implicitEnabled := true
-	client, redirectUri := createImplicitFlowClient(t, &implicitEnabled)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	client, redirectURI := createImplicitFlowClient(t, &implicitEnabled)
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 	user, password := createTestUserForImplicit(t)
-	resp := signInToIssue(t, createHttpClient(t),
-		implicitModeAuthorizeURL(client, redirectUri.URI, "token", "", fake.LetterN(12), ""), user, password)
+	resp := signInToIssue(t, createHTTPClient(t),
+		implicitModeAuthorizeURL(client, redirectURI.URI, "token", "", fake.LetterN(12), ""), user, password)
 	_ = resp.Body.Close()
 	require.Equal(t, http.StatusFound, resp.StatusCode)
 	accessToken := getTokensFromFragment(t, resp)["access_token"]
@@ -100,8 +100,8 @@ func TestClientRowBinding_AnImplicitFlowTokenIsRefusedOnceAnOlderClientTakesItsI
 	assertUserinfoAdmits(t, accessToken, user.Subject)
 	assertActive(t, observer.introspect(t, accessToken))
 
-	saveClientSettings(t, manager, client.Id, renamedIdentifier())
-	saveClientSettings(t, manager, older.Id, client.ClientIdentifier)
+	saveClientSettings(t, manager, client.ID, renamedIdentifier())
+	saveClientSettings(t, manager, older.ID, client.ClientIdentifier)
 
 	assertUserinfoRefusesTheToken(t, accessToken)
 	assertInactive(t, observer.introspect(t, accessToken))
@@ -112,16 +112,16 @@ func TestClientRowBinding_AnImplicitFlowTokenIsRefusedOnceAnOlderClientTakesItsI
 func TestClientRowBinding_AClientRenamedAwayAndBackKeepsItsOwnToken(t *testing.T) {
 	manager, _ := createAdminClientWithToken(t)
 	accessToken, original, _ := createAdminClientWithTokenAndSecret(t)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, original.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, original.ID) })
 	observer := authserverAPI(t)
 	const target = "/api/v1/admin/resources"
 	assertAPIAdmitsToken(t, target, accessToken)
 
-	saveClientSettings(t, manager, original.Id, renamedIdentifier())
+	saveClientSettings(t, manager, original.ID, renamedIdentifier())
 	assertAPIRefusesToken(t, target, accessToken)
 	assertInactive(t, observer.introspect(t, accessToken))
 
-	saveClientSettings(t, manager, original.Id, original.ClientIdentifier)
+	saveClientSettings(t, manager, original.ID, original.ClientIdentifier)
 	assertAPIAdmitsToken(t, target, accessToken)
 	assertActive(t, observer.introspect(t, accessToken))
 }

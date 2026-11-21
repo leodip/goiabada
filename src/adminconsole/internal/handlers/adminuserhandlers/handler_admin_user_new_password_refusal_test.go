@@ -29,7 +29,7 @@ func (a refusingUserNewAPI) CreateUserAdmin(context.Context, string, *api.Create
 func TestHandleNewPost_TheNistRefusalsMarkThePassword(t *testing.T) {
 	for _, code := range []string{"validator.password.too_common", "validator.password.too_close_to_account"} {
 		t.Run(code, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 			handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_users_new.html").Once()
 

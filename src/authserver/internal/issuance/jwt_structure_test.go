@@ -30,13 +30,13 @@ func TestIssuedTokensPassTheStructuralCheckAndTheParser(t *testing.T) {
 	mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, code).Return(nil)
 	mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, code).Return(nil)
 	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "session-1").
-		Return(&record.UserSession{Id: 1, UserId: 1, Started: now.Add(-10 * time.Minute)}, nil)
+		Return(&record.UserSession{ID: 1, UserID: 1, Started: now.Add(-10 * time.Minute)}, nil)
 	expectSigningKeyAndUserLoads(t, mockDB)
 	captureRefreshTokenRow(mockDB)
 
 	codeTokens, err := tokenIssuer.mintAuthorizationCodeTokens(context.Background(), rfc9068Settings(), code, "")
 	require.NoError(t, err)
-	clientTokens, err := tokenIssuer.IssueClientCredentialsGrant(context.Background(), rfc9068Settings(), &record.Client{Id: 4, ClientIdentifier: "billing-service"}, "product-api:read", "")
+	clientTokens, err := tokenIssuer.IssueClientCredentialsGrant(context.Background(), rfc9068Settings(), &record.Client{ID: 4, ClientIdentifier: "billing-service"}, "product-api:read", "")
 
 	require.NoError(t, err)
 
@@ -47,7 +47,7 @@ func TestIssuedTokensPassTheStructuralCheckAndTheParser(t *testing.T) {
 
 	for name, token := range map[string]string{
 		"the code exchange's access token":     codeTokens.AccessToken,
-		"the code exchange's ID token":         codeTokens.IdToken,
+		"the code exchange's ID token":         codeTokens.IDToken,
 		"the code exchange's refresh token":    codeTokens.RefreshToken,
 		"the client credentials grant's token": clientTokens.AccessToken,
 	} {

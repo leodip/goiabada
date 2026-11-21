@@ -122,8 +122,8 @@ func TestFingerprint_TheFirstTwelveHexDigitsOfTheSHA256(t *testing.T) {
 	assert.Equal(t, "e3b0c44298fc", Fingerprint(nil))
 }
 
-func TestPath_NamesTheAssetByIdAndItsFingerprint(t *testing.T) {
-	asset := &record.BrandAsset{Id: 7, Fingerprint: "0123456789ab"}
+func TestPath_NamesTheAssetByIDAndItsFingerprint(t *testing.T) {
+	asset := &record.BrandAsset{ID: 7, Fingerprint: "0123456789ab"}
 
 	assert.Equal(t, "/brand-assets/7?v=0123456789ab", Path(asset))
 }
@@ -131,45 +131,45 @@ func TestPath_NamesTheAssetByIdAndItsFingerprint(t *testing.T) {
 // slotsBrand is a brand whose six slots name the assets 11 to 16, in slot order.
 func slotsBrand() *record.Brand {
 	brand := record.NewBrand("Acme", record.BrandAppearanceAuto, "blueberry")
-	for i, slot := range []*sql.NullInt64{&brand.LogoAssetId, &brand.DarkLogoAssetId, &brand.FaviconAssetId,
-		&brand.BackgroundAssetId, &brand.RegularFontAssetId, &brand.BoldFontAssetId} {
+	for i, slot := range []*sql.NullInt64{&brand.LogoAssetID, &brand.DarkLogoAssetID, &brand.FaviconAssetID,
+		&brand.BackgroundAssetID, &brand.RegularFontAssetID, &brand.BoldFontAssetID} {
 		*slot = sql.NullInt64{Int64: int64(11 + i), Valid: true}
 	}
 	return &brand
 }
 
-func TestSlotIds_TheFilledSlotsInSlotOrder(t *testing.T) {
-	assert.Equal(t, []int64{11, 12, 13, 14, 15, 16}, SlotIds(slotsBrand()))
+func TestSlotIDs_TheFilledSlotsInSlotOrder(t *testing.T) {
+	assert.Equal(t, []int64{11, 12, 13, 14, 15, 16}, SlotIDs(slotsBrand()))
 
 	brand := slotsBrand()
-	brand.LogoAssetId, brand.FaviconAssetId, brand.BoldFontAssetId = sql.NullInt64{}, sql.NullInt64{}, sql.NullInt64{}
-	assert.Equal(t, []int64{12, 14, 15}, SlotIds(brand))
+	brand.LogoAssetID, brand.FaviconAssetID, brand.BoldFontAssetID = sql.NullInt64{}, sql.NullInt64{}, sql.NullInt64{}
+	assert.Equal(t, []int64{12, 14, 15}, SlotIDs(brand))
 
 	empty := record.NewBrand("Acme", record.BrandAppearanceAuto, "blueberry")
-	assert.Empty(t, SlotIds(&empty))
+	assert.Empty(t, SlotIDs(&empty))
 
 	// An asset two slots name, as the two logo slots may, is read once.
 	brand = slotsBrand()
-	brand.DarkLogoAssetId = brand.LogoAssetId
-	assert.Equal(t, []int64{11, 13, 14, 15, 16}, SlotIds(brand))
+	brand.DarkLogoAssetID = brand.LogoAssetID
+	assert.Equal(t, []int64{11, 13, 14, 15, 16}, SlotIDs(brand))
 }
 
 func TestSlotsOf_EachSlotTakesTheAssetItNames(t *testing.T) {
-	assets := []record.BrandAsset{{Id: 16}, {Id: 99}, {Id: 14}, {Id: 13}, {Id: 12}, {Id: 11}, {Id: 15}}
+	assets := []record.BrandAsset{{ID: 16}, {ID: 99}, {ID: 14}, {ID: 13}, {ID: 12}, {ID: 11}, {ID: 15}}
 
 	slots := SlotsOf(slotsBrand(), assets)
 
 	got := []*record.BrandAsset{slots.Logo, slots.DarkLogo, slots.Favicon, slots.Background, slots.RegularFont, slots.BoldFont}
 	for i, asset := range got {
 		require.NotNil(t, asset, "slot %d", i)
-		assert.Equal(t, int64(11+i), asset.Id, "slot %d", i)
+		assert.Equal(t, int64(11+i), asset.ID, "slot %d", i)
 	}
 
 	// An empty slot stays empty whatever is read, and so does one whose asset was not.
 	brand := slotsBrand()
-	brand.FaviconAssetId = sql.NullInt64{}
-	slots = SlotsOf(brand, []record.BrandAsset{{Id: 11}, {Id: 13}})
-	assert.Equal(t, int64(11), slots.Logo.Id)
+	brand.FaviconAssetID = sql.NullInt64{}
+	slots = SlotsOf(brand, []record.BrandAsset{{ID: 11}, {ID: 13}})
+	assert.Equal(t, int64(11), slots.Logo.ID)
 	assert.Nil(t, slots.DarkLogo)
 	assert.Nil(t, slots.Favicon)
 	assert.Nil(t, slots.Background)
@@ -184,16 +184,16 @@ type assetsStub struct {
 	txs    []*sql.Tx
 }
 
-func (s *assetsStub) GetBrandAssetsByIds(_ context.Context, tx *sql.Tx, ids []int64) ([]record.BrandAsset, error) {
+func (s *assetsStub) GetBrandAssetsByIDs(_ context.Context, tx *sql.Tx, ids []int64) ([]record.BrandAsset, error) {
 	s.asked = append(s.asked, ids)
 	s.txs = append(s.txs, tx)
 	return s.assets, s.err
 }
 
 func TestReadSlots_ReadsTheFilledSlotsOnceAndNothingForAnEmptyBrand(t *testing.T) {
-	reader := &assetsStub{assets: []record.BrandAsset{{Id: 12, Kind: record.BrandAssetKindLogo, Fingerprint: "abcdefabcdef"}}}
+	reader := &assetsStub{assets: []record.BrandAsset{{ID: 12, Kind: record.BrandAssetKindLogo, Fingerprint: "abcdefabcdef"}}}
 	brand := record.NewBrand("Acme", record.BrandAppearanceAuto, "blueberry")
-	brand.DarkLogoAssetId = sql.NullInt64{Int64: 12, Valid: true}
+	brand.DarkLogoAssetID = sql.NullInt64{Int64: 12, Valid: true}
 	tx := &sql.Tx{}
 
 	slots, err := ReadSlots(context.Background(), reader, tx, &brand)

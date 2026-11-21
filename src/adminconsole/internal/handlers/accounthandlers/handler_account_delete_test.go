@@ -37,7 +37,7 @@ type deleteAccountAPI struct {
 }
 
 func (a *deleteAccountAPI) GetAccountProfile(_ context.Context, _ string) (*api.UserResponse, error) {
-	return &api.UserResponse{Id: 7, Email: "someone@example.com", OTPEnabled: a.otpEnabled}, nil
+	return &api.UserResponse{ID: 7, Email: "someone@example.com", OTPEnabled: a.otpEnabled}, nil
 }
 
 func (a *deleteAccountAPI) DeleteAccount(_ context.Context, accessToken string, request *api.DeleteAccountRequest) error {
@@ -61,7 +61,7 @@ func deletePostRequest(form url.Values, opts ...handlertest.Option) *http.Reques
 // Email verification page isn't there with email off; nothing is asked of the auth server.
 func TestHandleDeleteAccount_IsNotFoundWhileTheSettingIsOff(t *testing.T) {
 	t.Run("GET", func(t *testing.T) {
-		httpHelper := handlersmocks.NewHttpHelper(t)
+		httpHelper := handlersmocks.NewHTTPHelper(t)
 		handlertest.RefuseInternalServerError(t, httpHelper)
 		httpHelper.On("NotFound", mock.Anything, mock.Anything).Once()
 
@@ -70,7 +70,7 @@ func TestHandleDeleteAccount_IsNotFoundWhileTheSettingIsOff(t *testing.T) {
 				handlertest.WithSettings(deletionSettings(false))))
 	})
 	t.Run("POST", func(t *testing.T) {
-		httpHelper := handlersmocks.NewHttpHelper(t)
+		httpHelper := handlersmocks.NewHTTPHelper(t)
 		handlertest.RefuseInternalServerError(t, httpHelper)
 		httpHelper.On("NotFound", mock.Anything, mock.Anything).Once()
 
@@ -89,7 +89,7 @@ func TestHandleDeleteAccount_IsNotFoundWhileTheSettingIsOff(t *testing.T) {
 // authentication code, not the recovery code.
 func TestHandleDeleteAccountGet_AsksForASecondFactorOnlyWithTwoFactorOn(t *testing.T) {
 	for _, otpEnabled := range []bool{true, false} {
-		httpHelper := handlersmocks.NewHttpHelper(t)
+		httpHelper := handlersmocks.NewHTTPHelper(t)
 		handlertest.RefuseInternalServerError(t, httpHelper)
 		handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_delete.html").Once()
 
@@ -115,13 +115,13 @@ func TestHandleDeleteAccountPost_SendsThePasswordAndTheCodeShown(t *testing.T) {
 		{"the password alone", url.Values{"password": {"P4ss!word"}},
 			api.DeleteAccountRequest{Password: "P4ss!word"}},
 		{"with an authentication code", url.Values{"password": {"P4ss!word"}, "otp": {"123456"}},
-			api.DeleteAccountRequest{Password: "P4ss!word", OtpCode: "123456"}},
+			api.DeleteAccountRequest{Password: "P4ss!word", OTPCode: "123456"}},
 		{"with a recovery code", url.Values{"password": {"P4ss!word"}, "recoveryCode": {"7kq2-m9xh-4trw-b3np-j6vd-egac"}},
 			api.DeleteAccountRequest{Password: "P4ss!word", RecoveryCode: "7kq2-m9xh-4trw-b3np-j6vd-egac"}},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 
 			client := &deleteAccountAPI{otpEnabled: true}
@@ -152,7 +152,7 @@ func TestHandleDeleteAccountPost_EndsTheConsoleSessionAndSendsTheBrowserToTheDel
 	jar.keep(seed)
 	require.NotEmpty(t, jar.cookies)
 
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	rec := httptest.NewRecorder()
 	HandleDeleteAccountPost(httpHelper, store, &deleteAccountAPI{}, consoleBaseURL).ServeHTTP(rec,
@@ -208,7 +208,7 @@ func TestHandleDeleteAccountPost_EachRefusalIsShownOnTheForm(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 			handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_delete.html").Once()
 
@@ -232,7 +232,7 @@ func TestHandleDeleteAccountPost_EachRefusalIsShownOnTheForm(t *testing.T) {
 // Too many wrong guesses is the user's to wait out, drawn on the form in the page's language with
 // the console's own sentence, as the other account forms draw it (#559 decision 10).
 func TestHandleDeleteAccountPost_ARateLimitIsShownOnTheForm(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_delete.html").Once()
 
@@ -248,7 +248,7 @@ func TestHandleDeleteAccountPost_ARateLimitIsShownOnTheForm(t *testing.T) {
 // A refusal the user can't act on, such as the auth server refusing the console's own client, is
 // a fault: it goes to the error classifier and the form is not drawn with it.
 func TestHandleDeleteAccountPost_AnyOtherRefusalIsNotDrawnOnTheForm(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Maybe()
 	httpHelper.On("RenderTemplate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 
@@ -269,7 +269,7 @@ func TestHandleDeleteAccountPost_AnyOtherRefusalIsNotDrawnOnTheForm(t *testing.T
 // /account/deleted is the same page for anyone who opens it, on the layout without a menu: it reads
 // no session and asks the auth server nothing (decision 8).
 func TestHandleAccountDeletedGet_DrawsTheStaticPageWithoutAMenu(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/no_menu_layout.html", "/account_deleted.html").Once()
 

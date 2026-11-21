@@ -28,20 +28,20 @@ func createLevel1Client(t *testing.T, consentRequired bool) (*record.Client, *re
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          consentRequired,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 	}
 	if err := database.CreateClient(context.Background(), nil, client); err != nil {
 		t.Fatal(err)
 	}
 
-	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+	redirectURI := &record.RedirectURI{
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
-	if err := database.CreateRedirectURI(context.Background(), nil, redirectUri); err != nil {
+	if err := database.CreateRedirectURI(context.Background(), nil, redirectURI); err != nil {
 		t.Fatal(err)
 	}
-	return client, redirectUri
+	return client, redirectURI
 }
 
 // createCeremonyUser makes an enabled user with a password, and returns that password.
@@ -81,20 +81,20 @@ func assertCeremonyMismatchPage(t *testing.T, resp *http.Response, what string) 
 // assertNothingWasCompleted asserts the refused submission advanced no ceremony. A session is
 // created at /auth/completed, which is past both bound forms, so a user session existing at this
 // point means a stale form finished somebody's authorization.
-func assertNothingWasCompleted(t *testing.T, userId int64) {
+func assertNothingWasCompleted(t *testing.T, userID int64) {
 	t.Helper()
 
-	sessions, err := database.GetUserSessionsByUserId(context.Background(), nil, userId)
+	sessions, err := database.GetUserSessionsByUserID(context.Background(), nil, userID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	assert.Empty(t, sessions, "the refused submission must not have authenticated anybody")
 }
 
-func authorizeUrlFor(client *record.Client, redirectUri *record.RedirectURI, scope string,
+func authorizeURLFor(client *record.Client, redirectURI *record.RedirectURI, scope string,
 	state string) string {
 	return appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + randomCodeChallenge() +
@@ -104,20 +104,20 @@ func authorizeUrlFor(client *record.Client, redirectUri *record.RedirectURI, sco
 }
 
 // assertCodeFor follows a step's redirect to /auth/issue and asserts the code it issues answers the
-// request state was sent with, for client at redirectUri, and nothing else.
+// request state was sent with, for client at redirectURI, and nothing else.
 func assertCodeFor(t *testing.T, httpClient *http.Client, issueLocation string, client *record.Client,
-	redirectUri *record.RedirectURI, state string) *record.Code {
+	redirectURI *record.RedirectURI, state string) *record.Code {
 	t.Helper()
 
 	resp := loadPage(t, httpClient, issueLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
+	codeVal, stateVal := getCodeAndStateFromURL(t, resp)
 	assert.Equal(t, state, stateVal, "the code answers its own request, and no other")
 
 	code := loadCodeFromDatabase(t, codeVal)
 	assert.Equal(t, client.ClientIdentifier, code.Client.ClientIdentifier)
-	assert.Equal(t, redirectUri.URI, code.RedirectURI)
+	assert.Equal(t, redirectURI.URI, code.RedirectURI)
 	return code
 }
 
@@ -131,16 +131,16 @@ func assertCodeFor(t *testing.T, httpClient *http.Client, issueLocation string, 
 // browser holds both, and each form finishes the sign-in it belongs to, with the scopes ticked on
 // its own screen (#246).
 func TestAuthorize_ConsentFormsOfTwoSignInsInOneBrowserEachFinishTheirOwn(t *testing.T) {
-	clientA, redirectUriA := createConsentClient(t)
-	clientB, redirectUriB := createConsentClient(t)
+	clientA, redirectURIA := createConsentClient(t)
+	clientB, redirectURIB := createConsentClient(t)
 
 	user, password := createCeremonyUser(t)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
 	// Client A's authorization, all the way to its consent screen.
 	stateA := fake.LetterN(8)
-	resp, err := httpClient.Get(authorizeUrlFor(clientA, redirectUriA, "openid profile email", stateA))
+	resp, err := httpClient.Get(authorizeURLFor(clientA, redirectURIA, "openid profile email", stateA))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -165,16 +165,16 @@ func TestAuthorize_ConsentFormsOfTwoSignInsInOneBrowserEachFinishTheirOwn(t *tes
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
-	consentUrl := assertRedirect(t, resp, "/auth/consent")
-	consentPageA := loadPage(t, httpClient, consentUrl)
+	consentURL := assertRedirect(t, resp, "/auth/consent")
+	consentPageA := loadPage(t, httpClient, consentURL)
 	defer func() { _ = consentPageA.Body.Close() }()
 
-	ceremonyA := getCeremonyIdFromPage(t, consentPageA)
+	ceremonyA := getCeremonyIDFromPage(t, consentPageA)
 
 	// The second tab. Client B's authorization runs on the same browser, reusing the session A's
 	// ceremony created, and its sign-in is held beside A's. A's consent screen is still on screen.
 	stateB := fake.LetterN(8)
-	resp, err = httpClient.Get(authorizeUrlFor(clientB, redirectUriB, "openid profile", stateB))
+	resp, err = httpClient.Get(authorizeURLFor(clientB, redirectURIB, "openid profile", stateB))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -188,31 +188,31 @@ func TestAuthorize_ConsentFormsOfTwoSignInsInOneBrowserEachFinishTheirOwn(t *tes
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
-	consentUrlB := assertRedirect(t, resp, "/auth/consent")
-	consentPageB := loadPage(t, httpClient, consentUrlB)
+	consentURLB := assertRedirect(t, resp, "/auth/consent")
+	consentPageB := loadPage(t, httpClient, consentURLB)
 	defer func() { _ = consentPageB.Body.Close() }()
 
-	ceremonyB := getCeremonyIdFromPage(t, consentPageB)
+	ceremonyB := getCeremonyIDFromPage(t, consentPageB)
 	assert.NotEqual(t, ceremonyA, ceremonyB,
 		"each authorization request must render its own ceremony id, or nothing is bound")
 
 	// The user, still looking at A's screen, submits it, with the first and third boxes ticked: on
 	// A's list openid and email, a position B's two-scope list does not even have.
-	resp = postConsent(t, httpClient, consentUrl, consentPageA, []int{0, 2})
+	resp = postConsent(t, httpClient, consentURL, consentPageA, []int{0, 2})
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
-	codeA := assertCodeFor(t, httpClient, assertRedirect(t, resp, "/auth/issue"), clientA, redirectUriA, stateA)
+	codeA := assertCodeFor(t, httpClient, assertRedirect(t, resp, "/auth/issue"), clientA, redirectURIA, stateA)
 	assert.Equal(t, "openid email", codeA.Scope, "A's ticks resolved against A's own scope list")
 
 	// And B's own screen completes, in its own tab, with exactly the scopes ticked on it.
-	resp = postConsent(t, httpClient, consentUrlB, consentPageB, []int{0, 1})
+	resp = postConsent(t, httpClient, consentURLB, consentPageB, []int{0, 1})
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
-	codeB := assertCodeFor(t, httpClient, assertRedirect(t, resp, "/auth/issue"), clientB, redirectUriB, stateB)
+	codeB := assertCodeFor(t, httpClient, assertRedirect(t, resp, "/auth/issue"), clientB, redirectURIB, stateB)
 	assert.Equal(t, "openid profile", codeB.Scope)
 
 	for client, scope := range map[*record.Client]string{clientA: "openid email", clientB: "openid profile"} {
-		consent, getConsentErr := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, client.Id)
+		consent, getConsentErr := database.GetConsentByUserIDAndClientID(context.Background(), nil, user.ID, client.ID)
 		if getConsentErr != nil {
 			t.Fatal(getConsentErr)
 		}
@@ -231,38 +231,38 @@ func TestAuthorize_ConsentFormsOfTwoSignInsInOneBrowserEachFinishTheirOwn(t *tes
 // shown for it. Now the browser holds both: A's form finishes A's request, and B's own form, loaded
 // before A's was submitted, still finishes B's (#246).
 func TestAuthorize_PasswordFormsOfTwoSignInsInOneBrowserEachFinishTheirOwn(t *testing.T) {
-	clientA, redirectUriA := createLevel1Client(t, false)
-	clientB, redirectUriB := createLevel1Client(t, false)
+	clientA, redirectURIA := createLevel1Client(t, false)
+	clientB, redirectURIB := createLevel1Client(t, false)
 	user, password := createCeremonyUser(t)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
 	stateA := fake.LetterN(8)
-	pwdUrlA, pwdPageA := walkToPasswordPage(t, httpClient, clientA, redirectUriA, stateA)
+	pwdURLA, pwdPageA := walkToPasswordPage(t, httpClient, clientA, redirectURIA, stateA)
 	defer func() { _ = pwdPageA.Body.Close() }()
-	ceremonyA := getCeremonyIdFromPage(t, pwdPageA)
+	ceremonyA := getCeremonyIDFromPage(t, pwdPageA)
 
 	// The second tab, on the same browser. A's login screen is still on the user's screen.
 	stateB := fake.LetterN(8)
-	pwdUrlB, pwdPageB := walkToPasswordPage(t, httpClient, clientB, redirectUriB, stateB)
+	pwdURLB, pwdPageB := walkToPasswordPage(t, httpClient, clientB, redirectURIB, stateB)
 	defer func() { _ = pwdPageB.Body.Close() }()
 
-	ceremonyB := getCeremonyIdFromPage(t, pwdPageB)
+	ceremonyB := getCeremonyIDFromPage(t, pwdPageB)
 	assert.NotEqual(t, ceremonyA, ceremonyB,
 		"each authorization request must render its own ceremony id, or nothing is bound")
 
 	// The user, still looking at A's screen, signs in there, and A's request gets its code.
 	for _, signIn := range []struct {
-		pwdUrl      string
+		pwdURL      string
 		pwdPage     *http.Response
 		client      *record.Client
-		redirectUri *record.RedirectURI
+		redirectURI *record.RedirectURI
 		state       string
 	}{
-		{pwdUrlA, pwdPageA, clientA, redirectUriA, stateA},
-		{pwdUrlB, pwdPageB, clientB, redirectUriB, stateB},
+		{pwdURLA, pwdPageA, clientA, redirectURIA, stateA},
+		{pwdURLB, pwdPageB, clientB, redirectURIB, stateB},
 	} {
-		resp := authenticateWithPassword(t, httpClient, signIn.pwdUrl, signIn.pwdPage, user.Email, password)
+		resp := authenticateWithPassword(t, httpClient, signIn.pwdURL, signIn.pwdPage, user.Email, password)
 		defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 		location := assertRedirect(t, resp, "/auth/level1completed")
@@ -273,19 +273,19 @@ func TestAuthorize_PasswordFormsOfTwoSignInsInOneBrowserEachFinishTheirOwn(t *te
 		resp = loadPage(t, httpClient, location)
 		defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
-		assertCodeFor(t, httpClient, assertRedirect(t, resp, "/auth/issue"), signIn.client, signIn.redirectUri, signIn.state)
+		assertCodeFor(t, httpClient, assertRedirect(t, resp, "/auth/issue"), signIn.client, signIn.redirectURI, signIn.state)
 	}
 }
 
-// walkToOtpPrompt drives one authorization request from /auth/authorize to the OTP prompt, on an
-// http client the caller owns. startOtpCeremony cannot be used here: it creates a fresh cookie jar
+// walkToOTPPrompt drives one authorization request from /auth/authorize to the OTP prompt, on an
+// http client the caller owns. startOTPCeremony cannot be used here: it creates a fresh cookie jar
 // per call, and this case needs two ceremonies in ONE browser, which is the whole defect.
-func walkToOtpPrompt(t *testing.T, httpClient *http.Client, client *record.Client,
-	redirectUri *record.RedirectURI, state string, user *record.User, password string) (string, *http.Response) {
+func walkToOTPPrompt(t *testing.T, httpClient *http.Client, client *record.Client,
+	redirectURI *record.RedirectURI, state string, user *record.User, password string) (string, *http.Response) {
 
 	t.Helper()
 
-	resp, err := httpClient.Get(authorizeUrlFor(client, redirectUri, "openid profile email", state))
+	resp, err := httpClient.Get(authorizeURLFor(client, redirectURI, "openid profile email", state))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -295,10 +295,10 @@ func walkToOtpPrompt(t *testing.T, httpClient *http.Client, client *record.Clien
 	resp = loadPage(t, httpClient, redirectLocation)
 	_ = resp.Body.Close()
 
-	pwdUrl := assertRedirect(t, resp, "/auth/pwd")
-	pwdPage := loadPage(t, httpClient, pwdUrl)
+	pwdURL := assertRedirect(t, resp, "/auth/pwd")
+	pwdPage := loadPage(t, httpClient, pwdURL)
 
-	resp = authenticateWithPassword(t, httpClient, pwdUrl, pwdPage, user.Email, password)
+	resp = authenticateWithPassword(t, httpClient, pwdURL, pwdPage, user.Email, password)
 	_ = pwdPage.Body.Close()
 
 	redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
@@ -309,36 +309,36 @@ func walkToOtpPrompt(t *testing.T, httpClient *http.Client, client *record.Clien
 	_ = resp.Body.Close()
 	resp = loadPage(t, httpClient, redirectLocation)
 
-	otpUrl := assertRedirect(t, resp, "/auth/otp")
+	otpURL := assertRedirect(t, resp, "/auth/otp")
 	_ = resp.Body.Close()
 
 	// Caller closes this one.
-	return otpUrl, loadPage(t, httpClient, otpUrl)
+	return otpURL, loadPage(t, httpClient, otpURL)
 }
 
-// TestAuthorize_OtpFormsOfTwoSignInsInOneBrowserEachFinishTheirOwn is the same one factor up.
+// TestAuthorize_OTPFormsOfTwoSignInsInOneBrowserEachFinishTheirOwn is the same one factor up.
 //
 // The user is at client A's OTP prompt when client B's authorization reaches its own in another tab
 // of the same browser. A code entered on A's prompt finishes A's request, and the next code, entered
 // on B's prompt, finishes B's: neither tab took anything away from the other (#246).
-func TestAuthorize_OtpFormsOfTwoSignInsInOneBrowserEachFinishTheirOwn(t *testing.T) {
-	clientA, redirectUriA, user, password, otpSecret := createLevel2MandatoryUser(t, true)
-	clientB, redirectUriB := createLevel2MandatoryClient(t)
+func TestAuthorize_OTPFormsOfTwoSignInsInOneBrowserEachFinishTheirOwn(t *testing.T) {
+	clientA, redirectURIA, user, password, otpSecret := createLevel2MandatoryUser(t, true)
+	clientB, redirectURIB := createLevel2MandatoryClient(t)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
 	stateA := fake.LetterN(8)
-	otpUrlA, otpPageA := walkToOtpPrompt(t, httpClient, clientA, redirectUriA, stateA, user, password)
+	otpURLA, otpPageA := walkToOTPPrompt(t, httpClient, clientA, redirectURIA, stateA, user, password)
 	defer func() { _ = otpPageA.Body.Close() }()
 
-	ceremonyA := getCeremonyIdFromPage(t, otpPageA)
+	ceremonyA := getCeremonyIDFromPage(t, otpPageA)
 
 	// The second tab, on the same browser. A's OTP prompt is still on the user's screen.
 	stateB := fake.LetterN(8)
-	otpUrlB, otpPageB := walkToOtpPrompt(t, httpClient, clientB, redirectUriB, stateB, user, password)
+	otpURLB, otpPageB := walkToOTPPrompt(t, httpClient, clientB, redirectURIB, stateB, user, password)
 	defer func() { _ = otpPageB.Body.Close() }()
 
-	ceremonyB := getCeremonyIdFromPage(t, otpPageB)
+	ceremonyB := getCeremonyIDFromPage(t, otpPageB)
 	assert.NotEqual(t, ceremonyA, ceremonyB,
 		"each authorization request must render its own ceremony id, or nothing is bound")
 
@@ -346,25 +346,25 @@ func TestAuthorize_OtpFormsOfTwoSignInsInOneBrowserEachFinishTheirOwn(t *testing
 	// still accepts, and the current one.
 	codes := []string{otptest.PreviousStepCode(t, otpSecret), otptest.Code(t, otpSecret, time.Now())}
 	for i, signIn := range []struct {
-		otpUrl      string
+		otpURL      string
 		otpPage     *http.Response
 		client      *record.Client
-		redirectUri *record.RedirectURI
+		redirectURI *record.RedirectURI
 		state       string
 	}{
-		{otpUrlA, otpPageA, clientA, redirectUriA, stateA},
-		{otpUrlB, otpPageB, clientB, redirectUriB, stateB},
+		{otpURLA, otpPageA, clientA, redirectURIA, stateA},
+		{otpURLB, otpPageB, clientB, redirectURIB, stateB},
 	} {
 		otpCode := codes[i]
 
-		resp := authenticateWithOtp(t, httpClient, signIn.otpUrl, signIn.otpPage, otpCode)
+		resp := authenticateWithOTP(t, httpClient, signIn.otpURL, signIn.otpPage, otpCode)
 		defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 		location := assertRedirect(t, resp, "/auth/completed")
 		resp = loadPage(t, httpClient, location)
 		defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
-		assertCodeFor(t, httpClient, assertRedirect(t, resp, "/auth/issue"), signIn.client, signIn.redirectUri, signIn.state)
+		assertCodeFor(t, httpClient, assertRedirect(t, resp, "/auth/issue"), signIn.client, signIn.redirectURI, signIn.state)
 	}
 }
 
@@ -376,36 +376,36 @@ func TestAuthorize_OtpFormsOfTwoSignInsInOneBrowserEachFinishTheirOwn(t *testing
 // Before, whoever used the browser next could scan A's key, enrol it and be signed in as A without
 // A's password (#246).
 func TestAuthorize_AnotherUsersSignInEndsOneAbandonedAtItsEnrolment(t *testing.T) {
-	clientA, redirectUriA, userA, passwordA, _ := createLevel2MandatoryUser(t, false)
-	clientB, redirectUriB, userB, passwordB, otpSecretB := createLevel2MandatoryUser(t, true)
+	clientA, redirectURIA, userA, passwordA, _ := createLevel2MandatoryUser(t, false)
+	clientB, redirectURIB, userB, passwordB, otpSecretB := createLevel2MandatoryUser(t, true)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
-	enrolUrlA, enrolPageA := walkToOtpPrompt(t, httpClient, clientA, redirectUriA, fake.LetterN(8), userA, passwordA)
+	enrolURLA, enrolPageA := walkToOTPPrompt(t, httpClient, clientA, redirectURIA, fake.LetterN(8), userA, passwordA)
 	defer func() { _ = enrolPageA.Body.Close() }()
-	codeFromAsKey := otptest.Code(t, getOtpSecretFromEnrollmentPage(t, enrolPageA), time.Now())
+	codeFromAsKey := otptest.Code(t, getOTPSecretFromEnrollmentPage(t, enrolPageA), time.Now())
 
 	stateB := fake.LetterN(8)
-	otpUrlB, otpPageB := walkToOtpPrompt(t, httpClient, clientB, redirectUriB, stateB, userB, passwordB)
+	otpURLB, otpPageB := walkToOTPPrompt(t, httpClient, clientB, redirectURIB, stateB, userB, passwordB)
 	defer func() { _ = otpPageB.Body.Close() }()
 	codeB := otptest.Code(t, otpSecretB, time.Now())
 
-	resp := authenticateWithOtp(t, httpClient, otpUrlB, otpPageB, codeB)
+	resp := authenticateWithOTP(t, httpClient, otpURLB, otpPageB, codeB)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 	location := assertRedirect(t, resp, "/auth/completed")
 	resp = loadPage(t, httpClient, location)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
-	assertCodeFor(t, httpClient, assertRedirect(t, resp, "/auth/issue"), clientB, redirectUriB, stateB)
+	assertCodeFor(t, httpClient, assertRedirect(t, resp, "/auth/issue"), clientB, redirectURIB, stateB)
 
 	// A's enrolment page, still in its tab, submitted with a code from the key it shows.
-	resp = authenticateWithOtp(t, httpClient, enrolUrlA, enrolPageA, codeFromAsKey)
+	resp = authenticateWithOTP(t, httpClient, enrolURLA, enrolPageA, codeFromAsKey)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 	location = assertRedirect(t, resp, "/account/profile")
 	assert.Equal(t, appConfig.AdminConsole.BaseURL+"/account/profile", location,
 		"a browser holding no sign-in is sent to the account page")
-	assertNothingWasCompleted(t, userA.Id)
+	assertNothingWasCompleted(t, userA.ID)
 
-	storedA, err := database.GetUserById(context.Background(), nil, userA.Id)
+	storedA, err := database.GetUserByID(context.Background(), nil, userA.ID)
 	if err != nil {
 		t.Fatal(err)
 	}

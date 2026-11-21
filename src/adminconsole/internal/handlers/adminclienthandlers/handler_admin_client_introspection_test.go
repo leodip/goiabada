@@ -17,34 +17,34 @@ import (
 	"github.com/leodip/goiabada/core/api"
 )
 
-// clientIntrospectionSaveApiClient records the request the Introspection tab's save hands the API,
+// clientIntrospectionSaveAPIClient records the request the Introspection tab's save hands the API,
 // and the client it names, and answers it with err.
-type clientIntrospectionSaveApiClient struct {
+type clientIntrospectionSaveAPIClient struct {
 	err      error
-	clientId int64
+	clientID int64
 	sent     *api.UpdateClientIntrospectionResourcesRequest
 }
 
-func (s *clientIntrospectionSaveApiClient) UpdateClientIntrospectionResources(_ context.Context, _ string, clientId int64, request *api.UpdateClientIntrospectionResourcesRequest) error {
-	s.clientId = clientId
+func (s *clientIntrospectionSaveAPIClient) UpdateClientIntrospectionResources(_ context.Context, _ string, clientID int64, request *api.UpdateClientIntrospectionResourcesRequest) error {
+	s.clientID = clientID
 	s.sent = request
 	return s.err
 }
 
-// The rest of the ports clientIntrospectionSaveApiClient is passed to, which no save reaches.
+// The rest of the ports clientIntrospectionSaveAPIClient is passed to, which no save reaches.
 
-func (*clientIntrospectionSaveApiClient) GetAllResources(context.Context, string) ([]api.ResourceResponse, error) {
+func (*clientIntrospectionSaveAPIClient) GetAllResources(context.Context, string) ([]api.ResourceResponse, error) {
 	panic("unexpected call to GetAllResources")
 }
 
-func (*clientIntrospectionSaveApiClient) GetClientIntrospectionResources(context.Context, string, int64) (*api.ClientResponse, []api.ResourceResponse, error) {
+func (*clientIntrospectionSaveAPIClient) GetClientIntrospectionResources(context.Context, string, int64) (*api.ClientResponse, []api.ResourceResponse, error) {
 	panic("unexpected call to GetClientIntrospectionResources")
 }
 
-func postIntrospection(clientId, body string) *http.Request {
-	return handlertest.Request(http.MethodPost, "/admin/clients/"+clientId+"/introspection",
+func postIntrospection(clientID, body string) *http.Request {
+	return handlertest.Request(http.MethodPost, "/admin/clients/"+clientID+"/introspection",
 		handlertest.WithAccessToken(),
-		handlertest.WithPathValue("clientId", clientId),
+		handlertest.WithPathValue("clientId", clientID),
 		handlertest.WithBody(bytes.NewBufferString(body)),
 	)
 }
@@ -96,13 +96,13 @@ func TestHandleIntrospectionPost_SendsTheLoadedList(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// The API refuses, so the handler returns before the nil session is touched; the
 			// request it sent is what is under test.
-			stub := &clientIntrospectionSaveApiClient{err: &apiclient.APIError{Code: "VALIDATION_ERROR", Message: "refused", StatusCode: http.StatusBadRequest}}
+			stub := &clientIntrospectionSaveAPIClient{err: &apiclient.APIError{Code: "VALIDATION_ERROR", Message: "refused", StatusCode: http.StatusBadRequest}}
 			HandleIntrospectionPost(render.New(nil, nil), nil, stub).ServeHTTP(httptest.NewRecorder(), postIntrospection("5", tc.body))
 
 			require.NotNil(t, stub.sent)
-			assert.Equal(t, int64(5), stub.clientId)
-			assert.Equal(t, tc.wantWanted, stub.sent.ResourceIds)
-			assert.Equal(t, tc.wantExpected, stub.sent.ExpectedResourceIds)
+			assert.Equal(t, int64(5), stub.clientID)
+			assert.Equal(t, tc.wantWanted, stub.sent.ResourceIDs)
+			assert.Equal(t, tc.wantExpected, stub.sent.ExpectedResourceIDs)
 			wire, err := json.Marshal(stub.sent)
 			require.NoError(t, err)
 			assert.JSONEq(t, tc.wantWire, string(wire))
@@ -126,7 +126,7 @@ func TestHandleIntrospectionPost_ARefusalReachesTheBrowser(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			rec := httptest.NewRecorder()
-			HandleIntrospectionPost(render.New(nil, nil), nil, &clientIntrospectionSaveApiClient{err: tc.apiErr}).
+			HandleIntrospectionPost(render.New(nil, nil), nil, &clientIntrospectionSaveAPIClient{err: tc.apiErr}).
 				ServeHTTP(rec, postIntrospection("5", `{"resourceIds":[6],"expectedResourceIds":[3]}`))
 
 			assert.Equal(t, tc.apiErr.StatusCode, rec.Code)
@@ -142,7 +142,7 @@ func TestHandleIntrospectionPost_ARefusalReachesTheBrowser(t *testing.T) {
 // tab says "saved" from.
 func TestHandleIntrospectionPost_ASavedListAnswersSuccess(t *testing.T) {
 	store := newTestSessionStore()
-	stub := &clientIntrospectionSaveApiClient{}
+	stub := &clientIntrospectionSaveAPIClient{}
 	rec := httptest.NewRecorder()
 
 	HandleIntrospectionPost(render.New(nil, nil), store, stub).
@@ -167,7 +167,7 @@ func TestHandleIntrospectionPost_RefusesWhatItCannotRead(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			stub := &clientIntrospectionSaveApiClient{}
+			stub := &clientIntrospectionSaveAPIClient{}
 			rec := httptest.NewRecorder()
 			HandleIntrospectionPost(render.New(nil, nil), nil, stub).ServeHTTP(rec, tc.request)
 

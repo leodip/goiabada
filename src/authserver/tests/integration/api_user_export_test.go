@@ -131,7 +131,7 @@ func newExportedUser(t *testing.T) (*record.User, exportSecrets) {
 		ZoneInfo:                       "America/Sao_Paulo",
 		Locale:                         "pt-BR",
 		BirthDate:                      sql.NullTime{Time: time.Date(1990, 5, 17, 0, 0, 0, 0, time.UTC), Valid: true},
-		PhoneNumberCountryUniqueId:     "BRA_0",
+		PhoneNumberCountryUniqueID:     "BRA_0",
 		PhoneNumberCountryCallingCode:  "+55",
 		PhoneNumber:                    "11 91234-5678",
 		PhoneNumberVerified:            true,
@@ -147,12 +147,12 @@ func newExportedUser(t *testing.T) (*record.User, exportSecrets) {
 		ForgotPasswordCodeHash:         secrets.resetCodeHash,
 	}
 	require.NoError(t, database.CreateUser(ctx, nil, user))
-	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.Id) })
+	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.ID) })
 	require.NoError(t, database.RunInTransaction(ctx, func(tx *sql.Tx) error {
-		return database.ReplaceUserRecoveryCodes(ctx, tx, user.Id, []string{secrets.recoveryCodeHash})
+		return database.ReplaceUserRecoveryCodes(ctx, tx, user.ID, []string{secrets.recoveryCodeHash})
 	}))
 
-	stored, err := database.GetUserById(ctx, nil, user.Id)
+	stored, err := database.GetUserByID(ctx, nil, user.ID)
 	require.NoError(t, err)
 	require.NotNil(t, stored)
 	return stored, secrets
@@ -187,8 +187,8 @@ func expectedExport(user *record.User, issuer string) string {
 		"legalDocumentAcceptances": [],
 		"profilePicture": null
 	}`, issuer,
-		user.Id, user.Subject, user.Email, hashutil.HashString(user.Email),
-		user.Id, jsonTime(user.CreatedAt), jsonTime(user.UpdatedAt), user.Subject,
+		user.ID, user.Subject, user.Email, hashutil.HashString(user.Email),
+		user.ID, jsonTime(user.CreatedAt), jsonTime(user.UpdatedAt), user.Subject,
 		user.Username, user.Email, jsonTime(user.BirthDate))
 }
 
@@ -204,7 +204,7 @@ func jsonTime(stored sql.NullTime) string {
 // storedIssuer is the issuer in the settings row, which the document names.
 func storedIssuer(t *testing.T) string {
 	t.Helper()
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
+	settings, err := database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err)
 	require.NotNil(t, settings)
 	return settings.Issuer
@@ -237,7 +237,7 @@ func assertTheExport(t *testing.T, answer exportAnswer, user *record.User, befor
 	require.NoError(t, err)
 	assert.JSONEq(t, expectedExport(user, storedIssuer(t)), string(rest))
 
-	assert.Equal(t, fmt.Sprintf(`attachment; filename="user-%d-%s.json"`, user.Id, exportedAt.UTC().Format("2006-01-02")),
+	assert.Equal(t, fmt.Sprintf(`attachment; filename="user-%d-%s.json"`, user.ID, exportedAt.UTC().Format("2006-01-02")),
 		answer.header.Get("Content-Disposition"))
 	return exportedAt
 }
@@ -247,7 +247,7 @@ func TestAPIUserExport_AnswersTheUsersDocument(t *testing.T) {
 	user, _ := newExportedUser(t)
 	before := time.Now().UTC()
 
-	answer := getUserExport(t, adminToken, user.Id, "")
+	answer := getUserExport(t, adminToken, user.ID, "")
 
 	assertTheExport(t, answer, user, before)
 	assert.Empty(t, answer.header.Get("Content-Encoding"), "a caller that names no encoding gets plain JSON")
@@ -271,7 +271,7 @@ func TestAPIUserExport_GzipForACallerThatAcceptsIt(t *testing.T) {
 		t.Run(c.acceptEncoding, func(t *testing.T) {
 			before := time.Now().UTC()
 
-			answer := getUserExport(t, adminToken, user.Id, c.acceptEncoding)
+			answer := getUserExport(t, adminToken, user.ID, c.acceptEncoding)
 
 			if c.gzip {
 				assert.Equal(t, "gzip", answer.header.Get("Content-Encoding"))
@@ -290,7 +290,7 @@ func TestAPIUserExport_HoldsNoSecret(t *testing.T) {
 	adminToken, _ := createAdminClientWithToken(t)
 	user, secrets := newExportedUser(t)
 
-	answer := getUserExport(t, adminToken, user.Id, "")
+	answer := getUserExport(t, adminToken, user.ID, "")
 
 	require.Equal(t, http.StatusOK, answer.status)
 	body := string(answer.raw)
@@ -329,9 +329,9 @@ func TestAPIUserExport_TheScopeRule(t *testing.T) {
 	} {
 		t.Run("a client holding "+c.permission, func(t *testing.T) {
 			token, client := createClientWithGranularScope(t, c.permission)
-			t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+			t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 
-			answer := getUserExport(t, token, user.Id, "")
+			answer := getUserExport(t, token, user.ID, "")
 
 			assert.Equal(t, c.status, answer.status, "%s", answer.raw)
 			if c.status == http.StatusForbidden {
@@ -343,7 +343,7 @@ func TestAPIUserExport_TheScopeRule(t *testing.T) {
 	t.Run("a user holding manage-users and manage-settings", func(t *testing.T) {
 		token, _ := createUserAccessTokenWithScope(t, "openid authserver:manage-users authserver:manage-settings")
 
-		answer := getUserExport(t, token, user.Id, "")
+		answer := getUserExport(t, token, user.ID, "")
 
 		assert.Equal(t, http.StatusOK, answer.status, "%s", answer.raw)
 	})
@@ -351,14 +351,14 @@ func TestAPIUserExport_TheScopeRule(t *testing.T) {
 	t.Run("a user holding manage-users alone", func(t *testing.T) {
 		token, _ := createUserAccessTokenWithScope(t, "openid authserver:manage-users")
 
-		answer := getUserExport(t, token, user.Id, "")
+		answer := getUserExport(t, token, user.ID, "")
 
 		assert.Equal(t, http.StatusForbidden, answer.status, "%s", answer.raw)
 		assertExportErrorCode(t, answer, "INSUFFICIENT_SCOPE")
 	})
 
 	t.Run("no token", func(t *testing.T) {
-		answer := getUserExport(t, "", user.Id, "")
+		answer := getUserExport(t, "", user.ID, "")
 
 		assert.Equal(t, http.StatusUnauthorized, answer.status)
 	})
@@ -388,9 +388,9 @@ func TestAPIUserExport_Refusals(t *testing.T) {
 }
 
 // exportEvents is the exported_user_data rows about the user, oldest first.
-func exportEvents(t *testing.T, userId int64) []record.AuditLog {
+func exportEvents(t *testing.T, userID int64) []record.AuditLog {
 	t.Helper()
-	rows, err := database.GetAuditLogsByUserId(context.Background(), nil, userId)
+	rows, err := database.GetAuditLogsByUserID(context.Background(), nil, userID)
 	require.NoError(t, err)
 	var events []record.AuditLog
 	for _, row := range rows {
@@ -409,23 +409,23 @@ func TestAPIUserExport_RecordsTheExport(t *testing.T) {
 	user, _ := newExportedUser(t)
 	token, administrator := createUserAccessTokenWithScope(t, "openid authserver:manage-users authserver:manage-settings")
 
-	answer := getUserExport(t, token, user.Id, "gzip")
+	answer := getUserExport(t, token, user.ID, "gzip")
 	require.Equal(t, http.StatusOK, answer.status, "%s", answer.raw)
 
 	var events []record.AuditLog
 	require.Eventually(t, func() bool {
-		events = exportEvents(t, user.Id)
+		events = exportEvents(t, user.ID)
 		return len(events) == 1
 	}, afterResponseWait, 100*time.Millisecond, "one exported_user_data about the user")
 	event := events[0]
 	assert.Equal(t, "exported_user_data", event.AuditEvent, "the stored event name")
-	assert.Equal(t, sql.NullInt64{Int64: user.Id, Valid: true}, event.UserId)
-	assert.Equal(t, sql.NullInt64{Int64: administrator.Id, Valid: true}, event.LoggedInUserId)
-	assert.JSONEq(t, fmt.Sprintf(`{"user_id": %d, "logged_in_user": %q}`, user.Id, administrator.Subject), event.Details)
+	assert.Equal(t, sql.NullInt64{Int64: user.ID, Valid: true}, event.UserID)
+	assert.Equal(t, sql.NullInt64{Int64: administrator.ID, Valid: true}, event.LoggedInUserID)
+	assert.JSONEq(t, fmt.Sprintf(`{"user_id": %d, "logged_in_user": %q}`, user.ID, administrator.Subject), event.Details)
 
-	byAdministrator := exportEvents(t, administrator.Id)
+	byAdministrator := exportEvents(t, administrator.ID)
 	require.Len(t, byAdministrator, 1, "the entry is listed under the administrator too")
-	assert.Equal(t, event.Id, byAdministrator[0].Id)
+	assert.Equal(t, event.ID, byAdministrator[0].ID)
 }
 
 // A refused export or one of a user that does not exist writes nothing: the data never left.
@@ -434,16 +434,16 @@ func TestAPIUserExport_ARefusedExportRecordsNothing(t *testing.T) {
 	user, _ := newExportedUser(t)
 	token, administrator := createUserAccessTokenWithScope(t, "openid authserver:manage-users")
 
-	answer := getUserExport(t, token, user.Id, "")
+	answer := getUserExport(t, token, user.ID, "")
 	require.Equal(t, http.StatusForbidden, answer.status)
 
 	// A later export's event is what bounds the wait: once it is stored, the refused one would be too.
 	adminToken, _ := createAdminClientWithToken(t)
-	require.Equal(t, http.StatusOK, getUserExport(t, adminToken, user.Id, "").status)
-	require.Eventually(t, func() bool { return len(exportEvents(t, user.Id)) >= 1 }, afterResponseWait, 100*time.Millisecond)
+	require.Equal(t, http.StatusOK, getUserExport(t, adminToken, user.ID, "").status)
+	require.Eventually(t, func() bool { return len(exportEvents(t, user.ID)) >= 1 }, afterResponseWait, 100*time.Millisecond)
 
-	assert.Len(t, exportEvents(t, user.Id), 1, "only the admitted export is recorded")
-	assert.Empty(t, exportEvents(t, administrator.Id), "nothing names the refused caller")
+	assert.Len(t, exportEvents(t, user.ID), 1, "only the admitted export is recorded")
+	assert.Empty(t, exportEvents(t, administrator.ID), "nothing names the refused caller")
 }
 
 // exportedUserParts is what newExportedUserParts seeds about a user beside the profile, read back
@@ -474,36 +474,36 @@ func newExportedUserParts(t *testing.T, user *record.User) exportedUserParts {
 	suffix := strings.ToLower(fake.LetterN(8))
 
 	for i, attribute := range []*record.UserAttribute{
-		{Key: "employee_number", Value: "E-1001", IncludeInAccessToken: true, UserId: user.Id},
-		{Key: "department", Value: "Sales", IncludeInIdToken: true, UserId: user.Id},
+		{Key: "employee_number", Value: "E-1001", IncludeInAccessToken: true, UserID: user.ID},
+		{Key: "department", Value: "Sales", IncludeInIDToken: true, UserID: user.ID},
 	} {
 		require.NoError(t, database.CreateUserAttribute(ctx, nil, attribute))
-		stored, err := database.GetUserAttributeById(ctx, nil, attribute.Id)
+		stored, err := database.GetUserAttributeByID(ctx, nil, attribute.ID)
 		require.NoError(t, err)
 		p.attributes[i] = stored
 	}
 	// No app receives it: an administrators' own note, which the document leaves out (#782
 	// decision 8).
 	require.NoError(t, database.CreateUserAttribute(ctx, nil, &record.UserAttribute{
-		Key: "administrators_note", Value: exportedUserNote, UserId: user.Id}))
+		Key: "administrators_note", Value: exportedUserNote, UserID: user.ID}))
 
 	p.resource = createTestResource(t, "export-resource-"+suffix, "Export resource")
-	t.Cleanup(func() { _ = database.DeleteResource(context.Background(), nil, p.resource.Id) })
-	p.groupPerm = createTestPermission(t, p.resource.Id, "orders-read-"+suffix, "Read orders")
-	p.directPerm = createTestPermission(t, p.resource.Id, "orders-export-"+suffix, "Export orders")
+	t.Cleanup(func() { _ = database.DeleteResource(context.Background(), nil, p.resource.ID) })
+	p.groupPerm = createTestPermission(t, p.resource.ID, "orders-read-"+suffix, "Read orders")
+	p.directPerm = createTestPermission(t, p.resource.ID, "orders-export-"+suffix, "Export orders")
 
 	group := createTestGroup(t)
-	t.Cleanup(func() { _ = database.DeleteGroup(context.Background(), nil, group.Id) })
-	attribute := createTestGroupAttribute(t, group.Id, "region", "south")
+	t.Cleanup(func() { _ = database.DeleteGroup(context.Background(), nil, group.ID) })
+	attribute := createTestGroupAttribute(t, group.ID, "region", "south")
 	require.NoError(t, database.CreateGroupAttribute(ctx, nil, &record.GroupAttribute{
-		Key: "group_note", Value: exportedGroupNote, GroupId: group.Id}))
-	createTestGroupPermission(t, group.Id, p.groupPerm.Id)
-	require.NoError(t, database.CreateUserGroup(ctx, nil, &record.UserGroup{UserId: user.Id, GroupId: group.Id}))
-	require.NoError(t, database.CreateUserPermission(ctx, nil, &record.UserPermission{UserId: user.Id, PermissionId: p.directPerm.Id}))
+		Key: "group_note", Value: exportedGroupNote, GroupID: group.ID}))
+	createTestGroupPermission(t, group.ID, p.groupPerm.ID)
+	require.NoError(t, database.CreateUserGroup(ctx, nil, &record.UserGroup{UserID: user.ID, GroupID: group.ID}))
+	require.NoError(t, database.CreateUserPermission(ctx, nil, &record.UserPermission{UserID: user.ID, PermissionID: p.directPerm.ID}))
 	var err error
-	p.group, err = database.GetGroupById(ctx, nil, group.Id)
+	p.group, err = database.GetGroupByID(ctx, nil, group.ID)
 	require.NoError(t, err)
-	p.groupAttr, err = database.GetGroupAttributeById(ctx, nil, attribute.Id)
+	p.groupAttr, err = database.GetGroupAttributeByID(ctx, nil, attribute.ID)
 	require.NoError(t, err)
 
 	p.clientSecret = "export-client-secret-" + fake.LetterN(12)
@@ -514,44 +514,44 @@ func newExportedUserParts(t *testing.T, user *record.User) exportedUserParts {
 		Enabled:                  true,
 		ConsentRequired:          true,
 		AuthorizationCodeEnabled: true,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 	}
 	require.NoError(t, database.CreateClient(ctx, nil, p.client))
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, p.client.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, p.client.ID) })
 
-	consent := &record.UserConsent{UserId: user.Id, ClientId: p.client.Id, Scope: "openid profile",
+	consent := &record.UserConsent{UserID: user.ID, ClientID: p.client.ID, Scope: "openid profile",
 		GrantedAt: sql.NullTime{Time: time.Now().UTC().Add(-time.Hour), Valid: true}}
 	require.NoError(t, database.CreateUserConsent(ctx, nil, consent))
-	p.consent, err = database.GetUserConsentById(ctx, nil, consent.Id)
+	p.consent, err = database.GetUserConsentByID(ctx, nil, consent.ID)
 	require.NoError(t, err)
 
-	live := createTestUserSession(t, user.Id, fake.UUID())
-	t.Cleanup(func() { _ = database.DeleteUserSession(context.Background(), nil, live.Id) })
+	live := createTestUserSession(t, user.ID, fake.UUID())
+	t.Cleanup(func() { _ = database.DeleteUserSession(context.Background(), nil, live.ID) })
 	now := time.Now().UTC()
 	require.NoError(t, database.CreateUserSessionClient(ctx, nil, &record.UserSessionClient{
-		UserSessionId: live.Id, ClientId: p.client.Id, Started: now.Add(-time.Hour), LastAccessed: now.Add(-5 * time.Minute)}))
-	p.liveSession, err = database.GetUserSessionById(ctx, nil, live.Id)
+		UserSessionID: live.ID, ClientID: p.client.ID, Started: now.Add(-time.Hour), LastAccessed: now.Add(-5 * time.Minute)}))
+	p.liveSession, err = database.GetUserSessionByID(ctx, nil, live.ID)
 	require.NoError(t, err)
 	expired := &record.UserSession{
 		SessionIdentifier: fake.UUID(),
 		Started:           now.Add(-25 * time.Hour),
 		LastAccessed:      now.Add(-24 * time.Hour),
 		AuthMethods:       "pwd",
-		AcrLevel:          "urn:goiabada:pwd",
+		ACRLevel:          "urn:goiabada:pwd",
 		AuthTime:          now.Add(-25 * time.Hour),
 		PasswordAuthTime:  now.Add(-25 * time.Hour),
-		IpAddress:         "192.0.2.99",
-		UserId:            user.Id,
+		IPAddress:         "192.0.2.99",
+		UserID:            user.ID,
 	}
 	require.NoError(t, database.CreateUserSession(ctx, nil, expired))
-	t.Cleanup(func() { _ = database.DeleteUserSession(context.Background(), nil, expired.Id) })
+	t.Cleanup(func() { _ = database.DeleteUserSession(context.Background(), nil, expired.ID) })
 
 	p.acceptances = newAcceptancesFixture(t, user)
 
 	// The first eight bytes of a PNG, and a byte past them.
 	p.picture = []byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n', 0x00}
 	require.NoError(t, database.CreateUserProfilePicture(ctx, nil, &record.UserProfilePicture{
-		UserId: user.Id, Picture: p.picture, ContentType: "image/png"}))
+		UserID: user.ID, Picture: p.picture, ContentType: "image/png"}))
 	return p
 }
 
@@ -573,7 +573,7 @@ func jsonInstant(stored time.Time) string {
 // 8), the expired session left out and no session current.
 func expectedExportParts(user *record.User, p exportedUserParts) string {
 	resource := fmt.Sprintf(`{"id": %d, "resourceIdentifier": %q, "description": "Export resource", "isSystemLevelResource": false}`,
-		p.resource.Id, p.resource.ResourceIdentifier)
+		p.resource.ID, p.resource.ResourceIdentifier)
 	s := p.liveSession
 	return fmt.Sprintf(`{
 		"attributes": [
@@ -610,17 +610,17 @@ func expectedExportParts(user *record.User, p exportedUserParts) string {
 		],
 		"profilePicture": {"contentType": "image/png", "data": "iVBORw0KGgoA"}
 	}`,
-		p.attributes[0].Id, jsonTime(p.attributes[0].CreatedAt), jsonTime(p.attributes[0].UpdatedAt), user.Id,
-		p.attributes[1].Id, jsonTime(p.attributes[1].CreatedAt), jsonTime(p.attributes[1].UpdatedAt), user.Id,
-		p.group.Id, jsonTime(p.group.CreatedAt), jsonTime(p.group.UpdatedAt), p.group.GroupIdentifier,
-		p.groupAttr.Id, jsonTime(p.groupAttr.CreatedAt), jsonTime(p.groupAttr.UpdatedAt), p.group.Id,
-		p.groupPerm.Id, p.groupPerm.PermissionIdentifier, p.resource.Id, resource,
-		p.directPerm.Id, p.directPerm.PermissionIdentifier, p.resource.Id, resource,
-		p.consent.Id, jsonTime(p.consent.CreatedAt), jsonTime(p.consent.UpdatedAt), p.client.Id, user.Id,
+		p.attributes[0].ID, jsonTime(p.attributes[0].CreatedAt), jsonTime(p.attributes[0].UpdatedAt), user.ID,
+		p.attributes[1].ID, jsonTime(p.attributes[1].CreatedAt), jsonTime(p.attributes[1].UpdatedAt), user.ID,
+		p.group.ID, jsonTime(p.group.CreatedAt), jsonTime(p.group.UpdatedAt), p.group.GroupIdentifier,
+		p.groupAttr.ID, jsonTime(p.groupAttr.CreatedAt), jsonTime(p.groupAttr.UpdatedAt), p.group.ID,
+		p.groupPerm.ID, p.groupPerm.PermissionIdentifier, p.resource.ID, resource,
+		p.directPerm.ID, p.directPerm.PermissionIdentifier, p.resource.ID, resource,
+		p.consent.ID, jsonTime(p.consent.CreatedAt), jsonTime(p.consent.UpdatedAt), p.client.ID, user.ID,
 		jsonTime(p.consent.GrantedAt), p.client.ClientIdentifier, p.client.ClientIdentifier,
-		s.Id, jsonTime(s.CreatedAt), jsonTime(s.UpdatedAt), s.SessionIdentifier, jsonInstant(s.Started), jsonInstant(s.LastAccessed),
+		s.ID, jsonTime(s.CreatedAt), jsonTime(s.UpdatedAt), s.SessionIdentifier, jsonInstant(s.Started), jsonInstant(s.LastAccessed),
 		jsonInstant(s.AuthTime), testSessionUserAgent,
-		user.Id, p.client.ClientIdentifier,
+		user.ID, p.client.ClientIdentifier,
 		p.client.ClientIdentifier, p.client.ClientIdentifier)
 }
 
@@ -635,7 +635,7 @@ func TestAPIUserExport_HoldsWhatTheAdminAPIReadsAboutTheUser(t *testing.T) {
 	user, secrets := newExportedUser(t)
 	p := newExportedUserParts(t, user)
 
-	answer := getUserExport(t, adminToken, user.Id, "gzip")
+	answer := getUserExport(t, adminToken, user.ID, "gzip")
 
 	require.Equal(t, http.StatusOK, answer.status, "%s", answer.raw)
 	var document map[string]json.RawMessage
@@ -653,8 +653,8 @@ func TestAPIUserExport_HoldsWhatTheAdminAPIReadsAboutTheUser(t *testing.T) {
 	var acceptances []api.LegalDocumentAcceptanceResponse
 	require.NoError(t, json.Unmarshal(document["legalDocumentAcceptances"], &acceptances))
 	require.Len(t, acceptances, 3)
-	assert.Less(t, acceptances[0].Id, acceptances[1].Id)
-	assert.Less(t, acceptances[1].Id, acceptances[2].Id)
+	assert.Less(t, acceptances[0].ID, acceptances[1].ID)
+	assert.Less(t, acceptances[1].ID, acceptances[2].ID)
 	slices.Reverse(acceptances)
 	p.acceptances.assertTheFixturesAcceptances(t, acceptances)
 
@@ -713,29 +713,29 @@ func newExportedUserRefreshTokens(t *testing.T, user *record.User) exportedRefre
 		ShowDisplayName:          true,
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 	}
 	require.NoError(t, database.CreateClient(ctx, nil, r.shop))
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, r.shop.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, r.shop.ID) })
 
 	newCode := func(revoked bool, ipAddress, userAgent string, authenticatedAt time.Time) *record.Code {
 		codeHash := hashutil.HashString("export-authorization-code-" + fake.LetterN(16))
 		r.codeHashes = append(r.codeHashes, codeHash)
 		code := &record.Code{
-			CodeHash: codeHash, ClientId: r.shop.Id, Scope: "openid profile offline_access", State: "a-state",
-			Nonce: "a-nonce", RedirectURI: "https://shop.example.com/callback", UserId: user.Id,
-			IpAddress: ipAddress, UserAgent: userAgent, ResponseMode: "query", AuthenticatedAt: authenticatedAt,
-			SessionIdentifier: fake.UUID(), AcrLevel: record.AcrLevel1, AuthMethods: "pwd", Used: true, Revoked: revoked,
+			CodeHash: codeHash, ClientID: r.shop.ID, Scope: "openid profile offline_access", State: "a-state",
+			Nonce: "a-nonce", RedirectURI: "https://shop.example.com/callback", UserID: user.ID,
+			IPAddress: ipAddress, UserAgent: userAgent, ResponseMode: "query", AuthenticatedAt: authenticatedAt,
+			SessionIdentifier: fake.UUID(), ACRLevel: record.ACRLevel1, AuthMethods: "pwd", Used: true, Revoked: revoked,
 			AuthStateGeneration: user.AuthStateGeneration,
 		}
 		require.NoError(t, database.CreateCode(ctx, nil, code))
-		stored, err := database.GetCodeById(ctx, nil, code.Id)
+		stored, err := database.GetCodeByID(ctx, nil, code.ID)
 		require.NoError(t, err)
 		require.Equal(t, revoked, stored.Revoked)
 		return stored
 	}
 	readBack := func(jti string) *record.RefreshToken {
-		row, err := database.GetRefreshTokenByJti(ctx, nil, jti)
+		row, err := database.GetRefreshTokenByJTI(ctx, nil, jti)
 		require.NoError(t, err)
 		require.NotNil(t, row, "no row for %s", jti)
 		return row
@@ -745,7 +745,7 @@ func newExportedUserRefreshTokens(t *testing.T, user *record.User) exportedRefre
 	r.signIn = newCode(false, "203.0.113.7", "Mozilla/5.0 (X11; Linux x86_64) Firefox/131.0", now.Add(-2*time.Hour).Truncate(time.Second))
 	jti := fake.UUID()
 	require.NoError(t, database.CreateRefreshToken(ctx, nil, &record.RefreshToken{
-		CodeId: sql.NullInt64{Int64: r.signIn.Id, Valid: true}, RefreshTokenJti: jti, FirstRefreshTokenJti: jti,
+		CodeID: sql.NullInt64{Int64: r.signIn.ID, Valid: true}, RefreshTokenJTI: jti, FirstRefreshTokenJTI: jti,
 		SessionIdentifier: r.signIn.SessionIdentifier, RefreshTokenType: "Refresh", Scope: "openid profile",
 		IssuedAt: at(now.Add(-2 * time.Hour)), ExpiresAt: at(now.Add(2 * time.Hour)),
 		AuthStateGeneration: user.AuthStateGeneration,
@@ -755,7 +755,7 @@ func newExportedUserRefreshTokens(t *testing.T, user *record.User) exportedRefre
 	r.revokedSignIn = newCode(true, "198.51.100.4", "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0)", now.Add(-48*time.Hour).Truncate(time.Second))
 	jti = fake.UUID()
 	require.NoError(t, database.CreateRefreshToken(ctx, nil, &record.RefreshToken{
-		CodeId: sql.NullInt64{Int64: r.revokedSignIn.Id, Valid: true}, RefreshTokenJti: jti, FirstRefreshTokenJti: jti,
+		CodeID: sql.NullInt64{Int64: r.revokedSignIn.ID, Valid: true}, RefreshTokenJTI: jti, FirstRefreshTokenJTI: jti,
 		RefreshTokenType: "Offline", Scope: "openid offline_access",
 		IssuedAt: at(now.Add(-48 * time.Hour)), ExpiresAt: at(now.Add(24 * time.Hour)), MaxLifetime: at(now.Add(300 * 24 * time.Hour)),
 		AuthStateGeneration: user.AuthStateGeneration,
@@ -766,9 +766,9 @@ func newExportedUserRefreshTokens(t *testing.T, user *record.User) exportedRefre
 	changeSettings(t, func(settings *record.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = true })
 	cliSecret := fake.Password(32)
 	r.cli = createROPCClient(t, cliSecret, false)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, r.cli.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, r.cli.ID) })
 	f := ropcAuthTimeFixture{client: r.cli, clientSecret: cliSecret, user: user,
-		httpClient: createHttpClient(t), tokenURL: appConfig.AuthServer.BaseURL + "/auth/token/"}
+		httpClient: createHTTPClient(t), tokenURL: appConfig.AuthServer.BaseURL + "/auth/token/"}
 	r.passwordCheckedAt = now.Add(-72 * time.Hour).Truncate(time.Second)
 	first := issueROPCRefreshToken(t, f, at(r.passwordCheckedAt))
 	status, refreshed := f.refresh(t, first)
@@ -780,8 +780,8 @@ func newExportedUserRefreshTokens(t *testing.T, user *record.User) exportedRefre
 
 	jti = fake.UUID()
 	require.NoError(t, database.CreateRefreshToken(ctx, nil, &record.RefreshToken{
-		UserId: sql.NullInt64{Int64: user.Id, Valid: true}, ClientId: sql.NullInt64{Int64: r.cli.Id, Valid: true},
-		RefreshTokenJti: jti, FirstRefreshTokenJti: jti, RefreshTokenType: "Offline", Scope: "openid",
+		UserID: sql.NullInt64{Int64: user.ID, Valid: true}, ClientID: sql.NullInt64{Int64: r.cli.ID, Valid: true},
+		RefreshTokenJTI: jti, FirstRefreshTokenJTI: jti, RefreshTokenType: "Offline", Scope: "openid",
 		IssuedAt: at(now.Add(-time.Hour)), ExpiresAt: at(now.Add(time.Hour)), MaxLifetime: at(now.Add(24 * time.Hour)),
 		AuthStateGeneration: user.AuthStateGeneration,
 	}))
@@ -819,15 +819,15 @@ func expectedExportRefreshTokens(r exportedRefreshTokens) string {
 			"jti": %q, "revoked": true, "ipAddress": "", "userAgent": "", "authenticatedAt": null}
 	]`,
 		r.shop.ClientIdentifier, jsonTime(r.codeFlow.IssuedAt), jsonTime(r.codeFlow.ExpiresAt), r.signIn.SessionIdentifier,
-		r.codeFlow.RefreshTokenJti, jsonInstant(r.signIn.AuthenticatedAt),
+		r.codeFlow.RefreshTokenJTI, jsonInstant(r.signIn.AuthenticatedAt),
 		r.shop.ClientIdentifier, jsonTime(r.codeRevoked.IssuedAt), jsonTime(r.codeRevoked.ExpiresAt), jsonTime(r.codeRevoked.MaxLifetime),
-		r.codeRevoked.RefreshTokenJti, jsonInstant(r.revokedSignIn.AuthenticatedAt),
+		r.codeRevoked.RefreshTokenJTI, jsonInstant(r.revokedSignIn.AuthenticatedAt),
 		r.cli.ClientIdentifier, r.cli.ClientIdentifier, jsonTime(r.rotatedOut.IssuedAt), jsonTime(r.rotatedOut.ExpiresAt),
-		jsonTime(r.rotatedOut.MaxLifetime), r.rotatedOut.RefreshTokenJti, jsonInstant(r.passwordCheckedAt),
+		jsonTime(r.rotatedOut.MaxLifetime), r.rotatedOut.RefreshTokenJTI, jsonInstant(r.passwordCheckedAt),
 		r.cli.ClientIdentifier, r.cli.ClientIdentifier, jsonTime(r.rotated.IssuedAt), jsonTime(r.rotated.ExpiresAt),
-		jsonTime(r.rotated.MaxLifetime), r.rotated.RefreshTokenJti, jsonInstant(r.passwordCheckedAt),
+		jsonTime(r.rotated.MaxLifetime), r.rotated.RefreshTokenJTI, jsonInstant(r.passwordCheckedAt),
 		r.cli.ClientIdentifier, r.cli.ClientIdentifier, jsonTime(r.family.IssuedAt), jsonTime(r.family.ExpiresAt),
-		jsonTime(r.family.MaxLifetime), r.family.RefreshTokenJti)
+		jsonTime(r.family.MaxLifetime), r.family.RefreshTokenJTI)
 }
 
 // The document lists every refresh token the auth server holds for the user, a code flow's and a
@@ -842,7 +842,7 @@ func TestAPIUserExport_ListsEveryRefreshToken(t *testing.T) {
 	user, _ := newExportedUser(t)
 	r := newExportedUserRefreshTokens(t, user)
 
-	answer := getUserExport(t, adminToken, user.Id, "gzip")
+	answer := getUserExport(t, adminToken, user.ID, "gzip")
 
 	require.Equal(t, http.StatusOK, answer.status, "%s", answer.raw)
 	var document map[string]json.RawMessage
@@ -865,42 +865,42 @@ func TestAPIUserExport_ListsEveryRefreshToken(t *testing.T) {
 	}
 }
 
-// storedAuditRow waits for the audit row about or by the user that the request named requestId
+// storedAuditRow waits for the audit row about or by the user that the request named requestID
 // wrote, of the event given, and answers it as stored.
-func storedAuditRow(t *testing.T, userId int64, event, requestId string) record.AuditLog {
+func storedAuditRow(t *testing.T, userID int64, event, requestID string) record.AuditLog {
 	t.Helper()
 	var found record.AuditLog
 	require.Eventually(t, func() bool {
-		rows, err := database.GetAuditLogsByUserId(context.Background(), nil, userId)
+		rows, err := database.GetAuditLogsByUserID(context.Background(), nil, userID)
 		require.NoError(t, err)
 		for _, row := range rows {
-			if row.AuditEvent == event && row.RequestId == requestId {
+			if row.AuditEvent == event && row.RequestID == requestID {
 				found = row
 				return true
 			}
 		}
 		return false
-	}, afterResponseWait, 100*time.Millisecond, "the %s row of request %s", event, requestId)
+	}, afterResponseWait, 100*time.Millisecond, "the %s row of request %s", event, requestID)
 	return found
 }
 
 // enableUser enables the user through the admin API with the token given, which writes
 // updated_user_details about them, and answers that row as stored.
-func enableUser(t *testing.T, accessToken string, userId int64) record.AuditLog {
+func enableUser(t *testing.T, accessToken string, userID int64) record.AuditLog {
 	t.Helper()
-	resp, requestId := sendAdmin(t, accessToken, http.MethodPut, fmt.Sprintf("/api/v1/admin/users/%d/enabled", userId),
+	resp, requestID := sendAdmin(t, accessToken, http.MethodPut, fmt.Sprintf("/api/v1/admin/users/%d/enabled", userID),
 		map[string]any{"enabled": true})
 	_ = resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
-	return storedAuditRow(t, userId, audit.EventUpdatedUserDetails, requestId)
+	return storedAuditRow(t, userID, audit.EventUpdatedUserDetails, requestID)
 }
 
 // expectedAuditEvent is one entry of auditEvents: the stored row's id, time, event and request id,
 // and the details, user columns and actedByAdministrator written out by hand.
-func expectedAuditEvent(row record.AuditLog, details, userId, loggedInUserId string, actedByAdministrator bool) string {
+func expectedAuditEvent(row record.AuditLog, details, userID, loggedInUserID string, actedByAdministrator bool) string {
 	return fmt.Sprintf(`{"id": %d, "createdAt": %s, "auditEvent": %q, "details": %q, "requestId": %q,
 		"userId": %s, "loggedInUserId": %s, "actedByAdministrator": %t}`,
-		row.Id, jsonInstant(row.CreatedAt), row.AuditEvent, details, row.RequestId, userId, loggedInUserId, actedByAdministrator)
+		row.ID, jsonInstant(row.CreatedAt), row.AuditEvent, details, row.RequestID, userID, loggedInUserID, actedByAdministrator)
 }
 
 // exportedAuditEvents is the auditEvents of an export, as the raw entries.
@@ -928,60 +928,60 @@ func TestAPIUserExport_ListsTheAuditEventsWithoutTheAdministratorsWhoActed(t *te
 	adminToken, adminClient := createAdminClientWithToken(t)
 	token, administrator := createUserAccessTokenWithScope(t, "openid authserver:manage-users authserver:manage-settings")
 
-	byAdministrator := enableUser(t, token, user.Id)
-	byClient := enableUser(t, adminToken, user.Id)
+	byAdministrator := enableUser(t, token, user.ID)
+	byClient := enableUser(t, adminToken, user.ID)
 	// As the sign-in writes it, when the browser still carried the administrator's session (#133).
 	sharedBrowser := &record.AuditLog{
 		AuditEvent: audit.EventCrossUserSessionReplaced,
-		RequestId:  "export-" + fake.LetterN(12),
+		RequestID:  "export-" + fake.LetterN(12),
 		Details: fmt.Sprintf(`{"client_id":%d,"previous_session_identifier":"sid-of-the-other-user","previous_user_id":%d,"user_id":%d}`,
-			adminClient.Id, administrator.Id, user.Id),
-		UserId: sql.NullInt64{Int64: user.Id, Valid: true},
+			adminClient.ID, administrator.ID, user.ID),
+		UserID: sql.NullInt64{Int64: user.ID, Valid: true},
 	}
 	require.NoError(t, database.CreateAuditLog(ctx, nil, sharedBrowser))
-	sharedBrowserRow := storedAuditRow(t, user.Id, audit.EventCrossUserSessionReplaced, sharedBrowser.RequestId)
+	sharedBrowserRow := storedAuditRow(t, user.ID, audit.EventCrossUserSessionReplaced, sharedBrowser.RequestID)
 
 	// The administrator exports the user.
-	answer := getUserExport(t, token, user.Id, "gzip")
+	answer := getUserExport(t, token, user.ID, "gzip")
 	listed, err := json.Marshal(exportedAuditEvents(t, answer))
 	require.NoError(t, err)
 
-	userId := fmt.Sprint(user.Id)
+	userID := fmt.Sprint(user.ID)
 	assert.JSONEq(t, "["+strings.Join([]string{
-		expectedAuditEvent(byAdministrator, fmt.Sprintf(`{"user_id":%d}`, user.Id), userId, "null", true),
-		expectedAuditEvent(byClient, fmt.Sprintf(`{"logged_in_user":%q,"user_id":%d}`, adminClient.ClientIdentifier, user.Id),
-			userId, "null", false),
+		expectedAuditEvent(byAdministrator, fmt.Sprintf(`{"user_id":%d}`, user.ID), userID, "null", true),
+		expectedAuditEvent(byClient, fmt.Sprintf(`{"logged_in_user":%q,"user_id":%d}`, adminClient.ClientIdentifier, user.ID),
+			userID, "null", false),
 		expectedAuditEvent(sharedBrowserRow, fmt.Sprintf(`{"client_id":%d,"previous_session_identifier":"sid-of-the-other-user","user_id":%d}`,
-			adminClient.Id, user.Id), userId, "null", false),
+			adminClient.ID, user.ID), userID, "null", false),
 	}, ",")+"]", string(listed))
 	assert.NotContains(t, string(answer.document(t)), administrator.Subject, "the administrator is named nowhere")
 
 	// The export is recorded under both people.
 	var exportRows []record.AuditLog
 	require.Eventually(t, func() bool {
-		exportRows = exportEvents(t, user.Id)
+		exportRows = exportEvents(t, user.ID)
 		return len(exportRows) == 1
 	}, afterResponseWait, 100*time.Millisecond, "one exported_user_data about the user")
 	exported := exportRows[0]
 
 	// The administrator's own export keeps whom they acted on, and who they are.
-	administratorId := fmt.Sprint(administrator.Id)
+	administratorID := fmt.Sprint(administrator.ID)
 	ownEvents := map[int64]json.RawMessage{}
-	for _, e := range exportedAuditEvents(t, getUserExport(t, adminToken, administrator.Id, "")) {
+	for _, e := range exportedAuditEvents(t, getUserExport(t, adminToken, administrator.ID, "")) {
 		var entry struct {
-			Id int64 `json:"id"`
+			ID int64 `json:"id"`
 		}
 		require.NoError(t, json.Unmarshal(e, &entry))
-		ownEvents[entry.Id] = e
+		ownEvents[entry.ID] = e
 	}
-	assert.JSONEq(t, expectedAuditEvent(byAdministrator, fmt.Sprintf(`{"logged_in_user":%q,"user_id":%d}`, administrator.Subject, user.Id),
-		userId, administratorId, false), string(ownEvents[byAdministrator.Id]))
-	assert.JSONEq(t, expectedAuditEvent(exported, fmt.Sprintf(`{"logged_in_user":%q,"user_id":%d}`, administrator.Subject, user.Id),
-		userId, administratorId, false), string(ownEvents[exported.Id]))
-	assert.NotContains(t, ownEvents, byClient.Id, "a change to another user by a client is not the administrator's")
+	assert.JSONEq(t, expectedAuditEvent(byAdministrator, fmt.Sprintf(`{"logged_in_user":%q,"user_id":%d}`, administrator.Subject, user.ID),
+		userID, administratorID, false), string(ownEvents[byAdministrator.ID]))
+	assert.JSONEq(t, expectedAuditEvent(exported, fmt.Sprintf(`{"logged_in_user":%q,"user_id":%d}`, administrator.Subject, user.ID),
+		userID, administratorID, false), string(ownEvents[exported.ID]))
+	assert.NotContains(t, ownEvents, byClient.ID, "a change to another user by a client is not the administrator's")
 
 	// The user's next export lists the export as an administrator's.
-	events := exportedAuditEvents(t, getUserExport(t, adminToken, user.Id, ""))
+	events := exportedAuditEvents(t, getUserExport(t, adminToken, user.ID, ""))
 	require.Len(t, events, 4)
-	assert.JSONEq(t, expectedAuditEvent(exported, fmt.Sprintf(`{"user_id":%d}`, user.Id), userId, "null", true), string(events[3]))
+	assert.JSONEq(t, expectedAuditEvent(exported, fmt.Sprintf(`{"user_id":%d}`, user.ID), userID, "null", true), string(events[3]))
 }

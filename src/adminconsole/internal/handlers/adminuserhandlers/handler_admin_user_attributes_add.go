@@ -17,11 +17,11 @@ import (
 // create.
 type userAttributesAddAPI interface {
 	CreateUserAttribute(ctx context.Context, accessToken string, request *api.CreateUserAttributeRequest) (*api.UserAttributeResponse, error)
-	GetUserById(ctx context.Context, accessToken string, userId int64) (*api.UserResponse, error)
+	GetUserByID(ctx context.Context, accessToken string, userID int64) (*api.UserResponse, error)
 }
 
 func HandleAttributesAddGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient userAttributesAddAPI,
 ) http.HandlerFunc {
 
@@ -40,13 +40,13 @@ func HandleAttributesAddGet(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
-		user, err := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		user, err := apiClient.GetUserByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -73,7 +73,7 @@ func HandleAttributesAddGet(
 }
 
 func HandleAttributesAddPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient userAttributesAddAPI,
 	baseURL string,
 ) http.HandlerFunc {
@@ -93,13 +93,13 @@ func HandleAttributesAddPost(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
-		user, err := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		user, err := apiClient.GetUserByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -137,15 +137,15 @@ func HandleAttributesAddPost(
 		}
 
 		includeInAccessToken := r.FormValue("includeInAccessToken") == "on"
-		includeInIdToken := r.FormValue("includeInIdToken") == "on"
+		includeInIDToken := r.FormValue("includeInIdToken") == "on"
 
 		// Create request for API
 		request := &api.CreateUserAttributeRequest{
 			Key:                  attrKey,
 			Value:                attrValue,
 			IncludeInAccessToken: includeInAccessToken,
-			IncludeInIdToken:     includeInIdToken,
-			UserId:               user.Id,
+			IncludeInIDToken:     includeInIDToken,
+			UserID:               user.ID,
 		}
 
 		_, err = apiClient.CreateUserAttribute(r.Context(), jwtInfo.TokenResponse.AccessToken, request)
@@ -156,6 +156,6 @@ func HandleAttributesAddPost(
 			return
 		}
 
-		http.Redirect(w, r, withListPosition(baseURL, fmt.Sprintf("/admin/users/%v/attributes", user.Id), r), http.StatusFound)
+		http.Redirect(w, r, withListPosition(baseURL, fmt.Sprintf("/admin/users/%v/attributes", user.ID), r), http.StatusFound)
 	}
 }

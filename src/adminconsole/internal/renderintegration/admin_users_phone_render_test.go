@@ -30,12 +30,12 @@ type phoneTabAPI struct {
 
 func (s *phoneTabAPI) GetPhoneCountries(_ context.Context, _ string) ([]api.PhoneCountryResponse, error) {
 	return []api.PhoneCountryResponse{
-		{UniqueId: "BRA_0", Alpha2: "BR", CallingCode: "+55", Name: "Brazil"},
-		{UniqueId: "PRT_0", Alpha2: "PT", CallingCode: "+351", Name: "Portugal"},
+		{UniqueID: "BRA_0", Alpha2: "BR", CallingCode: "+55", Name: "Brazil"},
+		{UniqueID: "PRT_0", Alpha2: "PT", CallingCode: "+351", Name: "Portugal"},
 	}, nil
 }
 
-func (s *phoneTabAPI) GetUserById(_ context.Context, _ string, _ int64) (*api.UserResponse, error) {
+func (s *phoneTabAPI) GetUserByID(_ context.Context, _ string, _ int64) (*api.UserResponse, error) {
 	return s.stored, nil
 }
 
@@ -54,7 +54,7 @@ var userTabLinkRe = regexp.MustCompile(`<a class="tab-item" href="(/admin/users/
 func TestRender_AdminUserPhone_ARefusedSaveDrawsThePageWithItsUser(t *testing.T) {
 	const refusal = "The phone number is invalid."
 	apiClient := &phoneTabAPI{
-		stored: &api.UserResponse{Id: 9, Email: "ana@example.com", PhoneNumberCountryUniqueId: "PRT_0",
+		stored: &api.UserResponse{ID: 9, Email: "ana@example.com", PhoneNumberCountryUniqueID: "PRT_0",
 			PhoneNumber: "912345678", PhoneNumberVerified: true},
 		refusal: refusal,
 	}

@@ -41,7 +41,7 @@ var genderAccepted = []struct {
 // genderRefused is a spelling no gender has: a capital, a digit past the range, a stray letter.
 var genderRefused = []string{"Male", "3", "x"}
 
-const profileTestUserId = int64(42)
+const profileTestUserID = int64(42)
 
 func adminProfilePutRequest(t *testing.T, gender string) *http.Request {
 	t.Helper()
@@ -70,8 +70,8 @@ func TestHandleUserProfilePut_StoresTheGenderWordForEitherSpelling(t *testing.T)
 			auditLogger := handlersmocks.NewAuditLogger(t)
 
 			// The row starts with a gender, so the empty row shows the PUT clearing it.
-			database.On("GetUserById", mock.Anything, mock.Anything, profileTestUserId).
-				Return(&record.User{Id: profileTestUserId, Subject: "sub-42", Gender: "other"}, nil).Once()
+			database.On("GetUserByID", mock.Anything, mock.Anything, profileTestUserID).
+				Return(&record.User{ID: profileTestUserID, Subject: "sub-42", Gender: "other"}, nil).Once()
 			var stored *record.User
 			database.On("SetUserProfile", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 				Run(func(args mock.Arguments) { stored = args.Get(2).(*record.User) }).
@@ -100,8 +100,8 @@ func TestHandleUserProfilePut_RefusesAnyOtherGender(t *testing.T) {
 			auditLogger := handlersmocks.NewAuditLogger(t)
 
 			// No write and no audit record are stubbed: the mocks fail the test on either.
-			database.On("GetUserById", mock.Anything, mock.Anything, profileTestUserId).
-				Return(&record.User{Id: profileTestUserId, Subject: "sub-42", Gender: "other"}, nil).Once()
+			database.On("GetUserByID", mock.Anything, mock.Anything, profileTestUserID).
+				Return(&record.User{ID: profileTestUserID, Subject: "sub-42", Gender: "other"}, nil).Once()
 
 			rr := httptest.NewRecorder()
 			HandleUserProfilePut(database, accountvalidation.NewProfileValidator(database), auditLogger).

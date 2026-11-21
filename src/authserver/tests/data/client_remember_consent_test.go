@@ -23,34 +23,34 @@ func TestClientRememberConsent_RoundTrips(t *testing.T) {
 	unspecified := &record.Client{ClientIdentifier: "remember_unset_" + fake.LetterN(6), Description: "Remember consent test client", IsPublic: true}
 	require.NoError(t, database.CreateClient(ctx, nil, unspecified))
 
-	want := map[int64]bool{on.Id: true, off.Id: false, unspecified.Id: false}
+	want := map[int64]bool{on.ID: true, off.ID: false, unspecified.ID: false}
 
 	for id, w := range want {
-		byId, err := database.GetClientById(ctx, nil, id)
+		byID, err := database.GetClientByID(ctx, nil, id)
 		require.NoError(t, err)
-		require.NotNil(t, byId)
-		assert.Equalf(t, w, byId.RememberConsent, "GetClientById(%d)", id)
+		require.NotNil(t, byID)
+		assert.Equalf(t, w, byID.RememberConsent, "GetClientByID(%d)", id)
 
-		byIdentifier, err := database.GetClientByClientIdentifier(ctx, nil, byId.ClientIdentifier)
+		byIdentifier, err := database.GetClientByClientIdentifier(ctx, nil, byID.ClientIdentifier)
 		require.NoError(t, err)
 		require.NotNil(t, byIdentifier)
-		assert.Equalf(t, w, byIdentifier.RememberConsent, "GetClientByClientIdentifier(%q)", byId.ClientIdentifier)
+		assert.Equalf(t, w, byIdentifier.RememberConsent, "GetClientByClientIdentifier(%q)", byID.ClientIdentifier)
 	}
 
-	byIds, err := database.GetClientsByIds(ctx, nil, []int64{on.Id, off.Id, unspecified.Id})
+	byIDs, err := database.GetClientsByIDs(ctx, nil, []int64{on.ID, off.ID, unspecified.ID})
 	require.NoError(t, err)
-	require.Len(t, byIds, 3)
-	for _, c := range byIds {
-		assert.Equalf(t, want[c.Id], c.RememberConsent, "GetClientsByIds, client %d", c.Id)
+	require.Len(t, byIDs, 3)
+	for _, c := range byIDs {
+		assert.Equalf(t, want[c.ID], c.RememberConsent, "GetClientsByIDs, client %d", c.ID)
 	}
 
 	all, err := database.GetAllClients(ctx, nil)
 	require.NoError(t, err)
 	seen := 0
 	for _, c := range all {
-		if w, ok := want[c.Id]; ok {
+		if w, ok := want[c.ID]; ok {
 			seen++
-			assert.Equalf(t, w, c.RememberConsent, "GetAllClients, client %d", c.Id)
+			assert.Equalf(t, w, c.RememberConsent, "GetAllClients, client %d", c.ID)
 		}
 	}
 	assert.Equal(t, 3, seen, "GetAllClients must answer the three clients this test created")
@@ -71,7 +71,7 @@ func TestUpdateClient_LeavesRememberConsentAlone(t *testing.T) {
 		client.Description = "rewritten_" + fake.LetterN(6)
 		require.NoError(t, database.UpdateClient(ctx, nil, client))
 
-		got, err := database.GetClientById(ctx, nil, client.Id)
+		got, err := database.GetClientByID(ctx, nil, client.ID)
 		require.NoError(t, err)
 		require.NotNil(t, got)
 		assert.Equalf(t, stored, got.RememberConsent,
@@ -91,9 +91,9 @@ func TestSetClientRememberConsent_SwitchesTheOneClient(t *testing.T) {
 	onBystander := createRememberConsentTestClient(t, true, true)
 
 	for _, remember := range []bool{true, false, false, true} {
-		require.NoError(t, database.SetClientRememberConsent(ctx, nil, target.Id, remember))
+		require.NoError(t, database.SetClientRememberConsent(ctx, nil, target.ID, remember))
 
-		got, err := database.GetClientById(ctx, nil, target.Id)
+		got, err := database.GetClientByID(ctx, nil, target.ID)
 		require.NoError(t, err)
 		require.NotNil(t, got)
 		assert.Equalf(t, remember, got.RememberConsent, "the target after switching to %v", remember)
@@ -102,9 +102,9 @@ func TestSetClientRememberConsent_SwitchesTheOneClient(t *testing.T) {
 		assert.True(t, got.IsPublic, "the switch writes Remember consent alone, never the mode")
 
 		for want, other := range map[bool]*record.Client{false: bystander, true: onBystander} {
-			stored, err := database.GetClientById(ctx, nil, other.Id)
+			stored, err := database.GetClientByID(ctx, nil, other.ID)
 			require.NoError(t, err)
-			assert.Equalf(t, want, stored.RememberConsent, "client %d is not the one switched", other.Id)
+			assert.Equalf(t, want, stored.RememberConsent, "client %d is not the one switched", other.ID)
 		}
 	}
 
@@ -122,12 +122,12 @@ func TestSetClientPublic_TurnsRememberConsentOffOnTheRealTransition(t *testing.T
 		client := createRememberConsentTestClient(t, false, true)
 
 		tx := beginTx(t)
-		becamePublic, err := database.SetClientPublic(ctx, tx, client.Id)
+		becamePublic, err := database.SetClientPublic(ctx, tx, client.ID)
 		require.NoError(t, err)
 		require.True(t, becamePublic)
 		require.NoError(t, database.CommitTransaction(ctx, tx))
 
-		stored, err := database.GetClientById(ctx, nil, client.Id)
+		stored, err := database.GetClientByID(ctx, nil, client.ID)
 		require.NoError(t, err)
 		require.NotNil(t, stored)
 		assert.True(t, stored.IsPublic)
@@ -140,12 +140,12 @@ func TestSetClientPublic_TurnsRememberConsentOffOnTheRealTransition(t *testing.T
 			client := createRememberConsentTestClient(t, true, stored)
 
 			tx := beginTx(t)
-			becamePublic, err := database.SetClientPublic(ctx, tx, client.Id)
+			becamePublic, err := database.SetClientPublic(ctx, tx, client.ID)
 			require.NoError(t, err)
 			require.False(t, becamePublic)
 			require.NoError(t, database.CommitTransaction(ctx, tx))
 
-			got, err := database.GetClientById(ctx, nil, client.Id)
+			got, err := database.GetClientByID(ctx, nil, client.ID)
 			require.NoError(t, err)
 			require.NotNil(t, got)
 			assert.Equalf(t, stored, got.RememberConsent,
@@ -173,7 +173,7 @@ func TestSetClientPublic_TurnsRememberConsentOffOverACommittedConcurrentSwitchTo
 	client.IsPublic = false
 	client.ClientSecretEncrypted = []byte("the-secret-the-other-request-just-set")
 	require.NoError(t, database.UpdateClient(ctx, other, client))
-	require.NoError(t, database.SetClientRememberConsent(ctx, other, client.Id, true))
+	require.NoError(t, database.SetClientRememberConsent(ctx, other, client.ID, true))
 
 	saver := beginTx(t)
 	type outcome struct {
@@ -182,7 +182,7 @@ func TestSetClientPublic_TurnsRememberConsentOffOverACommittedConcurrentSwitchTo
 	}
 	done := make(chan outcome, 1)
 	go func() {
-		becamePublic, err := database.SetClientPublic(ctx, saver, client.Id)
+		becamePublic, err := database.SetClientPublic(ctx, saver, client.ID)
 		done <- outcome{becamePublic, err}
 	}()
 
@@ -204,7 +204,7 @@ func TestSetClientPublic_TurnsRememberConsentOffOverACommittedConcurrentSwitchTo
 	require.True(t, o.becamePublic)
 	require.NoError(t, database.CommitTransaction(ctx, saver))
 
-	stored, err := database.GetClientById(ctx, nil, client.Id)
+	stored, err := database.GetClientByID(ctx, nil, client.ID)
 	require.NoError(t, err)
 	require.NotNil(t, stored)
 	assert.True(t, stored.IsPublic)

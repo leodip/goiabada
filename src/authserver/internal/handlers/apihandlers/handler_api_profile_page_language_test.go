@@ -60,7 +60,7 @@ func profilePageLanguageRoutes() []profilePageLanguageRoute {
 				return HandleUserProfilePut(database, accountvalidation.NewProfileValidator(database), auditLogger)
 			},
 			expectRead: func(database *datamocks.Database, stored *record.User) {
-				database.On("GetUserById", mock.Anything, mock.Anything, profileTestUserId).Return(stored, nil).Once()
+				database.On("GetUserByID", mock.Anything, mock.Anything, profileTestUserID).Return(stored, nil).Once()
 			},
 			request: func(t *testing.T, body []byte) *http.Request {
 				req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/users/42/profile", bytes.NewReader(body))
@@ -73,7 +73,7 @@ func profilePageLanguageRoutes() []profilePageLanguageRoute {
 }
 
 func pageLanguageStoredUser() *record.User {
-	return &record.User{Id: profileTestUserId, Subject: profileTestSubject, GivenName: "Ada", PageLanguage: pageLanguageStored}
+	return &record.User{ID: profileTestUserID, Subject: profileTestSubject, GivenName: "Ada", PageLanguage: pageLanguageStored}
 }
 
 // pageLanguageBody is a profile PUT's body as an application sends it: the profile fields, and

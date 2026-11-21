@@ -30,25 +30,25 @@ var boundRefreshTokenRefusal = map[string]any{
 	"error_description": "The refresh token is bound to a DPoP key, and the request carries no proof by that key.",
 }
 
-// refreshWith refreshes refreshToken for clientId, with basic credentials when clientSecret is not
+// refreshWith refreshes refreshToken for clientID, with basic credentials when clientSecret is not
 // empty and the client_id in the form otherwise, and with a proof by key when key is not nil. A
 // proof carries a nonce the endpoint has just handed out, asked for by a request whose proof has
 // none, which is refused before the grant is looked at and so leaves the token unspent.
-func refreshWith(t *testing.T, refreshToken, clientId, clientSecret string, key *dpoptest.Key) (*http.Response, map[string]any) {
+func refreshWith(t *testing.T, refreshToken, clientID, clientSecret string, key *dpoptest.Key) (*http.Response, map[string]any) {
 	t.Helper()
 	form := url.Values{"grant_type": {"refresh_token"}, "refresh_token": {refreshToken}}
 	if clientSecret == "" {
-		form.Set("client_id", clientId)
+		form.Set("client_id", clientID)
 	}
 	if key == nil {
-		return postWithProof(t, form, clientId, clientSecret, "")
+		return postWithProof(t, form, clientID, clientSecret, "")
 	}
-	return postWithProof(t, form, clientId, clientSecret, key.Proof(t, "POST", dpopTokenURL(), time.Now(), nonceForRefresh(t, form, clientId, clientSecret, *key)))
+	return postWithProof(t, form, clientID, clientSecret, key.Proof(t, "POST", dpopTokenURL(), time.Now(), nonceForRefresh(t, form, clientID, clientSecret, *key)))
 }
 
-func nonceForRefresh(t *testing.T, form url.Values, clientId, clientSecret string, key dpoptest.Key) string {
+func nonceForRefresh(t *testing.T, form url.Values, clientID, clientSecret string, key dpoptest.Key) string {
 	t.Helper()
-	resp, body := postWithProof(t, form, clientId, clientSecret, key.Proof(t, "POST", dpopTokenURL(), time.Now(), ""))
+	resp, body := postWithProof(t, form, clientID, clientSecret, key.Proof(t, "POST", dpopTokenURL(), time.Now(), ""))
 	require.Equal(t, http.StatusBadRequest, resp.StatusCode, "%v", body)
 	require.Equal(t, "use_dpop_nonce", body["error"])
 	nonce := resp.Header.Get("DPoP-Nonce")
@@ -90,7 +90,7 @@ func boundCodeGrant(t *testing.T, public bool, clientSecret string, key *dpoptes
 // bindingOf is the thumbprint the refresh token is bound to on its row, empty for none.
 func bindingOf(t *testing.T, refreshToken string) string {
 	t.Helper()
-	row, err := database.GetRefreshTokenByJti(context.Background(), nil, refreshTokenJti(t, refreshToken))
+	row, err := database.GetRefreshTokenByJTI(context.Background(), nil, refreshTokenJTI(t, refreshToken))
 	require.NoError(t, err)
 	require.NotNil(t, row)
 	if row.DPoPJkt.Valid {
@@ -107,10 +107,10 @@ func requireRefused(t *testing.T, resp *http.Response, body map[string]any, refr
 	assert.Equal(t, boundRefreshTokenRefusal, body)
 	assert.Equal(t, "no-store", resp.Header.Get("Cache-Control"))
 
-	row, err := database.GetRefreshTokenByJti(context.Background(), nil, refreshTokenJti(t, refreshToken))
+	row, err := database.GetRefreshTokenByJTI(context.Background(), nil, refreshTokenJTI(t, refreshToken))
 	require.NoError(t, err)
 	assert.False(t, row.Revoked, "the refused refresh spent nothing")
-	revoked, err := database.IsRefreshTokenFamilyRevoked(context.Background(), nil, row.FirstRefreshTokenJti)
+	revoked, err := database.IsRefreshTokenFamilyRevoked(context.Background(), nil, row.FirstRefreshTokenJTI)
 	require.NoError(t, err)
 	assert.False(t, revoked, "and revoked no family")
 }
@@ -125,26 +125,26 @@ func refreshTokenOf(t *testing.T, body map[string]any) string {
 func TestDPoP_APublicClientsRefreshTokenIsBoundToItsKey(t *testing.T) {
 	key, other := dpoptest.RFC7517Key(t), dpoptest.RFC7515Key(t)
 	code, first := boundCodeGrant(t, true, fake.LetterN(32), &key)
-	clientId := code.Client.ClientIdentifier
+	clientID := code.Client.ClientIdentifier
 	assert.Equal(t, key.Thumbprint, bindingOf(t, first), "the family's first token is bound to the code exchange's proof key")
 
-	resp, body := refreshWith(t, first, clientId, "", nil)
+	resp, body := refreshWith(t, first, clientID, "", nil)
 	requireRefused(t, resp, body, first)
 	assert.Empty(t, resp.Header.Values("DPoP-Nonce"), "a request without a proof is not a DPoP request")
 
-	resp, body = refreshWith(t, first, clientId, "", &other)
+	resp, body = refreshWith(t, first, clientID, "", &other)
 	requireRefused(t, resp, body, first)
 	assert.Len(t, resp.Header.Values("DPoP-Nonce"), 1, "a DPoP request's refusal carries a fresh nonce")
 
-	resp, body = refreshWith(t, first, clientId, "", &key)
+	resp, body = refreshWith(t, first, clientID, "", &key)
 	require.Equal(t, http.StatusOK, resp.StatusCode, "%v", body)
 	assertBoundTo(t, body, key)
 	child := refreshTokenOf(t, body)
 	assert.Equal(t, key.Thumbprint, bindingOf(t, child), "the rotation copies the binding")
 
-	resp, body = refreshWith(t, child, clientId, "", nil)
+	resp, body = refreshWith(t, child, clientID, "", nil)
 	requireRefused(t, resp, body, child)
-	resp, body = refreshWith(t, child, clientId, "", &key)
+	resp, body = refreshWith(t, child, clientID, "", &key)
 	require.Equal(t, http.StatusOK, resp.StatusCode, "%v", body)
 	assert.Equal(t, key.Thumbprint, bindingOf(t, refreshTokenOf(t, body)))
 }
@@ -154,16 +154,16 @@ func TestDPoP_APublicClientsRefreshTokenIsBoundToItsKey(t *testing.T) {
 func TestDPoP_AnUnboundFamilyOfAPublicClientIsBoundByItsFirstRefreshWithAProof(t *testing.T) {
 	key := dpoptest.RFC7517Key(t)
 	code, first := boundCodeGrant(t, true, fake.LetterN(32), nil)
-	clientId := code.Client.ClientIdentifier
+	clientID := code.Client.ClientIdentifier
 	assert.Empty(t, bindingOf(t, first), "a family begun without a proof is unbound")
 
-	resp, body := refreshWith(t, first, clientId, "", &key)
+	resp, body := refreshWith(t, first, clientID, "", &key)
 	require.Equal(t, http.StatusOK, resp.StatusCode, "%v", body)
 	assertBoundTo(t, body, key)
 	bound := refreshTokenOf(t, body)
 	assert.Equal(t, key.Thumbprint, bindingOf(t, bound), "the first refresh with a proof binds the family")
 
-	resp, body = refreshWith(t, bound, clientId, "", nil)
+	resp, body = refreshWith(t, bound, clientID, "", nil)
 	requireRefused(t, resp, body, bound)
 }
 
@@ -173,16 +173,16 @@ func TestDPoP_AConfidentialClientsRefreshTokenStaysUnbound(t *testing.T) {
 	key, other := dpoptest.RFC7517Key(t), dpoptest.RFC7515Key(t)
 	clientSecret := fake.LetterN(32)
 	code, first := boundCodeGrant(t, false, clientSecret, &key)
-	clientId := code.Client.ClientIdentifier
+	clientID := code.Client.ClientIdentifier
 	assert.Empty(t, bindingOf(t, first), "the confidential client's family is unbound")
 
-	resp, body := refreshWith(t, first, clientId, clientSecret, &other)
+	resp, body := refreshWith(t, first, clientID, clientSecret, &other)
 	require.Equal(t, http.StatusOK, resp.StatusCode, "%v", body)
 	assertBoundTo(t, body, other)
 	child := refreshTokenOf(t, body)
 	assert.Empty(t, bindingOf(t, child))
 
-	resp, body = refreshWith(t, child, clientId, clientSecret, nil)
+	resp, body = refreshWith(t, child, clientID, clientSecret, nil)
 	require.Equal(t, http.StatusOK, resp.StatusCode, "%v", body)
 	assert.Equal(t, "Bearer", body["token_type"])
 	assert.Empty(t, bindingOf(t, refreshTokenOf(t, body)))
@@ -195,7 +195,7 @@ func TestDPoP_ABoundFamilyStaysBoundOnceItsClientIsConfidential(t *testing.T) {
 	code, first := boundCodeGrant(t, true, fake.LetterN(32), &key)
 
 	clientSecret := fake.LetterN(32)
-	client, err := database.GetClientById(context.Background(), nil, code.ClientId)
+	client, err := database.GetClientByID(context.Background(), nil, code.ClientID)
 	require.NoError(t, err)
 	client.IsPublic = false
 	client.ClientSecretEncrypted, err = dataCipher.Encrypt(clientSecret)
@@ -221,8 +221,8 @@ func TestDPoP_ConcurrentRefreshesOfABoundTokenLeaveNoUnboundToken(t *testing.T) 
 	const each = 3
 	key, other := dpoptest.RFC7517Key(t), dpoptest.RFC7515Key(t)
 	code, first := boundCodeGrant(t, true, fake.LetterN(32), &key)
-	clientId := code.Client.ClientIdentifier
-	form := url.Values{"grant_type": {"refresh_token"}, "refresh_token": {first}, "client_id": {clientId}}
+	clientID := code.Client.ClientIdentifier
+	form := url.Values{"grant_type": {"refresh_token"}, "refresh_token": {first}, "client_id": {clientID}}
 
 	type request struct {
 		key   *dpoptest.Key
@@ -233,7 +233,7 @@ func TestDPoP_ConcurrentRefreshesOfABoundTokenLeaveNoUnboundToken(t *testing.T) 
 		for _, k := range []*dpoptest.Key{&key, &other, nil} {
 			r := request{key: k}
 			if k != nil {
-				r.proof = k.Proof(t, "POST", dpopTokenURL(), time.Now(), nonceForRefresh(t, form, clientId, "", *k))
+				r.proof = k.Proof(t, "POST", dpopTokenURL(), time.Now(), nonceForRefresh(t, form, clientID, "", *k))
 			}
 			requests = append(requests, r)
 		}
@@ -246,7 +246,7 @@ func TestDPoP_ConcurrentRefreshesOfABoundTokenLeaveNoUnboundToken(t *testing.T) 
 		err    error
 	}
 	answers := make([]answer, len(requests))
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	start := make(chan struct{})
 	var wg sync.WaitGroup
 	for i, r := range requests {
@@ -278,11 +278,11 @@ func TestDPoP_ConcurrentRefreshesOfABoundTokenLeaveNoUnboundToken(t *testing.T) 
 	}
 	assert.Equal(t, 1, succeeded, "exactly one refresh is answered with tokens")
 
-	tokens, err := database.GetRefreshTokensByCodeId(context.Background(), nil, code.Id)
+	tokens, err := database.GetRefreshTokensByCodeID(context.Background(), nil, code.ID)
 	require.NoError(t, err)
 	require.Len(t, tokens, 2, "the family's first token and the one child its one rotation inserted")
 	for _, token := range tokens {
-		assert.Equalf(t, key.Thumbprint, token.DPoPJkt.String, "every token of the family is bound to its key, %s", token.RefreshTokenJti)
+		assert.Equalf(t, key.Thumbprint, token.DPoPJkt.String, "every token of the family is bound to its key, %s", token.RefreshTokenJTI)
 	}
 }
 

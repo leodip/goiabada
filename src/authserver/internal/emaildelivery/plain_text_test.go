@@ -73,7 +73,7 @@ func alternativeParts(t *testing.T, m sentMessage) (string, []sentPart) {
 // textOf sends html as an email's body and answers the plain text the message carries.
 func textOf(t *testing.T, html string) string {
 	t.Helper()
-	_, parts := alternativeParts(t, send(t, "Goiabada", &SendEmailInput{To: fixtureRecipient, Subject: "Test email", HtmlBody: html}))
+	_, parts := alternativeParts(t, send(t, "Goiabada", &SendEmailInput{To: fixtureRecipient, Subject: "Test email", HTMLBody: html}))
 	require.Len(t, parts, 2)
 	return parts[0].decoded
 }
@@ -84,7 +84,7 @@ func textOf(t *testing.T, html string) string {
 func TestSendEmail_AMessageIsItsTextThenItsHTML(t *testing.T) {
 	html := "<p>Olá, Ana</p>\n<p>A line with a dot\n.\nat the start</p>"
 
-	m := send(t, "Goiabada", &SendEmailInput{To: fixtureRecipient, Subject: "Test email", HtmlBody: html})
+	m := send(t, "Goiabada", &SendEmailInput{To: fixtureRecipient, Subject: "Test email", HTMLBody: html})
 	_, parts := alternativeParts(t, m)
 
 	require.Len(t, parts, 2, "the text and the HTML")
@@ -110,7 +110,7 @@ func TestSendEmail_TheBoundaryFollowsRFC2046(t *testing.T) {
 	// A body that writes what a delimiter line starts with, and the characters a boundary may hold.
 	html := "<p>--\n--=_ =_ -- ==</p>"
 
-	m := send(t, "Goiabada", &SendEmailInput{To: fixtureRecipient, Subject: "Test email", HtmlBody: html})
+	m := send(t, "Goiabada", &SendEmailInput{To: fixtureRecipient, Subject: "Test email", HTMLBody: html})
 	boundary, parts := alternativeParts(t, m)
 
 	assert.LessOrEqual(t, len(boundary), 70)
@@ -129,7 +129,7 @@ func TestSendEmail_TheBoundaryFollowsRFC2046(t *testing.T) {
 		assert.LessOrEqual(t, len(line), 78, "RFC 5322 section 2.1.1: the header that names the boundary is no longer than 78: %q", line)
 	}
 
-	other := send(t, "Goiabada", &SendEmailInput{To: fixtureRecipient, Subject: "Test email", HtmlBody: html})
+	other := send(t, "Goiabada", &SendEmailInput{To: fixtureRecipient, Subject: "Test email", HTMLBody: html})
 	otherBoundary, _ := alternativeParts(t, other)
 	assert.NotEqual(t, boundary, otherBoundary, "each message draws a boundary of its own")
 }
@@ -244,7 +244,7 @@ func TestSendEmail_AnEmailWithNoTextIsNotSent(t *testing.T) {
 
 			_, err := (&Sender{dataCipher: testDataCipher}).SendEmail(context.Background(),
 				relayConfig(t, "127.0.0.1", port, "none", "", "", "Goiabada"),
-				&SendEmailInput{To: fixtureRecipient, Subject: "Test email", HtmlBody: html})
+				&SendEmailInput{To: fixtureRecipient, Subject: "Test email", HTMLBody: html})
 
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), "the email has no text")
@@ -268,7 +268,7 @@ func (s brandStub) GetClientPageBrand(context.Context, *sql.Tx, string) (*record
 	return s.brand, nil
 }
 
-func (s brandStub) GetBrandAssetsByIds(context.Context, *sql.Tx, []int64) ([]record.BrandAsset, error) {
+func (s brandStub) GetBrandAssetsByIDs(context.Context, *sql.Tx, []int64) ([]record.BrandAsset, error) {
 	return s.assets, nil
 }
 
@@ -288,8 +288,8 @@ func renderEmailIn(t *testing.T, id, lang string, footer bool) string {
 	t.Helper()
 
 	brand := record.NewBrand("Shop", record.BrandAppearanceLight, "plum")
-	brand.Id = 7
-	brand.LogoAssetId = sql.NullInt64{Int64: 11, Valid: true}
+	brand.ID = 7
+	brand.LogoAssetID = sql.NullInt64{Int64: 11, Valid: true}
 	if footer {
 		brand.FooterLinks = record.BrandFooterLinks{
 			{URL: "https://acme.example/privacy", Label: "Privacy"},
@@ -298,7 +298,7 @@ func renderEmailIn(t *testing.T, id, lang string, footer bool) string {
 		brand.SupportEmail, brand.SupportPhone, brand.SupportURL = "help@acme.example", "+442079460958", "https://acme.example/support"
 	}
 	brands := brandStub{brand: &brand, assets: []record.BrandAsset{
-		{Id: 11, Kind: record.BrandAssetKindLogo, ContentType: "image/png", Fingerprint: "111111111111", Width: 200, Height: 60},
+		{ID: 11, Kind: record.BrandAssetKindLogo, ContentType: "image/png", Fingerprint: "111111111111", Width: 200, Height: 60},
 	}}
 
 	ctx := reqctx.WithSettings(context.Background(), &record.Settings{AppName: "Acme Portal"})

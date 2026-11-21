@@ -15,8 +15,8 @@ func TestCreateUserPermission(t *testing.T) {
 	permission := createTestPermission(t, resource)
 
 	userPermission := &record.UserPermission{
-		UserId:       user.Id,
-		PermissionId: permission.Id,
+		UserID:       user.ID,
+		PermissionID: permission.ID,
 	}
 
 	err := database.CreateUserPermission(context.Background(), nil, userPermission)
@@ -24,7 +24,7 @@ func TestCreateUserPermission(t *testing.T) {
 		t.Fatalf("Failed to create user permission: %v", err)
 	}
 
-	if userPermission.Id == 0 {
+	if userPermission.ID == 0 {
 		t.Error("Expected non-zero ID after creation")
 	}
 	if !userPermission.CreatedAt.Valid || userPermission.CreatedAt.Time.IsZero() {
@@ -34,16 +34,16 @@ func TestCreateUserPermission(t *testing.T) {
 		t.Error("Expected UpdatedAt to be set")
 	}
 
-	retrievedUserPermission, err := database.GetUserPermissionById(context.Background(), nil, userPermission.Id)
+	retrievedUserPermission, err := database.GetUserPermissionByID(context.Background(), nil, userPermission.ID)
 	if err != nil {
 		t.Fatalf("Failed to retrieve created user permission: %v", err)
 	}
 
-	if retrievedUserPermission.UserId != userPermission.UserId {
-		t.Errorf("Expected UserId %d, got %d", userPermission.UserId, retrievedUserPermission.UserId)
+	if retrievedUserPermission.UserID != userPermission.UserID {
+		t.Errorf("Expected UserID %d, got %d", userPermission.UserID, retrievedUserPermission.UserID)
 	}
-	if retrievedUserPermission.PermissionId != userPermission.PermissionId {
-		t.Errorf("Expected PermissionId %d, got %d", userPermission.PermissionId, retrievedUserPermission.PermissionId)
+	if retrievedUserPermission.PermissionID != userPermission.PermissionID {
+		t.Errorf("Expected PermissionID %d, got %d", userPermission.PermissionID, retrievedUserPermission.PermissionID)
 	}
 }
 
@@ -55,8 +55,8 @@ func TestUpdateUserPermission(t *testing.T) {
 
 	user := createTestUser(t)
 
-	userPermission.UserId = user.Id
-	userPermission.PermissionId = permission.Id
+	userPermission.UserID = user.ID
+	userPermission.PermissionID = permission.ID
 
 	time.Sleep(timestampTick)
 
@@ -65,7 +65,7 @@ func TestUpdateUserPermission(t *testing.T) {
 		t.Fatalf("Failed to update user permission: %v", err)
 	}
 
-	updatedUserPermission, err := database.GetUserPermissionById(context.Background(), nil, userPermission.Id)
+	updatedUserPermission, err := database.GetUserPermissionByID(context.Background(), nil, userPermission.ID)
 	if err != nil {
 		t.Fatalf("Failed to retrieve updated user permission: %v", err)
 	}
@@ -74,49 +74,49 @@ func TestUpdateUserPermission(t *testing.T) {
 		t.Error("Expected UpdatedAt to be after CreatedAt")
 	}
 
-	if updatedUserPermission.UserId != user.Id {
-		t.Errorf("Expected UserId %d, got %d", user.Id, updatedUserPermission.UserId)
+	if updatedUserPermission.UserID != user.ID {
+		t.Errorf("Expected UserID %d, got %d", user.ID, updatedUserPermission.UserID)
 	}
 
-	if updatedUserPermission.PermissionId != permission.Id {
-		t.Errorf("Expected PermissionId %d, got %d", permission.Id, updatedUserPermission.PermissionId)
+	if updatedUserPermission.PermissionID != permission.ID {
+		t.Errorf("Expected PermissionID %d, got %d", permission.ID, updatedUserPermission.PermissionID)
 	}
 }
 
-func TestGetUserPermissionById(t *testing.T) {
+func TestGetUserPermissionByID(t *testing.T) {
 	userPermission := createTestUserPermission(t)
 
-	retrievedUserPermission, err := database.GetUserPermissionById(context.Background(), nil, userPermission.Id)
+	retrievedUserPermission, err := database.GetUserPermissionByID(context.Background(), nil, userPermission.ID)
 	if err != nil {
 		t.Fatalf("Failed to get user permission by ID: %v", err)
 	}
 
-	if retrievedUserPermission.Id != userPermission.Id {
-		t.Errorf("Expected ID %d, got %d", userPermission.Id, retrievedUserPermission.Id)
+	if retrievedUserPermission.ID != userPermission.ID {
+		t.Errorf("Expected ID %d, got %d", userPermission.ID, retrievedUserPermission.ID)
 	}
-	if retrievedUserPermission.UserId != userPermission.UserId {
-		t.Errorf("Expected UserId %d, got %d", userPermission.UserId, retrievedUserPermission.UserId)
+	if retrievedUserPermission.UserID != userPermission.UserID {
+		t.Errorf("Expected UserID %d, got %d", userPermission.UserID, retrievedUserPermission.UserID)
 	}
-	if retrievedUserPermission.PermissionId != userPermission.PermissionId {
-		t.Errorf("Expected PermissionId %d, got %d", userPermission.PermissionId, retrievedUserPermission.PermissionId)
+	if retrievedUserPermission.PermissionID != userPermission.PermissionID {
+		t.Errorf("Expected PermissionID %d, got %d", userPermission.PermissionID, retrievedUserPermission.PermissionID)
 	}
 
-	nonExistentUserPermission, err := database.GetUserPermissionById(context.Background(), nil, 99999)
+	nonExistentUserPermission, err := database.GetUserPermissionByID(context.Background(), nil, 99999)
 	if err != nil {
 		t.Errorf("Expected no error for non-existent user permission, got: %v", err)
 	}
 	if nonExistentUserPermission != nil {
-		t.Errorf("Expected nil for non-existent user permission, got a user permission with ID: %d", nonExistentUserPermission.Id)
+		t.Errorf("Expected nil for non-existent user permission, got a user permission with ID: %d", nonExistentUserPermission.ID)
 	}
 }
 
-func TestGetUserPermissionsByUserIds(t *testing.T) {
+func TestGetUserPermissionsByUserIDs(t *testing.T) {
 	userPermission1 := createTestUserPermission(t)
 	userPermission2 := createTestUserPermission(t)
 
-	userIds := []int64{userPermission1.UserId, userPermission2.UserId}
+	userIDs := []int64{userPermission1.UserID, userPermission2.UserID}
 
-	userPermissions, err := database.GetUserPermissionsByUserIds(context.Background(), nil, userIds)
+	userPermissions, err := database.GetUserPermissionsByUserIDs(context.Background(), nil, userIDs)
 	if err != nil {
 		t.Fatalf("Failed to get user permissions by user IDs: %v", err)
 	}
@@ -128,30 +128,30 @@ func TestGetUserPermissionsByUserIds(t *testing.T) {
 	foundUserPermission1 := false
 	foundUserPermission2 := false
 	for _, up := range userPermissions {
-		if up.Id == userPermission1.Id {
+		if up.ID == userPermission1.ID {
 			foundUserPermission1 = true
 		}
-		if up.Id == userPermission2.Id {
+		if up.ID == userPermission2.ID {
 			foundUserPermission2 = true
 		}
 	}
 
 	if !foundUserPermission1 || !foundUserPermission2 {
-		t.Error("Not all created user permissions were found in GetUserPermissionsByUserIds result")
+		t.Error("Not all created user permissions were found in GetUserPermissionsByUserIDs result")
 	}
 }
 
-func TestGetUserPermissionsByUserId(t *testing.T) {
+func TestGetUserPermissionsByUserID(t *testing.T) {
 	user := createTestUser(t)
 	resource1 := createTestResource(t)
 	resource2 := createTestResource(t)
 	permission1 := createTestPermission(t, resource1)
 	permission2 := createTestPermission(t, resource2)
 
-	userPermission1 := createTestUserPermissionWithUserAndPermission(t, user.Id, permission1.Id)
-	userPermission2 := createTestUserPermissionWithUserAndPermission(t, user.Id, permission2.Id)
+	userPermission1 := createTestUserPermissionWithUserAndPermission(t, user.ID, permission1.ID)
+	userPermission2 := createTestUserPermissionWithUserAndPermission(t, user.ID, permission2.ID)
 
-	userPermissions, err := database.GetUserPermissionsByUserId(context.Background(), nil, user.Id)
+	userPermissions, err := database.GetUserPermissionsByUserID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatalf("Failed to get user permissions by user ID: %v", err)
 	}
@@ -163,60 +163,60 @@ func TestGetUserPermissionsByUserId(t *testing.T) {
 	foundUserPermission1 := false
 	foundUserPermission2 := false
 	for _, up := range userPermissions {
-		if up.Id == userPermission1.Id {
+		if up.ID == userPermission1.ID {
 			foundUserPermission1 = true
 		}
-		if up.Id == userPermission2.Id {
+		if up.ID == userPermission2.ID {
 			foundUserPermission2 = true
 		}
 	}
 
 	if !foundUserPermission1 || !foundUserPermission2 {
-		t.Error("Not all created user permissions were found in GetUserPermissionsByUserId result")
+		t.Error("Not all created user permissions were found in GetUserPermissionsByUserID result")
 	}
 }
 
-func TestGetUserPermissionByUserIdAndPermissionId(t *testing.T) {
+func TestGetUserPermissionByUserIDAndPermissionID(t *testing.T) {
 	userPermission := createTestUserPermission(t)
 
-	retrievedUserPermission, err := database.GetUserPermissionByUserIdAndPermissionId(context.Background(), nil, userPermission.UserId, userPermission.PermissionId)
+	retrievedUserPermission, err := database.GetUserPermissionByUserIDAndPermissionID(context.Background(), nil, userPermission.UserID, userPermission.PermissionID)
 	if err != nil {
 		t.Fatalf("Failed to get user permission by user ID and permission ID: %v", err)
 	}
 
-	if retrievedUserPermission.Id != userPermission.Id {
-		t.Errorf("Expected ID %d, got %d", userPermission.Id, retrievedUserPermission.Id)
+	if retrievedUserPermission.ID != userPermission.ID {
+		t.Errorf("Expected ID %d, got %d", userPermission.ID, retrievedUserPermission.ID)
 	}
-	if retrievedUserPermission.UserId != userPermission.UserId {
-		t.Errorf("Expected UserId %d, got %d", userPermission.UserId, retrievedUserPermission.UserId)
+	if retrievedUserPermission.UserID != userPermission.UserID {
+		t.Errorf("Expected UserID %d, got %d", userPermission.UserID, retrievedUserPermission.UserID)
 	}
-	if retrievedUserPermission.PermissionId != userPermission.PermissionId {
-		t.Errorf("Expected PermissionId %d, got %d", userPermission.PermissionId, retrievedUserPermission.PermissionId)
+	if retrievedUserPermission.PermissionID != userPermission.PermissionID {
+		t.Errorf("Expected PermissionID %d, got %d", userPermission.PermissionID, retrievedUserPermission.PermissionID)
 	}
 
-	nonExistentUserPermission, err := database.GetUserPermissionByUserIdAndPermissionId(context.Background(), nil, 99999, 99999)
+	nonExistentUserPermission, err := database.GetUserPermissionByUserIDAndPermissionID(context.Background(), nil, 99999, 99999)
 	if err != nil {
 		t.Errorf("Expected no error for non-existent user permission, got: %v", err)
 	}
 	if nonExistentUserPermission != nil {
-		t.Errorf("Expected nil for non-existent user permission, got a user permission with ID: %d", nonExistentUserPermission.Id)
+		t.Errorf("Expected nil for non-existent user permission, got a user permission with ID: %d", nonExistentUserPermission.ID)
 	}
 }
 
-func TestGetUsersByPermissionIdPaginated(t *testing.T) {
+func TestGetUsersByPermissionIDPaginated(t *testing.T) {
 	resource := createTestResource(t)
 	permission := createTestPermission(t, resource)
 	numUsers := 25
 
-	createdUserIds := make([]int64, 0, numUsers)
+	createdUserIDs := make([]int64, 0, numUsers)
 	for i := 0; i < numUsers; i++ {
 		user := createTestUser(t)
-		createTestUserPermissionWithUserAndPermission(t, user.Id, permission.Id)
-		createdUserIds = append(createdUserIds, user.Id)
+		createTestUserPermissionWithUserAndPermission(t, user.ID, permission.ID)
+		createdUserIDs = append(createdUserIDs, user.ID)
 	}
 
 	// Test first page
-	users, total, err := database.GetUsersByPermissionIdPaginated(context.Background(), nil, permission.Id, 1, 10)
+	users, total, err := database.GetUsersByPermissionIDPaginated(context.Background(), nil, permission.ID, 1, 10)
 	if err != nil {
 		t.Fatalf("Failed to get paginated users: %v", err)
 	}
@@ -230,7 +230,7 @@ func TestGetUsersByPermissionIdPaginated(t *testing.T) {
 	}
 
 	// Test second page
-	users, total, err = database.GetUsersByPermissionIdPaginated(context.Background(), nil, permission.Id, 2, 10)
+	users, total, err = database.GetUsersByPermissionIDPaginated(context.Background(), nil, permission.ID, 2, 10)
 	if err != nil {
 		t.Fatalf("Failed to get second page of paginated users: %v", err)
 	}
@@ -244,7 +244,7 @@ func TestGetUsersByPermissionIdPaginated(t *testing.T) {
 	}
 
 	// Test last page
-	users, total, err = database.GetUsersByPermissionIdPaginated(context.Background(), nil, permission.Id, 3, 10)
+	users, total, err = database.GetUsersByPermissionIDPaginated(context.Background(), nil, permission.ID, 3, 10)
 	if err != nil {
 		t.Fatalf("Failed to get last page of paginated users: %v", err)
 	}
@@ -258,7 +258,7 @@ func TestGetUsersByPermissionIdPaginated(t *testing.T) {
 	}
 
 	// Test page beyond total
-	users, total, err = database.GetUsersByPermissionIdPaginated(context.Background(), nil, permission.Id, 4, 10)
+	users, total, err = database.GetUsersByPermissionIDPaginated(context.Background(), nil, permission.ID, 4, 10)
 	if err != nil {
 		t.Fatalf("Failed to get page beyond total: %v", err)
 	}
@@ -272,7 +272,7 @@ func TestGetUsersByPermissionIdPaginated(t *testing.T) {
 	}
 
 	// Verify all created users are included in the total
-	allUsers, allTotal, err := database.GetUsersByPermissionIdPaginated(context.Background(), nil, permission.Id, 1, numUsers)
+	allUsers, allTotal, err := database.GetUsersByPermissionIDPaginated(context.Background(), nil, permission.ID, 1, numUsers)
 	if err != nil {
 		t.Fatalf("Failed to get all users: %v", err)
 	}
@@ -287,12 +287,12 @@ func TestGetUsersByPermissionIdPaginated(t *testing.T) {
 
 	foundUsers := make(map[int64]bool)
 	for _, user := range allUsers {
-		foundUsers[user.Id] = true
+		foundUsers[user.ID] = true
 	}
 
-	for _, userId := range createdUserIds {
-		if !foundUsers[userId] {
-			t.Errorf("Created user with ID %d not found in paginated results", userId)
+	for _, userID := range createdUserIDs {
+		if !foundUsers[userID] {
+			t.Errorf("Created user with ID %d not found in paginated results", userID)
 		}
 	}
 }
@@ -300,12 +300,12 @@ func TestGetUsersByPermissionIdPaginated(t *testing.T) {
 func TestDeleteUserPermission(t *testing.T) {
 	userPermission := createTestUserPermission(t)
 
-	err := database.DeleteUserPermission(context.Background(), nil, userPermission.Id)
+	err := database.DeleteUserPermission(context.Background(), nil, userPermission.ID)
 	if err != nil {
 		t.Fatalf("Failed to delete user permission: %v", err)
 	}
 
-	deletedUserPermission, err := database.GetUserPermissionById(context.Background(), nil, userPermission.Id)
+	deletedUserPermission, err := database.GetUserPermissionByID(context.Background(), nil, userPermission.ID)
 	if err != nil {
 		t.Fatalf("Error while checking for deleted user permission: %v", err)
 	}
@@ -323,13 +323,13 @@ func createTestUserPermission(t *testing.T) *record.UserPermission {
 	user := createTestUser(t)
 	resource := createTestResource(t)
 	permission := createTestPermission(t, resource)
-	return createTestUserPermissionWithUserAndPermission(t, user.Id, permission.Id)
+	return createTestUserPermissionWithUserAndPermission(t, user.ID, permission.ID)
 }
 
-func createTestUserPermissionWithUserAndPermission(t *testing.T, userId, permissionId int64) *record.UserPermission {
+func createTestUserPermissionWithUserAndPermission(t *testing.T, userID, permissionID int64) *record.UserPermission {
 	userPermission := &record.UserPermission{
-		UserId:       userId,
-		PermissionId: permissionId,
+		UserID:       userID,
+		PermissionID: permissionID,
 	}
 	err := database.CreateUserPermission(context.Background(), nil, userPermission)
 	if err != nil {
@@ -338,12 +338,12 @@ func createTestUserPermissionWithUserAndPermission(t *testing.T, userId, permiss
 	return userPermission
 }
 
-// TestGetUsersByPermissionIdPaginated_EnlistsInTheCallersTransaction pins #413's fourth site: the
+// TestGetUsersByPermissionIDPaginated_EnlistsInTheCallersTransaction pins #413's fourth site: the
 // count query beside the page passed nil where the page took the caller's transaction, so the two
 // halves of one answer were read on two connections.
 //
 // The rows are created inside the transaction for the reason ClientLoadPermissions' case gives.
-func TestGetUsersByPermissionIdPaginated_EnlistsInTheCallersTransaction(t *testing.T) {
+func TestGetUsersByPermissionIDPaginated_EnlistsInTheCallersTransaction(t *testing.T) {
 	tx := beginTx(t)
 
 	resource := &record.Resource{
@@ -357,7 +357,7 @@ func TestGetUsersByPermissionIdPaginated_EnlistsInTheCallersTransaction(t *testi
 	permission := &record.Permission{
 		PermissionIdentifier: "tx_permission_" + fake.LetterN(8),
 		Description:          "Transaction pass-through permission",
-		ResourceId:           resource.Id,
+		ResourceID:           resource.ID,
 	}
 	if err := database.CreatePermission(context.Background(), tx, permission); err != nil {
 		t.Fatalf("Failed to create permission inside the transaction: %v", err)
@@ -374,21 +374,21 @@ func TestGetUsersByPermissionIdPaginated_EnlistsInTheCallersTransaction(t *testi
 		t.Fatalf("Failed to create user inside the transaction: %v", err)
 	}
 
-	userPermission := &record.UserPermission{UserId: user.Id, PermissionId: permission.Id}
+	userPermission := &record.UserPermission{UserID: user.ID, PermissionID: permission.ID}
 	if err := database.CreateUserPermission(context.Background(), tx, userPermission); err != nil {
 		t.Fatalf("Failed to create users_permissions row inside the transaction: %v", err)
 	}
 
-	users, total, err := database.GetUsersByPermissionIdPaginated(context.Background(), tx, permission.Id, 1, 10)
+	users, total, err := database.GetUsersByPermissionIDPaginated(context.Background(), tx, permission.ID, 1, 10)
 	if err != nil {
-		t.Fatalf("GetUsersByPermissionIdPaginated through the transaction: %v", err)
+		t.Fatalf("GetUsersByPermissionIDPaginated through the transaction: %v", err)
 	}
 
 	if len(users) != 1 {
 		t.Fatalf("Expected the transaction's own user, got %d", len(users))
 	}
-	if users[0].Id != user.Id {
-		t.Errorf("Expected user %d, got %d", user.Id, users[0].Id)
+	if users[0].ID != user.ID {
+		t.Errorf("Expected user %d, got %d", user.ID, users[0].ID)
 	}
 	if total != 1 {
 		t.Errorf("Expected a total of 1 to agree with the one user on the page, got %d: "+

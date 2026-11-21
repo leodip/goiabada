@@ -21,7 +21,7 @@ func TestNewCreateCodeInput_CopiesEveryFieldTheCodeIsWrittenFrom(t *testing.T) {
 	authenticatedAt := time.Date(2026, 9, 29, 12, 0, 0, 0, time.UTC)
 	otpClaimGeneration := int64(5)
 	authContext := &ceremony.AuthContext{
-		ClientId:            "client-identifier",
+		ClientID:            "client-identifier",
 		RedirectURI:         "https://app.example/callback",
 		ResponseMode:        "form_post",
 		Scope:               "openid profile email",
@@ -31,23 +31,23 @@ func TestNewCreateCodeInput_CopiesEveryFieldTheCodeIsWrittenFrom(t *testing.T) {
 		State:               "state-value",
 		Nonce:               "nonce-value",
 		UserAgent:           "user-agent-value",
-		IpAddress:           "203.0.113.7",
-		UserId:              42,
-		AcrLevel:            record.AcrLevel2Optional,
+		IPAddress:           "203.0.113.7",
+		UserID:              42,
+		ACRLevel:            record.ACRLevel2Optional,
 		AuthMethods:         "pwd otp",
 		AuthenticatedAt:     &authenticatedAt,
 		AuthStateGeneration: 9,
-		OtpClaimGeneration:  &otpClaimGeneration,
+		OTPClaimGeneration:  &otpClaimGeneration,
 		DPoPJkt:             "NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs",
 		// Ceremony state issuance does not read, set so that copying it anywhere would show.
-		CeremonyId: "ceremony-id",
+		CeremonyID: "ceremony-id",
 		AuthState:  ceremony.AuthStateReadyToIssueCode,
 	}
 
 	got := newCreateCodeInput(authContext, "session-identifier")
 
 	assert.Equal(t, &issuance.CreateCodeInput{
-		ClientId:            "client-identifier",
+		ClientID:            "client-identifier",
 		RedirectURI:         "https://app.example/callback",
 		ResponseMode:        "form_post",
 		Scope:               "openid profile email",
@@ -57,9 +57,9 @@ func TestNewCreateCodeInput_CopiesEveryFieldTheCodeIsWrittenFrom(t *testing.T) {
 		State:               "state-value",
 		Nonce:               "nonce-value",
 		UserAgent:           "user-agent-value",
-		IpAddress:           "203.0.113.7",
-		UserId:              42,
-		AcrLevel:            record.AcrLevel2Optional,
+		IPAddress:           "203.0.113.7",
+		UserID:              42,
+		ACRLevel:            record.ACRLevel2Optional,
 		AuthMethods:         "pwd otp",
 		AuthenticatedAt:     &authenticatedAt,
 		AuthStateGeneration: 9,

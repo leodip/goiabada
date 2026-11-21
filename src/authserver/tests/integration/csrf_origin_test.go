@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestCsrf_MiddlewareIsRegistered makes the one claim the unit tables in
+// TestCSRF_MiddlewareIsRegistered makes the one claim the unit tables in
 // src/core/httpmw/middleware_csrf_test.go cannot: that httpmw.CSRF is actually mounted on
 // the running auth server. Those tables pass perfectly against a middleware nobody wired up, and
 // #155 rewrote both server wirings, so a deleted Use() line is exactly the regression they would
@@ -25,8 +25,8 @@ import (
 // Neither half authenticates, and neither needs to. The CSRF middleware runs before any handler, so
 // the refused half never reaches one, and the allowed half only has to come back as something other
 // than the CSRF 403.
-func TestCsrf_MiddlewareIsRegistered(t *testing.T) {
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/pwd"
+func TestCSRF_MiddlewareIsRegistered(t *testing.T) {
+	destURL := appConfig.AuthServer.BaseURL + "/auth/pwd"
 
 	post := func(t *testing.T, headers map[string]string) *http.Response {
 		t.Helper()
@@ -35,14 +35,14 @@ func TestCsrf_MiddlewareIsRegistered(t *testing.T) {
 			"email":    {"someone@example.com"},
 			"password": {"whatever"},
 		}
-		req, err := http.NewRequest(http.MethodPost, destUrl, strings.NewReader(form.Encode()))
+		req, err := http.NewRequest(http.MethodPost, destURL, strings.NewReader(form.Encode()))
 		require.NoError(t, err)
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		for name, value := range headers {
 			req.Header.Set(name, value)
 		}
 
-		resp, err := createHttpClient(t).Do(req)
+		resp, err := createHTTPClient(t).Do(req)
 		require.NoError(t, err)
 		return resp
 	}

@@ -101,7 +101,7 @@ func TestBrandCustomCSS_UpdateRefusals(t *testing.T) {
 	for _, c := range brandCustomCSSRefusals {
 		t.Run(c.name, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
-			database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(3)).
+			database.On("GetBrandByID", mock.Anything, (*sql.Tx)(nil), int64(3)).
 				Return(storedBrand(3, "Acme", record.BrandAppearanceDark, "plum"), nil).Once()
 
 			status, answer := serveBrand(HandleBrandUpdatePut(database, handlersmocks.NewAuditLogger(t), brandBaseURL),
@@ -174,7 +174,7 @@ func TestBrandCustomCSS_AnUpdateReplacesTheCSS(t *testing.T) {
 			database := datamocks.NewDatabase(t)
 			before := storedBrand(3, "Acme", record.BrandAppearanceDark, "plum")
 			before.CustomCSS = ".auth-card { border-width: 3px; }"
-			database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(3)).Return(before, nil).Once()
+			database.On("GetBrandByID", mock.Anything, (*sql.Tx)(nil), int64(3)).Return(before, nil).Once()
 			var written record.Brand
 			database.On("UpdateBrand", mock.Anything, (*sql.Tx)(nil), mock.Anything).Run(func(args mock.Arguments) {
 				written = *args.Get(2).(*record.Brand)
@@ -208,7 +208,7 @@ func TestBrandCustomCSS_ABrandReadAndWrittenBackIsUnchanged(t *testing.T) {
 	assert.Equal(t, css, brandAt(answer, "brand", "customCss"))
 
 	write := datamocks.NewDatabase(t)
-	write.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(3)).Return(stored, nil).Once()
+	write.On("GetBrandByID", mock.Anything, (*sql.Tx)(nil), int64(3)).Return(stored, nil).Once()
 	var written record.Brand
 	write.On("UpdateBrand", mock.Anything, (*sql.Tx)(nil), mock.Anything).Run(func(args mock.Arguments) {
 		written = *args.Get(2).(*record.Brand)
@@ -246,7 +246,7 @@ func TestBrandCustomCSS_TheAuditEventsRecordTheSizeAndNotTheText(t *testing.T) {
 	})
 	t.Run("update", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
-		database.On("GetBrandById", mock.Anything, (*sql.Tx)(nil), int64(3)).
+		database.On("GetBrandByID", mock.Anything, (*sql.Tx)(nil), int64(3)).
 			Return(storedBrand(3, "Acme", record.BrandAppearanceDark, "plum"), nil).Once()
 		database.On("UpdateBrand", mock.Anything, (*sql.Tx)(nil), mock.Anything).Return(nil).Once()
 		database.On("GetDefaultBrand", mock.Anything, (*sql.Tx)(nil)).

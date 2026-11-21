@@ -49,14 +49,14 @@ func AdministrativePermissions(ctx context.Context, database ScopeResolverDataba
 	if resource == nil {
 		return nil, errs.New("the authserver resource does not exist")
 	}
-	permissions, err := database.GetPermissionsByResourceId(ctx, tx, resource.Id)
+	permissions, err := database.GetPermissionsByResourceID(ctx, tx, resource.ID)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to read the authserver permissions for the administrative set")
 	}
 	administrative := make(map[int64]string, len(administrativePermissionIdentifiers))
 	for _, permission := range permissions {
 		if administrativePermissionIdentifiers[permission.PermissionIdentifier] {
-			administrative[permission.Id] = resource.ResourceIdentifier + ":" + permission.PermissionIdentifier
+			administrative[permission.ID] = resource.ResourceIdentifier + ":" + permission.PermissionIdentifier
 		}
 	}
 	return administrative, nil

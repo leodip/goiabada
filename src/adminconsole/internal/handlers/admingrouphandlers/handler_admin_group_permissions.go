@@ -19,12 +19,12 @@ import (
 // the group's own set.
 type groupPermissionsAPI interface {
 	GetAllResources(ctx context.Context, accessToken string) ([]api.ResourceResponse, error)
-	GetGroupPermissions(ctx context.Context, accessToken string, groupId int64) (*api.GroupResponse, []api.PermissionResponse, error)
-	UpdateGroupPermissions(ctx context.Context, accessToken string, groupId int64, request *api.UpdateGroupPermissionsRequest) error
+	GetGroupPermissions(ctx context.Context, accessToken string, groupID int64) (*api.GroupResponse, []api.PermissionResponse, error)
+	UpdateGroupPermissions(ctx context.Context, accessToken string, groupID int64, request *api.UpdateGroupPermissionsRequest) error
 }
 
 func HandlePermissionsGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient groupPermissionsAPI,
 ) http.HandlerFunc {
@@ -44,9 +44,9 @@ func HandlePermissionsGet(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
@@ -62,10 +62,10 @@ func HandlePermissionsGet(
 		}
 
 		groupPermsDisplay := struct {
-			GroupId         int64
+			GroupID         int64
 			GroupIdentifier string
 		}{
-			GroupId:         group.Id,
+			GroupID:         group.ID,
 			GroupIdentifier: group.GroupIdentifier,
 		}
 
@@ -73,7 +73,7 @@ func HandlePermissionsGet(
 		granted := make([]grantedPermission, 0, len(groupPermissions))
 		for _, permission := range groupPermissions {
 			granted = append(granted, grantedPermission{
-				Id:    permission.Id,
+				ID:    permission.ID,
 				Scope: permission.Resource.ResourceIdentifier + ":" + permission.PermissionIdentifier,
 			})
 		}
@@ -123,7 +123,7 @@ func HandlePermissionsGet(
 }
 
 func HandlePermissionsPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient groupPermissionsAPI,
 ) http.HandlerFunc {
@@ -144,19 +144,19 @@ func HandlePermissionsPost(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JSONError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.JSONError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
 		// Update group permissions via API (includes validation, security, and audit logging)
 		updateReq := &api.UpdateGroupPermissionsRequest{
-			PermissionIds:         data.AssignedPermissionsIds,
-			ExpectedPermissionIds: data.ExpectedPermissionIds,
+			PermissionIDs:         data.AssignedPermissionsIDs,
+			ExpectedPermissionIDs: data.ExpectedPermissionIDs,
 		}
 
-		err = apiClient.UpdateGroupPermissions(r.Context(), jwtInfo.TokenResponse.AccessToken, data.GroupId, updateReq)
+		err = apiClient.UpdateGroupPermissions(r.Context(), jwtInfo.TokenResponse.AccessToken, data.GroupID, updateReq)
 		if err != nil {
 			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return

@@ -17,9 +17,9 @@ import "slices"
 type Zone struct {
 	// CountryCode is the upper-case ISO 3166-1 alpha-2 code, e.g. "BR".
 	CountryCode string
-	// Zone is the IANA zone ID stored on the user and emitted as the zoneinfo claim, e.g.
-	// "America/Sao_Paulo".
-	Zone string
+	// Name is the IANA zone ID stored on the user and emitted as the zoneinfo claim, e.g.
+	// "America/Sao_Paulo". tzdata calls it the zone's name.
+	Name string
 	// CountryName is tzdata's English name for the country, from iso3166.tab, e.g. "Brazil". It is
 	// stored beside the zone as the picker's row identity, so it must keep coming from
 	// iso3166.tab: a name taken from anywhere else would stop matching the pairs profiles already
@@ -30,15 +30,15 @@ type Zone struct {
 	Comments string
 }
 
-// byZone indexes the table by zone ID, each entry the positions of that zone's rows in table order.
+// byName indexes the table by zone ID, each entry the positions of that zone's rows in table order.
 // It is built once at package initialization; Go orders package-level initialization by dependency,
 // so `zones` is populated first.
-var byZone = indexByZone(zones)
+var byName = indexByName(zones)
 
-func indexByZone(list []Zone) map[string][]int {
+func indexByName(list []Zone) map[string][]int {
 	index := make(map[string][]int)
 	for i, z := range list {
-		index[z.Zone] = append(index[z.Zone], i)
+		index[z.Name] = append(index[z.Name], i)
 	}
 	return index
 }
@@ -50,10 +50,10 @@ func All() []Zone {
 	return slices.Clone(zones)
 }
 
-// ByZone returns every row listing the zone ID, in table order, as a fresh slice; nil when no row
+// ByName returns every row listing the zone ID, in table order, as a fresh slice; nil when no row
 // does. The match is exact: case is not normalized.
-func ByZone(zone string) []Zone {
-	positions := byZone[zone]
+func ByName(name string) []Zone {
+	positions := byName[name]
 	if len(positions) == 0 {
 		return nil
 	}

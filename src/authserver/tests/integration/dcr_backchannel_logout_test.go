@@ -25,7 +25,7 @@ func postDCRBody(t *testing.T, body string) (int, map[string]json.RawMessage) {
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := createHttpClient(t).Do(req)
+	resp, err := createHTTPClient(t).Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -43,10 +43,10 @@ func registeredClientThroughTheAdminAPI(t *testing.T, adminToken string, members
 	client, err := database.GetClientByClientIdentifier(context.Background(), nil, identifier)
 	require.NoError(t, err)
 	require.NotNil(t, client)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 
 	detail := makeAPIRequest(t, "GET", appConfig.AuthServer.BaseURL+"/api/v1/admin/clients/"+
-		strconv.FormatInt(client.Id, 10), adminToken, nil)
+		strconv.FormatInt(client.ID, 10), adminToken, nil)
 	defer func() { _ = detail.Body.Close() }()
 	require.Equal(t, http.StatusOK, detail.StatusCode)
 

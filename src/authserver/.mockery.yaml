@@ -79,7 +79,7 @@ packages:
         config:
           dir: "./internal/handlers/mocks"
           pkgname: "handlersmocks"
-      OtpSecretGenerator:
+      OTPSecretGenerator:
         config:
           dir: "./internal/handlers/mocks"
           pkgname: "handlersmocks"

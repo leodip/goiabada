@@ -65,7 +65,7 @@ var registeredMethodErrorMsgs = map[string]string{
 
 // FindClient's refusals.
 const (
-	clientIdMissingErrorMsg    = "Missing required client_id parameter."
+	clientIDMissingErrorMsg    = "Missing required client_id parameter."
 	clientDoesNotExistErrorMsg = "Client does not exist."
 	clientDisabledErrorMsg     = "Client is disabled."
 )
@@ -140,7 +140,7 @@ func (a *Authenticator) AuthenticateConfidential(ctx context.Context, clientIden
 func (a *Authenticator) FindClient(ctx context.Context, clientIdentifier string) (*record.Client, error) {
 	if len(clientIdentifier) == 0 {
 		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_request",
-			clientIdMissingErrorMsg, http.StatusBadRequest)
+			clientIDMissingErrorMsg, http.StatusBadRequest)
 	}
 
 	client, err := a.database.GetClientByClientIdentifier(ctx, nil, clientIdentifier)

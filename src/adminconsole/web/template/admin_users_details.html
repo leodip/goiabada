@@ -3,7 +3,7 @@
 {{define "head"}}{{end}}
 
 {{define "page"}}
-{{ template "user_header" (args "details" .user.Id .user.Email .page .query $.ctx) }}
+{{ template "user_header" (args "details" .user.ID .user.Email .page .query $.ctx) }}
 
 {{/* Disabling the user asks first, in one dialog, against the user as stored. A refusal is the
      enabled switch's, the only field, drawn as stored (#562 decision 10). */}}
@@ -39,7 +39,7 @@
     {{/* The user's row id, the number the audit log and the admin API name users by (#780). */}}
     <dl class="detail-list">
       <dt>{{ T $.ctx "adminconsole.admin_users.details.field.user_id" }}</dt>
-      <dd class="font-mono text-sm">{{ .user.Id }}</dd>
+      <dd class="font-mono text-sm">{{ .user.ID }}</dd>
       <dt>{{ T $.ctx "adminconsole.admin_users.details.field.subject" }}</dt>
       <dd class="font-mono text-sm">{{ .user.Subject }}</dd>
       <dt>{{ T $.ctx "adminconsole.admin_users.details.field.full_name" }}</dt>

@@ -75,7 +75,7 @@ type backgroundWorkerDatabase interface {
 	DeleteCodesWithoutRefreshTokens(ctx context.Context, tx *sql.Tx, createdBefore time.Time) error
 	DeleteDeadPreRegistrations(ctx context.Context, tx *sql.Tx, deadBefore time.Time) error
 	DeleteUnattachedBrandAssets(ctx context.Context, tx *sql.Tx, createdBefore time.Time) (int, error)
-	GetSettingsById(ctx context.Context, tx *sql.Tx, settingsId int64) (*record.Settings, error)
+	GetSettingsByID(ctx context.Context, tx *sql.Tx, settingsID int64) (*record.Settings, error)
 	TryClaimCleanupRun(ctx context.Context, tx *sql.Tx, now time.Time, claimableBefore time.Time) (bool, error)
 }
 
@@ -444,12 +444,12 @@ func (w *Worker) sweep(ctx context.Context) (ranEveryStep, stepFailed bool) {
 		return false, stepFailed
 	}
 
-	settings, err := w.database.GetSettingsById(ctx, nil, 1)
+	settings, err := w.database.GetSettingsByID(ctx, nil, 1)
 	if err != nil {
 		slog.ErrorContext(ctx, "unable to read the settings row", "error", err)
 		return false, true
 	}
-	// GetSettingsById returns (nil, nil) when the row is absent. Every remaining
+	// GetSettingsByID returns (nil, nil) when the row is absent. Every remaining
 	// step reads a value from settings, so there is nothing to salvage here, but
 	// it must not be dereferenced.
 	if settings == nil {

@@ -31,19 +31,19 @@ func TestAPIUserAttributesGet_Success(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	// Setup: Create test attributes
-	attr1 := createTestUserAttribute(t, testUser.Id, "department", "engineering")
-	attr2 := createTestUserAttribute(t, testUser.Id, "role", "developer")
+	attr1 := createTestUserAttribute(t, testUser.ID, "department", "engineering")
+	attr2 := createTestUserAttribute(t, testUser.ID, "role", "developer")
 	defer func() {
-		_ = database.DeleteUserAttribute(context.Background(), nil, attr1.Id)
-		_ = database.DeleteUserAttribute(context.Background(), nil, attr2.Id)
+		_ = database.DeleteUserAttribute(context.Background(), nil, attr1.ID)
+		_ = database.DeleteUserAttribute(context.Background(), nil, attr2.ID)
 	}()
 
 	// Test: Get user attributes
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/attributes"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.ID, 10) + "/attributes"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -69,9 +69,9 @@ func TestAPIUserAttributesGet_Success(t *testing.T) {
 	deptAttr, exists := attrMap["department"]
 	assert.True(t, exists)
 	assert.Equal(t, "engineering", deptAttr.Value)
-	assert.True(t, deptAttr.IncludeInIdToken)
+	assert.True(t, deptAttr.IncludeInIDToken)
 	assert.False(t, deptAttr.IncludeInAccessToken)
-	assert.Equal(t, testUser.Id, deptAttr.UserId)
+	assert.Equal(t, testUser.ID, deptAttr.UserID)
 
 	roleAttr, exists := attrMap["role"]
 	assert.True(t, exists)
@@ -93,11 +93,11 @@ func TestAPIUserAttributesGet_EmptyAttributes(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	// Test: Get user attributes for user with no attributes
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/attributes"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.ID, 10) + "/attributes"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -126,13 +126,13 @@ func TestAPIUserAttributesGet_UserNotFound(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
-func TestAPIUserAttributesGet_InvalidId(t *testing.T) {
+func TestAPIUserAttributesGet_InvalidID(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)
 
 	testCases := []struct {
 		name           string
-		userId         string
+		userID         string
 		expectedStatus int
 	}{
 		{"non-numeric ID", "abc", http.StatusBadRequest},
@@ -143,7 +143,7 @@ func TestAPIUserAttributesGet_InvalidId(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + tc.userId + "/attributes"
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + tc.userID + "/attributes"
 			resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -164,15 +164,15 @@ func TestAPIUserAttributesGet_Unauthorized(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	// Test: Request without access token
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/attributes"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.ID, 10) + "/attributes"
 	req, err := http.NewRequest("GET", url, nil)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -197,17 +197,17 @@ func TestAPIUserAttributeGet_Success(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	// Setup: Create test attribute
-	attr := createTestUserAttribute(t, testUser.Id, "team", "backend")
+	attr := createTestUserAttribute(t, testUser.ID, "team", "backend")
 	defer func() {
-		_ = database.DeleteUserAttribute(context.Background(), nil, attr.Id)
+		_ = database.DeleteUserAttribute(context.Background(), nil, attr.ID)
 	}()
 
 	// Test: Get specific user attribute
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-attributes/" + strconv.FormatInt(attr.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-attributes/" + strconv.FormatInt(attr.ID, 10)
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -221,12 +221,12 @@ func TestAPIUserAttributeGet_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	// Assert: Should return the correct attribute
-	assert.Equal(t, attr.Id, getResponse.Attribute.Id)
+	assert.Equal(t, attr.ID, getResponse.Attribute.ID)
 	assert.Equal(t, "team", getResponse.Attribute.Key)
 	assert.Equal(t, "backend", getResponse.Attribute.Value)
-	assert.True(t, getResponse.Attribute.IncludeInIdToken)
+	assert.True(t, getResponse.Attribute.IncludeInIDToken)
 	assert.False(t, getResponse.Attribute.IncludeInAccessToken)
-	assert.Equal(t, testUser.Id, getResponse.Attribute.UserId)
+	assert.Equal(t, testUser.ID, getResponse.Attribute.UserID)
 }
 
 func TestAPIUserAttributeGet_NotFound(t *testing.T) {
@@ -242,13 +242,13 @@ func TestAPIUserAttributeGet_NotFound(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
-func TestAPIUserAttributeGet_InvalidId(t *testing.T) {
+func TestAPIUserAttributeGet_InvalidID(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)
 
 	testCases := []struct {
 		name           string
-		attributeId    string
+		attributeID    string
 		expectedStatus int
 	}{
 		{"non-numeric ID", "abc", http.StatusBadRequest},
@@ -258,7 +258,7 @@ func TestAPIUserAttributeGet_InvalidId(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-attributes/" + tc.attributeId
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-attributes/" + tc.attributeID
 			resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -279,20 +279,20 @@ func TestAPIUserAttributeGet_Unauthorized(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
-	attr := createTestUserAttribute(t, testUser.Id, "level", "senior")
+	attr := createTestUserAttribute(t, testUser.ID, "level", "senior")
 	defer func() {
-		_ = database.DeleteUserAttribute(context.Background(), nil, attr.Id)
+		_ = database.DeleteUserAttribute(context.Background(), nil, attr.ID)
 	}()
 
 	// Test: Request without access token
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-attributes/" + strconv.FormatInt(attr.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-attributes/" + strconv.FormatInt(attr.ID, 10)
 	req, err := http.NewRequest("GET", url, nil)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -317,16 +317,16 @@ func TestAPIUserAttributeCreatePost_Success(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	// Test: Create user attribute
 	createReq := api.CreateUserAttributeRequest{
 		Key:                  "location",
 		Value:                "San Francisco",
-		IncludeInIdToken:     true,
+		IncludeInIDToken:     true,
 		IncludeInAccessToken: true,
-		UserId:               testUser.Id,
+		UserID:               testUser.ID,
 	}
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-attributes"
@@ -345,20 +345,20 @@ func TestAPIUserAttributeCreatePost_Success(t *testing.T) {
 	// Assert: Response should match request
 	assert.Equal(t, createReq.Key, createResponse.Attribute.Key)
 	assert.Equal(t, createReq.Value, createResponse.Attribute.Value)
-	assert.Equal(t, createReq.IncludeInIdToken, createResponse.Attribute.IncludeInIdToken)
+	assert.Equal(t, createReq.IncludeInIDToken, createResponse.Attribute.IncludeInIDToken)
 	assert.Equal(t, createReq.IncludeInAccessToken, createResponse.Attribute.IncludeInAccessToken)
-	assert.Equal(t, createReq.UserId, createResponse.Attribute.UserId)
-	assert.Positive(t, createResponse.Attribute.Id)
+	assert.Equal(t, createReq.UserID, createResponse.Attribute.UserID)
+	assert.Positive(t, createResponse.Attribute.ID)
 
 	// Cleanup: Delete created attribute
 	defer func() {
-		if createResponse.Attribute.Id > 0 {
-			_ = database.DeleteUserAttribute(context.Background(), nil, createResponse.Attribute.Id)
+		if createResponse.Attribute.ID > 0 {
+			_ = database.DeleteUserAttribute(context.Background(), nil, createResponse.Attribute.ID)
 		}
 	}()
 
 	// Verify attribute was created in database
-	createdAttr, err := database.GetUserAttributeById(context.Background(), nil, createResponse.Attribute.Id)
+	createdAttr, err := database.GetUserAttributeByID(context.Background(), nil, createResponse.Attribute.ID)
 	require.NoError(t, err)
 	assert.NotNil(t, createdAttr)
 	assert.Equal(t, createReq.Key, createdAttr.Key)
@@ -380,7 +380,7 @@ func TestAPIUserAttributeCreatePost_ValidationErrors(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	testCases := []struct {
@@ -392,7 +392,7 @@ func TestAPIUserAttributeCreatePost_ValidationErrors(t *testing.T) {
 			"missing key",
 			api.CreateUserAttributeRequest{
 				Value:  "test",
-				UserId: testUser.Id,
+				UserID: testUser.ID,
 			},
 			http.StatusBadRequest,
 		},
@@ -401,7 +401,7 @@ func TestAPIUserAttributeCreatePost_ValidationErrors(t *testing.T) {
 			api.CreateUserAttributeRequest{
 				Key:    "",
 				Value:  "test",
-				UserId: testUser.Id,
+				UserID: testUser.ID,
 			},
 			http.StatusBadRequest,
 		},
@@ -410,7 +410,7 @@ func TestAPIUserAttributeCreatePost_ValidationErrors(t *testing.T) {
 			api.CreateUserAttributeRequest{
 				Key:    "test_key",
 				Value:  string(make([]byte, 251)), // 251 characters, exceeds 250 limit
-				UserId: testUser.Id,
+				UserID: testUser.ID,
 			},
 			http.StatusBadRequest,
 		},
@@ -419,7 +419,7 @@ func TestAPIUserAttributeCreatePost_ValidationErrors(t *testing.T) {
 			api.CreateUserAttributeRequest{
 				Key:    "invalid key with spaces",
 				Value:  "test",
-				UserId: testUser.Id,
+				UserID: testUser.ID,
 			},
 			http.StatusBadRequest,
 		},
@@ -428,7 +428,7 @@ func TestAPIUserAttributeCreatePost_ValidationErrors(t *testing.T) {
 			api.CreateUserAttributeRequest{
 				Key:    "valid_key",
 				Value:  "test",
-				UserId: 99999,
+				UserID: 99999,
 			},
 			http.StatusNotFound,
 		},
@@ -456,7 +456,7 @@ func TestAPIUserAttributeCreatePost_InvalidRequestBody(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -471,7 +471,7 @@ func TestAPIUserAttributeCreatePost_Unauthorized(t *testing.T) {
 	req, err := http.NewRequest("POST", url, nil)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -496,24 +496,24 @@ func TestAPIUserAttributeUpdatePut_Success(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	// Setup: Create test attribute
-	attr := createTestUserAttribute(t, testUser.Id, "status", "active")
+	attr := createTestUserAttribute(t, testUser.ID, "status", "active")
 	defer func() {
-		_ = database.DeleteUserAttribute(context.Background(), nil, attr.Id)
+		_ = database.DeleteUserAttribute(context.Background(), nil, attr.ID)
 	}()
 
 	// Test: Update attribute
 	updateReq := api.UpdateUserAttributeRequest{
 		Key:                  "status",
 		Value:                "inactive",
-		IncludeInIdToken:     false,
+		IncludeInIDToken:     false,
 		IncludeInAccessToken: true,
 	}
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-attributes/" + strconv.FormatInt(attr.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-attributes/" + strconv.FormatInt(attr.ID, 10)
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -527,19 +527,19 @@ func TestAPIUserAttributeUpdatePut_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	// Assert: Response should reflect updates
-	assert.Equal(t, attr.Id, updateResponse.Attribute.Id)
+	assert.Equal(t, attr.ID, updateResponse.Attribute.ID)
 	assert.Equal(t, updateReq.Key, updateResponse.Attribute.Key)
 	assert.Equal(t, updateReq.Value, updateResponse.Attribute.Value)
-	assert.Equal(t, updateReq.IncludeInIdToken, updateResponse.Attribute.IncludeInIdToken)
+	assert.Equal(t, updateReq.IncludeInIDToken, updateResponse.Attribute.IncludeInIDToken)
 	assert.Equal(t, updateReq.IncludeInAccessToken, updateResponse.Attribute.IncludeInAccessToken)
 
 	// Verify changes were persisted to database
-	updatedAttr, err := database.GetUserAttributeById(context.Background(), nil, attr.Id)
+	updatedAttr, err := database.GetUserAttributeByID(context.Background(), nil, attr.ID)
 	require.NoError(t, err)
 	assert.NotNil(t, updatedAttr)
 	assert.Equal(t, updateReq.Key, updatedAttr.Key)
 	assert.Equal(t, updateReq.Value, updatedAttr.Value)
-	assert.Equal(t, updateReq.IncludeInIdToken, updatedAttr.IncludeInIdToken)
+	assert.Equal(t, updateReq.IncludeInIDToken, updatedAttr.IncludeInIDToken)
 	assert.Equal(t, updateReq.IncludeInAccessToken, updatedAttr.IncludeInAccessToken)
 }
 
@@ -576,12 +576,12 @@ func TestAPIUserAttributeUpdatePut_ValidationErrors(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
-	attr := createTestUserAttribute(t, testUser.Id, "test_key", "test_value")
+	attr := createTestUserAttribute(t, testUser.ID, "test_key", "test_value")
 	defer func() {
-		_ = database.DeleteUserAttribute(context.Background(), nil, attr.Id)
+		_ = database.DeleteUserAttribute(context.Background(), nil, attr.ID)
 	}()
 
 	testCases := []struct {
@@ -624,7 +624,7 @@ func TestAPIUserAttributeUpdatePut_ValidationErrors(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-attributes/" + strconv.FormatInt(attr.Id, 10)
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-attributes/" + strconv.FormatInt(attr.ID, 10)
 			resp := makeAPIRequest(t, "PUT", url, accessToken, tc.request)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -633,7 +633,7 @@ func TestAPIUserAttributeUpdatePut_ValidationErrors(t *testing.T) {
 	}
 }
 
-func TestAPIUserAttributeUpdatePut_InvalidId(t *testing.T) {
+func TestAPIUserAttributeUpdatePut_InvalidID(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)
 
@@ -644,7 +644,7 @@ func TestAPIUserAttributeUpdatePut_InvalidId(t *testing.T) {
 
 	testCases := []struct {
 		name           string
-		attributeId    string
+		attributeID    string
 		expectedStatus int
 	}{
 		{"non-numeric ID", "abc", http.StatusBadRequest},
@@ -654,7 +654,7 @@ func TestAPIUserAttributeUpdatePut_InvalidId(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-attributes/" + tc.attributeId
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-attributes/" + tc.attributeID
 			resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -678,22 +678,22 @@ func TestAPIUserAttributeUpdatePut_InvalidRequestBody(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
-	attr := createTestUserAttribute(t, testUser.Id, "test_key", "test_value")
+	attr := createTestUserAttribute(t, testUser.ID, "test_key", "test_value")
 	defer func() {
-		_ = database.DeleteUserAttribute(context.Background(), nil, attr.Id)
+		_ = database.DeleteUserAttribute(context.Background(), nil, attr.ID)
 	}()
 
 	// Test: Invalid JSON
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-attributes/" + strconv.FormatInt(attr.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-attributes/" + strconv.FormatInt(attr.ID, 10)
 	req, err := http.NewRequest("PUT", url, nil)
 	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -714,20 +714,20 @@ func TestAPIUserAttributeUpdatePut_Unauthorized(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
-	attr := createTestUserAttribute(t, testUser.Id, "test_key", "test_value")
+	attr := createTestUserAttribute(t, testUser.ID, "test_key", "test_value")
 	defer func() {
-		_ = database.DeleteUserAttribute(context.Background(), nil, attr.Id)
+		_ = database.DeleteUserAttribute(context.Background(), nil, attr.ID)
 	}()
 
 	// Test: Request without access token
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-attributes/" + strconv.FormatInt(attr.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-attributes/" + strconv.FormatInt(attr.ID, 10)
 	req, err := http.NewRequest("PUT", url, nil)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -752,14 +752,14 @@ func TestAPIUserAttributeDelete_Success(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	// Setup: Create test attribute
-	attr := createTestUserAttribute(t, testUser.Id, "temp_attr", "temp_value")
+	attr := createTestUserAttribute(t, testUser.ID, "temp_attr", "temp_value")
 
 	// Test: Delete attribute
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-attributes/" + strconv.FormatInt(attr.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-attributes/" + strconv.FormatInt(attr.ID, 10)
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -776,7 +776,7 @@ func TestAPIUserAttributeDelete_Success(t *testing.T) {
 	assert.True(t, deleteResponse.Success)
 
 	// Verify attribute was actually deleted from database
-	deletedAttr, err := database.GetUserAttributeById(context.Background(), nil, attr.Id)
+	deletedAttr, err := database.GetUserAttributeByID(context.Background(), nil, attr.ID)
 	require.NoError(t, err)
 	assert.Nil(t, deletedAttr)
 }
@@ -794,13 +794,13 @@ func TestAPIUserAttributeDelete_NotFound(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
-func TestAPIUserAttributeDelete_InvalidId(t *testing.T) {
+func TestAPIUserAttributeDelete_InvalidID(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)
 
 	testCases := []struct {
 		name           string
-		attributeId    string
+		attributeID    string
 		expectedStatus int
 	}{
 		{"non-numeric ID", "abc", http.StatusBadRequest},
@@ -810,7 +810,7 @@ func TestAPIUserAttributeDelete_InvalidId(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-attributes/" + tc.attributeId
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-attributes/" + tc.attributeID
 			resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -831,20 +831,20 @@ func TestAPIUserAttributeDelete_Unauthorized(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
-	attr := createTestUserAttribute(t, testUser.Id, "persistent", "value")
+	attr := createTestUserAttribute(t, testUser.ID, "persistent", "value")
 	defer func() {
-		_ = database.DeleteUserAttribute(context.Background(), nil, attr.Id)
+		_ = database.DeleteUserAttribute(context.Background(), nil, attr.ID)
 	}()
 
 	// Test: Request without access token
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-attributes/" + strconv.FormatInt(attr.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-attributes/" + strconv.FormatInt(attr.ID, 10)
 	req, err := http.NewRequest("DELETE", url, nil)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -853,19 +853,19 @@ func TestAPIUserAttributeDelete_Unauthorized(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 
 	// Verify attribute was not deleted
-	stillExists, err := database.GetUserAttributeById(context.Background(), nil, attr.Id)
+	stillExists, err := database.GetUserAttributeByID(context.Background(), nil, attr.ID)
 	require.NoError(t, err)
 	assert.NotNil(t, stillExists)
 }
 
 // Helper function to create a test user attribute
-func createTestUserAttribute(t *testing.T, userId int64, key, value string) *record.UserAttribute {
+func createTestUserAttribute(t *testing.T, userID int64, key, value string) *record.UserAttribute {
 	attr := &record.UserAttribute{
 		Key:                  key,
 		Value:                value,
-		IncludeInIdToken:     true,
+		IncludeInIDToken:     true,
 		IncludeInAccessToken: false,
-		UserId:               userId,
+		UserID:               userID,
 	}
 	err := database.CreateUserAttribute(context.Background(), nil, attr)
 	assert.NoError(t, err)
@@ -886,10 +886,10 @@ func TestAPIUserAttribute_AngleBracketsRejected(t *testing.T) {
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
-	defer func() { _ = database.DeleteUser(context.Background(), nil, testUser.Id) }()
+	defer func() { _ = database.DeleteUser(context.Background(), nil, testUser.ID) }()
 
-	attr := createTestUserAttribute(t, testUser.Id, "status", "active")
-	defer func() { _ = database.DeleteUserAttribute(context.Background(), nil, attr.Id) }()
+	attr := createTestUserAttribute(t, testUser.ID, "status", "active")
+	defer func() { _ = database.DeleteUserAttribute(context.Background(), nil, attr.ID) }()
 
 	base := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-attributes"
 
@@ -897,7 +897,7 @@ func TestAPIUserAttribute_AngleBracketsRejected(t *testing.T) {
 		resp := makeAPIRequest(t, "POST", base, accessToken, api.CreateUserAttributeRequest{
 			Key:    "location",
 			Value:  "<b>San Francisco</b>",
-			UserId: testUser.Id,
+			UserID: testUser.ID,
 		})
 		defer func() { _ = resp.Body.Close() }()
 
@@ -908,7 +908,7 @@ func TestAPIUserAttribute_AngleBracketsRejected(t *testing.T) {
 	})
 
 	t.Run("update", func(t *testing.T) {
-		resp := makeAPIRequest(t, "PUT", base+"/"+strconv.FormatInt(attr.Id, 10), accessToken,
+		resp := makeAPIRequest(t, "PUT", base+"/"+strconv.FormatInt(attr.ID, 10), accessToken,
 			api.UpdateUserAttributeRequest{Key: "status", Value: "a < b"})
 		defer func() { _ = resp.Body.Close() }()
 
@@ -917,7 +917,7 @@ func TestAPIUserAttribute_AngleBracketsRejected(t *testing.T) {
 		_ = json.NewDecoder(resp.Body).Decode(&errResp)
 		assert.Equal(t, "validator.attribute.value_angle_brackets", errResp.ErrorCode)
 
-		stored, err := database.GetUserAttributeById(context.Background(), nil, attr.Id)
+		stored, err := database.GetUserAttributeByID(context.Background(), nil, attr.ID)
 		require.NoError(t, err)
 		assert.Equal(t, "active", stored.Value)
 	})
@@ -939,11 +939,11 @@ func TestAPIUserAttribute_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 	}
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
-	defer func() { _ = database.DeleteUser(context.Background(), nil, testUser.Id) }()
+	defer func() { _ = database.DeleteUser(context.Background(), nil, testUser.ID) }()
 
 	value := `  Tom & Jerry said "hi"  `
 	resp := makeAPIRequest(t, "POST", appConfig.AuthServer.BaseURL+"/api/v1/admin/user-attributes",
-		accessToken, api.CreateUserAttributeRequest{Key: "motto", Value: value, UserId: testUser.Id})
+		accessToken, api.CreateUserAttributeRequest{Key: "motto", Value: value, UserID: testUser.ID})
 	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusCreated, resp.StatusCode)
@@ -953,14 +953,14 @@ func TestAPIUserAttribute_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, value, createResponse.Attribute.Value)
 
-	stored, err := database.GetUserAttributeById(context.Background(), nil, createResponse.Attribute.Id)
+	stored, err := database.GetUserAttributeByID(context.Background(), nil, createResponse.Attribute.ID)
 	require.NoError(t, err)
 	assert.Equal(t, value, stored.Value)
-	defer func() { _ = database.DeleteUserAttribute(context.Background(), nil, createResponse.Attribute.Id) }()
+	defer func() { _ = database.DeleteUserAttribute(context.Background(), nil, createResponse.Attribute.ID) }()
 
 	updated := `  AT&T said "again"  `
 	updateResp := makeAPIRequest(t, "PUT", appConfig.AuthServer.BaseURL+"/api/v1/admin/user-attributes/"+
-		strconv.FormatInt(createResponse.Attribute.Id, 10), accessToken,
+		strconv.FormatInt(createResponse.Attribute.ID, 10), accessToken,
 		api.UpdateUserAttributeRequest{Key: "motto", Value: updated})
 	defer func() { _ = updateResp.Body.Close() }()
 
@@ -971,7 +971,7 @@ func TestAPIUserAttribute_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, updated, updateResponse.Attribute.Value)
 
-	stored, err = database.GetUserAttributeById(context.Background(), nil, createResponse.Attribute.Id)
+	stored, err = database.GetUserAttributeByID(context.Background(), nil, createResponse.Attribute.ID)
 	require.NoError(t, err)
 	assert.Equal(t, updated, stored.Value)
 }

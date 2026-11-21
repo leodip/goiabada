@@ -48,15 +48,15 @@ type fakeSessions struct {
 
 type bumpCall struct {
 	sessionIdentifier string
-	clientId          int64
+	clientID          int64
 	authMethods       string
-	acrLevel          record.AcrLevel
+	acrLevel          record.ACRLevel
 	ipAddress         string
 }
 
-func (f *fakeSessions) BumpUserSession(_ context.Context, sessionIdentifier string, clientId int64,
-	authMethods string, acrLevel record.AcrLevel, ipAddress string) (*record.UserSession, error) {
-	f.bumps = append(f.bumps, bumpCall{sessionIdentifier, clientId, authMethods, acrLevel, ipAddress})
+func (f *fakeSessions) BumpUserSession(_ context.Context, sessionIdentifier string, clientID int64,
+	authMethods string, acrLevel record.ACRLevel, ipAddress string) (*record.UserSession, error) {
+	f.bumps = append(f.bumps, bumpCall{sessionIdentifier, clientID, authMethods, acrLevel, ipAddress})
 	if f.note != nil {
 		f.note("bump")
 	}
@@ -68,26 +68,26 @@ func (f *fakeSessions) BumpUserSession(_ context.Context, sessionIdentifier stri
 func codeRefreshInput() *RefreshTokenGrantInput {
 	now := time.Now().UTC()
 	return &RefreshTokenGrantInput{
-		Client: &record.Client{Id: 1, ClientIdentifier: "test-client", AuthorizationCodeEnabled: true},
+		Client: &record.Client{ID: 1, ClientIdentifier: "test-client", AuthorizationCodeEnabled: true},
 		RefreshToken: &record.RefreshToken{
-			Id:                   7,
-			RefreshTokenJti:      "jti-presented",
-			FirstRefreshTokenJti: "jti-family",
+			ID:                   7,
+			RefreshTokenJTI:      "jti-presented",
+			FirstRefreshTokenJTI: "jti-family",
 			SessionIdentifier:    "sid-1",
 			MaxLifetime:          sql.NullTime{Time: now.Add(24 * time.Hour), Valid: true},
 			Scope:                "openid resource1:read",
-			CodeId:               sql.NullInt64{Int64: 9, Valid: true},
+			CodeID:               sql.NullInt64{Int64: 9, Valid: true},
 			Code: record.Code{
-				Id:                9,
-				ClientId:          1,
-				UserId:            5,
+				ID:                9,
+				ClientID:          1,
+				UserID:            5,
 				Scope:             "openid resource1:read",
 				AuthenticatedAt:   now.Add(-5 * time.Minute),
 				SessionIdentifier: "sid-1",
-				AcrLevel:          "urn:goiabada:level1",
+				ACRLevel:          "urn:goiabada:level1",
 				AuthMethods:       "pwd",
-				Client:            record.Client{Id: 1, ClientIdentifier: "test-client"},
-				User:              record.User{Id: 5, Subject: fake.UUID(), Email: "someone@example.com"},
+				Client:            record.Client{ID: 1, ClientIdentifier: "test-client"},
+				User:              record.User{ID: 5, Subject: fake.UUID(), Email: "someone@example.com"},
 			},
 		},
 	}
@@ -99,19 +99,19 @@ func ropcRefreshInput() *RefreshTokenGrantInput {
 	now := time.Now().UTC()
 	ropcOn := true
 	return &RefreshTokenGrantInput{
-		Client: &record.Client{Id: 1, ClientIdentifier: "ropc-client", ResourceOwnerPasswordCredentialsEnabled: &ropcOn},
+		Client: &record.Client{ID: 1, ClientIdentifier: "ropc-client", ResourceOwnerPasswordCredentialsEnabled: &ropcOn},
 		RefreshToken: &record.RefreshToken{
-			Id:                   7,
-			RefreshTokenJti:      "jti-presented",
-			FirstRefreshTokenJti: "jti-family",
-			UserId:               sql.NullInt64{Int64: 5, Valid: true},
-			ClientId:             sql.NullInt64{Int64: 1, Valid: true},
+			ID:                   7,
+			RefreshTokenJTI:      "jti-presented",
+			FirstRefreshTokenJTI: "jti-family",
+			UserID:               sql.NullInt64{Int64: 5, Valid: true},
+			ClientID:             sql.NullInt64{Int64: 1, Valid: true},
 			Scope:                "openid resource1:read",
 			RefreshTokenType:     "Offline",
 			MaxLifetime:          sql.NullTime{Time: now.Add(24 * time.Hour), Valid: true},
 			AuthenticatedAt:      sql.NullTime{Time: now.Add(-time.Hour), Valid: true},
-			User:                 record.User{Id: 5, Subject: fake.UUID(), Email: "someone@example.com"},
-			Client:               record.Client{Id: 1, ClientIdentifier: "ropc-client"},
+			User:                 record.User{ID: 5, Subject: fake.UUID(), Email: "someone@example.com"},
+			Client:               record.Client{ID: 1, ClientIdentifier: "ropc-client"},
 		},
 		IsROPC: true,
 	}
@@ -136,18 +136,18 @@ func armRotationReading(mockDB *datamocks.Database, input *RefreshTokenGrantInpu
 	claimed bool, familyRevoked bool, note func(string)) *datamocks.RunInTransactionStub {
 
 	stub := datamocks.ExpectRunInTransaction(mockDB, rotationTx, note)
-	mockDB.On("AcquireUserRow", mock.Anything, rotationTx, refreshOwnerUserId(input)).
+	mockDB.On("AcquireUserRow", mock.Anything, rotationTx, refreshOwnerUserID(input)).
 		Run(func(mock.Arguments) { note("acquire") }).Return(nil).Once()
-	mockDB.On("MarkRefreshTokenAsRevoked", mock.Anything, rotationTx, input.RefreshToken.Id).
+	mockDB.On("MarkRefreshTokenAsRevoked", mock.Anything, rotationTx, input.RefreshToken.ID).
 		Run(func(mock.Arguments) { note("claim") }).Return(claimed, nil).Once()
 	if claimed {
-		mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, rotationTx, input.RefreshToken.FirstRefreshTokenJti).
+		mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, rotationTx, input.RefreshToken.FirstRefreshTokenJTI).
 			Run(func(mock.Arguments) { note("family") }).Return(familyRevoked, nil).Once()
 	}
 	if claimed && !familyRevoked {
-		mockDB.On("GetRefreshTokenById", mock.Anything, rotationTx, input.RefreshToken.Id).
+		mockDB.On("GetRefreshTokenByID", mock.Anything, rotationTx, input.RefreshToken.ID).
 			Run(func(mock.Arguments) { note("reread") }).
-			Return(&record.RefreshToken{Id: input.RefreshToken.Id, Revoked: true, AuthStateGeneration: currentGeneration}, nil).Once()
+			Return(&record.RefreshToken{ID: input.RefreshToken.ID, Revoked: true, AuthStateGeneration: currentGeneration}, nil).Once()
 	}
 	return stub
 }
@@ -178,7 +178,7 @@ func armRefreshMint(t *testing.T, mockDB *datamocks.Database, input *RefreshToke
 	if input.IsROPC {
 		// The mint loads onto the parent it was handed: the presented token as the validator read
 		// it, with the generation the rotation re-read under the lock, so the row is matched by id.
-		sameToken := mock.MatchedBy(func(rt *record.RefreshToken) bool { return rt.Id == parent.Id })
+		sameToken := mock.MatchedBy(func(rt *record.RefreshToken) bool { return rt.ID == parent.ID })
 		mockDB.On("RefreshTokenLoadUser", mock.Anything, rotationTx, sameToken).Run(func(mock.Arguments) { note("mint") }).Return(nil).Once()
 		mockDB.On("RefreshTokenLoadClient", mock.Anything, rotationTx, sameToken).Return(nil).Once()
 		mockDB.On("UserLoadGroups", mock.Anything, rotationTx, &parent.User).Return(nil).Once()
@@ -195,7 +195,7 @@ func armRefreshMint(t *testing.T, mockDB *datamocks.Database, input *RefreshToke
 	mockDB.On("UserLoadAttributes", mock.Anything, rotationTx, &code.User).Return(nil).Once()
 	// The max lifetime of a session-bound token is read off the session, on the transaction.
 	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, rotationTx, "sid-1").Return(&record.UserSession{
-		Id: 1, UserId: 5, Started: now.Add(-30 * time.Minute), LastAccessed: now.Add(-5 * time.Minute),
+		ID: 1, UserID: 5, Started: now.Add(-30 * time.Minute), LastAccessed: now.Add(-5 * time.Minute),
 	}, nil).Once()
 	return inserted
 }
@@ -219,7 +219,7 @@ func TestIssueRefreshTokenGrant_ClaimsMintsThenBumpsTheSession(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	var order []string
 	note := func(what string) { order = append(order, what) }
-	sessions := &fakeSessions{session: &record.UserSession{Id: 3, UserId: 5}, note: note}
+	sessions := &fakeSessions{session: &record.UserSession{ID: 3, UserID: 5}, note: note}
 	issuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, sessions)
 
 	input := codeRefreshInput()
@@ -239,7 +239,7 @@ func TestIssueRefreshTokenGrant_ClaimsMintsThenBumpsTheSession(t *testing.T) {
 	require.Len(t, sessions.bumps, 1)
 	bump := sessions.bumps[0]
 	assert.Equal(t, "sid-1", bump.sessionIdentifier)
-	assert.Equal(t, int64(1), bump.clientId, "the session is bumped for the code's client")
+	assert.Equal(t, int64(1), bump.clientID, "the session is bumped for the code's client")
 	// No step-up and no address: the session keeps its methods, its level and the address its
 	// browser was last seen from (#243).
 	assert.Empty(t, bump.authMethods)
@@ -302,7 +302,7 @@ func TestIssueRefreshTokenGrant_TheMintReadsThePictureOnTheRotationTransaction(t
 	for _, tc := range []struct {
 		name   string
 		input  func() *RefreshTokenGrantInput
-		userId int64
+		userID int64
 	}{
 		{"authorization code token", codeRefreshInput, 5},
 		{"ROPC token", ropcRefreshInput, 5},
@@ -317,17 +317,17 @@ func TestIssueRefreshTokenGrant_TheMintReadsThePictureOnTheRotationTransaction(t
 			input.RefreshToken.Code.Scope = "openid profile"
 			settings := refreshGrantSettings()
 			settings.IncludeOpenIDConnectClaimsInAccessToken = true
-			settings.IncludeOpenIDConnectClaimsInIdToken = true
+			settings.IncludeOpenIDConnectClaimsInIDToken = true
 
 			armRotation(mockDB, input, true, false, func(string) {})
 			armRefreshMint(t, mockDB, input, func(string) {})
-			mockDB.On("UserHasProfilePicture", mock.Anything, rotationTx, tc.userId).Return(true, nil)
+			mockDB.On("UserHasProfilePicture", mock.Anything, rotationTx, tc.userID).Return(true, nil)
 
 			response, _, err := issuer.IssueRefreshTokenGrant(context.Background(), settings, input)
 
 			require.NoError(t, err)
-			assert.NotEmpty(t, response.IdToken)
-			mockDB.AssertCalled(t, "UserHasProfilePicture", mock.Anything, rotationTx, tc.userId)
+			assert.NotEmpty(t, response.IDToken)
+			mockDB.AssertCalled(t, "UserHasProfilePicture", mock.Anything, rotationTx, tc.userID)
 			mockDB.AssertExpectations(t)
 		})
 	}
@@ -496,21 +496,21 @@ func TestIssueRefreshTokenGrant_FlowGate(t *testing.T) {
 		refused    bool
 	}{
 		{"row 1: ROPC token, both flows on, accepted",
-			&record.Client{Id: 1, AuthorizationCodeEnabled: true, ResourceOwnerPasswordCredentialsEnabled: &ropcOn}, true, true, false},
+			&record.Client{ID: 1, AuthorizationCodeEnabled: true, ResourceOwnerPasswordCredentialsEnabled: &ropcOn}, true, true, false},
 		{"row 2: ROPC token, ROPC-only client, accepted",
-			&record.Client{Id: 1, AuthorizationCodeEnabled: false, ResourceOwnerPasswordCredentialsEnabled: &ropcOn}, true, true, false},
+			&record.Client{ID: 1, AuthorizationCodeEnabled: false, ResourceOwnerPasswordCredentialsEnabled: &ropcOn}, true, true, false},
 		{"row 3: ROPC token, ROPC off on the client, refused",
-			&record.Client{Id: 1, AuthorizationCodeEnabled: true, ResourceOwnerPasswordCredentialsEnabled: &ropcOff}, true, true, true},
+			&record.Client{ID: 1, AuthorizationCodeEnabled: true, ResourceOwnerPasswordCredentialsEnabled: &ropcOff}, true, true, true},
 		{"row 4: ROPC token, both flows off, refused",
-			&record.Client{Id: 1, AuthorizationCodeEnabled: false, ResourceOwnerPasswordCredentialsEnabled: &ropcOff}, true, true, true},
+			&record.Client{ID: 1, AuthorizationCodeEnabled: false, ResourceOwnerPasswordCredentialsEnabled: &ropcOff}, true, true, true},
 		// The only row that fails if the gate reads the per-client override alone: the client
 		// inherits, and the global switch is what turns ROPC off.
 		{"row 5: ROPC token, client inherits, global ROPC off, refused",
-			&record.Client{Id: 1, AuthorizationCodeEnabled: true}, false, true, true},
+			&record.Client{ID: 1, AuthorizationCodeEnabled: true}, false, true, true},
 		{"row 6: authorization code token, that flow off, refused",
-			&record.Client{Id: 1, AuthorizationCodeEnabled: false, ResourceOwnerPasswordCredentialsEnabled: &ropcOn}, true, false, true},
+			&record.Client{ID: 1, AuthorizationCodeEnabled: false, ResourceOwnerPasswordCredentialsEnabled: &ropcOn}, true, false, true},
 		{"row 7: authorization code token, that flow on, ROPC off, accepted",
-			&record.Client{Id: 1, AuthorizationCodeEnabled: true, ResourceOwnerPasswordCredentialsEnabled: &ropcOff}, false, false, false},
+			&record.Client{ID: 1, AuthorizationCodeEnabled: true, ResourceOwnerPasswordCredentialsEnabled: &ropcOff}, false, false, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			mockDB := datamocks.NewDatabase(t)
@@ -561,7 +561,7 @@ func TestIssueRefreshTokenGrant_ContainmentPrecedesTheFlowGate(t *testing.T) {
 			issuer := NewTokenIssuer(mockDB, "http://localhost:8081", "http://localhost:9091", testDataCipher, &fakeSessions{})
 
 			input := tc.input
-			input.Client = &record.Client{Id: 1, AuthorizationCodeEnabled: false, ResourceOwnerPasswordCredentialsEnabled: &ropcOff}
+			input.Client = &record.Client{ID: 1, AuthorizationCodeEnabled: false, ResourceOwnerPasswordCredentialsEnabled: &ropcOff}
 			input.RefreshToken.Revoked = true
 			settings := refreshGrantSettings()
 			settings.ResourceOwnerPasswordCredentialsEnabled = false
@@ -619,7 +619,7 @@ func TestIssueRefreshTokenGrant_AClaimFailureIsAFault(t *testing.T) {
 	failure := errs.New("connection refused")
 	datamocks.ExpectRunInTransaction(mockDB, rotationTx)
 	mockDB.On("AcquireUserRow", mock.Anything, rotationTx, int64(5)).Return(nil).Once()
-	mockDB.On("MarkRefreshTokenAsRevoked", mock.Anything, rotationTx, input.RefreshToken.Id).Return(false, failure).Once()
+	mockDB.On("MarkRefreshTokenAsRevoked", mock.Anything, rotationTx, input.RefreshToken.ID).Return(false, failure).Once()
 
 	response, outcome, err := issuer.IssueRefreshTokenGrant(context.Background(), refreshGrantSettings(), input)
 
@@ -679,7 +679,7 @@ func TestIssueRefreshTokenGrant_AFailedFamilyReadIsAFault(t *testing.T) {
 	failure := errs.New("connection refused")
 	stub := datamocks.ExpectRunInTransaction(mockDB, rotationTx)
 	mockDB.On("AcquireUserRow", mock.Anything, rotationTx, int64(5)).Return(nil).Once()
-	mockDB.On("MarkRefreshTokenAsRevoked", mock.Anything, rotationTx, input.RefreshToken.Id).Return(true, nil).Once()
+	mockDB.On("MarkRefreshTokenAsRevoked", mock.Anything, rotationTx, input.RefreshToken.ID).Return(true, nil).Once()
 	mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, rotationTx, "jti-family").Return(false, failure).Once()
 
 	response, outcome, err := issuer.IssueRefreshTokenGrant(context.Background(), refreshGrantSettings(), input)
@@ -747,10 +747,10 @@ func TestIssueRefreshTokenGrant_ARefusedCommitHandsOutNothing(t *testing.T) {
 	commitFailure := errs.New("commit refused")
 	datamocks.ExpectRunInTransactionThenFail(mockDB, rotationTx, commitFailure)
 	mockDB.On("AcquireUserRow", mock.Anything, rotationTx, int64(5)).Return(nil).Once()
-	mockDB.On("MarkRefreshTokenAsRevoked", mock.Anything, rotationTx, input.RefreshToken.Id).Return(true, nil).Once()
+	mockDB.On("MarkRefreshTokenAsRevoked", mock.Anything, rotationTx, input.RefreshToken.ID).Return(true, nil).Once()
 	mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, rotationTx, "jti-family").Return(false, nil).Once()
-	mockDB.On("GetRefreshTokenById", mock.Anything, rotationTx, input.RefreshToken.Id).
-		Return(&record.RefreshToken{Id: input.RefreshToken.Id}, nil).Once()
+	mockDB.On("GetRefreshTokenByID", mock.Anything, rotationTx, input.RefreshToken.ID).
+		Return(&record.RefreshToken{ID: input.RefreshToken.ID}, nil).Once()
 	armRefreshMint(t, mockDB, input, func(string) {})
 
 	response, outcome, err := issuer.IssueRefreshTokenGrant(context.Background(), refreshGrantSettings(), input)
@@ -774,13 +774,13 @@ func TestIssueRefreshTokenGrant_TakesTheTokensOwnersRowFirst(t *testing.T) {
 	}{
 		{"authorization code token: the code's user", func() *RefreshTokenGrantInput {
 			input := codeRefreshInput()
-			input.RefreshToken.UserId = sql.NullInt64{Int64: 99, Valid: true}
+			input.RefreshToken.UserID = sql.NullInt64{Int64: 99, Valid: true}
 			return input
 		}, 5},
 		{"ROPC token: the token's user", func() *RefreshTokenGrantInput {
 			input := ropcRefreshInput()
-			input.RefreshToken.UserId = sql.NullInt64{Int64: 99, Valid: true}
-			input.RefreshToken.Code.UserId = 5
+			input.RefreshToken.UserID = sql.NullInt64{Int64: 99, Valid: true}
+			input.RefreshToken.Code.UserID = 5
 			return input
 		}, 99},
 	} {
@@ -795,7 +795,7 @@ func TestIssueRefreshTokenGrant_TakesTheTokensOwnersRowFirst(t *testing.T) {
 			mockDB.On("AcquireUserRow", mock.Anything, rotationTx, tc.wantOwner).
 				Run(func(mock.Arguments) { note("acquire") }).Return(nil).Once()
 			// The claim is lost, so the case stops at it: what it measures is the row taken before.
-			mockDB.On("MarkRefreshTokenAsRevoked", mock.Anything, rotationTx, input.RefreshToken.Id).
+			mockDB.On("MarkRefreshTokenAsRevoked", mock.Anything, rotationTx, input.RefreshToken.ID).
 				Run(func(mock.Arguments) { note("claim") }).Return(false, nil).Once()
 
 			_, _, err := issuer.IssueRefreshTokenGrant(context.Background(), refreshGrantSettings(), input)
@@ -896,9 +896,9 @@ func TestIssueRefreshTokenGrant_ATokenThatCannotBeReadBackIsAFault(t *testing.T)
 			input := codeRefreshInput()
 			stub := datamocks.ExpectRunInTransaction(mockDB, rotationTx)
 			mockDB.On("AcquireUserRow", mock.Anything, rotationTx, int64(5)).Return(nil).Once()
-			mockDB.On("MarkRefreshTokenAsRevoked", mock.Anything, rotationTx, input.RefreshToken.Id).Return(true, nil).Once()
+			mockDB.On("MarkRefreshTokenAsRevoked", mock.Anything, rotationTx, input.RefreshToken.ID).Return(true, nil).Once()
 			mockDB.On("IsRefreshTokenFamilyRevoked", mock.Anything, rotationTx, "jti-family").Return(false, nil).Once()
-			mockDB.On("GetRefreshTokenById", mock.Anything, rotationTx, input.RefreshToken.Id).Return(tc.row, tc.err).Once()
+			mockDB.On("GetRefreshTokenByID", mock.Anything, rotationTx, input.RefreshToken.ID).Return(tc.row, tc.err).Once()
 
 			response, outcome, err := issuer.IssueRefreshTokenGrant(context.Background(), refreshGrantSettings(), input)
 
@@ -948,14 +948,14 @@ func TestIssueRefreshTokenGrant_AFailedBumpStillHandsOutTheTokens(t *testing.T) 
 				"the bump fails after the rotation committed")
 			require.NotNil(t, response)
 			assert.NotEmpty(t, response.AccessToken)
-			assert.NotEmpty(t, response.IdToken)
+			assert.NotEmpty(t, response.IDToken)
 			require.NotNil(t, inserted.row)
 			claims := jwt.MapClaims{}
 			_, _, parseErr := jwt.NewParser().ParseUnverified(response.RefreshToken, claims)
 			require.NoError(t, parseErr)
-			assert.Equal(t, inserted.row.RefreshTokenJti, claims["jti"],
+			assert.Equal(t, inserted.row.RefreshTokenJTI, claims["jti"],
 				"the refresh token handed out is the child the rotation inserted")
-			assert.NotEqual(t, input.RefreshToken.RefreshTokenJti, claims["jti"])
+			assert.NotEqual(t, input.RefreshToken.RefreshTokenJTI, claims["jti"])
 			require.NotNil(t, outcome)
 			assert.Nil(t, outcome.BumpedSession, "no session was kept alive, so the handler audits no bump")
 			assert.Len(t, sessions.bumps, 1)

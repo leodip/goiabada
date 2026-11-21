@@ -45,12 +45,12 @@ var ErrIssuingSessionGone = errors.New("the session this ceremony is issuing for
 // for and the shared lock it holds on that client's row, the code row it writes, and the
 // transaction they share.
 type codeIssuerDatabase interface {
-	AcquireUserRow(ctx context.Context, tx *sql.Tx, userId int64) error
+	AcquireUserRow(ctx context.Context, tx *sql.Tx, userID int64) error
 	AcquireUserSessionRow(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (bool, error)
 	CreateCode(ctx context.Context, tx *sql.Tx, code *record.Code) error
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
-	GetClientByIdForShare(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error)
-	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	GetClientByIDForShare(ctx context.Context, tx *sql.Tx, clientID int64) (*record.Client, error)
+	GetUserByID(ctx context.Context, tx *sql.Tx, userID int64) (*record.User, error)
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 }
 
@@ -63,7 +63,7 @@ type CodeIssuer struct {
 // every field of the ceremony's state machine to read seventeen of them; the handler that holds the
 // context copies them across (#437).
 type CreateCodeInput struct {
-	ClientId            string
+	ClientID            string
 	RedirectURI         string
 	ResponseMode        string
 	Scope               string
@@ -73,9 +73,9 @@ type CreateCodeInput struct {
 	State               string
 	Nonce               string
 	UserAgent           string
-	IpAddress           string
-	UserId              int64
-	AcrLevel            record.AcrLevel
+	IPAddress           string
+	UserID              int64
+	ACRLevel            record.ACRLevel
 	AuthMethods         string
 	// AuthenticatedAt is the code's auth_time: the ceremony's, which /auth/completed set from the
 	// session it bound, or prompt=none from the session it reused. Required: IssueAuthCode refuses a
@@ -164,7 +164,7 @@ func (ci *CodeIssuer) IssueAuthCode(ctx context.Context, tx *sql.Tx, input *Crea
 	// authenticated.
 	if input.AuthenticatedAt == nil || input.AuthenticatedAt.IsZero() {
 		return nil, errs.Errorf("the ceremony for user %v has no auth time to issue an authorization code with",
-			input.UserId)
+			input.UserID)
 	}
 
 	// A code naming a one-time code is issued only while the user still has the authenticator it
@@ -172,7 +172,7 @@ func (ci *CodeIssuer) IssueAuthCode(ctx context.Context, tx *sql.Tx, input *Crea
 	// asked a moment ago, but a removal committing since would otherwise see this code inserted after
 	// it, claiming otp, and redemption would not notice: a removal does not move the authentication
 	// generation it checks (#542).
-	if err := input.OTPClaim.Recheck(ctx, ci.database, tx, input.UserId); err != nil {
+	if err := input.OTPClaim.Recheck(ctx, ci.database, tx, input.UserID); err != nil {
 		return nil, err
 	}
 
@@ -205,7 +205,7 @@ func (ci *CodeIssuer) createAuthCode(ctx context.Context, tx *sql.Tx, input *Cre
 		responseMode = "query"
 	}
 
-	client, err := ci.database.GetClientByClientIdentifier(ctx, tx, input.ClientId)
+	client, err := ci.database.GetClientByClientIdentifier(ctx, tx, input.ClientID)
 	if err != nil {
 		return nil, err
 	}
@@ -213,7 +213,7 @@ func (ci *CodeIssuer) createAuthCode(ctx context.Context, tx *sql.Tx, input *Cre
 	// A client the ceremony started against can be gone by the time this runs, and since #139 that
 	// is a reliable schedule rather than a narrow race: issuance takes a shared lock on the client
 	// row, so a deletion that got there first makes this transaction WAIT and then proceed into
-	// this lookup, which now finds nothing. Dereferencing it for client.Id below was a panic, so
+	// this lookup, which now finds nothing. Dereferencing it for client.ID below was a panic, so
 	// the condition is answered as an error and the caller answers it the way it answers a session
 	// that has gone (#248 part 5).
 	if client == nil {
@@ -228,7 +228,7 @@ func (ci *CodeIssuer) createAuthCode(ctx context.Context, tx *sql.Tx, input *Cre
 	// held to the end of this transaction: either this code commits before the rename can change the
 	// row and the rename's sweep finds it, or the rename commits first, this read waits for it, and
 	// the identifier is no longer the one the ceremony named, so nothing is issued (#866).
-	held, err := ci.database.GetClientByIdForShare(ctx, tx, client.Id)
+	held, err := ci.database.GetClientByIDForShare(ctx, tx, client.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -260,9 +260,9 @@ func (ci *CodeIssuer) createAuthCode(ctx context.Context, tx *sql.Tx, input *Cre
 	code := &record.Code{
 		Code:                authCode,
 		CodeHash:            authCodeHash,
-		ClientId:            client.Id,
+		ClientID:            client.ID,
 		AuthenticatedAt:     *input.AuthenticatedAt,
-		UserId:              input.UserId,
+		UserID:              input.UserID,
 		CodeChallenge:       codeChallenge,
 		CodeChallengeMethod: codeChallengeMethod,
 		DPoPJkt:             dpopJkt,
@@ -278,8 +278,8 @@ func (ci *CodeIssuer) createAuthCode(ctx context.Context, tx *sql.Tx, input *Cre
 		// (#281).
 		UserAgent:         useragent.BoundRaw(input.UserAgent),
 		ResponseMode:      responseMode,
-		IpAddress:         input.IpAddress,
-		AcrLevel:          input.AcrLevel,
+		IPAddress:         input.IPAddress,
+		ACRLevel:          input.ACRLevel,
 		AuthMethods:       input.AuthMethods,
 		SessionIdentifier: input.SessionIdentifier,
 		Used:              false,

@@ -43,8 +43,8 @@
           <div class="grid gap-3">
             {{ if .HasConsent }}
             <div class="grid gap-1">
-              <span class="block text-sm text-ink-muted" id="consent-scope-{{ .ClientId }}">{{ T $.ctx "adminconsole.account.applications.consent_scope_label" }}</span>
-              <ul class="grid gap-2" aria-labelledby="consent-scope-{{ .ClientId }}">
+              <span class="block text-sm text-ink-muted" id="consent-scope-{{ .ClientID }}">{{ T $.ctx "adminconsole.account.applications.consent_scope_label" }}</span>
+              <ul class="grid gap-2" aria-labelledby="consent-scope-{{ .ClientID }}">
                 {{ range ScopeList $.ctx .ConsentScope }}
                 <li class="grid gap-0.5">{{ with .Description }}<span>{{ . }}</span>{{ end }}<span class="code-hint">{{ .Scope }}</span></li>
                 {{ end }}
@@ -53,8 +53,8 @@
             {{ end }}
             {{ if .GrantScope }}
             <div class="grid gap-1">
-              <span class="block text-sm text-ink-muted" id="grant-scope-{{ .ClientId }}">{{ T $.ctx "adminconsole.account.applications.grant_scope_label" }}</span>
-              <ul class="grid gap-2" aria-labelledby="grant-scope-{{ .ClientId }}">
+              <span class="block text-sm text-ink-muted" id="grant-scope-{{ .ClientID }}">{{ T $.ctx "adminconsole.account.applications.grant_scope_label" }}</span>
+              <ul class="grid gap-2" aria-labelledby="grant-scope-{{ .ClientID }}">
                 {{ range ScopeList $.ctx .GrantScope }}
                 <li class="grid gap-0.5">{{ with .Description }}<span>{{ . }}</span>{{ end }}<span class="code-hint">{{ .Scope }}</span></li>
                 {{ end }}
@@ -68,7 +68,7 @@
           {{ if .IsCurrent }}
           <span class="tag tag-note">{{ T $.ctx "adminconsole.account.applications.current_tag" }}</span>
           {{ else }}
-          <button class="button button-sm" type="button" data-action-url="/account/applications" data-action-body="{&#34;clientId&#34;:{{ .ClientId }}}" data-dialog="disconnectClient" data-done="{{ T $.ctx "adminconsole.account.applications.disconnected" }}" data-done-label="{{ T $.ctx "adminconsole.account.applications.disconnected_label" }}" data-confirm="{{ if .ClientNameUnverified }}{{ T $.ctx "adminconsole.account.applications.disconnect_confirm_unverified" "client" .ClientName }}{{ else }}{{ T $.ctx "adminconsole.account.applications.disconnect_confirm" "client" .ClientName }}{{ end }}">{{ T $.ctx "adminconsole.account.applications.disconnect_button" }}<span class="sr-only"> {{ .ClientName }}</span></button>
+          <button class="button button-sm" type="button" data-action-url="/account/applications" data-action-body="{&#34;clientId&#34;:{{ .ClientID }}}" data-dialog="disconnectClient" data-done="{{ T $.ctx "adminconsole.account.applications.disconnected" }}" data-done-label="{{ T $.ctx "adminconsole.account.applications.disconnected_label" }}" data-confirm="{{ if .ClientNameUnverified }}{{ T $.ctx "adminconsole.account.applications.disconnect_confirm_unverified" "client" .ClientName }}{{ else }}{{ T $.ctx "adminconsole.account.applications.disconnect_confirm" "client" .ClientName }}{{ end }}">{{ T $.ctx "adminconsole.account.applications.disconnect_button" }}<span class="sr-only"> {{ .ClientName }}</span></button>
           {{ end }}
         </td>
       </tr>

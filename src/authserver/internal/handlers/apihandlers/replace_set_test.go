@@ -13,7 +13,7 @@ type storedRow struct {
 }
 
 func storedRowKey(r storedRow) string { return r.key }
-func storedRowId(r storedRow) int64   { return r.id }
+func storedRowID(r storedRow) int64   { return r.id }
 
 // replaceSet is the plan every list save applies inside its transaction, owned here once; each save
 // carries one thin case showing a stored duplicate is removed with its original. The two duplicate
@@ -103,7 +103,7 @@ func TestReplaceSet(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			insert, remove := replaceSet(test.stored, storedRowKey, storedRowId, test.wanted)
+			insert, remove := replaceSet(test.stored, storedRowKey, storedRowID, test.wanted)
 			assert.Equal(t, test.wantInsert, insert)
 			assert.Equal(t, test.wantRemove, remove)
 		})

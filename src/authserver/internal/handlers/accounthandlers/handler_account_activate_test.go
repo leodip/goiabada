@@ -68,7 +68,7 @@ func preRegistrationWithCode(t *testing.T, id int64, email, code string, issuedA
 	codeHash := hashutil.HashString(code)
 
 	return &record.PreRegistration{
-		Id:                        id,
+		ID:                        id,
 		Email:                     email,
 		VerificationCodeEncrypted: encrypted,
 		VerificationCodeHash:      codeHash,
@@ -111,7 +111,7 @@ func expectRenderedLinkExpiredAt(pageRenderer *handlersmocks.PageRenderer, wantS
 // the branches where the lookup resolved a row the code matched. Pass 0 to require the key is
 // ABSENT rather than zero, since a payload naming row 0 asserts a row that does not exist (#435).
 func expectAuditFailedActivationCode(auditLogger *handlersmocks.AuditLogger, wantReason string,
-	wantPreRegistrationId int64) {
+	wantPreRegistrationID int64) {
 
 	auditLogger.On("Log", mock.Anything, audit.EventFailedAccountActivationCode,
 		mock.MatchedBy(func(details map[string]interface{}) bool {
@@ -122,10 +122,10 @@ func expectAuditFailedActivationCode(auditLogger *handlersmocks.AuditLogger, wan
 				return false
 			}
 			id, present := details["pre_registration_id"]
-			if wantPreRegistrationId == 0 {
+			if wantPreRegistrationID == 0 {
 				return !present
 			}
-			return present && id == wantPreRegistrationId
+			return present && id == wantPreRegistrationID
 		}),
 	).Return().Once()
 }
@@ -184,7 +184,7 @@ func TestHandleActivateGet_LinkFollowed(t *testing.T) {
 		require.NotNil(t, marker)
 		assert.Equal(t, codeHash, marker.CodeHash,
 			"the marker must name the code hash, which is what stops it outliving the activation")
-		assert.Equal(t, int64(7), marker.Id)
+		assert.Equal(t, int64(7), marker.ID)
 
 		database.AssertExpectations(t)
 	})
@@ -311,7 +311,7 @@ func TestHandleActivateGet_LinkFollowed(t *testing.T) {
 		require.Empty(t, rejection)
 		require.NotNil(t, marker)
 		assert.Equal(t, "the-first-hash", marker.CodeHash)
-		assert.Equal(t, int64(7), marker.Id)
+		assert.Equal(t, int64(7), marker.ID)
 
 		database.AssertExpectations(t)
 		pageRenderer.AssertExpectations(t)
@@ -492,7 +492,7 @@ func TestHandleActivateGet_Clean(t *testing.T) {
 		handler.ServeHTTP(rr, sent)
 
 		require.NotNil(t, rendered)
-		assert.Equal(t, marker.ContinuationId, rendered["continuationId"],
+		assert.Equal(t, marker.ContinuationID, rendered["continuationId"],
 			"the form must carry the continuation id of the marker that rendered it")
 		assert.Equal(t, activateTestEmail, rendered["email"])
 		assert.NotContains(t, rendered, "error")
@@ -525,7 +525,7 @@ func TestHandleActivateGet_Clean(t *testing.T) {
 		preReg, codeHash := preRegistrationWithCode(t, 7, activateTestEmail, code, time.Now().UTC())
 		database.On("GetPreRegistrationByVerificationCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(preReg, nil).Once()
 		database.On("GetUserByEmail", mock.Anything, (*sql.Tx)(nil), activateTestEmail).
-			Return(&record.User{Id: 3, Email: activateTestEmail}, nil).Once()
+			Return(&record.User{ID: 3, Email: activateTestEmail}, nil).Once()
 		database.On("DeletePreRegistration", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(nil).Once()
 		expectRenderedLinkExpired(pageRenderer)
 		expectAuditFailedActivationCode(auditLogger, "address_taken", 7)
@@ -740,7 +740,7 @@ func TestHandleActivateGet_TheExpiredPageLinksToRegistrationOnlyWhileItIsAvailab
 // refuseActivationLink's audit payload, pinned directly as TestAuditFailedResetPasswordCode pins
 // the reset twin's: the two entries are one shape, so a query reads both flows (#435).
 func TestRefuseActivationLink_AuditPayload(t *testing.T) {
-	capture := func(t *testing.T, r *http.Request, preRegistrationId int64, reason string) map[string]interface{} {
+	capture := func(t *testing.T, r *http.Request, preRegistrationID int64, reason string) map[string]interface{} {
 		t.Helper()
 		pageRenderer := handlersmocks.NewPageRenderer(t)
 		auditLogger := handlersmocks.NewAuditLogger(t)
@@ -751,7 +751,7 @@ func TestRefuseActivationLink_AuditPayload(t *testing.T) {
 				captured = args.Get(2).(map[string]interface{})
 			}).Return().Once()
 
-		refuseActivationLink(pageRenderer, auditLogger, httptest.NewRecorder(), r, preRegistrationId, reason, 0)
+		refuseActivationLink(pageRenderer, auditLogger, httptest.NewRecorder(), r, preRegistrationID, reason, 0)
 		return captured
 	}
 
@@ -797,12 +797,12 @@ var activationSettings = &record.Settings{AppName: "Goiabada", SelfRegistrationE
 
 // postActivationRequest builds the form submission, to the clean URL the template's empty action
 // re-submits to. continuationId is the hidden field the rendered form carries; pass "" for none.
-func postActivationRequest(password, passwordConfirmation, continuationId string) *http.Request {
+func postActivationRequest(password, passwordConfirmation, continuationID string) *http.Request {
 	form := url.Values{}
 	form.Set("password", password)
 	form.Set("passwordConfirmation", passwordConfirmation)
-	if continuationId != "" {
-		form.Set(continuationIdField, continuationId)
+	if continuationID != "" {
+		form.Set(continuationIDField, continuationID)
 	}
 
 	req := httptest.NewRequest("POST", emaillinks.AccountActivatePath, strings.NewReader(form.Encode()))
@@ -831,7 +831,7 @@ func postActivationWithMarker(t *testing.T, store *sessionstore.ConditionalStore
 	require.NoError(t, err)
 	require.Empty(t, rejection)
 
-	req := postActivationRequest(password, passwordConfirmation, marker.ContinuationId)
+	req := postActivationRequest(password, passwordConfirmation, marker.ContinuationID)
 	for _, c := range rr.Result().Cookies() {
 		req.AddCookie(c)
 	}
@@ -841,7 +841,7 @@ func postActivationWithMarker(t *testing.T, store *sessionstore.ConditionalStore
 // expectRenderedActivationFormError matches the choose-password form redrawn with a reason, still
 // naming the address and carrying back the continuation id the submission held, so a mistyped
 // confirmation does not cost the continuation.
-func expectRenderedActivationFormError(pageRenderer *handlersmocks.PageRenderer, wantContinuationId string) {
+func expectRenderedActivationFormError(pageRenderer *handlersmocks.PageRenderer, wantContinuationID string) {
 	pageRenderer.On("RenderTemplate",
 		mock.Anything,
 		mock.Anything,
@@ -849,7 +849,7 @@ func expectRenderedActivationFormError(pageRenderer *handlersmocks.PageRenderer,
 		"/account_activate_password.html",
 		mock.MatchedBy(func(data map[string]interface{}) bool {
 			msg, ok := data["error"].(string)
-			return ok && msg != "" && data["continuationId"] == wantContinuationId &&
+			return ok && msg != "" && data["continuationId"] == wantContinuationID &&
 				data["email"] == activateTestEmail
 		}),
 	).Return(nil).Once()
@@ -891,7 +891,7 @@ func TestHandleActivatePost_HappyPath(t *testing.T) {
 			created = args.Get(2).(*usercreation.Input)
 			steps = append(steps, "create account")
 		}).
-		Return(&record.User{Id: 3, Email: activateTestEmail}, nil).Once()
+		Return(&record.User{ID: 3, Email: activateTestEmail}, nil).Once()
 
 	var createdDetails, activatedDetails map[string]interface{}
 	auditLogger.On("Log", mock.Anything, audit.EventCreatedUser, mock.Anything).Run(func(args mock.Arguments) {
@@ -950,7 +950,7 @@ func TestHandleActivatePost_HappyPath(t *testing.T) {
 // A refused password redraws the form with the reason, as the reset form does, and nothing is
 // written: no account, no consumed row, no audit entry.
 func TestHandleActivatePost_PasswordFieldRejections(t *testing.T) {
-	const continuationId = "the-continuation-the-form-carried"
+	const continuationID = "the-continuation-the-form-carried"
 	const codeHash = "the-code-hash"
 
 	testCases := []struct {
@@ -990,13 +990,13 @@ func TestHandleActivatePost_PasswordFieldRejections(t *testing.T) {
 
 			tc.arrange(passwordValidator)
 			database.On("GetPreRegistrationByVerificationCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
-				Return(&record.PreRegistration{Id: 7, Email: activateTestEmail}, nil).Once()
+				Return(&record.PreRegistration{ID: 7, Email: activateTestEmail}, nil).Once()
 			database.On("GetUserByEmail", mock.Anything, (*sql.Tx)(nil), activateTestEmail).Return(nil, nil).Once()
-			expectRenderedActivationFormError(pageRenderer, continuationId)
+			expectRenderedActivationFormError(pageRenderer, continuationID)
 
 			handler := HandleActivatePost(pageRenderer, store, heldCeremonies{}, database, userCreator, passwordValidator, auditLogger, testBaseURL, testAdminConsoleBaseURL)
 			rr := httptest.NewRecorder()
-			handler.ServeHTTP(rr, withMarker(t, store, postActivationRequest(tc.password, tc.passwordConfirmation, continuationId),
+			handler.ServeHTTP(rr, withMarker(t, store, postActivationRequest(tc.password, tc.passwordConfirmation, continuationID),
 				emaillinks.LinkMarkerFlowAccountActivate, 7, codeHash))
 
 			assert.Equal(t, http.StatusOK, rr.Code)
@@ -1022,8 +1022,8 @@ func TestHandleActivatePost_RefusalsCreateNothing(t *testing.T) {
 		request func(t *testing.T, store *sessionstore.ConditionalStore) *http.Request
 		arrange func(database *datamocks.Database, passwordValidator *accounthandlersmocks.PasswordValidator)
 		reason  string
-		// wantPreRegistrationId is 0 where the key must be absent.
-		wantPreRegistrationId int64
+		// wantPreRegistrationID is 0 where the key must be absent.
+		wantPreRegistrationID int64
 	}{
 		{
 			name: "no marker at all",
@@ -1072,12 +1072,12 @@ func TestHandleActivatePost_RefusalsCreateNothing(t *testing.T) {
 			},
 			arrange: func(database *datamocks.Database, passwordValidator *accounthandlersmocks.PasswordValidator) {
 				database.On("GetPreRegistrationByVerificationCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
-					Return(&record.PreRegistration{Id: 7, Email: activateTestEmail}, nil).Once()
+					Return(&record.PreRegistration{ID: 7, Email: activateTestEmail}, nil).Once()
 				database.On("GetUserByEmail", mock.Anything, (*sql.Tx)(nil), activateTestEmail).Return(nil, nil).Once()
 				passwordValidator.On("ValidatePassword", record.PasswordPolicyMedium, chosenPassword, mock.Anything).Return(nil).Once()
 			},
 			reason:                "continuation_mismatch",
-			wantPreRegistrationId: 7,
+			wantPreRegistrationID: 7,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1090,7 +1090,7 @@ func TestHandleActivatePost_RefusalsCreateNothing(t *testing.T) {
 
 			tc.arrange(database, passwordValidator)
 			expectRenderedLinkExpiredAt(pageRenderer, http.StatusBadRequest)
-			expectAuditFailedActivationCode(auditLogger, tc.reason, tc.wantPreRegistrationId)
+			expectAuditFailedActivationCode(auditLogger, tc.reason, tc.wantPreRegistrationID)
 
 			sent := tc.request(t, store)
 			logs := logtest.CaptureSlog(t)
@@ -1130,7 +1130,7 @@ func TestHandleActivatePost_AddressTaken(t *testing.T) {
 		preReg, codeHash := preRegistrationWithCode(t, 7, activateTestEmail, code, time.Now().UTC())
 		database.On("GetPreRegistrationByVerificationCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(preReg, nil).Once()
 		database.On("GetUserByEmail", mock.Anything, (*sql.Tx)(nil), activateTestEmail).
-			Return(&record.User{Id: 3, Email: activateTestEmail}, nil).Once()
+			Return(&record.User{ID: 3, Email: activateTestEmail}, nil).Once()
 		database.On("DeletePreRegistration", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(nil).Once()
 		expectRenderedLinkExpiredAt(pageRenderer, http.StatusBadRequest)
 		expectAuditFailedActivationCode(auditLogger, "address_taken", 7)
@@ -1217,7 +1217,7 @@ func TestHandleActivatePost_AFailureCommitsNothing(t *testing.T) {
 				codeHash string) *datamocks.RunInTransactionStub {
 				stub := datamocks.ExpectRunInTransaction(database, activationTx)
 				userCreator.On("CreateUserInTransaction", mock.Anything, activationTx, mock.Anything).
-					Return(&record.User{Id: 3, Email: activateTestEmail}, nil).Once()
+					Return(&record.User{ID: 3, Email: activateTestEmail}, nil).Once()
 				database.On("DeletePreRegistrationHoldingCode", mock.Anything, activationTx, int64(7), codeHash).
 					Return(false, errs.New("connection reset")).Once()
 				return stub
@@ -1230,7 +1230,7 @@ func TestHandleActivatePost_AFailureCommitsNothing(t *testing.T) {
 				codeHash string) *datamocks.RunInTransactionStub {
 				stub := datamocks.ExpectRunInTransactionThenFail(database, activationTx, errs.New("commit refused"))
 				userCreator.On("CreateUserInTransaction", mock.Anything, activationTx, mock.Anything).
-					Return(&record.User{Id: 3, Email: activateTestEmail}, nil).Once()
+					Return(&record.User{ID: 3, Email: activateTestEmail}, nil).Once()
 				database.On("DeletePreRegistrationHoldingCode", mock.Anything, activationTx, int64(7), codeHash).Return(true, nil).Once()
 				return stub
 			},
@@ -1296,7 +1296,7 @@ func TestHandleActivatePost_DeletedMeanwhile(t *testing.T) {
 	passwordValidator.On("ValidatePassword", record.PasswordPolicyMedium, chosenPassword, mock.Anything).Return(nil).Once()
 	stub := datamocks.ExpectRunInTransaction(database, activationTx)
 	userCreator.On("CreateUserInTransaction", mock.Anything, activationTx, mock.Anything).
-		Return(&record.User{Id: 3, Email: activateTestEmail}, nil).Once()
+		Return(&record.User{ID: 3, Email: activateTestEmail}, nil).Once()
 	database.On("DeletePreRegistrationHoldingCode", mock.Anything, activationTx, int64(7), codeHash).Return(false, nil).Once()
 	expectRenderedLinkExpiredAt(pageRenderer, http.StatusBadRequest)
 	expectAuditFailedActivationCode(auditLogger, "code_no_longer_outstanding", 0)
@@ -1350,7 +1350,7 @@ func (s unclearableSessionStore) ChangeAndSave(*http.Request, http.ResponseWrite
 
 // A link marker that cannot be cleared after the account is created is logged, naming the new
 // account by its id and never by its address (#779).
-func TestHandleActivatePost_LinkMarkerCleanupFailureNamesUserId(t *testing.T) {
+func TestHandleActivatePost_LinkMarkerCleanupFailureNamesUserID(t *testing.T) {
 	const code = "the-emitted-code"
 	const chosenPassword = "Str0ngP4ss!"
 
@@ -1368,7 +1368,7 @@ func TestHandleActivatePost_LinkMarkerCleanupFailureNamesUserId(t *testing.T) {
 	datamocks.ExpectRunInTransaction(database, activationTx)
 	database.On("DeletePreRegistrationHoldingCode", mock.Anything, activationTx, int64(7), codeHash).Return(true, nil).Once()
 	userCreator.On("CreateUserInTransaction", mock.Anything, activationTx, mock.Anything).
-		Return(&record.User{Id: 3, Email: activateTestEmail}, nil).Once()
+		Return(&record.User{ID: 3, Email: activateTestEmail}, nil).Once()
 	auditLogger.On("Log", mock.Anything, audit.EventCreatedUser, mock.Anything).Return().Once()
 	auditLogger.On("Log", mock.Anything, audit.EventActivatedAccount, mock.Anything).Return().Once()
 	pageRenderer.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/auth_layout.html",

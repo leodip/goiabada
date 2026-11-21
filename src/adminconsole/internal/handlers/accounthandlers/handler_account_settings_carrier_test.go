@@ -29,25 +29,25 @@ import (
 // Each handler is driven with the flag both ways, so a handler that stopped reading the carrier and
 // bound a constant fails too.
 
-// settingsCarrierApiClient answers the one call these pages make before they read the settings.
-type settingsCarrierApiClient struct {
+// settingsCarrierAPIClient answers the one call these pages make before they read the settings.
+type settingsCarrierAPIClient struct {
 }
 
-func (settingsCarrierApiClient) GetAccountProfile(context.Context, string) (*api.UserResponse, error) {
-	return &api.UserResponse{Id: 11, Email: "someone@example.com", EmailVerified: true}, nil
+func (settingsCarrierAPIClient) GetAccountProfile(context.Context, string) (*api.UserResponse, error) {
+	return &api.UserResponse{ID: 11, Email: "someone@example.com", EmailVerified: true}, nil
 }
 
-// The rest of the ports settingsCarrierApiClient is passed to, which no test here reaches.
+// The rest of the ports settingsCarrierAPIClient is passed to, which no test here reaches.
 
-func (settingsCarrierApiClient) SendAccountEmailVerification(context.Context, string) (*api.AccountEmailVerificationSendResponse, error) {
+func (settingsCarrierAPIClient) SendAccountEmailVerification(context.Context, string) (*api.AccountEmailVerificationSendResponse, error) {
 	panic("unexpected call to SendAccountEmailVerification")
 }
 
-func (settingsCarrierApiClient) UpdateAccountEmail(context.Context, string, *api.UpdateAccountEmailRequest) (*api.UserResponse, error) {
+func (settingsCarrierAPIClient) UpdateAccountEmail(context.Context, string, *api.UpdateAccountEmailRequest) (*api.UserResponse, error) {
 	panic("unexpected call to UpdateAccountEmail")
 }
 
-func (settingsCarrierApiClient) VerifyAccountEmail(context.Context, string, *api.VerifyAccountEmailRequest) (*api.UserResponse, error) {
+func (settingsCarrierAPIClient) VerifyAccountEmail(context.Context, string, *api.VerifyAccountEmailRequest) (*api.UserResponse, error) {
 	panic("unexpected call to VerifyAccountEmail")
 }
 
@@ -63,7 +63,7 @@ func publicSettings(smtpEnabled bool) *api.PublicSettingsResponse {
 func TestHandleEmailGet_BindsSMTPEnabledFromTheSettingsCarrier(t *testing.T) {
 	for _, smtpEnabled := range []bool{true, false} {
 		t.Run(map[bool]string{true: "smtp enabled", false: "smtp disabled"}[smtpEnabled], func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 			handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_email.html").Once()
 
@@ -71,7 +71,7 @@ func TestHandleEmailGet_BindsSMTPEnabledFromTheSettingsCarrier(t *testing.T) {
 				handlertest.WithAccessToken(),
 				handlertest.WithSettings(publicSettings(smtpEnabled)))
 
-			HandleEmailGet(httpHelper, newFlashTestStore(), settingsCarrierApiClient{}).
+			HandleEmailGet(httpHelper, newFlashTestStore(), settingsCarrierAPIClient{}).
 				ServeHTTP(httptest.NewRecorder(), req)
 
 			assert.Equal(t, smtpEnabled, handlertest.Bind(t, httpHelper)["smtpEnabled"],
@@ -81,7 +81,7 @@ func TestHandleEmailGet_BindsSMTPEnabledFromTheSettingsCarrier(t *testing.T) {
 }
 
 func TestHandleEmailVerificationGet_BindsSMTPEnabledFromTheSettingsCarrier(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper,
 		"/layouts/menu_layout.html", "/account_email_verification.html").Once()
@@ -90,7 +90,7 @@ func TestHandleEmailVerificationGet_BindsSMTPEnabledFromTheSettingsCarrier(t *te
 		handlertest.WithAccessToken(),
 		handlertest.WithSettings(publicSettings(true)))
 
-	HandleEmailVerificationGet(httpHelper, newFlashTestStore(), settingsCarrierApiClient{}).
+	HandleEmailVerificationGet(httpHelper, newFlashTestStore(), settingsCarrierAPIClient{}).
 		ServeHTTP(httptest.NewRecorder(), req)
 
 	assert.Equal(t, true, handlertest.Bind(t, httpHelper)["smtpEnabled"])
@@ -101,7 +101,7 @@ func TestHandleEmailVerificationGet_BindsSMTPEnabledFromTheSettingsCarrier(t *te
 // until #542. Without this row the case above is satisfied by a handler that read the carrier once
 // and ignored what it said.
 func TestHandleEmailVerificationGet_IsNotThereWhenTheCarrierReportsSMTPOff(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	httpHelper.On("NotFound", mock.Anything, mock.Anything).Return().Once()
 
@@ -109,26 +109,26 @@ func TestHandleEmailVerificationGet_IsNotThereWhenTheCarrierReportsSMTPOff(t *te
 		handlertest.WithAccessToken(),
 		handlertest.WithSettings(publicSettings(false)))
 
-	HandleEmailVerificationGet(httpHelper, newFlashTestStore(), settingsCarrierApiClient{}).
+	HandleEmailVerificationGet(httpHelper, newFlashTestStore(), settingsCarrierAPIClient{}).
 		ServeHTTP(httptest.NewRecorder(), req)
 
 	httpHelper.AssertExpectations(t)
 }
 
-// verificationRefusingApiClient answers the profile the verification page reads first, then
+// verificationRefusingAPIClient answers the profile the verification page reads first, then
 // refuses the code with err.
-type verificationRefusingApiClient struct {
-	settingsCarrierApiClient
+type verificationRefusingAPIClient struct {
+	settingsCarrierAPIClient
 	err error
 }
 
-func (c verificationRefusingApiClient) VerifyAccountEmail(context.Context, string, *api.VerifyAccountEmailRequest) (*api.UserResponse, error) {
+func (c verificationRefusingAPIClient) VerifyAccountEmail(context.Context, string, *api.VerifyAccountEmailRequest) (*api.UserResponse, error) {
 	return nil, c.err
 }
 
-// The rest of the ports verificationRefusingApiClient is passed to, which no test here reaches.
+// The rest of the ports verificationRefusingAPIClient is passed to, which no test here reaches.
 
-func (verificationRefusingApiClient) SendAccountEmailVerification(context.Context, string) (*api.AccountEmailVerificationSendResponse, error) {
+func (verificationRefusingAPIClient) SendAccountEmailVerification(context.Context, string) (*api.AccountEmailVerificationSendResponse, error) {
 	panic("unexpected call to SendAccountEmailVerification")
 }
 
@@ -140,27 +140,27 @@ func TestAccountEmailPages_AbsentSettingsAreAnsweredWithTheSentinel(t *testing.T
 	verificationForm := handlertest.WithForm(url.Values{"verificationCode": {"123456"}})
 	testCases := []struct {
 		name    string
-		build   func(httpHelper *handlersmocks.HttpHelper) http.HandlerFunc
+		build   func(httpHelper *handlersmocks.HTTPHelper) http.HandlerFunc
 		request *http.Request
 	}{
 		{
 			name: "HandleEmailGet",
-			build: func(h *handlersmocks.HttpHelper) http.HandlerFunc {
-				return HandleEmailGet(h, newFlashTestStore(), settingsCarrierApiClient{})
+			build: func(h *handlersmocks.HTTPHelper) http.HandlerFunc {
+				return HandleEmailGet(h, newFlashTestStore(), settingsCarrierAPIClient{})
 			},
 			request: handlertest.Request(http.MethodGet, "/account/email", handlertest.WithAccessToken()),
 		},
 		{
 			name: "HandleEmailVerificationGet",
-			build: func(h *handlersmocks.HttpHelper) http.HandlerFunc {
-				return HandleEmailVerificationGet(h, newFlashTestStore(), settingsCarrierApiClient{})
+			build: func(h *handlersmocks.HTTPHelper) http.HandlerFunc {
+				return HandleEmailVerificationGet(h, newFlashTestStore(), settingsCarrierAPIClient{})
 			},
 			request: handlertest.Request(http.MethodGet, "/account/email-verification", handlertest.WithAccessToken()),
 		},
 		{
 			name: "HandleEmailVerificationPost, a code the API calls expired",
-			build: func(h *handlersmocks.HttpHelper) http.HandlerFunc {
-				return HandleEmailVerificationPost(h, newFlashTestStore(), verificationRefusingApiClient{
+			build: func(h *handlersmocks.HTTPHelper) http.HandlerFunc {
+				return HandleEmailVerificationPost(h, newFlashTestStore(), verificationRefusingAPIClient{
 					err: &apiclient.APIError{Code: "INVALID_OR_EXPIRED_VERIFICATION_CODE", Message: "Expired.", StatusCode: http.StatusBadRequest},
 				}, consoleBaseURL)
 			},
@@ -169,8 +169,8 @@ func TestAccountEmailPages_AbsentSettingsAreAnsweredWithTheSentinel(t *testing.T
 		},
 		{
 			name: "HandleEmailVerificationPost, any other refusal",
-			build: func(h *handlersmocks.HttpHelper) http.HandlerFunc {
-				return HandleEmailVerificationPost(h, newFlashTestStore(), verificationRefusingApiClient{
+			build: func(h *handlersmocks.HTTPHelper) http.HandlerFunc {
+				return HandleEmailVerificationPost(h, newFlashTestStore(), verificationRefusingAPIClient{
 					err: &apiclient.APIError{Code: "SOMETHING_ELSE", Message: "No.", StatusCode: http.StatusBadRequest},
 				}, consoleBaseURL)
 			},
@@ -181,7 +181,7 @@ func TestAccountEmailPages_AbsentSettingsAreAnsweredWithTheSentinel(t *testing.T
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			var refusedWith error
 			httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).
 				Run(func(args mock.Arguments) { refusedWith, _ = args.Get(2).(error) }).Once()

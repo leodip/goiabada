@@ -69,11 +69,11 @@ func parkTabA(t *testing.T, stalled *staleBindStaller, signaled <-chan error) {
 }
 
 // signInOf answers what one completed sign-in hands its bind, at the instant given.
-func signInOf(userId int64, methods string, level record.AcrLevel, at time.Time, passwordAt *time.Time) usersession.Authentication {
+func signInOf(userID int64, methods string, level record.ACRLevel, at time.Time, passwordAt *time.Time) usersession.Authentication {
 	return usersession.Authentication{
-		UserId:           userId,
+		UserID:           userID,
 		AuthMethods:      methods,
-		AcrLevel:         level,
+		ACRLevel:         level,
 		AuthTime:         &at,
 		PasswordAuthTime: passwordAt,
 	}
@@ -89,7 +89,7 @@ func TestBindUserSession_AnOlderStepUpThatResumesAfterANewerSignInWritesNothing(
 	user := createTestUser(t)
 	clientA := createTestClient(t)
 	clientB := createTestClient(t)
-	session := createTestUserSession(t, user.Id)
+	session := createTestUserSession(t, user.ID)
 
 	newer := time.Now().UTC().Truncate(time.Microsecond)
 	older := newer.Add(-2 * time.Minute)
@@ -100,8 +100,8 @@ func TestBindUserSession_AnOlderStepUpThatResumesAfterANewerSignInWritesNothing(
 
 	signaled := make(chan error, 1)
 	go func() {
-		_, err := tabA.BindUserSession(context.Background(), session.SessionIdentifier, clientA.Id,
-			signInOf(user.Id, "pwd otp", record.AcrLevel2Mandatory, older, nil), false, "")
+		_, err := tabA.BindUserSession(context.Background(), session.SessionIdentifier, clientA.ID,
+			signInOf(user.ID, "pwd otp", record.ACRLevel2Mandatory, older, nil), false, "")
 		signaled <- err
 	}()
 
@@ -110,10 +110,10 @@ func TestBindUserSession_AnOlderStepUpThatResumesAfterANewerSignInWritesNothing(
 
 	// Tab B's whole prompt=login, completing while tab A's request is stalled.
 	tabB := usersession.NewManager(database)
-	bumped, err := tabB.BindUserSession(context.Background(), session.SessionIdentifier, clientB.Id,
-		signInOf(user.Id, "pwd", record.AcrLevel1, newer, &newer), true, "")
+	bumped, err := tabB.BindUserSession(context.Background(), session.SessionIdentifier, clientB.ID,
+		signInOf(user.ID, "pwd", record.ACRLevel1, newer, &newer), true, "")
 	require.NoError(t, err)
-	assert.Equal(t, record.AcrLevel1, bumped.AcrLevel)
+	assert.Equal(t, record.ACRLevel1, bumped.ACRLevel)
 
 	stalled.proceed()
 
@@ -122,7 +122,7 @@ func TestBindUserSession_AnOlderStepUpThatResumesAfterANewerSignInWritesNothing(
 	require.ErrorIs(t, <-signaled, usersession.ErrStaleAuthentication)
 
 	final := readStaleTestSession(t, session.SessionIdentifier)
-	assert.Equal(t, record.AcrLevel1, final.AcrLevel, "the session keeps the newer sign-in's level")
+	assert.Equal(t, record.ACRLevel1, final.ACRLevel, "the session keeps the newer sign-in's level")
 	assert.Equal(t, "pwd", final.AuthMethods, "and its methods, without the code the older step-up verified")
 	assert.Truef(t, final.AuthTime.Equal(newer), "auth_time is the newer password's, not the older code's: %v", final.AuthTime)
 	assert.Truef(t, final.PasswordAuthTime.Equal(newer), "password_auth_time is the newer password's: %v", final.PasswordAuthTime)
@@ -137,7 +137,7 @@ func TestBindUserSession_AnOlderReplaceThatResumesAfterANewerStepUpWritesNothing
 	user := createTestUser(t)
 	clientA := createTestClient(t)
 	clientB := createTestClient(t)
-	session := createTestUserSession(t, user.Id)
+	session := createTestUserSession(t, user.ID)
 
 	newer := time.Now().UTC().Truncate(time.Microsecond)
 	older := newer.Add(-2 * time.Minute)
@@ -148,8 +148,8 @@ func TestBindUserSession_AnOlderReplaceThatResumesAfterANewerStepUpWritesNothing
 
 	signaled := make(chan error, 1)
 	go func() {
-		_, err := tabA.BindUserSession(context.Background(), session.SessionIdentifier, clientA.Id,
-			signInOf(user.Id, "pwd", record.AcrLevel1, older, &older), true, "")
+		_, err := tabA.BindUserSession(context.Background(), session.SessionIdentifier, clientA.ID,
+			signInOf(user.ID, "pwd", record.ACRLevel1, older, &older), true, "")
 		signaled <- err
 	}()
 
@@ -158,17 +158,17 @@ func TestBindUserSession_AnOlderReplaceThatResumesAfterANewerStepUpWritesNothing
 
 	// Tab B's whole step-up, completing while tab A's request is stalled.
 	tabB := usersession.NewManager(database)
-	bumped, err := tabB.BindUserSession(context.Background(), session.SessionIdentifier, clientB.Id,
-		signInOf(user.Id, "pwd otp", record.AcrLevel2Mandatory, newer, nil), false, "")
+	bumped, err := tabB.BindUserSession(context.Background(), session.SessionIdentifier, clientB.ID,
+		signInOf(user.ID, "pwd otp", record.ACRLevel2Mandatory, newer, nil), false, "")
 	require.NoError(t, err)
-	assert.Equal(t, record.AcrLevel2Mandatory, bumped.AcrLevel)
+	assert.Equal(t, record.ACRLevel2Mandatory, bumped.ACRLevel)
 
 	stalled.proceed()
 
 	require.ErrorIs(t, <-signaled, usersession.ErrStaleAuthentication)
 
 	final := readStaleTestSession(t, session.SessionIdentifier)
-	assert.Equal(t, record.AcrLevel2Mandatory, final.AcrLevel, "the session keeps the newer step-up's level")
+	assert.Equal(t, record.ACRLevel2Mandatory, final.ACRLevel, "the session keeps the newer step-up's level")
 	assert.Equal(t, "pwd otp", final.AuthMethods, "and its methods")
 	assert.Truef(t, final.AuthTime.Equal(newer), "auth_time is the newer code's, not the older password's: %v", final.AuthTime)
 }
@@ -187,36 +187,36 @@ func TestBindUserSession_TheNewerSignInWinsWhicheverBindRunsSecond(t *testing.T)
 		olderArm   string
 		newerArm   string
 		newMethods string
-		newLevel   record.AcrLevel
+		newLevel   record.ACRLevel
 	}{
 		{"the older step-up commits first, the newer prompt=login writes over it",
-			"step-up", "replace", "pwd", record.AcrLevel1},
+			"step-up", "replace", "pwd", record.ACRLevel1},
 		{"the older replace commits first, the newer step-up raises over it",
-			"replace", "step-up", "pwd otp", record.AcrLevel2Mandatory},
+			"replace", "step-up", "pwd otp", record.ACRLevel2Mandatory},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			user := createTestUser(t)
 			clientA := createTestClient(t)
 			clientB := createTestClient(t)
-			session := createTestUserSession(t, user.Id)
+			session := createTestUserSession(t, user.ID)
 
 			// The row holds an authentication older than both sign-ins, so the older bind
 			// commits: it is the newer of the pair the row knows about when it runs.
 			seeded := older.Add(-5 * time.Minute)
-			session.AcrLevel = record.AcrLevel1
+			session.ACRLevel = record.ACRLevel1
 			session.AuthMethods = "pwd"
 			session.AuthTime = seeded
 			session.PasswordAuthTime = seeded
 			require.NoError(t, database.UpdateUserSession(context.Background(), nil, session))
 
-			olderAuth := signInOf(user.Id, "pwd otp", record.AcrLevel2Mandatory, older, nil)
+			olderAuth := signInOf(user.ID, "pwd otp", record.ACRLevel2Mandatory, older, nil)
 			olderReplace := false
 			if tc.olderArm == "replace" {
-				olderAuth = signInOf(user.Id, "pwd", record.AcrLevel1, older, &older)
+				olderAuth = signInOf(user.ID, "pwd", record.ACRLevel1, older, &older)
 				olderReplace = true
 			}
 
-			newerAuth := signInOf(user.Id, tc.newMethods, tc.newLevel, newer, nil)
+			newerAuth := signInOf(user.ID, tc.newMethods, tc.newLevel, newer, nil)
 			newerReplace := false
 			if tc.newerArm == "replace" {
 				newerAuth.PasswordAuthTime = &newer
@@ -224,15 +224,15 @@ func TestBindUserSession_TheNewerSignInWinsWhicheverBindRunsSecond(t *testing.T)
 			}
 
 			_, err := usersession.NewManager(database).
-				BindUserSession(context.Background(), session.SessionIdentifier, clientA.Id, olderAuth, olderReplace, "")
+				BindUserSession(context.Background(), session.SessionIdentifier, clientA.ID, olderAuth, olderReplace, "")
 			require.NoError(t, err, "the older bind commits first, before the newer sign-in exists")
 
 			_, err = usersession.NewManager(database).
-				BindUserSession(context.Background(), session.SessionIdentifier, clientB.Id, newerAuth, newerReplace, "")
+				BindUserSession(context.Background(), session.SessionIdentifier, clientB.ID, newerAuth, newerReplace, "")
 			require.NoError(t, err, "the newer sign-in takes the session")
 
 			final := readStaleTestSession(t, session.SessionIdentifier)
-			assert.Equal(t, tc.newLevel, final.AcrLevel, "the newer sign-in's level is what the session holds")
+			assert.Equal(t, tc.newLevel, final.ACRLevel, "the newer sign-in's level is what the session holds")
 			assert.Equal(t, tc.newMethods, final.AuthMethods, "and its methods")
 			assert.Truef(t, final.AuthTime.Equal(newer), "auth_time is the newer sign-in's: %v", final.AuthTime)
 		})
@@ -246,10 +246,10 @@ func TestBindUserSession_TheNewerSignInWinsWhicheverBindRunsSecond(t *testing.T)
 func TestBindUserSession_CurrentAndNewerBindsAreNotRefused(t *testing.T) {
 	user := createTestUser(t)
 	client := createTestClient(t)
-	session := createTestUserSession(t, user.Id)
+	session := createTestUserSession(t, user.ID)
 
 	held := time.Now().UTC().Truncate(time.Microsecond)
-	session.AcrLevel = record.AcrLevel1
+	session.ACRLevel = record.ACRLevel1
 	session.AuthMethods = "pwd"
 	session.AuthTime = held
 	session.PasswordAuthTime = held
@@ -258,15 +258,15 @@ func TestBindUserSession_CurrentAndNewerBindsAreNotRefused(t *testing.T) {
 	manager := usersession.NewManager(database)
 
 	at := held
-	_, err := manager.BindUserSession(context.Background(), session.SessionIdentifier, client.Id,
-		signInOf(user.Id, "pwd", record.AcrLevel1, at, &at), true, "")
+	_, err := manager.BindUserSession(context.Background(), session.SessionIdentifier, client.ID,
+		signInOf(user.ID, "pwd", record.ACRLevel1, at, &at), true, "")
 	require.NoError(t, err, "a bind whose instant is the session's own auth_time is current, not stale")
 
 	newer := held.Add(time.Minute)
-	raised, err := manager.BindUserSession(context.Background(), session.SessionIdentifier, client.Id,
-		signInOf(user.Id, "pwd otp", record.AcrLevel2Mandatory, newer, nil), false, "")
+	raised, err := manager.BindUserSession(context.Background(), session.SessionIdentifier, client.ID,
+		signInOf(user.ID, "pwd otp", record.ACRLevel2Mandatory, newer, nil), false, "")
 	require.NoError(t, err, "a newer bind writes as it always did")
-	assert.Equal(t, record.AcrLevel2Mandatory, raised.AcrLevel)
+	assert.Equal(t, record.ACRLevel2Mandatory, raised.ACRLevel)
 	assert.Equal(t, "pwd otp", raised.AuthMethods)
 
 	final := readStaleTestSession(t, session.SessionIdentifier)
@@ -294,7 +294,7 @@ func TestBindUserSession_AnSSOBindWhoseAdoptedSessionWasReplacedWritesNothing(t 
 	user := createTestUser(t)
 	clientA := createTestClient(t)
 	clientB := createTestClient(t)
-	session := createTestUserSession(t, user.Id)
+	session := createTestUserSession(t, user.ID)
 
 	// The session as the ceremony adopted it: level 2, pwd otp, with the auth_time tab A's
 	// ceremony copied at /auth/authorize.
@@ -302,8 +302,8 @@ func TestBindUserSession_AnSSOBindWhoseAdoptedSessionWasReplacedWritesNothing(t 
 	// Newer than the row createTestUserSession stamped, so the seed bind that writes the
 	// adopted state is current rather than stale against it.
 	adopted := time.Now().UTC().Truncate(time.Microsecond)
-	_, err := seed.BindUserSession(context.Background(), session.SessionIdentifier, clientA.Id,
-		signInOf(user.Id, "pwd otp", record.AcrLevel2Mandatory, adopted, &adopted), true, "")
+	_, err := seed.BindUserSession(context.Background(), session.SessionIdentifier, clientA.ID,
+		signInOf(user.ID, "pwd otp", record.ACRLevel2Mandatory, adopted, &adopted), true, "")
 	require.NoError(t, err)
 
 	// Later than the adopted instant by construction: two clock reads could return the same
@@ -318,8 +318,8 @@ func TestBindUserSession_AnSSOBindWhoseAdoptedSessionWasReplacedWritesNothing(t 
 	go func() {
 		// The SSO bind: the methods and level the ceremony adopted, and the instant it adopted
 		// them at, entering no credential of its own.
-		_, bindErr := tabA.BindUserSession(context.Background(), session.SessionIdentifier, clientA.Id,
-			usersession.Authentication{UserId: user.Id, AuthMethods: "pwd otp", AcrLevel: record.AcrLevel2Mandatory,
+		_, bindErr := tabA.BindUserSession(context.Background(), session.SessionIdentifier, clientA.ID,
+			usersession.Authentication{UserID: user.ID, AuthMethods: "pwd otp", ACRLevel: record.ACRLevel2Mandatory,
 				AdoptedAuthTime: &adopted}, false, "")
 		signaled <- bindErr
 	}()
@@ -329,10 +329,10 @@ func TestBindUserSession_AnSSOBindWhoseAdoptedSessionWasReplacedWritesNothing(t 
 
 	// Tab B's whole prompt=login, completing while tab A's request is stalled.
 	tabB := usersession.NewManager(database)
-	bumped, err := tabB.BindUserSession(context.Background(), session.SessionIdentifier, clientB.Id,
-		signInOf(user.Id, "pwd", record.AcrLevel1, newer, &newer), true, "")
+	bumped, err := tabB.BindUserSession(context.Background(), session.SessionIdentifier, clientB.ID,
+		signInOf(user.ID, "pwd", record.ACRLevel1, newer, &newer), true, "")
 	require.NoError(t, err)
-	assert.Equal(t, record.AcrLevel1, bumped.AcrLevel)
+	assert.Equal(t, record.ACRLevel1, bumped.ACRLevel)
 
 	stalled.proceed()
 
@@ -341,7 +341,7 @@ func TestBindUserSession_AnSSOBindWhoseAdoptedSessionWasReplacedWritesNothing(t 
 	require.ErrorIs(t, <-signaled, usersession.ErrStaleAuthentication)
 
 	final := readStaleTestSession(t, session.SessionIdentifier)
-	assert.Equal(t, record.AcrLevel1, final.AcrLevel, "the session keeps the newer sign-in's level")
+	assert.Equal(t, record.ACRLevel1, final.ACRLevel, "the session keeps the newer sign-in's level")
 	assert.Equal(t, "pwd", final.AuthMethods, "and its methods, without the otp the SSO ceremony would merge back")
 	assert.Truef(t, final.AuthTime.Equal(newer), "auth_time is the newer password's, not the adopted instant: %v", final.AuthTime)
 }
@@ -356,26 +356,26 @@ func TestBindUserSession_TheSameSignInBindsTwice(t *testing.T) {
 	t.Run("an SSO ceremony that stepped up", func(t *testing.T) {
 		user := createTestUser(t)
 		client := createTestClient(t)
-		session := createTestUserSession(t, user.Id)
+		session := createTestUserSession(t, user.ID)
 
 		adopted := time.Now().UTC().Truncate(time.Microsecond)
-		session.AcrLevel, session.AuthMethods, session.AuthTime, session.PasswordAuthTime =
-			record.AcrLevel1, "pwd", adopted, adopted
+		session.ACRLevel, session.AuthMethods, session.AuthTime, session.PasswordAuthTime =
+			record.ACRLevel1, "pwd", adopted, adopted
 		require.NoError(t, database.UpdateUserSession(context.Background(), nil, session))
 
 		code := adopted.Add(time.Minute + 1600*time.Nanosecond)
-		stepUp := usersession.Authentication{UserId: user.Id, AuthMethods: "pwd otp",
-			AcrLevel: record.AcrLevel2Mandatory, AuthTime: &code, AdoptedAuthTime: &adopted}
+		stepUp := usersession.Authentication{UserID: user.ID, AuthMethods: "pwd otp",
+			ACRLevel: record.ACRLevel2Mandatory, AuthTime: &code, AdoptedAuthTime: &adopted}
 
 		manager := usersession.NewManager(database)
 		for attempt := 1; attempt <= 2; attempt++ {
-			_, err := manager.BindUserSession(context.Background(), session.SessionIdentifier, client.Id,
+			_, err := manager.BindUserSession(context.Background(), session.SessionIdentifier, client.ID,
 				stepUp, false, "")
 			require.NoErrorf(t, err, "bind %d of the same step-up", attempt)
 		}
 
 		final := readStaleTestSession(t, session.SessionIdentifier)
-		assert.Equal(t, record.AcrLevel2Mandatory, final.AcrLevel)
+		assert.Equal(t, record.ACRLevel2Mandatory, final.ACRLevel)
 		assert.Equal(t, "pwd otp", final.AuthMethods)
 		assert.Lessf(t, final.AuthTime.Sub(code).Abs(), time.Microsecond,
 			"auth_time is the step-up's code at the column's precision: %v", final.AuthTime)
@@ -384,14 +384,14 @@ func TestBindUserSession_TheSameSignInBindsTwice(t *testing.T) {
 	t.Run("a ceremony that authenticated afresh", func(t *testing.T) {
 		user := createTestUser(t)
 		client := createTestClient(t)
-		session := createTestUserSession(t, user.Id)
+		session := createTestUserSession(t, user.ID)
 
 		password := time.Now().UTC().Add(time.Minute).Truncate(time.Microsecond).Add(1600 * time.Nanosecond)
-		signIn := signInOf(user.Id, "pwd", record.AcrLevel1, password, &password)
+		signIn := signInOf(user.ID, "pwd", record.ACRLevel1, password, &password)
 
 		manager := usersession.NewManager(database)
 		for attempt := 1; attempt <= 2; attempt++ {
-			_, err := manager.BindUserSession(context.Background(), session.SessionIdentifier, client.Id,
+			_, err := manager.BindUserSession(context.Background(), session.SessionIdentifier, client.ID,
 				signIn, true, "")
 			require.NoErrorf(t, err, "bind %d of the same sign-in", attempt)
 		}

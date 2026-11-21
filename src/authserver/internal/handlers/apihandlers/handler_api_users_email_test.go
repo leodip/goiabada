@@ -31,7 +31,7 @@ import (
 // now answers it 409 EMAIL_ALREADY_EXISTS, as user creation does, where it answered 500.
 
 const (
-	emailTestUserId  = int64(42)
+	emailTestUserID  = int64(42)
 	emailTestSubject = "sub-42"
 	emailTestAddress = "taken@example.com"
 )
@@ -64,10 +64,10 @@ func adminEmailPutRequest(t *testing.T) *http.Request {
 // stubAdminEmailUpdate answers every read before the write, the validator's included, as an
 // address no other user holds, and the write with updateErr.
 func stubAdminEmailUpdate(database *datamocks.Database, updateErr error) {
-	database.On("GetUserById", mock.Anything, mock.Anything, emailTestUserId).
-		Return(&record.User{Id: emailTestUserId, Subject: emailTestSubject, Email: "old@example.com"}, nil).Once()
+	database.On("GetUserByID", mock.Anything, mock.Anything, emailTestUserID).
+		Return(&record.User{ID: emailTestUserID, Subject: emailTestSubject, Email: "old@example.com"}, nil).Once()
 	database.On("GetUserBySubject", mock.Anything, mock.Anything, emailTestSubject).
-		Return(&record.User{Id: emailTestUserId, Subject: emailTestSubject}, nil).Once()
+		Return(&record.User{ID: emailTestUserID, Subject: emailTestSubject}, nil).Once()
 	database.On("GetUserByEmail", mock.Anything, mock.Anything, emailTestAddress).Return(nil, nil).Once()
 	database.On("SetUserEmail", mock.Anything, mock.Anything, mock.Anything).Return(updateErr).Once()
 }
@@ -114,9 +114,9 @@ func TestHandleUserEmailPut_SavesTheEmailNarrowly(t *testing.T) {
 			database := datamocks.NewDatabase(t)
 			auditLogger := handlersmocks.NewAuditLogger(t)
 
-			database.On("GetUserById", mock.Anything, mock.Anything, emailTestUserId).
+			database.On("GetUserByID", mock.Anything, mock.Anything, emailTestUserID).
 				Return(&record.User{
-					Id:                             emailTestUserId,
+					ID:                             emailTestUserID,
 					Subject:                        emailTestSubject,
 					Email:                          "old@example.com",
 					EmailVerified:                  !verified,
@@ -126,7 +126,7 @@ func TestHandleUserEmailPut_SavesTheEmailNarrowly(t *testing.T) {
 					PasswordHash:                   "the-hash-as-read",
 				}, nil).Once()
 			database.On("GetUserBySubject", mock.Anything, mock.Anything, emailTestSubject).
-				Return(&record.User{Id: emailTestUserId, Subject: emailTestSubject}, nil).Once()
+				Return(&record.User{ID: emailTestUserID, Subject: emailTestSubject}, nil).Once()
 			database.On("GetUserByEmail", mock.Anything, mock.Anything, emailTestAddress).Return(nil, nil).Once()
 			saved := expectNarrowSave(database, "SetUserEmail")
 			auditLogger.On("Log", mock.Anything, audit.EventUpdatedUserEmail, mock.Anything).Return().Once()
@@ -143,7 +143,7 @@ func TestHandleUserEmailPut_SavesTheEmailNarrowly(t *testing.T) {
 			require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 			database.AssertNotCalled(t, "UpdateUser", mock.Anything, mock.Anything, mock.Anything)
 			require.NotNil(t, *saved, "the narrow write was not reached")
-			assert.Equal(t, emailTestUserId, (*saved).Id)
+			assert.Equal(t, emailTestUserID, (*saved).ID)
 			assert.Equal(t, emailTestAddress, (*saved).Email)
 			assert.Equal(t, verified, (*saved).EmailVerified)
 

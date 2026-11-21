@@ -32,7 +32,7 @@ func TestAPIClientSessionsGet_Success(t *testing.T) {
 	}
 	err := database.CreateClient(context.Background(), nil, testClient)
 	require.NoError(t, err)
-	defer func() { _ = database.DeleteClient(context.Background(), nil, testClient.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, testClient.ID) }()
 
 	// Create a user
 	testUser := &record.User{
@@ -45,27 +45,27 @@ func TestAPIClientSessionsGet_Success(t *testing.T) {
 	}
 	err = database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
-	defer func() { _ = database.DeleteUser(context.Background(), nil, testUser.Id) }()
+	defer func() { _ = database.DeleteUser(context.Background(), nil, testUser.ID) }()
 
 	// Create sessions
-	s1 := createTestUserSession(t, testUser.Id, fake.UUID())
-	s2 := createTestUserSession(t, testUser.Id, fake.UUID())
+	s1 := createTestUserSession(t, testUser.ID, fake.UUID())
+	s2 := createTestUserSession(t, testUser.ID, fake.UUID())
 	defer func() {
-		_ = database.DeleteUserSession(context.Background(), nil, s1.Id)
-		_ = database.DeleteUserSession(context.Background(), nil, s2.Id)
+		_ = database.DeleteUserSession(context.Background(), nil, s1.ID)
+		_ = database.DeleteUserSession(context.Background(), nil, s2.ID)
 	}()
 
 	// Link sessions to client
 	now := time.Now().UTC()
-	usc1 := &record.UserSessionClient{UserSessionId: s1.Id, ClientId: testClient.Id, Started: now.Add(-time.Hour), LastAccessed: now.Add(-time.Minute * 5)}
+	usc1 := &record.UserSessionClient{UserSessionID: s1.ID, ClientID: testClient.ID, Started: now.Add(-time.Hour), LastAccessed: now.Add(-time.Minute * 5)}
 	err = database.CreateUserSessionClient(context.Background(), nil, usc1)
 	require.NoError(t, err)
-	usc2 := &record.UserSessionClient{UserSessionId: s2.Id, ClientId: testClient.Id, Started: now.Add(-time.Hour), LastAccessed: now.Add(-time.Minute * 5)}
+	usc2 := &record.UserSessionClient{UserSessionID: s2.ID, ClientID: testClient.ID, Started: now.Add(-time.Hour), LastAccessed: now.Add(-time.Minute * 5)}
 	err = database.CreateUserSessionClient(context.Background(), nil, usc2)
 	require.NoError(t, err)
 
 	// Call endpoint
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(testClient.Id, 10) + "/sessions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(testClient.ID, 10) + "/sessions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -80,22 +80,22 @@ func TestAPIClientSessionsGet_Success(t *testing.T) {
 	// Decision 10's normalization, at its smallest: two sessions of one person, so the array
 	// they resolve against holds one record and both rows are keys into it.
 	require.Len(t, out.Users, 1)
-	assert.Equal(t, testUser.Id, out.Users[0].Id)
+	assert.Equal(t, testUser.ID, out.Users[0].ID)
 	assert.Equal(t, testUser.Email, out.Users[0].Email)
 	assert.Equal(t, "Test", out.Users[0].GivenName)
 	assert.Equal(t, "User", out.Users[0].FamilyName)
 
 	for _, s := range out.Sessions {
-		assert.Positive(t, s.Id)
+		assert.Positive(t, s.ID)
 		assert.NotEmpty(t, s.SessionIdentifier)
 		require.NotNil(t, s.Started)
 		require.NotNil(t, s.LastAccessed)
-		assert.Equal(t, "192.168.1.100", s.IpAddress)
+		assert.Equal(t, "192.168.1.100", s.IPAddress)
 		assert.Equal(t, "Test Device", s.DeviceName)
 		assert.Equal(t, "computer", s.DeviceType)
 		assert.Equal(t, "linux", s.DeviceOS)
 		assert.Equal(t, testSessionUserAgent, s.UserAgent)
-		assert.Equal(t, testUser.Id, s.UserId)
+		assert.Equal(t, testUser.ID, s.UserID)
 		assert.Contains(t, s.ClientIdentifiers, testClient.ClientIdentifier)
 	}
 }
@@ -116,9 +116,9 @@ func TestAPIClientSessionsGet_EmptySessions(t *testing.T) {
 	}
 	err := database.CreateClient(context.Background(), nil, testClient)
 	require.NoError(t, err)
-	defer func() { _ = database.DeleteClient(context.Background(), nil, testClient.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, testClient.ID) }()
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(testClient.Id, 10) + "/sessions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(testClient.ID, 10) + "/sessions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -150,12 +150,12 @@ func TestAPIClientSessionsGet_ClientNotFound(t *testing.T) {
 	assert.Equal(t, "Client not found", errResp.ErrorDescription)
 }
 
-func TestAPIClientSessionsGet_InvalidId(t *testing.T) {
+func TestAPIClientSessionsGet_InvalidID(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	cases := []struct {
 		name     string
-		clientId string
+		clientID string
 		expected int
 	}{
 		{"non-numeric", "abc", http.StatusBadRequest},
@@ -163,16 +163,16 @@ func TestAPIClientSessionsGet_InvalidId(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + tc.clientId + "/sessions"
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + tc.clientID + "/sessions"
 			resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 			defer func() { _ = resp.Body.Close() }()
 			assert.Equal(t, tc.expected, resp.StatusCode)
 			var errResp api.ErrorResponse
 			_ = json.NewDecoder(resp.Body).Decode(&errResp)
-			if tc.clientId == "abc" {
+			if tc.clientID == "abc" {
 				assert.Equal(t, "Invalid client ID format", errResp.ErrorDescription)
 			}
-			if tc.clientId == "-1" {
+			if tc.clientID == "-1" {
 				assert.Equal(t, "Client not found", errResp.ErrorDescription)
 			}
 		})
@@ -193,12 +193,12 @@ func TestAPIClientSessionsGet_Unauthorized(t *testing.T) {
 	}
 	err := database.CreateClient(context.Background(), nil, testClient)
 	require.NoError(t, err)
-	defer func() { _ = database.DeleteClient(context.Background(), nil, testClient.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, testClient.ID) }()
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(testClient.Id, 10) + "/sessions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(testClient.ID, 10) + "/sessions"
 	req, err := http.NewRequest("GET", url, nil)
 	require.NoError(t, err)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -221,7 +221,7 @@ func TestAPIClientSessionsGet_OnlyValidSessions(t *testing.T) {
 	}
 	err := database.CreateClient(context.Background(), nil, testClient)
 	require.NoError(t, err)
-	defer func() { _ = database.DeleteClient(context.Background(), nil, testClient.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, testClient.ID) }()
 
 	// User
 	testUser := &record.User{
@@ -234,7 +234,7 @@ func TestAPIClientSessionsGet_OnlyValidSessions(t *testing.T) {
 	}
 	err = database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
-	defer func() { _ = database.DeleteUser(context.Background(), nil, testUser.Id) }()
+	defer func() { _ = database.DeleteUser(context.Background(), nil, testUser.ID) }()
 
 	// Valid session
 	valid := &record.UserSession{
@@ -242,18 +242,18 @@ func TestAPIClientSessionsGet_OnlyValidSessions(t *testing.T) {
 		Started:           time.Now().UTC().Add(-30 * time.Minute),
 		LastAccessed:      time.Now().UTC().Add(-5 * time.Minute),
 		AuthMethods:       "pwd",
-		AcrLevel:          "urn:goiabada:pwd",
+		ACRLevel:          "urn:goiabada:pwd",
 		AuthTime:          time.Now().UTC().Add(-30 * time.Minute),
 		PasswordAuthTime:  time.Now().UTC().Add(-30 * time.Minute),
-		IpAddress:         "192.168.1.100",
+		IPAddress:         "192.168.1.100",
 		DeviceName:        "Valid Session Device",
 		DeviceType:        "computer",
 		DeviceOS:          "linux",
-		UserId:            testUser.Id,
+		UserID:            testUser.ID,
 	}
 	err = database.CreateUserSession(context.Background(), nil, valid)
 	require.NoError(t, err)
-	defer func() { _ = database.DeleteUserSession(context.Background(), nil, valid.Id) }()
+	defer func() { _ = database.DeleteUserSession(context.Background(), nil, valid.ID) }()
 
 	// Expired session
 	expired := &record.UserSession{
@@ -261,28 +261,28 @@ func TestAPIClientSessionsGet_OnlyValidSessions(t *testing.T) {
 		Started:           time.Now().UTC().Add(-25 * time.Hour),
 		LastAccessed:      time.Now().UTC().Add(-24 * time.Hour),
 		AuthMethods:       "pwd",
-		AcrLevel:          "urn:goiabada:pwd",
+		ACRLevel:          "urn:goiabada:pwd",
 		AuthTime:          time.Now().UTC().Add(-25 * time.Hour),
 		PasswordAuthTime:  time.Now().UTC().Add(-25 * time.Hour),
-		IpAddress:         "192.168.1.100",
+		IPAddress:         "192.168.1.100",
 		DeviceName:        "Expired Session Device",
 		DeviceType:        "computer",
 		DeviceOS:          "linux",
-		UserId:            testUser.Id,
+		UserID:            testUser.ID,
 	}
 	err = database.CreateUserSession(context.Background(), nil, expired)
 	require.NoError(t, err)
-	defer func() { _ = database.DeleteUserSession(context.Background(), nil, expired.Id) }()
+	defer func() { _ = database.DeleteUserSession(context.Background(), nil, expired.ID) }()
 
 	// Link both to client
 	now := time.Now().UTC()
-	err = database.CreateUserSessionClient(context.Background(), nil, &record.UserSessionClient{UserSessionId: valid.Id, ClientId: testClient.Id, Started: now.Add(-time.Hour), LastAccessed: now.Add(-5 * time.Minute)})
+	err = database.CreateUserSessionClient(context.Background(), nil, &record.UserSessionClient{UserSessionID: valid.ID, ClientID: testClient.ID, Started: now.Add(-time.Hour), LastAccessed: now.Add(-5 * time.Minute)})
 	require.NoError(t, err)
-	err = database.CreateUserSessionClient(context.Background(), nil, &record.UserSessionClient{UserSessionId: expired.Id, ClientId: testClient.Id, Started: now.Add(-26 * time.Hour), LastAccessed: now.Add(-25 * time.Hour)})
+	err = database.CreateUserSessionClient(context.Background(), nil, &record.UserSessionClient{UserSessionID: expired.ID, ClientID: testClient.ID, Started: now.Add(-26 * time.Hour), LastAccessed: now.Add(-25 * time.Hour)})
 	require.NoError(t, err)
 
 	// Call endpoint
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(testClient.Id, 10) + "/sessions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(testClient.ID, 10) + "/sessions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -312,7 +312,7 @@ func TestAPIClientSessionsGet_PaginationDefaultAndCap(t *testing.T) {
 	}
 	err := database.CreateClient(context.Background(), nil, testClient)
 	require.NoError(t, err)
-	defer func() { _ = database.DeleteClient(context.Background(), nil, testClient.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, testClient.ID) }()
 
 	// User
 	testUser := &record.User{
@@ -325,7 +325,7 @@ func TestAPIClientSessionsGet_PaginationDefaultAndCap(t *testing.T) {
 	}
 	err = database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
-	defer func() { _ = database.DeleteUser(context.Background(), nil, testUser.Id) }()
+	defer func() { _ = database.DeleteUser(context.Background(), nil, testUser.ID) }()
 
 	// Create many valid sessions (e.g., 120)
 	total := 120
@@ -337,31 +337,31 @@ func TestAPIClientSessionsGet_PaginationDefaultAndCap(t *testing.T) {
 			Started:           now.Add(-time.Hour),
 			LastAccessed:      now.Add(-time.Minute * 5),
 			AuthMethods:       "pwd",
-			AcrLevel:          "urn:goiabada:pwd",
+			ACRLevel:          "urn:goiabada:pwd",
 			AuthTime:          now.Add(-time.Hour),
 			PasswordAuthTime:  now.Add(-time.Hour),
-			IpAddress:         "192.168.1.100",
+			IPAddress:         "192.168.1.100",
 			DeviceName:        "Test Device",
 			DeviceType:        "computer",
 			DeviceOS:          "linux",
-			UserId:            testUser.Id,
+			UserID:            testUser.ID,
 		}
 		sessionErr := database.CreateUserSession(context.Background(), nil, s)
 		require.NoError(t, sessionErr)
 		sessions = append(sessions, s)
 		// Link to client
-		usc := &record.UserSessionClient{UserSessionId: s.Id, ClientId: testClient.Id, Started: now.Add(-time.Hour), LastAccessed: now.Add(-time.Minute * 5)}
+		usc := &record.UserSessionClient{UserSessionID: s.ID, ClientID: testClient.ID, Started: now.Add(-time.Hour), LastAccessed: now.Add(-time.Minute * 5)}
 		sessionErr = database.CreateUserSessionClient(context.Background(), nil, usc)
 		require.NoError(t, sessionErr)
 	}
 	defer func() {
 		for _, s := range sessions {
-			_ = database.DeleteUserSession(context.Background(), nil, s.Id)
+			_ = database.DeleteUserSession(context.Background(), nil, s.ID)
 		}
 	}()
 
 	// Default pagination (no page/size): expect 50 items returned
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(testClient.Id, 10) + "/sessions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(testClient.ID, 10) + "/sessions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -371,7 +371,7 @@ func TestAPIClientSessionsGet_PaginationDefaultAndCap(t *testing.T) {
 	assert.Len(t, out.Sessions, 50)
 
 	// Request size over cap (e.g., 200) should cap at 100
-	url2 := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(testClient.Id, 10) + "/sessions?size=200"
+	url2 := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(testClient.ID, 10) + "/sessions?size=200"
 	resp2 := makeAPIRequest(t, "GET", url2, accessToken, nil)
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp2.StatusCode)
@@ -403,7 +403,7 @@ func TestAPIClientSessionsGet_UsersAreNormalizedAndCarryOnlyTheOwnerFields(t *te
 	}
 	err := database.CreateClient(context.Background(), nil, testClient)
 	require.NoError(t, err)
-	defer func() { _ = database.DeleteClient(context.Background(), nil, testClient.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, testClient.ID) }()
 
 	// Two sessions for the first person, one for the second.
 	first := &record.User{
@@ -420,7 +420,7 @@ func TestAPIClientSessionsGet_UsersAreNormalizedAndCarryOnlyTheOwnerFields(t *te
 	}
 	err = database.CreateUser(context.Background(), nil, first)
 	require.NoError(t, err)
-	defer func() { _ = database.DeleteUser(context.Background(), nil, first.Id) }()
+	defer func() { _ = database.DeleteUser(context.Background(), nil, first.ID) }()
 
 	second := &record.User{
 		Subject:       fake.UUID(),
@@ -432,21 +432,21 @@ func TestAPIClientSessionsGet_UsersAreNormalizedAndCarryOnlyTheOwnerFields(t *te
 	}
 	err = database.CreateUser(context.Background(), nil, second)
 	require.NoError(t, err)
-	defer func() { _ = database.DeleteUser(context.Background(), nil, second.Id) }()
+	defer func() { _ = database.DeleteUser(context.Background(), nil, second.ID) }()
 
 	now := time.Now().UTC()
-	for _, userId := range []int64{first.Id, first.Id, second.Id} {
-		session := createTestUserSession(t, userId, fake.UUID())
-		defer func(id int64) { _ = database.DeleteUserSession(context.Background(), nil, id) }(session.Id)
+	for _, userID := range []int64{first.ID, first.ID, second.ID} {
+		session := createTestUserSession(t, userID, fake.UUID())
+		defer func(id int64) { _ = database.DeleteUserSession(context.Background(), nil, id) }(session.ID)
 
 		err = database.CreateUserSessionClient(context.Background(), nil, &record.UserSessionClient{
-			UserSessionId: session.Id, ClientId: testClient.Id,
+			UserSessionID: session.ID, ClientID: testClient.ID,
 			Started: now.Add(-time.Hour), LastAccessed: now.Add(-5 * time.Minute),
 		})
 		require.NoError(t, err)
 	}
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(testClient.Id, 10) + "/sessions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(testClient.ID, 10) + "/sessions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -460,21 +460,21 @@ func TestAPIClientSessionsGet_UsersAreNormalizedAndCarryOnlyTheOwnerFields(t *te
 
 	owners := make(map[int64]api.SessionOwnerResponse, len(out.Users))
 	for _, owner := range out.Users {
-		_, duplicate := owners[owner.Id]
-		assert.False(t, duplicate, "user %d appears twice in the users array", owner.Id)
-		owners[owner.Id] = owner
+		_, duplicate := owners[owner.ID]
+		assert.False(t, duplicate, "user %d appears twice in the users array", owner.ID)
+		owners[owner.ID] = owner
 	}
 	for _, session := range out.Sessions {
-		_, resolved := owners[session.UserId]
+		_, resolved := owners[session.UserID]
 		assert.True(t, resolved, "session %d names user %d, which the users array does not carry",
-			session.Id, session.UserId)
+			session.ID, session.UserID)
 	}
 
-	assert.Equal(t, "Jane", owners[first.Id].GivenName)
-	assert.Equal(t, "Q", owners[first.Id].MiddleName)
-	assert.Equal(t, "Doe", owners[first.Id].FamilyName)
-	assert.Equal(t, first.Email, owners[first.Id].Email)
-	assert.Equal(t, "Sam Reed", owners[second.Id].GivenName+" "+owners[second.Id].FamilyName)
+	assert.Equal(t, "Jane", owners[first.ID].GivenName)
+	assert.Equal(t, "Q", owners[first.ID].MiddleName)
+	assert.Equal(t, "Doe", owners[first.ID].FamilyName)
+	assert.Equal(t, first.Email, owners[first.ID].Email)
+	assert.Equal(t, "Sam Reed", owners[second.ID].GivenName+" "+owners[second.ID].FamilyName)
 
 	// The profile a clients-only caller is not entitled to. Each of these is a key an
 	// api.UserResponse would have carried into the same array.

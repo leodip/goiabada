@@ -274,10 +274,10 @@ func TestTokenClient_EncodesTheSecretTheServerDecodes(t *testing.T) {
 	decoded, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(seen.authorization, "Basic "))
 	require.NoError(t, err)
 
-	encodedId, encodedSecret, ok := strings.Cut(string(decoded), ":")
+	encodedID, encodedSecret, ok := strings.Cut(string(decoded), ":")
 	require.True(t, ok, "the identifier and the secret, joined by one colon")
 
-	assert.Equal(t, "the-client-id", encodedId, "an identifier the encoding does not change")
+	assert.Equal(t, "the-client-id", encodedID, "an identifier the encoding does not change")
 	assert.Equal(t, "a%2525b%2Bc+d%3Ae~~~", encodedSecret, "RFC 6749's form encoding, before Base64")
 	unescapedSecret, err := url.QueryUnescape(encodedSecret)
 	require.NoError(t, err)
@@ -312,7 +312,7 @@ func TestTokenClient_DecodesEveryTokenResponseField(t *testing.T) {
 			// Field by field rather than against a struct literal: a field added to
 			// oauth.TokenResponse later leaves a gap here that reads as a gap.
 			assert.Equal(t, "the-access-token", tokenResponse.AccessToken)
-			assert.Equal(t, "the-id-token", tokenResponse.IdToken)
+			assert.Equal(t, "the-id-token", tokenResponse.IDToken)
 			assert.Equal(t, "Bearer", tokenResponse.TokenType)
 			assert.Equal(t, int64(300), tokenResponse.ExpiresIn)
 			assert.Equal(t, "the-refresh-token", tokenResponse.RefreshToken)

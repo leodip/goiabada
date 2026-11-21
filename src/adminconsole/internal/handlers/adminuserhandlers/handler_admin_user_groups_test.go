@@ -17,24 +17,24 @@ import (
 	"github.com/leodip/goiabada/core/api"
 )
 
-// userGroupsSaveApiClient records the request the save hands the API and answers it with err.
-type userGroupsSaveApiClient struct {
+// userGroupsSaveAPIClient records the request the save hands the API and answers it with err.
+type userGroupsSaveAPIClient struct {
 	err  error
 	sent *api.UpdateUserGroupsRequest
 }
 
-func (s *userGroupsSaveApiClient) UpdateUserGroups(_ context.Context, _ string, _ int64, request *api.UpdateUserGroupsRequest) (*api.UserResponse, []api.GroupResponse, error) {
+func (s *userGroupsSaveAPIClient) UpdateUserGroups(_ context.Context, _ string, _ int64, request *api.UpdateUserGroupsRequest) (*api.UserResponse, []api.GroupResponse, error) {
 	s.sent = request
 	return nil, nil, s.err
 }
 
-// The rest of the ports userGroupsSaveApiClient is passed to, which no test here reaches.
+// The rest of the ports userGroupsSaveAPIClient is passed to, which no test here reaches.
 
-func (*userGroupsSaveApiClient) GetAllGroups(context.Context, string) ([]api.GroupResponse, error) {
+func (*userGroupsSaveAPIClient) GetAllGroups(context.Context, string) ([]api.GroupResponse, error) {
 	panic("unexpected call to GetAllGroups")
 }
 
-func (*userGroupsSaveApiClient) GetUserGroups(context.Context, string, int64) (*api.UserResponse, []api.GroupResponse, error) {
+func (*userGroupsSaveAPIClient) GetUserGroups(context.Context, string, int64) (*api.UserResponse, []api.GroupResponse, error) {
 	panic("unexpected call to GetUserGroups")
 }
 
@@ -86,12 +86,12 @@ func TestHandleGroupsPost_SendsTheLoadedList(t *testing.T) {
 
 			// The API refuses, so the handler returns before the nil session is touched; the
 			// request it sent is what is under test.
-			stub := &userGroupsSaveApiClient{err: &apiclient.APIError{Code: "VALIDATION_ERROR", Message: "refused", StatusCode: http.StatusBadRequest}}
+			stub := &userGroupsSaveAPIClient{err: &apiclient.APIError{Code: "VALIDATION_ERROR", Message: "refused", StatusCode: http.StatusBadRequest}}
 			HandleGroupsPost(httpHelper, nil, stub).ServeHTTP(httptest.NewRecorder(), req)
 
 			require.NotNil(t, stub.sent)
-			assert.Equal(t, tc.wantWanted, stub.sent.GroupIds)
-			assert.Equal(t, tc.wantExpected, stub.sent.ExpectedGroupIds)
+			assert.Equal(t, tc.wantWanted, stub.sent.GroupIDs)
+			assert.Equal(t, tc.wantExpected, stub.sent.ExpectedGroupIDs)
 			wire, err := json.Marshal(stub.sent)
 			require.NoError(t, err)
 			assert.Contains(t, string(wire), tc.wantWire)
@@ -111,7 +111,7 @@ func TestHandleGroupsPost_AConflictReachesTheBrowser(t *testing.T) {
 	)
 	rec := httptest.NewRecorder()
 
-	stub := &userGroupsSaveApiClient{err: &apiclient.APIError{Code: "CONCURRENT_UPDATE", Message: sentence, StatusCode: http.StatusConflict}}
+	stub := &userGroupsSaveAPIClient{err: &apiclient.APIError{Code: "CONCURRENT_UPDATE", Message: sentence, StatusCode: http.StatusConflict}}
 	HandleGroupsPost(httpHelper, nil, stub).ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusConflict, rec.Code)

@@ -3,7 +3,7 @@
 {{define "head"}}{{end}}
 
 {{define "page"}}
-{{ template "user_header" (args "address" .user.Id .user.Email .page .query $.ctx) }}
+{{ template "user_header" (args "address" .user.ID .user.Email .page .query $.ctx) }}
 
 {{/* errorField names the field the API refused, which is marked invalid, described by the notice
      and focused. */}}

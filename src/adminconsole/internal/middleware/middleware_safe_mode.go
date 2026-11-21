@@ -32,7 +32,7 @@ func SafeMode(sessions sessionstore.Store, sessionName string, errorRenderer Ser
 			// reads it: only true turns it on, and any other value is absent (#816 decision 3).
 			asked := r.URL.Query().Get(oauthclient.SafeModeParameter) == "true"
 			on := asked
-			if _, signedIn := reqctx.JwtInfoFrom(r.Context()); signedIn {
+			if _, signedIn := reqctx.JWTInfoFrom(r.Context()); signedIn {
 				sess, err := sessions.Get(r, sessionName)
 				if err != nil {
 					errorRenderer.InternalServerError(w, r, errs.Wrap(err, "unable to get the session"))

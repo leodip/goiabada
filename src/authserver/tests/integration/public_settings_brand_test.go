@@ -24,7 +24,7 @@ import (
 func TestPublicSettings_CarriesTheDefaultBrandsStylesheet(t *testing.T) {
 	brand := makeDefaultBrand(t, record.BrandAppearanceDark, "plum")
 	base := appConfig.AuthServer.BaseURL
-	browser := createHttpClient(t)
+	browser := createHTTPClient(t)
 
 	resp, err := browser.Get(base + "/api/public/settings")
 	require.NoError(t, err)
@@ -40,7 +40,7 @@ func TestPublicSettings_CarriesTheDefaultBrandsStylesheet(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal(published["brand"], &publishedBrand))
 	assert.Equal(t, "dark", publishedBrand.Appearance)
-	assert.Regexp(t, `^`+regexp.QuoteMeta(base)+`/brand/`+strconv.FormatInt(brand.Id, 10)+`/stylesheet\.css\?v=[0-9a-f]{12}$`,
+	assert.Regexp(t, `^`+regexp.QuoteMeta(base)+`/brand/`+strconv.FormatInt(brand.ID, 10)+`/stylesheet\.css\?v=[0-9a-f]{12}$`,
 		publishedBrand.StylesheetURL)
 
 	// It is the URL the auth server's own pages link, relative there.
@@ -66,7 +66,7 @@ func TestPublicSettings_CarriesTheDefaultBrandsStylesheet(t *testing.T) {
 func TestPublicSettings_CarriesAnAutomaticDefaultBrandAsAuto(t *testing.T) {
 	makeDefaultBrand(t, record.BrandAppearanceAuto, "coconut")
 
-	resp, err := createHttpClient(t).Get(appConfig.AuthServer.BaseURL + "/api/public/settings")
+	resp, err := createHTTPClient(t).Get(appConfig.AuthServer.BaseURL + "/api/public/settings")
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -83,7 +83,7 @@ func TestPublicSettings_CarriesAnAutomaticDefaultBrandAsAuto(t *testing.T) {
 // publicBrand reads the brand /api/public/settings answers: its appearance and stylesheet URL.
 func publicBrand(t *testing.T) (appearance, stylesheetURL string) {
 	t.Helper()
-	resp, err := createHttpClient(t).Get(appConfig.AuthServer.BaseURL + "/api/public/settings")
+	resp, err := createHTTPClient(t).Get(appConfig.AuthServer.BaseURL + "/api/public/settings")
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -100,7 +100,7 @@ func publicBrand(t *testing.T) (appearance, stylesheetURL string) {
 
 // brandStylesheetURL is the pattern of the absolute URL of brand's stylesheet.
 func brandStylesheetURL(brand *record.Brand) string {
-	return `^` + regexp.QuoteMeta(appConfig.AuthServer.BaseURL) + `/brand/` + strconv.FormatInt(brand.Id, 10) +
+	return `^` + regexp.QuoteMeta(appConfig.AuthServer.BaseURL) + `/brand/` + strconv.FormatInt(brand.ID, 10) +
 		`/stylesheet\.css\?v=[0-9a-f]{12}$`
 }
 
@@ -113,10 +113,10 @@ func TestPublicSettings_CarriesTheConsoleClientsBrand(t *testing.T) {
 	console, err := database.GetClientByClientIdentifier(ctx, nil, builtin.AdminConsoleClientIdentifier)
 	require.NoError(t, err)
 	require.NotNil(t, console)
-	require.False(t, console.BrandId.Valid, "the console's client starts on the default brand")
+	require.False(t, console.BrandID.Valid, "the console's client starts on the default brand")
 
 	// Another client given a brand leaves the answer on the default.
-	other, _ := brandSignInClient(t, record.AcrLevel1)
+	other, _ := brandSignInClient(t, record.ACRLevel1)
 	giveClientBrand(t, other, record.BrandAppearanceLight, "guava")
 	appearance, stylesheetURL := publicBrand(t)
 	assert.Equal(t, "dark", appearance)
@@ -130,7 +130,7 @@ func TestPublicSettings_CarriesTheConsoleClientsBrand(t *testing.T) {
 
 	// Put back on the default, the answer is the default again.
 	require.NoError(t, database.RunInTransaction(ctx, func(tx *sql.Tx) error {
-		_, err := database.SetClientBrand(ctx, tx, console.Id, sql.NullInt64{})
+		_, err := database.SetClientBrand(ctx, tx, console.ID, sql.NullInt64{})
 		return err
 	}))
 	appearance, stylesheetURL = publicBrand(t)

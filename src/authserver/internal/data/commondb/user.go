@@ -72,7 +72,7 @@ var userColumns = columnList{
 // scanUser reads one row selected with userColumns.
 func scanUser(row rowScanner, user *record.User) error {
 	return row.Scan(
-		&user.Id,
+		&user.ID,
 		&user.CreatedAt,
 		&user.UpdatedAt,
 		&user.Enabled,
@@ -93,7 +93,7 @@ func scanUser(row rowScanner, user *record.User) error {
 		&user.Locale,
 		&user.PageLanguage,
 		&user.BirthDate,
-		&user.PhoneNumberCountryUniqueId,
+		&user.PhoneNumberCountryUniqueID,
 		&user.PhoneNumberCountryCallingCode,
 		&user.PhoneNumber,
 		&user.PhoneNumberVerified,
@@ -111,10 +111,10 @@ func scanUser(row rowScanner, user *record.User) error {
 		&user.ForgotPasswordCodeHash,
 		&user.AuthStateGeneration,
 		&user.LastOTPStep,
-		&user.OtpConfigGeneration,
-		&user.OtpConsecutiveFailures,
-		&user.OtpEnrollmentSecretEncrypted,
-		&user.OtpEnrollmentIssuedAt,
+		&user.OTPConfigGeneration,
+		&user.OTPConsecutiveFailures,
+		&user.OTPEnrollmentSecretEncrypted,
+		&user.OTPEnrollmentIssuedAt,
 	)
 }
 
@@ -220,17 +220,17 @@ var updateUser = statement{
 		"forgot_password_code_issued_at = @p34, forgot_password_code_hash = @p35 WHERE id = @p36",
 }
 
-var selectUserById = statement{
+var selectUserByID = statement{
 	sqlite:   "SELECT " + userColumns.sqlite + " FROM users WHERE id = ?",
 	mysql:    "SELECT " + userColumns.mysql + " FROM users WHERE id = ?",
 	postgres: "SELECT " + userColumns.postgres + " FROM users WHERE id = $1",
 	mssql:    "SELECT " + userColumns.mssql + " FROM users WHERE id = @p1",
 }
 
-// selectUserByIdForUpdate is the locking read GetUserByIdForUpdate runs, the lock in each engine's
+// selectUserByIDForUpdate is the locking read GetUserByIDForUpdate runs, the lock in each engine's
 // own grammar: FOR UPDATE on MySQL and PostgreSQL, the UPDLOCK and ROWLOCK table hints on SQL
 // Server, which has no FOR UPDATE on a SELECT, and none on SQLite, which has no row locks.
-var selectUserByIdForUpdate = statement{
+var selectUserByIDForUpdate = statement{
 	sqlite:   "SELECT " + userColumns.sqlite + " FROM users WHERE id = ?",
 	mysql:    "SELECT " + userColumns.mysql + " FROM users WHERE id = ? FOR UPDATE",
 	postgres: "SELECT " + userColumns.postgres + " FROM users WHERE id = $1 FOR UPDATE",
@@ -380,26 +380,26 @@ func (d *Database) CreateUser(ctx context.Context, tx *sql.Tx, user *record.User
 		user.MiddleName, user.FamilyName, user.Nickname, user.Website, user.Gender, user.Email,
 		user.EmailVerified, user.EmailVerificationCodeEncrypted, user.EmailVerificationCodeIssuedAt,
 		user.ZoneInfoCountryName, user.ZoneInfo, user.Locale, user.PageLanguage, user.BirthDate,
-		user.PhoneNumberCountryUniqueId, user.PhoneNumberCountryCallingCode, user.PhoneNumber,
+		user.PhoneNumberCountryUniqueID, user.PhoneNumberCountryCallingCode, user.PhoneNumber,
 		user.PhoneNumberVerified, user.AddressLine1, user.AddressLine2, user.AddressLocality,
 		user.AddressRegion, user.AddressPostalCode, user.AddressCountry, user.PasswordHash,
 		user.OTPSecretEncrypted, user.OTPEnabled, user.ForgotPasswordCodeEncrypted,
 		user.ForgotPasswordCodeIssuedAt, user.ForgotPasswordCodeHash, user.AuthStateGeneration,
-		user.LastOTPStep, user.OtpConfigGeneration, user.OtpConsecutiveFailures,
-		user.OtpEnrollmentSecretEncrypted, user.OtpEnrollmentIssuedAt)
+		user.LastOTPStep, user.OTPConfigGeneration, user.OTPConsecutiveFailures,
+		user.OTPEnrollmentSecretEncrypted, user.OTPEnrollmentIssuedAt)
 	if err != nil {
 		user.CreatedAt = originalCreatedAt
 		user.UpdatedAt = originalUpdatedAt
 		return err
 	}
 
-	user.Id = id
+	user.ID = id
 	return nil
 }
 
 func (d *Database) UpdateUser(ctx context.Context, tx *sql.Tx, user *record.User) error {
 
-	if user.Id == 0 {
+	if user.ID == 0 {
 		return errs.New("can't update user with id 0")
 	}
 
@@ -411,12 +411,12 @@ func (d *Database) UpdateUser(ctx context.Context, tx *sql.Tx, user *record.User
 		user.FamilyName, user.Nickname, user.Website, user.Gender, user.Email, user.EmailVerified,
 		user.EmailVerificationCodeEncrypted, user.EmailVerificationCodeIssuedAt,
 		user.ZoneInfoCountryName, user.ZoneInfo, user.Locale, user.PageLanguage, user.BirthDate,
-		user.PhoneNumberCountryUniqueId, user.PhoneNumberCountryCallingCode, user.PhoneNumber,
+		user.PhoneNumberCountryUniqueID, user.PhoneNumberCountryCallingCode, user.PhoneNumber,
 		user.PhoneNumberVerified, user.AddressLine1, user.AddressLine2, user.AddressLocality,
 		user.AddressRegion, user.AddressPostalCode, user.AddressCountry, user.PasswordHash,
 		user.OTPSecretEncrypted, user.OTPEnabled, user.ForgotPasswordCodeEncrypted,
 		user.ForgotPasswordCodeIssuedAt, user.ForgotPasswordCodeHash,
-		user.Id)
+		user.ID)
 	if err != nil {
 		user.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update user")
@@ -425,15 +425,15 @@ func (d *Database) UpdateUser(ctx context.Context, tx *sql.Tx, user *record.User
 	return nil
 }
 
-func (d *Database) GetUsersByIds(ctx context.Context, tx *sql.Tx, userIds []int64) (map[int64]record.User, error) {
+func (d *Database) GetUsersByIDs(ctx context.Context, tx *sql.Tx, userIDs []int64) (map[int64]record.User, error) {
 
-	if len(userIds) == 0 {
+	if len(userIDs) == 0 {
 		return nil, nil
 	}
 
 	var list []record.User
 
-	err := forEachIdBatch(userIds, func(batch []int64) error {
+	err := forEachIDBatch(userIDs, func(batch []int64) error {
 		query := selectUsersWhere.text(d.Dialect) + inList(d.Dialect, "id", 1, len(batch))
 		var err error
 		list, err = queryAll(ctx, d, tx, list, query, int64Args(batch), scanUser, "user")
@@ -445,18 +445,18 @@ func (d *Database) GetUsersByIds(ctx context.Context, tx *sql.Tx, userIds []int6
 
 	users := make(map[int64]record.User, len(list))
 	for _, user := range list {
-		users[user.Id] = user
+		users[user.ID] = user
 	}
 
 	return users, nil
 }
 
-func (d *Database) GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error) {
-	return queryOne(ctx, d, tx, selectUserById.text(d.Dialect), []any{userId}, scanUser, "user")
+func (d *Database) GetUserByID(ctx context.Context, tx *sql.Tx, userID int64) (*record.User, error) {
+	return queryOne(ctx, d, tx, selectUserByID.text(d.Dialect), []any{userID}, scanUser, "user")
 }
 
-// GetUserByIdForUpdate reads the user as last committed and takes the row for the rest of the
-// caller's transaction: a locking read, where GetUserById is a consistent one.
+// GetUserByIDForUpdate reads the user as last committed and takes the row for the rest of the
+// caller's transaction: a locking read, where GetUserByID is a consistent one.
 //
 // The difference is MySQL's. Under InnoDB's default REPEATABLE READ every consistent read in a
 // transaction reads the snapshot the first one established, so a plain read after waiting on a
@@ -465,19 +465,19 @@ func (d *Database) GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*
 // PostgreSQL and SQL Server at READ COMMITTED each statement reads what was committed when it
 // started, and SQLite has one writer at a time, so on those three only the lock is added (#498).
 //
-// The locking clause is the engine's own, so each version of selectUserByIdForUpdate spells it:
+// The locking clause is the engine's own, so each version of selectUserByIDForUpdate spells it:
 // FOR UPDATE on MySQL and PostgreSQL, the UPDLOCK and ROWLOCK table hints on SQL Server, which has
 // no FOR UPDATE on a SELECT, and none on SQLite, which has no row locks.
 //
 // tx is required: without one the statement autocommits and the row is released before the
 // caller can decide on what it read.
-func (d *Database) GetUserByIdForUpdate(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error) {
+func (d *Database) GetUserByIDForUpdate(ctx context.Context, tx *sql.Tx, userID int64) (*record.User, error) {
 
 	if tx == nil {
 		return nil, errs.New("a locking read of a user requires a transaction: an autocommitted statement releases the row before the caller can decide on it")
 	}
 
-	return queryOne(ctx, d, tx, selectUserByIdForUpdate.text(d.Dialect), []any{userId}, scanUser, "user")
+	return queryOne(ctx, d, tx, selectUserByIDForUpdate.text(d.Dialect), []any{userID}, scanUser, "user")
 }
 
 func (d *Database) UsersLoadPermissions(ctx context.Context, tx *sql.Tx, users []record.User) error {
@@ -486,22 +486,22 @@ func (d *Database) UsersLoadPermissions(ctx context.Context, tx *sql.Tx, users [
 		return nil
 	}
 
-	userIds := make([]int64, len(users))
+	userIDs := make([]int64, len(users))
 	for i, user := range users {
-		userIds[i] = user.Id
+		userIDs[i] = user.ID
 	}
 
-	userPermissions, err := d.GetUserPermissionsByUserIds(ctx, tx, userIds)
+	userPermissions, err := d.GetUserPermissionsByUserIDs(ctx, tx, userIDs)
 	if err != nil {
 		return err
 	}
 
-	permissionIds := make([]int64, len(userPermissions))
+	permissionIDs := make([]int64, len(userPermissions))
 	for i, userPermission := range userPermissions {
-		permissionIds[i] = userPermission.PermissionId
+		permissionIDs[i] = userPermission.PermissionID
 	}
 
-	permissions, err := d.GetPermissionsByIds(ctx, tx, permissionIds)
+	permissions, err := d.GetPermissionsByIDs(ctx, tx, permissionIDs)
 	if err != nil {
 		return err
 	}
@@ -509,18 +509,18 @@ func (d *Database) UsersLoadPermissions(ctx context.Context, tx *sql.Tx, users [
 	// Create a map for faster permission lookups
 	permissionMap := make(map[int64]record.Permission)
 	for _, permission := range permissions {
-		permissionMap[permission.Id] = permission
+		permissionMap[permission.ID] = permission
 	}
 
-	permissionsByUserId := make(map[int64][]record.Permission)
+	permissionsByUserID := make(map[int64][]record.Permission)
 	for _, userPermission := range userPermissions {
-		if permission, ok := permissionMap[userPermission.PermissionId]; ok {
-			permissionsByUserId[userPermission.UserId] = append(permissionsByUserId[userPermission.UserId], permission)
+		if permission, ok := permissionMap[userPermission.PermissionID]; ok {
+			permissionsByUserID[userPermission.UserID] = append(permissionsByUserID[userPermission.UserID], permission)
 		}
 	}
 
 	for i, user := range users {
-		users[i].Permissions = permissionsByUserId[user.Id]
+		users[i].Permissions = permissionsByUserID[user.ID]
 	}
 
 	return nil
@@ -532,7 +532,7 @@ func (d *Database) UserLoadAttributes(ctx context.Context, tx *sql.Tx, user *rec
 		return nil
 	}
 
-	userAttributes, err := d.GetUserAttributesByUserId(ctx, tx, user.Id)
+	userAttributes, err := d.GetUserAttributesByUserID(ctx, tx, user.ID)
 	if err != nil {
 		return err
 	}
@@ -548,17 +548,17 @@ func (d *Database) UserLoadPermissions(ctx context.Context, tx *sql.Tx, user *re
 		return nil
 	}
 
-	userPermissions, err := d.GetUserPermissionsByUserId(ctx, tx, user.Id)
+	userPermissions, err := d.GetUserPermissionsByUserID(ctx, tx, user.ID)
 	if err != nil {
 		return err
 	}
 
-	permissionIds := make([]int64, len(userPermissions))
+	permissionIDs := make([]int64, len(userPermissions))
 	for i, userPermission := range userPermissions {
-		permissionIds[i] = userPermission.PermissionId
+		permissionIDs[i] = userPermission.PermissionID
 	}
 
-	permissions, err := d.GetPermissionsByIds(ctx, tx, permissionIds)
+	permissions, err := d.GetPermissionsByIDs(ctx, tx, permissionIDs)
 	if err != nil {
 		return err
 	}
@@ -575,40 +575,40 @@ func (d *Database) UsersLoadGroups(ctx context.Context, tx *sql.Tx, users []reco
 		return nil
 	}
 
-	userIds := make([]int64, len(users))
+	userIDs := make([]int64, len(users))
 	for i, user := range users {
-		userIds[i] = user.Id
+		userIDs[i] = user.ID
 	}
 
-	userGroups, err := d.GetUserGroupsByUserIds(ctx, tx, userIds)
+	userGroups, err := d.GetUserGroupsByUserIDs(ctx, tx, userIDs)
 	if err != nil {
 		return err
 	}
 
-	groupIds := make([]int64, len(userGroups))
+	groupIDs := make([]int64, len(userGroups))
 	for i, userGroup := range userGroups {
-		groupIds[i] = userGroup.GroupId
+		groupIDs[i] = userGroup.GroupID
 	}
 
-	groups, err := d.GetGroupsByIds(ctx, tx, groupIds)
+	groups, err := d.GetGroupsByIDs(ctx, tx, groupIDs)
 	if err != nil {
 		return err
 	}
 
-	groupsByUserId := make(map[int64][]record.Group)
+	groupsByUserID := make(map[int64][]record.Group)
 	for _, userGroup := range userGroups {
 		var group record.Group
 		for _, g := range groups {
-			if g.Id == userGroup.GroupId {
+			if g.ID == userGroup.GroupID {
 				group = g
 				break
 			}
 		}
-		groupsByUserId[userGroup.UserId] = append(groupsByUserId[userGroup.UserId], group)
+		groupsByUserID[userGroup.UserID] = append(groupsByUserID[userGroup.UserID], group)
 	}
 
 	for i, user := range users {
-		users[i].Groups = groupsByUserId[user.Id]
+		users[i].Groups = groupsByUserID[user.ID]
 	}
 
 	return nil
@@ -620,17 +620,17 @@ func (d *Database) UserLoadGroups(ctx context.Context, tx *sql.Tx, user *record.
 		return nil
 	}
 
-	userGroups, err := d.GetUserGroupsByUserId(ctx, tx, user.Id)
+	userGroups, err := d.GetUserGroupsByUserID(ctx, tx, user.ID)
 	if err != nil {
 		return err
 	}
 
-	groupIds := make([]int64, len(userGroups))
+	groupIDs := make([]int64, len(userGroups))
 	for i, group := range userGroups {
-		groupIds[i] = group.GroupId
+		groupIDs[i] = group.GroupID
 	}
 
-	groups, err := d.GetGroupsByIds(ctx, tx, groupIds)
+	groups, err := d.GetGroupsByIDs(ctx, tx, groupIDs)
 	if err != nil {
 		return err
 	}
@@ -808,31 +808,31 @@ func (d *Database) SearchUsersPaginated(ctx context.Context, tx *sql.Tx, query s
 // credential change for the same user, which writes the users row first, is the one pair this
 // shape can still deadlock with; that pair is answered by RunInTransaction rerunning the
 // victim rather than by an ordering here.
-func (d *Database) DeleteUser(ctx context.Context, tx *sql.Tx, userId int64) error {
+func (d *Database) DeleteUser(ctx context.Context, tx *sql.Tx, userID int64) error {
 
 	return d.inTransaction(ctx, tx, func(tx *sql.Tx) error {
-		sessions, err := d.GetUserSessionsByUserId(ctx, tx, userId)
+		sessions, err := d.GetUserSessionsByUserID(ctx, tx, userID)
 		if err != nil {
 			return err
 		}
 
 		// Ordered by id so several sessions are always taken in the same sequence.
-		// GetUserSessionsByUserId carries no ORDER BY of its own, so two transactions of
+		// GetUserSessionsByUserID carries no ORDER BY of its own, so two transactions of
 		// this shape could otherwise take the same two rows in opposite orders and deadlock
 		// on nothing but the order the engine returned them in (#139).
-		sort.Slice(sessions, func(i, j int) bool { return sessions[i].Id < sessions[j].Id })
+		sort.Slice(sessions, func(i, j int) bool { return sessions[i].ID < sessions[j].ID })
 
 		for i := range sessions {
-			if deleteUserSessionErr := d.DeleteUserSession(ctx, tx, sessions[i].Id); deleteUserSessionErr != nil {
+			if deleteUserSessionErr := d.DeleteUserSession(ctx, tx, sessions[i].ID); deleteUserSessionErr != nil {
 				return deleteUserSessionErr
 			}
 		}
 
-		if deleteRefreshTokensErr := d.deleteRefreshTokensByColumn(ctx, tx, "user_id", userId); deleteRefreshTokensErr != nil {
+		if deleteRefreshTokensErr := d.deleteRefreshTokensByColumn(ctx, tx, "user_id", userID); deleteRefreshTokensErr != nil {
 			return deleteRefreshTokensErr
 		}
 
-		_, err = d.ExecSQL(ctx, tx, deleteUser.text(d.Dialect), userId)
+		_, err = d.ExecSQL(ctx, tx, deleteUser.text(d.Dialect), userID)
 		if err != nil {
 			return errs.Wrap(err, "unable to delete user")
 		}
@@ -864,17 +864,17 @@ func (d *Database) DeleteUser(ctx context.Context, tx *sql.Tx, userId int64) err
 //
 // tx is required: without one the statement autocommits and the row is released before the caller
 // can use it.
-func (d *Database) AcquireUserRow(ctx context.Context, tx *sql.Tx, userId int64) error {
+func (d *Database) AcquireUserRow(ctx context.Context, tx *sql.Tx, userID int64) error {
 
 	if tx == nil {
 		return errs.New("acquiring a user row requires a transaction: an autocommitted statement releases the row before the caller can use it")
 	}
 
-	if userId == 0 {
+	if userID == 0 {
 		return errs.New("can't acquire a user row with an id of 0")
 	}
 
-	if _, err := d.ExecSQL(ctx, tx, acquireUserRow.text(d.Dialect), userId); err != nil {
+	if _, err := d.ExecSQL(ctx, tx, acquireUserRow.text(d.Dialect), userID); err != nil {
 		return errs.Wrap(err, "unable to acquire user row")
 	}
 
@@ -922,16 +922,16 @@ var selectUserAuthStateGeneration = statement{
 // regress the boundary. No production code saves the whole row any more, and
 // TestNoWholeRowUserSave holds it (#471); the tag stays because the data and integration
 // tiers still seed fixtures through UpdateUser.
-func (d *Database) IncrementUserAuthStateGeneration(ctx context.Context, tx *sql.Tx, userId int64) (int64, error) {
+func (d *Database) IncrementUserAuthStateGeneration(ctx context.Context, tx *sql.Tx, userID int64) (int64, error) {
 
-	if userId == 0 {
+	if userID == 0 {
 		return 0, errs.New("can't increment the auth state generation of user with id 0")
 	}
 	if tx == nil {
 		return 0, errs.New("incrementing the auth state generation requires a transaction: the increment and the read-back must not be separable")
 	}
 
-	result, err := d.ExecSQL(ctx, tx, incrementUserAuthStateGeneration.text(d.Dialect), time.Now().UTC(), userId)
+	result, err := d.ExecSQL(ctx, tx, incrementUserAuthStateGeneration.text(d.Dialect), time.Now().UTC(), userID)
 	if err != nil {
 		return 0, errs.Wrap(err, "unable to increment user auth state generation")
 	}
@@ -947,7 +947,7 @@ func (d *Database) IncrementUserAuthStateGeneration(ctx context.Context, tx *sql
 	// Read back rather than computing the successor in Go: the increment happened in the
 	// database, so this is the value that actually landed.
 	var generation int64
-	rows, err := d.QuerySQL(ctx, tx, selectUserAuthStateGeneration.text(d.Dialect), userId)
+	rows, err := d.QuerySQL(ctx, tx, selectUserAuthStateGeneration.text(d.Dialect), userID)
 	if err != nil {
 		return 0, errs.Wrap(err, "unable to read back user auth state generation")
 	}
@@ -967,9 +967,9 @@ func (d *Database) IncrementUserAuthStateGeneration(ctx context.Context, tx *sql
 	return generation, nil
 }
 
-// incrementUserOtpConfigGeneration and selectUserOtpConfigGeneration are the increment and the
-// read-back of IncrementUserOtpConfigGeneration.
-var incrementUserOtpConfigGeneration = statement{
+// incrementUserOTPConfigGeneration and selectUserOTPConfigGeneration are the increment and the
+// read-back of IncrementUserOTPConfigGeneration.
+var incrementUserOTPConfigGeneration = statement{
 	sqlite: "UPDATE users SET otp_config_generation = otp_config_generation + 1, updated_at = ? " +
 		"WHERE id = ?",
 	mysql: "UPDATE users SET otp_config_generation = otp_config_generation + 1, updated_at = ? " +
@@ -980,14 +980,14 @@ var incrementUserOtpConfigGeneration = statement{
 		"WHERE id = @p2",
 }
 
-var selectUserOtpConfigGeneration = statement{
+var selectUserOTPConfigGeneration = statement{
 	sqlite:   "SELECT otp_config_generation FROM users WHERE id = ?",
 	mysql:    "SELECT otp_config_generation FROM users WHERE id = ?",
 	postgres: "SELECT otp_config_generation FROM users WHERE id = $1",
 	mssql:    "SELECT otp_config_generation FROM users WHERE id = @p1",
 }
 
-// IncrementUserOtpConfigGeneration advances the user's OTP configuration generation and
+// IncrementUserOTPConfigGeneration advances the user's OTP configuration generation and
 // returns the value that landed.
 //
 // Called at every site that establishes or removes an authenticator, inside the same
@@ -1001,16 +1001,16 @@ var selectUserOtpConfigGeneration = statement{
 // otp_config_generation is tagged dont-update precisely so a handler that loaded the
 // user before a concurrent change cannot write the old counter back and discharge every
 // session's obligation at once (#106, #242).
-func (d *Database) IncrementUserOtpConfigGeneration(ctx context.Context, tx *sql.Tx, userId int64) (int64, error) {
+func (d *Database) IncrementUserOTPConfigGeneration(ctx context.Context, tx *sql.Tx, userID int64) (int64, error) {
 
-	if userId == 0 {
+	if userID == 0 {
 		return 0, errs.New("can't increment the otp config generation of user with id 0")
 	}
 	if tx == nil {
 		return 0, errs.New("incrementing the otp config generation requires a transaction: it must commit with the write that changed the authenticator")
 	}
 
-	result, err := d.ExecSQL(ctx, tx, incrementUserOtpConfigGeneration.text(d.Dialect), time.Now().UTC(), userId)
+	result, err := d.ExecSQL(ctx, tx, incrementUserOTPConfigGeneration.text(d.Dialect), time.Now().UTC(), userID)
 	if err != nil {
 		return 0, errs.Wrap(err, "unable to increment user otp config generation")
 	}
@@ -1028,7 +1028,7 @@ func (d *Database) IncrementUserOtpConfigGeneration(ctx context.Context, tx *sql
 	// promotes this value onto the session it is about to create, and computing N+1 here
 	// would promote a number a concurrent change may already have passed.
 	var generation int64
-	rows, err := d.QuerySQL(ctx, tx, selectUserOtpConfigGeneration.text(d.Dialect), userId)
+	rows, err := d.QuerySQL(ctx, tx, selectUserOTPConfigGeneration.text(d.Dialect), userID)
 	if err != nil {
 		return 0, errs.Wrap(err, "unable to read back user otp config generation")
 	}
@@ -1082,13 +1082,13 @@ var setUserPasswordHash = statement{
 // Narrow rather than going through UpdateUser, which writes every non-tagged column:
 // a credential handler that loaded the user before a concurrent admin disable would
 // otherwise write Enabled back as it was and silently re-enable the account. (#106)
-func (d *Database) SetUserPasswordHash(ctx context.Context, tx *sql.Tx, userId int64, passwordHash string) error {
+func (d *Database) SetUserPasswordHash(ctx context.Context, tx *sql.Tx, userID int64, passwordHash string) error {
 
-	if userId == 0 {
+	if userID == 0 {
 		return errs.New("can't set the password hash of user with id 0")
 	}
 
-	_, err := d.ExecSQL(ctx, tx, setUserPasswordHash.text(d.Dialect), passwordHash, time.Now().UTC(), userId)
+	_, err := d.ExecSQL(ctx, tx, setUserPasswordHash.text(d.Dialect), passwordHash, time.Now().UTC(), userID)
 	if err != nil {
 		return errs.Wrap(err, "unable to set user password hash")
 	}
@@ -1179,7 +1179,7 @@ var setUserPhone = statement{
 // withPageLanguage false, and the column keeps what the row holds when the statement runs, not
 // the request's read, so a choice saved in between stands (#631 decision 8).
 func (d *Database) SetUserProfile(ctx context.Context, tx *sql.Tx, user *record.User, withPageLanguage bool) error {
-	if user.Id == 0 {
+	if user.ID == 0 {
 		return errs.New("can't set the profile of user with id 0")
 	}
 	values := []any{user.Username, user.GivenName, user.MiddleName, user.FamilyName, user.Nickname,
@@ -1194,7 +1194,7 @@ func (d *Database) SetUserProfile(ctx context.Context, tx *sql.Tx, user *record.
 // SetUserAddress writes the user's six address columns from user, and updated_at, and no other
 // column, for SetUserProfile's reason.
 func (d *Database) SetUserAddress(ctx context.Context, tx *sql.Tx, user *record.User) error {
-	if user.Id == 0 {
+	if user.ID == 0 {
 		return errs.New("can't set the address of user with id 0")
 	}
 	return d.setUserColumns(ctx, tx, user, "address", setUserAddress,
@@ -1207,11 +1207,11 @@ func (d *Database) SetUserAddress(ctx context.Context, tx *sql.Tx, user *record.
 // is verified is the caller's to decide: the self-service save always clears it, and the
 // administrator's keeps what the administrator sent.
 func (d *Database) SetUserPhone(ctx context.Context, tx *sql.Tx, user *record.User) error {
-	if user.Id == 0 {
+	if user.ID == 0 {
 		return errs.New("can't set the phone of user with id 0")
 	}
 	return d.setUserColumns(ctx, tx, user, "phone", setUserPhone,
-		user.PhoneNumberCountryUniqueId, user.PhoneNumberCountryCallingCode, user.PhoneNumber,
+		user.PhoneNumberCountryUniqueID, user.PhoneNumberCountryCallingCode, user.PhoneNumber,
 		user.PhoneNumberVerified)
 }
 
@@ -1223,7 +1223,7 @@ func (d *Database) setUserColumns(ctx context.Context, tx *sql.Tx, user *record.
 	stmt statement, values ...any) error {
 
 	now := time.Now().UTC()
-	if _, err := d.ExecSQL(ctx, tx, stmt.text(d.Dialect), append(values, now, user.Id)...); err != nil {
+	if _, err := d.ExecSQL(ctx, tx, stmt.text(d.Dialect), append(values, now, user.ID)...); err != nil {
 		return errs.Wrapf(err, "unable to set user %s", group)
 	}
 
@@ -1291,7 +1291,7 @@ var setUserEmail = statement{
 // the verified flag, and marking verified the address a setup email was just mailed to, or saving
 // the form unchanged, changes no address and must leave that link working.
 func (d *Database) SetUserEmail(ctx context.Context, tx *sql.Tx, user *record.User) error {
-	if user.Id == 0 {
+	if user.ID == 0 {
 		return errs.New("can't set the email of user with id 0")
 	}
 	// The address is bound four times, once per CASE and once for the assignment, so the
@@ -1345,10 +1345,10 @@ var trySetUserEmail = statement{
 // password hash a concurrent change or reset replaced after its revocation had run, or
 // undo a concurrent OTP change (#404). A taken address arrives as ErrUniqueViolation through
 // ExecSQL, as it does on UpdateUser.
-func (d *Database) TrySetUserEmail(ctx context.Context, tx *sql.Tx, userId int64, fromEmail string,
+func (d *Database) TrySetUserEmail(ctx context.Context, tx *sql.Tx, userID int64, fromEmail string,
 	fromVerified bool, toEmail string) (bool, error) {
 
-	if userId == 0 {
+	if userID == 0 {
 		return false, errs.New("can't set the email of user with id 0")
 	}
 	// The same address in and out would leave the row as it was, and MySQL counts a row it
@@ -1359,7 +1359,7 @@ func (d *Database) TrySetUserEmail(ctx context.Context, tx *sql.Tx, userId int64
 	}
 
 	result, err := d.ExecSQL(ctx, tx, trySetUserEmail.text(d.Dialect),
-		toEmail, false, time.Now().UTC(), userId, fromEmail, fromVerified)
+		toEmail, false, time.Now().UTC(), userID, fromEmail, fromVerified)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to set user email")
 	}
@@ -1406,10 +1406,10 @@ var tryStoreEmailVerificationCode = statement{
 // address is in the predicate too, so a code is never stored for an address the account moved
 // away from while the code was being issued, and the row the request loaded is never written
 // back, for TrySetUserEmail's reason.
-func (d *Database) TryStoreEmailVerificationCode(ctx context.Context, tx *sql.Tx, userId int64, email string,
+func (d *Database) TryStoreEmailVerificationCode(ctx context.Context, tx *sql.Tx, userID int64, email string,
 	codeEncrypted []byte, issuedAt time.Time, issuedNotAfter time.Time) (bool, error) {
 
-	if userId == 0 {
+	if userID == 0 {
 		return false, errs.New("can't store an email verification code for user with id 0")
 	}
 	if len(codeEncrypted) == 0 {
@@ -1417,7 +1417,7 @@ func (d *Database) TryStoreEmailVerificationCode(ctx context.Context, tx *sql.Tx
 	}
 
 	result, err := d.ExecSQL(ctx, tx, tryStoreEmailVerificationCode.text(d.Dialect),
-		codeEncrypted, issuedAt, time.Now().UTC(), userId, email, false, issuedNotAfter)
+		codeEncrypted, issuedAt, time.Now().UTC(), userID, email, false, issuedNotAfter)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to store email verification code")
 	}
@@ -1456,10 +1456,10 @@ var tryIssueEmailVerificationCode = statement{
 // administrator reads the code from the response rather than having it mailed, and generating a
 // second one replaces the first, as it always has. Narrow rather than writing back the row the
 // request loaded, for SetUserProfile's reason.
-func (d *Database) TryIssueEmailVerificationCode(ctx context.Context, tx *sql.Tx, userId int64, email string,
+func (d *Database) TryIssueEmailVerificationCode(ctx context.Context, tx *sql.Tx, userID int64, email string,
 	codeEncrypted []byte, issuedAt time.Time) (bool, error) {
 
-	if userId == 0 {
+	if userID == 0 {
 		return false, errs.New("can't issue an email verification code for user with id 0")
 	}
 	if len(codeEncrypted) == 0 {
@@ -1467,7 +1467,7 @@ func (d *Database) TryIssueEmailVerificationCode(ctx context.Context, tx *sql.Tx
 	}
 
 	result, err := d.ExecSQL(ctx, tx, tryIssueEmailVerificationCode.text(d.Dialect),
-		false, codeEncrypted, issuedAt, time.Now().UTC(), userId, email)
+		false, codeEncrypted, issuedAt, time.Now().UTC(), userID, email)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to issue email verification code")
 	}
@@ -1509,10 +1509,10 @@ var tryVerifyUserEmail = statement{
 // Narrow rather than writing back the row the request loaded, which would re-enable an account
 // an administrator disabled under it, or put back an address a concurrent change replaced
 // (#404).
-func (d *Database) TryVerifyUserEmail(ctx context.Context, tx *sql.Tx, userId int64, email string,
+func (d *Database) TryVerifyUserEmail(ctx context.Context, tx *sql.Tx, userID int64, email string,
 	codeEncrypted []byte) (bool, error) {
 
-	if userId == 0 {
+	if userID == 0 {
 		return false, errs.New("can't verify the email of user with id 0")
 	}
 	// An empty ciphertext is the dormant value, and NULL compares equal to nothing anyway.
@@ -1521,7 +1521,7 @@ func (d *Database) TryVerifyUserEmail(ctx context.Context, tx *sql.Tx, userId in
 	}
 
 	result, err := d.ExecSQL(ctx, tx, tryVerifyUserEmail.text(d.Dialect),
-		true, time.Now().UTC(), userId, email, false, codeEncrypted)
+		true, time.Now().UTC(), userID, email, false, codeEncrypted)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to verify user email")
 	}
@@ -1593,10 +1593,10 @@ var tryConsumeForgotPasswordCode = statement{
 // Separate from SetUserPasswordHash rather than a fourth parameter on it: its other two
 // callers, the admin user-create path and the account password-change API, hold no
 // outstanding code and would have to pass a meaningless predicate.
-func (d *Database) TryConsumeForgotPasswordCode(ctx context.Context, tx *sql.Tx, userId int64, codeHash string,
+func (d *Database) TryConsumeForgotPasswordCode(ctx context.Context, tx *sql.Tx, userID int64, codeHash string,
 	passwordHash string) (bool, error) {
 
-	if userId == 0 {
+	if userID == 0 {
 		return false, errs.New("can't consume a forgot password code for user with id 0")
 	}
 	// An error rather than a benign false, and it is not defensive: '' is the dormant
@@ -1621,7 +1621,7 @@ func (d *Database) TryConsumeForgotPasswordCode(ctx context.Context, tx *sql.Tx,
 	// enabled is in the predicate so a disable landing between the reset handler's read and
 	// this write refuses the reset instead of setting a password (#404 decision 2).
 	result, err := d.ExecSQL(ctx, tx, tryConsumeForgotPasswordCode.text(d.Dialect),
-		passwordHash, true, time.Now().UTC(), userId, codeHash, true)
+		passwordHash, true, time.Now().UTC(), userID, codeHash, true)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to consume forgot password code")
 	}
@@ -1664,10 +1664,10 @@ var tryStoreForgotPasswordCode = statement{
 // Conditional so that the same disable, an address change or anything else that unverified the
 // address since the lookup leaves the row untouched and the request mails nothing (#404
 // decision 2). A false return does not say which of them happened.
-func (d *Database) TryStoreForgotPasswordCode(ctx context.Context, tx *sql.Tx, userId int64, email string,
+func (d *Database) TryStoreForgotPasswordCode(ctx context.Context, tx *sql.Tx, userID int64, email string,
 	codeEncrypted []byte, codeHash string, issuedAt time.Time) (bool, error) {
 
-	if userId == 0 {
+	if userID == 0 {
 		return false, errs.New("can't store a forgot password code for user with id 0")
 	}
 	// '' is the dormant value meaning no code outstanding, so a code stored with it could
@@ -1678,7 +1678,7 @@ func (d *Database) TryStoreForgotPasswordCode(ctx context.Context, tx *sql.Tx, u
 
 	// Bound Go bools, as TrySetUserEnabled does against users.enabled.
 	result, err := d.ExecSQL(ctx, tx, tryStoreForgotPasswordCode.text(d.Dialect),
-		codeEncrypted, codeHash, issuedAt, time.Now().UTC(), userId, email, true, true)
+		codeEncrypted, codeHash, issuedAt, time.Now().UTC(), userID, email, true, true)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to store forgot password code")
 	}
@@ -1715,14 +1715,14 @@ var trySetUserEnabled = statement{
 // Covers both directions on purpose. The endpoint behind it serves enable as well as
 // disable, and leaving enable on the full-row UpdateUser would keep the clobbering
 // problem alive in half of it. (#106)
-func (d *Database) TrySetUserEnabled(ctx context.Context, tx *sql.Tx, userId int64, expected bool, desired bool) (bool, error) {
+func (d *Database) TrySetUserEnabled(ctx context.Context, tx *sql.Tx, userID int64, expected bool, desired bool) (bool, error) {
 
-	if userId == 0 {
+	if userID == 0 {
 		return false, errs.New("can't set enabled on user with id 0")
 	}
 
 	result, err := d.ExecSQL(ctx, tx, trySetUserEnabled.text(d.Dialect),
-		desired, time.Now().UTC(), userId, expected)
+		desired, time.Now().UTC(), userID, expected)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to set user enabled")
 	}
@@ -1759,7 +1759,7 @@ var consumeUserOTPStep = statement{
 // verifier, done beside the claim rather than after it so no committed state has a step consumed
 // and the attempts before it still standing (#489). otp_enabled is compared with a bound Go bool,
 // as TrySetUserEnabled does against users.enabled. The count's limit is part of the claim, not a
-// read before it: an authenticator disabled at record.OtpConsecutiveFailureLimit stays disabled
+// read before it: an authenticator disabled at record.OTPConsecutiveFailureLimit stays disabled
 // even to a request that loaded the user before the count reached it, the same way the generation
 // term refuses a replaced authenticator (#489).
 var consumeEnrolledUserOTPStep = statement{
@@ -1808,8 +1808,8 @@ var consumeEnrolledUserOTPStep = statement{
 // Deliberately not part of UpdateUser. last_otp_step is tagged dont-update because a
 // whole-row write from a snapshot read before the claim would write the pre-claim value
 // over it.
-func (d *Database) TryConsumeUserOTPStep(ctx context.Context, tx *sql.Tx, userId int64, step int64) (bool, error) {
-	return d.consumeUserOTPStep(ctx, tx, userId, step, nil)
+func (d *Database) TryConsumeUserOTPStep(ctx context.Context, tx *sql.Tx, userID int64, step int64) (bool, error) {
+	return d.consumeUserOTPStep(ctx, tx, userID, step, nil)
 }
 
 // TryConsumeEnrolledUserOTPStep is the verification claim: TryConsumeUserOTPStep's
@@ -1830,29 +1830,29 @@ func (d *Database) TryConsumeUserOTPStep(ctx context.Context, tx *sql.Tx, userId
 //
 // The claim also carries the consecutive-failure count's two rules, in the same
 // statement: it returns otp_consecutive_failures to 0, and it refuses while the count
-// stands at record.OtpConsecutiveFailureLimit, where the authenticator is disabled until
+// stands at record.OTPConsecutiveFailureLimit, where the authenticator is disabled until
 // it is rebound (NIST SP 800-63B section 3.2.2, #489).
 //
 // Everything else, the false and the error, is as TryConsumeUserOTPStep documents.
-func (d *Database) TryConsumeEnrolledUserOTPStep(ctx context.Context, tx *sql.Tx, userId int64, step int64,
+func (d *Database) TryConsumeEnrolledUserOTPStep(ctx context.Context, tx *sql.Tx, userID int64, step int64,
 	expectedGeneration int64) (bool, error) {
-	return d.consumeUserOTPStep(ctx, tx, userId, step, &expectedGeneration)
+	return d.consumeUserOTPStep(ctx, tx, userID, step, &expectedGeneration)
 }
 
 // consumeUserOTPStep is the one conditional UPDATE both claims run. enrolledAt is nil for
 // the enrolment claim and the generation read with the secret for the verification claim.
-func (d *Database) consumeUserOTPStep(ctx context.Context, tx *sql.Tx, userId int64, step int64,
+func (d *Database) consumeUserOTPStep(ctx context.Context, tx *sql.Tx, userID int64, step int64,
 	enrolledAt *int64) (bool, error) {
 
-	if userId == 0 {
+	if userID == 0 {
 		return false, errs.New("can't consume an OTP step for user with id 0")
 	}
 
 	query := consumeUserOTPStep.text(d.Dialect)
-	args := []any{step, time.Now().UTC(), userId, step}
+	args := []any{step, time.Now().UTC(), userID, step}
 	if enrolledAt != nil {
 		query = consumeEnrolledUserOTPStep.text(d.Dialect)
-		args = append(args, true, *enrolledAt, record.OtpConsecutiveFailureLimit)
+		args = append(args, true, *enrolledAt, record.OTPConsecutiveFailureLimit)
 	}
 
 	result, err := d.ExecSQL(ctx, tx, query, args...)
@@ -1894,13 +1894,13 @@ var resetUserOTPStep = statement{
 // Resetting an already-reset user is not a failure, so this reports only an error
 // rather than whether anything changed. Nothing gates on the transition, unlike
 // TrySetUserEnabled's disable direction.
-func (d *Database) ResetUserOTPStep(ctx context.Context, tx *sql.Tx, userId int64) error {
+func (d *Database) ResetUserOTPStep(ctx context.Context, tx *sql.Tx, userID int64) error {
 
-	if userId == 0 {
+	if userID == 0 {
 		return errs.New("can't reset the OTP step of user with id 0")
 	}
 
-	_, err := d.ExecSQL(ctx, tx, resetUserOTPStep.text(d.Dialect), time.Now().UTC(), userId)
+	_, err := d.ExecSQL(ctx, tx, resetUserOTPStep.text(d.Dialect), time.Now().UTC(), userID)
 	if err != nil {
 		return errs.Wrap(err, "unable to reset user OTP step")
 	}
@@ -1908,10 +1908,10 @@ func (d *Database) ResetUserOTPStep(ctx context.Context, tx *sql.Tx, userId int6
 	return nil
 }
 
-// advanceUserOtpConsecutiveFailures and reachUserOtpConsecutiveFailureLimit are
-// IncrementUserOtpConsecutiveFailures' two statements. Both assignments change the count, so a
+// advanceUserOTPConsecutiveFailures and reachUserOTPConsecutiveFailureLimit are
+// IncrementUserOTPConsecutiveFailures' two statements. Both assignments change the count, so a
 // matched row is a changed row on all four engines.
-var advanceUserOtpConsecutiveFailures = statement{
+var advanceUserOTPConsecutiveFailures = statement{
 	sqlite: "UPDATE users SET otp_consecutive_failures = otp_consecutive_failures + 1 " +
 		"WHERE id = ? AND otp_enabled = ? AND otp_config_generation = ? " +
 		"AND otp_consecutive_failures < ?",
@@ -1926,7 +1926,7 @@ var advanceUserOtpConsecutiveFailures = statement{
 		"AND otp_consecutive_failures < @p4",
 }
 
-var reachUserOtpConsecutiveFailureLimit = statement{
+var reachUserOTPConsecutiveFailureLimit = statement{
 	sqlite: "UPDATE users SET otp_consecutive_failures = ? WHERE id = ? AND otp_enabled = ? " +
 		"AND otp_config_generation = ? AND otp_consecutive_failures = ?",
 	mysql: "UPDATE users SET otp_consecutive_failures = ? WHERE id = ? AND otp_enabled = ? " +
@@ -1937,9 +1937,9 @@ var reachUserOtpConsecutiveFailureLimit = statement{
 		"AND otp_config_generation = @p4 AND otp_consecutive_failures = @p5",
 }
 
-// IncrementUserOtpConsecutiveFailures advances the count of consecutive failed attempts
+// IncrementUserOTPConsecutiveFailures advances the count of consecutive failed attempts
 // against the user's enrolled authenticator by one, stopping at
-// record.OtpConsecutiveFailureLimit, where the authenticator is disabled until it is
+// record.OTPConsecutiveFailureLimit, where the authenticator is disabled until it is
 // rebound (NIST SP 800-63B section 3.2.2, #489), and reports whether this call is the one
 // that moved the count to the limit, so the caller audits the disable exactly once.
 //
@@ -1959,7 +1959,7 @@ var reachUserOtpConsecutiveFailureLimit = statement{
 // count cleared by a success landing between the two matches neither, and this attempt,
 // which came before that success, is disregarded with the others.
 //
-// A row that matches nothing is not an error, unlike IncrementUserOtpConfigGeneration's
+// A row that matches nothing is not an error, unlike IncrementUserOTPConfigGeneration's
 // missing row: a user already at the limit matches no row, and so does an authenticator
 // removed or replaced since the read, or a row deleted, and none is a failure. The
 // ceiling is the load-bearing half -- an attacker grinding a disabled authenticator must
@@ -1972,27 +1972,27 @@ var reachUserOtpConsecutiveFailureLimit = statement{
 // Deliberately not part of UpdateUser. otp_consecutive_failures is tagged dont-update
 // because a whole-row write from a model read before the refusal would write the
 // pre-attempt count back over the row's, silently unlocking a disabled authenticator.
-func (d *Database) IncrementUserOtpConsecutiveFailures(ctx context.Context, tx *sql.Tx, userId int64,
+func (d *Database) IncrementUserOTPConsecutiveFailures(ctx context.Context, tx *sql.Tx, userID int64,
 	expectedGeneration int64) (bool, error) {
 
-	if userId == 0 {
+	if userID == 0 {
 		return false, errs.New("can't increment the OTP consecutive failures of user with id 0")
 	}
 
-	advanced, err := d.casUserOtpConsecutiveFailures(ctx, tx, advanceUserOtpConsecutiveFailures,
-		userId, true, expectedGeneration, record.OtpConsecutiveFailureLimit-1)
+	advanced, err := d.casUserOTPConsecutiveFailures(ctx, tx, advanceUserOTPConsecutiveFailures,
+		userID, true, expectedGeneration, record.OTPConsecutiveFailureLimit-1)
 	if err != nil || advanced {
 		return false, err
 	}
 
-	return d.casUserOtpConsecutiveFailures(ctx, tx, reachUserOtpConsecutiveFailureLimit,
-		record.OtpConsecutiveFailureLimit, userId, true, expectedGeneration, record.OtpConsecutiveFailureLimit-1)
+	return d.casUserOTPConsecutiveFailures(ctx, tx, reachUserOTPConsecutiveFailureLimit,
+		record.OTPConsecutiveFailureLimit, userID, true, expectedGeneration, record.OTPConsecutiveFailureLimit-1)
 }
 
-// casUserOtpConsecutiveFailures runs one of IncrementUserOtpConsecutiveFailures' two
+// casUserOTPConsecutiveFailures runs one of IncrementUserOTPConsecutiveFailures' two
 // statements, each of which writes the count only where the row still holds the authenticator
 // at the generation it binds and the count matches its own term, and reports whether it matched.
-func (d *Database) casUserOtpConsecutiveFailures(ctx context.Context, tx *sql.Tx, stmt statement,
+func (d *Database) casUserOTPConsecutiveFailures(ctx context.Context, tx *sql.Tx, stmt statement,
 	args ...any) (bool, error) {
 
 	result, err := d.ExecSQL(ctx, tx, stmt.text(d.Dialect), args...)
@@ -2008,35 +2008,35 @@ func (d *Database) casUserOtpConsecutiveFailures(ctx context.Context, tx *sql.Tx
 	return rowsAffected == 1, nil
 }
 
-// clearUserOtpConsecutiveFailures returns the consecutive-failure count to 0.
-var clearUserOtpConsecutiveFailures = statement{
+// clearUserOTPConsecutiveFailures returns the consecutive-failure count to 0.
+var clearUserOTPConsecutiveFailures = statement{
 	sqlite:   "UPDATE users SET otp_consecutive_failures = 0, updated_at = ? WHERE id = ?",
 	mysql:    "UPDATE users SET otp_consecutive_failures = 0, updated_at = ? WHERE id = ?",
 	postgres: "UPDATE users SET otp_consecutive_failures = 0, updated_at = $1 WHERE id = $2",
 	mssql:    "UPDATE users SET otp_consecutive_failures = 0, updated_at = @p1 WHERE id = @p2",
 }
 
-// ClearUserOtpConsecutiveFailures returns the consecutive-failure count to 0, the state
+// ClearUserOTPConsecutiveFailures returns the consecutive-failure count to 0, the state
 // of a user no failed attempt has been counted against. Called inside the same
 // transaction as the write that binds a fresh authenticator, because rebinding is the
-// one path back from record.OtpConsecutiveFailureLimit: a count committed with the
+// one path back from record.OTPConsecutiveFailureLimit: a count committed with the
 // authenticator would disable the enrolment that exists to clear it (NIST SP 800-63B
 // section 3.2.2, #489).
 //
 // Unconditional and narrow, as ResetUserOTPStep is: the enrolment transaction already
 // matched the row it expected, and nothing gates on whether the count was already 0.
-// Unlike the increment, tx is required, as IncrementUserOtpConfigGeneration's is -- the
+// Unlike the increment, tx is required, as IncrementUserOTPConfigGeneration's is -- the
 // clear must commit with the establish that rebinds, or not at all.
-func (d *Database) ClearUserOtpConsecutiveFailures(ctx context.Context, tx *sql.Tx, userId int64) error {
+func (d *Database) ClearUserOTPConsecutiveFailures(ctx context.Context, tx *sql.Tx, userID int64) error {
 
-	if userId == 0 {
+	if userID == 0 {
 		return errs.New("can't clear the OTP consecutive failures of user with id 0")
 	}
 	if tx == nil {
 		return errs.New("clearing the OTP consecutive failures requires a transaction: it must commit with the write that rebinds the authenticator")
 	}
 
-	_, err := d.ExecSQL(ctx, tx, clearUserOtpConsecutiveFailures.text(d.Dialect), time.Now().UTC(), userId)
+	_, err := d.ExecSQL(ctx, tx, clearUserOTPConsecutiveFailures.text(d.Dialect), time.Now().UTC(), userID)
 	if err != nil {
 		return errs.Wrap(err, "unable to clear user OTP consecutive failures")
 	}
@@ -2102,10 +2102,10 @@ var tryInstallPendingOTPEnrollment = statement{
 //
 // Deliberately not part of UpdateUser: both columns are tagged dont-update, because the full-row
 // write is what would let one enrolment request erase another's issuance. See record.User.
-func (d *Database) TryInstallPendingOTPEnrollment(ctx context.Context, tx *sql.Tx, userId int64,
+func (d *Database) TryInstallPendingOTPEnrollment(ctx context.Context, tx *sql.Tx, userID int64,
 	secretEncrypted []byte, issuedAt time.Time, staleBefore time.Time) (bool, error) {
 
-	if userId == 0 {
+	if userID == 0 {
 		return false, errs.New("can't install a pending OTP enrollment for user with id 0")
 	}
 	// Errors rather than benign falses, and neither is defensive. An empty ciphertext is the
@@ -2121,7 +2121,7 @@ func (d *Database) TryInstallPendingOTPEnrollment(ctx context.Context, tx *sql.T
 	}
 
 	result, err := d.ExecSQL(ctx, tx, tryInstallPendingOTPEnrollment.text(d.Dialect),
-		secretEncrypted, issuedAt, time.Now().UTC(), userId, false, staleBefore)
+		secretEncrypted, issuedAt, time.Now().UTC(), userID, false, staleBefore)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to install pending OTP enrollment")
 	}
@@ -2159,13 +2159,13 @@ var clearPendingOTPEnrollment = statement{
 // the SQL Server driver types an untyped Go nil as nvarchar, which it then refuses to convert
 // implicitly to varbinary(max). A literal NULL has no parameter type to get wrong and is portable
 // across all four engines (#247).
-func (d *Database) ClearPendingOTPEnrollment(ctx context.Context, tx *sql.Tx, userId int64) error {
+func (d *Database) ClearPendingOTPEnrollment(ctx context.Context, tx *sql.Tx, userID int64) error {
 
-	if userId == 0 {
+	if userID == 0 {
 		return errs.New("can't clear the pending OTP enrollment of user with id 0")
 	}
 
-	_, err := d.ExecSQL(ctx, tx, clearPendingOTPEnrollment.text(d.Dialect), time.Now().UTC(), userId)
+	_, err := d.ExecSQL(ctx, tx, clearPendingOTPEnrollment.text(d.Dialect), time.Now().UTC(), userID)
 	if err != nil {
 		return errs.Wrap(err, "unable to clear pending OTP enrollment")
 	}
@@ -2197,15 +2197,15 @@ var tryEstablishUserOTP = statement{
 // enrolments from one read exactly one lands, so the second no longer replaces the first's secret,
 // and the generation term refuses an enrolment read before an enable and a disable landed in
 // between, which leave otp_enabled where it was and move the generation twice. The generation
-// advance itself stays IncrementUserOtpConfigGeneration's, in the caller's transaction, and runs
+// advance itself stays IncrementUserOTPConfigGeneration's, in the caller's transaction, and runs
 // only when this reports true.
 //
 // otp_enabled flips from false to true on every matched row, so a matched row is a changed row on
 // all four engines and MySQL's changed-rows accounting agrees with matched rows.
-func (d *Database) TryEstablishUserOTP(ctx context.Context, tx *sql.Tx, userId int64, expectedGeneration int64,
+func (d *Database) TryEstablishUserOTP(ctx context.Context, tx *sql.Tx, userID int64, expectedGeneration int64,
 	secretEncrypted []byte) (bool, error) {
 
-	if userId == 0 {
+	if userID == 0 {
 		return false, errs.New("can't establish OTP for user with id 0")
 	}
 	if len(secretEncrypted) == 0 {
@@ -2213,7 +2213,7 @@ func (d *Database) TryEstablishUserOTP(ctx context.Context, tx *sql.Tx, userId i
 	}
 
 	result, err := d.ExecSQL(ctx, tx, tryEstablishUserOTP.text(d.Dialect),
-		secretEncrypted, true, time.Now().UTC(), userId, false, expectedGeneration)
+		secretEncrypted, true, time.Now().UTC(), userID, false, expectedGeneration)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to establish user OTP")
 	}
@@ -2251,14 +2251,14 @@ var tryRemoveUserOTP = statement{
 // The seed clears to a literal NULL rather than a bound nil, for the reason setUserPasswordHash
 // gives. otp_enabled flips on every matched row, so a matched row is a changed
 // row on all four engines.
-func (d *Database) TryRemoveUserOTP(ctx context.Context, tx *sql.Tx, userId int64, expectedGeneration int64) (bool, error) {
+func (d *Database) TryRemoveUserOTP(ctx context.Context, tx *sql.Tx, userID int64, expectedGeneration int64) (bool, error) {
 
-	if userId == 0 {
+	if userID == 0 {
 		return false, errs.New("can't remove OTP for user with id 0")
 	}
 
 	result, err := d.ExecSQL(ctx, tx, tryRemoveUserOTP.text(d.Dialect),
-		false, time.Now().UTC(), userId, true, expectedGeneration)
+		false, time.Now().UTC(), userID, true, expectedGeneration)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to remove user OTP")
 	}

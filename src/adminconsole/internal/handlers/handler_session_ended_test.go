@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"encoding/gob"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -43,7 +42,7 @@ const indexAuthServerBaseURL = "https://auth.example.test"
 // newMemoryStore is the production store over an in-memory backend.
 func newMemoryStore(t *testing.T) *sessionstore.ServerSideStore {
 	t.Helper()
-	gob.Register(oauth.TokenResponse{})
+	sessionkeys.RegisterStoredTokenResponse()
 	store, err := sessionstore.NewServerSideStore(sessiontest.NewMemoryBackend(), sessionkeys.JWT, false, sessionstore.BrowserSessionCookie,
 		sessionstore.KeyPair{
 			AuthenticationKey: []byte("12345678901234567890123456789012"),
@@ -119,7 +118,7 @@ func withCookies(req *http.Request, cookies []*http.Cookie) *http.Request {
 // how the tests tell "the tokens were cleared" from "the session was destroyed".
 func signedInValues() map[string]any {
 	return map[string]any{
-		sessionkeys.JWT:          oauth.TokenResponse{AccessToken: "the-access-token", IdToken: "the-id-token"},
+		sessionkeys.JWT:          sessionkeys.StoreTokenResponse(oauth.TokenResponse{AccessToken: "the-access-token", IDToken: "the-id-token"}),
 		sessionkeys.JWTExpiresAt: int64(1_900_000_000),
 		"somethingElse":          "kept",
 	}
@@ -130,7 +129,7 @@ func TestHandleSessionEndedGet_ClearsTheTokensAndLeavesTheNoticeForTheNextReques
 	logs := logtest.CaptureSlog(t)
 	cookies := seedSession(t, store, signedInValues())
 
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	w := httptest.NewRecorder()
 	HandleSessionEndedGet(httpHelper, store).ServeHTTP(w,
 		withCookies(handlertest.Request(http.MethodGet, "/auth/session-ended"), cookies))
@@ -175,7 +174,7 @@ func TestHandleSessionEndedGet_AnswersTheErrorPageWhenTheSessionCannotBeReadOrSa
 			if testCase.getErr == nil {
 				store.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(testCase.saveErr)
 			}
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Return().Once()
 
 			w := httptest.NewRecorder()
@@ -191,7 +190,7 @@ func TestHandleSessionEndedGet_AnswersTheErrorPageWhenTheSessionCannotBeReadOrSa
 // serveIndex answers one home page request with cookies, and returns the bind it rendered with.
 func serveIndex(t *testing.T, store sessionstore.Store, cookies []*http.Cookie) map[string]interface{} {
 	t.Helper()
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.ExpectRender(httpHelper, "/layouts/no_menu_layout.html", "/index.html").Once()
 	HandleIndexGet(nil, httpHelper, store, indexAuthServerBaseURL).ServeHTTP(httptest.NewRecorder(),
 		withCookies(handlertest.Request(http.MethodGet, "/"), cookies))
@@ -209,15 +208,15 @@ func TestHandleIndexGet_ReadsTheSignedInAdministratorFromTheTokenSet(t *testing.
 	authHelper := oauthclient.NewAuthHelper(nil, "", "", reqctx.SafeModeFrom)
 
 	serve := func(opts ...handlertest.Option) map[string]interface{} {
-		httpHelper := handlersmocks.NewHttpHelper(t)
+		httpHelper := handlersmocks.NewHTTPHelper(t)
 		handlertest.ExpectRender(httpHelper, "/layouts/no_menu_layout.html", "/index.html").Once()
 		HandleIndexGet(authHelper, httpHelper, store, indexAuthServerBaseURL).ServeHTTP(httptest.NewRecorder(),
 			handlertest.Request(http.MethodGet, "/", opts...))
 		return handlertest.Bind(t, httpHelper)
 	}
 
-	signedIn := serve(handlertest.WithJwtInfo(oauthclient.JwtInfo{
-		IdToken: &oauth.JwtToken{Claims: jwt.MapClaims{"email": "admin@example.com"}},
+	signedIn := serve(handlertest.WithJWTInfo(oauthclient.JWTInfo{
+		IDToken: &oauth.JWTToken{Claims: jwt.MapClaims{"email": "admin@example.com"}},
 	}))
 	assert.Equal(t, true, signedIn["IsAuthenticated"])
 	assert.Equal(t, "admin@example.com", signedIn["LoggedInUser"])
@@ -232,7 +231,7 @@ func TestHandleIndexGet_ReadsTheSignedInAdministratorFromTheTokenSet(t *testing.
 
 	// The page links to the auth server's public base URL it was built with, signed in or not.
 	for name, bind := range map[string]map[string]interface{}{"signed in": signedIn, "anonymous": anonymous} {
-		assert.Equal(t, "https://auth.example.test", bind["AuthServerBaseUrl"], name)
+		assert.Equal(t, "https://auth.example.test", bind["AuthServerBaseURL"], name)
 	}
 }
 
@@ -283,7 +282,7 @@ func TestHandleIndexGet_AnswersTheErrorPageWhenTheSessionCannotBeReadOrSaved(t *
 			if testCase.getErr == nil {
 				store.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(testCase.saveErr)
 			}
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Return().Once()
 
 			HandleIndexGet(nil, httpHelper, store, indexAuthServerBaseURL).ServeHTTP(httptest.NewRecorder(),
@@ -303,7 +302,7 @@ func TestHandleSessionEndedGet_ASessionWithoutTokensGetsTheNoticeAndLogsNothing(
 	cookies := seedSession(t, store, map[string]any{"somethingElse": "kept"})
 
 	w := httptest.NewRecorder()
-	HandleSessionEndedGet(handlersmocks.NewHttpHelper(t), store).ServeHTTP(w,
+	HandleSessionEndedGet(handlersmocks.NewHTTPHelper(t), store).ServeHTTP(w,
 		withCookies(handlertest.Request(http.MethodGet, "/auth/session-ended"), cookies))
 
 	assert.Equal(t, http.StatusFound, w.Code)
@@ -323,7 +322,7 @@ func TestHandleSessionEndedGet_SendsTheNoticeInTheQueryWhenTheSessionsRowIsGone(
 	store := newMemoryStore(t)
 
 	w := httptest.NewRecorder()
-	HandleSessionEndedGet(handlersmocks.NewHttpHelper(t), store).ServeHTTP(w,
+	HandleSessionEndedGet(handlersmocks.NewHTTPHelper(t), store).ServeHTTP(w,
 		withCookies(handlertest.Request(http.MethodGet, "/auth/session-ended"), cookies))
 
 	assert.Equal(t, http.StatusFound, w.Code)
@@ -333,7 +332,7 @@ func TestHandleSessionEndedGet_SendsTheNoticeInTheQueryWhenTheSessionsRowIsGone(
 
 	t.Run("a visit with no cookie is told nothing", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		HandleSessionEndedGet(handlersmocks.NewHttpHelper(t), store).ServeHTTP(w,
+		HandleSessionEndedGet(handlersmocks.NewHTTPHelper(t), store).ServeHTTP(w,
 			handlertest.Request(http.MethodGet, "/auth/session-ended"))
 
 		assert.Equal(t, http.StatusFound, w.Code)
@@ -350,7 +349,7 @@ func TestHandleIndexGet_ShowsTheQuerysNoticeOnlyToAVisitorNotSignedIn(t *testing
 		Return(&sessionstore.Session{Values: map[string]any{}}, nil)
 	authHelper := oauthclient.NewAuthHelper(nil, "", "", reqctx.SafeModeFrom)
 	serve := func(target string, opts ...handlertest.Option) any {
-		httpHelper := handlersmocks.NewHttpHelper(t)
+		httpHelper := handlersmocks.NewHTTPHelper(t)
 		handlertest.ExpectRender(httpHelper, "/layouts/no_menu_layout.html", "/index.html").Once()
 		HandleIndexGet(authHelper, httpHelper, store, indexAuthServerBaseURL).ServeHTTP(httptest.NewRecorder(),
 			handlertest.Request(http.MethodGet, target, opts...))
@@ -358,8 +357,8 @@ func TestHandleIndexGet_ShowsTheQuerysNoticeOnlyToAVisitorNotSignedIn(t *testing
 	}
 
 	assert.Equal(t, true, serve("/?session-ended"), "a visitor not signed in")
-	assert.Equal(t, false, serve("/?session-ended", handlertest.WithJwtInfo(oauthclient.JwtInfo{
-		IdToken: &oauth.JwtToken{Claims: jwt.MapClaims{"email": "admin@example.com"}},
+	assert.Equal(t, false, serve("/?session-ended", handlertest.WithJWTInfo(oauthclient.JWTInfo{
+		IDToken: &oauth.JWTToken{Claims: jwt.MapClaims{"email": "admin@example.com"}},
 	})), "a signed-in administrator")
 	assert.Equal(t, false, serve("/"), "no query")
 }
@@ -367,7 +366,7 @@ func TestHandleIndexGet_ShowsTheQuerysNoticeOnlyToAVisitorNotSignedIn(t *testing
 // #427 decision 18: the page RequiresScope sends a signed-in administrator without the scope to is a
 // 403, since a 401 owes a WWW-Authenticate challenge the console does not have.
 func TestHandleUnauthorizedGet_Answers403(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.ExpectRender(httpHelper, "/layouts/no_menu_layout.html", "/unauthorized.html").Once()
 
 	HandleUnauthorizedGet(httpHelper).ServeHTTP(httptest.NewRecorder(),
@@ -400,7 +399,7 @@ func TestHandleSessionEndedGet_SendsANavigationTheBrowserReportsCrossSiteHomeAnd
 			req.Header.Set("Sec-Fetch-Site", testCase.site)
 
 			w := httptest.NewRecorder()
-			HandleSessionEndedGet(handlersmocks.NewHttpHelper(t), store).ServeHTTP(w, req)
+			HandleSessionEndedGet(handlersmocks.NewHTTPHelper(t), store).ServeHTTP(w, req)
 
 			assert.Equal(t, http.StatusFound, w.Code, "sent on, not dead-ended on a 403")
 			assert.Equal(t, "/", w.Header().Get("Location"),
@@ -452,7 +451,7 @@ func TestHandleSessionEndedGet_StillSignsOutTheNavigationsThisConsoleInitiates(t
 			}
 
 			w := httptest.NewRecorder()
-			HandleSessionEndedGet(handlersmocks.NewHttpHelper(t), store).ServeHTTP(w, req)
+			HandleSessionEndedGet(handlersmocks.NewHTTPHelper(t), store).ServeHTTP(w, req)
 
 			assert.Equal(t, http.StatusFound, w.Code)
 			assert.Equal(t, "/", w.Header().Get("Location"))

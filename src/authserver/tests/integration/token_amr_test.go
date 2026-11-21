@@ -18,7 +18,7 @@ func TestToken_AuthCode_AMR_IsArray(t *testing.T) {
 	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	formData := url.Values{
 		"grant_type":    {"authorization_code"},
@@ -29,7 +29,7 @@ func TestToken_AuthCode_AMR_IsArray(t *testing.T) {
 		"client_secret": {clientSecret},
 	}
 
-	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destURL, formData)
 
 	// Verify we got tokens
 	assert.NotNil(t, data["access_token"])
@@ -49,16 +49,16 @@ func TestToken_AuthCode_AMR_IsArray(t *testing.T) {
 	idToken := data["id_token"].(string)
 	idClaims := decodeJWTPayload(t, idToken)
 
-	amrId := idClaims["amr"]
-	assert.NotNil(t, amrId, "id_token must contain amr claim")
-	amrArrayId, ok := amrId.([]interface{})
-	assert.True(t, ok, "amr in id_token must be a JSON array, got %T", amrId)
-	assert.GreaterOrEqual(t, len(amrArrayId), 1, "amr array must contain at least one method")
+	amrID := idClaims["amr"]
+	assert.NotNil(t, amrID, "id_token must contain amr claim")
+	amrArrayID, ok := amrID.([]interface{})
+	assert.True(t, ok, "amr in id_token must be a JSON array, got %T", amrID)
+	assert.GreaterOrEqual(t, len(amrArrayID), 1, "amr array must contain at least one method")
 
 	// Verify the array contains "pwd" (password authentication)
 	// Since this is a normal auth code flow, at minimum pwd should be present
 	assert.Contains(t, amrArrayAccess, "pwd", "amr should contain 'pwd' for password authentication")
-	assert.Contains(t, amrArrayId, "pwd", "amr should contain 'pwd' for password authentication")
+	assert.Contains(t, amrArrayID, "pwd", "amr should contain 'pwd' for password authentication")
 }
 
 // TestToken_Refresh_AMR_IsArray verifies AMR is preserved as array through refresh
@@ -68,7 +68,7 @@ func TestToken_Refresh_AMR_IsArray(t *testing.T) {
 	// The auth code flow still returns a refresh token with these scopes
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	// First, get initial tokens
 	formData := url.Values{
@@ -80,7 +80,7 @@ func TestToken_Refresh_AMR_IsArray(t *testing.T) {
 		"client_secret": {clientSecret},
 	}
 
-	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destURL, formData)
 	assert.NotNil(t, data["refresh_token"])
 
 	// Refresh the token
@@ -92,7 +92,7 @@ func TestToken_Refresh_AMR_IsArray(t *testing.T) {
 		"client_secret": {clientSecret},
 	}
 
-	refreshData := postToTokenEndpoint(t, httpClient, destUrl, refreshFormData)
+	refreshData := postToTokenEndpoint(t, httpClient, destURL, refreshFormData)
 	assert.NotNil(t, refreshData["access_token"])
 
 	// Verify AMR is still an array after refresh

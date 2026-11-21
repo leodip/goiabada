@@ -55,7 +55,7 @@ func HandleAccountPhonePut(
 
 		// Validate phone input
 		input := &accountvalidation.ValidatePhoneInput{
-			PhoneCountryUniqueId: req.PhoneCountryUniqueId,
+			PhoneCountryUniqueID: req.PhoneCountryUniqueID,
 			PhoneNumber:          strings.TrimSpace(req.PhoneNumber),
 		}
 		if err := phoneValidator.ValidatePhone(input); err != nil {
@@ -67,8 +67,8 @@ func HandleAccountPhonePut(
 		// know, so the refusal below is a second line, and it says the validator's sentence under the
 		// code it always wrote (#559).
 		var callingCode string
-		if len(input.PhoneCountryUniqueId) > 0 {
-			pc, found := phonecountries.ByUniqueID(input.PhoneCountryUniqueId)
+		if len(input.PhoneCountryUniqueID) > 0 {
+			pc, found := phonecountries.ByUniqueID(input.PhoneCountryUniqueID)
 			if !found {
 				writeLocalizedError(w, r, i18n.NewLocalizedError(i18n.ErrCodePhoneCountryInvalid, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 				return
@@ -78,12 +78,12 @@ func HandleAccountPhonePut(
 
 		// Apply updates; always mark phone as unverified on change
 		if strings.TrimSpace(input.PhoneNumber) == "" {
-			user.PhoneNumberCountryUniqueId = ""
+			user.PhoneNumberCountryUniqueID = ""
 			user.PhoneNumberCountryCallingCode = ""
 			user.PhoneNumber = ""
 			user.PhoneNumberVerified = false
 		} else {
-			user.PhoneNumberCountryUniqueId = input.PhoneCountryUniqueId
+			user.PhoneNumberCountryUniqueID = input.PhoneCountryUniqueID
 			user.PhoneNumberCountryCallingCode = callingCode
 			user.PhoneNumber = input.PhoneNumber
 			user.PhoneNumberVerified = false
@@ -98,7 +98,7 @@ func HandleAccountPhonePut(
 
 		// Audit (self-service)
 		auditLogger.Log(r.Context(), audit.EventUpdatedOwnPhone, map[string]interface{}{
-			"user_id":        user.Id,
+			"user_id":        user.ID,
 			"logged_in_user": subject,
 		})
 

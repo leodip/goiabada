@@ -56,7 +56,7 @@ func TestMigration000028_CodeHashColumns(t *testing.T) {
 	// Seeded with raw SQL rather than through the models: both Go structs already carry
 	// the new fields, so an ORM insert at 000027 would target columns that do not exist
 	// yet.
-	userId := seedPreMigration000028User(t, h)
+	userID := seedPreMigration000028User(t, h)
 
 	// TWO pre-registration rows, not one. One '' value satisfies a UNIQUE index on every
 	// engine, so a single row would let this whole case pass with the DELETE removed.
@@ -73,11 +73,11 @@ func TestMigration000028_CodeHashColumns(t *testing.T) {
 
 	// 3a. A users row that predates the column lands at '', meaning no code outstanding.
 	//
-	// Read with raw SQL rather than GetUserById, as the 000027 test does: the seeded row
+	// Read with raw SQL rather than GetUserByID, as the 000027 test does: the seeded row
 	// leaves the nullable string columns as SQL NULL, which the model scanner cannot map
 	// into Go strings. The model mapping is covered by the seam 2 cases in user_test.go.
 	assert.Empty(t, readString000028(t, h,
-		fmt.Sprintf("SELECT forgot_password_code_hash FROM users WHERE id = %d", userId)),
+		fmt.Sprintf("SELECT forgot_password_code_hash FROM users WHERE id = %d", userID)),
 		"a users row that predates the column must land at the dormant ''")
 
 	// 5b. The pre-existing pre-registrations are gone.
@@ -86,9 +86,9 @@ func TestMigration000028_CodeHashColumns(t *testing.T) {
 
 	// 3b. A pre-registration written without the column lands at '' too. Written after
 	// the migration, since the up migration deletes everything written before it.
-	preRegId := seedPreMigration000028PreRegistration(t, h)
+	preRegID := seedPreMigration000028PreRegistration(t, h)
 	assert.Empty(t, readString000028(t, h,
-		fmt.Sprintf("SELECT verification_code_hash FROM pre_registrations WHERE id = %d", preRegId)),
+		fmt.Sprintf("SELECT verification_code_hash FROM pre_registrations WHERE id = %d", preRegID)),
 		"a pre_registrations row written without the column must land at the dormant ''")
 
 	// 6. Down, then up again. The down migration is not a true inverse (the deleted rows

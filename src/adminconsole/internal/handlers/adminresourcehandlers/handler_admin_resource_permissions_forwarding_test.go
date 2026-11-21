@@ -30,30 +30,30 @@ import (
 // not, and the one path that skipped escaping was the one carrying a value the API had echoed back.
 // Since #120 the modal shows a plain message as text, on either path.
 //
-// The handler is exercised through the real HttpHelper rather than the mock, because the status on
-// the wire is the whole of what this pins; NewHttpHelper(nil) never reaches a template on a
+// The handler is exercised through the real HTTPHelper rather than the mock, because the status on
+// the wire is the whole of what this pins; NewHTTPHelper(nil) never reaches a template on a
 // JSONError path carrying a status.
-type savePermissionsApiClient struct {
+type savePermissionsAPIClient struct {
 	resource  *api.ResourceResponse
 	updateErr error
 }
 
-func (c *savePermissionsApiClient) GetResourceById(_ context.Context, accessToken string, resourceId int64) (*api.ResourceResponse, error) {
+func (c *savePermissionsAPIClient) GetResourceByID(_ context.Context, accessToken string, resourceID int64) (*api.ResourceResponse, error) {
 	return c.resource, nil
 }
 
-func (c *savePermissionsApiClient) UpdateResourcePermissions(_ context.Context, accessToken string, resourceId int64,
+func (c *savePermissionsAPIClient) UpdateResourcePermissions(_ context.Context, accessToken string, resourceID int64,
 	req *api.UpdateResourcePermissionsRequest) error {
 	return c.updateErr
 }
 
-// The rest of the ports savePermissionsApiClient is passed to, which no test here reaches.
+// The rest of the ports savePermissionsAPIClient is passed to, which no test here reaches.
 
-func (*savePermissionsApiClient) GetPermissionsByResource(context.Context, string, int64) ([]api.PermissionResponse, error) {
+func (*savePermissionsAPIClient) GetPermissionsByResource(context.Context, string, int64) ([]api.PermissionResponse, error) {
 	panic("unexpected call to GetPermissionsByResource")
 }
 
-func TestResourcePermissionsPost_ForwardsTheApisStatus(t *testing.T) {
+func TestResourcePermissionsPost_ForwardsTheAPIsStatus(t *testing.T) {
 	testCases := []struct {
 		name            string
 		updateErr       error
@@ -111,7 +111,7 @@ func TestResourcePermissionsPost_ForwardsTheApisStatus(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			body, err := json.Marshal(SavePermissionsInput{
-				ResourceId:  3,
+				ResourceID:  3,
 				Permissions: []Permission{{Identifier: "read-audit-log", Description: "Reads it"}},
 			})
 			require.NoError(t, err)
@@ -126,8 +126,8 @@ func TestResourcePermissionsPost_ForwardsTheApisStatus(t *testing.T) {
 			HandlePermissionsPost(
 				render.New(nil, nil),
 				nil,
-				&savePermissionsApiClient{
-					resource:  &api.ResourceResponse{Id: 3},
+				&savePermissionsAPIClient{
+					resource:  &api.ResourceResponse{ID: 3},
 					updateErr: testCase.updateErr,
 				}).ServeHTTP(rec, req)
 

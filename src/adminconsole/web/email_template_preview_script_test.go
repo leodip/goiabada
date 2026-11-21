@@ -157,7 +157,7 @@ type emailPreviewFrame struct {
 	Subject     string `json:"subject"`
 	ButtonLabel string `json:"buttonLabel"`
 	Body        string `json:"body"`
-	BrandId     string `json:"brandId"`
+	BrandID     string `json:"brandId"`
 }
 
 type emailPreviewLook struct {
@@ -226,7 +226,7 @@ func TestEmailTemplatePreviewJS_PreviewsTheTextAsTheEditorOpens(t *testing.T) {
 	assert.Empty(t, looks[0].Frames, "the frame waits for the answer")
 	assert.Equal(t, "Welcome!", looks[1].Subject)
 	assert.Equal(t, "Hello,", looks[1].Text)
-	assert.Equal(t, []emailPreviewFrame{{Subject: "Welcome!", ButtonLabel: "Sign in", Body: "Hello,\n\n{{button}}", BrandId: ""}}, looks[1].Frames)
+	assert.Equal(t, []emailPreviewFrame{{Subject: "Welcome!", ButtonLabel: "Sign in", Body: "Hello,\n\n{{button}}", BrandID: ""}}, looks[1].Frames)
 }
 
 // Typing asks again, and so does choosing a brand, whose id goes with the text. A text the preview
@@ -257,7 +257,7 @@ func TestEmailTemplatePreviewJS_ARefusalKeepsTheLastGoodPreview(t *testing.T) {
 	assert.Equal(t, map[string]any{"subject": "Welcome!", "buttonLabel": "", "body": "Hi", "brandId": float64(4)}, looks[2].Requests[1].Body)
 	assert.Nil(t, looks[2].PreviewNotice, "an answer empties the refusal")
 	assert.Equal(t, "Hi", looks[2].Text)
-	assert.Equal(t, emailPreviewFrame{Subject: "Welcome!", Body: "Hi", BrandId: "4"}, looks[2].Frames[1])
+	assert.Equal(t, emailPreviewFrame{Subject: "Welcome!", Body: "Hi", BrandID: "4"}, looks[2].Frames[1])
 }
 
 // An answer to a request the editor has asked again since is dropped, so a slow answer never

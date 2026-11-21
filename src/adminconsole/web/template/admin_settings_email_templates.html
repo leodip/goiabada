@@ -38,8 +38,8 @@
           {{ range .Emails }}
           <tr>
             <td class="cell-wrap">
-              <a class="text-link" href="/admin/settings/email/templates/{{ .Id }}">{{ if .Known }}{{ T $.ctx (printf "adminconsole.email_templates.email.%s.name" .Id) }}{{ else }}{{ .Id }}{{ end }}</a>
-              {{ if .Known }}<span class="cell-secondary">{{ T $.ctx (printf "adminconsole.email_templates.email.%s.sent" .Id) }}</span>{{ end }}
+              <a class="text-link" href="/admin/settings/email/templates/{{ .ID }}">{{ if .Known }}{{ T $.ctx (printf "adminconsole.email_templates.email.%s.name" .ID) }}{{ else }}{{ .ID }}{{ end }}</a>
+              {{ if .Known }}<span class="cell-secondary">{{ T $.ctx (printf "adminconsole.email_templates.email.%s.sent" .ID) }}</span>{{ end }}
             </td>
             <td class="cell-wrap" data-label="{{ T $.ctx "adminconsole.email_templates.list.col_languages" }}">
               {{ if .Languages }}

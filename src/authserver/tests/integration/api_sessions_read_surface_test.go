@@ -84,12 +84,12 @@ func TestAPISessionLists_PublishNoPresentationFields(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, testClient))
-	defer func() { _ = database.DeleteClient(context.Background(), nil, testClient.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, testClient.ID) }()
 
 	now := time.Now().UTC()
 	require.NoError(t, database.CreateUserSessionClient(context.Background(), nil, &record.UserSessionClient{
-		UserSessionId: session.Id,
-		ClientId:      testClient.Id,
+		UserSessionID: session.ID,
+		ClientID:      testClient.ID,
 		Started:       now.Add(-time.Hour),
 		LastAccessed:  now.Add(-5 * time.Minute),
 	}))
@@ -99,8 +99,8 @@ func TestAPISessionLists_PublishNoPresentationFields(t *testing.T) {
 		name string
 		url  string
 	}{
-		{"admin user sessions", base + "/api/v1/admin/users/" + strconv.FormatInt(user.Id, 10) + "/sessions"},
-		{"admin client sessions", base + "/api/v1/admin/clients/" + strconv.FormatInt(testClient.Id, 10) + "/sessions"},
+		{"admin user sessions", base + "/api/v1/admin/users/" + strconv.FormatInt(user.ID, 10) + "/sessions"},
+		{"admin client sessions", base + "/api/v1/admin/clients/" + strconv.FormatInt(testClient.ID, 10) + "/sessions"},
 		{"account sessions", base + "/api/v1/account/sessions"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -138,23 +138,23 @@ func TestAPISessionLists_IsCurrentIsTrueOnAllThreeEndpoints(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, testClient))
-	defer func() { _ = database.DeleteClient(context.Background(), nil, testClient.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, testClient.ID) }()
 
 	now := time.Now().UTC()
 	require.NoError(t, database.CreateUserSessionClient(context.Background(), nil, &record.UserSessionClient{
-		UserSessionId: session.Id,
-		ClientId:      testClient.Id,
+		UserSessionID: session.ID,
+		ClientID:      testClient.ID,
 		Started:       now.Add(-time.Hour),
 		LastAccessed:  now.Add(-5 * time.Minute),
 	}))
 
 	// A second live session for the same user, which the token does not name. Without it a
 	// producer that set isCurrent true on every row would pass.
-	other := createTestUserSession(t, user.Id, fake.UUID())
-	defer func() { _ = database.DeleteUserSession(context.Background(), nil, other.Id) }()
+	other := createTestUserSession(t, user.ID, fake.UUID())
+	defer func() { _ = database.DeleteUserSession(context.Background(), nil, other.ID) }()
 	require.NoError(t, database.CreateUserSessionClient(context.Background(), nil, &record.UserSessionClient{
-		UserSessionId: other.Id,
-		ClientId:      testClient.Id,
+		UserSessionID: other.ID,
+		ClientID:      testClient.ID,
 		Started:       now.Add(-time.Hour),
 		LastAccessed:  now.Add(-5 * time.Minute),
 	}))
@@ -164,8 +164,8 @@ func TestAPISessionLists_IsCurrentIsTrueOnAllThreeEndpoints(t *testing.T) {
 		name string
 		url  string
 	}{
-		{"admin user sessions", base + "/api/v1/admin/users/" + strconv.FormatInt(user.Id, 10) + "/sessions"},
-		{"admin client sessions", base + "/api/v1/admin/clients/" + strconv.FormatInt(testClient.Id, 10) + "/sessions"},
+		{"admin user sessions", base + "/api/v1/admin/users/" + strconv.FormatInt(user.ID, 10) + "/sessions"},
+		{"admin client sessions", base + "/api/v1/admin/clients/" + strconv.FormatInt(testClient.ID, 10) + "/sessions"},
 		{"account sessions", base + "/api/v1/account/sessions"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -208,16 +208,16 @@ func TestAPIUserSessionsGet_AClientCredentialsTokenMarksNothingCurrent(t *testin
 		EmailVerified: true,
 	}
 	require.NoError(t, database.CreateUser(context.Background(), nil, testUser))
-	defer func() { _ = database.DeleteUser(context.Background(), nil, testUser.Id) }()
+	defer func() { _ = database.DeleteUser(context.Background(), nil, testUser.ID) }()
 
-	s1 := createTestUserSession(t, testUser.Id, fake.UUID())
-	s2 := createTestUserSession(t, testUser.Id, fake.UUID())
+	s1 := createTestUserSession(t, testUser.ID, fake.UUID())
+	s2 := createTestUserSession(t, testUser.ID, fake.UUID())
 	defer func() {
-		_ = database.DeleteUserSession(context.Background(), nil, s1.Id)
-		_ = database.DeleteUserSession(context.Background(), nil, s2.Id)
+		_ = database.DeleteUserSession(context.Background(), nil, s1.ID)
+		_ = database.DeleteUserSession(context.Background(), nil, s2.ID)
 	}()
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/sessions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.ID, 10) + "/sessions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 

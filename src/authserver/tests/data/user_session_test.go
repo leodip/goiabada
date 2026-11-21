@@ -20,18 +20,18 @@ const (
 		"AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Mobile/15E148 Safari/604.1"
 )
 
-// testDeviceId and testDeviceIdUpdated are device identifiers as stored, a SHA-256 in hex: of
+// testDeviceID and testDeviceIDUpdated are device identifiers as stored, a SHA-256 in hex: of
 // "a" and of "b", written out (#564).
 const (
-	testDeviceId        = "ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb"
-	testDeviceIdUpdated = "3e23e8160039594a33894f6564e1b1348bbd7a0088d42c4acb73eeaed59c009d"
+	testDeviceID        = "ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb"
+	testDeviceIDUpdated = "3e23e8160039594a33894f6564e1b1348bbd7a0088d42c4acb73eeaed59c009d"
 )
 
 func TestCreateUserSession(t *testing.T) {
 	user := createTestUser(t)
-	userSession := createTestUserSession(t, user.Id)
+	userSession := createTestUserSession(t, user.ID)
 
-	if userSession.Id == 0 {
+	if userSession.ID == 0 {
 		t.Error("Expected non-zero ID after creation")
 	}
 	if !userSession.CreatedAt.Valid || userSession.CreatedAt.Time.IsZero() {
@@ -41,7 +41,7 @@ func TestCreateUserSession(t *testing.T) {
 		t.Error("Expected UpdatedAt to be set")
 	}
 
-	retrievedUserSession, err := database.GetUserSessionById(context.Background(), nil, userSession.Id)
+	retrievedUserSession, err := database.GetUserSessionByID(context.Background(), nil, userSession.ID)
 	if err != nil {
 		t.Fatalf("Failed to retrieve created user session: %v", err)
 	}
@@ -51,22 +51,22 @@ func TestCreateUserSession(t *testing.T) {
 
 func TestUpdateUserSession(t *testing.T) {
 	user := createTestUser(t)
-	userSession := createTestUserSession(t, user.Id)
+	userSession := createTestUserSession(t, user.ID)
 
 	// Update all properties
 	userSession.SessionIdentifier = "updated_" + fake.UUID()
 	userSession.Started = time.Now().UTC().Add(-1 * time.Hour).Truncate(time.Microsecond)
 	userSession.LastAccessed = time.Now().UTC().Truncate(time.Microsecond)
 	userSession.AuthMethods = "pwd,otp"
-	userSession.AcrLevel = record.AcrLevel2Optional
+	userSession.ACRLevel = record.ACRLevel2Optional
 	userSession.AuthTime = time.Now().UTC().Add(-30 * time.Minute).Truncate(time.Microsecond)
-	userSession.IpAddress = "192.168.1.2"
+	userSession.IPAddress = "192.168.1.2"
 	userSession.DeviceName = "Updated Device"
 	userSession.DeviceType = "tablet"
 	userSession.DeviceOS = "iOS"
 	userSession.UserAgent = testUserAgentUpdated
-	userSession.DeviceId = testDeviceIdUpdated
-	userSession.UserId = user.Id // This shouldn't change, but we'll update it to ensure it's not accidentally modified
+	userSession.DeviceID = testDeviceIDUpdated
+	userSession.UserID = user.ID // This shouldn't change, but we'll update it to ensure it's not accidentally modified
 
 	time.Sleep(timestampTick)
 
@@ -75,7 +75,7 @@ func TestUpdateUserSession(t *testing.T) {
 		t.Fatalf("Failed to update user session: %v", err)
 	}
 
-	updatedUserSession, err := database.GetUserSessionById(context.Background(), nil, userSession.Id)
+	updatedUserSession, err := database.GetUserSessionByID(context.Background(), nil, userSession.ID)
 	if err != nil {
 		t.Fatalf("Failed to retrieve updated user session: %v", err)
 	}
@@ -87,29 +87,29 @@ func TestUpdateUserSession(t *testing.T) {
 	}
 }
 
-func TestGetUserSessionById(t *testing.T) {
+func TestGetUserSessionByID(t *testing.T) {
 	user := createTestUser(t)
-	userSession := createTestUserSession(t, user.Id)
+	userSession := createTestUserSession(t, user.ID)
 
-	retrievedUserSession, err := database.GetUserSessionById(context.Background(), nil, userSession.Id)
+	retrievedUserSession, err := database.GetUserSessionByID(context.Background(), nil, userSession.ID)
 	if err != nil {
 		t.Fatalf("Failed to get user session by ID: %v", err)
 	}
 
 	assertUserSessionEqual(t, userSession, retrievedUserSession)
 
-	nonExistentUserSession, err := database.GetUserSessionById(context.Background(), nil, 99999)
+	nonExistentUserSession, err := database.GetUserSessionByID(context.Background(), nil, 99999)
 	if err != nil {
 		t.Errorf("Expected no error for non-existent user session, got: %v", err)
 	}
 	if nonExistentUserSession != nil {
-		t.Errorf("Expected nil for non-existent user session, got a user session with ID: %d", nonExistentUserSession.Id)
+		t.Errorf("Expected nil for non-existent user session, got a user session with ID: %d", nonExistentUserSession.ID)
 	}
 }
 
 func TestGetUserSessionBySessionIdentifier(t *testing.T) {
 	user := createTestUser(t)
-	userSession := createTestUserSession(t, user.Id)
+	userSession := createTestUserSession(t, user.ID)
 
 	retrievedUserSession, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, userSession.SessionIdentifier)
 	if err != nil {
@@ -123,17 +123,17 @@ func TestGetUserSessionBySessionIdentifier(t *testing.T) {
 		t.Errorf("Expected no error for non-existent user session, got: %v", err)
 	}
 	if nonExistentUserSession != nil {
-		t.Errorf("Expected nil for non-existent user session, got a user session with ID: %d", nonExistentUserSession.Id)
+		t.Errorf("Expected nil for non-existent user session, got a user session with ID: %d", nonExistentUserSession.ID)
 	}
 }
 
-func TestGetUserSessionsByClientIdPaginated(t *testing.T) {
+func TestGetUserSessionsByClientIDPaginated(t *testing.T) {
 	user := createTestUser(t)
 	client := createTestClient(t)
-	createTestUserSessionsWithClient(t, user.Id, client.Id, 25)
+	createTestUserSessionsWithClient(t, user.ID, client.ID, 25)
 
 	// Test first page
-	userSessionsPage1, total1, err := database.GetUserSessionsByClientIdPaginated(context.Background(), nil, client.Id, 1, 10)
+	userSessionsPage1, total1, err := database.GetUserSessionsByClientIDPaginated(context.Background(), nil, client.ID, 1, 10)
 	if err != nil {
 		t.Fatalf("Failed to get paginated user sessions (page 1): %v", err)
 	}
@@ -147,7 +147,7 @@ func TestGetUserSessionsByClientIdPaginated(t *testing.T) {
 	}
 
 	// Test second page
-	userSessionsPage2, total2, err := database.GetUserSessionsByClientIdPaginated(context.Background(), nil, client.Id, 2, 10)
+	userSessionsPage2, total2, err := database.GetUserSessionsByClientIDPaginated(context.Background(), nil, client.ID, 2, 10)
 	if err != nil {
 		t.Fatalf("Failed to get second page of paginated user sessions: %v", err)
 	}
@@ -161,7 +161,7 @@ func TestGetUserSessionsByClientIdPaginated(t *testing.T) {
 	}
 
 	// Test last page
-	userSessionsPage3, total3, err := database.GetUserSessionsByClientIdPaginated(context.Background(), nil, client.Id, 3, 10)
+	userSessionsPage3, total3, err := database.GetUserSessionsByClientIDPaginated(context.Background(), nil, client.ID, 3, 10)
 	if err != nil {
 		t.Fatalf("Failed to get last page of paginated user sessions: %v", err)
 	}
@@ -175,7 +175,7 @@ func TestGetUserSessionsByClientIdPaginated(t *testing.T) {
 	}
 
 	// Test page beyond total
-	userSessionsPage4, total4, err := database.GetUserSessionsByClientIdPaginated(context.Background(), nil, client.Id, 4, 10)
+	userSessionsPage4, total4, err := database.GetUserSessionsByClientIDPaginated(context.Background(), nil, client.ID, 4, 10)
 	if err != nil {
 		t.Fatalf("Failed to get page beyond total: %v", err)
 	}
@@ -194,15 +194,15 @@ func TestGetUserSessionsByClientIdPaginated(t *testing.T) {
 		if err := database.UserSessionLoadClients(context.Background(), nil, &us); err != nil {
 			t.Fatalf("Failed to load clients for user session: %v", err)
 		}
-		if len(us.Clients) != 1 || us.Clients[0].ClientId != client.Id {
-			t.Errorf("User session %d is not associated with the correct client", us.Id)
+		if len(us.Clients) != 1 || us.Clients[0].ClientID != client.ID {
+			t.Errorf("User session %d is not associated with the correct client", us.ID)
 		}
 	}
 }
 
 func TestUserSessionsLoadUsers(t *testing.T) {
 	user := createTestUser(t)
-	userSessions := createTestUserSessions(t, user.Id, 5)
+	userSessions := createTestUserSessions(t, user.ID, 5)
 
 	err := database.UserSessionsLoadUsers(context.Background(), nil, userSessions)
 	if err != nil {
@@ -210,8 +210,8 @@ func TestUserSessionsLoadUsers(t *testing.T) {
 	}
 
 	for _, us := range userSessions {
-		if us.User.Id != user.Id {
-			t.Errorf("Expected user ID %d, got %d", user.Id, us.User.Id)
+		if us.User.ID != user.ID {
+			t.Errorf("Expected user ID %d, got %d", user.ID, us.User.ID)
 		}
 	}
 }
@@ -219,7 +219,7 @@ func TestUserSessionsLoadUsers(t *testing.T) {
 func TestUserSessionsLoadClients(t *testing.T) {
 	user := createTestUser(t)
 	client := createTestClient(t)
-	userSessions := createTestUserSessionsWithClient(t, user.Id, client.Id, 5)
+	userSessions := createTestUserSessionsWithClient(t, user.ID, client.ID, 5)
 
 	err := database.UserSessionsLoadClients(context.Background(), nil, userSessions)
 	if err != nil {
@@ -230,8 +230,8 @@ func TestUserSessionsLoadClients(t *testing.T) {
 		if len(us.Clients) != 1 {
 			t.Errorf("Expected 1 client, got %d", len(us.Clients))
 		}
-		if us.Clients[0].ClientId != client.Id {
-			t.Errorf("Expected client ID %d, got %d", client.Id, us.Clients[0].ClientId)
+		if us.Clients[0].ClientID != client.ID {
+			t.Errorf("Expected client ID %d, got %d", client.ID, us.Clients[0].ClientID)
 		}
 	}
 }
@@ -262,7 +262,7 @@ func TestUserSessionsLoadClients_NilAndEmptySlices(t *testing.T) {
 func TestUserSessionLoadClients(t *testing.T) {
 	user := createTestUser(t)
 	client := createTestClient(t)
-	userSession := createTestUserSessionWithClient(t, user.Id, client.Id)
+	userSession := createTestUserSessionWithClient(t, user.ID, client.ID)
 
 	err := database.UserSessionLoadClients(context.Background(), nil, userSession)
 	if err != nil {
@@ -272,30 +272,30 @@ func TestUserSessionLoadClients(t *testing.T) {
 	if len(userSession.Clients) != 1 {
 		t.Errorf("Expected 1 client, got %d", len(userSession.Clients))
 	}
-	if userSession.Clients[0].ClientId != client.Id {
-		t.Errorf("Expected client ID %d, got %d", client.Id, userSession.Clients[0].ClientId)
+	if userSession.Clients[0].ClientID != client.ID {
+		t.Errorf("Expected client ID %d, got %d", client.ID, userSession.Clients[0].ClientID)
 	}
 }
 
 func TestUserSessionLoadUser(t *testing.T) {
 	user := createTestUser(t)
-	userSession := createTestUserSession(t, user.Id)
+	userSession := createTestUserSession(t, user.ID)
 
 	err := database.UserSessionLoadUser(context.Background(), nil, userSession)
 	if err != nil {
 		t.Fatalf("Failed to load user for user session: %v", err)
 	}
 
-	if userSession.User.Id != user.Id {
-		t.Errorf("Expected user ID %d, got %d", user.Id, userSession.User.Id)
+	if userSession.User.ID != user.ID {
+		t.Errorf("Expected user ID %d, got %d", user.ID, userSession.User.ID)
 	}
 }
 
-func TestGetUserSessionsByUserId(t *testing.T) {
+func TestGetUserSessionsByUserID(t *testing.T) {
 	user := createTestUser(t)
-	createTestUserSessions(t, user.Id, 5)
+	createTestUserSessions(t, user.ID, 5)
 
-	retrievedUserSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	retrievedUserSessions, err := database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatalf("Failed to get user sessions by user ID: %v", err)
 	}
@@ -305,22 +305,22 @@ func TestGetUserSessionsByUserId(t *testing.T) {
 	}
 
 	for _, us := range retrievedUserSessions {
-		if us.UserId != user.Id {
-			t.Errorf("Expected user ID %d, got %d", user.Id, us.UserId)
+		if us.UserID != user.ID {
+			t.Errorf("Expected user ID %d, got %d", user.ID, us.UserID)
 		}
 	}
 }
 
 func TestDeleteUserSession(t *testing.T) {
 	user := createTestUser(t)
-	userSession := createTestUserSession(t, user.Id)
+	userSession := createTestUserSession(t, user.ID)
 
-	err := database.DeleteUserSession(context.Background(), nil, userSession.Id)
+	err := database.DeleteUserSession(context.Background(), nil, userSession.ID)
 	if err != nil {
 		t.Fatalf("Failed to delete user session: %v", err)
 	}
 
-	deletedUserSession, err := database.GetUserSessionById(context.Background(), nil, userSession.Id)
+	deletedUserSession, err := database.GetUserSessionByID(context.Background(), nil, userSession.ID)
 	if err != nil {
 		t.Fatalf("Error while checking for deleted user session: %v", err)
 	}
@@ -336,26 +336,26 @@ func TestDeleteUserSession(t *testing.T) {
 
 // createTestUserSession seeds a session on the package's shared handle; createTestUserSessionOn
 // takes the handle, for the reason createTestUserOn does.
-func createTestUserSession(t *testing.T, userId int64) *record.UserSession {
-	return createTestUserSessionOn(t, database, userId)
+func createTestUserSession(t *testing.T, userID int64) *record.UserSession {
+	return createTestUserSessionOn(t, database, userID)
 }
 
-func createTestUserSessionOn(t *testing.T, db data.Database, userId int64) *record.UserSession {
+func createTestUserSessionOn(t *testing.T, db data.Database, userID int64) *record.UserSession {
 	userSession := &record.UserSession{
 		SessionIdentifier: fake.UUID(),
 		Started:           time.Now().UTC().Truncate(time.Microsecond),
 		LastAccessed:      time.Now().UTC().Truncate(time.Microsecond),
 		AuthMethods:       "pwd",
-		AcrLevel:          record.AcrLevel1,
+		ACRLevel:          record.ACRLevel1,
 		AuthTime:          time.Now().UTC().Truncate(time.Microsecond),
 		PasswordAuthTime:  time.Now().UTC().Truncate(time.Microsecond),
-		IpAddress:         fake.IPv4Address(),
+		IPAddress:         fake.IPv4Address(),
 		DeviceName:        fake.Name(),
 		DeviceType:        "desktop",
 		DeviceOS:          "Windows",
 		UserAgent:         testUserAgent,
-		DeviceId:          testDeviceId,
-		UserId:            userId,
+		DeviceID:          testDeviceID,
+		UserID:            userID,
 	}
 	err := db.CreateUserSession(context.Background(), nil, userSession)
 	if err != nil {
@@ -364,24 +364,24 @@ func createTestUserSessionOn(t *testing.T, db data.Database, userId int64) *reco
 	return userSession
 }
 
-func createTestUserSessions(t *testing.T, userId int64, count int) []record.UserSession {
+func createTestUserSessions(t *testing.T, userID int64, count int) []record.UserSession {
 	var userSessions []record.UserSession
 	for i := 0; i < count; i++ {
-		userSession := createTestUserSession(t, userId)
+		userSession := createTestUserSession(t, userID)
 		userSessions = append(userSessions, *userSession)
 	}
 	return userSessions
 }
 
-func createTestUserSessionWithClient(t *testing.T, userId, clientId int64) *record.UserSession {
-	return createTestUserSessionWithClientOn(t, database, userId, clientId)
+func createTestUserSessionWithClient(t *testing.T, userID, clientID int64) *record.UserSession {
+	return createTestUserSessionWithClientOn(t, database, userID, clientID)
 }
 
-func createTestUserSessionWithClientOn(t *testing.T, db data.Database, userId, clientId int64) *record.UserSession {
-	userSession := createTestUserSessionOn(t, db, userId)
+func createTestUserSessionWithClientOn(t *testing.T, db data.Database, userID, clientID int64) *record.UserSession {
+	userSession := createTestUserSessionOn(t, db, userID)
 	userSessionClient := &record.UserSessionClient{
-		UserSessionId: userSession.Id,
-		ClientId:      clientId,
+		UserSessionID: userSession.ID,
+		ClientID:      clientID,
 		Started:       time.Now().UTC().Truncate(time.Microsecond),
 		LastAccessed:  time.Now().UTC().Truncate(time.Microsecond),
 	}
@@ -392,18 +392,18 @@ func createTestUserSessionWithClientOn(t *testing.T, db data.Database, userId, c
 	return userSession
 }
 
-func createTestUserSessionsWithClient(t *testing.T, userId, clientId int64, count int) []record.UserSession {
+func createTestUserSessionsWithClient(t *testing.T, userID, clientID int64, count int) []record.UserSession {
 	var userSessions []record.UserSession
 	for i := 0; i < count; i++ {
-		userSession := createTestUserSessionWithClient(t, userId, clientId)
+		userSession := createTestUserSessionWithClient(t, userID, clientID)
 		userSessions = append(userSessions, *userSession)
 	}
 	return userSessions
 }
 
 func assertUserSessionEqual(t *testing.T, expected, actual *record.UserSession) {
-	if actual.Id != expected.Id {
-		t.Errorf("Expected ID %d, got %d", expected.Id, actual.Id)
+	if actual.ID != expected.ID {
+		t.Errorf("Expected ID %d, got %d", expected.ID, actual.ID)
 	}
 	if actual.SessionIdentifier != expected.SessionIdentifier {
 		t.Errorf("Expected SessionIdentifier %s, got %s", expected.SessionIdentifier, actual.SessionIdentifier)
@@ -417,14 +417,14 @@ func assertUserSessionEqual(t *testing.T, expected, actual *record.UserSession) 
 	if actual.AuthMethods != expected.AuthMethods {
 		t.Errorf("Expected AuthMethods %s, got %s", expected.AuthMethods, actual.AuthMethods)
 	}
-	if actual.AcrLevel != expected.AcrLevel {
-		t.Errorf("Expected AcrLevel %s, got %s", expected.AcrLevel, actual.AcrLevel)
+	if actual.ACRLevel != expected.ACRLevel {
+		t.Errorf("Expected ACRLevel %s, got %s", expected.ACRLevel, actual.ACRLevel)
 	}
 	if !actual.AuthTime.Equal(expected.AuthTime) {
 		t.Errorf("Expected AuthTime %v, got %v", expected.AuthTime, actual.AuthTime)
 	}
-	if actual.IpAddress != expected.IpAddress {
-		t.Errorf("Expected IpAddress %s, got %s", expected.IpAddress, actual.IpAddress)
+	if actual.IPAddress != expected.IPAddress {
+		t.Errorf("Expected IPAddress %s, got %s", expected.IPAddress, actual.IPAddress)
 	}
 	if actual.DeviceName != expected.DeviceName {
 		t.Errorf("Expected DeviceName %s, got %s", expected.DeviceName, actual.DeviceName)
@@ -443,11 +443,11 @@ func assertUserSessionEqual(t *testing.T, expected, actual *record.UserSession) 
 	// The device identifier's digest, compared exactly: StartNewUserSession decides two sign-ins
 	// came from the same browser by comparing it, so a value the round trip alters changes which
 	// sessions supersede which (#564).
-	if actual.DeviceId != expected.DeviceId {
-		t.Errorf("Expected DeviceId %s, got %s", expected.DeviceId, actual.DeviceId)
+	if actual.DeviceID != expected.DeviceID {
+		t.Errorf("Expected DeviceID %s, got %s", expected.DeviceID, actual.DeviceID)
 	}
-	if actual.UserId != expected.UserId {
-		t.Errorf("Expected UserId %d, got %d", expected.UserId, actual.UserId)
+	if actual.UserID != expected.UserID {
+		t.Errorf("Expected UserID %d, got %d", expected.UserID, actual.UserID)
 	}
 	if !actual.CreatedAt.Valid || actual.CreatedAt.Time.IsZero() {
 		t.Error("Expected CreatedAt to be set")
@@ -488,7 +488,7 @@ func TestDeleteIdleSessions(t *testing.T) {
 		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 86400 * 30, // 30 days
 		IncludeOpenIDConnectClaimsInAccessToken: "no",
-		DefaultAcrLevel:                         record.AcrLevel1,
+		DefaultACRLevel:                         record.ACRLevel1,
 	}
 	err = database.CreateClient(context.Background(), nil, client)
 	if err != nil {
@@ -504,14 +504,14 @@ func TestDeleteIdleSessions(t *testing.T) {
 		Started:           now.Add(-10 * time.Minute),
 		LastAccessed:      now.Add(-10 * time.Minute),
 		AuthMethods:       "pwd",
-		AcrLevel:          record.AcrLevel1,
+		ACRLevel:          record.ACRLevel1,
 		AuthTime:          now.Add(-10 * time.Minute),
 		PasswordAuthTime:  now.Add(-10 * time.Minute),
-		IpAddress:         fake.IPv4Address(),
+		IPAddress:         fake.IPv4Address(),
 		DeviceName:        fake.Name(),
 		DeviceType:        "desktop",
 		DeviceOS:          "Windows",
-		UserId:            user.Id,
+		UserID:            user.ID,
 	}
 	err = database.CreateUserSession(context.Background(), nil, activeSession)
 	if err != nil {
@@ -520,8 +520,8 @@ func TestDeleteIdleSessions(t *testing.T) {
 
 	// Create UserSessionClient for active session
 	activeSessionClient := &record.UserSessionClient{
-		UserSessionId: activeSession.Id,
-		ClientId:      client.Id,
+		UserSessionID: activeSession.ID,
+		ClientID:      client.ID,
 		Started:       activeSession.Started,
 		LastAccessed:  activeSession.LastAccessed,
 	}
@@ -536,14 +536,14 @@ func TestDeleteIdleSessions(t *testing.T) {
 		Started:           now.Add(-3 * time.Hour),
 		LastAccessed:      now.Add(-2 * time.Hour),
 		AuthMethods:       "pwd",
-		AcrLevel:          record.AcrLevel1,
+		ACRLevel:          record.ACRLevel1,
 		AuthTime:          now.Add(-3 * time.Hour),
 		PasswordAuthTime:  now.Add(-3 * time.Hour),
-		IpAddress:         fake.IPv4Address(),
+		IPAddress:         fake.IPv4Address(),
 		DeviceName:        fake.Name(),
 		DeviceType:        "desktop",
 		DeviceOS:          "Windows",
-		UserId:            user.Id,
+		UserID:            user.ID,
 	}
 	err = database.CreateUserSession(context.Background(), nil, idleSession)
 	if err != nil {
@@ -552,8 +552,8 @@ func TestDeleteIdleSessions(t *testing.T) {
 
 	// Create UserSessionClient for idle session
 	idleSessionClient := &record.UserSessionClient{
-		UserSessionId: idleSession.Id,
-		ClientId:      client.Id,
+		UserSessionID: idleSession.ID,
+		ClientID:      client.ID,
 		Started:       idleSession.Started,
 		LastAccessed:  idleSession.LastAccessed,
 	}
@@ -568,14 +568,14 @@ func TestDeleteIdleSessions(t *testing.T) {
 		Started:           now.Add(-5 * time.Hour),
 		LastAccessed:      now.Add(-4 * time.Hour),
 		AuthMethods:       "pwd",
-		AcrLevel:          record.AcrLevel1,
+		ACRLevel:          record.ACRLevel1,
 		AuthTime:          now.Add(-5 * time.Hour),
 		PasswordAuthTime:  now.Add(-5 * time.Hour),
-		IpAddress:         fake.IPv4Address(),
+		IPAddress:         fake.IPv4Address(),
 		DeviceName:        fake.Name(),
 		DeviceType:        "desktop",
 		DeviceOS:          "Windows",
-		UserId:            user.Id,
+		UserID:            user.ID,
 	}
 	err = database.CreateUserSession(context.Background(), nil, veryIdleSession)
 	if err != nil {
@@ -584,8 +584,8 @@ func TestDeleteIdleSessions(t *testing.T) {
 
 	// Create UserSessionClient for very idle session
 	veryIdleSessionClient := &record.UserSessionClient{
-		UserSessionId: veryIdleSession.Id,
-		ClientId:      client.Id,
+		UserSessionID: veryIdleSession.ID,
+		ClientID:      client.ID,
 		Started:       veryIdleSession.Started,
 		LastAccessed:  veryIdleSession.LastAccessed,
 	}
@@ -604,7 +604,7 @@ func TestDeleteIdleSessions(t *testing.T) {
 	}
 
 	// Check if active session still exists
-	activeExists, err := database.GetUserSessionById(context.Background(), nil, activeSession.Id)
+	activeExists, err := database.GetUserSessionByID(context.Background(), nil, activeSession.ID)
 	if err != nil {
 		t.Fatalf("Error checking active session: %v", err)
 	}
@@ -613,7 +613,7 @@ func TestDeleteIdleSessions(t *testing.T) {
 	}
 
 	// Verify active session's client association still exists
-	activeSessionClients, err := database.GetUserSessionClientsByUserSessionId(context.Background(), nil, activeSession.Id)
+	activeSessionClients, err := database.GetUserSessionClientsByUserSessionID(context.Background(), nil, activeSession.ID)
 	if err != nil {
 		t.Fatalf("Error checking active session clients: %v", err)
 	}
@@ -622,7 +622,7 @@ func TestDeleteIdleSessions(t *testing.T) {
 	}
 
 	// Check if idle session was deleted
-	idleExists, err := database.GetUserSessionById(context.Background(), nil, idleSession.Id)
+	idleExists, err := database.GetUserSessionByID(context.Background(), nil, idleSession.ID)
 	if err != nil {
 		t.Fatalf("Error checking idle session: %v", err)
 	}
@@ -631,7 +631,7 @@ func TestDeleteIdleSessions(t *testing.T) {
 	}
 
 	// Verify idle session's client association was also deleted
-	idleSessionClients, err := database.GetUserSessionClientsByUserSessionId(context.Background(), nil, idleSession.Id)
+	idleSessionClients, err := database.GetUserSessionClientsByUserSessionID(context.Background(), nil, idleSession.ID)
 	if err != nil {
 		t.Fatalf("Error checking idle session clients: %v", err)
 	}
@@ -640,7 +640,7 @@ func TestDeleteIdleSessions(t *testing.T) {
 	}
 
 	// Check if very idle session was deleted
-	veryIdleExists, err := database.GetUserSessionById(context.Background(), nil, veryIdleSession.Id)
+	veryIdleExists, err := database.GetUserSessionByID(context.Background(), nil, veryIdleSession.ID)
 	if err != nil {
 		t.Fatalf("Error checking very idle session: %v", err)
 	}
@@ -649,7 +649,7 @@ func TestDeleteIdleSessions(t *testing.T) {
 	}
 
 	// Verify very idle session's client association was also deleted
-	veryIdleSessionClients, err := database.GetUserSessionClientsByUserSessionId(context.Background(), nil, veryIdleSession.Id)
+	veryIdleSessionClients, err := database.GetUserSessionClientsByUserSessionID(context.Background(), nil, veryIdleSession.ID)
 	if err != nil {
 		t.Fatalf("Error checking very idle session clients: %v", err)
 	}
@@ -689,7 +689,7 @@ func TestDeleteExpiredSessions(t *testing.T) {
 		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 86400 * 30, // 30 days
 		IncludeOpenIDConnectClaimsInAccessToken: "no",
-		DefaultAcrLevel:                         record.AcrLevel1,
+		DefaultACRLevel:                         record.ACRLevel1,
 	}
 	err = database.CreateClient(context.Background(), nil, client)
 	if err != nil {
@@ -705,14 +705,14 @@ func TestDeleteExpiredSessions(t *testing.T) {
 		Started:           now.Add(-1 * time.Hour),
 		LastAccessed:      now,
 		AuthMethods:       "pwd",
-		AcrLevel:          record.AcrLevel1,
+		ACRLevel:          record.ACRLevel1,
 		AuthTime:          now.Add(-1 * time.Hour),
 		PasswordAuthTime:  now.Add(-1 * time.Hour),
-		IpAddress:         fake.IPv4Address(),
+		IPAddress:         fake.IPv4Address(),
 		DeviceName:        fake.Name(),
 		DeviceType:        "desktop",
 		DeviceOS:          "Windows",
-		UserId:            user.Id,
+		UserID:            user.ID,
 	}
 	err = database.CreateUserSession(context.Background(), nil, recentSession)
 	if err != nil {
@@ -721,8 +721,8 @@ func TestDeleteExpiredSessions(t *testing.T) {
 
 	// Create UserSessionClient for recent session
 	recentSessionClient := &record.UserSessionClient{
-		UserSessionId: recentSession.Id,
-		ClientId:      client.Id,
+		UserSessionID: recentSession.ID,
+		ClientID:      client.ID,
 		Started:       recentSession.Started,
 		LastAccessed:  recentSession.LastAccessed,
 	}
@@ -737,14 +737,14 @@ func TestDeleteExpiredSessions(t *testing.T) {
 		Started:           now.Add(-48 * time.Hour),
 		LastAccessed:      now,
 		AuthMethods:       "pwd",
-		AcrLevel:          record.AcrLevel1,
+		ACRLevel:          record.ACRLevel1,
 		AuthTime:          now.Add(-48 * time.Hour),
 		PasswordAuthTime:  now.Add(-48 * time.Hour),
-		IpAddress:         fake.IPv4Address(),
+		IPAddress:         fake.IPv4Address(),
 		DeviceName:        fake.Name(),
 		DeviceType:        "desktop",
 		DeviceOS:          "Windows",
-		UserId:            user.Id,
+		UserID:            user.ID,
 	}
 	err = database.CreateUserSession(context.Background(), nil, oldSession)
 	if err != nil {
@@ -753,8 +753,8 @@ func TestDeleteExpiredSessions(t *testing.T) {
 
 	// Create UserSessionClient for old session
 	oldSessionClient := &record.UserSessionClient{
-		UserSessionId: oldSession.Id,
-		ClientId:      client.Id,
+		UserSessionID: oldSession.ID,
+		ClientID:      client.ID,
 		Started:       oldSession.Started,
 		LastAccessed:  oldSession.LastAccessed,
 	}
@@ -769,14 +769,14 @@ func TestDeleteExpiredSessions(t *testing.T) {
 		Started:           now.Add(-120 * time.Hour),
 		LastAccessed:      now,
 		AuthMethods:       "pwd",
-		AcrLevel:          record.AcrLevel1,
+		ACRLevel:          record.ACRLevel1,
 		AuthTime:          now.Add(-120 * time.Hour),
 		PasswordAuthTime:  now.Add(-120 * time.Hour),
-		IpAddress:         fake.IPv4Address(),
+		IPAddress:         fake.IPv4Address(),
 		DeviceName:        fake.Name(),
 		DeviceType:        "desktop",
 		DeviceOS:          "Windows",
-		UserId:            user.Id,
+		UserID:            user.ID,
 	}
 	err = database.CreateUserSession(context.Background(), nil, veryOldSession)
 	if err != nil {
@@ -785,8 +785,8 @@ func TestDeleteExpiredSessions(t *testing.T) {
 
 	// Create UserSessionClient for very old session
 	veryOldSessionClient := &record.UserSessionClient{
-		UserSessionId: veryOldSession.Id,
-		ClientId:      client.Id,
+		UserSessionID: veryOldSession.ID,
+		ClientID:      client.ID,
 		Started:       veryOldSession.Started,
 		LastAccessed:  veryOldSession.LastAccessed,
 	}
@@ -805,7 +805,7 @@ func TestDeleteExpiredSessions(t *testing.T) {
 	}
 
 	// Check if recent session still exists
-	recentExists, err := database.GetUserSessionById(context.Background(), nil, recentSession.Id)
+	recentExists, err := database.GetUserSessionByID(context.Background(), nil, recentSession.ID)
 	if err != nil {
 		t.Fatalf("Error checking recent session: %v", err)
 	}
@@ -814,7 +814,7 @@ func TestDeleteExpiredSessions(t *testing.T) {
 	}
 
 	// Verify recent session's client association still exists
-	recentSessionClients, err := database.GetUserSessionClientsByUserSessionId(context.Background(), nil, recentSession.Id)
+	recentSessionClients, err := database.GetUserSessionClientsByUserSessionID(context.Background(), nil, recentSession.ID)
 	if err != nil {
 		t.Fatalf("Error checking recent session clients: %v", err)
 	}
@@ -823,7 +823,7 @@ func TestDeleteExpiredSessions(t *testing.T) {
 	}
 
 	// Check if old session was deleted
-	oldExists, err := database.GetUserSessionById(context.Background(), nil, oldSession.Id)
+	oldExists, err := database.GetUserSessionByID(context.Background(), nil, oldSession.ID)
 	if err != nil {
 		t.Fatalf("Error checking old session: %v", err)
 	}
@@ -832,7 +832,7 @@ func TestDeleteExpiredSessions(t *testing.T) {
 	}
 
 	// Verify old session's client association was also deleted
-	oldSessionClients, err := database.GetUserSessionClientsByUserSessionId(context.Background(), nil, oldSession.Id)
+	oldSessionClients, err := database.GetUserSessionClientsByUserSessionID(context.Background(), nil, oldSession.ID)
 	if err != nil {
 		t.Fatalf("Error checking old session clients: %v", err)
 	}
@@ -841,7 +841,7 @@ func TestDeleteExpiredSessions(t *testing.T) {
 	}
 
 	// Check if very old session was deleted
-	veryOldExists, err := database.GetUserSessionById(context.Background(), nil, veryOldSession.Id)
+	veryOldExists, err := database.GetUserSessionByID(context.Background(), nil, veryOldSession.ID)
 	if err != nil {
 		t.Fatalf("Error checking very old session: %v", err)
 	}
@@ -850,7 +850,7 @@ func TestDeleteExpiredSessions(t *testing.T) {
 	}
 
 	// Verify very old session's client association was also deleted
-	veryOldSessionClients, err := database.GetUserSessionClientsByUserSessionId(context.Background(), nil, veryOldSession.Id)
+	veryOldSessionClients, err := database.GetUserSessionClientsByUserSessionID(context.Background(), nil, veryOldSession.ID)
 	if err != nil {
 		t.Fatalf("Error checking very old session clients: %v", err)
 	}
@@ -869,19 +869,19 @@ func TestDeleteExpiredSessions(t *testing.T) {
 // would undo the promotion and sign the user out.
 func TestUpdateUserSession_DoesNotClobberAuthStateGeneration(t *testing.T) {
 	user := createTestUser(t)
-	userSession := createTestUserSession(t, user.Id)
+	userSession := createTestUserSession(t, user.ID)
 
 	userSession.AuthStateGeneration = 7
 	// 5 rather than 7, so a mapping that crossed the two columns would be caught here rather
 	// than passing silently.
-	userSession.OtpConfigGeneration = 5
-	userSession.Id = 0
+	userSession.OTPConfigGeneration = 5
+	userSession.ID = 0
 	userSession.SessionIdentifier = fake.UUID()
 	if err := database.CreateUserSession(context.Background(), nil, userSession); err != nil {
 		t.Fatalf("Failed to create user session with a generation: %v", err)
 	}
 
-	created, err := database.GetUserSessionById(context.Background(), nil, userSession.Id)
+	created, err := database.GetUserSessionByID(context.Background(), nil, userSession.ID)
 	if err != nil {
 		t.Fatalf("Failed to reload created user session: %v", err)
 	}
@@ -889,9 +889,9 @@ func TestUpdateUserSession_DoesNotClobberAuthStateGeneration(t *testing.T) {
 		t.Fatalf("CreateUserSession must persist auth_state_generation, got %d want 7",
 			created.AuthStateGeneration)
 	}
-	if created.OtpConfigGeneration != 5 {
+	if created.OTPConfigGeneration != 5 {
 		t.Fatalf("CreateUserSession must persist otp_config_generation, got %d want 5",
-			created.OtpConfigGeneration)
+			created.OTPConfigGeneration)
 	}
 
 	created.AuthStateGeneration = 0
@@ -899,13 +899,13 @@ func TestUpdateUserSession_DoesNotClobberAuthStateGeneration(t *testing.T) {
 	// one this issue exists to close: BumpUserSession writes the whole row on every request,
 	// so in the ordinary update set a stale model would regress the snapshot and hand every
 	// session of the user a re-prompt it does not owe, or discharge one it does (#242).
-	created.OtpConfigGeneration = 0
+	created.OTPConfigGeneration = 0
 	created.DeviceName = "the rest of the update still applies"
 	if updateUserSessionErr := database.UpdateUserSession(context.Background(), nil, created); updateUserSessionErr != nil {
 		t.Fatalf("Failed to update user session: %v", updateUserSessionErr)
 	}
 
-	after, err := database.GetUserSessionById(context.Background(), nil, userSession.Id)
+	after, err := database.GetUserSessionByID(context.Background(), nil, userSession.ID)
 	if err != nil {
 		t.Fatalf("Failed to reload updated user session: %v", err)
 	}
@@ -913,9 +913,9 @@ func TestUpdateUserSession_DoesNotClobberAuthStateGeneration(t *testing.T) {
 		t.Errorf("UpdateUserSession regressed auth_state_generation to %d, want 7 (is the dont-update tag missing?)",
 			after.AuthStateGeneration)
 	}
-	if after.OtpConfigGeneration != 5 {
+	if after.OTPConfigGeneration != 5 {
 		t.Errorf("UpdateUserSession regressed otp_config_generation to %d, want 5 (is the dont-update tag missing?)",
-			after.OtpConfigGeneration)
+			after.OTPConfigGeneration)
 	}
 	if after.DeviceName != "the rest of the update still applies" {
 		t.Errorf("the rest of the update must still apply, DeviceName is %q", after.DeviceName)
@@ -930,25 +930,25 @@ func TestUpdateUserSession_DoesNotClobberAuthStateGeneration(t *testing.T) {
 // another device on the superseded generation still working (#106).
 func TestPromoteUserSessionGeneration(t *testing.T) {
 	user := createTestUser(t)
-	named := createTestUserSession(t, user.Id)
-	unnamed := createTestUserSession(t, user.Id)
+	named := createTestUserSession(t, user.ID)
+	unnamed := createTestUserSession(t, user.ID)
 
-	if err := database.PromoteUserSessionGeneration(context.Background(), nil, named.Id, 7); err != nil {
+	if err := database.PromoteUserSessionGeneration(context.Background(), nil, named.ID, 7); err != nil {
 		t.Fatalf("PromoteUserSessionGeneration failed: %v", err)
 	}
 
 	reload := func(id int64) *record.UserSession {
-		us, err := database.GetUserSessionById(context.Background(), nil, id)
+		us, err := database.GetUserSessionByID(context.Background(), nil, id)
 		if err != nil {
 			t.Fatalf("Failed to reload user session %d: %v", id, err)
 		}
 		return us
 	}
 
-	if got := reload(named.Id).AuthStateGeneration; got != 7 {
+	if got := reload(named.ID).AuthStateGeneration; got != 7 {
 		t.Errorf("named session generation = %d, want 7", got)
 	}
-	if got := reload(unnamed.Id).AuthStateGeneration; got != 0 {
+	if got := reload(unnamed.ID).AuthStateGeneration; got != 0 {
 		t.Errorf("unnamed session generation = %d, want 0 (promotion must not touch it)", got)
 	}
 
@@ -960,7 +960,7 @@ func TestPromoteUserSessionGeneration(t *testing.T) {
 	// The caller preserves a session and its refresh tokens together, so a promotion
 	// that matched nothing would leave that half applied: the tokens promoted, the
 	// session not, and the session then rejected on its next request.
-	if err := database.PromoteUserSessionGeneration(context.Background(), nil, unnamed.Id+1_000_000, 7); err == nil {
+	if err := database.PromoteUserSessionGeneration(context.Background(), nil, unnamed.ID+1_000_000, 7); err == nil {
 		t.Error("expected an error promoting the generation of an unknown user session id")
 	}
 }
@@ -975,7 +975,7 @@ func TestPromoteUserSessionGeneration(t *testing.T) {
 // (#139).
 func TestAcquireUserSessionRow(t *testing.T) {
 	user := createTestUser(t)
-	session := createTestUserSession(t, user.Id)
+	session := createTestUserSession(t, user.ID)
 
 	tx := beginTx(t)
 	live, err := database.AcquireUserSessionRow(context.Background(), tx, session.SessionIdentifier)
@@ -992,9 +992,9 @@ func TestAcquireUserSessionRow(t *testing.T) {
 	// Only updated_at moves. Session validity is measured from started and last_accessed,
 	// so a statement that touched either would make acquiring the row extend or shorten
 	// the session it was only meant to lock.
-	reloaded, err := database.GetUserSessionById(context.Background(), nil, session.Id)
+	reloaded, err := database.GetUserSessionByID(context.Background(), nil, session.ID)
 	if err != nil {
-		t.Fatalf("GetUserSessionById after acquiring: %v", err)
+		t.Fatalf("GetUserSessionByID after acquiring: %v", err)
 	}
 	if reloaded == nil {
 		t.Fatal("acquiring a session row must not remove it")
@@ -1008,7 +1008,7 @@ func TestAcquireUserSessionRow(t *testing.T) {
 
 	// The row is gone. This is the answer the ceremony refuses on, and it is a report
 	// rather than an error: nothing went wrong, the session simply ended first.
-	if deleteUserSessionErr := database.DeleteUserSession(context.Background(), nil, session.Id); deleteUserSessionErr != nil {
+	if deleteUserSessionErr := database.DeleteUserSession(context.Background(), nil, session.ID); deleteUserSessionErr != nil {
 		t.Fatalf("DeleteUserSession: %v", deleteUserSessionErr)
 	}
 	gone := beginTx(t)
@@ -1033,7 +1033,7 @@ func TestAcquireUserSessionRow(t *testing.T) {
 // ceremony would refuse.
 func TestAcquireUserSessionRow_RefusedArguments(t *testing.T) {
 	user := createTestUser(t)
-	session := createTestUserSession(t, user.Id)
+	session := createTestUserSession(t, user.ID)
 
 	live, err := database.AcquireUserSessionRow(context.Background(), nil, session.SessionIdentifier)
 	if err == nil {
@@ -1065,11 +1065,11 @@ func TestAcquireUserSessionRow_RefusedArguments(t *testing.T) {
 // send a legitimate sign-in back to the login page whenever the database hiccuped.
 func TestAcquireUserSessionRow_TransactionAndFailurePath(t *testing.T) {
 	user := createTestUser(t)
-	session := createTestUserSession(t, user.Id)
+	session := createTestUserSession(t, user.ID)
 
-	before, err := database.GetUserSessionById(context.Background(), nil, session.Id)
+	before, err := database.GetUserSessionByID(context.Background(), nil, session.ID)
 	if err != nil {
-		t.Fatalf("GetUserSessionById before acquiring: %v", err)
+		t.Fatalf("GetUserSessionByID before acquiring: %v", err)
 	}
 
 	tx := beginTx(t)
@@ -1085,9 +1085,9 @@ func TestAcquireUserSessionRow_TransactionAndFailurePath(t *testing.T) {
 	}
 
 	// Had the statement gone through the pool it would have survived the rollback.
-	after, err := database.GetUserSessionById(context.Background(), nil, session.Id)
+	after, err := database.GetUserSessionByID(context.Background(), nil, session.ID)
 	if err != nil {
-		t.Fatalf("GetUserSessionById after rollback: %v", err)
+		t.Fatalf("GetUserSessionByID after rollback: %v", err)
 	}
 	if after == nil {
 		t.Fatal("the session must survive a rolled-back acquisition")
@@ -1115,33 +1115,33 @@ func TestAcquireUserSessionRow_TransactionAndFailurePath(t *testing.T) {
 func TestUpdateUserSession_TheOwnerIsNotRewritten(t *testing.T) {
 	owner := createTestUser(t)
 	other := createTestUser(t)
-	userSession := createTestUserSession(t, owner.Id)
+	userSession := createTestUserSession(t, owner.ID)
 
-	userSession.UserId = other.Id
+	userSession.UserID = other.ID
 	userSession.DeviceName = "moved-" + fake.LetterN(6)
 	err := database.UpdateUserSession(context.Background(), nil, userSession)
 	if err != nil {
 		t.Fatalf("Failed to update user session: %v", err)
 	}
 
-	stored, err := database.GetUserSessionById(context.Background(), nil, userSession.Id)
+	stored, err := database.GetUserSessionByID(context.Background(), nil, userSession.ID)
 	if err != nil {
 		t.Fatalf("Failed to retrieve updated user session: %v", err)
 	}
-	if stored.UserId != owner.Id {
-		t.Errorf("Expected the session to still belong to user %d, got %d: user_id must not be in the update set", owner.Id, stored.UserId)
+	if stored.UserID != owner.ID {
+		t.Errorf("Expected the session to still belong to user %d, got %d: user_id must not be in the update set", owner.ID, stored.UserID)
 	}
 	if stored.DeviceName != userSession.DeviceName {
 		t.Errorf("Expected the ordinary columns to have been written, DeviceName %q, got %q", userSession.DeviceName, stored.DeviceName)
 	}
 }
 
-// TestGetUserSessionsByClientIdPaginated_EnlistsInTheCallersTransaction pins the last of #413's
+// TestGetUserSessionsByClientIDPaginated_EnlistsInTheCallersTransaction pins the last of #413's
 // five sites: the count query beside the page passed nil where the page took the caller's
 // transaction, so the two halves of one answer were read on two connections.
 //
 // The rows are created inside the transaction for the reason ClientLoadPermissions' case gives.
-func TestGetUserSessionsByClientIdPaginated_EnlistsInTheCallersTransaction(t *testing.T) {
+func TestGetUserSessionsByClientIDPaginated_EnlistsInTheCallersTransaction(t *testing.T) {
 	tx := beginTx(t)
 
 	client := &record.Client{
@@ -1169,23 +1169,23 @@ func TestGetUserSessionsByClientIdPaginated_EnlistsInTheCallersTransaction(t *te
 		Started:           now,
 		LastAccessed:      now,
 		AuthMethods:       "pwd",
-		AcrLevel:          record.AcrLevel1,
+		ACRLevel:          record.ACRLevel1,
 		AuthTime:          now,
 		PasswordAuthTime:  now,
-		IpAddress:         fake.IPv4Address(),
+		IPAddress:         fake.IPv4Address(),
 		DeviceName:        fake.Name(),
 		DeviceType:        "desktop",
 		DeviceOS:          "Windows",
 		UserAgent:         testUserAgent,
-		UserId:            user.Id,
+		UserID:            user.ID,
 	}
 	if err := database.CreateUserSession(context.Background(), tx, userSession); err != nil {
 		t.Fatalf("Failed to create user session inside the transaction: %v", err)
 	}
 
 	userSessionClient := &record.UserSessionClient{
-		UserSessionId: userSession.Id,
-		ClientId:      client.Id,
+		UserSessionID: userSession.ID,
+		ClientID:      client.ID,
 		Started:       now,
 		LastAccessed:  now,
 	}
@@ -1193,16 +1193,16 @@ func TestGetUserSessionsByClientIdPaginated_EnlistsInTheCallersTransaction(t *te
 		t.Fatalf("Failed to create user_session_clients row inside the transaction: %v", err)
 	}
 
-	sessions, total, err := database.GetUserSessionsByClientIdPaginated(context.Background(), tx, client.Id, 1, 10)
+	sessions, total, err := database.GetUserSessionsByClientIDPaginated(context.Background(), tx, client.ID, 1, 10)
 	if err != nil {
-		t.Fatalf("GetUserSessionsByClientIdPaginated through the transaction: %v", err)
+		t.Fatalf("GetUserSessionsByClientIDPaginated through the transaction: %v", err)
 	}
 
 	if len(sessions) != 1 {
 		t.Fatalf("Expected the transaction's own session, got %d", len(sessions))
 	}
-	if sessions[0].Id != userSession.Id {
-		t.Errorf("Expected user session %d, got %d", userSession.Id, sessions[0].Id)
+	if sessions[0].ID != userSession.ID {
+		t.Errorf("Expected user session %d, got %d", userSession.ID, sessions[0].ID)
 	}
 	if total != 1 {
 		t.Errorf("Expected a total of 1 to agree with the one session on the page, got %d: "+

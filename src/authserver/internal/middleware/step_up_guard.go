@@ -25,11 +25,11 @@ import (
 // Every refusal names both parameters, whichever was short, so the client signs in once and meets
 // both.
 //
-// It reads the token JwtAuthorizationHeaderToContext stored, after RequireValidSession has judged
+// It reads the token JWTAuthorizationHeaderToContext stored, after RequireValidSession has judged
 // it live, and is mounted after RequireAdminConsoleClient on the download, so another client's
 // token is told the client check's answer and is never asked to sign the user in again. now is the
 // clock, read on every request. The sentence is English, as every bearer refusal is.
-func (m *BearerToken) RequireRecentAuthentication(maxAge time.Duration, minimum record.AcrLevel,
+func (m *BearerToken) RequireRecentAuthentication(maxAge time.Duration, minimum record.ACRLevel,
 	now func() time.Time) func(http.Handler) http.Handler {
 
 	return func(next http.Handler) http.Handler {
@@ -44,7 +44,7 @@ func (m *BearerToken) RequireRecentAuthentication(maxAge time.Duration, minimum 
 
 			authTime, readable := jwtToken.IntClaim("auth_time")
 			recent := readable && now().Sub(time.Unix(authTime, 0)) <= maxAge
-			acr := record.AcrLevel(jwtToken.StringClaim("acr"))
+			acr := record.ACRLevel(jwtToken.StringClaim("acr"))
 			strong := acr.Priority() > 0 && acr.Priority() >= minimum.Priority()
 			if !recent || !strong {
 				slog.WarnContext(r.Context(), "rejecting bearer token: its sign-in is too old or too weak for the route",

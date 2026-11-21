@@ -88,7 +88,7 @@ func TestCutBody_ThePermissionPutsAnswerInvalidRequestBody(t *testing.T) {
 			name:  "client permissions",
 			param: "id",
 			stub: func(database *datamocks.Database) {
-				database.On("GetClientById", mock.Anything, mock.Anything, int64(1)).Return(&record.Client{Id: 1}, nil).Once()
+				database.On("GetClientByID", mock.Anything, mock.Anything, int64(1)).Return(&record.Client{ID: 1}, nil).Once()
 			},
 			handler: func(database *datamocks.Database, t *testing.T) http.HandlerFunc {
 				return HandleClientPermissionsPut(database, handlersmocks.NewAuditLogger(t))
@@ -98,7 +98,7 @@ func TestCutBody_ThePermissionPutsAnswerInvalidRequestBody(t *testing.T) {
 			name:  "group permissions",
 			param: "id",
 			stub: func(database *datamocks.Database) {
-				database.On("GetGroupById", mock.Anything, mock.Anything, int64(1)).Return(&record.Group{Id: 1}, nil).Once()
+				database.On("GetGroupByID", mock.Anything, mock.Anything, int64(1)).Return(&record.Group{ID: 1}, nil).Once()
 			},
 			handler: func(database *datamocks.Database, t *testing.T) http.HandlerFunc {
 				return HandleGroupPermissionsPut(database, handlersmocks.NewAuditLogger(t))
@@ -108,7 +108,7 @@ func TestCutBody_ThePermissionPutsAnswerInvalidRequestBody(t *testing.T) {
 			name:  "user permissions",
 			param: "id",
 			stub: func(database *datamocks.Database) {
-				database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&record.User{Id: 1}, nil).Once()
+				database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(&record.User{ID: 1}, nil).Once()
 			},
 			handler: func(database *datamocks.Database, t *testing.T) http.HandlerFunc {
 				return HandleUserPermissionsPut(database, handlersmocks.NewAuditLogger(t))
@@ -118,7 +118,7 @@ func TestCutBody_ThePermissionPutsAnswerInvalidRequestBody(t *testing.T) {
 			name:  "resource permissions",
 			param: "resourceId",
 			stub: func(database *datamocks.Database) {
-				database.On("GetResourceById", mock.Anything, mock.Anything, int64(1)).Return(&record.Resource{Id: 1}, nil).Once()
+				database.On("GetResourceByID", mock.Anything, mock.Anything, int64(1)).Return(&record.Resource{ID: 1}, nil).Once()
 			},
 			handler: func(database *datamocks.Database, t *testing.T) http.HandlerFunc {
 				return HandleResourcePermissionsPut(database, inputvalidation.NewIdentifierValidator(), handlersmocks.NewAuditLogger(t))

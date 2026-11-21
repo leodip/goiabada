@@ -32,11 +32,11 @@ import (
 
 // flipToPublic runs the admin API's confidential-to-public transition and returns the decoded
 // response body. The status is asserted here so every caller below reads as one line.
-func flipToPublic(t *testing.T, adminToken string, clientId int64) api.UpdateClientResponse {
+func flipToPublic(t *testing.T, adminToken string, clientID int64) api.UpdateClientResponse {
 	t.Helper()
 
 	apiURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" +
-		strconv.FormatInt(clientId, 10) + "/authentication"
+		strconv.FormatInt(clientID, 10) + "/authentication"
 	resp := makeAPIRequest(t, "PUT", apiURL, adminToken, api.UpdateClientAuthenticationRequest{IsPublic: true})
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -48,12 +48,12 @@ func flipToPublic(t *testing.T, adminToken string, clientId int64) api.UpdateCli
 
 // flipToConfidential is the reverse transition, which must NOT revoke. It returns the secret it
 // set, because a confidential client has to present one afterwards.
-func flipToConfidential(t *testing.T, adminToken string, clientId int64) string {
+func flipToConfidential(t *testing.T, adminToken string, clientID int64) string {
 	t.Helper()
 
 	secret := securerandom.String(60)
 	apiURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" +
-		strconv.FormatInt(clientId, 10) + "/authentication"
+		strconv.FormatInt(clientID, 10) + "/authentication"
 	resp := makeAPIRequest(t, "PUT", apiURL, adminToken,
 		api.UpdateClientAuthenticationRequest{IsPublic: false, ClientSecret: secret})
 	defer func() { _ = resp.Body.Close() }()
@@ -94,7 +94,7 @@ func presentRefreshToken(t *testing.T, clientIdentifier, refreshToken, clientSec
 	if clientSecret != "" {
 		form.Set("client_secret", clientSecret)
 	}
-	return postToTokenEndpoint(t, createHttpClient(t), appConfig.AuthServer.BaseURL+"/auth/token/", form)
+	return postToTokenEndpoint(t, createHTTPClient(t), appConfig.AuthServer.BaseURL+"/auth/token/", form)
 }
 
 // requireDatabaseAuditLogs makes the audit_logs table the observable it is supposed to be. The
@@ -117,7 +117,7 @@ func TestAPIClientAuthenticationPut_FlipToPublic_RevokesTheClientsGrants(t *test
 
 	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
-	defer func() { _ = database.DeleteClient(context.Background(), nil, code.ClientId) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, code.ClientID) }()
 
 	tokens := redeemCode(t, httpClient, code, clientSecret)
 	refreshToken, ok := tokens["refresh_token"].(string)
@@ -129,7 +129,7 @@ func TestAPIClientAuthenticationPut_FlipToPublic_RevokesTheClientsGrants(t *test
 	rotated, ok := before["refresh_token"].(string)
 	require.True(t, ok, "rotation must return a replacement: %v", before)
 
-	flipToPublic(t, adminToken, code.ClientId)
+	flipToPublic(t, adminToken, code.ClientID)
 
 	// No secret: the client is public now, and presenting one would be refused by decision 11's
 	// rule instead, which is a different gate and would prove nothing about the revocation.
@@ -152,7 +152,7 @@ func TestAPIClientAuthenticationPut_FlipToPublic_RevokesTheClientsGrants(t *test
 		if err := json.Unmarshal([]byte(entry.Details), &details); err != nil {
 			continue
 		}
-		if int64(details["client_id"].(float64)) != code.ClientId {
+		if int64(details["client_id"].(float64)) != code.ClientID {
 			continue
 		}
 		found = true
@@ -186,7 +186,7 @@ func TestAPIClientAuthenticationPut_FlipToPublic_LeavesTheUsersOtherClientAlone(
 	flippedSecret := fake.LetterN(32)
 	flippedClient, flippedCode := createAuthCode(t, flippedSecret, "openid profile email",
 		authCodeOptions{user: user, userPassword: password})
-	defer func() { _ = database.DeleteClient(context.Background(), nil, flippedCode.ClientId) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, flippedCode.ClientID) }()
 
 	// Each createAuthCode runs in a browser of its own, so the second grant is another device's.
 	// That is a fixture requirement rather than decoration: two ceremonies for one user from the
@@ -195,10 +195,10 @@ func TestAPIClientAuthenticationPut_FlipToPublic_LeavesTheUsersOtherClientAlone(
 	otherSecret := fake.LetterN(32)
 	otherClient, otherCode := createAuthCode(t, otherSecret, "openid profile email",
 		authCodeOptions{user: user, userPassword: password})
-	defer func() { _ = database.DeleteClient(context.Background(), nil, otherCode.ClientId) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, otherCode.ClientID) }()
 
 	// Both grants belong to the same person, which is the whole point of the fixture.
-	require.Equal(t, flippedCode.UserId, otherCode.UserId,
+	require.Equal(t, flippedCode.UserID, otherCode.UserID,
 		"both grants must belong to one user, or this proves only that two clients are different")
 
 	flippedTokens := redeemCode(t, flippedClient, flippedCode, flippedSecret)
@@ -206,7 +206,7 @@ func TestAPIClientAuthenticationPut_FlipToPublic_LeavesTheUsersOtherClientAlone(
 	otherRefresh, ok := otherTokens["refresh_token"].(string)
 	require.True(t, ok, "the untouched grant must carry a refresh token: %v", otherTokens)
 
-	flipToPublic(t, adminToken, flippedCode.ClientId)
+	flipToPublic(t, adminToken, flippedCode.ClientID)
 
 	// The flipped client's grant is gone.
 	flippedRefresh, ok := flippedTokens["refresh_token"].(string)
@@ -233,11 +233,11 @@ func TestAPIClientAuthenticationPut_FlipToPublic_RevokesROPCGrantsToo(t *testing
 	clientSecret := fake.Password(32)
 	password := fake.Password(12)
 	client := createROPCClient(t, clientSecret, false)
-	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.ID) }()
 	user := createROPCUser(t, password)
 
 	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
-	data := postToTokenEndpoint(t, createHttpClient(t), destURL, url.Values{
+	data := postToTokenEndpoint(t, createHTTPClient(t), destURL, url.Values{
 		"grant_type":    {"password"},
 		"client_id":     {client.ClientIdentifier},
 		"client_secret": {clientSecret},
@@ -249,7 +249,7 @@ func TestAPIClientAuthenticationPut_FlipToPublic_RevokesROPCGrantsToo(t *testing
 	refreshToken, ok := data["refresh_token"].(string)
 	require.True(t, ok, "the ROPC grant must carry a refresh token: %v", data)
 
-	flipToPublic(t, adminToken, client.Id)
+	flipToPublic(t, adminToken, client.ID)
 
 	after := presentRefreshToken(t, client.ClientIdentifier, refreshToken, "")
 	assert.Equal(t, "invalid_grant", after["error"], "the flip must revoke the client's ROPC grants: %v", after)
@@ -267,13 +267,13 @@ func TestAPIClientAuthenticationPut_FlipToConfidential_DoesNotRevoke(t *testing.
 
 	httpClient, code := createAuthCode(t, fake.LetterN(32), "openid profile email",
 		authCodeOptions{isPublic: true})
-	defer func() { _ = database.DeleteClient(context.Background(), nil, code.ClientId) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, code.ClientID) }()
 
 	tokens := redeemCode(t, httpClient, code, "")
 	refreshToken, ok := tokens["refresh_token"].(string)
 	require.True(t, ok, "the grant must carry a refresh token: %v", tokens)
 
-	newSecret := flipToConfidential(t, adminToken, code.ClientId)
+	newSecret := flipToConfidential(t, adminToken, code.ClientID)
 
 	after := presentRefreshToken(t, code.Client.ClientIdentifier, refreshToken, newSecret)
 	assert.Nil(t, after["error"],
@@ -289,13 +289,13 @@ func TestAPIClientAuthenticationPut_RotatingAConfidentialSecret_DoesNotRevoke(t 
 
 	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
-	defer func() { _ = database.DeleteClient(context.Background(), nil, code.ClientId) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, code.ClientID) }()
 
 	tokens := redeemCode(t, httpClient, code, clientSecret)
 	refreshToken, ok := tokens["refresh_token"].(string)
 	require.True(t, ok, "the grant must carry a refresh token: %v", tokens)
 
-	rotatedSecret := flipToConfidential(t, adminToken, code.ClientId)
+	rotatedSecret := flipToConfidential(t, adminToken, code.ClientID)
 
 	after := presentRefreshToken(t, code.Client.ClientIdentifier, refreshToken, rotatedSecret)
 	assert.Nil(t, after["error"],
@@ -312,13 +312,13 @@ func TestAPIClientAuthenticationPut_SavingAnAlreadyPublicClient_DoesNotRevoke(t 
 
 	httpClient, code := createAuthCode(t, fake.LetterN(32), "openid profile email",
 		authCodeOptions{isPublic: true})
-	defer func() { _ = database.DeleteClient(context.Background(), nil, code.ClientId) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, code.ClientID) }()
 
 	tokens := redeemCode(t, httpClient, code, "")
 	refreshToken, ok := tokens["refresh_token"].(string)
 	require.True(t, ok, "the grant must carry a refresh token: %v", tokens)
 
-	flipToPublic(t, adminToken, code.ClientId)
+	flipToPublic(t, adminToken, code.ClientID)
 
 	after := presentRefreshToken(t, code.Client.ClientIdentifier, refreshToken, "")
 	assert.Nil(t, after["error"],
@@ -343,9 +343,9 @@ func TestAPIClientAuthenticationPut_FlipToPublic_SetsPKCERequired(t *testing.T) 
 		PKCERequired:             &pkceOptional,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
-	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.ID) }()
 
-	body := flipToPublic(t, adminToken, client.Id)
+	body := flipToPublic(t, adminToken, client.ID)
 
 	assert.True(t, body.Client.IsPublic)
 	require.NotNil(t, body.Client.PKCERequired, "the flip must write the column, not leave it inheriting the global")
@@ -365,7 +365,7 @@ func TestAPIClientAuthenticationPut_FlipToPublic_ChildBornAfterTheFlipIsRejected
 	adminToken, _ := createAdminClientWithToken(t)
 	grant := createOfflineGrant(t)
 
-	parentRow, err := database.GetRefreshTokenByJti(context.Background(), nil, refreshTokenJti(t, grant.refreshToken))
+	parentRow, err := database.GetRefreshTokenByJTI(context.Background(), nil, refreshTokenJTI(t, grant.refreshToken))
 	require.NoError(t, err)
 	require.NotNil(t, parentRow, "the redeemed grant must have a refresh token row")
 
@@ -376,16 +376,16 @@ func TestAPIClientAuthenticationPut_FlipToPublic_ChildBornAfterTheFlipIsRejected
 	childToken, ok := rotated["refresh_token"].(string)
 	require.True(t, ok, "rotation must return a replacement refresh token: %v", rotated)
 
-	childJti := refreshTokenJti(t, childToken)
-	childRow, err := database.GetRefreshTokenByJti(context.Background(), nil, childJti)
+	childJTI := refreshTokenJTI(t, childToken)
+	childRow, err := database.GetRefreshTokenByJTI(context.Background(), nil, childJTI)
 	require.NoError(t, err)
 	require.NotNil(t, childRow, "the rotated child must have been persisted")
 
 	// Decision 16's load-bearing property, asserted rather than assumed: the child hangs off the
 	// SAME code as its parent, which is what lets one marker reject a whole grant including a
 	// member that does not exist yet.
-	require.True(t, childRow.CodeId.Valid, "an auth-code-derived refresh token must carry a code id")
-	require.Equal(t, parentRow.CodeId.Int64, childRow.CodeId.Int64,
+	require.True(t, childRow.CodeID.Valid, "an auth-code-derived refresh token must carry a code id")
+	require.Equal(t, parentRow.CodeID.Int64, childRow.CodeID.Int64,
 		"the rotated child must inherit its parent's code id, or nothing below tests the marker")
 
 	// And the two requirements that stop this being the benign member of its class.
@@ -394,7 +394,7 @@ func TestAPIClientAuthenticationPut_FlipToPublic_ChildBornAfterTheFlipIsRejected
 	require.Empty(t, childRow.SessionIdentifier,
 		"an offline token carries no session identifier of its own, which is why only the code can reach it")
 
-	flipToPublic(t, adminToken, grant.client.Id)
+	flipToPublic(t, adminToken, grant.client.ID)
 
 	// One: the child that already existed when the flip ran. Its own row was swept and its code
 	// was marked in the same transaction, so both gates could refuse it, and the description says
@@ -414,7 +414,7 @@ func TestAPIClientAuthenticationPut_FlipToPublic_ChildBornAfterTheFlipIsRejected
 	// marked. Nothing here fabricates a grant: the JWT was minted by the server, the row was
 	// written by rotation, the code was marked by the real PUT above, and the client really is
 	// public now.
-	swept, err := database.GetRefreshTokenByJti(context.Background(), nil, childJti)
+	swept, err := database.GetRefreshTokenByJTI(context.Background(), nil, childJTI)
 	require.NoError(t, err)
 	require.NotNil(t, swept)
 	require.True(t, swept.Revoked,
@@ -422,11 +422,11 @@ func TestAPIClientAuthenticationPut_FlipToPublic_ChildBornAfterTheFlipIsRejected
 
 	swept.Revoked = false
 	require.NoError(t, database.UpdateRefreshToken(context.Background(), nil, swept))
-	relived, err := database.GetRefreshTokenByJti(context.Background(), nil, childJti)
+	relived, err := database.GetRefreshTokenByJTI(context.Background(), nil, childJTI)
 	require.NoError(t, err)
 	require.False(t, relived.Revoked, "the child must be live again, or this case proves nothing")
 
-	familyBefore, err := database.GetRefreshTokensByCodeId(context.Background(), nil, childRow.CodeId.Int64)
+	familyBefore, err := database.GetRefreshTokensByCodeID(context.Background(), nil, childRow.CodeID.Int64)
 	require.NoError(t, err)
 
 	// This is the presentation that would succeed under a sweep alone: the row is live, so the
@@ -439,7 +439,7 @@ func TestAPIClientAuthenticationPut_FlipToPublic_ChildBornAfterTheFlipIsRejected
 	assert.Empty(t, born["access_token"], "no access token may be issued for a revoked grant")
 	assert.Empty(t, born["refresh_token"], "no replacement may be issued for a revoked grant")
 
-	familyAfter, err := database.GetRefreshTokensByCodeId(context.Background(), nil, childRow.CodeId.Int64)
+	familyAfter, err := database.GetRefreshTokensByCodeID(context.Background(), nil, childRow.CodeID.Int64)
 	require.NoError(t, err)
 	assert.Len(t, familyAfter, len(familyBefore), "a refused presentation must mint no descendant")
 }

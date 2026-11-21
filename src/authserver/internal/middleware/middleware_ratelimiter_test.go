@@ -54,13 +54,13 @@ var testTemplateFS = fstest.MapFS{
 
 // auditEvent is one call the middleware made to its audit logger.
 //
-// requestId is what chi's id read off the context the call carried, recorded beside the event so
+// requestID is what chi's id read off the context the call carried, recorded beside the event so
 // the trip cases can assert that reportTrip audits under the request's own id rather than under
 // some context it reached for (#328 seam 3). Empty when the context carried none.
 type auditEvent struct {
 	name      string
 	details   map[string]interface{}
-	requestId string
+	requestID string
 }
 
 // stubAuditLogger records what the limiter audited. Hand-written rather than generated,
@@ -76,7 +76,7 @@ func (s *stubAuditLogger) Log(ctx context.Context, name string, details map[stri
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.events = append(s.events, auditEvent{
-		name: name, details: details, requestId: requestid.FromContext(ctx),
+		name: name, details: details, requestID: requestid.FromContext(ctx),
 	})
 }
 
@@ -125,13 +125,13 @@ func newMeteredTestMiddleware(ceremonyStore authContextGetter, enabled bool) (*R
 func limiterRequest(method, target string, body io.Reader) *http.Request {
 	req := httptest.NewRequest(method, target, body)
 	ctx := reqctx.WithSettings(req.Context(), &record.Settings{AppName: "Goiabada"})
-	ctx = requestid.NewContext(ctx, limiterRequestId)
+	ctx = requestid.NewContext(ctx, limiterRequestID)
 	return req.WithContext(ctx)
 }
 
-// limiterRequestId is the id every limiterRequest carries, so a case asserting on it names one
+// limiterRequestID is the id every limiterRequest carries, so a case asserting on it names one
 // constant rather than a literal the helper could drift away from.
-const limiterRequestId = "goiabada/req-limiter-1"
+const limiterRequestID = "goiabada/req-limiter-1"
 
 // rateLimitHeaderNames are the four headers decision 13 blanks. They told any caller the
 // exact budget, how much was left and whether the limiter was on at all, without tripping
@@ -162,8 +162,8 @@ func (s stubCeremonyStore) GetAuthContext(r *http.Request) (*ceremony.AuthContex
 	if s.err != nil {
 		return nil, s.err
 	}
-	userId, _ := strconv.ParseInt(r.URL.Query().Get("userId"), 10, 64)
-	return &ceremony.AuthContext{UserId: userId}, nil
+	userID, _ := strconv.ParseInt(r.URL.Query().Get("userId"), 10, 64)
+	return &ceremony.AuthContext{UserID: userID}, nil
 }
 
 // spellingsOf returns ten spellings of one address that differ only in case and
@@ -1488,7 +1488,7 @@ func TestLimitRegister_PerAddress(t *testing.T) {
 	})
 }
 
-// TestLimitOtp_PerUserAndMissingAuthContext verifies the OTP limiter keys its
+// TestLimitOTP_PerUserAndMissingAuthContext verifies the OTP limiter keys its
 // budget on the user id, that only a wrong code spends it, and that a request whose auth
 // context cannot be read reaches the handler instead of being answered with a blank 200
 // (#114).
@@ -1503,14 +1503,14 @@ func TestLimitRegister_PerAddress(t *testing.T) {
 // The handler stub writes 418 rather than 200 on purpose: a middleware that
 // writes nothing produces exactly 200 with an empty body, so 418 is what tells
 // "the handler ran" apart from "nothing was written", and from 429.
-func TestLimitOtp_PerUserAndMissingAuthContext(t *testing.T) {
+func TestLimitOTP_PerUserAndMissingAuthContext(t *testing.T) {
 	const budget = 5
 
-	run := func(m *RateLimiter, userId int, failed bool) (int, bool) {
-		req := limiterRequest(http.MethodPost, fmt.Sprintf("/auth/otp?userId=%d", userId), nil)
+	run := func(m *RateLimiter, userID int, failed bool) (int, bool) {
+		req := limiterRequest(http.MethodPost, fmt.Sprintf("/auth/otp?userId=%d", userID), nil)
 		rr := httptest.NewRecorder()
 		reached := false
-		m.LimitOtp(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		m.LimitOTP(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			reached = true
 			if failed {
 				m.RecordCredentialFailure(r)
@@ -1617,7 +1617,7 @@ func verificationRequest(subject string) *http.Request {
 	if subject == "" {
 		return req
 	}
-	return req.WithContext(reqctx.WithValidatedToken(req.Context(), oauth.JwtToken{Claims: map[string]interface{}{"sub": subject}}))
+	return req.WithContext(reqctx.WithValidatedToken(req.Context(), oauth.JWTToken{Claims: map[string]interface{}{"sub": subject}}))
 }
 
 // runVerification drives one request through LimitEmailVerification and reports the status,
@@ -1744,7 +1744,7 @@ func TestLimitEmailVerification_PerSubject(t *testing.T) {
 func runVerificationSend(m *RateLimiter, subject string) (int, bool, *httptest.ResponseRecorder) {
 	req := limiterRequest(http.MethodPost, "/api/v1/account/email/verification/send", nil)
 	if subject != "" {
-		req = req.WithContext(reqctx.WithValidatedToken(req.Context(), oauth.JwtToken{Claims: map[string]interface{}{"sub": subject}}))
+		req = req.WithContext(reqctx.WithValidatedToken(req.Context(), oauth.JWTToken{Claims: map[string]interface{}{"sub": subject}}))
 	}
 	rr := httptest.NewRecorder()
 	reached := false
@@ -1852,7 +1852,7 @@ func runAccountEmailChange(m *RateLimiter, subject, email string, failed bool) (
 	req := limiterRequest(http.MethodPut, "/api/v1/account/email",
 		strings.NewReader(fmt.Sprintf(`{"email":%q,"currentPassword":"pw"}`, email)))
 	if subject != "" {
-		req = req.WithContext(reqctx.WithValidatedToken(req.Context(), oauth.JwtToken{Claims: map[string]interface{}{"sub": subject}}))
+		req = req.WithContext(reqctx.WithValidatedToken(req.Context(), oauth.JWTToken{Claims: map[string]interface{}{"sub": subject}}))
 	}
 	rr := httptest.NewRecorder()
 	reached := false
@@ -2108,7 +2108,7 @@ func TestLimitAccountCredentialChange_PerSubject(t *testing.T) {
 func runAccountExport(m *RateLimiter, subject string) (int, bool, *httptest.ResponseRecorder) {
 	req := limiterRequest(http.MethodGet, "/api/v1/account/export", nil)
 	if subject != "" {
-		req = req.WithContext(reqctx.WithValidatedToken(req.Context(), oauth.JwtToken{Claims: map[string]interface{}{"sub": subject}}))
+		req = req.WithContext(reqctx.WithValidatedToken(req.Context(), oauth.JWTToken{Claims: map[string]interface{}{"sub": subject}}))
 	}
 	rr := httptest.NewRecorder()
 	reached := false
@@ -2212,7 +2212,7 @@ func accountPasswordRequest(target, subject string) *http.Request {
 	if subject == "" {
 		return req
 	}
-	return req.WithContext(reqctx.WithValidatedToken(req.Context(), oauth.JwtToken{Claims: map[string]interface{}{"sub": subject}}))
+	return req.WithContext(reqctx.WithValidatedToken(req.Context(), oauth.JWTToken{Claims: map[string]interface{}{"sub": subject}}))
 }
 
 // runAccountPassword drives one request through LimitAccountPassword and reports the status,
@@ -2645,8 +2645,8 @@ func TestRejection_AuditedOncePerKeyPerWindow(t *testing.T) {
 		// property under test is that the audit call is given that same context rather than one
 		// reached for. The stub read chi's id off whatever it was handed, so an empty value here
 		// means the trip was audited under a context carrying no request (#328 seam 3).
-		if e.requestId != limiterRequestId {
-			t.Errorf("request id on the audited context = %q, want %q", e.requestId, limiterRequestId)
+		if e.requestID != limiterRequestID {
+			t.Errorf("request id on the audited context = %q, want %q", e.requestID, limiterRequestID)
 		}
 	})
 
@@ -2755,10 +2755,10 @@ func builtLimiters() []builtLimiter {
 		}
 	}
 	ipWarned := func(limiter string) map[string]any {
-		return map[string]any{"limiter": limiter, "ip": ip, "request_id": limiterRequestId}
+		return map[string]any{"limiter": limiter, "ip": ip, "request_id": limiterRequestID}
 	}
 	subjectWarned := func(limiter string) map[string]any {
-		return map[string]any{"limiter": limiter, "request_id": limiterRequestId}
+		return map[string]any{"limiter": limiter, "request_id": limiterRequestID}
 	}
 	noToken := func(target string) func() (authContextGetter, *http.Request) {
 		return func() (authContextGetter, *http.Request) {
@@ -2788,7 +2788,7 @@ func builtLimiters() []builtLimiter {
 			// The bucket is user_7, and the event records the user id itself, as an int64: the
 			// identifier the audit records is not the bucket key, which is why the subject
 			// function returns both.
-			name: "LimitOtp", limit: func(m *RateLimiter) func(http.Handler) http.Handler { return m.LimitOtp },
+			name: "LimitOTP", limit: func(m *RateLimiter) func(http.Handler) http.Handler { return m.LimitOTP },
 			alwaysOn: true,
 			request:  func() *http.Request { return limiterRequest(http.MethodPost, "/auth/otp?userId=7", nil) },
 			failures: true, budget: 5,
@@ -2886,8 +2886,8 @@ func TestBuiltLimiters_EachKeepsItsOwnRefusal(t *testing.T) {
 				if !reflect.DeepEqual(events[0].details, c.audited) {
 					t.Errorf("event details = %#v, want %#v", events[0].details, c.audited)
 				}
-				if events[0].requestId != limiterRequestId {
-					t.Errorf("request id on the audited context = %q, want %q", events[0].requestId, limiterRequestId)
+				if events[0].requestID != limiterRequestID {
+					t.Errorf("request id on the audited context = %q, want %q", events[0].requestID, limiterRequestID)
 				}
 
 				warnings := 0
@@ -3303,13 +3303,13 @@ func TestLimitDCR_PerIP(t *testing.T) {
 // calls RecordCredentialFailure only where ValidateTokenRequest answered invalid_grant for a
 // password grant. A case that drives requests without it spends no tier at all, ropc_ip
 // included, whatever it says it is measuring (#219, #564).
-func runROPC(m *RateLimiter, grantType, username, clientId, ip string,
+func runROPC(m *RateLimiter, grantType, username, clientID, ip string,
 	failed bool) (int, bool, *httptest.ResponseRecorder) {
 
 	form := url.Values{
 		"grant_type": {grantType},
 		"username":   {username},
-		"client_id":  {clientId},
+		"client_id":  {clientID},
 	}
 	req := limiterRequest(http.MethodPost, "/auth/token", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")

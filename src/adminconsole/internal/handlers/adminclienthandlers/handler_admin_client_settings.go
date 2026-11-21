@@ -17,12 +17,12 @@ import (
 // clientSettingsAPI is what the client settings page needs: the client, the brands its Brand
 // select offers, the settings' write, and the allowance's and the brand's own writes.
 type clientSettingsAPI interface {
-	GetClientById(ctx context.Context, accessToken string, clientId int64) (*api.ClientResponse, error)
+	GetClientByID(ctx context.Context, accessToken string, clientID int64) (*api.ClientResponse, error)
 	GetAllBrands(ctx context.Context, accessToken string) ([]api.BrandResponse, error)
-	UpdateClient(ctx context.Context, accessToken string, clientId int64, request *api.UpdateClientSettingsRequest) (*api.ClientResponse, error)
-	UpdateClientAdministrativeScopes(ctx context.Context, accessToken string, clientId int64,
+	UpdateClient(ctx context.Context, accessToken string, clientID int64, request *api.UpdateClientSettingsRequest) (*api.ClientResponse, error)
+	UpdateClientAdministrativeScopes(ctx context.Context, accessToken string, clientID int64,
 		request *api.UpdateClientAdministrativeScopesRequest) (*api.ClientResponse, error)
-	UpdateClientBrand(ctx context.Context, accessToken string, clientId int64,
+	UpdateClientBrand(ctx context.Context, accessToken string, clientID int64,
 		request *api.UpdateClientBrandRequest) (*api.ClientResponse, error)
 }
 
@@ -34,7 +34,7 @@ type settingsInvalidator interface {
 
 // BrandOption is one brand the Brand select offers by name: its id is the value the select sends.
 type BrandOption struct {
-	Id   int64
+	ID   int64
 	Name string
 }
 
@@ -50,7 +50,7 @@ type BrandOption struct {
 // enabled state are drawn from. They differ only when a refused save is drawn again, with the
 // inputs keeping what was typed (#522).
 type ClientSettings struct {
-	ClientId                    int64
+	ClientID                    int64
 	ClientIdentifier            string
 	Description                 string
 	WebsiteURL                  string
@@ -66,11 +66,11 @@ type ClientSettings struct {
 	ShowDescription             bool
 	ShowWebsiteURL              bool
 	AuthorizationCodeEnabled    bool
-	DefaultAcrLevel             string
+	DefaultACRLevel             string
 	IsSystemLevelClient         bool
 	CreatedViaDCR               bool
-	// BrandId is the client's own brand, or 0 for a client with none, drawn in the default brand.
-	BrandId int64
+	// BrandID is the client's own brand, or 0 for a client with none, drawn in the default brand.
+	BrandID int64
 	// IsPublic is not edited here; the tab bar reads it, from the client as stored, to leave out
 	// the Introspection tab of a public client.
 	IsPublic bool
@@ -79,7 +79,7 @@ type ClientSettings struct {
 // clientSettingsFrom draws the Settings tab from the client as the auth server answers it.
 func clientSettingsFrom(c *api.ClientResponse) ClientSettings {
 	return ClientSettings{
-		ClientId:                    c.Id,
+		ClientID:                    c.ID,
 		ClientIdentifier:            c.ClientIdentifier,
 		Description:                 c.Description,
 		WebsiteURL:                  c.WebsiteURL,
@@ -95,20 +95,20 @@ func clientSettingsFrom(c *api.ClientResponse) ClientSettings {
 		ShowDescription:             c.ShowDescription,
 		ShowWebsiteURL:              c.ShowWebsiteURL,
 		AuthorizationCodeEnabled:    c.AuthorizationCodeEnabled,
-		DefaultAcrLevel:             c.DefaultAcrLevel,
+		DefaultACRLevel:             c.DefaultACRLevel,
 		IsSystemLevelClient:         c.IsSystemLevelClient,
 		CreatedViaDCR:               c.CreatedViaDCR,
-		BrandId:                     brandIdOf(c.BrandId),
+		BrandID:                     brandIDOf(c.BrandID),
 		IsPublic:                    c.IsPublic,
 	}
 }
 
-// brandIdOf is the Brand select's value for a client's brand: the brand's id, or 0 for none.
-func brandIdOf(brandId *int64) int64 {
-	if brandId == nil {
+// brandIDOf is the Brand select's value for a client's brand: the brand's id, or 0 for none.
+func brandIDOf(brandID *int64) int64 {
+	if brandID == nil {
 		return 0
 	}
-	return *brandId
+	return *brandID
 }
 
 // submittedBrand is the brand the save gives the client, as the Brand select sent it in the body:
@@ -132,13 +132,13 @@ func submittedBrand(r *http.Request, stored *int64) *int64 {
 }
 
 func sameBrand(a, b *int64) bool {
-	return brandIdOf(a) == brandIdOf(b)
+	return brandIDOf(a) == brandIDOf(b)
 }
 
 // bindBrands adds what the Brand select is drawn from to bind: every brand by name, in the auth
 // server's order, and the name of the default brand, which its first choice names. It answers
 // false, having answered the page that says why, when the brands cannot be read.
-func bindBrands(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, apiClient clientSettingsAPI,
+func bindBrands(httpHelper HTTPHelper, w http.ResponseWriter, r *http.Request, apiClient clientSettingsAPI,
 	accessToken string, bind map[string]interface{}) bool {
 
 	brands, err := apiClient.GetAllBrands(r.Context(), accessToken)
@@ -149,7 +149,7 @@ func bindBrands(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, a
 	options := make([]BrandOption, 0, len(brands))
 	defaultName := ""
 	for _, brand := range brands {
-		options = append(options, BrandOption{Id: brand.Id, Name: brand.Name})
+		options = append(options, BrandOption{ID: brand.ID, Name: brand.Name})
 		if brand.IsDefault {
 			defaultName = brand.Name
 		}
@@ -160,7 +160,7 @@ func bindBrands(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, a
 }
 
 // renderSettings draws the Settings tab from bind, with the Brand select's brands.
-func renderSettings(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, apiClient clientSettingsAPI,
+func renderSettings(httpHelper HTTPHelper, w http.ResponseWriter, r *http.Request, apiClient clientSettingsAPI,
 	accessToken string, bind map[string]interface{}) {
 
 	if !bindBrands(httpHelper, w, r, apiClient, accessToken, bind) {
@@ -172,7 +172,7 @@ func renderSettings(httpHelper HttpHelper, w http.ResponseWriter, r *http.Reques
 }
 
 func HandleSettingsGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient clientSettingsAPI,
 ) http.HandlerFunc {
@@ -191,13 +191,13 @@ func HandleSettingsGet(
 			return
 		}
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
-		clientResp, err := apiClient.GetClientById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		clientResp, err := apiClient.GetClientByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -255,7 +255,7 @@ func HandleSettingsGet(
 // tab is drawn again from the client as it now stands, saying the settings were saved, with the
 // refusal beside its control. A refused allowance writes no brand.
 func HandleSettingsPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient clientSettingsAPI,
 	settingsCache settingsInvalidator,
@@ -283,13 +283,13 @@ func HandleSettingsPost(
 		showWebsiteURL := r.FormValue("showWebsiteUrl") == "on"
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
-		clientResp, err := apiClient.GetClientById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		clientResp, err := apiClient.GetClientByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -323,10 +323,10 @@ func HandleSettingsPost(
 			sentRememberConsent = &rememberConsent
 		}
 
-		brandId := submittedBrand(r, clientResp.BrandId)
+		brandID := submittedBrand(r, clientResp.BrandID)
 
 		adminClientSettings := ClientSettings{
-			ClientId:                    id,
+			ClientID:                    id,
 			ClientIdentifier:            r.FormValue("clientIdentifier"),
 			Description:                 r.FormValue("description"),
 			WebsiteURL:                  r.FormValue("websiteUrl"),
@@ -342,10 +342,10 @@ func HandleSettingsPost(
 			ShowDescription:             showDescription,
 			ShowWebsiteURL:              showWebsiteURL,
 			AuthorizationCodeEnabled:    clientResp.AuthorizationCodeEnabled,
-			DefaultAcrLevel:             r.FormValue("defaultAcrLevel"),
+			DefaultACRLevel:             r.FormValue("defaultAcrLevel"),
 			IsSystemLevelClient:         isSystemLevelClient,
 			CreatedViaDCR:               clientResp.CreatedViaDCR,
-			BrandId:                     brandIdOf(brandId),
+			BrandID:                     brandIDOf(brandID),
 			IsPublic:                    clientResp.IsPublic,
 		}
 		accessToken := jwtInfo.TokenResponse.AccessToken
@@ -379,7 +379,7 @@ func HandleSettingsPost(
 			ShowWebsiteURL:    adminClientSettings.ShowWebsiteURL,
 		}
 		if clientResp.AuthorizationCodeEnabled {
-			updateReq.DefaultAcrLevel = r.FormValue("defaultAcrLevel")
+			updateReq.DefaultACRLevel = r.FormValue("defaultAcrLevel")
 		}
 
 		updated, err := apiClient.UpdateClient(r.Context(), accessToken, id, updateReq)
@@ -420,8 +420,8 @@ func HandleSettingsPost(
 			}
 		}
 
-		if !sameBrand(brandId, clientResp.BrandId) {
-			_, err = apiClient.UpdateClientBrand(r.Context(), accessToken, id, &api.UpdateClientBrandRequest{BrandId: brandId})
+		if !sameBrand(brandID, clientResp.BrandID) {
+			_, err = apiClient.UpdateClientBrand(r.Context(), accessToken, id, &api.UpdateClientBrandRequest{BrandID: brandID})
 			if err != nil {
 				render.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderSavedWith("brandError"))
 				return

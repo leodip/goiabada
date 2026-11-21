@@ -42,16 +42,16 @@ type Database interface {
 	revocation.Database
 	otpcredential.Database
 	AcquireManagePermissionRow(ctx context.Context, tx *sql.Tx) (int64, error)
-	AcquireSettingsRow(ctx context.Context, tx *sql.Tx, settingsId int64) error
-	AcquireUserRow(ctx context.Context, tx *sql.Tx, userId int64) error
+	AcquireSettingsRow(ctx context.Context, tx *sql.Tx, settingsID int64) error
+	AcquireUserRow(ctx context.Context, tx *sql.Tx, userID int64) error
 	CreateUserPermission(ctx context.Context, tx *sql.Tx, userPermission *record.UserPermission) error
-	GetPermissionsByResourceId(ctx context.Context, tx *sql.Tx, resourceId int64) ([]record.Permission, error)
+	GetPermissionsByResourceID(ctx context.Context, tx *sql.Tx, resourceID int64) ([]record.Permission, error)
 	GetResourceByResourceIdentifier(ctx context.Context, tx *sql.Tx, resourceIdentifier string) (*record.Resource, error)
-	GetSettingsById(ctx context.Context, tx *sql.Tx, settingsId int64) (*record.Settings, error)
+	GetSettingsByID(ctx context.Context, tx *sql.Tx, settingsID int64) (*record.Settings, error)
 	GetUserByEmail(ctx context.Context, tx *sql.Tx, email string) (*record.User, error)
-	GetUserByIdForUpdate(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
-	GetUserPermissionsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserPermission, error)
-	SetUserPasswordHash(ctx context.Context, tx *sql.Tx, userId int64, passwordHash string) error
+	GetUserByIDForUpdate(ctx context.Context, tx *sql.Tx, userID int64) (*record.User, error)
+	GetUserPermissionsByUserID(ctx context.Context, tx *sql.Tx, userID int64) ([]record.UserPermission, error)
+	SetUserPasswordHash(ctx context.Context, tx *sql.Tx, userID int64, passwordHash string) error
 	UpdateSettings(ctx context.Context, tx *sql.Tx, settings *record.Settings) error
 }
 
@@ -73,10 +73,10 @@ type Request struct {
 }
 
 // Outcome is what a committed recovery did: each action's result as the committing attempt
-// produced it, and the revocation sweep's. UserId and Email are zero, and Revocation empty, when no
+// produced it, and the revocation sweep's. UserID and Email are zero, and Revocation empty, when no
 // user was named.
 type Outcome struct {
-	UserId            int64
+	UserID            int64
 	Email             string // the address as Run looked it up, trimmed and lowercased
 	PasswordSet       bool
 	OTPRemoved        bool // false when no authenticator was enrolled
@@ -129,9 +129,9 @@ func Run(ctx context.Context, database Database, auditLogger AuditLogger, req Re
 	// The manage permission's id is read before the transaction: the permission row it names is
 	// seeded with the instance and changes with a migration, not with a concurrent request.
 	// Whether the user already holds it is read inside the transaction, under the permission's row.
-	var managePermissionId int64
+	var managePermissionID int64
 	if req.GrantManage {
-		managePermissionId, err = managePermission(ctx, database)
+		managePermissionID, err = managePermission(ctx, database)
 		if err != nil {
 			return Outcome{}, err
 		}
@@ -139,7 +139,7 @@ func Run(ctx context.Context, database Database, auditLogger AuditLogger, req Re
 
 	// The settings give the password policy, the issuer the logout tokens name and the session
 	// lifetimes that say which of the user's sessions were still valid when the recovery ended them.
-	settings, err := database.GetSettingsById(ctx, nil, 1)
+	settings, err := database.GetSettingsByID(ctx, nil, 1)
 	if err != nil {
 		return Outcome{}, errs.Wrap(err, "unable to read the settings")
 	}
@@ -212,7 +212,7 @@ func Run(ctx context.Context, database Database, auditLogger AuditLogger, req Re
 	// A recovery ends every session of the user and keeps none, a user-wide end, so the sweep
 	// collects a logout token for every app that knew the user (#784 decisions 3 and 11). A
 	// database with no settings row has no issuer to sign them as, and tells nobody.
-	outcome := Outcome{Email: email, UserId: user.Id}
+	outcome := Outcome{Email: email, UserID: user.ID}
 	var notice revocation.LogoutNotice
 	if settings != nil {
 		outcome.Issuer = settings.Issuer
@@ -220,11 +220,11 @@ func Run(ctx context.Context, database Database, auditLogger AuditLogger, req Re
 			Live: revocation.LiveUnder(settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds)}
 	}
 	var turnstile turnstileChange
-	result, err := revocation.RevokeUserAuthStateTx(ctx, database, user.Id, "", notice, func(tx *sql.Tx) error {
+	result, err := revocation.RevokeUserAuthStateTx(ctx, database, user.ID, "", notice, func(tx *sql.Tx) error {
 		outcome.PasswordSet, outcome.OTPRemoved, outcome.ManageGranted = false, false, false
 		outcome.TurnstileDisabled, turnstile = false, turnstileChange{}
 
-		if acquireErr := database.AcquireUserRow(ctx, tx, user.Id); acquireErr != nil {
+		if acquireErr := database.AcquireUserRow(ctx, tx, user.ID); acquireErr != nil {
 			return acquireErr
 		}
 		if req.GrantManage {
@@ -232,7 +232,7 @@ func Run(ctx context.Context, database Database, auditLogger AuditLogger, req Re
 				return acquireErr
 			}
 		}
-		current, readErr := database.GetUserByIdForUpdate(ctx, tx, user.Id)
+		current, readErr := database.GetUserByIDForUpdate(ctx, tx, user.ID)
 		if readErr != nil {
 			return readErr
 		}
@@ -255,7 +255,7 @@ func Run(ctx context.Context, database Database, auditLogger AuditLogger, req Re
 		}
 
 		if passwordHash != "" {
-			if writeErr := database.SetUserPasswordHash(ctx, tx, current.Id, passwordHash); writeErr != nil {
+			if writeErr := database.SetUserPasswordHash(ctx, tx, current.ID, passwordHash); writeErr != nil {
 				return writeErr
 			}
 			outcome.PasswordSet = true
@@ -276,18 +276,18 @@ func Run(ctx context.Context, database Database, auditLogger AuditLogger, req Re
 			outcome.OTPRemoved = removed
 		}
 		if req.GrantManage {
-			grants, grantsErr := database.GetUserPermissionsByUserId(ctx, tx, current.Id)
+			grants, grantsErr := database.GetUserPermissionsByUserID(ctx, tx, current.ID)
 			if grantsErr != nil {
 				return grantsErr
 			}
 			for _, grant := range grants {
-				if grant.PermissionId == managePermissionId {
+				if grant.PermissionID == managePermissionID {
 					return nil
 				}
 			}
 			if writeErr := database.CreateUserPermission(ctx, tx, &record.UserPermission{
-				UserId:       current.Id,
-				PermissionId: managePermissionId,
+				UserID:       current.ID,
+				PermissionID: managePermissionID,
 			}); writeErr != nil {
 				return writeErr
 			}
@@ -305,20 +305,20 @@ func Run(ctx context.Context, database Database, auditLogger AuditLogger, req Re
 	// attempt did, and each names the command as the actor.
 	if outcome.PasswordSet {
 		auditLogger.Log(ctx, audit.EventUpdatedUserAuthentication, map[string]interface{}{
-			"user_id": user.Id,
+			"user_id": user.ID,
 			"command": Actor,
 		})
 	}
 	if outcome.OTPRemoved {
 		auditLogger.Log(ctx, audit.EventDisabledOTP, map[string]interface{}{
-			"user_id": user.Id,
+			"user_id": user.ID,
 			"command": Actor,
 		})
 	}
 	if outcome.ManageGranted {
 		auditLogger.Log(ctx, audit.EventAddedUserPermission, map[string]interface{}{
-			"user_id":       user.Id,
-			"permission_id": managePermissionId,
+			"user_id":       user.ID,
+			"permission_id": managePermissionID,
 			"command":       Actor,
 		})
 		// The record every change to who is an administrator writes, after the change's own, so
@@ -327,8 +327,8 @@ func Run(ctx context.Context, database Database, auditLogger AuditLogger, req Re
 		auditLogger.Log(ctx, audit.EventAdministrativePermissionChanged, map[string]interface{}{
 			"change":      "granted",
 			"target_kind": "user",
-			"target_id":   user.Id,
-			"user_id":     user.Id,
+			"target_id":   user.ID,
+			"user_id":     user.ID,
 			"permission_identifiers": []string{
 				builtin.AuthServerResourceIdentifier + ":" + builtin.ManagePermissionIdentifier,
 			},
@@ -336,7 +336,7 @@ func Run(ctx context.Context, database Database, auditLogger AuditLogger, req Re
 		})
 	}
 	logTurnstileChange(ctx, auditLogger, turnstile)
-	revocation.LogRevokedUserAuthStateByCommand(ctx, auditLogger, user.Id, revocation.ReasonRecoveryCommand,
+	revocation.LogRevokedUserAuthStateByCommand(ctx, auditLogger, user.ID, revocation.ReasonRecoveryCommand,
 		Actor, result)
 
 	return outcome, nil
@@ -353,13 +353,13 @@ func managePermission(ctx context.Context, database Database) (int64, error) {
 		return 0, refused("the database holds no %s resource, so there is no %s permission to grant",
 			builtin.AuthServerResourceIdentifier, builtin.ManagePermissionIdentifier)
 	}
-	permissions, err := database.GetPermissionsByResourceId(ctx, nil, resource.Id)
+	permissions, err := database.GetPermissionsByResourceID(ctx, nil, resource.ID)
 	if err != nil {
 		return 0, errs.Wrap(err, "unable to read the resource's permissions")
 	}
 	for _, permission := range permissions {
 		if permission.PermissionIdentifier == builtin.ManagePermissionIdentifier {
-			return permission.Id, nil
+			return permission.ID, nil
 		}
 	}
 	return 0, refused("the %s resource holds no %s permission",
@@ -403,7 +403,7 @@ func disableTurnstile(ctx context.Context, database Database, tx *sql.Tx) (turns
 	if err := database.AcquireSettingsRow(ctx, tx, 1); err != nil {
 		return turnstileChange{}, errs.Wrap(err, "unable to acquire the settings row")
 	}
-	settings, err := database.GetSettingsById(ctx, tx, 1)
+	settings, err := database.GetSettingsByID(ctx, tx, 1)
 	if err != nil {
 		return turnstileChange{}, errs.Wrap(err, "unable to read the settings")
 	}

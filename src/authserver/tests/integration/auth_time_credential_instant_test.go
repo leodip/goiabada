@@ -60,22 +60,22 @@ type pausedCeremony struct {
 // only a real ceremony shows the value surviving the AuthContext, the code row and the token
 // issuer to reach the claim a relying party actually reads.
 func TestAuthTime_IsTheInstantTheCredentialWasAccepted(t *testing.T) {
-	client, clientSecret, redirectUri, user, password := newAuthTimeFixture(t)
+	client, clientSecret, redirectURI, user, password := newAuthTimeFixture(t)
 
 	// One client for both ceremonies, so the second arrives carrying the first's cookie, which
 	// is what makes it the reuse arm.
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
 	// The create arm: nothing in the jar yet, so /auth/completed mints a session and
 	// StartNewUserSession stamps AuthTime.
 	created := runPausedCeremony(t, httpClient, client.ClientIdentifier, clientSecret,
-		redirectUri.URI, user.Email, password, "")
+		redirectURI.URI, user.Email, password, "")
 	assertAuthTimeIsTheCredentialInstant(t, created, "create arm")
 
 	// The reuse arm: the same browser, prompt=login, so the ceremony re-authenticates against
 	// the session it already holds and /auth/completed refreshes that row's AuthTime instead.
 	reused := runPausedCeremony(t, httpClient, client.ClientIdentifier, clientSecret,
-		redirectUri.URI, user.Email, password, "&prompt=login")
+		redirectURI.URI, user.Email, password, "&prompt=login")
 	assertAuthTimeIsTheCredentialInstant(t, reused, "reuse arm")
 
 	// sid is the user session's identifier, and a bump leaves it alone where a fresh session
@@ -119,7 +119,7 @@ func assertAuthTimeIsTheCredentialInstant(t *testing.T, c pausedCeremony, arm st
 // password being accepted and the redirect chain that completes it. prompt is appended to the
 // authorization request verbatim, so "" is a plain sign-in and "&prompt=login" forces one.
 func runPausedCeremony(t *testing.T, httpClient *http.Client, clientIdentifier string,
-	clientSecret string, redirectUri string, email string, password string,
+	clientSecret string, redirectURI string, email string, password string,
 	prompt string) pausedCeremony {
 
 	t.Helper()
@@ -127,8 +127,8 @@ func runPausedCeremony(t *testing.T, httpClient *http.Client, clientIdentifier s
 	codeVerifier := testCodeVerifier + "-" + fake.LetterN(16)
 	codeChallenge := oauth.GeneratePKCECodeChallenge(codeVerifier)
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + clientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + clientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + codeChallenge +
@@ -137,7 +137,7 @@ func runPausedCeremony(t *testing.T, httpClient *http.Client, clientIdentifier s
 		"&nonce=" + fake.LetterN(8) +
 		prompt
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -176,7 +176,7 @@ func runPausedCeremony(t *testing.T, httpClient *http.Client, clientIdentifier s
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	code, _ := getCodeAndStateFromUrl(t, resp)
+	code, _ := getCodeAndStateFromURL(t, resp)
 
 	data := postToTokenEndpoint(t, httpClient, appConfig.AuthServer.BaseURL+"/auth/token",
 		url.Values{
@@ -184,7 +184,7 @@ func runPausedCeremony(t *testing.T, httpClient *http.Client, clientIdentifier s
 			"client_id":     {clientIdentifier},
 			"client_secret": {clientSecret},
 			"code":          {code},
-			"redirect_uri":  {redirectUri},
+			"redirect_uri":  {redirectURI},
 			"code_verifier": {codeVerifier},
 		})
 
@@ -226,7 +226,7 @@ func newAuthTimeFixture(t *testing.T) (*record.Client, string, *record.RedirectU
 		Enabled:                                 true,
 		AuthorizationCodeEnabled:                true,
 		ConsentRequired:                         false,
-		DefaultAcrLevel:                         record.AcrLevel1,
+		DefaultACRLevel:                         record.ACRLevel1,
 		TokenExpirationInSeconds:                300,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 3600,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 86400,
@@ -235,11 +235,11 @@ func newAuthTimeFixture(t *testing.T) (*record.Client, string, *record.RedirectU
 		t.Fatal(createClientErr)
 	}
 
-	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+	redirectURI := &record.RedirectURI{
+		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
-	if createRedirectURIErr := database.CreateRedirectURI(context.Background(), nil, redirectUri); createRedirectURIErr != nil {
+	if createRedirectURIErr := database.CreateRedirectURI(context.Background(), nil, redirectURI); createRedirectURIErr != nil {
 		t.Fatal(createRedirectURIErr)
 	}
 
@@ -259,7 +259,7 @@ func newAuthTimeFixture(t *testing.T) (*record.Client, string, *record.RedirectU
 		t.Fatal(err)
 	}
 
-	return client, clientSecret, redirectUri, user, password
+	return client, clientSecret, redirectURI, user, password
 }
 
 // TestAuthTime_MaxAgeIsMeasuredFromTheLastSignIn drives #243 defect 1 through the real stack.
@@ -274,13 +274,13 @@ func TestAuthTime_MaxAgeIsMeasuredFromTheLastSignIn(t *testing.T) {
 		settings.UserSessionIdleTimeoutInSeconds = 7200
 		settings.UserSessionMaxLifetimeInSeconds = 86400
 	})
-	client, clientSecret, redirectUri, user, password := newAuthTimeFixture(t)
-	httpClient := createHttpClient(t)
+	client, clientSecret, redirectURI, user, password := newAuthTimeFixture(t)
+	httpClient := createHTTPClient(t)
 
 	longAgo := time.Duration(settings.UserSessionMaxLifetimeInSeconds)*time.Second - 10*time.Minute
 
 	signedIn := runPausedCeremony(t, httpClient, client.ClientIdentifier, clientSecret,
-		redirectUri.URI, user.Email, password, "")
+		redirectURI.URI, user.Email, password, "")
 	if signedIn.sid == "" {
 		t.Fatal("the ID token carried no sid, so the session row cannot be found")
 	}
@@ -307,8 +307,8 @@ func TestAuthTime_MaxAgeIsMeasuredFromTheLastSignIn(t *testing.T) {
 	silentAuthorize := func() (*http.Response, string) {
 		t.Helper()
 		codeVerifier := testCodeVerifier + "-" + fake.LetterN(16)
-		destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-			"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+		destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+			"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 			"&response_type=code" +
 			"&code_challenge_method=S256" +
 			"&code_challenge=" + oauth.GeneratePKCECodeChallenge(codeVerifier) +
@@ -316,7 +316,7 @@ func TestAuthTime_MaxAgeIsMeasuredFromTheLastSignIn(t *testing.T) {
 			"&state=" + fake.LetterN(8) +
 			"&nonce=" + fake.LetterN(8) +
 			"&prompt=none&max_age=3600"
-		resp, err := httpClient.Get(destUrl)
+		resp, err := httpClient.Get(destURL)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -331,7 +331,7 @@ func TestAuthTime_MaxAgeIsMeasuredFromTheLastSignIn(t *testing.T) {
 		redirectLocation := assertRedirect(t, resp, "/auth/issue")
 		resp = loadPage(t, httpClient, redirectLocation)
 		defer func() { _ = resp.Body.Close() }()
-		code, _ := getCodeAndStateFromUrl(t, resp)
+		code, _ := getCodeAndStateFromURL(t, resp)
 		if code == "" {
 			t.Fatalf("no code was issued; Location %q", resp.Header.Get("Location"))
 		}
@@ -342,7 +342,7 @@ func TestAuthTime_MaxAgeIsMeasuredFromTheLastSignIn(t *testing.T) {
 				"client_id":     {client.ClientIdentifier},
 				"client_secret": {clientSecret},
 				"code":          {code},
-				"redirect_uri":  {redirectUri.URI},
+				"redirect_uri":  {redirectURI.URI},
 				"code_verifier": {codeVerifier},
 			})
 		idToken, ok := data["id_token"].(string)
@@ -367,7 +367,7 @@ func TestAuthTime_MaxAgeIsMeasuredFromTheLastSignIn(t *testing.T) {
 		defer func() { _ = resp.Body.Close() }()
 
 		assert.Equal(t, http.StatusFound, resp.StatusCode)
-		errorCode, errorDescription, _ := getErrorFromUrl(t, resp)
+		errorCode, errorDescription, _ := getErrorFromURL(t, resp)
 		assert.Equal(t, "login_required", errorCode)
 		assert.Equal(t, "Session age exceeds max_age", errorDescription)
 	})
@@ -393,8 +393,8 @@ func TestReLogin_EndsTheSessionItReplaces(t *testing.T) {
 	oldSession, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, grant.sessionIdentifier)
 	require.NoError(t, err)
 	require.NotNil(t, oldSession)
-	oldSession.IpAddress = "203.0.113.77"
-	oldSession.DeviceId = ""
+	oldSession.IPAddress = "203.0.113.77"
+	oldSession.DeviceID = ""
 	oldSession.AuthTime = time.Now().UTC().Add(-2 * time.Hour)
 	require.NoError(t, database.UpdateUserSession(context.Background(), nil, oldSession))
 
@@ -440,7 +440,7 @@ func TestReLogin_EndsTheSessionItReplaces(t *testing.T) {
 	})
 
 	t.Run("the refresh token bound to the replaced session stops", func(t *testing.T) {
-		refused := postToTokenEndpoint(t, createHttpClient(t), appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
+		refused := postToTokenEndpoint(t, createHTTPClient(t), appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
 			"grant_type":    {"refresh_token"},
 			"client_id":     {grant.client.ClientIdentifier},
 			"client_secret": {grant.clientSecret},

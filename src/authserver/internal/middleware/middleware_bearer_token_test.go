@@ -22,7 +22,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/middleware/mocks"
 )
 
-// These tests drive JwtAuthorizationHeaderToContext alone, on the API surface, and own how it reads
+// These tests drive JWTAuthorizationHeaderToContext alone, on the API surface, and own how it reads
 // the two methods RFC 6750 sections 2.1 and 2.2 define: what counts as a presented credential, which
 // token is validated, and what reaches the context. The whole chain on both surfaces, with the exact
 // challenge and body of every refusal, is bearer_guard_chain_test.go's; the refusals here pin only
@@ -36,7 +36,7 @@ var errRefusedToken = fmt.Errorf("token signature is invalid: %w", signingkeys.E
 type parseGuardResult struct {
 	rr         *httptest.ResponseRecorder
 	nextCalled bool
-	token      oauth.JwtToken
+	token      oauth.JWTToken
 	present    bool
 }
 
@@ -49,13 +49,13 @@ func serveParseGuard(parser tokenParser, req *http.Request) parseGuardResult {
 		result.token, result.present = reqctx.BearerTokenFrom(r.Context())
 	})
 	result.rr = httptest.NewRecorder()
-	NewBearerTokenForAPI(parser, ResourceProofs{}).JwtAuthorizationHeaderToContext()(next).ServeHTTP(result.rr, req)
+	NewBearerTokenForAPI(parser, ResourceProofs{}).JWTAuthorizationHeaderToContext()(next).ServeHTTP(result.rr, req)
 	return result
 }
 
 // accessToken is a token the parse guard admits: typ Bearer, aud authserver.
-func accessToken(tokenBase64 string) *oauth.JwtToken {
-	return &oauth.JwtToken{TokenBase64: tokenBase64, Claims: map[string]interface{}{
+func accessToken(tokenBase64 string) *oauth.JWTToken {
+	return &oauth.JWTToken{TokenBase64: tokenBase64, Claims: map[string]interface{}{
 		"sub": "user",
 		"typ": "Bearer",
 		"aud": "authserver",
@@ -94,7 +94,7 @@ func assertParserNotCalled(t *testing.T, parser *middlewaremocks.TokenParser) {
 	parser.AssertNotCalled(t, "DecodeAndValidateTokenString", mock.Anything, mock.Anything, mock.Anything)
 }
 
-func TestJwtAuthorizationHeaderToContext_ValidBearerToken(t *testing.T) {
+func TestJWTAuthorizationHeaderToContext_ValidBearerToken(t *testing.T) {
 	parser := new(middlewaremocks.TokenParser)
 	parser.On("DecodeAndValidateTokenString", mock.Anything, "validtoken", true).Return(accessToken("validtoken"), nil)
 
@@ -110,7 +110,7 @@ func TestJwtAuthorizationHeaderToContext_ValidBearerToken(t *testing.T) {
 // RFC 6750 section 2.1's credentials are `"Bearer" 1*SP b64token`, ABNF whose quoted string is case
 // insensitive (RFC 5234 section 2.3), and resource servers MUST support the method. Before #435
 // only "Bearer " matched and every other spelling read as no credential at all.
-func TestJwtAuthorizationHeaderToContext_TheSchemeIsCaseInsensitive(t *testing.T) {
+func TestJWTAuthorizationHeaderToContext_TheSchemeIsCaseInsensitive(t *testing.T) {
 	for _, header := range []string{"bearer tok", "BEARER tok", "bEaReR tok", "Bearer   tok"} {
 		t.Run(header, func(t *testing.T) {
 			parser := new(middlewaremocks.TokenParser)
@@ -125,7 +125,7 @@ func TestJwtAuthorizationHeaderToContext_TheSchemeIsCaseInsensitive(t *testing.T
 	}
 }
 
-func TestJwtAuthorizationHeaderToContext_InvalidBearerToken(t *testing.T) {
+func TestJWTAuthorizationHeaderToContext_InvalidBearerToken(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
 	parser := new(middlewaremocks.TokenParser)
 	parser.On("DecodeAndValidateTokenString", mock.Anything, "invalidtoken", true).Return(nil, errRefusedToken)
@@ -145,7 +145,7 @@ func TestJwtAuthorizationHeaderToContext_InvalidBearerToken(t *testing.T) {
 
 // An expired token is a refused one, carrying both marks, and gets the one sentence every refused
 // token gets: the parse guard does not name the reason.
-func TestJwtAuthorizationHeaderToContext_ExpiredBearerToken(t *testing.T) {
+func TestJWTAuthorizationHeaderToContext_ExpiredBearerToken(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
 	parser := new(middlewaremocks.TokenParser)
 	parser.On("DecodeAndValidateTokenString", mock.Anything, "expiredtoken", true).
@@ -163,7 +163,7 @@ func TestJwtAuthorizationHeaderToContext_ExpiredBearerToken(t *testing.T) {
 	assert.Contains(t, records[0].Message, "did not validate")
 }
 
-func TestJwtAuthorizationHeaderToContext_NoBearerToken(t *testing.T) {
+func TestJWTAuthorizationHeaderToContext_NoBearerToken(t *testing.T) {
 	parser := new(middlewaremocks.TokenParser)
 	requirePassedThroughEmpty(t, serveParseGuard(parser, httptest.NewRequest("GET", "/", nil)))
 	assertParserNotCalled(t, parser)
@@ -171,7 +171,7 @@ func TestJwtAuthorizationHeaderToContext_NoBearerToken(t *testing.T) {
 
 // Another scheme presents no bearer credential, so it passes through for the scope guard to answer
 // as a request carrying none. "Bearerx" is another scheme, not Bearer without its space.
-func TestJwtAuthorizationHeaderToContext_AnotherSchemeIsNoCredential(t *testing.T) {
+func TestJWTAuthorizationHeaderToContext_AnotherSchemeIsNoCredential(t *testing.T) {
 	for _, header := range []string{"NotBearer token", "Basic dXNlcjpwYXNz", "Bearertoken", "Bearer\ttoken"} {
 		t.Run(header, func(t *testing.T) {
 			parser := new(middlewaremocks.TokenParser)
@@ -186,7 +186,7 @@ func TestJwtAuthorizationHeaderToContext_AnotherSchemeIsNoCredential(t *testing.
 
 // The Bearer scheme with nothing after it, or only spaces, presents a credential that is empty. It
 // is refused as an invalid token rather than read as absent, since the client did send one.
-func TestJwtAuthorizationHeaderToContext_EmptyBearerTokenInHeader(t *testing.T) {
+func TestJWTAuthorizationHeaderToContext_EmptyBearerTokenInHeader(t *testing.T) {
 	for _, header := range []string{"Bearer", "Bearer ", "bearer    "} {
 		t.Run(header, func(t *testing.T) {
 			parser := new(middlewaremocks.TokenParser)
@@ -201,7 +201,7 @@ func TestJwtAuthorizationHeaderToContext_EmptyBearerTokenInHeader(t *testing.T) 
 
 // Tests for POST body access_token extraction (RFC 6750 section 2.2, OIDC Core 1.0 section 5.3.1)
 
-func TestJwtAuthorizationHeaderToContext_ValidPostBodyToken(t *testing.T) {
+func TestJWTAuthorizationHeaderToContext_ValidPostBodyToken(t *testing.T) {
 	parser := new(middlewaremocks.TokenParser)
 	parser.On("DecodeAndValidateTokenString", mock.Anything, "validposttoken", true).Return(accessToken("validposttoken"), nil)
 
@@ -212,7 +212,7 @@ func TestJwtAuthorizationHeaderToContext_ValidPostBodyToken(t *testing.T) {
 	parser.AssertExpectations(t)
 }
 
-func TestJwtAuthorizationHeaderToContext_InvalidPostBodyToken(t *testing.T) {
+func TestJWTAuthorizationHeaderToContext_InvalidPostBodyToken(t *testing.T) {
 	parser := new(middlewaremocks.TokenParser)
 	parser.On("DecodeAndValidateTokenString", mock.Anything, "invalidposttoken", true).Return(nil, errRefusedToken)
 
@@ -227,7 +227,7 @@ func TestJwtAuthorizationHeaderToContext_InvalidPostBodyToken(t *testing.T) {
 // request", and section 3.1 names such a request invalid_request, which SHOULD be answered 400.
 // Before #435 the header silently won. Neither token is validated: the request is refused for its
 // shape, whatever either token is. An empty header token counts as a method used, as it does alone.
-func TestJwtAuthorizationHeaderToContext_HeaderAndBodyTogetherAreInvalidRequest(t *testing.T) {
+func TestJWTAuthorizationHeaderToContext_HeaderAndBodyTogetherAreInvalidRequest(t *testing.T) {
 	for _, tc := range []struct{ name, header, body string }{
 		{"two tokens", "Bearer headertoken", "access_token=bodytoken"},
 		{"the same token twice", "Bearer tok", "access_token=tok"},
@@ -250,7 +250,7 @@ func TestJwtAuthorizationHeaderToContext_HeaderAndBodyTogetherAreInvalidRequest(
 // RFC 6750 section 3.1 names a request that "repeats the same parameter" invalid_request. Before
 // #435 the first access_token silently won. Refused before either copy is validated, and before the
 // two-method check, so a repeated body parameter is reported as what it is whatever the header holds.
-func TestJwtAuthorizationHeaderToContext_ARepeatedAccessTokenIsInvalidRequest(t *testing.T) {
+func TestJWTAuthorizationHeaderToContext_ARepeatedAccessTokenIsInvalidRequest(t *testing.T) {
 	for _, tc := range []struct{ name, header, body string }{
 		{"two different tokens", "", "access_token=one&access_token=two"},
 		{"the same token twice", "", "access_token=tok&access_token=tok"},
@@ -280,7 +280,7 @@ func TestJwtAuthorizationHeaderToContext_ARepeatedAccessTokenIsInvalidRequest(t 
 // otherwise malformed" invalid_request. Before #435 the first line won: a Bearer token behind a
 // Basic line read as no credential, and a second token behind a Bearer line was never seen. Refused
 // before either line is read, whatever the schemes, and before the body's own checks.
-func TestJwtAuthorizationHeaderToContext_ARepeatedAuthorizationHeaderIsInvalidRequest(t *testing.T) {
+func TestJWTAuthorizationHeaderToContext_ARepeatedAuthorizationHeaderIsInvalidRequest(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
 		lines []string
@@ -331,7 +331,7 @@ func TestJwtAuthorizationHeaderToContext_ARepeatedAuthorizationHeaderIsInvalidRe
 // A form media type whose parameters do not parse is the same refusal, in any case: ParseForm
 // reports it, whether it read the body (a parameter with no value) or not (a parameter given twice
 // with two values). Passed over instead, the body beside a valid header would go unread.
-func TestJwtAuthorizationHeaderToContext_ABodyThatDoesNotParseIsInvalidRequest(t *testing.T) {
+func TestJWTAuthorizationHeaderToContext_ABodyThatDoesNotParseIsInvalidRequest(t *testing.T) {
 	for _, tc := range []struct {
 		name, header, contentType, body string
 		limit                           int64
@@ -382,7 +382,7 @@ func TestJwtAuthorizationHeaderToContext_ABodyThatDoesNotParseIsInvalidRequest(t
 
 // A Basic header beside a body token is one bearer method, not two: Basic is not a way of sending a
 // bearer token.
-func TestJwtAuthorizationHeaderToContext_BasicHeaderBesideABodyTokenIsOneMethod(t *testing.T) {
+func TestJWTAuthorizationHeaderToContext_BasicHeaderBesideABodyTokenIsOneMethod(t *testing.T) {
 	parser := new(middlewaremocks.TokenParser)
 	parser.On("DecodeAndValidateTokenString", mock.Anything, "bodytoken", true).Return(accessToken("bodytoken"), nil)
 
@@ -394,7 +394,7 @@ func TestJwtAuthorizationHeaderToContext_BasicHeaderBesideABodyTokenIsOneMethod(
 	parser.AssertExpectations(t)
 }
 
-func TestJwtAuthorizationHeaderToContext_PostBodyIgnoredForGetRequest(t *testing.T) {
+func TestJWTAuthorizationHeaderToContext_PostBodyIgnoredForGetRequest(t *testing.T) {
 	parser := new(middlewaremocks.TokenParser)
 
 	// GET request with access_token in query string should NOT extract the token
@@ -414,7 +414,7 @@ func TestJwtAuthorizationHeaderToContext_PostBodyIgnoredForGetRequest(t *testing
 //
 // The GET case above does not pin this: it is refused by the method check and never reaches the
 // read at all. This is the case that fails if the accessor regresses (#333).
-func TestJwtAuthorizationHeaderToContext_PostQueryTokenIgnored(t *testing.T) {
+func TestJWTAuthorizationHeaderToContext_PostQueryTokenIgnored(t *testing.T) {
 	parser := new(middlewaremocks.TokenParser)
 
 	// A genuine form submission whose body does not carry the token, with the token in the query.
@@ -427,7 +427,7 @@ func TestJwtAuthorizationHeaderToContext_PostQueryTokenIgnored(t *testing.T) {
 
 // A query token is no method this server supports, so a header token beside one is one method, not
 // two, and is admitted.
-func TestJwtAuthorizationHeaderToContext_HeaderBesideAQueryTokenIsOneMethod(t *testing.T) {
+func TestJWTAuthorizationHeaderToContext_HeaderBesideAQueryTokenIsOneMethod(t *testing.T) {
 	parser := new(middlewaremocks.TokenParser)
 	parser.On("DecodeAndValidateTokenString", mock.Anything, "headertoken", true).Return(accessToken("headertoken"), nil)
 
@@ -439,7 +439,7 @@ func TestJwtAuthorizationHeaderToContext_HeaderBesideAQueryTokenIsOneMethod(t *t
 	parser.AssertExpectations(t)
 }
 
-func TestJwtAuthorizationHeaderToContext_PostBodyIgnoredForWrongContentType(t *testing.T) {
+func TestJWTAuthorizationHeaderToContext_PostBodyIgnoredForWrongContentType(t *testing.T) {
 	parser := new(middlewaremocks.TokenParser)
 
 	req := httptest.NewRequest("POST", "/userinfo", strings.NewReader("access_token=jsontoken"))
@@ -451,7 +451,7 @@ func TestJwtAuthorizationHeaderToContext_PostBodyIgnoredForWrongContentType(t *t
 
 // An access_token parameter supplied empty is a presented token, empty, and refused as invalid
 // without reaching the parser; before #435 it read as absent.
-func TestJwtAuthorizationHeaderToContext_PostBodyEmptyAccessToken(t *testing.T) {
+func TestJWTAuthorizationHeaderToContext_PostBodyEmptyAccessToken(t *testing.T) {
 	parser := new(middlewaremocks.TokenParser)
 
 	req := httptest.NewRequest("POST", "/userinfo", strings.NewReader("access_token="))
@@ -461,7 +461,7 @@ func TestJwtAuthorizationHeaderToContext_PostBodyEmptyAccessToken(t *testing.T) 
 	assertParserNotCalled(t, parser)
 }
 
-func TestJwtAuthorizationHeaderToContext_PostBodyNoAccessTokenParameter(t *testing.T) {
+func TestJWTAuthorizationHeaderToContext_PostBodyNoAccessTokenParameter(t *testing.T) {
 	parser := new(middlewaremocks.TokenParser)
 
 	req := httptest.NewRequest("POST", "/userinfo", strings.NewReader("other_param=value"))
@@ -471,7 +471,7 @@ func TestJwtAuthorizationHeaderToContext_PostBodyNoAccessTokenParameter(t *testi
 	assertParserNotCalled(t, parser)
 }
 
-func TestJwtAuthorizationHeaderToContext_PostBodyContentTypeWithCharset(t *testing.T) {
+func TestJWTAuthorizationHeaderToContext_PostBodyContentTypeWithCharset(t *testing.T) {
 	parser := new(middlewaremocks.TokenParser)
 	parser.On("DecodeAndValidateTokenString", mock.Anything, "charsettoken", true).Return(accessToken("charsettoken"), nil)
 
@@ -491,7 +491,7 @@ func TestJwtAuthorizationHeaderToContext_PostBodyContentTypeWithCharset(t *testi
 // The dotted capital I is the row strings.EqualFold would get wrong: strings.ToLower, which mime
 // applies, folds it to i, and ParseForm reads the body. The two Content-Type field lines are read as
 // ParseForm reads them, through Header.Get, so the first decides.
-func TestJwtAuthorizationHeaderToContext_EverySpellingOfTheFormMediaTypeIsAForm(t *testing.T) {
+func TestJWTAuthorizationHeaderToContext_EverySpellingOfTheFormMediaTypeIsAForm(t *testing.T) {
 	for _, tc := range []struct {
 		name         string
 		contentTypes []string
@@ -536,7 +536,7 @@ func TestJwtAuthorizationHeaderToContext_EverySpellingOfTheFormMediaTypeIsAForm(
 	}
 }
 
-func TestJwtAuthorizationHeaderToContext_PostBodyWithOtherParameters(t *testing.T) {
+func TestJWTAuthorizationHeaderToContext_PostBodyWithOtherParameters(t *testing.T) {
 	parser := new(middlewaremocks.TokenParser)
 	parser.On("DecodeAndValidateTokenString", mock.Anything, "tokenwithotherparams", true).Return(accessToken("tokenwithotherparams"), nil)
 
@@ -547,7 +547,7 @@ func TestJwtAuthorizationHeaderToContext_PostBodyWithOtherParameters(t *testing.
 	parser.AssertExpectations(t)
 }
 
-func TestJwtAuthorizationHeaderToContext_PutRequestIgnoresPostBody(t *testing.T) {
+func TestJWTAuthorizationHeaderToContext_PutRequestIgnoresPostBody(t *testing.T) {
 	parser := new(middlewaremocks.TokenParser)
 
 	// PUT request should NOT extract token from body
@@ -558,7 +558,7 @@ func TestJwtAuthorizationHeaderToContext_PutRequestIgnoresPostBody(t *testing.T)
 	assertParserNotCalled(t, parser)
 }
 
-// TestJwtAuthorizationHeaderToContext_TokenKindAndAudience is the bearer table of #401: a validly
+// TestJWTAuthorizationHeaderToContext_TokenKindAndAudience is the bearer table of #401: a validly
 // signed token reaches the context only when it is an access token (typ Bearer) whose aud names
 // authserver. Every refused row is answered 401 invalid_token by the guard itself, exactly as a
 // token that does not parse, and the next handler never runs (#435).
@@ -566,7 +566,7 @@ func TestJwtAuthorizationHeaderToContext_PutRequestIgnoresPostBody(t *testing.T)
 // The aud rows use the shapes the real parser hands over. It decodes into jwt.MapClaims, so the
 // []string issuance writes for two audiences arrives as []interface{}; []string is kept as a row
 // because it is the in-process shape.
-func TestJwtAuthorizationHeaderToContext_TokenKindAndAudience(t *testing.T) {
+func TestJWTAuthorizationHeaderToContext_TokenKindAndAudience(t *testing.T) {
 	tests := []struct {
 		name      string
 		typ       interface{} // nil leaves the claim out
@@ -609,7 +609,7 @@ func TestJwtAuthorizationHeaderToContext_TokenKindAndAudience(t *testing.T) {
 				claims["aud"] = tc.aud
 			}
 			parser.On("DecodeAndValidateTokenString", mock.Anything, "the-signed-token", true).
-				Return(&oauth.JwtToken{TokenBase64: "the-signed-token", Claims: claims}, nil)
+				Return(&oauth.JWTToken{TokenBase64: "the-signed-token", Claims: claims}, nil)
 
 			req := httptest.NewRequest("GET", "/", nil)
 			req.Header.Set("Authorization", "Bearer the-signed-token")
@@ -635,10 +635,10 @@ func TestJwtAuthorizationHeaderToContext_TokenKindAndAudience(t *testing.T) {
 
 // The form-body read of OIDC Core 1.0 section 5.3.1 reaches the same check: a refresh token sent
 // as access_token is refused like one sent in the header.
-func TestJwtAuthorizationHeaderToContext_PostBodyRefreshTokenRefused(t *testing.T) {
+func TestJWTAuthorizationHeaderToContext_PostBodyRefreshTokenRefused(t *testing.T) {
 	parser := new(middlewaremocks.TokenParser)
 	parser.On("DecodeAndValidateTokenString", mock.Anything, "refreshtoken", true).
-		Return(&oauth.JwtToken{TokenBase64: "refreshtoken", Claims: map[string]interface{}{
+		Return(&oauth.JWTToken{TokenBase64: "refreshtoken", Claims: map[string]interface{}{
 			"sub": "user",
 			"typ": "Refresh",
 			"aud": "https://auth.example.com",

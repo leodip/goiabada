@@ -331,7 +331,7 @@ func serveDCR(t *testing.T, request oidc.DynamicClientRegistrationRequest,
 
 	req := httptest.NewRequest(http.MethodPost, "/connect/register", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{Id: 1, DynamicClientRegistrationEnabled: true}))
+	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{ID: 1, DynamicClientRegistrationEnabled: true}))
 
 	rr := httptest.NewRecorder()
 	HandleDynamicClientRegistrationPost(database, auditLogger, testDataCipher).ServeHTTP(rr, req)
@@ -374,12 +374,12 @@ func TestHandleDynamicClientRegistrationPost_WritesTheClientAndItsRedirectURIsIn
 	datamocks.ExpectRunInTransaction(database, dcrTx, note)
 	database.On("CreateClient", mock.Anything, dcrTx, mock.Anything).
 		Run(func(args mock.Arguments) {
-			args.Get(2).(*record.Client).Id = 42
+			args.Get(2).(*record.Client).ID = 42
 			note("client")
 		}).Return(nil).Once()
 	for _, uri := range confidentialTwoURIRegistration.RedirectURIs {
 		database.On("CreateRedirectURI", mock.Anything, dcrTx, mock.MatchedBy(func(r *record.RedirectURI) bool {
-			return r.ClientId == 42 && r.URI == uri
+			return r.ClientID == 42 && r.URI == uri
 		})).Run(func(mock.Arguments) { note("redirect uri") }).Return(nil).Once()
 	}
 	auditLogger.On("Log", mock.Anything, audit.EventDynamicClientRegistration, mock.Anything).
@@ -518,7 +518,7 @@ func TestHandleDynamicClientRegistrationPost_BothClaimChoicesAreDefault(t *testi
 	require.Equal(t, http.StatusCreated, rr.Code)
 	require.NotNil(t, created)
 	assert.Equal(t, "default", created.IncludeOpenIDConnectClaimsInAccessToken)
-	assert.Equal(t, "default", created.IncludeOpenIDConnectClaimsInIdToken)
+	assert.Equal(t, "default", created.IncludeOpenIDConnectClaimsInIDToken)
 }
 
 // The registration's audit entry records the client IP through the module's one reader, so it
@@ -666,7 +666,7 @@ func TestHandleDynamicClientRegistrationPost_EveryRefusalIsLoggedAtWarn(t *testi
 			req := httptest.NewRequest(http.MethodPost, "/connect/register", strings.NewReader(tc.body))
 			req.Header.Set("Content-Type", "application/json")
 			req = req.WithContext(reqctx.WithSettings(req.Context(),
-				&record.Settings{Id: 1, DynamicClientRegistrationEnabled: tc.enabled}))
+				&record.Settings{ID: 1, DynamicClientRegistrationEnabled: tc.enabled}))
 			rr := httptest.NewRecorder()
 
 			HandleDynamicClientRegistrationPost(datamocks.NewDatabase(t), handlersmocks.NewAuditLogger(t),

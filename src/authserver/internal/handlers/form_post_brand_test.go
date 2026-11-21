@@ -49,7 +49,7 @@ func readFormPostHead(t *testing.T, page string) formPostHead {
 // which every form_post page reads once.
 func formPostBrandDatabase(t *testing.T, callback string, brand *record.Brand, err error) *datamocks.Database {
 	database := datamocks.NewDatabase(t)
-	database.On("GetRedirectURIsByClientId", mock.Anything, mock.Anything, mock.Anything).
+	database.On("GetRedirectURIsByClientID", mock.Anything, mock.Anything, mock.Anything).
 		Return([]record.RedirectURI{{URI: callback}}, nil).Maybe()
 	database.On("GetDefaultBrand", mock.Anything, mock.Anything).Return(brand, err).Once()
 	return database
@@ -76,7 +76,7 @@ func TestFormPost_ThePageIsDrawnInTheDefaultBrand(t *testing.T) {
 	}{
 		{
 			name:  "an error, in a dark brand",
-			brand: &record.Brand{Id: 7, Name: "Night", Appearance: record.BrandAppearanceDark, Theme: "plum"},
+			brand: &record.Brand{ID: 7, Name: "Night", Appearance: record.BrandAppearanceDark, Theme: "plum"},
 			write: func(responder *ClientErrorResponder, w http.ResponseWriter, r *http.Request) error {
 				return responder.redirToClientWithError(w, r,
 					testRedirectError("login_required", "Login required", "form_post", callback, "st", "code"))
@@ -87,7 +87,7 @@ func TestFormPost_ThePageIsDrawnInTheDefaultBrand(t *testing.T) {
 		},
 		{
 			name:  "a code, in a light brand",
-			brand: &record.Brand{Id: 12, Name: "Day", Appearance: record.BrandAppearanceLight, Theme: "avocado"},
+			brand: &record.Brand{ID: 12, Name: "Day", Appearance: record.BrandAppearanceLight, Theme: "avocado"},
 			write: func(responder *ClientErrorResponder, w http.ResponseWriter, r *http.Request) error {
 				return issueAuthCode(w, r, responder.formPost, &record.Code{Code: "c0de", State: "st", RedirectURI: callback}, "form_post")
 			},
@@ -97,7 +97,7 @@ func TestFormPost_ThePageIsDrawnInTheDefaultBrand(t *testing.T) {
 		},
 		{
 			name:  "an error, in an automatic brand",
-			brand: &record.Brand{Id: 7, Name: "Night", Appearance: record.BrandAppearanceAuto, Theme: "plum"},
+			brand: &record.Brand{ID: 7, Name: "Night", Appearance: record.BrandAppearanceAuto, Theme: "plum"},
 			write: func(responder *ClientErrorResponder, w http.ResponseWriter, r *http.Request) error {
 				return responder.redirToClientWithError(w, r,
 					testRedirectError("login_required", "Login required", "form_post", callback, "st", "code"))

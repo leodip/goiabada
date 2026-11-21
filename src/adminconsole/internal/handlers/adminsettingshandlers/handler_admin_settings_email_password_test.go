@@ -56,7 +56,7 @@ func TestHandleEmailGet_ThePageIsToldWhetherAPasswordIsSavedAndForWhichHost(t *t
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 			handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_email.html").Once()
 			apiClient := &emailSettingsAPI{stored: api.SettingsEmailResponse{
@@ -137,7 +137,7 @@ func TestHandleEmailPost_TheFormBecomesKeepReplaceOrRemove(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 			apiClient := &emailSettingsAPI{}
 			w := httptest.NewRecorder()
@@ -201,7 +201,7 @@ func TestHandleEmailPost_ARefusedSaveIsRedrawnWithThePasswordAndTheSavedState(t 
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 			handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_email.html").Once()
 			cache := &invalidationRecorder{}
@@ -259,7 +259,7 @@ func TestHandleEmailPost_ANullCharacterRefusalMarksItsField(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 			handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_email.html").Once()
 			apiClient := &emailSettingsAPI{saveErr: &apiclient.APIError{

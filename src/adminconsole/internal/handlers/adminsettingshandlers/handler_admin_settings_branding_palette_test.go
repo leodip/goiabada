@@ -50,10 +50,10 @@ func basicOf(colors map[string]string) map[string]string {
 func withCustomBrands() *brandingAPI {
 	apiClient := newBrandingAPI()
 	apiClient.brands = append(apiClient.brands,
-		api.BrandResponse{Id: 8, Name: "Custom", Appearance: "auto", Theme: "custom",
+		api.BrandResponse{ID: 8, Name: "Custom", Appearance: "auto", Theme: "custom",
 			Palette: &api.BrandPaletteResponse{Mode: "basic", Light: basicOf(fullColors("c0de")), Dark: basicOf(fullColors("d0de"))},
 			Colors:  &api.BrandColors{Light: fullColors("c0de"), Dark: fullColors("d0de")}},
-		api.BrandResponse{Id: 9, Name: "Advanced", Appearance: "light", Theme: "custom",
+		api.BrandResponse{ID: 9, Name: "Advanced", Appearance: "light", Theme: "custom",
 			Palette: &api.BrandPaletteResponse{Mode: "advanced", Light: fullColors("a0de"), Dark: fullColors("b0de")},
 			Colors:  &api.BrandColors{Light: fullColors("a0de"), Dark: fullColors("b0de")}})
 	return apiClient
@@ -86,7 +86,7 @@ func paletteOf(t *testing.T, bind map[string]interface{}) BrandPaletteView {
 
 func getBrand(t *testing.T, apiClient *brandingAPI, id string) map[string]interface{} {
 	t.Helper()
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_branding_brand.html").Once()
 
@@ -100,7 +100,7 @@ func getBrand(t *testing.T, apiClient *brandingAPI, id string) map[string]interf
 // drawn again, or nil when the save went through.
 func postBrand(t *testing.T, apiClient *brandingAPI, id string, form url.Values, refusal error) map[string]interface{} {
 	t.Helper()
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	apiClient.writeErr = refusal
 	if refusal != nil {
@@ -119,7 +119,7 @@ func postBrand(t *testing.T, apiClient *brandingAPI, id string, form url.Values,
 // A new brand's fields hold the first theme's colors, which the form starts on, in basic mode; the
 // brand has no palette, so the first pick of Custom may replace them (decision 7).
 func TestHandleBrandNewGet_TheColorsStartAsTheFirstThemesInBasicMode(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_branding_brand.html").Once()
 
@@ -192,7 +192,7 @@ func TestHandleBrandPost_ABuiltInThemeSendsNoPalette(t *testing.T) {
 
 // A new brand is created with the palette the form holds.
 func TestHandleBrandNewPost_ACustomBrandIsCreatedWithItsPalette(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	apiClient := newBrandingAPI()
 
@@ -339,11 +339,11 @@ func TestNewBrandPaletteView_EachFieldHoldsItsValueAndItsWell(t *testing.T) {
 
 	view := NewBrandPaletteView(BrandPaletteForm{Mode: "basic", Light: light, Dark: fullColors("f0de")}, "auto", "")
 
-	assert.Equal(t, BrandPaletteField{Id: "palette-light-brand", Mode: "light", Value: "#ABCDEF", Well: "#abcdef", Shown: true},
+	assert.Equal(t, BrandPaletteField{ID: "palette-light-brand", Mode: "light", Value: "#ABCDEF", Well: "#abcdef", Shown: true},
 		fieldOf(t, view, "light", "brand"))
-	assert.Equal(t, BrandPaletteField{Id: "palette-light-ink", Mode: "light", Value: "#abcd", Well: "#000000", Shown: true, Invalid: true},
+	assert.Equal(t, BrandPaletteField{ID: "palette-light-ink", Mode: "light", Value: "#abcd", Well: "#000000", Shown: true, Invalid: true},
 		fieldOf(t, view, "light", "ink"))
-	assert.Equal(t, BrandPaletteField{Id: "palette-dark-line-strong", Mode: "dark", Value: "#f0de04", Well: "#f0de04", Shown: true},
+	assert.Equal(t, BrandPaletteField{ID: "palette-dark-line-strong", Mode: "dark", Value: "#f0de04", Well: "#f0de04", Shown: true},
 		fieldOf(t, view, "dark", "line-strong"))
 }
 
@@ -421,7 +421,7 @@ func TestNewBrandPaletteView_TheSwatchShowsThePaletteEdited(t *testing.T) {
 
 // The brand list and the delete page name the custom theme in words.
 func TestHandleBrandingGet_NamesTheCustomTheme(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_branding.html").Once()
 

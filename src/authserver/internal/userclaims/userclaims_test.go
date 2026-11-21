@@ -23,7 +23,7 @@ import (
 // base URLs the assertions can name apart, the auth server's and the admin console's.
 func idTokenMapper(db Database) Mapper {
 	return Mapper{Database: db, BaseURL: "http://localhost:8081", AdminConsoleBaseURL: "http://localhost:9091",
-		Inclusion: InclusionIdToken}
+		Inclusion: InclusionIDToken}
 }
 
 // TestAddOpenIDConnectClaims is the table that came with the code from
@@ -60,7 +60,7 @@ func TestAddOpenIDConnectClaims(t *testing.T) {
 				BirthDate:                     sql.NullTime{Time: time.Date(1990, 1, 1, 0, 0, 0, 0, time.UTC), Valid: true},
 				ZoneInfo:                      "Europe/London",
 				Locale:                        "en-GB",
-				PhoneNumberCountryUniqueId:    "PRT_0",
+				PhoneNumberCountryUniqueID:    "PRT_0",
 				PhoneNumberCountryCallingCode: "+351",
 				PhoneNumber:                   "912 345 678",
 				PhoneNumberVerified:           true,
@@ -149,7 +149,7 @@ func TestAddOpenIDConnectClaims(t *testing.T) {
 		{
 			name: "Phone scope only",
 			user: &record.User{
-				PhoneNumberCountryUniqueId:    "USA_0",
+				PhoneNumberCountryUniqueID:    "USA_0",
 				PhoneNumberCountryCallingCode: "+1",
 				PhoneNumber:                   "555-123-4567",
 				PhoneNumberVerified:           false,
@@ -234,7 +234,7 @@ func TestAddOpenIDConnectClaims_UpdatedAtRidesWithTheProfileScope(t *testing.T) 
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			user := &record.User{Id: 7, Email: "a@example.com",
+			user := &record.User{ID: 7, Email: "a@example.com",
 				UpdatedAt: sql.NullTime{Time: updatedAt, Valid: true}}
 			mockDB := datamocks.NewDatabase(t)
 			if slices.Contains(test.scopes, "profile") {
@@ -260,9 +260,9 @@ func TestAddOpenIDConnectClaims_UpdatedAtRidesWithTheProfileScope(t *testing.T) 
 // slice one caller has extended and the other has not, would show up here.
 func TestAddOpenIDConnectClaims_UpdatedAtDoesNotDependOnTheTokenType(t *testing.T) {
 	updatedAt := time.Date(2026, 9, 22, 10, 0, 0, 0, time.UTC)
-	user := &record.User{Id: 7, Email: "a@example.com", UpdatedAt: sql.NullTime{Time: updatedAt, Valid: true}}
+	user := &record.User{ID: 7, Email: "a@example.com", UpdatedAt: sql.NullTime{Time: updatedAt, Valid: true}}
 
-	for _, inclusion := range []Inclusion{InclusionIdToken, InclusionAccessToken} {
+	for _, inclusion := range []Inclusion{InclusionIDToken, InclusionAccessToken} {
 		mapper := Mapper{Database: datamocks.NewDatabase(t), BaseURL: "http://localhost:8081",
 			Inclusion: inclusion}
 
@@ -283,7 +283,7 @@ func TestAddOpenIDConnectClaims_CarriesTheCallersContext(t *testing.T) {
 		return got.Value(marker{}) == "the caller's own"
 	})
 
-	user := &record.User{Id: 42, Subject: "sub-42", GivenName: "Ada", FamilyName: "Lovelace"}
+	user := &record.User{ID: 42, Subject: "sub-42", GivenName: "Ada", FamilyName: "Lovelace"}
 
 	t.Run("the profile scope reads the picture flag under the caller's context", func(t *testing.T) {
 		mockDB := datamocks.NewDatabase(t)
@@ -317,7 +317,7 @@ func TestAddOpenIDConnectClaims_CarriesTheCallersContext(t *testing.T) {
 // nothing and the case fails, and the nil case is the other half: /userinfo runs in no transaction
 // and reads on none.
 func TestAddOpenIDConnectClaims_ReadsThePictureOnTheTransactionItIsHanded(t *testing.T) {
-	user := &record.User{Id: 42, Subject: "sub-42", GivenName: "Ada"}
+	user := &record.User{ID: 42, Subject: "sub-42", GivenName: "Ada"}
 
 	t.Run("the transaction it is handed", func(t *testing.T) {
 		tx := &sql.Tx{}
@@ -350,7 +350,7 @@ func TestAddOpenIDConnectClaims_PictureFailureLeavesTheRestStanding(t *testing.T
 	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, int64(9)).
 		Return(false, assert.AnError).Once()
 
-	user := &record.User{Id: 9, Subject: "sub-9", GivenName: "Ada"}
+	user := &record.User{ID: 9, Subject: "sub-9", GivenName: "Ada"}
 	claims := jwt.MapClaims{}
 	idTokenMapper(mockDB).
 		AddOpenIDConnectClaims(context.Background(), nil, claims, user, []string{"openid", "profile"})
@@ -364,24 +364,24 @@ func TestAddOpenIDConnectClaims_PictureFailureLeavesTheRestStanding(t *testing.T
 // one include flag and not the other, so a mapper reading the wrong flag cannot pass.
 func groupsAndAttributesUser() *record.User {
 	return &record.User{
-		Id: 1,
+		ID: 1,
 		Groups: []record.Group{
 			{
 				GroupIdentifier:  "id-token-group",
-				IncludeInIdToken: true, IncludeInAccessToken: false,
+				IncludeInIDToken: true, IncludeInAccessToken: false,
 				Attributes: []record.GroupAttribute{
-					{Key: "group-id-attr", Value: "id", IncludeInIdToken: true, IncludeInAccessToken: false},
-					{Key: "group-access-attr", Value: "access", IncludeInIdToken: false, IncludeInAccessToken: true},
+					{Key: "group-id-attr", Value: "id", IncludeInIDToken: true, IncludeInAccessToken: false},
+					{Key: "group-access-attr", Value: "access", IncludeInIDToken: false, IncludeInAccessToken: true},
 				},
 			},
 			{
 				GroupIdentifier:  "access-token-group",
-				IncludeInIdToken: false, IncludeInAccessToken: true,
+				IncludeInIDToken: false, IncludeInAccessToken: true,
 			},
 		},
 		Attributes: []record.UserAttribute{
-			{Key: "user-id-attr", Value: "id", IncludeInIdToken: true, IncludeInAccessToken: false},
-			{Key: "user-access-attr", Value: "access", IncludeInIdToken: false, IncludeInAccessToken: true},
+			{Key: "user-id-attr", Value: "id", IncludeInIDToken: true, IncludeInAccessToken: false},
+			{Key: "user-access-attr", Value: "access", IncludeInIDToken: false, IncludeInAccessToken: true},
 		},
 	}
 }
@@ -395,7 +395,7 @@ func TestGroupAndAttributeClaimsFollowTheInclusion(t *testing.T) {
 
 	t.Run("the ID token's flag", func(t *testing.T) {
 		claims := jwt.MapClaims{}
-		mapper := Mapper{Inclusion: InclusionIdToken}
+		mapper := Mapper{Inclusion: InclusionIDToken}
 		mapper.AddGroupClaims(claims, user, scopes)
 		mapper.AddAttributeClaims(claims, user, scopes)
 
@@ -432,7 +432,7 @@ func TestGroupAndAttributeClaimsWithoutTheirScopes(t *testing.T) {
 
 	t.Run("no groups or attributes scope", func(t *testing.T) {
 		claims := jwt.MapClaims{}
-		mapper := Mapper{Inclusion: InclusionIdToken}
+		mapper := Mapper{Inclusion: InclusionIDToken}
 		mapper.AddGroupClaims(claims, user, []string{"openid", "profile"})
 		mapper.AddAttributeClaims(claims, user, []string{"openid", "profile"})
 
@@ -442,13 +442,13 @@ func TestGroupAndAttributeClaimsWithoutTheirScopes(t *testing.T) {
 
 	t.Run("scoped but nothing carries the flag", func(t *testing.T) {
 		none := &record.User{
-			Id:         2,
-			Groups:     []record.Group{{GroupIdentifier: "hidden", IncludeInIdToken: false}},
-			Attributes: []record.UserAttribute{{Key: "hidden", Value: "x", IncludeInIdToken: false}},
+			ID:         2,
+			Groups:     []record.Group{{GroupIdentifier: "hidden", IncludeInIDToken: false}},
+			Attributes: []record.UserAttribute{{Key: "hidden", Value: "x", IncludeInIDToken: false}},
 		}
 
 		claims := jwt.MapClaims{}
-		mapper := Mapper{Inclusion: InclusionIdToken}
+		mapper := Mapper{Inclusion: InclusionIDToken}
 		mapper.AddGroupClaims(claims, none, []string{"groups", "attributes"})
 		mapper.AddAttributeClaims(claims, none, []string{"groups", "attributes"})
 
@@ -462,16 +462,16 @@ func TestGroupAndAttributeClaimsWithoutTheirScopes(t *testing.T) {
 // second.
 func TestAttributeClaims_GroupPassWinsACollision(t *testing.T) {
 	user := &record.User{
-		Id:         3,
-		Attributes: []record.UserAttribute{{Key: "shared", Value: "from the user", IncludeInIdToken: true}},
+		ID:         3,
+		Attributes: []record.UserAttribute{{Key: "shared", Value: "from the user", IncludeInIDToken: true}},
 		Groups: []record.Group{{
 			GroupIdentifier: "g",
-			Attributes:      []record.GroupAttribute{{Key: "shared", Value: "from the group", IncludeInIdToken: true}},
+			Attributes:      []record.GroupAttribute{{Key: "shared", Value: "from the group", IncludeInIDToken: true}},
 		}},
 	}
 
 	claims := jwt.MapClaims{}
-	Mapper{Inclusion: InclusionIdToken}.AddAttributeClaims(claims, user, []string{"attributes"})
+	Mapper{Inclusion: InclusionIDToken}.AddAttributeClaims(claims, user, []string{"attributes"})
 
 	assert.Equal(t, map[string]string{"shared": "from the group"}, claims["attributes"])
 }
@@ -648,7 +648,7 @@ func TestAddressClaim(t *testing.T) {
 func TestAddOpenIDConnectClaims_AddressScopeWithoutAnAddress(t *testing.T) {
 	claims := jwt.MapClaims{}
 	idTokenMapper(datamocks.NewDatabase(t)).
-		AddOpenIDConnectClaims(context.Background(), nil, claims, &record.User{Id: 4}, []string{"openid", "address"})
+		AddOpenIDConnectClaims(context.Background(), nil, claims, &record.User{ID: 4}, []string{"openid", "address"})
 
 	assert.NotContains(t, claims, "address")
 }
@@ -695,13 +695,13 @@ func TestAddOpenIDConnectClaims_PhoneNumberIsE164(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			user := &record.User{
-				Id:                            3,
+				ID:                            3,
 				PhoneNumberCountryCallingCode: test.callingCode,
 				PhoneNumber:                   test.number,
 				PhoneNumberVerified:           test.verified,
 			}
 
-			for _, inclusion := range []Inclusion{InclusionIdToken, InclusionAccessToken} {
+			for _, inclusion := range []Inclusion{InclusionIDToken, InclusionAccessToken} {
 				claims := jwt.MapClaims{}
 				Mapper{Database: datamocks.NewDatabase(t), BaseURL: "https://auth.example.com", Inclusion: inclusion}.
 					AddOpenIDConnectClaims(context.Background(), nil, claims, user, []string{"openid", "phone"})
@@ -743,13 +743,13 @@ func TestAddOpenIDConnectClaims_TheDocsGiveThePhoneNumberFormat(t *testing.T) {
 // too, and for the access token's, with base URLs that differ, so a profile built on the auth
 // server's cannot pass, and the Scopes and UserInfo pages say where it goes (#527, #563 decision 7).
 func TestAddOpenIDConnectClaims_ProfileIsTheAdminConsolesProfilePage(t *testing.T) {
-	for _, inclusion := range []Inclusion{InclusionIdToken, InclusionAccessToken} {
+	for _, inclusion := range []Inclusion{InclusionIDToken, InclusionAccessToken} {
 		db := datamocks.NewDatabase(t)
 		db.On("UserHasProfilePicture", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(true, nil)
 		claims := jwt.MapClaims{}
 		Mapper{Database: db, BaseURL: "https://auth.example.com", AdminConsoleBaseURL: "https://admin.example.com",
 			Inclusion: inclusion}.
-			AddOpenIDConnectClaims(context.Background(), nil, claims, &record.User{Id: 1, Subject: "sub-1"},
+			AddOpenIDConnectClaims(context.Background(), nil, claims, &record.User{ID: 1, Subject: "sub-1"},
 				[]string{"openid", "profile"})
 		assert.Equal(t, "https://admin.example.com/account/profile", claims["profile"])
 		assert.Equal(t, "https://auth.example.com/userinfo/picture/sub-1", claims["picture"])

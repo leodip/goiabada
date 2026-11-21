@@ -154,13 +154,13 @@ func TestValidateAuthorizeRequest(t *testing.T) {
 	}
 }
 
-// TestValidateIdTokenHint_TypeOfToken: a validly signed token of this server that is not an ID
+// TestValidateIDTokenHint_TypeOfToken: a validly signed token of this server that is not an ID
 // Token is refused as a hint, with the answer a hint that does not parse gets, so the reply does
 // not say which kind of token was sent (#401). Two things say which kind it is: the typ claim,
 // which ID Tokens leave out, and the JOSE header typ, which must be JWT, as every ID Token's is, so
 // a logout token or an access token, signed with the same key, is never taken for one (#784
 // decision 12). The first row is the shape a real hint takes.
-func TestValidateIdTokenHint_TypeOfToken(t *testing.T) {
+func TestValidateIDTokenHint_TypeOfToken(t *testing.T) {
 	settings := &record.Settings{Issuer: "https://test-issuer.com"}
 
 	tests := []struct {
@@ -190,9 +190,9 @@ func TestValidateIdTokenHint_TypeOfToken(t *testing.T) {
 			}
 			tokenParser := handlersmocks.NewTokenParser(t)
 			tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "the-hint", false).
-				Return(&oauth.JwtToken{TokenBase64: "the-hint", Header: header, Claims: claims}, nil)
+				Return(&oauth.JWTToken{TokenBase64: "the-hint", Header: header, Claims: claims}, nil)
 
-			sub, err := validateIdTokenHint(context.Background(), "the-hint", tokenParser, settings)
+			sub, err := validateIDTokenHint(context.Background(), "the-hint", tokenParser, settings)
 
 			if tc.accepted {
 				require.NoError(t, err)
@@ -209,11 +209,11 @@ func TestValidateIdTokenHint_TypeOfToken(t *testing.T) {
 	}
 }
 
-// TestValidateIdTokenHint_TheParsersAnswer: a hint the parser refuses, expired included, is the
+// TestValidateIDTokenHint_TheParsersAnswer: a hint the parser refuses, expired included, is the
 // invalid_request every bad hint gets, and a hint it could not check, because the signing keys could
 // not be read, is returned as the fault itself, which the handler answers on its server error page,
 // rather than telling the client a hint that may be good is invalid (#680).
-func TestValidateIdTokenHint_TheParsersAnswer(t *testing.T) {
+func TestValidateIDTokenHint_TheParsersAnswer(t *testing.T) {
 	settings := &record.Settings{Issuer: "https://test-issuer.com"}
 	keyStoreDown := errors.New("the signing keys could not be read")
 
@@ -235,7 +235,7 @@ func TestValidateIdTokenHint_TheParsersAnswer(t *testing.T) {
 			tokenParser := handlersmocks.NewTokenParser(t)
 			tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "the-hint", false).Return(nil, tc.parserErr)
 
-			sub, err := validateIdTokenHint(context.Background(), "the-hint", tokenParser, settings)
+			sub, err := validateIDTokenHint(context.Background(), "the-hint", tokenParser, settings)
 
 			assert.Empty(t, sub)
 			var detail *oauth.ErrorDetail

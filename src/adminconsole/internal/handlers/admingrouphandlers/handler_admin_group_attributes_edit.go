@@ -14,13 +14,13 @@ import (
 // groupAttributesEditAPI is what the edit group attribute page needs: the group, the attribute,
 // and the write.
 type groupAttributesEditAPI interface {
-	GetGroupAttributeById(ctx context.Context, accessToken string, attributeId int64) (*api.GroupAttributeResponse, error)
-	GetGroupById(ctx context.Context, accessToken string, groupId int64) (*api.GroupResponse, error)
-	UpdateGroupAttribute(ctx context.Context, accessToken string, attributeId int64, request *api.UpdateGroupAttributeRequest) (*api.GroupAttributeResponse, error)
+	GetGroupAttributeByID(ctx context.Context, accessToken string, attributeID int64) (*api.GroupAttributeResponse, error)
+	GetGroupByID(ctx context.Context, accessToken string, groupID int64) (*api.GroupResponse, error)
+	UpdateGroupAttribute(ctx context.Context, accessToken string, attributeID int64, request *api.UpdateGroupAttributeRequest) (*api.GroupAttributeResponse, error)
 }
 
 func HandleAttributesEditGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient groupAttributesEditAPI,
 ) http.HandlerFunc {
 
@@ -32,7 +32,7 @@ func HandleAttributesEditGet(
 			return
 		}
 
-		groupId, err := strconv.ParseInt(idStr, 10, 64)
+		groupID, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			httpHelper.NotFound(w, r)
 			return
@@ -44,21 +44,21 @@ func HandleAttributesEditGet(
 			return
 		}
 
-		attributeId, err := strconv.ParseInt(idStr, 10, 64)
+		attributeID, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			httpHelper.NotFound(w, r)
 			return
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
 		// Get group via API
-		group, err := apiClient.GetGroupById(r.Context(), jwtInfo.TokenResponse.AccessToken, groupId)
+		group, err := apiClient.GetGroupByID(r.Context(), jwtInfo.TokenResponse.AccessToken, groupID)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -69,12 +69,12 @@ func HandleAttributesEditGet(
 		}
 
 		// Get attribute via API
-		attribute, err := apiClient.GetGroupAttributeById(r.Context(), jwtInfo.TokenResponse.AccessToken, attributeId)
+		attribute, err := apiClient.GetGroupAttributeByID(r.Context(), jwtInfo.TokenResponse.AccessToken, attributeID)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
-		if attribute == nil || attribute.GroupId != group.Id {
+		if attribute == nil || attribute.GroupID != group.ID {
 			httpHelper.NotFound(w, r)
 			return
 		}
@@ -94,7 +94,7 @@ func HandleAttributesEditGet(
 }
 
 func HandleAttributesEditPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient groupAttributesEditAPI,
 ) http.HandlerFunc {
 
@@ -106,7 +106,7 @@ func HandleAttributesEditPost(
 			return
 		}
 
-		groupId, err := strconv.ParseInt(idStr, 10, 64)
+		groupID, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			httpHelper.NotFound(w, r)
 			return
@@ -118,21 +118,21 @@ func HandleAttributesEditPost(
 			return
 		}
 
-		attributeId, err := strconv.ParseInt(idStr, 10, 64)
+		attributeID, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			httpHelper.NotFound(w, r)
 			return
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
 		// Get group via API for the redirect and error rendering
-		group, err := apiClient.GetGroupById(r.Context(), jwtInfo.TokenResponse.AccessToken, groupId)
+		group, err := apiClient.GetGroupByID(r.Context(), jwtInfo.TokenResponse.AccessToken, groupID)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -143,12 +143,12 @@ func HandleAttributesEditPost(
 		}
 
 		// Get current attribute for error rendering
-		currentAttribute, err := apiClient.GetGroupAttributeById(r.Context(), jwtInfo.TokenResponse.AccessToken, attributeId)
+		currentAttribute, err := apiClient.GetGroupAttributeByID(r.Context(), jwtInfo.TokenResponse.AccessToken, attributeID)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
-		if currentAttribute == nil || currentAttribute.GroupId != group.Id {
+		if currentAttribute == nil || currentAttribute.GroupID != group.ID {
 			httpHelper.NotFound(w, r)
 			return
 		}
@@ -157,7 +157,7 @@ func HandleAttributesEditPost(
 		key := r.FormValue("attributeKey")
 		value := r.FormValue("attributeValue")
 		includeInAccessToken := r.FormValue("includeInAccessToken") == "on"
-		includeInIdToken := r.FormValue("includeInIdToken") == "on"
+		includeInIDToken := r.FormValue("includeInIdToken") == "on"
 
 		// Create a temporary attribute for error rendering: its inputs show what was submitted, and
 		// the title names the attribute as stored, never a refused key or an empty one (#562
@@ -166,7 +166,7 @@ func HandleAttributesEditPost(
 		tempAttribute.Key = key
 		tempAttribute.Value = value
 		tempAttribute.IncludeInAccessToken = includeInAccessToken
-		tempAttribute.IncludeInIdToken = includeInIdToken
+		tempAttribute.IncludeInIDToken = includeInIDToken
 
 		renderError := func(message, errorField string) {
 			bind := map[string]interface{}{
@@ -188,10 +188,10 @@ func HandleAttributesEditPost(
 			Key:                  key,
 			Value:                value,
 			IncludeInAccessToken: includeInAccessToken,
-			IncludeInIdToken:     includeInIdToken,
+			IncludeInIDToken:     includeInIDToken,
 		}
 
-		_, err = apiClient.UpdateGroupAttribute(r.Context(), jwtInfo.TokenResponse.AccessToken, attributeId, updateReq)
+		_, err = apiClient.UpdateGroupAttribute(r.Context(), jwtInfo.TokenResponse.AccessToken, attributeID, updateReq)
 		if err != nil {
 			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
 				renderError(message, render.ErrorField(err, render.AttributeErrorFields))
@@ -199,6 +199,6 @@ func HandleAttributesEditPost(
 			return
 		}
 
-		http.Redirect(w, r, fmt.Sprintf("/admin/groups/%v/attributes", group.Id), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("/admin/groups/%v/attributes", group.ID), http.StatusFound)
 	}
 }

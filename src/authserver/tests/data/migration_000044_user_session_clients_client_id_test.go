@@ -9,15 +9,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// userSessionClientsClientIdIndex000044 is the name all four engines carry after 000044: three
+// userSessionClientsClientIDIndex000044 is the name all four engines carry after 000044: three
 // create it, and MySQL renames the index InnoDB built for the foreign key.
-const userSessionClientsClientIdIndex000044 = "idx_user_session_clients_client_id"
+const userSessionClientsClientIDIndex000044 = "idx_user_session_clients_client_id"
 
 // innodbForeignKeyIndex000044 is the name MySQL carried before 000044, declared inline by the
 // initial migration to satisfy InnoDB's requirement that a foreign key's columns be indexed.
 const innodbForeignKeyIndex000044 = "fk_user_session_clients_client"
 
-// TestMigration000044_UserSessionClientsClientIdIndex is #139's index, and it takes two shapes
+// TestMigration000044_UserSessionClientsClientIDIndex is #139's index, and it takes two shapes
 // because the migration does: SQLite, PostgreSQL and SQL Server CREATE it, and MySQL RENAMEs the
 // index it already had.
 //
@@ -35,8 +35,8 @@ const innodbForeignKeyIndex000044 = "fk_user_session_clients_client"
 //
 // Run per dialect via: ./run-tests.sh --type data --db <sqlite|mysql|postgres|mssql>
 //
-//	--run TestMigration000044_UserSessionClientsClientIdIndex
-func TestMigration000044_UserSessionClientsClientIdIndex(t *testing.T) {
+//	--run TestMigration000044_UserSessionClientsClientIDIndex
+func TestMigration000044_UserSessionClientsClientIDIndex(t *testing.T) {
 	t.Parallel()
 
 	h := newIsolatedDB(t)
@@ -58,10 +58,10 @@ func TestMigration000044_UserSessionClientsClientIdIndex(t *testing.T) {
 	require.True(t, control.Unique,
 		"idx_refresh_token_jti is UNIQUE on every engine; reading it as non-unique means the uniqueness flag is being read backwards")
 
-	before := describeIndex(t, h, "user_session_clients", userSessionClientsClientIdIndex000044)
+	before := describeIndex(t, h, "user_session_clients", userSessionClientsClientIDIndex000044)
 	require.Falsef(t, before.Exists,
 		"%s must not exist below 000044 on any engine: on MySQL the column is indexed under %s, and on the other three it is not indexed at all",
-		userSessionClientsClientIdIndex000044, innodbForeignKeyIndex000044)
+		userSessionClientsClientIDIndex000044, innodbForeignKeyIndex000044)
 
 	if isMySQL000044() {
 		require.True(t, describeIndex(t, h, "user_session_clients", innodbForeignKeyIndex000044).Exists,
@@ -70,11 +70,11 @@ func TestMigration000044_UserSessionClientsClientIdIndex(t *testing.T) {
 	}
 
 	require.NoError(t, h.Migrator.Migrate(context.Background(), 44), "apply 000044")
-	assertUserSessionClientsClientIdIndex000044(t, h, "after apply")
+	assertUserSessionClientsClientIDIndex000044(t, h, "after apply")
 
 	require.NoErrorf(t, h.Migrator.Migrate(context.Background(), previous), "roll back 000044 to %06d", previous)
-	assert.Falsef(t, describeIndex(t, h, "user_session_clients", userSessionClientsClientIdIndex000044).Exists,
-		"%s must be gone after rolling back 000044", userSessionClientsClientIdIndex000044)
+	assert.Falsef(t, describeIndex(t, h, "user_session_clients", userSessionClientsClientIDIndex000044).Exists,
+		"%s must be gone after rolling back 000044", userSessionClientsClientIDIndex000044)
 	if isMySQL000044() {
 		assert.Truef(t, describeIndex(t, h, "user_session_clients", innodbForeignKeyIndex000044).Exists,
 			"the down migration renames MySQL's index back to %s rather than dropping it: InnoDB would refuse to leave the foreign key uncovered",
@@ -82,24 +82,24 @@ func TestMigration000044_UserSessionClientsClientIdIndex(t *testing.T) {
 	}
 
 	require.NoError(t, h.Migrator.Migrate(context.Background(), 44), "re-apply 000044")
-	assertUserSessionClientsClientIdIndex000044(t, h, "after down/up round trip")
+	assertUserSessionClientsClientIDIndex000044(t, h, "after down/up round trip")
 }
 
-// assertUserSessionClientsClientIdIndex000044 checks the shape rather than the name alone: an
+// assertUserSessionClientsClientIDIndex000044 checks the shape rather than the name alone: an
 // index built over the wrong column would pass a name check while doing nothing for the scan this
 // exists to remove.
-func assertUserSessionClientsClientIdIndex000044(t *testing.T, h *isolatedDB, phase string) {
+func assertUserSessionClientsClientIDIndex000044(t *testing.T, h *isolatedDB, phase string) {
 	t.Helper()
 
-	shape := describeIndex(t, h, "user_session_clients", userSessionClientsClientIdIndex000044)
+	shape := describeIndex(t, h, "user_session_clients", userSessionClientsClientIDIndex000044)
 
 	require.Truef(t, shape.Exists, "[%s] %s is missing on %s",
-		phase, userSessionClientsClientIdIndex000044, dbType())
+		phase, userSessionClientsClientIDIndex000044, dbType())
 	assert.Equalf(t, []string{"client_id"}, shape.Columns,
-		"[%s] %s must cover exactly client_id", phase, userSessionClientsClientIdIndex000044)
+		"[%s] %s must cover exactly client_id", phase, userSessionClientsClientIDIndex000044)
 	assert.Falsef(t, shape.Unique,
 		"[%s] %s must NOT be unique: one client is named by many sessions. The unique constraint on the PAIR is #249's, and a different index",
-		phase, userSessionClientsClientIdIndex000044)
+		phase, userSessionClientsClientIDIndex000044)
 
 	if isMySQL000044() {
 		assert.Falsef(t, describeIndex(t, h, "user_session_clients", innodbForeignKeyIndex000044).Exists,

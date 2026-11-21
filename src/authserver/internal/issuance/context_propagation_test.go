@@ -38,13 +38,13 @@ func issuanceCallerContext() context.Context {
 
 func propagationCodeInput() *CreateCodeInput {
 	return &CreateCodeInput{
-		ClientId:          "test-client",
-		UserId:            123,
+		ClientID:          "test-client",
+		UserID:            123,
 		Scope:             "openid profile",
 		RedirectURI:       "https://example.com/callback",
 		ResponseMode:      "query",
-		IpAddress:         "127.0.0.1",
-		AcrLevel:          record.AcrLevel1,
+		IPAddress:         "127.0.0.1",
+		ACRLevel:          record.ACRLevel1,
 		AuthMethods:       "pwd",
 		AuthenticatedAt:   codeAuthTime(),
 		SessionIdentifier: "session-propagation",
@@ -61,9 +61,9 @@ func TestIssueAuthCode_IssuesUnderTheCallersContext(t *testing.T) {
 	mockDB.On("AcquireUserSessionRow", theIssuersCallersContext(), issuanceTx, "session-propagation").
 		Return(true, nil).Once()
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, issuanceTx, "test-client").
-		Return(&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil).Once()
-	mockDB.On("GetClientByIdForShare", theIssuersCallersContext(), issuanceTx, int64(1)).
-		Return(&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil).Once()
+		Return(&record.Client{ID: 1, ClientIdentifier: "test-client"}, nil).Once()
+	mockDB.On("GetClientByIDForShare", theIssuersCallersContext(), issuanceTx, int64(1)).
+		Return(&record.Client{ID: 1, ClientIdentifier: "test-client"}, nil).Once()
 	mockDB.On("CreateCode", theIssuersCallersContext(), issuanceTx, mock.AnythingOfType("*record.Code")).
 		Return(nil).Once()
 

@@ -93,15 +93,34 @@ linters:
       disable:
         - encoded-compare
     staticcheck:
-      # golangci-lint's default list with one exclusion taken out: ST1000, a
+      # golangci-lint's default list with two exclusions taken out. ST1000, a
       # library package with no comment attached to its package clause, or one
-      # that does not begin "Package <name>". Twenty library packages had none,
+      # that does not begin "Package <name>": twenty library packages had none,
       # so `go doc` showed nothing for them, and nothing stopped the next one
-      # (#443 decision 11). The other five exclusions are the default's own;
-      # ST1003 stays off because the tree spells Id and Url throughout, the JSON
-      # keys of stored sign-ins among them. ST1000 skips package main and
-      # generated files, so the mains keep theirs by review.
-      checks: ["all", "-ST1003", "-ST1016", "-ST1020", "-ST1021", "-ST1022"]
+      # (#443 decision 11). ST1000 skips package main and generated files, so
+      # the mains keep theirs by review. ST1003, an initialism in a Go name
+      # spelled in mixed case (Id, Url, Otp): every module, tests included, is
+      # spelled the Go way, and this configuration excludes no directory or
+      # file (#482 decisions 2 and 3). golangci-lint skips generated files,
+      # so a generator's names follow by review. The other four exclusions
+      # are the default's own.
+      checks: ["all", "-ST1016", "-ST1020", "-ST1021", "-ST1022"]
+      # The initialisms ST1003 holds to one case. golangci-lint replaces
+      # staticcheck's default list rather than extending it, so the first 42
+      # are that default restated; the last ten are this product's own (#482
+      # decision 1). DPoP and PKCE are not listed: the tree spells each one
+      # way, and an entry would force DPOP. A name that is stored or sent is
+      # declared by a tag or a stored shape, never left to a Go field's name,
+      # so a respelling cannot change it. The one name kept in the old spelling
+      # is the admin console's StoredTokenResponse.IdToken, under a //nolint on
+      # its line: gob writes a field's name into the console's session and has
+      # no tags, so the name is what every session in flight holds (#482
+      # decision 6).
+      initialisms: ["ACL", "API", "ASCII", "CPU", "CSS", "DNS", "EOF", "GUID", "HTML", "HTTP",
+        "HTTPS", "ID", "IP", "JSON", "QPS", "RAM", "RPC", "SLA", "SMTP", "SQL", "SSH", "TCP",
+        "TLS", "TTL", "UDP", "UI", "GID", "UID", "UUID", "URI", "URL", "UTF8", "VM", "XML",
+        "XMPP", "XSRF", "XSS", "SIP", "RTP", "AMQP", "DB", "TS",
+        "JWT", "OTP", "ACR", "JWKS", "JWK", "JTI", "CSRF", "CORS", "OIDC", "AMR"]
     nolintlint:
       # Every //nolint names the linter it silences and says why, and one that
       # silences nothing is itself a finding, so a suppression cannot outlive
@@ -190,7 +209,7 @@ linters:
         - name: github.com/leodip/goiabada/authserver/internal/handlers/apihandlers.writeListSaveFailure
           msg-pos: -1
           args-pos: 3
-        - name: github.com/leodip/goiabada/authserver/internal/handlers.rejectIdTokenHint
+        - name: github.com/leodip/goiabada/authserver/internal/handlers.rejectIDTokenHint
           msg-pos: -1
           args-pos: 2
   exclusions:

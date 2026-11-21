@@ -34,13 +34,13 @@ import (
 type AuthServerConfig struct {
 	BaseURL                  string
 	InternalBaseURL          string
-	ListenHostHttps          string
-	ListenPortHttps          int
-	ListenHostHttp           string
-	ListenPortHttp           int
+	ListenHostHTTPS          string
+	ListenPortHTTPS          int
+	ListenHostHTTP           string
+	ListenPortHTTP           int
 	TrustProxyHeaders        bool
 	TrustedProxies           []string
-	LogHttpRequests          bool
+	LogHTTPRequests          bool
 	LogLevel                 string
 	LogFormat                string
 	CertFile                 string
@@ -185,8 +185,8 @@ const (
 // listener it asks is the one the server listens on (#808).
 const (
 	DefaultListenHost      = "0.0.0.0"
-	DefaultListenPortHttp  = 9090
-	DefaultListenPortHttps = 9443
+	DefaultListenPortHTTP  = 9090
+	DefaultListenPortHTTPS = 9443
 )
 
 type Config struct {
@@ -235,13 +235,13 @@ func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 		AuthServer: AuthServerConfig{
 			BaseURL:                          authServerBaseURL,
 			InternalBaseURL:                  getEnv("GOIABADA_AUTHSERVER_INTERNALBASEURL", ""),
-			ListenHostHttps:                  getEnv("GOIABADA_AUTHSERVER_LISTEN_HOST_HTTPS", DefaultListenHost),
-			ListenPortHttps:                  getEnvAsInt("GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS", DefaultListenPortHttps, &malformed),
-			ListenHostHttp:                   getEnv("GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP", DefaultListenHost),
-			ListenPortHttp:                   getEnvAsInt("GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP", DefaultListenPortHttp, &malformed),
+			ListenHostHTTPS:                  getEnv("GOIABADA_AUTHSERVER_LISTEN_HOST_HTTPS", DefaultListenHost),
+			ListenPortHTTPS:                  getEnvAsInt("GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS", DefaultListenPortHTTPS, &malformed),
+			ListenHostHTTP:                   getEnv("GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP", DefaultListenHost),
+			ListenPortHTTP:                   getEnvAsInt("GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP", DefaultListenPortHTTP, &malformed),
 			TrustProxyHeaders:                getEnvAsBool("GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS", &malformed),
 			TrustedProxies:                   getEnvAsStringSlice("GOIABADA_AUTHSERVER_TRUSTED_PROXIES"),
-			LogHttpRequests:                  getEnvAsBool("GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS", &malformed),
+			LogHTTPRequests:                  getEnvAsBool("GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS", &malformed),
 			LogLevel:                         getEnv("GOIABADA_AUTHSERVER_LOG_LEVEL", "info"),
 			LogFormat:                        getEnv("GOIABADA_AUTHSERVER_LOG_FORMAT", "text"),
 			CertFile:                         getEnv("GOIABADA_AUTHSERVER_CERTFILE", ""),
@@ -378,14 +378,14 @@ func registerFlags(fs *flag.FlagSet, c *Config, trustedProxies *string) {
 	// Auth server
 	fs.StringVar(&c.AuthServer.BaseURL, "authserver-baseurl", c.AuthServer.BaseURL, "Goiabada auth server base URL")
 	fs.StringVar(&c.AuthServer.InternalBaseURL, "authserver-internalbaseurl", c.AuthServer.InternalBaseURL, "Goiabada auth server internal base URL")
-	fs.StringVar(&c.AuthServer.ListenHostHttps, "authserver-listen-host-https", c.AuthServer.ListenHostHttps, "Auth server https host")
-	fs.IntVar(&c.AuthServer.ListenPortHttps, "authserver-listen-port-https", c.AuthServer.ListenPortHttps, "Auth server https port")
-	fs.StringVar(&c.AuthServer.ListenHostHttp, "authserver-listen-host-http", c.AuthServer.ListenHostHttp, "Auth server http host")
-	fs.IntVar(&c.AuthServer.ListenPortHttp, "authserver-listen-port-http", c.AuthServer.ListenPortHttp, "Auth server http port")
+	fs.StringVar(&c.AuthServer.ListenHostHTTPS, "authserver-listen-host-https", c.AuthServer.ListenHostHTTPS, "Auth server https host")
+	fs.IntVar(&c.AuthServer.ListenPortHTTPS, "authserver-listen-port-https", c.AuthServer.ListenPortHTTPS, "Auth server https port")
+	fs.StringVar(&c.AuthServer.ListenHostHTTP, "authserver-listen-host-http", c.AuthServer.ListenHostHTTP, "Auth server http host")
+	fs.IntVar(&c.AuthServer.ListenPortHTTP, "authserver-listen-port-http", c.AuthServer.ListenPortHTTP, "Auth server http port")
 	fs.BoolVar(&c.AuthServer.TrustProxyHeaders, "authserver-trust-proxy-headers", c.AuthServer.TrustProxyHeaders, "Trust HTTP headers from reverse proxy in Auth server? (X-Forwarded-For, or X-Real-IP when it has no address)")
 	*trustedProxies = strings.Join(c.AuthServer.TrustedProxies, ",")
 	fs.StringVar(trustedProxies, "authserver-trusted-proxies", *trustedProxies, "Comma-separated list of trusted reverse-proxy IPs/CIDRs used to resolve the real client IP from X-Forwarded-For (auth server)")
-	fs.BoolVar(&c.AuthServer.LogHttpRequests, "authserver-log-http-requests", c.AuthServer.LogHttpRequests, "Log HTTP requests for auth server")
+	fs.BoolVar(&c.AuthServer.LogHTTPRequests, "authserver-log-http-requests", c.AuthServer.LogHTTPRequests, "Log HTTP requests for auth server")
 	fs.StringVar(&c.AuthServer.LogLevel, "authserver-log-level", c.AuthServer.LogLevel, "Lowest level of log record the auth server writes. Options: debug, info, warn, error")
 	fs.StringVar(&c.AuthServer.LogFormat, "authserver-log-format", c.AuthServer.LogFormat, "Format the auth server writes log records in. Options: text, json")
 	fs.StringVar(&c.AuthServer.CertFile, "authserver-certfile", c.AuthServer.CertFile, "Certificate file for HTTPS (auth server)")

@@ -95,7 +95,7 @@ func backchannelClient(t *testing.T, adminToken, uri string) *record.Client {
 	t.Helper()
 	client := newBackchannelLogoutClient(t, "bcl-", false, "", false)
 	if uri != "" {
-		status, body, _ := saveBackchannelLogout(t, adminToken, client.Id, backchannelLogoutBody(uri, false))
+		status, body, _ := saveBackchannelLogout(t, adminToken, client.ID, backchannelLogoutBody(uri, false))
 		require.Equal(t, http.StatusOK, status, "%v", body)
 	}
 	return client
@@ -106,7 +106,7 @@ func onSession(t *testing.T, session *record.UserSession, client *record.Client)
 	t.Helper()
 	now := time.Now().UTC()
 	require.NoError(t, database.CreateUserSessionClient(context.Background(), nil, &record.UserSessionClient{
-		UserSessionId: session.Id, ClientId: client.Id, Started: now, LastAccessed: now,
+		UserSessionID: session.ID, ClientID: client.ID, Started: now, LastAccessed: now,
 	}))
 }
 
@@ -158,7 +158,7 @@ func assertLogoutToken(t *testing.T, got logoutPost, clientIdentifier, subject, 
 	assert.Equal(t, "logout+jwt", header["typ"])
 	assert.Equal(t, "RS256", header["alg"])
 
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
+	settings, err := database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err)
 	assert.Equal(t, settings.Issuer, claims["iss"])
 	assert.Equal(t, clientIdentifier, claims["aud"])
@@ -180,31 +180,31 @@ func assertLogoutToken(t *testing.T, got logoutPost, clientIdentifier, subject, 
 	return claims
 }
 
-// sentLogoutTokenRow waits for the sent_logout_token row the request requestId left, which is
+// sentLogoutTokenRow waits for the sent_logout_token row the request requestID left, which is
 // written once its delivery has finished, and answers its details.
-func sentLogoutTokenRow(t *testing.T, requestId string, timeout time.Duration) (record.AuditLog, map[string]interface{}) {
+func sentLogoutTokenRow(t *testing.T, requestID string, timeout time.Duration) (record.AuditLog, map[string]interface{}) {
 	t.Helper()
-	rows := sentLogoutTokenRows(t, requestId, 1, timeout)
+	rows := sentLogoutTokenRows(t, requestID, 1, timeout)
 	var details map[string]interface{}
 	require.NoError(t, json.Unmarshal([]byte(rows[0].Details), &details))
 	return rows[0], details
 }
 
-// sentLogoutTokenRows waits for the want sent_logout_token rows the request requestId left, each
+// sentLogoutTokenRows waits for the want sent_logout_token rows the request requestID left, each
 // written once its delivery has finished, and answers them. It waits for the page itself to list
 // them: GetAuditLogsPaginated reads the page and its count in two statements, so a row written
 // between them is counted before it is listed. Once the page lists them, a count above want is a
 // row too many, not one still being written.
-func sentLogoutTokenRows(t *testing.T, requestId string, want int, timeout time.Duration) []record.AuditLog {
+func sentLogoutTokenRows(t *testing.T, requestID string, want int, timeout time.Duration) []record.AuditLog {
 	t.Helper()
 	deadline := time.Now().Add(timeout)
 	for {
 		rows, total, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 20,
-			record.AuditLogFilter{AuditEvent: "sent_logout_token", RequestId: requestId})
+			record.AuditLogFilter{AuditEvent: "sent_logout_token", RequestID: requestID})
 		require.NoError(t, err)
 		if len(rows) >= want || time.Now().After(deadline) {
-			require.Len(t, rows, want, "sent_logout_token rows for request %s", requestId)
-			require.Equal(t, want, total, "sent_logout_token rows counted for request %s", requestId)
+			require.Len(t, rows, want, "sent_logout_token rows for request %s", requestID)
+			require.Equal(t, want, total, "sent_logout_token rows counted for request %s", requestID)
 			return rows
 		}
 		time.Sleep(100 * time.Millisecond)
@@ -217,10 +217,10 @@ func sentLogoutTokenRows(t *testing.T, requestId string, want int, timeout time.
 func accountSessionUser(t *testing.T, rc *logoutReceiver) (string, *record.User, *record.UserSession, *record.Client, *logoutReceiver) {
 	t.Helper()
 	adminToken, adminClient := createAdminClientWithToken(t)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, adminClient.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, adminClient.ID) })
 
 	accessToken, user := getUserAccessTokenWithAccountScope(t)
-	session := createTestUserSession(t, user.Id, fake.UUID())
+	session := createTestUserSession(t, user.ID, fake.UUID())
 
 	told := backchannelClient(t, adminToken, rc.uri())
 	onSession(t, session, told)
@@ -240,8 +240,8 @@ func TestBackchannelLogout_AUserEndingTheirSessionTellsItsApps(t *testing.T) {
 	accessToken, user, session, told, elsewhere := accountSessionUser(t, rc)
 	deliveredBefore := sampleValue(t, scrapeMetrics(t), `goiabada_backchannel_logout_deliveries_total{outcome="delivered"}`)
 
-	resp, requestId := sendAdminRequest(t, accessToken, http.MethodDelete,
-		"/api/v1/account/sessions/"+strconv.FormatInt(session.Id, 10), nil)
+	resp, requestID := sendAdminRequest(t, accessToken, http.MethodDelete,
+		"/api/v1/account/sessions/"+strconv.FormatInt(session.ID, 10), nil)
 	_ = resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
@@ -249,16 +249,16 @@ func TestBackchannelLogout_AUserEndingTheirSessionTellsItsApps(t *testing.T) {
 	require.Len(t, posts, 1)
 	claims := assertLogoutToken(t, posts[0], told.ClientIdentifier, user.Subject, session.SessionIdentifier)
 
-	row, details := sentLogoutTokenRow(t, requestId, 10*time.Second)
+	row, details := sentLogoutTokenRow(t, requestID, 10*time.Second)
 	assert.Equal(t, map[string]interface{}{
-		"client_id":          float64(told.Id),
-		"user_id":            float64(user.Id),
+		"client_id":          float64(told.ID),
+		"user_id":            float64(user.ID),
 		"session_identifier": session.SessionIdentifier,
 		"jti":                claims["jti"],
 		"outcome":            "delivered",
 		"attempts":           float64(1),
 	}, details)
-	assert.Equal(t, user.Id, row.UserId.Int64, "the row is found by the user filter")
+	assert.Equal(t, user.ID, row.UserID.Int64, "the row is found by the user filter")
 
 	assert.InDelta(t, deliveredBefore+1,
 		sampleValue(t, scrapeMetrics(t), `goiabada_backchannel_logout_deliveries_total{outcome="delivered"}`), 0)
@@ -270,19 +270,19 @@ func TestBackchannelLogout_AUserEndingTheirSessionTellsItsApps(t *testing.T) {
 func TestBackchannelLogout_AnAdministratorEndingASessionTellsItsApps(t *testing.T) {
 	requireDatabaseAuditLogs(t)
 	adminToken, adminClient := createAdminClientWithToken(t)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, adminClient.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, adminClient.ID) })
 
 	user := &record.User{Subject: fake.UUID(), Enabled: true, Email: uniqueEmail("bcl@admin-end.test")}
 	require.NoError(t, database.CreateUser(context.Background(), nil, user))
-	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.Id) })
-	session := createTestUserSession(t, user.Id, fake.UUID())
+	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.ID) })
+	session := createTestUserSession(t, user.ID, fake.UUID())
 
 	rc := newLogoutReceiver(t, http.StatusBadRequest)
 	client := backchannelClient(t, adminToken, rc.uri())
 	onSession(t, session, client)
 
-	resp, requestId := sendAdminRequest(t, adminToken, http.MethodDelete,
-		"/api/v1/admin/user-sessions/"+strconv.FormatInt(session.Id, 10), nil)
+	resp, requestID := sendAdminRequest(t, adminToken, http.MethodDelete,
+		"/api/v1/admin/user-sessions/"+strconv.FormatInt(session.ID, 10), nil)
 	_ = resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
@@ -291,7 +291,7 @@ func TestBackchannelLogout_AnAdministratorEndingASessionTellsItsApps(t *testing.
 
 	// The row is written when the delivery finishes, so one attempt on it is a delivery that was not
 	// retried.
-	_, details := sentLogoutTokenRow(t, requestId, 10*time.Second)
+	_, details := sentLogoutTokenRow(t, requestID, 10*time.Second)
 	assert.Equal(t, "refused", details["outcome"])
 	assert.InDelta(t, 1, details["attempts"], 0)
 	assert.Len(t, rc.received(), 1)
@@ -304,8 +304,8 @@ func TestBackchannelLogout_AnAppThatFailsIsTriedAgain(t *testing.T) {
 	rc := newLogoutReceiver(t, http.StatusServiceUnavailable, http.StatusOK)
 	accessToken, _, session, _, _ := accountSessionUser(t, rc)
 
-	resp, requestId := sendAdminRequest(t, accessToken, http.MethodDelete,
-		"/api/v1/account/sessions/"+strconv.FormatInt(session.Id, 10), nil)
+	resp, requestID := sendAdminRequest(t, accessToken, http.MethodDelete,
+		"/api/v1/account/sessions/"+strconv.FormatInt(session.ID, 10), nil)
 	_ = resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
@@ -316,7 +316,7 @@ func TestBackchannelLogout_AnAppThatFailsIsTriedAgain(t *testing.T) {
 	assert.GreaterOrEqual(t, gap, 13*time.Second)
 	assert.LessOrEqual(t, gap, 18*time.Second)
 
-	_, details := sentLogoutTokenRow(t, requestId, 10*time.Second)
+	_, details := sentLogoutTokenRow(t, requestID, 10*time.Second)
 	assert.Equal(t, "delivered", details["outcome"])
 	assert.InDelta(t, 2, details["attempts"], 0)
 }
@@ -324,11 +324,11 @@ func TestBackchannelLogout_AnAppThatFailsIsTriedAgain(t *testing.T) {
 // TestBackchannelLogout_AnotherUserSigningInOnTheBrowserTellsThePreviousUsersApps: the browser
 // changes hands, and the app the previous user's session served is told that session ended.
 func TestBackchannelLogout_AnotherUserSigningInOnTheBrowserTellsThePreviousUsersApps(t *testing.T) {
-	b := createCrossUserBrowser(t, record.AcrLevel1, record.AcrLevel1)
+	b := createCrossUserBrowser(t, record.ACRLevel1, record.ACRLevel1)
 	rc := newLogoutReceiver(t, http.StatusOK)
-	require.NoError(t, database.SetClientBackchannelLogout(context.Background(), nil, b.client.Id, rc.uri(), false))
+	require.NoError(t, database.SetClientBackchannelLogout(context.Background(), nil, b.client.ID, rc.uri(), false))
 
-	signInWithPassword(t, b.jar, crossUserAuthorizeUrl(b, "&prompt=login"), b.userB.Email, b.passwordB, false, "")
+	signInWithPassword(t, b.jar, crossUserAuthorizeURL(b, "&prompt=login"), b.userB.Email, b.passwordB, false, "")
 
 	posts := rc.waitFor(t, 1, 10*time.Second)
 	require.Len(t, posts, 1)
@@ -340,14 +340,14 @@ func TestBackchannelLogout_AnotherUserSigningInOnTheBrowserTellsThePreviousUsers
 func TestBackchannelLogout_AnExpiredSessionEndedByAHandoverTellsNobody(t *testing.T) {
 	for _, dead := range deadSessionCases(t) {
 		t.Run(dead.name, func(t *testing.T) {
-			b := createCrossUserBrowser(t, record.AcrLevel1, record.AcrLevel1)
+			b := createCrossUserBrowser(t, record.ACRLevel1, record.ACRLevel1)
 			rc := newLogoutReceiver(t, http.StatusOK)
-			require.NoError(t, database.SetClientBackchannelLogout(context.Background(), nil, b.client.Id, rc.uri(), false))
+			require.NoError(t, database.SetClientBackchannelLogout(context.Background(), nil, b.client.ID, rc.uri(), false))
 			b.sessionA.Started = dead.started
 			b.sessionA.LastAccessed = dead.lastAccessed
 			require.NoError(t, database.UpdateUserSession(context.Background(), nil, b.sessionA))
 
-			signInWithPassword(t, b.jar, crossUserAuthorizeUrl(b, ""), b.userB.Email, b.passwordB, false, "")
+			signInWithPassword(t, b.jar, crossUserAuthorizeURL(b, ""), b.userB.Email, b.passwordB, false, "")
 
 			ended, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, b.sessionA.SessionIdentifier)
 			require.NoError(t, err)

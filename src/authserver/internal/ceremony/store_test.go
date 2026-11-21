@@ -19,13 +19,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// GetAuthContext reads the ceremony the request names, through RequestedId's one rule: the URL's
+// GetAuthContext reads the ceremony the request names, through RequestedID's one rule: the URL's
 // parameter on a GET, the form's field on a POST. Each case varies one thing from a request that is
 // answered with the ceremony the browser holds, and names what refuses it: ErrCeremonyNotHeld while
 // the browser holds a ceremony the request does not name, and ErrNoAuthContext while it holds none,
 // whatever the request names.
 func TestGetAuthContext(t *testing.T) {
-	const otherId = "543210ZyXwVuTsRqPoNmLkJiHgFeDcBa"
+	const otherID = "543210ZyXwVuTsRqPoNmLkJiHgFeDcBa"
 
 	testCases := []struct {
 		name    string
@@ -42,20 +42,20 @@ func TestGetAuthContext(t *testing.T) {
 		{name: "a POST naming it in the body and in the URL", method: http.MethodPost,
 			stored: ceremonyA, inQuery: ceremonyA, inForm: ceremonyA, accept: true},
 		{name: "a GET naming no ceremony", method: http.MethodGet, stored: ceremonyA},
-		{name: "a GET naming another ceremony", method: http.MethodGet, stored: ceremonyA, inQuery: otherId},
+		{name: "a GET naming another ceremony", method: http.MethodGet, stored: ceremonyA, inQuery: otherID},
 		{name: "a GET naming a prefix of the held ceremony", method: http.MethodGet,
 			stored: ceremonyA, inQuery: ceremonyA[:len(ceremonyA)-1]},
 		{name: "a GET naming the held ceremony and more", method: http.MethodGet,
 			stored: ceremonyA, inQuery: ceremonyA + "x"},
 		{name: "a POST naming no ceremony", method: http.MethodPost, stored: ceremonyA},
 		{name: "a POST naming another ceremony in the body", method: http.MethodPost,
-			stored: ceremonyA, inForm: otherId},
+			stored: ceremonyA, inForm: otherID},
 		// The query can never satisfy a POST: a page's own URL carries the id it was loaded with,
 		// and a stale form posting to it is judged by the id its body holds.
 		{name: "a POST naming the held ceremony in the URL alone", method: http.MethodPost,
 			stored: ceremonyA, inQuery: ceremonyA},
 		{name: "a POST whose URL names the held ceremony and whose body names another",
-			method: http.MethodPost, stored: ceremonyA, inQuery: ceremonyA, inForm: otherId},
+			method: http.MethodPost, stored: ceremonyA, inQuery: ceremonyA, inForm: otherID},
 		// A context a binary from before #79 wrote carries no id, and "" is never matched against "".
 		{name: "a held context naming no ceremony against a GET naming none", method: http.MethodGet},
 		{name: "a held context naming no ceremony against a POST naming none", method: http.MethodPost},
@@ -65,15 +65,15 @@ func TestGetAuthContext(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ceremonyStore, store, _ := newRealStore(t)
 			cookies := seedBrowserSession(t, store, map[string]any{
-				sessionkeys.AuthContexts: heldJSON(t, &AuthContext{CeremonyId: tc.stored, ClientId: "test-client"}),
+				sessionkeys.AuthContexts: heldJSON(t, &AuthContext{CeremonyID: tc.stored, ClientID: "test-client"}),
 			})
 
 			result, err := ceremonyStore.GetAuthContext(namingRequest(tc.method, cookies, tc.inQuery, tc.inForm))
 
 			if tc.accept {
 				require.NoError(t, err)
-				assert.Equal(t, tc.stored, result.CeremonyId)
-				assert.Equal(t, "test-client", result.ClientId)
+				assert.Equal(t, tc.stored, result.CeremonyID)
+				assert.Equal(t, "test-client", result.ClientID)
 				return
 			}
 			require.ErrorIs(t, err, ErrCeremonyNotHeld)
@@ -109,7 +109,7 @@ func TestGetAuthContext(t *testing.T) {
 	t.Run("SessionError", func(t *testing.T) {
 		ceremonyStore, store, backend := newRealStore(t)
 		cookies := seedBrowserSession(t, store, map[string]any{
-			sessionkeys.AuthContexts: heldJSON(t, &AuthContext{CeremonyId: ceremonyA}),
+			sessionkeys.AuthContexts: heldJSON(t, &AuthContext{CeremonyID: ceremonyA}),
 		})
 		backend.failLoad = true
 
@@ -146,14 +146,14 @@ func TestLatestAuthContext(t *testing.T) {
 			t.Run(name, func(t *testing.T) {
 				ceremonyStore, store, _ := newRealStore(t)
 				cookies := seedBrowserSession(t, store, map[string]any{
-					sessionkeys.AuthContexts: heldJSON(t, &AuthContext{CeremonyId: ceremonyA, ClientId: "client-a"}),
+					sessionkeys.AuthContexts: heldJSON(t, &AuthContext{CeremonyID: ceremonyA, ClientID: "client-a"}),
 				})
 
 				result, err := ceremonyStore.LatestAuthContext(req(cookies))
 
 				require.NoError(t, err)
-				assert.Equal(t, ceremonyA, result.CeremonyId)
-				assert.Equal(t, "client-a", result.ClientId)
+				assert.Equal(t, ceremonyA, result.CeremonyID)
+				assert.Equal(t, "client-a", result.ClientID)
 			})
 		}
 	})
@@ -172,7 +172,7 @@ func TestLatestAuthContext(t *testing.T) {
 	t.Run("SessionError", func(t *testing.T) {
 		ceremonyStore, store, backend := newRealStore(t)
 		cookies := seedBrowserSession(t, store, map[string]any{
-			sessionkeys.AuthContexts: heldJSON(t, &AuthContext{CeremonyId: ceremonyA}),
+			sessionkeys.AuthContexts: heldJSON(t, &AuthContext{CeremonyID: ceremonyA}),
 		})
 		backend.failLoad = true
 
@@ -206,7 +206,7 @@ func namingRequest(method string, cookies []*http.Cookie, inQuery string, inForm
 	if method == http.MethodPost {
 		form := url.Values{}
 		if inForm != "" {
-			form.Set(IdField, inForm)
+			form.Set(IDField, inForm)
 		}
 		req = httptest.NewRequest(method, target, strings.NewReader(form.Encode()))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -229,10 +229,10 @@ const userA int64 = 1
 
 // addCeremony is another tab's /auth/authorize in the browser cookies name, adding the ceremony
 // ceremonyId beside the ones the browser holds.
-func addCeremony(t *testing.T, ceremonyStore *Store, cookies []*http.Cookie, ceremonyId string) {
+func addCeremony(t *testing.T, ceremonyStore *Store, cookies []*http.Cookie, ceremonyID string) {
 	t.Helper()
 	require.NoError(t, ceremonyStore.AddAuthContext(httptest.NewRecorder(), browserRequest(cookies),
-		&AuthContext{CeremonyId: ceremonyId, ClientId: "client-" + ceremonyId, AuthState: AuthStateRequiresLevel1}))
+		&AuthContext{CeremonyID: ceremonyID, ClientID: "client-" + ceremonyID, AuthState: AuthStateRequiresLevel1}))
 }
 
 // pushOut has five other tabs of the browser start a sign-in each, which is what pushes out one the
@@ -246,9 +246,9 @@ func pushOut(t *testing.T, ceremonyStore *Store, cookies []*http.Cookie) []strin
 	return newer
 }
 
-// heldIds is the ceremonies the browser session cookies name holds, least recently written first,
+// heldIDs is the ceremonies the browser session cookies name holds, least recently written first,
 // read through the store's own reads: the latest one, and whether each candidate is held.
-func heldIds(t *testing.T, ceremonyStore *Store, cookies []*http.Cookie, candidates ...string) []string {
+func heldIDs(t *testing.T, ceremonyStore *Store, cookies []*http.Cookie, candidates ...string) []string {
 	t.Helper()
 	var held []string
 	for _, id := range candidates {
@@ -269,14 +269,14 @@ func loadedStep(t *testing.T, ceremonyStore *Store) ([]*http.Cookie, *http.Reque
 	seedReq := browserRequest(nil)
 	seedRR := httptest.NewRecorder()
 	require.NoError(t, ceremonyStore.AddAuthContext(seedRR, seedReq,
-		&AuthContext{CeremonyId: ceremonyA, ClientId: "client-a", AuthState: AuthStateRequiresLevel1}))
+		&AuthContext{CeremonyID: ceremonyA, ClientID: "client-a", AuthState: AuthStateRequiresLevel1}))
 	cookies := seedRR.Result().Cookies()
 	require.Len(t, cookies, 1)
 
 	stepReq := namingRequest(http.MethodGet, cookies, ceremonyA, "")
 	loaded, err := ceremonyStore.GetAuthContext(stepReq)
 	require.NoError(t, err)
-	require.Equal(t, ceremonyA, loaded.CeremonyId)
+	require.Equal(t, ceremonyA, loaded.CeremonyID)
 	return cookies, stepReq, loaded
 }
 
@@ -295,7 +295,7 @@ func TestSaveAuthContext(t *testing.T) {
 
 		stored, err := ceremonyStore.LatestAuthContext(browserRequest(cookies))
 		require.NoError(t, err)
-		assert.Equal(t, ceremonyA, stored.CeremonyId)
+		assert.Equal(t, ceremonyA, stored.CeremonyID)
 		assert.Equal(t, AuthStateLevel1Password, stored.AuthState)
 	})
 
@@ -315,7 +315,7 @@ func TestSaveAuthContext(t *testing.T) {
 		assert.Equal(t, AuthStateLevel1Password, savedA.AuthState, "tab A's save landed")
 		storedB, err := ceremonyStore.GetAuthContext(namingRequest(http.MethodGet, cookies, ceremonyB, ""))
 		require.NoError(t, err, "the ceremony added meanwhile is kept")
-		assert.Equal(t, "client-ceremony-b", storedB.ClientId)
+		assert.Equal(t, "client-ceremony-b", storedB.ClientID)
 		assert.Equal(t, AuthStateRequiresLevel1, storedB.AuthState, "and tab A's state did not land on it")
 	})
 
@@ -331,7 +331,7 @@ func TestSaveAuthContext(t *testing.T) {
 
 		require.ErrorIs(t, err, ErrCeremonyReplaced)
 		assert.Empty(t, rr.Result().Cookies(), "a step that wrote nothing tells the browser nothing")
-		assert.Equal(t, newer, heldIds(t, ceremonyStore, cookies, append([]string{ceremonyA}, newer...)...),
+		assert.Equal(t, newer, heldIDs(t, ceremonyStore, cookies, append([]string{ceremonyA}, newer...)...),
 			"the five newer ceremonies are what the browser session keeps")
 	})
 
@@ -423,7 +423,7 @@ func TestSaveAuthContext(t *testing.T) {
 		ceremonyStore, _, _ := newRealStore(t)
 		rr := httptest.NewRecorder()
 
-		err := ceremonyStore.SaveAuthContext(rr, browserRequest(nil), &AuthContext{CeremonyId: ceremonyA})
+		err := ceremonyStore.SaveAuthContext(rr, browserRequest(nil), &AuthContext{CeremonyID: ceremonyA})
 
 		require.ErrorIs(t, err, ErrCeremonyReplaced, "only /auth/authorize starts a ceremony")
 		assert.Empty(t, rr.Result().Cookies(), "no row is created for it, and no cookie names one")
@@ -434,7 +434,7 @@ func TestSaveAuthContext(t *testing.T) {
 		// as idMatches refuses it for the same reason.
 		ceremonyStore, store, _ := newRealStore(t)
 		cookies := seedBrowserSession(t, store, map[string]any{
-			sessionkeys.AuthContexts: heldJSON(t, &AuthContext{ClientId: "test-client"}),
+			sessionkeys.AuthContexts: heldJSON(t, &AuthContext{ClientID: "test-client"}),
 		})
 		stepReq := browserRequest(cookies)
 		loaded, err := ceremonyStore.LatestAuthContext(stepReq)
@@ -452,7 +452,7 @@ func TestSaveAuthContext(t *testing.T) {
 		backend.failLoad = true
 		rr := httptest.NewRecorder()
 
-		err := ceremonyStore.SaveAuthContext(rr, browserRequest(cookies), &AuthContext{CeremonyId: ceremonyA})
+		err := ceremonyStore.SaveAuthContext(rr, browserRequest(cookies), &AuthContext{CeremonyID: ceremonyA})
 
 		require.ErrorIs(t, err, errLoadRefused)
 		assert.Empty(t, rr.Result().Cookies(), "a session that could not be read is not written")
@@ -503,32 +503,32 @@ func TestAddAuthContext(t *testing.T) {
 		ceremonyStore, _, _ := newRealStore(t)
 		rr := httptest.NewRecorder()
 
-		err := ceremonyStore.AddAuthContext(rr, browserRequest(nil), &AuthContext{CeremonyId: "c", ClientId: "test-client"})
+		err := ceremonyStore.AddAuthContext(rr, browserRequest(nil), &AuthContext{CeremonyID: "c", ClientID: "test-client"})
 		require.NoError(t, err)
 
 		result, err := ceremonyStore.LatestAuthContext(replayThroughJar(t, rr.Result(), nil))
 		require.NoError(t, err)
-		assert.Equal(t, "test-client", result.ClientId)
+		assert.Equal(t, "test-client", result.ClientID)
 	})
 
 	t.Run("KeepsTheCeremoniesTheSessionHolds", func(t *testing.T) {
 		ceremonyStore, store, _ := newRealStore(t)
 		cookies := seedBrowserSession(t, store, map[string]any{
-			sessionkeys.AuthContexts: heldJSON(t, &AuthContext{CeremonyId: "older", ClientId: "client-a"}),
+			sessionkeys.AuthContexts: heldJSON(t, &AuthContext{CeremonyID: "older", ClientID: "client-a"}),
 			"unrelated":              "value",
 		})
 
 		err := ceremonyStore.AddAuthContext(httptest.NewRecorder(), browserRequest(cookies),
-			&AuthContext{CeremonyId: "newer", ClientId: "client-b"})
+			&AuthContext{CeremonyID: "newer", ClientID: "client-b"})
 		require.NoError(t, err)
 
 		result, err := ceremonyStore.LatestAuthContext(browserRequest(cookies))
 		require.NoError(t, err)
-		assert.Equal(t, "newer", result.CeremonyId)
-		assert.Equal(t, "client-b", result.ClientId)
+		assert.Equal(t, "newer", result.CeremonyID)
+		assert.Equal(t, "client-b", result.ClientID)
 		older, err := ceremonyStore.GetAuthContext(namingRequest(http.MethodGet, cookies, "older", ""))
 		require.NoError(t, err, "the ceremony the session held is still held")
-		assert.Equal(t, "client-a", older.ClientId)
+		assert.Equal(t, "client-a", older.ClientID)
 		sess, err := store.Get(browserRequest(cookies), realStoreSessionName)
 		require.NoError(t, err)
 		assert.Equal(t, "value", sess.Values["unrelated"], "the session's other values are kept")
@@ -542,13 +542,13 @@ func TestAddAuthContext(t *testing.T) {
 		for _, id := range all[1:5] {
 			addCeremony(t, ceremonyStore, cookies, id)
 		}
-		assert.Equal(t, all[:5], heldIds(t, ceremonyStore, cookies, all...), "a browser holds five")
+		assert.Equal(t, all[:5], heldIDs(t, ceremonyStore, cookies, all...), "a browser holds five")
 
 		addCeremony(t, ceremonyStore, cookies, "c6")
-		assert.Equal(t, all[1:6], heldIds(t, ceremonyStore, cookies, all...), "the sixth pushes out the first")
+		assert.Equal(t, all[1:6], heldIDs(t, ceremonyStore, cookies, all...), "the sixth pushes out the first")
 
 		addCeremony(t, ceremonyStore, cookies, "c7")
-		assert.Equal(t, all[2:7], heldIds(t, ceremonyStore, cookies, all...), "and the seventh the next")
+		assert.Equal(t, all[2:7], heldIDs(t, ceremonyStore, cookies, all...), "and the seventh the next")
 	})
 
 	t.Run("ASaveMakesItsCeremonyTheMostRecent", func(t *testing.T) {
@@ -564,14 +564,14 @@ func TestAddAuthContext(t *testing.T) {
 		require.NoError(t, ceremonyStore.SaveAuthContext(httptest.NewRecorder(), stepReq, loaded))
 		latest, err := ceremonyStore.LatestAuthContext(browserRequest(cookies))
 		require.NoError(t, err)
-		assert.Equal(t, ceremonyA, latest.CeremonyId, "the save made ceremony A the most recently written")
+		assert.Equal(t, ceremonyA, latest.CeremonyID, "the save made ceremony A the most recently written")
 
 		addCeremony(t, ceremonyStore, cookies, "c6")
 
-		assert.Equal(t, []string{ceremonyA, "c3", "c4", "c5", "c6"}, heldIds(t, ceremonyStore, cookies, all...))
+		assert.Equal(t, []string{ceremonyA, "c3", "c4", "c5", "c6"}, heldIDs(t, ceremonyStore, cookies, all...))
 		latest, err = ceremonyStore.LatestAuthContext(browserRequest(cookies))
 		require.NoError(t, err)
-		assert.Equal(t, "c6", latest.CeremonyId)
+		assert.Equal(t, "c6", latest.CeremonyID)
 	})
 
 	t.Run("ASessionGoneInBetweenStartsAFreshOne", func(t *testing.T) {
@@ -579,26 +579,26 @@ func TestAddAuthContext(t *testing.T) {
 		// ceremony is stored as in a browser holding none, and nothing of the gone session is put back.
 		ceremonyStore, store, backend := newRealStore(t)
 		cookies := seedBrowserSession(t, store, map[string]any{
-			sessionkeys.AuthContexts:      heldJSON(t, &AuthContext{CeremonyId: "older"}),
+			sessionkeys.AuthContexts:      heldJSON(t, &AuthContext{CeremonyID: "older"}),
 			sessionkeys.SessionIdentifier: "signed-out-user-session",
 		})
 		req := browserRequest(cookies)
 		_, err := store.Get(req, realStoreSessionName)
 		require.NoError(t, err)
-		oldId := sessionIdentifier(t, store, cookies[0])
-		require.NoError(t, backend.Delete(context.Background(), oldId))
+		oldID := sessionIdentifier(t, store, cookies[0])
+		require.NoError(t, backend.Delete(context.Background(), oldID))
 
 		rr := httptest.NewRecorder()
-		require.NoError(t, ceremonyStore.AddAuthContext(rr, req, &AuthContext{CeremonyId: "newer", ClientId: "client-b"}))
+		require.NoError(t, ceremonyStore.AddAuthContext(rr, req, &AuthContext{CeremonyID: "newer", ClientID: "client-b"}))
 
 		fresh := rr.Result().Cookies()
 		require.Len(t, fresh, 1)
-		assert.NotEqual(t, oldId, sessionIdentifier(t, store, fresh[0]))
-		assert.Equal(t, []string{"newer"}, heldIds(t, ceremonyStore, fresh, "older", "newer"))
+		assert.NotEqual(t, oldID, sessionIdentifier(t, store, fresh[0]))
+		assert.Equal(t, []string{"newer"}, heldIDs(t, ceremonyStore, fresh, "older", "newer"))
 		sess, err := store.Get(browserRequest(fresh), realStoreSessionName)
 		require.NoError(t, err)
 		assert.Nil(t, sess.Values[sessionkeys.SessionIdentifier], "the gone session's values are not put back")
-		_, err = backend.Load(context.Background(), oldId)
+		_, err = backend.Load(context.Background(), oldID)
 		require.ErrorIs(t, err, sessionstore.ErrNotFound)
 	})
 
@@ -618,14 +618,14 @@ func TestAddAuthContext(t *testing.T) {
 			require.NoError(t, ceremonyStore.SaveAuthContext(httptest.NewRecorder(), stepReq, loaded))
 		}
 		require.NoError(t, ceremonyStore.AddAuthContext(httptest.NewRecorder(), addReq,
-			&AuthContext{CeremonyId: ceremonyB, AuthState: AuthStateRequiresLevel1}))
+			&AuthContext{CeremonyID: ceremonyB, AuthState: AuthStateRequiresLevel1}))
 
 		savedA, err := ceremonyStore.GetAuthContext(namingRequest(http.MethodGet, cookies, ceremonyA, ""))
 		require.NoError(t, err)
 		assert.Equal(t, AuthStateLevel1Password, savedA.AuthState, "the step's save is not written over")
 		latest, err := ceremonyStore.LatestAuthContext(browserRequest(cookies))
 		require.NoError(t, err)
-		assert.Equal(t, ceremonyB, latest.CeremonyId, "and the add landed after it")
+		assert.Equal(t, ceremonyB, latest.CeremonyID, "and the add landed after it")
 	})
 
 	t.Run("SaveError", func(t *testing.T) {
@@ -633,7 +633,7 @@ func TestAddAuthContext(t *testing.T) {
 		backend.failCreate = true
 		rr := httptest.NewRecorder()
 
-		err := ceremonyStore.AddAuthContext(rr, browserRequest(nil), &AuthContext{ClientId: "test-client"})
+		err := ceremonyStore.AddAuthContext(rr, browserRequest(nil), &AuthContext{ClientID: "test-client"})
 
 		require.ErrorIs(t, err, errCreateRefused)
 		assert.Empty(t, rr.Result().Cookies(), "no cookie names a row that was never written")
@@ -644,7 +644,7 @@ func TestAddAuthContext(t *testing.T) {
 		cookies := seedBrowserSession(t, store, map[string]any{sessionkeys.AuthContexts: "invalid json"})
 		rr := httptest.NewRecorder()
 
-		err := ceremonyStore.AddAuthContext(rr, browserRequest(cookies), &AuthContext{CeremonyId: "newer"})
+		err := ceremonyStore.AddAuthContext(rr, browserRequest(cookies), &AuthContext{CeremonyID: "newer"})
 
 		require.Error(t, err)
 		assert.Empty(t, rr.Result().Cookies())
@@ -653,13 +653,13 @@ func TestAddAuthContext(t *testing.T) {
 	t.Run("SessionError", func(t *testing.T) {
 		ceremonyStore, store, backend := newRealStore(t)
 		cookies := seedBrowserSession(t, store, map[string]any{
-			sessionkeys.AuthContexts: heldJSON(t, &AuthContext{CeremonyId: "older"}),
+			sessionkeys.AuthContexts: heldJSON(t, &AuthContext{CeremonyID: "older"}),
 		})
 		backend.failLoad = true
 		created := backend.created
 		rr := httptest.NewRecorder()
 
-		err := ceremonyStore.AddAuthContext(rr, browserRequest(cookies), &AuthContext{CeremonyId: "newer"})
+		err := ceremonyStore.AddAuthContext(rr, browserRequest(cookies), &AuthContext{CeremonyID: "newer"})
 
 		require.ErrorIs(t, err, errLoadRefused)
 		assert.Empty(t, rr.Result().Cookies())
@@ -671,7 +671,7 @@ func TestAddAuthContext(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		err := ceremonyStore.AddAuthContext(rr, browserRequest(nil),
-			&AuthContext{CeremonyId: "c", AuthenticatedAt: unencodableInstant()})
+			&AuthContext{CeremonyID: "c", AuthenticatedAt: unencodableInstant()})
 
 		require.Error(t, err)
 		assert.Empty(t, rr.Result().Cookies())
@@ -877,10 +877,10 @@ func largeAuthContext() *AuthContext {
 		long += "scope" + string(rune('a'+i%26)) + ":permission "
 	}
 	return &AuthContext{
-		CeremonyId:  "large-ceremony",
+		CeremonyID:  "large-ceremony",
 		AuthState:   AuthStateReadyToIssueCode,
-		ClientId:    "test-client",
-		UserId:      123,
+		ClientID:    "test-client",
+		UserID:      123,
 		RedirectURI: "https://example.com/callback",
 		State:       "test-state",
 		Scope:       long,
@@ -913,10 +913,10 @@ func TestClearAuthContext(t *testing.T) {
 
 		require.NoError(t, ceremonyStore.ClearAuthContext(httptest.NewRecorder(), stepReq, ceremonyA))
 
-		assert.Equal(t, []string{ceremonyB}, heldIds(t, ceremonyStore, cookies, ceremonyA, ceremonyB))
+		assert.Equal(t, []string{ceremonyB}, heldIDs(t, ceremonyStore, cookies, ceremonyA, ceremonyB))
 		stored, err := ceremonyStore.LatestAuthContext(browserRequest(cookies))
 		require.NoError(t, err)
-		assert.Equal(t, "client-ceremony-b", stored.ClientId)
+		assert.Equal(t, "client-ceremony-b", stored.ClientID)
 	})
 
 	t.Run("ACeremonyPushedOutInBetweenWritesNothing", func(t *testing.T) {
@@ -929,7 +929,7 @@ func TestClearAuthContext(t *testing.T) {
 
 		require.ErrorIs(t, err, ErrCeremonyReplaced)
 		assert.Empty(t, rr.Result().Cookies(), "a clear that wrote nothing tells the browser nothing")
-		assert.Equal(t, newer, heldIds(t, ceremonyStore, cookies, newer...))
+		assert.Equal(t, newer, heldIDs(t, ceremonyStore, cookies, newer...))
 	})
 
 	t.Run("NoCeremonyLeftInBetweenWritesNothing", func(t *testing.T) {
@@ -1005,7 +1005,7 @@ func TestClearAuthContext(t *testing.T) {
 	t.Run("SessionError", func(t *testing.T) {
 		ceremonyStore, store, backend := newRealStore(t)
 		cookies := seedBrowserSession(t, store, map[string]any{
-			sessionkeys.AuthContexts: heldJSON(t, &AuthContext{CeremonyId: ceremonyA, ClientId: "test-client"}),
+			sessionkeys.AuthContexts: heldJSON(t, &AuthContext{CeremonyID: ceremonyA, ClientID: "test-client"}),
 		})
 		backend.failLoad = true
 		rr := httptest.NewRecorder()
@@ -1049,7 +1049,7 @@ func TestClearAuthContext(t *testing.T) {
 		browserReq := replayThroughJar(t, seedRes, nil)
 
 		rr := httptest.NewRecorder()
-		err = ceremonyStore.ClearAuthContext(rr, browserReq, largeAuthContext().CeremonyId)
+		err = ceremonyStore.ClearAuthContext(rr, browserReq, largeAuthContext().CeremonyID)
 		require.NoError(t, err)
 		http.Redirect(rr, browserReq, clientRefusalURL, http.StatusFound)
 
@@ -1089,7 +1089,7 @@ func TestClearAuthContext(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 		http.Redirect(rr, browserReq, clientRefusalURL, http.StatusFound)
-		err = ceremonyStore.ClearAuthContext(rr, browserReq, largeAuthContext().CeremonyId)
+		err = ceremonyStore.ClearAuthContext(rr, browserReq, largeAuthContext().CeremonyID)
 		require.NoError(t, err)
 
 		res := rr.Result()
@@ -1129,8 +1129,8 @@ func TestRegenerateSession(t *testing.T) {
 
 		authContext, err := ceremonyStore.LatestAuthContext(browserRequest(rotated))
 		require.NoError(t, err, "the session's contents survive the rotation")
-		assert.Equal(t, ceremonyA, authContext.CeremonyId)
-		assert.Equal(t, "client-a", authContext.ClientId)
+		assert.Equal(t, ceremonyA, authContext.CeremonyID)
+		assert.Equal(t, "client-a", authContext.ClientID)
 
 		old, err := store.Get(browserRequest(cookies), realStoreSessionName)
 		require.NoError(t, err)
@@ -1164,7 +1164,7 @@ func TestRegenerateSession(t *testing.T) {
 		backend.failCreate = false
 		authContext, err := ceremonyStore.LatestAuthContext(browserRequest(cookies))
 		require.NoError(t, err, "the old session is intact: nothing was deleted before the new row existed")
-		assert.Equal(t, ceremonyA, authContext.CeremonyId)
+		assert.Equal(t, ceremonyA, authContext.CeremonyID)
 	})
 
 	t.Run("AnotherCeremonyAddedInBetweenGoesWithIt", func(t *testing.T) {
@@ -1180,10 +1180,10 @@ func TestRegenerateSession(t *testing.T) {
 
 		rotated := rr.Result().Cookies()
 		require.Len(t, rotated, 1)
-		assert.Equal(t, []string{ceremonyA, ceremonyB}, heldIds(t, ceremonyStore, rotated, ceremonyA, ceremonyB))
+		assert.Equal(t, []string{ceremonyA, ceremonyB}, heldIDs(t, ceremonyStore, rotated, ceremonyA, ceremonyB))
 		latest, err := ceremonyStore.LatestAuthContext(browserRequest(rotated))
 		require.NoError(t, err)
-		assert.Equal(t, ceremonyB, latest.CeremonyId, "a rotation writes no ceremony, so it moves none")
+		assert.Equal(t, ceremonyB, latest.CeremonyID, "a rotation writes no ceremony, so it moves none")
 	})
 
 	t.Run("ACeremonyPushedOutInBetweenIsNotPutBack", func(t *testing.T) {
@@ -1200,7 +1200,7 @@ func TestRegenerateSession(t *testing.T) {
 		require.ErrorIs(t, err, ErrCeremonyReplaced)
 		assert.Empty(t, rr.Result().Cookies(), "a step that rotated nothing tells the browser nothing")
 		assert.Equal(t, created, backend.created, "no row is written under a new identifier")
-		assert.Equal(t, newer, heldIds(t, ceremonyStore, cookies, append([]string{ceremonyA}, newer...)...),
+		assert.Equal(t, newer, heldIDs(t, ceremonyStore, cookies, append([]string{ceremonyA}, newer...)...),
 			"the browser's identifier still names its session, with the newer ceremonies")
 	})
 
@@ -1287,7 +1287,7 @@ func TestRegenerateSession(t *testing.T) {
 	t.Run("SessionError", func(t *testing.T) {
 		ceremonyStore, store, backend := newRealStore(t)
 		cookies := seedBrowserSession(t, store, map[string]any{
-			sessionkeys.AuthContexts: heldJSON(t, &AuthContext{CeremonyId: ceremonyA}),
+			sessionkeys.AuthContexts: heldJSON(t, &AuthContext{CeremonyID: ceremonyA}),
 		})
 		backend.failLoad = true
 		created := backend.created
@@ -1345,7 +1345,7 @@ func TestConfirmCeremony(t *testing.T) {
 
 		require.ErrorIs(t, err, ErrCeremonyReplaced)
 		assert.Empty(t, rr.Result().Cookies())
-		assert.Equal(t, newer, heldIds(t, ceremonyStore, cookies, newer...))
+		assert.Equal(t, newer, heldIDs(t, ceremonyStore, cookies, newer...))
 	})
 
 	t.Run("ASessionGoneInBetween", func(t *testing.T) {
@@ -1385,7 +1385,7 @@ func TestConfirmCeremony(t *testing.T) {
 	t.Run("SessionError", func(t *testing.T) {
 		ceremonyStore, store, backend := newRealStore(t)
 		cookies := seedBrowserSession(t, store, map[string]any{
-			sessionkeys.AuthContexts: heldJSON(t, &AuthContext{CeremonyId: ceremonyA}),
+			sessionkeys.AuthContexts: heldJSON(t, &AuthContext{CeremonyID: ceremonyA}),
 		})
 		backend.failLoad = true
 		rr := httptest.NewRecorder()
@@ -1406,11 +1406,11 @@ type lastAttemptBackend struct {
 	*sessiontest.MemoryBackend
 	beforeConditional func(id string)
 	comparisons       int
-	createdIds        []string
+	createdIDs        []string
 }
 
 func (b *lastAttemptBackend) Create(ctx context.Context, id string, data []byte, authenticated bool) (time.Time, error) {
-	b.createdIds = append(b.createdIds, id)
+	b.createdIDs = append(b.createdIDs, id)
 	return b.MemoryBackend.Create(ctx, id, data, authenticated)
 }
 
@@ -1453,7 +1453,7 @@ func TestStepWrites_ReplacedAtTheLastAttemptAnswerReplaced(t *testing.T) {
 				backend := &lastAttemptBackend{MemoryBackend: sessiontest.NewMemoryBackend()}
 				ceremonyStore, store := storeOver(t, backend)
 				cookies, stepReq, loaded := loadedStep(t, ceremonyStore)
-				oldId := sessionIdentifier(t, store, cookies[0])
+				oldID := sessionIdentifier(t, store, cookies[0])
 
 				backend.beforeConditional = func(id string) {
 					if backend.comparisons == lastAttempt && replacement == "the row removed" {
@@ -1468,7 +1468,7 @@ func TestStepWrites_ReplacedAtTheLastAttemptAnswerReplaced(t *testing.T) {
 						sess.Values["unrelated"] = backend.comparisons
 					case replacement == "another ceremony":
 						sess.Values[sessionkeys.AuthContexts] = heldJSON(t,
-							&AuthContext{CeremonyId: ceremonyB, AuthState: AuthStateRequiresLevel1})
+							&AuthContext{CeremonyID: ceremonyB, AuthState: AuthStateRequiresLevel1})
 					default:
 						delete(sess.Values, sessionkeys.AuthContexts)
 					}
@@ -1490,18 +1490,18 @@ func TestStepWrites_ReplacedAtTheLastAttemptAnswerReplaced(t *testing.T) {
 				require.ErrorIs(t, err, ErrCeremonyReplaced)
 				assert.Equal(t, lastAttempt, backend.comparisons)
 				assert.Empty(t, rr.Result().Cookies(), "a step that wrote nothing tells the browser nothing")
-				for _, id := range backend.createdIds[1:] {
+				for _, id := range backend.createdIDs[1:] {
 					_, loadErr := backend.Load(context.Background(), id)
 					require.ErrorIs(t, loadErr, sessionstore.ErrNotFound, "every losing rotation's row is removed")
 				}
 				switch replacement {
 				case "the row removed":
-					_, loadErr := backend.Load(context.Background(), oldId)
+					_, loadErr := backend.Load(context.Background(), oldID)
 					require.ErrorIs(t, loadErr, sessionstore.ErrNotFound, "a gone session is not put back")
 				case "another ceremony":
 					stored, loadErr := ceremonyStore.LatestAuthContext(browserRequest(cookies))
 					require.NoError(t, loadErr)
-					assert.Equal(t, ceremonyB, stored.CeremonyId, "the newer ceremony is what the browser session keeps")
+					assert.Equal(t, ceremonyB, stored.CeremonyID, "the newer ceremony is what the browser session keeps")
 				default:
 					_, loadErr := ceremonyStore.LatestAuthContext(browserRequest(cookies))
 					require.ErrorIs(t, loadErr, ErrNoAuthContext)
@@ -1525,7 +1525,7 @@ func TestTakeRecoveryCodes(t *testing.T) {
 		t.Helper()
 		seedRR := httptest.NewRecorder()
 		require.NoError(t, ceremonyStore.AddAuthContext(seedRR, browserRequest(nil),
-			&AuthContext{CeremonyId: ceremonyA, ClientId: "client-a", UserId: userA,
+			&AuthContext{CeremonyID: ceremonyA, ClientID: "client-a", UserID: userA,
 				AuthState: AuthStateLevel2RecoveryCodes, AuthMethods: "pwd otp", RecoveryCodes: set}))
 		cookies := seedRR.Result().Cookies()
 		require.Len(t, cookies, 1)
@@ -1550,14 +1550,14 @@ func TestTakeRecoveryCodes(t *testing.T) {
 		assert.NotEmpty(t, rr.Result().Cookies(), "the write names the session, as a step's save does")
 		stored, err := ceremonyStore.LatestAuthContext(browserRequest(cookies))
 		require.NoError(t, err)
-		assert.Equal(t, ceremonyA, stored.CeremonyId, "the ceremony becomes the most recently written")
+		assert.Equal(t, ceremonyA, stored.CeremonyID, "the ceremony becomes the most recently written")
 		assert.Empty(t, stored.RecoveryCodes)
 		assert.Equal(t, AuthStateLevel2RecoveryCodes, stored.AuthState)
 		assert.Equal(t, "pwd otp", stored.AuthMethods)
-		assert.Equal(t, userA, stored.UserId)
+		assert.Equal(t, userA, stored.UserID)
 		storedB, err := ceremonyStore.GetAuthContext(namingRequest(http.MethodGet, cookies, ceremonyB, ""))
 		require.NoError(t, err, "the other ceremony is kept")
-		assert.Equal(t, "client-ceremony-b", storedB.ClientId)
+		assert.Equal(t, "client-ceremony-b", storedB.ClientID)
 	})
 
 	t.Run("ASecondRequestThatLoadedTheSetTakesNone", func(t *testing.T) {
@@ -1638,7 +1638,7 @@ func TestRegenerateSessionAndBind(t *testing.T) {
 		assert.Equal(t, userSessionIdentifier, sess.Values[sessionkeys.SessionIdentifier])
 		authContext, err := ceremonyStore.LatestAuthContext(browserRequest(rotated))
 		require.NoError(t, err, "the rotation keeps what the session held")
-		assert.Equal(t, ceremonyA, authContext.CeremonyId)
+		assert.Equal(t, ceremonyA, authContext.CeremonyID)
 
 		old, err := store.Get(browserRequest(cookies), realStoreSessionName)
 		require.NoError(t, err)
@@ -1688,7 +1688,7 @@ func TestRegenerateSessionAndBind(t *testing.T) {
 		backend.failCreate = false
 		authContext, err := ceremonyStore.LatestAuthContext(browserRequest(cookies))
 		require.NoError(t, err, "the old session is intact: nothing was deleted before the new row existed")
-		assert.Equal(t, ceremonyA, authContext.CeremonyId)
+		assert.Equal(t, ceremonyA, authContext.CeremonyID)
 	})
 
 	t.Run("AnotherCeremonyAddedInBetweenGoesWithIt", func(t *testing.T) {
@@ -1701,7 +1701,7 @@ func TestRegenerateSessionAndBind(t *testing.T) {
 
 		rotated := rr.Result().Cookies()
 		require.Len(t, rotated, 1)
-		assert.Equal(t, []string{ceremonyA, ceremonyB}, heldIds(t, ceremonyStore, rotated, ceremonyA, ceremonyB))
+		assert.Equal(t, []string{ceremonyA, ceremonyB}, heldIDs(t, ceremonyStore, rotated, ceremonyA, ceremonyB))
 		sess, err := store.Get(browserRequest(rotated), realStoreSessionName)
 		require.NoError(t, err)
 		assert.Equal(t, userSessionIdentifier, sess.Values[sessionkeys.SessionIdentifier])
@@ -1721,7 +1721,7 @@ func TestRegenerateSessionAndBind(t *testing.T) {
 		require.ErrorIs(t, err, ErrCeremonyReplaced)
 		assert.Empty(t, rr.Result().Cookies(), "a step that rotated nothing tells the browser nothing")
 		assert.Equal(t, created, backend.created, "no row is written under a new identifier")
-		assert.Equal(t, newer, heldIds(t, ceremonyStore, cookies, newer...), "the browser's identifier still names its session")
+		assert.Equal(t, newer, heldIDs(t, ceremonyStore, cookies, newer...), "the browser's identifier still names its session")
 		sess, err := store.Get(browserRequest(cookies), realStoreSessionName)
 		require.NoError(t, err)
 		assert.Nil(t, sess.Values[sessionkeys.SessionIdentifier], "no pointer to the abandoned user session is written")
@@ -1746,7 +1746,7 @@ func TestRegenerateSessionAndBind(t *testing.T) {
 		// #579 removes, one caller passing no ceremony away.
 		ceremonyStore, store, backend := newRealStore(t)
 		cookies := seedBrowserSession(t, store, map[string]any{
-			sessionkeys.AuthContexts: heldJSON(t, &AuthContext{CeremonyId: ""}),
+			sessionkeys.AuthContexts: heldJSON(t, &AuthContext{CeremonyID: ""}),
 		})
 		created := backend.created
 
@@ -1766,12 +1766,12 @@ func TestRegenerateSessionAndBind(t *testing.T) {
 // enrol a key they had scanned and be signed in as the other user (#246). The rest stays as it was
 // written.
 func TestRotations_KeepNoOtherUsersCeremony(t *testing.T) {
-	abandoned := &AuthContext{CeremonyId: "abandoned", ClientId: "client-x", UserId: 2, Level1AuthCompleted: true,
+	abandoned := &AuthContext{CeremonyID: "abandoned", ClientID: "client-x", UserID: 2, Level1AuthCompleted: true,
 		AuthState: AuthStateLevel2OTP, OTPKeyURL: "otpauth://totp/Goiabada:other@example.com?secret=JBSWY3DPEHPK3PXP"}
-	anonymous := &AuthContext{CeremonyId: "anonymous", ClientId: "client-y", AuthState: AuthStateLevel1Password}
-	ownOtherTab := &AuthContext{CeremonyId: "own-other-tab", ClientId: "client-z", UserId: userA,
+	anonymous := &AuthContext{CeremonyID: "anonymous", ClientID: "client-y", AuthState: AuthStateLevel1Password}
+	ownOtherTab := &AuthContext{CeremonyID: "own-other-tab", ClientID: "client-z", UserID: userA,
 		AuthState: AuthStateRequiresConsent}
-	rotating := &AuthContext{CeremonyId: ceremonyA, ClientId: "client-a", AuthState: AuthStateLevel1Password}
+	rotating := &AuthContext{CeremonyID: ceremonyA, ClientID: "client-a", AuthState: AuthStateLevel1Password}
 
 	rotations := map[string]func(*Store, http.ResponseWriter, *http.Request) error{
 		"RegenerateSession": func(s *Store, w http.ResponseWriter, r *http.Request) error {
@@ -1793,7 +1793,7 @@ func TestRotations_KeepNoOtherUsersCeremony(t *testing.T) {
 
 			rotated := rr.Result().Cookies()
 			require.Len(t, rotated, 1)
-			_, err := ceremonyStore.GetAuthContext(namingRequest(http.MethodGet, rotated, abandoned.CeremonyId, ""))
+			_, err := ceremonyStore.GetAuthContext(namingRequest(http.MethodGet, rotated, abandoned.CeremonyID, ""))
 			require.ErrorIs(t, err, ErrCeremonyNotHeld, "the other user's sign-in is no longer active")
 			sess, err := store.Get(browserRequest(rotated), realStoreSessionName)
 			require.NoError(t, err)
@@ -1807,14 +1807,14 @@ func TestRotations_KeepNoOtherUsersCeremony(t *testing.T) {
 
 // holds is the condition every write of this ceremony to the browser session is made on (#579).
 func TestHolds(t *testing.T) {
-	stored := func(t *testing.T, ceremonyId string) map[string]any {
-		return map[string]any{sessionkeys.AuthContexts: heldJSON(t, &AuthContext{CeremonyId: ceremonyId})}
+	stored := func(t *testing.T, ceremonyID string) map[string]any {
+		return map[string]any{sessionkeys.AuthContexts: heldJSON(t, &AuthContext{CeremonyID: ceremonyID})}
 	}
 
 	require.NoError(t, holds(ceremonyA)(stored(t, ceremonyA)))
 	require.ErrorIs(t, holds(ceremonyA)(stored(t, ceremonyB)), ErrCeremonyReplaced)
 	require.NoError(t, holds(ceremonyA)(map[string]any{sessionkeys.AuthContexts: heldJSON(t,
-		&AuthContext{CeremonyId: ceremonyB}, &AuthContext{CeremonyId: ceremonyA}, &AuthContext{CeremonyId: "c"})}),
+		&AuthContext{CeremonyID: ceremonyB}, &AuthContext{CeremonyID: ceremonyA}, &AuthContext{CeremonyID: "c"})}),
 		"held among others")
 	require.ErrorIs(t, holds(ceremonyA)(map[string]any{"unrelated": "value"}), ErrCeremonyReplaced)
 	require.ErrorIs(t, holds(ceremonyA)(map[string]any{}), ErrCeremonyReplaced)
@@ -1840,7 +1840,7 @@ func TestHeldRotation(t *testing.T) {
 		require.NoError(t, err)
 		ids := []string{}
 		for _, c := range ceremonies {
-			ids = append(ids, c.CeremonyId)
+			ids = append(ids, c.CeremonyID)
 		}
 		return ids, nil
 	}
@@ -1852,29 +1852,29 @@ func TestHeldRotation(t *testing.T) {
 	}{
 		{
 			name: "another user's ceremony is removed",
-			held: []*AuthContext{{CeremonyId: "other", UserId: anotherUser, Level1AuthCompleted: true},
-				{CeremonyId: ceremonyA}},
+			held: []*AuthContext{{CeremonyID: "other", UserID: anotherUser, Level1AuthCompleted: true},
+				{CeremonyID: ceremonyA}},
 			want: []string{ceremonyA},
 		},
 		{
 			name: "a ceremony naming no user is kept",
-			held: []*AuthContext{{CeremonyId: "anonymous"}, {CeremonyId: ceremonyA}},
+			held: []*AuthContext{{CeremonyID: "anonymous"}, {CeremonyID: ceremonyA}},
 			want: []string{"anonymous", ceremonyA},
 		},
 		{
 			name: "the user's own are kept",
-			held: []*AuthContext{{CeremonyId: ceremonyA}, {CeremonyId: "own", UserId: userA}},
+			held: []*AuthContext{{CeremonyID: ceremonyA}, {CeremonyID: "own", UserID: userA}},
 			want: []string{ceremonyA, "own"},
 		},
 		{
 			name: "the ceremony rotating is kept whoever it names",
-			held: []*AuthContext{{CeremonyId: ceremonyA, UserId: anotherUser}},
+			held: []*AuthContext{{CeremonyID: ceremonyA, UserID: anotherUser}},
 			want: []string{ceremonyA},
 		},
 		{
 			name: "what is kept keeps the order it was written in",
-			held: []*AuthContext{{CeremonyId: "own", UserId: userA}, {CeremonyId: "other", UserId: anotherUser},
-				{CeremonyId: ceremonyA}, {CeremonyId: "anonymous"}},
+			held: []*AuthContext{{CeremonyID: "own", UserID: userA}, {CeremonyID: "other", UserID: anotherUser},
+				{CeremonyID: ceremonyA}, {CeremonyID: "anonymous"}},
 			want: []string{"own", ceremonyA, "anonymous"},
 		},
 	}
@@ -1887,7 +1887,7 @@ func TestHeldRotation(t *testing.T) {
 	}
 
 	t.Run("a ceremony not held removes nothing", func(t *testing.T) {
-		values := map[string]any{sessionkeys.AuthContexts: heldJSON(t, &AuthContext{CeremonyId: "other", UserId: anotherUser})}
+		values := map[string]any{sessionkeys.AuthContexts: heldJSON(t, &AuthContext{CeremonyID: "other", UserID: anotherUser})}
 		before := values[sessionkeys.AuthContexts]
 
 		require.ErrorIs(t, heldRotation(ceremonyA, userA)(values), ErrCeremonyReplaced)
@@ -1896,7 +1896,7 @@ func TestHeldRotation(t *testing.T) {
 
 	t.Run("the retired key is removed", func(t *testing.T) {
 		values := map[string]any{
-			sessionkeys.AuthContexts:       heldJSON(t, &AuthContext{CeremonyId: ceremonyA}),
+			sessionkeys.AuthContexts:       heldJSON(t, &AuthContext{CeremonyID: ceremonyA}),
 			sessionkeys.RetiredAuthContext: "a sign-in as the binary before #246 stored it",
 		}
 
@@ -1949,7 +1949,7 @@ func TestUILocales(t *testing.T) {
 			t.Run(method, func(t *testing.T) {
 				ceremonyStore, store, _ := newRealStore(t)
 				cookies := seedBrowserSession(t, store, map[string]any{
-					sessionkeys.AuthContexts: heldJSON(t, &AuthContext{CeremonyId: ceremonyA, UILocales: []string{"pt-BR"}}),
+					sessionkeys.AuthContexts: heldJSON(t, &AuthContext{CeremonyID: ceremonyA, UILocales: []string{"pt-BR"}}),
 				})
 				// A step's form posts to the URL its page was loaded with, and its body is the step's
 				// own: the locale middleware runs ahead of the handler and never reads it.
@@ -1972,11 +1972,11 @@ func TestSeveralCeremoniesHeld(t *testing.T) {
 		ceremonyStore, _, _ := newRealStore(t)
 		rr := httptest.NewRecorder()
 		require.NoError(t, ceremonyStore.AddAuthContext(rr, browserRequest(nil),
-			&AuthContext{CeremonyId: ceremonyA, ClientId: "client-a", UILocales: []string{"pt-BR"}}))
+			&AuthContext{CeremonyID: ceremonyA, ClientID: "client-a", UILocales: []string{"pt-BR"}}))
 		cookies := rr.Result().Cookies()
 		require.Len(t, cookies, 1)
 		require.NoError(t, ceremonyStore.AddAuthContext(httptest.NewRecorder(), browserRequest(cookies),
-			&AuthContext{CeremonyId: ceremonyB, ClientId: "client-b", UILocales: []string{"en"}}))
+			&AuthContext{CeremonyID: ceremonyB, ClientID: "client-b", UILocales: []string{"en"}}))
 		return ceremonyStore, cookies
 	}
 
@@ -1990,7 +1990,7 @@ func TestSeveralCeremoniesHeld(t *testing.T) {
 				}
 				result, err := ceremonyStore.GetAuthContext(req)
 				require.NoError(t, err)
-				assert.Equal(t, client, result.ClientId, "%s naming %s", method, id)
+				assert.Equal(t, client, result.ClientID, "%s naming %s", method, id)
 			}
 		}
 
@@ -2002,7 +2002,7 @@ func TestSeveralCeremoniesHeld(t *testing.T) {
 		ceremonyStore, cookies := twoHeld(t)
 		latest, err := ceremonyStore.LatestAuthContext(browserRequest(cookies))
 		require.NoError(t, err)
-		assert.Equal(t, ceremonyB, latest.CeremonyId, "the later add")
+		assert.Equal(t, ceremonyB, latest.CeremonyID, "the later add")
 
 		stepReq := namingRequest(http.MethodGet, cookies, ceremonyA, "")
 		loaded, err := ceremonyStore.GetAuthContext(stepReq)
@@ -2011,7 +2011,7 @@ func TestSeveralCeremoniesHeld(t *testing.T) {
 
 		latest, err = ceremonyStore.LatestAuthContext(browserRequest(cookies))
 		require.NoError(t, err)
-		assert.Equal(t, ceremonyA, latest.CeremonyId, "a save moves its ceremony to the most recent")
+		assert.Equal(t, ceremonyA, latest.CeremonyID, "a save moves its ceremony to the most recent")
 	})
 
 	t.Run("the language is the named ceremony's, else the latest's", func(t *testing.T) {
@@ -2029,7 +2029,7 @@ func TestSeveralCeremoniesHeld(t *testing.T) {
 // the store makes to a session removes it (#246 decision 3).
 func TestTheRetiredKey(t *testing.T) {
 	retired := func(t *testing.T) *AuthContext {
-		return &AuthContext{CeremonyId: ceremonyA, ClientId: "client-a", UILocales: []string{"pt-BR"}}
+		return &AuthContext{CeremonyID: ceremonyA, ClientID: "client-a", UILocales: []string{"pt-BR"}}
 	}
 	// retiredJSON is a sign-in as the binary before #246 stored it: one context, not a list.
 	retiredJSON := func(t *testing.T) string {
@@ -2083,7 +2083,7 @@ func TestTheRetiredKey(t *testing.T) {
 			ceremonyStore, store, _ := newRealStore(t)
 			cookies := seedBrowserSession(t, store, map[string]any{
 				sessionkeys.RetiredAuthContext: retiredJSON(t),
-				sessionkeys.AuthContexts:       heldJSON(t, &AuthContext{CeremonyId: ceremonyB}),
+				sessionkeys.AuthContexts:       heldJSON(t, &AuthContext{CeremonyID: ceremonyB}),
 				"unrelated":                    "value",
 			})
 
@@ -2106,6 +2106,6 @@ func TestTheRetiredKey(t *testing.T) {
 		sess, err := store.Get(browserRequest(cookies), realStoreSessionName)
 		require.NoError(t, err)
 		assert.NotContains(t, sess.Values, sessionkeys.RetiredAuthContext)
-		assert.Equal(t, []string{ceremonyB}, heldIds(t, ceremonyStore, cookies, ceremonyA, ceremonyB))
+		assert.Equal(t, []string{ceremonyB}, heldIDs(t, ceremonyStore, cookies, ceremonyA, ceremonyB))
 	})
 }

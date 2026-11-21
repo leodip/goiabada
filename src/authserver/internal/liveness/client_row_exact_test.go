@@ -44,7 +44,7 @@ func TestAccessToken_ClientRowAboveTheFloat64SafeRange(t *testing.T) {
 		"client_id":          clientIdentifier,
 		"client_internal_id": row,
 		"sub":                clientIdentifier,
-		"jti":                testJti,
+		"jti":                testJTI,
 		"typ":                "Bearer",
 		"iat":                issuedAt.Unix(),
 		"nbf":                issuedAt.Unix(),
@@ -71,10 +71,10 @@ func TestAccessToken_ClientRowAboveTheFloat64SafeRange(t *testing.T) {
 	} {
 		t.Run(tc.label, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
-			holder := &record.Client{Id: tc.holder, ClientIdentifier: clientIdentifier, Enabled: true, CreatedAt: created}
+			holder := &record.Client{ID: tc.holder, ClientIdentifier: clientIdentifier, Enabled: true, CreatedAt: created}
 			database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), clientIdentifier).Return(holder, nil).Once()
 			if tc.wantRefusal == Live {
-				database.On("IsAccessTokenRevoked", mock.Anything, (*sql.Tx)(nil), testJti).Return(false, nil).Once()
+				database.On("IsAccessTokenRevoked", mock.Anything, (*sql.Tx)(nil), testJTI).Return(false, nil).Once()
 			}
 
 			verdict, err := AccessToken(context.Background(), database, *token, settings, checkedAt)

@@ -23,15 +23,15 @@ import (
 // mid-ceremony therefore redefined, retroactively, what that ceremony had been required to do.
 //
 // This is the case that could not be caught anywhere else: every unit case can pass with
-// authflow.Authorization.Run never calling SetTargetAcrLevel at all, because they call the reader and the
+// authflow.Authorization.Run never calling SetTargetACRLevel at all, because they call the reader and the
 // writer directly. Only a real ceremony proves the snapshot is taken and carried.
 
-// TestAcrSnapshot_ClientRaisedMidCeremonyDoesNotElevateTheAcr drives a password-only ceremony on a
+// TestACRSnapshot_ClientRaisedMidCeremonyDoesNotElevateTheACR drives a password-only ceremony on a
 // level1 client and raises that client to level2_mandatory in the gap between the step-up decision
 // and the code being stamped.
 //
 // Without the snapshot /auth/completed reads the raised row, hands level2_mandatory to
-// BumpUserSession and SetAcrLevel, and the authorization code goes out claiming
+// BumpUserSession and SetACRLevel, and the authorization code goes out claiming
 // acr: urn:goiabada:level2_mandatory over amr: ["pwd"]. No second factor was ever presented, and
 // OIDC Core section 2 defines acr as the class "the authentication performed satisfied", so that
 // claim is false in the direction a relying party doing OIDC Core 3.1.2.2's check trusts.
@@ -39,21 +39,21 @@ import (
 // The raise is applied between two hops the test drives itself, which is why the ceremony is
 // stepped through here rather than run by one of the suite's sign-in helpers: the whole subject of
 // the case is what happens in the gap between them.
-func TestAcrSnapshot_ClientRaisedMidCeremonyDoesNotElevateTheAcr(t *testing.T) {
+func TestACRSnapshot_ClientRaisedMidCeremonyDoesNotElevateTheACR(t *testing.T) {
 	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
 
-	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+	redirectURI := &record.RedirectURI{
+		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
-	require.NoError(t, database.CreateRedirectURI(context.Background(), nil, redirectUri))
+	require.NoError(t, database.CreateRedirectURI(context.Background(), nil, redirectURI))
 
 	password := fake.Password(10)
 	passwordHashed, err := passwordhash.Hash(password)
@@ -69,10 +69,10 @@ func TestAcrSnapshot_ClientRaisedMidCeremonyDoesNotElevateTheAcr(t *testing.T) {
 	}
 	require.NoError(t, database.CreateUser(context.Background(), nil, user))
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + randomCodeChallenge() +
@@ -80,7 +80,7 @@ func TestAcrSnapshot_ClientRaisedMidCeremonyDoesNotElevateTheAcr(t *testing.T) {
 		"&state=" + fake.LetterN(8) +
 		"&nonce=" + fake.LetterN(8)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	require.NoError(t, err)
 
 	loc := assertRedirect(t, resp, "/auth/level1")
@@ -106,7 +106,7 @@ func TestAcrSnapshot_ClientRaisedMidCeremonyDoesNotElevateTheAcr(t *testing.T) {
 	_ = resp.Body.Close()
 
 	// The administrator tightens the client's policy, mid-ceremony.
-	client.DefaultAcrLevel = record.AcrLevel2Mandatory
+	client.DefaultACRLevel = record.ACRLevel2Mandatory
 	require.NoError(t, database.UpdateClient(context.Background(), nil, client))
 
 	resp = loadPage(t, httpClient, loc)
@@ -116,11 +116,11 @@ func TestAcrSnapshot_ClientRaisedMidCeremonyDoesNotElevateTheAcr(t *testing.T) {
 	resp = loadPage(t, httpClient, loc)
 	defer func() { _ = resp.Body.Close() }()
 
-	codeVal, _ := getCodeAndStateFromUrl(t, resp)
+	codeVal, _ := getCodeAndStateFromURL(t, resp)
 	require.NotEmpty(t, codeVal, "the ceremony should still complete; the raise applies to later requests")
 
 	code := loadCodeFromDatabase(t, codeVal)
-	assert.Equal(t, record.AcrLevel1, code.AcrLevel,
+	assert.Equal(t, record.ACRLevel1, code.ACRLevel,
 		"the acr must describe the authentication this ceremony performed, not the policy that "+
 			"replaced the one it was accepted under")
 	assert.Equal(t, oidc.AuthMethodPassword.String(), code.AuthMethods,
@@ -129,9 +129,9 @@ func TestAcrSnapshot_ClientRaisedMidCeremonyDoesNotElevateTheAcr(t *testing.T) {
 	// The session the ceremony bound to carries the same level, so the next request on this browser
 	// is judged against what actually happened here too. A raise reaches that request through the
 	// client's row, where it now sits, and steps the user up properly.
-	sessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	sessions, err := database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	require.NoError(t, err)
 	require.Len(t, sessions, 1)
-	assert.Equal(t, record.AcrLevel1, sessions[0].AcrLevel,
+	assert.Equal(t, record.ACRLevel1, sessions[0].ACRLevel,
 		"the session records the level reached, so a later step-up is decided from the truth")
 }

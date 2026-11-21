@@ -47,17 +47,17 @@ var oneElementSpellings = []struct {
 	{"U+00A0", whitespaceScopeA + "\u00a0" + whitespaceScopeB},
 }
 
-var billingResource = record.Resource{Id: 1, ResourceIdentifier: "billing-api"}
+var billingResource = record.Resource{ID: 1, ResourceIdentifier: "billing-api"}
 
 var billingPermissions = []record.Permission{
-	{Id: 10, PermissionIdentifier: "read", ResourceId: 1, Resource: billingResource},
-	{Id: 11, PermissionIdentifier: "write", ResourceId: 1, Resource: billingResource},
+	{ID: 10, PermissionIdentifier: "read", ResourceID: 1, Resource: billingResource},
+	{ID: 11, PermissionIdentifier: "write", ResourceID: 1, Resource: billingResource},
 }
 
 func expectBillingResolution(mockDB *datamocks.Database) {
 	mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "billing-api").
 		Return(&billingResource, nil)
-	mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(1)).
+	mockDB.On("GetPermissionsByResourceID", mock.Anything, mock.Anything, int64(1)).
 		Return(billingPermissions, nil)
 }
 
@@ -146,7 +146,7 @@ func newWhitespaceClientCredentials(t *testing.T, scope string) (*TokenValidator
 
 	return validator, mockDB, &ValidateTokenRequestInput{
 		GrantType:    "client_credentials",
-		ClientId:     "cc_client",
+		ClientID:     "cc_client",
 		ClientSecret: "valid_secret",
 		Scope:        scope,
 	}
@@ -189,7 +189,7 @@ func newWhitespaceROPC(t *testing.T, scope string) (*TokenValidator, *datamocks.
 
 	passwordHash, err := passwordhash.Hash("correctpassword")
 	require.NoError(t, err)
-	user := &record.User{Id: 1, Email: "user@example.com", PasswordHash: passwordHash, Enabled: true}
+	user := &record.User{ID: 1, Email: "user@example.com", PasswordHash: passwordHash, Enabled: true}
 	ropcEnabled := true
 	client := &record.Client{
 		ClientIdentifier:                        "ropc-client",
@@ -205,7 +205,7 @@ func newWhitespaceROPC(t *testing.T, scope string) (*TokenValidator, *datamocks.
 
 	return validator, mockDB, mockPermissionChecker, settings, &ValidateTokenRequestInput{
 		GrantType: "password",
-		ClientId:  "ropc-client",
+		ClientID:  "ropc-client",
 		Username:  "user@example.com",
 		Password:  "correctpassword",
 		Scope:     scope,

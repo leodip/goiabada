@@ -16,7 +16,7 @@ import (
 type userSessionsDatabase interface {
 	sessionDetailsDatabase
 
-	GetUserSessionById(ctx context.Context, tx *sql.Tx, userSessionId int64) (*record.UserSession, error)
+	GetUserSessionByID(ctx context.Context, tx *sql.Tx, userSessionID int64) (*record.UserSession, error)
 	UserSessionsLoadClients(ctx context.Context, tx *sql.Tx, userSessions []record.UserSession) error
 }
 
@@ -40,14 +40,14 @@ func HandleUserSessionGet(
 			return
 		}
 
-		sessionId, err := strconv.ParseInt(idStr, 10, 64)
+		sessionID, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			writeJSONError(w, "Invalid user session ID format", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
 		// Get user session from database
-		userSession, err := database.GetUserSessionById(r.Context(), nil, sessionId)
+		userSession, err := database.GetUserSessionByID(r.Context(), nil, sessionID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return

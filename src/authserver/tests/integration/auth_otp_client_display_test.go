@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestAuthOtp_ClientDisplay_ShowDisplayName_Enabled(t *testing.T) {
+func TestAuthOTP_ClientDisplay_ShowDisplayName_Enabled(t *testing.T) {
 	// Create client with display name enabled
 	client := createClientWithDisplaySettings(t, ClientDisplaySettings{
 		ClientIdentifier: "test-app-" + fake.LetterN(8),
@@ -20,14 +20,14 @@ func TestAuthOtp_ClientDisplay_ShowDisplayName_Enabled(t *testing.T) {
 		ShowDescription:  false,
 		ShowWebsiteURL:   false,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  record.AcrLevel2Mandatory, // Requires OTP
+		DefaultACRLevel:  record.ACRLevel2Mandatory, // Requires OTP
 	})
 
-	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+	redirectURI := &record.RedirectURI{
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
-	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err := database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	require.NoError(t, err)
 
 	// Create user with OTP enabled
@@ -50,8 +50,8 @@ func TestAuthOtp_ClientDisplay_ShowDisplayName_Enabled(t *testing.T) {
 	require.NoError(t, err)
 
 	// Navigate to OTP screen
-	httpClient := createHttpClient(t)
-	resp := navigateToOtpScreen(t, httpClient, client, user, password, redirectUri.URI)
+	httpClient := createHTTPClient(t)
+	resp := navigateToOTPScreen(t, httpClient, client, user, password, redirectURI.URI)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Parse HTML
@@ -61,10 +61,10 @@ func TestAuthOtp_ClientDisplay_ShowDisplayName_Enabled(t *testing.T) {
 	assertClientNameInHTML(t, doc, "My Awesome Application")
 	assertClientLogoInHTML(t, doc, client.ClientIdentifier, false)
 	assertClientDescriptionInHTML(t, doc, "", false)
-	assertClientWebsiteUrlInHTML(t, doc, "", false)
+	assertClientWebsiteURLInHTML(t, doc, "", false)
 }
 
-func TestAuthOtp_ClientDisplay_AllEnabled_Enabled(t *testing.T) {
+func TestAuthOTP_ClientDisplay_AllEnabled_Enabled(t *testing.T) {
 	// Create client with all display settings enabled
 	client := createClientWithDisplaySettings(t, ClientDisplaySettings{
 		ClientIdentifier: "test-app-" + fake.LetterN(8),
@@ -77,14 +77,14 @@ func TestAuthOtp_ClientDisplay_AllEnabled_Enabled(t *testing.T) {
 		ShowWebsiteURL:   true,
 		UploadLogo:       true,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  record.AcrLevel2Mandatory,
+		DefaultACRLevel:  record.ACRLevel2Mandatory,
 	})
 
-	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+	redirectURI := &record.RedirectURI{
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
-	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err := database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	require.NoError(t, err)
 
 	// Create user with OTP enabled
@@ -107,8 +107,8 @@ func TestAuthOtp_ClientDisplay_AllEnabled_Enabled(t *testing.T) {
 	require.NoError(t, err)
 
 	// Navigate to OTP screen
-	httpClient := createHttpClient(t)
-	resp := navigateToOtpScreen(t, httpClient, client, user, password, redirectUri.URI)
+	httpClient := createHTTPClient(t)
+	resp := navigateToOTPScreen(t, httpClient, client, user, password, redirectURI.URI)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Parse HTML
@@ -118,14 +118,14 @@ func TestAuthOtp_ClientDisplay_AllEnabled_Enabled(t *testing.T) {
 	assertClientNameInHTML(t, doc, "My Awesome Application")
 	assertClientLogoInHTML(t, doc, client.ClientIdentifier, true)
 	assertClientDescriptionInHTML(t, doc, "The best app for testing OAuth flows", true)
-	assertClientWebsiteUrlInHTML(t, doc, "https://example.com", true)
+	assertClientWebsiteURLInHTML(t, doc, "https://example.com", true)
 }
 
-func TestAuthOtp_ClientDisplay_AllDisabled_Enabled(t *testing.T) {
+func TestAuthOTP_ClientDisplay_AllDisabled_Enabled(t *testing.T) {
 	// Create client with all display settings disabled
-	clientId := "test-app-" + fake.LetterN(8)
+	clientID := "test-app-" + fake.LetterN(8)
 	client := createClientWithDisplaySettings(t, ClientDisplaySettings{
-		ClientIdentifier: clientId,
+		ClientIdentifier: clientID,
 		DisplayName:      "My Awesome Application",
 		Description:      "The best app for testing OAuth flows",
 		WebsiteURL:       "https://example.com",
@@ -135,14 +135,14 @@ func TestAuthOtp_ClientDisplay_AllDisabled_Enabled(t *testing.T) {
 		ShowWebsiteURL:   false,
 		UploadLogo:       true,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  record.AcrLevel2Mandatory,
+		DefaultACRLevel:  record.ACRLevel2Mandatory,
 	})
 
-	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+	redirectURI := &record.RedirectURI{
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
-	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err := database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	require.NoError(t, err)
 
 	// Create user with OTP enabled
@@ -165,21 +165,21 @@ func TestAuthOtp_ClientDisplay_AllDisabled_Enabled(t *testing.T) {
 	require.NoError(t, err)
 
 	// Navigate to OTP screen
-	httpClient := createHttpClient(t)
-	resp := navigateToOtpScreen(t, httpClient, client, user, password, redirectUri.URI)
+	httpClient := createHTTPClient(t)
+	resp := navigateToOTPScreen(t, httpClient, client, user, password, redirectURI.URI)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Parse HTML
 	doc := parseHTMLResponse(t, resp)
 
 	// Only client identifier should be visible
-	assertClientNameInHTML(t, doc, clientId)
+	assertClientNameInHTML(t, doc, clientID)
 	assertClientLogoInHTML(t, doc, client.ClientIdentifier, false)
 	assertClientDescriptionInHTML(t, doc, "The best app for testing OAuth flows", false)
-	assertClientWebsiteUrlInHTML(t, doc, "https://example.com", false)
+	assertClientWebsiteURLInHTML(t, doc, "https://example.com", false)
 }
 
-func TestAuthOtp_ClientDisplay_ShowDisplayName_Enrollment(t *testing.T) {
+func TestAuthOTP_ClientDisplay_ShowDisplayName_Enrollment(t *testing.T) {
 	// Create client with display name enabled
 	client := createClientWithDisplaySettings(t, ClientDisplaySettings{
 		ClientIdentifier: "test-app-" + fake.LetterN(8),
@@ -189,14 +189,14 @@ func TestAuthOtp_ClientDisplay_ShowDisplayName_Enrollment(t *testing.T) {
 		ShowDescription:  false,
 		ShowWebsiteURL:   false,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  record.AcrLevel2Mandatory, // Requires OTP
+		DefaultACRLevel:  record.ACRLevel2Mandatory, // Requires OTP
 	})
 
-	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+	redirectURI := &record.RedirectURI{
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
-	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err := database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	require.NoError(t, err)
 
 	// Create user WITHOUT OTP (enrollment scenario)
@@ -215,8 +215,8 @@ func TestAuthOtp_ClientDisplay_ShowDisplayName_Enrollment(t *testing.T) {
 	require.NoError(t, err)
 
 	// Navigate to OTP screen (will show enrollment page)
-	httpClient := createHttpClient(t)
-	resp := navigateToOtpScreen(t, httpClient, client, user, password, redirectUri.URI)
+	httpClient := createHTTPClient(t)
+	resp := navigateToOTPScreen(t, httpClient, client, user, password, redirectURI.URI)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Parse HTML
@@ -226,10 +226,10 @@ func TestAuthOtp_ClientDisplay_ShowDisplayName_Enrollment(t *testing.T) {
 	assertClientNameInHTML(t, doc, "My Awesome Application")
 	assertClientLogoInHTML(t, doc, client.ClientIdentifier, false)
 	assertClientDescriptionInHTML(t, doc, "", false)
-	assertClientWebsiteUrlInHTML(t, doc, "", false)
+	assertClientWebsiteURLInHTML(t, doc, "", false)
 }
 
-func TestAuthOtp_ClientDisplay_AllEnabled_Enrollment(t *testing.T) {
+func TestAuthOTP_ClientDisplay_AllEnabled_Enrollment(t *testing.T) {
 	// Create client with all display settings enabled
 	client := createClientWithDisplaySettings(t, ClientDisplaySettings{
 		ClientIdentifier: "test-app-" + fake.LetterN(8),
@@ -242,14 +242,14 @@ func TestAuthOtp_ClientDisplay_AllEnabled_Enrollment(t *testing.T) {
 		ShowWebsiteURL:   true,
 		UploadLogo:       true,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  record.AcrLevel2Mandatory,
+		DefaultACRLevel:  record.ACRLevel2Mandatory,
 	})
 
-	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+	redirectURI := &record.RedirectURI{
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
-	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err := database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	require.NoError(t, err)
 
 	// Create user WITHOUT OTP (enrollment scenario)
@@ -268,8 +268,8 @@ func TestAuthOtp_ClientDisplay_AllEnabled_Enrollment(t *testing.T) {
 	require.NoError(t, err)
 
 	// Navigate to OTP screen (enrollment)
-	httpClient := createHttpClient(t)
-	resp := navigateToOtpScreen(t, httpClient, client, user, password, redirectUri.URI)
+	httpClient := createHTTPClient(t)
+	resp := navigateToOTPScreen(t, httpClient, client, user, password, redirectURI.URI)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Parse HTML
@@ -279,14 +279,14 @@ func TestAuthOtp_ClientDisplay_AllEnabled_Enrollment(t *testing.T) {
 	assertClientNameInHTML(t, doc, "My Awesome Application")
 	assertClientLogoInHTML(t, doc, client.ClientIdentifier, true)
 	assertClientDescriptionInHTML(t, doc, "The best app for testing OAuth flows", true)
-	assertClientWebsiteUrlInHTML(t, doc, "https://example.com", true)
+	assertClientWebsiteURLInHTML(t, doc, "https://example.com", true)
 }
 
-func TestAuthOtp_ClientDisplay_AllDisabled_Enrollment(t *testing.T) {
+func TestAuthOTP_ClientDisplay_AllDisabled_Enrollment(t *testing.T) {
 	// Create client with all display settings disabled
-	clientId := "test-app-" + fake.LetterN(8)
+	clientID := "test-app-" + fake.LetterN(8)
 	client := createClientWithDisplaySettings(t, ClientDisplaySettings{
-		ClientIdentifier: clientId,
+		ClientIdentifier: clientID,
 		DisplayName:      "My Awesome Application",
 		Description:      "The best app for testing OAuth flows",
 		WebsiteURL:       "https://example.com",
@@ -296,14 +296,14 @@ func TestAuthOtp_ClientDisplay_AllDisabled_Enrollment(t *testing.T) {
 		ShowWebsiteURL:   false,
 		UploadLogo:       true,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  record.AcrLevel2Mandatory,
+		DefaultACRLevel:  record.ACRLevel2Mandatory,
 	})
 
-	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+	redirectURI := &record.RedirectURI{
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
-	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err := database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	require.NoError(t, err)
 
 	// Create user WITHOUT OTP (enrollment scenario)
@@ -322,16 +322,16 @@ func TestAuthOtp_ClientDisplay_AllDisabled_Enrollment(t *testing.T) {
 	require.NoError(t, err)
 
 	// Navigate to OTP screen (enrollment)
-	httpClient := createHttpClient(t)
-	resp := navigateToOtpScreen(t, httpClient, client, user, password, redirectUri.URI)
+	httpClient := createHTTPClient(t)
+	resp := navigateToOTPScreen(t, httpClient, client, user, password, redirectURI.URI)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Parse HTML
 	doc := parseHTMLResponse(t, resp)
 
 	// Only client identifier should be visible on enrollment page
-	assertClientNameInHTML(t, doc, clientId)
+	assertClientNameInHTML(t, doc, clientID)
 	assertClientLogoInHTML(t, doc, client.ClientIdentifier, false)
 	assertClientDescriptionInHTML(t, doc, "The best app for testing OAuth flows", false)
-	assertClientWebsiteUrlInHTML(t, doc, "https://example.com", false)
+	assertClientWebsiteURLInHTML(t, doc, "https://example.com", false)
 }

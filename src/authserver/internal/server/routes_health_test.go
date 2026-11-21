@@ -26,7 +26,7 @@ func TestRegisterRoutes_HealthAnswersWithTheDatabaseDown(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	// A page reads the default brand; none leaves it automatic, in the built-in colors.
 	database.On("GetDefaultBrand", mock.Anything, mock.Anything).Return(nil, nil).Maybe()
-	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).
+	database.On("GetSettingsByID", mock.Anything, mock.Anything, int64(1)).
 		Return(nil, errors.New("the database is down")).Maybe()
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, errors.New("the database is down")).Maybe()
@@ -54,7 +54,7 @@ func TestRegisterRoutes_HealthAnswersWithTheDatabaseDown(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, rr.Code)
 	assert.Equal(t, "healthy", rr.Body.String())
-	database.AssertNotCalled(t, "GetSettingsById", mock.Anything, mock.Anything, int64(1))
+	database.AssertNotCalled(t, "GetSettingsByID", mock.Anything, mock.Anything, int64(1))
 	database.AssertNotCalled(t, "GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything)
 }
 
@@ -64,7 +64,7 @@ func TestRegisterRoutes_ApplicationRoutesStillFailWithTheDatabaseDown(t *testing
 	database := datamocks.NewDatabase(t)
 	// A page reads the default brand; none leaves it automatic, in the built-in colors.
 	database.On("GetDefaultBrand", mock.Anything, mock.Anything).Return(nil, nil).Maybe()
-	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).
+	database.On("GetSettingsByID", mock.Anything, mock.Anything, int64(1)).
 		Return(nil, errors.New("the database is down")).Once()
 
 	s := newStaticBranchTestServer(database)

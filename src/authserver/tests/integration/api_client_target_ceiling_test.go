@@ -31,16 +31,16 @@ import (
 
 // clientTargetFixture is one target client and what a route acts on beside it.
 type clientTargetFixture struct {
-	clientId   int64
+	clientID   int64
 	identifier string
 	// before is a value read before the route, which the route would change.
 	before string
-	// ordinaryPermissionId is a permission on a resource of the test's own, administrative to
+	// ordinaryPermissionID is a permission on a resource of the test's own, administrative to
 	// nobody.
-	ordinaryPermissionId int64
-	// requestId is the request id the route was sent under, and readerToken a token that reads the
+	ordinaryPermissionID int64
+	// requestID is the request id the route was sent under, and readerToken a token that reads the
 	// audit log.
-	requestId   string
+	requestID   string
 	readerToken string
 }
 
@@ -60,33 +60,33 @@ type clientTargetCeilingRoute struct {
 	notOnTheConsoleClient bool
 }
 
-func storedClient(t *testing.T, clientId int64) *record.Client {
+func storedClient(t *testing.T, clientID int64) *record.Client {
 	t.Helper()
-	client, err := database.GetClientById(context.Background(), nil, clientId)
+	client, err := database.GetClientByID(context.Background(), nil, clientID)
 	require.NoError(t, err)
 	return client
 }
 
-func clientPermissionIds(t *testing.T, clientId int64) []int64 {
+func clientPermissionIDs(t *testing.T, clientID int64) []int64 {
 	t.Helper()
-	rows, err := database.GetClientPermissionsByClientId(context.Background(), nil, clientId)
+	rows, err := database.GetClientPermissionsByClientID(context.Background(), nil, clientID)
 	require.NoError(t, err)
 	ids := []int64{}
 	for _, row := range rows {
-		ids = append(ids, row.PermissionId)
+		ids = append(ids, row.PermissionID)
 	}
 	return ids
 }
 
-func clientHasLogo(t *testing.T, clientId int64) bool {
+func clientHasLogo(t *testing.T, clientID int64) bool {
 	t.Helper()
-	has, err := database.ClientHasLogo(context.Background(), nil, clientId)
+	has, err := database.ClientHasLogo(context.Background(), nil, clientID)
 	require.NoError(t, err)
 	return has
 }
 
 // sendClientLogo uploads a logo under its own request id.
-func sendClientLogo(t *testing.T, accessToken string, clientId int64) (*http.Response, string) {
+func sendClientLogo(t *testing.T, accessToken string, clientID int64) (*http.Response, string) {
 	t.Helper()
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
@@ -96,16 +96,16 @@ func sendClientLogo(t *testing.T, accessToken string, clientId int64) (*http.Res
 	require.NoError(t, err)
 	require.NoError(t, writer.Close())
 
-	req, err := http.NewRequest(http.MethodPost, appConfig.AuthServer.BaseURL+fmt.Sprintf("/api/v1/admin/clients/%d/logo", clientId), &body)
+	req, err := http.NewRequest(http.MethodPost, appConfig.AuthServer.BaseURL+fmt.Sprintf("/api/v1/admin/clients/%d/logo", clientID), &body)
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 	req.Header.Set("Authorization", "Bearer "+accessToken)
-	requestId := "client-target-" + fake.LetterN(16)
-	req.Header.Set("X-Request-Id", requestId)
+	requestID := "client-target-" + fake.LetterN(16)
+	req.Header.Set("X-Request-Id", requestID)
 
-	resp, err := createHttpClient(t).Do(req)
+	resp, err := createHTTPClient(t).Do(req)
 	require.NoError(t, err)
-	return resp, requestId
+	return resp, requestID
 }
 
 // keepClientLogoOff puts a logo on the client for the test and takes it off again afterwards, so a
@@ -113,44 +113,44 @@ func sendClientLogo(t *testing.T, accessToken string, clientId int64) (*http.Res
 func keepClientLogoOff(t *testing.T, f *clientTargetFixture) {
 	t.Helper()
 	require.NoError(t, database.CreateClientLogo(context.Background(), nil,
-		&record.ClientLogo{ClientId: f.clientId, Logo: createTestPNGImage(32, 32), ContentType: "image/png"}))
-	t.Cleanup(func() { _ = database.DeleteClientLogo(context.Background(), nil, f.clientId) })
+		&record.ClientLogo{ClientID: f.clientID, Logo: createTestPNGImage(32, 32), ContentType: "image/png"}))
+	t.Cleanup(func() { _ = database.DeleteClientLogo(context.Background(), nil, f.clientID) })
 }
 
 var clientTargetCeilingRoutes = []clientTargetCeilingRoute{
 	{
 		name: "PUT clients", method: http.MethodPut, route: "/api/v1/admin/clients/{id}",
-		prepare: func(t *testing.T, f *clientTargetFixture) { f.before = storedClient(t, f.clientId).Description },
+		prepare: func(t *testing.T, f *clientTargetFixture) { f.before = storedClient(t, f.clientID).Description },
 		send: func(t *testing.T, token string, f *clientTargetFixture) (*http.Response, string) {
-			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/clients/%d", f.clientId),
+			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/clients/%d", f.clientID),
 				map[string]any{"clientIdentifier": f.identifier, "description": "Taken over", "enabled": true})
 		},
 		changed: func(t *testing.T, f *clientTargetFixture) bool {
-			return storedClient(t, f.clientId).Description == "Taken over"
+			return storedClient(t, f.clientID).Description == "Taken over"
 		},
 	},
 	{
 		name: "PUT clients authentication", method: http.MethodPut, route: "/api/v1/admin/clients/{id}/authentication",
 		prepare: func(t *testing.T, f *clientTargetFixture) {
-			f.before = string(storedClient(t, f.clientId).ClientSecretEncrypted)
+			f.before = string(storedClient(t, f.clientID).ClientSecretEncrypted)
 		},
 		send: func(t *testing.T, token string, f *clientTargetFixture) (*http.Response, string) {
-			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/clients/%d/authentication", f.clientId),
+			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/clients/%d/authentication", f.clientID),
 				map[string]any{"isPublic": false, "clientSecret": strings.Repeat("k", 60)})
 		},
 		changed: func(t *testing.T, f *clientTargetFixture) bool {
-			return string(storedClient(t, f.clientId).ClientSecretEncrypted) != f.before
+			return string(storedClient(t, f.clientID).ClientSecretEncrypted) != f.before
 		},
 	},
 	{
 		name: "PUT clients oauth2 flows", method: http.MethodPut, route: "/api/v1/admin/clients/{id}/oauth2-flows",
 		prepare: noClientPrepare,
 		send: func(t *testing.T, token string, f *clientTargetFixture) (*http.Response, string) {
-			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/clients/%d/oauth2-flows", f.clientId),
+			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/clients/%d/oauth2-flows", f.clientID),
 				map[string]any{"authorizationCodeEnabled": true, "clientCredentialsEnabled": true, "implicitGrantEnabled": true})
 		},
 		changed: func(t *testing.T, f *clientTargetFixture) bool {
-			enabled := storedClient(t, f.clientId).ImplicitGrantEnabled
+			enabled := storedClient(t, f.clientID).ImplicitGrantEnabled
 			return enabled != nil && *enabled
 		},
 	},
@@ -160,17 +160,17 @@ var clientTargetCeilingRoutes = []clientTargetCeilingRoute{
 			f.before = "https://attacker-" + strings.ToLower(fake.LetterN(8)) + ".example/cb"
 		},
 		send: func(t *testing.T, token string, f *clientTargetFixture) (*http.Response, string) {
-			client := storedClient(t, f.clientId)
+			client := storedClient(t, f.clientID)
 			require.NoError(t, database.ClientLoadRedirectURIs(context.Background(), nil, client))
 			current := []string{}
 			for _, uri := range client.RedirectURIs {
 				current = append(current, uri.URI)
 			}
-			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/clients/%d/redirect-uris", f.clientId),
+			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/clients/%d/redirect-uris", f.clientID),
 				map[string]any{"redirectURIs": append(append([]string{}, current...), f.before), "expectedRedirectURIs": current})
 		},
 		changed: func(t *testing.T, f *clientTargetFixture) bool {
-			client := storedClient(t, f.clientId)
+			client := storedClient(t, f.clientID)
 			require.NoError(t, database.ClientLoadRedirectURIs(context.Background(), nil, client))
 			for _, uri := range client.RedirectURIs {
 				if uri.URI == f.before {
@@ -186,12 +186,12 @@ var clientTargetCeilingRoutes = []clientTargetCeilingRoute{
 			f.before = "https://attacker-" + strings.ToLower(fake.LetterN(8)) + ".example/bye"
 		},
 		send: func(t *testing.T, token string, f *clientTargetFixture) (*http.Response, string) {
-			current := storedPostLogoutRedirectURIs(t, f.clientId)
-			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/clients/%d/post-logout-redirect-uris", f.clientId),
+			current := storedPostLogoutRedirectURIs(t, f.clientID)
+			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/clients/%d/post-logout-redirect-uris", f.clientID),
 				map[string]any{"postLogoutRedirectURIs": append(append([]string{}, current...), f.before), "expectedPostLogoutRedirectURIs": current})
 		},
 		changed: func(t *testing.T, f *clientTargetFixture) bool {
-			return slices.Contains(storedPostLogoutRedirectURIs(t, f.clientId), f.before)
+			return slices.Contains(storedPostLogoutRedirectURIs(t, f.clientID), f.before)
 		},
 	},
 	{
@@ -200,11 +200,11 @@ var clientTargetCeilingRoutes = []clientTargetCeilingRoute{
 		name: "PUT clients backchannel logout", method: http.MethodPut, route: "/api/v1/admin/clients/{id}/backchannel-logout",
 		prepare: noClientPrepare,
 		send: func(t *testing.T, token string, f *clientTargetFixture) (*http.Response, string) {
-			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/clients/%d/backchannel-logout", f.clientId),
-				map[string]any{"backchannelLogoutUri": storedClient(t, f.clientId).BackchannelLogoutURI, "backchannelLogoutSessionRequired": true})
+			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/clients/%d/backchannel-logout", f.clientID),
+				map[string]any{"backchannelLogoutUri": storedClient(t, f.clientID).BackchannelLogoutURI, "backchannelLogoutSessionRequired": true})
 		},
 		changed: func(t *testing.T, f *clientTargetFixture) bool {
-			return storedClient(t, f.clientId).BackchannelLogoutSessionRequired
+			return storedClient(t, f.clientID).BackchannelLogoutSessionRequired
 		},
 	},
 	{
@@ -213,11 +213,11 @@ var clientTargetCeilingRoutes = []clientTargetCeilingRoute{
 		name: "PUT clients dpop", method: http.MethodPut, route: "/api/v1/admin/clients/{id}/dpop",
 		prepare: noClientPrepare,
 		send: func(t *testing.T, token string, f *clientTargetFixture) (*http.Response, string) {
-			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/clients/%d/dpop", f.clientId),
+			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/clients/%d/dpop", f.clientID),
 				map[string]any{"dpopBoundAccessTokens": true})
 		},
 		changed: func(t *testing.T, f *clientTargetFixture) bool {
-			return storedClient(t, f.clientId).DPoPBoundAccessTokens
+			return storedClient(t, f.clientID).DPoPBoundAccessTokens
 		},
 		notOnTheConsoleClient: true,
 	},
@@ -225,16 +225,16 @@ var clientTargetCeilingRoutes = []clientTargetCeilingRoute{
 		// Giving the client a brand of its own (#812 decision 2): the brand is made for the test.
 		name: "PUT clients brand", method: http.MethodPut, route: "/api/v1/admin/clients/{id}/brand",
 		prepare: func(t *testing.T, f *clientTargetFixture) {
-			f.before = strconv.FormatInt(newBrandInStore(t, "Target").Id, 10)
+			f.before = strconv.FormatInt(newBrandInStore(t, "Target").ID, 10)
 		},
 		send: func(t *testing.T, token string, f *clientTargetFixture) (*http.Response, string) {
-			brandId, err := strconv.ParseInt(f.before, 10, 64)
+			brandID, err := strconv.ParseInt(f.before, 10, 64)
 			require.NoError(t, err)
-			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/clients/%d/brand", f.clientId),
-				map[string]any{"brandId": brandId})
+			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/clients/%d/brand", f.clientID),
+				map[string]any{"brandId": brandID})
 		},
 		changed: func(t *testing.T, f *clientTargetFixture) bool {
-			return strconv.FormatInt(storedBrandId(t, f.clientId), 10) == f.before
+			return strconv.FormatInt(storedBrandID(t, f.clientID), 10) == f.before
 		},
 	},
 	{
@@ -243,17 +243,17 @@ var clientTargetCeilingRoutes = []clientTargetCeilingRoute{
 			f.before = "https://attacker-" + strings.ToLower(fake.LetterN(8)) + ".example"
 		},
 		send: func(t *testing.T, token string, f *clientTargetFixture) (*http.Response, string) {
-			client := storedClient(t, f.clientId)
+			client := storedClient(t, f.clientID)
 			require.NoError(t, database.ClientLoadWebOrigins(context.Background(), nil, client))
 			current := []string{}
 			for _, origin := range client.WebOrigins {
 				current = append(current, origin.Origin)
 			}
-			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/clients/%d/web-origins", f.clientId),
+			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/clients/%d/web-origins", f.clientID),
 				map[string]any{"webOrigins": append(append([]string{}, current...), f.before), "expectedWebOrigins": current})
 		},
 		changed: func(t *testing.T, f *clientTargetFixture) bool {
-			client := storedClient(t, f.clientId)
+			client := storedClient(t, f.clientID)
 			require.NoError(t, database.ClientLoadWebOrigins(context.Background(), nil, client))
 			for _, origin := range client.WebOrigins {
 				if origin.Origin == f.before {
@@ -267,25 +267,25 @@ var clientTargetCeilingRoutes = []clientTargetCeilingRoute{
 		name: "PUT clients tokens", method: http.MethodPut, route: "/api/v1/admin/clients/{id}/tokens",
 		prepare: noClientPrepare,
 		send: func(t *testing.T, token string, f *clientTargetFixture) (*http.Response, string) {
-			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/clients/%d/tokens", f.clientId),
+			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/clients/%d/tokens", f.clientID),
 				map[string]any{"tokenExpirationInSeconds": 4321,
 					"includeOpenIDConnectClaimsInAccessToken": "default", "includeOpenIDConnectClaimsInIdToken": "default"})
 		},
 		changed: func(t *testing.T, f *clientTargetFixture) bool {
-			return storedClient(t, f.clientId).TokenExpirationInSeconds == 4321
+			return storedClient(t, f.clientID).TokenExpirationInSeconds == 4321
 		},
 	},
 	{
 		name: "PUT clients permissions", method: http.MethodPut, route: "/api/v1/admin/clients/{id}/permissions",
 		prepare: noClientPrepare,
 		send: func(t *testing.T, token string, f *clientTargetFixture) (*http.Response, string) {
-			current := clientPermissionIds(t, f.clientId)
-			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/clients/%d/permissions", f.clientId),
-				map[string]any{"permissionIds": append(append([]int64{}, current...), f.ordinaryPermissionId), "expectedPermissionIds": current})
+			current := clientPermissionIDs(t, f.clientID)
+			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/clients/%d/permissions", f.clientID),
+				map[string]any{"permissionIDs": append(append([]int64{}, current...), f.ordinaryPermissionID), "expectedPermissionIds": current})
 		},
 		changed: func(t *testing.T, f *clientTargetFixture) bool {
-			for _, id := range clientPermissionIds(t, f.clientId) {
-				if id == f.ordinaryPermissionId {
+			for _, id := range clientPermissionIDs(t, f.clientID) {
+				if id == f.ordinaryPermissionID {
 					return true
 				}
 			}
@@ -296,42 +296,42 @@ var clientTargetCeilingRoutes = []clientTargetCeilingRoute{
 		name: "DELETE clients", method: http.MethodDelete, route: "/api/v1/admin/clients/{id}",
 		prepare: noClientPrepare,
 		send: func(t *testing.T, token string, f *clientTargetFixture) (*http.Response, string) {
-			return sendAdmin(t, token, http.MethodDelete, fmt.Sprintf("/api/v1/admin/clients/%d", f.clientId), nil)
+			return sendAdmin(t, token, http.MethodDelete, fmt.Sprintf("/api/v1/admin/clients/%d", f.clientID), nil)
 		},
-		changed:               func(t *testing.T, f *clientTargetFixture) bool { return storedClient(t, f.clientId) == nil },
+		changed:               func(t *testing.T, f *clientTargetFixture) bool { return storedClient(t, f.clientID) == nil },
 		notOnTheConsoleClient: true,
 	},
 	{
 		name: "POST clients logo", method: http.MethodPost, route: "/api/v1/admin/clients/{id}/logo",
 		prepare: func(t *testing.T, f *clientTargetFixture) {
-			t.Cleanup(func() { _ = database.DeleteClientLogo(context.Background(), nil, f.clientId) })
-			f.before = fmt.Sprint(clientHasLogo(t, f.clientId))
+			t.Cleanup(func() { _ = database.DeleteClientLogo(context.Background(), nil, f.clientID) })
+			f.before = fmt.Sprint(clientHasLogo(t, f.clientID))
 		},
 		send: func(t *testing.T, token string, f *clientTargetFixture) (*http.Response, string) {
-			return sendClientLogo(t, token, f.clientId)
+			return sendClientLogo(t, token, f.clientID)
 		},
 		changed: func(t *testing.T, f *clientTargetFixture) bool {
-			return f.before == "false" && clientHasLogo(t, f.clientId)
+			return f.before == "false" && clientHasLogo(t, f.clientID)
 		},
 	},
 	{
 		name: "DELETE clients logo", method: http.MethodDelete, route: "/api/v1/admin/clients/{id}/logo",
 		prepare: keepClientLogoOff,
 		send: func(t *testing.T, token string, f *clientTargetFixture) (*http.Response, string) {
-			return sendAdmin(t, token, http.MethodDelete, fmt.Sprintf("/api/v1/admin/clients/%d/logo", f.clientId), nil)
+			return sendAdmin(t, token, http.MethodDelete, fmt.Sprintf("/api/v1/admin/clients/%d/logo", f.clientID), nil)
 		},
-		changed: func(t *testing.T, f *clientTargetFixture) bool { return !clientHasLogo(t, f.clientId) },
+		changed: func(t *testing.T, f *clientTargetFixture) bool { return !clientHasLogo(t, f.clientID) },
 	},
 	{
 		name: "GET clients secret", method: http.MethodGet, route: "/api/v1/admin/clients/{id}/secret",
 		prepare: noClientPrepare,
 		send: func(t *testing.T, token string, f *clientTargetFixture) (*http.Response, string) {
-			resp, requestId := sendAdmin(t, token, http.MethodGet, fmt.Sprintf("/api/v1/admin/clients/%d/secret", f.clientId), nil)
-			f.requestId = requestId
-			return resp, requestId
+			resp, requestID := sendAdmin(t, token, http.MethodGet, fmt.Sprintf("/api/v1/admin/clients/%d/secret", f.clientID), nil)
+			f.requestID = requestID
+			return resp, requestID
 		},
 		changed: func(t *testing.T, f *clientTargetFixture) bool {
-			return len(viewedSecretRows(t, f.readerToken, f.requestId)) > 0
+			return len(viewedSecretRows(t, f.readerToken, f.requestID)) > 0
 		},
 	},
 }
@@ -339,9 +339,9 @@ var clientTargetCeilingRoutes = []clientTargetCeilingRoute{
 func noClientPrepare(t *testing.T, f *clientTargetFixture) {}
 
 // viewedSecretRows is the viewed_client_secret rows one request left.
-func viewedSecretRows(t *testing.T, readerToken, requestId string) []any {
+func viewedSecretRows(t *testing.T, readerToken, requestID string) []any {
 	t.Helper()
-	logs, resp := getAuditLogs(t, readerToken, "auditEvent=viewed_client_secret&requestId="+url.QueryEscape(requestId))
+	logs, resp := getAuditLogs(t, readerToken, "auditEvent=viewed_client_secret&requestId="+url.QueryEscape(requestID))
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	rows := []any{}
@@ -353,7 +353,7 @@ func viewedSecretRows(t *testing.T, readerToken, requestId string) []any {
 
 // newTargetClient is a fresh confidential client with the code and client credentials flows on,
 // holding the permissions given.
-func newTargetClient(t *testing.T, permissionIds ...int64) *clientTargetFixture {
+func newTargetClient(t *testing.T, permissionIDs ...int64) *clientTargetFixture {
 	t.Helper()
 	secret, err := dataCipher.Encrypt(fake.Password(60))
 	require.NoError(t, err)
@@ -363,15 +363,15 @@ func newTargetClient(t *testing.T, permissionIds ...int64) *clientTargetFixture 
 		AuthorizationCodeEnabled: true,
 		ClientCredentialsEnabled: true,
 		ClientSecretEncrypted:    secret,
-		DefaultAcrLevel:          record.AcrLevel2Optional,
+		DefaultACRLevel:          record.ACRLevel2Optional,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
-	for _, permissionId := range permissionIds {
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
+	for _, permissionID := range permissionIDs {
 		require.NoError(t, database.CreateClientPermission(context.Background(), nil,
-			&record.ClientPermission{ClientId: client.Id, PermissionId: permissionId}))
+			&record.ClientPermission{ClientID: client.ID, PermissionID: permissionID}))
 	}
-	return &clientTargetFixture{clientId: client.Id, identifier: client.ClientIdentifier}
+	return &clientTargetFixture{clientID: client.ID, identifier: client.ClientIdentifier}
 }
 
 // consoleClient is the admin console's own client, as seeded.
@@ -380,37 +380,37 @@ func consoleClient(t *testing.T) *clientTargetFixture {
 	client, err := database.GetClientByClientIdentifier(context.Background(), nil, builtin.AdminConsoleClientIdentifier)
 	require.NoError(t, err)
 	require.NotNil(t, client)
-	return &clientTargetFixture{clientId: client.Id, identifier: client.ClientIdentifier}
+	return &clientTargetFixture{clientID: client.ID, identifier: client.ClientIdentifier}
 }
 
 // assertClientRefusedByTheTargetCeiling holds one answered request to decision 4's refusal and
 // decision 5's one record under ceiling "target" naming the client.
-func assertClientRefusedByTheTargetCeiling(t *testing.T, resp *http.Response, requestId, readerToken string,
-	caller *record.Client, route clientTargetCeilingRoute, clientId int64) {
+func assertClientRefusedByTheTargetCeiling(t *testing.T, resp *http.Response, requestID, readerToken string,
+	caller *record.Client, route clientTargetCeilingRoute, clientID int64) {
 	t.Helper()
-	assertRefusedByTheTargetCeiling(t, resp, requestId, readerToken, caller,
-		targetCeilingWrite{name: route.name, method: route.method, route: route.route, kind: "client"}, clientId)
+	assertRefusedByTheTargetCeiling(t, resp, requestID, readerToken, caller,
+		targetCeilingWrite{name: route.name, method: route.method, route: route.route, kind: "client"}, clientID)
 }
 
 func TestClientTargetCeiling_AGranularTokenCannotWriteToAnAdministratorClient(t *testing.T) {
 	requireDatabaseAuditLogs(t)
 	manageToken, _ := createAdminClientWithToken(t)
 	granularToken, caller := createClientWithGranularScope(t, builtin.ManageClientsPermissionIdentifier)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.ID) })
 	ordinary := ordinaryPermission(t)
 
 	for i, route := range clientTargetCeilingRoutes {
 		// Each route meets a different administrative permission.
 		identifier := administrativePermissionIdentifiers[i%len(administrativePermissionIdentifiers)]
 		t.Run(route.name+"/"+identifier, func(t *testing.T) {
-			f := newTargetClient(t, authServerPermissionId(t, identifier))
-			f.ordinaryPermissionId = ordinary
+			f := newTargetClient(t, authServerPermissionID(t, identifier))
+			f.ordinaryPermissionID = ordinary
 			f.readerToken = manageToken
 			route.prepare(t, f)
 
-			resp, requestId := route.send(t, granularToken, f)
+			resp, requestID := route.send(t, granularToken, f)
 
-			assertClientRefusedByTheTargetCeiling(t, resp, requestId, manageToken, caller, route, f.clientId)
+			assertClientRefusedByTheTargetCeiling(t, resp, requestID, manageToken, caller, route, f.clientID)
 			assert.False(t, route.changed(t, f), "the refused request changed nothing")
 		})
 	}
@@ -422,7 +422,7 @@ func TestClientTargetCeiling_AGranularTokenCannotWriteToTheAdminConsolesOwnClien
 	requireDatabaseAuditLogs(t)
 	manageToken, _ := createAdminClientWithToken(t)
 	granularToken, caller := createClientWithGranularScope(t, builtin.ManageClientsPermissionIdentifier)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.ID) })
 	ordinary := ordinaryPermission(t)
 
 	for _, route := range clientTargetCeilingRoutes {
@@ -431,13 +431,13 @@ func TestClientTargetCeiling_AGranularTokenCannotWriteToTheAdminConsolesOwnClien
 		}
 		t.Run(route.name, func(t *testing.T) {
 			f := consoleClient(t)
-			f.ordinaryPermissionId = ordinary
+			f.ordinaryPermissionID = ordinary
 			f.readerToken = manageToken
 			route.prepare(t, f)
 
-			resp, requestId := route.send(t, granularToken, f)
+			resp, requestID := route.send(t, granularToken, f)
 
-			assertClientRefusedByTheTargetCeiling(t, resp, requestId, manageToken, caller, route, f.clientId)
+			assertClientRefusedByTheTargetCeiling(t, resp, requestID, manageToken, caller, route, f.clientID)
 			assert.False(t, route.changed(t, f), "the refused request changed nothing")
 		})
 	}
@@ -447,7 +447,7 @@ func TestClientTargetCeiling_AGranularTokenStillWritesToOrdinaryClients(t *testi
 	requireDatabaseAuditLogs(t)
 	manageToken, _ := createAdminClientWithToken(t)
 	granularToken, caller := createClientWithGranularScope(t, builtin.ManageClientsPermissionIdentifier)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.ID) })
 	ordinary := ordinaryPermission(t)
 	other := ordinaryPermission(t)
 
@@ -455,18 +455,18 @@ func TestClientTargetCeiling_AGranularTokenStillWritesToOrdinaryClients(t *testi
 		t.Run(route.name, func(t *testing.T) {
 			// manage-account, a permission of another resource: neither makes a client an
 			// administrator.
-			f := newTargetClient(t, authServerPermissionId(t, builtin.ManageAccountPermissionIdentifier), other)
-			f.ordinaryPermissionId = ordinary
+			f := newTargetClient(t, authServerPermissionID(t, builtin.ManageAccountPermissionIdentifier), other)
+			f.ordinaryPermissionID = ordinary
 			f.readerToken = manageToken
 			route.prepare(t, f)
 
-			resp, requestId := route.send(t, granularToken, f)
+			resp, requestID := route.send(t, granularToken, f)
 			body, _ := io.ReadAll(resp.Body)
 			_ = resp.Body.Close()
 
 			assert.Less(t, resp.StatusCode, 300, "an ordinary client is written as before: %s", body)
 			assert.True(t, route.changed(t, f))
-			assert.Empty(t, refusalRows(t, manageToken, requestId))
+			assert.Empty(t, refusalRows(t, manageToken, requestID))
 		})
 	}
 }
@@ -478,18 +478,18 @@ func TestClientTargetCeiling_AManageTokenWritesToAdministratorClients(t *testing
 
 	for _, route := range clientTargetCeilingRoutes {
 		t.Run(route.name, func(t *testing.T) {
-			f := newTargetClient(t, authServerPermissionId(t, builtin.ManagePermissionIdentifier))
-			f.ordinaryPermissionId = ordinary
+			f := newTargetClient(t, authServerPermissionID(t, builtin.ManagePermissionIdentifier))
+			f.ordinaryPermissionID = ordinary
 			f.readerToken = manageToken
 			route.prepare(t, f)
 
-			resp, requestId := route.send(t, manageToken, f)
+			resp, requestID := route.send(t, manageToken, f)
 			body, _ := io.ReadAll(resp.Body)
 			_ = resp.Body.Close()
 
 			assert.Less(t, resp.StatusCode, 300, string(body))
 			assert.True(t, route.changed(t, f))
-			assert.Empty(t, refusalRows(t, manageToken, requestId))
+			assert.Empty(t, refusalRows(t, manageToken, requestID))
 		})
 	}
 }

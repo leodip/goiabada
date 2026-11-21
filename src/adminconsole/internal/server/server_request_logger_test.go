@@ -43,7 +43,7 @@ const loggerTestTarget = "/admin/clients?page=2&size=10&id_token_hint=" + jwtLik
 // answers 500 and returns on a fetch failure, so an unreachable auth server would stop the request
 // before the handler, and "the request still reached the handler" is exactly the half of this test
 // that says the logger did not swallow it.
-func newLoggerTestServer(t *testing.T, logHttpRequests bool, handlerRan *bool) *Server {
+func newLoggerTestServer(t *testing.T, logHTTPRequests bool, handlerRan *bool) *Server {
 	t.Helper()
 
 	authServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -57,7 +57,7 @@ func newLoggerTestServer(t *testing.T, logHttpRequests bool, handlerRan *bool) *
 		router:        routing.New(),
 		sessionStore:  newTestSessionStore(),
 		settingsCache: publicsettings.NewCache(publicsettings.NewClient(authServer.URL, nil, nil), publicsettings.DefaultTTL, metrics.NewRegistry()),
-		cfg:           &config.Config{AdminConsole: config.AdminConsoleConfig{LogHttpRequests: logHttpRequests}},
+		cfg:           &config.Config{AdminConsole: config.AdminConsoleConfig{LogHTTPRequests: logHTTPRequests}},
 		metrics:       metrics.NewRegistry(),
 	}
 	s.initMiddleware()

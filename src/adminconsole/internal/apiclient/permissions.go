@@ -11,10 +11,10 @@ import (
 
 // GetUserPermissions retrieves user permissions from the auth server, two values out of one
 // envelope: the user the endpoint resolved and the permissions it holds.
-func (c *AuthServerClient) GetUserPermissions(ctx context.Context, accessToken string, userId int64) (*api.UserResponse, []api.PermissionResponse, error) {
+func (c *AuthServerClient) GetUserPermissions(ctx context.Context, accessToken string, userID int64) (*api.UserResponse, []api.PermissionResponse, error) {
 	response, err := execute[api.GetUserPermissionsResponse](ctx, c, accessToken, apiRequest{
 		method:        "GET",
-		url:           fmt.Sprintf("%s/api/v1/admin/users/%d/permissions", c.baseURL, userId),
+		url:           fmt.Sprintf("%s/api/v1/admin/users/%d/permissions", c.baseURL, userID),
 		contentType:   contentTypeJSON,
 		successStatus: http.StatusOK,
 	})
@@ -25,10 +25,10 @@ func (c *AuthServerClient) GetUserPermissions(ctx context.Context, accessToken s
 }
 
 // UpdateUserPermissions updates user permissions via the auth server
-func (c *AuthServerClient) UpdateUserPermissions(ctx context.Context, accessToken string, userId int64, request *api.UpdateUserPermissionsRequest) error {
+func (c *AuthServerClient) UpdateUserPermissions(ctx context.Context, accessToken string, userID int64, request *api.UpdateUserPermissionsRequest) error {
 	_, err := c.do(ctx, accessToken, apiRequest{
 		method:        "PUT",
-		url:           fmt.Sprintf("%s/api/v1/admin/users/%d/permissions", c.baseURL, userId),
+		url:           fmt.Sprintf("%s/api/v1/admin/users/%d/permissions", c.baseURL, userID),
 		jsonBody:      request,
 		contentType:   contentTypeJSON,
 		successStatus: http.StatusOK,
@@ -37,10 +37,10 @@ func (c *AuthServerClient) UpdateUserPermissions(ctx context.Context, accessToke
 }
 
 // GetPermissionsByResource retrieves permissions for a specific resource from the auth server
-func (c *AuthServerClient) GetPermissionsByResource(ctx context.Context, accessToken string, resourceId int64) ([]api.PermissionResponse, error) {
+func (c *AuthServerClient) GetPermissionsByResource(ctx context.Context, accessToken string, resourceID int64) ([]api.PermissionResponse, error) {
 	response, err := execute[api.GetPermissionsByResourceResponse](ctx, c, accessToken, apiRequest{
 		method:        "GET",
-		url:           fmt.Sprintf("%s/api/v1/admin/resources/%d/permissions", c.baseURL, resourceId),
+		url:           fmt.Sprintf("%s/api/v1/admin/resources/%d/permissions", c.baseURL, resourceID),
 		contentType:   contentTypeJSON,
 		successStatus: http.StatusOK,
 	})
@@ -51,10 +51,10 @@ func (c *AuthServerClient) GetPermissionsByResource(ctx context.Context, accessT
 }
 
 // UpdateResourcePermissions replaces the full set of permission definitions for a resource
-func (c *AuthServerClient) UpdateResourcePermissions(ctx context.Context, accessToken string, resourceId int64, request *api.UpdateResourcePermissionsRequest) error {
+func (c *AuthServerClient) UpdateResourcePermissions(ctx context.Context, accessToken string, resourceID int64, request *api.UpdateResourcePermissionsRequest) error {
 	_, err := c.do(ctx, accessToken, apiRequest{
 		method:        "PUT",
-		url:           fmt.Sprintf("%s/api/v1/admin/resources/%d/permissions", c.baseURL, resourceId),
+		url:           fmt.Sprintf("%s/api/v1/admin/resources/%d/permissions", c.baseURL, resourceID),
 		jsonBody:      request,
 		contentType:   contentTypeJSON,
 		successStatus: http.StatusOK,
@@ -63,10 +63,10 @@ func (c *AuthServerClient) UpdateResourcePermissions(ctx context.Context, access
 }
 
 // GetUsersByPermission retrieves users that have the given permission with pagination
-func (c *AuthServerClient) GetUsersByPermission(ctx context.Context, accessToken string, permissionId int64, page, size int) ([]api.UserResponse, int, error) {
+func (c *AuthServerClient) GetUsersByPermission(ctx context.Context, accessToken string, permissionID int64, page, size int) ([]api.UserResponse, int, error) {
 	response, err := execute[api.GetUsersByPermissionResponse](ctx, c, accessToken, apiRequest{
 		method:        "GET",
-		url:           fmt.Sprintf("%s/api/v1/admin/permissions/%d/users?page=%d&size=%d", c.baseURL, permissionId, page, size),
+		url:           fmt.Sprintf("%s/api/v1/admin/permissions/%d/users?page=%d&size=%d", c.baseURL, permissionID, page, size),
 		contentType:   contentTypeJSON,
 		successStatus: http.StatusOK,
 	})
@@ -76,9 +76,9 @@ func (c *AuthServerClient) GetUsersByPermission(ctx context.Context, accessToken
 	return response.Users, response.Total, nil
 }
 
-// SearchUsersWithPermissionAnnotation searches users and annotates with HasPermission for a permissionId
-func (c *AuthServerClient) SearchUsersWithPermissionAnnotation(ctx context.Context, accessToken string, permissionId int64, query string, page, size int) ([]api.UserWithPermissionResponse, int, error) {
-	base := fmt.Sprintf("%s/api/v1/admin/users/search?annotatePermissionId=%d&page=%d&size=%d", c.baseURL, permissionId, page, size)
+// SearchUsersWithPermissionAnnotation searches users and annotates with HasPermission for a permissionID
+func (c *AuthServerClient) SearchUsersWithPermissionAnnotation(ctx context.Context, accessToken string, permissionID int64, query string, page, size int) ([]api.UserWithPermissionResponse, int, error) {
+	base := fmt.Sprintf("%s/api/v1/admin/users/search?annotatePermissionId=%d&page=%d&size=%d", c.baseURL, permissionID, page, size)
 	if query != "" {
 		base = base + "&query=" + url.QueryEscape(query)
 	}

@@ -80,10 +80,10 @@ func servesStatus(t *testing.T, status int, body string) (*AuthServerClient, fun
 	return NewAuthServerClient(server.URL, nil, nil), func() (string, string) { return gotPath, gotAuthorization }
 }
 
-func TestAuthServerClient_GetUserByIdDecodesEveryFieldTheConsoleBinds(t *testing.T) {
+func TestAuthServerClient_GetUserByIDDecodesEveryFieldTheConsoleBinds(t *testing.T) {
 	client, recorded := serves(t, `{"user":{`+userBodyFields+`}}`)
 
-	user, err := client.GetUserById(context.Background(), "an-access-token", 42)
+	user, err := client.GetUserByID(context.Background(), "an-access-token", 42)
 	require.NoError(t, err)
 	require.NotNil(t, user)
 
@@ -91,7 +91,7 @@ func TestAuthServerClient_GetUserByIdDecodesEveryFieldTheConsoleBinds(t *testing
 	assert.Equal(t, "/api/v1/admin/users/42", gotPath)
 	assert.Equal(t, "Bearer an-access-token", gotAuthorization)
 
-	assert.Equal(t, int64(42), user.Id)
+	assert.Equal(t, int64(42), user.ID)
 	assert.True(t, user.Enabled)
 	assert.Equal(t, "3f2a1c4e-5b6d-4e8f-9a0b-1c2d3e4f5a6b", user.Subject)
 	assert.Equal(t, "jdoe", user.Username)
@@ -106,7 +106,7 @@ func TestAuthServerClient_GetUserByIdDecodesEveryFieldTheConsoleBinds(t *testing
 	assert.Equal(t, "Brazil", user.ZoneInfoCountryName)
 	assert.Equal(t, "America/Sao_Paulo", user.ZoneInfo)
 	assert.Equal(t, "pt-BR", user.Locale)
-	assert.Equal(t, "BRA_0", user.PhoneNumberCountryUniqueId)
+	assert.Equal(t, "BRA_0", user.PhoneNumberCountryUniqueID)
 	assert.Equal(t, "+55", user.PhoneNumberCountryCallingCode)
 	assert.Equal(t, "999999999", user.PhoneNumber)
 	assert.True(t, user.PhoneNumberVerified)
@@ -138,9 +138,9 @@ func TestAuthServerClient_SearchUsersPaginatedReturnsThePagesUsersAndItsTotal(t 
 
 	assert.Equal(t, 73, total, "the total drives the paginator, not the length of this page")
 	require.Len(t, users, 2)
-	assert.Equal(t, int64(42), users[0].Id)
+	assert.Equal(t, int64(42), users[0].ID)
 	assert.Equal(t, "jane@example.com", users[0].Email)
-	assert.Equal(t, int64(43), users[1].Id)
+	assert.Equal(t, int64(43), users[1].ID)
 	assert.Equal(t, "other@example.com", users[1].Email)
 }
 

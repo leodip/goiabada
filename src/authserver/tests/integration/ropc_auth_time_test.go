@@ -44,7 +44,7 @@ func newROPCAuthTimeFixture(t *testing.T) ropcAuthTimeFixture {
 		clientSecret: clientSecret,
 		user:         createROPCUser(t, password),
 		password:     password,
-		httpClient:   createHttpClient(t),
+		httpClient:   createHTTPClient(t),
 		tokenURL:     appConfig.AuthServer.BaseURL + "/auth/token/",
 	}
 }
@@ -67,7 +67,7 @@ func tokenRow(t *testing.T, refreshToken string) *record.RefreshToken {
 	t.Helper()
 	jti, ok := decodeJWTPayload(t, refreshToken)["jti"].(string)
 	require.True(t, ok, "the refresh token carries no jti")
-	row, err := database.GetRefreshTokenByJti(context.Background(), nil, jti)
+	row, err := database.GetRefreshTokenByJTI(context.Background(), nil, jti)
 	require.NoError(t, err)
 	require.NotNil(t, row, "no row for the refresh token")
 	return row
@@ -127,9 +127,9 @@ func TestROPC_RefreshKeepsThePasswordGrantsAuthTime(t *testing.T) {
 		status, refreshed := f.refresh(t, refreshToken)
 		require.Equal(t, http.StatusOK, status, "refresh %d: %v", rotation, refreshed)
 
-		gotAccess, gotId, iat := requireAuthTime(t, refreshed)
+		gotAccess, gotID, iat := requireAuthTime(t, refreshed)
 		assert.InDelta(t, accessAuthTime, gotAccess, 0, "refresh %d: the access token's auth_time moved", rotation)
-		assert.InDelta(t, accessAuthTime, gotId, 0, "refresh %d: the ID token's auth_time moved", rotation)
+		assert.InDelta(t, accessAuthTime, gotID, 0, "refresh %d: the ID token's auth_time moved", rotation)
 		assert.Greater(t, iat, accessAuthTime, "refresh %d: iat is the refresh, later than the grant", rotation)
 
 		refreshToken, ok = refreshed["refresh_token"].(string)
@@ -149,7 +149,7 @@ func TestROPC_RefreshKeepsThePasswordGrantsAuthTime(t *testing.T) {
 func issueROPCRefreshToken(t *testing.T, f ropcAuthTimeFixture, instant sql.NullTime) string {
 	t.Helper()
 
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
+	settings, err := database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err)
 	now := time.Now().UTC()
 	exp := now.Add(time.Hour)
@@ -157,10 +157,10 @@ func issueROPCRefreshToken(t *testing.T, f ropcAuthTimeFixture, instant sql.Null
 	jti := fake.UUID()
 
 	require.NoError(t, database.CreateRefreshToken(context.Background(), nil, &record.RefreshToken{
-		UserId:               sql.NullInt64{Int64: f.user.Id, Valid: true},
-		ClientId:             sql.NullInt64{Int64: f.client.Id, Valid: true},
-		RefreshTokenJti:      jti,
-		FirstRefreshTokenJti: jti,
+		UserID:               sql.NullInt64{Int64: f.user.ID, Valid: true},
+		ClientID:             sql.NullInt64{Int64: f.client.ID, Valid: true},
+		RefreshTokenJTI:      jti,
+		FirstRefreshTokenJTI: jti,
 		RefreshTokenType:     "Offline",
 		Scope:                "openid",
 		IssuedAt:             sql.NullTime{Time: now, Valid: true},
@@ -233,7 +233,7 @@ func TestROPC_RefreshOfATokenRecordingNoInstantIsRefused(t *testing.T) {
 	row := tokenRow(t, legacy)
 	assert.False(t, row.Revoked, "a refusal is not a redemption: the token was revoked")
 	assert.False(t, row.AuthenticatedAt.Valid, "the refusal wrote an instant onto the token")
-	family, err := database.GetRefreshTokensByUserId(context.Background(), nil, f.user.Id)
+	family, err := database.GetRefreshTokensByUserID(context.Background(), nil, f.user.ID)
 	require.NoError(t, err)
 	assert.Len(t, family, 1, "the refusal issued a refresh token")
 

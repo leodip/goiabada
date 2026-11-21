@@ -50,8 +50,8 @@ func (passwordPage) CreateUserAdmin(context.Context, string, *api.CreateUserAdmi
 	return nil, tooCommon
 }
 
-func (passwordPage) GetUserById(context.Context, string, int64) (*api.UserResponse, error) {
-	return &api.UserResponse{Id: 7, Email: "jane.doe@example.com"}, nil
+func (passwordPage) GetUserByID(context.Context, string, int64) (*api.UserResponse, error) {
+	return &api.UserResponse{ID: 7, Email: "jane.doe@example.com"}, nil
 }
 
 func (passwordPage) UpdateUserOTP(context.Context, string, int64, *api.UpdateUserOTPRequest) (*api.UserResponse, error) {

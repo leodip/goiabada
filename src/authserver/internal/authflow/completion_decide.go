@@ -23,7 +23,7 @@ type completionFacts struct {
 	raisesPrivilege bool
 	// otpConfigGenerationCaptured says the ceremony captured the user's OTP config generation.
 	otpConfigGenerationCaptured bool
-	target                      record.AcrLevel
+	target                      record.ACRLevel
 }
 
 // completionPlan is decideCompletion's answer, one of three modes: reuseSessionPlan,
@@ -47,21 +47,21 @@ type reuseSessionPlan struct {
 	// session, as the create arm would stamp them on a new one (#537), and records its answer to Keep
 	// me signed in in the browser session, as the create arm records it (#743).
 	replaceAuthentication bool
-	// promoteOtpConfigGeneration records the generation the session answered level 2 against (#242).
-	promoteOtpConfigGeneration bool
+	// promoteOTPConfigGeneration records the generation the session answered level 2 against (#242).
+	promoteOTPConfigGeneration bool
 }
 
 func (reuseSessionPlan) completionPlan() {}
 
 // reuseSession is the reuse mode with the attributes given.
 func reuseSession(rotateIdentifier, refreshAuthTime, replaceAuthentication,
-	promoteOtpConfigGeneration bool) reuseSessionPlan {
+	promoteOTPConfigGeneration bool) reuseSessionPlan {
 
 	return reuseSessionPlan{
 		rotateIdentifier:           rotateIdentifier,
 		refreshAuthTime:            refreshAuthTime,
 		replaceAuthentication:      replaceAuthentication,
-		promoteOtpConfigGeneration: promoteOtpConfigGeneration,
+		promoteOTPConfigGeneration: promoteOTPConfigGeneration,
 	}
 }
 
@@ -146,7 +146,7 @@ func restartAtLevel1() restartPlan {
 //
 // With no session this ceremony may reuse, only level 1 performed in this ceremony
 // (level1Completed) creates one; otherwise the ceremony restarts at level 1 (restartAtLevel1), so a
-// ceremony whose session ended mid-flight never mints a session from its UserId with no proof anyone
+// ceremony whose session ended mid-flight never mints a session from its UserID with no proof anyone
 // authenticated (#129 decision 6). It reads level1Completed, not credentialEntered, because AuthenticatedAt is also
 // set by a code entered over a reused session, with no password (#129 decision 15). The second pass
 // sets level1Completed at the password step, so the restart does not loop, and a session deleted
@@ -162,7 +162,7 @@ func decideCompletion(f completionFacts) completionPlan {
 			f.raisesPrivilege,   // rotateIdentifier
 			f.credentialEntered, // refreshAuthTime
 			f.level1Completed,   // replaceAuthentication
-			f.otpConfigGenerationCaptured && ceremony.TargetRequiresSecondFactor(f.target), // promoteOtpConfigGeneration
+			f.otpConfigGenerationCaptured && ceremony.TargetRequiresSecondFactor(f.target), // promoteOTPConfigGeneration
 		)
 	}
 	if !f.level1Completed {

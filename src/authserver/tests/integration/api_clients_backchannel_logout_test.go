@@ -25,8 +25,8 @@ import (
 const backchannelLogoutRoute = "/api/v1/admin/clients/{id}/backchannel-logout"
 
 // backchannelLogoutPath is the save's path for a client.
-func backchannelLogoutPath(clientId int64) string {
-	return "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10) + "/backchannel-logout"
+func backchannelLogoutPath(clientID int64) string {
+	return "/api/v1/admin/clients/" + strconv.FormatInt(clientID, 10) + "/backchannel-logout"
 }
 
 // backchannelLogoutBody is a body carrying both fields.
@@ -35,13 +35,13 @@ func backchannelLogoutBody(uri string, sessionRequired bool) map[string]any {
 }
 
 // saveBackchannelLogout sends one save and decodes the answer as a JSON object.
-func saveBackchannelLogout(t *testing.T, accessToken string, clientId int64, body any) (int, map[string]any, string) {
+func saveBackchannelLogout(t *testing.T, accessToken string, clientID int64, body any) (int, map[string]any, string) {
 	t.Helper()
-	resp, requestId := sendAdmin(t, accessToken, http.MethodPut, backchannelLogoutPath(clientId), body)
+	resp, requestID := sendAdmin(t, accessToken, http.MethodPut, backchannelLogoutPath(clientID), body)
 	defer func() { _ = resp.Body.Close() }()
 	var decoded map[string]any
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&decoded))
-	return resp.StatusCode, decoded, requestId
+	return resp.StatusCode, decoded, requestID
 }
 
 // newBackchannelLogoutClient creates a client with the authorization code flow on, confidential or
@@ -59,7 +59,7 @@ func newBackchannelLogoutClientRecord(t *testing.T, prefix string, public bool, 
 		Enabled:                          true,
 		IsPublic:                         public,
 		AuthorizationCodeEnabled:         true,
-		DefaultAcrLevel:                  record.AcrLevel2Optional,
+		DefaultACRLevel:                  record.ACRLevel2Optional,
 		BackchannelLogoutURI:             uri,
 		BackchannelLogoutSessionRequired: sessionRequired,
 	}
@@ -77,22 +77,22 @@ func createBackchannelLogoutClient(t *testing.T, client *record.Client, selfRegi
 	t.Helper()
 	client.CreatedViaDCR = selfRegistered
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 	return client
 }
 
 // storedBackchannelLogout is the client's two settings as the database holds them.
-func storedBackchannelLogout(t *testing.T, clientId int64) (string, bool) {
+func storedBackchannelLogout(t *testing.T, clientID int64) (string, bool) {
 	t.Helper()
-	client := storedClient(t, clientId)
+	client := storedClient(t, clientID)
 	require.NotNil(t, client)
 	return client.BackchannelLogoutURI, client.BackchannelLogoutSessionRequired
 }
 
 // readBackchannelLogout is the client's two settings as GET /clients/{id} answers them.
-func readBackchannelLogout(t *testing.T, accessToken string, clientId int64) (string, bool) {
+func readBackchannelLogout(t *testing.T, accessToken string, clientID int64) (string, bool) {
 	t.Helper()
-	resp := makeAPIRequest(t, http.MethodGet, appConfig.AuthServer.BaseURL+"/api/v1/admin/clients/"+strconv.FormatInt(clientId, 10), accessToken, nil)
+	resp := makeAPIRequest(t, http.MethodGet, appConfig.AuthServer.BaseURL+"/api/v1/admin/clients/"+strconv.FormatInt(clientID, 10), accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	var got api.GetClientResponse
@@ -107,17 +107,17 @@ func TestAPIClientBackchannelLogoutPut_SavesClearsAndAnswersBothSettings(t *test
 	client := newBackchannelLogoutClient(t, "bcl-save-", false, "", false)
 	uri := "http://testapp.internal:3000/backchannel-logout?tenant=a&v=%2F1"
 
-	status, body, _ := saveBackchannelLogout(t, accessToken, client.Id, backchannelLogoutBody(uri, true))
+	status, body, _ := saveBackchannelLogout(t, accessToken, client.ID, backchannelLogoutBody(uri, true))
 	require.Equal(t, http.StatusOK, status, body)
 	answered := body["client"].(map[string]any)
-	assert.InDelta(t, float64(client.Id), answered["id"], 0)
+	assert.InDelta(t, float64(client.ID), answered["id"], 0)
 	assert.Equal(t, uri, answered["backchannelLogoutUri"])
 	assert.Equal(t, true, answered["backchannelLogoutSessionRequired"])
 
-	storedURI, storedRequired := storedBackchannelLogout(t, client.Id)
+	storedURI, storedRequired := storedBackchannelLogout(t, client.ID)
 	assert.Equal(t, uri, storedURI)
 	assert.True(t, storedRequired)
-	readURI, readRequired := readBackchannelLogout(t, accessToken, client.Id)
+	readURI, readRequired := readBackchannelLogout(t, accessToken, client.ID)
 	assert.Equal(t, uri, readURI)
 	assert.True(t, readRequired)
 
@@ -128,17 +128,17 @@ func TestAPIClientBackchannelLogoutPut_SavesClearsAndAnswersBothSettings(t *test
 	require.NoError(t, json.NewDecoder(listing.Body).Decode(&clients))
 	found := false
 	for _, listed := range clients.Clients {
-		if listed.Id == client.Id {
+		if listed.ID == client.ID {
 			found = true
 			assert.Equal(t, uri, listed.BackchannelLogoutURI)
 			assert.True(t, listed.BackchannelLogoutSessionRequired)
 		}
 	}
-	assert.True(t, found, "client %d is in the listing", client.Id)
+	assert.True(t, found, "client %d is in the listing", client.ID)
 
-	status, body, _ = saveBackchannelLogout(t, accessToken, client.Id, backchannelLogoutBody("", false))
+	status, body, _ = saveBackchannelLogout(t, accessToken, client.ID, backchannelLogoutBody("", false))
 	require.Equal(t, http.StatusOK, status, body)
-	storedURI, storedRequired = storedBackchannelLogout(t, client.Id)
+	storedURI, storedRequired = storedBackchannelLogout(t, client.ID)
 	assert.Empty(t, storedURI, "an empty URI clears it")
 	assert.False(t, storedRequired)
 }
@@ -187,11 +187,11 @@ func TestAPIClientBackchannelLogoutPut_TheURIRules(t *testing.T) {
 	}
 	for _, tc := range refused {
 		t.Run(tc.name, func(t *testing.T) {
-			status, body, _ := saveBackchannelLogout(t, accessToken, tc.client.Id, backchannelLogoutBody(tc.uri, true))
+			status, body, _ := saveBackchannelLogout(t, accessToken, tc.client.ID, backchannelLogoutBody(tc.uri, true))
 			assert.Equal(t, http.StatusBadRequest, status)
 			assert.Equal(t, "handler.client_backchannel_logout."+tc.wantCode, body["error_code"])
 			assert.Equal(t, tc.wantDescription, body["error_description"])
-			storedURI, storedRequired := storedBackchannelLogout(t, tc.client.Id)
+			storedURI, storedRequired := storedBackchannelLogout(t, tc.client.ID)
 			assert.Empty(t, storedURI, "a refused save writes nothing")
 			assert.False(t, storedRequired, "a refused save writes nothing")
 		})
@@ -211,9 +211,9 @@ func TestAPIClientBackchannelLogoutPut_TheURIRules(t *testing.T) {
 	}
 	for _, tc := range admitted {
 		t.Run(tc.name, func(t *testing.T) {
-			status, body, _ := saveBackchannelLogout(t, accessToken, tc.client.Id, backchannelLogoutBody(tc.uri, false))
+			status, body, _ := saveBackchannelLogout(t, accessToken, tc.client.ID, backchannelLogoutBody(tc.uri, false))
 			require.Equal(t, http.StatusOK, status, body)
-			storedURI, _ := storedBackchannelLogout(t, tc.client.Id)
+			storedURI, _ := storedBackchannelLogout(t, tc.client.ID)
 			assert.Equal(t, strings.TrimSpace(tc.uri), storedURI)
 		})
 	}
@@ -237,10 +237,10 @@ func TestAPIClientBackchannelLogoutPut_BothFieldsAreRequired(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			status, body, _ := saveBackchannelLogout(t, accessToken, client.Id, tc.body)
+			status, body, _ := saveBackchannelLogout(t, accessToken, client.ID, tc.body)
 			assert.Equal(t, http.StatusBadRequest, status)
 			assert.Equal(t, tc.wantCode, body["error_code"])
-			storedURI, storedRequired := storedBackchannelLogout(t, client.Id)
+			storedURI, storedRequired := storedBackchannelLogout(t, client.ID)
 			assert.Equal(t, "https://kept.example.com/bcl", storedURI)
 			assert.True(t, storedRequired)
 		})
@@ -264,34 +264,34 @@ func TestAPIClientBackchannelLogoutPut_TheSignInFlowGate(t *testing.T) {
 			BackchannelLogoutURI:     uri,
 		}
 		require.NoError(t, database.CreateClient(context.Background(), nil, client))
-		t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+		t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 		return client
 	}
 
 	t.Run("neither flow", func(t *testing.T) {
 		client := newClient(t, "bcl-noflow-", false, "")
-		status, body, _ := saveBackchannelLogout(t, accessToken, client.Id, backchannelLogoutBody("https://app.example.com/bcl", false))
+		status, body, _ := saveBackchannelLogout(t, accessToken, client.ID, backchannelLogoutBody("https://app.example.com/bcl", false))
 		assert.Equal(t, http.StatusBadRequest, status)
 		assert.Equal(t, "handler.client_backchannel_logout.no_sign_in_flow", body["error_code"])
 		assert.Equal(t, "A back-channel logout URI is used by clients that sign users in through the authorization code with PKCE flow or the implicit flow, and neither is enabled for this client.",
 			body["error_description"])
-		storedURI, _ := storedBackchannelLogout(t, client.Id)
+		storedURI, _ := storedBackchannelLogout(t, client.ID)
 		assert.Empty(t, storedURI)
 	})
 
 	t.Run("neither flow, clearing a stored URI", func(t *testing.T) {
 		client := newClient(t, "bcl-noflow-clear-", false, "https://old.example.com/bcl")
-		status, body, _ := saveBackchannelLogout(t, accessToken, client.Id, backchannelLogoutBody("", false))
+		status, body, _ := saveBackchannelLogout(t, accessToken, client.ID, backchannelLogoutBody("", false))
 		require.Equal(t, http.StatusOK, status, body)
-		storedURI, _ := storedBackchannelLogout(t, client.Id)
+		storedURI, _ := storedBackchannelLogout(t, client.ID)
 		assert.Empty(t, storedURI)
 	})
 
 	t.Run("the implicit flow alone", func(t *testing.T) {
 		client := newClient(t, "bcl-implicit-", true, "")
-		status, body, _ := saveBackchannelLogout(t, accessToken, client.Id, backchannelLogoutBody("https://app.example.com/bcl", false))
+		status, body, _ := saveBackchannelLogout(t, accessToken, client.ID, backchannelLogoutBody("https://app.example.com/bcl", false))
 		require.Equal(t, http.StatusOK, status, body)
-		storedURI, _ := storedBackchannelLogout(t, client.Id)
+		storedURI, _ := storedBackchannelLogout(t, client.ID)
 		assert.Equal(t, "https://app.example.com/bcl", storedURI)
 	})
 }
@@ -299,14 +299,14 @@ func TestAPIClientBackchannelLogoutPut_TheSignInFlowGate(t *testing.T) {
 // assertRefusedByTheBackchannelLogoutURICeiling holds one answered save to decision 15's refusal: 403
 // MANAGE_SCOPE_REQUIRED with the insufficient_scope challenge, one administrator_change_refused row
 // under ceiling backchannel_logout_uri naming the client, and no record of a save.
-func assertRefusedByTheBackchannelLogoutURICeiling(t *testing.T, status int, body map[string]any, requestId, readerToken string,
-	caller *record.Client, clientId int64) {
+func assertRefusedByTheBackchannelLogoutURICeiling(t *testing.T, status int, body map[string]any, requestID, readerToken string,
+	caller *record.Client, clientID int64) {
 	t.Helper()
 	assert.Equal(t, http.StatusForbidden, status)
 	assert.Equal(t, "MANAGE_SCOPE_REQUIRED", body["error_code"])
 	assert.Contains(t, body["error_description"], "authserver:manage")
 
-	rows := refusalRows(t, readerToken, requestId)
+	rows := refusalRows(t, readerToken, requestID)
 	require.Len(t, rows, 1, "exactly one administrator_change_refused row for the refused request")
 	assert.Equal(t, map[string]any{
 		"logged_in_user": caller.ClientIdentifier,
@@ -314,9 +314,9 @@ func assertRefusedByTheBackchannelLogoutURICeiling(t *testing.T, status int, bod
 		"route":          backchannelLogoutRoute,
 		"ceiling":        "backchannel_logout_uri",
 		"target_kind":    "client",
-		"target_id":      float64(clientId),
+		"target_id":      float64(clientID),
 	}, rows[0])
-	assert.Empty(t, auditRows(t, readerToken, "updated_client_backchannel_logout", requestId), "no record of a save that was not made")
+	assert.Empty(t, auditRows(t, readerToken, "updated_client_backchannel_logout", requestID), "no record of a save that was not made")
 }
 
 // Decision 15: a token without authserver:manage cannot set a URI or change the stored one, on an
@@ -326,11 +326,11 @@ func TestAPIClientBackchannelLogoutPut_OnlyManageSetsOrChangesTheURI(t *testing.
 	requireDatabaseAuditLogs(t)
 	manageToken, _ := createAdminClientWithToken(t)
 	granularToken, caller := createClientWithGranularScope(t, builtin.ManageClientsPermissionIdentifier)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.ID) })
 
 	t.Run("setting a URI on a client with none", func(t *testing.T) {
 		client := newBackchannelLogoutClient(t, "bcl-ceiling-set-", false, "", false)
-		resp, requestId := sendAdmin(t, granularToken, http.MethodPut, backchannelLogoutPath(client.Id),
+		resp, requestID := sendAdmin(t, granularToken, http.MethodPut, backchannelLogoutPath(client.ID),
 			backchannelLogoutBody("http://metadata.internal/latest", false))
 		defer func() { _ = resp.Body.Close() }()
 		challenge := resp.Header.Get("WWW-Authenticate")
@@ -339,57 +339,57 @@ func TestAPIClientBackchannelLogoutPut_OnlyManageSetsOrChangesTheURI(t *testing.
 		assert.Contains(t, challenge, `scope="authserver:manage"`)
 		var body map[string]any
 		require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
-		assertRefusedByTheBackchannelLogoutURICeiling(t, resp.StatusCode, body, requestId, manageToken, caller, client.Id)
-		storedURI, _ := storedBackchannelLogout(t, client.Id)
+		assertRefusedByTheBackchannelLogoutURICeiling(t, resp.StatusCode, body, requestID, manageToken, caller, client.ID)
+		storedURI, _ := storedBackchannelLogout(t, client.ID)
 		assert.Empty(t, storedURI)
 	})
 
 	t.Run("changing the stored URI", func(t *testing.T) {
 		client := newBackchannelLogoutClient(t, "bcl-ceiling-change-", false, "https://app.example.com/bcl", false)
-		status, body, requestId := saveBackchannelLogout(t, granularToken, client.Id,
+		status, body, requestID := saveBackchannelLogout(t, granularToken, client.ID,
 			backchannelLogoutBody("https://elsewhere.example.com/bcl", false))
-		assertRefusedByTheBackchannelLogoutURICeiling(t, status, body, requestId, manageToken, caller, client.Id)
-		storedURI, _ := storedBackchannelLogout(t, client.Id)
+		assertRefusedByTheBackchannelLogoutURICeiling(t, status, body, requestID, manageToken, caller, client.ID)
+		storedURI, _ := storedBackchannelLogout(t, client.ID)
 		assert.Equal(t, "https://app.example.com/bcl", storedURI)
 	})
 
 	t.Run("changing the flag alone", func(t *testing.T) {
 		client := newBackchannelLogoutClient(t, "bcl-ceiling-flag-", false, "https://app.example.com/bcl", false)
-		status, body, requestId := saveBackchannelLogout(t, granularToken, client.Id,
+		status, body, requestID := saveBackchannelLogout(t, granularToken, client.ID,
 			backchannelLogoutBody("https://app.example.com/bcl", true))
 		require.Equal(t, http.StatusOK, status, body)
-		storedURI, storedRequired := storedBackchannelLogout(t, client.Id)
+		storedURI, storedRequired := storedBackchannelLogout(t, client.ID)
 		assert.Equal(t, "https://app.example.com/bcl", storedURI)
 		assert.True(t, storedRequired)
-		assert.Empty(t, refusalRows(t, manageToken, requestId))
+		assert.Empty(t, refusalRows(t, manageToken, requestID))
 	})
 
 	t.Run("clearing the URI", func(t *testing.T) {
 		client := newBackchannelLogoutClient(t, "bcl-ceiling-clear-", false, "https://app.example.com/bcl", true)
-		status, body, requestId := saveBackchannelLogout(t, granularToken, client.Id, backchannelLogoutBody("", false))
+		status, body, requestID := saveBackchannelLogout(t, granularToken, client.ID, backchannelLogoutBody("", false))
 		require.Equal(t, http.StatusOK, status, body)
-		storedURI, storedRequired := storedBackchannelLogout(t, client.Id)
+		storedURI, storedRequired := storedBackchannelLogout(t, client.ID)
 		assert.Empty(t, storedURI)
 		assert.False(t, storedRequired)
-		assert.Empty(t, refusalRows(t, manageToken, requestId))
+		assert.Empty(t, refusalRows(t, manageToken, requestID))
 	})
 
 	t.Run("the request's own 400 comes first", func(t *testing.T) {
 		client := newBackchannelLogoutClient(t, "bcl-ceiling-400-", false, "", false)
-		status, body, requestId := saveBackchannelLogout(t, granularToken, client.Id, backchannelLogoutBody("ftp://app.example.com/bcl", false))
+		status, body, requestID := saveBackchannelLogout(t, granularToken, client.ID, backchannelLogoutBody("ftp://app.example.com/bcl", false))
 		assert.Equal(t, http.StatusBadRequest, status)
 		assert.Equal(t, "handler.client_backchannel_logout.uri_scheme_invalid", body["error_code"])
-		assert.Empty(t, refusalRows(t, manageToken, requestId))
+		assert.Empty(t, refusalRows(t, manageToken, requestID))
 	})
 
 	t.Run("authserver:manage sets and changes it", func(t *testing.T) {
 		client := newBackchannelLogoutClient(t, "bcl-ceiling-manage-", false, "", false)
 		for _, uri := range []string{"http://app.internal:3000/bcl", "https://app.example.com/bcl"} {
-			status, body, requestId := saveBackchannelLogout(t, manageToken, client.Id, backchannelLogoutBody(uri, false))
+			status, body, requestID := saveBackchannelLogout(t, manageToken, client.ID, backchannelLogoutBody(uri, false))
 			require.Equal(t, http.StatusOK, status, body)
-			storedURI, _ := storedBackchannelLogout(t, client.Id)
+			storedURI, _ := storedBackchannelLogout(t, client.ID)
 			assert.Equal(t, uri, storedURI)
-			assert.Empty(t, refusalRows(t, manageToken, requestId))
+			assert.Empty(t, refusalRows(t, manageToken, requestID))
 		}
 	})
 }
@@ -401,18 +401,18 @@ func TestAPIClientBackchannelLogoutPut_TheSaveIsAudited(t *testing.T) {
 	accessToken, caller := createAdminClientWithToken(t)
 	client := newBackchannelLogoutClient(t, "bcl-audit-", false, "", false)
 
-	status, body, requestId := saveBackchannelLogout(t, accessToken, client.Id, backchannelLogoutBody("https://app.example.com/bcl", true))
+	status, body, requestID := saveBackchannelLogout(t, accessToken, client.ID, backchannelLogoutBody("https://app.example.com/bcl", true))
 	require.Equal(t, http.StatusOK, status, body)
-	assert.Equal(t, []map[string]any{{"client_id": float64(client.Id), "logged_in_user": caller.ClientIdentifier}},
-		auditRows(t, accessToken, "updated_client_backchannel_logout", requestId))
+	assert.Equal(t, []map[string]any{{"client_id": float64(client.ID), "logged_in_user": caller.ClientIdentifier}},
+		auditRows(t, accessToken, "updated_client_backchannel_logout", requestID))
 
-	status, _, requestId = saveBackchannelLogout(t, accessToken, client.Id, backchannelLogoutBody("ftp://app.example.com/bcl", true))
+	status, _, requestID = saveBackchannelLogout(t, accessToken, client.ID, backchannelLogoutBody("ftp://app.example.com/bcl", true))
 	require.Equal(t, http.StatusBadRequest, status)
-	assert.Empty(t, auditRows(t, accessToken, "updated_client_backchannel_logout", requestId))
+	assert.Empty(t, auditRows(t, accessToken, "updated_client_backchannel_logout", requestID))
 }
 
 // The request's own refusals, and the route's scopes: admin-read reads both fields and cannot save.
-func TestAPIClientBackchannelLogoutPut_NotFound_InvalidId_InvalidBody_Unauthorized_InsufficientScope(t *testing.T) {
+func TestAPIClientBackchannelLogoutPut_NotFound_InvalidID_InvalidBody_Unauthorized_InsufficientScope(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	status, body, _ := saveBackchannelLogout(t, accessToken, 999999, backchannelLogoutBody("https://app.example.com/bcl", false))
@@ -427,8 +427,8 @@ func TestAPIClientBackchannelLogoutPut_NotFound_InvalidId_InvalidBody_Unauthoriz
 	assert.Equal(t, "Invalid client ID", bad["error_description"])
 
 	client := newBackchannelLogoutClient(t, "bcl-request-", false, "https://app.example.com/bcl", false)
-	httpClient := createHttpClient(t)
-	url := appConfig.AuthServer.BaseURL + backchannelLogoutPath(client.Id)
+	httpClient := createHTTPClient(t)
+	url := appConfig.AuthServer.BaseURL + backchannelLogoutPath(client.ID)
 
 	req, err := http.NewRequest(http.MethodPut, url, strings.NewReader("{not json"))
 	require.NoError(t, err)
@@ -450,12 +450,12 @@ func TestAPIClientBackchannelLogoutPut_NotFound_InvalidId_InvalidBody_Unauthoriz
 	assert.Equal(t, http.StatusUnauthorized, noToken.StatusCode)
 
 	readToken, reader := createClientWithGranularScope(t, builtin.AdminReadPermissionIdentifier)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, reader.Id) })
-	readURI, _ := readBackchannelLogout(t, readToken, client.Id)
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, reader.ID) })
+	readURI, _ := readBackchannelLogout(t, readToken, client.ID)
 	assert.Equal(t, "https://app.example.com/bcl", readURI, "admin-read reads the URI")
-	status, body, _ = saveBackchannelLogout(t, readToken, client.Id, backchannelLogoutBody("", false))
+	status, body, _ = saveBackchannelLogout(t, readToken, client.ID, backchannelLogoutBody("", false))
 	assert.Equal(t, http.StatusForbidden, status)
 	assert.Equal(t, "INSUFFICIENT_SCOPE", body["error_code"])
-	storedURI, _ := storedBackchannelLogout(t, client.Id)
+	storedURI, _ := storedBackchannelLogout(t, client.ID)
 	assert.Equal(t, "https://app.example.com/bcl", storedURI, "nothing changed")
 }

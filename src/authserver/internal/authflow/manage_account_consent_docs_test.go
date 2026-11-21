@@ -44,8 +44,8 @@ func manageAccountSilentRefusals(t *testing.T) []silentRefusal {
 	world := silentWorld{
 		valid:            true,
 		subject:          "sub-1",
-		target:           record.AcrLevel1,
-		sessionAcr:       record.AcrLevel1,
+		target:           record.ACRLevel1,
+		sessionACR:       record.ACRLevel1,
 		effectiveScope:   "openid " + consentManageAccountScope,
 		clientIdentifier: "my-app",
 	}

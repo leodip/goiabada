@@ -59,7 +59,7 @@ func registerThroughTheHandler(t *testing.T, db *dcrWriteRecorder,
 
 	req := httptest.NewRequest(http.MethodPost, "/connect/register", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{Id: 1, DynamicClientRegistrationEnabled: true}))
+	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{ID: 1, DynamicClientRegistrationEnabled: true}))
 
 	rr := httptest.NewRecorder()
 	handlers.HandleDynamicClientRegistrationPost(db, auditLogger, dataCipher).ServeHTTP(rr, req)
@@ -84,7 +84,7 @@ func TestDCR_AFailedSecondRedirectURIWriteLeavesNoClientAndNoRedirectURI(t *test
 	require.NoError(t, err)
 	assert.Nil(t, client, "the client row was rolled back with the redirect URIs")
 
-	uris, err := database.GetRedirectURIsByClientId(context.Background(), nil, db.created.Id)
+	uris, err := database.GetRedirectURIsByClientID(context.Background(), nil, db.created.ID)
 	require.NoError(t, err)
 	assert.Empty(t, uris, "the first redirect URI was rolled back with the client")
 }
@@ -105,10 +105,10 @@ func TestDCR_ARegistrationWithNoFailureCommitsTheClientAndItsRedirectURIs(t *tes
 	client, err := database.GetClientByClientIdentifier(context.Background(), nil, db.created.ClientIdentifier)
 	require.NoError(t, err)
 	require.NotNil(t, client)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 	assert.NotEmpty(t, client.ClientSecretEncrypted)
 
-	uris, err := database.GetRedirectURIsByClientId(context.Background(), nil, client.Id)
+	uris, err := database.GetRedirectURIsByClientID(context.Background(), nil, client.ID)
 	require.NoError(t, err)
 	got := make([]string, 0, len(uris))
 	for _, uri := range uris {

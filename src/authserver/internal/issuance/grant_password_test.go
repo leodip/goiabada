@@ -23,7 +23,7 @@ func TestIssuePasswordGrant_BasicOpenIDScope(t *testing.T) {
 		TokenExpirationInSeconds:                600,
 		UserSessionIdleTimeoutInSeconds:         1200,
 		UserSessionMaxLifetimeInSeconds:         2400,
-		IncludeOpenIDConnectClaimsInIdToken:     true,
+		IncludeOpenIDConnectClaimsInIDToken:     true,
 		IncludeOpenIDConnectClaimsInAccessToken: true,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 1800,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 3600,
@@ -36,14 +36,14 @@ func TestIssuePasswordGrant_BasicOpenIDScope(t *testing.T) {
 
 	sub := fake.UUID()
 	client := &record.Client{
-		Id:                                      1,
+		ID:                                      1,
 		ClientIdentifier:                        "test-client",
 		TokenExpirationInSeconds:                900,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 3600,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 7200,
 	}
 	user := &record.User{
-		Id:            1,
+		ID:            1,
 		Subject:       sub,
 		Email:         "user@example.com",
 		EmailVerified: true,
@@ -52,7 +52,7 @@ func TestIssuePasswordGrant_BasicOpenIDScope(t *testing.T) {
 	}
 
 	keyPair := &record.KeyPair{
-		Id:            1,
+		ID:            1,
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 		PublicKeyPEM:  publicKeyBytes,
@@ -77,13 +77,13 @@ func TestIssuePasswordGrant_BasicOpenIDScope(t *testing.T) {
 		Scope:  "openid",
 	}
 
-	expectPasswordGrantClientRow(mockDB, input.Client.Id, input.Client)
+	expectPasswordGrantClientRow(mockDB, input.Client.ID, input.Client)
 	response, err := tokenIssuer.IssuePasswordGrant(ctx, settings, input)
 
 	require.NoError(t, err)
 	assert.NotNil(t, response)
 	assert.NotEmpty(t, response.AccessToken)
-	assert.NotEmpty(t, response.IdToken)
+	assert.NotEmpty(t, response.IDToken)
 	assert.NotEmpty(t, response.RefreshToken)
 	assert.Equal(t, "Bearer", response.TokenType)
 	assert.Equal(t, int64(900), response.ExpiresIn) // Client override
@@ -102,7 +102,7 @@ func TestIssuePasswordGrant_BasicOpenIDScope(t *testing.T) {
 	assert.NotContains(t, accessClaims, "sid")
 
 	// Verify id_token claims
-	idClaims := verifyAndDecodeToken(t, response.IdToken, publicKeyBytes)
+	idClaims := verifyAndDecodeToken(t, response.IDToken, publicKeyBytes)
 	assert.Equal(t, "https://test-issuer.com", idClaims["iss"])
 	assert.Equal(t, sub, idClaims["sub"])
 	assert.Equal(t, "urn:goiabada:level1", idClaims["acr"])
@@ -137,13 +137,13 @@ func TestIssuePasswordGrant_WithOfflineAccess(t *testing.T) {
 
 	sub := fake.UUID()
 	client := &record.Client{
-		Id:                                      1,
+		ID:                                      1,
 		ClientIdentifier:                        "test-client",
 		RefreshTokenOfflineIdleTimeoutInSeconds: 172800,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 1209600,
 	}
 	user := &record.User{
-		Id:            1,
+		ID:            1,
 		Subject:       sub,
 		Email:         "user@example.com",
 		EmailVerified: true,
@@ -152,7 +152,7 @@ func TestIssuePasswordGrant_WithOfflineAccess(t *testing.T) {
 	}
 
 	keyPair := &record.KeyPair{
-		Id:            1,
+		ID:            1,
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 		PublicKeyPEM:  publicKeyBytes,
@@ -177,13 +177,13 @@ func TestIssuePasswordGrant_WithOfflineAccess(t *testing.T) {
 		Scope:  "openid offline_access",
 	}
 
-	expectPasswordGrantClientRow(mockDB, input.Client.Id, input.Client)
+	expectPasswordGrantClientRow(mockDB, input.Client.ID, input.Client)
 	response, err := tokenIssuer.IssuePasswordGrant(ctx, settings, input)
 
 	require.NoError(t, err)
 	assert.NotNil(t, response)
 	assert.NotEmpty(t, response.AccessToken)
-	assert.NotEmpty(t, response.IdToken)
+	assert.NotEmpty(t, response.IDToken)
 	assert.NotEmpty(t, response.RefreshToken)
 	assert.Equal(t, "Bearer", response.TokenType)
 	assert.Contains(t, response.Scope, "offline_access")
@@ -206,7 +206,7 @@ func TestIssuePasswordGrant_WithProfileScope(t *testing.T) {
 		TokenExpirationInSeconds:                600,
 		UserSessionIdleTimeoutInSeconds:         1200,
 		UserSessionMaxLifetimeInSeconds:         2400,
-		IncludeOpenIDConnectClaimsInIdToken:     true,
+		IncludeOpenIDConnectClaimsInIDToken:     true,
 		IncludeOpenIDConnectClaimsInAccessToken: true,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 1800,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 3600,
@@ -219,11 +219,11 @@ func TestIssuePasswordGrant_WithProfileScope(t *testing.T) {
 
 	sub := fake.UUID()
 	client := &record.Client{
-		Id:               1,
+		ID:               1,
 		ClientIdentifier: "test-client",
 	}
 	user := &record.User{
-		Id:         1,
+		ID:         1,
 		Subject:    sub,
 		Email:      "user@example.com",
 		Username:   "testuser",
@@ -234,7 +234,7 @@ func TestIssuePasswordGrant_WithProfileScope(t *testing.T) {
 	}
 
 	keyPair := &record.KeyPair{
-		Id:            1,
+		ID:            1,
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 		PublicKeyPEM:  publicKeyBytes,
@@ -251,7 +251,7 @@ func TestIssuePasswordGrant_WithProfileScope(t *testing.T) {
 		u := args.Get(2).(*record.User)
 		u.Attributes = []record.UserAttribute{}
 	})
-	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.Id).Return(false, nil)
+	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.ID).Return(false, nil)
 	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*record.RefreshToken")).Return(nil)
 
 	input := &ROPCGrantInput{
@@ -260,15 +260,15 @@ func TestIssuePasswordGrant_WithProfileScope(t *testing.T) {
 		Scope:  "openid profile",
 	}
 
-	expectPasswordGrantClientRow(mockDB, input.Client.Id, input.Client)
+	expectPasswordGrantClientRow(mockDB, input.Client.ID, input.Client)
 	response, err := tokenIssuer.IssuePasswordGrant(ctx, settings, input)
 
 	require.NoError(t, err)
 	assert.NotNil(t, response)
-	assert.NotEmpty(t, response.IdToken)
+	assert.NotEmpty(t, response.IDToken)
 
 	// Verify id_token contains profile claims
-	idClaims := verifyAndDecodeToken(t, response.IdToken, publicKeyBytes)
+	idClaims := verifyAndDecodeToken(t, response.IDToken, publicKeyBytes)
 	assert.Equal(t, "John", idClaims["given_name"])
 	assert.Equal(t, "Doe", idClaims["family_name"])
 	assert.Equal(t, "johnd", idClaims["nickname"])
@@ -287,7 +287,7 @@ func TestIssuePasswordGrant_WithEmailScope(t *testing.T) {
 		TokenExpirationInSeconds:                600,
 		UserSessionIdleTimeoutInSeconds:         1200,
 		UserSessionMaxLifetimeInSeconds:         2400,
-		IncludeOpenIDConnectClaimsInIdToken:     true,
+		IncludeOpenIDConnectClaimsInIDToken:     true,
 		IncludeOpenIDConnectClaimsInAccessToken: true,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 1800,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 3600,
@@ -300,11 +300,11 @@ func TestIssuePasswordGrant_WithEmailScope(t *testing.T) {
 
 	sub := fake.UUID()
 	client := &record.Client{
-		Id:               1,
+		ID:               1,
 		ClientIdentifier: "test-client",
 	}
 	user := &record.User{
-		Id:            1,
+		ID:            1,
 		Subject:       sub,
 		Email:         "user@example.com",
 		EmailVerified: true,
@@ -313,7 +313,7 @@ func TestIssuePasswordGrant_WithEmailScope(t *testing.T) {
 	}
 
 	keyPair := &record.KeyPair{
-		Id:            1,
+		ID:            1,
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 		PublicKeyPEM:  publicKeyBytes,
@@ -338,15 +338,15 @@ func TestIssuePasswordGrant_WithEmailScope(t *testing.T) {
 		Scope:  "openid email",
 	}
 
-	expectPasswordGrantClientRow(mockDB, input.Client.Id, input.Client)
+	expectPasswordGrantClientRow(mockDB, input.Client.ID, input.Client)
 	response, err := tokenIssuer.IssuePasswordGrant(ctx, settings, input)
 
 	require.NoError(t, err)
 	assert.NotNil(t, response)
-	assert.NotEmpty(t, response.IdToken)
+	assert.NotEmpty(t, response.IDToken)
 
 	// Verify id_token contains email claims
-	idClaims := verifyAndDecodeToken(t, response.IdToken, publicKeyBytes)
+	idClaims := verifyAndDecodeToken(t, response.IDToken, publicKeyBytes)
 	assert.Equal(t, "user@example.com", idClaims["email"])
 	assert.Equal(t, true, idClaims["email_verified"])
 
@@ -375,11 +375,11 @@ func TestIssuePasswordGrant_WithResourcePermissions(t *testing.T) {
 
 	sub := fake.UUID()
 	client := &record.Client{
-		Id:               1,
+		ID:               1,
 		ClientIdentifier: "test-client",
 	}
 	user := &record.User{
-		Id:            1,
+		ID:            1,
 		Subject:       sub,
 		Email:         "user@example.com",
 		EmailVerified: true,
@@ -388,7 +388,7 @@ func TestIssuePasswordGrant_WithResourcePermissions(t *testing.T) {
 	}
 
 	keyPair := &record.KeyPair{
-		Id:            1,
+		ID:            1,
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 		PublicKeyPEM:  publicKeyBytes,
@@ -413,7 +413,7 @@ func TestIssuePasswordGrant_WithResourcePermissions(t *testing.T) {
 		Scope:  "openid myapi:read myapi:write",
 	}
 
-	expectPasswordGrantClientRow(mockDB, input.Client.Id, input.Client)
+	expectPasswordGrantClientRow(mockDB, input.Client.ID, input.Client)
 	response, err := tokenIssuer.IssuePasswordGrant(ctx, settings, input)
 
 	require.NoError(t, err)
@@ -459,11 +459,11 @@ func TestIssuePasswordGrant_WithGroups(t *testing.T) {
 
 	sub := fake.UUID()
 	client := &record.Client{
-		Id:               1,
+		ID:               1,
 		ClientIdentifier: "test-client",
 	}
 	user := &record.User{
-		Id:            1,
+		ID:            1,
 		Subject:       sub,
 		Email:         "user@example.com",
 		EmailVerified: true,
@@ -472,7 +472,7 @@ func TestIssuePasswordGrant_WithGroups(t *testing.T) {
 	}
 
 	keyPair := &record.KeyPair{
-		Id:            1,
+		ID:            1,
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 		PublicKeyPEM:  publicKeyBytes,
@@ -483,8 +483,8 @@ func TestIssuePasswordGrant_WithGroups(t *testing.T) {
 	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
 		u := args.Get(2).(*record.User)
 		u.Groups = []record.Group{
-			{Id: 1, GroupIdentifier: "admins", IncludeInAccessToken: true, IncludeInIdToken: true},
-			{Id: 2, GroupIdentifier: "users", IncludeInAccessToken: true, IncludeInIdToken: false},
+			{ID: 1, GroupIdentifier: "admins", IncludeInAccessToken: true, IncludeInIDToken: true},
+			{ID: 2, GroupIdentifier: "users", IncludeInAccessToken: true, IncludeInIDToken: false},
 		}
 	})
 	mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything, mock.Anything).Return(nil)
@@ -500,18 +500,18 @@ func TestIssuePasswordGrant_WithGroups(t *testing.T) {
 		Scope:  "openid groups",
 	}
 
-	expectPasswordGrantClientRow(mockDB, input.Client.Id, input.Client)
+	expectPasswordGrantClientRow(mockDB, input.Client.ID, input.Client)
 	response, err := tokenIssuer.IssuePasswordGrant(ctx, settings, input)
 
 	require.NoError(t, err)
 	assert.NotNil(t, response)
-	assert.NotEmpty(t, response.IdToken)
+	assert.NotEmpty(t, response.IDToken)
 
 	// Verify id_token contains groups
-	idClaims := verifyAndDecodeToken(t, response.IdToken, publicKeyBytes)
+	idClaims := verifyAndDecodeToken(t, response.IDToken, publicKeyBytes)
 	groups := idClaims["groups"].([]interface{})
 	assert.Contains(t, groups, "admins")
-	// "users" has IncludeInIdToken=false so should not be in id_token
+	// "users" has IncludeInIDToken=false so should not be in id_token
 
 	// Verify access token contains groups
 	accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
@@ -544,11 +544,11 @@ func TestIssuePasswordGrant_WithoutOpenID(t *testing.T) {
 
 	sub := fake.UUID()
 	client := &record.Client{
-		Id:               1,
+		ID:               1,
 		ClientIdentifier: "test-client",
 	}
 	user := &record.User{
-		Id:            1,
+		ID:            1,
 		Subject:       sub,
 		Email:         "user@example.com",
 		EmailVerified: true,
@@ -557,7 +557,7 @@ func TestIssuePasswordGrant_WithoutOpenID(t *testing.T) {
 	}
 
 	keyPair := &record.KeyPair{
-		Id:            1,
+		ID:            1,
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 		PublicKeyPEM:  publicKeyBytes,
@@ -582,13 +582,13 @@ func TestIssuePasswordGrant_WithoutOpenID(t *testing.T) {
 		Scope:  "myapi:read",
 	}
 
-	expectPasswordGrantClientRow(mockDB, input.Client.Id, input.Client)
+	expectPasswordGrantClientRow(mockDB, input.Client.ID, input.Client)
 	response, err := tokenIssuer.IssuePasswordGrant(ctx, settings, input)
 
 	require.NoError(t, err)
 	assert.NotNil(t, response)
 	assert.NotEmpty(t, response.AccessToken)
-	assert.Empty(t, response.IdToken) // No openid scope = no id_token
+	assert.Empty(t, response.IDToken) // No openid scope = no id_token
 	assert.NotEmpty(t, response.RefreshToken)
 	assert.Equal(t, "Bearer", response.TokenType)
 
@@ -609,11 +609,11 @@ func TestIssuePasswordGrant_DatabaseError_GetSigningKey(t *testing.T) {
 
 	sub := fake.UUID()
 	client := &record.Client{
-		Id:               1,
+		ID:               1,
 		ClientIdentifier: "test-client",
 	}
 	user := &record.User{
-		Id:       1,
+		ID:       1,
 		Subject:  sub,
 		Email:    "user@example.com",
 		Username: "testuser",
@@ -660,11 +660,11 @@ func TestIssuePasswordGrant_DatabaseError_CreateRefreshToken(t *testing.T) {
 
 	sub := fake.UUID()
 	client := &record.Client{
-		Id:               1,
+		ID:               1,
 		ClientIdentifier: "test-client",
 	}
 	user := &record.User{
-		Id:       1,
+		ID:       1,
 		Subject:  sub,
 		Email:    "user@example.com",
 		Username: "testuser",
@@ -672,7 +672,7 @@ func TestIssuePasswordGrant_DatabaseError_CreateRefreshToken(t *testing.T) {
 	}
 
 	keyPair := &record.KeyPair{
-		Id:            1,
+		ID:            1,
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 		PublicKeyPEM:  publicKeyBytes,
@@ -697,7 +697,7 @@ func TestIssuePasswordGrant_DatabaseError_CreateRefreshToken(t *testing.T) {
 		Scope:  "openid",
 	}
 
-	expectPasswordGrantClientRow(mockDB, input.Client.Id, input.Client)
+	expectPasswordGrantClientRow(mockDB, input.Client.ID, input.Client)
 	response, err := tokenIssuer.IssuePasswordGrant(ctx, settings, input)
 
 	require.Error(t, err)
@@ -729,12 +729,12 @@ func TestIssuePasswordGrant_ClientTokenExpiration(t *testing.T) {
 
 	sub := fake.UUID()
 	client := &record.Client{
-		Id:                       1,
+		ID:                       1,
 		ClientIdentifier:         "test-client",
 		TokenExpirationInSeconds: 1800, // Client-specific override
 	}
 	user := &record.User{
-		Id:            1,
+		ID:            1,
 		Subject:       sub,
 		Email:         "user@example.com",
 		EmailVerified: true,
@@ -743,7 +743,7 @@ func TestIssuePasswordGrant_ClientTokenExpiration(t *testing.T) {
 	}
 
 	keyPair := &record.KeyPair{
-		Id:            1,
+		ID:            1,
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 		PublicKeyPEM:  publicKeyBytes,
@@ -768,7 +768,7 @@ func TestIssuePasswordGrant_ClientTokenExpiration(t *testing.T) {
 		Scope:  "openid",
 	}
 
-	expectPasswordGrantClientRow(mockDB, input.Client.Id, input.Client)
+	expectPasswordGrantClientRow(mockDB, input.Client.ID, input.Client)
 	response, err := tokenIssuer.IssuePasswordGrant(ctx, settings, input)
 
 	require.NoError(t, err)
@@ -800,12 +800,12 @@ func TestIssuePasswordGrant_GlobalTokenExpiration(t *testing.T) {
 
 	sub := fake.UUID()
 	client := &record.Client{
-		Id:                       1,
+		ID:                       1,
 		ClientIdentifier:         "test-client",
 		TokenExpirationInSeconds: 0, // No client override
 	}
 	user := &record.User{
-		Id:            1,
+		ID:            1,
 		Subject:       sub,
 		Email:         "user@example.com",
 		EmailVerified: true,
@@ -814,7 +814,7 @@ func TestIssuePasswordGrant_GlobalTokenExpiration(t *testing.T) {
 	}
 
 	keyPair := &record.KeyPair{
-		Id:            1,
+		ID:            1,
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 		PublicKeyPEM:  publicKeyBytes,
@@ -839,7 +839,7 @@ func TestIssuePasswordGrant_GlobalTokenExpiration(t *testing.T) {
 		Scope:  "openid",
 	}
 
-	expectPasswordGrantClientRow(mockDB, input.Client.Id, input.Client)
+	expectPasswordGrantClientRow(mockDB, input.Client.ID, input.Client)
 	response, err := tokenIssuer.IssuePasswordGrant(ctx, settings, input)
 
 	require.NoError(t, err)

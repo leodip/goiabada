@@ -47,7 +47,7 @@ func acceptRegistration(database *datamocks.Database, auditLogger *handlersmocks
 	var written []record.PostLogoutRedirectURI
 	datamocks.ExpectRunInTransaction(database, dcrTx)
 	database.On("CreateClient", mock.Anything, dcrTx, mock.Anything).
-		Run(func(args mock.Arguments) { args.Get(2).(*record.Client).Id = 42 }).Return(nil).Once()
+		Run(func(args mock.Arguments) { args.Get(2).(*record.Client).ID = 42 }).Return(nil).Once()
 	database.On("CreateRedirectURI", mock.Anything, dcrTx, mock.Anything).Return(nil).Maybe()
 	database.On("CreatePostLogoutRedirectURI", mock.Anything, dcrTx, mock.Anything).
 		Run(func(args mock.Arguments) {
@@ -144,7 +144,7 @@ func TestHandleDynamicClientRegistrationPost_SignOutRedirectURIRules(t *testing.
 				assert.Equal(t, tc.uris, decodeDCRResponse(t, rr).PostLogoutRedirectURIs)
 				stored := make([]string, 0, len(*written))
 				for _, row := range *written {
-					assert.Equal(t, int64(42), row.ClientId)
+					assert.Equal(t, int64(42), row.ClientID)
 					stored = append(stored, row.URI)
 				}
 				assert.Equal(t, tc.uris, stored)
@@ -178,14 +178,14 @@ func TestHandleDynamicClientRegistrationPost_WritesTheSignOutRedirectURIsInTheRe
 	datamocks.ExpectRunInTransaction(database, dcrTx, note)
 	database.On("CreateClient", mock.Anything, dcrTx, mock.Anything).
 		Run(func(args mock.Arguments) {
-			args.Get(2).(*record.Client).Id = 42
+			args.Get(2).(*record.Client).ID = 42
 			note("client")
 		}).Return(nil).Once()
 	database.On("CreateRedirectURI", mock.Anything, dcrTx, mock.Anything).
 		Run(func(mock.Arguments) { note("redirect uri") }).Return(nil).Once()
 	for _, uri := range []string{"https://client.example.com/signed-out", "https://client.example.com/bye?state=fixed"} {
 		database.On("CreatePostLogoutRedirectURI", mock.Anything, dcrTx, mock.MatchedBy(func(r *record.PostLogoutRedirectURI) bool {
-			return r.ClientId == 42 && r.URI == uri
+			return r.ClientID == 42 && r.URI == uri
 		})).Run(func(mock.Arguments) { note("sign-out redirect uri") }).Return(nil).Once()
 	}
 	auditLogger.On("Log", mock.Anything, audit.EventDynamicClientRegistration, mock.Anything).

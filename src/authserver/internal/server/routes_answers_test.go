@@ -49,7 +49,7 @@ func newRoutingTestServer(t *testing.T, database *datamocks.Database) *Server {
 
 	cfg := &config.Config{}
 	cfg.AuthServer.ProfilePictureMaxSizeBytes = testProfilePictureMaxSizeBytes
-	cfg.AuthServer.LogHttpRequests = true
+	cfg.AuthServer.LogHTTPRequests = true
 
 	s := NewServer(routing.New(), database, newTestSessionStore(), nil, nil, cfg, testTokenProofs(t))
 	s.registerRoutes()
@@ -65,8 +65,8 @@ func newRoutingDatabase(t *testing.T) *datamocks.Database {
 	// it automatic, in the built-in colors.
 	database.On("GetDefaultBrand", mock.Anything, mock.Anything).Return(nil, nil).Maybe()
 	database.On("GetClientPageBrand", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil).Maybe()
-	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).
-		Return(&record.Settings{Id: 1, AppName: "Goiabada"}, nil).Maybe()
+	database.On("GetSettingsByID", mock.Anything, mock.Anything, int64(1)).
+		Return(&record.Settings{ID: 1, AppName: "Goiabada"}, nil).Maybe()
 	return database
 }
 
@@ -149,7 +149,7 @@ func TestRegisterRoutes_AnUnmatchedPageMeetsThePageChainFirst(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	// A page reads the default brand; none leaves it automatic, in the built-in colors.
 	database.On("GetDefaultBrand", mock.Anything, mock.Anything).Return(nil, nil).Maybe()
-	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).
+	database.On("GetSettingsByID", mock.Anything, mock.Anything, int64(1)).
 		Return(nil, errors.New("the database is down"))
 	s := newRoutingTestServer(t, database)
 
@@ -461,10 +461,10 @@ func TestRegisterRoutes_ADirectoryUnderAnEscapedStaticIsThe404Page(t *testing.T)
 	}
 }
 
-// mintedRequestId is the request id requestid.Middleware mints when a request carries none, the shape
+// mintedRequestID is the request id requestid.Middleware mints when a request carries none, the shape
 // #462 decision 6 keeps: the host name, ten base62 characters, and a counter of at least six
 // digits. A host whose name cannot be read is localhost.
-func mintedRequestId(t *testing.T) *regexp.Regexp {
+func mintedRequestID(t *testing.T) *regexp.Regexp {
 	t.Helper()
 	hostname, err := os.Hostname()
 	if err != nil || hostname == "" {
@@ -475,7 +475,7 @@ func mintedRequestId(t *testing.T) *regexp.Regexp {
 
 // An incoming X-Request-Id is the request's id verbatim, on its records; without one an id is
 // minted, the same prefix for every request and a counter that grows. No response carries it.
-func TestRegisterRoutes_RequestIdsAreAdoptedOrMinted(t *testing.T) {
+func TestRegisterRoutes_RequestIDsAreAdoptedOrMinted(t *testing.T) {
 	s := newRoutingTestServer(t, newRoutingDatabase(t))
 	logged := logtest.CaptureSlog(t)
 
@@ -494,15 +494,15 @@ func TestRegisterRoutes_RequestIdsAreAdoptedOrMinted(t *testing.T) {
 
 	records = httpRequestRecords(logged)
 	require.Len(t, records, 3)
-	shape := mintedRequestId(t)
-	firstId := shape.FindStringSubmatch(records[1].Attrs["request_id"].(string))
-	secondId := shape.FindStringSubmatch(records[2].Attrs["request_id"].(string))
-	require.NotNil(t, firstId, "minted id %q", records[1].Attrs["request_id"])
-	require.NotNil(t, secondId, "minted id %q", records[2].Attrs["request_id"])
-	assert.Equal(t, firstId[1], secondId[1], "one prefix for the process")
-	firstCount, err := strconv.Atoi(firstId[2])
+	shape := mintedRequestID(t)
+	firstID := shape.FindStringSubmatch(records[1].Attrs["request_id"].(string))
+	secondID := shape.FindStringSubmatch(records[2].Attrs["request_id"].(string))
+	require.NotNil(t, firstID, "minted id %q", records[1].Attrs["request_id"])
+	require.NotNil(t, secondID, "minted id %q", records[2].Attrs["request_id"])
+	assert.Equal(t, firstID[1], secondID[1], "one prefix for the process")
+	firstCount, err := strconv.Atoi(firstID[2])
 	require.NoError(t, err)
-	secondCount, err := strconv.Atoi(secondId[2])
+	secondCount, err := strconv.Atoi(secondID[2])
 	require.NoError(t, err)
 	assert.Greater(t, secondCount, firstCount, "the counter grows")
 }
@@ -514,7 +514,7 @@ func newPanickingServer(t *testing.T, value any) *Server {
 	database := datamocks.NewDatabase(t)
 	// A page reads the default brand; none leaves it automatic, in the built-in colors.
 	database.On("GetDefaultBrand", mock.Anything, mock.Anything).Return(nil, nil).Maybe()
-	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).
+	database.On("GetSettingsByID", mock.Anything, mock.Anything, int64(1)).
 		Run(func(mock.Arguments) { panic(value) }).Return(nil, nil)
 	return newRoutingTestServer(t, database)
 }
@@ -536,8 +536,8 @@ func TestRegisterRoutes_APanicIsAnswered500OnEachBranch(t *testing.T) {
 		{http.MethodGet, "/api/public/settings", "api"},
 	} {
 		t.Run(request.method+" "+request.target, func(t *testing.T) {
-			requestId := "panic" + strings.ReplaceAll(request.target, "/", "-")
-			rr := serveRouting(s, request.method, request.target, http.Header{"X-Request-Id": {requestId}})
+			requestID := "panic" + strings.ReplaceAll(request.target, "/", "-")
+			rr := serveRouting(s, request.method, request.target, http.Header{"X-Request-Id": {requestID}})
 
 			require.Equal(t, http.StatusInternalServerError, rr.Code)
 			if request.format == "page" {
@@ -547,13 +547,13 @@ func TestRegisterRoutes_APanicIsAnswered500OnEachBranch(t *testing.T) {
 				assertFaultFormat(t, request.format, "", rr)
 				var body map[string]string
 				require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &body))
-				assert.True(t, strings.HasSuffix(body["error_description"], "Request Id: "+requestId), body["error_description"])
+				assert.True(t, strings.HasSuffix(body["error_description"], "Request Id: "+requestID), body["error_description"])
 			}
 
 			records := httpRequestRecords(logged)
 			require.NotEmpty(t, records)
 			last := records[len(records)-1]
-			assert.Equal(t, requestId, last.Attrs["request_id"])
+			assert.Equal(t, requestID, last.Attrs["request_id"])
 			assert.EqualValues(t, http.StatusInternalServerError, last.Attrs["status"])
 		})
 	}
@@ -587,12 +587,12 @@ func TestRegisterRoutes_APanicIsOneErrorRecordOnEachBranch(t *testing.T) {
 		{http.MethodGet, "/api/public/settings"},
 	} {
 		t.Run(request.method+" "+request.target, func(t *testing.T) {
-			requestId := "panic-record" + strings.ReplaceAll(request.target, "/", "-")
-			serveRouting(s, request.method, request.target, http.Header{"X-Request-Id": {requestId}})
+			requestID := "panic-record" + strings.ReplaceAll(request.target, "/", "-")
+			serveRouting(s, request.method, request.target, http.Header{"X-Request-Id": {requestID}})
 
 			var lines []string
 			for _, line := range strings.Split(logged.Text(), "\n") {
-				if strings.Contains(line, "level=ERROR") && strings.Contains(line, "request_id="+requestId) {
+				if strings.Contains(line, "level=ERROR") && strings.Contains(line, "request_id="+requestID) {
 					lines = append(lines, line)
 				}
 			}

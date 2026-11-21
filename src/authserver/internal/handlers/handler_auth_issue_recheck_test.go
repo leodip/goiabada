@@ -88,22 +88,22 @@ func newRecheckFixtureFor(t *testing.T, responseType string, prompt string, sess
 			UserSessionIdleTimeoutInSeconds: testIdleTimeoutInSeconds,
 			UserSessionMaxLifetimeInSeconds: testMaxLifetimeInSeconds,
 		},
-		client: &record.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true,
+		client: &record.Client{ID: 1, ClientIdentifier: "test-client", Enabled: true,
 			AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed},
-		user: &record.User{Id: 123, Subject: "11111111-1111-1111-1111-111111111111", Enabled: true,
+		user: &record.User{ID: 123, Subject: "11111111-1111-1111-1111-111111111111", Enabled: true,
 			AuthStateGeneration: recheckGeneration},
 		authContext: &ceremony.AuthContext{
-			CeremonyId:          testCeremonyId,
+			CeremonyID:          testCeremonyID,
 			AuthState:           ceremony.AuthStateReadyToIssueCode,
-			ClientId:            "test-client",
-			UserId:              123,
+			ClientID:            "test-client",
+			UserID:              123,
 			ResponseType:        responseType,
 			RedirectURI:         callback,
 			Scope:               "openid",
 			RequestedScope:      "openid",
 			State:               "test-state",
 			Nonce:               "test-nonce",
-			AcrLevel:            record.AcrLevel1,
+			ACRLevel:            record.ACRLevel1,
 			AuthMethods:         "pwd",
 			Prompt:              prompt,
 			AuthStateGeneration: recheckGeneration,
@@ -112,7 +112,7 @@ func newRecheckFixtureFor(t *testing.T, responseType string, prompt string, sess
 		rr: httptest.NewRecorder(),
 	}
 
-	req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+	req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 	require.NoError(t, err)
 	req = withSettings(req, f.settings)
 	if sessionIdentifier != "" {
@@ -127,11 +127,11 @@ func newRecheckFixtureFor(t *testing.T, responseType string, prompt string, sess
 		Run(func(args mock.Arguments) {
 			args.Get(2).(*record.Client).RedirectURIs = []record.RedirectURI{{URI: callback}}
 		}).Return(nil).Maybe()
-	f.database.On("GetRedirectURIsByClientId", mock.Anything, mock.Anything, mock.Anything).
+	f.database.On("GetRedirectURIsByClientID", mock.Anything, mock.Anything, mock.Anything).
 		Return([]record.RedirectURI{{URI: callback}}, nil).Maybe()
-	f.database.On("GetUserById", mock.Anything, mock.Anything, int64(123)).Return(f.user, nil).Maybe()
+	f.database.On("GetUserByID", mock.Anything, mock.Anything, int64(123)).Return(f.user, nil).Maybe()
 	f.database.On("GetUserSessionBySessionIdentifier", mock.Anything, (*sql.Tx)(nil), liveSessionIdentifier).
-		Return(&record.UserSession{Id: 55, SessionIdentifier: liveSessionIdentifier, UserId: 123}, nil).Maybe()
+		Return(&record.UserSession{ID: 55, SessionIdentifier: liveSessionIdentifier, UserID: 123}, nil).Maybe()
 
 	userSessionManager := handlersmocks.NewUserSessionManager(t)
 	// As the real manager answers: a row that does not resolve is not valid.
@@ -193,7 +193,7 @@ func TestHandleIssueGet_ADisabledClientIsRefusedOnThePage(t *testing.T) {
 			f.client.Enabled = false
 
 			var order []string
-			f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).
+			f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyID).
 				Run(func(mock.Arguments) { order = append(order, "clear") }).Return(nil).Once()
 			wantMessage := i18n.NewLocalizedError(errcode.AuthorizeClientDisabled, nil).Localize(f.req.Context())
 			f.pageRenderer.On("RenderTemplate", f.rr, f.req, "/layouts/no_menu_layout.html", "/auth_error.html",
@@ -209,7 +209,7 @@ func TestHandleIssueGet_ADisabledClientIsRefusedOnThePage(t *testing.T) {
 			f.assertNothingIssued(t)
 			f.auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 			// Nothing after the check that refused was read: not the user, not the session.
-			f.database.AssertNotCalled(t, "GetUserById", mock.Anything, mock.Anything, mock.Anything)
+			f.database.AssertNotCalled(t, "GetUserByID", mock.Anything, mock.Anything, mock.Anything)
 			f.database.AssertNotCalled(t, "GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything)
 			f.pageRenderer.AssertExpectations(t)
 			f.ceremonyStore.AssertExpectations(t)
@@ -221,7 +221,7 @@ func TestHandleIssueGet_ADisabledClientIsRefusedOnThePage(t *testing.T) {
 		f.client.Enabled = false
 		logs := logtest.CaptureSlog(t)
 
-		f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).Return(errs.New("the store is unreachable")).Once()
+		f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyID).Return(errs.New("the store is unreachable")).Once()
 		f.pageRenderer.On("RenderTemplate", f.rr, f.req, "/layouts/no_menu_layout.html", "/auth_error.html", mock.Anything).
 			Return(nil).Once()
 
@@ -285,7 +285,7 @@ func TestHandleIssueGet_AFlowSwitchedOffIsAnsweredUnauthorizedClient(t *testing.
 			tc.edit(f)
 
 			var order []string
-			f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).
+			f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyID).
 				Run(func(mock.Arguments) { order = append(order, "clear") }).Return(nil).Once()
 
 			f.serve()
@@ -306,7 +306,7 @@ func TestHandleIssueGet_AFlowSwitchedOffIsAnsweredUnauthorizedClient(t *testing.
 			f := newRecheckFixture(t, tc.responseType, "")
 			tc.edit(f)
 
-			f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).Return(errs.New("the store is unreachable")).Once()
+			f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyID).Return(errs.New("the store is unreachable")).Once()
 
 			f.serve()
 
@@ -325,10 +325,10 @@ func TestHandleIssueGet_AFlowSwitchedOffIsAnsweredUnauthorizedClient(t *testing.
 		f.client.ImplicitGrantEnabled = &off
 
 		f.codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.Anything).
-			Return(&record.Code{Id: 1, Code: "the-code", ClientId: 1, RedirectURI: "https://example.com/callback",
+			Return(&record.Code{ID: 1, Code: "the-code", ClientID: 1, RedirectURI: "https://example.com/callback",
 				State: "test-state"}, nil).Once()
 		f.auditLogger.On("Log", mock.Anything, audit.EventCreatedAuthCode, mock.Anything).Return().Once()
-		f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).Return(nil).Once()
+		f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyID).Return(nil).Once()
 
 		f.serve()
 
@@ -343,7 +343,7 @@ func TestHandleIssueGet_AFlowSwitchedOffIsAnsweredUnauthorizedClient(t *testing.
 		f.implicitIssuer.On("IssueImplicitTx", mock.Anything, mock.Anything, mock.Anything, true, false).
 			Return(&issuance.ImplicitGrantResponse{AccessToken: "the-token", TokenType: "Bearer", ExpiresIn: 60, Scope: "openid"}, nil).Once()
 		f.auditLogger.On("Log", mock.Anything, audit.EventTokenIssuedImplicitResponse, mock.Anything).Return().Once()
-		f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).Return(nil).Once()
+		f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyID).Return(nil).Once()
 
 		f.serve()
 
@@ -364,7 +364,7 @@ func TestHandleIssueGet_AClientRequiringDPoPIsRefusedAnImplicitAccessToken(t *te
 			f.client.DPoPBoundAccessTokens = true
 
 			var order []string
-			f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).
+			f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyID).
 				Run(func(mock.Arguments) { order = append(order, "clear") }).Return(nil).Once()
 
 			f.serve()
@@ -385,9 +385,9 @@ func TestHandleIssueGet_AClientRequiringDPoPIsRefusedAnImplicitAccessToken(t *te
 		f.client.DPoPBoundAccessTokens = true
 
 		f.implicitIssuer.On("IssueImplicitTx", mock.Anything, mock.Anything, mock.Anything, false, true).
-			Return(&issuance.ImplicitGrantResponse{IdToken: "the-id-token"}, nil).Once()
+			Return(&issuance.ImplicitGrantResponse{IDToken: "the-id-token"}, nil).Once()
 		f.auditLogger.On("Log", mock.Anything, audit.EventTokenIssuedImplicitResponse, mock.Anything).Return().Once()
-		f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).Return(nil).Once()
+		f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyID).Return(nil).Once()
 
 		f.serve()
 
@@ -400,10 +400,10 @@ func TestHandleIssueGet_AClientRequiringDPoPIsRefusedAnImplicitAccessToken(t *te
 		f.client.DPoPBoundAccessTokens = true
 
 		f.codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.Anything).
-			Return(&record.Code{Id: 1, Code: "the-code", ClientId: 1, RedirectURI: "https://example.com/callback",
+			Return(&record.Code{ID: 1, Code: "the-code", ClientID: 1, RedirectURI: "https://example.com/callback",
 				State: "test-state"}, nil).Once()
 		f.auditLogger.On("Log", mock.Anything, audit.EventCreatedAuthCode, mock.Anything).Return().Once()
-		f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).Return(nil).Once()
+		f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyID).Return(nil).Once()
 
 		f.serve()
 
@@ -432,7 +432,7 @@ func TestHandleIssueGet_ADisabledUserIsAnsweredAccessDenied(t *testing.T) {
 			f.auditLogger.On("Log", mock.Anything, audit.EventUserDisabled, map[string]interface{}{
 				"user_id": int64(123),
 			}).Run(func(mock.Arguments) { order = append(order, "audit") }).Return().Once()
-			f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).
+			f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyID).
 				Run(func(mock.Arguments) { order = append(order, "clear") }).Return(nil).Once()
 
 			f.serve()
@@ -474,10 +474,10 @@ func TestHandleIssueGet_AStaleGenerationRestartsTheCeremony(t *testing.T) {
 			f.serve()
 
 			require.Equal(t, http.StatusFound, f.rr.Code)
-			assert.Equal(t, testCeremonyId, assertStepLocation(t, f.rr.Header().Get("Location"), "/auth/level1"))
+			assert.Equal(t, testCeremonyID, assertStepLocation(t, f.rr.Header().Get("Location"), "/auth/level1"))
 			require.NotNil(t, saved)
 			assert.Zero(t, saved.AuthStateGeneration, "the attempt is discarded with the restart")
-			assert.Zero(t, saved.UserId, "whoever signs in next is not assumed to be this user")
+			assert.Zero(t, saved.UserID, "whoever signs in next is not assumed to be this user")
 			assert.Equal(t, "openid", saved.Scope, "the request survives the restart")
 			f.assertNothingIssued(t)
 			f.auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
@@ -493,7 +493,7 @@ func TestHandleIssueGet_AStaleGenerationRestartsTheCeremony(t *testing.T) {
 			f := newRecheckFixture(t, tc.responseType, "none")
 			f.user.AuthStateGeneration = recheckGeneration + 1
 
-			f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).Return(nil).Once()
+			f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyID).Return(nil).Once()
 
 			f.serve()
 
@@ -550,7 +550,7 @@ func TestHandleIssueGet_ARemovedAuthenticatorRestartsTheCeremony(t *testing.T) {
 			f.serve()
 
 			require.Equal(t, http.StatusFound, f.rr.Code)
-			assert.Equal(t, testCeremonyId, assertStepLocation(t, f.rr.Header().Get("Location"), "/auth/level1"))
+			assert.Equal(t, testCeremonyID, assertStepLocation(t, f.rr.Header().Get("Location"), "/auth/level1"))
 			require.NotNil(t, saved)
 			assert.Empty(t, saved.AuthMethods, "the attempt, and the code it named, are discarded with the restart")
 			f.assertNothingIssued(t)
@@ -567,7 +567,7 @@ func TestHandleIssueGet_ARemovedAuthenticatorRestartsTheCeremony(t *testing.T) {
 			f.authContext.AuthMethods = "pwd otp"
 			f.user.OTPEnabled = false
 
-			f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).Return(nil).Once()
+			f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyID).Return(nil).Once()
 
 			f.serve()
 
@@ -597,7 +597,7 @@ func TestHandleIssueGet_AnUnearnedLevelRestartsTheCeremony(t *testing.T) {
 	} {
 		t.Run(tc.name+", interactive, restarts at level 1 and writes nothing to the client", func(t *testing.T) {
 			f := newRecheckFixture(t, tc.responseType, "")
-			f.authContext.AcrLevel = record.AcrLevel2Mandatory
+			f.authContext.ACRLevel = record.ACRLevel2Mandatory
 			f.authContext.AuthMethods = "pwd"
 			logs := logtest.CaptureSlog(t)
 
@@ -609,11 +609,11 @@ func TestHandleIssueGet_AnUnearnedLevelRestartsTheCeremony(t *testing.T) {
 			f.serve()
 
 			require.Equal(t, http.StatusFound, f.rr.Code)
-			assert.Equal(t, testCeremonyId, assertStepLocation(t, f.rr.Header().Get("Location"), "/auth/level1"))
+			assert.Equal(t, testCeremonyID, assertStepLocation(t, f.rr.Header().Get("Location"), "/auth/level1"))
 			require.NotNil(t, saved)
-			assert.Empty(t, saved.AcrLevel, "the attempt, and the level it claimed, are discarded with the restart")
+			assert.Empty(t, saved.ACRLevel, "the attempt, and the level it claimed, are discarded with the restart")
 			assert.Empty(t, saved.AuthMethods, "the sign-in that starts over earns its own methods")
-			assert.Zero(t, saved.UserId, "whoever signs in next is not assumed to be this user")
+			assert.Zero(t, saved.UserID, "whoever signs in next is not assumed to be this user")
 			assert.Equal(t, "openid", saved.Scope, "the request survives the restart")
 			f.assertNothingIssued(t)
 			f.auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
@@ -628,11 +628,11 @@ func TestHandleIssueGet_AnUnearnedLevelRestartsTheCeremony(t *testing.T) {
 
 		t.Run(tc.name+", silent, is answered login_required", func(t *testing.T) {
 			f := newRecheckFixture(t, tc.responseType, "none")
-			f.authContext.AcrLevel = record.AcrLevel2Mandatory
+			f.authContext.ACRLevel = record.ACRLevel2Mandatory
 			f.authContext.AuthMethods = "pwd"
 			logs := logtest.CaptureSlog(t)
 
-			f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).Return(nil).Once()
+			f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyID).Return(nil).Once()
 
 			f.serve()
 
@@ -661,12 +661,12 @@ func TestHandleIssueGet_AnUnearnedLevelRestartsTheCeremony(t *testing.T) {
 	// posts it, and the client reads login_required from its fields.
 	t.Run("code, silent, form_post, is answered login_required in the posted form", func(t *testing.T) {
 		f := newRecheckFixture(t, "code", "none")
-		f.authContext.AcrLevel = record.AcrLevel2Mandatory
+		f.authContext.ACRLevel = record.ACRLevel2Mandatory
 		f.authContext.AuthMethods = ""
 		f.authContext.ResponseMode = "form_post"
 		f.templateFS = web.TemplateFS()
 
-		f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).Return(nil).Once()
+		f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyID).Return(nil).Once()
 
 		f.serve()
 
@@ -688,25 +688,25 @@ func TestHandleIssueGet_AnUnearnedLevelRestartsTheCeremony(t *testing.T) {
 		for _, responseType := range []string{"code", "id_token token"} {
 			t.Run(responseType+" at level 3 naming "+methods+" is issued", func(t *testing.T) {
 				f := newRecheckFixture(t, responseType, "")
-				f.authContext.AcrLevel = record.AcrLevel2Mandatory
+				f.authContext.ACRLevel = record.ACRLevel2Mandatory
 				f.authContext.AuthMethods = methods
 				generation := int64(2)
-				f.authContext.OtpClaimGeneration = &generation
+				f.authContext.OTPClaimGeneration = &generation
 				f.user.OTPEnabled = true
-				f.user.OtpConfigGeneration = generation
+				f.user.OTPConfigGeneration = generation
 
 				if responseType == "code" {
 					f.codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.MatchedBy(func(input *issuance.CreateCodeInput) bool {
-						return input.AcrLevel == record.AcrLevel2Mandatory && input.AuthMethods == methods
-					})).Return(&record.Code{Id: 9, Code: "c0de", ClientId: 1, RedirectURI: "https://example.com/callback",
+						return input.ACRLevel == record.ACRLevel2Mandatory && input.AuthMethods == methods
+					})).Return(&record.Code{ID: 9, Code: "c0de", ClientID: 1, RedirectURI: "https://example.com/callback",
 						State: "test-state"}, nil).Once()
 				} else {
 					f.implicitIssuer.On("IssueImplicitTx", mock.Anything, mock.Anything, mock.MatchedBy(func(input *issuance.ImplicitGrantInput) bool {
-						return input.AcrLevel == record.AcrLevel2Mandatory && input.AuthMethods == methods
-					}), true, true).Return(&issuance.ImplicitGrantResponse{AccessToken: "access", IdToken: "id"}, nil).Once()
+						return input.ACRLevel == record.ACRLevel2Mandatory && input.AuthMethods == methods
+					}), true, true).Return(&issuance.ImplicitGrantResponse{AccessToken: "access", IDToken: "id"}, nil).Once()
 				}
 				f.auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
-				f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).Return(nil).Once()
+				f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyID).Return(nil).Once()
 
 				f.serve()
 
@@ -734,9 +734,9 @@ func TestHandleIssueGet_AnAuthenticatorRemovedAtTheIssuerIsAnsweredAsAtTheCheck(
 	} {
 		arm := func(f *recheckFixture, order *[]string) {
 			f.authContext.AuthMethods = "pwd otp"
-			f.authContext.OtpClaimGeneration = &generation
+			f.authContext.OTPClaimGeneration = &generation
 			f.user.OTPEnabled = true
-			f.user.OtpConfigGeneration = generation
+			f.user.OTPConfigGeneration = generation
 			refused := func(mock.Arguments) { *order = append(*order, "issuer") }
 			if tc.responseType == "code" {
 				f.codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.MatchedBy(func(input *issuance.CreateCodeInput) bool {
@@ -760,7 +760,7 @@ func TestHandleIssueGet_AnAuthenticatorRemovedAtTheIssuerIsAnsweredAsAtTheCheck(
 			f.serve()
 
 			require.Equal(t, http.StatusFound, f.rr.Code)
-			assert.Equal(t, testCeremonyId, assertStepLocation(t, f.rr.Header().Get("Location"), "/auth/level1"))
+			assert.Equal(t, testCeremonyID, assertStepLocation(t, f.rr.Header().Get("Location"), "/auth/level1"))
 			assert.Equal(t, []string{"issuer", "save"}, order)
 			f.auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 			f.pageRenderer.AssertNotCalled(t, "InternalServerError", mock.Anything, mock.Anything, mock.Anything)
@@ -770,7 +770,7 @@ func TestHandleIssueGet_AnAuthenticatorRemovedAtTheIssuerIsAnsweredAsAtTheCheck(
 			f := newRecheckFixture(t, tc.responseType, "none")
 			var order []string
 			arm(f, &order)
-			f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).Return(nil).Once()
+			f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyID).Return(nil).Once()
 
 			f.serve()
 
@@ -803,7 +803,7 @@ func TestHandleIssueGet_AnImplicitSessionEndedAtTheSigningIsAnsweredAsAGoneSessi
 		f.serve()
 
 		require.Equal(t, http.StatusFound, f.rr.Code)
-		assert.Equal(t, testCeremonyId, assertStepLocation(t, f.rr.Header().Get("Location"), "/auth/level1"))
+		assert.Equal(t, testCeremonyID, assertStepLocation(t, f.rr.Header().Get("Location"), "/auth/level1"))
 		assert.Equal(t, []string{"issued", "save"}, order, "the refusal writes the store only after the issuer has rolled back")
 		f.auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 		f.ceremonyStore.AssertNotCalled(t, "ClearAuthContext", mock.Anything, mock.Anything, mock.Anything)
@@ -815,7 +815,7 @@ func TestHandleIssueGet_AnImplicitSessionEndedAtTheSigningIsAnsweredAsAGoneSessi
 
 		f.implicitIssuer.On("IssueImplicitTx", mock.Anything, mock.Anything, mock.Anything, true, false).
 			Return(nil, errs.WithStack(issuance.ErrIssuingSessionGone)).Once()
-		f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).Return(nil).Once()
+		f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyID).Return(nil).Once()
 
 		f.serve()
 
@@ -880,11 +880,11 @@ func TestHandleIssueGet_TheImplicitIssuerIsHandedTheSessionAndAnswersAfterItsCom
 			order = append(order, "issued")
 			handed = args.Get(2).(*issuance.ImplicitGrantInput)
 		}).
-		Return(&issuance.ImplicitGrantResponse{AccessToken: "the-token", IdToken: "the-id-token", TokenType: "Bearer",
+		Return(&issuance.ImplicitGrantResponse{AccessToken: "the-token", IDToken: "the-id-token", TokenType: "Bearer",
 			ExpiresIn: 60, Scope: "openid"}, nil).Once()
 	f.auditLogger.On("Log", mock.Anything, audit.EventTokenIssuedImplicitResponse, mock.Anything).
 		Run(func(mock.Arguments) { order = append(order, "audit") }).Return().Once()
-	f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).
+	f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyID).
 		Run(func(mock.Arguments) { order = append(order, "clear") }).Return(nil).Once()
 
 	f.serve()

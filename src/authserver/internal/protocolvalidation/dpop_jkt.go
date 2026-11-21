@@ -52,6 +52,6 @@ func refuseCodeWithoutItsKey(ctx context.Context, client *record.Client, code *r
 	slog.WarnContext(ctx, "authorization code refused for its dpop binding",
 		"reason", reason,
 		"client_identifier", client.ClientIdentifier,
-		"code_id", code.Id)
+		"code_id", code.ID)
 	return oauth.NewErrorDetailWithHTTPStatus("invalid_grant", BoundCodeMessage, http.StatusBadRequest)
 }

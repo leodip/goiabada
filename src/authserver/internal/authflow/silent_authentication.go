@@ -15,7 +15,7 @@ import (
 type silentAuthenticationDatabase interface {
 	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
 	UserSessionLoadUser(ctx context.Context, tx *sql.Tx, userSession *record.UserSession) error
-	GetConsentByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (*record.UserConsent, error)
+	GetConsentByUserIDAndClientID(ctx context.Context, tx *sql.Tx, userID int64, clientID int64) (*record.UserConsent, error)
 }
 
 // silentAuthenticationSessions is what SilentAuthentication asks of the user sessions: whether the
@@ -23,8 +23,8 @@ type silentAuthenticationDatabase interface {
 // it.
 type silentAuthenticationSessions interface {
 	sessionValidity
-	BumpUserSession(ctx context.Context, sessionIdentifier string, clientId int64,
-		authMethods string, acrLevel record.AcrLevel, ipAddress string) (*record.UserSession, error)
+	BumpUserSession(ctx context.Context, sessionIdentifier string, clientID int64,
+		authMethods string, acrLevel record.ACRLevel, ipAddress string) (*record.UserSession, error)
 }
 
 // SilentAuthentication is GET /auth/authorize for a request carrying prompt=none (OIDC Core 1.0
@@ -92,8 +92,8 @@ func (o *SilentAuthentication) Run(ctx context.Context, browser authorizeBrowser
 	requestedMaxAge := authContext.RequestedMaxAge()
 	facts := silentAuthenticationFacts{
 		MaxAgeRequested:  requestedMaxAge != nil,
-		HintSubject:      authContext.IdTokenHintSub,
-		Target:           authContext.GetTargetAcrLevel(client.DefaultAcrLevel),
+		HintSubject:      authContext.IDTokenHintSub,
+		Target:           authContext.GetTargetACRLevel(client.DefaultACRLevel),
 		ConsentRequired:  client.ConsentRequired,
 		ClientIdentifier: client.ClientIdentifier,
 		RemembersConsent: client.RemembersConsent(),
@@ -133,7 +133,7 @@ func (o *SilentAuthentication) Run(ctx context.Context, browser authorizeBrowser
 			facts.EffectiveScope = &effectiveScope
 
 		case silentFactLegalDocuments:
-			owed, err := o.legalDocuments.Owed(ctx, client, facts.Session.User.Id)
+			owed, err := o.legalDocuments.Owed(ctx, client, facts.Session.User.ID)
 			if err != nil {
 				return SilentAuthenticationResult{}, err
 			}
@@ -141,7 +141,7 @@ func (o *SilentAuthentication) Run(ctx context.Context, browser authorizeBrowser
 			facts.LegalDocumentsOwed = &owes
 
 		case silentFactConsent:
-			consent, err := o.database.GetConsentByUserIdAndClientId(ctx, nil, facts.Session.User.Id, client.Id)
+			consent, err := o.database.GetConsentByUserIDAndClientID(ctx, nil, facts.Session.User.ID, client.ID)
 			if err != nil {
 				return SilentAuthenticationResult{}, err
 			}
@@ -154,7 +154,7 @@ func (o *SilentAuthentication) Run(ctx context.Context, browser authorizeBrowser
 	if answer.ErrorCode != "" {
 		if answer.UserDisabled {
 			o.auditLogger.Log(ctx, audit.EventUserDisabled, map[string]interface{}{
-				"user_id": facts.Session.UserId,
+				"user_id": facts.Session.UserID,
 			})
 		}
 		return SilentAuthenticationResult{
@@ -166,22 +166,22 @@ func (o *SilentAuthentication) Run(ctx context.Context, browser authorizeBrowser
 	authContext.AdoptSession(userSession)
 	authContext.SetScope(*facts.EffectiveScope)
 	if userSession.AuthTime.IsZero() {
-		return SilentAuthenticationResult{}, errs.Errorf("user session %v has no auth time", userSession.Id)
+		return SilentAuthenticationResult{}, errs.Errorf("user session %v has no auth time", userSession.ID)
 	}
 	authContext.AuthenticatedAt = &userSession.AuthTime
 
-	err := authContext.SetAcrLevel(facts.Target, userSession)
+	err := authContext.SetACRLevel(facts.Target, userSession)
 	if err != nil {
 		return SilentAuthenticationResult{}, err
 	}
 
-	_, err = o.sessions.BumpUserSession(ctx, sessionIdentifier, client.Id, "", "", ipAddress)
+	_, err = o.sessions.BumpUserSession(ctx, sessionIdentifier, client.ID, "", "", ipAddress)
 	if err != nil {
 		return SilentAuthenticationResult{}, err
 	}
 	o.auditLogger.Log(ctx, audit.EventBumpedUserSession, map[string]interface{}{
-		"user_id":   authContext.UserId,
-		"client_id": client.Id,
+		"user_id":   authContext.UserID,
+		"client_id": client.ID,
 	})
 
 	authContext.AuthState = ceremony.AuthStateReadyToIssueCode

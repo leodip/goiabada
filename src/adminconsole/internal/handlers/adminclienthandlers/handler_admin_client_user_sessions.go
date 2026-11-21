@@ -15,13 +15,13 @@ import (
 // clientSessionsAPI is what the client sessions page needs: the client, its sessions, and the
 // revoke of one.
 type clientSessionsAPI interface {
-	DeleteUserSessionById(ctx context.Context, accessToken string, sessionId int64) error
-	GetClientById(ctx context.Context, accessToken string, clientId int64) (*api.ClientResponse, error)
-	GetClientSessionsByClientId(ctx context.Context, accessToken string, clientId int64, page, size int) (*api.GetClientSessionsResponse, error)
+	DeleteUserSessionByID(ctx context.Context, accessToken string, sessionID int64) error
+	GetClientByID(ctx context.Context, accessToken string, clientID int64) (*api.ClientResponse, error)
+	GetClientSessionsByClientID(ctx context.Context, accessToken string, clientID int64, page, size int) (*api.GetClientSessionsResponse, error)
 }
 
 func HandleUserSessionsGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient clientSessionsAPI,
 ) http.HandlerFunc {
 
@@ -39,14 +39,14 @@ func HandleUserSessionsGet(
 			return
 		}
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
 		// Load client via API
-		clientResp, err := apiClient.GetClientById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		clientResp, err := apiClient.GetClientByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -57,7 +57,7 @@ func HandleUserSessionsGet(
 		}
 
 		// Get the first 50 sessions (server filters invalid)
-		clientSessions, err := apiClient.GetClientSessionsByClientId(r.Context(), jwtInfo.TokenResponse.AccessToken, clientResp.Id, 1, 50)
+		clientSessions, err := apiClient.GetClientSessionsByClientID(r.Context(), jwtInfo.TokenResponse.AccessToken, clientResp.ID, 1, 50)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -67,7 +67,7 @@ func HandleUserSessionsGet(
 		// full page that was 50 HTTP round trips to fill two columns (#373 decision 9).
 		owners := make(map[int64]api.SessionOwnerResponse, len(clientSessions.Users))
 		for _, owner := range clientSessions.Users {
-			owners[owner.Id] = owner
+			owners[owner.ID] = owner
 		}
 
 		// IsCurrent comes from the response; this page no longer recomputes it from the sid on
@@ -75,21 +75,21 @@ func HandleUserSessionsGet(
 		sessionInfoArr := []SessionInfo{}
 		for _, es := range clientSessions.Sessions {
 			usi := SessionInfo{
-				UserSessionId: es.Id,
+				UserSessionID: es.ID,
 				IsCurrent:     es.IsCurrent,
-				UserId:        es.UserId,
+				UserID:        es.UserID,
 				UserEmail:     "",
 				UserFullName:  "",
 				Started:       es.Started,
 				LastAccessed:  es.LastAccessed,
-				IpAddress:     es.IpAddress,
+				IPAddress:     es.IPAddress,
 				DeviceName:    es.DeviceName,
 				DeviceType:    es.DeviceType,
 				DeviceOS:      es.DeviceOS,
 				UserAgent:     es.UserAgent,
 				Clients:       es.ClientIdentifiers,
 			}
-			if owner, ok := owners[es.UserId]; ok {
+			if owner, ok := owners[es.UserID]; ok {
 				usi.UserEmail = owner.Email
 				usi.UserFullName = render.SessionOwnerFullName(&owner)
 			}
@@ -98,7 +98,7 @@ func HandleUserSessionsGet(
 
 		sort.Slice(sessionInfoArr, func(i, j int) bool {
 			a, b := sessionInfoArr[i], sessionInfoArr[j]
-			return render.SessionListedBefore(a.IsCurrent, a.LastAccessed, a.UserSessionId, b.IsCurrent, b.LastAccessed, b.UserSessionId)
+			return render.SessionListedBefore(a.IsCurrent, a.LastAccessed, a.UserSessionID, b.IsCurrent, b.LastAccessed, b.UserSessionID)
 		})
 
 		bind := map[string]interface{}{
@@ -115,7 +115,7 @@ func HandleUserSessionsGet(
 }
 
 func HandleUserSessionsPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient clientSessionsAPI,
 ) http.HandlerFunc {
 
@@ -133,12 +133,12 @@ func HandleUserSessionsPost(
 			return
 		}
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JSONError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.JSONError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
-		clientResp, err := apiClient.GetClientById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		clientResp, err := apiClient.GetClientByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
@@ -155,8 +155,8 @@ func HandleUserSessionsPost(
 			return
 		}
 
-		userSessionId, ok := data["userSessionId"].(float64)
-		if !ok || userSessionId == 0 {
+		userSessionID, ok := data["userSessionId"].(float64)
+		if !ok || userSessionID == 0 {
 			render.JSONBadRequestBody(httpHelper, w, r)
 			return
 		}
@@ -167,7 +167,7 @@ func HandleUserSessionsPost(
 		// in one place (#373).
 		//
 		// The page this request comes from is the first 50 rows, so the same page is read back.
-		clientSessions, err := apiClient.GetClientSessionsByClientId(r.Context(), jwtInfo.TokenResponse.AccessToken, clientResp.Id, 1, 50)
+		clientSessions, err := apiClient.GetClientSessionsByClientID(r.Context(), jwtInfo.TokenResponse.AccessToken, clientResp.ID, 1, 50)
 		if err != nil {
 			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
@@ -175,7 +175,7 @@ func HandleUserSessionsPost(
 
 		isDeletingCurrentSession := false
 		for _, es := range clientSessions.Sessions {
-			if es.Id == int64(userSessionId) && es.IsCurrent {
+			if es.ID == int64(userSessionID) && es.IsCurrent {
 				isDeletingCurrentSession = true
 				break
 			}
@@ -197,7 +197,7 @@ func HandleUserSessionsPost(
 		}
 
 		// Delete the session via API (authserver performs audit)
-		err = apiClient.DeleteUserSessionById(r.Context(), jwtInfo.TokenResponse.AccessToken, int64(userSessionId))
+		err = apiClient.DeleteUserSessionByID(r.Context(), jwtInfo.TokenResponse.AccessToken, int64(userSessionID))
 		if err != nil {
 			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return

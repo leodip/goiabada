@@ -79,7 +79,7 @@ func TestRateLimiter_EachKindDerivesItsBucket(t *testing.T) {
 		req := limiterRequest(http.MethodPost, "/any?userId=42", nil)
 		req.RemoteAddr = "203.0.113.7:5000"
 		return req.WithContext(reqctx.WithValidatedToken(req.Context(),
-			oauth.JwtToken{Claims: map[string]interface{}{"sub": subject}}))
+			oauth.JWTToken{Claims: map[string]interface{}{"sub": subject}}))
 	}
 
 	cases := []struct {
@@ -112,7 +112,7 @@ func TestRateLimiter_AKindWithNoSubjectHasNoBucket(t *testing.T) {
 	m := newTestMiddleware(stubCeremonyStore{err: ceremony.ErrNoAuthContext}, true)
 	bare := limiterRequest(http.MethodPost, "/any", nil)
 	blank := bare.WithContext(reqctx.WithValidatedToken(bare.Context(),
-		oauth.JwtToken{Claims: map[string]interface{}{"sub": "  "}}))
+		oauth.JWTToken{Claims: map[string]interface{}{"sub": "  "}}))
 
 	cases := []struct {
 		name string

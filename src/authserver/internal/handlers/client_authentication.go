@@ -94,20 +94,20 @@ func clientAuthMethod(r *http.Request) string {
 // credentials cannot be read, or name no client, is refused invalid_client, and the body is not
 // read in its place.
 // A header of another scheme, such as Bearer, is ignored.
-func extractClientCredentials(r *http.Request) (clientId, clientSecret string, method clientauth.Method, err error) {
+func extractClientCredentials(r *http.Request) (clientID, clientSecret string, method clientauth.Method, err error) {
 	if len(r.Header.Values("Authorization")) > 1 {
 		return "", "", "", oauth.NewErrorDetailWithHTTPStatus("invalid_request",
 			"The request included more than one Authorization header. Send one.", http.StatusBadRequest)
 	}
 
 	// Check for Basic auth in Authorization header
-	basicClientId, basicClientSecret, hasBasicAuth, err := parseBasicAuth(r.Header.Get("Authorization"))
+	basicClientID, basicClientSecret, hasBasicAuth, err := parseBasicAuth(r.Header.Get("Authorization"))
 	if err != nil {
 		return "", "", "", err
 	}
 
 	// Get credentials from POST body
-	postClientId := r.PostForm.Get("client_id")
+	postClientID := r.PostForm.Get("client_id")
 	postClientSecret := r.PostForm.Get("client_secret")
 	hasPostAuth := postClientSecret != ""
 
@@ -121,14 +121,14 @@ func extractClientCredentials(r *http.Request) (clientId, clientSecret string, m
 
 	// Use Basic auth if present
 	if hasBasicAuth {
-		return basicClientId, basicClientSecret, clientauth.ClientSecretBasic, nil
+		return basicClientID, basicClientSecret, clientauth.ClientSecretBasic, nil
 	}
 
 	// Fall back to POST body credentials
 	if hasPostAuth {
-		return postClientId, postClientSecret, clientauth.ClientSecretPost, nil
+		return postClientID, postClientSecret, clientauth.ClientSecretPost, nil
 	}
-	return postClientId, "", clientauth.MethodNone, nil
+	return postClientID, "", clientauth.MethodNone, nil
 }
 
 // basicCredentials returns what follows the Basic scheme and the spaces after it in an Authorization
@@ -155,7 +155,7 @@ func basicCredentials(authHeader string) (string, bool) {
 // Credentials with nothing before the colon name no client, and are
 // clientauth.BasicCredentialsNamingNoClient: before, they were answered invalid_request for a
 // missing client_id, with no challenge.
-func parseBasicAuth(authHeader string) (clientId, clientSecret string, ok bool, err error) {
+func parseBasicAuth(authHeader string) (clientID, clientSecret string, ok bool, err error) {
 	encoded, basic := basicCredentials(authHeader)
 	if !basic {
 		return "", "", false, nil
@@ -174,11 +174,11 @@ func parseBasicAuth(authHeader string) (clientId, clientSecret string, ok bool, 
 		return "", "", false, clientauth.UnreadableBasicCredentials()
 	}
 
-	clientId = percentDecoded(credentials[:colonIdx])
-	if clientId == "" {
+	clientID = percentDecoded(credentials[:colonIdx])
+	if clientID == "" {
 		return "", "", false, clientauth.BasicCredentialsNamingNoClient()
 	}
-	return clientId, percentDecoded(credentials[colonIdx+1:]), true, nil
+	return clientID, percentDecoded(credentials[colonIdx+1:]), true, nil
 }
 
 // percentDecoded undoes RFC 6749 section 2.3.1's form encoding before Basic authentication:

@@ -15,10 +15,10 @@ func TestCreateGroupAttribute(t *testing.T) {
 
 	random := fake.LetterN(6)
 	groupAttribute := &record.GroupAttribute{
-		GroupId:              group.Id,
+		GroupID:              group.ID,
 		Key:                  "testkey_" + random,
 		Value:                "testvalue_" + random,
-		IncludeInIdToken:     true,
+		IncludeInIDToken:     true,
 		IncludeInAccessToken: false,
 	}
 
@@ -28,14 +28,14 @@ func TestCreateGroupAttribute(t *testing.T) {
 	}
 
 	// Verify the group attribute was created
-	createdGroupAttribute, err := database.GetGroupAttributeById(context.Background(), nil, groupAttribute.Id)
+	createdGroupAttribute, err := database.GetGroupAttributeByID(context.Background(), nil, groupAttribute.ID)
 	if err != nil {
 		t.Fatalf("Failed to retrieve created group attribute: %v", err)
 	}
 
 	// Check all properties
-	if createdGroupAttribute.GroupId != groupAttribute.GroupId {
-		t.Errorf("Expected GroupId %d, got %d", groupAttribute.GroupId, createdGroupAttribute.GroupId)
+	if createdGroupAttribute.GroupID != groupAttribute.GroupID {
+		t.Errorf("Expected GroupID %d, got %d", groupAttribute.GroupID, createdGroupAttribute.GroupID)
 	}
 	if createdGroupAttribute.Key != groupAttribute.Key {
 		t.Errorf("Expected Key '%s', got '%s'", groupAttribute.Key, createdGroupAttribute.Key)
@@ -43,8 +43,8 @@ func TestCreateGroupAttribute(t *testing.T) {
 	if createdGroupAttribute.Value != groupAttribute.Value {
 		t.Errorf("Expected Value '%s', got '%s'", groupAttribute.Value, createdGroupAttribute.Value)
 	}
-	if createdGroupAttribute.IncludeInIdToken != groupAttribute.IncludeInIdToken {
-		t.Errorf("Expected IncludeInIdToken %v, got %v", groupAttribute.IncludeInIdToken, createdGroupAttribute.IncludeInIdToken)
+	if createdGroupAttribute.IncludeInIDToken != groupAttribute.IncludeInIDToken {
+		t.Errorf("Expected IncludeInIDToken %v, got %v", groupAttribute.IncludeInIDToken, createdGroupAttribute.IncludeInIDToken)
 	}
 	if createdGroupAttribute.IncludeInAccessToken != groupAttribute.IncludeInAccessToken {
 		t.Errorf("Expected IncludeInAccessToken %v, got %v", groupAttribute.IncludeInAccessToken, createdGroupAttribute.IncludeInAccessToken)
@@ -58,7 +58,7 @@ func TestCreateGroupAttribute(t *testing.T) {
 
 	// Test creating a group attribute with invalid group ID
 	invalidGroupAttribute := &record.GroupAttribute{
-		GroupId: 0,
+		GroupID: 0,
 		Key:     "invalidkey",
 		Value:   "invalidvalue",
 	}
@@ -71,12 +71,12 @@ func TestCreateGroupAttribute(t *testing.T) {
 func TestUpdateGroupAttribute(t *testing.T) {
 	// Create a test group and group attribute
 	group := createTestGroup(t)
-	groupAttribute := createTestGroupAttribute(t, group.Id)
+	groupAttribute := createTestGroupAttribute(t, group.ID)
 
 	// Update the group attribute
 	groupAttribute.Key = "updated_key"
 	groupAttribute.Value = "updated_value"
-	groupAttribute.IncludeInIdToken = false
+	groupAttribute.IncludeInIDToken = false
 	groupAttribute.IncludeInAccessToken = true
 
 	time.Sleep(timestampTick) // Ensure some time passes before update
@@ -87,7 +87,7 @@ func TestUpdateGroupAttribute(t *testing.T) {
 	}
 
 	// Fetch the updated group attribute
-	updatedGroupAttribute, err := database.GetGroupAttributeById(context.Background(), nil, groupAttribute.Id)
+	updatedGroupAttribute, err := database.GetGroupAttributeByID(context.Background(), nil, groupAttribute.ID)
 	if err != nil {
 		t.Fatalf("Failed to retrieve updated group attribute: %v", err)
 	}
@@ -99,8 +99,8 @@ func TestUpdateGroupAttribute(t *testing.T) {
 	if updatedGroupAttribute.Value != "updated_value" {
 		t.Errorf("Expected Value 'updated_value', got '%s'", updatedGroupAttribute.Value)
 	}
-	if updatedGroupAttribute.IncludeInIdToken != false {
-		t.Errorf("Expected IncludeInIdToken false, got %v", updatedGroupAttribute.IncludeInIdToken)
+	if updatedGroupAttribute.IncludeInIDToken != false {
+		t.Errorf("Expected IncludeInIDToken false, got %v", updatedGroupAttribute.IncludeInIDToken)
 	}
 	if updatedGroupAttribute.IncludeInAccessToken != true {
 		t.Errorf("Expected IncludeInAccessToken true, got %v", updatedGroupAttribute.IncludeInAccessToken)
@@ -110,23 +110,23 @@ func TestUpdateGroupAttribute(t *testing.T) {
 	}
 }
 
-func TestGetGroupAttributeById(t *testing.T) {
+func TestGetGroupAttributeByID(t *testing.T) {
 	// Create a test group and group attribute
 	group := createTestGroup(t)
-	groupAttribute := createTestGroupAttribute(t, group.Id)
+	groupAttribute := createTestGroupAttribute(t, group.ID)
 
 	// Retrieve the group attribute
-	retrievedGroupAttribute, err := database.GetGroupAttributeById(context.Background(), nil, groupAttribute.Id)
+	retrievedGroupAttribute, err := database.GetGroupAttributeByID(context.Background(), nil, groupAttribute.ID)
 	if err != nil {
 		t.Fatalf("Failed to retrieve group attribute by ID: %v", err)
 	}
 
 	// Check all properties
-	if retrievedGroupAttribute.Id != groupAttribute.Id {
-		t.Errorf("Expected Id %d, got %d", groupAttribute.Id, retrievedGroupAttribute.Id)
+	if retrievedGroupAttribute.ID != groupAttribute.ID {
+		t.Errorf("Expected ID %d, got %d", groupAttribute.ID, retrievedGroupAttribute.ID)
 	}
-	if retrievedGroupAttribute.GroupId != groupAttribute.GroupId {
-		t.Errorf("Expected GroupId %d, got %d", groupAttribute.GroupId, retrievedGroupAttribute.GroupId)
+	if retrievedGroupAttribute.GroupID != groupAttribute.GroupID {
+		t.Errorf("Expected GroupID %d, got %d", groupAttribute.GroupID, retrievedGroupAttribute.GroupID)
 	}
 	if retrievedGroupAttribute.Key != groupAttribute.Key {
 		t.Errorf("Expected Key '%s', got '%s'", groupAttribute.Key, retrievedGroupAttribute.Key)
@@ -134,8 +134,8 @@ func TestGetGroupAttributeById(t *testing.T) {
 	if retrievedGroupAttribute.Value != groupAttribute.Value {
 		t.Errorf("Expected Value '%s', got '%s'", groupAttribute.Value, retrievedGroupAttribute.Value)
 	}
-	if retrievedGroupAttribute.IncludeInIdToken != groupAttribute.IncludeInIdToken {
-		t.Errorf("Expected IncludeInIdToken %v, got %v", groupAttribute.IncludeInIdToken, retrievedGroupAttribute.IncludeInIdToken)
+	if retrievedGroupAttribute.IncludeInIDToken != groupAttribute.IncludeInIDToken {
+		t.Errorf("Expected IncludeInIDToken %v, got %v", groupAttribute.IncludeInIDToken, retrievedGroupAttribute.IncludeInIDToken)
 	}
 	if retrievedGroupAttribute.IncludeInAccessToken != groupAttribute.IncludeInAccessToken {
 		t.Errorf("Expected IncludeInAccessToken %v, got %v", groupAttribute.IncludeInAccessToken, retrievedGroupAttribute.IncludeInAccessToken)
@@ -148,24 +148,24 @@ func TestGetGroupAttributeById(t *testing.T) {
 	}
 
 	// Test retrieving a non-existent group attribute
-	nonExistentGroupAttribute, err := database.GetGroupAttributeById(context.Background(), nil, 99999)
+	nonExistentGroupAttribute, err := database.GetGroupAttributeByID(context.Background(), nil, 99999)
 	if err != nil {
 		t.Errorf("Expected no error for non-existent group attribute, got: %v", err)
 	}
 	if nonExistentGroupAttribute != nil {
-		t.Errorf("Expected nil for non-existent group attribute, got a group attribute with ID: %d", nonExistentGroupAttribute.Id)
+		t.Errorf("Expected nil for non-existent group attribute, got a group attribute with ID: %d", nonExistentGroupAttribute.ID)
 	}
 }
 
-func TestGetGroupAttributesByGroupIds(t *testing.T) {
+func TestGetGroupAttributesByGroupIDs(t *testing.T) {
 	// Create test groups and group attributes
 	group1 := createTestGroup(t)
 	group2 := createTestGroup(t)
-	createTestGroupAttribute(t, group1.Id)
-	createTestGroupAttribute(t, group2.Id)
+	createTestGroupAttribute(t, group1.ID)
+	createTestGroupAttribute(t, group2.ID)
 
 	// Retrieve group attributes by group IDs
-	groupAttributes, err := database.GetGroupAttributesByGroupIds(context.Background(), nil, []int64{group1.Id, group2.Id})
+	groupAttributes, err := database.GetGroupAttributesByGroupIDs(context.Background(), nil, []int64{group1.ID, group2.ID})
 	if err != nil {
 		t.Fatalf("Failed to retrieve group attributes by group IDs: %v", err)
 	}
@@ -176,8 +176,8 @@ func TestGetGroupAttributesByGroupIds(t *testing.T) {
 
 	// Verify the properties of fetched group attributes
 	for _, attr := range groupAttributes {
-		if attr.GroupId != group1.Id && attr.GroupId != group2.Id {
-			t.Errorf("Unexpected GroupId: %d", attr.GroupId)
+		if attr.GroupID != group1.ID && attr.GroupID != group2.ID {
+			t.Errorf("Unexpected GroupID: %d", attr.GroupID)
 		}
 		if attr.Key == "" {
 			t.Errorf("Key is empty")
@@ -194,7 +194,7 @@ func TestGetGroupAttributesByGroupIds(t *testing.T) {
 	}
 
 	// Test retrieving group attributes for non-existent group IDs
-	nonExistentGroupAttributes, err := database.GetGroupAttributesByGroupIds(context.Background(), nil, []int64{99999})
+	nonExistentGroupAttributes, err := database.GetGroupAttributesByGroupIDs(context.Background(), nil, []int64{99999})
 	if err != nil {
 		t.Errorf("Expected no error for non-existent group IDs, got: %v", err)
 	}
@@ -203,14 +203,14 @@ func TestGetGroupAttributesByGroupIds(t *testing.T) {
 	}
 }
 
-func TestGetGroupAttributesByGroupId(t *testing.T) {
+func TestGetGroupAttributesByGroupID(t *testing.T) {
 	// Create a test group and multiple group attributes
 	group := createTestGroup(t)
-	createTestGroupAttribute(t, group.Id)
-	createTestGroupAttribute(t, group.Id)
+	createTestGroupAttribute(t, group.ID)
+	createTestGroupAttribute(t, group.ID)
 
 	// Retrieve group attributes by group ID
-	groupAttributes, err := database.GetGroupAttributesByGroupId(context.Background(), nil, group.Id)
+	groupAttributes, err := database.GetGroupAttributesByGroupID(context.Background(), nil, group.ID)
 	if err != nil {
 		t.Fatalf("Failed to retrieve group attributes by group ID: %v", err)
 	}
@@ -221,8 +221,8 @@ func TestGetGroupAttributesByGroupId(t *testing.T) {
 
 	// Verify the properties of fetched group attributes
 	for _, attr := range groupAttributes {
-		if attr.GroupId != group.Id {
-			t.Errorf("Expected GroupId %d, got %d", group.Id, attr.GroupId)
+		if attr.GroupID != group.ID {
+			t.Errorf("Expected GroupID %d, got %d", group.ID, attr.GroupID)
 		}
 		if attr.Key == "" {
 			t.Errorf("Key is empty")
@@ -239,7 +239,7 @@ func TestGetGroupAttributesByGroupId(t *testing.T) {
 	}
 
 	// Test retrieving group attributes for a non-existent group ID
-	nonExistentGroupAttributes, err := database.GetGroupAttributesByGroupId(context.Background(), nil, 99999)
+	nonExistentGroupAttributes, err := database.GetGroupAttributesByGroupID(context.Background(), nil, 99999)
 	if err != nil {
 		t.Errorf("Expected no error for non-existent group ID, got: %v", err)
 	}
@@ -251,16 +251,16 @@ func TestGetGroupAttributesByGroupId(t *testing.T) {
 func TestDeleteGroupAttribute(t *testing.T) {
 	// Create a test group and group attribute
 	group := createTestGroup(t)
-	groupAttribute := createTestGroupAttribute(t, group.Id)
+	groupAttribute := createTestGroupAttribute(t, group.ID)
 
 	// Delete the group attribute
-	err := database.DeleteGroupAttribute(context.Background(), nil, groupAttribute.Id)
+	err := database.DeleteGroupAttribute(context.Background(), nil, groupAttribute.ID)
 	if err != nil {
 		t.Fatalf("Failed to delete group attribute: %v", err)
 	}
 
 	// Try to retrieve the deleted group attribute
-	deletedGroupAttribute, err := database.GetGroupAttributeById(context.Background(), nil, groupAttribute.Id)
+	deletedGroupAttribute, err := database.GetGroupAttributeByID(context.Background(), nil, groupAttribute.ID)
 	if err != nil {
 		t.Fatalf("Error while checking for deleted group attribute: %v", err)
 	}
@@ -275,13 +275,13 @@ func TestDeleteGroupAttribute(t *testing.T) {
 	}
 }
 
-func createTestGroupAttribute(t *testing.T, groupId int64) *record.GroupAttribute {
+func createTestGroupAttribute(t *testing.T, groupID int64) *record.GroupAttribute {
 	random := fake.LetterN(6)
 	groupAttribute := &record.GroupAttribute{
-		GroupId:              groupId,
+		GroupID:              groupID,
 		Key:                  "TestKey_" + random,
 		Value:                "TestValue_" + random,
-		IncludeInIdToken:     true,
+		IncludeInIDToken:     true,
 		IncludeInAccessToken: false,
 	}
 	err := database.CreateGroupAttribute(context.Background(), nil, groupAttribute)

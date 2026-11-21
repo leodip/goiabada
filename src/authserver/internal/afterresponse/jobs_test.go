@@ -17,8 +17,8 @@ import (
 
 // requestContext is a request's context as the handler holds it: carrying the request id, and
 // cancelled the moment the handler returns, which the test does by calling the cancel it gets.
-func requestContext(requestId string) (context.Context, context.CancelFunc) {
-	return context.WithCancel(requestid.NewContext(context.Background(), requestId))
+func requestContext(requestID string) (context.Context, context.CancelFunc) {
+	return context.WithCancel(requestid.NewContext(context.Background(), requestID))
 }
 
 // The job outlives its request: the request's cancellation does not reach it, and every value the

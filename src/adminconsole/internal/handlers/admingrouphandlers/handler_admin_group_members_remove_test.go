@@ -13,15 +13,15 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/render"
 )
 
-// membersRemoveRecordingApiClient records the ids the one write was asked for.
-type membersRemoveRecordingApiClient struct {
+// membersRemoveRecordingAPIClient records the ids the one write was asked for.
+type membersRemoveRecordingAPIClient struct {
 	calls           int
-	groupId, userId int64
+	groupID, userID int64
 }
 
-func (c *membersRemoveRecordingApiClient) RemoveUserFromGroup(_ context.Context, _ string, groupId int64, userId int64) error {
+func (c *membersRemoveRecordingAPIClient) RemoveUserFromGroup(_ context.Context, _ string, groupID int64, userID int64) error {
 	c.calls++
-	c.groupId, c.userId = groupId, userId
+	c.groupID, c.userID = groupID, userID
 	return nil
 }
 
@@ -29,7 +29,7 @@ func (c *membersRemoveRecordingApiClient) RemoveUserFromGroup(_ context.Context,
 // group named by {groupId} loses the user named by {userId}. Two different numbers, so reading
 // either value under the other's name sends the wrong pair.
 func TestHandleMembersRemoveUserPost_RemovesTheUserItsPathNamesFromTheGroupItsPathNames(t *testing.T) {
-	apiClient := &membersRemoveRecordingApiClient{}
+	apiClient := &membersRemoveRecordingAPIClient{}
 	req := handlertest.Request(http.MethodPost, "/admin/groups/5/members/42/remove",
 		handlertest.WithAccessToken(),
 		handlertest.WithPathValue("groupId", "5"),
@@ -41,6 +41,6 @@ func TestHandleMembersRemoveUserPost_RemovesTheUserItsPathNamesFromTheGroupItsPa
 
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	require.Equal(t, 1, apiClient.calls)
-	assert.Equal(t, int64(5), apiClient.groupId)
-	assert.Equal(t, int64(42), apiClient.userId)
+	assert.Equal(t, int64(5), apiClient.groupID)
+	assert.Equal(t, int64(42), apiClient.userID)
 }

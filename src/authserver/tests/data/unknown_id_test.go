@@ -27,116 +27,116 @@ import (
 // comparison happens at the getter's own concrete type and there is no interface
 // boxing in the assertion to reason about.
 
-type byIdReader struct {
+type byIDReader struct {
 	name  string
 	found func(tx *sql.Tx, id int64) (bool, error)
 }
 
-func byIdReaders() []byIdReader {
-	return []byIdReader{
-		{"GetClientById", func(tx *sql.Tx, id int64) (bool, error) {
-			v, err := database.GetClientById(context.Background(), tx, id)
+func byIDReaders() []byIDReader {
+	return []byIDReader{
+		{"GetClientByID", func(tx *sql.Tx, id int64) (bool, error) {
+			v, err := database.GetClientByID(context.Background(), tx, id)
 			return v != nil, err
 		}},
-		{"GetUserById", func(tx *sql.Tx, id int64) (bool, error) {
-			v, err := database.GetUserById(context.Background(), tx, id)
+		{"GetUserByID", func(tx *sql.Tx, id int64) (bool, error) {
+			v, err := database.GetUserByID(context.Background(), tx, id)
 			return v != nil, err
 		}},
-		{"GetCodeById", func(tx *sql.Tx, id int64) (bool, error) {
-			v, err := database.GetCodeById(context.Background(), tx, id)
+		{"GetCodeByID", func(tx *sql.Tx, id int64) (bool, error) {
+			v, err := database.GetCodeByID(context.Background(), tx, id)
 			return v != nil, err
 		}},
-		{"GetResourceById", func(tx *sql.Tx, id int64) (bool, error) {
-			v, err := database.GetResourceById(context.Background(), tx, id)
+		{"GetResourceByID", func(tx *sql.Tx, id int64) (bool, error) {
+			v, err := database.GetResourceByID(context.Background(), tx, id)
 			return v != nil, err
 		}},
-		{"GetPermissionById", func(tx *sql.Tx, id int64) (bool, error) {
-			v, err := database.GetPermissionById(context.Background(), tx, id)
+		{"GetPermissionByID", func(tx *sql.Tx, id int64) (bool, error) {
+			v, err := database.GetPermissionByID(context.Background(), tx, id)
 			return v != nil, err
 		}},
-		{"GetKeyPairById", func(tx *sql.Tx, id int64) (bool, error) {
-			v, err := database.GetKeyPairById(context.Background(), tx, id)
+		{"GetKeyPairByID", func(tx *sql.Tx, id int64) (bool, error) {
+			v, err := database.GetKeyPairByID(context.Background(), tx, id)
 			return v != nil, err
 		}},
-		{"GetRedirectURIById", func(tx *sql.Tx, id int64) (bool, error) {
-			v, err := database.GetRedirectURIById(context.Background(), tx, id)
+		{"GetRedirectURIByID", func(tx *sql.Tx, id int64) (bool, error) {
+			v, err := database.GetRedirectURIByID(context.Background(), tx, id)
 			return v != nil, err
 		}},
-		{"GetWebOriginById", func(tx *sql.Tx, id int64) (bool, error) {
-			v, err := database.GetWebOriginById(context.Background(), tx, id)
+		{"GetWebOriginByID", func(tx *sql.Tx, id int64) (bool, error) {
+			v, err := database.GetWebOriginByID(context.Background(), tx, id)
 			return v != nil, err
 		}},
-		{"GetSettingsById", func(tx *sql.Tx, id int64) (bool, error) {
-			v, err := database.GetSettingsById(context.Background(), tx, id)
+		{"GetSettingsByID", func(tx *sql.Tx, id int64) (bool, error) {
+			v, err := database.GetSettingsByID(context.Background(), tx, id)
 			return v != nil, err
 		}},
-		{"GetUserPermissionById", func(tx *sql.Tx, id int64) (bool, error) {
-			v, err := database.GetUserPermissionById(context.Background(), tx, id)
+		{"GetUserPermissionByID", func(tx *sql.Tx, id int64) (bool, error) {
+			v, err := database.GetUserPermissionByID(context.Background(), tx, id)
 			return v != nil, err
 		}},
-		{"GetGroupById", func(tx *sql.Tx, id int64) (bool, error) {
-			v, err := database.GetGroupById(context.Background(), tx, id)
+		{"GetGroupByID", func(tx *sql.Tx, id int64) (bool, error) {
+			v, err := database.GetGroupByID(context.Background(), tx, id)
 			return v != nil, err
 		}},
-		{"GetUserAttributeById", func(tx *sql.Tx, id int64) (bool, error) {
-			v, err := database.GetUserAttributeById(context.Background(), tx, id)
+		{"GetUserAttributeByID", func(tx *sql.Tx, id int64) (bool, error) {
+			v, err := database.GetUserAttributeByID(context.Background(), tx, id)
 			return v != nil, err
 		}},
-		{"GetUserProfilePictureByUserId", func(tx *sql.Tx, id int64) (bool, error) {
-			v, err := database.GetUserProfilePictureByUserId(context.Background(), tx, id)
+		{"GetUserProfilePictureByUserID", func(tx *sql.Tx, id int64) (bool, error) {
+			v, err := database.GetUserProfilePictureByUserID(context.Background(), tx, id)
 			return v != nil, err
 		}},
-		{"GetClientLogoByClientId", func(tx *sql.Tx, id int64) (bool, error) {
-			v, err := database.GetClientLogoByClientId(context.Background(), tx, id)
+		{"GetClientLogoByClientID", func(tx *sql.Tx, id int64) (bool, error) {
+			v, err := database.GetClientLogoByClientID(context.Background(), tx, id)
 			return v != nil, err
 		}},
-		{"GetClientPermissionById", func(tx *sql.Tx, id int64) (bool, error) {
-			v, err := database.GetClientPermissionById(context.Background(), tx, id)
+		{"GetClientPermissionByID", func(tx *sql.Tx, id int64) (bool, error) {
+			v, err := database.GetClientPermissionByID(context.Background(), tx, id)
 			return v != nil, err
 		}},
-		{"GetUserSessionById", func(tx *sql.Tx, id int64) (bool, error) {
-			v, err := database.GetUserSessionById(context.Background(), tx, id)
+		{"GetUserSessionByID", func(tx *sql.Tx, id int64) (bool, error) {
+			v, err := database.GetUserSessionByID(context.Background(), tx, id)
 			return v != nil, err
 		}},
-		{"GetUserConsentById", func(tx *sql.Tx, id int64) (bool, error) {
-			v, err := database.GetUserConsentById(context.Background(), tx, id)
+		{"GetUserConsentByID", func(tx *sql.Tx, id int64) (bool, error) {
+			v, err := database.GetUserConsentByID(context.Background(), tx, id)
 			return v != nil, err
 		}},
-		{"GetPreRegistrationById", func(tx *sql.Tx, id int64) (bool, error) {
-			v, err := database.GetPreRegistrationById(context.Background(), tx, id)
+		{"GetPreRegistrationByID", func(tx *sql.Tx, id int64) (bool, error) {
+			v, err := database.GetPreRegistrationByID(context.Background(), tx, id)
 			return v != nil, err
 		}},
-		{"GetUserGroupById", func(tx *sql.Tx, id int64) (bool, error) {
-			v, err := database.GetUserGroupById(context.Background(), tx, id)
+		{"GetUserGroupByID", func(tx *sql.Tx, id int64) (bool, error) {
+			v, err := database.GetUserGroupByID(context.Background(), tx, id)
 			return v != nil, err
 		}},
-		{"GetGroupAttributeById", func(tx *sql.Tx, id int64) (bool, error) {
-			v, err := database.GetGroupAttributeById(context.Background(), tx, id)
+		{"GetGroupAttributeByID", func(tx *sql.Tx, id int64) (bool, error) {
+			v, err := database.GetGroupAttributeByID(context.Background(), tx, id)
 			return v != nil, err
 		}},
-		{"GetGroupPermissionById", func(tx *sql.Tx, id int64) (bool, error) {
-			v, err := database.GetGroupPermissionById(context.Background(), tx, id)
+		{"GetGroupPermissionByID", func(tx *sql.Tx, id int64) (bool, error) {
+			v, err := database.GetGroupPermissionByID(context.Background(), tx, id)
 			return v != nil, err
 		}},
-		{"GetRefreshTokenById", func(tx *sql.Tx, id int64) (bool, error) {
-			v, err := database.GetRefreshTokenById(context.Background(), tx, id)
+		{"GetRefreshTokenByID", func(tx *sql.Tx, id int64) (bool, error) {
+			v, err := database.GetRefreshTokenByID(context.Background(), tx, id)
 			return v != nil, err
 		}},
-		{"GetUserSessionClientById", func(tx *sql.Tx, id int64) (bool, error) {
-			v, err := database.GetUserSessionClientById(context.Background(), tx, id)
+		{"GetUserSessionClientByID", func(tx *sql.Tx, id int64) (bool, error) {
+			v, err := database.GetUserSessionClientByID(context.Background(), tx, id)
 			return v != nil, err
 		}},
 	}
 }
 
-// TestUnknownId_ReturnsNilWithoutError covers every getter that takes an int64 id.
+// TestUnknownID_ReturnsNilWithoutError covers every getter that takes an int64 id.
 // Zero and a negative id are included because they are what a caller passes after
 // failing to parse a path parameter, and they must read as "not found" rather than
 // as a malformed query.
-func TestUnknownId_ReturnsNilWithoutError(t *testing.T) {
+func TestUnknownID_ReturnsNilWithoutError(t *testing.T) {
 	ids := []int64{999999999, 0, -1}
 
-	for _, reader := range byIdReaders() {
+	for _, reader := range byIDReaders() {
 		for _, id := range ids {
 			t.Run(fmt.Sprintf("%s/%d", reader.name, id), func(t *testing.T) {
 				found, err := reader.found(nil, id)
@@ -195,8 +195,8 @@ func byValueReaders() []byValueReader {
 				p, err := database.GetPreRegistrationByEmail(context.Background(), tx, v)
 				return p != nil, err
 			}},
-		{"GetRefreshTokenByJti", randomUUID, func(tx *sql.Tx, v string) (bool, error) {
-			rt, err := database.GetRefreshTokenByJti(context.Background(), tx, v)
+		{"GetRefreshTokenByJTI", randomUUID, func(tx *sql.Tx, v string) (bool, error) {
+			rt, err := database.GetRefreshTokenByJTI(context.Background(), tx, v)
 			return rt != nil, err
 		}},
 		{"GetCodeByCodeHash", randomWord, func(tx *sql.Tx, v string) (bool, error) {
@@ -226,10 +226,10 @@ func TestUnknownValue_ReturnsNilWithoutError(t *testing.T) {
 
 // The convention has to hold inside a transaction too, since that is where the
 // callers that check for nil before writing do their reads.
-func TestUnknownId_ReturnsNilWithoutErrorInTransaction(t *testing.T) {
+func TestUnknownID_ReturnsNilWithoutErrorInTransaction(t *testing.T) {
 	tx := beginTx(t)
 
-	for _, reader := range byIdReaders() {
+	for _, reader := range byIDReaders() {
 		found, err := reader.found(tx, 999999999)
 		require.NoErrorf(t, err, "%s must not return an error for a missing row in a transaction", reader.name)
 		assert.Falsef(t, found, "%s must return nil for a missing row in a transaction", reader.name)

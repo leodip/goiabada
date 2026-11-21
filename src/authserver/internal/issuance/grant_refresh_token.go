@@ -122,7 +122,7 @@ func (t *TokenIssuer) IssueRefreshTokenGrant(ctx context.Context, settings *reco
 		//
 		// The handler audits after it returns, so an audit row is never written for a containment
 		// that rolled back.
-		revokedCount, recorded, err := t.containRefreshTokenFamily(ctx, refreshToken.FirstRefreshTokenJti)
+		revokedCount, recorded, err := t.containRefreshTokenFamily(ctx, refreshToken.FirstRefreshTokenJTI)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -193,18 +193,18 @@ func (t *TokenIssuer) IssueRefreshTokenGrant(ctx context.Context, settings *reco
 		// change left it, promoted or revoked. One that went first inserts its child before the change
 		// starts, and the change's sweep finds it. Both take the user row first, so the pair cannot
 		// deadlock on each other (#131, #301). Only a lock on the user: updated_at is left alone.
-		if err := t.database.AcquireUserRow(ctx, tx, refreshOwnerUserId(input)); err != nil {
+		if err := t.database.AcquireUserRow(ctx, tx, refreshOwnerUserID(input)); err != nil {
 			return err
 		}
 
-		claimed, err := t.database.MarkRefreshTokenAsRevoked(ctx, tx, refreshToken.Id)
+		claimed, err := t.database.MarkRefreshTokenAsRevoked(ctx, tx, refreshToken.ID)
 		if err != nil {
 			return err
 		}
 		if !claimed {
 			slog.DebugContext(ctx, "refresh token was no longer live at claim time, rejecting",
 				"grant_type", oidc.GrantTypeRefreshToken.String(),
-				"refresh_token_id", refreshToken.Id)
+				"refresh_token_id", refreshToken.ID)
 			return ErrRefreshTokenNotClaimed
 		}
 
@@ -216,7 +216,7 @@ func (t *TokenIssuer) IssueRefreshTokenGrant(ctx context.Context, settings *reco
 		// child into a family the operator believes is revoked, and nothing but a record refuses it
 		// (#132, #259). A revocation that commits after this read and before the insert leaves the
 		// child born into a recorded family, which the validator refuses when it is presented.
-		revoked, err := t.database.IsRefreshTokenFamilyRevoked(ctx, tx, refreshToken.FirstRefreshTokenJti)
+		revoked, err := t.database.IsRefreshTokenFamilyRevoked(ctx, tx, refreshToken.FirstRefreshTokenJTI)
 		if err != nil {
 			return err
 		}
@@ -233,12 +233,12 @@ func (t *TokenIssuer) IssueRefreshTokenGrant(ctx context.Context, settings *reco
 		// token claims, from the row this read returns (#106 rule 5 still holds: the parent's
 		// generation, never the user's). A token the change revoked never gets here, because its
 		// claim above was lost.
-		current, err := t.database.GetRefreshTokenById(ctx, tx, refreshToken.Id)
+		current, err := t.database.GetRefreshTokenByID(ctx, tx, refreshToken.ID)
 		if err != nil {
 			return err
 		}
 		if current == nil {
-			return errs.Errorf("the refresh token %d vanished while its rotation held it", refreshToken.Id)
+			return errs.Errorf("the refresh token %d vanished while its rotation held it", refreshToken.ID)
 		}
 		parent := *refreshToken
 		parent.AuthStateGeneration = current.AuthStateGeneration
@@ -283,12 +283,12 @@ func (t *TokenIssuer) IssueRefreshTokenGrant(ctx context.Context, settings *reco
 		// session's last use and the client's association with it. A session that ended in the
 		// meantime fails the bump too, and the validator refuses the child at its next refresh.
 		bumped, bumpErr := t.sessions.BumpUserSession(ctx, refreshToken.SessionIdentifier,
-			refreshToken.Code.ClientId, "", "", "")
+			refreshToken.Code.ClientID, "", "", "")
 		if bumpErr != nil {
 			slog.WarnContext(ctx, "unable to bump the user session after a refresh token rotation",
 				"grant_type", oidc.GrantTypeRefreshToken.String(),
-				"refresh_token_id", refreshToken.Id,
-				"client_id", refreshToken.Code.ClientId,
+				"refresh_token_id", refreshToken.ID,
+				"client_id", refreshToken.Code.ClientID,
 				"error", bumpErr)
 		} else {
 			outcome.BumpedSession = bumped
@@ -297,14 +297,14 @@ func (t *TokenIssuer) IssueRefreshTokenGrant(ctx context.Context, settings *reco
 	return tokenResponse, outcome, nil
 }
 
-// refreshOwnerUserId is the user a presented refresh token belongs to: the token's own for a
+// refreshOwnerUserID is the user a presented refresh token belongs to: the token's own for a
 // password grant's, which records none through a code, and the code's otherwise. The rotation takes
 // this user's row first (#131).
-func refreshOwnerUserId(input *RefreshTokenGrantInput) int64 {
+func refreshOwnerUserID(input *RefreshTokenGrantInput) int64 {
 	if input.IsROPC {
-		return input.RefreshToken.UserId.Int64
+		return input.RefreshToken.UserID.Int64
 	}
-	return input.RefreshToken.Code.UserId
+	return input.RefreshToken.Code.UserID
 }
 
 // containRefreshTokenFamily records a rotation family as revoked and revokes every live member, in
@@ -319,16 +319,16 @@ func refreshOwnerUserId(input *RefreshTokenGrantInput) int64 {
 // Two containments of one new family can both read the record absent and the second insert then
 // loses on the key. RunInTransactionRetryingConflict runs the loser once more, and it finds the
 // record the winner committed.
-func (t *TokenIssuer) containRefreshTokenFamily(ctx context.Context, firstRefreshTokenJti string) (int64, bool, error) {
+func (t *TokenIssuer) containRefreshTokenFamily(ctx context.Context, firstRefreshTokenJTI string) (int64, bool, error) {
 	var revokedCount int64
 	var recorded bool
 	err := data.RunInTransactionRetryingConflict(ctx, t.database, func(tx *sql.Tx) error {
 		var err error
-		recorded, err = t.database.RecordRefreshTokenFamilyRevoked(ctx, tx, firstRefreshTokenJti, RevokedFamilyReasonReplay)
+		recorded, err = t.database.RecordRefreshTokenFamilyRevoked(ctx, tx, firstRefreshTokenJTI, RevokedFamilyReasonReplay)
 		if err != nil {
 			return err
 		}
-		revokedCount, err = t.database.RevokeRefreshTokenFamily(ctx, tx, firstRefreshTokenJti)
+		revokedCount, err = t.database.RevokeRefreshTokenFamily(ctx, tx, firstRefreshTokenJTI)
 		return err
 	})
 	if err != nil {
@@ -393,7 +393,7 @@ func (t *TokenIssuer) mintCodeRefreshTokens(ctx context.Context, tx *sql.Tx, set
 	// The PARENT refresh token is the authorizing credential here, not the code, and its family is
 	// the grant the access token names (#676 decision 1).
 	accessTokenStr, err := t.generateAccessToken(ctx, tx, settings, code, scopeToUse, now, privKey, keyIdentifier, parent,
-		parent.FirstRefreshTokenJti, dpopThumbprint)
+		parent.FirstRefreshTokenJTI, dpopThumbprint)
 	if err != nil {
 		return nil, err
 	}
@@ -404,11 +404,11 @@ func (t *TokenIssuer) mintCodeRefreshTokens(ctx context.Context, tx *sql.Tx, set
 
 	scopes := strings.Split(scopeToUse, " ")
 	if slices.Contains(scopes, "openid") {
-		idTokenStr, idTokenErr := t.generateIdToken(ctx, tx, settings, code, scopeToUse, now, privKey, keyIdentifier, parent)
+		idTokenStr, idTokenErr := t.generateIDToken(ctx, tx, settings, code, scopeToUse, now, privKey, keyIdentifier, parent)
 		if idTokenErr != nil {
 			return nil, idTokenErr
 		}
-		tokenResponse.IdToken = idTokenStr
+		tokenResponse.IDToken = idTokenStr
 	}
 
 	// refresh_token ----------------------------------------------------------------------
@@ -497,7 +497,7 @@ func (t *TokenIssuer) mintROPCRefreshTokens(ctx context.Context, tx *sql.Tx, set
 
 	// The parent refresh token authorizes this, not the reloaded user.
 	accessTokenStr, err := t.generateROPCAccessToken(ctx, tx, settings, ropcInput, scopeToUse, now, privKey, keyIdentifier, parent,
-		parent.FirstRefreshTokenJti)
+		parent.FirstRefreshTokenJTI)
 	if err != nil {
 		return nil, err
 	}
@@ -508,11 +508,11 @@ func (t *TokenIssuer) mintROPCRefreshTokens(ctx context.Context, tx *sql.Tx, set
 
 	scopes := strings.Split(scopeToUse, " ")
 	if slices.Contains(scopes, "openid") {
-		idTokenStr, idTokenErr := t.generateROPCIdToken(ctx, tx, settings, ropcInput, scopeToUse, now, privKey, keyIdentifier)
+		idTokenStr, idTokenErr := t.generateROPCIDToken(ctx, tx, settings, ropcInput, scopeToUse, now, privKey, keyIdentifier)
 		if idTokenErr != nil {
 			return nil, idTokenErr
 		}
-		tokenResponse.IdToken = idTokenStr
+		tokenResponse.IDToken = idTokenStr
 	}
 
 	// refresh_token ----------------------------------------------------------------------

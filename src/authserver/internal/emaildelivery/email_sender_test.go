@@ -44,7 +44,7 @@ func TestSendEmail(t *testing.T) {
 	input := &SendEmailInput{
 		To:       recipient,
 		Subject:  "Test Email",
-		HtmlBody: "<p>This is a test email</p>",
+		HTMLBody: "<p>This is a test email</p>",
 	}
 
 	_, err := emailSender.SendEmail(context.Background(), smtpConfig, input)
@@ -197,7 +197,7 @@ func TestSendEmail_EncryptionModes(t *testing.T) {
 			result, err := sender.SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 				To:       fixtureRecipient,
 				Subject:  "Test email",
-				HtmlBody: "<p>hello</p>",
+				HTMLBody: "<p>hello</p>",
 			})
 			require.NoError(t, err)
 			assert.Equal(t, SendResult{Encrypted: test.wantEncrypted}, result)
@@ -265,7 +265,7 @@ func TestSendEmail_IPv6Host(t *testing.T) {
 			_, err := sender.SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 				To:       fixtureRecipient,
 				Subject:  "Test email",
-				HtmlBody: "<p>hello</p>",
+				HTMLBody: "<p>hello</p>",
 			})
 			require.NoError(t, err)
 
@@ -345,7 +345,7 @@ func TestSendEmail_MechanismChoice(t *testing.T) {
 			_, err := (&Sender{dataCipher: testDataCipher}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 				To:       fixtureRecipient,
 				Subject:  "Test email",
-				HtmlBody: "<p>hello</p>",
+				HTMLBody: "<p>hello</p>",
 			})
 
 			if test.wantError != "" {
@@ -391,7 +391,7 @@ func TestSendEmail_LoginOverProtectedConnection(t *testing.T) {
 	_, err := (&Sender{dataCipher: testDataCipher, rootCAs: cert.pool}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 		To:       fixtureRecipient,
 		Subject:  "Test email",
-		HtmlBody: "<p>hello</p>",
+		HTMLBody: "<p>hello</p>",
 	})
 	require.NoError(t, err)
 
@@ -422,7 +422,7 @@ func TestSendEmail_LoginAnswersUnconventionalChallenges(t *testing.T) {
 	_, err := (&Sender{dataCipher: testDataCipher}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 		To:       fixtureRecipient,
 		Subject:  "Test email",
-		HtmlBody: "<p>hello</p>",
+		HTMLBody: "<p>hello</p>",
 	})
 	require.NoError(t, err)
 
@@ -437,7 +437,7 @@ func TestSendEmail_LoginAnswersUnconventionalChallenges(t *testing.T) {
 // sealing cipher logs in with the plaintext, and one built with a cipher under another key refuses
 // before it dials, so nothing reaches the relay (#434).
 func TestSendEmail_DecryptsWithTheCipherItWasGiven(t *testing.T) {
-	input := &SendEmailInput{To: fixtureRecipient, Subject: "Test email", HtmlBody: "<p>hello</p>"}
+	input := &SendEmailInput{To: fixtureRecipient, Subject: "Test email", HTMLBody: "<p>hello</p>"}
 
 	t.Run("the sealing cipher", func(t *testing.T) {
 		f := &fakeSMTP{ext: []string{"AUTH LOGIN", "8BITMIME"}}
@@ -510,7 +510,7 @@ func TestSendEmail_PlainInitialResponseBoundary(t *testing.T) {
 			_, err := (&Sender{dataCipher: testDataCipher}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 				To:       fixtureRecipient,
 				Subject:  "Test email",
-				HtmlBody: "<p>hello</p>",
+				HTMLBody: "<p>hello</p>",
 			})
 			require.NoError(t, err)
 
@@ -554,7 +554,7 @@ func TestSendEmail_PlainChallengeFormOverProtectedConnection(t *testing.T) {
 	_, err := (&Sender{dataCipher: testDataCipher, rootCAs: cert.pool}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 		To:       fixtureRecipient,
 		Subject:  "Test email",
-		HtmlBody: "<p>hello</p>",
+		HTMLBody: "<p>hello</p>",
 	})
 	require.NoError(t, err)
 
@@ -628,7 +628,7 @@ func TestSendEmail_PlainRepeatedChallenge(t *testing.T) {
 	_, err := (&Sender{dataCipher: testDataCipher}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 		To:       fixtureRecipient,
 		Subject:  "Test email",
-		HtmlBody: "<p>hello</p>",
+		HTMLBody: "<p>hello</p>",
 	})
 	require.Error(t, err)
 	require.ErrorContains(t, err, "unexpected server challenge")
@@ -871,7 +871,7 @@ func TestSendEmail_FailsClosed(t *testing.T) {
 			_, err := sender.SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 				To:       fixtureRecipient,
 				Subject:  "Test email",
-				HtmlBody: "<p>hello</p>",
+				HTMLBody: "<p>hello</p>",
 			})
 
 			if test.wantTLS {
@@ -981,7 +981,7 @@ func TestSendEmail_CertificateVerification(t *testing.T) {
 			_, err := (&Sender{dataCipher: testDataCipher, rootCAs: pool}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 				To:       fixtureRecipient,
 				Subject:  "Test email",
-				HtmlBody: "<p>hello</p>",
+				HTMLBody: "<p>hello</p>",
 			})
 			require.Error(t, err)
 			for _, want := range test.wantInError {
@@ -1061,7 +1061,7 @@ func TestSendEmail_MessageHeaderOrder(t *testing.T) {
 	m := send(t, "Goiabada", &SendEmailInput{
 		To:       fixtureRecipient,
 		Subject:  "Test email",
-		HtmlBody: "<p>hello</p>",
+		HTMLBody: "<p>hello</p>",
 	})
 
 	// go-simple-mail wrote these in Go map order. Pinning the order is what makes the wire
@@ -1122,7 +1122,7 @@ func TestSendEmail_FromHeader(t *testing.T) {
 			m := send(t, test.fromName, &SendEmailInput{
 				To:       fixtureRecipient,
 				Subject:  "Test email",
-				HtmlBody: "<p>hello</p>",
+				HTMLBody: "<p>hello</p>",
 			})
 
 			value := m.headers["From"]
@@ -1180,7 +1180,7 @@ func TestSendEmail_SubjectHeader(t *testing.T) {
 			m := send(t, "Goiabada", &SendEmailInput{
 				To:       fixtureRecipient,
 				Subject:  test.subject,
-				HtmlBody: "<p>hello</p>",
+				HTMLBody: "<p>hello</p>",
 			})
 
 			if test.wantLiteral {
@@ -1218,7 +1218,7 @@ func TestSendEmail_SubjectHardLineLimit(t *testing.T) {
 		m := send(t, "Goiabada", &SendEmailInput{
 			To:       fixtureRecipient,
 			Subject:  subject,
-			HtmlBody: "<p>hello</p>",
+			HTMLBody: "<p>hello</p>",
 		})
 		assert.Equal(t, subject, m.headers["Subject"])
 		for _, line := range m.rawHeaders {
@@ -1236,7 +1236,7 @@ func TestSendEmail_SubjectHardLineLimit(t *testing.T) {
 		_, err := (&Sender{dataCipher: testDataCipher}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 			To:       fixtureRecipient,
 			Subject:  strings.Repeat("s", longest+1),
-			HtmlBody: "<p>hello</p>",
+			HTMLBody: "<p>hello</p>",
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "998-byte line limit")
@@ -1255,7 +1255,7 @@ func TestSendEmail_SubjectHardLineLimit(t *testing.T) {
 		_, err := (&Sender{dataCipher: testDataCipher}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 			To:       strings.Repeat("r", 1000) + "@example.com",
 			Subject:  "Test email",
-			HtmlBody: "<p>hello</p>",
+			HTMLBody: "<p>hello</p>",
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "the To header")
@@ -1354,7 +1354,7 @@ func TestSendEmail_HeaderFolding(t *testing.T) {
 				subject = "Test email"
 			}
 
-			m := send(t, fromName, &SendEmailInput{To: to, Subject: subject, HtmlBody: "<p>hello</p>"})
+			m := send(t, fromName, &SendEmailInput{To: to, Subject: subject, HTMLBody: "<p>hello</p>"})
 
 			lines := fieldLines(t, m, test.field)
 			for _, line := range lines {
@@ -1402,7 +1402,7 @@ func TestSendEmail_HeaderFolding(t *testing.T) {
 	}
 
 	t.Run("a quoted display name is kept whole on its line", func(t *testing.T) {
-		m := send(t, quotedName, &SendEmailInput{To: fixtureRecipient, Subject: "Test email", HtmlBody: "<p>hello</p>"})
+		m := send(t, quotedName, &SendEmailInput{To: fixtureRecipient, Subject: "Test email", HTMLBody: "<p>hello</p>"})
 		assert.Equal(t, []string{
 			`From: "D'Ippolito, Leonardo - Goiabada Identity Notifications Team"`,
 			" <noreply@example.com>",
@@ -1413,7 +1413,7 @@ func TestSendEmail_HeaderFolding(t *testing.T) {
 		// The encoder passes plain ASCII through, but a reader still decodes the encoded word in
 		// it, so the line holding it stays at 76 after plain words follow: 8 + 22 + 21 + 26 = 77.
 		subject := "=?UTF-8?q?caf=C3=A9?= " + strings.Repeat("a", 20) + " " + strings.Repeat("b", 25)
-		m := send(t, "Goiabada", &SendEmailInput{To: fixtureRecipient, Subject: subject, HtmlBody: "<p>hello</p>"})
+		m := send(t, "Goiabada", &SendEmailInput{To: fixtureRecipient, Subject: subject, HTMLBody: "<p>hello</p>"})
 		assert.Equal(t, []string{
 			"Subject: =?UTF-8?q?caf=C3=A9?= " + strings.Repeat("a", 20),
 			" " + strings.Repeat("b", 25),
@@ -1424,7 +1424,7 @@ func TestSendEmail_HeaderFolding(t *testing.T) {
 		// "Subject: " plus 68 bytes is 77, so the three spaces cannot end that line; moved whole
 		// onto the next, they leave no line of only whitespace and unfold to the same subject.
 		subject := strings.Repeat("a", 68) + "   b"
-		m := send(t, "Goiabada", &SendEmailInput{To: fixtureRecipient, Subject: subject, HtmlBody: "<p>hello</p>"})
+		m := send(t, "Goiabada", &SendEmailInput{To: fixtureRecipient, Subject: subject, HTMLBody: "<p>hello</p>"})
 		assert.Equal(t, []string{"Subject: " + strings.Repeat("a", 68), "   b"}, fieldLines(t, m, "Subject"))
 		assert.Equal(t, subject, m.headers["Subject"])
 	})
@@ -1433,7 +1433,7 @@ func TestSendEmail_HeaderFolding(t *testing.T) {
 		m := send(t, "Goiabada", &SendEmailInput{
 			To:       fixtureRecipient,
 			Subject:  strings.Repeat("a", 50) + "é",
-			HtmlBody: "<p>hello</p>",
+			HTMLBody: "<p>hello</p>",
 		})
 		assert.Equal(t, []string{
 			"Subject:",
@@ -1455,7 +1455,7 @@ func TestSendEmail_FinalDataRejection(t *testing.T) {
 	_, err := (&Sender{dataCipher: testDataCipher}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 		To:       fixtureRecipient,
 		Subject:  "Test email",
-		HtmlBody: "<p>hello</p>",
+		HTMLBody: "<p>hello</p>",
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unable to send SMTP message")
@@ -1553,7 +1553,7 @@ func TestSendEmail_MessageID(t *testing.T) {
 		m := send(t, "Goiabada", &SendEmailInput{
 			To:       fixtureRecipient,
 			Subject:  "Test email",
-			HtmlBody: "<p>hello</p>",
+			HTMLBody: "<p>hello</p>",
 		})
 		assert.Regexp(t, pattern, m.headers["Message-ID"])
 	})
@@ -1569,7 +1569,7 @@ func TestSendEmail_MessageID(t *testing.T) {
 			_, err := sender.SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 				To:       fixtureRecipient,
 				Subject:  fmt.Sprintf("Test email %d", i),
-				HtmlBody: "<p>hello</p>",
+				HTMLBody: "<p>hello</p>",
 			})
 			require.NoError(t, err)
 			seen = append(seen, parseMessage(t, f.data()).headers["Message-ID"])
@@ -1589,7 +1589,7 @@ func TestSendEmail_MessageID(t *testing.T) {
 		_, err := sender.SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 			To:       fixtureRecipient,
 			Subject:  "Test email",
-			HtmlBody: "<p>hello</p>",
+			HTMLBody: "<p>hello</p>",
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "unable to generate a Message-ID")
@@ -1606,7 +1606,7 @@ func TestSendEmail_Body(t *testing.T) {
 	m := send(t, "Goiabada", &SendEmailInput{
 		To:       fixtureRecipient,
 		Subject:  "Test email",
-		HtmlBody: body,
+		HTMLBody: body,
 	})
 
 	assert.Contains(t, m.raw, "\r\n..\r\n", "RFC 5321 4.5.2: a body line of '.' has to be stuffed on the wire")
@@ -1630,7 +1630,7 @@ func TestSendEmail_HeaderInjection(t *testing.T) {
 		m := send(t, "Goiabada", &SendEmailInput{
 			To:       fixtureRecipient,
 			Subject:  attempt,
-			HtmlBody: "<p>hello</p>",
+			HTMLBody: "<p>hello</p>",
 		})
 
 		assertNoInjectedHeader(t, m, m.headers["Subject"])
@@ -1644,7 +1644,7 @@ func TestSendEmail_HeaderInjection(t *testing.T) {
 		m := send(t, attempt, &SendEmailInput{
 			To:       fixtureRecipient,
 			Subject:  "Test email",
-			HtmlBody: "<p>hello</p>",
+			HTMLBody: "<p>hello</p>",
 		})
 
 		assertNoInjectedHeader(t, m, m.headers["From"])
@@ -1690,7 +1690,7 @@ func TestSendEmail_InvalidRecipient(t *testing.T) {
 			_, err := (&Sender{dataCipher: testDataCipher}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 				To:       c.to,
 				Subject:  "Test email",
-				HtmlBody: "<p>hello</p>",
+				HTMLBody: "<p>hello</p>",
 			})
 			require.Error(t, err)
 			assert.Equal(t, "invalid recipient address", err.Error())
@@ -1719,7 +1719,7 @@ func TestSendEmail_DialTimeout(t *testing.T) {
 	_, err := (&Sender{dataCipher: testDataCipher, dialTimeout: -time.Second}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 		To:       fixtureRecipient,
 		Subject:  "Test email",
-		HtmlBody: "<p>hello</p>",
+		HTMLBody: "<p>hello</p>",
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unable to connect to SMTP server")

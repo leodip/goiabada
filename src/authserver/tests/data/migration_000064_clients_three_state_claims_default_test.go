@@ -55,7 +55,7 @@ func TestMigration000064_ClientsThreeStateClaimsDefault(t *testing.T) {
 		accessToken     string
 		idToken         string
 		wantAccessToken string
-		wantIdToken     string
+		wantIDToken     string
 		why             string
 	}{
 		{"m63_empty_" + random, "", "",
@@ -91,10 +91,10 @@ func TestMigration000064_ClientsThreeStateClaimsDefault(t *testing.T) {
 			ClientIdentifier:                        c.identifier,
 			Description:                             "Migration 000064 test client",
 			IncludeOpenIDConnectClaimsInAccessToken: c.accessToken,
-			IncludeOpenIDConnectClaimsInIdToken:     c.idToken,
+			IncludeOpenIDConnectClaimsInIDToken:     c.idToken,
 		}
 		require.NoErrorf(t, h.DB.CreateClient(ctx, nil, client), "seed client %s on %s", c.identifier, dbType())
-		ids[i] = client.Id
+		ids[i] = client.ID
 	}
 
 	// 3. Down to 000063 changes nothing: the seeded values are still what the seed wrote.
@@ -110,14 +110,14 @@ func TestMigration000064_ClientsThreeStateClaimsDefault(t *testing.T) {
 	for i, c := range cases {
 		accessToken, idToken := readThreeStateClaims000064(t, h, ids[i])
 		assert.Equalf(t, c.wantAccessToken, accessToken, "%s: include_open_id_connect_claims_in_access_token on %s, because %s", c.identifier, dbType(), c.why)
-		assert.Equalf(t, c.wantIdToken, idToken, "%s: include_open_id_connect_claims_in_id_token on %s, because %s", c.identifier, dbType(), c.why)
+		assert.Equalf(t, c.wantIDToken, idToken, "%s: include_open_id_connect_claims_in_id_token on %s, because %s", c.identifier, dbType(), c.why)
 	}
 }
 
-func readThreeStateClaims000064(t *testing.T, h *isolatedDB, clientId int64) (string, string) {
+func readThreeStateClaims000064(t *testing.T, h *isolatedDB, clientID int64) (string, string) {
 	t.Helper()
 	var accessToken, idToken string
-	q := fmt.Sprintf("SELECT include_open_id_connect_claims_in_access_token, include_open_id_connect_claims_in_id_token FROM clients WHERE id = %d", clientId)
+	q := fmt.Sprintf("SELECT include_open_id_connect_claims_in_access_token, include_open_id_connect_claims_in_id_token FROM clients WHERE id = %d", clientID)
 	require.NoErrorf(t, h.SQL.QueryRow(q).Scan(&accessToken, &idToken), "read the three-state claim columns on %s", dbType())
 	return accessToken, idToken
 }

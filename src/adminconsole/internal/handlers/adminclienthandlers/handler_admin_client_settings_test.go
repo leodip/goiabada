@@ -18,10 +18,10 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 )
 
-// stubAdministrativeScopesApiClient implements the Settings tab's port: the client the tab is drawn
+// stubAdministrativeScopesAPIClient implements the Settings tab's port: the client the tab is drawn
 // from, the brands its Brand select offers, and the settings', the allowance's and the brand's
 // writes, each recording what it was sent and in which order.
-type stubAdministrativeScopesApiClient struct {
+type stubAdministrativeScopesAPIClient struct {
 	client *api.ClientResponse
 	// brands is what the brands' read answers.
 	brands []api.BrandResponse
@@ -49,11 +49,11 @@ type stubAdministrativeScopesApiClient struct {
 	settingsWrites  int
 }
 
-func (s *stubAdministrativeScopesApiClient) GetClientById(_ context.Context, _ string, _ int64) (*api.ClientResponse, error) {
+func (s *stubAdministrativeScopesAPIClient) GetClientByID(_ context.Context, _ string, _ int64) (*api.ClientResponse, error) {
 	return s.client, nil
 }
 
-func (s *stubAdministrativeScopesApiClient) UpdateClient(_ context.Context, _ string, _ int64,
+func (s *stubAdministrativeScopesAPIClient) UpdateClient(_ context.Context, _ string, _ int64,
 	request *api.UpdateClientSettingsRequest) (*api.ClientResponse, error) {
 	s.settingsWrites++
 	s.writes = append(s.writes, "settings")
@@ -67,12 +67,12 @@ func (s *stubAdministrativeScopesApiClient) UpdateClient(_ context.Context, _ st
 	return s.client, nil
 }
 
-func (s *stubAdministrativeScopesApiClient) UpdateClientAdministrativeScopes(_ context.Context, accessToken string,
-	clientId int64, request *api.UpdateClientAdministrativeScopesRequest) (*api.ClientResponse, error) {
+func (s *stubAdministrativeScopesAPIClient) UpdateClientAdministrativeScopes(_ context.Context, accessToken string,
+	clientID int64, request *api.UpdateClientAdministrativeScopesRequest) (*api.ClientResponse, error) {
 	s.allowanceWrites++
 	s.writes = append(s.writes, "allowance")
 	s.sentAllowance = request
-	s.sentAllowanceTo = clientId
+	s.sentAllowanceTo = clientID
 	s.sentAllowanceAs = accessToken
 	if s.updateErr != nil {
 		return nil, s.updateErr
@@ -80,16 +80,16 @@ func (s *stubAdministrativeScopesApiClient) UpdateClientAdministrativeScopes(_ c
 	return s.client, nil
 }
 
-func (s *stubAdministrativeScopesApiClient) GetAllBrands(_ context.Context, _ string) ([]api.BrandResponse, error) {
+func (s *stubAdministrativeScopesAPIClient) GetAllBrands(_ context.Context, _ string) ([]api.BrandResponse, error) {
 	return s.brands, nil
 }
 
-func (s *stubAdministrativeScopesApiClient) UpdateClientBrand(_ context.Context, accessToken string, clientId int64,
+func (s *stubAdministrativeScopesAPIClient) UpdateClientBrand(_ context.Context, accessToken string, clientID int64,
 	request *api.UpdateClientBrandRequest) (*api.ClientResponse, error) {
 	s.brandWrites++
 	s.writes = append(s.writes, "brand")
 	s.sentBrand = request
-	s.sentBrandTo = clientId
+	s.sentBrandTo = clientID
 	s.sentBrandAs = accessToken
 	if s.brandErr != nil {
 		return nil, s.brandErr
@@ -116,14 +116,14 @@ const manageGrant = "openid authserver:manage"
 
 // postSettings posts the Settings tab for client 7 with form, and with query on the URL when given,
 // as an administrator granted scope.
-func postSettings(t *testing.T, apiClient clientSettingsAPI, httpHelper *stubHttpHelper, form url.Values, query string, scope ...string) *httptest.ResponseRecorder {
+func postSettings(t *testing.T, apiClient clientSettingsAPI, httpHelper *stubHTTPHelper, form url.Values, query string, scope ...string) *httptest.ResponseRecorder {
 	t.Helper()
 	return postSettingsDropping(t, apiClient, httpHelper, &invalidationRecorder{}, form, query, scope...)
 }
 
 // postSettingsDropping posts the Settings tab as postSettings does, with cache standing for the
 // console's cached public settings.
-func postSettingsDropping(t *testing.T, apiClient clientSettingsAPI, httpHelper *stubHttpHelper, cache *invalidationRecorder,
+func postSettingsDropping(t *testing.T, apiClient clientSettingsAPI, httpHelper *stubHTTPHelper, cache *invalidationRecorder,
 	form url.Values, query string, scope ...string) *httptest.ResponseRecorder {
 	t.Helper()
 	target := "/admin/clients/7/settings"
@@ -135,7 +135,7 @@ func postSettingsDropping(t *testing.T, apiClient clientSettingsAPI, httpHelper 
 		grant = scope[0]
 	}
 	req := handlertest.Request(http.MethodPost, target,
-		handlertest.WithJwtInfo(oauthclient.JwtInfo{TokenResponse: oauth.TokenResponse{AccessToken: handlertest.AccessToken, Scope: grant}}),
+		handlertest.WithJWTInfo(oauthclient.JWTInfo{TokenResponse: oauth.TokenResponse{AccessToken: handlertest.AccessToken, Scope: grant}}),
 		handlertest.WithPathValue("clientId", "7"), handlertest.WithForm(form))
 	rec := httptest.NewRecorder()
 	HandleSettingsPost(httpHelper, newTestSessionStore(), apiClient, cache, consoleBaseURL).ServeHTTP(rec, req)
@@ -154,16 +154,16 @@ func TestHandleSettingsGet_BindsTheAdministrativeScopesAllowance(t *testing.T) {
 	}{
 		{
 			name:        "an allowed client",
-			client:      &api.ClientResponse{Id: 7, ClientIdentifier: "ops-tool", AdministrativeScopesAllowed: true},
+			client:      &api.ClientResponse{ID: 7, ClientIdentifier: "ops-tool", AdministrativeScopesAllowed: true},
 			wantAllowed: true,
 		},
 		{
 			name:   "a client that is not allowed",
-			client: &api.ClientResponse{Id: 7, ClientIdentifier: "portal"},
+			client: &api.ClientResponse{ID: 7, ClientIdentifier: "portal"},
 		},
 		{
 			name: "the admin console's client",
-			client: &api.ClientResponse{Id: 7, ClientIdentifier: "admin-console-client",
+			client: &api.ClientResponse{ID: 7, ClientIdentifier: "admin-console-client",
 				AdministrativeScopesAllowed: true, IsSystemLevelClient: true},
 			wantAllowed: true,
 			wantSystem:  true,
@@ -172,11 +172,11 @@ func TestHandleSettingsGet_BindsTheAdministrativeScopesAllowance(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := &stubHttpHelper{}
+			httpHelper := &stubHTTPHelper{}
 			req := handlertest.Request(http.MethodGet, "/admin/clients/7/settings",
 				handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "7"))
 
-			HandleSettingsGet(httpHelper, newTestSessionStore(), &stubAdministrativeScopesApiClient{client: tc.client}).
+			HandleSettingsGet(httpHelper, newTestSessionStore(), &stubAdministrativeScopesAPIClient{client: tc.client}).
 				ServeHTTP(httptest.NewRecorder(), req)
 
 			require.NoError(t, httpHelper.err)
@@ -192,12 +192,12 @@ func TestHandleSettingsGet_BindsTheAdministrativeScopesAllowance(t *testing.T) {
 // read-only: on for a self-registered client, off for one an administrator created.
 func TestHandleSettingsGet_BindsWhetherTheClientRegisteredItself(t *testing.T) {
 	for _, createdViaDCR := range []bool{true, false} {
-		httpHelper := &stubHttpHelper{}
+		httpHelper := &stubHTTPHelper{}
 		req := handlertest.Request(http.MethodGet, "/admin/clients/7/settings",
 			handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "7"))
-		client := &api.ClientResponse{Id: 7, ClientIdentifier: "dcr_a3f9e1b2", CreatedViaDCR: createdViaDCR}
+		client := &api.ClientResponse{ID: 7, ClientIdentifier: "dcr_a3f9e1b2", CreatedViaDCR: createdViaDCR}
 
-		HandleSettingsGet(httpHelper, newTestSessionStore(), &stubAdministrativeScopesApiClient{client: client}).
+		HandleSettingsGet(httpHelper, newTestSessionStore(), &stubAdministrativeScopesAPIClient{client: client}).
 			ServeHTTP(httptest.NewRecorder(), req)
 
 		require.NoError(t, httpHelper.err)
@@ -228,9 +228,9 @@ func TestHandleSettingsPost_WritesTheAllowanceOnlyWhenItChanged(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			apiClient := &stubAdministrativeScopesApiClient{client: &api.ClientResponse{Id: 7, ClientIdentifier: "ops-tool",
+			apiClient := &stubAdministrativeScopesAPIClient{client: &api.ClientResponse{ID: 7, ClientIdentifier: "ops-tool",
 				AdministrativeScopesAllowed: tc.stored}}
-			httpHelper := &stubHttpHelper{}
+			httpHelper := &stubHTTPHelper{}
 
 			rec := postSettings(t, apiClient, httpHelper, tc.form, "")
 
@@ -255,10 +255,10 @@ func TestHandleSettingsPost_WritesTheAllowanceOnlyWhenItChanged(t *testing.T) {
 // submits it, and the save never writes it, whatever the body says.
 func TestHandleSettingsPost_NeverWritesASystemLevelClientsAllowance(t *testing.T) {
 	for _, form := range []url.Values{{}, {"administrativeScopesAllowed": {"on"}}} {
-		apiClient := &stubAdministrativeScopesApiClient{client: &api.ClientResponse{Id: 7, ClientIdentifier: "admin-console-client",
+		apiClient := &stubAdministrativeScopesAPIClient{client: &api.ClientResponse{ID: 7, ClientIdentifier: "admin-console-client",
 			AdministrativeScopesAllowed: true, IsSystemLevelClient: true}}
 
-		postSettings(t, apiClient, &stubHttpHelper{}, form, "")
+		postSettings(t, apiClient, &stubHTTPHelper{}, form, "")
 
 		assert.Equal(t, 1, apiClient.settingsWrites)
 		assert.Zero(t, apiClient.allowanceWrites, "form %v", form)
@@ -268,9 +268,9 @@ func TestHandleSettingsPost_NeverWritesASystemLevelClientsAllowance(t *testing.T
 // The switch is read from the request body alone. A switch in the URL is not a submission of the
 // form, so it switches nothing on.
 func TestHandleSettingsPost_IgnoresTheSwitchInTheQuery(t *testing.T) {
-	apiClient := &stubAdministrativeScopesApiClient{client: &api.ClientResponse{Id: 7, ClientIdentifier: "ops-tool"}}
+	apiClient := &stubAdministrativeScopesAPIClient{client: &api.ClientResponse{ID: 7, ClientIdentifier: "ops-tool"}}
 
-	postSettings(t, apiClient, &stubHttpHelper{}, url.Values{}, "administrativeScopesAllowed=on")
+	postSettings(t, apiClient, &stubHTTPHelper{}, url.Values{}, "administrativeScopesAllowed=on")
 
 	assert.Zero(t, apiClient.allowanceWrites, "the stored allowance is off and the body says off")
 }
@@ -280,12 +280,12 @@ func TestHandleSettingsPost_IgnoresTheSwitchInTheQuery(t *testing.T) {
 // nothing is redirected.
 func TestHandleSettingsPost_ARefusedAllowanceLeavesTheSettingsSaved(t *testing.T) {
 	const refusal = "Only authserver:manage may switch this."
-	apiClient := &stubAdministrativeScopesApiClient{
-		client:    &api.ClientResponse{Id: 7, ClientIdentifier: "ops-tool", DisplayName: "Ops"},
-		updated:   &api.ClientResponse{Id: 7, ClientIdentifier: "ops-tool", DisplayName: "Ops tool"},
+	apiClient := &stubAdministrativeScopesAPIClient{
+		client:    &api.ClientResponse{ID: 7, ClientIdentifier: "ops-tool", DisplayName: "Ops"},
+		updated:   &api.ClientResponse{ID: 7, ClientIdentifier: "ops-tool", DisplayName: "Ops tool"},
 		updateErr: &apiclient.APIError{Code: "VALIDATION_ERROR", Message: refusal, StatusCode: http.StatusBadRequest},
 	}
-	httpHelper := &stubHttpHelper{}
+	httpHelper := &stubHTTPHelper{}
 
 	rec := postSettings(t, apiClient, httpHelper, url.Values{"displayName": {"Ops tool"}, "administrativeScopesAllowed": {"on"}}, "")
 
@@ -304,11 +304,11 @@ func TestHandleSettingsPost_ARefusedAllowanceLeavesTheSettingsSaved(t *testing.T
 // A refused settings save writes no allowance, and draws the tab again with the switch as submitted,
 // as every other input is.
 func TestHandleSettingsPost_ARefusedSettingsSaveWritesNoAllowance(t *testing.T) {
-	apiClient := &stubAdministrativeScopesApiClient{
-		client:      &api.ClientResponse{Id: 7, ClientIdentifier: "ops-tool"},
+	apiClient := &stubAdministrativeScopesAPIClient{
+		client:      &api.ClientResponse{ID: 7, ClientIdentifier: "ops-tool"},
 		settingsErr: &apiclient.APIError{Code: "VALIDATION_ERROR", Message: "Invalid website URL.", StatusCode: http.StatusBadRequest},
 	}
-	httpHelper := &stubHttpHelper{}
+	httpHelper := &stubHTTPHelper{}
 
 	postSettings(t, apiClient, httpHelper, url.Values{"websiteUrl": {"not a url"}, "administrativeScopesAllowed": {"on"}}, "")
 
@@ -328,9 +328,9 @@ func TestHandleSettingsPost_ARefusedSettingsSaveWritesNoAllowance(t *testing.T) 
 func TestHandleSettingsPost_WithoutManageTheAllowanceStands(t *testing.T) {
 	for _, stored := range []bool{true, false} {
 		for _, form := range []url.Values{{}, {"administrativeScopesAllowed": {"on"}}} {
-			apiClient := &stubAdministrativeScopesApiClient{client: &api.ClientResponse{Id: 7, ClientIdentifier: "ops-tool",
+			apiClient := &stubAdministrativeScopesAPIClient{client: &api.ClientResponse{ID: 7, ClientIdentifier: "ops-tool",
 				AdministrativeScopesAllowed: stored}}
-			httpHelper := &stubHttpHelper{}
+			httpHelper := &stubHTTPHelper{}
 
 			rec := postSettings(t, apiClient, httpHelper, form, "", "openid authserver:manage-clients")
 
@@ -345,13 +345,13 @@ func TestHandleSettingsPost_WithoutManageTheAllowanceStands(t *testing.T) {
 // The tab shows the client's own privacy policy and terms of service URLs as the auth server
 // answers them (#622 decision 12).
 func TestHandleSettingsGet_BindsTheClientsDocumentURLs(t *testing.T) {
-	httpHelper := &stubHttpHelper{}
+	httpHelper := &stubHTTPHelper{}
 	req := handlertest.Request(http.MethodGet, "/admin/clients/7/settings",
 		handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "7"))
-	client := &api.ClientResponse{Id: 7, ClientIdentifier: "portal",
+	client := &api.ClientResponse{ID: 7, ClientIdentifier: "portal",
 		PrivacyPolicyURL: "https://portal.example.com/privacy", TermsOfServiceURL: "https://portal.example.com/terms"}
 
-	HandleSettingsGet(httpHelper, newTestSessionStore(), &stubAdministrativeScopesApiClient{client: client}).
+	HandleSettingsGet(httpHelper, newTestSessionStore(), &stubAdministrativeScopesAPIClient{client: client}).
 		ServeHTTP(httptest.NewRecorder(), req)
 
 	require.NoError(t, httpHelper.err)
@@ -364,11 +364,11 @@ func TestHandleSettingsGet_BindsTheClientsDocumentURLs(t *testing.T) {
 // A save sends the two URLs as typed, trimmed, and an emptied field as empty, which clears it; a
 // refused save draws them again as typed.
 func TestHandleSettingsPost_SendsTheClientsDocumentURLs(t *testing.T) {
-	stored := &api.ClientResponse{Id: 7, ClientIdentifier: "portal",
+	stored := &api.ClientResponse{ID: 7, ClientIdentifier: "portal",
 		PrivacyPolicyURL: "https://portal.example.com/privacy", TermsOfServiceURL: "https://portal.example.com/terms"}
-	apiClient := &stubAdministrativeScopesApiClient{client: stored}
+	apiClient := &stubAdministrativeScopesAPIClient{client: stored}
 
-	rec := postSettings(t, apiClient, &stubHttpHelper{}, url.Values{
+	rec := postSettings(t, apiClient, &stubHTTPHelper{}, url.Values{
 		"clientIdentifier":  {"portal"},
 		"privacyPolicyUrl":  {"  https://legal.example.org/portal/privacy  "},
 		"termsOfServiceUrl": {""},
@@ -379,9 +379,9 @@ func TestHandleSettingsPost_SendsTheClientsDocumentURLs(t *testing.T) {
 	assert.Equal(t, "https://legal.example.org/portal/privacy", apiClient.sentSettings.PrivacyPolicyURL)
 	assert.Empty(t, apiClient.sentSettings.TermsOfServiceURL, "an emptied field clears the URL")
 
-	refused := &stubAdministrativeScopesApiClient{client: stored,
+	refused := &stubAdministrativeScopesAPIClient{client: stored,
 		settingsErr: &apiclient.APIError{Code: "handler.client.terms_of_service_url_invalid", Message: "Invalid terms of service URL.", StatusCode: http.StatusBadRequest}}
-	httpHelper := &stubHttpHelper{}
+	httpHelper := &stubHTTPHelper{}
 	postSettings(t, refused, httpHelper, url.Values{
 		"clientIdentifier":  {"portal"},
 		"privacyPolicyUrl":  {"https://legal.example.org/portal/privacy"},
@@ -401,16 +401,16 @@ func TestHandleSettingsGet_BindsRememberConsent(t *testing.T) {
 		name   string
 		client *api.ClientResponse
 	}{
-		{"a public client remembering consent", &api.ClientResponse{Id: 7, ClientIdentifier: "spa", IsPublic: true, RememberConsent: true}},
-		{"a public client not remembering consent", &api.ClientResponse{Id: 7, ClientIdentifier: "spa", IsPublic: true}},
-		{"a confidential client", &api.ClientResponse{Id: 7, ClientIdentifier: "portal", RememberConsent: true}},
+		{"a public client remembering consent", &api.ClientResponse{ID: 7, ClientIdentifier: "spa", IsPublic: true, RememberConsent: true}},
+		{"a public client not remembering consent", &api.ClientResponse{ID: 7, ClientIdentifier: "spa", IsPublic: true}},
+		{"a confidential client", &api.ClientResponse{ID: 7, ClientIdentifier: "portal", RememberConsent: true}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := &stubHttpHelper{}
+			httpHelper := &stubHTTPHelper{}
 			req := handlertest.Request(http.MethodGet, "/admin/clients/7/settings",
 				handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "7"))
 
-			HandleSettingsGet(httpHelper, newTestSessionStore(), &stubAdministrativeScopesApiClient{client: tc.client}).
+			HandleSettingsGet(httpHelper, newTestSessionStore(), &stubAdministrativeScopesAPIClient{client: tc.client}).
 				ServeHTTP(httptest.NewRecorder(), req)
 
 			require.NoError(t, httpHelper.err)
@@ -441,12 +441,12 @@ func TestHandleSettingsPost_SendsAPublicClientsRememberConsentFromTheBody(t *tes
 		{name: "a value other than the checkbox's", form: url.Values{"rememberConsent": {"true"}}, want: false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			apiClient := &stubAdministrativeScopesApiClient{
-				client: &api.ClientResponse{Id: 7, ClientIdentifier: "spa", IsPublic: true, RememberConsent: tc.stored}}
+			apiClient := &stubAdministrativeScopesAPIClient{
+				client: &api.ClientResponse{ID: 7, ClientIdentifier: "spa", IsPublic: true, RememberConsent: tc.stored}}
 			form := tc.form
 			form.Set("clientIdentifier", "spa")
 
-			rec := postSettings(t, apiClient, &stubHttpHelper{}, form, tc.query)
+			rec := postSettings(t, apiClient, &stubHTTPHelper{}, form, tc.query)
 
 			assert.Equal(t, http.StatusFound, rec.Code)
 			require.NotNil(t, apiClient.sentSettings)
@@ -463,10 +463,10 @@ func TestHandleSettingsPost_SendsNoRememberConsentForAConfidentialClient(t *test
 		{"clientIdentifier": {"portal"}},
 		{"clientIdentifier": {"portal"}, "rememberConsent": {"on"}},
 	} {
-		apiClient := &stubAdministrativeScopesApiClient{
-			client: &api.ClientResponse{Id: 7, ClientIdentifier: "portal", RememberConsent: true}}
+		apiClient := &stubAdministrativeScopesAPIClient{
+			client: &api.ClientResponse{ID: 7, ClientIdentifier: "portal", RememberConsent: true}}
 
-		rec := postSettings(t, apiClient, &stubHttpHelper{}, form, "")
+		rec := postSettings(t, apiClient, &stubHTTPHelper{}, form, "")
 
 		assert.Equal(t, http.StatusFound, rec.Code)
 		require.NotNil(t, apiClient.sentSettings)
@@ -476,10 +476,10 @@ func TestHandleSettingsPost_SendsNoRememberConsentForAConfidentialClient(t *test
 
 // A refused save draws the checkbox again as submitted, so the administrator does not lose it.
 func TestHandleSettingsPost_ARefusedSaveKeepsRememberConsentAsSubmitted(t *testing.T) {
-	apiClient := &stubAdministrativeScopesApiClient{
-		client:      &api.ClientResponse{Id: 7, ClientIdentifier: "spa", IsPublic: true},
+	apiClient := &stubAdministrativeScopesAPIClient{
+		client:      &api.ClientResponse{ID: 7, ClientIdentifier: "spa", IsPublic: true},
 		settingsErr: &apiclient.APIError{Code: "handler.client.website_url_invalid", Message: "Invalid website URL.", StatusCode: http.StatusBadRequest}}
-	httpHelper := &stubHttpHelper{}
+	httpHelper := &stubHTTPHelper{}
 
 	postSettings(t, apiClient, httpHelper, url.Values{"clientIdentifier": {"spa"}, "rememberConsent": {"on"}, "websiteUrl": {"x"}}, "")
 
@@ -488,14 +488,14 @@ func TestHandleSettingsPost_ARefusedSaveKeepsRememberConsentAsSubmitted(t *testi
 	assert.False(t, reflect.ValueOf(httpHelper.bind["storedClient"]).FieldByName("RememberConsent").Bool(), "compared with the stored value")
 }
 
-func brandIdPtr(id int64) *int64 { return &id }
+func brandIDPtr(id int64) *int64 { return &id }
 
 // The brands as the auth server lists them, by name, the default marked: Autumn (4), Default (5)
 // and Spring (6).
 var testBrands = []api.BrandResponse{
-	{Id: 4, Name: "Autumn", Appearance: "dark", Theme: "plum"},
-	{Id: 5, Name: "Default", Appearance: "auto", Theme: "blueberry", IsDefault: true},
-	{Id: 6, Name: "Spring", Appearance: "light", Theme: "avocado"},
+	{ID: 4, Name: "Autumn", Appearance: "dark", Theme: "plum"},
+	{ID: 5, Name: "Default", Appearance: "auto", Theme: "blueberry", IsDefault: true},
+	{ID: 6, Name: "Spring", Appearance: "light", Theme: "avocado"},
 }
 
 // The Brand select under Sign-in and consent pages (#812 decision 6): Default brand first, naming
@@ -504,29 +504,29 @@ var testBrands = []api.BrandResponse{
 func TestHandleSettingsGet_BindsTheBrandSelect(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
-		brandId *int64
+		brandID *int64
 		want    int64
 	}{
 		{"a client with no brand of its own", nil, 0},
-		{"a client given a brand", brandIdPtr(6), 6},
-		{"a client given the default brand itself", brandIdPtr(5), 5},
+		{"a client given a brand", brandIDPtr(6), 6},
+		{"a client given the default brand itself", brandIDPtr(5), 5},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := &stubHttpHelper{}
+			httpHelper := &stubHTTPHelper{}
 			req := handlertest.Request(http.MethodGet, "/admin/clients/7/settings",
 				handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "7"))
-			apiClient := &stubAdministrativeScopesApiClient{brands: testBrands,
-				client: &api.ClientResponse{Id: 7, ClientIdentifier: "portal", BrandId: tc.brandId}}
+			apiClient := &stubAdministrativeScopesAPIClient{brands: testBrands,
+				client: &api.ClientResponse{ID: 7, ClientIdentifier: "portal", BrandID: tc.brandID}}
 
 			HandleSettingsGet(httpHelper, newTestSessionStore(), apiClient).ServeHTTP(httptest.NewRecorder(), req)
 
 			require.NoError(t, httpHelper.err)
 			require.NotNil(t, httpHelper.bind, "the handler rendered nothing")
 			assert.Equal(t, "Default", httpHelper.bind["defaultBrandName"])
-			assert.Equal(t, []BrandOption{{Id: 4, Name: "Autumn"}, {Id: 5, Name: "Default"}, {Id: 6, Name: "Spring"}},
+			assert.Equal(t, []BrandOption{{ID: 4, Name: "Autumn"}, {ID: 5, Name: "Default"}, {ID: 6, Name: "Spring"}},
 				httpHelper.bind["brands"])
-			assert.Equal(t, tc.want, reflect.ValueOf(httpHelper.bind["client"]).FieldByName("BrandId").Int())
-			assert.Equal(t, tc.want, reflect.ValueOf(httpHelper.bind["storedClient"]).FieldByName("BrandId").Int())
+			assert.Equal(t, tc.want, reflect.ValueOf(httpHelper.bind["client"]).FieldByName("BrandID").Int())
+			assert.Equal(t, tc.want, reflect.ValueOf(httpHelper.bind["storedClient"]).FieldByName("BrandID").Int())
 		})
 	}
 }
@@ -545,20 +545,20 @@ func TestHandleSettingsPost_WritesTheBrandOnlyWhenItChanged(t *testing.T) {
 		wantSent  *int64
 	}{
 		{name: "left on the default", form: url.Values{"brandId": {""}}},
-		{name: "given a brand", form: url.Values{"brandId": {"6"}}, wantWrite: true, wantSent: brandIdPtr(6)},
-		{name: "given the default brand by name", form: url.Values{"brandId": {"5"}}, wantWrite: true, wantSent: brandIdPtr(5)},
-		{name: "put back on the default", stored: brandIdPtr(6), form: url.Values{"brandId": {""}}, wantWrite: true},
-		{name: "put back from the default brand by name", stored: brandIdPtr(5), form: url.Values{"brandId": {""}}, wantWrite: true},
-		{name: "moved to another brand", stored: brandIdPtr(4), form: url.Values{"brandId": {"6"}}, wantWrite: true, wantSent: brandIdPtr(6)},
-		{name: "left on its brand", stored: brandIdPtr(6), form: url.Values{"brandId": {"6"}}},
-		{name: "the select not submitted", stored: brandIdPtr(6), form: url.Values{}},
-		{name: "a value the select never sends", stored: brandIdPtr(6), form: url.Values{"brandId": {"autumn"}}},
-		{name: "a brand id that is no id", stored: brandIdPtr(6), form: url.Values{"brandId": {"0"}}},
+		{name: "given a brand", form: url.Values{"brandId": {"6"}}, wantWrite: true, wantSent: brandIDPtr(6)},
+		{name: "given the default brand by name", form: url.Values{"brandId": {"5"}}, wantWrite: true, wantSent: brandIDPtr(5)},
+		{name: "put back on the default", stored: brandIDPtr(6), form: url.Values{"brandId": {""}}, wantWrite: true},
+		{name: "put back from the default brand by name", stored: brandIDPtr(5), form: url.Values{"brandId": {""}}, wantWrite: true},
+		{name: "moved to another brand", stored: brandIDPtr(4), form: url.Values{"brandId": {"6"}}, wantWrite: true, wantSent: brandIDPtr(6)},
+		{name: "left on its brand", stored: brandIDPtr(6), form: url.Values{"brandId": {"6"}}},
+		{name: "the select not submitted", stored: brandIDPtr(6), form: url.Values{}},
+		{name: "a value the select never sends", stored: brandIDPtr(6), form: url.Values{"brandId": {"autumn"}}},
+		{name: "a brand id that is no id", stored: brandIDPtr(6), form: url.Values{"brandId": {"0"}}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			apiClient := &stubAdministrativeScopesApiClient{brands: testBrands,
-				client: &api.ClientResponse{Id: 7, ClientIdentifier: "portal", BrandId: tc.stored}}
-			httpHelper := &stubHttpHelper{}
+			apiClient := &stubAdministrativeScopesAPIClient{brands: testBrands,
+				client: &api.ClientResponse{ID: 7, ClientIdentifier: "portal", BrandID: tc.stored}}
+			httpHelper := &stubHTTPHelper{}
 			cache := &invalidationRecorder{}
 
 			rec := postSettingsDropping(t, apiClient, httpHelper, cache, tc.form, "")
@@ -573,7 +573,7 @@ func TestHandleSettingsPost_WritesTheBrandOnlyWhenItChanged(t *testing.T) {
 			}
 			assert.Equal(t, []string{"settings", "brand"}, apiClient.writes, "the brand is written once, after the settings")
 			require.NotNil(t, apiClient.sentBrand)
-			assert.Equal(t, tc.wantSent, apiClient.sentBrand.BrandId)
+			assert.Equal(t, tc.wantSent, apiClient.sentBrand.BrandID)
 			assert.Equal(t, int64(7), apiClient.sentBrandTo)
 			assert.Equal(t, handlertest.AccessToken, apiClient.sentBrandAs)
 			assert.Zero(t, cache.invalidations, "another client's brand leaves the console's look alone")
@@ -584,10 +584,10 @@ func TestHandleSettingsPost_WritesTheBrandOnlyWhenItChanged(t *testing.T) {
 // The select is read from the body alone, as the tab's other switches are: a brand in the URL is no
 // submission of the form.
 func TestHandleSettingsPost_IgnoresTheBrandInTheQuery(t *testing.T) {
-	apiClient := &stubAdministrativeScopesApiClient{brands: testBrands,
-		client: &api.ClientResponse{Id: 7, ClientIdentifier: "portal", BrandId: brandIdPtr(6)}}
+	apiClient := &stubAdministrativeScopesAPIClient{brands: testBrands,
+		client: &api.ClientResponse{ID: 7, ClientIdentifier: "portal", BrandID: brandIDPtr(6)}}
 
-	postSettings(t, apiClient, &stubHttpHelper{}, url.Values{}, "brandId=")
+	postSettings(t, apiClient, &stubHTTPHelper{}, url.Values{}, "brandId=")
 
 	assert.Zero(t, apiClient.brandWrites)
 }
@@ -595,20 +595,20 @@ func TestHandleSettingsPost_IgnoresTheBrandInTheQuery(t *testing.T) {
 // A refused settings save writes no brand, and draws the tab again with the select as submitted,
 // beside the brands it offers.
 func TestHandleSettingsPost_ARefusedSettingsSaveWritesNoBrand(t *testing.T) {
-	apiClient := &stubAdministrativeScopesApiClient{brands: testBrands,
-		client:      &api.ClientResponse{Id: 7, ClientIdentifier: "portal"},
+	apiClient := &stubAdministrativeScopesAPIClient{brands: testBrands,
+		client:      &api.ClientResponse{ID: 7, ClientIdentifier: "portal"},
 		settingsErr: &apiclient.APIError{Code: "handler.client.website_url_invalid", Message: "Invalid website URL.", StatusCode: http.StatusBadRequest}}
-	httpHelper := &stubHttpHelper{}
+	httpHelper := &stubHTTPHelper{}
 
 	postSettings(t, apiClient, httpHelper, url.Values{"websiteUrl": {"x"}, "brandId": {"6"}}, "")
 
 	require.NoError(t, httpHelper.err)
 	assert.Zero(t, apiClient.brandWrites)
 	require.NotNil(t, httpHelper.bind, "the refused save is drawn again")
-	assert.Equal(t, int64(6), reflect.ValueOf(httpHelper.bind["client"]).FieldByName("BrandId").Int(), "drawn as submitted")
-	assert.Equal(t, int64(0), reflect.ValueOf(httpHelper.bind["storedClient"]).FieldByName("BrandId").Int())
+	assert.Equal(t, int64(6), reflect.ValueOf(httpHelper.bind["client"]).FieldByName("BrandID").Int(), "drawn as submitted")
+	assert.Equal(t, int64(0), reflect.ValueOf(httpHelper.bind["storedClient"]).FieldByName("BrandID").Int())
 	assert.Equal(t, "Default", httpHelper.bind["defaultBrandName"])
-	assert.Equal(t, []BrandOption{{Id: 4, Name: "Autumn"}, {Id: 5, Name: "Default"}, {Id: 6, Name: "Spring"}},
+	assert.Equal(t, []BrandOption{{ID: 4, Name: "Autumn"}, {ID: 5, Name: "Default"}, {ID: 6, Name: "Spring"}},
 		httpHelper.bind["brands"])
 }
 
@@ -618,12 +618,12 @@ func TestHandleSettingsPost_ARefusedSettingsSaveWritesNoBrand(t *testing.T) {
 // redirected and the console's look is left alone.
 func TestHandleSettingsPost_ARefusedBrandLeavesTheSettingsSaved(t *testing.T) {
 	const refusal = "The brand does not exist."
-	apiClient := &stubAdministrativeScopesApiClient{brands: testBrands,
-		client:   &api.ClientResponse{Id: 7, ClientIdentifier: "admin-console-client", DisplayName: "Console", IsSystemLevelClient: true},
-		updated:  &api.ClientResponse{Id: 7, ClientIdentifier: "admin-console-client", DisplayName: "Admin console", IsSystemLevelClient: true},
+	apiClient := &stubAdministrativeScopesAPIClient{brands: testBrands,
+		client:   &api.ClientResponse{ID: 7, ClientIdentifier: "admin-console-client", DisplayName: "Console", IsSystemLevelClient: true},
+		updated:  &api.ClientResponse{ID: 7, ClientIdentifier: "admin-console-client", DisplayName: "Admin console", IsSystemLevelClient: true},
 		brandErr: &apiclient.APIError{Code: "handler.client_brand.brand_not_found", Message: refusal, StatusCode: http.StatusBadRequest},
 	}
-	httpHelper := &stubHttpHelper{}
+	httpHelper := &stubHTTPHelper{}
 	cache := &invalidationRecorder{}
 
 	rec := postSettingsDropping(t, apiClient, httpHelper, cache, url.Values{"displayName": {"Admin console"}, "brandId": {"9"}}, "")
@@ -637,8 +637,8 @@ func TestHandleSettingsPost_ARefusedBrandLeavesTheSettingsSaved(t *testing.T) {
 	assert.Nil(t, httpHelper.bind["error"], "the settings form's own error slot stays empty")
 	bound := reflect.ValueOf(httpHelper.bind["client"])
 	assert.Equal(t, "Admin console", bound.FieldByName("DisplayName").String(), "the client as it now stands")
-	assert.Equal(t, int64(0), bound.FieldByName("BrandId").Int(), "the stored brand, not the refused one")
-	assert.Equal(t, []BrandOption{{Id: 4, Name: "Autumn"}, {Id: 5, Name: "Default"}, {Id: 6, Name: "Spring"}},
+	assert.Equal(t, int64(0), bound.FieldByName("BrandID").Int(), "the stored brand, not the refused one")
+	assert.Equal(t, []BrandOption{{ID: 4, Name: "Autumn"}, {ID: 5, Name: "Default"}, {ID: 6, Name: "Spring"}},
 		httpHelper.bind["brands"])
 	assert.Zero(t, cache.invalidations, "a refused brand changed nothing")
 }
@@ -657,12 +657,12 @@ func TestHandleSettingsPost_TheConsolesOwnBrandDropsItsCachedSettings(t *testing
 		{"its brand left alone", url.Values{"brandId": {"6"}}, 0},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			apiClient := &stubAdministrativeScopesApiClient{brands: testBrands,
-				client: &api.ClientResponse{Id: 7, ClientIdentifier: "admin-console-client", BrandId: brandIdPtr(6),
+			apiClient := &stubAdministrativeScopesAPIClient{brands: testBrands,
+				client: &api.ClientResponse{ID: 7, ClientIdentifier: "admin-console-client", BrandID: brandIDPtr(6),
 					AdministrativeScopesAllowed: true, IsSystemLevelClient: true}}
 			cache := &invalidationRecorder{}
 
-			rec := postSettingsDropping(t, apiClient, &stubHttpHelper{}, cache, tc.form, "")
+			rec := postSettingsDropping(t, apiClient, &stubHTTPHelper{}, cache, tc.form, "")
 
 			assert.Equal(t, http.StatusFound, rec.Code)
 			assert.Equal(t, tc.want, cache.invalidations)

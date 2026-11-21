@@ -25,20 +25,20 @@ import (
 // cause it: the enabled flag written directly, and the generation advanced by the statement a
 // credential change runs. Written straight to the database, because the admin API's own paths
 // also revoke the user's grants, and the subject here is a grant that is still there.
-func moveAccountState(t *testing.T, userId int64, state string) {
+func moveAccountState(t *testing.T, userID int64, state string) {
 	t.Helper()
 
 	switch state {
 	case "untouched":
 	case "disabled":
-		user, err := database.GetUserById(context.Background(), nil, userId)
+		user, err := database.GetUserByID(context.Background(), nil, userID)
 		require.NoError(t, err)
 		require.NotNil(t, user)
 		user.Enabled = false
 		require.NoError(t, database.UpdateUser(context.Background(), nil, user))
 	case "superseded":
 		require.NoError(t, database.RunInTransaction(context.Background(), func(tx *sql.Tx) error {
-			_, err := database.IncrementUserAuthStateGeneration(context.Background(), tx, userId)
+			_, err := database.IncrementUserAuthStateGeneration(context.Background(), tx, userID)
 			return err
 		}))
 	default:
@@ -78,7 +78,7 @@ func TestToken_AuthCode_AccountStateReadAfterPKCE(t *testing.T) {
 		t.Run(tc.state, func(t *testing.T) {
 			clientSecret := fake.Password(32)
 			_, code := createAuthCode(t, clientSecret, "openid")
-			moveAccountState(t, code.UserId, tc.state)
+			moveAccountState(t, code.UserID, tc.state)
 
 			form := func(verifier string) url.Values {
 				return url.Values{
@@ -117,7 +117,7 @@ func TestToken_Refresh_AccountStateReadAfterOwnership(t *testing.T) {
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		IsPublic:                 true,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, otherClient))
 
@@ -135,7 +135,7 @@ func TestToken_Refresh_AccountStateReadAfterOwnership(t *testing.T) {
 			httpClient, code := createAuthCode(t, clientSecret, "openid")
 			refreshToken := exchangeAuthCode(t, httpClient, code.Client.ClientIdentifier, clientSecret,
 				code.Code, code.RedirectURI, testCodeVerifier)
-			moveAccountState(t, code.UserId, tc.state)
+			moveAccountState(t, code.UserID, tc.state)
 
 			status, body := postFormToTokenEndpoint(t, url.Values{
 				"grant_type":    {"refresh_token"},

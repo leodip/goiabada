@@ -24,7 +24,7 @@ func TestSlogConvention_SettingsReadFailureIsError(t *testing.T) {
 	logged := logtest.CaptureSlog(t)
 
 	mockDB := datamocks.NewDatabase(t)
-	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(nil, errors.New("database error"))
+	mockDB.On("GetSettingsByID", mock.Anything, mock.Anything, int64(1)).Return(nil, errors.New("database error"))
 
 	rr := httptest.NewRecorder()
 	requestid.Middleware(Settings(mockDB, PageFaults())(http.HandlerFunc(
@@ -40,13 +40,13 @@ func TestSlogConvention_SettingsReadFailureIsError(t *testing.T) {
 	err, isError := record.Attrs["error"].(error)
 	require.True(t, isError, "the error attribute must be an error value, not a string")
 	assert.Contains(t, err.Error(), "database error")
-	requestId, isString := record.Attrs["request_id"].(string)
+	requestID, isString := record.Attrs["request_id"].(string)
 	require.True(t, isString, "the record must carry the request id injected from its context")
-	require.NotEmpty(t, requestId)
+	require.NotEmpty(t, requestID)
 
 	// The id on the record is the one the reader is shown, which is the whole point of
 	// correlating them: an operator handed this number by a user greps the log for it.
-	assert.Contains(t, rr.Body.String(), requestId)
+	assert.Contains(t, rr.Body.String(), requestID)
 	assert.Equal(t, 1, strings.Count(logged.Text(), "request_id="),
 		"request_id comes from the handler alone, never also from the call site")
 }
@@ -54,7 +54,7 @@ func TestSlogConvention_SettingsReadFailureIsError(t *testing.T) {
 // Fail-closed, and loud: an unreadable web origins list is not an empty one, and the middleware
 // answers false rather than letting script on any origin read a token response. Somebody has to
 // act, so Error.
-func TestSlogConvention_CorsConfigurationFailureIsError(t *testing.T) {
+func TestSlogConvention_CORSConfigurationFailureIsError(t *testing.T) {
 	logged := logtest.CaptureSlog(t)
 
 	mockDB := datamocks.NewDatabase(t)
@@ -128,9 +128,9 @@ func TestSlogConvention_RateLimitTripIsWarnAndJoinsTheRequest(t *testing.T) {
 	assert.Equal(t, "rate limit reached", record.Message)
 	assert.Equal(t, "pwd_ip", record.Attrs["limiter"])
 	assert.Equal(t, "198.51.100.9", record.Attrs["ip"])
-	requestId, isString := record.Attrs["request_id"].(string)
+	requestID, isString := record.Attrs["request_id"].(string)
 	require.True(t, isString, "the record must carry the request id injected from its context")
-	require.NotEmpty(t, requestId)
+	require.NotEmpty(t, requestID)
 }
 
 func requireOneRecord(t *testing.T, logged *logtest.SlogCapture) logtest.CapturedRecord {

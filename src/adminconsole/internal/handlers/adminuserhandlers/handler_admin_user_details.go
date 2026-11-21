@@ -15,12 +15,12 @@ import (
 
 // userDetailsAPI is what the user details page needs: the user, and the enabled write.
 type userDetailsAPI interface {
-	GetUserById(ctx context.Context, accessToken string, userId int64) (*api.UserResponse, error)
-	UpdateUserEnabled(ctx context.Context, accessToken string, userId int64, enabled bool) (*api.UserResponse, error)
+	GetUserByID(ctx context.Context, accessToken string, userID int64) (*api.UserResponse, error)
+	UpdateUserEnabled(ctx context.Context, accessToken string, userID int64, enabled bool) (*api.UserResponse, error)
 }
 
 func HandleDetailsGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient userDetailsAPI,
 ) http.HandlerFunc {
@@ -40,13 +40,13 @@ func HandleDetailsGet(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
-		user, err := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		user, err := apiClient.GetUserByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -92,7 +92,7 @@ func HandleDetailsGet(
 }
 
 func HandleDetailsPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient userDetailsAPI,
 	baseURL string,
@@ -113,9 +113,9 @@ func HandleDetailsPost(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
@@ -126,7 +126,7 @@ func HandleDetailsPost(
 		// its only refusal comes from the disable path, so the submitted "off" is exactly what cannot
 		// be saved.
 		renderError := func(message string) {
-			user, getErr := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+			user, getErr := apiClient.GetUserByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 			if getErr != nil {
 				render.HandleAPIError(httpHelper, w, r, getErr)
 				return

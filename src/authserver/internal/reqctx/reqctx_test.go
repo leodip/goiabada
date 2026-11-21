@@ -18,21 +18,21 @@ import (
 func present(ctx context.Context) map[string]bool {
 	_, settings := SettingsFrom(ctx)
 	_, sessionIdentifier := SessionIdentifierFrom(ctx)
-	_, sessionUserId := SessionUserIdFrom(ctx)
+	_, sessionUserID := SessionUserIDFrom(ctx)
 	_, bearer := BearerTokenFrom(ctx)
 	_, validated := ValidatedTokenFrom(ctx)
 	_, reservation := CredentialReservationFrom(ctx)
-	_, actingUserId := ActingUserIdFrom(ctx)
+	_, actingUserID := ActingUserIDFrom(ctx)
 	_, dpopProof := DPoPProofFrom(ctx)
 	_, pageClient := PageClientFrom(ctx)
 	return map[string]bool{
 		"settings":          settings,
 		"sessionIdentifier": sessionIdentifier,
-		"sessionUserId":     sessionUserId,
+		"sessionUserID":     sessionUserID,
 		"bearer":            bearer,
 		"validated":         validated,
 		"reservation":       reservation,
-		"actingUserId":      actingUserId,
+		"actingUserID":      actingUserID,
 		"dpopProof":         dpopProof,
 		"pageClient":        pageClient,
 	}
@@ -55,26 +55,26 @@ func TestReqctx_RoundTrip(t *testing.T) {
 	})
 
 	t.Run("session user id", func(t *testing.T) {
-		got, ok := SessionUserIdFrom(WithSessionUserId(ctx, 7))
+		got, ok := SessionUserIDFrom(WithSessionUserID(ctx, 7))
 		require.True(t, ok)
 		assert.Equal(t, int64(7), got)
 	})
 
 	t.Run("acting user id", func(t *testing.T) {
-		got, ok := ActingUserIdFrom(WithActingUserId(ctx, 42))
+		got, ok := ActingUserIDFrom(WithActingUserID(ctx, 42))
 		require.True(t, ok)
 		assert.Equal(t, int64(42), got)
 	})
 
 	t.Run("bearer token", func(t *testing.T) {
-		want := oauth.JwtToken{TokenBase64: "bearer", Claims: jwt.MapClaims{"sub": "user-1"}}
+		want := oauth.JWTToken{TokenBase64: "bearer", Claims: jwt.MapClaims{"sub": "user-1"}}
 		got, ok := BearerTokenFrom(WithBearerToken(ctx, want))
 		require.True(t, ok)
 		assert.Equal(t, want, got)
 	})
 
 	t.Run("validated token", func(t *testing.T) {
-		want := oauth.JwtToken{TokenBase64: "validated", Claims: jwt.MapClaims{"sub": "user-2"}}
+		want := oauth.JWTToken{TokenBase64: "validated", Claims: jwt.MapClaims{"sub": "user-2"}}
 		got, ok := ValidatedTokenFrom(WithValidatedToken(ctx, want))
 		require.True(t, ok)
 		assert.Equal(t, want, got)
@@ -147,16 +147,16 @@ func TestReqctx_CredentialReservationFromRefusesTypedNil(t *testing.T) {
 // accessor.
 func TestReqctx_EachWriterSetsOnlyItsOwnValue(t *testing.T) {
 	ctx := context.Background()
-	token := oauth.JwtToken{TokenBase64: "t"}
+	token := oauth.JWTToken{TokenBase64: "t"}
 
 	cases := map[string]context.Context{
 		"settings":          WithSettings(ctx, &record.Settings{}),
 		"sessionIdentifier": WithSessionIdentifier(ctx, "session-1"),
-		"sessionUserId":     WithSessionUserId(ctx, 7),
+		"sessionUserID":     WithSessionUserID(ctx, 7),
 		"bearer":            WithBearerToken(ctx, token),
 		"validated":         WithValidatedToken(ctx, token),
 		"reservation":       WithCredentialReservation(ctx, &CredentialReservation{}),
-		"actingUserId":      WithActingUserId(ctx, 7),
+		"actingUserID":      WithActingUserID(ctx, 7),
 		"dpopProof":         WithDPoPProof(ctx, &dpop.Proof{}),
 		"pageClient":        WithPageClient(ctx, &PageClient{}),
 	}
@@ -180,7 +180,7 @@ func TestReqctx_ErrNoSettingsMatchesThroughAWrap(t *testing.T) {
 // surrounding whitespace.
 func TestReqctx_SubjectsAreTrimmedAndBlankIsAbsent(t *testing.T) {
 	readers := map[string]struct {
-		write func(context.Context, oauth.JwtToken) context.Context
+		write func(context.Context, oauth.JWTToken) context.Context
 		read  func(context.Context) (string, bool)
 	}{
 		"validated": {WithValidatedToken, ValidatedSubject},
@@ -192,13 +192,13 @@ func TestReqctx_SubjectsAreTrimmedAndBlankIsAbsent(t *testing.T) {
 			assert.Empty(t, subject)
 
 			for _, sub := range []string{"user-1", " user-1", "user-1\t", "\n user-1 "} {
-				subject, ok := r.read(r.write(context.Background(), oauth.JwtToken{Claims: jwt.MapClaims{"sub": sub}}))
+				subject, ok := r.read(r.write(context.Background(), oauth.JWTToken{Claims: jwt.MapClaims{"sub": sub}}))
 				assert.Truef(t, ok, "sub %q", sub)
 				assert.Equalf(t, "user-1", subject, "sub %q", sub)
 			}
 
 			for _, claims := range []jwt.MapClaims{{}, {"sub": ""}, {"sub": " \t "}, {"sub": 42}} {
-				subject, ok := r.read(r.write(context.Background(), oauth.JwtToken{Claims: claims}))
+				subject, ok := r.read(r.write(context.Background(), oauth.JWTToken{Claims: claims}))
 				assert.Falsef(t, ok, "claims %v", claims)
 				assert.Emptyf(t, subject, "claims %v", claims)
 			}
@@ -206,7 +206,7 @@ func TestReqctx_SubjectsAreTrimmedAndBlankIsAbsent(t *testing.T) {
 	}
 
 	t.Run("each reads its own token", func(t *testing.T) {
-		ctx := WithBearerToken(context.Background(), oauth.JwtToken{Claims: jwt.MapClaims{"sub": "bearer-user"}})
+		ctx := WithBearerToken(context.Background(), oauth.JWTToken{Claims: jwt.MapClaims{"sub": "bearer-user"}})
 		_, ok := ValidatedSubject(ctx)
 		assert.False(t, ok, "a bearer token alone is not a validated one")
 	})

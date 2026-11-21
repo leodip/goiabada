@@ -56,7 +56,7 @@ type AdministrativeScopeRefusedError struct {
 	Detail *oauth.ErrorDetail
 	Client *record.Client
 	Scopes []string
-	UserId int64
+	UserID int64
 }
 
 func (e *AdministrativeScopeRefusedError) Error() string {
@@ -81,13 +81,13 @@ type AuditLogger interface {
 // /auth/issue ("issue") and the token endpoint under the grant's name, so the record has one shape
 // wherever the condition is met, as the answer does in AdministrativeScopeRefusal.
 func LogAdministrativeScopeRefused(ctx context.Context, auditLogger AuditLogger, client *record.Client,
-	scopes []string, checkpoint string, userId int64) {
+	scopes []string, checkpoint string, userID int64) {
 
 	auditLogger.Log(ctx, audit.EventAdministrativeScopeRefused, map[string]interface{}{
-		"client_id":         client.Id,
+		"client_id":         client.ID,
 		"client_identifier": client.ClientIdentifier,
 		"scopes":            scopes,
 		"checkpoint":        checkpoint,
-		"user_id":           userId,
+		"user_id":           userID,
 	})
 }

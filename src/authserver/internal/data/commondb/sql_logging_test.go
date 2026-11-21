@@ -77,7 +77,7 @@ func TestDatabaseLog_QuerySQLWritesOneRecordAndNoBoundValue(t *testing.T) {
 
 // The off case, which is what makes the on case attributable: without it, a logger that wrote
 // nothing at all would satisfy every assertion above about what is absent.
-func TestDatabaseLog_WritesNothingWhenLogSqlIsOff(t *testing.T) {
+func TestDatabaseLog_WritesNothingWhenLogSQLIsOff(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
 	database := loggingDB(t, false)
 

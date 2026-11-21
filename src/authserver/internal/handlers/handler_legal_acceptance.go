@@ -86,7 +86,7 @@ func answerLegalAcceptance(w http.ResponseWriter, r *http.Request, boundary *Cer
 			"changed":    result.Screen.Changed,
 			// The form names the ceremony that rendered it, and the boundary refuses a submission
 			// naming any other.
-			"ceremonyId": authContext.CeremonyId,
+			"ceremonyId": authContext.CeremonyID,
 		}
 		if err := pageRenderer.RenderTemplate(w, r, "/layouts/auth_layout.html", "/legal_acceptance.html", bind); err != nil {
 			pageRenderer.InternalServerError(w, r, err)

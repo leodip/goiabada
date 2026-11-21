@@ -193,11 +193,11 @@ func TestHandleLogoutGet(t *testing.T) {
 
 		handler := HandleLogoutGet(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher, &recordingLogoutTokens{})
 
-		req := hintedRequest(t, http.MethodGet, url.Values{"id_token_hint": {hintedToken}}, hintedSessionId)
+		req := hintedRequest(t, http.MethodGet, url.Values{"id_token_hint": {hintedToken}}, hintedSessionID)
 		rr := httptest.NewRecorder()
 
 		client := stubConfirmedHint(database, tokenParser, hintedClaims())
-		stubPerClientTeardown(database, auditLogger, client, hintedSessionId)
+		stubPerClientTeardown(database, auditLogger, client, hintedSessionID)
 
 		mockSession := expectCookieWipedBeforeSave(t, httpSession)
 		pageRenderer.On("RenderTemplate", rr, mock.Anything, "/layouts/auth_layout.html", "/logged_out.html",
@@ -234,12 +234,12 @@ func TestHandleLogoutGet(t *testing.T) {
 			"id_token_hint":            {hintedToken},
 			"post_logout_redirect_uri": {hintedRegisteredURI},
 			"state":                    {"aB+cd/efgh==#&x=1"},
-		}, hintedSessionId)
+		}, hintedSessionID)
 		rr := httptest.NewRecorder()
 
 		client := stubConfirmedHint(database, tokenParser, hintedClaims())
 		stubSignOutRedirectURI(database, client, hintedRegisteredURI)
-		stubPerClientTeardown(database, auditLogger, client, hintedSessionId)
+		stubPerClientTeardown(database, auditLogger, client, hintedSessionID)
 
 		mockSession := expectCookieWipedBeforeSave(t, httpSession)
 
@@ -274,13 +274,13 @@ func TestHandleLogoutGet(t *testing.T) {
 		req := hintedRequest(t, http.MethodGet, url.Values{
 			"id_token_hint":            {hintedToken},
 			"post_logout_redirect_uri": {hintedRegisteredURI},
-		}, hintedSessionId)
+		}, hintedSessionID)
 		rr := httptest.NewRecorder()
 
 		client := stubConfirmedHint(database, tokenParser, hintedClaims())
 		client.CreatedViaDCR = true
 		stubSignOutRedirectURI(database, client, hintedRegisteredURI)
-		stubPerClientTeardown(database, auditLogger, client, hintedSessionId)
+		stubPerClientTeardown(database, auditLogger, client, hintedSessionID)
 
 		mockSession := expectCookieWipedBeforeSave(t, httpSession)
 
@@ -341,13 +341,13 @@ func TestHandleLogoutGet(t *testing.T) {
 		req := hintedRequest(t, http.MethodGet, url.Values{
 			"id_token_hint":            {hintedToken},
 			"post_logout_redirect_uri": {"https://example.com/somewhere-else"},
-		}, hintedSessionId)
+		}, hintedSessionID)
 		rr := httptest.NewRecorder()
 
 		client := stubConfirmedHint(database, tokenParser, hintedClaims())
 		stubSignOutRedirectURI(database, client, hintedRegisteredURI)
 		stubRedirectURIs(database, client, "https://example.com/callback")
-		stubPerClientTeardown(database, auditLogger, client, hintedSessionId)
+		stubPerClientTeardown(database, auditLogger, client, hintedSessionID)
 
 		mockSession := expectCookieWipedBeforeSave(t, httpSession)
 		pageRenderer.On("RenderTemplate", rr, mock.Anything, "/layouts/auth_layout.html", "/logged_out.html",
@@ -380,7 +380,7 @@ func TestHandleLogoutGet(t *testing.T) {
 		}
 		require.Len(t, refusals, 1, "one record says why the redirect was declined")
 		assert.Equal(t, slog.LevelWarn, refusals[0].Level)
-		assert.Equal(t, hintedClientId, refusals[0].Attrs["client_identifier"])
+		assert.Equal(t, hintedClientID, refusals[0].Attrs["client_identifier"])
 	})
 
 	// #147 decisions 1 and 9. The redirect URIs no longer count for sign-out, so a target that is one
@@ -401,13 +401,13 @@ func TestHandleLogoutGet(t *testing.T) {
 			"id_token_hint":            {hintedToken},
 			"post_logout_redirect_uri": {"https://example.com/callback"},
 			"state":                    {"abc"},
-		}, hintedSessionId)
+		}, hintedSessionID)
 		rr := httptest.NewRecorder()
 
 		client := stubConfirmedHint(database, tokenParser, hintedClaims())
 		stubSignOutRedirectURI(database, client, hintedRegisteredURI)
 		stubRedirectURIs(database, client, "https://example.com/other", "https://example.com/callback")
-		stubPerClientTeardown(database, auditLogger, client, hintedSessionId)
+		stubPerClientTeardown(database, auditLogger, client, hintedSessionID)
 
 		mockSession := expectCookieWipedBeforeSave(t, httpSession)
 		pageRenderer.On("RenderTemplate", rr, mock.Anything, "/layouts/auth_layout.html", "/logged_out.html",
@@ -436,7 +436,7 @@ func TestHandleLogoutGet(t *testing.T) {
 		require.Len(t, refusals, 1, "one record names the address to add")
 		assert.Equal(t, slog.LevelWarn, refusals[0].Level)
 		assert.Equal(t, map[string]any{
-			"client_identifier":        hintedClientId,
+			"client_identifier":        hintedClientID,
 			"post_logout_redirect_uri": "https://example.com/callback",
 		}, refusals[0].Attrs)
 	})
@@ -455,12 +455,12 @@ func TestHandleLogoutGet(t *testing.T) {
 		req := hintedRequest(t, http.MethodGet, url.Values{
 			"id_token_hint":            {hintedToken},
 			"post_logout_redirect_uri": {"https://app.example/bye?state=fixed"},
-		}, hintedSessionId)
+		}, hintedSessionID)
 		rr := httptest.NewRecorder()
 
 		client := stubConfirmedHint(database, tokenParser, hintedClaims())
 		stubSignOutRedirectURI(database, client, "https://app.example/bye?state=fixed")
-		stubPerClientTeardown(database, auditLogger, client, hintedSessionId)
+		stubPerClientTeardown(database, auditLogger, client, hintedSessionID)
 		expectCookieWipedBeforeSave(t, httpSession)
 
 		handler.ServeHTTP(rr, req)
@@ -487,7 +487,7 @@ func TestHandleLogoutGet(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		client := stubConfirmedHint(database, tokenParser, hintedClaims())
-		stubPerClientTeardown(database, auditLogger, client, hintedSessionId)
+		stubPerClientTeardown(database, auditLogger, client, hintedSessionID)
 
 		expectCookieWipedBeforeSave(t, httpSession)
 		pageRenderer.On("RenderTemplate", rr, mock.Anything, "/layouts/auth_layout.html", "/logged_out.html",
@@ -516,7 +516,7 @@ func TestHandleLogoutGet(t *testing.T) {
 			"id_token_hint":            {hintedToken},
 			"post_logout_redirect_uri": {hintedRegisteredURI},
 			"state":                    {"abc"},
-		}, hintedSessionId)
+		}, hintedSessionID)
 		rr := httptest.NewRecorder()
 
 		claims := hintedClaims()
@@ -526,7 +526,7 @@ func TestHandleLogoutGet(t *testing.T) {
 		stubSignOutRedirectURI(database, client, hintedRegisteredURI)
 		// The tolerance lookup and the teardown read the same row through the same call, which is one
 		// of the reasons a database fault there propagates rather than being read as "no such session".
-		stubPerClientTeardown(database, auditLogger, client, hintedSessionId)
+		stubPerClientTeardown(database, auditLogger, client, hintedSessionID)
 
 		expectCookieWipedBeforeSave(t, httpSession)
 
@@ -550,14 +550,14 @@ func TestHandleLogoutGet(t *testing.T) {
 
 		handler := HandleLogoutGet(pageRenderer, httpSession, database, tokenParser, auditLogger, testDataCipher, &recordingLogoutTokens{})
 
-		req := hintedRequest(t, http.MethodGet, url.Values{"id_token_hint": {hintedToken}}, hintedSessionId)
+		req := hintedRequest(t, http.MethodGet, url.Values{"id_token_hint": {hintedToken}}, hintedSessionID)
 		rr := httptest.NewRecorder()
 
 		claims := hintedClaims()
 		claims["exp"] = float64(time.Now().UTC().Add(-1 * time.Minute).Unix())
 
 		stubConfirmedHint(database, tokenParser, claims)
-		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, hintedSessionId).
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, hintedSessionID).
 			Return(nil, errors.New("the database is on fire"))
 
 		pageRenderer.On("InternalServerError", mock.Anything, mock.Anything,
@@ -599,11 +599,11 @@ func TestHandleLogoutGet(t *testing.T) {
 			"client_id":                {"another_client"},
 			"post_logout_redirect_uri": {hintedRegisteredURI},
 			"state":                    {"abc"},
-		}, hintedSessionId)
+		}, hintedSessionID)
 		rr := httptest.NewRecorder()
 
 		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, hintedToken, false).
-			Return(&oauth.JwtToken{TokenBase64: hintedToken, Header: idTokenHeader(), Claims: hintedClaims()}, nil)
+			Return(&oauth.JWTToken{TokenBase64: hintedToken, Header: idTokenHeader(), Claims: hintedClaims()}, nil)
 
 		var bound map[string]interface{}
 		pageRenderer.On("RenderTemplate", rr, mock.Anything, "/layouts/auth_layout.html", "/logout_consent.html",
@@ -826,7 +826,7 @@ func TestDecryptIDTokenHint(t *testing.T) {
 //
 // The sid guard this function used to open with is gone, and so is the subtest that pinned it:
 // whether the hint names the browser's session is part of whether the hint can be confirmed at all,
-// and classifyIdTokenHint owns that with an exhaustive table. Deciding it here meant returning an
+// and classifyIDTokenHint owns that with an exhaustive table. Deciding it here meant returning an
 // error the caller turned into a 500, which is what a user whose session had merely been reaped or
 // replaced saw (#109 decision 11).
 // logoutTestSettings is the settings a teardown judges a session's liveness by and takes the logout
@@ -847,22 +847,22 @@ func expectClientPartEnd(database *datamocks.Database, sessionIdentifier string,
 	committed []record.UserSessionClient) {
 	datamocks.ExpectRunInTransaction(database, clientPartTx)
 	database.On("AcquireUserSessionRow", mock.Anything, clientPartTx, sessionIdentifier).Return(true, nil)
-	database.On("GetCommittedUserSessionClients", mock.Anything, clientPartTx, userSession.Id).Return(committed, nil)
+	database.On("GetCommittedUserSessionClients", mock.Anything, clientPartTx, userSession.ID).Return(committed, nil)
 }
 
 // expectSignOutSweep stubs the revocation a hinted sign-out makes on the same transaction once the
 // app's part ended (#135 decision 9): the app's codes from the session not yet redeemed, and its
 // session-bound refresh tokens from it, each family recorded before its tokens are flipped.
-func expectSignOutSweep(database *datamocks.Database, sessionIdentifier string, clientId int64, codes int64,
+func expectSignOutSweep(database *datamocks.Database, sessionIdentifier string, clientID int64, codes int64,
 	tokens ...*record.RefreshToken) {
-	database.On("RevokeUnusedCodesBySessionIdentifierAndClientId", mock.Anything, clientPartTx, sessionIdentifier, clientId).
+	database.On("RevokeUnusedCodesBySessionIdentifierAndClientID", mock.Anything, clientPartTx, sessionIdentifier, clientID).
 		Return(codes, nil).Once()
-	database.On("GetSessionBoundRefreshTokensBySessionIdentifierAndClientId", mock.Anything, clientPartTx,
-		sessionIdentifier, clientId).Return(tokens, nil).Once()
+	database.On("GetSessionBoundRefreshTokensBySessionIdentifierAndClientID", mock.Anything, clientPartTx,
+		sessionIdentifier, clientID).Return(tokens, nil).Once()
 	for _, rt := range tokens {
-		database.On("RecordRefreshTokenFamilyRevoked", mock.Anything, clientPartTx, rt.FirstRefreshTokenJti,
+		database.On("RecordRefreshTokenFamilyRevoked", mock.Anything, clientPartTx, rt.FirstRefreshTokenJTI,
 			revocation.ReasonClientSignedOut).Return(true, nil).Once()
-		database.On("MarkRefreshTokenAsRevoked", mock.Anything, clientPartTx, rt.Id).Return(true, nil).Once()
+		database.On("MarkRefreshTokenAsRevoked", mock.Anything, clientPartTx, rt.ID).Return(true, nil).Once()
 	}
 }
 
@@ -914,19 +914,19 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
 		userSession := &record.UserSession{
-			Id:                1,
-			UserId:            123,
+			ID:                1,
+			UserID:            123,
 			SessionIdentifier: sessionIdentifier,
 			Clients: []record.UserSessionClient{
 				{
-					Id: 1,
+					ID: 1,
 					Client: record.Client{
-						Id:               41,
+						ID:               41,
 						ClientIdentifier: "test-client",
 					},
 				},
 				{
-					Id: 2,
+					ID: 2,
 					Client: record.Client{
 						ClientIdentifier: "other-client",
 					},
@@ -939,7 +939,7 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 		database.On("DeleteUserSessionClient", mock.Anything, clientPartTx, int64(1)).Return(nil)
 		// We don't expect DeleteUserSession to be called in this case
 		expectSignOutSweep(database, sessionIdentifier, 41, 1,
-			&record.RefreshToken{Id: 9, RefreshTokenJti: "rt-session-bound", FirstRefreshTokenJti: "fam-1"})
+			&record.RefreshToken{ID: 9, RefreshTokenJTI: "rt-session-bound", FirstRefreshTokenJTI: "fam-1"})
 
 		auditLogger.On("Log", mock.Anything, audit.EventDeletedUserSessionClient, mock.Anything).Return()
 		auditLogger.On("Log", mock.Anything, audit.EventRevokedSignOutGrants, map[string]interface{}{
@@ -973,11 +973,11 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
 		userSession := &record.UserSession{
-			Id:     1,
-			UserId: 123,
+			ID:     1,
+			UserID: 123,
 			Clients: []record.UserSessionClient{
 				{
-					Id: 1,
+					ID: 1,
 					Client: record.Client{
 						ClientIdentifier: "test-client",
 					},
@@ -1018,11 +1018,11 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 		auditLogger := handlersmocks.NewAuditLogger(t)
 
 		userSession := &record.UserSession{
-			Id:     1,
-			UserId: 123,
+			ID:     1,
+			UserID: 123,
 			Clients: []record.UserSessionClient{
 				{
-					Id: 1,
+					ID: 1,
 					Client: record.Client{
 						ClientIdentifier: "other-client",
 					},
@@ -1048,10 +1048,10 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		logoutTokens := &recordingLogoutTokens{}
 
-		hinted := record.UserSessionClient{Id: 1, Client: record.Client{Id: 41, ClientIdentifier: "test-client"}}
-		joined := record.UserSessionClient{Id: 2, Client: record.Client{Id: 42, ClientIdentifier: "joined-client",
+		hinted := record.UserSessionClient{ID: 1, Client: record.Client{ID: 41, ClientIdentifier: "test-client"}}
+		joined := record.UserSessionClient{ID: 2, Client: record.Client{ID: 42, ClientIdentifier: "joined-client",
 			BackchannelLogoutURI: "https://joined.example/bcl"}}
-		readBefore := &record.UserSession{Id: 1, UserId: 123, Clients: []record.UserSessionClient{hinted}}
+		readBefore := &record.UserSession{ID: 1, UserID: 123, Clients: []record.UserSessionClient{hinted}}
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session").Return(readBefore, nil)
 		expectClientPartEnd(database, "test-session", readBefore, []record.UserSessionClient{hinted, joined})
@@ -1080,8 +1080,8 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 		auditLogger := handlersmocks.NewAuditLogger(t)
 		logoutTokens := &recordingLogoutTokens{}
 
-		readBefore := &record.UserSession{Id: 1, UserId: 123, Clients: []record.UserSessionClient{
-			{Id: 1, Client: record.Client{Id: 41, ClientIdentifier: "test-client", BackchannelLogoutURI: "https://app.example/bcl"}},
+		readBefore := &record.UserSession{ID: 1, UserID: 123, Clients: []record.UserSessionClient{
+			{ID: 1, Client: record.Client{ID: 41, ClientIdentifier: "test-client", BackchannelLogoutURI: "https://app.example/bcl"}},
 		}}
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session").Return(readBefore, nil)
 		datamocks.ExpectRunInTransaction(database, clientPartTx)
@@ -1103,15 +1103,15 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 	// session tells nobody (decision 1).
 	hintedSession := func(started time.Time, lastAccessed time.Time) *record.UserSession {
 		return &record.UserSession{
-			Id:                1,
-			UserId:            123,
+			ID:                1,
+			UserID:            123,
 			SessionIdentifier: "test-session",
 			Started:           started,
 			LastAccessed:      lastAccessed,
 			Clients: []record.UserSessionClient{
-				{Id: 1, Client: record.Client{Id: 41, ClientIdentifier: "test-client",
+				{ID: 1, Client: record.Client{ID: 41, ClientIdentifier: "test-client",
 					BackchannelLogoutURI: "https://app.example/bcl?tenant=1"}},
-				{Id: 2, Client: record.Client{Id: 42, ClientIdentifier: "other-client",
+				{ID: 2, Client: record.Client{ID: 42, ClientIdentifier: "other-client",
 					BackchannelLogoutURI: "https://other.example/bcl"}},
 			},
 		}
@@ -1126,10 +1126,10 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 			name:    "A live session tells the app whose part ended, and only it",
 			session: hintedSession(now.Add(-time.Hour), now.Add(-time.Minute)),
 			told: [][]backchannel.Delivery{{{
-				ClientId:          41,
+				ClientID:          41,
 				ClientIdentifier:  "test-client",
 				URI:               "https://app.example/bcl?tenant=1",
-				UserId:            123,
+				UserID:            123,
 				Subject:           "hint-subject",
 				SessionIdentifier: "test-session",
 			}}},
@@ -1167,21 +1167,21 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 	}
 }
 
-// The fixtures the hinted pipeline's cases share. A confirmed hint is one classifyIdTokenHint
+// The fixtures the hinted pipeline's cases share. A confirmed hint is one classifyIDTokenHint
 // accepts, and seam 2 owns the exhaustive table of what makes it accept or refuse one, so the cases
 // here need exactly one confirmed hint and one rejected one and say which they are using.
 const (
 	hintedIssuer        = "https://hinted-issuer.example"
-	hintedClientId      = "hinted_client"
-	hintedSessionId     = "hinted-session"
+	hintedClientID      = "hinted_client"
+	hintedSessionID     = "hinted-session"
 	hintedSubject       = "the-user"
 	hintedToken         = "a.signed.hint"
 	hintedRegisteredURI = "https://example.com/out"
-	// The user hintedSubject names, and the owner of the session hintedSessionId names. One constant
-	// for both, because the classifier now compares them: a fixture that left the session's UserId
+	// The user hintedSubject names, and the owner of the session hintedSessionID names. One constant
+	// for both, because the classifier now compares them: a fixture that left the session's UserID
 	// unrelated to the hint's sub would make the ownership gate refuse every case here, and one that
 	// left it zero would satisfy the gate without either value meaning anything.
-	hintedUserId int64 = 123
+	hintedUserID int64 = 123
 )
 
 // hintedClaims is the claim set of a hint that validates. Every numeric claim is a float64 because
@@ -1194,8 +1194,8 @@ func hintedClaims() map[string]interface{} {
 		"sub": hintedSubject,
 		"iat": float64(now.Add(-2 * time.Minute).Unix()),
 		"exp": float64(now.Add(2 * time.Minute).Unix()),
-		"aud": hintedClientId,
-		"sid": hintedSessionId,
+		"aud": hintedClientID,
+		"sid": hintedSessionID,
 	}
 }
 
@@ -1225,7 +1225,7 @@ func hintedRequest(t *testing.T, method string, form url.Values, sessionIdentifi
 	return req.WithContext(ctx)
 }
 
-// stubConfirmedHint wires everything classifyIdTokenHint reads for a hint that validates, given a
+// stubConfirmedHint wires everything classifyIDTokenHint reads for a hint that validates, given a
 // request carrying id_token_hint=hintedToken and no client_id, and returns the client its aud names. That client pointer is the one the teardown then compares against the
 // session's clients, so the cases must not build a second one.
 //
@@ -1241,13 +1241,13 @@ func stubConfirmedHint(
 	tokenParser *handlersmocks.TokenParser,
 	claims map[string]interface{},
 ) *record.Client {
-	client := &record.Client{Id: 11, ClientIdentifier: hintedClientId}
+	client := &record.Client{ID: 11, ClientIdentifier: hintedClientID}
 
 	tokenParser.On("DecodeAndValidateTokenString", mock.Anything, hintedToken, false).
-		Return(&oauth.JwtToken{TokenBase64: hintedToken, Header: idTokenHeader(), Claims: claims}, nil)
-	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, hintedClientId).Return(client, nil)
+		Return(&oauth.JWTToken{TokenBase64: hintedToken, Header: idTokenHeader(), Claims: claims}, nil)
+	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, hintedClientID).Return(client, nil)
 	database.On("GetUserBySubject", mock.Anything, mock.Anything, hintedSubject).
-		Return(&record.User{Id: hintedUserId}, nil).Maybe()
+		Return(&record.User{ID: hintedUserID}, nil).Maybe()
 
 	return client
 }
@@ -1299,25 +1299,25 @@ func stubPerClientTeardown(
 	sessionIdentifier string,
 ) {
 	userSession := &record.UserSession{
-		Id: 42,
+		ID: 42,
 		// The hint's own subject, corrected from a bare 123 that matched nothing. This one expectation
 		// serves two calls now, the classifier's ownership lookup and the teardown's, so a session
 		// owned by somebody else would refuse the hint before the teardown ran at all (#133).
-		UserId:  hintedUserId,
-		Clients: []record.UserSessionClient{{Id: 7, ClientId: client.Id, Client: *client}},
+		UserID:  hintedUserID,
+		Clients: []record.UserSessionClient{{ID: 7, ClientID: client.ID, Client: *client}},
 	}
 
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(userSession, nil)
 	expectClientPartEnd(database, sessionIdentifier, userSession, userSession.Clients)
 	database.On("DeleteUserSessionClient", mock.Anything, clientPartTx, int64(7)).Return(nil)
 	database.On("DeleteUserSession", mock.Anything, clientPartTx, int64(42)).Return(nil)
-	expectSignOutSweep(database, sessionIdentifier, client.Id, 0)
+	expectSignOutSweep(database, sessionIdentifier, client.ID, 0)
 
 	auditLogger.On("Log", mock.Anything, audit.EventDeletedUserSessionClient, mock.Anything).Return()
 	auditLogger.On("Log", mock.Anything, audit.EventRevokedSignOutGrants, mock.Anything).Return()
 	auditLogger.On("Log", mock.Anything, audit.EventDeletedUserSession, map[string]interface{}{
 		"user_session_id": int64(42),
-		"user_id":         hintedUserId,
+		"user_id":         hintedUserID,
 		"logged_in_user":  "",
 		"reason":          audit.DeletedUserSessionSignedOut,
 	}).Return()
@@ -1411,7 +1411,7 @@ func TestHandleLogoutPost(t *testing.T) {
 		req := withSessionIdentifier(logoutPostRequest(t, url.Values{}), "test-session")
 		rr := httptest.NewRecorder()
 
-		userSession := &record.UserSession{Id: 42, UserId: 123}
+		userSession := &record.UserSession{ID: 42, UserID: 123}
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session").Return(userSession, nil)
 		database.On("DeleteUserSession", mock.Anything, mock.Anything, int64(42)).Return(nil)
 
@@ -1470,7 +1470,7 @@ func TestHandleLogoutPost(t *testing.T) {
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test_client").Return(client, nil)
 		stubSignOutRedirectURI(database, client, "https://example.com/out?state=registered&lang=en")
 
-		userSession := &record.UserSession{Id: 42, UserId: 123}
+		userSession := &record.UserSession{ID: 42, UserID: 123}
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session").Return(userSession, nil)
 		database.On("DeleteUserSession", mock.Anything, mock.Anything, int64(42)).Return(nil)
 
@@ -1525,7 +1525,7 @@ func TestHandleLogoutPost(t *testing.T) {
 				database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test_client").Return(client, nil)
 				stubSignOutRedirectURI(database, client, target)
 
-				userSession := &record.UserSession{Id: 42, UserId: 123}
+				userSession := &record.UserSession{ID: 42, UserID: 123}
 				database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session").Return(userSession, nil)
 				database.On("DeleteUserSession", mock.Anything, mock.Anything, int64(42)).Return(nil)
 				auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return()
@@ -1599,7 +1599,7 @@ func TestHandleLogoutPost(t *testing.T) {
 
 		for _, tc := range []struct {
 			name        string
-			clientId    string
+			clientID    string
 			redirectURI string
 			stubDB      func(database *datamocks.Database)
 			// checkLogs, when set, reads the records the request wrote.
@@ -1607,7 +1607,7 @@ func TestHandleLogoutPost(t *testing.T) {
 		}{
 			{
 				name:     "no client_id, so nothing can confirm the target",
-				clientId: "",
+				clientID: "",
 				stubDB:   func(database *datamocks.Database) {},
 			},
 			{
@@ -1616,7 +1616,7 @@ func TestHandleLogoutPost(t *testing.T) {
 				// the target. Without a hint this would make the sign-out page a redirector to any
 				// host an anonymous caller registers, RFC 9700 section 4.11.2 (#682).
 				name:     "client_id names a self-registered client",
-				clientId: "dcr_client",
+				clientID: "dcr_client",
 				stubDB: func(database *datamocks.Database) {
 					client := &record.Client{
 						ClientIdentifier:       "dcr_client",
@@ -1649,14 +1649,14 @@ func TestHandleLogoutPost(t *testing.T) {
 			},
 			{
 				name:     "client_id names no client",
-				clientId: "ghost_client",
+				clientID: "ghost_client",
 				stubDB: func(database *datamocks.Database) {
 					database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "ghost_client").Return(nil, nil)
 				},
 			},
 			{
 				name:     "the URI is not registered to the named client",
-				clientId: "test_client",
+				clientID: "test_client",
 				stubDB:   registers("https://example.com/somewhere-else"),
 			},
 			{
@@ -1664,7 +1664,7 @@ func TestHandleLogoutPost(t *testing.T) {
 				// is the one the old rule would have honored, so its record names the client and the
 				// URI, which tells the operator what to add to the Sign-out redirect URIs tab.
 				name:        "the URI is a redirect URI of the named client, not one of its sign-out redirect URIs",
-				clientId:    "test_client",
+				clientID:    "test_client",
 				redirectURI: "https://example.com/callback",
 				stubDB:      registers("https://example.com/out"),
 				checkLogs: func(t *testing.T, logs *logtest.SlogCapture) {
@@ -1692,7 +1692,7 @@ func TestHandleLogoutPost(t *testing.T) {
 				// previously registered post_logout_redirect_uris values", and RFC 9700 section 2.1,
 				// "authorization servers MUST utilize exact string matching".
 				name:        "the requested URI only starts with a registered one",
-				clientId:    "test_client",
+				clientID:    "test_client",
 				redirectURI: "https://trusted.example@evil.example/callback",
 				stubDB:      registers("https://trusted.example"),
 			},
@@ -1700,7 +1700,7 @@ func TestHandleLogoutPost(t *testing.T) {
 				// The same defect with the operands reversed, which a comparison written as
 				// HasPrefix(registered, requested) would accept.
 				name:        "a registered URI merely extends the requested one",
-				clientId:    "test_client",
+				clientID:    "test_client",
 				redirectURI: "https://example.com/out",
 				stubDB:      registers("https://example.com/out/deeper"),
 			},
@@ -1709,7 +1709,7 @@ func TestHandleLogoutPost(t *testing.T) {
 				// path differs in case here and not only the host, and paths are case-sensitive
 				// under RFC 3986 section 6.2.2.1.
 				name:        "the requested URI differs from a registered one only in case",
-				clientId:    "test_client",
+				clientID:    "test_client",
 				redirectURI: "https://EXAMPLE.com/OUT",
 				stubDB:      registers("https://example.com/out"),
 			},
@@ -1719,7 +1719,7 @@ func TestHandleLogoutPost(t *testing.T) {
 				// knows nothing but a public client_id the ability to choose the query the trusted
 				// RP's logout endpoint is called with, on a URI its operator never registered.
 				name:        "the requested URI differs from a registered one only in its query",
-				clientId:    "test_client",
+				clientID:    "test_client",
 				redirectURI: "https://trusted.example/logout?fixed=2",
 				stubDB:      registers("https://trusted.example/logout?fixed=1"),
 			},
@@ -1730,7 +1730,7 @@ func TestHandleLogoutPost(t *testing.T) {
 				// plain-http gate, which refuses http to any other host before the match (#590),
 				// lets the pair through and the comparison is what refuses it.
 				name:        "the requested URI differs from a registered one only in its scheme",
-				clientId:    "test_client",
+				clientID:    "test_client",
 				redirectURI: "http://localhost/out",
 				stubDB:      registers("https://localhost/out"),
 			},
@@ -1740,7 +1740,7 @@ func TestHandleLogoutPost(t *testing.T) {
 				// section 6.2.2.3 these are different paths, and on many RPs they are different
 				// routes.
 				name:        "the requested URI differs from a registered one only by a trailing slash",
-				clientId:    "test_client",
+				clientID:    "test_client",
 				redirectURI: "https://example.com/out/",
 				stubDB:      registers("https://example.com/out"),
 			},
@@ -1750,7 +1750,7 @@ func TestHandleLogoutPost(t *testing.T) {
 				// same character. Byte-for-byte equality is what both texts ask for, not equality
 				// after decoding.
 				name:        "the requested URI differs from a registered one only in percent-encoding",
-				clientId:    "test_client",
+				clientID:    "test_client",
 				redirectURI: "https://example.com/%6fut",
 				stubDB:      registers("https://example.com/out"),
 			},
@@ -1759,7 +1759,7 @@ func TestHandleLogoutPost(t *testing.T) {
 				// this pair equal to it and unequal to string comparison. Same family, and it is the
 				// one that reads most like a harmless normalization.
 				name:        "the requested URI differs from a registered one only by an explicit default port",
-				clientId:    "test_client",
+				clientID:    "test_client",
 				redirectURI: "https://example.com:443/out",
 				stubDB:      registers("https://example.com/out"),
 			},
@@ -1772,7 +1772,7 @@ func TestHandleLogoutPost(t *testing.T) {
 				// client to leave the target out, or to register the port it will listen on and send
 				// the URI exactly as registered, which this row pins.
 				name:        "the requested URI adds a port to a registered loopback one",
-				clientId:    "test_client",
+				clientID:    "test_client",
 				redirectURI: "http://127.0.0.1:53682/callback",
 				stubDB:      registers("http://127.0.0.1/callback"),
 			},
@@ -1787,7 +1787,7 @@ func TestHandleLogoutPost(t *testing.T) {
 				// Each is a Location today if the gate is absent: url.Parse accepts all three, so
 				// buildPostLogoutRedirect returns happily and the browser is forwarded.
 				name:        "the registered URI is scheme-relative, so the browser resolves it against this server's scheme",
-				clientId:    "test_client",
+				clientID:    "test_client",
 				redirectURI: "//evil.example/cb",
 				stubDB:      registersLoadOptional("//evil.example/cb"),
 			},
@@ -1796,7 +1796,7 @@ func TestHandleLogoutPost(t *testing.T) {
 				// grammar rule alone does not catch it: Go parses no host and a user agent reading
 				// the emitted Location resolves it to evil.example on any deployment.
 				name:        "the registered URI is https with no authority",
-				clientId:    "test_client",
+				clientID:    "test_client",
 				redirectURI: "https:///evil.example/cb",
 				stubDB:      registersLoadOptional("https:///evil.example/cb"),
 			},
@@ -1806,7 +1806,7 @@ func TestHandleLogoutPost(t *testing.T) {
 				// the RP is called at ".../out?state=abc#frag". A fragment is forbidden on a
 				// redirect URI by RFC 6749 section 3.1.2 for this reason.
 				name:        "the registered URI carries a fragment",
-				clientId:    "test_client",
+				clientID:    "test_client",
 				redirectURI: "https://example.com/out#frag",
 				stubDB:      registersLoadOptional("https://example.com/out#frag"),
 			},
@@ -1818,7 +1818,7 @@ func TestHandleLogoutPost(t *testing.T) {
 				// Warn names the client and never the URI, as the absolute-URI refusal's does (#590
 				// decision 13).
 				name:        "the registered URI is plain http off the loopback interface",
-				clientId:    "test_client",
+				clientID:    "test_client",
 				redirectURI: "http://example.com/out",
 				stubDB:      registersLoadOptional("http://example.com/out"),
 				checkLogs: func(t *testing.T, logs *logtest.SlogCapture) {
@@ -1841,7 +1841,7 @@ func TestHandleLogoutPost(t *testing.T) {
 				// The scheme is case-insensitive (RFC 3986 section 3.1), so an uppercase one is the
 				// same cleartext target and must not slip past a comparison against "http".
 				name:        "the registered URI is plain HTTP in uppercase off the loopback interface",
-				clientId:    "test_client",
+				clientID:    "test_client",
 				redirectURI: "HTTP://example.com/out",
 				stubDB:      registersLoadOptional("HTTP://example.com/out"),
 			},
@@ -1849,13 +1849,13 @@ func TestHandleLogoutPost(t *testing.T) {
 				// A prefix match on "localhost" is the mistake the shared loopback test exists to
 				// avoid: this host is the attacker's, not the loopback interface.
 				name:        "the registered URI is plain http on a host that only starts with localhost",
-				clientId:    "test_client",
+				clientID:    "test_client",
 				redirectURI: "http://localhost.attacker.example/out",
 				stubDB:      registersLoadOptional("http://localhost.attacker.example/out"),
 			},
 			{
 				name:     "the client lookup fails",
-				clientId: "test_client",
+				clientID: "test_client",
 				stubDB: func(database *datamocks.Database) {
 					database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test_client").
 						Return(nil, errors.New("client lookup exploded"))
@@ -1863,7 +1863,7 @@ func TestHandleLogoutPost(t *testing.T) {
 			},
 			{
 				name:     "the client's sign-out redirect URIs cannot be loaded",
-				clientId: "test_client",
+				clientID: "test_client",
 				stubDB: func(database *datamocks.Database) {
 					client := &record.Client{ClientIdentifier: "test_client"}
 					database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test_client").Return(client, nil)
@@ -1887,7 +1887,7 @@ func TestHandleLogoutPost(t *testing.T) {
 				// The pure function's error return is pinned by TestBuildPostLogoutRedirect's
 				// "://bad" row, which is where it belongs now that no handler path can reach it.
 				name:        "the redirect cannot be built from the registered URI",
-				clientId:    "test_client",
+				clientID:    "test_client",
 				redirectURI: unparseableURI,
 				stubDB:      registersLoadOptional(unparseableURI),
 			},
@@ -1911,8 +1911,8 @@ func TestHandleLogoutPost(t *testing.T) {
 					"post_logout_redirect_uri": {redirectURI},
 					"state":                    {"abc"},
 				}
-				if tc.clientId != "" {
-					form.Set("client_id", tc.clientId)
+				if tc.clientID != "" {
+					form.Set("client_id", tc.clientID)
 				}
 
 				req := withSessionIdentifier(logoutPostRequest(t, form), "test-session")
@@ -1920,7 +1920,7 @@ func TestHandleLogoutPost(t *testing.T) {
 
 				tc.stubDB(database)
 
-				userSession := &record.UserSession{Id: 42, UserId: 123}
+				userSession := &record.UserSession{ID: 42, UserID: 123}
 				database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session").Return(userSession, nil)
 				database.On("DeleteUserSession", mock.Anything, mock.Anything, int64(42)).Return(nil)
 
@@ -1976,7 +1976,7 @@ func TestHandleLogoutPost(t *testing.T) {
 			{
 				name: "the delete fails",
 				stubDB: func(database *datamocks.Database) {
-					userSession := &record.UserSession{Id: 42, UserId: 123}
+					userSession := &record.UserSession{ID: 42, UserID: 123}
 					database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session").Return(userSession, nil)
 					database.On("DeleteUserSession", mock.Anything, mock.Anything, int64(42)).Return(errors.New("delete exploded"))
 				},
@@ -2119,11 +2119,11 @@ func TestHandleLogoutPost(t *testing.T) {
 		req := hintedRequest(t, http.MethodPost, url.Values{
 			"id_token_hint": {hintedToken},
 			"ui_locales":    {"pt-BR"},
-		}, hintedSessionId)
+		}, hintedSessionID)
 		rr := httptest.NewRecorder()
 
 		client := stubConfirmedHint(database, tokenParser, hintedClaims())
-		stubPerClientTeardown(database, auditLogger, client, hintedSessionId)
+		stubPerClientTeardown(database, auditLogger, client, hintedSessionID)
 
 		expectCookieWipedBeforeSave(t, httpSession)
 		pageRenderer.On("RenderTemplate", rr, mock.MatchedBy(func(rendered *http.Request) bool {
@@ -2169,11 +2169,11 @@ func TestHandleLogoutPost(t *testing.T) {
 			"post_logout_redirect_uri": {hintedRegisteredURI},
 			"state":                    {"aB+cd/efgh==#&x=1"},
 			"ui_locales":               {"pt-BR"},
-		}, hintedSessionId)
+		}, hintedSessionID)
 		rr := httptest.NewRecorder()
 
 		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, hintedToken, false).
-			Return(&oauth.JwtToken{TokenBase64: hintedToken, Header: idTokenHeader(), Claims: hintedClaims()}, nil)
+			Return(&oauth.JWTToken{TokenBase64: hintedToken, Header: idTokenHeader(), Claims: hintedClaims()}, nil)
 
 		handler.ServeHTTP(rr, req)
 
@@ -2189,8 +2189,8 @@ func TestHandleLogoutPost(t *testing.T) {
 		_, hintCarried := location.Query()["id_token_hint"]
 		assert.False(t, hintCarried,
 			"carrying the hint back would put an ID token in the address bar, its history and its referrers")
-		_, clientIdCarried := location.Query()["client_id"]
-		assert.False(t, clientIdCarried,
+		_, clientIDCarried := location.Query()["client_id"]
+		assert.False(t, clientIDCarried,
 			"a rejected hint's client_id must not survive, or it authorizes the redirect decision 15 denies")
 
 		database.AssertNotCalled(t, "DeleteUserSessionClient", mock.Anything, mock.Anything, mock.Anything)
@@ -2226,11 +2226,11 @@ func TestHandleLogoutPost(t *testing.T) {
 				if tc.present {
 					form.Set("state", tc.value)
 				}
-				req := hintedRequest(t, http.MethodPost, form, hintedSessionId)
+				req := hintedRequest(t, http.MethodPost, form, hintedSessionID)
 				rr := httptest.NewRecorder()
 
 				tokenParser.On("DecodeAndValidateTokenString", mock.Anything, hintedToken, false).
-					Return(&oauth.JwtToken{TokenBase64: hintedToken, Header: idTokenHeader(), Claims: hintedClaims()}, nil)
+					Return(&oauth.JWTToken{TokenBase64: hintedToken, Header: idTokenHeader(), Claims: hintedClaims()}, nil)
 
 				handler.ServeHTTP(rr, req)
 
@@ -2519,7 +2519,7 @@ func TestBuildPostLogoutRedirect(t *testing.T) {
 	}
 }
 
-// TestClassifyIdTokenHint is the exhaustive table for the hint classifier. Every negative row
+// TestClassifyIDTokenHint is the exhaustive table for the hint classifier. Every negative row
 // differs from the confirmed row in exactly one field and names the gate that refuses it, which is
 // why the confirmed claims come from a constructor the rows mutate rather than from copy-paste: a
 // row that varied two fields could pass because of the field it was not testing.
@@ -2569,24 +2569,24 @@ func assertRejectionRecord(t *testing.T, logs *logtest.SlogCapture, want hintSta
 		"the gate is an attribute, so the message stays one greppable literal")
 }
 
-func TestClassifyIdTokenHint(t *testing.T) {
+func TestClassifyIDTokenHint(t *testing.T) {
 	const (
 		theIssuer    = "https://issuer.example"
-		theClientId  = "test_client"
-		theSessionId = "test-session"
+		theClientID  = "test_client"
+		theSessionID = "test-session"
 		theSubject   = "the-user"
 		theHint      = "a.signed.hint"
 		// The persisted row ID, distinct from the identifier, because the two are not
-		// interchangeable downstream: ClientLoadRedirectURIs queries by Client.Id, so a classifier
-		// that rebuilt the client from the identifier alone would carry Id 0 and every registered
+		// interchangeable downstream: ClientLoadRedirectURIs queries by Client.ID, so a classifier
+		// that rebuilt the client from the identifier alone would carry ID 0 and every registered
 		// redirect URI would come back empty (#109).
-		theClientDbId int64 = 11
-		// The user theSubject names. theOtherUserDbId is anybody else, and the pair is what the
-		// ownership gate compares: a row owned by theUserDbId confirms and one owned by
-		// theOtherUserDbId is refused. Neither is zero, so a gate that compared two unset fields
+		theClientDBID int64 = 11
+		// The user theSubject names. theOtherUserDBID is anybody else, and the pair is what the
+		// ownership gate compares: a row owned by theUserDBID confirms and one owned by
+		// theOtherUserDBID is refused. Neither is zero, so a gate that compared two unset fields
 		// could not pass by accident (#133).
-		theUserDbId      int64 = 5
-		theOtherUserDbId int64 = 9
+		theUserDBID      int64 = 5
+		theOtherUserDBID int64 = 9
 	)
 
 	now := time.Now().UTC()
@@ -2601,20 +2601,20 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			"iat": float64(now.Add(-2 * time.Minute).Unix()),
 			"nbf": float64(now.Add(-2 * time.Minute).Unix()),
 			"exp": float64(now.Add(2 * time.Minute).Unix()),
-			"aud": theClientId,
-			"sid": theSessionId,
+			"aud": theClientID,
+			"sid": theSessionID,
 		}
 	}
 
 	newClient := func() *record.Client {
-		return &record.Client{Id: theClientDbId, ClientIdentifier: theClientId}
+		return &record.Client{ID: theClientDBID, ClientIdentifier: theClientID}
 	}
 
 	// The confirmed row's database: the hint's aud resolves to a client and nothing else is asked.
 	// Maybe(), because the rows refused at an earlier gate never get here, and the state assertion is
 	// what catches a gate that stopped refusing.
 	resolvesClient := func(database *datamocks.Database) {
-		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, theClientId).Return(newClient(), nil).Maybe()
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, theClientID).Return(newClient(), nil).Maybe()
 	}
 
 	// The default database for a row that reaches the sid gate: the session sid names, owned by the
@@ -2624,10 +2624,10 @@ func TestClassifyIdTokenHint(t *testing.T) {
 	// Split from the client lookup so a row that stubs its own client, which the JWE rows do to give it
 	// a secret, can still reach the sid gate.
 	resolvesOwnedSessionRows := func(database *datamocks.Database) {
-		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, theSessionId).
-			Return(&record.UserSession{Id: 7, UserId: theUserDbId}, nil).Maybe()
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, theSessionID).
+			Return(&record.UserSession{ID: 7, UserID: theUserDBID}, nil).Maybe()
 		database.On("GetUserBySubject", mock.Anything, mock.Anything, theSubject).
-			Return(&record.User{Id: theUserDbId}, nil).Maybe()
+			Return(&record.User{ID: theUserDBID}, nil).Maybe()
 	}
 	resolvesOwnedSession := func(database *datamocks.Database) {
 		resolvesClient(database)
@@ -2640,20 +2640,20 @@ func TestClassifyIdTokenHint(t *testing.T) {
 	resolvesClientAndSession := func(userSession *record.UserSession, err error) func(*datamocks.Database) {
 		return func(database *datamocks.Database) {
 			resolvesClient(database)
-			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, theSessionId).Return(userSession, err)
+			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, theSessionID).Return(userSession, err)
 			database.On("GetUserBySubject", mock.Anything, mock.Anything, theSubject).
-				Return(&record.User{Id: theUserDbId}, nil).Maybe()
+				Return(&record.User{ID: theUserDBID}, nil).Maybe()
 		}
 	}
 
 	// The ownership gate's own fixture: who owns the row sid names, and what sub resolves to. Neither
 	// lookup is Maybe, so a row using this fails outright if the gate stops making them rather than
 	// quietly agreeing with whatever the classifier decided for another reason.
-	resolvesOwnership := func(sessionUserId int64, user *record.User, userErr error) func(*datamocks.Database) {
+	resolvesOwnership := func(sessionUserID int64, user *record.User, userErr error) func(*datamocks.Database) {
 		return func(database *datamocks.Database) {
 			resolvesClient(database)
-			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, theSessionId).
-				Return(&record.UserSession{Id: 7, UserId: sessionUserId}, nil)
+			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, theSessionID).
+				Return(&record.UserSession{ID: 7, UserID: sessionUserID}, nil)
 			database.On("GetUserBySubject", mock.Anything, mock.Anything, theSubject).Return(user, userErr)
 		}
 	}
@@ -2678,12 +2678,12 @@ func TestClassifyIdTokenHint(t *testing.T) {
 		hintAbsent      bool
 		hintValue       *string
 		innerToken      *string
-		// clientId is the value the parameter arrived with; clientIdAbsent says it did not arrive at
+		// clientID is the value the parameter arrived with; clientIDAbsent says it did not arrive at
 		// all. The two are separate fields because the classifier reads client_id for presence, so a
 		// row that could only say "" would be unable to tell the gate's two sides apart, which is
 		// exactly the hole this pair was added to close.
-		clientId       *string
-		clientIdAbsent bool
+		clientID       *string
+		clientIDAbsent bool
 		noSession      bool
 		parserErr      error
 		stubDB         func(*datamocks.Database)
@@ -2693,7 +2693,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 	}{
 		{
 			name: "the confirmed case",
-			want: hintConfirmed, wantSid: theSessionId,
+			want: hintConfirmed, wantSid: theSessionID,
 		},
 		{
 			name: "no id_token_hint parameter at all", gate: "presence",
@@ -2712,7 +2712,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 		{
 			name: "an encrypted hint with no client_id", gate: "JWE key selection",
 			hintValue:      strPtr("a.b.c.d.e"),
-			clientIdAbsent: true,
+			clientIDAbsent: true,
 			want:           hintRejected,
 		},
 		{
@@ -2721,7 +2721,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			// either, so it must stop here too rather than reaching the client_id gate.
 			name: "an encrypted hint with an empty client_id", gate: "JWE key selection",
 			hintValue: strPtr("a.b.c.d.e"),
-			clientId:  strPtr(""),
+			clientID:  strPtr(""),
 			want:      hintRejected,
 		},
 		{
@@ -2730,8 +2730,8 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			stubDB: func(database *datamocks.Database) {
 				secret, err := testDataCipher.Encrypt("some_client_secret")
 				require.NoError(t, err)
-				database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, theClientId).
-					Return(&record.Client{ClientIdentifier: theClientId, ClientSecretEncrypted: secret}, nil)
+				database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, theClientID).
+					Return(&record.Client{ClientIdentifier: theClientID, ClientSecretEncrypted: secret}, nil)
 			},
 			want: hintRejected,
 		},
@@ -2745,11 +2745,11 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			stubDB: func(database *datamocks.Database) {
 				secret, err := testDataCipher.Encrypt("some_client_secret")
 				require.NoError(t, err)
-				database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, theClientId).
-					Return(&record.Client{Id: theClientDbId, ClientIdentifier: theClientId, ClientSecretEncrypted: secret}, nil)
+				database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, theClientID).
+					Return(&record.Client{ID: theClientDBID, ClientIdentifier: theClientID, ClientSecretEncrypted: secret}, nil)
 				resolvesOwnedSessionRows(database)
 			},
-			want: hintConfirmed, wantSid: theSessionId,
+			want: hintConfirmed, wantSid: theSessionID,
 		},
 		{
 			name: "the hint cannot be parsed", gate: "parse and signature",
@@ -2785,7 +2785,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			// row fails the moment somebody inverts it.
 			name: "typ says this is an ID token", gate: "ID-Token shape",
 			mutate: func(claims map[string]interface{}) { claims["typ"] = "ID" },
-			want:   hintConfirmed, wantSid: theSessionId,
+			want:   hintConfirmed, wantSid: theSessionID,
 		},
 		{
 			// A logout token names sub, sid and aud, carries iss and iat and no typ claim, and is
@@ -2810,7 +2810,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			// A typ is a media type, compared without regard to case (RFC 7515 section 4.1.9).
 			name: "the header typ is jwt in lower case", gate: "ID-Token shape",
 			headerTyp: strPtr("jwt"),
-			want:      hintConfirmed, wantSid: theSessionId,
+			want:      hintConfirmed, wantSid: theSessionID,
 		},
 		{
 			name: "sub is missing", gate: "ID-Token shape",
@@ -2853,7 +2853,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			// multi-audience access token carries.
 			name: "aud arrived as an array", gate: "aud",
 			mutate: func(claims map[string]interface{}) {
-				claims["aud"] = []interface{}{theClientId}
+				claims["aud"] = []interface{}{theClientID}
 			},
 			want: hintRejected,
 		},
@@ -2863,7 +2863,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			// the row would pass without the lookup ever happening.
 			name: "aud names no client", gate: "aud",
 			mutate:   func(claims map[string]interface{}) { claims["aud"] = "ghost_client" },
-			clientId: strPtr("ghost_client"),
+			clientID: strPtr("ghost_client"),
 			stubDB: func(database *datamocks.Database) {
 				database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "ghost_client").Return(nil, nil)
 			},
@@ -2875,14 +2875,14 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			// on a terminal page while still signed in.
 			name: "the client lookup fails", gate: "aud",
 			stubDB: func(database *datamocks.Database) {
-				database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, theClientId).
+				database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, theClientID).
 					Return(nil, errors.New("the database is on fire"))
 			},
 			want: hintRejected,
 		},
 		{
 			name: "client_id does not match aud", gate: "client_id",
-			clientId: strPtr("another_client"),
+			clientID: strPtr("another_client"),
 			want:     hintRejected,
 		},
 		{
@@ -2891,8 +2891,8 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			// here means the parameter did not arrive, which is why the row says so rather than
 			// passing an empty value: the row below is the empty one and they must not agree.
 			name: "client_id is absent beside a valid aud", gate: "client_id",
-			clientIdAbsent: true,
-			want:           hintConfirmed, wantSid: theSessionId,
+			clientIDAbsent: true,
+			want:           hintConfirmed, wantSid: theSessionID,
 		},
 		{
 			// Supplied empty is supplied. RP-Initiated Logout 1.0 section 2 makes the OP verify the
@@ -2902,7 +2902,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			// the request carried, and it is the row that stops the two reads of client_id, this gate
 			// and the JWE key selection above, from being collapsed back into one.
 			name: "client_id supplied with an empty value", gate: "client_id",
-			clientId: strPtr(""),
+			clientID: strPtr(""),
 			want:     hintRejected,
 		},
 		{
@@ -2922,7 +2922,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 		{
 			name: "nbf is absent", gate: "nbf",
 			mutate: func(claims map[string]interface{}) { delete(claims, "nbf") },
-			want:   hintConfirmed, wantSid: theSessionId,
+			want:   hintConfirmed, wantSid: theSessionID,
 		},
 		{
 			// Decision 14 tolerates a past exp, never a missing one: a hint with no expiry is an
@@ -2960,8 +2960,8 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			// gate that only ran when the middleware had supplied an identifier would pass here.
 			name: "no browser session, so sid seeds the identifier", gate: "sid",
 			noSession: true,
-			stubDB:    resolvesOwnership(theUserDbId, &record.User{Id: theUserDbId}, nil),
-			want:      hintConfirmed, wantSid: theSessionId,
+			stubDB:    resolvesOwnership(theUserDBID, &record.User{ID: theUserDBID}, nil),
+			want:      hintConfirmed, wantSid: theSessionID,
 		},
 		{
 			// The reachable half of decision 14: the admin console mints a 60-second hint, so a user
@@ -2970,8 +2970,8 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			mutate: func(claims map[string]interface{}) {
 				claims["exp"] = float64(now.Add(-1 * time.Minute).Unix())
 			},
-			stubDB: resolvesClientAndSession(&record.UserSession{Id: 7, UserId: theUserDbId}, nil),
-			want:   hintConfirmed, wantSid: theSessionId,
+			stubDB: resolvesClientAndSession(&record.UserSession{ID: 7, UserID: theUserDBID}, nil),
+			want:   hintConfirmed, wantSid: theSessionID,
 		},
 		{
 			name: "expired, and sid names no live session", gate: "expiry tolerance",
@@ -2999,7 +2999,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			// ... currently logged in End-User", and the section makes asking the End-User a MUST in
 			// that case. Rejecting is how this endpoint asks, so the refusal here IS the conformance.
 			name: "sid names a session belonging to another user", gate: "session ownership",
-			stubDB: resolvesOwnership(theOtherUserDbId, &record.User{Id: theUserDbId}, nil),
+			stubDB: resolvesOwnership(theOtherUserDBID, &record.User{ID: theUserDBID}, nil),
 			want:   hintRejected,
 		},
 		{
@@ -3011,7 +3011,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			// one, and leave the whole suite green.
 			name: "no browser session, and sid names a session belonging to another user", gate: "session ownership",
 			noSession: true,
-			stubDB:    resolvesOwnership(theOtherUserDbId, &record.User{Id: theUserDbId}, nil),
+			stubDB:    resolvesOwnership(theOtherUserDBID, &record.User{ID: theUserDBID}, nil),
 			want:      hintRejected,
 		},
 		{
@@ -3019,8 +3019,8 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			// not expired: the fixture is not Maybe, so a build that left the session lookup inside the
 			// expiry branch would find no call for it and fail here.
 			name: "sid names a session belonging to sub", gate: "session ownership",
-			stubDB: resolvesOwnership(theUserDbId, &record.User{Id: theUserDbId}, nil),
-			want:   hintConfirmed, wantSid: theSessionId,
+			stubDB: resolvesOwnership(theUserDBID, &record.User{ID: theUserDBID}, nil),
+			want:   hintConfirmed, wantSid: theSessionID,
 		},
 		{
 			// A signature this server produced over a subject that is no longer a user. Ownership
@@ -3028,7 +3028,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			// skipped as unknowable. It is separate from the row above because a comparison written as
 			// user != nil && mismatch would pass this one while failing that one.
 			name: "sub names no user at this server", gate: "session ownership",
-			stubDB: resolvesOwnership(theUserDbId, nil, nil),
+			stubDB: resolvesOwnership(theUserDBID, nil, nil),
 			want:   hintRejected,
 		},
 		{
@@ -3036,7 +3036,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			// whether the hint's session may be trusted, and reading a failure as "no such user" would
 			// answer that on the database's health.
 			name: "the user lookup fails", gate: "session ownership",
-			stubDB:  resolvesOwnership(theUserDbId, nil, errors.New("the database is on fire")),
+			stubDB:  resolvesOwnership(theUserDBID, nil, errors.New("the database is on fire")),
 			want:    hintRejected,
 			wantErr: true,
 		},
@@ -3047,9 +3047,9 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			name: "sid names no session at all", gate: "session ownership",
 			stubDB: func(database *datamocks.Database) {
 				resolvesClient(database)
-				database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, theSessionId).Return(nil, nil)
+				database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, theSessionID).Return(nil, nil)
 			},
-			want: hintConfirmed, wantSid: theSessionId,
+			want: hintConfirmed, wantSid: theSessionID,
 		},
 		{
 			// Newly reachable, because the lookup no longer sits inside the expiry branch. Before the
@@ -3057,7 +3057,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			name: "the session lookup fails on a hint that has not expired", gate: "session ownership",
 			stubDB: func(database *datamocks.Database) {
 				resolvesClient(database)
-				database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, theSessionId).
+				database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, theSessionID).
 					Return(nil, errors.New("the database is on fire"))
 			},
 			want:    hintRejected,
@@ -3073,23 +3073,23 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			if tc.hintValue != nil {
 				hint = *tc.hintValue
 			}
-			clientId := theClientId
-			if tc.clientId != nil {
-				clientId = *tc.clientId
+			clientID := theClientID
+			if tc.clientID != nil {
+				clientID = *tc.clientID
 			}
 			query := url.Values{}
 			if !tc.hintAbsent {
 				query.Set("id_token_hint", hint)
 			}
-			if !tc.clientIdAbsent {
-				query.Set("client_id", clientId)
+			if !tc.clientIDAbsent {
+				query.Set("client_id", clientID)
 			}
 
 			req, err := http.NewRequest("GET", "/auth/logout?"+query.Encode(), nil)
 			require.NoError(t, err)
 			ctx := req.Context()
 			if !tc.noSession {
-				ctx = reqctx.WithSessionIdentifier(ctx, theSessionId)
+				ctx = reqctx.WithSessionIdentifier(ctx, theSessionID)
 			}
 			req = req.WithContext(ctx)
 
@@ -3116,7 +3116,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			if tc.parserErr != nil {
 				parserCall.Return(nil, tc.parserErr).Maybe()
 			} else {
-				parserCall.Return(&oauth.JwtToken{TokenBase64: parsed, Header: header, Claims: claims}, nil).Maybe()
+				parserCall.Return(&oauth.JWTToken{TokenBase64: parsed, Header: header, Claims: claims}, nil).Maybe()
 			}
 
 			stubDB := tc.stubDB
@@ -3125,7 +3125,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			}
 			stubDB(database)
 
-			got, err := classifyIdTokenHint(req, theIssuer, database, tokenParser, testDataCipher)
+			got, err := classifyIDTokenHint(req, theIssuer, database, tokenParser, testDataCipher)
 
 			if tc.wantErr {
 				require.Error(t, err, "a database failure in either lookup that decides whether the hint's session may be trusted must propagate")
@@ -3136,11 +3136,11 @@ func TestClassifyIdTokenHint(t *testing.T) {
 
 			if tc.want == hintConfirmed {
 				assert.NotNil(t, got.client, "a confirmed hint must yield the client its aud named")
-				assert.Equal(t, theClientId, got.client.ClientIdentifier)
+				assert.Equal(t, theClientID, got.client.ClientIdentifier)
 				// The persisted row, not a model rebuilt from the identifier. Asserting the identifier
-				// alone leaves Id 0 indistinguishable from the real client, and Id is what the
+				// alone leaves ID 0 indistinguishable from the real client, and ID is what the
 				// redirect path queries by.
-				assert.Equal(t, theClientDbId, got.client.Id,
+				assert.Equal(t, theClientDBID, got.client.ID,
 					"a confirmed hint must yield the persisted client, since its Id is what loads the registered redirect URIs")
 				assert.Equal(t, tc.wantSid, got.sessionIdentifier)
 			} else {

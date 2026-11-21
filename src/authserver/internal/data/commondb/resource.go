@@ -20,7 +20,7 @@ var resourceColumns = columnList{
 // scanResource reads one row selected with resourceColumns.
 func scanResource(row rowScanner, resource *record.Resource) error {
 	return row.Scan(
-		&resource.Id,
+		&resource.ID,
 		&resource.CreatedAt,
 		&resource.UpdatedAt,
 		&resource.ResourceIdentifier,
@@ -43,7 +43,7 @@ var updateResource = statement{
 	mssql:    "UPDATE resources SET updated_at = @p1, resource_identifier = @p2, description = @p3 WHERE id = @p4",
 }
 
-var selectResourceById = statement{
+var selectResourceByID = statement{
 	sqlite:   "SELECT " + resourceColumns.sqlite + " FROM resources WHERE id = ?",
 	mysql:    "SELECT " + resourceColumns.mysql + " FROM resources WHERE id = ?",
 	postgres: "SELECT " + resourceColumns.postgres + " FROM resources WHERE id = $1",
@@ -107,13 +107,13 @@ func (d *Database) CreateResource(ctx context.Context, tx *sql.Tx, resource *rec
 		return err
 	}
 
-	resource.Id = id
+	resource.ID = id
 	return nil
 }
 
 func (d *Database) UpdateResource(ctx context.Context, tx *sql.Tx, resource *record.Resource) error {
 
-	if resource.Id == 0 {
+	if resource.ID == 0 {
 		return errs.New("can't update resource with id 0")
 	}
 
@@ -121,7 +121,7 @@ func (d *Database) UpdateResource(ctx context.Context, tx *sql.Tx, resource *rec
 	resource.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
 	_, err := d.ExecSQL(ctx, tx, updateResource.text(d.Dialect),
-		resource.UpdatedAt, resource.ResourceIdentifier, resource.Description, resource.Id)
+		resource.UpdatedAt, resource.ResourceIdentifier, resource.Description, resource.ID)
 	if err != nil {
 		resource.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update resource")
@@ -130,8 +130,8 @@ func (d *Database) UpdateResource(ctx context.Context, tx *sql.Tx, resource *rec
 	return nil
 }
 
-func (d *Database) GetResourceById(ctx context.Context, tx *sql.Tx, resourceId int64) (*record.Resource, error) {
-	return queryOne(ctx, d, tx, selectResourceById.text(d.Dialect), []any{resourceId}, scanResource, "resource")
+func (d *Database) GetResourceByID(ctx context.Context, tx *sql.Tx, resourceID int64) (*record.Resource, error) {
+	return queryOne(ctx, d, tx, selectResourceByID.text(d.Dialect), []any{resourceID}, scanResource, "resource")
 }
 
 func (d *Database) GetResourceByResourceIdentifier(ctx context.Context, tx *sql.Tx, resourceIdentifier string) (*record.Resource, error) {
@@ -151,15 +151,15 @@ func (d *Database) GetResourceByResourceIdentifier(ctx context.Context, tx *sql.
 	return resource, nil
 }
 
-func (d *Database) GetResourcesByIds(ctx context.Context, tx *sql.Tx, resourceIds []int64) ([]record.Resource, error) {
+func (d *Database) GetResourcesByIDs(ctx context.Context, tx *sql.Tx, resourceIDs []int64) ([]record.Resource, error) {
 
-	if len(resourceIds) == 0 {
+	if len(resourceIDs) == 0 {
 		return nil, nil
 	}
 
 	var resources []record.Resource
 
-	err := forEachIdBatch(resourceIds, func(batch []int64) error {
+	err := forEachIDBatch(resourceIDs, func(batch []int64) error {
 		query := selectResourcesWhere.text(d.Dialect) + inList(d.Dialect, "id", 1, len(batch))
 		var err error
 		resources, err = queryAll(ctx, d, tx, resources, query, int64Args(batch), scanResource, "resource")
@@ -206,9 +206,9 @@ func (d *Database) GetIdentifiersSharedByClientsAndResources(ctx context.Context
 	return identifiers, nil
 }
 
-func (d *Database) DeleteResource(ctx context.Context, tx *sql.Tx, resourceId int64) error {
+func (d *Database) DeleteResource(ctx context.Context, tx *sql.Tx, resourceID int64) error {
 
-	_, err := d.ExecSQL(ctx, tx, deleteResource.text(d.Dialect), resourceId)
+	_, err := d.ExecSQL(ctx, tx, deleteResource.text(d.Dialect), resourceID)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete resource")
 	}

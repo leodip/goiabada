@@ -27,11 +27,11 @@ const groupAttributeBodyFields = `
 	"includeInAccessToken": false,
 	"groupId": 4`
 
-func TestAuthServerClient_GetGroupAttributesByGroupIdDecodesTheAttributeShape(t *testing.T) {
+func TestAuthServerClient_GetGroupAttributesByGroupIDDecodesTheAttributeShape(t *testing.T) {
 	client, recorded := serves(t, `{"attributes":[{`+groupAttributeBodyFields+`},`+
 		`{"id":8,"key":"region","value":"br","groupId":4}]}`)
 
-	attributes, err := client.GetGroupAttributesByGroupId(context.Background(), "an-access-token", 4)
+	attributes, err := client.GetGroupAttributesByGroupID(context.Background(), "an-access-token", 4)
 	require.NoError(t, err)
 
 	gotPath, gotAuthorization := recorded()
@@ -39,35 +39,35 @@ func TestAuthServerClient_GetGroupAttributesByGroupIdDecodesTheAttributeShape(t 
 	assert.Equal(t, "Bearer an-access-token", gotAuthorization)
 
 	require.Len(t, attributes, 2)
-	assert.Equal(t, int64(7), attributes[0].Id)
+	assert.Equal(t, int64(7), attributes[0].ID)
 	assert.Equal(t, "tier", attributes[0].Key)
 	assert.Equal(t, "gold", attributes[0].Value)
-	assert.True(t, attributes[0].IncludeInIdToken)
+	assert.True(t, attributes[0].IncludeInIDToken)
 	assert.False(t, attributes[0].IncludeInAccessToken)
-	assert.Equal(t, int64(4), attributes[0].GroupId)
+	assert.Equal(t, int64(4), attributes[0].GroupID)
 
 	require.NotNil(t, attributes[0].CreatedAt)
 	assert.Equal(t, time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC), attributes[0].CreatedAt.UTC())
 	assert.Nil(t, attributes[0].UpdatedAt, "a null timestamp must arrive as nil rather than as a zero time")
 
-	assert.Equal(t, int64(8), attributes[1].Id)
+	assert.Equal(t, int64(8), attributes[1].ID)
 	assert.Equal(t, "region", attributes[1].Key)
 }
 
-func TestAuthServerClient_GetGroupAttributeByIdDecodesTheSingleAttribute(t *testing.T) {
+func TestAuthServerClient_GetGroupAttributeByIDDecodesTheSingleAttribute(t *testing.T) {
 	client, recorded := serves(t, `{"attribute":{`+groupAttributeBodyFields+`}}`)
 
-	attribute, err := client.GetGroupAttributeById(context.Background(), "an-access-token", 7)
+	attribute, err := client.GetGroupAttributeByID(context.Background(), "an-access-token", 7)
 	require.NoError(t, err)
 	require.NotNil(t, attribute)
 
 	gotPath, _ := recorded()
 	assert.Equal(t, "/api/v1/admin/group-attributes/7", gotPath)
 
-	assert.Equal(t, int64(7), attribute.Id)
+	assert.Equal(t, int64(7), attribute.ID)
 	assert.Equal(t, "tier", attribute.Key)
 	assert.Equal(t, "gold", attribute.Value)
-	assert.Equal(t, int64(4), attribute.GroupId,
+	assert.Equal(t, int64(4), attribute.GroupID,
 		"the edit page compares this against the group in the URL before it renders anything")
 }
 
@@ -83,7 +83,7 @@ func TestAuthServerClient_CreateAndUpdateGroupAttributeReturnTheSavedAttribute(t
 
 		gotPath, _ := recorded()
 		assert.Equal(t, "/api/v1/admin/group-attributes", gotPath)
-		assert.Equal(t, int64(7), attribute.Id)
+		assert.Equal(t, int64(7), attribute.ID)
 		assert.Equal(t, "tier", attribute.Key)
 	})
 
@@ -97,6 +97,6 @@ func TestAuthServerClient_CreateAndUpdateGroupAttributeReturnTheSavedAttribute(t
 		gotPath, _ := recorded()
 		assert.Equal(t, "/api/v1/admin/group-attributes/7", gotPath)
 		assert.Equal(t, "gold", attribute.Value)
-		assert.Equal(t, int64(4), attribute.GroupId)
+		assert.Equal(t, int64(4), attribute.GroupID)
 	})
 }

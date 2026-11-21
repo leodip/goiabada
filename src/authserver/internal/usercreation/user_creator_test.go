@@ -33,20 +33,20 @@ import (
 // what was this package's convention is the shared stub's rule (#422).
 var txSentinel = &sql.Tx{}
 
-const accountPermissionId = int64(31)
+const accountPermissionID = int64(31)
 
 // expectAccountPermissionLookup registers the two reads that precede the transaction: the
 // authserver resource and its permissions.
 func expectAccountPermissionLookup(db *datamocks.Database, permissions []record.Permission) {
 	db.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, builtin.AuthServerResourceIdentifier).
-		Return(&record.Resource{Id: 3}, nil).Once()
-	db.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(3)).Return(permissions, nil).Once()
+		Return(&record.Resource{ID: 3}, nil).Once()
+	db.On("GetPermissionsByResourceID", mock.Anything, mock.Anything, int64(3)).Return(permissions, nil).Once()
 }
 
 func accountPermissions() []record.Permission {
 	return []record.Permission{
-		{Id: 30, PermissionIdentifier: builtin.ManageAccountPermissionIdentifier + "-lookalike"},
-		{Id: accountPermissionId, PermissionIdentifier: builtin.ManageAccountPermissionIdentifier},
+		{ID: 30, PermissionIdentifier: builtin.ManageAccountPermissionIdentifier + "-lookalike"},
+		{ID: accountPermissionID, PermissionIdentifier: builtin.ManageAccountPermissionIdentifier},
 	}
 }
 
@@ -58,11 +58,11 @@ func TestCreator_CreateUser_WritesTheUserAndItsAccountPermissionInOneTransaction
 	stub := datamocks.ExpectRunInTransaction(db, txSentinel)
 	db.On("CreateUser", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		created := args.Get(2).(*record.User)
-		created.Id = 77 // stand in for the generated primary key
+		created.ID = 77 // stand in for the generated primary key
 		calls = append(calls, "user row")
 	}).Return(nil).Once()
 	db.On("CreateUserPermission", mock.Anything, mock.Anything, mock.MatchedBy(func(up *record.UserPermission) bool {
-		return up.UserId == 77 && up.PermissionId == accountPermissionId
+		return up.UserID == 77 && up.PermissionID == accountPermissionID
 	})).Run(func(mock.Arguments) { calls = append(calls, "permission row") }).Return(nil).Once()
 
 	user, err := New(db).CreateUser(context.Background(), &Input{
@@ -78,7 +78,7 @@ func TestCreator_CreateUser_WritesTheUserAndItsAccountPermissionInOneTransaction
 	assert.Equal(t, []string{"user row", "permission row"}, calls,
 		"the permission insert follows the user insert, inside the same transaction, and names the id it assigned")
 	require.NoError(t, stub.BodyErr, "the body asked the helper to commit")
-	assert.Equal(t, int64(77), user.Id)
+	assert.Equal(t, int64(77), user.ID)
 	assert.True(t, user.Enabled)
 	assert.Equal(t, "ada@example.com", user.Email)
 	assert.True(t, user.EmailVerified)
@@ -87,7 +87,7 @@ func TestCreator_CreateUser_WritesTheUserAndItsAccountPermissionInOneTransaction
 	assert.Equal(t, "Lovelace", user.FamilyName)
 	assert.NotEmpty(t, user.Subject)
 	require.Len(t, user.Permissions, 1)
-	assert.Equal(t, accountPermissionId, user.Permissions[0].Id)
+	assert.Equal(t, accountPermissionID, user.Permissions[0].ID)
 }
 
 func TestCreator_CreateUser_AFailedUserInsertReachesTheHelperAndWritesNoPermission(t *testing.T) {
@@ -123,7 +123,7 @@ func TestCreator_CreateUser_ATransactionThatCannotOpenIsReported(t *testing.T) {
 func TestCreator_CreateUser_RefusesWithoutTheAccountPermissionBeforeAnyTransaction(t *testing.T) {
 	db := datamocks.NewDatabase(t)
 	expectAccountPermissionLookup(db, []record.Permission{
-		{Id: 30, PermissionIdentifier: "something-else"},
+		{ID: 30, PermissionIdentifier: "something-else"},
 	})
 
 	user, err := New(db).CreateUser(context.Background(), &Input{Email: "ada@example.com"})
@@ -147,7 +147,7 @@ func TestCreator_CreateUser_RefusesWhenTheAuthServerResourceIsMissing(t *testing
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unable to find the "+builtin.AuthServerResourceIdentifier+" resource")
 	assert.Nil(t, user)
-	db.AssertNotCalled(t, "GetPermissionsByResourceId", mock.Anything, mock.Anything, mock.Anything)
+	db.AssertNotCalled(t, "GetPermissionsByResourceID", mock.Anything, mock.Anything, mock.Anything)
 	db.AssertNotCalled(t, "RunInTransaction", mock.Anything, mock.Anything)
 }
 
@@ -169,21 +169,21 @@ func TestCreator_CreateUser_TheBodyIsSafeToRerun(t *testing.T) {
 	}).Once()
 
 	ids := []int64{77, 78}
-	var permissionUserIds []int64
+	var permissionUserIDs []int64
 	db.On("CreateUser", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		args.Get(2).(*record.User).Id = ids[0]
+		args.Get(2).(*record.User).ID = ids[0]
 		ids = ids[1:]
 	}).Return(nil).Twice()
 	db.On("CreateUserPermission", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		permissionUserIds = append(permissionUserIds, args.Get(2).(*record.UserPermission).UserId)
+		permissionUserIDs = append(permissionUserIDs, args.Get(2).(*record.UserPermission).UserID)
 	}).Return(nil).Twice()
 
 	user, err := New(db).CreateUser(context.Background(), &Input{Email: "ada@example.com"})
 	require.NoError(t, err)
 
-	assert.Equal(t, []int64{77, 78}, permissionUserIds,
+	assert.Equal(t, []int64{77, 78}, permissionUserIDs,
 		"each attempt's permission row names the id that attempt's user insert assigned")
-	assert.Equal(t, int64(78), user.Id, "the caller sees the id of the attempt that committed")
+	assert.Equal(t, int64(78), user.ID, "the caller sees the id of the attempt that committed")
 }
 
 // CreateUserInTransaction is for a caller that writes other rows beside the account and must
@@ -192,16 +192,16 @@ func TestCreator_CreateUser_TheBodyIsSafeToRerun(t *testing.T) {
 func TestCreator_CreateUserInTransaction_RunsEverythingOnTheCallersTransaction(t *testing.T) {
 	db := datamocks.NewDatabase(t)
 	db.On("GetResourceByResourceIdentifier", mock.Anything, txSentinel, builtin.AuthServerResourceIdentifier).
-		Return(&record.Resource{Id: 3}, nil).Once()
-	db.On("GetPermissionsByResourceId", mock.Anything, txSentinel, int64(3)).Return(accountPermissions(), nil).Once()
+		Return(&record.Resource{ID: 3}, nil).Once()
+	db.On("GetPermissionsByResourceID", mock.Anything, txSentinel, int64(3)).Return(accountPermissions(), nil).Once()
 
 	var calls []string
 	db.On("CreateUser", mock.Anything, txSentinel, mock.Anything).Run(func(args mock.Arguments) {
-		args.Get(2).(*record.User).Id = 77
+		args.Get(2).(*record.User).ID = 77
 		calls = append(calls, "user row")
 	}).Return(nil).Once()
 	db.On("CreateUserPermission", mock.Anything, txSentinel, mock.MatchedBy(func(up *record.UserPermission) bool {
-		return up.UserId == 77 && up.PermissionId == accountPermissionId
+		return up.UserID == 77 && up.PermissionID == accountPermissionID
 	})).Run(func(mock.Arguments) { calls = append(calls, "permission row") }).Return(nil).Once()
 
 	user, err := New(db).CreateUserInTransaction(context.Background(), txSentinel, &Input{
@@ -213,12 +213,12 @@ func TestCreator_CreateUserInTransaction_RunsEverythingOnTheCallersTransaction(t
 	require.NotNil(t, user)
 
 	assert.Equal(t, []string{"user row", "permission row"}, calls)
-	assert.Equal(t, int64(77), user.Id)
+	assert.Equal(t, int64(77), user.ID)
 	assert.True(t, user.Enabled)
 	assert.True(t, user.EmailVerified)
 	assert.Equal(t, "hash", user.PasswordHash)
 	require.Len(t, user.Permissions, 1)
-	assert.Equal(t, accountPermissionId, user.Permissions[0].Id)
+	assert.Equal(t, accountPermissionID, user.Permissions[0].ID)
 	db.AssertNotCalled(t, "RunInTransaction", mock.Anything, mock.Anything)
 }
 
@@ -227,8 +227,8 @@ func TestCreator_CreateUserInTransaction_RunsEverythingOnTheCallersTransaction(t
 func TestCreator_CreateUserInTransaction_AFailedUserInsertIsReturnedAndWritesNoPermission(t *testing.T) {
 	db := datamocks.NewDatabase(t)
 	db.On("GetResourceByResourceIdentifier", mock.Anything, txSentinel, builtin.AuthServerResourceIdentifier).
-		Return(&record.Resource{Id: 3}, nil).Once()
-	db.On("GetPermissionsByResourceId", mock.Anything, txSentinel, int64(3)).Return(accountPermissions(), nil).Once()
+		Return(&record.Resource{ID: 3}, nil).Once()
+	db.On("GetPermissionsByResourceID", mock.Anything, txSentinel, int64(3)).Return(accountPermissions(), nil).Once()
 
 	boom := errors.New("the engine refused the insert")
 	db.On("CreateUser", mock.Anything, txSentinel, mock.Anything).Return(boom).Once()

@@ -30,8 +30,8 @@ type accountPasswordDatabase interface {
 	revocation.Database
 
 	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error)
-	GetUserByIdForUpdate(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
-	SetUserPasswordHash(ctx context.Context, tx *sql.Tx, userId int64, passwordHash string) error
+	GetUserByIDForUpdate(ctx context.Context, tx *sql.Tx, userID int64) (*record.User, error)
+	SetUserPasswordHash(ctx context.Context, tx *sql.Tx, userID int64, passwordHash string) error
 }
 
 // HandleAccountPasswordPut - PUT /api/v1/account/password
@@ -133,13 +133,13 @@ func HandleAccountPasswordPut(
 		// are told nothing (#784 decision 3).
 		var current *record.User
 		notice := revocation.LogoutNotice{Subject: user.Subject, Live: sessionLive(settings)}
-		result, err := revocation.RevokeUserAuthStateTx(r.Context(), database, user.Id, exceptSid, notice,
+		result, err := revocation.RevokeUserAuthStateTx(r.Context(), database, user.ID, exceptSid, notice,
 			func(tx *sql.Tx) error {
 				var readErr error
-				if current, readErr = database.GetUserByIdForUpdate(r.Context(), tx, user.Id); readErr != nil {
+				if current, readErr = database.GetUserByIDForUpdate(r.Context(), tx, user.ID); readErr != nil {
 					return readErr
 				}
-				return database.SetUserPasswordHash(r.Context(), tx, user.Id, passwordHash)
+				return database.SetUserPasswordHash(r.Context(), tx, user.ID, passwordHash)
 			})
 		if err != nil {
 			writeInternalServerError(w, r, err)
@@ -150,10 +150,10 @@ func HandleAccountPasswordPut(
 		// existing event stays exactly as it is, and the revocation gets its own so revocations
 		// are queryable as a class rather than spread across four generic event types.
 		auditLogger.Log(r.Context(), audit.EventChangedPassword, map[string]interface{}{
-			"user_id":        user.Id,
+			"user_id":        user.ID,
 			"logged_in_user": subject,
 		})
-		revocation.LogRevokedUserAuthState(r.Context(), auditLogger, user.Id,
+		revocation.LogRevokedUserAuthState(r.Context(), auditLogger, user.ID,
 			revocation.ReasonPasswordChange, subject, result)
 		logoutTokens.Send(r.Context(), settings.Issuer, result.LogoutDeliveries)
 

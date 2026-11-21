@@ -30,7 +30,7 @@ func TestBackchannelLogout_ASelfRegisteredClientIsNotSentToAnInternalAddress(t *
 	requireDatabaseAuditLogs(t)
 	enableDCR(t)
 	adminToken, adminClient := createAdminClientWithToken(t)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, adminClient.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, adminClient.ID) })
 
 	var reached atomic.Int32
 	receiver := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -63,27 +63,27 @@ func TestBackchannelLogout_ASelfRegisteredClientIsNotSentToAnInternalAddress(t *
 			client, err := database.GetClientByClientIdentifier(context.Background(), nil, identifier)
 			require.NoError(t, err)
 			require.NotNil(t, client)
-			t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+			t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 			if tc.adminURI != "" {
-				status, body, _ := saveBackchannelLogout(t, adminToken, client.Id, backchannelLogoutBody(tc.adminURI, false))
+				status, body, _ := saveBackchannelLogout(t, adminToken, client.ID, backchannelLogoutBody(tc.adminURI, false))
 				require.Equal(t, http.StatusOK, status, "%v", body)
 			}
 
 			accessToken, user := getUserAccessTokenWithAccountScope(t)
-			session := createTestUserSession(t, user.Id, fake.UUID())
+			session := createTestUserSession(t, user.ID, fake.UUID())
 			onSession(t, session, client)
 			blockedBefore := sampleValue(t, scrapeMetrics(t), `goiabada_backchannel_logout_deliveries_total{outcome="blocked"}`)
 			reachedBefore := reached.Load()
 
-			resp, requestId := sendAdminRequest(t, accessToken, http.MethodDelete,
-				"/api/v1/account/sessions/"+strconv.FormatInt(session.Id, 10), nil)
+			resp, requestID := sendAdminRequest(t, accessToken, http.MethodDelete,
+				"/api/v1/account/sessions/"+strconv.FormatInt(session.ID, 10), nil)
 			_ = resp.Body.Close()
 			require.Equal(t, http.StatusOK, resp.StatusCode)
 
-			_, details := sentLogoutTokenRow(t, requestId, 10*time.Second)
+			_, details := sentLogoutTokenRow(t, requestID, 10*time.Second)
 			assert.Equal(t, "blocked", details["outcome"])
 			assert.InDelta(t, 1, details["attempts"], 0, "a blocked address is not tried again")
-			assert.InDelta(t, float64(client.Id), details["client_id"], 0)
+			assert.InDelta(t, float64(client.ID), details["client_id"], 0)
 			assert.Equal(t, session.SessionIdentifier, details["session_identifier"])
 
 			assert.InDelta(t, blockedBefore+1,

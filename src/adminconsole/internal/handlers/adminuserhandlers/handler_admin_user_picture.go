@@ -17,12 +17,12 @@ import (
 
 // userPictureAPI is what the user picture endpoint needs: the user, and the picture it serves.
 type userPictureAPI interface {
-	GetUserById(ctx context.Context, accessToken string, userId int64) (*api.UserResponse, error)
-	GetUserProfilePicture(ctx context.Context, accessToken string, userId int64) (*api.ProfilePictureInfoResponse, error)
+	GetUserByID(ctx context.Context, accessToken string, userID int64) (*api.UserResponse, error)
+	GetUserProfilePicture(ctx context.Context, accessToken string, userID int64) (*api.ProfilePictureInfoResponse, error)
 }
 
 func HandlePictureGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient userPictureAPI,
 ) http.HandlerFunc {
 
@@ -41,13 +41,13 @@ func HandlePictureGet(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
-		user, err := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		user, err := apiClient.GetUserByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -58,7 +58,7 @@ func HandlePictureGet(
 		}
 
 		// Get profile picture info
-		var profilePictureUrl string
+		var profilePictureURL string
 		// A user with no picture is a 200 from the API with HasPicture false, so an error here is a
 		// real failure and is answered as one rather than drawn as an empty picture (#425).
 		pictureInfo, err := apiClient.GetUserProfilePicture(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
@@ -68,14 +68,14 @@ func HandlePictureGet(
 		}
 		if pictureInfo != nil && pictureInfo.HasPicture {
 			// Add cache-busting parameter to prevent browser caching
-			profilePictureUrl = fmt.Sprintf("%s?t=%d", pictureInfo.PictureUrl, time.Now().UnixNano())
+			profilePictureURL = fmt.Sprintf("%s?t=%d", pictureInfo.PictureURL, time.Now().UnixNano())
 		}
 
 		bind := map[string]interface{}{
 			"user":              user,
 			"page":              r.URL.Query().Get("page"),
 			"query":             r.URL.Query().Get("query"),
-			"profilePictureUrl": profilePictureUrl,
+			"profilePictureUrl": profilePictureURL,
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_users_picture.html", bind)
@@ -88,8 +88,8 @@ func HandlePictureGet(
 
 // userProfilePictureAPI is what the user profile picture page needs: the upload, and the delete.
 type userProfilePictureAPI interface {
-	DeleteUserProfilePicture(ctx context.Context, accessToken string, userId int64) error
-	UploadUserProfilePicture(ctx context.Context, accessToken string, userId int64, pictureData []byte, filename string) (*api.ProfilePictureUploadResponse, error)
+	DeleteUserProfilePicture(ctx context.Context, accessToken string, userID int64) error
+	UploadUserProfilePicture(ctx context.Context, accessToken string, userID int64, pictureData []byte, filename string) (*api.ProfilePictureUploadResponse, error)
 }
 
 // The error surface here answers through the console's shared JSON writers rather than the
@@ -99,20 +99,20 @@ type userProfilePictureAPI interface {
 // was about to call response.json(). The success bodies are unchanged.
 // HandleProfilePicturePost handles uploading a profile picture for a user (admin)
 func HandleProfilePicturePost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient userProfilePictureAPI,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get JWT info to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JSONError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.JSONError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
 		// Get user ID from URL
-		userIdStr := r.PathValue("userId")
-		userId, err := strconv.ParseInt(userIdStr, 10, 64)
+		userIDStr := r.PathValue("userId")
+		userID, err := strconv.ParseInt(userIDStr, 10, 64)
 		if err != nil {
 			render.JSONNotFound(httpHelper, w, r)
 			return
@@ -143,7 +143,7 @@ func HandleProfilePicturePost(
 		}
 
 		// Call API client to upload
-		response, err := apiClient.UploadUserProfilePicture(r.Context(), jwtInfo.TokenResponse.AccessToken, userId, pictureData, header.Filename)
+		response, err := apiClient.UploadUserProfilePicture(r.Context(), jwtInfo.TokenResponse.AccessToken, userID, pictureData, header.Filename)
 		if err != nil {
 			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
@@ -152,34 +152,34 @@ func HandleProfilePicturePost(
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"success":    true,
-			"pictureUrl": response.PictureUrl,
+			"pictureUrl": response.PictureURL,
 		})
 	}
 }
 
 // HandleProfilePictureDelete handles deleting a user's profile picture (admin)
 func HandleProfilePictureDelete(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient userProfilePictureAPI,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get JWT info to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JSONError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.JSONError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
 		// Get user ID from URL
-		userIdStr := r.PathValue("userId")
-		userId, err := strconv.ParseInt(userIdStr, 10, 64)
+		userIDStr := r.PathValue("userId")
+		userID, err := strconv.ParseInt(userIDStr, 10, 64)
 		if err != nil {
 			render.JSONNotFound(httpHelper, w, r)
 			return
 		}
 
 		// Call API client to delete
-		err = apiClient.DeleteUserProfilePicture(r.Context(), jwtInfo.TokenResponse.AccessToken, userId)
+		err = apiClient.DeleteUserProfilePicture(r.Context(), jwtInfo.TokenResponse.AccessToken, userID)
 		if err != nil {
 			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return

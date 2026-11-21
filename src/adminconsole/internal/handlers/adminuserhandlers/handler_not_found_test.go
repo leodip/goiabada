@@ -24,28 +24,28 @@ import (
 // JWT middleware holds, and a 500 from the API is a server fault: both stay 500, and a sweep that
 // turned every InternalServerError in this file into a NotFound would fail here.
 //
-// notFoundUserApiClient answers the one call the handler makes before it decides. The rest of the
+// notFoundUserAPIClient answers the one call the handler makes before it decides. The rest of the
 // ports it is passed to panic, rather than return a helpful zero value.
-type notFoundUserApiClient struct {
+type notFoundUserAPIClient struct {
 	entity *api.UserResponse
 	err    error
 }
 
-func (c *notFoundUserApiClient) GetUserById(_ context.Context, accessToken string, id int64) (*api.UserResponse, error) {
+func (c *notFoundUserAPIClient) GetUserByID(_ context.Context, accessToken string, id int64) (*api.UserResponse, error) {
 	return c.entity, c.err
 }
 
-// The rest of the ports notFoundUserApiClient is passed to, which no test here reaches.
+// The rest of the ports notFoundUserAPIClient is passed to, which no test here reaches.
 
-func (*notFoundUserApiClient) UpdateUserEnabled(context.Context, string, int64, bool) (*api.UserResponse, error) {
+func (*notFoundUserAPIClient) UpdateUserEnabled(context.Context, string, int64, bool) (*api.UserResponse, error) {
 	panic("unexpected call to UpdateUserEnabled")
 }
 
-func TestUser_StaleOrMalformedUrlAnswers404(t *testing.T) {
+func TestUser_StaleOrMalformedURLAnswers404(t *testing.T) {
 	const pathValueName = "userId"
 
 	// present, gone and broken stand for the three answers the API can give this handler.
-	present := &api.UserResponse{Id: 42}
+	present := &api.UserResponse{ID: 42}
 	gone := &apiclient.APIError{Code: "NOT_FOUND", Message: "User not found", StatusCode: http.StatusNotFound}
 	broken := &apiclient.APIError{Code: "INTERNAL_SERVER_ERROR", Message: "the database is on fire", StatusCode: http.StatusInternalServerError}
 
@@ -55,7 +55,7 @@ func TestUser_StaleOrMalformedUrlAnswers404(t *testing.T) {
 		// the router never bound, which is how an unbound parameter reads from r.PathValue.
 		target       string
 		id           string
-		withJwt      bool
+		withJWT      bool
 		entity       *api.UserResponse
 		apiErr       error
 		wantNotFound bool
@@ -64,14 +64,14 @@ func TestUser_StaleOrMalformedUrlAnswers404(t *testing.T) {
 			name:         "an id that does not parse",
 			target:       "/admin/users/not-a-number/details",
 			id:           "not-a-number",
-			withJwt:      true,
+			withJWT:      true,
 			entity:       present,
 			wantNotFound: true,
 		},
 		{
 			name:         "an id the router never bound",
 			target:       "/admin/users/42/details",
-			withJwt:      true,
+			withJWT:      true,
 			entity:       present,
 			wantNotFound: true,
 		},
@@ -79,7 +79,7 @@ func TestUser_StaleOrMalformedUrlAnswers404(t *testing.T) {
 			name:         "an entity the API says is gone",
 			target:       "/admin/users/42/details",
 			id:           "42",
-			withJwt:      true,
+			withJWT:      true,
 			apiErr:       gone,
 			wantNotFound: true,
 		},
@@ -87,28 +87,28 @@ func TestUser_StaleOrMalformedUrlAnswers404(t *testing.T) {
 			name:         "an entity the API returns as nil without an error",
 			target:       "/admin/users/42/details",
 			id:           "42",
-			withJwt:      true,
+			withJWT:      true,
 			wantNotFound: true,
 		},
 		{
 			name:    "no JWT info in context, which is a middleware invariant and stays a 500",
 			target:  "/admin/users/42/details",
 			id:      "42",
-			withJwt: false,
+			withJWT: false,
 			entity:  present,
 		},
 		{
 			name:    "a 500 from the API, which is a server fault and stays a 500",
 			target:  "/admin/users/42/details",
 			id:      "42",
-			withJwt: true,
+			withJWT: true,
 			apiErr:  broken,
 		},
 	}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			if testCase.wantNotFound {
 				httpHelper.On("NotFound", mock.Anything, mock.Anything).Return().Once()
 			} else {
@@ -117,7 +117,7 @@ func TestUser_StaleOrMalformedUrlAnswers404(t *testing.T) {
 			}
 
 			var opts []handlertest.Option
-			if testCase.withJwt {
+			if testCase.withJWT {
 				opts = append(opts, handlertest.WithAccessToken())
 			}
 			if testCase.id != "" {
@@ -125,7 +125,7 @@ func TestUser_StaleOrMalformedUrlAnswers404(t *testing.T) {
 			}
 			req := handlertest.Request(http.MethodGet, testCase.target, opts...)
 
-			apiClient := &notFoundUserApiClient{entity: testCase.entity, err: testCase.apiErr}
+			apiClient := &notFoundUserAPIClient{entity: testCase.entity, err: testCase.apiErr}
 			handler := HandleDetailsGet(httpHelper, nil, apiClient)
 			w := httptest.NewRecorder()
 

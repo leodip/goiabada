@@ -40,9 +40,9 @@ type completionDatabase interface {
 	revocation.Database
 
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
-	GetConsentByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (*record.UserConsent, error)
-	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
-	PromoteUserSessionOtpConfigGeneration(ctx context.Context, tx *sql.Tx, userSessionId int64, generation int64) error
+	GetConsentByUserIDAndClientID(ctx context.Context, tx *sql.Tx, userID int64, clientID int64) (*record.UserConsent, error)
+	GetUserByID(ctx context.Context, tx *sql.Tx, userID int64) (*record.User, error)
+	PromoteUserSessionOTPConfigGeneration(ctx context.Context, tx *sql.Tx, userSessionID int64, generation int64) error
 	UserSessionLoadUser(ctx context.Context, tx *sql.Tx, userSession *record.UserSession) error
 }
 
@@ -54,9 +54,9 @@ type completionSessions interface {
 	sessionValidity
 	AuthenticationIsStale(ctx context.Context, sessionIdentifier string,
 		authentication usersession.Authentication) (bool, error)
-	BindUserSession(ctx context.Context, sessionIdentifier string, clientId int64,
+	BindUserSession(ctx context.Context, sessionIdentifier string, clientID int64,
 		authentication usersession.Authentication, replace bool, ipAddress string) (*record.UserSession, error)
-	StartNewUserSession(ctx context.Context, clientId int64, authentication usersession.Authentication,
+	StartNewUserSession(ctx context.Context, clientID int64, authentication usersession.Authentication,
 		authStateGeneration int64, otpConfigGeneration *int64, device usersession.Device, ipAddress string,
 		replacing *record.UserSession, limits usersession.SessionLimits) (*record.UserSession, []usersession.Removal, error)
 	AbandonUserSession(ctx context.Context, userSession *record.UserSession, cause error) error
@@ -91,15 +91,15 @@ type completionBrowser interface {
 	sessionRotator
 	// ConfirmCeremony writes nothing: it answers nil while the browser session, read afresh, still
 	// holds the ceremony, the create arm's check before it ends or creates anything.
-	ConfirmCeremony(ceremonyId string) error
+	ConfirmCeremony(ceremonyID string) error
 	// RegenerateSessionAndBind rotates the browser session's identifier and writes the user session
-	// named into it, the create arm's rotation, keeping no ceremony held for a user other than userId.
+	// named into it, the create arm's rotation, keeping no ceremony held for a user other than userID.
 	// It records keepSignedIn in the same write, as RecordKeepSignedIn does.
-	RegenerateSessionAndBind(ceremonyId string, userId int64, userSessionIdentifier string, keepSignedIn *bool) error
+	RegenerateSessionAndBind(ceremonyID string, userID int64, userSessionIdentifier string, keepSignedIn *bool) error
 	// RecordKeepSignedIn records in the browser session the answer the password page's Keep me
 	// signed in box was given, which the session's cookie follows from then on: true or false, or
 	// none at all for nil (#743 decisions 2 and 5).
-	RecordKeepSignedIn(ceremonyId string, keepSignedIn *bool) error
+	RecordKeepSignedIn(ceremonyID string, keepSignedIn *bool) error
 	// Device is the browser the request comes from: its device cookie's identifier, or a new one,
 	// and its display labels.
 	Device() usersession.Device
@@ -179,7 +179,7 @@ type CompletionResult struct {
 //  6. Takes the ceremony's auth time from the bound session, and refuses one with none: such a
 //     session cannot be stored (StartNewUserSession refuses a zero instant, migration 000062 ended
 //     every older session), and an auth_time is never invented for it (#580 decision 5).
-//  7. Sets the ceremony's ACR against the bound session (AuthContext.SetAcrLevel).
+//  7. Sets the ceremony's ACR against the bound session (AuthContext.SetACRLevel).
 //  8. Decides where the bound ceremony goes (routeBoundCeremony), loading what it asks for: the scope
 //     narrowed to what the user holds, which replaces the ceremony's, and the stored consent. A user
 //     holding none of the scopes is answered access_denied after the clear. A user who owes the
@@ -205,15 +205,15 @@ func (o *Completion) Run(ctx context.Context, browser completionBrowser, setting
 		return CompletionResult{}, err
 	}
 
-	client, err := o.database.GetClientByClientIdentifier(ctx, nil, authContext.ClientId)
+	client, err := o.database.GetClientByClientIdentifier(ctx, nil, authContext.ClientID)
 	if err != nil {
 		return CompletionResult{}, err
 	}
 	if client == nil {
-		return CompletionResult{}, errs.Errorf("client %v not found", authContext.ClientId)
+		return CompletionResult{}, errs.Errorf("client %v not found", authContext.ClientID)
 	}
 
-	targetAcrLevel := authContext.GetTargetAcrLevel(client.DefaultAcrLevel)
+	targetACRLevel := authContext.GetTargetACRLevel(client.DefaultACRLevel)
 	plan := decideCompletion(completionFacts{
 		sessionPresent: userSession != nil,
 		sessionValid: o.sessions.HasValidUserSession(userSession, settings.UserSessionIdleTimeoutInSeconds,
@@ -223,20 +223,20 @@ func (o *Completion) Run(ctx context.Context, browser completionBrowser, setting
 		// AuthenticatedAt is set by the password and the OTP steps when a credential is entered, and is
 		// nil on an SSO pass. It is no proof of level 1, since OTP alone sets it (#129 decision 15).
 		credentialEntered:           authContext.AuthenticatedAt != nil && !authContext.AuthenticatedAt.IsZero(),
-		raisesPrivilege:             usersession.WillRaisePrivilege(userSession, authContext.AuthMethods, targetAcrLevel),
-		otpConfigGenerationCaptured: authContext.OtpConfigGeneration != nil,
-		target:                      targetAcrLevel,
+		raisesPrivilege:             usersession.WillRaisePrivilege(userSession, authContext.AuthMethods, targetACRLevel),
+		otpConfigGenerationCaptured: authContext.OTPConfigGeneration != nil,
+		target:                      targetACRLevel,
 	})
 
 	var user *record.User
 	if _, restarts := plan.(restartPlan); !restarts {
-		user, err = o.database.GetUserById(ctx, nil, authContext.UserId)
+		user, err = o.database.GetUserByID(ctx, nil, authContext.UserID)
 		if err != nil {
 			return CompletionResult{}, err
 		}
 
 		switch decideBeforeBinding(user, authContext.AuthStateGeneration, otpClaimOf(authContext),
-			authContext.IdTokenHintSub) {
+			authContext.IDTokenHintSub) {
 		case beforeBindingUserMissing:
 			return CompletionResult{}, errs.New("user not found")
 		case beforeBindingHintMismatch:
@@ -244,7 +244,7 @@ func (o *Completion) Run(ctx context.Context, browser completionBrowser, setting
 			// arrived with, when it is another user's, is ended as the create arm would end it,
 			// and no session is started for this user (#133, #535).
 			if create, creates := plan.(createSessionPlan); creates && create.terminatesForeignSession() {
-				err = browser.ConfirmCeremony(authContext.CeremonyId)
+				err = browser.ConfirmCeremony(authContext.CeremonyID)
 				if err == nil {
 					err = o.terminateForeignSession(ctx, settings, authContext, client, userSession)
 				}
@@ -258,23 +258,23 @@ func (o *Completion) Run(ctx context.Context, browser completionBrowser, setting
 			return CompletionResult{
 				ClientError: &ClientError{Client: client, Code: oidc.ErrorLoginRequired,
 					Description: hintMismatchDescription},
-				ClearErr: browser.ClearAuthContext(authContext.CeremonyId),
+				ClearErr: browser.ClearAuthContext(authContext.CeremonyID),
 			}, nil
 		case beforeBindingUserDisabled:
 			o.auditLogger.Log(ctx, audit.EventUserDisabled, map[string]interface{}{
-				"user_id": user.Id,
+				"user_id": user.ID,
 			})
 			return CompletionResult{
 				ClientError: &ClientError{Client: client, Code: "access_denied", Description: userDisabledDescription},
-				ClearErr:    browser.ClearAuthContext(authContext.CeremonyId),
+				ClearErr:    browser.ClearAuthContext(authContext.CeremonyID),
 			}, nil
 		case beforeBindingGenerationMoved:
 			slog.WarnContext(ctx, "the user's authentication generation has moved on since this ceremony authenticated, restarting level 1 instead of binding a session",
-				"ceremony_user_id", authContext.UserId)
+				"ceremony_user_id", authContext.UserID)
 			plan = restartAtLevel1()
 		case beforeBindingAuthenticatorRemoved:
 			slog.WarnContext(ctx, "this ceremony names a one-time code from an authenticator the user no longer has, restarting level 1 instead of binding a session",
-				"ceremony_user_id", authContext.UserId)
+				"ceremony_user_id", authContext.UserID)
 			plan = restartAtLevel1()
 		}
 	}
@@ -283,9 +283,9 @@ func (o *Completion) Run(ctx context.Context, browser completionBrowser, setting
 	switch mode := plan.(type) {
 	case reuseSessionPlan:
 		boundSession, err = o.bindReusedSession(ctx, browser, mode, authContext, client, sessionIdentifier,
-			targetAcrLevel, ipAddress)
+			targetACRLevel, ipAddress)
 	case createSessionPlan:
-		boundSession, err = o.bindNewSession(ctx, browser, mode, authContext, client, userSession, targetAcrLevel,
+		boundSession, err = o.bindNewSession(ctx, browser, mode, authContext, client, userSession, targetACRLevel,
 			ipAddress, settings)
 	default:
 		// restartPlan, the third mode.
@@ -296,11 +296,11 @@ func (o *Completion) Run(ctx context.Context, browser completionBrowser, setting
 		// decideBeforeBinding's question, asked again by the write under the user's row lock: an
 		// authenticator removed between the two is answered as it would have been there (#542).
 		slog.WarnContext(ctx, "this ceremony names a one-time code from an authenticator the user no longer has, restarting level 1 instead of binding a session",
-			"ceremony_user_id", authContext.UserId)
+			"ceremony_user_id", authContext.UserID)
 		return restartCompletion(browser, authContext), nil
 	case errors.Is(err, usersession.ErrStaleAuthentication):
 		slog.WarnContext(ctx, "a newer authentication has already reached this session, answering this ceremony as one the browser has replaced",
-			"ceremony_user_id", authContext.UserId)
+			"ceremony_user_id", authContext.UserID)
 		return CompletionResult{Stale: true}, nil
 	case errors.Is(err, ceremony.ErrCeremonyReplaced):
 		return CompletionResult{Replaced: true}, nil
@@ -309,7 +309,7 @@ func (o *Completion) Run(ctx context.Context, browser completionBrowser, setting
 	}
 
 	if boundSession.AuthTime.IsZero() {
-		return CompletionResult{}, errs.Errorf("user session %v has no auth time", boundSession.Id)
+		return CompletionResult{}, errs.Errorf("user session %v has no auth time", boundSession.ID)
 	}
 	authContext.AuthenticatedAt = &boundSession.AuthTime
 
@@ -318,7 +318,7 @@ func (o *Completion) Run(ctx context.Context, browser completionBrowser, setting
 	// expired one, would raise the acr of a token bound to a different session (#133). A ceremony that
 	// authenticated afresh has just written its target onto the session, so its ACR is the target
 	// (#537).
-	err = authContext.SetAcrLevel(targetAcrLevel, boundSession)
+	err = authContext.SetACRLevel(targetACRLevel, boundSession)
 	if err != nil {
 		return CompletionResult{}, err
 	}
@@ -328,7 +328,7 @@ func (o *Completion) Run(ctx context.Context, browser completionBrowser, setting
 		return CompletionResult{}, err
 	}
 	if answer != afterBindingNoScope {
-		owed, owedErr := o.legalDocuments.Owed(ctx, client, user.Id)
+		owed, owedErr := o.legalDocuments.Owed(ctx, client, user.ID)
 		if owedErr != nil {
 			return CompletionResult{}, owedErr
 		}
@@ -380,12 +380,12 @@ func restartCompletion(browser stepSaver, authContext *ceremony.AuthContext) Com
 // resumed hours later must not be told it signed in just now (#252 decision 8).
 func (o *Completion) bindReusedSession(ctx context.Context, browser completionBrowser, plan reuseSessionPlan,
 	authContext *ceremony.AuthContext, client *record.Client, sessionIdentifier string,
-	targetAcrLevel record.AcrLevel, ipAddress string) (*record.UserSession, error) {
+	targetACRLevel record.ACRLevel, ipAddress string) (*record.UserSession, error) {
 
 	authentication := usersession.Authentication{
-		UserId:      authContext.UserId,
+		UserID:      authContext.UserID,
 		AuthMethods: authContext.AuthMethods,
-		AcrLevel:    targetAcrLevel,
+		ACRLevel:    targetACRLevel,
 		OTPClaim:    otpClaimOf(authContext),
 		// The instant the ceremony adopted the session at, nil for one that authenticated afresh. The
 		// bind's ordering rule compares it with the locked row (#538).
@@ -406,12 +406,12 @@ func (o *Completion) bindReusedSession(ctx context.Context, browser completionBr
 		if stale {
 			return nil, errs.WithStack(usersession.ErrStaleAuthentication)
 		}
-		if err = browser.RegenerateSession(authContext.CeremonyId, authContext.UserId); err != nil {
+		if err = browser.RegenerateSession(authContext.CeremonyID, authContext.UserID); err != nil {
 			return nil, err
 		}
 	}
 
-	boundSession, err := o.sessions.BindUserSession(ctx, sessionIdentifier, client.Id, authentication,
+	boundSession, err := o.sessions.BindUserSession(ctx, sessionIdentifier, client.ID, authentication,
 		plan.replaceAuthentication, ipAddress)
 	if err != nil {
 		return nil, err
@@ -419,22 +419,22 @@ func (o *Completion) bindReusedSession(ctx context.Context, browser completionBr
 
 	// After the bind, which writes the whole row: otp_config_generation is dont-update, and this
 	// narrow write is the only thing that moves it (#242).
-	if plan.promoteOtpConfigGeneration {
-		err = o.database.PromoteUserSessionOtpConfigGeneration(ctx, nil, boundSession.Id,
-			*authContext.OtpConfigGeneration)
+	if plan.promoteOTPConfigGeneration {
+		err = o.database.PromoteUserSessionOTPConfigGeneration(ctx, nil, boundSession.ID,
+			*authContext.OTPConfigGeneration)
 		if err != nil {
 			return nil, err
 		}
-		boundSession.OtpConfigGeneration = *authContext.OtpConfigGeneration
+		boundSession.OTPConfigGeneration = *authContext.OTPConfigGeneration
 	}
 
 	o.auditLogger.Log(ctx, audit.EventBumpedUserSession, map[string]interface{}{
-		"user_id":   authContext.UserId,
-		"client_id": client.Id,
+		"user_id":   authContext.UserID,
+		"client_id": client.ID,
 	})
 
 	if plan.replaceAuthentication {
-		if err = browser.RecordKeepSignedIn(authContext.CeremonyId, authContext.KeepSignedIn); err != nil {
+		if err = browser.RecordKeepSignedIn(authContext.CeremonyID, authContext.KeepSignedIn); err != nil {
 			return nil, err
 		}
 	}
@@ -472,9 +472,9 @@ func (o *Completion) bindReusedSession(ctx context.Context, browser completionBr
 // old session: the fail-closed direction.
 func (o *Completion) bindNewSession(ctx context.Context, browser completionBrowser, plan createSessionPlan,
 	authContext *ceremony.AuthContext, client *record.Client, userSession *record.UserSession,
-	targetAcrLevel record.AcrLevel, ipAddress string, settings *record.Settings) (*record.UserSession, error) {
+	targetACRLevel record.ACRLevel, ipAddress string, settings *record.Settings) (*record.UserSession, error) {
 
-	if err := browser.ConfirmCeremony(authContext.CeremonyId); err != nil {
+	if err := browser.ConfirmCeremony(authContext.CeremonyID); err != nil {
 		return nil, err
 	}
 
@@ -507,16 +507,16 @@ func (o *Completion) bindNewSession(ctx context.Context, browser completionBrows
 	// AuthenticatedAt is always set here: decideCompletion takes this arm only with
 	// Level1AuthCompleted, and the password step sets both. StartNewUserSession refuses a nil or
 	// zero instant rather than invent one (#252 decision 8).
-	newSession, removedSessions, err := o.sessions.StartNewUserSession(ctx, client.Id, usersession.Authentication{
-		UserId:           authContext.UserId,
+	newSession, removedSessions, err := o.sessions.StartNewUserSession(ctx, client.ID, usersession.Authentication{
+		UserID:           authContext.UserID,
 		AuthMethods:      authContext.AuthMethods,
-		AcrLevel:         targetAcrLevel,
+		ACRLevel:         targetACRLevel,
 		AuthTime:         authContext.AuthenticatedAt,
 		PasswordAuthTime: authContext.PasswordVerifiedAt,
 		OTPClaim:         otpClaimOf(authContext),
-	}, authContext.AuthStateGeneration, authContext.OtpConfigGeneration, device, ipAddress, replacing, limits)
+	}, authContext.AuthStateGeneration, authContext.OTPConfigGeneration, device, ipAddress, replacing, limits)
 	if err == nil {
-		if rotateErr := browser.RegenerateSessionAndBind(authContext.CeremonyId, authContext.UserId,
+		if rotateErr := browser.RegenerateSessionAndBind(authContext.CeremonyID, authContext.UserID,
 			newSession.SessionIdentifier, authContext.KeepSignedIn); rotateErr != nil {
 			err = o.sessions.AbandonUserSession(ctx, newSession,
 				errs.Wrap(rotateErr, "unable to rotate the browser session identifier"))
@@ -529,8 +529,8 @@ func (o *Completion) bindNewSession(ctx context.Context, browser completionBrows
 		// The removed session's own user, which a same-device sweep can tell from the user signing
 		// in.
 		o.auditLogger.Log(ctx, audit.EventDeletedUserSession, map[string]interface{}{
-			"user_session_id": removal.Session.Id,
-			"user_id":         removal.Session.UserId,
+			"user_session_id": removal.Session.ID,
+			"user_id":         removal.Session.UserID,
 			"logged_in_user":  "",
 			"reason":          removal.Reason,
 		})
@@ -542,8 +542,8 @@ func (o *Completion) bindNewSession(ctx context.Context, browser completionBrows
 	}
 
 	o.auditLogger.Log(ctx, audit.EventStartedNewUserSession, map[string]interface{}{
-		"user_id":   authContext.UserId,
-		"client_id": client.Id,
+		"user_id":   authContext.UserID,
+		"client_id": client.ID,
 	})
 	return newSession, nil
 }
@@ -573,16 +573,16 @@ func (o *Completion) terminateForeignSession(ctx context.Context, settings *reco
 	// scope is the cookie's, which is still the user being terminated, and the actor is this
 	// event's user_id.
 	o.auditLogger.Log(ctx, audit.EventCrossUserSessionReplaced, map[string]interface{}{
-		"user_id":                     authContext.UserId,
-		"previous_user_id":            userSession.UserId,
+		"user_id":                     authContext.UserID,
+		"previous_user_id":            userSession.UserID,
 		"previous_session_identifier": userSession.SessionIdentifier,
-		"client_id":                   client.Id,
+		"client_id":                   client.ID,
 	})
 	// deleted_user_session beside terminated_user_session, the pair every caller of
 	// TerminateUserSessionTx writes (#129 decision 9).
 	o.auditLogger.Log(ctx, audit.EventDeletedUserSession, map[string]interface{}{
-		"user_session_id": userSession.Id,
-		"user_id":         userSession.UserId,
+		"user_session_id": userSession.ID,
+		"user_id":         userSession.UserID,
 		"logged_in_user":  "",
 		"reason":          audit.DeletedUserSessionReplacedByOtherUser,
 	})
@@ -595,5 +595,5 @@ func (o *Completion) terminateForeignSession(ctx context.Context, settings *reco
 // generation of the authenticator it came from, adopted from the session or recorded when the code
 // was entered (#542).
 func otpClaimOf(authContext *ceremony.AuthContext) otpcredential.OTPClaim {
-	return otpcredential.OTPClaim{Claimed: authContext.ClaimsOTP(), Generation: authContext.OtpClaimGeneration}
+	return otpcredential.OTPClaim{Claimed: authContext.ClaimsOTP(), Generation: authContext.OTPClaimGeneration}
 }

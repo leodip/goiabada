@@ -26,7 +26,7 @@ func TestLegalAcceptanceAccepted_OnlyTheAcceptButtonAlone(t *testing.T) {
 	}
 }
 
-func TestSubmittedVersions_TheIdsTheBodyCarriesUnderTheName(t *testing.T) {
+func TestSubmittedVersions_TheIDsTheBodyCarriesUnderTheName(t *testing.T) {
 	body := url.Values{"legalDocument": {"12", "71", "x", "-3", "0", ""}, "shownVersion": {"12"}}
 	assert.Equal(t, map[int64]bool{12: true, 71: true}, submittedVersions(body, "legalDocument"),
 		"positive ids alone; anything else is no version")

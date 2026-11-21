@@ -54,10 +54,10 @@ func TestAPIAccountPasswordPut_Success(t *testing.T) {
 	var updateResp api.UpdateUserResponse
 	err := json.NewDecoder(resp.Body).Decode(&updateResp)
 	require.NoError(t, err)
-	assert.Equal(t, u.Id, updateResp.User.Id)
+	assert.Equal(t, u.ID, updateResp.User.ID)
 
 	// Verify password updated in DB and matches
-	updatedUser, err := database.GetUserById(context.Background(), nil, u.Id)
+	updatedUser, err := database.GetUserByID(context.Background(), nil, u.ID)
 	require.NoError(t, err)
 	assert.True(t, passwordhash.Verify(updatedUser.PasswordHash, reqBody.NewPassword))
 }
@@ -120,7 +120,7 @@ func TestAPIAccountPasswordPut_UnauthorizedAndScope(t *testing.T) {
 	// No token
 	req, err := http.NewRequest("PUT", url, nil)
 	require.NoError(t, err)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -155,7 +155,7 @@ func TestAPIAccountPasswordPut_InvalidRequestBody(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()

@@ -38,7 +38,7 @@ func TestNewKeyPair_BuildsTheRowTheKeySetStores(t *testing.T) {
 			assert.Equal(t, state.String(), row.State)
 			assert.Equal(t, "RSA", row.Type)
 			assert.Equal(t, "RS256", row.Algorithm)
-			assert.Zero(t, row.Id, "NewKeyPair writes nothing, so no id is assigned")
+			assert.Zero(t, row.ID, "NewKeyPair writes nothing, so no id is assigned")
 
 			parsedKid, err := uuidtest.Parse(row.KeyIdentifier)
 			require.NoError(t, err)
@@ -52,9 +52,9 @@ func TestNewKeyPair_BuildsTheRowTheKeySetStores(t *testing.T) {
 			require.NotNil(t, block)
 			assert.Empty(t, rest)
 			assert.Equal(t, "PUBLIC KEY", block.Type)
-			assert.Equal(t, row.PublicKeyASN1_DER, block.Bytes, "the public PEM and the DER column disagree")
+			assert.Equal(t, row.PublicKeyASN1DER, block.Bytes, "the public PEM and the DER column disagree")
 
-			parsed, err := x509.ParsePKIXPublicKey(row.PublicKeyASN1_DER)
+			parsed, err := x509.ParsePKIXPublicKey(row.PublicKeyASN1DER)
 			require.NoError(t, err)
 			publicKey, ok := parsed.(*rsa.PublicKey)
 			require.True(t, ok)
@@ -98,7 +98,7 @@ func TestNewKeyPair_MintsAKidPerKey(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.NotEqual(t, first.KeyIdentifier, second.KeyIdentifier)
-	assert.NotEqual(t, first.PublicKeyASN1_DER, second.PublicKeyASN1_DER)
+	assert.NotEqual(t, first.PublicKeyASN1DER, second.PublicKeyASN1DER)
 }
 
 func TestNewKeyPair_RefusesABitSizeRSARefuses(t *testing.T) {

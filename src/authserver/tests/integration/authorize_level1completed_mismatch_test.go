@@ -22,7 +22,7 @@ func TestAuthorize_Level1CompletedInTheWrongStateAnswersTheMismatchPage(t *testi
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -30,12 +30,12 @@ func TestAuthorize_Level1CompletedInTheWrongStateAnswersTheMismatchPage(t *testi
 		t.Fatal(err)
 	}
 
-	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+	redirectURI := &record.RedirectURI{
+		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,8 +60,8 @@ func TestAuthorize_Level1CompletedInTheWrongStateAnswersTheMismatchPage(t *testi
 
 	requestState := fake.LetterN(8)
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + randomCodeChallenge() +
@@ -69,9 +69,9 @@ func TestAuthorize_Level1CompletedInTheWrongStateAnswersTheMismatchPage(t *testi
 		"&state=" + requestState +
 		"&nonce=" + fake.LetterN(8)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,9 +109,9 @@ func TestAuthorize_Level1CompletedInTheWrongStateAnswersTheMismatchPage(t *testi
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
+	codeVal, stateVal := getCodeAndStateFromURL(t, resp)
 	assert.Equal(t, requestState, stateVal)
 
 	code := loadCodeFromDatabase(t, codeVal)
-	assert.Equal(t, user.Id, code.User.Id)
+	assert.Equal(t, user.ID, code.User.ID)
 }

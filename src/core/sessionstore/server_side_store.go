@@ -18,10 +18,10 @@ import (
 )
 
 const (
-	// SessionIdBytes is how much entropy the identifier carries, 256 bits, hex encoded
+	// SessionIDBytes is how much entropy the identifier carries, 256 bits, hex encoded
 	// to 64 characters. OWASP's session management guidance asks for at least 64 bits
 	// and at least 16 hexadecimal characters; this is four times both (#266).
-	SessionIdBytes = 32
+	SessionIDBytes = 32
 
 	// PreAuthLifetime is how long a browser session that has not yet authenticated
 	// lives. It is short on purpose: /auth/authorize validates a request before it writes
@@ -314,7 +314,7 @@ func NewServerSideStore(backend Backend, authenticatedKey string, secure bool, l
 		previous: previousSealer,
 		options: &Options{
 			Path:     "/",
-			HttpOnly: true,
+			HTTPOnly: true,
 			Secure:   secure,
 			SameSite: http.SameSiteLaxMode,
 		},
@@ -684,7 +684,7 @@ func (s *ServerSideStore) Save(r *http.Request, w http.ResponseWriter, session *
 	authenticated := s.isAuthenticated(session)
 
 	if session.ID == "" {
-		id, createErr := s.newSessionId()
+		id, createErr := s.newSessionID()
 		if createErr != nil {
 			return createErr
 		}
@@ -776,7 +776,7 @@ func (s *ServerSideStore) writeCookie(w http.ResponseWriter, session *Session, i
 
 // sessionCookie is the cookie naming id, sealed, with session's options and maxAge.
 func (s *ServerSideStore) sessionCookie(session *Session, id string, maxAge int) (*http.Cookie, error) {
-	encodedId, err := seal(s.random, s.current.cookie, session.Name(), []byte(id))
+	encodedID, err := seal(s.random, s.current.cookie, session.Name(), []byte(id))
 	if err != nil {
 		// The row is already written at this point, so the session exists and the
 		// browser is about to be told nothing about it. That is reported rather than
@@ -787,7 +787,7 @@ func (s *ServerSideStore) sessionCookie(session *Session, id string, maxAge int)
 
 	opts := *session.Options
 	opts.MaxAge = maxAge
-	return s.buildCookie(session.Name(), encodedId, &opts), nil
+	return s.buildCookie(session.Name(), encodedID, &opts), nil
 }
 
 // DeletionCookie is the cookie that removes name from the browser.
@@ -813,7 +813,7 @@ func (s *ServerSideStore) DeletionCookie(name string) *http.Cookie {
 		MaxAge:   -1,
 		Expires:  time.Unix(0, 0).UTC(),
 		Secure:   s.secure,
-		HttpOnly: s.options.HttpOnly,
+		HttpOnly: s.options.HTTPOnly,
 		SameSite: s.options.SameSite,
 	}
 }
@@ -827,7 +827,7 @@ func (s *ServerSideStore) buildCookie(logicalName, value string, options *Option
 		Domain:   options.Domain,
 		MaxAge:   options.MaxAge,
 		Secure:   options.Secure,
-		HttpOnly: options.HttpOnly,
+		HttpOnly: options.HTTPOnly,
 		SameSite: options.SameSite,
 	}
 	if options.MaxAge < 0 {
@@ -876,7 +876,7 @@ func chunkCookieName(logicalName string, n int) string {
 	return logicalName + "-chunk-" + strconv.Itoa(n)
 }
 
-// newSessionId returns 256 bits from the CSPRNG, hex encoded.
+// newSessionID returns 256 bits from the CSPRNG, hex encoded.
 //
 // Deliberately not securerandom.String: that helper has no error return at all, because a
 // CSPRNG failure there ends the process (#211, closed by #278).
@@ -884,8 +884,8 @@ func chunkCookieName(logicalName string, n int) string {
 // row -- rather than the server. It also keeps that failure reachable from a test through
 // the store's random field, which is what pins the behaviour; the helper reads crypto/rand
 // directly and nothing can make it fail in-process.
-func (s *ServerSideStore) newSessionId() (string, error) {
-	buf := make([]byte, SessionIdBytes)
+func (s *ServerSideStore) newSessionID() (string, error) {
+	buf := make([]byte, SessionIDBytes)
 	if _, err := io.ReadFull(s.random, buf); err != nil {
 		return "", errs.Wrap(err, "unable to read from the random number generator")
 	}

@@ -50,7 +50,7 @@ func TestMigration000027_LastOTPStep(t *testing.T) {
 	// Seeded with raw SQL rather than CreateUser: the Go model already carries
 	// LastOTPStep, so an ORM insert at 000026 would target a column that does not
 	// exist yet.
-	userId := seedPreMigration000027User(t, h)
+	userID := seedPreMigration000027User(t, h)
 
 	require.NoError(t, h.Migrator.Migrate(context.Background(), 27), "apply 000027")
 
@@ -59,11 +59,11 @@ func TestMigration000027_LastOTPStep(t *testing.T) {
 
 	// 3. A row that predates the column lands at 0, meaning no code consumed.
 	//
-	// Read with raw SQL rather than GetUserById, as the 000024 test does: the seeded
+	// Read with raw SQL rather than GetUserByID, as the 000024 test does: the seeded
 	// row leaves the nullable string columns as SQL NULL, which the model scanner
 	// cannot map into Go strings. The model mapping is covered by the seam 2 tests in
 	// user_test.go.
-	assert.EqualValues(t, 0, readUserLastOTPStep000027(t, h, userId),
+	assert.EqualValues(t, 0, readUserLastOTPStep000027(t, h, userID),
 		"a users row that predates the column must land at step 0")
 
 	// 4. Down, then up again. Nothing else in the suite executes a down migration
@@ -72,7 +72,7 @@ func TestMigration000027_LastOTPStep(t *testing.T) {
 	require.NoError(t, h.Migrator.Migrate(context.Background(), 26), "roll back 000027")
 	require.NoError(t, h.Migrator.Migrate(context.Background(), 27), "re-apply 000027")
 
-	assert.EqualValues(t, 0, readUserLastOTPStep000027(t, h, userId),
+	assert.EqualValues(t, 0, readUserLastOTPStep000027(t, h, userID),
 		"step after the down/up round trip")
 	assertLastOTPStepShape000027(t, h, "after down/up round trip")
 }
@@ -106,10 +106,10 @@ func seedPreMigration000027User(t *testing.T, h *isolatedDB) int64 {
 	return id
 }
 
-func readUserLastOTPStep000027(t *testing.T, h *isolatedDB, userId int64) int64 {
+func readUserLastOTPStep000027(t *testing.T, h *isolatedDB, userID int64) int64 {
 	t.Helper()
 	var step int64
-	q := fmt.Sprintf("SELECT last_otp_step FROM users WHERE id = %d", userId)
+	q := fmt.Sprintf("SELECT last_otp_step FROM users WHERE id = %d", userID)
 	require.NoError(t, h.SQL.QueryRow(q).Scan(&step), "read last_otp_step")
 	return step
 }

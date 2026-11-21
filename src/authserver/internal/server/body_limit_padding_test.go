@@ -60,7 +60,7 @@ type readCount struct {
 
 // newPaddingTestServer runs the real initMiddleware and initRoutes behind a listener. Outside the
 // root chain, a wrapper counts what is read from the request body before the handler returns, and
-// places the decoded bearer token where JwtAuthorizationHeaderToContext would: signature
+// places the decoded bearer token where JWTAuthorizationHeaderToContext would: signature
 // validation is not what these cases claim.
 func newPaddingTestServer(t *testing.T, database *datamocks.Database) (*httptest.Server, <-chan readCount) {
 	t.Helper()
@@ -169,7 +169,7 @@ func assertReadNoFurtherThanTheValue(t *testing.T, server *httptest.Server, coun
 // paddingTestSettings is what middleware.Settings reads. Registration is on so DCR reaches its
 // decode; both audit sinks are off so the real audit.Logger writes no row.
 func paddingTestSettings() *record.Settings {
-	return &record.Settings{Id: 1, AppName: "Goiabada", Issuer: routesTestIssuer, DynamicClientRegistrationEnabled: true}
+	return &record.Settings{ID: 1, AppName: "Goiabada", Issuer: routesTestIssuer, DynamicClientRegistrationEnabled: true}
 }
 
 // paddingDCRTx is the transaction the registration's writes are stubbed on.
@@ -179,7 +179,7 @@ func TestBodyLimitPadding_DynamicClientRegistration(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	// A page reads the default brand; none leaves it automatic, in the built-in colors.
 	database.On("GetDefaultBrand", mock.Anything, mock.Anything).Return(nil, nil).Maybe()
-	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(paddingTestSettings(), nil)
+	database.On("GetSettingsByID", mock.Anything, mock.Anything, int64(1)).Return(paddingTestSettings(), nil)
 	// One registration per request, and the helper sends two: with a Content-Length and chunked.
 	for range 2 {
 		datamocks.ExpectRunInTransaction(database, paddingDCRTx)
@@ -204,9 +204,9 @@ func TestBodyLimitPadding_ABearerJSONHandler(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	// A page reads the default brand; none leaves it automatic, in the built-in colors.
 	database.On("GetDefaultBrand", mock.Anything, mock.Anything).Return(nil, nil).Maybe()
-	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(paddingTestSettings(), nil)
+	database.On("GetSettingsByID", mock.Anything, mock.Anything, int64(1)).Return(paddingTestSettings(), nil)
 	database.On("GetUserBySubject", mock.Anything, mock.Anything, routesTestSubject).
-		Return(&record.User{Id: 1, Enabled: true, Subject: routesTestSubject}, nil)
+		Return(&record.User{ID: 1, Enabled: true, Subject: routesTestSubject}, nil)
 	database.On("SetUserPhone", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	server, counts := newPaddingTestServer(t, database)
 
@@ -228,10 +228,10 @@ func TestBodyLimitPadding_AnUpload(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	// A page reads the default brand; none leaves it automatic, in the built-in colors.
 	database.On("GetDefaultBrand", mock.Anything, mock.Anything).Return(nil, nil).Maybe()
-	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(paddingTestSettings(), nil)
+	database.On("GetSettingsByID", mock.Anything, mock.Anything, int64(1)).Return(paddingTestSettings(), nil)
 	database.On("GetUserBySubject", mock.Anything, mock.Anything, routesTestSubject).
-		Return(&record.User{Id: 1, Enabled: true, Subject: routesTestSubject}, nil)
-	database.On("GetUserProfilePictureByUserId", mock.Anything, mock.Anything, int64(1)).Return(nil, nil)
+		Return(&record.User{ID: 1, Enabled: true, Subject: routesTestSubject}, nil)
+	database.On("GetUserProfilePictureByUserID", mock.Anything, mock.Anything, int64(1)).Return(nil, nil)
 	database.On("CreateUserProfilePicture", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	server, counts := newPaddingTestServer(t, database)
 

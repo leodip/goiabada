@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"crypto/sha256"
-	"encoding/gob"
 	"encoding/hex"
 	"fmt"
 	"log/slog"
@@ -119,7 +118,7 @@ func (p *recordingProfiles) GetAccountProfile(_ context.Context, accessToken str
 	if p.err != nil {
 		return nil, p.err
 	}
-	return &api.UserResponse{Id: 7, Locale: "de", PageLanguage: p.pageLanguage}, nil
+	return &api.UserResponse{ID: 7, Locale: "de", PageLanguage: p.pageLanguage}, nil
 }
 
 type callbackHarness struct {
@@ -127,14 +126,14 @@ type callbackHarness struct {
 	backend    *armableBackend
 	store      *sessionstore.ServerSideStore
 	parser     *oauthclient.JWKSTokenParser
-	httpHelper *handlersmocks.HttpHelper
+	httpHelper *handlersmocks.HTTPHelper
 	logs       *logtest.SlogCapture
 	profiles   *recordingProfiles
 }
 
 func newCallbackHarness(t *testing.T) *callbackHarness {
 	t.Helper()
-	gob.Register(oauth.TokenResponse{})
+	sessionkeys.RegisterStoredTokenResponse()
 
 	backend := &armableBackend{MemoryBackend: sessiontest.NewMemoryBackend()}
 	store, err := sessionstore.NewServerSideStore(backend, sessionkeys.JWT, false, sessionstore.BrowserSessionCookie,
@@ -145,7 +144,7 @@ func newCallbackHarness(t *testing.T) *callbackHarness {
 	require.NoError(t, err)
 
 	signing, _ := oauthclienttest.Keys(t)
-	jwks, _ := oauthclienttest.NewJwksServer(t, oauthclienttest.JwkFromPublicKey(callbackKid, &signing.PublicKey))
+	jwks, _ := oauthclienttest.NewJWKSServer(t, oauthclienttest.JWKFromPublicKey(callbackKid, &signing.PublicKey))
 	parser := oauthclient.NewJWKSTokenParser(jwks.URL, jwks.Client(), nil, oauthclienttest.ClientID,
 		oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
 
@@ -154,7 +153,7 @@ func newCallbackHarness(t *testing.T) *callbackHarness {
 		backend:    backend,
 		store:      store,
 		parser:     parser,
-		httpHelper: handlersmocks.NewHttpHelper(t),
+		httpHelper: handlersmocks.NewHTTPHelper(t),
 		logs:       logtest.CaptureSlog(t),
 		profiles:   &recordingProfiles{},
 	}
@@ -270,7 +269,7 @@ func (h *callbackHarness) idToken(edit func(jwt.MapClaims)) string {
 func (h *callbackHarness) tokenResponse() *oauth.TokenResponse {
 	return &oauth.TokenResponse{
 		AccessToken:  "the-access-token",
-		IdToken:      h.idToken(nil),
+		IDToken:      h.idToken(nil),
 		TokenType:    "Bearer",
 		ExpiresIn:    300,
 		RefreshToken: "the-refresh-token",
@@ -528,7 +527,7 @@ func TestHandleAuthCallbackPost_RefusesWhatTheAuthServerAnswered(t *testing.T) {
 			name: "no id token",
 			exchange: func(h *callbackHarness) (*oauth.TokenResponse, error) {
 				r := h.tokenResponse()
-				r.IdToken = ""
+				r.IDToken = ""
 				return r, nil
 			},
 			want: refusalUnverified,
@@ -546,7 +545,7 @@ func TestHandleAuthCallbackPost_RefusesWhatTheAuthServerAnswered(t *testing.T) {
 			name: "an id token from another issuer",
 			exchange: func(h *callbackHarness) (*oauth.TokenResponse, error) {
 				r := h.tokenResponse()
-				r.IdToken = h.idToken(func(c jwt.MapClaims) { c["iss"] = "https://another-issuer.example" })
+				r.IDToken = h.idToken(func(c jwt.MapClaims) { c["iss"] = "https://another-issuer.example" })
 				return r, nil
 			},
 			want: refusalUnverified,
@@ -555,7 +554,7 @@ func TestHandleAuthCallbackPost_RefusesWhatTheAuthServerAnswered(t *testing.T) {
 			name: "an id token for another audience",
 			exchange: func(h *callbackHarness) (*oauth.TokenResponse, error) {
 				r := h.tokenResponse()
-				r.IdToken = h.idToken(func(c jwt.MapClaims) { c["aud"] = "another-client" })
+				r.IDToken = h.idToken(func(c jwt.MapClaims) { c["aud"] = "another-client" })
 				return r, nil
 			},
 			want: refusalUnverified,
@@ -564,7 +563,7 @@ func TestHandleAuthCallbackPost_RefusesWhatTheAuthServerAnswered(t *testing.T) {
 			name: "an id token with no nonce",
 			exchange: func(h *callbackHarness) (*oauth.TokenResponse, error) {
 				r := h.tokenResponse()
-				r.IdToken = h.idToken(func(c jwt.MapClaims) { delete(c, "nonce") })
+				r.IDToken = h.idToken(func(c jwt.MapClaims) { delete(c, "nonce") })
 				return r, nil
 			},
 			want: refusalUnverified,
@@ -574,7 +573,7 @@ func TestHandleAuthCallbackPost_RefusesWhatTheAuthServerAnswered(t *testing.T) {
 			exchange: func(h *callbackHarness) (*oauth.TokenResponse, error) {
 				r := h.tokenResponse()
 				other := sha256.Sum256([]byte("another-raw-nonce"))
-				r.IdToken = h.idToken(func(c jwt.MapClaims) { c["nonce"] = hex.EncodeToString(other[:]) })
+				r.IDToken = h.idToken(func(c jwt.MapClaims) { c["nonce"] = hex.EncodeToString(other[:]) })
 				return r, nil
 			},
 			want: refusalUnverified,
@@ -651,9 +650,9 @@ func assertSignedInWithPageLanguage(t *testing.T, sess *sessionstore.Session, wa
 	before, after time.Time, wantPageLanguage string) {
 	t.Helper()
 	require.False(t, sess.IsNew, "a session is stored")
-	stored, ok := sess.Values[sessionkeys.JWT].(oauth.TokenResponse)
+	stored, ok := sess.Values[sessionkeys.JWT].(sessionkeys.StoredTokenResponse)
 	require.True(t, ok, "the token response is stored")
-	assert.Equal(t, want, stored)
+	assert.Equal(t, want, stored.TokenResponse())
 
 	expiresAt, ok := sess.Values[sessionkeys.JWTExpiresAt].(int64)
 	require.True(t, ok, "the expiry is stored as int64 Unix seconds")
@@ -769,7 +768,7 @@ func TestHandleAuthCallbackPost_ARefusedTabLeavesAnotherTabsSignIn(t *testing.T)
 	require.NoError(t, err)
 	sentB := sha256.Sum256([]byte(handshakeB[sessionkeys.Nonce]))
 	response := h.tokenResponse()
-	response.IdToken = h.idToken(func(c jwt.MapClaims) { c["nonce"] = hex.EncodeToString(sentB[:]) })
+	response.IDToken = h.idToken(func(c jwt.MapClaims) { c["nonce"] = hex.EncodeToString(sentB[:]) })
 	exchanger := &recordingExchanger{response: response}
 
 	wA := h.serve(exchanger, jar.Cookies(console), url.Values{"state": {stateA}, "code": {"tab-a-code"}})

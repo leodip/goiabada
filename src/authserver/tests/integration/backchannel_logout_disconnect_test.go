@@ -38,21 +38,21 @@ func newDisconnectedUser(t *testing.T, user *record.User) *disconnectedUser {
 	t.Helper()
 	requireDatabaseAuditLogs(t)
 	adminToken, adminClient := createAdminClientWithToken(t)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, adminClient.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, adminClient.ID) })
 
 	if user == nil {
 		user = &record.User{Subject: fake.UUID(), Enabled: true, Email: uniqueEmail("bcl@disconnect.test")}
 		require.NoError(t, database.CreateUser(context.Background(), nil, user))
-		t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.Id) })
+		t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.ID) })
 	}
 
 	d := &disconnectedUser{adminToken: adminToken, user: user}
-	d.session = createTestUserSession(t, user.Id, fake.UUID())
+	d.session = createTestUserSession(t, user.ID, fake.UUID())
 	d.told = newLogoutReceiver(t, http.StatusOK)
 	d.client = backchannelClient(t, adminToken, d.told.uri())
 	onSession(t, d.session, d.client)
 	holdRefreshToken(t, user, d.client, false, time.Now().UTC().Add(time.Hour))
-	d.consent = createTestUserConsent(t, user.Id, d.client.Id)
+	d.consent = createTestUserConsent(t, user.ID, d.client.ID)
 
 	d.untold = newLogoutReceiver(t, http.StatusOK)
 	d.other = backchannelClient(t, adminToken, d.untold.uri())
@@ -61,22 +61,22 @@ func newDisconnectedUser(t *testing.T, user *record.User) *disconnectedUser {
 }
 
 // assertToldAboutTheUser holds what arrived to one token naming the user and no session, to the
-// disconnected client alone, recorded by the request requestId.
-func (d *disconnectedUser) assertToldAboutTheUser(t *testing.T, requestId string) {
+// disconnected client alone, recorded by the request requestID.
+func (d *disconnectedUser) assertToldAboutTheUser(t *testing.T, requestID string) {
 	t.Helper()
 	posts := d.told.waitFor(t, 1, 10*time.Second)
 	claims := assertLogoutToken(t, posts[0], d.client.ClientIdentifier, d.user.Subject, "")
 
-	row, details := sentLogoutTokenRow(t, requestId, 10*time.Second)
+	row, details := sentLogoutTokenRow(t, requestID, 10*time.Second)
 	assert.Equal(t, map[string]interface{}{
-		"client_id":          float64(d.client.Id),
-		"user_id":            float64(d.user.Id),
+		"client_id":          float64(d.client.ID),
+		"user_id":            float64(d.user.ID),
 		"session_identifier": "",
 		"jti":                claims["jti"],
 		"outcome":            "delivered",
 		"attempts":           float64(1),
 	}, details)
-	assert.Equal(t, d.user.Id, row.UserId.Int64)
+	assert.Equal(t, d.user.ID, row.UserID.Int64)
 
 	// Every delivery has started by now; any further one would have arrived meanwhile.
 	time.Sleep(2 * time.Second)
@@ -91,13 +91,13 @@ func (d *disconnectedUser) assertSessionUntouched(t *testing.T) {
 	session, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, d.session.SessionIdentifier)
 	require.NoError(t, err)
 	require.NotNil(t, session, "a disconnect ends no session")
-	sessionClients, err := database.GetUserSessionClientsByUserSessionId(context.Background(), nil, session.Id)
+	sessionClients, err := database.GetUserSessionClientsByUserSessionID(context.Background(), nil, session.ID)
 	require.NoError(t, err)
 	var onIt []int64
 	for _, sessionClient := range sessionClients {
-		onIt = append(onIt, sessionClient.ClientId)
+		onIt = append(onIt, sessionClient.ClientID)
 	}
-	assert.ElementsMatch(t, []int64{d.client.Id, d.other.Id}, onIt, "the client stays on the session")
+	assert.ElementsMatch(t, []int64{d.client.ID, d.other.ID}, onIt, "the client stays on the session")
 }
 
 // TestBackchannelLogout_AnAdministratorWithdrawingAConsentTellsTheClient: an administrator withdraws
@@ -105,13 +105,13 @@ func (d *disconnectedUser) assertSessionUntouched(t *testing.T) {
 // asks it to end every session it has for them. A repeated DELETE is 404 and sends nothing.
 func TestBackchannelLogout_AnAdministratorWithdrawingAConsentTellsTheClient(t *testing.T) {
 	d := newDisconnectedUser(t, nil)
-	path := "/api/v1/admin/user-consents/" + strconv.FormatInt(d.consent.Id, 10)
+	path := "/api/v1/admin/user-consents/" + strconv.FormatInt(d.consent.ID, 10)
 
-	resp, requestId := sendAdminRequest(t, d.adminToken, http.MethodDelete, path, nil)
+	resp, requestID := sendAdminRequest(t, d.adminToken, http.MethodDelete, path, nil)
 	_ = resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
-	d.assertToldAboutTheUser(t, requestId)
+	d.assertToldAboutTheUser(t, requestID)
 	d.assertSessionUntouched(t)
 
 	again, _ := sendAdminRequest(t, d.adminToken, http.MethodDelete, path, nil)
@@ -127,12 +127,12 @@ func TestBackchannelLogout_AUserWithdrawingTheirConsentTellsTheClient(t *testing
 	accessToken, user := getUserAccessTokenWithAccountScope(t)
 	d := newDisconnectedUser(t, user)
 
-	resp, requestId := sendAdminRequest(t, accessToken, http.MethodDelete,
-		"/api/v1/account/consents/"+strconv.FormatInt(d.consent.Id, 10), nil)
+	resp, requestID := sendAdminRequest(t, accessToken, http.MethodDelete,
+		"/api/v1/account/consents/"+strconv.FormatInt(d.consent.ID, 10), nil)
 	_ = resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
-	d.assertToldAboutTheUser(t, requestId)
+	d.assertToldAboutTheUser(t, requestID)
 	d.assertSessionUntouched(t)
 }
 
@@ -141,25 +141,25 @@ func TestBackchannelLogout_AUserWithdrawingTheirConsentTellsTheClient(t *testing
 // the expired one, and not the valid one it is not on.
 func TestBackchannelLogout_WithdrawingAConsentTellsASidRequiringClientOfEachValidSession(t *testing.T) {
 	d := newDisconnectedUser(t, nil)
-	require.NoError(t, database.SetClientBackchannelLogout(context.Background(), nil, d.client.Id, d.told.uri(), true))
+	require.NoError(t, database.SetClientBackchannelLogout(context.Background(), nil, d.client.ID, d.told.uri(), true))
 
-	expired := createTestUserSession(t, d.user.Id, fake.UUID())
+	expired := createTestUserSession(t, d.user.ID, fake.UUID())
 	dead := deadSessionCases(t)[0]
 	expired.Started = dead.started
 	expired.LastAccessed = dead.lastAccessed
 	require.NoError(t, database.UpdateUserSession(context.Background(), nil, expired))
 	onSession(t, expired, d.client)
-	elsewhere := createTestUserSession(t, d.user.Id, fake.UUID())
+	elsewhere := createTestUserSession(t, d.user.ID, fake.UUID())
 	onSession(t, elsewhere, d.other)
 
-	resp, requestId := sendAdminRequest(t, d.adminToken, http.MethodDelete,
-		"/api/v1/admin/user-consents/"+strconv.FormatInt(d.consent.Id, 10), nil)
+	resp, requestID := sendAdminRequest(t, d.adminToken, http.MethodDelete,
+		"/api/v1/admin/user-consents/"+strconv.FormatInt(d.consent.ID, 10), nil)
 	_ = resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
 	posts := d.told.waitFor(t, 1, 10*time.Second)
 	assertLogoutToken(t, posts[0], d.client.ClientIdentifier, d.user.Subject, d.session.SessionIdentifier)
-	rows := sentLogoutTokenRows(t, requestId, 1, 10*time.Second)
+	rows := sentLogoutTokenRows(t, requestID, 1, 10*time.Second)
 	var details map[string]interface{}
 	require.NoError(t, json.Unmarshal([]byte(rows[0].Details), &details))
 	assert.Equal(t, d.session.SessionIdentifier, details["session_identifier"])
@@ -175,18 +175,18 @@ func TestBackchannelLogout_WithdrawingAConsentTellsASidRequiringClientOfEachVali
 // still revoked.
 func TestBackchannelLogout_WithdrawingAConsentTellsASidRequiringClientOnNoValidSessionNothing(t *testing.T) {
 	d := newDisconnectedUser(t, nil)
-	require.NoError(t, database.SetClientBackchannelLogout(context.Background(), nil, d.client.Id, d.told.uri(), true))
+	require.NoError(t, database.SetClientBackchannelLogout(context.Background(), nil, d.client.ID, d.told.uri(), true))
 	dead := deadSessionCases(t)[0]
 	d.session.Started = dead.started
 	d.session.LastAccessed = dead.lastAccessed
 	require.NoError(t, database.UpdateUserSession(context.Background(), nil, d.session))
 
 	resp, _ := sendAdminRequest(t, d.adminToken, http.MethodDelete,
-		"/api/v1/admin/user-consents/"+strconv.FormatInt(d.consent.Id, 10), nil)
+		"/api/v1/admin/user-consents/"+strconv.FormatInt(d.consent.ID, 10), nil)
 	_ = resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
-	tokens, err := database.GetRefreshTokensByUserIdAndClientId(context.Background(), nil, d.user.Id, d.client.Id)
+	tokens, err := database.GetRefreshTokensByUserIDAndClientID(context.Background(), nil, d.user.ID, d.client.ID)
 	require.NoError(t, err)
 	require.Len(t, tokens, 1)
 	assert.True(t, tokens[0].Revoked, "the grant is revoked whether or not the client is told")
@@ -202,14 +202,14 @@ func TestBackchannelLogout_DisconnectingAConnectedClientTellsIt(t *testing.T) {
 	accessToken, user := getUserAccessTokenWithAccountScope(t)
 	d := newDisconnectedUser(t, user)
 
-	resp, requestId := sendAdminRequest(t, accessToken, http.MethodDelete,
-		"/api/v1/account/connected-clients/"+strconv.FormatInt(d.client.Id, 10), nil)
+	resp, requestID := sendAdminRequest(t, accessToken, http.MethodDelete,
+		"/api/v1/account/connected-clients/"+strconv.FormatInt(d.client.ID, 10), nil)
 	_ = resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
-	d.assertToldAboutTheUser(t, requestId)
+	d.assertToldAboutTheUser(t, requestID)
 	d.assertSessionUntouched(t)
-	consent, err := database.GetUserConsentById(context.Background(), nil, d.consent.Id)
+	consent, err := database.GetUserConsentByID(context.Background(), nil, d.consent.ID)
 	require.NoError(t, err)
 	assert.Nil(t, consent, "the client's consent is deleted")
 }

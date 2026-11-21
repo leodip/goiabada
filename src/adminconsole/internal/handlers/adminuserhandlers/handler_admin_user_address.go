@@ -18,12 +18,12 @@ import (
 
 // userAddressAPI is what the user address page needs: the user, and the address write.
 type userAddressAPI interface {
-	GetUserById(ctx context.Context, accessToken string, userId int64) (*api.UserResponse, error)
-	UpdateUserAddress(ctx context.Context, accessToken string, userId int64, request *api.UpdateUserAddressRequest) (*api.UserResponse, error)
+	GetUserByID(ctx context.Context, accessToken string, userID int64) (*api.UserResponse, error)
+	UpdateUserAddress(ctx context.Context, accessToken string, userID int64, request *api.UpdateUserAddressRequest) (*api.UserResponse, error)
 }
 
 func HandleAddressGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient userAddressAPI,
 ) http.HandlerFunc {
@@ -47,13 +47,13 @@ func HandleAddressGet(
 			return
 		}
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
-		user, err := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		user, err := apiClient.GetUserByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -105,7 +105,7 @@ func HandleAddressGet(
 }
 
 func HandleAddressPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient userAddressAPI,
 	baseURL string,
@@ -130,9 +130,9 @@ func HandleAddressPost(
 			return
 		}
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
@@ -151,7 +151,7 @@ func HandleAddressPost(
 			// Handle validation errors by showing them in the form
 			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(errorMessage string) {
 				// Get user data for form display
-				userForDisplay, userErr := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+				userForDisplay, userErr := apiClient.GetUserByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 				if userErr != nil {
 					render.HandleAPIError(httpHelper, w, r, userErr)
 					return
@@ -191,7 +191,7 @@ func HandleAddressPost(
 			return
 		}
 
-		pagePath := fmt.Sprintf("/admin/users/%v/address", user.Id)
+		pagePath := fmt.Sprintf("/admin/users/%v/address", user.ID)
 		sess.SetFlash(pagePath, "savedSuccessfully", "true")
 		err = httpSession.Save(r, w, sess)
 		if err != nil {

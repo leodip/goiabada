@@ -34,40 +34,40 @@ func createUserToChange(t *testing.T) *record.User {
 		EmailVerified: true,
 	}
 	require.NoError(t, database.CreateUser(context.Background(), nil, user))
-	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.Id) })
+	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.ID) })
 	return user
 }
 
-// disableUserUnderRequestId disables user through the admin API with accessToken, under a request
+// disableUserUnderRequestID disables user through the admin API with accessToken, under a request
 // id of its own, and answers that id.
-func disableUserUnderRequestId(t *testing.T, accessToken string, user *record.User) string {
+func disableUserUnderRequestID(t *testing.T, accessToken string, user *record.User) string {
 	t.Helper()
 	body, err := json.Marshal(api.UpdateUserEnabledRequest{Enabled: false})
 	require.NoError(t, err)
 
 	req, err := http.NewRequest(http.MethodPut,
-		appConfig.AuthServer.BaseURL+"/api/v1/admin/users/"+strconv.FormatInt(user.Id, 10)+"/enabled",
+		appConfig.AuthServer.BaseURL+"/api/v1/admin/users/"+strconv.FormatInt(user.ID, 10)+"/enabled",
 		bytes.NewReader(body))
 	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
-	requestId := "user-columns-" + fake.LetterN(16)
-	req.Header.Set("X-Request-Id", requestId)
+	requestID := "user-columns-" + fake.LetterN(16)
+	req.Header.Set("X-Request-Id", requestID)
 
-	resp, err := createHttpClient(t).Do(req)
+	resp, err := createHTTPClient(t).Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
-	return requestId
+	return requestID
 }
 
-// storedRow is the one row of event that request requestId stored.
-func storedRow(t *testing.T, event, requestId string) record.AuditLog {
+// storedRow is the one row of event that request requestID stored.
+func storedRow(t *testing.T, event, requestID string) record.AuditLog {
 	t.Helper()
 	rows, total, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 10,
-		record.AuditLogFilter{AuditEvent: event, RequestId: requestId})
+		record.AuditLogFilter{AuditEvent: event, RequestID: requestID})
 	require.NoError(t, err)
-	require.Equal(t, 1, total, "one %s row for request %s", event, requestId)
+	require.Equal(t, 1, total, "one %s row for request %s", event, requestID)
 	return rows[0]
 }
 
@@ -76,20 +76,20 @@ func TestAuditLogUserColumns_AChangeMadeWithAUsersToken(t *testing.T) {
 	adminToken, administrator := createUserAccessTokenWithScope(t,
 		builtin.AuthServerResourceIdentifier+":"+builtin.ManageUsersPermissionIdentifier)
 	changed := createUserToChange(t)
-	require.NotEqual(t, administrator.Id, changed.Id)
+	require.NotEqual(t, administrator.ID, changed.ID)
 
-	requestId := disableUserUnderRequestId(t, adminToken, changed)
+	requestID := disableUserUnderRequestID(t, adminToken, changed)
 
-	row := storedRow(t, "updated_user_details", requestId)
-	assert.Equal(t, sql.NullInt64{Int64: changed.Id, Valid: true}, row.UserId,
+	row := storedRow(t, "updated_user_details", requestID)
+	assert.Equal(t, sql.NullInt64{Int64: changed.ID, Valid: true}, row.UserID,
 		"user_id is the user the change was made to")
-	assert.Equal(t, sql.NullInt64{Int64: administrator.Id, Valid: true}, row.LoggedInUserId,
+	assert.Equal(t, sql.NullInt64{Int64: administrator.ID, Valid: true}, row.LoggedInUserID,
 		"logged_in_user_id is the administrator whose token made the change")
 
 	var details map[string]any
 	require.NoError(t, json.Unmarshal([]byte(row.Details), &details))
 	assert.Equal(t, map[string]any{
-		"user_id":        float64(changed.Id),
+		"user_id":        float64(changed.ID),
 		"logged_in_user": administrator.Subject,
 	}, details, "the details are written as before")
 }
@@ -97,13 +97,13 @@ func TestAuditLogUserColumns_AChangeMadeWithAUsersToken(t *testing.T) {
 func TestAuditLogUserColumns_AChangeMadeWithAClientCredentialsToken(t *testing.T) {
 	requireDatabaseAuditLogs(t)
 	clientToken, client := createAdminClientWithToken(t)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 	changed := createUserToChange(t)
 
-	requestId := disableUserUnderRequestId(t, clientToken, changed)
+	requestID := disableUserUnderRequestID(t, clientToken, changed)
 
-	row := storedRow(t, "updated_user_details", requestId)
-	assert.Equal(t, sql.NullInt64{Int64: changed.Id, Valid: true}, row.UserId,
+	row := storedRow(t, "updated_user_details", requestID)
+	assert.Equal(t, sql.NullInt64{Int64: changed.ID, Valid: true}, row.UserID,
 		"user_id is the user the change was made to")
-	assert.False(t, row.LoggedInUserId.Valid, "a client credentials token has no user, so logged_in_user_id is NULL")
+	assert.False(t, row.LoggedInUserID.Valid, "a client credentials token has no user, so logged_in_user_id is NULL")
 }

@@ -31,10 +31,10 @@ func clientJSONMembers(t *testing.T, resp *http.Response) map[string]interface{}
 
 // tokenEndpointAuthMethodOf is the tokenEndpointAuthMethod member of the admin API's client detail,
 // failing the test when the member is absent or not a string.
-func tokenEndpointAuthMethodOf(t *testing.T, accessToken string, clientId int64) string {
+func tokenEndpointAuthMethodOf(t *testing.T, accessToken string, clientID int64) string {
 	t.Helper()
 	client := clientJSONMembers(t, makeAPIRequest(t, http.MethodGet,
-		appConfig.AuthServer.BaseURL+"/api/v1/admin/clients/"+strconv.FormatInt(clientId, 10), accessToken, nil))
+		appConfig.AuthServer.BaseURL+"/api/v1/admin/clients/"+strconv.FormatInt(clientID, 10), accessToken, nil))
 	return stringMember(t, client)
 }
 
@@ -47,13 +47,13 @@ func stringMember(t *testing.T, client map[string]interface{}) string {
 	return method
 }
 
-// selfRegisteredClientId is the id of the client a registration created.
-func selfRegisteredClientId(t *testing.T, clientIdentifier string) int64 {
+// selfRegisteredClientID is the id of the client a registration created.
+func selfRegisteredClientID(t *testing.T, clientIdentifier string) int64 {
 	t.Helper()
 	client, err := database.GetClientByClientIdentifier(context.Background(), nil, clientIdentifier)
 	require.NoError(t, err)
 	require.NotNil(t, client)
-	return client.Id
+	return client.ID
 }
 
 // The admin API's client response carries the method a self-registered confidential client is
@@ -74,7 +74,7 @@ func TestAPIClient_TokenEndpointAuthMethodIsTheRegisteredOne(t *testing.T) {
 	} {
 		t.Run("registered naming "+row.named, func(t *testing.T) {
 			clientIdentifier, _ := registerConfidentialClient(t, row.named)
-			assert.Equal(t, row.want, tokenEndpointAuthMethodOf(t, accessToken, selfRegisteredClientId(t, clientIdentifier)))
+			assert.Equal(t, row.want, tokenEndpointAuthMethodOf(t, accessToken, selfRegisteredClientID(t, clientIdentifier)))
 		})
 	}
 
@@ -88,10 +88,10 @@ func TestAPIClient_TokenEndpointAuthMethodIsTheRegisteredOne(t *testing.T) {
 		require.Equal(t, http.StatusCreated, resp.StatusCode)
 		var registered oidc.DynamicClientRegistrationResponse
 		require.NoError(t, json.NewDecoder(resp.Body).Decode(&registered))
-		clientId := selfRegisteredClientId(t, registered.ClientID)
-		t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, clientId) })
+		clientID := selfRegisteredClientID(t, registered.ClientID)
+		t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, clientID) })
 
-		assert.Empty(t, tokenEndpointAuthMethodOf(t, accessToken, clientId))
+		assert.Empty(t, tokenEndpointAuthMethodOf(t, accessToken, clientID))
 	})
 
 	t.Run("a client an administrator created", func(t *testing.T) {
@@ -102,9 +102,9 @@ func TestAPIClient_TokenEndpointAuthMethodIsTheRegisteredOne(t *testing.T) {
 		require.Equal(t, http.StatusCreated, resp.StatusCode)
 		var created api.CreateClientResponse
 		require.NoError(t, json.NewDecoder(resp.Body).Decode(&created))
-		t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, created.Client.Id) })
+		t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, created.Client.ID) })
 
-		assert.Empty(t, tokenEndpointAuthMethodOf(t, accessToken, created.Client.Id))
+		assert.Empty(t, tokenEndpointAuthMethodOf(t, accessToken, created.Client.ID))
 	})
 }
 
@@ -137,14 +137,14 @@ func TestAPIClient_TheSwitchToPublicClearsTheMethodShown(t *testing.T) {
 	enableDCR(t)
 	accessToken, _ := createAdminClientWithToken(t)
 	clientIdentifier, _ := registerConfidentialClient(t, "client_secret_post")
-	clientId := selfRegisteredClientId(t, clientIdentifier)
-	require.Equal(t, "client_secret_post", tokenEndpointAuthMethodOf(t, accessToken, clientId))
-	authenticationURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10) + "/authentication"
+	clientID := selfRegisteredClientID(t, clientIdentifier)
+	require.Equal(t, "client_secret_post", tokenEndpointAuthMethodOf(t, accessToken, clientID))
+	authenticationURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientID, 10) + "/authentication"
 
 	switched := clientJSONMembers(t, makeAPIRequest(t, http.MethodPut, authenticationURL, accessToken,
 		api.UpdateClientAuthenticationRequest{IsPublic: true}))
 	assert.Empty(t, stringMember(t, switched), "the switch's own answer")
-	assert.Empty(t, tokenEndpointAuthMethodOf(t, accessToken, clientId), "a read after the switch")
+	assert.Empty(t, tokenEndpointAuthMethodOf(t, accessToken, clientID), "a read after the switch")
 
 	back := clientJSONMembers(t, makeAPIRequest(t, http.MethodPut, authenticationURL, accessToken,
 		api.UpdateClientAuthenticationRequest{IsPublic: false, ClientSecret: strings.Repeat("s", 60)}))

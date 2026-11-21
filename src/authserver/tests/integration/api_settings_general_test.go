@@ -20,7 +20,7 @@ func TestAPISettingsGeneralGet_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Fetch current settings directly from DB for expected values
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
+	settings, err := database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err)
 	assert.NotNil(t, settings)
 
@@ -76,7 +76,7 @@ func TestAPISettingsGeneralPut_Success(t *testing.T) {
 	assert.Equal(t, strings.ToLower(req.PasswordPolicy), strings.ToLower(body.PasswordPolicy))
 
 	// Verify DB persisted
-	settings, err2 := database.GetSettingsById(context.Background(), nil, 1)
+	settings, err2 := database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err2)
 	assert.Equal(t, "My New App", settings.AppName)
 	assert.Equal(t, req.Issuer, settings.Issuer)
@@ -127,7 +127,7 @@ func TestAPISettingsGeneralPut_DisablingSelfRegKeepsTheVerificationChoice(t *tes
 	assert.True(t, body.SelfRegistrationRequiresEmailVerification)
 
 	// And the database holds it, so turning self-registration back on brings it back
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
+	settings, err := database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err)
 	assert.False(t, settings.SelfRegistrationEnabled)
 	assert.True(t, settings.SelfRegistrationRequiresEmailVerification)
@@ -213,7 +213,7 @@ func TestAPISettingsGeneralPut_TheBaseURLIsAnAcceptedIssuer(t *testing.T) {
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
-	stored, err := database.GetSettingsById(context.Background(), nil, 1)
+	stored, err := database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err)
 	assert.Equal(t, appConfig.AuthServer.BaseURL, stored.Issuer)
 }
@@ -237,7 +237,7 @@ func TestAPISettingsGeneralPut_AStoredIssuerTheRuleRefusesStandsUntilChanged(t *
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
-	stored, err := database.GetSettingsById(context.Background(), nil, 1)
+	stored, err := database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err)
 	assert.Equal(t, legacyIssuer, stored.Issuer)
 	assert.Equal(t, "Saved around the issuer", stored.AppName)
@@ -252,7 +252,7 @@ func TestAPISettingsGeneralPut_AStoredIssuerTheRuleRefusesStandsUntilChanged(t *
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
 
-	stored, err = database.GetSettingsById(context.Background(), nil, 1)
+	stored, err = database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err)
 	assert.Equal(t, legacyIssuer, stored.Issuer)
 }
@@ -284,7 +284,7 @@ func TestAPISettingsGeneralPut_ImplicitFlowEnabled(t *testing.T) {
 	assert.True(t, body.ImplicitFlowEnabled, "ImplicitFlowEnabled should be true in response")
 
 	// Verify DB persisted
-	updatedSettings, err := database.GetSettingsById(context.Background(), nil, 1)
+	updatedSettings, err := database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err)
 	assert.True(t, updatedSettings.ImplicitFlowEnabled, "ImplicitFlowEnabled should be true in DB")
 
@@ -300,7 +300,7 @@ func TestAPISettingsGeneralPut_ImplicitFlowEnabled(t *testing.T) {
 	assert.False(t, body2.ImplicitFlowEnabled, "ImplicitFlowEnabled should be false in response")
 
 	// Verify DB persisted
-	updatedSettings2, err := database.GetSettingsById(context.Background(), nil, 1)
+	updatedSettings2, err := database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err)
 	assert.False(t, updatedSettings2.ImplicitFlowEnabled, "ImplicitFlowEnabled should be false in DB")
 }
@@ -309,7 +309,7 @@ func TestAPISettingsGeneralGet_IncludesImplicitFlowEnabled(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Get current settings
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
+	settings, err := database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err)
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/general"
@@ -355,7 +355,7 @@ func TestAPISettingsGeneralPut_ResourceOwnerPasswordCredentialsEnabled(t *testin
 	assert.True(t, body.ResourceOwnerPasswordCredentialsEnabled, "ResourceOwnerPasswordCredentialsEnabled should be true in response")
 
 	// Verify DB persisted
-	updatedSettings, err := database.GetSettingsById(context.Background(), nil, 1)
+	updatedSettings, err := database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err)
 	assert.True(t, updatedSettings.ResourceOwnerPasswordCredentialsEnabled, "ResourceOwnerPasswordCredentialsEnabled should be true in DB")
 
@@ -371,7 +371,7 @@ func TestAPISettingsGeneralPut_ResourceOwnerPasswordCredentialsEnabled(t *testin
 	assert.False(t, body2.ResourceOwnerPasswordCredentialsEnabled, "ResourceOwnerPasswordCredentialsEnabled should be false in response")
 
 	// Verify DB persisted
-	updatedSettings2, err := database.GetSettingsById(context.Background(), nil, 1)
+	updatedSettings2, err := database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err)
 	assert.False(t, updatedSettings2.ResourceOwnerPasswordCredentialsEnabled, "ResourceOwnerPasswordCredentialsEnabled should be false in DB")
 }
@@ -380,7 +380,7 @@ func TestAPISettingsGeneralGet_IncludesROPCEnabled(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Get current settings
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
+	settings, err := database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err)
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/general"
@@ -402,7 +402,7 @@ func TestAPISettingsGeneral_UnauthorizedAndScope(t *testing.T) {
 	// No token - GET
 	req, err := http.NewRequest("GET", url, nil)
 	require.NoError(t, err)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -473,7 +473,7 @@ func TestAPISettingsGeneralPut_AngleBracketsRejected(t *testing.T) {
 			_ = json.NewDecoder(resp.Body).Decode(&errResp)
 			assert.Equal(t, tc.wantCode, errResp.ErrorCode)
 
-			stored, err := database.GetSettingsById(context.Background(), nil, 1)
+			stored, err := database.GetSettingsByID(context.Background(), nil, 1)
 			require.NoError(t, err)
 			assert.Equal(t, before.AppName, stored.AppName)
 			assert.Equal(t, before.Issuer, stored.Issuer)
@@ -503,7 +503,7 @@ func TestAPISettingsGeneralPut_TheAppNameIsRequiredAndMeasuredTrimmed(t *testing
 		assert.Equal(t, "handler.settings_general.app_name_required", errResp.ErrorCode, "%q", appName)
 		assert.Equal(t, "App name is required.", errResp.ErrorDescription, "%q", appName)
 
-		stored, err := database.GetSettingsById(context.Background(), nil, 1)
+		stored, err := database.GetSettingsByID(context.Background(), nil, 1)
 		require.NoError(t, err)
 		assert.Equal(t, before.AppName, stored.AppName, "nothing is written for %q", appName)
 		assert.Equal(t, before.Issuer, stored.Issuer, "nothing is written for %q", appName)
@@ -521,7 +521,7 @@ func TestAPISettingsGeneralPut_TheAppNameIsRequiredAndMeasuredTrimmed(t *testing
 	var body api.SettingsGeneralResponse
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
 	assert.Equal(t, thirty, body.AppName)
-	stored, err := database.GetSettingsById(context.Background(), nil, 1)
+	stored, err := database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err)
 	assert.Equal(t, thirty, stored.AppName)
 }
@@ -548,7 +548,7 @@ func TestAPISettingsGeneralPut_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, `R&D "labs"`, body.AppName)
 
-	stored, err := database.GetSettingsById(context.Background(), nil, 1)
+	stored, err := database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err)
 	assert.Equal(t, `R&D "labs"`, stored.AppName)
 }
@@ -572,7 +572,7 @@ func TestAPISettingsGeneralPut_AccountDeletionEnabledIsRequired(t *testing.T) {
 			require.NoError(t, err)
 			req.Header.Set("Authorization", "Bearer "+accessToken)
 			req.Header.Set("Content-Type", "application/json")
-			resp, err := createHttpClient(t).Do(req)
+			resp, err := createHTTPClient(t).Do(req)
 			require.NoError(t, err)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -582,7 +582,7 @@ func TestAPISettingsGeneralPut_AccountDeletionEnabledIsRequired(t *testing.T) {
 			assert.Equal(t, "handler.settings_general.account_deletion_enabled_required", refusal.ErrorCode)
 			assert.Equal(t, "Choose whether to let users delete their own account.", refusal.ErrorDescription)
 
-			after, err := database.GetSettingsById(context.Background(), nil, 1)
+			after, err := database.GetSettingsByID(context.Background(), nil, 1)
 			require.NoError(t, err)
 			assert.True(t, after.AccountDeletionEnabled, "nothing is saved")
 			assert.Equal(t, before.AppName, after.AppName, "nothing is saved")
@@ -611,7 +611,7 @@ func TestAPISettingsGeneral_AccountDeletionEnabledIsSavedServedAndPublished(t *t
 		_ = resp.Body.Close()
 		assert.Equal(t, enabled, saved["accountDeletionEnabled"], "the PUT answers %v", enabled)
 
-		stored, err := database.GetSettingsById(context.Background(), nil, 1)
+		stored, err := database.GetSettingsByID(context.Background(), nil, 1)
 		require.NoError(t, err)
 		assert.Equal(t, enabled, stored.AccountDeletionEnabled, "stored %v", enabled)
 
@@ -622,7 +622,7 @@ func TestAPISettingsGeneral_AccountDeletionEnabledIsSavedServedAndPublished(t *t
 		_ = got.Body.Close()
 		assert.Equal(t, enabled, read["accountDeletionEnabled"], "the GET answers %v", enabled)
 
-		public, err := createHttpClient(t).Get(appConfig.AuthServer.BaseURL + "/api/public/settings")
+		public, err := createHTTPClient(t).Get(appConfig.AuthServer.BaseURL + "/api/public/settings")
 		require.NoError(t, err)
 		require.Equal(t, http.StatusOK, public.StatusCode)
 		var published map[string]any

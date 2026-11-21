@@ -13,7 +13,7 @@
     <label class="field-label" for="permissionSelect">{{ T $.ctx "adminconsole.admin_resources.users_with_permission.field.permission" }}</label>
     <select class="control" id="permissionSelect" name="permission">
       {{ range .permissionChoices }}
-      <option value="{{ .Id }}"{{ if eq $.selectedPermission .Id }} selected{{ end }}>{{ .Label }}</option>
+      <option value="{{ .ID }}"{{ if eq $.selectedPermission .ID }} selected{{ end }}>{{ .Label }}</option>
       {{ end }}
     </select>
   </div>
@@ -39,12 +39,12 @@
       {{ range .pageResult.Users }}
       <tr>
         <td class="cell-wrap sm:whitespace-nowrap">
-          <a class="text-link" href="/admin/users/{{ .Id }}/details">{{ .Email }}</a>
+          <a class="text-link" href="/admin/users/{{ .ID }}/details">{{ .Email }}</a>
           {{ if or .GivenName .MiddleName .FamilyName .Username }}<span class="cell-secondary">{{ .GivenName }} {{ .MiddleName }} {{ .FamilyName }}{{ if .Username }}{{ if or .GivenName .MiddleName .FamilyName }} · {{ end }}{{ .Username }}{{ end }}</span>{{ end }}
         </td>
         <td class="cell-mono" data-label="{{ T $.ctx "adminconsole.admin_resources.users_with_permission.col_subject" }}">{{ .Subject }}</td>
         <td class="cell-actions">
-          <button class="button button-sm" type="button" data-action-url="/admin/resources/{{ $.resourceId }}/users-with-permission/remove/{{ .Id }}/{{ $.selectedPermission }}" data-dialog="removeUserPermission"
+          <button class="button button-sm" type="button" data-action-url="/admin/resources/{{ $.resourceId }}/users-with-permission/remove/{{ .ID }}/{{ $.selectedPermission }}" data-dialog="removeUserPermission"
             data-confirm="{{ T $.ctx "adminconsole.admin_resources.users_with_permission.remove_confirm" "scope" (print $.resourceIdentifier ":" $.selectedPermissionIdentifier) "user" .Email }}" data-done="{{ T $.ctx "adminconsole.admin_resources.users_with_permission.removed" }}" data-done-label="{{ T $.ctx "adminconsole.admin_resources.users_with_permission.removed_label" }}">{{ T $.ctx "adminconsole.admin_resources.users_with_permission.remove_button" }}<span class="sr-only"> {{ .Email }}</span></button>
         </td>
       </tr>

@@ -192,12 +192,12 @@ func TestValidateTokenRequest_CodeGrant_ABoundCodeNeedsAProofByItsKey(t *testing
 			validator := NewTokenValidator(mockDB, protocolvalidationmocks.NewTokenParser(t),
 				protocolvalidationmocks.NewPermissionChecker(t), testDataCipher)
 
-			client := &record.Client{Id: 1, ClientIdentifier: "spa", Enabled: true, AuthorizationCodeEnabled: true, IsPublic: true}
+			client := &record.Client{ID: 1, ClientIdentifier: "spa", Enabled: true, AuthorizationCodeEnabled: true, IsPublic: true}
 			code := &record.Code{
-				Id:            42,
+				ID:            42,
 				RedirectURI:   redirectURI,
-				ClientId:      client.Id,
-				UserId:        7,
+				ClientID:      client.ID,
+				UserID:        7,
 				CodeChallenge: sql.NullString{String: oauth.GeneratePKCECodeChallenge(testCodeVerifier), Valid: true},
 				CreatedAt:     sql.NullTime{Time: time.Now().UTC(), Valid: true},
 				Used:          a.used,
@@ -213,7 +213,7 @@ func TestValidateTokenRequest_CodeGrant_ABoundCodeNeedsAProofByItsKey(t *testing
 			mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, code).
 				Run(func(args mock.Arguments) { args.Get(2).(*record.Code).Client = *client }).Return(nil).Once()
 			mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, code).
-				Run(func(args mock.Arguments) { args.Get(2).(*record.Code).User = record.User{Id: 7, Enabled: false} }).Return(nil).Once()
+				Run(func(args mock.Arguments) { args.Get(2).(*record.Code).User = record.User{ID: 7, Enabled: false} }).Return(nil).Once()
 
 			verifier := testCodeVerifier
 			if a.verifier != "" {
@@ -222,7 +222,7 @@ func TestValidateTokenRequest_CodeGrant_ABoundCodeNeedsAProofByItsKey(t *testing
 			capture := logtest.CaptureSlog(t)
 			grant, err := validator.ValidateTokenRequest(context.Background(), &record.Settings{}, &ValidateTokenRequestInput{
 				GrantType:      "authorization_code",
-				ClientId:       "spa",
+				ClientID:       "spa",
 				Code:           "the_code",
 				RedirectURI:    redirectURI,
 				CodeVerifier:   verifier,

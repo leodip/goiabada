@@ -41,7 +41,7 @@ func HandleClientPostLogoutRedirectURIsPut(
 			return
 		}
 
-		client, err := database.GetClientById(r.Context(), nil, id)
+		client, err := database.GetClientByID(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error getting client by ID for sign-out redirect URIs update"), "client_id", id)
 			return
@@ -90,7 +90,7 @@ func HandleClientPostLogoutRedirectURIsPut(
 		}
 
 		key := func(row record.PostLogoutRedirectURI) string { return strings.TrimSpace(row.URI) }
-		rowId := func(row record.PostLogoutRedirectURI) int64 { return row.Id }
+		rowID := func(row record.PostLogoutRedirectURI) int64 { return row.ID }
 
 		// One transaction, as the redirect URI save's: a failure part way through commits nothing,
 		// and the stored list is read on it, compared with the loaded one and planned from on every
@@ -104,40 +104,40 @@ func HandleClientPostLogoutRedirectURIsPut(
 				return errListChanged
 			}
 
-			insert, remove := replaceSet(client.PostLogoutRedirectURIs, key, rowId, normalized)
+			insert, remove := replaceSet(client.PostLogoutRedirectURIs, key, rowID, normalized)
 			for _, removed := range remove {
 				if deleteErr := database.DeletePostLogoutRedirectURI(r.Context(), tx, removed); deleteErr != nil {
 					return errs.Wrapf(deleteErr, "database error deleting sign-out redirect URI %d", removed)
 				}
 			}
 			for _, uri := range insert {
-				if createErr := database.CreatePostLogoutRedirectURI(r.Context(), tx, &record.PostLogoutRedirectURI{ClientId: client.Id, URI: uri}); createErr != nil {
+				if createErr := database.CreatePostLogoutRedirectURI(r.Context(), tx, &record.PostLogoutRedirectURI{ClientID: client.ID, URI: uri}); createErr != nil {
 					return errs.Wrap(createErr, "database error creating sign-out redirect URI")
 				}
 			}
 			return nil
 		})
 		if err != nil {
-			writeListSaveFailure(w, r, err, "client_id", client.Id)
+			writeListSaveFailure(w, r, err, "client_id", client.ID)
 			return
 		}
 
 		// Audit, once the save has committed.
 		auditLogger.Log(r.Context(), audit.EventUpdatedPostLogoutRedirectURIs, map[string]interface{}{
-			"client_id":      client.Id,
+			"client_id":      client.ID,
 			"logged_in_user": callerSubject(r),
 		})
 
 		if err := database.ClientLoadRedirectURIs(r.Context(), nil, client); err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client redirect URIs after sign-out redirect URIs update"), "client_id", client.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client redirect URIs after sign-out redirect URIs update"), "client_id", client.ID)
 			return
 		}
 		if err := database.ClientLoadPostLogoutRedirectURIs(r.Context(), nil, client); err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client sign-out redirect URIs after update"), "client_id", client.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client sign-out redirect URIs after update"), "client_id", client.ID)
 			return
 		}
 		if err := database.ClientLoadWebOrigins(r.Context(), nil, client); err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client web origins after sign-out redirect URIs update"), "client_id", client.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client web origins after sign-out redirect URIs update"), "client_id", client.ID)
 			return
 		}
 

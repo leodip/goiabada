@@ -39,8 +39,8 @@ var stepUpNow = time.Date(2026, 11, 7, 12, 0, 0, 0, time.UTC)
 
 // stepUpToken is a console user's Account API token with the given claims added; a nil value
 // leaves that claim out.
-func stepUpToken(claims map[string]interface{}) oauth.JwtToken {
-	token := oauth.JwtToken{Claims: map[string]interface{}{
+func stepUpToken(claims map[string]interface{}) oauth.JWTToken {
+	token := oauth.JWTToken{Claims: map[string]interface{}{
 		"sub": "u1", "client_id": builtin.AdminConsoleClientIdentifier, "scope": "openid authserver:manage-account",
 	}}
 	for name, value := range claims {
@@ -59,7 +59,7 @@ func signedInAgo(seconds int64) float64 {
 
 // serveStepUpGuard runs the guard as the account download mounts it, and reports whether the next
 // handler ran.
-func serveStepUpGuard(t *testing.T, token *oauth.JwtToken) (*httptest.ResponseRecorder, bool) {
+func serveStepUpGuard(t *testing.T, token *oauth.JWTToken) (*httptest.ResponseRecorder, bool) {
 	t.Helper()
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/account/export", nil)
 	if token != nil {
@@ -67,7 +67,7 @@ func serveStepUpGuard(t *testing.T, token *oauth.JwtToken) (*httptest.ResponseRe
 	}
 	rr := httptest.NewRecorder()
 	reached := false
-	guard := NewBearerTokenForAPI(nil, ResourceProofs{}).RequireRecentAuthentication(300*time.Second, record.AcrLevel2Optional,
+	guard := NewBearerTokenForAPI(nil, ResourceProofs{}).RequireRecentAuthentication(300*time.Second, record.ACRLevel2Optional,
 		func() time.Time { return stepUpNow })
 	guard(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		reached = true
@@ -148,7 +148,7 @@ func TestRequireRecentAuthentication_NoTokenIsTheMissingCredential(t *testing.T)
 // The guard reads the clock on each request, not once when it is built.
 func TestRequireRecentAuthentication_ReadsTheClockOnEachRequest(t *testing.T) {
 	now := stepUpNow
-	guard := NewBearerTokenForAPI(nil, ResourceProofs{}).RequireRecentAuthentication(300*time.Second, record.AcrLevel2Optional,
+	guard := NewBearerTokenForAPI(nil, ResourceProofs{}).RequireRecentAuthentication(300*time.Second, record.ACRLevel2Optional,
 		func() time.Time { return now })(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte("admitted"))
 	}))
@@ -176,7 +176,7 @@ func TestRequireRecentAuthentication_TheChallengeNamesTheGuardsOwnFigures(t *tes
 	req = req.WithContext(reqctx.WithBearerToken(req.Context(), token))
 	rr := httptest.NewRecorder()
 
-	NewBearerTokenForAPI(nil, ResourceProofs{}).RequireRecentAuthentication(10*time.Minute, record.AcrLevel2Mandatory,
+	NewBearerTokenForAPI(nil, ResourceProofs{}).RequireRecentAuthentication(10*time.Minute, record.ACRLevel2Mandatory,
 		func() time.Time { return stepUpNow })(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Error("the next handler ran for a level the guard refuses")
 	})).ServeHTTP(rr, req)
@@ -201,8 +201,8 @@ func TestRequireRecentAuthentication_ADPoPTokenIsRefusedInTheDPoPChallenge(t *te
 			logtest.CaptureSlog(t)
 			store := newReplayStore()
 			guards := dpopGuards(t, surface, dpopResourceBaseURL, store)
-			chain := guards.JwtAuthorizationHeaderToContext()(guards.RequireRecentAuthentication(300*time.Second,
-				record.AcrLevel2Optional, func() time.Time { return dpopNow })(http.HandlerFunc(
+			chain := guards.JWTAuthorizationHeaderToContext()(guards.RequireRecentAuthentication(300*time.Second,
+				record.ACRLevel2Optional, func() time.Time { return dpopNow })(http.HandlerFunc(
 				func(w http.ResponseWriter, r *http.Request) {
 					t.Error("the next handler ran for a sign-in the guard refuses")
 				})))
@@ -222,12 +222,12 @@ func TestRequireRecentAuthentication_ADPoPTokenIsRefusedInTheDPoPChallenge(t *te
 func TestRequireRecentAuthentication_AfterTheClientGuard(t *testing.T) {
 	guards := NewBearerTokenForAPI(nil, ResourceProofs{})
 	chain := guards.RequireAdminConsoleClient()(guards.RequireRecentAuthentication(300*time.Second,
-		record.AcrLevel2Optional, func() time.Time { return stepUpNow })(http.HandlerFunc(
+		record.ACRLevel2Optional, func() time.Time { return stepUpNow })(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte("admitted")) })))
 
 	for _, tc := range []struct {
 		name     string
-		clientId string
+		clientID string
 		authTime float64
 		want     chainAnswer
 	}{
@@ -239,7 +239,7 @@ func TestRequireRecentAuthentication_AfterTheClientGuard(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			logtest.CaptureSlog(t)
 			token := stepUpToken(map[string]interface{}{"auth_time": tc.authTime, "acr": "urn:goiabada:level2_optional",
-				"client_id": tc.clientId})
+				"client_id": tc.clientID})
 			req := httptest.NewRequest(http.MethodGet, "/api/v1/account/export", nil)
 			req = req.WithContext(reqctx.WithBearerToken(req.Context(), token))
 			rr := httptest.NewRecorder()

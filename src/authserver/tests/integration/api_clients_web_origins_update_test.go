@@ -37,23 +37,23 @@ func TestAPIClientWebOriginsPut_Success_AddRemoveAndNormalize(t *testing.T) {
 	}
 	err = database.CreateClient(context.Background(), nil, client)
 	require.NoError(t, err)
-	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.ID) }()
 
 	// Seed existing web origins
 	originA := "https://a.example.com"
 	originB := "https://b.example.com"
-	err = database.CreateWebOrigin(context.Background(), nil, &record.WebOrigin{ClientId: client.Id, Origin: originA})
+	err = database.CreateWebOrigin(context.Background(), nil, &record.WebOrigin{ClientID: client.ID, Origin: originA})
 	require.NoError(t, err)
-	err = database.CreateWebOrigin(context.Background(), nil, &record.WebOrigin{ClientId: client.Id, Origin: originB})
+	err = database.CreateWebOrigin(context.Background(), nil, &record.WebOrigin{ClientID: client.ID, Origin: originB})
 	require.NoError(t, err)
 
 	// Desired: keep A (with spaces and uppercase to test trimming+lowercasing), remove B, add C
 	originAMixed := "  HTTPS://A.EXAMPLE.COM  "
 	originC := "https://c.example.com"
 	reqBody := api.UpdateClientWebOriginsRequest{WebOrigins: []string{originAMixed, originC},
-		ExpectedWebOrigins: getClientWebOrigins(t, accessToken, client.Id)}
+		ExpectedWebOrigins: getClientWebOrigins(t, accessToken, client.ID)}
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/web-origins"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.ID, 10) + "/web-origins"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -74,7 +74,7 @@ func TestAPIClientWebOriginsPut_Success_AddRemoveAndNormalize(t *testing.T) {
 	assert.True(t, got[originC])
 
 	// Verify DB reflects the change
-	refreshed, err := database.GetClientById(context.Background(), nil, client.Id)
+	refreshed, err := database.GetClientByID(context.Background(), nil, client.ID)
 	require.NoError(t, err)
 	err = database.ClientLoadWebOrigins(context.Background(), nil, refreshed)
 	require.NoError(t, err)
@@ -109,11 +109,11 @@ func TestAPIClientWebOriginsPut_AuthCodeDisabledAccepted(t *testing.T) {
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	require.NoError(t, err)
-	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.ID) }()
 
 	origin := "https://spa-" + strings.ToLower(fake.LetterN(8)) + ".example.com"
-	reqBody := api.UpdateClientWebOriginsRequest{WebOrigins: []string{origin}, ExpectedWebOrigins: getClientWebOrigins(t, accessToken, client.Id)}
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/web-origins"
+	reqBody := api.UpdateClientWebOriginsRequest{WebOrigins: []string{origin}, ExpectedWebOrigins: getClientWebOrigins(t, accessToken, client.ID)}
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.ID, 10) + "/web-origins"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -125,7 +125,7 @@ func TestAPIClientWebOriginsPut_AuthCodeDisabledAccepted(t *testing.T) {
 	assert.Equal(t, origin, updateResp.Client.WebOrigins[0].Origin)
 
 	// And it really landed, rather than being echoed back from the request.
-	refreshed, err := database.GetClientById(context.Background(), nil, client.Id)
+	refreshed, err := database.GetClientByID(context.Background(), nil, client.ID)
 	require.NoError(t, err)
 	err = database.ClientLoadWebOrigins(context.Background(), nil, refreshed)
 	require.NoError(t, err)
@@ -151,10 +151,10 @@ func TestAPIClientWebOriginsPut_StoresTheCanonicalOrigin(t *testing.T) {
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	require.NoError(t, err)
-	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.ID) }()
 
 	host := "canon-" + strings.ToLower(fake.LetterN(8)) + ".example.com"
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/web-origins"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.ID, 10) + "/web-origins"
 
 	testCases := []struct {
 		name string
@@ -175,12 +175,12 @@ func TestAPIClientWebOriginsPut_StoresTheCanonicalOrigin(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			reqBody := api.UpdateClientWebOriginsRequest{WebOrigins: []string{tc.sent}, ExpectedWebOrigins: getClientWebOrigins(t, accessToken, client.Id)}
+			reqBody := api.UpdateClientWebOriginsRequest{WebOrigins: []string{tc.sent}, ExpectedWebOrigins: getClientWebOrigins(t, accessToken, client.ID)}
 			resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 			defer func() { _ = resp.Body.Close() }()
 			assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-			refreshed, err := database.GetClientById(context.Background(), nil, client.Id)
+			refreshed, err := database.GetClientByID(context.Background(), nil, client.ID)
 			require.NoError(t, err)
 			err = database.ClientLoadWebOrigins(context.Background(), nil, refreshed)
 			require.NoError(t, err)
@@ -200,25 +200,25 @@ func TestAPIClientWebOriginsPut_SystemLevelClientAllowed(t *testing.T) {
 	err := json.NewDecoder(resp.Body).Decode(&listResp)
 	require.NoError(t, err)
 
-	var sysId int64
+	var sysID int64
 	for _, c := range listResp.Clients {
 		if c.ClientIdentifier == builtin.AdminConsoleClientIdentifier {
-			sysId = c.Id
+			sysID = c.ID
 			break
 		}
 	}
-	if sysId == 0 {
+	if sysID == 0 {
 		t.Skip("system-level client not found")
 	}
 
 	// Update web origins (should succeed)
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysId, 10) + "/web-origins"
-	seeded := getClientWebOrigins(t, accessToken, sysId)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysID, 10) + "/web-origins"
+	seeded := getClientWebOrigins(t, accessToken, sysID)
 
 	// Every test in this tier shares the console client, so its origins go back as they were.
 	t.Cleanup(func() {
 		restore := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateClientWebOriginsRequest{WebOrigins: seeded,
-			ExpectedWebOrigins: getClientWebOrigins(t, accessToken, sysId)})
+			ExpectedWebOrigins: getClientWebOrigins(t, accessToken, sysID)})
 		defer func() { _ = restore.Body.Close() }()
 		assert.Equal(t, http.StatusOK, restore.StatusCode)
 	})
@@ -244,10 +244,10 @@ func TestAPIClientWebOriginsPut_ValidationErrors(t *testing.T) {
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	require.NoError(t, err)
-	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.ID) }()
 
-	baseURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/web-origins"
-	loaded := getClientWebOrigins(t, accessToken, client.Id)
+	baseURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.ID, 10) + "/web-origins"
+	loaded := getClientWebOrigins(t, accessToken, client.ID)
 
 	// Sub-test: Empty web origin value
 	t.Run("EmptyOrigin", func(t *testing.T) {
@@ -315,9 +315,9 @@ func webOriginOfLength(t *testing.T, n int) string {
 }
 
 // getClientWebOrigins reads a client's web origins back through the admin API.
-func getClientWebOrigins(t *testing.T, accessToken string, clientId int64) []string {
+func getClientWebOrigins(t *testing.T, accessToken string, clientID int64) []string {
 	t.Helper()
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientID, 10)
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -345,27 +345,27 @@ func TestAPIClientWebOriginsPut_TheBoundIsTheLongestStandardOrigin(t *testing.T)
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	require.NoError(t, err)
-	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.ID) }()
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/web-origins"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.ID, 10) + "/web-origins"
 
 	atTheBound := webOriginOfLength(t, 267)
 	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateClientWebOriginsRequest{WebOrigins: []string{atTheBound},
-		ExpectedWebOrigins: getClientWebOrigins(t, accessToken, client.Id)})
+		ExpectedWebOrigins: getClientWebOrigins(t, accessToken, client.ID)})
 	_ = resp.Body.Close()
 	assert.Equal(t, http.StatusOK, resp.StatusCode, "a 267-byte origin is the longest standards-valid one and must be admitted")
-	assert.Equal(t, []string{atTheBound}, getClientWebOrigins(t, accessToken, client.Id))
+	assert.Equal(t, []string{atTheBound}, getClientWebOrigins(t, accessToken, client.ID))
 
 	overTheBound := webOriginOfLength(t, 268)
 	resp = makeAPIRequest(t, "PUT", url, accessToken, api.UpdateClientWebOriginsRequest{WebOrigins: []string{overTheBound},
-		ExpectedWebOrigins: getClientWebOrigins(t, accessToken, client.Id)})
+		ExpectedWebOrigins: getClientWebOrigins(t, accessToken, client.ID)})
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var errResp api.ErrorResponse
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&errResp))
 	assert.Equal(t, "handler.client_web_origins.too_long", errResp.ErrorCode)
 	assert.Contains(t, errResp.ErrorDescription, "too long")
-	assert.Equal(t, []string{atTheBound}, getClientWebOrigins(t, accessToken, client.Id),
+	assert.Equal(t, []string{atTheBound}, getClientWebOrigins(t, accessToken, client.ID),
 		"a refused save must leave the stored list as it was")
 }
 
@@ -379,7 +379,7 @@ func newWebOriginsClient(t *testing.T, prefix string) *record.Client {
 		AuthorizationCodeEnabled: true,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 	return client
 }
 
@@ -388,7 +388,7 @@ func newWebOriginsClient(t *testing.T, prefix string) *record.Client {
 func TestAPIClientWebOriginsPut_TheLoadedListIsRequired(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 	client := newWebOriginsClient(t, "weborig-expected-")
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/web-origins"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.ID, 10) + "/web-origins"
 
 	bodies := map[string]interface{}{
 		"absent": map[string]interface{}{"webOrigins": []string{"https://a.example.com"}},
@@ -403,7 +403,7 @@ func TestAPIClientWebOriginsPut_TheLoadedListIsRequired(t *testing.T) {
 			require.NoError(t, json.NewDecoder(resp.Body).Decode(&got))
 			assert.Equal(t, "VALIDATION_ERROR", got["error_code"])
 			assert.Contains(t, got["error_description"], "expectedWebOrigins is required")
-			assert.Empty(t, getClientWebOrigins(t, accessToken, client.Id))
+			assert.Empty(t, getClientWebOrigins(t, accessToken, client.ID))
 		})
 	}
 }
@@ -417,10 +417,10 @@ func TestAPIClientWebOriginsPut_AnOutdatedLoadedListIsRefused(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 	client := newWebOriginsClient(t, "weborig-outdated-")
 	require.NoError(t, database.CreateWebOrigin(context.Background(), nil,
-		&record.WebOrigin{ClientId: client.Id, Origin: "https://a.example.com"}))
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/web-origins"
+		&record.WebOrigin{ClientID: client.ID, Origin: "https://a.example.com"}))
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.ID, 10) + "/web-origins"
 
-	loadedByBoth := getClientWebOrigins(t, accessToken, client.Id)
+	loadedByBoth := getClientWebOrigins(t, accessToken, client.ID)
 
 	first := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateClientWebOriginsRequest{
 		WebOrigins:         []string{"https://a.example.com", "https://b.example.com"},
@@ -439,10 +439,10 @@ func TestAPIClientWebOriginsPut_AnOutdatedLoadedListIsRefused(t *testing.T) {
 	assert.Contains(t, body["error_description"], "reload it")
 
 	assert.ElementsMatch(t, []string{"https://a.example.com", "https://b.example.com"},
-		getClientWebOrigins(t, accessToken, client.Id), "the refused save wrote nothing")
+		getClientWebOrigins(t, accessToken, client.ID), "the refused save wrote nothing")
 }
 
-func TestAPIClientWebOriginsPut_NotFound_InvalidId_InvalidBody_Unauthorized(t *testing.T) {
+func TestAPIClientWebOriginsPut_NotFound_InvalidID_InvalidBody_Unauthorized(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Not found
@@ -480,14 +480,14 @@ func TestAPIClientWebOriginsPut_NotFound_InvalidId_InvalidBody_Unauthorized(t *t
 	}
 	err := database.CreateClient(context.Background(), nil, client2)
 	require.NoError(t, err)
-	defer func() { _ = database.DeleteClient(context.Background(), nil, client2.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client2.ID) }()
 
-	urlIB := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client2.Id, 10) + "/web-origins"
+	urlIB := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client2.ID, 10) + "/web-origins"
 	req, err := http.NewRequest("PUT", urlIB, nil)
 	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp3, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp3.Body.Close() }()
@@ -522,9 +522,9 @@ func TestAPIClientWebOriginsPut_InsufficientScope(t *testing.T) {
 	}
 	err := database.CreateClient(context.Background(), nil, target)
 	require.NoError(t, err)
-	defer func() { _ = database.DeleteClient(context.Background(), nil, target.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, target.ID) }()
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(target.Id, 10) + "/web-origins"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(target.ID, 10) + "/web-origins"
 	reqBody := api.UpdateClientWebOriginsRequest{WebOrigins: []string{"https://example.com"}, ExpectedWebOrigins: []string{}}
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()

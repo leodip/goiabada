@@ -33,7 +33,7 @@ import (
 func restoreSettings(t *testing.T) *record.Settings {
 	t.Helper()
 
-	found, err := database.GetSettingsById(context.Background(), nil, 1)
+	found, err := database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err)
 	require.NotNil(t, found)
 
@@ -65,7 +65,7 @@ func changeSettings(t *testing.T, edit func(settings *record.Settings)) *record.
 // the legacy key column. Two of them UpdateSettings never writes, being dont-update: last_cleanup_at,
 // which TryClaimCleanupRun alone writes (#407), and the legacy key column.
 var settingsColumnsNoTestOwns = map[string]bool{
-	"Id":                     true,
+	"ID":                     true,
 	"CreatedAt":              true,
 	"UpdatedAt":              true,
 	"LastCleanupAt":          true,

@@ -34,17 +34,17 @@ import (
 // handler made before it.
 
 const (
-	adminPasswordNoticeUserId    = int64(77)
+	adminPasswordNoticeUserID    = int64(77)
 	adminPasswordNoticeNew       = "N3wP4ss!word-set-by-admin"
 	adminPasswordNoticeAddress   = "bruno.costa@example.com"
-	adminPasswordNoticeRequestId = "req-admin-password-0001"
+	adminPasswordNoticeRequestID = "req-admin-password-0001"
 )
 
 // adminPasswordNoticeRow is the account as a read finds it: a verified address, a name and the
 // password hash given, "" for an account whose setup link is still pending.
 func adminPasswordNoticeRow(passwordHash string) *record.User {
 	return &record.User{
-		Id:            adminPasswordNoticeUserId,
+		ID:            adminPasswordNoticeUserID,
 		Subject:       "the-target",
 		Enabled:       true,
 		GivenName:     "Bruno",
@@ -61,11 +61,11 @@ func adminPasswordNoticeRequest(t *testing.T, settings *record.Settings, newPass
 	t.Helper()
 	body, err := json.Marshal(map[string]string{"newPassword": newPassword})
 	require.NoError(t, err)
-	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/api/v1/admin/users/%d/password", adminPasswordNoticeUserId),
+	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/api/v1/admin/users/%d/password", adminPasswordNoticeUserID),
 		bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	req.SetPathValue("id", fmt.Sprint(adminPasswordNoticeUserId))
-	ctx := requestid.NewContext(req.Context(), adminPasswordNoticeRequestId)
+	req.SetPathValue("id", fmt.Sprint(adminPasswordNoticeUserID))
+	ctx := requestid.NewContext(req.Context(), adminPasswordNoticeRequestID)
 	ctx = reqctx.WithSettings(ctx, settings)
 	return setTokenContextWithClaims(req.WithContext(ctx),
 		map[string]interface{}{"scope": "authserver:manage", "sub": adminSubject, "auth_time": float64(1)})
@@ -77,13 +77,13 @@ func adminPasswordNoticeRequest(t *testing.T, settings *record.Settings, newPass
 // notice that wrote an audit entry of its own would fail the case.
 func stubAdminPasswordSet(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger,
 	before *record.User, replaced *record.User) {
-	database.On("GetUserById", mock.Anything, mock.Anything, adminPasswordNoticeUserId).Return(before, nil).Once()
-	database.On("GetUserByIdForUpdate", mock.Anything, apiRevokeTx, adminPasswordNoticeUserId).Return(replaced, nil).Once()
-	database.On("SetUserPasswordHash", mock.Anything, apiRevokeTx, adminPasswordNoticeUserId, mock.Anything).Return(nil).Once()
-	stubSweep(database, adminPasswordNoticeUserId, 5)
+	database.On("GetUserByID", mock.Anything, mock.Anything, adminPasswordNoticeUserID).Return(before, nil).Once()
+	database.On("GetUserByIDForUpdate", mock.Anything, apiRevokeTx, adminPasswordNoticeUserID).Return(replaced, nil).Once()
+	database.On("SetUserPasswordHash", mock.Anything, apiRevokeTx, adminPasswordNoticeUserID, mock.Anything).Return(nil).Once()
+	stubSweep(database, adminPasswordNoticeUserID, 5)
 	auditLogger.On("Log", mock.Anything, audit.EventUpdatedUserAuthentication, mock.Anything).Return().Once()
 	auditLogger.On("Log", mock.Anything, audit.EventRevokedUserAuthState, mock.Anything).Return().Once()
-	database.On("GetUserById", mock.Anything, mock.Anything, adminPasswordNoticeUserId).
+	database.On("GetUserByID", mock.Anything, mock.Anything, adminPasswordNoticeUserID).
 		Return(adminPasswordNoticeRow("the-new-hash"), nil).Once()
 }
 
@@ -229,19 +229,19 @@ func TestHandleUserPasswordPut_SendsNoNoticeWhereNoneMayGo(t *testing.T) {
 			}, ""},
 		{"the new password is refused", http.StatusBadRequest,
 			func(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, settings *record.Settings) {
-				database.On("GetUserById", mock.Anything, mock.Anything, adminPasswordNoticeUserId).
+				database.On("GetUserByID", mock.Anything, mock.Anything, adminPasswordNoticeUserID).
 					Return(adminPasswordNoticeRow("the-old-hash"), nil).Once()
 			}, "short"},
 		{"the change rolls back", http.StatusInternalServerError,
 			func(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, settings *record.Settings) {
-				database.On("GetUserById", mock.Anything, mock.Anything, adminPasswordNoticeUserId).
+				database.On("GetUserByID", mock.Anything, mock.Anything, adminPasswordNoticeUserID).
 					Return(adminPasswordNoticeRow("the-old-hash"), nil).Once()
 				datamocks.ExpectRunInTransaction(database, apiRevokeTx)
-				database.On("GetUserByIdForUpdate", mock.Anything, apiRevokeTx, adminPasswordNoticeUserId).
+				database.On("GetUserByIDForUpdate", mock.Anything, apiRevokeTx, adminPasswordNoticeUserID).
 					Return(adminPasswordNoticeRow("the-old-hash"), nil).Once()
-				database.On("SetUserPasswordHash", mock.Anything, apiRevokeTx, adminPasswordNoticeUserId, mock.Anything).
+				database.On("SetUserPasswordHash", mock.Anything, apiRevokeTx, adminPasswordNoticeUserID, mock.Anything).
 					Return(nil).Once()
-				database.On("IncrementUserAuthStateGeneration", mock.Anything, apiRevokeTx, adminPasswordNoticeUserId).
+				database.On("IncrementUserAuthStateGeneration", mock.Anything, apiRevokeTx, adminPasswordNoticeUserID).
 					Return(int64(0), errors.New("increment failed")).Once()
 			}, ""},
 	} {

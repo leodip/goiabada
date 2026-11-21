@@ -63,8 +63,8 @@ func TestHandleUserPasswordPut_HoldsThePasswordToNist(t *testing.T) {
 	for _, tc := range refusals {
 		t.Run(tc.name, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
-			database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(42)).
-				Return(&record.User{Id: 42, Email: "jane.doe@example.com", Username: "janedoe", Enabled: true}, nil).Once()
+			database.On("GetUserByID", mock.Anything, (*sql.Tx)(nil), int64(42)).
+				Return(&record.User{ID: 42, Email: "jane.doe@example.com", Username: "janedoe", Enabled: true}, nil).Once()
 
 			body, err := json.Marshal(map[string]string{"newPassword": tc.password})
 			require.NoError(t, err)
@@ -129,7 +129,7 @@ func TestHandleAccountPasswordPut_HoldsThePasswordToNist(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
 			database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), "the-subject").
-				Return(&record.User{Id: 42, Email: "jane.doe@example.com", Username: "janedoe", Enabled: true, PasswordHash: currentHash}, nil).Once()
+				Return(&record.User{ID: 42, Email: "jane.doe@example.com", Username: "janedoe", Enabled: true, PasswordHash: currentHash}, nil).Once()
 
 			body, err := json.Marshal(map[string]string{"currentPassword": currentPassword, "newPassword": tc.password})
 			require.NoError(t, err)

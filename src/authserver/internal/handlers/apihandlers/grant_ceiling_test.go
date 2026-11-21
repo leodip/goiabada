@@ -24,7 +24,7 @@ import (
 // The authserver resource as the cases' policy reads it: the six administrative permissions, the
 // self-service one and a custom permission an operator added, which is not administrative.
 const (
-	ceilingResourceId      = int64(1)
+	ceilingResourceID      = int64(1)
 	permManageAccount      = int64(10)
 	permManage             = int64(11)
 	permAdminRead          = int64(12)
@@ -44,17 +44,17 @@ func expectAuthServerPermissions(database *datamocks.Database) {
 // expectAuthServerPermissionsOn registers the same read on tx.
 func expectAuthServerPermissionsOn(database *datamocks.Database, tx *sql.Tx) {
 	database.On("GetResourceByResourceIdentifier", mock.Anything, tx, "authserver").
-		Return(&record.Resource{Id: ceilingResourceId, ResourceIdentifier: "authserver"}, nil).Once()
-	database.On("GetPermissionsByResourceId", mock.Anything, tx, ceilingResourceId).
+		Return(&record.Resource{ID: ceilingResourceID, ResourceIdentifier: "authserver"}, nil).Once()
+	database.On("GetPermissionsByResourceID", mock.Anything, tx, ceilingResourceID).
 		Return([]record.Permission{
-			{Id: permManageAccount, PermissionIdentifier: "manage-account", ResourceId: ceilingResourceId},
-			{Id: permManage, PermissionIdentifier: "manage", ResourceId: ceilingResourceId},
-			{Id: permAdminRead, PermissionIdentifier: "admin-read", ResourceId: ceilingResourceId},
-			{Id: permManageUsers, PermissionIdentifier: "manage-users", ResourceId: ceilingResourceId},
-			{Id: permManageClients, PermissionIdentifier: "manage-clients", ResourceId: ceilingResourceId},
-			{Id: permManageSettings, PermissionIdentifier: "manage-settings", ResourceId: ceilingResourceId},
-			{Id: permBrowserSessions, PermissionIdentifier: "browser-sessions", ResourceId: ceilingResourceId},
-			{Id: permCustomOnAuthServer, PermissionIdentifier: "reports", ResourceId: ceilingResourceId},
+			{ID: permManageAccount, PermissionIdentifier: "manage-account", ResourceID: ceilingResourceID},
+			{ID: permManage, PermissionIdentifier: "manage", ResourceID: ceilingResourceID},
+			{ID: permAdminRead, PermissionIdentifier: "admin-read", ResourceID: ceilingResourceID},
+			{ID: permManageUsers, PermissionIdentifier: "manage-users", ResourceID: ceilingResourceID},
+			{ID: permManageClients, PermissionIdentifier: "manage-clients", ResourceID: ceilingResourceID},
+			{ID: permManageSettings, PermissionIdentifier: "manage-settings", ResourceID: ceilingResourceID},
+			{ID: permBrowserSessions, PermissionIdentifier: "browser-sessions", ResourceID: ceilingResourceID},
+			{ID: permCustomOnAuthServer, PermissionIdentifier: "reports", ResourceID: ceilingResourceID},
 		}, nil).Once()
 }
 
@@ -64,12 +64,12 @@ func expectAuthServerPermissionsOn(database *datamocks.Database, tx *sql.Tx) {
 func expectOrdinaryOwner(database *datamocks.Database, save grantSave) {
 	switch save.kind {
 	case targetKindUser:
-		expectHoldsNothing(database, grantOwnerId)
+		expectHoldsNothing(database, grantOwnerID)
 	case targetKindGroup:
-		database.On("GetGroupPermissionsByGroupIds", mock.Anything, (*sql.Tx)(nil), []int64{grantOwnerId}).
+		database.On("GetGroupPermissionsByGroupIDs", mock.Anything, (*sql.Tx)(nil), []int64{grantOwnerID}).
 			Return([]record.GroupPermission{}, nil).Once()
 	case targetKindClient:
-		database.On("GetClientPermissionsByClientId", mock.Anything, (*sql.Tx)(nil), grantOwnerId).
+		database.On("GetClientPermissionsByClientID", mock.Anything, (*sql.Tx)(nil), grantOwnerID).
 			Return([]record.ClientPermission{}, nil).Once()
 	}
 }
@@ -155,8 +155,8 @@ func TestGrantCeiling_AGranularTokenChangingAnAdministrativePermissionIsRefused(
 				assert.Contains(t, record.details, "route")
 				assert.Equal(t, "grant", record.details["ceiling"])
 				assert.Equal(t, save.kind, record.details["target_kind"])
-				assert.Equal(t, grantOwnerId, record.details["target_id"])
-				assertUserIdOfAUserTarget(t, record.details, save.kind, grantOwnerId)
+				assert.Equal(t, grantOwnerID, record.details["target_id"])
+				assertUserIDOfAUserTarget(t, record.details, save.kind, grantOwnerID)
 				assert.Equal(t, variant.causes, record.details["permission_ids"])
 			})
 		}
@@ -215,7 +215,7 @@ func TestGrantCeiling_AGranularTokenChangingOrdinaryPermissionsProceeds(t *testi
 			expectAuthServerPermissions(database)
 			expectOrdinaryOwner(database, save)
 			datamocks.ExpectRunInTransaction(database, grantsTx)
-			save.expectStored(database, grantRow{id: 21, permissionId: 4})
+			save.expectStored(database, grantRow{id: 21, permissionID: 4})
 			database.On(save.deleteMethod, mock.Anything, grantsTx, int64(21)).Return(nil).Once()
 			database.On(save.createMethod, mock.Anything, grantsTx, mock.Anything).Return(nil).Times(3)
 			records := save.recordAudits(t, auditLogger, nil)
@@ -244,7 +244,7 @@ func TestGrantCeiling_ASaveThatChangesNothingReadsNothingForTheGrantCeiling(t *t
 			expectPermissionsExist(database, 4)
 			expectOrdinaryOwner(database, save)
 			datamocks.ExpectRunInTransaction(database, grantsTx)
-			save.expectStored(database, grantRow{id: 21, permissionId: 4})
+			save.expectStored(database, grantRow{id: 21, permissionID: 4})
 			if save.consolidatedEvent != "" {
 				save.recordAudits(t, auditLogger, nil)
 			}
@@ -253,7 +253,7 @@ func TestGrantCeiling_ASaveThatChangesNothingReadsNothingForTheGrantCeiling(t *t
 
 			assert.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 			database.AssertExpectations(t)
-			assertNotAttemptedOnClientDatabase(t, database, "GetResourceByResourceIdentifier", "GetPermissionsByResourceId")
+			assertNotAttemptedOnClientDatabase(t, database, "GetResourceByResourceIdentifier", "GetPermissionsByResourceID")
 		})
 	}
 }
@@ -268,7 +268,7 @@ func TestGrantCeiling_AMissingPermissionIsAnsweredFirst(t *testing.T) {
 
 			save.expectOwner(database)
 			expectPermissionsExist(database, permManage)
-			database.On("GetPermissionById", mock.Anything, (*sql.Tx)(nil), int64(99)).
+			database.On("GetPermissionByID", mock.Anything, (*sql.Tx)(nil), int64(99)).
 				Return((*record.Permission)(nil), nil).Once()
 
 			rr := save.serveWithScope(database, auditLogger, save.body(t, []int64{permManage, 99}, []int64{}), granularScopeOf(save))

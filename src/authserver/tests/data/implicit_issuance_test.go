@@ -36,7 +36,7 @@ func implicitSettings() *record.Settings {
 		Issuer:                                  "https://implicit.example.com",
 		TokenExpirationInSeconds:                600,
 		IncludeOpenIDConnectClaimsInAccessToken: true,
-		IncludeOpenIDConnectClaimsInIdToken:     true,
+		IncludeOpenIDConnectClaimsInIDToken:     true,
 	}
 }
 
@@ -46,7 +46,7 @@ func implicitInput(client *record.Client, user *record.User, sessionIdentifier s
 		Client:            client,
 		User:              user,
 		Scope:             "openid profile",
-		AcrLevel:          record.AcrLevel1,
+		ACRLevel:          record.ACRLevel1,
 		AuthMethods:       "pwd",
 		SessionIdentifier: sessionIdentifier,
 		Nonce:             "implicit-nonce",
@@ -64,22 +64,22 @@ func withRealSigningKeyOn(t *testing.T, db data.Database) {
 	require.NoError(t, err)
 	for _, existing := range keyPairs {
 		if existing.State == record.KeyStateCurrent.String() {
-			require.NoError(t, db.DeleteKeyPair(context.Background(), nil, existing.Id))
+			require.NoError(t, db.DeleteKeyPair(context.Background(), nil, existing.ID))
 		}
 	}
 
 	keyPair, err := signingkeys.NewKeyPair(dataCipher, record.KeyStateCurrent, 2048)
 	require.NoError(t, err, "generating a signing key")
 	require.NoError(t, db.CreateKeyPair(context.Background(), nil, keyPair))
-	t.Cleanup(func() { _ = db.DeleteKeyPair(context.Background(), nil, keyPair.Id) })
+	t.Cleanup(func() { _ = db.DeleteKeyPair(context.Background(), nil, keyPair.ID) })
 }
 
 // withProfilePictureOn stores a real picture for the user, so the mapper's lookup has something to
 // find.
-func withProfilePictureOn(t *testing.T, db data.Database, userId int64) {
+func withProfilePictureOn(t *testing.T, db data.Database, userID int64) {
 	t.Helper()
 	require.NoError(t, db.CreateUserProfilePicture(context.Background(), nil, &record.UserProfilePicture{
-		UserId:      userId,
+		UserID:      userID,
 		Picture:     createTestPNG(100, 100),
 		ContentType: "image/png",
 	}))
@@ -112,8 +112,8 @@ func TestIssueImplicit_KeepsThePictureInBothTokens(t *testing.T) {
 	withRealSigningKeyOn(t, db)
 	client := createTestClientOn(t, db)
 	user := createTestUserOn(t, db)
-	session := createTestUserSessionOn(t, db, user.Id)
-	withProfilePictureOn(t, db, user.Id)
+	session := createTestUserSessionOn(t, db, user.ID)
+	withProfilePictureOn(t, db, user.ID)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -125,7 +125,7 @@ func TestIssueImplicit_KeepsThePictureInBothTokens(t *testing.T) {
 
 	want := implicitTestBaseURL + "/userinfo/picture/" + user.Subject
 	assert.Equal(t, want, claimsOf(t, response.AccessToken)["picture"], "the access token carries the picture")
-	assert.Equal(t, want, claimsOf(t, response.IdToken)["picture"], "the ID token carries the picture")
+	assert.Equal(t, want, claimsOf(t, response.IDToken)["picture"], "the ID token carries the picture")
 	assert.Equal(t, session.SessionIdentifier, claimsOf(t, response.AccessToken)["sid"])
 }
 
@@ -136,7 +136,7 @@ func TestIssueImplicit_NoPictureNoClaim(t *testing.T) {
 	withRealSigningKeyOn(t, db)
 	client := createTestClientOn(t, db)
 	user := createTestUserOn(t, db)
-	session := createTestUserSessionOn(t, db, user.Id)
+	session := createTestUserSessionOn(t, db, user.ID)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -146,7 +146,7 @@ func TestIssueImplicit_NoPictureNoClaim(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.NotContains(t, claimsOf(t, response.AccessToken), "picture")
-	assert.NotContains(t, claimsOf(t, response.IdToken), "picture")
+	assert.NotContains(t, claimsOf(t, response.IDToken), "picture")
 }
 
 // A session that is gone is refused with the sentinel /auth/issue answers with the level 1 restart,
@@ -156,8 +156,8 @@ func TestIssueImplicit_ASessionThatIsGoneIsRefused(t *testing.T) {
 	withRealSigningKeyOn(t, db)
 	client := createTestClientOn(t, db)
 	user := createTestUserOn(t, db)
-	session := createTestUserSessionOn(t, db, user.Id)
-	require.NoError(t, db.DeleteUserSession(context.Background(), nil, session.Id))
+	session := createTestUserSessionOn(t, db, user.ID)
+	require.NoError(t, db.DeleteUserSession(context.Background(), nil, session.ID))
 
 	response, err := implicitIssuerOn(db).IssueImplicitTx(context.Background(), implicitSettings(),
 		implicitInput(client, user, session.SessionIdentifier), true, true)
@@ -218,7 +218,7 @@ func runImplicitOrderingAgainstTermination(t *testing.T, db data.Database, other
 		withRealSigningKeyOn(t, db)
 		client := createTestClientOn(t, db)
 		user := createTestUserOn(t, db)
-		session := createTestUserSessionOn(t, db, user.Id)
+		session := createTestUserSessionOn(t, db, user.ID)
 
 		tx, err := db.BeginTransaction(context.Background())
 		require.NoError(t, err, "opening the ceremony's transaction")
@@ -249,14 +249,14 @@ func runImplicitOrderingAgainstTermination(t *testing.T, db data.Database, other
 		// The tokens were signed while the session was alive, name it, and the termination then
 		// ended it.
 		assert.Equal(t, session.SessionIdentifier, claimsOf(t, response.AccessToken)["sid"])
-		assertSessionGoneOn(t, db, session.Id, "the terminated session")
+		assertSessionGoneOn(t, db, session.ID, "the terminated session")
 	})
 
 	t.Run("the termination goes first and issuance waits", func(t *testing.T) {
 		withRealSigningKeyOn(t, db)
 		client := createTestClientOn(t, db)
 		user := createTestUserOn(t, db)
-		session := createTestUserSessionOn(t, db, user.Id)
+		session := createTestUserSessionOn(t, db, user.ID)
 
 		// revocation.TerminateUserSessionTx owns and commits its own transaction, so an ordering
 		// that needs the termination HELD OPEN across the ceremony's arrival replays its statements
@@ -298,6 +298,6 @@ func runImplicitOrderingAgainstTermination(t *testing.T, db data.Database, other
 		require.ErrorIs(t, outcome.err, issuance.ErrIssuingSessionGone,
 			"the ceremony must wait for the termination and then refuse, not deadlock with it or sign")
 		assert.Nil(t, outcome.response, "a ceremony whose session is gone signs nothing")
-		assertSessionGoneOn(t, db, session.Id, "the terminated session")
+		assertSessionGoneOn(t, db, session.ID, "the terminated session")
 	})
 }

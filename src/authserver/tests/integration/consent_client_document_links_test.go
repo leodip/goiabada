@@ -63,7 +63,7 @@ func assertConsentDocumentLink(t *testing.T, doc *goquery.Document, text, href s
 // consentScreenOfClient signs a new user in to the client and returns the consent screen it reaches.
 func consentScreenOfClient(t *testing.T, client *record.Client) *goquery.Document {
 	t.Helper()
-	redirectURI := &record.RedirectURI{ClientId: client.Id, URI: fake.URL()}
+	redirectURI := &record.RedirectURI{ClientID: client.ID, URI: fake.URL()}
 	require.NoError(t, database.CreateRedirectURI(context.Background(), nil, redirectURI))
 
 	password := fake.Password(8)
@@ -72,7 +72,7 @@ func consentScreenOfClient(t *testing.T, client *record.Client) *goquery.Documen
 	user := &record.User{Subject: fake.UUID(), Enabled: true, Email: fake.Email(), PasswordHash: passwordHashed}
 	require.NoError(t, database.CreateUser(context.Background(), nil, user))
 
-	resp := navigateToConsentScreen(t, createHttpClient(t), client, user, password, redirectURI.URI)
+	resp := navigateToConsentScreen(t, createHTTPClient(t), client, user, password, redirectURI.URI)
 	defer func() { _ = resp.Body.Close() }()
 	return parseHTMLResponse(t, resp)
 }
@@ -87,15 +87,15 @@ func TestConsent_ClientDocumentLinks_ShownWheneverSet(t *testing.T) {
 		PrivacyPolicyURL:  "https://docs-app.example.com/privacy",
 		TermsOfServiceURL: "https://legal.example.org/docs-app/terms?v=2",
 		ConsentRequired:   true,
-		DefaultAcrLevel:   record.AcrLevel1,
+		DefaultACRLevel:   record.ACRLevel1,
 	})
-	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.ID) }()
 
 	doc := consentScreenOfClient(t, client)
 
 	assertConsentDocumentLink(t, doc, consentPrivacyPolicyLinkText, "https://docs-app.example.com/privacy")
 	assertConsentDocumentLink(t, doc, consentTermsOfServiceLinkText, "https://legal.example.org/docs-app/terms?v=2")
-	assertClientWebsiteUrlInHTML(t, doc, "https://docs-app.example.com", false)
+	assertClientWebsiteURLInHTML(t, doc, "https://docs-app.example.com", false)
 }
 
 // Each link is drawn on its own: a client with only a terms of service URL gets that link alone, and
@@ -105,9 +105,9 @@ func TestConsent_ClientDocumentLinks_EachShownOnItsOwn(t *testing.T) {
 		ClientIdentifier:  "terms-app-" + fake.LetterN(8),
 		TermsOfServiceURL: "https://terms-app.example.com/terms",
 		ConsentRequired:   true,
-		DefaultAcrLevel:   record.AcrLevel1,
+		DefaultACRLevel:   record.ACRLevel1,
 	})
-	defer func() { _ = database.DeleteClient(context.Background(), nil, termsOnly.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, termsOnly.ID) }()
 
 	doc := consentScreenOfClient(t, termsOnly)
 	assertConsentDocumentLink(t, doc, consentPrivacyPolicyLinkText, "")
@@ -116,9 +116,9 @@ func TestConsent_ClientDocumentLinks_EachShownOnItsOwn(t *testing.T) {
 	neither := createClientWithDisplaySettings(t, ClientDisplaySettings{
 		ClientIdentifier: "plain-app-" + fake.LetterN(8),
 		ConsentRequired:  true,
-		DefaultAcrLevel:  record.AcrLevel1,
+		DefaultACRLevel:  record.ACRLevel1,
 	})
-	defer func() { _ = database.DeleteClient(context.Background(), nil, neither.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, neither.ID) }()
 
 	doc = consentScreenOfClient(t, neither)
 	assertConsentDocumentLink(t, doc, consentPrivacyPolicyLinkText, "")
@@ -151,12 +151,12 @@ func TestDCR_DocumentURLs_KeptOnARedirectURIsHostAndShownOnConsent(t *testing.T)
 	client, err := database.GetClientByClientIdentifier(context.Background(), nil, clientIdentifier)
 	require.NoError(t, err)
 	require.NotNil(t, client)
-	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.ID) }()
 	assert.Equal(t, "https://dcr-docs-app.example.com/privacy", client.PrivacyPolicyURL)
 	assert.Empty(t, client.TermsOfServiceURL)
 
 	user, password := createCeremonyUser(t)
-	chain, page := followAuthChain(t, createHttpClient(t), client.ClientIdentifier, redirectURI, user, password)
+	chain, page := followAuthChain(t, createHTTPClient(t), client.ClientIdentifier, redirectURI, user, password)
 	defer func() { _ = page.Body.Close() }()
 	require.Contains(t, strings.Join(chain, " -> "), "/auth/consent")
 

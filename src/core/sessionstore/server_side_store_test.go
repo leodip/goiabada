@@ -66,7 +66,7 @@ type fakeBackend struct {
 
 	lastData          []byte
 	lastAuthenticated bool
-	lastDeletedId     string
+	lastDeletedID     string
 
 	expiresAt time.Time
 
@@ -143,7 +143,7 @@ func (f *fakeBackend) Touch(ctx context.Context, id string, authenticated bool) 
 
 func (f *fakeBackend) Delete(ctx context.Context, id string) error {
 	f.deletes++
-	f.lastDeletedId = id
+	f.lastDeletedID = id
 	if f.deleteErr != nil {
 		return f.deleteErr
 	}
@@ -188,7 +188,7 @@ func saveNew(t *testing.T, store *ServerSideStore, values map[string]any) *http.
 	return cookies[0]
 }
 
-func decodeCookieId(t *testing.T, store *ServerSideStore, cookie *http.Cookie) string {
+func decodeCookieID(t *testing.T, store *ServerSideStore, cookie *http.Cookie) string {
 	t.Helper()
 
 	id, err := store.OpenCookie(storeTestName, cookie.Value)
@@ -220,7 +220,7 @@ func TestServerSideStore_CookieCarriesA64HexIdentifier(t *testing.T) {
 	store := newTestStore(backend, false)
 
 	cookie := saveNew(t, store, nil)
-	id := decodeCookieId(t, store, cookie)
+	id := decodeCookieID(t, store, cookie)
 
 	assert.Len(t, id, 64, "256 bits, hex encoded")
 	assert.Regexp(t, "^[0-9a-f]{64}$", id)
@@ -231,8 +231,8 @@ func TestServerSideStore_EachSessionGetsItsOwnIdentifier(t *testing.T) {
 	backend := newFakeBackend()
 	store := newTestStore(backend, false)
 
-	first := decodeCookieId(t, store, saveNew(t, store, nil))
-	second := decodeCookieId(t, store, saveNew(t, store, nil))
+	first := decodeCookieID(t, store, saveNew(t, store, nil))
+	second := decodeCookieID(t, store, saveNew(t, store, nil))
 
 	assert.NotEqual(t, first, second)
 }
@@ -248,7 +248,7 @@ func (failingReader) Read(p []byte) (int, error) { return 0, errors.New("no entr
 //
 // The order is seal then identifier, so a reader that always fails only ever exercises the
 // nonce. The second case lets the nonce read succeed and fails the one after it, which is
-// the identifier's, and it is the case that would survive if newSessionId went back to
+// the identifier's, and it is the case that would survive if newSessionID went back to
 // returning the empty string on failure (#211, #266, #270).
 func TestServerSideStore_CSPRNGFailureFailsTheSave(t *testing.T) {
 	cases := []struct {
@@ -328,7 +328,7 @@ func TestServerSideStore_RoundTrip(t *testing.T) {
 	assert.False(t, session.IsNew)
 	assert.Equal(t, "hello", session.Values["greeting"])
 	assert.Equal(t, 7, session.Values["count"])
-	assert.Equal(t, decodeCookieId(t, store, cookie), session.ID)
+	assert.Equal(t, decodeCookieID(t, store, cookie), session.ID)
 }
 
 func TestServerSideStore_TamperedCookieGivesAFreshSession(t *testing.T) {
@@ -375,7 +375,7 @@ func TestServerSideStore_TamperedBlobGivesAFreshSession(t *testing.T) {
 	store := newTestStore(backend, false)
 
 	cookie := saveNew(t, store, map[string]any{"greeting": "hello"})
-	id := decodeCookieId(t, store, cookie)
+	id := decodeCookieID(t, store, cookie)
 
 	record := backend.rows[id]
 	record.Data = flipLastByte(t, record.Data)
@@ -421,7 +421,7 @@ func TestServerSideStore_ACookieValueStoredAsABlobGivesAFreshSession(t *testing.
 	store := newTestStore(backend, false)
 
 	cookie := saveNew(t, store, map[string]any{"greeting": "hello"})
-	id := decodeCookieId(t, store, cookie)
+	id := decodeCookieID(t, store, cookie)
 	backend.rows[id].Data = []byte(cookie.Value)
 
 	session, err := store.New(requestWith(cookie), storeTestName)
@@ -630,9 +630,9 @@ func requireNeitherHalfOpens(t *testing.T, varied KeyPair) {
 	assert.Zero(t, backend.loads, "a cookie that fails its tag never reaches storage")
 
 	ownCookie := saveNew(t, store, map[string]any{"greeting": "hello"})
-	id := decodeCookieId(t, store, ownCookie)
-	foreignId := decodeCookieId(t, foreign, foreignCookie)
-	backend.rows[id].Data = foreignBackend.rows[foreignId].Data
+	id := decodeCookieID(t, store, ownCookie)
+	foreignID := decodeCookieID(t, foreign, foreignCookie)
+	backend.rows[id].Data = foreignBackend.rows[foreignID].Data
 
 	session, err = store.New(requestWith(ownCookie), storeTestName)
 	require.NoError(t, err, "an unopenable blob is a fresh session, not an error")
@@ -655,7 +655,7 @@ func TestServerSideStore_EverySealUsesAFreshNonce(t *testing.T) {
 	store := newTestStore(backend, false)
 
 	first := saveNew(t, store, map[string]any{"greeting": "hello"})
-	id := decodeCookieId(t, store, first)
+	id := decodeCookieID(t, store, first)
 	firstBlob := string(backend.rows[id].Data)
 
 	// The same session, saved again with nothing about it changed.
@@ -678,7 +678,7 @@ func TestServerSideStore_EverySealUsesAFreshNonce(t *testing.T) {
 
 	// And the difference is the nonce rather than the contents: both still open, to the
 	// same identifier and the same values.
-	assert.Equal(t, id, decodeCookieId(t, store, second),
+	assert.Equal(t, id, decodeCookieID(t, store, second),
 		"the identifier is unchanged, so only the sealing may differ")
 
 	reloaded, err := store.New(requestWith(second), storeTestName)
@@ -708,12 +708,12 @@ func TestServerSideStore_ABlobDoesNotOpenUnderAnotherSessionName(t *testing.T) {
 	require.NoError(t, err)
 	otherSession.Values["greeting"] = "hello"
 	require.NoError(t, store.Save(req, w, otherSession))
-	otherId := otherSession.ID
-	require.Contains(t, backend.rows, otherId)
+	otherID := otherSession.ID
+	require.Contains(t, backend.rows, otherID)
 
 	cookie := saveNew(t, store, map[string]any{"greeting": "hello"})
-	id := decodeCookieId(t, store, cookie)
-	backend.rows[id].Data = backend.rows[otherId].Data
+	id := decodeCookieID(t, store, cookie)
+	backend.rows[id].Data = backend.rows[otherID].Data
 
 	session, err := store.New(requestWith(cookie), storeTestName)
 
@@ -796,7 +796,7 @@ func TestServerSideStore_StaleSessionIsTouched(t *testing.T) {
 	store := newTestStore(backend, false)
 
 	cookie := saveNew(t, store, nil)
-	id := decodeCookieId(t, store, cookie)
+	id := decodeCookieID(t, store, cookie)
 	backend.rows[id].LastAccessed = time.Now().UTC().Add(-30 * time.Second)
 
 	_, err := store.New(requestWith(cookie), storeTestName)
@@ -810,7 +810,7 @@ func TestServerSideStore_FreshSessionIsNotTouched(t *testing.T) {
 	store := newTestStore(backend, false)
 
 	cookie := saveNew(t, store, nil)
-	id := decodeCookieId(t, store, cookie)
+	id := decodeCookieID(t, store, cookie)
 	backend.rows[id].LastAccessed = time.Now().UTC().Add(-1 * time.Second)
 
 	// Two reads inside the threshold, which is the case the threshold exists for: a
@@ -828,7 +828,7 @@ func TestServerSideStore_TouchOnAVanishedRowGivesAFreshSession(t *testing.T) {
 	store := newTestStore(backend, false)
 
 	cookie := saveNew(t, store, map[string]any{"greeting": "hello"})
-	id := decodeCookieId(t, store, cookie)
+	id := decodeCookieID(t, store, cookie)
 	backend.rows[id].LastAccessed = time.Now().UTC().Add(-30 * time.Second)
 	backend.touchErr = ErrNotFound
 
@@ -844,7 +844,7 @@ func TestServerSideStore_TouchFailurePropagates(t *testing.T) {
 	store := newTestStore(backend, false)
 
 	cookie := saveNew(t, store, nil)
-	id := decodeCookieId(t, store, cookie)
+	id := decodeCookieID(t, store, cookie)
 	backend.rows[id].LastAccessed = time.Now().UTC().Add(-30 * time.Second)
 	backend.touchErr = errors.New("the database is unreachable")
 
@@ -880,7 +880,7 @@ func persistentStoreAtRefreshTestNow(t *testing.T, values map[string]any, lastAc
 	store.now = func() time.Time { return refreshTestNow }
 
 	cookie := saveNew(t, store, values)
-	id := decodeCookieId(t, store, cookie)
+	id := decodeCookieID(t, store, cookie)
 	backend.rows[id].LastAccessed = refreshTestNow.Add(-lastAccessedAgo)
 	backend.expiresAt = touchedExpiry
 	return store, backend, cookie, id
@@ -928,7 +928,7 @@ func TestServerSideStore_APageRequestThatRefreshesASignedInSessionSendsItsCookie
 	assert.Equal(t, id, session.ID, "the session is the one the cookie names")
 	require.Len(t, cookies, 1, "the touch sends the session cookie again")
 	assert.Equal(t, 7200, cookies[0].MaxAge, "with the row's new expiry, two hours from now")
-	assert.Equal(t, id, decodeCookieId(t, store, cookies[0]), "naming the same session")
+	assert.Equal(t, id, decodeCookieID(t, store, cookies[0]), "naming the same session")
 	assert.Equal(t, "/", cookies[0].Path)
 	assert.True(t, cookies[0].HttpOnly)
 	assert.Equal(t, http.SameSiteLaxMode, cookies[0].SameSite)
@@ -989,7 +989,7 @@ func TestServerSideStore_APageRequestRefreshesASignInInProgressAndSendsItsCookie
 
 	assert.Equal(t, 1, backend.touches)
 	require.Len(t, cookies, 1)
-	assert.Equal(t, id, decodeCookieId(t, store, cookies[0]))
+	assert.Equal(t, id, decodeCookieID(t, store, cookies[0]))
 	assert.Equal(t, int(PreAuthLifetime.Seconds()), cookies[0].MaxAge)
 }
 
@@ -1012,7 +1012,7 @@ func TestServerSideStore_ABrowserSessionCookieStoreTouchesWithoutRefreshing(t *t
 	backend := newFakeBackend()
 	store := newTestStore(backend, false)
 	cookie := saveNew(t, store, signedInValues())
-	id := decodeCookieId(t, store, cookie)
+	id := decodeCookieID(t, store, cookie)
 	backend.rows[id].LastAccessed = time.Now().UTC().Add(-time.Minute)
 
 	_, cookies := readSession(t, store, requestWith(cookie), false)
@@ -1069,7 +1069,7 @@ func TestServerSideStore_GetSurvivesAStorageFailure(t *testing.T) {
 		store := newTestStore(backend, false)
 
 		cookie := saveNew(t, store, map[string]any{"greeting": "hello"})
-		id := decodeCookieId(t, store, cookie)
+		id := decodeCookieID(t, store, cookie)
 		backend.rows[id].LastAccessed = time.Now().UTC().Add(-30 * time.Second)
 		backend.touchErr = errors.New("the database is unreachable")
 
@@ -1092,7 +1092,7 @@ func TestServerSideStore_RegenerateRotatesAnAdminConsoleSession(t *testing.T) {
 	store := newMatrixStore(owner, backend, false)
 
 	cookie := liveCookie(t, store, owner, map[string]any{"state": "the handshake"})
-	plantedId := decodeCookieId2(t, store, owner, cookie)
+	plantedID := decodeCookieID2(t, store, owner, cookie)
 
 	req := requestWith(cookie)
 	w := httptest.NewRecorder()
@@ -1104,18 +1104,18 @@ func TestServerSideStore_RegenerateRotatesAnAdminConsoleSession(t *testing.T) {
 
 	cookies := w.Result().Cookies()
 	require.Len(t, cookies, 1)
-	rotatedId := decodeCookieId2(t, store, owner, cookies[0])
+	rotatedID := decodeCookieID2(t, store, owner, cookies[0])
 
-	assert.NotEqual(t, plantedId, rotatedId,
+	assert.NotEqual(t, plantedID, rotatedID,
 		"an identifier that existed before sign-in must not name the session sign-in produces")
-	_, planted := backend.rows[plantedId]
+	_, planted := backend.rows[plantedID]
 	assert.False(t, planted, "the row the old identifier named has to go, or it still works")
-	require.Contains(t, backend.rows, rotatedId)
+	require.Contains(t, backend.rows, rotatedID)
 }
 
-// decodeCookieId2 is decodeCookieId for a matrix owner, whose codec name is not the one
+// decodeCookieID2 is decodeCookieID for a matrix owner, whose codec name is not the one
 // the single-owner helpers hardcode.
-func decodeCookieId2(t *testing.T, store *ServerSideStore, owner matrixOwner, cookie *http.Cookie) string {
+func decodeCookieID2(t *testing.T, store *ServerSideStore, owner matrixOwner, cookie *http.Cookie) string {
 	t.Helper()
 
 	id, err := store.OpenCookie(owner.sessionName, cookie.Value)
@@ -1147,7 +1147,7 @@ func TestServerSideStore_SaveOnAVanishedRowFailsAndWritesNothing(t *testing.T) {
 	store := newTestStore(backend, false)
 
 	cookie := saveNew(t, store, map[string]any{"greeting": "hello"})
-	id := decodeCookieId(t, store, cookie)
+	id := decodeCookieID(t, store, cookie)
 
 	req := requestWith(cookie)
 	w := httptest.NewRecorder()
@@ -1177,7 +1177,7 @@ func TestServerSideStore_NegativeMaxAgeDeletesRowAndCookie(t *testing.T) {
 	store := newTestStore(backend, false)
 
 	cookie := saveNew(t, store, map[string]any{"greeting": "hello"})
-	id := decodeCookieId(t, store, cookie)
+	id := decodeCookieID(t, store, cookie)
 
 	req := requestWith(cookie)
 	w := httptest.NewRecorder()
@@ -1187,7 +1187,7 @@ func TestServerSideStore_NegativeMaxAgeDeletesRowAndCookie(t *testing.T) {
 	require.NoError(t, store.Save(req, w, session))
 
 	assert.Equal(t, 1, backend.deletes)
-	assert.Equal(t, id, backend.lastDeletedId)
+	assert.Equal(t, id, backend.lastDeletedID)
 	assert.Empty(t, backend.rows, "logging out has to invalidate the server's half too")
 
 	cookies := w.Result().Cookies()
@@ -1376,7 +1376,7 @@ func TestServerSideStore_RegenerateMovesTheSessionToANewIdentifier(t *testing.T)
 	store := newTestStore(backend, false)
 
 	oldCookie := saveNew(t, store, map[string]any{"greeting": "hello"})
-	oldId := decodeCookieId(t, store, oldCookie)
+	oldID := decodeCookieID(t, store, oldCookie)
 
 	req := requestWith(oldCookie)
 	w := httptest.NewRecorder()
@@ -1387,12 +1387,12 @@ func TestServerSideStore_RegenerateMovesTheSessionToANewIdentifier(t *testing.T)
 
 	cookies := w.Result().Cookies()
 	require.Len(t, cookies, 1)
-	newId := decodeCookieId(t, store, cookies[0])
+	newID := decodeCookieID(t, store, cookies[0])
 
-	assert.NotEqual(t, oldId, newId, "an identifier that existed before must not name what comes after")
-	assert.NotContains(t, backend.rows, oldId)
-	assert.Contains(t, backend.rows, newId)
-	assert.Equal(t, newId, session.ID)
+	assert.NotEqual(t, oldID, newID, "an identifier that existed before must not name what comes after")
+	assert.NotContains(t, backend.rows, oldID)
+	assert.Contains(t, backend.rows, newID)
+	assert.Equal(t, newID, session.ID)
 
 	// The contents survive: rotation replaces the name, not the session.
 	loaded, err := store.New(requestWith(cookies[0]), storeTestName)
@@ -1405,7 +1405,7 @@ func TestServerSideStore_RegenerateWithAFailedCreateEmitsNothing(t *testing.T) {
 	store := newTestStore(backend, false)
 
 	oldCookie := saveNew(t, store, map[string]any{"greeting": "hello"})
-	oldId := decodeCookieId(t, store, oldCookie)
+	oldID := decodeCookieID(t, store, oldCookie)
 
 	req := requestWith(oldCookie)
 	w := httptest.NewRecorder()
@@ -1417,7 +1417,7 @@ func TestServerSideStore_RegenerateWithAFailedCreateEmitsNothing(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Empty(t, w.Result().Cookies())
-	assert.Contains(t, backend.rows, oldId, "a failed rotation leaves the session it started with")
+	assert.Contains(t, backend.rows, oldID, "a failed rotation leaves the session it started with")
 	assert.Equal(t, 0, backend.deletes)
 }
 
@@ -1595,7 +1595,7 @@ func TestServerSideStore_GetFreshReadsPastTheRequestsMemo(t *testing.T) {
 		backend := newFakeBackend()
 		store := newTestStore(backend, false)
 		cookie := saveNew(t, store, map[string]any{"greeting": "hello"})
-		id := decodeCookieId(t, store, cookie)
+		id := decodeCookieID(t, store, cookie)
 		backend.rows[id].LastAccessed = time.Now().UTC().Add(-30 * time.Second)
 		backend.loads, backend.touches, backend.updates, backend.creates = 0, 0, 0, 0
 
@@ -1641,7 +1641,7 @@ func TestServerSideStore_GetFreshReadsPastTheRequestsMemo(t *testing.T) {
 		backend := newFakeBackend()
 		store := newTestStore(backend, false)
 		cookie := saveNew(t, store, map[string]any{"greeting": "hello"})
-		delete(backend.rows, decodeCookieId(t, store, cookie))
+		delete(backend.rows, decodeCookieID(t, store, cookie))
 
 		gone, err := store.GetFresh(requestWith(cookie), storeTestName)
 		require.NoError(t, err)
@@ -1811,7 +1811,7 @@ func TestServerSideStore_DeletionCookieCarriesWhatADeletionNeeds(t *testing.T) {
 		assert.Equal(t, store.options.Path, cookie.Path)
 		assert.Equal(t, secure, cookie.Secure,
 			"a __Host- cookie is refused unless the deletion is Secure too")
-		assert.Equal(t, store.options.HttpOnly, cookie.HttpOnly)
+		assert.Equal(t, store.options.HTTPOnly, cookie.HttpOnly)
 		assert.Equal(t, store.options.SameSite, cookie.SameSite)
 	}
 }

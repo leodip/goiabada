@@ -29,7 +29,7 @@ func TestAPIClientDelete_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	// Delete via API
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.ID, 10)
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -59,18 +59,18 @@ func TestAPIClientDelete_SystemLevelRejected(t *testing.T) {
 	err := json.NewDecoder(resp.Body).Decode(&listResp)
 	require.NoError(t, err)
 
-	var sysId int64
+	var sysID int64
 	for _, c := range listResp.Clients {
 		if c.ClientIdentifier == "admin-console-client" {
-			sysId = c.Id
+			sysID = c.ID
 			break
 		}
 	}
-	if sysId == 0 {
+	if sysID == 0 {
 		t.Skip("system-level client not found")
 	}
 
-	delURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysId, 10)
+	delURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysID, 10)
 	resp2 := makeAPIRequest(t, "DELETE", delURL, accessToken, nil)
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
@@ -82,8 +82,8 @@ func TestAPIClientDelete_SystemLevelRejected(t *testing.T) {
 	}
 }
 
-// TestAPIClientDelete_NotFoundAndInvalidId covers 404 and 400 branches
-func TestAPIClientDelete_NotFoundAndInvalidId(t *testing.T) {
+// TestAPIClientDelete_NotFoundAndInvalidID covers 404 and 400 branches
+func TestAPIClientDelete_NotFoundAndInvalidID(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Not found
@@ -99,7 +99,7 @@ func TestAPIClientDelete_NotFoundAndInvalidId(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 
 	// Unauthorized
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	req, err := http.NewRequest("DELETE", appConfig.AuthServer.BaseURL+"/api/v1/admin/clients/1", nil)
 	require.NoError(t, err)
 	resp2, err := httpClient.Do(req)
@@ -120,15 +120,15 @@ func TestAPIClientGetPermissions_IncludesPermissions(t *testing.T) {
 	}
 	err := database.CreateClient(context.Background(), nil, client)
 	require.NoError(t, err)
-	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.ID) }()
 
 	resource := createResource(t)
-	perm := createPermission(t, resource.Id)
-	err = database.CreateClientPermission(context.Background(), nil, &record.ClientPermission{ClientId: client.Id, PermissionId: perm.Id})
+	perm := createPermission(t, resource.ID)
+	err = database.CreateClientPermission(context.Background(), nil, &record.ClientPermission{ClientID: client.ID, PermissionID: perm.ID})
 	require.NoError(t, err)
 
 	// Call GET client permissions by id
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.ID, 10) + "/permissions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -142,7 +142,7 @@ func TestAPIClientGetPermissions_IncludesPermissions(t *testing.T) {
 	// Verify identifiers present
 	found := false
 	for _, p := range getResp.Permissions {
-		if p.Id == perm.Id {
+		if p.ID == perm.ID {
 			found = true
 			break
 		}
@@ -163,9 +163,9 @@ func TestAPIClientDelete_InsufficientScope(t *testing.T) {
 	}
 	err := database.CreateClient(context.Background(), nil, target)
 	require.NoError(t, err)
-	defer func() { _ = database.DeleteClient(context.Background(), nil, target.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, target.ID) }()
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(target.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(target.ID, 10)
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusForbidden, resp.StatusCode)
@@ -186,31 +186,31 @@ func TestAPIClientDelete_CascadesLinkedData(t *testing.T) {
 
 	// Create permission and assign to client
 	resource := createResource(t)
-	perm := createPermission(t, resource.Id)
-	err = database.CreateClientPermission(context.Background(), nil, &record.ClientPermission{ClientId: client.Id, PermissionId: perm.Id})
+	perm := createPermission(t, resource.ID)
+	err = database.CreateClientPermission(context.Background(), nil, &record.ClientPermission{ClientID: client.ID, PermissionID: perm.ID})
 	require.NoError(t, err)
 
 	// Create user and consent to the client
 	user := &record.User{Subject: fake.UUID(), Enabled: true, Email: fake.Email()}
 	err = database.CreateUser(context.Background(), nil, user)
 	require.NoError(t, err)
-	consent := &record.UserConsent{ClientId: client.Id, UserId: user.Id, Scope: "openid"}
+	consent := &record.UserConsent{ClientID: client.ID, UserID: user.ID, Scope: "openid"}
 	err = database.CreateUserConsent(context.Background(), nil, consent)
 	require.NoError(t, err)
 
 	// Delete client via API
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.ID, 10)
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	// Assert client permissions removed
-	cps, err := database.GetClientPermissionsByClientId(context.Background(), nil, client.Id)
+	cps, err := database.GetClientPermissionsByClientID(context.Background(), nil, client.ID)
 	require.NoError(t, err)
 	assert.Empty(t, cps)
 
 	// Assert user consent removed
-	uc, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, client.Id)
+	uc, err := database.GetConsentByUserIDAndClientID(context.Background(), nil, user.ID, client.ID)
 	require.NoError(t, err)
 	assert.Nil(t, uc)
 }

@@ -14,8 +14,8 @@ func TestCreateUserConsent(t *testing.T) {
 	user := createTestUser(t)
 
 	userConsent := &record.UserConsent{
-		UserId:    user.Id,
-		ClientId:  client.Id,
+		UserID:    user.ID,
+		ClientID:  client.ID,
 		Scope:     "openid profile",
 		GrantedAt: sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
 	}
@@ -25,7 +25,7 @@ func TestCreateUserConsent(t *testing.T) {
 		t.Fatalf("Failed to create user consent: %v", err)
 	}
 
-	if userConsent.Id == 0 {
+	if userConsent.ID == 0 {
 		t.Error("Expected non-zero ID after creation")
 	}
 	if !userConsent.CreatedAt.Valid || userConsent.CreatedAt.Time.IsZero() {
@@ -35,16 +35,16 @@ func TestCreateUserConsent(t *testing.T) {
 		t.Error("Expected UpdatedAt to be set")
 	}
 
-	retrievedConsent, err := database.GetUserConsentById(context.Background(), nil, userConsent.Id)
+	retrievedConsent, err := database.GetUserConsentByID(context.Background(), nil, userConsent.ID)
 	if err != nil {
 		t.Fatalf("Failed to retrieve created user consent: %v", err)
 	}
 
-	if retrievedConsent.UserId != userConsent.UserId {
-		t.Errorf("Expected UserId %d, got %d", userConsent.UserId, retrievedConsent.UserId)
+	if retrievedConsent.UserID != userConsent.UserID {
+		t.Errorf("Expected UserID %d, got %d", userConsent.UserID, retrievedConsent.UserID)
 	}
-	if retrievedConsent.ClientId != userConsent.ClientId {
-		t.Errorf("Expected ClientId %d, got %d", userConsent.ClientId, retrievedConsent.ClientId)
+	if retrievedConsent.ClientID != userConsent.ClientID {
+		t.Errorf("Expected ClientID %d, got %d", userConsent.ClientID, retrievedConsent.ClientID)
 	}
 	if retrievedConsent.Scope != userConsent.Scope {
 		t.Errorf("Expected Scope %s, got %s", userConsent.Scope, retrievedConsent.Scope)
@@ -67,7 +67,7 @@ func TestUpdateUserConsent(t *testing.T) {
 		t.Fatalf("Failed to update user consent: %v", err)
 	}
 
-	updatedConsent, err := database.GetUserConsentById(context.Background(), nil, userConsent.Id)
+	updatedConsent, err := database.GetUserConsentByID(context.Background(), nil, userConsent.ID)
 	if err != nil {
 		t.Fatalf("Failed to retrieve updated user consent: %v", err)
 	}
@@ -83,57 +83,57 @@ func TestUpdateUserConsent(t *testing.T) {
 	}
 }
 
-func TestGetUserConsentById(t *testing.T) {
+func TestGetUserConsentByID(t *testing.T) {
 	userConsent := createTestUserConsent(t)
 
-	retrievedConsent, err := database.GetUserConsentById(context.Background(), nil, userConsent.Id)
+	retrievedConsent, err := database.GetUserConsentByID(context.Background(), nil, userConsent.ID)
 	if err != nil {
 		t.Fatalf("Failed to get user consent by ID: %v", err)
 	}
 
-	if retrievedConsent.Id != userConsent.Id {
-		t.Errorf("Expected ID %d, got %d", userConsent.Id, retrievedConsent.Id)
+	if retrievedConsent.ID != userConsent.ID {
+		t.Errorf("Expected ID %d, got %d", userConsent.ID, retrievedConsent.ID)
 	}
-	if retrievedConsent.UserId != userConsent.UserId {
-		t.Errorf("Expected UserId %d, got %d", userConsent.UserId, retrievedConsent.UserId)
+	if retrievedConsent.UserID != userConsent.UserID {
+		t.Errorf("Expected UserID %d, got %d", userConsent.UserID, retrievedConsent.UserID)
 	}
-	if retrievedConsent.ClientId != userConsent.ClientId {
-		t.Errorf("Expected ClientId %d, got %d", userConsent.ClientId, retrievedConsent.ClientId)
+	if retrievedConsent.ClientID != userConsent.ClientID {
+		t.Errorf("Expected ClientID %d, got %d", userConsent.ClientID, retrievedConsent.ClientID)
 	}
 
-	nonExistentConsent, err := database.GetUserConsentById(context.Background(), nil, 99999)
+	nonExistentConsent, err := database.GetUserConsentByID(context.Background(), nil, 99999)
 	if err != nil {
 		t.Errorf("Expected no error for non-existent user consent, got: %v", err)
 	}
 	if nonExistentConsent != nil {
-		t.Errorf("Expected nil for non-existent user consent, got a consent with ID: %d", nonExistentConsent.Id)
+		t.Errorf("Expected nil for non-existent user consent, got a consent with ID: %d", nonExistentConsent.ID)
 	}
 }
 
-func TestGetConsentByUserIdAndClientId(t *testing.T) {
+func TestGetConsentByUserIDAndClientID(t *testing.T) {
 	userConsent := createTestUserConsent(t)
 
-	retrievedConsent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, userConsent.UserId, userConsent.ClientId)
+	retrievedConsent, err := database.GetConsentByUserIDAndClientID(context.Background(), nil, userConsent.UserID, userConsent.ClientID)
 	if err != nil {
 		t.Fatalf("Failed to get consent by user ID and client ID: %v", err)
 	}
 
-	if retrievedConsent.Id != userConsent.Id {
-		t.Errorf("Expected ID %d, got %d", userConsent.Id, retrievedConsent.Id)
+	if retrievedConsent.ID != userConsent.ID {
+		t.Errorf("Expected ID %d, got %d", userConsent.ID, retrievedConsent.ID)
 	}
-	if retrievedConsent.UserId != userConsent.UserId {
-		t.Errorf("Expected UserId %d, got %d", userConsent.UserId, retrievedConsent.UserId)
+	if retrievedConsent.UserID != userConsent.UserID {
+		t.Errorf("Expected UserID %d, got %d", userConsent.UserID, retrievedConsent.UserID)
 	}
-	if retrievedConsent.ClientId != userConsent.ClientId {
-		t.Errorf("Expected ClientId %d, got %d", userConsent.ClientId, retrievedConsent.ClientId)
+	if retrievedConsent.ClientID != userConsent.ClientID {
+		t.Errorf("Expected ClientID %d, got %d", userConsent.ClientID, retrievedConsent.ClientID)
 	}
 
-	nonExistentConsent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, 99999, 99999)
+	nonExistentConsent, err := database.GetConsentByUserIDAndClientID(context.Background(), nil, 99999, 99999)
 	if err != nil {
 		t.Errorf("Expected no error for non-existent user consent, got: %v", err)
 	}
 	if nonExistentConsent != nil {
-		t.Errorf("Expected nil for non-existent user consent, got a consent with ID: %d", nonExistentConsent.Id)
+		t.Errorf("Expected nil for non-existent user consent, got a consent with ID: %d", nonExistentConsent.ID)
 	}
 }
 
@@ -149,18 +149,18 @@ func TestUserConsentsLoadClients(t *testing.T) {
 	}
 
 	for _, consent := range userConsents {
-		if consent.Client.Id != consent.ClientId {
-			t.Errorf("Expected Client.Id %d, got %d", consent.ClientId, consent.Client.Id)
+		if consent.Client.ID != consent.ClientID {
+			t.Errorf("Expected Client.ID %d, got %d", consent.ClientID, consent.Client.ID)
 		}
 	}
 }
 
-func TestGetConsentsByUserId(t *testing.T) {
+func TestGetConsentsByUserID(t *testing.T) {
 	user := createTestUser(t)
-	userConsent1 := createTestUserConsentForUser(t, user.Id)
-	userConsent2 := createTestUserConsentForUser(t, user.Id)
+	userConsent1 := createTestUserConsentForUser(t, user.ID)
+	userConsent2 := createTestUserConsentForUser(t, user.ID)
 
-	consents, err := database.GetConsentsByUserId(context.Background(), nil, user.Id)
+	consents, err := database.GetConsentsByUserID(context.Background(), nil, user.ID)
 	if err != nil {
 		t.Fatalf("Failed to get consents by user ID: %v", err)
 	}
@@ -169,23 +169,23 @@ func TestGetConsentsByUserId(t *testing.T) {
 		t.Errorf("Expected 2 consents, got %d", len(consents))
 	}
 
-	consentIds := make(map[int64]bool)
+	consentIDs := make(map[int64]bool)
 	for _, consent := range consents {
-		consentIds[consent.Id] = true
-		if consent.UserId != user.Id {
-			t.Errorf("Expected UserId %d, got %d", user.Id, consent.UserId)
+		consentIDs[consent.ID] = true
+		if consent.UserID != user.ID {
+			t.Errorf("Expected UserID %d, got %d", user.ID, consent.UserID)
 		}
 	}
 
-	if !consentIds[userConsent1.Id] || !consentIds[userConsent2.Id] {
-		t.Error("Not all created consents were found in GetConsentsByUserId result")
+	if !consentIDs[userConsent1.ID] || !consentIDs[userConsent2.ID] {
+		t.Error("Not all created consents were found in GetConsentsByUserID result")
 	}
 }
 
 func TestDeleteUserConsent(t *testing.T) {
 	userConsent := createTestUserConsent(t)
 
-	deleted, err := database.DeleteUserConsent(context.Background(), nil, userConsent.Id)
+	deleted, err := database.DeleteUserConsent(context.Background(), nil, userConsent.ID)
 	if err != nil {
 		t.Fatalf("Failed to delete user consent: %v", err)
 	}
@@ -193,7 +193,7 @@ func TestDeleteUserConsent(t *testing.T) {
 		t.Errorf("Expected the deletion of an existing user consent to report it deleted the row")
 	}
 
-	deletedConsent, err := database.GetUserConsentById(context.Background(), nil, userConsent.Id)
+	deletedConsent, err := database.GetUserConsentByID(context.Background(), nil, userConsent.ID)
 	if err != nil {
 		t.Fatalf("Error while checking for deleted user consent: %v", err)
 	}
@@ -203,7 +203,7 @@ func TestDeleteUserConsent(t *testing.T) {
 
 	// The same row again, as a second request withdrawing the same consent would: no error, and
 	// the answer says this call deleted nothing (#135 decision 2).
-	deleted, err = database.DeleteUserConsent(context.Background(), nil, userConsent.Id)
+	deleted, err = database.DeleteUserConsent(context.Background(), nil, userConsent.ID)
 	if err != nil {
 		t.Errorf("Expected no error when deleting an already deleted user consent, got: %v", err)
 	}
@@ -220,23 +220,23 @@ func TestDeleteUserConsent(t *testing.T) {
 	}
 }
 
-// TestGetConsentByUserIdAndClientIdForUpdate reads the consent a disconnect deletes, inside a
+// TestGetConsentByUserIDAndClientIDForUpdate reads the consent a disconnect deletes, inside a
 // transaction, on every engine's own locking grammar: the user's consent to the client, nil for a
 // client the user gave none, and a refusal without a transaction (#135).
-func TestGetConsentByUserIdAndClientIdForUpdate(t *testing.T) {
+func TestGetConsentByUserIDAndClientIDForUpdate(t *testing.T) {
 	ctx := context.Background()
 	userConsent := createTestUserConsent(t)
 	otherClient := createTestClient(t)
 
 	err := database.RunInTransaction(ctx, func(tx *sql.Tx) error {
-		got, err := database.GetConsentByUserIdAndClientIdForUpdate(ctx, tx, userConsent.UserId, userConsent.ClientId)
+		got, err := database.GetConsentByUserIDAndClientIDForUpdate(ctx, tx, userConsent.UserID, userConsent.ClientID)
 		if err != nil {
 			return err
 		}
-		if got == nil || got.Id != userConsent.Id || got.Scope != "openid profile" {
-			t.Errorf("expected consent %d with scope %q, got %+v", userConsent.Id, "openid profile", got)
+		if got == nil || got.ID != userConsent.ID || got.Scope != "openid profile" {
+			t.Errorf("expected consent %d with scope %q, got %+v", userConsent.ID, "openid profile", got)
 		}
-		none, err := database.GetConsentByUserIdAndClientIdForUpdate(ctx, tx, userConsent.UserId, otherClient.Id)
+		none, err := database.GetConsentByUserIDAndClientIDForUpdate(ctx, tx, userConsent.UserID, otherClient.ID)
 		if err != nil {
 			return err
 		}
@@ -249,7 +249,7 @@ func TestGetConsentByUserIdAndClientIdForUpdate(t *testing.T) {
 		t.Fatalf("locking read failed: %v", err)
 	}
 
-	if _, err := database.GetConsentByUserIdAndClientIdForUpdate(ctx, nil, userConsent.UserId, userConsent.ClientId); err == nil {
+	if _, err := database.GetConsentByUserIDAndClientIDForUpdate(ctx, nil, userConsent.UserID, userConsent.ClientID); err == nil {
 		t.Error("expected a locking read without a transaction to be refused")
 	}
 }
@@ -259,8 +259,8 @@ func createTestUserConsent(t *testing.T) *record.UserConsent {
 	user := createTestUser(t)
 
 	userConsent := &record.UserConsent{
-		UserId:    user.Id,
-		ClientId:  client.Id,
+		UserID:    user.ID,
+		ClientID:  client.ID,
 		Scope:     "openid profile",
 		GrantedAt: sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
 	}
@@ -273,12 +273,12 @@ func createTestUserConsent(t *testing.T) *record.UserConsent {
 	return userConsent
 }
 
-func createTestUserConsentForUser(t *testing.T, userId int64) *record.UserConsent {
+func createTestUserConsentForUser(t *testing.T, userID int64) *record.UserConsent {
 	client := createTestClient(t)
 
 	userConsent := &record.UserConsent{
-		UserId:   userId,
-		ClientId: client.Id,
+		UserID:   userID,
+		ClientID: client.ID,
 		Scope:    "openid profile",
 	}
 

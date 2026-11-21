@@ -99,13 +99,13 @@ func TestMigration000089_Brands(t *testing.T) {
 	require.NoErrorf(t, h.Migrator.Migrate(ctx, brands000089), "re-apply 000089 on %s", dbType())
 	def := defaultBrand000089(t, h)
 	require.NotNil(t, def)
-	_, err := h.SQL.Exec(fmt.Sprintf("UPDATE brands SET appearance = 'dark' WHERE id = %d", def.Id))
+	_, err := h.SQL.Exec(fmt.Sprintf("UPDATE brands SET appearance = 'dark' WHERE id = %d", def.ID))
 	require.NoErrorf(t, err, "edit the default brand's appearance on %s", dbType())
 
 	// 4.
 	_, err = h.SQL.Exec("INSERT INTO brands (name, appearance, theme) VALUES ('Default', 'auto', 'plum')")
 	require.Errorf(t, err, "4. a second brand named Default on %s", dbType())
-	_, err = h.SQL.Exec(fmt.Sprintf("DELETE FROM brands WHERE id = %d", def.Id))
+	_, err = h.SQL.Exec(fmt.Sprintf("DELETE FROM brands WHERE id = %d", def.ID))
 	require.Errorf(t, err, "4. the foreign key refuses deleting the default brand on %s", dbType())
 
 	// 5.
@@ -113,7 +113,7 @@ func TestMigration000089_Brands(t *testing.T) {
 	require.NoErrorf(t, err, "save the settings as the previous release does on %s", dbType())
 	after := defaultBrand000089(t, h)
 	require.NotNil(t, after, "5. the previous release's save leaves the pointer")
-	assert.Equal(t, def.Id, after.Id)
+	assert.Equal(t, def.ID, after.ID)
 	assert.Equal(t, record.BrandAppearance("dark"), after.Appearance, "5. and the brand")
 
 	require.NoErrorf(t, h.Migrator.Migrate(ctx, beforeBrands000089), "roll back 000089 again on %s", dbType())
@@ -176,7 +176,7 @@ func defaultBrand000089(t *testing.T, h *isolatedDB) *record.Brand {
 	var brand record.Brand
 	err := h.SQL.QueryRow("SELECT brands.id, brands.created_at, brands.updated_at, brands.name, brands.appearance, brands.theme "+
 		"FROM brands INNER JOIN settings ON settings.default_brand_id = brands.id WHERE settings.id = 1").
-		Scan(&brand.Id, &brand.CreatedAt, &brand.UpdatedAt, &brand.Name, &brand.Appearance, &brand.Theme)
+		Scan(&brand.ID, &brand.CreatedAt, &brand.UpdatedAt, &brand.Name, &brand.Appearance, &brand.Theme)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil
 	}

@@ -62,7 +62,7 @@ func HandleClientBackchannelLogoutPut(
 			return
 		}
 
-		client, err := database.GetClientById(r.Context(), nil, id)
+		client, err := database.GetClientByID(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error getting client by ID for back-channel logout update"), "client_id", id)
 			return
@@ -127,10 +127,10 @@ func HandleClientBackchannelLogoutPut(
 		var refusedRow *record.Client
 		err = database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
 			httpRefusal, refusedRow = nil, nil
-			if acquireErr := database.AcquireClientRow(r.Context(), tx, client.Id); acquireErr != nil {
+			if acquireErr := database.AcquireClientRow(r.Context(), tx, client.ID); acquireErr != nil {
 				return acquireErr
 			}
-			current, readErr := database.GetClientById(r.Context(), tx, client.Id)
+			current, readErr := database.GetClientByID(r.Context(), tx, client.ID)
 			if readErr != nil {
 				return readErr
 			}
@@ -145,7 +145,7 @@ func HandleClientBackchannelLogoutPut(
 				refusedRow = current
 				return errBackchannelLogoutURICeiling
 			}
-			if setErr := database.SetClientBackchannelLogout(r.Context(), tx, client.Id, uri, sessionRequired); setErr != nil {
+			if setErr := database.SetClientBackchannelLogout(r.Context(), tx, client.ID, uri, sessionRequired); setErr != nil {
 				return setErr
 			}
 			current.BackchannelLogoutURI = uri
@@ -163,30 +163,30 @@ func HandleClientBackchannelLogoutPut(
 			if !backchannelLogoutURICeilingAllows(w, r, auditLogger, refusedRow, uri) {
 				return
 			}
-			writeInternalServerError(w, r, errs.New("the back-channel logout URI ceiling refused under the client's row and allowed after it"), "client_id", client.Id)
+			writeInternalServerError(w, r, errs.New("the back-channel logout URI ceiling refused under the client's row and allowed after it"), "client_id", client.ID)
 			return
 		case err != nil:
-			writeInternalServerError(w, r, errs.Wrap(err, "database error updating client back-channel logout"), "client_id", client.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error updating client back-channel logout"), "client_id", client.ID)
 			return
 		}
 
 		// The save has committed: it is recorded now, before the reads building the answer, whose
 		// failure answers 500 but does not undo the change.
 		auditLogger.Log(r.Context(), audit.EventUpdatedClientBackchannelLogout, map[string]interface{}{
-			"client_id":      saved.Id,
+			"client_id":      saved.ID,
 			"logged_in_user": callerSubject(r),
 		})
 
 		if err := database.ClientLoadRedirectURIs(r.Context(), nil, saved); err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client redirect URIs after back-channel logout update"), "client_id", saved.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client redirect URIs after back-channel logout update"), "client_id", saved.ID)
 			return
 		}
 		if err := database.ClientLoadPostLogoutRedirectURIs(r.Context(), nil, saved); err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client sign-out redirect URIs after back-channel logout update"), "client_id", saved.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client sign-out redirect URIs after back-channel logout update"), "client_id", saved.ID)
 			return
 		}
 		if err := database.ClientLoadWebOrigins(r.Context(), nil, saved); err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client web origins after back-channel logout update"), "client_id", saved.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client web origins after back-channel logout update"), "client_id", saved.ID)
 			return
 		}
 

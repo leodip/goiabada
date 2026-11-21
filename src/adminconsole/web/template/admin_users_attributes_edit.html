@@ -3,7 +3,7 @@
 {{define "head"}}{{end}}
 
 {{define "page"}}
-{{ template "user_header" (args "attributes" .user.Id .user.Email .page .query $.ctx) }}
+{{ template "user_header" (args "attributes" .user.ID .user.Email .page .query $.ctx) }}
 
 {{/* errorField names the field a refusal is about, which is marked invalid, described by the
      notice and focused; a refusal naming no field leaves the focus on the key. The heading keeps
@@ -44,7 +44,7 @@
           </span>
         </label>
         <label class="check-row" for="includeInIdToken">
-          <input type="checkbox" id="includeInIdToken" name="includeInIdToken" aria-describedby="includeInIdTokenHint"{{ if .attribute.IncludeInIdToken }} checked{{ end }}>
+          <input type="checkbox" id="includeInIdToken" name="includeInIdToken" aria-describedby="includeInIdTokenHint"{{ if .attribute.IncludeInIDToken }} checked{{ end }}>
           <span class="grid min-w-0 flex-1 gap-0.5">
             <span class="choice-label">{{ T $.ctx "adminconsole.admin_users.attributes_form.include_id" }}</span>
             <span class="field-hint" id="includeInIdTokenHint">{{ T $.ctx "adminconsole.admin_users.attributes_form.include_id_hint" }}</span>
@@ -54,7 +54,7 @@
     </fieldset>
   </div>
   <div class="panel-footer">
-    <a class="button button-quiet" href="/admin/users/{{ .user.Id }}/attributes?page={{ .page }}{{ if .query }}&query={{ .query }}{{ end }}">{{ T $.ctx "common.button.cancel" }}</a>
+    <a class="button button-quiet" href="/admin/users/{{ .user.ID }}/attributes?page={{ .page }}{{ if .query }}&query={{ .query }}{{ end }}">{{ T $.ctx "common.button.cancel" }}</a>
     <button id="btnSave" class="button button-primary" type="submit">{{ T $.ctx "adminconsole.admin_users.attributes_form.edit_button" }}</button>
   </div>
 </form>

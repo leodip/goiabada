@@ -29,14 +29,14 @@ func TestHandleConsentGet_Failures(t *testing.T) {
 		{
 			name: "the user read fails",
 			stub: func(database *datamocks.Database, _ *handlersmocks.PageRenderer, _ *handlersmocks.CeremonyStore) {
-				database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(nil, boom)
+				database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(nil, boom)
 			},
 			wantErr: "boom",
 		},
 		{
 			name: "the client read fails",
 			stub: func(database *datamocks.Database, _ *handlersmocks.PageRenderer, _ *handlersmocks.CeremonyStore) {
-				database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&record.User{Id: 1}, nil)
+				database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(&record.User{ID: 1}, nil)
 				database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(nil, boom)
 			},
 			wantErr: "boom",
@@ -44,20 +44,20 @@ func TestHandleConsentGet_Failures(t *testing.T) {
 		{
 			name: "the consent read fails",
 			stub: func(database *datamocks.Database, _ *handlersmocks.PageRenderer, _ *handlersmocks.CeremonyStore) {
-				database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&record.User{Id: 1}, nil)
+				database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(&record.User{ID: 1}, nil)
 				database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
-					Return(&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
-				database.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(1), int64(1)).Return(nil, boom)
+					Return(&record.Client{ID: 1, ClientIdentifier: "test-client"}, nil)
+				database.On("GetConsentByUserIDAndClientID", mock.Anything, mock.Anything, int64(1), int64(1)).Return(nil, boom)
 			},
 			wantErr: "boom",
 		},
 		{
 			name: "the render fails",
 			stub: func(database *datamocks.Database, pageRenderer *handlersmocks.PageRenderer, _ *handlersmocks.CeremonyStore) {
-				database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&record.User{Id: 1}, nil)
+				database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(&record.User{ID: 1}, nil)
 				database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
-					Return(&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
-				database.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(1), int64(1)).Return(nil, nil)
+					Return(&record.Client{ID: 1, ClientIdentifier: "test-client"}, nil)
+				database.On("GetConsentByUserIDAndClientID", mock.Anything, mock.Anything, int64(1), int64(1)).Return(nil, nil)
 				pageRenderer.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/auth_layout.html", "/consent.html", mock.Anything).
 					Return(boom)
 			},
@@ -66,11 +66,11 @@ func TestHandleConsentGet_Failures(t *testing.T) {
 		{
 			name: "the save before issuance fails",
 			stub: func(database *datamocks.Database, _ *handlersmocks.PageRenderer, ceremonyStore *handlersmocks.CeremonyStore) {
-				database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&record.User{Id: 1}, nil)
+				database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(&record.User{ID: 1}, nil)
 				database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
-					Return(&record.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
-				database.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(1), int64(1)).
-					Return(&record.UserConsent{Id: 1, UserId: 1, ClientId: 1, Scope: "openid"}, nil)
+					Return(&record.Client{ID: 1, ClientIdentifier: "test-client"}, nil)
+				database.On("GetConsentByUserIDAndClientID", mock.Anything, mock.Anything, int64(1), int64(1)).
+					Return(&record.UserConsent{ID: 1, UserID: 1, ClientID: 1, Scope: "openid"}, nil)
 				ceremonyStore.On("SaveAuthContext", mock.Anything, mock.Anything, mock.Anything).Return(boom)
 			},
 			wantErr: "boom",
@@ -91,15 +91,15 @@ func TestHandleConsentGet_Failures(t *testing.T) {
 				auditLogger:   auditLogger,
 			})
 
-			req, _ := http.NewRequest("GET", "/auth/consent?ceremony="+testCeremonyId, nil)
+			req, _ := http.NewRequest("GET", "/auth/consent?ceremony="+testCeremonyID, nil)
 			req = withSettings(req, &record.Settings{})
 			rr := httptest.NewRecorder()
 
 			ceremonyStore.On("GetAuthContext", mock.Anything).Return(&ceremony.AuthContext{
-				CeremonyId: testCeremonyId,
+				CeremonyID: testCeremonyID,
 				AuthState:  ceremony.AuthStateRequiresConsent,
-				UserId:     1,
-				ClientId:   "test-client",
+				UserID:     1,
+				ClientID:   "test-client",
 				Scope:      "openid",
 			}, nil)
 			tc.stub(database, pageRenderer, ceremonyStore)
@@ -122,8 +122,8 @@ func TestHandleConsentGet_Failures(t *testing.T) {
 // "The filter failing closed records nothing" in handler_consent_test.go.
 func TestHandleConsentPost_GrantFailures(t *testing.T) {
 	boom := errors.New("boom")
-	client := &record.Client{Id: 1, ClientIdentifier: "test-client"}
-	user := &record.User{Id: 1}
+	client := &record.Client{ID: 1, ClientIdentifier: "test-client"}
+	user := &record.User{ID: 1}
 
 	testCases := []struct {
 		name    string
@@ -148,7 +148,7 @@ func TestHandleConsentPost_GrantFailures(t *testing.T) {
 			name: "the user read fails",
 			stub: func(database *datamocks.Database, _ *handlersmocks.PermissionChecker, _ *handlersmocks.CeremonyStore) {
 				database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
-				database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(nil, boom)
+				database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(nil, boom)
 			},
 			wantErr: "boom",
 		},
@@ -156,7 +156,7 @@ func TestHandleConsentPost_GrantFailures(t *testing.T) {
 			name: "the user is gone",
 			stub: func(database *datamocks.Database, _ *handlersmocks.PermissionChecker, _ *handlersmocks.CeremonyStore) {
 				database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
-				database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(nil, nil)
+				database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(nil, nil)
 			},
 			wantErr: "user not found",
 		},
@@ -164,10 +164,10 @@ func TestHandleConsentPost_GrantFailures(t *testing.T) {
 			name: "the consent read fails",
 			stub: func(database *datamocks.Database, permissionChecker *handlersmocks.PermissionChecker, _ *handlersmocks.CeremonyStore) {
 				database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
-				database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
+				database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 				stubUserHoldsEveryScope(permissionChecker)
 				datamocks.ExpectRunInTransaction(database, consentSaveTx)
-				database.On("GetConsentByUserIdAndClientId", mock.Anything, consentSaveTx, int64(1), int64(1)).Return(nil, boom)
+				database.On("GetConsentByUserIDAndClientID", mock.Anything, consentSaveTx, int64(1), int64(1)).Return(nil, boom)
 			},
 			wantErr: "boom",
 		},
@@ -175,10 +175,10 @@ func TestHandleConsentPost_GrantFailures(t *testing.T) {
 			name: "the consent write fails",
 			stub: func(database *datamocks.Database, permissionChecker *handlersmocks.PermissionChecker, _ *handlersmocks.CeremonyStore) {
 				database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
-				database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
+				database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 				stubUserHoldsEveryScope(permissionChecker)
 				datamocks.ExpectRunInTransaction(database, consentSaveTx)
-				database.On("GetConsentByUserIdAndClientId", mock.Anything, consentSaveTx, int64(1), int64(1)).Return(nil, nil)
+				database.On("GetConsentByUserIDAndClientID", mock.Anything, consentSaveTx, int64(1), int64(1)).Return(nil, nil)
 				database.On("CreateUserConsent", mock.Anything, consentSaveTx, mock.Anything).Return(boom)
 			},
 			wantErr: "boom",
@@ -203,7 +203,7 @@ func TestHandleConsentPost_GrantFailures(t *testing.T) {
 
 			form := url.Values{}
 			form.Add("btnSubmit", "submit")
-			form.Add(ceremony.IdField, testCeremonyId)
+			form.Add(ceremony.IDField, testCeremonyID)
 			form.Add("consent0", "on")
 			req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
 			req = withSettings(req, &record.Settings{})
@@ -212,9 +212,9 @@ func TestHandleConsentPost_GrantFailures(t *testing.T) {
 
 			ceremonyStore.On("GetAuthContext", mock.Anything).Return(&ceremony.AuthContext{
 				AuthState:  ceremony.AuthStateRequiresConsent,
-				CeremonyId: testCeremonyId,
-				UserId:     1,
-				ClientId:   "test-client",
+				CeremonyID: testCeremonyID,
+				UserID:     1,
+				ClientID:   "test-client",
 				Scope:      "openid profile",
 			}, nil)
 			tc.stub(database, permissionChecker, ceremonyStore)
@@ -251,7 +251,7 @@ func TestHandleConsentPost_GrantFailures(t *testing.T) {
 
 		form := url.Values{}
 		form.Add("btnSubmit", "submit")
-		form.Add(ceremony.IdField, testCeremonyId)
+		form.Add(ceremony.IDField, testCeremonyID)
 		form.Add("consent0", "on")
 		req, _ := http.NewRequest("POST", "/auth/consent", strings.NewReader(form.Encode()))
 		req = withSettings(req, &record.Settings{})
@@ -260,16 +260,16 @@ func TestHandleConsentPost_GrantFailures(t *testing.T) {
 
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(&ceremony.AuthContext{
 			AuthState:  ceremony.AuthStateRequiresConsent,
-			CeremonyId: testCeremonyId,
-			UserId:     1,
-			ClientId:   "test-client",
+			CeremonyID: testCeremonyID,
+			UserID:     1,
+			ClientID:   "test-client",
 			Scope:      "openid profile",
 		}, nil)
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
-		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 		stubUserHoldsEveryScope(permissionChecker)
 		datamocks.ExpectRunInTransaction(database, consentSaveTx)
-		database.On("GetConsentByUserIdAndClientId", mock.Anything, consentSaveTx, int64(1), int64(1)).Return(nil, nil)
+		database.On("GetConsentByUserIDAndClientID", mock.Anything, consentSaveTx, int64(1), int64(1)).Return(nil, nil)
 		database.On("CreateUserConsent", mock.Anything, consentSaveTx, mock.Anything).Return(nil)
 		auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return()
 		ceremonyStore.On("SaveAuthContext", rr, req, mock.Anything).Return(boom)

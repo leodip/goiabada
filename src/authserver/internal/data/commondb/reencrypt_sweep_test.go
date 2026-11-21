@@ -332,7 +332,7 @@ func TestReencryptStoredSecrets_NamesEachUnreadableValueAsItReachesIt(t *testing
 	assert.Equal(t, record.Reencryption{Unreadable: 101}, report)
 	require.Len(t, named, 101)
 	for i, value := range named {
-		assert.Equal(t, record.StoredSecret{Table: "clients", Column: "client_secret_encrypted", Id: int64(i + 1)}, value)
+		assert.Equal(t, record.StoredSecret{Table: "clients", Column: "client_secret_encrypted", ID: int64(i + 1)}, value)
 	}
 	assert.Equal(t, 1, batchesReadAtEach[0], "the first unreadable value is named before the second batch is read")
 	assert.Equal(t, 1, batchesReadAtEach[99], "the first batch's values are all named before the second is read")

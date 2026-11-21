@@ -98,12 +98,12 @@ const (
 
 func wireGroupModel() record.Group {
 	return record.Group{
-		Id:                   2,
+		ID:                   2,
 		CreatedAt:            wireNullTime(wireCreated),
 		UpdatedAt:            wireNullTime(wireUpdated),
 		GroupIdentifier:      "admins",
 		Description:          "administrators",
-		IncludeInIdToken:     true,
+		IncludeInIDToken:     true,
 		IncludeInAccessToken: false,
 		MemberCount:          3,
 	}
@@ -111,7 +111,7 @@ func wireGroupModel() record.Group {
 
 func wireResourceModel() record.Resource {
 	return record.Resource{
-		Id:                 9,
+		ID:                 9,
 		CreatedAt:          wireNullTime(wireCreated),
 		ResourceIdentifier: "backend-svc",
 		Description:        "the backend service",
@@ -120,26 +120,26 @@ func wireResourceModel() record.Resource {
 
 func wirePermissionModel() record.Permission {
 	return record.Permission{
-		Id:                   5,
+		ID:                   5,
 		CreatedAt:            wireNullTime(wireCreated),
 		UpdatedAt:            wireNullTime(wireUpdated),
 		PermissionIdentifier: "read-all",
 		Description:          "read everything",
-		ResourceId:           9,
+		ResourceID:           9,
 		Resource:             wireResourceModel(),
 	}
 }
 
 func wireUserAttributeModel() record.UserAttribute {
 	return record.UserAttribute{
-		Id:                   11,
+		ID:                   11,
 		CreatedAt:            wireNullTime(wireCreated),
 		UpdatedAt:            wireNullTime(wireUpdated),
 		Key:                  "department",
 		Value:                "engineering",
-		IncludeInIdToken:     true,
+		IncludeInIDToken:     true,
 		IncludeInAccessToken: false,
-		UserId:               7,
+		UserID:               7,
 	}
 }
 
@@ -152,7 +152,7 @@ const wireUserAttributeJSON = `{"id":11,"createdAt":"2026-09-16T10:00:00Z","upda
 
 func wireUserModel() *record.User {
 	return &record.User{
-		Id:                            7,
+		ID:                            7,
 		CreatedAt:                     wireNullTime(wireCreated),
 		UpdatedAt:                     wireNullTime(wireUpdated),
 		Enabled:                       true,
@@ -171,7 +171,7 @@ func wireUserModel() *record.User {
 		Locale:                        "pt-BR",
 		PageLanguage:                  "es",
 		BirthDate:                     wireNullTime(wireBorn),
-		PhoneNumberCountryUniqueId:    "BRA_55",
+		PhoneNumberCountryUniqueID:    "BRA_55",
 		PhoneNumberCountryCallingCode: "55",
 		PhoneNumber:                   "11 99999-0000",
 		PhoneNumberVerified:           true,
@@ -182,7 +182,7 @@ func wireUserModel() *record.User {
 		AddressPostalCode:             "01000-000",
 		AddressCountry:                "BRA",
 		OTPEnabled:                    true,
-		OtpConsecutiveFailures:        record.OtpConsecutiveFailureLimit,
+		OTPConsecutiveFailures:        record.OTPConsecutiveFailureLimit,
 	}
 }
 
@@ -222,7 +222,7 @@ func TestWireJSON_UserFamily(t *testing.T) {
 	attribute := wireUserAttributeModel()
 
 	empty := &record.User{
-		Id:          7,
+		ID:          7,
 		Groups:      []record.Group{},
 		Permissions: []record.Permission{},
 		Attributes:  []record.UserAttribute{},
@@ -238,7 +238,7 @@ func TestWireJSON_UserFamily(t *testing.T) {
 			// A user loaded without its collections, which was 20 of the 23
 			// ToUserResponse call sites: every timestamp is NULL.
 			name:    "NULL timestamps",
-			value:   ToUserResponse(&record.User{Id: 7}),
+			value:   ToUserResponse(&record.User{ID: 7}),
 			literal: "{" + wireBareUserFields() + "}",
 		},
 		{
@@ -258,7 +258,7 @@ func TestWireJSON_UserFamily(t *testing.T) {
 		{
 			name: "UserAttributeResponse with NULL timestamps",
 			value: ToUserAttributeResponse(&record.UserAttribute{
-				Id: 11, Key: "department", Value: "engineering", UserId: 7,
+				ID: 11, Key: "department", Value: "engineering", UserID: 7,
 			}),
 			literal: `{"id":11,"createdAt":null,"updatedAt":null,"key":"department","value":"engineering",` +
 				`"includeInIdToken":false,"includeInAccessToken":false,"userId":7}`,
@@ -312,21 +312,21 @@ func TestWireJSON_UserResponseOmitsTheNestedCollections(t *testing.T) {
 
 func TestWireJSON_UserSessionFamily(t *testing.T) {
 	populated := &record.UserSession{
-		Id:                21,
+		ID:                21,
 		CreatedAt:         wireNullTime(wireCreated),
 		UpdatedAt:         wireNullTime(wireUpdated),
 		SessionIdentifier: "b1c2d3",
 		Started:           wireStarted,
 		LastAccessed:      wireTouched,
 		AuthMethods:       "pwd otp",
-		AcrLevel:          record.AcrLevel2Optional,
+		ACRLevel:          record.ACRLevel2Optional,
 		AuthTime:          wireStarted,
-		IpAddress:         "203.0.113.7",
+		IPAddress:         "203.0.113.7",
 		DeviceName:        "Firefox",
 		DeviceType:        "Desktop",
 		DeviceOS:          "Linux",
 		UserAgent:         "Mozilla/5.0",
-		UserId:            7,
+		UserID:            7,
 	}
 
 	// The detail form is what the three list endpoints return. It embeds
@@ -334,23 +334,23 @@ func TestWireJSON_UserSessionFamily(t *testing.T) {
 	// has to flatten into the same object rather than nest under a key, which is
 	// what the OpenAPI allOf claims and what every generated client will assume.
 	detail := *ToUserSessionDetailResponse(&record.UserSession{
-		Id:                21,
+		ID:                21,
 		CreatedAt:         wireNullTime(wireCreated),
 		UpdatedAt:         wireNullTime(wireUpdated),
 		SessionIdentifier: "b1c2d3",
 		Started:           wireStarted,
 		LastAccessed:      wireTouched,
 		AuthMethods:       "pwd otp",
-		AcrLevel:          record.AcrLevel2Optional,
+		ACRLevel:          record.ACRLevel2Optional,
 		AuthTime:          wireStarted,
-		IpAddress:         "203.0.113.7",
+		IPAddress:         "203.0.113.7",
 		DeviceName:        "Firefox",
 		DeviceType:        "Desktop",
 		DeviceOS:          "Linux",
 		UserAgent:         "Mozilla/5.0",
-		UserId:            7,
+		UserID:            7,
 		Clients: []record.UserSessionClient{
-			{ClientId: 5, Client: record.Client{Id: 5, ClientIdentifier: "admin-console-client"}},
+			{ClientID: 5, Client: record.Client{ID: 5, ClientIdentifier: "admin-console-client"}},
 		},
 	}, "")
 
@@ -369,7 +369,7 @@ func TestWireJSON_UserSessionFamily(t *testing.T) {
 			// A zero time.Time is not a NULL column, but both reach the wire as
 			// null. The mapper is what decides that, and this is where it shows.
 			name:  "UserSessionResponse, zero times become null",
-			value: ToUserSessionResponse(&record.UserSession{Id: 21, UserId: 7}),
+			value: ToUserSessionResponse(&record.UserSession{ID: 21, UserID: 7}),
 			literal: `{"id":21,"createdAt":null,"updatedAt":null,"sessionIdentifier":"","started":null,` +
 				`"lastAccessed":null,"authMethods":"","acrLevel":"","authTime":null,"ipAddress":"",` +
 				`"deviceName":"","deviceType":"","deviceOS":"","userAgent":"","userId":7}`,
@@ -396,7 +396,7 @@ func TestWireJSON_UserSessionFamily(t *testing.T) {
 			// isCurrent true, which no other row here carries, and the empty
 			// client list the mapper must publish as [] rather than null.
 			name:  "UserSessionDetailResponse, current and no clients",
-			value: *ToUserSessionDetailResponse(&record.UserSession{Id: 21, SessionIdentifier: "b1c2d3", UserId: 7}, "b1c2d3"),
+			value: *ToUserSessionDetailResponse(&record.UserSession{ID: 21, SessionIdentifier: "b1c2d3", UserID: 7}, "b1c2d3"),
 			literal: `{"id":21,"createdAt":null,"updatedAt":null,"sessionIdentifier":"b1c2d3","started":null,` +
 				`"lastAccessed":null,"authMethods":"","acrLevel":"","authTime":null,"ipAddress":"",` +
 				`"deviceName":"","deviceType":"","deviceOS":"","userAgent":"","userId":7,` +
@@ -408,7 +408,7 @@ func TestWireJSON_UserSessionFamily(t *testing.T) {
 			// leaves either nil. Kept so the difference between the two is visible here rather
 			// than asserted only in the mapper's own table.
 			name:  "UserSessionDetailResponse, a nil client list is null",
-			value: api.UserSessionDetailResponse{UserSessionResponse: api.UserSessionResponse{Id: 21, UserId: 7}},
+			value: api.UserSessionDetailResponse{UserSessionResponse: api.UserSessionResponse{ID: 21, UserID: 7}},
 			literal: `{"id":21,"createdAt":null,"updatedAt":null,"sessionIdentifier":"","started":null,` +
 				`"lastAccessed":null,"authMethods":"","acrLevel":"","authTime":null,"ipAddress":"",` +
 				`"deviceName":"","deviceType":"","deviceOS":"","userAgent":"","userId":7,` +
@@ -420,18 +420,18 @@ func TestWireJSON_UserSessionFamily(t *testing.T) {
 func TestWireJSON_UserConsentFamily(t *testing.T) {
 	consent := func() *record.UserConsent {
 		return &record.UserConsent{
-			Id:        31,
+			ID:        31,
 			CreatedAt: wireNullTime(wireCreated),
 			UpdatedAt: wireNullTime(wireUpdated),
-			UserId:    7,
-			ClientId:  3,
+			UserID:    7,
+			ClientID:  3,
 			Scope:     "openid profile",
 			GrantedAt: wireNullTime(wireGranted),
 		}
 	}
 
 	withClient := consent()
-	withClient.Client = record.Client{Id: 3, ClientIdentifier: "web-app", Description: "the web app"}
+	withClient.Client = record.Client{ID: 3, ClientIdentifier: "web-app", Description: "the web app"}
 
 	runWireCases(t, []wireCase{
 		{
@@ -476,20 +476,20 @@ func TestWireJSON_GroupFamily(t *testing.T) {
 		},
 		{
 			name:  "GroupResponse, NULL timestamps",
-			value: ToGroupResponse(&record.Group{Id: 2, GroupIdentifier: "admins"}, 0),
+			value: ToGroupResponse(&record.Group{ID: 2, GroupIdentifier: "admins"}, 0),
 			literal: `{"id":2,"createdAt":null,"updatedAt":null,"groupIdentifier":"admins","description":"",` +
 				`"includeInIdToken":false,"includeInAccessToken":false,"memberCount":0}`,
 		},
 		{
 			name: "GroupAttributeResponse",
 			value: ToGroupAttributeResponse(&record.GroupAttribute{
-				Id:               41,
+				ID:               41,
 				CreatedAt:        wireNullTime(wireCreated),
 				UpdatedAt:        wireNullTime(wireUpdated),
 				Key:              "cost-centre",
 				Value:            "ops",
-				IncludeInIdToken: true,
-				GroupId:          2,
+				IncludeInIDToken: true,
+				GroupID:          2,
 			}),
 			literal: `{"id":41,"createdAt":"2026-09-16T10:00:00Z","updatedAt":"2026-09-16T11:00:00Z",` +
 				`"key":"cost-centre","value":"ops","includeInIdToken":true,"includeInAccessToken":false,` +
@@ -498,7 +498,7 @@ func TestWireJSON_GroupFamily(t *testing.T) {
 		{
 			name: "GroupAttributeResponse with NULL timestamps",
 			value: ToGroupAttributeResponse(&record.GroupAttribute{
-				Id: 41, Key: "cost-centre", Value: "ops", GroupId: 2,
+				ID: 41, Key: "cost-centre", Value: "ops", GroupID: 2,
 			}),
 			literal: `{"id":41,"createdAt":null,"updatedAt":null,"key":"cost-centre","value":"ops",` +
 				`"includeInIdToken":false,"includeInAccessToken":false,"groupId":2}`,
@@ -536,7 +536,7 @@ func TestWireJSON_PermissionAndResourceFamilies(t *testing.T) {
 			// asks the model rather than writing a constant (#350).
 			name: "ResourceResponse for the system-level resource",
 			value: ToResourceResponse(&record.Resource{
-				Id:                 1,
+				ID:                 1,
 				ResourceIdentifier: builtin.AuthServerResourceIdentifier,
 				Description:        "Goiabada auth server",
 			}),
@@ -555,7 +555,7 @@ func TestWireJSON_ClientFamily(t *testing.T) {
 	ropcEnabled := false
 
 	client := &record.Client{
-		Id:                                      3,
+		ID:                                      3,
 		CreatedAt:                               wireNullTime(wireCreated),
 		UpdatedAt:                               wireNullTime(wireUpdated),
 		ClientIdentifier:                        "web-app",
@@ -571,7 +571,7 @@ func TestWireJSON_ClientFamily(t *testing.T) {
 		BackchannelLogoutSessionRequired:        true,
 		DPoPBoundAccessTokens:                   true,
 		TokenEndpointAuthMethod:                 "client_secret_post",
-		BrandId:                                 sql.NullInt64{Int64: 7, Valid: true},
+		BrandID:                                 sql.NullInt64{Int64: 7, Valid: true},
 		ShowLogo:                                true,
 		ShowDisplayName:                         true,
 		ShowWebsiteURL:                          true,
@@ -582,26 +582,26 @@ func TestWireJSON_ClientFamily(t *testing.T) {
 		RefreshTokenOfflineIdleTimeoutInSeconds: 3600,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 86400,
 		IncludeOpenIDConnectClaimsInAccessToken: "on",
-		IncludeOpenIDConnectClaimsInIdToken:     "off",
-		DefaultAcrLevel:                         record.AcrLevel1,
+		IncludeOpenIDConnectClaimsInIDToken:     "off",
+		DefaultACRLevel:                         record.ACRLevel1,
 		RedirectURIs: []record.RedirectURI{{
-			Id:        1,
+			ID:        1,
 			CreatedAt: wireNullTime(wireCreated),
 			URI:       "https://app.example/cb",
-			ClientId:  3,
+			ClientID:  3,
 		}},
 		PostLogoutRedirectURIs: []record.PostLogoutRedirectURI{{
-			Id:        4,
+			ID:        4,
 			CreatedAt: wireNullTime(wireCreated),
 			URI:       "https://app.example/signed-out",
-			ClientId:  3,
+			ClientID:  3,
 		}},
 		// CreatedAt left NULL on purpose: it is the nested column that used to
 		// reach the wire as a two-field object and now reads null.
 		WebOrigins: []record.WebOrigin{{
-			Id:       2,
+			ID:       2,
 			Origin:   "https://app.example",
-			ClientId: 3,
+			ClientID: 3,
 		}},
 	}
 
@@ -611,7 +611,7 @@ func TestWireJSON_ClientFamily(t *testing.T) {
 	// reads administrativeScopesAllowed true with its row's column left false: the
 	// admin console's client is always allowed (#499). brandId is the client's own brand, or null
 	// for a client that follows the default (#812).
-	clientScalars := func(identifier string, systemLevel bool, brandId string) string {
+	clientScalars := func(identifier string, systemLevel bool, brandID string) string {
 		flag := `false`
 		if systemLevel {
 			flag = `true`
@@ -622,7 +622,7 @@ func TestWireJSON_ClientFamily(t *testing.T) {
 			`"consentRequired":true,"rememberConsent":true,` +
 			`"backchannelLogoutUri":"http://app.internal:3000/backchannel-logout?tenant=a",` +
 			`"backchannelLogoutSessionRequired":true,"dpopBoundAccessTokens":true,"createdViaDcr":false,"administrativeScopesAllowed":` + flag +
-			`,"brandId":` + brandId + `,"showLogo":true,"showDisplayName":true,` +
+			`,"brandId":` + brandID + `,"showLogo":true,"showDisplayName":true,` +
 			`"showDescription":false,"showWebsiteUrl":true,"isPublic":false,` +
 			`"tokenEndpointAuthMethod":"client_secret_post","isSystemLevelClient":` + flag +
 			`,"authorizationCodeEnabled":true,"clientCredentialsEnabled":false,` +
@@ -639,7 +639,7 @@ func TestWireJSON_ClientFamily(t *testing.T) {
 	systemLevel.RedirectURIs = nil
 	systemLevel.PostLogoutRedirectURIs = nil
 	systemLevel.WebOrigins = nil
-	systemLevel.BrandId = sql.NullInt64{}
+	systemLevel.BrandID = sql.NullInt64{}
 
 	runWireCases(t, []wireCase{
 		{
@@ -704,7 +704,7 @@ func TestWireJSON_ListMapperNilShapes(t *testing.T) {
 // this struct cannot tell [] from null.
 func TestWireJSON_ClientSessionsEnvelope(t *testing.T) {
 	session := *ToUserSessionDetailResponse(&record.UserSession{
-		Id: 21, SessionIdentifier: "b1c2d3", UserId: 7,
+		ID: 21, SessionIdentifier: "b1c2d3", UserID: 7,
 	}, "")
 	sessionFields := `"id":21,"createdAt":null,"updatedAt":null,"sessionIdentifier":"b1c2d3",` +
 		`"started":null,"lastAccessed":null,"authMethods":"","acrLevel":"","authTime":null,` +
@@ -717,7 +717,7 @@ func TestWireJSON_ClientSessionsEnvelope(t *testing.T) {
 			value: api.GetClientSessionsResponse{
 				Sessions: []api.UserSessionDetailResponse{session},
 				Users: ToSessionOwnerResponses([]record.User{{
-					Id:           7,
+					ID:           7,
 					Email:        "jane@example.com",
 					GivenName:    "Jane",
 					MiddleName:   "Q",
@@ -771,9 +771,9 @@ func TestWireJSON_ClientSessionsEnvelope(t *testing.T) {
 func TestWireJSON_AuditLogFamily(t *testing.T) {
 	aboutUser, actingUser := int64(42), int64(7)
 	entry := api.AuditLogResponse{
-		Id: 1, CreatedAt: wireCreated, AuditEvent: "user_login",
-		Details: `{"email":"alice@example.com"}`, RequestId: "host/Ppg6bHPK5f-000012",
-		UserId: &aboutUser, LoggedInUserId: &actingUser,
+		ID: 1, CreatedAt: wireCreated, AuditEvent: "user_login",
+		Details: `{"email":"alice@example.com"}`, RequestID: "host/Ppg6bHPK5f-000012",
+		UserID: &aboutUser, LoggedInUserID: &actingUser,
 	}
 	entryJSON := `{"id":1,"createdAt":"2026-09-16T10:00:00Z","auditEvent":"user_login",` +
 		`"details":"{\"email\":\"alice@example.com\"}","requestId":"host/Ppg6bHPK5f-000012",` +
@@ -791,7 +791,7 @@ func TestWireJSON_AuditLogFamily(t *testing.T) {
 			// A sub-second instant keeps its precision, where the format it replaced dropped it.
 			name: "AuditLogResponse, sub-second precision survives",
 			value: api.AuditLogResponse{
-				Id: 2, CreatedAt: wireCreated.Add(1500 * time.Millisecond), AuditEvent: "user_login",
+				ID: 2, CreatedAt: wireCreated.Add(1500 * time.Millisecond), AuditEvent: "user_login",
 			},
 			literal: `{"id":2,"createdAt":"2026-09-16T10:00:01.5Z","auditEvent":"user_login",` +
 				`"details":"","requestId":"","userId":null,"loggedInUserId":null}`,
@@ -816,7 +816,7 @@ func TestWireJSON_AuditLogFamily(t *testing.T) {
 // than here: it carries no mapped family, so what is worth pinning about it is
 // its member's timestamp.
 func TestWireJSON_PaginatedWrappers(t *testing.T) {
-	bareUser := ToUserResponse(&record.User{Id: 7})
+	bareUser := ToUserResponse(&record.User{ID: 7})
 	bareUserFields := wireBareUserFields()
 
 	group := wireGroupModel()
@@ -825,7 +825,7 @@ func TestWireJSON_PaginatedWrappers(t *testing.T) {
 		{
 			name: "SearchUsersResponse",
 			value: api.SearchUsersResponse{
-				Users: ToUserResponses([]record.User{{Id: 7}}),
+				Users: ToUserResponses([]record.User{{ID: 7}}),
 				Total: 1, Page: 1, Size: 10, Query: "ali",
 			},
 			literal: `{"users":[{` + bareUserFields + `}],"total":1,"page":1,"size":10,"query":"ali"}`,
@@ -833,7 +833,7 @@ func TestWireJSON_PaginatedWrappers(t *testing.T) {
 		{
 			name: "GetGroupMembersResponse",
 			value: api.GetGroupMembersResponse{
-				Members: ToUserResponses([]record.User{{Id: 7}}),
+				Members: ToUserResponses([]record.User{{ID: 7}}),
 				Total:   1, Page: 1, Size: 10,
 			},
 			literal: `{"members":[{` + bareUserFields + `}],"total":1,"page":1,"size":10}`,
@@ -841,7 +841,7 @@ func TestWireJSON_PaginatedWrappers(t *testing.T) {
 		{
 			name: "GetUsersByPermissionResponse",
 			value: api.GetUsersByPermissionResponse{
-				Users: ToUserResponses([]record.User{{Id: 7}}),
+				Users: ToUserResponses([]record.User{{ID: 7}}),
 				Total: 1, Page: 1, Size: 10,
 			},
 			literal: `{"users":[{` + bareUserFields + `}],"total":1,"page":1,"size":10}`,

@@ -15,11 +15,11 @@ import (
 // the create.
 type groupAttributesAddAPI interface {
 	CreateGroupAttribute(ctx context.Context, accessToken string, request *api.CreateGroupAttributeRequest) (*api.GroupAttributeResponse, error)
-	GetGroupById(ctx context.Context, accessToken string, groupId int64) (*api.GroupResponse, error)
+	GetGroupByID(ctx context.Context, accessToken string, groupID int64) (*api.GroupResponse, error)
 }
 
 func HandleAttributesAddGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient groupAttributesAddAPI,
 ) http.HandlerFunc {
 
@@ -38,14 +38,14 @@ func HandleAttributesAddGet(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
 		// Get group via API
-		group, err := apiClient.GetGroupById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		group, err := apiClient.GetGroupByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -56,7 +56,7 @@ func HandleAttributesAddGet(
 		}
 
 		bind := map[string]interface{}{
-			"groupId":              group.Id,
+			"groupId":              group.ID,
 			"groupIdentifier":      group.GroupIdentifier,
 			"includeInAccessToken": true,
 			"includeInIdToken":     true,
@@ -72,7 +72,7 @@ func HandleAttributesAddGet(
 }
 
 func HandleAttributesAddPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient groupAttributesAddAPI,
 ) http.HandlerFunc {
 
@@ -91,14 +91,14 @@ func HandleAttributesAddPost(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
 		// Get group via API
-		group, err := apiClient.GetGroupById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		group, err := apiClient.GetGroupByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -110,7 +110,7 @@ func HandleAttributesAddPost(
 
 		renderError := func(message, errorField string) {
 			bind := map[string]interface{}{
-				"groupId":              group.Id,
+				"groupId":              group.ID,
 				"groupIdentifier":      group.GroupIdentifier,
 				"attributeKey":         r.FormValue("attributeKey"),
 				"attributeValue":       r.FormValue("attributeValue"),
@@ -129,15 +129,15 @@ func HandleAttributesAddPost(
 		attrKey := r.FormValue("attributeKey")
 		attrValue := r.FormValue("attributeValue")
 		includeInAccessToken := r.FormValue("includeInAccessToken") == "on"
-		includeInIdToken := r.FormValue("includeInIdToken") == "on"
+		includeInIDToken := r.FormValue("includeInIdToken") == "on"
 
 		// Create group attribute via API (validation handled by AuthServer)
 		createReq := &api.CreateGroupAttributeRequest{
 			Key:                  attrKey,
 			Value:                attrValue,
 			IncludeInAccessToken: includeInAccessToken,
-			IncludeInIdToken:     includeInIdToken,
-			GroupId:              group.Id,
+			IncludeInIDToken:     includeInIDToken,
+			GroupID:              group.ID,
 		}
 
 		_, err = apiClient.CreateGroupAttribute(r.Context(), jwtInfo.TokenResponse.AccessToken, createReq)
@@ -148,6 +148,6 @@ func HandleAttributesAddPost(
 			return
 		}
 
-		http.Redirect(w, r, fmt.Sprintf("/admin/groups/%v/attributes", group.Id), http.StatusFound)
+		http.Redirect(w, r, fmt.Sprintf("/admin/groups/%v/attributes", group.ID), http.StatusFound)
 	}
 }

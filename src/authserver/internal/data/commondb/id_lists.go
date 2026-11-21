@@ -1,6 +1,6 @@
 package commondb
 
-// maxIdsPerStatement bounds how many ids one id-list lookup puts into a single statement. Every
+// maxIDsPerStatement bounds how many ids one id-list lookup puts into a single statement. Every
 // id in an IN list is a bound parameter, and SQL Server refuses a statement carrying more than
 // 2,100 of them with error 8003, which is the lowest ceiling of the four supported engines:
 // modernc.org/sqlite allows 32,766, PostgreSQL 65,535, and MySQL bounds the statement's size
@@ -14,9 +14,9 @@ package commondb
 // absent from the result, which is what the same delete already does between loading a session
 // and loading its clients. Revisit when a deployment is measured spending real time on the extra
 // round trip; a per-engine budget is the next shape, and it owes a data tier case per engine.
-const maxIdsPerStatement = 1000
+const maxIDsPerStatement = 1000
 
-// forEachIdBatch calls fn once per batch of ids that one statement may carry, and is how every
+// forEachIDBatch calls fn once per batch of ids that one statement may carry, and is how every
 // id-list lookup in this package issues its query. It exists so the budget above has one home:
 // a constant per file is a budget nobody can change in one place, and twelve lookups went on
 // expanding without one until the thirteenth crashed and was fixed alone (#373).
@@ -30,7 +30,7 @@ const maxIdsPerStatement = 1000
 // fn receives a batch that is never empty, so a caller's own "no ids, no query" answer stays its
 // own: an empty list calls fn zero times, and the lookups differ on what they return for it.
 // Each batch is a window into one slice and is not retained.
-func forEachIdBatch(ids []int64, fn func(batch []int64) error) error {
+func forEachIDBatch(ids []int64, fn func(batch []int64) error) error {
 
 	unique := make([]int64, 0, len(ids))
 	seen := make(map[int64]struct{}, len(ids))
@@ -42,8 +42,8 @@ func forEachIdBatch(ids []int64, fn func(batch []int64) error) error {
 		unique = append(unique, id)
 	}
 
-	for start := 0; start < len(unique); start += maxIdsPerStatement {
-		end := start + maxIdsPerStatement
+	for start := 0; start < len(unique); start += maxIDsPerStatement {
+		end := start + maxIDsPerStatement
 		if end > len(unique) {
 			end = len(unique)
 		}

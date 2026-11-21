@@ -110,7 +110,7 @@ func HandleSettingsGeneralPut(
 		}
 
 		// Apply updates, onto the row as stored when the save runs (#407)
-		saved, err := saveSettingsSection(r.Context(), database, currentSettings.Id, func(stored *record.Settings) {
+		saved, err := saveSettingsSection(r.Context(), database, currentSettings.ID, func(stored *record.Settings) {
 			stored.AppName = appName
 			stored.Issuer = issuer
 			stored.SelfRegistrationEnabled = req.SelfRegistrationEnabled

@@ -40,13 +40,13 @@ func readerMethods() []readerMethod {
 	return []readerMethod{
 		{"sign-in", func(parser *oauthclient.JWKSTokenParser, _ jwt.MapClaims, idToken string) error {
 			_, err := parser.DecodeAndValidateSignInResponse(context.Background(),
-				&oauth.TokenResponse{AccessToken: "opaque-access-token", IdToken: idToken}, rawNonce)
+				&oauth.TokenResponse{AccessToken: "opaque-access-token", IDToken: idToken}, rawNonce)
 			return err
 		}},
 		{"refresh", func(parser *oauthclient.JWKSTokenParser, claims jwt.MapClaims, idToken string) error {
-			previous := &oauth.JwtToken{TokenBase64: "the-stored-id-token", Claims: decoded(claims)}
+			previous := &oauth.JWTToken{TokenBase64: "the-stored-id-token", Claims: decoded(claims)}
 			_, err := parser.DecodeAndValidateRefreshResponse(context.Background(),
-				&oauth.TokenResponse{AccessToken: "opaque-access-token", IdToken: idToken}, previous)
+				&oauth.TokenResponse{AccessToken: "opaque-access-token", IDToken: idToken}, previous)
 			return err
 		}},
 		{"stored", func(parser *oauthclient.JWKSTokenParser, _ jwt.MapClaims, idToken string) error {
@@ -71,9 +71,9 @@ func decoded(claims jwt.MapClaims) jwt.MapClaims {
 
 // parserOver builds a parser expecting oauthclienttest.Issuer and ClientID over a JWKS publishing
 // keys, and answers how many times the JWKS was fetched.
-func parserOver(t *testing.T, keys ...oauth.Jwk) (*oauthclient.JWKSTokenParser, *atomic.Int32) {
+func parserOver(t *testing.T, keys ...oauth.JWK) (*oauthclient.JWKSTokenParser, *atomic.Int32) {
 	t.Helper()
-	server, hits := oauthclienttest.NewJwksServer(t, keys...)
+	server, hits := oauthclienttest.NewJWKSServer(t, keys...)
 	return oauthclient.NewJWKSTokenParser(server.URL, server.Client(), nil, oauthclienttest.ClientID,
 		oauthclienttest.StaticIssuer(oauthclienttest.Issuer)), hits
 }
@@ -133,13 +133,13 @@ func TestIDToken_RefusesATokenOfInvalidStructure(t *testing.T) {
 
 	for _, method := range readerMethods() {
 		t.Run(method.name+"/the unaltered token", func(t *testing.T) {
-			parser, _ := parserOver(t, oauthclienttest.JwkFromPublicKey("key-1", &key.PublicKey))
+			parser, _ := parserOver(t, oauthclienttest.JWKFromPublicKey("key-1", &key.PublicKey))
 
 			require.NoError(t, method.run(parser, claims, valid))
 		})
 		for _, tc := range tokens {
 			t.Run(method.name+"/"+tc.name, func(t *testing.T) {
-				parser, _ := parserOver(t, oauthclienttest.JwkFromPublicKey("key-1", &key.PublicKey))
+				parser, _ := parserOver(t, oauthclienttest.JWKFromPublicKey("key-1", &key.PublicKey))
 
 				err := method.run(parser, claims, tc.token)
 
@@ -160,7 +160,7 @@ func TestIDToken_AStructurallyRefusedTokenFetchesNoKey(t *testing.T) {
 
 	for _, method := range readerMethods() {
 		t.Run(method.name, func(t *testing.T) {
-			parser, hits := parserOver(t, oauthclienttest.JwkFromPublicKey("key-1", &key.PublicKey))
+			parser, hits := parserOver(t, oauthclienttest.JWKFromPublicKey("key-1", &key.PublicKey))
 
 			err := method.run(parser, claims, token)
 
@@ -199,7 +199,7 @@ func TestIDToken_SubAndIat(t *testing.T) {
 	for _, method := range readerMethods() {
 		for _, tc := range testCases {
 			t.Run(method.name+"/"+tc.name, func(t *testing.T) {
-				parser, _ := parserOver(t, oauthclienttest.JwkFromPublicKey("key-1", &key.PublicKey))
+				parser, _ := parserOver(t, oauthclienttest.JWKFromPublicKey("key-1", &key.PublicKey))
 				claims := idClaims()
 				tc.mutate(claims)
 				token := oauthclienttest.SignRawRS256(t, key, `{"alg":"RS256","kid":"key-1","typ":"JWT"}`, claimsJSON(t, claims))
@@ -238,8 +238,8 @@ func exponentIn(n int) string {
 func TestIDToken_VerificationKeys(t *testing.T) {
 	key, _ := oauthclienttest.Keys(t)
 	weak := weakKey(t)
-	published := oauthclienttest.JwkFromPublicKey("key-1", &key.PublicKey)
-	with := func(change func(*oauth.Jwk)) oauth.Jwk {
+	published := oauthclienttest.JWKFromPublicKey("key-1", &key.PublicKey)
+	with := func(change func(*oauth.JWK)) oauth.JWK {
 		jwk := published
 		change(&jwk)
 		return jwk
@@ -255,41 +255,41 @@ func TestIDToken_VerificationKeys(t *testing.T) {
 		return func(m map[string]any) { m[name] = value }
 	}
 
-	// members, when set, changes the key's members as the document carries them, for what oauth.Jwk
+	// members, when set, changes the key's members as the document carries them, for what oauth.JWK
 	// cannot say: a member absent, or present with a value that is not a string.
 	testCases := []struct {
 		name    string
-		jwk     oauth.Jwk
+		jwk     oauth.JWK
 		members func(map[string]any)
 		signer  *rsa.PrivateKey
 		kid     string
 		want    outcome
 	}{
 		{"the key as the auth server publishes it", published, nil, key, "key-1", accepted},
-		{"a 1024-bit key", oauthclienttest.JwkFromPublicKey("key-1", &weak.PublicKey), nil, weak, "key-1", refusedNotForeign},
-		{"e in four bytes", with(func(j *oauth.Jwk) { j.E = exponentIn(4) }), nil, key, "key-1", accepted},
-		{"e in five bytes", with(func(j *oauth.Jwk) { j.E = exponentIn(5) }), nil, key, "key-1", refusedNotForeign},
-		{"e in nine bytes", with(func(j *oauth.Jwk) { j.E = exponentIn(9) }), nil, key, "key-1", refusedNotForeign},
+		{"a 1024-bit key", oauthclienttest.JWKFromPublicKey("key-1", &weak.PublicKey), nil, weak, "key-1", refusedNotForeign},
+		{"e in four bytes", with(func(j *oauth.JWK) { j.E = exponentIn(4) }), nil, key, "key-1", accepted},
+		{"e in five bytes", with(func(j *oauth.JWK) { j.E = exponentIn(5) }), nil, key, "key-1", refusedNotForeign},
+		{"e in nine bytes", with(func(j *oauth.JWK) { j.E = exponentIn(9) }), nil, key, "key-1", refusedNotForeign},
 		{"use absent", published, absent("use"), key, "key-1", accepted},
-		{"use enc", with(func(j *oauth.Jwk) { j.Use = "enc" }), nil, key, "key-1", refusedNotForeign},
-		{"use SIG, which is not sig", with(func(j *oauth.Jwk) { j.Use = "SIG" }), nil, key, "key-1", refusedNotForeign},
+		{"use enc", with(func(j *oauth.JWK) { j.Use = "enc" }), nil, key, "key-1", refusedNotForeign},
+		{"use SIG, which is not sig", with(func(j *oauth.JWK) { j.Use = "SIG" }), nil, key, "key-1", refusedNotForeign},
 		{"use an empty string, which is not absent", published, set("use", ""), key, "key-1", refusedNotForeign},
 		{"use null, which is not absent", published, set("use", nil), key, "key-1", refusedNotForeign},
 		{"use a number", published, set("use", 1), key, "key-1", refusedNotForeign},
 		{"alg absent", published, absent("alg"), key, "key-1", accepted},
-		{"alg RS512", with(func(j *oauth.Jwk) { j.Alg = "RS512" }), nil, key, "key-1", refusedNotForeign},
-		{"alg PS256", with(func(j *oauth.Jwk) { j.Alg = "PS256" }), nil, key, "key-1", refusedNotForeign},
-		{"alg rs256, which is not RS256", with(func(j *oauth.Jwk) { j.Alg = "rs256" }), nil, key, "key-1", refusedNotForeign},
+		{"alg RS512", with(func(j *oauth.JWK) { j.Alg = "RS512" }), nil, key, "key-1", refusedNotForeign},
+		{"alg PS256", with(func(j *oauth.JWK) { j.Alg = "PS256" }), nil, key, "key-1", refusedNotForeign},
+		{"alg rs256, which is not RS256", with(func(j *oauth.JWK) { j.Alg = "rs256" }), nil, key, "key-1", refusedNotForeign},
 		{"alg an empty string, which is not absent", published, set("alg", ""), key, "key-1", refusedNotForeign},
 		{"alg null, which is not absent", published, set("alg", nil), key, "key-1", refusedNotForeign},
 		{"alg an array holding RS256", published, set("alg", []string{"RS256"}), key, "key-1", refusedNotForeign},
 		{"no kid, the one key as published", published, nil, key, "", accepted},
 		{"no kid, the one key without use or alg", published, absent("use", "alg"), key, "", accepted},
-		{"no kid, the one key marked use enc", with(func(j *oauth.Jwk) { j.Use = "enc" }), nil, key, "", refusedNotForeign},
-		{"no kid, the one key marked alg RS512", with(func(j *oauth.Jwk) { j.Alg = "RS512" }), nil, key, "", refusedNotForeign},
+		{"no kid, the one key marked use enc", with(func(j *oauth.JWK) { j.Use = "enc" }), nil, key, "", refusedNotForeign},
+		{"no kid, the one key marked alg RS512", with(func(j *oauth.JWK) { j.Alg = "RS512" }), nil, key, "", refusedNotForeign},
 		{"no kid, the one key with use empty", published, set("use", ""), key, "", refusedNotForeign},
 		{"no kid, the one key with alg null", published, set("alg", nil), key, "", refusedNotForeign},
-		{"no kid, the one key 1024 bits", oauthclienttest.JwkFromPublicKey("key-1", &weak.PublicKey), nil, weak, "", refusedNotForeign},
+		{"no kid, the one key 1024 bits", oauthclienttest.JWKFromPublicKey("key-1", &weak.PublicKey), nil, weak, "", refusedNotForeign},
 	}
 
 	for _, method := range readerMethods() {
@@ -309,7 +309,7 @@ func TestIDToken_VerificationKeys(t *testing.T) {
 // parserOverDocument builds a parser expecting oauthclienttest.Issuer and ClientID over a JWKS
 // publishing jwk alone, its members as JSON changed by members when that is set, served as the raw
 // document so a member can be absent or hold any JSON value.
-func parserOverDocument(t *testing.T, jwk oauth.Jwk, members func(map[string]any)) *oauthclient.JWKSTokenParser {
+func parserOverDocument(t *testing.T, jwk oauth.JWK, members func(map[string]any)) *oauthclient.JWKSTokenParser {
 	t.Helper()
 	encoded, err := json.Marshal(jwk)
 	require.NoError(t, err)
@@ -329,11 +329,11 @@ func parserOverDocument(t *testing.T, jwk oauth.Jwk, members func(map[string]any
 		oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
 }
 
-// authServerJwk writes a key as the auth server's /certs serves it (rsakey's JWK: alg, kid, kty,
+// authServerJWK writes a key as the auth server's /certs serves it (rsakey's JWK: alg, kid, kty,
 // use, n, e), with e written out as RFC 7518 section 6.3.1.2's example for 65537.
-func authServerJwk(kid string, pub *rsa.PublicKey) string {
+func authServerJWK(kid string, pub *rsa.PublicKey) string {
 	if pub.E != 65537 {
-		panic("authServerJwk writes e as AQAB")
+		panic("authServerJWK writes e as AQAB")
 	}
 	return fmt.Sprintf(`{"alg":"RS256","kid":%q,"kty":"RSA","use":"sig","n":%q,"e":"AQAB"}`,
 		kid, base64.RawURLEncoding.EncodeToString(pub.N.Bytes()))
@@ -346,9 +346,9 @@ func TestIDToken_AcceptsTheAuthServersJWKS(t *testing.T) {
 	current, err := rsa.GenerateKey(rand.Reader, 4096)
 	require.NoError(t, err)
 	next, previous := oauthclienttest.Keys(t)
-	document := `{"keys":[` + authServerJwk("next-kid", &next.PublicKey) + "," +
-		authServerJwk("current-kid", &current.PublicKey) + "," +
-		authServerJwk("previous-kid", &previous.PublicKey) + `]}`
+	document := `{"keys":[` + authServerJWK("next-kid", &next.PublicKey) + "," +
+		authServerJWK("current-kid", &current.PublicKey) + "," +
+		authServerJWK("previous-kid", &previous.PublicKey) + `]}`
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(document))
@@ -422,7 +422,7 @@ func TestIDToken_RefusesTheAuthServersOtherTokens(t *testing.T) {
 	for _, method := range readerMethods() {
 		for _, tc := range tokens {
 			t.Run(method.name+"/"+tc.name, func(t *testing.T) {
-				parser, _ := parserOver(t, oauthclienttest.JwkFromPublicKey("key-1", &key.PublicKey))
+				parser, _ := parserOver(t, oauthclienttest.JWKFromPublicKey("key-1", &key.PublicKey))
 				err := method.run(parser, tc.claims, oauthclienttest.SignRawRS256(t, key, tc.header, claimsJSON(t, tc.claims)))
 
 				assertOutcome(t, foreign, err)

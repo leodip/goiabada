@@ -27,8 +27,8 @@ import (
 func TestRequest_AnOptionNotGivenLeavesTheValueOff(t *testing.T) {
 	req := Request(http.MethodGet, "/admin/users")
 
-	_, hasJwtInfo := reqctx.JwtInfoFrom(req.Context())
-	assert.False(t, hasJwtInfo, "a request built without WithAccessToken must carry no JwtInfo at all")
+	_, hasJWTInfo := reqctx.JWTInfoFrom(req.Context())
+	assert.False(t, hasJWTInfo, "a request built without WithAccessToken must carry no JWTInfo at all")
 	_, hasSettings := reqctx.SettingsFrom(req.Context())
 	assert.False(t, hasSettings, "a request built without WithSettings must carry no settings at all")
 	assert.Empty(t, req.PathValue("groupId"),
@@ -39,8 +39,8 @@ func TestRequest_AnOptionNotGivenLeavesTheValueOff(t *testing.T) {
 func TestRequest_WithAccessTokenCarriesTheBearerTheHandlersRead(t *testing.T) {
 	req := Request(http.MethodGet, "/admin/users", WithAccessToken())
 
-	jwtInfo, ok := reqctx.JwtInfoFrom(req.Context())
-	require.True(t, ok, "the context carries no oauthclient.JwtInfo")
+	jwtInfo, ok := reqctx.JWTInfoFrom(req.Context())
+	require.True(t, ok, "the context carries no oauthclient.JWTInfo")
 	assert.Equal(t, AccessToken, jwtInfo.TokenResponse.AccessToken)
 }
 
@@ -65,18 +65,18 @@ func TestRequest_WithSettingsPutsTheValueWhereTheMiddlewarePutsOne(t *testing.T)
 	assert.Same(t, settings, got)
 }
 
-// WithJwtInfo hands over the whole token set, the ID token included, where WithAccessToken carries
+// WithJWTInfo hands over the whole token set, the ID token included, where WithAccessToken carries
 // the bearer alone.
-func TestRequest_WithJwtInfoCarriesTheWholeTokenSet(t *testing.T) {
-	want := oauthclient.JwtInfo{
+func TestRequest_WithJWTInfoCarriesTheWholeTokenSet(t *testing.T) {
+	want := oauthclient.JWTInfo{
 		TokenResponse: oauth.TokenResponse{AccessToken: "a", Scope: "openid"},
-		IdToken:       &oauth.JwtToken{TokenBase64: "i"},
+		IDToken:       &oauth.JWTToken{TokenBase64: "i"},
 	}
 
-	req := Request(http.MethodGet, "/account/logout", WithJwtInfo(want))
+	req := Request(http.MethodGet, "/account/logout", WithJWTInfo(want))
 
-	got, ok := reqctx.JwtInfoFrom(req.Context())
-	require.True(t, ok, "the context carries no oauthclient.JwtInfo")
+	got, ok := reqctx.JWTInfoFrom(req.Context())
+	require.True(t, ok, "the context carries no oauthclient.JWTInfo")
 	assert.Equal(t, want, got)
 }
 
@@ -116,7 +116,7 @@ func TestRequest_WithContentTypeCarriesTheCallersOwnEncoding(t *testing.T) {
 // The negative half of the case below: a handler that never faults must draw no report, or the
 // expectation would fail every test that registers it.
 func TestRefuseInternalServerError_SaysNothingWhenTheHandlerDoesNotFault(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 
 	report := guard.Run(func(reporter guard.Reporter) {
 		RefuseInternalServerError(reporter, httpHelper)
@@ -126,7 +126,7 @@ func TestRefuseInternalServerError_SaysNothingWhenTheHandlerDoesNotFault(t *test
 }
 
 func TestRefuseInternalServerError_NamesTheErrorTheHandlerAnsweredWith(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 
 	report := guard.Run(func(reporter guard.Reporter) {
 		RefuseInternalServerError(reporter, httpHelper)
@@ -144,7 +144,7 @@ func TestRefuseInternalServerError_NamesTheErrorTheHandlerAnsweredWith(t *testin
 // Once() sets it to 1 and Maybe() leaves it at 0 while setting an unexported flag, so the zero
 // here is read together with the call succeeding below.
 func TestExpectRender_AdmitsTheNamedPageAndIsLeftUnbounded(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	call := ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_users.html")
 
 	assert.Equal(t, "RenderTemplate", call.Method)
@@ -156,7 +156,7 @@ func TestExpectRender_AdmitsTheNamedPageAndIsLeftUnbounded(t *testing.T) {
 }
 
 func TestBind_ReturnsTheMapTheHandlerRenderedWith(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	ExpectRender(httpHelper, mock.Anything, mock.Anything).Twice()
 
 	req := Request(http.MethodGet, "/admin/users")
@@ -170,7 +170,7 @@ func TestBind_ReturnsTheMapTheHandlerRenderedWith(t *testing.T) {
 }
 
 func TestBind_StopsTheTestWhenTheHandlerRenderedNothing(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 
 	report := guard.Run(func(reporter guard.Reporter) {
 		Bind(reporter, httpHelper)
@@ -182,7 +182,7 @@ func TestBind_StopsTheTestWhenTheHandlerRenderedNothing(t *testing.T) {
 
 // The AJAX half of the case above, and unbounded for the same reason.
 func TestExpectEncodeJSON_AdmitsTheCallAndIsLeftUnbounded(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	call := ExpectEncodeJSON(httpHelper)
 
 	assert.Equal(t, "EncodeJSON", call.Method)
@@ -195,7 +195,7 @@ func TestExpectEncodeJSON_AdmitsTheCallAndIsLeftUnbounded(t *testing.T) {
 // Two things at once: the last answer is the one returned, and it arrives marshalled, so a field
 // the handler left off its struct is absent from the map rather than present and false.
 func TestEncoded_ReturnsTheLastAnswerAsTheBrowserReadsIt(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	ExpectEncodeJSON(httpHelper).Twice()
 
 	req := Request(http.MethodPost, "/account/sessions")
@@ -213,7 +213,7 @@ func TestEncoded_ReturnsTheLastAnswerAsTheBrowserReadsIt(t *testing.T) {
 }
 
 func TestEncoded_StopsTheTestWhenTheHandlerAnsweredNothing(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 
 	report := guard.Run(func(reporter guard.Reporter) {
 		Encoded(reporter, httpHelper)
@@ -226,7 +226,7 @@ func TestEncoded_StopsTheTestWhenTheHandlerAnsweredNothing(t *testing.T) {
 // A value encoding/json cannot represent ends the test naming that, rather than returning an empty
 // map a case would then assert against and pass.
 func TestEncoded_StopsTheTestWhenTheAnswerDoesNotMarshal(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	ExpectEncodeJSON(httpHelper).Once()
 
 	httpHelper.EncodeJSON(httptest.NewRecorder(), Request(http.MethodPost, "/account/sessions"),
@@ -245,7 +245,7 @@ func TestEncoded_StopsTheTestWhenTheAnswerDoesNotMarshal(t *testing.T) {
 // and is not a map, and a case asserting only that a field is absent would pass against a handler
 // that answered nothing at all.
 func TestEncoded_StopsTheTestWhenTheAnswerIsNull(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	ExpectEncodeJSON(httpHelper).Once()
 
 	httpHelper.EncodeJSON(httptest.NewRecorder(), Request(http.MethodPost, "/account/sessions"), nil)
@@ -261,7 +261,7 @@ func TestEncoded_StopsTheTestWhenTheAnswerIsNull(t *testing.T) {
 // A handler that answers a bare array or a string is not one of these, and the failure says so
 // rather than reporting a nil map the caller would index into.
 func TestEncoded_StopsTheTestWhenTheAnswerIsNotAnObject(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	ExpectEncodeJSON(httpHelper).Once()
 
 	httpHelper.EncodeJSON(httptest.NewRecorder(), Request(http.MethodPost, "/account/sessions"),

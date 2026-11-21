@@ -30,7 +30,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 	t.Run("Client credentials flow not enabled", func(t *testing.T) {
 		input := &ValidateTokenRequestInput{
 			GrantType:    "client_credentials",
-			ClientId:     "client1",
+			ClientID:     "client1",
 			ClientSecret: "secret",
 		}
 
@@ -57,7 +57,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 	t.Run("Public client not eligible for client credentials", func(t *testing.T) {
 		input := &ValidateTokenRequestInput{
 			GrantType:    "client_credentials",
-			ClientId:     "client1",
+			ClientID:     "client1",
 			ClientSecret: "secret",
 		}
 
@@ -85,7 +85,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 	t.Run("Missing client secret", func(t *testing.T) {
 		input := &ValidateTokenRequestInput{
 			GrantType: "client_credentials",
-			ClientId:  "client1",
+			ClientID:  "client1",
 			// ClientSecret is intentionally left empty
 		}
 
@@ -122,7 +122,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "client_credentials",
-			ClientId:     "valid_client",
+			ClientID:     "valid_client",
 			ClientSecret: "valid_secret",
 			Scope:        "resource:permission",
 		}
@@ -139,14 +139,14 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 			// Ids are load-bearing: ownership is decided by resource-scoped permission id,
 			// so a fixture leaving them zero matches every other zero and passes whether the
 			// check is right, wrong, or absent. Do not tidy these back to bare identifiers.
-			Permissions: []record.Permission{{Id: 10, PermissionIdentifier: "permission", ResourceId: 1}},
+			Permissions: []record.Permission{{ID: 10, PermissionIdentifier: "permission", ResourceID: 1}},
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "valid_client").Return(client, nil)
 		mockDB.On("ClientLoadPermissions", mock.Anything, mock.Anything, client).Return(nil)
 		mockDB.On("PermissionsLoadResources", mock.Anything, mock.Anything, mock.AnythingOfType("[]record.Permission")).Return(nil)
-		mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "resource").Return(&record.Resource{Id: 1, ResourceIdentifier: "resource"}, nil)
-		mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(1)).Return([]record.Permission{{Id: 10, PermissionIdentifier: "permission", ResourceId: 1}}, nil)
+		mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "resource").Return(&record.Resource{ID: 1, ResourceIdentifier: "resource"}, nil)
+		mockDB.On("GetPermissionsByResourceID", mock.Anything, mock.Anything, int64(1)).Return([]record.Permission{{ID: 10, PermissionIdentifier: "permission", ResourceID: 1}}, nil)
 
 		result, err := validator.ValidateTokenRequest(subtestCtx, settings, input)
 
@@ -167,7 +167,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "client_credentials",
-			ClientId:     "valid_client",
+			ClientID:     "valid_client",
 			ClientSecret: "invalid_secret",
 		}
 
@@ -206,7 +206,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "client_credentials",
-			ClientId:     "valid_client",
+			ClientID:     "valid_client",
 			ClientSecret: "valid_secret",
 			Scope:        "resource1:read resource2:write",
 		}
@@ -222,18 +222,18 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 			ClientSecretEncrypted:    clientSecretEncrypted,
 			// Ids are load-bearing, see "Valid client credentials request" above.
 			Permissions: []record.Permission{
-				{Id: 10, PermissionIdentifier: "read", ResourceId: 1},
-				{Id: 20, PermissionIdentifier: "write", ResourceId: 2},
+				{ID: 10, PermissionIdentifier: "read", ResourceID: 1},
+				{ID: 20, PermissionIdentifier: "write", ResourceID: 2},
 			},
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "valid_client").Return(client, nil)
 		mockDB.On("ClientLoadPermissions", mock.Anything, mock.Anything, client).Return(nil)
 		mockDB.On("PermissionsLoadResources", mock.Anything, mock.Anything, mock.AnythingOfType("[]record.Permission")).Return(nil)
-		mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "resource1").Return(&record.Resource{Id: 1, ResourceIdentifier: "resource1"}, nil)
-		mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "resource2").Return(&record.Resource{Id: 2, ResourceIdentifier: "resource2"}, nil)
-		mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(1)).Return([]record.Permission{{Id: 10, PermissionIdentifier: "read", ResourceId: 1}}, nil)
-		mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(2)).Return([]record.Permission{{Id: 20, PermissionIdentifier: "write", ResourceId: 2}}, nil)
+		mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "resource1").Return(&record.Resource{ID: 1, ResourceIdentifier: "resource1"}, nil)
+		mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "resource2").Return(&record.Resource{ID: 2, ResourceIdentifier: "resource2"}, nil)
+		mockDB.On("GetPermissionsByResourceID", mock.Anything, mock.Anything, int64(1)).Return([]record.Permission{{ID: 10, PermissionIdentifier: "read", ResourceID: 1}}, nil)
+		mockDB.On("GetPermissionsByResourceID", mock.Anything, mock.Anything, int64(2)).Return([]record.Permission{{ID: 20, PermissionIdentifier: "write", ResourceID: 2}}, nil)
 
 		result, err := validator.ValidateTokenRequest(subtestCtx, settings, input)
 
@@ -253,7 +253,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "client_credentials",
-			ClientId:     "valid_client",
+			ClientID:     "valid_client",
 			ClientSecret: "valid_secret",
 			Scope:        "invalid_scope",
 		}
@@ -295,7 +295,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "client_credentials",
-			ClientId:     "valid_client",
+			ClientID:     "valid_client",
 			ClientSecret: "valid_secret",
 			Scope:        "resource:read",
 		}
@@ -315,8 +315,8 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "valid_client").Return(client, nil)
 		mockDB.On("ClientLoadPermissions", mock.Anything, mock.Anything, client).Return(nil)
 		mockDB.On("PermissionsLoadResources", mock.Anything, mock.Anything, mock.AnythingOfType("[]record.Permission")).Return(nil)
-		mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "resource").Return(&record.Resource{Id: 1, ResourceIdentifier: "resource"}, nil)
-		mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(1)).Return([]record.Permission{{PermissionIdentifier: "read"}}, nil)
+		mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "resource").Return(&record.Resource{ID: 1, ResourceIdentifier: "resource"}, nil)
+		mockDB.On("GetPermissionsByResourceID", mock.Anything, mock.Anything, int64(1)).Return([]record.Permission{{PermissionIdentifier: "read"}}, nil)
 
 		result, err := validator.ValidateTokenRequest(subtestCtx, settings, input)
 
@@ -340,7 +340,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "client_credentials",
-			ClientId:     "valid_client",
+			ClientID:     "valid_client",
 			ClientSecret: "valid_secret",
 			Scope:        "openid profile",
 		}
@@ -382,7 +382,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "client_credentials",
-			ClientId:     "valid_client",
+			ClientID:     "valid_client",
 			ClientSecret: "valid_secret",
 			Scope:        "non_existent_resource:read",
 		}
@@ -425,7 +425,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "client_credentials",
-			ClientId:     "valid_client",
+			ClientID:     "valid_client",
 			ClientSecret: "valid_secret",
 			Scope:        "resource:non_existent_permission",
 		}
@@ -444,8 +444,8 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "valid_client").Return(client, nil)
 		mockDB.On("ClientLoadPermissions", mock.Anything, mock.Anything, client).Return(nil)
 		mockDB.On("PermissionsLoadResources", mock.Anything, mock.Anything, mock.AnythingOfType("[]record.Permission")).Return(nil)
-		mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "resource").Return(&record.Resource{Id: 1, ResourceIdentifier: "resource"}, nil)
-		mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(1)).Return([]record.Permission{}, nil)
+		mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "resource").Return(&record.Resource{ID: 1, ResourceIdentifier: "resource"}, nil)
+		mockDB.On("GetPermissionsByResourceID", mock.Anything, mock.Anything, int64(1)).Return([]record.Permission{}, nil)
 
 		result, err := validator.ValidateTokenRequest(subtestCtx, settings, input)
 
@@ -469,7 +469,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "client_credentials",
-			ClientId:     "valid_client",
+			ClientID:     "valid_client",
 			ClientSecret: "valid_secret",
 			Scope:        "resource1:read resource2:write resource3:delete",
 		}
@@ -485,21 +485,21 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 			ClientSecretEncrypted:    clientSecretEncrypted,
 			// Ids are load-bearing, see "Valid client credentials request" above.
 			Permissions: []record.Permission{
-				{Id: 10, PermissionIdentifier: "read", ResourceId: 1},
-				{Id: 20, PermissionIdentifier: "write", ResourceId: 2},
-				{Id: 30, PermissionIdentifier: "delete", ResourceId: 3},
+				{ID: 10, PermissionIdentifier: "read", ResourceID: 1},
+				{ID: 20, PermissionIdentifier: "write", ResourceID: 2},
+				{ID: 30, PermissionIdentifier: "delete", ResourceID: 3},
 			},
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "valid_client").Return(client, nil)
 		mockDB.On("ClientLoadPermissions", mock.Anything, mock.Anything, client).Return(nil)
 		mockDB.On("PermissionsLoadResources", mock.Anything, mock.Anything, mock.AnythingOfType("[]record.Permission")).Return(nil)
-		mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "resource1").Return(&record.Resource{Id: 1, ResourceIdentifier: "resource1"}, nil)
-		mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "resource2").Return(&record.Resource{Id: 2, ResourceIdentifier: "resource2"}, nil)
-		mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "resource3").Return(&record.Resource{Id: 3, ResourceIdentifier: "resource3"}, nil)
-		mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(1)).Return([]record.Permission{{Id: 10, PermissionIdentifier: "read", ResourceId: 1}}, nil)
-		mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(2)).Return([]record.Permission{{Id: 20, PermissionIdentifier: "write", ResourceId: 2}}, nil)
-		mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(3)).Return([]record.Permission{{Id: 30, PermissionIdentifier: "delete", ResourceId: 3}}, nil)
+		mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "resource1").Return(&record.Resource{ID: 1, ResourceIdentifier: "resource1"}, nil)
+		mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "resource2").Return(&record.Resource{ID: 2, ResourceIdentifier: "resource2"}, nil)
+		mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "resource3").Return(&record.Resource{ID: 3, ResourceIdentifier: "resource3"}, nil)
+		mockDB.On("GetPermissionsByResourceID", mock.Anything, mock.Anything, int64(1)).Return([]record.Permission{{ID: 10, PermissionIdentifier: "read", ResourceID: 1}}, nil)
+		mockDB.On("GetPermissionsByResourceID", mock.Anything, mock.Anything, int64(2)).Return([]record.Permission{{ID: 20, PermissionIdentifier: "write", ResourceID: 2}}, nil)
+		mockDB.On("GetPermissionsByResourceID", mock.Anything, mock.Anything, int64(3)).Return([]record.Permission{{ID: 30, PermissionIdentifier: "delete", ResourceID: 3}}, nil)
 
 		result, err := validator.ValidateTokenRequest(subtestCtx, settings, input)
 
@@ -521,11 +521,11 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 	// resources under three different ids, and "manage" on two. A test whose fixture
 	// leaves ids at zero cannot tell the fixed code from the broken code.
 	var (
-		billingRead      = record.Permission{Id: 10, PermissionIdentifier: "read", ResourceId: 1}
-		billingManage    = record.Permission{Id: 12, PermissionIdentifier: "manage", ResourceId: 1}
-		reportsRead      = record.Permission{Id: 20, PermissionIdentifier: "read", ResourceId: 2}
-		archiveRead      = record.Permission{Id: 30, PermissionIdentifier: "read", ResourceId: 3}
-		authserverManage = record.Permission{Id: 40, PermissionIdentifier: "manage", ResourceId: 4}
+		billingRead      = record.Permission{ID: 10, PermissionIdentifier: "read", ResourceID: 1}
+		billingManage    = record.Permission{ID: 12, PermissionIdentifier: "manage", ResourceID: 1}
+		reportsRead      = record.Permission{ID: 20, PermissionIdentifier: "read", ResourceID: 2}
+		archiveRead      = record.Permission{ID: 30, PermissionIdentifier: "read", ResourceID: 3}
+		authserverManage = record.Permission{ID: 40, PermissionIdentifier: "manage", ResourceID: 4}
 	)
 
 	ccSecretEncrypted, _ := testDataCipher.Encrypt("valid_secret")
@@ -545,8 +545,8 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 			{"authserver", 4, []record.Permission{authserverManage}},
 		} {
 			mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, r.identifier).
-				Return(&record.Resource{Id: r.id, ResourceIdentifier: r.identifier}, nil).Maybe()
-			mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, r.id).Return(r.perms, nil).Maybe()
+				Return(&record.Resource{ID: r.id, ResourceIdentifier: r.identifier}, nil).Maybe()
+			mockDB.On("GetPermissionsByResourceID", mock.Anything, mock.Anything, r.id).Return(r.perms, nil).Maybe()
 		}
 		// Anything not in the catalog resolves to nil, exercising the not-found branch.
 		for _, unknown := range []string{"nope-api", ""} {
@@ -578,7 +578,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		result, err := validator.ValidateTokenRequest(ctx, settings, &ValidateTokenRequestInput{
 			GrantType:    "client_credentials",
-			ClientId:     "cc_client",
+			ClientID:     "cc_client",
 			ClientSecret: "valid_secret",
 			Scope:        scope,
 		})
@@ -816,11 +816,11 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 			},
 		},
 		{
-			name: "GetPermissionsByResourceId error propagates",
+			name: "GetPermissionsByResourceID error propagates",
 			setup: func(mockDB *datamocks.Database) {
 				mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "billing-api").
-					Return(&record.Resource{Id: 1, ResourceIdentifier: "billing-api"}, nil)
-				mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(1)).
+					Return(&record.Resource{ID: 1, ResourceIdentifier: "billing-api"}, nil)
+				mockDB.On("GetPermissionsByResourceID", mock.Anything, mock.Anything, int64(1)).
 					Return(nil, errors.New("database is down"))
 			},
 		},
@@ -845,7 +845,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 			result, err := validator.ValidateTokenRequest(ctx, settings, &ValidateTokenRequestInput{
 				GrantType:    "client_credentials",
-				ClientId:     "cc_client",
+				ClientID:     "cc_client",
 				ClientSecret: "valid_secret",
 				Scope:        "billing-api:read",
 			})
@@ -873,11 +873,11 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 // is required, and .Once() is what makes the test fail if the expansion looks anything up: before
 // the removal each resource was fetched twice per request, once expanding and once validating.
 func TestValidateTokenRequest_ClientCredentials_NoScopeGiven(t *testing.T) {
-	billingResource := record.Resource{Id: 1, ResourceIdentifier: "billing-api"}
-	reportsResource := record.Resource{Id: 2, ResourceIdentifier: "reports-api"}
+	billingResource := record.Resource{ID: 1, ResourceIdentifier: "billing-api"}
+	reportsResource := record.Resource{ID: 2, ResourceIdentifier: "reports-api"}
 
-	billingRead := record.Permission{Id: 10, PermissionIdentifier: "read", ResourceId: 1, Resource: billingResource}
-	reportsRead := record.Permission{Id: 20, PermissionIdentifier: "read", ResourceId: 2, Resource: reportsResource}
+	billingRead := record.Permission{ID: 10, PermissionIdentifier: "read", ResourceID: 1, Resource: billingResource}
+	reportsRead := record.Permission{ID: 20, PermissionIdentifier: "read", ResourceID: 2, Resource: reportsResource}
 
 	testCases := []struct {
 		name string
@@ -933,17 +933,17 @@ func TestValidateTokenRequest_ClientCredentials_NoScopeGiven(t *testing.T) {
 					Return(&res, nil).Once()
 				var perms []record.Permission
 				for _, p := range tc.clientPerms {
-					if p.ResourceId == res.Id {
+					if p.ResourceID == res.ID {
 						perms = append(perms, p)
 					}
 				}
-				mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, res.Id).Return(perms, nil).Once()
+				mockDB.On("GetPermissionsByResourceID", mock.Anything, mock.Anything, res.ID).Return(perms, nil).Once()
 			}
 
 			// Scope deliberately omitted, which is what selects the expansion branch.
 			result, err := validator.ValidateTokenRequest(ctx, settings, &ValidateTokenRequestInput{
 				GrantType:    "client_credentials",
-				ClientId:     "cc_client",
+				ClientID:     "cc_client",
 				ClientSecret: "valid_secret",
 			})
 
@@ -978,7 +978,7 @@ func TestValidateTokenRequest_ClientCredentials_NoScopeFromAClientHoldingNothing
 
 	result, err := validator.ValidateTokenRequest(context.Background(), &record.Settings{}, &ValidateTokenRequestInput{
 		GrantType:    "client_credentials",
-		ClientId:     "cc_client",
+		ClientID:     "cc_client",
 		ClientSecret: "valid_secret",
 	})
 

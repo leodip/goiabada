@@ -35,18 +35,18 @@ var apiRevokeTx = &sql.Tx{}
 // stubSweep registers the sweep calls for a user with no sessions and no refresh tokens. Thin on
 // purpose: the sweep table is owned exhaustively by revocation_test.go in internal/revocation,
 // and restating it here would mean two places to update.
-func stubSweep(database *datamocks.Database, userId int64, newGeneration int64) {
+func stubSweep(database *datamocks.Database, userID int64, newGeneration int64) {
 	datamocks.ExpectRunInTransaction(database, apiRevokeTx)
-	database.On("IncrementUserAuthStateGeneration", mock.Anything, apiRevokeTx, userId).
+	database.On("IncrementUserAuthStateGeneration", mock.Anything, apiRevokeTx, userID).
 		Return(newGeneration, nil).Once()
-	database.On("GetRefreshTokensByUserId", mock.Anything, apiRevokeTx, userId).
+	database.On("GetRefreshTokensByUserID", mock.Anything, apiRevokeTx, userID).
 		Return([]*record.RefreshToken{}, nil).Once()
 	database.On("PromoteRefreshTokenGenerations", mock.Anything, apiRevokeTx, []int64{}, newGeneration).
 		Return(nil).Once()
-	database.On("GetUserSessionsByUserId", mock.Anything, apiRevokeTx, userId).
+	database.On("GetUserSessionsByUserID", mock.Anything, apiRevokeTx, userID).
 		Return([]record.UserSession{}, nil).Once()
 	// A user-wide end of a user with a subject reads the apps holding the user's grants; none do.
-	database.On("GetUsableRefreshTokenClientIdsByUserId", mock.Anything, apiRevokeTx, userId, mock.Anything).
+	database.On("GetUsableRefreshTokenClientIDsByUserID", mock.Anything, apiRevokeTx, userID, mock.Anything).
 		Return([]int64(nil), nil).Maybe()
 }
 
@@ -78,7 +78,7 @@ func TestHandleAccountPasswordPut_ValidatesAgainstTheRequestsPolicy(t *testing.T
 	currentHash, err := passwordhash.Hash(currentPassword)
 	require.NoError(t, err)
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), "the-subject").
-		Return(&record.User{Id: 42, Email: "jane.doe@example.com", Username: "janedoe", Enabled: true, PasswordHash: currentHash}, nil).Once()
+		Return(&record.User{ID: 42, Email: "jane.doe@example.com", Username: "janedoe", Enabled: true, PasswordHash: currentHash}, nil).Once()
 
 	// accountPasswordRequest carries PasswordPolicyLow and the app name Goiabada; matching those
 	// values, not any, is the assertion.
@@ -111,12 +111,12 @@ func TestHandleAccountPasswordPut_PreservesTheCallersSession(t *testing.T) {
 
 	currentHash, err := passwordhash.Hash(currentPassword)
 	require.NoError(t, err)
-	user := &record.User{Id: 42, Enabled: true, PasswordHash: currentHash}
+	user := &record.User{ID: 42, Enabled: true, PasswordHash: currentHash}
 
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).Return(user, nil).Once()
 
 	var savedHash string
-	database.On("GetUserByIdForUpdate", mock.Anything, apiRevokeTx, int64(42)).Return(&record.User{Id: int64(42)}, nil).Once()
+	database.On("GetUserByIDForUpdate", mock.Anything, apiRevokeTx, int64(42)).Return(&record.User{ID: int64(42)}, nil).Once()
 	database.On("SetUserPasswordHash", mock.Anything, apiRevokeTx, int64(42), mock.Anything).
 		Run(func(args mock.Arguments) {
 			savedHash = args.Get(3).(string)
@@ -128,21 +128,21 @@ func TestHandleAccountPasswordPut_PreservesTheCallersSession(t *testing.T) {
 	datamocks.ExpectRunInTransaction(database, apiRevokeTx)
 	database.On("IncrementUserAuthStateGeneration", mock.Anything, apiRevokeTx, int64(42)).
 		Return(int64(8), nil).Once()
-	database.On("GetRefreshTokensByUserId", mock.Anything, apiRevokeTx, int64(42)).
+	database.On("GetRefreshTokensByUserID", mock.Anything, apiRevokeTx, int64(42)).
 		Return([]*record.RefreshToken{
-			{Id: 1, RefreshTokenJti: "rt-keep", SessionIdentifier: callerSid},
-			{Id: 2, RefreshTokenJti: "rt-other", SessionIdentifier: "sid-other"},
+			{ID: 1, RefreshTokenJTI: "rt-keep", SessionIdentifier: callerSid},
+			{ID: 2, RefreshTokenJTI: "rt-other", SessionIdentifier: "sid-other"},
 		}, nil).Once()
 	database.On("GetRefreshTokensBySessionIdentifier", mock.Anything, apiRevokeTx, callerSid).
-		Return([]*record.RefreshToken{{Id: 1, RefreshTokenJti: "rt-keep", SessionIdentifier: callerSid}}, nil).Once()
+		Return([]*record.RefreshToken{{ID: 1, RefreshTokenJTI: "rt-keep", SessionIdentifier: callerSid}}, nil).Once()
 	database.On("UpdateRefreshToken", mock.Anything, apiRevokeTx, mock.MatchedBy(func(rt *record.RefreshToken) bool {
-		return rt.Id == 2
+		return rt.ID == 2
 	})).Return(nil).Once()
 	database.On("PromoteRefreshTokenGenerations", mock.Anything, apiRevokeTx, []int64{1}, int64(8)).Return(nil).Once()
-	database.On("GetUserSessionsByUserId", mock.Anything, apiRevokeTx, int64(42)).
+	database.On("GetUserSessionsByUserID", mock.Anything, apiRevokeTx, int64(42)).
 		Return([]record.UserSession{
-			{Id: 100, SessionIdentifier: callerSid},
-			{Id: 200, SessionIdentifier: "sid-other"},
+			{ID: 100, SessionIdentifier: callerSid},
+			{ID: 200, SessionIdentifier: "sid-other"},
 		}, nil).Once()
 	database.On("PromoteUserSessionGeneration", mock.Anything, apiRevokeTx, int64(100), int64(8)).Return(nil).Once()
 	database.On("DeleteUserSession", mock.Anything, apiRevokeTx, int64(200)).Return(nil).Once()
@@ -204,8 +204,8 @@ func TestHandleAccountPasswordPut_SidlessBearerRevokesEverything(t *testing.T) {
 	require.NoError(t, err)
 
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).
-		Return(&record.User{Id: 42, Enabled: true, PasswordHash: currentHash}, nil).Once()
-	database.On("GetUserByIdForUpdate", mock.Anything, apiRevokeTx, int64(42)).Return(&record.User{Id: int64(42)}, nil).Once()
+		Return(&record.User{ID: 42, Enabled: true, PasswordHash: currentHash}, nil).Once()
+	database.On("GetUserByIDForUpdate", mock.Anything, apiRevokeTx, int64(42)).Return(&record.User{ID: int64(42)}, nil).Once()
 	database.On("SetUserPasswordHash", mock.Anything, apiRevokeTx, int64(42), mock.Anything).Return(nil).Once()
 	stubSweep(database, 42, 8)
 
@@ -252,9 +252,9 @@ func TestHandleAccountPasswordPut_RevocationFailureIsA500(t *testing.T) {
 	require.NoError(t, err)
 
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), "the-subject").
-		Return(&record.User{Id: 42, Enabled: true, PasswordHash: currentHash}, nil).Once()
+		Return(&record.User{ID: 42, Enabled: true, PasswordHash: currentHash}, nil).Once()
 	stub := datamocks.ExpectRunInTransaction(database, apiRevokeTx)
-	database.On("GetUserByIdForUpdate", mock.Anything, apiRevokeTx, int64(42)).Return(&record.User{Id: int64(42)}, nil).Once()
+	database.On("GetUserByIDForUpdate", mock.Anything, apiRevokeTx, int64(42)).Return(&record.User{ID: int64(42)}, nil).Once()
 	database.On("SetUserPasswordHash", mock.Anything, apiRevokeTx, int64(42), mock.Anything).Return(nil).Once()
 	database.On("IncrementUserAuthStateGeneration", mock.Anything, apiRevokeTx, int64(42)).
 		Return(int64(0), errors.New("increment failed")).Once()

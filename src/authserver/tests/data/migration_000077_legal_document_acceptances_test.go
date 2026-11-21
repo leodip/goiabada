@@ -123,41 +123,41 @@ func assertLegalDocumentAcceptancesBehaviour(t *testing.T, h *isolatedDB, when s
 	newUser := func() int64 {
 		user := &record.User{Subject: fake.UUID(), Email: fake.LetterN(12) + "@example.com", Enabled: true}
 		require.NoError(t, h.DB.CreateUser(ctx, nil, user), "CreateUser")
-		return user.Id
+		return user.ID
 	}
 
 	shortName := "accepted-" + fake.LetterN(8)
 	require.NoError(t, exec("INSERT INTO legal_documents (short_name, kind) VALUES ('%s', 'must_accept')", shortName))
-	documentId := scalar("SELECT id FROM legal_documents WHERE short_name = '%s'", shortName)
+	documentID := scalar("SELECT id FROM legal_documents WHERE short_name = '%s'", shortName)
 	require.NoError(t, exec("INSERT INTO legal_document_versions (published_at, legal_document_id, version_number, title, markdown) VALUES (%s, %d, 1, 'Terms', 'Text')",
-		now, documentId))
-	versionId := scalar("SELECT id FROM legal_document_versions WHERE legal_document_id = %d", documentId)
+		now, documentID))
+	versionID := scalar("SELECT id FROM legal_document_versions WHERE legal_document_id = %d", documentID)
 
-	userId := newUser()
-	otherUserId := newUser()
+	userID := newUser()
+	otherUserID := newUser()
 	acceptances := func(column string, id int64) int64 {
 		return scalar("SELECT COUNT(*) FROM legal_document_acceptances WHERE %s = %d", column, id)
 	}
 
 	accept := "INSERT INTO legal_document_acceptances (accepted_at, user_id, legal_document_version_id) VALUES (%s, %d, %d)"
-	require.NoErrorf(t, exec(accept, now, userId, versionId), "the first acceptance is accepted %s", when)
-	require.Errorf(t, exec(accept, now, userId, versionId), "a second acceptance of the version by the user is refused by the key %s", when)
-	assert.Equalf(t, int64(1), acceptances("user_id", userId), "and writes nothing %s", when)
-	require.Errorf(t, exec(accept, now, userId, versionId+1_000_000), "an acceptance of no version is refused %s", when)
-	require.Errorf(t, exec(accept, now, userId+1_000_000, versionId), "an acceptance by no user is refused %s", when)
+	require.NoErrorf(t, exec(accept, now, userID, versionID), "the first acceptance is accepted %s", when)
+	require.Errorf(t, exec(accept, now, userID, versionID), "a second acceptance of the version by the user is refused by the key %s", when)
+	assert.Equalf(t, int64(1), acceptances("user_id", userID), "and writes nothing %s", when)
+	require.Errorf(t, exec(accept, now, userID, versionID+1_000_000), "an acceptance of no version is refused %s", when)
+	require.Errorf(t, exec(accept, now, userID+1_000_000, versionID), "an acceptance by no user is refused %s", when)
 	require.Errorf(t, exec("INSERT INTO legal_document_acceptances (user_id, legal_document_version_id) VALUES (%d, %d)",
-		otherUserId, versionId), "an acceptance with no time is refused %s", when)
-	require.NoError(t, exec(accept, now, otherUserId, versionId))
+		otherUserID, versionID), "an acceptance with no time is refused %s", when)
+	require.NoError(t, exec(accept, now, otherUserID, versionID))
 
-	require.Errorf(t, exec("DELETE FROM legal_document_versions WHERE id = %d", versionId),
+	require.Errorf(t, exec("DELETE FROM legal_document_versions WHERE id = %d", versionID),
 		"a version accepted cannot be deleted %s", when)
 
-	require.NoError(t, exec("DELETE FROM users WHERE id = %d", userId))
-	assert.Equalf(t, int64(0), acceptances("user_id", userId), "deleting the user removed their acceptances %s", when)
-	assert.Equalf(t, int64(1), acceptances("legal_document_version_id", versionId),
+	require.NoError(t, exec("DELETE FROM users WHERE id = %d", userID))
+	assert.Equalf(t, int64(0), acceptances("user_id", userID), "deleting the user removed their acceptances %s", when)
+	assert.Equalf(t, int64(1), acceptances("legal_document_version_id", versionID),
 		"and left another user's acceptance of the version %s", when)
 
-	require.NoError(t, exec("DELETE FROM users WHERE id = %d", otherUserId))
-	require.NoError(t, exec("DELETE FROM legal_document_versions WHERE id = %d", versionId))
-	require.NoError(t, exec("DELETE FROM legal_documents WHERE id = %d", documentId))
+	require.NoError(t, exec("DELETE FROM users WHERE id = %d", otherUserID))
+	require.NoError(t, exec("DELETE FROM legal_document_versions WHERE id = %d", versionID))
+	require.NoError(t, exec("DELETE FROM legal_documents WHERE id = %d", documentID))
 }

@@ -14,13 +14,13 @@ import (
 // CSRF can honour a decision SkipCSRF made earlier in the chain. It replaces
 // gorilla/csrf's UnsafeSkipCheck, which left with the library (#155).
 //
-// The key type is unexported and the value is written only by markCsrfSkipped, which is what stops
+// The key type is unexported and the value is written only by markCSRFSkipped, which is what stops
 // any other package forging an exemption: a handler cannot name the key, so it cannot set it.
 type csrfSkipContextKey struct{}
 
-// markCsrfSkipped returns a request carrying the exemption mark. Callers must use the returned
+// markCSRFSkipped returns a request carrying the exemption mark. Callers must use the returned
 // request, since context values are immutable.
-func markCsrfSkipped(r *http.Request) *http.Request {
+func markCSRFSkipped(r *http.Request) *http.Request {
 	return r.WithContext(context.WithValue(r.Context(), csrfSkipContextKey{}, true))
 }
 
@@ -84,13 +84,13 @@ type csrfSkipper struct {
 	conditional map[string]func(*http.Request) bool
 }
 
-// newCsrfSkipper compiles a policy and refuses the two shapes that are silently wrong.
+// newCSRFSkipper compiles a policy and refuses the two shapes that are silently wrong.
 //
 // It panics rather than returning an error because a policy is a literal at a composition root,
 // evaluated once at startup: both refusals are programming errors that no request can produce and
 // that no deployment can configure its way into, so failing to start is the whole of the correct
 // response. Answering them per request would instead mean a server that boots with a hole in it.
-func newCsrfSkipper(policy CSRFPolicy) csrfSkipper {
+func newCSRFSkipper(policy CSRFPolicy) csrfSkipper {
 	exact := make(map[string]bool, len(policy.ExactPaths))
 	for _, path := range policy.ExactPaths {
 		exact[path] = true
@@ -147,14 +147,14 @@ func (s csrfSkipper) shouldSkip(r *http.Request, path string) bool {
 // SkipCSRF marks the requests policy exempts, for CSRF below to honour. The
 // policy is the caller's because the routes are: see CSRFPolicy.
 func SkipCSRF(policy CSRFPolicy) func(next http.Handler) http.Handler {
-	skipper := newCsrfSkipper(policy)
+	skipper := newCSRFSkipper(policy)
 
 	return func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
 			// The path as routed: StripTrailingSlash, mounted above, has already stripped one
 			// trailing slash from r.URL.Path, so "/auth/token/" is exempt as "/auth/token" is.
 			if skipper.shouldSkip(r, r.URL.Path) {
-				r = markCsrfSkipped(r)
+				r = markCSRFSkipped(r)
 			}
 			next.ServeHTTP(w, r)
 		}
@@ -180,7 +180,7 @@ func SkipCSRF(policy CSRFPolicy) func(next http.Handler) http.Handler {
 //     plain-HTTP deployment needs no configuration to work.
 //
 // Check is called inline rather than through CrossOriginProtection.Handler so the skip mark can
-// short-circuit it and so explainCsrfFailure still holds the request, which is the only thing that
+// short-circuit it and so explainCSRFFailure still holds the request, which is the only thing that
 // can tell the failure causes apart.
 func CSRF() func(next http.Handler) http.Handler {
 	cop := http.NewCrossOriginProtection()
@@ -210,9 +210,9 @@ func CSRF() func(next http.Handler) http.Handler {
 			// RequestTargetForLog for the target, under the key that logger uses for it. Without
 			// that one unauthenticated request with a 1 MB Origin wrote a 1 MB log line (#159,
 			// #425).
-			explanation, remedy := explainCsrfFailure(r)
+			explanation, remedy := explainCSRFFailure(r)
 
-			// The message is a literal and the sentence explainCsrfFailure built is an attribute:
+			// The message is a literal and the sentence explainCSRFFailure built is an attribute:
 			// a variable message cannot be grepped for, and a collector counting CSRF refusals
 			// had to know all four wordings to find them (#320 decision 4).
 			slog.WarnContext(r.Context(), "cross-origin request refused",
@@ -241,7 +241,7 @@ func CSRF() func(next http.Handler) http.Handler {
 	}
 }
 
-// explainCsrfFailure turns a rejection into a sentence an operator can act on, plus a one-line
+// explainCSRFFailure turns a rejection into a sentence an operator can act on, plus a one-line
 // remedy. The wording distinguishes "your deployment is misconfigured" from "a browser behaved
 // unexpectedly" from "this may be a real attack", because the same 403 covers all three and guessing
 // between them has cost real debugging time.
@@ -251,7 +251,7 @@ func CSRF() func(next http.Handler) http.Handler {
 // has no target and only string comparison could separate them, which would break on any Go release.
 // It does not need the error anyway, because the two headers Check consults fully determine the
 // cause (#155).
-func explainCsrfFailure(r *http.Request) (explanation, remedy string) {
+func explainCSRFFailure(r *http.Request) (explanation, remedy string) {
 	origin := r.Header.Get("Origin")
 	secFetchSite := r.Header.Get("Sec-Fetch-Site")
 

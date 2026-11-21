@@ -67,10 +67,10 @@ const sixPairsBelow = "6 pairs are below their minimum. Text and boundaries draw
 func paletteCheckForm(mode, appearance string, light, dark map[string]string) url.Values {
 	form := url.Values{"paletteMode": {mode}, "appearance": {appearance}}
 	for token, value := range light {
-		form.Set(paletteFieldId("light", token), value)
+		form.Set(paletteFieldID("light", token), value)
 	}
 	for token, value := range dark {
-		form.Set(paletteFieldId("dark", token), value)
+		form.Set(paletteFieldID("dark", token), value)
 	}
 	return form
 }
@@ -78,7 +78,7 @@ func paletteCheckForm(mode, appearance string, light, dark map[string]string) ur
 // checkPalette posts form to the route and answers what it encoded.
 func checkPalette(t *testing.T, form url.Values) map[string]any {
 	t.Helper()
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.ExpectEncodeJSON(httpHelper).Once()
 	HandleBrandPaletteCheckPost(httpHelper).ServeHTTP(httptest.NewRecorder(),
 		handlertest.Request(http.MethodPost, "/admin/settings/branding/palette-check", handlertest.WithAccessToken(),
@@ -89,7 +89,7 @@ func checkPalette(t *testing.T, form url.Values) map[string]any {
 // refusedPalette posts form to the route and answers its refusal.
 func refusedPalette(t *testing.T, form url.Values) (code, description string, status int) {
 	t.Helper()
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	httpHelper.On("JSONError", mock.Anything, mock.Anything, mock.Anything).Return().Once()
 	HandleBrandPaletteCheckPost(httpHelper).ServeHTTP(httptest.NewRecorder(),
 		handlertest.Request(http.MethodPost, "/admin/settings/branding/palette-check", handlertest.WithAccessToken(),

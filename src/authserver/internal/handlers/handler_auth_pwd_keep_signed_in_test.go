@@ -31,8 +31,8 @@ const (
 )
 
 func passwordPageCeremony() *ceremony.AuthContext {
-	return &ceremony.AuthContext{AuthState: ceremony.AuthStateLevel1Password, CeremonyId: testCeremonyId,
-		ClientId: "my-app"}
+	return &ceremony.AuthContext{AuthState: ceremony.AuthStateLevel1Password, CeremonyID: testCeremonyID,
+		ClientID: "my-app"}
 }
 
 // The form shows the box under Let each user choose alone, and unticked.
@@ -52,7 +52,7 @@ func TestHandleAuthPwdGet_AsksKeepMeSignedInUnderLetEachUserChooseAlone(t *testi
 			handler := buildAuthPwdGet(authPwdGetDeps{pageRenderer: pageRenderer, ceremonyStore: ceremonyStore,
 				database: database, auditLogger: handlersmocks.NewAuditLogger(t)})
 
-			req := httptest.NewRequest(http.MethodGet, "/auth/pwd?ceremony="+testCeremonyId, nil)
+			req := httptest.NewRequest(http.MethodGet, "/auth/pwd?ceremony="+testCeremonyID, nil)
 			req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{KeepSignedIn: tc.mode}))
 			rr := httptest.NewRecorder()
 
@@ -93,7 +93,7 @@ func TestHandleAuthPwdPost_ARefusalRedrawsTheBoxAsLeft(t *testing.T) {
 			handler := buildAuthPwdPost(authPwdPostDeps{pageRenderer: pageRenderer, ceremonyStore: ceremonyStore,
 				database: database, auditLogger: handlersmocks.NewAuditLogger(t)})
 
-			form := url.Values{ceremony.IdField: {testCeremonyId}, "email": {"alice@example.com"}}
+			form := url.Values{ceremony.IDField: {testCeremonyID}, "email": {"alice@example.com"}}
 			if tc.posted != "" {
 				form.Set(boxField, tc.posted)
 			}
@@ -145,7 +145,7 @@ func TestHandleAuthPwdPost_SavesTheAnswerWithThePassword(t *testing.T) {
 
 			passwordHash, err := passwordhash.Hash("the-right-password")
 			require.NoError(t, err)
-			form := url.Values{ceremony.IdField: {testCeremonyId}, "email": {"alice@example.com"},
+			form := url.Values{ceremony.IDField: {testCeremonyID}, "email": {"alice@example.com"},
 				"password": {"the-right-password"}}
 			if tc.posted != "" {
 				form.Set(boxField, tc.posted)
@@ -157,9 +157,9 @@ func TestHandleAuthPwdPost_SavesTheAnswerWithThePassword(t *testing.T) {
 
 			ceremonyStore.On("GetAuthContext", mock.Anything).Return(passwordPageCeremony(), nil)
 			database.On("GetUserByEmail", mock.Anything, mock.Anything, "alice@example.com").
-				Return(&record.User{Id: 1, Email: "alice@example.com", PasswordHash: passwordHash, Enabled: true}, nil)
+				Return(&record.User{ID: 1, Email: "alice@example.com", PasswordHash: passwordHash, Enabled: true}, nil)
 			auditLogger.On("Log", mock.Anything, audit.EventAuthSuccessPwd, mock.Anything).Return()
-			ceremonyStore.On("RegenerateSession", rr, mock.Anything, testCeremonyId, int64(1)).Return(nil).Once()
+			ceremonyStore.On("RegenerateSession", rr, mock.Anything, testCeremonyID, int64(1)).Return(nil).Once()
 			var saved *ceremony.AuthContext
 			ceremonyStore.On("SaveAuthContext", rr, mock.Anything, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 				saved = ac
@@ -187,7 +187,7 @@ func TestHandleAuthPwdPost_ReadsTheBoxFromTheBodyAlone(t *testing.T) {
 
 	passwordHash, err := passwordhash.Hash("the-right-password")
 	require.NoError(t, err)
-	form := url.Values{ceremony.IdField: {testCeremonyId}, "email": {"alice@example.com"},
+	form := url.Values{ceremony.IDField: {testCeremonyID}, "email": {"alice@example.com"},
 		"password": {"the-right-password"}}
 	req := httptest.NewRequest(http.MethodPost, "/auth/pwd?"+boxField+"="+boxTicked,
 		strings.NewReader(form.Encode()))
@@ -197,9 +197,9 @@ func TestHandleAuthPwdPost_ReadsTheBoxFromTheBodyAlone(t *testing.T) {
 
 	ceremonyStore.On("GetAuthContext", mock.Anything).Return(passwordPageCeremony(), nil)
 	database.On("GetUserByEmail", mock.Anything, mock.Anything, "alice@example.com").
-		Return(&record.User{Id: 1, Email: "alice@example.com", PasswordHash: passwordHash, Enabled: true}, nil)
+		Return(&record.User{ID: 1, Email: "alice@example.com", PasswordHash: passwordHash, Enabled: true}, nil)
 	auditLogger.On("Log", mock.Anything, audit.EventAuthSuccessPwd, mock.Anything).Return()
-	ceremonyStore.On("RegenerateSession", rr, mock.Anything, testCeremonyId, int64(1)).Return(nil).Once()
+	ceremonyStore.On("RegenerateSession", rr, mock.Anything, testCeremonyID, int64(1)).Return(nil).Once()
 	ceremonyStore.On("SaveAuthContext", rr, mock.Anything, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 		return assert.Equal(t, &unticked, ac.KeepSignedIn)
 	})).Return(nil).Once()

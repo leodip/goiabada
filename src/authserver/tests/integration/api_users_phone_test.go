@@ -39,7 +39,7 @@ func TestAPIPhoneCountriesGet_Success(t *testing.T) {
 
 	// Verify structure of first phone country; calling code must be "+"-prefixed.
 	firstCountry := response.PhoneCountries[0]
-	assert.NotEmpty(t, firstCountry.UniqueId)
+	assert.NotEmpty(t, firstCountry.UniqueID)
 	assert.Truef(t, strings.HasPrefix(firstCountry.CallingCode, "+"),
 		"calling code must be +-prefixed, got %q", firstCountry.CallingCode)
 	assert.NotEmpty(t, firstCountry.Name)
@@ -47,7 +47,7 @@ func TestAPIPhoneCountriesGet_Success(t *testing.T) {
 	// Assert: Should contain some expected countries (verify a few common ones)
 	countryMap := make(map[string]api.PhoneCountryResponse)
 	for _, country := range response.PhoneCountries {
-		countryMap[country.UniqueId] = country
+		countryMap[country.UniqueID] = country
 	}
 
 	// We expect at least some basic countries to be present
@@ -71,7 +71,7 @@ func TestAPIPhoneCountriesGet_Unauthorized(t *testing.T) {
 	req, err := http.NewRequest("GET", url, nil)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -107,17 +107,17 @@ func TestAPIUserPhonePut_Success(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	// Test: Update user phone
 	updateReq := api.UpdateUserPhoneRequest{
-		PhoneCountryUniqueId: "USA_0", // Assuming this is a valid country ID
+		PhoneCountryUniqueID: "USA_0", // Assuming this is a valid country ID
 		PhoneNumber:          "555-123-4567",
 		PhoneNumberVerified:  true,
 	}
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/phone"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.ID, 10) + "/phone"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -131,17 +131,17 @@ func TestAPIUserPhonePut_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	// Assert: Phone data should be updated
-	assert.Equal(t, updateReq.PhoneCountryUniqueId, updateResponse.User.PhoneNumberCountryUniqueId)
+	assert.Equal(t, updateReq.PhoneCountryUniqueID, updateResponse.User.PhoneNumberCountryUniqueID)
 	assert.Equal(t, updateReq.PhoneNumber, updateResponse.User.PhoneNumber)
 	assert.Equal(t, updateReq.PhoneNumberVerified, updateResponse.User.PhoneNumberVerified)
 	// USA_0 must resolve to the "+"-prefixed calling code in the API response.
 	assert.Equal(t, "+1", updateResponse.User.PhoneNumberCountryCallingCode)
 
 	// Verify changes were persisted to database
-	updatedUser, err := database.GetUserById(context.Background(), nil, testUser.Id)
+	updatedUser, err := database.GetUserByID(context.Background(), nil, testUser.ID)
 	require.NoError(t, err)
 	assert.NotNil(t, updatedUser)
-	assert.Equal(t, updateReq.PhoneCountryUniqueId, updatedUser.PhoneNumberCountryUniqueId)
+	assert.Equal(t, updateReq.PhoneCountryUniqueID, updatedUser.PhoneNumberCountryUniqueID)
 	assert.Equal(t, updateReq.PhoneNumber, updatedUser.PhoneNumber)
 	assert.Equal(t, updateReq.PhoneNumberVerified, updatedUser.PhoneNumberVerified)
 	// The "+"-prefixed calling code must be persisted, not just returned.
@@ -160,7 +160,7 @@ func TestAPIUserPhonePut_ClearPhoneNumber(t *testing.T) {
 		GivenName:                     "Test",
 		FamilyName:                    "User",
 		EmailVerified:                 true,
-		PhoneNumberCountryUniqueId:    "USA_0",
+		PhoneNumberCountryUniqueID:    "USA_0",
 		PhoneNumberCountryCallingCode: "+1",
 		PhoneNumber:                   "555-999-8888",
 		PhoneNumberVerified:           true,
@@ -168,17 +168,17 @@ func TestAPIUserPhonePut_ClearPhoneNumber(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	// Test: Clear phone number by setting empty values
 	updateReq := api.UpdateUserPhoneRequest{
-		PhoneCountryUniqueId: "",
+		PhoneCountryUniqueID: "",
 		PhoneNumber:          "",
 		PhoneNumberVerified:  false,
 	}
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/phone"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.ID, 10) + "/phone"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -191,15 +191,15 @@ func TestAPIUserPhonePut_ClearPhoneNumber(t *testing.T) {
 	require.NoError(t, err)
 
 	// Assert: Phone fields should be cleared
-	assert.Empty(t, updateResponse.User.PhoneNumberCountryUniqueId)
+	assert.Empty(t, updateResponse.User.PhoneNumberCountryUniqueID)
 	assert.Empty(t, updateResponse.User.PhoneNumberCountryCallingCode)
 	assert.Empty(t, updateResponse.User.PhoneNumber)
 	assert.False(t, updateResponse.User.PhoneNumberVerified)
 
 	// Verify changes were persisted to database
-	updatedUser, err := database.GetUserById(context.Background(), nil, testUser.Id)
+	updatedUser, err := database.GetUserByID(context.Background(), nil, testUser.ID)
 	require.NoError(t, err)
-	assert.Empty(t, updatedUser.PhoneNumberCountryUniqueId)
+	assert.Empty(t, updatedUser.PhoneNumberCountryUniqueID)
 	assert.Empty(t, updatedUser.PhoneNumberCountryCallingCode)
 	assert.Empty(t, updatedUser.PhoneNumber)
 	assert.False(t, updatedUser.PhoneNumberVerified)
@@ -221,7 +221,7 @@ func TestAPIUserPhonePut_ValidationErrors(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	testCases := []struct {
@@ -232,7 +232,7 @@ func TestAPIUserPhonePut_ValidationErrors(t *testing.T) {
 		{
 			"phone number without country",
 			api.UpdateUserPhoneRequest{
-				PhoneCountryUniqueId: "",
+				PhoneCountryUniqueID: "",
 				PhoneNumber:          "555-123-4567",
 				PhoneNumberVerified:  false,
 			},
@@ -241,7 +241,7 @@ func TestAPIUserPhonePut_ValidationErrors(t *testing.T) {
 		{
 			"country without phone number",
 			api.UpdateUserPhoneRequest{
-				PhoneCountryUniqueId: "USA_0",
+				PhoneCountryUniqueID: "USA_0",
 				PhoneNumber:          "",
 				PhoneNumberVerified:  false,
 			},
@@ -250,7 +250,7 @@ func TestAPIUserPhonePut_ValidationErrors(t *testing.T) {
 		{
 			"phone number too short",
 			api.UpdateUserPhoneRequest{
-				PhoneCountryUniqueId: "USA_0",
+				PhoneCountryUniqueID: "USA_0",
 				PhoneNumber:          "123",
 				PhoneNumberVerified:  false,
 			},
@@ -259,7 +259,7 @@ func TestAPIUserPhonePut_ValidationErrors(t *testing.T) {
 		{
 			"phone number too long",
 			api.UpdateUserPhoneRequest{
-				PhoneCountryUniqueId: "USA_0",
+				PhoneCountryUniqueID: "USA_0",
 				PhoneNumber:          "1234567890123456789012345678901", // 31 chars
 				PhoneNumberVerified:  false,
 			},
@@ -268,7 +268,7 @@ func TestAPIUserPhonePut_ValidationErrors(t *testing.T) {
 		{
 			"invalid phone number characters",
 			api.UpdateUserPhoneRequest{
-				PhoneCountryUniqueId: "USA_0",
+				PhoneCountryUniqueID: "USA_0",
 				PhoneNumber:          "555-ABC-DEFG",
 				PhoneNumberVerified:  false,
 			},
@@ -277,7 +277,7 @@ func TestAPIUserPhonePut_ValidationErrors(t *testing.T) {
 		{
 			"invalid country id",
 			api.UpdateUserPhoneRequest{
-				PhoneCountryUniqueId: "INVALID_COUNTRY",
+				PhoneCountryUniqueID: "INVALID_COUNTRY",
 				PhoneNumber:          "555-123-4567",
 				PhoneNumberVerified:  false,
 			},
@@ -287,7 +287,7 @@ func TestAPIUserPhonePut_ValidationErrors(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/phone"
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.ID, 10) + "/phone"
 			resp := makeAPIRequest(t, "PUT", url, accessToken, tc.request)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -302,7 +302,7 @@ func TestAPIUserPhonePut_UserNotFound(t *testing.T) {
 
 	// Test: Update phone for non-existent user
 	updateReq := api.UpdateUserPhoneRequest{
-		PhoneCountryUniqueId: "USA_0",
+		PhoneCountryUniqueID: "USA_0",
 		PhoneNumber:          "555-123-4567",
 		PhoneNumberVerified:  false,
 	}
@@ -315,19 +315,19 @@ func TestAPIUserPhonePut_UserNotFound(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
-func TestAPIUserPhonePut_InvalidUserId(t *testing.T) {
+func TestAPIUserPhonePut_InvalidUserID(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)
 
 	updateReq := api.UpdateUserPhoneRequest{
-		PhoneCountryUniqueId: "USA_0",
+		PhoneCountryUniqueID: "USA_0",
 		PhoneNumber:          "555-123-4567",
 		PhoneNumberVerified:  false,
 	}
 
 	testCases := []struct {
 		name           string
-		userId         string
+		userID         string
 		expectedStatus int
 	}{
 		{"non-numeric ID", "abc", http.StatusBadRequest},
@@ -338,7 +338,7 @@ func TestAPIUserPhonePut_InvalidUserId(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + tc.userId + "/phone"
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + tc.userID + "/phone"
 			resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -363,17 +363,17 @@ func TestAPIUserPhonePut_InvalidRequestBody(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	// Test: Invalid JSON
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/phone"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.ID, 10) + "/phone"
 	req, err := http.NewRequest("PUT", url, nil)
 	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -395,15 +395,15 @@ func TestAPIUserPhonePut_Unauthorized(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	// Test: Request without access token
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/phone"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.ID, 10) + "/phone"
 	req, err := http.NewRequest("PUT", url, nil)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -428,18 +428,18 @@ func TestAPIUserPhonePut_PhoneNumberVerifiedAutoCleared(t *testing.T) {
 	err := database.CreateUser(context.Background(), nil, testUser)
 	require.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
 
 	// Test: Set phone number verified to true but clear the phone number
 	// The verified flag should be automatically set to false when phone is cleared
 	updateReq := api.UpdateUserPhoneRequest{
-		PhoneCountryUniqueId: "",
+		PhoneCountryUniqueID: "",
 		PhoneNumber:          "",
 		PhoneNumberVerified:  true, // This should be ignored/overridden
 	}
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/phone"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.ID, 10) + "/phone"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -455,7 +455,7 @@ func TestAPIUserPhonePut_PhoneNumberVerifiedAutoCleared(t *testing.T) {
 	assert.False(t, updateResponse.User.PhoneNumberVerified)
 
 	// Verify in database
-	updatedUser, err := database.GetUserById(context.Background(), nil, testUser.Id)
+	updatedUser, err := database.GetUserByID(context.Background(), nil, testUser.ID)
 	require.NoError(t, err)
 	assert.False(t, updatedUser.PhoneNumberVerified)
 }

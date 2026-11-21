@@ -20,11 +20,11 @@ var userSessionClientColumns = columnList{
 // scanUserSessionClient reads one row selected with userSessionClientColumns.
 func scanUserSessionClient(row rowScanner, userSessionClient *record.UserSessionClient) error {
 	return row.Scan(
-		&userSessionClient.Id,
+		&userSessionClient.ID,
 		&userSessionClient.CreatedAt,
 		&userSessionClient.UpdatedAt,
-		&userSessionClient.UserSessionId,
-		&userSessionClient.ClientId,
+		&userSessionClient.UserSessionID,
+		&userSessionClient.ClientID,
 		&userSessionClient.Started,
 		&userSessionClient.LastAccessed,
 	)
@@ -52,33 +52,33 @@ var updateUserSessionClient = statement{
 	mssql:    "UPDATE user_session_clients SET updated_at = @p1, started = @p2, last_accessed = @p3 WHERE id = @p4",
 }
 
-var selectUserSessionClientById = statement{
+var selectUserSessionClientByID = statement{
 	sqlite:   "SELECT " + userSessionClientColumns.sqlite + " FROM user_session_clients WHERE id = ?",
 	mysql:    "SELECT " + userSessionClientColumns.mysql + " FROM user_session_clients WHERE id = ?",
 	postgres: "SELECT " + userSessionClientColumns.postgres + " FROM user_session_clients WHERE id = $1",
 	mssql:    "SELECT " + userSessionClientColumns.mssql + " FROM user_session_clients WHERE id = @p1",
 }
 
-var selectUserSessionClientsByUserSessionId = statement{
+var selectUserSessionClientsByUserSessionID = statement{
 	sqlite:   "SELECT " + userSessionClientColumns.sqlite + " FROM user_session_clients WHERE user_session_id = ?",
 	mysql:    "SELECT " + userSessionClientColumns.mysql + " FROM user_session_clients WHERE user_session_id = ?",
 	postgres: "SELECT " + userSessionClientColumns.postgres + " FROM user_session_clients WHERE user_session_id = $1",
 	mssql:    "SELECT " + userSessionClientColumns.mssql + " FROM user_session_clients WHERE user_session_id = @p1",
 }
 
-// selectCommittedUserSessionClientsByUserSessionId and selectCommittedClientById are the reads
-// GetCommittedUserSessionClients runs: the same rows as selectUserSessionClientsByUserSessionId and
-// selectClientById, read as last committed. On MySQL that takes a locking read, FOR SHARE; the
+// selectCommittedUserSessionClientsByUserSessionID and selectCommittedClientByID are the reads
+// GetCommittedUserSessionClients runs: the same rows as selectUserSessionClientsByUserSessionID and
+// selectClientByID, read as last committed. On MySQL that takes a locking read, FOR SHARE; the
 // other three already read what was committed when each statement started (see
 // GetCommittedUserSessionClients).
-var selectCommittedUserSessionClientsByUserSessionId = statement{
+var selectCommittedUserSessionClientsByUserSessionID = statement{
 	sqlite:   "SELECT " + userSessionClientColumns.sqlite + " FROM user_session_clients WHERE user_session_id = ?",
 	mysql:    "SELECT " + userSessionClientColumns.mysql + " FROM user_session_clients WHERE user_session_id = ? FOR SHARE",
 	postgres: "SELECT " + userSessionClientColumns.postgres + " FROM user_session_clients WHERE user_session_id = $1",
 	mssql:    "SELECT " + userSessionClientColumns.mssql + " FROM user_session_clients WHERE user_session_id = @p1",
 }
 
-var selectCommittedClientById = statement{
+var selectCommittedClientByID = statement{
 	sqlite:   "SELECT " + clientColumns.sqlite + " FROM clients WHERE id = ?",
 	mysql:    "SELECT " + clientColumns.mysql + " FROM clients WHERE id = ? FOR SHARE",
 	postgres: "SELECT " + clientColumns.postgres + " FROM clients WHERE id = $1",
@@ -110,21 +110,21 @@ func (d *Database) CreateUserSessionClient(ctx context.Context, tx *sql.Tx, user
 	userSessionClient.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
 	id, err := d.insert(ctx, tx, insertUserSessionClient, "userSessionClient",
-		userSessionClient.CreatedAt, userSessionClient.UpdatedAt, userSessionClient.UserSessionId,
-		userSessionClient.ClientId, userSessionClient.Started, userSessionClient.LastAccessed)
+		userSessionClient.CreatedAt, userSessionClient.UpdatedAt, userSessionClient.UserSessionID,
+		userSessionClient.ClientID, userSessionClient.Started, userSessionClient.LastAccessed)
 	if err != nil {
 		userSessionClient.CreatedAt = originalCreatedAt
 		userSessionClient.UpdatedAt = originalUpdatedAt
 		return err
 	}
 
-	userSessionClient.Id = id
+	userSessionClient.ID = id
 	return nil
 }
 
 func (d *Database) UpdateUserSessionClient(ctx context.Context, tx *sql.Tx, userSessionClient *record.UserSessionClient) error {
 
-	if userSessionClient.Id == 0 {
+	if userSessionClient.ID == 0 {
 		return errs.New("can't update userSessionClient with id 0")
 	}
 
@@ -132,7 +132,7 @@ func (d *Database) UpdateUserSessionClient(ctx context.Context, tx *sql.Tx, user
 	userSessionClient.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
 	_, err := d.ExecSQL(ctx, tx, updateUserSessionClient.text(d.Dialect),
-		userSessionClient.UpdatedAt, userSessionClient.Started, userSessionClient.LastAccessed, userSessionClient.Id)
+		userSessionClient.UpdatedAt, userSessionClient.Started, userSessionClient.LastAccessed, userSessionClient.ID)
 	if err != nil {
 		userSessionClient.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update userSessionClient")
@@ -147,25 +147,25 @@ func (d *Database) UserSessionClientsLoadClients(ctx context.Context, tx *sql.Tx
 		return nil
 	}
 
-	clientIds := make([]int64, 0)
+	clientIDs := make([]int64, 0)
 	for _, userSessionClient := range userSessionClients {
-		clientIds = append(clientIds, userSessionClient.ClientId)
+		clientIDs = append(clientIDs, userSessionClient.ClientID)
 	}
 
-	clients, err := d.GetClientsByIds(ctx, tx, clientIds)
+	clients, err := d.GetClientsByIDs(ctx, tx, clientIDs)
 	if err != nil {
 		return errs.Wrap(err, "unable to get clients by ids")
 	}
 
 	clientsMap := make(map[int64]record.Client)
 	for _, client := range clients {
-		clientsMap[client.Id] = client
+		clientsMap[client.ID] = client
 	}
 
 	for i, userSessionClient := range userSessionClients {
-		client, ok := clientsMap[userSessionClient.ClientId]
+		client, ok := clientsMap[userSessionClient.ClientID]
 		if !ok {
-			return errs.Errorf("client with id %d not found", userSessionClient.ClientId)
+			return errs.Errorf("client with id %d not found", userSessionClient.ClientID)
 		}
 		userSessionClients[i].Client = client
 	}
@@ -173,15 +173,15 @@ func (d *Database) UserSessionClientsLoadClients(ctx context.Context, tx *sql.Tx
 	return nil
 }
 
-func (d *Database) GetUserSessionClientsByUserSessionIds(ctx context.Context, tx *sql.Tx, userSessionIds []int64) ([]record.UserSessionClient, error) {
+func (d *Database) GetUserSessionClientsByUserSessionIDs(ctx context.Context, tx *sql.Tx, userSessionIDs []int64) ([]record.UserSessionClient, error) {
 
-	if len(userSessionIds) == 0 {
+	if len(userSessionIDs) == 0 {
 		return nil, nil
 	}
 
 	var userSessionClients []record.UserSessionClient
 
-	err := forEachIdBatch(userSessionIds, func(batch []int64) error {
+	err := forEachIDBatch(userSessionIDs, func(batch []int64) error {
 		query := selectUserSessionClientsWhere.text(d.Dialect) + inList(d.Dialect, "user_session_id", 1, len(batch))
 		var err error
 		userSessionClients, err = queryAll(ctx, d, tx, userSessionClients, query, int64Args(batch),
@@ -195,15 +195,15 @@ func (d *Database) GetUserSessionClientsByUserSessionIds(ctx context.Context, tx
 	return userSessionClients, nil
 }
 
-func (d *Database) GetUserSessionClientsByUserSessionId(ctx context.Context, tx *sql.Tx, userSessionId int64) ([]record.UserSessionClient, error) {
-	return queryAll(ctx, d, tx, nil, selectUserSessionClientsByUserSessionId.text(d.Dialect), []any{userSessionId},
+func (d *Database) GetUserSessionClientsByUserSessionID(ctx context.Context, tx *sql.Tx, userSessionID int64) ([]record.UserSessionClient, error) {
+	return queryAll(ctx, d, tx, nil, selectUserSessionClientsByUserSessionID.text(d.Dialect), []any{userSessionID},
 		scanUserSessionClient, "userSessionClient")
 }
 
 // GetCommittedUserSessionClients answers the apps a session served, each with its client, as last
 // committed: what an end of the session tells, read under the session's row (#784).
 //
-// The difference from GetUserSessionClientsByUserSessionId and UserSessionClientsLoadClients is
+// The difference from GetUserSessionClientsByUserSessionID and UserSessionClientsLoadClients is
 // MySQL's. Under InnoDB's default REPEATABLE READ every consistent read in a transaction reads the
 // snapshot its first read established, and an end reads the user's sessions before it takes a
 // session's row. A sign-in that adds an app to the session and commits in between is waited for by
@@ -215,27 +215,27 @@ func (d *Database) GetUserSessionClientsByUserSessionId(ctx context.Context, tx 
 // their statements take no lock.
 //
 // tx is required: the read is only current under the session's row, which a transaction holds.
-func (d *Database) GetCommittedUserSessionClients(ctx context.Context, tx *sql.Tx, userSessionId int64) ([]record.UserSessionClient, error) {
+func (d *Database) GetCommittedUserSessionClients(ctx context.Context, tx *sql.Tx, userSessionID int64) ([]record.UserSessionClient, error) {
 
 	if tx == nil {
 		return nil, errs.New("reading a session's apps as committed requires a transaction: they are current only under the session's row")
 	}
 
-	userSessionClients, err := queryAll(ctx, d, tx, nil, selectCommittedUserSessionClientsByUserSessionId.text(d.Dialect),
-		[]any{userSessionId}, scanUserSessionClient, "userSessionClient")
+	userSessionClients, err := queryAll(ctx, d, tx, nil, selectCommittedUserSessionClientsByUserSessionID.text(d.Dialect),
+		[]any{userSessionID}, scanUserSessionClient, "userSessionClient")
 	if err != nil {
 		return nil, err
 	}
 
 	// One read per app, by id: a session serves a handful, and it keeps the lock on the one row read.
 	for i := range userSessionClients {
-		client, err := queryOne(ctx, d, tx, selectCommittedClientById.text(d.Dialect),
-			[]any{userSessionClients[i].ClientId}, scanClient, "client")
+		client, err := queryOne(ctx, d, tx, selectCommittedClientByID.text(d.Dialect),
+			[]any{userSessionClients[i].ClientID}, scanClient, "client")
 		if err != nil {
 			return nil, err
 		}
 		if client == nil {
-			return nil, errs.Errorf("client with id %d not found", userSessionClients[i].ClientId)
+			return nil, errs.Errorf("client with id %d not found", userSessionClients[i].ClientID)
 		}
 		userSessionClients[i].Client = *client
 	}
@@ -243,15 +243,15 @@ func (d *Database) GetCommittedUserSessionClients(ctx context.Context, tx *sql.T
 	return userSessionClients, nil
 }
 
-func (d *Database) GetUserSessionsClientByIds(ctx context.Context, tx *sql.Tx, userSessionClientIds []int64) ([]record.UserSessionClient, error) {
+func (d *Database) GetUserSessionsClientByIDs(ctx context.Context, tx *sql.Tx, userSessionClientIDs []int64) ([]record.UserSessionClient, error) {
 
-	if len(userSessionClientIds) == 0 {
+	if len(userSessionClientIDs) == 0 {
 		return nil, nil
 	}
 
 	var userSessionClients []record.UserSessionClient
 
-	err := forEachIdBatch(userSessionClientIds, func(batch []int64) error {
+	err := forEachIDBatch(userSessionClientIDs, func(batch []int64) error {
 		query := selectUserSessionClientsWhere.text(d.Dialect) + inList(d.Dialect, "id", 1, len(batch))
 		var err error
 		userSessionClients, err = queryAll(ctx, d, tx, userSessionClients, query, int64Args(batch),
@@ -265,14 +265,14 @@ func (d *Database) GetUserSessionsClientByIds(ctx context.Context, tx *sql.Tx, u
 	return userSessionClients, nil
 }
 
-func (d *Database) GetUserSessionClientById(ctx context.Context, tx *sql.Tx, userSessionClientId int64) (*record.UserSessionClient, error) {
-	return queryOne(ctx, d, tx, selectUserSessionClientById.text(d.Dialect), []any{userSessionClientId},
+func (d *Database) GetUserSessionClientByID(ctx context.Context, tx *sql.Tx, userSessionClientID int64) (*record.UserSessionClient, error) {
+	return queryOne(ctx, d, tx, selectUserSessionClientByID.text(d.Dialect), []any{userSessionClientID},
 		scanUserSessionClient, "userSessionClient")
 }
 
-func (d *Database) DeleteUserSessionClient(ctx context.Context, tx *sql.Tx, userSessionClientId int64) error {
+func (d *Database) DeleteUserSessionClient(ctx context.Context, tx *sql.Tx, userSessionClientID int64) error {
 
-	_, err := d.ExecSQL(ctx, tx, deleteUserSessionClient.text(d.Dialect), userSessionClientId)
+	_, err := d.ExecSQL(ctx, tx, deleteUserSessionClient.text(d.Dialect), userSessionClientID)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete userSessionClient")
 	}

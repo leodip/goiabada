@@ -27,19 +27,19 @@ const sharedSubject = "portal"
 // expectConnectedClientsOfUser42 registers the list's reads: user 42, holding a live grant with the
 // portal client (5) and with another client (6).
 func expectConnectedClientsOfUser42(database *datamocks.Database) {
-	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(42)).
-		Return(&record.User{Id: 42, Subject: sharedSubject}, nil).Once()
-	database.On("GetConsentsByUserId", mock.Anything, (*sql.Tx)(nil), int64(42)).
+	database.On("GetUserByID", mock.Anything, (*sql.Tx)(nil), int64(42)).
+		Return(&record.User{ID: 42, Subject: sharedSubject}, nil).Once()
+	database.On("GetConsentsByUserID", mock.Anything, (*sql.Tx)(nil), int64(42)).
 		Return([]record.UserConsent{}, nil).Once()
-	database.On("GetLiveGrantsByUserId", mock.Anything, (*sql.Tx)(nil), int64(42), mock.Anything).
+	database.On("GetLiveGrantsByUserID", mock.Anything, (*sql.Tx)(nil), int64(42), mock.Anything).
 		Return([]record.LiveGrant{
-			{RefreshTokenId: 1, ClientId: 5, Scope: "openid"},
-			{RefreshTokenId: 2, ClientId: 6, Scope: "openid"},
+			{RefreshTokenID: 1, ClientID: 5, Scope: "openid"},
+			{RefreshTokenID: 2, ClientID: 6, Scope: "openid"},
 		}, nil).Once()
-	database.On("GetClientsByIds", mock.Anything, (*sql.Tx)(nil), []int64{5, 6}).
+	database.On("GetClientsByIDs", mock.Anything, (*sql.Tx)(nil), []int64{5, 6}).
 		Return([]record.Client{
-			{Id: 5, ClientIdentifier: "portal"},
-			{Id: 6, ClientIdentifier: "calendar"},
+			{ID: 5, ClientIdentifier: "portal"},
+			{ID: 6, ClientIdentifier: "calendar"},
 		}, nil).Once()
 }
 

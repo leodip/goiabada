@@ -30,7 +30,7 @@ func HandlePhoneCountriesGet() http.HandlerFunc {
 		phoneCountryResponses := make([]api.PhoneCountryResponse, len(phoneCountries))
 		for i, pc := range phoneCountries {
 			phoneCountryResponses[i] = api.PhoneCountryResponse{
-				UniqueId:    pc.UniqueId,
+				UniqueID:    pc.UniqueID,
 				Alpha2:      pc.Alpha2,
 				Emoji:       pc.Emoji,
 				CallingCode: pc.CallingCode,
@@ -52,7 +52,7 @@ func HandlePhoneCountriesGet() http.HandlerFunc {
 // whether the user is an administrator.
 type usersPhoneDatabase interface {
 	userTargetPolicyDatabase
-	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	GetUserByID(ctx context.Context, tx *sql.Tx, userID int64) (*record.User, error)
 	SetUserPhone(ctx context.Context, tx *sql.Tx, user *record.User) error
 }
 
@@ -72,7 +72,7 @@ func HandleUserPhonePut(
 			return
 		}
 
-		userId, err := strconv.ParseInt(idStr, 10, 64)
+		userID, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			writeJSONError(w, "Invalid user ID", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
@@ -86,7 +86,7 @@ func HandleUserPhonePut(
 		}
 
 		// Get user from database
-		user, err := database.GetUserById(r.Context(), nil, userId)
+		user, err := database.GetUserByID(r.Context(), nil, userID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -99,7 +99,7 @@ func HandleUserPhonePut(
 
 		// Validate phone data
 		input := &accountvalidation.ValidatePhoneInput{
-			PhoneCountryUniqueId: req.PhoneCountryUniqueId,
+			PhoneCountryUniqueID: req.PhoneCountryUniqueID,
 			PhoneNumber:          strings.TrimSpace(req.PhoneNumber),
 		}
 
@@ -112,25 +112,25 @@ func HandleUserPhonePut(
 		// Look up the phone country. ValidatePhone has already refused a country it does not know, so
 		// this is a second line, and it says the validator's sentence under the code it always wrote
 		// (#559).
-		phoneCountry, found := phonecountries.ByUniqueID(input.PhoneCountryUniqueId)
-		if !found && len(input.PhoneCountryUniqueId) > 0 {
+		phoneCountry, found := phonecountries.ByUniqueID(input.PhoneCountryUniqueID)
+		if !found && len(input.PhoneCountryUniqueID) > 0 {
 			writeValidationError(w, r, i18n.NewLocalizedError(i18n.ErrCodePhoneCountryInvalid, nil))
 			return
 		}
 
 		// Only authserver:manage writes to an administrator (#402 decision 1).
-		if !userTargetCeilingAllows(w, r, database, auditLogger, user.Id) {
+		if !userTargetCeilingAllows(w, r, database, auditLogger, user.ID) {
 			return
 		}
 
 		// Update user phone fields
 		if strings.TrimSpace(input.PhoneNumber) == "" {
-			user.PhoneNumberCountryUniqueId = ""
+			user.PhoneNumberCountryUniqueID = ""
 			user.PhoneNumberCountryCallingCode = ""
 			user.PhoneNumber = ""
 			user.PhoneNumberVerified = false
 		} else {
-			user.PhoneNumberCountryUniqueId = input.PhoneCountryUniqueId
+			user.PhoneNumberCountryUniqueID = input.PhoneCountryUniqueID
 			user.PhoneNumberCountryCallingCode = phoneCountry.CallingCode
 			user.PhoneNumber = input.PhoneNumber
 			user.PhoneNumberVerified = req.PhoneNumberVerified
@@ -157,7 +157,7 @@ func HandleUserPhonePut(
 
 		// Log audit event
 		auditLogger.Log(r.Context(), audit.EventUpdatedUserPhone, map[string]interface{}{
-			"user_id":        user.Id,
+			"user_id":        user.ID,
 			"logged_in_user": loggedInUser,
 		})
 

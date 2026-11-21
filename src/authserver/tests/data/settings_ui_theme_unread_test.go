@@ -26,17 +26,17 @@ func TestUpdateSettings_LeavesUIThemeAsStored(t *testing.T) {
 	require.NoError(t, h.DB.CreateSettings(ctx, nil, settings))
 
 	// An old replica saves a theme after this one read the row and before it saves its own.
-	loaded, err := h.DB.GetSettingsById(ctx, nil, settings.Id)
+	loaded, err := h.DB.GetSettingsByID(ctx, nil, settings.ID)
 	require.NoError(t, err)
 	require.NotNil(t, loaded)
-	setUIThemeUnread(t, h, settings.Id, "dark")
+	setUIThemeUnread(t, h, settings.ID, "dark")
 
 	loaded.AppName = "After"
 	require.NoError(t, h.DB.UpdateSettings(ctx, nil, loaded))
 
-	assert.Equalf(t, "dark", uiThemeUnread(t, h, settings.Id),
+	assert.Equalf(t, "dark", uiThemeUnread(t, h, settings.ID),
 		"a settings save leaves ui_theme as stored on %s", dbType())
-	stored, err := h.DB.GetSettingsById(ctx, nil, settings.Id)
+	stored, err := h.DB.GetSettingsByID(ctx, nil, settings.ID)
 	require.NoError(t, err)
 	assert.Equal(t, "After", stored.AppName, "the save itself is written")
 }
@@ -50,7 +50,7 @@ func TestCreateSettings_FillsUIThemeWithTheEmptyValue(t *testing.T) {
 	settings := initialSettings("Ordinary")
 	require.NoError(t, h.DB.CreateSettings(ctx, nil, settings))
 
-	assert.Emptyf(t, uiThemeUnread(t, h, settings.Id), "an insert stores the empty ui_theme on %s", dbType())
+	assert.Emptyf(t, uiThemeUnread(t, h, settings.ID), "an insert stores the empty ui_theme on %s", dbType())
 }
 
 func TestCreateInitialSettings_FillsUIThemeWithTheEmptyValue(t *testing.T) {
@@ -67,17 +67,17 @@ func TestCreateInitialSettings_FillsUIThemeWithTheEmptyValue(t *testing.T) {
 
 // setUIThemeUnread writes a settings row's ui_theme with raw SQL, as the previous release does.
 // Bound rather than inlined, since some of the values 000065's test stores are not plain ASCII.
-func setUIThemeUnread(t *testing.T, h *isolatedDB, settingsId int64, theme string) {
+func setUIThemeUnread(t *testing.T, h *isolatedDB, settingsID int64, theme string) {
 	t.Helper()
 	q := fmt.Sprintf("UPDATE settings SET ui_theme = %s WHERE id = %s", placeholder000059(1), placeholder000059(2))
-	_, err := h.SQL.Exec(q, theme, settingsId)
+	_, err := h.SQL.Exec(q, theme, settingsID)
 	require.NoErrorf(t, err, "store ui_theme %q on %s", theme, dbType())
 }
 
-func uiThemeUnread(t *testing.T, h *isolatedDB, settingsId int64) string {
+func uiThemeUnread(t *testing.T, h *isolatedDB, settingsID int64) string {
 	t.Helper()
 	var theme string
-	q := fmt.Sprintf("SELECT ui_theme FROM settings WHERE id = %d", settingsId)
+	q := fmt.Sprintf("SELECT ui_theme FROM settings WHERE id = %d", settingsID)
 	require.NoErrorf(t, h.SQL.QueryRow(q).Scan(&theme), "read settings.ui_theme on %s", dbType())
 	return theme
 }

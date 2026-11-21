@@ -40,7 +40,7 @@ const (
 // withSecret is set.
 func turnstileSaveSettings(t *testing.T, enabled, withSecret bool) *record.Settings {
 	t.Helper()
-	settings := &record.Settings{Id: 1, TurnstileEnabled: enabled, TurnstileSiteKey: turnstileTestSiteKey}
+	settings := &record.Settings{ID: 1, TurnstileEnabled: enabled, TurnstileSiteKey: turnstileTestSiteKey}
 	if withSecret {
 		ciphertext, err := testDataCipher.Encrypt(turnstileStoredSecretKey)
 		require.NoError(t, err)
@@ -115,7 +115,7 @@ func serveTurnstileSaveUnder(t *testing.T, dataCipher *encryption.DataCipher, se
 		database.EXPECT().RunInTransaction(mock.Anything, mock.Anything).
 			RunAndReturn(func(_ context.Context, fn func(tx *sql.Tx) error) error { return fn(settingsSaveTx) }).Maybe()
 		database.EXPECT().AcquireSettingsRow(mock.Anything, settingsSaveTx, mock.Anything).Return(nil).Maybe()
-		database.EXPECT().GetSettingsById(mock.Anything, settingsSaveTx, mock.Anything).
+		database.EXPECT().GetSettingsByID(mock.Anything, settingsSaveTx, mock.Anything).
 			RunAndReturn(func(context.Context, *sql.Tx, int64) (*record.Settings, error) {
 				stored := *locked
 				stored.TurnstileSecretKeyEncrypted = bytes.Clone(locked.TurnstileSecretKeyEncrypted)
@@ -203,7 +203,7 @@ func TestHandleSettingsTurnstileGet_AnswersWhetherASecretKeyIsStoredAndNeverTheK
 // under the data key, and records the values the save replaced and wrote, the secret key only as
 // whether one is stored.
 func TestHandleSettingsTurnstilePut_TurningTheChallengeOnStoresTheKeys(t *testing.T) {
-	settings := &record.Settings{Id: 1}
+	settings := &record.Settings{ID: 1}
 
 	save := serveTurnstileSave(t, settings, turnstileSaveBody(t, true, turnstileTestSiteKey,
 		map[string]interface{}{"turnstileSecretKey": turnstileTestSecretKey}))
@@ -734,7 +734,7 @@ func TestHandleSettingsTurnstilePut_RefusalsWriteNothing(t *testing.T) {
 func TestHandleSettingsTurnstilePut_KeysOf128CharactersSave(t *testing.T) {
 	siteKey, secretKey := strings.Repeat("s", 128), strings.Repeat("k", 128)
 
-	save := serveTurnstileSave(t, &record.Settings{Id: 1}, turnstileSaveBody(t, true, siteKey,
+	save := serveTurnstileSave(t, &record.Settings{ID: 1}, turnstileSaveBody(t, true, siteKey,
 		map[string]interface{}{"turnstileSecretKey": secretKey}))
 
 	require.Equal(t, http.StatusOK, save.rr.Code, save.rr.Body.String())
@@ -745,7 +745,7 @@ func TestHandleSettingsTurnstilePut_KeysOf128CharactersSave(t *testing.T) {
 
 // A body that will not parse is an integrator's mistake, answered in English with nothing written.
 func TestHandleSettingsTurnstilePut_ABodyThatWillNotParseIsRefused(t *testing.T) {
-	save := serveTurnstileSave(t, &record.Settings{Id: 1}, `{"turnstileEnabled": "yes"`)
+	save := serveTurnstileSave(t, &record.Settings{ID: 1}, `{"turnstileEnabled": "yes"`)
 
 	assert.Equal(t, http.StatusBadRequest, save.rr.Code)
 	code, _ := decodeErrorEnvelope(t, save.rr)

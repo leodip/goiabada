@@ -38,7 +38,7 @@ func TestHandleAccountProfilePut_StoresTheGenderWordForEitherSpelling(t *testing
 
 			// The row starts with a gender, so the empty row shows the PUT clearing it.
 			database.On("GetUserBySubject", mock.Anything, mock.Anything, profileTestSubject).
-				Return(&record.User{Id: profileTestUserId, Subject: profileTestSubject, Gender: "other"}, nil).Once()
+				Return(&record.User{ID: profileTestUserID, Subject: profileTestSubject, Gender: "other"}, nil).Once()
 			var stored *record.User
 			database.On("SetUserProfile", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 				Run(func(args mock.Arguments) { stored = args.Get(2).(*record.User) }).
@@ -68,7 +68,7 @@ func TestHandleAccountProfilePut_RefusesAnyOtherGender(t *testing.T) {
 
 			// No write and no audit record are stubbed: the mocks fail the test on either.
 			database.On("GetUserBySubject", mock.Anything, mock.Anything, profileTestSubject).
-				Return(&record.User{Id: profileTestUserId, Subject: profileTestSubject, Gender: "other"}, nil).Once()
+				Return(&record.User{ID: profileTestUserID, Subject: profileTestSubject, Gender: "other"}, nil).Once()
 
 			rr := httptest.NewRecorder()
 			HandleAccountProfilePut(database, accountvalidation.NewProfileValidator(database), auditLogger).

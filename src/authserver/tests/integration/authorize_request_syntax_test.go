@@ -19,10 +19,10 @@ import (
 // reached on the wire, and that the refusal is the one the client reads.
 
 // authorizeRequest is a code-flow authorization request for client, its parameters overridable.
-func authorizeRequest(client *record.Client, redirectUri *record.RedirectURI, overrides map[string]string) string {
+func authorizeRequest(client *record.Client, redirectURI *record.RedirectURI, overrides map[string]string) string {
 	query := url.Values{
 		"client_id":             {client.ClientIdentifier},
-		"redirect_uri":          {redirectUri.URI},
+		"redirect_uri":          {redirectURI.URI},
 		"response_type":         {"code"},
 		"code_challenge_method": {"S256"},
 		"code_challenge":        {randomCodeChallenge()},
@@ -37,11 +37,11 @@ func authorizeRequest(client *record.Client, redirectUri *record.RedirectURI, ov
 
 // answeredAtOnce sends the request from a browser that holds a session, which answers a refusal on
 // the redirect itself (#213), and returns that redirect.
-func answeredAtOnce(t *testing.T, destUrl string) *http.Response {
+func answeredAtOnce(t *testing.T, destURL string) *http.Response {
 	t.Helper()
-	httpClient := createAuthenticatedHttpClient(t)
+	httpClient := createAuthenticatedHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = resp.Body.Close() })
 
@@ -52,7 +52,7 @@ func answeredAtOnce(t *testing.T, destUrl string) *http.Response {
 // A response_type that repeats a value or names an unknown one is unsupported_response_type. Each
 // used to be collapsed into the request it resembled and accepted as the code flow.
 func TestAuthorize_ResponseTypeSpellingsAreRefused(t *testing.T) {
-	client, redirectUri := createTestClientAndRedirectURI(t)
+	client, redirectURI := createTestClientAndRedirectURI(t)
 
 	for name, responseType := range map[string]string{
 		"a repeated value":                     "code code",
@@ -61,9 +61,9 @@ func TestAuthorize_ResponseTypeSpellingsAreRefused(t *testing.T) {
 		"two types joined by a no-break space": "code token",
 	} {
 		t.Run(name, func(t *testing.T) {
-			resp := answeredAtOnce(t, authorizeRequest(client, redirectUri, map[string]string{"response_type": responseType}))
+			resp := answeredAtOnce(t, authorizeRequest(client, redirectURI, map[string]string{"response_type": responseType}))
 
-			errorCode, description, _ := getErrorFromUrl(t, resp)
+			errorCode, description, _ := getErrorFromURL(t, resp)
 
 			assert.Equal(t, "unsupported_response_type", errorCode)
 			assert.Equal(t, "The authorization server does not support this response_type. Supported values: code, token, id_token, id_token token.", description)
@@ -72,7 +72,7 @@ func TestAuthorize_ResponseTypeSpellingsAreRefused(t *testing.T) {
 
 	// The control: the same request with a plain "code" is not refused, so it is the spelling.
 	t.Run("code alone goes on to the login", func(t *testing.T) {
-		resp, err := createHttpClient(t).Get(authorizeRequest(client, redirectUri, nil))
+		resp, err := createHTTPClient(t).Get(authorizeRequest(client, redirectURI, nil))
 		require.NoError(t, err)
 		defer func() { _ = resp.Body.Close() }()
 
@@ -92,7 +92,7 @@ func TestAuthorize_AnImpossibleS256ChallengeIsRefused(t *testing.T) {
 		// The client takes the global setting, which requires PKCE.
 		description = "The code_challenge parameter is either missing or incorrect. It must be the SHA-256 hash of the code_verifier, base64url-encoded without padding: 43 characters of A-Z, a-z, 0-9, '-' and '_'."
 	)
-	client, redirectUri := createTestClientAndRedirectURI(t)
+	client, redirectURI := createTestClientAndRedirectURI(t)
 
 	for name, challenge := range map[string]string{
 		"the lower spare bit set":  realChallenge[:42] + "N",
@@ -112,9 +112,9 @@ func TestAuthorize_AnImpossibleS256ChallengeIsRefused(t *testing.T) {
 		"non-ASCII":                realChallenge[:41] + "é",
 	} {
 		t.Run(name, func(t *testing.T) {
-			resp := answeredAtOnce(t, authorizeRequest(client, redirectUri, map[string]string{"code_challenge": challenge}))
+			resp := answeredAtOnce(t, authorizeRequest(client, redirectURI, map[string]string{"code_challenge": challenge}))
 
-			errorCode, gotDescription, _ := getErrorFromUrl(t, resp)
+			errorCode, gotDescription, _ := getErrorFromURL(t, resp)
 
 			assert.Equal(t, "invalid_request", errorCode)
 			assert.Equal(t, description, gotDescription)
@@ -128,7 +128,7 @@ func TestAuthorize_AnImpossibleS256ChallengeIsRefused(t *testing.T) {
 		"a real SHA-256 thumbprint": "NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs",
 	} {
 		t.Run("accepts "+name, func(t *testing.T) {
-			resp, err := createHttpClient(t).Get(authorizeRequest(client, redirectUri, map[string]string{"code_challenge": challenge}))
+			resp, err := createHTTPClient(t).Get(authorizeRequest(client, redirectURI, map[string]string{"code_challenge": challenge}))
 			require.NoError(t, err)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -143,20 +143,20 @@ func TestAuthorize_OfflineAccessAloneIsRefused(t *testing.T) {
 	const description = "The 'scope' parameter holds only 'offline_access', which grants nothing by itself. Include at least one other scope, such as 'openid' or a resource:permission scope."
 
 	t.Run("in the code flow", func(t *testing.T) {
-		client, redirectUri := createTestClientAndRedirectURI(t)
+		client, redirectURI := createTestClientAndRedirectURI(t)
 
-		resp := answeredAtOnce(t, authorizeRequest(client, redirectUri, map[string]string{"scope": "offline_access"}))
+		resp := answeredAtOnce(t, authorizeRequest(client, redirectURI, map[string]string{"scope": "offline_access"}))
 
-		errorCode, errorDescription, _ := getErrorFromUrl(t, resp)
+		errorCode, errorDescription, _ := getErrorFromURL(t, resp)
 		assert.Equal(t, "invalid_scope", errorCode)
 		assert.Equal(t, description, errorDescription)
 	})
 
 	t.Run("in the implicit flow, in the fragment, where the response type ignores it and leaves nothing", func(t *testing.T) {
 		enabled := true
-		client, redirectUri := createImplicitFlowClient(t, &enabled)
+		client, redirectURI := createImplicitFlowClient(t, &enabled)
 
-		resp := answeredAtOnce(t, authorizeRequest(client, redirectUri, map[string]string{
+		resp := answeredAtOnce(t, authorizeRequest(client, redirectURI, map[string]string{
 			"response_type": "token", "scope": "offline_access", "code_challenge": "", "code_challenge_method": "",
 		}))
 
@@ -168,9 +168,9 @@ func TestAuthorize_OfflineAccessAloneIsRefused(t *testing.T) {
 	// offline_access beside another scope is a fine request, so it is the absence of the other scope
 	// that was refused.
 	t.Run("beside openid is served", func(t *testing.T) {
-		client, redirectUri := createTestClientAndRedirectURI(t)
+		client, redirectURI := createTestClientAndRedirectURI(t)
 
-		resp, err := createHttpClient(t).Get(authorizeRequest(client, redirectUri, map[string]string{"scope": "openid offline_access"}))
+		resp, err := createHTTPClient(t).Get(authorizeRequest(client, redirectURI, map[string]string{"scope": "openid offline_access"}))
 		require.NoError(t, err)
 		defer func() { _ = resp.Body.Close() }()
 
@@ -183,19 +183,19 @@ func TestAuthorize_OfflineAccessAloneIsRefused(t *testing.T) {
 // flow, and the tokens' scope claim does not carry it.
 func TestAuthorize_ImplicitIgnoresOfflineAccess(t *testing.T) {
 	enabled := true
-	client, redirectUri := createImplicitFlowClient(t, &enabled)
+	client, redirectURI := createImplicitFlowClient(t, &enabled)
 	user, password := createTestUserForImplicit(t)
 
 	requestState := fake.LetterN(16)
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=token" +
 		"&scope=" + url.QueryEscape("openid offline_access") +
 		"&state=" + requestState
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	require.NoError(t, err)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
@@ -271,7 +271,7 @@ func TestToken_AuthCode_MalformedCodeVerifierIsRefusedAndTheCodeStaysRedeemable(
 
 			assertTokenRefusal(t, status, body, http.StatusBadRequest, "invalid_grant", description)
 
-			stored, err := database.GetCodeById(context.Background(), nil, code.Id)
+			stored, err := database.GetCodeByID(context.Background(), nil, code.ID)
 			require.NoError(t, err)
 			assert.False(t, stored.Used, "a verifier that is not one must not consume the code")
 		})

@@ -50,15 +50,15 @@ func TestToken_Refresh_ATokenOfAnEarlierIssuerIsRefused(t *testing.T) {
 	changeSettings(t, func(settings *record.Settings) { settings.Issuer = anotherIssuer() })
 
 	assertRefusedForItsIssuer(t, httpClient, code.Client.ClientIdentifier, clientSecret, refreshToken)
-	assert.False(t, refreshTokenRowByJti(t, refreshToken).Revoked, "the refusal revokes nothing")
-	rows, err := database.GetRefreshTokensByCodeId(context.Background(), nil, code.Id)
+	assert.False(t, refreshTokenRowByJTI(t, refreshToken).Revoked, "the refusal revokes nothing")
+	rows, err := database.GetRefreshTokensByCodeID(context.Background(), nil, code.ID)
 	require.NoError(t, err)
 	assert.Len(t, rows, 1, "the refusal minted no refresh token")
 
 	assertInactive(t, introspectAs(t, code.Client.ClientIdentifier, clientSecret, refreshToken))
 	revokeAs(t, code.Client.ClientIdentifier, clientSecret, refreshToken)
-	assert.False(t, refreshTokenRowByJti(t, refreshToken).Revoked, "revocation revoked nothing: the token is not live")
-	recorded, err := database.IsRefreshTokenFamilyRevoked(context.Background(), nil, refreshTokenRowByJti(t, refreshToken).FirstRefreshTokenJti)
+	assert.False(t, refreshTokenRowByJTI(t, refreshToken).Revoked, "revocation revoked nothing: the token is not live")
+	recorded, err := database.IsRefreshTokenFamilyRevoked(context.Background(), nil, refreshTokenRowByJTI(t, refreshToken).FirstRefreshTokenJTI)
 	require.NoError(t, err)
 	assert.False(t, recorded, "nor recorded its family")
 
@@ -80,7 +80,7 @@ func TestToken_Refresh_APasswordGrantTokenOfAnEarlierIssuerIsRefused(t *testing.
 	password := fake.Password(12)
 	client := createROPCClient(t, clientSecret, false)
 	user := createROPCUser(t, password)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	data := postToTokenEndpoint(t, httpClient, appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
 		"grant_type":    {"password"},
 		"client_id":     {client.ClientIdentifier},
@@ -95,7 +95,7 @@ func TestToken_Refresh_APasswordGrantTokenOfAnEarlierIssuerIsRefused(t *testing.
 	changeSettings(t, func(settings *record.Settings) { settings.Issuer = anotherIssuer() })
 
 	assertRefusedForItsIssuer(t, httpClient, client.ClientIdentifier, clientSecret, refreshToken)
-	assert.False(t, refreshTokenRowByJti(t, refreshToken).Revoked, "the refusal revokes nothing")
+	assert.False(t, refreshTokenRowByJTI(t, refreshToken).Revoked, "the refusal revokes nothing")
 	assertInactive(t, introspectAs(t, client.ClientIdentifier, clientSecret, refreshToken))
 }
 
@@ -120,7 +120,7 @@ func TestToken_Refresh_ATokenWhoseAudIsNotTheIssuerIsRefused(t *testing.T) {
 
 			assertRefusedForItsIssuer(t, httpClient, code.Client.ClientIdentifier, clientSecret, forged)
 			assertInactive(t, introspectAs(t, code.Client.ClientIdentifier, clientSecret, forged))
-			assert.False(t, refreshTokenRowByJti(t, refreshToken).Revoked, "the refusal revokes nothing")
+			assert.False(t, refreshTokenRowByJTI(t, refreshToken).Revoked, "the refusal revokes nothing")
 
 			// The control: the token as the server signed it still refreshes.
 			status, rotated := refreshAuthCodeGrant(t, httpClient, code, clientSecret, refreshToken, "")
@@ -141,7 +141,7 @@ func TestToken_Refresh_ARotatedTokenOfAnEarlierIssuerContainsItsFamily(t *testin
 	rt1 := exchangeAuthCode(t, httpClient, code.Client.ClientIdentifier, clientSecret,
 		code.Code, code.RedirectURI, testCodeVerifier)
 	rt2 := rotateRefreshToken(t, httpClient, code.Client.ClientIdentifier, clientSecret, rt1)
-	require.True(t, refreshTokenRowByJti(t, rt1).Revoked, "the rotation retired rt1")
+	require.True(t, refreshTokenRowByJTI(t, rt1).Revoked, "the rotation retired rt1")
 
 	claims := jwt.MapClaims(decodeJWTPayload(t, rt1))
 	earlier := anotherIssuer()
@@ -153,8 +153,8 @@ func TestToken_Refresh_ARotatedTokenOfAnEarlierIssuerContainsItsFamily(t *testin
 	assertRefusedAsInvalidGrant(t, status, body, "a rotated token of an earlier issuer")
 	assert.Equal(t, "This refresh token has been revoked.", body["error_description"])
 
-	assert.True(t, refreshTokenRowByJti(t, rt2).Revoked, "the family's live member is revoked")
-	recorded, err := database.IsRefreshTokenFamilyRevoked(context.Background(), nil, refreshTokenRowByJti(t, rt1).FirstRefreshTokenJti)
+	assert.True(t, refreshTokenRowByJTI(t, rt2).Revoked, "the family's live member is revoked")
+	recorded, err := database.IsRefreshTokenFamilyRevoked(context.Background(), nil, refreshTokenRowByJTI(t, rt1).FirstRefreshTokenJTI)
 	require.NoError(t, err)
 	assert.True(t, recorded, "the family is recorded as revoked")
 	status, body = replayRefreshToken(t, httpClient, code.Client.ClientIdentifier, clientSecret, rt2)

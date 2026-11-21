@@ -41,7 +41,7 @@ type JSONWriter interface {
 // on the concrete type and not here: only the locale middleware reads it, and no handler does
 // (#435).
 type CeremonyStore interface {
-	// GetAuthContext reads the ceremony the request names (ceremony.RequestedId). It answers
+	// GetAuthContext reads the ceremony the request names (ceremony.RequestedID). It answers
 	// ceremony.ErrCeremonyNotHeld when the browser session holds a ceremony but not that one, and
 	// ceremony.ErrNoAuthContext when it holds none.
 	GetAuthContext(r *http.Request) (*ceremony.AuthContext, error)
@@ -59,33 +59,33 @@ type CeremonyStore interface {
 	AddAuthContext(w http.ResponseWriter, r *http.Request, authContext *ceremony.AuthContext) error
 	// ClearAuthContext is a step's clear, which ends the ceremony only while the browser session
 	// still holds it and otherwise answers ceremony.ErrCeremonyReplaced, writing nothing (#579).
-	ClearAuthContext(w http.ResponseWriter, r *http.Request, ceremonyId string) error
+	ClearAuthContext(w http.ResponseWriter, r *http.Request, ceremonyID string) error
 	// RegenerateSession replaces the browser session's identifier without losing its
 	// contents, which is what a server-side session store must do at every privilege
 	// change to match a cookie store's structural immunity to session fixation (#266). It
 	// rotates only while the browser session still holds the ceremony named, and otherwise
 	// answers ceremony.ErrCeremonyReplaced, writing nothing (#579). It keeps no ceremony held for a
-	// user other than userId, the user the rotation is for (#246).
-	RegenerateSession(w http.ResponseWriter, r *http.Request, ceremonyId string, userId int64) error
+	// user other than userID, the user the rotation is for (#246).
+	RegenerateSession(w http.ResponseWriter, r *http.Request, ceremonyID string, userID int64) error
 	// RegenerateSessionAndBind is RegenerateSession for /auth/completed's create arm, which also
 	// writes the new user session's identifier into the browser session as it rotates it (#266),
 	// on the same condition (#579 decision 4), and the answer the ceremony entered its password with
 	// to the Keep me signed in box, removing any earlier one when keepSignedIn is nil (#743).
-	RegenerateSessionAndBind(w http.ResponseWriter, r *http.Request, ceremonyId string, userId int64,
+	RegenerateSessionAndBind(w http.ResponseWriter, r *http.Request, ceremonyID string, userID int64,
 		userSessionIdentifier string, keepSignedIn *bool) error
 	// RecordKeepSignedIn records that answer in the browser session for /auth/completed's reuse arm,
 	// only while the session still holds the ceremony named, and otherwise answers
 	// ceremony.ErrCeremonyReplaced, writing nothing (#579, #743).
-	RecordKeepSignedIn(w http.ResponseWriter, r *http.Request, ceremonyId string, keepSignedIn *bool) error
+	RecordKeepSignedIn(w http.ResponseWriter, r *http.Request, ceremonyID string, keepSignedIn *bool) error
 	// ConfirmCeremony answers nil while the browser session, read afresh, still holds the
 	// ceremony named, and ceremony.ErrCeremonyReplaced otherwise. It writes nothing (#579).
-	ConfirmCeremony(w http.ResponseWriter, r *http.Request, ceremonyId string) error
+	ConfirmCeremony(w http.ResponseWriter, r *http.Request, ceremonyID string) error
 	// TakeRecoveryCodes takes the set of recovery codes off the ceremony named, as the browser
 	// session stores it now, in one conditional write, and answers the set taken: none, writing
 	// nothing, when the ceremony holds none, so of two requests only one takes a set, and
 	// ceremony.ErrCeremonyReplaced, writing nothing, when the session no longer holds the ceremony
 	// (#257 decision 14).
-	TakeRecoveryCodes(w http.ResponseWriter, r *http.Request, ceremonyId string) ([]string, error)
+	TakeRecoveryCodes(w http.ResponseWriter, r *http.Request, ceremonyID string) ([]string, error)
 }
 
 // TokenIssuer redeems a validated grant at the token endpoint, one method per grant. Each owns its
@@ -108,7 +108,7 @@ type TokenValidator interface {
 }
 
 type TokenParser interface {
-	DecodeAndValidateTokenString(ctx context.Context, token string, withExpirationCheck bool) (*oauth.JwtToken, error)
+	DecodeAndValidateTokenString(ctx context.Context, token string, withExpirationCheck bool) (*oauth.JWTToken, error)
 }
 
 // AuditLogger records one security event. The context is first because every audit event raised

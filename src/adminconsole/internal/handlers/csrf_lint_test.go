@@ -10,8 +10,8 @@ import (
 	"testing"
 )
 
-// TestHandlers_NoCsrfFieldBind is the bind-side half of the guard whose template-side half lives in
-// web/template_lint_test.go as TestTemplates_NoCsrfField. #155 replaced the CSRF token with an
+// TestHandlers_NoCSRFFieldBind is the bind-side half of the guard whose template-side half lives in
+// web/template_lint_test.go as TestTemplates_NoCSRFField. #155 replaced the CSRF token with an
 // origin check, deleting 100 csrfField binds from the 59 handler files under internal/handlers and
 // four more from the render tests now in internal/renderintegration, and nothing else in this
 // module can tell if one comes back.
@@ -44,7 +44,7 @@ import (
 // would still be out of reach, so the boundary is lexical on purpose rather than by oversight.
 // Anything that reaches it has been written deliberately to evade this file, which is a different
 // problem from the one #155 left behind.
-func TestHandlers_NoCsrfFieldBind(t *testing.T) {
+func TestHandlers_NoCSRFFieldBind(t *testing.T) {
 	// go test runs with the package directory as the working directory, so ".." is
 	// src/adminconsole/internal.
 	const self = "../handlers/csrf_lint_test.go"

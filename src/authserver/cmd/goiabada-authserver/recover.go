@@ -348,7 +348,7 @@ func runRecover(ctx context.Context, database recoverDatabase, m schemaVersionRe
 		return migrateExitOK
 	}
 
-	outf(stdout, "recovered %s (user %d)\n", outcome.Email, outcome.UserId)
+	outf(stdout, "recovered %s (user %d)\n", outcome.Email, outcome.UserID)
 	if outcome.PasswordSet {
 		outf(stdout, "  password set\n")
 	}
@@ -369,7 +369,7 @@ func runRecover(ctx context.Context, database recoverDatabase, m schemaVersionRe
 		}
 	}
 	outf(stdout, "  sessions ended: %d, refresh tokens revoked: %d, authentication generation %d to %d\n",
-		len(outcome.Revocation.TerminatedSessionIdentifiers), len(outcome.Revocation.RevokedRefreshTokenJtis),
+		len(outcome.Revocation.TerminatedSessionIdentifiers), len(outcome.Revocation.RevokedRefreshTokenJTIs),
 		outcome.Revocation.OldGeneration, outcome.Revocation.NewGeneration)
 
 	// The recovery has committed, so its exit status is decided: telling the apps comes after it,
@@ -402,7 +402,7 @@ func tellRecoveredUsersApps(ctx context.Context, database backchannel.KeyDatabas
 	// Each app's deliveries, counted, so its line is printed when its last one finishes.
 	pending := map[int64]int{}
 	for _, delivery := range deliveries {
-		pending[delivery.ClientId]++
+		pending[delivery.ClientID]++
 	}
 	apps := countedApps(len(pending))
 
@@ -424,14 +424,14 @@ func tellRecoveredUsersApps(ctx context.Context, database backchannel.KeyDatabas
 	notTold := map[int64]backchannel.Outcome{}
 	told, untold := 0, 0
 	sender.SendAndWait(ctx, outcome.Issuer, deliveries, func(delivery backchannel.Delivery, delivered backchannel.Outcome) {
-		if _, already := notTold[delivery.ClientId]; !already && delivered != backchannel.Delivered {
-			notTold[delivery.ClientId] = delivered
+		if _, already := notTold[delivery.ClientID]; !already && delivered != backchannel.Delivered {
+			notTold[delivery.ClientID] = delivered
 		}
-		pending[delivery.ClientId]--
-		if pending[delivery.ClientId] > 0 {
+		pending[delivery.ClientID]--
+		if pending[delivery.ClientID] > 0 {
 			return
 		}
-		appOutcome, failed := notTold[delivery.ClientId]
+		appOutcome, failed := notTold[delivery.ClientID]
 		if !failed {
 			appOutcome = backchannel.Delivered
 			told++

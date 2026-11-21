@@ -17,31 +17,31 @@ import (
 	"github.com/leodip/goiabada/core/api"
 )
 
-// resourcePermissionsSaveApiClient records the request the save hands the API and answers it with
+// resourcePermissionsSaveAPIClient records the request the save hands the API and answers it with
 // err.
-type resourcePermissionsSaveApiClient struct {
+type resourcePermissionsSaveAPIClient struct {
 	err  error
 	sent *api.UpdateResourcePermissionsRequest
 }
 
-func (s *resourcePermissionsSaveApiClient) GetResourceById(_ context.Context, _ string, resourceId int64) (*api.ResourceResponse, error) {
-	return &api.ResourceResponse{Id: resourceId}, nil
+func (s *resourcePermissionsSaveAPIClient) GetResourceByID(_ context.Context, _ string, resourceID int64) (*api.ResourceResponse, error) {
+	return &api.ResourceResponse{ID: resourceID}, nil
 }
 
-func (s *resourcePermissionsSaveApiClient) UpdateResourcePermissions(_ context.Context, _ string, _ int64, request *api.UpdateResourcePermissionsRequest) error {
+func (s *resourcePermissionsSaveAPIClient) UpdateResourcePermissions(_ context.Context, _ string, _ int64, request *api.UpdateResourcePermissionsRequest) error {
 	s.sent = request
 	return s.err
 }
 
-// The rest of the ports resourcePermissionsSaveApiClient is passed to, which no test here reaches.
+// The rest of the ports resourcePermissionsSaveAPIClient is passed to, which no test here reaches.
 
-func (*resourcePermissionsSaveApiClient) GetPermissionsByResource(context.Context, string, int64) ([]api.PermissionResponse, error) {
+func (*resourcePermissionsSaveAPIClient) GetPermissionsByResource(context.Context, string, int64) ([]api.PermissionResponse, error) {
 	panic("unexpected call to GetPermissionsByResource")
 }
 
 // serveResourcePermissionsSave posts body to the save with the resource id as the path value the
 // route binds, so it reaches the handler as it does in production.
-func serveResourcePermissionsSave(stub *resourcePermissionsSaveApiClient, body string) *httptest.ResponseRecorder {
+func serveResourcePermissionsSave(stub *resourcePermissionsSaveAPIClient, body string) *httptest.ResponseRecorder {
 	req := handlertest.Request(http.MethodPost, "/admin/resources/3/permissions",
 		handlertest.WithAccessToken(),
 		handlertest.WithPathValue("resourceId", "3"),
@@ -69,7 +69,7 @@ func TestHandlePermissionsPost_SendsTheLoadedList(t *testing.T) {
 			name: "the loaded list passes through as sent beside the wanted one",
 			body: `{"resourceId":3,"permissions":[{"id":9,"permissionIdentifier":" ler ","description":"Ler"}],` +
 				`"expectedPermissions":[{"id":9,"permissionIdentifier":"ler","description":" Ler faturas "}]}`,
-			wantExpected: []api.ResourcePermissionUpsert{{Id: 9, PermissionIdentifier: "ler", Description: " Ler faturas "}},
+			wantExpected: []api.ResourcePermissionUpsert{{ID: 9, PermissionIdentifier: "ler", Description: " Ler faturas "}},
 			wantWire:     `"expectedPermissions":[{"id":9,"permissionIdentifier":"ler","description":" Ler faturas "}]`,
 		},
 		{
@@ -90,7 +90,7 @@ func TestHandlePermissionsPost_SendsTheLoadedList(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// The API refuses, so the handler returns before the nil session is touched; the
 			// request it sent is what is under test.
-			stub := &resourcePermissionsSaveApiClient{err: &apiclient.APIError{Code: "VALIDATION_ERROR", Message: "refused", StatusCode: http.StatusBadRequest}}
+			stub := &resourcePermissionsSaveAPIClient{err: &apiclient.APIError{Code: "VALIDATION_ERROR", Message: "refused", StatusCode: http.StatusBadRequest}}
 			serveResourcePermissionsSave(stub, tc.body)
 
 			require.NotNil(t, stub.sent)
@@ -102,11 +102,11 @@ func TestHandlePermissionsPost_SendsTheLoadedList(t *testing.T) {
 	}
 
 	t.Run("the wanted entries are trimmed as before", func(t *testing.T) {
-		stub := &resourcePermissionsSaveApiClient{err: &apiclient.APIError{Code: "VALIDATION_ERROR", Message: "refused", StatusCode: http.StatusBadRequest}}
+		stub := &resourcePermissionsSaveAPIClient{err: &apiclient.APIError{Code: "VALIDATION_ERROR", Message: "refused", StatusCode: http.StatusBadRequest}}
 		serveResourcePermissionsSave(stub, testCases[0].body)
 
 		require.NotNil(t, stub.sent)
-		assert.Equal(t, []api.ResourcePermissionUpsert{{Id: 9, PermissionIdentifier: "ler", Description: "Ler"}}, stub.sent.Permissions)
+		assert.Equal(t, []api.ResourcePermissionUpsert{{ID: 9, PermissionIdentifier: "ler", Description: "Ler"}}, stub.sent.Permissions)
 	})
 }
 
@@ -114,7 +114,7 @@ func TestHandlePermissionsPost_SendsTheLoadedList(t *testing.T) {
 // telling them to reload, rather than the generic error (#428).
 func TestHandlePermissionsPost_AConflictReachesTheBrowser(t *testing.T) {
 	const sentence = "The list was changed by another save after it was loaded."
-	stub := &resourcePermissionsSaveApiClient{err: &apiclient.APIError{Code: "CONCURRENT_UPDATE", Message: sentence, StatusCode: http.StatusConflict}}
+	stub := &resourcePermissionsSaveAPIClient{err: &apiclient.APIError{Code: "CONCURRENT_UPDATE", Message: sentence, StatusCode: http.StatusConflict}}
 
 	rec := serveResourcePermissionsSave(stub, `{"resourceId":3,"permissions":[],"expectedPermissions":[]}`)
 

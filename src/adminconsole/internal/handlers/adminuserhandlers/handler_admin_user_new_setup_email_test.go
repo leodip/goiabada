@@ -22,7 +22,7 @@ type setupEmailUserNewAPI struct {
 }
 
 func (a setupEmailUserNewAPI) CreateUserAdmin(context.Context, string, *api.CreateUserAdminRequest) (*api.CreateUserResponse, error) {
-	return &api.CreateUserResponse{User: api.UserResponse{Id: 7}, SetupEmailSent: a.setupEmailSent}, nil
+	return &api.CreateUserResponse{User: api.UserResponse{ID: 7}, SetupEmailSent: a.setupEmailSent}, nil
 }
 
 // A new user whose setup email could not be sent is shown with a warning on its details page, once
@@ -41,7 +41,7 @@ func TestHandleNewPost_ASetupEmailNotSentIsShownOnTheNewUsersPage(t *testing.T) 
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			store := newFlashTestStore()
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 
 			req := handlertest.Request(http.MethodPost, "/admin/users/new",

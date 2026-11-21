@@ -49,14 +49,14 @@ func newPublicPKCEClient(t *testing.T, pkceRequired *bool) (*record.Client, stri
 		AuthorizationCodeEnabled: true,
 		IsPublic:                 true,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 		PKCERequired:             pkceRequired,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
 
 	redirectURI := "https://public-pkce.example.com/callback"
 	require.NoError(t, database.CreateRedirectURI(context.Background(), nil, &record.RedirectURI{
-		ClientId: client.Id,
+		ClientID: client.ID,
 		URI:      redirectURI,
 	}))
 
@@ -104,7 +104,7 @@ func assertRefusedForMissingChallenge(t *testing.T, client *record.Client, redir
 
 	t.Helper()
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp := driveDeferral(t, httpClient,
 		authorizeURLWithoutChallenge(client.ClientIdentifier, redirectURI), user, password)
 	defer func() { _ = resp.Body.Close() }()

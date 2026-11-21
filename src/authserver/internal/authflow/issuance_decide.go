@@ -106,7 +106,7 @@ type issuanceFacts struct {
 	sessionIdentifierPresent bool
 	// acrLevel and authMethods are the level the ceremony would issue and the methods it names, the
 	// space-separated amr list, as its context holds them.
-	acrLevel    record.AcrLevel
+	acrLevel    record.ACRLevel
 	authMethods string
 
 	registrationLoaded     bool

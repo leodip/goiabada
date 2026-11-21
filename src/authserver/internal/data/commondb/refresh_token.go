@@ -47,15 +47,15 @@ var refreshTokenColumns = columnList{
 // scanRefreshToken reads one row selected with refreshTokenColumns.
 func scanRefreshToken(row rowScanner, refreshToken *record.RefreshToken) error {
 	return row.Scan(
-		&refreshToken.Id,
+		&refreshToken.ID,
 		&refreshToken.CreatedAt,
 		&refreshToken.UpdatedAt,
-		&refreshToken.CodeId,
-		&refreshToken.UserId,
-		&refreshToken.ClientId,
-		&refreshToken.RefreshTokenJti,
-		&refreshToken.PreviousRefreshTokenJti,
-		&refreshToken.FirstRefreshTokenJti,
+		&refreshToken.CodeID,
+		&refreshToken.UserID,
+		&refreshToken.ClientID,
+		&refreshToken.RefreshTokenJTI,
+		&refreshToken.PreviousRefreshTokenJTI,
+		&refreshToken.FirstRefreshTokenJTI,
 		&refreshToken.SessionIdentifier,
 		&refreshToken.RefreshTokenType,
 		&refreshToken.Scope,
@@ -130,28 +130,28 @@ var updateRefreshToken = statement{
 		"revoked = @p11 WHERE id = @p12",
 }
 
-var selectRefreshTokenById = statement{
+var selectRefreshTokenByID = statement{
 	sqlite:   "SELECT " + refreshTokenColumns.sqlite + " FROM refresh_tokens WHERE id = ?",
 	mysql:    "SELECT " + refreshTokenColumns.mysql + " FROM refresh_tokens WHERE id = ?",
 	postgres: "SELECT " + refreshTokenColumns.postgres + " FROM refresh_tokens WHERE id = $1",
 	mssql:    "SELECT " + refreshTokenColumns.mssql + " FROM refresh_tokens WHERE id = @p1",
 }
 
-var selectRefreshTokenByJti = statement{
+var selectRefreshTokenByJTI = statement{
 	sqlite:   "SELECT " + refreshTokenColumns.sqlite + " FROM refresh_tokens WHERE refresh_token_jti = ?",
 	mysql:    "SELECT " + refreshTokenColumns.mysql + " FROM refresh_tokens WHERE refresh_token_jti = ?",
 	postgres: "SELECT " + refreshTokenColumns.postgres + " FROM refresh_tokens WHERE refresh_token_jti = $1",
 	mssql:    "SELECT " + refreshTokenColumns.mssql + " FROM refresh_tokens WHERE refresh_token_jti = @p1",
 }
 
-var selectRefreshTokensByCodeId = statement{
+var selectRefreshTokensByCodeID = statement{
 	sqlite:   "SELECT " + refreshTokenColumns.sqlite + " FROM refresh_tokens WHERE code_id = ?",
 	mysql:    "SELECT " + refreshTokenColumns.mysql + " FROM refresh_tokens WHERE code_id = ?",
 	postgres: "SELECT " + refreshTokenColumns.postgres + " FROM refresh_tokens WHERE code_id = $1",
 	mssql:    "SELECT " + refreshTokenColumns.mssql + " FROM refresh_tokens WHERE code_id = @p1",
 }
 
-var selectRefreshTokensByFirstRefreshTokenJti = statement{
+var selectRefreshTokensByFirstRefreshTokenJTI = statement{
 	sqlite:   "SELECT " + refreshTokenColumns.sqlite + " FROM refresh_tokens WHERE first_refresh_token_jti = ?",
 	mysql:    "SELECT " + refreshTokenColumns.mysql + " FROM refresh_tokens WHERE first_refresh_token_jti = ?",
 	postgres: "SELECT " + refreshTokenColumns.postgres + " FROM refresh_tokens WHERE first_refresh_token_jti = $1",
@@ -169,9 +169,9 @@ var selectRefreshTokensBySessionIdentifier = statement{
 		"WHERE codes.session_identifier = @p1",
 }
 
-// selectSessionBoundRefreshTokensBySessionIdentifierAndClientId binds the session identifier, the
+// selectSessionBoundRefreshTokensBySessionIdentifierAndClientID binds the session identifier, the
 // client id, then the session identifier again for the token's own column.
-var selectSessionBoundRefreshTokensBySessionIdentifierAndClientId = statement{
+var selectSessionBoundRefreshTokensBySessionIdentifierAndClientID = statement{
 	sqlite: "SELECT " + refreshTokenColumns.sqlite + " FROM refresh_tokens INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
 		"WHERE codes.session_identifier = ? AND codes.client_id = ? AND refresh_tokens.session_identifier = ?",
 	mysql: "SELECT " + refreshTokenColumns.mysql + " FROM refresh_tokens INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
@@ -182,8 +182,8 @@ var selectSessionBoundRefreshTokensBySessionIdentifierAndClientId = statement{
 		"WHERE codes.session_identifier = @p1 AND codes.client_id = @p2 AND refresh_tokens.session_identifier = @p3",
 }
 
-// selectRefreshTokensByUserId binds the user id once per branch: the code's user, then the token's.
-var selectRefreshTokensByUserId = statement{
+// selectRefreshTokensByUserID binds the user id once per branch: the code's user, then the token's.
+var selectRefreshTokensByUserID = statement{
 	sqlite: "SELECT " + refreshTokenColumns.sqlite + " FROM refresh_tokens INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
 		"WHERE codes.user_id = ? " +
 		"UNION ALL SELECT " + refreshTokenColumns.sqlite + " FROM refresh_tokens " +
@@ -202,13 +202,13 @@ var selectRefreshTokensByUserId = statement{
 		"WHERE refresh_tokens.user_id = @p2",
 }
 
-// selectRefreshTokensByUserIdAndClientId binds the user id and the client id once per branch: the
+// selectRefreshTokensByUserIDAndClientID binds the user id and the client id once per branch: the
 // code's, then the token's. MySQL's is a locking read, FOR UPDATE in each parenthesized branch, so
-// it answers the rows as last committed (see GetRefreshTokensByUserIdAndClientId). It locks the
+// it answers the rows as last committed (see GetRefreshTokensByUserIDAndClientID). It locks the
 // codes the first branch joins through as well as the tokens: InnoDB answers a joined table the
 // locking clause does not name from the snapshot, which would miss the code of a grant committed
 // after it.
-var selectRefreshTokensByUserIdAndClientId = statement{
+var selectRefreshTokensByUserIDAndClientID = statement{
 	sqlite: "SELECT " + refreshTokenColumns.sqlite + " FROM refresh_tokens INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
 		"WHERE codes.user_id = ? AND codes.client_id = ? " +
 		"UNION ALL SELECT " + refreshTokenColumns.sqlite + " FROM refresh_tokens " +
@@ -227,10 +227,10 @@ var selectRefreshTokensByUserIdAndClientId = statement{
 		"WHERE refresh_tokens.user_id = @p3 AND refresh_tokens.client_id = @p4",
 }
 
-// selectUsableRefreshTokenClientIds binds the user id, false for revoked and the instant once per
+// selectUsableRefreshTokenClientIDs binds the user id, false for revoked and the instant once per
 // branch: the code's user, then the token's. UNION rather than UNION ALL, so a client holding several
 // such tokens is named once.
-var selectUsableRefreshTokenClientIds = statement{
+var selectUsableRefreshTokenClientIDs = statement{
 	sqlite: "SELECT codes.client_id FROM refresh_tokens INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
 		"WHERE codes.user_id = ? AND refresh_tokens.revoked = ? AND refresh_tokens.expires_at > ? " +
 		"UNION SELECT refresh_tokens.client_id FROM refresh_tokens " +
@@ -253,14 +253,14 @@ var selectUsableRefreshTokenClientIds = statement{
 		"AND refresh_tokens.client_id IS NOT NULL",
 }
 
-// liveGrantFamilyUnrecorded is the condition both branches of selectLiveGrantsByUserId end with:
+// liveGrantFamilyUnrecorded is the condition both branches of selectLiveGrantsByUserID end with:
 // the token's rotation family has no revocation record.
 const liveGrantFamilyUnrecorded = "AND NOT EXISTS (SELECT 1 FROM refresh_token_family_revocations " +
 	"WHERE refresh_token_family_revocations.first_refresh_token_jti = refresh_tokens.first_refresh_token_jti)"
 
-// selectLiveGrantsByUserId binds the user id, false for revoked and the instant once per branch:
+// selectLiveGrantsByUserID binds the user id, false for revoked and the instant once per branch:
 // the code's user, then the token's. UNION ALL, since the two shapes are mutually exclusive.
-var selectLiveGrantsByUserId = statement{
+var selectLiveGrantsByUserID = statement{
 	sqlite: "SELECT refresh_tokens.id, codes.client_id, refresh_tokens.scope FROM refresh_tokens " +
 		"INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
 		"WHERE codes.user_id = ? AND refresh_tokens.revoked = ? AND refresh_tokens.expires_at > ? " +
@@ -291,8 +291,8 @@ var selectLiveGrantsByUserId = statement{
 		"AND refresh_tokens.client_id IS NOT NULL " + liveGrantFamilyUnrecorded,
 }
 
-// selectRefreshTokensByClientId binds the client id once per branch: the code's, then the token's.
-var selectRefreshTokensByClientId = statement{
+// selectRefreshTokensByClientID binds the client id once per branch: the code's, then the token's.
+var selectRefreshTokensByClientID = statement{
 	sqlite: "SELECT " + refreshTokenColumns.sqlite + " FROM refresh_tokens INNER JOIN codes ON codes.id = refresh_tokens.code_id " +
 		"WHERE codes.client_id = ? " +
 		"UNION ALL SELECT " + refreshTokenColumns.sqlite + " FROM refresh_tokens " +
@@ -349,14 +349,14 @@ var deleteRefreshToken = statement{
 	mssql:    "DELETE FROM refresh_tokens WHERE id = @p1",
 }
 
-var deleteRefreshTokensByUserId = statement{
+var deleteRefreshTokensByUserID = statement{
 	sqlite:   "DELETE FROM refresh_tokens WHERE user_id = ?",
 	mysql:    "DELETE FROM refresh_tokens WHERE user_id = ?",
 	postgres: "DELETE FROM refresh_tokens WHERE user_id = $1",
 	mssql:    "DELETE FROM refresh_tokens WHERE user_id = @p1",
 }
 
-var deleteRefreshTokensByClientId = statement{
+var deleteRefreshTokensByClientID = statement{
 	sqlite:   "DELETE FROM refresh_tokens WHERE client_id = ?",
 	mysql:    "DELETE FROM refresh_tokens WHERE client_id = ?",
 	postgres: "DELETE FROM refresh_tokens WHERE client_id = $1",
@@ -381,9 +381,9 @@ func (d *Database) CreateRefreshToken(ctx context.Context, tx *sql.Tx, refreshTo
 	refreshToken.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
 	id, err := d.insert(ctx, tx, insertRefreshToken, "refreshToken",
-		refreshToken.CreatedAt, refreshToken.UpdatedAt, refreshToken.CodeId, refreshToken.UserId,
-		refreshToken.ClientId, refreshToken.RefreshTokenJti, refreshToken.PreviousRefreshTokenJti,
-		refreshToken.FirstRefreshTokenJti, refreshToken.SessionIdentifier, refreshToken.RefreshTokenType,
+		refreshToken.CreatedAt, refreshToken.UpdatedAt, refreshToken.CodeID, refreshToken.UserID,
+		refreshToken.ClientID, refreshToken.RefreshTokenJTI, refreshToken.PreviousRefreshTokenJTI,
+		refreshToken.FirstRefreshTokenJTI, refreshToken.SessionIdentifier, refreshToken.RefreshTokenType,
 		refreshToken.Scope, refreshToken.IssuedAt, refreshToken.ExpiresAt, refreshToken.MaxLifetime,
 		refreshToken.Revoked, refreshToken.AuthStateGeneration, refreshToken.AuthenticatedAt, refreshToken.DPoPJkt)
 	if err != nil {
@@ -392,13 +392,13 @@ func (d *Database) CreateRefreshToken(ctx context.Context, tx *sql.Tx, refreshTo
 		return err
 	}
 
-	refreshToken.Id = id
+	refreshToken.ID = id
 	return nil
 }
 
 func (d *Database) UpdateRefreshToken(ctx context.Context, tx *sql.Tx, refreshToken *record.RefreshToken) error {
 
-	if refreshToken.Id == 0 {
+	if refreshToken.ID == 0 {
 		return errs.New("can't update refreshToken with id 0")
 	}
 
@@ -406,10 +406,10 @@ func (d *Database) UpdateRefreshToken(ctx context.Context, tx *sql.Tx, refreshTo
 	refreshToken.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
 	_, err := d.ExecSQL(ctx, tx, updateRefreshToken.text(d.Dialect),
-		refreshToken.UpdatedAt, refreshToken.RefreshTokenJti, refreshToken.PreviousRefreshTokenJti,
-		refreshToken.FirstRefreshTokenJti, refreshToken.SessionIdentifier, refreshToken.RefreshTokenType,
+		refreshToken.UpdatedAt, refreshToken.RefreshTokenJTI, refreshToken.PreviousRefreshTokenJTI,
+		refreshToken.FirstRefreshTokenJTI, refreshToken.SessionIdentifier, refreshToken.RefreshTokenType,
 		refreshToken.Scope, refreshToken.IssuedAt, refreshToken.ExpiresAt, refreshToken.MaxLifetime,
-		refreshToken.Revoked, refreshToken.Id)
+		refreshToken.Revoked, refreshToken.ID)
 	if err != nil {
 		refreshToken.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update refreshToken")
@@ -434,14 +434,14 @@ func (d *Database) UpdateRefreshToken(ctx context.Context, tx *sql.Tx, refreshTo
 // UpdateRefreshToken: the full-row writer already excludes the column through its
 // dont-update struct tag (#106). Stating it in the statement itself means the boundary
 // does not rest on a tag a future writer might not honour.
-func (d *Database) MarkRefreshTokenAsRevoked(ctx context.Context, tx *sql.Tx, refreshTokenId int64) (bool, error) {
+func (d *Database) MarkRefreshTokenAsRevoked(ctx context.Context, tx *sql.Tx, refreshTokenID int64) (bool, error) {
 
-	if refreshTokenId == 0 {
+	if refreshTokenID == 0 {
 		return false, errs.New("can't mark refresh token with id 0 as revoked")
 	}
 
 	result, err := d.ExecSQL(ctx, tx, markRefreshTokenAsRevoked.text(d.Dialect),
-		true, time.Now().UTC(), refreshTokenId, false)
+		true, time.Now().UTC(), refreshTokenID, false)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to mark refresh token as revoked")
 	}
@@ -475,14 +475,14 @@ func (d *Database) MarkRefreshTokenAsRevoked(ctx context.Context, tx *sql.Tx, re
 // and absorbing it goes wrong in two different directions depending on the data: with
 // no matching rows it hides the bug as a zero-count no-op, and with malformed
 // empty-family rows present it mutates them.
-func (d *Database) RevokeRefreshTokenFamily(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string) (int64, error) {
+func (d *Database) RevokeRefreshTokenFamily(ctx context.Context, tx *sql.Tx, firstRefreshTokenJTI string) (int64, error) {
 
-	if firstRefreshTokenJti == "" {
+	if firstRefreshTokenJTI == "" {
 		return 0, errs.New("can't revoke a refresh token family with an empty first refresh token jti")
 	}
 
 	result, err := d.ExecSQL(ctx, tx, revokeRefreshTokenFamily.text(d.Dialect),
-		true, time.Now().UTC(), firstRefreshTokenJti, false)
+		true, time.Now().UTC(), firstRefreshTokenJTI, false)
 	if err != nil {
 		return 0, errs.Wrap(err, "unable to revoke refresh token family")
 	}
@@ -495,8 +495,8 @@ func (d *Database) RevokeRefreshTokenFamily(ctx context.Context, tx *sql.Tx, fir
 	return rowsAffected, nil
 }
 
-func (d *Database) GetRefreshTokenById(ctx context.Context, tx *sql.Tx, refreshTokenId int64) (*record.RefreshToken, error) {
-	return queryOne(ctx, d, tx, selectRefreshTokenById.text(d.Dialect), []any{refreshTokenId}, scanRefreshToken,
+func (d *Database) GetRefreshTokenByID(ctx context.Context, tx *sql.Tx, refreshTokenID int64) (*record.RefreshToken, error) {
+	return queryOne(ctx, d, tx, selectRefreshTokenByID.text(d.Dialect), []any{refreshTokenID}, scanRefreshToken,
 		"refreshToken")
 }
 
@@ -505,13 +505,13 @@ func (d *Database) RefreshTokenLoadCode(ctx context.Context, tx *sql.Tx, refresh
 		return nil
 	}
 
-	// Only load code if CodeId is valid (auth code flow tokens)
-	// ROPC tokens don't have a CodeId
-	if !refreshToken.CodeId.Valid {
+	// Only load code if CodeID is valid (auth code flow tokens)
+	// ROPC tokens don't have a CodeID
+	if !refreshToken.CodeID.Valid {
 		return nil
 	}
 
-	code, err := d.GetCodeById(ctx, tx, refreshToken.CodeId.Int64)
+	code, err := d.GetCodeByID(ctx, tx, refreshToken.CodeID.Int64)
 	if err != nil {
 		return errs.Wrap(err, "unable to load code")
 	}
@@ -524,18 +524,18 @@ func (d *Database) RefreshTokenLoadCode(ctx context.Context, tx *sql.Tx, refresh
 }
 
 // RefreshTokenLoadUser loads the User entity for ROPC flow refresh tokens.
-// For auth code flow tokens (with CodeId), use RefreshTokenLoadCode instead.
+// For auth code flow tokens (with CodeID), use RefreshTokenLoadCode instead.
 func (d *Database) RefreshTokenLoadUser(ctx context.Context, tx *sql.Tx, refreshToken *record.RefreshToken) error {
 	if refreshToken == nil {
 		return nil
 	}
 
-	// Only load user if UserId is valid (ROPC flow tokens)
-	if !refreshToken.UserId.Valid {
+	// Only load user if UserID is valid (ROPC flow tokens)
+	if !refreshToken.UserID.Valid {
 		return nil
 	}
 
-	user, err := d.GetUserById(ctx, tx, refreshToken.UserId.Int64)
+	user, err := d.GetUserByID(ctx, tx, refreshToken.UserID.Int64)
 	if err != nil {
 		return errs.Wrap(err, "unable to load user")
 	}
@@ -548,18 +548,18 @@ func (d *Database) RefreshTokenLoadUser(ctx context.Context, tx *sql.Tx, refresh
 }
 
 // RefreshTokenLoadClient loads the Client entity for ROPC flow refresh tokens.
-// For auth code flow tokens (with CodeId), use RefreshTokenLoadCode instead.
+// For auth code flow tokens (with CodeID), use RefreshTokenLoadCode instead.
 func (d *Database) RefreshTokenLoadClient(ctx context.Context, tx *sql.Tx, refreshToken *record.RefreshToken) error {
 	if refreshToken == nil {
 		return nil
 	}
 
-	// Only load client if ClientId is valid (ROPC flow tokens)
-	if !refreshToken.ClientId.Valid {
+	// Only load client if ClientID is valid (ROPC flow tokens)
+	if !refreshToken.ClientID.Valid {
 		return nil
 	}
 
-	client, err := d.GetClientById(ctx, tx, refreshToken.ClientId.Int64)
+	client, err := d.GetClientByID(ctx, tx, refreshToken.ClientID.Int64)
 	if err != nil {
 		return errs.Wrap(err, "unable to load client")
 	}
@@ -571,11 +571,11 @@ func (d *Database) RefreshTokenLoadClient(ctx context.Context, tx *sql.Tx, refre
 	return nil
 }
 
-func (d *Database) GetRefreshTokenByJti(ctx context.Context, tx *sql.Tx, jti string) (*record.RefreshToken, error) {
-	return queryOne(ctx, d, tx, selectRefreshTokenByJti.text(d.Dialect), []any{jti}, scanRefreshToken, "refreshToken")
+func (d *Database) GetRefreshTokenByJTI(ctx context.Context, tx *sql.Tx, jti string) (*record.RefreshToken, error) {
+	return queryOne(ctx, d, tx, selectRefreshTokenByJTI.text(d.Dialect), []any{jti}, scanRefreshToken, "refreshToken")
 }
 
-// GetRefreshTokensByFirstRefreshTokenJti returns every member of one rotation family, live and
+// GetRefreshTokensByFirstRefreshTokenJTI returns every member of one rotation family, live and
 // revoked: the rows a client revoking the grant at /auth/revoke ends, and the jtis its audit record
 // lists (#676 decision 1). It reads by idx_refresh_tokens_first_refresh_token_jti.
 //
@@ -584,22 +584,22 @@ func (d *Database) GetRefreshTokenByJti(ctx context.Context, tx *sql.Tx, jti str
 // otherwise find the members of the family without one, and a revocation would end a grant other
 // than the one asked for. An empty identifier is an error, for the reason RevokeRefreshTokenFamily
 // states.
-func (d *Database) GetRefreshTokensByFirstRefreshTokenJti(ctx context.Context, tx *sql.Tx,
-	firstRefreshTokenJti string) ([]*record.RefreshToken, error) {
+func (d *Database) GetRefreshTokensByFirstRefreshTokenJTI(ctx context.Context, tx *sql.Tx,
+	firstRefreshTokenJTI string) ([]*record.RefreshToken, error) {
 
-	if firstRefreshTokenJti == "" {
+	if firstRefreshTokenJTI == "" {
 		return nil, errs.New("can't read a refresh token family with an empty first refresh token jti")
 	}
 
-	rows, err := queryRefreshTokens(ctx, d, tx, selectRefreshTokensByFirstRefreshTokenJti.text(d.Dialect),
-		[]any{firstRefreshTokenJti})
+	rows, err := queryRefreshTokens(ctx, d, tx, selectRefreshTokensByFirstRefreshTokenJTI.text(d.Dialect),
+		[]any{firstRefreshTokenJTI})
 	if err != nil {
 		return nil, err
 	}
 
 	members := make([]*record.RefreshToken, 0, len(rows))
 	for _, rt := range rows {
-		if engineFoldedTheMatch(rt.FirstRefreshTokenJti, firstRefreshTokenJti) {
+		if engineFoldedTheMatch(rt.FirstRefreshTokenJTI, firstRefreshTokenJTI) {
 			continue
 		}
 		members = append(members, rt)
@@ -607,8 +607,8 @@ func (d *Database) GetRefreshTokensByFirstRefreshTokenJti(ctx context.Context, t
 	return members, nil
 }
 
-func (d *Database) GetRefreshTokensByCodeId(ctx context.Context, tx *sql.Tx, codeId int64) ([]*record.RefreshToken, error) {
-	return queryRefreshTokens(ctx, d, tx, selectRefreshTokensByCodeId.text(d.Dialect), []any{codeId})
+func (d *Database) GetRefreshTokensByCodeID(ctx context.Context, tx *sql.Tx, codeID int64) ([]*record.RefreshToken, error) {
+	return queryRefreshTokens(ctx, d, tx, selectRefreshTokensByCodeID.text(d.Dialect), []any{codeID})
 }
 
 // GetRefreshTokensBySessionIdentifier returns every refresh token whose
@@ -628,7 +628,7 @@ func (d *Database) GetRefreshTokensBySessionIdentifier(ctx context.Context, tx *
 		[]any{sessionIdentifier})
 }
 
-// GetSessionBoundRefreshTokensBySessionIdentifierAndClientId returns the session-bound refresh tokens
+// GetSessionBoundRefreshTokensBySessionIdentifierAndClientID returns the session-bound refresh tokens
 // one client holds from one session: the tokens descended from the client's codes on the session
 // whose own session_identifier is the session's. That last term is what leaves out the client's
 // offline tokens from the same session, whose own session_identifier is empty and whose code carries
@@ -637,7 +637,7 @@ func (d *Database) GetRefreshTokensBySessionIdentifier(ctx context.Context, tx *
 //
 // It exists for the sign-out with a confirmed id_token_hint (#135 decision 9), which revokes these
 // and leaves the client's offline grants working (Back-Channel Logout 1.0 section 2.7). Revoked rows
-// are returned beside the live ones, for the reason GetRefreshTokensByUserIdAndClientId gives: the
+// are returned beside the live ones, for the reason GetRefreshTokensByUserIDAndClientID gives: the
 // sign-out records the family of every row it reads, and a family whose stored members are all
 // revoked can still have a child mid-rotation that only that record refuses (#259).
 //
@@ -645,21 +645,21 @@ func (d *Database) GetRefreshTokensBySessionIdentifier(ctx context.Context, tx *
 // well as on the token's own. An empty session identifier or a zero client id names no grant and
 // returns an empty slice with no error, following GetRefreshTokensBySessionIdentifier: the join
 // would otherwise match every code with an empty session_identifier.
-func (d *Database) GetSessionBoundRefreshTokensBySessionIdentifierAndClientId(ctx context.Context, tx *sql.Tx,
-	sessionIdentifier string, clientId int64) ([]*record.RefreshToken, error) {
+func (d *Database) GetSessionBoundRefreshTokensBySessionIdentifierAndClientID(ctx context.Context, tx *sql.Tx,
+	sessionIdentifier string, clientID int64) ([]*record.RefreshToken, error) {
 
-	if sessionIdentifier == "" || clientId == 0 {
+	if sessionIdentifier == "" || clientID == 0 {
 		return nil, nil
 	}
 
 	return queryRefreshTokens(ctx, d, tx,
-		selectSessionBoundRefreshTokensBySessionIdentifierAndClientId.text(d.Dialect),
-		[]any{sessionIdentifier, clientId, sessionIdentifier})
+		selectSessionBoundRefreshTokensBySessionIdentifierAndClientID.text(d.Dialect),
+		[]any{sessionIdentifier, clientID, sessionIdentifier})
 }
 
-func (d *Database) DeleteRefreshToken(ctx context.Context, tx *sql.Tx, refreshTokenId int64) error {
+func (d *Database) DeleteRefreshToken(ctx context.Context, tx *sql.Tx, refreshTokenID int64) error {
 
-	_, err := d.ExecSQL(ctx, tx, deleteRefreshToken.text(d.Dialect), refreshTokenId)
+	_, err := d.ExecSQL(ctx, tx, deleteRefreshToken.text(d.Dialect), refreshTokenID)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete refreshToken")
 	}
@@ -690,9 +690,9 @@ func (d *Database) deleteRefreshTokensByColumn(ctx context.Context, tx *sql.Tx, 
 	var s statement
 	switch column {
 	case "user_id":
-		s = deleteRefreshTokensByUserId
+		s = deleteRefreshTokensByUserID
 	case "client_id":
-		s = deleteRefreshTokensByClientId
+		s = deleteRefreshTokensByClientID
 	default:
 		return errs.Errorf("can't delete refresh tokens by %v", column)
 	}
@@ -739,7 +739,7 @@ func (d *Database) DeleteExpiredRefreshTokens(ctx context.Context, tx *sql.Tx) e
 	return nil
 }
 
-// GetRefreshTokensByUserId returns every refresh token belonging to a user, whatever
+// GetRefreshTokensByUserID returns every refresh token belonging to a user, whatever
 // shape links it to them.
 //
 // The invariant this rests on: a refresh token reaches its user through
@@ -751,68 +751,68 @@ func (d *Database) DeleteExpiredRefreshTokens(ctx context.Context, tx *sql.Tx) e
 // Built as two UNION ALL branches rather than one join with an OR across the two
 // tables. The shapes are mutually exclusive, so the union cannot produce duplicates,
 // and each branch can use its own index where the OR would defeat both. (#106)
-func (d *Database) GetRefreshTokensByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]*record.RefreshToken, error) {
+func (d *Database) GetRefreshTokensByUserID(ctx context.Context, tx *sql.Tx, userID int64) ([]*record.RefreshToken, error) {
 
-	if userId == 0 {
+	if userID == 0 {
 		return nil, nil
 	}
 
-	return queryRefreshTokens(ctx, d, tx, selectRefreshTokensByUserId.text(d.Dialect), []any{userId, userId})
+	return queryRefreshTokens(ctx, d, tx, selectRefreshTokensByUserID.text(d.Dialect), []any{userID, userID})
 }
 
-// GetUsableRefreshTokenClientIdsByUserId answers the clients holding one of the user's refresh tokens that
+// GetUsableRefreshTokenClientIDsByUserID answers the clients holding one of the user's refresh tokens that
 // is still unrevoked and unexpired at now, each once, through either linkage shape: codes.client_id
 // for an authorization-code token and refresh_tokens.client_id for a password grant, the two
-// branches GetRefreshTokensByUserId reads. A user-wide end tells each of them that the user was
-// signed out (#784 decision 3). A zero userId names no client.
-func (d *Database) GetUsableRefreshTokenClientIdsByUserId(ctx context.Context, tx *sql.Tx, userId int64,
+// branches GetRefreshTokensByUserID reads. A user-wide end tells each of them that the user was
+// signed out (#784 decision 3). A zero userID names no client.
+func (d *Database) GetUsableRefreshTokenClientIDsByUserID(ctx context.Context, tx *sql.Tx, userID int64,
 	now time.Time) ([]int64, error) {
 
-	if userId == 0 {
+	if userID == 0 {
 		return nil, nil
 	}
 
-	return queryAll(ctx, d, tx, []int64(nil), selectUsableRefreshTokenClientIds.text(d.Dialect),
-		[]any{userId, false, now, userId, false, now},
-		func(row rowScanner, clientId *int64) error { return row.Scan(clientId) }, "client id")
+	return queryAll(ctx, d, tx, []int64(nil), selectUsableRefreshTokenClientIDs.text(d.Dialect),
+		[]any{userID, false, now, userID, false, now},
+		func(row rowScanner, clientID *int64) error { return row.Scan(clientID) }, "client id")
 }
 
-// GetLiveGrantsByUserId answers one row for each live refresh token the user holds, with the client
+// GetLiveGrantsByUserID answers one row for each live refresh token the user holds, with the client
 // it reaches and the scope it records, through either linkage shape: codes.client_id for an
 // authorization-code token, refresh_tokens.client_id for a password grant, the two branches
-// GetRefreshTokensByUserId reads (#135 decision 4). A live token is one whose row is not revoked,
+// GetRefreshTokensByUserID reads (#135 decision 4). A live token is one whose row is not revoked,
 // whose expires_at is set and after now, and whose rotation family has no revocation record: the
 // record is what refuses a family whose stored members a sweep left looking live, a child a
 // rotation in flight inserted after it (#259). The list of the user's connected clients reads it,
-// and merges each client's scopes itself. A zero userId holds no live grant.
+// and merges each client's scopes itself. A zero userID holds no live grant.
 //
 // The family is matched by the engine's comparison of first_refresh_token_jti, as
 // DeleteOrphanedRefreshTokenFamilyRevocations matches it, not in Go as IsRefreshTokenFamilyRevoked
 // does: the jtis are server-minted UUIDs, so no two families differ only by case or trailing
 // spaces, and a fold could only leave a live grant unlisted, never list a dead one.
-func (d *Database) GetLiveGrantsByUserId(ctx context.Context, tx *sql.Tx, userId int64,
+func (d *Database) GetLiveGrantsByUserID(ctx context.Context, tx *sql.Tx, userID int64,
 	now time.Time) ([]record.LiveGrant, error) {
 
-	if userId == 0 {
+	if userID == 0 {
 		return nil, nil
 	}
 
-	return queryAll(ctx, d, tx, []record.LiveGrant(nil), selectLiveGrantsByUserId.text(d.Dialect),
-		[]any{userId, false, now, userId, false, now},
+	return queryAll(ctx, d, tx, []record.LiveGrant(nil), selectLiveGrantsByUserID.text(d.Dialect),
+		[]any{userID, false, now, userID, false, now},
 		func(row rowScanner, grant *record.LiveGrant) error {
-			return row.Scan(&grant.RefreshTokenId, &grant.ClientId, &grant.Scope)
+			return row.Scan(&grant.RefreshTokenID, &grant.ClientID, &grant.Scope)
 		}, "live grant")
 }
 
-// GetRefreshTokensByUserIdAndClientId returns every refresh token one user holds with one
-// client, whatever shape links it to them: GetRefreshTokensByUserId's two branches with
+// GetRefreshTokensByUserIDAndClientID returns every refresh token one user holds with one
+// client, whatever shape links it to them: GetRefreshTokensByUserID's two branches with
 // the client predicate added to each, so an authorization-code token matches through
 // codes.user_id and codes.client_id and a ROPC token through refresh_tokens.user_id and
 // refresh_tokens.client_id.
 //
 // It exists for one caller, the consent withdrawal response, which must not sweep what
 // the user holds with every OTHER client: withdrawing consent to one app ends that app's
-// grants and leaves the user signed in everywhere else (#622). GetRefreshTokensByUserId
+// grants and leaves the user signed in everywhere else (#622). GetRefreshTokensByUserID
 // plus a client filter cannot substitute for it, because an auth-code token's row
 // carries no client at all: its client is on the code, which this query joins to.
 //
@@ -831,24 +831,24 @@ func (d *Database) GetLiveGrantsByUserId(ctx context.Context, tx *sql.Tx, userId
 // On PostgreSQL and SQL Server at READ COMMITTED each statement reads what was committed when
 // it started, and SQLite has one writer at a time, so their statements take no lock.
 //
-// Built as two UNION ALL branches for the reason GetRefreshTokensByUserId is: the shapes
+// Built as two UNION ALL branches for the reason GetRefreshTokensByUserID is: the shapes
 // are mutually exclusive, so the union cannot produce duplicates, and each branch can
 // use its own index where an OR across the two tables would defeat both (#106).
 //
-// A zero userId or clientId returns an empty slice with no error, following
-// GetRefreshTokensByUserId: the caller's own checks already refuse such identifiers, and
+// A zero userID or clientID returns an empty slice with no error, following
+// GetRefreshTokensByUserID: the caller's own checks already refuse such identifiers, and
 // a sweep over an empty result is a no-op either way.
-func (d *Database) GetRefreshTokensByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) ([]*record.RefreshToken, error) {
+func (d *Database) GetRefreshTokensByUserIDAndClientID(ctx context.Context, tx *sql.Tx, userID int64, clientID int64) ([]*record.RefreshToken, error) {
 
-	if userId == 0 || clientId == 0 {
+	if userID == 0 || clientID == 0 {
 		return nil, nil
 	}
 
-	return queryRefreshTokens(ctx, d, tx, selectRefreshTokensByUserIdAndClientId.text(d.Dialect),
-		[]any{userId, clientId, userId, clientId})
+	return queryRefreshTokens(ctx, d, tx, selectRefreshTokensByUserIDAndClientID.text(d.Dialect),
+		[]any{userID, clientID, userID, clientID})
 }
 
-// GetRefreshTokensByClientId returns every refresh token belonging to a client,
+// GetRefreshTokensByClientID returns every refresh token belonging to a client,
 // whatever shape links it to them.
 //
 // The invariant this rests on: a refresh token reaches its client through
@@ -859,16 +859,16 @@ func (d *Database) GetRefreshTokensByUserIdAndClientId(ctx context.Context, tx *
 // and the union cannot produce duplicates. If a third issuance shape is ever added,
 // the data test enumerating shapes is what should fail.
 //
-// Built as two UNION ALL branches for the reason GetRefreshTokensByUserId is: each
+// Built as two UNION ALL branches for the reason GetRefreshTokensByUserID is: each
 // branch can use its own index where an OR across the two tables would defeat both.
 // (#245)
-func (d *Database) GetRefreshTokensByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]*record.RefreshToken, error) {
+func (d *Database) GetRefreshTokensByClientID(ctx context.Context, tx *sql.Tx, clientID int64) ([]*record.RefreshToken, error) {
 
-	if clientId == 0 {
+	if clientID == 0 {
 		return nil, nil
 	}
 
-	return queryRefreshTokens(ctx, d, tx, selectRefreshTokensByClientId.text(d.Dialect), []any{clientId, clientId})
+	return queryRefreshTokens(ctx, d, tx, selectRefreshTokensByClientID.text(d.Dialect), []any{clientID, clientID})
 }
 
 // PromoteRefreshTokenGenerations moves the named refresh tokens to a new
@@ -881,9 +881,9 @@ func (d *Database) GetRefreshTokensByClientId(ctx context.Context, tx *sql.Tx, c
 // superseded generation. (#106)
 //
 // An empty id list is a no-op, and sends no statement: there is nothing to promote.
-func (d *Database) PromoteRefreshTokenGenerations(ctx context.Context, tx *sql.Tx, refreshTokenIds []int64, generation int64) error {
+func (d *Database) PromoteRefreshTokenGenerations(ctx context.Context, tx *sql.Tx, refreshTokenIDs []int64, generation int64) error {
 
-	if len(refreshTokenIds) == 0 {
+	if len(refreshTokenIDs) == 0 {
 		return nil
 	}
 
@@ -891,10 +891,10 @@ func (d *Database) PromoteRefreshTokenGenerations(ctx context.Context, tx *sql.T
 	// leave the rows it promoted carrying updated_at values a few milliseconds apart.
 	updatedAt := time.Now().UTC()
 
-	// A long id list is promoted in several statements (see forEachIdBatch). The caller always
+	// A long id list is promoted in several statements (see forEachIDBatch). The caller always
 	// holds a transaction -- this is only reachable from the revocation sweep -- so the several
 	// statements commit or roll back together, exactly as the one did.
-	return forEachIdBatch(refreshTokenIds, func(batch []int64) error {
+	return forEachIDBatch(refreshTokenIDs, func(batch []int64) error {
 		query := promoteRefreshTokenGenerationsWhere.text(d.Dialect) + inList(d.Dialect, "id", 4, len(batch))
 		args := append([]any{generation, updatedAt, false}, int64Args(batch)...)
 		_, err := d.ExecSQL(ctx, tx, query, args...)

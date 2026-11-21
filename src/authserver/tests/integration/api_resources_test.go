@@ -26,8 +26,8 @@ func TestAPIResourcesGet_Success(t *testing.T) {
 	resource1 := createTestResource(t, "api-test-resource-1", "API Test Resource 1")
 	resource2 := createTestResource(t, "api-test-resource-2", "API Test Resource 2")
 	defer func() {
-		_ = database.DeleteResource(context.Background(), nil, resource1.Id)
-		_ = database.DeleteResource(context.Background(), nil, resource2.Id)
+		_ = database.DeleteResource(context.Background(), nil, resource1.ID)
+		_ = database.DeleteResource(context.Background(), nil, resource2.ID)
 	}()
 
 	// Test: Get all resources
@@ -57,12 +57,12 @@ func TestAPIResourcesGet_Success(t *testing.T) {
 	res1, exists := resourceMap["api-test-resource-1"]
 	assert.True(t, exists)
 	assert.Equal(t, "API Test Resource 1", res1.Description)
-	assert.Equal(t, resource1.Id, res1.Id)
+	assert.Equal(t, resource1.ID, res1.ID)
 
 	res2, exists := resourceMap["api-test-resource-2"]
 	assert.True(t, exists)
 	assert.Equal(t, "API Test Resource 2", res2.Description)
-	assert.Equal(t, resource2.Id, res2.Id)
+	assert.Equal(t, resource2.ID, res2.ID)
 
 	// Verify resources are sorted by identifier (should come before existing resources like "goiabada-authserver")
 	if len(getResponse.Resources) >= 2 {
@@ -111,7 +111,7 @@ func TestAPIResourcesGet_Unauthorized(t *testing.T) {
 	req, err := http.NewRequest("GET", url, nil)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -175,7 +175,7 @@ func createClientCredentialsTokenWithScope(t *testing.T, resourceIdentifier, per
 	err = database.CreateClient(context.Background(), nil, client)
 	require.NoError(t, err)
 	t.Cleanup(func() {
-		assert.NoError(t, database.DeleteClient(context.Background(), nil, client.Id))
+		assert.NoError(t, database.DeleteClient(context.Background(), nil, client.ID))
 	})
 
 	// Find the requested permission
@@ -183,7 +183,7 @@ func createClientCredentialsTokenWithScope(t *testing.T, resourceIdentifier, per
 	require.NoError(t, err)
 	assert.NotNil(t, resource)
 
-	perms, err := database.GetPermissionsByResourceId(context.Background(), nil, resource.Id)
+	perms, err := database.GetPermissionsByResourceID(context.Background(), nil, resource.ID)
 	require.NoError(t, err)
 
 	var selected *record.Permission
@@ -196,7 +196,7 @@ func createClientCredentialsTokenWithScope(t *testing.T, resourceIdentifier, per
 	assert.NotNil(t, selected, "permission should exist")
 
 	// Assign permission to client
-	err = database.CreateClientPermission(context.Background(), nil, &record.ClientPermission{ClientId: client.Id, PermissionId: selected.Id})
+	err = database.CreateClientPermission(context.Background(), nil, &record.ClientPermission{ClientID: client.ID, PermissionID: selected.ID})
 	require.NoError(t, err)
 
 	// Request an access token with that scope
@@ -207,7 +207,7 @@ func createClientCredentialsTokenWithScope(t *testing.T, resourceIdentifier, per
 		"scope":         {resourceIdentifier + ":" + permissionIdentifier},
 	}
 	tokenEndpoint := appConfig.AuthServer.BaseURL + "/auth/token/"
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	data := postToTokenEndpoint(t, httpClient, tokenEndpoint, form)
 	accessToken, ok := data["access_token"].(string)
 	assert.True(t, ok)
@@ -227,10 +227,10 @@ func createClientCredentialsTokenWithoutRouteScope(t *testing.T) string {
 	require.NoError(t, err)
 	require.NotNil(t, resource)
 
-	permission := createTestPermission(t, resource.Id, "no-route-scope-"+strings.ToLower(fake.LetterN(8)), "Grants no route")
-	require.NotZero(t, permission.Id)
+	permission := createTestPermission(t, resource.ID, "no-route-scope-"+strings.ToLower(fake.LetterN(8)), "Grants no route")
+	require.NotZero(t, permission.ID)
 	t.Cleanup(func() {
-		assert.NoError(t, database.DeletePermission(context.Background(), nil, permission.Id))
+		assert.NoError(t, database.DeletePermission(context.Background(), nil, permission.ID))
 	})
 
 	return createClientCredentialsTokenWithScope(t, builtin.AuthServerResourceIdentifier, permission.PermissionIdentifier)
@@ -253,7 +253,7 @@ func TestAPIResourcesGet_ManyResources(t *testing.T) {
 	defer func() {
 		// Cleanup test resources
 		for _, resource := range testResources {
-			_ = database.DeleteResource(context.Background(), nil, resource.Id)
+			_ = database.DeleteResource(context.Background(), nil, resource.ID)
 		}
 	}()
 

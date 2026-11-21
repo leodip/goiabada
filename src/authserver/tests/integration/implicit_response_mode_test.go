@@ -27,27 +27,27 @@ import (
 func implicitModeAuthorizeURL(client *record.Client, redirectURI string, responseType string,
 	responseMode string, state string, nonce string) string {
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectURI) +
 		"&response_type=" + url.QueryEscape(responseType) +
 		"&scope=" + url.QueryEscape("openid") +
 		"&state=" + url.QueryEscape(state)
 	if nonce != "" {
-		destUrl += "&nonce=" + url.QueryEscape(nonce)
+		destURL += "&nonce=" + url.QueryEscape(nonce)
 	}
 	if responseMode != "" {
-		destUrl += "&response_mode=" + responseMode
+		destURL += "&response_mode=" + responseMode
 	}
-	return destUrl
+	return destURL
 }
 
 // signInToIssue walks a whole sign-in, asserting every hop, and returns the response /auth/issue
 // produced, which the caller closes. It is the ceremony the longhand tests in implicit_flow_test.go
 // walk, written once for the cases here.
-func signInToIssue(t *testing.T, httpClient *http.Client, destUrl string, user *record.User, password string) *http.Response {
+func signInToIssue(t *testing.T, httpClient *http.Client, destURL string, user *record.User, password string) *http.Response {
 	t.Helper()
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	require.NoError(t, err)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
@@ -99,14 +99,14 @@ func formInputs(t *testing.T, resp *http.Response) (action string, inputs map[st
 func TestImplicitFlow_ResponseModeFormPost_PostsTheTokens(t *testing.T) {
 	enableImplicitFlowGlobally(t)
 
-	client, redirectUri := createImplicitFlowClient(t, nil)
+	client, redirectURI := createImplicitFlowClient(t, nil)
 	user, password := createTestUserForImplicit(t)
 
 	requestState := fake.LetterN(16)
 	requestNonce := fake.LetterN(16)
 
-	resp := signInToIssue(t, createHttpClient(t),
-		implicitModeAuthorizeURL(client, redirectUri.URI, "id_token token", "form_post", requestState, requestNonce),
+	resp := signInToIssue(t, createHTTPClient(t),
+		implicitModeAuthorizeURL(client, redirectURI.URI, "id_token token", "form_post", requestState, requestNonce),
 		user, password)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -117,7 +117,7 @@ func TestImplicitFlow_ResponseModeFormPost_PostsTheTokens(t *testing.T) {
 	assert.Equal(t, "no-cache", resp.Header.Get("Pragma"))
 
 	action, inputs := formInputs(t, resp)
-	assert.Equal(t, redirectUri.URI, action)
+	assert.Equal(t, redirectURI.URI, action)
 	assert.NotEmpty(t, inputs["access_token"])
 	assert.Equal(t, "Bearer", inputs["token_type"])
 	assert.NotEmpty(t, inputs["expires_in"])
@@ -154,11 +154,11 @@ func TestImplicitFlow_ResponseModeFormPost_CarriesTheTokensOfTheResponseType(t *
 			present: []string{"id_token"}, absent: []string{"access_token", "token_type", "expires_in"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			client, redirectUri := createImplicitFlowClient(t, nil)
+			client, redirectURI := createImplicitFlowClient(t, nil)
 			user, password := createTestUserForImplicit(t)
 
-			resp := signInToIssue(t, createHttpClient(t),
-				implicitModeAuthorizeURL(client, redirectUri.URI, tc.responseType, "form_post", fake.LetterN(8), fake.LetterN(16)),
+			resp := signInToIssue(t, createHTTPClient(t),
+				implicitModeAuthorizeURL(client, redirectURI.URI, tc.responseType, "form_post", fake.LetterN(8), fake.LetterN(16)),
 				user, password)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -181,17 +181,17 @@ func TestImplicitFlow_ResponseModeFragmentAndAbsent_AreStillDeliveredInTheFragme
 
 	for _, mode := range []string{"", "fragment"} {
 		t.Run("response_mode="+mode, func(t *testing.T) {
-			client, redirectUri := createImplicitFlowClient(t, nil)
+			client, redirectURI := createImplicitFlowClient(t, nil)
 			user, password := createTestUserForImplicit(t)
 
 			requestState := fake.LetterN(16)
-			resp := signInToIssue(t, createHttpClient(t),
-				implicitModeAuthorizeURL(client, redirectUri.URI, "token", mode, requestState, ""),
+			resp := signInToIssue(t, createHTTPClient(t),
+				implicitModeAuthorizeURL(client, redirectURI.URI, "token", mode, requestState, ""),
 				user, password)
 			defer func() { _ = resp.Body.Close() }()
 
 			require.Equal(t, http.StatusFound, resp.StatusCode)
-			assert.True(t, strings.HasPrefix(resp.Header.Get("Location"), redirectUri.URI+"#"),
+			assert.True(t, strings.HasPrefix(resp.Header.Get("Location"), redirectURI.URI+"#"),
 				"the tokens are in the fragment")
 			tokens := getTokensFromFragment(t, resp)
 			assert.NotEmpty(t, tokens["access_token"])
@@ -206,17 +206,17 @@ func TestImplicitFlow_ResponseModeFragmentAndAbsent_AreStillDeliveredInTheFragme
 func TestImplicitFlow_ResponseModeQuery_IsRefusedInTheFragment(t *testing.T) {
 	enableImplicitFlowGlobally(t)
 
-	client, redirectUri := createImplicitFlowClient(t, nil)
+	client, redirectURI := createImplicitFlowClient(t, nil)
 	requestState := fake.LetterN(16)
 
-	resp, err := createAuthenticatedHttpClient(t).Get(
-		implicitModeAuthorizeURL(client, redirectUri.URI, "token", "query", requestState, ""))
+	resp, err := createAuthenticatedHTTPClient(t).Get(
+		implicitModeAuthorizeURL(client, redirectURI.URI, "token", "query", requestState, ""))
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 
 	require.Equal(t, http.StatusFound, resp.StatusCode)
 	location := resp.Header.Get("Location")
-	assert.True(t, strings.HasPrefix(location, redirectUri.URI+"#"), "the refusal is in the fragment: %s", location)
+	assert.True(t, strings.HasPrefix(location, redirectURI.URI+"#"), "the refusal is in the fragment: %s", location)
 	assert.NotContains(t, location, "?", "nothing may be written into the query component")
 
 	errorCode, errorDescription, state := getErrorFromFragment(t, resp)
@@ -231,17 +231,17 @@ func TestImplicitFlow_ResponseModeQuery_IsRefusedInTheFragment(t *testing.T) {
 func TestImplicitFlow_ResponseModeQuery_IsRefusedInTheFragmentAfterLogin(t *testing.T) {
 	enableImplicitFlowGlobally(t)
 
-	client, redirectUri := createImplicitFlowClient(t, nil)
+	client, redirectURI := createImplicitFlowClient(t, nil)
 	user, password := createTestUserForImplicit(t)
 	requestState := fake.LetterN(16)
 
-	resp := driveDeferral(t, createHttpClient(t),
-		implicitModeAuthorizeURL(client, redirectUri.URI, "token", "query", requestState, ""), user, password)
+	resp := driveDeferral(t, createHTTPClient(t),
+		implicitModeAuthorizeURL(client, redirectURI.URI, "token", "query", requestState, ""), user, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	require.Equal(t, http.StatusFound, resp.StatusCode)
 	location := resp.Header.Get("Location")
-	assert.True(t, strings.HasPrefix(location, redirectUri.URI+"#"), "the refusal is in the fragment: %s", location)
+	assert.True(t, strings.HasPrefix(location, redirectURI.URI+"#"), "the refusal is in the fragment: %s", location)
 	assert.NotContains(t, location, "?")
 
 	errorCode, _, state := getErrorFromFragment(t, resp)
@@ -256,23 +256,23 @@ func TestImplicitFlow_ResponseModeQuery_IsRefusedInTheFragmentAfterLogin(t *test
 func TestImplicitFlow_ResponseModeFormPost_AnErrorIsAnsweredInTheForm(t *testing.T) {
 	enableImplicitFlowGlobally(t)
 
-	client, redirectUri := createImplicitFlowClient(t, nil)
+	client, redirectURI := createImplicitFlowClient(t, nil)
 	user, password := createTestUserForImplicit(t)
 	requestState := fake.LetterN(16)
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=token" +
 		"&response_mode=form_post" +
 		"&scope=not_a_valid_scope" +
 		"&state=" + url.QueryEscape(requestState)
 
-	resp := driveDeferral(t, createHttpClient(t), destUrl, user, password)
+	resp := driveDeferral(t, createHTTPClient(t), destURL, user, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	action, inputs := formInputs(t, resp)
-	assert.Equal(t, redirectUri.URI, action)
+	assert.Equal(t, redirectURI.URI, action)
 	assert.Equal(t, "invalid_scope", inputs["error"])
 	assert.Equal(t, requestState, inputs["state"])
 	assert.NotContains(t, inputs, "access_token", "an error response carries no token")
@@ -283,14 +283,14 @@ func TestImplicitFlow_ResponseModeFormPost_AnErrorIsAnsweredInTheForm(t *testing
 func TestPromptNone_ImplicitFormPost(t *testing.T) {
 	enableImplicitFlowGlobally(t)
 
-	httpClient, _, _, _ := createSessionWithAcrLevel1(t)
-	client, redirectUri := createImplicitClientForPromptTests(t)
+	httpClient, _, _, _ := createSessionWithACRLevel1(t)
+	client, redirectURI := createImplicitClientForPromptTests(t)
 
 	requestState := fake.LetterN(8)
-	destUrl := implicitModeAuthorizeURL(client, redirectUri.URI, "token", "form_post", requestState, "") +
+	destURL := implicitModeAuthorizeURL(client, redirectURI.URI, "token", "form_post", requestState, "") +
 		"&prompt=none"
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	require.NoError(t, err)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
@@ -301,7 +301,7 @@ func TestPromptNone_ImplicitFormPost(t *testing.T) {
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	assert.Equal(t, "no-store", resp.Header.Get("Cache-Control"))
 	action, inputs := formInputs(t, resp)
-	assert.Equal(t, redirectUri.URI, action)
+	assert.Equal(t, redirectURI.URI, action)
 	assert.NotEmpty(t, inputs["access_token"])
 	assert.Equal(t, requestState, inputs["state"])
 }

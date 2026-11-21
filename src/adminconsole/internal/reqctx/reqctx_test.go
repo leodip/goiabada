@@ -16,7 +16,7 @@ import (
 
 // present reports which of the two values ctx carries, so a test can say which it expects.
 func present(ctx context.Context) map[string]bool {
-	_, jwtInfo := JwtInfoFrom(ctx)
+	_, jwtInfo := JWTInfoFrom(ctx)
 	_, settings := SettingsFrom(ctx)
 	return map[string]bool{
 		"jwtInfo":  jwtInfo,
@@ -28,11 +28,11 @@ func TestReqctx_RoundTrip(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("token set", func(t *testing.T) {
-		want := oauthclient.JwtInfo{
+		want := oauthclient.JWTInfo{
 			TokenResponse: oauth.TokenResponse{AccessToken: "access", Scope: "openid"},
-			IdToken:       &oauth.JwtToken{TokenBase64: "id", Claims: jwt.MapClaims{"sub": "user-1"}},
+			IDToken:       &oauth.JWTToken{TokenBase64: "id", Claims: jwt.MapClaims{"sub": "user-1"}},
 		}
-		got, ok := JwtInfoFrom(WithJwtInfo(ctx, want))
+		got, ok := JWTInfoFrom(WithJWTInfo(ctx, want))
 		require.True(t, ok)
 		assert.Equal(t, want, got)
 	})
@@ -63,16 +63,16 @@ func TestReqctx_SettingsFromRefusesTypedNil(t *testing.T) {
 // reader that took the zero value for absence would send an authenticated-but-empty session down
 // the unauthenticated path without saying so.
 func TestReqctx_AnEmptyTokenSetIsPresent(t *testing.T) {
-	got, ok := JwtInfoFrom(WithJwtInfo(context.Background(), oauthclient.JwtInfo{}))
+	got, ok := JWTInfoFrom(WithJWTInfo(context.Background(), oauthclient.JWTInfo{}))
 	assert.True(t, ok)
-	assert.Equal(t, oauthclient.JwtInfo{}, got)
+	assert.Equal(t, oauthclient.JWTInfo{}, got)
 }
 
 func TestReqctx_EachWriterSetsOnlyItsOwnValue(t *testing.T) {
 	ctx := context.Background()
 
 	cases := map[string]context.Context{
-		"jwtInfo":  WithJwtInfo(ctx, oauthclient.JwtInfo{TokenResponse: oauth.TokenResponse{AccessToken: "a"}}),
+		"jwtInfo":  WithJWTInfo(ctx, oauthclient.JWTInfo{TokenResponse: oauth.TokenResponse{AccessToken: "a"}}),
 		"settings": WithSettings(ctx, &api.PublicSettingsResponse{}),
 	}
 
@@ -86,9 +86,9 @@ func TestReqctx_EachWriterSetsOnlyItsOwnValue(t *testing.T) {
 }
 
 func TestReqctx_SentinelsMatchThroughAWrap(t *testing.T) {
-	require.ErrorIs(t, errs.Wrap(ErrNoJwtInfo, "x"), ErrNoJwtInfo)
+	require.ErrorIs(t, errs.Wrap(ErrNoJWTInfo, "x"), ErrNoJWTInfo)
 	require.ErrorIs(t, errs.Wrap(ErrNoSettings, "x"), ErrNoSettings)
-	assert.NotErrorIs(t, ErrNoJwtInfo, ErrNoSettings, "the two sentinels are one error")
+	assert.NotErrorIs(t, ErrNoJWTInfo, ErrNoSettings, "the two sentinels are one error")
 }
 
 // Every authenticated request carries both values, written by two middlewares in turn, so each key
@@ -96,19 +96,19 @@ func TestReqctx_SentinelsMatchThroughAWrap(t *testing.T) {
 // its reader would answer absent on a request that has it. Both orders, because which one hides
 // depends on which is written last.
 func TestReqctx_BothValuesTravelTogether(t *testing.T) {
-	jwtInfo := oauthclient.JwtInfo{TokenResponse: oauth.TokenResponse{AccessToken: "a"}}
+	jwtInfo := oauthclient.JWTInfo{TokenResponse: oauth.TokenResponse{AccessToken: "a"}}
 	settings := &api.PublicSettingsResponse{AppName: "sentinel app"}
 
 	orders := map[string]context.Context{
-		"token set first": WithSettings(WithJwtInfo(context.Background(), jwtInfo), settings),
-		"settings first":  WithJwtInfo(WithSettings(context.Background(), settings), jwtInfo),
+		"token set first": WithSettings(WithJWTInfo(context.Background(), jwtInfo), settings),
+		"settings first":  WithJWTInfo(WithSettings(context.Background(), settings), jwtInfo),
 	}
 
 	for name, ctx := range orders {
 		t.Run(name, func(t *testing.T) {
-			gotJwtInfo, ok := JwtInfoFrom(ctx)
+			gotJWTInfo, ok := JWTInfoFrom(ctx)
 			require.True(t, ok, "token set hidden by the settings")
-			assert.Equal(t, jwtInfo, gotJwtInfo)
+			assert.Equal(t, jwtInfo, gotJWTInfo)
 			gotSettings, ok := SettingsFrom(ctx)
 			require.True(t, ok, "settings hidden by the token set")
 			assert.Same(t, settings, gotSettings)

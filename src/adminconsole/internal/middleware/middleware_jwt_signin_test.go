@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"context"
-	"encoding/gob"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -20,7 +19,6 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
 	sessionstoremocks "github.com/leodip/goiabada/core/sessionstore/mocks"
 	"github.com/leodip/goiabada/core/sessionstore/sessiontest"
@@ -46,7 +44,7 @@ func (c *createCountingBackend) Create(ctx context.Context, id string, data []by
 // sign-in and set the handshake cookie, and not one of them creates a row. The cookie opens to the
 // handshake the redirect sent.
 func TestRequiresScope_AnAnonymousRequestWritesNoRow(t *testing.T) {
-	gob.Register(oauth.TokenResponse{})
+	sessionkeys.RegisterStoredTokenResponse()
 	backend := &createCountingBackend{MemoryBackend: sessiontest.NewMemoryBackend()}
 	store, err := sessionstore.NewServerSideStore(backend, sessionkeys.JWT, true, sessionstore.BrowserSessionCookie,
 		sessionstore.KeyPair{
@@ -136,7 +134,7 @@ func TestRequiresScope_BoundsTheReturnTargetItStoresForTheSignIn(t *testing.T) {
 			mw := NewJWT(mockSessionStore, nil, "test-session", nil, nil, mockAuthHelper,
 				stubErrorRenderer{}, "http://localhost:9091", builtin.AdminConsoleClientIdentifier)
 
-			jwtInfo := oauthclient.JwtInfo{}
+			jwtInfo := oauthclient.JWTInfo{}
 			mockAuthHelper.On("IsAuthorizedToAccessResource", jwtInfo, []string{"required:scope"}).Return(false)
 			mockAuthHelper.On("IsAuthenticated", jwtInfo).Return(false)
 			mockAuthHelper.On("RedirToAuthorize", mock.Anything, mock.Anything,
@@ -144,7 +142,7 @@ func TestRequiresScope_BoundsTheReturnTargetItStoresForTheSignIn(t *testing.T) {
 				testCase.redirectBack).Return(nil)
 
 			req := httptest.NewRequest(http.MethodGet, testCase.requestURI, nil)
-			req = req.WithContext(reqctx.WithJwtInfo(req.Context(), jwtInfo))
+			req = req.WithContext(reqctx.WithJWTInfo(req.Context(), jwtInfo))
 
 			rr := httptest.NewRecorder()
 			next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -165,7 +163,7 @@ func TestRequiresScope_BoundsTheReturnTargetItStoresForTheSignIn(t *testing.T) {
 // which is what the callback then redirects to. Each answers the redirect with a handshake cookie
 // that opens (#620).
 func TestRequiresScope_ATargetWithinTheBoundAlwaysSeals(t *testing.T) {
-	gob.Register(oauth.TokenResponse{})
+	sessionkeys.RegisterStoredTokenResponse()
 	store, err := sessionstore.NewServerSideStore(sessiontest.NewMemoryBackend(), sessionkeys.JWT, true,
 		sessionstore.BrowserSessionCookie, sessionstore.KeyPair{
 			AuthenticationKey: []byte("12345678901234567890123456789012"),
@@ -236,7 +234,7 @@ func TestRequiresScope_FallsBackToTheHomePageWhenTheSealIsTooLong(t *testing.T) 
 			mw := NewJWT(new(sessionstoremocks.Store), nil, "test-session", nil, nil, mockAuthHelper,
 				stubErrorRenderer{}, "http://localhost:9091", builtin.AdminConsoleClientIdentifier)
 
-			jwtInfo := oauthclient.JwtInfo{}
+			jwtInfo := oauthclient.JWTInfo{}
 			mockAuthHelper.On("IsAuthorizedToAccessResource", jwtInfo, []string{"required:scope"}).Return(false)
 			mockAuthHelper.On("IsAuthenticated", jwtInfo).Return(false)
 			mockAuthHelper.On("RedirToAuthorize", mock.Anything, mock.Anything, builtin.AdminConsoleClientIdentifier,
@@ -247,7 +245,7 @@ func TestRequiresScope_FallsBackToTheHomePageWhenTheSealIsTooLong(t *testing.T) 
 			}
 
 			req := httptest.NewRequest(http.MethodGet, tc.requestURI, nil)
-			req = req.WithContext(reqctx.WithJwtInfo(req.Context(), jwtInfo))
+			req = req.WithContext(reqctx.WithJWTInfo(req.Context(), jwtInfo))
 			rr := httptest.NewRecorder()
 			mw.RequiresScope([]string{"required:scope"})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				t.Error("an anonymous request never reaches the page it asked for")

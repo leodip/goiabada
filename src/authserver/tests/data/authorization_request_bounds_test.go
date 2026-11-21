@@ -62,8 +62,8 @@ func TestCreateCode_StateNonceAndScopeAtTheBoundRoundTrip(t *testing.T) {
 				user := createTestUser(t)
 				random := fake.LetterN(6)
 				code := &record.Code{
-					ClientId:          client.Id,
-					UserId:            user.Id,
+					ClientID:          client.ID,
+					UserID:            user.ID,
 					Code:              "testcode_" + random,
 					CodeHash:          "testhash_" + random,
 					RedirectURI:       "https://example.com/callback",
@@ -71,7 +71,7 @@ func TestCreateCode_StateNonceAndScopeAtTheBoundRoundTrip(t *testing.T) {
 					ResponseMode:      "query",
 					AuthenticatedAt:   time.Now().UTC().Truncate(time.Microsecond),
 					SessionIdentifier: "testsession_" + random,
-					AcrLevel:          "1",
+					ACRLevel:          "1",
 					AuthMethods:       "password",
 				}
 				column.set(code, tc.value)
@@ -79,7 +79,7 @@ func TestCreateCode_StateNonceAndScopeAtTheBoundRoundTrip(t *testing.T) {
 				err := database.CreateCode(context.Background(), nil, code)
 				require.NoError(t, err, "a code carrying a %d-byte %s was refused by the column", column.max, column.name)
 
-				stored, err := database.GetCodeById(context.Background(), nil, code.Id)
+				stored, err := database.GetCodeByID(context.Background(), nil, code.ID)
 				require.NoError(t, err)
 				require.NotNil(t, stored)
 				require.Equal(t, tc.value, column.get(stored), "the code's %s did not round-trip unchanged", column.name)
@@ -99,8 +99,8 @@ func TestCreateCode_StateNonceAndScopeAtTheBoundRoundTrip(t *testing.T) {
 			user := createTestUser(t)
 			random := fake.LetterN(6)
 			code := &record.Code{
-				ClientId:          client.Id,
-				UserId:            user.Id,
+				ClientID:          client.ID,
+				UserID:            user.ID,
 				Code:              "testcode_" + random,
 				CodeHash:          "testhash_" + random,
 				RedirectURI:       "https://example.com/callback",
@@ -110,14 +110,14 @@ func TestCreateCode_StateNonceAndScopeAtTheBoundRoundTrip(t *testing.T) {
 				ResponseMode:      "query",
 				AuthenticatedAt:   time.Now().UTC().Truncate(time.Microsecond),
 				SessionIdentifier: "testsession_" + random,
-				AcrLevel:          "1",
+				ACRLevel:          "1",
 				AuthMethods:       "password",
 			}
 
 			err := database.CreateCode(context.Background(), nil, code)
 			require.NoError(t, err, "a code with state, nonce and scope all at their bounds was refused")
 
-			stored, err := database.GetCodeById(context.Background(), nil, code.Id)
+			stored, err := database.GetCodeByID(context.Background(), nil, code.ID)
 			require.NoError(t, err)
 			require.NotNil(t, stored)
 			require.Equal(t, states[i].value, stored.State)
@@ -135,12 +135,12 @@ func TestCreateRefreshToken_AScopeAtTheBoundRoundTrips(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			client := createTestClient(t)
 			user := createTestUser(t)
-			code := createTestCode(t, client.Id, user.Id)
+			code := createTestCode(t, client.ID, user.ID)
 			refreshToken := &record.RefreshToken{
-				CodeId:            sql.NullInt64{Int64: code.Id, Valid: true},
-				UserId:            sql.NullInt64{Int64: user.Id, Valid: true},
-				ClientId:          sql.NullInt64{Int64: client.Id, Valid: true},
-				RefreshTokenJti:   fake.UUID(),
+				CodeID:            sql.NullInt64{Int64: code.ID, Valid: true},
+				UserID:            sql.NullInt64{Int64: user.ID, Valid: true},
+				ClientID:          sql.NullInt64{Int64: client.ID, Valid: true},
+				RefreshTokenJTI:   fake.UUID(),
 				SessionIdentifier: fake.UUID(),
 				RefreshTokenType:  "Bearer",
 				Scope:             tc.value,
@@ -152,7 +152,7 @@ func TestCreateRefreshToken_AScopeAtTheBoundRoundTrips(t *testing.T) {
 			err := database.CreateRefreshToken(context.Background(), nil, refreshToken)
 			require.NoError(t, err, "a refresh token carrying a %d-byte scope was refused by the column", record.ScopeMaxBytes)
 
-			stored, err := database.GetRefreshTokenById(context.Background(), nil, refreshToken.Id)
+			stored, err := database.GetRefreshTokenByID(context.Background(), nil, refreshToken.ID)
 			require.NoError(t, err)
 			require.NotNil(t, stored)
 			require.Equal(t, tc.value, stored.Scope, "the refresh token's scope did not round-trip unchanged")
@@ -168,8 +168,8 @@ func TestCreateUserConsent_AScopeAtTheBoundRoundTrips(t *testing.T) {
 			client := createTestClient(t)
 			user := createTestUser(t)
 			consent := &record.UserConsent{
-				UserId:    user.Id,
-				ClientId:  client.Id,
+				UserID:    user.ID,
+				ClientID:  client.ID,
 				Scope:     tc.value,
 				GrantedAt: sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
 			}
@@ -177,7 +177,7 @@ func TestCreateUserConsent_AScopeAtTheBoundRoundTrips(t *testing.T) {
 			err := database.CreateUserConsent(context.Background(), nil, consent)
 			require.NoError(t, err, "a consent carrying a %d-byte scope was refused by the column", record.ScopeMaxBytes)
 
-			stored, err := database.GetUserConsentById(context.Background(), nil, consent.Id)
+			stored, err := database.GetUserConsentByID(context.Background(), nil, consent.ID)
 			require.NoError(t, err)
 			require.NotNil(t, stored)
 			require.Equal(t, tc.value, stored.Scope, "the consent's scope did not round-trip unchanged")

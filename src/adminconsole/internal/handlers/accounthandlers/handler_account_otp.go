@@ -22,17 +22,17 @@ type accountOTPAPI interface {
 	CreateAccountRecoveryCodes(ctx context.Context, accessToken string, request *api.CreateAccountRecoveryCodesRequest) (*api.CreateAccountRecoveryCodesResponse, error)
 }
 
-func HandleOtpGet(
-	httpHelper HttpHelper,
+func HandleOTPGet(
+	httpHelper HTTPHelper,
 	apiClient accountOTPAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		// Get access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
@@ -70,8 +70,8 @@ func HandleOtpGet(
 	}
 }
 
-func HandleOtpPost(
-	httpHelper HttpHelper,
+func HandleOTPPost(
+	httpHelper HTTPHelper,
 	apiClient accountOTPAPI,
 	baseURL string,
 ) http.HandlerFunc {
@@ -79,9 +79,9 @@ func HandleOtpPost(
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		// Get access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 		// The posted form says what it does, enable or disable, and the auth server is asked for
@@ -238,7 +238,7 @@ func HandleOtpPost(
 			otpCode := r.PostFormValue("otp")
 
 			if len(otpCode) == 0 {
-				renderEnrollmentError(i18n.NewLocalizedError(i18n.ErrCodeOtpCodeRequired, nil).Localize(r.Context()), "otp")
+				renderEnrollmentError(i18n.NewLocalizedError(i18n.ErrCodeOTPCodeRequired, nil).Localize(r.Context()), "otp")
 				return
 			}
 
@@ -249,7 +249,7 @@ func HandleOtpPost(
 			req := &api.UpdateAccountOTPRequest{
 				Enabled:  true,
 				Password: password,
-				OtpCode:  otpCode,
+				OTPCode:  otpCode,
 			}
 			enabled, err := apiClient.UpdateAccountOTP(r.Context(), jwtInfo.TokenResponse.AccessToken, req)
 			if err != nil {
@@ -300,7 +300,7 @@ func HandleOtpPost(
 // renderOTPEnabledPage draws the page of an account with two-factor authentication: bind's entries
 // and the count of the account's unused recovery codes, read from the auth server each time the
 // page is drawn, since the page always says how many are left (#257 decision 9).
-func renderOTPEnabledPage(httpHelper HttpHelper, apiClient accountOTPAPI, w http.ResponseWriter, r *http.Request,
+func renderOTPEnabledPage(httpHelper HTTPHelper, apiClient accountOTPAPI, w http.ResponseWriter, r *http.Request,
 	accessToken string, bind map[string]interface{}) {
 
 	count, err := apiClient.GetAccountRecoveryCodes(r.Context(), accessToken)

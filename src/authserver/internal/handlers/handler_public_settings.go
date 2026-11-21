@@ -18,7 +18,7 @@ import (
 // publicSettingsDatabase is what the public settings endpoint needs: the settings row, and the brand
 // the admin console's own client is drawn in, its own or the default the row points at.
 type publicSettingsDatabase interface {
-	GetSettingsById(ctx context.Context, tx *sql.Tx, settingsId int64) (*record.Settings, error)
+	GetSettingsByID(ctx context.Context, tx *sql.Tx, settingsID int64) (*record.Settings, error)
 	render.PageBrandReader
 }
 
@@ -46,12 +46,12 @@ type publicSettingsDatabase interface {
 func HandlePublicSettingsGet(database publicSettingsDatabase, baseURL string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get settings from database
-		settings, err := database.GetSettingsById(r.Context(), nil, 1)
+		settings, err := database.GetSettingsByID(r.Context(), nil, 1)
 		if err != nil {
 			apiresponse.WriteInternalServerError(w, r, errs.Wrap(err, "unable to retrieve the settings"))
 			return
 		}
-		// GetSettingsById returns (nil, nil) when the row is absent, so this guard is
+		// GetSettingsByID returns (nil, nil) when the row is absent, so this guard is
 		// what stops an unauthenticated request from panicking the handler.
 		if settings == nil {
 			apiresponse.WriteInternalServerError(w, r, errs.New("the settings row is absent"))

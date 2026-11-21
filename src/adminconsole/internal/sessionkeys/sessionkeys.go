@@ -18,6 +18,9 @@
 //
 // SafeMode is in both: the handshake carries it to the callback, which writes it into the session
 // (#816 decision 2). Renaming it takes the sessions in safe mode at the deploy out of it.
+//
+// StoredTokenResponse is the value stored under JWT, a shape of its own whose registered gob name
+// and field names are stored data in the same way (#482).
 package sessionkeys
 
 // JWT is the authenticated-session key. Its string value, like every one here, is the

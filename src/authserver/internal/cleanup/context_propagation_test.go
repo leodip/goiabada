@@ -32,7 +32,7 @@ func lifecycleContext() context.Context {
 }
 
 // Stage 8 tightens two of the stubs below from mock.Anything to theWorkersContext(), because
-// TryClaimCleanupRun and GetSettingsById only took a context from that stage onward, and adds the
+// TryClaimCleanupRun and GetSettingsByID only took a context from that stage onward, and adds the
 // audit-log batch loop, which is the one sweep whose statement runs up to a hundred times.
 
 // The accept arm: the browser-session reap runs on the poll's own context. It is the sweep that
@@ -101,7 +101,7 @@ func TestWorker_PerformTask_SweepsUnderTheWorkersContext(t *testing.T) {
 	mockDB.On("DeleteUnattachedBrandAssets", theWorkersContext(), mock.Anything, mock.Anything).Return(0, nil).Once()
 	// The settings row is absent, which stops the task before the two session sweeps. That keeps
 	// this case about the context and not about the sweep order, which its own tests own.
-	mockDB.On("GetSettingsById", theWorkersContext(), mock.Anything, int64(1)).Return(nil, nil).Once()
+	mockDB.On("GetSettingsByID", theWorkersContext(), mock.Anything, int64(1)).Return(nil, nil).Once()
 
 	worker.performTask(lifecycleContext())
 

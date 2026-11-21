@@ -43,9 +43,9 @@ func SessionIdentifier(sessionStore sessionIdentifierStore, database sessionIden
 	return func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
-			requestId := requestid.FromContext(ctx)
+			requestID := requestid.FromContext(ctx)
 
-			errorMsg := fmt.Sprintf("fatal failure in session middleware. For additional information, refer to the server logs. Request Id: %v", requestId)
+			errorMsg := fmt.Sprintf("fatal failure in session middleware. For additional information, refer to the server logs. Request Id: %v", requestID)
 
 			sess, err := sessionStore.Get(r, sessionkeys.AuthServerSessionName)
 			if err != nil {
@@ -84,7 +84,7 @@ func SessionIdentifier(sessionStore sessionIdentifierStore, database sessionIden
 					}
 				} else {
 					ctx = reqctx.WithSessionIdentifier(ctx, sessionIdentifier)
-					ctx = reqctx.WithSessionUserId(ctx, userSession.UserId)
+					ctx = reqctx.WithSessionUserID(ctx, userSession.UserID)
 				}
 			}
 

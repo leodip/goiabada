@@ -42,7 +42,7 @@ const (
 	otpNoticeSubject   = "the-subject"
 	otpNoticePassword  = "P4ss!word"
 	otpNoticeAddress   = "carla.mendes@example.com"
-	otpNoticeRequestId = "req-otp-0001"
+	otpNoticeRequestID = "req-otp-0001"
 )
 
 // otpNoticeUser is the caller part way through an enrolment (otpTestUser), with a verified
@@ -60,7 +60,7 @@ func otpNoticeUser(t *testing.T) *record.User {
 
 // withNoticeContext gives a request the request's id and settings.
 func withNoticeContext(req *http.Request, settings *record.Settings) *http.Request {
-	ctx := requestid.NewContext(req.Context(), otpNoticeRequestId)
+	ctx := requestid.NewContext(req.Context(), otpNoticeRequestID)
 	return req.WithContext(reqctx.WithSettings(ctx, settings))
 }
 
@@ -76,16 +76,16 @@ func stubOTPEnable(database *datamocks.Database, auditLogger *handlersmocks.Audi
 func stubOTPEnableAnswering(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, user *record.User,
 	answered *record.User) {
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), otpNoticeSubject).Return(user, nil).Once()
-	database.On("TryConsumeUserOTPStep", mock.Anything, (*sql.Tx)(nil), user.Id, mock.Anything).Return(true, nil).Once()
+	database.On("TryConsumeUserOTPStep", mock.Anything, (*sql.Tx)(nil), user.ID, mock.Anything).Return(true, nil).Once()
 	datamocks.ExpectRunInTransaction(database, otpDisableTx)
-	database.On("TryEstablishUserOTP", mock.Anything, otpDisableTx, user.Id, user.OtpConfigGeneration, mock.Anything).
+	database.On("TryEstablishUserOTP", mock.Anything, otpDisableTx, user.ID, user.OTPConfigGeneration, mock.Anything).
 		Return(true, nil).Once()
-	database.On("IncrementUserOtpConfigGeneration", mock.Anything, otpDisableTx, user.Id).Return(int64(1), nil).Once()
-	database.On("ClearPendingOTPEnrollment", mock.Anything, otpDisableTx, user.Id).Return(nil).Once()
-	database.On("ClearUserOtpConsecutiveFailures", mock.Anything, otpDisableTx, user.Id).Return(nil).Once()
-	database.On("GetUserByIdForUpdate", mock.Anything, otpDisableTx, user.Id).Return(user, nil).Once()
-	database.On("ReplaceUserRecoveryCodes", mock.Anything, otpDisableTx, user.Id, mock.Anything).Return(nil).Once()
-	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), user.Id).Return(answered, nil).Once()
+	database.On("IncrementUserOTPConfigGeneration", mock.Anything, otpDisableTx, user.ID).Return(int64(1), nil).Once()
+	database.On("ClearPendingOTPEnrollment", mock.Anything, otpDisableTx, user.ID).Return(nil).Once()
+	database.On("ClearUserOTPConsecutiveFailures", mock.Anything, otpDisableTx, user.ID).Return(nil).Once()
+	database.On("GetUserByIDForUpdate", mock.Anything, otpDisableTx, user.ID).Return(user, nil).Once()
+	database.On("ReplaceUserRecoveryCodes", mock.Anything, otpDisableTx, user.ID, mock.Anything).Return(nil).Once()
+	database.On("GetUserByID", mock.Anything, (*sql.Tx)(nil), user.ID).Return(answered, nil).Once()
 	auditLogger.On("Log", mock.Anything, audit.EventEnabledOTP, mock.Anything).Return().Once()
 	auditLogger.On("Log", mock.Anything, audit.EventRecoveryCodesCreated, mock.Anything).Return().Once()
 }
@@ -103,13 +103,13 @@ func stubOTPRemoveAnswering(database *datamocks.Database, auditLogger *handlersm
 	readMethod string, readKey interface{}, answered *record.User) {
 	database.On(readMethod, mock.Anything, (*sql.Tx)(nil), readKey).Return(user, nil).Once()
 	datamocks.ExpectRunInTransaction(database, otpDisableTx)
-	database.On("TryRemoveUserOTP", mock.Anything, otpDisableTx, user.Id, user.OtpConfigGeneration).Return(true, nil).Once()
-	database.On("ResetUserOTPStep", mock.Anything, otpDisableTx, user.Id).Return(nil).Once()
-	database.On("DeleteUserRecoveryCodes", mock.Anything, otpDisableTx, user.Id).Return(nil).Once()
-	database.On("IncrementUserOtpConfigGeneration", mock.Anything, otpDisableTx, user.Id).Return(int64(1), nil).Once()
-	database.On("GetUserByIdForUpdate", mock.Anything, otpDisableTx, user.Id).Return(user, nil).Once()
-	database.On("LowerUserSessionsToPassword", mock.Anything, otpDisableTx, user.Id, "pwd").Return(nil).Once()
-	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), user.Id).Return(answered, nil).Once()
+	database.On("TryRemoveUserOTP", mock.Anything, otpDisableTx, user.ID, user.OTPConfigGeneration).Return(true, nil).Once()
+	database.On("ResetUserOTPStep", mock.Anything, otpDisableTx, user.ID).Return(nil).Once()
+	database.On("DeleteUserRecoveryCodes", mock.Anything, otpDisableTx, user.ID).Return(nil).Once()
+	database.On("IncrementUserOTPConfigGeneration", mock.Anything, otpDisableTx, user.ID).Return(int64(1), nil).Once()
+	database.On("GetUserByIDForUpdate", mock.Anything, otpDisableTx, user.ID).Return(user, nil).Once()
+	database.On("LowerUserSessionsToPassword", mock.Anything, otpDisableTx, user.ID, "pwd").Return(nil).Once()
+	database.On("GetUserByID", mock.Anything, (*sql.Tx)(nil), user.ID).Return(answered, nil).Once()
 	auditLogger.On("Log", mock.Anything, audit.EventDisabledOTP, mock.Anything).Return().Once()
 }
 
@@ -175,7 +175,7 @@ func TestHandleAccountOTPPut_TellsTheUserTwoFactorWasSetUp(t *testing.T) {
 
 			rr := httptest.NewRecorder()
 			accountOTPNoticeHandler(database, auditLogger, jobs, pageRenderer, emailSender).ServeHTTP(rr,
-				withNoticeContext(accountOTPEnableRequest(t, otpNoticeSubject, otpNoticePassword, currentOtpCode(t)),
+				withNoticeContext(accountOTPEnableRequest(t, otpNoticeSubject, otpNoticePassword, currentOTPCode(t)),
 					passwordNoticeSettings()))
 
 			// The renderer and the sender have no expectations yet, so a notice sent inside the
@@ -197,7 +197,7 @@ func TestHandleAccountOTPPut_TellsTheUserTwoFactorWasSetUp(t *testing.T) {
 			for _, code := range body.RecoveryCodes {
 				assert.NotContains(t, fmt.Sprintf("%+v", captured.values), code, "the notice carries no recovery code")
 			}
-			assert.NotContains(t, captured.sent.Subject+captured.sent.HtmlBody, body.RecoveryCodes[0])
+			assert.NotContains(t, captured.sent.Subject+captured.sent.HTMLBody, body.RecoveryCodes[0])
 		})
 	}
 }
@@ -286,30 +286,30 @@ func TestHandleAccountOTPPut_SendsNoNoticeWhereNoneMayGo(t *testing.T) {
 		{"set up losing its compare-and-set", true, http.StatusBadRequest,
 			func(t *testing.T, database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, user *record.User, settings *record.Settings) {
 				database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), otpNoticeSubject).Return(user, nil).Once()
-				database.On("TryConsumeUserOTPStep", mock.Anything, (*sql.Tx)(nil), user.Id, mock.Anything).Return(true, nil).Once()
+				database.On("TryConsumeUserOTPStep", mock.Anything, (*sql.Tx)(nil), user.ID, mock.Anything).Return(true, nil).Once()
 				datamocks.ExpectRunInTransaction(database, otpDisableTx)
-				database.On("TryEstablishUserOTP", mock.Anything, otpDisableTx, user.Id, user.OtpConfigGeneration, mock.Anything).
+				database.On("TryEstablishUserOTP", mock.Anything, otpDisableTx, user.ID, user.OTPConfigGeneration, mock.Anything).
 					Return(false, nil).Once()
-				database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), user.Id).
-					Return(&record.User{Id: user.Id, Enabled: true, OTPEnabled: true}, nil).Once()
+				database.On("GetUserByID", mock.Anything, (*sql.Tx)(nil), user.ID).
+					Return(&record.User{ID: user.ID, Enabled: true, OTPEnabled: true}, nil).Once()
 			}, ""},
 		{"turned off losing its compare-and-set", false, http.StatusBadRequest,
 			func(t *testing.T, database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, user *record.User, settings *record.Settings) {
 				user.OTPEnabled = true
 				database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), otpNoticeSubject).Return(user, nil).Once()
 				datamocks.ExpectRunInTransaction(database, otpDisableTx)
-				database.On("TryRemoveUserOTP", mock.Anything, otpDisableTx, user.Id, user.OtpConfigGeneration).Return(false, nil).Once()
-				database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), user.Id).
-					Return(&record.User{Id: user.Id, Enabled: true, OTPEnabled: false}, nil).Once()
+				database.On("TryRemoveUserOTP", mock.Anything, otpDisableTx, user.ID, user.OTPConfigGeneration).Return(false, nil).Once()
+				database.On("GetUserByID", mock.Anything, (*sql.Tx)(nil), user.ID).
+					Return(&record.User{ID: user.ID, Enabled: true, OTPEnabled: false}, nil).Once()
 			}, ""},
 		{"set up rolling back", true, http.StatusInternalServerError,
 			func(t *testing.T, database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, user *record.User, settings *record.Settings) {
 				database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), otpNoticeSubject).Return(user, nil).Once()
-				database.On("TryConsumeUserOTPStep", mock.Anything, (*sql.Tx)(nil), user.Id, mock.Anything).Return(true, nil).Once()
+				database.On("TryConsumeUserOTPStep", mock.Anything, (*sql.Tx)(nil), user.ID, mock.Anything).Return(true, nil).Once()
 				datamocks.ExpectRunInTransaction(database, otpDisableTx)
-				database.On("TryEstablishUserOTP", mock.Anything, otpDisableTx, user.Id, user.OtpConfigGeneration, mock.Anything).
+				database.On("TryEstablishUserOTP", mock.Anything, otpDisableTx, user.ID, user.OTPConfigGeneration, mock.Anything).
 					Return(true, nil).Once()
-				database.On("IncrementUserOtpConfigGeneration", mock.Anything, otpDisableTx, user.Id).
+				database.On("IncrementUserOTPConfigGeneration", mock.Anything, otpDisableTx, user.ID).
 					Return(int64(0), errors.New("increment failed")).Once()
 			}, ""},
 		{"turned off rolling back", false, http.StatusInternalServerError,
@@ -317,8 +317,8 @@ func TestHandleAccountOTPPut_SendsNoNoticeWhereNoneMayGo(t *testing.T) {
 				user.OTPEnabled = true
 				database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), otpNoticeSubject).Return(user, nil).Once()
 				datamocks.ExpectRunInTransaction(database, otpDisableTx)
-				database.On("TryRemoveUserOTP", mock.Anything, otpDisableTx, user.Id, user.OtpConfigGeneration).Return(true, nil).Once()
-				database.On("ResetUserOTPStep", mock.Anything, otpDisableTx, user.Id).Return(errors.New("reset failed")).Once()
+				database.On("TryRemoveUserOTP", mock.Anything, otpDisableTx, user.ID, user.OTPConfigGeneration).Return(true, nil).Once()
+				database.On("ResetUserOTPStep", mock.Anything, otpDisableTx, user.ID).Return(errors.New("reset failed")).Once()
 			}, ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -334,7 +334,7 @@ func TestHandleAccountOTPPut_SendsNoNoticeWhereNoneMayGo(t *testing.T) {
 			}
 			var req *http.Request
 			if tc.enable {
-				req = accountOTPEnableRequest(t, otpNoticeSubject, password, currentOtpCode(t))
+				req = accountOTPEnableRequest(t, otpNoticeSubject, password, currentOTPCode(t))
 			} else {
 				req = accountOTPDisableRequest(t, otpNoticeSubject, password)
 			}
@@ -378,20 +378,20 @@ func TestHandleAccountOTPPut_AFailedNoticeIsOneErrorRecord(t *testing.T) {
 	assert.Equal(t, slog.LevelError, records[0].Level)
 	assert.Equal(t, "unable to send an account notice", records[0].Message)
 	assert.Equal(t, "otp_disabled", records[0].Attrs["notice"])
-	assert.Equal(t, otpNoticeRequestId, records[0].Attrs["request_id"])
-	assert.Equal(t, user.Id, records[0].Attrs["user_id"])
+	assert.Equal(t, otpNoticeRequestID, records[0].Attrs["request_id"])
+	assert.Equal(t, user.ID, records[0].Attrs["user_id"])
 	assert.NotContains(t, capture.Text(), otpNoticeAddress, "the record names no address")
 }
 
 // adminOTPNoticeRequest is the administrator's switch turning the user's authenticator off, with a
 // manage-scoped token, the request's id and settings.
-func adminOTPNoticeRequest(t *testing.T, settings *record.Settings, userId int64) *http.Request {
+func adminOTPNoticeRequest(t *testing.T, settings *record.Settings, userID int64) *http.Request {
 	t.Helper()
 	body, err := json.Marshal(map[string]bool{"enabled": false})
 	require.NoError(t, err)
-	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/api/v1/admin/users/%d/otp", userId), bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/api/v1/admin/users/%d/otp", userID), bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	req.SetPathValue("id", fmt.Sprint(userId))
+	req.SetPathValue("id", fmt.Sprint(userID))
 	return setTokenContextWithClaims(withNoticeContext(req, settings),
 		map[string]interface{}{"scope": "authserver:manage", "sub": adminSubject, "auth_time": float64(1)})
 }
@@ -419,11 +419,11 @@ func TestHandleUserOTPPut_TellsTheUserAnAdministratorTurnedItOff(t *testing.T) {
 			user := otpNoticeUser(t)
 			user.OTPEnabled = true
 			user.Locale = tc.locale
-			stubOTPRemove(database, auditLogger, user, "GetUserById", user.Id)
+			stubOTPRemove(database, auditLogger, user, "GetUserByID", user.ID)
 
 			rr := httptest.NewRecorder()
 			adminOTPNoticeHandler(database, auditLogger, jobs, pageRenderer, emailSender).
-				ServeHTTP(rr, adminOTPNoticeRequest(t, passwordNoticeSettings(), user.Id))
+				ServeHTTP(rr, adminOTPNoticeRequest(t, passwordNoticeSettings(), user.ID))
 
 			require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 
@@ -450,32 +450,32 @@ func TestHandleUserOTPPut_SendsNoNoticeWhereNoneMayGo(t *testing.T) {
 		{"SMTP is off", http.StatusOK,
 			func(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, user *record.User, settings *record.Settings) {
 				settings.SMTPEnabled = false
-				stubOTPRemove(database, auditLogger, user, "GetUserById", user.Id)
+				stubOTPRemove(database, auditLogger, user, "GetUserByID", user.ID)
 			}},
 		{"the address is unverified", http.StatusOK,
 			func(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, user *record.User, settings *record.Settings) {
 				user.EmailVerified = false
-				stubOTPRemove(database, auditLogger, user, "GetUserById", user.Id)
+				stubOTPRemove(database, auditLogger, user, "GetUserByID", user.ID)
 			}},
 		{"two-factor authentication is already off", http.StatusBadRequest,
 			func(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, user *record.User, settings *record.Settings) {
 				user.OTPEnabled = false
-				database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), user.Id).Return(user, nil).Once()
+				database.On("GetUserByID", mock.Anything, (*sql.Tx)(nil), user.ID).Return(user, nil).Once()
 			}},
 		{"the removal loses its compare-and-set", http.StatusBadRequest,
 			func(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, user *record.User, settings *record.Settings) {
-				database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), user.Id).Return(user, nil).Once()
+				database.On("GetUserByID", mock.Anything, (*sql.Tx)(nil), user.ID).Return(user, nil).Once()
 				datamocks.ExpectRunInTransaction(database, otpDisableTx)
-				database.On("TryRemoveUserOTP", mock.Anything, otpDisableTx, user.Id, user.OtpConfigGeneration).Return(false, nil).Once()
-				database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), user.Id).
-					Return(&record.User{Id: user.Id, Enabled: true, OTPEnabled: false}, nil).Once()
+				database.On("TryRemoveUserOTP", mock.Anything, otpDisableTx, user.ID, user.OTPConfigGeneration).Return(false, nil).Once()
+				database.On("GetUserByID", mock.Anything, (*sql.Tx)(nil), user.ID).
+					Return(&record.User{ID: user.ID, Enabled: true, OTPEnabled: false}, nil).Once()
 			}},
 		{"the removal rolls back", http.StatusInternalServerError,
 			func(database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, user *record.User, settings *record.Settings) {
-				database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), user.Id).Return(user, nil).Once()
+				database.On("GetUserByID", mock.Anything, (*sql.Tx)(nil), user.ID).Return(user, nil).Once()
 				datamocks.ExpectRunInTransaction(database, otpDisableTx)
-				database.On("TryRemoveUserOTP", mock.Anything, otpDisableTx, user.Id, user.OtpConfigGeneration).Return(true, nil).Once()
-				database.On("ResetUserOTPStep", mock.Anything, otpDisableTx, user.Id).Return(errors.New("reset failed")).Once()
+				database.On("TryRemoveUserOTP", mock.Anything, otpDisableTx, user.ID, user.OTPConfigGeneration).Return(true, nil).Once()
+				database.On("ResetUserOTPStep", mock.Anything, otpDisableTx, user.ID).Return(errors.New("reset failed")).Once()
 			}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -489,7 +489,7 @@ func TestHandleUserOTPPut_SendsNoNoticeWhereNoneMayGo(t *testing.T) {
 
 			rr := httptest.NewRecorder()
 			adminOTPNoticeHandler(database, auditLogger, jobs, handlersmocks.NewPageRenderer(t), accounthandlersmocks.NewEmailSender(t)).
-				ServeHTTP(rr, adminOTPNoticeRequest(t, settings, user.Id))
+				ServeHTTP(rr, adminOTPNoticeRequest(t, settings, user.ID))
 
 			require.Equal(t, tc.expectCode, rr.Code, rr.Body.String())
 			assert.Empty(t, jobs.jobs, "no notice is handed off")

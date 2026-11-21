@@ -22,14 +22,14 @@ type previewInput struct {
 
 // previewOutput is the HTML the auth server rendered, by the renderer its public pages use.
 type previewOutput struct {
-	Html string `json:"html"`
+	HTML string `json:"html"`
 }
 
 // HandlePreviewPost answers the editor's text rendered as the document's public page renders it.
 // The console renders nothing itself: the auth server's renderer is the one that keeps raw HTML,
 // script addresses and images out of a document (#622 decision 4).
 func HandlePreviewPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient legalDocumentPreviewAPI,
 ) http.HandlerFunc {
 
@@ -46,9 +46,9 @@ func HandlePreviewPost(
 			return
 		}
 
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JSONError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.JSONError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
@@ -58,6 +58,6 @@ func HandlePreviewPost(
 			return
 		}
 
-		httpHelper.EncodeJSON(w, r, previewOutput{Html: html})
+		httpHelper.EncodeJSON(w, r, previewOutput{HTML: html})
 	}
 }

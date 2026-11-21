@@ -25,7 +25,7 @@ import (
 // asked for (#499 decision 9). The client is answered with the validator's own detail. Wrapped
 // once, as a validator's result may be, so the match is shown to go through the chain.
 func TestHandleTokenPost_AdministrativeScopeRefusalIsAudited(t *testing.T) {
-	client := &record.Client{Id: 3, ClientIdentifier: "app"}
+	client := &record.Client{ID: 3, ClientIdentifier: "app"}
 
 	for _, tc := range []struct {
 		name        string
@@ -77,7 +77,7 @@ func TestHandleTokenPost_AdministrativeScopeRefusalIsAudited(t *testing.T) {
 				Detail: tc.detail,
 				Client: client,
 				Scopes: []string{"authserver:manage"},
-				UserId: 7,
+				UserID: 7,
 			}
 			tokenValidator.On("ValidateTokenRequest", mock.Anything, mock.Anything,
 				mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).

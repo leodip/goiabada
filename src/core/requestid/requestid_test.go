@@ -35,7 +35,7 @@ func idOf(t *testing.T, header string) (string, http.Header) {
 	return seen, recorder.Header()
 }
 
-func TestMiddleware_AnIncomingIdIsAdoptedVerbatim(t *testing.T) {
+func TestMiddleware_AnIncomingIDIsAdoptedVerbatim(t *testing.T) {
 	for _, incoming := range []string{
 		"req-from-the-edge",
 		"a proxy's id, with spaces/slashes and ✓",
@@ -50,7 +50,7 @@ func TestMiddleware_AnIncomingIdIsAdoptedVerbatim(t *testing.T) {
 
 // The header is the one chi read, spelled as the docs spell it, and Go's header lookup is
 // case-insensitive, so a proxy writing it in lower case is adopted too.
-func TestMiddleware_TheHeaderIsXRequestId(t *testing.T) {
+func TestMiddleware_TheHeaderIsXRequestID(t *testing.T) {
 	assert.Equal(t, "X-Request-Id", Header)
 
 	var seen string
@@ -64,7 +64,7 @@ func TestMiddleware_TheHeaderIsXRequestId(t *testing.T) {
 	assert.Equal(t, "lower", seen)
 }
 
-func TestMiddleware_WithoutAnIncomingIdOneIsMinted(t *testing.T) {
+func TestMiddleware_WithoutAnIncomingIDOneIsMinted(t *testing.T) {
 	hostname, err := os.Hostname()
 	if err != nil || hostname == "" {
 		hostname = "localhost"
@@ -89,7 +89,7 @@ func TestMiddleware_WithoutAnIncomingIdOneIsMinted(t *testing.T) {
 	assert.Equal(t, firstCount+1, secondCount)
 }
 
-func TestFromContext_AContextWithNoIdReadsEmpty(t *testing.T) {
+func TestFromContext_AContextWithNoIDReadsEmpty(t *testing.T) {
 	assert.Empty(t, FromContext(context.Background()))
 	assert.Equal(t, "planted", FromContext(NewContext(context.Background(), "planted")))
 }

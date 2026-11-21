@@ -6,7 +6,7 @@ import (
 )
 
 type UserSessionClient struct {
-	Id        int64        `db:"id" fieldtag:"pk"`
+	ID        int64        `db:"id" fieldtag:"pk"`
 	CreatedAt sql.NullTime `db:"created_at" fieldtag:"dont-update"`
 	UpdatedAt sql.NullTime `db:"updated_at"`
 	// Both keys are tagged dont-update because nothing reassigns an association's session
@@ -19,8 +19,8 @@ type UserSessionClient struct {
 	// row and then asked for B's, while a deletion of B held B exclusively and was waiting
 	// for that session. Removing the lock is the fix rather than ordering it: a lock no
 	// statement names is one no reader of that code can be expected to order (#139).
-	UserSessionId int64     `db:"user_session_id" fieldtag:"dont-update"`
-	ClientId      int64     `db:"client_id" fieldtag:"dont-update"`
+	UserSessionID int64     `db:"user_session_id" fieldtag:"dont-update"`
+	ClientID      int64     `db:"client_id" fieldtag:"dont-update"`
 	Client        Client    `db:"-"`
 	Started       time.Time `db:"started"`
 	LastAccessed  time.Time `db:"last_accessed"`

@@ -13,7 +13,7 @@ import (
 // picture attached to it.
 type profilePictureDatabase interface {
 	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error)
-	GetUserProfilePictureByUserId(ctx context.Context, tx *sql.Tx, userId int64) (*record.UserProfilePicture, error)
+	GetUserProfilePictureByUserID(ctx context.Context, tx *sql.Tx, userID int64) (*record.UserProfilePicture, error)
 }
 
 // HandleProfilePictureGet answers a user's profile picture, to anyone, and no cache may store it. A
@@ -42,7 +42,7 @@ func HandleProfilePictureGet(
 			return
 		}
 
-		profilePicture, err := database.GetUserProfilePictureByUserId(r.Context(), nil, user.Id)
+		profilePicture, err := database.GetUserProfilePictureByUserID(r.Context(), nil, user.ID)
 		if err != nil {
 			pageRenderer.InternalServerError(w, r, err)
 			return

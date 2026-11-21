@@ -1,6 +1,6 @@
 package mssqldb
 
-// explicitIdInsertSQL is SQL Server's answer to "what does an INSERT naming its own id need around
+// explicitIDInsertSQL is SQL Server's answer to "what does an INSERT naming its own id need around
 // it". SQL Server refuses an explicit value in an IDENTITY column unless IDENTITY_INSERT is on for
 // that table, and allows it on for one table per session at a time, so the insert is bracketed by
 // switching it on and back off. An explicit id above the identity's current value moves the
@@ -15,7 +15,7 @@ package mssqldb
 //
 // It is wired onto commondb.Database in the constructor, beside the deadlock and unique-violation
 // classifiers. table is always a literal from the caller's code, never input.
-func explicitIdInsertSQL(table string) (before []string, after []string) {
+func explicitIDInsertSQL(table string) (before []string, after []string) {
 	return []string{"SET IDENTITY_INSERT " + table + " ON"},
 		[]string{"SET IDENTITY_INSERT " + table + " OFF"}
 }

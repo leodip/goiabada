@@ -120,7 +120,7 @@ func brandPaletteAudit(brand *record.Brand, details map[string]interface{}) {
 func brandResponse(ctx context.Context, brand *record.Brand, slots brandasset.Slots, baseURL string, isDefault bool,
 	clientCount int) api.BrandResponse {
 	if brand.Theme == record.BrandThemeCustom && brand.Palette == nil {
-		slog.WarnContext(ctx, "brand has the custom theme and no palette", "brand_id", brand.Id)
+		slog.WarnContext(ctx, "brand has the custom theme and no palette", "brand_id", brand.ID)
 	}
 	return apimapping.ToBrandResponse(brand, slots, baseURL, isDefault, clientCount)
 }

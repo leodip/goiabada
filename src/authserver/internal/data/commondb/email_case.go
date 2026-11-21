@@ -63,7 +63,7 @@ func (d *Database) scanEmailCase(query func(query string) (*sql.Rows, error)) ([
 	var result []record.EmailCaseRow
 	for rows.Next() {
 		var row record.EmailCaseRow
-		if err := rows.Scan(&row.Id, &row.Email, &row.EngineLowered); err != nil {
+		if err := rows.Scan(&row.ID, &row.Email, &row.EngineLowered); err != nil {
 			return nil, errs.Wrap(err, "unable to scan a user email for the email case pre-flight")
 		}
 		result = append(result, row)

@@ -11,9 +11,9 @@ import (
 
 func TestCreateClientLogo(t *testing.T) {
 	client := createTestClient(t)
-	clientLogo := createTestClientLogo(t, client.Id)
+	clientLogo := createTestClientLogo(t, client.ID)
 
-	if clientLogo.Id == 0 {
+	if clientLogo.ID == 0 {
 		t.Error("Expected non-zero ID after creation")
 	}
 	if !clientLogo.CreatedAt.Valid || clientLogo.CreatedAt.Time.IsZero() {
@@ -23,16 +23,16 @@ func TestCreateClientLogo(t *testing.T) {
 		t.Error("Expected UpdatedAt to be set")
 	}
 
-	retrieved, err := database.GetClientLogoByClientId(context.Background(), nil, client.Id)
+	retrieved, err := database.GetClientLogoByClientID(context.Background(), nil, client.ID)
 	if err != nil {
 		t.Fatalf("Failed to retrieve created client logo: %v", err)
 	}
 
-	if retrieved.Id != clientLogo.Id {
-		t.Errorf("Expected ID %d, got %d", clientLogo.Id, retrieved.Id)
+	if retrieved.ID != clientLogo.ID {
+		t.Errorf("Expected ID %d, got %d", clientLogo.ID, retrieved.ID)
 	}
-	if retrieved.ClientId != clientLogo.ClientId {
-		t.Errorf("Expected ClientId %d, got %d", clientLogo.ClientId, retrieved.ClientId)
+	if retrieved.ClientID != clientLogo.ClientID {
+		t.Errorf("Expected ClientID %d, got %d", clientLogo.ClientID, retrieved.ClientID)
 	}
 	if retrieved.ContentType != clientLogo.ContentType {
 		t.Errorf("Expected ContentType %s, got %s", clientLogo.ContentType, retrieved.ContentType)
@@ -42,22 +42,22 @@ func TestCreateClientLogo(t *testing.T) {
 	}
 }
 
-func TestCreateClientLogo_ZeroClientId(t *testing.T) {
+func TestCreateClientLogo_ZeroClientID(t *testing.T) {
 	clientLogo := &record.ClientLogo{
-		ClientId:    0,
+		ClientID:    0,
 		Logo:        createTestPNG(100, 100),
 		ContentType: "image/png",
 	}
 
 	err := database.CreateClientLogo(context.Background(), nil, clientLogo)
 	if err == nil {
-		t.Error("Expected error when creating client logo with zero ClientId")
+		t.Error("Expected error when creating client logo with zero ClientID")
 	}
 }
 
 func TestUpdateClientLogo(t *testing.T) {
 	client := createTestClient(t)
-	clientLogo := createTestClientLogo(t, client.Id)
+	clientLogo := createTestClientLogo(t, client.ID)
 
 	// Update the logo
 	newLogoData := createTestPNG(200, 200)
@@ -71,7 +71,7 @@ func TestUpdateClientLogo(t *testing.T) {
 		t.Fatalf("Failed to update client logo: %v", err)
 	}
 
-	updated, err := database.GetClientLogoByClientId(context.Background(), nil, client.Id)
+	updated, err := database.GetClientLogoByClientID(context.Background(), nil, client.ID)
 	if err != nil {
 		t.Fatalf("Failed to retrieve updated client logo: %v", err)
 	}
@@ -87,10 +87,10 @@ func TestUpdateClientLogo(t *testing.T) {
 	}
 }
 
-func TestUpdateClientLogo_ZeroId(t *testing.T) {
+func TestUpdateClientLogo_ZeroID(t *testing.T) {
 	clientLogo := &record.ClientLogo{
-		Id:          0,
-		ClientId:    1,
+		ID:          0,
+		ClientID:    1,
 		Logo:        createTestPNG(100, 100),
 		ContentType: "image/png",
 	}
@@ -101,11 +101,11 @@ func TestUpdateClientLogo_ZeroId(t *testing.T) {
 	}
 }
 
-func TestGetClientLogoByClientId(t *testing.T) {
+func TestGetClientLogoByClientID(t *testing.T) {
 	client := createTestClient(t)
-	clientLogo := createTestClientLogo(t, client.Id)
+	clientLogo := createTestClientLogo(t, client.ID)
 
-	retrieved, err := database.GetClientLogoByClientId(context.Background(), nil, client.Id)
+	retrieved, err := database.GetClientLogoByClientID(context.Background(), nil, client.ID)
 	if err != nil {
 		t.Fatalf("Failed to get client logo by client ID: %v", err)
 	}
@@ -113,31 +113,31 @@ func TestGetClientLogoByClientId(t *testing.T) {
 	if retrieved == nil {
 		t.Fatal("Expected client logo to be found")
 	}
-	if retrieved.Id != clientLogo.Id {
-		t.Errorf("Expected ID %d, got %d", clientLogo.Id, retrieved.Id)
+	if retrieved.ID != clientLogo.ID {
+		t.Errorf("Expected ID %d, got %d", clientLogo.ID, retrieved.ID)
 	}
-	if retrieved.ClientId != client.Id {
-		t.Errorf("Expected ClientId %d, got %d", client.Id, retrieved.ClientId)
+	if retrieved.ClientID != client.ID {
+		t.Errorf("Expected ClientID %d, got %d", client.ID, retrieved.ClientID)
 	}
 }
 
-func TestGetClientLogoByClientId_NotFound(t *testing.T) {
+func TestGetClientLogoByClientID_NotFound(t *testing.T) {
 	// Use a client ID that doesn't have a logo
-	retrieved, err := database.GetClientLogoByClientId(context.Background(), nil, 99999999)
+	retrieved, err := database.GetClientLogoByClientID(context.Background(), nil, 99999999)
 	if err != nil {
 		t.Errorf("Expected no error for non-existent client logo, got: %v", err)
 	}
 	if retrieved != nil {
-		t.Errorf("Expected nil for non-existent client logo, got ID: %d", retrieved.Id)
+		t.Errorf("Expected nil for non-existent client logo, got ID: %d", retrieved.ID)
 	}
 }
 
 func TestDeleteClientLogo(t *testing.T) {
 	client := createTestClient(t)
-	_ = createTestClientLogo(t, client.Id)
+	_ = createTestClientLogo(t, client.ID)
 
 	// Verify it exists
-	exists, err := database.ClientHasLogo(context.Background(), nil, client.Id)
+	exists, err := database.ClientHasLogo(context.Background(), nil, client.ID)
 	if err != nil {
 		t.Fatalf("Failed to check if client has logo: %v", err)
 	}
@@ -146,13 +146,13 @@ func TestDeleteClientLogo(t *testing.T) {
 	}
 
 	// Delete it
-	err = database.DeleteClientLogo(context.Background(), nil, client.Id)
+	err = database.DeleteClientLogo(context.Background(), nil, client.ID)
 	if err != nil {
 		t.Fatalf("Failed to delete client logo: %v", err)
 	}
 
 	// Verify it's gone
-	deleted, err := database.GetClientLogoByClientId(context.Background(), nil, client.Id)
+	deleted, err := database.GetClientLogoByClientID(context.Background(), nil, client.ID)
 	if err != nil {
 		t.Fatalf("Error while checking for deleted client logo: %v", err)
 	}
@@ -171,9 +171,9 @@ func TestDeleteClientLogo_NotExist(t *testing.T) {
 
 func TestClientHasLogo_True(t *testing.T) {
 	client := createTestClient(t)
-	_ = createTestClientLogo(t, client.Id)
+	_ = createTestClientLogo(t, client.ID)
 
-	hasLogo, err := database.ClientHasLogo(context.Background(), nil, client.Id)
+	hasLogo, err := database.ClientHasLogo(context.Background(), nil, client.ID)
 	if err != nil {
 		t.Fatalf("Failed to check if client has logo: %v", err)
 	}
@@ -186,7 +186,7 @@ func TestClientHasLogo_False(t *testing.T) {
 	client := createTestClient(t)
 	// Don't create a logo for this client
 
-	hasLogo, err := database.ClientHasLogo(context.Background(), nil, client.Id)
+	hasLogo, err := database.ClientHasLogo(context.Background(), nil, client.ID)
 	if err != nil {
 		t.Fatalf("Failed to check if client has logo: %v", err)
 	}
@@ -214,7 +214,7 @@ func TestClientLogo_MultipleClients(t *testing.T) {
 	logo2Data := createTestPNG(100, 100)
 
 	logo1 := &record.ClientLogo{
-		ClientId:    client1.Id,
+		ClientID:    client1.ID,
 		Logo:        logo1Data,
 		ContentType: "image/png",
 	}
@@ -224,7 +224,7 @@ func TestClientLogo_MultipleClients(t *testing.T) {
 	}
 
 	logo2 := &record.ClientLogo{
-		ClientId:    client2.Id,
+		ClientID:    client2.ID,
 		Logo:        logo2Data,
 		ContentType: "image/png",
 	}
@@ -234,7 +234,7 @@ func TestClientLogo_MultipleClients(t *testing.T) {
 	}
 
 	// Verify each client has their own logo
-	retrieved1, err := database.GetClientLogoByClientId(context.Background(), nil, client1.Id)
+	retrieved1, err := database.GetClientLogoByClientID(context.Background(), nil, client1.ID)
 	if err != nil {
 		t.Fatalf("Failed to get logo for client1: %v", err)
 	}
@@ -242,7 +242,7 @@ func TestClientLogo_MultipleClients(t *testing.T) {
 		t.Error("Client1's logo data doesn't match")
 	}
 
-	retrieved2, err := database.GetClientLogoByClientId(context.Background(), nil, client2.Id)
+	retrieved2, err := database.GetClientLogoByClientID(context.Background(), nil, client2.ID)
 	if err != nil {
 		t.Fatalf("Failed to get logo for client2: %v", err)
 	}
@@ -251,12 +251,12 @@ func TestClientLogo_MultipleClients(t *testing.T) {
 	}
 
 	// Deleting client1's logo shouldn't affect client2's logo
-	err = database.DeleteClientLogo(context.Background(), nil, client1.Id)
+	err = database.DeleteClientLogo(context.Background(), nil, client1.ID)
 	if err != nil {
 		t.Fatalf("Failed to delete client1's logo: %v", err)
 	}
 
-	client2StillHasLogo, err := database.ClientHasLogo(context.Background(), nil, client2.Id)
+	client2StillHasLogo, err := database.ClientHasLogo(context.Background(), nil, client2.ID)
 	if err != nil {
 		t.Fatalf("Failed to check if client2 has logo: %v", err)
 	}
@@ -272,7 +272,7 @@ func TestClientLogo_LargeLogoData(t *testing.T) {
 	largeLogoData := createTestPNG(512, 512)
 
 	clientLogo := &record.ClientLogo{
-		ClientId:    client.Id,
+		ClientID:    client.ID,
 		Logo:        largeLogoData,
 		ContentType: "image/png",
 	}
@@ -282,7 +282,7 @@ func TestClientLogo_LargeLogoData(t *testing.T) {
 		t.Fatalf("Failed to create client logo with large data: %v", err)
 	}
 
-	retrieved, err := database.GetClientLogoByClientId(context.Background(), nil, client.Id)
+	retrieved, err := database.GetClientLogoByClientID(context.Background(), nil, client.ID)
 	if err != nil {
 		t.Fatalf("Failed to retrieve large client logo: %v", err)
 	}
@@ -292,10 +292,10 @@ func TestClientLogo_LargeLogoData(t *testing.T) {
 	}
 }
 
-func createTestClientLogo(t *testing.T, clientId int64) *record.ClientLogo {
+func createTestClientLogo(t *testing.T, clientID int64) *record.ClientLogo {
 	logoData := createTestPNG(100, 100)
 	clientLogo := &record.ClientLogo{
-		ClientId:    clientId,
+		ClientID:    clientID,
 		Logo:        logoData,
 		ContentType: "image/png",
 	}

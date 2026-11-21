@@ -15,13 +15,13 @@ import (
 func TestRender_AdminGroupsPermissions_SendsTheLoadedList(t *testing.T) {
 	out := renderMenuPage(t, "/admin_groups_permissions.html", map[string]interface{}{
 		"group": struct {
-			GroupId         int64
+			GroupID         int64
 			GroupIdentifier string
-		}{GroupId: 5, GroupIdentifier: "admins"},
+		}{GroupID: 5, GroupIdentifier: "admins"},
 		"granted": []struct {
-			Id    int64
+			ID    int64
 			Scope string
-		}{{Id: 3, Scope: "some-resource:read"}, {Id: 4, Scope: "some-resource:write"}},
+		}{{ID: 3, Scope: "some-resource:read"}, {ID: 4, Scope: "some-resource:write"}},
 		"resources":         []render.Choice{},
 		"savedSuccessfully": false,
 	})
@@ -43,9 +43,9 @@ func TestRender_AdminGroupsPermissions_SendsTheLoadedList(t *testing.T) {
 func TestRender_AdminGroups(t *testing.T) {
 	out := renderMenuPage(t, "/admin_groups.html", map[string]interface{}{
 		"groups": []api.GroupResponse{
-			{Id: 2, GroupIdentifier: "admins", Description: "Administradores",
-				IncludeInIdToken: true, IncludeInAccessToken: false, MemberCount: 17},
-			{Id: 3, GroupIdentifier: "site-viewers", MemberCount: 0},
+			{ID: 2, GroupIdentifier: "admins", Description: "Administradores",
+				IncludeInIDToken: true, IncludeInAccessToken: false, MemberCount: 17},
+			{ID: 3, GroupIdentifier: "site-viewers", MemberCount: 0},
 		},
 	})
 
@@ -53,7 +53,7 @@ func TestRender_AdminGroups(t *testing.T) {
 	assert.Contains(t, out, "Administradores")
 	assert.Contains(t, out, "site-viewers")
 	assert.Regexp(t, `data-label="Membros">17</td>`, out,
-		"the member count column is what GetGroupById's second return used to carry")
+		"the member count column is what GetGroupByID's second return used to carry")
 
 	// The token cell, both arms: the first row's ID token tag and no access token tag, and the
 	// second row's word for neither. A row that rendered neither arm would still leave the other
@@ -67,7 +67,7 @@ func TestRender_AdminGroups(t *testing.T) {
 // return value the apiclient answered beside the group.
 func TestRender_AdminGroupDelete(t *testing.T) {
 	out := renderMenuPage(t, "/admin_groups_delete.html", map[string]interface{}{
-		"group":        &api.GroupResponse{Id: 2, GroupIdentifier: "admins", Description: "Administradores"},
+		"group":        &api.GroupResponse{ID: 2, GroupIdentifier: "admins", Description: "Administradores"},
 		"countOfUsers": 17,
 	})
 
@@ -87,8 +87,8 @@ func TestRender_AdminGroupAttributes(t *testing.T) {
 			"groupIdentifier": "admins",
 			"description":     "Administradores",
 			"attributes": []api.GroupAttributeResponse{
-				{Id: 7, Key: "tier", Value: "gold", GroupId: 2, IncludeInIdToken: true},
-				{Id: 8, Key: "region", Value: "br", GroupId: 2, IncludeInAccessToken: true},
+				{ID: 7, Key: "tier", Value: "gold", GroupID: 2, IncludeInIDToken: true},
+				{ID: 8, Key: "region", Value: "br", GroupID: 2, IncludeInAccessToken: true},
 			},
 		})
 
@@ -121,9 +121,9 @@ func TestRender_AdminGroupAttributes(t *testing.T) {
 func TestRender_AdminResourcesList(t *testing.T) {
 	bind := map[string]interface{}{
 		"resources": []api.ResourceResponse{
-			{Id: 1, ResourceIdentifier: "authserver", Description: "Servidor de autenticação",
+			{ID: 1, ResourceIdentifier: "authserver", Description: "Servidor de autenticação",
 				IsSystemLevelResource: true},
-			{Id: 2, ResourceIdentifier: "faturamento", Description: ""},
+			{ID: 2, ResourceIdentifier: "faturamento", Description: ""},
 		},
 	}
 
@@ -132,7 +132,7 @@ func TestRender_AdminResourcesList(t *testing.T) {
 	assert.Contains(t, out, "authserver")
 	assert.Contains(t, out, "Servidor de autenticação")
 	assert.Contains(t, out, "/admin/resources/2/settings",
-		"the row's links are built from the DTO's Id")
+		"the row's links are built from the DTO's ID")
 }
 
 func TestRender_AdminResourcePermissions(t *testing.T) {
@@ -142,11 +142,11 @@ func TestRender_AdminResourcePermissions(t *testing.T) {
 		"isSystemLevelResource": false,
 		"savedSuccessfully":     false,
 		"entries": []struct {
-			Id          int64
+			ID          int64
 			Identifier  string
 			Description string
 			BuiltIn     bool
-		}{{Id: 9, Identifier: "ler", Description: "Ler faturas"}},
+		}{{ID: 9, Identifier: "ler", Description: "Ler faturas"}},
 	})
 
 	// The rows are drawn from the entries' fields, which the editor reads back out of the row, so a
@@ -165,11 +165,11 @@ func TestRender_AdminResourcePermissions_BuiltInsHaveNoEditOrRemove(t *testing.T
 		"isSystemLevelResource": true,
 		"savedSuccessfully":     false,
 		"entries": []struct {
-			Id          int64
+			ID          int64
 			Identifier  string
 			Description string
 			BuiltIn     bool
-		}{{Id: 1, Identifier: "manage", Description: "Manage", BuiltIn: true}, {Id: 9, Identifier: "custom", Description: "Custom"}},
+		}{{ID: 1, Identifier: "manage", Description: "Manage", BuiltIn: true}, {ID: 9, Identifier: "custom", Description: "Custom"}},
 	})
 
 	assert.Equal(t, 1, strings.Count(out, "data-entry-edit>"), "only the custom permission is editable")
@@ -188,11 +188,11 @@ func TestRender_AdminResourcePermissions_SendsTheLoadedList(t *testing.T) {
 		"isSystemLevelResource": false,
 		"savedSuccessfully":     false,
 		"entries": []struct {
-			Id          int64
+			ID          int64
 			Identifier  string
 			Description string
 			BuiltIn     bool
-		}{{Id: 9, Identifier: "ler", Description: "Ler faturas"}, {Id: 10, Identifier: "escrever", Description: "Escrever faturas"}},
+		}{{ID: 9, Identifier: "ler", Description: "Ler faturas"}, {ID: 10, Identifier: "escrever", Description: "Escrever faturas"}},
 	})
 
 	assert.Contains(t, out, `data-list-key="permissions" data-expected-key="expectedPermissions"`)

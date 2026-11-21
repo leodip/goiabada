@@ -19,17 +19,17 @@ type Accepted struct {
 // AcceptedDatabase is what reading a user's acceptances needs: the acceptances, every document, and
 // each one's versions. data.Database satisfies it.
 type AcceptedDatabase interface {
-	GetLegalDocumentAcceptancesByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.LegalDocumentAcceptance, error)
+	GetLegalDocumentAcceptancesByUserID(ctx context.Context, tx *sql.Tx, userID int64) ([]record.LegalDocumentAcceptance, error)
 	GetAllLegalDocuments(ctx context.Context, tx *sql.Tx) ([]record.LegalDocument, error)
-	GetLegalDocumentVersionsByLegalDocumentId(ctx context.Context, tx *sql.Tx, legalDocumentId int64) ([]record.LegalDocumentVersion, error)
+	GetLegalDocumentVersionsByLegalDocumentID(ctx context.Context, tx *sql.Tx, legalDocumentID int64) ([]record.LegalDocumentVersion, error)
 }
 
 // AcceptedBy answers every version the user accepted, the latest acceptance first, retired
 // documents included (#622 decision 10). An acceptance is written once, at the moment the user
 // accepts, so the latest is the one stored last. Only the documents the user accepted a version of
 // have their versions read.
-func AcceptedBy(ctx context.Context, db AcceptedDatabase, userId int64) ([]Accepted, error) {
-	acceptances, err := db.GetLegalDocumentAcceptancesByUserId(ctx, nil, userId)
+func AcceptedBy(ctx context.Context, db AcceptedDatabase, userID int64) ([]Accepted, error) {
+	acceptances, err := db.GetLegalDocumentAcceptancesByUserID(ctx, nil, userID)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to read the user's legal document acceptances")
 	}
@@ -38,7 +38,7 @@ func AcceptedBy(ctx context.Context, db AcceptedDatabase, userId int64) ([]Accep
 	}
 	wanted := make(map[int64]bool, len(acceptances))
 	for _, acceptance := range acceptances {
-		wanted[acceptance.LegalDocumentVersionId] = true
+		wanted[acceptance.LegalDocumentVersionID] = true
 	}
 
 	docs, err := db.GetAllLegalDocuments(ctx, nil)
@@ -49,18 +49,18 @@ func AcceptedBy(ctx context.Context, db AcceptedDatabase, userId int64) ([]Accep
 		document record.LegalDocument
 		version  record.LegalDocumentVersion
 	}
-	byVersionId := make(map[int64]found, len(wanted))
+	byVersionID := make(map[int64]found, len(wanted))
 	for _, doc := range docs {
-		if len(byVersionId) == len(wanted) {
+		if len(byVersionID) == len(wanted) {
 			break
 		}
-		versions, err := db.GetLegalDocumentVersionsByLegalDocumentId(ctx, nil, doc.Id)
+		versions, err := db.GetLegalDocumentVersionsByLegalDocumentID(ctx, nil, doc.ID)
 		if err != nil {
 			return nil, errs.Wrap(err, "unable to read the legal document's versions")
 		}
 		for _, version := range versions {
-			if wanted[version.Id] {
-				byVersionId[version.Id] = found{document: doc, version: version}
+			if wanted[version.ID] {
+				byVersionID[version.ID] = found{document: doc, version: version}
 			}
 		}
 	}
@@ -68,7 +68,7 @@ func AcceptedBy(ctx context.Context, db AcceptedDatabase, userId int64) ([]Accep
 	accepted := make([]Accepted, 0, len(acceptances))
 	for i := len(acceptances) - 1; i >= 0; i-- {
 		acceptance := acceptances[i]
-		f, ok := byVersionId[acceptance.LegalDocumentVersionId]
+		f, ok := byVersionID[acceptance.LegalDocumentVersionID]
 		if !ok {
 			// The version's foreign key has no cascade, so a version a user accepted is never
 			// deleted, and neither is its document.

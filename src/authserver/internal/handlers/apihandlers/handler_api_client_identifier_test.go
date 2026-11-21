@@ -40,10 +40,10 @@ func settingsPutRequest(body string) *http.Request {
 // expectSettingsSaveRow registers the request's load of client 7 as loaded, and the transaction
 // that acquires the row and reads it as row.
 func expectSettingsSaveRow(database *datamocks.Database, loaded, row *record.Client) *datamocks.RunInTransactionStub {
-	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(loaded, nil).Once()
+	database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(loaded, nil).Once()
 	stub := datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 	database.On("AcquireClientRow", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
-	database.On("GetClientById", mock.Anything, clientUpdateTx, int64(7)).Return(row, nil).Once()
+	database.On("GetClientByID", mock.Anything, clientUpdateTx, int64(7)).Return(row, nil).Once()
 	return stub
 }
 
@@ -62,8 +62,8 @@ func TestHandleClientUpdatePut_ARenameIsCheckedThenWrittenByTheNarrowWrite(t *te
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	expectSettingsSaveRow(database,
-		&record.Client{Id: 7, ClientIdentifier: "old-name"},
-		&record.Client{Id: 7, ClientIdentifier: "old-name"})
+		&record.Client{ID: 7, ClientIdentifier: "old-name"},
+		&record.Client{ID: 7, ClientIdentifier: "old-name"})
 	database.On("GetClientByClientIdentifier", mock.Anything, clientUpdateTx, "new-name").Return(nil, nil).Once()
 	database.On("GetResourceByResourceIdentifier", mock.Anything, clientUpdateTx, "new-name").Return(nil, nil).Once()
 	var written *record.Client
@@ -74,8 +74,8 @@ func TestHandleClientUpdatePut_ARenameIsCheckedThenWrittenByTheNarrowWrite(t *te
 		}).Return(nil).Once()
 	database.On("SetClientIdentifier", mock.Anything, clientUpdateTx, int64(7), "new-name").Return(true, nil).Once()
 	// The rename revokes the client's grants: here it has none (#710 decision 5).
-	database.On("RevokeCodesByClientId", mock.Anything, clientUpdateTx, int64(7)).Return(int64(0), nil).Once()
-	database.On("GetRefreshTokensByClientId", mock.Anything, clientUpdateTx, int64(7)).
+	database.On("RevokeCodesByClientID", mock.Anything, clientUpdateTx, int64(7)).Return(int64(0), nil).Once()
+	database.On("GetRefreshTokensByClientID", mock.Anything, clientUpdateTx, int64(7)).
 		Return([]*record.RefreshToken{}, nil).Once()
 	stubClientResponseLoads(database)
 	auditLogger.On("Log", mock.Anything, audit.EventRevokedClientGrants, mock.Anything).Return().Once()
@@ -93,8 +93,8 @@ func TestHandleClientUpdatePut_ARenameIsCheckedThenWrittenByTheNarrowWrite(t *te
 
 	// The checks are decided against the row read under its lock, and refuse before anything is
 	// written.
-	assert.Less(t, callIndex(t, database, "AcquireClientRow"), lastCallIndex(t, database, "GetClientById"))
-	assert.Less(t, lastCallIndex(t, database, "GetClientById"), callIndex(t, database, "GetClientByClientIdentifier"))
+	assert.Less(t, callIndex(t, database, "AcquireClientRow"), lastCallIndex(t, database, "GetClientByID"))
+	assert.Less(t, lastCallIndex(t, database, "GetClientByID"), callIndex(t, database, "GetClientByClientIdentifier"))
 	assert.Less(t, callIndex(t, database, "GetResourceByResourceIdentifier"), callIndex(t, database, "UpdateClient"))
 	assert.Less(t, callIndex(t, database, "GetResourceByResourceIdentifier"), callIndex(t, database, "SetClientIdentifier"))
 }
@@ -111,8 +111,8 @@ func TestHandleClientUpdatePut_TheRowsIdentifierIsNotChecked(t *testing.T) {
 	require.Len(t, rowIdentifier, 40)
 
 	expectSettingsSaveRow(database,
-		&record.Client{Id: 7, ClientIdentifier: "loaded-name"},
-		&record.Client{Id: 7, ClientIdentifier: rowIdentifier})
+		&record.Client{ID: 7, ClientIdentifier: "loaded-name"},
+		&record.Client{ID: 7, ClientIdentifier: rowIdentifier})
 	database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
 	database.On("SetClientIdentifier", mock.Anything, clientUpdateTx, int64(7), rowIdentifier).Return(false, nil).Once()
 	stubClientResponseLoads(database)
@@ -144,7 +144,7 @@ func TestHandleClientUpdatePut_TheLoadedIdentifierIsCheckedWhenTheRowWasRenamed(
 			loaded: "loaded-name",
 			expect: func(database *datamocks.Database, loaded string) {
 				database.On("GetClientByClientIdentifier", mock.Anything, clientUpdateTx, loaded).
-					Return(&record.Client{Id: 9, ClientIdentifier: loaded}, nil).Once()
+					Return(&record.Client{ID: 9, ClientIdentifier: loaded}, nil).Once()
 			},
 			code: "handler.client.identifier_in_use",
 		},
@@ -154,7 +154,7 @@ func TestHandleClientUpdatePut_TheLoadedIdentifierIsCheckedWhenTheRowWasRenamed(
 			expect: func(database *datamocks.Database, loaded string) {
 				database.On("GetClientByClientIdentifier", mock.Anything, clientUpdateTx, loaded).Return(nil, nil).Once()
 				database.On("GetResourceByResourceIdentifier", mock.Anything, clientUpdateTx, loaded).
-					Return(&record.Resource{Id: 4, ResourceIdentifier: loaded}, nil).Once()
+					Return(&record.Resource{ID: 4, ResourceIdentifier: loaded}, nil).Once()
 			},
 			code: "handler.client.identifier_names_resource",
 		},
@@ -174,8 +174,8 @@ func TestHandleClientUpdatePut_TheLoadedIdentifierIsCheckedWhenTheRowWasRenamed(
 			auditLogger := handlersmocks.NewAuditLogger(t)
 
 			stub := expectSettingsSaveRow(database,
-				&record.Client{Id: 7, ClientIdentifier: tc.loaded},
-				&record.Client{Id: 7, ClientIdentifier: "renamed-meanwhile"})
+				&record.Client{ID: 7, ClientIdentifier: tc.loaded},
+				&record.Client{ID: 7, ClientIdentifier: "renamed-meanwhile"})
 			tc.expect(database, tc.loaded)
 
 			rr := serveSettingsPut(database, auditLogger, `{"clientIdentifier":"`+tc.loaded+`","description":"d","enabled":true}`)
@@ -197,8 +197,8 @@ func TestHandleClientUpdatePut_AFailedIdentifierLookupIsAFiveHundredAndWritesNot
 			auditLogger := handlersmocks.NewAuditLogger(t)
 
 			expectSettingsSaveRow(database,
-				&record.Client{Id: 7, ClientIdentifier: "old-name"},
-				&record.Client{Id: 7, ClientIdentifier: "old-name"})
+				&record.Client{ID: 7, ClientIdentifier: "old-name"},
+				&record.Client{ID: 7, ClientIdentifier: "old-name"})
 			if lookup == "GetClientByClientIdentifier" {
 				database.On("GetClientByClientIdentifier", mock.Anything, clientUpdateTx, "new-name").
 					Return(nil, errors.New("boom")).Once()
@@ -223,8 +223,8 @@ func TestHandleClientUpdatePut_AFailedNarrowWriteIsAFiveHundred(t *testing.T) {
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	stub := expectSettingsSaveRow(database,
-		&record.Client{Id: 7, ClientIdentifier: "same-name"},
-		&record.Client{Id: 7, ClientIdentifier: "same-name"})
+		&record.Client{ID: 7, ClientIdentifier: "same-name"},
+		&record.Client{ID: 7, ClientIdentifier: "same-name"})
 	database.On("SetClientIdentifier", mock.Anything, clientUpdateTx, int64(7), "same-name").
 		Return(false, errors.New("deadlock")).Once()
 
@@ -244,11 +244,11 @@ func TestUpdateClientNotOwningAuthenticationMode_TheOtherSavesNeverWriteTheIdent
 
 	datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 	database.On("AcquireClientRow", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
-	database.On("GetClientById", mock.Anything, clientUpdateTx, int64(7)).
-		Return(&record.Client{Id: 7, ClientIdentifier: "renamed-meanwhile"}, nil).Once()
+	database.On("GetClientByID", mock.Anything, clientUpdateTx, int64(7)).
+		Return(&record.Client{ID: 7, ClientIdentifier: "renamed-meanwhile"}, nil).Once()
 	database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
 
-	stale := &record.Client{Id: 7, ClientIdentifier: "loaded-name"}
+	stale := &record.Client{ID: 7, ClientIdentifier: "loaded-name"}
 	require.NoError(t, updateClientNotOwningAuthenticationMode(context.Background(), database, stale, nil))
 
 	assert.Equal(t, "renamed-meanwhile", stale.ClientIdentifier, "the answer takes the row's identifier")
@@ -269,17 +269,17 @@ func TestHandleClientAuthenticationPut_AnswersTheIdentifierTheRowHolds(t *testin
 		{
 			name:    "a save to public",
 			request: api.UpdateClientAuthenticationRequest{IsPublic: true},
-			loaded:  &record.Client{Id: 7, ClientIdentifier: "old-name", IsPublic: true},
+			loaded:  &record.Client{ID: 7, ClientIdentifier: "old-name", IsPublic: true},
 			expect: func(database *datamocks.Database) {
 				database.On("SetClientPublic", mock.Anything, clientUpdateTx, int64(7)).Return(false, nil).Once()
-				database.On("DeleteClientIntrospectionResourcesByClientId", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
+				database.On("DeleteClientIntrospectionResourcesByClientID", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
 				database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
 			},
 		},
 		{
 			name:    "a confidential save",
 			request: api.UpdateClientAuthenticationRequest{IsPublic: false, ClientSecret: strings.Repeat("Ab3", 20)},
-			loaded:  &record.Client{Id: 7, ClientIdentifier: "old-name", ClientSecretEncrypted: []byte("secret")},
+			loaded:  &record.Client{ID: 7, ClientIdentifier: "old-name", ClientSecretEncrypted: []byte("secret")},
 			expect: func(database *datamocks.Database) {
 				database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
 				database.On("SetClientRememberConsent", mock.Anything, clientUpdateTx, int64(7), true).Return(nil).Once()
@@ -292,12 +292,12 @@ func TestHandleClientAuthenticationPut_AnswersTheIdentifierTheRowHolds(t *testin
 			database := datamocks.NewDatabase(t)
 			auditLogger := handlersmocks.NewAuditLogger(t)
 
-			database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(tc.loaded, nil).Once()
+			database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(tc.loaded, nil).Once()
 			datamocks.ExpectRunInTransaction(database, clientUpdateTx)
 			tc.expect(database)
 			// The row as the save's transaction reads it: renamed since the request loaded it.
-			database.On("GetClientById", mock.Anything, clientUpdateTx, int64(7)).
-				Return(&record.Client{Id: 7, ClientIdentifier: "new-name", IsPublic: tc.request.IsPublic}, nil).Once()
+			database.On("GetClientByID", mock.Anything, clientUpdateTx, int64(7)).
+				Return(&record.Client{ID: 7, ClientIdentifier: "new-name", IsPublic: tc.request.IsPublic}, nil).Once()
 			stubClientResponseLoads(database)
 			auditLogger.On("Log", mock.Anything, audit.EventUpdatedClientAuthentication, mock.Anything).Return().Once()
 
@@ -323,8 +323,8 @@ func TestHandleClientUpdatePut_AnswersTheTimestampOfItsLastWrite(t *testing.T) {
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
 	expectSettingsSaveRow(database,
-		&record.Client{Id: 7, ClientIdentifier: "old-name"},
-		&record.Client{Id: 7, ClientIdentifier: "old-name"})
+		&record.Client{ID: 7, ClientIdentifier: "old-name"},
+		&record.Client{ID: 7, ClientIdentifier: "old-name"})
 	database.On("GetClientByClientIdentifier", mock.Anything, clientUpdateTx, "new-name").Return(nil, nil).Once()
 	database.On("GetResourceByResourceIdentifier", mock.Anything, clientUpdateTx, "new-name").Return(nil, nil).Once()
 	database.On("SetClientIdentifier", mock.Anything, clientUpdateTx, int64(7), "new-name").Return(true, nil).Once()
@@ -334,8 +334,8 @@ func TestHandleClientUpdatePut_AnswersTheTimestampOfItsLastWrite(t *testing.T) {
 		Run(func(args mock.Arguments) {
 			args.Get(2).(*record.Client).UpdatedAt = sql.NullTime{Time: written, Valid: true}
 		}).Return(nil).Once()
-	database.On("RevokeCodesByClientId", mock.Anything, clientUpdateTx, int64(7)).Return(int64(0), nil).Once()
-	database.On("GetRefreshTokensByClientId", mock.Anything, clientUpdateTx, int64(7)).
+	database.On("RevokeCodesByClientID", mock.Anything, clientUpdateTx, int64(7)).Return(int64(0), nil).Once()
+	database.On("GetRefreshTokensByClientID", mock.Anything, clientUpdateTx, int64(7)).
 		Return([]*record.RefreshToken{}, nil).Once()
 	stubClientResponseLoads(database)
 	auditLogger.On("Log", mock.Anything, audit.EventRevokedClientGrants, mock.Anything).Return().Once()

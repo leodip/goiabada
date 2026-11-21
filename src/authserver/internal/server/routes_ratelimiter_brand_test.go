@@ -27,8 +27,8 @@ import (
 // route's published budget through the real route table, its middleware and the real page
 // renderer, beneath the page middleware that gives every page request its client (#812).
 func TestInitRoutes_ALimiterRefusalIsDrawnInTheBrandOfTheSignInsClient(t *testing.T) {
-	night := &record.Brand{Id: 7, Name: "Night", Appearance: record.BrandAppearanceDark, Theme: "plum"}
-	day := &record.Brand{Id: 12, Name: "Day", Appearance: record.BrandAppearanceLight, Theme: "avocado"}
+	night := &record.Brand{ID: 7, Name: "Night", Appearance: record.BrandAppearanceDark, Theme: "plum"}
+	day := &record.Brand{ID: 12, Name: "Day", Appearance: record.BrandAppearanceLight, Theme: "avocado"}
 
 	for _, tc := range []struct {
 		name          string
@@ -40,18 +40,18 @@ func TestInitRoutes_ALimiterRefusalIsDrawnInTheBrandOfTheSignInsClient(t *testin
 	}{
 		{
 			name:   "POST /auth/pwd, a step of the sign-in",
-			budget: pwdIpBudget, window: pwdIpWindow,
+			budget: pwdIPBudget, window: pwdIPWindow,
 			request:       func(s *Server) func(int) *http.Request { return pwdGuess(t, s) },
 			wantDataTheme: "light",
 			wantBrandHref: routesTestBrandHref(t, 12, "avocado"),
 		},
 		{
 			name:   "POST /forgot-password naming the sign-in the browser holds",
-			budget: forgotPwdIpBudget, window: forgotPwdWindow,
+			budget: forgotPwdIPBudget, window: forgotPwdWindow,
 			request: func(s *Server) func(int) *http.Request {
-				ceremonyId, cookie := linkedSignInCookie(t, s)
+				ceremonyID, cookie := linkedSignInCookie(t, s)
 				return func(attempt int) *http.Request {
-					r := browserForm(http.MethodPost, "/forgot-password?"+ceremony.QueryParameter+"="+ceremonyId,
+					r := browserForm(http.MethodPost, "/forgot-password?"+ceremony.QueryParameter+"="+ceremonyID,
 						"email=user"+strconv.Itoa(attempt)+"@example.com")
 					r.AddCookie(cookie)
 					return r
@@ -62,7 +62,7 @@ func TestInitRoutes_ALimiterRefusalIsDrawnInTheBrandOfTheSignInsClient(t *testin
 		},
 		{
 			name:   "POST /forgot-password naming no sign-in",
-			budget: forgotPwdIpBudget, window: forgotPwdWindow,
+			budget: forgotPwdIPBudget, window: forgotPwdWindow,
 			request: func(*Server) func(int) *http.Request {
 				return func(attempt int) *http.Request {
 					return browserForm(http.MethodPost, "/forgot-password", "email=user"+strconv.Itoa(attempt)+"@example.com")
@@ -76,7 +76,7 @@ func TestInitRoutes_ALimiterRefusalIsDrawnInTheBrandOfTheSignInsClient(t *testin
 			server := newRoutesTestServerDrawnIn(t, nil, newTestSessionStore(), nil, web.TemplateFS(), night)
 			database, ok := server.database.(*datamocks.Database)
 			require.True(t, ok)
-			database.On("GetClientPageBrand", mock.Anything, mock.Anything, routesTestClientId).Return(day, nil).Maybe()
+			database.On("GetClientPageBrand", mock.Anything, mock.Anything, routesTestClientID).Return(day, nil).Maybe()
 			pages := middleware.PageClient()(server.router)
 			request := tc.request(server)
 
@@ -116,21 +116,21 @@ func routesTestBrandHref(t *testing.T, id int64, theme string) string {
 	return "/brand/" + strconv.FormatInt(id, 10) + "/stylesheet.css?v=" + stylesheet.Fingerprint
 }
 
-// linkedSignInCookie mints the session cookie of a browser holding a sign-in to routesTestClientId at
+// linkedSignInCookie mints the session cookie of a browser holding a sign-in to routesTestClientID at
 // its password step, under a well-formed ceremony id, which a page the sign-in links to names in its
-// URL; routesTestCeremonyId is not one. It answers the id and the cookie.
+// URL; routesTestCeremonyID is not one. It answers the id and the cookie.
 func linkedSignInCookie(t *testing.T, s *Server) (string, *http.Cookie) {
 	t.Helper()
-	ceremonyId := ceremony.NewId()
+	ceremonyID := ceremony.NewID()
 	r := httptest.NewRequest(http.MethodGet, "/auth/pwd", nil)
 	recorder := httptest.NewRecorder()
 	require.NoError(t, ceremony.NewStore(s.sessionStore, sessionkeys.AuthServerSessionName).AddAuthContext(recorder, r,
 		&ceremony.AuthContext{
 			AuthState:  ceremony.AuthStateLevel1Password,
-			CeremonyId: ceremonyId,
-			ClientId:   routesTestClientId,
+			CeremonyID: ceremonyID,
+			ClientID:   routesTestClientID,
 		}))
 	cookies := recorder.Result().Cookies()
 	require.Len(t, cookies, 1)
-	return ceremonyId, cookies[0]
+	return ceremonyID, cookies[0]
 }

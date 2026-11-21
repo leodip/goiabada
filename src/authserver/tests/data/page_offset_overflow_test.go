@@ -91,7 +91,7 @@ func TestPaginatedReads_AnOverflowingPageIsAnEmptyPage(t *testing.T) {
 		givenName := "offsettest" + fake.LetterN(10)
 		for i := 0; i < 3; i++ {
 			user := createUserWithGivenName(t, givenName)
-			t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.Id) })
+			t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.ID) })
 		}
 
 		assertEmptyPagePastTheEnd(t, "SearchUsersPaginated", 10,
@@ -106,7 +106,7 @@ func TestPaginatedReads_AnOverflowingPageIsAnEmptyPage(t *testing.T) {
 		// package adds to, so it needs no fixture of its own -- but one group
 		// makes the total certainly non-zero even on an empty database.
 		group := createTestGroup(t)
-		t.Cleanup(func() { _ = database.DeleteGroup(context.Background(), nil, group.Id) })
+		t.Cleanup(func() { _ = database.DeleteGroup(context.Background(), nil, group.ID) })
 
 		assertEmptyPagePastTheEnd(t, "GetAllGroupsPaginated", 10,
 			func(page, pageSize int) (int, int, error) {
@@ -117,48 +117,48 @@ func TestPaginatedReads_AnOverflowingPageIsAnEmptyPage(t *testing.T) {
 
 	t.Run("GetGroupMembersPaginated", func(t *testing.T) {
 		group := createTestGroup(t)
-		t.Cleanup(func() { _ = database.DeleteGroup(context.Background(), nil, group.Id) })
+		t.Cleanup(func() { _ = database.DeleteGroup(context.Background(), nil, group.ID) })
 		for i := 0; i < 3; i++ {
 			user := createTestUser(t)
-			createTestUserGroupWithUserAndGroup(t, user.Id, group.Id)
-			t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.Id) })
+			createTestUserGroupWithUserAndGroup(t, user.ID, group.ID)
+			t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.ID) })
 		}
 
 		assertEmptyPagePastTheEnd(t, "GetGroupMembersPaginated", 10,
 			func(page, pageSize int) (int, int, error) {
-				users, total, err := database.GetGroupMembersPaginated(context.Background(), nil, group.Id, page, pageSize)
+				users, total, err := database.GetGroupMembersPaginated(context.Background(), nil, group.ID, page, pageSize)
 				return len(users), total, err
 			})
 	})
 
-	t.Run("GetUsersByPermissionIdPaginated", func(t *testing.T) {
+	t.Run("GetUsersByPermissionIDPaginated", func(t *testing.T) {
 		resource := createTestResource(t)
-		t.Cleanup(func() { _ = database.DeleteResource(context.Background(), nil, resource.Id) })
+		t.Cleanup(func() { _ = database.DeleteResource(context.Background(), nil, resource.ID) })
 		permission := createTestPermission(t, resource)
-		t.Cleanup(func() { _ = database.DeletePermission(context.Background(), nil, permission.Id) })
+		t.Cleanup(func() { _ = database.DeletePermission(context.Background(), nil, permission.ID) })
 		for i := 0; i < 3; i++ {
 			user := createTestUser(t)
-			createTestUserPermissionWithUserAndPermission(t, user.Id, permission.Id)
-			t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.Id) })
+			createTestUserPermissionWithUserAndPermission(t, user.ID, permission.ID)
+			t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.ID) })
 		}
 
-		assertEmptyPagePastTheEnd(t, "GetUsersByPermissionIdPaginated", 10,
+		assertEmptyPagePastTheEnd(t, "GetUsersByPermissionIDPaginated", 10,
 			func(page, pageSize int) (int, int, error) {
-				users, total, err := database.GetUsersByPermissionIdPaginated(context.Background(), nil, permission.Id, page, pageSize)
+				users, total, err := database.GetUsersByPermissionIDPaginated(context.Background(), nil, permission.ID, page, pageSize)
 				return len(users), total, err
 			})
 	})
 
-	t.Run("GetUserSessionsByClientIdPaginated", func(t *testing.T) {
+	t.Run("GetUserSessionsByClientIDPaginated", func(t *testing.T) {
 		user := createTestUser(t)
-		t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.Id) })
+		t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.ID) })
 		client := createTestClient(t)
-		t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
-		createTestUserSessionsWithClient(t, user.Id, client.Id, 3)
+		t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
+		createTestUserSessionsWithClient(t, user.ID, client.ID, 3)
 
-		assertEmptyPagePastTheEnd(t, "GetUserSessionsByClientIdPaginated", 50,
+		assertEmptyPagePastTheEnd(t, "GetUserSessionsByClientIDPaginated", 50,
 			func(page, pageSize int) (int, int, error) {
-				sessions, total, err := database.GetUserSessionsByClientIdPaginated(context.Background(), nil, client.Id, page, pageSize)
+				sessions, total, err := database.GetUserSessionsByClientIDPaginated(context.Background(), nil, client.ID, page, pageSize)
 				return len(sessions), total, err
 			})
 	})

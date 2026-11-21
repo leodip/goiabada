@@ -28,12 +28,12 @@ import (
 // to the record mapping test.
 
 const (
-	sessionUserId       = 7
-	sessionId           = 9
-	sessionClientId     = 3
+	sessionUserID       = 7
+	sessionID           = 9
+	sessionClientID     = 3
 	sessionIdentifier   = "sid-1"
 	sessionOwner        = "authserver"
-	sessionIdHash       = "hash-1"
+	sessionIDHash       = "hash-1"
 	sessionData         = "sealed-new"
 	sessionExpectedData = "sealed-old"
 )
@@ -44,7 +44,7 @@ var sessionExpiresAt = time.Date(2004, 4, 4, 0, 0, 0, 0, time.UTC)
 func browserSessionRow() *scriptedRows {
 	return &scriptedRows{
 		cols: []string{"id", "created_at", "updated_at", "owner", "session_id_hash", "data", "last_accessed", "expires_at"},
-		values: [][]driver.Value{{int64(1), issuedAt, issuedAt, sessionOwner, sessionIdHash, sessionData,
+		values: [][]driver.Value{{int64(1), issuedAt, issuedAt, sessionOwner, sessionIDHash, sessionData,
 			issuedAt, sessionExpiresAt}},
 	}
 }
@@ -53,9 +53,9 @@ func sessionStatements() []narrowWrite {
 	return []narrowWrite{
 		// User sessions.
 		{
-			name: "GetUserSessionById",
+			name: "GetUserSessionByID",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				_, err := d.GetUserSessionById(ctx, nil, sessionId)
+				_, err := d.GetUserSessionByID(ctx, nil, sessionID)
 				return nil, err
 			},
 			statements: []string{"SELECT <columns> FROM user_sessions WHERE id = 9"},
@@ -76,9 +76,9 @@ func sessionStatements() []narrowWrite {
 			},
 		},
 		{
-			name: "GetUserSessionsByUserId",
+			name: "GetUserSessionsByUserID",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				_, err := d.GetUserSessionsByUserId(ctx, nil, sessionUserId)
+				_, err := d.GetUserSessionsByUserID(ctx, nil, sessionUserID)
 				return nil, err
 			},
 			statements: []string{"SELECT <columns> FROM user_sessions WHERE user_id = 7"},
@@ -86,7 +86,7 @@ func sessionStatements() []narrowWrite {
 		{
 			name: "DeleteUserSession",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return nil, d.DeleteUserSession(ctx, nil, sessionId)
+				return nil, d.DeleteUserSession(ctx, nil, sessionID)
 			},
 			statements: []string{"DELETE FROM user_sessions WHERE id = 9"},
 		},
@@ -114,21 +114,21 @@ func sessionStatements() []narrowWrite {
 		{
 			name: "PromoteUserSessionGeneration",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return nil, d.PromoteUserSessionGeneration(ctx, nil, sessionId, 4)
+				return nil, d.PromoteUserSessionGeneration(ctx, nil, sessionID, 4)
 			},
 			statements: []string{"UPDATE user_sessions SET auth_state_generation = 4, updated_at = <now> WHERE id = 9"},
 		},
 		{
-			name: "PromoteUserSessionOtpConfigGeneration",
+			name: "PromoteUserSessionOTPConfigGeneration",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return nil, d.PromoteUserSessionOtpConfigGeneration(ctx, nil, sessionId, 4)
+				return nil, d.PromoteUserSessionOTPConfigGeneration(ctx, nil, sessionID, 4)
 			},
 			statements: []string{"UPDATE user_sessions SET otp_config_generation = 4, updated_at = <now> WHERE id = 9"},
 		},
 		{
 			name: "LowerUserSessionsToPassword",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return nil, d.LowerUserSessionsToPassword(ctx, nil, sessionUserId, "pwd")
+				return nil, d.LowerUserSessionsToPassword(ctx, nil, sessionUserID, "pwd")
 			},
 			statements: []string{
 				"UPDATE user_sessions SET auth_methods = 'pwd', " +
@@ -140,33 +140,33 @@ func sessionStatements() []narrowWrite {
 
 		// The clients a session has signed in to.
 		{
-			name: "GetUserSessionClientById",
+			name: "GetUserSessionClientByID",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				_, err := d.GetUserSessionClientById(ctx, nil, sessionId)
+				_, err := d.GetUserSessionClientByID(ctx, nil, sessionID)
 				return nil, err
 			},
 			statements: []string{"SELECT <columns> FROM user_session_clients WHERE id = 9"},
 		},
 		{
-			name: "GetUserSessionClientsByUserSessionId",
+			name: "GetUserSessionClientsByUserSessionID",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				_, err := d.GetUserSessionClientsByUserSessionId(ctx, nil, sessionId)
+				_, err := d.GetUserSessionClientsByUserSessionID(ctx, nil, sessionID)
 				return nil, err
 			},
 			statements: []string{"SELECT <columns> FROM user_session_clients WHERE user_session_id = 9"},
 		},
 		{
-			name: "GetUserSessionClientsByUserSessionIds",
+			name: "GetUserSessionClientsByUserSessionIDs",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				_, err := d.GetUserSessionClientsByUserSessionIds(ctx, nil, []int64{4, 5})
+				_, err := d.GetUserSessionClientsByUserSessionIDs(ctx, nil, []int64{4, 5})
 				return nil, err
 			},
 			statements: []string{"SELECT <columns> FROM user_session_clients WHERE user_session_id IN (4, 5)"},
 		},
 		{
-			name: "GetUserSessionsClientByIds",
+			name: "GetUserSessionsClientByIDs",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				_, err := d.GetUserSessionsClientByIds(ctx, nil, []int64{4, 5})
+				_, err := d.GetUserSessionsClientByIDs(ctx, nil, []int64{4, 5})
 				return nil, err
 			},
 			statements: []string{"SELECT <columns> FROM user_session_clients WHERE id IN (4, 5)"},
@@ -174,16 +174,16 @@ func sessionStatements() []narrowWrite {
 		{
 			name: "DeleteUserSessionClient",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return nil, d.DeleteUserSessionClient(ctx, nil, sessionId)
+				return nil, d.DeleteUserSessionClient(ctx, nil, sessionID)
 			},
 			statements: []string{"DELETE FROM user_session_clients WHERE id = 9"},
 		},
 
 		// Browser sessions.
 		{
-			name: "GetBrowserSessionByOwnerAndSessionIdHash",
+			name: "GetBrowserSessionByOwnerAndSessionIDHash",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				_, err := d.GetBrowserSessionByOwnerAndSessionIdHash(ctx, nil, sessionOwner, sessionIdHash, issuedAt)
+				_, err := d.GetBrowserSessionByOwnerAndSessionIDHash(ctx, nil, sessionOwner, sessionIDHash, issuedAt)
 				return nil, err
 			},
 			statements: []string{
@@ -194,7 +194,7 @@ func sessionStatements() []narrowWrite {
 		{
 			name: "UpdateBrowserSessionData",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return d.UpdateBrowserSessionData(ctx, nil, sessionOwner, sessionIdHash, sessionData, issuedAt, sessionExpiresAt)
+				return d.UpdateBrowserSessionData(ctx, nil, sessionOwner, sessionIDHash, sessionData, issuedAt, sessionExpiresAt)
 			},
 			answer: true,
 			statements: []string{
@@ -207,7 +207,7 @@ func sessionStatements() []narrowWrite {
 			name:  "UpdateBrowserSessionData when the session is gone",
 			execs: []*scriptedExec{{rowsAffected: 0}},
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return d.UpdateBrowserSessionData(ctx, nil, sessionOwner, sessionIdHash, sessionData, issuedAt, sessionExpiresAt)
+				return d.UpdateBrowserSessionData(ctx, nil, sessionOwner, sessionIDHash, sessionData, issuedAt, sessionExpiresAt)
 			},
 			answer: false,
 			statements: []string{
@@ -219,7 +219,7 @@ func sessionStatements() []narrowWrite {
 		{
 			name: "TouchBrowserSession",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return d.TouchBrowserSession(ctx, nil, sessionOwner, sessionIdHash, issuedAt, sessionExpiresAt)
+				return d.TouchBrowserSession(ctx, nil, sessionOwner, sessionIDHash, issuedAt, sessionExpiresAt)
 			},
 			answer: true,
 			statements: []string{
@@ -235,7 +235,7 @@ func sessionStatements() []narrowWrite {
 			execs: []*scriptedExec{{rowsAffected: 0}},
 			rows:  []*scriptedRows{browserSessionRow()},
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return d.TouchBrowserSession(ctx, nil, sessionOwner, sessionIdHash, issuedAt, sessionExpiresAt)
+				return d.TouchBrowserSession(ctx, nil, sessionOwner, sessionIDHash, issuedAt, sessionExpiresAt)
 			},
 			answer: true,
 			statements: []string{
@@ -250,7 +250,7 @@ func sessionStatements() []narrowWrite {
 			name:  "TouchBrowserSession when the session is gone",
 			execs: []*scriptedExec{{rowsAffected: 0}},
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return d.TouchBrowserSession(ctx, nil, sessionOwner, sessionIdHash, issuedAt, sessionExpiresAt)
+				return d.TouchBrowserSession(ctx, nil, sessionOwner, sessionIDHash, issuedAt, sessionExpiresAt)
 			},
 			answer: false,
 			statements: []string{
@@ -264,14 +264,14 @@ func sessionStatements() []narrowWrite {
 		{
 			name: "DeleteBrowserSession",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return nil, d.DeleteBrowserSession(ctx, nil, sessionOwner, sessionIdHash)
+				return nil, d.DeleteBrowserSession(ctx, nil, sessionOwner, sessionIDHash)
 			},
 			statements: []string{"DELETE FROM browser_sessions WHERE owner = 'authserver' AND session_id_hash = 'hash-1'"},
 		},
 		{
 			name: "UpdateBrowserSessionDataIfUnchanged",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return d.UpdateBrowserSessionDataIfUnchanged(ctx, nil, sessionOwner, sessionIdHash,
+				return d.UpdateBrowserSessionDataIfUnchanged(ctx, nil, sessionOwner, sessionIDHash,
 					sessionExpectedData, sessionData, issuedAt, sessionExpiresAt)
 			},
 			answer: true,
@@ -286,7 +286,7 @@ func sessionStatements() []narrowWrite {
 			name:  "UpdateBrowserSessionDataIfUnchanged when another write landed",
 			execs: []*scriptedExec{{rowsAffected: 0}},
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return d.UpdateBrowserSessionDataIfUnchanged(ctx, nil, sessionOwner, sessionIdHash,
+				return d.UpdateBrowserSessionDataIfUnchanged(ctx, nil, sessionOwner, sessionIDHash,
 					sessionExpectedData, sessionData, issuedAt, sessionExpiresAt)
 			},
 			answer: false,
@@ -300,7 +300,7 @@ func sessionStatements() []narrowWrite {
 		{
 			name: "DeleteBrowserSessionIfUnchanged",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return d.DeleteBrowserSessionIfUnchanged(ctx, nil, sessionOwner, sessionIdHash, sessionExpectedData, issuedAt)
+				return d.DeleteBrowserSessionIfUnchanged(ctx, nil, sessionOwner, sessionIDHash, sessionExpectedData, issuedAt)
 			},
 			answer: true,
 			statements: []string{
@@ -312,7 +312,7 @@ func sessionStatements() []narrowWrite {
 			name:  "DeleteBrowserSessionIfUnchanged when another write landed",
 			execs: []*scriptedExec{{rowsAffected: 0}},
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return d.DeleteBrowserSessionIfUnchanged(ctx, nil, sessionOwner, sessionIdHash, sessionExpectedData, issuedAt)
+				return d.DeleteBrowserSessionIfUnchanged(ctx, nil, sessionOwner, sessionIDHash, sessionExpectedData, issuedAt)
 			},
 			answer: false,
 			statements: []string{
@@ -330,25 +330,25 @@ func sessionStatements() []narrowWrite {
 
 		// Consents.
 		{
-			name: "GetUserConsentById",
+			name: "GetUserConsentByID",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				_, err := d.GetUserConsentById(ctx, nil, sessionId)
+				_, err := d.GetUserConsentByID(ctx, nil, sessionID)
 				return nil, err
 			},
 			statements: []string{"SELECT <columns> FROM user_consents WHERE id = 9"},
 		},
 		{
-			name: "GetConsentByUserIdAndClientId",
+			name: "GetConsentByUserIDAndClientID",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				_, err := d.GetConsentByUserIdAndClientId(ctx, nil, sessionUserId, sessionClientId)
+				_, err := d.GetConsentByUserIDAndClientID(ctx, nil, sessionUserID, sessionClientID)
 				return nil, err
 			},
 			statements: []string{"SELECT <columns> FROM user_consents WHERE user_id = 7 AND client_id = 3"},
 		},
 		{
-			name: "GetConsentsByUserId",
+			name: "GetConsentsByUserID",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				_, err := d.GetConsentsByUserId(ctx, nil, sessionUserId)
+				_, err := d.GetConsentsByUserID(ctx, nil, sessionUserID)
 				return nil, err
 			},
 			statements: []string{"SELECT <columns> FROM user_consents WHERE user_id = 7"},
@@ -357,7 +357,7 @@ func sessionStatements() []narrowWrite {
 			name:  "DeleteUserConsent",
 			execs: []*scriptedExec{{rowsAffected: 1}},
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return d.DeleteUserConsent(ctx, nil, sessionId)
+				return d.DeleteUserConsent(ctx, nil, sessionID)
 			},
 			answer:     true,
 			statements: []string{"DELETE FROM user_consents WHERE id = 9"},
@@ -368,7 +368,7 @@ func sessionStatements() []narrowWrite {
 			name:  "DeleteUserConsent of a row already gone",
 			execs: []*scriptedExec{{rowsAffected: 0}},
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return d.DeleteUserConsent(ctx, nil, sessionId)
+				return d.DeleteUserConsent(ctx, nil, sessionID)
 			},
 			answer:     false,
 			statements: []string{"DELETE FROM user_consents WHERE id = 9"},
@@ -406,7 +406,7 @@ func TestSessionStatements_TheEnginesPageAClientsSessions(t *testing.T) {
 		"INNER JOIN user_session_clients ON user_sessions.id = user_session_clients.user_session_id " +
 		"WHERE user_session_clients.client_id = 3"
 	run := func(ctx context.Context, d *Database) (any, error) {
-		_, _, err := d.GetUserSessionsByClientIdPaginated(ctx, nil, sessionClientId, 3, 10)
+		_, _, err := d.GetUserSessionsByClientIDPaginated(ctx, nil, sessionClientID, 3, 10)
 		return nil, err
 	}
 

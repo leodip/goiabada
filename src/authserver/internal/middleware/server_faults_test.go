@@ -23,7 +23,7 @@ import (
 // the protocol format so its body is the bytes on the wire. Which route is registered on which
 // branch is the server package's to show (#435).
 
-const faultRequestId = "req-fault-1"
+const faultRequestID = "req-fault-1"
 
 // faultFormat is one branch's answering format and what it answers any of these faults with.
 type faultFormat struct {
@@ -38,16 +38,16 @@ func faultFormats() []faultFormat {
 	return []faultFormat{
 		{name: "page", faults: PageFaults},
 		{name: "protocol", faults: func() ServerFaults { return ProtocolFaults(render.New(nil, nil, nil)) },
-			body: `{"error":"server_error","error_description":"An unexpected server error has occurred. For additional information, refer to the server logs. Request Id: ` + faultRequestId + `"}`},
+			body: `{"error":"server_error","error_description":"An unexpected server error has occurred. For additional information, refer to the server logs. Request Id: ` + faultRequestID + `"}`},
 		{name: "api", faults: APIFaults,
-			body: `{"error_code":"INTERNAL_SERVER_ERROR","error_description":"An unexpected server error has occurred. For additional information, refer to the server logs. Request Id: ` + faultRequestId + `"}`},
+			body: `{"error_code":"INTERNAL_SERVER_ERROR","error_description":"An unexpected server error has occurred. For additional information, refer to the server logs. Request Id: ` + faultRequestID + `"}`},
 	}
 }
 
 // faultRequest is a request carrying the request id requestid.Middleware would have put on it.
 func faultRequest() *http.Request {
 	req := httptest.NewRequest(http.MethodPost, "/auth/token", nil)
-	return req.WithContext(requestid.NewContext(req.Context(), faultRequestId))
+	return req.WithContext(requestid.NewContext(req.Context(), faultRequestID))
 }
 
 // faultingSessionStore is a browser session store answering the session middleware's read with
@@ -90,10 +90,10 @@ func TestServerFaults_EachFaultInEachFormat(t *testing.T) {
 			name: "the settings row cannot be read",
 			middleware: func(t *testing.T, faults ServerFaults) func(http.Handler) http.Handler {
 				db := datamocks.NewDatabase(t)
-				db.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(nil, errors.New("the database is down"))
+				db.On("GetSettingsByID", mock.Anything, mock.Anything, int64(1)).Return(nil, errors.New("the database is down"))
 				return Settings(db, faults)
 			},
-			pageSentence: "fatal failure in GetSettings() middleware. For additional information, refer to the server logs. Request Id: " + faultRequestId,
+			pageSentence: "fatal failure in GetSettings() middleware. For additional information, refer to the server logs. Request Id: " + faultRequestID,
 			pageMessage:  "unable to load the settings",
 			cause:        "the database is down",
 		},
@@ -103,7 +103,7 @@ func TestServerFaults_EachFaultInEachFormat(t *testing.T) {
 				store := faultingSessionStore{getErr: errors.New("the session backend is down")}
 				return SessionIdentifier(store, datamocks.NewDatabase(t), faults)
 			},
-			pageSentence: "fatal failure in session middleware. For additional information, refer to the server logs. Request Id: " + faultRequestId,
+			pageSentence: "fatal failure in session middleware. For additional information, refer to the server logs. Request Id: " + faultRequestID,
 			pageMessage:  "unable to get the session store",
 			cause:        "the session backend is down",
 		},
@@ -115,7 +115,7 @@ func TestServerFaults_EachFaultInEachFormat(t *testing.T) {
 				db.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "sid-1").Return(nil, errors.New("the database is down"))
 				return SessionIdentifier(store, db, faults)
 			},
-			pageSentence: "fatal failure in session middleware. For additional information, refer to the server logs. Request Id: " + faultRequestId,
+			pageSentence: "fatal failure in session middleware. For additional information, refer to the server logs. Request Id: " + faultRequestID,
 			pageMessage:  "unable to get the user session",
 			cause:        "the database is down",
 		},
@@ -127,7 +127,7 @@ func TestServerFaults_EachFaultInEachFormat(t *testing.T) {
 				db.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "sid-1").Return(nil, nil)
 				return SessionIdentifier(store, db, faults)
 			},
-			pageSentence: "fatal failure in session middleware. For additional information, refer to the server logs. Request Id: " + faultRequestId,
+			pageSentence: "fatal failure in session middleware. For additional information, refer to the server logs. Request Id: " + faultRequestID,
 			pageMessage:  "unable to save the session",
 			cause:        "the session backend is down",
 		},

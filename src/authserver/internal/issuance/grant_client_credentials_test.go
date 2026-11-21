@@ -40,7 +40,7 @@ func TestIssueClientCredentialsGrant(t *testing.T) {
 		{
 			name: "Single custom scope",
 			client: &record.Client{
-				Id:               1,
+				ID:               1,
 				ClientIdentifier: "test-client-1",
 			},
 			scope:            "resource1:read",
@@ -51,7 +51,7 @@ func TestIssueClientCredentialsGrant(t *testing.T) {
 		{
 			name: "Multiple custom scopes",
 			client: &record.Client{
-				Id:               2,
+				ID:               2,
 				ClientIdentifier: "test-client-2",
 			},
 			scope:            "resource1:read resource2:write",
@@ -62,7 +62,7 @@ func TestIssueClientCredentialsGrant(t *testing.T) {
 		{
 			name: "Custom scopes with OIDC scopes (should be ignored)",
 			client: &record.Client{
-				Id:               3,
+				ID:               3,
 				ClientIdentifier: "test-client-3",
 			},
 			scope:            "resource1:read openid profile",
@@ -75,7 +75,7 @@ func TestIssueClientCredentialsGrant(t *testing.T) {
 			// for every other grant (#437 decision 11).
 			name: "Client lifetime override",
 			client: &record.Client{
-				Id:                       5,
+				ID:                       5,
 				ClientIdentifier:         "test-client-5",
 				TokenExpirationInSeconds: 900,
 			},
@@ -100,7 +100,7 @@ func TestIssueClientCredentialsGrant(t *testing.T) {
 			assert.Equal(t, "Bearer", response.TokenType)
 			assert.Equal(t, int64(tt.expectedLifetime), response.ExpiresIn)
 			assert.NotEmpty(t, response.AccessToken)
-			assert.Empty(t, response.IdToken)
+			assert.Empty(t, response.IDToken)
 			assert.Empty(t, response.RefreshToken)
 			assert.Equal(t, tt.scope, response.Scope)
 
@@ -137,7 +137,7 @@ func TestIssueClientCredentialsGrant_InvalidScope(t *testing.T) {
 	ctx := context.Background()
 
 	client := &record.Client{
-		Id:               4,
+		ID:               4,
 		ClientIdentifier: "test-client-4",
 	}
 

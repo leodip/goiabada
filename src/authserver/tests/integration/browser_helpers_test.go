@@ -18,7 +18,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func createHttpClient(t *testing.T) *http.Client {
+func createHTTPClient(t *testing.T) *http.Client {
 	jar, err := cookiejar.New(nil)
 	if err != nil {
 		t.Fatal(err)
@@ -68,11 +68,11 @@ func assertRedirect(t *testing.T, response *http.Response, location string) stri
 	// judged by the ceremony it names and a tab of a replaced sign-in cannot act on the newer one
 	// (#246 decision 22). Checked here so that every flow test that follows a Location asserts it.
 	if ceremonyRoutes[redirectLocation.Path] {
-		ceremonyIds := redirectLocation.Query()[ceremony.QueryParameter]
-		if assert.Len(t, ceremonyIds, 1, "a redirect to %s names exactly one ceremony: %s", location,
+		ceremonyIDs := redirectLocation.Query()[ceremony.QueryParameter]
+		if assert.Len(t, ceremonyIDs, 1, "a redirect to %s names exactly one ceremony: %s", location,
 			redirectLocation.String()) {
-			assert.True(t, ceremony.IsWellFormedId(ceremonyIds[0]),
-				"the ceremony a redirect to %s names is an id: %q", location, ceremonyIds[0])
+			assert.True(t, ceremony.IsWellFormedID(ceremonyIDs[0]),
+				"the ceremony a redirect to %s names is an id: %q", location, ceremonyIDs[0])
 		}
 		assert.Len(t, redirectLocation.Query(), 1, "a redirect between ceremony routes carries the ceremony and nothing else")
 	}
@@ -90,11 +90,11 @@ func stepURLOfTheSameCeremony(t *testing.T, location string, path string) string
 	if err != nil {
 		t.Fatal(err)
 	}
-	ceremonyId := parsed.Query().Get(ceremony.QueryParameter)
-	if ceremonyId == "" {
+	ceremonyID := parsed.Query().Get(ceremony.QueryParameter)
+	if ceremonyID == "" {
 		t.Fatalf("the location %q names no ceremony", location)
 	}
-	return appConfig.AuthServer.BaseURL + path + "?" + url.Values{ceremony.QueryParameter: {ceremonyId}}.Encode()
+	return appConfig.AuthServer.BaseURL + path + "?" + url.Values{ceremony.QueryParameter: {ceremonyID}}.Encode()
 }
 
 // ceremonyRoutes are the routes of the ceremony between /auth/authorize and /auth/issue, each of
@@ -158,23 +158,23 @@ func loadPage(t *testing.T, client *http.Client, url string) *http.Response {
 //
 // Where a submission follows a refused one, the page to pass is the refusal's own re-render, which
 // is what the user is looking at by then.
-func authenticateWithPassword(t *testing.T, client *http.Client, destUrl string,
+func authenticateWithPassword(t *testing.T, client *http.Client, destURL string,
 	pwdPage *http.Response, email string, password string) *http.Response {
 
 	formData := url.Values{
 		"email":      {email},
 		"password":   {password},
-		"ceremonyId": {getCeremonyIdFromPage(t, pwdPage)},
+		"ceremonyId": {getCeremonyIDFromPage(t, pwdPage)},
 	}
 
 	formDataString := formData.Encode()
 	requestBody := strings.NewReader(formDataString)
-	request, err := http.NewRequest("POST", destUrl, requestBody)
+	request, err := http.NewRequest("POST", destURL, requestBody)
 	if err != nil {
 		t.Fatal(err)
 	}
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	request.Header.Set("Referer", destUrl)
+	request.Header.Set("Referer", destURL)
 	request.Header.Set("Origin", appConfig.AuthServer.BaseURL)
 
 	resp, err := client.Do(request)
@@ -184,24 +184,24 @@ func authenticateWithPassword(t *testing.T, client *http.Client, destUrl string,
 	return resp
 }
 
-// authenticateWithOtp submits the OTP form, verification or enrollment. otpPage is the response
+// authenticateWithOTP submits the OTP form, verification or enrollment. otpPage is the response
 // that rendered it, read the same way authenticateWithPassword reads its own (#79).
-func authenticateWithOtp(t *testing.T, client *http.Client, destUrl string, otpPage *http.Response,
+func authenticateWithOTP(t *testing.T, client *http.Client, destURL string, otpPage *http.Response,
 	otp string) *http.Response {
 
 	formData := url.Values{
 		"otp":        {otp},
-		"ceremonyId": {getCeremonyIdFromPage(t, otpPage)},
+		"ceremonyId": {getCeremonyIDFromPage(t, otpPage)},
 	}
 
 	formDataString := formData.Encode()
 	requestBody := strings.NewReader(formDataString)
-	request, err := http.NewRequest("POST", destUrl, requestBody)
+	request, err := http.NewRequest("POST", destURL, requestBody)
 	if err != nil {
 		t.Fatal(err)
 	}
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	request.Header.Set("Referer", destUrl)
+	request.Header.Set("Referer", destURL)
 	request.Header.Set("Origin", appConfig.AuthServer.BaseURL)
 
 	resp, err := client.Do(request)
@@ -211,7 +211,7 @@ func authenticateWithOtp(t *testing.T, client *http.Client, destUrl string, otpP
 	return resp
 }
 
-func getOtpSecretFromEnrollmentPage(t *testing.T, response *http.Response) string {
+func getOTPSecretFromEnrollmentPage(t *testing.T, response *http.Response) string {
 	byteArr, err := io.ReadAll(response.Body)
 	if err != nil {
 		t.Fatal(err)
@@ -228,7 +228,7 @@ func getOtpSecretFromEnrollmentPage(t *testing.T, response *http.Response) strin
 	return secret.Text()
 }
 
-// getCeremonyIdFromPage reads the hidden ceremony id out of a rendered auth-flow page, so the
+// getCeremonyIDFromPage reads the hidden ceremony id out of a rendered auth-flow page, so the
 // tests post the value the server actually rendered rather than one they made up. A field rename
 // on one side alone then fails here instead of passing silently (#79).
 //
@@ -237,9 +237,9 @@ func getOtpSecretFromEnrollmentPage(t *testing.T, response *http.Response) strin
 // submitted by any browser, so every real submission would be refused, while a helper that finds
 // the value anywhere on the page and posts it by hand would sail past.
 //
-// The body is re-buffered, as getOtpSecretFromEnrollmentPage does, so a later reader of the same
+// The body is re-buffered, as getOTPSecretFromEnrollmentPage does, so a later reader of the same
 // response still sees it.
-func getCeremonyIdFromPage(t *testing.T, response *http.Response) string {
+func getCeremonyIDFromPage(t *testing.T, response *http.Response) string {
 	byteArr, err := io.ReadAll(response.Body)
 	if err != nil {
 		t.Fatal(err)
@@ -254,14 +254,14 @@ func getCeremonyIdFromPage(t *testing.T, response *http.Response) string {
 	if field.Length() != 1 {
 		t.Fatalf("expecting exactly one ceremonyId input inside the form, found %d", field.Length())
 	}
-	ceremonyId, ok := field.Attr("value")
-	if !ok || ceremonyId == "" {
+	ceremonyID, ok := field.Attr("value")
+	if !ok || ceremonyID == "" {
 		t.Fatal("the ceremonyId input carries no value")
 	}
-	return ceremonyId
+	return ceremonyID
 }
 
-func getCodeAndStateFromUrl(t *testing.T, resp *http.Response) (code string, state string) {
+func getCodeAndStateFromURL(t *testing.T, resp *http.Response) (code string, state string) {
 	redirectLocation, err := url.Parse(resp.Header.Get("Location"))
 	if err != nil {
 		t.Fatal(err)
@@ -281,11 +281,11 @@ func getCodeAndStateFromUrl(t *testing.T, resp *http.Response) (code string, sta
 // postConsent submits the consent form. consentPage is the response that rendered it, and the
 // ceremony id is read out of it rather than constructed, so the submission carries what a browser
 // on that page would carry (#79).
-func postConsent(t *testing.T, client *http.Client, destUrl string, consentPage *http.Response,
+func postConsent(t *testing.T, client *http.Client, destURL string, consentPage *http.Response,
 	consents []int) (resp *http.Response) {
 
 	formData := url.Values{}
-	formData.Add("ceremonyId", getCeremonyIdFromPage(t, consentPage))
+	formData.Add("ceremonyId", getCeremonyIDFromPage(t, consentPage))
 	for _, consent := range consents {
 		formData.Add(fmt.Sprintf("consent%d", consent), "[on]")
 	}
@@ -297,12 +297,12 @@ func postConsent(t *testing.T, client *http.Client, destUrl string, consentPage 
 
 	formDataString := formData.Encode()
 	requestBody := strings.NewReader(formDataString)
-	request, err := http.NewRequest("POST", destUrl, requestBody)
+	request, err := http.NewRequest("POST", destURL, requestBody)
 	if err != nil {
 		t.Fatal(err)
 	}
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	request.Header.Set("Referer", destUrl)
+	request.Header.Set("Referer", destURL)
 	request.Header.Set("Origin", appConfig.AuthServer.BaseURL)
 
 	resp, err = client.Do(request)
@@ -312,7 +312,7 @@ func postConsent(t *testing.T, client *http.Client, destUrl string, consentPage 
 	return resp
 }
 
-// createAuthenticatedHttpClient returns a browser holding a valid level 1 session, for the tests
+// createAuthenticatedHTTPClient returns a browser holding a valid level 1 session, for the tests
 // that assert what an authorization ERROR looks like when it reaches the client.
 //
 // Since #213 the authorization endpoint no longer redirects a logged-out browser to a client's
@@ -327,28 +327,28 @@ func postConsent(t *testing.T, client *http.Client, destUrl string, consentPage 
 // The client and user the session was created for are discarded on purpose. A session cookie
 // belongs to the browser and not to the client that minted it, so this authenticates a request for
 // whichever client the caller creates for itself.
-func createAuthenticatedHttpClient(t *testing.T) *http.Client {
-	httpClient, _, _, _ := createSessionWithAcrLevel1(t)
+func createAuthenticatedHTTPClient(t *testing.T) *http.Client {
+	httpClient, _, _, _ := createSessionWithACRLevel1(t)
 	return httpClient
 }
 
 // navigateToPasswordScreen starts an auth flow and navigates to the password screen
 // Returns the HTTP response for the password page
-func navigateToPasswordScreen(t *testing.T, httpClient *http.Client, client *record.Client, redirectUri string) *http.Response {
-	return navigateToPasswordScreenWithUILocales(t, httpClient, client, redirectUri, "")
+func navigateToPasswordScreen(t *testing.T, httpClient *http.Client, client *record.Client, redirectURI string) *http.Response {
+	return navigateToPasswordScreenWithUILocales(t, httpClient, client, redirectURI, "")
 }
 
 // navigateToPasswordScreenWithUILocales is the same as navigateToPasswordScreen
 // but appends an ui_locales query parameter (space-separated BCP 47 tags) when
 // non-empty, exercising the OIDC hint preservation across the redirect chain.
-func navigateToPasswordScreenWithUILocales(t *testing.T, httpClient *http.Client, client *record.Client, redirectUri, uiLocales string) *http.Response {
+func navigateToPasswordScreenWithUILocales(t *testing.T, httpClient *http.Client, client *record.Client, redirectURI, uiLocales string) *http.Response {
 	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -356,10 +356,10 @@ func navigateToPasswordScreenWithUILocales(t *testing.T, httpClient *http.Client
 		"&state=" + requestState +
 		"&nonce=" + requestNonce
 	if uiLocales != "" {
-		destUrl += "&ui_locales=" + url.QueryEscape(uiLocales)
+		destURL += "&ui_locales=" + url.QueryEscape(uiLocales)
 	}
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -376,18 +376,18 @@ func navigateToPasswordScreenWithUILocales(t *testing.T, httpClient *http.Client
 	return resp
 }
 
-// navigateToOtpScreen starts an auth flow, authenticates with password, and navigates to OTP screen
+// navigateToOTPScreen starts an auth flow, authenticates with password, and navigates to OTP screen
 // Returns the HTTP response for the OTP page
-func navigateToOtpScreen(t *testing.T, httpClient *http.Client, client *record.Client, user *record.User,
-	password string, redirectUri string) *http.Response {
+func navigateToOTPScreen(t *testing.T, httpClient *http.Client, client *record.Client, user *record.User,
+	password string, redirectURI string) *http.Response {
 
 	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -395,7 +395,7 @@ func navigateToOtpScreen(t *testing.T, httpClient *http.Client, client *record.C
 		"&state=" + requestState +
 		"&nonce=" + requestNonce
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -433,15 +433,15 @@ func navigateToOtpScreen(t *testing.T, httpClient *http.Client, client *record.C
 // navigateToConsentScreen completes auth flow and navigates to consent screen
 // Returns the HTTP response for the consent page
 func navigateToConsentScreen(t *testing.T, httpClient *http.Client, client *record.Client,
-	user *record.User, password string, redirectUri string) *http.Response {
+	user *record.User, password string, redirectURI string) *http.Response {
 
 	requestCodeChallenge := randomCodeChallenge()
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -449,7 +449,7 @@ func navigateToConsentScreen(t *testing.T, httpClient *http.Client, client *reco
 		"&state=" + requestState +
 		"&nonce=" + requestNonce
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}

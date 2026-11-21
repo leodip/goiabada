@@ -40,9 +40,9 @@ func expectGuardOfGroup(database *datamocks.Database, tx *sql.Tx, group int64) {
 // expectGuardOfOrdinaryUser registers the administrators' lock on tx and the guard's reads of a user
 // who holds manage neither directly nor through a group, so disabling or deleting them counts
 // nothing.
-func expectGuardOfOrdinaryUser(database *datamocks.Database, tx *sql.Tx, userId int64) {
+func expectGuardOfOrdinaryUser(database *datamocks.Database, tx *sql.Tx, userID int64) {
 	expectAdministratorsLock(database, tx)
-	database.On("GetUserPermissionByUserIdAndPermissionId", mock.Anything, tx, userId, permManage).
+	database.On("GetUserPermissionByUserIDAndPermissionID", mock.Anything, tx, userID, permManage).
 		Return((*record.UserPermission)(nil), nil).Once()
-	database.On("GetUserGroupsByUserId", mock.Anything, tx, userId).Return([]record.UserGroup{}, nil).Once()
+	database.On("GetUserGroupsByUserID", mock.Anything, tx, userID).Return([]record.UserGroup{}, nil).Once()
 }

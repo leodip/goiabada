@@ -5,6 +5,6 @@
 // the routes require; nothing here reaches another user's account.
 //
 // A handler answers a page or JSON, never both, and passes an account API failure to render's
-// classifiers. HttpHelper is declared here rather than imported from the parent handlers package,
+// classifiers. HTTPHelper is declared here rather than imported from the parent handlers package,
 // and each handler names the API methods it calls in an unexported port beside it (#386, #440).
 package accounthandlers

@@ -25,22 +25,22 @@
       {{ range .groups }}
       <tr>
         <td class="cell-wrap">
-          <a class="text-link font-mono text-sm" href="/admin/groups/{{ .Id }}/settings">{{ .GroupIdentifier }}</a>
+          <a class="text-link font-mono text-sm" href="/admin/groups/{{ .ID }}/settings">{{ .GroupIdentifier }}</a>
           {{ if .Description }}<span class="cell-secondary">{{ .Description }}</span>{{ end }}
         </td>
         <td data-label="{{ T $.ctx "adminconsole.admin_groups.list.col_members" }}">{{ .MemberCount }}</td>
         <td data-label="{{ T $.ctx "adminconsole.admin_groups.list.col_tokens" }}">
-          {{ if or .IncludeInAccessToken .IncludeInIdToken }}
+          {{ if or .IncludeInAccessToken .IncludeInIDToken }}
           <span class="flex flex-wrap gap-1">
             {{ if .IncludeInAccessToken }}<span class="tag">{{ T $.ctx "adminconsole.admin_groups.list.access_token" }}</span>{{ end }}
-            {{ if .IncludeInIdToken }}<span class="tag">{{ T $.ctx "adminconsole.admin_groups.list.id_token" }}</span>{{ end }}
+            {{ if .IncludeInIDToken }}<span class="tag">{{ T $.ctx "adminconsole.admin_groups.list.id_token" }}</span>{{ end }}
           </span>
           {{ else }}
           <span class="text-ink-muted">{{ T $.ctx "adminconsole.admin_groups.list.in_no_token" }}</span>
           {{ end }}
         </td>
         <td class="cell-actions">
-          <a class="text-link text-link-danger" href="/admin/groups/{{ .Id }}/delete">{{ T $.ctx "adminconsole.admin_groups.list.action_delete" }}<span class="sr-only"> {{ .GroupIdentifier }}</span></a>
+          <a class="text-link text-link-danger" href="/admin/groups/{{ .ID }}/delete">{{ T $.ctx "adminconsole.admin_groups.list.action_delete" }}<span class="sr-only"> {{ .GroupIdentifier }}</span></a>
         </td>
       </tr>
       {{ end }}

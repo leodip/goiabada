@@ -102,7 +102,7 @@ func accountHandlersOutsideTheTable() []accountHandlerCase {
 	return []accountHandlerCase{
 		{
 			name: "HandleChangePasswordGet",
-			build: func(h *handlersmocks.HttpHelper, c accountAPI) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c accountAPI) http.HandlerFunc {
 				return HandleChangePasswordGet(h, newFlashTestStore(), c)
 			},
 			request: func() *http.Request {
@@ -111,7 +111,7 @@ func accountHandlersOutsideTheTable() []accountHandlerCase {
 		},
 		{
 			name: "HandleProfilePicturePost",
-			build: func(h *handlersmocks.HttpHelper, c accountAPI) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c accountAPI) http.HandlerFunc {
 				return HandleProfilePicturePost(h, c)
 			},
 			request: func() *http.Request {
@@ -130,7 +130,7 @@ func accountHandlersOutsideTheTable() []accountHandlerCase {
 		},
 		{
 			name: "HandleProfilePictureDelete",
-			build: func(h *handlersmocks.HttpHelper, c accountAPI) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c accountAPI) http.HandlerFunc {
 				return HandleProfilePictureDelete(h, c)
 			},
 			request: func() *http.Request {
@@ -151,7 +151,7 @@ func TestAccountHandlers_NoAccountPageAsksTheAdminAPI(t *testing.T) {
 				name = tc.name + "/writes refused"
 			}
 			t.Run(name, func(t *testing.T) {
-				httpHelper := handlersmocks.NewHttpHelper(t)
+				httpHelper := handlersmocks.NewHTTPHelper(t)
 				if refuseWrites {
 					// A refused write ends a page without a form on its error page or its JSON
 					// error, which is the classifier's business and not this test's.

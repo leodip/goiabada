@@ -30,7 +30,7 @@ import (
 
 // TestGroupRefusals_AreInTheRequestsLanguage covers the group endpoints' refusals.
 func TestGroupRefusals_AreInTheRequestsLanguage(t *testing.T) {
-	stored := func() *record.Group { return &record.Group{Id: 5, GroupIdentifier: "a-group", Description: "A group"} }
+	stored := func() *record.Group { return &record.Group{ID: 5, GroupIdentifier: "a-group", Description: "A group"} }
 	create := func(body string, expect func(database *datamocks.Database)) func(*testing.T, string) *httptest.ResponseRecorder {
 		return func(t *testing.T, acceptLanguage string) *httptest.ResponseRecorder {
 			database := datamocks.NewDatabase(t)
@@ -46,7 +46,7 @@ func TestGroupRefusals_AreInTheRequestsLanguage(t *testing.T) {
 	update := func(body string, expect func(database *datamocks.Database)) func(*testing.T, string) *httptest.ResponseRecorder {
 		return func(t *testing.T, acceptLanguage string) *httptest.ResponseRecorder {
 			database := datamocks.NewDatabase(t)
-			database.On("GetGroupById", mock.Anything, (*sql.Tx)(nil), int64(5)).Return(stored(), nil).Once()
+			database.On("GetGroupByID", mock.Anything, (*sql.Tx)(nil), int64(5)).Return(stored(), nil).Once()
 			if expect != nil {
 				expect(database)
 			}
@@ -108,7 +108,7 @@ func TestGroupRefusals_AreInTheRequestsLanguage(t *testing.T) {
 		{
 			name: "update onto another group's identifier",
 			serve: update(`{"groupIdentifier":"other-group","description":"d"}`,
-				identifierHeldBy("other-group", &record.Group{Id: 6, GroupIdentifier: "other-group"})),
+				identifierHeldBy("other-group", &record.Group{ID: 6, GroupIdentifier: "other-group"})),
 			status:     http.StatusBadRequest,
 			code:       "handler.group.identifier_in_use",
 			english:    "The group identifier is already in use",
@@ -124,7 +124,7 @@ func TestGroupMemberRefusals_AreInTheRequestsLanguage(t *testing.T) {
 		return func(database *datamocks.Database) {
 			expectGroup(database, 5)
 			expectMember(database)
-			database.On("GetUserGroupByUserIdAndGroupId", mock.Anything, (*sql.Tx)(nil), ceilingMemberId, int64(5)).
+			database.On("GetUserGroupByUserIDAndGroupID", mock.Anything, (*sql.Tx)(nil), ceilingMemberID, int64(5)).
 				Return(existing, nil).Once()
 		}
 	}
@@ -139,13 +139,13 @@ func TestGroupMemberRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			return rr
 		}
 	}
-	member := strconv.FormatInt(ceilingMemberId, 10)
+	member := strconv.FormatInt(ceilingMemberID, 10)
 
 	assertRefusalLanguages(t, []refusalCase{
 		{
 			name: "adding a member twice",
 			serve: serve(http.MethodPost, "/api/v1/admin/groups/5/members", `{"userId":`+member+`}`,
-				map[string]string{"id": "5"}, &record.UserGroup{Id: 9, UserId: ceilingMemberId, GroupId: 5},
+				map[string]string{"id": "5"}, &record.UserGroup{ID: 9, UserID: ceilingMemberID, GroupID: 5},
 				func(database *datamocks.Database) http.Handler {
 					return HandleGroupMemberAddPost(database, handlersmocks.NewAuditLogger(t))
 				}),
@@ -187,8 +187,8 @@ func TestAttributeRefusals_AreInTheRequestsLanguage(t *testing.T) {
 	groupUpdate := func(body string) func(*testing.T, string) *httptest.ResponseRecorder {
 		return func(t *testing.T, acceptLanguage string) *httptest.ResponseRecorder {
 			database := datamocks.NewDatabase(t)
-			database.On("GetGroupAttributeById", mock.Anything, (*sql.Tx)(nil), int64(3)).
-				Return(&record.GroupAttribute{Id: 3, GroupId: 5, Key: "k", Value: "v"}, nil).Once()
+			database.On("GetGroupAttributeByID", mock.Anything, (*sql.Tx)(nil), int64(3)).
+				Return(&record.GroupAttribute{ID: 3, GroupID: 5, Key: "k", Value: "v"}, nil).Once()
 			r := httptest.NewRequest(http.MethodPut, "/api/v1/admin/groups/attributes/3", strings.NewReader(body))
 			r = inRequestLanguage(withPathValue(r, "id", "3"), acceptLanguage)
 			rr := httptest.NewRecorder()
@@ -200,7 +200,7 @@ func TestAttributeRefusals_AreInTheRequestsLanguage(t *testing.T) {
 		return func(t *testing.T, acceptLanguage string) *httptest.ResponseRecorder {
 			database := datamocks.NewDatabase(t)
 			if readsUser {
-				database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(&record.User{Id: 7}, nil).Once()
+				database.On("GetUserByID", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(&record.User{ID: 7}, nil).Once()
 			}
 			r := inRequestLanguage(httptest.NewRequest(http.MethodPost, "/api/v1/admin/users/attributes", strings.NewReader(body)), acceptLanguage)
 			rr := httptest.NewRecorder()
@@ -211,8 +211,8 @@ func TestAttributeRefusals_AreInTheRequestsLanguage(t *testing.T) {
 	userUpdate := func(body string) func(*testing.T, string) *httptest.ResponseRecorder {
 		return func(t *testing.T, acceptLanguage string) *httptest.ResponseRecorder {
 			database := datamocks.NewDatabase(t)
-			database.On("GetUserAttributeById", mock.Anything, (*sql.Tx)(nil), int64(4)).
-				Return(&record.UserAttribute{Id: 4, UserId: 7, Key: "k", Value: "v"}, nil).Once()
+			database.On("GetUserAttributeByID", mock.Anything, (*sql.Tx)(nil), int64(4)).
+				Return(&record.UserAttribute{ID: 4, UserID: 7, Key: "k", Value: "v"}, nil).Once()
 			r := httptest.NewRequest(http.MethodPut, "/api/v1/admin/users/attributes/4", strings.NewReader(body))
 			r = inRequestLanguage(withPathValue(r, "id", "4"), acceptLanguage)
 			rr := httptest.NewRecorder()
@@ -319,14 +319,14 @@ func TestUserRefusals_AreInTheRequestsLanguage(t *testing.T) {
 		return func(t *testing.T, acceptLanguage string) *httptest.ResponseRecorder {
 			database := datamocks.NewDatabase(t)
 			if stored != nil {
-				database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(73)).Return(stored, nil).Once()
+				database.On("GetUserByID", mock.Anything, (*sql.Tx)(nil), int64(73)).Return(stored, nil).Once()
 			}
 			rr := httptest.NewRecorder()
 			HandleUserOTPPut(database, handlersmocks.NewAuditLogger(t), heldNotifier(t, &heldJobs{})).ServeHTTP(rr, userRequest(http.MethodPut, "/api/v1/admin/users/73/otp", body, acceptLanguage))
 			return rr
 		}
 	}
-	tooManyGroups := make([]string, maxGroupIdsPerRequest+1)
+	tooManyGroups := make([]string, maxGroupIDsPerRequest+1)
 	for i := range tooManyGroups {
 		tooManyGroups[i] = strconv.Itoa(i + 1)
 	}
@@ -405,7 +405,7 @@ func TestUserRefusals_AreInTheRequestsLanguage(t *testing.T) {
 		},
 		{
 			name:       "two-factor authentication disabled for a user who has none",
-			serve:      disableOTP(`{"enabled":false}`, &record.User{Id: 73, Subject: "sub-73", OTPEnabled: false}),
+			serve:      disableOTP(`{"enabled":false}`, &record.User{ID: 73, Subject: "sub-73", OTPEnabled: false}),
 			status:     http.StatusBadRequest,
 			code:       "OTP_NOT_ENABLED",
 			english:    "User does not have OTP enabled",
@@ -430,7 +430,7 @@ func TestUserRefusals_AreInTheRequestsLanguage(t *testing.T) {
 			serve: func(t *testing.T, acceptLanguage string) *httptest.ResponseRecorder {
 				database := datamocks.NewDatabase(t)
 				expectCodeGenRead(database)
-				database.On("TryIssueEmailVerificationCode", mock.Anything, mock.Anything, codeGenUserId, codeGenAddress,
+				database.On("TryIssueEmailVerificationCode", mock.Anything, mock.Anything, codeGenUserID, codeGenAddress,
 					mock.Anything, mock.Anything).Return(false, nil).Once()
 				rr := httptest.NewRecorder()
 				HandleUserEmailVerificationCodePost(database, handlersmocks.NewAuditLogger(t), testDataCipher).

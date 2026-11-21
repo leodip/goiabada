@@ -234,7 +234,7 @@ type SettingsTokensResponse struct {
 	RefreshTokenOfflineIdleTimeoutInSeconds int  `json:"refreshTokenOfflineIdleTimeoutInSeconds"`
 	RefreshTokenOfflineMaxLifetimeInSeconds int  `json:"refreshTokenOfflineMaxLifetimeInSeconds"`
 	IncludeOpenIDConnectClaimsInAccessToken bool `json:"includeOpenIDConnectClaimsInAccessToken"`
-	IncludeOpenIDConnectClaimsInIdToken     bool `json:"includeOpenIDConnectClaimsInIdToken"`
+	IncludeOpenIDConnectClaimsInIDToken     bool `json:"includeOpenIDConnectClaimsInIdToken"`
 }
 
 // UpdateSettingsTokensRequest contains token-related global settings fields for update
@@ -243,7 +243,7 @@ type UpdateSettingsTokensRequest struct {
 	RefreshTokenOfflineIdleTimeoutInSeconds int  `json:"refreshTokenOfflineIdleTimeoutInSeconds"`
 	RefreshTokenOfflineMaxLifetimeInSeconds int  `json:"refreshTokenOfflineMaxLifetimeInSeconds"`
 	IncludeOpenIDConnectClaimsInAccessToken bool `json:"includeOpenIDConnectClaimsInAccessToken"`
-	IncludeOpenIDConnectClaimsInIdToken     bool `json:"includeOpenIDConnectClaimsInIdToken"`
+	IncludeOpenIDConnectClaimsInIDToken     bool `json:"includeOpenIDConnectClaimsInIdToken"`
 }
 
 // SettingsAuditLogsResponse represents the audit log settings returned by the API
@@ -263,7 +263,7 @@ type UpdateSettingsAuditLogsRequest struct {
 // SettingsSigningKeyResponse represents a public view of a signing key
 // exposed by the admin API. Private key material is never exposed.
 type SettingsSigningKeyResponse struct {
-	Id               int64      `json:"id"`
+	ID               int64      `json:"id"`
 	CreatedAt        *time.Time `json:"createdAt"`
 	State            string     `json:"state"`
 	KeyIdentifier    string     `json:"keyIdentifier"`

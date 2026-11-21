@@ -18,11 +18,11 @@ import (
 // an administrator.
 type clientLogoDatabase interface {
 	clientTargetPolicyDatabase
-	ClientHasLogo(ctx context.Context, tx *sql.Tx, clientId int64) (bool, error)
+	ClientHasLogo(ctx context.Context, tx *sql.Tx, clientID int64) (bool, error)
 	CreateClientLogo(ctx context.Context, tx *sql.Tx, clientLogo *record.ClientLogo) error
-	DeleteClientLogo(ctx context.Context, tx *sql.Tx, clientId int64) error
-	GetClientById(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error)
-	GetClientLogoByClientId(ctx context.Context, tx *sql.Tx, clientId int64) (*record.ClientLogo, error)
+	DeleteClientLogo(ctx context.Context, tx *sql.Tx, clientID int64) error
+	GetClientByID(ctx context.Context, tx *sql.Tx, clientID int64) (*record.Client, error)
+	GetClientLogoByClientID(ctx context.Context, tx *sql.Tx, clientID int64) (*record.ClientLogo, error)
 	UpdateClientLogo(ctx context.Context, tx *sql.Tx, clientLogo *record.ClientLogo) error
 }
 
@@ -42,14 +42,14 @@ func HandleClientLogoPost(
 			return
 		}
 
-		clientId, err := strconv.ParseInt(idStr, 10, 64)
+		clientID, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			writeJSONError(w, "Invalid client ID", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
 		// Get client from database
-		client, err := database.GetClientById(r.Context(), nil, clientId)
+		client, err := database.GetClientByID(r.Context(), nil, clientID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -77,7 +77,7 @@ func HandleClientLogoPost(
 		}
 
 		// Check if client already has a logo
-		existingLogo, err := database.GetClientLogoByClientId(r.Context(), nil, clientId)
+		existingLogo, err := database.GetClientLogoByClientID(r.Context(), nil, clientID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -91,7 +91,7 @@ func HandleClientLogoPost(
 		} else {
 			// Create new logo
 			clientLogo := &record.ClientLogo{
-				ClientId:    clientId,
+				ClientID:    clientID,
 				Logo:        fileData,
 				ContentType: result.ContentType,
 			}
@@ -112,13 +112,13 @@ func HandleClientLogoPost(
 
 		// Log audit event
 		auditLogger.Log(r.Context(), audit.EventUpdatedClientLogo, map[string]interface{}{
-			"client_id":      client.Id,
+			"client_id":      client.ID,
 			"logged_in_user": loggedInUser,
 		})
 
 		response := api.ClientLogoUploadResponse{
 			Success:    true,
-			PictureUrl: baseURL + "/client/logo/" + client.ClientIdentifier,
+			PictureURL: baseURL + "/client/logo/" + client.ClientIdentifier,
 		}
 
 		writeJSON(w, r, http.StatusOK, response)
@@ -138,14 +138,14 @@ func HandleClientLogoDelete(
 			return
 		}
 
-		clientId, err := strconv.ParseInt(idStr, 10, 64)
+		clientID, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			writeJSONError(w, "Invalid client ID", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
 		// Get client from database
-		client, err := database.GetClientById(r.Context(), nil, clientId)
+		client, err := database.GetClientByID(r.Context(), nil, clientID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -162,7 +162,7 @@ func HandleClientLogoDelete(
 		}
 
 		// Delete the logo
-		err = database.DeleteClientLogo(r.Context(), nil, clientId)
+		err = database.DeleteClientLogo(r.Context(), nil, clientID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -177,7 +177,7 @@ func HandleClientLogoDelete(
 
 		// Log audit event
 		auditLogger.Log(r.Context(), audit.EventDeletedClientLogo, map[string]interface{}{
-			"client_id":      client.Id,
+			"client_id":      client.ID,
 			"logged_in_user": loggedInUser,
 		})
 
@@ -200,14 +200,14 @@ func HandleClientLogoGet(
 			return
 		}
 
-		clientId, err := strconv.ParseInt(idStr, 10, 64)
+		clientID, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			writeJSONError(w, "Invalid client ID", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
 		// Get client from database
-		client, err := database.GetClientById(r.Context(), nil, clientId)
+		client, err := database.GetClientByID(r.Context(), nil, clientID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -219,7 +219,7 @@ func HandleClientLogoGet(
 		}
 
 		// Check if client has a logo
-		hasLogo, err := database.ClientHasLogo(r.Context(), nil, clientId)
+		hasLogo, err := database.ClientHasLogo(r.Context(), nil, clientID)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -227,7 +227,7 @@ func HandleClientLogoGet(
 
 		response := api.ClientLogoInfoResponse{HasLogo: hasLogo}
 		if hasLogo {
-			response.LogoUrl = baseURL + "/client/logo/" + client.ClientIdentifier
+			response.LogoURL = baseURL + "/client/logo/" + client.ClientIdentifier
 		}
 
 		writeJSON(w, r, http.StatusOK, response)

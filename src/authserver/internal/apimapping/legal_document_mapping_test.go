@@ -24,7 +24,7 @@ var (
 
 func publishedTerms() (*record.LegalDocument, []record.LegalDocumentVersion) {
 	doc := &record.LegalDocument{
-		Id:            7,
+		ID:            7,
 		CreatedAt:     sql.NullTime{Time: legalCreated, Valid: true},
 		UpdatedAt:     sql.NullTime{Time: legalUpdated, Valid: true},
 		ShortName:     "terms",
@@ -35,8 +35,8 @@ func publishedTerms() (*record.LegalDocument, []record.LegalDocumentVersion) {
 		AppliesToAllApps: true,
 	}
 	versions := []record.LegalDocumentVersion{
-		{Id: 11, PublishedAt: legalPublished, LegalDocumentId: 7, VersionNumber: 1, Title: "Terms", Markdown: "First text"},
-		{Id: 12, PublishedAt: legalRepublish, LegalDocumentId: 7, VersionNumber: 2, Title: "Terms of use", Markdown: "Second text"},
+		{ID: 11, PublishedAt: legalPublished, LegalDocumentID: 7, VersionNumber: 1, Title: "Terms", Markdown: "First text"},
+		{ID: 12, PublishedAt: legalRepublish, LegalDocumentID: 7, VersionNumber: 2, Title: "Terms of use", Markdown: "Second text"},
 	}
 	return doc, versions
 }
@@ -101,16 +101,16 @@ func TestLegalDocumentList_TakesEachDocumentsCurrentVersion(t *testing.T) {
 
 // A document set to selected apps carries the client ids it lists, in the order read; one listing
 // none carries [] and is still selected apps, which applies to nobody, never all apps.
-func TestLegalDocument_SelectedAppsCarryTheirClientIds(t *testing.T) {
+func TestLegalDocument_SelectedAppsCarryTheirClientIDs(t *testing.T) {
 	doc, versions := publishedTerms()
 	doc.AppliesToAllApps = false
 	links := []record.LegalDocumentClient{
-		{Id: 31, LegalDocumentId: 7, ClientId: 5},
-		{Id: 32, LegalDocumentId: 7, ClientId: 3},
+		{ID: 31, LegalDocumentID: 7, ClientID: 5},
+		{ID: 32, LegalDocumentID: 7, ClientID: 3},
 	}
 	got := ToLegalDocumentResponse(doc, &versions[1], links)
 	assert.Equal(t, "selected_apps", got.AppliesTo)
-	assert.Equal(t, []int64{5, 3}, got.ClientIds)
+	assert.Equal(t, []int64{5, 3}, got.ClientIDs)
 
 	none := ToLegalDocumentDetailResponse(doc, versions, nil)
 	assert.Contains(t, wire(t, none.LegalDocument), `"appliesTo":"selected_apps","clientIds":[]`)
@@ -121,7 +121,7 @@ func TestLegalDocument_SelectedAppsCarryTheirClientIds(t *testing.T) {
 func TestLegalDocumentAcceptance_LinksTheVersionsPublicPageUnlessRetired(t *testing.T) {
 	doc, versions := publishedTerms()
 	acceptedAt := time.Date(2026, 10, 6, 9, 0, 0, 0, time.UTC)
-	acceptance := &record.LegalDocumentAcceptance{Id: 31, AcceptedAt: acceptedAt, UserId: 42, LegalDocumentVersionId: 11}
+	acceptance := &record.LegalDocumentAcceptance{ID: 31, AcceptedAt: acceptedAt, UserID: 42, LegalDocumentVersionID: 11}
 
 	assert.Equal(t, `{"id":31,"acceptedAt":"2026-10-06T09:00:00Z","legalDocumentId":7,"shortName":"terms",`+
 		`"version":1,"title":"Terms","publishedAt":"2026-10-03T09:00:00Z","retired":false,`+

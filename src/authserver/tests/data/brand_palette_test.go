@@ -56,7 +56,7 @@ func TestBrand_APaletteReadsBackWhatWasWritten(t *testing.T) {
 	brand.Palette = basic
 	require.NoError(t, database.CreateBrand(ctx, nil, &brand))
 
-	stored, err := database.GetBrandById(ctx, nil, brand.Id)
+	stored, err := database.GetBrandByID(ctx, nil, brand.ID)
 	require.NoError(t, err)
 	require.NotNil(t, stored)
 	assert.Equal(t, "custom", stored.Theme)
@@ -67,7 +67,7 @@ func TestBrand_APaletteReadsBackWhatWasWritten(t *testing.T) {
 	require.NoError(t, err)
 	var listed *record.Brand
 	for i := range all {
-		if all[i].Id == brand.Id {
+		if all[i].ID == brand.ID {
 			listed = &all[i]
 		}
 	}
@@ -85,7 +85,7 @@ func TestBrand_APaletteReadsBackWhatWasWritten(t *testing.T) {
 	edit.Palette = &record.BrandPalette{Mode: record.BrandPaletteModeAdvanced, Light: light, Dark: dark}
 	require.NoError(t, database.UpdateBrand(ctx, nil, &edit))
 
-	updated, err := database.GetBrandById(ctx, nil, brand.Id)
+	updated, err := database.GetBrandByID(ctx, nil, brand.ID)
 	require.NoError(t, err)
 	require.NotNil(t, updated)
 	wantLight := lightColors()
@@ -99,7 +99,7 @@ func TestBrand_APaletteReadsBackWhatWasWritten(t *testing.T) {
 	edit.Theme = "plum"
 	edit.Palette = nil
 	require.NoError(t, database.UpdateBrand(ctx, nil, &edit))
-	cleared, err := database.GetBrandById(ctx, nil, brand.Id)
+	cleared, err := database.GetBrandByID(ctx, nil, brand.ID)
 	require.NoError(t, err)
 	require.NotNil(t, cleared)
 	assert.Nil(t, cleared.Palette, "a brand saved with no palette reads with none")
@@ -125,7 +125,7 @@ func TestBrand_TheDefaultAndAClientsPageBrandReadThePalette(t *testing.T) {
 	drawnIn, err := h.DB.GetClientPageBrand(ctx, nil, following.ClientIdentifier)
 	require.NoError(t, err)
 	require.NotNil(t, drawnIn)
-	assert.Equal(t, def.Id, drawnIn.Id)
+	assert.Equal(t, def.ID, drawnIn.ID)
 	assert.Equal(t, &record.BrandPalette{Mode: "advanced", Light: lightColors(), Dark: darkColors()}, drawnIn.Palette)
 
 	// A client given a brand of its own reads that brand's palette.
@@ -133,11 +133,11 @@ func TestBrand_TheDefaultAndAClientsPageBrandReadThePalette(t *testing.T) {
 	own.Palette = &record.BrandPalette{Mode: record.BrandPaletteModeBasic, Light: darkColors(), Dark: lightColors()}
 	require.NoError(t, h.DB.CreateBrand(ctx, nil, &own))
 	given := createIsolatedClient(t, h)
-	setBrand(t, h, given.Id, brandId(own.Id))
+	setBrand(t, h, given.ID, brandID(own.ID))
 	drawnIn, err = h.DB.GetClientPageBrand(ctx, nil, given.ClientIdentifier)
 	require.NoError(t, err)
 	require.NotNil(t, drawnIn)
-	assert.Equal(t, own.Id, drawnIn.Id)
+	assert.Equal(t, own.ID, drawnIn.ID)
 	assert.Equal(t, &record.BrandPalette{Mode: "basic", Light: darkColors(), Dark: lightColors()}, drawnIn.Palette)
 }
 
@@ -156,7 +156,7 @@ func TestBrand_NoPaletteIsStoredAsNull(t *testing.T) {
 		t.Helper()
 		var nulls int
 		require.NoError(t, h.SQL.QueryRow(fmt.Sprintf(
-			"SELECT COUNT(*) FROM brands WHERE id = %d AND palette IS NULL", brand.Id)).Scan(&nulls))
+			"SELECT COUNT(*) FROM brands WHERE id = %d AND palette IS NULL", brand.ID)).Scan(&nulls))
 		assert.Equalf(t, 1, nulls, "[%s] a brand with no palette stores NULL on %s", phase, dbType())
 	}
 	isNull("create")
@@ -165,7 +165,7 @@ func TestBrand_NoPaletteIsStoredAsNull(t *testing.T) {
 	brand.Palette = &record.BrandPalette{Mode: record.BrandPaletteModeBasic, Light: lightColors(), Dark: darkColors()}
 	require.NoError(t, h.DB.UpdateBrand(ctx, nil, &brand))
 	var stored string
-	require.NoError(t, h.SQL.QueryRow(fmt.Sprintf("SELECT palette FROM brands WHERE id = %d", brand.Id)).Scan(&stored))
+	require.NoError(t, h.SQL.QueryRow(fmt.Sprintf("SELECT palette FROM brands WHERE id = %d", brand.ID)).Scan(&stored))
 	var asJSON map[string]any
 	require.NoErrorf(t, json.Unmarshal([]byte(stored), &asJSON), "the stored palette is JSON text on %s", dbType())
 	assert.Equal(t, "basic", asJSON["mode"])
@@ -198,7 +198,7 @@ func TestBrand_APaletteThatIsNotCompleteOrNotColorsIsNotWritten(t *testing.T) {
 		require.NoError(t, database.CreateBrand(ctx, nil, &valid))
 		valid.Palette = palette
 		require.Errorf(t, database.UpdateBrand(ctx, nil, &valid), "%s is refused on update on %s", name, dbType())
-		stored, err := database.GetBrandById(ctx, nil, valid.Id)
+		stored, err := database.GetBrandByID(ctx, nil, valid.ID)
 		require.NoError(t, err)
 		require.NotNil(t, stored)
 		assert.Nilf(t, stored.Palette, "%s: the brand keeps no palette on %s", name, dbType())
@@ -234,7 +234,7 @@ func withColor(mode map[string]string, token string, value any) map[string]any {
 func TestBrand_AStoredPaletteThatDoesNotParseReadsAsNone(t *testing.T) {
 	ctx := context.Background()
 	h, def := brandsIsolatedDB(t)
-	_, setupErr := h.SQL.Exec(fmt.Sprintf("UPDATE brands SET theme = 'custom', support_email = 'help@example.com' WHERE id = %d", def.Id))
+	_, setupErr := h.SQL.Exec(fmt.Sprintf("UPDATE brands SET theme = 'custom', support_email = 'help@example.com' WHERE id = %d", def.ID))
 	require.NoError(t, setupErr)
 
 	light, dark := lightColors(), darkColors()
@@ -273,17 +273,17 @@ func TestBrand_AStoredPaletteThatDoesNotParseReadsAsNone(t *testing.T) {
 		"an empty value":              storedPalette(t, whole("advanced", withColor(light, "on-brand", ""), dark)),
 		"a value with a CSS fragment": storedPalette(t, whole("advanced", withColor(light, "brand", "#000000;}body{"), dark)),
 	} {
-		_, err := h.SQL.Exec(fmt.Sprintf("UPDATE brands SET palette = '%s' WHERE id = %d", stored, def.Id))
+		_, err := h.SQL.Exec(fmt.Sprintf("UPDATE brands SET palette = '%s' WHERE id = %d", stored, def.ID))
 		require.NoErrorf(t, err, "%s: store %q on %s", name, stored, dbType())
 
 		capture := logtest.CaptureSlog(t)
 
-		byId, err := h.DB.GetBrandById(ctx, nil, def.Id)
+		byID, err := h.DB.GetBrandByID(ctx, nil, def.ID)
 		require.NoErrorf(t, err, "%s: the brand is still read on %s", name, dbType())
-		require.NotNil(t, byId)
-		assert.Nilf(t, byId.Palette, "%s reads as no palette on %s", name, dbType())
-		assert.Equalf(t, "help@example.com", byId.SupportEmail, "%s: the rest of the brand is read on %s", name, dbType())
-		assert.Equal(t, "custom", byId.Theme, "the theme is read as stored")
+		require.NotNil(t, byID)
+		assert.Nilf(t, byID.Palette, "%s reads as no palette on %s", name, dbType())
+		assert.Equalf(t, "help@example.com", byID.SupportEmail, "%s: the rest of the brand is read on %s", name, dbType())
+		assert.Equal(t, "custom", byID.Theme, "the theme is read as stored")
 
 		byDefault, err := h.DB.GetDefaultBrand(ctx, nil)
 		require.NoErrorf(t, err, "%s: the default brand is still read on %s", name, dbType())
@@ -304,27 +304,27 @@ func TestBrand_AStoredPaletteThatDoesNotParseReadsAsNone(t *testing.T) {
 		require.Lenf(t, logged, 3, "%s: each of the three reads logs it on %s", name, dbType())
 		for _, r := range logged {
 			assert.Equal(t, slog.LevelWarn, r.Level)
-			assert.Equal(t, def.Id, r.Attrs["brand_id"], "the record names the brand")
+			assert.Equal(t, def.ID, r.Attrs["brand_id"], "the record names the brand")
 			assert.NotEmpty(t, r.Attrs["error"], "the record carries why")
 		}
 	}
 
 	// A complete palette reads as itself again, and logs nothing; so does NULL, as no palette.
 	_, err := h.SQL.Exec(fmt.Sprintf("UPDATE brands SET palette = '%s' WHERE id = %d",
-		storedPalette(t, whole("basic", light, dark)), def.Id))
+		storedPalette(t, whole("basic", light, dark)), def.ID))
 	require.NoError(t, err)
 	capture := logtest.CaptureSlog(t)
-	byId, err := h.DB.GetBrandById(ctx, nil, def.Id)
+	byID, err := h.DB.GetBrandByID(ctx, nil, def.ID)
 	require.NoError(t, err)
-	require.NotNil(t, byId)
-	assert.Equal(t, &record.BrandPalette{Mode: "basic", Light: lightColors(), Dark: darkColors()}, byId.Palette)
+	require.NotNil(t, byID)
+	assert.Equal(t, &record.BrandPalette{Mode: "basic", Light: lightColors(), Dark: darkColors()}, byID.Palette)
 
-	_, err = h.SQL.Exec(fmt.Sprintf("UPDATE brands SET palette = NULL WHERE id = %d", def.Id))
+	_, err = h.SQL.Exec(fmt.Sprintf("UPDATE brands SET palette = NULL WHERE id = %d", def.ID))
 	require.NoError(t, err)
-	byId, err = h.DB.GetBrandById(ctx, nil, def.Id)
+	byID, err = h.DB.GetBrandByID(ctx, nil, def.ID)
 	require.NoError(t, err)
-	require.NotNil(t, byId)
-	assert.Nil(t, byId.Palette)
+	require.NotNil(t, byID)
+	assert.Nil(t, byID.Palette)
 	for _, r := range capture.Records() {
 		assert.NotEqual(t, paletteUnparsedMessage, r.Message)
 	}

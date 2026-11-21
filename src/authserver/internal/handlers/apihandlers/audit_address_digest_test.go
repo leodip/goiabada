@@ -45,7 +45,7 @@ func captureAuditDetails(auditLogger *handlersmocks.AuditLogger, event string) *
 	return &details
 }
 
-func TestHandleUserCreatePost_AuditsTheCreatedUsersIdAndAddressDigest(t *testing.T) {
+func TestHandleUserCreatePost_AuditsTheCreatedUsersIDAndAddressDigest(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	userCreator := accounthandlersmocks.NewUserCreator(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
@@ -69,7 +69,7 @@ func TestHandleUserCreatePost_AuditsTheCreatedUsersIdAndAddressDigest(t *testing
 
 	database.On("GetUserByEmail", mock.Anything, mock.Anything, "newuser@example.com").Return(nil, nil).Once()
 	userCreator.On("CreateUser", mock.Anything, mock.Anything).
-		Return(&record.User{Id: 41, Email: "newuser@example.com"}, nil).Once()
+		Return(&record.User{ID: 41, Email: "newuser@example.com"}, nil).Once()
 	details := captureAuditDetails(auditLogger, audit.EventCreatedUser)
 
 	rr := httptest.NewRecorder()
@@ -87,7 +87,7 @@ func TestHandleUserEmailVerificationCodePost_AuditsTheAddressDigest(t *testing.T
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 	expectCodeGenRead(database)
-	database.On("TryIssueEmailVerificationCode", mock.Anything, mock.Anything, codeGenUserId, codeGenAddress,
+	database.On("TryIssueEmailVerificationCode", mock.Anything, mock.Anything, codeGenUserID, codeGenAddress,
 		mock.Anything, mock.Anything).Return(true, nil).Once()
 	details := captureAuditDetails(auditLogger, audit.EventGeneratedEmailVerificationCode)
 
@@ -96,7 +96,7 @@ func TestHandleUserEmailVerificationCodePost_AuditsTheAddressDigest(t *testing.T
 
 	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 	assert.Equal(t, map[string]interface{}{
-		"user_id":        codeGenUserId,
+		"user_id":        codeGenUserID,
 		"email_digest":   lowercaseAddressDigest("read@example.com"),
 		"logged_in_user": adminSubject,
 	}, *details)
@@ -108,7 +108,7 @@ func TestHandleAccountEmailVerificationSendPost_AuditsTheAddressDigest(t *testin
 	emailSender := accounthandlersmocks.NewEmailSender(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
-	user := &record.User{Id: 7, Subject: verificationSubject, Email: "someone@example.com"}
+	user := &record.User{ID: 7, Subject: verificationSubject, Email: "someone@example.com"}
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), verificationSubject).Return(user, nil).Once()
 	database.On("TryStoreEmailVerificationCode", mock.Anything, (*sql.Tx)(nil), int64(7), "someone@example.com",
 		mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Once()

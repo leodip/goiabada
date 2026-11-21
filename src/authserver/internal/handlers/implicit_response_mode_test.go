@@ -38,7 +38,7 @@ func implicitTokenResponse() *issuance.ImplicitGrantResponse {
 		AccessToken: "access-token-123",
 		TokenType:   "Bearer",
 		ExpiresIn:   3600,
-		IdToken:     "id-token-123",
+		IDToken:     "id-token-123",
 		Scope:       "openid profile",
 	}
 }
@@ -74,7 +74,7 @@ func TestIssueImplicitTokens_FormPost(t *testing.T) {
 	// so a template that fails to render a field cannot pass a row asserting its absence elsewhere.
 	t.Run("every token parameter is a hidden input, and nothing is redirected", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := withSessionSettings(httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil))
+		r := withSessionSettings(httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil))
 
 		err := issueImplicitTokens(w, r, newFormPostTemplate(web.TemplateFS(), nil), "form_post", "https://example.com/callback",
 			"client-csrf-token", implicitTokenResponse())
@@ -100,7 +100,7 @@ func TestIssueImplicitTokens_FormPost(t *testing.T) {
 	// left to writeFormPost's own tests.
 	t.Run("the page is not to be stored", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := withSessionSettings(httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil))
+		r := withSessionSettings(httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil))
 
 		err := issueImplicitTokens(w, r, newFormPostTemplate(web.TemplateFS(), nil), "form_post", "https://example.com/callback", "s",
 			implicitTokenResponse())
@@ -126,20 +126,20 @@ func TestIssueImplicitTokens_FormPost(t *testing.T) {
 			},
 			{
 				name:     "id_token",
-				response: &issuance.ImplicitGrantResponse{IdToken: "it", Scope: "openid"},
+				response: &issuance.ImplicitGrantResponse{IDToken: "it", Scope: "openid"},
 				present:  []string{"id_token", "scope"},
 				absent:   []string{"access_token", "token_type", "expires_in"},
 			},
 			{
 				name:     "id_token token",
-				response: &issuance.ImplicitGrantResponse{AccessToken: "at", TokenType: "Bearer", ExpiresIn: 60, IdToken: "it"},
+				response: &issuance.ImplicitGrantResponse{AccessToken: "at", TokenType: "Bearer", ExpiresIn: 60, IDToken: "it"},
 				present:  []string{"access_token", "token_type", "expires_in", "id_token"},
 				absent:   []string{"scope"},
 			},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
 				w := httptest.NewRecorder()
-				r := withSessionSettings(httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil))
+				r := withSessionSettings(httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil))
 
 				err := issueImplicitTokens(w, r, newFormPostTemplate(web.TemplateFS(), nil), "form_post", "https://example.com/callback", "s", tc.response)
 
@@ -174,7 +174,7 @@ func TestIssueImplicitTokens_FormPost(t *testing.T) {
 		} {
 			t.Run(tc.name, func(t *testing.T) {
 				w := httptest.NewRecorder()
-				r := withSessionSettings(httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil))
+				r := withSessionSettings(httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil))
 				templateFS := fstest.MapFS{"form_post.html": {Data: []byte(keysTemplate)}}
 
 				err := issueImplicitTokens(w, r, newFormPostTemplate(templateFS, nil), "form_post", "https://example.com/callback",
@@ -188,7 +188,7 @@ func TestIssueImplicitTokens_FormPost(t *testing.T) {
 
 	t.Run("the real template omits an absent state and echoes a whitespace-only one", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := withSessionSettings(httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil))
+		r := withSessionSettings(httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil))
 		err := issueImplicitTokens(w, r, newFormPostTemplate(web.TemplateFS(), nil), "form_post", "https://example.com/callback", "",
 			implicitTokenResponse())
 		require.NoError(t, err)
@@ -206,7 +206,7 @@ func TestIssueImplicitTokens_FormPost(t *testing.T) {
 	// open an element of its own on a page that holds the tokens.
 	t.Run("a state that is markup is escaped in the attribute", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := withSessionSettings(httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil))
+		r := withSessionSettings(httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil))
 
 		err := issueImplicitTokens(w, r, newFormPostTemplate(web.TemplateFS(), nil), "form_post", "https://example.com/callback",
 			`"><script>alert(1)</script>`, implicitTokenResponse())
@@ -234,7 +234,7 @@ func TestIssueImplicitTokens_FormPost(t *testing.T) {
 		} {
 			t.Run(redirectURI, func(t *testing.T) {
 				w := httptest.NewRecorder()
-				r := withSessionSettings(httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil))
+				r := withSessionSettings(httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil))
 
 				err := issueImplicitTokens(w, r, newFormPostTemplate(web.TemplateFS(), nil), "form_post", redirectURI, "s", implicitTokenResponse())
 
@@ -250,7 +250,7 @@ func TestIssueImplicitTokens_FormPost(t *testing.T) {
 	// 500 is the only answer and no partial page carrying a token is committed (#141).
 	t.Run("a template that cannot render leaves the response uncommitted", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := withSessionSettings(httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil))
+		r := withSessionSettings(httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil))
 
 		err := issueImplicitTokens(w, r, newFormPostTemplate(fstest.MapFS{}, nil), "form_post", "https://example.com/callback", "s",
 			implicitTokenResponse())
@@ -269,7 +269,7 @@ func TestIssueImplicitTokens_FragmentIsTheDefault(t *testing.T) {
 	for _, mode := range []string{"", "fragment", "query", "jwt"} {
 		t.Run("response_mode="+mode, func(t *testing.T) {
 			w := httptest.NewRecorder()
-			r := withSessionSettings(httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil))
+			r := withSessionSettings(httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil))
 
 			err := issueImplicitTokens(w, r, formPostTemplate{}, mode, "https://example.com/callback", "test-state",
 				implicitTokenResponse())
@@ -315,33 +315,33 @@ func TestHandleIssueGet_ImplicitFlow_FormPost(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	authContext := &ceremony.AuthContext{
-		CeremonyId:      testCeremonyId,
+		CeremonyID:      testCeremonyID,
 		AuthState:       ceremony.AuthStateReadyToIssueCode,
-		ClientId:        "test-client",
-		UserId:          123,
+		ClientID:        "test-client",
+		UserID:          123,
 		ResponseMode:    "form_post",
 		ResponseType:    "id_token token",
 		RedirectURI:     "https://example.com/callback",
 		Scope:           "openid",
 		State:           "test-state",
 		Nonce:           "test-nonce",
-		AcrLevel:        "urn:goiabada:pwd",
+		ACRLevel:        "urn:goiabada:pwd",
 		AuthMethods:     "pwd",
 		AuthenticatedAt: &testIssueAuthTime,
 	}
 	ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
-		Return(&record.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}, nil)
-	database.On("GetUserById", mock.Anything, mock.Anything, int64(123)).
-		Return(&record.User{Id: 123, Subject: "11111111-1111-1111-1111-111111111111", Enabled: true}, nil)
+		Return(&record.Client{ID: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}, nil)
+	database.On("GetUserByID", mock.Anything, mock.Anything, int64(123)).
+		Return(&record.User{ID: 123, Subject: "11111111-1111-1111-1111-111111111111", Enabled: true}, nil)
 
 	implicitTokenIssuer.On("IssueImplicitTx", mock.Anything, mock.Anything, mock.Anything, true, true).
 		Return(implicitTokenResponse(), nil)
 	auditLogger.On("Log", mock.Anything, audit.EventTokenIssuedImplicitResponse, mock.Anything).Return()
 
 	// The context is cleared, and only then does the response go out.
-	ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)
+	ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyID).Return(nil)
 
 	stubLiveSession(database, 123)
 	armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)

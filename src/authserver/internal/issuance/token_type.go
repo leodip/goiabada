@@ -14,7 +14,7 @@ import (
 type TokenType int
 
 const (
-	TokenTypeId TokenType = iota
+	TokenTypeID TokenType = iota
 	TokenTypeBearer
 	// TokenTypeRefresh is a session-bound refresh token, valid while its browser session is.
 	TokenTypeRefresh
@@ -27,7 +27,7 @@ const (
 // value is one of the four constants -- but the guard goes on the type so the next caller cannot
 // step on it (#385).
 func (tt TokenType) String() string {
-	if tt < TokenTypeId || tt > TokenTypeOffline {
+	if tt < TokenTypeID || tt > TokenTypeOffline {
 		return ""
 	}
 	return []string{"ID", "Bearer", "Refresh", "Offline"}[tt]
@@ -85,7 +85,7 @@ func ResponseTokenType(dpopThumbprint string) string {
 // as finishAccessToken writes it (RFC 9449 section 6.1), or "" for a bearer token: one with no cnf,
 // or whose cnf holds no jkt string. The token is one the auth server signed, so its cnf is always
 // the object finishAccessToken wrote, when it has one.
-func AccessTokenThumbprint(token oauth.JwtToken) string {
+func AccessTokenThumbprint(token oauth.JWTToken) string {
 	cnf, _ := token.Claims["cnf"].(map[string]interface{})
 	jkt, _ := cnf["jkt"].(string)
 	return jkt

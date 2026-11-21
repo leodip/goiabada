@@ -179,19 +179,19 @@ func TestTokenDPoP_AValidProofBindsTheAccessTokenOnEveryGrant(t *testing.T) {
 	}{
 		{"authorization_code", "grant_type=authorization_code&code=c&redirect_uri=https://app.example.com/cb&client_id=test_client&code_verifier=v",
 			func(e *dpopTokenEndpoint) {
-				code := &record.Code{Id: 1}
+				code := &record.Code{ID: 1}
 				e.validates(&protocolvalidation.AuthorizationCodeGrant{Code: code})
 				e.issuer.On("IssueAuthorizationCodeGrant", mock.Anything, mock.Anything, code, key.Thumbprint).Return(bound, nil).Once()
 			}},
 		{"client_credentials", clientCredentialsForm,
 			func(e *dpopTokenEndpoint) {
-				client := &record.Client{Id: 1}
+				client := &record.Client{ID: 1}
 				e.validates(&protocolvalidation.ClientCredentialsGrant{Client: client, Scope: "r:p"})
 				e.issuer.On("IssueClientCredentialsGrant", mock.Anything, mock.Anything, client, "r:p", key.Thumbprint).Return(bound, nil).Once()
 			}},
 		{"password", "grant_type=password&client_id=test_client&username=u&password=p&scope=openid",
 			func(e *dpopTokenEndpoint) {
-				e.validates(&protocolvalidation.PasswordGrant{Client: &record.Client{Id: 1}, User: &record.User{Id: 42}, Scope: "openid"})
+				e.validates(&protocolvalidation.PasswordGrant{Client: &record.Client{ID: 1}, User: &record.User{ID: 42}, Scope: "openid"})
 				e.issuer.On("IssuePasswordGrant", mock.Anything, mock.Anything, mock.MatchedBy(func(in *issuance.ROPCGrantInput) bool {
 					return in.DPoPThumbprint == key.Thumbprint
 				})).Return(bound, nil).Once()
@@ -236,7 +236,7 @@ func (e *dpopTokenEndpoint) validates(grant protocolvalidation.TokenGrant) {
 // carries no nonce.
 func TestTokenDPoP_ARequestWithoutAProofIsAnsweredAsBefore(t *testing.T) {
 	e := newDPoPTokenEndpoint(t, dpopPublicBaseURL, dpopSessionKey)
-	client := &record.Client{Id: 1}
+	client := &record.Client{ID: 1}
 	// No proof, so nothing is recorded: the database double fails a call nobody expected.
 	e.validator.On("ValidateTokenRequest", mock.Anything, mock.Anything, mock.Anything).
 		Return(&protocolvalidation.ClientCredentialsGrant{Client: client, Scope: "r:p"}, nil).Once()
@@ -328,7 +328,7 @@ func TestTokenDPoP_NoncesAcrossInstances(t *testing.T) {
 
 	accepted := func(t *testing.T, e *dpopTokenEndpoint) {
 		t.Helper()
-		client := &record.Client{Id: 1}
+		client := &record.Client{ID: 1}
 		e.validates(&protocolvalidation.ClientCredentialsGrant{Client: client, Scope: "r:p"})
 		e.issuer.On("IssueClientCredentialsGrant", mock.Anything, mock.Anything, client, "r:p", key.Thumbprint).
 			Return(&oauth.TokenResponse{AccessToken: "a", TokenType: "DPoP"}, nil).Once()
@@ -368,7 +368,7 @@ func TestTokenDPoP_FreshnessComesFromTheNonce(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			e := newDPoPTokenEndpoint(t, dpopPublicBaseURL, dpopSessionKey)
 			nonce := e.freshNonce(t)
-			client := &record.Client{Id: 1}
+			client := &record.Client{ID: 1}
 			e.validates(&protocolvalidation.ClientCredentialsGrant{Client: client, Scope: "r:p"})
 			e.issuer.On("IssueClientCredentialsGrant", mock.Anything, mock.Anything, client, "r:p", key.Thumbprint).
 				Return(&oauth.TokenResponse{AccessToken: "a", TokenType: "DPoP"}, nil).Once()
@@ -394,7 +394,7 @@ func TestTokenDPoP_ABaseURLWithAPath(t *testing.T) {
 		assertTokenError(t, rr, "use_dpop_nonce", "Authorization server requires nonce in DPoP proof.")
 		nonce := rr.Header().Get("DPoP-Nonce")
 
-		client := &record.Client{Id: 1}
+		client := &record.Client{ID: 1}
 		e.validates(&protocolvalidation.ClientCredentialsGrant{Client: client, Scope: "r:p"})
 		e.issuer.On("IssueClientCredentialsGrant", mock.Anything, mock.Anything, client, "r:p", key.Thumbprint).
 			Return(&oauth.TokenResponse{AccessToken: "a", TokenType: "DPoP"}, nil).Once()
@@ -493,7 +493,7 @@ func TestTokenDPoP_HTUNamesThePathTheClientSent(t *testing.T) {
 		e.handler = httpmw.StripTrailingSlash(e.handler).ServeHTTP
 		nonce := e.post(t, "/auth/token/", clientCredentialsForm, key.Proof(t, "POST", dpopTokenHTU+"/", e.now, "")).
 			Header().Get("DPoP-Nonce")
-		client := &record.Client{Id: 1}
+		client := &record.Client{ID: 1}
 		e.validates(&protocolvalidation.ClientCredentialsGrant{Client: client, Scope: "r:p"})
 		e.issuer.On("IssueClientCredentialsGrant", mock.Anything, mock.Anything, client, "r:p", key.Thumbprint).
 			Return(&oauth.TokenResponse{AccessToken: "a", TokenType: "DPoP"}, nil).Once()

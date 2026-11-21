@@ -59,7 +59,7 @@ func armEveryStep(mockDB *datamocks.Database) {
 	mockDB.On("DeleteCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteDeadPreRegistrations", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 	mockDB.On("DeleteUnattachedBrandAssets", mock.Anything, mock.Anything, mock.Anything).Return(0, nil).Maybe()
-	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(&record.Settings{
+	mockDB.On("GetSettingsByID", mock.Anything, mock.Anything, int64(1)).Return(&record.Settings{
 		UserSessionIdleTimeoutInSeconds: 3600,
 		UserSessionMaxLifetimeInSeconds: 86400,
 		AuditLogRetentionDays:           30,
@@ -133,11 +133,11 @@ func TestWorker_PerformTask_ARunWithAFailedStepIsCountedFailed(t *testing.T) {
 				Return(0, errors.New("delete failed")).Once()
 		}, true},
 		{"the settings row cannot be read", func(mockDB *datamocks.Database) {
-			mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).
+			mockDB.On("GetSettingsByID", mock.Anything, mock.Anything, int64(1)).
 				Return(nil, errors.New("database is down")).Once()
 		}, false},
 		{"the settings row is absent", func(mockDB *datamocks.Database) {
-			mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(nil, nil).Once()
+			mockDB.On("GetSettingsByID", mock.Anything, mock.Anything, int64(1)).Return(nil, nil).Once()
 		}, false},
 	}
 	for _, test := range tests {

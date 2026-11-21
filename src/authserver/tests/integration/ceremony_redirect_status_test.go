@@ -29,7 +29,7 @@ func TestCeremony_APasswordPostFindingNoCeremonyIs303(t *testing.T) {
 		request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		request.Header.Set("Origin", appConfig.AuthServer.BaseURL)
 
-		resp, err := createHttpClient(t).Do(request)
+		resp, err := createHTTPClient(t).Do(request)
 		require.NoError(t, err)
 		defer func() { _ = resp.Body.Close() }()
 
@@ -38,7 +38,7 @@ func TestCeremony_APasswordPostFindingNoCeremonyIs303(t *testing.T) {
 	})
 
 	t.Run("GET", func(t *testing.T) {
-		resp := loadPage(t, createHttpClient(t), pwdURL)
+		resp := loadPage(t, createHTTPClient(t), pwdURL)
 		defer func() { _ = resp.Body.Close() }()
 
 		assert.Equal(t, http.StatusFound, resp.StatusCode)

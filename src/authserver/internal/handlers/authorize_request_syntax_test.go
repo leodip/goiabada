@@ -40,8 +40,8 @@ func newSyntaxAuthorizeEndpoint(t *testing.T) *authorizeEndpoint {
 
 	implicit := true
 	client := &record.Client{
-		Id: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true,
-		ImplicitGrantEnabled: &implicit, DefaultAcrLevel: record.AcrLevel1,
+		ID: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true,
+		ImplicitGrantEnabled: &implicit, DefaultACRLevel: record.ACRLevel1,
 	}
 	e.database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 	e.database.On("ClientLoadRedirectURIs", mock.Anything, mock.Anything, mock.Anything).
@@ -129,8 +129,8 @@ func TestHandleAuthorizeGet_OfflineAccessIsHonouredOnlyWithACode(t *testing.T) {
 				// unknown: this row shows only that the text is not mistaken for offline_access, and
 				// what the endpoint stores is asserted for the rows above.
 				e.database.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "res").
-					Return(&record.Resource{Id: 1}, nil)
-				e.database.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(1)).
+					Return(&record.Resource{ID: 1}, nil)
+				e.database.On("GetPermissionsByResourceID", mock.Anything, mock.Anything, int64(1)).
 					Return([]record.Permission{{PermissionIdentifier: "offline_access_read"}}, nil)
 				tc.want = "openid res:offline_access_read"
 			}

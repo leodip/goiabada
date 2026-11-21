@@ -34,10 +34,10 @@ var ErrKeySetIncomplete = errors.New("expected current and next signing keys to 
 // apihandlers and its own port has to name this capability to hand it on (#386 decision 8).
 type RotationDatabase interface {
 	CreateKeyPair(ctx context.Context, tx *sql.Tx, keyPair *record.KeyPair) error
-	DeleteKeyPair(ctx context.Context, tx *sql.Tx, keyPairId int64) error
+	DeleteKeyPair(ctx context.Context, tx *sql.Tx, keyPairID int64) error
 	GetAllSigningKeys(ctx context.Context, tx *sql.Tx) ([]record.KeyPair, error)
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
-	UpdateKeyPairState(ctx context.Context, tx *sql.Tx, keyPairId int64, fromState string, toState string) (bool, error)
+	UpdateKeyPairState(ctx context.Context, tx *sql.Tx, keyPairID int64, fromState string, toState string) (bool, error)
 }
 
 // Rotator performs the current -> previous -> deleted transition of the signing
@@ -132,12 +132,12 @@ func (r *Rotator) Rotate(ctx context.Context) error {
 		// still there would put two rows in the previous state within one statement, which
 		// the unique index on key_pairs (state) refuses on every engine.
 		if previousKey != nil {
-			if deleteKeyPairErr := r.database.DeleteKeyPair(ctx, tx, previousKey.Id); deleteKeyPairErr != nil {
+			if deleteKeyPairErr := r.database.DeleteKeyPair(ctx, tx, previousKey.ID); deleteKeyPairErr != nil {
 				return deleteKeyPairErr
 			}
 		}
 
-		moved, err := r.database.UpdateKeyPairState(ctx, tx, currentKey.Id,
+		moved, err := r.database.UpdateKeyPairState(ctx, tx, currentKey.ID,
 			record.KeyStateCurrent.String(), record.KeyStatePrevious.String())
 		if err != nil {
 			return err
@@ -146,7 +146,7 @@ func (r *Rotator) Rotate(ctx context.Context) error {
 			return errs.WithStack(ErrRotationInProgress)
 		}
 
-		moved, err = r.database.UpdateKeyPairState(ctx, tx, nextKey.Id,
+		moved, err = r.database.UpdateKeyPairState(ctx, tx, nextKey.ID,
 			record.KeyStateNext.String(), record.KeyStateCurrent.String())
 		if err != nil {
 			return err

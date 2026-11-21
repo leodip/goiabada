@@ -26,7 +26,7 @@ func TestMissingSettings_IssueAnswersBeforeReadingItsCeremony(t *testing.T) {
 	codeIssuer := handlersmocks.NewCodeIssuer(t)
 	implicitIssuer := handlersmocks.NewImplicitTokenIssuer(t)
 
-	req := httptest.NewRequest(http.MethodGet, "/auth/issue?ceremony="+testCeremonyId, nil)
+	req := httptest.NewRequest(http.MethodGet, "/auth/issue?ceremony="+testCeremonyID, nil)
 	rr := httptest.NewRecorder()
 	pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(isErrNoSettings)).Return().Once()
 
@@ -60,10 +60,10 @@ func TestHandleIssueGet_TheImplicitTokensCarryTheCeremonysAuthTime(t *testing.T)
 	var handed *issuance.ImplicitGrantInput
 	f.implicitIssuer.On("IssueImplicitTx", mock.Anything, theseSettings(f.settings), mock.Anything, true, true).
 		Run(func(args mock.Arguments) { handed = args.Get(2).(*issuance.ImplicitGrantInput) }).
-		Return(&issuance.ImplicitGrantResponse{AccessToken: "the-token", IdToken: "the-id-token", TokenType: "Bearer",
+		Return(&issuance.ImplicitGrantResponse{AccessToken: "the-token", IDToken: "the-id-token", TokenType: "Bearer",
 			ExpiresIn: 60, Scope: "openid"}, nil).Once()
 	f.auditLogger.On("Log", mock.Anything, audit.EventTokenIssuedImplicitResponse, mock.Anything).Return().Once()
-	f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).Return(nil).Once()
+	f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyID).Return(nil).Once()
 
 	f.serve()
 
@@ -110,9 +110,9 @@ func TestHandleIssueGet_AnAnswerThatCannotBeWrittenIs500(t *testing.T) {
 
 		var order []string
 		f.codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.Anything).
-			Return(&record.Code{Id: 1, Code: "the-code", ClientId: 1, RedirectURI: f.authContext.RedirectURI}, nil).Once()
+			Return(&record.Code{ID: 1, Code: "the-code", ClientID: 1, RedirectURI: f.authContext.RedirectURI}, nil).Once()
 		f.auditLogger.On("Log", mock.Anything, audit.EventCreatedAuthCode, mock.Anything).Return().Once()
-		f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).
+		f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyID).
 			Run(func(mock.Arguments) { order = append(order, "clear") }).Return(nil).Once()
 		f.pageRenderer.On("InternalServerError", f.rr, f.req, mock.Anything).
 			Run(func(mock.Arguments) { order = append(order, "500") }).Return().Once()
@@ -131,10 +131,10 @@ func TestHandleIssueGet_AnAnswerThatCannotBeWrittenIs500(t *testing.T) {
 
 		var order []string
 		f.implicitIssuer.On("IssueImplicitTx", mock.Anything, theseSettings(f.settings), mock.Anything, true, true).
-			Return(&issuance.ImplicitGrantResponse{AccessToken: "the-token", IdToken: "the-id-token", TokenType: "Bearer",
+			Return(&issuance.ImplicitGrantResponse{AccessToken: "the-token", IDToken: "the-id-token", TokenType: "Bearer",
 				ExpiresIn: 60, Scope: "openid"}, nil).Once()
 		f.auditLogger.On("Log", mock.Anything, audit.EventTokenIssuedImplicitResponse, mock.Anything).Return().Once()
-		f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).
+		f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyID).
 			Run(func(mock.Arguments) { order = append(order, "clear") }).Return(nil).Once()
 		f.pageRenderer.On("InternalServerError", f.rr, f.req, mock.Anything).
 			Run(func(mock.Arguments) { order = append(order, "500") }).Return().Once()

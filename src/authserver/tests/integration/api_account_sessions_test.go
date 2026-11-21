@@ -33,18 +33,18 @@ func TestAPIAccountSessionsGet_Success_IncludesIsCurrent(t *testing.T) {
 	}
 	err := database.CreateClient(context.Background(), nil, testClient)
 	require.NoError(t, err)
-	defer func() { _ = database.DeleteClient(context.Background(), nil, testClient.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, testClient.ID) }()
 
-	s1 := createTestUserSession(t, user.Id, fake.UUID())
-	s2 := createTestUserSession(t, user.Id, fake.UUID())
+	s1 := createTestUserSession(t, user.ID, fake.UUID())
+	s2 := createTestUserSession(t, user.ID, fake.UUID())
 	defer func() {
-		_ = database.DeleteUserSession(context.Background(), nil, s1.Id)
-		_ = database.DeleteUserSession(context.Background(), nil, s2.Id)
+		_ = database.DeleteUserSession(context.Background(), nil, s1.ID)
+		_ = database.DeleteUserSession(context.Background(), nil, s2.ID)
 	}()
 
 	now := time.Now().UTC()
-	_ = database.CreateUserSessionClient(context.Background(), nil, &record.UserSessionClient{UserSessionId: s1.Id, ClientId: testClient.Id, Started: now.Add(-time.Hour), LastAccessed: now.Add(-5 * time.Minute)})
-	_ = database.CreateUserSessionClient(context.Background(), nil, &record.UserSessionClient{UserSessionId: s2.Id, ClientId: testClient.Id, Started: now.Add(-time.Hour), LastAccessed: now.Add(-5 * time.Minute)})
+	_ = database.CreateUserSessionClient(context.Background(), nil, &record.UserSessionClient{UserSessionID: s1.ID, ClientID: testClient.ID, Started: now.Add(-time.Hour), LastAccessed: now.Add(-5 * time.Minute)})
+	_ = database.CreateUserSessionClient(context.Background(), nil, &record.UserSessionClient{UserSessionID: s2.ID, ClientID: testClient.ID, Started: now.Add(-time.Hour), LastAccessed: now.Add(-5 * time.Minute)})
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/sessions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
@@ -60,7 +60,7 @@ func TestAPIAccountSessionsGet_Success_IncludesIsCurrent(t *testing.T) {
 
 	foundCurrent := false
 	for _, s := range out.Sessions {
-		assert.Positive(t, s.Id)
+		assert.Positive(t, s.ID)
 		assert.NotEmpty(t, s.SessionIdentifier)
 		require.NotNil(t, s.Started)
 		require.NotNil(t, s.LastAccessed)
@@ -94,36 +94,36 @@ func TestAPIAccountSessionsGet_OnlyValidSessions(t *testing.T) {
 		Started:           time.Now().UTC().Add(-30 * time.Minute),
 		LastAccessed:      time.Now().UTC().Add(-5 * time.Minute),
 		AuthMethods:       "pwd",
-		AcrLevel:          "urn:goiabada:pwd",
+		ACRLevel:          "urn:goiabada:pwd",
 		AuthTime:          time.Now().UTC().Add(-30 * time.Minute),
 		PasswordAuthTime:  time.Now().UTC().Add(-30 * time.Minute),
-		IpAddress:         "192.168.1.100",
+		IPAddress:         "192.168.1.100",
 		DeviceName:        "Valid Account Session",
 		DeviceType:        "computer",
 		DeviceOS:          "linux",
-		UserId:            user.Id,
+		UserID:            user.ID,
 	}
 	err := database.CreateUserSession(context.Background(), nil, valid)
 	require.NoError(t, err)
-	defer func() { _ = database.DeleteUserSession(context.Background(), nil, valid.Id) }()
+	defer func() { _ = database.DeleteUserSession(context.Background(), nil, valid.ID) }()
 
 	expired := &record.UserSession{
 		SessionIdentifier: fake.UUID(),
 		Started:           time.Now().UTC().Add(-25 * time.Hour),
 		LastAccessed:      time.Now().UTC().Add(-24 * time.Hour),
 		AuthMethods:       "pwd",
-		AcrLevel:          "urn:goiabada:pwd",
+		ACRLevel:          "urn:goiabada:pwd",
 		AuthTime:          time.Now().UTC().Add(-25 * time.Hour),
 		PasswordAuthTime:  time.Now().UTC().Add(-25 * time.Hour),
-		IpAddress:         "192.168.1.100",
+		IPAddress:         "192.168.1.100",
 		DeviceName:        "Expired Account Session",
 		DeviceType:        "computer",
 		DeviceOS:          "linux",
-		UserId:            user.Id,
+		UserID:            user.ID,
 	}
 	err = database.CreateUserSession(context.Background(), nil, expired)
 	require.NoError(t, err)
-	defer func() { _ = database.DeleteUserSession(context.Background(), nil, expired.Id) }()
+	defer func() { _ = database.DeleteUserSession(context.Background(), nil, expired.ID) }()
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/sessions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
@@ -144,9 +144,9 @@ func TestAPIAccountSessionsGet_OnlyValidSessions(t *testing.T) {
 func TestAPIAccountSessionDelete_Success(t *testing.T) {
 	accessToken, user := getUserAccessTokenWithAccountScope(t)
 
-	session := createTestUserSession(t, user.Id, fake.UUID())
+	session := createTestUserSession(t, user.ID, fake.UUID())
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/account/sessions/" + strconv.FormatInt(session.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/sessions/" + strconv.FormatInt(session.ID, 10)
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -159,7 +159,7 @@ func TestAPIAccountSessionDelete_Success(t *testing.T) {
 	assert.True(t, out.Success)
 
 	// ensure deleted
-	s, err := database.GetUserSessionById(context.Background(), nil, session.Id)
+	s, err := database.GetUserSessionByID(context.Background(), nil, session.ID)
 	require.NoError(t, err)
 	assert.Nil(t, s)
 }
@@ -171,12 +171,12 @@ func TestAPIAccountSessionDelete_ForbiddenOnOtherUsersSession(t *testing.T) {
 	other := &record.User{Subject: fake.UUID(), Enabled: true, Email: "other-" + fake.UUID()[:8] + "@acctsess.test"}
 	err := database.CreateUser(context.Background(), nil, other)
 	require.NoError(t, err)
-	defer func() { _ = database.DeleteUser(context.Background(), nil, other.Id) }()
+	defer func() { _ = database.DeleteUser(context.Background(), nil, other.ID) }()
 
-	otherSession := createTestUserSession(t, other.Id, fake.UUID())
-	defer func() { _ = database.DeleteUserSession(context.Background(), nil, otherSession.Id) }()
+	otherSession := createTestUserSession(t, other.ID, fake.UUID())
+	defer func() { _ = database.DeleteUserSession(context.Background(), nil, otherSession.ID) }()
 
-	url := appConfig.AuthServer.BaseURL + "/api/v1/account/sessions/" + strconv.FormatInt(otherSession.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/sessions/" + strconv.FormatInt(otherSession.ID, 10)
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -204,7 +204,7 @@ func TestAPIAccountSessionDelete_TerminatesTheOfflineGrantsOfThatSession(t *test
 	require.NoError(t, err)
 	require.NotNil(t, session)
 
-	deleteURL := appConfig.AuthServer.BaseURL + "/api/v1/account/sessions/" + strconv.FormatInt(session.Id, 10)
+	deleteURL := appConfig.AuthServer.BaseURL + "/api/v1/account/sessions/" + strconv.FormatInt(session.ID, 10)
 	resp := makeAPIRequest(t, "DELETE", deleteURL, grant.accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -231,12 +231,12 @@ func TestAPIAccountSessionDelete_ForbiddenDoesNotTerminate(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, session)
 
-	deleteURL := appConfig.AuthServer.BaseURL + "/api/v1/account/sessions/" + strconv.FormatInt(session.Id, 10)
+	deleteURL := appConfig.AuthServer.BaseURL + "/api/v1/account/sessions/" + strconv.FormatInt(session.ID, 10)
 	resp := makeAPIRequest(t, "DELETE", deleteURL, callerToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusForbidden, resp.StatusCode)
 
-	stillThere, err := database.GetUserSessionById(context.Background(), nil, session.Id)
+	stillThere, err := database.GetUserSessionByID(context.Background(), nil, session.ID)
 	require.NoError(t, err)
 	assert.NotNil(t, stillThere, "a refused request must not delete the session")
 
@@ -251,7 +251,7 @@ func TestAPIAccountSessions_UnauthorizedAndScope(t *testing.T) {
 	// No token
 	req, err := http.NewRequest("GET", url, nil)
 	require.NoError(t, err)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -276,12 +276,12 @@ func TestAPIAccountSessions_UnauthorizedAndScope(t *testing.T) {
 	assert.Contains(t, string(body3), "Insufficient scope.")
 }
 
-func TestAPIAccountSessionDelete_UnauthorizedAndInvalidId(t *testing.T) {
+func TestAPIAccountSessionDelete_UnauthorizedAndInvalidID(t *testing.T) {
 	// No token
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/sessions/123"
 	req, err := http.NewRequest("DELETE", url, nil)
 	require.NoError(t, err)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -330,7 +330,7 @@ func TestAPIAccountSessionDelete_AnOwnSessionNoLongerLiveIsNotFound(t *testing.T
 			grant := createOfflineGrant(t)
 			session := killGrantSession(t, grant, dead)
 
-			url := appConfig.AuthServer.BaseURL + "/api/v1/account/sessions/" + strconv.FormatInt(session.Id, 10)
+			url := appConfig.AuthServer.BaseURL + "/api/v1/account/sessions/" + strconv.FormatInt(session.ID, 10)
 			resp := makeAPIRequest(t, "DELETE", url, grant.accessToken, nil)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -356,7 +356,7 @@ func TestAPIAccountSessionDelete_AnotherUsersDeadSessionIsForbidden(t *testing.T
 			victim := createOfflineGrant(t)
 			session := killGrantSession(t, victim, dead)
 
-			url := appConfig.AuthServer.BaseURL + "/api/v1/account/sessions/" + strconv.FormatInt(session.Id, 10)
+			url := appConfig.AuthServer.BaseURL + "/api/v1/account/sessions/" + strconv.FormatInt(session.ID, 10)
 			resp := makeAPIRequest(t, "DELETE", url, callerToken, nil)
 			defer func() { _ = resp.Body.Close() }()
 

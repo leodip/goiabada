@@ -22,7 +22,7 @@ import (
 // Note the schema is at 000058 throughout; only the version marker moves. 000021 is
 // data-only, so the schema it runs against is irrelevant to what it transforms, as long
 // as it still has the columns 000021 writes, and reading the rows back through
-// GetUserById requires columns that later migrations added. The rows themselves are seeded
+// GetUserByID requires columns that later migrations added. The rows themselves are seeded
 // with SQL (seedUser, then an UPDATE for the columns 000021 transforms). 000058 is the last
 // version that has both: 000059 drops the two phone verification code columns 000021
 // clears (#471), which the models no longer name, so those two are seeded and read with SQL.
@@ -41,7 +41,7 @@ func TestMigration000021_CountryData(t *testing.T) {
 	// This used to be a plain Migrate(20). That worked while the pre-000021 schema
 	// and the current schema were identical, but 000024 (#106) added
 	// auth_state_generation to users, so the Go model now references a column that
-	// does not exist at version 20 and the GetUserById reads in assertMigration000021
+	// does not exist at version 20 and the GetUserByID reads in assertMigration000021
 	// fail with "Unknown column". The seeds are SQL (seedUser and the UPDATE in
 	// seedMigrationFixture). Force changes the marker without touching the schema, which
 	// is exactly the trick the idempotency check at the end of this test already
@@ -292,17 +292,17 @@ func seedMigrationFixture(t *testing.T, h *isolatedDB, f migFixture) int64 {
 func assertMigration000021(t *testing.T, h *isolatedDB, fixtures []migFixture, ids map[string]int64, phase string) {
 	t.Helper()
 	for _, f := range fixtures {
-		// Every row must remain loadable via GetUserById (commondb scans the
+		// Every row must remain loadable via GetUserByID (commondb scans the
 		// plain-string columns, which cannot hold SQL NULL) -- this proves the
 		// NULL normalization worked. The ORM read is the subject, so it stays
 		// the ORM's below head, unlike the seed (#510): the forced marker this
 		// test starts from cannot reach head, and a column a later migration
 		// adds to users fails here, loudly, at the read this test is about.
-		u, err := h.DB.GetUserById(context.Background(), nil, ids[f.label])
-		require.NoErrorf(t, err, "%s [%s]: GetUserById", f.label, phase)
+		u, err := h.DB.GetUserByID(context.Background(), nil, ids[f.label])
+		require.NoErrorf(t, err, "%s [%s]: GetUserByID", f.label, phase)
 		require.NotNilf(t, u, "%s [%s]: user nil", f.label, phase)
 
-		assert.Equalf(t, f.wUID, u.PhoneNumberCountryUniqueId, "%s [%s]: uniqueid", f.label, phase)
+		assert.Equalf(t, f.wUID, u.PhoneNumberCountryUniqueID, "%s [%s]: uniqueid", f.label, phase)
 		assert.Equalf(t, f.wCC, u.PhoneNumberCountryCallingCode, "%s [%s]: callingcode", f.label, phase)
 		assert.Equalf(t, f.wPhone, u.PhoneNumber, "%s [%s]: phone_number", f.label, phase)
 		assert.Equalf(t, f.wVerified, u.PhoneNumberVerified, "%s [%s]: verified", f.label, phase)

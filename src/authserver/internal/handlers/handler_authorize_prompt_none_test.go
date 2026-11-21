@@ -28,44 +28,44 @@ import (
 func TestHandlePromptNone_StepUpAnswers(t *testing.T) {
 	testCases := []struct {
 		name            string
-		target          record.AcrLevel
-		sessionAcr      record.AcrLevel
-		sessionOtpGen   int64
-		userOtpGen      int64
+		target          record.ACRLevel
+		sessionACR      record.ACRLevel
+		sessionOTPGen   int64
+		userOTPGen      int64
 		userOTPEnabled  bool
 		wantDescription string
 	}{
 		{
 			// Step 6 would refuse too; step 5 is asked first.
 			name:            "a target above the session's level, before the missing authenticator",
-			target:          record.AcrLevel2Mandatory,
-			sessionAcr:      record.AcrLevel1,
+			target:          record.ACRLevel2Mandatory,
+			sessionACR:      record.ACRLevel1,
 			userOTPEnabled:  false,
 			wantDescription: "Higher authentication level required",
 		},
 		{
 			name:            "an unknown session level is insufficient",
-			target:          record.AcrLevel1,
-			sessionAcr:      "urn:goiabada:pwd",
+			target:          record.ACRLevel1,
+			sessionACR:      "urn:goiabada:pwd",
 			userOTPEnabled:  true,
 			wantDescription: "Higher authentication level required",
 		},
 		{
 			// Step 7 would refuse too; step 6 is asked first.
 			name:            "a mandatory target with no authenticator, before the changed configuration",
-			target:          record.AcrLevel2Mandatory,
-			sessionAcr:      record.AcrLevel2Mandatory,
-			sessionOtpGen:   2,
-			userOtpGen:      3,
+			target:          record.ACRLevel2Mandatory,
+			sessionACR:      record.ACRLevel2Mandatory,
+			sessionOTPGen:   2,
+			userOTPGen:      3,
 			userOTPEnabled:  false,
 			wantDescription: "Additional authentication setup required",
 		},
 		{
 			name:            "the authenticator changed since the session answered level 2",
-			target:          record.AcrLevel2Optional,
-			sessionAcr:      record.AcrLevel2Optional,
-			sessionOtpGen:   2,
-			userOtpGen:      3,
+			target:          record.ACRLevel2Optional,
+			sessionACR:      record.ACRLevel2Optional,
+			sessionOTPGen:   2,
+			userOTPGen:      3,
 			userOTPEnabled:  true,
 			wantDescription: "Authentication configuration has changed",
 		},
@@ -107,20 +107,20 @@ func TestHandlePromptNone_StepUpAnswers(t *testing.T) {
 			authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 			authorizeValidator.On("ValidatePrompt", "none").Return("none", nil)
 
-			client := &record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: tc.target}
+			client := &record.Client{ID: 1, ClientIdentifier: "test-client", DefaultACRLevel: tc.target}
 			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 			userSession := &record.UserSession{
-				Id:                  1,
-				UserId:              7,
-				AcrLevel:            tc.sessionAcr,
+				ID:                  1,
+				UserID:              7,
+				ACRLevel:            tc.sessionACR,
 				AuthMethods:         "pwd",
-				OtpConfigGeneration: tc.sessionOtpGen,
+				OTPConfigGeneration: tc.sessionOTPGen,
 				User: record.User{
-					Id:                  7,
+					ID:                  7,
 					Enabled:             true,
 					OTPEnabled:          tc.userOTPEnabled,
-					OtpConfigGeneration: tc.userOtpGen,
+					OTPConfigGeneration: tc.userOTPGen,
 				},
 			}
 			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "session-1").Return(userSession, nil)
@@ -154,7 +154,7 @@ func TestHandlePromptNone_LoadFaultsAnswer500(t *testing.T) {
 		{"the session's user", "UserSessionLoadUser"},
 		{"the effective scope", "FilterOutScopesWhereUserIsNotAuthorized"},
 		{"the legal documents owed", "Owed"},
-		{"the consent", "GetConsentByUserIdAndClientId"},
+		{"the consent", "GetConsentByUserIDAndClientID"},
 		{"the session bump", "BumpUserSession"},
 		{"the save", "AddAuthContext"},
 	}
@@ -197,16 +197,16 @@ func TestHandlePromptNone_LoadFaultsAnswer500(t *testing.T) {
 			authorizeValidator.On("ValidatePrompt", "none").Return("none", nil)
 
 			// ConsentRequired, so the consent is read and every load is reached.
-			client := &record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: record.AcrLevel1, ConsentRequired: true}
+			client := &record.Client{ID: 1, ClientIdentifier: "test-client", DefaultACRLevel: record.ACRLevel1, ConsentRequired: true}
 			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 			userSession := &record.UserSession{
-				Id:          1,
-				UserId:      7,
-				AcrLevel:    record.AcrLevel1,
+				ID:          1,
+				UserID:      7,
+				ACRLevel:    record.ACRLevel1,
 				AuthMethods: "pwd",
 				AuthTime:    time.Date(2026, 10, 14, 8, 0, 0, 0, time.UTC),
-				User:        record.User{Id: 7, Enabled: true},
+				User:        record.User{ID: 7, Enabled: true},
 			}
 
 			// Each load answers until the one this row fails, and nothing after it is stubbed, so
@@ -242,19 +242,19 @@ func TestHandlePromptNone_LoadFaultsAnswer500(t *testing.T) {
 						legalDocuments.err = fault
 					}
 				}},
-				{"GetConsentByUserIdAndClientId", func(fail bool) {
+				{"GetConsentByUserIDAndClientID", func(fail bool) {
 					if fail {
-						database.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(7), int64(1)).Return(nil, fault)
+						database.On("GetConsentByUserIDAndClientID", mock.Anything, mock.Anything, int64(7), int64(1)).Return(nil, fault)
 						return
 					}
-					database.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(7), int64(1)).Return(&record.UserConsent{Scope: "openid"}, nil)
+					database.On("GetConsentByUserIDAndClientID", mock.Anything, mock.Anything, int64(7), int64(1)).Return(&record.UserConsent{Scope: "openid"}, nil)
 				}},
 				{"BumpUserSession", func(fail bool) {
 					if fail {
-						userSessionManager.On("BumpUserSession", mock.Anything, "session-1", int64(1), "", record.AcrLevel(""), mock.Anything).Return(nil, fault)
+						userSessionManager.On("BumpUserSession", mock.Anything, "session-1", int64(1), "", record.ACRLevel(""), mock.Anything).Return(nil, fault)
 						return
 					}
-					userSessionManager.On("BumpUserSession", mock.Anything, "session-1", int64(1), "", record.AcrLevel(""), mock.Anything).Return(userSession, nil)
+					userSessionManager.On("BumpUserSession", mock.Anything, "session-1", int64(1), "", record.ACRLevel(""), mock.Anything).Return(userSession, nil)
 					auditLogger.On("Log", mock.Anything, audit.EventBumpedUserSession, mock.Anything).Return()
 				}},
 				{"AddAuthContext", func(fail bool) {
@@ -340,16 +340,16 @@ func TestHandlePromptNone_ManageAccountConsent(t *testing.T) {
 			authorizeValidator.On("ValidatePrompt", "none").Return("none", nil)
 
 			// Consent required off, as every client an administrator creates starts.
-			client := &record.Client{Id: 1, ClientIdentifier: tc.clientIdentifier, DefaultAcrLevel: record.AcrLevel1}
+			client := &record.Client{ID: 1, ClientIdentifier: tc.clientIdentifier, DefaultACRLevel: record.ACRLevel1}
 			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, tc.clientIdentifier).Return(client, nil)
 
 			userSession := &record.UserSession{
-				Id:          1,
-				UserId:      7,
-				AcrLevel:    record.AcrLevel1,
+				ID:          1,
+				UserID:      7,
+				ACRLevel:    record.ACRLevel1,
 				AuthMethods: "pwd",
 				AuthTime:    time.Date(2026, 10, 14, 8, 0, 0, 0, time.UTC),
-				User:        record.User{Id: 7, Enabled: true},
+				User:        record.User{ID: 7, Enabled: true},
 			}
 			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "session-1").Return(userSession, nil)
 			database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
@@ -357,11 +357,11 @@ func TestHandlePromptNone_ManageAccountConsent(t *testing.T) {
 			permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, scope, &userSession.User).Return(scope, nil)
 
 			if tc.wantIssue {
-				userSessionManager.On("BumpUserSession", mock.Anything, "session-1", int64(1), "", record.AcrLevel(""), mock.Anything).Return(userSession, nil)
+				userSessionManager.On("BumpUserSession", mock.Anything, "session-1", int64(1), "", record.ACRLevel(""), mock.Anything).Return(userSession, nil)
 				auditLogger.On("Log", mock.Anything, audit.EventBumpedUserSession, mock.Anything).Return()
 				ceremonyStore.On("AddAuthContext", rr, req, mock.AnythingOfType("*ceremony.AuthContext")).Return(nil)
 			} else {
-				database.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(7), int64(1)).Return(nil, nil).Once()
+				database.On("GetConsentByUserIDAndClientID", mock.Anything, mock.Anything, int64(7), int64(1)).Return(nil, nil).Once()
 				stubRegisteredRedirectURI(database, "https://example.com")
 			}
 
@@ -372,7 +372,7 @@ func TestHandlePromptNone_ManageAccountConsent(t *testing.T) {
 			require.NoError(t, err)
 			if tc.wantIssue {
 				assert.Equal(t, "/auth/issue", location.Path)
-				database.AssertNotCalled(t, "GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+				database.AssertNotCalled(t, "GetConsentByUserIDAndClientID", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 				return
 			}
 			assert.Equal(t, "consent_required", location.Query().Get("error"))
@@ -424,7 +424,7 @@ func newSilentSessionFixture(t *testing.T, authTime time.Time) *silentSessionFix
 	require.NoError(t, err)
 	ctx := reqctx.WithSettings(req.Context(), &record.Settings{Issuer: "https://test-issuer.com"})
 	ctx = reqctx.WithSessionIdentifier(ctx, "session-1")
-	ctx = requestid.NewContext(ctx, propagatedRequestId)
+	ctx = requestid.NewContext(ctx, propagatedRequestID)
 	f.req = req.WithContext(ctx)
 	f.rr = httptest.NewRecorder()
 
@@ -434,17 +434,17 @@ func newSilentSessionFixture(t *testing.T, authTime time.Time) *silentSessionFix
 	authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 	authorizeValidator.On("ValidatePrompt", "none").Return("none", nil)
 
-	client := &record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: record.AcrLevel1}
+	client := &record.Client{ID: 1, ClientIdentifier: "test-client", DefaultACRLevel: record.ACRLevel1}
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 	f.userSession = &record.UserSession{
-		Id:          1,
-		UserId:      7,
-		AcrLevel:    record.AcrLevel1,
+		ID:          1,
+		UserID:      7,
+		ACRLevel:    record.ACRLevel1,
 		AuthMethods: "pwd",
 		Started:     time.Date(2026, 10, 14, 7, 0, 0, 0, time.UTC),
 		AuthTime:    authTime,
-		User:        record.User{Id: 7, Enabled: true},
+		User:        record.User{ID: 7, Enabled: true},
 	}
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "session-1").Return(f.userSession, nil)
 	database.On("UserSessionLoadUser", mock.Anything, mock.Anything, f.userSession).Return(nil)
@@ -464,7 +464,7 @@ func TestHandlePromptNone_TheCeremonyCarriesTheSessionsAuthTime(t *testing.T) {
 	authTime := time.Date(2026, 10, 14, 8, 15, 0, 0, time.UTC)
 	f := newSilentSessionFixture(t, authTime)
 	f.expectScopeFiltered()
-	f.userSessionManager.On("BumpUserSession", mock.Anything, "session-1", int64(1), "", record.AcrLevel(""), mock.Anything).Return(f.userSession, nil)
+	f.userSessionManager.On("BumpUserSession", mock.Anything, "session-1", int64(1), "", record.ACRLevel(""), mock.Anything).Return(f.userSession, nil)
 	f.auditLogger.On("Log", mock.Anything, audit.EventBumpedUserSession, mock.Anything).Return()
 	var saved *ceremony.AuthContext
 	f.ceremonyStore.On("AddAuthContext", f.rr, f.req, mock.AnythingOfType("*ceremony.AuthContext")).
@@ -473,7 +473,7 @@ func TestHandlePromptNone_TheCeremonyCarriesTheSessionsAuthTime(t *testing.T) {
 	f.handler.ServeHTTP(f.rr, f.req)
 
 	require.Equal(t, http.StatusFound, f.rr.Code)
-	assert.Equal(t, saved.CeremonyId, assertStepLocation(t, f.rr.Header().Get("Location"), "/auth/issue"))
+	assert.Equal(t, saved.CeremonyID, assertStepLocation(t, f.rr.Header().Get("Location"), "/auth/issue"))
 	require.NotNil(t, saved.AuthenticatedAt)
 	assert.Equal(t, authTime, *saved.AuthenticatedAt)
 	assert.Equal(t, ceremony.AuthStateReadyToIssueCode, saved.AuthState)

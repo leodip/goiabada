@@ -70,7 +70,7 @@ func HandleForgotPasswordGet(
 // render of the form, its first and each beside a refusal, carries a
 // fresh Turnstile widget while the challenge is on (#642 decision 2); the page answering a request,
 // which has no form, carries none. adminConsoleBaseURL is for the page's sign-in link when its URL
-// names no sign-in (registrationCeremonyId).
+// names no sign-in (registrationCeremonyID).
 func renderForgotPasswordForm(w http.ResponseWriter, r *http.Request, pageRenderer PageRenderer,
 	adminConsoleBaseURL string, settings *record.Settings, email, refusal, field string) {
 
@@ -78,7 +78,7 @@ func renderForgotPasswordForm(w http.ResponseWriter, r *http.Request, pageRender
 		"email":               email,
 		"error":               refusal,
 		"errorField":          field,
-		"ceremonyId":          registrationCeremonyId(r),
+		"ceremonyId":          registrationCeremonyID(r),
 		"adminConsoleBaseUrl": adminConsoleBaseURL,
 	}
 	err := turnstile.WithWidget(pageRenderer, settings).RenderTemplate(w, r, "/layouts/auth_layout.html", "/forgot_password.html", bind)
@@ -91,7 +91,7 @@ func renderForgotPasswordForm(w http.ResponseWriter, r *http.Request, pageRender
 // code.
 type forgotPasswordDatabase interface {
 	GetUserByEmail(ctx context.Context, tx *sql.Tx, email string) (*record.User, error)
-	TryStoreForgotPasswordCode(ctx context.Context, tx *sql.Tx, userId int64, email string, codeEncrypted []byte,
+	TryStoreForgotPasswordCode(ctx context.Context, tx *sql.Tx, userID int64, email string, codeEncrypted []byte,
 		codeHash string, issuedAt time.Time) (bool, error)
 }
 
@@ -155,14 +155,14 @@ func ineligibleRecoveryOutcome(user *record.User) string {
 // by the job after its response, under the job's context, which keeps the request's id; the
 // client IP is read off the request before the handler returns.
 func auditRequestedPasswordReset(ctx context.Context, auditLogger AuditLogger, clientIP string, email string,
-	userId int64, outcome string) {
+	userID int64, outcome string) {
 	details := map[string]interface{}{
 		"ip":           clientIP,
 		"email_digest": hashutil.HashString(email),
 		"outcome":      outcome,
 	}
-	if userId != 0 {
-		details["user_id"] = userId
+	if userID != 0 {
+		details["user_id"] = userID
 	}
 	auditLogger.Log(ctx, audit.EventRequestedPasswordReset, details)
 }
@@ -250,15 +250,15 @@ func finishForgotPassword(
 		auditRequestedPasswordReset(ctx, auditLogger, clientIP, email, 0, recoveryOutcomeUnknownAddress)
 		return
 	case !canRecoverPassword(user):
-		auditRequestedPasswordReset(ctx, auditLogger, clientIP, email, user.Id, ineligibleRecoveryOutcome(user))
+		auditRequestedPasswordReset(ctx, auditLogger, clientIP, email, user.ID, ineligibleRecoveryOutcome(user))
 		return
 	}
 
 	verificationCode := securerandom.String(32)
 	verificationCodeEncrypted, err := dataCipher.Encrypt(verificationCode)
 	if err != nil {
-		slog.ErrorContext(ctx, "unable to encrypt the password reset code", "user_id", user.Id, "error", err)
-		auditRequestedPasswordReset(ctx, auditLogger, clientIP, email, user.Id, recoveryOutcomeServerError)
+		slog.ErrorContext(ctx, "unable to encrypt the password reset code", "user_id", user.ID, "error", err)
+		auditRequestedPasswordReset(ctx, auditLogger, clientIP, email, user.ID, recoveryOutcomeServerError)
 		return
 	}
 
@@ -271,18 +271,18 @@ func finishForgotPassword(
 	// enabled and would re-enable an account an administrator disabled meanwhile. The store takes
 	// effect only while the account is still enabled and its address still verified and still the
 	// one looked up; when it declines, nothing is mailed (#404 decision 2).
-	stored, err := database.TryStoreForgotPasswordCode(ctx, nil, user.Id, user.Email,
+	stored, err := database.TryStoreForgotPasswordCode(ctx, nil, user.ID, user.Email,
 		verificationCodeEncrypted, verificationCodeHash, time.Now().UTC())
 	if err != nil {
-		slog.ErrorContext(ctx, "unable to store the password reset code", "user_id", user.Id, "error", err)
-		auditRequestedPasswordReset(ctx, auditLogger, clientIP, email, user.Id, recoveryOutcomeServerError)
+		slog.ErrorContext(ctx, "unable to store the password reset code", "user_id", user.ID, "error", err)
+		auditRequestedPasswordReset(ctx, auditLogger, clientIP, email, user.ID, recoveryOutcomeServerError)
 		return
 	}
 	if !stored {
-		auditRequestedPasswordReset(ctx, auditLogger, clientIP, email, user.Id, recoveryOutcomeAccountChanged)
+		auditRequestedPasswordReset(ctx, auditLogger, clientIP, email, user.ID, recoveryOutcomeAccountChanged)
 		return
 	}
-	auditRequestedPasswordReset(ctx, auditLogger, clientIP, email, user.Id, recoveryOutcomeCodeIssued)
+	auditRequestedPasswordReset(ctx, auditLogger, clientIP, email, user.ID, recoveryOutcomeCodeIssued)
 
 	// The link names the sign-in this page's URL named, when the id is well formed, so a reset in
 	// the browser holding it carries it on (#812 decision 9). The id is echoed, never looked up: the
@@ -292,28 +292,28 @@ func finishForgotPassword(
 	// decisions 4 and 15).
 	values := emailtemplate.Values{
 		Name:   emailtemplate.RecipientName(user.FullName(), user.Email),
-		Link:   emaillinks.ResetPasswordLink(baseURL, verificationCode, registrationCeremonyId(r)),
+		Link:   emaillinks.ResetPasswordLink(baseURL, verificationCode, registrationCeremonyID(r)),
 		Expiry: codeLifetime(user),
 	}
 	emailReq := r.WithContext(i18n.WithRecipientLanguage(ctx, user.PageLanguage, user.Locale))
 	message, err := pageRenderer.RenderEmail(emailReq, emailtemplate.PasswordResetLink, values)
 	if err != nil {
-		slog.ErrorContext(ctx, "unable to render the password reset email", "user_id", user.Id, "error", err)
+		slog.ErrorContext(ctx, "unable to render the password reset email", "user_id", user.ID, "error", err)
 		return
 	}
 
 	settings, ok := reqctx.SettingsFrom(ctx)
 	if !ok {
-		slog.ErrorContext(ctx, "unable to send the password reset email", "user_id", user.Id, "error", reqctx.ErrNoSettings)
+		slog.ErrorContext(ctx, "unable to send the password reset email", "user_id", user.ID, "error", reqctx.ErrNoSettings)
 		return
 	}
 	input := &emaildelivery.SendEmailInput{
 		To:       user.Email,
 		Subject:  message.Subject,
-		HtmlBody: message.HTML,
+		HTMLBody: message.HTML,
 	}
 	if _, err := emailSender.SendEmail(ctx, emaildelivery.SMTPConfigFromSettings(settings), input); err != nil {
-		slog.ErrorContext(ctx, "unable to send the password reset email", "user_id", user.Id, "error", err)
+		slog.ErrorContext(ctx, "unable to send the password reset email", "user_id", user.ID, "error", err)
 	}
 }
 
@@ -325,7 +325,7 @@ func renderForgotPasswordLinkSent(pageRenderer PageRenderer, w http.ResponseWrit
 	bind := map[string]interface{}{
 		"linkSent":            true,
 		"email":               email,
-		"ceremonyId":          registrationCeremonyId(r),
+		"ceremonyId":          registrationCeremonyID(r),
 		"adminConsoleBaseUrl": adminConsoleBaseURL,
 	}
 

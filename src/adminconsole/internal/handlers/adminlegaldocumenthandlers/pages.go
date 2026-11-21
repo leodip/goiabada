@@ -16,22 +16,22 @@ import (
 
 // legalDocumentReader reads one document with its draft and versions.
 type legalDocumentReader interface {
-	GetLegalDocumentById(ctx context.Context, accessToken string, legalDocumentId int64) (*api.LegalDocumentDetailResponse, error)
+	GetLegalDocumentByID(ctx context.Context, accessToken string, legalDocumentID int64) (*api.LegalDocumentDetailResponse, error)
 }
 
 // legalDocumentTextReader is legalDocumentReader with the text of one version, which the editor
 // opens on when the document holds no draft.
 type legalDocumentTextReader interface {
 	legalDocumentReader
-	GetLegalDocumentVersion(ctx context.Context, accessToken string, legalDocumentId int64, version int) (*api.GetLegalDocumentVersionResponse, error)
+	GetLegalDocumentVersion(ctx context.Context, accessToken string, legalDocumentID int64, version int) (*api.GetLegalDocumentVersionResponse, error)
 }
 
 // accessToken answers the bearer the request carries, answering the request when it carries none,
 // which is a wiring defect: every one of these routes is mounted under RequiresScope.
-func accessToken(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request) (string, bool) {
-	jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+func accessToken(httpHelper HTTPHelper, w http.ResponseWriter, r *http.Request) (string, bool) {
+	jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 	if !ok {
-		httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+		httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 		return "", false
 	}
 	return jwtInfo.TokenResponse.AccessToken, true
@@ -39,14 +39,14 @@ func accessToken(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request) 
 
 // loadLegalDocument reads the document the path names, answering the request when it cannot: not
 // found for an address naming no document, and what the API's failure classifies as.
-func loadLegalDocument(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, apiClient legalDocumentReader,
+func loadLegalDocument(httpHelper HTTPHelper, w http.ResponseWriter, r *http.Request, apiClient legalDocumentReader,
 	token string) (*api.LegalDocumentDetailResponse, bool) {
-	id, ok := legalDocumentId(r)
+	id, ok := legalDocumentID(r)
 	if !ok {
 		httpHelper.NotFound(w, r)
 		return nil, false
 	}
-	detail, err := apiClient.GetLegalDocumentById(r.Context(), token, id)
+	detail, err := apiClient.GetLegalDocumentByID(r.Context(), token, id)
 	if err != nil {
 		render.HandleAPIError(httpHelper, w, r, err)
 		return nil, false
@@ -64,7 +64,7 @@ func draftText(ctx context.Context, apiClient legalDocumentTextReader, token str
 	if detail.LegalDocument.CurrentVersion == 0 {
 		return detail.LegalDocument.Title, "", nil
 	}
-	current, err := apiClient.GetLegalDocumentVersion(ctx, token, detail.LegalDocument.Id, detail.LegalDocument.CurrentVersion)
+	current, err := apiClient.GetLegalDocumentVersion(ctx, token, detail.LegalDocument.ID, detail.LegalDocument.CurrentVersion)
 	if err != nil {
 		return "", "", err
 	}
@@ -79,7 +79,7 @@ type draftForm struct {
 
 // renderDraft draws the editor of the document with form in its fields and extra beside them, the
 // flash or the refusal.
-func renderDraft(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, detail *api.LegalDocumentDetailResponse,
+func renderDraft(httpHelper HTTPHelper, w http.ResponseWriter, r *http.Request, detail *api.LegalDocumentDetailResponse,
 	form draftForm, extra map[string]interface{}) {
 	doc := detail.LegalDocument
 	bind := map[string]interface{}{
@@ -101,7 +101,7 @@ func renderDraft(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, 
 }
 
 // renderStoredDraft draws the editor with the document's text as stored, beside extra.
-func renderStoredDraft(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, apiClient legalDocumentTextReader,
+func renderStoredDraft(httpHelper HTTPHelper, w http.ResponseWriter, r *http.Request, apiClient legalDocumentTextReader,
 	token string, detail *api.LegalDocumentDetailResponse, extra map[string]interface{}) {
 	title, markdown, err := draftText(r.Context(), apiClient, token, detail)
 	if err != nil {
@@ -112,7 +112,7 @@ func renderStoredDraft(httpHelper HttpHelper, w http.ResponseWriter, r *http.Req
 }
 
 // renderVersions draws the versions tab of the document beside extra.
-func renderVersions(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, detail *api.LegalDocumentDetailResponse,
+func renderVersions(httpHelper HTTPHelper, w http.ResponseWriter, r *http.Request, detail *api.LegalDocumentDetailResponse,
 	extra map[string]interface{}) {
 	bind := map[string]interface{}{
 		"doc":        detail.LegalDocument,
@@ -129,7 +129,7 @@ func renderVersions(httpHelper HttpHelper, w http.ResponseWriter, r *http.Reques
 
 // takeFlashes reads, and clears, the flashes named, answering the request when the session cannot
 // be read or saved.
-func takeFlashes(httpHelper HttpHelper, httpSession sessionstore.Store, w http.ResponseWriter, r *http.Request,
+func takeFlashes(httpHelper HTTPHelper, httpSession sessionstore.Store, w http.ResponseWriter, r *http.Request,
 	keys ...string) (map[string]string, bool) {
 	sess, err := httpSession.Get(r, builtin.AdminConsoleSessionName)
 	if err != nil {
@@ -153,7 +153,7 @@ func takeFlashes(httpHelper HttpHelper, httpSession sessionstore.Store, w http.R
 
 // setFlash leaves a flash for the page at pagePath, the one a write redirects to, answering the
 // request when the session cannot be saved.
-func setFlash(httpHelper HttpHelper, httpSession sessionstore.Store, w http.ResponseWriter, r *http.Request,
+func setFlash(httpHelper HTTPHelper, httpSession sessionstore.Store, w http.ResponseWriter, r *http.Request,
 	pagePath, key, value string) bool {
 	sess, err := httpSession.Get(r, builtin.AdminConsoleSessionName)
 	if err != nil {

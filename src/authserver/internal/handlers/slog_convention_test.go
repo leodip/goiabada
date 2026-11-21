@@ -29,7 +29,7 @@ import (
 // mounts it, and asserts the record it writes carries an id nothing in this test named: not the
 // attribute, not the key, not the value. Remove the wrapper from either server and every request
 // record silently loses its correlation while every other test here stays green (#320).
-func TestSlogConvention_AHandlerRecordCarriesTheRequestIdWithoutNamingIt(t *testing.T) {
+func TestSlogConvention_AHandlerRecordCarriesTheRequestIDWithoutNamingIt(t *testing.T) {
 	logs := logtest.CaptureSlog(t)
 
 	pageRenderer := handlersmocks.NewPageRenderer(t)
@@ -41,7 +41,7 @@ func TestSlogConvention_AHandlerRecordCarriesTheRequestIdWithoutNamingIt(t *test
 	// mock fails this test if the handler takes the other branch.
 	ceremonyStore.On("GetAuthContext", mock.Anything).Return(nil, ceremony.ErrNoAuthContext)
 
-	req := withSessionSettings(httptest.NewRequest(http.MethodGet, "/auth/level2?ceremony="+testCeremonyId, nil))
+	req := withSessionSettings(httptest.NewRequest(http.MethodGet, "/auth/level2?ceremony="+testCeremonyID, nil))
 	// The id the middleware will adopt. requestid.Middleware takes X-Request-Id from the caller
 	// verbatim, which is also why the handler clips it (#159).
 	req.Header.Set("X-Request-Id", "req-level2-e2e")

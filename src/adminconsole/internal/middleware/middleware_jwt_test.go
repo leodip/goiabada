@@ -56,11 +56,11 @@ func TestRequiresScope_Authorized(t *testing.T) {
 	req := httptest.NewRequest("GET", "/", nil)
 	rr := httptest.NewRecorder()
 
-	jwtInfo := oauthclient.JwtInfo{
+	jwtInfo := oauthclient.JWTInfo{
 		TokenResponse: oauth.TokenResponse{AccessToken: "validtoken"},
 	}
 	ctx := req.Context()
-	ctx = reqctx.WithJwtInfo(ctx, jwtInfo)
+	ctx = reqctx.WithJWTInfo(ctx, jwtInfo)
 	req = req.WithContext(ctx)
 
 	mockAuthHelper.On("IsAuthorizedToAccessResource", jwtInfo, []string{"required:scope"}).Return(true)
@@ -89,11 +89,11 @@ func TestRequiresScope_Unauthorized(t *testing.T) {
 	req := httptest.NewRequest("GET", "/", nil)
 	rr := httptest.NewRecorder()
 
-	jwtInfo := oauthclient.JwtInfo{
+	jwtInfo := oauthclient.JWTInfo{
 		TokenResponse: oauth.TokenResponse{AccessToken: "validtoken"},
 	}
 	ctx := req.Context()
-	ctx = reqctx.WithJwtInfo(ctx, jwtInfo)
+	ctx = reqctx.WithJWTInfo(ctx, jwtInfo)
 	req = req.WithContext(ctx)
 
 	mockAuthHelper.On("IsAuthorizedToAccessResource", jwtInfo, []string{"required:scope"}).Return(false)
@@ -127,9 +127,9 @@ func TestRequiresScope_Unauthenticated(t *testing.T) {
 	req := httptest.NewRequest("GET", "/", nil)
 	rr := httptest.NewRecorder()
 
-	jwtInfo := oauthclient.JwtInfo{}
+	jwtInfo := oauthclient.JWTInfo{}
 	ctx := req.Context()
-	ctx = reqctx.WithJwtInfo(ctx, jwtInfo)
+	ctx = reqctx.WithJWTInfo(ctx, jwtInfo)
 	req = req.WithContext(ctx)
 
 	mockAuthHelper.On("IsAuthorizedToAccessResource", jwtInfo, []string{"required:scope"}).Return(false)
@@ -146,7 +146,7 @@ func TestRequiresScope_Unauthenticated(t *testing.T) {
 	mockAuthHelper.AssertExpectations(t)
 }
 
-func TestRequiresScope_NoJwtInfo(t *testing.T) {
+func TestRequiresScope_NoJWTInfo(t *testing.T) {
 	const testSessionName = "test-session"
 	mockTokenParser := new(middlewaremocks.TokenParser)
 	mockAuthHelper := new(middlewaremocks.AuthHelper)
@@ -157,8 +157,8 @@ func TestRequiresScope_NoJwtInfo(t *testing.T) {
 	req := httptest.NewRequest("GET", "/", nil)
 	rr := httptest.NewRecorder()
 
-	mockAuthHelper.On("IsAuthorizedToAccessResource", oauthclient.JwtInfo{}, []string{"required:scope"}).Return(false)
-	mockAuthHelper.On("IsAuthenticated", oauthclient.JwtInfo{}).Return(false)
+	mockAuthHelper.On("IsAuthorizedToAccessResource", oauthclient.JWTInfo{}, []string{"required:scope"}).Return(false)
+	mockAuthHelper.On("IsAuthenticated", oauthclient.JWTInfo{}).Return(false)
 	mockAuthHelper.On("RedirToAuthorize", mock.Anything, mock.Anything, builtin.AdminConsoleClientIdentifier, mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(nil)
 
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -182,9 +182,9 @@ func TestRequiresScope_RedirectError(t *testing.T) {
 	req := httptest.NewRequest("GET", "/", nil)
 	rr := httptest.NewRecorder()
 
-	jwtInfo := oauthclient.JwtInfo{}
+	jwtInfo := oauthclient.JWTInfo{}
 	ctx := req.Context()
-	ctx = reqctx.WithJwtInfo(ctx, jwtInfo)
+	ctx = reqctx.WithJWTInfo(ctx, jwtInfo)
 	req = req.WithContext(ctx)
 
 	mockAuthHelper.On("IsAuthorizedToAccessResource", jwtInfo, []string{"required:scope"}).Return(false)
@@ -222,8 +222,8 @@ func TestRequiresScope_ReturnsToTheBaseURLPlusPathAndQuery(t *testing.T) {
 			req := httptest.NewRequest("GET", testCase.requestLine, nil)
 			require.Equal(t, testCase.requestLine, req.RequestURI, "the request line did not reach the request as sent")
 
-			mockAuthHelper.On("IsAuthorizedToAccessResource", oauthclient.JwtInfo{}, []string{"required:scope"}).Return(false)
-			mockAuthHelper.On("IsAuthenticated", oauthclient.JwtInfo{}).Return(false)
+			mockAuthHelper.On("IsAuthorizedToAccessResource", oauthclient.JWTInfo{}, []string{"required:scope"}).Return(false)
+			mockAuthHelper.On("IsAuthenticated", oauthclient.JWTInfo{}).Return(false)
 			mockAuthHelper.On("RedirToAuthorize", mock.Anything, mock.Anything, builtin.AdminConsoleClientIdentifier,
 				mock.AnythingOfType("string"), "http://localhost:9091/admin/users?page=2&query=a%26b").Return(nil)
 
@@ -250,8 +250,8 @@ func TestRequiresScope_AScriptsRequestWithoutASignInIsToldItEnded(t *testing.T) 
 	req.Header.Set("X-Requested-With", "XMLHttpRequest")
 	rr := httptest.NewRecorder()
 
-	mockAuthHelper.On("IsAuthorizedToAccessResource", oauthclient.JwtInfo{}, []string{"required:scope"}).Return(false)
-	mockAuthHelper.On("IsAuthenticated", oauthclient.JwtInfo{}).Return(false)
+	mockAuthHelper.On("IsAuthorizedToAccessResource", oauthclient.JWTInfo{}, []string{"required:scope"}).Return(false)
+	mockAuthHelper.On("IsAuthenticated", oauthclient.JWTInfo{}).Return(false)
 
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Error("Next handler should not have been called")

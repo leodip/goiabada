@@ -17,11 +17,11 @@ import (
 func TestTokenPageClient_NamesTheClientOfTheRequestsAccessToken(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
-		token *oauth.JwtToken
+		token *oauth.JWTToken
 		want  string
 	}{
-		{"a token issued to a client", &oauth.JwtToken{Claims: map[string]interface{}{"sub": "u1", "client_id": "app-1"}}, "app-1"},
-		{"a token naming no client", &oauth.JwtToken{Claims: map[string]interface{}{"sub": "u1"}}, ""},
+		{"a token issued to a client", &oauth.JWTToken{Claims: map[string]interface{}{"sub": "u1", "client_id": "app-1"}}, "app-1"},
+		{"a token naming no client", &oauth.JWTToken{Claims: map[string]interface{}{"sub": "u1"}}, ""},
 		{"no token", nil, ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

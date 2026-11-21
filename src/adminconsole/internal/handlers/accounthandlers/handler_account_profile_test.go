@@ -37,7 +37,7 @@ type accountProfileRecorder struct {
 func storedAccountProfile() *api.UserResponse {
 	birthDate := time.Date(1970, time.January, 2, 0, 0, 0, 0, time.UTC)
 	return &api.UserResponse{
-		Id:                  7,
+		ID:                  7,
 		Email:               "stored@example.com",
 		Username:            "stored-username",
 		GivenName:           "Stored",
@@ -93,7 +93,7 @@ var submittedAccountProfile = url.Values{
 // A refusal from the API redraws the account profile page with what the user typed rather than what
 // is stored, and the API's sentence, so nothing the user entered is lost (#440 decision 7).
 func TestHandleProfilePost_ARefusalRedrawsThePageWithTheSubmittedValues(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_profile.html").Once()
 
@@ -125,7 +125,7 @@ func TestHandleProfilePost_ARefusalRedrawsThePageWithTheSubmittedValues(t *testi
 	bind := handlertest.Bind(t, httpHelper)
 	storedBirthDate := time.Date(1970, time.January, 2, 0, 0, 0, 0, time.UTC)
 	assert.Equal(t, &api.UserResponse{
-		Id:                  7,
+		ID:                  7,
 		Email:               "stored@example.com",
 		Username:            "jane-doe",
 		GivenName:           "Jane",
@@ -154,7 +154,7 @@ func TestHandleProfilePost_ARefusalRedrawsThePageWithTheSubmittedValues(t *testi
 func TestHandleProfilePost_AMalformedZoneAnswers500AndUpdatesNothing(t *testing.T) {
 	for _, zoneInfo := range []string{"America/Sao_Paulo", "Brazil___America___Sao_Paulo"} {
 		t.Run(zoneInfo, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Return().Once()
 
 			apiClient := &accountProfileRecorder{}
@@ -217,7 +217,7 @@ func TestHandleProfileGet_CopiesTheFetchedPageLanguageIntoTheSession(t *testing.
 				values[sessionkeys.PageLanguage] = tc.copied
 			}
 			jar := seedAccountSession(t, store, values)
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 			handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_profile.html").Once()
 
@@ -238,7 +238,7 @@ func TestHandleProfileGet_CopiesTheFetchedPageLanguageIntoTheSession(t *testing.
 // core/i18n loads them, English first, and a stored tag whose catalog has gone shows Automatic selected, so the
 // next save writes Automatic (#631 decision 3).
 func TestHandleProfileGet_OffersTheLoadedCatalogsAndAVanishedOneIsAutomatic(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_profile.html").Once()
 
@@ -278,7 +278,7 @@ func TestHandleProfilePost_SendsThePageLanguageAndCopiesTheSavedOne(t *testing.T
 			store := newFlashTestStore()
 			jar := seedAccountSession(t, store, map[string]any{sessionkeys.PageLanguage: "pt-BR"})
 			apiClient := &accountProfileRecorder{pageLanguage: "it"}
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 
 			rr := httptest.NewRecorder()
@@ -297,7 +297,7 @@ func TestHandleProfilePost_SendsThePageLanguageAndCopiesTheSavedOne(t *testing.T
 // A Page language posted in the address rather than the form is not the form's: it is not sent.
 func TestHandleProfilePost_APageLanguageInTheQueryIsNotSent(t *testing.T) {
 	apiClient := &accountProfileRecorder{}
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 
 	HandleProfilePost(httpHelper, newFlashTestStore(), apiClient, consoleBaseURL).ServeHTTP(httptest.NewRecorder(),

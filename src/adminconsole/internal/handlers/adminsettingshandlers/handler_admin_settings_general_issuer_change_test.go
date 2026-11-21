@@ -2,7 +2,6 @@ package adminsettingshandlers
 
 import (
 	"context"
-	"encoding/gob"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -41,13 +40,13 @@ func (a issuerChangingAPI) UpdateSettingsGeneral(context.Context, string, *api.U
 // Observed through the store's own Get with the cookie the handler answered with, which is what
 // the next request would load; the unrelated value proves the session was edited, not discarded.
 func TestHandleGeneralPost_AnIssuerChangeDeletesTheTokenResponseAndItsExpiry(t *testing.T) {
-	gob.Register(oauth.TokenResponse{})
+	sessionkeys.RegisterStoredTokenResponse()
 	store := newSettingsTestStore()
 
 	seedReq := httptest.NewRequest(http.MethodGet, "/", nil)
 	seeded, err := store.Get(seedReq, builtin.AdminConsoleSessionName)
 	require.NoError(t, err)
-	seeded.Values[sessionkeys.JWT] = oauth.TokenResponse{AccessToken: "the-access-token"}
+	seeded.Values[sessionkeys.JWT] = sessionkeys.StoreTokenResponse(oauth.TokenResponse{AccessToken: "the-access-token"})
 	seeded.Values[sessionkeys.JWTExpiresAt] = int64(1_900_000_000)
 	seeded.Values["Unrelated"] = "kept"
 	seedW := httptest.NewRecorder()
@@ -62,7 +61,7 @@ func TestHandleGeneralPost_AnIssuerChangeDeletesTheTokenResponseAndItsExpiry(t *
 		req.AddCookie(c)
 	}
 
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	w := httptest.NewRecorder()
 	HandleGeneralPost(httpHelper, store,

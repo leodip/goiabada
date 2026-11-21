@@ -36,7 +36,7 @@ func TestResetPassword_AnEmailChangeRetiresTheLinkMailedToThePreviousAddress(t *
 				user, password := createResetTestUser(t, plusAddress())
 				adminToken, _ := createAdminClientWithToken(t)
 				return user, password, func(t *testing.T, toEmail string) {
-					target := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(user.Id, 10) + "/email"
+					target := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(user.ID, 10) + "/email"
 					resp := makeAPIRequest(t, "PUT", target, adminToken, api.UpdateUserEmailRequest{Email: toEmail, EmailVerified: true})
 					_ = resp.Body.Close()
 					require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -47,7 +47,7 @@ func TestResetPassword_AnEmailChangeRetiresTheLinkMailedToThePreviousAddress(t *
 			name: "the account's own change",
 			account: func(t *testing.T) (*record.User, string, func(t *testing.T, toEmail string)) {
 				accessToken, u := accountEmailUserWithPassword(t)
-				stored, err := database.GetUserById(context.Background(), nil, u.Id)
+				stored, err := database.GetUserByID(context.Background(), nil, u.ID)
 				require.NoError(t, err)
 				stored.Email = plusAddress()
 				stored.EmailVerified = true
@@ -66,18 +66,18 @@ func TestResetPassword_AnEmailChangeRetiresTheLinkMailedToThePreviousAddress(t *
 			user, password, change := tc.account(t)
 			previous := user.Email
 
-			requestPasswordReset(t, createHttpClient(t), previous)
+			requestPasswordReset(t, createHTTPClient(t), previous)
 			link := latestResetLink(t, previous)
 
 			// One browser follows the link before the change and holds the form.
-			early := createHttpClient(t)
+			early := createHTTPClient(t)
 			cleanURL := followResetLink(t, early, link)
-			continuationId := loadResetForm(t, early, cleanURL)
+			continuationID := loadResetForm(t, early, cleanURL)
 
 			change(t, plusAddress())
 
 			// A browser following the link only now is refused at the first hop.
-			late := createHttpClient(t)
+			late := createHTTPClient(t)
 			resp := loadPage(t, late, link)
 			body := bodyString(t, resp)
 			_ = resp.Body.Close()
@@ -92,13 +92,13 @@ func TestResetPassword_AnEmailChangeRetiresTheLinkMailedToThePreviousAddress(t *
 			assert.Contains(t, body, resetCodeInvalidText)
 			assert.NotContains(t, body, `name="password"`)
 
-			resp = postCleanReset(t, early, cleanURL, "N3wP4ss!word", continuationId)
+			resp = postCleanReset(t, early, cleanURL, "N3wP4ss!word", continuationID)
 			body = bodyString(t, resp)
 			_ = resp.Body.Close()
 			assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 			assert.Contains(t, body, resetCodeInvalidText)
 
-			assert.True(t, passwordhash.Verify(passwordHashOf(t, user.Id), password),
+			assert.True(t, passwordhash.Verify(passwordHashOf(t, user.ID), password),
 				"a link mailed to the previous address must not set the account's password")
 		})
 	}

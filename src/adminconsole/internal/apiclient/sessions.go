@@ -9,10 +9,10 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 )
 
-func (c *AuthServerClient) GetUserSessionsByUserId(ctx context.Context, accessToken string, userId int64) ([]api.UserSessionDetailResponse, error) {
+func (c *AuthServerClient) GetUserSessionsByUserID(ctx context.Context, accessToken string, userID int64) ([]api.UserSessionDetailResponse, error) {
 	response, err := execute[api.GetUserSessionsResponse](ctx, c, accessToken, apiRequest{
 		method:        "GET",
-		url:           c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userId, 10) + "/sessions",
+		url:           c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userID, 10) + "/sessions",
 		contentType:   contentTypeJSON,
 		successStatus: http.StatusOK,
 	})
@@ -22,12 +22,12 @@ func (c *AuthServerClient) GetUserSessionsByUserId(ctx context.Context, accessTo
 	return response.Sessions, nil
 }
 
-// DeleteUserSessionById returns only an error and still decodes: a 200 carrying `success:false` is
+// DeleteUserSessionByID returns only an error and still decodes: a 200 carrying `success:false` is
 // refused. The same is true of DeleteAccountSession below, and of no other method in this package.
-func (c *AuthServerClient) DeleteUserSessionById(ctx context.Context, accessToken string, sessionId int64) error {
+func (c *AuthServerClient) DeleteUserSessionByID(ctx context.Context, accessToken string, sessionID int64) error {
 	response, err := execute[api.SuccessResponse](ctx, c, accessToken, apiRequest{
 		method:        "DELETE",
-		url:           c.baseURL + "/api/v1/admin/user-sessions/" + strconv.FormatInt(sessionId, 10),
+		url:           c.baseURL + "/api/v1/admin/user-sessions/" + strconv.FormatInt(sessionID, 10),
 		contentType:   contentTypeJSON,
 		successStatus: http.StatusOK,
 	})
@@ -40,13 +40,13 @@ func (c *AuthServerClient) DeleteUserSessionById(ctx context.Context, accessToke
 	return nil
 }
 
-// GetClientSessionsByClientId answers the whole envelope rather than the sessions alone: this
+// GetClientSessionsByClientID answers the whole envelope rather than the sessions alone: this
 // endpoint is the only one listing sessions across users, and it returns their owners so the
 // caller does not read them back one at a time (#373).
-func (c *AuthServerClient) GetClientSessionsByClientId(ctx context.Context, accessToken string, clientId int64, page, size int) (*api.GetClientSessionsResponse, error) {
+func (c *AuthServerClient) GetClientSessionsByClientID(ctx context.Context, accessToken string, clientID int64, page, size int) (*api.GetClientSessionsResponse, error) {
 	// Pagination is defaulted at the caller, so a non-positive page or size is left off the query
 	// entirely rather than sent as a zero.
-	fullURL := c.baseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10) + "/sessions"
+	fullURL := c.baseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientID, 10) + "/sessions"
 	if page > 0 || size > 0 {
 		q := "?"
 		if page > 0 {
@@ -82,10 +82,10 @@ func (c *AuthServerClient) GetAccountSessions(ctx context.Context, accessToken s
 	return response.Sessions, nil
 }
 
-func (c *AuthServerClient) DeleteAccountSession(ctx context.Context, accessToken string, sessionId int64) error {
+func (c *AuthServerClient) DeleteAccountSession(ctx context.Context, accessToken string, sessionID int64) error {
 	response, err := execute[api.SuccessResponse](ctx, c, accessToken, apiRequest{
 		method:        "DELETE",
-		url:           c.baseURL + "/api/v1/account/sessions/" + strconv.FormatInt(sessionId, 10),
+		url:           c.baseURL + "/api/v1/account/sessions/" + strconv.FormatInt(sessionID, 10),
 		contentType:   contentTypeJSON,
 		successStatus: http.StatusOK,
 	})

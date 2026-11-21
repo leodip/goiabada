@@ -54,9 +54,9 @@ const (
 // client, the family's revocation record, and the session the grant is bound to.
 type RefreshDatabase interface {
 	CodeLoadUser(ctx context.Context, tx *sql.Tx, code *record.Code) error
-	GetRefreshTokenByJti(ctx context.Context, tx *sql.Tx, jti string) (*record.RefreshToken, error)
+	GetRefreshTokenByJTI(ctx context.Context, tx *sql.Tx, jti string) (*record.RefreshToken, error)
 	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
-	IsRefreshTokenFamilyRevoked(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string) (bool, error)
+	IsRefreshTokenFamilyRevoked(ctx context.Context, tx *sql.Tx, firstRefreshTokenJTI string) (bool, error)
 	RefreshTokenLoadClient(ctx context.Context, tx *sql.Tx, refreshToken *record.RefreshToken) error
 	RefreshTokenLoadCode(ctx context.Context, tx *sql.Tx, refreshToken *record.RefreshToken) error
 	RefreshTokenLoadUser(ctx context.Context, tx *sql.Tx, refreshToken *record.RefreshToken) error
@@ -69,8 +69,8 @@ type StoredRefreshToken struct {
 	Row *record.RefreshToken
 	// IsROPC says the password grant minted the token: its row has no code.
 	IsROPC   bool
-	ClientId int64
-	UserId   int64
+	ClientID int64
+	UserID   int64
 	// User is the grant's user as loaded: the row's for the password grant, the code's otherwise.
 	User  *record.User
 	Scope string
@@ -82,17 +82,17 @@ type StoredRefreshToken struct {
 // dead token. A token without jti, which the auth server never signs, is a fault.
 //
 // The check is in two calls so a caller can do what is its own between them, and what it does
-// first is match the token's client, ClientId, to the client presenting it. Nothing that tells a
+// first is match the token's client, ClientID, to the client presenting it. Nothing that tells a
 // live token from a dead one is decided before that match: a public client_id is no secret, so a
 // check above it would let anyone holding a stolen token learn what became of the grant by
 // presenting it under any public client (#137).
-func FindRefreshToken(ctx context.Context, database RefreshDatabase, token oauth.JwtToken) (*StoredRefreshToken, error) {
+func FindRefreshToken(ctx context.Context, database RefreshDatabase, token oauth.JWTToken) (*StoredRefreshToken, error) {
 	jti := token.StringClaim("jti")
 	if len(jti) == 0 {
 		return nil, errs.New("the refresh token is invalid because it does not contain a jti claim")
 	}
 
-	row, err := database.GetRefreshTokenByJti(ctx, nil, jti)
+	row, err := database.GetRefreshTokenByJTI(ctx, nil, jti)
 	if err != nil {
 		return nil, err
 	}
@@ -103,7 +103,7 @@ func FindRefreshToken(ctx context.Context, database RefreshDatabase, token oauth
 		return nil, nil
 	}
 
-	if !row.CodeId.Valid {
+	if !row.CodeID.Valid {
 		if err := database.RefreshTokenLoadUser(ctx, nil, row); err != nil {
 			return nil, err
 		}
@@ -113,8 +113,8 @@ func FindRefreshToken(ctx context.Context, database RefreshDatabase, token oauth
 		return &StoredRefreshToken{
 			Row:      row,
 			IsROPC:   true,
-			ClientId: row.ClientId.Int64,
-			UserId:   row.UserId.Int64,
+			ClientID: row.ClientID.Int64,
+			UserID:   row.UserID.Int64,
 			User:     &row.User,
 			Scope:    row.Scope,
 		}, nil
@@ -128,8 +128,8 @@ func FindRefreshToken(ctx context.Context, database RefreshDatabase, token oauth
 	}
 	return &StoredRefreshToken{
 		Row:      row,
-		ClientId: row.Code.ClientId,
-		UserId:   row.Code.UserId,
+		ClientID: row.Code.ClientID,
+		UserID:   row.Code.UserID,
 		User:     &row.Code.User,
 		Scope:    row.Code.Scope,
 	}, nil
@@ -139,7 +139,7 @@ func FindRefreshToken(ctx context.Context, database RefreshDatabase, token oauth
 // at now: the checks the refresh grant makes on a token's state, which introspection makes too, so
 // the two cannot disagree about a token (#676 decision 7). What belongs to a request stays
 // with its caller: authenticating the client, matching it to the token, PKCE for a public client,
-// and the scope a refresh may ask for. Whose token it is, ClientId, the caller matches to a client
+// and the scope a refresh may ask for. Whose token it is, ClientID, the caller matches to a client
 // authentication has found to exist and be enabled, so the check reads no client of its own.
 //
 // The checks run in this order, and the first that refuses is the answer, nothing below it being
@@ -165,7 +165,7 @@ func FindRefreshToken(ctx context.Context, database RefreshDatabase, token oauth
 // revoked one only once it gets as far as its session's bounds: a nil settings is ErrNoSettings.
 // Any error is a fault, never a refusal: the token's state could not be read, and a caller must not
 // answer it as a dead token.
-func RefreshToken(ctx context.Context, database RefreshDatabase, stored *StoredRefreshToken, token oauth.JwtToken,
+func RefreshToken(ctx context.Context, database RefreshDatabase, stored *StoredRefreshToken, token oauth.JWTToken,
 	settings *record.Settings, now time.Time) (RefreshRefusal, error) {
 
 	row := stored.Row
@@ -237,7 +237,7 @@ func RefreshToken(ctx context.Context, database RefreshDatabase, stored *StoredR
 	//
 	// Skipped for a token whose own row is revoked: the row answers for that one, last.
 	if !row.Revoked {
-		familyRevoked, err := database.IsRefreshTokenFamilyRevoked(ctx, nil, row.FirstRefreshTokenJti)
+		familyRevoked, err := database.IsRefreshTokenFamilyRevoked(ctx, nil, row.FirstRefreshTokenJTI)
 		if err != nil {
 			return 0, err
 		}
@@ -263,7 +263,7 @@ func RefreshToken(ctx context.Context, database RefreshDatabase, stored *StoredR
 		// unconditionally, because there is no browser session to bind to.
 		//
 		// Placed before the settings are needed: this comparison needs none.
-		if session.UserId != stored.UserId {
+		if session.UserID != stored.UserID {
 			return RefreshSessionOfAnotherUser, nil
 		}
 
@@ -308,7 +308,7 @@ func RefreshToken(ctx context.Context, database RefreshDatabase, stored *StoredR
 			if err != nil {
 				return 0, err
 			}
-			if codeSession != nil && codeSession.UserId != stored.UserId {
+			if codeSession != nil && codeSession.UserID != stored.UserID {
 				return RefreshSessionOfAnotherUser, nil
 			}
 		}

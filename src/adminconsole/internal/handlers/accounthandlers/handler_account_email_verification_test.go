@@ -46,12 +46,12 @@ func TestHandleEmailVerificationPost_ARefusalIsDrawnWithItsSentence(t *testing.T
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 			handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_email_verification.html").Once()
 
 			rec := httptest.NewRecorder()
-			HandleEmailVerificationPost(httpHelper, newFlashTestStore(), verificationRefusingApiClient{err: tc.refusal}, consoleBaseURL).
+			HandleEmailVerificationPost(httpHelper, newFlashTestStore(), verificationRefusingAPIClient{err: tc.refusal}, consoleBaseURL).
 				ServeHTTP(rec, handlertest.Request(http.MethodPost, "/account/email-verification",
 					handlertest.WithAccessToken(), handlertest.WithSettings(publicSettings(tc.smtpEnabled)),
 					handlertest.WithForm(url.Values{"verificationCode": {"ABC123"}})))

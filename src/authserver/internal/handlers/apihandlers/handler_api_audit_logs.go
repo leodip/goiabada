@@ -31,20 +31,20 @@ func HandleAuditLogsGet(
 		auditEvent := r.URL.Query().Get("auditEvent")
 		// Exact match, as auditEvent is: the id an operator holds came off one log record, so
 		// a prefix or a fold would list a different request's events under it (#328).
-		requestId := r.URL.Query().Get("requestId")
+		requestID := r.URL.Query().Get("requestId")
 
 		// The user filter lists the rows about that user or made by them. A value that is not a
 		// positive integer is refused rather than ignored as page and size are: ignored, it
 		// would list every user's events under a filter the caller believes is set (#780
 		// decision 3). An empty value is refused too: only an absent parameter sets no filter.
-		var userId int64
+		var userID int64
 		if query := r.URL.Query(); query.Has("userId") {
 			id, err := strconv.ParseInt(query.Get("userId"), 10, 64)
 			if err != nil || id <= 0 {
 				writeJSONError(w, "Invalid userId value", "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
-			userId = id
+			userID = id
 		}
 
 		// Default values
@@ -67,7 +67,7 @@ func HandleAuditLogsGet(
 
 		// Get audit logs
 		auditLogs, total, err := database.GetAuditLogsPaginated(r.Context(), nil, page, size,
-			record.AuditLogFilter{AuditEvent: auditEvent, RequestId: requestId, UserId: userId})
+			record.AuditLogFilter{AuditEvent: auditEvent, RequestID: requestID, UserID: userID})
 		if err != nil {
 			// Both filter values are client-chosen, so both go on the record through
 			// FieldForLog: without it a multi-kilobyte auditEvent lands whole, carrying
@@ -78,8 +78,8 @@ func HandleAuditLogsGet(
 			writeInternalServerError(w, r, errs.Wrap(err, "failed to get audit logs"),
 				"page", page, "size", size,
 				"audit_event", logging.FieldForLog(auditEvent),
-				"filter_request_id", logging.FieldForLog(requestId),
-				"filter_user_id", userId)
+				"filter_request_id", logging.FieldForLog(requestID),
+				"filter_user_id", userID)
 			return
 		}
 

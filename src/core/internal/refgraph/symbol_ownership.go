@@ -61,7 +61,7 @@ const (
 	// justificationOwnPackage: the declaring package's own production code names it, from a
 	// declaration that is itself justified. The table asks why core declares a symbol, which is
 	// two questions -- does the package belong in core, and does the symbol belong to the package
-	// -- and they come apart for a package with behaviour. sessionstore.SessionIdBytes is the
+	// -- and they come apart for a package with behaviour. sessionstore.SessionIDBytes is the
 	// width the store mints an identifier at, inside a store both processes depend on.
 	justificationOwnPackage = "own-package"
 	// justificationReachable: a justified symbol's own declaration names it, or it is a const or
@@ -173,7 +173,7 @@ type packageSymbols struct {
 // declNode is one owner and the package-level names its declaration reaches, split by position.
 // The split is the line between own-package and reachable: decl is the type and the signature,
 // which is how api.RedirectURIResponse is reached from ClientResponse, and body is everything
-// else, which is how sessionstore.SessionIdBytes is reached from the method that mints an
+// else, which is how sessionstore.SessionIDBytes is reached from the method that mints an
 // identifier.
 type declNode struct {
 	exported bool

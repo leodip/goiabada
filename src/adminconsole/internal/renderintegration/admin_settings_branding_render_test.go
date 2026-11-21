@@ -37,9 +37,9 @@ var renderThemes = []adminsettingshandlers.BrandThemeOption{
 func TestRender_AdminSettingsBrandingListMarksTheDefault(t *testing.T) {
 	out := renderMenuPageAt(t, "/admin/settings/branding", "/admin_settings_branding.html", map[string]interface{}{
 		"brands": []adminsettingshandlers.BrandRow{
-			{BrandResponse: api.BrandResponse{Id: 4, Name: "<b>Autumn</b>", Appearance: "dark", Theme: "plum", ClientCount: 2},
+			{BrandResponse: api.BrandResponse{ID: 4, Name: "<b>Autumn</b>", Appearance: "dark", Theme: "plum", ClientCount: 2},
 				AppearanceName: "Escuro", ThemeName: "Ameixa"},
-			{BrandResponse: api.BrandResponse{Id: 5, Name: "Default", Appearance: "auto", Theme: "blueberry", IsDefault: true, ClientCount: 13},
+			{BrandResponse: api.BrandResponse{ID: 5, Name: "Default", Appearance: "auto", Theme: "blueberry", IsDefault: true, ClientCount: 13},
 				AppearanceName: "Automático", ThemeName: "Mirtilo"},
 		},
 	})
@@ -80,7 +80,7 @@ func radioTag(t *testing.T, out, id string) string {
 func TestRender_AdminSettingsBrandingFormDrawsTheSwatchesFromThePalettes(t *testing.T) {
 	out := renderMenuPage(t, "/admin_settings_branding_brand.html", map[string]interface{}{
 		"isNew":           false,
-		"storedBrand":     api.BrandResponse{Id: 4, Name: "Autumn", Appearance: "dark", Theme: "plum", ClientCount: 1},
+		"storedBrand":     api.BrandResponse{ID: 4, Name: "Autumn", Appearance: "dark", Theme: "plum", ClientCount: 1},
 		"brand":           adminsettingshandlers.BrandForm{Name: "Autumn", Appearance: "dark", Theme: "plum"},
 		"brandThemes":     renderThemes,
 		"appearanceTheme": renderThemes[1],
@@ -126,7 +126,7 @@ func TestRender_AdminSettingsBrandingFormDrawsTheSwatchesFromThePalettes(t *test
 func TestRender_AdminSettingsBrandingFormOfTheDefaultOffersNoMakeDefault(t *testing.T) {
 	out := renderMenuPage(t, "/admin_settings_branding_brand.html", map[string]interface{}{
 		"isNew":             false,
-		"storedBrand":       api.BrandResponse{Id: 5, Name: "Default", Appearance: "auto", Theme: "blueberry", IsDefault: true},
+		"storedBrand":       api.BrandResponse{ID: 5, Name: "Default", Appearance: "auto", Theme: "blueberry", IsDefault: true},
 		"brand":             adminsettingshandlers.BrandForm{Name: "Default", Appearance: "auto", Theme: "blueberry"},
 		"brandThemes":       renderThemes,
 		"appearanceTheme":   renderThemes[0],
@@ -214,7 +214,7 @@ func TestRender_AdminSettingsBrandingFormMarksTheRefusedField(t *testing.T) {
 func TestRender_AdminSettingsBrandingDeletePage(t *testing.T) {
 	out := renderMenuPage(t, "/admin_settings_branding_delete.html", map[string]interface{}{
 		"brand": adminsettingshandlers.BrandRow{
-			BrandResponse:  api.BrandResponse{Id: 4, Name: "Autumn", Appearance: "dark", Theme: "plum"},
+			BrandResponse:  api.BrandResponse{ID: 4, Name: "Autumn", Appearance: "dark", Theme: "plum"},
 			AppearanceName: "Escuro", ThemeName: "Ameixa"},
 		"clientsNote": "2 clientes a usam. Eles passarão para a marca padrão, Default.", //nolint:misspell // the pt-BR catalog's text: "clientes" is Portuguese, not a misspelling of "clients"
 	})
@@ -232,7 +232,7 @@ func TestRender_AdminSettingsBrandingDeletePage(t *testing.T) {
 	// no deletion.
 	out = renderMenuPage(t, "/admin_settings_branding_delete.html", map[string]interface{}{
 		"brand": adminsettingshandlers.BrandRow{
-			BrandResponse:  api.BrandResponse{Id: 5, Name: "Default", Appearance: "auto", Theme: "blueberry", IsDefault: true},
+			BrandResponse:  api.BrandResponse{ID: 5, Name: "Default", Appearance: "auto", Theme: "blueberry", IsDefault: true},
 			AppearanceName: "Automático", ThemeName: "Mirtilo"},
 	})
 	assert.Contains(t, out, `<div class="notice notice-caution">`)
@@ -270,7 +270,7 @@ func TestRender_AdminSettingsBrandingFormDrawsThePreview(t *testing.T) {
 				"appearanceTheme": renderThemes[1],
 			}
 			if !isNew {
-				bind["storedBrand"] = api.BrandResponse{Id: 4, Name: "Autumn", Appearance: "dark", Theme: "plum"}
+				bind["storedBrand"] = api.BrandResponse{ID: 4, Name: "Autumn", Appearance: "dark", Theme: "plum"}
 			}
 			out := renderMenuPage(t, "/admin_settings_branding_brand.html", bind)
 
@@ -473,7 +473,7 @@ func optionTag(t *testing.T, out, value string) string {
 func TestRender_AdminSettingsBrandingFormDrawsTheKitsChoices(t *testing.T) {
 	out := renderMenuPage(t, "/admin_settings_branding_brand.html", map[string]interface{}{
 		"isNew":       false,
-		"storedBrand": api.BrandResponse{Id: 4, Name: "Autumn", Appearance: "dark", Theme: "plum"},
+		"storedBrand": api.BrandResponse{ID: 4, Name: "Autumn", Appearance: "dark", Theme: "plum"},
 		"brand": adminsettingshandlers.BrandForm{Name: "Autumn", Appearance: "dark", Theme: "plum",
 			Corners: "pill", Font: "serif", BackgroundFit: "tile", HideAppName: true},
 		"brandThemes":     renderThemes,
@@ -649,12 +649,12 @@ func renderKitForm(t *testing.T, errorField string) string {
 	t.Helper()
 	bind := map[string]interface{}{
 		"isNew":       false,
-		"storedBrand": api.BrandResponse{Id: 4, Name: "Autumn", Appearance: "auto", Theme: "plum"},
+		"storedBrand": api.BrandResponse{ID: 4, Name: "Autumn", Appearance: "auto", Theme: "plum"},
 		"brand": adminsettingshandlers.BrandForm{Name: "Autumn", Appearance: "auto", Theme: "plum",
 			Corners: "rounded", Font: "uploaded", BackgroundFit: "cover",
-			Logo:        &api.BrandAssetResponse{Id: 11, Kind: "logo", Url: "https://login.example.test/brand-assets/11?v=a&x=<b>", ContentType: "image/png", Width: 200, Height: 60},
-			Favicon:     &api.BrandAssetResponse{Id: 13, Kind: "favicon", Url: "https://login.example.test/brand-assets/13?v=c", ContentType: "image/png", Width: 64, Height: 64},
-			RegularFont: &api.BrandAssetResponse{Id: 15, Kind: "font", Url: "https://login.example.test/brand-assets/15?v=e", ContentType: "font/woff2"}},
+			Logo:        &api.BrandAssetResponse{ID: 11, Kind: "logo", URL: "https://login.example.test/brand-assets/11?v=a&x=<b>", ContentType: "image/png", Width: 200, Height: 60},
+			Favicon:     &api.BrandAssetResponse{ID: 13, Kind: "favicon", URL: "https://login.example.test/brand-assets/13?v=c", ContentType: "image/png", Width: 64, Height: 64},
+			RegularFont: &api.BrandAssetResponse{ID: 15, Kind: "font", URL: "https://login.example.test/brand-assets/15?v=e", ContentType: "font/woff2"}},
 		"brandThemes":       renderThemes,
 		"appearanceTheme":   renderThemes[1],
 		"brandAssetUploads": renderUploads,
@@ -809,9 +809,9 @@ func TestRender_AdminSettingsBrandingSampleHasARoomForTheFooter(t *testing.T) {
 	out := renderMenuPage(t, "/admin_settings_branding_brand.html", map[string]interface{}{
 		"isNew": false,
 		"brand": adminsettingshandlers.BrandForm{Appearance: "auto", Theme: "plum", Corners: "rounded", Font: "system-ui", BackgroundFit: "cover",
-			FooterLinks:  [3]adminsettingshandlers.BrandFooterLinkRow{{Label: "Privacy", Url: "https://autumn.example/privacy"}},
+			FooterLinks:  [3]adminsettingshandlers.BrandFooterLinkRow{{Label: "Privacy", URL: "https://autumn.example/privacy"}},
 			SupportEmail: "help@autumn.example"},
-		"storedBrand":     api.BrandResponse{Id: 4, Name: "Autumn", Appearance: "auto", Theme: "plum"},
+		"storedBrand":     api.BrandResponse{ID: 4, Name: "Autumn", Appearance: "auto", Theme: "plum"},
 		"brandThemes":     renderThemes,
 		"appearanceTheme": renderThemes[1],
 	})

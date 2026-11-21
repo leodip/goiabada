@@ -50,7 +50,7 @@ func TestHandleTokenPost_AServerFaultAnswersJSON(t *testing.T) {
 	reuse := &protocolvalidation.AuthCodeReusedError{
 		Detail: oauth.NewErrorDetailWithHTTPStatus("invalid_grant", "Code is invalid.",
 			http.StatusBadRequest),
-		Code: &record.Code{Id: 7, ClientId: 3, UserId: 11, SessionIdentifier: "sid-reused"},
+		Code: &record.Code{ID: 7, ClientID: 3, UserID: 11, SessionIdentifier: "sid-reused"},
 	}
 	tokenValidator.On("ValidateTokenRequest", mock.Anything, mock.Anything,
 		mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).Return(nil, reuse)
@@ -77,7 +77,7 @@ func TestHandleUserInfoGetPost_AServerFaultAnswersJSON(t *testing.T) {
 		Return(nil, errs.New("the database went away")).Once()
 
 	req := httptest.NewRequest(http.MethodGet, "/userinfo", nil)
-	req = req.WithContext(reqctx.WithValidatedToken(req.Context(), oauth.JwtToken{
+	req = req.WithContext(reqctx.WithValidatedToken(req.Context(), oauth.JWTToken{
 		Claims: map[string]interface{}{"sub": "user123", "scope": "openid"},
 	}))
 	rr := httptest.NewRecorder()

@@ -33,21 +33,21 @@ func TestTerminateUserSessionTx_SweepsAfterTheSessionRowIsDeleted(t *testing.T) 
 	client := createTestClient(t)
 	user := createTestUser(t)
 
-	session := createTestUserSession(t, user.Id)
-	sessionBoundCode := createTestCodeInSession(t, client.Id, user.Id, session.SessionIdentifier)
-	offlineCode := createTestCodeInSession(t, client.Id, user.Id, session.SessionIdentifier)
+	session := createTestUserSession(t, user.ID)
+	sessionBoundCode := createTestCodeInSession(t, client.ID, user.ID, session.SessionIdentifier)
+	offlineCode := createTestCodeInSession(t, client.ID, user.ID, session.SessionIdentifier)
 
 	// Session-bound: the row carries the identifier itself.
-	sessionBoundToken := createTokenOfCode(t, client.Id, user.Id, sessionBoundCode.Id, session.SessionIdentifier)
+	sessionBoundToken := createTokenOfCode(t, client.ID, user.ID, sessionBoundCode.ID, session.SessionIdentifier)
 	// Offline: the row carries NO identifier, and is reachable only through its code.
-	offlineToken := createTokenOfCode(t, client.Id, user.Id, offlineCode.Id, "")
+	offlineToken := createTokenOfCode(t, client.ID, user.ID, offlineCode.ID, "")
 
 	// The negative control, on a session of its own. Without it this test passes against a
 	// termination that revokes every code and every token in the table, which would sign out
 	// every other device of every user.
-	otherSession := createTestUserSession(t, user.Id)
-	otherCode := createTestCodeInSession(t, client.Id, user.Id, otherSession.SessionIdentifier)
-	otherToken := createTokenOfCode(t, client.Id, user.Id, otherCode.Id, otherSession.SessionIdentifier)
+	otherSession := createTestUserSession(t, user.ID)
+	otherCode := createTestCodeInSession(t, client.ID, user.ID, otherSession.SessionIdentifier)
+	otherToken := createTokenOfCode(t, client.ID, user.ID, otherCode.ID, otherSession.SessionIdentifier)
 
 	result, err := revocation.TerminateUserSessionTx(context.Background(), database, session, false)
 	if err != nil {
@@ -57,32 +57,32 @@ func TestTerminateUserSessionTx_SweepsAfterTheSessionRowIsDeleted(t *testing.T) 
 	if result.RevokedCodeCount != 2 {
 		t.Errorf("RevokedCodeCount = %d, want 2", result.RevokedCodeCount)
 	}
-	if len(result.RevokedRefreshTokenJtis) != 2 {
+	if len(result.RevokedRefreshTokenJTIs) != 2 {
 		t.Errorf("RevokedRefreshTokenJtis = %v, want the two tokens of this session",
-			result.RevokedRefreshTokenJtis)
+			result.RevokedRefreshTokenJTIs)
 	}
 
 	// The row is gone, which is what the first statement did.
-	gone, err := database.GetUserSessionById(context.Background(), nil, session.Id)
+	gone, err := database.GetUserSessionByID(context.Background(), nil, session.ID)
 	if err != nil {
-		t.Fatalf("GetUserSessionById after terminating: %v", err)
+		t.Fatalf("GetUserSessionByID after terminating: %v", err)
 	}
 	if gone != nil {
 		t.Error("the terminated session row must be gone")
 	}
 
 	// And the two sweeps still ran, against a session row that no longer existed when they did.
-	assertCodeRevoked(t, sessionBoundCode.Id, true, "the code of the terminated session")
-	assertCodeRevoked(t, offlineCode.Id, true, "the offline grant's code of the terminated session")
-	assertTokenRevoked(t, sessionBoundToken.Id, true, "the session-bound token of the terminated session")
-	assertTokenRevoked(t, offlineToken.Id, true, "the offline token of the terminated session")
+	assertCodeRevoked(t, sessionBoundCode.ID, true, "the code of the terminated session")
+	assertCodeRevoked(t, offlineCode.ID, true, "the offline grant's code of the terminated session")
+	assertTokenRevoked(t, sessionBoundToken.ID, true, "the session-bound token of the terminated session")
+	assertTokenRevoked(t, offlineToken.ID, true, "the offline token of the terminated session")
 
-	assertCodeRevoked(t, otherCode.Id, false, "a code of an unrelated session")
-	assertTokenRevoked(t, otherToken.Id, false, "a token of an unrelated session")
+	assertCodeRevoked(t, otherCode.ID, false, "a code of an unrelated session")
+	assertTokenRevoked(t, otherToken.ID, false, "a token of an unrelated session")
 
-	stillThere, err := database.GetUserSessionById(context.Background(), nil, otherSession.Id)
+	stillThere, err := database.GetUserSessionByID(context.Background(), nil, otherSession.ID)
 	if err != nil {
-		t.Fatalf("GetUserSessionById for the unrelated session: %v", err)
+		t.Fatalf("GetUserSessionByID for the unrelated session: %v", err)
 	}
 	if stillThere == nil {
 		t.Error("an unrelated session must survive the termination")
@@ -92,22 +92,22 @@ func TestTerminateUserSessionTx_SweepsAfterTheSessionRowIsDeleted(t *testing.T) 
 // createTokenOfCode makes a refresh token descending from one code. sessionIdentifier is the
 // token's OWN column, which an offline token leaves empty: the sid its grant came from lives on
 // the codes row, and the sid-scoped sweep reaches it through that join alone.
-func createTokenOfCode(t *testing.T, clientId, userId, codeId int64, sessionIdentifier string) *record.RefreshToken {
-	return createTokenOfCodeOn(t, database, clientId, userId, codeId, sessionIdentifier)
+func createTokenOfCode(t *testing.T, clientID, userID, codeID int64, sessionIdentifier string) *record.RefreshToken {
+	return createTokenOfCodeOn(t, database, clientID, userID, codeID, sessionIdentifier)
 }
 
 // createTokenOfCodeOn takes the handle, for the reason createTestUserOn does.
-func createTokenOfCodeOn(t *testing.T, db data.Database, clientId, userId, codeId int64, sessionIdentifier string) *record.RefreshToken {
+func createTokenOfCodeOn(t *testing.T, db data.Database, clientID, userID, codeID int64, sessionIdentifier string) *record.RefreshToken {
 	t.Helper()
 	tokenType := "Refresh"
 	if sessionIdentifier == "" {
 		tokenType = "Offline"
 	}
 	token := &record.RefreshToken{
-		CodeId:            sql.NullInt64{Int64: codeId, Valid: true},
-		UserId:            sql.NullInt64{Int64: userId, Valid: true},
-		ClientId:          sql.NullInt64{Int64: clientId, Valid: true},
-		RefreshTokenJti:   fake.UUID(),
+		CodeID:            sql.NullInt64{Int64: codeID, Valid: true},
+		UserID:            sql.NullInt64{Int64: userID, Valid: true},
+		ClientID:          sql.NullInt64{Int64: clientID, Valid: true},
+		RefreshTokenJTI:   fake.UUID(),
 		SessionIdentifier: sessionIdentifier,
 		RefreshTokenType:  tokenType,
 		Scope:             "openid profile offline_access",
@@ -124,21 +124,21 @@ func createTokenOfCodeOn(t *testing.T, db data.Database, clientId, userId, codeI
 // assertTokenRevoked reloads a refresh token and checks the marker, for the same reason
 // assertCodeRevoked reloads a code: what the column says on a later read is the whole point of
 // writing it.
-func assertTokenRevoked(t *testing.T, tokenId int64, want bool, what string) {
+func assertTokenRevoked(t *testing.T, tokenID int64, want bool, what string) {
 	t.Helper()
-	assertTokenRevokedOn(t, database, tokenId, want, what)
+	assertTokenRevokedOn(t, database, tokenID, want, what)
 }
 
 // assertTokenRevokedOn reloads through the handle it is given, for the reason assertCodeRevokedOn
 // does.
-func assertTokenRevokedOn(t *testing.T, db data.Database, tokenId int64, want bool, what string) {
+func assertTokenRevokedOn(t *testing.T, db data.Database, tokenID int64, want bool, what string) {
 	t.Helper()
-	token, err := db.GetRefreshTokenById(context.Background(), nil, tokenId)
+	token, err := db.GetRefreshTokenByID(context.Background(), nil, tokenID)
 	if err != nil {
-		t.Fatalf("Failed to reload refresh token %d: %v", tokenId, err)
+		t.Fatalf("Failed to reload refresh token %d: %v", tokenID, err)
 	}
 	if token == nil {
-		t.Fatalf("Refresh token %d disappeared", tokenId)
+		t.Fatalf("Refresh token %d disappeared", tokenID)
 	}
 	if token.Revoked != want {
 		t.Errorf("%s: Revoked = %v, want %v", what, token.Revoked, want)

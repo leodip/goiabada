@@ -47,13 +47,13 @@ func recoveryCodesOnPage(t *testing.T, resp *http.Response) []string {
 func continuePastRecoveryCodes(t *testing.T, httpClient *http.Client, codesPage *http.Response) *http.Response {
 	t.Helper()
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/recovery-codes"
-	request, err := http.NewRequest(http.MethodPost, destUrl, strings.NewReader(url.Values{
-		"ceremonyId": {getCeremonyIdFromPage(t, codesPage)},
+	destURL := appConfig.AuthServer.BaseURL + "/auth/recovery-codes"
+	request, err := http.NewRequest(http.MethodPost, destURL, strings.NewReader(url.Values{
+		"ceremonyId": {getCeremonyIDFromPage(t, codesPage)},
 	}.Encode()))
 	require.NoError(t, err)
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	request.Header.Set("Referer", destUrl)
+	request.Header.Set("Referer", destURL)
 	request.Header.Set("Origin", appConfig.AuthServer.BaseURL)
 
 	resp, err := httpClient.Do(request)
@@ -85,12 +85,12 @@ func passSetupRecoveryCodes(t *testing.T, httpClient *http.Client, accepted *htt
 // the sign-in then finishes with the code that set up the authenticator in its amr. A code the page
 // showed then signs in on its own.
 func TestSetupRecoveryCodes_AreShownOnceBeforeTheSignInGoesOn(t *testing.T) {
-	client, redirectUri := createPublicClientAt(t, record.AcrLevel2Mandatory)
+	client, redirectURI := createPublicClientAt(t, record.ACRLevel2Mandatory)
 	_, _, user, password, _ := createLevel2MandatoryUser(t, false)
 
-	httpClient, setupPage, otpUrl := startOtpCeremony(t, client, redirectUri, user, password, "")
-	secret := getOtpSecretFromEnrollmentPage(t, setupPage)
-	accepted := authenticateWithOtp(t, httpClient, otpUrl, setupPage, otptest.Code(t, secret, time.Now()))
+	httpClient, setupPage, otpURL := startOTPCeremony(t, client, redirectURI, user, password, "")
+	secret := getOTPSecretFromEnrollmentPage(t, setupPage)
+	accepted := authenticateWithOTP(t, httpClient, otpURL, setupPage, otptest.Code(t, secret, time.Now()))
 	_ = setupPage.Body.Close()
 
 	codesLocation := assertRedirect(t, accepted, "/auth/recovery-codes")
@@ -105,12 +105,12 @@ func TestSetupRecoveryCodes_AreShownOnceBeforeTheSignInGoesOn(t *testing.T) {
 	for _, code := range codes {
 		assert.Regexp(t, `^[0-9a-hjkmnp-tv-z]{4}(-[0-9a-hjkmnp-tv-z]{4}){5}$`, code)
 		// The set stores the SHA-256 of each code's 24 characters (decision 2).
-		stored, err := database.UserRecoveryCodeExists(context.Background(), nil, user.Id,
+		stored, err := database.UserRecoveryCodeExists(context.Background(), nil, user.ID,
 			hashutil.HashString(strings.ReplaceAll(code, "-", "")))
 		require.NoError(t, err)
 		assert.True(t, stored, "the page shows a code of the account's set: %s", code)
 	}
-	assert.Equal(t, 10, unusedRecoveryCodesForTest(t, user.Id))
+	assert.Equal(t, 10, unusedRecoveryCodesForTest(t, user.ID))
 
 	reloaded := loadPage(t, httpClient, codesLocation)
 	defer func() { _ = reloaded.Body.Close() }()
@@ -135,8 +135,8 @@ func TestSetupRecoveryCodes_AreShownOnceBeforeTheSignInGoesOn(t *testing.T) {
 	assert.Equal(t, []interface{}{"pwd", "otp"}, idClaims["amr"])
 
 	// A code the page showed is a code that signs in.
-	signIn, resp, _ := recoveryCodeSignInTo(t, client, redirectUri, user, password, codes[7])
+	signIn, resp, _ := recoveryCodeSignInTo(t, client, redirectURI, user, password, codes[7])
 	idClaims, _ = finishSignIn(t, signIn, resp)
 	assert.Equal(t, []interface{}{"pwd", "recovery_code"}, idClaims["amr"])
-	assert.Equal(t, 9, unusedRecoveryCodesForTest(t, user.Id))
+	assert.Equal(t, 9, unusedRecoveryCodesForTest(t, user.ID))
 }

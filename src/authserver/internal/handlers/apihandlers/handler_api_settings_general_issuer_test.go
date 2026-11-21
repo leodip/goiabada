@@ -49,7 +49,7 @@ func putGeneralIssuer(t *testing.T, storedIssuer, issuer string) (*httptest.Resp
 	})
 	require.NoError(t, err)
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/settings/general", bytes.NewReader(body))
-	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{Id: 1, Issuer: storedIssuer}))
+	req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{ID: 1, Issuer: storedIssuer}))
 	rr := httptest.NewRecorder()
 
 	HandleSettingsGeneralPut(database, auditLogger, issuerRuleBaseURL).ServeHTTP(rr, req)

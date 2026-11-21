@@ -41,10 +41,10 @@ func putPageLanguageProfile(t *testing.T, putURL, accessToken string, body map[s
 
 // assertPageLanguageSaves drives one profile route through the four outcomes, reading the row
 // after each.
-func assertPageLanguageSaves(t *testing.T, putURL, accessToken string, userId int64) {
+func assertPageLanguageSaves(t *testing.T, putURL, accessToken string, userID int64) {
 	t.Helper()
 	stored := func() string {
-		u, err := database.GetUserById(context.Background(), nil, userId)
+		u, err := database.GetUserByID(context.Background(), nil, userID)
 		require.NoError(t, err)
 		require.NotNil(t, u)
 		return u.PageLanguage
@@ -79,7 +79,7 @@ func TestAPIAccountProfilePut_PageLanguage(t *testing.T) {
 	accessToken, u := getUserAccessTokenWithAccountScope(t)
 	profileURL := appConfig.AuthServer.BaseURL + "/api/v1/account/profile"
 
-	assertPageLanguageSaves(t, profileURL, accessToken, u.Id)
+	assertPageLanguageSaves(t, profileURL, accessToken, u.ID)
 
 	// The account's own read carries it.
 	_, _, _ = putPageLanguageProfile(t, profileURL, accessToken,
@@ -104,11 +104,11 @@ func TestAPIUserProfilePut_PageLanguage(t *testing.T) {
 	}
 	require.NoError(t, database.CreateUser(context.Background(), nil, testUser))
 	defer func() {
-		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.ID)
 	}()
-	userURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10)
+	userURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.ID, 10)
 
-	assertPageLanguageSaves(t, userURL+"/profile", accessToken, testUser.Id)
+	assertPageLanguageSaves(t, userURL+"/profile", accessToken, testUser.ID)
 
 	// The administrator's read and the user search carry it.
 	status, _, _ := putPageLanguageProfile(t, userURL+"/profile", accessToken,

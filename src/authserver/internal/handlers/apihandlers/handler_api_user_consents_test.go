@@ -43,15 +43,15 @@ func TestHandleUserConsentsGet_Success(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	handler := HandleUserConsentsGet(database)
 
-	user := &record.User{Id: 7}
-	consents := []record.UserConsent{{Id: 1, UserId: 7, ClientId: 3, Scope: "openid"}}
+	user := &record.User{ID: 7}
+	consents := []record.UserConsent{{ID: 1, UserID: 7, ClientID: 3, Scope: "openid"}}
 
 	req, _ := http.NewRequest("GET", "/api/v1/admin/users/7/consents", nil)
 	req.SetPathValue("id", "7")
 	rr := httptest.NewRecorder()
 
-	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(user, nil)
-	database.On("GetConsentsByUserId", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(consents, nil)
+	database.On("GetUserByID", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(user, nil)
+	database.On("GetConsentsByUserID", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(consents, nil)
 	database.On("UserConsentsLoadClients", mock.Anything, (*sql.Tx)(nil), consents).Return(nil)
 
 	handler.ServeHTTP(rr, req)
@@ -71,7 +71,7 @@ func TestHandleUserConsentsGet_GetUserFails_JSON500(t *testing.T) {
 	req.SetPathValue("id", "7")
 	rr := httptest.NewRecorder()
 
-	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(nil, assert.AnError)
+	database.On("GetUserByID", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(nil, assert.AnError)
 
 	handler.ServeHTTP(rr, req)
 
@@ -87,8 +87,8 @@ func TestHandleUserConsentsGet_GetConsentsFails_JSON500(t *testing.T) {
 	req.SetPathValue("id", "7")
 	rr := httptest.NewRecorder()
 
-	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(&record.User{Id: 7}, nil)
-	database.On("GetConsentsByUserId", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(nil, assert.AnError)
+	database.On("GetUserByID", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(&record.User{ID: 7}, nil)
+	database.On("GetConsentsByUserID", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(nil, assert.AnError)
 
 	handler.ServeHTTP(rr, req)
 
@@ -100,14 +100,14 @@ func TestHandleUserConsentsGet_LoadClientsFails_JSON500(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	handler := HandleUserConsentsGet(database)
 
-	consents := []record.UserConsent{{Id: 1, UserId: 7, ClientId: 3}}
+	consents := []record.UserConsent{{ID: 1, UserID: 7, ClientID: 3}}
 
 	req, _ := http.NewRequest("GET", "/api/v1/admin/users/7/consents", nil)
 	req.SetPathValue("id", "7")
 	rr := httptest.NewRecorder()
 
-	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(&record.User{Id: 7}, nil)
-	database.On("GetConsentsByUserId", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(consents, nil)
+	database.On("GetUserByID", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(&record.User{ID: 7}, nil)
+	database.On("GetConsentsByUserID", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(consents, nil)
 	database.On("UserConsentsLoadClients", mock.Anything, (*sql.Tx)(nil), consents).Return(assert.AnError)
 
 	handler.ServeHTTP(rr, req)
@@ -123,8 +123,8 @@ var consentWithdrawalTx = &sql.Tx{}
 // expectWithdrawnClientTellsNobody registers the withdrawal's first read, the consent's client 3,
 // which registered no back-channel logout URI, so the withdrawal tells nobody (#135 decision 3).
 func expectWithdrawnClientTellsNobody(database *datamocks.Database) {
-	database.On("GetClientsByIds", mock.Anything, consentWithdrawalTx, []int64{3}).
-		Return([]record.Client{{Id: 3, ClientIdentifier: "no-logout-uri"}}, nil)
+	database.On("GetClientsByIDs", mock.Anything, consentWithdrawalTx, []int64{3}).
+		Return([]record.Client{{ID: 3, ClientIdentifier: "no-logout-uri"}}, nil)
 }
 
 func TestHandleUserConsentDelete_Success(t *testing.T) {
@@ -139,8 +139,8 @@ func TestHandleUserConsentDelete_Success(t *testing.T) {
 	req = setTokenContextWithClaims(req, map[string]interface{}{"scope": "authserver:manage", "sub": "admin-subject-1"})
 	rr := httptest.NewRecorder()
 
-	database.On("GetUserConsentById", mock.Anything, (*sql.Tx)(nil), int64(5)).
-		Return(&record.UserConsent{Id: 5, UserId: 7, ClientId: 3}, nil)
+	database.On("GetUserConsentByID", mock.Anything, (*sql.Tx)(nil), int64(5)).
+		Return(&record.UserConsent{ID: 5, UserID: 7, ClientID: 3}, nil)
 	// The withdrawal deletes the consent and sweeps what it leaves standing inside ONE
 	// transaction (#622). One live family token, so the family record is written under the
 	// withdrawal's reason and the sweep flips the token before it saves it. The enumeration is
@@ -149,12 +149,12 @@ func TestHandleUserConsentDelete_Success(t *testing.T) {
 	datamocks.ExpectRunInTransaction(database, consentWithdrawalTx)
 	expectWithdrawnClientTellsNobody(database)
 	database.On("DeleteUserConsent", mock.Anything, consentWithdrawalTx, int64(5)).Return(true, nil).Once()
-	database.On("RevokeUnusedCodesByUserIdAndClientId", mock.Anything, consentWithdrawalTx, int64(7), int64(3)).
+	database.On("RevokeUnusedCodesByUserIDAndClientID", mock.Anything, consentWithdrawalTx, int64(7), int64(3)).
 		Return(int64(1), nil).Once()
-	database.On("GetRefreshTokensByUserIdAndClientId", mock.Anything, consentWithdrawalTx, int64(7), int64(3)).
+	database.On("GetRefreshTokensByUserIDAndClientID", mock.Anything, consentWithdrawalTx, int64(7), int64(3)).
 		Return([]*record.RefreshToken{
-			{Id: 11, RefreshTokenJti: "rt-live", FirstRefreshTokenJti: "rt-first"},
-			{Id: 12, RefreshTokenJti: "rt-already-gone", FirstRefreshTokenJti: "rt-first", Revoked: true},
+			{ID: 11, RefreshTokenJTI: "rt-live", FirstRefreshTokenJTI: "rt-first"},
+			{ID: 12, RefreshTokenJTI: "rt-already-gone", FirstRefreshTokenJTI: "rt-first", Revoked: true},
 		}, nil).Once()
 	database.On("RecordRefreshTokenFamilyRevoked", mock.Anything, consentWithdrawalTx, "rt-first", revocation.ReasonClientDisconnected).
 		Return(true, nil).Once()
@@ -194,7 +194,7 @@ func TestHandleUserConsentDelete_GetConsentFails_JSON500(t *testing.T) {
 	req.SetPathValue("id", "5")
 	rr := httptest.NewRecorder()
 
-	database.On("GetUserConsentById", mock.Anything, (*sql.Tx)(nil), int64(5)).Return(nil, assert.AnError)
+	database.On("GetUserConsentByID", mock.Anything, (*sql.Tx)(nil), int64(5)).Return(nil, assert.AnError)
 
 	handler.ServeHTTP(rr, req)
 
@@ -211,8 +211,8 @@ func TestHandleUserConsentDelete_DeleteFails_JSON500(t *testing.T) {
 	req.SetPathValue("id", "5")
 	rr := httptest.NewRecorder()
 
-	database.On("GetUserConsentById", mock.Anything, (*sql.Tx)(nil), int64(5)).
-		Return(&record.UserConsent{Id: 5, UserId: 7, ClientId: 3}, nil)
+	database.On("GetUserConsentByID", mock.Anything, (*sql.Tx)(nil), int64(5)).
+		Return(&record.UserConsent{ID: 5, UserID: 7, ClientID: 3}, nil)
 	// No token: the target ceiling reads what the user holds, and an ordinary user's write goes on.
 	expectHoldsNothing(database, 7)
 	// The delete runs as the withdrawal's own write, first inside the transaction, and its
@@ -236,12 +236,12 @@ func adminConsentDeleteRaced(database *datamocks.Database) *http.Request {
 	req, _ := http.NewRequest("DELETE", "/api/v1/admin/user-consents/5", nil)
 	req.SetPathValue("id", "5")
 	req = withSessionSettings(setTokenContextWithClaims(req, map[string]interface{}{"scope": "authserver:manage", "sub": "admin-subject-1"}))
-	database.On("GetUserConsentById", mock.Anything, (*sql.Tx)(nil), int64(5)).
-		Return(&record.UserConsent{Id: 5, UserId: 7, ClientId: 3}, nil).Once()
+	database.On("GetUserConsentByID", mock.Anything, (*sql.Tx)(nil), int64(5)).
+		Return(&record.UserConsent{ID: 5, UserID: 7, ClientID: 3}, nil).Once()
 	datamocks.ExpectRunInTransaction(database, consentWithdrawalTx)
 	expectWithdrawnClientTellsNobody(database)
 	database.On("DeleteUserConsent", mock.Anything, consentWithdrawalTx, int64(5)).Return(false, nil).Once()
-	database.On("RevokeUnusedCodesByUserIdAndClientId", mock.Anything, consentWithdrawalTx, int64(7), int64(3)).
+	database.On("RevokeUnusedCodesByUserIDAndClientID", mock.Anything, consentWithdrawalTx, int64(7), int64(3)).
 		Return(int64(0), nil).Once()
 	return req
 }
@@ -252,7 +252,7 @@ func TestHandleUserConsentDelete_AConsentDeletedMeanwhileWithNothingToEndIs404(t
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 	req := adminConsentDeleteRaced(database)
-	database.On("GetRefreshTokensByUserIdAndClientId", mock.Anything, consentWithdrawalTx, int64(7), int64(3)).
+	database.On("GetRefreshTokensByUserIDAndClientID", mock.Anything, consentWithdrawalTx, int64(7), int64(3)).
 		Return([]*record.RefreshToken{}, nil).Once()
 
 	rr := httptest.NewRecorder()
@@ -272,9 +272,9 @@ func TestHandleUserConsentDelete_AConsentDeletedMeanwhileStillAuditsWhatItRecord
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 	req := adminConsentDeleteRaced(database)
-	database.On("GetRefreshTokensByUserIdAndClientId", mock.Anything, consentWithdrawalTx, int64(7), int64(3)).
+	database.On("GetRefreshTokensByUserIDAndClientID", mock.Anything, consentWithdrawalTx, int64(7), int64(3)).
 		Return([]*record.RefreshToken{
-			{Id: 11, RefreshTokenJti: "rt-claimed", FirstRefreshTokenJti: "rt-first", Revoked: true},
+			{ID: 11, RefreshTokenJTI: "rt-claimed", FirstRefreshTokenJTI: "rt-first", Revoked: true},
 		}, nil).Once()
 	database.On("RecordRefreshTokenFamilyRevoked", mock.Anything, consentWithdrawalTx, "rt-first", revocation.ReasonClientDisconnected).
 		Return(true, nil).Once()
@@ -299,26 +299,26 @@ func TestHandleUserConsentDelete_TellsTheClientAfterTheCommit(t *testing.T) {
 	req, _ := http.NewRequest("DELETE", "/api/v1/admin/user-consents/5", nil)
 	req.SetPathValue("id", "5")
 	req = withSessionSettings(setTokenContextWithClaims(req, map[string]interface{}{"scope": "authserver:manage", "sub": "admin-subject-1"}))
-	database.On("GetUserConsentById", mock.Anything, (*sql.Tx)(nil), int64(5)).
-		Return(&record.UserConsent{Id: 5, UserId: 7, ClientId: 3}, nil).Once()
+	database.On("GetUserConsentByID", mock.Anything, (*sql.Tx)(nil), int64(5)).
+		Return(&record.UserConsent{ID: 5, UserID: 7, ClientID: 3}, nil).Once()
 	datamocks.ExpectRunInTransaction(database, consentWithdrawalTx)
-	client := record.Client{Id: 3, ClientIdentifier: "web", BackchannelLogoutURI: "https://web.example/bc",
+	client := record.Client{ID: 3, ClientIdentifier: "web", BackchannelLogoutURI: "https://web.example/bc",
 		BackchannelLogoutSessionRequired: true}
-	database.On("GetClientsByIds", mock.Anything, consentWithdrawalTx, []int64{3}).Return([]record.Client{client}, nil).Once()
-	database.On("GetUserById", mock.Anything, consentWithdrawalTx, int64(7)).
-		Return(&record.User{Id: 7, Subject: "subject-of-7"}, nil).Once()
+	database.On("GetClientsByIDs", mock.Anything, consentWithdrawalTx, []int64{3}).Return([]record.Client{client}, nil).Once()
+	database.On("GetUserByID", mock.Anything, consentWithdrawalTx, int64(7)).
+		Return(&record.User{ID: 7, Subject: "subject-of-7"}, nil).Once()
 	// One session within the settings' idle timeout and lifetime, one past its idle timeout.
 	now := time.Now().UTC()
-	database.On("GetUserSessionsByUserId", mock.Anything, consentWithdrawalTx, int64(7)).Return([]record.UserSession{
-		{Id: 20, UserId: 7, SessionIdentifier: "sid-live", Started: now.Add(-time.Hour), LastAccessed: now.Add(-time.Minute)},
-		{Id: 21, UserId: 7, SessionIdentifier: "sid-idle", Started: now.Add(-3 * time.Hour), LastAccessed: now.Add(-2 * time.Hour)},
+	database.On("GetUserSessionsByUserID", mock.Anything, consentWithdrawalTx, int64(7)).Return([]record.UserSession{
+		{ID: 20, UserID: 7, SessionIdentifier: "sid-live", Started: now.Add(-time.Hour), LastAccessed: now.Add(-time.Minute)},
+		{ID: 21, UserID: 7, SessionIdentifier: "sid-idle", Started: now.Add(-3 * time.Hour), LastAccessed: now.Add(-2 * time.Hour)},
 	}, nil).Once()
-	database.On("GetUserSessionClientsByUserSessionIds", mock.Anything, consentWithdrawalTx, []int64{20}).
-		Return([]record.UserSessionClient{{UserSessionId: 20, ClientId: 3}}, nil).Once()
+	database.On("GetUserSessionClientsByUserSessionIDs", mock.Anything, consentWithdrawalTx, []int64{20}).
+		Return([]record.UserSessionClient{{UserSessionID: 20, ClientID: 3}}, nil).Once()
 	database.On("DeleteUserConsent", mock.Anything, consentWithdrawalTx, int64(5)).Return(true, nil).Once()
-	database.On("RevokeUnusedCodesByUserIdAndClientId", mock.Anything, consentWithdrawalTx, int64(7), int64(3)).
+	database.On("RevokeUnusedCodesByUserIDAndClientID", mock.Anything, consentWithdrawalTx, int64(7), int64(3)).
 		Return(int64(0), nil).Once()
-	database.On("GetRefreshTokensByUserIdAndClientId", mock.Anything, consentWithdrawalTx, int64(7), int64(3)).
+	database.On("GetRefreshTokensByUserIDAndClientID", mock.Anything, consentWithdrawalTx, int64(7), int64(3)).
 		Return([]*record.RefreshToken{}, nil).Once()
 	auditLogger.On("Log", mock.Anything, audit.EventDeletedUserConsent, mock.Anything).Return().Once()
 	auditLogger.On("Log", mock.Anything, audit.EventDisconnectedClient, mock.Anything).Return().Once()
@@ -329,7 +329,7 @@ func TestHandleUserConsentDelete_TellsTheClientAfterTheCommit(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, rr.Code)
 	assert.Equal(t, [][]backchannel.Delivery{{{
-		ClientId: 3, ClientIdentifier: "web", URI: "https://web.example/bc", UserId: 7, Subject: "subject-of-7",
+		ClientID: 3, ClientIdentifier: "web", URI: "https://web.example/bc", UserID: 7, Subject: "subject-of-7",
 		SessionIdentifier: "sid-live",
 	}}}, logoutTokens.sent)
 	assert.Equal(t, "https://issuer.example", logoutTokens.issuer)
@@ -340,7 +340,7 @@ func TestHandleUserConsentDelete_A404TellsNobody(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 	req := adminConsentDeleteRaced(database)
-	database.On("GetRefreshTokensByUserIdAndClientId", mock.Anything, consentWithdrawalTx, int64(7), int64(3)).
+	database.On("GetRefreshTokensByUserIDAndClientID", mock.Anything, consentWithdrawalTx, int64(7), int64(3)).
 		Return([]*record.RefreshToken{}, nil).Once()
 
 	logoutTokens := &recordingLogoutTokens{}

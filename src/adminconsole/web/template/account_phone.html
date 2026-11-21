@@ -35,7 +35,7 @@
         <select class="control" id="phoneCountryUniqueId" name="phoneCountryUniqueId" autocomplete="tel-country-code" data-searchable{{ if .error }}{{ if eq .errorField "phoneCountryUniqueId" }} aria-invalid="true" aria-describedby="phone-error" autofocus{{ end }}{{ end }}>
           <option value=""{{ if eq .selectedPhoneCountryUniqueId "" }} selected{{ end }}>{{ T $.ctx "adminconsole.account.phone.country_blank" }}</option>
           {{ range .phoneCountries }}
-          <option value="{{ .UniqueId }}" data-calling-code="{{ .CallingCode }}"{{ if eq $.selectedPhoneCountryUniqueId .UniqueId }} selected{{ end }}>{{ RefPhoneCountry $.ctx .Emoji .Alpha2 .CallingCode .Name }}</option>
+          <option value="{{ .UniqueID }}" data-calling-code="{{ .CallingCode }}"{{ if eq $.selectedPhoneCountryUniqueId .UniqueID }} selected{{ end }}>{{ RefPhoneCountry $.ctx .Emoji .Alpha2 .CallingCode .Name }}</option>
           {{ end }}
         </select>
       </div>

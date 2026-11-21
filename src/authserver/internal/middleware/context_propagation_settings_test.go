@@ -23,24 +23,24 @@ import (
 // so a middleware that passed context.Background() matches nothing and the strict mock reports an
 // unexpected call.
 
-const settingsPropagatedRequestId = "goiabada/req-settings-propagation-1"
+const settingsPropagatedRequestID = "goiabada/req-settings-propagation-1"
 
-func settingsRequestCarryingId() *http.Request {
+func settingsRequestCarryingID() *http.Request {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	return req.WithContext(requestid.NewContext(req.Context(), settingsPropagatedRequestId))
+	return req.WithContext(requestid.NewContext(req.Context(), settingsPropagatedRequestID))
 }
 
 func theSettingsRequestsContext() interface{} {
 	return mock.MatchedBy(func(ctx context.Context) bool {
-		return requestid.FromContext(ctx) == settingsPropagatedRequestId
+		return requestid.FromContext(ctx) == settingsPropagatedRequestID
 	})
 }
 
 // The accept arm: the settings read is issued on behalf of the request that triggered it.
 func TestSettings_ReadsSettingsUnderTheRequestsContext(t *testing.T) {
 	db := datamocks.NewDatabase(t)
-	db.On("GetSettingsById", theSettingsRequestsContext(), mock.Anything, int64(1)).
-		Return(&record.Settings{Id: 1, AppName: "TestApp"}, nil).Once()
+	db.On("GetSettingsByID", theSettingsRequestsContext(), mock.Anything, int64(1)).
+		Return(&record.Settings{ID: 1, AppName: "TestApp"}, nil).Once()
 
 	reached := false
 	handler := Settings(db, PageFaults())(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -48,7 +48,7 @@ func TestSettings_ReadsSettingsUnderTheRequestsContext(t *testing.T) {
 	}))
 
 	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, settingsRequestCarryingId())
+	handler.ServeHTTP(rr, settingsRequestCarryingID())
 
 	require.Equal(t, http.StatusOK, rr.Code)
 	assert.True(t, reached, "the next handler runs once the settings are on the context")

@@ -32,7 +32,7 @@ func createImplicitClientForPromptTests(t *testing.T) (*record.Client, *record.R
 		AuthorizationCodeEnabled: true, // Needed for establishing session
 		ImplicitGrantEnabled:     nil,  // Inherit from global (enabled)
 		ConsentRequired:          false,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -40,37 +40,37 @@ func createImplicitClientForPromptTests(t *testing.T) (*record.Client, *record.R
 		t.Fatal(err)
 	}
 
-	redirectUri := &record.RedirectURI{
-		ClientId: client.Id,
+	redirectURI := &record.RedirectURI{
+		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
 
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	return client, redirectUri
+	return client, redirectURI
 }
 
 func TestPromptNone_ImplicitResponseTypeToken(t *testing.T) {
 	enableImplicitFlowGlobally(t)
 
 	// Establish session via auth code flow
-	httpClient, _, _, _ := createSessionWithAcrLevel1(t)
+	httpClient, _, _, _ := createSessionWithACRLevel1(t)
 
 	// Create a client that supports implicit flow
-	client, redirectUri := createImplicitClientForPromptTests(t)
+	client, redirectURI := createImplicitClientForPromptTests(t)
 
 	requestState := fake.LetterN(8)
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=token" +
 		"&scope=" + url.QueryEscape("openid profile") +
 		"&state=" + requestState +
 		"&prompt=none"
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,7 +84,7 @@ func TestPromptNone_ImplicitResponseTypeToken(t *testing.T) {
 	// Implicit flow returns tokens in fragment
 	assert.Equal(t, http.StatusFound, resp.StatusCode)
 	location := resp.Header.Get("Location")
-	assert.True(t, strings.HasPrefix(location, redirectUri.URI+"#"), "Should redirect with fragment")
+	assert.True(t, strings.HasPrefix(location, redirectURI.URI+"#"), "Should redirect with fragment")
 
 	tokens := getTokensFromFragment(t, resp)
 
@@ -99,24 +99,24 @@ func TestPromptNone_ImplicitResponseTypeToken(t *testing.T) {
 	assert.Empty(t, tokens["refresh_token"], "refresh_token should NOT be present in implicit flow")
 }
 
-func TestPromptNone_ImplicitResponseTypeIdToken(t *testing.T) {
+func TestPromptNone_ImplicitResponseTypeIDToken(t *testing.T) {
 	enableImplicitFlowGlobally(t)
 
-	httpClient, _, _, _ := createSessionWithAcrLevel1(t)
+	httpClient, _, _, _ := createSessionWithACRLevel1(t)
 
-	client, redirectUri := createImplicitClientForPromptTests(t)
+	client, redirectURI := createImplicitClientForPromptTests(t)
 
 	requestState := fake.LetterN(8)
 	requestNonce := "test-nonce-" + fake.LetterN(16)
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=id_token" +
 		"&scope=" + url.QueryEscape("openid profile") +
 		"&state=" + requestState +
 		"&nonce=" + requestNonce +
 		"&prompt=none"
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -128,7 +128,7 @@ func TestPromptNone_ImplicitResponseTypeIdToken(t *testing.T) {
 
 	assert.Equal(t, http.StatusFound, resp.StatusCode)
 	location := resp.Header.Get("Location")
-	assert.True(t, strings.HasPrefix(location, redirectUri.URI+"#"), "Should redirect with fragment")
+	assert.True(t, strings.HasPrefix(location, redirectURI.URI+"#"), "Should redirect with fragment")
 
 	tokens := getTokensFromFragment(t, resp)
 
@@ -143,24 +143,24 @@ func TestPromptNone_ImplicitResponseTypeIdToken(t *testing.T) {
 	assert.Equal(t, requestNonce, idClaims["nonce"], "nonce should be preserved in id_token")
 }
 
-func TestPromptNone_ImplicitResponseTypeIdTokenToken(t *testing.T) {
+func TestPromptNone_ImplicitResponseTypeIDTokenToken(t *testing.T) {
 	enableImplicitFlowGlobally(t)
 
-	httpClient, _, _, _ := createSessionWithAcrLevel1(t)
+	httpClient, _, _, _ := createSessionWithACRLevel1(t)
 
-	client, redirectUri := createImplicitClientForPromptTests(t)
+	client, redirectURI := createImplicitClientForPromptTests(t)
 
 	requestState := fake.LetterN(8)
 	requestNonce := "test-nonce-" + fake.LetterN(16)
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=" + url.QueryEscape("id_token token") +
 		"&scope=" + url.QueryEscape("openid profile") +
 		"&state=" + requestState +
 		"&nonce=" + requestNonce +
 		"&prompt=none"
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,7 +172,7 @@ func TestPromptNone_ImplicitResponseTypeIdTokenToken(t *testing.T) {
 
 	assert.Equal(t, http.StatusFound, resp.StatusCode)
 	location := resp.Header.Get("Location")
-	assert.True(t, strings.HasPrefix(location, redirectUri.URI+"#"), "Should redirect with fragment")
+	assert.True(t, strings.HasPrefix(location, redirectURI.URI+"#"), "Should redirect with fragment")
 
 	tokens := getTokensFromFragment(t, resp)
 
@@ -193,9 +193,9 @@ func TestPromptNone_ImplicitAuthTimeCorrect(t *testing.T) {
 	enableImplicitFlowGlobally(t)
 
 	// Establish session at T1
-	httpClient, _, _, _ := createSessionWithAcrLevel1(t)
+	httpClient, _, _, _ := createSessionWithACRLevel1(t)
 
-	client, redirectUri := createImplicitClientForPromptTests(t)
+	client, redirectURI := createImplicitClientForPromptTests(t)
 
 	// Wait to ensure different timestamps
 	time.Sleep(1100 * time.Millisecond)
@@ -203,15 +203,15 @@ func TestPromptNone_ImplicitAuthTimeCorrect(t *testing.T) {
 	// Use prompt=none at T2 with implicit flow
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=" + url.QueryEscape("id_token token") +
 		"&scope=" + url.QueryEscape("openid profile") +
 		"&state=" + requestState +
 		"&nonce=" + requestNonce +
 		"&prompt=none"
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -241,20 +241,20 @@ func TestPromptNone_ImplicitMissingNonce(t *testing.T) {
 	enableImplicitFlowGlobally(t)
 
 	// Establish session (needed so prompt=none doesn't fail with login_required first)
-	httpClient, _, _, _ := createSessionWithAcrLevel1(t)
+	httpClient, _, _, _ := createSessionWithACRLevel1(t)
 
-	client, redirectUri := createImplicitClientForPromptTests(t)
+	client, redirectURI := createImplicitClientForPromptTests(t)
 
 	requestState := fake.LetterN(8)
 	// Missing nonce - required for response_type=id_token
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=id_token" +
 		"&scope=" + url.QueryEscape("openid profile") +
 		"&state=" + requestState +
 		"&prompt=none"
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}

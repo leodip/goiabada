@@ -72,7 +72,7 @@ func TestInitRoutes_ATokenFormThatDoesNotParseIsCountedOnceWhicheverAnswersIt(t 
 			database := datamocks.NewDatabase(t)
 			// A page reads the default brand; none leaves it automatic, in the built-in colors.
 			database.On("GetDefaultBrand", mock.Anything, mock.Anything).Return(nil, nil).Maybe()
-			database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(&record.Settings{Id: 1}, nil)
+			database.On("GetSettingsByID", mock.Anything, mock.Anything, int64(1)).Return(&record.Settings{ID: 1}, nil)
 			s := newTokenRefusalTestServer(database, func(cfg *config.Config) {
 				cfg.AuthServer.RateLimiterEnabled = enabled
 			})
@@ -91,7 +91,7 @@ func TestInitRoutes_ATokenRequestStoppedByASettingsFaultIsCounted(t *testing.T) 
 	database := datamocks.NewDatabase(t)
 	// A page reads the default brand; none leaves it automatic, in the built-in colors.
 	database.On("GetDefaultBrand", mock.Anything, mock.Anything).Return(nil, nil).Maybe()
-	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(nil, errors.New("the database is down"))
+	database.On("GetSettingsByID", mock.Anything, mock.Anything, int64(1)).Return(nil, errors.New("the database is down"))
 	s := newTokenRefusalTestServer(database, nil)
 
 	rr := postToken(s, "grant_type=client_credentials&client_id=c&client_secret=s")
@@ -119,7 +119,7 @@ func TestInitRoutes_APasswordGrantStoppedByTheSharedCountIsCountedAsItsAnswer(t 
 		database := datamocks.NewDatabase(t)
 		// A page reads the default brand; none leaves it automatic, in the built-in colors.
 		database.On("GetDefaultBrand", mock.Anything, mock.Anything).Return(nil, nil).Maybe()
-		database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(&record.Settings{Id: 1}, nil)
+		database.On("GetSettingsByID", mock.Anything, mock.Anything, int64(1)).Return(&record.Settings{ID: 1}, nil)
 		database.On("ReserveRateLimitHit", mock.Anything, mock.Anything, mock.Anything, mock.Anything,
 			mock.Anything, mock.Anything).Return(false, errors.New("the database is down"))
 		s := newTokenRefusalTestServer(database, func(cfg *config.Config) {
@@ -141,7 +141,7 @@ func TestInitRoutes_APasswordGrantStoppedByTheSharedCountIsCountedAsItsAnswer(t 
 		database := datamocks.NewDatabase(t)
 		// A page reads the default brand; none leaves it automatic, in the built-in colors.
 		database.On("GetDefaultBrand", mock.Anything, mock.Anything).Return(nil, nil).Maybe()
-		database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(&record.Settings{Id: 1}, nil)
+		database.On("GetSettingsByID", mock.Anything, mock.Anything, int64(1)).Return(&record.Settings{ID: 1}, nil)
 		database.On("ReserveRateLimitHit", mock.Anything, mock.Anything, mock.Anything, mock.Anything,
 			mock.Anything, mock.Anything).Return(false, nil)
 		s := newTokenRefusalTestServer(database, func(cfg *config.Config) {

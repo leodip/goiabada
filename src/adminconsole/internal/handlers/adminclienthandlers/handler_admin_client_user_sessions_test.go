@@ -21,11 +21,11 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 )
 
-// clientSessionsApiClient answers the two reads this page performs: the client, and its
-// sessions with their owners. GetUserById is answered too, and counted rather than served, so
+// clientSessionsAPIClient answers the two reads this page performs: the client, and its
+// sessions with their owners. GetUserByID is answered too, and counted rather than served, so
 // the per-session user read this page used to make is absent by assertion and not merely by
 // nobody having written a stub for it.
-type clientSessionsApiClient struct {
+type clientSessionsAPIClient struct {
 	client      *api.ClientResponse
 	sessions    []api.UserSessionDetailResponse
 	sessionsErr error
@@ -37,11 +37,11 @@ type clientSessionsApiClient struct {
 	deleted []int64
 }
 
-func (c *clientSessionsApiClient) GetClientById(_ context.Context, accessToken string, clientId int64) (*api.ClientResponse, error) {
+func (c *clientSessionsAPIClient) GetClientByID(_ context.Context, accessToken string, clientID int64) (*api.ClientResponse, error) {
 	return c.client, nil
 }
 
-func (c *clientSessionsApiClient) GetClientSessionsByClientId(_ context.Context, accessToken string, clientId int64,
+func (c *clientSessionsAPIClient) GetClientSessionsByClientID(_ context.Context, accessToken string, clientID int64,
 	page, size int) (*api.GetClientSessionsResponse, error) {
 	if c.sessionsErr != nil {
 		return nil, c.sessionsErr
@@ -49,12 +49,12 @@ func (c *clientSessionsApiClient) GetClientSessionsByClientId(_ context.Context,
 	return &api.GetClientSessionsResponse{Sessions: c.sessions, Users: c.users}, nil
 }
 
-func (c *clientSessionsApiClient) DeleteUserSessionById(_ context.Context, accessToken string, sessionId int64) error {
-	c.deleted = append(c.deleted, sessionId)
+func (c *clientSessionsAPIClient) DeleteUserSessionByID(_ context.Context, accessToken string, sessionID int64) error {
+	c.deleted = append(c.deleted, sessionID)
 	return nil
 }
 
-func (c *clientSessionsApiClient) GetUserById(_ context.Context, accessToken string, userId int64) (*api.UserResponse, error) {
+func (c *clientSessionsAPIClient) GetUserByID(_ context.Context, accessToken string, userID int64) (*api.UserResponse, error) {
 	c.userReads++
 	return nil, nil
 }
@@ -64,16 +64,16 @@ func (c *clientSessionsApiClient) GetUserById(_ context.Context, accessToken str
 func TestHandleUserSessionsGet_BindsTheRawUserAgent(t *testing.T) {
 	const header = `goiabada-d2-second-device`
 
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper,
 		"/layouts/menu_layout.html", "/admin_clients_usersessions.html").Maybe()
 
-	apiClient := &clientSessionsApiClient{
-		client: &api.ClientResponse{Id: 3, ClientIdentifier: "web-app"},
-		users:  []api.SessionOwnerResponse{{Id: 7, Email: "someone@example.com"}},
+	apiClient := &clientSessionsAPIClient{
+		client: &api.ClientResponse{ID: 3, ClientIdentifier: "web-app"},
+		users:  []api.SessionOwnerResponse{{ID: 7, Email: "someone@example.com"}},
 		sessions: []api.UserSessionDetailResponse{
-			{Id: 1, UserId: 7, DeviceName: "goiabada-d2-second-device", DeviceType: "unknown", UserAgent: header},
+			{ID: 1, UserID: 7, DeviceName: "goiabada-d2-second-device", DeviceType: "unknown", UserAgent: header},
 		},
 	}
 
@@ -99,16 +99,16 @@ func TestHandleUserSessionsGet_BindsTheSessionInstants(t *testing.T) {
 	started := time.Date(2026, 9, 14, 21, 3, 0, 0, time.UTC)
 	lastAccessed := time.Date(2026, 9, 17, 8, 45, 0, 0, time.UTC)
 
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper,
 		"/layouts/menu_layout.html", "/admin_clients_usersessions.html").Maybe()
 
-	apiClient := &clientSessionsApiClient{
-		client: &api.ClientResponse{Id: 3, ClientIdentifier: "web-app"},
-		users:  []api.SessionOwnerResponse{{Id: 7, Email: "someone@example.com"}},
+	apiClient := &clientSessionsAPIClient{
+		client: &api.ClientResponse{ID: 3, ClientIdentifier: "web-app"},
+		users:  []api.SessionOwnerResponse{{ID: 7, Email: "someone@example.com"}},
 		sessions: []api.UserSessionDetailResponse{
-			{Id: 1, UserId: 7, Started: &started, LastAccessed: &lastAccessed},
+			{ID: 1, UserID: 7, Started: &started, LastAccessed: &lastAccessed},
 		},
 	}
 
@@ -132,16 +132,16 @@ func TestHandleUserSessionsGet_BindsTheSessionInstants(t *testing.T) {
 // every case in this trio is: this is the second of the two recomputations #373 deleted, and one
 // of them left behind would be invisible to the other's test.
 func TestHandleUserSessionsGet_BindsIsCurrentFromTheResponse(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_clients_usersessions.html").Maybe()
 
-	apiClient := &clientSessionsApiClient{
-		client: &api.ClientResponse{Id: 3},
-		users:  []api.SessionOwnerResponse{{Id: 7}},
+	apiClient := &clientSessionsAPIClient{
+		client: &api.ClientResponse{ID: 3},
+		users:  []api.SessionOwnerResponse{{ID: 7}},
 		sessions: []api.UserSessionDetailResponse{
-			{UserSessionResponse: api.UserSessionResponse{Id: 1, SessionIdentifier: "sid-one"}},
-			{UserSessionResponse: api.UserSessionResponse{Id: 2, SessionIdentifier: "sid-two"}, IsCurrent: true},
+			{UserSessionResponse: api.UserSessionResponse{ID: 1, SessionIdentifier: "sid-one"}},
+			{UserSessionResponse: api.UserSessionResponse{ID: 2, SessionIdentifier: "sid-two"}, IsCurrent: true},
 		},
 	}
 
@@ -156,7 +156,7 @@ func TestHandleUserSessionsGet_BindsIsCurrentFromTheResponse(t *testing.T) {
 	require.True(t, ok, "the bind carries no []SessionInfo")
 	require.Len(t, sessions, 2)
 
-	assert.Equal(t, int64(2), sessions[0].UserSessionId)
+	assert.Equal(t, int64(2), sessions[0].UserSessionID)
 	assert.True(t, sessions[0].IsCurrent)
 	assert.False(t, sessions[1].IsCurrent)
 }
@@ -166,19 +166,19 @@ func TestHandleUserSessionsGet_BindsIsCurrentFromTheResponse(t *testing.T) {
 // to fill the two columns below, so the read count is asserted rather than the columns alone:
 // filling them correctly while still making the calls would be the same page it was.
 func TestHandleUserSessionsGet_FillsTheOwnerColumnsFromTheEnvelope(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_clients_usersessions.html").Maybe()
 
-	apiClient := &clientSessionsApiClient{
-		client: &api.ClientResponse{Id: 3},
+	apiClient := &clientSessionsAPIClient{
+		client: &api.ClientResponse{ID: 3},
 		sessions: []api.UserSessionDetailResponse{
-			{UserSessionResponse: api.UserSessionResponse{Id: 1, UserId: 7}},
-			{UserSessionResponse: api.UserSessionResponse{Id: 2, UserId: 9}},
+			{UserSessionResponse: api.UserSessionResponse{ID: 1, UserID: 7}},
+			{UserSessionResponse: api.UserSessionResponse{ID: 2, UserID: 9}},
 		},
 		users: []api.SessionOwnerResponse{
-			{Id: 7, Email: "jane@example.com", GivenName: "Jane", MiddleName: "Q", FamilyName: "Doe"},
-			{Id: 9, Email: "sam@example.com", GivenName: "Sam", FamilyName: "Reed"},
+			{ID: 7, Email: "jane@example.com", GivenName: "Jane", MiddleName: "Q", FamilyName: "Doe"},
+			{ID: 9, Email: "sam@example.com", GivenName: "Sam", FamilyName: "Reed"},
 		},
 	}
 
@@ -194,10 +194,10 @@ func TestHandleUserSessionsGet_FillsTheOwnerColumnsFromTheEnvelope(t *testing.T)
 	require.Len(t, sessions, 2)
 
 	// Sorted by session id, descending, so session 2 is first.
-	assert.Equal(t, int64(9), sessions[0].UserId)
+	assert.Equal(t, int64(9), sessions[0].UserID)
 	assert.Equal(t, "sam@example.com", sessions[0].UserEmail)
 	assert.Equal(t, "Sam Reed", sessions[0].UserFullName)
-	assert.Equal(t, int64(7), sessions[1].UserId)
+	assert.Equal(t, int64(7), sessions[1].UserID)
 	assert.Equal(t, "jane@example.com", sessions[1].UserEmail)
 	assert.Equal(t, "Jane Q Doe", sessions[1].UserFullName)
 
@@ -209,17 +209,17 @@ func TestHandleUserSessionsGet_FillsTheOwnerColumnsFromTheEnvelope(t *testing.T)
 // one record answers both rows. A page indexing users by position rather than by id would put
 // the wrong name on the second row, or none.
 func TestHandleUserSessionsGet_OneOwnerAnswersEveryRowOfTheirs(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_clients_usersessions.html").Maybe()
 
-	apiClient := &clientSessionsApiClient{
-		client: &api.ClientResponse{Id: 3},
+	apiClient := &clientSessionsAPIClient{
+		client: &api.ClientResponse{ID: 3},
 		sessions: []api.UserSessionDetailResponse{
-			{UserSessionResponse: api.UserSessionResponse{Id: 1, UserId: 7}},
-			{UserSessionResponse: api.UserSessionResponse{Id: 2, UserId: 7}},
+			{UserSessionResponse: api.UserSessionResponse{ID: 1, UserID: 7}},
+			{UserSessionResponse: api.UserSessionResponse{ID: 2, UserID: 7}},
 		},
-		users: []api.SessionOwnerResponse{{Id: 7, Email: "jane@example.com", GivenName: "Jane"}},
+		users: []api.SessionOwnerResponse{{ID: 7, Email: "jane@example.com", GivenName: "Jane"}},
 	}
 
 	req := handlertest.Request(http.MethodGet, "/admin/clients/3/user-sessions",
@@ -243,14 +243,14 @@ func TestHandleUserSessionsGet_OneOwnerAnswersEveryRowOfTheirs(t *testing.T) {
 // something it did not expect rather than a case the endpoint produces; the page showing the
 // device and the timestamps with a blank name beats the page not showing at all.
 func TestHandleUserSessionsGet_AnAbsentOwnerLeavesTheColumnsEmpty(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_clients_usersessions.html").Maybe()
 
-	apiClient := &clientSessionsApiClient{
-		client: &api.ClientResponse{Id: 3},
+	apiClient := &clientSessionsAPIClient{
+		client: &api.ClientResponse{ID: 3},
 		sessions: []api.UserSessionDetailResponse{
-			{UserSessionResponse: api.UserSessionResponse{Id: 1, UserId: 7, DeviceName: "Firefox"}},
+			{UserSessionResponse: api.UserSessionResponse{ID: 1, UserID: 7, DeviceName: "Firefox"}},
 		},
 		users: []api.SessionOwnerResponse{},
 	}
@@ -289,37 +289,37 @@ func TestHandleUserSessionsPost_TheAnswerFollowsIsCurrentOnTheRow(t *testing.T) 
 		{
 			name: "the row being deleted is the caller's own",
 			sessions: []api.UserSessionDetailResponse{
-				{UserSessionResponse: api.UserSessionResponse{Id: deleting}, IsCurrent: true},
-				{UserSessionResponse: api.UserSessionResponse{Id: 6}},
+				{UserSessionResponse: api.UserSessionResponse{ID: deleting}, IsCurrent: true},
+				{UserSessionResponse: api.UserSessionResponse{ID: 6}},
 			},
 			wantCurrent: true,
 		},
 		{
 			name: "another row is the caller's own",
 			sessions: []api.UserSessionDetailResponse{
-				{UserSessionResponse: api.UserSessionResponse{Id: deleting}},
-				{UserSessionResponse: api.UserSessionResponse{Id: 6}, IsCurrent: true},
+				{UserSessionResponse: api.UserSessionResponse{ID: deleting}},
+				{UserSessionResponse: api.UserSessionResponse{ID: 6}, IsCurrent: true},
 			},
 		},
 		{
 			name: "no row is the caller's own, which is what a client credentials token produces",
 			sessions: []api.UserSessionDetailResponse{
-				{UserSessionResponse: api.UserSessionResponse{Id: deleting}},
-				{UserSessionResponse: api.UserSessionResponse{Id: 6}},
+				{UserSessionResponse: api.UserSessionResponse{ID: deleting}},
+				{UserSessionResponse: api.UserSessionResponse{ID: 6}},
 			},
 		},
 		{
 			name: "the row's identifier matches the console's own claim and the field says no",
 			sid:  "sid-one",
 			sessions: []api.UserSessionDetailResponse{
-				{UserSessionResponse: api.UserSessionResponse{Id: deleting, SessionIdentifier: "sid-one"}},
+				{UserSessionResponse: api.UserSessionResponse{ID: deleting, SessionIdentifier: "sid-one"}},
 			},
 		},
 		{
 			name: "the field says yes and the console's own claim names another session",
 			sid:  "sid-elsewhere",
 			sessions: []api.UserSessionDetailResponse{
-				{UserSessionResponse: api.UserSessionResponse{Id: deleting, SessionIdentifier: "sid-one"},
+				{UserSessionResponse: api.UserSessionResponse{ID: deleting, SessionIdentifier: "sid-one"},
 					IsCurrent: true},
 			},
 			wantCurrent: true,
@@ -328,11 +328,11 @@ func TestHandleUserSessionsPost_TheAnswerFollowsIsCurrentOnTheRow(t *testing.T) 
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			handlertest.ExpectEncodeJSON(httpHelper).Once()
 
-			apiClient := &clientSessionsApiClient{
-				client:   &api.ClientResponse{Id: 3},
+			apiClient := &clientSessionsAPIClient{
+				client:   &api.ClientResponse{ID: 3},
 				sessions: testCase.sessions,
 			}
 
@@ -343,9 +343,9 @@ func TestHandleUserSessionsPost_TheAnswerFollowsIsCurrentOnTheRow(t *testing.T) 
 			if testCase.sid == "" {
 				opts = append(opts, handlertest.WithAccessToken())
 			} else {
-				opts = append(opts, handlertest.WithJwtInfo(oauthclient.JwtInfo{
+				opts = append(opts, handlertest.WithJWTInfo(oauthclient.JWTInfo{
 					TokenResponse: oauth.TokenResponse{AccessToken: handlertest.AccessToken},
-					IdToken:       &oauth.JwtToken{Claims: jwt.MapClaims{"sid": testCase.sid}},
+					IDToken:       &oauth.JWTToken{Claims: jwt.MapClaims{"sid": testCase.sid}},
 				}))
 			}
 
@@ -374,16 +374,16 @@ func TestHandleUserSessionsPost_TheAnswerFollowsIsCurrentOnTheRow(t *testing.T) 
 // The list read is what the answer above turns on, so a list this handler cannot read is answered
 // rather than swallowed. It swallowed the failure until #373, because the read was made only to
 // compare against a claim rather than to decide the answer.
-func TestHandleUserSessionsPost_AListTheApiCannotReadStopsTheDelete(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+func TestHandleUserSessionsPost_AListTheAPICannotReadStopsTheDelete(t *testing.T) {
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	var captured error
 	httpHelper.On("JSONError", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
 			captured, _ = args.Get(2).(error)
 		}).Return().Once()
 
-	apiClient := &clientSessionsApiClient{
-		client: &api.ClientResponse{Id: 3},
+	apiClient := &clientSessionsAPIClient{
+		client: &api.ClientResponse{ID: 3},
 		sessionsErr: &apiclient.APIError{
 			Code: "INTERNAL_SERVER_ERROR", Message: "the database is on fire",
 			StatusCode: http.StatusInternalServerError,

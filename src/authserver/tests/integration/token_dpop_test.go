@@ -28,18 +28,18 @@ func dpopTokenURL() string { return appConfig.AuthServer.BaseURL + "/auth/token"
 
 // postWithProof posts form to the token endpoint with proof in a DPoP header, and basic
 // credentials when clientSecret is not empty, and returns the answer and its JSON body.
-func postWithProof(t *testing.T, form url.Values, clientId, clientSecret, proof string) (*http.Response, map[string]any) {
+func postWithProof(t *testing.T, form url.Values, clientID, clientSecret, proof string) (*http.Response, map[string]any) {
 	t.Helper()
 	req, err := http.NewRequest(http.MethodPost, dpopTokenURL(), strings.NewReader(form.Encode()))
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	if clientSecret != "" {
-		req.SetBasicAuth(url.QueryEscape(clientId), url.QueryEscape(clientSecret))
+		req.SetBasicAuth(url.QueryEscape(clientID), url.QueryEscape(clientSecret))
 	}
 	if proof != "" {
 		req.Header.Set("DPoP", proof)
 	}
-	resp, err := createHttpClient(t).Do(req)
+	resp, err := createHTTPClient(t).Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	raw, err := io.ReadAll(resp.Body)
@@ -52,15 +52,15 @@ func postWithProof(t *testing.T, form url.Values, clientId, clientSecret, proof 
 // redeemWithDPoP sends form with a proof by key and no nonce, which is answered use_dpop_nonce,
 // then again with the nonce that answer gave, and returns the second answer's body, a bound token
 // response. nonce, when not empty, is a nonce from an earlier answer, used from the start.
-func redeemWithDPoP(t *testing.T, form url.Values, clientId, clientSecret string, key dpoptest.Key) map[string]any {
+func redeemWithDPoP(t *testing.T, form url.Values, clientID, clientSecret string, key dpoptest.Key) map[string]any {
 	t.Helper()
-	resp, body := postWithProof(t, form, clientId, clientSecret, key.Proof(t, "POST", dpopTokenURL(), time.Now(), ""))
+	resp, body := postWithProof(t, form, clientID, clientSecret, key.Proof(t, "POST", dpopTokenURL(), time.Now(), ""))
 	require.Equal(t, http.StatusBadRequest, resp.StatusCode, "%v", body)
 	assert.Equal(t, map[string]any{"error": "use_dpop_nonce", "error_description": "Authorization server requires nonce in DPoP proof."}, body)
 	require.Len(t, resp.Header.Values("DPoP-Nonce"), 1, "the refusal carries one nonce")
 	nonce := resp.Header.Get("DPoP-Nonce")
 
-	resp, body = postWithProof(t, form, clientId, clientSecret, key.Proof(t, "POST", dpopTokenURL(), time.Now(), nonce))
+	resp, body = postWithProof(t, form, clientID, clientSecret, key.Proof(t, "POST", dpopTokenURL(), time.Now(), nonce))
 	require.Equal(t, http.StatusOK, resp.StatusCode, "%v", body)
 	require.Len(t, resp.Header.Values("DPoP-Nonce"), 1, "the answer carries one fresh nonce")
 	assert.Equal(t, "no-store", resp.Header.Get("Cache-Control"))
@@ -86,19 +86,19 @@ func TestDPoP_ClientCredentialsGrant(t *testing.T) {
 	clientSecret := fake.Password(32)
 	secretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	require.NoError(t, err)
-	resource := createResourceWithId(t, "dpop-api-"+fake.LetterN(8))
-	permission := createPermissionWithId(t, resource.Id, "read-"+fake.LetterN(8))
+	resource := createResourceWithID(t, "dpop-api-"+fake.LetterN(8))
+	permission := createPermissionWithID(t, resource.ID, "read-"+fake.LetterN(8))
 	client := &record.Client{
 		ClientIdentifier:         "dpop-service-" + fake.LetterN(8),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
-		DefaultAcrLevel:          record.AcrLevel2Optional,
+		DefaultACRLevel:          record.ACRLevel2Optional,
 		ClientSecretEncrypted:    secretEncrypted,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 	require.NoError(t, database.CreateClientPermission(context.Background(), nil,
-		&record.ClientPermission{ClientId: client.Id, PermissionId: permission.Id}))
+		&record.ClientPermission{ClientID: client.ID, PermissionID: permission.ID}))
 
 	redeemWithDPoP(t, url.Values{"grant_type": {"client_credentials"}}, client.ClientIdentifier, clientSecret,
 		dpoptest.RFC7517Key(t))
@@ -146,19 +146,19 @@ func TestDPoP_ARefusedProofAndARequestWithoutOne(t *testing.T) {
 	clientSecret := fake.Password(32)
 	secretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	require.NoError(t, err)
-	resource := createResourceWithId(t, "dpop-api-"+fake.LetterN(8))
-	permission := createPermissionWithId(t, resource.Id, "read-"+fake.LetterN(8))
+	resource := createResourceWithID(t, "dpop-api-"+fake.LetterN(8))
+	permission := createPermissionWithID(t, resource.ID, "read-"+fake.LetterN(8))
 	client := &record.Client{
 		ClientIdentifier:         "dpop-service-" + fake.LetterN(8),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
-		DefaultAcrLevel:          record.AcrLevel2Optional,
+		DefaultACRLevel:          record.ACRLevel2Optional,
 		ClientSecretEncrypted:    secretEncrypted,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 	require.NoError(t, database.CreateClientPermission(context.Background(), nil,
-		&record.ClientPermission{ClientId: client.Id, PermissionId: permission.Id}))
+		&record.ClientPermission{ClientID: client.ID, PermissionID: permission.ID}))
 	key := dpoptest.RFC7517Key(t)
 	form := url.Values{"grant_type": {"client_credentials"}}
 

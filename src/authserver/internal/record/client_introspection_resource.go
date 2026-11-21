@@ -6,8 +6,8 @@ import "database/sql"
 // (#676 decision 5). A client lists a resource once, and the row goes with either side. It is
 // created and deleted, never rewritten.
 type ClientIntrospectionResource struct {
-	Id         int64        `db:"id" fieldtag:"pk"`
+	ID         int64        `db:"id" fieldtag:"pk"`
 	CreatedAt  sql.NullTime `db:"created_at" fieldtag:"dont-update"`
-	ClientId   int64        `db:"client_id"`
-	ResourceId int64        `db:"resource_id"`
+	ClientID   int64        `db:"client_id"`
+	ResourceID int64        `db:"resource_id"`
 }

@@ -15,13 +15,13 @@ import (
 // userAttributesEditAPI is what the edit user attribute page needs: the user, the attribute, and
 // the write.
 type userAttributesEditAPI interface {
-	GetUserAttributeById(ctx context.Context, accessToken string, attributeId int64) (*api.UserAttributeResponse, error)
-	GetUserById(ctx context.Context, accessToken string, userId int64) (*api.UserResponse, error)
-	UpdateUserAttribute(ctx context.Context, accessToken string, attributeId int64, request *api.UpdateUserAttributeRequest) (*api.UserAttributeResponse, error)
+	GetUserAttributeByID(ctx context.Context, accessToken string, attributeID int64) (*api.UserAttributeResponse, error)
+	GetUserByID(ctx context.Context, accessToken string, userID int64) (*api.UserResponse, error)
+	UpdateUserAttribute(ctx context.Context, accessToken string, attributeID int64, request *api.UpdateUserAttributeRequest) (*api.UserAttributeResponse, error)
 }
 
 func HandleAttributesEditGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient userAttributesEditAPI,
 ) http.HandlerFunc {
 
@@ -40,13 +40,13 @@ func HandleAttributesEditGet(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
-		user, err := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		user, err := apiClient.GetUserByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -68,12 +68,12 @@ func HandleAttributesEditGet(
 			return
 		}
 
-		attribute, err := apiClient.GetUserAttributeById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		attribute, err := apiClient.GetUserAttributeByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
-		if attribute == nil || attribute.UserId != user.Id {
+		if attribute == nil || attribute.UserID != user.ID {
 			httpHelper.NotFound(w, r)
 			return
 		}
@@ -95,7 +95,7 @@ func HandleAttributesEditGet(
 }
 
 func HandleAttributesEditPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	apiClient userAttributesEditAPI,
 	baseURL string,
 ) http.HandlerFunc {
@@ -115,13 +115,13 @@ func HandleAttributesEditPost(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
-		user, err := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		user, err := apiClient.GetUserByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -137,18 +137,18 @@ func HandleAttributesEditPost(
 			return
 		}
 
-		attributeId, err := strconv.ParseInt(idStr, 10, 64)
+		attributeID, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
 			httpHelper.NotFound(w, r)
 			return
 		}
 
-		attribute, err := apiClient.GetUserAttributeById(r.Context(), jwtInfo.TokenResponse.AccessToken, attributeId)
+		attribute, err := apiClient.GetUserAttributeByID(r.Context(), jwtInfo.TokenResponse.AccessToken, attributeID)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
-		if attribute == nil || attribute.UserId != user.Id {
+		if attribute == nil || attribute.UserID != user.ID {
 			httpHelper.NotFound(w, r)
 			return
 		}
@@ -161,7 +161,7 @@ func HandleAttributesEditPost(
 		attribute.Key = r.FormValue("attributeKey")
 		attribute.Value = r.FormValue("attributeValue")
 		attribute.IncludeInAccessToken = r.FormValue("includeInAccessToken") == "on"
-		attribute.IncludeInIdToken = r.FormValue("includeInIdToken") == "on"
+		attribute.IncludeInIDToken = r.FormValue("includeInIdToken") == "on"
 
 		renderError := func(message, errorField string) {
 			bind := map[string]interface{}{
@@ -190,10 +190,10 @@ func HandleAttributesEditPost(
 			Key:                  attribute.Key,
 			Value:                attribute.Value,
 			IncludeInAccessToken: attribute.IncludeInAccessToken,
-			IncludeInIdToken:     attribute.IncludeInIdToken,
+			IncludeInIDToken:     attribute.IncludeInIDToken,
 		}
 
-		_, err = apiClient.UpdateUserAttribute(r.Context(), jwtInfo.TokenResponse.AccessToken, attributeId, request)
+		_, err = apiClient.UpdateUserAttribute(r.Context(), jwtInfo.TokenResponse.AccessToken, attributeID, request)
 		if err != nil {
 			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(message string) {
 				renderError(message, render.ErrorField(err, render.AttributeErrorFields))
@@ -201,6 +201,6 @@ func HandleAttributesEditPost(
 			return
 		}
 
-		http.Redirect(w, r, withListPosition(baseURL, fmt.Sprintf("/admin/users/%v/attributes", user.Id), r), http.StatusFound)
+		http.Redirect(w, r, withListPosition(baseURL, fmt.Sprintf("/admin/users/%v/attributes", user.ID), r), http.StatusFound)
 	}
 }

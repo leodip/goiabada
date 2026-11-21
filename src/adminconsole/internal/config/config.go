@@ -24,13 +24,13 @@ import (
 
 type AdminConsoleConfig struct {
 	BaseURL                  string
-	ListenHostHttps          string
-	ListenPortHttps          int
-	ListenHostHttp           string
-	ListenPortHttp           int
+	ListenHostHTTPS          string
+	ListenPortHTTPS          int
+	ListenHostHTTP           string
+	ListenPortHTTP           int
 	TrustProxyHeaders        bool
 	TrustedProxies           []string
-	LogHttpRequests          bool
+	LogHTTPRequests          bool
 	LogLevel                 string
 	LogFormat                string
 	CertFile                 string
@@ -113,8 +113,8 @@ func (c *AuthServerConfig) GetEffectiveBaseURL() string {
 // listener it asks is the one the console listens on (#808).
 const (
 	DefaultListenHost      = "0.0.0.0"
-	DefaultListenPortHttp  = 9091
-	DefaultListenPortHttps = 9444
+	DefaultListenPortHTTP  = 9091
+	DefaultListenPortHTTPS = 9444
 )
 
 type Config struct {
@@ -138,13 +138,13 @@ func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 	c := &Config{
 		AdminConsole: AdminConsoleConfig{
 			BaseURL:                          getEnv("GOIABADA_ADMINCONSOLE_BASEURL", "http://localhost:9091"),
-			ListenHostHttps:                  getEnv("GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTPS", DefaultListenHost),
-			ListenPortHttps:                  getEnvAsInt("GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS", DefaultListenPortHttps, &malformed),
-			ListenHostHttp:                   getEnv("GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP", DefaultListenHost),
-			ListenPortHttp:                   getEnvAsInt("GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP", DefaultListenPortHttp, &malformed),
+			ListenHostHTTPS:                  getEnv("GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTPS", DefaultListenHost),
+			ListenPortHTTPS:                  getEnvAsInt("GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS", DefaultListenPortHTTPS, &malformed),
+			ListenHostHTTP:                   getEnv("GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP", DefaultListenHost),
+			ListenPortHTTP:                   getEnvAsInt("GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP", DefaultListenPortHTTP, &malformed),
 			TrustProxyHeaders:                getEnvAsBool("GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS", &malformed),
 			TrustedProxies:                   getEnvAsStringSlice("GOIABADA_ADMINCONSOLE_TRUSTED_PROXIES"),
-			LogHttpRequests:                  getEnvAsBool("GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS", &malformed),
+			LogHTTPRequests:                  getEnvAsBool("GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS", &malformed),
 			LogLevel:                         getEnv("GOIABADA_ADMINCONSOLE_LOG_LEVEL", "info"),
 			LogFormat:                        getEnv("GOIABADA_ADMINCONSOLE_LOG_FORMAT", "text"),
 			CertFile:                         getEnv("GOIABADA_ADMINCONSOLE_CERTFILE", ""),
@@ -208,14 +208,14 @@ func Load(fs *flag.FlagSet, args []string) (*Config, error) {
 func registerFlags(fs *flag.FlagSet, c *Config, trustedProxies *string) {
 	// Admin console
 	fs.StringVar(&c.AdminConsole.BaseURL, "adminconsole-baseurl", c.AdminConsole.BaseURL, "Goiabada admin console base URL")
-	fs.StringVar(&c.AdminConsole.ListenHostHttps, "adminconsole-listen-host-https", c.AdminConsole.ListenHostHttps, "Admin console https host")
-	fs.IntVar(&c.AdminConsole.ListenPortHttps, "adminconsole-listen-port-https", c.AdminConsole.ListenPortHttps, "Admin console https port")
-	fs.StringVar(&c.AdminConsole.ListenHostHttp, "adminconsole-listen-host-http", c.AdminConsole.ListenHostHttp, "Admin console http host")
-	fs.IntVar(&c.AdminConsole.ListenPortHttp, "adminconsole-listen-port-http", c.AdminConsole.ListenPortHttp, "Admin console http port")
+	fs.StringVar(&c.AdminConsole.ListenHostHTTPS, "adminconsole-listen-host-https", c.AdminConsole.ListenHostHTTPS, "Admin console https host")
+	fs.IntVar(&c.AdminConsole.ListenPortHTTPS, "adminconsole-listen-port-https", c.AdminConsole.ListenPortHTTPS, "Admin console https port")
+	fs.StringVar(&c.AdminConsole.ListenHostHTTP, "adminconsole-listen-host-http", c.AdminConsole.ListenHostHTTP, "Admin console http host")
+	fs.IntVar(&c.AdminConsole.ListenPortHTTP, "adminconsole-listen-port-http", c.AdminConsole.ListenPortHTTP, "Admin console http port")
 	fs.BoolVar(&c.AdminConsole.TrustProxyHeaders, "adminconsole-trust-proxy-headers", c.AdminConsole.TrustProxyHeaders, "Trust HTTP headers from reverse proxy in Admin console? (X-Forwarded-For, or X-Real-IP when it has no address)")
 	*trustedProxies = strings.Join(c.AdminConsole.TrustedProxies, ",")
 	fs.StringVar(trustedProxies, "adminconsole-trusted-proxies", *trustedProxies, "Comma-separated list of trusted reverse-proxy IPs/CIDRs used to resolve the real client IP from X-Forwarded-For (admin console)")
-	fs.BoolVar(&c.AdminConsole.LogHttpRequests, "adminconsole-log-http-requests", c.AdminConsole.LogHttpRequests, "Log HTTP requests for admin console")
+	fs.BoolVar(&c.AdminConsole.LogHTTPRequests, "adminconsole-log-http-requests", c.AdminConsole.LogHTTPRequests, "Log HTTP requests for admin console")
 	fs.StringVar(&c.AdminConsole.LogLevel, "adminconsole-log-level", c.AdminConsole.LogLevel, "Lowest level of log record the admin console writes. Options: debug, info, warn, error")
 	fs.StringVar(&c.AdminConsole.LogFormat, "adminconsole-log-format", c.AdminConsole.LogFormat, "Format the admin console writes log records in. Options: text, json")
 	fs.StringVar(&c.AdminConsole.CertFile, "adminconsole-certfile", c.AdminConsole.CertFile, "Certificate file for HTTPS (admin console)")

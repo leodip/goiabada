@@ -222,7 +222,7 @@ func runReencrypt(ctx context.Context, database reencryptDatabase, m schemaVersi
 	// prints as it goes and holds no list of every row.
 	report, err := database.ReencryptStoredSecrets(ctx, keys.current, keys.previous, func(value record.StoredSecret) {
 		outf(stderr, "unreadable: %s.%s, row %d: neither data key opens it, so it was left as it is\n",
-			value.Table, value.Column, value.Id)
+			value.Table, value.Column, value.ID)
 	})
 	if report.Reencrypted > 0 {
 		auditLogger.Log(ctx, audit.EventReencryptedStoredSecrets, map[string]interface{}{

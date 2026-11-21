@@ -79,7 +79,7 @@ func TestHandleTokenPost_WrappedUserDisabledStillAudits(t *testing.T) {
 	} {
 		t.Run(description, func(t *testing.T) {
 			disabled := &protocolvalidation.UserDisabledError{Detail: oauth.NewErrorDetailWithHTTPStatus(
-				"invalid_grant", description, http.StatusBadRequest), UserId: 17}
+				"invalid_grant", description, http.StatusBadRequest), UserID: 17}
 
 			jsonWriter, auditLogger, _, rr, req, handler := wrappedTokenRequest(t,
 				errs.Wrap(disabled, "unable to validate the token request"))
@@ -129,7 +129,7 @@ func TestHandleTokenPost_GenericRefusalWritesNoUserDisabledRow(t *testing.T) {
 // The same for the deregistered-redirect-URI sentinel, the other by-value comparison this handler
 // makes. Its audit row is the only record that a redemption was refused for that reason, so losing
 // the match makes the refusal indistinguishable from any other server fault in the log.
-func TestHandleTokenPost_WrappedDeregisteredRedirectUriStillAudits(t *testing.T) {
+func TestHandleTokenPost_WrappedDeregisteredRedirectURIStillAudits(t *testing.T) {
 	refusal := oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 		"The redirect URI recorded on this authorization code is no longer registered on the client, so the code can no longer be redeemed.",
 		http.StatusBadRequest)
@@ -156,7 +156,7 @@ func TestHandleTokenPost_WrappedAuthCodeReuseStillRevokes(t *testing.T) {
 	reuse := &protocolvalidation.AuthCodeReusedError{
 		Detail: oauth.NewErrorDetailWithHTTPStatus("invalid_grant", "Code is invalid.",
 			http.StatusBadRequest),
-		Code: &record.Code{Id: 7, ClientId: 3, UserId: 11, SessionIdentifier: "sid-reused"},
+		Code: &record.Code{ID: 7, ClientID: 3, UserID: 11, SessionIdentifier: "sid-reused"},
 	}
 
 	jsonWriter, auditLogger, database, rr, req, handler := wrappedTokenRequest(t,
@@ -167,17 +167,17 @@ func TestHandleTokenPost_WrappedAuthCodeReuseStillRevokes(t *testing.T) {
 	database.EXPECT().GetRefreshTokensBySessionIdentifier(mock.Anything, revokeTx, "sid-reused").
 		Return(nil, nil).Once()
 
-	var auditedCodeId int64
+	var auditedCodeID int64
 	auditLogger.On("Log", mock.Anything, audit.EventAuthCodeReuseDetected, mock.Anything).
 		Run(func(args mock.Arguments) {
 			details, _ := args.Get(2).(map[string]interface{})
-			auditedCodeId, _ = details["code_id"].(int64)
+			auditedCodeID, _ = details["code_id"].(int64)
 		}).Return().Once()
 	captured := expectJSONErrorWithDetail(jsonWriter)
 
 	handler.ServeHTTP(rr, req)
 
-	assert.Equal(t, int64(7), auditedCodeId, "the reuse row must name the replayed code")
+	assert.Equal(t, int64(7), auditedCodeID, "the reuse row must name the replayed code")
 	// The same pointer: the handler hands the validator's own detail through unrebuilt, and the
 	// writer conforms the sentence on its way to the wire (#213, #435).
 	var answered *oauth.ErrorDetail

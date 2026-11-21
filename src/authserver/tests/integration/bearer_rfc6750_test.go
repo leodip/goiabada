@@ -53,7 +53,7 @@ func sendBearerRequestAs(t *testing.T, method, path string, authorizations []str
 	for _, authorization := range authorizations {
 		req.Header.Add("Authorization", authorization)
 	}
-	resp, err := createHttpClient(t).Do(req)
+	resp, err := createHTTPClient(t).Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	raw, err := io.ReadAll(resp.Body)

@@ -29,7 +29,7 @@ import (
 // before it even looks at the scope string: fetch the user, then load its
 // permissions, groups, and the groups' permissions.
 func expectUserLoaded(mockDB *datamocks.Database, user *record.User, times int) {
-	mockDB.On("GetUserById", mock.Anything, mock.Anything, user.Id).Return(user, nil).Times(times)
+	mockDB.On("GetUserByID", mock.Anything, mock.Anything, user.ID).Return(user, nil).Times(times)
 	mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, user).Return(nil).Times(times)
 	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Times(times)
 	mockDB.On("GroupsLoadPermissions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Times(times)
@@ -40,15 +40,15 @@ func TestUserHasScopePermission_GrantedViaDirectUserPermission(t *testing.T) {
 	pc := NewChecker(mockDB)
 
 	user := &record.User{
-		Id:          1,
-		Permissions: []record.Permission{{Id: 5, PermissionIdentifier: "read"}},
+		ID:          1,
+		Permissions: []record.Permission{{ID: 5, PermissionIdentifier: "read"}},
 	}
 	expectUserLoaded(mockDB, user, 1)
 
-	resource := &record.Resource{Id: 10, ResourceIdentifier: "backend-svc"}
+	resource := &record.Resource{ID: 10, ResourceIdentifier: "backend-svc"}
 	mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "backend-svc").Return(resource, nil).Once()
-	mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(10)).Return(
-		[]record.Permission{{Id: 5, PermissionIdentifier: "read"}}, nil).Once()
+	mockDB.On("GetPermissionsByResourceID", mock.Anything, mock.Anything, int64(10)).Return(
+		[]record.Permission{{ID: 5, PermissionIdentifier: "read"}}, nil).Once()
 
 	result, err := pc.UserHasScopePermission(context.Background(), 1, "backend-svc:read")
 
@@ -62,22 +62,22 @@ func TestUserHasScopePermission_GrantedViaGroupPermission(t *testing.T) {
 
 	// The user has no permission of its own; the grant comes from group membership.
 	user := &record.User{
-		Id:          1,
+		ID:          1,
 		Permissions: []record.Permission{},
 		Groups: []record.Group{
 			{
-				Id:              7,
+				ID:              7,
 				GroupIdentifier: "site-admins",
-				Permissions:     []record.Permission{{Id: 5, PermissionIdentifier: "read"}},
+				Permissions:     []record.Permission{{ID: 5, PermissionIdentifier: "read"}},
 			},
 		},
 	}
 	expectUserLoaded(mockDB, user, 1)
 
-	resource := &record.Resource{Id: 10, ResourceIdentifier: "backend-svc"}
+	resource := &record.Resource{ID: 10, ResourceIdentifier: "backend-svc"}
 	mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "backend-svc").Return(resource, nil).Once()
-	mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(10)).Return(
-		[]record.Permission{{Id: 5, PermissionIdentifier: "read"}}, nil).Once()
+	mockDB.On("GetPermissionsByResourceID", mock.Anything, mock.Anything, int64(10)).Return(
+		[]record.Permission{{ID: 5, PermissionIdentifier: "read"}}, nil).Once()
 
 	result, err := pc.UserHasScopePermission(context.Background(), 1, "backend-svc:read")
 
@@ -91,19 +91,19 @@ func TestUserHasScopePermission_GrantedViaSecondGroup(t *testing.T) {
 
 	// Ensures the group loop does not stop at the first group.
 	user := &record.User{
-		Id:          1,
+		ID:          1,
 		Permissions: []record.Permission{},
 		Groups: []record.Group{
-			{Id: 6, GroupIdentifier: "readers", Permissions: []record.Permission{{Id: 99, PermissionIdentifier: "other"}}},
-			{Id: 7, GroupIdentifier: "writers", Permissions: []record.Permission{{Id: 5, PermissionIdentifier: "read"}}},
+			{ID: 6, GroupIdentifier: "readers", Permissions: []record.Permission{{ID: 99, PermissionIdentifier: "other"}}},
+			{ID: 7, GroupIdentifier: "writers", Permissions: []record.Permission{{ID: 5, PermissionIdentifier: "read"}}},
 		},
 	}
 	expectUserLoaded(mockDB, user, 1)
 
-	resource := &record.Resource{Id: 10, ResourceIdentifier: "backend-svc"}
+	resource := &record.Resource{ID: 10, ResourceIdentifier: "backend-svc"}
 	mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "backend-svc").Return(resource, nil).Once()
-	mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(10)).Return(
-		[]record.Permission{{Id: 5, PermissionIdentifier: "read"}}, nil).Once()
+	mockDB.On("GetPermissionsByResourceID", mock.Anything, mock.Anything, int64(10)).Return(
+		[]record.Permission{{ID: 5, PermissionIdentifier: "read"}}, nil).Once()
 
 	result, err := pc.UserHasScopePermission(context.Background(), 1, "backend-svc:read")
 
@@ -116,18 +116,18 @@ func TestUserHasScopePermission_DeniedWhenNeitherUserNorGroupHasIt(t *testing.T)
 	pc := NewChecker(mockDB)
 
 	user := &record.User{
-		Id:          1,
-		Permissions: []record.Permission{{Id: 99, PermissionIdentifier: "other"}},
+		ID:          1,
+		Permissions: []record.Permission{{ID: 99, PermissionIdentifier: "other"}},
 		Groups: []record.Group{
-			{Id: 7, Permissions: []record.Permission{{Id: 98, PermissionIdentifier: "another"}}},
+			{ID: 7, Permissions: []record.Permission{{ID: 98, PermissionIdentifier: "another"}}},
 		},
 	}
 	expectUserLoaded(mockDB, user, 1)
 
-	resource := &record.Resource{Id: 10, ResourceIdentifier: "backend-svc"}
+	resource := &record.Resource{ID: 10, ResourceIdentifier: "backend-svc"}
 	mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "backend-svc").Return(resource, nil).Once()
-	mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(10)).Return(
-		[]record.Permission{{Id: 5, PermissionIdentifier: "read"}}, nil).Once()
+	mockDB.On("GetPermissionsByResourceID", mock.Anything, mock.Anything, int64(10)).Return(
+		[]record.Permission{{ID: 5, PermissionIdentifier: "read"}}, nil).Once()
 
 	result, err := pc.UserHasScopePermission(context.Background(), 1, "backend-svc:read")
 
@@ -136,24 +136,24 @@ func TestUserHasScopePermission_DeniedWhenNeitherUserNorGroupHasIt(t *testing.T)
 }
 
 // A permission identifier such as "read" is only unique within its resource.
-// Matching is done on permission Id precisely so that holding "read" on one
+// Matching is done on permission ID precisely so that holding "read" on one
 // resource does not grant "read" on another. This test guards that.
 func TestUserHasScopePermission_DeniedWhenIdentifierMatchesButResourceDiffers(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	pc := NewChecker(mockDB)
 
-	// The user holds "read" (Id 77) on some other resource.
+	// The user holds "read" (ID 77) on some other resource.
 	user := &record.User{
-		Id:          1,
-		Permissions: []record.Permission{{Id: 77, PermissionIdentifier: "read", ResourceId: 20}},
+		ID:          1,
+		Permissions: []record.Permission{{ID: 77, PermissionIdentifier: "read", ResourceID: 20}},
 	}
 	expectUserLoaded(mockDB, user, 1)
 
-	// On backend-svc, "read" is a different row (Id 5).
-	resource := &record.Resource{Id: 10, ResourceIdentifier: "backend-svc"}
+	// On backend-svc, "read" is a different row (ID 5).
+	resource := &record.Resource{ID: 10, ResourceIdentifier: "backend-svc"}
 	mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "backend-svc").Return(resource, nil).Once()
-	mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(10)).Return(
-		[]record.Permission{{Id: 5, PermissionIdentifier: "read", ResourceId: 10}}, nil).Once()
+	mockDB.On("GetPermissionsByResourceID", mock.Anything, mock.Anything, int64(10)).Return(
+		[]record.Permission{{ID: 5, PermissionIdentifier: "read", ResourceID: 10}}, nil).Once()
 
 	result, err := pc.UserHasScopePermission(context.Background(), 1, "backend-svc:read")
 
@@ -165,7 +165,7 @@ func TestUserHasScopePermission_UserNotFound(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	pc := NewChecker(mockDB)
 
-	mockDB.On("GetUserById", mock.Anything, mock.Anything, int64(42)).Return(nil, nil).Once()
+	mockDB.On("GetUserByID", mock.Anything, mock.Anything, int64(42)).Return(nil, nil).Once()
 
 	result, err := pc.UserHasScopePermission(context.Background(), 42, "backend-svc:read")
 
@@ -190,7 +190,7 @@ func TestUserHasScopePermission_MalformedScope(t *testing.T) {
 			mockDB := datamocks.NewDatabase(t)
 			pc := NewChecker(mockDB)
 
-			user := &record.User{Id: 1}
+			user := &record.User{ID: 1}
 			expectUserLoaded(mockDB, user, 1)
 
 			result, err := pc.UserHasScopePermission(context.Background(), 1, tc.scope)
@@ -209,7 +209,7 @@ func TestUserHasScopePermission_SeparatorOnlyScopeIsDenied(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	pc := NewChecker(mockDB)
 
-	user := &record.User{Id: 1}
+	user := &record.User{ID: 1}
 	expectUserLoaded(mockDB, user, 1)
 	mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "").Return(nil, nil).Once()
 
@@ -227,7 +227,7 @@ func TestUserHasScopePermission_DeniedWhenResourceDoesNotExist(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	pc := NewChecker(mockDB)
 
-	user := &record.User{Id: 1}
+	user := &record.User{ID: 1}
 	expectUserLoaded(mockDB, user, 1)
 	mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "ghost").Return(nil, nil).Once()
 
@@ -241,13 +241,13 @@ func TestUserHasScopePermission_DeniedWhenPermissionIdentifierNotOnResource(t *t
 	mockDB := datamocks.NewDatabase(t)
 	pc := NewChecker(mockDB)
 
-	user := &record.User{Id: 1}
+	user := &record.User{ID: 1}
 	expectUserLoaded(mockDB, user, 1)
 
-	resource := &record.Resource{Id: 10, ResourceIdentifier: "backend-svc"}
+	resource := &record.Resource{ID: 10, ResourceIdentifier: "backend-svc"}
 	mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "backend-svc").Return(resource, nil).Once()
-	mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(10)).Return(
-		[]record.Permission{{Id: 5, PermissionIdentifier: "read"}}, nil).Once()
+	mockDB.On("GetPermissionsByResourceID", mock.Anything, mock.Anything, int64(10)).Return(
+		[]record.Permission{{ID: 5, PermissionIdentifier: "read"}}, nil).Once()
 
 	result, err := pc.UserHasScopePermission(context.Background(), 1, "backend-svc:delete")
 
@@ -259,30 +259,30 @@ func TestUserHasScopePermission_DeniedWhenPermissionIdentifierNotOnResource(t *t
 // than being swallowed into a plain deny.
 func TestUserHasScopePermission_DatabaseErrorsPropagate(t *testing.T) {
 	dbErr := errors.New("database is down")
-	user := &record.User{Id: 1}
-	resource := &record.Resource{Id: 10, ResourceIdentifier: "backend-svc"}
+	user := &record.User{ID: 1}
+	resource := &record.Resource{ID: 10, ResourceIdentifier: "backend-svc"}
 
 	testCases := []struct {
 		name  string
 		setup func(mockDB *datamocks.Database)
 	}{
 		{
-			name: "GetUserById fails",
+			name: "GetUserByID fails",
 			setup: func(mockDB *datamocks.Database) {
-				mockDB.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(nil, dbErr).Once()
+				mockDB.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(nil, dbErr).Once()
 			},
 		},
 		{
 			name: "UserLoadPermissions fails",
 			setup: func(mockDB *datamocks.Database) {
-				mockDB.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil).Once()
+				mockDB.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(user, nil).Once()
 				mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, user).Return(dbErr).Once()
 			},
 		},
 		{
 			name: "UserLoadGroups fails",
 			setup: func(mockDB *datamocks.Database) {
-				mockDB.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil).Once()
+				mockDB.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(user, nil).Once()
 				mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, user).Return(nil).Once()
 				mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(dbErr).Once()
 			},
@@ -290,7 +290,7 @@ func TestUserHasScopePermission_DatabaseErrorsPropagate(t *testing.T) {
 		{
 			name: "GroupsLoadPermissions fails",
 			setup: func(mockDB *datamocks.Database) {
-				mockDB.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil).Once()
+				mockDB.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(user, nil).Once()
 				mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, user).Return(nil).Once()
 				mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Once()
 				mockDB.On("GroupsLoadPermissions", mock.Anything, mock.Anything, mock.Anything).Return(dbErr).Once()
@@ -304,11 +304,11 @@ func TestUserHasScopePermission_DatabaseErrorsPropagate(t *testing.T) {
 			},
 		},
 		{
-			name: "GetPermissionsByResourceId fails",
+			name: "GetPermissionsByResourceID fails",
 			setup: func(mockDB *datamocks.Database) {
 				expectUserLoaded(mockDB, user, 1)
 				mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "backend-svc").Return(resource, nil).Once()
-				mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(10)).Return(nil, dbErr).Once()
+				mockDB.On("GetPermissionsByResourceID", mock.Anything, mock.Anything, int64(10)).Return(nil, dbErr).Once()
 			},
 		},
 	}
@@ -348,7 +348,7 @@ func TestFilterOutScopes_NilUser(t *testing.T) {
 
 // OIDC and offline_access scopes are returned without any database lookup.
 // NewDatabase(t) asserts no unexpected calls, so this also proves no lookup happens.
-func TestFilterOutScopes_OidcAndOfflineAccessBypassPermissionCheck(t *testing.T) {
+func TestFilterOutScopes_OIDCAndOfflineAccessBypassPermissionCheck(t *testing.T) {
 	testCases := []struct {
 		name  string
 		scope string
@@ -370,7 +370,7 @@ func TestFilterOutScopes_OidcAndOfflineAccessBypassPermissionCheck(t *testing.T)
 			mockDB := datamocks.NewDatabase(t)
 			pc := NewChecker(mockDB)
 
-			result, err := pc.FilterOutScopesWhereUserIsNotAuthorized(context.Background(), tc.scope, &record.User{Id: 1})
+			result, err := pc.FilterOutScopesWhereUserIsNotAuthorized(context.Background(), tc.scope, &record.User{ID: 1})
 
 			require.NoError(t, err)
 			assert.Equal(t, tc.want, result)
@@ -382,7 +382,7 @@ func TestFilterOutScopes_EmptyScope(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	pc := NewChecker(mockDB)
 
-	result, err := pc.FilterOutScopesWhereUserIsNotAuthorized(context.Background(), "", &record.User{Id: 1})
+	result, err := pc.FilterOutScopesWhereUserIsNotAuthorized(context.Background(), "", &record.User{ID: 1})
 
 	require.NoError(t, err)
 	assert.Empty(t, result)
@@ -392,19 +392,19 @@ func TestFilterOutScopes_KeepsAuthorizedStripsUnauthorized(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	pc := NewChecker(mockDB)
 
-	// The user holds "read" (Id 5) but not "write" (Id 6).
+	// The user holds "read" (ID 5) but not "write" (ID 6).
 	user := &record.User{
-		Id:          1,
-		Permissions: []record.Permission{{Id: 5, PermissionIdentifier: "read"}},
+		ID:          1,
+		Permissions: []record.Permission{{ID: 5, PermissionIdentifier: "read"}},
 	}
 	// Two resource scopes resolve twice, but the user and their grants load once.
 	expectUserLoaded(mockDB, user, 1)
 
-	resource := &record.Resource{Id: 10, ResourceIdentifier: "backend-svc"}
+	resource := &record.Resource{ID: 10, ResourceIdentifier: "backend-svc"}
 	mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "backend-svc").Return(resource, nil).Times(2)
-	mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(10)).Return([]record.Permission{
-		{Id: 5, PermissionIdentifier: "read"},
-		{Id: 6, PermissionIdentifier: "write"},
+	mockDB.On("GetPermissionsByResourceID", mock.Anything, mock.Anything, int64(10)).Return([]record.Permission{
+		{ID: 5, PermissionIdentifier: "read"},
+		{ID: 6, PermissionIdentifier: "write"},
 	}, nil).Times(2)
 
 	result, err := pc.FilterOutScopesWhereUserIsNotAuthorized(context.Background(), "backend-svc:read backend-svc:write", user)
@@ -413,21 +413,21 @@ func TestFilterOutScopes_KeepsAuthorizedStripsUnauthorized(t *testing.T) {
 	assert.Equal(t, "backend-svc:read", result, "the unauthorized scope must be dropped")
 }
 
-func TestFilterOutScopes_PreservesOrderAndMixesOidcWithResourceScopes(t *testing.T) {
+func TestFilterOutScopes_PreservesOrderAndMixesOIDCWithResourceScopes(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	pc := NewChecker(mockDB)
 
 	user := &record.User{
-		Id:          1,
-		Permissions: []record.Permission{{Id: 5, PermissionIdentifier: "read"}},
+		ID:          1,
+		Permissions: []record.Permission{{ID: 5, PermissionIdentifier: "read"}},
 	}
 	expectUserLoaded(mockDB, user, 1)
 
-	resource := &record.Resource{Id: 10, ResourceIdentifier: "backend-svc"}
+	resource := &record.Resource{ID: 10, ResourceIdentifier: "backend-svc"}
 	mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "backend-svc").Return(resource, nil).Times(2)
-	mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(10)).Return([]record.Permission{
-		{Id: 5, PermissionIdentifier: "read"},
-		{Id: 6, PermissionIdentifier: "write"},
+	mockDB.On("GetPermissionsByResourceID", mock.Anything, mock.Anything, int64(10)).Return([]record.Permission{
+		{ID: 5, PermissionIdentifier: "read"},
+		{ID: 6, PermissionIdentifier: "write"},
 	}, nil).Times(2)
 
 	result, err := pc.FilterOutScopesWhereUserIsNotAuthorized(context.Background(),
@@ -443,7 +443,7 @@ func TestFilterOutScopes_HandlesExtraWhitespace(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	pc := NewChecker(mockDB)
 
-	result, err := pc.FilterOutScopesWhereUserIsNotAuthorized(context.Background(), "  openid   profile  ", &record.User{Id: 1})
+	result, err := pc.FilterOutScopesWhereUserIsNotAuthorized(context.Background(), "  openid   profile  ", &record.User{ID: 1})
 
 	require.NoError(t, err)
 	assert.Equal(t, "openid profile", result)
@@ -456,7 +456,7 @@ func TestFilterOutScopes_DoesNotDeduplicate(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	pc := NewChecker(mockDB)
 
-	result, err := pc.FilterOutScopesWhereUserIsNotAuthorized(context.Background(), "openid openid", &record.User{Id: 1})
+	result, err := pc.FilterOutScopesWhereUserIsNotAuthorized(context.Background(), "openid openid", &record.User{ID: 1})
 
 	require.NoError(t, err)
 	assert.Equal(t, "openid openid", result)
@@ -466,7 +466,7 @@ func TestFilterOutScopes_MalformedScopeElementReturnsError(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	pc := NewChecker(mockDB)
 
-	result, err := pc.FilterOutScopesWhereUserIsNotAuthorized(context.Background(), "openid not-a-valid-scope", &record.User{Id: 1})
+	result, err := pc.FilterOutScopesWhereUserIsNotAuthorized(context.Background(), "openid not-a-valid-scope", &record.User{ID: 1})
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid scope format")
@@ -477,12 +477,12 @@ func TestFilterOutScopes_MalformedScopeElementReturnsError(t *testing.T) {
 // a strip, and no partial scope string comes back with it.
 func TestFilterOutScopes_DatabaseErrorPropagates(t *testing.T) {
 	dbErr := errors.New("database is down")
-	user := &record.User{Id: 1}
-	resource := &record.Resource{Id: 10, ResourceIdentifier: "backend-svc"}
+	user := &record.User{ID: 1}
+	resource := &record.Resource{ID: 10, ResourceIdentifier: "backend-svc"}
 	stubResolved := func(mockDB *datamocks.Database) {
 		mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "backend-svc").Return(resource, nil).Once()
-		mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(10)).
-			Return([]record.Permission{{Id: 5, PermissionIdentifier: "read"}}, nil).Once()
+		mockDB.On("GetPermissionsByResourceID", mock.Anything, mock.Anything, int64(10)).
+			Return([]record.Permission{{ID: 5, PermissionIdentifier: "read"}}, nil).Once()
 	}
 
 	testCases := []struct {
@@ -496,24 +496,24 @@ func TestFilterOutScopes_DatabaseErrorPropagates(t *testing.T) {
 			},
 		},
 		{
-			name: "GetPermissionsByResourceId fails",
+			name: "GetPermissionsByResourceID fails",
 			setup: func(mockDB *datamocks.Database) {
 				mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "backend-svc").Return(resource, nil).Once()
-				mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(10)).Return(nil, dbErr).Once()
+				mockDB.On("GetPermissionsByResourceID", mock.Anything, mock.Anything, int64(10)).Return(nil, dbErr).Once()
 			},
 		},
 		{
-			name: "GetUserById fails",
+			name: "GetUserByID fails",
 			setup: func(mockDB *datamocks.Database) {
 				stubResolved(mockDB)
-				mockDB.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(nil, dbErr).Once()
+				mockDB.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(nil, dbErr).Once()
 			},
 		},
 		{
 			name: "UserLoadPermissions fails",
 			setup: func(mockDB *datamocks.Database) {
 				stubResolved(mockDB)
-				mockDB.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil).Once()
+				mockDB.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(user, nil).Once()
 				mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, user).Return(dbErr).Once()
 			},
 		},
@@ -521,7 +521,7 @@ func TestFilterOutScopes_DatabaseErrorPropagates(t *testing.T) {
 			name: "UserLoadGroups fails",
 			setup: func(mockDB *datamocks.Database) {
 				stubResolved(mockDB)
-				mockDB.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil).Once()
+				mockDB.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(user, nil).Once()
 				mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, user).Return(nil).Once()
 				mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(dbErr).Once()
 			},
@@ -530,7 +530,7 @@ func TestFilterOutScopes_DatabaseErrorPropagates(t *testing.T) {
 			name: "GroupsLoadPermissions fails",
 			setup: func(mockDB *datamocks.Database) {
 				stubResolved(mockDB)
-				mockDB.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil).Once()
+				mockDB.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(user, nil).Once()
 				mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, user).Return(nil).Once()
 				mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Once()
 				mockDB.On("GroupsLoadPermissions", mock.Anything, mock.Anything, mock.Anything).Return(dbErr).Once()
@@ -544,7 +544,7 @@ func TestFilterOutScopes_DatabaseErrorPropagates(t *testing.T) {
 			pc := NewChecker(mockDB)
 			tc.setup(mockDB)
 
-			result, err := pc.FilterOutScopesWhereUserIsNotAuthorized(context.Background(), "openid backend-svc:read", &record.User{Id: 1})
+			result, err := pc.FilterOutScopesWhereUserIsNotAuthorized(context.Background(), "openid backend-svc:read", &record.User{ID: 1})
 
 			require.ErrorIs(t, err, dbErr)
 			assert.Empty(t, result)
@@ -560,15 +560,15 @@ func TestFilterOutScopes_StripsEveryResourceScopeWhenUserNotInDatabase(t *testin
 	pc := NewChecker(mockDB)
 
 	mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "backend-svc").
-		Return(&record.Resource{Id: 10, ResourceIdentifier: "backend-svc"}, nil).Times(2)
-	mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(10)).Return([]record.Permission{
-		{Id: 5, PermissionIdentifier: "read"},
-		{Id: 6, PermissionIdentifier: "write"},
+		Return(&record.Resource{ID: 10, ResourceIdentifier: "backend-svc"}, nil).Times(2)
+	mockDB.On("GetPermissionsByResourceID", mock.Anything, mock.Anything, int64(10)).Return([]record.Permission{
+		{ID: 5, PermissionIdentifier: "read"},
+		{ID: 6, PermissionIdentifier: "write"},
 	}, nil).Times(2)
-	mockDB.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(nil, nil).Once()
+	mockDB.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(nil, nil).Once()
 
 	// The caller's copy still claims both grants; only the database's answer counts.
-	callersCopy := &record.User{Id: 1, Permissions: []record.Permission{{Id: 5}, {Id: 6}}}
+	callersCopy := &record.User{ID: 1, Permissions: []record.Permission{{ID: 5}, {ID: 6}}}
 	result, err := pc.FilterOutScopesWhereUserIsNotAuthorized(context.Background(),
 		"openid backend-svc:read backend-svc:write offline_access", callersCopy)
 
@@ -584,33 +584,33 @@ func TestFilterOutScopes_LoadsTheUserAndGrantsOnce(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	pc := NewChecker(mockDB)
 
-	dbRow := &record.User{Id: 1}
-	mockDB.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(dbRow, nil).Once()
+	dbRow := &record.User{ID: 1}
+	mockDB.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(dbRow, nil).Once()
 	mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, dbRow).Run(func(args mock.Arguments) {
-		args.Get(2).(*record.User).Permissions = []record.Permission{{Id: 5}}
+		args.Get(2).(*record.User).Permissions = []record.Permission{{ID: 5}}
 	}).Return(nil).Once()
 	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, dbRow).Run(func(args mock.Arguments) {
-		args.Get(2).(*record.User).Groups = []record.Group{{Id: 7}}
+		args.Get(2).(*record.User).Groups = []record.Group{{ID: 7}}
 	}).Return(nil).Once()
 	mockDB.On("GroupsLoadPermissions", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		args.Get(2).([]record.Group)[0].Permissions = []record.Permission{{Id: 21}}
+		args.Get(2).([]record.Group)[0].Permissions = []record.Permission{{ID: 21}}
 	}).Return(nil).Once()
 
 	mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "backend-svc").
-		Return(&record.Resource{Id: 10, ResourceIdentifier: "backend-svc"}, nil).Times(3)
-	mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(10)).Return([]record.Permission{
-		{Id: 5, PermissionIdentifier: "read"},
-		{Id: 6, PermissionIdentifier: "write"},
+		Return(&record.Resource{ID: 10, ResourceIdentifier: "backend-svc"}, nil).Times(3)
+	mockDB.On("GetPermissionsByResourceID", mock.Anything, mock.Anything, int64(10)).Return([]record.Permission{
+		{ID: 5, PermissionIdentifier: "read"},
+		{ID: 6, PermissionIdentifier: "write"},
 	}, nil).Times(3)
 	mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "billing-api").
-		Return(&record.Resource{Id: 20, ResourceIdentifier: "billing-api"}, nil).Once()
-	mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(20)).Return([]record.Permission{
-		{Id: 21, PermissionIdentifier: "read"},
+		Return(&record.Resource{ID: 20, ResourceIdentifier: "billing-api"}, nil).Once()
+	mockDB.On("GetPermissionsByResourceID", mock.Anything, mock.Anything, int64(20)).Return([]record.Permission{
+		{ID: 21, PermissionIdentifier: "read"},
 	}, nil).Once()
 	mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "ghost").Return(nil, nil).Once()
 
 	// The caller's struct is never loaded onto: the grants land on the fresh row.
-	callersCopy := &record.User{Id: 1}
+	callersCopy := &record.User{ID: 1}
 	result, err := pc.FilterOutScopesWhereUserIsNotAuthorized(context.Background(),
 		"openid backend-svc:read ghost:read backend-svc:write billing-api:read backend-svc:delete", callersCopy)
 
@@ -629,15 +629,15 @@ func TestFilterOutScopes_UnresolvedScopesNeverReadTheUser(t *testing.T) {
 
 	mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "ghost").Return(nil, nil).Once()
 	mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "backend-svc").
-		Return(&record.Resource{Id: 10, ResourceIdentifier: "backend-svc"}, nil).Once()
-	mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(10)).
-		Return([]record.Permission{{Id: 5, PermissionIdentifier: "read"}}, nil).Once()
+		Return(&record.Resource{ID: 10, ResourceIdentifier: "backend-svc"}, nil).Once()
+	mockDB.On("GetPermissionsByResourceID", mock.Anything, mock.Anything, int64(10)).
+		Return([]record.Permission{{ID: 5, PermissionIdentifier: "read"}}, nil).Once()
 
-	result, err := pc.FilterOutScopesWhereUserIsNotAuthorized(context.Background(), "openid ghost:read backend-svc:delete", &record.User{Id: 1})
+	result, err := pc.FilterOutScopesWhereUserIsNotAuthorized(context.Background(), "openid ghost:read backend-svc:delete", &record.User{ID: 1})
 
 	require.NoError(t, err)
 	assert.Equal(t, "openid", result)
-	mockDB.AssertNotCalled(t, "GetUserById", mock.Anything, mock.Anything, mock.Anything)
+	mockDB.AssertNotCalled(t, "GetUserByID", mock.Anything, mock.Anything, mock.Anything)
 }
 
 // RFC 6749 section 3.3 makes scope values case-sensitive, so OFFLINE_ACCESS is not
@@ -648,7 +648,7 @@ func TestFilterOutScopes_UppercaseOfflineAccessIsNotExempt(t *testing.T) {
 	mockDB := datamocks.NewDatabase(t)
 	pc := NewChecker(mockDB)
 
-	result, err := pc.FilterOutScopesWhereUserIsNotAuthorized(context.Background(), "openid OFFLINE_ACCESS", &record.User{Id: 1})
+	result, err := pc.FilterOutScopesWhereUserIsNotAuthorized(context.Background(), "openid OFFLINE_ACCESS", &record.User{ID: 1})
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid scope format")
@@ -663,10 +663,10 @@ func TestFilterOutScopes_UppercaseOfflineAccessIsNotExempt(t *testing.T) {
 // =============================================================================
 
 func TestResolveScope_Outcomes(t *testing.T) {
-	resource := &record.Resource{Id: 10, ResourceIdentifier: "backend-svc"}
+	resource := &record.Resource{ID: 10, ResourceIdentifier: "backend-svc"}
 	onResource := []record.Permission{
-		{Id: 5, PermissionIdentifier: "read", ResourceId: 10},
-		{Id: 6, PermissionIdentifier: "write", ResourceId: 10},
+		{ID: 5, PermissionIdentifier: "read", ResourceID: 10},
+		{ID: 6, PermissionIdentifier: "write", ResourceID: 10},
 	}
 
 	testCases := []struct {
@@ -676,7 +676,7 @@ func TestResolveScope_Outcomes(t *testing.T) {
 		want          ScopeOutcome
 		wantResource  string
 		wantPerm      string
-		wantPermRowId int64
+		wantPermRowID int64
 	}{
 		{name: "no separator", scope: "backendsvc", want: ScopeMalformed},
 		{name: "two separators", scope: "backend-svc:read:extra", want: ScopeMalformed},
@@ -694,7 +694,7 @@ func TestResolveScope_Outcomes(t *testing.T) {
 			scope: "backend-svc:delete",
 			setup: func(mockDB *datamocks.Database) {
 				mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "backend-svc").Return(resource, nil).Once()
-				mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(10)).Return(onResource, nil).Once()
+				mockDB.On("GetPermissionsByResourceID", mock.Anything, mock.Anything, int64(10)).Return(onResource, nil).Once()
 			},
 			want: ScopePermissionUnknown, wantResource: "backend-svc", wantPerm: "delete",
 		},
@@ -703,9 +703,9 @@ func TestResolveScope_Outcomes(t *testing.T) {
 			scope: "backend-svc:write",
 			setup: func(mockDB *datamocks.Database) {
 				mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "backend-svc").Return(resource, nil).Once()
-				mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(10)).Return(onResource, nil).Once()
+				mockDB.On("GetPermissionsByResourceID", mock.Anything, mock.Anything, int64(10)).Return(onResource, nil).Once()
 			},
-			want: ScopeOK, wantResource: "backend-svc", wantPerm: "write", wantPermRowId: 6,
+			want: ScopeOK, wantResource: "backend-svc", wantPerm: "write", wantPermRowID: 6,
 		},
 	}
 
@@ -725,7 +725,7 @@ func TestResolveScope_Outcomes(t *testing.T) {
 			assert.Equal(t, tc.wantPerm, resolution.PermissionIdentifier)
 			if tc.want == ScopeOK {
 				if assert.NotNil(t, resolution.Permission) {
-					assert.Equal(t, tc.wantPermRowId, resolution.Permission.Id)
+					assert.Equal(t, tc.wantPermRowID, resolution.Permission.ID)
 				}
 			} else {
 				assert.Nil(t, resolution.Permission)
@@ -791,8 +791,8 @@ func TestResolveScope_DatabaseErrorsPropagate(t *testing.T) {
 	t.Run("permission lookup", func(t *testing.T) {
 		mockDB := datamocks.NewDatabase(t)
 		mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "backend-svc").
-			Return(&record.Resource{Id: 10, ResourceIdentifier: "backend-svc"}, nil).Once()
-		mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(10)).Return(nil, dbErr).Once()
+			Return(&record.Resource{ID: 10, ResourceIdentifier: "backend-svc"}, nil).Once()
+		mockDB.On("GetPermissionsByResourceID", mock.Anything, mock.Anything, int64(10)).Return(nil, dbErr).Once()
 
 		_, err := ResolveScope(context.Background(), mockDB, "backend-svc:read")
 
@@ -818,15 +818,15 @@ func TestUserHasScopePermission_CarriesTheCallersContextToEveryRead(t *testing.T
 	mockDB := datamocks.NewDatabase(t)
 	pc := NewChecker(mockDB)
 
-	user := &record.User{Id: 1, Permissions: []record.Permission{{Id: 5, PermissionIdentifier: "read"}}}
-	mockDB.On("GetUserById", callersContext, mock.Anything, user.Id).Return(user, nil).Once()
+	user := &record.User{ID: 1, Permissions: []record.Permission{{ID: 5, PermissionIdentifier: "read"}}}
+	mockDB.On("GetUserByID", callersContext, mock.Anything, user.ID).Return(user, nil).Once()
 	mockDB.On("UserLoadPermissions", callersContext, mock.Anything, user).Return(nil).Once()
 	mockDB.On("UserLoadGroups", callersContext, mock.Anything, user).Return(nil).Once()
 	mockDB.On("GroupsLoadPermissions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "backend-svc").
-		Return(&record.Resource{Id: 10, ResourceIdentifier: "backend-svc"}, nil).Once()
-	mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(10)).
-		Return([]record.Permission{{Id: 5, PermissionIdentifier: "read"}}, nil).Once()
+		Return(&record.Resource{ID: 10, ResourceIdentifier: "backend-svc"}, nil).Once()
+	mockDB.On("GetPermissionsByResourceID", mock.Anything, mock.Anything, int64(10)).
+		Return([]record.Permission{{ID: 5, PermissionIdentifier: "read"}}, nil).Once()
 
 	granted, err := pc.UserHasScopePermission(ctx, 1, "backend-svc:read")
 
@@ -838,7 +838,7 @@ func TestUserHasScopePermission_CarriesTheCallersContextToEveryRead(t *testing.T
 // The scope filter reaches the database through the resolver and its one grant load, so the
 // context it was given has to survive both hops as well. An OIDC scope is answered without any read
 // at all, which is the reject arm: nothing to carry, nothing to get wrong.
-func TestFilterOutScopesWhereUserIsNotAuthorized_CarriesTheCallersContextAndSkipsOidcScopes(t *testing.T) {
+func TestFilterOutScopesWhereUserIsNotAuthorized_CarriesTheCallersContextAndSkipsOIDCScopes(t *testing.T) {
 	type marker struct{}
 	ctx := context.WithValue(context.Background(), marker{}, "the caller's own")
 	callersContext := mock.MatchedBy(func(got context.Context) bool {
@@ -848,15 +848,15 @@ func TestFilterOutScopesWhereUserIsNotAuthorized_CarriesTheCallersContextAndSkip
 	mockDB := datamocks.NewDatabase(t)
 	pc := NewChecker(mockDB)
 
-	user := &record.User{Id: 1, Permissions: []record.Permission{{Id: 5, PermissionIdentifier: "read"}}}
-	mockDB.On("GetUserById", callersContext, mock.Anything, user.Id).Return(user, nil).Once()
+	user := &record.User{ID: 1, Permissions: []record.Permission{{ID: 5, PermissionIdentifier: "read"}}}
+	mockDB.On("GetUserByID", callersContext, mock.Anything, user.ID).Return(user, nil).Once()
 	mockDB.On("UserLoadPermissions", callersContext, mock.Anything, user).Return(nil).Once()
 	mockDB.On("UserLoadGroups", callersContext, mock.Anything, user).Return(nil).Once()
 	mockDB.On("GroupsLoadPermissions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "backend-svc").
-		Return(&record.Resource{Id: 10, ResourceIdentifier: "backend-svc"}, nil).Once()
-	mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(10)).
-		Return([]record.Permission{{Id: 5, PermissionIdentifier: "read"}}, nil).Once()
+		Return(&record.Resource{ID: 10, ResourceIdentifier: "backend-svc"}, nil).Once()
+	mockDB.On("GetPermissionsByResourceID", mock.Anything, mock.Anything, int64(10)).
+		Return([]record.Permission{{ID: 5, PermissionIdentifier: "read"}}, nil).Once()
 
 	filtered, err := pc.FilterOutScopesWhereUserIsNotAuthorized(ctx, "openid backend-svc:read", user)
 

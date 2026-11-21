@@ -6,7 +6,7 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 )
 
-// JwtInfo is a token response with its ID token verified and decoded, as the JWKS parser produces
+// JWTInfo is a token response with its ID token verified and decoded, as the JWKS parser produces
 // it and the JWT session middleware puts it on the request context. The ID token is the one token
 // addressed to the console (OIDC Core 3.1.3.7); the access and refresh tokens stay the strings in
 // TokenResponse, carried and never decoded, as RFC 6749 sections 1.4 and 1.5 describe a client
@@ -17,16 +17,16 @@ import (
 // the auth server's parser method producing one had no caller and went in #424, and a type one
 // process uses moves to that process, as this package's doc says. It never reaches the session,
 // which stores the TokenResponse alone, so the move renamed nothing persisted.
-type JwtInfo struct {
+type JWTInfo struct {
 	TokenResponse oauth.TokenResponse
-	IdToken       *oauth.JwtToken
+	IDToken       *oauth.JWTToken
 }
 
 // HasScope reports whether the grant the token response records includes scope, matched
 // exactly against its space-delimited values (RFC 6749 section 3.3). It reads the response
 // rather than the access token, which the console carries without decoding (#427). An empty
 // scope never matches, so a doubled space in the grant grants nothing.
-func (j JwtInfo) HasScope(scope string) bool {
+func (j JWTInfo) HasScope(scope string) bool {
 	if scope == "" {
 		return false
 	}

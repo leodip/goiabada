@@ -25,8 +25,8 @@ func TestHandleClientPermissionsPut_ClientCredentialsOffIsRefusedBeforeTheTransa
 
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
-	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), grantOwnerId).
-		Return(&record.Client{Id: grantOwnerId, ClientIdentifier: "a-web-app", ClientCredentialsEnabled: false}, nil).Once()
+	database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), grantOwnerID).
+		Return(&record.Client{ID: grantOwnerID, ClientIdentifier: "a-web-app", ClientCredentialsEnabled: false}, nil).Once()
 
 	rr := save.serve(database, auditLogger, save.body(t, []int64{6}, []int64{}))
 
@@ -35,6 +35,6 @@ func TestHandleClientPermissionsPut_ClientCredentialsOffIsRefusedBeforeTheTransa
 	assert.Equal(t, "handler.client_permissions.client_credentials_disabled", code, "the refusal answers its catalog key")
 	assert.Contains(t, description, "only be configured when client credentials flow is enabled")
 	database.AssertExpectations(t)
-	assertNotAttemptedOnClientDatabase(t, database, "GetPermissionById", "RunInTransaction")
+	assertNotAttemptedOnClientDatabase(t, database, "GetPermissionByID", "RunInTransaction")
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 }

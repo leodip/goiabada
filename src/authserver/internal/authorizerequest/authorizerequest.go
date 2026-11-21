@@ -56,7 +56,7 @@ type Parking interface {
 // that consumes it never parks.
 type Consuming interface {
 	GetAuthorizeRequestByHandleHash(ctx context.Context, tx *sql.Tx, handleHash string, now time.Time) (*record.AuthorizeRequest, error)
-	ClaimAuthorizeRequest(ctx context.Context, tx *sql.Tx, authorizeRequestId int64) (bool, error)
+	ClaimAuthorizeRequest(ctx context.Context, tx *sql.Tx, authorizeRequestID int64) (bool, error)
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 }
 
@@ -122,7 +122,7 @@ func Consume(ctx context.Context, db Consuming, handle string) (url.Values, bool
 			return nil
 		}
 
-		claimed, err := db.ClaimAuthorizeRequest(ctx, tx, found.Id)
+		claimed, err := db.ClaimAuthorizeRequest(ctx, tx, found.ID)
 		if err != nil {
 			return errs.Wrap(err, "unable to claim the authorize request")
 		}

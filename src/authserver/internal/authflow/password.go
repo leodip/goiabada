@@ -156,14 +156,14 @@ func (o *PasswordSubmission) Run(ctx context.Context, browser passwordSubmission
 		browser.RecordCredentialFailure()
 		o.auditLogger.Log(ctx, audit.EventAuthFailedPwd, map[string]interface{}{
 			"email_digest": emailDigest,
-			"user_id":      user.Id,
+			"user_id":      user.ID,
 		})
 		return PasswordSubmissionResult{Answer: PasswordRefused}, nil
 	}
 
 	if !user.Enabled {
 		o.auditLogger.Log(ctx, audit.EventUserDisabled, map[string]interface{}{
-			"user_id": user.Id,
+			"user_id": user.ID,
 		})
 		return PasswordSubmissionResult{Answer: PasswordAccountDisabled, UserPageLanguage: user.PageLanguage}, nil
 	}
@@ -227,13 +227,13 @@ func (o *PasswordProof) Record(ctx context.Context, browser passwordProofBrowser
 	user *record.User, keepSignedIn *bool) PasswordProofResult {
 
 	o.auditLogger.Log(ctx, audit.EventAuthSuccessPwd, map[string]interface{}{
-		"user_id": user.Id,
+		"user_id": user.ID,
 	})
 
 	authContext.RecordPasswordVerified(user, time.Now(), keepSignedIn)
 
 	result := PasswordProofResult{NextStep: "/auth/level1completed"}
-	if result.SaveErr = browser.RegenerateSession(authContext.CeremonyId, authContext.UserId); result.SaveErr != nil {
+	if result.SaveErr = browser.RegenerateSession(authContext.CeremonyID, authContext.UserID); result.SaveErr != nil {
 		return result
 	}
 	result.SaveErr = browser.SaveAuthContext(authContext)

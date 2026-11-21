@@ -24,8 +24,8 @@ import (
 // client's brand, and one answered before, when the address check itself fails, in the default:
 // GET's read of the browser's session and POST's park both come after the check (#812).
 func TestAuthorize_AFaultOnceTheClientIsKnownKeepsItsBrand(t *testing.T) {
-	night := &record.Brand{Id: 7, Name: "Night", Appearance: record.BrandAppearanceDark, Theme: "plum"}
-	day := &record.Brand{Id: 12, Name: "Day", Appearance: record.BrandAppearanceLight, Theme: "avocado"}
+	night := &record.Brand{ID: 7, Name: "Night", Appearance: record.BrandAppearanceDark, Theme: "plum"}
+	day := &record.Brand{ID: 12, Name: "Day", Appearance: record.BrandAppearanceLight, Theme: "avocado"}
 
 	for _, tc := range []struct {
 		name          string
@@ -62,7 +62,7 @@ func TestAuthorize_AFaultOnceTheClientIsKnownKeepsItsBrand(t *testing.T) {
 			if tc.method == http.MethodGet {
 				if tc.clientKnown {
 					database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
-						Return(&record.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true}, nil).Once()
+						Return(&record.Client{ID: 1, ClientIdentifier: "test-client", Enabled: true}, nil).Once()
 					stubRegisteredRedirectURI(database, "https://example.com")
 					database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything).
 						Return(nil, errors.New("injected session read fault")).Once()
@@ -103,8 +103,8 @@ func TestAuthorize_AFaultOnceTheClientIsKnownKeepsItsBrand(t *testing.T) {
 // URIs comes after the client was read, so its 500 is drawn in that client's brand, on GET and on
 // POST alike (#812).
 func TestAuthorize_AnAddressCheckFaultKeepsTheBrandOnceItHasReadTheClient(t *testing.T) {
-	night := &record.Brand{Id: 7, Name: "Night", Appearance: record.BrandAppearanceDark, Theme: "plum"}
-	day := &record.Brand{Id: 12, Name: "Day", Appearance: record.BrandAppearanceLight, Theme: "avocado"}
+	night := &record.Brand{ID: 7, Name: "Night", Appearance: record.BrandAppearanceDark, Theme: "plum"}
+	day := &record.Brand{ID: 12, Name: "Day", Appearance: record.BrandAppearanceLight, Theme: "avocado"}
 
 	for _, tc := range []struct {
 		name          string
@@ -129,7 +129,7 @@ func TestAuthorize_AnAddressCheckFaultKeepsTheBrandOnceItHasReadTheClient(t *tes
 			renderer := render.New(web.TemplateFS(), web.StaticFS(), database)
 
 			if tc.clientRead {
-				client := &record.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true}
+				client := &record.Client{ID: 1, ClientIdentifier: "test-client", Enabled: true}
 				database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
 					Return(client, nil).Once()
 				database.On("ClientLoadRedirectURIs", mock.Anything, mock.Anything, client).

@@ -27,7 +27,7 @@ import (
 // deployment's.
 func TestToken_PhoneNumber_IsE164AfterAnAdminAPISave(t *testing.T) {
 	changeSettings(t, func(settings *record.Settings) {
-		settings.IncludeOpenIDConnectClaimsInIdToken = true
+		settings.IncludeOpenIDConnectClaimsInIDToken = true
 		settings.IncludeOpenIDConnectClaimsInAccessToken = true
 	})
 
@@ -48,9 +48,9 @@ func TestToken_PhoneNumber_IsE164AfterAnAdminAPISave(t *testing.T) {
 			httpClient, code := createAuthCodeWithUserProfile(t, clientSecret, "openid phone")
 
 			adminToken, _ := createAdminClientWithToken(t)
-			phoneURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(code.UserId, 10) + "/phone"
+			phoneURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(code.UserID, 10) + "/phone"
 			saveResp := makeAPIRequest(t, "PUT", phoneURL, adminToken, api.UpdateUserPhoneRequest{
-				PhoneCountryUniqueId: "PRT_0",
+				PhoneCountryUniqueID: "PRT_0",
 				PhoneNumber:          test.number,
 				PhoneNumberVerified:  true,
 			})

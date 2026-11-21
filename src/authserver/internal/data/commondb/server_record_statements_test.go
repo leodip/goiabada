@@ -25,7 +25,7 @@ import (
 // mapping test.
 
 const (
-	serverRecordId = 9
+	serverRecordID = 9
 	keyHash        = "key-1"
 	dpopProofHash  = "462c64cca02281f55a11dd7d75a15fa32a13d06b1c710a6df24776076741b096"
 )
@@ -64,9 +64,9 @@ func serverRecordStatements() []narrowWrite {
 	return []narrowWrite{
 		// The settings row.
 		{
-			name: "GetSettingsById",
+			name: "GetSettingsByID",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				_, err := d.GetSettingsById(ctx, nil, serverRecordId)
+				_, err := d.GetSettingsByID(ctx, nil, serverRecordID)
 				return nil, err
 			},
 			statements: []string{"SELECT <columns> FROM settings WHERE id = 9"},
@@ -83,7 +83,7 @@ func serverRecordStatements() []narrowWrite {
 			name: "AcquireSettingsRow",
 			run: func(ctx context.Context, d *Database) (any, error) {
 				return inTx(ctx, d, func(tx *sql.Tx) (any, error) {
-					return nil, d.AcquireSettingsRow(ctx, tx, serverRecordId)
+					return nil, d.AcquireSettingsRow(ctx, tx, serverRecordID)
 				})
 			},
 			statements: []string{"UPDATE settings SET updated_at = <now> WHERE id = 9"},
@@ -114,9 +114,9 @@ func serverRecordStatements() []narrowWrite {
 
 		// Signing keys.
 		{
-			name: "GetKeyPairById",
+			name: "GetKeyPairByID",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				_, err := d.GetKeyPairById(ctx, nil, serverRecordId)
+				_, err := d.GetKeyPairByID(ctx, nil, serverRecordID)
 				return nil, err
 			},
 			statements: []string{"SELECT <columns> FROM key_pairs WHERE id = 9"},
@@ -141,7 +141,7 @@ func serverRecordStatements() []narrowWrite {
 		{
 			name: "UpdateKeyPairState",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return d.UpdateKeyPairState(ctx, nil, serverRecordId, record.KeyStateCurrent.String(), record.KeyStatePrevious.String())
+				return d.UpdateKeyPairState(ctx, nil, serverRecordID, record.KeyStateCurrent.String(), record.KeyStatePrevious.String())
 			},
 			answer: true,
 			statements: []string{
@@ -152,7 +152,7 @@ func serverRecordStatements() []narrowWrite {
 			name:  "UpdateKeyPairState when another rotation moved the key first",
 			execs: []*scriptedExec{{rowsAffected: 0}},
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return d.UpdateKeyPairState(ctx, nil, serverRecordId, record.KeyStateCurrent.String(), record.KeyStatePrevious.String())
+				return d.UpdateKeyPairState(ctx, nil, serverRecordID, record.KeyStateCurrent.String(), record.KeyStatePrevious.String())
 			},
 			answer: false,
 			statements: []string{
@@ -162,16 +162,16 @@ func serverRecordStatements() []narrowWrite {
 		{
 			name: "DeleteKeyPair",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return nil, d.DeleteKeyPair(ctx, nil, serverRecordId)
+				return nil, d.DeleteKeyPair(ctx, nil, serverRecordID)
 			},
 			statements: []string{"DELETE FROM key_pairs WHERE id = 9"},
 		},
 
 		// Pending registrations.
 		{
-			name: "GetPreRegistrationById",
+			name: "GetPreRegistrationByID",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				_, err := d.GetPreRegistrationById(ctx, nil, serverRecordId)
+				_, err := d.GetPreRegistrationByID(ctx, nil, serverRecordID)
 				return nil, err
 			},
 			statements: []string{"SELECT <columns> FROM pre_registrations WHERE id = 9"},
@@ -202,14 +202,14 @@ func serverRecordStatements() []narrowWrite {
 		{
 			name: "DeletePreRegistration",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return nil, d.DeletePreRegistration(ctx, nil, serverRecordId)
+				return nil, d.DeletePreRegistration(ctx, nil, serverRecordID)
 			},
 			statements: []string{"DELETE FROM pre_registrations WHERE id = 9"},
 		},
 		{
 			name: "DeletePreRegistrationHoldingCode",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return d.DeletePreRegistrationHoldingCode(ctx, nil, serverRecordId, "hash-1")
+				return d.DeletePreRegistrationHoldingCode(ctx, nil, serverRecordID, "hash-1")
 			},
 			answer:     true,
 			statements: []string{"DELETE FROM pre_registrations WHERE id = 9 AND verification_code_hash = 'hash-1'"},
@@ -218,7 +218,7 @@ func serverRecordStatements() []narrowWrite {
 			name:  "DeletePreRegistrationHoldingCode when the row holds another code",
 			execs: []*scriptedExec{{rowsAffected: 0}},
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return d.DeletePreRegistrationHoldingCode(ctx, nil, serverRecordId, "hash-1")
+				return d.DeletePreRegistrationHoldingCode(ctx, nil, serverRecordID, "hash-1")
 			},
 			answer:     false,
 			statements: []string{"DELETE FROM pre_registrations WHERE id = 9 AND verification_code_hash = 'hash-1'"},
@@ -236,7 +236,7 @@ func serverRecordStatements() []narrowWrite {
 		{
 			name: "TryReplacePreRegistrationCode",
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return d.TryReplacePreRegistrationCode(ctx, nil, serverRecordId, "dead-hash", []byte("sealed code"), "hash-1", issuedAt)
+				return d.TryReplacePreRegistrationCode(ctx, nil, serverRecordID, "dead-hash", []byte("sealed code"), "hash-1", issuedAt)
 			},
 			answer: true,
 			statements: []string{
@@ -249,7 +249,7 @@ func serverRecordStatements() []narrowWrite {
 			name:  "TryReplacePreRegistrationCode when another request replaced it first",
 			execs: []*scriptedExec{{rowsAffected: 0}},
 			run: func(ctx context.Context, d *Database) (any, error) {
-				return d.TryReplacePreRegistrationCode(ctx, nil, serverRecordId, "dead-hash", []byte("sealed code"), "hash-1", issuedAt)
+				return d.TryReplacePreRegistrationCode(ctx, nil, serverRecordID, "dead-hash", []byte("sealed code"), "hash-1", issuedAt)
 			},
 			answer: false,
 			statements: []string{
@@ -385,8 +385,8 @@ func TestServerRecordStatements_TheEnginesPageTheAuditLogs(t *testing.T) {
 	)
 	for _, c := range []struct {
 		name                  string
-		auditEvent, requestId string
-		userId                int64
+		auditEvent, requestID string
+		userID                int64
 		where, mssqlWhere     string
 	}{
 		{"no filter", "", "", 0, "", ""},
@@ -411,7 +411,7 @@ func TestServerRecordStatements_TheEnginesPageTheAuditLogs(t *testing.T) {
 				assertNarrowWriteOn(t, narrowWrite{
 					run: func(ctx context.Context, d *Database) (any, error) {
 						_, _, err := d.GetAuditLogsPaginated(ctx, nil, 3, 10,
-							record.AuditLogFilter{AuditEvent: c.auditEvent, RequestId: c.requestId, UserId: c.userId})
+							record.AuditLogFilter{AuditEvent: c.auditEvent, RequestID: c.requestID, UserID: c.userID})
 						return nil, err
 					},
 					statements: []string{
@@ -432,7 +432,7 @@ func TestServerRecordStatements_TheEnginesReadOneUsersAuditLogsWhole(t *testing.
 		t.Run(string(dialect), func(t *testing.T) {
 			assertNarrowWriteOn(t, narrowWrite{
 				run: func(ctx context.Context, d *Database) (any, error) {
-					_, err := d.GetAuditLogsByUserId(ctx, nil, 41)
+					_, err := d.GetAuditLogsByUserID(ctx, nil, 41)
 					return nil, err
 				},
 				statements: []string{
@@ -454,7 +454,7 @@ func TestServerRecordStatements_TheEmailCasePreFlightAsksTheEngineToLowerEveryAd
 			values: [][]driver.Value{{int64(3), "Ana@Example.com", "ana@example.com"}},
 		}}
 	}
-	wantRows := []record.EmailCaseRow{{Id: 3, Email: "Ana@Example.com", EngineLowered: "ana@example.com"}}
+	wantRows := []record.EmailCaseRow{{ID: 3, Email: "Ana@Example.com", EngineLowered: "ana@example.com"}}
 
 	for _, dialect := range allDialects {
 		t.Run("ScanEmailCase/"+string(dialect), func(t *testing.T) {

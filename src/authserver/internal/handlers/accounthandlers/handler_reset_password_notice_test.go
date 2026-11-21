@@ -37,8 +37,8 @@ const (
 	resetNoticeCodeHash  = "the-code-hash"
 	resetNoticePassword  = "Str0ngP4ss!-reset"
 	resetNoticeAddress   = "carla.dias@example.com"
-	resetNoticeRequestId = "req-reset-0001"
-	resetNoticeUserId    = int64(31)
+	resetNoticeRequestID = "req-reset-0001"
+	resetNoticeUserID    = int64(31)
 )
 
 // resetHeldJobs holds every job handed to it rather than starting it, so a case asserts what the
@@ -76,7 +76,7 @@ func heldResetNotifier(t *testing.T, pageRenderer *handlersmocks.PageRenderer) *
 // setup link is pending) and the verified flag given.
 func resetNoticeRow(passwordHash string, verified bool) *record.User {
 	return &record.User{
-		Id:            resetNoticeUserId,
+		ID:            resetNoticeUserID,
 		Enabled:       true,
 		GivenName:     "Carla",
 		FamilyName:    "Dias",
@@ -129,8 +129,8 @@ func (rt *resetNoticeTest) serve(t *testing.T, settings *record.Settings) {
 	passwordValidator.On("ValidatePassword", settings.PasswordPolicy, resetNoticePassword, mock.Anything).Return(nil).Maybe()
 
 	req := postWithMarker(t, store, resetNoticePassword, resetNoticePassword,
-		emaillinks.LinkMarkerFlowResetPassword, resetNoticeUserId, resetNoticeCodeHash)
-	ctx := requestid.NewContext(req.Context(), resetNoticeRequestId)
+		emaillinks.LinkMarkerFlowResetPassword, resetNoticeUserID, resetNoticeCodeHash)
+	ctx := requestid.NewContext(req.Context(), resetNoticeRequestID)
 	req = req.WithContext(reqctx.WithSettings(ctx, settings))
 
 	HandleResetPasswordPost(rt.pageRenderer, store, heldCeremonies{}, rt.database, passwordValidator, rt.auditLogger,
@@ -144,11 +144,11 @@ func (rt *resetNoticeTest) serve(t *testing.T, settings *record.Settings) {
 // of its own would fail the case.
 func (rt *resetNoticeTest) stubReset(before *record.User, replaced *record.User) {
 	rt.database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), resetNoticeCodeHash).Return(before, nil).Once()
-	rt.database.On("AcquireUserRow", mock.Anything, revokeTx, resetNoticeUserId).Return(nil).Once()
-	rt.database.On("GetUserById", mock.Anything, revokeTx, resetNoticeUserId).Return(replaced, nil).Once()
-	rt.database.On("TryConsumeForgotPasswordCode", mock.Anything, revokeTx, resetNoticeUserId, resetNoticeCodeHash, mock.Anything).
+	rt.database.On("AcquireUserRow", mock.Anything, revokeTx, resetNoticeUserID).Return(nil).Once()
+	rt.database.On("GetUserByID", mock.Anything, revokeTx, resetNoticeUserID).Return(replaced, nil).Once()
+	rt.database.On("TryConsumeForgotPasswordCode", mock.Anything, revokeTx, resetNoticeUserID, resetNoticeCodeHash, mock.Anything).
 		Return(true, nil).Once()
-	stubRevocationSweepTx(rt.database, resetNoticeUserId, 6)
+	stubRevocationSweepTx(rt.database, resetNoticeUserID, 6)
 	rt.auditLogger.On("Log", mock.Anything, audit.EventRevokedUserAuthState, mock.Anything).Return().Once()
 	if !replaced.EmailVerified {
 		rt.auditLogger.On("Log", mock.Anything, audit.EventVerifiedEmail, mock.Anything).Return().Once()
@@ -256,7 +256,7 @@ func TestHandleResetPasswordPost_TellsTheUserTheirPasswordWasReset(t *testing.T)
 			assert.Equal(t, "Carla Dias", values.Name)
 			assert.Empty(t, values.Link, "the notice carries no link")
 			assert.NotContains(t, fmt.Sprintf("%+v", values), resetNoticePassword, "the notice carries no password")
-			assert.Equal(t, resetNoticeRequestId, requestid.FromContext(sendCtx), "the job's records carry the request's id")
+			assert.Equal(t, resetNoticeRequestID, requestid.FromContext(sendCtx), "the job's records carry the request's id")
 		})
 	}
 }
@@ -282,10 +282,10 @@ func TestHandleResetPasswordPost_SendsNoNoticeWhereNoneMayGo(t *testing.T) {
 			rt.database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), resetNoticeCodeHash).
 				Return(resetNoticeRow("the-old-hash", true), nil).Once()
 			datamocks.ExpectRunInTransaction(rt.database, revokeTx)
-			rt.database.On("AcquireUserRow", mock.Anything, revokeTx, resetNoticeUserId).Return(nil).Once()
-			rt.database.On("GetUserById", mock.Anything, revokeTx, resetNoticeUserId).
+			rt.database.On("AcquireUserRow", mock.Anything, revokeTx, resetNoticeUserID).Return(nil).Once()
+			rt.database.On("GetUserByID", mock.Anything, revokeTx, resetNoticeUserID).
 				Return(resetNoticeRow("the-old-hash", true), nil).Once()
-			rt.database.On("TryConsumeForgotPasswordCode", mock.Anything, revokeTx, resetNoticeUserId, resetNoticeCodeHash, mock.Anything).
+			rt.database.On("TryConsumeForgotPasswordCode", mock.Anything, revokeTx, resetNoticeUserID, resetNoticeCodeHash, mock.Anything).
 				Return(false, nil).Once()
 			rt.auditLogger.On("Log", mock.Anything, audit.EventFailedResetPasswordCode, mock.Anything).Return().Once()
 			expectRenderedCodeInvalid(rt.pageRenderer, http.StatusBadRequest)
@@ -294,12 +294,12 @@ func TestHandleResetPasswordPost_SendsNoNoticeWhereNoneMayGo(t *testing.T) {
 			rt.database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), resetNoticeCodeHash).
 				Return(resetNoticeRow("the-old-hash", true), nil).Once()
 			datamocks.ExpectRunInTransaction(rt.database, revokeTx)
-			rt.database.On("AcquireUserRow", mock.Anything, revokeTx, resetNoticeUserId).Return(nil).Once()
-			rt.database.On("GetUserById", mock.Anything, revokeTx, resetNoticeUserId).
+			rt.database.On("AcquireUserRow", mock.Anything, revokeTx, resetNoticeUserID).Return(nil).Once()
+			rt.database.On("GetUserByID", mock.Anything, revokeTx, resetNoticeUserID).
 				Return(resetNoticeRow("the-old-hash", true), nil).Once()
-			rt.database.On("TryConsumeForgotPasswordCode", mock.Anything, revokeTx, resetNoticeUserId, resetNoticeCodeHash, mock.Anything).
+			rt.database.On("TryConsumeForgotPasswordCode", mock.Anything, revokeTx, resetNoticeUserID, resetNoticeCodeHash, mock.Anything).
 				Return(true, nil).Once()
-			rt.database.On("IncrementUserAuthStateGeneration", mock.Anything, revokeTx, resetNoticeUserId).
+			rt.database.On("IncrementUserAuthStateGeneration", mock.Anything, revokeTx, resetNoticeUserID).
 				Return(int64(0), errors.New("increment failed")).Once()
 			rt.pageRenderer.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Return().Once()
 		}},

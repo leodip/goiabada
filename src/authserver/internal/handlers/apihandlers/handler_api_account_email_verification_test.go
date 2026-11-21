@@ -79,7 +79,7 @@ func newVerificationEnv(t *testing.T) *verificationEnv {
 	require.NoError(t, err)
 
 	user := &record.User{
-		Id:                             7,
+		ID:                             7,
 		Enabled:                        true,
 		Email:                          "someone@example.com",
 		EmailVerificationCodeEncrypted: encrypted,
@@ -229,7 +229,7 @@ func TestHandleAccountEmailVerificationSendPost_LinksToTheAdminConsoleItWasHande
 	handler := HandleAccountEmailVerificationSendPost(pageRenderer, database, emailSender, auditLogger,
 		testDataCipher, testAdminConsoleBaseURL)
 
-	user := &record.User{Id: 7, Subject: verificationSubject, Email: "someone@example.com"}
+	user := &record.User{ID: 7, Subject: verificationSubject, Email: "someone@example.com"}
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), verificationSubject).Return(user, nil)
 	database.On("TryStoreEmailVerificationCode", mock.Anything, (*sql.Tx)(nil), int64(7), "someone@example.com",
 		mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
@@ -280,7 +280,7 @@ func TestHandleAccountEmailVerificationSendPost_IsWrittenInTheRecipientsLanguage
 			handler := HandleAccountEmailVerificationSendPost(pageRenderer, database, emailSender, auditLogger,
 				testDataCipher, testAdminConsoleBaseURL)
 
-			user := &record.User{Id: 7, Subject: verificationSubject, Email: "someone@example.com",
+			user := &record.User{ID: 7, Subject: verificationSubject, Email: "someone@example.com",
 				PageLanguage: tc.pageLanguage, Locale: tc.locale}
 			database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), verificationSubject).Return(user, nil)
 			database.On("TryStoreEmailVerificationCode", mock.Anything, (*sql.Tx)(nil), int64(7), "someone@example.com",
@@ -367,7 +367,7 @@ func TestHandleAccountEmailVerificationSendPost_TheCooldownIsTheAccounts(t *test
 		t.Run("a code issued four minutes ago refuses the send, with "+tc.name, func(t *testing.T) {
 			// Past the minute the cooldown used to be, so this is the five minutes refusing.
 			before := time.Now().UTC()
-			user := &record.User{Id: 7, Subject: verificationSubject, Email: "anyone@example.com",
+			user := &record.User{ID: 7, Subject: verificationSubject, Email: "anyone@example.com",
 				EmailVerificationCodeEncrypted: tc.code,
 				EmailVerificationCodeIssuedAt:  sql.NullTime{Time: before.Add(-4 * time.Minute), Valid: true}}
 
@@ -385,7 +385,7 @@ func TestHandleAccountEmailVerificationSendPost_TheCooldownIsTheAccounts(t *test
 	}
 
 	t.Run("a code issued over five minutes ago, none pending, lets the send through", func(t *testing.T) {
-		user := &record.User{Id: 7, Subject: verificationSubject, Email: "anyone@example.com",
+		user := &record.User{ID: 7, Subject: verificationSubject, Email: "anyone@example.com",
 			EmailVerificationCodeIssuedAt: sql.NullTime{Time: time.Now().UTC().Add(-5*time.Minute - time.Second), Valid: true}}
 		pageRenderer := handlersmocks.NewPageRenderer(t)
 		emailSender := accounthandlersmocks.NewEmailSender(t)
@@ -429,7 +429,7 @@ func TestHandleAccountEmailVerificationSendPost_ClaimsTheCodeInOneConditionalWri
 	emailSender := accounthandlersmocks.NewEmailSender(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
-	user := &record.User{Id: 7, Subject: verificationSubject, Email: "anyone@example.com"}
+	user := &record.User{ID: 7, Subject: verificationSubject, Email: "anyone@example.com"}
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), verificationSubject).Return(user, nil).Once()
 	var stored []byte
 	var issuedAt, issuedNotAfter time.Time
@@ -484,7 +484,7 @@ func TestHandleAccountEmailVerificationSendPost_ALostClaimSendsNothing(t *testin
 	}{
 		{
 			name: "a concurrent send claimed the code",
-			reread: &record.User{Id: 7, Subject: verificationSubject, Email: "anyone@example.com",
+			reread: &record.User{ID: 7, Subject: verificationSubject, Email: "anyone@example.com",
 				EmailVerificationCodeIssuedAt: sql.NullTime{Time: claimedAt, Valid: true}},
 			check: func(t *testing.T, rr *httptest.ResponseRecorder) {
 				require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
@@ -497,7 +497,7 @@ func TestHandleAccountEmailVerificationSendPost_ALostClaimSendsNothing(t *testin
 		},
 		{
 			name:   "a concurrent verification verified the address",
-			reread: &record.User{Id: 7, Subject: verificationSubject, Email: "anyone@example.com", EmailVerified: true},
+			reread: &record.User{ID: 7, Subject: verificationSubject, Email: "anyone@example.com", EmailVerified: true},
 			check: func(t *testing.T, rr *httptest.ResponseRecorder) {
 				require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 				var resp api.AccountEmailVerificationSendResponse
@@ -508,7 +508,7 @@ func TestHandleAccountEmailVerificationSendPost_ALostClaimSendsNothing(t *testin
 		},
 		{
 			name:   "a concurrent email change moved the address",
-			reread: &record.User{Id: 7, Subject: verificationSubject, Email: "elsewhere@example.com"},
+			reread: &record.User{ID: 7, Subject: verificationSubject, Email: "elsewhere@example.com"},
 			check: func(t *testing.T, rr *httptest.ResponseRecorder) {
 				require.Equal(t, http.StatusConflict, rr.Code, rr.Body.String())
 				var body map[string]string
@@ -519,7 +519,7 @@ func TestHandleAccountEmailVerificationSendPost_ALostClaimSendsNothing(t *testin
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
-			first := &record.User{Id: 7, Subject: verificationSubject, Email: "anyone@example.com"}
+			first := &record.User{ID: 7, Subject: verificationSubject, Email: "anyone@example.com"}
 			database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), verificationSubject).Return(first, nil).Once()
 			database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), verificationSubject).Return(tc.reread, nil).Once()
 			database.On("TryStoreEmailVerificationCode", mock.Anything, (*sql.Tx)(nil), int64(7), "anyone@example.com",
@@ -549,7 +549,7 @@ func pendingCodeUser(t *testing.T) *record.User {
 	t.Helper()
 	encrypted, err := testDataCipher.Encrypt(verificationCode)
 	require.NoError(t, err)
-	return &record.User{Id: 7, Subject: verificationSubject, Enabled: true, Email: "someone@example.com",
+	return &record.User{ID: 7, Subject: verificationSubject, Enabled: true, Email: "someone@example.com",
 		EmailVerificationCodeEncrypted: encrypted,
 		EmailVerificationCodeIssuedAt:  sql.NullTime{Time: time.Now().UTC(), Valid: true}}
 }
@@ -593,7 +593,7 @@ func TestHandleAccountEmailVerificationPost_ALostWriteIsNotAGuess(t *testing.T) 
 		{
 			name: "a twin submission verified the address first",
 			reread: func(user *record.User) *record.User {
-				return &record.User{Id: 7, Subject: verificationSubject, Email: user.Email, EmailVerified: true}
+				return &record.User{ID: 7, Subject: verificationSubject, Email: user.Email, EmailVerified: true}
 			},
 			wantStatus: http.StatusOK,
 		},
@@ -609,7 +609,7 @@ func TestHandleAccountEmailVerificationPost_ALostWriteIsNotAGuess(t *testing.T) 
 		{
 			name: "an email change moved the address, verified meanwhile",
 			reread: func(user *record.User) *record.User {
-				return &record.User{Id: 7, Subject: verificationSubject, Email: "elsewhere@example.com", EmailVerified: true}
+				return &record.User{ID: 7, Subject: verificationSubject, Email: "elsewhere@example.com", EmailVerified: true}
 			},
 			wantStatus: http.StatusBadRequest,
 		},
@@ -765,7 +765,7 @@ func TestHandleAccountEmailVerificationPost_OnlyTheComparedCodeIsWrittenOnceMore
 			},
 			retryMisses: true,
 			lastRead: func(user *record.User) *record.User {
-				return &record.User{Id: 7, Subject: verificationSubject, Email: user.Email, EmailVerified: true}
+				return &record.User{ID: 7, Subject: verificationSubject, Email: user.Email, EmailVerified: true}
 			},
 			wantStatus: http.StatusOK,
 		},
@@ -808,7 +808,7 @@ func TestHandleAccountEmailVerificationPost_OnlyTheComparedCodeIsWrittenOnceMore
 
 // A verification email the relay refuses is logged naming the account by its id, never by its
 // address (#779).
-func TestHandleAccountEmailVerificationSendPost_SendFailureNamesUserIdOnly(t *testing.T) {
+func TestHandleAccountEmailVerificationSendPost_SendFailureNamesUserIDOnly(t *testing.T) {
 	const address = "someone@example.com"
 	pageRenderer := handlersmocks.NewPageRenderer(t)
 	database := datamocks.NewDatabase(t)
@@ -818,7 +818,7 @@ func TestHandleAccountEmailVerificationSendPost_SendFailureNamesUserIdOnly(t *te
 	handler := HandleAccountEmailVerificationSendPost(pageRenderer, database, emailSender, auditLogger,
 		testDataCipher, testAdminConsoleBaseURL)
 
-	user := &record.User{Id: 7, Subject: verificationSubject, Email: address}
+	user := &record.User{ID: 7, Subject: verificationSubject, Email: address}
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), verificationSubject).Return(user, nil)
 	database.On("TryStoreEmailVerificationCode", mock.Anything, (*sql.Tx)(nil), int64(7), address,
 		mock.Anything, mock.Anything, mock.Anything).Return(true, nil)

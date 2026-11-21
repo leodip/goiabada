@@ -25,7 +25,7 @@ func TestCreateSettings(t *testing.T) {
 		// Off, against the column's default of on, so reading it back shows the insert wrote it.
 		AccountDeletionEnabled:                  false,
 		IncludeOpenIDConnectClaimsInAccessToken: true,
-		IncludeOpenIDConnectClaimsInIdToken:     true,
+		IncludeOpenIDConnectClaimsInIDToken:     true,
 		AESEncryptionKeyLegacy:                  []byte("testaes"),
 		SMTPHost:                                "smtp.test.com",
 		SMTPPort:                                587,
@@ -49,7 +49,7 @@ func TestCreateSettings(t *testing.T) {
 		t.Fatalf("Failed to create settings: %v", err)
 	}
 
-	if settings.Id == 0 {
+	if settings.ID == 0 {
 		t.Error("Expected non-zero ID after creation")
 	}
 	if !settings.CreatedAt.Valid || settings.CreatedAt.Time.IsZero() {
@@ -59,7 +59,7 @@ func TestCreateSettings(t *testing.T) {
 		t.Error("Expected UpdatedAt to be set")
 	}
 
-	retrievedSettings, err := database.GetSettingsById(context.Background(), nil, settings.Id)
+	retrievedSettings, err := database.GetSettingsByID(context.Background(), nil, settings.ID)
 	if err != nil {
 		t.Fatalf("Failed to retrieve created settings: %v", err)
 	}
@@ -87,7 +87,7 @@ func TestUpdateSettings(t *testing.T) {
 	// From off to on: read back as on, it shows both the update and the read carry the column.
 	settings.AccountDeletionEnabled = true
 	settings.IncludeOpenIDConnectClaimsInAccessToken = false
-	settings.IncludeOpenIDConnectClaimsInIdToken = false
+	settings.IncludeOpenIDConnectClaimsInIDToken = false
 	// AESEncryptionKeyLegacy is migration-only (dont-update); UpdateSettings must
 	// leave it unchanged, so we don't modify it here and the comparison below
 	// verifies it still equals the created value.
@@ -114,7 +114,7 @@ func TestUpdateSettings(t *testing.T) {
 		t.Fatalf("Failed to update settings: %v", err)
 	}
 
-	updatedSettings, err := database.GetSettingsById(context.Background(), nil, settings.Id)
+	updatedSettings, err := database.GetSettingsByID(context.Background(), nil, settings.ID)
 	if err != nil {
 		t.Fatalf("Failed to retrieve updated settings: %v", err)
 	}
@@ -126,22 +126,22 @@ func TestUpdateSettings(t *testing.T) {
 	}
 }
 
-func TestGetSettingsById(t *testing.T) {
+func TestGetSettingsByID(t *testing.T) {
 	settings := createTestSettings(t)
 
-	retrievedSettings, err := database.GetSettingsById(context.Background(), nil, settings.Id)
+	retrievedSettings, err := database.GetSettingsByID(context.Background(), nil, settings.ID)
 	if err != nil {
 		t.Fatalf("Failed to get settings by ID: %v", err)
 	}
 
 	compareSettings(t, settings, retrievedSettings)
 
-	nonExistentSettings, err := database.GetSettingsById(context.Background(), nil, 99999)
+	nonExistentSettings, err := database.GetSettingsByID(context.Background(), nil, 99999)
 	if err != nil {
 		t.Errorf("Expected no error for non-existent settings, got: %v", err)
 	}
 	if nonExistentSettings != nil {
-		t.Errorf("Expected nil for non-existent settings, got settings with ID: %d", nonExistentSettings.Id)
+		t.Errorf("Expected nil for non-existent settings, got settings with ID: %d", nonExistentSettings.ID)
 	}
 }
 
@@ -161,7 +161,7 @@ func createTestSettings(t *testing.T) *record.Settings {
 		KeepSignedIn:                              record.KeepSignedInNever,
 		AccountDeletionEnabled:                    false,
 		IncludeOpenIDConnectClaimsInAccessToken:   true,
-		IncludeOpenIDConnectClaimsInIdToken:       true,
+		IncludeOpenIDConnectClaimsInIDToken:       true,
 		AESEncryptionKeyLegacy:                    []byte("testaes"),
 		SMTPHost:                                  "smtp.test.com",
 		SMTPPort:                                  587,
@@ -229,8 +229,8 @@ func compareSettings(t *testing.T, expected, actual *record.Settings) {
 	if actual.IncludeOpenIDConnectClaimsInAccessToken != expected.IncludeOpenIDConnectClaimsInAccessToken {
 		t.Errorf("Expected IncludeOpenIDConnectClaimsInAccessToken %v, got %v", expected.IncludeOpenIDConnectClaimsInAccessToken, actual.IncludeOpenIDConnectClaimsInAccessToken)
 	}
-	if actual.IncludeOpenIDConnectClaimsInIdToken != expected.IncludeOpenIDConnectClaimsInIdToken {
-		t.Errorf("Expected IncludeOpenIDConnectClaimsInIdToken %v, got %v", expected.IncludeOpenIDConnectClaimsInIdToken, actual.IncludeOpenIDConnectClaimsInIdToken)
+	if actual.IncludeOpenIDConnectClaimsInIDToken != expected.IncludeOpenIDConnectClaimsInIDToken {
+		t.Errorf("Expected IncludeOpenIDConnectClaimsInIDToken %v, got %v", expected.IncludeOpenIDConnectClaimsInIDToken, actual.IncludeOpenIDConnectClaimsInIDToken)
 	}
 	if string(actual.AESEncryptionKeyLegacy) != string(expected.AESEncryptionKeyLegacy) {
 		t.Errorf("Expected AESEncryptionKeyLegacy %s, got %s", string(expected.AESEncryptionKeyLegacy), string(actual.AESEncryptionKeyLegacy))

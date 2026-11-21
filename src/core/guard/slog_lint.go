@@ -217,8 +217,8 @@ var slogSpreadSites = []slogSpreadSite{
 		forwarder: apihandlersImportPath + ".writeInternalServerError"},
 	{scope: "authserver/internal/handlers/apihandlers", name: "writeListSaveFailure",
 		forwarder: apihandlersImportPath + ".writeListSaveFailure"},
-	{scope: "authserver/internal/handlers", name: "rejectIdTokenHint",
-		forwarder: handlersImportPath + ".rejectIdTokenHint"},
+	{scope: "authserver/internal/handlers", name: "rejectIDTokenHint",
+		forwarder: handlersImportPath + ".rejectIDTokenHint"},
 	{scope: "authserver/internal/middleware", name: "reportTrip"},
 	{scope: "core/httpmw", name: "RequestLogger"},
 }
@@ -303,7 +303,7 @@ type slogPlainSite struct {
 
 // slogPlainSites is rule 5's table, each function with the reason no context reaches it.
 //
-// addUrlParam and convertToString are the admin console's template function and the helper it
+// addURLParam and convertToString are the admin console's template function and the helper it
 // calls, and html/template invokes a template function with no context, so a record either writes
 // has nothing to carry request_id on. convertToString was core/stringutil.ConvertToString and
 // stood outside the request-path scope altogether until #385 moved it in with its one caller.
@@ -322,7 +322,7 @@ type slogPlainSite struct {
 // slogNoRequestDirs: the auth server's also serves the OpenAPI document on every request, so both
 // are admitted function by function, the way core/i18n's orEmpty is (#442).
 var slogPlainSites = []slogPlainSite{
-	{scope: "adminconsole/internal/render/template_funcs.go", name: "addUrlParam"},
+	{scope: "adminconsole/internal/render/template_funcs.go", name: "addURLParam"},
 	{scope: "adminconsole/internal/render/template_funcs.go", name: "convertToString"},
 	{scope: "core/i18n/i18n.go", name: "orEmpty"},
 	{scope: "authserver/web/embed_fs.go", name: "StaticFS"},

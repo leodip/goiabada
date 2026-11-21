@@ -27,9 +27,9 @@ import "slices"
 
 const (
 	EventAuthFailedPwd         = "auth_failed_pwd" //nolint:gosec // G101: an audit event name, not a credential
-	EventAuthFailedOtp         = "auth_failed_otp"
+	EventAuthFailedOTP         = "auth_failed_otp"
 	EventAuthSuccessPwd        = "auth_success_pwd" //nolint:gosec // G101: an audit event name, not a credential
-	EventAuthSuccessOtp        = "auth_success_otp"
+	EventAuthSuccessOTP        = "auth_success_otp"
 	EventUserDisabled          = "user_disabled"
 	EventStartedNewUserSession = "started_new_user_session"
 	EventBumpedUserSession     = "bumped_user_session"
@@ -112,7 +112,7 @@ const (
 	EventRefreshTokenReplayDetected = "refresh_token_replay_detected"
 	// EventOTPCodeReplayDetected records a TOTP code that validated against the user's
 	// secret but whose time step could not be claimed, which per RFC 6238 Section 5.2
-	// means the code had already been used. Emitted alongside EventAuthFailedOtp rather
+	// means the code had already been used. Emitted alongside EventAuthFailedOTP rather
 	// than instead of it: a replayed code is a far stronger signal than a mistyped one,
 	// usually a real-time phishing proxy, and it deserves to be alertable on its own
 	// (#111 decision 5).
@@ -130,9 +130,9 @@ const (
 	EventOTPCodeReplayDetected = "otp_code_replay_detected"
 	// EventOTPAuthenticatorDisabled records the refused code that brought a user's
 	// consecutive failed attempts against their authenticator to
-	// record.OtpConsecutiveFailureLimit, disabling it until a new one is set up (NIST SP
+	// record.OTPConsecutiveFailureLimit, disabling it until a new one is set up (NIST SP
 	// 800-63B section 3.2.2, #489). Emitted once per disable, beside that attempt's
-	// EventAuthFailedOtp: the count's statement reports the one call that reached the
+	// EventAuthFailedOTP: the count's statement reports the one call that reached the
 	// limit, and the codes refused after it move nothing and raise nothing more.
 	//
 	// It is the evidence that someone holds the user's password or one of their sessions,
@@ -514,7 +514,7 @@ const (
 	// password and one of their codes are in someone else's hands (#257 decision 10).
 	EventAuthSuccessRecoveryCode = "auth_success_recovery_code"
 	// EventAuthFailedRecoveryCode records a recovery code refused at sign-in, wrong or already
-	// used, with user_id. Its own event rather than EventAuthFailedOtp, so a filter on the
+	// used, with user_id. Its own event rather than EventAuthFailedOTP, so a filter on the
 	// authenticator's events does not count recovery codes (#257 decision 10).
 	EventAuthFailedRecoveryCode = "auth_failed_recovery_code"
 	// EventRecoveryCodeReplayDetected records a refused recovery code that belongs to the user's
@@ -739,15 +739,15 @@ const (
 	DeletedUserSessionEndedByAdministrator = "ended_by_administrator"
 )
 
-// The reason field of EventAuthFailedOtp, written only on a refusal that is not a wrong or a
+// The reason field of EventAuthFailedOTP, written only on a refusal that is not a wrong or a
 // replayed code, so an operator can tell a device's clock from someone guessing. Stored data like
 // the event names: a consumer filters on these strings, so a value here cannot change.
 const (
-	// AuthFailedOtpClockAhead is an authenticator code from the time step after the server's
+	// AuthFailedOTPClockAhead is an authenticator code from the time step after the server's
 	// current one, which only an authenticator whose clock runs ahead shows. It is refused with a
 	// message to check the device's time, and neither charged to the otp rate tier nor counted
 	// against the authenticator (#142).
-	AuthFailedOtpClockAhead = "clock_ahead"
+	AuthFailedOTPClockAhead = "clock_ahead"
 )
 
 // EventTypes returns the canonical list of audit event names, which the admin console's
@@ -773,10 +773,10 @@ var auditEventTypes = []string{
 	EventAdministratorChangeRefused,
 	EventAuthCeremonyMismatch,
 	EventAuthCodeReuseDetected,
-	EventAuthFailedOtp,
+	EventAuthFailedOTP,
 	EventAuthFailedPwd,
 	EventAuthFailedRecoveryCode,
-	EventAuthSuccessOtp,
+	EventAuthSuccessOTP,
 	EventAuthSuccessPwd,
 	EventAuthSuccessRecoveryCode,
 	EventBumpedUserSession,

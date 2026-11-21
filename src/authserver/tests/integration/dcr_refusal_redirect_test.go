@@ -86,11 +86,11 @@ func TestDCR_Refusal_DeclinedConsentIsNotDeliveredByRedirect(t *testing.T) {
 // and vetted its redirect URI, which is precisely the risk-assessment input RFC 9700 4.11.2 names,
 // so its error response is delivered exactly as it was before this change.
 func TestDCR_Refusal_AdministratorClientStillRedirects(t *testing.T) {
-	client, redirectUri := createConsentClient(t)
+	client, redirectURI := createConsentClient(t)
 	user, password := createCeremonyUser(t)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
-	consentPage := navigateToConsentScreen(t, httpClient, client, user, password, redirectUri.URI)
+	consentPage := navigateToConsentScreen(t, httpClient, client, user, password, redirectURI.URI)
 	consentURL := appConfig.AuthServer.BaseURL + "/auth/consent"
 
 	resp := postConsent(t, httpClient, consentURL, consentPage, []int{})
@@ -100,11 +100,11 @@ func TestDCR_Refusal_AdministratorClientStillRedirects(t *testing.T) {
 	assert.Equal(t, http.StatusSeeOther, resp.StatusCode,
 		"an administrator-created client's error response is still delivered by redirect")
 
-	errorCode, _, _ := getErrorFromUrl(t, resp)
+	errorCode, _, _ := getErrorFromURL(t, resp)
 	assert.Equal(t, "access_denied", errorCode)
 
 	location := resp.Header.Get("Location")
-	assert.True(t, strings.HasPrefix(location, redirectUri.URI),
+	assert.True(t, strings.HasPrefix(location, redirectURI.URI),
 		"and it goes to the client's own registered URI: %s", location)
 }
 
@@ -123,7 +123,7 @@ func TestDCR_Refusal_InvalidScopeIsNotDeliveredByRedirect(t *testing.T) {
 	client := registerDCRClient(t, "Payroll Portal", redirectURI)
 
 	// A browser with no cookies at all. Nobody is logged in.
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
 	resp, err := httpClient.Get(authorizeURLWithScope(client.ClientIdentifier, redirectURI, "openid nonsense", ""))
 	require.NoError(t, err)
@@ -141,22 +141,22 @@ func TestDCR_Refusal_InvalidScopeIsNotDeliveredByRedirect(t *testing.T) {
 // exactly this. The client is administrator-created on purpose, so the case fails if the nil
 // disjunct is dropped rather than passing on the provenance test instead (#108, decision 14).
 func TestDCR_Refusal_UnresolvedClientIsNotRedirectedEither(t *testing.T) {
-	client, redirectUri := createConsentClient(t)
+	client, redirectURI := createConsentClient(t)
 	user, password := createCeremonyUser(t)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
-	consentPage := navigateToConsentScreen(t, httpClient, client, user, password, redirectUri.URI)
+	consentPage := navigateToConsentScreen(t, httpClient, client, user, password, redirectURI.URI)
 	consentURL := appConfig.AuthServer.BaseURL + "/auth/consent"
 
 	// The ceremony still holds the redirect URI, the state and everything else the redirect would
 	// be built from. Only the client row is gone, which is all provenance is read from.
-	require.NoError(t, database.DeleteClient(context.Background(), nil, client.Id))
+	require.NoError(t, database.DeleteClient(context.Background(), nil, client.ID))
 
 	resp := postConsent(t, httpClient, consentURL, consentPage, []int{})
 	_ = consentPage.Body.Close()
 	defer func() { _ = resp.Body.Close() }()
 
-	parsedRedirect, err := url.Parse(redirectUri.URI)
+	parsedRedirect, err := url.Parse(redirectURI.URI)
 	require.NoError(t, err)
 	assertRedirectWasWithheld(t, resp, parsedRedirect.Host)
 }
@@ -182,7 +182,7 @@ func TestDCR_Refusal_SilentRequestIsNotDeliveredByRedirect(t *testing.T) {
 	const redirectURI = "https://dcr-silent-scope.example.com/callback"
 	client := registerDCRClient(t, "Silent Portal", redirectURI)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
 	resp, err := httpClient.Get(authorizeURLWithScope(client.ClientIdentifier, redirectURI,
 		"openid nonsense", fake.LetterN(8)) + "&prompt=none")
@@ -200,12 +200,12 @@ func TestDCR_Refusal_SilentRequestIsNotDeliveredByRedirect(t *testing.T) {
 // It is also the half of decision 15's cost that stays paid for: an administrator-created client
 // still gets its consent_required, or any other error, back where its code can read it.
 func TestDCR_Refusal_SilentAdministratorClientStillRedirects(t *testing.T) {
-	client, redirectUri := createConsentClient(t)
+	client, redirectURI := createConsentClient(t)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	requestState := fake.LetterN(8)
 
-	resp, err := httpClient.Get(authorizeURLWithScope(client.ClientIdentifier, redirectUri.URI,
+	resp, err := httpClient.Get(authorizeURLWithScope(client.ClientIdentifier, redirectURI.URI,
 		"openid nonsense", requestState) + "&prompt=none")
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -213,7 +213,7 @@ func TestDCR_Refusal_SilentAdministratorClientStillRedirects(t *testing.T) {
 	assert.Equal(t, http.StatusFound, resp.StatusCode,
 		"a client an administrator registered keeps the ordinary error redirect, silent or not")
 
-	errorCode, _, state := getErrorFromUrl(t, resp)
+	errorCode, _, state := getErrorFromURL(t, resp)
 	assert.Equal(t, "invalid_scope", errorCode)
 	assert.Equal(t, requestState, state)
 }

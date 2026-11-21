@@ -19,21 +19,21 @@ import (
 // the user's own set.
 type userPermissionsAPI interface {
 	GetAllResources(ctx context.Context, accessToken string) ([]api.ResourceResponse, error)
-	GetUserPermissions(ctx context.Context, accessToken string, userId int64) (*api.UserResponse, []api.PermissionResponse, error)
-	UpdateUserPermissions(ctx context.Context, accessToken string, userId int64, request *api.UpdateUserPermissionsRequest) error
+	GetUserPermissions(ctx context.Context, accessToken string, userID int64) (*api.UserResponse, []api.PermissionResponse, error)
+	UpdateUserPermissions(ctx context.Context, accessToken string, userID int64, request *api.UpdateUserPermissionsRequest) error
 }
 
 func HandlePermissionsGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient userPermissionsAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 		accessToken := jwtInfo.TokenResponse.AccessToken
@@ -65,7 +65,7 @@ func HandlePermissionsGet(
 		granted := make([]grantedPermission, 0, len(userPermissions))
 		for _, permission := range userPermissions {
 			granted = append(granted, grantedPermission{
-				Id:    permission.Id,
+				ID:    permission.ID,
 				Scope: permission.Resource.ResourceIdentifier + ":" + permission.PermissionIdentifier,
 			})
 		}
@@ -115,16 +115,16 @@ func HandlePermissionsGet(
 }
 
 func HandlePermissionsPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient userPermissionsAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JSONError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.JSONError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 		accessToken := jwtInfo.TokenResponse.AccessToken
@@ -156,8 +156,8 @@ func HandlePermissionsPost(
 
 		// Convert to API request format
 		request := &api.UpdateUserPermissionsRequest{
-			PermissionIds:         data.AssignedPermissionsIds,
-			ExpectedPermissionIds: data.ExpectedPermissionIds,
+			PermissionIDs:         data.AssignedPermissionsIDs,
+			ExpectedPermissionIDs: data.ExpectedPermissionIDs,
 		}
 
 		// Update user permissions via API (includes validation and audit logging)

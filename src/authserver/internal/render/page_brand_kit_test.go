@@ -29,9 +29,9 @@ const (
 
 // kitAssets are the brand's logo, dark logo and favicon, as stored and read without their bytes.
 var kitAssets = []record.BrandAsset{
-	{Id: 11, Kind: record.BrandAssetKindLogo, ContentType: "image/png", Fingerprint: "111111111111", Width: 200, Height: 60},
-	{Id: 12, Kind: record.BrandAssetKindLogo, ContentType: "image/webp", Fingerprint: "222222222222", Width: 200, Height: 60},
-	{Id: 13, Kind: record.BrandAssetKindFavicon, ContentType: "image/png", Fingerprint: "333333333333", Width: 64, Height: 64},
+	{ID: 11, Kind: record.BrandAssetKindLogo, ContentType: "image/png", Fingerprint: "111111111111", Width: 200, Height: 60},
+	{ID: 12, Kind: record.BrandAssetKindLogo, ContentType: "image/webp", Fingerprint: "222222222222", Width: 200, Height: 60},
+	{ID: 13, Kind: record.BrandAssetKindFavicon, ContentType: "image/png", Fingerprint: "333333333333", Width: 64, Height: 64},
 }
 
 var cardLayouts = []struct{ layout, page string }{
@@ -44,16 +44,16 @@ var cardLayouts = []struct{ layout, page string }{
 // asset 13 when favicon is.
 func kitPageBrand(appearance record.BrandAppearance, logo, darkLogo, favicon, hideAppName bool) *record.Brand {
 	brand := record.NewBrand("Shop", appearance, "blueberry")
-	brand.Id = 7
+	brand.ID = 7
 	brand.HideAppName = hideAppName
 	if logo {
-		brand.LogoAssetId = sql.NullInt64{Int64: 11, Valid: true}
+		brand.LogoAssetID = sql.NullInt64{Int64: 11, Valid: true}
 	}
 	if darkLogo {
-		brand.DarkLogoAssetId = sql.NullInt64{Int64: 12, Valid: true}
+		brand.DarkLogoAssetID = sql.NullInt64{Int64: 12, Valid: true}
 	}
 	if favicon {
-		brand.FaviconAssetId = sql.NullInt64{Int64: 13, Valid: true}
+		brand.FaviconAssetID = sql.NullInt64{Int64: 13, Valid: true}
 	}
 	return &brand
 }

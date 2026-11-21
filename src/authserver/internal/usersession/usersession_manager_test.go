@@ -14,104 +14,104 @@ import (
 )
 
 // =============================================================================
-// Tests for shouldUpgradeAcrLevel
+// Tests for shouldUpgradeACRLevel
 // =============================================================================
 
-func TestShouldUpgradeAcrLevel(t *testing.T) {
+func TestShouldUpgradeACRLevel(t *testing.T) {
 	// Test all valid ACR level upgrade scenarios
 	t.Run("level1 to level2_optional should upgrade", func(t *testing.T) {
-		result := shouldUpgradeAcrLevel(
-			record.AcrLevel1,
-			record.AcrLevel2Optional,
+		result := shouldUpgradeACRLevel(
+			record.ACRLevel1,
+			record.ACRLevel2Optional,
 		)
 		assert.True(t, result, "level1 → level2_optional should return true (upgrade)")
 	})
 
 	t.Run("level1 to level2_mandatory should upgrade", func(t *testing.T) {
-		result := shouldUpgradeAcrLevel(
-			record.AcrLevel1,
-			record.AcrLevel2Mandatory,
+		result := shouldUpgradeACRLevel(
+			record.ACRLevel1,
+			record.ACRLevel2Mandatory,
 		)
 		assert.True(t, result, "level1 → level2_mandatory should return true (upgrade)")
 	})
 
 	t.Run("level2_optional to level2_mandatory should upgrade", func(t *testing.T) {
-		result := shouldUpgradeAcrLevel(
-			record.AcrLevel2Optional,
-			record.AcrLevel2Mandatory,
+		result := shouldUpgradeACRLevel(
+			record.ACRLevel2Optional,
+			record.ACRLevel2Mandatory,
 		)
 		assert.True(t, result, "level2_optional → level2_mandatory should return true (upgrade)")
 	})
 
 	// Test all valid ACR level NO upgrade scenarios (same or downgrade)
 	t.Run("level2_optional to level1 should NOT upgrade (downgrade)", func(t *testing.T) {
-		result := shouldUpgradeAcrLevel(
-			record.AcrLevel2Optional,
-			record.AcrLevel1,
+		result := shouldUpgradeACRLevel(
+			record.ACRLevel2Optional,
+			record.ACRLevel1,
 		)
 		assert.False(t, result, "level2_optional → level1 should return false (no downgrade)")
 	})
 
 	t.Run("level2_mandatory to level1 should NOT upgrade (downgrade)", func(t *testing.T) {
-		result := shouldUpgradeAcrLevel(
-			record.AcrLevel2Mandatory,
-			record.AcrLevel1,
+		result := shouldUpgradeACRLevel(
+			record.ACRLevel2Mandatory,
+			record.ACRLevel1,
 		)
 		assert.False(t, result, "level2_mandatory → level1 should return false (no downgrade)")
 	})
 
 	t.Run("level2_mandatory to level2_optional should NOT upgrade (downgrade)", func(t *testing.T) {
-		result := shouldUpgradeAcrLevel(
-			record.AcrLevel2Mandatory,
-			record.AcrLevel2Optional,
+		result := shouldUpgradeACRLevel(
+			record.ACRLevel2Mandatory,
+			record.ACRLevel2Optional,
 		)
 		assert.False(t, result, "level2_mandatory → level2_optional should return false (no downgrade)")
 	})
 
 	// Test same level scenarios
 	t.Run("level1 to level1 should NOT upgrade (same)", func(t *testing.T) {
-		result := shouldUpgradeAcrLevel(
-			record.AcrLevel1,
-			record.AcrLevel1,
+		result := shouldUpgradeACRLevel(
+			record.ACRLevel1,
+			record.ACRLevel1,
 		)
 		assert.False(t, result, "level1 → level1 should return false (same level)")
 	})
 
 	t.Run("level2_optional to level2_optional should NOT upgrade (same)", func(t *testing.T) {
-		result := shouldUpgradeAcrLevel(
-			record.AcrLevel2Optional,
-			record.AcrLevel2Optional,
+		result := shouldUpgradeACRLevel(
+			record.ACRLevel2Optional,
+			record.ACRLevel2Optional,
 		)
 		assert.False(t, result, "level2_optional → level2_optional should return false (same level)")
 	})
 
 	t.Run("level2_mandatory to level2_mandatory should NOT upgrade (same)", func(t *testing.T) {
-		result := shouldUpgradeAcrLevel(
-			record.AcrLevel2Mandatory,
-			record.AcrLevel2Mandatory,
+		result := shouldUpgradeACRLevel(
+			record.ACRLevel2Mandatory,
+			record.ACRLevel2Mandatory,
 		)
 		assert.False(t, result, "level2_mandatory → level2_mandatory should return false (same level)")
 	})
 
 	// Test unknown/invalid ACR levels (fail-safe behavior)
 	t.Run("unknown current ACR should NOT upgrade (fail-safe)", func(t *testing.T) {
-		result := shouldUpgradeAcrLevel(
+		result := shouldUpgradeACRLevel(
 			"unknown:acr:level",
-			record.AcrLevel2Mandatory,
+			record.ACRLevel2Mandatory,
 		)
 		assert.False(t, result, "unknown current ACR should return false (fail-safe)")
 	})
 
 	t.Run("unknown new ACR should NOT upgrade (fail-safe)", func(t *testing.T) {
-		result := shouldUpgradeAcrLevel(
-			record.AcrLevel1,
+		result := shouldUpgradeACRLevel(
+			record.ACRLevel1,
 			"unknown:acr:level",
 		)
 		assert.False(t, result, "unknown new ACR should return false (fail-safe)")
 	})
 
 	t.Run("both unknown ACRs should NOT upgrade (fail-safe)", func(t *testing.T) {
-		result := shouldUpgradeAcrLevel(
+		result := shouldUpgradeACRLevel(
 			"unknown:acr:level1",
 			"unknown:acr:level2",
 		)
@@ -119,23 +119,23 @@ func TestShouldUpgradeAcrLevel(t *testing.T) {
 	})
 
 	t.Run("empty current ACR should NOT upgrade (fail-safe)", func(t *testing.T) {
-		result := shouldUpgradeAcrLevel(
+		result := shouldUpgradeACRLevel(
 			"",
-			record.AcrLevel2Mandatory,
+			record.ACRLevel2Mandatory,
 		)
 		assert.False(t, result, "empty current ACR should return false (fail-safe)")
 	})
 
 	t.Run("empty new ACR should NOT upgrade (fail-safe)", func(t *testing.T) {
-		result := shouldUpgradeAcrLevel(
-			record.AcrLevel1,
+		result := shouldUpgradeACRLevel(
+			record.ACRLevel1,
 			"",
 		)
 		assert.False(t, result, "empty new ACR should return false (fail-safe)")
 	})
 
 	t.Run("both empty ACRs should NOT upgrade (fail-safe)", func(t *testing.T) {
-		result := shouldUpgradeAcrLevel("", "")
+		result := shouldUpgradeACRLevel("", "")
 		assert.False(t, result, "both empty ACRs should return false (fail-safe)")
 	})
 }
@@ -146,14 +146,14 @@ func TestShouldUpgradeAcrLevel(t *testing.T) {
 
 func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 	// Helper to create a user session with specific ACR/AMR
-	createUserSession := func(acrLevel record.AcrLevel, authMethods string) *record.UserSession {
+	createUserSession := func(acrLevel record.ACRLevel, authMethods string) *record.UserSession {
 		return &record.UserSession{
-			Id:                1,
+			ID:                1,
 			SessionIdentifier: "test-session-id",
-			UserId:            123,
-			AcrLevel:          acrLevel,
+			UserID:            123,
+			ACRLevel:          acrLevel,
 			AuthMethods:       authMethods,
-			IpAddress:         "192.168.1.1",
+			IPAddress:         "192.168.1.1",
 			LastAccessed:      time.Now().UTC().Add(-1 * time.Hour),
 			Clients:           []record.UserSessionClient{},
 		}
@@ -164,7 +164,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		manager := &Manager{database: database}
 
 		// Session starts at level1 with password only
-		userSession := createUserSession(record.AcrLevel1, "pwd")
+		userSession := createUserSession(record.ACRLevel1, "pwd")
 
 		database.On("AcquireUserSessionRow", mock.Anything, mock.Anything, "test-session-id").Return(true, nil).Once()
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session-id").
@@ -174,18 +174,18 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		datamocks.ExpectRunInTransaction(database, txSentinel)
 		database.On("UpdateUserSession", mock.Anything, mock.Anything, mock.MatchedBy(func(s *record.UserSession) bool {
 			// Verify the session was updated with new ACR and AuthMethods
-			return s.AcrLevel == record.AcrLevel2Optional &&
+			return s.ACRLevel == record.ACRLevel2Optional &&
 				s.AuthMethods == "pwd otp"
 		})).Return(nil)
 		database.On("CreateUserSessionClient", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 		// Step-up to level2_optional with pwd+otp
 		result, err := manager.BumpUserSession(context.Background(), "test-session-id", 456,
-			"pwd otp", record.AcrLevel2Optional, "192.168.1.1")
+			"pwd otp", record.ACRLevel2Optional, "192.168.1.1")
 
 		require.NoError(t, err)
 		assert.NotNil(t, result)
-		assert.Equal(t, record.AcrLevel2Optional, result.AcrLevel)
+		assert.Equal(t, record.ACRLevel2Optional, result.ACRLevel)
 		assert.Equal(t, "pwd otp", result.AuthMethods)
 
 		database.AssertExpectations(t)
@@ -195,7 +195,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		manager := &Manager{database: database}
 
-		userSession := createUserSession(record.AcrLevel1, "pwd")
+		userSession := createUserSession(record.ACRLevel1, "pwd")
 
 		database.On("AcquireUserSessionRow", mock.Anything, mock.Anything, "test-session-id").Return(true, nil).Once()
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session-id").
@@ -204,17 +204,17 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 			Return(nil)
 		datamocks.ExpectRunInTransaction(database, txSentinel)
 		database.On("UpdateUserSession", mock.Anything, mock.Anything, mock.MatchedBy(func(s *record.UserSession) bool {
-			return s.AcrLevel == record.AcrLevel2Mandatory &&
+			return s.ACRLevel == record.ACRLevel2Mandatory &&
 				s.AuthMethods == "pwd otp"
 		})).Return(nil)
 		database.On("CreateUserSessionClient", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 		result, err := manager.BumpUserSession(context.Background(), "test-session-id", 456,
-			"pwd otp", record.AcrLevel2Mandatory, "192.168.1.1")
+			"pwd otp", record.ACRLevel2Mandatory, "192.168.1.1")
 
 		require.NoError(t, err)
 		assert.NotNil(t, result)
-		assert.Equal(t, record.AcrLevel2Mandatory, result.AcrLevel)
+		assert.Equal(t, record.ACRLevel2Mandatory, result.ACRLevel)
 		assert.Equal(t, "pwd otp", result.AuthMethods)
 
 		database.AssertExpectations(t)
@@ -225,7 +225,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		manager := &Manager{database: database}
 
 		// Already at level2_optional with pwd+otp
-		userSession := createUserSession(record.AcrLevel2Optional, "pwd otp")
+		userSession := createUserSession(record.ACRLevel2Optional, "pwd otp")
 
 		database.On("AcquireUserSessionRow", mock.Anything, mock.Anything, "test-session-id").Return(true, nil).Once()
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session-id").
@@ -235,17 +235,17 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		datamocks.ExpectRunInTransaction(database, txSentinel)
 		database.On("UpdateUserSession", mock.Anything, mock.Anything, mock.MatchedBy(func(s *record.UserSession) bool {
 			// ACR should upgrade, AuthMethods should stay the same
-			return s.AcrLevel == record.AcrLevel2Mandatory &&
+			return s.ACRLevel == record.ACRLevel2Mandatory &&
 				s.AuthMethods == "pwd otp"
 		})).Return(nil)
 		database.On("CreateUserSessionClient", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 		result, err := manager.BumpUserSession(context.Background(), "test-session-id", 456,
-			"pwd otp", record.AcrLevel2Mandatory, "192.168.1.1")
+			"pwd otp", record.ACRLevel2Mandatory, "192.168.1.1")
 
 		require.NoError(t, err)
 		assert.NotNil(t, result)
-		assert.Equal(t, record.AcrLevel2Mandatory, result.AcrLevel)
+		assert.Equal(t, record.ACRLevel2Mandatory, result.ACRLevel)
 
 		database.AssertExpectations(t)
 	})
@@ -255,7 +255,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		manager := &Manager{database: database}
 
 		// Session is at level2_mandatory
-		userSession := createUserSession(record.AcrLevel2Mandatory, "pwd otp")
+		userSession := createUserSession(record.ACRLevel2Mandatory, "pwd otp")
 
 		database.On("AcquireUserSessionRow", mock.Anything, mock.Anything, "test-session-id").Return(true, nil).Once()
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session-id").
@@ -265,17 +265,17 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		datamocks.ExpectRunInTransaction(database, txSentinel)
 		database.On("UpdateUserSession", mock.Anything, mock.Anything, mock.MatchedBy(func(s *record.UserSession) bool {
 			// ACR should NOT be downgraded, should remain level2_mandatory
-			return s.AcrLevel == record.AcrLevel2Mandatory
+			return s.ACRLevel == record.ACRLevel2Mandatory
 		})).Return(nil)
 		database.On("CreateUserSessionClient", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 		// Request level1, but session should stay at level2_mandatory
 		result, err := manager.BumpUserSession(context.Background(), "test-session-id", 456,
-			"pwd otp", record.AcrLevel1, "192.168.1.1")
+			"pwd otp", record.ACRLevel1, "192.168.1.1")
 
 		require.NoError(t, err)
 		assert.NotNil(t, result)
-		assert.Equal(t, record.AcrLevel2Mandatory, result.AcrLevel,
+		assert.Equal(t, record.ACRLevel2Mandatory, result.ACRLevel,
 			"ACR should NOT be downgraded from level2_mandatory to level1")
 
 		database.AssertExpectations(t)
@@ -285,7 +285,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		manager := &Manager{database: database}
 
-		userSession := createUserSession(record.AcrLevel2Optional, "pwd otp")
+		userSession := createUserSession(record.ACRLevel2Optional, "pwd otp")
 
 		database.On("AcquireUserSessionRow", mock.Anything, mock.Anything, "test-session-id").Return(true, nil).Once()
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session-id").
@@ -294,16 +294,16 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 			Return(nil)
 		datamocks.ExpectRunInTransaction(database, txSentinel)
 		database.On("UpdateUserSession", mock.Anything, mock.Anything, mock.MatchedBy(func(s *record.UserSession) bool {
-			return s.AcrLevel == record.AcrLevel2Optional
+			return s.ACRLevel == record.ACRLevel2Optional
 		})).Return(nil)
 		database.On("CreateUserSessionClient", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 		result, err := manager.BumpUserSession(context.Background(), "test-session-id", 456,
-			"pwd otp", record.AcrLevel1, "192.168.1.1")
+			"pwd otp", record.ACRLevel1, "192.168.1.1")
 
 		require.NoError(t, err)
 		assert.NotNil(t, result)
-		assert.Equal(t, record.AcrLevel2Optional, result.AcrLevel,
+		assert.Equal(t, record.ACRLevel2Optional, result.ACRLevel,
 			"ACR should NOT be downgraded from level2_optional to level1")
 
 		database.AssertExpectations(t)
@@ -313,7 +313,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		manager := &Manager{database: database}
 
-		userSession := createUserSession(record.AcrLevel2Optional, "pwd otp")
+		userSession := createUserSession(record.ACRLevel2Optional, "pwd otp")
 
 		database.On("AcquireUserSessionRow", mock.Anything, mock.Anything, "test-session-id").Return(true, nil).Once()
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session-id").
@@ -322,17 +322,17 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 			Return(nil)
 		datamocks.ExpectRunInTransaction(database, txSentinel)
 		database.On("UpdateUserSession", mock.Anything, mock.Anything, mock.MatchedBy(func(s *record.UserSession) bool {
-			return s.AcrLevel == record.AcrLevel2Optional &&
+			return s.ACRLevel == record.ACRLevel2Optional &&
 				s.AuthMethods == "pwd otp"
 		})).Return(nil)
 		database.On("CreateUserSessionClient", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 		result, err := manager.BumpUserSession(context.Background(), "test-session-id", 456,
-			"pwd otp", record.AcrLevel2Optional, "192.168.1.1")
+			"pwd otp", record.ACRLevel2Optional, "192.168.1.1")
 
 		require.NoError(t, err)
 		assert.NotNil(t, result)
-		assert.Equal(t, record.AcrLevel2Optional, result.AcrLevel)
+		assert.Equal(t, record.ACRLevel2Optional, result.ACRLevel)
 
 		database.AssertExpectations(t)
 	})
@@ -341,7 +341,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		manager := &Manager{database: database}
 
-		userSession := createUserSession(record.AcrLevel1, "pwd")
+		userSession := createUserSession(record.ACRLevel1, "pwd")
 
 		database.On("AcquireUserSessionRow", mock.Anything, mock.Anything, "test-session-id").Return(true, nil).Once()
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session-id").
@@ -357,7 +357,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 
 		// Pass empty authMethods - should preserve existing
 		result, err := manager.BumpUserSession(context.Background(), "test-session-id", 456,
-			"", record.AcrLevel1, "192.168.1.1")
+			"", record.ACRLevel1, "192.168.1.1")
 
 		require.NoError(t, err)
 		assert.NotNil(t, result)
@@ -367,11 +367,11 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		database.AssertExpectations(t)
 	})
 
-	t.Run("Empty acrLevel preserves existing AcrLevel", func(t *testing.T) {
+	t.Run("Empty acrLevel preserves existing ACRLevel", func(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		manager := &Manager{database: database}
 
-		userSession := createUserSession(record.AcrLevel2Optional, "pwd otp")
+		userSession := createUserSession(record.ACRLevel2Optional, "pwd otp")
 
 		database.On("AcquireUserSessionRow", mock.Anything, mock.Anything, "test-session-id").Return(true, nil).Once()
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session-id").
@@ -380,8 +380,8 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 			Return(nil)
 		datamocks.ExpectRunInTransaction(database, txSentinel)
 		database.On("UpdateUserSession", mock.Anything, mock.Anything, mock.MatchedBy(func(s *record.UserSession) bool {
-			// AcrLevel should remain level2_optional when empty string passed
-			return s.AcrLevel == record.AcrLevel2Optional
+			// ACRLevel should remain level2_optional when empty string passed
+			return s.ACRLevel == record.ACRLevel2Optional
 		})).Return(nil)
 		database.On("CreateUserSessionClient", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
@@ -391,8 +391,8 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.NotNil(t, result)
-		assert.Equal(t, record.AcrLevel2Optional, result.AcrLevel,
-			"AcrLevel should be preserved when empty string is passed")
+		assert.Equal(t, record.ACRLevel2Optional, result.ACRLevel,
+			"ACRLevel should be preserved when empty string is passed")
 
 		database.AssertExpectations(t)
 	})
@@ -401,7 +401,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		manager := &Manager{database: database}
 
-		userSession := createUserSession(record.AcrLevel2Mandatory, "pwd otp")
+		userSession := createUserSession(record.ACRLevel2Mandatory, "pwd otp")
 
 		database.On("AcquireUserSessionRow", mock.Anything, mock.Anything, "test-session-id").Return(true, nil).Once()
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session-id").
@@ -411,7 +411,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		datamocks.ExpectRunInTransaction(database, txSentinel)
 		database.On("UpdateUserSession", mock.Anything, mock.Anything, mock.MatchedBy(func(s *record.UserSession) bool {
 			// Both should be preserved
-			return s.AcrLevel == record.AcrLevel2Mandatory &&
+			return s.ACRLevel == record.ACRLevel2Mandatory &&
 				s.AuthMethods == "pwd otp"
 		})).Return(nil)
 		database.On("CreateUserSessionClient", mock.Anything, mock.Anything, mock.Anything).Return(nil)
@@ -421,7 +421,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.NotNil(t, result)
-		assert.Equal(t, record.AcrLevel2Mandatory, result.AcrLevel)
+		assert.Equal(t, record.ACRLevel2Mandatory, result.ACRLevel)
 		assert.Equal(t, "pwd otp", result.AuthMethods)
 
 		database.AssertExpectations(t)
@@ -433,7 +433,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 
 		// Edge case: same ACR but different auth methods string
 		// (This shouldn't normally happen, but we should handle it)
-		userSession := createUserSession(record.AcrLevel2Optional, "pwd")
+		userSession := createUserSession(record.ACRLevel2Optional, "pwd")
 
 		database.On("AcquireUserSessionRow", mock.Anything, mock.Anything, "test-session-id").Return(true, nil).Once()
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session-id").
@@ -448,7 +448,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		database.On("CreateUserSessionClient", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 		result, err := manager.BumpUserSession(context.Background(), "test-session-id", 456,
-			"pwd otp", record.AcrLevel2Optional, "192.168.1.1")
+			"pwd otp", record.ACRLevel2Optional, "192.168.1.1")
 
 		require.NoError(t, err)
 		assert.NotNil(t, result)
@@ -466,7 +466,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		database := datamocks.NewDatabase(t)
 		manager := &Manager{database: database}
 
-		userSession := createUserSession(record.AcrLevel2Mandatory, "pwd otp")
+		userSession := createUserSession(record.ACRLevel2Mandatory, "pwd otp")
 
 		database.On("AcquireUserSessionRow", mock.Anything, mock.Anything, "test-session-id").Return(true, nil).Once()
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session-id").
@@ -475,15 +475,15 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 			Return(nil)
 		datamocks.ExpectRunInTransaction(database, txSentinel)
 		database.On("UpdateUserSession", mock.Anything, mock.Anything, mock.MatchedBy(func(s *record.UserSession) bool {
-			return s.AcrLevel == record.AcrLevel2Mandatory && s.AuthMethods == "pwd otp"
+			return s.ACRLevel == record.ACRLevel2Mandatory && s.AuthMethods == "pwd otp"
 		})).Return(nil)
 		database.On("CreateUserSessionClient", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 		result, err := manager.BumpUserSession(context.Background(), "test-session-id", 456,
-			"pwd", record.AcrLevel1, "192.168.1.1")
+			"pwd", record.ACRLevel1, "192.168.1.1")
 
 		require.NoError(t, err)
-		assert.Equal(t, record.AcrLevel2Mandatory, result.AcrLevel)
+		assert.Equal(t, record.ACRLevel2Mandatory, result.ACRLevel)
 		assert.Equal(t, "pwd otp", result.AuthMethods)
 		database.AssertExpectations(t)
 	})
@@ -498,7 +498,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		database.On("AcquireUserSessionRow", mock.Anything, txSentinel, "non-existent-session").Return(false, nil).Once()
 
 		result, err := manager.BumpUserSession(context.Background(), "non-existent-session", 456,
-			"pwd", record.AcrLevel1, "192.168.1.1")
+			"pwd", record.ACRLevel1, "192.168.1.1")
 
 		require.Error(t, err)
 		assert.Nil(t, result)
@@ -520,15 +520,15 @@ func TestBumpUserSession_ClientTracking(t *testing.T) {
 		manager := &Manager{database: database}
 
 		userSession := &record.UserSession{
-			Id:                1,
+			ID:                1,
 			SessionIdentifier: "test-session-id",
-			UserId:            123,
-			AcrLevel:          record.AcrLevel1,
+			UserID:            123,
+			ACRLevel:          record.ACRLevel1,
 			AuthMethods:       "pwd",
-			IpAddress:         "192.168.1.1",
+			IPAddress:         "192.168.1.1",
 			LastAccessed:      time.Now().UTC().Add(-1 * time.Hour),
 			Clients: []record.UserSessionClient{
-				{Id: 1, ClientId: 100, UserSessionId: 1},
+				{ID: 1, ClientID: 100, UserSessionID: 1},
 			},
 		}
 
@@ -541,7 +541,7 @@ func TestBumpUserSession_ClientTracking(t *testing.T) {
 		database.On("UpdateUserSession", mock.Anything, mock.Anything, userSession).Return(nil)
 		database.On("UpdateUserSessionClient", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		database.On("CreateUserSessionClient", mock.Anything, mock.Anything, mock.MatchedBy(func(c *record.UserSessionClient) bool {
-			return c.ClientId == 200
+			return c.ClientID == 200
 		})).Return(nil)
 
 		// Add new client 200
@@ -560,15 +560,15 @@ func TestBumpUserSession_ClientTracking(t *testing.T) {
 
 		oldTime := time.Now().UTC().Add(-1 * time.Hour)
 		userSession := &record.UserSession{
-			Id:                1,
+			ID:                1,
 			SessionIdentifier: "test-session-id",
-			UserId:            123,
-			AcrLevel:          record.AcrLevel1,
+			UserID:            123,
+			ACRLevel:          record.ACRLevel1,
 			AuthMethods:       "pwd",
-			IpAddress:         "192.168.1.1",
+			IPAddress:         "192.168.1.1",
 			LastAccessed:      oldTime,
 			Clients: []record.UserSessionClient{
-				{Id: 1, ClientId: 100, UserSessionId: 1, LastAccessed: oldTime},
+				{ID: 1, ClientID: 100, UserSessionID: 1, LastAccessed: oldTime},
 			},
 		}
 
@@ -581,7 +581,7 @@ func TestBumpUserSession_ClientTracking(t *testing.T) {
 		database.On("UpdateUserSession", mock.Anything, mock.Anything, userSession).Return(nil)
 		database.On("UpdateUserSessionClient", mock.Anything, mock.Anything, mock.MatchedBy(func(c *record.UserSessionClient) bool {
 			// LastAccessed should be updated to a newer time
-			return c.ClientId == 100 && c.LastAccessed.After(oldTime)
+			return c.ClientID == 100 && c.LastAccessed.After(oldTime)
 		})).Return(nil)
 
 		// Same client 100 again
@@ -621,12 +621,12 @@ func TestBumpUserSession_RecordsTheLatestAddress(t *testing.T) {
 			manager := &Manager{database: database}
 
 			userSession := &record.UserSession{
-				Id:                1,
+				ID:                1,
 				SessionIdentifier: "test-session-id",
-				UserId:            123,
-				AcrLevel:          record.AcrLevel1,
+				UserID:            123,
+				ACRLevel:          record.ACRLevel1,
 				AuthMethods:       "pwd",
-				IpAddress:         tc.stored,
+				IPAddress:         tc.stored,
 				LastAccessed:      time.Now().UTC().Add(-1 * time.Hour),
 				Clients:           []record.UserSessionClient{},
 			}
@@ -638,14 +638,14 @@ func TestBumpUserSession_RecordsTheLatestAddress(t *testing.T) {
 				Return(nil)
 			datamocks.ExpectRunInTransaction(database, txSentinel)
 			database.On("UpdateUserSession", mock.Anything, txSentinel, mock.MatchedBy(func(s *record.UserSession) bool {
-				return s.IpAddress == tc.wantAfter
+				return s.IPAddress == tc.wantAfter
 			})).Return(nil).Once()
 			database.On("CreateUserSessionClient", mock.Anything, txSentinel, mock.Anything).Return(nil).Once()
 
 			result, err := manager.BumpUserSession(context.Background(), "test-session-id", 100, "", "", tc.given)
 
 			require.NoError(t, err)
-			assert.Equal(t, tc.wantAfter, result.IpAddress)
+			assert.Equal(t, tc.wantAfter, result.IPAddress)
 		})
 	}
 }
@@ -749,44 +749,44 @@ func TestWillRaisePrivilege(t *testing.T) {
 		name        string
 		userSession *record.UserSession
 		authMethods string
-		acrLevel    record.AcrLevel
+		acrLevel    record.ACRLevel
 		expected    bool
 	}{
 		{
 			name:        "Nil session raises nothing",
 			userSession: nil,
 			authMethods: "pwd otp",
-			acrLevel:    record.AcrLevel2Mandatory,
+			acrLevel:    record.ACRLevel2Mandatory,
 			expected:    false,
 		},
 		{
 			name:        "Neither changes",
-			userSession: &record.UserSession{AuthMethods: "pwd", AcrLevel: record.AcrLevel1},
+			userSession: &record.UserSession{AuthMethods: "pwd", ACRLevel: record.ACRLevel1},
 			authMethods: "pwd",
-			acrLevel:    record.AcrLevel1,
+			acrLevel:    record.ACRLevel1,
 			expected:    false,
 		},
 		{
 			name:        "Auth methods rise",
-			userSession: &record.UserSession{AuthMethods: "pwd", AcrLevel: record.AcrLevel1},
+			userSession: &record.UserSession{AuthMethods: "pwd", ACRLevel: record.ACRLevel1},
 			authMethods: "pwd otp",
-			acrLevel:    record.AcrLevel1,
+			acrLevel:    record.ACRLevel1,
 			expected:    true,
 		},
 		{
 			name:        "ACR level rises",
-			userSession: &record.UserSession{AuthMethods: "pwd", AcrLevel: record.AcrLevel1},
+			userSession: &record.UserSession{AuthMethods: "pwd", ACRLevel: record.ACRLevel1},
 			authMethods: "pwd",
-			acrLevel:    record.AcrLevel2Mandatory,
+			acrLevel:    record.ACRLevel2Mandatory,
 			expected:    true,
 		},
 		{
 			// The session already holds the stronger level, so this ceremony is not a
 			// step-up and rotating would spend a write on nothing.
 			name:        "ACR level would be downgraded",
-			userSession: &record.UserSession{AuthMethods: "pwd otp", AcrLevel: record.AcrLevel2Mandatory},
+			userSession: &record.UserSession{AuthMethods: "pwd otp", ACRLevel: record.ACRLevel2Mandatory},
 			authMethods: "pwd otp",
-			acrLevel:    record.AcrLevel1,
+			acrLevel:    record.ACRLevel1,
 			expected:    false,
 		},
 		{
@@ -794,24 +794,24 @@ func TestWillRaisePrivilege(t *testing.T) {
 			// session's. Until #537 any difference counted, so a prompt=login ceremony at a
 			// level 1 client over a level 3 session rotated the identifier for a drop.
 			name:        "Fewer auth methods are not a raise",
-			userSession: &record.UserSession{AuthMethods: "pwd otp", AcrLevel: record.AcrLevel2Mandatory},
+			userSession: &record.UserSession{AuthMethods: "pwd otp", ACRLevel: record.ACRLevel2Mandatory},
 			authMethods: "pwd",
-			acrLevel:    record.AcrLevel1,
+			acrLevel:    record.ACRLevel1,
 			expected:    false,
 		},
 		{
 			// The same methods in another order add nothing.
 			name:        "The same auth methods in another order are not a raise",
-			userSession: &record.UserSession{AuthMethods: "pwd otp", AcrLevel: record.AcrLevel2Optional},
+			userSession: &record.UserSession{AuthMethods: "pwd otp", ACRLevel: record.ACRLevel2Optional},
 			authMethods: "otp pwd",
-			acrLevel:    record.AcrLevel2Optional,
+			acrLevel:    record.ACRLevel2Optional,
 			expected:    false,
 		},
 		{
 			// An empty incoming value means the ceremony recorded nothing, which is not a
 			// change. Reading it as one would rotate on every SSO reuse.
 			name:        "Empty inputs change nothing",
-			userSession: &record.UserSession{AuthMethods: "pwd", AcrLevel: record.AcrLevel1},
+			userSession: &record.UserSession{AuthMethods: "pwd", ACRLevel: record.ACRLevel1},
 			authMethods: "",
 			acrLevel:    "",
 			expected:    false,

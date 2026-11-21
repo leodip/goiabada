@@ -8,7 +8,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-type JwtToken struct {
+type JWTToken struct {
 	TokenBase64 string
 	// Header is the token's JOSE header, as the parser that verified it read it. The auth server's
 	// access-token check reads its typ (RFC 9068 section 4); a parser that does not fill it leaves
@@ -23,7 +23,7 @@ type JwtToken struct {
 // treated as malformed rather than silently accepted as a different number than was sent.
 const maxSafeFloat64Int = float64(1<<53 - 1)
 
-func (t JwtToken) StringClaim(claimName string) string {
+func (t JWTToken) StringClaim(claimName string) string {
 	if t.Claims[claimName] != nil {
 		s, ok := t.Claims[claimName].(string)
 		if ok {
@@ -33,7 +33,7 @@ func (t JwtToken) StringClaim(claimName string) string {
 	return ""
 }
 
-func (t JwtToken) TimeClaim(claimName string) time.Time {
+func (t JWTToken) TimeClaim(claimName string) time.Time {
 	if t.Claims[claimName] != nil {
 		f64, ok := t.Claims[claimName].(float64)
 		if ok {
@@ -56,7 +56,7 @@ func (t JwtToken) TimeClaim(claimName string) time.Time {
 //
 // Rejects non-integral, negative, and values beyond the range float64 represents
 // exactly, since none of those can be a generation counter that started at 0.
-func (t JwtToken) IntClaim(claimName string) (int64, bool) {
+func (t JWTToken) IntClaim(claimName string) (int64, bool) {
 	raw, ok := t.Claims[claimName]
 	if !ok || raw == nil {
 		return 0, false
@@ -79,7 +79,7 @@ func (t JwtToken) IntClaim(claimName string) (int64, bool) {
 	return int64(f64), true
 }
 
-func (t JwtToken) HasScope(scope string) bool {
+func (t JWTToken) HasScope(scope string) bool {
 	if t.Claims["scope"] != nil {
 		scopesStr, ok := t.Claims["scope"].(string)
 		if ok {

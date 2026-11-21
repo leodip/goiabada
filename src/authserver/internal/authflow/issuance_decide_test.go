@@ -48,7 +48,7 @@ type issuanceWorld struct {
 	// acrLevel and methods are the level the ceremony would issue and the methods it names, level 1
 	// and a password unless a case says otherwise. A case naming otp or recovery_code sets claimsOTP
 	// too, as otpClaimOf reads the claim from the same methods.
-	acrLevel record.AcrLevel
+	acrLevel record.ACRLevel
 	methods  string
 	// session is whether the identifier names a row; owned and valid are about that row, and valid
 	// is also HasValidUserSession's answer for no row, which is false.
@@ -64,9 +64,9 @@ func driveIssuance(t *testing.T, world issuanceWorld) (issuanceAnswer, []issuanc
 	t.Helper()
 
 	claimGeneration := int64(2)
-	userOtpConfigGeneration := claimGeneration
+	userOTPConfigGeneration := claimGeneration
 	if world.authenticatorReplaced {
-		userOtpConfigGeneration = 4
+		userOTPConfigGeneration = 4
 	}
 
 	facts := issuanceFacts{
@@ -107,7 +107,7 @@ func driveIssuance(t *testing.T, world issuanceWorld) (issuanceAnswer, []issuanc
 					Enabled:             !world.userDisabled,
 					AuthStateGeneration: ceremonyGeneration + world.generationDrift,
 					OTPEnabled:          !world.noAuthenticator,
-					OtpConfigGeneration: userOtpConfigGeneration,
+					OTPConfigGeneration: userOTPConfigGeneration,
 				}
 			}
 		case issuanceFactSession:
@@ -148,7 +148,7 @@ func TestDecideIssuance(t *testing.T) {
 	ok := issuanceWorld{
 		redirectURI: callback, responseType: "code", registered: []string{callback},
 		identifier: true, userSubject: "subject-a", session: true, owned: true, valid: true, scope: "openid",
-		acrLevel: record.AcrLevel1, methods: "pwd",
+		acrLevel: record.ACRLevel1, methods: "pwd",
 	}
 	with := func(edit func(w *issuanceWorld)) issuanceWorld {
 		w := ok
@@ -653,7 +653,7 @@ func TestDecideIssuance(t *testing.T) {
 		// no longer stands does, for both flows.
 		{
 			name:      "a code ceremony at level 3 naming a password alone restarts",
-			world:     with(func(w *issuanceWorld) { w.acrLevel = record.AcrLevel2Mandatory; w.methods = "pwd" }),
+			world:     with(func(w *issuanceWorld) { w.acrLevel = record.ACRLevel2Mandatory; w.methods = "pwd" }),
 			want:      issuanceAnswer{outcome: issuanceRefuseUnusableSession, sessionShape: sessionLevelUnearned},
 			wantReads: []issuanceFact{registration, flows, session, validity, user},
 		},
@@ -661,7 +661,7 @@ func TestDecideIssuance(t *testing.T) {
 			name: "an implicit ceremony at level 3 naming a password alone restarts",
 			world: with(func(w *issuanceWorld) {
 				w.responseType = "id_token token"
-				w.acrLevel = record.AcrLevel2Mandatory
+				w.acrLevel = record.ACRLevel2Mandatory
 				w.methods = "pwd"
 			}),
 			want:      issuanceAnswer{outcome: issuanceRefuseUnusableSession, sessionShape: sessionLevelUnearned},
@@ -669,26 +669,26 @@ func TestDecideIssuance(t *testing.T) {
 		},
 		{
 			name:      "a ceremony at level 3 naming no method at all restarts",
-			world:     with(func(w *issuanceWorld) { w.acrLevel = record.AcrLevel2Mandatory; w.methods = "" }),
+			world:     with(func(w *issuanceWorld) { w.acrLevel = record.ACRLevel2Mandatory; w.methods = "" }),
 			want:      issuanceAnswer{outcome: issuanceRefuseUnusableSession, sessionShape: sessionLevelUnearned},
 			wantReads: []issuanceFact{registration, flows, session, validity, user},
 		},
 		{
 			name:      "a lookalike of otp names no second factor",
-			world:     with(func(w *issuanceWorld) { w.acrLevel = record.AcrLevel2Mandatory; w.methods = "pwd xotp" }),
+			world:     with(func(w *issuanceWorld) { w.acrLevel = record.ACRLevel2Mandatory; w.methods = "pwd xotp" }),
 			want:      issuanceAnswer{outcome: issuanceRefuseUnusableSession, sessionShape: sessionLevelUnearned},
 			wantReads: []issuanceFact{registration, flows, session, validity, user},
 		},
 		{
 			name:      "otp in another case names no second factor",
-			world:     with(func(w *issuanceWorld) { w.acrLevel = record.AcrLevel2Mandatory; w.methods = "pwd OTP" }),
+			world:     with(func(w *issuanceWorld) { w.acrLevel = record.ACRLevel2Mandatory; w.methods = "pwd OTP" }),
 			want:      issuanceAnswer{outcome: issuanceRefuseUnusableSession, sessionShape: sessionLevelUnearned},
 			wantReads: []issuanceFact{registration, flows, session, validity, user},
 		},
 		{
 			name: "a lookalike of recovery_code names no second factor",
 			world: with(func(w *issuanceWorld) {
-				w.acrLevel = record.AcrLevel2Mandatory
+				w.acrLevel = record.ACRLevel2Mandatory
 				w.methods = "pwd recoveryXcode"
 			}),
 			want:      issuanceAnswer{outcome: issuanceRefuseUnusableSession, sessionShape: sessionLevelUnearned},
@@ -700,7 +700,7 @@ func TestDecideIssuance(t *testing.T) {
 			// authenticator checks ran first and passed.
 			name: "otp after a tab names no second factor",
 			world: with(func(w *issuanceWorld) {
-				w.acrLevel = record.AcrLevel2Mandatory
+				w.acrLevel = record.ACRLevel2Mandatory
 				w.methods = "pwd\totp"
 				w.claimsOTP = true
 			}),
@@ -711,7 +711,7 @@ func TestDecideIssuance(t *testing.T) {
 			name: "an implicit ceremony naming recovery_code after a tab restarts",
 			world: with(func(w *issuanceWorld) {
 				w.responseType = "id_token"
-				w.acrLevel = record.AcrLevel2Mandatory
+				w.acrLevel = record.ACRLevel2Mandatory
 				w.methods = "pwd\trecovery_code"
 				w.claimsOTP = true
 			}),
@@ -721,7 +721,7 @@ func TestDecideIssuance(t *testing.T) {
 		{
 			name: "a removed authenticator is named before otp after a tab",
 			world: with(func(w *issuanceWorld) {
-				w.acrLevel = record.AcrLevel2Mandatory
+				w.acrLevel = record.ACRLevel2Mandatory
 				w.methods = "pwd\totp"
 				w.claimsOTP = true
 				w.noAuthenticator = true
@@ -733,7 +733,7 @@ func TestDecideIssuance(t *testing.T) {
 			// Two spaces leave an empty name between them; the migration keeps this row too.
 			name: "otp after two spaces still names a second factor",
 			world: with(func(w *issuanceWorld) {
-				w.acrLevel = record.AcrLevel2Mandatory
+				w.acrLevel = record.ACRLevel2Mandatory
 				w.methods = "pwd  otp"
 				w.claimsOTP = true
 			}),
@@ -743,7 +743,7 @@ func TestDecideIssuance(t *testing.T) {
 		{
 			name: "a one-time-code sign-in at level 3 issues a code",
 			world: with(func(w *issuanceWorld) {
-				w.acrLevel = record.AcrLevel2Mandatory
+				w.acrLevel = record.ACRLevel2Mandatory
 				w.methods = "pwd otp"
 				w.claimsOTP = true
 			}),
@@ -754,7 +754,7 @@ func TestDecideIssuance(t *testing.T) {
 			name: "a one-time-code sign-in at level 3 issues implicit tokens",
 			world: with(func(w *issuanceWorld) {
 				w.responseType = "id_token token"
-				w.acrLevel = record.AcrLevel2Mandatory
+				w.acrLevel = record.ACRLevel2Mandatory
 				w.methods = "pwd otp"
 				w.claimsOTP = true
 			}),
@@ -764,7 +764,7 @@ func TestDecideIssuance(t *testing.T) {
 		{
 			name: "a recovery-code sign-in at level 3 issues a code",
 			world: with(func(w *issuanceWorld) {
-				w.acrLevel = record.AcrLevel2Mandatory
+				w.acrLevel = record.ACRLevel2Mandatory
 				w.methods = "pwd recovery_code"
 				w.claimsOTP = true
 			}),
@@ -775,7 +775,7 @@ func TestDecideIssuance(t *testing.T) {
 			name: "a recovery-code sign-in at level 3 issues implicit tokens",
 			world: with(func(w *issuanceWorld) {
 				w.responseType = "id_token"
-				w.acrLevel = record.AcrLevel2Mandatory
+				w.acrLevel = record.ACRLevel2Mandatory
 				w.methods = "pwd recovery_code"
 				w.claimsOTP = true
 			}),
@@ -785,7 +785,7 @@ func TestDecideIssuance(t *testing.T) {
 		{
 			name: "a second factor listed first still names one",
 			world: with(func(w *issuanceWorld) {
-				w.acrLevel = record.AcrLevel2Mandatory
+				w.acrLevel = record.ACRLevel2Mandatory
 				w.methods = "otp pwd"
 				w.claimsOTP = true
 			}),
@@ -794,25 +794,25 @@ func TestDecideIssuance(t *testing.T) {
 		},
 		{
 			name:      "a password sign-in at level 2 optional issues",
-			world:     with(func(w *issuanceWorld) { w.acrLevel = record.AcrLevel2Optional; w.methods = "pwd" }),
+			world:     with(func(w *issuanceWorld) { w.acrLevel = record.ACRLevel2Optional; w.methods = "pwd" }),
 			want:      issuanceAnswer{outcome: issuanceIssueCode},
 			wantReads: []issuanceFact{registration, flows, session, validity, user, scope},
 		},
 		{
 			name:      "a disabled user outranks an unearned level",
-			world:     with(func(w *issuanceWorld) { w.acrLevel = record.AcrLevel2Mandatory; w.userDisabled = true }),
+			world:     with(func(w *issuanceWorld) { w.acrLevel = record.ACRLevel2Mandatory; w.userDisabled = true }),
 			want:      issuanceAnswer{outcome: issuanceRefuseUserDisabled},
 			wantReads: []issuanceFact{registration, flows, session, validity, user},
 		},
 		{
 			name:      "a stale generation is named before an unearned level",
-			world:     with(func(w *issuanceWorld) { w.acrLevel = record.AcrLevel2Mandatory; w.generationDrift = 1 }),
+			world:     with(func(w *issuanceWorld) { w.acrLevel = record.ACRLevel2Mandatory; w.generationDrift = 1 }),
 			want:      issuanceAnswer{outcome: issuanceRefuseUnusableSession, sessionShape: sessionGenerationStale},
 			wantReads: []issuanceFact{registration, flows, session, validity, user},
 		},
 		{
 			name:      "an unearned level outranks a scope the user no longer holds, which it never reads",
-			world:     with(func(w *issuanceWorld) { w.acrLevel = record.AcrLevel2Mandatory; w.scope = "" }),
+			world:     with(func(w *issuanceWorld) { w.acrLevel = record.ACRLevel2Mandatory; w.scope = "" }),
 			want:      issuanceAnswer{outcome: issuanceRefuseUnusableSession, sessionShape: sessionLevelUnearned},
 			wantReads: []issuanceFact{registration, flows, session, validity, user},
 		},

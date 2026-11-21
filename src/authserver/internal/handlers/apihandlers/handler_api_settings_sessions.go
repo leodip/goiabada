@@ -103,7 +103,7 @@ func HandleSettingsSessionsPut(
 		// Apply updates, onto the row as stored when the save runs (#407). The old values are that
 		// row's, read under the save's lock, which is what the save replaced.
 		var oldVals map[string]interface{}
-		saved, err := saveSettingsSection(r.Context(), database, currentSettings.Id, func(stored *record.Settings) {
+		saved, err := saveSettingsSection(r.Context(), database, currentSettings.ID, func(stored *record.Settings) {
 			oldVals = sessionsSettingsAuditValues(stored)
 			stored.UserSessionIdleTimeoutInSeconds = req.UserSessionIdleTimeoutInSeconds
 			stored.UserSessionMaxLifetimeInSeconds = req.UserSessionMaxLifetimeInSeconds

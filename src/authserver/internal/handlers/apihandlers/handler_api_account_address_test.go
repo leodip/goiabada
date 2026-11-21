@@ -30,7 +30,7 @@ import (
 // committed with WriteHeader before the encoder ran, so a failing encode could only add a
 // superfluous header to a body already half on the wire (decision 8).
 
-const addressRequestId = "req-address-1"
+const addressRequestID = "req-address-1"
 
 func addressPutRequest(t *testing.T, subject string, body api.UpdateUserAddressRequest) *http.Request {
 	t.Helper()
@@ -38,7 +38,7 @@ func addressPutRequest(t *testing.T, subject string, body api.UpdateUserAddressR
 	require.NoError(t, err)
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/account/address", bytes.NewReader(encoded))
 	req.Header.Set("Content-Type", "application/json")
-	req = req.WithContext(requestid.NewContext(req.Context(), addressRequestId))
+	req = req.WithContext(requestid.NewContext(req.Context(), addressRequestID))
 	return setTokenContextWithClaims(req, map[string]interface{}{"sub": subject})
 }
 
@@ -65,13 +65,13 @@ func TestHandleAccountAddressPut_ADatabaseFailureIsOneLoggedFiveHundred(t *testi
 	var body map[string]any
 	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &body))
 	assert.Equal(t, "INTERNAL_SERVER_ERROR", body["error_code"])
-	assert.Contains(t, body["error_description"], addressRequestId)
+	assert.Contains(t, body["error_description"], addressRequestID)
 
 	// One record, carrying the error that was discarded and the request id the body names, so
 	// the two can be joined.
 	assert.Equal(t, 1, strings.Count(logged, "internal server error"))
 	assert.Contains(t, logged, "the database is down")
-	assert.Contains(t, logged, "request_id="+addressRequestId)
+	assert.Contains(t, logged, "request_id="+addressRequestID)
 	database.AssertExpectations(t)
 }
 
@@ -81,7 +81,7 @@ func TestHandleAccountAddressPut_ASuccessWritesTheWholeBody(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
-	user := &record.User{Id: 42, Subject: "the-subject"}
+	user := &record.User{ID: 42, Subject: "the-subject"}
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), "the-subject").Return(user, nil).Once()
 	database.On("SetUserAddress", mock.Anything, (*sql.Tx)(nil), user).Return(nil).Once()
 	auditLogger.On("Log", mock.Anything, audit.EventUpdatedOwnAddress, mock.Anything).Return().Once()

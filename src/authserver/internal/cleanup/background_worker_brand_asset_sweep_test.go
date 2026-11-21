@@ -37,7 +37,7 @@ func TestWorker_PerformTask_SweepsUnattachedBrandAssetsADayBack(t *testing.T) {
 			order = append(order, "brand assets")
 			createdBefore = args.Get(2).(time.Time)
 		}).Return(3, nil).Once()
-	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).
+	mockDB.On("GetSettingsByID", mock.Anything, mock.Anything, int64(1)).
 		Run(func(mock.Arguments) { order = append(order, "settings") }).Return(nil, nil).Once()
 
 	before := time.Now().UTC()
@@ -67,7 +67,7 @@ func TestWorker_PerformTask_ContinuesAfterTheBrandAssetSweepFails(t *testing.T) 
 	mockDB.On("DeleteDeadPreRegistrations", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	mockDB.On("DeleteUnattachedBrandAssets", mock.Anything, mock.Anything, mock.Anything).
 		Return(0, errors.New("foreign key violation")).Once()
-	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(&record.Settings{
+	mockDB.On("GetSettingsByID", mock.Anything, mock.Anything, int64(1)).Return(&record.Settings{
 		UserSessionIdleTimeoutInSeconds: 3600,
 		UserSessionMaxLifetimeInSeconds: 86400,
 	}, nil).Once()
@@ -116,7 +116,7 @@ func TestWorker_PerformTask_StopsAroundTheBrandAssetSweepWhenCancelled(t *testin
 
 		worker.performTask(ctx)
 
-		mockDB.AssertNotCalled(t, "GetSettingsById", mock.Anything, mock.Anything, mock.Anything)
+		mockDB.AssertNotCalled(t, "GetSettingsByID", mock.Anything, mock.Anything, mock.Anything)
 		mockDB.AssertExpectations(t)
 	})
 }

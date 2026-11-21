@@ -25,176 +25,176 @@ import (
 // Seam 4 for the client pages whose calls have moved (#386). See accounthandlers' file of the same
 // name for what this owns and why the context is the assertion.
 //
-// GetClientById and GetClientPermissions record and then succeed rather than refusing, because
+// GetClientByID and GetClientPermissions record and then succeed rather than refusing, because
 // nearly every page here reads one of them first and everything below it would otherwise be
 // unreachable. Every write records its name as well, so a case whose request stops short of its
 // write fails rather than passing on the read alone (#477).
 
 type clientCtxMarkerKey struct{}
 
-type ctxRecordingApiClient struct {
+type ctxRecordingAPIClient struct {
 	seen   []context.Context
 	writes []string
 }
 
-func (s *ctxRecordingApiClient) record(ctx context.Context) error {
+func (s *ctxRecordingAPIClient) record(ctx context.Context) error {
 	s.seen = append(s.seen, ctx)
 	return errs.New("the auth server refused")
 }
 
-func (s *ctxRecordingApiClient) recordWrite(ctx context.Context, name string) error {
+func (s *ctxRecordingAPIClient) recordWrite(ctx context.Context, name string) error {
 	s.writes = append(s.writes, name)
 	return s.record(ctx)
 }
 
-// GetClientById records and then succeeds rather than refusing, because nearly every page here
+// GetClientByID records and then succeeds rather than refusing, because nearly every page here
 // reads it first and everything below it would otherwise be unreachable.
-func (s *ctxRecordingApiClient) GetClientById(ctx context.Context, _ string, clientId int64) (*api.ClientResponse, error) {
+func (s *ctxRecordingAPIClient) GetClientByID(ctx context.Context, _ string, clientID int64) (*api.ClientResponse, error) {
 	s.seen = append(s.seen, ctx)
-	return &api.ClientResponse{Id: clientId, ClientIdentifier: "a-client"}, nil
+	return &api.ClientResponse{ID: clientID, ClientIdentifier: "a-client"}, nil
 }
 
-func (s *ctxRecordingApiClient) GetAllClients(ctx context.Context, _ string) ([]api.ClientResponse, error) {
+func (s *ctxRecordingAPIClient) GetAllClients(ctx context.Context, _ string) ([]api.ClientResponse, error) {
 	return nil, s.record(ctx)
 }
 
 // GetClientPermissions records and succeeds for the same reason: the delete page reads it before
 // the identifier check and the delete below it.
-func (s *ctxRecordingApiClient) GetClientPermissions(ctx context.Context, _ string, clientId int64) (*api.ClientResponse, []api.PermissionResponse, error) {
+func (s *ctxRecordingAPIClient) GetClientPermissions(ctx context.Context, _ string, clientID int64) (*api.ClientResponse, []api.PermissionResponse, error) {
 	s.seen = append(s.seen, ctx)
-	return &api.ClientResponse{Id: clientId, ClientIdentifier: "a-client"}, nil, nil
+	return &api.ClientResponse{ID: clientID, ClientIdentifier: "a-client"}, nil, nil
 }
 
 // GetClientIntrospectionResources records and succeeds for the same reason: the Introspection tab
 // reads it first, and the resources to choose from below it.
-func (s *ctxRecordingApiClient) GetClientIntrospectionResources(ctx context.Context, _ string, clientId int64) (*api.ClientResponse, []api.ResourceResponse, error) {
+func (s *ctxRecordingAPIClient) GetClientIntrospectionResources(ctx context.Context, _ string, clientID int64) (*api.ClientResponse, []api.ResourceResponse, error) {
 	s.seen = append(s.seen, ctx)
-	return &api.ClientResponse{Id: clientId, ClientIdentifier: "a-client"}, nil, nil
+	return &api.ClientResponse{ID: clientID, ClientIdentifier: "a-client"}, nil, nil
 }
 
-func (s *ctxRecordingApiClient) GetClientLogo(ctx context.Context, _ string, _ int64) (*api.ClientLogoInfoResponse, error) {
+func (s *ctxRecordingAPIClient) GetClientLogo(ctx context.Context, _ string, _ int64) (*api.ClientLogoInfoResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) DeleteClient(ctx context.Context, _ string, _ int64) error {
+func (s *ctxRecordingAPIClient) DeleteClient(ctx context.Context, _ string, _ int64) error {
 	return s.recordWrite(ctx, "DeleteClient")
 }
 
-func (s *ctxRecordingApiClient) GetSettingsGeneral(ctx context.Context, _ string) (*api.SettingsGeneralResponse, error) {
+func (s *ctxRecordingAPIClient) GetSettingsGeneral(ctx context.Context, _ string) (*api.SettingsGeneralResponse, error) {
 	s.seen = append(s.seen, ctx)
 	return nil, errs.New("the auth server refused")
 }
 
 // GetSettingsTokens records and refuses, as the general settings read does: the tokens tab reads it
 // after the client, before it draws.
-func (s *ctxRecordingApiClient) GetSettingsTokens(ctx context.Context, _ string) (*api.SettingsTokensResponse, error) {
+func (s *ctxRecordingAPIClient) GetSettingsTokens(ctx context.Context, _ string) (*api.SettingsTokensResponse, error) {
 	s.seen = append(s.seen, ctx)
 	return nil, errs.New("the auth server refused")
 }
 
-// GetClientSessionsByClientId records and succeeds rather than refusing, because the session
+// GetClientSessionsByClientID records and succeeds rather than refusing, because the session
 // delete below it is reached only through the page it answers.
-func (s *ctxRecordingApiClient) GetClientSessionsByClientId(ctx context.Context, _ string, _ int64, _, _ int) (*api.GetClientSessionsResponse, error) {
+func (s *ctxRecordingAPIClient) GetClientSessionsByClientID(ctx context.Context, _ string, _ int64, _, _ int) (*api.GetClientSessionsResponse, error) {
 	s.seen = append(s.seen, ctx)
 	return &api.GetClientSessionsResponse{
-		Sessions: []api.UserSessionDetailResponse{{Id: 31, UserId: 42}},
+		Sessions: []api.UserSessionDetailResponse{{ID: 31, UserID: 42}},
 	}, nil
 }
 
-func (s *ctxRecordingApiClient) DeleteUserSessionById(ctx context.Context, _ string, _ int64) error {
-	return s.recordWrite(ctx, "DeleteUserSessionById")
+func (s *ctxRecordingAPIClient) DeleteUserSessionByID(ctx context.Context, _ string, _ int64) error {
+	return s.recordWrite(ctx, "DeleteUserSessionByID")
 }
 
-func (s *ctxRecordingApiClient) CreateClient(ctx context.Context, _ string, _ *api.CreateClientRequest) (*api.ClientResponse, error) {
+func (s *ctxRecordingAPIClient) CreateClient(ctx context.Context, _ string, _ *api.CreateClientRequest) (*api.ClientResponse, error) {
 	return nil, s.recordWrite(ctx, "CreateClient")
 }
 
-func (s *ctxRecordingApiClient) DeleteClientLogo(ctx context.Context, _ string, _ int64) error {
+func (s *ctxRecordingAPIClient) DeleteClientLogo(ctx context.Context, _ string, _ int64) error {
 	return s.recordWrite(ctx, "DeleteClientLogo")
 }
 
-func (s *ctxRecordingApiClient) GetAllResources(ctx context.Context, _ string) ([]api.ResourceResponse, error) {
+func (s *ctxRecordingAPIClient) GetAllResources(ctx context.Context, _ string) ([]api.ResourceResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) UpdateClient(ctx context.Context, _ string, _ int64, _ *api.UpdateClientSettingsRequest) (*api.ClientResponse, error) {
+func (s *ctxRecordingAPIClient) UpdateClient(ctx context.Context, _ string, _ int64, _ *api.UpdateClientSettingsRequest) (*api.ClientResponse, error) {
 	return nil, s.recordWrite(ctx, "UpdateClient")
 }
 
-func (s *ctxRecordingApiClient) GetAllBrands(ctx context.Context, _ string) ([]api.BrandResponse, error) {
+func (s *ctxRecordingAPIClient) GetAllBrands(ctx context.Context, _ string) ([]api.BrandResponse, error) {
 	return nil, s.record(ctx)
 }
 
-func (s *ctxRecordingApiClient) UpdateClientBrand(ctx context.Context, _ string, _ int64, _ *api.UpdateClientBrandRequest) (*api.ClientResponse, error) {
+func (s *ctxRecordingAPIClient) UpdateClientBrand(ctx context.Context, _ string, _ int64, _ *api.UpdateClientBrandRequest) (*api.ClientResponse, error) {
 	return nil, s.recordWrite(ctx, "UpdateClientBrand")
 }
 
-func (s *ctxRecordingApiClient) UpdateClientAdministrativeScopes(ctx context.Context, _ string, _ int64, _ *api.UpdateClientAdministrativeScopesRequest) (*api.ClientResponse, error) {
+func (s *ctxRecordingAPIClient) UpdateClientAdministrativeScopes(ctx context.Context, _ string, _ int64, _ *api.UpdateClientAdministrativeScopesRequest) (*api.ClientResponse, error) {
 	return nil, s.recordWrite(ctx, "UpdateClientAdministrativeScopes")
 }
 
-func (s *ctxRecordingApiClient) UpdateClientAuthentication(ctx context.Context, _ string, _ int64, _ *api.UpdateClientAuthenticationRequest) (*api.ClientResponse, error) {
+func (s *ctxRecordingAPIClient) UpdateClientAuthentication(ctx context.Context, _ string, _ int64, _ *api.UpdateClientAuthenticationRequest) (*api.ClientResponse, error) {
 	return nil, s.recordWrite(ctx, "UpdateClientAuthentication")
 }
 
-func (s *ctxRecordingApiClient) UpdateClientOAuth2Flows(ctx context.Context, _ string, _ int64, _ *api.UpdateClientOAuth2FlowsRequest) (*api.ClientResponse, error) {
+func (s *ctxRecordingAPIClient) UpdateClientOAuth2Flows(ctx context.Context, _ string, _ int64, _ *api.UpdateClientOAuth2FlowsRequest) (*api.ClientResponse, error) {
 	return nil, s.recordWrite(ctx, "UpdateClientOAuth2Flows")
 }
 
-func (s *ctxRecordingApiClient) UpdateClientPermissions(ctx context.Context, _ string, _ int64, _ *api.UpdateClientPermissionsRequest) error {
+func (s *ctxRecordingAPIClient) UpdateClientPermissions(ctx context.Context, _ string, _ int64, _ *api.UpdateClientPermissionsRequest) error {
 	return s.recordWrite(ctx, "UpdateClientPermissions")
 }
 
-func (s *ctxRecordingApiClient) UpdateClientIntrospectionResources(ctx context.Context, _ string, _ int64, _ *api.UpdateClientIntrospectionResourcesRequest) error {
+func (s *ctxRecordingAPIClient) UpdateClientIntrospectionResources(ctx context.Context, _ string, _ int64, _ *api.UpdateClientIntrospectionResourcesRequest) error {
 	return s.recordWrite(ctx, "UpdateClientIntrospectionResources")
 }
 
-func (s *ctxRecordingApiClient) UpdateClientRedirectURIs(ctx context.Context, _ string, _ int64, _ *api.UpdateClientRedirectURIsRequest) (*api.ClientResponse, error) {
+func (s *ctxRecordingAPIClient) UpdateClientRedirectURIs(ctx context.Context, _ string, _ int64, _ *api.UpdateClientRedirectURIsRequest) (*api.ClientResponse, error) {
 	return nil, s.recordWrite(ctx, "UpdateClientRedirectURIs")
 }
 
-func (s *ctxRecordingApiClient) UpdateClientPostLogoutRedirectURIs(ctx context.Context, _ string, _ int64, _ *api.UpdateClientPostLogoutRedirectURIsRequest) (*api.ClientResponse, error) {
+func (s *ctxRecordingAPIClient) UpdateClientPostLogoutRedirectURIs(ctx context.Context, _ string, _ int64, _ *api.UpdateClientPostLogoutRedirectURIsRequest) (*api.ClientResponse, error) {
 	return nil, s.recordWrite(ctx, "UpdateClientPostLogoutRedirectURIs")
 }
 
-func (s *ctxRecordingApiClient) UpdateClientBackchannelLogout(ctx context.Context, _ string, _ int64, _ *api.UpdateClientBackchannelLogoutRequest) (*api.ClientResponse, error) {
+func (s *ctxRecordingAPIClient) UpdateClientBackchannelLogout(ctx context.Context, _ string, _ int64, _ *api.UpdateClientBackchannelLogoutRequest) (*api.ClientResponse, error) {
 	return nil, s.recordWrite(ctx, "UpdateClientBackchannelLogout")
 }
 
-func (s *ctxRecordingApiClient) UpdateClientTokens(ctx context.Context, _ string, _ int64, _ *api.UpdateClientTokensRequest) (*api.ClientResponse, error) {
+func (s *ctxRecordingAPIClient) UpdateClientTokens(ctx context.Context, _ string, _ int64, _ *api.UpdateClientTokensRequest) (*api.ClientResponse, error) {
 	return nil, s.recordWrite(ctx, "UpdateClientTokens")
 }
 
-func (s *ctxRecordingApiClient) UpdateClientDPoP(ctx context.Context, _ string, _ int64, _ *api.UpdateClientDPoPRequest) (*api.ClientResponse, error) {
+func (s *ctxRecordingAPIClient) UpdateClientDPoP(ctx context.Context, _ string, _ int64, _ *api.UpdateClientDPoPRequest) (*api.ClientResponse, error) {
 	return nil, s.recordWrite(ctx, "UpdateClientDPoP")
 }
 
-func (s *ctxRecordingApiClient) UpdateClientWebOrigins(ctx context.Context, _ string, _ int64, _ *api.UpdateClientWebOriginsRequest) (*api.ClientResponse, error) {
+func (s *ctxRecordingAPIClient) UpdateClientWebOrigins(ctx context.Context, _ string, _ int64, _ *api.UpdateClientWebOriginsRequest) (*api.ClientResponse, error) {
 	return nil, s.recordWrite(ctx, "UpdateClientWebOrigins")
 }
 
-func (s *ctxRecordingApiClient) UploadClientLogo(ctx context.Context, _ string, _ int64, _ []byte, _ string) (*api.ClientLogoUploadResponse, error) {
+func (s *ctxRecordingAPIClient) UploadClientLogo(ctx context.Context, _ string, _ int64, _ []byte, _ string) (*api.ClientLogoUploadResponse, error) {
 	return nil, s.recordWrite(ctx, "UploadClientLogo")
 }
 
 func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) {
 	testCases := []struct {
 		name  string
-		build func(httpHelper *handlersmocks.HttpHelper, apiClient *ctxRecordingApiClient) http.HandlerFunc
+		build func(httpHelper *handlersmocks.HTTPHelper, apiClient *ctxRecordingAPIClient) http.HandlerFunc
 		// write is the one write the request must reach, empty for a page that only reads.
 		write   string
 		request *http.Request
 	}{
 		{
 			name: "HandleListGet",
-			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *ctxRecordingAPIClient) http.HandlerFunc {
 				return HandleListGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/clients", handlertest.WithAccessToken()),
 		},
 		{
 			name: "HandlePermissionsGet",
-			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *ctxRecordingAPIClient) http.HandlerFunc {
 				return HandlePermissionsGet(h, newTestSessionStore(), c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/clients/3/permissions",
@@ -202,7 +202,7 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 		},
 		{
 			name: "HandleIntrospectionGet",
-			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *ctxRecordingAPIClient) http.HandlerFunc {
 				return HandleIntrospectionGet(h, newTestSessionStore(), c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/clients/3/introspection",
@@ -210,7 +210,7 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 		},
 		{
 			name: "HandleLogoGet",
-			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *ctxRecordingAPIClient) http.HandlerFunc {
 				return HandleLogoGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/clients/3/logo",
@@ -218,7 +218,7 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 		},
 		{
 			name: "HandleDeleteGet",
-			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *ctxRecordingAPIClient) http.HandlerFunc {
 				return HandleDeleteGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/clients/3/delete",
@@ -226,7 +226,7 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 		},
 		{
 			name: "HandleTokensGet",
-			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *ctxRecordingAPIClient) http.HandlerFunc {
 				return HandleTokensGet(h, newTestSessionStore(), c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/clients/3/tokens",
@@ -234,7 +234,7 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 		},
 		{
 			name: "HandleSettingsGet",
-			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *ctxRecordingAPIClient) http.HandlerFunc {
 				return HandleSettingsGet(h, newTestSessionStore(), c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/clients/3/settings",
@@ -242,7 +242,7 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 		},
 		{
 			name: "HandleOAuth2FlowsGet",
-			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *ctxRecordingAPIClient) http.HandlerFunc {
 				return HandleOAuth2FlowsGet(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/clients/3/oauth2-flows",
@@ -250,7 +250,7 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 		},
 		{
 			name: "HandleRedirectURIsGet",
-			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *ctxRecordingAPIClient) http.HandlerFunc {
 				return HandleRedirectURIsGet(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/clients/3/redirect-uris",
@@ -258,7 +258,7 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 		},
 		{
 			name: "HandleSignOutRedirectURIsGet",
-			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *ctxRecordingAPIClient) http.HandlerFunc {
 				return HandleSignOutRedirectURIsGet(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/clients/3/sign-out-redirect-uris",
@@ -266,7 +266,7 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 		},
 		{
 			name: "HandleBackchannelLogoutGet",
-			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *ctxRecordingAPIClient) http.HandlerFunc {
 				return HandleBackchannelLogoutGet(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/clients/3/backchannel-logout",
@@ -274,7 +274,7 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 		},
 		{
 			name: "HandleUserSessionsGet",
-			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *ctxRecordingAPIClient) http.HandlerFunc {
 				return HandleUserSessionsGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/clients/3/user-sessions",
@@ -282,10 +282,10 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 		},
 		{
 			name: "HandleUserSessionsPost",
-			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *ctxRecordingAPIClient) http.HandlerFunc {
 				return HandleUserSessionsPost(h, c)
 			},
-			write: "DeleteUserSessionById",
+			write: "DeleteUserSessionByID",
 			request: handlertest.Request(http.MethodPost, "/admin/clients/3/user-sessions",
 				handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "3"),
 				handlertest.WithBody(strings.NewReader(`{"userSessionId":31}`)),
@@ -293,7 +293,7 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 		},
 		{
 			name: "HandleNewPost",
-			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *ctxRecordingAPIClient) http.HandlerFunc {
 				return HandleNewPost(h, c, consoleBaseURL)
 			},
 			write: "CreateClient",
@@ -303,7 +303,7 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 		},
 		{
 			name: "HandleSettingsPost",
-			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *ctxRecordingAPIClient) http.HandlerFunc {
 				return HandleSettingsPost(h, newTestSessionStore(), c, &invalidationRecorder{}, consoleBaseURL)
 			},
 			write: "UpdateClient",
@@ -313,7 +313,7 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 		},
 		{
 			name: "HandleAuthenticationPost",
-			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *ctxRecordingAPIClient) http.HandlerFunc {
 				return HandleAuthenticationPost(h, newTestSessionStore(), c, consoleBaseURL)
 			},
 			write: "UpdateClientAuthentication",
@@ -323,7 +323,7 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 		},
 		{
 			name: "HandleOAuth2FlowsPost",
-			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *ctxRecordingAPIClient) http.HandlerFunc {
 				return HandleOAuth2FlowsPost(h, newTestSessionStore(), c, consoleBaseURL)
 			},
 			write: "UpdateClientOAuth2Flows",
@@ -333,7 +333,7 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 		},
 		{
 			name: "HandleRedirectURIsPost",
-			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *ctxRecordingAPIClient) http.HandlerFunc {
 				return HandleRedirectURIsPost(h, newTestSessionStore(), c)
 			},
 			write: "UpdateClientRedirectURIs",
@@ -345,7 +345,7 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 		},
 		{
 			name: "HandleSignOutRedirectURIsPost",
-			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *ctxRecordingAPIClient) http.HandlerFunc {
 				return HandleSignOutRedirectURIsPost(h, newTestSessionStore(), c)
 			},
 			write: "UpdateClientPostLogoutRedirectURIs",
@@ -357,7 +357,7 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 		},
 		{
 			name: "HandleBackchannelLogoutPost",
-			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *ctxRecordingAPIClient) http.HandlerFunc {
 				return HandleBackchannelLogoutPost(h, newTestSessionStore(), c, consoleBaseURL)
 			},
 			write: "UpdateClientBackchannelLogout",
@@ -367,7 +367,7 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 		},
 		{
 			name: "HandleWebOriginsPost",
-			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *ctxRecordingAPIClient) http.HandlerFunc {
 				return HandleWebOriginsPost(h, newTestSessionStore(), c)
 			},
 			write: "UpdateClientWebOrigins",
@@ -379,7 +379,7 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 		},
 		{
 			name: "HandleTokensPost",
-			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *ctxRecordingAPIClient) http.HandlerFunc {
 				return HandleTokensPost(h, newTestSessionStore(), c, consoleBaseURL)
 			},
 			write: "UpdateClientTokens",
@@ -395,7 +395,7 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 		},
 		{
 			name: "HandlePermissionsPost",
-			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *ctxRecordingAPIClient) http.HandlerFunc {
 				return HandlePermissionsPost(h, newTestSessionStore(), c)
 			},
 			write: "UpdateClientPermissions",
@@ -407,7 +407,7 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 		},
 		{
 			name: "HandleIntrospectionPost",
-			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *ctxRecordingAPIClient) http.HandlerFunc {
 				return HandleIntrospectionPost(h, newTestSessionStore(), c)
 			},
 			write: "UpdateClientIntrospectionResources",
@@ -418,7 +418,7 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 		},
 		{
 			name: "HandleDeletePost",
-			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *ctxRecordingAPIClient) http.HandlerFunc {
 				return HandleDeletePost(h, c, consoleBaseURL)
 			},
 			write: "DeleteClient",
@@ -428,7 +428,7 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 		},
 		{
 			name: "HandleLogoPost",
-			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *ctxRecordingAPIClient) http.HandlerFunc {
 				return HandleLogoPost(h, c)
 			},
 			write:   "UploadClientLogo",
@@ -436,7 +436,7 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 		},
 		{
 			name: "HandleLogoDelete",
-			build: func(h *handlersmocks.HttpHelper, c *ctxRecordingApiClient) http.HandlerFunc {
+			build: func(h *handlersmocks.HTTPHelper, c *ctxRecordingAPIClient) http.HandlerFunc {
 				return HandleLogoDelete(h, c)
 			},
 			write: "DeleteClientLogo",
@@ -447,7 +447,7 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Maybe()
 			httpHelper.On("JSONError", mock.Anything, mock.Anything, mock.Anything).Maybe()
 			httpHelper.On("EncodeJSON", mock.Anything, mock.Anything, mock.Anything).Maybe()
@@ -455,7 +455,7 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 			httpHelper.On("RenderTemplate", mock.Anything, mock.Anything, mock.Anything,
 				mock.Anything, mock.Anything).Return(nil).Maybe()
 
-			apiClient := &ctxRecordingApiClient{}
+			apiClient := &ctxRecordingAPIClient{}
 
 			marked := tc.request.WithContext(
 				context.WithValue(tc.request.Context(), clientCtxMarkerKey{}, tc.name))
@@ -482,16 +482,16 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 // has succeeded and only when an administrator holding authserver:manage switches it. The table's
 // case stops at UpdateClient, which refuses there, so this one reaches the second write as well.
 func TestAdminClientHandlers_TheAllowanceWriteCarriesTheRequestsContext(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Maybe()
 	httpHelper.On("RenderTemplate", mock.Anything, mock.Anything, mock.Anything,
 		mock.Anything, mock.Anything).Return(nil).Maybe()
 
-	apiClient := &allowanceWriteApiClient{}
+	apiClient := &allowanceWriteAPIClient{}
 
-	// GetClientById answers a client whose allowance is off, so the switch submitted on is a change.
+	// GetClientByID answers a client whose allowance is off, so the switch submitted on is a change.
 	request := handlertest.Request(http.MethodPost, "/admin/clients/3/settings",
-		handlertest.WithJwtInfo(oauthclient.JwtInfo{TokenResponse: oauth.TokenResponse{
+		handlertest.WithJWTInfo(oauthclient.JWTInfo{TokenResponse: oauth.TokenResponse{
 			AccessToken: handlertest.AccessToken, Scope: manageGrant}}),
 		handlertest.WithPathValue("clientId", "3"),
 		handlertest.WithForm(url.Values{"clientIdentifier": {"a-client"}, "administrativeScopesAllowed": {"on"}}))
@@ -508,21 +508,21 @@ func TestAdminClientHandlers_TheAllowanceWriteCarriesTheRequestsContext(t *testi
 	}
 }
 
-// allowanceWriteApiClient lets UpdateClient record and then succeed, so the allowance write below it
+// allowanceWriteAPIClient lets UpdateClient record and then succeed, so the allowance write below it
 // is reached at all.
-type allowanceWriteApiClient struct {
-	ctxRecordingApiClient
+type allowanceWriteAPIClient struct {
+	ctxRecordingAPIClient
 }
 
-func (s *allowanceWriteApiClient) UpdateClient(ctx context.Context, _ string, clientId int64, _ *api.UpdateClientSettingsRequest) (*api.ClientResponse, error) {
+func (s *allowanceWriteAPIClient) UpdateClient(ctx context.Context, _ string, clientID int64, _ *api.UpdateClientSettingsRequest) (*api.ClientResponse, error) {
 	s.seen = append(s.seen, ctx)
 	s.writes = append(s.writes, "UpdateClient")
-	return &api.ClientResponse{Id: clientId, ClientIdentifier: "a-client"}, nil
+	return &api.ClientResponse{ID: clientID, ClientIdentifier: "a-client"}, nil
 }
 
 // logoUpload is the one request here that is not form-encoded or JSON: the upload handler reads a
 // multipart "picture" part and refuses anything else before it reaches the API.
-func logoUpload(clientId string) *http.Request {
+func logoUpload(clientID string) *http.Request {
 	var buf bytes.Buffer
 	writer := multipart.NewWriter(&buf)
 	part, err := writer.CreateFormFile("picture", "logo.png")
@@ -531,12 +531,12 @@ func logoUpload(clientId string) *http.Request {
 	}
 	_ = writer.Close()
 
-	return handlertest.Request(http.MethodPost, "/admin/clients/"+clientId+"/logo",
-		handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", clientId),
+	return handlertest.Request(http.MethodPost, "/admin/clients/"+clientID+"/logo",
+		handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", clientID),
 		handlertest.WithContentType(writer.FormDataContentType()),
 		handlertest.WithBody(bytes.NewReader(buf.Bytes())))
 }
 
-func (s *ctxRecordingApiClient) GetClientSecret(ctx context.Context, _ string, _ int64) (string, error) {
+func (s *ctxRecordingAPIClient) GetClientSecret(ctx context.Context, _ string, _ int64) (string, error) {
 	return "", s.record(ctx)
 }

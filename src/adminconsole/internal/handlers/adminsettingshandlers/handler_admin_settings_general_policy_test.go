@@ -39,7 +39,7 @@ func TestHandleGeneralPost_SavesThePolicyChosen(t *testing.T) {
 				handlertest.WithAccessToken(),
 				handlertest.WithForm(url.Values{"issuer": {"https://auth.example.test"}, "passwordPolicy": {policy}}))
 
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 			apiClient := &policyRecordingAPI{}
 			w := httptest.NewRecorder()

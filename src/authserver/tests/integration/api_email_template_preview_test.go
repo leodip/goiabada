@@ -31,13 +31,13 @@ const (
 
 func TestAPIEmailTemplatePreview_AnswersTheEmailAndStoresNothing(t *testing.T) {
 	readToken, client := createClientWithGranularScope(t, builtin.AdminReadPermissionIdentifier)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 	appName := appNameOfSettings(t)
 	dark := record.NewBrand(brandName("Preview"), record.BrandAppearanceDark, "plum")
 	require.NoError(t, database.CreateBrand(context.Background(), nil, &dark))
 	t.Cleanup(func() {
 		_ = database.RunInTransaction(context.Background(), func(tx *sql.Tx) error {
-			_, err := database.DeleteBrand(context.Background(), tx, dark.Id)
+			_, err := database.DeleteBrand(context.Background(), tx, dark.ID)
 			return err
 		})
 	})
@@ -46,7 +46,7 @@ func TestAPIEmailTemplatePreview_AnswersTheEmailAndStoresNothing(t *testing.T) {
 		"subject":     "Nouveau mot de passe pour {{app_name}}",
 		"buttonLabel": "Changer",
 		"body":        "Bonjour {{name}}, le lien vaut {{expiry}} : {{link}}\n\n{{button}}",
-		"brandId":     dark.Id,
+		"brandId":     dark.ID,
 	})
 
 	require.Equal(t, http.StatusOK, status, "preview: %v", body)
@@ -79,7 +79,7 @@ func TestAPIEmailTemplateSendTest_ReachesTheMailboxAndIsAudited(t *testing.T) {
 	appName := appNameOfSettings(t)
 	to := plusAddress()
 
-	status, body, requestId := emailTemplateCall(t, manageToken, http.MethodPost, emailTemplatesPath+"/verification_code/es/send-test", map[string]any{
+	status, body, requestID := emailTemplateCall(t, manageToken, http.MethodPost, emailTemplatesPath+"/verification_code/es/send-test", map[string]any{
 		"to":      to,
 		"subject": "Tu código de {{app_name}}: {{code}}",
 		"body":    "Hola {{name}}:\n\n{{code}}\n\nCaduca en {{expiry}}.",
@@ -99,7 +99,7 @@ func TestAPIEmailTemplateSendTest_ReachesTheMailboxAndIsAudited(t *testing.T) {
 		"email_digest":   hashutil.HashString(strings.ToLower(to)),
 		"email_template": "verification_code",
 		"language":       "es",
-	}}, auditRows(t, manageToken, "sent_test_email", requestId))
+	}}, auditRows(t, manageToken, "sent_test_email", requestID))
 }
 
 // authserver:manage-settings reads and previews templates but is refused a test send, which is
@@ -109,17 +109,17 @@ func TestAPIEmailTemplateSendTest_TakesManage(t *testing.T) {
 	requireDatabaseAuditLogs(t)
 	manageToken, _ := createAdminClientWithToken(t)
 	token, client := createClientWithGranularScope(t, builtin.ManageSettingsPermissionIdentifier)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 	to := plusAddress()
 	text := map[string]any{"to": to, "subject": "Bienvenido", "buttonLabel": "Activar", "body": "Hola.\n\n{{button}}"}
 
 	status, _, _ := emailTemplateCall(t, token, http.MethodPost, emailTemplatesPath+"/welcome/es/preview", text)
 	assert.Equal(t, http.StatusOK, status, "manage-settings previews")
 
-	status, body, requestId := emailTemplateCall(t, token, http.MethodPost, emailTemplatesPath+"/welcome/es/send-test", text)
+	status, body, requestID := emailTemplateCall(t, token, http.MethodPost, emailTemplatesPath+"/welcome/es/send-test", text)
 	assert.Equal(t, http.StatusForbidden, status)
 	assert.Equal(t, "MANAGE_SCOPE_REQUIRED", body["error_code"])
-	rows := refusalRows(t, manageToken, requestId)
+	rows := refusalRows(t, manageToken, requestID)
 	require.Len(t, rows, 1)
 	assert.Equal(t, "settings", rows[0]["ceiling"])
 	assert.Equal(t, "/api/v1/admin/email-templates/{email}/{language}/send-test", rows[0]["route"])
@@ -147,7 +147,7 @@ func TestAPISettingsEmailSendTest_IsAuditedWithTheTestTemplate(t *testing.T) {
 	manageToken, caller := createAdminClientWithToken(t)
 	to := plusAddress()
 
-	resp, requestId := sendAdmin(t, manageToken, http.MethodPost, "/api/v1/admin/settings/email/send-test", api.SendTestEmailRequest{To: to})
+	resp, requestID := sendAdmin(t, manageToken, http.MethodPost, "/api/v1/admin/settings/email/send-test", api.SendTestEmailRequest{To: to})
 	_ = resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
@@ -156,5 +156,5 @@ func TestAPISettingsEmailSendTest_IsAuditedWithTheTestTemplate(t *testing.T) {
 		"email_digest":   hashutil.HashString(strings.ToLower(to)),
 		"email_template": "test",
 		"language":       "en",
-	}}, auditRows(t, manageToken, "sent_test_email", requestId))
+	}}, auditRows(t, manageToken, "sent_test_email", requestID))
 }

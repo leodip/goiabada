@@ -38,7 +38,7 @@ func TestHandleGeneralPost_AnAppNameRefusalMarksTheAppNameField(t *testing.T) {
 	}
 	for code, message := range refusals {
 		t.Run(code, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 			handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_general.html").Once()
 			apiClient := &refusingGeneralAPI{updateErr: &apiclient.APIError{Code: code, Message: message, StatusCode: http.StatusBadRequest}}

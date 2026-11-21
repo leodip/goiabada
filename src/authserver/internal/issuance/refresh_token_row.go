@@ -100,10 +100,10 @@ func (t *TokenIssuer) generateRefreshToken(ctx context.Context, tx *sql.Tx, sett
 
 	// save 1st refresh token
 	refreshTokenEntity := &record.RefreshToken{
-		RefreshTokenJti:  jti,
+		RefreshTokenJTI:  jti,
 		IssuedAt:         sql.NullTime{Time: now, Valid: true},
 		ExpiresAt:        sql.NullTime{Time: time.Unix(claims["exp"].(int64), 0), Valid: true},
-		CodeId:           sql.NullInt64{Int64: code.Id, Valid: true},
+		CodeID:           sql.NullInt64{Int64: code.ID, Valid: true},
 		RefreshTokenType: claims["typ"].(string),
 		Scope:            claims["scope"].(string),
 		Revoked:          false,
@@ -111,15 +111,15 @@ func (t *TokenIssuer) generateRefreshToken(ctx context.Context, tx *sql.Tx, sett
 	}
 
 	if refreshToken != nil {
-		refreshTokenEntity.PreviousRefreshTokenJti = refreshToken.RefreshTokenJti
-		refreshTokenEntity.FirstRefreshTokenJti = refreshToken.FirstRefreshTokenJti
+		refreshTokenEntity.PreviousRefreshTokenJTI = refreshToken.RefreshTokenJTI
+		refreshTokenEntity.FirstRefreshTokenJTI = refreshToken.FirstRefreshTokenJTI
 		// Copied from the PARENT, never re-read from the code or the user. The parent may
 		// have been promoted while the code was not, and reading the user's current value
 		// would let an old grant launder itself into a new generation (#106 rule 5).
 		refreshTokenEntity.AuthStateGeneration = refreshToken.AuthStateGeneration
 	} else {
 		// first refresh token issued
-		refreshTokenEntity.FirstRefreshTokenJti = jti
+		refreshTokenEntity.FirstRefreshTokenJTI = jti
 		refreshTokenEntity.AuthStateGeneration = code.AuthStateGeneration
 	}
 
@@ -225,7 +225,7 @@ func (t *TokenIssuer) getRefreshTokenMaxLifetime(ctx context.Context, tx *sql.Tx
 }
 
 // generateRefreshTokenForROPC creates a refresh token specifically for ROPC flow.
-// Unlike auth code flow, ROPC tokens store UserId and ClientId directly on the RefreshToken
+// Unlike auth code flow, ROPC tokens store UserID and ClientID directly on the RefreshToken
 // instead of referencing a Code entity. jti is generateRefreshToken's, and the binding is decided
 // as it is there, from input.DPoPThumbprint and input.Client.
 func (t *TokenIssuer) generateRefreshTokenForROPC(ctx context.Context, tx *sql.Tx, settings *record.Settings, input *ROPCGrantInput, scope string,
@@ -264,13 +264,13 @@ func (t *TokenIssuer) generateRefreshTokenForROPC(ctx context.Context, tx *sql.T
 
 	claims["scope"] = scope
 
-	// Create refresh token entity with direct UserId and ClientId (no Code reference)
+	// Create refresh token entity with direct UserID and ClientID (no Code reference)
 	refreshTokenEntity := &record.RefreshToken{
-		RefreshTokenJti:  jti,
+		RefreshTokenJTI:  jti,
 		IssuedAt:         sql.NullTime{Time: now, Valid: true},
 		ExpiresAt:        sql.NullTime{Time: time.Unix(claims["exp"].(int64), 0), Valid: true},
-		UserId:           sql.NullInt64{Int64: input.User.Id, Valid: true},
-		ClientId:         sql.NullInt64{Int64: input.Client.Id, Valid: true},
+		UserID:           sql.NullInt64{Int64: input.User.ID, Valid: true},
+		ClientID:         sql.NullInt64{Int64: input.Client.ID, Valid: true},
 		RefreshTokenType: claims["typ"].(string),
 		Scope:            claims["scope"].(string),
 		Revoked:          false,
@@ -279,8 +279,8 @@ func (t *TokenIssuer) generateRefreshTokenForROPC(ctx context.Context, tx *sql.T
 	}
 
 	if previousRefreshToken != nil {
-		refreshTokenEntity.PreviousRefreshTokenJti = previousRefreshToken.RefreshTokenJti
-		refreshTokenEntity.FirstRefreshTokenJti = previousRefreshToken.FirstRefreshTokenJti
+		refreshTokenEntity.PreviousRefreshTokenJTI = previousRefreshToken.RefreshTokenJTI
+		refreshTokenEntity.FirstRefreshTokenJTI = previousRefreshToken.FirstRefreshTokenJTI
 		// From the PARENT. The refresh path reloads the user, so reading input.User here
 		// would stamp the current generation onto a grant authenticated under an older one
 		// (#106 rule 5 and decision 13).
@@ -289,7 +289,7 @@ func (t *TokenIssuer) generateRefreshTokenForROPC(ctx context.Context, tx *sql.T
 		refreshTokenEntity.AuthenticatedAt = previousRefreshToken.AuthenticatedAt
 	} else {
 		// first refresh token issued
-		refreshTokenEntity.FirstRefreshTokenJti = jti
+		refreshTokenEntity.FirstRefreshTokenJTI = jti
 		// The User snapshot the password validation returned, not a reload.
 		refreshTokenEntity.AuthStateGeneration = input.User.AuthStateGeneration
 		// The password grant's own instant, which its access and ID tokens carry too.

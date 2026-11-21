@@ -32,9 +32,9 @@ func TestLockOrder_ReplayResponseAgainstTermination(t *testing.T) {
 
 		client := createTestClient(t)
 		user := createTestUser(t)
-		session := createTestUserSession(t, user.Id)
-		code := createTestCodeInSession(t, client.Id, user.Id, session.SessionIdentifier)
-		token := createTokenOfCode(t, client.Id, user.Id, code.Id, session.SessionIdentifier)
+		session := createTestUserSession(t, user.ID)
+		code := createTestCodeInSession(t, client.ID, user.ID, session.SessionIdentifier)
+		token := createTokenOfCode(t, client.ID, user.ID, code.ID, session.SessionIdentifier)
 
 		tx, err := database.BeginTransaction(context.Background())
 		require.NoError(t, err, "opening the replay's transaction")
@@ -42,7 +42,7 @@ func TestLockOrder_ReplayResponseAgainstTermination(t *testing.T) {
 
 		result, err := revocation.RevokeOnAuthCodeReuse(context.Background(), database, tx, code, nil)
 		require.NoError(t, err, "the replay response on a session nothing else has touched yet")
-		assert.Equal(t, []string{token.RefreshTokenJti}, result.RevokedRefreshTokenJtis,
+		assert.Equal(t, []string{token.RefreshTokenJTI}, result.RevokedRefreshTokenJTIs,
 			"the replay revokes the grant's token")
 
 		// The real termination, on the other handle, arriving while the replay holds the row.
@@ -60,9 +60,9 @@ func TestLockOrder_ReplayResponseAgainstTermination(t *testing.T) {
 		require.NoError(t, termination.await(t),
 			"the termination must wait for the replay and then commit, not deadlock with it")
 
-		assertCodeRevoked(t, code.Id, true, "the code of the terminated session")
-		assertTokenRevoked(t, token.Id, true, "the token the replay revoked")
-		assertSessionGone(t, session.Id, "the session both parties removed")
+		assertCodeRevoked(t, code.ID, true, "the code of the terminated session")
+		assertTokenRevoked(t, token.ID, true, "the token the replay revoked")
+		assertSessionGone(t, session.ID, "the session both parties removed")
 	})
 
 	t.Run("the termination goes first and the replay waits", func(t *testing.T) {
@@ -70,9 +70,9 @@ func TestLockOrder_ReplayResponseAgainstTermination(t *testing.T) {
 
 		client := createTestClient(t)
 		user := createTestUser(t)
-		session := createTestUserSession(t, user.Id)
-		code := createTestCodeInSession(t, client.Id, user.Id, session.SessionIdentifier)
-		token := createTokenOfCode(t, client.Id, user.Id, code.Id, session.SessionIdentifier)
+		session := createTestUserSession(t, user.ID)
+		code := createTestCodeInSession(t, client.ID, user.ID, session.SessionIdentifier)
+		token := createTokenOfCode(t, client.ID, user.ID, code.ID, session.SessionIdentifier)
 
 		tx, err := database.BeginTransaction(context.Background())
 		require.NoError(t, err, "opening the termination's transaction")
@@ -113,18 +113,18 @@ func TestLockOrder_ReplayResponseAgainstTermination(t *testing.T) {
 		// a snapshot taken before it, so it finds the token the termination already revoked and
 		// transitions nothing, which also keeps #77's guard from deleting anything. A replay that
 		// read the token before the termination committed would revoke it again and report it.
-		require.NotNil(t, outcome.result.RevokedRefreshTokenJtis)
-		assert.Empty(t, outcome.result.RevokedRefreshTokenJtis,
+		require.NotNil(t, outcome.result.RevokedRefreshTokenJTIs)
+		assert.Empty(t, outcome.result.RevokedRefreshTokenJTIs,
 			"the replay must see the termination's revocation, which is what waiting for it buys")
 
-		assertCodeRevoked(t, code.Id, true, "the code the termination revoked")
-		assertTokenRevoked(t, token.Id, true, "the token the termination revoked")
-		assertSessionGone(t, session.Id, "the terminated session")
+		assertCodeRevoked(t, code.ID, true, "the code the termination revoked")
+		assertTokenRevoked(t, token.ID, true, "the token the termination revoked")
+		assertSessionGone(t, session.ID, "the terminated session")
 	})
 }
 
 // assertSessionGone reloads a session row and requires it to be absent.
-func assertSessionGone(t *testing.T, sessionId int64, what string) {
+func assertSessionGone(t *testing.T, sessionID int64, what string) {
 	t.Helper()
-	assertSessionGoneOn(t, database, sessionId, what)
+	assertSessionGoneOn(t, database, sessionID, what)
 }

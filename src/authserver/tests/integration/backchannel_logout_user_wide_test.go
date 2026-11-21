@@ -46,10 +46,10 @@ func holdRefreshToken(t *testing.T, user *record.User, client *record.Client, re
 	now := time.Now().UTC()
 	jti := fake.UUID()
 	require.NoError(t, database.CreateRefreshToken(context.Background(), nil, &record.RefreshToken{
-		UserId:               sql.NullInt64{Int64: user.Id, Valid: true},
-		ClientId:             sql.NullInt64{Int64: client.Id, Valid: true},
-		RefreshTokenJti:      jti,
-		FirstRefreshTokenJti: jti,
+		UserID:               sql.NullInt64{Int64: user.ID, Valid: true},
+		ClientID:             sql.NullInt64{Int64: client.ID, Valid: true},
+		RefreshTokenJTI:      jti,
+		FirstRefreshTokenJTI: jti,
 		RefreshTokenType:     "Offline",
 		Scope:                "openid",
 		IssuedAt:             sql.NullTime{Time: now.Add(-2 * time.Hour), Valid: true},
@@ -66,17 +66,17 @@ func newUserWideApps(t *testing.T, user *record.User) *userWideApps {
 	t.Helper()
 	requireDatabaseAuditLogs(t)
 	adminToken, adminClient := createAdminClientWithToken(t)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, adminClient.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, adminClient.ID) })
 
 	if user == nil {
 		user = &record.User{Subject: fake.UUID(), Enabled: true, Email: uniqueEmail("bcl@user-wide.test")}
 		require.NoError(t, database.CreateUser(context.Background(), nil, user))
-		t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.Id) })
+		t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.ID) })
 	}
 
 	a := &userWideApps{adminToken: adminToken, user: user, clients: map[*logoutReceiver]*record.Client{}}
-	a.live = createTestUserSession(t, user.Id, fake.UUID())
-	a.expired = createTestUserSession(t, user.Id, fake.UUID())
+	a.live = createTestUserSession(t, user.ID, fake.UUID())
+	a.expired = createTestUserSession(t, user.ID, fake.UUID())
 	dead := deadSessionCases(t)[0]
 	a.expired.Started = dead.started
 	a.expired.LastAccessed = dead.lastAccessed
@@ -101,7 +101,7 @@ func newUserWideApps(t *testing.T, user *record.User) *userWideApps {
 
 	a.sidRequired = app()
 	a.sidRequiredClient = a.clients[a.sidRequired]
-	require.NoError(t, database.SetClientBackchannelLogout(context.Background(), nil, a.sidRequiredClient.Id,
+	require.NoError(t, database.SetClientBackchannelLogout(context.Background(), nil, a.sidRequiredClient.ID,
 		a.sidRequired.uri(), true))
 	onSession(t, a.live, a.sidRequiredClient)
 	onSession(t, a.expired, a.sidRequiredClient)
@@ -114,10 +114,10 @@ func newUserWideApps(t *testing.T, user *record.User) *userWideApps {
 
 // assertToldEverywhere holds what the apps received to decision 3's user-wide shape: one sub-only
 // token to each app that knew the user, a sub+sid token for the valid session to the app requiring
-// sid, and nothing to the apps whose only grant was revoked or expired. requestId is the request
+// sid, and nothing to the apps whose only grant was revoked or expired. requestID is the request
 // that ended the sessions, whose sent_logout_token rows are checked when the audit log is the
 // database.
-func (a *userWideApps) assertToldEverywhere(t *testing.T, requestId string) {
+func (a *userWideApps) assertToldEverywhere(t *testing.T, requestID string) {
 	t.Helper()
 	for _, rc := range []*logoutReceiver{a.onBoth, a.onExpired, a.grantOnly} {
 		posts := rc.waitFor(t, 1, 10*time.Second)
@@ -136,14 +136,14 @@ func (a *userWideApps) assertToldEverywhere(t *testing.T, requestId string) {
 	assert.Empty(t, a.revokedGrant.received(), "a revoked grant is no app that knew the user")
 	assert.Empty(t, a.expiredGrant.received(), "an expired grant is no app that knew the user")
 
-	if requestId == "" {
+	if requestID == "" {
 		return
 	}
 	// One sent_logout_token row per delivery.
-	rows := sentLogoutTokenRows(t, requestId, 4, 10*time.Second)
+	rows := sentLogoutTokenRows(t, requestID, 4, 10*time.Second)
 	sids := map[string]int{}
 	for _, row := range rows {
-		assert.Equal(t, a.user.Id, row.UserId.Int64)
+		assert.Equal(t, a.user.ID, row.UserID.Int64)
 		var details map[string]interface{}
 		require.NoError(t, json.Unmarshal([]byte(row.Details), &details))
 		assert.Equal(t, "delivered", details["outcome"])
@@ -156,12 +156,12 @@ func (a *userWideApps) assertToldEverywhere(t *testing.T, requestId string) {
 func TestBackchannelLogout_DisablingAUserTellsEveryAppThatKnewThem(t *testing.T) {
 	a := newUserWideApps(t, nil)
 
-	resp, requestId := sendAdminRequest(t, a.adminToken, http.MethodPut,
-		"/api/v1/admin/users/"+strconv.FormatInt(a.user.Id, 10)+"/enabled", api.UpdateUserEnabledRequest{Enabled: false})
+	resp, requestID := sendAdminRequest(t, a.adminToken, http.MethodPut,
+		"/api/v1/admin/users/"+strconv.FormatInt(a.user.ID, 10)+"/enabled", api.UpdateUserEnabledRequest{Enabled: false})
 	_ = resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
-	a.assertToldEverywhere(t, requestId)
+	a.assertToldEverywhere(t, requestID)
 }
 
 // TestBackchannelLogout_DisablingADisabledUserTellsNobody: a second disable ends nothing, so it
@@ -169,14 +169,14 @@ func TestBackchannelLogout_DisablingAUserTellsEveryAppThatKnewThem(t *testing.T)
 func TestBackchannelLogout_DisablingADisabledUserTellsNobody(t *testing.T) {
 	a := newUserWideApps(t, nil)
 	require.NoError(t, database.UpdateUser(context.Background(), nil, func() *record.User {
-		u, err := database.GetUserById(context.Background(), nil, a.user.Id)
+		u, err := database.GetUserByID(context.Background(), nil, a.user.ID)
 		require.NoError(t, err)
 		u.Enabled = false
 		return u
 	}()))
 
 	resp, _ := sendAdminRequest(t, a.adminToken, http.MethodPut,
-		"/api/v1/admin/users/"+strconv.FormatInt(a.user.Id, 10)+"/enabled", api.UpdateUserEnabledRequest{Enabled: false})
+		"/api/v1/admin/users/"+strconv.FormatInt(a.user.ID, 10)+"/enabled", api.UpdateUserEnabledRequest{Enabled: false})
 	_ = resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
@@ -193,7 +193,7 @@ func TestBackchannelLogout_DeletingAUserTellsEveryAppThatKnewThem(t *testing.T) 
 	a := newUserWideApps(t, nil)
 
 	resp, _ := sendAdminRequest(t, a.adminToken, http.MethodDelete,
-		"/api/v1/admin/users/"+strconv.FormatInt(a.user.Id, 10), nil)
+		"/api/v1/admin/users/"+strconv.FormatInt(a.user.ID, 10), nil)
 	_ = resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
@@ -221,13 +221,13 @@ func TestBackchannelLogout_DeletingTheirOwnAccountTellsEveryAppThatKnewThem(t *t
 func TestBackchannelLogout_AnAdministratorSettingThePasswordTellsEveryAppThatKnewTheUser(t *testing.T) {
 	a := newUserWideApps(t, nil)
 
-	resp, requestId := sendAdminRequest(t, a.adminToken, http.MethodPut,
-		"/api/v1/admin/users/"+strconv.FormatInt(a.user.Id, 10)+"/password",
+	resp, requestID := sendAdminRequest(t, a.adminToken, http.MethodPut,
+		"/api/v1/admin/users/"+strconv.FormatInt(a.user.ID, 10)+"/password",
 		api.UpdateUserPasswordRequest{NewPassword: fake.Password(20)})
 	_ = resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
-	a.assertToldEverywhere(t, requestId)
+	a.assertToldEverywhere(t, requestID)
 }
 
 // TestBackchannelLogout_APasswordResetTellsEveryAppThatKnewTheUser: the user resets a forgotten
@@ -236,7 +236,7 @@ func TestBackchannelLogout_APasswordResetTellsEveryAppThatKnewTheUser(t *testing
 	user := &record.User{Subject: fake.UUID(), Enabled: true, EmailVerified: true,
 		Email: uniqueEmail("bcl@reset.test")}
 	require.NoError(t, database.CreateUser(context.Background(), nil, user))
-	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.Id) })
+	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.ID) })
 	a := newUserWideApps(t, user)
 
 	resetPasswordFor(t, user, fake.Password(20))

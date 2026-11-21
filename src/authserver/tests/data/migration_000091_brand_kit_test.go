@@ -92,7 +92,7 @@ func TestMigration000091_BrandKit(t *testing.T) {
 			require.NoErrorf(t, h.Migrator.Migrate(ctx, brandKit000091), "roll back to 000091 on %s", dbType())
 		}()
 		for _, p := range predating {
-			brand, err := h.DB.GetBrandById(ctx, nil, p.id)
+			brand, err := h.DB.GetBrandByID(ctx, nil, p.id)
 			require.NoError(t, err)
 			require.NotNilf(t, brand, "[%s] the brand %q is kept on %s", phase, p.name, dbType())
 			assert.Equalf(t, p.name, brand.Name, "[%s] its name", phase)
@@ -102,8 +102,8 @@ func TestMigration000091_BrandKit(t *testing.T) {
 			assert.Equalf(t, record.BrandFont("system-ui"), brand.Font, "[%s] 3. %q is on System UI on %s", phase, p.name, dbType())
 			assert.Equalf(t, record.BrandBackgroundFit("cover"), brand.BackgroundFit, "[%s] 3. %q fits cover on %s", phase, p.name, dbType())
 			assert.Falsef(t, brand.HideAppName, "[%s] 3. %q shows the app name on %s", phase, p.name, dbType())
-			for _, s := range []sql.NullInt64{brand.LogoAssetId, brand.DarkLogoAssetId, brand.FaviconAssetId,
-				brand.BackgroundAssetId, brand.RegularFontAssetId, brand.BoldFontAssetId} {
+			for _, s := range []sql.NullInt64{brand.LogoAssetID, brand.DarkLogoAssetID, brand.FaviconAssetID,
+				brand.BackgroundAssetID, brand.RegularFontAssetID, brand.BoldFontAssetID} {
 				assert.Equalf(t, sql.NullInt64{}, s, "[%s] 3. every slot of %q is empty on %s", phase, p.name, dbType())
 			}
 		}
@@ -114,19 +114,19 @@ func TestMigration000091_BrandKit(t *testing.T) {
 	logo := createTestBrandAsset(t, h.DB, record.BrandAssetKindLogo)
 	night := predating[1].id
 	for _, column := range brandKitSlots000091 {
-		_, err := h.SQL.Exec(fmt.Sprintf("UPDATE brands SET %s = %d WHERE id = %d", column, logo.Id, night))
+		_, err := h.SQL.Exec(fmt.Sprintf("UPDATE brands SET %s = %d WHERE id = %d", column, logo.ID, night))
 		require.NoErrorf(t, err, "5. a slot %s naming a stored asset on %s", column, dbType())
-		_, err = h.SQL.Exec(fmt.Sprintf("DELETE FROM brand_assets WHERE id = %d", logo.Id))
+		_, err = h.SQL.Exec(fmt.Sprintf("DELETE FROM brand_assets WHERE id = %d", logo.ID))
 		require.Errorf(t, err, "5. the foreign key on %s refuses deleting the asset it names on %s", column, dbType())
 		_, err = h.SQL.Exec(fmt.Sprintf("UPDATE brands SET %s = NULL WHERE id = %d", column, night))
 		require.NoError(t, err)
 
-		_, err = h.SQL.Exec(fmt.Sprintf("UPDATE brands SET %s = %d WHERE id = %d", column, logo.Id+1_000, night))
+		_, err = h.SQL.Exec(fmt.Sprintf("UPDATE brands SET %s = %d WHERE id = %d", column, logo.ID+1_000, night))
 		require.Errorf(t, err, "5. the foreign key on %s refuses a slot naming no asset on %s", column, dbType())
 	}
 
 	// 6. With a slot filled, so the down drops a column that holds a value.
-	_, err := h.SQL.Exec(fmt.Sprintf("UPDATE brands SET logo_asset_id = %d WHERE id = %d", logo.Id, night))
+	_, err := h.SQL.Exec(fmt.Sprintf("UPDATE brands SET logo_asset_id = %d WHERE id = %d", logo.ID, night))
 	require.NoError(t, err)
 	require.NoErrorf(t, h.Migrator.Migrate(ctx, beforeBrandKit000091), "roll back 000091 on %s", dbType())
 	assert.Equalf(t, before, dumpTable(t, h, "brands"),
@@ -172,12 +172,12 @@ func assertBrandKitShape000091(t *testing.T, h *isolatedDB, before *tableShape, 
 		assert.Falsef(t, column.Nullable, "[%s] brands.%s is NOT NULL on %s", phase, name, dbType())
 		assert.Truef(t, column.HasDefault, "[%s] brands.%s has the default existing brands take on %s", phase, name, dbType())
 	}
-	assetId := assets.column(t, "id")
+	assetID := assets.column(t, "id")
 	for _, name := range brandKitSlots000091 {
 		column := brands.column(t, name)
 		assert.Truef(t, column.Nullable, "[%s] brands.%s is nullable: NULL is an empty slot, on %s", phase, name, dbType())
 		assert.Falsef(t, column.HasDefault, "[%s] brands.%s has no default on %s", phase, name, dbType())
-		assert.Equalf(t, assetId.Type, column.Type, "[%s] brands.%s has brand_assets.id's type on %s", phase, name, dbType())
+		assert.Equalf(t, assetID.Type, column.Type, "[%s] brands.%s has brand_assets.id's type on %s", phase, name, dbType())
 
 		fk := brands.foreignKey(t, name)
 		assert.Equalf(t, "brand_assets", fk.RefTable, "[%s] brands.%s references brand_assets on %s", phase, name, dbType())

@@ -40,7 +40,7 @@ func TestWorker_PerformTask_SweepsRevokedAccessTokensAtTheRunsMoment(t *testing.
 		Run(recordStep("codes")).Return(nil).Once()
 	mockDB.On("DeleteDeadPreRegistrations", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	mockDB.On("DeleteUnattachedBrandAssets", mock.Anything, mock.Anything, mock.Anything).Return(0, nil).Once()
-	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(nil, nil).Once()
+	mockDB.On("GetSettingsByID", mock.Anything, mock.Anything, int64(1)).Return(nil, nil).Once()
 
 	before := time.Now().UTC()
 	worker.performTask(context.Background())
@@ -66,7 +66,7 @@ func TestWorker_PerformTask_ContinuesAfterTheRevokedAccessTokenSweepFails(t *tes
 	mockDB.On("DeleteCodesWithoutRefreshTokens", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	mockDB.On("DeleteDeadPreRegistrations", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	mockDB.On("DeleteUnattachedBrandAssets", mock.Anything, mock.Anything, mock.Anything).Return(0, nil).Once()
-	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(&record.Settings{
+	mockDB.On("GetSettingsByID", mock.Anything, mock.Anything, int64(1)).Return(&record.Settings{
 		UserSessionIdleTimeoutInSeconds: 3600,
 		UserSessionMaxLifetimeInSeconds: 86400,
 	}, nil).Once()
@@ -96,6 +96,6 @@ func TestWorker_PerformTask_StopsAfterTheRevokedAccessTokenSweepWhenCancelled(t 
 	worker.performTask(ctx)
 
 	mockDB.AssertNumberOfCalls(t, "DeleteCodesWithoutRefreshTokens", 0)
-	mockDB.AssertNumberOfCalls(t, "GetSettingsById", 0)
+	mockDB.AssertNumberOfCalls(t, "GetSettingsByID", 0)
 	mockDB.AssertExpectations(t)
 }

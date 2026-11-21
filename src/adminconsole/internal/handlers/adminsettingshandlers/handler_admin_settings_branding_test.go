@@ -33,9 +33,9 @@ type brandingAPI struct {
 	writeErr error
 
 	created     *api.CreateBrandRequest
-	updatedId   int64
+	updatedID   int64
 	updated     *api.UpdateBrandRequest
-	deletedId   int64
+	deletedID   int64
 	madeDefault int64
 }
 
@@ -43,21 +43,21 @@ func (a *brandingAPI) GetAllBrands(context.Context, string) ([]api.BrandResponse
 	return a.brands, nil
 }
 
-func (a *brandingAPI) GetBrandById(_ context.Context, _ string, brandId int64) (*api.BrandResponse, error) {
+func (a *brandingAPI) GetBrandByID(_ context.Context, _ string, brandID int64) (*api.BrandResponse, error) {
 	for _, brand := range a.brands {
-		if brand.Id == brandId {
+		if brand.ID == brandID {
 			return &brand, nil
 		}
 	}
 	return nil, &apiclient.APIError{Code: "NOT_FOUND", Message: "Brand not found", StatusCode: http.StatusNotFound}
 }
 
-func (a *brandingAPI) GetBrandAssetById(_ context.Context, _ string, assetId int64) (*api.BrandAssetResponse, error) {
+func (a *brandingAPI) GetBrandAssetByID(_ context.Context, _ string, assetID int64) (*api.BrandAssetResponse, error) {
 	if a.assetErr != nil {
 		return nil, a.assetErr
 	}
 	for _, asset := range a.assets {
-		if asset.Id == assetId {
+		if asset.ID == assetID {
 			return &asset, nil
 		}
 	}
@@ -73,28 +73,28 @@ func (a *brandingAPI) CreateBrand(_ context.Context, _ string, request *api.Crea
 	if a.writeErr != nil {
 		return nil, a.writeErr
 	}
-	return &api.BrandResponse{Id: 9, Name: request.Name}, nil
+	return &api.BrandResponse{ID: 9, Name: request.Name}, nil
 }
 
-func (a *brandingAPI) UpdateBrand(_ context.Context, _ string, brandId int64, request *api.UpdateBrandRequest) (*api.BrandResponse, error) {
-	a.updatedId, a.updated = brandId, request
+func (a *brandingAPI) UpdateBrand(_ context.Context, _ string, brandID int64, request *api.UpdateBrandRequest) (*api.BrandResponse, error) {
+	a.updatedID, a.updated = brandID, request
 	if a.writeErr != nil {
 		return nil, a.writeErr
 	}
-	return &api.BrandResponse{Id: brandId, Name: request.Name}, nil
+	return &api.BrandResponse{ID: brandID, Name: request.Name}, nil
 }
 
-func (a *brandingAPI) DeleteBrand(_ context.Context, _ string, brandId int64) error {
-	a.deletedId = brandId
+func (a *brandingAPI) DeleteBrand(_ context.Context, _ string, brandID int64) error {
+	a.deletedID = brandID
 	return a.writeErr
 }
 
-func (a *brandingAPI) MakeBrandDefault(_ context.Context, _ string, brandId int64) (*api.BrandResponse, error) {
-	a.madeDefault = brandId
+func (a *brandingAPI) MakeBrandDefault(_ context.Context, _ string, brandID int64) (*api.BrandResponse, error) {
+	a.madeDefault = brandID
 	if a.writeErr != nil {
 		return nil, a.writeErr
 	}
-	return &api.BrandResponse{Id: brandId, IsDefault: true}, nil
+	return &api.BrandResponse{ID: brandID, IsDefault: true}, nil
 }
 
 // Two of the auth server's themes, with values that are no theme's real ones, so a swatch drawn
@@ -111,19 +111,19 @@ var (
 func newBrandingAPI() *brandingAPI {
 	return &brandingAPI{
 		brands: []api.BrandResponse{
-			{Id: 4, Name: "Autumn", Appearance: "dark", Theme: "plum", ClientCount: 2,
+			{ID: 4, Name: "Autumn", Appearance: "dark", Theme: "plum", ClientCount: 2,
 				Corners: "pill", Font: "serif", BackgroundFit: "tile", HideAppName: true,
-				Logo:        &api.BrandAssetResponse{Id: 11, Kind: "logo", Url: "https://auth.example.test/brand-assets/11?v=a", ContentType: "image/png", Width: 200, Height: 60},
-				Favicon:     &api.BrandAssetResponse{Id: 13, Kind: "favicon", Url: "https://auth.example.test/brand-assets/13?v=c", ContentType: "image/png", Width: 64, Height: 64},
-				RegularFont: &api.BrandAssetResponse{Id: 15, Kind: "font", Url: "https://auth.example.test/brand-assets/15?v=e", ContentType: "font/woff2"},
+				Logo:        &api.BrandAssetResponse{ID: 11, Kind: "logo", URL: "https://auth.example.test/brand-assets/11?v=a", ContentType: "image/png", Width: 200, Height: 60},
+				Favicon:     &api.BrandAssetResponse{ID: 13, Kind: "favicon", URL: "https://auth.example.test/brand-assets/13?v=c", ContentType: "image/png", Width: 64, Height: 64},
+				RegularFont: &api.BrandAssetResponse{ID: 15, Kind: "font", URL: "https://auth.example.test/brand-assets/15?v=e", ContentType: "font/woff2"},
 				FooterLinks: []api.BrandFooterLinkResponse{
-					{Url: "https://autumn.example/privacy", Label: "Privacy", Labels: map[string]string{"de": "Datenschutz", "pt-BR": "Privacidade"}},
-					{Url: "https://status.autumn.example", Label: "Status", Labels: map[string]string{}},
+					{URL: "https://autumn.example/privacy", Label: "Privacy", Labels: map[string]string{"de": "Datenschutz", "pt-BR": "Privacidade"}},
+					{URL: "https://status.autumn.example", Label: "Status", Labels: map[string]string{}},
 				},
-				SupportEmail: "help@autumn.example", SupportUrl: "https://help.autumn.example", SupportPhone: "+15550100199"},
-			{Id: 5, Name: "Default", Appearance: "auto", Theme: "blueberry", IsDefault: true, ClientCount: 3},
-			{Id: 6, Name: "Spring", Appearance: "light", Theme: "plum", ClientCount: 1},
-			{Id: 7, Name: "Unused", Appearance: "auto", Theme: "plum"},
+				SupportEmail: "help@autumn.example", SupportURL: "https://help.autumn.example", SupportPhone: "+15550100199"},
+			{ID: 5, Name: "Default", Appearance: "auto", Theme: "blueberry", IsDefault: true, ClientCount: 3},
+			{ID: 6, Name: "Spring", Appearance: "light", Theme: "plum", ClientCount: 1},
+			{ID: 7, Name: "Unused", Appearance: "auto", Theme: "plum"},
 		},
 		themes: []api.BrandThemeResponse{testBlueberry, testPlum},
 		assets: []api.BrandAssetResponse{uploadedLogo, uploadedDarkLogo, uploadedFavicon, uploadedBackground, uploadedRegularFont, uploadedBoldFont},
@@ -132,12 +132,12 @@ func newBrandingAPI() *brandingAPI {
 
 // Assets uploaded in the editor and not yet saved, as the admin API answers each read by its id.
 var (
-	uploadedLogo        = api.BrandAssetResponse{Id: 21, Kind: "logo", Url: "https://auth.example.test/brand-assets/21?v=l", ContentType: "image/png", Width: 240, Height: 80}
-	uploadedDarkLogo    = api.BrandAssetResponse{Id: 22, Kind: "logo", Url: "https://auth.example.test/brand-assets/22?v=d", ContentType: "image/webp", Width: 240, Height: 80}
-	uploadedFavicon     = api.BrandAssetResponse{Id: 23, Kind: "favicon", Url: "https://auth.example.test/brand-assets/23?v=f", ContentType: "image/png", Width: 64, Height: 64}
-	uploadedBackground  = api.BrandAssetResponse{Id: 24, Kind: "background", Url: "https://auth.example.test/brand-assets/24?v=b", ContentType: "image/jpeg", Width: 1920, Height: 1080}
-	uploadedRegularFont = api.BrandAssetResponse{Id: 25, Kind: "font", Url: "https://auth.example.test/brand-assets/25?v=r", ContentType: "font/woff2"}
-	uploadedBoldFont    = api.BrandAssetResponse{Id: 26, Kind: "font", Url: "https://auth.example.test/brand-assets/26?v=o", ContentType: "font/woff2"}
+	uploadedLogo        = api.BrandAssetResponse{ID: 21, Kind: "logo", URL: "https://auth.example.test/brand-assets/21?v=l", ContentType: "image/png", Width: 240, Height: 80}
+	uploadedDarkLogo    = api.BrandAssetResponse{ID: 22, Kind: "logo", URL: "https://auth.example.test/brand-assets/22?v=d", ContentType: "image/webp", Width: 240, Height: 80}
+	uploadedFavicon     = api.BrandAssetResponse{ID: 23, Kind: "favicon", URL: "https://auth.example.test/brand-assets/23?v=f", ContentType: "image/png", Width: 64, Height: 64}
+	uploadedBackground  = api.BrandAssetResponse{ID: 24, Kind: "background", URL: "https://auth.example.test/brand-assets/24?v=b", ContentType: "image/jpeg", Width: 1920, Height: 1080}
+	uploadedRegularFont = api.BrandAssetResponse{ID: 25, Kind: "font", URL: "https://auth.example.test/brand-assets/25?v=r", ContentType: "font/woff2"}
+	uploadedBoldFont    = api.BrandAssetResponse{ID: 26, Kind: "font", URL: "https://auth.example.test/brand-assets/26?v=o", ContentType: "font/woff2"}
 )
 
 // slotsForm is the six slots' fields as the editor posts them: each slot's asset id, or empty.
@@ -164,7 +164,7 @@ func refusal(code, message string) error {
 
 // Each row carries how many clients the brand draws, for the list's Clients column (#812 decision 3).
 func TestHandleBrandingGet_ListsTheBrandsInTheServersOrderWithTheirLookInWords(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_branding.html").Once()
 
@@ -173,11 +173,11 @@ func TestHandleBrandingGet_ListsTheBrandsInTheServersOrderWithTheirLookInWords(t
 
 	assert.Equal(t, []BrandRow{
 		{BrandResponse: newBrandingAPI().brands[0], AppearanceName: "Dark", ThemeName: "Plum"},
-		{BrandResponse: api.BrandResponse{Id: 5, Name: "Default", Appearance: "auto", Theme: "blueberry", IsDefault: true, ClientCount: 3},
+		{BrandResponse: api.BrandResponse{ID: 5, Name: "Default", Appearance: "auto", Theme: "blueberry", IsDefault: true, ClientCount: 3},
 			AppearanceName: "Automatic", ThemeName: "Blueberry"},
-		{BrandResponse: api.BrandResponse{Id: 6, Name: "Spring", Appearance: "light", Theme: "plum", ClientCount: 1},
+		{BrandResponse: api.BrandResponse{ID: 6, Name: "Spring", Appearance: "light", Theme: "plum", ClientCount: 1},
 			AppearanceName: "Light", ThemeName: "Plum"},
-		{BrandResponse: api.BrandResponse{Id: 7, Name: "Unused", Appearance: "auto", Theme: "plum"},
+		{BrandResponse: api.BrandResponse{ID: 7, Name: "Unused", Appearance: "auto", Theme: "plum"},
 			AppearanceName: "Automatic", ThemeName: "Plum"},
 	}, handlertest.Bind(t, httpHelper)["brands"])
 }
@@ -185,11 +185,11 @@ func TestHandleBrandingGet_ListsTheBrandsInTheServersOrderWithTheirLookInWords(t
 // A theme the console has no name for, as a newer auth server's could be, is named by its key
 // rather than by a catalog key leaking onto the page.
 func TestHandleBrandingGet_ATheConsoleDoesNotKnowIsNamedByItsKey(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_branding.html").Once()
 	apiClient := newBrandingAPI()
-	apiClient.brands = []api.BrandResponse{{Id: 6, Name: "Lab", Appearance: "light", Theme: "dragonfruit"}}
+	apiClient.brands = []api.BrandResponse{{ID: 6, Name: "Lab", Appearance: "light", Theme: "dragonfruit"}}
 
 	HandleBrandingGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(),
 		handlertest.Request(http.MethodGet, "/admin/settings/branding", handlertest.WithAccessToken()))
@@ -208,7 +208,7 @@ var wantThemeOptions = []BrandThemeOption{
 }
 
 func TestHandleBrandNewGet_StartsAutomaticOnTheFirstTheme(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_branding_brand.html").Once()
 
@@ -228,7 +228,7 @@ func TestHandleBrandNewGet_StartsAutomaticOnTheFirstTheme(t *testing.T) {
 // Each upload field's picker offers the types its kind takes: a logo, drawn in emails too, a PNG or
 // a JPEG, and a background, drawn on pages alone, a WebP as well (#817 decision 5).
 func TestHandleBrandNewGet_EachPickerOffersItsKindsTypes(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_branding_brand.html").Once()
 
@@ -249,7 +249,7 @@ func TestHandleBrandNewGet_EachPickerOffersItsKindsTypes(t *testing.T) {
 }
 
 func TestHandleBrandNewPost_CreatesTheBrandAndGoesBackToTheList(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	apiClient := newBrandingAPI()
 	cache := &invalidationRecorder{}
@@ -272,7 +272,7 @@ func TestHandleBrandNewPost_CreatesTheBrandAndGoesBackToTheList(t *testing.T) {
 // a form without it sends the switch off; the choices are sent exactly as the form holds them, for
 // the admin API to refuse one it does not know.
 func TestHandleBrandNewPost_SendsTheSwitchOffWhenTheFormLeavesItOut(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	apiClient := newBrandingAPI()
 
@@ -319,7 +319,7 @@ var brandRefusals = []struct {
 func TestHandleBrandNewPost_EachRefusalIsShownOnItsField(t *testing.T) {
 	for _, tc := range brandRefusals {
 		t.Run(tc.code, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 			handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_branding_brand.html").Once()
 			apiClient := newBrandingAPI()
@@ -345,7 +345,7 @@ func TestHandleBrandNewPost_EachRefusalIsShownOnItsField(t *testing.T) {
 }
 
 func TestHandleBrandGet_DrawsTheStoredBrand(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_branding_brand.html").Once()
 
@@ -359,10 +359,10 @@ func TestHandleBrandGet_DrawsTheStoredBrand(t *testing.T) {
 	assert.Equal(t, BrandForm{Name: "Autumn", Appearance: "dark", Theme: "plum", Corners: "pill", Font: "serif",
 		BackgroundFit: "tile", HideAppName: true, Logo: stored.Logo, Favicon: stored.Favicon, RegularFont: stored.RegularFont,
 		FooterLinks: [3]BrandFooterLinkRow{
-			{Label: "Privacy", Url: "https://autumn.example/privacy", Labels: map[string]string{"de": "Datenschutz", "pt-BR": "Privacidade"}},
-			{Label: "Status", Url: "https://status.autumn.example"},
+			{Label: "Privacy", URL: "https://autumn.example/privacy", Labels: map[string]string{"de": "Datenschutz", "pt-BR": "Privacidade"}},
+			{Label: "Status", URL: "https://status.autumn.example"},
 		},
-		SupportEmail: "help@autumn.example", SupportUrl: "https://help.autumn.example", SupportPhone: "+15550100199"},
+		SupportEmail: "help@autumn.example", SupportURL: "https://help.autumn.example", SupportPhone: "+15550100199"},
 		bind["brand"], "the stored choices, slots and footer")
 	assert.Equal(t, newBrandingAPI().brands[0], bind["storedBrand"])
 	assert.Equal(t, wantThemeOptions, bind["brandThemes"])
@@ -374,7 +374,7 @@ func TestHandleBrandGet_DrawsTheStoredBrand(t *testing.T) {
 func TestHandleBrandGet_AnUnknownOrMalformedBrandIsNotFound(t *testing.T) {
 	for _, id := range []string{"77", "abc"} {
 		t.Run(id, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 			httpHelper.On("NotFound", mock.Anything, mock.Anything).Once()
 
@@ -395,7 +395,7 @@ func TestHandleBrandPost_SavesTheBrandAndSaysSoOnItsPage(t *testing.T) {
 	store := newSettingsTestStore()
 	apiClient := newBrandingAPI()
 	cache := &invalidationRecorder{}
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	w := httptest.NewRecorder()
 
@@ -409,11 +409,11 @@ func TestHandleBrandPost_SavesTheBrandAndSaysSoOnItsPage(t *testing.T) {
 				"footerLinks-1-label": {"Status"}, "footerLinks-1-url": {"https://status.winter.example"},
 				"supportPhone": {"+15550100100"}}))))
 
-	assert.Equal(t, int64(4), apiClient.updatedId)
+	assert.Equal(t, int64(4), apiClient.updatedID)
 	assert.Equal(t, &api.UpdateBrandRequest{Name: "Winter", Appearance: "light", Theme: "blueberry",
 		Corners: "square", Font: "uploaded", BackgroundFit: "contain", HideAppName: false,
-		Logo: &api.BrandAssetRef{Id: 11}, Background: &api.BrandAssetRef{Id: 24}, RegularFont: &api.BrandAssetRef{Id: 25},
-		FooterLinks:  []api.BrandFooterLink{{Url: "https://status.winter.example", Label: "Status"}},
+		Logo: &api.BrandAssetRef{ID: 11}, Background: &api.BrandAssetRef{ID: 24}, RegularFont: &api.BrandAssetRef{ID: 25},
+		FooterLinks:  []api.BrandFooterLink{{URL: "https://status.winter.example", Label: "Status"}},
 		SupportPhone: "+15550100100"},
 		apiClient.updated)
 	assert.Equal(t, http.StatusFound, w.Code)
@@ -428,7 +428,7 @@ func TestHandleBrandPost_SavesTheBrandAndSaysSoOnItsPage(t *testing.T) {
 // Create attaches the files uploaded in the new brand's form, each slot by its asset's id, and sends
 // an empty slot empty (#813 decision 1).
 func TestHandleBrandNewPost_AttachesTheUploadedFiles(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	apiClient := newBrandingAPI()
 
@@ -440,14 +440,14 @@ func TestHandleBrandNewPost_AttachesTheUploadedFiles(t *testing.T) {
 
 	assert.Equal(t, &api.CreateBrandRequest{Name: "Spring", Appearance: "auto", Theme: "plum",
 		Corners: "rounded", Font: "uploaded", BackgroundFit: "cover",
-		Logo: &api.BrandAssetRef{Id: 21}, DarkLogo: &api.BrandAssetRef{Id: 22}, Favicon: &api.BrandAssetRef{Id: 23},
-		RegularFont: &api.BrandAssetRef{Id: 25}, BoldFont: &api.BrandAssetRef{Id: 26}}, apiClient.created)
+		Logo: &api.BrandAssetRef{ID: 21}, DarkLogo: &api.BrandAssetRef{ID: 22}, Favicon: &api.BrandAssetRef{ID: 23},
+		RegularFont: &api.BrandAssetRef{ID: 25}, BoldFont: &api.BrandAssetRef{ID: 26}}, apiClient.created)
 }
 
 // A slot holding no number, which the editor never sends, is sent as an asset no store holds, for the
 // admin API to refuse at its field, rather than emptied without a word.
 func TestHandleBrandNewPost_ASlotHoldingNoNumberIsSentForTheAPIToRefuse(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	apiClient := newBrandingAPI()
 
@@ -458,7 +458,7 @@ func TestHandleBrandNewPost_ASlotHoldingNoNumberIsSentForTheAPIToRefuse(t *testi
 				"corners": {"rounded"}, "font": {"system-ui"}, "backgroundFit": {"cover"}}))))
 
 	require.NotNil(t, apiClient.created)
-	assert.Equal(t, &api.BrandAssetRef{Id: 0}, apiClient.created.Logo)
+	assert.Equal(t, &api.BrandAssetRef{ID: 0}, apiClient.created.Logo)
 }
 
 // A refused form is drawn again with the files it held, each read by its id, so an upload not yet
@@ -486,13 +486,13 @@ func TestHandleBrandWrite_ARefusedFormKeepsItsUploads(t *testing.T) {
 		{"every slot filled", withValues(slotsForm("21", "22", "23", "24", "25", "26"), look),
 			refusal("handler.brand.name_required", "Not that."), "name", wantAllSix},
 	} {
-		draw := map[string]func(httpHelper *handlersmocks.HttpHelper, apiClient *brandingAPI){
-			"new form": func(httpHelper *handlersmocks.HttpHelper, apiClient *brandingAPI) {
+		draw := map[string]func(httpHelper *handlersmocks.HTTPHelper, apiClient *brandingAPI){
+			"new form": func(httpHelper *handlersmocks.HTTPHelper, apiClient *brandingAPI) {
 				HandleBrandNewPost(httpHelper, apiClient, &invalidationRecorder{}, consoleBaseURL).ServeHTTP(httptest.NewRecorder(),
 					handlertest.Request(http.MethodPost, "/admin/settings/branding/new", handlertest.WithAccessToken(),
 						handlertest.WithForm(c.form)))
 			},
-			"brand's form": func(httpHelper *handlersmocks.HttpHelper, apiClient *brandingAPI) {
+			"brand's form": func(httpHelper *handlersmocks.HTTPHelper, apiClient *brandingAPI) {
 				HandleBrandPost(httpHelper, newSettingsTestStore(), apiClient, &invalidationRecorder{}, consoleBaseURL).ServeHTTP(
 					httptest.NewRecorder(), handlertest.Request(http.MethodPost, "/admin/settings/branding/4/edit",
 						handlertest.WithAccessToken(), handlertest.WithPathValue("brandId", "4"), handlertest.WithForm(c.form)))
@@ -500,7 +500,7 @@ func TestHandleBrandWrite_ARefusedFormKeepsItsUploads(t *testing.T) {
 		}
 		for name, drawPage := range draw {
 			t.Run(c.name+"/"+name, func(t *testing.T) {
-				httpHelper := handlersmocks.NewHttpHelper(t)
+				httpHelper := handlersmocks.NewHTTPHelper(t)
 				handlertest.RefuseInternalServerError(t, httpHelper)
 				handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_branding_brand.html").Once()
 				apiClient := newBrandingAPI()
@@ -519,7 +519,7 @@ func TestHandleBrandWrite_ARefusedFormKeepsItsUploads(t *testing.T) {
 // A refused form whose file cannot be read for a reason other than its absence answers the page that
 // says why, as any other failed read does.
 func TestHandleBrandNewPost_AFailedReadOfARefusedFormsFileIsAnswered(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Return().Once()
 	apiClient := newBrandingAPI()
 	apiClient.writeErr = refusal("handler.brand.name_required", "Not that.")
@@ -536,7 +536,7 @@ func TestHandleBrandNewPost_AFailedReadOfARefusedFormsFileIsAnswered(t *testing.
 func TestHandleBrandPost_EachRefusalIsShownOnItsField(t *testing.T) {
 	for _, tc := range brandRefusals {
 		t.Run(tc.code, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 			handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_branding_brand.html").Once()
 			apiClient := newBrandingAPI()
@@ -568,7 +568,7 @@ func TestHandleBrandMakeDefaultPost_MovesTheDefaultAndSaysSoOnTheBrandsPage(t *t
 	store := newSettingsTestStore()
 	apiClient := newBrandingAPI()
 	cache := &invalidationRecorder{}
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	w := httptest.NewRecorder()
 
@@ -587,7 +587,7 @@ func TestHandleBrandMakeDefaultPost_MovesTheDefaultAndSaysSoOnTheBrandsPage(t *t
 }
 
 func TestHandleBrandMakeDefaultPost_AnUnknownBrandIsNotFoundAndChangesNothing(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	httpHelper.On("NotFound", mock.Anything, mock.Anything).Once()
 	apiClient := newBrandingAPI()
@@ -602,7 +602,7 @@ func TestHandleBrandMakeDefaultPost_AnUnknownBrandIsNotFoundAndChangesNothing(t 
 }
 
 func TestHandleBrandDeleteGet_DrawsTheBrandInWords(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_branding_delete.html").Once()
 
@@ -611,7 +611,7 @@ func TestHandleBrandDeleteGet_DrawsTheBrandInWords(t *testing.T) {
 			handlertest.WithPathValue("brandId", "5")))
 
 	assert.Equal(t, BrandRow{
-		BrandResponse:  api.BrandResponse{Id: 5, Name: "Default", Appearance: "auto", Theme: "blueberry", IsDefault: true, ClientCount: 3},
+		BrandResponse:  api.BrandResponse{ID: 5, Name: "Default", Appearance: "auto", Theme: "blueberry", IsDefault: true, ClientCount: 3},
 		AppearanceName: "Automatic", ThemeName: "Blueberry",
 	}, handlertest.Bind(t, httpHelper)["brand"])
 }
@@ -626,7 +626,7 @@ func TestHandleBrandGet_SaysHowManyClientsUseTheBrand(t *testing.T) {
 		"7": "No client uses this brand.",
 	} {
 		t.Run(id, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 			handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_branding_brand.html").Once()
 
@@ -638,7 +638,7 @@ func TestHandleBrandGet_SaysHowManyClientsUseTheBrand(t *testing.T) {
 		})
 	}
 
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_branding_brand.html").Once()
 	apiClient := newBrandingAPI()
@@ -660,7 +660,7 @@ func TestHandleBrandDeleteGet_SaysWhereTheBrandsClientsWillMove(t *testing.T) {
 		"7": "No client uses it, so no page will change.",
 	} {
 		t.Run(id, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 			handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_branding_delete.html").Once()
 
@@ -672,7 +672,7 @@ func TestHandleBrandDeleteGet_SaysWhereTheBrandsClientsWillMove(t *testing.T) {
 		})
 	}
 
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_branding_delete.html").Once()
 	HandleBrandDeletePost(httpHelper, newBrandingAPI(), &invalidationRecorder{}, consoleBaseURL).ServeHTTP(httptest.NewRecorder(),
@@ -686,7 +686,7 @@ func TestHandleBrandDeleteGet_SaysWhereTheBrandsClientsWillMove(t *testing.T) {
 // The default brand named is the one the auth server marks, not the brand being deleted or the
 // first listed.
 func TestHandleBrandDeleteGet_NamesTheDefaultTheServerMarks(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_branding_delete.html").Once()
 	apiClient := newBrandingAPI()
@@ -701,7 +701,7 @@ func TestHandleBrandDeleteGet_NamesTheDefaultTheServerMarks(t *testing.T) {
 }
 
 func TestHandleBrandDeletePost_DeletesTheBrandWhoseNameIsTyped(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	apiClient := newBrandingAPI()
 	cache := &invalidationRecorder{}
@@ -711,7 +711,7 @@ func TestHandleBrandDeletePost_DeletesTheBrandWhoseNameIsTyped(t *testing.T) {
 		handlertest.Request(http.MethodPost, "/admin/settings/branding/4/delete", handlertest.WithAccessToken(),
 			handlertest.WithPathValue("brandId", "4"), handlertest.WithForm(url.Values{"name": {"Autumn"}})))
 
-	assert.Equal(t, int64(4), apiClient.deletedId)
+	assert.Equal(t, int64(4), apiClient.deletedID)
 	assert.Equal(t, http.StatusFound, w.Code)
 	assert.Equal(t, "https://console.example.test/admin/settings/branding", w.Header().Get("Location"))
 	assert.Equal(t, 1, cache.invalidations)
@@ -723,21 +723,21 @@ func TestHandleBrandDeletePost_Refusals(t *testing.T) {
 	testCases := []struct {
 		name     string
 		typed    string
-		brandId  string
+		brandID  string
 		writeErr error
 		message  string
 		deleted  int64
 	}{
-		{name: "nothing typed", typed: "", brandId: "4", message: "Type the brand's name to confirm."},
-		{name: "another name", typed: "autumn", brandId: "4", message: "That isn't this brand's name. Type it as shown above."},
-		{name: "the default", typed: "Default", brandId: "5", deleted: 5,
+		{name: "nothing typed", typed: "", brandID: "4", message: "Type the brand's name to confirm."},
+		{name: "another name", typed: "autumn", brandID: "4", message: "That isn't this brand's name. Type it as shown above."},
+		{name: "the default", typed: "Default", brandID: "5", deleted: 5,
 			writeErr: refusal("handler.brand.default_delete_not_allowed", "The default brand cannot be deleted."),
 			message:  "The default brand cannot be deleted."},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 			handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_branding_delete.html").Once()
 			apiClient := newBrandingAPI()
@@ -745,12 +745,12 @@ func TestHandleBrandDeletePost_Refusals(t *testing.T) {
 			cache := &invalidationRecorder{}
 
 			HandleBrandDeletePost(httpHelper, apiClient, cache, consoleBaseURL).ServeHTTP(httptest.NewRecorder(),
-				handlertest.Request(http.MethodPost, "/admin/settings/branding/"+tc.brandId+"/delete", handlertest.WithAccessToken(),
-					handlertest.WithPathValue("brandId", tc.brandId), handlertest.WithForm(url.Values{"name": {tc.typed}})))
+				handlertest.Request(http.MethodPost, "/admin/settings/branding/"+tc.brandID+"/delete", handlertest.WithAccessToken(),
+					handlertest.WithPathValue("brandId", tc.brandID), handlertest.WithForm(url.Values{"name": {tc.typed}})))
 
 			bind := handlertest.Bind(t, httpHelper)
 			assert.Equal(t, tc.message, bind["error"])
-			assert.Equal(t, tc.deleted, apiClient.deletedId)
+			assert.Equal(t, tc.deleted, apiClient.deletedID)
 			assert.Equal(t, 0, cache.invalidations)
 		})
 	}
@@ -763,17 +763,17 @@ func TestBrandEditor_HandsThePreviewEveryThemesPalettes(t *testing.T) {
 	const want = `[{"key":"blueberry","light":{"canvas":"#000001","surface":"#000002"},"dark":{"canvas":"#000003","surface":"#000004"}},` +
 		`{"key":"plum","light":{"canvas":"#000011","surface":"#000012"},"dark":{"canvas":"#000013","surface":"#000014"}}]`
 
-	draw := map[string]func(httpHelper *handlersmocks.HttpHelper){
-		"new form": func(httpHelper *handlersmocks.HttpHelper) {
+	draw := map[string]func(httpHelper *handlersmocks.HTTPHelper){
+		"new form": func(httpHelper *handlersmocks.HTTPHelper) {
 			HandleBrandNewGet(httpHelper, newBrandingAPI()).ServeHTTP(httptest.NewRecorder(),
 				handlertest.Request(http.MethodGet, "/admin/settings/branding/new", handlertest.WithAccessToken()))
 		},
-		"stored brand": func(httpHelper *handlersmocks.HttpHelper) {
+		"stored brand": func(httpHelper *handlersmocks.HTTPHelper) {
 			HandleBrandGet(httpHelper, newSettingsTestStore(), newBrandingAPI()).ServeHTTP(httptest.NewRecorder(),
 				handlertest.Request(http.MethodGet, "/admin/settings/branding/4/edit", handlertest.WithAccessToken(),
 					handlertest.WithPathValue("brandId", "4")))
 		},
-		"refused form": func(httpHelper *handlersmocks.HttpHelper) {
+		"refused form": func(httpHelper *handlersmocks.HTTPHelper) {
 			apiClient := newBrandingAPI()
 			apiClient.writeErr = refusal("handler.brand.theme_invalid", "Not that.")
 			HandleBrandPost(httpHelper, newSettingsTestStore(), apiClient, &invalidationRecorder{}, consoleBaseURL).ServeHTTP(
@@ -784,7 +784,7 @@ func TestBrandEditor_HandsThePreviewEveryThemesPalettes(t *testing.T) {
 	}
 	for name, drawPage := range draw {
 		t.Run(name, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 			handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_branding_brand.html").Once()
 
@@ -821,24 +821,24 @@ func TestBrandEditor_HandsThePreviewWhatEachCornerShapeAndFamilyDraws(t *testing
 		`"contain":{"size":"contain","position":"center","repeat":"no-repeat"},` +
 		`"tile":{"size":"","position":"","repeat":"repeat"}}}`
 
-	draw := map[string]func(httpHelper *handlersmocks.HttpHelper){
-		"new form": func(httpHelper *handlersmocks.HttpHelper) {
+	draw := map[string]func(httpHelper *handlersmocks.HTTPHelper){
+		"new form": func(httpHelper *handlersmocks.HTTPHelper) {
 			HandleBrandNewGet(httpHelper, newBrandingAPI()).ServeHTTP(httptest.NewRecorder(),
 				handlertest.Request(http.MethodGet, "/admin/settings/branding/new", handlertest.WithAccessToken()))
 		},
-		"refused new form": func(httpHelper *handlersmocks.HttpHelper) {
+		"refused new form": func(httpHelper *handlersmocks.HTTPHelper) {
 			apiClient := newBrandingAPI()
 			apiClient.writeErr = refusal("handler.brand.corners_invalid", "Not that.")
 			HandleBrandNewPost(httpHelper, apiClient, &invalidationRecorder{}, consoleBaseURL).ServeHTTP(httptest.NewRecorder(),
 				handlertest.Request(http.MethodPost, "/admin/settings/branding/new", handlertest.WithAccessToken(),
 					handlertest.WithForm(url.Values{"name": {"Spring"}, "appearance": {"auto"}, "theme": {"plum"}})))
 		},
-		"stored brand": func(httpHelper *handlersmocks.HttpHelper) {
+		"stored brand": func(httpHelper *handlersmocks.HTTPHelper) {
 			HandleBrandGet(httpHelper, newSettingsTestStore(), newBrandingAPI()).ServeHTTP(httptest.NewRecorder(),
 				handlertest.Request(http.MethodGet, "/admin/settings/branding/4/edit", handlertest.WithAccessToken(),
 					handlertest.WithPathValue("brandId", "4")))
 		},
-		"refused form": func(httpHelper *handlersmocks.HttpHelper) {
+		"refused form": func(httpHelper *handlersmocks.HTTPHelper) {
 			apiClient := newBrandingAPI()
 			apiClient.writeErr = refusal("handler.brand.font_invalid", "Not that.")
 			HandleBrandPost(httpHelper, newSettingsTestStore(), apiClient, &invalidationRecorder{}, consoleBaseURL).ServeHTTP(
@@ -849,7 +849,7 @@ func TestBrandEditor_HandsThePreviewWhatEachCornerShapeAndFamilyDraws(t *testing
 	}
 	for name, drawPage := range draw {
 		t.Run(name, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 			handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_branding_brand.html").Once()
 
@@ -866,7 +866,7 @@ func TestBrandEditor_HandsThePreviewWhatEachCornerShapeAndFamilyDraws(t *testing
 // carrying its session cookie, and answers what the page was drawn with.
 func editPageAfter(t *testing.T, store sessionstore.Store, apiClient *brandingAPI, w *httptest.ResponseRecorder) map[string]interface{} {
 	t.Helper()
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_settings_branding_brand.html").Once()
 	req := handlertest.Request(http.MethodGet, "/admin/settings/branding/4/edit", handlertest.WithAccessToken(),

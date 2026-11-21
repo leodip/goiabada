@@ -26,8 +26,8 @@ func TestCreateClient(t *testing.T) {
 		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 2592000,
 		IncludeOpenIDConnectClaimsInAccessToken: record.ThreeStateSettingDefault.String(),
-		IncludeOpenIDConnectClaimsInIdToken:     record.ThreeStateSettingDefault.String(),
-		DefaultAcrLevel:                         record.AcrLevel1,
+		IncludeOpenIDConnectClaimsInIDToken:     record.ThreeStateSettingDefault.String(),
+		DefaultACRLevel:                         record.ACRLevel1,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -78,11 +78,11 @@ func TestCreateClient(t *testing.T) {
 	if createdClient.IncludeOpenIDConnectClaimsInAccessToken != client.IncludeOpenIDConnectClaimsInAccessToken {
 		t.Errorf("Expected IncludeOpenIDConnectClaimsInAccessToken '%s', got '%s'", client.IncludeOpenIDConnectClaimsInAccessToken, createdClient.IncludeOpenIDConnectClaimsInAccessToken)
 	}
-	if createdClient.IncludeOpenIDConnectClaimsInIdToken != client.IncludeOpenIDConnectClaimsInIdToken {
-		t.Errorf("Expected IncludeOpenIDConnectClaimsInIdToken '%s', got '%s'", client.IncludeOpenIDConnectClaimsInIdToken, createdClient.IncludeOpenIDConnectClaimsInIdToken)
+	if createdClient.IncludeOpenIDConnectClaimsInIDToken != client.IncludeOpenIDConnectClaimsInIDToken {
+		t.Errorf("Expected IncludeOpenIDConnectClaimsInIDToken '%s', got '%s'", client.IncludeOpenIDConnectClaimsInIDToken, createdClient.IncludeOpenIDConnectClaimsInIDToken)
 	}
-	if createdClient.DefaultAcrLevel != client.DefaultAcrLevel {
-		t.Errorf("Expected DefaultAcrLevel %v, got %v", client.DefaultAcrLevel, createdClient.DefaultAcrLevel)
+	if createdClient.DefaultACRLevel != client.DefaultACRLevel {
+		t.Errorf("Expected DefaultACRLevel %v, got %v", client.DefaultACRLevel, createdClient.DefaultACRLevel)
 	}
 	if !createdClient.CreatedAt.Valid || createdClient.CreatedAt.Time.IsZero() {
 		t.Errorf("CreatedAt is not set properly")
@@ -107,8 +107,8 @@ func TestUpdateClient(t *testing.T) {
 		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 2592000,
 		IncludeOpenIDConnectClaimsInAccessToken: record.ThreeStateSettingDefault.String(),
-		IncludeOpenIDConnectClaimsInIdToken:     record.ThreeStateSettingDefault.String(),
-		DefaultAcrLevel:                         record.AcrLevel1,
+		IncludeOpenIDConnectClaimsInIDToken:     record.ThreeStateSettingDefault.String(),
+		DefaultACRLevel:                         record.ACRLevel1,
 	}
 
 	err := database.CreateClient(context.Background(), nil, originalClient)
@@ -117,7 +117,7 @@ func TestUpdateClient(t *testing.T) {
 	}
 
 	updatedClient := &record.Client{
-		Id:                                      originalClient.Id,
+		ID:                                      originalClient.ID,
 		ClientIdentifier:                        "updated_client_" + random,
 		ClientSecretEncrypted:                   []byte("updated_secret"),
 		Description:                             "Updated Description",
@@ -130,8 +130,8 @@ func TestUpdateClient(t *testing.T) {
 		RefreshTokenOfflineIdleTimeoutInSeconds: 172800,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 5184000,
 		IncludeOpenIDConnectClaimsInAccessToken: record.ThreeStateSettingOn.String(),
-		IncludeOpenIDConnectClaimsInIdToken:     record.ThreeStateSettingOff.String(),
-		DefaultAcrLevel:                         record.AcrLevel2Optional,
+		IncludeOpenIDConnectClaimsInIDToken:     record.ThreeStateSettingOff.String(),
+		DefaultACRLevel:                         record.ACRLevel2Optional,
 	}
 
 	err = database.UpdateClient(context.Background(), nil, updatedClient)
@@ -140,7 +140,7 @@ func TestUpdateClient(t *testing.T) {
 	}
 
 	// Retrieve the updated client
-	retrievedClient, err := database.GetClientById(context.Background(), nil, originalClient.Id)
+	retrievedClient, err := database.GetClientByID(context.Background(), nil, originalClient.ID)
 	if err != nil {
 		t.Fatalf("Failed to retrieve updated client: %v", err)
 	}
@@ -183,11 +183,11 @@ func TestUpdateClient(t *testing.T) {
 	if retrievedClient.IncludeOpenIDConnectClaimsInAccessToken != updatedClient.IncludeOpenIDConnectClaimsInAccessToken {
 		t.Errorf("Expected IncludeOpenIDConnectClaimsInAccessToken '%s', got '%s'", updatedClient.IncludeOpenIDConnectClaimsInAccessToken, retrievedClient.IncludeOpenIDConnectClaimsInAccessToken)
 	}
-	if retrievedClient.IncludeOpenIDConnectClaimsInIdToken != updatedClient.IncludeOpenIDConnectClaimsInIdToken {
-		t.Errorf("Expected IncludeOpenIDConnectClaimsInIdToken '%s', got '%s'", updatedClient.IncludeOpenIDConnectClaimsInIdToken, retrievedClient.IncludeOpenIDConnectClaimsInIdToken)
+	if retrievedClient.IncludeOpenIDConnectClaimsInIDToken != updatedClient.IncludeOpenIDConnectClaimsInIDToken {
+		t.Errorf("Expected IncludeOpenIDConnectClaimsInIDToken '%s', got '%s'", updatedClient.IncludeOpenIDConnectClaimsInIDToken, retrievedClient.IncludeOpenIDConnectClaimsInIDToken)
 	}
-	if retrievedClient.DefaultAcrLevel != updatedClient.DefaultAcrLevel {
-		t.Errorf("Expected DefaultAcrLevel %v, got %v", updatedClient.DefaultAcrLevel, retrievedClient.DefaultAcrLevel)
+	if retrievedClient.DefaultACRLevel != updatedClient.DefaultACRLevel {
+		t.Errorf("Expected DefaultACRLevel %v, got %v", updatedClient.DefaultACRLevel, retrievedClient.DefaultACRLevel)
 	}
 	if !retrievedClient.CreatedAt.Valid || retrievedClient.CreatedAt.Time.IsZero() {
 		t.Errorf("CreatedAt is not set properly")
@@ -214,7 +214,7 @@ func TestUpdateClient(t *testing.T) {
 		t.Fatalf("Failed to update client second time: %v", err)
 	}
 
-	retrievedClientAgain, err := database.GetClientById(context.Background(), nil, originalClient.Id)
+	retrievedClientAgain, err := database.GetClientByID(context.Background(), nil, originalClient.ID)
 	if err != nil {
 		t.Fatalf("Failed to retrieve updated client second time: %v", err)
 	}
@@ -224,7 +224,7 @@ func TestUpdateClient(t *testing.T) {
 	}
 }
 
-func TestGetClientById(t *testing.T) {
+func TestGetClientByID(t *testing.T) {
 	random := fake.LetterN(6)
 	client := &record.Client{
 		ClientIdentifier:                        "test_client_" + random,
@@ -239,7 +239,7 @@ func TestGetClientById(t *testing.T) {
 		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 2592000,
 		IncludeOpenIDConnectClaimsInAccessToken: record.ThreeStateSettingDefault.String(),
-		DefaultAcrLevel:                         record.AcrLevel1,
+		DefaultACRLevel:                         record.ACRLevel1,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -248,14 +248,14 @@ func TestGetClientById(t *testing.T) {
 	}
 
 	// Test retrieving the client
-	retrievedClient, err := database.GetClientById(context.Background(), nil, client.Id)
+	retrievedClient, err := database.GetClientByID(context.Background(), nil, client.ID)
 	if err != nil {
 		t.Fatalf("Failed to retrieve client by ID: %v", err)
 	}
 
 	// Check all properties
-	if retrievedClient.Id != client.Id {
-		t.Errorf("Expected Id %d, got %d", client.Id, retrievedClient.Id)
+	if retrievedClient.ID != client.ID {
+		t.Errorf("Expected ID %d, got %d", client.ID, retrievedClient.ID)
 	}
 	if retrievedClient.ClientIdentifier != client.ClientIdentifier {
 		t.Errorf("Expected ClientIdentifier '%s', got '%s'", client.ClientIdentifier, retrievedClient.ClientIdentifier)
@@ -293,8 +293,8 @@ func TestGetClientById(t *testing.T) {
 	if retrievedClient.IncludeOpenIDConnectClaimsInAccessToken != client.IncludeOpenIDConnectClaimsInAccessToken {
 		t.Errorf("Expected IncludeOpenIDConnectClaimsInAccessToken '%s', got '%s'", client.IncludeOpenIDConnectClaimsInAccessToken, retrievedClient.IncludeOpenIDConnectClaimsInAccessToken)
 	}
-	if retrievedClient.DefaultAcrLevel != client.DefaultAcrLevel {
-		t.Errorf("Expected DefaultAcrLevel %v, got %v", client.DefaultAcrLevel, retrievedClient.DefaultAcrLevel)
+	if retrievedClient.DefaultACRLevel != client.DefaultACRLevel {
+		t.Errorf("Expected DefaultACRLevel %v, got %v", client.DefaultACRLevel, retrievedClient.DefaultACRLevel)
 	}
 	if !retrievedClient.CreatedAt.Valid || retrievedClient.CreatedAt.Time.IsZero() {
 		t.Errorf("CreatedAt is not set properly")
@@ -304,22 +304,22 @@ func TestGetClientById(t *testing.T) {
 	}
 
 	// Test retrieving a non-existent client
-	nonExistentId := client.Id + 10000 // Assuming this ID doesn't exist
-	nonExistentClient, err := database.GetClientById(context.Background(), nil, nonExistentId)
+	nonExistentID := client.ID + 10000 // Assuming this ID doesn't exist
+	nonExistentClient, err := database.GetClientByID(context.Background(), nil, nonExistentID)
 	if err != nil {
 		t.Errorf("Expected no error for non-existent client, got: %v", err)
 	}
 	if nonExistentClient != nil {
-		t.Errorf("Expected nil for non-existent client, got a client with ID: %d", nonExistentClient.Id)
+		t.Errorf("Expected nil for non-existent client, got a client with ID: %d", nonExistentClient.ID)
 	}
 
 	// Test with invalid ID (e.g., negative ID)
-	invalidClient, err := database.GetClientById(context.Background(), nil, -1)
+	invalidClient, err := database.GetClientByID(context.Background(), nil, -1)
 	if err != nil {
 		t.Errorf("Expected no error for invalid client ID, got: %v", err)
 	}
 	if invalidClient != nil {
-		t.Errorf("Expected nil for invalid client ID, got a client with ID: %d", invalidClient.Id)
+		t.Errorf("Expected nil for invalid client ID, got a client with ID: %d", invalidClient.ID)
 	}
 }
 
@@ -339,7 +339,7 @@ func TestGetClientByClientIdentifier(t *testing.T) {
 		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 2592000,
 		IncludeOpenIDConnectClaimsInAccessToken: record.ThreeStateSettingDefault.String(),
-		DefaultAcrLevel:                         record.AcrLevel1,
+		DefaultACRLevel:                         record.ACRLevel1,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -354,8 +354,8 @@ func TestGetClientByClientIdentifier(t *testing.T) {
 	}
 
 	// Check all properties
-	if retrievedClient.Id != client.Id {
-		t.Errorf("Expected Id %d, got %d", client.Id, retrievedClient.Id)
+	if retrievedClient.ID != client.ID {
+		t.Errorf("Expected ID %d, got %d", client.ID, retrievedClient.ID)
 	}
 	if retrievedClient.ClientIdentifier != client.ClientIdentifier {
 		t.Errorf("Expected ClientIdentifier '%s', got '%s'", client.ClientIdentifier, retrievedClient.ClientIdentifier)
@@ -393,8 +393,8 @@ func TestGetClientByClientIdentifier(t *testing.T) {
 	if retrievedClient.IncludeOpenIDConnectClaimsInAccessToken != client.IncludeOpenIDConnectClaimsInAccessToken {
 		t.Errorf("Expected IncludeOpenIDConnectClaimsInAccessToken '%s', got '%s'", client.IncludeOpenIDConnectClaimsInAccessToken, retrievedClient.IncludeOpenIDConnectClaimsInAccessToken)
 	}
-	if retrievedClient.DefaultAcrLevel != client.DefaultAcrLevel {
-		t.Errorf("Expected DefaultAcrLevel %v, got %v", client.DefaultAcrLevel, retrievedClient.DefaultAcrLevel)
+	if retrievedClient.DefaultACRLevel != client.DefaultACRLevel {
+		t.Errorf("Expected DefaultACRLevel %v, got %v", client.DefaultACRLevel, retrievedClient.DefaultACRLevel)
 	}
 	if !retrievedClient.CreatedAt.Valid || retrievedClient.CreatedAt.Time.IsZero() {
 		t.Errorf("CreatedAt is not set properly")
@@ -410,7 +410,7 @@ func TestGetClientByClientIdentifier(t *testing.T) {
 		t.Errorf("Expected no error for non-existent client, got: %v", err)
 	}
 	if nonExistentClient != nil {
-		t.Errorf("Expected nil for non-existent client, got a client with ID: %d", nonExistentClient.Id)
+		t.Errorf("Expected nil for non-existent client, got a client with ID: %d", nonExistentClient.ID)
 	}
 
 	// Test with empty client identifier
@@ -419,7 +419,7 @@ func TestGetClientByClientIdentifier(t *testing.T) {
 		t.Errorf("Expected no error for empty client identifier, got: %v", err)
 	}
 	if emptyIdentifierClient != nil {
-		t.Errorf("Expected nil for empty client identifier, got a client with ID: %d", emptyIdentifierClient.Id)
+		t.Errorf("Expected nil for empty client identifier, got a client with ID: %d", emptyIdentifierClient.ID)
 	}
 }
 
@@ -438,7 +438,7 @@ func TestClientLoadRedirectURIs(t *testing.T) {
 		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 2592000,
 		IncludeOpenIDConnectClaimsInAccessToken: record.ThreeStateSettingDefault.String(),
-		DefaultAcrLevel:                         record.AcrLevel1,
+		DefaultACRLevel:                         record.ACRLevel1,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -448,9 +448,9 @@ func TestClientLoadRedirectURIs(t *testing.T) {
 
 	// Create multiple redirect URIs for the client
 	redirectURIs := []record.RedirectURI{
-		{URI: "https://example.com/callback1", ClientId: client.Id},
-		{URI: "https://example.com/callback2", ClientId: client.Id},
-		{URI: "http://localhost:8080/callback", ClientId: client.Id},
+		{URI: "https://example.com/callback1", ClientID: client.ID},
+		{URI: "https://example.com/callback2", ClientID: client.ID},
+		{URI: "http://localhost:8080/callback", ClientID: client.ID},
 	}
 
 	for _, uri := range redirectURIs {
@@ -523,7 +523,7 @@ func TestClientLoadWebOrigins(t *testing.T) {
 		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 2592000,
 		IncludeOpenIDConnectClaimsInAccessToken: record.ThreeStateSettingDefault.String(),
-		DefaultAcrLevel:                         record.AcrLevel1,
+		DefaultACRLevel:                         record.ACRLevel1,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -533,9 +533,9 @@ func TestClientLoadWebOrigins(t *testing.T) {
 
 	// Create multiple web origins for the client
 	webOrigins := []record.WebOrigin{
-		{Origin: "https://example.com", ClientId: client.Id},
-		{Origin: "https://app.example.com", ClientId: client.Id},
-		{Origin: "http://localhost:3000", ClientId: client.Id},
+		{Origin: "https://example.com", ClientID: client.ID},
+		{Origin: "https://app.example.com", ClientID: client.ID},
+		{Origin: "http://localhost:3000", ClientID: client.ID},
 	}
 
 	for _, origin := range webOrigins {
@@ -593,10 +593,10 @@ func TestClientLoadWebOrigins(t *testing.T) {
 	}
 }
 
-func TestGetClientsByIds(t *testing.T) {
+func TestGetClientsByIDs(t *testing.T) {
 	// Create multiple test clients
 	clients := make([]record.Client, 3)
-	clientIds := make([]int64, 3)
+	clientIDs := make([]int64, 3)
 
 	for i := 0; i < 3; i++ {
 		random := fake.LetterN(6)
@@ -613,7 +613,7 @@ func TestGetClientsByIds(t *testing.T) {
 			RefreshTokenOfflineIdleTimeoutInSeconds: 86400 + i*43200,
 			RefreshTokenOfflineMaxLifetimeInSeconds: 2592000 + i*1296000,
 			IncludeOpenIDConnectClaimsInAccessToken: record.ThreeStateSettingDefault.String(),
-			DefaultAcrLevel:                         record.AcrLevel1,
+			DefaultACRLevel:                         record.ACRLevel1,
 		}
 
 		err := database.CreateClient(context.Background(), nil, &client)
@@ -622,11 +622,11 @@ func TestGetClientsByIds(t *testing.T) {
 		}
 
 		clients[i] = client
-		clientIds[i] = client.Id
+		clientIDs[i] = client.ID
 	}
 
 	// Test retrieving all created clients
-	retrievedClients, err := database.GetClientsByIds(context.Background(), nil, clientIds)
+	retrievedClients, err := database.GetClientsByIDs(context.Background(), nil, clientIDs)
 	if err != nil {
 		t.Fatalf("Failed to retrieve clients by IDs: %v", err)
 	}
@@ -639,7 +639,7 @@ func TestGetClientsByIds(t *testing.T) {
 	for i, client := range clients {
 		found := false
 		for _, retrievedClient := range retrievedClients {
-			if retrievedClient.Id == client.Id {
+			if retrievedClient.ID == client.ID {
 				found = true
 				// Check all properties
 				if retrievedClient.ClientIdentifier != client.ClientIdentifier {
@@ -659,35 +659,35 @@ func TestGetClientsByIds(t *testing.T) {
 			}
 		}
 		if !found {
-			t.Errorf("Client with ID %d not found in retrieved clients", client.Id)
+			t.Errorf("Client with ID %d not found in retrieved clients", client.ID)
 		}
 	}
 
 	// Test retrieving a subset of clients
-	subsetIds := clientIds[:2]
-	subsetClients, err := database.GetClientsByIds(context.Background(), nil, subsetIds)
+	subsetIDs := clientIDs[:2]
+	subsetClients, err := database.GetClientsByIDs(context.Background(), nil, subsetIDs)
 	if err != nil {
 		t.Fatalf("Failed to retrieve subset of clients: %v", err)
 	}
-	if len(subsetClients) != len(subsetIds) {
-		t.Errorf("Expected %d clients in subset, got %d", len(subsetIds), len(subsetClients))
+	if len(subsetClients) != len(subsetIDs) {
+		t.Errorf("Expected %d clients in subset, got %d", len(subsetIDs), len(subsetClients))
 	}
 
 	// Test retrieving with some non-existent IDs
-	nonExistentId := clientIds[len(clientIds)-1] + 1000 // Assume this ID doesn't exist
-	mixedIds := make([]int64, len(clientIds[:2]), len(clientIds[:2])+1)
-	copy(mixedIds, clientIds[:2])
-	mixedIds = append(mixedIds, nonExistentId)
-	mixedClients, err := database.GetClientsByIds(context.Background(), nil, mixedIds)
+	nonExistentID := clientIDs[len(clientIDs)-1] + 1000 // Assume this ID doesn't exist
+	mixedIDs := make([]int64, len(clientIDs[:2]), len(clientIDs[:2])+1)
+	copy(mixedIDs, clientIDs[:2])
+	mixedIDs = append(mixedIDs, nonExistentID)
+	mixedClients, err := database.GetClientsByIDs(context.Background(), nil, mixedIDs)
 	if err != nil {
 		t.Fatalf("Failed to retrieve clients with mixed existing and non-existing IDs: %v", err)
 	}
-	if len(mixedClients) != len(clientIds[:2]) {
-		t.Errorf("Expected %d clients when including non-existent ID, got %d", len(clientIds[:2]), len(mixedClients))
+	if len(mixedClients) != len(clientIDs[:2]) {
+		t.Errorf("Expected %d clients when including non-existent ID, got %d", len(clientIDs[:2]), len(mixedClients))
 	}
 
 	// Test with empty slice of IDs
-	emptyClients, err := database.GetClientsByIds(context.Background(), nil, []int64{})
+	emptyClients, err := database.GetClientsByIDs(context.Background(), nil, []int64{})
 	if err != nil {
 		t.Errorf("Expected no error for empty ID slice, got: %v", err)
 	}
@@ -696,7 +696,7 @@ func TestGetClientsByIds(t *testing.T) {
 	}
 
 	// Test with nil slice of IDs
-	nilClients, err := database.GetClientsByIds(context.Background(), nil, nil)
+	nilClients, err := database.GetClientsByIDs(context.Background(), nil, nil)
 	if err != nil {
 		t.Errorf("Expected no error for nil ID slice, got: %v", err)
 	}
@@ -705,7 +705,7 @@ func TestGetClientsByIds(t *testing.T) {
 	}
 }
 
-// TestGetClientsByIds_MoreIdsThanOneStatementCanCarry asks for more ids than a single statement
+// TestGetClientsByIDs_MoreIDsThanOneStatementCanCarry asks for more ids than a single statement
 // can bind. Every id in an IN list is a bound parameter and SQL Server refuses a statement
 // carrying more than 2,100 of them with error 8003, the lowest ceiling of the four engines, so
 // an unbounded list answered a valid request with an error instead of its rows. The method reads
@@ -715,8 +715,8 @@ func TestGetClientsByIds(t *testing.T) {
 // multiple of the batch size, where an off-by-one in the loop bounds drops the final batch
 // instead of failing loudly. The real ids sit in different batches in both, including the last
 // slot, so a batch that is never issued loses a client the assertions are counting.
-func TestGetClientsByIds_MoreIdsThanOneStatementCanCarry(t *testing.T) {
-	realIds := make([]int64, 3)
+func TestGetClientsByIDs_MoreIDsThanOneStatementCanCarry(t *testing.T) {
+	realIDs := make([]int64, 3)
 	for i := 0; i < 3; i++ {
 		random := fake.LetterN(6)
 		client := record.Client{
@@ -728,12 +728,12 @@ func TestGetClientsByIds_MoreIdsThanOneStatementCanCarry(t *testing.T) {
 			RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
 			RefreshTokenOfflineMaxLifetimeInSeconds: 2592000,
 			IncludeOpenIDConnectClaimsInAccessToken: record.ThreeStateSettingDefault.String(),
-			DefaultAcrLevel:                         record.AcrLevel1,
+			DefaultACRLevel:                         record.ACRLevel1,
 		}
 		if err := database.CreateClient(context.Background(), nil, &client); err != nil {
 			t.Fatalf("Failed to create test client %d: %v", i, err)
 		}
-		realIds[i] = client.Id
+		realIDs[i] = client.ID
 	}
 
 	// Ids no row can hold: client ids are assigned by the engine from one, so a billion up is
@@ -756,35 +756,35 @@ func TestGetClientsByIds_MoreIdsThanOneStatementCanCarry(t *testing.T) {
 				ids[i] = paddingBase + int64(i)
 			}
 			for i, position := range testCase.positions {
-				ids[position] = realIds[i]
+				ids[position] = realIDs[i]
 			}
 
-			clients, err := database.GetClientsByIds(context.Background(), nil, ids)
+			clients, err := database.GetClientsByIDs(context.Background(), nil, ids)
 			if err != nil {
 				t.Fatalf("Failed to retrieve %d clients by ids: %v", testCase.total, err)
 			}
 
-			if len(clients) != len(realIds) {
-				t.Errorf("Expected %d clients, got %d", len(realIds), len(clients))
+			if len(clients) != len(realIDs) {
+				t.Errorf("Expected %d clients, got %d", len(realIDs), len(clients))
 			}
 
-			for _, realId := range realIds {
+			for _, realID := range realIDs {
 				found := false
 				for _, client := range clients {
-					if client.Id == realId {
+					if client.ID == realID {
 						found = true
 						break
 					}
 				}
 				if !found {
-					t.Errorf("Client with ID %d not found in retrieved clients", realId)
+					t.Errorf("Client with ID %d not found in retrieved clients", realID)
 				}
 			}
 		})
 	}
 }
 
-// TestGetClientsByIds_ARepeatedIdOnEitherSideOfABatchBoundary asks for one client twice, at two
+// TestGetClientsByIDs_ARepeatedIDOnEitherSideOfABatchBoundary asks for one client twice, at two
 // positions a batch boundary sits between. A single IN list answers a repeated id once, so the
 // method owes one row per matching client however long the list is; reading a long list in
 // several statements is what could make the same row arrive twice, and a caller reading the
@@ -797,7 +797,7 @@ func TestGetClientsByIds_MoreIdsThanOneStatementCanCarry(t *testing.T) {
 // only a method that remembers every id it has already seen answers one row. Keep both: with the
 // far pair alone a boundary off by one slot goes unnoticed, and with the near pair alone
 // deduplicating neighbours passes for deduplicating the list (#373).
-func TestGetClientsByIds_ARepeatedIdOnEitherSideOfABatchBoundary(t *testing.T) {
+func TestGetClientsByIDs_ARepeatedIDOnEitherSideOfABatchBoundary(t *testing.T) {
 	random := fake.LetterN(6)
 	client := record.Client{
 		ClientIdentifier:                        "test_client_" + random,
@@ -808,7 +808,7 @@ func TestGetClientsByIds_ARepeatedIdOnEitherSideOfABatchBoundary(t *testing.T) {
 		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 2592000,
 		IncludeOpenIDConnectClaimsInAccessToken: record.ThreeStateSettingDefault.String(),
-		DefaultAcrLevel:                         record.AcrLevel1,
+		DefaultACRLevel:                         record.ACRLevel1,
 	}
 	if err := database.CreateClient(context.Background(), nil, &client); err != nil {
 		t.Fatalf("Failed to create test client: %v", err)
@@ -833,10 +833,10 @@ func TestGetClientsByIds_ARepeatedIdOnEitherSideOfABatchBoundary(t *testing.T) {
 				ids[i] = paddingBase + int64(i)
 			}
 			for _, position := range testCase.positions {
-				ids[position] = client.Id
+				ids[position] = client.ID
 			}
 
-			clients, err := database.GetClientsByIds(context.Background(), nil, ids)
+			clients, err := database.GetClientsByIDs(context.Background(), nil, ids)
 			if err != nil {
 				t.Fatalf("Failed to retrieve clients by ids: %v", err)
 			}
@@ -845,8 +845,8 @@ func TestGetClientsByIds_ARepeatedIdOnEitherSideOfABatchBoundary(t *testing.T) {
 				t.Errorf("Expected 1 client for an id repeated across a batch boundary, got %d", len(clients))
 			}
 			for _, retrieved := range clients {
-				if retrieved.Id != client.Id {
-					t.Errorf("Expected client with ID %d, got %d", client.Id, retrieved.Id)
+				if retrieved.ID != client.ID {
+					t.Errorf("Expected client with ID %d, got %d", client.ID, retrieved.ID)
 				}
 			}
 		})
@@ -868,7 +868,7 @@ func TestClientLoadPermissions(t *testing.T) {
 		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 2592000,
 		IncludeOpenIDConnectClaimsInAccessToken: record.ThreeStateSettingDefault.String(),
-		DefaultAcrLevel:                         record.AcrLevel1,
+		DefaultACRLevel:                         record.ACRLevel1,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -888,9 +888,9 @@ func TestClientLoadPermissions(t *testing.T) {
 
 	// Create multiple permissions for the resource
 	permissions := []record.Permission{
-		{PermissionIdentifier: "read_" + random, Description: "Read Permission", ResourceId: resource.Id},
-		{PermissionIdentifier: "write_" + random, Description: "Write Permission", ResourceId: resource.Id},
-		{PermissionIdentifier: "delete_" + random, Description: "Delete Permission", ResourceId: resource.Id},
+		{PermissionIdentifier: "read_" + random, Description: "Read Permission", ResourceID: resource.ID},
+		{PermissionIdentifier: "write_" + random, Description: "Write Permission", ResourceID: resource.ID},
+		{PermissionIdentifier: "delete_" + random, Description: "Delete Permission", ResourceID: resource.ID},
 	}
 
 	for i := range permissions {
@@ -903,8 +903,8 @@ func TestClientLoadPermissions(t *testing.T) {
 	// Associate permissions with the client
 	for _, perm := range permissions {
 		clientPermission := &record.ClientPermission{
-			ClientId:     client.Id,
-			PermissionId: perm.Id,
+			ClientID:     client.ID,
+			PermissionID: perm.ID,
 		}
 		createClientPermissionErr := database.CreateClientPermission(context.Background(), nil, clientPermission)
 		if createClientPermissionErr != nil {
@@ -927,8 +927,8 @@ func TestClientLoadPermissions(t *testing.T) {
 	permMap := make(map[string]bool)
 	for _, perm := range client.Permissions {
 		permMap[perm.PermissionIdentifier] = true
-		if perm.ResourceId != resource.Id {
-			t.Errorf("Expected ResourceId %d, got %d for permission %s", resource.Id, perm.ResourceId, perm.PermissionIdentifier)
+		if perm.ResourceID != resource.ID {
+			t.Errorf("Expected ResourceID %d, got %d for permission %s", resource.ID, perm.ResourceID, perm.PermissionIdentifier)
 		}
 	}
 
@@ -970,7 +970,7 @@ func TestGetAllClients(t *testing.T) {
 		t.Fatalf("Failed to get initial clients: %v", err)
 	}
 	for _, client := range allClients {
-		err = database.DeleteClient(context.Background(), nil, client.Id)
+		err = database.DeleteClient(context.Background(), nil, client.ID)
 		if err != nil {
 			t.Fatalf("Failed to delete existing client: %v", err)
 		}
@@ -995,7 +995,7 @@ func TestGetAllClients(t *testing.T) {
 			RefreshTokenOfflineIdleTimeoutInSeconds: 86400 + i*43200,
 			RefreshTokenOfflineMaxLifetimeInSeconds: 2592000 + i*1296000,
 			IncludeOpenIDConnectClaimsInAccessToken: record.ThreeStateSettingDefault.String(),
-			DefaultAcrLevel:                         record.AcrLevel1,
+			DefaultACRLevel:                         record.ACRLevel1,
 		}
 
 		createClientErr := database.CreateClient(context.Background(), nil, client)
@@ -1062,8 +1062,8 @@ func TestGetAllClients(t *testing.T) {
 		if retrievedClient.IncludeOpenIDConnectClaimsInAccessToken != createdClient.IncludeOpenIDConnectClaimsInAccessToken {
 			t.Errorf("Client %s: Expected IncludeOpenIDConnectClaimsInAccessToken %s, got %s", retrievedClient.ClientIdentifier, createdClient.IncludeOpenIDConnectClaimsInAccessToken, retrievedClient.IncludeOpenIDConnectClaimsInAccessToken)
 		}
-		if retrievedClient.DefaultAcrLevel != createdClient.DefaultAcrLevel {
-			t.Errorf("Client %s: Expected DefaultAcrLevel %v, got %v", retrievedClient.ClientIdentifier, createdClient.DefaultAcrLevel, retrievedClient.DefaultAcrLevel)
+		if retrievedClient.DefaultACRLevel != createdClient.DefaultACRLevel {
+			t.Errorf("Client %s: Expected DefaultACRLevel %v, got %v", retrievedClient.ClientIdentifier, createdClient.DefaultACRLevel, retrievedClient.DefaultACRLevel)
 		}
 
 		// Check if CreatedAt and UpdatedAt are set
@@ -1087,7 +1087,7 @@ func TestGetAllClients(t *testing.T) {
 
 	// Test when there are no clients
 	for _, client := range retrievedClients {
-		err = database.DeleteClient(context.Background(), nil, client.Id)
+		err = database.DeleteClient(context.Background(), nil, client.ID)
 		if err != nil {
 			t.Fatalf("Failed to delete client during cleanup: %v", err)
 		}
@@ -1117,7 +1117,7 @@ func TestDeleteClient(t *testing.T) {
 		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 2592000,
 		IncludeOpenIDConnectClaimsInAccessToken: record.ThreeStateSettingDefault.String(),
-		DefaultAcrLevel:                         record.AcrLevel1,
+		DefaultACRLevel:                         record.ACRLevel1,
 	}
 
 	err := database.CreateClient(context.Background(), nil, client)
@@ -1129,7 +1129,7 @@ func TestDeleteClient(t *testing.T) {
 	// 1. Redirect URIs
 	redirectURI := &record.RedirectURI{
 		URI:      "https://example.com/callback",
-		ClientId: client.Id,
+		ClientID: client.ID,
 	}
 	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	if err != nil {
@@ -1139,7 +1139,7 @@ func TestDeleteClient(t *testing.T) {
 	// 2. Web Origins
 	webOrigin := &record.WebOrigin{
 		Origin:   "https://example.com",
-		ClientId: client.Id,
+		ClientID: client.ID,
 	}
 	err = database.CreateWebOrigin(context.Background(), nil, webOrigin)
 	if err != nil {
@@ -1159,7 +1159,7 @@ func TestDeleteClient(t *testing.T) {
 	permission := &record.Permission{
 		PermissionIdentifier: "test_permission_" + random,
 		Description:          "Test Permission",
-		ResourceId:           resource.Id,
+		ResourceID:           resource.ID,
 	}
 	err = database.CreatePermission(context.Background(), nil, permission)
 	if err != nil {
@@ -1167,8 +1167,8 @@ func TestDeleteClient(t *testing.T) {
 	}
 
 	clientPermission := &record.ClientPermission{
-		ClientId:     client.Id,
-		PermissionId: permission.Id,
+		ClientID:     client.ID,
+		PermissionID: permission.ID,
 	}
 	err = database.CreateClientPermission(context.Background(), nil, clientPermission)
 	if err != nil {
@@ -1176,13 +1176,13 @@ func TestDeleteClient(t *testing.T) {
 	}
 
 	// Delete the client
-	err = database.DeleteClient(context.Background(), nil, client.Id)
+	err = database.DeleteClient(context.Background(), nil, client.ID)
 	if err != nil {
 		t.Fatalf("Failed to delete client: %v", err)
 	}
 
 	// Verify that the client has been deleted
-	deletedClient, err := database.GetClientById(context.Background(), nil, client.Id)
+	deletedClient, err := database.GetClientByID(context.Background(), nil, client.ID)
 	if err != nil {
 		t.Fatalf("Error while checking for deleted client: %v", err)
 	}
@@ -1192,7 +1192,7 @@ func TestDeleteClient(t *testing.T) {
 
 	// Verify that associated data has been deleted
 	// 1. Check Redirect URIs
-	redirectURIs, err := database.GetRedirectURIsByClientId(context.Background(), nil, client.Id)
+	redirectURIs, err := database.GetRedirectURIsByClientID(context.Background(), nil, client.ID)
 	if err != nil {
 		t.Fatalf("Error while checking for deleted redirect URIs: %v", err)
 	}
@@ -1201,7 +1201,7 @@ func TestDeleteClient(t *testing.T) {
 	}
 
 	// 2. Check Web Origins
-	webOrigins, err := database.GetWebOriginsByClientId(context.Background(), nil, client.Id)
+	webOrigins, err := database.GetWebOriginsByClientID(context.Background(), nil, client.ID)
 	if err != nil {
 		t.Fatalf("Error while checking for deleted web origins: %v", err)
 	}
@@ -1210,7 +1210,7 @@ func TestDeleteClient(t *testing.T) {
 	}
 
 	// 3. Check Client Permissions
-	clientPermissions, err := database.GetClientPermissionsByClientId(context.Background(), nil, client.Id)
+	clientPermissions, err := database.GetClientPermissionsByClientID(context.Background(), nil, client.ID)
 	if err != nil {
 		t.Fatalf("Error while checking for deleted client permissions: %v", err)
 	}
@@ -1219,7 +1219,7 @@ func TestDeleteClient(t *testing.T) {
 	}
 
 	// Test deleting a non-existent client
-	err = database.DeleteClient(context.Background(), nil, client.Id)
+	err = database.DeleteClient(context.Background(), nil, client.ID)
 	if err != nil {
 		t.Errorf("Expected no error when deleting non-existent client, got: %v", err)
 	}
@@ -1266,7 +1266,7 @@ func TestClientNullableOverrideFields(t *testing.T) {
 		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 2592000,
 		IncludeOpenIDConnectClaimsInAccessToken: record.ThreeStateSettingDefault.String(),
-		DefaultAcrLevel:                         record.AcrLevel1,
+		DefaultACRLevel:                         record.ACRLevel1,
 		// PKCERequired, ImplicitGrantEnabled, ResourceOwnerPasswordCredentialsEnabled are nil (use global settings)
 	}
 
@@ -1275,7 +1275,7 @@ func TestClientNullableOverrideFields(t *testing.T) {
 		t.Fatalf("Failed to create client with nil overrides: %v", err)
 	}
 
-	retrievedClient, err := database.GetClientById(context.Background(), nil, clientWithNilOverrides.Id)
+	retrievedClient, err := database.GetClientByID(context.Background(), nil, clientWithNilOverrides.ID)
 	if err != nil {
 		t.Fatalf("Failed to retrieve client with nil overrides: %v", err)
 	}
@@ -1309,7 +1309,7 @@ func TestClientNullableOverrideFields(t *testing.T) {
 		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 2592000,
 		IncludeOpenIDConnectClaimsInAccessToken: record.ThreeStateSettingDefault.String(),
-		DefaultAcrLevel:                         record.AcrLevel1,
+		DefaultACRLevel:                         record.ACRLevel1,
 		PKCERequired:                            &pkceTrue,
 		ImplicitGrantEnabled:                    &implicitTrue,
 		ResourceOwnerPasswordCredentialsEnabled: &ropcTrue,
@@ -1320,7 +1320,7 @@ func TestClientNullableOverrideFields(t *testing.T) {
 		t.Fatalf("Failed to create client with true overrides: %v", err)
 	}
 
-	retrievedClientTrue, err := database.GetClientById(context.Background(), nil, clientWithTrueOverrides.Id)
+	retrievedClientTrue, err := database.GetClientByID(context.Background(), nil, clientWithTrueOverrides.ID)
 	if err != nil {
 		t.Fatalf("Failed to retrieve client with true overrides: %v", err)
 	}
@@ -1354,7 +1354,7 @@ func TestClientNullableOverrideFields(t *testing.T) {
 		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 2592000,
 		IncludeOpenIDConnectClaimsInAccessToken: record.ThreeStateSettingDefault.String(),
-		DefaultAcrLevel:                         record.AcrLevel1,
+		DefaultACRLevel:                         record.ACRLevel1,
 		PKCERequired:                            &pkceFalse,
 		ImplicitGrantEnabled:                    &implicitFalse,
 		ResourceOwnerPasswordCredentialsEnabled: &ropcFalse,
@@ -1365,7 +1365,7 @@ func TestClientNullableOverrideFields(t *testing.T) {
 		t.Fatalf("Failed to create client with false overrides: %v", err)
 	}
 
-	retrievedClientFalse, err := database.GetClientById(context.Background(), nil, clientWithFalseOverrides.Id)
+	retrievedClientFalse, err := database.GetClientByID(context.Background(), nil, clientWithFalseOverrides.ID)
 	if err != nil {
 		t.Fatalf("Failed to retrieve client with false overrides: %v", err)
 	}
@@ -1394,7 +1394,7 @@ func TestClientNullableOverrideFields(t *testing.T) {
 		t.Fatalf("Failed to update client override fields: %v", err)
 	}
 
-	retrievedUpdatedClient, err := database.GetClientById(context.Background(), nil, clientWithNilOverrides.Id)
+	retrievedUpdatedClient, err := database.GetClientByID(context.Background(), nil, clientWithNilOverrides.ID)
 	if err != nil {
 		t.Fatalf("Failed to retrieve updated client: %v", err)
 	}
@@ -1420,7 +1420,7 @@ func TestClientNullableOverrideFields(t *testing.T) {
 		t.Fatalf("Failed to update client override fields back to nil: %v", err)
 	}
 
-	retrievedResetClient, err := database.GetClientById(context.Background(), nil, clientWithNilOverrides.Id)
+	retrievedResetClient, err := database.GetClientByID(context.Background(), nil, clientWithNilOverrides.ID)
 	if err != nil {
 		t.Fatalf("Failed to retrieve reset client: %v", err)
 	}
@@ -1448,7 +1448,7 @@ func TestSetClientPublic(t *testing.T) {
 	}
 
 	tx := beginTx(t)
-	becamePublic, err := database.SetClientPublic(context.Background(), tx, client.Id)
+	becamePublic, err := database.SetClientPublic(context.Background(), tx, client.ID)
 	if err != nil {
 		t.Fatalf("SetClientPublic returned error: %v", err)
 	}
@@ -1461,9 +1461,9 @@ func TestSetClientPublic(t *testing.T) {
 
 	// The column really moved. Reporting the transition without performing it would leave the
 	// flip revoking the grants of a client that is still confidential.
-	stored, err := database.GetClientById(context.Background(), nil, client.Id)
+	stored, err := database.GetClientByID(context.Background(), nil, client.ID)
 	if err != nil {
-		t.Fatalf("GetClientById: %v", err)
+		t.Fatalf("GetClientByID: %v", err)
 	}
 	if stored == nil || !stored.IsPublic {
 		t.Errorf("expected the client to be public after the transition, got %+v", stored)
@@ -1473,7 +1473,7 @@ func TestSetClientPublic(t *testing.T) {
 	// re-saving the authentication page from signing every user of the application out: the save
 	// removes no requirement, so it must revoke nothing.
 	tx = beginTx(t)
-	becamePublic, err = database.SetClientPublic(context.Background(), tx, client.Id)
+	becamePublic, err = database.SetClientPublic(context.Background(), tx, client.ID)
 	if err != nil {
 		t.Fatalf("second SetClientPublic returned error: %v", err)
 	}
@@ -1488,12 +1488,12 @@ func TestSetClientPublic(t *testing.T) {
 	// taken away from a client that exists", and answering that about a row nobody can find would
 	// let the endpoint reply 200 describing a client it did not save.
 	tx = beginTx(t)
-	if _, err := database.SetClientPublic(context.Background(), tx, client.Id+1_000_000); err == nil {
+	if _, err := database.SetClientPublic(context.Background(), tx, client.ID+1_000_000); err == nil {
 		t.Errorf("expected an error for a client id that does not exist")
 	}
 	_ = database.RollbackTransaction(context.Background(), tx)
 
-	// A zero id is a caller bug rather than a filter, exactly as it is in RevokeCodesByClientId.
+	// A zero id is a caller bug rather than a filter, exactly as it is in RevokeCodesByClientID.
 	tx = beginTx(t)
 	if _, err := database.SetClientPublic(context.Background(), tx, 0); err == nil {
 		t.Errorf("expected an error for a client id of 0")
@@ -1503,7 +1503,7 @@ func TestSetClientPublic(t *testing.T) {
 	// Without a transaction the two statements autocommit separately, so the row is released
 	// between acquiring it and classifying the write and the whole mechanism is gone. Refused
 	// rather than silently degraded.
-	if _, err := database.SetClientPublic(context.Background(), nil, client.Id); err == nil {
+	if _, err := database.SetClientPublic(context.Background(), nil, client.ID); err == nil {
 		t.Errorf("expected an error when called without a transaction")
 	}
 }
@@ -1553,7 +1553,7 @@ func TestSetClientPublic_ClassifiesAgainstACommittedConcurrentWrite(t *testing.T
 	}
 	done := make(chan outcome, 1)
 	go func() {
-		becamePublic, err := database.SetClientPublic(context.Background(), saver, client.Id)
+		becamePublic, err := database.SetClientPublic(context.Background(), saver, client.ID)
 		done <- outcome{becamePublic, err}
 	}()
 
@@ -1589,9 +1589,9 @@ func TestSetClientPublic_ClassifiesAgainstACommittedConcurrentWrite(t *testing.T
 	if err := database.CommitTransaction(context.Background(), saver); err != nil {
 		t.Fatalf("committing the save: %v", err)
 	}
-	stored, err := database.GetClientById(context.Background(), nil, client.Id)
+	stored, err := database.GetClientByID(context.Background(), nil, client.ID)
 	if err != nil {
-		t.Fatalf("GetClientById: %v", err)
+		t.Fatalf("GetClientByID: %v", err)
 	}
 	if stored == nil || !stored.IsPublic {
 		t.Errorf("expected the client to end public, got %+v", stored)
@@ -1605,15 +1605,15 @@ func TestAcquireClientRow(t *testing.T) {
 	client := createTestClient(t)
 
 	tx := beginTx(t)
-	if err := database.AcquireClientRow(context.Background(), tx, client.Id); err != nil {
+	if err := database.AcquireClientRow(context.Background(), tx, client.ID); err != nil {
 		t.Fatalf("AcquireClientRow returned error: %v", err)
 	}
 
 	// Nothing about the client changes. The callers of this run their own write afterwards, so
 	// an acquisition that altered a column would be corrupting the row it was asked to protect.
-	held, err := database.GetClientById(context.Background(), tx, client.Id)
+	held, err := database.GetClientByID(context.Background(), tx, client.ID)
 	if err != nil {
-		t.Fatalf("GetClientById inside the transaction: %v", err)
+		t.Fatalf("GetClientByID inside the transaction: %v", err)
 	}
 	if held == nil {
 		t.Fatalf("the client vanished inside the transaction that acquired it")
@@ -1631,13 +1631,13 @@ func TestAcquireClientRow(t *testing.T) {
 	// immediately afterwards and answers "the client no longer exists" itself. Reporting it twice
 	// would put one sentence in two places and let them disagree.
 	tx = beginTx(t)
-	if err := database.AcquireClientRow(context.Background(), tx, client.Id+1_000_000); err != nil {
+	if err := database.AcquireClientRow(context.Background(), tx, client.ID+1_000_000); err != nil {
 		t.Errorf("acquiring a row that does not exist must not error, got %v", err)
 	}
 	_ = database.RollbackTransaction(context.Background(), tx)
 
 	// A zero id is a caller bug rather than a filter, exactly as it is in SetClientPublic and
-	// RevokeCodesByClientId.
+	// RevokeCodesByClientID.
 	tx = beginTx(t)
 	if err := database.AcquireClientRow(context.Background(), tx, 0); err == nil {
 		t.Errorf("expected an error for a client id of 0")
@@ -1646,7 +1646,7 @@ func TestAcquireClientRow(t *testing.T) {
 
 	// Without a transaction the statement autocommits and drops the row before the caller can
 	// read it, which is the whole of what this buys. Refused rather than silently degraded.
-	if err := database.AcquireClientRow(context.Background(), nil, client.Id); err == nil {
+	if err := database.AcquireClientRow(context.Background(), nil, client.ID); err == nil {
 		t.Errorf("expected an error when called without a transaction")
 	}
 }
@@ -1702,11 +1702,11 @@ func TestAcquireClientRow_MakesALaterReadSeeAConcurrentCommit(t *testing.T) {
 	}
 	done := make(chan outcome, 1)
 	go func() {
-		if err := database.AcquireClientRow(context.Background(), saver, client.Id); err != nil {
+		if err := database.AcquireClientRow(context.Background(), saver, client.ID); err != nil {
 			done <- outcome{nil, err}
 			return
 		}
-		refreshed, err := database.GetClientById(context.Background(), saver, client.Id)
+		refreshed, err := database.GetClientByID(context.Background(), saver, client.ID)
 		done <- outcome{refreshed, err}
 	}()
 
@@ -1783,10 +1783,10 @@ func TestGetClientByClientIdentifierIsCaseSensitive(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		lookup string
-		wantId int64
+		wantID int64
 	}{
-		{"the lowercase name resolves the lowercase client", lower, lowerClient.Id},
-		{"the uppercase name resolves the uppercase client", upper, upperClient.Id},
+		{"the lowercase name resolves the lowercase client", lower, lowerClient.ID},
+		{"the uppercase name resolves the uppercase client", upper, upperClient.ID},
 		{"a mis-cased name resolves nothing", "Case_Client_" + strings.ToUpper(lower[12:]), 0},
 		{"a trailing space resolves nothing, which SQL Server's padding would otherwise defeat", lower + " ", 0},
 		{"a leading space resolves nothing", " " + lower, 0},
@@ -1795,19 +1795,19 @@ func TestGetClientByClientIdentifierIsCaseSensitive(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: unexpected error: %v", tc.name, err)
 		}
-		if tc.wantId == 0 {
+		if tc.wantID == 0 {
 			if got != nil {
 				t.Errorf("%s: expected nil, got the client with id %d and identifier %q",
-					tc.name, got.Id, got.ClientIdentifier)
+					tc.name, got.ID, got.ClientIdentifier)
 			}
 			continue
 		}
 		if got == nil {
-			t.Fatalf("%s: expected the client with id %d, got nil", tc.name, tc.wantId)
+			t.Fatalf("%s: expected the client with id %d, got nil", tc.name, tc.wantID)
 		}
-		if got.Id != tc.wantId {
+		if got.ID != tc.wantID {
 			t.Errorf("%s: expected the client with id %d, got id %d (identifier %q)",
-				tc.name, tc.wantId, got.Id, got.ClientIdentifier)
+				tc.name, tc.wantID, got.ID, got.ClientIdentifier)
 		}
 	}
 }
@@ -1824,13 +1824,13 @@ func newCaseTestClient(t *testing.T, identifier string) *record.Client {
 		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 2592000,
 		IncludeOpenIDConnectClaimsInAccessToken: record.ThreeStateSettingDefault.String(),
-		DefaultAcrLevel:                         record.AcrLevel1,
+		DefaultACRLevel:                         record.ACRLevel1,
 	}
 }
 
 // TestClientLoadPermissions_EnlistsInTheCallersTransaction pins the first of #413's five sites.
 // ClientLoadPermissions holds a tx, loads the join rows through it, and then passed nil to
-// GetPermissionsByIds, so the permissions themselves were read outside the caller's transaction.
+// GetPermissionsByIDs, so the permissions themselves were read outside the caller's transaction.
 //
 // Every row here is created inside the transaction on purpose. Created before it, the escaped
 // read finds them anyway and the case passes with the defect still in place, which is the shape
@@ -1853,7 +1853,7 @@ func TestClientLoadPermissions_EnlistsInTheCallersTransaction(t *testing.T) {
 	permission := &record.Permission{
 		PermissionIdentifier: "tx_permission_" + fake.LetterN(8),
 		Description:          "Transaction pass-through permission",
-		ResourceId:           resource.Id,
+		ResourceID:           resource.ID,
 	}
 	if err := database.CreatePermission(context.Background(), tx, permission); err != nil {
 		t.Fatalf("Failed to create permission inside the transaction: %v", err)
@@ -1868,8 +1868,8 @@ func TestClientLoadPermissions_EnlistsInTheCallersTransaction(t *testing.T) {
 	}
 
 	clientPermission := &record.ClientPermission{
-		ClientId:     client.Id,
-		PermissionId: permission.Id,
+		ClientID:     client.ID,
+		PermissionID: permission.ID,
 	}
 	if err := database.CreateClientPermission(context.Background(), tx, clientPermission); err != nil {
 		t.Fatalf("Failed to create client permission inside the transaction: %v", err)
@@ -1883,8 +1883,8 @@ func TestClientLoadPermissions_EnlistsInTheCallersTransaction(t *testing.T) {
 		t.Fatalf("Expected the transaction's own permission to be loaded, got %d permission(s): "+
 			"the read ran outside the caller's transaction (#413)", len(client.Permissions))
 	}
-	if client.Permissions[0].Id != permission.Id {
-		t.Errorf("Expected permission %d, got %d", permission.Id, client.Permissions[0].Id)
+	if client.Permissions[0].ID != permission.ID {
+		t.Errorf("Expected permission %d, got %d", permission.ID, client.Permissions[0].ID)
 	}
 
 	if err := database.RollbackTransaction(context.Background(), tx); err != nil {

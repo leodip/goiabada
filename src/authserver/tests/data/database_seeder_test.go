@@ -95,7 +95,7 @@ func TestSeed_TheAuthServerPermissionsAreTheBuiltIns(t *testing.T) {
 	resource, err := h.DB.GetResourceByResourceIdentifier(ctx, nil, builtin.AuthServerResourceIdentifier)
 	require.NoError(t, err)
 	require.NotNil(t, resource)
-	permissions, err := h.DB.GetPermissionsByResourceId(ctx, nil, resource.Id)
+	permissions, err := h.DB.GetPermissionsByResourceID(ctx, nil, resource.ID)
 	require.NoError(t, err)
 	identifiers := make([]string, 0, len(permissions))
 	for _, p := range permissions {
@@ -125,7 +125,7 @@ func TestSeed_TheAdministrativeDescriptionsStateTheBoundary(t *testing.T) {
 	resource, err := h.DB.GetResourceByResourceIdentifier(ctx, nil, builtin.AuthServerResourceIdentifier)
 	require.NoError(t, err)
 	require.NotNil(t, resource)
-	permissions, err := h.DB.GetPermissionsByResourceId(ctx, nil, resource.Id)
+	permissions, err := h.DB.GetPermissionsByResourceID(ctx, nil, resource.ID)
 	require.NoError(t, err)
 	descriptions := map[string]string{}
 	for _, p := range permissions {
@@ -222,7 +222,7 @@ func TestSeed_AFailedFirstSeedLeavesNothingAndTheNextSeeds(t *testing.T) {
 
 			require.NoError(t, err, "the next start seeds")
 			assert.Equal(t, bootstrap.Continue, outcome)
-			settings, err := h.DB.GetSettingsById(ctx, nil, 1)
+			settings, err := h.DB.GetSettingsByID(ctx, nil, 1)
 			require.NoError(t, err)
 			require.NotNil(t, settings, "the reseed's settings row is at id 1, whatever the failed attempt drew")
 			isEmpty, err = h.DB.IsEmpty(ctx)

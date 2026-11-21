@@ -25,24 +25,24 @@ import (
 //
 // The 500 row is what keeps the fix narrow, and it is the row a sweep breaks: an API that is broken
 // is still a server fault and still belongs in the log.
-type deleteClientApiClient struct {
+type deleteClientAPIClient struct {
 	err error
 }
 
-func (c *deleteClientApiClient) GetClientPermissions(_ context.Context, accessToken string, clientId int64) (*api.ClientResponse, []api.PermissionResponse, error) {
+func (c *deleteClientAPIClient) GetClientPermissions(_ context.Context, accessToken string, clientID int64) (*api.ClientResponse, []api.PermissionResponse, error) {
 	if c.err != nil {
 		return nil, nil, c.err
 	}
-	return &api.ClientResponse{Id: clientId}, nil, nil
+	return &api.ClientResponse{ID: clientID}, nil, nil
 }
 
-// The rest of the ports deleteClientApiClient is passed to, which no test here reaches.
+// The rest of the ports deleteClientAPIClient is passed to, which no test here reaches.
 
-func (*deleteClientApiClient) DeleteClient(context.Context, string, int64) error {
+func (*deleteClientAPIClient) DeleteClient(context.Context, string, int64) error {
 	panic("unexpected call to DeleteClient")
 }
 
-func TestClientDeleteGet_ForwardsTheApisStatus(t *testing.T) {
+func TestClientDeleteGet_ForwardsTheAPIsStatus(t *testing.T) {
 	testCases := []struct {
 		name         string
 		apiErr       error
@@ -69,7 +69,7 @@ func TestClientDeleteGet_ForwardsTheApisStatus(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			if testCase.wantNotFound {
 				httpHelper.On("NotFound", mock.Anything, mock.Anything).Return().Once()
 			} else {
@@ -80,7 +80,7 @@ func TestClientDeleteGet_ForwardsTheApisStatus(t *testing.T) {
 			req := handlertest.Request(http.MethodGet, "/admin/clients/42/delete",
 				handlertest.WithAccessToken(), handlertest.WithPathValue("clientId", "42"))
 
-			HandleDeleteGet(httpHelper, &deleteClientApiClient{err: testCase.apiErr}).
+			HandleDeleteGet(httpHelper, &deleteClientAPIClient{err: testCase.apiErr}).
 				ServeHTTP(httptest.NewRecorder(), req)
 
 			httpHelper.AssertExpectations(t)

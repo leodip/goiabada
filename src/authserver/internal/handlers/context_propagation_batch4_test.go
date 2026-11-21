@@ -16,7 +16,7 @@ import (
 // Seam 4 of #386 for the last batch of Database methods, in this package: the JWKS endpoint's key
 // read and the public settings endpoint's settings read.
 //
-// Same argument and same thinness as context_propagation_test.go, whose requestCarryingId and
+// Same argument and same thinness as context_propagation_test.go, whose requestCarryingID and
 // theRequestsContext this file reuses. Both endpoints below are unauthenticated and both are
 // polled -- /certs by every relying party that caches keys, /api/v1/public/settings by the admin
 // console on its own schedule -- so both are reads a peer that has gone away leaves running.
@@ -32,7 +32,7 @@ func TestHandleCertsGet_ReadsKeysUnderTheRequestsContext(t *testing.T) {
 	jsonWriter.On("EncodeJSON", mock.Anything, mock.Anything, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
-	HandleCertsGet(jsonWriter, database).ServeHTTP(rr, requestCarryingId(t, http.MethodGet, "/certs"))
+	HandleCertsGet(jsonWriter, database).ServeHTTP(rr, requestCarryingID(t, http.MethodGet, "/certs"))
 
 	database.AssertExpectations(t)
 	jsonWriter.AssertExpectations(t)
@@ -42,13 +42,13 @@ func TestHandleCertsGet_ReadsKeysUnderTheRequestsContext(t *testing.T) {
 func TestPublicSettings_ReadsSettingsUnderTheRequestsContext(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 
-	database.On("GetSettingsById", theRequestsContext(), mock.Anything, int64(1)).
-		Return(&record.Settings{Id: 1, AppName: "TestApp"}, nil).Once()
+	database.On("GetSettingsByID", theRequestsContext(), mock.Anything, int64(1)).
+		Return(&record.Settings{ID: 1, AppName: "TestApp"}, nil).Once()
 	database.On("GetClientPageBrand", theRequestsContext(), (*sql.Tx)(nil), "admin-console-client").
-		Return(&record.Brand{Id: 1, Appearance: record.BrandAppearanceAuto, Theme: "blueberry"}, nil).Once()
+		Return(&record.Brand{ID: 1, Appearance: record.BrandAppearanceAuto, Theme: "blueberry"}, nil).Once()
 
 	rr := httptest.NewRecorder()
-	HandlePublicSettingsGet(database, "https://auth.example.test").ServeHTTP(rr, requestCarryingId(t, http.MethodGet, "/api/v1/public/settings"))
+	HandlePublicSettingsGet(database, "https://auth.example.test").ServeHTTP(rr, requestCarryingID(t, http.MethodGet, "/api/v1/public/settings"))
 
 	require.Equal(t, http.StatusOK, rr.Code)
 	database.AssertExpectations(t)

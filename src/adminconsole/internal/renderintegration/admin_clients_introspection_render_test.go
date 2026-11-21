@@ -28,7 +28,7 @@ type clientPagesAPI struct {
 	resourcesRead int
 }
 
-func (s *clientPagesAPI) GetClientById(context.Context, string, int64) (*api.ClientResponse, error) {
+func (s *clientPagesAPI) GetClientByID(context.Context, string, int64) (*api.ClientResponse, error) {
 	return s.client, nil
 }
 
@@ -44,9 +44,9 @@ func (s *clientPagesAPI) GetClientPermissions(context.Context, string, int64) (*
 func (s *clientPagesAPI) GetAllResources(context.Context, string) ([]api.ResourceResponse, error) {
 	s.resourcesRead++
 	return []api.ResourceResponse{
-		{Id: 4, ResourceIdentifier: "orders-api", Description: "Orders"},
-		{Id: 1, ResourceIdentifier: "authserver", Description: "Authorization server (system-level)", IsSystemLevelResource: true},
-		{Id: 3, ResourceIdentifier: "billing-api", Description: "Billing"},
+		{ID: 4, ResourceIdentifier: "orders-api", Description: "Orders"},
+		{ID: 1, ResourceIdentifier: "authserver", Description: "Authorization server (system-level)", IsSystemLevelResource: true},
+		{ID: 3, ResourceIdentifier: "billing-api", Description: "Billing"},
 	}, nil
 }
 
@@ -70,7 +70,7 @@ func (s *clientPagesAPI) GetAllClients(context.Context, string) ([]api.ClientRes
 	return []api.ClientResponse{*s.client}, nil
 }
 
-func (s *clientPagesAPI) GetClientSessionsByClientId(context.Context, string, int64, int, int) (*api.GetClientSessionsResponse, error) {
+func (s *clientPagesAPI) GetClientSessionsByClientID(context.Context, string, int64, int, int) (*api.GetClientSessionsResponse, error) {
 	return &api.GetClientSessionsResponse{}, nil
 }
 
@@ -85,7 +85,7 @@ func (*clientPagesAPI) UpdateClientBackchannelLogout(context.Context, string, in
 }
 
 func (*clientPagesAPI) GetAllBrands(context.Context, string) ([]api.BrandResponse, error) {
-	return []api.BrandResponse{{Id: 5, Name: "Default", IsDefault: true}}, nil
+	return []api.BrandResponse{{ID: 5, Name: "Default", IsDefault: true}}, nil
 }
 
 func (*clientPagesAPI) UpdateClientBrand(context.Context, string, int64, *api.UpdateClientBrandRequest) (*api.ClientResponse, error) {
@@ -140,8 +140,8 @@ func (*clientPagesAPI) DeleteClientLogo(context.Context, string, int64) error {
 	panic("unexpected call to DeleteClientLogo")
 }
 
-func (*clientPagesAPI) DeleteUserSessionById(context.Context, string, int64) error {
-	panic("unexpected call to DeleteUserSessionById")
+func (*clientPagesAPI) DeleteUserSessionByID(context.Context, string, int64) error {
+	panic("unexpected call to DeleteUserSessionByID")
 }
 
 // serveClientTab draws one tab of client 7 through its real handler and the real renderer, in the
@@ -187,7 +187,7 @@ const introspectionTab = `<a class="tab-item" href="/admin/clients/7/introspecti
 // whether the client is public fails here.
 func TestRender_AdminClientTabs_IntrospectionOnlyForAConfidentialClient(t *testing.T) {
 	for _, isPublic := range []bool{false, true} {
-		for tab, handler := range clientTabs(t, &clientPagesAPI{client: &api.ClientResponse{Id: 7, ClientIdentifier: "orders-backend", IsPublic: isPublic}}) {
+		for tab, handler := range clientTabs(t, &clientPagesAPI{client: &api.ClientResponse{ID: 7, ClientIdentifier: "orders-backend", IsPublic: isPublic}}) {
 			kind := "confidential"
 			if isPublic {
 				kind = "public"
@@ -216,10 +216,10 @@ func TestRender_AdminClientTabs_IntrospectionOnlyForAConfidentialClient(t *testi
 // the save's route and the two lists it sends, the list wanted and the list as loaded (#428).
 func TestRender_AdminClientIntrospection_AConfidentialClientsList(t *testing.T) {
 	pages := &clientPagesAPI{
-		client: &api.ClientResponse{Id: 7, ClientIdentifier: "orders-backend"},
+		client: &api.ClientResponse{ID: 7, ClientIdentifier: "orders-backend"},
 		listed: []api.ResourceResponse{
-			{Id: 4, ResourceIdentifier: "orders-api", Description: "Orders"},
-			{Id: 3, ResourceIdentifier: "billing-api", Description: "Billing"},
+			{ID: 4, ResourceIdentifier: "orders-api", Description: "Orders"},
+			{ID: 3, ResourceIdentifier: "billing-api", Description: "Billing"},
 		},
 	}
 
@@ -256,7 +256,7 @@ func TestRender_AdminClientIntrospection_AConfidentialClientsList(t *testing.T) 
 
 // A confidential client listing nothing yet says so, with the table hidden.
 func TestRender_AdminClientIntrospection_AnEmptyList(t *testing.T) {
-	pages := &clientPagesAPI{client: &api.ClientResponse{Id: 7, ClientIdentifier: "orders-backend"}, listed: []api.ResourceResponse{}}
+	pages := &clientPagesAPI{client: &api.ClientResponse{ID: 7, ClientIdentifier: "orders-backend"}, listed: []api.ResourceResponse{}}
 
 	out := serveClientTab(t, clientTabs(t, pages)["introspection"], "introspection", "en")
 
@@ -270,7 +270,7 @@ func TestRender_AdminClientIntrospection_AnEmptyList(t *testing.T) {
 // A public client's Introspection tab, reached by its address, says why it has no list and offers
 // nothing to edit: no form, no Save, and no read of the resources it could not list.
 func TestRender_AdminClientIntrospection_APublicClientHasNone(t *testing.T) {
-	pages := &clientPagesAPI{client: &api.ClientResponse{Id: 7, ClientIdentifier: "a-spa", IsPublic: true}, listed: []api.ResourceResponse{}}
+	pages := &clientPagesAPI{client: &api.ClientResponse{ID: 7, ClientIdentifier: "a-spa", IsPublic: true}, listed: []api.ResourceResponse{}}
 
 	out := serveClientTab(t, clientTabs(t, pages)["introspection"], "introspection", "pt-BR")
 
@@ -283,7 +283,7 @@ func TestRender_AdminClientIntrospection_APublicClientHasNone(t *testing.T) {
 
 // Saving the admin console's own client asks first, with the warning every save of it carries.
 func TestRender_AdminClientIntrospection_TheSystemClientAsksBeforeSaving(t *testing.T) {
-	pages := &clientPagesAPI{client: &api.ClientResponse{Id: 7, ClientIdentifier: "admin-console-client", IsSystemLevelClient: true}, listed: []api.ResourceResponse{}}
+	pages := &clientPagesAPI{client: &api.ClientResponse{ID: 7, ClientIdentifier: "admin-console-client", IsSystemLevelClient: true}, listed: []api.ResourceResponse{}}
 
 	out := serveClientTab(t, clientTabs(t, pages)["introspection"], "introspection", "en")
 

@@ -1,5 +1,5 @@
 // Package oauth is the OAuth2/OIDC surface both processes share: the value types that
-// cross the wire or a session (TokenResponse, JwtToken, Jwk, Jwks), the PKCE challenge
+// cross the wire or a session (TokenResponse, JWTToken, JWK, JWKS), the PKCE challenge
 // helper, and the error response of RFC 6749 section 5.2 (ErrorDetail, with
 // ConformErrorDescription, the Appendix A.8 rule its description is held to). It reaches no
 // database and no persistence type, which is what lets the admin console link it without

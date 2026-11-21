@@ -52,7 +52,7 @@ func TestBrandPaletteStylesheets_PagesAreDrawnInTheStoredColors(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 	_, created := keepDefaultBrand(t)
 	base := appConfig.AuthServer.BaseURL
-	browser := createHttpClient(t)
+	browser := createHTTPClient(t)
 
 	// A basic palette: the light mode's other 19 colors are worked out at the save, and are the
 	// probe's for the mid-gray brand color.
@@ -119,8 +119,8 @@ func TestBrandPaletteStylesheets_ACustomBrandWithNoPaletteIsAnUnknownTheme(t *te
 	broken := record.NewBrand("Broken "+fake.LetterN(10), record.BrandAppearanceDark, record.BrandThemeCustom)
 	brand := makeDefaultBrandOf(t, &broken)
 	base := appConfig.AuthServer.BaseURL
-	browser := createHttpClient(t)
-	id := strconv.FormatInt(brand.Id, 10)
+	browser := createHTTPClient(t)
+	id := strconv.FormatInt(brand.ID, 10)
 
 	page := loadPage(t, browser, base+"/no-such-page-"+fake.LetterN(8))
 	defer func() { _ = page.Body.Close() }()

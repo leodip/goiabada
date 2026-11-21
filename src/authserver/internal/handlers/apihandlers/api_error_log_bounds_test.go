@@ -34,7 +34,7 @@ import (
 const (
 	forgedLine  = "user_login\nlevel=INFO msg=\"nothing happened\""
 	padTo4096   = 4096
-	requestIdOf = "req-error-log-bounds"
+	requestIDOf = "req-error-log-bounds"
 )
 
 // oversized returns prefix padded out to 4096 bytes, and the exact string FieldForLog must turn it
@@ -58,7 +58,7 @@ func oversized(t *testing.T, prefix string) (raw, want string) {
 func errorLogRequest(t *testing.T, target string, query url.Values) *http.Request {
 	t.Helper()
 	r := httptest.NewRequest(http.MethodGet, target+"?"+query.Encode(), nil)
-	return r.WithContext(requestid.NewContext(r.Context(), requestIdOf))
+	return r.WithContext(requestid.NewContext(r.Context(), requestIDOf))
 }
 
 // oneErrorRecord asserts that exactly one ERROR record was written and returns its attributes.
@@ -75,26 +75,26 @@ func oneErrorRecord(t *testing.T, capture *logtest.SlogCapture) map[string]any {
 // and neither reaches it whole.
 func TestHandleAuditLogsGet_ErrorRecordBoundsBothFilters(t *testing.T) {
 	rawEvent, wantEvent := oversized(t, forgedLine)
-	rawRequestId, wantRequestId := oversized(t, "abc\ndef")
+	rawRequestID, wantRequestID := oversized(t, "abc\ndef")
 
 	database := datamocks.NewDatabase(t)
-	database.On("GetAuditLogsPaginated", mock.Anything, mock.Anything, 1, 20, record.AuditLogFilter{AuditEvent: rawEvent, RequestId: rawRequestId}).
+	database.On("GetAuditLogsPaginated", mock.Anything, mock.Anything, 1, 20, record.AuditLogFilter{AuditEvent: rawEvent, RequestID: rawRequestID}).
 		Return([]record.AuditLog(nil), 0, errs.New("engine is down"))
 
 	capture := logtest.CaptureSlog(t)
 	rr := httptest.NewRecorder()
 
 	HandleAuditLogsGet(database).ServeHTTP(rr, errorLogRequest(t, "/api/v1/admin/audit-logs",
-		url.Values{"auditEvent": {rawEvent}, "requestId": {rawRequestId}}))
+		url.Values{"auditEvent": {rawEvent}, "requestId": {rawRequestID}}))
 
 	require.Equal(t, http.StatusInternalServerError, rr.Code)
 	attrs := oneErrorRecord(t, capture)
 
 	assert.Equal(t, wantEvent, attrs["audit_event"],
 		"the filter the caller sent, clipped at 128 bytes with its line break escaped")
-	assert.Equal(t, wantRequestId, attrs["filter_request_id"],
+	assert.Equal(t, wantRequestID, attrs["filter_request_id"],
 		"filter_request_id is the caller's value; request_id is the handler's own")
-	assert.Equal(t, requestIdOf, attrs["request_id"],
+	assert.Equal(t, requestIDOf, attrs["request_id"],
 		"the handler's own id is injected from the context and is not the filter")
 
 	// The two halves of the bound, stated as the reader of the log sees them.
@@ -132,23 +132,23 @@ func TestHandleUsersSearchGet_ErrorRecordBoundsTheQuery(t *testing.T) {
 // every value an operator actually sends, so the record still shows the filter they used.
 func TestErrorRecordFiltersOfOrdinaryLengthAreUnchanged(t *testing.T) {
 	const event = "user_login"
-	const filterId = "goiabada/abc123-7"
+	const filterID = "goiabada/abc123-7"
 
 	database := datamocks.NewDatabase(t)
-	database.On("GetAuditLogsPaginated", mock.Anything, mock.Anything, 1, 20, record.AuditLogFilter{AuditEvent: event, RequestId: filterId}).
+	database.On("GetAuditLogsPaginated", mock.Anything, mock.Anything, 1, 20, record.AuditLogFilter{AuditEvent: event, RequestID: filterID}).
 		Return([]record.AuditLog(nil), 0, errs.New("engine is down"))
 
 	capture := logtest.CaptureSlog(t)
 	rr := httptest.NewRecorder()
 
 	HandleAuditLogsGet(database).ServeHTTP(rr, errorLogRequest(t, "/api/v1/admin/audit-logs",
-		url.Values{"auditEvent": {event}, "requestId": {filterId}}))
+		url.Values{"auditEvent": {event}, "requestId": {filterID}}))
 
 	require.Equal(t, http.StatusInternalServerError, rr.Code)
 	attrs := oneErrorRecord(t, capture)
 
 	assert.Equal(t, event, attrs["audit_event"], "nothing to escape and nothing to clip")
-	assert.Equal(t, filterId, attrs["filter_request_id"])
+	assert.Equal(t, filterID, attrs["filter_request_id"])
 	database.AssertExpectations(t)
 }
 
@@ -161,7 +161,7 @@ func TestErrorRecordFiltersOfOrdinaryLengthAreUnchanged(t *testing.T) {
 // the first error record and into the annotation branch.
 func searchThatSucceeds(database *datamocks.Database, rawQuery string) {
 	database.On("SearchUsersPaginated", mock.Anything, mock.Anything, rawQuery, 1, 10).
-		Return([]record.User{{Id: 42}}, 1, nil)
+		Return([]record.User{{ID: 42}}, 1, nil)
 }
 
 func TestHandleUsersSearchGet_ErrorRecordBoundsTheQueryWhenTheGroupLookupFails(t *testing.T) {
@@ -169,7 +169,7 @@ func TestHandleUsersSearchGet_ErrorRecordBoundsTheQueryWhenTheGroupLookupFails(t
 
 	database := datamocks.NewDatabase(t)
 	searchThatSucceeds(database, rawQuery)
-	database.On("GetGroupById", mock.Anything, mock.Anything, int64(7)).
+	database.On("GetGroupByID", mock.Anything, mock.Anything, int64(7)).
 		Return(nil, errs.New("engine is down"))
 
 	capture := logtest.CaptureSlog(t)
@@ -194,7 +194,7 @@ func TestHandleUsersSearchGet_ErrorRecordBoundsTheQueryWhenLoadingGroupsFails(t 
 
 	database := datamocks.NewDatabase(t)
 	searchThatSucceeds(database, rawQuery)
-	database.On("GetGroupById", mock.Anything, mock.Anything, int64(7)).Return(&record.Group{Id: 7}, nil)
+	database.On("GetGroupByID", mock.Anything, mock.Anything, int64(7)).Return(&record.Group{ID: 7}, nil)
 	database.On("UsersLoadGroups", mock.Anything, mock.Anything, mock.Anything).
 		Return(errs.New("engine is down"))
 

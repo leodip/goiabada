@@ -21,10 +21,10 @@ type silentWorld struct {
 	disabled           bool
 	subject            string
 	hint               string
-	target             record.AcrLevel
-	sessionAcr         record.AcrLevel
-	sessionOtpGen      int64
-	userOtpGen         int64
+	target             record.ACRLevel
+	sessionACR         record.ACRLevel
+	sessionOTPGen      int64
+	userOTPGen         int64
 	otpEnabled         bool
 	effectiveScope     string
 	consentRequired    bool
@@ -64,15 +64,15 @@ func driveSilentAuthentication(t *testing.T, world silentWorld) (silentAuthentic
 			facts.SessionLoaded = true
 			if !world.noSession {
 				facts.Session = &record.UserSession{
-					UserId:              7,
-					AcrLevel:            world.sessionAcr,
-					OtpConfigGeneration: world.sessionOtpGen,
+					UserID:              7,
+					ACRLevel:            world.sessionACR,
+					OTPConfigGeneration: world.sessionOTPGen,
 					User: record.User{
-						Id:                  7,
+						ID:                  7,
 						Subject:             world.subject,
 						Enabled:             !world.disabled,
 						OTPEnabled:          world.otpEnabled,
-						OtpConfigGeneration: world.userOtpGen,
+						OTPConfigGeneration: world.userOTPGen,
 					},
 				}
 			}
@@ -91,7 +91,7 @@ func driveSilentAuthentication(t *testing.T, world silentWorld) (silentAuthentic
 		case silentFactConsent:
 			facts.ConsentLoaded = true
 			if world.consentScope != nil {
-				facts.Consent = &record.UserConsent{UserId: 7, Scope: *world.consentScope}
+				facts.Consent = &record.UserConsent{UserID: 7, Scope: *world.consentScope}
 			}
 		default:
 			require.FailNow(t, "an unknown fact", "%v", need)
@@ -118,8 +118,8 @@ func TestDecideSilentAuthentication(t *testing.T) {
 	passing := silentWorld{
 		valid:          true,
 		subject:        "sub-1",
-		target:         record.AcrLevel1,
-		sessionAcr:     record.AcrLevel1,
+		target:         record.ACRLevel1,
+		sessionACR:     record.ACRLevel1,
 		effectiveScope: "openid profile",
 	}
 	with := func(edit func(*silentWorld)) silentWorld {
@@ -209,21 +209,21 @@ func TestDecideSilentAuthentication(t *testing.T) {
 		},
 		{
 			name:            "a hint mismatch is asked before the step-up rule",
-			world:           with(func(w *silentWorld) { w.hint = "sub-2"; w.target = record.AcrLevel2Mandatory }),
+			world:           with(func(w *silentWorld) { w.hint = "sub-2"; w.target = record.ACRLevel2Mandatory }),
 			wantCode:        oidc.ErrorLoginRequired,
 			wantDescription: "The current session user does not match the id_token_hint",
 			wantReads:       []silentFact{session, validity},
 		},
 		{
 			name:            "a target above the session's level",
-			world:           with(func(w *silentWorld) { w.target = record.AcrLevel2Optional; w.otpEnabled = true }),
+			world:           with(func(w *silentWorld) { w.target = record.ACRLevel2Optional; w.otpEnabled = true }),
 			wantCode:        oidc.ErrorInteractionRequired,
 			wantDescription: "Higher authentication level required",
 			wantReads:       []silentFact{session, validity},
 		},
 		{
 			name:            "an unknown session level is insufficient",
-			world:           with(func(w *silentWorld) { w.sessionAcr = "urn:goiabada:pwd" }),
+			world:           with(func(w *silentWorld) { w.sessionACR = "urn:goiabada:pwd" }),
 			wantCode:        oidc.ErrorInteractionRequired,
 			wantDescription: "Higher authentication level required",
 			wantReads:       []silentFact{session, validity},
@@ -231,9 +231,9 @@ func TestDecideSilentAuthentication(t *testing.T) {
 		{
 			name: "a mandatory target with no authenticator, before the changed configuration",
 			world: with(func(w *silentWorld) {
-				w.target = record.AcrLevel2Mandatory
-				w.sessionAcr = record.AcrLevel2Mandatory
-				w.sessionOtpGen, w.userOtpGen = 2, 3
+				w.target = record.ACRLevel2Mandatory
+				w.sessionACR = record.ACRLevel2Mandatory
+				w.sessionOTPGen, w.userOTPGen = 2, 3
 			}),
 			wantCode:        oidc.ErrorInteractionRequired,
 			wantDescription: "Additional authentication setup required",
@@ -242,10 +242,10 @@ func TestDecideSilentAuthentication(t *testing.T) {
 		{
 			name: "the authenticator changed since the session answered level 2",
 			world: with(func(w *silentWorld) {
-				w.target = record.AcrLevel2Optional
-				w.sessionAcr = record.AcrLevel2Optional
+				w.target = record.ACRLevel2Optional
+				w.sessionACR = record.ACRLevel2Optional
 				w.otpEnabled = true
-				w.sessionOtpGen, w.userOtpGen = 2, 3
+				w.sessionOTPGen, w.userOTPGen = 2, 3
 			}),
 			wantCode:        oidc.ErrorInteractionRequired,
 			wantDescription: "Authentication configuration has changed",
@@ -255,16 +255,16 @@ func TestDecideSilentAuthentication(t *testing.T) {
 			// The level 2 question is not asked of a level 1 target.
 			name: "a changed authenticator does not refuse a level 1 target",
 			world: with(func(w *silentWorld) {
-				w.sessionAcr = record.AcrLevel2Optional
-				w.sessionOtpGen, w.userOtpGen = 2, 3
+				w.sessionACR = record.ACRLevel2Optional
+				w.sessionOTPGen, w.userOTPGen = 2, 3
 			}),
 			wantReads: []silentFact{session, validity, scope, legal},
 		},
 		{
 			name: "a mandatory target satisfied by an enrolled session passes",
 			world: with(func(w *silentWorld) {
-				w.target = record.AcrLevel2Mandatory
-				w.sessionAcr = record.AcrLevel2Mandatory
+				w.target = record.ACRLevel2Mandatory
+				w.sessionACR = record.ACRLevel2Mandatory
 				w.otpEnabled = true
 			}),
 			wantReads: []silentFact{session, validity, scope, legal},
@@ -530,7 +530,7 @@ func TestSilentStepUpRefusal_FailsClosed(t *testing.T) {
 		{"no step-up", ceremony.StepUpNone, nil, false, ""},
 		{"a higher level", ceremony.StepUpLevel, nil, true, "Higher authentication level required"},
 		{"no authenticator", ceremony.StepUpAuthenticatorMissing, nil, true, "Additional authentication setup required"},
-		{"a changed authenticator", ceremony.StepUpOtpConfigChanged, nil, true, "Authentication configuration has changed"},
+		{"a changed authenticator", ceremony.StepUpOTPConfigChanged, nil, true, "Authentication configuration has changed"},
 		{"a value StepUp does not name", ceremony.StepUp(99), nil, true, "Higher authentication level required"},
 		{"StepUpOwed's error", ceremony.StepUpNone, errs.New("unknown target level"), true, "Higher authentication level required"},
 	}

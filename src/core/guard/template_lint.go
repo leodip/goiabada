@@ -105,7 +105,7 @@ func findHTMLInTitle(path, content string) []templateFinding {
 	return found
 }
 
-// AssertTemplatesNoCsrfField guards the half of the CSRF token deletion that nothing else in any
+// AssertTemplatesNoCSRFField guards the half of the CSRF token deletion that nothing else in any
 // tier can observe. #155 replaced the CSRF token with an origin check, so no handler binds csrfField
 // any more and no template may name it again.
 //
@@ -136,19 +136,19 @@ func findHTMLInTitle(path, content string) []templateFinding {
 // which needs the calling module's whole func map to parse at all, and a key computed at run time
 // would still be out of reach. The boundary is drawn here on purpose. See the matching note in
 // adminconsole/internal/handlers/csrf_lint_test.go, which draws the same one on the bind side.
-func AssertTemplatesNoCsrfField(t *testing.T, fsys fs.FS, root string) {
+func AssertTemplatesNoCSRFField(t *testing.T, fsys fs.FS, root string) {
 	t.Helper()
 
-	assertTemplatesNoCsrfField(t, fsys, root)
+	assertTemplatesNoCSRFField(t, fsys, root)
 }
 
-// assertTemplatesNoCsrfField is the reporting half, failing through a Reporter so a rule test can drive it
+// assertTemplatesNoCSRFField is the reporting half, failing through a Reporter so a rule test can drive it
 // against a fixture FS. See Reporter in guard.go.
-func assertTemplatesNoCsrfField(r Reporter, fsys fs.FS, root string) {
+func assertTemplatesNoCSRFField(r Reporter, fsys fs.FS, root string) {
 	r.Helper()
 
 	walkOrFail(r, fsys, root, func(path, content string) {
-		for _, f := range findCsrfField(path, content) {
+		for _, f := range findCSRFField(path, content) {
 			// Lexical, like the scan. It does not predict what the occurrence would render
 			// as: that depends on the context the action sits in, per the note above.
 			r.Errorf(`%s: names csrfField, the spelling #155 deleted when it replaced the CSRF `+
@@ -158,27 +158,27 @@ func assertTemplatesNoCsrfField(r Reporter, fsys fs.FS, root string) {
 	})
 }
 
-// findCsrfField returns a finding when content names csrfField at all.
-func findCsrfField(path, content string) []templateFinding {
+// findCSRFField returns a finding when content names csrfField at all.
+func findCSRFField(path, content string) []templateFinding {
 	if !strings.Contains(content, "csrfField") {
 		return nil
 	}
 	return []templateFinding{{path: path}}
 }
 
-// AssertTemplatesHtmlLangNotHardcoded guards the <html lang="en"> bug: layouts must render the lang
+// AssertTemplatesHTMLLangNotHardcoded guards the <html lang="en"> bug: layouts must render the lang
 // attribute from the language the document renders in, a page's from the active locale and an email's
 // from the body copy the renderer chose. Email layouts are held to it too: the bodies are per-locale
 // sibling files, but the one layout they are drawn in is shared (#645 decision 10).
-func AssertTemplatesHtmlLangNotHardcoded(t *testing.T, fsys fs.FS, root string) {
+func AssertTemplatesHTMLLangNotHardcoded(t *testing.T, fsys fs.FS, root string) {
 	t.Helper()
 
-	assertTemplatesHtmlLangNotHardcoded(t, fsys, root)
+	assertTemplatesHTMLLangNotHardcoded(t, fsys, root)
 }
 
-// assertTemplatesHtmlLangNotHardcoded is the reporting half, failing through a Reporter so a rule test can drive it
+// assertTemplatesHTMLLangNotHardcoded is the reporting half, failing through a Reporter so a rule test can drive it
 // against a fixture FS. See Reporter in guard.go.
-func assertTemplatesHtmlLangNotHardcoded(r Reporter, fsys fs.FS, root string) {
+func assertTemplatesHTMLLangNotHardcoded(r Reporter, fsys fs.FS, root string) {
 	r.Helper()
 
 	walkOrFail(r, fsys, root, func(path, content string) {

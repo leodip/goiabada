@@ -57,7 +57,7 @@ func TestSettingsTokensPut_TheEventRecordsTheCallerAndEachValueBeforeAndAfter(t 
 		RefreshTokenOfflineIdleTimeoutInSeconds: 1800,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 7200,
 		IncludeOpenIDConnectClaimsInAccessToken: true,
-		IncludeOpenIDConnectClaimsInIdToken:     false,
+		IncludeOpenIDConnectClaimsInIDToken:     false,
 	}))
 	r = setTokenContextWithClaims(r, map[string]interface{}{"scope": "authserver:manage", "sub": grantCaller})
 	rr := httptest.NewRecorder()
@@ -69,6 +69,6 @@ func TestSettingsTokensPut_TheEventRecordsTheCallerAndEachValueBeforeAndAfter(t 
 	assert.Equal(t, 3600, saved.RefreshTokenOfflineIdleTimeoutInSeconds)
 	assert.Equal(t, 86400, saved.RefreshTokenOfflineMaxLifetimeInSeconds)
 	assert.False(t, saved.IncludeOpenIDConnectClaimsInAccessToken)
-	assert.True(t, saved.IncludeOpenIDConnectClaimsInIdToken)
+	assert.True(t, saved.IncludeOpenIDConnectClaimsInIDToken)
 	auditLogger.AssertNumberOfCalls(t, "Log", 1)
 }

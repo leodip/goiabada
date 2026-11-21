@@ -6,12 +6,12 @@ import (
 )
 
 type Code struct {
-	Id                  int64          `db:"id" fieldtag:"pk"`
+	ID                  int64          `db:"id" fieldtag:"pk"`
 	CreatedAt           sql.NullTime   `db:"created_at" fieldtag:"dont-update"`
 	UpdatedAt           sql.NullTime   `db:"updated_at"`
 	Code                string         `db:"-"`
 	CodeHash            string         `db:"code_hash"`
-	ClientId            int64          `db:"client_id"`
+	ClientID            int64          `db:"client_id"`
 	Client              Client         `db:"-"`
 	CodeChallenge       sql.NullString `db:"code_challenge"`
 	CodeChallengeMethod sql.NullString `db:"code_challenge_method"`
@@ -19,21 +19,21 @@ type Code struct {
 	State               string         `db:"state"`
 	Nonce               string         `db:"nonce"`
 	RedirectURI         string         `db:"redirect_uri"`
-	UserId              int64          `db:"user_id"`
+	UserID              int64          `db:"user_id"`
 	User                User           `db:"-"`
-	IpAddress           string         `db:"ip_address"`
+	IPAddress           string         `db:"ip_address"`
 	UserAgent           string         `db:"user_agent"`
 	ResponseMode        string         `db:"response_mode"`
 	AuthenticatedAt     time.Time      `db:"authenticated_at"`
 	SessionIdentifier   string         `db:"session_identifier"`
-	AcrLevel            AcrLevel       `db:"acr_level"`
+	ACRLevel            ACRLevel       `db:"acr_level"`
 	AuthMethods         string         `db:"auth_methods"`
 	Used                bool           `db:"used"`
 	// Revoked records that the grant this code started was explicitly cut off: the
 	// session it was issued through was terminated, its client became public, or, for
 	// an unused code, the user withdrew their consent to its client (#622). Redemption
 	// rejects a revoked code, and so does any refresh token
-	// descended from it, since a rotated child inherits its parent's CodeId. Tagged
+	// descended from it, since a rotated child inherits its parent's CodeID. Tagged
 	// dont-update so an ordinary full-row UpdateCode cannot regress it (#129).
 	Revoked bool `db:"revoked" fieldtag:"dont-update"`
 	// AuthStateGeneration records the user's generation when this code was issued,

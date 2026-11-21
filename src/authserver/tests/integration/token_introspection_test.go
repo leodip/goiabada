@@ -46,13 +46,13 @@ func createIntrospectingAPI(t *testing.T, resourceIdentifiers ...string) introsp
 		ClientSecretEncrypted: encrypted,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 	for _, identifier := range resourceIdentifiers {
 		resource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, identifier)
 		require.NoError(t, err)
 		require.NotNil(t, resource, identifier)
 		require.NoError(t, database.CreateClientIntrospectionResource(context.Background(), nil,
-			&record.ClientIntrospectionResource{ClientId: client.Id, ResourceId: resource.Id}))
+			&record.ClientIntrospectionResource{ClientID: client.ID, ResourceID: resource.ID}))
 	}
 	return introspectingAPI{client: client, secret: secret}
 }
@@ -96,7 +96,7 @@ func postIntrospect(t *testing.T, request introspectRequest) introspectAnswer {
 	for name, value := range request.header {
 		req.Header.Set(name, value)
 	}
-	resp, err := createHttpClient(t).Do(req)
+	resp, err := createHTTPClient(t).Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	body, err := io.ReadAll(resp.Body)
@@ -141,10 +141,10 @@ func assertInactive(t *testing.T, members map[string]interface{}) {
 // session and the grant stay out of it.
 func TestIntrospect_AnAccessTokenIsActiveToAListedResource(t *testing.T) {
 	resource := createResource(t)
-	permission := createPermission(t, resource.Id)
+	permission := createPermission(t, resource.ID)
 	scope := "openid " + resource.ResourceIdentifier + ":" + permission.PermissionIdentifier
 	data, code, _, _ := userTokenResponseWithScope(t, scope, nil)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, code.ClientId) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, code.ClientID) })
 	accessToken := data["access_token"].(string)
 	claims := decodeJWTPayload(t, accessToken)
 	api := createIntrospectingAPI(t, resource.ResourceIdentifier)
@@ -171,10 +171,10 @@ func TestIntrospect_AnAccessTokenIsActiveToAListedResource(t *testing.T) {
 // listing nothing, and one listing another resource. The token goes on working.
 func TestIntrospect_AnUnlistedCallerGetsInactiveForALiveToken(t *testing.T) {
 	resource := createResource(t)
-	permission := createPermission(t, resource.Id)
+	permission := createPermission(t, resource.ID)
 	other := createResource(t)
 	data, code, _, clientSecret := userTokenResponseWithScope(t, resource.ResourceIdentifier+":"+permission.PermissionIdentifier, nil)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, code.ClientId) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, code.ClientID) })
 	accessToken := data["access_token"].(string)
 	require.Equal(t, resource.ResourceIdentifier, decodeJWTPayload(t, accessToken)["aud"])
 	assertActive(t, createIntrospectingAPI(t, resource.ResourceIdentifier).introspect(t, accessToken))
@@ -191,7 +191,7 @@ func TestIntrospect_AnUnlistedCallerGetsInactiveForALiveToken(t *testing.T) {
 // {"active": false}.
 func TestIntrospect_ARefreshTokenIsActiveToItsOwnClientAlone(t *testing.T) {
 	data, code, httpClient, clientSecret := userTokenResponseWithScope(t, "openid", nil)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, code.ClientId) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, code.ClientID) })
 	refreshToken := data["refresh_token"].(string)
 	claims := decodeJWTPayload(t, refreshToken)
 
@@ -224,9 +224,9 @@ func TestIntrospect_ARefreshTokenIsActiveToItsOwnClientAlone(t *testing.T) {
 // nothing (#250).
 func TestIntrospect_ARefreshTokenIsInactiveWhileItsFlowIsSwitchedOff(t *testing.T) {
 	data, code, httpClient, clientSecret := userTokenResponseWithScope(t, "openid", nil)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, code.ClientId) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, code.ClientID) })
 	refreshToken := data["refresh_token"].(string)
-	client, err := database.GetClientById(context.Background(), nil, code.ClientId)
+	client, err := database.GetClientByID(context.Background(), nil, code.ClientID)
 	require.NoError(t, err)
 
 	client.AuthorizationCodeEnabled = false
@@ -270,7 +270,7 @@ func TestIntrospect_FollowsASessionEnded(t *testing.T) {
 	session, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, grant.sessionIdentifier)
 	require.NoError(t, err)
 	require.NotNil(t, session)
-	deleteThroughAdminAPI(t, adminToken, "/api/v1/admin/user-sessions/"+strconv.FormatInt(session.Id, 10))
+	deleteThroughAdminAPI(t, adminToken, "/api/v1/admin/user-sessions/"+strconv.FormatInt(session.ID, 10))
 
 	assertInactive(t, api.introspect(t, grant.accessToken))
 	assertInactive(t, introspectAs(t, grant.client.ClientIdentifier, grant.clientSecret, grant.refreshToken))
@@ -281,7 +281,7 @@ func TestIntrospect_FollowsACodeReused(t *testing.T) {
 	api := authserverAPI(t)
 	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, code.ClientId) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, code.ClientID) })
 	first := redeemCode(t, httpClient, code, clientSecret)
 	accessToken := first["access_token"].(string)
 	assertActive(t, api.introspect(t, accessToken))
@@ -305,11 +305,11 @@ func TestIntrospect_FollowsAClientMadePublic(t *testing.T) {
 	api := authserverAPI(t)
 	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, code.ClientId) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, code.ClientID) })
 	accessToken := redeemCode(t, httpClient, code, clientSecret)["access_token"].(string)
 	assertActive(t, api.introspect(t, accessToken))
 
-	flipToPublic(t, adminToken, code.ClientId)
+	flipToPublic(t, adminToken, code.ClientID)
 
 	assertInactive(t, api.introspect(t, accessToken))
 }
@@ -319,18 +319,18 @@ func TestIntrospect_FollowsConsentWithdrawn(t *testing.T) {
 	adminToken, _ := createAdminClientWithToken(t)
 	api := authserverAPI(t)
 	data, code, _, _ := userTokenResponseWithScope(t, "openid", nil)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, code.ClientId) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, code.ClientID) })
 	accessToken := data["access_token"].(string)
 	assertActive(t, api.introspect(t, accessToken))
 
-	consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, code.UserId, code.ClientId)
+	consent, err := database.GetConsentByUserIDAndClientID(context.Background(), nil, code.UserID, code.ClientID)
 	require.NoError(t, err)
 	if consent == nil {
-		consent = &record.UserConsent{UserId: code.UserId, ClientId: code.ClientId, Scope: code.Scope,
+		consent = &record.UserConsent{UserID: code.UserID, ClientID: code.ClientID, Scope: code.Scope,
 			GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true}}
 		require.NoError(t, database.CreateUserConsent(context.Background(), nil, consent))
 	}
-	deleteThroughAdminAPI(t, adminToken, "/api/v1/admin/user-consents/"+strconv.FormatInt(consent.Id, 10))
+	deleteThroughAdminAPI(t, adminToken, "/api/v1/admin/user-consents/"+strconv.FormatInt(consent.ID, 10))
 
 	assertInactive(t, api.introspect(t, accessToken))
 }
@@ -340,7 +340,7 @@ func TestIntrospect_FollowsConsentWithdrawn(t *testing.T) {
 func TestIntrospect_FollowsARevocationOfTheGrant(t *testing.T) {
 	api := authserverAPI(t)
 	data, code, _, clientSecret := userTokenResponseWithScope(t, "openid", nil)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, code.ClientId) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, code.ClientID) })
 	accessToken := data["access_token"].(string)
 	refreshToken := data["refresh_token"].(string)
 	assertActive(t, api.introspect(t, accessToken))
@@ -356,7 +356,7 @@ func TestIntrospect_FollowsARevocationOfTheGrant(t *testing.T) {
 func TestIntrospect_FollowsARevocationOfAnAccessTokenWithoutAGrant(t *testing.T) {
 	api := authserverAPI(t)
 	accessToken, client, clientSecret := createAdminClientWithTokenAndSecret(t)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 	require.NotContains(t, decodeJWTPayload(t, accessToken), "grant_id")
 	members := api.introspect(t, accessToken)
 	assertActive(t, members)
@@ -372,11 +372,11 @@ func TestIntrospect_FollowsARevocationOfAnAccessTokenWithoutAGrant(t *testing.T)
 func TestIntrospect_FollowsADisabledClient(t *testing.T) {
 	api := authserverAPI(t)
 	data, code, _, _ := userTokenResponseWithScope(t, "openid", nil)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, code.ClientId) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, code.ClientID) })
 	accessToken := data["access_token"].(string)
 	assertActive(t, api.introspect(t, accessToken))
 
-	client, err := database.GetClientById(context.Background(), nil, code.ClientId)
+	client, err := database.GetClientByID(context.Background(), nil, code.ClientID)
 	require.NoError(t, err)
 	client.Enabled = false
 	require.NoError(t, database.UpdateClient(context.Background(), nil, client))
@@ -392,7 +392,7 @@ func TestIntrospect_FollowsADisabledClient(t *testing.T) {
 func TestIntrospect_AnInvalidTokenIsInactive(t *testing.T) {
 	api := authserverAPI(t)
 	data, code, _, _ := userTokenResponseWithScope(t, "openid", nil)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, code.ClientId) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, code.ClientID) })
 
 	for name, token := range map[string]string{
 		"a string that is no token": "not-a-token",
@@ -410,7 +410,7 @@ func TestIntrospect_AnInvalidTokenIsInactive(t *testing.T) {
 func TestIntrospect_TheCallerAuthenticates(t *testing.T) {
 	api := authserverAPI(t)
 	data, code, _, _ := userTokenResponseWithScope(t, "openid", nil)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, code.ClientId) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, code.ClientID) })
 	accessToken := data["access_token"].(string)
 
 	answer := postIntrospect(t, introspectRequest{form: url.Values{"token": {accessToken}},
@@ -421,7 +421,7 @@ func TestIntrospect_TheCallerAuthenticates(t *testing.T) {
 
 	public := &record.Client{ClientIdentifier: "public-introspector-" + fake.LetterN(8), Enabled: true, IsPublic: true}
 	require.NoError(t, database.CreateClient(context.Background(), nil, public))
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, public.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, public.ID) })
 	answer = postIntrospect(t, introspectRequest{form: url.Values{"token": {accessToken}, "client_id": {public.ClientIdentifier}}})
 	assertIntrospectError(t, answer, http.StatusUnauthorized, "invalid_client",
 		"This client is configured as public, and a public client cannot introspect tokens. Introspect as a confidential client.")
@@ -451,7 +451,7 @@ func TestIntrospect_RefusesGet(t *testing.T) {
 	t.Run("at the trailing-slash spelling", func(t *testing.T) {
 		req, err := http.NewRequest(http.MethodGet, appConfig.AuthServer.BaseURL+"/auth/introspect/", nil)
 		require.NoError(t, err)
-		resp, err := createHttpClient(t).Do(req)
+		resp, err := createHTTPClient(t).Do(req)
 		require.NoError(t, err)
 		_ = resp.Body.Close()
 
@@ -466,10 +466,10 @@ func TestIntrospect_RefusesGet(t *testing.T) {
 func TestIntrospect_IsExemptFromCSRFAndAnswersNoCORS(t *testing.T) {
 	api := authserverAPI(t)
 	data, code, _, _ := userTokenResponseWithScope(t, "openid", nil)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, code.ClientId) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, code.ClientID) })
 	registered := "https://introspect-" + strings.ToLower(fake.LetterN(8)) + ".example.com"
 	require.NoError(t, database.CreateWebOrigin(context.Background(), nil, &record.WebOrigin{
-		ClientId: code.ClientId, Origin: registered,
+		ClientID: code.ClientID, Origin: registered,
 	}))
 
 	answer := postIntrospect(t, introspectRequest{

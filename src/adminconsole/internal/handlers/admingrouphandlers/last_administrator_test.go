@@ -32,29 +32,29 @@ func lastAdministratorRefusal() error {
 	return &apiclient.APIError{Code: "LAST_ADMINISTRATOR", Message: lastAdministratorSentence, StatusCode: http.StatusConflict}
 }
 
-// lastAdministratorGroupApiClient answers the group read and refuses every write as the last
+// lastAdministratorGroupAPIClient answers the group read and refuses every write as the last
 // administrator's.
-type lastAdministratorGroupApiClient struct {
+type lastAdministratorGroupAPIClient struct {
 	group *api.GroupResponse
 }
 
-func (c *lastAdministratorGroupApiClient) GetGroupById(context.Context, string, int64) (*api.GroupResponse, error) {
+func (c *lastAdministratorGroupAPIClient) GetGroupByID(context.Context, string, int64) (*api.GroupResponse, error) {
 	return c.group, nil
 }
 
-func (*lastAdministratorGroupApiClient) DeleteGroup(context.Context, string, int64) error {
+func (*lastAdministratorGroupAPIClient) DeleteGroup(context.Context, string, int64) error {
 	return lastAdministratorRefusal()
 }
 
-func (*lastAdministratorGroupApiClient) RemoveUserFromGroup(context.Context, string, int64, int64) error {
+func (*lastAdministratorGroupAPIClient) RemoveUserFromGroup(context.Context, string, int64, int64) error {
 	return lastAdministratorRefusal()
 }
 
 // Deleting the group renders the confirmation page again, with the group and its member count as
 // before and the sentence where the page shows an error, rather than the 500 page.
 func TestHandleDeletePost_TheLastAdministratorRefusalIsShownOnThePage(t *testing.T) {
-	group := &api.GroupResponse{Id: 4, GroupIdentifier: "admins", MemberCount: 1}
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	group := &api.GroupResponse{ID: 4, GroupIdentifier: "admins", MemberCount: 1}
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_groups_delete.html").Once()
 
@@ -65,7 +65,7 @@ func TestHandleDeletePost_TheLastAdministratorRefusalIsShownOnThePage(t *testing
 	)
 	rec := httptest.NewRecorder()
 
-	HandleDeletePost(httpHelper, &lastAdministratorGroupApiClient{group: group}, "https://console.example.com").ServeHTTP(rec, req)
+	HandleDeletePost(httpHelper, &lastAdministratorGroupAPIClient{group: group}, "https://console.example.com").ServeHTTP(rec, req)
 
 	assert.Empty(t, rec.Header().Get("Location"), "no redirect to the list: the group was not deleted")
 	bind := handlertest.Bind(t, httpHelper)
@@ -84,7 +84,7 @@ func TestHandleMembersRemoveUserPost_TheLastAdministratorRefusalReachesTheBrowse
 	)
 	rec := httptest.NewRecorder()
 
-	HandleMembersRemoveUserPost(render.New(nil, nil), &lastAdministratorGroupApiClient{}).ServeHTTP(rec, req)
+	HandleMembersRemoveUserPost(render.New(nil, nil), &lastAdministratorGroupAPIClient{}).ServeHTTP(rec, req)
 
 	assertLastAdministratorJSON(t, rec)
 }
@@ -97,7 +97,7 @@ func TestHandlePermissionsPost_TheLastAdministratorRefusalReachesTheBrowser(t *t
 	)
 	rec := httptest.NewRecorder()
 
-	HandlePermissionsPost(render.New(nil, nil), nil, &groupPermissionsSaveApiClient{err: lastAdministratorRefusal()}).ServeHTTP(rec, req)
+	HandlePermissionsPost(render.New(nil, nil), nil, &groupPermissionsSaveAPIClient{err: lastAdministratorRefusal()}).ServeHTTP(rec, req)
 
 	assertLastAdministratorJSON(t, rec)
 }

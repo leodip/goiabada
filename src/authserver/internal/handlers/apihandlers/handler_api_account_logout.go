@@ -61,7 +61,7 @@ func HandleAccountLogoutRequestPost(
 			return
 		}
 
-		postLogout := req.PostLogoutRedirectUri
+		postLogout := req.PostLogoutRedirectURI
 		if postLogout == "" {
 			writeLocalizedError(w, r, i18n.NewLocalizedError(errcode.AccountLogoutRedirectURIRequired, nil), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
@@ -167,7 +167,7 @@ func HandleAccountLogoutRequestPost(
 		}
 		hasClient := false
 		for _, sc := range userSession.Clients {
-			if sc.Client.Id == client.Id {
+			if sc.Client.ID == client.ID {
 				hasClient = true
 				break
 			}
@@ -234,11 +234,11 @@ func HandleAccountLogoutRequestPost(
 		}
 
 		// Build logout redirect URL
-		logoutUrl := fmt.Sprintf("%s/auth/logout?id_token_hint=%s&post_logout_redirect_uri=%s", baseURL, url.QueryEscape(idToken), url.QueryEscape(postLogout))
+		logoutURL := fmt.Sprintf("%s/auth/logout?id_token_hint=%s&post_logout_redirect_uri=%s", baseURL, url.QueryEscape(idToken), url.QueryEscape(postLogout))
 		if req.State != "" {
-			logoutUrl += "&state=" + url.QueryEscape(req.State)
+			logoutURL += "&state=" + url.QueryEscape(req.State)
 		}
-		resp := api.AccountLogoutRedirectResponse{LogoutUrl: logoutUrl}
+		resp := api.AccountLogoutRedirectResponse{LogoutURL: logoutURL}
 		writeJSON(w, r, http.StatusOK, resp)
 	}
 }

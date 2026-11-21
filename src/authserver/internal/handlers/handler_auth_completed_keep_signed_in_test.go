@@ -53,7 +53,7 @@ func reuseArmCompletion(t *testing.T, passwordEntered bool, answer *bool) (http.
 		permissionChecker:  permissionChecker,
 	})
 
-	req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
+	req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyID, nil)
 	req = withSessionSettings(req)
 	sessionIdentifier := "test-session"
 	req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier))
@@ -61,10 +61,10 @@ func reuseArmCompletion(t *testing.T, passwordEntered bool, answer *bool) (http.
 
 	sessionAuthTime := time.Now().UTC().Add(-time.Hour)
 	authContext := &ceremony.AuthContext{
-		CeremonyId:   testCeremonyId,
+		CeremonyID:   testCeremonyID,
 		AuthState:    ceremony.AuthStateAuthenticationCompleted,
-		ClientId:     "test-client",
-		UserId:       1,
+		ClientID:     "test-client",
+		UserID:       1,
 		Scope:        "openid",
 		AuthMethods:  "pwd",
 		KeepSignedIn: answer,
@@ -77,11 +77,11 @@ func reuseArmCompletion(t *testing.T, passwordEntered bool, answer *bool) (http.
 	}
 	ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-	userSession := &record.UserSession{Id: 1, UserId: 1, AcrLevel: record.AcrLevel1, AuthMethods: "pwd",
+	userSession := &record.UserSession{ID: 1, UserID: 1, ACRLevel: record.ACRLevel1, AuthMethods: "pwd",
 		AuthTime: sessionAuthTime}
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(userSession, nil)
 	database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
-	client := &record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: record.AcrLevel1,
+	client := &record.Client{ID: 1, ClientIdentifier: "test-client", DefaultACRLevel: record.ACRLevel1,
 		AuthorizationCodeEnabled: true}
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 	userSessionManager.On("HasValidUserSession", userSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds,
@@ -89,8 +89,8 @@ func reuseArmCompletion(t *testing.T, passwordEntered bool, answer *bool) (http.
 	userSessionManager.On("BindUserSession", mock.Anything, sessionIdentifier, int64(1), mock.Anything,
 		passwordEntered, "").Return(userSession, nil).Once()
 	auditLogger.On("Log", mock.Anything, audit.EventBumpedUserSession, mock.Anything).Return()
-	user := &record.User{Id: 1, Enabled: true}
-	database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
+	user := &record.User{ID: 1, Enabled: true}
+	database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 	permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid", user).
 		Return("openid", nil).Maybe()
 
@@ -106,7 +106,7 @@ func TestHandleAuthCompletedGet_TheReuseArmRecordsTheAnswerOfAPasswordEntered(t 
 			handler, ceremonyStore, _, rr, req := reuseArmCompletion(t, true, answer)
 
 			var steps []string
-			ceremonyStore.On("RecordKeepSignedIn", rr, req, testCeremonyId, answer).Return(nil).Once().
+			ceremonyStore.On("RecordKeepSignedIn", rr, req, testCeremonyID, answer).Return(nil).Once().
 				Run(func(mock.Arguments) { steps = append(steps, "record") })
 			ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 				return ac.AuthState == ceremony.AuthStateReadyToIssueCode
@@ -115,7 +115,7 @@ func TestHandleAuthCompletedGet_TheReuseArmRecordsTheAnswerOfAPasswordEntered(t 
 			handler.ServeHTTP(rr, req)
 
 			assert.Equal(t, http.StatusFound, rr.Code)
-			assert.Equal(t, testBaseURL+"/auth/issue?ceremony="+testCeremonyId, rr.Header().Get("Location"))
+			assert.Equal(t, testBaseURL+"/auth/issue?ceremony="+testCeremonyID, rr.Header().Get("Location"))
 			assert.Equal(t, []string{"record", "save"}, steps, "the answer is recorded before the ceremony moves on")
 			ceremonyStore.AssertExpectations(t)
 		})
@@ -143,7 +143,7 @@ func TestHandleAuthCompletedGet_ASingleSignOnRecordsNoAnswer(t *testing.T) {
 func TestHandleAuthCompletedGet_ARecordFindingTheCeremonyReplacedAnswersNoLongerActive(t *testing.T) {
 	ticked := true
 	handler, ceremonyStore, pageRenderer, rr, req := reuseArmCompletion(t, true, &ticked)
-	ceremonyStore.On("RecordKeepSignedIn", rr, req, testCeremonyId, &ticked).Return(ceremony.ErrCeremonyReplaced).Once()
+	ceremonyStore.On("RecordKeepSignedIn", rr, req, testCeremonyID, &ticked).Return(ceremony.ErrCeremonyReplaced).Once()
 	expectCeremonyNoLongerActive(t, pageRenderer, rr, req)
 
 	handler.ServeHTTP(rr, req)
@@ -173,7 +173,7 @@ func TestHandleAuthCompletedGet_TheCreateArmRecordsTheAnswerAsItBinds(t *testing
 				permissionChecker:  permissionChecker,
 			})
 
-			req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyId, nil)
+			req, _ := http.NewRequest("GET", "/auth/completed?ceremony="+testCeremonyID, nil)
 			req = withSessionSettings(req)
 			sessionIdentifier := "pre-sign-in-session"
 			req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier))
@@ -181,10 +181,10 @@ func TestHandleAuthCompletedGet_TheCreateArmRecordsTheAnswerAsItBinds(t *testing
 
 			pwdAuthTime := time.Now().UTC().Add(-time.Minute)
 			authContext := &ceremony.AuthContext{
-				CeremonyId:          testCeremonyId,
+				CeremonyID:          testCeremonyID,
 				AuthState:           ceremony.AuthStateAuthenticationCompleted,
-				ClientId:            "test-client",
-				UserId:              1,
+				ClientID:            "test-client",
+				UserID:              1,
 				Scope:               "openid",
 				AuthMethods:         "pwd",
 				AuthenticatedAt:     &pwdAuthTime,
@@ -195,28 +195,28 @@ func TestHandleAuthCompletedGet_TheCreateArmRecordsTheAnswerAsItBinds(t *testing
 			ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(nil, nil)
 			database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*record.UserSession)(nil)).Return(nil)
-			client := &record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: record.AcrLevel1,
+			client := &record.Client{ID: 1, ClientIdentifier: "test-client", DefaultACRLevel: record.ACRLevel1,
 				AuthorizationCodeEnabled: true}
 			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 			userSessionManager.On("HasValidUserSession", (*record.UserSession)(nil), testIdleTimeoutInSeconds,
 				testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(false)
-			newSession := &record.UserSession{Id: 2, SessionIdentifier: "new-session-of-user-1", UserId: 1,
-				AcrLevel: record.AcrLevel1, AuthTime: pwdAuthTime}
+			newSession := &record.UserSession{ID: 2, SessionIdentifier: "new-session-of-user-1", UserID: 1,
+				ACRLevel: record.ACRLevel1, AuthTime: pwdAuthTime}
 			userSessionManager.On("StartNewUserSession", mock.Anything, int64(1), mock.Anything, mock.Anything,
 				mock.Anything, mock.Anything, "", (*record.UserSession)(nil), testSessionLimits).Return(newSession, nil, nil)
 			expectCeremonyConfirmed(ceremonyStore, rr, req)
-			ceremonyStore.On("RegenerateSessionAndBind", rr, req, testCeremonyId, int64(1), "new-session-of-user-1",
+			ceremonyStore.On("RegenerateSessionAndBind", rr, req, testCeremonyID, int64(1), "new-session-of-user-1",
 				answer).Return(nil).Once()
 			auditLogger.On("Log", mock.Anything, audit.EventStartedNewUserSession, mock.Anything).Return()
-			user := &record.User{Id: 1, Enabled: true}
-			database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
+			user := &record.User{ID: 1, Enabled: true}
+			database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 			permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid", user).Return("openid", nil)
 			ceremonyStore.On("SaveAuthContext", rr, req, mock.Anything).Return(nil).Once()
 
 			handler.ServeHTTP(rr, req)
 
 			assert.Equal(t, http.StatusFound, rr.Code)
-			assert.Equal(t, testBaseURL+"/auth/issue?ceremony="+testCeremonyId, rr.Header().Get("Location"))
+			assert.Equal(t, testBaseURL+"/auth/issue?ceremony="+testCeremonyID, rr.Header().Get("Location"))
 			ceremonyStore.AssertNotCalled(t, "RecordKeepSignedIn", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 			ceremonyStore.AssertExpectations(t)
 		})

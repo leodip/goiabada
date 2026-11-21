@@ -25,7 +25,7 @@ func staleSignedInSession(t *testing.T, rule KeepSignedIn) (*ConditionalStore, *
 	t.Helper()
 	store, backend := keepTestStore(t, rule)
 	cookie := saveNew(t, store.ServerSideStore, signedInValues())
-	id := decodeCookieId(t, store.ServerSideStore, cookie)
+	id := decodeCookieID(t, store.ServerSideStore, cookie)
 	backend.rows[id].LastAccessed = keepTestNow.Add(-time.Minute)
 	return store, backend, cookie, id
 }
@@ -117,7 +117,7 @@ func TestRefreshing_SendsNoCookieBuiltFromContentsAnotherRequestRewroteMeanwhile
 		return ticked, nil
 	})
 	cookie := saveNew(t, store.ServerSideStore, map[string]any{"SessionIdentifier": "a-user-session", "KeepSignedIn": true})
-	id := decodeCookieId(t, store.ServerSideStore, cookie)
+	id := decodeCookieID(t, store.ServerSideStore, cookie)
 	backend.rows[id].LastAccessed = keepTestNow.Add(-time.Minute)
 	var otherCookies []*http.Cookie
 
@@ -195,7 +195,7 @@ func TestRefreshing_TheCookieGoesOutWithTheHeadersHoweverTheyAreSent(t *testing.
 
 			cookies := sessionCookies(store, w)
 			require.Len(t, cookies, 1)
-			assert.Equal(t, id, decodeCookieId(t, store.ServerSideStore, cookies[0]))
+			assert.Equal(t, id, decodeCookieID(t, store.ServerSideStore, cookies[0]))
 			assert.Equal(t, int(keepTestRowLifetime.Seconds()), cookies[0].MaxAge)
 		})
 	}
@@ -230,7 +230,7 @@ func TestRefreshing_TheCookieGoesOutOnTheAnswerToAPanic(t *testing.T) {
 	require.Equal(t, http.StatusInternalServerError, w.Code)
 	cookies := sessionCookies(store, w)
 	require.Len(t, cookies, 1)
-	assert.Equal(t, id, decodeCookieId(t, store.ServerSideStore, cookies[0]))
+	assert.Equal(t, id, decodeCookieID(t, store.ServerSideStore, cookies[0]))
 	assertEndsWithTheBrowser(t, cookies[0])
 }
 
@@ -290,7 +290,7 @@ func TestRefreshing_AnInformationalAnswerLeavesTheCookieHeld(t *testing.T) {
 			}
 			if test.wantCookie {
 				require.Len(t, cookies, 1)
-				assert.Equal(t, id, decodeCookieId(t, store.ServerSideStore, cookies[0]))
+				assert.Equal(t, id, decodeCookieID(t, store.ServerSideStore, cookies[0]))
 			} else {
 				assert.Empty(t, cookies, "no cookie names the rotated-away row")
 			}

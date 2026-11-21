@@ -13,8 +13,8 @@ import "database/sql"
 const WebOriginMaxBytes = 267
 
 type WebOrigin struct {
-	Id        int64        `db:"id" fieldtag:"pk"`
+	ID        int64        `db:"id" fieldtag:"pk"`
 	CreatedAt sql.NullTime `db:"created_at" fieldtag:"dont-update"`
 	Origin    string       `db:"origin"`
-	ClientId  int64        `db:"client_id"`
+	ClientID  int64        `db:"client_id"`
 }

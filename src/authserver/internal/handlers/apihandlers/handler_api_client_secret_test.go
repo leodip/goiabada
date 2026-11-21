@@ -35,8 +35,8 @@ func TestHandleClientSecretGet_AnswersTheDecryptedSecretAndRecordsTheRead(t *tes
 
 	sealed, err := testDataCipher.Encrypt("the-plaintext-secret")
 	require.NoError(t, err)
-	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
-		Return(&record.Client{Id: 7, ClientIdentifier: "portal", ClientSecretEncrypted: sealed}, nil).Once()
+	database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), int64(7)).
+		Return(&record.Client{ID: 7, ClientIdentifier: "portal", ClientSecretEncrypted: sealed}, nil).Once()
 
 	var payload map[string]interface{}
 	auditLogger.On("Log", mock.Anything, audit.EventViewedClientSecret, mock.Anything).
@@ -64,8 +64,8 @@ func TestHandleClientSecretGet_AClientWithNoSecretAnswersAnEmptyOneUnrecorded(t 
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
-	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
-		Return(&record.Client{Id: 7, ClientIdentifier: "spa", IsPublic: true}, nil).Once()
+	database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), int64(7)).
+		Return(&record.Client{ID: 7, ClientIdentifier: "spa", IsPublic: true}, nil).Once()
 
 	rr := httptest.NewRecorder()
 	HandleClientSecretGet(database, auditLogger, testDataCipher).ServeHTTP(rr, clientSecretRequest("7"))
@@ -79,7 +79,7 @@ func TestHandleClientSecretGet_AnUnknownClientIsNotFoundAndUnrecorded(t *testing
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
-	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(nil, nil).Once()
+	database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(nil, nil).Once()
 
 	rr := httptest.NewRecorder()
 	HandleClientSecretGet(database, auditLogger, testDataCipher).ServeHTTP(rr, clientSecretRequest("7"))
@@ -89,7 +89,7 @@ func TestHandleClientSecretGet_AnUnknownClientIsNotFoundAndUnrecorded(t *testing
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 }
 
-func TestHandleClientSecretGet_AMalformedIdReadsNothing(t *testing.T) {
+func TestHandleClientSecretGet_AMalformedIDReadsNothing(t *testing.T) {
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 
@@ -97,7 +97,7 @@ func TestHandleClientSecretGet_AMalformedIdReadsNothing(t *testing.T) {
 	HandleClientSecretGet(database, auditLogger, testDataCipher).ServeHTTP(rr, clientSecretRequest("not-a-number"))
 
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
-	database.AssertNotCalled(t, "GetClientById", mock.Anything, mock.Anything, mock.Anything)
+	database.AssertNotCalled(t, "GetClientByID", mock.Anything, mock.Anything, mock.Anything)
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 }
 
@@ -110,8 +110,8 @@ func TestHandleClientSecretGet_ASecretThatDoesNotDecryptIsAFailureUnrecorded(t *
 	require.NoError(t, err)
 	sealed, err := otherCipher.Encrypt("sealed-under-another-key")
 	require.NoError(t, err)
-	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
-		Return(&record.Client{Id: 7, ClientIdentifier: "portal", ClientSecretEncrypted: sealed}, nil).Once()
+	database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), int64(7)).
+		Return(&record.Client{ID: 7, ClientIdentifier: "portal", ClientSecretEncrypted: sealed}, nil).Once()
 
 	rr := httptest.NewRecorder()
 	HandleClientSecretGet(database, auditLogger, testDataCipher).ServeHTTP(rr, clientSecretRequest("7"))
@@ -127,8 +127,8 @@ func TestHandleClientGet_CarriesNoClientSecret(t *testing.T) {
 
 	sealed, err := testDataCipher.Encrypt("the-plaintext-secret")
 	require.NoError(t, err)
-	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
-		Return(&record.Client{Id: 7, ClientIdentifier: "portal", ClientSecretEncrypted: sealed}, nil).Once()
+	database.On("GetClientByID", mock.Anything, (*sql.Tx)(nil), int64(7)).
+		Return(&record.Client{ID: 7, ClientIdentifier: "portal", ClientSecretEncrypted: sealed}, nil).Once()
 	stubClientResponseLoads(database)
 
 	r := withPathValue(httptest.NewRequest(http.MethodGet, "/api/v1/admin/clients/7", nil), "id", "7")

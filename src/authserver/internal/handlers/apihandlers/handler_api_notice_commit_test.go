@@ -71,7 +71,7 @@ func noticeRoutes() []noticeRoute {
 				jobs *heldJobs, pageRenderer *handlersmocks.PageRenderer, emailSender *accounthandlersmocks.EmailSender) (http.Handler, *http.Request) {
 				stubOTPEnable(database, auditLogger, before)
 				return accountOTPNoticeHandler(database, auditLogger, jobs, pageRenderer, emailSender),
-					withNoticeContext(accountOTPEnableRequest(t, otpNoticeSubject, otpNoticePassword, currentOtpCode(t)),
+					withNoticeContext(accountOTPEnableRequest(t, otpNoticeSubject, otpNoticePassword, currentOTPCode(t)),
 						passwordNoticeSettings())
 			},
 		},
@@ -90,9 +90,9 @@ func noticeRoutes() []noticeRoute {
 			user: enrolledOTPNoticeUser,
 			arm: func(t *testing.T, database *datamocks.Database, auditLogger *handlersmocks.AuditLogger, before *record.User,
 				jobs *heldJobs, pageRenderer *handlersmocks.PageRenderer, emailSender *accounthandlersmocks.EmailSender) (http.Handler, *http.Request) {
-				stubOTPRemove(database, auditLogger, before, "GetUserById", before.Id)
+				stubOTPRemove(database, auditLogger, before, "GetUserByID", before.ID)
 				return adminOTPNoticeHandler(database, auditLogger, jobs, pageRenderer, emailSender),
-					adminOTPNoticeRequest(t, passwordNoticeSettings(), before.Id)
+					adminOTPNoticeRequest(t, passwordNoticeSettings(), before.ID)
 			},
 		},
 		{
@@ -131,7 +131,7 @@ func answerLockedRead(t *testing.T, database *datamocks.Database, current *recor
 	t.Helper()
 	found := false
 	for _, call := range database.ExpectedCalls {
-		if call.Method == "GetUserByIdForUpdate" {
+		if call.Method == "GetUserByIDForUpdate" {
 			call.ReturnArguments = mock.Arguments{current, nil}
 			found = true
 		}
@@ -157,10 +157,10 @@ func TestCredentialNotices_ACommittedChangeIsToldWhenItsResponseCannotBeRead(t *
 			before := route.user(t)
 			handler, req := route.arm(t, database, auditLogger, before, jobs, pageRenderer, emailSender)
 
-			// The response's read is the last GetUserById the route makes, after the commit.
+			// The response's read is the last GetUserByID the route makes, after the commit.
 			var responseRead *mock.Call
 			for _, call := range database.ExpectedCalls {
-				if call.Method == "GetUserById" {
+				if call.Method == "GetUserByID" {
 					responseRead = call
 				}
 			}

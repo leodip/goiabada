@@ -27,10 +27,10 @@ import (
 func signInAtLevel3(t *testing.T) (*http.Client, *record.Client, *record.RedirectURI, *record.User) {
 	t.Helper()
 
-	client, redirectUri, user, password, otpSecret := createLevel2MandatoryUser(t, true)
-	httpClient, otpPage, otpUrl := startOtpCeremony(t, client, redirectUri, user, password, "")
+	client, redirectURI, user, password, otpSecret := createLevel2MandatoryUser(t, true)
+	httpClient, otpPage, otpURL := startOTPCeremony(t, client, redirectURI, user, password, "")
 	code := otptest.Code(t, otpSecret, time.Now())
-	resp := authenticateWithOtp(t, httpClient, otpUrl, otpPage, code)
+	resp := authenticateWithOTP(t, httpClient, otpURL, otpPage, code)
 	_ = otpPage.Body.Close()
 	location := assertRedirect(t, resp, "/auth/completed")
 	_ = resp.Body.Close()
@@ -40,21 +40,21 @@ func signInAtLevel3(t *testing.T) (*http.Client, *record.Client, *record.Redirec
 	resp = loadPage(t, httpClient, location)
 	_ = resp.Body.Close()
 
-	sessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	sessions, err := database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	require.NoError(t, err)
 	require.Len(t, sessions, 1)
-	require.Equal(t, record.AcrLevel2Mandatory, sessions[0].AcrLevel, "the sign-in leaves a level 3 session")
+	require.Equal(t, record.ACRLevel2Mandatory, sessions[0].ACRLevel, "the sign-in leaves a level 3 session")
 	require.Equal(t, "pwd otp", sessions[0].AuthMethods)
-	return httpClient, client, redirectUri, user
+	return httpClient, client, redirectURI, user
 }
 
 // removeAuthenticatorAsAdministrator turns the user's two-factor authentication off through the
 // admin API, the path the admin console's switch takes.
-func removeAuthenticatorAsAdministrator(t *testing.T, userId int64) {
+func removeAuthenticatorAsAdministrator(t *testing.T, userID int64) {
 	t.Helper()
 
 	token, _ := createAdminClientWithToken(t)
-	resp, _ := sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/users/%d/otp", userId),
+	resp, _ := sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/users/%d/otp", userID),
 		map[string]any{"enabled": false})
 	_ = resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -73,14 +73,14 @@ func issuedCode(t *testing.T, issueResponse *http.Response) *record.Code {
 	return loadCodeFromDatabase(t, code)
 }
 
-// TestOtpCeremony_RemovingTheAuthenticatorLowersEverySession: an administrator turns off the
+// TestOTPCeremony_RemovingTheAuthenticatorLowersEverySession: an administrator turns off the
 // two-factor authentication of a user signed in at level 3, on two sessions. Each is lowered to
 // what a password alone earns, level 2 optional and "pwd", with its auth_time moved back from the
 // code's to the time the password was entered, and the next SSO sign-in at a level 1 client is
 // issued a code saying so. Until the removal lowered them, that code said level 3 and "pwd otp", for
 // an authenticator the administrator had just removed; and lowered with the code's auth_time kept,
 // it said a password was entered when only the code was (#542).
-func TestOtpCeremony_RemovingTheAuthenticatorLowersEverySession(t *testing.T) {
+func TestOTPCeremony_RemovingTheAuthenticatorLowersEverySession(t *testing.T) {
 	httpClient, _, _, user := signInAtLevel3(t)
 
 	// A second session of the same user, on another device, which stepped up with a code half an
@@ -94,44 +94,44 @@ func TestOtpCeremony_RemovingTheAuthenticatorLowersEverySession(t *testing.T) {
 		AuthTime:          passwordAt.Add(30 * time.Minute),
 		PasswordAuthTime:  passwordAt,
 		AuthMethods:       "pwd otp",
-		AcrLevel:          record.AcrLevel2Mandatory,
-		IpAddress:         "192.0.2.10",
-		UserId:            user.Id,
+		ACRLevel:          record.ACRLevel2Mandatory,
+		IPAddress:         "192.0.2.10",
+		UserID:            user.ID,
 	}
 	require.NoError(t, database.CreateUserSession(context.Background(), nil, other))
-	before, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	before, err := database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	require.NoError(t, err)
 	require.Len(t, before, 2)
 	passwordTimes := map[int64]time.Time{}
 	for _, session := range before {
 		require.True(t, session.AuthTime.After(session.PasswordAuthTime),
-			"session %d's auth_time is its code's, entered after its password", session.Id)
-		passwordTimes[session.Id] = session.PasswordAuthTime
+			"session %d's auth_time is its code's, entered after its password", session.ID)
+		passwordTimes[session.ID] = session.PasswordAuthTime
 	}
 
-	removeAuthenticatorAsAdministrator(t, user.Id)
+	removeAuthenticatorAsAdministrator(t, user.ID)
 
-	after, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	after, err := database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	require.NoError(t, err)
 	require.Len(t, after, 2, "nobody is signed out")
 	for _, session := range after {
-		assert.Equal(t, record.AcrLevel2Optional, session.AcrLevel, "session %d is lowered to level 2 optional", session.Id)
-		assert.Equal(t, "pwd", session.AuthMethods, "session %d no longer names the code", session.Id)
-		assert.True(t, passwordTimes[session.Id].Equal(session.AuthTime),
-			"session %d's auth_time is when its password was entered, which amr \"pwd\" now describes", session.Id)
+		assert.Equal(t, record.ACRLevel2Optional, session.ACRLevel, "session %d is lowered to level 2 optional", session.ID)
+		assert.Equal(t, "pwd", session.AuthMethods, "session %d no longer names the code", session.ID)
+		assert.True(t, passwordTimes[session.ID].Equal(session.AuthTime),
+			"session %d's auth_time is when its password was entered, which amr \"pwd\" now describes", session.ID)
 	}
 
-	level1Client, level1RedirectUri := createLevel1Client(t, false)
-	where, page, _ := authorizeOnExistingSession(t, httpClient, level1Client, level1RedirectUri)
+	level1Client, level1RedirectURI := createLevel1Client(t, false)
+	where, page, _ := authorizeOnExistingSession(t, httpClient, level1Client, level1RedirectURI)
 	_ = page.Body.Close()
 	require.Equal(t, "/auth/issue", where, "SSO at a level 1 client goes straight through")
 
 	code := issuedCode(t, page)
-	assert.Equal(t, record.AcrLevel2Optional, code.AcrLevel, "the code's acr is what the session now holds")
+	assert.Equal(t, record.ACRLevel2Optional, code.ACRLevel, "the code's acr is what the session now holds")
 	assert.Equal(t, "pwd", code.AuthMethods, "the code names no code from the removed authenticator")
 	var signedIn record.UserSession
 	for _, session := range after {
-		if session.Id != other.Id {
+		if session.ID != other.ID {
 			signedIn = session
 		}
 	}
@@ -139,23 +139,23 @@ func TestOtpCeremony_RemovingTheAuthenticatorLowersEverySession(t *testing.T) {
 		"the code's auth_time is the password's, beside its amr [\"pwd\"]")
 }
 
-// TestOtpCeremony_ASignInInFlightWhenTheAuthenticatorIsRemovedStartsOver: an SSO sign-in adopts the
+// TestOTPCeremony_ASignInInFlightWhenTheAuthenticatorIsRemovedStartsOver: an SSO sign-in adopts the
 // session's methods at /auth/authorize. When the authenticator is removed before it reaches
 // /auth/completed, it still names "pwd otp", and binding it would merge otp back into the session
 // the removal had just lowered, which every later SSO token would then claim. It starts over at
 // level 1 instead, and the session stays lowered.
-func TestOtpCeremony_ASignInInFlightWhenTheAuthenticatorIsRemovedStartsOver(t *testing.T) {
+func TestOTPCeremony_ASignInInFlightWhenTheAuthenticatorIsRemovedStartsOver(t *testing.T) {
 	httpClient, _, _, user := signInAtLevel3(t)
-	level1Client, level1RedirectUri := createLevel1Client(t, false)
+	level1Client, level1RedirectURI := createLevel1Client(t, false)
 
-	authorizeUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + level1Client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(level1RedirectUri.URI) +
+	authorizeURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + level1Client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(level1RedirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + randomCodeChallenge() +
 		"&scope=openid" +
 		"&state=" + fake.LetterN(8)
-	resp := loadPage(t, httpClient, authorizeUrl)
+	resp := loadPage(t, httpClient, authorizeURL)
 	location := assertRedirect(t, resp, "/auth/level1completed")
 	_ = resp.Body.Close()
 	resp = loadPage(t, httpClient, location)
@@ -163,16 +163,16 @@ func TestOtpCeremony_ASignInInFlightWhenTheAuthenticatorIsRemovedStartsOver(t *t
 	_ = resp.Body.Close()
 
 	// The removal lands while the browser is between /auth/level1completed and /auth/completed.
-	removeAuthenticatorAsAdministrator(t, user.Id)
+	removeAuthenticatorAsAdministrator(t, user.ID)
 
 	resp = loadPage(t, httpClient, completedLocation)
 	assertRedirect(t, resp, "/auth/level1")
 	_ = resp.Body.Close()
 
-	sessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+	sessions, err := database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	require.NoError(t, err)
 	require.Len(t, sessions, 1)
-	assert.Equal(t, record.AcrLevel2Optional, sessions[0].AcrLevel, "the ceremony did not raise the lowered session")
+	assert.Equal(t, record.ACRLevel2Optional, sessions[0].ACRLevel, "the ceremony did not raise the lowered session")
 	assert.Equal(t, "pwd", sessions[0].AuthMethods, "the ceremony did not put otp back on the lowered session")
 }
 
@@ -181,21 +181,21 @@ func TestOtpCeremony_ASignInInFlightWhenTheAuthenticatorIsRemovedStartsOver(t *t
 func setUpAnotherAuthenticator(t *testing.T, user *record.User) {
 	t.Helper()
 
-	fresh, err := database.GetUserById(context.Background(), nil, user.Id)
+	fresh, err := database.GetUserByID(context.Background(), nil, user.ID)
 	require.NoError(t, err)
 	require.False(t, fresh.OTPEnabled, "the user has no authenticator to replace")
 	fresh.OTPEnabled = true
 	fresh.OTPSecretEncrypted = []byte("another authenticator's seed")
 	require.NoError(t, database.UpdateUser(context.Background(), nil, fresh))
-	advanceOtpConfigGeneration(t, user.Id)
+	advanceOTPConfigGeneration(t, user.ID)
 }
 
-// TestOtpCeremony_ASignInInFlightWhenTheAuthenticatorIsReplacedStartsOver: as above, but the user sets
+// TestOTPCeremony_ASignInInFlightWhenTheAuthenticatorIsReplacedStartsOver: as above, but the user sets
 // up another authenticator before the sign-in goes on. The sign-in's "pwd otp" came from the one
 // removed, which the new one does not make true again, so it starts over rather than raising the
 // lowered session back to level 3 or issuing a code naming otp: at /auth/completed when the
 // replacement lands before it, at /auth/issue when it lands after (#542 review).
-func TestOtpCeremony_ASignInInFlightWhenTheAuthenticatorIsReplacedStartsOver(t *testing.T) {
+func TestOTPCeremony_ASignInInFlightWhenTheAuthenticatorIsReplacedStartsOver(t *testing.T) {
 	for _, landsBeforeCompleted := range []bool{true, false} {
 		name := "before /auth/completed"
 		if !landsBeforeCompleted {
@@ -203,16 +203,16 @@ func TestOtpCeremony_ASignInInFlightWhenTheAuthenticatorIsReplacedStartsOver(t *
 		}
 		t.Run(name, func(t *testing.T) {
 			httpClient, _, _, user := signInAtLevel3(t)
-			level1Client, level1RedirectUri := createLevel1Client(t, false)
+			level1Client, level1RedirectURI := createLevel1Client(t, false)
 
-			authorizeUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + level1Client.ClientIdentifier +
-				"&redirect_uri=" + url.QueryEscape(level1RedirectUri.URI) +
+			authorizeURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + level1Client.ClientIdentifier +
+				"&redirect_uri=" + url.QueryEscape(level1RedirectURI.URI) +
 				"&response_type=code" +
 				"&code_challenge_method=S256" +
 				"&code_challenge=" + randomCodeChallenge() +
 				"&scope=openid" +
 				"&state=" + fake.LetterN(8)
-			resp := loadPage(t, httpClient, authorizeUrl)
+			resp := loadPage(t, httpClient, authorizeURL)
 			location := assertRedirect(t, resp, "/auth/level1completed")
 			_ = resp.Body.Close()
 			resp = loadPage(t, httpClient, location)
@@ -225,52 +225,52 @@ func TestOtpCeremony_ASignInInFlightWhenTheAuthenticatorIsReplacedStartsOver(t *
 				_ = resp.Body.Close()
 			}
 
-			removeAuthenticatorAsAdministrator(t, user.Id)
+			removeAuthenticatorAsAdministrator(t, user.ID)
 			setUpAnotherAuthenticator(t, user)
 
 			resp = loadPage(t, httpClient, next)
 			assertRedirect(t, resp, "/auth/level1")
 			_ = resp.Body.Close()
 
-			sessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
+			sessions, err := database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 			require.NoError(t, err)
 			require.Len(t, sessions, 1)
-			assert.Equal(t, record.AcrLevel2Optional, sessions[0].AcrLevel, "the sign-in did not raise the lowered session")
+			assert.Equal(t, record.ACRLevel2Optional, sessions[0].ACRLevel, "the sign-in did not raise the lowered session")
 			assert.Equal(t, "pwd", sessions[0].AuthMethods, "the sign-in did not put otp back on the lowered session")
 		})
 	}
 }
 
-// TestOtpCeremony_ASessionStillNamingARemovedAuthenticatorSignsInAgain: a session that kept level 3
+// TestOTPCeremony_ASessionStillNamingARemovedAuthenticatorSignsInAgain: a session that kept level 3
 // and "pwd otp" after its user's authenticator went, which is what every removal left before
 // removals lowered sessions. Migration 000062 ended those, and no write leaves one now, so this is
 // the second line: its claims are no longer true, so it vouches for nothing that names the code. A
 // silent request at a level 1 client is answered login_required, an interactive one starts over at
 // level 1, and a level 3 client asks for a new authenticator to be set up.
-func TestOtpCeremony_ASessionStillNamingARemovedAuthenticatorSignsInAgain(t *testing.T) {
-	httpClient, level3Client, level3RedirectUri, user := signInAtLevel3(t)
+func TestOTPCeremony_ASessionStillNamingARemovedAuthenticatorSignsInAgain(t *testing.T) {
+	httpClient, level3Client, level3RedirectURI, user := signInAtLevel3(t)
 
 	// The removal as it was before it lowered sessions: the secret cleared, the consumed step reset
 	// and the counter moved, the session left as it was.
 	user.OTPEnabled = false
 	user.OTPSecretEncrypted = nil
 	require.NoError(t, database.UpdateUser(context.Background(), nil, user))
-	require.NoError(t, database.ResetUserOTPStep(context.Background(), nil, user.Id))
-	advanceOtpConfigGeneration(t, user.Id)
+	require.NoError(t, database.ResetUserOTPStep(context.Background(), nil, user.ID))
+	advanceOTPConfigGeneration(t, user.ID)
 
-	level1Client, level1RedirectUri := createLevel1Client(t, false)
+	level1Client, level1RedirectURI := createLevel1Client(t, false)
 
 	// Silent: the step-up rule has nothing to ask at level 1, so the request reaches /auth/issue,
 	// which will not issue a code naming the removed authenticator.
-	silentUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + level1Client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(level1RedirectUri.URI) +
+	silentURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + level1Client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(level1RedirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + randomCodeChallenge() +
 		"&scope=openid" +
 		"&state=" + fake.LetterN(8) +
 		"&prompt=none"
-	resp := loadPage(t, httpClient, silentUrl)
+	resp := loadPage(t, httpClient, silentURL)
 	issueLocation := assertRedirect(t, resp, "/auth/issue")
 	_ = resp.Body.Close()
 	resp = loadPage(t, httpClient, issueLocation)
@@ -281,15 +281,15 @@ func TestOtpCeremony_ASessionStillNamingARemovedAuthenticatorSignsInAgain(t *tes
 	assert.Empty(t, answer.Query().Get("code"))
 
 	// Interactive: it starts over at level 1 rather than binding the session's "pwd otp".
-	where, page, _ := authorizeOnExistingSession(t, httpClient, level1Client, level1RedirectUri)
+	where, page, _ := authorizeOnExistingSession(t, httpClient, level1Client, level1RedirectURI)
 	_ = page.Body.Close()
 	assert.Equal(t, "/auth/level1", where, "a sign-in naming a removed authenticator asks for the password again")
 
 	// Level 3: the session's level matches, and the user has no authenticator, so one is set up.
-	where, page, _ = authorizeOnExistingSession(t, httpClient, level3Client, level3RedirectUri)
+	where, page, _ = authorizeOnExistingSession(t, httpClient, level3Client, level3RedirectURI)
 	defer func() { _ = page.Body.Close() }()
 	assert.Equal(t, "/auth/otp", where, "a level 3 sign-in of a user with no authenticator sets one up")
 	if where == "/auth/otp" {
-		assert.NotEmpty(t, getOtpSecretFromEnrollmentPage(t, page), "the OTP page must be the enrolment page")
+		assert.NotEmpty(t, getOTPSecretFromEnrollmentPage(t, page), "the OTP page must be the enrolment page")
 	}
 }

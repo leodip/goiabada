@@ -33,10 +33,10 @@ func storedLoopbackLogoutTarget() string {
 	return "http://127.0.0.1:8123/after-logout-" + fake.LetterN(8)
 }
 
-func storeSignOutRedirectURI(t *testing.T, clientId int64, uri string) {
+func storeSignOutRedirectURI(t *testing.T, clientID int64, uri string) {
 	t.Helper()
 	require.NoError(t, database.CreatePostLogoutRedirectURI(context.Background(), nil,
-		&record.PostLogoutRedirectURI{ClientId: clientId, URI: uri}))
+		&record.PostLogoutRedirectURI{ClientID: clientID, URI: uri}))
 }
 
 // assertSessionGone asserts the sign-out tore the session down whatever became of the redirect.
@@ -50,7 +50,7 @@ func assertSessionGone(t *testing.T, sessionIdentifier string) {
 func TestLogout_Hintless_AStoredPlainHTTPTargetIsDeclinedButTheLogoutHappens(t *testing.T) {
 	grant := createOfflineGrant(t)
 	target := storedPlainHTTPLogoutTarget()
-	storeSignOutRedirectURI(t, grant.client.Id, target)
+	storeSignOutRedirectURI(t, grant.client.ID, target)
 
 	resp := logoutThroughConsentPage(t, grant.httpClient, url.Values{
 		"post_logout_redirect_uri": {target},
@@ -65,10 +65,10 @@ func TestLogout_Hintless_AStoredPlainHTTPTargetIsDeclinedButTheLogoutHappens(t *
 	assertSessionGone(t, grant.sessionIdentifier)
 }
 
-func TestLogout_WithIdTokenHint_AStoredPlainHTTPTargetIsDeclinedButTheLogoutHappens(t *testing.T) {
+func TestLogout_WithIDTokenHint_AStoredPlainHTTPTargetIsDeclinedButTheLogoutHappens(t *testing.T) {
 	grant := createOfflineGrant(t)
 	target := storedPlainHTTPLogoutTarget()
-	storeSignOutRedirectURI(t, grant.client.Id, target)
+	storeSignOutRedirectURI(t, grant.client.ID, target)
 	idToken, _ := sessionBoundGrantOnSameSession(t, grant)
 
 	resp, err := grant.httpClient.Get(appConfig.AuthServer.BaseURL + "/auth/logout?id_token_hint=" + url.QueryEscape(idToken) +
@@ -85,7 +85,7 @@ func TestLogout_WithIdTokenHint_AStoredPlainHTTPTargetIsDeclinedButTheLogoutHapp
 func TestLogout_Hintless_AStoredLoopbackHTTPTargetStillRedirects(t *testing.T) {
 	grant := createOfflineGrant(t)
 	target := storedLoopbackLogoutTarget()
-	storeSignOutRedirectURI(t, grant.client.Id, target)
+	storeSignOutRedirectURI(t, grant.client.ID, target)
 
 	resp := logoutThroughConsentPage(t, grant.httpClient, url.Values{
 		"post_logout_redirect_uri": {target},
@@ -105,10 +105,10 @@ func TestLogout_Hintless_AStoredLoopbackHTTPTargetStillRedirects(t *testing.T) {
 func TestAPIAccountLogoutRequest_RefusesATargetLogoutWouldDecline(t *testing.T) {
 	_, accessToken, code := getUserAccessTokenAndCodeForAccountScope(t)
 	storedPlainHTTP := storedPlainHTTPLogoutTarget()
-	storeSignOutRedirectURI(t, code.ClientId, storedPlainHTTP)
+	storeSignOutRedirectURI(t, code.ClientID, storedPlainHTTP)
 	// A row no intake accepts, as #122's legacy redirect URIs were.
 	storedSchemeRelative := "//rp.example.com/after-logout-" + fake.LetterN(8)
-	storeSignOutRedirectURI(t, code.ClientId, storedSchemeRelative)
+	storeSignOutRedirectURI(t, code.ClientID, storedSchemeRelative)
 
 	const (
 		insecureHTTP = "postLogoutRedirectUri must not use plain http on a host other than the loopback interface (127.0.0.1, [::1] or localhost)"
@@ -129,7 +129,7 @@ func TestAPIAccountLogoutRequest_RefusesATargetLogoutWouldDecline(t *testing.T) 
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			resp := makeAPIRequest(t, "POST", urlLogoutReq, accessToken, api.AccountLogoutRequest{
-				PostLogoutRedirectUri: tc.target,
+				PostLogoutRedirectURI: tc.target,
 				ClientIdentifier:      tc.clientIdentifier,
 			})
 			defer func() { _ = resp.Body.Close() }()
@@ -147,18 +147,18 @@ func TestAPIAccountLogoutRequest_RefusesATargetLogoutWouldDecline(t *testing.T) 
 func TestAPIAccountLogoutRequest_AStoredLoopbackHTTPTargetStillSignsOutAndRedirects(t *testing.T) {
 	httpClientWithCookies, accessToken, code := getUserAccessTokenAndCodeForAccountScope(t)
 	target := storedLoopbackLogoutTarget()
-	storeSignOutRedirectURI(t, code.ClientId, target)
+	storeSignOutRedirectURI(t, code.ClientID, target)
 
 	// Resolved by URI, the path that scans every client's rows.
 	resp := makeAPIRequest(t, "POST", appConfig.AuthServer.BaseURL+"/api/v1/account/logout-request", accessToken,
-		api.AccountLogoutRequest{PostLogoutRedirectUri: target, State: "abc"})
+		api.AccountLogoutRequest{PostLogoutRedirectURI: target, State: "abc"})
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
 	var out api.AccountLogoutRedirectResponse
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
 
-	logoutResp, err := httpClientWithCookies.Get(out.LogoutUrl)
+	logoutResp, err := httpClientWithCookies.Get(out.LogoutURL)
 	require.NoError(t, err)
 	defer func() { _ = logoutResp.Body.Close() }()
 

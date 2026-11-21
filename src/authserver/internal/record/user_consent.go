@@ -7,11 +7,11 @@ import (
 )
 
 type UserConsent struct {
-	Id        int64        `db:"id" fieldtag:"pk"`
+	ID        int64        `db:"id" fieldtag:"pk"`
 	CreatedAt sql.NullTime `db:"created_at" fieldtag:"dont-update"`
 	UpdatedAt sql.NullTime `db:"updated_at"`
-	UserId    int64        `db:"user_id"`
-	ClientId  int64        `db:"client_id"`
+	UserID    int64        `db:"user_id"`
+	ClientID  int64        `db:"client_id"`
 	Client    Client       `db:"-"`
 	Scope     string       `db:"scope"`
 	GrantedAt sql.NullTime `db:"granted_at"`

@@ -14,17 +14,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func getUserAccessTokenWithAccountScope_Phone(t *testing.T) (string, *record.User) {
+func getUserAccessTokenWithAccountScopePhone(t *testing.T) (string, *record.User) {
 	scope := "openid profile email " + builtin.AuthServerResourceIdentifier + ":" + builtin.ManageAccountPermissionIdentifier
 	return createUserAccessTokenWithScope(t, scope)
 }
 
 func TestAPIAccountPhonePut_Success(t *testing.T) {
-	accessToken, u := getUserAccessTokenWithAccountScope_Phone(t)
+	accessToken, u := getUserAccessTokenWithAccountScopePhone(t)
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/phone"
 	reqBody := api.UpdateAccountPhoneRequest{
-		PhoneCountryUniqueId: "USA_0",
+		PhoneCountryUniqueID: "USA_0",
 		PhoneNumber:          "555-123-4567",
 	}
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
@@ -39,18 +39,18 @@ func TestAPIAccountPhonePut_Success(t *testing.T) {
 	var updateResp api.UpdateUserResponse
 	err := json.NewDecoder(resp.Body).Decode(&updateResp)
 	require.NoError(t, err)
-	assert.Equal(t, u.Id, updateResp.User.Id)
-	assert.Equal(t, reqBody.PhoneCountryUniqueId, updateResp.User.PhoneNumberCountryUniqueId)
+	assert.Equal(t, u.ID, updateResp.User.ID)
+	assert.Equal(t, reqBody.PhoneCountryUniqueID, updateResp.User.PhoneNumberCountryUniqueID)
 	assert.Equal(t, reqBody.PhoneNumber, updateResp.User.PhoneNumber)
 	assert.False(t, updateResp.User.PhoneNumberVerified)
 	// USA_0 must resolve to the "+"-prefixed calling code in the API response.
 	assert.Equal(t, "+1", updateResp.User.PhoneNumberCountryCallingCode)
 
 	// Verify persisted changes
-	updatedUser, err := database.GetUserById(context.Background(), nil, u.Id)
+	updatedUser, err := database.GetUserByID(context.Background(), nil, u.ID)
 	require.NoError(t, err)
 	assert.NotNil(t, updatedUser)
-	assert.Equal(t, reqBody.PhoneCountryUniqueId, updatedUser.PhoneNumberCountryUniqueId)
+	assert.Equal(t, reqBody.PhoneCountryUniqueID, updatedUser.PhoneNumberCountryUniqueID)
 	assert.Equal(t, reqBody.PhoneNumber, updatedUser.PhoneNumber)
 	assert.False(t, updatedUser.PhoneNumberVerified)
 	// The "+"-prefixed calling code must be persisted, not just returned.
@@ -58,18 +58,18 @@ func TestAPIAccountPhonePut_Success(t *testing.T) {
 }
 
 func TestAPIAccountPhonePut_ClearPhone(t *testing.T) {
-	accessToken, u := getUserAccessTokenWithAccountScope_Phone(t)
+	accessToken, u := getUserAccessTokenWithAccountScopePhone(t)
 
 	// First set a phone
 	setURL := appConfig.AuthServer.BaseURL + "/api/v1/account/phone"
 	_ = makeAPIRequest(t, "PUT", setURL, accessToken, api.UpdateAccountPhoneRequest{
-		PhoneCountryUniqueId: "USA_0",
+		PhoneCountryUniqueID: "USA_0",
 		PhoneNumber:          "555-000-1111",
 	})
 
 	// Now clear it
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/phone"
-	reqBody := api.UpdateAccountPhoneRequest{PhoneCountryUniqueId: "", PhoneNumber: ""}
+	reqBody := api.UpdateAccountPhoneRequest{PhoneCountryUniqueID: "", PhoneNumber: ""}
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -77,19 +77,19 @@ func TestAPIAccountPhonePut_ClearPhone(t *testing.T) {
 	var updateResp api.UpdateUserResponse
 	err := json.NewDecoder(resp.Body).Decode(&updateResp)
 	require.NoError(t, err)
-	assert.Equal(t, u.Id, updateResp.User.Id)
-	assert.Empty(t, updateResp.User.PhoneNumberCountryUniqueId)
+	assert.Equal(t, u.ID, updateResp.User.ID)
+	assert.Empty(t, updateResp.User.PhoneNumberCountryUniqueID)
 	assert.Empty(t, updateResp.User.PhoneNumberCountryCallingCode)
 	assert.Empty(t, updateResp.User.PhoneNumber)
 	assert.False(t, updateResp.User.PhoneNumberVerified)
 }
 
 func TestAPIAccountPhonePut_ValidationErrors(t *testing.T) {
-	accessToken, _ := getUserAccessTokenWithAccountScope_Phone(t)
+	accessToken, _ := getUserAccessTokenWithAccountScopePhone(t)
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/phone"
 
 	// Phone number without country
-	resp1 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateAccountPhoneRequest{PhoneCountryUniqueId: "", PhoneNumber: "555-123-4567"})
+	resp1 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateAccountPhoneRequest{PhoneCountryUniqueID: "", PhoneNumber: "555-123-4567"})
 	defer func() { _ = resp1.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp1.StatusCode)
 	var err1 api.ErrorResponse
@@ -97,7 +97,7 @@ func TestAPIAccountPhonePut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, "You must select a country for your phone number.", err1.ErrorDescription)
 
 	// Country without phone number
-	resp2 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateAccountPhoneRequest{PhoneCountryUniqueId: "USA_0", PhoneNumber: ""})
+	resp2 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateAccountPhoneRequest{PhoneCountryUniqueID: "USA_0", PhoneNumber: ""})
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
 	var err2 api.ErrorResponse
@@ -105,7 +105,7 @@ func TestAPIAccountPhonePut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, "Enter the phone number. To remove it, set the country to Not set.", err2.ErrorDescription)
 
 	// Too short
-	resp3 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateAccountPhoneRequest{PhoneCountryUniqueId: "USA_0", PhoneNumber: "123"})
+	resp3 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateAccountPhoneRequest{PhoneCountryUniqueID: "USA_0", PhoneNumber: "123"})
 	defer func() { _ = resp3.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp3.StatusCode)
 	var err3 api.ErrorResponse
@@ -113,7 +113,7 @@ func TestAPIAccountPhonePut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, "The phone number must be at least 6 digits long.", err3.ErrorDescription)
 
 	// Too long (>30) with non-simple pattern
-	resp4 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateAccountPhoneRequest{PhoneCountryUniqueId: "USA_0", PhoneNumber: "1234567890123456789012345678901"})
+	resp4 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateAccountPhoneRequest{PhoneCountryUniqueID: "USA_0", PhoneNumber: "1234567890123456789012345678901"})
 	defer func() { _ = resp4.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp4.StatusCode)
 	var err4 api.ErrorResponse
@@ -121,7 +121,7 @@ func TestAPIAccountPhonePut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, "The maximum allowed length for a phone number is 30 characters.", err4.ErrorDescription)
 
 	// Invalid characters
-	resp5 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateAccountPhoneRequest{PhoneCountryUniqueId: "USA_0", PhoneNumber: "555-ABC-DEFG"})
+	resp5 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateAccountPhoneRequest{PhoneCountryUniqueID: "USA_0", PhoneNumber: "555-ABC-DEFG"})
 	defer func() { _ = resp5.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp5.StatusCode)
 	var err5 api.ErrorResponse
@@ -129,7 +129,7 @@ func TestAPIAccountPhonePut_ValidationErrors(t *testing.T) {
 	assert.Equal(t, "Please enter a valid number. Phone numbers can contain only digits, and may include single spaces or hyphens as separators.", err5.ErrorDescription)
 
 	// Invalid country id
-	resp6 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateAccountPhoneRequest{PhoneCountryUniqueId: "INVALID_COUNTRY", PhoneNumber: "555-123-4567"})
+	resp6 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateAccountPhoneRequest{PhoneCountryUniqueID: "INVALID_COUNTRY", PhoneNumber: "555-123-4567"})
 	defer func() { _ = resp6.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp6.StatusCode)
 	var err6 api.ErrorResponse
@@ -143,7 +143,7 @@ func TestAPIAccountPhonePut_UnauthorizedAndScope(t *testing.T) {
 	// No token
 	req, err := http.NewRequest("PUT", url, nil)
 	require.NoError(t, err)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -153,7 +153,7 @@ func TestAPIAccountPhonePut_UnauthorizedAndScope(t *testing.T) {
 	assert.Contains(t, string(body1), "Access token required.")
 
 	// Invalid token
-	respInvalid := makeAPIRequest(t, "PUT", url, "invalid-token", api.UpdateAccountPhoneRequest{PhoneCountryUniqueId: "USA_0", PhoneNumber: "555-123-4567"})
+	respInvalid := makeAPIRequest(t, "PUT", url, "invalid-token", api.UpdateAccountPhoneRequest{PhoneCountryUniqueID: "USA_0", PhoneNumber: "555-123-4567"})
 	defer func() { _ = respInvalid.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, respInvalid.StatusCode)
 	bodyInvalid, _ := io.ReadAll(respInvalid.Body)
@@ -161,7 +161,7 @@ func TestAPIAccountPhonePut_UnauthorizedAndScope(t *testing.T) {
 
 	// Insufficient scope
 	tok := createClientCredentialsTokenWithoutRouteScope(t)
-	resp2 := makeAPIRequest(t, "PUT", url, tok, api.UpdateAccountPhoneRequest{PhoneCountryUniqueId: "USA_0", PhoneNumber: "555-123-4567"})
+	resp2 := makeAPIRequest(t, "PUT", url, tok, api.UpdateAccountPhoneRequest{PhoneCountryUniqueID: "USA_0", PhoneNumber: "555-123-4567"})
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusForbidden, resp2.StatusCode)
 	body2, _ := io.ReadAll(resp2.Body)
@@ -169,7 +169,7 @@ func TestAPIAccountPhonePut_UnauthorizedAndScope(t *testing.T) {
 }
 
 func TestAPIAccountPhonePut_InvalidRequestBody(t *testing.T) {
-	accessToken, _ := getUserAccessTokenWithAccountScope_Phone(t)
+	accessToken, _ := getUserAccessTokenWithAccountScopePhone(t)
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/phone"
 
 	// Invalid JSON (no body)
@@ -177,7 +177,7 @@ func TestAPIAccountPhonePut_InvalidRequestBody(t *testing.T) {
 	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()

@@ -87,7 +87,7 @@ func TestMigration000061_DCRClientsLegacyFlowsOff(t *testing.T) {
 			ResourceOwnerPasswordCredentialsEnabled: c.ropc,
 		}
 		require.NoErrorf(t, h.DB.CreateClient(ctx, nil, client), "seed client %s on %s", c.identifier, dbType())
-		ids[i] = client.Id
+		ids[i] = client.ID
 	}
 
 	// 4. Down to 000060 changes nothing: the seeded values are still what the seed wrote.
@@ -114,10 +114,10 @@ func nullBoolOf(b *bool) sql.NullBool {
 	return sql.NullBool{Valid: true, Bool: *b}
 }
 
-func readLegacyFlowSwitches000061(t *testing.T, h *isolatedDB, clientId int64) (sql.NullBool, sql.NullBool) {
+func readLegacyFlowSwitches000061(t *testing.T, h *isolatedDB, clientID int64) (sql.NullBool, sql.NullBool) {
 	t.Helper()
 	var implicit, ropc sql.NullBool
-	q := fmt.Sprintf("SELECT implicit_grant_enabled, resource_owner_password_credentials_enabled FROM clients WHERE id = %d", clientId)
+	q := fmt.Sprintf("SELECT implicit_grant_enabled, resource_owner_password_credentials_enabled FROM clients WHERE id = %d", clientID)
 	require.NoErrorf(t, h.SQL.QueryRow(q).Scan(&implicit, &ropc), "read the legacy flow switches on %s", dbType())
 	return implicit, ropc
 }

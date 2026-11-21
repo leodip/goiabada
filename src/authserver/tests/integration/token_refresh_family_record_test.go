@@ -39,21 +39,21 @@ func TestToken_Refresh_ARecordedFamilyRefusesALiveChild(t *testing.T) {
 	rt1 := exchangeAuthCode(t, httpClient, code.Client.ClientIdentifier, clientSecret,
 		code.Code, code.RedirectURI, testCodeVerifier)
 	rt2 := rotateRefreshToken(t, httpClient, code.Client.ClientIdentifier, clientSecret, rt1)
-	child := refreshTokenRowByJti(t, rt2)
+	child := refreshTokenRowByJTI(t, rt2)
 	require.False(t, child.Revoked, "the child starts out live")
 
 	// The control: before the record exists the live child rotates, which is what makes the refusal
 	// below the record's and not something the child trips anyway.
-	written, err := database.RecordRefreshTokenFamilyRevoked(context.Background(), nil, child.FirstRefreshTokenJti, "test_family_record")
+	written, err := database.RecordRefreshTokenFamilyRevoked(context.Background(), nil, child.FirstRefreshTokenJTI, "test_family_record")
 	require.NoError(t, err)
 	require.True(t, written)
 
 	status, body := replayRefreshToken(t, httpClient, code.Client.ClientIdentifier, clientSecret, rt2)
 	requireRefusedAsAnInvalidRefreshToken(t, status, body, "a live child of a recorded family")
 
-	assert.False(t, refreshTokenRowByJti(t, rt2).Revoked,
+	assert.False(t, refreshTokenRowByJTI(t, rt2).Revoked,
 		"the refusal came before any claim, so the child was not spent")
-	rows, err := database.GetRefreshTokensByCodeId(context.Background(), nil, code.Id)
+	rows, err := database.GetRefreshTokensByCodeID(context.Background(), nil, code.ID)
 	require.NoError(t, err)
 	assert.Len(t, rows, 2, "no row was inserted by the refused refresh")
 }
@@ -68,7 +68,7 @@ func TestToken_Refresh_ARecordedFamilyRefusesALiveROPCChild(t *testing.T) {
 	client := createROPCClient(t, clientSecret, false)
 	user := createROPCUser(t, password)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	data := postToTokenEndpoint(t, httpClient, appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
 		"grant_type":    {"password"},
 		"client_id":     {client.ClientIdentifier},
@@ -80,17 +80,17 @@ func TestToken_Refresh_ARecordedFamilyRefusesALiveROPCChild(t *testing.T) {
 	require.NotNil(t, data["refresh_token"], "the ROPC grant must return a refresh token")
 	rt1 := data["refresh_token"].(string)
 	rt2 := rotateRefreshToken(t, httpClient, client.ClientIdentifier, clientSecret, rt1)
-	child := refreshTokenRowByJti(t, rt2)
-	require.False(t, child.CodeId.Valid, "a ROPC child has no code behind it")
+	child := refreshTokenRowByJTI(t, rt2)
+	require.False(t, child.CodeID.Valid, "a ROPC child has no code behind it")
 
-	written, err := database.RecordRefreshTokenFamilyRevoked(context.Background(), nil, child.FirstRefreshTokenJti, "test_family_record")
+	written, err := database.RecordRefreshTokenFamilyRevoked(context.Background(), nil, child.FirstRefreshTokenJTI, "test_family_record")
 	require.NoError(t, err)
 	require.True(t, written)
 
 	status, body := replayRefreshToken(t, httpClient, client.ClientIdentifier, clientSecret, rt2)
 	requireRefusedAsAnInvalidRefreshToken(t, status, body, "a live ROPC child of a recorded family")
 
-	assert.False(t, refreshTokenRowByJti(t, rt2).Revoked, "the refusal came before any claim")
+	assert.False(t, refreshTokenRowByJTI(t, rt2).Revoked, "the refusal came before any claim")
 }
 
 // A replay's containment writes the family's record, and a repeated replay is answered as before:
@@ -105,7 +105,7 @@ func TestToken_Refresh_AReplayRecordsTheFamilyAndARepeatStillAnswersAsRevoked(t 
 	rt1 := exchangeAuthCode(t, httpClient, code.Client.ClientIdentifier, clientSecret,
 		code.Code, code.RedirectURI, testCodeVerifier)
 	rt2 := rotateRefreshToken(t, httpClient, code.Client.ClientIdentifier, clientSecret, rt1)
-	first := refreshTokenRowByJti(t, rt1).FirstRefreshTokenJti
+	first := refreshTokenRowByJTI(t, rt1).FirstRefreshTokenJTI
 
 	recorded, err := database.IsRefreshTokenFamilyRevoked(context.Background(), nil, first)
 	require.NoError(t, err)
@@ -120,7 +120,7 @@ func TestToken_Refresh_AReplayRecordsTheFamilyAndARepeatStillAnswersAsRevoked(t 
 	recorded, err = database.IsRefreshTokenFamilyRevoked(context.Background(), nil, first)
 	require.NoError(t, err)
 	assert.True(t, recorded, "the containment wrote the family's record")
-	assert.True(t, refreshTokenRowByJti(t, rt2).Revoked, "and revoked the live successor")
+	assert.True(t, refreshTokenRowByJTI(t, rt2).Revoked, "and revoked the live successor")
 
 	// Every later presentation of the family, the retired parent or the contained successor, is a
 	// revoked row and is answered as one.
@@ -147,7 +147,7 @@ func TestToken_Refresh_ARecordedFamilyLeavesOtherFamiliesRotating(t *testing.T) 
 		rawCodeB, redirectB, testCodeVerifier+"-second-client")
 
 	written, err := database.RecordRefreshTokenFamilyRevoked(context.Background(), nil,
-		refreshTokenRowByJti(t, rtA1).FirstRefreshTokenJti, "test_family_record")
+		refreshTokenRowByJTI(t, rtA1).FirstRefreshTokenJTI, "test_family_record")
 	require.NoError(t, err)
 	require.True(t, written)
 

@@ -102,14 +102,14 @@ func (o *Level1Completion) Run(ctx context.Context, browser level1CompletionBrow
 	authContext *ceremony.AuthContext, sessionIdentifier string) (Level1CompletionResult, error) {
 
 	if authContext.DeferredErrorCode != "" {
-		client := clientProvenance(ctx, o.database, authContext.ClientId)
+		client := clientProvenance(ctx, o.database, authContext.ClientID)
 		return Level1CompletionResult{
 			DeferredError: &ClientError{
 				Client:      client,
 				Code:        authContext.DeferredErrorCode,
 				Description: authContext.DeferredErrorDescription,
 			},
-			ClearErr: browser.ClearAuthContext(authContext.CeremonyId),
+			ClearErr: browser.ClearAuthContext(authContext.CeremonyID),
 		}, nil
 	}
 
@@ -122,14 +122,14 @@ func (o *Level1Completion) Run(ctx context.Context, browser level1CompletionBrow
 		return Level1CompletionResult{}, err
 	}
 
-	client, err := o.database.GetClientByClientIdentifier(ctx, nil, authContext.ClientId)
+	client, err := o.database.GetClientByClientIdentifier(ctx, nil, authContext.ClientID)
 	if err != nil {
 		return Level1CompletionResult{}, err
 	}
 	if client == nil {
-		return Level1CompletionResult{}, errs.Errorf("client %v not found", authContext.ClientId)
+		return Level1CompletionResult{}, errs.Errorf("client %v not found", authContext.ClientID)
 	}
-	targetAcrLevel := authContext.GetTargetAcrLevel(client.DefaultAcrLevel)
+	targetACRLevel := authContext.GetTargetACRLevel(client.DefaultACRLevel)
 
 	var reusableSession *record.UserSession
 	if !authContext.Level1AuthCompleted && o.sessions.HasValidUserSession(userSession,
@@ -140,7 +140,7 @@ func (o *Level1Completion) Run(ctx context.Context, browser level1CompletionBrow
 
 	// UserSessionLoadUser populated the session's user, so the rule's OTP configuration comparison
 	// costs no query.
-	stepUp, err := ceremony.StepUpOwed(targetAcrLevel, reusableSession)
+	stepUp, err := ceremony.StepUpOwed(targetACRLevel, reusableSession)
 	if err != nil {
 		return Level1CompletionResult{}, err
 	}

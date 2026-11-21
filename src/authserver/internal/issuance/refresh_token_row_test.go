@@ -40,22 +40,22 @@ func TestGenerateRefreshToken_Offline(t *testing.T) {
 	require.NoError(t, err)
 
 	code := &record.Code{
-		Id:                1,
-		ClientId:          1,
-		UserId:            1,
+		ID:                1,
+		ClientID:          1,
+		UserID:            1,
 		Scope:             "openid offline_access",
 		Nonce:             "test-nonce",
 		AuthenticatedAt:   now.Add(-5 * time.Minute),
 		SessionIdentifier: sessionIdentifier,
 	}
 	client := &record.Client{
-		Id:                                      1,
+		ID:                                      1,
 		ClientIdentifier:                        "test-client",
 		RefreshTokenOfflineIdleTimeoutInSeconds: 7200,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 172800,
 	}
 	user := &record.User{
-		Id:      1,
+		ID:      1,
 		Subject: sub,
 	}
 
@@ -111,20 +111,20 @@ func TestGenerateRefreshToken_Refresh(t *testing.T) {
 	require.NoError(t, err)
 
 	code := &record.Code{
-		Id:                2,
-		ClientId:          2,
-		UserId:            2,
+		ID:                2,
+		ClientID:          2,
+		UserID:            2,
 		Scope:             "openid",
 		Nonce:             "refresh-nonce",
 		AuthenticatedAt:   now.Add(-10 * time.Minute),
 		SessionIdentifier: sessionIdentifier,
 	}
 	client := &record.Client{
-		Id:               2,
+		ID:               2,
 		ClientIdentifier: "refresh-client",
 	}
 	user := &record.User{
-		Id:      2,
+		ID:      2,
 		Subject: sub,
 	}
 
@@ -133,8 +133,8 @@ func TestGenerateRefreshToken_Refresh(t *testing.T) {
 
 	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*record.RefreshToken")).Return(nil)
 	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(&record.UserSession{
-		Id:           1,
-		UserId:       2,
+		ID:           1,
+		UserID:       2,
 		Started:      now.Add(-30 * time.Minute),
 		LastAccessed: now.Add(-5 * time.Minute),
 	}, nil)
@@ -186,20 +186,20 @@ func TestGenerateRefreshToken_WithExistingRefreshToken(t *testing.T) {
 	require.NoError(t, err)
 
 	code := &record.Code{
-		Id:                3,
-		ClientId:          3,
-		UserId:            3,
+		ID:                3,
+		ClientID:          3,
+		UserID:            3,
 		Scope:             "openid offline_access",
 		Nonce:             "existing-nonce",
 		AuthenticatedAt:   now.Add(-15 * time.Minute),
 		SessionIdentifier: sessionIdentifier,
 	}
 	client := &record.Client{
-		Id:               3,
+		ID:               3,
 		ClientIdentifier: "existing-client",
 	}
 	user := &record.User{
-		Id:      3,
+		ID:      3,
 		Subject: sub,
 	}
 
@@ -207,9 +207,9 @@ func TestGenerateRefreshToken_WithExistingRefreshToken(t *testing.T) {
 	code.User = *user
 
 	existingRefreshToken := &record.RefreshToken{
-		Id:                   1,
-		RefreshTokenJti:      "existing-jti",
-		FirstRefreshTokenJti: "first-jti",
+		ID:                   1,
+		RefreshTokenJTI:      "existing-jti",
+		FirstRefreshTokenJTI: "first-jti",
 		MaxLifetime:          sql.NullTime{Time: now.Add(24 * time.Hour), Valid: true},
 	}
 
@@ -240,8 +240,8 @@ func TestGenerateRefreshToken_WithExistingRefreshToken(t *testing.T) {
 	mockDB.AssertExpectations(t)
 
 	mockDB.AssertCalled(t, "CreateRefreshToken", mock.Anything, mock.Anything, mock.MatchedBy(func(rt *record.RefreshToken) bool {
-		return rt.PreviousRefreshTokenJti == "existing-jti" &&
-			rt.FirstRefreshTokenJti == "first-jti"
+		return rt.PreviousRefreshTokenJTI == "existing-jti" &&
+			rt.FirstRefreshTokenJTI == "first-jti"
 	}))
 }
 
@@ -267,22 +267,22 @@ func TestGenerateRefreshToken_OfflineMaxLifetimeLimit(t *testing.T) {
 	require.NoError(t, err)
 
 	code := &record.Code{
-		Id:                4,
-		ClientId:          4,
-		UserId:            4,
+		ID:                4,
+		ClientID:          4,
+		UserID:            4,
 		Scope:             "openid offline_access",
 		Nonce:             "max-lifetime-nonce",
 		AuthenticatedAt:   initialTime.Add(-22 * time.Hour), // 22 hours ago
 		SessionIdentifier: sessionIdentifier,
 	}
 	client := &record.Client{
-		Id:                                      4,
+		ID:                                      4,
 		ClientIdentifier:                        "max-lifetime-client",
 		RefreshTokenOfflineIdleTimeoutInSeconds: 7200,   // 2 hours
 		RefreshTokenOfflineMaxLifetimeInSeconds: 172800, // 48 hours (client setting)
 	}
 	user := &record.User{
-		Id:      4,
+		ID:      4,
 		Subject: sub,
 	}
 
@@ -295,10 +295,10 @@ func TestGenerateRefreshToken_OfflineMaxLifetimeLimit(t *testing.T) {
 	secondRefreshTime := initialTime.Add(-1 * time.Hour)
 
 	secondRefreshToken := &record.RefreshToken{
-		Id:                      2,
-		RefreshTokenJti:         "second-jti",
-		FirstRefreshTokenJti:    "first-jti",
-		PreviousRefreshTokenJti: "first-jti",
+		ID:                      2,
+		RefreshTokenJTI:         "second-jti",
+		FirstRefreshTokenJTI:    "first-jti",
+		PreviousRefreshTokenJTI: "first-jti",
 		MaxLifetime:             sql.NullTime{Time: initialTime.Add(1 * time.Hour), Valid: true},
 		IssuedAt:                sql.NullTime{Time: secondRefreshTime, Valid: true},
 	}
@@ -339,8 +339,8 @@ func TestGenerateRefreshToken_OfflineMaxLifetimeLimit(t *testing.T) {
 
 	// Verify that the correct previous and first refresh token JTIs are used
 	mockDB.AssertCalled(t, "CreateRefreshToken", mock.Anything, mock.Anything, mock.MatchedBy(func(rt *record.RefreshToken) bool {
-		return rt.PreviousRefreshTokenJti == "second-jti" &&
-			rt.FirstRefreshTokenJti == "first-jti"
+		return rt.PreviousRefreshTokenJTI == "second-jti" &&
+			rt.FirstRefreshTokenJTI == "first-jti"
 	}))
 }
 

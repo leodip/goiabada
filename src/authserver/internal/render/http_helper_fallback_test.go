@@ -82,13 +82,13 @@ func TestInternalServerError_RenderFailureWritesCatalogTextAndLogsTheRenderError
 	require.True(t, isError)
 	assert.Contains(t, renderErr.Error(), "never_defined", "the record carries what the body must not")
 
-	requestId, isString := records[1].Attrs["request_id"].(string)
+	requestID, isString := records[1].Attrs["request_id"].(string)
 	require.True(t, isString, "request_id must be a string attribute")
-	require.NotEmpty(t, requestId)
+	require.NotEmpty(t, requestID)
 
 	body := w.Body.String()
 	assert.Equal(t, catalogText(t, "error.body")+" "+catalogText(t, "error.request_id_label")+" "+
-		requestId+"\n", body)
+		requestID+"\n", body)
 	assert.NotContains(t, body, "never_defined")
 	assert.NotContains(t, body, "template")
 	assert.NotContains(t, body, failure.Error())
@@ -122,16 +122,16 @@ func TestInternalServerError_WithoutSettingsAnswersThePlainTextFallback(t *testi
 	require.True(t, isError)
 	require.ErrorIs(t, renderErr, reqctx.ErrNoSettings)
 
-	requestId, isString := records[1].Attrs["request_id"].(string)
+	requestID, isString := records[1].Attrs["request_id"].(string)
 	require.True(t, isString, "request_id must be a string attribute")
-	require.NotEmpty(t, requestId)
+	require.NotEmpty(t, requestID)
 	assert.Equal(t, catalogText(t, "error.body")+" "+catalogText(t, "error.request_id_label")+" "+
-		requestId+"\n", w.Body.String())
+		requestID+"\n", w.Body.String())
 }
 
 // requestid.Middleware adopts an inbound X-Request-Id verbatim, so the one variable in the body is the
 // caller's to choose. A megabyte of it, led by control bytes, comes back escaped and clipped.
-func TestInternalServerError_RenderFailureBoundsAClientChosenRequestId(t *testing.T) {
+func TestInternalServerError_RenderFailureBoundsAClientChosenRequestID(t *testing.T) {
 	_ = logtest.CaptureSlog(t)
 	httpHelper := failingErrorPageHelper()
 

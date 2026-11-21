@@ -40,10 +40,10 @@ func TestInitRoutes_EveryBearerRouteSpendsTheDPoPProofOnce(t *testing.T) {
 			}
 		}
 		t.Run(method+" "+route, func(t *testing.T) {
-			assert.Equal(t, "JwtAuthorizationHeaderToContext", guards[0], "the parse guard comes first: %v", guards)
+			assert.Equal(t, "JWTAuthorizationHeaderToContext", guards[0], "the parse guard comes first: %v", guards)
 			count := 0
 			for _, g := range guards {
-				if g == "JwtAuthorizationHeaderToContext" {
+				if g == "JWTAuthorizationHeaderToContext" {
 					count++
 				}
 			}

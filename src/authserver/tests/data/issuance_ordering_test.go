@@ -26,11 +26,11 @@ type issuanceOutcome struct {
 func ceremonyCodeInput(client *record.Client, user *record.User, sessionIdentifier string) *issuance.CreateCodeInput {
 	authenticatedAt := time.Now().UTC().Add(-time.Minute)
 	return &issuance.CreateCodeInput{
-		ClientId:          client.ClientIdentifier,
-		UserId:            user.Id,
+		ClientID:          client.ClientIdentifier,
+		UserID:            user.ID,
 		RedirectURI:       "https://example.com/callback",
 		Scope:             "openid profile",
-		AcrLevel:          "urn:goiabada:level1",
+		ACRLevel:          "urn:goiabada:level1",
 		AuthMethods:       "pwd",
 		AuthenticatedAt:   &authenticatedAt,
 		SessionIdentifier: sessionIdentifier,
@@ -87,7 +87,7 @@ func runIssuanceOrderingAgainstTermination(t *testing.T, db data.Database, other
 	t.Run("issuance goes first and the termination waits", func(t *testing.T) {
 		client := createTestClientOn(t, db)
 		user := createTestUserOn(t, db)
-		session := createTestUserSessionOn(t, db, user.Id)
+		session := createTestUserSessionOn(t, db, user.ID)
 
 		tx, err := db.BeginTransaction(context.Background())
 		require.NoError(t, err, "opening the ceremony's transaction")
@@ -128,14 +128,14 @@ func runIssuanceOrderingAgainstTermination(t *testing.T, db data.Database, other
 		// if the sweep read a snapshot taken before the insert rather than the committed row.
 		assert.Equal(t, int64(1), outcome.result.RevokedCodeCount,
 			"the termination's code sweep must mark the code inserted before it arrived")
-		assertCodeRevokedOn(t, db, code.Id, true, "the code the client received")
-		assertSessionGoneOn(t, db, session.Id, "the terminated session")
+		assertCodeRevokedOn(t, db, code.ID, true, "the code the client received")
+		assertSessionGoneOn(t, db, session.ID, "the terminated session")
 	})
 
 	t.Run("the termination goes first and issuance waits", func(t *testing.T) {
 		client := createTestClientOn(t, db)
 		user := createTestUserOn(t, db)
-		session := createTestUserSessionOn(t, db, user.Id)
+		session := createTestUserSessionOn(t, db, user.ID)
 
 		// revocation.TerminateUserSessionTx owns and commits its own transaction, so an ordering that needs
 		// the termination HELD OPEN across the ceremony's arrival replays its statements by hand;
@@ -186,7 +186,7 @@ func runIssuanceOrderingAgainstTermination(t *testing.T, db data.Database, other
 		leftBehind, err := db.RevokeCodesBySessionIdentifier(context.Background(), nil, session.SessionIdentifier)
 		require.NoError(t, err, "sweeping the terminated session once more")
 		assert.Zero(t, leftBehind, "no code of the terminated session may exist unrevoked")
-		assertSessionGoneOn(t, db, session.Id, "the terminated session")
+		assertSessionGoneOn(t, db, session.ID, "the terminated session")
 	})
 }
 
@@ -195,7 +195,7 @@ func runIssuanceOrderingAgainstTermination(t *testing.T, db data.Database, other
 // ordering that needs the termination HELD OPEN across the other party's arrival cannot call it;
 // the ordering that does not is driven through the real function.
 func terminationStatements(db data.Database, tx *sql.Tx, session *record.UserSession) error {
-	if err := db.DeleteUserSession(context.Background(), tx, session.Id); err != nil {
+	if err := db.DeleteUserSession(context.Background(), tx, session.ID); err != nil {
 		return err
 	}
 	if _, err := db.RevokeCodesBySessionIdentifier(context.Background(), tx, session.SessionIdentifier); err != nil {
@@ -206,10 +206,10 @@ func terminationStatements(db data.Database, tx *sql.Tx, session *record.UserSes
 		return err
 	}
 	for _, rt := range tokens {
-		if rt.FirstRefreshTokenJti == "" {
+		if rt.FirstRefreshTokenJTI == "" {
 			continue
 		}
-		if _, err := db.RecordRefreshTokenFamilyRevoked(context.Background(), tx, rt.FirstRefreshTokenJti,
+		if _, err := db.RecordRefreshTokenFamilyRevoked(context.Background(), tx, rt.FirstRefreshTokenJTI,
 			revocation.ReasonSessionTerminated); err != nil {
 			return err
 		}
@@ -228,9 +228,9 @@ func terminationStatements(db data.Database, tx *sql.Tx, session *record.UserSes
 
 // assertSessionGoneOn reloads through the handle it is given, for the reason assertCodeRevokedOn
 // does.
-func assertSessionGoneOn(t *testing.T, db data.Database, sessionId int64, what string) {
+func assertSessionGoneOn(t *testing.T, db data.Database, sessionID int64, what string) {
 	t.Helper()
-	session, err := db.GetUserSessionById(context.Background(), nil, sessionId)
+	session, err := db.GetUserSessionByID(context.Background(), nil, sessionID)
 	require.NoErrorf(t, err, "reloading %s", what)
 	assert.Nilf(t, session, "%s must be gone", what)
 }

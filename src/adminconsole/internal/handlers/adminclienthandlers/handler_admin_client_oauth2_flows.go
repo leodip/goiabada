@@ -16,13 +16,13 @@ import (
 // clientOAuth2FlowsAPI is what the OAuth2 flows page needs: the client, the global switches it
 // reads against, and the write.
 type clientOAuth2FlowsAPI interface {
-	GetClientById(ctx context.Context, accessToken string, clientId int64) (*api.ClientResponse, error)
+	GetClientByID(ctx context.Context, accessToken string, clientID int64) (*api.ClientResponse, error)
 	GetSettingsGeneral(ctx context.Context, accessToken string) (*api.SettingsGeneralResponse, error)
-	UpdateClientOAuth2Flows(ctx context.Context, accessToken string, clientId int64, request *api.UpdateClientOAuth2FlowsRequest) (*api.ClientResponse, error)
+	UpdateClientOAuth2Flows(ctx context.Context, accessToken string, clientID int64, request *api.UpdateClientOAuth2FlowsRequest) (*api.ClientResponse, error)
 }
 
 func HandleOAuth2FlowsGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient clientOAuth2FlowsAPI,
 ) http.HandlerFunc {
@@ -41,12 +41,12 @@ func HandleOAuth2FlowsGet(
 			return
 		}
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
-		client, err := apiClient.GetClientById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		client, err := apiClient.GetClientByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -64,7 +64,7 @@ func HandleOAuth2FlowsGet(
 		}
 
 		adminClientOAuth2Flows := struct {
-			ClientId                                      int64
+			ClientID                                      int64
 			ClientIdentifier                              string
 			IsPublic                                      bool
 			AuthorizationCodeEnabled                      bool
@@ -77,7 +77,7 @@ func HandleOAuth2FlowsGet(
 			ResourceOwnerPasswordCredentialsEnabled       *bool
 			GlobalResourceOwnerPasswordCredentialsEnabled bool
 		}{
-			ClientId:                                client.Id,
+			ClientID:                                client.ID,
 			ClientIdentifier:                        client.ClientIdentifier,
 			IsPublic:                                client.IsPublic,
 			AuthorizationCodeEnabled:                client.AuthorizationCodeEnabled,
@@ -120,7 +120,7 @@ func HandleOAuth2FlowsGet(
 }
 
 func HandleOAuth2FlowsPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient clientOAuth2FlowsAPI,
 	baseURL string,
@@ -141,12 +141,12 @@ func HandleOAuth2FlowsPost(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
-		client, err := apiClient.GetClientById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		client, err := apiClient.GetClientByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -220,7 +220,7 @@ func HandleOAuth2FlowsPost(
 			ImplicitGrantEnabled:                    implicitGrantEnabled,
 			ResourceOwnerPasswordCredentialsEnabled: ropcEnabled,
 		}
-		_, err = apiClient.UpdateClientOAuth2Flows(r.Context(), jwtInfo.TokenResponse.AccessToken, client.Id, req)
+		_, err = apiClient.UpdateClientOAuth2Flows(r.Context(), jwtInfo.TokenResponse.AccessToken, client.ID, req)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -232,7 +232,7 @@ func HandleOAuth2FlowsPost(
 			return
 		}
 
-		pagePath := fmt.Sprintf("/admin/clients/%v/oauth2-flows", client.Id)
+		pagePath := fmt.Sprintf("/admin/clients/%v/oauth2-flows", client.ID)
 		sess.SetFlash(pagePath, "savedSuccessfully", "true")
 		err = httpSession.Save(r, w, sess)
 		if err != nil {

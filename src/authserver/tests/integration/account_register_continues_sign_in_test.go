@@ -36,8 +36,8 @@ func newRegistrationApp(t *testing.T) (*legalAcceptanceFixture, int64) {
 	t.Helper()
 	adminToken, _ := createAdminClientWithToken(t)
 	f := newLegalAcceptanceApp(t, nil, "", adminToken)
-	termsId, _ := f.mustAcceptFor(t, "reg-terms", "Shop terms")
-	return f, termsId
+	termsID, _ := f.mustAcceptFor(t, "reg-terms", "Shop terms")
+	return f, termsID
 }
 
 // createAnAccountLink starts a sign-in to the fixture's app in browser and answers the address the
@@ -56,9 +56,9 @@ func (f *legalAcceptanceFixture) createAnAccountLink(t *testing.T, browser *http
 	require.True(t, ok, "the password page links Create an account")
 	link, err := url.Parse(href)
 	require.NoError(t, err)
-	ceremonyId := link.Query().Get(ceremony.QueryParameter)
-	require.True(t, ceremony.IsWellFormedId(ceremonyId), "the link names the sign-in: %s", href)
-	return appConfig.AuthServer.BaseURL + href, ceremonyId
+	ceremonyID := link.Query().Get(ceremony.QueryParameter)
+	require.True(t, ceremony.IsWellFormedID(ceremonyID), "the link names the sign-in: %s", href)
+	return appConfig.AuthServer.BaseURL + href, ceremonyID
 }
 
 // postRegisterAt submits the register form at the address it was loaded from, which is where its
@@ -81,7 +81,7 @@ func registeredUser(t *testing.T, email string) *record.User {
 	user, err := database.GetUserByEmail(context.Background(), nil, email)
 	require.NoError(t, err)
 	require.NotNil(t, user, "the account for %s exists", email)
-	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.Id) })
+	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.ID) })
 	return user
 }
 
@@ -89,13 +89,13 @@ func registeredUser(t *testing.T, email string) *record.User {
 // on, through the acceptance step, which it accepts, to the code the app gets, and asserts that the
 // acceptance is the new user's.
 func (f *legalAcceptanceFixture) carriedOnToTheApp(t *testing.T, browser *http.Client, resp *http.Response,
-	ceremonyId string, user *record.User, termsId int64) {
+	ceremonyID string, user *record.User, termsID int64) {
 	t.Helper()
 	location := assertRedirect(t, resp, "/auth/level1completed")
 	_ = resp.Body.Close()
 	next, err := url.Parse(location)
 	require.NoError(t, err)
-	assert.Equal(t, ceremonyId, next.Query().Get(ceremony.QueryParameter), "the sign-in the link named")
+	assert.Equal(t, ceremonyID, next.Query().Get(ceremony.QueryParameter), "the sign-in the link named")
 
 	resp = loadPage(t, browser, location)
 	location = assertRedirect(t, resp, "/auth/completed")
@@ -106,15 +106,15 @@ func (f *legalAcceptanceFixture) carriedOnToTheApp(t *testing.T, browser *http.C
 	resp = postStep(t, browser, stepURL, page, versionsOf(documents), false)
 	f.assertCodeIssued(t, browser, resp)
 
-	assert.Equal(t, []int64{versionId(t, termsId, 1)}, acceptedVersionIds(t, user.Id),
+	assert.Equal(t, []int64{versionID(t, termsID, 1)}, acceptedVersionIDs(t, user.ID),
 		"the sign-in is the new user's")
 }
 
 func TestRegistrationContinuesSignIn_WithoutVerificationTheNewUserGoesOnIntoTheApp(t *testing.T) {
 	setRegSettings(t, true, false, false)
-	f, termsId := newRegistrationApp(t)
-	browser := createHttpClient(t)
-	registerURL, ceremonyId := f.createAnAccountLink(t, browser)
+	f, termsID := newRegistrationApp(t)
+	browser := createHTTPClient(t)
+	registerURL, ceremonyID := f.createAnAccountLink(t, browser)
 	before := decodeSessionIdentifier(t, requireSessionCookie(t, browser))
 
 	email := fake.Email()
@@ -127,25 +127,25 @@ func TestRegistrationContinuesSignIn_WithoutVerificationTheNewUserGoesOnIntoTheA
 
 	assert.NotEqual(t, before, decodeSessionIdentifier(t, requireSessionCookie(t, browser)),
 		"the browser session's identifier is rotated when the password is recorded")
-	f.carriedOnToTheApp(t, browser, resp, ceremonyId, user, termsId)
+	f.carriedOnToTheApp(t, browser, resp, ceremonyID, user, termsID)
 }
 
 // activationLinkFor answers the activation link mailed to email, which carries the sign-in's id and
 // the code.
-func activationLinkFor(t *testing.T, email, ceremonyId string) string {
+func activationLinkFor(t *testing.T, email, ceremonyID string) string {
 	t.Helper()
 	links := awaitActivationLinks(t, email, 1)
 	require.Len(t, links, 1, "an activation link is mailed to %s", email)
 	link, err := url.Parse(html.UnescapeString(links[0]))
 	require.NoError(t, err)
 	assert.Equal(t, []string{"ceremony", "code"}, queryKeys(link), "the link carries the sign-in and the code")
-	assert.Equal(t, ceremonyId, link.Query().Get(ceremony.QueryParameter))
+	assert.Equal(t, ceremonyID, link.Query().Get(ceremony.QueryParameter))
 	return link.String()
 }
 
 // followActivationLinkWithSignIn performs the link's first hop and answers the clean URL it sends the
 // browser to, which keeps the sign-in's id and drops the code.
-func followActivationLinkWithSignIn(t *testing.T, browser *http.Client, link, ceremonyId string) string {
+func followActivationLinkWithSignIn(t *testing.T, browser *http.Client, link, ceremonyID string) string {
 	t.Helper()
 	resp := loadPage(t, browser, link)
 	_ = resp.Body.Close()
@@ -153,7 +153,7 @@ func followActivationLinkWithSignIn(t *testing.T, browser *http.Client, link, ce
 	location, err := url.Parse(resp.Header.Get("Location"))
 	require.NoError(t, err)
 	assert.Equal(t, "/account/activate", location.Path)
-	assert.Equal(t, url.Values{ceremony.QueryParameter: {ceremonyId}}, location.Query(),
+	assert.Equal(t, url.Values{ceremony.QueryParameter: {ceremonyID}}, location.Query(),
 		"the code leaves the URL, and the sign-in stays")
 	return appConfig.AuthServer.BaseURL + location.String()
 }
@@ -162,36 +162,36 @@ func followActivationLinkWithSignIn(t *testing.T, browser *http.Client, link, ce
 // answers the sign-in's id and the link mailed.
 func (f *legalAcceptanceFixture) registerFromTheApp(t *testing.T, browser *http.Client, email string) (string, string) {
 	t.Helper()
-	registerURL, ceremonyId := f.createAnAccountLink(t, browser)
+	registerURL, ceremonyID := f.createAnAccountLink(t, browser)
 	resp := postRegisterAt(t, browser, registerURL, url.Values{"email": {email}})
 	body := bodyString(t, resp)
 	_ = resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	require.Contains(t, body, checkYourEmailTitle)
-	return ceremonyId, activationLinkFor(t, email, ceremonyId)
+	return ceremonyID, activationLinkFor(t, email, ceremonyID)
 }
 
 func TestRegistrationContinuesSignIn_ActivatingInTheSameBrowserGoesOnIntoTheApp(t *testing.T) {
 	useMailpitSMTP(t)
 	setRegSettings(t, true, true, true)
-	f, termsId := newRegistrationApp(t)
-	browser := createHttpClient(t)
+	f, termsID := newRegistrationApp(t)
+	browser := createHTTPClient(t)
 	email := registerAddress()
-	ceremonyId, link := f.registerFromTheApp(t, browser, email)
+	ceremonyID, link := f.registerFromTheApp(t, browser, email)
 
-	cleanURL := followActivationLinkWithSignIn(t, browser, link, ceremonyId)
-	continuationId := loadActivationForm(t, browser, cleanURL, email)
+	cleanURL := followActivationLinkWithSignIn(t, browser, link, ceremonyID)
+	continuationID := loadActivationForm(t, browser, cleanURL, email)
 	before := decodeSessionIdentifier(t, requireSessionCookie(t, browser))
 
 	const chosenPassword = "Chosen-At-Activation-1!"
-	resp := postActivation(t, browser, cleanURL, chosenPassword, chosenPassword, continuationId)
+	resp := postActivation(t, browser, cleanURL, chosenPassword, chosenPassword, continuationID)
 	user := registeredUser(t, email)
 	assert.True(t, user.EmailVerified)
 	assert.True(t, passwordhash.Verify(user.PasswordHash, chosenPassword))
 
 	assert.NotEqual(t, before, decodeSessionIdentifier(t, requireSessionCookie(t, browser)),
 		"the browser session's identifier is rotated when the password is recorded")
-	f.carriedOnToTheApp(t, browser, resp, ceremonyId, user, termsId)
+	f.carriedOnToTheApp(t, browser, resp, ceremonyID, user, termsID)
 }
 
 func TestRegistrationContinuesSignIn_ActivatingInAnotherBrowserActivatesAndSendsThePersonBackToTheApp(t *testing.T) {
@@ -199,13 +199,13 @@ func TestRegistrationContinuesSignIn_ActivatingInAnotherBrowserActivatesAndSends
 	setRegSettings(t, true, true, true)
 	f, _ := newRegistrationApp(t)
 	email := registerAddress()
-	ceremonyId, link := f.registerFromTheApp(t, createHttpClient(t), email)
+	ceremonyID, link := f.registerFromTheApp(t, createHTTPClient(t), email)
 
-	other := createHttpClient(t)
-	cleanURL := followActivationLinkWithSignIn(t, other, link, ceremonyId)
-	continuationId := loadActivationForm(t, other, cleanURL, email)
+	other := createHTTPClient(t)
+	cleanURL := followActivationLinkWithSignIn(t, other, link, ceremonyID)
+	continuationID := loadActivationForm(t, other, cleanURL, email)
 	const chosenPassword = "Chosen-At-Activation-1!"
-	resp := postActivation(t, other, cleanURL, chosenPassword, chosenPassword, continuationId)
+	resp := postActivation(t, other, cleanURL, chosenPassword, chosenPassword, continuationID)
 	require.Equal(t, http.StatusOK, resp.StatusCode, "the page answers in place")
 	page := parseHTMLResponse(t, resp)
 	_ = resp.Body.Close()
@@ -227,7 +227,7 @@ func TestRegistrationContinuesSignIn_WithVerificationEveryAddressGetsTheSamePage
 	useMailpitSMTP(t)
 	setRegSettings(t, true, true, true)
 	f, _ := newRegistrationApp(t)
-	browser := createHttpClient(t)
+	browser := createHTTPClient(t)
 	registerURL, _ := f.createAnAccountLink(t, browser)
 
 	taken := registerAddress()

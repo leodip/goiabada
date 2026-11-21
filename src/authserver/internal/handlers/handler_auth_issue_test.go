@@ -55,14 +55,14 @@ func armIssueGate(database *datamocks.Database, userSessionManager *handlersmock
 	permissionChecker *handlersmocks.PermissionChecker, redirectURI string) {
 
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, mock.Anything).
-		Return(&record.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}, nil).Maybe()
+		Return(&record.Client{ID: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}, nil).Maybe()
 	database.On("ClientLoadRedirectURIs", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
 			client := args.Get(2).(*record.Client)
 			client.RedirectURIs = []record.RedirectURI{{URI: redirectURI}}
 		}).Return(nil).Maybe()
-	database.On("GetUserById", mock.Anything, mock.Anything, mock.Anything).
-		Return(&record.User{Id: 1, Subject: fake.UUID(), Enabled: true}, nil).Maybe()
+	database.On("GetUserByID", mock.Anything, mock.Anything, mock.Anything).
+		Return(&record.User{ID: 1, Subject: fake.UUID(), Enabled: true}, nil).Maybe()
 	userSessionManager.On("HasValidUserSession", mock.Anything, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.Anything).
 		Return(true).Maybe()
 	permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, mock.Anything, mock.Anything).
@@ -93,7 +93,7 @@ func TestHandleIssueGet(t *testing.T) {
 			permissionChecker:   permissionChecker,
 		})
 
-		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 		require.NoError(t, err)
 
 		req = withSessionSettings(req)
@@ -136,7 +136,7 @@ func TestHandleIssueGet(t *testing.T) {
 			permissionChecker:   permissionChecker,
 		})
 
-		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 		require.NoError(t, err)
 
 		req = withSessionSettings(req)
@@ -144,7 +144,7 @@ func TestHandleIssueGet(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId: testCeremonyId,
+			CeremonyID: testCeremonyID,
 			AuthState:  ceremony.AuthStateRequiresConsent, // Unexpected state
 		}
 		ceremonyStore.On("GetAuthContext", mock.Anything).Return(authContext, nil)
@@ -192,11 +192,11 @@ func TestHandleIssueGet(t *testing.T) {
 
 		// Mock auth context - note: ResponseType "code" means authorization code flow, not implicit
 		authContext := &ceremony.AuthContext{
-			CeremonyId:   testCeremonyId,
+			CeremonyID:   testCeremonyID,
 			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			Scope:        "openid profile",
-			ClientId:     "test-client",
-			UserId:       123,
+			ClientID:     "test-client",
+			UserID:       123,
 			ResponseMode: "query",
 			ResponseType: "code",
 			RedirectURI:  "https://example.com/callback",
@@ -207,9 +207,9 @@ func TestHandleIssueGet(t *testing.T) {
 
 		// Mock code creation
 		mockCode := &record.Code{
-			Id:          1,
+			ID:          1,
 			Code:        "test-code",
-			ClientId:    1,
+			ClientID:    1,
 			RedirectURI: "https://example.com/callback",
 			State:       "test-state",
 		}
@@ -223,7 +223,7 @@ func TestHandleIssueGet(t *testing.T) {
 		})).Return()
 
 		// Mock clearing auth context
-		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyID).Return(nil)
 
 		// Execute the handler
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
@@ -283,18 +283,18 @@ func TestHandleIssueGet(t *testing.T) {
 		// cookie session, and leaves it out of the request context. It is also the shape
 		// grantIsOffline reads as an offline grant, so a code issued here would produce a
 		// refresh token with a max lifetime and no session to check.
-		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 		require.NoError(t, err)
 		req = withSessionSettings(req)
 
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId:   testCeremonyId,
+			CeremonyID:   testCeremonyID,
 			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			Scope:        "openid profile",
-			ClientId:     "test-client",
-			UserId:       123,
+			ClientID:     "test-client",
+			UserID:       123,
 			ResponseMode: "query",
 			ResponseType: "code",
 			RedirectURI:  "https://example.com/callback",
@@ -312,7 +312,7 @@ func TestHandleIssueGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, testCeremonyId, assertStepLocation(t, rr.Header().Get("Location"), "/auth/level1"),
+		assert.Equal(t, testCeremonyID, assertStepLocation(t, rr.Header().Get("Location"), "/auth/level1"),
 			"the restart names the ceremony it kept")
 		assert.NotNil(t, savedAuthContext)
 		assert.Equal(t, ceremony.AuthStateRequiresLevel1, savedAuthContext.AuthState)
@@ -347,18 +347,18 @@ func TestHandleIssueGet(t *testing.T) {
 			permissionChecker:   permissionChecker,
 		})
 
-		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 		require.NoError(t, err)
 		req = withSessionSettings(req)
 
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId:   testCeremonyId,
+			CeremonyID:   testCeremonyID,
 			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			Scope:        "openid profile",
-			ClientId:     "test-client",
-			UserId:       123,
+			ClientID:     "test-client",
+			UserID:       123,
 			ResponseMode: "query",
 			ResponseType: "code",
 			RedirectURI:  "https://example.com/callback",
@@ -406,11 +406,11 @@ func TestHandleIssueGet(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId:   testCeremonyId,
+			CeremonyID:   testCeremonyID,
 			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			Scope:        "openid profile",
-			ClientId:     "test-client",
-			UserId:       123,
+			ClientID:     "test-client",
+			UserID:       123,
 			ResponseMode: "query",
 			ResponseType: "code",
 			RedirectURI:  "https://example.com/callback",
@@ -428,7 +428,7 @@ func TestHandleIssueGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusFound, rr.Code)
-		assert.Equal(t, testCeremonyId, assertStepLocation(t, rr.Header().Get("Location"), "/auth/level1"),
+		assert.Equal(t, testCeremonyID, assertStepLocation(t, rr.Header().Get("Location"), "/auth/level1"),
 			"the restart names the ceremony it kept")
 
 		pageRenderer.AssertExpectations(t)
@@ -465,18 +465,18 @@ func TestHandleIssueGet(t *testing.T) {
 		// than from the consent screen: it validated and bumped the session, redirected here,
 		// and the session was ended in that hop. Restarting level 1 would render a password
 		// form, which this request forbids (#129 decision 16).
-		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 		require.NoError(t, err)
 		req = withSessionSettings(req)
 
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId:   testCeremonyId,
+			CeremonyID:   testCeremonyID,
 			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			Scope:        "openid profile",
-			ClientId:     "test-client",
-			UserId:       123,
+			ClientID:     "test-client",
+			UserID:       123,
 			ResponseMode: "query",
 			ResponseType: "code",
 			RedirectURI:  "https://example.com/callback",
@@ -492,7 +492,7 @@ func TestHandleIssueGet(t *testing.T) {
 		// is dropped. The stub writes a sentinel where the CookieStore would write that
 		// cookie, so the committed response is what carries the assertion below.
 		const clearedContextCookie = "cleared-auth-context"
-		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Run(func(args mock.Arguments) {
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyID).Run(func(args mock.Arguments) {
 			args.Get(0).(http.ResponseWriter).Header().Set("Set-Cookie", clearedContextCookie)
 		}).Return(nil)
 
@@ -547,7 +547,7 @@ func TestHandleIssueGet(t *testing.T) {
 			permissionChecker:   permissionChecker,
 		})
 
-		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 		require.NoError(t, err)
 
 		req = withSessionSettings(req)
@@ -555,11 +555,11 @@ func TestHandleIssueGet(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId:   testCeremonyId,
+			CeremonyID:   testCeremonyID,
 			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			Scope:        "openid profile",
-			ClientId:     "test-client",
-			UserId:       123,
+			ClientID:     "test-client",
+			UserID:       123,
 			ResponseMode: "query",
 			ResponseType: "code",
 			RedirectURI:  "https://example.com/callback",
@@ -573,7 +573,7 @@ func TestHandleIssueGet(t *testing.T) {
 		// branch: a failed clear writes no cookie, so the browser keeps the auth context whether
 		// this answers 500 or redirects, and the client is owed its error response either way
 		// (#141 decision 7). It used to get nothing at all.
-		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(errs.New("the session store is unreachable"))
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyID).Return(errs.New("the session store is unreachable"))
 
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
@@ -625,7 +625,7 @@ func TestHandleIssueGet(t *testing.T) {
 			permissionChecker:   permissionChecker,
 		})
 
-		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 		require.NoError(t, err)
 
 		req = withSessionSettings(req)
@@ -633,11 +633,11 @@ func TestHandleIssueGet(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId:   testCeremonyId,
+			CeremonyID:   testCeremonyID,
 			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			Scope:        "openid profile",
-			ClientId:     "test-client",
-			UserId:       123,
+			ClientID:     "test-client",
+			UserID:       123,
 			ResponseMode: "form_post",
 			ResponseType: "code",
 			RedirectURI:  "https://example.com/callback",
@@ -647,7 +647,7 @@ func TestHandleIssueGet(t *testing.T) {
 		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 		stubClientProvenanceLookup(database)
 
-		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(errs.New("the session store is unreachable"))
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyID).Return(errs.New("the session store is unreachable"))
 
 		// The clear failed and the server_error response the client is owed cannot be built
 		// either, so there is nowhere left to send it and the 500 is the last resort.
@@ -693,7 +693,7 @@ func TestHandleIssueGet(t *testing.T) {
 			permissionChecker:   permissionChecker,
 		})
 
-		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 		require.NoError(t, err)
 
 		req = withSessionSettings(req)
@@ -701,11 +701,11 @@ func TestHandleIssueGet(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId:   testCeremonyId,
+			CeremonyID:   testCeremonyID,
 			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			Scope:        "openid profile",
-			ClientId:     "test-client",
-			UserId:       123,
+			ClientID:     "test-client",
+			UserID:       123,
 			ResponseMode: "form_post",
 			ResponseType: "code",
 			RedirectURI:  "https://example.com/callback",
@@ -718,7 +718,7 @@ func TestHandleIssueGet(t *testing.T) {
 		// The other half of the same family: the clear succeeds and it is the ordinary
 		// login_required refusal that cannot be committed. This 500 predates #141 and is pinned
 		// separately so a future edit cannot delete either copy unnoticed.
-		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyID).Return(nil)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return strings.Contains(err.Error(), "unable to parse template")
@@ -763,11 +763,11 @@ func TestHandleIssueGet(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId:   testCeremonyId,
+			CeremonyID:   testCeremonyID,
 			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			Scope:        "openid profile",
-			ClientId:     "test-client",
-			UserId:       123,
+			ClientID:     "test-client",
+			UserID:       123,
 			ResponseMode: "query",
 			ResponseType: "code",
 			RedirectURI:  "https://example.com/callback",
@@ -821,11 +821,11 @@ func TestHandleIssueGet(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId:   testCeremonyId,
+			CeremonyID:   testCeremonyID,
 			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			Scope:        "openid profile",
-			ClientId:     "test-client",
-			UserId:       123,
+			ClientID:     "test-client",
+			UserID:       123,
 			ResponseMode: "query",
 			ResponseType: "code",
 			RedirectURI:  "https://example.com/callback",
@@ -877,11 +877,11 @@ func TestHandleIssueGet_AnswersEachIssuanceOutcome(t *testing.T) {
 	// above the dispatch passes and the issuer is the only thing left that can refuse.
 	issuanceAuthContext := func(prompt string) *ceremony.AuthContext {
 		return &ceremony.AuthContext{
-			CeremonyId:   testCeremonyId,
+			CeremonyID:   testCeremonyID,
 			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			Scope:        "openid profile",
-			ClientId:     "test-client",
-			UserId:       123,
+			ClientID:     "test-client",
+			UserID:       123,
 			ResponseMode: "query",
 			ResponseType: "code",
 			RedirectURI:  "https://example.com/callback",
@@ -946,11 +946,11 @@ func TestHandleIssueGet_AnswersEachIssuanceOutcome(t *testing.T) {
 		f.codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.MatchedBy(func(input *issuance.CreateCodeInput) bool {
 			return reflect.DeepEqual(input, newCreateCodeInput(f.authContext, liveSessionIdentifier))
 		})).Run(func(mock.Arguments) { order = append(order, "issued") }).
-			Return(&record.Code{Id: 1, Code: "test-code", ClientId: 1,
+			Return(&record.Code{ID: 1, Code: "test-code", ClientID: 1,
 				RedirectURI: "https://example.com/callback", State: "test-state"}, nil).Once()
 		f.auditLogger.On("Log", mock.Anything, audit.EventCreatedAuthCode, mock.Anything).
 			Run(func(mock.Arguments) { order = append(order, "audit") }).Return().Once()
-		f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).Return(nil).Once()
+		f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyID).Return(nil).Once()
 
 		f.serve()
 
@@ -971,14 +971,14 @@ func TestHandleIssueGet_AnswersEachIssuanceOutcome(t *testing.T) {
 
 		clearErr := errs.New("the session store is unreachable")
 		f.codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.Anything).
-			Return(&record.Code{Id: 1, Code: "first-code", ClientId: 1,
+			Return(&record.Code{ID: 1, Code: "first-code", ClientID: 1,
 				RedirectURI: "https://example.com/callback", State: "test-state"}, nil).Once()
 		f.codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.Anything).
-			Return(&record.Code{Id: 2, Code: "second-code", ClientId: 1,
+			Return(&record.Code{ID: 2, Code: "second-code", ClientID: 1,
 				RedirectURI: "https://example.com/callback", State: "test-state"}, nil).Once()
 		f.auditLogger.On("Log", mock.Anything, audit.EventCreatedAuthCode, mock.Anything).Return().Twice()
-		f.ceremonyStore.On("ClearAuthContext", mock.Anything, f.req, testCeremonyId).Return(clearErr).Once()
-		f.ceremonyStore.On("ClearAuthContext", mock.Anything, f.req, testCeremonyId).Return(nil).Once()
+		f.ceremonyStore.On("ClearAuthContext", mock.Anything, f.req, testCeremonyID).Return(clearErr).Once()
+		f.ceremonyStore.On("ClearAuthContext", mock.Anything, f.req, testCeremonyID).Return(nil).Once()
 		f.pageRenderer.On("InternalServerError", mock.Anything, f.req, mock.MatchedBy(func(err error) bool {
 			return errors.Is(err, clearErr)
 		})).Run(func(args mock.Arguments) {
@@ -1046,7 +1046,7 @@ func TestHandleIssueGet_AnswersEachIssuanceOutcome(t *testing.T) {
 			// The same answer the liveness read gives for the same condition, which is what makes
 			// authflow.Issuance's refuseUnusableSession one implementation rather than two that agree today.
 			assert.Equal(t, http.StatusFound, f.rr.Code)
-			assert.Equal(t, testCeremonyId, assertStepLocation(t, f.rr.Header().Get("Location"), "/auth/level1"),
+			assert.Equal(t, testCeremonyID, assertStepLocation(t, f.rr.Header().Get("Location"), "/auth/level1"),
 				"the restart names the ceremony it kept")
 			assert.NotContains(t, f.rr.Header().Get("Location"), "code=")
 			require.NotNil(t, savedAuthContext)
@@ -1076,7 +1076,7 @@ func TestHandleIssueGet_AnswersEachIssuanceOutcome(t *testing.T) {
 
 			f.codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.Anything).
 				Return(nil, errs.WithStack(refusal.sentinel)).Once()
-			f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).Return(nil).Once()
+			f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyID).Return(nil).Once()
 
 			f.serve()
 
@@ -1140,9 +1140,9 @@ func TestHandleIssueGet_AnswersEachIssuanceOutcome(t *testing.T) {
 // explicit AssertNotCalled lines are there to name what is being claimed.
 // =============================================================================
 
-// foreignSessionUserId owns the ambient session in the refusal rows below. It differs from
-// every ceremony's UserId, which is the only thing making the gate refuse.
-const foreignSessionUserId int64 = 999
+// foreignSessionUserID owns the ambient session in the refusal rows below. It differs from
+// every ceremony's UserID, which is the only thing making the gate refuse.
+const foreignSessionUserID int64 = 999
 
 func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 	// Each row is a different issuance family reached from the same gate. ResponseMode is left
@@ -1188,11 +1188,11 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 			rr := httptest.NewRecorder()
 
 			authContext := &ceremony.AuthContext{
-				CeremonyId:   testCeremonyId,
+				CeremonyID:   testCeremonyID,
 				AuthState:    ceremony.AuthStateReadyToIssueCode,
 				Scope:        "openid profile",
-				ClientId:     "test-client",
-				UserId:       123,
+				ClientID:     "test-client",
+				UserID:       123,
 				ResponseMode: family.responseMode,
 				ResponseType: family.responseType,
 				RedirectURI:  "https://example.com/callback",
@@ -1202,7 +1202,7 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 
 			// The row resolves, so this is not the liveness case #129 closed. It simply
 			// belongs to someone else.
-			stubLiveSession(database, foreignSessionUserId)
+			stubLiveSession(database, foreignSessionUserID)
 
 			var savedAuthContext *ceremony.AuthContext
 			ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
@@ -1215,7 +1215,7 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 			handler.ServeHTTP(rr, req)
 
 			assert.Equal(t, http.StatusFound, rr.Code)
-			assert.Equal(t, testCeremonyId, assertStepLocation(t, rr.Header().Get("Location"), "/auth/level1"),
+			assert.Equal(t, testCeremonyID, assertStepLocation(t, rr.Header().Get("Location"), "/auth/level1"),
 				"the restart names the ceremony it kept")
 			assert.NotNil(t, savedAuthContext)
 			assert.Equal(t, ceremony.AuthStateRequiresLevel1, savedAuthContext.AuthState)
@@ -1229,10 +1229,10 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 			implicitTokenIssuer.AssertNotCalled(t, "IssueImplicitTx",
 				mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 
-			// The literal, not authContext.UserId: the restart has since discarded the user from
+			// The literal, not authContext.UserID: the restart has since discarded the user from
 			// the context, and the warning was written before it did (#436).
 			assertWarnedForeignSession(t, logs, int64(123))
-			assert.Zero(t, savedAuthContext.UserId, "the restart discards the user this attempt authenticated")
+			assert.Zero(t, savedAuthContext.UserID, "the restart discards the user this attempt authenticated")
 
 			// The ceremony is restarted rather than ended, so the context survives to be
 			// rebuilt at /auth/level1.
@@ -1291,11 +1291,11 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 			rr := httptest.NewRecorder()
 
 			authContext := &ceremony.AuthContext{
-				CeremonyId:   testCeremonyId,
+				CeremonyID:   testCeremonyID,
 				AuthState:    ceremony.AuthStateReadyToIssueCode,
 				Scope:        "openid profile",
-				ClientId:     "test-client",
-				UserId:       123,
+				ClientID:     "test-client",
+				UserID:       123,
 				ResponseMode: family.responseMode,
 				ResponseType: family.responseType,
 				RedirectURI:  "https://example.com/callback",
@@ -1304,9 +1304,9 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 			}
 			ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
-			stubLiveSession(database, foreignSessionUserId)
+			stubLiveSession(database, foreignSessionUserID)
 			stubClientProvenanceLookup(database)
-			ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)
+			ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyID).Return(nil)
 
 			armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
@@ -1325,7 +1325,7 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 			implicitTokenIssuer.AssertNotCalled(t, "IssueImplicitTx",
 				mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 
-			assertWarnedForeignSession(t, logs, authContext.UserId)
+			assertWarnedForeignSession(t, logs, authContext.UserID)
 
 			// A silent ceremony ends here rather than restarting, so no state is saved.
 			ceremonyStore.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
@@ -1369,10 +1369,10 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId:      testCeremonyId,
+			CeremonyID:      testCeremonyID,
 			AuthState:       ceremony.AuthStateReadyToIssueCode,
-			ClientId:        "test-client",
-			UserId:          123,
+			ClientID:        "test-client",
+			UserID:          123,
 			ResponseMode:    "fragment",
 			ResponseType:    "token",
 			AuthenticatedAt: &testIssueAuthTime,
@@ -1386,12 +1386,12 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 		stubLiveSession(database, 123)
 
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
-			Return(&record.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}, nil)
-		database.On("GetUserById", mock.Anything, mock.Anything, int64(123)).
-			Return(&record.User{Id: 123, Subject: "11111111-1111-1111-1111-111111111111", Enabled: true}, nil)
+			Return(&record.Client{ID: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}, nil)
+		database.On("GetUserByID", mock.Anything, mock.Anything, int64(123)).
+			Return(&record.User{ID: 123, Subject: "11111111-1111-1111-1111-111111111111", Enabled: true}, nil)
 
 		implicitTokenIssuer.On("IssueImplicitTx", mock.Anything, mock.Anything, mock.MatchedBy(func(input *issuance.ImplicitGrantInput) bool {
-			return input.User.Id == int64(123) && input.SessionIdentifier == liveSessionIdentifier
+			return input.User.ID == int64(123) && input.SessionIdentifier == liveSessionIdentifier
 		}), true, false).Return(&issuance.ImplicitGrantResponse{
 			AccessToken: "access-token-123",
 			TokenType:   "Bearer",
@@ -1400,7 +1400,7 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 		}, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventTokenIssuedImplicitResponse, mock.Anything).Return()
-		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyID).Return(nil)
 
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
@@ -1464,11 +1464,11 @@ func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId:      testCeremonyId,
+			CeremonyID:      testCeremonyID,
 			AuthState:       ceremony.AuthStateReadyToIssueCode,
 			Scope:           "openid profile",
-			ClientId:        "test-client",
-			UserId:          123,
+			ClientID:        "test-client",
+			UserID:          123,
 			ResponseType:    "token",
 			AuthenticatedAt: &testIssueAuthTime,
 			RedirectURI:     "https://example.com/callback",
@@ -1538,11 +1538,11 @@ func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId:      testCeremonyId,
+			CeremonyID:      testCeremonyID,
 			AuthState:       ceremony.AuthStateReadyToIssueCode,
 			Scope:           "openid profile",
-			ClientId:        "test-client",
-			UserId:          123,
+			ClientID:        "test-client",
+			UserID:          123,
 			ResponseType:    "id_token token",
 			AuthenticatedAt: &testIssueAuthTime,
 			RedirectURI:     "https://example.com/callback",
@@ -1553,7 +1553,7 @@ func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
 		stubClientProvenanceLookup(database)
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, (*sql.Tx)(nil), liveSessionIdentifier).Return(nil, nil)
-		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyID).Return(nil)
 
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
@@ -1590,7 +1590,7 @@ const liveSessionIdentifier = "session-identifier-abc"
 // a code have to opt in (#129 stage 6).
 func requestWithSessionIdentifier(t *testing.T, sessionIdentifier string) *http.Request {
 	t.Helper()
-	req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+	req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 	require.NoError(t, err)
 	req = withSessionSettings(req)
 	return withSessionSettings(req.WithContext(reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier)))
@@ -1605,7 +1605,7 @@ var testIssueAuthTime = time.Date(2026, 10, 14, 8, 0, 0, 0, time.UTC)
 // here rather than taken from authflow, so the expectation does not come from the code under test.
 func newCreateCodeInput(authContext *ceremony.AuthContext, sessionIdentifier string) *issuance.CreateCodeInput {
 	return &issuance.CreateCodeInput{
-		ClientId:            authContext.ClientId,
+		ClientID:            authContext.ClientID,
 		RedirectURI:         authContext.RedirectURI,
 		ResponseMode:        authContext.ResponseMode,
 		Scope:               authContext.Scope,
@@ -1615,14 +1615,14 @@ func newCreateCodeInput(authContext *ceremony.AuthContext, sessionIdentifier str
 		State:               authContext.State,
 		Nonce:               authContext.Nonce,
 		UserAgent:           authContext.UserAgent,
-		IpAddress:           authContext.IpAddress,
-		UserId:              authContext.UserId,
-		AcrLevel:            authContext.AcrLevel,
+		IPAddress:           authContext.IPAddress,
+		UserID:              authContext.UserID,
+		ACRLevel:            authContext.ACRLevel,
 		AuthMethods:         authContext.AuthMethods,
 		AuthenticatedAt:     authContext.AuthenticatedAt,
 		AuthStateGeneration: authContext.AuthStateGeneration,
 		SessionIdentifier:   sessionIdentifier,
-		OTPClaim:            otpcredential.OTPClaim{Claimed: authContext.ClaimsOTP(), Generation: authContext.OtpClaimGeneration},
+		OTPClaim:            otpcredential.OTPClaim{Claimed: authContext.ClaimsOTP(), Generation: authContext.OTPClaimGeneration},
 	}
 }
 
@@ -1630,9 +1630,9 @@ func newCreateCodeInput(authContext *ceremony.AuthContext, sessionIdentifier str
 // IssueAuthCodeTx or IssueImplicitTx at all. Liveness alone was enough after
 // #129 stage 6; #133 added the owner comparison, so the caller has to say which user the row
 // belongs to and a subtest that wants the gate to pass has to name its own ceremony's user.
-func stubLiveSession(database *datamocks.Database, ownerUserId int64) {
+func stubLiveSession(database *datamocks.Database, ownerUserID int64) {
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, (*sql.Tx)(nil), liveSessionIdentifier).
-		Return(&record.UserSession{Id: 55, SessionIdentifier: liveSessionIdentifier, UserId: ownerUserId}, nil)
+		Return(&record.UserSession{ID: 55, SessionIdentifier: liveSessionIdentifier, UserID: ownerUserID}, nil)
 }
 
 // The records are read whole rather than as rendered text, because two of the properties decision
@@ -1675,16 +1675,16 @@ func noRecordSays(t *testing.T, logs *logtest.SlogCapture, phrase string) {
 // has to be able to tell "this browser's session belongs to someone else" from "this ceremony's
 // session is gone", and to see the two user ids that failed to match, because those ids are the
 // whole record of an account takeover attempt that got as far as issuance (#133).
-func assertWarnedForeignSession(t *testing.T, logs *logtest.SlogCapture, ceremonyUserId int64) {
+func assertWarnedForeignSession(t *testing.T, logs *logtest.SlogCapture, ceremonyUserID int64) {
 	t.Helper()
 	warning, ok := warningSaying(t, logs, "belongs to a different user")
 	if !ok {
 		return
 	}
 	attrs := warning.Attrs
-	assert.Equal(t, foreignSessionUserId, attrs["session_user_id"],
+	assert.Equal(t, foreignSessionUserID, attrs["session_user_id"],
 		"the ambient session's owner, on the record that names the refusal")
-	assert.Equal(t, ceremonyUserId, attrs["ceremony_user_id"],
+	assert.Equal(t, ceremonyUserID, attrs["ceremony_user_id"],
 		"the user this ceremony authenticated, on that same record")
 	// #129's sentence, which is the wrong one here: the row resolved.
 	noRecordSays(t, logs, "is gone")
@@ -1793,7 +1793,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 			permissionChecker:   permissionChecker,
 		})
 
-		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 		require.NoError(t, err)
 
 		// The issuer is handed the request's own settings, matched by identity below.
@@ -1805,10 +1805,10 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId:      testCeremonyId,
+			CeremonyID:      testCeremonyID,
 			AuthState:       ceremony.AuthStateReadyToIssueCode,
-			ClientId:        "test-client",
-			UserId:          123,
+			ClientID:        "test-client",
+			UserID:          123,
 			ResponseMode:    "fragment",
 			ResponseType:    "token",
 			AuthenticatedAt: &testIssueAuthTime,
@@ -1816,7 +1816,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 			Scope:           "openid",
 			State:           "test-state",
 			Nonce:           "test-nonce",
-			AcrLevel:        "urn:goiabada:pwd",
+			ACRLevel:        "urn:goiabada:pwd",
 			// Nonzero so the matcher below pins that the handler carries this into
 			// ImplicitGrantInput rather than leaving it at the zero value (#106
 			// decision 13: implicit's only possible source is the AuthContext).
@@ -1827,7 +1827,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 
 		// Mock client lookup
 		mockClient := &record.Client{
-			Id:                       1,
+			ID:                       1,
 			ClientIdentifier:         "test-client",
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
@@ -1837,13 +1837,13 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 
 		// Mock user lookup
 		mockUser := &record.User{
-			Id:                  123,
+			ID:                  123,
 			Subject:             "11111111-1111-1111-1111-111111111111",
 			Email:               "test@example.com",
 			Enabled:             true,
 			AuthStateGeneration: 7,
 		}
-		database.On("GetUserById", mock.Anything, mock.Anything, int64(123)).Return(mockUser, nil)
+		database.On("GetUserByID", mock.Anything, mock.Anything, int64(123)).Return(mockUser, nil)
 
 		// Mock token generation
 		tokenResponse := &issuance.ImplicitGrantResponse{
@@ -1853,7 +1853,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 			Scope:       "openid",
 		}
 		implicitTokenIssuer.On("IssueImplicitTx", mock.Anything, theseSettings(requestSettings), mock.MatchedBy(func(input *issuance.ImplicitGrantInput) bool {
-			return input.Client.Id == int64(1) && input.User.Id == int64(123) && input.Scope == "openid" &&
+			return input.Client.ID == int64(1) && input.User.ID == int64(123) && input.Scope == "openid" &&
 				input.AuthStateGeneration == 7
 		}), true, false).Return(tokenResponse, nil)
 
@@ -1863,7 +1863,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		})).Return()
 
 		// Mock clearing auth context
-		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyID).Return(nil)
 
 		stubLiveSession(database, 123)
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
@@ -1908,7 +1908,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 			permissionChecker:   permissionChecker,
 		})
 
-		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 		require.NoError(t, err)
 		req = withSessionSettings(req)
 		req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), liveSessionIdentifier))
@@ -1916,10 +1916,10 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId:      testCeremonyId,
+			CeremonyID:      testCeremonyID,
 			AuthState:       ceremony.AuthStateReadyToIssueCode,
-			ClientId:        "test-client",
-			UserId:          123,
+			ClientID:        "test-client",
+			UserID:          123,
 			ResponseMode:    "fragment",
 			ResponseType:    "id_token",
 			AuthenticatedAt: &testIssueAuthTime,
@@ -1927,7 +1927,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 			Scope:           "openid",
 			State:           "test-state",
 			Nonce:           "test-nonce",
-			AcrLevel:        "urn:goiabada:pwd",
+			ACRLevel:        "urn:goiabada:pwd",
 			// Nonzero so the matcher below pins that the handler carries this into
 			// ImplicitGrantInput rather than leaving it at the zero value (#106
 			// decision 13: implicit's only possible source is the AuthContext).
@@ -1937,7 +1937,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
 		mockClient := &record.Client{
-			Id:                       1,
+			ID:                       1,
 			ClientIdentifier:         "test-client",
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
@@ -1946,27 +1946,27 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(mockClient, nil)
 
 		mockUser := &record.User{
-			Id:                  123,
+			ID:                  123,
 			Subject:             "11111111-1111-1111-1111-111111111111",
 			Email:               "test@example.com",
 			Enabled:             true,
 			AuthStateGeneration: 7,
 		}
-		database.On("GetUserById", mock.Anything, mock.Anything, int64(123)).Return(mockUser, nil)
+		database.On("GetUserByID", mock.Anything, mock.Anything, int64(123)).Return(mockUser, nil)
 
 		tokenResponse := &issuance.ImplicitGrantResponse{
-			IdToken: "id-token-123",
+			IDToken: "id-token-123",
 			Scope:   "openid",
 		}
 		implicitTokenIssuer.On("IssueImplicitTx", mock.Anything, mock.Anything, mock.MatchedBy(func(input *issuance.ImplicitGrantInput) bool {
-			return input.Client.Id == int64(1) && input.User.Id == int64(123) && input.Nonce == "test-nonce"
+			return input.Client.ID == int64(1) && input.User.ID == int64(123) && input.Nonce == "test-nonce"
 		}), false, true).Return(tokenResponse, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventTokenIssuedImplicitResponse, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["issue_access_token"] == false && details["issue_id_token"] == true
 		})).Return()
 
-		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyID).Return(nil)
 
 		stubLiveSession(database, 123)
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
@@ -2010,7 +2010,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 			permissionChecker:   permissionChecker,
 		})
 
-		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 		require.NoError(t, err)
 		req = withSessionSettings(req)
 		req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), liveSessionIdentifier))
@@ -2018,10 +2018,10 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId:      testCeremonyId,
+			CeremonyID:      testCeremonyID,
 			AuthState:       ceremony.AuthStateReadyToIssueCode,
-			ClientId:        "test-client",
-			UserId:          123,
+			ClientID:        "test-client",
+			UserID:          123,
 			ResponseMode:    "fragment",
 			ResponseType:    "id_token token",
 			AuthenticatedAt: &testIssueAuthTime,
@@ -2029,7 +2029,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 			Scope:           "openid",
 			State:           "test-state",
 			Nonce:           "test-nonce",
-			AcrLevel:        "urn:goiabada:pwd",
+			ACRLevel:        "urn:goiabada:pwd",
 			// Nonzero so the matcher below pins that the handler carries this into
 			// ImplicitGrantInput rather than leaving it at the zero value (#106
 			// decision 13: implicit's only possible source is the AuthContext).
@@ -2039,7 +2039,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
 		mockClient := &record.Client{
-			Id:                       1,
+			ID:                       1,
 			ClientIdentifier:         "test-client",
 			Enabled:                  true,
 			AuthorizationCodeEnabled: true,
@@ -2048,30 +2048,30 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(mockClient, nil)
 
 		mockUser := &record.User{
-			Id:                  123,
+			ID:                  123,
 			Subject:             "11111111-1111-1111-1111-111111111111",
 			Email:               "test@example.com",
 			Enabled:             true,
 			AuthStateGeneration: 7,
 		}
-		database.On("GetUserById", mock.Anything, mock.Anything, int64(123)).Return(mockUser, nil)
+		database.On("GetUserByID", mock.Anything, mock.Anything, int64(123)).Return(mockUser, nil)
 
 		tokenResponse := &issuance.ImplicitGrantResponse{
 			AccessToken: "access-token-123",
 			TokenType:   "Bearer",
 			ExpiresIn:   3600,
-			IdToken:     "id-token-123",
+			IDToken:     "id-token-123",
 			Scope:       "openid",
 		}
 		implicitTokenIssuer.On("IssueImplicitTx", mock.Anything, mock.Anything, mock.MatchedBy(func(input *issuance.ImplicitGrantInput) bool {
-			return input.Client.Id == int64(1) && input.User.Id == int64(123)
+			return input.Client.ID == int64(1) && input.User.ID == int64(123)
 		}), true, true).Return(tokenResponse, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventTokenIssuedImplicitResponse, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["issue_access_token"] == true && details["issue_id_token"] == true
 		})).Return()
 
-		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyID).Return(nil)
 
 		stubLiveSession(database, 123)
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
@@ -2117,7 +2117,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 			permissionChecker:   permissionChecker,
 		})
 
-		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 		require.NoError(t, err)
 		req = withSessionSettings(req)
 		req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), liveSessionIdentifier))
@@ -2125,10 +2125,10 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId:      testCeremonyId,
+			CeremonyID:      testCeremonyID,
 			AuthState:       ceremony.AuthStateReadyToIssueCode,
-			ClientId:        "test-client",
-			UserId:          123,
+			ClientID:        "test-client",
+			UserID:          123,
 			ResponseType:    "token",
 			AuthenticatedAt: &testIssueAuthTime,
 			RedirectURI:     "https://example.com/callback",
@@ -2138,11 +2138,11 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
-		mockClient := &record.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
+		mockClient := &record.Client{ID: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(mockClient, nil)
 
-		mockUser := &record.User{Id: 123, Subject: "11111111-1111-1111-1111-111111111111", Enabled: true}
-		database.On("GetUserById", mock.Anything, mock.Anything, int64(123)).Return(mockUser, nil)
+		mockUser := &record.User{ID: 123, Subject: "11111111-1111-1111-1111-111111111111", Enabled: true}
+		database.On("GetUserByID", mock.Anything, mock.Anything, int64(123)).Return(mockUser, nil)
 
 		tokenResponse := &issuance.ImplicitGrantResponse{
 			AccessToken: "access-token-123",
@@ -2155,7 +2155,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		}), true, false).Return(tokenResponse, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventTokenIssuedImplicitResponse, mock.Anything).Return()
-		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyID).Return(nil)
 
 		stubLiveSession(database, 123)
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
@@ -2197,7 +2197,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 			permissionChecker:   permissionChecker,
 		})
 
-		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 		require.NoError(t, err)
 
 		req = withSessionSettings(req)
@@ -2205,11 +2205,11 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId:      testCeremonyId,
+			CeremonyID:      testCeremonyID,
 			AuthState:       ceremony.AuthStateReadyToIssueCode,
 			Scope:           "openid profile",
-			ClientId:        "unknown-client",
-			UserId:          123,
+			ClientID:        "unknown-client",
+			UserID:          123,
 			ResponseType:    "token",
 			AuthenticatedAt: &testIssueAuthTime,
 			RedirectURI:     "https://example.com/callback",
@@ -2224,7 +2224,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 			"user_id":           int64(123),
 			"client_identifier": "unknown-client",
 		}).Return()
-		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyID).Return(nil)
 
 		// No clientName in the bind: renderRedirectBlocked leaves it out when the client could
 		// not be resolved, because saying anything about the application would be a claim this
@@ -2269,7 +2269,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 			permissionChecker:   permissionChecker,
 		})
 
-		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 		require.NoError(t, err)
 
 		req = withSessionSettings(req)
@@ -2278,21 +2278,21 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId:      testCeremonyId,
+			CeremonyID:      testCeremonyID,
 			AuthState:       ceremony.AuthStateReadyToIssueCode,
 			Scope:           "openid profile",
-			ClientId:        "test-client",
-			UserId:          999,
+			ClientID:        "test-client",
+			UserID:          999,
 			ResponseType:    "token",
 			AuthenticatedAt: &testIssueAuthTime,
 			RedirectURI:     "https://example.com/callback",
 		}
 		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
-		mockClient := &record.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
+		mockClient := &record.Client{ID: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(mockClient, nil)
 
-		database.On("GetUserById", mock.Anything, mock.Anything, int64(999)).Return(nil, nil)
+		database.On("GetUserByID", mock.Anything, mock.Anything, int64(999)).Return(nil, nil)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err != nil && strings.Contains(err.Error(), "user 999 not found")
@@ -2330,7 +2330,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 			permissionChecker:   permissionChecker,
 		})
 
-		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 		require.NoError(t, err)
 		req = withSessionSettings(req)
 		req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), liveSessionIdentifier))
@@ -2338,10 +2338,10 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId:      testCeremonyId,
+			CeremonyID:      testCeremonyID,
 			AuthState:       ceremony.AuthStateReadyToIssueCode,
-			ClientId:        "test-client",
-			UserId:          123,
+			ClientID:        "test-client",
+			UserID:          123,
 			ResponseType:    "token",
 			AuthenticatedAt: &testIssueAuthTime,
 			RedirectURI:     "https://example.com/callback",
@@ -2349,11 +2349,11 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
-		mockClient := &record.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
+		mockClient := &record.Client{ID: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(mockClient, nil)
 
-		mockUser := &record.User{Id: 123, Subject: "11111111-1111-1111-1111-111111111111", Enabled: true}
-		database.On("GetUserById", mock.Anything, mock.Anything, int64(123)).Return(mockUser, nil)
+		mockUser := &record.User{ID: 123, Subject: "11111111-1111-1111-1111-111111111111", Enabled: true}
+		database.On("GetUserByID", mock.Anything, mock.Anything, int64(123)).Return(mockUser, nil)
 
 		tokenError := errs.New("token generation failed")
 		implicitTokenIssuer.On("IssueImplicitTx", mock.Anything, mock.Anything, mock.Anything, true, false).Return(nil, tokenError)
@@ -2375,7 +2375,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 func TestIssueImplicitTokens(t *testing.T) {
 	t.Run("Access token only", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 		r = withSessionSettings(r)
 
 		tokenResponse := &issuance.ImplicitGrantResponse{
@@ -2401,11 +2401,11 @@ func TestIssueImplicitTokens(t *testing.T) {
 
 	t.Run("ID token only", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 		r = withSessionSettings(r)
 
 		tokenResponse := &issuance.ImplicitGrantResponse{
-			IdToken: "id-token-123",
+			IDToken: "id-token-123",
 			Scope:   "openid",
 		}
 
@@ -2425,14 +2425,14 @@ func TestIssueImplicitTokens(t *testing.T) {
 
 	t.Run("Both access token and ID token", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 		r = withSessionSettings(r)
 
 		tokenResponse := &issuance.ImplicitGrantResponse{
 			AccessToken: "access-token-123",
 			TokenType:   "Bearer",
 			ExpiresIn:   3600,
-			IdToken:     "id-token-123",
+			IDToken:     "id-token-123",
 			Scope:       "openid profile",
 		}
 
@@ -2451,7 +2451,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 
 	t.Run("No state parameter", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 		r = withSessionSettings(r)
 
 		tokenResponse := &issuance.ImplicitGrantResponse{
@@ -2479,7 +2479,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 	// an omitted one, so nothing is echoed for it.
 	t.Run("State with whitespace only is echoed exactly", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 		r = withSessionSettings(r)
 
 		tokenResponse := &issuance.ImplicitGrantResponse{
@@ -2501,7 +2501,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 	// base64 state values are full of, "#" truncates, and "&" splits one field into two.
 	t.Run("A state is echoed byte for byte", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 		r = withSessionSettings(r)
 
 		tokenResponse := &issuance.ImplicitGrantResponse{
@@ -2523,7 +2523,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 	// query branch, which replaces a registered state because it is writing into the query (#146).
 	t.Run("A registered query is left alone, state included", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 		r = withSessionSettings(r)
 
 		tokenResponse := &issuance.ImplicitGrantResponse{
@@ -2541,7 +2541,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 
 	t.Run("No scope in response", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 		r = withSessionSettings(r)
 
 		tokenResponse := &issuance.ImplicitGrantResponse{
@@ -2598,14 +2598,14 @@ func TestIssueImplicitTokens(t *testing.T) {
 		} {
 			t.Run(tc.name, func(t *testing.T) {
 				w := httptest.NewRecorder()
-				r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+				r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 				r = withSessionSettings(r)
 
 				tokenResponse := &issuance.ImplicitGrantResponse{
 					AccessToken: "access-token-123",
 					TokenType:   "Bearer",
 					ExpiresIn:   3600,
-					IdToken:     "id-token-123",
+					IDToken:     "id-token-123",
 					Scope:       "openid",
 				}
 
@@ -2643,7 +2643,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 			permissionChecker:   permissionChecker,
 		})
 
-		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 		require.NoError(t, err)
 
 		req = withSessionSettings(req)
@@ -2651,11 +2651,11 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId:      testCeremonyId,
+			CeremonyID:      testCeremonyID,
 			AuthState:       ceremony.AuthStateReadyToIssueCode,
 			Scope:           "openid profile",
-			ClientId:        "test-client",
-			UserId:          123,
+			ClientID:        "test-client",
+			UserID:          123,
 			ResponseType:    "token",
 			AuthenticatedAt: &testIssueAuthTime,
 			RedirectURI:     "https://example.com/callback",
@@ -2700,7 +2700,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 			permissionChecker:   permissionChecker,
 		})
 
-		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 		require.NoError(t, err)
 
 		req = withSessionSettings(req)
@@ -2709,22 +2709,22 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId:      testCeremonyId,
+			CeremonyID:      testCeremonyID,
 			AuthState:       ceremony.AuthStateReadyToIssueCode,
 			Scope:           "openid profile",
-			ClientId:        "test-client",
-			UserId:          123,
+			ClientID:        "test-client",
+			UserID:          123,
 			ResponseType:    "token",
 			AuthenticatedAt: &testIssueAuthTime,
 			RedirectURI:     "https://example.com/callback",
 		}
 		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
-		mockClient := &record.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
+		mockClient := &record.Client{ID: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(mockClient, nil)
 
 		dbError := errs.New("user database error")
-		database.On("GetUserById", mock.Anything, mock.Anything, int64(123)).Return(nil, dbError)
+		database.On("GetUserByID", mock.Anything, mock.Anything, int64(123)).Return(nil, dbError)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return errors.Is(err, dbError)
@@ -2762,7 +2762,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 			permissionChecker:   permissionChecker,
 		})
 
-		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 		require.NoError(t, err)
 		req = withSessionSettings(req)
 		req = req.WithContext(reqctx.WithSessionIdentifier(req.Context(), liveSessionIdentifier))
@@ -2770,10 +2770,10 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId:      testCeremonyId,
+			CeremonyID:      testCeremonyID,
 			AuthState:       ceremony.AuthStateReadyToIssueCode,
-			ClientId:        "test-client",
-			UserId:          123,
+			ClientID:        "test-client",
+			UserID:          123,
 			ResponseType:    "token",
 			AuthenticatedAt: &testIssueAuthTime,
 			RedirectURI:     "https://example.com/callback",
@@ -2781,11 +2781,11 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
-		mockClient := &record.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
+		mockClient := &record.Client{ID: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(mockClient, nil)
 
-		mockUser := &record.User{Id: 123, Subject: "11111111-1111-1111-1111-111111111111", Enabled: true}
-		database.On("GetUserById", mock.Anything, mock.Anything, int64(123)).Return(mockUser, nil)
+		mockUser := &record.User{ID: 123, Subject: "11111111-1111-1111-1111-111111111111", Enabled: true}
+		database.On("GetUserByID", mock.Anything, mock.Anything, int64(123)).Return(mockUser, nil)
 
 		tokenResponse := &issuance.ImplicitGrantResponse{
 			AccessToken: "access-token-123",
@@ -2797,7 +2797,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		auditLogger.On("Log", mock.Anything, audit.EventTokenIssuedImplicitResponse, mock.Anything).Return()
 
 		clearError := errs.New("failed to clear auth context")
-		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(clearError)
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyID).Return(clearError)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return errors.Is(err, clearError)
@@ -2892,7 +2892,7 @@ func TestIsImplicitFlow_EdgeCases(t *testing.T) {
 func TestIssueAuthCode(t *testing.T) {
 	t.Run("Query response mode", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 		r = withSessionSettings(r)
 		code := &record.Code{
 			Code:        "test_code",
@@ -2909,7 +2909,7 @@ func TestIssueAuthCode(t *testing.T) {
 
 	t.Run("Fragment response mode", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 		r = withSessionSettings(r)
 		code := &record.Code{
 			Code:        "test_code",
@@ -2926,7 +2926,7 @@ func TestIssueAuthCode(t *testing.T) {
 
 	t.Run("Form post response mode", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 		r = withSessionSettings(r)
 		code := &record.Code{
 			Code:        "test_code",
@@ -2952,7 +2952,7 @@ func TestIssueAuthCode(t *testing.T) {
 
 	t.Run("Default to query response mode", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 		r = withSessionSettings(r)
 		code := &record.Code{
 			Code:        "test_code",
@@ -2969,7 +2969,7 @@ func TestIssueAuthCode(t *testing.T) {
 
 	t.Run("Error parsing template", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 		r = withSessionSettings(r)
 		code := &record.Code{
 			Code:        "test_code",
@@ -3040,7 +3040,7 @@ func TestIssueAuthCode(t *testing.T) {
 			} {
 				t.Run(tc.name+", response_mode "+mode.name, func(t *testing.T) {
 					w := httptest.NewRecorder()
-					r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+					r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 					r = withSessionSettings(r)
 					code := &record.Code{
 						Code:        "test_code",
@@ -3079,7 +3079,7 @@ func TestIssueAuthCode(t *testing.T) {
 	// cases in TestIssueAuthCode_RegisteredQuery are the ones that tell the two apart.
 	t.Run("A registered query survives the addition of code and state", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 		r = withSessionSettings(r)
 		code := &record.Code{
 			Code:        "test_code",
@@ -3110,7 +3110,7 @@ func TestIssueAuthCode(t *testing.T) {
 func TestIssueAuthCode_RegisteredQuery(t *testing.T) {
 	t.Run("query mode replaces a registered state and keeps the rest", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 		r = withSessionSettings(r)
 		code := &record.Code{
 			Code:        "test_code",
@@ -3129,7 +3129,7 @@ func TestIssueAuthCode_RegisteredQuery(t *testing.T) {
 
 	t.Run("query mode replaces a registered code as well", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 		r = withSessionSettings(r)
 		code := &record.Code{
 			Code:        "test_code",
@@ -3150,7 +3150,7 @@ func TestIssueAuthCode_RegisteredQuery(t *testing.T) {
 
 	t.Run("query mode preserves a registered query that does not round-trip", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 		r = withSessionSettings(r)
 		code := &record.Code{
 			Code:        "test_code",
@@ -3170,7 +3170,7 @@ func TestIssueAuthCode_RegisteredQuery(t *testing.T) {
 
 	t.Run("fragment mode leaves the registered query alone", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 		r = withSessionSettings(r)
 		code := &record.Code{
 			Code:        "test_code",
@@ -3193,7 +3193,7 @@ func TestIssueAuthCode_RegisteredQuery(t *testing.T) {
 	// place and both assertions fail (#146, decision 13).
 	t.Run("query mode drops a registered state the request did not supply", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 		r = withSessionSettings(r)
 		code := &record.Code{
 			Code:        "test_code",
@@ -3213,7 +3213,7 @@ func TestIssueAuthCode_RegisteredQuery(t *testing.T) {
 
 	t.Run("query mode drops a registered error from a success response", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 		r = withSessionSettings(r)
 		code := &record.Code{
 			Code:        "test_code",
@@ -3244,7 +3244,7 @@ func TestIssueAuthCode_RegisteredQuery(t *testing.T) {
 func TestIssueAuthCode_StateEmission(t *testing.T) {
 	t.Run("an empty state is omitted in query mode", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 		r = withSessionSettings(r)
 		code := &record.Code{Code: "test_code", RedirectURI: "https://example.com/callback"}
 
@@ -3256,7 +3256,7 @@ func TestIssueAuthCode_StateEmission(t *testing.T) {
 
 	t.Run("an empty state is omitted in fragment mode", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 		r = withSessionSettings(r)
 		code := &record.Code{Code: "test_code", RedirectURI: "https://example.com/callback"}
 
@@ -3268,7 +3268,7 @@ func TestIssueAuthCode_StateEmission(t *testing.T) {
 
 	t.Run("a whitespace-only state is echoed exactly in query mode", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 		r = withSessionSettings(r)
 		code := &record.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: "   "}
 
@@ -3280,7 +3280,7 @@ func TestIssueAuthCode_StateEmission(t *testing.T) {
 
 	t.Run("a whitespace-only state is echoed exactly in fragment mode", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 		r = withSessionSettings(r)
 		code := &record.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: "   "}
 
@@ -3301,7 +3301,7 @@ func TestIssueAuthCode_ByteExactState(t *testing.T) {
 
 	t.Run("query mode", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 		r = withSessionSettings(r)
 		code := &record.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: state}
 
@@ -3314,7 +3314,7 @@ func TestIssueAuthCode_ByteExactState(t *testing.T) {
 
 	t.Run("fragment mode", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 		r = withSessionSettings(r)
 		code := &record.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: state}
 
@@ -3327,7 +3327,7 @@ func TestIssueAuthCode_ByteExactState(t *testing.T) {
 
 	t.Run("form_post mode", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 		r = withSessionSettings(r)
 		code := &record.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: state}
 
@@ -3355,7 +3355,7 @@ func TestIssueAuthCode_ByteExactState(t *testing.T) {
 func TestIssueAuthCode_FormPostIsNotCacheable(t *testing.T) {
 	t.Run("both headers are set on a rendered page", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 		r = withSessionSettings(r)
 		code := &record.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: "abc123"}
 
@@ -3372,7 +3372,7 @@ func TestIssueAuthCode_FormPostIsNotCacheable(t *testing.T) {
 
 	t.Run("neither header is set when the render failed", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+		r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 		r = withSessionSettings(r)
 		code := &record.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: "abc123"}
 
@@ -3402,7 +3402,7 @@ func TestIssueAuthCode_FormPostIsNotCacheable(t *testing.T) {
 // that page; the buffer is pinned so that such a change fails here rather than on the wire.
 func TestIssueAuthCode_FormPostRenderIsBuffered(t *testing.T) {
 	w := httptest.NewRecorder()
-	r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+	r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 	r = withSessionSettings(r)
 	code := &record.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: "abc123"}
 
@@ -3461,7 +3461,7 @@ func TestFormPostBindMapOmitsAnAbsentState(t *testing.T) {
 		} {
 			t.Run(tc.name, func(t *testing.T) {
 				w := httptest.NewRecorder()
-				r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+				r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 				r = withSessionSettings(r)
 				code := &record.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: tc.state}
 
@@ -3532,7 +3532,7 @@ func TestFormPostTemplateOmitsAnAbsentState(t *testing.T) {
 		} {
 			t.Run(tc.name, func(t *testing.T) {
 				w := httptest.NewRecorder()
-				r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+				r := httptest.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 				r = withSessionSettings(r)
 				code := &record.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: tc.state}
 
@@ -3586,10 +3586,10 @@ func TestFormPostTemplateOmitsAnAbsentState(t *testing.T) {
 	})
 }
 
-func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
+func TestHandleIssueGet_IDTokenHintSubMatching(t *testing.T) {
 	// Test cases for id_token_hint sub enforcement at issuance time (the critical safety net)
 
-	t.Run("IdTokenHintSub set matching user - issues code successfully", func(t *testing.T) {
+	t.Run("IDTokenHintSub set matching user - issues code successfully", func(t *testing.T) {
 		pageRenderer := handlersmocks.NewPageRenderer(t)
 		ceremonyStore := handlersmocks.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
@@ -3617,38 +3617,38 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		// Create authContext with IdTokenHintSub matching the user's subject
+		// Create authContext with IDTokenHintSub matching the user's subject
 		userSubject := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 		authContext := &ceremony.AuthContext{
-			CeremonyId:     testCeremonyId,
+			CeremonyID:     testCeremonyID,
 			AuthState:      ceremony.AuthStateReadyToIssueCode,
 			Scope:          "openid profile",
-			ClientId:       "test-client",
-			UserId:         1,
+			ClientID:       "test-client",
+			UserID:         1,
 			ResponseMode:   "query",
 			ResponseType:   "code",
 			RedirectURI:    "https://example.com/callback",
 			State:          "test-state",
-			IdTokenHintSub: userSubject,
+			IDTokenHintSub: userSubject,
 		}
 		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
-		// Mock user lookup - subject matches IdTokenHintSub
+		// Mock user lookup - subject matches IDTokenHintSub
 		mockUser := &record.User{
-			Id:      1,
+			ID:      1,
 			Subject: userSubject,
 			Email:   "test@example.com",
 			Enabled: true,
 		}
-		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(mockUser, nil)
+		database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(mockUser, nil)
 
 		stubLiveSession(database, 1)
 
 		// Mock code creation
 		mockCode := &record.Code{
-			Id:          1,
+			ID:          1,
 			Code:        "test-code",
-			ClientId:    1,
+			ClientID:    1,
 			RedirectURI: "https://example.com/callback",
 			State:       "test-state",
 		}
@@ -3662,7 +3662,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		})).Return()
 
 		// Mock clearing auth context
-		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyID).Return(nil)
 
 		// Execute the handler
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
@@ -3681,7 +3681,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		auditLogger.AssertExpectations(t)
 	})
 
-	t.Run("IdTokenHintSub set different user - returns login_required", func(t *testing.T) {
+	t.Run("IDTokenHintSub set different user - returns login_required", func(t *testing.T) {
 		pageRenderer := handlersmocks.NewPageRenderer(t)
 		ceremonyStore := handlersmocks.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
@@ -3705,39 +3705,39 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			permissionChecker:   permissionChecker,
 		})
 
-		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 		require.NoError(t, err)
 
 		req = withSessionSettings(req)
 
 		rr := httptest.NewRecorder()
 
-		// Create authContext with IdTokenHintSub for user A
+		// Create authContext with IDTokenHintSub for user A
 		userASubject := "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
 		userBSubject := "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
 		authContext := &ceremony.AuthContext{
-			CeremonyId:     testCeremonyId,
+			CeremonyID:     testCeremonyID,
 			AuthState:      ceremony.AuthStateReadyToIssueCode,
 			Scope:          "openid profile",
-			ClientId:       "test-client",
-			UserId:         1,
+			ClientID:       "test-client",
+			UserID:         1,
 			ResponseMode:   "query",
 			ResponseType:   "code",
 			RedirectURI:    "https://example.com/callback",
 			State:          "test-state",
-			IdTokenHintSub: userASubject, // Hint says user A
+			IDTokenHintSub: userASubject, // Hint says user A
 		}
 		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 		stubClientProvenanceLookup(database)
 
 		// Mock user lookup - authenticated user is user B (DIFFERENT)
 		mockUser := &record.User{
-			Id:      1,
+			ID:      1,
 			Subject: userBSubject,
 			Email:   "userb@example.com",
 			Enabled: true,
 		}
-		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(mockUser, nil)
+		database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(mockUser, nil)
 
 		// The clear has to reach the browser, so it must run before the response is committed.
 		// This refusal is the one that leaves the context in ready_to_issue_code, so a browser
@@ -3746,7 +3746,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		// shows it under either ordering, while rr.Result() reads the snapshot taken when the
 		// status line was written.
 		const clearedContextCookie = "cleared-auth-context"
-		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Run(func(args mock.Arguments) {
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyID).Run(func(args mock.Arguments) {
 			args.Get(0).(http.ResponseWriter).Header().Set("Set-Cookie", clearedContextCookie)
 		}).Return(nil)
 
@@ -3776,7 +3776,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		auditLogger.AssertExpectations(t)
 	})
 
-	t.Run("IdTokenHintSub set different user, failing clear - server_error to the client", func(t *testing.T) {
+	t.Run("IDTokenHintSub set different user, failing clear - server_error to the client", func(t *testing.T) {
 		pageRenderer := handlersmocks.NewPageRenderer(t)
 		ceremonyStore := handlersmocks.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
@@ -3800,7 +3800,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			permissionChecker:   permissionChecker,
 		})
 
-		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 		require.NoError(t, err)
 
 		req = withSessionSettings(req)
@@ -3810,22 +3810,22 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		userASubject := "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
 		userBSubject := "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
 		authContext := &ceremony.AuthContext{
-			CeremonyId:     testCeremonyId,
+			CeremonyID:     testCeremonyID,
 			AuthState:      ceremony.AuthStateReadyToIssueCode,
 			Scope:          "openid profile",
-			ClientId:       "test-client",
-			UserId:         1,
+			ClientID:       "test-client",
+			UserID:         1,
 			ResponseMode:   "query",
 			ResponseType:   "code",
 			RedirectURI:    "https://example.com/callback",
 			State:          "test-state",
-			IdTokenHintSub: userASubject,
+			IDTokenHintSub: userASubject,
 		}
 		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 		stubClientProvenanceLookup(database)
 
-		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&record.User{
-			Id:      1,
+		database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(&record.User{
+			ID:      1,
 			Subject: userBSubject,
 			Email:   "userb@example.com",
 			Enabled: true,
@@ -3834,7 +3834,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		// A failed clear writes no cookie, so the browser keeps the auth context whatever the
 		// handler does next. The client is still owed its error response, and server_error is
 		// the code RFC 6749 4.1.2.1 mints for a fault that cannot travel as a 500.
-		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(errs.New("the session store is unreachable"))
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyID).Return(errs.New("the session store is unreachable"))
 
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
@@ -3857,7 +3857,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		database.AssertExpectations(t)
 	})
 
-	t.Run("IdTokenHintSub set different user, failing clear and an unusable form_post template - last-resort 500", func(t *testing.T) {
+	t.Run("IDTokenHintSub set different user, failing clear and an unusable form_post template - last-resort 500", func(t *testing.T) {
 		pageRenderer := handlersmocks.NewPageRenderer(t)
 		ceremonyStore := handlersmocks.NewCeremonyStore(t)
 		codeIssuer := handlersmocks.NewCodeIssuer(t)
@@ -3888,7 +3888,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			permissionChecker:   permissionChecker,
 		})
 
-		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 		require.NoError(t, err)
 
 		req = withSessionSettings(req)
@@ -3898,28 +3898,28 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		userASubject := "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
 		userBSubject := "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
 		authContext := &ceremony.AuthContext{
-			CeremonyId:     testCeremonyId,
+			CeremonyID:     testCeremonyID,
 			AuthState:      ceremony.AuthStateReadyToIssueCode,
 			Scope:          "openid profile",
-			ClientId:       "test-client",
-			UserId:         1,
+			ClientID:       "test-client",
+			UserID:         1,
 			ResponseMode:   "form_post",
 			ResponseType:   "code",
 			RedirectURI:    "https://example.com/callback",
 			State:          "test-state",
-			IdTokenHintSub: userASubject,
+			IDTokenHintSub: userASubject,
 		}
 		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 		stubClientProvenanceLookup(database)
 
-		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&record.User{
-			Id:      1,
+		database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(&record.User{
+			ID:      1,
 			Subject: userBSubject,
 			Email:   "userb@example.com",
 			Enabled: true,
 		}, nil)
 
-		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(errs.New("the session store is unreachable"))
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyID).Return(errs.New("the session store is unreachable"))
 
 		// The clear failed and the server_error response the client is owed cannot be built
 		// either, so there is nowhere left to send it and the 500 is the last resort. Without
@@ -3941,7 +3941,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		database.AssertExpectations(t)
 	})
 
-	t.Run("IdTokenHintSub set different user, unusable form_post template - 500 when the refusal itself cannot be sent", func(t *testing.T) {
+	t.Run("IDTokenHintSub set different user, unusable form_post template - 500 when the refusal itself cannot be sent", func(t *testing.T) {
 		pageRenderer := handlersmocks.NewPageRenderer(t)
 		ceremonyStore := handlersmocks.NewCeremonyStore(t)
 		codeIssuer := handlersmocks.NewCodeIssuer(t)
@@ -3968,7 +3968,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			permissionChecker:   permissionChecker,
 		})
 
-		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 		require.NoError(t, err)
 
 		req = withSessionSettings(req)
@@ -3978,22 +3978,22 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		userASubject := "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
 		userBSubject := "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
 		authContext := &ceremony.AuthContext{
-			CeremonyId:     testCeremonyId,
+			CeremonyID:     testCeremonyID,
 			AuthState:      ceremony.AuthStateReadyToIssueCode,
 			Scope:          "openid profile",
-			ClientId:       "test-client",
-			UserId:         1,
+			ClientID:       "test-client",
+			UserID:         1,
 			ResponseMode:   "form_post",
 			ResponseType:   "code",
 			RedirectURI:    "https://example.com/callback",
 			State:          "test-state",
-			IdTokenHintSub: userASubject,
+			IDTokenHintSub: userASubject,
 		}
 		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 		stubClientProvenanceLookup(database)
 
-		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&record.User{
-			Id:      1,
+		database.On("GetUserByID", mock.Anything, mock.Anything, int64(1)).Return(&record.User{
+			ID:      1,
 			Subject: userBSubject,
 			Email:   "userb@example.com",
 			Enabled: true,
@@ -4003,7 +4003,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		// login_required refusal that cannot be committed. This is the site's second and
 		// pre-existing 500, pinned separately so a future edit cannot delete either copy
 		// unnoticed.
-		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyID).Return(nil)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return strings.Contains(err.Error(), "unable to parse template")
@@ -4020,7 +4020,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		database.AssertExpectations(t)
 	})
 
-	t.Run("IdTokenHintSub empty - proceeds normally without check", func(t *testing.T) {
+	t.Run("IDTokenHintSub empty - proceeds normally without check", func(t *testing.T) {
 		pageRenderer := handlersmocks.NewPageRenderer(t)
 		ceremonyStore := handlersmocks.NewCeremonyStore(t)
 		templateFS := fstest.MapFS{}
@@ -4048,22 +4048,22 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		// Create authContext with empty IdTokenHintSub (no hint provided)
+		// Create authContext with empty IDTokenHintSub (no hint provided)
 		authContext := &ceremony.AuthContext{
-			CeremonyId:     testCeremonyId,
+			CeremonyID:     testCeremonyID,
 			AuthState:      ceremony.AuthStateReadyToIssueCode,
 			Scope:          "openid profile",
-			ClientId:       "test-client",
-			UserId:         1,
+			ClientID:       "test-client",
+			UserID:         1,
 			ResponseMode:   "query",
 			ResponseType:   "code",
 			RedirectURI:    "https://example.com/callback",
 			State:          "test-state",
-			IdTokenHintSub: "", // Empty - no hint
+			IDTokenHintSub: "", // Empty - no hint
 		}
 		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
-		// GetUserById IS reached with no hint: armIssueGate stubs it because #241's live
+		// GetUserByID IS reached with no hint: armIssueGate stubs it because #241's live
 		// permission check loads the user whichever way the hint branch went. What an empty
 		// hint decides is only that no subject is compared, which is what the 302 below shows.
 
@@ -4071,9 +4071,9 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 
 		// Mock code creation
 		mockCode := &record.Code{
-			Id:          1,
+			ID:          1,
 			Code:        "test-code",
-			ClientId:    1,
+			ClientID:    1,
 			RedirectURI: "https://example.com/callback",
 			State:       "test-state",
 		}
@@ -4087,7 +4087,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		})).Return()
 
 		// Mock clearing auth context
-		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyID).Return(nil)
 
 		// Execute the handler
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
@@ -4129,7 +4129,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			permissionChecker:   permissionChecker,
 		})
 
-		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyId, nil)
+		req, err := http.NewRequest("GET", "/auth/issue?ceremony="+testCeremonyID, nil)
 		require.NoError(t, err)
 
 		req = withSessionSettings(req)
@@ -4144,16 +4144,16 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		ceremonyStore.On("GetAuthContext", req).Run(func(args mock.Arguments) {
 			stubClientProvenanceLookup(database)
 			savedAuthContext = &ceremony.AuthContext{
-				CeremonyId:     testCeremonyId,
+				CeremonyID:     testCeremonyID,
 				AuthState:      ceremony.AuthStateReadyToIssueCode,
 				Scope:          "openid profile",
-				ClientId:       "test-client",
-				UserId:         99,
+				ClientID:       "test-client",
+				UserID:         99,
 				ResponseMode:   "query",
 				ResponseType:   "code",
 				RedirectURI:    "https://example.com/callback",
 				State:          "test-state",
-				IdTokenHintSub: userASubject,
+				IDTokenHintSub: userASubject,
 				Prompt:         "login",
 			}
 		}).Return(func(r *http.Request) *ceremony.AuthContext {
@@ -4161,12 +4161,12 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		}, nil)
 
 		mockUserB := &record.User{
-			Id:      99,
+			ID:      99,
 			Subject: userBSubject,
 			Email:   "userb@example.com",
 			Enabled: true,
 		}
-		database.On("GetUserById", mock.Anything, mock.Anything, int64(99)).Return(mockUserB, nil)
+		database.On("GetUserByID", mock.Anything, mock.Anything, int64(99)).Return(mockUserB, nil)
 
 		// The registration gate above the hint check loads the client, which
 		// stubClientProvenanceLookup already supplies, and then its registrations. Armed by hand
@@ -4179,7 +4179,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 				client.RedirectURIs = []record.RedirectURI{{URI: "https://example.com/callback"}}
 			}).Return(nil)
 
-		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyID).Return(nil)
 
 		handler.ServeHTTP(rr, req)
 
@@ -4191,8 +4191,8 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		assert.Contains(t, location, "state=test-state")
 
 		assert.NotNil(t, savedAuthContext, "AuthContext should have been created")
-		assert.Equal(t, userASubject, savedAuthContext.IdTokenHintSub, "IdTokenHintSub should persist from authorize request")
-		assert.Equal(t, int64(99), savedAuthContext.UserId, "UserId should be set to authenticated user (user B)")
+		assert.Equal(t, userASubject, savedAuthContext.IDTokenHintSub, "IDTokenHintSub should persist from authorize request")
+		assert.Equal(t, int64(99), savedAuthContext.UserID, "UserID should be set to authenticated user (user B)")
 
 		codeIssuer.AssertNotCalled(t, "IssueAuthCodeTx", mock.Anything, mock.Anything)
 
@@ -4294,11 +4294,11 @@ func TestHandleIssueGet_RedirectURIRecheck(t *testing.T) {
 			rr := httptest.NewRecorder()
 
 			authContext := &ceremony.AuthContext{
-				CeremonyId:   testCeremonyId,
+				CeremonyID:   testCeremonyID,
 				AuthState:    ceremony.AuthStateReadyToIssueCode,
 				Scope:        "openid profile",
-				ClientId:     "test-client",
-				UserId:       123,
+				ClientID:     "test-client",
+				UserID:       123,
 				ResponseMode: "query",
 				ResponseType: tc.responseType,
 				RedirectURI:  tc.requested,
@@ -4306,7 +4306,7 @@ func TestHandleIssueGet_RedirectURIRecheck(t *testing.T) {
 			}
 			ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
-			issuingClient := &record.Client{Id: 1, ClientIdentifier: "test-client", DisplayName: "Test Client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
+			issuingClient := &record.Client{ID: 1, ClientIdentifier: "test-client", DisplayName: "Test Client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
 			database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
 			database.On("ClientLoadRedirectURIs", mock.Anything, (*sql.Tx)(nil), issuingClient).
 				Run(func(args mock.Arguments) {
@@ -4320,17 +4320,17 @@ func TestHandleIssueGet_RedirectURIRecheck(t *testing.T) {
 			// Everything below the gate, armed as a pass so that a row reaching it gets there on
 			// its own merits. A refused row touches none of these, which is why they are Maybe().
 			database.On("GetUserSessionBySessionIdentifier", mock.Anything, (*sql.Tx)(nil), liveSessionIdentifier).
-				Return(&record.UserSession{Id: 55, SessionIdentifier: liveSessionIdentifier, UserId: 123}, nil).Maybe()
+				Return(&record.UserSession{ID: 55, SessionIdentifier: liveSessionIdentifier, UserID: 123}, nil).Maybe()
 			userSessionManager.On("HasValidUserSession", mock.Anything, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.Anything).Return(true).Maybe()
-			database.On("GetUserById", mock.Anything, mock.Anything, int64(123)).
-				Return(&record.User{Id: 123, Subject: fake.UUID(), Enabled: true}, nil).Maybe()
+			database.On("GetUserByID", mock.Anything, mock.Anything, int64(123)).
+				Return(&record.User{ID: 123, Subject: fake.UUID(), Enabled: true}, nil).Maybe()
 			permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, mock.Anything, mock.Anything).
 				Return(func(_ context.Context, scope string, _ *record.User) string { return scope }, nil).Maybe()
-			ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)
+			ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyID).Return(nil)
 
 			if tc.wantIssued {
 				codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.Anything).
-					Return(&record.Code{Id: 1, Code: "test-code", ClientId: 1, RedirectURI: tc.requested, State: "test-state"}, nil)
+					Return(&record.Code{ID: 1, Code: "test-code", ClientID: 1, RedirectURI: tc.requested, State: "test-state"}, nil)
 				auditLogger.On("Log", mock.Anything, audit.EventCreatedAuthCode, mock.Anything).Return()
 			} else {
 				// The client row beside its identifier, since the gate loaded it (#522 decision 7).
@@ -4368,7 +4368,7 @@ func TestHandleIssueGet_RedirectURIRecheck(t *testing.T) {
 	}
 }
 
-// TestHandleIssueGet_RedirectURIRecheckOutranksTheIdTokenHintRefusal is the ordering case, and it
+// TestHandleIssueGet_RedirectURIRecheckOutranksTheIDTokenHintRefusal is the ordering case, and it
 // is the reason the registration check sits at the very top of the handler rather than beside the
 // other two.
 //
@@ -4379,7 +4379,7 @@ func TestHandleIssueGet_RedirectURIRecheck(t *testing.T) {
 // an unregistered callback.
 //
 // It needs its ordering stated or it reads as a duplicate of the row above and gets tidied away.
-func TestHandleIssueGet_RedirectURIRecheckOutranksTheIdTokenHintRefusal(t *testing.T) {
+func TestHandleIssueGet_RedirectURIRecheckOutranksTheIDTokenHintRefusal(t *testing.T) {
 	pageRenderer := handlersmocks.NewPageRenderer(t)
 	ceremonyStore := handlersmocks.NewCeremonyStore(t)
 	templateFS := fstest.MapFS{}
@@ -4408,25 +4408,25 @@ func TestHandleIssueGet_RedirectURIRecheckOutranksTheIdTokenHintRefusal(t *testi
 	// The hint names user A; the ceremony authenticated user B. On its own that is answered with
 	// login_required AT THE CLIENT'S REDIRECT URI.
 	authContext := &ceremony.AuthContext{
-		CeremonyId:     testCeremonyId,
+		CeremonyID:     testCeremonyID,
 		AuthState:      ceremony.AuthStateReadyToIssueCode,
 		Scope:          "openid profile",
-		ClientId:       "test-client",
-		UserId:         99,
+		ClientID:       "test-client",
+		UserID:         99,
 		ResponseMode:   "query",
 		ResponseType:   "code",
 		RedirectURI:    "https://example.com/callback",
 		State:          "test-state",
-		IdTokenHintSub: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+		IDTokenHintSub: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
 	}
 	ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
-	issuingClient := &record.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
+	issuingClient := &record.Client{ID: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
 	database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
 	database.On("ClientLoadRedirectURIs", mock.Anything, (*sql.Tx)(nil), issuingClient).Return(nil)
 
 	auditLogger.On("Log", mock.Anything, audit.EventIssuanceRefusedRedirectURI, mock.Anything).Return()
-	ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)
+	ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyID).Return(nil)
 	pageRenderer.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_redirect_blocked.html",
 		mock.Anything).Return(nil)
 
@@ -4437,7 +4437,7 @@ func TestHandleIssueGet_RedirectURIRecheckOutranksTheIdTokenHintRefusal(t *testi
 
 	// The user is never even read: the gate refuses above the hint check, so the comparison that
 	// would have produced the redirect is never made.
-	database.AssertNotCalled(t, "GetUserById", mock.Anything, mock.Anything, mock.Anything)
+	database.AssertNotCalled(t, "GetUserByID", mock.Anything, mock.Anything, mock.Anything)
 
 	pageRenderer.AssertExpectations(t)
 	database.AssertExpectations(t)
@@ -4497,11 +4497,11 @@ func TestHandleIssueGet_ExpiredAmbientSession(t *testing.T) {
 			rr := httptest.NewRecorder()
 
 			authContext := &ceremony.AuthContext{
-				CeremonyId:   testCeremonyId,
+				CeremonyID:   testCeremonyID,
 				AuthState:    ceremony.AuthStateReadyToIssueCode,
 				Scope:        "openid profile",
-				ClientId:     "test-client",
-				UserId:       123,
+				ClientID:     "test-client",
+				UserID:       123,
 				ResponseMode: "query",
 				ResponseType: "code",
 				RedirectURI:  "https://example.com/callback",
@@ -4510,7 +4510,7 @@ func TestHandleIssueGet_ExpiredAmbientSession(t *testing.T) {
 			}
 			ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
-			issuingClient := &record.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
+			issuingClient := &record.Client{ID: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
 			database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
 			database.On("ClientLoadRedirectURIs", mock.Anything, (*sql.Tx)(nil), issuingClient).
 				Run(func(args mock.Arguments) {
@@ -4535,7 +4535,7 @@ func TestHandleIssueGet_ExpiredAmbientSession(t *testing.T) {
 			}).Return()
 
 			if tc.silent {
-				ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)
+				ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyID).Return(nil)
 			} else {
 				ceremonyStore.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 					return ac.AuthState == ceremony.AuthStateRequiresLevel1
@@ -4659,12 +4659,12 @@ func TestHandleIssueGet_ScopeRefilter(t *testing.T) {
 			rr := httptest.NewRecorder()
 
 			authContext := &ceremony.AuthContext{
-				CeremonyId:     testCeremonyId,
+				CeremonyID:     testCeremonyID,
 				AuthState:      ceremony.AuthStateReadyToIssueCode,
 				Scope:          tc.scope,
 				ConsentedScope: tc.consentedScope,
-				ClientId:       "test-client",
-				UserId:         123,
+				ClientID:       "test-client",
+				UserID:         123,
 				ResponseMode:   "query",
 				ResponseType:   "code",
 				RedirectURI:    "https://example.com/callback",
@@ -4672,7 +4672,7 @@ func TestHandleIssueGet_ScopeRefilter(t *testing.T) {
 			}
 			ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
-			issuingClient := &record.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
+			issuingClient := &record.Client{ID: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
 			database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
 			database.On("ClientLoadRedirectURIs", mock.Anything, (*sql.Tx)(nil), issuingClient).
 				Run(func(args mock.Arguments) {
@@ -4682,8 +4682,8 @@ func TestHandleIssueGet_ScopeRefilter(t *testing.T) {
 			stubLiveSession(database, 123)
 			userSessionManager.On("HasValidUserSession", mock.Anything, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.Anything).Return(true)
 
-			user := &record.User{Id: 123, Subject: fake.UUID(), Enabled: true}
-			database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(user, nil)
+			user := &record.User{ID: 123, Subject: fake.UUID(), Enabled: true}
+			database.On("GetUserByID", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(user, nil)
 
 			// The field the filter is asked about is the one the issuer will read, and asserting
 			// it here is half of decision 2: reading the wrong field is as wrong as writing it.
@@ -4694,13 +4694,13 @@ func TestHandleIssueGet_ScopeRefilter(t *testing.T) {
 			permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, wantFiltered, user).
 				Return(tc.filtered, nil)
 
-			ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)
+			ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyID).Return(nil)
 
 			if tc.wantIssued {
 				codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.MatchedBy(func(input *issuance.CreateCodeInput) bool {
 					return input.Scope == tc.wantScope &&
 						input.ConsentedScope == tc.wantConsented
-				})).Return(&record.Code{Id: 1, Code: "test-code", ClientId: 1,
+				})).Return(&record.Code{ID: 1, Code: "test-code", ClientID: 1,
 					RedirectURI: "https://example.com/callback", State: "test-state"}, nil)
 				auditLogger.On("Log", mock.Anything, audit.EventCreatedAuthCode, mock.Anything).Return()
 			} else {
@@ -4782,9 +4782,9 @@ func TestHandleIssueGet_TheLiveChecksFailClosedOnAStorageError(t *testing.T) {
 							[]record.RedirectURI{{URI: "https://example.com/callback"}}
 					}).Return(nil)
 				database.On("GetUserSessionBySessionIdentifier", mock.Anything, (*sql.Tx)(nil), liveSessionIdentifier).
-					Return(&record.UserSession{Id: 55, SessionIdentifier: liveSessionIdentifier, UserId: 123}, nil)
-				database.On("GetUserById", mock.Anything, mock.Anything, int64(123)).
-					Return(&record.User{Id: 123, Subject: fake.UUID(), Enabled: true}, nil)
+					Return(&record.UserSession{ID: 55, SessionIdentifier: liveSessionIdentifier, UserID: 123}, nil)
+				database.On("GetUserByID", mock.Anything, mock.Anything, int64(123)).
+					Return(&record.User{ID: 123, Subject: fake.UUID(), Enabled: true}, nil)
 				permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid profile", mock.Anything).
 					Return("", errs.New("permission filter sentinel"))
 			},
@@ -4821,11 +4821,11 @@ func TestHandleIssueGet_TheLiveChecksFailClosedOnAStorageError(t *testing.T) {
 			rr := httptest.NewRecorder()
 
 			authContext := &ceremony.AuthContext{
-				CeremonyId:   testCeremonyId,
+				CeremonyID:   testCeremonyID,
 				AuthState:    ceremony.AuthStateReadyToIssueCode,
 				Scope:        "openid profile",
-				ClientId:     "test-client",
-				UserId:       123,
+				ClientID:     "test-client",
+				UserID:       123,
 				ResponseMode: "query",
 				ResponseType: "code",
 				RedirectURI:  "https://example.com/callback",
@@ -4833,7 +4833,7 @@ func TestHandleIssueGet_TheLiveChecksFailClosedOnAStorageError(t *testing.T) {
 			}
 			ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
-			issuingClient := &record.Client{Id: 1, ClientIdentifier: "test-client", DisplayName: "Test Client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
+			issuingClient := &record.Client{ID: 1, ClientIdentifier: "test-client", DisplayName: "Test Client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
 			database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
 
 			// Only reached on the second row, and only because its own arming got that far.
@@ -4906,11 +4906,11 @@ func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId:   testCeremonyId,
+			CeremonyID:   testCeremonyID,
 			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			Scope:        "openid profile",
-			ClientId:     "test-client",
-			UserId:       123,
+			ClientID:     "test-client",
+			UserID:       123,
 			ResponseMode: "query",
 			ResponseType: "code",
 			RedirectURI:  "https://example.com/callback",
@@ -4918,7 +4918,7 @@ func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
-		issuingClient := &record.Client{Id: 1, ClientIdentifier: "test-client", DisplayName: "Test Client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
+		issuingClient := &record.Client{ID: 1, ClientIdentifier: "test-client", DisplayName: "Test Client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
 		database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
 		database.On("ClientLoadRedirectURIs", mock.Anything, (*sql.Tx)(nil), issuingClient).
 			Run(func(args mock.Arguments) {
@@ -4933,7 +4933,7 @@ func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 		// is as unacceptable here as a code would be. The page is rendered anyway and the browser
 		// keeps a replayable auth context, which is the lesser of the two: a replay arrives back at
 		// this same gate and is refused again for as long as the registration is gone.
-		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyID).
 			Return(errs.New("the session store is unreachable"))
 
 		// This expectation IS the assertion. A handler that returned after the failed clear never
@@ -4986,11 +4986,11 @@ func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId:   testCeremonyId,
+			CeremonyID:   testCeremonyID,
 			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			Scope:        "openid profile",
-			ClientId:     "test-client",
-			UserId:       123,
+			ClientID:     "test-client",
+			UserID:       123,
 			ResponseMode: "query",
 			ResponseType: "code",
 			RedirectURI:  "https://example.com/callback",
@@ -4998,7 +4998,7 @@ func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 		}
 		ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 
-		issuingClient := &record.Client{Id: 1, ClientIdentifier: "test-client", DisplayName: "Test Client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
+		issuingClient := &record.Client{ID: 1, ClientIdentifier: "test-client", DisplayName: "Test Client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
 		database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
 		database.On("ClientLoadRedirectURIs", mock.Anything, (*sql.Tx)(nil), issuingClient).
 			Run(func(args mock.Arguments) {
@@ -5007,7 +5007,7 @@ func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 			}).Return(nil)
 
 		auditLogger.On("Log", mock.Anything, audit.EventIssuanceRefusedRedirectURI, mock.Anything).Return()
-		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyID).Return(nil)
 
 		// The clear worked and it is the page that cannot be produced. There is nowhere left to
 		// report the refusal, so the 500 is the last resort, and it stays a 500: falling back to a
@@ -5034,7 +5034,7 @@ func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 
 // The empty-scope refusal answers the client by redirect, so it has the full house triple: the
 // clear can fail, the response can fail to be produced, and both can fail together. It is the same
-// triple TestHandleIssueGet_IdTokenHintSubMatching runs for the refusal directly above it in the
+// triple TestHandleIssueGet_IDTokenHintSubMatching runs for the refusal directly above it in the
 // handler, and it landed with none of the three.
 //
 // form_post is the response mode used throughout, because it is the only one whose arm can fail
@@ -5052,12 +5052,12 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 		t.Helper()
 
 		authContext := &ceremony.AuthContext{
-			CeremonyId:     testCeremonyId,
+			CeremonyID:     testCeremonyID,
 			AuthState:      ceremony.AuthStateReadyToIssueCode,
 			Scope:          "backend:read backend:write",
 			ConsentedScope: "backend:read",
-			ClientId:       "test-client",
-			UserId:         123,
+			ClientID:       "test-client",
+			UserID:         123,
 			ResponseMode:   responseMode,
 			ResponseType:   "code",
 			RedirectURI:    "https://example.com/callback",
@@ -5067,7 +5067,7 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 
 		// The gate's own registration read, and separately the emitter's: the refusal below is an
 		// answer to the client, so it passes through RedirectWillBeEmitted too (#241 decision 11).
-		issuingClient := &record.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
+		issuingClient := &record.Client{ID: 1, ClientIdentifier: "test-client", Enabled: true, AuthorizationCodeEnabled: true, ImplicitGrantEnabled: &implicitAllowed}
 		database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
 		database.On("ClientLoadRedirectURIs", mock.Anything, (*sql.Tx)(nil), issuingClient).
 			Run(func(args mock.Arguments) {
@@ -5079,8 +5079,8 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 		stubLiveSession(database, 123)
 		userSessionManager.On("HasValidUserSession", mock.Anything, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.Anything).Return(true)
 
-		user := &record.User{Id: 123, Subject: fake.UUID(), Enabled: true}
-		database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(user, nil)
+		user := &record.User{ID: 123, Subject: fake.UUID(), Enabled: true}
+		database.On("GetUserByID", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(user, nil)
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "backend:read", user).
 			Return("", nil)
 
@@ -5119,7 +5119,7 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 		// A failed clear writes no cookie, so the browser keeps the auth context whatever the
 		// handler does next. The client is still owed its error response, and server_error is the
 		// code RFC 6749 4.1.2.1 mints for a fault that cannot travel as a 500.
-		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyID).
 			Return(errs.New("the session store is unreachable"))
 
 		handler.ServeHTTP(rr, req)
@@ -5175,7 +5175,7 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 		rr := httptest.NewRecorder()
 		armEmptiedScope(t, "form_post", database, ceremonyStore, auditLogger, userSessionManager, permissionChecker, req)
 
-		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyID).
 			Return(errs.New("the session store is unreachable"))
 
 		// The clear failed and the server_error response the client is owed cannot be built
@@ -5229,7 +5229,7 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 		// The other half of the same family: here the clear succeeds and it is the ordinary
 		// access_denied refusal that cannot be committed. This is the site's second and separate
 		// 500, pinned on its own so a future edit cannot delete either copy unnoticed.
-		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil)
+		ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyID).Return(nil)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err != nil && strings.Contains(err.Error(), "unable to parse template")
@@ -5274,11 +5274,11 @@ func TestHandleIssueGet_ACodeInFormPostRendersFromTheRespondersTemplates(t *test
 	rr := httptest.NewRecorder()
 
 	authContext := &ceremony.AuthContext{
-		CeremonyId:   testCeremonyId,
+		CeremonyID:   testCeremonyID,
 		AuthState:    ceremony.AuthStateReadyToIssueCode,
 		Scope:        "openid profile",
-		ClientId:     "test-client",
-		UserId:       123,
+		ClientID:     "test-client",
+		UserID:       123,
 		ResponseMode: "form_post",
 		ResponseType: "code",
 		RedirectURI:  "https://example.com/callback",
@@ -5286,10 +5286,10 @@ func TestHandleIssueGet_ACodeInFormPostRendersFromTheRespondersTemplates(t *test
 	ceremonyStore.On("GetAuthContext", req).Return(authContext, nil)
 	stubLiveSession(database, 123)
 	codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.Anything).Return(&record.Code{
-		Id: 1, Code: "form-post-code", ClientId: 1, RedirectURI: "https://example.com/callback",
+		ID: 1, Code: "form-post-code", ClientID: 1, RedirectURI: "https://example.com/callback",
 	}, nil).Once()
 	auditLogger.On("Log", mock.Anything, audit.EventCreatedAuthCode, mock.Anything).Return().Once()
-	ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyId).Return(nil).Once()
+	ceremonyStore.On("ClearAuthContext", rr, req, testCeremonyID).Return(nil).Once()
 	armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
 
 	handler.ServeHTTP(rr, req)
@@ -5351,10 +5351,10 @@ func TestHandleIssueGet_RefusesAStoredPlainHTTPRedirectURIBeforeMinting(t *testi
 		f.req = requestWithSessionIdentifier(t, liveSessionIdentifier)
 		f.rr = httptest.NewRecorder()
 		f.authContext = &ceremony.AuthContext{
-			CeremonyId:   testCeremonyId,
+			CeremonyID:   testCeremonyID,
 			AuthState:    ceremony.AuthStateReadyToIssueCode,
-			ClientId:     "test-client",
-			UserId:       123,
+			ClientID:     "test-client",
+			UserID:       123,
 			ResponseMode: responseMode,
 			ResponseType: responseType,
 			RedirectURI:  redirectURI,
@@ -5385,7 +5385,7 @@ func TestHandleIssueGet_RefusesAStoredPlainHTTPRedirectURIBeforeMinting(t *testi
 		t.Run(tc.name+" is refused on the page, before anything is minted", func(t *testing.T) {
 			f := newFixture(t, tc.responseType, tc.responseMode, tc.storedURI)
 			armIssueGate(f.database, f.userSessionManager, f.permissionChecker, tc.storedURI)
-			f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).Return(nil).Once()
+			f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyID).Return(nil).Once()
 
 			// This expectation is the page: "You have not been sent anywhere", naming the host the
 			// client asked for and the client, as the deregistered-URI refusal does (#241).
@@ -5404,7 +5404,7 @@ func TestHandleIssueGet_RefusesAStoredPlainHTTPRedirectURIBeforeMinting(t *testi
 			f.codeIssuer.AssertNotCalled(t, "IssueAuthCodeTx", mock.Anything, mock.Anything)
 			f.implicitTokenIssuer.AssertNotCalled(t, "IssueImplicitTx",
 				mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
-			f.database.AssertNotCalled(t, "GetUserById", mock.Anything, mock.Anything, mock.Anything)
+			f.database.AssertNotCalled(t, "GetUserByID", mock.Anything, mock.Anything, mock.Anything)
 
 			warning, ok := warningSaying(t, logs, "plain http")
 			if ok {
@@ -5425,9 +5425,9 @@ func TestHandleIssueGet_RefusesAStoredPlainHTTPRedirectURIBeforeMinting(t *testi
 		t.Run(storedURI+" still receives the code", func(t *testing.T) {
 			f := newFixture(t, "code", "query", storedURI)
 			f.codeIssuer.On("IssueAuthCodeTx", mock.Anything, mock.Anything).
-				Return(&record.Code{Id: 1, Code: "test-code", ClientId: 1, RedirectURI: storedURI, State: "test-state"}, nil).Once()
+				Return(&record.Code{ID: 1, Code: "test-code", ClientID: 1, RedirectURI: storedURI, State: "test-state"}, nil).Once()
 			f.auditLogger.On("Log", mock.Anything, audit.EventCreatedAuthCode, mock.Anything).Return().Once()
-			f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyId).Return(nil).Once()
+			f.ceremonyStore.On("ClearAuthContext", f.rr, f.req, testCeremonyID).Return(nil).Once()
 			stubLiveSession(f.database, 123)
 			armIssueGate(f.database, f.userSessionManager, f.permissionChecker, storedURI)
 

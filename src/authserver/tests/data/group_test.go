@@ -14,7 +14,7 @@ func TestCreateGroup(t *testing.T) {
 	group := &record.Group{
 		GroupIdentifier:      "test_group_" + fake.LetterN(6),
 		Description:          "Test Group",
-		IncludeInIdToken:     true,
+		IncludeInIDToken:     true,
 		IncludeInAccessToken: false,
 	}
 
@@ -23,7 +23,7 @@ func TestCreateGroup(t *testing.T) {
 		t.Fatalf("Failed to create group: %v", err)
 	}
 
-	if group.Id == 0 {
+	if group.ID == 0 {
 		t.Error("Expected non-zero ID after creation")
 	}
 	if !group.CreatedAt.Valid || group.CreatedAt.Time.IsZero() {
@@ -33,7 +33,7 @@ func TestCreateGroup(t *testing.T) {
 		t.Error("Expected UpdatedAt to be set")
 	}
 
-	retrievedGroup, err := database.GetGroupById(context.Background(), nil, group.Id)
+	retrievedGroup, err := database.GetGroupByID(context.Background(), nil, group.ID)
 	if err != nil {
 		t.Fatalf("Failed to retrieve created group: %v", err)
 	}
@@ -44,8 +44,8 @@ func TestCreateGroup(t *testing.T) {
 	if retrievedGroup.Description != group.Description {
 		t.Errorf("Expected Description %s, got %s", group.Description, retrievedGroup.Description)
 	}
-	if retrievedGroup.IncludeInIdToken != group.IncludeInIdToken {
-		t.Errorf("Expected IncludeInIdToken %v, got %v", group.IncludeInIdToken, retrievedGroup.IncludeInIdToken)
+	if retrievedGroup.IncludeInIDToken != group.IncludeInIDToken {
+		t.Errorf("Expected IncludeInIDToken %v, got %v", group.IncludeInIDToken, retrievedGroup.IncludeInIDToken)
 	}
 	if retrievedGroup.IncludeInAccessToken != group.IncludeInAccessToken {
 		t.Errorf("Expected IncludeInAccessToken %v, got %v", group.IncludeInAccessToken, retrievedGroup.IncludeInAccessToken)
@@ -56,7 +56,7 @@ func TestUpdateGroup(t *testing.T) {
 	group := createTestGroup(t)
 
 	group.Description = "Updated Description"
-	group.IncludeInIdToken = false
+	group.IncludeInIDToken = false
 	group.IncludeInAccessToken = true
 
 	// Wait a moment to ensure UpdatedAt will be different
@@ -67,7 +67,7 @@ func TestUpdateGroup(t *testing.T) {
 		t.Fatalf("Failed to update group: %v", err)
 	}
 
-	updatedGroup, err := database.GetGroupById(context.Background(), nil, group.Id)
+	updatedGroup, err := database.GetGroupByID(context.Background(), nil, group.ID)
 	if err != nil {
 		t.Fatalf("Failed to retrieve updated group: %v", err)
 	}
@@ -75,8 +75,8 @@ func TestUpdateGroup(t *testing.T) {
 	if updatedGroup.Description != group.Description {
 		t.Errorf("Expected Description %s, got %s", group.Description, updatedGroup.Description)
 	}
-	if updatedGroup.IncludeInIdToken != group.IncludeInIdToken {
-		t.Errorf("Expected IncludeInIdToken %v, got %v", group.IncludeInIdToken, updatedGroup.IncludeInIdToken)
+	if updatedGroup.IncludeInIDToken != group.IncludeInIDToken {
+		t.Errorf("Expected IncludeInIDToken %v, got %v", group.IncludeInIDToken, updatedGroup.IncludeInIDToken)
 	}
 	if updatedGroup.IncludeInAccessToken != group.IncludeInAccessToken {
 		t.Errorf("Expected IncludeInAccessToken %v, got %v", group.IncludeInAccessToken, updatedGroup.IncludeInAccessToken)
@@ -86,27 +86,27 @@ func TestUpdateGroup(t *testing.T) {
 	}
 }
 
-func TestGetGroupById(t *testing.T) {
+func TestGetGroupByID(t *testing.T) {
 	group := createTestGroup(t)
 
-	retrievedGroup, err := database.GetGroupById(context.Background(), nil, group.Id)
+	retrievedGroup, err := database.GetGroupByID(context.Background(), nil, group.ID)
 	if err != nil {
 		t.Fatalf("Failed to get group by ID: %v", err)
 	}
 
-	if retrievedGroup.Id != group.Id {
-		t.Errorf("Expected ID %d, got %d", group.Id, retrievedGroup.Id)
+	if retrievedGroup.ID != group.ID {
+		t.Errorf("Expected ID %d, got %d", group.ID, retrievedGroup.ID)
 	}
 	if retrievedGroup.GroupIdentifier != group.GroupIdentifier {
 		t.Errorf("Expected GroupIdentifier %s, got %s", group.GroupIdentifier, retrievedGroup.GroupIdentifier)
 	}
 
-	nonExistentGroup, err := database.GetGroupById(context.Background(), nil, 99999)
+	nonExistentGroup, err := database.GetGroupByID(context.Background(), nil, 99999)
 	if err != nil {
 		t.Errorf("Expected no error for non-existent group, got: %v", err)
 	}
 	if nonExistentGroup != nil {
-		t.Errorf("Expected nil for non-existent group, got a group with ID: %d", nonExistentGroup.Id)
+		t.Errorf("Expected nil for non-existent group, got a group with ID: %d", nonExistentGroup.ID)
 	}
 }
 
@@ -118,8 +118,8 @@ func TestGetGroupByGroupIdentifier(t *testing.T) {
 		t.Fatalf("Failed to get group by identifier: %v", err)
 	}
 
-	if retrievedGroup.Id != group.Id {
-		t.Errorf("Expected ID %d, got %d", group.Id, retrievedGroup.Id)
+	if retrievedGroup.ID != group.ID {
+		t.Errorf("Expected ID %d, got %d", group.ID, retrievedGroup.ID)
 	}
 	if retrievedGroup.GroupIdentifier != group.GroupIdentifier {
 		t.Errorf("Expected GroupIdentifier %s, got %s", group.GroupIdentifier, retrievedGroup.GroupIdentifier)
@@ -130,7 +130,7 @@ func TestGetGroupByGroupIdentifier(t *testing.T) {
 		t.Errorf("Expected no error for non-existent group, got: %v", err)
 	}
 	if nonExistentGroup != nil {
-		t.Errorf("Expected nil for non-existent group, got a group with ID: %d", nonExistentGroup.Id)
+		t.Errorf("Expected nil for non-existent group, got a group with ID: %d", nonExistentGroup.ID)
 	}
 }
 
@@ -150,10 +150,10 @@ func TestGetAllGroups(t *testing.T) {
 	foundGroup1 := false
 	foundGroup2 := false
 	for _, group := range groups {
-		if group.Id == group1.Id {
+		if group.ID == group1.ID {
 			foundGroup1 = true
 		}
-		if group.Id == group2.Id {
+		if group.ID == group2.ID {
 			foundGroup2 = true
 		}
 	}
@@ -191,7 +191,7 @@ func TestGetAllGroupsPaginated(t *testing.T) {
 		// Remove only what this test made. Unlike the old table-wide wipe this
 		// touches nothing another test owns, and it keeps the table from growing by
 		// 25 rows on every run of the three server databases, which are never reset.
-		t.Cleanup(func() { _ = database.DeleteGroup(context.Background(), nil, group.Id) })
+		t.Cleanup(func() { _ = database.DeleteGroup(context.Background(), nil, group.ID) })
 	}
 
 	expectedTotal := baseline + numGroups
@@ -271,12 +271,12 @@ func TestGetAllGroupsPaginated(t *testing.T) {
 func TestDeleteGroup(t *testing.T) {
 	group := createTestGroup(t)
 
-	err := database.DeleteGroup(context.Background(), nil, group.Id)
+	err := database.DeleteGroup(context.Background(), nil, group.ID)
 	if err != nil {
 		t.Fatalf("Failed to delete group: %v", err)
 	}
 
-	deletedGroup, err := database.GetGroupById(context.Background(), nil, group.Id)
+	deletedGroup, err := database.GetGroupByID(context.Background(), nil, group.ID)
 	if err != nil {
 		t.Fatalf("Error while checking for deleted group: %v", err)
 	}
@@ -331,10 +331,10 @@ func TestGetGroupByGroupIdentifierIsCaseSensitive(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		lookup string
-		wantId int64
+		wantID int64
 	}{
-		{"the lowercase name resolves the lowercase group", lower, lowerGroup.Id},
-		{"the uppercase name resolves the uppercase group", upper, upperGroup.Id},
+		{"the lowercase name resolves the lowercase group", lower, lowerGroup.ID},
+		{"the uppercase name resolves the uppercase group", upper, upperGroup.ID},
 		{"a mis-cased name resolves nothing", "Case_Group_" + strings.ToUpper(lower[11:]), 0},
 		{"a trailing space resolves nothing, which SQL Server's padding would otherwise defeat", lower + " ", 0},
 	} {
@@ -342,19 +342,19 @@ func TestGetGroupByGroupIdentifierIsCaseSensitive(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: unexpected error: %v", tc.name, err)
 		}
-		if tc.wantId == 0 {
+		if tc.wantID == 0 {
 			if got != nil {
 				t.Errorf("%s: expected nil, got the group with id %d and identifier %q",
-					tc.name, got.Id, got.GroupIdentifier)
+					tc.name, got.ID, got.GroupIdentifier)
 			}
 			continue
 		}
 		if got == nil {
-			t.Fatalf("%s: expected the group with id %d, got nil", tc.name, tc.wantId)
+			t.Fatalf("%s: expected the group with id %d, got nil", tc.name, tc.wantID)
 		}
-		if got.Id != tc.wantId {
+		if got.ID != tc.wantID {
 			t.Errorf("%s: expected the group with id %d, got id %d (identifier %q)",
-				tc.name, tc.wantId, got.Id, got.GroupIdentifier)
+				tc.name, tc.wantID, got.ID, got.GroupIdentifier)
 		}
 	}
 }
@@ -387,12 +387,12 @@ func TestGetGroupMembersPaginated_EnlistsInTheCallersTransaction(t *testing.T) {
 		t.Fatalf("Failed to create user inside the transaction: %v", err)
 	}
 
-	userGroup := &record.UserGroup{UserId: user.Id, GroupId: group.Id}
+	userGroup := &record.UserGroup{UserID: user.ID, GroupID: group.ID}
 	if err := database.CreateUserGroup(context.Background(), tx, userGroup); err != nil {
 		t.Fatalf("Failed to create users_groups row inside the transaction: %v", err)
 	}
 
-	members, total, err := database.GetGroupMembersPaginated(context.Background(), tx, group.Id, 1, 10)
+	members, total, err := database.GetGroupMembersPaginated(context.Background(), tx, group.ID, 1, 10)
 	if err != nil {
 		t.Fatalf("GetGroupMembersPaginated through the transaction: %v", err)
 	}
@@ -400,8 +400,8 @@ func TestGetGroupMembersPaginated_EnlistsInTheCallersTransaction(t *testing.T) {
 	if len(members) != 1 {
 		t.Fatalf("Expected the transaction's own member, got %d", len(members))
 	}
-	if members[0].Id != user.Id {
-		t.Errorf("Expected user %d, got %d", user.Id, members[0].Id)
+	if members[0].ID != user.ID {
+		t.Errorf("Expected user %d, got %d", user.ID, members[0].ID)
 	}
 	if total != 1 {
 		t.Errorf("Expected a total of 1 to agree with the one member on the page, got %d: "+

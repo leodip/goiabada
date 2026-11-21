@@ -26,7 +26,7 @@ const quietPeriod = 2 * time.Second
 func tellFixtureClient(t *testing.T, f *deviceFixture) *logoutReceiver {
 	t.Helper()
 	rc := newLogoutReceiver(t, http.StatusOK)
-	require.NoError(t, database.SetClientBackchannelLogout(context.Background(), nil, f.client.Id, rc.uri(), false))
+	require.NoError(t, database.SetClientBackchannelLogout(context.Background(), nil, f.client.ID, rc.uri(), false))
 	return rc
 }
 
@@ -197,7 +197,7 @@ func TestBackchannelLogout_ASignInOverTheCapEndingAnExpiredSessionTellsNobody(t 
 
 	f.signIn(t, newDeviceBrowser(t))
 
-	assert.NotContains(t, storedSessionIds(f.storedSessions(t)), expired.Id, "the expired session is the one ended")
+	assert.NotContains(t, storedSessionIDs(f.storedSessions(t)), expired.ID, "the expired session is the one ended")
 	time.Sleep(quietPeriod)
 	assert.Empty(t, rc.received())
 }

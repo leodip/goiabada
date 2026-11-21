@@ -37,7 +37,7 @@ const (
 type silentAuthenticationFacts struct {
 	MaxAgeRequested bool
 	HintSubject     string
-	Target          record.AcrLevel
+	Target          record.ACRLevel
 	// ConsentRequired is the client's ConsentRequired.
 	ConsentRequired bool
 	// ClientIdentifier is the client's ClientIdentifier.
@@ -199,7 +199,7 @@ func silentStepUpRefusal(stepUp ceremony.StepUp, err error) (code, description s
 		return "", "", false
 	case ceremony.StepUpAuthenticatorMissing:
 		return oidc.ErrorInteractionRequired, "Additional authentication setup required", true
-	case ceremony.StepUpOtpConfigChanged:
+	case ceremony.StepUpOTPConfigChanged:
 		return oidc.ErrorInteractionRequired, "Authentication configuration has changed", true
 	default:
 		// ceremony.StepUpLevel, and any value this switch does not name.

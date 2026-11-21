@@ -20,11 +20,11 @@ var userConsentColumns = columnList{
 // scanUserConsent reads one row selected with userConsentColumns.
 func scanUserConsent(row rowScanner, userConsent *record.UserConsent) error {
 	return row.Scan(
-		&userConsent.Id,
+		&userConsent.ID,
 		&userConsent.CreatedAt,
 		&userConsent.UpdatedAt,
-		&userConsent.UserId,
-		&userConsent.ClientId,
+		&userConsent.UserID,
+		&userConsent.ClientID,
 		&userConsent.Scope,
 		&userConsent.GrantedAt,
 	)
@@ -50,31 +50,31 @@ var updateUserConsent = statement{
 		"WHERE id = @p6",
 }
 
-var selectUserConsentById = statement{
+var selectUserConsentByID = statement{
 	sqlite:   "SELECT " + userConsentColumns.sqlite + " FROM user_consents WHERE id = ?",
 	mysql:    "SELECT " + userConsentColumns.mysql + " FROM user_consents WHERE id = ?",
 	postgres: "SELECT " + userConsentColumns.postgres + " FROM user_consents WHERE id = $1",
 	mssql:    "SELECT " + userConsentColumns.mssql + " FROM user_consents WHERE id = @p1",
 }
 
-var selectUserConsentByUserIdAndClientId = statement{
+var selectUserConsentByUserIDAndClientID = statement{
 	sqlite:   "SELECT " + userConsentColumns.sqlite + " FROM user_consents WHERE user_id = ? AND client_id = ?",
 	mysql:    "SELECT " + userConsentColumns.mysql + " FROM user_consents WHERE user_id = ? AND client_id = ?",
 	postgres: "SELECT " + userConsentColumns.postgres + " FROM user_consents WHERE user_id = $1 AND client_id = $2",
 	mssql:    "SELECT " + userConsentColumns.mssql + " FROM user_consents WHERE user_id = @p1 AND client_id = @p2",
 }
 
-// selectUserConsentByUserIdAndClientIdForUpdate is the locking read
-// GetConsentByUserIdAndClientIdForUpdate runs, the lock in each engine's own grammar, as
-// selectUserByIdForUpdate spells it.
-var selectUserConsentByUserIdAndClientIdForUpdate = statement{
+// selectUserConsentByUserIDAndClientIDForUpdate is the locking read
+// GetConsentByUserIDAndClientIDForUpdate runs, the lock in each engine's own grammar, as
+// selectUserByIDForUpdate spells it.
+var selectUserConsentByUserIDAndClientIDForUpdate = statement{
 	sqlite:   "SELECT " + userConsentColumns.sqlite + " FROM user_consents WHERE user_id = ? AND client_id = ?",
 	mysql:    "SELECT " + userConsentColumns.mysql + " FROM user_consents WHERE user_id = ? AND client_id = ? FOR UPDATE",
 	postgres: "SELECT " + userConsentColumns.postgres + " FROM user_consents WHERE user_id = $1 AND client_id = $2 FOR UPDATE",
 	mssql:    "SELECT " + userConsentColumns.mssql + " FROM user_consents WITH (UPDLOCK, ROWLOCK) WHERE user_id = @p1 AND client_id = @p2",
 }
 
-var selectUserConsentsByUserId = statement{
+var selectUserConsentsByUserID = statement{
 	sqlite:   "SELECT " + userConsentColumns.sqlite + " FROM user_consents WHERE user_id = ?",
 	mysql:    "SELECT " + userConsentColumns.mysql + " FROM user_consents WHERE user_id = ?",
 	postgres: "SELECT " + userConsentColumns.postgres + " FROM user_consents WHERE user_id = $1",
@@ -97,11 +97,11 @@ var deleteAllUserConsents = statement{
 
 func (d *Database) CreateUserConsent(ctx context.Context, tx *sql.Tx, userConsent *record.UserConsent) error {
 
-	if userConsent.ClientId == 0 {
+	if userConsent.ClientID == 0 {
 		return errs.New("client id must be greater than 0")
 	}
 
-	if userConsent.UserId == 0 {
+	if userConsent.UserID == 0 {
 		return errs.New("user id must be greater than 0")
 	}
 
@@ -113,7 +113,7 @@ func (d *Database) CreateUserConsent(ctx context.Context, tx *sql.Tx, userConsen
 	userConsent.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 
 	id, err := d.insert(ctx, tx, insertUserConsent, "userConsent",
-		userConsent.CreatedAt, userConsent.UpdatedAt, userConsent.UserId, userConsent.ClientId, userConsent.Scope,
+		userConsent.CreatedAt, userConsent.UpdatedAt, userConsent.UserID, userConsent.ClientID, userConsent.Scope,
 		userConsent.GrantedAt)
 	if err != nil {
 		userConsent.CreatedAt = originalCreatedAt
@@ -121,13 +121,13 @@ func (d *Database) CreateUserConsent(ctx context.Context, tx *sql.Tx, userConsen
 		return err
 	}
 
-	userConsent.Id = id
+	userConsent.ID = id
 	return nil
 }
 
 func (d *Database) UpdateUserConsent(ctx context.Context, tx *sql.Tx, userConsent *record.UserConsent) error {
 
-	if userConsent.Id == 0 {
+	if userConsent.ID == 0 {
 		return errs.New("can't update userConsent with id 0")
 	}
 
@@ -135,8 +135,8 @@ func (d *Database) UpdateUserConsent(ctx context.Context, tx *sql.Tx, userConsen
 	userConsent.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
 
 	_, err := d.ExecSQL(ctx, tx, updateUserConsent.text(d.Dialect),
-		userConsent.UpdatedAt, userConsent.UserId, userConsent.ClientId, userConsent.Scope, userConsent.GrantedAt,
-		userConsent.Id)
+		userConsent.UpdatedAt, userConsent.UserID, userConsent.ClientID, userConsent.Scope, userConsent.GrantedAt,
+		userConsent.ID)
 	if err != nil {
 		userConsent.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update userConsent")
@@ -145,34 +145,34 @@ func (d *Database) UpdateUserConsent(ctx context.Context, tx *sql.Tx, userConsen
 	return nil
 }
 
-func (d *Database) GetUserConsentById(ctx context.Context, tx *sql.Tx, userConsentId int64) (*record.UserConsent, error) {
-	return queryOne(ctx, d, tx, selectUserConsentById.text(d.Dialect), []any{userConsentId},
+func (d *Database) GetUserConsentByID(ctx context.Context, tx *sql.Tx, userConsentID int64) (*record.UserConsent, error) {
+	return queryOne(ctx, d, tx, selectUserConsentByID.text(d.Dialect), []any{userConsentID},
 		scanUserConsent, "userConsent")
 }
 
-func (d *Database) GetConsentByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (*record.UserConsent, error) {
-	return queryOne(ctx, d, tx, selectUserConsentByUserIdAndClientId.text(d.Dialect), []any{userId, clientId},
+func (d *Database) GetConsentByUserIDAndClientID(ctx context.Context, tx *sql.Tx, userID int64, clientID int64) (*record.UserConsent, error) {
+	return queryOne(ctx, d, tx, selectUserConsentByUserIDAndClientID.text(d.Dialect), []any{userID, clientID},
 		scanUserConsent, "userConsent")
 }
 
-// GetConsentByUserIdAndClientIdForUpdate reads the user's consent to the client as last committed
+// GetConsentByUserIDAndClientIDForUpdate reads the user's consent to the client as last committed
 // and takes its row for the rest of the caller's transaction: a locking read, where
-// GetConsentByUserIdAndClientId is a consistent one. A disconnect reads the consent it deletes
+// GetConsentByUserIDAndClientID is a consistent one. A disconnect reads the consent it deletes
 // this way (#135 decision 1). Under MySQL's REPEATABLE READ a consistent read answers the
 // snapshot the transaction's first read fixed, and the disconnect reads the client and the user's
 // sessions before it, so a consent given in between would survive a disconnect that reported
-// success. The lock is each engine's own, as GetUserByIdForUpdate's is: FOR UPDATE on MySQL and
+// success. The lock is each engine's own, as GetUserByIDForUpdate's is: FOR UPDATE on MySQL and
 // PostgreSQL, UPDLOCK and ROWLOCK on SQL Server, none on SQLite, which has no row locks.
 //
-// A transaction is required, for the reason GetUserByIdForUpdate gives.
-func (d *Database) GetConsentByUserIdAndClientIdForUpdate(ctx context.Context, tx *sql.Tx, userId int64,
-	clientId int64) (*record.UserConsent, error) {
+// A transaction is required, for the reason GetUserByIDForUpdate gives.
+func (d *Database) GetConsentByUserIDAndClientIDForUpdate(ctx context.Context, tx *sql.Tx, userID int64,
+	clientID int64) (*record.UserConsent, error) {
 
 	if tx == nil {
 		return nil, errs.New("a locking read of a consent requires a transaction: an autocommitted statement releases the row before the caller can decide on it")
 	}
 
-	return queryOne(ctx, d, tx, selectUserConsentByUserIdAndClientIdForUpdate.text(d.Dialect), []any{userId, clientId},
+	return queryOne(ctx, d, tx, selectUserConsentByUserIDAndClientIDForUpdate.text(d.Dialect), []any{userID, clientID},
 		scanUserConsent, "userConsent")
 }
 
@@ -182,25 +182,25 @@ func (d *Database) UserConsentsLoadClients(ctx context.Context, tx *sql.Tx, user
 		return nil
 	}
 
-	clientIds := make([]int64, len(userConsents))
+	clientIDs := make([]int64, len(userConsents))
 	for i, userConsent := range userConsents {
-		clientIds[i] = userConsent.ClientId
+		clientIDs[i] = userConsent.ClientID
 	}
 
-	clients, err := d.GetClientsByIds(ctx, tx, clientIds)
+	clients, err := d.GetClientsByIDs(ctx, tx, clientIDs)
 	if err != nil {
 		return errs.Wrap(err, "unable to load clients")
 	}
 
-	clientsById := make(map[int64]record.Client)
+	clientsByID := make(map[int64]record.Client)
 	for _, client := range clients {
-		clientsById[client.Id] = client
+		clientsByID[client.ID] = client
 	}
 
 	for i, userConsent := range userConsents {
-		client, ok := clientsById[userConsent.ClientId]
+		client, ok := clientsByID[userConsent.ClientID]
 		if !ok {
-			return errs.Errorf("unable to find client with id %v", userConsent.ClientId)
+			return errs.Errorf("unable to find client with id %v", userConsent.ClientID)
 		}
 		userConsents[i].Client = client
 	}
@@ -208,8 +208,8 @@ func (d *Database) UserConsentsLoadClients(ctx context.Context, tx *sql.Tx, user
 	return nil
 }
 
-func (d *Database) GetConsentsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserConsent, error) {
-	return queryAll(ctx, d, tx, nil, selectUserConsentsByUserId.text(d.Dialect), []any{userId},
+func (d *Database) GetConsentsByUserID(ctx context.Context, tx *sql.Tx, userID int64) ([]record.UserConsent, error) {
+	return queryAll(ctx, d, tx, nil, selectUserConsentsByUserID.text(d.Dialect), []any{userID},
 		scanUserConsent, "userConsent")
 }
 
@@ -217,9 +217,9 @@ func (d *Database) GetConsentsByUserId(ctx context.Context, tx *sql.Tx, userId i
 // when no row had the id, because it never existed or another request deleted it first. A
 // consent withdrawal answers from it, so two overlapping withdrawals never both report the
 // deletion (#135 decision 2).
-func (d *Database) DeleteUserConsent(ctx context.Context, tx *sql.Tx, userConsentId int64) (bool, error) {
+func (d *Database) DeleteUserConsent(ctx context.Context, tx *sql.Tx, userConsentID int64) (bool, error) {
 
-	result, err := d.ExecSQL(ctx, tx, deleteUserConsent.text(d.Dialect), userConsentId)
+	result, err := d.ExecSQL(ctx, tx, deleteUserConsent.text(d.Dialect), userConsentID)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to delete userConsent")
 	}

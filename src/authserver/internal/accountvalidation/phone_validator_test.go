@@ -33,14 +33,14 @@ func TestValidatePhone(t *testing.T) {
 		{
 			name: "Valid phone number",
 			input: ValidatePhoneInput{
-				PhoneCountryUniqueId: "USA_0",
+				PhoneCountryUniqueID: "USA_0",
 				PhoneNumber:          "123-456-7890",
 			},
 		},
 		{
 			name: "Invalid phone country",
 			input: ValidatePhoneInput{
-				PhoneCountryUniqueId: "INVALID",
+				PhoneCountryUniqueID: "INVALID",
 				PhoneNumber:          "123-456-7890",
 			},
 			expectedCode:    i18n.ErrCodePhoneCountryInvalid,
@@ -49,7 +49,7 @@ func TestValidatePhone(t *testing.T) {
 		{
 			name: "Missing phone number",
 			input: ValidatePhoneInput{
-				PhoneCountryUniqueId: "USA_0",
+				PhoneCountryUniqueID: "USA_0",
 				PhoneNumber:          "",
 			},
 			expectedCode:    i18n.ErrCodePhoneNumberRequired,
@@ -58,7 +58,7 @@ func TestValidatePhone(t *testing.T) {
 		{
 			name: "Phone number too short",
 			input: ValidatePhoneInput{
-				PhoneCountryUniqueId: "USA_0",
+				PhoneCountryUniqueID: "USA_0",
 				PhoneNumber:          "12345",
 			},
 			expectedCode:    i18n.ErrCodePhoneNumberTooShort,
@@ -68,7 +68,7 @@ func TestValidatePhone(t *testing.T) {
 		{
 			name: "Simple pattern phone number",
 			input: ValidatePhoneInput{
-				PhoneCountryUniqueId: "USA_0",
+				PhoneCountryUniqueID: "USA_0",
 				PhoneNumber:          "111111111",
 			},
 			expectedCode:    i18n.ErrCodePhoneSimplePattern,
@@ -77,7 +77,7 @@ func TestValidatePhone(t *testing.T) {
 		{
 			name: "Invalid characters in phone number",
 			input: ValidatePhoneInput{
-				PhoneCountryUniqueId: "USA_0",
+				PhoneCountryUniqueID: "USA_0",
 				PhoneNumber:          "123-456-7890a",
 			},
 			expectedCode:    i18n.ErrCodePhoneInvalidFormat,
@@ -86,7 +86,7 @@ func TestValidatePhone(t *testing.T) {
 		{
 			name: "Phone number too long",
 			input: ValidatePhoneInput{
-				PhoneCountryUniqueId: "USA_0",
+				PhoneCountryUniqueID: "USA_0",
 				PhoneNumber:          "123456789012345678901234567890123",
 			},
 			expectedCode:    i18n.ErrCodePhoneNumberTooLong,
@@ -96,7 +96,7 @@ func TestValidatePhone(t *testing.T) {
 		{
 			name: "Missing country for phone number",
 			input: ValidatePhoneInput{
-				PhoneCountryUniqueId: "",
+				PhoneCountryUniqueID: "",
 				PhoneNumber:          "123-456-7890",
 			},
 			expectedCode:    i18n.ErrCodePhoneCountryRequired,
@@ -107,7 +107,7 @@ func TestValidatePhone(t *testing.T) {
 		{
 			name: "Pins decision 3 of #275 - no less-than",
 			input: ValidatePhoneInput{
-				PhoneCountryUniqueId: "USA_0",
+				PhoneCountryUniqueID: "USA_0",
 				PhoneNumber:          "123<456",
 			},
 			expectedCode:    i18n.ErrCodePhoneInvalidFormat,
@@ -116,7 +116,7 @@ func TestValidatePhone(t *testing.T) {
 		{
 			name: "Pins decision 3 of #275 - no greater-than",
 			input: ValidatePhoneInput{
-				PhoneCountryUniqueId: "USA_0",
+				PhoneCountryUniqueID: "USA_0",
 				PhoneNumber:          "123>456",
 			},
 			expectedCode:    i18n.ErrCodePhoneInvalidFormat,

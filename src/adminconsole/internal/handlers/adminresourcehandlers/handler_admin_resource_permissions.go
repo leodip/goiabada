@@ -22,13 +22,13 @@ import (
 // resourcePermissionsAPI is what the resource permissions page needs: the resource, its
 // permissions, and the write.
 type resourcePermissionsAPI interface {
-	GetPermissionsByResource(ctx context.Context, accessToken string, resourceId int64) ([]api.PermissionResponse, error)
-	GetResourceById(ctx context.Context, accessToken string, resourceId int64) (*api.ResourceResponse, error)
-	UpdateResourcePermissions(ctx context.Context, accessToken string, resourceId int64, request *api.UpdateResourcePermissionsRequest) error
+	GetPermissionsByResource(ctx context.Context, accessToken string, resourceID int64) ([]api.PermissionResponse, error)
+	GetResourceByID(ctx context.Context, accessToken string, resourceID int64) (*api.ResourceResponse, error)
+	UpdateResourcePermissions(ctx context.Context, accessToken string, resourceID int64, request *api.UpdateResourcePermissionsRequest) error
 }
 
 func HandlePermissionsGet(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient resourcePermissionsAPI,
 ) http.HandlerFunc {
@@ -47,13 +47,13 @@ func HandlePermissionsGet(
 			return
 		}
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.InternalServerError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
 
-		resource, err := apiClient.GetResourceById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		resource, err := apiClient.GetResourceByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -78,7 +78,7 @@ func HandlePermissionsGet(
 			}
 		}
 
-		permissions, err := apiClient.GetPermissionsByResource(r.Context(), jwtInfo.TokenResponse.AccessToken, resource.Id)
+		permissions, err := apiClient.GetPermissionsByResource(r.Context(), jwtInfo.TokenResponse.AccessToken, resource.ID)
 		if err != nil {
 			render.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -93,7 +93,7 @@ func HandlePermissionsGet(
 		entries := make([]permissionEntry, 0, len(permissions))
 		for _, permission := range permissions {
 			entries = append(entries, permissionEntry{
-				Id:          permission.Id,
+				ID:          permission.ID,
 				Identifier:  permission.PermissionIdentifier,
 				Description: permission.Description,
 				BuiltIn:     slices.Contains(builtInPermissionIdentifiers, permission.PermissionIdentifier),
@@ -101,7 +101,7 @@ func HandlePermissionsGet(
 		}
 
 		bind := map[string]interface{}{
-			"resourceId":            resource.Id,
+			"resourceId":            resource.ID,
 			"resourceIdentifier":    resource.ResourceIdentifier,
 			"isSystemLevelResource": resource.IsSystemLevelResource,
 			"savedSuccessfully":     savedSuccessfully,
@@ -117,7 +117,7 @@ func HandlePermissionsGet(
 }
 
 func HandlePermissionsPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	httpSession sessionstore.Store,
 	apiClient resourcePermissionsAPI,
 ) http.HandlerFunc {
@@ -138,12 +138,12 @@ func HandlePermissionsPost(
 			return
 		}
 		// Get JWT info
-		jwtInfo, ok := reqctx.JwtInfoFrom(r.Context())
+		jwtInfo, ok := reqctx.JWTInfoFrom(r.Context())
 		if !ok {
-			httpHelper.JSONError(w, r, reqctx.ErrNoJwtInfo)
+			httpHelper.JSONError(w, r, reqctx.ErrNoJWTInfo)
 			return
 		}
-		resource, err := apiClient.GetResourceById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+		resource, err := apiClient.GetResourceByID(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			render.HandleAPIErrorJSON(httpHelper, w, r, err)
 			return
@@ -160,7 +160,7 @@ func HandlePermissionsPost(
 			return
 		}
 
-		if data.ResourceId != resource.Id {
+		if data.ResourceID != resource.ID {
 			render.JSONBadRequestBody(httpHelper, w, r)
 			return
 		}
@@ -169,7 +169,7 @@ func HandlePermissionsPost(
 		upserts := make([]api.ResourcePermissionUpsert, 0, len(data.Permissions))
 		for _, p := range data.Permissions {
 			upserts = append(upserts, api.ResourcePermissionUpsert{
-				Id:                   p.Id,
+				ID:                   p.ID,
 				PermissionIdentifier: strings.TrimSpace(p.Identifier),
 				Description:          strings.TrimSpace(p.Description),
 			})
@@ -182,14 +182,14 @@ func HandlePermissionsPost(
 			expected = make([]api.ResourcePermissionUpsert, 0, len(data.ExpectedPermissions))
 			for _, p := range data.ExpectedPermissions {
 				expected = append(expected, api.ResourcePermissionUpsert{
-					Id:                   p.Id,
+					ID:                   p.ID,
 					PermissionIdentifier: p.Identifier,
 					Description:          p.Description,
 				})
 			}
 		}
 		updateReq := &api.UpdateResourcePermissionsRequest{Permissions: upserts, ExpectedPermissions: expected}
-		if updateResourcePermissionsErr := apiClient.UpdateResourcePermissions(r.Context(), jwtInfo.TokenResponse.AccessToken, resource.Id, updateReq); updateResourcePermissionsErr != nil {
+		if updateResourcePermissionsErr := apiClient.UpdateResourcePermissions(r.Context(), jwtInfo.TokenResponse.AccessToken, resource.ID, updateReq); updateResourcePermissionsErr != nil {
 			// Forward the API's status rather than dressing a 400 as a 200 carrying result.Error.
 			// The administrator still reads the API's sentence either way: sendAjaxRequest draws
 			// error_description from any non-2xx into this same modal, which shows it as text
@@ -235,7 +235,7 @@ type IdentifierValidator interface {
 // sanitizing it first turned "valid<b" into "valid" and reported a name the API would reject as
 // available.
 func HandleValidatePermissionPost(
-	httpHelper HttpHelper,
+	httpHelper HTTPHelper,
 	identifierValidator IdentifierValidator,
 ) http.HandlerFunc {
 
@@ -255,7 +255,7 @@ func HandleValidatePermissionPost(
 
 		// i18n surface: A — admin browser-flow, JSON to in-page handler.
 		if inputvalidation.ContainsAngleBrackets(description) {
-			result.Error = i18n.NewLocalizedError(i18n.ErrCodeAdminResourcePermissionsDescriptionHtmlNotAllowed, nil).Localize(r.Context())
+			result.Error = i18n.NewLocalizedError(i18n.ErrCodeAdminResourcePermissionsDescriptionHTMLNotAllowed, nil).Localize(r.Context())
 			result.Field = "description"
 			httpHelper.EncodeJSON(w, r, result)
 			return

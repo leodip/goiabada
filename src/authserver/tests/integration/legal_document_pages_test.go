@@ -42,11 +42,11 @@ func publishedForApps(t *testing.T, accessToken, prefix, title, markdown string,
 	shortName := legalShortName(prefix)
 	id := createLegalDocumentOverAPI(t, accessToken, "for_information", shortName, title, markdown)
 	if len(clients) > 0 {
-		clientIds := []int64{}
+		clientIDs := []int64{}
 		for _, c := range clients {
-			clientIds = append(clientIds, c.Id)
+			clientIDs = append(clientIDs, c.ID)
 		}
-		status, body := setApps(t, accessToken, id, "selected_apps", clientIds, []int64{})
+		status, body := setApps(t, accessToken, id, "selected_apps", clientIDs, []int64{})
 		require.Equal(t, http.StatusOK, status, "apps: %v", body)
 	}
 	status, body, _ := legalCall(t, accessToken, http.MethodPost, legalPath(id, "/publish"), nil)
@@ -64,7 +64,7 @@ func retireOverAPI(t *testing.T, accessToken string, id int64) {
 // getPublicPage loads a page with a browser that holds no session: the pages need no sign-in.
 func getPublicPage(t *testing.T, path string) (int, *goquery.Document) {
 	t.Helper()
-	resp := loadPage(t, createHttpClient(t), appConfig.AuthServer.BaseURL+path)
+	resp := loadPage(t, createHTTPClient(t), appConfig.AuthServer.BaseURL+path)
 	defer func() { _ = resp.Body.Close() }()
 	return resp.StatusCode, parseHTMLResponse(t, resp)
 }
@@ -85,12 +85,12 @@ func appWithRedirect(t *testing.T) (*record.Client, string) {
 	t.Helper()
 	client := createClientWithDisplaySettings(t, ClientDisplaySettings{
 		ClientIdentifier: "legal-app-" + strings.ToLower(fake.LetterN(10)),
-		DefaultAcrLevel:  record.AcrLevel1,
+		DefaultACRLevel:  record.ACRLevel1,
 	})
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 	redirectURI := fake.URL()
 	require.NoError(t, database.CreateRedirectURI(context.Background(), nil, &record.RedirectURI{
-		ClientId: client.Id, URI: redirectURI,
+		ClientID: client.ID, URI: redirectURI,
 	}))
 	return client, redirectURI
 }
@@ -109,7 +109,7 @@ func TestLegalDocumentPages_TheCurrentVersionAndEveryEarlierOne(t *testing.T) {
 	assert.Contains(t, text, "<em>address</em>", "the Markdown is rendered")
 	assert.NotContains(t, text, "What we keep", "the current version alone")
 	assert.Contains(t, page.Find("#legal-document-version").Text(), "Version 2")
-	versions, err := database.GetLegalDocumentVersionsByLegalDocumentId(context.Background(), nil, id)
+	versions, err := database.GetLegalDocumentVersionsByLegalDocumentID(context.Background(), nil, id)
 	require.NoError(t, err)
 	require.Len(t, versions, 2)
 	published, _ := page.Find("#legal-document-version time").Attr("datetime")
@@ -135,7 +135,7 @@ func TestLegalDocumentPages_TheCurrentVersionAndEveryEarlierOne(t *testing.T) {
 	assert.Equal(t, "/legal/"+shortName, current)
 	// Opened from a sign-in, the link to the current version names it too, so that version is drawn
 	// in the sign-in's brand as well.
-	signIn := ceremony.NewId()
+	signIn := ceremony.NewID()
 	status, page = getPublicPage(t, withCeremonyParameter(t, "/legal/"+shortName+"/versions/1", signIn))
 	require.Equal(t, http.StatusOK, status)
 	current, ok = page.Find("#legal-document-superseded a").Attr("href")
@@ -201,13 +201,13 @@ func TestLegalDocumentLinks_TheRegistrationFormLinksTheDocumentsWhereItCollectsT
 	publishedForApps(t, accessToken, "reg-others", "Another app's notice", "For another.", other)
 
 	// Registration from the app's sign-in: the password page's Create an account link names it.
-	browser := createHttpClient(t)
+	browser := createHTTPClient(t)
 	resp := navigateToPasswordScreen(t, browser, app, redirectURI)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
-	ceremonyId := resp.Request.URL.Query().Get(ceremony.QueryParameter)
+	ceremonyID := resp.Request.URL.Query().Get(ceremony.QueryParameter)
 	_ = resp.Body.Close()
-	require.NotEmpty(t, ceremonyId)
-	named := "?" + url.Values{ceremony.QueryParameter: {ceremonyId}}.Encode()
+	require.NotEmpty(t, ceremonyID)
+	named := "?" + url.Values{ceremony.QueryParameter: {ceremonyID}}.Encode()
 	registerURL := appConfig.AuthServer.BaseURL + "/account/register" + named
 
 	resp = loadPage(t, browser, registerURL)
@@ -222,7 +222,7 @@ func TestLegalDocumentLinks_TheRegistrationFormLinksTheDocumentsWhereItCollectsT
 
 	// The same link in a browser that does not hold that sign-in names no app. Its links still name
 	// the sign-in, which the page echoes without reading it.
-	resp = loadPage(t, createHttpClient(t), registerURL)
+	resp = loadPage(t, createHTTPClient(t), registerURL)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	page = parseHTMLResponse(t, resp)
 	_ = resp.Body.Close()
@@ -231,7 +231,7 @@ func TestLegalDocumentLinks_TheRegistrationFormLinksTheDocumentsWhereItCollectsT
 	assert.NotContains(t, formLinks, "/legal/"+own+named, "a sign-in the browser does not hold")
 
 	// Registration reached from anywhere else links the all-apps documents.
-	resp = loadPage(t, createHttpClient(t), appConfig.AuthServer.BaseURL+"/account/register")
+	resp = loadPage(t, createHTTPClient(t), appConfig.AuthServer.BaseURL+"/account/register")
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	page = parseHTMLResponse(t, resp)
 	_ = resp.Body.Close()

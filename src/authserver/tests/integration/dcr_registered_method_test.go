@@ -79,7 +79,7 @@ func presentClientSecret(t *testing.T, path string, form url.Values, clientIdent
 	if basic {
 		req.SetBasicAuth(url.QueryEscape(clientIdentifier), url.QueryEscape(secret))
 	}
-	resp, err := createHttpClient(t).Do(req)
+	resp, err := createHTTPClient(t).Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	raw, err := io.ReadAll(resp.Body)
@@ -141,7 +141,7 @@ func registerConfidentialClient(t *testing.T, authMethod string) (string, string
 	t.Cleanup(func() {
 		client, err := database.GetClientByClientIdentifier(context.Background(), nil, response.ClientID)
 		if err == nil && client != nil {
-			_ = database.DeleteClient(context.Background(), nil, client.Id)
+			_ = database.DeleteClient(context.Background(), nil, client.ID)
 		}
 	})
 	return response.ClientID, response.ClientSecret
@@ -193,9 +193,9 @@ func TestDCR_AClientHeldToItsMethodIsIssuedATokenByIt(t *testing.T) {
 	client, err := database.GetClientByClientIdentifier(context.Background(), nil, clientIdentifier)
 	require.NoError(t, err)
 	resource := createResource(t)
-	permission := createPermission(t, resource.Id)
+	permission := createPermission(t, resource.ID)
 	require.NoError(t, database.CreateClientPermission(context.Background(), nil,
-		&record.ClientPermission{ClientId: client.Id, PermissionId: permission.Id}))
+		&record.ClientPermission{ClientID: client.ID, PermissionID: permission.ID}))
 	form := url.Values{"grant_type": {"client_credentials"},
 		"scope": {resource.ResourceIdentifier + ":" + permission.PermissionIdentifier}}
 
@@ -219,9 +219,9 @@ func TestClientAuthentication_ClientsNotHeldToOneMethodAcceptBoth(t *testing.T) 
 		require.Equal(t, http.StatusCreated, resp.StatusCode)
 		var created api.CreateClientResponse
 		require.NoError(t, json.NewDecoder(resp.Body).Decode(&created))
-		t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, created.Client.Id) })
+		t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, created.Client.ID) })
 
-		assertBothMethodsAuthenticate(t, created.Client.ClientIdentifier, clientSecretThroughTheAdminAPI(t, accessToken, created.Client.Id))
+		assertBothMethodsAuthenticate(t, created.Client.ClientIdentifier, clientSecretThroughTheAdminAPI(t, accessToken, created.Client.ID))
 	})
 
 	t.Run("the admin console's client", func(t *testing.T) {
@@ -244,7 +244,7 @@ func TestDCR_AClientSwitchedToPublicAndBackAcceptsBoth(t *testing.T) {
 	client, err := database.GetClientByClientIdentifier(context.Background(), nil, clientIdentifier)
 	require.NoError(t, err)
 	accessToken, _ := createAdminClientWithToken(t)
-	authenticationURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/authentication"
+	authenticationURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.ID, 10) + "/authentication"
 
 	toPublic := makeAPIRequest(t, http.MethodPut, authenticationURL, accessToken, api.UpdateClientAuthenticationRequest{IsPublic: true})
 	_ = toPublic.Body.Close()
@@ -260,10 +260,10 @@ func TestDCR_AClientSwitchedToPublicAndBackAcceptsBoth(t *testing.T) {
 }
 
 // clientSecretThroughTheAdminAPI is the client's secret, as the admin API's secret route answers it.
-func clientSecretThroughTheAdminAPI(t *testing.T, accessToken string, clientId int64) string {
+func clientSecretThroughTheAdminAPI(t *testing.T, accessToken string, clientID int64) string {
 	t.Helper()
 	resp := makeAPIRequest(t, http.MethodGet,
-		appConfig.AuthServer.BaseURL+"/api/v1/admin/clients/"+strconv.FormatInt(clientId, 10)+"/secret", accessToken, nil)
+		appConfig.AuthServer.BaseURL+"/api/v1/admin/clients/"+strconv.FormatInt(clientID, 10)+"/secret", accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	var secret api.GetClientSecretResponse

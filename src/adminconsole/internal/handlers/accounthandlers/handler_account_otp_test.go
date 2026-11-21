@@ -38,8 +38,8 @@ const (
 	accountOTPPath  = "/account/otp"
 )
 
-// stubApiClient implements accountOTPAPI, the port both OTP handlers take.
-type stubApiClient struct {
+// stubAPIClient implements accountOTPAPI, the port both OTP handlers take.
+type stubAPIClient struct {
 	profile *api.UserResponse
 
 	enrollment    *api.AccountOTPEnrollmentResponse
@@ -65,14 +65,14 @@ type stubApiClient struct {
 }
 
 // GetAccountRecoveryCodes answers the count of unused codes.
-func (s *stubApiClient) GetAccountRecoveryCodes(_ context.Context, accessToken string) (*api.AccountRecoveryCodesResponse, error) {
+func (s *stubAPIClient) GetAccountRecoveryCodes(_ context.Context, accessToken string) (*api.AccountRecoveryCodesResponse, error) {
 	s.remainingGET++
 	return &api.AccountRecoveryCodesResponse{Remaining: s.remaining}, nil
 }
 
 // CreateAccountRecoveryCodes refuses a user without OTP, as POST
 // /api/v1/account/otp/recovery-codes does.
-func (s *stubApiClient) CreateAccountRecoveryCodes(_ context.Context, accessToken string,
+func (s *stubAPIClient) CreateAccountRecoveryCodes(_ context.Context, accessToken string,
 	request *api.CreateAccountRecoveryCodesRequest) (*api.CreateAccountRecoveryCodesResponse, error) {
 
 	s.newSetReq = request
@@ -86,12 +86,12 @@ func (s *stubApiClient) CreateAccountRecoveryCodes(_ context.Context, accessToke
 	return &api.CreateAccountRecoveryCodesResponse{RecoveryCodes: s.newSet}, nil
 }
 
-func (s *stubApiClient) GetAccountProfile(_ context.Context, accessToken string) (*api.UserResponse, error) {
+func (s *stubAPIClient) GetAccountProfile(_ context.Context, accessToken string) (*api.UserResponse, error) {
 	return s.profile, nil
 }
 
 // GetAccountOTPEnrollment refuses a user who has OTP, as GET /api/v1/account/otp/enrollment does.
-func (s *stubApiClient) GetAccountOTPEnrollment(_ context.Context, accessToken string) (*api.AccountOTPEnrollmentResponse, error) {
+func (s *stubAPIClient) GetAccountOTPEnrollment(_ context.Context, accessToken string) (*api.AccountOTPEnrollmentResponse, error) {
 	s.enrollmentGET++
 	if s.enrollmentErr != nil {
 		return nil, s.enrollmentErr
@@ -105,7 +105,7 @@ func (s *stubApiClient) GetAccountOTPEnrollment(_ context.Context, accessToken s
 // UpdateAccountOTP answers a request for the state the user is already in as PUT
 // /api/v1/account/otp does, with the 400 that names it, so a case about a stale form can assert
 // what the console asked for and what it did with the refusal.
-func (s *stubApiClient) UpdateAccountOTP(_ context.Context, accessToken string,
+func (s *stubAPIClient) UpdateAccountOTP(_ context.Context, accessToken string,
 	request *api.UpdateAccountOTPRequest) (*api.UpdateAccountOTPResponse, error) {
 
 	s.updateReq = request
@@ -131,9 +131,9 @@ func otpAlreadyEnabled() error {
 		StatusCode: http.StatusBadRequest}
 }
 
-func newStubApiClient(otpEnabled bool) *stubApiClient {
-	return &stubApiClient{
-		profile: &api.UserResponse{Id: 7, OTPEnabled: otpEnabled},
+func newStubAPIClient(otpEnabled bool) *stubAPIClient {
+	return &stubAPIClient{
+		profile: &api.UserResponse{ID: 7, OTPEnabled: otpEnabled},
 		enrollment: &api.AccountOTPEnrollmentResponse{
 			Base64Image: testBase64Image,
 			SecretKey:   testSecretKey,
@@ -164,7 +164,7 @@ func apiError(code string) error {
 
 // Every way the enrolment form can be redrawn must carry a QR code and a seed, fetched from the API
 // rather than read back off the submission. An empty one is a page the user cannot enrol from.
-func TestHandleOtpPost_EveryEnrollmentRerenderCarriesTheQRAndTheSeed(t *testing.T) {
+func TestHandleOTPPost_EveryEnrollmentRerenderCarriesTheQRAndTheSeed(t *testing.T) {
 	testCases := []struct {
 		name      string
 		form      url.Values
@@ -198,14 +198,14 @@ func TestHandleOtpPost_EveryEnrollmentRerenderCarriesTheQRAndTheSeed(t *testing.
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_otp.html").Once()
 
-			client := newStubApiClient(false)
+			client := newStubAPIClient(false)
 			client.updateErr = tc.updateErr
 
 			rr := httptest.NewRecorder()
-			HandleOtpPost(httpHelper, client, consoleBaseURL).ServeHTTP(rr, otpPostRequest(tc.form))
+			HandleOTPPost(httpHelper, client, consoleBaseURL).ServeHTTP(rr, otpPostRequest(tc.form))
 
 			bind := handlertest.Bind(t, httpHelper)
 			assert.Equal(t, testBase64Image, bind["base64Image"],
@@ -229,14 +229,14 @@ func TestHandleOtpPost_EveryEnrollmentRerenderCarriesTheQRAndTheSeed(t *testing.
 // An enrolment that succeeded elsewhere while this form was open reloads the page instead of
 // redrawing the form. Redrawing it would call the enrolment endpoint, which refuses for the same
 // reason, turning a race that resolved correctly into an error page.
-func TestHandleOtpPost_AlreadyEnabledReloadsRatherThanRedrawing(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+func TestHandleOTPPost_AlreadyEnabledReloadsRatherThanRedrawing(t *testing.T) {
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 
-	client := newStubApiClient(false)
+	client := newStubAPIClient(false)
 	client.updateErr = apiError("OTP_ALREADY_ENABLED")
 
 	rr := httptest.NewRecorder()
-	HandleOtpPost(httpHelper, client, consoleBaseURL).ServeHTTP(rr,
+	HandleOTPPost(httpHelper, client, consoleBaseURL).ServeHTTP(rr,
 		otpPostRequest(url.Values{"otpAction": {"enable"}, "password": {"P4ss!word"}, "otp": {"123456"}}))
 
 	assert.Equal(t, http.StatusFound, rr.Code)
@@ -249,15 +249,15 @@ func TestHandleOtpPost_AlreadyEnabledReloadsRatherThanRedrawing(t *testing.T) {
 
 // The disable form has no QR code and no seed, and must not acquire one: fetching an enrolment for
 // a user who has OTP enabled is refused by the API.
-func TestHandleOtpPost_DisableErrorFetchesNoEnrollment(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+func TestHandleOTPPost_DisableErrorFetchesNoEnrollment(t *testing.T) {
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_otp.html").Once()
 
-	client := newStubApiClient(true)
+	client := newStubAPIClient(true)
 	client.updateErr = apiError("AUTHENTICATION_FAILED")
 
 	rr := httptest.NewRecorder()
-	HandleOtpPost(httpHelper, client, consoleBaseURL).ServeHTTP(rr,
+	HandleOTPPost(httpHelper, client, consoleBaseURL).ServeHTTP(rr,
 		otpPostRequest(url.Values{"otpAction": {"disable"}, "password": {"wrong"}}))
 
 	bind := handlertest.Bind(t, httpHelper)
@@ -269,20 +269,20 @@ func TestHandleOtpPost_DisableErrorFetchesNoEnrollment(t *testing.T) {
 
 // A successful enable with no set to show redirects, and the request it sent carries only the
 // password and the code.
-func TestHandleOtpPost_EnableSendsOnlyThePasswordAndTheCode(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+func TestHandleOTPPost_EnableSendsOnlyThePasswordAndTheCode(t *testing.T) {
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 
-	client := newStubApiClient(false)
+	client := newStubAPIClient(false)
 
 	rr := httptest.NewRecorder()
-	HandleOtpPost(httpHelper, client, consoleBaseURL).ServeHTTP(rr,
+	HandleOTPPost(httpHelper, client, consoleBaseURL).ServeHTTP(rr,
 		otpPostRequest(url.Values{"otpAction": {"enable"}, "password": {"P4ss!word"}, "otp": {"123456"}}))
 
 	assert.Equal(t, http.StatusFound, rr.Code)
 	require.NotNil(t, client.updateReq)
 	assert.True(t, client.updateReq.Enabled)
 	assert.Equal(t, "P4ss!word", client.updateReq.Password)
-	assert.Equal(t, "123456", client.updateReq.OtpCode)
+	assert.Equal(t, "123456", client.updateReq.OTPCode)
 	assert.NotContains(t, mustJSON(t, client.updateReq), "secretKey",
 		"the wire form must carry no secret, which is the whole of the console's half of #247")
 }
@@ -292,7 +292,7 @@ func TestHandleOtpPost_EnableSendsOnlyThePasswordAndTheCode(t *testing.T) {
 // write, and nothing was saved (#471 decision 2). It is something the user can act on by trying
 // again, so the page shows the API's sentence on the form rather than sending it to the generic
 // error page, on both the disable form and the enrolment form.
-func TestHandleOtpPost_AConcurrentUpdateIsShownOnTheForm(t *testing.T) {
+func TestHandleOTPPost_AConcurrentUpdateIsShownOnTheForm(t *testing.T) {
 	const message = "The account was changed by another request after it was loaded. Nothing was saved: reload it and make the change again."
 	concurrentUpdate := &apiclient.APIError{Code: "CONCURRENT_UPDATE", Message: message, StatusCode: http.StatusConflict}
 
@@ -307,14 +307,14 @@ func TestHandleOtpPost_AConcurrentUpdateIsShownOnTheForm(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
 			handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_otp.html").Once()
 
-			client := newStubApiClient(tc.otpEnabled)
+			client := newStubAPIClient(tc.otpEnabled)
 			client.updateErr = concurrentUpdate
 
 			rr := httptest.NewRecorder()
-			HandleOtpPost(httpHelper, client, consoleBaseURL).ServeHTTP(rr, otpPostRequest(tc.form))
+			HandleOTPPost(httpHelper, client, consoleBaseURL).ServeHTTP(rr, otpPostRequest(tc.form))
 
 			bind := handlertest.Bind(t, httpHelper)
 			assert.Equal(t, message, bind["error"])
@@ -330,7 +330,7 @@ func TestHandleOtpPost_AConcurrentUpdateIsShownOnTheForm(t *testing.T) {
 // factor off with nothing but the password (#562 decision 8). A form that no longer matches the
 // account changes nothing: the auth server refuses it, and the page reloads to show the account as
 // it is now.
-func TestHandleOtpPost_AStaleFormNeverSwitchesTheOtherWay(t *testing.T) {
+func TestHandleOTPPost_AStaleFormNeverSwitchesTheOtherWay(t *testing.T) {
 	testCases := []struct {
 		name        string
 		otpEnabled  bool
@@ -353,11 +353,11 @@ func TestHandleOtpPost_AStaleFormNeverSwitchesTheOtherWay(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
-			client := newStubApiClient(tc.otpEnabled)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
+			client := newStubAPIClient(tc.otpEnabled)
 
 			rr := httptest.NewRecorder()
-			HandleOtpPost(httpHelper, client, consoleBaseURL).ServeHTTP(rr, otpPostRequest(tc.form))
+			HandleOTPPost(httpHelper, client, consoleBaseURL).ServeHTTP(rr, otpPostRequest(tc.form))
 
 			require.NotNil(t, client.updateReq, "the console asks the auth server, which decides")
 			assert.Equal(t, tc.wantEnabled, client.updateReq.Enabled,
@@ -376,7 +376,7 @@ func TestHandleOtpPost_AStaleFormNeverSwitchesTheOtherWay(t *testing.T) {
 // for the password before it looks at the state, is redrawn by fetching the enrolment, which the
 // auth server refuses for a user who has OTP. That is the same mismatch, and it reloads the page
 // rather than showing the error page.
-func TestHandleOtpPost_AStaleEnrolmentFormRefusedOnItsOwnTermsReloads(t *testing.T) {
+func TestHandleOTPPost_AStaleEnrolmentFormRefusedOnItsOwnTermsReloads(t *testing.T) {
 	testCases := []struct {
 		name      string
 		form      url.Values
@@ -395,12 +395,12 @@ func TestHandleOtpPost_AStaleEnrolmentFormRefusedOnItsOwnTermsReloads(t *testing
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
-			client := newStubApiClient(true)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
+			client := newStubAPIClient(true)
 			client.updateErr = tc.updateErr
 
 			rr := httptest.NewRecorder()
-			HandleOtpPost(httpHelper, client, consoleBaseURL).ServeHTTP(rr, otpPostRequest(tc.form))
+			HandleOTPPost(httpHelper, client, consoleBaseURL).ServeHTTP(rr, otpPostRequest(tc.form))
 
 			if client.updateReq != nil {
 				assert.True(t, client.updateReq.Enabled, "an enrolment form never asks to disable")
@@ -416,7 +416,7 @@ func TestHandleOtpPost_AStaleEnrolmentFormRefusedOnItsOwnTermsReloads(t *testing
 
 // A post that names neither form, or names something else, asks the auth server for nothing and
 // reloads the page.
-func TestHandleOtpPost_APostNamingNeitherFormChangesNothing(t *testing.T) {
+func TestHandleOTPPost_APostNamingNeitherFormChangesNothing(t *testing.T) {
 	testCases := []struct {
 		name       string
 		otpEnabled bool
@@ -431,11 +431,11 @@ func TestHandleOtpPost_APostNamingNeitherFormChangesNothing(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := handlersmocks.NewHttpHelper(t)
-			client := newStubApiClient(tc.otpEnabled)
+			httpHelper := handlersmocks.NewHTTPHelper(t)
+			client := newStubAPIClient(tc.otpEnabled)
 
 			rr := httptest.NewRecorder()
-			HandleOtpPost(httpHelper, client, consoleBaseURL).ServeHTTP(rr, otpPostRequest(tc.form))
+			HandleOTPPost(httpHelper, client, consoleBaseURL).ServeHTTP(rr, otpPostRequest(tc.form))
 
 			assert.Nil(t, client.updateReq, "nothing is asked of the auth server")
 			assert.Equal(t, http.StatusFound, rr.Code)
@@ -452,7 +452,7 @@ func TestHandleOtpPost_APostNamingNeitherFormChangesNothing(t *testing.T) {
 // passwords ended on the 500 page. It now redraws the form, the disable form and the enrolment
 // form alike, with the console's own rate-limit sentence in the page's language, not the API's
 // English one (#559 decision 10).
-func TestHandleOtpPost_ARateLimitIsShownOnTheForm(t *testing.T) {
+func TestHandleOTPPost_ARateLimitIsShownOnTheForm(t *testing.T) {
 	rateLimited := &apiclient.APIError{Code: "TOO_MANY_REQUESTS",
 		Message: "Too many requests. Please try again later.", StatusCode: http.StatusTooManyRequests}
 
@@ -475,16 +475,16 @@ func TestHandleOtpPost_ARateLimitIsShownOnTheForm(t *testing.T) {
 	for _, tc := range testCases {
 		for _, language := range languages {
 			t.Run(tc.name+" "+language.name, func(t *testing.T) {
-				httpHelper := handlersmocks.NewHttpHelper(t)
+				httpHelper := handlersmocks.NewHTTPHelper(t)
 				handlertest.RefuseInternalServerError(t, httpHelper)
 				handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_otp.html").Once()
 
-				client := newStubApiClient(tc.otpEnabled)
+				client := newStubAPIClient(tc.otpEnabled)
 				client.updateErr = rateLimited
 
 				req := handlertest.Request(http.MethodPost, accountOTPPath, handlertest.WithAccessToken(),
 					handlertest.WithLocale(language.tag), handlertest.WithForm(tc.form))
-				HandleOtpPost(httpHelper, client, consoleBaseURL).ServeHTTP(httptest.NewRecorder(), req)
+				HandleOTPPost(httpHelper, client, consoleBaseURL).ServeHTTP(httptest.NewRecorder(), req)
 
 				bind := handlertest.Bind(t, httpHelper)
 				assert.Equal(t, language.want, bind["error"])
@@ -502,17 +502,17 @@ func TestHandleOtpPost_ARateLimitIsShownOnTheForm(t *testing.T) {
 // an authenticator whose clock runs ahead shows (#142). The user acts on it by fixing the device's
 // time, so the page shows the API's sentence on the code field, with the QR code to retype from,
 // rather than sending it to the generic error page.
-func TestHandleOtpPost_AClockAheadRefusalIsShownOnTheCodeField(t *testing.T) {
+func TestHandleOTPPost_AClockAheadRefusalIsShownOnTheCodeField(t *testing.T) {
 	const message = "Your device's clock seems to be ahead. Check that its date and time are set automatically, then enter the code your app shows."
 
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_otp.html").Once()
 
-	client := newStubApiClient(false)
+	client := newStubAPIClient(false)
 	client.updateErr = &apiclient.APIError{Code: "OTP_CLOCK_AHEAD", Message: message, StatusCode: http.StatusBadRequest}
 
 	rr := httptest.NewRecorder()
-	HandleOtpPost(httpHelper, client, consoleBaseURL).ServeHTTP(rr,
+	HandleOTPPost(httpHelper, client, consoleBaseURL).ServeHTTP(rr,
 		otpPostRequest(url.Values{"otpAction": {"enable"}, "password": {"P4ss!word"}, "otp": {"123456"}}))
 
 	bind := handlertest.Bind(t, httpHelper)
@@ -526,7 +526,7 @@ func TestHandleOtpPost_AClockAheadRefusalIsShownOnTheCodeField(t *testing.T) {
 // Turning two-factor authentication on shows the set of recovery codes it created, once: in the
 // response to the console's own POST, stored nowhere, so a reload of the page draws it without them
 // (#257 decisions 1 and 14).
-func TestHandleOtpPost_TurningOnShowsTheRecoveryCodesOnce(t *testing.T) {
+func TestHandleOTPPost_TurningOnShowsTheRecoveryCodesOnce(t *testing.T) {
 	codes := []string{
 		"7kq2-m9xh-4trw-b3np-j6vd-egac", "0123-4567-89ab-cdef-ghjk-mnpq",
 		"rstv-wxyz-0123-4567-89ab-cdef", "ghjk-mnpq-rstv-wxyz-0123-4567",
@@ -534,14 +534,14 @@ func TestHandleOtpPost_TurningOnShowsTheRecoveryCodesOnce(t *testing.T) {
 		"gggg-hhhh-jjjj-kkkk-mmmm-nnnn", "pppp-qqqq-rrrr-ssss-tttt-vvvv",
 		"wwww-xxxx-yyyy-zzzz-0000-1111", "2222-3333-4444-5555-6666-7777",
 	}
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_otp.html").Once()
 
-	client := newStubApiClient(false)
+	client := newStubAPIClient(false)
 	client.recoveryCodes = codes
 
 	rr := httptest.NewRecorder()
-	HandleOtpPost(httpHelper, client, consoleBaseURL).ServeHTTP(rr,
+	HandleOTPPost(httpHelper, client, consoleBaseURL).ServeHTTP(rr,
 		otpPostRequest(url.Values{"otpAction": {"enable"}, "password": {"P4ss!word"}, "otp": {"123456"}}))
 
 	assert.Empty(t, rr.Header().Get("Location"), "the page is the answer, not a redirect to one")
@@ -552,10 +552,10 @@ func TestHandleOtpPost_TurningOnShowsTheRecoveryCodesOnce(t *testing.T) {
 	assert.Zero(t, client.enrollmentGET, "an enrolled user is not offered another enrolment")
 
 	// The page drawn afresh shows no codes: they were shown once.
-	reload := handlersmocks.NewHttpHelper(t)
+	reload := handlersmocks.NewHTTPHelper(t)
 	handlertest.ExpectRender(reload, "/layouts/menu_layout.html", "/account_otp.html").Once()
 	client.profile.OTPEnabled = true
-	HandleOtpGet(reload, client).ServeHTTP(httptest.NewRecorder(),
+	HandleOTPGet(reload, client).ServeHTTP(httptest.NewRecorder(),
 		handlertest.Request(http.MethodGet, accountOTPPath, handlertest.WithAccessToken()))
 	assert.NotContains(t, handlertest.Bind(t, reload), "recoveryCodes")
 }
@@ -571,14 +571,14 @@ var testRecoveryCodes = []string{
 
 // The page of an account with two-factor authentication says how many of its recovery codes are
 // unused, read from the auth server each time it is drawn (#257 decision 9).
-func TestHandleOtpGet_ShowsHowManyRecoveryCodesAreLeft(t *testing.T) {
+func TestHandleOTPGet_ShowsHowManyRecoveryCodesAreLeft(t *testing.T) {
 	for _, remaining := range []int{7, 1, 0} {
-		httpHelper := handlersmocks.NewHttpHelper(t)
+		httpHelper := handlersmocks.NewHTTPHelper(t)
 		handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_otp.html").Once()
 
-		client := newStubApiClient(true)
+		client := newStubAPIClient(true)
 		client.remaining = remaining
-		HandleOtpGet(httpHelper, client).ServeHTTP(httptest.NewRecorder(),
+		HandleOTPGet(httpHelper, client).ServeHTTP(httptest.NewRecorder(),
 			handlertest.Request(http.MethodGet, accountOTPPath, handlertest.WithAccessToken()))
 
 		bind := handlertest.Bind(t, httpHelper)
@@ -588,12 +588,12 @@ func TestHandleOtpGet_ShowsHowManyRecoveryCodesAreLeft(t *testing.T) {
 }
 
 // An account without an authenticator has no codes, and its page asks for no count.
-func TestHandleOtpGet_AskForNoCountWithoutAnAuthenticator(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+func TestHandleOTPGet_AskForNoCountWithoutAnAuthenticator(t *testing.T) {
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_otp.html").Once()
 
-	client := newStubApiClient(false)
-	HandleOtpGet(httpHelper, client).ServeHTTP(httptest.NewRecorder(),
+	client := newStubAPIClient(false)
+	HandleOTPGet(httpHelper, client).ServeHTTP(httptest.NewRecorder(),
 		handlertest.Request(http.MethodGet, accountOTPPath, handlertest.WithAccessToken()))
 
 	assert.Zero(t, client.remainingGET)
@@ -602,16 +602,16 @@ func TestHandleOtpGet_AskForNoCountWithoutAnAuthenticator(t *testing.T) {
 
 // Getting a new set sends the password alone and shows the set the auth server answered, once, in
 // the response to this POST and stored nowhere (#257 decision 8).
-func TestHandleOtpPost_ANewSetOfRecoveryCodesIsShownOnce(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+func TestHandleOTPPost_ANewSetOfRecoveryCodesIsShownOnce(t *testing.T) {
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_otp.html").Once()
 
-	client := newStubApiClient(true)
+	client := newStubAPIClient(true)
 	client.newSet = testRecoveryCodes
 
 	rr := httptest.NewRecorder()
-	HandleOtpPost(httpHelper, client, consoleBaseURL).ServeHTTP(rr,
+	HandleOTPPost(httpHelper, client, consoleBaseURL).ServeHTTP(rr,
 		otpPostRequest(url.Values{"otpAction": {"recovery-codes"}, "password": {"P4ss!word"}}))
 
 	assert.Empty(t, rr.Header().Get("Location"), "the page is the answer, not a redirect to one")
@@ -628,17 +628,17 @@ func TestHandleOtpPost_ANewSetOfRecoveryCodesIsShownOnce(t *testing.T) {
 
 // A wrong password is shown on the new-set form's password field, with the count still drawn and no
 // new set; the disable form above it is left without an error.
-func TestHandleOtpPost_ANewSetRefusedForThePasswordIsShownOnItsForm(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+func TestHandleOTPPost_ANewSetRefusedForThePasswordIsShownOnItsForm(t *testing.T) {
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_otp.html").Once()
 
-	client := newStubApiClient(true)
+	client := newStubAPIClient(true)
 	client.remaining = 3
 	client.newSetErr = &apiclient.APIError{Code: "AUTHENTICATION_FAILED",
 		Message: "That password isn't right. Try again.", StatusCode: http.StatusBadRequest}
 
-	HandleOtpPost(httpHelper, client, consoleBaseURL).ServeHTTP(httptest.NewRecorder(),
+	HandleOTPPost(httpHelper, client, consoleBaseURL).ServeHTTP(httptest.NewRecorder(),
 		otpPostRequest(url.Values{"otpAction": {"recovery-codes"}, "password": {"wrong"}}))
 
 	bind := handlertest.Bind(t, httpHelper)
@@ -650,16 +650,16 @@ func TestHandleOtpPost_ANewSetRefusedForThePasswordIsShownOnItsForm(t *testing.T
 }
 
 // A rate limit on the new set is the console's own sentence, in the page's language.
-func TestHandleOtpPost_ANewSetRateLimitedIsShownOnItsForm(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+func TestHandleOTPPost_ANewSetRateLimitedIsShownOnItsForm(t *testing.T) {
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_otp.html").Once()
 
-	client := newStubApiClient(true)
+	client := newStubAPIClient(true)
 	client.newSetErr = &apiclient.APIError{Code: "TOO_MANY_REQUESTS",
 		Message: "Too many requests. Please try again later.", StatusCode: http.StatusTooManyRequests}
 
-	HandleOtpPost(httpHelper, client, consoleBaseURL).ServeHTTP(httptest.NewRecorder(),
+	HandleOTPPost(httpHelper, client, consoleBaseURL).ServeHTTP(httptest.NewRecorder(),
 		otpPostRequest(url.Values{"otpAction": {"recovery-codes"}, "password": {"wrong"}}))
 
 	bind := handlertest.Bind(t, httpHelper)
@@ -670,12 +670,12 @@ func TestHandleOtpPost_ANewSetRateLimitedIsShownOnItsForm(t *testing.T) {
 
 // A new-set form posted after two-factor authentication was turned off in another tab is stale: the
 // page reloads and draws the account as it is now.
-func TestHandleOtpPost_ANewSetForAnAccountWithoutAnAuthenticatorReloads(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+func TestHandleOTPPost_ANewSetForAnAccountWithoutAnAuthenticatorReloads(t *testing.T) {
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 
-	client := newStubApiClient(false)
+	client := newStubAPIClient(false)
 	rr := httptest.NewRecorder()
-	HandleOtpPost(httpHelper, client, consoleBaseURL).ServeHTTP(rr,
+	HandleOTPPost(httpHelper, client, consoleBaseURL).ServeHTTP(rr,
 		otpPostRequest(url.Values{"otpAction": {"recovery-codes"}, "password": {"P4ss!word"}}))
 
 	assert.Equal(t, http.StatusFound, rr.Code)
@@ -686,15 +686,15 @@ func TestHandleOtpPost_ANewSetForAnAccountWithoutAnAuthenticatorReloads(t *testi
 
 // The disable form redrawn with its refusal draws the count of the recovery codes too, since the
 // page of an account with two-factor authentication always says it.
-func TestHandleOtpPost_ADisableRefusalStillDrawsTheCount(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+func TestHandleOTPPost_ADisableRefusalStillDrawsTheCount(t *testing.T) {
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_otp.html").Once()
 
-	client := newStubApiClient(true)
+	client := newStubAPIClient(true)
 	client.remaining = 4
 	client.updateErr = apiError("AUTHENTICATION_FAILED")
 
-	HandleOtpPost(httpHelper, client, consoleBaseURL).ServeHTTP(httptest.NewRecorder(),
+	HandleOTPPost(httpHelper, client, consoleBaseURL).ServeHTTP(httptest.NewRecorder(),
 		otpPostRequest(url.Values{"otpAction": {"disable"}, "password": {"wrong"}}))
 
 	bind := handlertest.Bind(t, httpHelper)

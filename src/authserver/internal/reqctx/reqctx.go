@@ -23,11 +23,11 @@ type key int
 const (
 	settingsKey key = iota
 	sessionIdentifierKey
-	sessionUserIdKey
+	sessionUserIDKey
 	bearerTokenKey
 	validatedTokenKey
 	credentialReservationKey
-	actingUserIdKey
+	actingUserIDKey
 	dpopProofKey
 	pageClientKey
 	brandSafeModeKey
@@ -59,37 +59,37 @@ func SessionIdentifierFrom(ctx context.Context) (string, bool) {
 	return id, ok
 }
 
-// WithSessionUserId records the user of the session the session identifier names, which the
+// WithSessionUserID records the user of the session the session identifier names, which the
 // session identifier middleware read with it, so a reader of the user need not read the session
 // again.
-func WithSessionUserId(ctx context.Context, userId int64) context.Context {
-	return context.WithValue(ctx, sessionUserIdKey, userId)
+func WithSessionUserID(ctx context.Context, userID int64) context.Context {
+	return context.WithValue(ctx, sessionUserIDKey, userID)
 }
 
-// SessionUserIdFrom answers false when the browser holds no session, as SessionIdentifierFrom does.
-func SessionUserIdFrom(ctx context.Context) (int64, bool) {
-	userId, ok := ctx.Value(sessionUserIdKey).(int64)
-	return userId, ok
+// SessionUserIDFrom answers false when the browser holds no session, as SessionIdentifierFrom does.
+func SessionUserIDFrom(ctx context.Context) (int64, bool) {
+	userID, ok := ctx.Value(sessionUserIDKey).(int64)
+	return userID, ok
 }
 
-func WithBearerToken(ctx context.Context, t oauth.JwtToken) context.Context {
+func WithBearerToken(ctx context.Context, t oauth.JWTToken) context.Context {
 	return context.WithValue(ctx, bearerTokenKey, t)
 }
 
 // BearerTokenFrom answers the token the bearer middleware validated off the request, whether
 // or not any scope guard has run.
-func BearerTokenFrom(ctx context.Context) (oauth.JwtToken, bool) {
-	t, ok := ctx.Value(bearerTokenKey).(oauth.JwtToken)
+func BearerTokenFrom(ctx context.Context) (oauth.JWTToken, bool) {
+	t, ok := ctx.Value(bearerTokenKey).(oauth.JWTToken)
 	return t, ok
 }
 
-func WithValidatedToken(ctx context.Context, t oauth.JwtToken) context.Context {
+func WithValidatedToken(ctx context.Context, t oauth.JWTToken) context.Context {
 	return context.WithValue(ctx, validatedTokenKey, t)
 }
 
 // ValidatedTokenFrom answers the token a scope guard accepted; true means one did.
-func ValidatedTokenFrom(ctx context.Context) (oauth.JwtToken, bool) {
-	t, ok := ctx.Value(validatedTokenKey).(oauth.JwtToken)
+func ValidatedTokenFrom(ctx context.Context) (oauth.JWTToken, bool) {
+	t, ok := ctx.Value(validatedTokenKey).(oauth.JWTToken)
 	return t, ok
 }
 
@@ -142,18 +142,18 @@ func CredentialReservationFrom(ctx context.Context) (*CredentialReservation, boo
 	return res, ok && res != nil
 }
 
-// WithActingUserId records the user whose access token made the request, which the session guard
+// WithActingUserID records the user whose access token made the request, which the session guard
 // found live, so the audit logger can record who acted without reading the user again (#780
 // decision 2).
-func WithActingUserId(ctx context.Context, userId int64) context.Context {
-	return context.WithValue(ctx, actingUserIdKey, userId)
+func WithActingUserID(ctx context.Context, userID int64) context.Context {
+	return context.WithValue(ctx, actingUserIDKey, userID)
 }
 
-// ActingUserIdFrom answers false when no user's token made the request: a browser flow, a client
+// ActingUserIDFrom answers false when no user's token made the request: a browser flow, a client
 // credentials token, or a request the session guard never ran for.
-func ActingUserIdFrom(ctx context.Context) (int64, bool) {
-	userId, ok := ctx.Value(actingUserIdKey).(int64)
-	return userId, ok
+func ActingUserIDFrom(ctx context.Context) (int64, bool) {
+	userID, ok := ctx.Value(actingUserIDKey).(int64)
+	return userID, ok
 }
 
 // WithDPoPProof records the DPoP proof the bearer guard accepted beside the request's access token,

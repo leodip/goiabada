@@ -27,8 +27,8 @@ import (
 
 const accountLegalDocumentAcceptancesPath = "/api/v1/account/legal-document-acceptances"
 
-func userLegalDocumentAcceptancesPath(userId int64) string {
-	return fmt.Sprintf("/api/v1/admin/users/%d/legal-document-acceptances", userId)
+func userLegalDocumentAcceptancesPath(userID int64) string {
+	return fmt.Sprintf("/api/v1/admin/users/%d/legal-document-acceptances", userID)
 }
 
 // acceptancesFixture is a user who accepted three versions: version 1 and version 2 of "Terms of
@@ -36,13 +36,13 @@ func userLegalDocumentAcceptancesPath(userId int64) string {
 // "Terms of use" too, which is not the first user's.
 type acceptancesFixture struct {
 	termsShort    string
-	termsId       int64
+	termsID       int64
 	houseShort    string
-	houseId       int64
+	houseID       int64
 	termsV1At     time.Time
 	termsV2At     time.Time
 	houseV1At     time.Time
-	otherUserId   int64
+	otherUserID   int64
 	adminToken    string
 	termsVersion1 int64
 }
@@ -56,40 +56,40 @@ func newAcceptancesFixture(t *testing.T, user *record.User) *acceptancesFixture 
 	publishFor := func(prefix, title string) (int64, string) {
 		shortName := legalShortName(prefix)
 		id := createLegalDocumentOverAPI(t, adminToken, "must_accept", shortName, title, "Be nice: "+title+".")
-		status, body := setApps(t, adminToken, id, "selected_apps", []int64{app.Id}, []int64{})
+		status, body := setApps(t, adminToken, id, "selected_apps", []int64{app.ID}, []int64{})
 		require.Equal(t, http.StatusOK, status, "apps: %v", body)
 		status, body, _ = legalCall(t, adminToken, http.MethodPost, legalPath(id, "/publish"), nil)
 		require.Equal(t, http.StatusOK, status, "publish: %v", body)
 		return id, shortName
 	}
-	accept := func(userId, versionId int64, at time.Time) {
+	accept := func(userID, versionID int64, at time.Time) {
 		require.NoError(t, database.CreateLegalDocumentAcceptance(context.Background(), nil,
-			&record.LegalDocumentAcceptance{AcceptedAt: at, UserId: userId, LegalDocumentVersionId: versionId}))
+			&record.LegalDocumentAcceptance{AcceptedAt: at, UserID: userID, LegalDocumentVersionID: versionID}))
 	}
 
 	base := time.Now().UTC().Add(-3 * time.Hour).Truncate(time.Second)
 	f.termsV1At, f.termsV2At, f.houseV1At = base, base.Add(time.Hour), base.Add(2*time.Hour)
 
-	f.termsId, f.termsShort = publishFor("acceptances-terms", "Terms of use")
-	f.termsVersion1 = versionId(t, f.termsId, 1)
-	accept(user.Id, f.termsVersion1, f.termsV1At)
+	f.termsID, f.termsShort = publishFor("acceptances-terms", "Terms of use")
+	f.termsVersion1 = versionID(t, f.termsID, 1)
+	accept(user.ID, f.termsVersion1, f.termsV1At)
 
-	status, body, _ := legalCall(t, adminToken, http.MethodPut, legalPath(f.termsId, "/draft"), map[string]any{
+	status, body, _ := legalCall(t, adminToken, http.MethodPut, legalPath(f.termsID, "/draft"), map[string]any{
 		"title": "Terms of use, revised", "markdown": "Be nicer.",
 	})
 	require.Equal(t, http.StatusOK, status, "draft: %v", body)
-	status, body, _ = legalCall(t, adminToken, http.MethodPost, legalPath(f.termsId, "/publish"), nil)
+	status, body, _ = legalCall(t, adminToken, http.MethodPost, legalPath(f.termsID, "/publish"), nil)
 	require.Equal(t, http.StatusOK, status, "publish version 2: %v", body)
-	accept(user.Id, versionId(t, f.termsId, 2), f.termsV2At)
+	accept(user.ID, versionID(t, f.termsID, 2), f.termsV2At)
 
-	f.houseId, f.houseShort = publishFor("acceptances-house", "House rules")
-	accept(user.Id, versionId(t, f.houseId, 1), f.houseV1At)
-	status, body, _ = legalCall(t, adminToken, http.MethodPost, legalPath(f.houseId, "/retire"), nil)
+	f.houseID, f.houseShort = publishFor("acceptances-house", "House rules")
+	accept(user.ID, versionID(t, f.houseID, 1), f.houseV1At)
+	status, body, _ = legalCall(t, adminToken, http.MethodPost, legalPath(f.houseID, "/retire"), nil)
 	require.Equal(t, http.StatusOK, status, "retire: %v", body)
 
 	other, _ := newLegalAcceptanceUser(t)
-	f.otherUserId = other.Id
-	accept(other.Id, f.termsVersion1, f.termsV1At)
+	f.otherUserID = other.ID
+	accept(other.ID, f.termsVersion1, f.termsV1At)
 	return f
 }
 
@@ -101,7 +101,7 @@ func (f *acceptancesFixture) assertTheFixturesAcceptances(t *testing.T, got []ap
 	baseURL := appConfig.AuthServer.BaseURL
 
 	type want struct {
-		documentId int64
+		documentID int64
 		shortName  string
 		version    int
 		title      string
@@ -110,13 +110,13 @@ func (f *acceptancesFixture) assertTheFixturesAcceptances(t *testing.T, got []ap
 		url        string
 	}
 	for i, w := range []want{
-		{f.houseId, f.houseShort, 1, "House rules", f.houseV1At, true, ""},
-		{f.termsId, f.termsShort, 2, "Terms of use, revised", f.termsV2At, false, baseURL + "/legal/" + f.termsShort + "/versions/2"},
-		{f.termsId, f.termsShort, 1, "Terms of use", f.termsV1At, false, baseURL + "/legal/" + f.termsShort + "/versions/1"},
+		{f.houseID, f.houseShort, 1, "House rules", f.houseV1At, true, ""},
+		{f.termsID, f.termsShort, 2, "Terms of use, revised", f.termsV2At, false, baseURL + "/legal/" + f.termsShort + "/versions/2"},
+		{f.termsID, f.termsShort, 1, "Terms of use", f.termsV1At, false, baseURL + "/legal/" + f.termsShort + "/versions/1"},
 	} {
 		a := got[i]
-		assert.NotZero(t, a.Id, "acceptance %d", i)
-		assert.Equal(t, w.documentId, a.LegalDocumentId, "acceptance %d", i)
+		assert.NotZero(t, a.ID, "acceptance %d", i)
+		assert.Equal(t, w.documentID, a.LegalDocumentID, "acceptance %d", i)
 		assert.Equal(t, w.shortName, a.ShortName, "acceptance %d", i)
 		assert.Equal(t, w.version, a.Version, "acceptance %d", i)
 		assert.Equal(t, w.title, a.Title, "acceptance %d", i)
@@ -174,10 +174,10 @@ func TestAPIUserLegalDocumentAcceptances_ListsWhatTheUserAccepted(t *testing.T) 
 	user, _ := newLegalAcceptanceUser(t)
 	f := newAcceptancesFixture(t, user)
 
-	resp := makeAPIRequest(t, http.MethodGet, appConfig.AuthServer.BaseURL+userLegalDocumentAcceptancesPath(user.Id), f.adminToken, nil)
+	resp := makeAPIRequest(t, http.MethodGet, appConfig.AuthServer.BaseURL+userLegalDocumentAcceptancesPath(user.ID), f.adminToken, nil)
 	f.assertTheFixturesAcceptances(t, decodeAcceptances(t, resp))
 
-	resp = makeAPIRequest(t, http.MethodGet, appConfig.AuthServer.BaseURL+userLegalDocumentAcceptancesPath(f.otherUserId), f.adminToken, nil)
+	resp = makeAPIRequest(t, http.MethodGet, appConfig.AuthServer.BaseURL+userLegalDocumentAcceptancesPath(f.otherUserID), f.adminToken, nil)
 	others := decodeAcceptances(t, resp)
 	require.Len(t, others, 1, "the other user accepted version 1 of the terms alone: %+v", others)
 	assert.Equal(t, f.termsShort, others[0].ShortName)
@@ -212,9 +212,9 @@ func TestAPIUserLegalDocumentAcceptances_TheUsersReadScopes(t *testing.T) {
 	} {
 		t.Run(c.permission, func(t *testing.T) {
 			token, client := createClientWithGranularScope(t, c.permission)
-			t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+			t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 
-			status, body, _ := legalCall(t, token, http.MethodGet, userLegalDocumentAcceptancesPath(user.Id), nil)
+			status, body, _ := legalCall(t, token, http.MethodGet, userLegalDocumentAcceptancesPath(user.ID), nil)
 			assert.Equal(t, c.status, status, "%v", body)
 		})
 	}

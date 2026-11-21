@@ -104,7 +104,7 @@ func (val *TokenValidator) validatePasswordGrant(ctx context.Context, settings *
 	// depends on the client alone: unauthorized_client (RFC 6749 section 5.2), as the switch
 	// above is, so no password is compared, none is charged to the account's rate-limit budget
 	// or audited as a failed guess, and the answer says nothing of the account (#533).
-	if client.AuthorizationCodeEnabled && client.DefaultAcrLevel == record.AcrLevel2Mandatory {
+	if client.AuthorizationCodeEnabled && client.DefaultACRLevel == record.ACRLevel2Mandatory {
 		return nil, oauth.NewErrorDetailWithHTTPStatus("unauthorized_client",
 			"Resource owner password credentials grant is not available for a client whose "+
 				"default ACR level is urn:goiabada:level2_mandatory. "+
@@ -148,7 +148,7 @@ func (val *TokenValidator) validatePasswordGrant(ctx context.Context, settings *
 	// Named plainly, unlike a disabled user's code or refresh token (#137): this caller has just
 	// proved the account's password, so the account's state is its own to know.
 	if !user.Enabled {
-		return nil, userDisabled("The user account is disabled.", user.Id)
+		return nil, userDisabled("The user account is disabled.", user.ID)
 	}
 
 	// Block ROPC for users with 2FA enabled
@@ -165,7 +165,7 @@ func (val *TokenValidator) validatePasswordGrant(ctx context.Context, settings *
 	// browser; left open, the grant would be a way around the step (#622 decision 7). invalid_grant,
 	// as the two-factor refusal above: the grant the user's credentials stand for cannot be issued
 	// as things are. After the password, so the answer says nothing to whoever does not know it.
-	owed, err := val.legalDocuments.Owed(ctx, client, user.Id)
+	owed, err := val.legalDocuments.Owed(ctx, client, user.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -230,7 +230,7 @@ func (val *TokenValidator) validateROPCScopes(ctx context.Context, scope string,
 			Detail: AdministrativeScopeRefusal(refused),
 			Client: client,
 			Scopes: refused,
-			UserId: user.Id,
+			UserID: user.ID,
 		}
 	}
 
@@ -267,7 +267,7 @@ func (val *TokenValidator) validateROPCScopes(ctx context.Context, scope string,
 		}
 
 		// Check if user has this permission (directly or via groups)
-		userHasPermission, err := val.permissionChecker.UserHasScopePermission(ctx, user.Id, scopeStr)
+		userHasPermission, err := val.permissionChecker.UserHasScopePermission(ctx, user.ID, scopeStr)
 		if err != nil {
 			return "", err
 		}

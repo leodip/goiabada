@@ -39,7 +39,7 @@ const refreshAdministrativeScopeRefusal = "Scope 'authserver:manage' is not reco
 
 // withdrawAdministrativeScopes switches a client's stored allowance off, as an operator withdrawing
 // it does. Written to the row directly, because the client save never writes the column.
-func withdrawAdministrativeScopes(t *testing.T, clientId int64) {
+func withdrawAdministrativeScopes(t *testing.T, clientID int64) {
 	t.Helper()
 
 	var engine *commondb.Database
@@ -57,10 +57,10 @@ func withdrawAdministrativeScopes(t *testing.T, clientId int64) {
 	}
 
 	_, err := engine.ExecSQL(context.Background(), nil, withdrawAdministrativeScopesSQL[engine.Dialect],
-		false, clientId)
+		false, clientID)
 	require.NoError(t, err)
 
-	client, err := database.GetClientById(context.Background(), nil, clientId)
+	client, err := database.GetClientByID(context.Background(), nil, clientID)
 	require.NoError(t, err)
 	require.False(t, client.AdministrativeScopesAllowed, "the allowance is withdrawn")
 }
@@ -76,16 +76,16 @@ var withdrawAdministrativeScopesSQL = map[data.Dialect]string{
 
 // assertRefusedAtTheTokenEndpoint holds the rows naming client to the one a refusal at checkpoint
 // leaves.
-func assertRefusedAtTheTokenEndpoint(t *testing.T, client *record.Client, userId int64, checkpoint string) {
+func assertRefusedAtTheTokenEndpoint(t *testing.T, client *record.Client, userID int64, checkpoint string) {
 	t.Helper()
 	rows := administrativeScopeRefusedRows(t, client.ClientIdentifier)
 	require.Len(t, rows, 1, "one row for the refusal")
 	assert.Equal(t, map[string]any{
-		"client_id":         float64(client.Id),
+		"client_id":         float64(client.ID),
 		"client_identifier": client.ClientIdentifier,
 		"scopes":            []any{"authserver:manage"},
 		"checkpoint":        checkpoint,
-		"user_id":           float64(userId),
+		"user_id":           float64(userID),
 	}, rows[0])
 }
 
@@ -108,9 +108,9 @@ func TestToken_AdministrativeScope_CodeRedeemedAfterTheAllowanceWasWithdrawn(t *
 	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCodeEnsuringUserScope(t, clientSecret, "openid profile authserver:manage")
 	require.True(t, code.Client.AdministrativeScopesAllowed, "the fixture allows its client for an administrative scope")
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, code.Client.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, code.Client.ID) })
 
-	withdrawAdministrativeScopes(t, code.Client.Id)
+	withdrawAdministrativeScopes(t, code.Client.ID)
 
 	status, body, err := concurrentTokenPost(httpClient, appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
 		"grant_type":    {"authorization_code"},
@@ -126,7 +126,7 @@ func TestToken_AdministrativeScope_CodeRedeemedAfterTheAllowanceWasWithdrawn(t *
 	assert.Equal(t, administrativeScopeRefusal, body["error_description"])
 	assert.NotContains(t, body, "access_token")
 	assert.NotContains(t, body, "refresh_token")
-	assertRefusedAtTheTokenEndpoint(t, &code.Client, code.UserId, "authorization_code")
+	assertRefusedAtTheTokenEndpoint(t, &code.Client, code.UserID, "authorization_code")
 }
 
 // A refresh token descended from an authorization code, issued while the client was allowed. It
@@ -138,7 +138,7 @@ func TestToken_AdministrativeScope_RefreshFromACodeAfterTheAllowanceWasWithdrawn
 	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCodeEnsuringUserScope(t, clientSecret, "openid profile authserver:manage")
 	require.True(t, code.Client.AdministrativeScopesAllowed, "the fixture allows its client for an administrative scope")
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, code.Client.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, code.Client.ID) })
 
 	tokens := postToTokenEndpoint(t, httpClient, appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
 		"grant_type":    {"authorization_code"},
@@ -157,11 +157,11 @@ func TestToken_AdministrativeScope_RefreshFromACodeAfterTheAllowanceWasWithdrawn
 	assert.Equal(t, "openid profile authserver:manage", body["scope"])
 	refreshToken = body["refresh_token"].(string)
 
-	withdrawAdministrativeScopes(t, code.Client.Id)
+	withdrawAdministrativeScopes(t, code.Client.ID)
 
 	status, body = refreshWithScope(t, httpClient, code.Client.ClientIdentifier, clientSecret, refreshToken, "")
 	assertRefreshRefused(t, status, body)
-	assertRefusedAtTheTokenEndpoint(t, &code.Client, code.UserId, "refresh_token")
+	assertRefusedAtTheTokenEndpoint(t, &code.Client, code.UserID, "refresh_token")
 
 	// The token was not spent: narrowed to leave the administrative scope out, it refreshes.
 	status, body = refreshWithScope(t, httpClient, code.Client.ClientIdentifier, clientSecret, refreshToken, "openid profile")
@@ -180,15 +180,15 @@ func newAdministrativeROPCClient(t *testing.T, allowed bool) (*record.Client, st
 
 	clientSecret := fake.Password(32)
 	client := createROPCClientAllowing(t, clientSecret, false, allowed)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 
 	password := fake.Password(12)
 	passwordHashed, err := passwordhash.Hash(password)
 	require.NoError(t, err)
 	user := &record.User{Subject: fake.UUID(), Enabled: true, Email: fake.Email(), PasswordHash: passwordHashed}
 	require.NoError(t, database.CreateUser(context.Background(), nil, user))
-	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.Id) })
-	assignPermissionToUser(t, user.Id, authServerPermissionId(t, builtin.ManagePermissionIdentifier))
+	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.ID) })
+	assignPermissionToUser(t, user.ID, authServerPermissionID(t, builtin.ManagePermissionIdentifier))
 
 	return client, clientSecret, user, password
 }
@@ -198,7 +198,7 @@ func passwordGrant(t *testing.T, client *record.Client, clientSecret string, use
 	scope string) (int, map[string]interface{}) {
 	t.Helper()
 
-	status, body, err := concurrentTokenPost(createHttpClient(t), appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
+	status, body, err := concurrentTokenPost(createHTTPClient(t), appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
 		"grant_type":    {"password"},
 		"client_id":     {client.ClientIdentifier},
 		"client_secret": {clientSecret},
@@ -222,12 +222,12 @@ func TestToken_AdministrativeScope_RefreshFromThePasswordGrantAfterTheAllowanceW
 	refreshToken, ok := tokens["refresh_token"].(string)
 	require.True(t, ok, "the password grant yields a refresh token: %v", tokens)
 
-	withdrawAdministrativeScopes(t, client.Id)
+	withdrawAdministrativeScopes(t, client.ID)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	status, body := refreshWithScope(t, httpClient, client.ClientIdentifier, clientSecret, refreshToken, "")
 	assertRefreshRefused(t, status, body)
-	assertRefusedAtTheTokenEndpoint(t, client, user.Id, "refresh_token")
+	assertRefusedAtTheTokenEndpoint(t, client, user.ID, "refresh_token")
 
 	status, body = refreshWithScope(t, httpClient, client.ClientIdentifier, clientSecret, refreshToken, "openid")
 	require.Equal(t, http.StatusOK, status, "a refresh leaving the administrative scope out succeeds: %v", body)
@@ -248,7 +248,7 @@ func TestToken_AdministrativeScope_PasswordGrantRefused(t *testing.T) {
 	assert.Equal(t, "invalid_scope", body["error"])
 	assert.Equal(t, administrativeScopeRefusal, body["error_description"])
 	assert.NotContains(t, body, "access_token")
-	assertRefusedAtTheTokenEndpoint(t, client, user.Id, "password")
+	assertRefusedAtTheTokenEndpoint(t, client, user.ID, "password")
 
 	// The same client and user obtain what is not administrative.
 	status, body = passwordGrant(t, client, clientSecret, user, password, "openid")

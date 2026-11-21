@@ -21,14 +21,14 @@ import (
 // every 500 on that surface produces. The handlers get a thin case each; the table is here, so the
 // properties are stated once (#279 seam 4).
 
-const requestId = "req-abc-123"
+const requestID = "req-abc-123"
 
-// requestWithId builds a request carrying the request id, which is the attribute the request
+// requestWithID builds a request carrying the request id, which is the attribute the request
 // logger already writes and therefore the one the body and the log record have to agree on.
-func requestWithId(t *testing.T) *http.Request {
+func requestWithID(t *testing.T) *http.Request {
 	t.Helper()
 	r := httptest.NewRequest(http.MethodGet, "/api/v1/admin/anything", nil)
-	return r.WithContext(requestid.NewContext(r.Context(), requestId))
+	return r.WithContext(requestid.NewContext(r.Context(), requestID))
 }
 
 func decodeEnvelope(t *testing.T, rr *httptest.ResponseRecorder) (code, description string) {
@@ -60,7 +60,7 @@ func TestWriteJSON_WritesStatusContentTypeAndBody(t *testing.T) {
 	rr := httptest.NewRecorder()
 	capture := logtest.CaptureSlog(t)
 
-	WriteJSON(rr, requestWithId(t), http.StatusCreated, map[string]string{"hello": "world"})
+	WriteJSON(rr, requestWithID(t), http.StatusCreated, map[string]string{"hello": "world"})
 
 	records := capture.Records()
 
@@ -78,14 +78,14 @@ func TestWriteJSON_AnUnencodableValueIsARealFiveHundred(t *testing.T) {
 	rr := httptest.NewRecorder()
 	capture := logtest.CaptureSlog(t)
 
-	WriteJSON(rr, requestWithId(t), http.StatusOK, map[string]any{"broken": math.Inf(1)})
+	WriteJSON(rr, requestWithID(t), http.StatusOK, map[string]any{"broken": math.Inf(1)})
 
 	records := capture.Records()
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 	code, description := decodeEnvelope(t, rr)
 	assert.Equal(t, "INTERNAL_SERVER_ERROR", code)
-	assert.Contains(t, description, requestId)
+	assert.Contains(t, description, requestID)
 	require.Len(t, records, 1)
 	assert.ErrorContains(t, loggedError(t, records[0]), "unable to encode the API response")
 }
@@ -131,7 +131,7 @@ func TestWriteInternalServerError_AnswersOneCodeAndLogsOnce(t *testing.T) {
 	rr := httptest.NewRecorder()
 	capture := logtest.CaptureSlog(t)
 
-	WriteInternalServerError(rr, requestWithId(t),
+	WriteInternalServerError(rr, requestWithID(t),
 		errs.Wrap(errors.New("connection refused"), "failed to load the client"),
 		"client_id", int64(7))
 
@@ -142,7 +142,7 @@ func TestWriteInternalServerError_AnswersOneCodeAndLogsOnce(t *testing.T) {
 	code, description := decodeEnvelope(t, rr)
 	assert.Equal(t, "INTERNAL_SERVER_ERROR", code)
 	assert.Equal(t, "An unexpected server error has occurred. For additional information, "+
-		"refer to the server logs. Request Id: "+requestId, description)
+		"refer to the server logs. Request Id: "+requestID, description)
 
 	require.Len(t, records, 1, "exactly one record, which is the point of the primitive")
 	// The level is pinned rather than merely observed. Nothing in the text of a call holds a
@@ -151,7 +151,7 @@ func TestWriteInternalServerError_AnswersOneCodeAndLogsOnce(t *testing.T) {
 	// server produces all day and nobody would find it again (#320 decision 5).
 	assert.Equal(t, slog.LevelError, records[0].Level)
 	assert.Equal(t, "internal server error", records[0].Message)
-	assert.Equal(t, requestId, records[0].Attrs["request_id"])
+	assert.Equal(t, requestID, records[0].Attrs["request_id"])
 	// snake_case, like every other key in the tree. The caller's attributes reach the record
 	// through a variadic parameter, so this key is written at the call site and read nowhere
 	// else: until the slog lint read through the wrapper, 179 of the 328 calls that pass
@@ -168,11 +168,11 @@ func TestWriteInternalServerError_RepeatsTheWebSurfaceSentence(t *testing.T) {
 	// Held so the record does not reach the test's own output; nothing here asserts on it.
 	logtest.CaptureSlog(t)
 
-	WriteInternalServerError(rr, requestWithId(t), errors.New("boom"))
+	WriteInternalServerError(rr, requestWithID(t), errors.New("boom"))
 
 	_, description := decodeEnvelope(t, rr)
 	assert.Equal(t, "An unexpected server error has occurred. For additional information, "+
-		"refer to the server logs. Request Id: "+requestId, description)
+		"refer to the server logs. Request Id: "+requestID, description)
 }
 
 // errs.WithStack is applied inside the primitive, not at the call sites, which is what lets all 344
@@ -182,7 +182,7 @@ func TestWriteInternalServerError_ABareStdlibErrorStillLogsAStack(t *testing.T) 
 	rr := httptest.NewRecorder()
 	capture := logtest.CaptureSlog(t)
 
-	WriteInternalServerError(rr, requestWithId(t), errors.New("a bare stdlib error"))
+	WriteInternalServerError(rr, requestWithID(t), errors.New("a bare stdlib error"))
 
 	logged := capture.Text()
 
@@ -198,7 +198,7 @@ func TestWriteInternalServerError_DoesNotAddASecondStack(t *testing.T) {
 
 	capture := logtest.CaptureSlog(t)
 
-	WriteInternalServerError(rr, requestWithId(t), errs.Wrap(origin, "on the way up"))
+	WriteInternalServerError(rr, requestWithID(t), errs.Wrap(origin, "on the way up"))
 
 	logged := capture.Text()
 
@@ -214,16 +214,16 @@ func TestLogInternalServerError_LogsAndWritesNothing(t *testing.T) {
 	var returned string
 	capture := logtest.CaptureSlog(t)
 
-	returned = LogInternalServerError(requestWithId(t), errs.New("DCR: could not register"),
+	returned = LogInternalServerError(requestWithID(t), errs.New("DCR: could not register"),
 		"uri", "https://a.example.com")
 
 	records := capture.Records()
 
-	assert.Equal(t, requestId, returned)
+	assert.Equal(t, requestID, returned)
 	assert.Equal(t, 200, rr.Code, "nothing was written")
 	assert.Empty(t, rr.Body.String())
 	require.Len(t, records, 1)
-	assert.Equal(t, requestId, records[0].Attrs["request_id"])
+	assert.Equal(t, requestID, records[0].Attrs["request_id"])
 	assert.Equal(t, "https://a.example.com", records[0].Attrs["uri"])
 }
 
@@ -231,7 +231,7 @@ func TestLogInternalServerError_LogsAndWritesNothing(t *testing.T) {
 // absent rather than empty: the writer stopped naming it at #320 decision 2, and the handler that
 // injects it writes nothing when chi's helper returns the empty string, so an empty request_id can
 // no longer reach a record and be mistaken for a correlated one.
-func TestWriteInternalServerError_WithoutARequestId(t *testing.T) {
+func TestWriteInternalServerError_WithoutARequestID(t *testing.T) {
 	rr := httptest.NewRecorder()
 	capture := logtest.CaptureSlog(t)
 

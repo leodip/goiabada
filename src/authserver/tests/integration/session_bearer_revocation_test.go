@@ -49,7 +49,7 @@ func TestSession_AdminAPI_DeletedSessionRejectsBearer(t *testing.T) {
 	session, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, sid)
 	require.NoError(t, err)
 	assert.NotNil(t, session, "session should exist for sid %s", sid)
-	err = database.DeleteUserSession(context.Background(), nil, session.Id)
+	err = database.DeleteUserSession(context.Background(), nil, session.ID)
 	require.NoError(t, err)
 
 	// Post-condition: same token now rejected with 401 invalid_token.
@@ -83,7 +83,7 @@ func TestSession_AccountAPI_DeletedSessionRejectsBearer(t *testing.T) {
 	session, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, sid)
 	require.NoError(t, err)
 	assert.NotNil(t, session, "session should exist for sid %s", sid)
-	err = database.DeleteUserSession(context.Background(), nil, session.Id)
+	err = database.DeleteUserSession(context.Background(), nil, session.ID)
 	require.NoError(t, err)
 
 	// Post-condition: 401 invalid_token.

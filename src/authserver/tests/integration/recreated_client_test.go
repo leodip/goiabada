@@ -30,21 +30,21 @@ func recreateThroughAdminAPI(t *testing.T, adminToken string, deleted *record.Cl
 	replacement, err := database.GetClientByClientIdentifier(context.Background(), nil, deleted.ClientIdentifier)
 	require.NoError(t, err)
 	require.NotNil(t, replacement)
-	require.NotEqual(t, deleted.Id, replacement.Id, "the replacement is another client")
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, replacement.Id) })
+	require.NotEqual(t, deleted.ID, replacement.ID, "the replacement is another client")
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, replacement.ID) })
 	return replacement
 }
 
 func TestRecreatedClient_AClientCredentialsTokenOfTheDeletedClientStaysRefused(t *testing.T) {
 	manager, _ := createAdminClientWithToken(t)
 	accessToken, original, _ := createAdminClientWithTokenAndSecret(t)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, original.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, original.ID) })
 	observer := authserverAPI(t)
 	const target = "/api/v1/admin/resources"
 	assertAPIAdmitsToken(t, target, accessToken)
 	assertActive(t, observer.introspect(t, accessToken))
 
-	deleteThroughAdminAPI(t, manager, fmt.Sprintf("/api/v1/admin/clients/%d", original.Id))
+	deleteThroughAdminAPI(t, manager, fmt.Sprintf("/api/v1/admin/clients/%d", original.ID))
 	assertAPIRefusesToken(t, target, accessToken)
 	assertInactive(t, observer.introspect(t, accessToken))
 
@@ -58,11 +58,11 @@ func TestRecreatedClient_AnImplicitFlowTokenOfTheDeletedClientStaysRefused(t *te
 	manager, _ := createAdminClientWithToken(t)
 	enableImplicitFlowGlobally(t)
 	implicitEnabled := true
-	client, redirectUri := createImplicitFlowClient(t, &implicitEnabled)
-	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	client, redirectURI := createImplicitFlowClient(t, &implicitEnabled)
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 	user, password := createTestUserForImplicit(t)
-	resp := signInToIssue(t, createHttpClient(t),
-		implicitModeAuthorizeURL(client, redirectUri.URI, "token", "", fake.LetterN(12), ""), user, password)
+	resp := signInToIssue(t, createHTTPClient(t),
+		implicitModeAuthorizeURL(client, redirectURI.URI, "token", "", fake.LetterN(12), ""), user, password)
 	_ = resp.Body.Close()
 	require.Equal(t, http.StatusFound, resp.StatusCode)
 	accessToken := getTokensFromFragment(t, resp)["access_token"]
@@ -72,7 +72,7 @@ func TestRecreatedClient_AnImplicitFlowTokenOfTheDeletedClientStaysRefused(t *te
 	assertUserinfoAdmits(t, accessToken, user.Subject)
 	assertActive(t, observer.introspect(t, accessToken))
 
-	deleteThroughAdminAPI(t, manager, fmt.Sprintf("/api/v1/admin/clients/%d", client.Id))
+	deleteThroughAdminAPI(t, manager, fmt.Sprintf("/api/v1/admin/clients/%d", client.ID))
 	assertUserinfoRefusesTheToken(t, accessToken)
 	assertInactive(t, observer.introspect(t, accessToken))
 

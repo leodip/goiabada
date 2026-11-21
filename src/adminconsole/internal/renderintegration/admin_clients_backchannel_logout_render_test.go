@@ -24,7 +24,7 @@ var (
 // Every tab of a client links to its Back-channel logout tab, right after Sign-out redirect URIs and
 // before Web origins, and marks it current on its own page only (#784 decision 9).
 func TestRender_AdminClientTabs_BackchannelLogoutFollowsSignOutRedirectURIs(t *testing.T) {
-	pages := &clientPagesAPI{client: &api.ClientResponse{Id: 7, ClientIdentifier: "a-web-app", AuthorizationCodeEnabled: true}}
+	pages := &clientPagesAPI{client: &api.ClientResponse{ID: 7, ClientIdentifier: "a-web-app", AuthorizationCodeEnabled: true}}
 	tabs := clientTabs(t, pages)
 	require.Contains(t, tabs, "backchannel-logout", "the tab has a handler of its own")
 	for tab, handler := range tabs {
@@ -49,7 +49,7 @@ func TestRender_AdminClientTabs_BackchannelLogoutFollowsSignOutRedirectURIs(t *t
 // A client that signs users in gets a form with the URI and the checkbox, drawn as stored, the line
 // saying what the URI is for, and one Save; the form posts to the tab itself.
 func TestRender_AdminClientBackchannelLogout_AClientThatSignsUsersIn(t *testing.T) {
-	pages := &clientPagesAPI{client: &api.ClientResponse{Id: 7, ClientIdentifier: "a-web-app", AuthorizationCodeEnabled: true,
+	pages := &clientPagesAPI{client: &api.ClientResponse{ID: 7, ClientIdentifier: "a-web-app", AuthorizationCodeEnabled: true,
 		BackchannelLogoutURI: "https://app.example.com/backchannel-logout?tenant=a&x=1", BackchannelLogoutSessionRequired: true}}
 
 	out := serveClientTab(t, clientTabs(t, pages)["backchannel-logout"], "backchannel-logout", "en")
@@ -81,7 +81,7 @@ func TestRender_AdminClientBackchannelLogout_AClientThatSignsUsersIn(t *testing.
 // A client with neither the authorization code flow nor the implicit flow signs nobody in: the tab
 // shows the note its neighbour shows instead of the form.
 func TestRender_AdminClientBackchannelLogout_AClientWithoutASignInFlow(t *testing.T) {
-	pages := &clientPagesAPI{client: &api.ClientResponse{Id: 7, ClientIdentifier: "a-service", ClientCredentialsEnabled: true}}
+	pages := &clientPagesAPI{client: &api.ClientResponse{ID: 7, ClientIdentifier: "a-service", ClientCredentialsEnabled: true}}
 
 	out := serveClientTab(t, clientTabs(t, pages)["backchannel-logout"], "backchannel-logout", "en")
 
@@ -93,7 +93,7 @@ func TestRender_AdminClientBackchannelLogout_AClientWithoutASignInFlow(t *testin
 
 // Saving the admin console's own client asks first, with the warning every save of it carries.
 func TestRender_AdminClientBackchannelLogout_TheSystemClientAsksBeforeSaving(t *testing.T) {
-	pages := &clientPagesAPI{client: &api.ClientResponse{Id: 7, ClientIdentifier: "admin-console-client", AuthorizationCodeEnabled: true, IsSystemLevelClient: true}}
+	pages := &clientPagesAPI{client: &api.ClientResponse{ID: 7, ClientIdentifier: "admin-console-client", AuthorizationCodeEnabled: true, IsSystemLevelClient: true}}
 
 	out := serveClientTab(t, clientTabs(t, pages)["backchannel-logout"], "backchannel-logout", "en")
 
@@ -115,7 +115,7 @@ func renderBackchannelLogout(t *testing.T, bind map[string]interface{}) string {
 // A refusal is drawn at the top of the form and marks the field it is about: invalid, described by
 // the notice, focused. The URI keeps what was typed (#784 decision 9).
 func TestRender_AdminClientBackchannelLogout_ARefusalMarksItsField(t *testing.T) {
-	client := adminclienthandlers.ClientBackchannelLogout{ClientId: 7, ClientIdentifier: "a-web-app",
+	client := adminclienthandlers.ClientBackchannelLogout{ClientID: 7, ClientIdentifier: "a-web-app",
 		CanManageBackchannelLogout: true, BackchannelLogoutURI: "ftp://typed.example.com/bcl"}
 
 	out := renderBackchannelLogout(t, map[string]interface{}{"client": client,
@@ -138,7 +138,7 @@ func TestRender_AdminClientBackchannelLogout_ARefusalMarksItsField(t *testing.T)
 // (#784 decision 15).
 func TestRender_AdminClientBackchannelLogout_SaysWhoSetsTheURI(t *testing.T) {
 	const manageOnly = "Only an administrator holding authserver:manage can set or change it. You can clear it."
-	client := adminclienthandlers.ClientBackchannelLogout{ClientId: 7, ClientIdentifier: "a-web-app", CanManageBackchannelLogout: true}
+	client := adminclienthandlers.ClientBackchannelLogout{ClientID: 7, ClientIdentifier: "a-web-app", CanManageBackchannelLogout: true}
 
 	withManage := renderBackchannelLogout(t, map[string]interface{}{"client": client})
 	assert.NotContains(t, withManage, manageOnly)
@@ -152,7 +152,7 @@ func TestRender_AdminClientBackchannelLogout_SaysWhoSetsTheURI(t *testing.T) {
 
 // A save drawn back from its redirect says it was saved.
 func TestRender_AdminClientBackchannelLogout_Saved(t *testing.T) {
-	client := adminclienthandlers.ClientBackchannelLogout{ClientId: 7, ClientIdentifier: "a-web-app", CanManageBackchannelLogout: true}
+	client := adminclienthandlers.ClientBackchannelLogout{ClientID: 7, ClientIdentifier: "a-web-app", CanManageBackchannelLogout: true}
 
 	out := renderBackchannelLogout(t, map[string]interface{}{"client": client, "savedSuccessfully": true})
 
@@ -166,8 +166,8 @@ func TestRender_AdminClientBackchannelLogout_InEveryLocale(t *testing.T) {
 	leakedKey := regexp.MustCompile(`adminconsole\.[a-z_.]+`)
 	for _, locale := range []string{"en", "de", "es", "fr", "it", "pt-BR"} {
 		for _, client := range []*api.ClientResponse{
-			{Id: 7, ClientIdentifier: "a-web-app", AuthorizationCodeEnabled: true, BackchannelLogoutURI: "https://app.example.com/bcl"},
-			{Id: 7, ClientIdentifier: "a-service", ClientCredentialsEnabled: true},
+			{ID: 7, ClientIdentifier: "a-web-app", AuthorizationCodeEnabled: true, BackchannelLogoutURI: "https://app.example.com/bcl"},
+			{ID: 7, ClientIdentifier: "a-service", ClientCredentialsEnabled: true},
 		} {
 			out := serveClientTab(t, clientTabs(t, &clientPagesAPI{client: client})["backchannel-logout"], "backchannel-logout", locale)
 			visible := regexp.MustCompile(`(?s)<script.*?</script>`).ReplaceAllString(out, "")
@@ -183,7 +183,7 @@ func TestRender_AdminClientBackchannelLogout_InEveryLocale(t *testing.T) {
 			{"savedSuccessfully": true},
 			{"isAdmin": false},
 		} {
-			bind["client"] = adminclienthandlers.ClientBackchannelLogout{ClientId: 7, ClientIdentifier: "a-web-app", CanManageBackchannelLogout: true}
+			bind["client"] = adminclienthandlers.ClientBackchannelLogout{ClientID: 7, ClientIdentifier: "a-web-app", CanManageBackchannelLogout: true}
 			if _, ok := bind["isAdmin"]; !ok {
 				bind["isAdmin"] = true
 			}

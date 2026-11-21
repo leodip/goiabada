@@ -79,36 +79,36 @@ func TestMigration000087_ClientDPoPBoundAccessTokens(t *testing.T) {
 	require.NotNil(t, without)
 	assert.False(t, without.DPoPBoundAccessTokens, "a row inserted without the column does not require DPoP")
 
-	requiring := &record.Client{ClientIdentifier: "requires_dpop_" + fake.LetterN(6), DefaultAcrLevel: record.AcrLevel1,
+	requiring := &record.Client{ClientIdentifier: "requires_dpop_" + fake.LetterN(6), DefaultACRLevel: record.ACRLevel1,
 		DPoPBoundAccessTokens: true}
-	notRequiring := &record.Client{ClientIdentifier: "no_dpop_" + fake.LetterN(6), DefaultAcrLevel: record.AcrLevel1}
+	notRequiring := &record.Client{ClientIdentifier: "no_dpop_" + fake.LetterN(6), DefaultACRLevel: record.ACRLevel1}
 	require.NoError(t, h.DB.CreateClient(ctx, nil, requiring))
 	require.NoError(t, h.DB.CreateClient(ctx, nil, notRequiring))
-	want := map[int64]bool{requiring.Id: true, notRequiring.Id: false}
+	want := map[int64]bool{requiring.ID: true, notRequiring.ID: false}
 
 	for id, w := range want {
-		byId, readErr := h.DB.GetClientById(ctx, nil, id)
+		byID, readErr := h.DB.GetClientByID(ctx, nil, id)
 		require.NoError(t, readErr)
-		require.NotNil(t, byId)
-		assert.Equalf(t, w, byId.DPoPBoundAccessTokens, "GetClientById(%d)", id)
-		byIdentifier, readErr := h.DB.GetClientByClientIdentifier(ctx, nil, byId.ClientIdentifier)
+		require.NotNil(t, byID)
+		assert.Equalf(t, w, byID.DPoPBoundAccessTokens, "GetClientByID(%d)", id)
+		byIdentifier, readErr := h.DB.GetClientByClientIdentifier(ctx, nil, byID.ClientIdentifier)
 		require.NoError(t, readErr)
 		require.NotNil(t, byIdentifier)
-		assert.Equalf(t, w, byIdentifier.DPoPBoundAccessTokens, "GetClientByClientIdentifier(%q)", byId.ClientIdentifier)
+		assert.Equalf(t, w, byIdentifier.DPoPBoundAccessTokens, "GetClientByClientIdentifier(%q)", byID.ClientIdentifier)
 	}
-	byIds, err := h.DB.GetClientsByIds(ctx, nil, []int64{requiring.Id, notRequiring.Id})
+	byIDs, err := h.DB.GetClientsByIDs(ctx, nil, []int64{requiring.ID, notRequiring.ID})
 	require.NoError(t, err)
-	require.Len(t, byIds, 2)
-	for _, c := range byIds {
-		assert.Equalf(t, want[c.Id], c.DPoPBoundAccessTokens, "GetClientsByIds, client %d", c.Id)
+	require.Len(t, byIDs, 2)
+	for _, c := range byIDs {
+		assert.Equalf(t, want[c.ID], c.DPoPBoundAccessTokens, "GetClientsByIDs, client %d", c.ID)
 	}
 	all, err := h.DB.GetAllClients(ctx, nil)
 	require.NoError(t, err)
 	seen := 0
 	for _, c := range all {
-		if w, ok := want[c.Id]; ok {
+		if w, ok := want[c.ID]; ok {
 			seen++
-			assert.Equalf(t, w, c.DPoPBoundAccessTokens, "GetAllClients, client %d", c.Id)
+			assert.Equalf(t, w, c.DPoPBoundAccessTokens, "GetAllClients, client %d", c.ID)
 		}
 	}
 	assert.Equal(t, 2, seen, "GetAllClients answers both clients")
@@ -116,25 +116,25 @@ func TestMigration000087_ClientDPoPBoundAccessTokens(t *testing.T) {
 	// The whole-row save carries it in neither direction: the other client saves write the row
 	// from a copy read earlier in their request, which would write back a setting switched since.
 	for _, stored := range []*record.Client{requiring, notRequiring} {
-		read, readErr := h.DB.GetClientById(ctx, nil, stored.Id)
+		read, readErr := h.DB.GetClientByID(ctx, nil, stored.ID)
 		require.NoError(t, readErr)
-		read.DPoPBoundAccessTokens = !want[stored.Id]
+		read.DPoPBoundAccessTokens = !want[stored.ID]
 		read.Description = "rewritten_" + fake.LetterN(6)
 		require.NoError(t, h.DB.UpdateClient(ctx, nil, read))
-		updated, readErr := h.DB.GetClientById(ctx, nil, stored.Id)
+		updated, readErr := h.DB.GetClientByID(ctx, nil, stored.ID)
 		require.NoError(t, readErr)
-		assert.Equalf(t, want[stored.Id], updated.DPoPBoundAccessTokens, "UpdateClient must not write dpop_bound_access_tokens")
+		assert.Equalf(t, want[stored.ID], updated.DPoPBoundAccessTokens, "UpdateClient must not write dpop_bound_access_tokens")
 		assert.Equal(t, read.Description, updated.Description, "and still writes the ordinary columns")
 	}
 
 	// The setter switches the one client it names, both ways, and nothing else of it.
 	for _, on := range []bool{true, false, false, true} {
-		require.NoError(t, h.DB.SetClientDPoPBoundAccessTokens(ctx, nil, notRequiring.Id, on))
-		got, readErr := h.DB.GetClientById(ctx, nil, notRequiring.Id)
+		require.NoError(t, h.DB.SetClientDPoPBoundAccessTokens(ctx, nil, notRequiring.ID, on))
+		got, readErr := h.DB.GetClientByID(ctx, nil, notRequiring.ID)
 		require.NoError(t, readErr)
 		assert.Equalf(t, on, got.DPoPBoundAccessTokens, "the target after switching to %v", on)
 		assert.Equal(t, notRequiring.ClientIdentifier, got.ClientIdentifier)
-		bystander, readErr := h.DB.GetClientById(ctx, nil, requiring.Id)
+		bystander, readErr := h.DB.GetClientByID(ctx, nil, requiring.ID)
 		require.NoError(t, readErr)
 		assert.True(t, bystander.DPoPBoundAccessTokens, "the client not switched is left as it was")
 	}

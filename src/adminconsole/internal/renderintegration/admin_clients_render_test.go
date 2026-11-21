@@ -22,8 +22,8 @@ import (
 func TestRender_AdminClients(t *testing.T) {
 	bind := map[string]interface{}{
 		"clients": []api.ClientResponse{
-			{Id: 1, ClientIdentifier: "dcr_a3f9e1b2", Enabled: true, CreatedViaDCR: true},
-			{Id: 2, ClientIdentifier: "web-app", Enabled: true, CreatedViaDCR: false},
+			{ID: 1, ClientIdentifier: "dcr_a3f9e1b2", Enabled: true, CreatedViaDCR: true},
+			{ID: 2, ClientIdentifier: "web-app", Enabled: true, CreatedViaDCR: false},
 		},
 	}
 	out := renderMenuPage(t, "/admin_clients.html", bind)
@@ -45,14 +45,14 @@ func TestRender_AdminClientRedirectURIs(t *testing.T) {
 	page := func(canManage bool) string {
 		return renderMenuPage(t, "/admin_clients_redirect_uris.html", map[string]interface{}{
 			"client": struct {
-				ClientId              int64
+				ClientID              int64
 				ClientIdentifier      string
 				CanManageRedirectURIs bool
 				RedirectURIs          []string
 				IsSystemLevelClient   bool
 				IsPublic              bool
 			}{
-				ClientId:              7,
+				ClientID:              7,
 				ClientIdentifier:      "an-implicit-app",
 				CanManageRedirectURIs: canManage,
 				RedirectURIs:          []string{"https://example.com/cb"},
@@ -82,14 +82,14 @@ func TestRender_AdminClientRedirectURIs_SendsTheLoadedList(t *testing.T) {
 
 	out := renderMenuPage(t, "/admin_clients_redirect_uris.html", map[string]interface{}{
 		"client": struct {
-			ClientId              int64
+			ClientID              int64
 			ClientIdentifier      string
 			CanManageRedirectURIs bool
 			RedirectURIs          []string
 			IsSystemLevelClient   bool
 			IsPublic              bool
 		}{
-			ClientId:              7,
+			ClientID:              7,
 			ClientIdentifier:      "an-app",
 			CanManageRedirectURIs: true,
 			RedirectURIs:          []string{"https://example.com/a", "https://example.com/b?x=1&y=2"},
@@ -119,14 +119,14 @@ func TestRender_AdminClientWebOrigins(t *testing.T) {
 
 	out := renderMenuPage(t, "/admin_clients_web_origins.html", map[string]interface{}{
 		"client": struct {
-			ClientId            int64
+			ClientID            int64
 			ClientIdentifier    string
 			WebOrigins          []string
 			EffectiveWebOrigins []effectiveWebOrigin
 			IsSystemLevelClient bool
 			IsPublic            bool
 		}{
-			ClientId:         7,
+			ClientID:         7,
 			ClientIdentifier: "a-javascript-app",
 			WebOrigins:       []string{"https://mine.example.com"},
 			EffectiveWebOrigins: []effectiveWebOrigin{
@@ -164,14 +164,14 @@ func TestRender_AdminClientWebOrigins_SendsTheLoadedList(t *testing.T) {
 
 	out := renderMenuPage(t, "/admin_clients_web_origins.html", map[string]interface{}{
 		"client": struct {
-			ClientId            int64
+			ClientID            int64
 			ClientIdentifier    string
 			WebOrigins          []string
 			EffectiveWebOrigins []struct{ Origin, ClientIdentifier string }
 			IsSystemLevelClient bool
 			IsPublic            bool
 		}{
-			ClientId:         7,
+			ClientID:         7,
 			ClientIdentifier: "a-javascript-app",
 			WebOrigins:       []string{"https://a.example.com", "https://b.example.com"},
 		},
@@ -189,23 +189,23 @@ func TestRender_AdminClientWebOrigins_SendsTheLoadedList(t *testing.T) {
 func TestRender_AdminClientsPermissions_SendsTheLoadedList(t *testing.T) {
 	out := renderMenuPage(t, "/admin_clients_permissions.html", map[string]interface{}{
 		"client": struct {
-			ClientId                 int64
+			ClientID                 int64
 			ClientIdentifier         string
 			ClientCredentialsEnabled bool
 			Permissions              []struct {
-				Id    int64
+				ID    int64
 				Scope string
 			}
 			IsSystemLevelClient bool
 			IsPublic            bool
 		}{
-			ClientId:                 7,
+			ClientID:                 7,
 			ClientIdentifier:         "a-service",
 			ClientCredentialsEnabled: true,
 			Permissions: []struct {
-				Id    int64
+				ID    int64
 				Scope string
-			}{{Id: 3, Scope: "some-resource:read"}, {Id: 4, Scope: "some-resource:write"}},
+			}{{ID: 3, Scope: "some-resource:read"}, {ID: 4, Scope: "some-resource:write"}},
 		},
 		"resources":         []api.ResourceResponse{},
 		"savedSuccessfully": false,
@@ -225,7 +225,7 @@ func TestRender_AdminClientsPermissions_SendsTheLoadedList(t *testing.T) {
 // in the page, from the form's data-remove-label.
 func TestRender_ListRemoveButtonsAreNamedForTheirRow(t *testing.T) {
 	type permission struct {
-		Id    int64
+		ID    int64
 		Scope string
 	}
 	cases := []struct {
@@ -235,66 +235,66 @@ func TestRender_ListRemoveButtonsAreNamedForTheirRow(t *testing.T) {
 		script string
 	}{
 		{"/admin_clients_redirect_uris.html", map[string]interface{}{"client": struct {
-			ClientId              int64
+			ClientID              int64
 			ClientIdentifier      string
 			CanManageRedirectURIs bool
 			RedirectURIs          []string
 			IsSystemLevelClient   bool
 			IsPublic              bool
-		}{ClientId: 7, ClientIdentifier: "an-app", CanManageRedirectURIs: true, RedirectURIs: []string{"https://example.com/cb"}}},
+		}{ClientID: 7, ClientIdentifier: "an-app", CanManageRedirectURIs: true, RedirectURIs: []string{"https://example.com/cb"}}},
 			"https://example.com/cb", "pages/client-uri-list.js"},
 		{"/admin_clients_web_origins.html", map[string]interface{}{"client": struct {
-			ClientId            int64
+			ClientID            int64
 			ClientIdentifier    string
 			WebOrigins          []string
 			EffectiveWebOrigins []struct{ Origin, ClientIdentifier string }
 			IsSystemLevelClient bool
 			IsPublic            bool
-		}{ClientId: 7, ClientIdentifier: "a-javascript-app", WebOrigins: []string{"https://a.example.com"}}},
+		}{ClientID: 7, ClientIdentifier: "a-javascript-app", WebOrigins: []string{"https://a.example.com"}}},
 			"https://a.example.com", "pages/client-uri-list.js"},
 		{"/admin_clients_permissions.html", map[string]interface{}{"client": struct {
-			ClientId                 int64
+			ClientID                 int64
 			ClientIdentifier         string
 			ClientCredentialsEnabled bool
 			Permissions              []permission
 			IsSystemLevelClient      bool
 			IsPublic                 bool
-		}{ClientId: 7, ClientIdentifier: "a-service", ClientCredentialsEnabled: true, Permissions: []permission{{3, "some-resource:read"}}},
+		}{ClientID: 7, ClientIdentifier: "a-service", ClientCredentialsEnabled: true, Permissions: []permission{{3, "some-resource:read"}}},
 			"resources": []api.ResourceResponse{}},
 			"some-resource:read", "pages/permission-list.js"},
 		{"/admin_clients_introspection.html", map[string]interface{}{"client": struct {
-			ClientId            int64
+			ClientID            int64
 			ClientIdentifier    string
 			IsPublic            bool
 			IsSystemLevelClient bool
 			Resources           []struct {
-				Id         int64
+				ID         int64
 				Identifier string
 			}
-		}{ClientId: 7, ClientIdentifier: "orders-backend", Resources: []struct {
-			Id         int64
+		}{ClientID: 7, ClientIdentifier: "orders-backend", Resources: []struct {
+			ID         int64
 			Identifier string
 		}{{3, "orders-api"}}},
 			"resources": []render.Choice{}},
 			"orders-api", "pages/introspection-resources.js"},
 		{"/admin_users_permissions.html", map[string]interface{}{
-			"user":      &api.UserResponse{Id: 5, Email: "someone@example.com"},
+			"user":      &api.UserResponse{ID: 5, Email: "someone@example.com"},
 			"granted":   []permission{{3, "some-resource:read"}},
 			"resources": []render.Choice{}},
 			"some-resource:read", "pages/permission-list.js"},
 		{"/admin_users_groups.html", map[string]interface{}{
-			"user": &api.UserResponse{Id: 5, Email: "someone@example.com"},
+			"user": &api.UserResponse{ID: 5, Email: "someone@example.com"},
 			"memberships": []struct {
-				Id              int64
+				ID              int64
 				GroupIdentifier string
 			}{{3, "admins"}},
 			"groupChoices": []render.Choice{}},
 			"admins", "pages/user-groups.js"},
 		{"/admin_groups_permissions.html", map[string]interface{}{
 			"group": struct {
-				GroupId         int64
+				GroupID         int64
 				GroupIdentifier string
-			}{GroupId: 5, GroupIdentifier: "admins"},
+			}{GroupID: 5, GroupIdentifier: "admins"},
 			"granted":   []permission{{3, "some-resource:read"}},
 			"resources": []render.Choice{}},
 			"some-resource:read", "pages/permission-list.js"},

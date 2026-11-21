@@ -46,12 +46,12 @@ func newFormPostClient(t *testing.T) *record.Client {
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ImplicitGrantEnabled:     &implicit,
-		DefaultAcrLevel:          record.AcrLevel1,
+		DefaultACRLevel:          record.ACRLevel1,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
 	for _, uri := range []string{formPostCustomSchemeURI, formPostRFC8252URI, formPostHTTPSURI} {
 		require.NoError(t, database.CreateRedirectURI(context.Background(), nil,
-			&record.RedirectURI{ClientId: client.Id, URI: uri}))
+			&record.RedirectURI{ClientID: client.ID, URI: uri}))
 	}
 	return client
 }
@@ -111,7 +111,7 @@ func TestAuthorize_FormPostToAPrivateUseSchemeIsRefusedOnThePage(t *testing.T) {
 	} {
 		t.Run("GET "+tc.name, func(t *testing.T) {
 			params := formPostAuthorizeParams(client, tc.responseType, "form_post", tc.redirectURI, tc.prompt)
-			resp := loadPage(t, createHttpClient(t), appConfig.AuthServer.BaseURL+"/auth/authorize?"+params.Encode())
+			resp := loadPage(t, createHTTPClient(t), appConfig.AuthServer.BaseURL+"/auth/authorize?"+params.Encode())
 			defer func() { _ = resp.Body.Close() }()
 
 			assertFormPostRefusalPage(t, resp, tc.want)
@@ -142,7 +142,7 @@ func TestAuthorize_FormPostToHTTPSAndQueryToAPrivateUseSchemeBeginTheCeremony(t 
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			params := formPostAuthorizeParams(client, "code", tc.responseMode, tc.redirectURI, "")
-			resp := loadPage(t, createHttpClient(t), appConfig.AuthServer.BaseURL+"/auth/authorize?"+params.Encode())
+			resp := loadPage(t, createHTTPClient(t), appConfig.AuthServer.BaseURL+"/auth/authorize?"+params.Encode())
 			defer func() { _ = resp.Body.Close() }()
 
 			assertRedirect(t, resp, "/auth/level1")

@@ -305,14 +305,14 @@ func TestLogger_AsksTheSwitchesOncePerEventWithTheCallersValues(t *testing.T) {
 	}
 }
 
-// requestContext is a context carrying the request id under the key chimiddleware.GetReqID
-// reads, which is what a request's context holds once the RequestID middleware at the root of
-// both servers has run.
+// requestContext is a context carrying the request id where requestid.FromContext reads it,
+// which is what a request's context holds once requestid.Middleware at the root of both servers
+// has run.
 func requestContext(id string) context.Context {
 	return requestid.NewContext(context.Background(), id)
 }
 
-// TestLogger_EveryRecordCarriesTheRequestId is the whole of #328 at this seam: all four
+// TestLogger_EveryRecordCarriesTheRequestID is the whole of #328 at this seam: all four
 // records this function can write carry the request id when the context has one, and none carries
 // it when the context has none. Four records rather than one because the three failures are the
 // records an operator reads while working out why an event is missing, and a failure nobody can
@@ -321,8 +321,8 @@ func requestContext(id string) context.Context {
 // Nothing below names request_id at a call site. CaptureSlog installs logging.WrapRequestID, the
 // same wrapper both servers install, so what these cases exercise is the injection in production
 // and not a second copy of it.
-func TestLogger_EveryRecordCarriesTheRequestId(t *testing.T) {
-	const requestId = "goiabada/req-0000042"
+func TestLogger_EveryRecordCarriesTheRequestID(t *testing.T) {
+	const requestID = "goiabada/req-0000042"
 
 	records := []struct {
 		name string
@@ -379,13 +379,13 @@ func TestLogger_EveryRecordCarriesTheRequestId(t *testing.T) {
 			mockDB := datamocks.NewDatabase(t)
 			rec.setup(mockDB)
 
-			NewLogger(mockDB, rec.switches(), nil).Log(requestContext(requestId), "auth_failed_pwd", rec.details)
+			NewLogger(mockDB, rec.switches(), nil).Log(requestContext(requestID), "auth_failed_pwd", rec.details)
 
 			written := logs.Records()
 			require.Len(t, written, 1, "exactly the record this case is about")
 			require.Equal(t, rec.message, written[0].Message)
 			assert.Equal(t, rec.level, written[0].Level)
-			assert.Equal(t, requestId, written[0].Attrs["request_id"],
+			assert.Equal(t, requestID, written[0].Attrs["request_id"],
 				"the record an operator filters by request_id is the one this request raised")
 		})
 
@@ -405,7 +405,7 @@ func TestLogger_EveryRecordCarriesTheRequestId(t *testing.T) {
 	}
 }
 
-// TestLogger_TheRowCarriesTheRequestIdTheLogCarries is the row half of #328, and decision 7
+// TestLogger_TheRowCarriesTheRequestIDTheLogCarries is the row half of #328, and decision 7
 // stated as an assertion: what CreateAuditLog is handed is not chi's raw id but the string
 // core/logging renders onto the record, so the value an administrator reads off the admin page is
 // the value they grep the log for.
@@ -419,7 +419,7 @@ func TestLogger_EveryRecordCarriesTheRequestId(t *testing.T) {
 // The id is client-chosen: requestid.Middleware adopts an inbound X-Request-Id header
 // verbatim, bounded only by the server's 1 MiB header cap, which is why the oversized and the
 // non-printable cases are here and not just the well-behaved one.
-func TestLogger_TheRowCarriesTheRequestIdTheLogCarries(t *testing.T) {
+func TestLogger_TheRowCarriesTheRequestIDTheLogCarries(t *testing.T) {
 	ids := []struct {
 		name     string
 		ctx      context.Context
@@ -486,7 +486,7 @@ func TestLogger_TheRowCarriesTheRequestIdTheLogCarries(t *testing.T) {
 
 			mockDB.AssertExpectations(t)
 			require.NotNil(t, row, "the row handed to CreateAuditLog")
-			assert.Equal(t, tc.expected, row.RequestId,
+			assert.Equal(t, tc.expected, row.RequestID,
 				"the persisted request id is the log's own rendering of it, not chi's raw string")
 
 			written := logs.Records()
@@ -496,7 +496,7 @@ func TestLogger_TheRowCarriesTheRequestIdTheLogCarries(t *testing.T) {
 					"no id means no attribute, and the row's empty string says the same thing")
 				return
 			}
-			assert.Equal(t, row.RequestId, written[0].Attrs["request_id"],
+			assert.Equal(t, row.RequestID, written[0].Attrs["request_id"],
 				"the whole point of the column: the page and the log show one string, not two")
 		})
 	}

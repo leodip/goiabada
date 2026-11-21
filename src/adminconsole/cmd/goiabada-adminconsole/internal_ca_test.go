@@ -12,7 +12,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/x509"
-	"encoding/gob"
 	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
@@ -307,8 +306,8 @@ func TestMain_HandsTheInternalRootsToTheServer(t *testing.T) {
 		case "/api/public/settings":
 			_, _ = w.Write([]byte(`{"appName":"Goiabada","issuer":"` + oauthclienttest.Issuer + `"}`))
 		case "/certs":
-			assert.NoError(t, json.NewEncoder(w).Encode(oauth.Jwks{
-				Keys: []oauth.Jwk{oauthclienttest.JwkFromPublicKey("key-1", &signing.PublicKey)}}))
+			assert.NoError(t, json.NewEncoder(w).Encode(oauth.JWKS{
+				Keys: []oauth.JWK{oauthclienttest.JWKFromPublicKey("key-1", &signing.PublicKey)}}))
 		case "/api/v1/account/sessions":
 			_, _ = w.Write([]byte(`{}`))
 		default:
@@ -327,16 +326,16 @@ func TestMain_HandsTheInternalRootsToTheServer(t *testing.T) {
 	require.NoError(t, err)
 	claims := oauthclienttest.ValidClaims()
 	claims["aud"] = builtin.AdminConsoleClientIdentifier
-	gob.Register(oauth.TokenResponse{})
+	sessionkeys.RegisterStoredTokenResponse()
 	seed := httptest.NewRequest(http.MethodGet, "/", nil)
 	session, err := store.Get(seed, builtin.AdminConsoleSessionName)
 	require.NoError(t, err)
-	session.Values[sessionkeys.JWT] = oauth.TokenResponse{
+	session.Values[sessionkeys.JWT] = sessionkeys.StoreTokenResponse(oauth.TokenResponse{
 		AccessToken: "an-access-token",
-		IdToken:     oauthclienttest.SignRS256(t, signing, "key-1", claims),
+		IDToken:     oauthclienttest.SignRS256(t, signing, "key-1", claims),
 		TokenType:   "Bearer",
 		Scope:       "openid authserver:manage-account",
-	}
+	})
 	session.Values[sessionkeys.JWTExpiresAt] = time.Now().Add(time.Hour).Unix()
 	saved := httptest.NewRecorder()
 	require.NoError(t, store.Save(seed, saved, session))
@@ -405,22 +404,22 @@ func serveSessionEndpoint(t *testing.T, backend sessionstore.Backend, w http.Res
 	switch operation {
 	case "load":
 		var record *sessionstore.Record
-		if record, err = backend.Load(r.Context(), request.Id); err == nil {
+		if record, err = backend.Load(r.Context(), request.ID); err == nil {
 			answer = api.SessionLoadResponse{Data: string(record.Data), LastAccessed: record.LastAccessed, ExpiresAt: record.ExpiresAt}
 		}
 	case "create", "update", "touch":
 		var expiresAt time.Time
 		switch operation {
 		case "create":
-			expiresAt, err = backend.Create(r.Context(), request.Id, []byte(request.Data), request.Authenticated)
+			expiresAt, err = backend.Create(r.Context(), request.ID, []byte(request.Data), request.Authenticated)
 		case "update":
-			expiresAt, err = backend.Update(r.Context(), request.Id, []byte(request.Data), request.Authenticated)
+			expiresAt, err = backend.Update(r.Context(), request.ID, []byte(request.Data), request.Authenticated)
 		default:
-			expiresAt, err = backend.Touch(r.Context(), request.Id, request.Authenticated)
+			expiresAt, err = backend.Touch(r.Context(), request.ID, request.Authenticated)
 		}
 		answer = api.SessionWriteResponse{ExpiresAt: expiresAt}
 	case "delete":
-		if err = backend.Delete(r.Context(), request.Id); err == nil {
+		if err = backend.Delete(r.Context(), request.ID); err == nil {
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}

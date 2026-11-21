@@ -39,12 +39,12 @@ func assertNotStorable(t *testing.T, resp *http.Response, what string) {
 // the login form and stops there, which is as far as the claim goes: the page is rendered, and
 // what it carries is a header the request that fetched it received.
 func TestCacheDirectives_ThePasswordFormIsNotStorable(t *testing.T) {
-	client, redirectUri, _, _, _ := createLevel2MandatoryUser(t, false)
+	client, redirectURI, _, _, _ := createLevel2MandatoryUser(t, false)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
 	resp := loadPage(t, httpClient,
-		authorizeUrlFor(client, redirectUri, "openid profile email", fake.LetterN(8)))
+		authorizeURLFor(client, redirectURI, "openid profile email", fake.LetterN(8)))
 	redirectLocation := assertRedirect(t, resp, "/auth/level1")
 	_ = resp.Body.Close()
 
@@ -57,31 +57,31 @@ func TestCacheDirectives_ThePasswordFormIsNotStorable(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	// The page really is the form, so the assertion below is about the page it claims to be.
-	assert.NotEmpty(t, getCeremonyIdFromPage(t, resp),
+	assert.NotEmpty(t, getCeremonyIDFromPage(t, resp),
 		"the password form must have rendered, or the header assertion means nothing")
 
 	assertNotStorable(t, resp, "the password form")
 }
 
-// TestCacheDirectives_TheOtpEnrolmentPageIsNotStorable is the same claim about the page that
+// TestCacheDirectives_TheOTPEnrolmentPageIsNotStorable is the same claim about the page that
 // renders the TOTP seed in plain text, which is the surface #247 was opened about. The user has no
 // authenticator yet, so /auth/otp answers with the enrolment arm.
-func TestCacheDirectives_TheOtpEnrolmentPageIsNotStorable(t *testing.T) {
-	client, redirectUri, user, password, _ := createLevel2MandatoryUser(t, false)
+func TestCacheDirectives_TheOTPEnrolmentPageIsNotStorable(t *testing.T) {
+	client, redirectURI, user, password, _ := createLevel2MandatoryUser(t, false)
 
-	_, otpPage, _ := startOtpCeremony(t, client, redirectUri, user, password, "")
+	_, otpPage, _ := startOTPCeremony(t, client, redirectURI, user, password, "")
 	defer func() { _ = otpPage.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, otpPage.StatusCode)
 	// Reading the seed off the page is what distinguishes the enrolment arm from the verification
 	// one, and it is the credential the directives exist for.
-	assert.NotEmpty(t, getOtpSecretFromEnrollmentPage(t, otpPage),
+	assert.NotEmpty(t, getOTPSecretFromEnrollmentPage(t, otpPage),
 		"the enrolment page must render a secret, or the header assertion means nothing")
 
 	assertNotStorable(t, otpPage, "the OTP enrolment page")
 }
 
-// TestCacheDirectives_TheEnrolmentJsonIsNotStorable is the same claim about the second surface that
+// TestCacheDirectives_TheEnrolmentJSONIsNotStorable is the same claim about the second surface that
 // serves the TOTP seed, and the one response in this change that carries a credential without being
 // rendered from a template: GET /api/v1/account/otp/enrollment answers JSON, hand-encoded, with a
 // bearer token.
@@ -94,7 +94,7 @@ func TestCacheDirectives_TheOtpEnrolmentPageIsNotStorable(t *testing.T) {
 // internal/server/routes_no_store_test.go calls each route without credentials, so it never
 // reaches this handler, and it says nothing about anything the response passes on its way out of
 // the process.
-func TestCacheDirectives_TheEnrolmentJsonIsNotStorable(t *testing.T) {
+func TestCacheDirectives_TheEnrolmentJSONIsNotStorable(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope(t)
 
 	resp := makeAPIRequest(t, "GET",
@@ -112,7 +112,7 @@ func TestCacheDirectives_TheEnrolmentJsonIsNotStorable(t *testing.T) {
 	assertNotStorable(t, resp, "the OTP enrolment JSON")
 }
 
-// TestCacheDirectives_AnApiRefusalIsNotStorable is the mount position proven end to end. It is the
+// TestCacheDirectives_AnAPIRefusalIsNotStorable is the mount position proven end to end. It is the
 // property the sweep asserts on the router in process, checked here over real HTTP: the pair is
 // written ahead of the guards, so a refusal carries it too.
 //
@@ -120,7 +120,7 @@ func TestCacheDirectives_TheEnrolmentJsonIsNotStorable(t *testing.T) {
 // response containing sensitive information, and it is also what lets the sweep call all 105
 // registered API routes without credentials and still assert something. Mounted behind the guards
 // instead, this case fails and the sweep quietly stops testing anything.
-func TestCacheDirectives_AnApiRefusalIsNotStorable(t *testing.T) {
+func TestCacheDirectives_AnAPIRefusalIsNotStorable(t *testing.T) {
 	resp := makeAPIRequest(t, "GET",
 		appConfig.AuthServer.BaseURL+"/api/v1/account/otp/enrollment", "not-a-token", nil)
 	defer func() { _ = resp.Body.Close() }()
@@ -175,7 +175,7 @@ func TestCacheDirectives_EveryUserinfoAnswerIsNotStorable(t *testing.T) {
 // lifetime. The next key is published before it signs, so a key set cached that long still holds
 // the key of every token it is asked about after a rotation.
 func TestCacheDirectives_DiscoveryAndTheKeySetMayBeCachedForFiveMinutes(t *testing.T) {
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
 	for _, path := range []string{"/.well-known/openid-configuration", "/.well-known/oauth-authorization-server", "/certs"} {
 		for _, method := range []string{http.MethodGet, http.MethodHead} {
@@ -204,7 +204,7 @@ func userinfoWithoutCredentials(method string) func(*testing.T, string) *http.Re
 		if method == http.MethodPost {
 			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		}
-		resp, err := createHttpClient(t).Do(req)
+		resp, err := createHTTPClient(t).Do(req)
 		require.NoError(t, err)
 		return resp
 	}

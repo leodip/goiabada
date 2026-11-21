@@ -8,8 +8,8 @@ import "database/sql"
 // authorization code can be delivered (#147). Its uri column is as wide as redirect_uris.uri, so
 // RedirectURIMaxBytes and RedirectURIsMaxPerClient bound it too.
 type PostLogoutRedirectURI struct {
-	Id        int64        `db:"id" fieldtag:"pk"`
+	ID        int64        `db:"id" fieldtag:"pk"`
 	CreatedAt sql.NullTime `db:"created_at" fieldtag:"dont-update"`
 	URI       string       `db:"uri"`
-	ClientId  int64        `db:"client_id"`
+	ClientID  int64        `db:"client_id"`
 }

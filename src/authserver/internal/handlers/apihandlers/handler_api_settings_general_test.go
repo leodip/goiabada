@@ -68,7 +68,7 @@ func TestHandleSettingsGeneralPut_KeepsEmailVerificationWhileSelfRegistrationIsO
 		require.NoError(t, err)
 		req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/settings/general", bytes.NewReader(body))
 		req = req.WithContext(reqctx.WithSettings(req.Context(),
-			&record.Settings{Id: 1, SelfRegistrationEnabled: true, SelfRegistrationRequiresEmailVerification: !requiresVerification}))
+			&record.Settings{ID: 1, SelfRegistrationEnabled: true, SelfRegistrationRequiresEmailVerification: !requiresVerification}))
 		rr := httptest.NewRecorder()
 
 		HandleSettingsGeneralPut(database, auditLogger, "http://localhost:9090").ServeHTTP(rr, req)
@@ -86,7 +86,7 @@ func TestHandleSettingsGeneralPut_KeepsEmailVerificationWhileSelfRegistrationIsO
 func TestHandleSettingsGeneral_NistIsStoredAsFour(t *testing.T) {
 	t.Run("a stored 4 reads as nist", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/settings/general", nil)
-		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{Id: 1, PasswordPolicy: record.PasswordPolicy(4)}))
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{ID: 1, PasswordPolicy: record.PasswordPolicy(4)}))
 		rr := httptest.NewRecorder()
 
 		HandleSettingsGeneralGet().ServeHTTP(rr, req)
@@ -113,7 +113,7 @@ func TestHandleSettingsGeneral_NistIsStoredAsFour(t *testing.T) {
 		})
 		require.NoError(t, err)
 		req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/settings/general", bytes.NewReader(body))
-		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{Id: 1, PasswordPolicy: record.PasswordPolicyLow}))
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{ID: 1, PasswordPolicy: record.PasswordPolicyLow}))
 		rr := httptest.NewRecorder()
 
 		HandleSettingsGeneralPut(database, auditLogger, "http://localhost:9090").ServeHTTP(rr, req)
@@ -138,7 +138,7 @@ func putSettingsGeneral(t *testing.T, database *datamocks.Database, auditLogger 
 	require.NoError(t, err)
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/settings/general", bytes.NewReader(body))
 	req = req.WithContext(reqctx.WithSettings(req.Context(),
-		&record.Settings{Id: 1, AppName: "Before", Issuer: "https://auth.example.com", PasswordPolicy: record.PasswordPolicyLow}))
+		&record.Settings{ID: 1, AppName: "Before", Issuer: "https://auth.example.com", PasswordPolicy: record.PasswordPolicyLow}))
 	rr := httptest.NewRecorder()
 	HandleSettingsGeneralPut(database, auditLogger, "http://localhost:9090").ServeHTTP(rr, req)
 	return rr
@@ -204,7 +204,7 @@ func TestHandleSettingsGeneralGet_AnswersAccountDeletionEnabled(t *testing.T) {
 	for _, stored := range []bool{true, false} {
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/settings/general", nil)
 		req = req.WithContext(reqctx.WithSettings(req.Context(),
-			&record.Settings{Id: 1, PasswordPolicy: record.PasswordPolicyLow, AccountDeletionEnabled: stored}))
+			&record.Settings{ID: 1, PasswordPolicy: record.PasswordPolicyLow, AccountDeletionEnabled: stored}))
 		rr := httptest.NewRecorder()
 
 		HandleSettingsGeneralGet().ServeHTTP(rr, req)
@@ -228,7 +228,7 @@ func TestHandleSettingsGeneralPut_RequiresAccountDeletionEnabled(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/settings/general", strings.NewReader(body))
-			req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{Id: 1,
+			req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{ID: 1,
 				Issuer: "https://auth.example.com", PasswordPolicy: record.PasswordPolicyLow, AccountDeletionEnabled: true}))
 			rr := httptest.NewRecorder()
 
@@ -257,7 +257,7 @@ func TestHandleSettingsGeneralPut_StoresAccountDeletionEnabledAsSent(t *testing.
 		body := `{"appName":"Goiabada","issuer":"https://auth.example.com","passwordPolicy":"low",` +
 			`"accountDeletionEnabled":` + map[bool]string{false: "false", true: "true"}[sent] + `}`
 		req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/settings/general", strings.NewReader(body))
-		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{Id: 1,
+		req = req.WithContext(reqctx.WithSettings(req.Context(), &record.Settings{ID: 1,
 			Issuer: "https://auth.example.com", PasswordPolicy: record.PasswordPolicyLow, AccountDeletionEnabled: !sent}))
 		rr := httptest.NewRecorder()
 

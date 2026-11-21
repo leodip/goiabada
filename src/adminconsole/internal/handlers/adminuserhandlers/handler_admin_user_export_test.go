@@ -18,20 +18,20 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 )
 
-// userExportApiClient answers the export the Download data button asks for, with export or err,
+// userExportAPIClient answers the export the Download data button asks for, with export or err,
 // and records which user's export was asked for and whether its body was closed.
-type userExportApiClient struct {
+type userExportAPIClient struct {
 	export *apiclient.UserExport
 	err    error
 
 	askedFor []int64
 }
 
-func (c *userExportApiClient) GetUserExport(_ context.Context, accessToken string, userId int64) (*apiclient.UserExport, error) {
+func (c *userExportAPIClient) GetUserExport(_ context.Context, accessToken string, userID int64) (*apiclient.UserExport, error) {
 	if accessToken != handlertest.AccessToken {
 		panic("the download must forward the signed-in administrator's token")
 	}
-	c.askedFor = append(c.askedFor, userId)
+	c.askedFor = append(c.askedFor, userID)
 	return c.export, c.err
 }
 
@@ -50,12 +50,12 @@ func (b *closeRecorder) Close() error {
 // still compressed, with the encoding that lets the browser unpack them, the file name the auth
 // server chose, and never stored by a cache.
 func TestHandleExportPost_PassesTheExportThroughUntouched(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 
 	compressed := []byte{0x1f, 0x8b, 0x08, 0x00, 'c', 'o', 'm', 'p', 'r', 'e', 's', 's', 'e', 'd'}
 	body := &closeRecorder{Reader: bytes.NewReader(compressed)}
-	apiClient := &userExportApiClient{export: &apiclient.UserExport{
+	apiClient := &userExportAPIClient{export: &apiclient.UserExport{
 		ContentType:        "application/json",
 		ContentEncoding:    "gzip",
 		ContentLength:      "14",
@@ -93,9 +93,9 @@ func (d *deadlineRecorder) SetWriteDeadline(deadline time.Time) error {
 // The console's listener gives this answer five minutes to reach the browser, in place of its 60
 // seconds, as the auth server's does (decision 5).
 func TestHandleExportPost_LiftsTheWriteDeadlineToFiveMinutes(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
-	apiClient := &userExportApiClient{export: &apiclient.UserExport{
+	apiClient := &userExportAPIClient{export: &apiclient.UserExport{
 		ContentType: "application/json",
 		Body:        io.NopCloser(bytes.NewReader([]byte(`{"formatVersion":1}`))),
 	}}
@@ -116,10 +116,10 @@ func TestHandleExportPost_LiftsTheWriteDeadlineToFiveMinutes(t *testing.T) {
 // A plain answer is passed on plain: no encoding is claimed for bytes that carry none, and no
 // length for an answer that named none.
 func TestHandleExportPost_ClaimsNoEncodingTheAuthServerDidNot(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 
-	apiClient := &userExportApiClient{export: &apiclient.UserExport{
+	apiClient := &userExportAPIClient{export: &apiclient.UserExport{
 		ContentType:        "application/json",
 		ContentDisposition: `attachment; filename="user-7-2026-11-05.json"`,
 		Body:               io.NopCloser(bytes.NewReader([]byte(`{"formatVersion":1}`))),
@@ -141,9 +141,9 @@ func TestHandleExportPost_ClaimsNoEncodingTheAuthServerDidNot(t *testing.T) {
 // page, anything else to the error page.
 func TestHandleExportPost_AFailedExportGoesThroughTheClassifier(t *testing.T) {
 	t.Run("an ended session", func(t *testing.T) {
-		httpHelper := handlersmocks.NewHttpHelper(t)
+		httpHelper := handlersmocks.NewHTTPHelper(t)
 		handlertest.RefuseInternalServerError(t, httpHelper)
-		apiClient := &userExportApiClient{err: &apiclient.APIError{Code: "invalid_token", Message: "ended", StatusCode: http.StatusUnauthorized}}
+		apiClient := &userExportAPIClient{err: &apiclient.APIError{Code: "invalid_token", Message: "ended", StatusCode: http.StatusUnauthorized}}
 
 		rec := httptest.NewRecorder()
 		req := handlertest.Request(http.MethodPost, "/admin/users/7/export",
@@ -156,10 +156,10 @@ func TestHandleExportPost_AFailedExportGoesThroughTheClassifier(t *testing.T) {
 	})
 
 	t.Run("a user who no longer exists", func(t *testing.T) {
-		httpHelper := handlersmocks.NewHttpHelper(t)
+		httpHelper := handlersmocks.NewHTTPHelper(t)
 		handlertest.RefuseInternalServerError(t, httpHelper)
 		httpHelper.On("NotFound", mock.Anything, mock.Anything).Return().Once()
-		apiClient := &userExportApiClient{err: &apiclient.APIError{Code: "NOT_FOUND", Message: "User not found", StatusCode: http.StatusNotFound}}
+		apiClient := &userExportAPIClient{err: &apiclient.APIError{Code: "NOT_FOUND", Message: "User not found", StatusCode: http.StatusNotFound}}
 
 		rec := httptest.NewRecorder()
 		req := handlertest.Request(http.MethodPost, "/admin/users/7/export",
@@ -170,11 +170,11 @@ func TestHandleExportPost_AFailedExportGoesThroughTheClassifier(t *testing.T) {
 	})
 
 	t.Run("anything else", func(t *testing.T) {
-		httpHelper := handlersmocks.NewHttpHelper(t)
+		httpHelper := handlersmocks.NewHTTPHelper(t)
 		var answered error
 		httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).
 			Run(func(args mock.Arguments) { answered = args.Error(2) }).Return().Once()
-		apiClient := &userExportApiClient{err: &apiclient.APIError{Code: "INSUFFICIENT_SCOPE", Message: "no", StatusCode: http.StatusForbidden}}
+		apiClient := &userExportAPIClient{err: &apiclient.APIError{Code: "INSUFFICIENT_SCOPE", Message: "no", StatusCode: http.StatusForbidden}}
 
 		rec := httptest.NewRecorder()
 		req := handlertest.Request(http.MethodPost, "/admin/users/7/export",
@@ -188,11 +188,11 @@ func TestHandleExportPost_AFailedExportGoesThroughTheClassifier(t *testing.T) {
 }
 
 // An address that is not a user id is the not-found page, and no export is asked for.
-func TestHandleExportPost_AnAddressThatIsNotAnIdIsNotFound(t *testing.T) {
-	httpHelper := handlersmocks.NewHttpHelper(t)
+func TestHandleExportPost_AnAddressThatIsNotAnIDIsNotFound(t *testing.T) {
+	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	httpHelper.On("NotFound", mock.Anything, mock.Anything).Return().Once()
-	apiClient := &userExportApiClient{}
+	apiClient := &userExportAPIClient{}
 
 	req := handlertest.Request(http.MethodPost, "/admin/users/abc/export",
 		handlertest.WithAccessToken(), handlertest.WithPathValue("userId", "abc"))

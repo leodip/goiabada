@@ -57,11 +57,11 @@ func TestAdminResourceDeletePost_RefusesInThePagesLanguage(t *testing.T) {
 			{"in pt-BR", "pt-BR", testCase.portuguese},
 		} {
 			t.Run(testCase.name+" "+language.name, func(t *testing.T) {
-				httpHelper := handlersmocks.NewHttpHelper(t)
+				httpHelper := handlersmocks.NewHTTPHelper(t)
 				handlertest.RefuseInternalServerError(t, httpHelper)
 				handlertest.ExpectRender(httpHelper, mock.Anything, "/admin_resources_delete.html").Once()
 
-				handler := HandleDeletePost(httpHelper, &systemLevelApiClient{resource: testCase.resource}, consoleBaseURL)
+				handler := HandleDeletePost(httpHelper, &systemLevelAPIClient{resource: testCase.resource}, consoleBaseURL)
 				req := handlertest.Request(http.MethodPost, "/admin/resources/7/delete",
 					handlertest.WithAccessToken(), handlertest.WithPathValue("resourceId", "7"),
 					handlertest.WithLocale(language.tag),

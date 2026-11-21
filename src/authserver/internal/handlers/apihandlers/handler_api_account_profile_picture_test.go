@@ -64,7 +64,7 @@ func createMultipartRequest(method, url string, fieldName string, fileData []byt
 
 // setTokenContext sets a JWT token in the request context
 func setTokenContext(req *http.Request, sub string) *http.Request {
-	jwtToken := oauth.JwtToken{
+	jwtToken := oauth.JWTToken{
 		Claims: map[string]interface{}{
 			"sub": sub,
 		},
@@ -133,9 +133,9 @@ func TestHandleAccountProfilePictureGet_HasPicture(t *testing.T) {
 	req = setTokenContext(req, sub)
 	rr := httptest.NewRecorder()
 
-	user := &record.User{Id: 1, Subject: sub, Enabled: true}
+	user := &record.User{ID: 1, Subject: sub, Enabled: true}
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), sub).Return(user, nil)
-	database.On("UserHasProfilePicture", mock.Anything, (*sql.Tx)(nil), user.Id).Return(true, nil)
+	database.On("UserHasProfilePicture", mock.Anything, (*sql.Tx)(nil), user.ID).Return(true, nil)
 
 	handler.ServeHTTP(rr, req)
 
@@ -156,9 +156,9 @@ func TestHandleAccountProfilePictureGet_NoPicture(t *testing.T) {
 	req = setTokenContext(req, sub)
 	rr := httptest.NewRecorder()
 
-	user := &record.User{Id: 1, Subject: sub, Enabled: true}
+	user := &record.User{ID: 1, Subject: sub, Enabled: true}
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), sub).Return(user, nil)
-	database.On("UserHasProfilePicture", mock.Anything, (*sql.Tx)(nil), user.Id).Return(false, nil)
+	database.On("UserHasProfilePicture", mock.Anything, (*sql.Tx)(nil), user.ID).Return(false, nil)
 
 	handler.ServeHTTP(rr, req)
 
@@ -212,7 +212,7 @@ func TestHandleAccountProfilePicturePost_NoFile(t *testing.T) {
 	handler := HandleAccountProfilePicturePost(database, auditLogger, testBaseURL, testMaxUploadBytes)
 
 	sub := fake.UUID()
-	user := &record.User{Id: 1, Subject: sub, Enabled: true}
+	user := &record.User{ID: 1, Subject: sub, Enabled: true}
 
 	// A well-formed multipart form whose file is under another field name.
 	req, err := createMultipartRequest("POST", "/api/v1/account/profile-picture", "avatar", createTestPNG(100, 100))
@@ -239,7 +239,7 @@ func TestHandleAccountProfilePicturePost_BodyOverTheBound(t *testing.T) {
 	handler := HandleAccountProfilePicturePost(database, auditLogger, testBaseURL, 64)
 
 	sub := fake.UUID()
-	user := &record.User{Id: 1, Subject: sub, Enabled: true}
+	user := &record.User{ID: 1, Subject: sub, Enabled: true}
 
 	req, err := createMultipartRequest("POST", "/api/v1/account/profile-picture", "picture", bytes.Repeat([]byte{0xAB}, 64+2048))
 	require.NoError(t, err)
@@ -263,7 +263,7 @@ func TestHandleAccountProfilePicturePost_InvalidImage(t *testing.T) {
 	handler := HandleAccountProfilePicturePost(database, auditLogger, testBaseURL, testMaxUploadBytes)
 
 	sub := fake.UUID()
-	user := &record.User{Id: 1, Subject: sub, Enabled: true}
+	user := &record.User{ID: 1, Subject: sub, Enabled: true}
 
 	// Create a request with invalid image data
 	invalidImageData := []byte("not a valid image")
@@ -296,7 +296,7 @@ func TestHandleAccountProfilePicturePost_RefusesAnImageOverTheCapItWasHanded(t *
 	handler := HandleAccountProfilePicturePost(database, auditLogger, testBaseURL, 64)
 
 	sub := fake.UUID()
-	user := &record.User{Id: 1, Subject: sub, Enabled: true}
+	user := &record.User{ID: 1, Subject: sub, Enabled: true}
 
 	pictureData := createTestPNG(100, 100)
 	require.Greater(t, len(pictureData), 64)
@@ -324,7 +324,7 @@ func TestHandleAccountProfilePicturePost_CreateNew(t *testing.T) {
 	handler := HandleAccountProfilePicturePost(database, auditLogger, testBaseURL, testMaxUploadBytes)
 
 	sub := fake.UUID()
-	user := &record.User{Id: 1, Subject: sub, Enabled: true}
+	user := &record.User{ID: 1, Subject: sub, Enabled: true}
 
 	pictureData := createTestPNG(100, 100)
 	req, err := createMultipartRequest("POST", "/api/v1/account/profile-picture", "picture", pictureData)
@@ -333,13 +333,13 @@ func TestHandleAccountProfilePicturePost_CreateNew(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), sub).Return(user, nil)
-	database.On("GetUserProfilePictureByUserId", mock.Anything, (*sql.Tx)(nil), user.Id).Return(nil, nil)
+	database.On("GetUserProfilePictureByUserID", mock.Anything, (*sql.Tx)(nil), user.ID).Return(nil, nil)
 	database.On("CreateUserProfilePicture", mock.Anything, (*sql.Tx)(nil), mock.MatchedBy(func(pp *record.UserProfilePicture) bool {
-		return pp.UserId == user.Id && pp.ContentType == "image/png"
+		return pp.UserID == user.ID && pp.ContentType == "image/png"
 	})).Return(nil)
 
 	auditLogger.On("Log", mock.Anything, audit.EventUpdatedOwnProfilePicture, map[string]interface{}{
-		"user_id":        user.Id,
+		"user_id":        user.ID,
 		"logged_in_user": sub,
 	}).Return()
 
@@ -360,10 +360,10 @@ func TestHandleAccountProfilePicturePost_UpdateExisting(t *testing.T) {
 	handler := HandleAccountProfilePicturePost(database, auditLogger, testBaseURL, testMaxUploadBytes)
 
 	sub := fake.UUID()
-	user := &record.User{Id: 1, Subject: sub, Enabled: true}
+	user := &record.User{ID: 1, Subject: sub, Enabled: true}
 	existingPicture := &record.UserProfilePicture{
-		Id:          1,
-		UserId:      user.Id,
+		ID:          1,
+		UserID:      user.ID,
 		Picture:     []byte("old picture data"),
 		ContentType: "image/jpeg",
 	}
@@ -375,13 +375,13 @@ func TestHandleAccountProfilePicturePost_UpdateExisting(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), sub).Return(user, nil)
-	database.On("GetUserProfilePictureByUserId", mock.Anything, (*sql.Tx)(nil), user.Id).Return(existingPicture, nil)
+	database.On("GetUserProfilePictureByUserID", mock.Anything, (*sql.Tx)(nil), user.ID).Return(existingPicture, nil)
 	database.On("UpdateUserProfilePicture", mock.Anything, (*sql.Tx)(nil), mock.MatchedBy(func(pp *record.UserProfilePicture) bool {
-		return pp.Id == existingPicture.Id && pp.ContentType == "image/png"
+		return pp.ID == existingPicture.ID && pp.ContentType == "image/png"
 	})).Return(nil)
 
 	auditLogger.On("Log", mock.Anything, audit.EventUpdatedOwnProfilePicture, map[string]interface{}{
-		"user_id":        user.Id,
+		"user_id":        user.ID,
 		"logged_in_user": sub,
 	}).Return()
 
@@ -436,17 +436,17 @@ func TestHandleAccountProfilePictureDelete_Success(t *testing.T) {
 	handler := HandleAccountProfilePictureDelete(database, auditLogger)
 
 	sub := fake.UUID()
-	user := &record.User{Id: 1, Subject: sub, Enabled: true}
+	user := &record.User{ID: 1, Subject: sub, Enabled: true}
 
 	req, _ := http.NewRequest("DELETE", "/api/v1/account/profile-picture", nil)
 	req = setTokenContext(req, sub)
 	rr := httptest.NewRecorder()
 
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), sub).Return(user, nil)
-	database.On("DeleteUserProfilePicture", mock.Anything, (*sql.Tx)(nil), user.Id).Return(nil)
+	database.On("DeleteUserProfilePicture", mock.Anything, (*sql.Tx)(nil), user.ID).Return(nil)
 
 	auditLogger.On("Log", mock.Anything, audit.EventDeletedOwnProfilePicture, map[string]interface{}{
-		"user_id":        user.Id,
+		"user_id":        user.ID,
 		"logged_in_user": sub,
 	}).Return()
 
@@ -487,14 +487,14 @@ func TestHandleAccountProfilePictureDelete_DatabaseError(t *testing.T) {
 	handler := HandleAccountProfilePictureDelete(database, auditLogger)
 
 	sub := fake.UUID()
-	user := &record.User{Id: 1, Subject: sub, Enabled: true}
+	user := &record.User{ID: 1, Subject: sub, Enabled: true}
 
 	req, _ := http.NewRequest("DELETE", "/api/v1/account/profile-picture", nil)
 	req = setTokenContext(req, sub)
 	rr := httptest.NewRecorder()
 
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), sub).Return(user, nil)
-	database.On("DeleteUserProfilePicture", mock.Anything, (*sql.Tx)(nil), user.Id).Return(assert.AnError)
+	database.On("DeleteUserProfilePicture", mock.Anything, (*sql.Tx)(nil), user.ID).Return(assert.AnError)
 
 	handler.ServeHTTP(rr, req)
 

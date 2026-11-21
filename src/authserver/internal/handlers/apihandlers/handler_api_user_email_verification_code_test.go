@@ -25,7 +25,7 @@ import (
 // made in between, and could answer with an address the code was never stored for.
 
 const (
-	codeGenUserId  = int64(73)
+	codeGenUserID  = int64(73)
 	codeGenAddress = "read@example.com"
 )
 
@@ -36,8 +36,8 @@ func codeGenRequest() *http.Request {
 }
 
 func expectCodeGenRead(database *datamocks.Database) {
-	database.On("GetUserById", mock.Anything, mock.Anything, codeGenUserId).
-		Return(&record.User{Id: codeGenUserId, Subject: "sub-73", Email: codeGenAddress, EmailVerified: true, Enabled: true}, nil).Once()
+	database.On("GetUserByID", mock.Anything, mock.Anything, codeGenUserID).
+		Return(&record.User{ID: codeGenUserID, Subject: "sub-73", Email: codeGenAddress, EmailVerified: true, Enabled: true}, nil).Once()
 }
 
 func TestHandleUserEmailVerificationCodePost_StoresTheCodeForTheAddressItRead(t *testing.T) {
@@ -47,7 +47,7 @@ func TestHandleUserEmailVerificationCodePost_StoresTheCodeForTheAddressItRead(t 
 
 	var storedCode []byte
 	var storedAt time.Time
-	database.On("TryIssueEmailVerificationCode", mock.Anything, mock.Anything, codeGenUserId, codeGenAddress,
+	database.On("TryIssueEmailVerificationCode", mock.Anything, mock.Anything, codeGenUserID, codeGenAddress,
 		mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
 			storedCode = args.Get(4).([]byte)
@@ -64,7 +64,7 @@ func TestHandleUserEmailVerificationCodePost_StoresTheCodeForTheAddressItRead(t 
 
 	var resp api.GenerateUserEmailVerificationCodeResponse
 	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &resp))
-	assert.Equal(t, codeGenUserId, resp.UserId)
+	assert.Equal(t, codeGenUserID, resp.UserID)
 	assert.Equal(t, codeGenAddress, resp.Email)
 
 	// The code answered is the code stored, encrypted, and it expires five minutes after the
@@ -84,7 +84,7 @@ func TestHandleUserEmailVerificationCodePost_TheAddressMovedUnderTheRequestAnswe
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 	expectCodeGenRead(database)
-	database.On("TryIssueEmailVerificationCode", mock.Anything, mock.Anything, codeGenUserId, codeGenAddress,
+	database.On("TryIssueEmailVerificationCode", mock.Anything, mock.Anything, codeGenUserID, codeGenAddress,
 		mock.Anything, mock.Anything).Return(false, nil).Once()
 
 	rr := httptest.NewRecorder()
@@ -106,7 +106,7 @@ func TestHandleUserEmailVerificationCodePost_AWriteFailureAnswers500(t *testing.
 	database := datamocks.NewDatabase(t)
 	auditLogger := handlersmocks.NewAuditLogger(t)
 	expectCodeGenRead(database)
-	database.On("TryIssueEmailVerificationCode", mock.Anything, mock.Anything, codeGenUserId, codeGenAddress,
+	database.On("TryIssueEmailVerificationCode", mock.Anything, mock.Anything, codeGenUserID, codeGenAddress,
 		mock.Anything, mock.Anything).Return(false, errs.New("the connection was reset")).Once()
 
 	rr := httptest.NewRecorder()

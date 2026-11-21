@@ -24,7 +24,7 @@ var ErrNoAuthContext = oauth.NewErrorDetail("no_auth_context", "no auth context 
 var ErrCeremonyReplaced = errors.New("the browser session no longer holds this ceremony")
 
 // ErrCeremonyNotHeld is GetAuthContext's answer when the browser session holds a ceremony but not the
-// one the request names (RequestedId), or the request names none. The step boundary answers it with
+// one the request names (RequestedID), or the request names none. The step boundary answers it with
 // the "no longer active" page and the ceremony mismatch audit event, apart from a session holding no
 // ceremony at all, ErrNoAuthContext, which is sent to the account page.
 //

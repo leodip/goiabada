@@ -49,7 +49,7 @@ func renderClientSettings(t *testing.T, client adminclienthandlers.ClientSetting
 // (#542). It had a Save of its own in the middle of the form, which saved it alone and reloaded the
 // page, dropping every other change; nothing here may bring a second form or a second Save back.
 func TestRender_AdminClientSettings_TheAllowanceIsSavedByTheTabsOneSave(t *testing.T) {
-	out := renderClientSettings(t, adminclienthandlers.ClientSettings{ClientId: 7, ClientIdentifier: "ops-tool"}, nil)
+	out := renderClientSettings(t, adminclienthandlers.ClientSettings{ClientID: 7, ClientIdentifier: "ops-tool"}, nil)
 
 	formStart := strings.Index(out, `<form id="formClientSettings"`)
 	require.NotEqual(t, -1, formStart, "the settings form is rendered")
@@ -93,16 +93,16 @@ func TestRender_AdminClientSettings_TheSwitchShowsTheAllowance(t *testing.T) {
 	}{
 		{
 			name:        "an allowed client",
-			client:      adminclienthandlers.ClientSettings{ClientId: 7, ClientIdentifier: "ops-tool", AdministrativeScopesAllowed: true},
+			client:      adminclienthandlers.ClientSettings{ClientID: 7, ClientIdentifier: "ops-tool", AdministrativeScopesAllowed: true},
 			wantChecked: true,
 		},
 		{
 			name:   "a client that is not allowed",
-			client: adminclienthandlers.ClientSettings{ClientId: 7, ClientIdentifier: "portal"},
+			client: adminclienthandlers.ClientSettings{ClientID: 7, ClientIdentifier: "portal"},
 		},
 		{
 			name: "the admin console's client",
-			client: adminclienthandlers.ClientSettings{ClientId: 1, ClientIdentifier: "admin-console-client",
+			client: adminclienthandlers.ClientSettings{ClientID: 1, ClientIdentifier: "admin-console-client",
 				AdministrativeScopesAllowed: true, IsSystemLevelClient: true},
 			wantChecked:  true,
 			wantDisabled: true,
@@ -128,7 +128,7 @@ func TestRender_AdminClientSettings_TheSwitchShowsTheAllowance(t *testing.T) {
 // names and is marked invalid by, the checkbox focused, and the settings, written before it, as
 // saved.
 func TestRender_AdminClientSettings_ARefusedAllowanceIsShownBesideTheSwitch(t *testing.T) {
-	client := adminclienthandlers.ClientSettings{ClientId: 7, ClientIdentifier: "ops-tool"}
+	client := adminclienthandlers.ClientSettings{ClientID: 7, ClientIdentifier: "ops-tool"}
 
 	out := renderClientSettings(t, client, map[string]interface{}{
 		"savedSuccessfully":         true,
@@ -150,8 +150,8 @@ func TestRender_AdminClientSettings_ARefusedAllowanceIsShownBesideTheSwitch(t *t
 // allowance, not the switch as a refused save drew it again: otherwise the second save of the same
 // switch would ask nothing.
 func TestRender_AdminClientSettings_TheSwitchingOnQuestionComparesWithTheStoredAllowance(t *testing.T) {
-	typed := adminclienthandlers.ClientSettings{ClientId: 7, ClientIdentifier: "ops-tool", AdministrativeScopesAllowed: true}
-	stored := adminclienthandlers.ClientSettings{ClientId: 7, ClientIdentifier: "ops-tool"}
+	typed := adminclienthandlers.ClientSettings{ClientID: 7, ClientIdentifier: "ops-tool", AdministrativeScopesAllowed: true}
+	stored := adminclienthandlers.ClientSettings{ClientID: 7, ClientIdentifier: "ops-tool"}
 
 	out := renderMenuPage(t, "/admin_clients_settings.html", map[string]interface{}{
 		"client": typed, "storedClient": stored, "savedSuccessfully": false,
@@ -181,18 +181,18 @@ func TestRender_AdminClientSettings_TheIdentifierIsReadOnlyWhereItCannotChange(t
 	}{
 		{
 			name:   "an ordinary client",
-			client: adminclienthandlers.ClientSettings{ClientId: 7, ClientIdentifier: "portal"},
+			client: adminclienthandlers.ClientSettings{ClientID: 7, ClientIdentifier: "portal"},
 		},
 		{
 			name: "a self-registered client",
-			client: adminclienthandlers.ClientSettings{ClientId: 8,
+			client: adminclienthandlers.ClientSettings{ClientID: 8,
 				ClientIdentifier: "dcr_3f6c1d2e-8a4b-4c5d-9e0f-1a2b3c4d5e6f", CreatedViaDCR: true},
 			wantReadOnly: true,
 			wantLine:     true,
 		},
 		{
 			name: "the admin console's client",
-			client: adminclienthandlers.ClientSettings{ClientId: 1, ClientIdentifier: "admin-console-client",
+			client: adminclienthandlers.ClientSettings{ClientID: 1, ClientIdentifier: "admin-console-client",
 				AdministrativeScopesAllowed: true, IsSystemLevelClient: true},
 			wantReadOnly: true,
 		},
@@ -220,7 +220,7 @@ type settingsTabAPI struct {
 	code string
 }
 
-func (s *settingsTabAPI) GetClientById(_ context.Context, _ string, _ int64) (*api.ClientResponse, error) {
+func (s *settingsTabAPI) GetClientByID(_ context.Context, _ string, _ int64) (*api.ClientResponse, error) {
 	return s.stored, nil
 }
 
@@ -235,7 +235,7 @@ func (s *settingsTabAPI) UpdateClient(_ context.Context, _ string, _ int64,
 
 // GetAllBrands answers the brands the Brand select offers when the refused tab is drawn again.
 func (s *settingsTabAPI) GetAllBrands(context.Context, string) ([]api.BrandResponse, error) {
-	return []api.BrandResponse{{Id: 5, Name: "Default", IsDefault: true}}, nil
+	return []api.BrandResponse{{ID: 5, Name: "Default", IsDefault: true}}, nil
 }
 
 // UpdateClientBrand is never reached: the settings' write before it is refused.
@@ -275,7 +275,7 @@ func postClientSettings(t *testing.T, apiClient *settingsTabAPI, form url.Values
 func TestRender_AdminClientSettings_ARefusedSaveKeepsTheStoredClient(t *testing.T) {
 	const refusal = "The client identifier is already in use."
 	apiClient := &settingsTabAPI{
-		stored:  &api.ClientResponse{Id: 7, ClientIdentifier: "portal", DisplayName: "Portal", Enabled: true},
+		stored:  &api.ClientResponse{ID: 7, ClientIdentifier: "portal", DisplayName: "Portal", Enabled: true},
 		refusal: refusal,
 	}
 
@@ -307,7 +307,7 @@ func TestRender_AdminClientSettings_ARefusedSaveKeepsTheStoredClient(t *testing.
 func TestRender_AdminClientSettings_ARefusedSaveKeepsASelfRegisteredIdentifierReadOnly(t *testing.T) {
 	const identifier = "dcr_3f6c1d2e-8a4b-4c5d-9e0f-1a2b3c4d5e6f"
 	apiClient := &settingsTabAPI{
-		stored:  &api.ClientResponse{Id: 7, ClientIdentifier: identifier, Enabled: true, CreatedViaDCR: true},
+		stored:  &api.ClientResponse{ID: 7, ClientIdentifier: identifier, Enabled: true, CreatedViaDCR: true},
 		refusal: "Invalid website URL.",
 	}
 
@@ -327,7 +327,7 @@ func TestRender_AdminClientSettings_ARefusedSaveKeepsASelfRegisteredIdentifierRe
 // who can change it, since the auth server would refuse the change (#499 decision 4).
 func TestRender_AdminClientSettings_WithoutManageTheSwitchIsDisabled(t *testing.T) {
 	const manageOnly = "Somente um administrador com authserver:manage pode alterar isto."
-	client := adminclienthandlers.ClientSettings{ClientId: 7, ClientIdentifier: "ops-tool", AdministrativeScopesAllowed: true}
+	client := adminclienthandlers.ClientSettings{ClientID: 7, ClientIdentifier: "ops-tool", AdministrativeScopesAllowed: true}
 
 	out := renderClientSettings(t, client, map[string]interface{}{"isAdmin": false})
 	toggle := allowanceSwitchRe.FindString(out)
@@ -346,7 +346,7 @@ func TestRender_AdminClientSettings_WithoutManageTheSwitchIsDisabled(t *testing.
 // admin console's requesting authserver:manage-account (#509 decision 5). An operator puzzled by an
 // unexpected consent screen looks there first.
 func TestRender_AdminClientSettings_TheConsentTooltipSaysWhenUsersAreAskedRegardless(t *testing.T) {
-	out := renderClientSettings(t, adminclienthandlers.ClientSettings{ClientId: 7, ClientIdentifier: "portal"}, nil)
+	out := renderClientSettings(t, adminclienthandlers.ClientSettings{ClientID: 7, ClientIdentifier: "portal"}, nil)
 
 	consent := regexp.MustCompile(`<input [^>]*id="consentRequired"[^>]*>`).FindString(out)
 	require.NotEmpty(t, consent, "the setting is rendered")
@@ -389,7 +389,7 @@ func TestRender_AdminClientSettings_ARefusalByKeyMarksItsField(t *testing.T) {
 	} {
 		t.Run(tc.code, func(t *testing.T) {
 			apiClient := &settingsTabAPI{
-				stored:  &api.ClientResponse{Id: 7, ClientIdentifier: "portal", Enabled: true, AuthorizationCodeEnabled: true},
+				stored:  &api.ClientResponse{ID: 7, ClientIdentifier: "portal", Enabled: true, AuthorizationCodeEnabled: true},
 				refusal: tc.refusal,
 				code:    tc.code,
 			}
@@ -409,7 +409,7 @@ func TestRender_AdminClientSettings_ARefusalByKeyMarksItsField(t *testing.T) {
 // Sign-in and consent pages: the consent screen links them whenever set.
 func TestRender_AdminClientSettings_TheClientsDocumentURLFields(t *testing.T) {
 	out := renderClientSettings(t, adminclienthandlers.ClientSettings{
-		ClientId: 7, ClientIdentifier: "portal", Enabled: true,
+		ClientID: 7, ClientIdentifier: "portal", Enabled: true,
 		PrivacyPolicyURL:  "https://portal.example.com/privacy",
 		TermsOfServiceURL: "https://portal.example.com/terms?v=2",
 	}, nil)
@@ -449,13 +449,13 @@ func brandOptions(t *testing.T, out string) []string {
 	return brandOptionRe.FindAllString(out[start:start+end], -1)
 }
 
-var renderBrands = []adminclienthandlers.BrandOption{{Id: 4, Name: "<i>Autumn</i>"}, {Id: 5, Name: "Default"}, {Id: 6, Name: "Spring"}}
+var renderBrands = []adminclienthandlers.BrandOption{{ID: 4, Name: "<i>Autumn</i>"}, {ID: 5, Name: "Default"}, {ID: 6, Name: "Spring"}}
 
 // The Brand select sits under Sign-in and consent pages, in the tab's one form (#812 decision 6):
 // Default brand first, naming the current default, then every brand by name, the client's brand
 // selected, or Default brand for a client with none of its own.
 func TestRender_AdminClientSettings_TheBrandSelect(t *testing.T) {
-	out := renderClientSettings(t, adminclienthandlers.ClientSettings{ClientId: 7, ClientIdentifier: "portal"},
+	out := renderClientSettings(t, adminclienthandlers.ClientSettings{ClientID: 7, ClientIdentifier: "portal"},
 		map[string]interface{}{"brands": renderBrands, "defaultBrandName": "Default"})
 
 	legendAt := strings.Index(out, "Páginas de entrada e de consentimento</legend>")
@@ -479,7 +479,7 @@ func TestRender_AdminClientSettings_TheBrandSelect(t *testing.T) {
 		`<option value="6">Spring</option>`,
 	}, brandOptions(t, out))
 
-	out = renderClientSettings(t, adminclienthandlers.ClientSettings{ClientId: 7, ClientIdentifier: "portal", BrandId: 6},
+	out = renderClientSettings(t, adminclienthandlers.ClientSettings{ClientID: 7, ClientIdentifier: "portal", BrandID: 6},
 		map[string]interface{}{"brands": renderBrands, "defaultBrandName": "Default"})
 	assert.Equal(t, []string{
 		`<option value="">Marca padrão (Default)</option>`,
@@ -492,7 +492,7 @@ func TestRender_AdminClientSettings_TheBrandSelect(t *testing.T) {
 // A brand refused by the auth server is said in a notice the select is described by, and the
 // select is marked invalid and focused.
 func TestRender_AdminClientSettings_ARefusedBrandIsShownOnTheSelect(t *testing.T) {
-	out := renderClientSettings(t, adminclienthandlers.ClientSettings{ClientId: 7, ClientIdentifier: "portal"},
+	out := renderClientSettings(t, adminclienthandlers.ClientSettings{ClientID: 7, ClientIdentifier: "portal"},
 		map[string]interface{}{"brands": renderBrands, "defaultBrandName": "Default",
 			"savedSuccessfully": true, "brandError": "A marca não existe."})
 

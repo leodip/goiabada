@@ -47,7 +47,7 @@ func TestAPIResourcesCreate_Success(t *testing.T) {
 	assert.Equal(t, "Created via API", stored.Description)
 
 	// Cleanup
-	_ = database.DeleteResource(context.Background(), nil, stored.Id)
+	_ = database.DeleteResource(context.Background(), nil, stored.ID)
 }
 
 func TestAPIResourcesCreate_ValidationErrors(t *testing.T) {
@@ -103,7 +103,7 @@ func TestAPIResourcesCreate_DuplicateIdentifier(t *testing.T) {
 	// Pre-create a resource
 	identifier := "api-test-dup-resource-" + fake.LetterN(8)
 	existing := createTestResource(t, identifier, "Existing")
-	defer func() { _ = database.DeleteResource(context.Background(), nil, existing.Id) }()
+	defer func() { _ = database.DeleteResource(context.Background(), nil, existing.ID) }()
 
 	// Attempt to create with the same identifier
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources"
@@ -129,10 +129,10 @@ func TestAPIResourcesCreate_ClashingWithAClientIdentifier(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	client := createTestClientUnique(t, true)
-	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.ID) }()
 	defer func() {
 		if stored, err := database.GetResourceByResourceIdentifier(context.Background(), nil, client.ClientIdentifier); err == nil && stored != nil {
-			_ = database.DeleteResource(context.Background(), nil, stored.Id)
+			_ = database.DeleteResource(context.Background(), nil, stored.ID)
 		}
 	}()
 
@@ -167,7 +167,7 @@ func TestAPIResourcesCreate_UnauthorizedAndScope(t *testing.T) {
 	// No token
 	req, err := http.NewRequest("POST", url, nil)
 	require.NoError(t, err)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -244,5 +244,5 @@ func TestAPIResourcesCreate_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, stored)
 	assert.Equal(t, `AT&T "Wireless"`, stored.Description)
-	_ = database.DeleteResource(context.Background(), nil, stored.Id)
+	_ = database.DeleteResource(context.Background(), nil, stored.ID)
 }
