@@ -1154,12 +1154,44 @@ func Decrypt(hint, secret string) (string, error) { return "", nil }
 	assert.Empty(t, stale)
 }
 
+// A listed method that one build declares and another's type has only through an embedded field is
+// one the finder passes on a direct call in that build and reports through an interface, so the list
+// check reports it though the first build declares it.
+func TestDiscardedErrors_ListCheck_ReportsAMethodABuildHasOnlyByEmbedding(t *testing.T) {
+	root := t.TempDir()
+	writeDiscardedErrorModule(t, root)
+	writeDiscardedErrorFixture(t, root, "authserver/internal/encryption/cipher.go",
+		"//go:build production\n\n"+discardedErrorCipherFixture)
+	writeDiscardedErrorFixture(t, root, "authserver/internal/encryption/cipher_dev.go", `//go:build !production
+
+package encryption
+
+type Envelope struct{}
+
+func (Envelope) Decrypt(ciphertext []byte) (string, error) { return "", nil }
+
+type DataCipher struct{ Envelope }
+
+func (c *DataCipher) Encrypt(plaintext string) ([]byte, error) { return nil, nil }
+`)
+
+	stale, err := staleDiscardedErrorEntries(root, discardedErrorScope, nil, discardedErrorMethods)
+	require.NoError(t, err)
+	assert.Equal(t, []string{
+		"encryption.DataCipher.Decrypt is listed, but a build's DataCipher has Decrypt only through an embedded field, " +
+			"which the finder does not match: declare it on DataCipher in every build",
+	}, stale)
+}
+
 // staleDiscardedErrorEntries returns, sorted, each listed function or method that none of the
 // builds the finder reads declares with the universe's error as its last result, the position the
 // finder reads. A function entry has to be a top-level function of its package, and a method entry
 // a method declared on the named type or its pointer: a promoted method's receiver is the embedded
 // type, which the finder would never match under this one's name. One build declaring a name is
-// enough, since the finder can match it there.
+// enough, since the finder can match it there. A build whose type has a listed method only through
+// an embedded field, where another build declares it, is reported even so: the finder passes a
+// direct call there and reports one through an interface the type implements, a form the tree does
+// not write.
 //
 // It looks the names up in the type-checked packages by object, as the finder matches calls, but
 // on its own rather than through discardedErrorListedTypes, so a defect in the finder's lookup
@@ -1176,8 +1208,10 @@ func staleDiscardedErrorEntries(
 
 	returnsError := func(fn *types.Func) bool { return discardedErrorEndsInError(fn.Signature().Results()) }
 
-	// declared holds each entry some build declares, as import path, then name or type.name.
+	// declared holds each entry some build declares, as import path, then name or type.name, and
+	// promoted each method entry some build's type has only through an embedded field.
 	declared := map[string]bool{}
+	promoted := map[string]bool{}
 	for _, pkgs := range loaded {
 		for _, p := range pkgs {
 			pkgScope := p.Types.Scope()
@@ -1198,9 +1232,18 @@ func staleDiscardedErrorEntries(
 				if !ok {
 					continue
 				}
+				declares := false
 				for i := range named.NumMethods() {
-					if fn := named.Method(i); fn.Name() == m.name && returnsError(fn) {
-						declared[m.pkg+" "+m.recv+"."+m.name] = true
+					if fn := named.Method(i); fn.Name() == m.name {
+						declares = true
+						if returnsError(fn) {
+							declared[m.pkg+" "+m.recv+"."+m.name] = true
+						}
+					}
+				}
+				if obj, index, _ := types.LookupFieldOrMethod(named, true, p.Types, m.name); !declares && len(index) > 1 {
+					if _, isFunc := obj.(*types.Func); isFunc {
+						promoted[m.pkg+" "+m.recv+"."+m.name] = true
 					}
 				}
 			}
@@ -1221,6 +1264,12 @@ func staleDiscardedErrorEntries(
 	}
 	for _, m := range methods {
 		report(m.pkg, m.recv+"."+m.name)
+		// An entry no build declares is reported above already, promoted or not.
+		if key := m.pkg + " " + m.recv + "." + m.name; declared[key] && promoted[key] {
+			stale = append(stale, fmt.Sprintf("%s.%s.%s is listed, but a build's %s has %s only through an embedded "+
+				"field, which the finder does not match: declare it on %s in every build",
+				path.Base(m.pkg), m.recv, m.name, m.recv, m.name, m.recv))
+		}
 	}
 	sort.Strings(stale)
 	return stale, nil
