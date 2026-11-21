@@ -12,6 +12,7 @@ var durationUnits = map[string]struct{ minute, minutes, hour, hours string }{
 	"de":    {"Minute", "Minuten", "Stunde", "Stunden"},
 	"es":    {"minuto", "minutos", "hora", "horas"},
 	"fr":    {"minute", "minutes", "heure", "heures"},
+	"id":    {"menit", "menit", "jam", "jam"},
 	"it":    {"minuto", "minuti", "ora", "ore"},
 	"pt-BR": {"minuto", "minutos", "hora", "horas"},
 }

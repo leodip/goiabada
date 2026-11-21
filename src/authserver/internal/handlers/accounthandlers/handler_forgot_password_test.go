@@ -450,6 +450,8 @@ func TestHandleForgotPasswordPost_WritesTheEmailInTheRecipientsLanguage(t *testi
 		{"a recipient who chose Portuguese, over a French locale", "", "pt-BR", "fr", "pt-BR"},
 		{"a recipient on Automatic, with a French locale", "", "", "fr", "fr"},
 		{"a recipient on Automatic with no locale", "", "", "", "en"},
+		{"a recipient who chose Indonesian, over a French locale", "", "id", "fr", "id"},
+		{"a recipient on Automatic, with an Indonesian locale", "", "", "id-ID", "id-ID"},
 		{"from a browser signed in as a user who chose German: the recipient's choice", "de", "pt-BR", "fr", "pt-BR"},
 		{"from a browser signed in as a user who chose German: the recipient's locale", "de", "", "fr", "fr"},
 		{"from a browser signed in as a user who chose German: English", "de", "", "", "en"},

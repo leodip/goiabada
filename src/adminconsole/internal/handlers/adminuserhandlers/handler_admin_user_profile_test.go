@@ -219,6 +219,7 @@ func TestHandleProfileGet_OffersTheLoadedCatalogsAndSelectsTheStoredPageLanguage
 				{Tag: "de", Name: "German"},
 				{Tag: "es", Name: "Spanish"},
 				{Tag: "fr", Name: "French"},
+				{Tag: "id", Name: "Indonesian"},
 				{Tag: "it", Name: "Italian"},
 				{Tag: "pt-BR", Name: "Portuguese (Brazil)"},
 			}, bind["pageLanguages"])
@@ -238,6 +239,7 @@ func TestHandleProfilePost_SendsThePageLanguageTheFormPosted(t *testing.T) {
 		want   *string
 	}{
 		{"a language chosen", "/admin/users/7/profile", url.Values{"username": {"jane-doe"}, "pageLanguage": {"es"}}, ptr("es")},
+		{"Indonesian chosen", "/admin/users/7/profile", url.Values{"username": {"jane-doe"}, "pageLanguage": {"id"}}, ptr("id")},
 		{"Automatic chosen", "/admin/users/7/profile", url.Values{"username": {"jane-doe"}, "pageLanguage": {""}}, ptr("")},
 		{"no field posted", "/admin/users/7/profile", url.Values{"username": {"jane-doe"}}, nil},
 		{"the field in the query only", "/admin/users/7/profile?pageLanguage=de", url.Values{"username": {"jane-doe"}}, nil},

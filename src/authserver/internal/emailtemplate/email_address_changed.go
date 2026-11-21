@@ -60,6 +60,19 @@ Si vous avez effectué cette modification, vous n’avez rien à faire.
 Cordialement,
 {{app_name}}`,
 		},
+		"id": {
+			Subject: "Alamat email Anda telah diubah",
+			Body: `Halo {{name}},
+
+Alamat email akun {{app_name}} Anda telah diubah, sehingga alamat ini tidak akan lagi menerima pesan tentang akun tersebut, termasuk tautan pengaturan ulang kata sandi.
+
+Jika Anda yang melakukan perubahan ini, Anda tidak perlu melakukan apa pun.
+
+**Jika bukan Anda, orang lain mungkin mengetahui kata sandi Anda.** Masuk, ubah kata sandi Anda, dan kembalikan alamat email Anda, atau hubungi administrator Anda.
+
+Salam,
+{{app_name}}`,
+		},
 		"it": {
 			Subject: "Il tuo indirizzo email è stato cambiato",
 			Body: `Ciao {{name}},

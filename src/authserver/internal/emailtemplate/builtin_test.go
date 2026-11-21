@@ -10,16 +10,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// The six built-in languages, as the catalogs built into Goiabada are tagged.
-var builtInLanguages = []string{"en", "de", "es", "fr", "it", "pt-BR"}
+// The built-in languages, as the catalogs built into Goiabada are tagged.
+var builtInLanguages = []string{"en", "de", "es", "fr", "id", "it", "pt-BR"}
 
-func TestLanguages_AreTheSixBuiltInOnes(t *testing.T) {
+func TestLanguages_AreTheBuiltInOnes(t *testing.T) {
 	assert.Equal(t, builtInLanguages, Languages)
 	// A catalog built in without email text would leave its readers on English emails.
 	assert.Equal(t, i18n.CatalogTags(), Languages, "the email languages are the built-in catalogs")
 }
 
-// Every built-in email holds its text in the six languages, passes its own rules in each (#818
+// Every built-in email holds its text in each built-in language, passes its own rules in each (#818
 // decision 8), and has a button label exactly when it offers the button (decision 5).
 func TestBuiltIns_EveryTextPassesItsOwnRules(t *testing.T) {
 	require.NotEmpty(t, BuiltIns())
@@ -27,7 +27,7 @@ func TestBuiltIns_EveryTextPassesItsOwnRules(t *testing.T) {
 	for _, email := range BuiltIns() {
 		assert.False(t, seen[email.ID], "%s is defined once", email.ID)
 		seen[email.ID] = true
-		require.Len(t, email.BuiltIn, len(builtInLanguages), "%s is written in the six languages", email.ID)
+		require.Len(t, email.BuiltIn, len(builtInLanguages), "%s is written in each built-in language", email.ID)
 		for _, lang := range builtInLanguages {
 			t.Run(email.ID+"/"+lang, func(t *testing.T) {
 				text, ok := email.BuiltIn[lang]
@@ -63,6 +63,8 @@ func TestPasswordResetLink_InEachLanguage(t *testing.T) {
 			"Para restablecer tu contraseña, abre este enlace:", "El enlace caduca en 5 minutos."},
 		{"fr", "Réinitialisation du mot de passe", "Réinitialiser le mot de passe", "Bonjour Ana,",
 			"Pour réinitialiser votre mot de passe, cliquez sur le lien ci-dessous :", "Le lien expire dans 5 minutes."},
+		{"id", "Atur ulang kata sandi", "Atur ulang kata sandi", "Halo Ana,",
+			"Anda dapat mengatur ulang kata sandi Anda melalui tautan di bawah ini:", "Tautan ini kedaluwarsa dalam 5 menit."},
 		{"it", "Reimpostazione della password", "Reimposta la password", "Ciao Ana,",
 			"Per reimpostare la password, apri questo link:", "Il link scade tra 5 minuti."},
 		{"pt-BR", "Redefinição de senha", "Redefinir senha", "Olá Ana,",
@@ -112,6 +114,11 @@ func TestRender_TheExpiryInEachLanguage(t *testing.T) {
 		{"fr", time.Minute, "1 minute"},
 		{"fr", 24 * time.Hour, "24 heures"},
 		{"fr", time.Hour, "1 heure"},
+		{"id", 5 * time.Minute, "5 menit"},
+		{"id", time.Minute, "1 menit"},
+		{"id", 24 * time.Hour, "24 jam"},
+		{"id", time.Hour, "1 jam"},
+		{"id", 90 * time.Minute, "90 menit"},
 		{"it", 5 * time.Minute, "5 minuti"},
 		{"it", time.Minute, "1 minuto"},
 		{"it", 24 * time.Hour, "24 ore"},
@@ -132,12 +139,12 @@ func TestRender_TheExpiryInEachLanguage(t *testing.T) {
 	}
 }
 
-// The recipient's language picks one of the six built-in languages as an email's copy was picked
+// The recipient's language picks one of the built-in languages as an email's copy was picked
 // before: a regional variant reads its language's text, and a language with none reads English.
 func TestLanguage_MatchesTheRecipientsLanguage(t *testing.T) {
 	for locale, want := range map[string]string{
 		"en": "en", "en-GB": "en", "de": "de", "de-AT": "de", "es-MX": "es", "fr-CA": "fr", "fr-CH": "fr",
-		"it-CH": "it", "pt-BR": "pt-BR", "pt": "pt-BR", "nl": "en", "sv-SE": "en", "": "en", "not a tag!": "en",
+		"it-CH": "it", "id": "id", "id-ID": "id", "in": "id", "ms": "en", "pt-BR": "pt-BR", "pt": "pt-BR", "nl": "en", "sv-SE": "en", "": "en", "not a tag!": "en",
 		"pt-PT": "pt-BR",
 		// A language with no text reads English, never a neighbour the matcher rates close: Galician
 		// and Basque would otherwise read Spanish.

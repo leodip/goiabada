@@ -31,6 +31,12 @@ Se envió desde la configuración de correo para comprobar que se pueden enviar 
 			Body: "Ceci est un e-mail de test envoyé par {{app_name}}.\n\n" +
 				"Il a été envoyé depuis les paramètres des e-mails pour vérifier que l’envoi d’e-mails fonctionne. Si vous pouvez le lire, vous n’avez rien d’autre à faire.",
 		},
+		"id": {
+			Subject: "{{app_name}} - email uji coba",
+			Body: `Ini adalah email uji coba dari {{app_name}}.
+
+Email ini dikirim dari pengaturan email untuk memeriksa bahwa email dapat dikirim. Jika Anda dapat membacanya, tidak ada lagi yang perlu dilakukan.`,
+		},
 		"it": {
 			Subject: "{{app_name}} - email di prova",
 			Body: `Questa è un’email di prova inviata da {{app_name}}.

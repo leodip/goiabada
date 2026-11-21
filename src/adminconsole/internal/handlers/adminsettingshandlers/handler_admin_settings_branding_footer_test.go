@@ -13,10 +13,11 @@ import (
 	handlersmocks "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/i18n"
 )
 
 // The editor's Footer links and Support contact sections (#814 decision 11): three fixed rows, each a
-// label, a URL and a label for each of the six built-in languages, and the contact's three fields. A
+// label, a URL and a label for each built-in language, and the contact's three fields. A
 // row left empty is no link, and the links keep their order with empty rows skipped. A refusal about
 // a link names the input it is about in the error answer's error_field (decision 10), which the editor
 // marks.
@@ -33,7 +34,7 @@ func refusalAt(code, message, field string) error {
 }
 
 // A stored brand's links fill the rows in their order, the rest left empty, and its contact the three
-// fields, the phone number as stored. The language labels are offered for the six built-in languages.
+// fields, the phone number as stored. The language labels are offered for the built-in languages.
 func TestHandleBrandGet_DrawsTheStoredFooterInItsRows(t *testing.T) {
 	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
@@ -59,10 +60,11 @@ func TestHandleBrandGet_DrawsTheStoredFooterInItsRows(t *testing.T) {
 	for _, language := range languages {
 		tags = append(tags, language.Tag)
 	}
-	assert.Equal(t, []string{"en", "de", "es", "fr", "it", "pt-BR"}, tags)
+	assert.Equal(t, []string{"en", "de", "es", "fr", "id", "it", "pt-BR"}, tags)
 }
 
-// A new brand's form starts with its three rows and its contact empty.
+// A new brand's form starts with its three rows and its contact empty, and offers a language label
+// for each built-in catalog.
 func TestHandleBrandNewGet_StartsWithNoFooter(t *testing.T) {
 	httpHelper := handlersmocks.NewHTTPHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
@@ -75,7 +77,7 @@ func TestHandleBrandNewGet_StartsWithNoFooter(t *testing.T) {
 	form := bind["brand"].(BrandForm)
 	assert.Equal(t, [3]BrandFooterLinkRow{}, form.FooterLinks)
 	assert.Empty(t, form.SupportEmail+form.SupportURL+form.SupportPhone)
-	assert.Len(t, bind["footerLanguages"], 6)
+	assert.Len(t, bind["footerLanguages"], len(i18n.CatalogTags()))
 }
 
 // The links are sent in the rows' order with empty rows skipped: an empty first row, a row whose

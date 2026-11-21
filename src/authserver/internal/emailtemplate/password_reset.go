@@ -60,6 +60,19 @@ Si vous l’avez réinitialisé vous-même, vous n’avez rien à faire.
 Cordialement,
 {{app_name}}`,
 		},
+		"id": {
+			Subject: "Kata sandi Anda telah diatur ulang",
+			Body: `Halo {{name}},
+
+Kata sandi akun {{app_name}} Anda telah diatur ulang melalui tautan yang dikirim ke alamat email ini.
+
+Jika Anda yang mengatur ulangnya, Anda tidak perlu melakukan apa pun.
+
+**Jika bukan Anda, orang lain mungkin dapat membaca email Anda dan menggunakan akun Anda.** Amankan akun email Anda, lalu pilih kata sandi baru melalui "Lupa kata sandi?" di halaman masuk, masuk dan periksa pengaturan autentikasi dua faktor Anda, atau hubungi administrator Anda.
+
+Salam,
+{{app_name}}`,
+		},
 		"it": {
 			Subject: "La tua password è stata reimpostata",
 			Body: `Ciao {{name}},

@@ -19,7 +19,7 @@ import (
 
 // The admin API's email templates (#818 decisions 7 to 10, 13 and 17), in the settings domain: an
 // administrator's edit of the subject, the button label and the body of one of the 19 emails, in
-// one of the six built-in languages. One language of one email is what is saved and reset, so two
+// one of the built-in languages. One language of one email is what is saved and reset, so two
 // administrators working on different languages never overwrite each other.
 //
 // A stored edit holds only the fields that differ from the built-in text, and its validity is
@@ -78,7 +78,7 @@ func emailTemplateFromPath(w http.ResponseWriter, r *http.Request) (*emailtempla
 
 // emailTemplateLanguageFromPath is the email and the language the {email} and {language} path
 // values name, answering 404 for an email there is none of or a language that is not exactly one of
-// the six built-in tags.
+// the built-in tags.
 func emailTemplateLanguageFromPath(w http.ResponseWriter, r *http.Request) (*emailtemplate.Email, string, bool) {
 	email, ok := emailTemplateFromPath(w, r)
 	if !ok {
@@ -96,7 +96,7 @@ func writeEmailTemplateNotFound(w http.ResponseWriter) {
 	writeJSONError(w, "Email template not found", "NOT_FOUND", http.StatusNotFound)
 }
 
-// HandleEmailTemplatesGet lists the 19 emails, each with its six languages' status.
+// HandleEmailTemplatesGet lists the 19 emails, each with the status of each built-in language.
 func HandleEmailTemplatesGet(database emailTemplatesReader) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		edits, err := emailTemplateEdits(r.Context(), database)

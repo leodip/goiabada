@@ -1,8 +1,9 @@
 // Every page is marked with the language it is written in, the catalog's, whatever the first
 // language asked for (WCAG 2.2 SC 3.1.1, Language of Page): a screen reader chooses its voice from
 // <html lang>. A language with no catalog (sv) reads an English page, marked en; nl then pt-BR reads
-// a pt-BR page, marked pt-BR, not nl. The console's country names follow the page too, so an English
-// page asked for in Swedish names Germany in English.
+// a pt-BR page, marked pt-BR, not nl. Indonesian is asked for as id or as in, the tag older Android
+// and Java systems send; Malay (ms), which has no catalog, reads English. The console's country
+// names follow the page too, so an English page asked for in Swedish names Germany in English.
 import { userUrl } from "../../lib/admin-console";
 import { openSignIn, testRedirectUri } from "../../lib/browser-sign-in";
 import { env } from "../../lib/environment";
@@ -20,6 +21,9 @@ const asked = [
   { uiLocales: "gsw", lang: "en" },
   { uiLocales: "lb", lang: "en" },
   { uiLocales: "nl pt-BR", lang: "pt-BR" },
+  { uiLocales: "id", lang: "id" },
+  { uiLocales: "in", lang: "id" },
+  { uiLocales: "ms", lang: "en" },
 ];
 
 for (const { uiLocales, lang } of asked) {

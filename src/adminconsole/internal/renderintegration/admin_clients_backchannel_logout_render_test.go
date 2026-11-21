@@ -164,7 +164,7 @@ func TestRender_AdminClientBackchannelLogout_Saved(t *testing.T) {
 // and an untranslated one shows the English sentence.
 func TestRender_AdminClientBackchannelLogout_InEveryLocale(t *testing.T) {
 	leakedKey := regexp.MustCompile(`adminconsole\.[a-z_.]+`)
-	for _, locale := range []string{"en", "de", "es", "fr", "it", "pt-BR"} {
+	for _, locale := range []string{"en", "de", "es", "fr", "it", "pt-BR", "id"} {
 		for _, client := range []*api.ClientResponse{
 			{ID: 7, ClientIdentifier: "a-web-app", AuthorizationCodeEnabled: true, BackchannelLogoutURI: "https://app.example.com/bcl"},
 			{ID: 7, ClientIdentifier: "a-service", ClientCredentialsEnabled: true},

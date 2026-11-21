@@ -11,7 +11,6 @@
 # apostrophes for elision and accents on vowels; «quoted interface labels».
 # Numeric dates: day/month/year, 24-hour clock. Relative times are whole phrases.
 # Keep Go {{.name}} and JavaScript {{name}} placeholders exactly as in English.
-# Native-speaker review of this catalog and all seven emails is required before release.
 
 # --- Common shared strings ---------------------------------------------------
 
@@ -403,7 +402,7 @@
 "adminconsole.email_tabs.templates" = "Modelli email"
 
 # The Email templates tab (#818 decision 14): the list of every email and the editor of one.
-"adminconsole.email_templates.list.intro" = "Ciò che dice ogni email, in ciascuna delle sei lingue integrate. Una lingua senza modifiche viene inviata con il testo integrato di Goiabada."
+"adminconsole.email_templates.list.intro" = "Ciò che dice ogni email, in ciascuna lingua integrata. Una lingua senza modifiche viene inviata con il testo integrato di Goiabada."
 "adminconsole.email_templates.list.branding_note" = "L’aspetto delle email, i colori, il logo e il piè di pagina, segue il marchio in cui sono mostrate."
 "adminconsole.email_templates.list.branding_link" = "Vai a Branding"
 "adminconsole.email_templates.list.col_email" = "Email"

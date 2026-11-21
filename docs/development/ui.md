@@ -335,8 +335,8 @@ the [e2e README](../../e2e/README.md#screenshots) says what it starts and how to
 - **Email templates**: every email is sent from its built-in definition, and has no template file and
   no catalog message (#818). Its definition in `internal/emailtemplate`
   holds its identifier, the placeholders it offers and requires, and its subject, button label and
-  body in the six built-in languages; `render.Renderer.RenderEmail` matches the recipient's language
-  against those six (`emailtemplate.Language`, English for any other), renders the body inside
+  body in each built-in language; `render.Renderer.RenderEmail` matches the recipient's language
+  against those languages (`emailtemplate.Language`, English for any other), renders the body inside
   `layouts/email_layout.html` with the frame above, and writes the subject as the `<title>`. The
   body is a small Markdown set: paragraphs, a single newline as a line break, bold, italic, links,
   bulleted and numbered lists. goldmark parses it with every other parser left out, so a heading, a
@@ -361,7 +361,7 @@ the [e2e README](../../e2e/README.md#screenshots) says what it starts and how to
   read) naming the email, the language and the rules broken, never the text. The start logs the
   same warning for each invalid stored edit. Its output is the auth server's second guarded `template.HTML`, which
   `legalmarkdown/trusted_html_lint_test.go` holds. `TestBuiltIns_EveryTextPassesItsOwnRules` holds
-  every built-in text to its email's rules in the six languages, and
+  every built-in text to its email's rules in each built-in language, and
   `TestEmails_EveryDefinedEmailIsDrawnInlineAlone` to the inline rules above. A change to the
   placeholders an email offers or requires can make an administrator's edit of it invalid, so it
   needs a release-notes line. The console's Email templates tab, under Admin, Email, lists the

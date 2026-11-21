@@ -60,6 +60,19 @@ Si vous l’avez créé, vous n’avez rien à faire. Conservez les nouveaux cod
 Cordialement,
 {{app_name}}`,
 		},
+		"id": {
+			Subject: "Kode pemulihan Anda telah diganti",
+			Body: `Halo {{name}},
+
+Satu set kode pemulihan baru telah dibuat untuk akun {{app_name}} Anda dari pengaturan akun Anda. Kode pemulihan Anda sebelumnya tidak lagi berlaku, baik yang sudah digunakan maupun belum.
+
+Jika Anda yang membuatnya, Anda tidak perlu melakukan apa pun. Simpan kode baru tersebut di tempat yang aman.
+
+**Jika bukan Anda, orang lain mungkin mengetahui kata sandi Anda.** Pilih kata sandi baru melalui "Lupa kata sandi?" di halaman masuk, lalu masuk dan buat satu set kode pemulihan baru di pengaturan akun Anda, atau hubungi administrator Anda.
+
+Salam,
+{{app_name}}`,
+		},
 		"it": {
 			Subject: "I tuoi codici di recupero sono stati sostituiti",
 			Body: `Ciao {{name}},

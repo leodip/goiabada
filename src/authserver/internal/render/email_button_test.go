@@ -24,22 +24,26 @@ var emailButtonLabels = map[string]map[string]string{
 	"password_reset_link": {
 		"en": "Reset password", "de": "Passwort zurücksetzen", "es": "Restablecer contraseña",
 		"fr": "Réinitialiser le mot de passe", "it": "Reimposta la password", "pt-BR": "Redefinir senha",
+		"id": "Atur ulang kata sandi",
 	},
 	"activation_link": {
 		"en": "Activate account", "de": "Konto aktivieren", "es": "Activar cuenta",
 		"fr": "Activer le compte", "it": "Attiva l'account", "pt-BR": "Ativar conta",
+		"id": "Aktifkan akun",
 	},
 	"new_user_setup": {
 		"en": "Create password", "de": "Passwort festlegen", "es": "Crear contraseña",
 		"fr": "Créer le mot de passe", "it": "Crea la password", "pt-BR": "Criar senha",
+		"id": "Buat kata sandi",
 	},
 	"welcome": {
 		"en": "Sign in", "de": "Anmelden", "es": "Iniciar sesión",
 		"fr": "Se connecter", "it": "Accedi", "pt-BR": "Entrar",
+		"id": "Masuk",
 	},
 }
 
-var emailLanguages = []string{"en", "de", "es", "fr", "it", "pt-BR"}
+var emailLanguages = []string{"en", "de", "es", "fr", "id", "it", "pt-BR"}
 
 // drawnButton is what an email draws of its button: the cell that paints it and the link in it.
 type drawnButton struct {

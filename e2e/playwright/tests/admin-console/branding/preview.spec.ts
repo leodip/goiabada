@@ -664,7 +664,7 @@ test("the uploaded font without a regular font file is refused at the font field
 // every built-in language: Automatic's, whose sentence and switch make it the tallest, in English and
 // in the languages whose words run longer. A brand with a logo, a background and an uploaded font in
 // its sample fits too (#813).
-const locales = ["en", "pt-BR", "de", "es", "fr", "it"];
+const locales = ["en", "pt-BR", "de", "es", "fr", "it", "id"];
 
 // Three footer links, each labelled in every built-in language, and every contact value.
 const fullFooter: BrandFooter = {
@@ -672,17 +672,17 @@ const fullFooter: BrandFooter = {
     {
       url: "https://example.com/privacy",
       label: "Privacy policy",
-      labels: { en: "Privacy policy", "pt-BR": "Política de privacidade", de: "Datenschutzerklärung", es: "Política de privacidad", fr: "Politique de confidentialité", it: "Informativa sulla privacy" },
+      labels: { en: "Privacy policy", "pt-BR": "Política de privacidade", de: "Datenschutzerklärung", es: "Política de privacidad", fr: "Politique de confidentialité", it: "Informativa sulla privacy", id: "Kebijakan privasi" },
     },
     {
       url: "https://example.com/terms",
       label: "Terms of service",
-      labels: { en: "Terms of service", "pt-BR": "Termos de serviço", de: "Nutzungsbedingungen", es: "Términos del servicio", fr: "Conditions d'utilisation", it: "Termini di servizio" },
+      labels: { en: "Terms of service", "pt-BR": "Termos de serviço", de: "Nutzungsbedingungen", es: "Términos del servicio", fr: "Conditions d'utilisation", it: "Termini di servizio", id: "Ketentuan layanan" },
     },
     {
       url: "https://status.example.com",
       label: "System status",
-      labels: { en: "System status", "pt-BR": "Status do sistema", de: "Systemstatus", es: "Estado del sistema", fr: "État du système", it: "Stato del sistema" },
+      labels: { en: "System status", "pt-BR": "Status do sistema", de: "Systemstatus", es: "Estado del sistema", fr: "État du système", it: "Stato del sistema", id: "Status sistem" },
     },
   ],
   supportEmail: "support@example.com",

@@ -53,8 +53,8 @@ func written(name string) string {
 
 // The section's steps name the editor where the console puts it, Admin, Email, its tab, by the
 // console's labels, and each field, the placeholder buttons, the preview, the test send, the save
-// and the reset by theirs (#818 decision 14). It says the six languages are edited one at a time,
-// that a field left alone follows later releases (decision 7), and that edits are not per brand.
+// and the reset by theirs (#818 decision 14). It says each built-in language is edited on its own,
+// counting none of them (#668 decision 3), that a field left alone follows later releases (decision 7), and that edits are not per brand.
 func TestEmailTemplateDocs_TheGuideSaysWhereTheEditorIsAndWhatItDoes(t *testing.T) {
 	guard.AssertSectionSays(t, filepath.Dir(guard.SourceRoot(t)), customizeGuidePage, emailTemplatesHead,
 		[]string{
@@ -69,11 +69,11 @@ func TestEmailTemplateDocs_TheGuideSaysWhereTheEditorIsAndWhatItDoes(t *testing.
 			"**" + english("adminconsole.email_tabs.send_test") + "**",
 			editorLabel("save_button"),
 			editorLabel("reset_button"),
-			"six built-in languages",
+			"each built-in language",
 			"follows the built-in text when you upgrade",
 			"every brand",
 			"#branded-emails",
-		}, nil)
+		}, []string{"six built-in languages"})
 }
 
 // The format names the Markdown set a body takes and what is shown as typed (#818 decision 2): the
@@ -258,14 +258,16 @@ func TestEmailTemplateDocs_TheAPISectionNamesEachOperationAndItsScopes(t *testin
 }
 
 // The guide's first steps link the section, and no section links the one it replaced; the glossary
-// defines the term and links it; the personal data page does not say an email template can load an
-// image, which the format refuses (#818 decision 2).
+// defines the term, with no count of the built-in languages (#668 decision 3), and links it; the
+// personal data page does not say an email template can load an image, which the format refuses
+// (#818 decision 2).
 func TestEmailTemplateDocs_TheOtherSectionsAndTheGlossaryLinkIt(t *testing.T) {
 	root := filepath.Dir(guard.SourceRoot(t))
 	guard.AssertSectionSays(t, root, customizeGuidePage, "## Brand the pages", []string{"(#email-templates)"}, nil)
 	guard.AssertSectionSays(t, root, customizeGuidePage, "", nil, []string{"## Email bodies", "#email-bodies"})
 	guard.AssertSectionSays(t, root, glossaryPage, emailTemplateGlossary,
-		[]string{"subject", "body", "button label", "six built-in languages", "**Admin**, **Email**", emailTemplatesLink}, nil)
+		[]string{"subject", "body", "button label", "each built-in language", "**Admin**, **Email**", emailTemplatesLink},
+		[]string{"six built-in languages"})
 	guard.AssertSectionSays(t, root, personalDataPage, "", nil, []string{"An email template can embed"})
 }
 

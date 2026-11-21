@@ -38,7 +38,7 @@ func footerBrand(links record.BrandFooterLinks, email, url, phone string) *recor
 
 // threeLinks are a brand's three footer links, the first with a label for pt-BR and German.
 var threeLinks = record.BrandFooterLinks{
-	{URL: "https://acme.example/privacy", Label: "Privacy", Labels: map[string]string{"pt-BR": "Privacidade", "de": "Datenschutz"}},
+	{URL: "https://acme.example/privacy", Label: "Privacy", Labels: map[string]string{"pt-BR": "Privacidade", "de": "Datenschutz", "id": "Privasi"}},
 	{URL: "https://status.acme.example/", Label: "Status"},
 	{URL: "https://acme.example/", Label: "Acme"},
 }
@@ -218,6 +218,7 @@ func TestRender_TheFooterIsInThePagesLanguage(t *testing.T) {
 	}{
 		{"pt-BR", "pt-BR", []string{"Privacidade", "Status", "Acme"}, "Precisa de ajuda? Página de suporte", "(abre em uma nova aba)"},
 		{"de-AT", "de", []string{"Datenschutz", "Status", "Acme"}, "Brauchen Sie Hilfe? Supportseite", "(öffnet sich in einem neuen Tab)"},
+		{"id-ID", "id", []string{"Privasi", "Status", "Acme"}, "Perlu bantuan? Halaman dukungan", "(terbuka di tab baru)"},
 		{"es", "es", []string{"Privacy", "Status", "Acme"}, "¿Necesitas ayuda? Página de soporte", "(se abre en una pestaña nueva)"},
 		{"sv-SE", "en", []string{"Privacy", "Status", "Acme"}, "Need help? Support page", "(opens in a new tab)"},
 	} {

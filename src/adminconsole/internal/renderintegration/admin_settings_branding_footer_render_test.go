@@ -13,14 +13,14 @@ import (
 )
 
 // The brand editor's Footer links and Support contact sections (#814 decision 11), drawn through the
-// real renderer in pt-BR: after the kit, three rows of a label and a URL, each with its six language
-// labels in a closed disclosure the browser provides, and the contact's three fields; every input
+// real renderer in pt-BR: after the kit, three rows of a label and a URL, each with a label for each
+// built-in language in a closed disclosure the browser provides, and the contact's three fields; every input
 // labelled and none autofilled; a refusal marked at the exact input its error_field points at, a
 // disclosure drawn open around a refused language label.
 
 var renderFooterLanguages = []adminsettingshandlers.FooterLanguage{
 	{Tag: "en", Name: "English"}, {Tag: "de", Name: "German"}, {Tag: "es", Name: "Spanish"},
-	{Tag: "fr", Name: "French"}, {Tag: "it", Name: "Italian"}, {Tag: "pt-BR", Name: "Portuguese (Brazil)"},
+	{Tag: "fr", Name: "French"}, {Tag: "id", Name: "Indonesian"}, {Tag: "it", Name: "Italian"}, {Tag: "pt-BR", Name: "Portuguese (Brazil)"},
 }
 
 // renderFooterForm draws a stored brand's form holding two links and the whole contact, refused at
@@ -102,7 +102,7 @@ func TestRender_AdminSettingsBrandingFormDrawsTheFooterSectionsAfterTheKit(t *te
 	assert.Contains(t, inputTag(t, form, "footerLinks-2-label"), `value=""`)
 	assert.Contains(t, inputTag(t, form, "footerLinks-2-url"), `value=""`)
 
-	// Each row's six language labels are in a closed disclosure under it, each labelled with its
+	// Each row's language labels, one for each built-in language, are in a closed disclosure under it, each labelled with its
 	// language, written in it, and holding the stored label or nothing.
 	row := footerRow(t, form, 0)
 	assert.Contains(t, row, `<details class="disclosure">`)

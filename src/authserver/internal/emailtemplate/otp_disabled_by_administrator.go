@@ -61,6 +61,19 @@ Si vous l’aviez demandé, vous n’avez rien à faire. Vous pouvez configurer 
 Cordialement,
 {{app_name}}`,
 		},
+		"id": {
+			Subject: "Administrator telah menonaktifkan autentikasi dua faktor Anda",
+			Body: `Halo {{name}},
+
+Administrator telah menonaktifkan autentikasi dua faktor untuk akun {{app_name}} Anda. Aplikasi autentikator dan kode pemulihan Anda tidak lagi dapat digunakan untuk masuk.
+
+Jika Anda yang memintanya, Anda tidak perlu melakukan apa pun. Anda dapat menyiapkan aplikasi autentikator baru di pengaturan akun Anda.
+
+**Jika Anda tidak mengharapkannya, hubungi administrator Anda.** Anda juga dapat memilih kata sandi baru melalui "Lupa kata sandi?" di halaman masuk, lalu masuk dan periksa pengaturan autentikasi dua faktor Anda.
+
+Salam,
+{{app_name}}`,
+		},
 		//nolint:misspell // the it text: "configurare" is Italian, not a misspelling of "configure"
 		"it": {
 			Subject: "Un amministratore ha disattivato la tua autenticazione a due fattori",

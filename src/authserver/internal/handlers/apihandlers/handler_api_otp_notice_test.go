@@ -409,6 +409,7 @@ func TestHandleUserOTPPut_TellsTheUserAnAdministratorTurnedItOff(t *testing.T) {
 	}{
 		{"an English user", "en", "An administrator turned off your two-factor authentication"},
 		{"an Italian user", "it", "Un amministratore ha disattivato la tua autenticazione a due fattori"},
+		{"an Indonesian user", "id", "Administrator telah menonaktifkan autentikasi dua faktor Anda"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			database := datamocks.NewDatabase(t)
