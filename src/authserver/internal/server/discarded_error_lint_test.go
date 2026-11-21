@@ -22,8 +22,8 @@ package server
 // dependency missing from the module cache, as any build of the module would.
 
 import (
+	"fmt"
 	"go/ast"
-	"go/parser"
 	"go/token"
 	"go/types"
 	"os"
@@ -45,11 +45,6 @@ import (
 // the auth server's module. Every listed function is internal to the auth server, so no other
 // module could name one.
 const discardedErrorScope = "authserver"
-
-// discardedErrorModuleParent is what a directory under the source root is prefixed with to make
-// its import path: the auth server's module is github.com/leodip/goiabada/authserver, rooted at
-// src/authserver.
-const discardedErrorModuleParent = "github.com/leodip/goiabada/"
 
 // discardedErrorFuncs is every package-level function whose error may not be discarded, by import
 // path. Each returns a value beside the error whose zero is storable: a hash, a ciphertext, a
@@ -892,62 +887,128 @@ func TestDiscardedErrors_Guard_IsFatalOnAnEmptyRead(t *testing.T) {
 
 // TestDiscardedErrors_EveryListedFunctionReturnsAnError holds both lists to the real tree. A listed
 // name that has been renamed or deleted guards nothing, and the finder cannot tell: it would match
-// no call and report a clean tree. So each function entry has to be a top-level function its
-// package still declares, and each method entry a method its package declares on the named type or
-// its pointer, with error as the last result, which is the position the finder reads.
+// no call and report a clean tree.
 func TestDiscardedErrors_EveryListedFunctionReturnsAnError(t *testing.T) {
-	root := guard.SourceRoot(t)
+	stale, err := staleDiscardedErrorEntries(guard.SourceRoot(t), discardedErrorScope, discardedErrorFuncs, discardedErrorMethods)
+	require.NoError(t, err)
+	assert.Empty(t, stale)
+}
 
-	want := map[string][]string{}
-	for importPath, names := range discardedErrorFuncs {
-		want[importPath] = append(want[importPath], names...)
+// A renamed function, a renamed method, a method the type has only by embedding another, and a
+// function whose last result is no longer an error each leave an entry that guards nothing.
+// Envelope's Decrypt, on another type, stands in for none of them.
+func TestDiscardedErrors_ListCheck_ReportsEachEntryThatGuardsNothing(t *testing.T) {
+	root := t.TempDir()
+	writeDiscardedErrorModule(t, root)
+	writeDiscardedErrorFixture(t, root, "authserver/internal/passwordhash/passwordhash.go", `package passwordhash
+
+func HashPassword(password string) (string, error) { return "", nil }
+`)
+	writeDiscardedErrorFixture(t, root, "authserver/internal/encryption/cipher.go", `package encryption
+
+type sealer struct{}
+
+func (sealer) Encrypt(plaintext string) ([]byte, error) { return nil, nil }
+
+type DataCipher struct{ sealer }
+
+func (c *DataCipher) Open(ciphertext []byte) (string, error) { return "", nil }
+
+type Envelope struct{}
+
+func (Envelope) Decrypt(ciphertext []byte) (string, error) { return "", nil }
+`)
+	writeDiscardedErrorFixture(t, root, "authserver/internal/rsakey/rsakey.go", `package rsakey
+
+type Material struct{}
+
+func Generate(bits int, kid string) (Material, bool) { return Material{}, true }
+`)
+
+	stale, err := staleDiscardedErrorEntries(root, discardedErrorScope, discardedErrorFuncs, discardedErrorMethods)
+	require.NoError(t, err)
+	assert.Equal(t, []string{
+		"encryption.DataCipher.Decrypt is listed, but no build of github.com/leodip/goiabada/authserver/internal/encryption declares it returning an error last",
+		"encryption.DataCipher.Encrypt is listed, but no build of github.com/leodip/goiabada/authserver/internal/encryption declares it returning an error last",
+		"passwordhash.Hash is listed, but no build of github.com/leodip/goiabada/authserver/internal/passwordhash declares it returning an error last",
+		"rsakey.Generate is listed, but no build of github.com/leodip/goiabada/authserver/internal/rsakey declares it returning an error last",
+	}, stale)
+}
+
+// staleDiscardedErrorEntries returns, sorted, each listed function or method that none of the
+// builds the finder reads declares with the universe's error as its last result, the position the
+// finder reads. A function entry has to be a top-level function of its package, and a method entry
+// a method declared on the named type or its pointer: a promoted method's receiver is the embedded
+// type, which the finder would never match under this one's name. One build declaring a name is
+// enough, since the finder can match it there.
+//
+// It looks the names up in the type-checked packages by object, as the finder matches calls, but
+// on its own rather than through discardedErrorListedTypes, so a defect in the finder's lookup
+// cannot also hide a stale entry. For the real tree the loads are the finder's, from pkgload's
+// cache.
+func staleDiscardedErrorEntries(
+	root, scope string, listed map[string][]string, methods []discardedErrorMethod,
+) ([]string, error) {
+	loaded, err := pkgload.LoadBuilds(append(pkgload.ReleaseBuilds(), pkgload.Build{}),
+		filepath.Join(root, filepath.FromSlash(scope)))
+	if err != nil {
+		return nil, err
 	}
-	for _, m := range discardedErrorMethods {
-		want[m.pkg] = append(want[m.pkg], m.recv+"."+m.name)
+
+	errorType := types.Universe.Lookup("error").Type()
+	returnsError := func(fn *types.Func) bool {
+		results := fn.Signature().Results()
+		return results.Len() > 0 && types.Identical(results.At(results.Len()-1).Type(), errorType)
 	}
 
-	for importPath, names := range want {
-		dir := filepath.Join(root, filepath.FromSlash(strings.TrimPrefix(importPath, discardedErrorModuleParent)))
-		entries, err := os.ReadDir(dir)
-		require.NoError(t, err, "the listed package %s is not at %s", importPath, dir)
-
-		declared := map[string]bool{}
-		for _, entry := range entries {
-			if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".go") || strings.HasSuffix(entry.Name(), "_test.go") {
-				continue
+	// declared holds each entry some build declares, as import path, then name or type.name.
+	declared := map[string]bool{}
+	for _, pkgs := range loaded {
+		for _, p := range pkgs {
+			pkgScope := p.Types.Scope()
+			for _, name := range listed[p.PkgPath] {
+				if fn, ok := pkgScope.Lookup(name).(*types.Func); ok && returnsError(fn) {
+					declared[p.PkgPath+" "+name] = true
+				}
 			}
-			file, pErr := parser.ParseFile(token.NewFileSet(), filepath.Join(dir, entry.Name()), nil, parser.SkipObjectResolution)
-			require.NoError(t, pErr)
-			for _, decl := range file.Decls {
-				fn, ok := decl.(*ast.FuncDecl)
-				if !ok || fn.Type.Results == nil {
+			for _, m := range methods {
+				if m.pkg != p.PkgPath {
 					continue
 				}
-				results := fn.Type.Results.List
-				if last, ok := results[len(results)-1].Type.(*ast.Ident); !ok || last.Name != "error" {
+				tn, ok := pkgScope.Lookup(m.recv).(*types.TypeName)
+				if !ok {
 					continue
 				}
-				key := fn.Name.Name
-				if fn.Recv != nil {
-					recv := fn.Recv.List[0].Type
-					if star, isStar := recv.(*ast.StarExpr); isStar {
-						recv = star.X
-					}
-					ident, isIdent := recv.(*ast.Ident)
-					if !isIdent {
-						continue
-					}
-					key = ident.Name + "." + key
+				named, ok := tn.Type().(*types.Named)
+				if !ok {
+					continue
 				}
-				declared[key] = true
+				for i := range named.NumMethods() {
+					if fn := named.Method(i); fn.Name() == m.name && returnsError(fn) {
+						declared[m.pkg+" "+m.recv+"."+m.name] = true
+					}
+				}
 			}
 		}
+	}
 
+	var stale []string
+	report := func(importPath, name string) {
+		if !declared[importPath+" "+name] {
+			stale = append(stale, fmt.Sprintf("%s.%s is listed, but no build of %s declares it returning an error last",
+				path.Base(importPath), name, importPath))
+		}
+	}
+	for importPath, names := range listed {
 		for _, name := range names {
-			assert.True(t, declared[name], "%s.%s is listed but %s declares no such function or method returning an error last",
-				path.Base(importPath), name, importPath)
+			report(importPath, name)
 		}
 	}
+	for _, m := range methods {
+		report(m.pkg, m.recv+"."+m.name)
+	}
+	sort.Strings(stale)
+	return stale, nil
 }
 
 // discardedErrorStrings renders findings for comparison, unsorted.
