@@ -275,6 +275,26 @@ type Seam interface{ B() }
 	assert.Equal(t, []string{"example.com/mod/handlers_test.Seam"}, deadNames(dead))
 }
 
+// A dead interface is reported at its own file and line, not where a //line directive maps it, so
+// the finding names the file to edit.
+func TestNoDeadInterfaces_ReportsTheDeclarationsOwnFileAndLine(t *testing.T) {
+	root := t.TempDir()
+
+	writeFixture(t, root, "mod/go.mod", "module example.com/mod\n\ngo 1.24\n")
+	writeFixture(t, root, "mod/handlers/generated.go", `package handlers
+
+//line interfaces.tmpl:100
+type Unused interface{ A() }
+`)
+	makeLoadable(t, root)
+
+	dead, _, err := findDeadInterfaces(root, []string{"mod/handlers"})
+	require.NoError(t, err)
+	require.Len(t, dead, 1)
+	assert.Equal(t, "mod/handlers/generated.go", dead[0].file)
+	assert.Equal(t, 4, dead[0].line)
+}
+
 // TestNoDeadInterfaces_DeclarationsOutsideTheGuardedDirsAreNotHeld keeps the dirs argument
 // meaningful: the module is searched whole for references, but only what the caller named is held
 // to the rule. Without this, a caller guarding one handler package would fail on every unreferenced
