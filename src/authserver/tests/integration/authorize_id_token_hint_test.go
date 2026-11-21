@@ -19,13 +19,13 @@ import (
 // id_token_hint Persistence Tests
 // =============================================================================
 
-// TestIdTokenHint_PromptLogin_MismatchedUser_BlocksBeforeBinding verifies that:
+// TestIDTokenHint_PromptLogin_MismatchedUser_BlocksBeforeBinding verifies that:
 //  1. id_token_hint is stored in AuthContext from the authorize endpoint
 //  2. The hint persists through the entire authentication state machine
 //  3. /auth/completed answers a sign-in by another user with error=login_required before a session
 //     is bound (#535), so the mismatched sign-in leaves nothing behind
 //  4. State parameter is preserved in the error response
-func TestIdTokenHint_PromptLogin_MismatchedUser_BlocksBeforeBinding(t *testing.T) {
+func TestIDTokenHint_PromptLogin_MismatchedUser_BlocksBeforeBinding(t *testing.T) {
 	// =========================================================================
 	// Step 1: Create User A and User B
 	// =========================================================================
@@ -74,25 +74,25 @@ func TestIdTokenHint_PromptLogin_MismatchedUser_BlocksBeforeBinding(t *testing.T
 	err = database.CreateClient(context.Background(), nil, client)
 	require.NoError(t, err)
 
-	redirectUri := &record.RedirectURI{
+	redirectURI := &record.RedirectURI{
 		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	require.NoError(t, err)
 
 	// =========================================================================
 	// Step 3: Get an ID token for User A (complete full auth flow)
 	// =========================================================================
-	httpClientA := createHttpClient(t)
+	httpClientA := createHTTPClient(t)
 	codeVerifierA := testCodeVerifier + "-a"
 	requestCodeChallengeA := oauth.GeneratePKCECodeChallenge(codeVerifierA)
 	requestStateA := fake.LetterN(8)
 	requestNonceA := fake.LetterN(8)
 	requestScope := "openid profile email"
 
-	destUrlA := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURLA := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallengeA +
@@ -107,7 +107,7 @@ func TestIdTokenHint_PromptLogin_MismatchedUser_BlocksBeforeBinding(t *testing.T
 	// used elsewhere in this file captures the variable, so under reassignment every defer closes
 	// the last response and the earlier ones are never closed. The replay hop at the end of this
 	// function adds one more, which makes that worse.
-	respA, err := httpClientA.Get(destUrlA)
+	respA, err := httpClientA.Get(destURLA)
 	require.NoError(t, err)
 	defer func(body io.ReadCloser) { _ = body.Close() }(respA.Body)
 
@@ -134,21 +134,21 @@ func TestIdTokenHint_PromptLogin_MismatchedUser_BlocksBeforeBinding(t *testing.T
 	respA = loadPage(t, httpClientA, redirectLocation)
 	defer func(body io.ReadCloser) { _ = body.Close() }(respA.Body)
 
-	codeA, stateA := getCodeAndStateFromUrl(t, respA)
+	codeA, stateA := getCodeAndStateFromURL(t, respA)
 	assert.Equal(t, requestStateA, stateA)
 
 	// Exchange code for tokens to get User A's ID token
-	tokenUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	tokenURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 	formDataA := url.Values{
 		"grant_type":    {"authorization_code"},
 		"client_id":     {client.ClientIdentifier},
 		"client_secret": {clientSecret},
 		"code":          {codeA},
-		"redirect_uri":  {redirectUri.URI},
+		"redirect_uri":  {redirectURI.URI},
 		"code_verifier": {codeVerifierA},
 	}
 
-	tokenDataA := postToTokenEndpoint(t, httpClientA, tokenUrl, formDataA)
+	tokenDataA := postToTokenEndpoint(t, httpClientA, tokenURL, formDataA)
 	assert.NotNil(t, tokenDataA["id_token"], "id_token should be present in token response")
 	idTokenUserA := tokenDataA["id_token"].(string)
 	assert.NotEmpty(t, idTokenUserA)
@@ -161,14 +161,14 @@ func TestIdTokenHint_PromptLogin_MismatchedUser_BlocksBeforeBinding(t *testing.T
 	// Step 4: Start NEW auth request with id_token_hint and prompt=login
 	// Use a fresh HTTP client (no cookies, simulating fresh browser)
 	// =========================================================================
-	httpClientB := createHttpClient(t) // Fresh client, no session
+	httpClientB := createHTTPClient(t) // Fresh client, no session
 	codeVerifierB := testCodeVerifier + "-b"
 	requestCodeChallengeB := oauth.GeneratePKCECodeChallenge(codeVerifierB)
 	requestStateB := fake.LetterN(8)
 	requestNonceB := fake.LetterN(8)
 
-	destUrlB := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURLB := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallengeB +
@@ -181,7 +181,7 @@ func TestIdTokenHint_PromptLogin_MismatchedUser_BlocksBeforeBinding(t *testing.T
 	// =========================================================================
 	// Step 5: User B authenticates (different user than the hint)
 	// =========================================================================
-	respB, err := httpClientB.Get(destUrlB)
+	respB, err := httpClientB.Get(destURLB)
 	require.NoError(t, err)
 	defer func(body io.ReadCloser) { _ = body.Close() }(respB.Body)
 
@@ -211,7 +211,7 @@ func TestIdTokenHint_PromptLogin_MismatchedUser_BlocksBeforeBinding(t *testing.T
 	// Should redirect back to client with error
 	assert.Equal(t, 302, respB.StatusCode, "Expected redirect to client callback")
 
-	errorCode, errorDescription, state := getErrorFromUrl(t, respB)
+	errorCode, errorDescription, state := getErrorFromURL(t, respB)
 
 	// Verify error response
 	assert.Equal(t, "login_required", errorCode,
@@ -223,7 +223,7 @@ func TestIdTokenHint_PromptLogin_MismatchedUser_BlocksBeforeBinding(t *testing.T
 
 	// Verify redirect goes to the correct callback URI
 	location := respB.Header.Get("Location")
-	assert.Contains(t, location, redirectUri.URI,
+	assert.Contains(t, location, redirectURI.URI,
 		"Should redirect to client's registered redirect_uri")
 
 	// =========================================================================
@@ -239,9 +239,9 @@ func TestIdTokenHint_PromptLogin_MismatchedUser_BlocksBeforeBinding(t *testing.T
 		"replaying the refused ceremony must not reach the auth context again")
 }
 
-// TestIdTokenHint_PromptLogin_MatchingUser_Success verifies that when the
+// TestIDTokenHint_PromptLogin_MatchingUser_Success verifies that when the
 // id_token_hint matches the authenticated user, the flow completes successfully.
-func TestIdTokenHint_PromptLogin_MatchingUser_Success(t *testing.T) {
+func TestIDTokenHint_PromptLogin_MatchingUser_Success(t *testing.T) {
 	// =========================================================================
 	// Step 1: Create User A
 	// =========================================================================
@@ -277,25 +277,25 @@ func TestIdTokenHint_PromptLogin_MatchingUser_Success(t *testing.T) {
 	err = database.CreateClient(context.Background(), nil, client)
 	require.NoError(t, err)
 
-	redirectUri := &record.RedirectURI{
+	redirectURI := &record.RedirectURI{
 		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	require.NoError(t, err)
 
 	// =========================================================================
 	// Step 3: Get an ID token for User A
 	// =========================================================================
-	httpClient1 := createHttpClient(t)
+	httpClient1 := createHTTPClient(t)
 	codeVerifier1 := testCodeVerifier + "-1"
 	requestCodeChallenge1 := oauth.GeneratePKCECodeChallenge(codeVerifier1)
 	requestState1 := fake.LetterN(8)
 	requestNonce1 := fake.LetterN(8)
 	requestScope := "openid profile email"
 
-	destUrl1 := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL1 := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge1 +
@@ -303,7 +303,7 @@ func TestIdTokenHint_PromptLogin_MatchingUser_Success(t *testing.T) {
 		"&state=" + requestState1 +
 		"&nonce=" + requestNonce1
 
-	resp, err := httpClient1.Get(destUrl1)
+	resp, err := httpClient1.Get(destURL1)
 	require.NoError(t, err)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
@@ -330,21 +330,21 @@ func TestIdTokenHint_PromptLogin_MatchingUser_Success(t *testing.T) {
 	resp = loadPage(t, httpClient1, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	code1, state1 := getCodeAndStateFromUrl(t, resp)
+	code1, state1 := getCodeAndStateFromURL(t, resp)
 	assert.Equal(t, requestState1, state1)
 
 	// Exchange code for tokens
-	tokenUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	tokenURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 	formData1 := url.Values{
 		"grant_type":    {"authorization_code"},
 		"client_id":     {client.ClientIdentifier},
 		"client_secret": {clientSecret},
 		"code":          {code1},
-		"redirect_uri":  {redirectUri.URI},
+		"redirect_uri":  {redirectURI.URI},
 		"code_verifier": {codeVerifier1},
 	}
 
-	tokenData1 := postToTokenEndpoint(t, httpClient1, tokenUrl, formData1)
+	tokenData1 := postToTokenEndpoint(t, httpClient1, tokenURL, formData1)
 	assert.NotNil(t, tokenData1["id_token"])
 	idToken := tokenData1["id_token"].(string)
 	assert.NotEmpty(t, idToken)
@@ -356,14 +356,14 @@ func TestIdTokenHint_PromptLogin_MatchingUser_Success(t *testing.T) {
 	// =========================================================================
 	// Step 4: Start NEW auth with same user using id_token_hint + prompt=login
 	// =========================================================================
-	httpClient2 := createHttpClient(t) // Fresh client
+	httpClient2 := createHTTPClient(t) // Fresh client
 	codeVerifier2 := testCodeVerifier + "-2"
 	requestCodeChallenge2 := oauth.GeneratePKCECodeChallenge(codeVerifier2)
 	requestState2 := fake.LetterN(8)
 	requestNonce2 := fake.LetterN(8)
 
-	destUrl2 := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL2 := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge2 +
@@ -376,7 +376,7 @@ func TestIdTokenHint_PromptLogin_MatchingUser_Success(t *testing.T) {
 	// =========================================================================
 	// Step 5: Same user authenticates again
 	// =========================================================================
-	resp2, err := httpClient2.Get(destUrl2)
+	resp2, err := httpClient2.Get(destURL2)
 	require.NoError(t, err)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp2)
 
@@ -407,7 +407,7 @@ func TestIdTokenHint_PromptLogin_MatchingUser_Success(t *testing.T) {
 	defer func() { _ = resp2.Body.Close() }()
 
 	// Should get a code, not an error
-	code2, state2 := getCodeAndStateFromUrl(t, resp2)
+	code2, state2 := getCodeAndStateFromURL(t, resp2)
 	assert.NotEmpty(t, code2, "Should receive authorization code when user matches id_token_hint")
 	assert.Equal(t, requestState2, state2)
 
@@ -417,23 +417,23 @@ func TestIdTokenHint_PromptLogin_MatchingUser_Success(t *testing.T) {
 		"client_id":     {client.ClientIdentifier},
 		"client_secret": {clientSecret},
 		"code":          {code2},
-		"redirect_uri":  {redirectUri.URI},
+		"redirect_uri":  {redirectURI.URI},
 		"code_verifier": {codeVerifier2},
 	}
 
-	tokenData2 := postToTokenEndpoint(t, httpClient2, tokenUrl, formData2)
+	tokenData2 := postToTokenEndpoint(t, httpClient2, tokenURL, formData2)
 	assert.NotNil(t, tokenData2["access_token"], "Should receive access_token")
 	assert.NotNil(t, tokenData2["id_token"], "Should receive id_token")
 
 	// Verify new ID token still has same subject
-	newIdToken := tokenData2["id_token"].(string)
-	newIdClaims := decodeJWTPayload(t, newIdToken)
-	assert.Equal(t, user.Subject, newIdClaims["sub"])
+	newIDToken := tokenData2["id_token"].(string)
+	newIDClaims := decodeJWTPayload(t, newIDToken)
+	assert.Equal(t, user.Subject, newIDClaims["sub"])
 }
 
-// TestIdTokenHint_NoPrompt_MismatchedUser_BlocksBeforeBinding verifies that
+// TestIDTokenHint_NoPrompt_MismatchedUser_BlocksBeforeBinding verifies that
 // id_token_hint works even without prompt=login parameter.
-func TestIdTokenHint_NoPrompt_MismatchedUser_BlocksBeforeBinding(t *testing.T) {
+func TestIDTokenHint_NoPrompt_MismatchedUser_BlocksBeforeBinding(t *testing.T) {
 	// Create two users
 	passwordA := fake.Password(10)
 	passwordHashedA, err := passwordhash.Hash(passwordA)
@@ -478,23 +478,23 @@ func TestIdTokenHint_NoPrompt_MismatchedUser_BlocksBeforeBinding(t *testing.T) {
 	err = database.CreateClient(context.Background(), nil, client)
 	require.NoError(t, err)
 
-	redirectUri := &record.RedirectURI{
+	redirectURI := &record.RedirectURI{
 		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	require.NoError(t, err)
 
 	// Get ID token for User A (complete flow and token exchange)
-	httpClientA := createHttpClient(t)
+	httpClientA := createHTTPClient(t)
 	codeVerifierA := testCodeVerifier + "-a"
 	requestCodeChallengeA := oauth.GeneratePKCECodeChallenge(codeVerifierA)
 	requestStateA := fake.LetterN(8)
 	requestNonceA := fake.LetterN(8)
 	requestScope := "openid profile"
 
-	destUrlA := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURLA := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallengeA +
@@ -502,7 +502,7 @@ func TestIdTokenHint_NoPrompt_MismatchedUser_BlocksBeforeBinding(t *testing.T) {
 		"&state=" + requestStateA +
 		"&nonce=" + requestNonceA
 
-	respA, err := httpClientA.Get(destUrlA)
+	respA, err := httpClientA.Get(destURLA)
 	require.NoError(t, err)
 	defer func(r *http.Response) { _ = r.Body.Close() }(respA)
 
@@ -529,32 +529,32 @@ func TestIdTokenHint_NoPrompt_MismatchedUser_BlocksBeforeBinding(t *testing.T) {
 	respA = loadPage(t, httpClientA, redirectLocation)
 	defer func() { _ = respA.Body.Close() }()
 
-	codeA, _ := getCodeAndStateFromUrl(t, respA)
+	codeA, _ := getCodeAndStateFromURL(t, respA)
 
 	// Exchange for ID token
-	tokenUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	tokenURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 	formDataA := url.Values{
 		"grant_type":    {"authorization_code"},
 		"client_id":     {client.ClientIdentifier},
 		"client_secret": {clientSecret},
 		"code":          {codeA},
-		"redirect_uri":  {redirectUri.URI},
+		"redirect_uri":  {redirectURI.URI},
 		"code_verifier": {codeVerifierA},
 	}
 
-	tokenDataA := postToTokenEndpoint(t, httpClientA, tokenUrl, formDataA)
+	tokenDataA := postToTokenEndpoint(t, httpClientA, tokenURL, formDataA)
 	idTokenUserA := tokenDataA["id_token"].(string)
 
 	// Start new auth with User B using User A's id_token_hint (NO prompt parameter)
-	httpClientB := createHttpClient(t)
+	httpClientB := createHTTPClient(t)
 	codeVerifierB := testCodeVerifier + "-b"
 	requestCodeChallengeB := oauth.GeneratePKCECodeChallenge(codeVerifierB)
 	requestStateB := fake.LetterN(8)
 	requestNonceB := fake.LetterN(8)
 
 	// Note: NO prompt=login parameter here
-	destUrlB := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURLB := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallengeB +
@@ -564,7 +564,7 @@ func TestIdTokenHint_NoPrompt_MismatchedUser_BlocksBeforeBinding(t *testing.T) {
 		"&id_token_hint=" + url.QueryEscape(idTokenUserA)
 
 	// User B authenticates
-	respB, err := httpClientB.Get(destUrlB)
+	respB, err := httpClientB.Get(destURLB)
 	require.NoError(t, err)
 	defer func(r *http.Response) { _ = r.Body.Close() }(respB)
 
@@ -589,7 +589,7 @@ func TestIdTokenHint_NoPrompt_MismatchedUser_BlocksBeforeBinding(t *testing.T) {
 
 	// Should get error=login_required even without prompt parameter, answered by /auth/completed
 	// before anything is bound
-	errorCode, errorDescription, state := getErrorFromUrl(t, respB)
+	errorCode, errorDescription, state := getErrorFromURL(t, respB)
 	assert.Equal(t, "login_required", errorCode,
 		"Should return login_required error when user differs from id_token_hint, even without prompt parameter")
 	assert.Contains(t, errorDescription, "authenticated user")

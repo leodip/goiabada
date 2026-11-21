@@ -37,7 +37,7 @@ func userinfoPost(t *testing.T, accessToken string) *http.Response {
 	req, err := http.NewRequest("POST", appConfig.AuthServer.BaseURL+"/userinfo", strings.NewReader(form.Encode()))
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	resp, err := createHttpClient(t).Do(req)
+	resp, err := createHTTPClient(t).Do(req)
 	require.NoError(t, err)
 	return resp
 }
@@ -197,7 +197,7 @@ func TestUserinfo_LegacyROPCGrantNamingUserinfo(t *testing.T) {
 	data, _ := ropcTokenResponse(t, "openid", nil)
 	refreshToken := data["refresh_token"].(string)
 
-	row := refreshTokenRowByJti(t, refreshToken)
+	row := refreshTokenRowByJTI(t, refreshToken)
 	row.Scope = "openid authserver:userinfo"
 	require.NoError(t, database.UpdateRefreshToken(context.Background(), nil, row))
 

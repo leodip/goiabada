@@ -157,7 +157,7 @@ func TestAPIClientCreate_Unauthorized(t *testing.T) {
 	require.NoError(t, err)
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients"
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(b))
 	require.NoError(t, err)
 	resp, err := httpClient.Do(req)

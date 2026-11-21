@@ -55,7 +55,7 @@ type crossUserBrowser struct {
 	jar          *http.Client
 	client       *record.Client
 	clientSecret string
-	redirectUri  *record.RedirectURI
+	redirectURI  *record.RedirectURI
 	userA        *record.User
 	userB        *record.User
 	passwordB    string
@@ -63,11 +63,11 @@ type crossUserBrowser struct {
 	sessionA *record.UserSession
 }
 
-// createCrossUserUser makes a user this file can sign in. withOtp enrols a real TOTP secret,
+// createCrossUserUser makes a user this file can sign in. withOTP enrols a real TOTP secret,
 // encrypted at rest the way production stores it, and RETURNS the plaintext seed so a case can
 // generate a passcode from it: users.otp_secret was dropped by migration 000048 (#98), so the seed
-// lives in a local rather than on the model. Without withOtp the returned seed is empty.
-func createCrossUserUser(t *testing.T, withOtp bool) (*record.User, string, string) {
+// lives in a local rather than on the model. Without withOTP the returned seed is empty.
+func createCrossUserUser(t *testing.T, withOTP bool) (*record.User, string, string) {
 	password := fake.Password(10)
 	passwordHashed, err := passwordhash.Hash(password)
 	require.NoError(t, err)
@@ -80,7 +80,7 @@ func createCrossUserUser(t *testing.T, withOtp bool) (*record.User, string, stri
 	}
 
 	otpSecret := ""
-	if withOtp {
+	if withOTP {
 		otpSecret = newOTPSecretForTest(t, user.Email)
 		user.OTPSecretEncrypted = encryptOTPSecretForTest(t, otpSecret)
 		user.OTPEnabled = true
@@ -93,13 +93,13 @@ func createCrossUserUser(t *testing.T, withOtp bool) (*record.User, string, stri
 // createCrossUserBrowser builds the confidential client, both users, and a browser with user A
 // already signed in on it.
 //
-// defaultAcrLevel is the client's. aSessionAcrLevel is the level A's session ends up holding, and
+// defaultACRLevel is the client's. aSessionACRLevel is the level A's session ends up holding, and
 // the two are separate parameters rather than one because a case needing A's session to sit ABOVE
 // the target B will later face cannot get there from the client's level alone: the client's level
 // is a floor under every ceremony on that client, B's included, so raising it to lift A's session
 // lifts B's target with it and the two stop differing (#240).
 //
-// A reaches aSessionAcrLevel by asking for it with acr_values, which is a step-up the floor still
+// A reaches aSessionACRLevel by asking for it with acr_values, which is a step-up the floor still
 // permits, so this is the same route a real user takes rather than a level written onto the row
 // behind the server's back.
 //
@@ -109,13 +109,13 @@ func createCrossUserUser(t *testing.T, withOtp bool) (*record.User, string, stri
 // it came from. Give both users the same methods and that assertion passes whether the value was B's
 // or copied off A's session, which is the shape a cross-user regression would take (#133).
 //
-// A session at level1 never asks A for a second factor, so a fixture built with aSessionAcrLevel at
+// A session at level1 never asks A for a second factor, so a fixture built with aSessionACRLevel at
 // level1 cannot make the two differ. There the methods assertions are consistency checks; the
 // provenance is carried by the cases where A reaches level2_optional.
-func createCrossUserBrowser(t *testing.T, defaultAcrLevel record.ACRLevel,
-	aSessionAcrLevel record.ACRLevel) *crossUserBrowser {
+func createCrossUserBrowser(t *testing.T, defaultACRLevel record.ACRLevel,
+	aSessionACRLevel record.ACRLevel) *crossUserBrowser {
 
-	require.False(t, defaultAcrLevel.IsHigherThan(aSessionAcrLevel),
+	require.False(t, defaultACRLevel.IsHigherThan(aSessionACRLevel),
 		"the client's level is a floor under A's ceremony too, so A's session cannot end up below it")
 
 	clientSecret := fake.LetterN(32)
@@ -128,27 +128,27 @@ func createCrossUserBrowser(t *testing.T, defaultAcrLevel record.ACRLevel,
 		AuthorizationCodeEnabled: true,
 		IsPublic:                 false,
 		ConsentRequired:          false,
-		DefaultACRLevel:          defaultAcrLevel,
+		DefaultACRLevel:          defaultACRLevel,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
 
-	redirectUri := &record.RedirectURI{
+	redirectURI := &record.RedirectURI{
 		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
-	require.NoError(t, database.CreateRedirectURI(context.Background(), nil, redirectUri))
+	require.NoError(t, database.CreateRedirectURI(context.Background(), nil, redirectURI))
 
 	// A presents a second factor whenever A's own level asks for one; B never does.
-	aPresentsOtp := aSessionAcrLevel.IsHigherThan(record.ACRLevel1)
-	userA, passwordA, otpSecretA := createCrossUserUser(t, aPresentsOtp)
+	aPresentsOTP := aSessionACRLevel.IsHigherThan(record.ACRLevel1)
+	userA, passwordA, otpSecretA := createCrossUserUser(t, aPresentsOTP)
 	userB, passwordB, _ := createCrossUserUser(t, false)
 
 	b := &crossUserBrowser{
-		jar:          createHttpClient(t),
+		jar:          createHTTPClient(t),
 		client:       client,
 		clientSecret: clientSecret,
-		redirectUri:  redirectUri,
+		redirectURI:  redirectURI,
 		userA:        userA,
 		userB:        userB,
 		passwordB:    passwordB,
@@ -158,23 +158,23 @@ func createCrossUserBrowser(t *testing.T, defaultAcrLevel record.ACRLevel,
 	// puts that level on S_A. At or below the client's level the parameter would be redundant, since
 	// the floor supplies it.
 	aExtra := ""
-	if aSessionAcrLevel.IsHigherThan(defaultAcrLevel) {
-		aExtra = "&acr_values=" + url.QueryEscape(aSessionAcrLevel.String())
+	if aSessionACRLevel.IsHigherThan(defaultACRLevel) {
+		aExtra = "&acr_values=" + url.QueryEscape(aSessionACRLevel.String())
 	}
-	signInWithPassword(t, b.jar, crossUserAuthorizeUrl(b, aExtra),
-		userA.Email, passwordA, aPresentsOtp, otpSecretA)
+	signInWithPassword(t, b.jar, crossUserAuthorizeURL(b, aExtra),
+		userA.Email, passwordA, aPresentsOTP, otpSecretA)
 
 	sessionsA, err := database.GetUserSessionsByUserID(context.Background(), nil, userA.ID)
 	require.NoError(t, err)
 	require.Len(t, sessionsA, 1, "user A should be signed in on exactly one session")
-	require.Equal(t, aSessionAcrLevel, sessionsA[0].ACRLevel)
+	require.Equal(t, aSessionACRLevel, sessionsA[0].ACRLevel)
 
 	// Pin what A's session records, because every provenance assertion downstream is only worth
 	// anything while it differs from B's "pwd". If a change to this fixture ever stopped A presenting
 	// a second factor, those assertions would keep passing while proving nothing, so the fixture says
 	// out loud what it set up.
 	expectedMethodsA := oidc.AuthMethodPassword.String()
-	if aPresentsOtp {
+	if aPresentsOTP {
 		expectedMethodsA += " " + oidc.AuthMethodOTP.String()
 	}
 	require.Equal(t, expectedMethodsA, sessionsA[0].AuthMethods,
@@ -185,12 +185,12 @@ func createCrossUserBrowser(t *testing.T, defaultAcrLevel record.ACRLevel,
 	return b
 }
 
-// crossUserAuthorizeUrl builds an authorization request for this fixture's client. extra is
+// crossUserAuthorizeURL builds an authorization request for this fixture's client. extra is
 // appended verbatim, already query-escaped, and is where a case puts prompt, acr_values, max_age or
 // an id_token_hint.
-func crossUserAuthorizeUrl(b *crossUserBrowser, extra string) string {
+func crossUserAuthorizeURL(b *crossUserBrowser, extra string) string {
 	return appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + b.client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(b.redirectUri.URI) +
+		"&redirect_uri=" + url.QueryEscape(b.redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + oauth.GeneratePKCECodeChallenge(crossUserCodeVerifier) +
@@ -211,7 +211,7 @@ func crossUserAuthorizeUrl(b *crossUserBrowser, extra string) string {
 // otpSecret is empty for a user without OTP, whose level2 hop skips straight onward. When it is set
 // the ceremony is expected to reach /auth/otp and answer it, which is the only way "otp" reaches the
 // session's authentication methods.
-func signInWithPassword(t *testing.T, jar *http.Client, destUrl string,
+func signInWithPassword(t *testing.T, jar *http.Client, destURL string,
 	email string, password string, expectLevel2 bool, otpSecret string) string {
 
 	t.Helper()
@@ -219,7 +219,7 @@ func signInWithPassword(t *testing.T, jar *http.Client, destUrl string,
 	require.False(t, otpSecret != "" && !expectLevel2,
 		"a user with OTP can only present it on a ceremony that reaches level 2")
 
-	resp, err := jar.Get(destUrl)
+	resp, err := jar.Get(destURL)
 	require.NoError(t, err)
 	defer func(body io.ReadCloser) { _ = body.Close() }(resp.Body)
 
@@ -252,7 +252,7 @@ func signInWithPassword(t *testing.T, jar *http.Client, destUrl string,
 		defer func(body io.ReadCloser) { _ = body.Close() }(resp.Body)
 
 		otpCode := otptest.Code(t, otpSecret, time.Now())
-		resp = authenticateWithOtp(t, jar, loc, resp, otpCode)
+		resp = authenticateWithOTP(t, jar, loc, resp, otpCode)
 		defer func(body io.ReadCloser) { _ = body.Close() }(resp.Body)
 	}
 
@@ -264,7 +264,7 @@ func signInWithPassword(t *testing.T, jar *http.Client, destUrl string,
 	resp = loadPage(t, jar, loc)
 	defer func(body io.ReadCloser) { _ = body.Close() }(resp.Body)
 
-	codeVal, _ := getCodeAndStateFromUrl(t, resp)
+	codeVal, _ := getCodeAndStateFromURL(t, resp)
 	return codeVal
 }
 
@@ -277,7 +277,7 @@ func redeemCrossUserCode(t *testing.T, b *crossUserBrowser, jar *http.Client, co
 		"client_id":     {b.client.ClientIdentifier},
 		"client_secret": {b.clientSecret},
 		"code":          {codeVal},
-		"redirect_uri":  {b.redirectUri.URI},
+		"redirect_uri":  {b.redirectURI.URI},
 		"code_verifier": {crossUserCodeVerifier},
 	})
 }
@@ -377,7 +377,7 @@ func assertNextRequestAuthenticatesAsUserB(t *testing.T, b *crossUserBrowser, ex
 func signInWithTheBrowsersSession(t *testing.T, b *crossUserBrowser) string {
 	t.Helper()
 
-	resp, err := b.jar.Get(crossUserAuthorizeUrl(b, ""))
+	resp, err := b.jar.Get(crossUserAuthorizeURL(b, ""))
 	require.NoError(t, err)
 	defer func(body io.ReadCloser) { _ = body.Close() }(resp.Body)
 
@@ -400,7 +400,7 @@ func signInWithTheBrowsersSession(t *testing.T, b *crossUserBrowser) string {
 		loc = parsed.String()
 	}
 
-	codeVal, _ := getCodeAndStateFromUrl(t, resp)
+	codeVal, _ := getCodeAndStateFromURL(t, resp)
 	return codeVal
 }
 
@@ -416,13 +416,13 @@ func signInWithTheBrowsersSession(t *testing.T, b *crossUserBrowser) string {
 func TestCrossUser_PromptLogin_BindsToTheAuthenticatingUsersSession(t *testing.T) {
 	b := createCrossUserBrowser(t, record.ACRLevel2Optional, record.ACRLevel2Optional)
 
-	codeVal := signInWithPassword(t, b.jar, crossUserAuthorizeUrl(b, "&prompt=login"),
+	codeVal := signInWithPassword(t, b.jar, crossUserAuthorizeURL(b, "&prompt=login"),
 		b.userB.Email, b.passwordB, true, "")
 
 	assertCeremonyBoundToUserB(t, b, codeVal)
 }
 
-// TestCrossUser_IdTokenHintNamingTheNewUser_DoesNotInheritTheOldSessionsAcr covers the second entry
+// TestCrossUser_IDTokenHintNamingTheNewUser_DoesNotInheritTheOldSessionsACR covers the second entry
 // path, and it is the shape that minted a cross-bound code.
 //
 // An id_token_hint naming a third party is refused before the ceremony binds a session, at
@@ -438,7 +438,7 @@ func TestCrossUser_PromptLogin_BindsToTheAuthenticatingUsersSession(t *testing.T
 // A really did present that second factor here, so A's session records "pwd otp" against B's "pwd".
 // The methods assertions in the shared block are therefore about provenance and not only about
 // value: the thing they forbid is a value sitting on the row this ceremony was cookied to.
-func TestCrossUser_IdTokenHintNamingTheNewUser_DoesNotInheritTheOldSessionsAcr(t *testing.T) {
+func TestCrossUser_IDTokenHintNamingTheNewUser_DoesNotInheritTheOldSessionsACR(t *testing.T) {
 	// A level1 client, with A stepping up to level2_optional by asking for it. The client has to
 	// stay at level1 for this case to keep discriminating: B's ceremony asks for level1, and the
 	// floor would otherwise raise B's target to the client's level, making the value the test
@@ -450,8 +450,8 @@ func TestCrossUser_IdTokenHintNamingTheNewUser_DoesNotInheritTheOldSessionsAcr(t
 	// once the token is in hand, which is what lets the shared block insist B holds exactly one
 	// session at the end. The hint names B, not a session, so it is still B's after.
 	level1 := "&acr_values=" + url.QueryEscape(record.ACRLevel1.String())
-	otherBrowser := createHttpClient(t)
-	hintCodeVal := signInWithPassword(t, otherBrowser, crossUserAuthorizeUrl(b, level1),
+	otherBrowser := createHTTPClient(t)
+	hintCodeVal := signInWithPassword(t, otherBrowser, crossUserAuthorizeURL(b, level1),
 		b.userB.Email, b.passwordB, false, "")
 	hintTokenData := redeemCrossUserCode(t, b, otherBrowser, hintCodeVal)
 	idTokenUserB, ok := hintTokenData["id_token"].(string)
@@ -462,7 +462,7 @@ func TestCrossUser_IdTokenHintNamingTheNewUser_DoesNotInheritTheOldSessionsAcr(t
 	require.NoError(t, database.DeleteUserSession(context.Background(), nil, hintSessions[0].ID))
 
 	codeVal := signInWithPassword(t, b.jar,
-		crossUserAuthorizeUrl(b, level1+"&id_token_hint="+url.QueryEscape(idTokenUserB)),
+		crossUserAuthorizeURL(b, level1+"&id_token_hint="+url.QueryEscape(idTokenUserB)),
 		b.userB.Email, b.passwordB, false, "")
 
 	code := loadCodeFromDatabase(t, codeVal)
@@ -488,19 +488,19 @@ func TestCrossUser_IdTokenHintNamingTheNewUser_DoesNotInheritTheOldSessionsAcr(t
 func TestCrossUser_ExpiredForeignSession_BindsToTheAuthenticatingUsersSession(t *testing.T) {
 	b := createCrossUserBrowser(t, record.ACRLevel1, record.ACRLevel1)
 
-	codeVal := signInWithPassword(t, b.jar, crossUserAuthorizeUrl(b, "&max_age=0"),
+	codeVal := signInWithPassword(t, b.jar, crossUserAuthorizeURL(b, "&max_age=0"),
 		b.userB.Email, b.passwordB, false, "")
 
 	assertCeremonyBoundToUserB(t, b, codeVal)
 }
 
-// TestCrossUser_IdTokenHintNamingAThirdUser_TheRefusedSignInStillEndsTheOldSession covers the
+// TestCrossUser_IDTokenHintNamingAThirdUser_TheRefusedSignInStillEndsTheOldSession covers the
 // handover a hint refuses. The client's hint names a third user, and B signs in over A's session:
 // /auth/completed answers login_required before it binds anything (#535), so B gets no session, but
 // the browser has changed hands all the same, so A's session is ended as any handover ends it, with
 // its refresh token revoked and the handover audited (#133). The browser then holds no session, and
 // the next ordinary request asks whoever is there for a password rather than signing them in as A.
-func TestCrossUser_IdTokenHintNamingAThirdUser_TheRefusedSignInStillEndsTheOldSession(t *testing.T) {
+func TestCrossUser_IDTokenHintNamingAThirdUser_TheRefusedSignInStillEndsTheOldSession(t *testing.T) {
 	requireDatabaseAuditLogs(t)
 	adminToken, adminClient := createAdminClientWithToken(t)
 	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, adminClient.ID) })
@@ -520,12 +520,12 @@ func TestCrossUser_IdTokenHintNamingAThirdUser_TheRefusedSignInStillEndsTheOldSe
 	require.NotEqual(t, b.userA.ID, hintCode.User.ID)
 	require.NotEqual(t, b.userB.ID, hintCode.User.ID)
 
-	authorizeUrl := crossUserAuthorizeUrl(b, "&id_token_hint="+url.QueryEscape(idToken))
-	parsedAuthorizeUrl, err := url.Parse(authorizeUrl)
+	authorizeURL := crossUserAuthorizeURL(b, "&id_token_hint="+url.QueryEscape(idToken))
+	parsedAuthorizeURL, err := url.Parse(authorizeURL)
 	require.NoError(t, err)
-	state := parsedAuthorizeUrl.Query().Get("state")
+	state := parsedAuthorizeURL.Query().Get("state")
 
-	resp, err := b.jar.Get(authorizeUrl)
+	resp, err := b.jar.Get(authorizeURL)
 	require.NoError(t, err)
 	defer func(body io.ReadCloser) { _ = body.Close() }(resp.Body)
 	loc := assertRedirect(t, resp, "/auth/level1")
@@ -543,14 +543,14 @@ func TestCrossUser_IdTokenHintNamingAThirdUser_TheRefusedSignInStillEndsTheOldSe
 
 	req, err := http.NewRequest(http.MethodGet, loc, nil)
 	require.NoError(t, err)
-	requestId := "completed-" + fake.LetterN(16)
-	req.Header.Set("X-Request-Id", requestId)
+	requestID := "completed-" + fake.LetterN(16)
+	req.Header.Set("X-Request-Id", requestID)
 	resp, err = b.jar.Do(req)
 	require.NoError(t, err)
 	defer func(body io.ReadCloser) { _ = body.Close() }(resp.Body)
 
 	destination, params := clientAnswer(t, resp, "code")
-	assert.Equal(t, b.redirectUri.URI, destination)
+	assert.Equal(t, b.redirectURI.URI, destination)
 	assert.Equal(t, "login_required", params.Get("error"))
 	assert.Equal(t, "The authenticated user does not match the id_token_hint", params.Get("error_description"))
 	assert.Equal(t, state, params.Get("state"))
@@ -560,7 +560,7 @@ func TestCrossUser_IdTokenHintNamingAThirdUser_TheRefusedSignInStillEndsTheOldSe
 	survivingA, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, b.sessionA.SessionIdentifier)
 	require.NoError(t, err)
 	assert.Nil(t, survivingA, "the previous user's session must be terminated, not left behind")
-	refreshRowA, err := database.GetRefreshTokenByJTI(context.Background(), nil, refreshTokenJti(t, refreshTokenA))
+	refreshRowA, err := database.GetRefreshTokenByJTI(context.Background(), nil, refreshTokenJTI(t, refreshTokenA))
 	require.NoError(t, err)
 	require.NotNil(t, refreshRowA)
 	assert.True(t, refreshRowA.Revoked, "the previous user's refresh token from this browser is revoked")
@@ -569,20 +569,20 @@ func TestCrossUser_IdTokenHintNamingAThirdUser_TheRefusedSignInStillEndsTheOldSe
 	sessionsB, err := database.GetUserSessionsByUserID(context.Background(), nil, b.userB.ID)
 	require.NoError(t, err)
 	assert.Empty(t, sessionsB, "the refused sign-in leaves no session for the user who signed in")
-	assert.Empty(t, auditRows(t, adminToken, "started_new_user_session", requestId),
+	assert.Empty(t, auditRows(t, adminToken, "started_new_user_session", requestID),
 		"no session start is recorded")
 
-	replaced := auditRows(t, adminToken, "cross_user_session_replaced", requestId)
+	replaced := auditRows(t, adminToken, "cross_user_session_replaced", requestID)
 	if assert.Len(t, replaced, 1, "the handover is recorded once") {
 		assert.EqualValues(t, b.userB.ID, replaced[0]["user_id"])
 		assert.EqualValues(t, b.userA.ID, replaced[0]["previous_user_id"])
 		assert.Equal(t, b.sessionA.SessionIdentifier, replaced[0]["previous_session_identifier"])
 	}
-	assert.Len(t, auditRows(t, adminToken, "terminated_user_session", requestId), 1)
-	assert.Len(t, auditRows(t, adminToken, "deleted_user_session", requestId), 1)
+	assert.Len(t, auditRows(t, adminToken, "terminated_user_session", requestID), 1)
+	assert.Len(t, auditRows(t, adminToken, "deleted_user_session", requestID), 1)
 
 	// The browser holds no session now, so whoever is at it is asked for a password.
-	resp, err = b.jar.Get(crossUserAuthorizeUrl(b, ""))
+	resp, err = b.jar.Get(crossUserAuthorizeURL(b, ""))
 	require.NoError(t, err)
 	defer func(body io.ReadCloser) { _ = body.Close() }(resp.Body)
 	assertRedirect(t, resp, "/auth/level1")

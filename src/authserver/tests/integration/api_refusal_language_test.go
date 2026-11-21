@@ -71,7 +71,7 @@ func TestAPIRefusals_AreAnsweredInTheRequestsLanguage(t *testing.T) {
 						req.Header.Set("Accept-Language", language.acceptLanguage)
 					}
 
-					resp, err := createHttpClient(t).Do(req)
+					resp, err := createHTTPClient(t).Do(req)
 					require.NoError(t, err)
 					defer func() { _ = resp.Body.Close() }()
 

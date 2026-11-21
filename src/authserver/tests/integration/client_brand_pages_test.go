@@ -135,7 +135,7 @@ func TestSignInPages_AreDrawnInTheClientsBrand(t *testing.T) {
 	defaultBrand := makeDefaultBrand(t, record.BrandAppearanceDark, "plum")
 	client, clientBrand, redirectURI := brandedSignInClient(t, record.ACRLevel1)
 	user, password := brandSignInUser(t, "")
-	browser := createHttpClient(t)
+	browser := createHTTPClient(t)
 
 	resp := loadPage(t, browser, brandAuthorizeURL(client, redirectURI, "form_post"))
 	resp, _ = brandFollowTo(t, browser, resp, "/auth/level1")
@@ -194,7 +194,7 @@ func TestSignInPages_AreDrawnInTheClientsBrand(t *testing.T) {
 	// Another client's sign-in, in another browser, keeps the default brand.
 	t.Run("another client's password page", func(t *testing.T) {
 		other, otherRedirectURI := brandSignInClient(t, record.ACRLevel1)
-		otherBrowser := createHttpClient(t)
+		otherBrowser := createHTTPClient(t)
 		page := loadPage(t, otherBrowser, brandAuthorizeURL(other, otherRedirectURI, ""))
 		page, _ = brandFollowTo(t, otherBrowser, page, "/auth/level1")
 		page, _ = brandFollowTo(t, otherBrowser, page, "/auth/pwd")
@@ -225,14 +225,14 @@ func TestSignInPages_TheOneTimeCodeStepIsDrawnInTheClientsBrand(t *testing.T) {
 		{"a client on the default brand", plain, plainRedirectURI, defaultBrand, "dark"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			browser := createHttpClient(t)
-			otpPage := navigateToOtpScreen(t, browser, tc.client, user, password, tc.redirectURI)
+			browser := createHTTPClient(t)
+			otpPage := navigateToOTPScreen(t, browser, tc.client, user, password, tc.redirectURI)
 			otpURL := otpPage.Request.URL.String()
 			require.Equal(t, http.StatusOK, otpPage.StatusCode)
 			assertDrawnInBrand(t, otpPage, tc.brand, tc.dataTheme)
 
 			wrong := otptest.Code(t, otpSecret, time.Now().Add(-10*time.Minute))
-			refused := authenticateWithOtp(t, browser, otpURL, otpPage, wrong)
+			refused := authenticateWithOTP(t, browser, otpURL, otpPage, wrong)
 			_ = otpPage.Body.Close()
 			defer func() { _ = refused.Body.Close() }()
 			require.Equal(t, http.StatusOK, refused.StatusCode)
@@ -319,7 +319,7 @@ func TestAuthorizeRefusals_AreDrawnInTheClientsBrandOnceTheClientIsKnown(t *test
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			resp := loadPage(t, createHttpClient(t), tc.target)
+			resp := loadPage(t, createHTTPClient(t), tc.target)
 			defer func() { _ = resp.Body.Close() }()
 			require.Equal(t, tc.wantStatus, resp.StatusCode)
 			assertDrawnInBrand(t, resp, tc.brand, tc.dataTheme)

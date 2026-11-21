@@ -82,10 +82,10 @@ func adminNoticeUser(t *testing.T, locale string, passwordHash string) *record.U
 
 // setPasswordAsAdministrator sets the user's password through the admin API, requires the 200 and
 // returns the password set.
-func setPasswordAsAdministrator(t *testing.T, accessToken string, userId int64) string {
+func setPasswordAsAdministrator(t *testing.T, accessToken string, userID int64) string {
 	t.Helper()
 	password := fake.Password(20)
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(userId, 10) + "/password"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(userID, 10) + "/password"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateUserPasswordRequest{NewPassword: password})
 	_ = resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -145,7 +145,7 @@ func TestAPIUserPasswordPut_AFirstPasswordSendsNothing(t *testing.T) {
 // page. It returns the password set.
 func resetThroughEmailedLink(t *testing.T, email string, earlierLinks int) string {
 	t.Helper()
-	client := createHttpClient(t)
+	client := createHTTPClient(t)
 	requestPasswordReset(t, client, email)
 	links := awaitResetLinks(t, email, earlierLinks+1)
 	require.Len(t, links, earlierLinks+1, "the reset link arrived")
@@ -157,9 +157,9 @@ func resetThroughEmailedLink(t *testing.T, email string, earlierLinks int) strin
 func setPasswordThroughLink(t *testing.T, client *http.Client, link string) string {
 	t.Helper()
 	cleanURL := followResetLink(t, client, link)
-	continuationId := loadResetForm(t, client, cleanURL)
+	continuationID := loadResetForm(t, client, cleanURL)
 	password := fake.Password(20)
-	resp := postCleanReset(t, client, cleanURL, password, continuationId)
+	resp := postCleanReset(t, client, cleanURL, password, continuationID)
 	body := bodyString(t, resp)
 	_ = resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -220,7 +220,7 @@ func TestAPIUserCreatePost_TheSetupLinkSendsNoNotice(t *testing.T) {
 	_ = resp.Body.Close()
 	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, created.User.ID) })
 
-	setPasswordThroughLink(t, createHttpClient(t), latestResetLink(t, email))
+	setPasswordThroughLink(t, createHTTPClient(t), latestResetLink(t, email))
 
 	resetThroughEmailedLink(t, email, 1)
 

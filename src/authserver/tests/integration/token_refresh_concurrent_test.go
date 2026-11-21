@@ -18,10 +18,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// refreshTokenJti pulls the jti claim out of a serialized refresh token. The tests
+// refreshTokenJTI pulls the jti claim out of a serialized refresh token. The tests
 // below need it to find the persisted row, since the response carries the JWT and the
 // database is keyed by the claim inside it.
-func refreshTokenJti(t *testing.T, refreshToken string) string {
+func refreshTokenJTI(t *testing.T, refreshToken string) string {
 	t.Helper()
 
 	parts := strings.Split(refreshToken, ".")
@@ -61,11 +61,11 @@ func TestToken_Refresh_ConcurrentDoubleSpend_IssuesOnlyOnce(t *testing.T) {
 	clientSecret := fake.Password(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	// Exchange the authorization code once, legitimately, to obtain the refresh token
 	// the race below contends for.
-	data := postToTokenEndpoint(t, httpClient, destUrl, url.Values{
+	data := postToTokenEndpoint(t, httpClient, destURL, url.Values{
 		"grant_type":    {"authorization_code"},
 		"client_id":     {code.Client.ClientIdentifier},
 		"code":          {code.Code},
@@ -76,7 +76,7 @@ func TestToken_Refresh_ConcurrentDoubleSpend_IssuesOnlyOnce(t *testing.T) {
 	require.NotNil(t, data["refresh_token"], "the authorization code exchange must return a refresh token")
 
 	parentToken := data["refresh_token"].(string)
-	parentJti := refreshTokenJti(t, parentToken)
+	parentJTI := refreshTokenJTI(t, parentToken)
 
 	formData := url.Values{
 		"grant_type":    {"refresh_token"},
@@ -97,7 +97,7 @@ func TestToken_Refresh_ConcurrentDoubleSpend_IssuesOnlyOnce(t *testing.T) {
 		go func(idx int) {
 			defer wg.Done()
 			<-release // release all goroutines together to maximize contention on the row
-			statuses[idx], bodies[idx], reqErrs[idx] = concurrentTokenPost(httpClient, destUrl, formData)
+			statuses[idx], bodies[idx], reqErrs[idx] = concurrentTokenPost(httpClient, destURL, formData)
 		}(i)
 	}
 	close(release)
@@ -131,7 +131,7 @@ func TestToken_Refresh_ConcurrentDoubleSpend_IssuesOnlyOnce(t *testing.T) {
 	assert.Equal(t, 1, successes, "exactly one concurrent presentation may succeed")
 
 	// The presented parent must be durably consumed.
-	storedParent, err := database.GetRefreshTokenByJTI(context.Background(), nil, parentJti)
+	storedParent, err := database.GetRefreshTokenByJTI(context.Background(), nil, parentJTI)
 	require.NoError(t, err)
 	require.NotNil(t, storedParent, "the presented refresh token row must still exist")
 	assert.True(t, storedParent.Revoked, "the presented refresh token must be revoked after the race")
@@ -144,7 +144,7 @@ func TestToken_Refresh_ConcurrentDoubleSpend_IssuesOnlyOnce(t *testing.T) {
 	children := make([]*record.RefreshToken, 0, len(family))
 	live := make([]*record.RefreshToken, 0, len(family))
 	for _, rt := range family {
-		if rt.PreviousRefreshTokenJTI == parentJti {
+		if rt.PreviousRefreshTokenJTI == parentJTI {
 			children = append(children, rt)
 		}
 		if !rt.Revoked {
@@ -215,7 +215,7 @@ func TestToken_Refresh_ChildOfATerminatedGrantIsBornRejected(t *testing.T) {
 	adminToken, _ := createAdminClientWithToken(t)
 	grant := createOfflineGrant(t)
 
-	parentRow, err := database.GetRefreshTokenByJTI(context.Background(), nil, refreshTokenJti(t, grant.refreshToken))
+	parentRow, err := database.GetRefreshTokenByJTI(context.Background(), nil, refreshTokenJTI(t, grant.refreshToken))
 	require.NoError(t, err)
 	require.NotNil(t, parentRow, "the redeemed grant must have a refresh token row")
 
@@ -227,8 +227,8 @@ func TestToken_Refresh_ChildOfATerminatedGrantIsBornRejected(t *testing.T) {
 	require.True(t, ok, "rotation must return a replacement refresh token: %v", rotated)
 	grant.refreshToken = childToken
 
-	childJti := refreshTokenJti(t, childToken)
-	childRow, err := database.GetRefreshTokenByJTI(context.Background(), nil, childJti)
+	childJTI := refreshTokenJTI(t, childToken)
+	childRow, err := database.GetRefreshTokenByJTI(context.Background(), nil, childJTI)
 	require.NoError(t, err)
 	require.NotNil(t, childRow, "the rotated child must have been persisted")
 
@@ -278,7 +278,7 @@ func TestToken_Refresh_ChildOfATerminatedGrantIsBornRejected(t *testing.T) {
 	//
 	// The window cannot be driven from outside the server, which is why it is reconstructed here
 	// and only approached by the racing case below.
-	swept, err := database.GetRefreshTokenByJTI(context.Background(), nil, childJti)
+	swept, err := database.GetRefreshTokenByJTI(context.Background(), nil, childJTI)
 	require.NoError(t, err)
 	require.NotNil(t, swept)
 	require.True(t, swept.Revoked,
@@ -286,7 +286,7 @@ func TestToken_Refresh_ChildOfATerminatedGrantIsBornRejected(t *testing.T) {
 
 	swept.Revoked = false
 	require.NoError(t, database.UpdateRefreshToken(context.Background(), nil, swept))
-	relived, err := database.GetRefreshTokenByJTI(context.Background(), nil, childJti)
+	relived, err := database.GetRefreshTokenByJTI(context.Background(), nil, childJTI)
 	require.NoError(t, err)
 	require.False(t, relived.Revoked, "the child must be live again, or this case proves nothing")
 
@@ -342,7 +342,7 @@ func TestToken_Refresh_RacingATermination_LeavesNoUsableDescendant(t *testing.T)
 	require.NotNil(t, session)
 
 	deleteURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-sessions/" + strconv.FormatInt(session.ID, 10)
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 	formData := url.Values{
 		"grant_type":    {"refresh_token"},
 		"client_id":     {grant.client.ClientIdentifier},
@@ -350,7 +350,7 @@ func TestToken_Refresh_RacingATermination_LeavesNoUsableDescendant(t *testing.T)
 		"client_secret": {grant.clientSecret},
 	}
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
 	const concurrency = 8
 	var wg sync.WaitGroup
@@ -366,7 +366,7 @@ func TestToken_Refresh_RacingATermination_LeavesNoUsableDescendant(t *testing.T)
 		go func(idx int) {
 			defer wg.Done()
 			<-release // release everything together, so the termination lands mid-rotation
-			statuses[idx], bodies[idx], reqErrs[idx] = concurrentTokenPost(httpClient, destUrl, formData)
+			statuses[idx], bodies[idx], reqErrs[idx] = concurrentTokenPost(httpClient, destURL, formData)
 		}(i)
 	}
 	wg.Add(1)
@@ -381,7 +381,7 @@ func TestToken_Refresh_RacingATermination_LeavesNoUsableDescendant(t *testing.T)
 		// which is what keeps this a knob rather than a dependency, and the log line below says
 		// what the chosen value actually produced.
 		time.Sleep(5 * time.Millisecond)
-		deleteStatus, deleteErr = concurrentDelete(createHttpClient(t), deleteURL, adminToken)
+		deleteStatus, deleteErr = concurrentDelete(createHTTPClient(t), deleteURL, adminToken)
 	}()
 	close(release)
 	wg.Wait()
@@ -441,7 +441,7 @@ func TestToken_Refresh_RacingATermination_LeavesNoUsableDescendant(t *testing.T)
 		// own interleaving, the child the sweep never saw, and then the marker is the only thing
 		// standing between it and a working grant. Read before presenting it, since the refusal
 		// below leaves the row alone.
-		row, rowErr := database.GetRefreshTokenByJTI(context.Background(), nil, refreshTokenJti(t, replacement))
+		row, rowErr := database.GetRefreshTokenByJTI(context.Background(), nil, refreshTokenJTI(t, replacement))
 		require.NoError(t, rowErr)
 		require.NotNil(t, row, "a replacement the server handed out must have a row")
 		if row.Revoked {
@@ -450,7 +450,7 @@ func TestToken_Refresh_RacingATermination_LeavesNoUsableDescendant(t *testing.T)
 			t.Logf("replacement %d is still live in storage: the sweep never saw it, which is gap 2's own interleaving", i)
 		}
 
-		presented := postToTokenEndpoint(t, createHttpClient(t), destUrl, url.Values{
+		presented := postToTokenEndpoint(t, createHTTPClient(t), destURL, url.Values{
 			"grant_type":    {"refresh_token"},
 			"client_id":     {grant.client.ClientIdentifier},
 			"refresh_token": {replacement},

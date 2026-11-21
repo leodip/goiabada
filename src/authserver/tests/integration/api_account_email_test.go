@@ -19,7 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func getUserAccessTokenWithAccountScope_Email(t *testing.T) (string, *record.User) {
+func getUserAccessTokenWithAccountScopeEmail(t *testing.T) (string, *record.User) {
 	scope := "openid profile email " + builtin.AuthServerResourceIdentifier + ":" + builtin.ManageAccountPermissionIdentifier
 	return createUserAccessTokenWithScope(t, scope)
 }
@@ -40,7 +40,7 @@ func givePassword(t *testing.T, user *record.User, password string) {
 // accountEmailUserWithPassword is a user holding an account-scoped token and a known password.
 func accountEmailUserWithPassword(t *testing.T) (string, *record.User) {
 	t.Helper()
-	accessToken, user := getUserAccessTokenWithAccountScope_Email(t)
+	accessToken, user := getUserAccessTokenWithAccountScopeEmail(t)
 	givePassword(t, user, accountEmailPassword)
 	return accessToken, user
 }
@@ -168,7 +168,7 @@ func TestAPIAccountEmailPut_UnauthorizedAndScope(t *testing.T) {
 	// No token
 	req, err := http.NewRequest("PUT", url, nil)
 	require.NoError(t, err)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -187,7 +187,7 @@ func TestAPIAccountEmailPut_UnauthorizedAndScope(t *testing.T) {
 }
 
 func TestAPIAccountEmailPut_InvalidRequestBody(t *testing.T) {
-	accessToken, _ := getUserAccessTokenWithAccountScope_Email(t)
+	accessToken, _ := getUserAccessTokenWithAccountScopeEmail(t)
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/email"
 
 	// Invalid JSON (no body)
@@ -195,7 +195,7 @@ func TestAPIAccountEmailPut_InvalidRequestBody(t *testing.T) {
 	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()

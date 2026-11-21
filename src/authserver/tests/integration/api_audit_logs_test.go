@@ -257,7 +257,7 @@ func TestAPIAuditLogs_UnauthorizedAndScope(t *testing.T) {
 	// No token
 	req, err := http.NewRequest("GET", url, nil)
 	require.NoError(t, err)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -290,7 +290,7 @@ func TestAPIAuditLogs_UnauthorizedAndScope(t *testing.T) {
 //
 // It also pins that the header is adopted from any client, verbatim (decision 9): that is chi's
 // behaviour today, and a change to it should be a deliberate one rather than a silent one.
-func auditedPutWithRequestId(t *testing.T, accessToken string, requestId string) {
+func auditedPutWithRequestID(t *testing.T, accessToken string, requestID string) {
 	t.Helper()
 
 	body, err := json.Marshal(api.UpdateSettingsAuditLogsRequest{
@@ -305,11 +305,11 @@ func auditedPutWithRequestId(t *testing.T, accessToken string, requestId string)
 	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
-	if requestId != "" {
-		req.Header.Set("X-Request-Id", requestId)
+	if requestID != "" {
+		req.Header.Set("X-Request-Id", requestID)
 	}
 
-	resp, err := createHttpClient(t).Do(req)
+	resp, err := createHTTPClient(t).Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -322,33 +322,33 @@ func enableAuditLogsInDatabase(t *testing.T) {
 	changeSettings(t, func(settings *record.Settings) { settings.AuditLogsInDatabaseEnabled = true })
 }
 
-func TestAPIAuditLogsGet_RequestIdFilter(t *testing.T) {
+func TestAPIAuditLogsGet_RequestIDFilter(t *testing.T) {
 	enableAuditLogsInDatabase(t)
 	accessToken, _ := createAdminClientWithToken(t)
 
 	t.Run("the id the client sent is the id the filter finds", func(t *testing.T) {
-		requestId := "itest-" + fake.LetterN(16)
-		auditedPutWithRequestId(t, accessToken, requestId)
+		requestID := "itest-" + fake.LetterN(16)
+		auditedPutWithRequestID(t, accessToken, requestID)
 
-		body, resp := getAuditLogs(t, accessToken, "requestId="+url.QueryEscape(requestId))
+		body, resp := getAuditLogs(t, accessToken, "requestId="+url.QueryEscape(requestID))
 		defer func() { _ = resp.Body.Close() }()
 
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 		assert.Equal(t, 1, body.Total)
 		if assert.Len(t, body.AuditLogs, 1) {
-			assert.Equal(t, requestId, body.AuditLogs[0].RequestID)
+			assert.Equal(t, requestID, body.AuditLogs[0].RequestID)
 			assert.Equal(t, audit.EventUpdatedAuditLogsSettings, body.AuditLogs[0].AuditEvent)
 		}
 
 		t.Run("and narrows further with the audit event", func(t *testing.T) {
-			withEvent, resp := getAuditLogs(t, accessToken, "requestId="+url.QueryEscape(requestId)+
+			withEvent, resp := getAuditLogs(t, accessToken, "requestId="+url.QueryEscape(requestID)+
 				"&auditEvent="+audit.EventUpdatedAuditLogsSettings)
 			defer func() { _ = resp.Body.Close() }()
 
 			assert.Equal(t, 1, withEvent.Total)
 			assert.Len(t, withEvent.AuditLogs, 1)
 
-			otherEvent, resp2 := getAuditLogs(t, accessToken, "requestId="+url.QueryEscape(requestId)+
+			otherEvent, resp2 := getAuditLogs(t, accessToken, "requestId="+url.QueryEscape(requestID)+
 				"&auditEvent=user_login")
 			defer func() { _ = resp2.Body.Close() }()
 
@@ -364,7 +364,7 @@ func TestAPIAuditLogsGet_RequestIdFilter(t *testing.T) {
 	t.Run("an oversized id is stored and found as the log renders it", func(t *testing.T) {
 		oversized := strings.Repeat("x", 300)
 		clipped := strings.Repeat("x", 128) + "[truncated, 128 of 300 bytes]"
-		auditedPutWithRequestId(t, accessToken, oversized)
+		auditedPutWithRequestID(t, accessToken, oversized)
 
 		body, resp := getAuditLogs(t, accessToken, "requestId="+url.QueryEscape(clipped))
 		defer func() { _ = resp.Body.Close() }()
@@ -385,12 +385,12 @@ func TestAPIAuditLogsGet_RequestIdFilter(t *testing.T) {
 		before, resp := getAuditLogs(t, accessToken,
 			"auditEvent="+audit.EventUpdatedAuditLogsSettings+"&size=1")
 		defer func() { _ = resp.Body.Close() }()
-		var lastIdBefore int64
+		var lastIDBefore int64
 		if len(before.AuditLogs) > 0 {
-			lastIdBefore = before.AuditLogs[0].ID
+			lastIDBefore = before.AuditLogs[0].ID
 		}
 
-		auditedPutWithRequestId(t, accessToken, "")
+		auditedPutWithRequestID(t, accessToken, "")
 
 		after, resp2 := getAuditLogs(t, accessToken,
 			"auditEvent="+audit.EventUpdatedAuditLogsSettings+"&size=1")
@@ -398,7 +398,7 @@ func TestAPIAuditLogsGet_RequestIdFilter(t *testing.T) {
 
 		if assert.Len(t, after.AuditLogs, 1) {
 			entry := after.AuditLogs[0]
-			assert.NotEqual(t, lastIdBefore, entry.ID, "the PUT must have written a new entry")
+			assert.NotEqual(t, lastIDBefore, entry.ID, "the PUT must have written a new entry")
 			// chi's own shape, hostname/prefix-counter, not chi's exact alphabet.
 			assert.Regexp(t, `^.+/.+-\d+$`, entry.RequestID)
 
@@ -415,8 +415,8 @@ func TestAPIAuditLogsGet_RequestIdFilter(t *testing.T) {
 // request it was written on. A zero user id leaves that column NULL, as on a row written before
 // the columns existed.
 type seededRow struct {
-	userId, loggedInUserId int64
-	requestId              string
+	userID, loggedInUserID int64
+	requestID              string
 }
 
 // seedAuditLogsWithUsers writes rows under a unique event name, oldest first and a second apart,
@@ -431,18 +431,18 @@ func seedAuditLogsWithUsers(t *testing.T, rows []seededRow) string {
 			CreatedAt:      base.Add(time.Duration(i) * time.Second),
 			AuditEvent:     auditEvent,
 			Details:        fmt.Sprintf(`{"seq":%d}`, i),
-			RequestID:      row.requestId,
-			UserID:         sql.NullInt64{Int64: row.userId, Valid: row.userId != 0},
-			LoggedInUserID: sql.NullInt64{Int64: row.loggedInUserId, Valid: row.loggedInUserId != 0},
+			RequestID:      row.requestID,
+			UserID:         sql.NullInt64{Int64: row.userID, Valid: row.userID != 0},
+			LoggedInUserID: sql.NullInt64{Int64: row.loggedInUserID, Valid: row.loggedInUserID != 0},
 		}
 		require.NoError(t, database.CreateAuditLog(context.Background(), nil, auditLog))
 	}
 	return auditEvent
 }
 
-// userIdOfNoRealUser is an id far above any user this suite creates, so the rows a test seeds
+// userIDOfNoRealUser is an id far above any user this suite creates, so the rows a test seeds
 // under it are the only rows the filter can find.
-func userIdOfNoRealUser() int64 {
+func userIDOfNoRealUser() int64 {
 	return int64(fake.Number(1_000_000_000, 1_900_000_000))
 }
 
@@ -464,22 +464,22 @@ func int64Ptr(v int64) *int64 { return &v }
 
 func TestAPIAuditLogsGet_UserFilter(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
-	user := userIdOfNoRealUser()
+	user := userIDOfNoRealUser()
 	other := user + 1
-	requestId := "user-filter-" + fake.LetterN(16)
+	requestID := "user-filter-" + fake.LetterN(16)
 
 	auditEvent := seedAuditLogsWithUsers(t, []seededRow{
-		{userId: user},                                // 0: about the user
-		{userId: other, loggedInUserId: user},         // 1: made by the user
-		{userId: user, loggedInUserId: user},          // 2: about and by the user, listed once
-		{userId: other, loggedInUserId: other},        // 3: naming neither
+		{userID: user},                                // 0: about the user
+		{userID: other, loggedInUserID: user},         // 1: made by the user
+		{userID: user, loggedInUserID: user},          // 2: about and by the user, listed once
+		{userID: other, loggedInUserID: other},        // 3: naming neither
 		{},                                            // 4: no user columns
-		{userId: user, requestId: requestId},          // 5: about the user, on the request
-		{loggedInUserId: other, requestId: requestId}, // 6: on the request, naming neither
-		{userId: other, loggedInUserId: user, requestId: requestId}, // 7: by the user, on the request
+		{userID: user, requestID: requestID},          // 5: about the user, on the request
+		{loggedInUserID: other, requestID: requestID}, // 6: on the request, naming neither
+		{userID: other, loggedInUserID: user, requestID: requestID}, // 7: by the user, on the request
 	})
 	// A row about the user under another event, which only the filters without auditEvent list.
-	otherEvent := seedAuditLogsWithUsers(t, []seededRow{{userId: user, requestId: requestId}})
+	otherEvent := seedAuditLogsWithUsers(t, []seededRow{{userID: user, requestID: requestID}})
 
 	testCases := []struct {
 		name     string
@@ -490,9 +490,9 @@ func TestAPIAuditLogsGet_UserFilter(t *testing.T) {
 		{"the user and the event list the rows about them or by them, newest first",
 			"userId=%d&auditEvent=" + auditEvent, []int{7, 5, 2, 1, 0}, nil},
 		{"the user and the request id",
-			"userId=%d&requestId=" + requestId, []int{0, 7, 5}, []string{otherEvent, auditEvent, auditEvent}},
+			"userId=%d&requestId=" + requestID, []int{0, 7, 5}, []string{otherEvent, auditEvent, auditEvent}},
 		{"all three",
-			"userId=%d&requestId=" + requestId + "&auditEvent=" + auditEvent, []int{7, 5}, nil},
+			"userId=%d&requestId=" + requestID + "&auditEvent=" + auditEvent, []int{7, 5}, nil},
 		{"the user alone",
 			"userId=%d", []int{0, 7, 5, 2, 1, 0}, []string{otherEvent, auditEvent, auditEvent, auditEvent, auditEvent, auditEvent}},
 	}
@@ -522,18 +522,18 @@ func TestAPIAuditLogsGet_UserFilter(t *testing.T) {
 		require.Equal(t, http.StatusOK, resp.StatusCode)
 		require.Equal(t, []int{7, 6, 5, 4, 3, 2, 1, 0}, seqs(t, body.AuditLogs))
 		// Newest first: seq 7 down to seq 0.
-		wantUserIds := []*int64{int64Ptr(other), nil, int64Ptr(user), nil,
+		wantUserIDs := []*int64{int64Ptr(other), nil, int64Ptr(user), nil,
 			int64Ptr(other), int64Ptr(user), int64Ptr(other), int64Ptr(user)}
-		wantLoggedInUserIds := []*int64{int64Ptr(user), int64Ptr(other), nil, nil,
+		wantLoggedInUserIDs := []*int64{int64Ptr(user), int64Ptr(other), nil, nil,
 			int64Ptr(other), int64Ptr(user), int64Ptr(user), nil}
 		for i, entry := range body.AuditLogs {
-			assert.Equal(t, wantUserIds[i], entry.UserID, "seq %d's userId", 7-i)
-			assert.Equal(t, wantLoggedInUserIds[i], entry.LoggedInUserID, "seq %d's loggedInUserId", 7-i)
+			assert.Equal(t, wantUserIDs[i], entry.UserID, "seq %d's userId", 7-i)
+			assert.Equal(t, wantLoggedInUserIDs[i], entry.LoggedInUserID, "seq %d's loggedInUserId", 7-i)
 		}
 	})
 
 	t.Run("an id no row names answers an empty page", func(t *testing.T) {
-		body, resp := getAuditLogs(t, accessToken, fmt.Sprintf("userId=%d", userIdOfNoRealUser()+1_000_000_000))
+		body, resp := getAuditLogs(t, accessToken, fmt.Sprintf("userId=%d", userIDOfNoRealUser()+1_000_000_000))
 		defer func() { _ = resp.Body.Close() }()
 
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -552,7 +552,7 @@ func TestAPIAuditLogsGet_UserFilter(t *testing.T) {
 
 // A userId that is not a positive integer is refused, never ignored: ignoring it would list every
 // user's events under a filter the caller believes is set (#780 decision 3).
-func TestAPIAuditLogsGet_AUserIdThatIsNotAPositiveIntegerIsRefused(t *testing.T) {
+func TestAPIAuditLogsGet_AUserIDThatIsNotAPositiveIntegerIsRefused(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	for _, value := range []string{"", "abc", "0", "-4", "4.0", "99999999999999999999"} {
@@ -580,7 +580,7 @@ func TestAPIAuditLogsGet_AChangeIsListedUnderBothUsers(t *testing.T) {
 	changed := createUserToChange(t)
 	require.NotEqual(t, administrator.ID, changed.ID)
 
-	requestId := disableUserUnderRequestId(t, adminToken, changed)
+	requestID := disableUserUnderRequestID(t, adminToken, changed)
 
 	for _, who := range []struct {
 		name string
@@ -588,7 +588,7 @@ func TestAPIAuditLogsGet_AChangeIsListedUnderBothUsers(t *testing.T) {
 	}{{"under the user changed", changed.ID}, {"under the administrator", administrator.ID}} {
 		t.Run(who.name, func(t *testing.T) {
 			body, resp := getAuditLogs(t, readToken,
-				fmt.Sprintf("userId=%d&requestId=%s", who.id, url.QueryEscape(requestId)))
+				fmt.Sprintf("userId=%d&requestId=%s", who.id, url.QueryEscape(requestID)))
 			defer func() { _ = resp.Body.Close() }()
 
 			require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -607,7 +607,7 @@ func TestAPIAuditLogsGet_AChangeIsListedUnderBothUsers(t *testing.T) {
 
 	t.Run("not under a user it does not name", func(t *testing.T) {
 		body, resp := getAuditLogs(t, readToken,
-			fmt.Sprintf("userId=%d&requestId=%s", userIdOfNoRealUser(), url.QueryEscape(requestId)))
+			fmt.Sprintf("userId=%d&requestId=%s", userIDOfNoRealUser(), url.QueryEscape(requestID)))
 		defer func() { _ = resp.Body.Close() }()
 
 		require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -624,11 +624,11 @@ func TestAPIAuditLogsGet_AChangeMadeWithAClientCredentialsTokenNamesNoActingUser
 	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 	changed := createUserToChange(t)
 
-	requestId := disableUserUnderRequestId(t, clientToken, changed)
+	requestID := disableUserUnderRequestID(t, clientToken, changed)
 
 	// All three filters together: the change's own entry, on its request, about the user.
 	query := fmt.Sprintf("userId=%d&requestId=%s&auditEvent=updated_user_details", changed.ID,
-		url.QueryEscape(requestId))
+		url.QueryEscape(requestID))
 	body, resp := getAuditLogs(t, clientToken, query)
 	defer func() { _ = resp.Body.Close() }()
 

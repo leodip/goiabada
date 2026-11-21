@@ -42,15 +42,15 @@ func uploadKit(t *testing.T, accessToken string) kitUploads {
 // slots is a write's six slots naming kit's assets.
 func (kit kitUploads) slots() map[string]any {
 	return map[string]any{
-		"logo": map[string]any{"id": kit.logo.Id}, "darkLogo": map[string]any{"id": kit.darkLogo.Id},
-		"favicon": map[string]any{"id": kit.favicon.Id}, "background": map[string]any{"id": kit.background.Id},
-		"regularFont": map[string]any{"id": kit.regularFont.Id}, "boldFont": map[string]any{"id": kit.boldFont.Id},
+		"logo": map[string]any{"id": kit.logo.ID}, "darkLogo": map[string]any{"id": kit.darkLogo.ID},
+		"favicon": map[string]any{"id": kit.favicon.ID}, "background": map[string]any{"id": kit.background.ID},
+		"regularFont": map[string]any{"id": kit.regularFont.ID}, "boldFont": map[string]any{"id": kit.boldFont.ID},
 	}
 }
 
 // assetAsAnswered is an uploaded asset as a brand's slot answers it, decoded from JSON.
 func assetAsAnswered(asset brandAssetAnswer) map[string]any {
-	return map[string]any{"id": float64(asset.Id), "kind": asset.Kind, "url": asset.Url,
+	return map[string]any{"id": float64(asset.ID), "kind": asset.Kind, "url": asset.URL,
 		"contentType": asset.ContentType, "width": float64(asset.Width), "height": float64(asset.Height)}
 }
 
@@ -77,7 +77,7 @@ func TestAPIBrands_SlotsNameUploadedAssetsAndReadBackUnchanged(t *testing.T) {
 	// Stored on the brand's slots, the engine's foreign keys naming the uploaded assets.
 	stored, err := database.GetBrandByID(context.Background(), nil, id)
 	require.NoError(t, err)
-	assert.Equal(t, []int64{kit.logo.Id, kit.darkLogo.Id, kit.favicon.Id, kit.background.Id, kit.regularFont.Id, kit.boldFont.Id},
+	assert.Equal(t, []int64{kit.logo.ID, kit.darkLogo.ID, kit.favicon.ID, kit.background.ID, kit.regularFont.ID, kit.boldFont.ID},
 		[]int64{stored.LogoAssetID.Int64, stored.DarkLogoAssetID.Int64, stored.FaviconAssetID.Int64,
 			stored.BackgroundAssetID.Int64, stored.RegularFontAssetID.Int64, stored.BoldFontAssetID.Int64})
 
@@ -95,7 +95,7 @@ func TestAPIBrands_SlotsNameUploadedAssetsAndReadBackUnchanged(t *testing.T) {
 	// An update is a full replace: the slots it leaves out are emptied, and the font goes back to a
 	// system family, as the uploaded font needs its regular file.
 	update := brandBody(map[string]any{"name": brandName("Kit"), "appearance": "auto", "theme": "plum",
-		"logo": map[string]any{"id": kit.logo.Id}})
+		"logo": map[string]any{"id": kit.logo.ID}})
 	status, answer, _ = brandCall(t, accessToken, http.MethodPut, brandPath(id, ""), update)
 	require.Equal(t, http.StatusOK, status, "%v", answer)
 	assert.Equal(t, assetAsAnswered(kit.logo), answer["brand"].(map[string]any)["logo"])
@@ -117,7 +117,7 @@ func TestAPIBrands_SlotRefusals(t *testing.T) {
 	_, created := keepDefaultBrand(t)
 	other := createBrandOverAPI(t, accessToken, created, brandName("Other"), "auto", "blueberry")
 	kit := uploadKit(t, accessToken)
-	ref := func(asset brandAssetAnswer) map[string]any { return map[string]any{"id": asset.Id} }
+	ref := func(asset brandAssetAnswer) map[string]any { return map[string]any{"id": asset.ID} }
 
 	refusals := []struct {
 		name  string
@@ -223,7 +223,7 @@ func TestPages_TheKitIsDrawnOnTheCardInTheHeadAndInTheStylesheet(t *testing.T) {
 	require.Equal(t, http.StatusOK, status, "%v", answer)
 
 	base := appConfig.AuthServer.BaseURL
-	path := func(asset brandAssetAnswer) string { return strings.TrimPrefix(asset.Url, base) }
+	path := func(asset brandAssetAnswer) string { return strings.TrimPrefix(asset.URL, base) }
 	client := newFormPostClient(t)
 
 	for _, tc := range []struct {
@@ -249,7 +249,7 @@ func TestPages_TheKitIsDrawnOnTheCardInTheHeadAndInTheStylesheet(t *testing.T) {
 		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			browser := createHttpClient(t)
+			browser := createHTTPClient(t)
 			resp := tc.load(t, browser)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -267,8 +267,8 @@ func TestPages_TheKitIsDrawnOnTheCardInTheHeadAndInTheStylesheet(t *testing.T) {
 	}
 
 	// The logo the card links is served, as current, to anyone.
-	browser := createHttpClient(t)
-	status, _, header := getStylesheet(t, browser, kit.logo.Url)
+	browser := createHTTPClient(t)
+	status, _, header := getStylesheet(t, browser, kit.logo.URL)
 	assert.Equal(t, http.StatusOK, status)
 	assert.Equal(t, "public, max-age=31536000, immutable", header.Get("Cache-Control"))
 
@@ -285,9 +285,9 @@ func TestPages_TheKitIsDrawnOnTheCardInTheHeadAndInTheStylesheet(t *testing.T) {
 		} `json:"brand"`
 	}
 	require.NoError(t, json.Unmarshal([]byte(settings), &published))
-	assert.Equal(t, kit.logo.Url, published.Brand.LogoURL)
-	assert.Equal(t, kit.darkLogo.Url, published.Brand.DarkLogoURL)
-	assert.Equal(t, kit.favicon.Url, published.Brand.FaviconURL)
+	assert.Equal(t, kit.logo.URL, published.Brand.LogoURL)
+	assert.Equal(t, kit.darkLogo.URL, published.Brand.DarkLogoURL)
+	assert.Equal(t, kit.favicon.URL, published.Brand.FaviconURL)
 	assert.True(t, published.Brand.HideAppName)
 
 	// The full stylesheet draws the background at its fit and the uploaded font from both files, by

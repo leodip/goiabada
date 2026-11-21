@@ -100,7 +100,7 @@ func TestAPIAccountConsentsGet_NamesClientsAsTheConsentScreenDid(t *testing.T) {
 		Enabled:          true,
 		IsPublic:         true,
 	}
-	consentIds := map[int64]*record.Client{}
+	consentIDs := map[int64]*record.Client{}
 	for _, client := range []*record.Client{named, selfRegistered} {
 		require.NoError(t, database.CreateClient(context.Background(), nil, client))
 		defer func() { _ = database.DeleteClient(context.Background(), nil, client.ID) }()
@@ -108,7 +108,7 @@ func TestAPIAccountConsentsGet_NamesClientsAsTheConsentScreenDid(t *testing.T) {
 			GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true}}
 		require.NoError(t, database.CreateUserConsent(context.Background(), nil, consent))
 		defer func() { _, _ = database.DeleteUserConsent(context.Background(), nil, consent.ID) }()
-		consentIds[consent.ID] = client
+		consentIDs[consent.ID] = client
 	}
 
 	resp := makeAPIRequest(t, "GET", appConfig.AuthServer.BaseURL+"/api/v1/account/consents", accessToken, nil)
@@ -119,7 +119,7 @@ func TestAPIAccountConsentsGet_NamesClientsAsTheConsentScreenDid(t *testing.T) {
 
 	got := map[string]api.UserConsentResponse{}
 	for _, c := range getResp.Consents {
-		if client, ok := consentIds[c.ID]; ok {
+		if client, ok := consentIDs[c.ID]; ok {
 			got[client.ClientIdentifier] = c
 		}
 	}
@@ -138,7 +138,7 @@ func TestAPIAccountConsentsGet_UnauthorizedAndScope(t *testing.T) {
 	// No token
 	req, err := http.NewRequest("GET", url, nil)
 	require.NoError(t, err)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -370,7 +370,7 @@ func TestAPIAccountConsentDelete_ForbiddenOnOtherUser(t *testing.T) {
 	assert.NotEqual(t, user1.ID, user2.ID)
 }
 
-func TestAPIAccountConsentDelete_NotFoundAndBadId(t *testing.T) {
+func TestAPIAccountConsentDelete_NotFoundAndBadID(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope(t)
 
 	// Not found

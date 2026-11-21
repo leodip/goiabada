@@ -15,13 +15,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func getUserAccessTokenWithAccountScope_EmailVerification(t *testing.T) (string, *record.User) {
-	return getUserAccessTokenWithAccountScope_Email(t)
+func getUserAccessTokenWithAccountScopeEmailVerification(t *testing.T) (string, *record.User) {
+	return getUserAccessTokenWithAccountScopeEmail(t)
 }
 
 // POST /api/v1/account/email/verification/send
 func TestAPIAccountEmailVerificationSend_Success(t *testing.T) {
-	accessToken, u := getUserAccessTokenWithAccountScope_EmailVerification(t)
+	accessToken, u := getUserAccessTokenWithAccountScopeEmailVerification(t)
 
 	// Ensure SMTP enabled
 	changeSettings(t, func(settings *record.Settings) { settings.SMTPEnabled = true })
@@ -58,7 +58,7 @@ func TestAPIAccountEmailVerificationSend_Success(t *testing.T) {
 }
 
 func TestAPIAccountEmailVerificationSend_TooManyRequests(t *testing.T) {
-	accessToken, _ := getUserAccessTokenWithAccountScope_EmailVerification(t)
+	accessToken, _ := getUserAccessTokenWithAccountScopeEmailVerification(t)
 
 	// Ensure SMTP enabled
 	changeSettings(t, func(settings *record.Settings) { settings.SMTPEnabled = true })
@@ -85,7 +85,7 @@ func TestAPIAccountEmailVerificationSend_TooManyRequests(t *testing.T) {
 }
 
 func TestAPIAccountEmailVerificationSend_AlreadyVerified(t *testing.T) {
-	accessToken, u := getUserAccessTokenWithAccountScope_EmailVerification(t)
+	accessToken, u := getUserAccessTokenWithAccountScopeEmailVerification(t)
 
 	// Enable SMTP
 	changeSettings(t, func(settings *record.Settings) { settings.SMTPEnabled = true })
@@ -111,7 +111,7 @@ func TestAPIAccountEmailVerificationSend_AlreadyVerified(t *testing.T) {
 }
 
 func TestAPIAccountEmailVerificationSend_SMTPDisabled(t *testing.T) {
-	accessToken, _ := getUserAccessTokenWithAccountScope_EmailVerification(t)
+	accessToken, _ := getUserAccessTokenWithAccountScopeEmailVerification(t)
 
 	changeSettings(t, func(settings *record.Settings) { settings.SMTPEnabled = false })
 
@@ -130,7 +130,7 @@ func TestAPIAccountEmailVerificationSend_Unauthorized(t *testing.T) {
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/email/verification/send"
 	req, err := http.NewRequest("POST", url, nil)
 	require.NoError(t, err)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -141,7 +141,7 @@ func TestAPIAccountEmailVerificationSend_Unauthorized(t *testing.T) {
 
 // POST /api/v1/account/email/verification
 func TestAPIAccountEmailVerification_VerifySuccess(t *testing.T) {
-	accessToken, u := getUserAccessTokenWithAccountScope_EmailVerification(t)
+	accessToken, u := getUserAccessTokenWithAccountScopeEmailVerification(t)
 
 	// Ensure SMTP enabled
 	changeSettings(t, func(settings *record.Settings) { settings.SMTPEnabled = true })
@@ -174,7 +174,7 @@ func TestAPIAccountEmailVerification_VerifySuccess(t *testing.T) {
 }
 
 func TestAPIAccountEmailVerification_VerifyInvalidCode(t *testing.T) {
-	accessToken, _ := getUserAccessTokenWithAccountScope_EmailVerification(t)
+	accessToken, _ := getUserAccessTokenWithAccountScopeEmailVerification(t)
 
 	// Ensure SMTP enabled
 	changeSettings(t, func(settings *record.Settings) { settings.SMTPEnabled = true })
@@ -190,7 +190,7 @@ func TestAPIAccountEmailVerification_VerifyInvalidCode(t *testing.T) {
 }
 
 func TestAPIAccountEmailVerification_VerifyExpiredCode(t *testing.T) {
-	accessToken, u := getUserAccessTokenWithAccountScope_EmailVerification(t)
+	accessToken, u := getUserAccessTokenWithAccountScopeEmailVerification(t)
 
 	// Ensure SMTP enabled
 	changeSettings(t, func(settings *record.Settings) { settings.SMTPEnabled = true })
@@ -216,7 +216,7 @@ func TestAPIAccountEmailVerification_VerifyExpiredCode(t *testing.T) {
 }
 
 func TestAPIAccountEmailVerification_VerifyAlreadyVerified(t *testing.T) {
-	accessToken, u := getUserAccessTokenWithAccountScope_EmailVerification(t)
+	accessToken, u := getUserAccessTokenWithAccountScopeEmailVerification(t)
 
 	// Enable SMTP
 	changeSettings(t, func(settings *record.Settings) { settings.SMTPEnabled = true })
@@ -239,7 +239,7 @@ func TestAPIAccountEmailVerification_VerifyAlreadyVerified(t *testing.T) {
 }
 
 func TestAPIAccountEmailVerification_VerifySMTPDisabled(t *testing.T) {
-	accessToken, _ := getUserAccessTokenWithAccountScope_EmailVerification(t)
+	accessToken, _ := getUserAccessTokenWithAccountScopeEmailVerification(t)
 	changeSettings(t, func(settings *record.Settings) { settings.SMTPEnabled = false })
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/email/verification"
@@ -253,7 +253,7 @@ func TestAPIAccountEmailVerification_VerifySMTPDisabled(t *testing.T) {
 }
 
 func TestAPIAccountEmailVerification_VerifyInvalidRequestBody(t *testing.T) {
-	accessToken, _ := getUserAccessTokenWithAccountScope_EmailVerification(t)
+	accessToken, _ := getUserAccessTokenWithAccountScopeEmailVerification(t)
 
 	// Enable SMTP
 	changeSettings(t, func(settings *record.Settings) { settings.SMTPEnabled = true })
@@ -263,7 +263,7 @@ func TestAPIAccountEmailVerification_VerifyInvalidRequestBody(t *testing.T) {
 	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -277,7 +277,7 @@ func TestAPIAccountEmailVerification_VerifyUnauthorized(t *testing.T) {
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/email/verification"
 	req, err := http.NewRequest("POST", url, nil)
 	require.NoError(t, err)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()

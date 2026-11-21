@@ -11,18 +11,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestCors_TrailingSlashUsesTheSamePolicy proves the CORS middleware mounted on the running
+// TestCORS_TrailingSlashUsesTheSamePolicy proves the CORS middleware mounted on the running
 // server treats paths that the trailing-slash strip routes to the same handler alike. Unit tests can
 // prove the policy function's answer, but they stay green if the middleware is no longer mounted.
-func TestCors_TrailingSlashUsesTheSamePolicy(t *testing.T) {
+func TestCORS_TrailingSlashUsesTheSamePolicy(t *testing.T) {
 	origin := "https://cors-" + strings.ToLower(fake.LetterN(8)) + ".example.com"
 
 	t.Run("always allowed certs needs no database fixture", func(t *testing.T) {
-		assertCorsPathPair(t, origin, "/certs", http.StatusOK)
+		assertCORSPathPair(t, origin, "/certs", http.StatusOK)
 	})
 
 	t.Run("always allowed RFC 8414 discovery needs no database fixture", func(t *testing.T) {
-		assertCorsPathPair(t, origin, "/.well-known/oauth-authorization-server", http.StatusOK)
+		assertCORSPathPair(t, origin, "/.well-known/oauth-authorization-server", http.StatusOK)
 	})
 
 	t.Run("database gated userinfo uses a registered origin", func(t *testing.T) {
@@ -37,11 +37,11 @@ func TestCors_TrailingSlashUsesTheSamePolicy(t *testing.T) {
 			Origin:   origin,
 		}))
 
-		assertCorsPathPair(t, origin, "/userinfo", http.StatusUnauthorized)
+		assertCORSPathPair(t, origin, "/userinfo", http.StatusUnauthorized)
 	})
 }
 
-func assertCorsPathPair(t *testing.T, origin string, path string, getStatus int) {
+func assertCORSPathPair(t *testing.T, origin string, path string, getStatus int) {
 	t.Helper()
 
 	methods := []struct {
@@ -67,7 +67,7 @@ func assertCorsPathPair(t *testing.T, origin string, path string, getStatus int)
 					req.Header.Set("Access-Control-Request-Method", http.MethodGet)
 				}
 
-				resp, err := createHttpClient(t).Do(req)
+				resp, err := createHTTPClient(t).Do(req)
 				require.NoError(t, err)
 				defer func() { _ = resp.Body.Close() }()
 

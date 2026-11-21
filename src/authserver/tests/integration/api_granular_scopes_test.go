@@ -65,8 +65,8 @@ func createClientWithGranularScopeAndSecret(t *testing.T, permissionIdentifier s
 	require.NoError(t, err)
 
 	// Get access token using client credentials flow
-	httpClient := createHttpClient(t)
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	httpClient := createHTTPClient(t)
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	formData := url.Values{
 		"grant_type":    {"client_credentials"},
@@ -75,7 +75,7 @@ func createClientWithGranularScopeAndSecret(t *testing.T, permissionIdentifier s
 		"scope":         {builtin.AuthServerResourceIdentifier + ":" + permissionIdentifier},
 	}
 
-	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destURL, formData)
 	accessToken, ok := data["access_token"].(string)
 	assert.True(t, ok, "access_token should be a string")
 	assert.NotEmpty(t, accessToken, "access_token should not be empty")
@@ -476,7 +476,7 @@ func TestGranularScopes_NoScopeCannotAccessAdmin(t *testing.T) {
 	req, err := http.NewRequest("GET", baseURL+"/api/v1/admin/users/search", nil)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -505,7 +505,7 @@ func TestGranularScopes_PhoneCountriesAccessibleByAnyAdminScope(t *testing.T) {
 
 	testCases := []struct {
 		name         string
-		permissionId string
+		permissionID string
 	}{
 		{"admin-read", builtin.AdminReadPermissionIdentifier},
 		{"manage-users", builtin.ManageUsersPermissionIdentifier},
@@ -516,7 +516,7 @@ func TestGranularScopes_PhoneCountriesAccessibleByAnyAdminScope(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			accessToken, client := createClientWithGranularScope(t, tc.permissionId)
+			accessToken, client := createClientWithGranularScope(t, tc.permissionID)
 			defer func() {
 				_ = database.DeleteClient(context.Background(), nil, client.ID)
 			}()
@@ -554,7 +554,7 @@ func TestGranularScopes_GroupsRequireUsersScope(t *testing.T) {
 
 	testCases := []struct {
 		name               string
-		permissionId       string
+		permissionID       string
 		expectedReadStatus int
 	}{
 		{"admin-read", builtin.AdminReadPermissionIdentifier, http.StatusOK},
@@ -565,7 +565,7 @@ func TestGranularScopes_GroupsRequireUsersScope(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			accessToken, client := createClientWithGranularScope(t, tc.permissionId)
+			accessToken, client := createClientWithGranularScope(t, tc.permissionID)
 			defer func() {
 				_ = database.DeleteClient(context.Background(), nil, client.ID)
 			}()
@@ -586,7 +586,7 @@ func TestGranularScopes_ResourcesRequireSettingsScope(t *testing.T) {
 
 	testCases := []struct {
 		name               string
-		permissionId       string
+		permissionID       string
 		expectedReadStatus int
 	}{
 		{"admin-read", builtin.AdminReadPermissionIdentifier, http.StatusOK},
@@ -597,7 +597,7 @@ func TestGranularScopes_ResourcesRequireSettingsScope(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			accessToken, client := createClientWithGranularScope(t, tc.permissionId)
+			accessToken, client := createClientWithGranularScope(t, tc.permissionID)
 			defer func() {
 				_ = database.DeleteClient(context.Background(), nil, client.ID)
 			}()
@@ -631,7 +631,7 @@ func TestGranularScopes_UserPermissionsRequireUsersScope(t *testing.T) {
 
 	testCases := []struct {
 		name               string
-		permissionId       string
+		permissionID       string
 		expectedReadStatus int
 	}{
 		{"admin-read", builtin.AdminReadPermissionIdentifier, http.StatusOK},
@@ -642,7 +642,7 @@ func TestGranularScopes_UserPermissionsRequireUsersScope(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			accessToken, client := createClientWithGranularScope(t, tc.permissionId)
+			accessToken, client := createClientWithGranularScope(t, tc.permissionID)
 			defer func() {
 				_ = database.DeleteClient(context.Background(), nil, client.ID)
 			}()
@@ -674,7 +674,7 @@ func TestGranularScopes_ClientPermissionsRequireClientsScope(t *testing.T) {
 
 	testCases := []struct {
 		name               string
-		permissionId       string
+		permissionID       string
 		expectedReadStatus int
 	}{
 		{"admin-read", builtin.AdminReadPermissionIdentifier, http.StatusOK},
@@ -685,7 +685,7 @@ func TestGranularScopes_ClientPermissionsRequireClientsScope(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			accessToken, client := createClientWithGranularScope(t, tc.permissionId)
+			accessToken, client := createClientWithGranularScope(t, tc.permissionID)
 			defer func() {
 				_ = database.DeleteClient(context.Background(), nil, client.ID)
 			}()
@@ -737,8 +737,8 @@ func TestGranularScopes_WriteOperationsRequireSpecificScopes(t *testing.T) {
 		if resp.StatusCode == http.StatusCreated {
 			var result map[string]interface{}
 			_ = json.NewDecoder(resp.Body).Decode(&result)
-			if userId, ok := result["id"].(float64); ok {
-				_ = database.DeleteUser(context.Background(), nil, int64(userId))
+			if userID, ok := result["id"].(float64); ok {
+				_ = database.DeleteUser(context.Background(), nil, int64(userID))
 			}
 		}
 		_ = resp.Body.Close()
@@ -764,8 +764,8 @@ func TestGranularScopes_WriteOperationsRequireSpecificScopes(t *testing.T) {
 		if resp.StatusCode == http.StatusCreated {
 			var result map[string]interface{}
 			_ = json.NewDecoder(resp.Body).Decode(&result)
-			if groupId, ok := result["id"].(float64); ok {
-				_ = database.DeleteGroup(context.Background(), nil, int64(groupId))
+			if groupID, ok := result["id"].(float64); ok {
+				_ = database.DeleteGroup(context.Background(), nil, int64(groupID))
 			}
 		}
 		_ = resp.Body.Close()

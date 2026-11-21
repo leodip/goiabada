@@ -228,17 +228,17 @@ func followResetLink(t *testing.T, client *http.Client, link string) string {
 	return appConfig.AuthServer.BaseURL + location.Path
 }
 
-var continuationIdPattern = regexp.MustCompile(
+var continuationIDPattern = regexp.MustCompile(
 	`<input[^>]*name="continuationId"[^>]*value="([^"]*)"`)
 
-// continuationIdIn reads the hidden field out of a rendered form, which is the only place
+// continuationIDIn reads the hidden field out of a rendered form, which is the only place
 // a browser gets it from. Parsing the page rather than reaching into the session is what
 // makes these cases able to fail: a template that stopped emitting the field, or a handler
 // that stopped binding it, breaks the flow here exactly as it would in a browser (#112).
-func continuationIdIn(t *testing.T, formBody string) string {
+func continuationIDIn(t *testing.T, formBody string) string {
 	t.Helper()
 
-	match := continuationIdPattern.FindStringSubmatch(formBody)
+	match := continuationIDPattern.FindStringSubmatch(formBody)
 	require.NotNil(t, match, "the reset form must carry the continuation id it was rendered from")
 	require.NotEmpty(t, match[1])
 	return match[1]
@@ -253,19 +253,19 @@ func loadResetForm(t *testing.T, client *http.Client, cleanURL string) string {
 	_ = resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	require.Contains(t, body, `name="password"`)
-	return continuationIdIn(t, body)
+	return continuationIDIn(t, body)
 }
 
 // postCleanReset submits the form to the clean URL, which is where the template's empty
 // action sends it, carrying the continuation id the rendered form held.
 func postCleanReset(t *testing.T, client *http.Client, cleanURL string, password string,
-	continuationId string) *http.Response {
+	continuationID string) *http.Response {
 	t.Helper()
 
 	form := url.Values{
 		"password":             {password},
 		"passwordConfirmation": {password},
-		"continuationId":       {continuationId},
+		"continuationId":       {continuationID},
 	}
 	req, err := http.NewRequest("POST", cleanURL, strings.NewReader(form.Encode()))
 	require.NoError(t, err)
@@ -293,17 +293,17 @@ func capturedSessionCookies(t *testing.T, client *http.Client) []*http.Cookie {
 func clientCarrying(t *testing.T, cookies []*http.Cookie) *http.Client {
 	t.Helper()
 
-	client := createHttpClient(t)
+	client := createHTTPClient(t)
 	base, err := url.Parse(appConfig.AuthServer.BaseURL)
 	require.NoError(t, err)
 	client.Jar.SetCookies(base, cookies)
 	return client
 }
 
-func passwordHashOf(t *testing.T, userId int64) string {
+func passwordHashOf(t *testing.T, userID int64) string {
 	t.Helper()
 
-	user, err := database.GetUserByID(context.Background(), nil, userId)
+	user, err := database.GetUserByID(context.Background(), nil, userID)
 	require.NoError(t, err)
 	require.NotNil(t, user)
 	return user.PasswordHash
@@ -321,7 +321,7 @@ func TestResetPassword_PlusAddressCompletesTheFlowFromTheEmailedLink(t *testing.
 	email := plusAddress()
 	user, oldPassword := createResetTestUser(t, email)
 
-	client := createHttpClient(t)
+	client := createHTTPClient(t)
 	requestPasswordReset(t, client, email)
 
 	link := latestResetLink(t, email)
@@ -337,7 +337,7 @@ func TestResetPassword_PlusAddressCompletesTheFlowFromTheEmailedLink(t *testing.
 	assert.NotContains(t, formBody, resetCodeInvalidText)
 
 	newPassword := fake.Password(20)
-	resp := postCleanReset(t, client, cleanURL, newPassword, continuationIdIn(t, formBody))
+	resp := postCleanReset(t, client, cleanURL, newPassword, continuationIDIn(t, formBody))
 	defer func() { _ = resp.Body.Close() }()
 
 	require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -358,16 +358,16 @@ func TestResetPassword_ReplayedMarkerAfterCompletionIsRefused(t *testing.T) {
 	email := plusAddress()
 	user, _ := createResetTestUser(t, email)
 
-	client := createHttpClient(t)
+	client := createHTTPClient(t)
 	requestPasswordReset(t, client, email)
 	cleanURL := followResetLink(t, client, latestResetLink(t, email))
-	continuationId := loadResetForm(t, client, cleanURL)
+	continuationID := loadResetForm(t, client, cleanURL)
 
 	// Taken while the marker is still live and usable.
 	captured := capturedSessionCookies(t, client)
 
 	newPassword := fake.Password(20)
-	resp := postCleanReset(t, client, cleanURL, newPassword, continuationId)
+	resp := postCleanReset(t, client, cleanURL, newPassword, continuationID)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	_ = resp.Body.Close()
 
@@ -385,7 +385,7 @@ func TestResetPassword_ReplayedMarkerAfterCompletionIsRefused(t *testing.T) {
 	// And the submission is refused, with the password left exactly as the real reset set it.
 	// The replay carries the captured continuation id as well as the captured cookies, so
 	// what refuses it is the code hash no longer resolving rather than a missing field.
-	postResp := postCleanReset(t, attacker, cleanURL, "Att4cker!Pass", continuationId)
+	postResp := postCleanReset(t, attacker, cleanURL, "Att4cker!Pass", continuationID)
 	postBody := bodyString(t, postResp)
 	_ = postResp.Body.Close()
 	assert.Equal(t, http.StatusBadRequest, postResp.StatusCode)
@@ -405,14 +405,14 @@ func TestResetPassword_MarkerIssuedBeforeANewerCodeIsRefused(t *testing.T) {
 	email := plusAddress()
 	user, oldPassword := createResetTestUser(t, email)
 
-	first := createHttpClient(t)
+	first := createHTTPClient(t)
 	requestPasswordReset(t, first, email)
 	cleanURL := followResetLink(t, first, latestResetLink(t, email))
-	continuationId := loadResetForm(t, first, cleanURL)
+	continuationID := loadResetForm(t, first, cleanURL)
 
 	// A second request replaces the outstanding code, and with it the hash the first marker
 	// names.
-	requestPasswordReset(t, createHttpClient(t), email)
+	requestPasswordReset(t, createHTTPClient(t), email)
 	require.Len(t, awaitResetLinks(t, email, 2), 2, "the second request must have emailed a second link")
 
 	getResp := loadPage(t, first, cleanURL)
@@ -420,7 +420,7 @@ func TestResetPassword_MarkerIssuedBeforeANewerCodeIsRefused(t *testing.T) {
 	_ = getResp.Body.Close()
 	assert.Contains(t, getBody, resetCodeInvalidText)
 
-	postResp := postCleanReset(t, first, cleanURL, "St4le!Marker", continuationId)
+	postResp := postCleanReset(t, first, cleanURL, "St4le!Marker", continuationID)
 	postBody := bodyString(t, postResp)
 	_ = postResp.Body.Close()
 	assert.Equal(t, http.StatusBadRequest, postResp.StatusCode)
@@ -450,7 +450,7 @@ func TestResetPassword_ASecondLinkDoesNotRetargetTheFormOnScreen(t *testing.T) {
 	otherEmail := plusAddress()
 	other, otherOldPassword := createResetTestUser(t, otherEmail)
 
-	browser := createHttpClient(t)
+	browser := createHTTPClient(t)
 	requestPasswordReset(t, browser, victimEmail)
 	cleanURL := followResetLink(t, browser, latestResetLink(t, victimEmail))
 
@@ -459,11 +459,11 @@ func TestResetPassword_ASecondLinkDoesNotRetargetTheFormOnScreen(t *testing.T) {
 	formBody := bodyString(t, formResp)
 	_ = formResp.Body.Close()
 	require.Contains(t, formBody, `name="password"`)
-	continuationId := continuationIdIn(t, formBody)
+	continuationID := continuationIDIn(t, formBody)
 
 	// The steered navigation: a reset link for the other account, followed in the same jar.
 	// Issued from elsewhere, because what matters is where it is FOLLOWED.
-	requestPasswordReset(t, createHttpClient(t), otherEmail)
+	requestPasswordReset(t, createHTTPClient(t), otherEmail)
 
 	steeredResp := loadPage(t, browser, latestResetLink(t, otherEmail))
 	steeredBody := bodyString(t, steeredResp)
@@ -475,7 +475,7 @@ func TestResetPassword_ASecondLinkDoesNotRetargetTheFormOnScreen(t *testing.T) {
 
 	// The victim submits the form they were already looking at.
 	newPassword := fake.Password(20)
-	resp := postCleanReset(t, browser, cleanURL, newPassword, continuationId)
+	resp := postCleanReset(t, browser, cleanURL, newPassword, continuationID)
 	body := bodyString(t, resp)
 	_ = resp.Body.Close()
 
@@ -513,18 +513,18 @@ func TestResetPassword_AStaleFormIsRefusedOnceTheSessionHoldsAnotherContinuation
 	otherEmail := plusAddress()
 	other, otherOldPassword := createResetTestUser(t, otherEmail)
 
-	browser := createHttpClient(t)
+	browser := createHTTPClient(t)
 	requestPasswordReset(t, browser, victimEmail)
 	cleanURL := followResetLink(t, browser, latestResetLink(t, victimEmail))
 
 	// Two tabs on one reset, so both forms carry the same continuation.
-	staleTabContinuationId := loadResetForm(t, browser, cleanURL)
-	activeTabContinuationId := loadResetForm(t, browser, cleanURL)
-	require.Equal(t, staleTabContinuationId, activeTabContinuationId,
+	staleTabContinuationID := loadResetForm(t, browser, cleanURL)
+	activeTabContinuationID := loadResetForm(t, browser, cleanURL)
+	require.Equal(t, staleTabContinuationID, activeTabContinuationID,
 		"one link followed once is one continuation, however many times its form is rendered")
 
 	victimPassword := fake.Password(20)
-	resp := postCleanReset(t, browser, cleanURL, victimPassword, activeTabContinuationId)
+	resp := postCleanReset(t, browser, cleanURL, victimPassword, activeTabContinuationID)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	_ = resp.Body.Close()
 
@@ -533,13 +533,13 @@ func TestResetPassword_AStaleFormIsRefusedOnceTheSessionHoldsAnotherContinuation
 
 	// The slot is free now, so the other account's link takes it legitimately: this is not
 	// the refused second link, it is the session moving on.
-	requestPasswordReset(t, createHttpClient(t), otherEmail)
+	requestPasswordReset(t, createHTTPClient(t), otherEmail)
 	otherCleanURL := followResetLink(t, browser, latestResetLink(t, otherEmail))
 	require.Equal(t, cleanURL, otherCleanURL, "both flows land on the same clean URL, which is the whole problem")
 
 	// The stale tab submits. It names a continuation the session no longer holds.
 	const typedInTheStaleTab = "St4le!TabChoice"
-	staleResp := postCleanReset(t, browser, cleanURL, typedInTheStaleTab, staleTabContinuationId)
+	staleResp := postCleanReset(t, browser, cleanURL, typedInTheStaleTab, staleTabContinuationID)
 	staleBody := bodyString(t, staleResp)
 	_ = staleResp.Body.Close()
 
@@ -566,10 +566,10 @@ func TestResetPassword_OneCopiedMarkerLeavesExactlyOnePasswordChange(t *testing.
 	email := plusAddress()
 	user, _ := createResetTestUser(t, email)
 
-	client := createHttpClient(t)
+	client := createHTTPClient(t)
 	requestPasswordReset(t, client, email)
 	cleanURL := followResetLink(t, client, latestResetLink(t, email))
-	continuationId := loadResetForm(t, client, cleanURL)
+	continuationID := loadResetForm(t, client, cleanURL)
 
 	copied := clientCarrying(t, capturedSessionCookies(t, client))
 
@@ -578,11 +578,11 @@ func TestResetPassword_OneCopiedMarkerLeavesExactlyOnePasswordChange(t *testing.
 
 	// Both submissions name the same continuation, because both hold the same marker. What
 	// separates them is the conditional claim, which is the subject here.
-	firstResp := postCleanReset(t, client, cleanURL, firstPassword, continuationId)
+	firstResp := postCleanReset(t, client, cleanURL, firstPassword, continuationID)
 	firstBody := bodyString(t, firstResp)
 	_ = firstResp.Body.Close()
 
-	secondResp := postCleanReset(t, copied, cleanURL, secondPassword, continuationId)
+	secondResp := postCleanReset(t, copied, cleanURL, secondPassword, continuationID)
 	secondBody := bodyString(t, secondResp)
 	_ = secondResp.Body.Close()
 
@@ -625,7 +625,7 @@ func TestForgotPassword_SendsNothingUnlessTheAddressIsVerifiedAndTheAccountEnabl
 	liveEmail := plusAddress()
 	createResetTestUser(t, liveEmail)
 
-	client := createHttpClient(t)
+	client := createHTTPClient(t)
 	unknownPage := requestPasswordResetPage(t, client, unknown)
 	assert.Contains(t, unknownPage, linkSentText)
 
@@ -660,7 +660,7 @@ func TestForgotPassword_SendsNothingUnlessTheAddressIsVerifiedAndTheAccountEnabl
 
 // failedResetReasonsFor returns the reasons of every failed_reset_password_code record naming a
 // user, which is where a refusal's cause is visible, since the page is the same for all of them.
-func failedResetReasonsFor(t *testing.T, userId int64) []string {
+func failedResetReasonsFor(t *testing.T, userID int64) []string {
 	t.Helper()
 
 	adminToken, _ := createAdminClientWithToken(t)
@@ -674,7 +674,7 @@ func failedResetReasonsFor(t *testing.T, userId int64) []string {
 		if err := json.Unmarshal([]byte(entry.Details), &details); err != nil {
 			continue
 		}
-		if id, ok := details["user_id"].(float64); ok && int64(id) == userId {
+		if id, ok := details["user_id"].(float64); ok && int64(id) == userID {
 			reason, _ := details["reason"].(string)
 			reasons = append(reasons, reason)
 		}
@@ -689,9 +689,9 @@ func TestResetPassword_DisablingTheAccountStopsTheLinkAtEveryStep(t *testing.T) 
 	useMailpitSMTP(t)
 	requireDatabaseAuditLogs(t)
 
-	setEnabled := func(t *testing.T, userId int64, enabled bool) {
+	setEnabled := func(t *testing.T, userID int64, enabled bool) {
 		t.Helper()
-		flipped, err := database.TrySetUserEnabled(context.Background(), nil, userId, !enabled, enabled)
+		flipped, err := database.TrySetUserEnabled(context.Background(), nil, userID, !enabled, enabled)
 		require.NoError(t, err)
 		require.True(t, flipped)
 	}
@@ -700,7 +700,7 @@ func TestResetPassword_DisablingTheAccountStopsTheLinkAtEveryStep(t *testing.T) 
 	user, oldPassword := createResetTestUser(t, email)
 	hashBefore := passwordHashOf(t, user.ID)
 
-	client := createHttpClient(t)
+	client := createHTTPClient(t)
 	requestPasswordReset(t, client, email)
 	link := latestResetLink(t, email)
 
@@ -715,7 +715,7 @@ func TestResetPassword_DisablingTheAccountStopsTheLinkAtEveryStep(t *testing.T) 
 	// 2. Rendering the form, from a marker set while the account was enabled.
 	setEnabled(t, user.ID, true)
 	cleanURL := followResetLink(t, client, link)
-	continuationId := loadResetForm(t, client, cleanURL)
+	continuationID := loadResetForm(t, client, cleanURL)
 
 	setEnabled(t, user.ID, false)
 	resp = loadPage(t, client, cleanURL)
@@ -726,7 +726,7 @@ func TestResetPassword_DisablingTheAccountStopsTheLinkAtEveryStep(t *testing.T) 
 	assert.NotContains(t, body, `name="password"`)
 
 	// 3. Submitting the form.
-	resp = postCleanReset(t, client, cleanURL, "N3wP4ss!word", continuationId)
+	resp = postCleanReset(t, client, cleanURL, "N3wP4ss!word", continuationID)
 	body = bodyString(t, resp)
 	_ = resp.Body.Close()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -806,7 +806,7 @@ func TestForgotPassword_EveryRequestIsAuditedOnce(t *testing.T) {
 	liveEmail := plusAddress()
 	live, _ := createResetTestUser(t, liveEmail)
 
-	client := createHttpClient(t)
+	client := createHTTPClient(t)
 	for _, address := range []string{unknown, unverifiedEmail, disabledEmail, liveEmail} {
 		requestPasswordReset(t, client, address)
 	}
@@ -818,13 +818,13 @@ func TestForgotPassword_EveryRequestIsAuditedOnce(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
 		address string
-		userId  int64
+		userID  int64
 		outcome string
 	}{
 		{name: "an address with no account", address: unknown, outcome: "unknown_address"},
-		{name: "an unverified address", address: unverifiedEmail, userId: unverified.ID, outcome: "unverified_address"},
-		{name: "a disabled account", address: disabledEmail, userId: disabled.ID, outcome: "account_disabled"},
-		{name: "a live account", address: liveEmail, userId: live.ID, outcome: "code_issued"},
+		{name: "an unverified address", address: unverifiedEmail, userID: unverified.ID, outcome: "unverified_address"},
+		{name: "a disabled account", address: disabledEmail, userID: disabled.ID, outcome: "account_disabled"},
+		{name: "a live account", address: liveEmail, userID: live.ID, outcome: "code_issued"},
 		{name: "a malformed address", address: malformed, outcome: "invalid_address"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -834,10 +834,10 @@ func TestForgotPassword_EveryRequestIsAuditedOnce(t *testing.T) {
 
 			assert.Equal(t, tc.outcome, auditDetails["outcome"])
 			assert.NotEmpty(t, auditDetails["ip"])
-			if tc.userId == 0 {
+			if tc.userID == 0 {
 				assert.NotContains(t, auditDetails, "user_id", "no account matched, so none is named")
 			} else {
-				assert.InDelta(t, float64(tc.userId), auditDetails["user_id"], 0)
+				assert.InDelta(t, float64(tc.userID), auditDetails["user_id"], 0)
 			}
 			for key, value := range auditDetails {
 				assert.NotContains(t, strings.ToLower(fmt.Sprint(value)), tc.address,
@@ -900,7 +900,7 @@ func TestForgotPassword_AnswersBeforeTheMailIsSent(t *testing.T) {
 	user, _ := createResetTestUser(t, email)
 
 	start := time.Now()
-	page := requestPasswordResetPage(t, createHttpClient(t), email)
+	page := requestPasswordResetPage(t, createHTTPClient(t), email)
 	answeredIn := time.Since(start)
 
 	assert.Contains(t, page, linkSentText, "the requester is told a link was sent")

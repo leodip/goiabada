@@ -28,9 +28,9 @@ var requiresDPoPRefusal = map[string]any{
 }
 
 // requireDPoPFor switches the client's requirement on.
-func requireDPoPFor(t *testing.T, clientId int64) {
+func requireDPoPFor(t *testing.T, clientID int64) {
 	t.Helper()
-	require.NoError(t, database.SetClientDPoPBoundAccessTokens(context.Background(), nil, clientId, true))
+	require.NoError(t, database.SetClientDPoPBoundAccessTokens(context.Background(), nil, clientID, true))
 }
 
 // assertRefusedForNoProof holds an answer to the requirement's refusal: a request without a DPoP
@@ -47,8 +47,8 @@ func TestDPoPRequirement_TheClientCredentialsGrant(t *testing.T) {
 	clientSecret := fake.Password(32)
 	secretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	require.NoError(t, err)
-	resource := createResourceWithId(t, "dpop-required-api-"+fake.LetterN(8))
-	permission := createPermissionWithId(t, resource.ID, "read-"+fake.LetterN(8))
+	resource := createResourceWithID(t, "dpop-required-api-"+fake.LetterN(8))
+	permission := createPermissionWithID(t, resource.ID, "read-"+fake.LetterN(8))
 	client := &record.Client{
 		ClientIdentifier:         "dpop-required-service-" + fake.LetterN(8),
 		Enabled:                  true,

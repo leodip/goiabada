@@ -41,10 +41,10 @@ func putPageLanguageProfile(t *testing.T, putURL, accessToken string, body map[s
 
 // assertPageLanguageSaves drives one profile route through the four outcomes, reading the row
 // after each.
-func assertPageLanguageSaves(t *testing.T, putURL, accessToken string, userId int64) {
+func assertPageLanguageSaves(t *testing.T, putURL, accessToken string, userID int64) {
 	t.Helper()
 	stored := func() string {
-		u, err := database.GetUserByID(context.Background(), nil, userId)
+		u, err := database.GetUserByID(context.Background(), nil, userID)
 		require.NoError(t, err)
 		require.NotNil(t, u)
 		return u.PageLanguage

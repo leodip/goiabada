@@ -31,7 +31,7 @@ import (
 // endpoint's resolution and the permission filter and reaches storage whole.
 func createScopeAtTheBound(t *testing.T, user *record.User, prefix string) string {
 	t.Helper()
-	resource := createResourceWithId(t, "bnd"+fake.LetterN(8))
+	resource := createResourceWithID(t, "bnd"+fake.LetterN(8))
 	overhead := len(" " + resource.ResourceIdentifier + ":")
 
 	scope := prefix
@@ -54,7 +54,7 @@ func createScopeAtTheBound(t *testing.T, user *record.User, prefix string) strin
 		}
 		identifier += strings.Repeat("x", width-len(identifier))
 
-		permission := createPermissionWithId(t, resource.ID, identifier)
+		permission := createPermissionWithID(t, resource.ID, identifier)
 		assignPermissionToUser(t, user.ID, permission.ID)
 		scope += " " + resource.ResourceIdentifier + ":" + identifier
 		if width == room {
@@ -82,8 +82,8 @@ func TestAuthorize_ValuesAtTheBoundAreStoredAndRedeemed(t *testing.T) {
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
-	redirectUri := &record.RedirectURI{ClientID: client.ID, URI: fake.URL()}
-	require.NoError(t, database.CreateRedirectURI(context.Background(), nil, redirectUri))
+	redirectURI := &record.RedirectURI{ClientID: client.ID, URI: fake.URL()}
+	require.NoError(t, database.CreateRedirectURI(context.Background(), nil, redirectURI))
 
 	password := fake.Password(8)
 	passwordHashed, err := passwordhash.Hash(password)
@@ -96,8 +96,8 @@ func TestAuthorize_ValuesAtTheBoundAreStoredAndRedeemed(t *testing.T) {
 	requestNonce := strings.Repeat("n", record.NonceMaxBytes)
 	codeVerifier := fake.LetterN(64)
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + oauth.GeneratePKCECodeChallenge(codeVerifier) +
@@ -105,9 +105,9 @@ func TestAuthorize_ValuesAtTheBoundAreStoredAndRedeemed(t *testing.T) {
 		"&state=" + requestState +
 		"&nonce=" + requestNonce
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	require.NoError(t, err)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
@@ -145,19 +145,19 @@ func TestAuthorize_ValuesAtTheBoundAreStoredAndRedeemed(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
+	codeVal, stateVal := getCodeAndStateFromURL(t, resp)
 	assert.Equal(t, requestState, stateVal, "the state comes back exactly as sent")
 
 	// The code is redeemed and the refresh token rotated through the token endpoint, which is how
 	// the stored values are read back: the scope and nonce reach the response only if the code row
 	// held them whole, and the refreshed token only if the refresh token row did.
-	tokenUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
-	tokens := postToTokenEndpoint(t, httpClient, tokenUrl, url.Values{
+	tokenURL := appConfig.AuthServer.BaseURL + "/auth/token/"
+	tokens := postToTokenEndpoint(t, httpClient, tokenURL, url.Values{
 		"grant_type":    {"authorization_code"},
 		"client_id":     {client.ClientIdentifier},
 		"client_secret": {clientSecret},
 		"code":          {codeVal},
-		"redirect_uri":  {redirectUri.URI},
+		"redirect_uri":  {redirectURI.URI},
 		"code_verifier": {codeVerifier},
 	})
 	require.NotEmpty(t, tokens["access_token"], "the code was refused: %v", tokens)
@@ -168,7 +168,7 @@ func TestAuthorize_ValuesAtTheBoundAreStoredAndRedeemed(t *testing.T) {
 
 	refreshToken, ok := tokens["refresh_token"].(string)
 	require.True(t, ok, "offline_access was granted, so a refresh token is issued: %v", tokens)
-	refreshed := postToTokenEndpoint(t, httpClient, tokenUrl, url.Values{
+	refreshed := postToTokenEndpoint(t, httpClient, tokenURL, url.Values{
 		"grant_type":    {"refresh_token"},
 		"client_id":     {client.ClientIdentifier},
 		"client_secret": {clientSecret},
@@ -179,12 +179,12 @@ func TestAuthorize_ValuesAtTheBoundAreStoredAndRedeemed(t *testing.T) {
 }
 
 func TestAuthorize_OverlongValueIsRefusedAtOnce(t *testing.T) {
-	client, redirectUri := createTestClientWithRedirect(t)
+	client, redirectURI := createTestClientWithRedirect(t)
 
 	// A session holder is answered at once (#213), so the refusal is on the redirect itself.
 	answer := func(t *testing.T, query url.Values) *url.URL {
 		t.Helper()
-		resp, err := createAuthenticatedHttpClient(t).Get(appConfig.AuthServer.BaseURL + "/auth/authorize/?" + query.Encode())
+		resp, err := createAuthenticatedHTTPClient(t).Get(appConfig.AuthServer.BaseURL + "/auth/authorize/?" + query.Encode())
 		require.NoError(t, err)
 		defer func() { _ = resp.Body.Close() }()
 		require.Equal(t, http.StatusFound, resp.StatusCode)
@@ -193,7 +193,7 @@ func TestAuthorize_OverlongValueIsRefusedAtOnce(t *testing.T) {
 		return location
 	}
 	request := func(overrides map[string]string) url.Values {
-		query := repeatedParametersQuery(client, redirectUri)
+		query := repeatedParametersQuery(client, redirectURI)
 		for name, value := range overrides {
 			query.Set(name, value)
 		}
@@ -271,7 +271,7 @@ func repeatedOpenidScope() string {
 
 func TestROPC_ScopeBound(t *testing.T) {
 	changeSettings(t, func(settings *record.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = true })
-	tokenUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	tokenURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	setup := func(t *testing.T) (client *record.Client, user *record.User, password string) {
 		t.Helper()
@@ -292,14 +292,14 @@ func TestROPC_ScopeBound(t *testing.T) {
 		client, user, password := setup(t)
 		scope := createScopeAtTheBound(t, user, "openid")
 
-		data := postToTokenEndpoint(t, createHttpClient(t), tokenUrl, request(client, user, password, scope))
+		data := postToTokenEndpoint(t, createHTTPClient(t), tokenURL, request(client, user, password, scope))
 
 		require.NotEmpty(t, data["access_token"], "the grant was refused: %v", data)
 		assert.Equal(t, scope, data["scope"])
 		refreshToken, ok := data["refresh_token"].(string)
 		require.True(t, ok, "the password grant issues a refresh token: %v", data)
 
-		refreshed := postToTokenEndpoint(t, createHttpClient(t), tokenUrl, url.Values{
+		refreshed := postToTokenEndpoint(t, createHTTPClient(t), tokenURL, url.Values{
 			"grant_type":    {"refresh_token"},
 			"client_id":     {client.ClientIdentifier},
 			"refresh_token": {refreshToken},
@@ -316,7 +316,7 @@ func TestROPC_ScopeBound(t *testing.T) {
 		}
 		scope := strings.Join(values, " ")
 
-		data := postToTokenEndpoint(t, createHttpClient(t), tokenUrl, request(client, user, password, scope))
+		data := postToTokenEndpoint(t, createHTTPClient(t), tokenURL, request(client, user, password, scope))
 
 		assert.Equal(t, "invalid_scope", data["error"])
 		assert.Equal(t, fmt.Sprintf("The 'scope' parameter is too long (%d bytes, the maximum is %d).",
@@ -333,7 +333,7 @@ func TestROPC_ScopeBound(t *testing.T) {
 			values = append(values, fmt.Sprintf("r:p%04d", i))
 		}
 
-		data := postToTokenEndpoint(t, createHttpClient(t), tokenUrl,
+		data := postToTokenEndpoint(t, createHTTPClient(t), tokenURL,
 			request(client, user, "wrongpassword", strings.Join(values, " ")))
 
 		assert.Equal(t, "invalid_grant", data["error"])
@@ -347,7 +347,7 @@ func TestROPC_ScopeBound(t *testing.T) {
 		scope := repeatedOpenidScope()
 		require.Greater(t, len(scope), record.ScopeMaxBytes)
 
-		data := postToTokenEndpoint(t, createHttpClient(t), tokenUrl, request(client, user, password, scope))
+		data := postToTokenEndpoint(t, createHTTPClient(t), tokenURL, request(client, user, password, scope))
 
 		require.NotEmpty(t, data["access_token"], "the grant was refused: %v", data)
 		assert.Equal(t, "openid", data["scope"])

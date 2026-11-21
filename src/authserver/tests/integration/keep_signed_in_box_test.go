@@ -70,7 +70,7 @@ func (f *deviceFixture) signInAnswering(t *testing.T, browser *deviceBrowser, au
 	form := url.Values{
 		"email":      {f.user.Email},
 		"password":   {f.password},
-		"ceremonyId": {getCeremonyIdFromPage(t, pwdPage)},
+		"ceremonyId": {getCeremonyIDFromPage(t, pwdPage)},
 	}
 	if tick {
 		require.True(t, box.shown, "a box to tick")
@@ -88,7 +88,7 @@ func (f *deviceFixture) signInAnswering(t *testing.T, browser *deviceBrowser, au
 	loc = follow(follow(assertRedirect(t, submitted, "/auth/level1completed"), "/auth/completed"), "/auth/issue")
 	issued := loadPage(t, browser.Client, loc)
 	defer func() { _ = issued.Body.Close() }()
-	code, _ := getCodeAndStateFromUrl(t, issued)
+	code, _ := getCodeAndStateFromURL(t, issued)
 	require.NotEmpty(t, code, "the sign-in reaches the client with a code")
 	return box
 }

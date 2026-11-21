@@ -57,7 +57,7 @@ func TestToken_AuthCode_ConcurrentDoubleSpend_IssuesOnlyOnce(t *testing.T) {
 	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 	formData := url.Values{
 		"grant_type":    {"authorization_code"},
 		"client_id":     {code.Client.ClientIdentifier},
@@ -79,7 +79,7 @@ func TestToken_AuthCode_ConcurrentDoubleSpend_IssuesOnlyOnce(t *testing.T) {
 		go func(idx int) {
 			defer wg.Done()
 			<-release // release all goroutines together to maximize contention on the code
-			statuses[idx], bodies[idx], reqErrs[idx] = concurrentTokenPost(httpClient, destUrl, formData)
+			statuses[idx], bodies[idx], reqErrs[idx] = concurrentTokenPost(httpClient, destURL, formData)
 		}(i)
 	}
 	close(release)

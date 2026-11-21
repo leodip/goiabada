@@ -80,7 +80,7 @@ func TestImplicitDPoPRequirement_AnAccessTokenIsRefusedAtTheAuthorizationRequest
 	for _, responseType := range []string{"token", "id_token token"} {
 		t.Run(responseType, func(t *testing.T) {
 			state := fake.LetterN(16)
-			resp, err := createAuthenticatedHttpClient(t).Get(implicitAuthorizeURL(client, redirectURI, responseType, state))
+			resp, err := createAuthenticatedHTTPClient(t).Get(implicitAuthorizeURL(client, redirectURI, responseType, state))
 			require.NoError(t, err)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -96,7 +96,7 @@ func TestImplicitDPoPRequirement_AnAccessTokenIsRefusedAtTheAuthorizationRequest
 
 func TestImplicitDPoPRequirement_AnIDTokenAloneIsIssued(t *testing.T) {
 	client, redirectURI := newImplicitClientRequiringDPoP(t, true)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
 	issue := signInToIssueAsANewUser(t, httpClient, implicitAuthorizeURL(client, redirectURI, "id_token", fake.LetterN(16)))
 	resp := loadPage(t, httpClient, issue)
@@ -115,7 +115,7 @@ func TestImplicitDPoPRequirement_SwitchedOnMidSignInIsAppliedAtIssuance(t *testi
 	for _, responseType := range []string{"token", "id_token token"} {
 		t.Run(responseType, func(t *testing.T) {
 			client, redirectURI := newImplicitClientRequiringDPoP(t, false)
-			httpClient := createHttpClient(t)
+			httpClient := createHTTPClient(t)
 			state := fake.LetterN(16)
 
 			issue := signInToIssueAsANewUser(t, httpClient, implicitAuthorizeURL(client, redirectURI, responseType, state))

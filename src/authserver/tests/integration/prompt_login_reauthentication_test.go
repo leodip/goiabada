@@ -81,9 +81,9 @@ func newReauthFixture(t *testing.T) *reauthFixture {
 	return fx
 }
 
-// nextOtpCode is a code for a step later than any this user has spent: the previous step first, then
+// nextOTPCode is a code for a step later than any this user has spent: the previous step first, then
 // the current one. The window accepts no later step, so no test asks for a third.
-func (fx *reauthFixture) nextOtpCode(t *testing.T) string {
+func (fx *reauthFixture) nextOTPCode(t *testing.T) string {
 	t.Helper()
 	require.Less(t, fx.otpStepsTaken, 2, "a third code would be outside the window")
 	var code string
@@ -133,7 +133,7 @@ func (fx *reauthFixture) signIn(t *testing.T, browser *http.Client, client *reco
 			_ = page.Body.Close()
 		case "/auth/otp":
 			steps = append(steps, "otp")
-			resp = authenticateWithOtp(t, browser, location, page, fx.nextOtpCode(t))
+			resp = authenticateWithOTP(t, browser, location, page, fx.nextOTPCode(t))
 			_ = page.Body.Close()
 		default:
 			resp = page
@@ -156,7 +156,7 @@ func reauthSession(t *testing.T, code *record.Code) *record.UserSession {
 // it issues says pwd and otp at a fresh auth_time, all of it about this sign-in.
 func TestPromptLogin_AtLevel3OverALevel3SessionAsksForTheCodeAgain(t *testing.T) {
 	fx := newReauthFixture(t)
-	browser := createHttpClient(t)
+	browser := createHTTPClient(t)
 
 	first, steps := fx.signIn(t, browser, fx.level3Client, fx.level3URI, "")
 	require.Equal(t, []string{"pwd", "otp"}, steps)
@@ -185,7 +185,7 @@ func TestPromptLogin_AtLevel3OverALevel3SessionAsksForTheCodeAgain(t *testing.T)
 // code nobody entered at that time (PR #238 decision 9).
 func TestPromptLogin_AtALowerLevelReplacesTheSessionsAuthentication(t *testing.T) {
 	fx := newReauthFixture(t)
-	browser := createHttpClient(t)
+	browser := createHTTPClient(t)
 
 	first, steps := fx.signIn(t, browser, fx.level3Client, fx.level3URI, "")
 	require.Equal(t, []string{"pwd", "otp"}, steps)
@@ -216,7 +216,7 @@ func TestPromptLogin_AtALowerLevelReplacesTheSessionsAuthentication(t *testing.T
 // that kept its behaviour through #537, held here beside the one that changed.
 func TestSSO_AtALowerLevelLeavesTheSessionAsItWas(t *testing.T) {
 	fx := newReauthFixture(t)
-	browser := createHttpClient(t)
+	browser := createHTTPClient(t)
 
 	first, steps := fx.signIn(t, browser, fx.level3Client, fx.level3URI, "")
 	require.Equal(t, []string{"pwd", "otp"}, steps)

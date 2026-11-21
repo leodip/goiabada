@@ -57,12 +57,12 @@ func TestAPIUserCreatePost_TheSetupEmailLinkSetsThePassword(t *testing.T) {
 	assert.True(t, stored.ForgotPasswordCodeIssuedAt.Valid)
 	assert.Empty(t, stored.PasswordHash, "the account is created with no password, for the link to set")
 
-	client := createHttpClient(t)
+	client := createHTTPClient(t)
 	cleanURL := followResetLink(t, client, link)
-	continuationId := loadResetForm(t, client, cleanURL)
+	continuationID := loadResetForm(t, client, cleanURL)
 
 	newPassword := fake.Password(20)
-	resp = postCleanReset(t, client, cleanURL, newPassword, continuationId)
+	resp = postCleanReset(t, client, cleanURL, newPassword, continuationID)
 	body := bodyString(t, resp)
 	_ = resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)

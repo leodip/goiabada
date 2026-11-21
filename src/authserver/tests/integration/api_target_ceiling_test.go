@@ -33,15 +33,15 @@ import (
 
 // targetFixture is one target and what a write acts on beside it.
 type targetFixture struct {
-	userId  int64
-	groupId int64
-	// rowId is the attribute, session, consent or ordinary group the write names in its path.
-	rowId int64
+	userID  int64
+	groupID int64
+	// rowID is the attribute, session, consent or ordinary group the write names in its path.
+	rowID int64
 	// before is a value read before the write, which the write would change.
 	before string
-	// ordinaryPermissionId is a permission on a resource of the test's own, administrative to
+	// ordinaryPermissionID is a permission on a resource of the test's own, administrative to
 	// nobody.
-	ordinaryPermissionId int64
+	ordinaryPermissionID int64
 }
 
 // targetCeilingWrite is one of the writes the target ceiling guards.
@@ -57,23 +57,23 @@ type targetCeilingWrite struct {
 	changed func(t *testing.T, f *targetFixture) bool
 }
 
-func storedUser(t *testing.T, userId int64) *record.User {
+func storedUser(t *testing.T, userID int64) *record.User {
 	t.Helper()
-	user, err := database.GetUserByID(context.Background(), nil, userId)
+	user, err := database.GetUserByID(context.Background(), nil, userID)
 	require.NoError(t, err)
 	return user
 }
 
-func updateStoredUser(t *testing.T, userId int64, change func(user *record.User)) {
+func updateStoredUser(t *testing.T, userID int64, change func(user *record.User)) {
 	t.Helper()
-	user := storedUser(t, userId)
+	user := storedUser(t, userID)
 	change(user)
 	require.NoError(t, database.UpdateUser(context.Background(), nil, user))
 }
 
-func userPermissionIds(t *testing.T, userId int64) []int64 {
+func userPermissionIDs(t *testing.T, userID int64) []int64 {
 	t.Helper()
-	rows, err := database.GetUserPermissionsByUserID(context.Background(), nil, userId)
+	rows, err := database.GetUserPermissionsByUserID(context.Background(), nil, userID)
 	require.NoError(t, err)
 	ids := []int64{}
 	for _, row := range rows {
@@ -82,9 +82,9 @@ func userPermissionIds(t *testing.T, userId int64) []int64 {
 	return ids
 }
 
-func userGroupIds(t *testing.T, userId int64) []int64 {
+func userGroupIDs(t *testing.T, userID int64) []int64 {
 	t.Helper()
-	rows, err := database.GetUserGroupsByUserID(context.Background(), nil, userId)
+	rows, err := database.GetUserGroupsByUserID(context.Background(), nil, userID)
 	require.NoError(t, err)
 	ids := []int64{}
 	for _, row := range rows {
@@ -93,9 +93,9 @@ func userGroupIds(t *testing.T, userId int64) []int64 {
 	return ids
 }
 
-func groupPermissionIds(t *testing.T, groupId int64) []int64 {
+func groupPermissionIDs(t *testing.T, groupID int64) []int64 {
 	t.Helper()
-	rows, err := database.GetGroupPermissionsByGroupID(context.Background(), nil, groupId)
+	rows, err := database.GetGroupPermissionsByGroupID(context.Background(), nil, groupID)
 	require.NoError(t, err)
 	ids := []int64{}
 	for _, row := range rows {
@@ -107,7 +107,7 @@ func groupPermissionIds(t *testing.T, groupId int64) []int64 {
 func noPrepare(t *testing.T, f *targetFixture) {}
 
 // sendPicture uploads a picture under its own request id.
-func sendPicture(t *testing.T, accessToken string, userId int64) (*http.Response, string) {
+func sendPicture(t *testing.T, accessToken string, userID int64) (*http.Response, string) {
 	t.Helper()
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
@@ -117,21 +117,21 @@ func sendPicture(t *testing.T, accessToken string, userId int64) (*http.Response
 	require.NoError(t, err)
 	require.NoError(t, writer.Close())
 
-	req, err := http.NewRequest(http.MethodPost, appConfig.AuthServer.BaseURL+fmt.Sprintf("/api/v1/admin/users/%d/profile-picture", userId), &body)
+	req, err := http.NewRequest(http.MethodPost, appConfig.AuthServer.BaseURL+fmt.Sprintf("/api/v1/admin/users/%d/profile-picture", userID), &body)
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 	req.Header.Set("Authorization", "Bearer "+accessToken)
-	requestId := "target-" + fake.LetterN(16)
-	req.Header.Set("X-Request-Id", requestId)
+	requestID := "target-" + fake.LetterN(16)
+	req.Header.Set("X-Request-Id", requestID)
 
-	resp, err := createHttpClient(t).Do(req)
+	resp, err := createHTTPClient(t).Do(req)
 	require.NoError(t, err)
-	return resp, requestId
+	return resp, requestID
 }
 
-func hasPicture(t *testing.T, userId int64) bool {
+func hasPicture(t *testing.T, userID int64) bool {
 	t.Helper()
-	has, err := database.UserHasProfilePicture(context.Background(), nil, userId)
+	has, err := database.UserHasProfilePicture(context.Background(), nil, userID)
 	require.NoError(t, err)
 	return has
 }
@@ -141,117 +141,117 @@ var userTargetCeilingWrites = []targetCeilingWrite{
 		name: "PUT users enabled", method: http.MethodPut, route: "/api/v1/admin/users/{id}/enabled", kind: "user",
 		prepare: noPrepare,
 		send: func(t *testing.T, token string, f *targetFixture) (*http.Response, string) {
-			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/users/%d/enabled", f.userId), map[string]any{"enabled": false})
+			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/users/%d/enabled", f.userID), map[string]any{"enabled": false})
 		},
-		changed: func(t *testing.T, f *targetFixture) bool { return !storedUser(t, f.userId).Enabled },
+		changed: func(t *testing.T, f *targetFixture) bool { return !storedUser(t, f.userID).Enabled },
 	},
 	{
 		name: "PUT users profile", method: http.MethodPut, route: "/api/v1/admin/users/{id}/profile", kind: "user",
 		prepare: noPrepare,
 		send: func(t *testing.T, token string, f *targetFixture) (*http.Response, string) {
-			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/users/%d/profile", f.userId), map[string]any{"givenName": "Changed"})
+			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/users/%d/profile", f.userID), map[string]any{"givenName": "Changed"})
 		},
-		changed: func(t *testing.T, f *targetFixture) bool { return storedUser(t, f.userId).GivenName == "Changed" },
+		changed: func(t *testing.T, f *targetFixture) bool { return storedUser(t, f.userID).GivenName == "Changed" },
 	},
 	{
 		name: "PUT users address", method: http.MethodPut, route: "/api/v1/admin/users/{id}/address", kind: "user",
 		prepare: noPrepare,
 		send: func(t *testing.T, token string, f *targetFixture) (*http.Response, string) {
-			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/users/%d/address", f.userId), map[string]any{"addressLine1": "1 Long Road"})
+			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/users/%d/address", f.userID), map[string]any{"addressLine1": "1 Long Road"})
 		},
 		changed: func(t *testing.T, f *targetFixture) bool {
-			return storedUser(t, f.userId).AddressLine1 == "1 Long Road"
+			return storedUser(t, f.userID).AddressLine1 == "1 Long Road"
 		},
 	},
 	{
 		name: "PUT users email", method: http.MethodPut, route: "/api/v1/admin/users/{id}/email", kind: "user",
 		prepare: func(t *testing.T, f *targetFixture) { f.before = uniqueEmail("taken-over@target.test") },
 		send: func(t *testing.T, token string, f *targetFixture) (*http.Response, string) {
-			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/users/%d/email", f.userId),
+			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/users/%d/email", f.userID),
 				map[string]any{"email": f.before, "emailVerified": true})
 		},
-		changed: func(t *testing.T, f *targetFixture) bool { return storedUser(t, f.userId).Email == f.before },
+		changed: func(t *testing.T, f *targetFixture) bool { return storedUser(t, f.userID).Email == f.before },
 	},
 	{
 		name: "POST users email verification code", method: http.MethodPost, route: "/api/v1/admin/users/{id}/email/verification-code", kind: "user",
 		prepare: noPrepare,
 		send: func(t *testing.T, token string, f *targetFixture) (*http.Response, string) {
-			return sendAdmin(t, token, http.MethodPost, fmt.Sprintf("/api/v1/admin/users/%d/email/verification-code", f.userId), nil)
+			return sendAdmin(t, token, http.MethodPost, fmt.Sprintf("/api/v1/admin/users/%d/email/verification-code", f.userID), nil)
 		},
 		changed: func(t *testing.T, f *targetFixture) bool {
-			return len(storedUser(t, f.userId).EmailVerificationCodeEncrypted) > 0
+			return len(storedUser(t, f.userID).EmailVerificationCodeEncrypted) > 0
 		},
 	},
 	{
 		name: "PUT users phone", method: http.MethodPut, route: "/api/v1/admin/users/{id}/phone", kind: "user",
 		prepare: func(t *testing.T, f *targetFixture) {
-			updateStoredUser(t, f.userId, func(user *record.User) { user.PhoneNumber = "5550100" })
+			updateStoredUser(t, f.userID, func(user *record.User) { user.PhoneNumber = "5550100" })
 		},
 		send: func(t *testing.T, token string, f *targetFixture) (*http.Response, string) {
-			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/users/%d/phone", f.userId),
+			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/users/%d/phone", f.userID),
 				map[string]any{"phoneCountryUniqueId": "", "phoneNumber": ""})
 		},
-		changed: func(t *testing.T, f *targetFixture) bool { return storedUser(t, f.userId).PhoneNumber == "" },
+		changed: func(t *testing.T, f *targetFixture) bool { return storedUser(t, f.userID).PhoneNumber == "" },
 	},
 	{
 		name: "PUT users password", method: http.MethodPut, route: "/api/v1/admin/users/{id}/password", kind: "user",
-		prepare: func(t *testing.T, f *targetFixture) { f.before = storedUser(t, f.userId).PasswordHash },
+		prepare: func(t *testing.T, f *targetFixture) { f.before = storedUser(t, f.userID).PasswordHash },
 		send: func(t *testing.T, token string, f *targetFixture) (*http.Response, string) {
-			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/users/%d/password", f.userId),
+			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/users/%d/password", f.userID),
 				map[string]any{"newPassword": "Correct-Horse-Battery-Staple-9"})
 		},
-		changed: func(t *testing.T, f *targetFixture) bool { return storedUser(t, f.userId).PasswordHash != f.before },
+		changed: func(t *testing.T, f *targetFixture) bool { return storedUser(t, f.userID).PasswordHash != f.before },
 	},
 	{
 		name: "PUT users otp", method: http.MethodPut, route: "/api/v1/admin/users/{id}/otp", kind: "user",
 		prepare: func(t *testing.T, f *targetFixture) {
-			updateStoredUser(t, f.userId, func(user *record.User) {
+			updateStoredUser(t, f.userID, func(user *record.User) {
 				user.OTPEnabled = true
 				user.OTPSecretEncrypted = encryptOTPSecretForTest(t, "JBSWY3DPEHPK3PXP")
 			})
 		},
 		send: func(t *testing.T, token string, f *targetFixture) (*http.Response, string) {
-			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/users/%d/otp", f.userId), map[string]any{"enabled": false})
+			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/users/%d/otp", f.userID), map[string]any{"enabled": false})
 		},
-		changed: func(t *testing.T, f *targetFixture) bool { return !storedUser(t, f.userId).OTPEnabled },
+		changed: func(t *testing.T, f *targetFixture) bool { return !storedUser(t, f.userID).OTPEnabled },
 	},
 	{
 		name: "POST users profile picture", method: http.MethodPost, route: "/api/v1/admin/users/{id}/profile-picture", kind: "user",
 		prepare: noPrepare,
 		send: func(t *testing.T, token string, f *targetFixture) (*http.Response, string) {
-			return sendPicture(t, token, f.userId)
+			return sendPicture(t, token, f.userID)
 		},
-		changed: func(t *testing.T, f *targetFixture) bool { return hasPicture(t, f.userId) },
+		changed: func(t *testing.T, f *targetFixture) bool { return hasPicture(t, f.userID) },
 	},
 	{
 		name: "DELETE users profile picture", method: http.MethodDelete, route: "/api/v1/admin/users/{id}/profile-picture", kind: "user",
 		prepare: func(t *testing.T, f *targetFixture) {
 			require.NoError(t, database.CreateUserProfilePicture(context.Background(), nil, &record.UserProfilePicture{
-				UserID: f.userId, Picture: createTestPNGImage(8, 8), ContentType: "image/png",
+				UserID: f.userID, Picture: createTestPNGImage(8, 8), ContentType: "image/png",
 			}))
 		},
 		send: func(t *testing.T, token string, f *targetFixture) (*http.Response, string) {
-			return sendAdmin(t, token, http.MethodDelete, fmt.Sprintf("/api/v1/admin/users/%d/profile-picture", f.userId), nil)
+			return sendAdmin(t, token, http.MethodDelete, fmt.Sprintf("/api/v1/admin/users/%d/profile-picture", f.userID), nil)
 		},
-		changed: func(t *testing.T, f *targetFixture) bool { return !hasPicture(t, f.userId) },
+		changed: func(t *testing.T, f *targetFixture) bool { return !hasPicture(t, f.userID) },
 	},
 	{
 		name: "DELETE users", method: http.MethodDelete, route: "/api/v1/admin/users/{id}", kind: "user",
 		prepare: noPrepare,
 		send: func(t *testing.T, token string, f *targetFixture) (*http.Response, string) {
-			return sendAdmin(t, token, http.MethodDelete, fmt.Sprintf("/api/v1/admin/users/%d", f.userId), nil)
+			return sendAdmin(t, token, http.MethodDelete, fmt.Sprintf("/api/v1/admin/users/%d", f.userID), nil)
 		},
-		changed: func(t *testing.T, f *targetFixture) bool { return storedUser(t, f.userId) == nil },
+		changed: func(t *testing.T, f *targetFixture) bool { return storedUser(t, f.userID) == nil },
 	},
 	{
 		name: "POST user attributes", method: http.MethodPost, route: "/api/v1/admin/user-attributes", kind: "user",
 		prepare: noPrepare,
 		send: func(t *testing.T, token string, f *targetFixture) (*http.Response, string) {
 			return sendAdmin(t, token, http.MethodPost, "/api/v1/admin/user-attributes",
-				map[string]any{"userId": f.userId, "key": "tier", "value": "gold"})
+				map[string]any{"userId": f.userID, "key": "tier", "value": "gold"})
 		},
 		changed: func(t *testing.T, f *targetFixture) bool {
-			attributes, err := database.GetUserAttributesByUserID(context.Background(), nil, f.userId)
+			attributes, err := database.GetUserAttributesByUserID(context.Background(), nil, f.userID)
 			require.NoError(t, err)
 			return len(attributes) > 0
 		},
@@ -259,14 +259,14 @@ var userTargetCeilingWrites = []targetCeilingWrite{
 	{
 		name: "PUT user attributes", method: http.MethodPut, route: "/api/v1/admin/user-attributes/{id}", kind: "user",
 		prepare: func(t *testing.T, f *targetFixture) {
-			f.rowId = createTestUserAttribute(t, f.userId, "tier", "gold").ID
+			f.rowID = createTestUserAttribute(t, f.userID, "tier", "gold").ID
 		},
 		send: func(t *testing.T, token string, f *targetFixture) (*http.Response, string) {
-			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/user-attributes/%d", f.rowId),
+			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/user-attributes/%d", f.rowID),
 				map[string]any{"key": "tier", "value": "platinum"})
 		},
 		changed: func(t *testing.T, f *targetFixture) bool {
-			attribute, err := database.GetUserAttributeByID(context.Background(), nil, f.rowId)
+			attribute, err := database.GetUserAttributeByID(context.Background(), nil, f.rowID)
 			require.NoError(t, err)
 			return attribute.Value == "platinum"
 		},
@@ -274,13 +274,13 @@ var userTargetCeilingWrites = []targetCeilingWrite{
 	{
 		name: "DELETE user attributes", method: http.MethodDelete, route: "/api/v1/admin/user-attributes/{id}", kind: "user",
 		prepare: func(t *testing.T, f *targetFixture) {
-			f.rowId = createTestUserAttribute(t, f.userId, "tier", "gold").ID
+			f.rowID = createTestUserAttribute(t, f.userID, "tier", "gold").ID
 		},
 		send: func(t *testing.T, token string, f *targetFixture) (*http.Response, string) {
-			return sendAdmin(t, token, http.MethodDelete, fmt.Sprintf("/api/v1/admin/user-attributes/%d", f.rowId), nil)
+			return sendAdmin(t, token, http.MethodDelete, fmt.Sprintf("/api/v1/admin/user-attributes/%d", f.rowID), nil)
 		},
 		changed: func(t *testing.T, f *targetFixture) bool {
-			attribute, err := database.GetUserAttributeByID(context.Background(), nil, f.rowId)
+			attribute, err := database.GetUserAttributeByID(context.Background(), nil, f.rowID)
 			require.NoError(t, err)
 			return attribute == nil
 		},
@@ -291,16 +291,16 @@ var userTargetCeilingWrites = []targetCeilingWrite{
 			now := time.Now().UTC()
 			session := &record.UserSession{
 				SessionIdentifier: fake.UUID(), Started: now, LastAccessed: now, AuthTime: now, PasswordAuthTime: now,
-				AuthMethods: "pwd", ACRLevel: "urn:goiabada:level1", IPAddress: "192.0.2.1", UserID: f.userId,
+				AuthMethods: "pwd", ACRLevel: "urn:goiabada:level1", IPAddress: "192.0.2.1", UserID: f.userID,
 			}
 			require.NoError(t, database.CreateUserSession(context.Background(), nil, session))
-			f.rowId = session.ID
+			f.rowID = session.ID
 		},
 		send: func(t *testing.T, token string, f *targetFixture) (*http.Response, string) {
-			return sendAdmin(t, token, http.MethodDelete, fmt.Sprintf("/api/v1/admin/user-sessions/%d", f.rowId), nil)
+			return sendAdmin(t, token, http.MethodDelete, fmt.Sprintf("/api/v1/admin/user-sessions/%d", f.rowID), nil)
 		},
 		changed: func(t *testing.T, f *targetFixture) bool {
-			session, err := database.GetUserSessionByID(context.Background(), nil, f.rowId)
+			session, err := database.GetUserSessionByID(context.Background(), nil, f.rowID)
 			require.NoError(t, err)
 			return session == nil
 		},
@@ -311,17 +311,17 @@ var userTargetCeilingWrites = []targetCeilingWrite{
 			client := createTestClient(t, "target-consent-"+strings.ToLower(fake.LetterN(8)))
 			t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 			consent := &record.UserConsent{
-				ClientID: client.ID, UserID: f.userId, Scope: "openid",
+				ClientID: client.ID, UserID: f.userID, Scope: "openid",
 				GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
 			}
 			require.NoError(t, database.CreateUserConsent(context.Background(), nil, consent))
-			f.rowId = consent.ID
+			f.rowID = consent.ID
 		},
 		send: func(t *testing.T, token string, f *targetFixture) (*http.Response, string) {
-			return sendAdmin(t, token, http.MethodDelete, fmt.Sprintf("/api/v1/admin/user-consents/%d", f.rowId), nil)
+			return sendAdmin(t, token, http.MethodDelete, fmt.Sprintf("/api/v1/admin/user-consents/%d", f.rowID), nil)
 		},
 		changed: func(t *testing.T, f *targetFixture) bool {
-			consent, err := database.GetUserConsentByID(context.Background(), nil, f.rowId)
+			consent, err := database.GetUserConsentByID(context.Background(), nil, f.rowID)
 			require.NoError(t, err)
 			return consent == nil
 		},
@@ -333,15 +333,15 @@ var userTargetCeilingWrites = []targetCeilingWrite{
 		prepare: func(t *testing.T, f *targetFixture) {
 			client := createTestClient(t, "target-connected-"+strings.ToLower(fake.LetterN(8)))
 			t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
-			holdRefreshToken(t, storedUser(t, f.userId), client, false, time.Now().UTC().Add(time.Hour))
-			f.rowId = client.ID
+			holdRefreshToken(t, storedUser(t, f.userID), client, false, time.Now().UTC().Add(time.Hour))
+			f.rowID = client.ID
 		},
 		send: func(t *testing.T, token string, f *targetFixture) (*http.Response, string) {
 			return sendAdmin(t, token, http.MethodDelete,
-				fmt.Sprintf("/api/v1/admin/users/%d/connected-clients/%d", f.userId, f.rowId), nil)
+				fmt.Sprintf("/api/v1/admin/users/%d/connected-clients/%d", f.userID, f.rowID), nil)
 		},
 		changed: func(t *testing.T, f *targetFixture) bool {
-			tokens, err := database.GetRefreshTokensByUserID(context.Background(), nil, f.userId)
+			tokens, err := database.GetRefreshTokensByUserID(context.Background(), nil, f.userID)
 			require.NoError(t, err)
 			require.Len(t, tokens, 1)
 			return tokens[0].Revoked
@@ -351,26 +351,26 @@ var userTargetCeilingWrites = []targetCeilingWrite{
 		// Joining an ordinary group, keeping every membership the user has: nothing administrative
 		// changes, so the grant ceiling lets it through and the target ceiling judges it.
 		name: "PUT users groups", method: http.MethodPut, route: "/api/v1/admin/users/{id}/groups", kind: "user",
-		prepare: func(t *testing.T, f *targetFixture) { f.rowId = ordinaryGroup(t) },
+		prepare: func(t *testing.T, f *targetFixture) { f.rowID = ordinaryGroup(t) },
 		send: func(t *testing.T, token string, f *targetFixture) (*http.Response, string) {
-			current := userGroupIds(t, f.userId)
-			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/users/%d/groups", f.userId),
-				map[string]any{"groupIds": append(append([]int64{}, current...), f.rowId), "expectedGroupIds": current})
+			current := userGroupIDs(t, f.userID)
+			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/users/%d/groups", f.userID),
+				map[string]any{"groupIds": append(append([]int64{}, current...), f.rowID), "expectedGroupIds": current})
 		},
-		changed: func(t *testing.T, f *targetFixture) bool { return memberOf(t, f.userId, f.rowId) },
+		changed: func(t *testing.T, f *targetFixture) bool { return memberOf(t, f.userID, f.rowID) },
 	},
 	{
 		// Granting an ordinary permission, keeping every permission the user holds.
 		name: "PUT users permissions", method: http.MethodPut, route: "/api/v1/admin/users/{id}/permissions", kind: "user",
 		prepare: noPrepare,
 		send: func(t *testing.T, token string, f *targetFixture) (*http.Response, string) {
-			current := userPermissionIds(t, f.userId)
-			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/users/%d/permissions", f.userId),
-				map[string]any{"permissionIDs": append(append([]int64{}, current...), f.ordinaryPermissionId), "expectedPermissionIds": current})
+			current := userPermissionIDs(t, f.userID)
+			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/users/%d/permissions", f.userID),
+				map[string]any{"permissionIDs": append(append([]int64{}, current...), f.ordinaryPermissionID), "expectedPermissionIds": current})
 		},
 		changed: func(t *testing.T, f *targetFixture) bool {
-			for _, id := range userPermissionIds(t, f.userId) {
-				if id == f.ordinaryPermissionId {
+			for _, id := range userPermissionIDs(t, f.userID) {
+				if id == f.ordinaryPermissionID {
 					return true
 				}
 			}
@@ -379,22 +379,22 @@ var userTargetCeilingWrites = []targetCeilingWrite{
 	},
 	{
 		name: "POST group members of an ordinary group", method: http.MethodPost, route: "/api/v1/admin/groups/{id}/members", kind: "user",
-		prepare: func(t *testing.T, f *targetFixture) { f.rowId = ordinaryGroup(t) },
+		prepare: func(t *testing.T, f *targetFixture) { f.rowID = ordinaryGroup(t) },
 		send: func(t *testing.T, token string, f *targetFixture) (*http.Response, string) {
-			return sendAdmin(t, token, http.MethodPost, fmt.Sprintf("/api/v1/admin/groups/%d/members", f.rowId), map[string]any{"userId": f.userId})
+			return sendAdmin(t, token, http.MethodPost, fmt.Sprintf("/api/v1/admin/groups/%d/members", f.rowID), map[string]any{"userId": f.userID})
 		},
-		changed: func(t *testing.T, f *targetFixture) bool { return memberOf(t, f.userId, f.rowId) },
+		changed: func(t *testing.T, f *targetFixture) bool { return memberOf(t, f.userID, f.rowID) },
 	},
 	{
 		name: "DELETE group member of an ordinary group", method: http.MethodDelete, route: "/api/v1/admin/groups/{id}/members/{userId}", kind: "user",
 		prepare: func(t *testing.T, f *targetFixture) {
-			f.rowId = ordinaryGroup(t)
-			joinGroup(t, f.userId, f.rowId)
+			f.rowID = ordinaryGroup(t)
+			joinGroup(t, f.userID, f.rowID)
 		},
 		send: func(t *testing.T, token string, f *targetFixture) (*http.Response, string) {
-			return sendAdmin(t, token, http.MethodDelete, fmt.Sprintf("/api/v1/admin/groups/%d/members/%d", f.rowId, f.userId), nil)
+			return sendAdmin(t, token, http.MethodDelete, fmt.Sprintf("/api/v1/admin/groups/%d/members/%d", f.rowID, f.userID), nil)
 		},
-		changed: func(t *testing.T, f *targetFixture) bool { return !memberOf(t, f.userId, f.rowId) },
+		changed: func(t *testing.T, f *targetFixture) bool { return !memberOf(t, f.userID, f.rowID) },
 	},
 }
 
@@ -403,11 +403,11 @@ var groupTargetCeilingWrites = []targetCeilingWrite{
 		name: "PUT groups", method: http.MethodPut, route: "/api/v1/admin/groups/{id}", kind: "group",
 		prepare: func(t *testing.T, f *targetFixture) { f.before = "renamed-" + strings.ToLower(fake.LetterN(10)) },
 		send: func(t *testing.T, token string, f *targetFixture) (*http.Response, string) {
-			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/groups/%d", f.groupId),
+			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/groups/%d", f.groupID),
 				map[string]any{"groupIdentifier": f.before, "description": "Renamed"})
 		},
 		changed: func(t *testing.T, f *targetFixture) bool {
-			group, err := database.GetGroupByID(context.Background(), nil, f.groupId)
+			group, err := database.GetGroupByID(context.Background(), nil, f.groupID)
 			require.NoError(t, err)
 			return group.GroupIdentifier == f.before
 		},
@@ -417,10 +417,10 @@ var groupTargetCeilingWrites = []targetCeilingWrite{
 		prepare: noPrepare,
 		send: func(t *testing.T, token string, f *targetFixture) (*http.Response, string) {
 			return sendAdmin(t, token, http.MethodPost, "/api/v1/admin/group-attributes",
-				map[string]any{"groupId": f.groupId, "key": "tier", "value": "gold"})
+				map[string]any{"groupId": f.groupID, "key": "tier", "value": "gold"})
 		},
 		changed: func(t *testing.T, f *targetFixture) bool {
-			attributes, err := database.GetGroupAttributesByGroupID(context.Background(), nil, f.groupId)
+			attributes, err := database.GetGroupAttributesByGroupID(context.Background(), nil, f.groupID)
 			require.NoError(t, err)
 			return len(attributes) > 0
 		},
@@ -428,14 +428,14 @@ var groupTargetCeilingWrites = []targetCeilingWrite{
 	{
 		name: "PUT group attributes", method: http.MethodPut, route: "/api/v1/admin/group-attributes/{id}", kind: "group",
 		prepare: func(t *testing.T, f *targetFixture) {
-			f.rowId = createTestGroupAttribute(t, f.groupId, "tier", "gold").ID
+			f.rowID = createTestGroupAttribute(t, f.groupID, "tier", "gold").ID
 		},
 		send: func(t *testing.T, token string, f *targetFixture) (*http.Response, string) {
-			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/group-attributes/%d", f.rowId),
+			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/group-attributes/%d", f.rowID),
 				map[string]any{"key": "tier", "value": "platinum"})
 		},
 		changed: func(t *testing.T, f *targetFixture) bool {
-			attribute, err := database.GetGroupAttributeByID(context.Background(), nil, f.rowId)
+			attribute, err := database.GetGroupAttributeByID(context.Background(), nil, f.rowID)
 			require.NoError(t, err)
 			return attribute.Value == "platinum"
 		},
@@ -443,13 +443,13 @@ var groupTargetCeilingWrites = []targetCeilingWrite{
 	{
 		name: "DELETE group attributes", method: http.MethodDelete, route: "/api/v1/admin/group-attributes/{id}", kind: "group",
 		prepare: func(t *testing.T, f *targetFixture) {
-			f.rowId = createTestGroupAttribute(t, f.groupId, "tier", "gold").ID
+			f.rowID = createTestGroupAttribute(t, f.groupID, "tier", "gold").ID
 		},
 		send: func(t *testing.T, token string, f *targetFixture) (*http.Response, string) {
-			return sendAdmin(t, token, http.MethodDelete, fmt.Sprintf("/api/v1/admin/group-attributes/%d", f.rowId), nil)
+			return sendAdmin(t, token, http.MethodDelete, fmt.Sprintf("/api/v1/admin/group-attributes/%d", f.rowID), nil)
 		},
 		changed: func(t *testing.T, f *targetFixture) bool {
-			attribute, err := database.GetGroupAttributeByID(context.Background(), nil, f.rowId)
+			attribute, err := database.GetGroupAttributeByID(context.Background(), nil, f.rowID)
 			require.NoError(t, err)
 			return attribute == nil
 		},
@@ -459,13 +459,13 @@ var groupTargetCeilingWrites = []targetCeilingWrite{
 		name: "PUT groups permissions", method: http.MethodPut, route: "/api/v1/admin/groups/{id}/permissions", kind: "group",
 		prepare: noPrepare,
 		send: func(t *testing.T, token string, f *targetFixture) (*http.Response, string) {
-			current := groupPermissionIds(t, f.groupId)
-			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/groups/%d/permissions", f.groupId),
-				map[string]any{"permissionIDs": append(append([]int64{}, current...), f.ordinaryPermissionId), "expectedPermissionIds": current})
+			current := groupPermissionIDs(t, f.groupID)
+			return sendAdmin(t, token, http.MethodPut, fmt.Sprintf("/api/v1/admin/groups/%d/permissions", f.groupID),
+				map[string]any{"permissionIDs": append(append([]int64{}, current...), f.ordinaryPermissionID), "expectedPermissionIds": current})
 		},
 		changed: func(t *testing.T, f *targetFixture) bool {
-			for _, id := range groupPermissionIds(t, f.groupId) {
-				if id == f.ordinaryPermissionId {
+			for _, id := range groupPermissionIDs(t, f.groupID) {
+				if id == f.ordinaryPermissionID {
 					return true
 				}
 			}
@@ -487,32 +487,32 @@ func ordinaryPermission(t *testing.T) int64 {
 // every user does.
 func administratorUser(t *testing.T, identifier string, throughGroup bool) int64 {
 	t.Helper()
-	userId := newMembershipUser(t)
+	userID := newMembershipUser(t)
 	require.NoError(t, database.CreateUserPermission(context.Background(), nil,
-		&record.UserPermission{UserID: userId, PermissionID: authServerPermissionId(t, builtin.ManageAccountPermissionIdentifier)}))
-	administrative := authServerPermissionId(t, identifier)
+		&record.UserPermission{UserID: userID, PermissionID: authServerPermissionID(t, builtin.ManageAccountPermissionIdentifier)}))
+	administrative := authServerPermissionID(t, identifier)
 	if throughGroup {
-		joinGroup(t, userId, newGroupHolding(t, administrative))
+		joinGroup(t, userID, newGroupHolding(t, administrative))
 	} else {
-		require.NoError(t, database.CreateUserPermission(context.Background(), nil, &record.UserPermission{UserID: userId, PermissionID: administrative}))
+		require.NoError(t, database.CreateUserPermission(context.Background(), nil, &record.UserPermission{UserID: userID, PermissionID: administrative}))
 	}
-	return userId
+	return userID
 }
 
 // ordinaryUser is a fresh user holding manage-account and belonging to an ordinary group.
 func ordinaryUser(t *testing.T) int64 {
 	t.Helper()
-	userId := newMembershipUser(t)
+	userID := newMembershipUser(t)
 	require.NoError(t, database.CreateUserPermission(context.Background(), nil,
-		&record.UserPermission{UserID: userId, PermissionID: authServerPermissionId(t, builtin.ManageAccountPermissionIdentifier)}))
-	joinGroup(t, userId, ordinaryGroup(t))
-	return userId
+		&record.UserPermission{UserID: userID, PermissionID: authServerPermissionID(t, builtin.ManageAccountPermissionIdentifier)}))
+	joinGroup(t, userID, ordinaryGroup(t))
+	return userID
 }
 
 // assertRefusedByTheTargetCeiling holds one answered request to decision 4's refusal and decision
 // 5's one record under ceiling "target".
-func assertRefusedByTheTargetCeiling(t *testing.T, resp *http.Response, requestId, readerToken string,
-	caller *record.Client, write targetCeilingWrite, targetId int64) {
+func assertRefusedByTheTargetCeiling(t *testing.T, resp *http.Response, requestID, readerToken string,
+	caller *record.Client, write targetCeilingWrite, targetID int64) {
 	t.Helper()
 	defer func() { _ = resp.Body.Close() }()
 
@@ -529,7 +529,7 @@ func assertRefusedByTheTargetCeiling(t *testing.T, resp *http.Response, requestI
 	assert.Contains(t, challenge, `error="insufficient_scope"`)
 	assert.Contains(t, challenge, `scope="authserver:manage"`)
 
-	rows := refusalRows(t, readerToken, requestId)
+	rows := refusalRows(t, readerToken, requestID)
 	require.Len(t, rows, 1, "exactly one administrator_change_refused row for the refused request")
 	row := rows[0]
 	assert.Equal(t, caller.ClientIdentifier, row["logged_in_user"], "the caller is the token's sub")
@@ -537,8 +537,8 @@ func assertRefusedByTheTargetCeiling(t *testing.T, resp *http.Response, requestI
 	assert.Equal(t, write.route, row["route"])
 	assert.Equal(t, "target", row["ceiling"])
 	assert.Equal(t, write.kind, row["target_kind"])
-	assert.InDelta(t, float64(targetId), row["target_id"], 0)
-	assertUserIdNamesAUserTarget(t, row, write.kind, targetId)
+	assert.InDelta(t, float64(targetID), row["target_id"], 0)
+	assertUserIDNamesAUserTarget(t, row, write.kind, targetID)
 	assert.NotContains(t, row, "permission_ids")
 }
 
@@ -560,12 +560,12 @@ func TestTargetCeiling_AGranularTokenCannotWriteToAnAdministratorUser(t *testing
 			{"through a group", administrativePermissionIdentifiers[(i+3)%len(administrativePermissionIdentifiers)], true},
 		} {
 			t.Run(write.name+"/"+variant.name+"/"+variant.identifier, func(t *testing.T) {
-				f := &targetFixture{userId: administratorUser(t, variant.identifier, variant.throughGroup), ordinaryPermissionId: ordinary}
+				f := &targetFixture{userID: administratorUser(t, variant.identifier, variant.throughGroup), ordinaryPermissionID: ordinary}
 				write.prepare(t, f)
 
-				resp, requestId := write.send(t, granularToken, f)
+				resp, requestID := write.send(t, granularToken, f)
 
-				assertRefusedByTheTargetCeiling(t, resp, requestId, manageToken, caller, write, f.userId)
+				assertRefusedByTheTargetCeiling(t, resp, requestID, manageToken, caller, write, f.userID)
 				assert.False(t, write.changed(t, f), "the refused request changed nothing")
 			})
 		}
@@ -582,12 +582,12 @@ func TestTargetCeiling_AGranularTokenCannotWriteToAnAdministrativeGroup(t *testi
 	for i, write := range groupTargetCeilingWrites {
 		identifier := administrativePermissionIdentifiers[i%len(administrativePermissionIdentifiers)]
 		t.Run(write.name+"/"+identifier, func(t *testing.T) {
-			f := &targetFixture{groupId: newGroupHolding(t, authServerPermissionId(t, identifier)), ordinaryPermissionId: ordinary}
+			f := &targetFixture{groupID: newGroupHolding(t, authServerPermissionID(t, identifier)), ordinaryPermissionID: ordinary}
 			write.prepare(t, f)
 
-			resp, requestId := write.send(t, granularToken, f)
+			resp, requestID := write.send(t, granularToken, f)
 
-			assertRefusedByTheTargetCeiling(t, resp, requestId, manageToken, caller, write, f.groupId)
+			assertRefusedByTheTargetCeiling(t, resp, requestID, manageToken, caller, write, f.groupID)
 			assert.False(t, write.changed(t, f), "the refused request changed nothing")
 		})
 	}
@@ -602,21 +602,21 @@ func TestTargetCeiling_AGranularTokenStillWritesToOrdinaryUsersAndGroups(t *test
 
 	for _, write := range append(append([]targetCeilingWrite{}, userTargetCeilingWrites...), groupTargetCeilingWrites...) {
 		t.Run(write.name, func(t *testing.T) {
-			f := &targetFixture{ordinaryPermissionId: ordinary}
+			f := &targetFixture{ordinaryPermissionID: ordinary}
 			if write.kind == "group" {
-				f.groupId = ordinaryGroup(t)
+				f.groupID = ordinaryGroup(t)
 			} else {
-				f.userId = ordinaryUser(t)
+				f.userID = ordinaryUser(t)
 			}
 			write.prepare(t, f)
 
-			resp, requestId := write.send(t, granularToken, f)
+			resp, requestID := write.send(t, granularToken, f)
 			body, _ := io.ReadAll(resp.Body)
 			_ = resp.Body.Close()
 
 			assert.Less(t, resp.StatusCode, 300, "manage-account and a custom authserver permission make nobody an administrator: %s", body)
 			assert.True(t, write.changed(t, f))
-			assert.Empty(t, refusalRows(t, manageToken, requestId))
+			assert.Empty(t, refusalRows(t, manageToken, requestID))
 		})
 	}
 }
@@ -628,21 +628,21 @@ func TestTargetCeiling_AManageTokenWritesToAdministrators(t *testing.T) {
 
 	for _, write := range append(append([]targetCeilingWrite{}, userTargetCeilingWrites...), groupTargetCeilingWrites...) {
 		t.Run(write.name, func(t *testing.T) {
-			f := &targetFixture{ordinaryPermissionId: ordinary}
+			f := &targetFixture{ordinaryPermissionID: ordinary}
 			if write.kind == "group" {
-				f.groupId = newGroupHolding(t, authServerPermissionId(t, builtin.ManagePermissionIdentifier))
+				f.groupID = newGroupHolding(t, authServerPermissionID(t, builtin.ManagePermissionIdentifier))
 			} else {
-				f.userId = administratorUser(t, builtin.ManagePermissionIdentifier, false)
+				f.userID = administratorUser(t, builtin.ManagePermissionIdentifier, false)
 			}
 			write.prepare(t, f)
 
-			resp, requestId := write.send(t, manageToken, f)
+			resp, requestID := write.send(t, manageToken, f)
 			body, _ := io.ReadAll(resp.Body)
 			_ = resp.Body.Close()
 
 			assert.Less(t, resp.StatusCode, 300, string(body))
 			assert.True(t, write.changed(t, f))
-			assert.Empty(t, refusalRows(t, manageToken, requestId))
+			assert.Empty(t, refusalRows(t, manageToken, requestID))
 		})
 	}
 }

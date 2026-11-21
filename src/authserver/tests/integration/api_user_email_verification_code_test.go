@@ -120,7 +120,7 @@ func TestAPIUserEmailVerificationCodePost_NotFound(t *testing.T) {
 	assert.Equal(t, "NOT_FOUND", errResp.ErrorCode)
 }
 
-func TestAPIUserEmailVerificationCodePost_InvalidUserId(t *testing.T) {
+func TestAPIUserEmailVerificationCodePost_InvalidUserID(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/invalid/email/verification-code"
@@ -139,7 +139,7 @@ func TestAPIUserEmailVerificationCodePost_Unauthorized(t *testing.T) {
 	req, err := http.NewRequest("POST", url, nil)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()

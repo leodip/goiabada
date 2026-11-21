@@ -25,20 +25,20 @@ import (
 // cause it: the enabled flag written directly, and the generation advanced by the statement a
 // credential change runs. Written straight to the database, because the admin API's own paths
 // also revoke the user's grants, and the subject here is a grant that is still there.
-func moveAccountState(t *testing.T, userId int64, state string) {
+func moveAccountState(t *testing.T, userID int64, state string) {
 	t.Helper()
 
 	switch state {
 	case "untouched":
 	case "disabled":
-		user, err := database.GetUserByID(context.Background(), nil, userId)
+		user, err := database.GetUserByID(context.Background(), nil, userID)
 		require.NoError(t, err)
 		require.NotNil(t, user)
 		user.Enabled = false
 		require.NoError(t, database.UpdateUser(context.Background(), nil, user))
 	case "superseded":
 		require.NoError(t, database.RunInTransaction(context.Background(), func(tx *sql.Tx) error {
-			_, err := database.IncrementUserAuthStateGeneration(context.Background(), tx, userId)
+			_, err := database.IncrementUserAuthStateGeneration(context.Background(), tx, userID)
 			return err
 		}))
 	default:

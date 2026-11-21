@@ -18,7 +18,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsNotRequired(t *testing.T) {
+func TestAuthorize_NoExistingSession_ACRLevel1_Pwd_ConsentIsNotRequired(t *testing.T) {
 	started := time.Now().UTC()
 	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
@@ -33,12 +33,12 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsNotRequired(t *testi
 		t.Fatal(err)
 	}
 
-	redirectUri := &record.RedirectURI{
+	redirectURI := &record.RedirectURI{
 		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,8 +66,8 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsNotRequired(t *testi
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -75,9 +75,9 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsNotRequired(t *testi
 		"&state=" + requestState +
 		"&nonce=" + requestNonce
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -106,7 +106,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsNotRequired(t *testi
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
+	codeVal, stateVal := getCodeAndStateFromURL(t, resp)
 	assert.Equal(t, requestState, stateVal)
 
 	code := loadCodeFromDatabase(t, codeVal)
@@ -117,7 +117,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsNotRequired(t *testi
 	assert.Equal(t, requestScope, code.Scope)
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
-	assert.Equal(t, redirectUri.URI, code.RedirectURI)
+	assert.Equal(t, redirectURI.URI, code.RedirectURI)
 	assert.Equal(t, user.ID, code.User.ID)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertStampedSince(t, code.AuthenticatedAt, started)
@@ -126,7 +126,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsNotRequired(t *testi
 	assert.False(t, code.Used)
 }
 
-func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIsNotRequired(t *testing.T) {
+func TestAuthorize_NoExistingSession_ACRLevel2Optional_Pwd_OTPDisabled_ConsentIsNotRequired(t *testing.T) {
 	started := time.Now().UTC()
 	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
@@ -141,12 +141,12 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 		t.Fatal(err)
 	}
 
-	redirectUri := &record.RedirectURI{
+	redirectURI := &record.RedirectURI{
 		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -175,8 +175,8 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -184,9 +184,9 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 		"&state=" + requestState +
 		"&nonce=" + requestNonce
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -219,7 +219,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
+	codeVal, stateVal := getCodeAndStateFromURL(t, resp)
 	assert.Equal(t, requestState, stateVal)
 
 	code := loadCodeFromDatabase(t, codeVal)
@@ -230,7 +230,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 	assert.Equal(t, requestScope, code.Scope)
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
-	assert.Equal(t, redirectUri.URI, code.RedirectURI)
+	assert.Equal(t, redirectURI.URI, code.RedirectURI)
 	assert.Equal(t, user.ID, code.User.ID)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertStampedSince(t, code.AuthenticatedAt, started)
@@ -239,7 +239,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 	assert.False(t, code.Used)
 }
 
-func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsNotRequired(t *testing.T) {
+func TestAuthorize_NoExistingSession_ACRLevel2Optional_Pwd_OTPEnabled_ConsentIsNotRequired(t *testing.T) {
 	started := time.Now().UTC()
 	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
@@ -254,12 +254,12 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsN
 		t.Fatal(err)
 	}
 
-	redirectUri := &record.RedirectURI{
+	redirectURI := &record.RedirectURI{
 		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -292,8 +292,8 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsN
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -301,9 +301,9 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsN
 		"&state=" + requestState +
 		"&nonce=" + requestNonce
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -333,7 +333,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsN
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	otpCode := otptest.Code(t, otpSecret, time.Now())
-	resp = authenticateWithOtp(t, httpClient, redirectLocation, resp, otpCode)
+	resp = authenticateWithOTP(t, httpClient, redirectLocation, resp, otpCode)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
@@ -344,7 +344,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsN
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
+	codeVal, stateVal := getCodeAndStateFromURL(t, resp)
 	assert.Equal(t, requestState, stateVal)
 
 	code := loadCodeFromDatabase(t, codeVal)
@@ -355,7 +355,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsN
 	assert.Equal(t, requestScope, code.Scope)
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
-	assert.Equal(t, redirectUri.URI, code.RedirectURI)
+	assert.Equal(t, redirectURI.URI, code.RedirectURI)
 	assert.Equal(t, user.ID, code.User.ID)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertStampedSince(t, code.AuthenticatedAt, started)
@@ -364,7 +364,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsN
 	assert.False(t, code.Used)
 }
 
-func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentIsNotRequired(t *testing.T) {
+func TestAuthorize_NoExistingSession_ACRLevel2Mandatory_Pwd_OTPDisabled_ConsentIsNotRequired(t *testing.T) {
 	started := time.Now().UTC()
 	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
@@ -379,12 +379,12 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 		t.Fatal(err)
 	}
 
-	redirectUri := &record.RedirectURI{
+	redirectURI := &record.RedirectURI{
 		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -414,8 +414,8 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -423,9 +423,9 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 		"&state=" + requestState +
 		"&nonce=" + requestNonce
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -454,9 +454,9 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
-	otpSecret := getOtpSecretFromEnrollmentPage(t, resp)
+	otpSecret := getOTPSecretFromEnrollmentPage(t, resp)
 	otpCode := otptest.Code(t, otpSecret, time.Now())
-	resp = passSetupRecoveryCodes(t, httpClient, authenticateWithOtp(t, httpClient, redirectLocation, resp, otpCode))
+	resp = passSetupRecoveryCodes(t, httpClient, authenticateWithOTP(t, httpClient, redirectLocation, resp, otpCode))
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
@@ -467,7 +467,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
+	codeVal, stateVal := getCodeAndStateFromURL(t, resp)
 	assert.Equal(t, requestState, stateVal)
 
 	code := loadCodeFromDatabase(t, codeVal)
@@ -478,7 +478,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	assert.Equal(t, requestScope, code.Scope)
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
-	assert.Equal(t, redirectUri.URI, code.RedirectURI)
+	assert.Equal(t, redirectURI.URI, code.RedirectURI)
 	assert.Equal(t, user.ID, code.User.ID)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertStampedSince(t, code.AuthenticatedAt, started)
@@ -487,7 +487,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	assert.False(t, code.Used)
 }
 
-func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIsNotRequired(t *testing.T) {
+func TestAuthorize_NoExistingSession_ACRLevel2Mandatory_Pwd_OTPEnabled_ConsentIsNotRequired(t *testing.T) {
 	started := time.Now().UTC()
 	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
@@ -502,12 +502,12 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 		t.Fatal(err)
 	}
 
-	redirectUri := &record.RedirectURI{
+	redirectURI := &record.RedirectURI{
 		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -540,8 +540,8 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -549,9 +549,9 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 		"&state=" + requestState +
 		"&nonce=" + requestNonce
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -581,7 +581,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	otpCode := otptest.Code(t, otpSecret, time.Now())
-	resp = authenticateWithOtp(t, httpClient, redirectLocation, resp, otpCode)
+	resp = authenticateWithOTP(t, httpClient, redirectLocation, resp, otpCode)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
@@ -592,7 +592,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
+	codeVal, stateVal := getCodeAndStateFromURL(t, resp)
 	assert.Equal(t, requestState, stateVal)
 
 	code := loadCodeFromDatabase(t, codeVal)
@@ -603,7 +603,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	assert.Equal(t, requestScope, code.Scope)
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
-	assert.Equal(t, redirectUri.URI, code.RedirectURI)
+	assert.Equal(t, redirectURI.URI, code.RedirectURI)
 	assert.Equal(t, user.ID, code.User.ID)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertStampedSince(t, code.AuthenticatedAt, started)
@@ -612,7 +612,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	assert.False(t, code.Used)
 }
 
-func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsNotRequired_PasswordIsIncorrect(t *testing.T) {
+func TestAuthorize_NoExistingSession_ACRLevel1_Pwd_ConsentIsNotRequired_PasswordIsIncorrect(t *testing.T) {
 	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
@@ -626,12 +626,12 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsNotRequired_Password
 		t.Fatal(err)
 	}
 
-	redirectUri := &record.RedirectURI{
+	redirectURI := &record.RedirectURI{
 		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -659,8 +659,8 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsNotRequired_Password
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -668,9 +668,9 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsNotRequired_Password
 		"&state=" + requestState +
 		"&nonce=" + requestNonce
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -706,7 +706,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsNotRequired_Password
 	assertStateMismatchPage(t, resp)
 }
 
-func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentIsNotRequired_OtpCodeIsIncorrect(t *testing.T) {
+func TestAuthorize_NoExistingSession_ACRLevel2Mandatory_Pwd_OTPDisabled_ConsentIsNotRequired_OTPCodeIsIncorrect(t *testing.T) {
 	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
@@ -720,12 +720,12 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 		t.Fatal(err)
 	}
 
-	redirectUri := &record.RedirectURI{
+	redirectURI := &record.RedirectURI{
 		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -755,8 +755,8 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -764,9 +764,9 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 		"&state=" + requestState +
 		"&nonce=" + requestNonce
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -795,8 +795,8 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
-	incorrectOtpCode := "123456" // Incorrect OTP code
-	resp = authenticateWithOtp(t, httpClient, redirectLocation, resp, incorrectOtpCode)
+	incorrectOTPCode := "123456" // Incorrect OTP code
+	resp = authenticateWithOTP(t, httpClient, redirectLocation, resp, incorrectOTPCode)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -822,7 +822,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	assertStateMismatchPage(t, resp)
 }
 
-func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIsNotRequired_OtpIsIncorrect(t *testing.T) {
+func TestAuthorize_NoExistingSession_ACRLevel2Mandatory_Pwd_OTPEnabled_ConsentIsNotRequired_OTPIsIncorrect(t *testing.T) {
 	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
@@ -836,12 +836,12 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 		t.Fatal(err)
 	}
 
-	redirectUri := &record.RedirectURI{
+	redirectURI := &record.RedirectURI{
 		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -874,8 +874,8 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -883,9 +883,9 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 		"&state=" + requestState +
 		"&nonce=" + requestNonce
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -914,8 +914,8 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
-	incorrectOtpCode := "123456" // Incorrect OTP code
-	resp = authenticateWithOtp(t, httpClient, redirectLocation, resp, incorrectOtpCode)
+	incorrectOTPCode := "123456" // Incorrect OTP code
+	resp = authenticateWithOTP(t, httpClient, redirectLocation, resp, incorrectOTPCode)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)

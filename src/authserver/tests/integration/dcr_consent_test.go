@@ -21,7 +21,7 @@ import (
 //
 // navigateToConsentScreen cannot be reused here: it asserts a fixed chain of
 // /auth/level1completed -> /auth/completed, while a client created through /connect/register
-// carries DefaultAcrLevel level2_optional and so routes through /auth/level2 first. Walking the
+// carries DefaultACRLevel level2_optional and so routes through /auth/level2 first. Walking the
 // chain instead of asserting it step by step is also what lets the caller assert where the flow
 // went, which is the security property this file owns (#108).
 //
@@ -97,7 +97,7 @@ func TestDCR_Consent_ReachesConsentAndMarksTheNameUnverified(t *testing.T) {
 
 	client := registerDCRClient(t, selfAssertedName, redirectURI)
 	user, password := createCeremonyUser(t)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
 	chain, resp := followAuthChain(t, httpClient, client.ClientIdentifier, redirectURI, user, password)
 	defer func() { _ = resp.Body.Close() }()
@@ -146,7 +146,7 @@ func TestDCR_Consent_SelfAssertedNameIsEscaped(t *testing.T) {
 	require.Equal(t, payload, client.Description, "the name is stored verbatim; escaping is the renderer's job")
 
 	user, password := createCeremonyUser(t)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
 	chain, resp := followAuthChain(t, httpClient, client.ClientIdentifier, redirectURI, user, password)
 	defer func() { _ = resp.Body.Close() }()
@@ -183,7 +183,7 @@ func TestDCR_Consent_RetainedMarkupNameIsEscaped(t *testing.T) {
 	require.NoError(t, database.UpdateClient(context.Background(), nil, client))
 
 	user, password := createCeremonyUser(t)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
 	chain, resp := followAuthChain(t, httpClient, client.ClientIdentifier, redirectURI, user, password)
 	defer func() { _ = resp.Body.Close() }()
@@ -216,7 +216,7 @@ func TestDCR_Consent_UnverifiedNameSuppressesTheDescriptionLine(t *testing.T) {
 	require.NoError(t, database.UpdateClient(context.Background(), nil, client))
 
 	user, password := createCeremonyUser(t)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
 	chain, resp := followAuthChain(t, httpClient, client.ClientIdentifier, redirectURI, user, password)
 	defer func() { _ = resp.Body.Close() }()
@@ -248,7 +248,7 @@ func TestDCR_Consent_APublicClientShowsTheScreenOnEverySignIn(t *testing.T) {
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&registered))
 
 	user, password := createCeremonyUser(t)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
 	chain, page := followAuthChain(t, httpClient, registered.ClientID, redirectURI, user, password)
 	defer func() { _ = page.Body.Close() }()

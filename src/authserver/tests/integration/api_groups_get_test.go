@@ -140,7 +140,7 @@ func TestAPIGroupsGet_Unauthorized(t *testing.T) {
 	req, err := http.NewRequest("GET", url, nil)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -233,7 +233,7 @@ func TestAPIGroupsGet_MixedTokenInclusion(t *testing.T) {
 	// Setup: Create test groups with different token inclusion settings
 	testCases := []struct {
 		identifier           string
-		includeInIdToken     bool
+		includeInIDToken     bool
 		includeInAccessToken bool
 	}{
 		{"mixed-group-1", true, false},  // Only ID token
@@ -247,7 +247,7 @@ func TestAPIGroupsGet_MixedTokenInclusion(t *testing.T) {
 		group := &record.Group{
 			GroupIdentifier:      tc.identifier,
 			Description:          "Test Group for " + tc.identifier,
-			IncludeInIDToken:     tc.includeInIdToken,
+			IncludeInIDToken:     tc.includeInIDToken,
 			IncludeInAccessToken: tc.includeInAccessToken,
 		}
 		err := database.CreateGroup(context.Background(), nil, group)
@@ -284,8 +284,8 @@ func TestAPIGroupsGet_MixedTokenInclusion(t *testing.T) {
 	for _, tc := range testCases {
 		foundGroup, exists := groupMap[tc.identifier]
 		assert.True(t, exists, "Group %s should be found", tc.identifier)
-		assert.Equal(t, tc.includeInIdToken, foundGroup.IncludeInIDToken,
-			"Group %s IncludeInIDToken should be %v", tc.identifier, tc.includeInIdToken)
+		assert.Equal(t, tc.includeInIDToken, foundGroup.IncludeInIDToken,
+			"Group %s IncludeInIDToken should be %v", tc.identifier, tc.includeInIDToken)
 		assert.Equal(t, tc.includeInAccessToken, foundGroup.IncludeInAccessToken,
 			"Group %s IncludeInAccessToken should be %v", tc.identifier, tc.includeInAccessToken)
 	}

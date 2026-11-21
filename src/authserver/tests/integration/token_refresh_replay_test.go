@@ -75,11 +75,11 @@ func assertRefusedAsInvalidGrant(t *testing.T, status int, body map[string]inter
 	assert.Nilf(t, body["refresh_token"], "%s must not yield a refresh_token", what)
 }
 
-// refreshTokenRowByJti loads the persisted row behind a serialized refresh token.
-func refreshTokenRowByJti(t *testing.T, refreshToken string) *record.RefreshToken {
+// refreshTokenRowByJTI loads the persisted row behind a serialized refresh token.
+func refreshTokenRowByJTI(t *testing.T, refreshToken string) *record.RefreshToken {
 	t.Helper()
 
-	row, err := database.GetRefreshTokenByJTI(context.Background(), nil, refreshTokenJti(t, refreshToken))
+	row, err := database.GetRefreshTokenByJTI(context.Background(), nil, refreshTokenJTI(t, refreshToken))
 	require.NoError(t, err)
 	require.NotNil(t, row, "the refresh token row must exist")
 	return row
@@ -129,7 +129,7 @@ func codeOnSameSessionForNewClient(t *testing.T, httpClient *http.Client, client
 
 	location := assertRedirect(t, resp, "/auth/issue")
 	resp = loadPage(t, httpClient, location)
-	code, _ := getCodeAndStateFromUrl(t, resp)
+	code, _ := getCodeAndStateFromURL(t, resp)
 	_ = resp.Body.Close()
 	require.NotEmpty(t, code, "expected a code from the SSO path on the existing session")
 
@@ -152,14 +152,14 @@ func TestToken_Refresh_Replay_ContainsFamily(t *testing.T) {
 	// A legitimate rotation: rt1 retires, rt2 is live.
 	rt2 := rotateRefreshToken(t, httpClient, code.Client.ClientIdentifier, clientSecret, rt1)
 	require.NotEqual(t, rt1, rt2, "rotation must return a different token")
-	require.False(t, refreshTokenRowByJti(t, rt2).Revoked, "the successor must start out live")
+	require.False(t, refreshTokenRowByJTI(t, rt2).Revoked, "the successor must start out live")
 
 	// Now replay the retired parent.
 	status, body := replayRefreshToken(t, httpClient, code.Client.ClientIdentifier, clientSecret, rt1)
 	assertRefusedAsInvalidGrant(t, status, body, "a replayed refresh token")
 
 	// The containment that did not happen before: the live successor is revoked too.
-	assert.True(t, refreshTokenRowByJti(t, rt2).Revoked,
+	assert.True(t, refreshTokenRowByJTI(t, rt2).Revoked,
 		"replaying the retired parent must revoke the live successor")
 
 	// And the successor is genuinely dead at the endpoint, not merely flagged.
@@ -199,11 +199,11 @@ func TestToken_Refresh_Replay_DoesNotContainOtherFamilies(t *testing.T) {
 	// Replay family A.
 	status, body := replayRefreshToken(t, httpClient, codeA.Client.ClientIdentifier, secretA, rtA1)
 	assertRefusedAsInvalidGrant(t, status, body, "a replayed refresh token")
-	assert.True(t, refreshTokenRowByJti(t, rtA2).Revoked, "family A's live member must be revoked")
+	assert.True(t, refreshTokenRowByJTI(t, rtA2).Revoked, "family A's live member must be revoked")
 
 	// Family B must be untouched. The ORDER matters: B is exercised AFTER the replay, not
 	// before, or it would prove nothing about what containment did.
-	assert.False(t, refreshTokenRowByJti(t, rtB1).Revoked,
+	assert.False(t, refreshTokenRowByJTI(t, rtB1).Revoked,
 		"family B shares the browser session but not the family: it must stay live")
 	rtB2 := rotateRefreshToken(t, httpClient, clientB.ClientIdentifier, secretB, rtB1)
 	require.NotEqual(t, rtB1, rtB2, "family B must still rotate after family A was contained")
@@ -228,10 +228,10 @@ func TestToken_Refresh_Replay_ContainsROPCFamily(t *testing.T) {
 	client := createROPCClient(t, clientSecret, false)
 	user := createROPCUser(t, password)
 
-	httpClient := createHttpClient(t)
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	httpClient := createHTTPClient(t)
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
-	data := postToTokenEndpoint(t, httpClient, destUrl, url.Values{
+	data := postToTokenEndpoint(t, httpClient, destURL, url.Values{
 		"grant_type":    {"password"},
 		"client_id":     {client.ClientIdentifier},
 		"client_secret": {clientSecret},
@@ -243,17 +243,17 @@ func TestToken_Refresh_Replay_ContainsROPCFamily(t *testing.T) {
 	rt1 := data["refresh_token"].(string)
 
 	// The shape that makes this case distinct: no code row behind the family.
-	row1 := refreshTokenRowByJti(t, rt1)
+	row1 := refreshTokenRowByJTI(t, rt1)
 	require.False(t, row1.CodeID.Valid, "a ROPC refresh token must have no code_id")
 	require.NotEmpty(t, row1.FirstRefreshTokenJTI, "the family identifier must still be stamped")
 
 	rt2 := rotateRefreshToken(t, httpClient, client.ClientIdentifier, clientSecret, rt1)
-	require.False(t, refreshTokenRowByJti(t, rt2).Revoked, "the ROPC successor must start out live")
+	require.False(t, refreshTokenRowByJTI(t, rt2).Revoked, "the ROPC successor must start out live")
 
 	status, body := replayRefreshToken(t, httpClient, client.ClientIdentifier, clientSecret, rt1)
 	assertRefusedAsInvalidGrant(t, status, body, "a replayed ROPC refresh token")
 
-	assert.True(t, refreshTokenRowByJti(t, rt2).Revoked,
+	assert.True(t, refreshTokenRowByJTI(t, rt2).Revoked,
 		"replaying a retired ROPC token must revoke the live successor")
 }
 

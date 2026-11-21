@@ -38,7 +38,7 @@ func sendJSONWithProof(t *testing.T, method, path, token, proof string, body any
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "DPoP "+token)
 	req.Header.Set("DPoP", proof)
-	resp, err := createHttpClient(t).Do(req)
+	resp, err := createHTTPClient(t).Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	answer := resourceAnswer{status: resp.StatusCode, challenge: resp.Header.Values("WWW-Authenticate"), header: resp.Header}

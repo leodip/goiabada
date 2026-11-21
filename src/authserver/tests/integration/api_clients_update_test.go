@@ -179,7 +179,7 @@ func TestAPIClientUpdatePut_UnchangedIdentifierNamingAResource(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 }
 
-func TestAPIClientUpdatePut_NotFoundAndInvalidId(t *testing.T) {
+func TestAPIClientUpdatePut_NotFoundAndInvalidID(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Not found
@@ -242,7 +242,7 @@ func TestAPIClientUpdatePut_InvalidRequestBodyAndUnauthorized(t *testing.T) {
 	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -270,7 +270,7 @@ func TestAPIClientUpdatePut_ACRRuleEnforcement(t *testing.T) {
 	client := createTestClientUnique(t, false)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, client.ID) }()
 
-	// Attempt to set DefaultAcrLevel when not applicable should be rejected
+	// Attempt to set DefaultACRLevel when not applicable should be rejected
 	updateReq := api.UpdateClientSettingsRequest{
 		ClientIdentifier: client.ClientIdentifier,
 		Description:      client.Description,
@@ -338,19 +338,19 @@ func TestAPIClientUpdatePut_SystemLevelClientAllowed(t *testing.T) {
 	err := json.NewDecoder(resp.Body).Decode(&listResp)
 	require.NoError(t, err)
 
-	var sysId int64
+	var sysID int64
 	for _, c := range listResp.Clients {
 		if c.ClientIdentifier == "admin-console-client" {
-			sysId = c.ID
+			sysID = c.ID
 			break
 		}
 	}
-	if sysId == 0 {
+	if sysID == 0 {
 		t.Skip("system-level client not found")
 	}
 
 	// Update with same identifier (should succeed)
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysId, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysID, 10)
 	reqBody := api.UpdateClientSettingsRequest{ClientIdentifier: "admin-console-client", Description: "Updated description", Enabled: true}
 	resp2 := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp2.Body.Close() }()
@@ -377,14 +377,14 @@ func TestAPIClientUpdatePut_SystemLevelClientIdentifierChangeBlocked(t *testing.
 	err := json.NewDecoder(resp.Body).Decode(&listResp)
 	require.NoError(t, err)
 
-	var sysId int64
+	var sysID int64
 	for _, c := range listResp.Clients {
 		if c.ClientIdentifier == "admin-console-client" {
-			sysId = c.ID
+			sysID = c.ID
 			break
 		}
 	}
-	if sysId == 0 {
+	if sysID == 0 {
 		t.Skip("system-level client not found")
 	}
 
@@ -399,7 +399,7 @@ func TestAPIClientUpdatePut_SystemLevelClientIdentifierChangeBlocked(t *testing.
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysId, 10)
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysID, 10)
 			reqBody := api.UpdateClientSettingsRequest{ClientIdentifier: tc.newIdentifier, Description: "test"}
 			resp2 := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 			defer func() { _ = resp2.Body.Close() }()
@@ -566,7 +566,7 @@ func TestAPIClientUpdatePut_WebsiteURLValidation(t *testing.T) {
 	}
 }
 
-func TestAPIClientUpdatePut_InvalidDefaultAcrLevelValue(t *testing.T) {
+func TestAPIClientUpdatePut_InvalidDefaultACRLevelValue(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	client := createTestClientUnique(t, true)

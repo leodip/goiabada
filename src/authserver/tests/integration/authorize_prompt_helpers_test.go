@@ -16,8 +16,8 @@ import (
 // Helper Functions
 // =============================================================================
 
-// getErrorFromUrl extracts error, error_description, and state from redirect URL query params
-func getErrorFromUrl(t *testing.T, resp *http.Response) (errorCode string, errorDescription string, state string) {
+// getErrorFromURL extracts error, error_description, and state from redirect URL query params
+func getErrorFromURL(t *testing.T, resp *http.Response) (errorCode string, errorDescription string, state string) {
 	location := resp.Header.Get("Location")
 	redirectURL, err := url.Parse(location)
 	if err != nil {
@@ -53,20 +53,20 @@ func createTestClientAndRedirectURI(t *testing.T) (*record.Client, *record.Redir
 		t.Fatal(err)
 	}
 
-	redirectUri := &record.RedirectURI{
+	redirectURI := &record.RedirectURI{
 		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	return client, redirectUri
+	return client, redirectURI
 }
 
-// createSessionWithAcrLevel1AndPassword creates a session at ACR level 1 and returns the password for re-auth tests
-func createSessionWithAcrLevel1AndPassword(t *testing.T) (*http.Client, *record.Client, *record.RedirectURI, *record.User, string) {
+// createSessionWithACRLevel1AndPassword creates a session at ACR level 1 and returns the password for re-auth tests
+func createSessionWithACRLevel1AndPassword(t *testing.T) (*http.Client, *record.Client, *record.RedirectURI, *record.User, string) {
 	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
@@ -80,12 +80,12 @@ func createSessionWithAcrLevel1AndPassword(t *testing.T) (*http.Client, *record.
 		t.Fatal(err)
 	}
 
-	redirectUri := &record.RedirectURI{
+	redirectURI := &record.RedirectURI{
 		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,8 +113,8 @@ func createSessionWithAcrLevel1AndPassword(t *testing.T) (*http.Client, *record.
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -122,9 +122,9 @@ func createSessionWithAcrLevel1AndPassword(t *testing.T) (*http.Client, *record.
 		"&state=" + requestState +
 		"&nonce=" + requestNonce
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -153,7 +153,7 @@ func createSessionWithAcrLevel1AndPassword(t *testing.T) (*http.Client, *record.
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	_, _ = getCodeAndStateFromUrl(t, resp)
+	_, _ = getCodeAndStateFromURL(t, resp)
 
-	return httpClient, client, redirectUri, user, password
+	return httpClient, client, redirectURI, user, password
 }

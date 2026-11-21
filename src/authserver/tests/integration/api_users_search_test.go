@@ -173,7 +173,7 @@ func TestAPIUsersSearch_Unauthorized(t *testing.T) {
 	req, err := http.NewRequest("GET", url, nil)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -481,7 +481,7 @@ func createTestUsersWithSuffix(t *testing.T, suffix string) []*record.User {
 // TestAPIUsersSearch_FixtureIsIndependentAcrossCalls is the regression guard for
 // the defect createTestUsersWithSuffix replaced: two callers of the search
 // fixture overlapping in the database used to collide on three fixed addresses,
-// and the collision then cascaded, because a failed insert leaves Id == 0 and
+// and the collision then cascaded, because a failed insert leaves ID == 0 and
 // the cleanup that followed deleted nothing while saying nothing.
 //
 // It builds the fixture twice with no cleanup in between, which is the shape a

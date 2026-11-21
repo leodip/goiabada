@@ -278,4 +278,3 @@ linters:
       - {path: '^src/adminconsole/internal/server/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
       - {path: '^src/adminconsole/internal/sessionbackend/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
       - {path: '^src/adminconsole/web/[^/]+$', linters: [staticcheck], text: '^ST1003:'}
-      - {path: '^src/authserver/tests/integration/[^/]+$', linters: [staticcheck], text: '^ST1003:'}

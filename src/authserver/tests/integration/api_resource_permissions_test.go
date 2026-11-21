@@ -130,13 +130,13 @@ func TestAPIResourcePermissionsGet_NonExistentResource(t *testing.T) {
 	assert.Empty(t, getResponse.Permissions)
 }
 
-func TestAPIResourcePermissionsGet_InvalidResourceId(t *testing.T) {
+func TestAPIResourcePermissionsGet_InvalidResourceID(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)
 
 	testCases := []struct {
 		name           string
-		resourceId     string
+		resourceID     string
 		expectedStatus int
 	}{
 		{"non-numeric ID", "abc", http.StatusBadRequest},
@@ -148,7 +148,7 @@ func TestAPIResourcePermissionsGet_InvalidResourceId(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + tc.resourceId + "/permissions"
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + tc.resourceID + "/permissions"
 			resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -188,15 +188,15 @@ func TestAPIResourcePermissionsGet_TheAuthServerResourceAnswersEveryStoredPermis
 
 	stored, err := database.GetPermissionsByResourceID(context.Background(), nil, authServerResource.ID)
 	require.NoError(t, err)
-	storedIds := make(map[int64]string, len(stored))
+	storedIDs := make(map[int64]string, len(stored))
 	for _, p := range stored {
-		storedIds[p.ID] = p.PermissionIdentifier
+		storedIDs[p.ID] = p.PermissionIdentifier
 	}
-	answeredIds := make(map[int64]string, len(getResponse.Permissions))
+	answeredIDs := make(map[int64]string, len(getResponse.Permissions))
 	for _, p := range getResponse.Permissions {
-		answeredIds[p.ID] = p.PermissionIdentifier
+		answeredIDs[p.ID] = p.PermissionIdentifier
 	}
-	assert.Equal(t, storedIds, answeredIds, "the GET answers exactly the stored permissions")
+	assert.Equal(t, storedIDs, answeredIDs, "the GET answers exactly the stored permissions")
 
 	answered := make([]string, 0, len(getResponse.Permissions))
 	for _, p := range getResponse.Permissions {
@@ -310,7 +310,7 @@ func TestAPIResourcePermissionsGet_Unauthorized(t *testing.T) {
 	req, err := http.NewRequest("GET", url, nil)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -387,13 +387,13 @@ func TestAPIResourcePermissionsGet_LargeNumberOfPermissions(t *testing.T) {
 	}
 
 	// Verify we can find all our created permissions
-	responsePermIds := make(map[int64]bool)
+	responsePermIDs := make(map[int64]bool)
 	for _, perm := range getResponse.Permissions {
-		responsePermIds[perm.ID] = true
+		responsePermIDs[perm.ID] = true
 	}
 
 	for _, createdPerm := range permissions {
-		assert.True(t, responsePermIds[createdPerm.ID],
+		assert.True(t, responsePermIDs[createdPerm.ID],
 			"Permission %d should be in response", createdPerm.ID)
 	}
 }

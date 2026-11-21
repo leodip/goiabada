@@ -85,11 +85,11 @@ func TestClientRowBinding_AnImplicitFlowTokenIsRefusedOnceAnOlderClientTakesItsI
 	enableImplicitFlowGlobally(t)
 	older := createOlderClient(t)
 	implicitEnabled := true
-	client, redirectUri := createImplicitFlowClient(t, &implicitEnabled)
+	client, redirectURI := createImplicitFlowClient(t, &implicitEnabled)
 	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 	user, password := createTestUserForImplicit(t)
-	resp := signInToIssue(t, createHttpClient(t),
-		implicitModeAuthorizeURL(client, redirectUri.URI, "token", "", fake.LetterN(12), ""), user, password)
+	resp := signInToIssue(t, createHTTPClient(t),
+		implicitModeAuthorizeURL(client, redirectURI.URI, "token", "", fake.LetterN(12), ""), user, password)
 	_ = resp.Body.Close()
 	require.Equal(t, http.StatusFound, resp.StatusCode)
 	accessToken := getTokensFromFragment(t, resp)["access_token"]

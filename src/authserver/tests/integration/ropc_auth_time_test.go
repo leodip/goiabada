@@ -44,7 +44,7 @@ func newROPCAuthTimeFixture(t *testing.T) ropcAuthTimeFixture {
 		clientSecret: clientSecret,
 		user:         createROPCUser(t, password),
 		password:     password,
-		httpClient:   createHttpClient(t),
+		httpClient:   createHTTPClient(t),
 		tokenURL:     appConfig.AuthServer.BaseURL + "/auth/token/",
 	}
 }
@@ -127,9 +127,9 @@ func TestROPC_RefreshKeepsThePasswordGrantsAuthTime(t *testing.T) {
 		status, refreshed := f.refresh(t, refreshToken)
 		require.Equal(t, http.StatusOK, status, "refresh %d: %v", rotation, refreshed)
 
-		gotAccess, gotId, iat := requireAuthTime(t, refreshed)
+		gotAccess, gotID, iat := requireAuthTime(t, refreshed)
 		assert.InDelta(t, accessAuthTime, gotAccess, 0, "refresh %d: the access token's auth_time moved", rotation)
-		assert.InDelta(t, accessAuthTime, gotId, 0, "refresh %d: the ID token's auth_time moved", rotation)
+		assert.InDelta(t, accessAuthTime, gotID, 0, "refresh %d: the ID token's auth_time moved", rotation)
 		assert.Greater(t, iat, accessAuthTime, "refresh %d: iat is the refresh, later than the grant", rotation)
 
 		refreshToken, ok = refreshed["refresh_token"].(string)

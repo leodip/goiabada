@@ -108,13 +108,13 @@ func TestAPIGroupAttributesGet_GroupNotFound(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
-func TestAPIGroupAttributesGet_InvalidId(t *testing.T) {
+func TestAPIGroupAttributesGet_InvalidID(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)
 
 	testCases := []struct {
 		name           string
-		groupId        string
+		groupID        string
 		expectedStatus int
 	}{
 		{"non-numeric ID", "abc", http.StatusBadRequest},
@@ -125,7 +125,7 @@ func TestAPIGroupAttributesGet_InvalidId(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + tc.groupId + "/attributes"
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + tc.groupID + "/attributes"
 			resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -146,7 +146,7 @@ func TestAPIGroupAttributesGet_Unauthorized(t *testing.T) {
 	req, err := http.NewRequest("GET", url, nil)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -208,13 +208,13 @@ func TestAPIGroupAttributeGet_NotFound(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
-func TestAPIGroupAttributeGet_InvalidId(t *testing.T) {
+func TestAPIGroupAttributeGet_InvalidID(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)
 
 	testCases := []struct {
 		name           string
-		attributeId    string
+		attributeID    string
 		expectedStatus int
 	}{
 		{"non-numeric ID", "abc", http.StatusBadRequest},
@@ -224,7 +224,7 @@ func TestAPIGroupAttributeGet_InvalidId(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/group-attributes/" + tc.attributeId
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/group-attributes/" + tc.attributeID
 			resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -250,7 +250,7 @@ func TestAPIGroupAttributeGet_Unauthorized(t *testing.T) {
 	req, err := http.NewRequest("GET", url, nil)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -398,7 +398,7 @@ func TestAPIGroupAttributeCreatePost_InvalidRequestBody(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -413,7 +413,7 @@ func TestAPIGroupAttributeCreatePost_Unauthorized(t *testing.T) {
 	req, err := http.NewRequest("POST", url, nil)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -559,7 +559,7 @@ func TestAPIGroupAttributeUpdatePut_ValidationErrors(t *testing.T) {
 	}
 }
 
-func TestAPIGroupAttributeUpdatePut_InvalidId(t *testing.T) {
+func TestAPIGroupAttributeUpdatePut_InvalidID(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)
 
@@ -570,7 +570,7 @@ func TestAPIGroupAttributeUpdatePut_InvalidId(t *testing.T) {
 
 	testCases := []struct {
 		name           string
-		attributeId    string
+		attributeID    string
 		expectedStatus int
 	}{
 		{"non-numeric ID", "abc", http.StatusBadRequest},
@@ -580,7 +580,7 @@ func TestAPIGroupAttributeUpdatePut_InvalidId(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/group-attributes/" + tc.attributeId
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/group-attributes/" + tc.attributeID
 			resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -611,7 +611,7 @@ func TestAPIGroupAttributeUpdatePut_InvalidRequestBody(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -637,7 +637,7 @@ func TestAPIGroupAttributeUpdatePut_Unauthorized(t *testing.T) {
 	req, err := http.NewRequest("PUT", url, nil)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -696,13 +696,13 @@ func TestAPIGroupAttributeDelete_NotFound(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
-func TestAPIGroupAttributeDelete_InvalidId(t *testing.T) {
+func TestAPIGroupAttributeDelete_InvalidID(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)
 
 	testCases := []struct {
 		name           string
-		attributeId    string
+		attributeID    string
 		expectedStatus int
 	}{
 		{"non-numeric ID", "abc", http.StatusBadRequest},
@@ -712,7 +712,7 @@ func TestAPIGroupAttributeDelete_InvalidId(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/group-attributes/" + tc.attributeId
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/group-attributes/" + tc.attributeID
 			resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -738,7 +738,7 @@ func TestAPIGroupAttributeDelete_Unauthorized(t *testing.T) {
 	req, err := http.NewRequest("DELETE", url, nil)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -753,13 +753,13 @@ func TestAPIGroupAttributeDelete_Unauthorized(t *testing.T) {
 }
 
 // Helper function to create a test group attribute
-func createTestGroupAttribute(t *testing.T, groupId int64, key, value string) *record.GroupAttribute {
+func createTestGroupAttribute(t *testing.T, groupID int64, key, value string) *record.GroupAttribute {
 	attr := &record.GroupAttribute{
 		Key:                  key,
 		Value:                value,
 		IncludeInIDToken:     true,
 		IncludeInAccessToken: false,
-		GroupID:              groupId,
+		GroupID:              groupID,
 	}
 	err := database.CreateGroupAttribute(context.Background(), nil, attr)
 	assert.NoError(t, err)

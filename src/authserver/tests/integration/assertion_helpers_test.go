@@ -101,8 +101,8 @@ func assertClientDescriptionInHTML(t *testing.T, doc *goquery.Document, expected
 		"Description '%s' should be visible when ShowDescription=true and description not empty", expectedDescription)
 }
 
-// assertClientWebsiteUrlInHTML verifies website URL link is present/absent as expected
-func assertClientWebsiteUrlInHTML(t *testing.T, doc *goquery.Document, expectedURL string, expectPresent bool) {
+// assertClientWebsiteURLInHTML verifies website URL link is present/absent as expected
+func assertClientWebsiteURLInHTML(t *testing.T, doc *goquery.Document, expectedURL string, expectPresent bool) {
 	if expectedURL == "" && !expectPresent {
 		return
 	}

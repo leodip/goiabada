@@ -47,16 +47,16 @@ func adminRequestClient(t *testing.T, method, path, accessToken string, body any
 	return client
 }
 
-func storedRememberConsent(t *testing.T, clientId int64) bool {
+func storedRememberConsent(t *testing.T, clientID int64) bool {
 	t.Helper()
-	client, err := database.GetClientByID(context.Background(), nil, clientId)
+	client, err := database.GetClientByID(context.Background(), nil, clientID)
 	require.NoError(t, err)
 	require.NotNil(t, client)
 	return client.RememberConsent
 }
 
-func clientPath(clientId int64) string {
-	return "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10)
+func clientPath(clientID int64) string {
+	return "/api/v1/admin/clients/" + strconv.FormatInt(clientID, 10)
 }
 
 // createRememberConsentClient stores a client with Remember consent as given, through the data

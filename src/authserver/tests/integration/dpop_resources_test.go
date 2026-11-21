@@ -104,7 +104,7 @@ func callResource(t *testing.T, method, path, authorization string, proofs []str
 	for name, value := range headers {
 		req.Header.Set(name, value)
 	}
-	resp, err := createHttpClient(t).Do(req)
+	resp, err := createHTTPClient(t).Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	raw, err := io.ReadAll(resp.Body)

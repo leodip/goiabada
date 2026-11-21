@@ -29,12 +29,12 @@ import (
 // went straight through"; the third is the ceremony starting over, which a session naming a removed
 // authenticator gets (#542 decision 1). The caller closes the body.
 func authorizeOnExistingSession(t *testing.T, httpClient *http.Client, client *record.Client,
-	redirectUri *record.RedirectURI) (string, *http.Response, string) {
+	redirectURI *record.RedirectURI) (string, *http.Response, string) {
 
 	t.Helper()
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + randomCodeChallenge() +
@@ -42,7 +42,7 @@ func authorizeOnExistingSession(t *testing.T, httpClient *http.Client, client *r
 		"&state=" + fake.LetterN(8) +
 		"&nonce=" + fake.LetterN(8)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +72,7 @@ func authorizeOnExistingSession(t *testing.T, httpClient *http.Client, client *r
 	return "", nil, ""
 }
 
-// TestOtpCeremony_AbandonedLevel2LeavesTheObligationStanding is part 1.1 of #242, observed the way
+// TestOTPCeremony_AbandonedLevel2LeavesTheObligationStanding is part 1.1 of #242, observed the way
 // a user meets it.
 //
 // The user has a live level 2 session and their authenticator changes out of band, so the next
@@ -91,13 +91,13 @@ func authorizeOnExistingSession(t *testing.T, httpClient *http.Client, client *r
 //
 // It fails for its stated reason in both directions: the third ceremony reaching /auth/issue is a
 // bypass, and the second one failing to reach /auth/otp would mean the re-prompt never fired.
-func TestOtpCeremony_AbandonedLevel2LeavesTheObligationStanding(t *testing.T) {
-	client, redirectUri, user, password, otpSecret := createLevel2MandatoryUser(t, true)
+func TestOTPCeremony_AbandonedLevel2LeavesTheObligationStanding(t *testing.T) {
+	client, redirectURI, user, password, otpSecret := createLevel2MandatoryUser(t, true)
 
 	// Ceremony one: password and OTP, which leaves a live level 2 session on this jar.
-	httpClient, otpPage, otpUrl := startOtpCeremony(t, client, redirectUri, user, password, "")
+	httpClient, otpPage, otpURL := startOTPCeremony(t, client, redirectURI, user, password, "")
 	firstCode := otptest.Code(t, otpSecret, time.Now())
-	resp := authenticateWithOtp(t, httpClient, otpUrl, otpPage, firstCode)
+	resp := authenticateWithOTP(t, httpClient, otpURL, otpPage, firstCode)
 	_ = otpPage.Body.Close()
 
 	// Followed all the way through, not stopped at the redirect: the session row is created at
@@ -112,23 +112,23 @@ func TestOtpCeremony_AbandonedLevel2LeavesTheObligationStanding(t *testing.T) {
 	_ = resp.Body.Close()
 
 	// The authenticator changes somewhere else, so every session of this user owes a re-prompt.
-	advanceOtpConfigGeneration(t, user.ID)
+	advanceOTPConfigGeneration(t, user.ID)
 
 	// Ceremony two reaches the OTP form and is abandoned there. Nothing is submitted.
-	where, page, _ := authorizeOnExistingSession(t, httpClient, client, redirectUri)
+	where, page, _ := authorizeOnExistingSession(t, httpClient, client, redirectURI)
 	_ = page.Body.Close()
 	assert.Equal(t, "/auth/otp", where,
 		"the changed authenticator must send this ceremony back to the OTP form")
 
 	// Ceremony three, the same jar and the same session, is the whole point.
-	where, page, _ = authorizeOnExistingSession(t, httpClient, client, redirectUri)
+	where, page, _ = authorizeOnExistingSession(t, httpClient, client, redirectURI)
 	_ = page.Body.Close()
 	assert.Equal(t, "/auth/otp", where,
 		"abandoning the OTP form must not have discharged the obligation: a visitor who closes the "+
 			"browser at the prompt is not a visitor who answered it")
 }
 
-// TestOtpCeremony_BrowserEnrolmentDoesNotOweAnImmediatePrompt is the other side of the same
+// TestOTPCeremony_BrowserEnrolmentDoesNotOweAnImmediatePrompt is the other side of the same
 // boundary, and it is what the plan review forced IncrementUserOTPConfigGeneration to return its
 // value for.
 //
@@ -140,15 +140,15 @@ func TestOtpCeremony_AbandonedLevel2LeavesTheObligationStanding(t *testing.T) {
 // increment returned, inside that transaction, which is why this passes.
 //
 // It fails for its stated reason in both directions: reaching /auth/otp again is the bug, and a
-// first ceremony that never reached the enrollment form would fail at startOtpCeremony instead.
-func TestOtpCeremony_BrowserEnrolmentDoesNotOweAnImmediatePrompt(t *testing.T) {
-	client, redirectUri, user, password, _ := createLevel2MandatoryUser(t, false)
+// first ceremony that never reached the enrollment form would fail at startOTPCeremony instead.
+func TestOTPCeremony_BrowserEnrolmentDoesNotOweAnImmediatePrompt(t *testing.T) {
+	client, redirectURI, user, password, _ := createLevel2MandatoryUser(t, false)
 
-	httpClient, otpPage, otpUrl := startOtpCeremony(t, client, redirectUri, user, password, "")
-	secret := getOtpSecretFromEnrollmentPage(t, otpPage)
+	httpClient, otpPage, otpURL := startOTPCeremony(t, client, redirectURI, user, password, "")
+	secret := getOTPSecretFromEnrollmentPage(t, otpPage)
 
 	code := otptest.Code(t, secret, time.Now())
-	resp := passSetupRecoveryCodes(t, httpClient, authenticateWithOtp(t, httpClient, otpUrl, otpPage, code))
+	resp := passSetupRecoveryCodes(t, httpClient, authenticateWithOTP(t, httpClient, otpURL, otpPage, code))
 	_ = otpPage.Body.Close()
 
 	redirectLocation := assertRedirect(t, resp, "/auth/completed")
@@ -166,14 +166,14 @@ func TestOtpCeremony_BrowserEnrolmentDoesNotOweAnImmediatePrompt(t *testing.T) {
 	assert.True(t, enrolled.OTPEnabled, "the first ceremony must have enrolled")
 
 	// Immediately again, same jar, same session, nothing changed in between.
-	where, page, _ := authorizeOnExistingSession(t, httpClient, client, redirectUri)
+	where, page, _ := authorizeOnExistingSession(t, httpClient, client, redirectURI)
 	_ = page.Body.Close()
 	assert.Equal(t, "/auth/issue", where,
 		"a session created by the ceremony that enrolled must not owe another second factor at "+
 			"once: it answered the level 2 question by establishing the authenticator")
 }
 
-// TestOtpCeremony_ARemovedAuthenticatorIsSetUpAgainAtLevel3 is the other way a level 2 obligation
+// TestOTPCeremony_ARemovedAuthenticatorIsSetUpAgainAtLevel3 is the other way a level 2 obligation
 // can be answered: by a level2_optional ceremony for a user who no longer has an authenticator,
 // which skips the code and promotes the generation, as #242 decision 3 requires. That ceremony
 // answers the level 2 optional question; it does not make the session's level 3 true again.
@@ -185,14 +185,14 @@ func TestOtpCeremony_BrowserEnrolmentDoesNotOweAnImmediatePrompt(t *testing.T) {
 // generation, it reached /auth/issue instead and issued a level 3 code from the session's old
 // code, while prompt=none at the same client answered interaction_required. The removal lowers the
 // session to level 2 optional now (#542 decision 1), so the level alone sends ceremony three to set
-// one up; a session still at level 3 is TestOtpCeremony_ASessionStillNamingARemovedAuthenticatorSignsInAgain's.
-func TestOtpCeremony_ARemovedAuthenticatorIsSetUpAgainAtLevel3(t *testing.T) {
-	client, redirectUri, user, password, otpSecret := createLevel2MandatoryUser(t, true)
+// one up; a session still at level 3 is TestOTPCeremony_ASessionStillNamingARemovedAuthenticatorSignsInAgain's.
+func TestOTPCeremony_ARemovedAuthenticatorIsSetUpAgainAtLevel3(t *testing.T) {
+	client, redirectURI, user, password, otpSecret := createLevel2MandatoryUser(t, true)
 
 	// Ceremony one: password and OTP, which leaves a live level 3 session on this jar.
-	httpClient, otpPage, otpUrl := startOtpCeremony(t, client, redirectUri, user, password, "")
+	httpClient, otpPage, otpURL := startOTPCeremony(t, client, redirectURI, user, password, "")
 	firstCode := otptest.Code(t, otpSecret, time.Now())
-	resp := authenticateWithOtp(t, httpClient, otpUrl, otpPage, firstCode)
+	resp := authenticateWithOTP(t, httpClient, otpURL, otpPage, firstCode)
 	_ = otpPage.Body.Close()
 	redirectLocation := assertRedirect(t, resp, "/auth/completed")
 	_ = resp.Body.Close()
@@ -215,11 +215,11 @@ func TestOtpCeremony_ARemovedAuthenticatorIsSetUpAgainAtLevel3(t *testing.T) {
 	if err := database.CreateClient(context.Background(), nil, optionalClient); err != nil {
 		t.Fatal(err)
 	}
-	optionalRedirectUri := &record.RedirectURI{ClientID: optionalClient.ID, URI: fake.URL()}
-	if err := database.CreateRedirectURI(context.Background(), nil, optionalRedirectUri); err != nil {
+	optionalRedirectURI := &record.RedirectURI{ClientID: optionalClient.ID, URI: fake.URL()}
+	if err := database.CreateRedirectURI(context.Background(), nil, optionalRedirectURI); err != nil {
 		t.Fatal(err)
 	}
-	where, page, _ := authorizeOnExistingSession(t, httpClient, optionalClient, optionalRedirectUri)
+	where, page, _ := authorizeOnExistingSession(t, httpClient, optionalClient, optionalRedirectURI)
 	_ = page.Body.Close()
 	assert.Equal(t, "/auth/issue", where,
 		"a level 2 optional sign-in asks a user with no authenticator for no code")
@@ -228,15 +228,15 @@ func TestOtpCeremony_ARemovedAuthenticatorIsSetUpAgainAtLevel3(t *testing.T) {
 	// before the answer it would be sent back with interaction_required. Without this, ceremony
 	// three reaching the OTP form would not tell the fix from a promotion that never happened,
 	// since an unanswered generation sends it there too.
-	silentUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + optionalClient.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(optionalRedirectUri.URI) +
+	silentURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + optionalClient.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(optionalRedirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + randomCodeChallenge() +
 		"&scope=openid" +
 		"&state=" + fake.LetterN(8) +
 		"&prompt=none"
-	silent, err := httpClient.Get(silentUrl)
+	silent, err := httpClient.Get(silentURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -251,12 +251,12 @@ func TestOtpCeremony_ARemovedAuthenticatorIsSetUpAgainAtLevel3(t *testing.T) {
 		"a silent request that passes every check goes on to issue its code")
 
 	// Ceremony three, at the level 3 client, is the whole point.
-	where, page, _ = authorizeOnExistingSession(t, httpClient, client, redirectUri)
+	where, page, _ = authorizeOnExistingSession(t, httpClient, client, redirectURI)
 	defer func() { _ = page.Body.Close() }()
 	assert.Equal(t, "/auth/otp", where,
 		"a level 3 sign-in of a user with no authenticator must set one up, whatever answered the "+
 			"changed generation before it")
 	if where == "/auth/otp" {
-		assert.NotEmpty(t, getOtpSecretFromEnrollmentPage(t, page), "the OTP page must be the enrolment page")
+		assert.NotEmpty(t, getOTPSecretFromEnrollmentPage(t, page), "the OTP page must be the enrolment page")
 	}
 }

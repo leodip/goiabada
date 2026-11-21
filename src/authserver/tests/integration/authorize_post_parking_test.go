@@ -49,7 +49,7 @@ func crossSitePost(t *testing.T, form url.Values) *http.Response {
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Origin", "https://www.certification.openid.net")
 
-	resp, err := createHttpClient(t).Do(req)
+	resp, err := createHTTPClient(t).Do(req)
 	require.NoError(t, err)
 	return resp
 }
@@ -58,9 +58,9 @@ func crossSitePost(t *testing.T, form url.Values) *http.Response {
 // browser: no cookie is set. A 303 rather than a 302 or 307, because the browser must re-issue the
 // request as a GET and drop the body.
 func TestAuthorizePost_IsParkedAndAnsweredWithA303TouchingNoCookie(t *testing.T) {
-	client, redirectUri := createTestClientAndRedirectURI(t)
+	client, redirectURI := createTestClientAndRedirectURI(t)
 
-	resp := crossSitePost(t, authorizePostForm(client, redirectUri.URI, ""))
+	resp := crossSitePost(t, authorizePostForm(client, redirectURI.URI, ""))
 	defer func() { _ = resp.Body.Close() }()
 
 	require.Equal(t, http.StatusSeeOther, resp.StatusCode)
@@ -75,12 +75,12 @@ func TestAuthorizePost_IsParkedAndAnsweredWithA303TouchingNoCookie(t *testing.T)
 // cookie over the browser's own, so the browser lost the pointer to its session. Now the POST
 // touches nothing, and the GET that follows carries the browser's cookie and finds the session.
 func TestAuthorizePost_ASignedInBrowserKeepsItsSessionAndIsSingleSignedOn(t *testing.T) {
-	browser, client, redirectUri, _ := createSessionWithAcrLevel1(t)
+	browser, client, redirectURI, _ := createSessionWithACRLevel1(t)
 	baseURL, err := url.Parse(appConfig.AuthServer.BaseURL)
 	require.NoError(t, err)
 	require.NotEmpty(t, browser.Jar.Cookies(baseURL), "the browser holds a session cookie")
 
-	resp := crossSitePost(t, authorizePostForm(client, redirectUri.URI, ""))
+	resp := crossSitePost(t, authorizePostForm(client, redirectURI.URI, ""))
 	handleURL := parkedAuthorizeLocation(t, resp)
 	_ = resp.Body.Close()
 	assert.Empty(t, resp.Header.Values("Set-Cookie"),
@@ -99,9 +99,9 @@ func TestAuthorizePost_ASignedInBrowserKeepsItsSessionAndIsSingleSignedOn(t *tes
 // renewal an application does with a hidden form. The GET the POST is answered with carries the
 // cookie, so the session is found.
 func TestAuthorizePost_PromptNoneFromASignedInBrowserIssuesSilently(t *testing.T) {
-	browser, client, redirectUri, _ := createSessionWithAcrLevel1(t)
+	browser, client, redirectURI, _ := createSessionWithACRLevel1(t)
 
-	resp := crossSitePost(t, authorizePostForm(client, redirectUri.URI, "none"))
+	resp := crossSitePost(t, authorizePostForm(client, redirectURI.URI, "none"))
 	handleURL := parkedAuthorizeLocation(t, resp)
 	_ = resp.Body.Close()
 
@@ -120,18 +120,18 @@ func TestAuthorizePost_PromptNoneFromASignedInBrowserIssuesSilently(t *testing.T
 // The other half: a browser with no session, over POST with prompt=none, is answered login_required
 // on the redirect and shown no login page (OIDC Core 3.1.2.3).
 func TestAuthorizePost_PromptNoneFromABrowserWithNoSessionIsAnsweredLoginRequired(t *testing.T) {
-	client, redirectUri := createTestClientAndRedirectURI(t)
-	form := authorizePostForm(client, redirectUri.URI, "none")
+	client, redirectURI := createTestClientAndRedirectURI(t)
+	form := authorizePostForm(client, redirectURI.URI, "none")
 
 	resp := crossSitePost(t, form)
 	handleURL := parkedAuthorizeLocation(t, resp)
 	_ = resp.Body.Close()
 
-	resp = loadPage(t, createHttpClient(t), handleURL)
+	resp = loadPage(t, createHTTPClient(t), handleURL)
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusFound, resp.StatusCode)
 
-	errorCode, _, state := getErrorFromUrl(t, resp)
+	errorCode, _, state := getErrorFromURL(t, resp)
 	assert.Equal(t, "login_required", errorCode)
 	assert.Equal(t, form.Get("state"), state)
 }
@@ -139,17 +139,17 @@ func TestAuthorizePost_PromptNoneFromABrowserWithNoSessionIsAnsweredLoginRequire
 // A handle is single use. The GET that consumed it ran the ceremony; the same link again is
 // refused on the page, with the one answer every unusable handle gets.
 func TestAuthorizeGet_ARequestHandleIsSingleUse(t *testing.T) {
-	client, redirectUri := createTestClientAndRedirectURI(t)
+	client, redirectURI := createTestClientAndRedirectURI(t)
 
-	resp := crossSitePost(t, authorizePostForm(client, redirectUri.URI, ""))
+	resp := crossSitePost(t, authorizePostForm(client, redirectURI.URI, ""))
 	handleURL := parkedAuthorizeLocation(t, resp)
 	_ = resp.Body.Close()
 
-	first := loadPage(t, createHttpClient(t), handleURL)
+	first := loadPage(t, createHTTPClient(t), handleURL)
 	defer func() { _ = first.Body.Close() }()
 	assertRedirect(t, first, "/auth/level1")
 
-	second := loadPage(t, createHttpClient(t), handleURL)
+	second := loadPage(t, createHTTPClient(t), handleURL)
 	defer func() { _ = second.Body.Close() }()
 	assert.Equal(t, unusableHandleMessage, refusalPageMessage(t, second))
 }
@@ -160,9 +160,9 @@ const unusableHandleMessage = "This sign-in link is no longer valid. It may have
 // Two browsers following one link at once: exactly one runs the ceremony. The claim is the arbiter,
 // and this is the whole request path around it.
 func TestAuthorizeGet_TwoRequestsForOneHandleHaveExactlyOneWinner(t *testing.T) {
-	client, redirectUri := createTestClientAndRedirectURI(t)
+	client, redirectURI := createTestClientAndRedirectURI(t)
 
-	resp := crossSitePost(t, authorizePostForm(client, redirectUri.URI, ""))
+	resp := crossSitePost(t, authorizePostForm(client, redirectURI.URI, ""))
 	handleURL := parkedAuthorizeLocation(t, resp)
 	_ = resp.Body.Close()
 
@@ -173,7 +173,7 @@ func TestAuthorizeGet_TwoRequestsForOneHandleHaveExactlyOneWinner(t *testing.T) 
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			r, err := createHttpClient(t).Get(handleURL)
+			r, err := createHTTPClient(t).Get(handleURL)
 			if err != nil {
 				return
 			}
@@ -199,26 +199,26 @@ func TestAuthorizeGet_TwoRequestsForOneHandleHaveExactlyOneWinner(t *testing.T) 
 // A handle beside any other authorization parameter is refused and never merged, and the refusal
 // comes BEFORE the handle is consumed: the same handle, sent alone, still runs the ceremony.
 func TestAuthorizeGet_ARequestHandleBesideAnotherParameterIsRefusedAndNotConsumed(t *testing.T) {
-	client, redirectUri := createTestClientAndRedirectURI(t)
+	client, redirectURI := createTestClientAndRedirectURI(t)
 
-	resp := crossSitePost(t, authorizePostForm(client, redirectUri.URI, ""))
+	resp := crossSitePost(t, authorizePostForm(client, redirectURI.URI, ""))
 	handleURL := parkedAuthorizeLocation(t, resp)
 	_ = resp.Body.Close()
 
-	beside := loadPage(t, createHttpClient(t), handleURL+"&state=injected")
+	beside := loadPage(t, createHTTPClient(t), handleURL+"&state=injected")
 	defer func() { _ = beside.Body.Close() }()
 	assert.Equal(t, unusableHandleMessage, refusalPageMessage(t, beside))
 
-	alone := loadPage(t, createHttpClient(t), handleURL)
+	alone := loadPage(t, createHTTPClient(t), handleURL)
 	defer func() { _ = alone.Body.Close() }()
 	assertRedirect(t, alone, "/auth/level1")
 
 	// A leniency on purpose: a parameter the endpoint does not read, appended by something in
 	// front of the server, is ignored as it is everywhere else on this endpoint.
-	resp = crossSitePost(t, authorizePostForm(client, redirectUri.URI, ""))
+	resp = crossSitePost(t, authorizePostForm(client, redirectURI.URI, ""))
 	handleURL = parkedAuthorizeLocation(t, resp)
 	_ = resp.Body.Close()
-	tagged := loadPage(t, createHttpClient(t), handleURL+"&utm_source=newsletter")
+	tagged := loadPage(t, createHTTPClient(t), handleURL+"&utm_source=newsletter")
 	defer func() { _ = tagged.Body.Close() }()
 	assertRedirect(t, tagged, "/auth/level1")
 }
@@ -244,7 +244,7 @@ func TestAuthorizeGet_AnUnusableRequestHandleIsRefusedOnThePage(t *testing.T) {
 		"one character off": strings.Repeat("A", 42) + "B",
 	} {
 		t.Run(name, func(t *testing.T) {
-			resp := loadPage(t, createHttpClient(t), authorizeURL+url.QueryEscape(handle))
+			resp := loadPage(t, createHTTPClient(t), authorizeURL+url.QueryEscape(handle))
 			defer func() { _ = resp.Body.Close() }()
 			assert.Equal(t, unusableHandleMessage, refusalPageMessage(t, resp))
 		})
@@ -254,10 +254,10 @@ func TestAuthorizeGet_AnUnusableRequestHandleIsRefusedOnThePage(t *testing.T) {
 // A request the GET would refuse on the page is refused at the POST, on the page, and no handle is
 // issued: a POST that could never begin a ceremony is not parked.
 func TestAuthorizePost_ARequestThatCanNotBeAddressedIsRefusedWithoutAHandle(t *testing.T) {
-	client, redirectUri := createTestClientAndRedirectURI(t)
+	client, redirectURI := createTestClientAndRedirectURI(t)
 
 	t.Run("a client that does not exist", func(t *testing.T) {
-		form := authorizePostForm(client, redirectUri.URI, "")
+		form := authorizePostForm(client, redirectURI.URI, "")
 		form.Set("client_id", "no-such-client-"+fake.LetterN(6))
 
 		resp := crossSitePost(t, form)
@@ -278,7 +278,7 @@ func TestAuthorizePost_ARequestThatCanNotBeAddressedIsRefusedWithoutAHandle(t *t
 	})
 
 	t.Run("a response_mode the server cannot encode", func(t *testing.T) {
-		form := authorizePostForm(client, redirectUri.URI, "")
+		form := authorizePostForm(client, redirectURI.URI, "")
 		form.Set("response_mode", "web_message")
 
 		resp := crossSitePost(t, form)
@@ -298,9 +298,9 @@ func TestAuthorizePost_ARequestThatCanNotBeAddressedIsRefusedWithoutAHandle(t *t
 // is delivered after the login. Reaching that refusal, and not the refusal page, is what shows the
 // GET read the form whole.
 func TestAuthorizePost_AFormPast64KiBTakesTheWholeTrip(t *testing.T) {
-	client, redirectUri := createTestClientAndRedirectURI(t)
+	client, redirectURI := createTestClientAndRedirectURI(t)
 
-	form := authorizePostForm(client, redirectUri.URI, "")
+	form := authorizePostForm(client, redirectURI.URI, "")
 	form.Set("id_token_hint", strings.Repeat("h", 45000))
 	acrValues := strings.Repeat("a", 21000)
 	body := form.Encode()
@@ -311,12 +311,12 @@ func TestAuthorizePost_AFormPast64KiBTakesTheWholeTrip(t *testing.T) {
 	req, err := http.NewRequest(http.MethodPost, appConfig.AuthServer.BaseURL+"/auth/authorize?"+query, strings.NewReader(body))
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	resp, err := createHttpClient(t).Do(req)
+	resp, err := createHTTPClient(t).Do(req)
 	require.NoError(t, err)
 	handleURL := parkedAuthorizeLocation(t, resp)
 	_ = resp.Body.Close()
 
-	resp = loadPage(t, createHttpClient(t), handleURL)
+	resp = loadPage(t, createHTTPClient(t), handleURL)
 	defer func() { _ = resp.Body.Close() }()
 	assertRedirect(t, resp, "/auth/level1")
 }

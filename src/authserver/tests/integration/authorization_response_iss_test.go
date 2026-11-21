@@ -77,7 +77,7 @@ func formPostNames(t *testing.T, resp *http.Response) (names []string, values ma
 
 // silentCodeURL is a prompt=none code request in responseMode.
 func silentCodeURL(clientIdentifier, redirectURI, state, responseMode string) string {
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + clientIdentifier +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + clientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectURI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -86,9 +86,9 @@ func silentCodeURL(clientIdentifier, redirectURI, state, responseMode string) st
 		"&state=" + state +
 		"&prompt=none"
 	if responseMode != "" {
-		destUrl += "&response_mode=" + responseMode
+		destURL += "&response_mode=" + responseMode
 	}
-	return destUrl
+	return destURL
 }
 
 func TestAuthorizationResponseIss_ACodeCarriesTheDiscoveryIssuer(t *testing.T) {
@@ -96,10 +96,10 @@ func TestAuthorizationResponseIss_ACodeCarriesTheDiscoveryIssuer(t *testing.T) {
 
 	for _, mode := range []string{"", "query", "fragment", "form_post"} {
 		t.Run("mode "+mode, func(t *testing.T) {
-			httpClient, client, redirectUri, _ := createSessionWithAcrLevel1(t)
+			httpClient, client, redirectURI, _ := createSessionWithACRLevel1(t)
 			state := fake.LetterN(12)
 
-			resp, err := httpClient.Get(silentCodeURL(client.ClientIdentifier, redirectUri.URI, state, mode))
+			resp, err := httpClient.Get(silentCodeURL(client.ClientIdentifier, redirectURI.URI, state, mode))
 			require.NoError(t, err)
 			defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
@@ -135,10 +135,10 @@ func TestAuthorizationResponseIss_AnErrorCarriesTheDiscoveryIssuer(t *testing.T)
 	// prompt=none with no session: login_required, answered at once.
 	for _, mode := range []string{"", "query", "fragment", "form_post"} {
 		t.Run("mode "+mode, func(t *testing.T) {
-			client, redirectUri := createTestClientAndRedirectURI(t)
+			client, redirectURI := createTestClientAndRedirectURI(t)
 			state := fake.LetterN(12)
 
-			resp, err := createHttpClient(t).Get(silentCodeURL(client.ClientIdentifier, redirectUri.URI, state, mode))
+			resp, err := createHTTPClient(t).Get(silentCodeURL(client.ClientIdentifier, redirectURI.URI, state, mode))
 			require.NoError(t, err)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -171,12 +171,12 @@ func TestAuthorizationResponseIss_ImplicitTokensCarryTheDiscoveryIssuer(t *testi
 
 	for _, mode := range []string{"fragment", "form_post"} {
 		t.Run(mode, func(t *testing.T) {
-			client, redirectUri := createImplicitFlowClient(t, nil)
+			client, redirectURI := createImplicitFlowClient(t, nil)
 			user, password := createTestUserForImplicit(t)
 			state := fake.LetterN(12)
 
-			resp := signInToIssue(t, createHttpClient(t),
-				implicitModeAuthorizeURL(client, redirectUri.URI, "id_token token", mode, state, fake.LetterN(12)),
+			resp := signInToIssue(t, createHTTPClient(t),
+				implicitModeAuthorizeURL(client, redirectURI.URI, "id_token token", mode, state, fake.LetterN(12)),
 				user, password)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -199,14 +199,14 @@ func TestAuthorizationResponseIss_ImplicitTokensCarryTheDiscoveryIssuer(t *testi
 // The issuer is the setting as read for the request: a changed issuer reaches the next response and
 // discovery alike, with no restart.
 func TestAuthorizationResponseIss_FollowsTheIssuerSetting(t *testing.T) {
-	client, redirectUri := createTestClientAndRedirectURI(t)
+	client, redirectURI := createTestClientAndRedirectURI(t)
 	changed := discoveryIssuer(t) + "/changed"
 	changeSettings(t, func(s *record.Settings) { s.Issuer = changed })
 
 	require.Equal(t, changed, discoveryIssuer(t))
 
 	state := fake.LetterN(12)
-	resp, err := createHttpClient(t).Get(silentCodeURL(client.ClientIdentifier, redirectUri.URI, state, "query"))
+	resp, err := createHTTPClient(t).Get(silentCodeURL(client.ClientIdentifier, redirectURI.URI, state, "query"))
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 

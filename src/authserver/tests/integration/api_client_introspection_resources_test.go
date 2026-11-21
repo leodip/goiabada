@@ -25,8 +25,8 @@ import (
 // refused for a public client, the list cleared when a client is made public, and every save
 // recorded as updated_client_introspection_resources.
 
-func introspectionResourcesPath(clientId int64) string {
-	return fmt.Sprintf("/api/v1/admin/clients/%d/introspection-resources", clientId)
+func introspectionResourcesPath(clientID int64) string {
+	return fmt.Sprintf("/api/v1/admin/clients/%d/introspection-resources", clientID)
 }
 
 // newIntrospectingClient is a confidential client, removed when the test ends.
@@ -67,7 +67,7 @@ func newAPIResource(t *testing.T) *record.Resource {
 	return resource
 }
 
-func authServerResourceId(t *testing.T) int64 {
+func authServerResourceID(t *testing.T) int64 {
 	t.Helper()
 	resource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
 	require.NoError(t, err)
@@ -75,10 +75,10 @@ func authServerResourceId(t *testing.T) int64 {
 	return resource.ID
 }
 
-// storedIntrospectionResourceIds is the client's list as the database holds it.
-func storedIntrospectionResourceIds(t *testing.T, clientId int64) []int64 {
+// storedIntrospectionResourceIDs is the client's list as the database holds it.
+func storedIntrospectionResourceIDs(t *testing.T, clientID int64) []int64 {
 	t.Helper()
-	links, err := database.GetClientIntrospectionResourcesByClientID(context.Background(), nil, clientId)
+	links, err := database.GetClientIntrospectionResourcesByClientID(context.Background(), nil, clientID)
 	require.NoError(t, err)
 	ids := []int64{}
 	for _, link := range links {
@@ -87,15 +87,15 @@ func storedIntrospectionResourceIds(t *testing.T, clientId int64) []int64 {
 	return ids
 }
 
-func listIntrospectionResource(t *testing.T, clientId, resourceId int64) {
+func listIntrospectionResource(t *testing.T, clientID, resourceID int64) {
 	t.Helper()
 	require.NoError(t, database.CreateClientIntrospectionResource(context.Background(), nil,
-		&record.ClientIntrospectionResource{ClientID: clientId, ResourceID: resourceId}))
+		&record.ClientIntrospectionResource{ClientID: clientID, ResourceID: resourceID}))
 }
 
 // putIntrospectionResources sends a save under its own request id, so the audit rows it leaves can
 // be read back by that id alone. A nil expected is sent as JSON null.
-func putIntrospectionResources(t *testing.T, accessToken string, clientId int64, wanted, expected []int64) (*http.Response, string) {
+func putIntrospectionResources(t *testing.T, accessToken string, clientID int64, wanted, expected []int64) (*http.Response, string) {
 	t.Helper()
 	if wanted == nil {
 		wanted = []int64{}
@@ -103,21 +103,21 @@ func putIntrospectionResources(t *testing.T, accessToken string, clientId int64,
 	body, err := json.Marshal(map[string]any{"resourceIds": wanted, "expectedResourceIds": expected})
 	require.NoError(t, err)
 
-	req, err := http.NewRequest(http.MethodPut, appConfig.AuthServer.BaseURL+introspectionResourcesPath(clientId), bytes.NewReader(body))
+	req, err := http.NewRequest(http.MethodPut, appConfig.AuthServer.BaseURL+introspectionResourcesPath(clientID), bytes.NewReader(body))
 	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
-	requestId := "introspect-" + fake.LetterN(16)
-	req.Header.Set("X-Request-Id", requestId)
+	requestID := "introspect-" + fake.LetterN(16)
+	req.Header.Set("X-Request-Id", requestID)
 
-	resp, err := createHttpClient(t).Do(req)
+	resp, err := createHTTPClient(t).Do(req)
 	require.NoError(t, err)
-	return resp, requestId
+	return resp, requestID
 }
 
-func getIntrospectionResources(t *testing.T, accessToken string, clientId int64) (*http.Response, []byte) {
+func getIntrospectionResources(t *testing.T, accessToken string, clientID int64) (*http.Response, []byte) {
 	t.Helper()
-	resp := makeAPIRequest(t, http.MethodGet, appConfig.AuthServer.BaseURL+introspectionResourcesPath(clientId), accessToken, nil)
+	resp := makeAPIRequest(t, http.MethodGet, appConfig.AuthServer.BaseURL+introspectionResourcesPath(clientID), accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	raw, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
@@ -181,7 +181,7 @@ func TestAPIClientIntrospectionResources_GetAnswersAnEmptyListAsAnArray(t *testi
 	assert.Equal(t, "[]", string(body["resources"]), "a client listing nothing answers [], never null")
 }
 
-func TestAPIClientIntrospectionResources_GetRefusesABadIdAndAnUnknownClient(t *testing.T) {
+func TestAPIClientIntrospectionResources_GetRefusesABadIDAndAnUnknownClient(t *testing.T) {
 	manageToken, _ := createAdminClientWithToken(t)
 
 	resp := makeAPIRequest(t, http.MethodGet, appConfig.AuthServer.BaseURL+"/api/v1/admin/clients/abc/introspection-resources", manageToken, nil)
@@ -208,22 +208,22 @@ func TestAPIClientIntrospectionResources_PutReplacesTheListAndRecordsTheChange(t
 	dropped := newAPIResource(t)
 	added := newAPIResource(t)
 
-	resp, requestId := putIntrospectionResources(t, clientsToken, client.ID, []int64{kept.ID, dropped.ID, kept.ID}, []int64{})
+	resp, requestID := putIntrospectionResources(t, clientsToken, client.ID, []int64{kept.ID, dropped.ID, kept.ID}, []int64{})
 	_ = resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode, "authserver:manage-clients edits a client's list")
-	assert.ElementsMatch(t, []int64{kept.ID, dropped.ID}, storedIntrospectionResourceIds(t, client.ID), "a repeated id is listed once")
-	rows := auditRows(t, manageToken, "updated_client_introspection_resources", requestId)
+	assert.ElementsMatch(t, []int64{kept.ID, dropped.ID}, storedIntrospectionResourceIDs(t, client.ID), "a repeated id is listed once")
+	rows := auditRows(t, manageToken, "updated_client_introspection_resources", requestID)
 	require.Len(t, rows, 1, "one record for the save")
 	assert.InDelta(t, float64(client.ID), rows[0]["client_id"], 0)
 	assert.Equal(t, []int64{kept.ID, dropped.ID}, idsOf(t, rows[0]["added_resource_ids"]), "in the order the save named them")
 	assert.Equal(t, []int64{}, idsOf(t, rows[0]["removed_resource_ids"]))
 	assert.Equal(t, caller.ClientIdentifier, rows[0]["logged_in_user"])
 
-	resp, requestId = putIntrospectionResources(t, clientsToken, client.ID, []int64{kept.ID, added.ID}, []int64{dropped.ID, kept.ID})
+	resp, requestID = putIntrospectionResources(t, clientsToken, client.ID, []int64{kept.ID, added.ID}, []int64{dropped.ID, kept.ID})
 	_ = resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
-	assert.ElementsMatch(t, []int64{kept.ID, added.ID}, storedIntrospectionResourceIds(t, client.ID))
-	rows = auditRows(t, manageToken, "updated_client_introspection_resources", requestId)
+	assert.ElementsMatch(t, []int64{kept.ID, added.ID}, storedIntrospectionResourceIDs(t, client.ID))
+	rows = auditRows(t, manageToken, "updated_client_introspection_resources", requestID)
 	require.Len(t, rows, 1)
 	assert.Equal(t, []int64{added.ID}, idsOf(t, rows[0]["added_resource_ids"]))
 	assert.Equal(t, []int64{dropped.ID}, idsOf(t, rows[0]["removed_resource_ids"]))
@@ -241,7 +241,7 @@ func TestAPIClientIntrospectionResources_PutReplacesTheListAndRecordsTheChange(t
 	resp, _ = putIntrospectionResources(t, clientsToken, client.ID, []int64{}, []int64{kept.ID, added.ID})
 	_ = resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
-	assert.Empty(t, storedIntrospectionResourceIds(t, client.ID), "and an empty list empties it")
+	assert.Empty(t, storedIntrospectionResourceIDs(t, client.ID), "and an empty list empties it")
 }
 
 func TestAPIClientIntrospectionResources_PutRefusesWhatItCannotSave(t *testing.T) {
@@ -253,21 +253,21 @@ func TestAPIClientIntrospectionResources_PutRefusesWhatItCannotSave(t *testing.T
 	listIntrospectionResource(t, client.ID, listed.ID)
 
 	t.Run("expectedResourceIds is required", func(t *testing.T) {
-		resp, requestId := putIntrospectionResources(t, manageToken, client.ID, []int64{other.ID}, nil)
+		resp, requestID := putIntrospectionResources(t, manageToken, client.ID, []int64{other.ID}, nil)
 		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 		code, _ := errorEnvelope(t, resp)
 		assert.Equal(t, "VALIDATION_ERROR", code)
-		assert.Equal(t, []int64{listed.ID}, storedIntrospectionResourceIds(t, client.ID), "nothing was saved")
-		assert.Empty(t, auditRows(t, manageToken, "updated_client_introspection_resources", requestId))
+		assert.Equal(t, []int64{listed.ID}, storedIntrospectionResourceIDs(t, client.ID), "nothing was saved")
+		assert.Empty(t, auditRows(t, manageToken, "updated_client_introspection_resources", requestID))
 	})
 
 	t.Run("a list read before another save is a 409", func(t *testing.T) {
-		resp, requestId := putIntrospectionResources(t, manageToken, client.ID, []int64{other.ID}, []int64{})
+		resp, requestID := putIntrospectionResources(t, manageToken, client.ID, []int64{other.ID}, []int64{})
 		assert.Equal(t, http.StatusConflict, resp.StatusCode)
 		code, _ := errorEnvelope(t, resp)
 		assert.Equal(t, "CONCURRENT_UPDATE", code)
-		assert.Equal(t, []int64{listed.ID}, storedIntrospectionResourceIds(t, client.ID), "nothing was saved")
-		assert.Empty(t, auditRows(t, manageToken, "updated_client_introspection_resources", requestId))
+		assert.Equal(t, []int64{listed.ID}, storedIntrospectionResourceIDs(t, client.ID), "nothing was saved")
+		assert.Empty(t, auditRows(t, manageToken, "updated_client_introspection_resources", requestID))
 	})
 
 	t.Run("an unknown resource is a 404", func(t *testing.T) {
@@ -276,7 +276,7 @@ func TestAPIClientIntrospectionResources_PutRefusesWhatItCannotSave(t *testing.T
 		code, description := errorEnvelope(t, resp)
 		assert.Equal(t, "NOT_FOUND", code)
 		assert.Equal(t, "Resource not found", description)
-		assert.Equal(t, []int64{listed.ID}, storedIntrospectionResourceIds(t, client.ID), "nothing was saved")
+		assert.Equal(t, []int64{listed.ID}, storedIntrospectionResourceIDs(t, client.ID), "nothing was saved")
 	})
 
 	t.Run("an unknown client is a 404", func(t *testing.T) {
@@ -300,7 +300,7 @@ func TestAPIClientIntrospectionResources_APublicClientListsNothing(t *testing.T)
 	code, description := errorEnvelope(t, resp)
 	assert.Equal(t, "handler.client_introspection_resources.public_client", code)
 	assert.Equal(t, "A public client can't introspect tokens, so it can't list introspection resources.", description)
-	assert.Empty(t, storedIntrospectionResourceIds(t, client.ID), "nothing was saved")
+	assert.Empty(t, storedIntrospectionResourceIDs(t, client.ID), "nothing was saved")
 
 	resp, _ = putIntrospectionResources(t, manageToken, client.ID, []int64{}, []int64{})
 	_ = resp.Body.Close()
@@ -322,8 +322,8 @@ func TestAPIClientIntrospectionResources_MakingTheClientPublicClearsTheList(t *t
 	_ = resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
-	assert.Empty(t, storedIntrospectionResourceIds(t, client.ID), "the client made public lists nothing")
-	assert.Equal(t, []int64{resource.ID}, storedIntrospectionResourceIds(t, other.ID), "another client keeps its list")
+	assert.Empty(t, storedIntrospectionResourceIDs(t, client.ID), "the client made public lists nothing")
+	assert.Equal(t, []int64{resource.ID}, storedIntrospectionResourceIDs(t, other.ID), "another client keeps its list")
 
 	// Made confidential again, the client starts with an empty list rather than its old one.
 	resp = makeAPIRequest(t, http.MethodPut,
@@ -331,7 +331,7 @@ func TestAPIClientIntrospectionResources_MakingTheClientPublicClearsTheList(t *t
 		manageToken, api.UpdateClientAuthenticationRequest{IsPublic: false, ClientSecret: securerandom.String(60)})
 	_ = resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
-	assert.Empty(t, storedIntrospectionResourceIds(t, client.ID))
+	assert.Empty(t, storedIntrospectionResourceIDs(t, client.ID))
 }
 
 // Listing the authserver resource lets a client read the claims of every sign-in token, so only
@@ -341,13 +341,13 @@ func TestAPIClientIntrospectionResources_OnlyManageListsTheAuthServerResource(t 
 	manageToken, _ := createAdminClientWithToken(t)
 	clientsToken, caller := createClientWithGranularScope(t, builtin.ManageClientsPermissionIdentifier)
 	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.ID) })
-	authServer := authServerResourceId(t)
+	authServer := authServerResourceID(t)
 	ordinary := newAPIResource(t)
 
 	t.Run("manage-clients is refused", func(t *testing.T) {
 		client := newIntrospectingClient(t)
 
-		resp, requestId := putIntrospectionResources(t, clientsToken, client.ID, []int64{ordinary.ID, authServer}, []int64{})
+		resp, requestID := putIntrospectionResources(t, clientsToken, client.ID, []int64{ordinary.ID, authServer}, []int64{})
 
 		assert.Equal(t, http.StatusForbidden, resp.StatusCode)
 		challenge := resp.Header.Get("WWW-Authenticate")
@@ -355,10 +355,10 @@ func TestAPIClientIntrospectionResources_OnlyManageListsTheAuthServerResource(t 
 		assert.Contains(t, challenge, `scope="authserver:manage"`)
 		code, _ := errorEnvelope(t, resp)
 		assert.Equal(t, "MANAGE_SCOPE_REQUIRED", code)
-		assert.Empty(t, storedIntrospectionResourceIds(t, client.ID), "the refused save wrote nothing, the ordinary resource included")
-		assert.Empty(t, auditRows(t, manageToken, "updated_client_introspection_resources", requestId))
+		assert.Empty(t, storedIntrospectionResourceIDs(t, client.ID), "the refused save wrote nothing, the ordinary resource included")
+		assert.Empty(t, auditRows(t, manageToken, "updated_client_introspection_resources", requestID))
 
-		rows := auditRows(t, manageToken, "administrator_change_refused", requestId)
+		rows := auditRows(t, manageToken, "administrator_change_refused", requestID)
 		require.Len(t, rows, 1, "exactly one administrator_change_refused row")
 		assert.Equal(t, caller.ClientIdentifier, rows[0]["logged_in_user"])
 		assert.Equal(t, http.MethodPut, rows[0]["method"])
@@ -373,12 +373,12 @@ func TestAPIClientIntrospectionResources_OnlyManageListsTheAuthServerResource(t 
 	t.Run("manage lists it", func(t *testing.T) {
 		client := newIntrospectingClient(t)
 
-		resp, requestId := putIntrospectionResources(t, manageToken, client.ID, []int64{authServer}, []int64{})
+		resp, requestID := putIntrospectionResources(t, manageToken, client.ID, []int64{authServer}, []int64{})
 		_ = resp.Body.Close()
 
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
-		assert.Equal(t, []int64{authServer}, storedIntrospectionResourceIds(t, client.ID))
-		assert.Empty(t, auditRows(t, manageToken, "administrator_change_refused", requestId))
+		assert.Equal(t, []int64{authServer}, storedIntrospectionResourceIDs(t, client.ID))
+		assert.Empty(t, auditRows(t, manageToken, "administrator_change_refused", requestID))
 	})
 
 	t.Run("manage-clients edits the rest of a list that already holds it, and removes it", func(t *testing.T) {
@@ -388,12 +388,12 @@ func TestAPIClientIntrospectionResources_OnlyManageListsTheAuthServerResource(t 
 		resp, _ := putIntrospectionResources(t, clientsToken, client.ID, []int64{authServer, ordinary.ID}, []int64{authServer})
 		_ = resp.Body.Close()
 		assert.Equal(t, http.StatusOK, resp.StatusCode, "keeping authserver listed adds nothing the ceiling guards")
-		assert.ElementsMatch(t, []int64{authServer, ordinary.ID}, storedIntrospectionResourceIds(t, client.ID))
+		assert.ElementsMatch(t, []int64{authServer, ordinary.ID}, storedIntrospectionResourceIDs(t, client.ID))
 
 		resp, _ = putIntrospectionResources(t, clientsToken, client.ID, []int64{ordinary.ID}, []int64{authServer, ordinary.ID})
 		_ = resp.Body.Close()
 		assert.Equal(t, http.StatusOK, resp.StatusCode, "removing it takes nothing away from anyone's sign-in")
-		assert.Equal(t, []int64{ordinary.ID}, storedIntrospectionResourceIds(t, client.ID))
+		assert.Equal(t, []int64{ordinary.ID}, storedIntrospectionResourceIDs(t, client.ID))
 	})
 }
 
@@ -406,7 +406,7 @@ func TestAPIClientIntrospectionResources_OnlyManageReadsOrSetsAnAuthServerIntros
 	manageToken, _ := createAdminClientWithToken(t)
 	clientsToken, caller := createClientWithGranularScope(t, builtin.ManageClientsPermissionIdentifier)
 	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.ID) })
-	authServer := authServerResourceId(t)
+	authServer := authServerResourceID(t)
 	secretPath := func(client *record.Client) string {
 		return fmt.Sprintf("%s/api/v1/admin/clients/%d/secret", appConfig.AuthServer.BaseURL, client.ID)
 	}
@@ -427,19 +427,19 @@ func TestAPIClientIntrospectionResources_OnlyManageReadsOrSetsAnAuthServerIntros
 		require.NoError(t, err)
 		req.Header.Set("Authorization", "Bearer "+accessToken)
 		req.Header.Set("Content-Type", "application/json")
-		requestId := "introspect-secret-" + fake.LetterN(16)
-		req.Header.Set("X-Request-Id", requestId)
-		resp, err := createHttpClient(t).Do(req)
+		requestID := "introspect-secret-" + fake.LetterN(16)
+		req.Header.Set("X-Request-Id", requestID)
+		resp, err := createHTTPClient(t).Do(req)
 		require.NoError(t, err)
-		return resp, requestId
+		return resp, requestID
 	}
-	assertRefused := func(t *testing.T, resp *http.Response, requestId string, client *record.Client, route string) {
+	assertRefused := func(t *testing.T, resp *http.Response, requestID string, client *record.Client, route string) {
 		t.Helper()
 		assert.Equal(t, http.StatusForbidden, resp.StatusCode)
 		assert.Contains(t, resp.Header.Get("WWW-Authenticate"), `scope="authserver:manage"`)
 		code, _ := errorEnvelope(t, resp)
 		assert.Equal(t, "MANAGE_SCOPE_REQUIRED", code)
-		rows := auditRows(t, manageToken, "administrator_change_refused", requestId)
+		rows := auditRows(t, manageToken, "administrator_change_refused", requestID)
 		require.Len(t, rows, 1, "exactly one administrator_change_refused row")
 		assert.Equal(t, caller.ClientIdentifier, rows[0]["logged_in_user"])
 		assert.Equal(t, route, rows[0]["route"])
@@ -452,21 +452,21 @@ func TestAPIClientIntrospectionResources_OnlyManageReadsOrSetsAnAuthServerIntros
 		client := newIntrospectingClient(t)
 		listIntrospectionResource(t, client.ID, authServer)
 
-		resp, requestId := send(t, http.MethodGet, secretPath(client), clientsToken, nil)
+		resp, requestID := send(t, http.MethodGet, secretPath(client), clientsToken, nil)
 		defer func() { _ = resp.Body.Close() }()
 
-		assertRefused(t, resp, requestId, client, "/api/v1/admin/clients/{id}/secret")
+		assertRefused(t, resp, requestID, client, "/api/v1/admin/clients/{id}/secret")
 	})
 
 	t.Run("manage-clients cannot set its secret", func(t *testing.T) {
 		client := newIntrospectingClient(t)
 		listIntrospectionResource(t, client.ID, authServer)
 
-		resp, requestId := send(t, http.MethodPut, authenticationPath(client), clientsToken,
+		resp, requestID := send(t, http.MethodPut, authenticationPath(client), clientsToken,
 			api.UpdateClientAuthenticationRequest{IsPublic: false, ClientSecret: securerandom.String(60)})
 		defer func() { _ = resp.Body.Close() }()
 
-		assertRefused(t, resp, requestId, client, "/api/v1/admin/clients/{id}/authentication")
+		assertRefused(t, resp, requestID, client, "/api/v1/admin/clients/{id}/authentication")
 		stored, err := database.GetClientByID(context.Background(), nil, client.ID)
 		require.NoError(t, err)
 		assert.Equal(t, client.ClientSecretEncrypted, stored.ClientSecretEncrypted, "the secret is the one it had")
@@ -494,7 +494,7 @@ func TestAPIClientIntrospectionResources_OnlyManageReadsOrSetsAnAuthServerIntros
 		_ = resp.Body.Close()
 
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
-		assert.Empty(t, storedIntrospectionResourceIds(t, client.ID))
+		assert.Empty(t, storedIntrospectionResourceIDs(t, client.ID))
 	})
 
 	t.Run("manage-clients reads the secret of a client listed for another resource", func(t *testing.T) {
@@ -534,7 +534,7 @@ func TestAPIClientIntrospectionResources_HeldToTheClientsScopes(t *testing.T) {
 	code, _ = errorEnvelope(t, resp)
 	assert.Equal(t, "INSUFFICIENT_SCOPE", code)
 
-	assert.Empty(t, storedIntrospectionResourceIds(t, client.ID))
+	assert.Empty(t, storedIntrospectionResourceIDs(t, client.ID))
 }
 
 // A write to an administrator client is authserver:manage's, this one included (#402 decision 1).
@@ -545,17 +545,17 @@ func TestAPIClientIntrospectionResources_AGranularTokenCannotEditAnAdministrator
 	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.ID) })
 	client := newIntrospectingClient(t)
 	require.NoError(t, database.CreateClientPermission(context.Background(), nil, &record.ClientPermission{
-		ClientID: client.ID, PermissionID: authServerPermissionId(t, builtin.AdminReadPermissionIdentifier),
+		ClientID: client.ID, PermissionID: authServerPermissionID(t, builtin.AdminReadPermissionIdentifier),
 	}))
 	resource := newAPIResource(t)
 
-	resp, requestId := putIntrospectionResources(t, clientsToken, client.ID, []int64{resource.ID}, []int64{})
+	resp, requestID := putIntrospectionResources(t, clientsToken, client.ID, []int64{resource.ID}, []int64{})
 
 	assert.Equal(t, http.StatusForbidden, resp.StatusCode)
 	code, _ := errorEnvelope(t, resp)
 	assert.Equal(t, "MANAGE_SCOPE_REQUIRED", code)
-	assert.Empty(t, storedIntrospectionResourceIds(t, client.ID))
-	rows := auditRows(t, manageToken, "administrator_change_refused", requestId)
+	assert.Empty(t, storedIntrospectionResourceIDs(t, client.ID))
+	rows := auditRows(t, manageToken, "administrator_change_refused", requestID)
 	require.Len(t, rows, 1)
 	assert.Equal(t, "target", rows[0]["ceiling"])
 	assert.Equal(t, "client", rows[0]["target_kind"])
@@ -563,5 +563,5 @@ func TestAPIClientIntrospectionResources_AGranularTokenCannotEditAnAdministrator
 	resp, _ = putIntrospectionResources(t, manageToken, client.ID, []int64{resource.ID}, []int64{})
 	_ = resp.Body.Close()
 	assert.Equal(t, http.StatusOK, resp.StatusCode, "authserver:manage edits it")
-	assert.Equal(t, []int64{resource.ID}, storedIntrospectionResourceIds(t, client.ID))
+	assert.Equal(t, []int64{resource.ID}, storedIntrospectionResourceIDs(t, client.ID))
 }

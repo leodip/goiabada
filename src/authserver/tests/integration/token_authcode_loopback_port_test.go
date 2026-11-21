@@ -70,7 +70,7 @@ func TestToken_AuthCode_LoopbackEphemeralPort(t *testing.T) {
 	codeVerifier := testCodeVerifier
 	requestState := fake.LetterN(8)
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(requestedURI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -79,9 +79,9 @@ func TestToken_AuthCode_LoopbackEphemeralPort(t *testing.T) {
 		"&state=" + requestState +
 		"&nonce=" + fake.LetterN(8)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	require.NoError(t, err)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
@@ -121,13 +121,13 @@ func TestToken_AuthCode_LoopbackEphemeralPort(t *testing.T) {
 	assert.Equal(t, fmt.Sprintf("127.0.0.1:%d", ephemeralPort), issuedLocation.Host)
 	assert.Equal(t, "/callback", issuedLocation.Path)
 
-	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
+	codeVal, stateVal := getCodeAndStateFromURL(t, resp)
 	assert.Equal(t, requestState, stateVal)
 
 	code := loadCodeFromDatabase(t, codeVal)
 	assert.Equal(t, requestedURI, code.RedirectURI)
 
-	tokenUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	tokenURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	// The token endpoint compares the code's stored URI against the one presented here,
 	// which is requested against requested, and gets no port flexibility (decision 8).
@@ -137,7 +137,7 @@ func TestToken_AuthCode_LoopbackEphemeralPort(t *testing.T) {
 	// and this assertion would still pass even if the token endpoint had been switched to
 	// flexible matching. A validation failure does not consume the code: ValidateTokenRequest
 	// returns before MarkCodeAsUsed, and revocation only fires for AuthCodeReusedError.
-	wrongPort := postToTokenEndpoint(t, httpClient, tokenUrl, url.Values{
+	wrongPort := postToTokenEndpoint(t, httpClient, tokenURL, url.Values{
 		"grant_type":    {"authorization_code"},
 		"client_id":     {client.ClientIdentifier},
 		"client_secret": {clientSecret},
@@ -149,7 +149,7 @@ func TestToken_AuthCode_LoopbackEphemeralPort(t *testing.T) {
 	assert.Equal(t, "Invalid redirect_uri.", wrongPort["error_description"])
 
 	// Now redeem the still-unused code with the URI that was actually authorized.
-	data := postToTokenEndpoint(t, httpClient, tokenUrl, url.Values{
+	data := postToTokenEndpoint(t, httpClient, tokenURL, url.Values{
 		"grant_type":    {"authorization_code"},
 		"client_id":     {client.ClientIdentifier},
 		"client_secret": {clientSecret},

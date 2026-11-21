@@ -38,7 +38,7 @@ func TestAPIResourceGet_Success(t *testing.T) {
 	assert.Equal(t, res.Description, getResp.Resource.Description)
 }
 
-func TestAPIResourceGet_NotFoundAndInvalidId(t *testing.T) {
+func TestAPIResourceGet_NotFoundAndInvalidID(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Not found
@@ -71,7 +71,7 @@ func TestAPIResourceGet_UnauthorizedAndScope(t *testing.T) {
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/1"
 	req, err := http.NewRequest("GET", url, nil)
 	require.NoError(t, err)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -274,7 +274,7 @@ func TestAPIResourceUpdatePut_SystemLevelResourceIdentifierChangeBlocked(t *test
 	assert.Equal(t, "handler.resource.system_level_identifier_fixed", errResp.ErrorCode)
 }
 
-func TestAPIResourceUpdatePut_InvalidIdAndBody(t *testing.T) {
+func TestAPIResourceUpdatePut_InvalidIDAndBody(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Invalid ID
@@ -299,7 +299,7 @@ func TestAPIResourceUpdatePut_InvalidIdAndBody(t *testing.T) {
 	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -316,7 +316,7 @@ func TestAPIResourceUpdatePut_UnauthorizedAndScope(t *testing.T) {
 	// No token
 	req, err := http.NewRequest("PUT", url, nil)
 	require.NoError(t, err)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()

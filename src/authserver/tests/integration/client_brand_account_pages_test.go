@@ -39,9 +39,9 @@ func forgotPasswordLink(t *testing.T, browser *http.Client, authorizeURL string)
 	require.True(t, ok, "the password page links Forgot password?")
 	link, err := url.Parse(href)
 	require.NoError(t, err)
-	ceremonyId := link.Query().Get(ceremony.QueryParameter)
-	require.True(t, ceremony.IsWellFormedID(ceremonyId), "the link names the sign-in: %s", href)
-	return appConfig.AuthServer.BaseURL + href, ceremonyId
+	ceremonyID := link.Query().Get(ceremony.QueryParameter)
+	require.True(t, ceremony.IsWellFormedID(ceremonyID), "the link names the sign-in: %s", href)
+	return appConfig.AuthServer.BaseURL + href, ceremonyID
 }
 
 // signInLink is the link under a page's form that goes back to signing in: what it says and where
@@ -86,9 +86,9 @@ func TestForgotPasswordPages_KeepTheClientsBrandWhileTheBrowserHoldsTheSignIn(t 
 	useMailpitSMTP(t)
 	defaultBrand := makeDefaultBrand(t, record.BrandAppearanceDark, "plum")
 	client, clientBrand, redirectURI := brandedSignInClient(t, record.ACRLevel1)
-	browser := createHttpClient(t)
-	forgotURL, ceremonyId := forgotPasswordLink(t, browser, brandAuthorizeURL(client, redirectURI, ""))
-	wantBack := signInLink{"Back to sign in", "/auth/pwd?" + url.Values{ceremony.QueryParameter: {ceremonyId}}.Encode()}
+	browser := createHTTPClient(t)
+	forgotURL, ceremonyID := forgotPasswordLink(t, browser, brandAuthorizeURL(client, redirectURI, ""))
+	wantBack := signInLink{"Back to sign in", "/auth/pwd?" + url.Values{ceremony.QueryParameter: {ceremonyID}}.Encode()}
 	wantAccount := signInLink{"Sign in to your account", consoleAccountPage()}
 
 	t.Run("the form", func(t *testing.T) {
@@ -118,7 +118,7 @@ func TestForgotPasswordPages_KeepTheClientsBrandWhileTheBrowserHoldsTheSignIn(t 
 	})
 
 	t.Run("the same link in another browser", func(t *testing.T) {
-		page := loadPage(t, createHttpClient(t), forgotURL)
+		page := loadPage(t, createHTTPClient(t), forgotURL)
 		defer func() { _ = page.Body.Close() }()
 		require.Equal(t, http.StatusOK, page.StatusCode)
 		assertDrawnInBrand(t, page, defaultBrand, "dark")
@@ -134,7 +134,7 @@ func TestForgotPasswordPages_KeepTheClientsBrandWhileTheBrowserHoldsTheSignIn(t 
 	})
 
 	t.Run("a malformed id", func(t *testing.T) {
-		page := loadPage(t, browser, withCeremonyParameter(t, forgotURL, ceremonyId+"x"))
+		page := loadPage(t, browser, withCeremonyParameter(t, forgotURL, ceremonyID+"x"))
 		defer func() { _ = page.Body.Close() }()
 		require.Equal(t, http.StatusOK, page.StatusCode)
 		assertDrawnInBrand(t, page, defaultBrand, "dark")
@@ -166,9 +166,9 @@ func TestRegistrationPages_KeepTheClientsBrandWhileTheBrowserHoldsTheSignIn(t *t
 	defaultBrand := makeDefaultBrand(t, record.BrandAppearanceDark, "plum")
 	f, _ := newRegistrationApp(t)
 	clientBrand := giveClientBrand(t, f.client, record.BrandAppearanceLight, "avocado")
-	browser := createHttpClient(t)
-	registerURL, ceremonyId := f.createAnAccountLink(t, browser)
-	wantBack := signInLink{"Sign in", "/auth/pwd?" + url.Values{ceremony.QueryParameter: {ceremonyId}}.Encode()}
+	browser := createHTTPClient(t)
+	registerURL, ceremonyID := f.createAnAccountLink(t, browser)
+	wantBack := signInLink{"Sign in", "/auth/pwd?" + url.Values{ceremony.QueryParameter: {ceremonyID}}.Encode()}
 	wantAccount := signInLink{"Sign in", consoleAccountPage()}
 
 	t.Run("the form", func(t *testing.T) {
@@ -189,7 +189,7 @@ func TestRegistrationPages_KeepTheClientsBrandWhileTheBrowserHoldsTheSignIn(t *t
 	})
 
 	t.Run("the same link in another browser", func(t *testing.T) {
-		page := loadPage(t, createHttpClient(t), registerURL)
+		page := loadPage(t, createHTTPClient(t), registerURL)
 		defer func() { _ = page.Body.Close() }()
 		require.Equal(t, http.StatusOK, page.StatusCode)
 		assertDrawnInBrand(t, page, defaultBrand, "dark")
@@ -203,7 +203,7 @@ func TestRegistrationPages_KeepTheClientsBrandWhileTheBrowserHoldsTheSignIn(t *t
 	})
 
 	t.Run("a malformed id", func(t *testing.T) {
-		page := loadPage(t, browser, withCeremonyParameter(t, registerURL, ceremonyId[1:]))
+		page := loadPage(t, browser, withCeremonyParameter(t, registerURL, ceremonyID[1:]))
 		defer func() { _ = page.Body.Close() }()
 		require.Equal(t, http.StatusOK, page.StatusCode)
 		assertDrawnInBrand(t, page, defaultBrand, "dark")
@@ -228,7 +228,7 @@ func TestActivationPages_KeepTheClientsBrandWhileTheBrowserHoldsTheSignIn(t *tes
 	clientBrand := giveClientBrand(t, f.client, record.BrandAppearanceLight, "avocado")
 
 	t.Run("the check your email page", func(t *testing.T) {
-		browser := createHttpClient(t)
+		browser := createHTTPClient(t)
 		registerURL, _ := f.createAnAccountLink(t, browser)
 		resp := postRegisterAt(t, browser, registerURL, url.Values{"email": {registerAddress()}})
 		defer func() { _ = resp.Body.Close() }()
@@ -239,10 +239,10 @@ func TestActivationPages_KeepTheClientsBrandWhileTheBrowserHoldsTheSignIn(t *tes
 	})
 
 	t.Run("the activation form in the browser holding the sign-in", func(t *testing.T) {
-		browser := createHttpClient(t)
+		browser := createHTTPClient(t)
 		email := registerAddress()
-		ceremonyId, link := f.registerFromTheApp(t, browser, email)
-		cleanURL := followActivationLinkWithSignIn(t, browser, link, ceremonyId)
+		ceremonyID, link := f.registerFromTheApp(t, browser, email)
+		cleanURL := followActivationLinkWithSignIn(t, browser, link, ceremonyID)
 		page := loadPage(t, browser, cleanURL)
 		defer func() { _ = page.Body.Close() }()
 		require.Equal(t, http.StatusOK, page.StatusCode)
@@ -253,9 +253,9 @@ func TestActivationPages_KeepTheClientsBrandWhileTheBrowserHoldsTheSignIn(t *tes
 
 	t.Run("the activation pages in another browser", func(t *testing.T) {
 		email := registerAddress()
-		ceremonyId, link := f.registerFromTheApp(t, createHttpClient(t), email)
-		other := createHttpClient(t)
-		cleanURL := followActivationLinkWithSignIn(t, other, link, ceremonyId)
+		ceremonyID, link := f.registerFromTheApp(t, createHTTPClient(t), email)
+		other := createHTTPClient(t)
+		cleanURL := followActivationLinkWithSignIn(t, other, link, ceremonyID)
 
 		page := loadPage(t, other, cleanURL)
 		body := peekBody(t, page)
@@ -263,9 +263,9 @@ func TestActivationPages_KeepTheClientsBrandWhileTheBrowserHoldsTheSignIn(t *tes
 		require.Equal(t, http.StatusOK, page.StatusCode)
 		assertDrawnInBrand(t, page, defaultBrand, "dark")
 
-		continuationId := continuationIdIn(t, body)
+		continuationID := continuationIDIn(t, body)
 		const chosenPassword = "Chosen-At-Activation-1!"
-		resp := postActivation(t, other, cleanURL, chosenPassword, chosenPassword, continuationId)
+		resp := postActivation(t, other, cleanURL, chosenPassword, chosenPassword, continuationID)
 		defer func() { _ = resp.Body.Close() }()
 		require.Equal(t, http.StatusOK, resp.StatusCode, "the page answers in place")
 		registeredUser(t, email)
@@ -282,11 +282,11 @@ func TestResetPasswordPages_KeepTheClientsBrandWhileTheBrowserHoldsTheSignIn(t *
 	defaultBrand := makeDefaultBrand(t, record.BrandAppearanceDark, "plum")
 	client, clientBrand, redirectURI := brandedSignInClient(t, record.ACRLevel1)
 	user, _ := resetFromTheAppUser(t)
-	browser := createHttpClient(t)
-	ceremonyId, link := requestResetFromTheApp(t, browser, brandAuthorizeURL(client, redirectURI, ""), user.Email)
+	browser := createHTTPClient(t)
+	ceremonyID, link := requestResetFromTheApp(t, browser, brandAuthorizeURL(client, redirectURI, ""), user.Email)
 
 	t.Run("the form in the browser holding the sign-in", func(t *testing.T) {
-		cleanURL := followResetLinkWithSignIn(t, browser, link, ceremonyId)
+		cleanURL := followResetLinkWithSignIn(t, browser, link, ceremonyID)
 		page := loadPage(t, browser, cleanURL)
 		defer func() { _ = page.Body.Close() }()
 		require.Equal(t, http.StatusOK, page.StatusCode)
@@ -296,7 +296,7 @@ func TestResetPasswordPages_KeepTheClientsBrandWhileTheBrowserHoldsTheSignIn(t *
 
 		resp := postRegisterAt(t, browser, cleanURL, url.Values{
 			"password": {"Mismatched-1!"}, "passwordConfirmation": {"Mismatched-2!"},
-			"continuationId": {continuationIdIn(t, body)},
+			"continuationId": {continuationIDIn(t, body)},
 		})
 		defer func() { _ = resp.Body.Close() }()
 		require.Equal(t, http.StatusOK, resp.StatusCode, "the form is drawn again beside the refusal")
@@ -305,7 +305,7 @@ func TestResetPasswordPages_KeepTheClientsBrandWhileTheBrowserHoldsTheSignIn(t *
 
 	t.Run("a refused link in the browser holding the sign-in", func(t *testing.T) {
 		page := loadPage(t, browser, withCeremonyParameter(t,
-			appConfig.AuthServer.BaseURL+"/reset-password?code="+fake.LetterN(32), ceremonyId))
+			appConfig.AuthServer.BaseURL+"/reset-password?code="+fake.LetterN(32), ceremonyID))
 		defer func() { _ = page.Body.Close() }()
 		require.Equal(t, http.StatusOK, page.StatusCode)
 		require.Contains(t, peekBody(t, page), resetCodeInvalidText)
@@ -313,15 +313,15 @@ func TestResetPasswordPages_KeepTheClientsBrandWhileTheBrowserHoldsTheSignIn(t *
 	})
 
 	t.Run("the pages in another browser", func(t *testing.T) {
-		other := createHttpClient(t)
-		cleanURL := followResetLinkWithSignIn(t, other, link, ceremonyId)
+		other := createHTTPClient(t)
+		cleanURL := followResetLinkWithSignIn(t, other, link, ceremonyID)
 		page := loadPage(t, other, cleanURL)
 		body := peekBody(t, page)
 		_ = page.Body.Close()
 		require.Equal(t, http.StatusOK, page.StatusCode)
 		assertDrawnInBrand(t, page, defaultBrand, "dark")
 
-		resp := postCleanReset(t, other, cleanURL, fake.Password(20), continuationIdIn(t, body))
+		resp := postCleanReset(t, other, cleanURL, fake.Password(20), continuationIDIn(t, body))
 		defer func() { _ = resp.Body.Close() }()
 		require.Equal(t, http.StatusOK, resp.StatusCode, "the page answers in place")
 		assertDrawnInBrand(t, resp, defaultBrand, "dark")

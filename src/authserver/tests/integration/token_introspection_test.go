@@ -96,7 +96,7 @@ func postIntrospect(t *testing.T, request introspectRequest) introspectAnswer {
 	for name, value := range request.header {
 		req.Header.Set(name, value)
 	}
-	resp, err := createHttpClient(t).Do(req)
+	resp, err := createHTTPClient(t).Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	body, err := io.ReadAll(resp.Body)
@@ -451,7 +451,7 @@ func TestIntrospect_RefusesGet(t *testing.T) {
 	t.Run("at the trailing-slash spelling", func(t *testing.T) {
 		req, err := http.NewRequest(http.MethodGet, appConfig.AuthServer.BaseURL+"/auth/introspect/", nil)
 		require.NoError(t, err)
-		resp, err := createHttpClient(t).Do(req)
+		resp, err := createHTTPClient(t).Do(req)
 		require.NoError(t, err)
 		_ = resp.Body.Close()
 

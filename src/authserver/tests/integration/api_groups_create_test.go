@@ -49,9 +49,9 @@ func TestHandleGroupCreatePost_Success(t *testing.T) {
 	assert.InDelta(t, 0, group["memberCount"], 0, "New group should have 0 members")
 
 	// Clean up - delete the created group
-	groupId := int64(group["id"].(float64))
+	groupID := int64(group["id"].(float64))
 	defer func() {
-		_ = database.DeleteGroup(context.Background(), nil, groupId)
+		_ = database.DeleteGroup(context.Background(), nil, groupID)
 	}()
 }
 
@@ -235,12 +235,12 @@ func TestHandleGroupCreatePost_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 	group := response["group"].(map[string]interface{})
 	assert.Equal(t, `Tom & Jerry said "hi"`, group["description"])
 
-	groupId := int64(group["id"].(float64))
+	groupID := int64(group["id"].(float64))
 	defer func() {
-		_ = database.DeleteGroup(context.Background(), nil, groupId)
+		_ = database.DeleteGroup(context.Background(), nil, groupID)
 	}()
 
-	stored, err := database.GetGroupByID(context.Background(), nil, groupId)
+	stored, err := database.GetGroupByID(context.Background(), nil, groupID)
 	require.NoError(t, err)
 	assert.Equal(t, `Tom & Jerry said "hi"`, stored.Description)
 }
@@ -274,7 +274,7 @@ func TestHandleGroupCreatePost_InvalidJSON(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()

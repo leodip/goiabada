@@ -388,9 +388,9 @@ func TestAPIUserExport_Refusals(t *testing.T) {
 }
 
 // exportEvents is the exported_user_data rows about the user, oldest first.
-func exportEvents(t *testing.T, userId int64) []record.AuditLog {
+func exportEvents(t *testing.T, userID int64) []record.AuditLog {
 	t.Helper()
-	rows, err := database.GetAuditLogsByUserID(context.Background(), nil, userId)
+	rows, err := database.GetAuditLogsByUserID(context.Background(), nil, userID)
 	require.NoError(t, err)
 	var events []record.AuditLog
 	for _, row := range rows {
@@ -768,7 +768,7 @@ func newExportedUserRefreshTokens(t *testing.T, user *record.User) exportedRefre
 	r.cli = createROPCClient(t, cliSecret, false)
 	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, r.cli.ID) })
 	f := ropcAuthTimeFixture{client: r.cli, clientSecret: cliSecret, user: user,
-		httpClient: createHttpClient(t), tokenURL: appConfig.AuthServer.BaseURL + "/auth/token/"}
+		httpClient: createHTTPClient(t), tokenURL: appConfig.AuthServer.BaseURL + "/auth/token/"}
 	r.passwordCheckedAt = now.Add(-72 * time.Hour).Truncate(time.Second)
 	first := issueROPCRefreshToken(t, f, at(r.passwordCheckedAt))
 	status, refreshed := f.refresh(t, first)
@@ -865,42 +865,42 @@ func TestAPIUserExport_ListsEveryRefreshToken(t *testing.T) {
 	}
 }
 
-// storedAuditRow waits for the audit row about or by the user that the request named requestId
+// storedAuditRow waits for the audit row about or by the user that the request named requestID
 // wrote, of the event given, and answers it as stored.
-func storedAuditRow(t *testing.T, userId int64, event, requestId string) record.AuditLog {
+func storedAuditRow(t *testing.T, userID int64, event, requestID string) record.AuditLog {
 	t.Helper()
 	var found record.AuditLog
 	require.Eventually(t, func() bool {
-		rows, err := database.GetAuditLogsByUserID(context.Background(), nil, userId)
+		rows, err := database.GetAuditLogsByUserID(context.Background(), nil, userID)
 		require.NoError(t, err)
 		for _, row := range rows {
-			if row.AuditEvent == event && row.RequestID == requestId {
+			if row.AuditEvent == event && row.RequestID == requestID {
 				found = row
 				return true
 			}
 		}
 		return false
-	}, afterResponseWait, 100*time.Millisecond, "the %s row of request %s", event, requestId)
+	}, afterResponseWait, 100*time.Millisecond, "the %s row of request %s", event, requestID)
 	return found
 }
 
 // enableUser enables the user through the admin API with the token given, which writes
 // updated_user_details about them, and answers that row as stored.
-func enableUser(t *testing.T, accessToken string, userId int64) record.AuditLog {
+func enableUser(t *testing.T, accessToken string, userID int64) record.AuditLog {
 	t.Helper()
-	resp, requestId := sendAdmin(t, accessToken, http.MethodPut, fmt.Sprintf("/api/v1/admin/users/%d/enabled", userId),
+	resp, requestID := sendAdmin(t, accessToken, http.MethodPut, fmt.Sprintf("/api/v1/admin/users/%d/enabled", userID),
 		map[string]any{"enabled": true})
 	_ = resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
-	return storedAuditRow(t, userId, audit.EventUpdatedUserDetails, requestId)
+	return storedAuditRow(t, userID, audit.EventUpdatedUserDetails, requestID)
 }
 
 // expectedAuditEvent is one entry of auditEvents: the stored row's id, time, event and request id,
 // and the details, user columns and actedByAdministrator written out by hand.
-func expectedAuditEvent(row record.AuditLog, details, userId, loggedInUserId string, actedByAdministrator bool) string {
+func expectedAuditEvent(row record.AuditLog, details, userID, loggedInUserID string, actedByAdministrator bool) string {
 	return fmt.Sprintf(`{"id": %d, "createdAt": %s, "auditEvent": %q, "details": %q, "requestId": %q,
 		"userId": %s, "loggedInUserId": %s, "actedByAdministrator": %t}`,
-		row.ID, jsonInstant(row.CreatedAt), row.AuditEvent, details, row.RequestID, userId, loggedInUserId, actedByAdministrator)
+		row.ID, jsonInstant(row.CreatedAt), row.AuditEvent, details, row.RequestID, userID, loggedInUserID, actedByAdministrator)
 }
 
 // exportedAuditEvents is the auditEvents of an export, as the raw entries.
@@ -946,13 +946,13 @@ func TestAPIUserExport_ListsTheAuditEventsWithoutTheAdministratorsWhoActed(t *te
 	listed, err := json.Marshal(exportedAuditEvents(t, answer))
 	require.NoError(t, err)
 
-	userId := fmt.Sprint(user.ID)
+	userID := fmt.Sprint(user.ID)
 	assert.JSONEq(t, "["+strings.Join([]string{
-		expectedAuditEvent(byAdministrator, fmt.Sprintf(`{"user_id":%d}`, user.ID), userId, "null", true),
+		expectedAuditEvent(byAdministrator, fmt.Sprintf(`{"user_id":%d}`, user.ID), userID, "null", true),
 		expectedAuditEvent(byClient, fmt.Sprintf(`{"logged_in_user":%q,"user_id":%d}`, adminClient.ClientIdentifier, user.ID),
-			userId, "null", false),
+			userID, "null", false),
 		expectedAuditEvent(sharedBrowserRow, fmt.Sprintf(`{"client_id":%d,"previous_session_identifier":"sid-of-the-other-user","user_id":%d}`,
-			adminClient.ID, user.ID), userId, "null", false),
+			adminClient.ID, user.ID), userID, "null", false),
 	}, ",")+"]", string(listed))
 	assert.NotContains(t, string(answer.document(t)), administrator.Subject, "the administrator is named nowhere")
 
@@ -965,23 +965,23 @@ func TestAPIUserExport_ListsTheAuditEventsWithoutTheAdministratorsWhoActed(t *te
 	exported := exportRows[0]
 
 	// The administrator's own export keeps whom they acted on, and who they are.
-	administratorId := fmt.Sprint(administrator.ID)
+	administratorID := fmt.Sprint(administrator.ID)
 	ownEvents := map[int64]json.RawMessage{}
 	for _, e := range exportedAuditEvents(t, getUserExport(t, adminToken, administrator.ID, "")) {
 		var entry struct {
-			Id int64 `json:"id"`
+			ID int64 `json:"id"`
 		}
 		require.NoError(t, json.Unmarshal(e, &entry))
-		ownEvents[entry.Id] = e
+		ownEvents[entry.ID] = e
 	}
 	assert.JSONEq(t, expectedAuditEvent(byAdministrator, fmt.Sprintf(`{"logged_in_user":%q,"user_id":%d}`, administrator.Subject, user.ID),
-		userId, administratorId, false), string(ownEvents[byAdministrator.ID]))
+		userID, administratorID, false), string(ownEvents[byAdministrator.ID]))
 	assert.JSONEq(t, expectedAuditEvent(exported, fmt.Sprintf(`{"logged_in_user":%q,"user_id":%d}`, administrator.Subject, user.ID),
-		userId, administratorId, false), string(ownEvents[exported.ID]))
+		userID, administratorID, false), string(ownEvents[exported.ID]))
 	assert.NotContains(t, ownEvents, byClient.ID, "a change to another user by a client is not the administrator's")
 
 	// The user's next export lists the export as an administrator's.
 	events := exportedAuditEvents(t, getUserExport(t, adminToken, user.ID, ""))
 	require.Len(t, events, 4)
-	assert.JSONEq(t, expectedAuditEvent(exported, fmt.Sprintf(`{"user_id":%d}`, user.ID), userId, "null", true), string(events[3]))
+	assert.JSONEq(t, expectedAuditEvent(exported, fmt.Sprintf(`{"user_id":%d}`, user.ID), userID, "null", true), string(events[3]))
 }

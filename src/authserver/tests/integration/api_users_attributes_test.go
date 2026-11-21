@@ -126,13 +126,13 @@ func TestAPIUserAttributesGet_UserNotFound(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
-func TestAPIUserAttributesGet_InvalidId(t *testing.T) {
+func TestAPIUserAttributesGet_InvalidID(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)
 
 	testCases := []struct {
 		name           string
-		userId         string
+		userID         string
 		expectedStatus int
 	}{
 		{"non-numeric ID", "abc", http.StatusBadRequest},
@@ -143,7 +143,7 @@ func TestAPIUserAttributesGet_InvalidId(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + tc.userId + "/attributes"
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + tc.userID + "/attributes"
 			resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -172,7 +172,7 @@ func TestAPIUserAttributesGet_Unauthorized(t *testing.T) {
 	req, err := http.NewRequest("GET", url, nil)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -242,13 +242,13 @@ func TestAPIUserAttributeGet_NotFound(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
-func TestAPIUserAttributeGet_InvalidId(t *testing.T) {
+func TestAPIUserAttributeGet_InvalidID(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)
 
 	testCases := []struct {
 		name           string
-		attributeId    string
+		attributeID    string
 		expectedStatus int
 	}{
 		{"non-numeric ID", "abc", http.StatusBadRequest},
@@ -258,7 +258,7 @@ func TestAPIUserAttributeGet_InvalidId(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-attributes/" + tc.attributeId
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-attributes/" + tc.attributeID
 			resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -292,7 +292,7 @@ func TestAPIUserAttributeGet_Unauthorized(t *testing.T) {
 	req, err := http.NewRequest("GET", url, nil)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -456,7 +456,7 @@ func TestAPIUserAttributeCreatePost_InvalidRequestBody(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -471,7 +471,7 @@ func TestAPIUserAttributeCreatePost_Unauthorized(t *testing.T) {
 	req, err := http.NewRequest("POST", url, nil)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -633,7 +633,7 @@ func TestAPIUserAttributeUpdatePut_ValidationErrors(t *testing.T) {
 	}
 }
 
-func TestAPIUserAttributeUpdatePut_InvalidId(t *testing.T) {
+func TestAPIUserAttributeUpdatePut_InvalidID(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)
 
@@ -644,7 +644,7 @@ func TestAPIUserAttributeUpdatePut_InvalidId(t *testing.T) {
 
 	testCases := []struct {
 		name           string
-		attributeId    string
+		attributeID    string
 		expectedStatus int
 	}{
 		{"non-numeric ID", "abc", http.StatusBadRequest},
@@ -654,7 +654,7 @@ func TestAPIUserAttributeUpdatePut_InvalidId(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-attributes/" + tc.attributeId
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-attributes/" + tc.attributeID
 			resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -693,7 +693,7 @@ func TestAPIUserAttributeUpdatePut_InvalidRequestBody(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -727,7 +727,7 @@ func TestAPIUserAttributeUpdatePut_Unauthorized(t *testing.T) {
 	req, err := http.NewRequest("PUT", url, nil)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -794,13 +794,13 @@ func TestAPIUserAttributeDelete_NotFound(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
-func TestAPIUserAttributeDelete_InvalidId(t *testing.T) {
+func TestAPIUserAttributeDelete_InvalidID(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)
 
 	testCases := []struct {
 		name           string
-		attributeId    string
+		attributeID    string
 		expectedStatus int
 	}{
 		{"non-numeric ID", "abc", http.StatusBadRequest},
@@ -810,7 +810,7 @@ func TestAPIUserAttributeDelete_InvalidId(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-attributes/" + tc.attributeId
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-attributes/" + tc.attributeID
 			resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -844,7 +844,7 @@ func TestAPIUserAttributeDelete_Unauthorized(t *testing.T) {
 	req, err := http.NewRequest("DELETE", url, nil)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -859,13 +859,13 @@ func TestAPIUserAttributeDelete_Unauthorized(t *testing.T) {
 }
 
 // Helper function to create a test user attribute
-func createTestUserAttribute(t *testing.T, userId int64, key, value string) *record.UserAttribute {
+func createTestUserAttribute(t *testing.T, userID int64, key, value string) *record.UserAttribute {
 	attr := &record.UserAttribute{
 		Key:                  key,
 		Value:                value,
 		IncludeInIDToken:     true,
 		IncludeInAccessToken: false,
-		UserID:               userId,
+		UserID:               userID,
 	}
 	err := database.CreateUserAttribute(context.Background(), nil, attr)
 	assert.NoError(t, err)

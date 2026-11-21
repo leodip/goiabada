@@ -37,7 +37,7 @@ func TestBrandStylesheets_TheFullOneDrawsTheKitAndTheColorsOneTheColorsAlone(t *
 	kit.Font = record.BrandFontSerif
 	brand := makeDefaultBrandOf(t, &kit)
 	base := appConfig.AuthServer.BaseURL
-	browser := createHttpClient(t)
+	browser := createHTTPClient(t)
 	id := strconv.FormatInt(brand.ID, 10)
 
 	status, settings, _ := getStylesheet(t, browser, base+"/api/public/settings")

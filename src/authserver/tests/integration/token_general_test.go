@@ -15,34 +15,34 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestToken_ClientIdIsMissing(t *testing.T) {
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+func TestToken_ClientIDIsMissing(t *testing.T) {
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
 	formData := url.Values{}
-	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destURL, formData)
 
 	assert.Equal(t, "invalid_request", data["error"])
 	assert.Equal(t, "Missing required client_id parameter.", data["error_description"])
 }
 
 func TestToken_ClientDoesNotExist(t *testing.T) {
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
 	formData := url.Values{
 		"client_id": {"invalid"},
 	}
-	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destURL, formData)
 
 	assert.Equal(t, "invalid_client", data["error"])
 	assert.Equal(t, "Client does not exist.", data["error_description"])
 }
 
 func TestToken_InvalidGrantType(t *testing.T) {
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
@@ -54,13 +54,13 @@ func TestToken_InvalidGrantType(t *testing.T) {
 	err := database.CreateClient(context.Background(), nil, client)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
 	formData := url.Values{
 		"grant_type": {"invalid_grant_type"},
 		"client_id":  {client.ClientIdentifier},
 	}
-	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destURL, formData)
 
 	assert.Equal(t, "unsupported_grant_type", data["error"])
 	assert.Equal(t, "Unsupported grant_type.", data["error_description"])
@@ -78,9 +78,9 @@ func TestToken_InvalidGrantType(t *testing.T) {
 // TestJSONError_ConformsTheFinalDescription in render, since no request from outside reaches
 // it through this path any more.
 func TestToken_UnparseableForm_IsInvalidRequest(t *testing.T) {
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
 	tests := []struct {
 		name string
@@ -91,7 +91,7 @@ func TestToken_UnparseableForm_IsInvalidRequest(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			request, err := http.NewRequest("POST", destUrl, strings.NewReader(test.body))
+			request, err := http.NewRequest("POST", destURL, strings.NewReader(test.body))
 			require.NoError(t, err)
 			request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 			request.Header.Set("X-Request-Id", "caller\U0001F4A3id\"x\\y")

@@ -29,10 +29,10 @@ import (
 
 // saveClientSettings runs the admin API's settings save of the client with its stored settings and
 // the identifier given, and asserts it succeeded.
-func saveClientSettings(t *testing.T, adminToken string, clientId int64, identifier string) {
+func saveClientSettings(t *testing.T, adminToken string, clientID int64, identifier string) {
 	t.Helper()
 
-	stored, err := database.GetClientByID(context.Background(), nil, clientId)
+	stored, err := database.GetClientByID(context.Background(), nil, clientID)
 	require.NoError(t, err)
 	require.NotNil(t, stored)
 	request := api.UpdateClientSettingsRequest{
@@ -53,7 +53,7 @@ func saveClientSettings(t *testing.T, adminToken string, clientId int64, identif
 		request.DefaultACRLevel = stored.DefaultACRLevel.String()
 	}
 
-	apiURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10)
+	apiURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientID, 10)
 	resp := makeAPIRequest(t, "PUT", apiURL, adminToken, request)
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -69,7 +69,7 @@ func renamedIdentifier() string {
 }
 
 // revokedClientGrantsEvents answers the details of every revoked_client_grants event of the client.
-func revokedClientGrantsEvents(t *testing.T, adminToken string, clientId int64) []map[string]interface{} {
+func revokedClientGrantsEvents(t *testing.T, adminToken string, clientID int64) []map[string]interface{} {
 	t.Helper()
 
 	logs, resp := getAuditLogs(t, adminToken, "auditEvent="+audit.EventRevokedClientGrants)
@@ -82,7 +82,7 @@ func revokedClientGrantsEvents(t *testing.T, adminToken string, clientId int64) 
 		if err := json.Unmarshal([]byte(entry.Details), &details); err != nil {
 			continue
 		}
-		if id, ok := details["client_id"].(float64); ok && int64(id) == clientId {
+		if id, ok := details["client_id"].(float64); ok && int64(id) == clientID {
 			events = append(events, details)
 		}
 	}
@@ -127,7 +127,7 @@ func TestAPIClientUpdatePut_Rename_RevokesTheClientsGrants(t *testing.T) {
 	require.Len(t, events, 1, "the rename must emit %v for this client", audit.EventRevokedClientGrants)
 	assert.Equal(t, "client_identifier_changed", events[0]["reason"])
 	assert.GreaterOrEqual(t, events[0]["revoked_code_count"], float64(1))
-	assert.Equal(t, []interface{}{refreshTokenJti(t, rotated)}, events[0]["revoked_refresh_token_jtis"],
+	assert.Equal(t, []interface{}{refreshTokenJTI(t, rotated)}, events[0]["revoked_refresh_token_jtis"],
 		"the live refresh token the rename revoked, and not the one rotation had already revoked")
 }
 
@@ -183,7 +183,7 @@ func TestAPIClientUpdatePut_Rename_RevokesPasswordGrantsToo(t *testing.T) {
 	defer func() { _ = database.DeleteClient(context.Background(), nil, client.ID) }()
 	user := createROPCUser(t, password)
 
-	data := postToTokenEndpoint(t, createHttpClient(t), appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
+	data := postToTokenEndpoint(t, createHTTPClient(t), appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
 		"grant_type":    {"password"},
 		"client_id":     {client.ClientIdentifier},
 		"client_secret": {clientSecret},
@@ -204,7 +204,7 @@ func TestAPIClientUpdatePut_Rename_RevokesPasswordGrantsToo(t *testing.T) {
 		"a password grant's token has no code to mark, so the sweep must be what refuses it: %v", after)
 
 	// A new password grant under the new identifier is issued as normal.
-	again := postToTokenEndpoint(t, createHttpClient(t), appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
+	again := postToTokenEndpoint(t, createHTTPClient(t), appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
 		"grant_type":    {"password"},
 		"client_id":     {renamed},
 		"client_secret": {clientSecret},
@@ -252,7 +252,7 @@ func TestAPIClientUpdatePut_Rename_ChildBornAfterTheRenameIsRejected(t *testing.
 	require.NotEmpty(t, rotated["access_token"], "the grant must refresh before the rename: %v", rotated)
 	childToken, ok := rotated["refresh_token"].(string)
 	require.True(t, ok, "rotation must return a replacement refresh token: %v", rotated)
-	childJti := refreshTokenJti(t, childToken)
+	childJTI := refreshTokenJTI(t, childToken)
 
 	renamed := renamedIdentifier()
 	saveClientSettings(t, adminToken, grant.client.ID, renamed)
@@ -263,7 +263,7 @@ func TestAPIClientUpdatePut_Rename_ChildBornAfterTheRenameIsRejected(t *testing.
 
 	// The row state a rotation that inserted its child after the rename's sweep read the tokens
 	// leaves: live, its code marked by the same rename.
-	swept, err := database.GetRefreshTokenByJTI(context.Background(), nil, childJti)
+	swept, err := database.GetRefreshTokenByJTI(context.Background(), nil, childJTI)
 	require.NoError(t, err)
 	require.NotNil(t, swept)
 	require.True(t, swept.Revoked, "the rename's sweep must have revoked the child that existed when it ran")

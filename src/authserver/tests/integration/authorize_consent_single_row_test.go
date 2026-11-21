@@ -29,7 +29,7 @@ import (
 
 type consentFixture struct {
 	client      *record.Client
-	redirectUri *record.RedirectURI
+	redirectURI *record.RedirectURI
 	user        *record.User
 	password    string
 	// scope is three entries, so the consent screen offers three checkboxes: 0 is openid, 1 is
@@ -49,8 +49,8 @@ func newConsentFixture(t *testing.T) *consentFixture {
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
 
-	redirectUri := &record.RedirectURI{ClientID: client.ID, URI: fake.URL()}
-	require.NoError(t, database.CreateRedirectURI(context.Background(), nil, redirectUri))
+	redirectURI := &record.RedirectURI{ClientID: client.ID, URI: fake.URL()}
+	require.NoError(t, database.CreateRedirectURI(context.Background(), nil, redirectURI))
 
 	password := fake.Password(8)
 	passwordHashed, err := passwordhash.Hash(password)
@@ -63,7 +63,7 @@ func newConsentFixture(t *testing.T) *consentFixture {
 	assignPermissionToUser(t, user.ID, permission.ID)
 
 	return &consentFixture{
-		client: client, redirectUri: redirectUri, user: user, password: password,
+		client: client, redirectURI: redirectURI, user: user, password: password,
 		scope: "openid profile " + resource.ResourceIdentifier + ":" + permission.PermissionIdentifier,
 	}
 }
@@ -71,11 +71,11 @@ func newConsentFixture(t *testing.T) *consentFixture {
 // reachConsentScreen signs the fixture's user in at a browser of its own, through a fresh
 // authorization request, and returns that browser at the consent screen with the ceremony id its
 // form carries. extraQuery is appended to the authorization request.
-func (f *consentFixture) reachConsentScreen(t *testing.T, extraQuery string) (browser *http.Client, consentUrl, ceremonyId string) {
+func (f *consentFixture) reachConsentScreen(t *testing.T, extraQuery string) (browser *http.Client, consentURL, ceremonyID string) {
 	t.Helper()
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + f.client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(f.redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + f.client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(f.redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + randomCodeChallenge() +
@@ -83,9 +83,9 @@ func (f *consentFixture) reachConsentScreen(t *testing.T, extraQuery string) (br
 		"&state=" + fake.LetterN(8) +
 		"&nonce=" + fake.LetterN(8) + extraQuery
 
-	browser = createHttpClient(t)
+	browser = createHTTPClient(t)
 
-	resp, err := browser.Get(destUrl)
+	resp, err := browser.Get(destURL)
 	require.NoError(t, err)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
@@ -112,34 +112,34 @@ func (f *consentFixture) reachConsentScreen(t *testing.T, extraQuery string) (br
 	resp = loadPage(t, browser, location)
 	defer func() { _ = resp.Body.Close() }()
 
-	return browser, location, getCeremonyIdFromPage(t, resp)
+	return browser, location, getCeremonyIDFromPage(t, resp)
 }
 
 // submitConsent posts the consent form ticking the given checkboxes. It reports its failures as
 // errors and never through t, so a goroutine may call it.
-func submitConsent(browser *http.Client, consentUrl, ceremonyId string, ticked []int) (*http.Response, error) {
+func submitConsent(browser *http.Client, consentURL, ceremonyID string, ticked []int) (*http.Response, error) {
 	form := url.Values{}
-	form.Add("ceremonyId", ceremonyId)
+	form.Add("ceremonyId", ceremonyID)
 	for _, index := range ticked {
 		form.Add(fmt.Sprintf("consent%d", index), "[on]")
 	}
 	form.Add("btnSubmit", "submit")
 
-	request, err := http.NewRequest("POST", consentUrl, strings.NewReader(form.Encode()))
+	request, err := http.NewRequest("POST", consentURL, strings.NewReader(form.Encode()))
 	if err != nil {
 		return nil, err
 	}
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	request.Header.Set("Referer", consentUrl)
+	request.Header.Set("Referer", consentURL)
 	request.Header.Set("Origin", appConfig.AuthServer.BaseURL)
 	return browser.Do(request)
 }
 
 // consentsOf is what the user holds for the client, as the admin API lists it.
-func consentsOf(t *testing.T, adminToken string, userId, clientId int64) []api.UserConsentResponse {
+func consentsOf(t *testing.T, adminToken string, userID, clientID int64) []api.UserConsentResponse {
 	t.Helper()
 
-	resp := makeAPIRequest(t, "GET", appConfig.AuthServer.BaseURL+"/api/v1/admin/users/"+strconv.FormatInt(userId, 10)+"/consents", adminToken, nil)
+	resp := makeAPIRequest(t, "GET", appConfig.AuthServer.BaseURL+"/api/v1/admin/users/"+strconv.FormatInt(userID, 10)+"/consents", adminToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
@@ -147,7 +147,7 @@ func consentsOf(t *testing.T, adminToken string, userId, clientId int64) []api.U
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&listed))
 	var forClient []api.UserConsentResponse
 	for _, consent := range listed.Consents {
-		if consent.ClientID == clientId {
+		if consent.ClientID == clientID {
 			forClient = append(forClient, consent)
 		}
 	}
@@ -161,8 +161,8 @@ func TestAuthorize_Consent_ASecondSaveReplacesTheConsentAndRefreshesItsDate(t *t
 	adminToken, _ := createAdminClientWithToken(t)
 	f := newConsentFixture(t)
 
-	browser, consentUrl, ceremonyId := f.reachConsentScreen(t, "")
-	resp, err := submitConsent(browser, consentUrl, ceremonyId, []int{0, 1, 2})
+	browser, consentURL, ceremonyID := f.reachConsentScreen(t, "")
+	resp, err := submitConsent(browser, consentURL, ceremonyID, []int{0, 1, 2})
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	assertRedirect(t, resp, "/auth/issue")
@@ -172,8 +172,8 @@ func TestAuthorize_Consent_ASecondSaveReplacesTheConsentAndRefreshesItsDate(t *t
 	assert.Equal(t, f.scope, first[0].Scope, "all three scopes were ticked")
 	require.NotNil(t, first[0].GrantedAt)
 
-	browser, consentUrl, ceremonyId = f.reachConsentScreen(t, "&prompt=consent")
-	resp2, err := submitConsent(browser, consentUrl, ceremonyId, []int{0, 1})
+	browser, consentURL, ceremonyID = f.reachConsentScreen(t, "&prompt=consent")
+	resp2, err := submitConsent(browser, consentURL, ceremonyID, []int{0, 1})
 	require.NoError(t, err)
 	defer func() { _ = resp2.Body.Close() }()
 	assertRedirect(t, resp2, "/auth/issue")

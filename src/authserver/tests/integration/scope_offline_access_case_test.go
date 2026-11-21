@@ -73,12 +73,12 @@ func TestAuthorize_OfflineAccessIsCaseSensitive(t *testing.T) {
 		{name: "offline_access passes validation", value: "offline_access", wantError: "login_required"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			client, redirectUri := createTestClientAndRedirectURI(t)
-			httpClient := createHttpClient(t)
+			client, redirectURI := createTestClientAndRedirectURI(t)
+			httpClient := createHTTPClient(t)
 			requestState := fake.LetterN(8)
 
-			destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-				"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+			destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+				"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 				"&response_type=code" +
 				"&code_challenge_method=S256" +
 				"&code_challenge=" + randomCodeChallenge() +
@@ -86,11 +86,11 @@ func TestAuthorize_OfflineAccessIsCaseSensitive(t *testing.T) {
 				"&state=" + requestState +
 				"&prompt=none"
 
-			resp, err := httpClient.Get(destUrl)
+			resp, err := httpClient.Get(destURL)
 			require.NoError(t, err)
 			defer func() { _ = resp.Body.Close() }()
 
-			errorCode, errorDescription, state := getErrorFromUrl(t, resp)
+			errorCode, errorDescription, state := getErrorFromURL(t, resp)
 			assert.Equal(t, tc.wantError, errorCode)
 			assert.Equal(t, requestState, state)
 			if tc.wantError == "invalid_scope" {
@@ -109,7 +109,7 @@ func TestROPC_OfflineAccessIsCaseSensitive(t *testing.T) {
 	password := fake.Password(12)
 	client := createROPCClient(t, "", true)
 	user := createROPCUser(t, password)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
 	request := func(scope string) (int, map[string]interface{}) {
 		status, body, err := concurrentTokenPost(httpClient, appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
@@ -160,7 +160,7 @@ func TestClientCredentials_OfflineAccessIsCaseSensitive(t *testing.T) {
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
 	for _, tc := range []struct {
 		name      string
@@ -220,7 +220,7 @@ func TestToken_Refresh_StoredUppercaseOfflineAccess_AuthCode(t *testing.T) {
 	storedCode.Scope = legacyScope
 	require.NoError(t, database.UpdateCode(ctx, nil, storedCode))
 
-	row := refreshTokenRowByJti(t, refreshToken)
+	row := refreshTokenRowByJTI(t, refreshToken)
 	require.Equal(t, "Refresh", row.RefreshTokenType, "the fixture must be a session-bound grant")
 	row.Scope = legacyScope
 	require.NoError(t, database.UpdateRefreshToken(ctx, nil, row))
@@ -249,7 +249,7 @@ func TestToken_Refresh_StoredUppercaseOfflineAccess_AuthCode(t *testing.T) {
 	})
 
 	t.Run("the refusals did not spend the token", func(t *testing.T) {
-		assert.False(t, refreshTokenRowByJti(t, refreshToken).Revoked)
+		assert.False(t, refreshTokenRowByJTI(t, refreshToken).Revoked)
 	})
 
 	var successor string
@@ -265,8 +265,8 @@ func TestToken_Refresh_StoredUppercaseOfflineAccess_AuthCode(t *testing.T) {
 
 		// RFC 6749 section 6: the successor's scope is identical to the presented token's, so the
 		// grant still carries the value.
-		assert.Equal(t, legacyScope, refreshTokenRowByJti(t, successor).Scope)
-		assert.True(t, refreshTokenRowByJti(t, refreshToken).Revoked, "rotation retires the presented token")
+		assert.Equal(t, legacyScope, refreshTokenRowByJTI(t, successor).Scope)
+		assert.True(t, refreshTokenRowByJTI(t, refreshToken).Revoked, "rotation retires the presented token")
 	})
 
 	t.Run("the successor inheriting the grant is refused again", func(t *testing.T) {
@@ -290,7 +290,7 @@ func TestROPC_RefreshToken_StoredUppercaseOfflineAccess(t *testing.T) {
 	password := fake.Password(12)
 	client := createROPCClient(t, clientSecret, false)
 	user := createROPCUser(t, password)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
 	data := postToTokenEndpoint(t, httpClient, appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
 		"grant_type":    {"password"},
@@ -303,7 +303,7 @@ func TestROPC_RefreshToken_StoredUppercaseOfflineAccess(t *testing.T) {
 	refreshToken, ok := data["refresh_token"].(string)
 	require.True(t, ok, "the password grant must return a refresh token: %v", data)
 
-	row := refreshTokenRowByJti(t, refreshToken)
+	row := refreshTokenRowByJTI(t, refreshToken)
 	require.Equal(t, "Offline", row.RefreshTokenType, "an ROPC refresh token is always offline")
 	row.Scope = legacyScope
 	require.NoError(t, database.UpdateRefreshToken(context.Background(), nil, row))
@@ -316,7 +316,7 @@ func TestROPC_RefreshToken_StoredUppercaseOfflineAccess(t *testing.T) {
 	})
 
 	t.Run("the refusal did not spend the token", func(t *testing.T) {
-		assert.False(t, refreshTokenRowByJti(t, refreshToken).Revoked)
+		assert.False(t, refreshTokenRowByJTI(t, refreshToken).Revoked)
 	})
 
 	t.Run("a request that leaves the value out refreshes", func(t *testing.T) {
@@ -328,7 +328,7 @@ func TestROPC_RefreshToken_StoredUppercaseOfflineAccess(t *testing.T) {
 		assert.NotContains(t, strings.Split(scope, " "), "OFFLINE_ACCESS")
 		successor, hasSuccessor := body["refresh_token"].(string)
 		require.True(t, hasSuccessor)
-		assert.Equal(t, legacyScope, refreshTokenRowByJti(t, successor).Scope,
+		assert.Equal(t, legacyScope, refreshTokenRowByJTI(t, successor).Scope,
 			"RFC 6749 section 6: the successor's scope is identical to the presented token's")
 	})
 }

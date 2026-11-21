@@ -40,7 +40,7 @@ func TestSignInPages_TheLegalAcceptanceStepIsDrawnInTheClientsBrand(t *testing.T
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.app.mustAcceptFor(t, "brand", "Brand terms")
-			browser := createHttpClient(t)
+			browser := createHTTPClient(t)
 
 			page, stepURL := toStep(t, browser, tc.app.signInToCompleted(t, browser))
 			assertDrawnInBrand(t, page, tc.brand, tc.dataTheme)
@@ -63,13 +63,13 @@ func TestLegalDocumentPages_KeepTheClientsBrandWhileTheBrowserHoldsTheSignIn(t *
 	branded := newLegalAcceptanceFixture(t)
 	clientBrand := giveClientBrand(t, branded.client, record.BrandAppearanceLight, "avocado")
 	_, shortName := branded.mustAcceptFor(t, "brand", "Brand terms")
-	browser := createHttpClient(t)
+	browser := createHTTPClient(t)
 
 	step, _ := toStep(t, browser, branded.signInToCompleted(t, browser))
-	ceremonyId := getCeremonyIdFromPage(t, step)
+	ceremonyID := getCeremonyIDFromPage(t, step)
 	_, documents := readStep(t, step)
 	_ = step.Body.Close()
-	named := "?" + url.Values{ceremony.QueryParameter: {ceremonyId}}.Encode()
+	named := "?" + url.Values{ceremony.QueryParameter: {ceremonyID}}.Encode()
 	documentPath := "/legal/" + shortName
 	versionPath := documentPath + "/versions/1"
 	require.Len(t, documents, 1)
@@ -85,7 +85,7 @@ func TestLegalDocumentPages_KeepTheClientsBrandWhileTheBrowserHoldsTheSignIn(t *
 	}{
 		{"the document, in the browser holding the sign-in", browser, documentPath + named, clientBrand, "light", versionPath + named},
 		{"a version it links", browser, versionPath + named, clientBrand, "light", versionPath + named},
-		{"the same link in another browser, which still names the sign-in", createHttpClient(t), documentPath + named,
+		{"the same link in another browser, which still names the sign-in", createHTTPClient(t), documentPath + named,
 			defaultBrand, "dark", versionPath + named},
 		{"a sign-in the browser does not hold", browser, withCeremonyParameter(t, documentPath, ceremony.NewID()), defaultBrand, "dark", ""},
 		{"an id of the wrong shape, not echoed", browser, documentPath + named + "x", defaultBrand, "dark", versionPath},
@@ -126,9 +126,9 @@ func TestSignInPages_TheRecoveryCodesStepIsDrawnInTheClientsBrand(t *testing.T) 
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, _, user, password, _ := createLevel2MandatoryUser(t, false)
-			browser, setupPage, otpURL := startOtpCeremony(t, tc.client, tc.redirectURI, user, password, "")
-			secret := getOtpSecretFromEnrollmentPage(t, setupPage)
-			accepted := authenticateWithOtp(t, browser, otpURL, setupPage, otptest.Code(t, secret, time.Now()))
+			browser, setupPage, otpURL := startOTPCeremony(t, tc.client, tc.redirectURI, user, password, "")
+			secret := getOTPSecretFromEnrollmentPage(t, setupPage)
+			accepted := authenticateWithOTP(t, browser, otpURL, setupPage, otptest.Code(t, secret, time.Now()))
 			_ = setupPage.Body.Close()
 
 			location := assertRedirect(t, accepted, "/auth/recovery-codes")
@@ -169,7 +169,7 @@ func TestDCR_ABrandInTheRequestIsIgnored(t *testing.T) {
 	request, err := http.NewRequest(http.MethodPost, appConfig.AuthServer.BaseURL+"/connect/register", bytes.NewReader(body))
 	require.NoError(t, err)
 	request.Header.Set("Content-Type", "application/json")
-	resp, err := createHttpClient(t).Do(request)
+	resp, err := createHTTPClient(t).Do(request)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 

@@ -167,7 +167,7 @@ func TestAPIResourcesCreate_UnauthorizedAndScope(t *testing.T) {
 	// No token
 	req, err := http.NewRequest("POST", url, nil)
 	require.NoError(t, err)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()

@@ -34,12 +34,12 @@ func authServerResource(t *testing.T) (*record.Resource, string) {
 
 // restorePermissionRows puts back, when the test ends, the resource's permissions as they are now:
 // each description, and no permission beside them.
-func restorePermissionRows(t *testing.T, resourceId int64) {
+func restorePermissionRows(t *testing.T, resourceID int64) {
 	t.Helper()
-	before, err := database.GetPermissionsByResourceID(context.Background(), nil, resourceId)
+	before, err := database.GetPermissionsByResourceID(context.Background(), nil, resourceID)
 	require.NoError(t, err)
 	t.Cleanup(func() {
-		after, err := database.GetPermissionsByResourceID(context.Background(), nil, resourceId)
+		after, err := database.GetPermissionsByResourceID(context.Background(), nil, resourceID)
 		require.NoError(t, err)
 		kept := make(map[int64]record.Permission, len(before))
 		for _, p := range before {
@@ -81,9 +81,9 @@ func TestPermissionDescriptionCeiling_ManageSettingsCannotRewriteAnAdministrativ
 	for _, identifier := range administrativePermissionIdentifiers {
 		t.Run(identifier, func(t *testing.T) {
 			loaded := storedPermissionEntries(t, resource.ID)
-			permissionId := authServerPermissionId(t, identifier)
+			permissionID := authServerPermissionID(t, identifier)
 
-			resp, requestId := sendAdmin(t, granularToken, http.MethodPut, path, api.UpdateResourcePermissionsRequest{
+			resp, requestID := sendAdmin(t, granularToken, http.MethodPut, path, api.UpdateResourcePermissionsRequest{
 				Permissions:         withDescription(loaded, identifier, "Read-only reporting"),
 				ExpectedPermissions: loaded,
 			})
@@ -103,9 +103,9 @@ func TestPermissionDescriptionCeiling_ManageSettingsCannotRewriteAnAdministrativ
 			assert.Contains(t, challenge, `scope="authserver:manage"`)
 
 			assert.ElementsMatch(t, loaded, storedPermissionEntries(t, resource.ID), "the refused save wrote nothing")
-			assert.Zero(t, eventRows(t, manageToken, "updated_resource_permissions", requestId), "no record of a save that was not made")
+			assert.Zero(t, eventRows(t, manageToken, "updated_resource_permissions", requestID), "no record of a save that was not made")
 
-			rows := refusalRows(t, manageToken, requestId)
+			rows := refusalRows(t, manageToken, requestID)
 			require.Len(t, rows, 1, "exactly one administrator_change_refused row for the refused request")
 			row := rows[0]
 			assert.Equal(t, caller.ClientIdentifier, row["logged_in_user"], "the caller is the token's sub")
@@ -115,7 +115,7 @@ func TestPermissionDescriptionCeiling_ManageSettingsCannotRewriteAnAdministrativ
 			assert.Equal(t, "resource", row["target_kind"])
 			assert.InDelta(t, float64(resource.ID), row["target_id"], 0)
 			assert.NotContains(t, row, "user_id", "a resource target names no user")
-			assert.Equal(t, []any{float64(permissionId)}, row["permission_ids"])
+			assert.Equal(t, []any{float64(permissionID)}, row["permission_ids"])
 		})
 	}
 }
@@ -139,7 +139,7 @@ func TestPermissionDescriptionCeiling_ManageSettingsStillSavesTheRest(t *testing
 		wanted := append(withDescription(loaded, builtin.ManageAccountPermissionIdentifier, "Edit your own account"),
 			api.ResourcePermissionUpsert{PermissionIdentifier: custom, Description: "Read reports"})
 
-		resp, requestId := sendAdmin(t, granularToken, http.MethodPut, authServerPath, api.UpdateResourcePermissionsRequest{
+		resp, requestID := sendAdmin(t, granularToken, http.MethodPut, authServerPath, api.UpdateResourcePermissionsRequest{
 			Permissions: wanted, ExpectedPermissions: loaded,
 		})
 		_ = resp.Body.Close()
@@ -152,7 +152,7 @@ func TestPermissionDescriptionCeiling_ManageSettingsStillSavesTheRest(t *testing
 		}
 		assert.Equal(t, "Edit your own account", descriptions[builtin.ManageAccountPermissionIdentifier])
 		assert.Equal(t, "Read reports", descriptions[custom])
-		assert.Empty(t, refusalRows(t, manageToken, requestId))
+		assert.Empty(t, refusalRows(t, manageToken, requestID))
 	})
 
 	t.Run("another resource", func(t *testing.T) {
@@ -160,14 +160,14 @@ func TestPermissionDescriptionCeiling_ManageSettingsStillSavesTheRest(t *testing
 		wanted := withDescription(loaded, loaded[0].PermissionIdentifier, "Re-described")
 		path := "/api/v1/admin/resources/" + strconv.FormatInt(other.ID, 10) + "/permissions"
 
-		resp, requestId := sendAdmin(t, granularToken, http.MethodPut, path, api.UpdateResourcePermissionsRequest{
+		resp, requestID := sendAdmin(t, granularToken, http.MethodPut, path, api.UpdateResourcePermissionsRequest{
 			Permissions: wanted, ExpectedPermissions: loaded,
 		})
 		_ = resp.Body.Close()
 
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 		assert.ElementsMatch(t, wanted, storedPermissionEntries(t, other.ID))
-		assert.Empty(t, refusalRows(t, manageToken, requestId))
+		assert.Empty(t, refusalRows(t, manageToken, requestID))
 	})
 }
 
@@ -184,13 +184,13 @@ func TestPermissionDescriptionCeiling_AManageTokenRewritesThem(t *testing.T) {
 		wanted = withDescription(wanted, identifier, "Rewritten "+identifier)
 	}
 
-	resp, requestId := sendAdmin(t, manageToken, http.MethodPut, path, api.UpdateResourcePermissionsRequest{
+	resp, requestID := sendAdmin(t, manageToken, http.MethodPut, path, api.UpdateResourcePermissionsRequest{
 		Permissions: wanted, ExpectedPermissions: loaded,
 	})
 	_ = resp.Body.Close()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	assert.ElementsMatch(t, wanted, storedPermissionEntries(t, resource.ID))
-	assert.Equal(t, 1, eventRows(t, manageToken, "updated_resource_permissions", requestId))
-	assert.Empty(t, refusalRows(t, manageToken, requestId))
+	assert.Equal(t, 1, eventRows(t, manageToken, "updated_resource_permissions", requestID))
+	assert.Empty(t, refusalRows(t, manageToken, requestID))
 }

@@ -219,13 +219,13 @@ func TestAPIGroupMembersGet_GroupNotFound(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
-func TestAPIGroupMembersGet_InvalidGroupId(t *testing.T) {
+func TestAPIGroupMembersGet_InvalidGroupID(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)
 
 	testCases := []struct {
 		name           string
-		groupId        string
+		groupID        string
 		expectedStatus int
 	}{
 		{"non-numeric ID", "abc", http.StatusBadRequest},
@@ -236,7 +236,7 @@ func TestAPIGroupMembersGet_InvalidGroupId(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + tc.groupId + "/members"
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + tc.groupID + "/members"
 			resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -417,7 +417,7 @@ func TestAPIGroupMemberAdd_InvalidRequestBody(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -556,14 +556,14 @@ func TestAPIGroupMemberRemove_GroupNotFound(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
-func TestAPIGroupMemberRemove_InvalidIds(t *testing.T) {
+func TestAPIGroupMemberRemove_InvalidIDs(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)
 
 	testCases := []struct {
 		name           string
-		groupId        string
-		userId         string
+		groupID        string
+		userID         string
 		expectedStatus int
 	}{
 		{"non-numeric group ID", "abc", "1", http.StatusBadRequest},
@@ -574,7 +574,7 @@ func TestAPIGroupMemberRemove_InvalidIds(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + tc.groupId + "/members/" + tc.userId
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + tc.groupID + "/members/" + tc.userID
 			resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -612,7 +612,7 @@ func TestAPIGroupMembers_Unauthorized(t *testing.T) {
 			req, err := http.NewRequest(tc.method, url, nil)
 			require.NoError(t, err)
 
-			httpClient := createHttpClient(t)
+			httpClient := createHTTPClient(t)
 			resp, err := httpClient.Do(req)
 			require.NoError(t, err)
 			defer func() { _ = resp.Body.Close() }()

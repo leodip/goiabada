@@ -22,10 +22,10 @@ import (
 
 // repeatedParametersQuery is a code-flow request for client, as a url.Values so a case can add a
 // second copy of any parameter.
-func repeatedParametersQuery(client *record.Client, redirectUri *record.RedirectURI) url.Values {
+func repeatedParametersQuery(client *record.Client, redirectURI *record.RedirectURI) url.Values {
 	return url.Values{
 		"client_id":             {client.ClientIdentifier},
-		"redirect_uri":          {redirectUri.URI},
+		"redirect_uri":          {redirectURI.URI},
 		"response_type":         {"code"},
 		"code_challenge_method": {"S256"},
 		"code_challenge":        {randomCodeChallenge()},
@@ -46,17 +46,17 @@ func refusalPageMessage(t *testing.T, resp *http.Response) string {
 }
 
 func TestAuthorize_RepeatedParameters_DeliveryParameterIsRefusedOnThePage(t *testing.T) {
-	client, redirectUri := createTestClientWithRedirect(t)
+	client, redirectURI := createTestClientWithRedirect(t)
 
 	for _, tc := range []struct{ name, second string }{
 		{"a second, differing client_id in the query", "some-other-client"},
 		{"a second, identical client_id in the query", client.ClientIdentifier},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			query := repeatedParametersQuery(client, redirectUri)
+			query := repeatedParametersQuery(client, redirectURI)
 			query.Add("client_id", tc.second)
 
-			resp, err := createAuthenticatedHttpClient(t).Get(appConfig.AuthServer.BaseURL + "/auth/authorize/?" + query.Encode())
+			resp, err := createAuthenticatedHTTPClient(t).Get(appConfig.AuthServer.BaseURL + "/auth/authorize/?" + query.Encode())
 			require.NoError(t, err)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -67,17 +67,17 @@ func TestAuthorize_RepeatedParameters_DeliveryParameterIsRefusedOnThePage(t *tes
 	// r.Form merges a POST body and the query, so one copy in each is the same violation.
 	for _, tc := range []struct{ name, inQuery string }{
 		{"one redirect_uri in a POST body and another in the query", "https://attacker.example/cb"},
-		{"one redirect_uri in a POST body and the same one in the query", redirectUri.URI},
+		{"one redirect_uri in a POST body and the same one in the query", redirectURI.URI},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			form := repeatedParametersQuery(client, redirectUri)
+			form := repeatedParametersQuery(client, redirectURI)
 			req, err := http.NewRequest(http.MethodPost,
 				appConfig.AuthServer.BaseURL+"/auth/authorize?redirect_uri="+url.QueryEscape(tc.inQuery),
 				strings.NewReader(form.Encode()))
 			require.NoError(t, err)
 			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-			resp, err := createHttpClient(t).Do(req)
+			resp, err := createHTTPClient(t).Do(req)
 			require.NoError(t, err)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -87,9 +87,9 @@ func TestAuthorize_RepeatedParameters_DeliveryParameterIsRefusedOnThePage(t *tes
 
 	// Before #228 the parse failure was ignored and the field carrying it silently dropped.
 	t.Run("a parameter that is not correctly encoded", func(t *testing.T) {
-		query := repeatedParametersQuery(client, redirectUri)
+		query := repeatedParametersQuery(client, redirectURI)
 
-		resp, err := createAuthenticatedHttpClient(t).Get(appConfig.AuthServer.BaseURL + "/auth/authorize/?" +
+		resp, err := createAuthenticatedHTTPClient(t).Get(appConfig.AuthServer.BaseURL + "/auth/authorize/?" +
 			query.Encode() + "&ui_locales=%zz")
 		require.NoError(t, err)
 		defer func() { _ = resp.Body.Close() }()
@@ -100,12 +100,12 @@ func TestAuthorize_RepeatedParameters_DeliveryParameterIsRefusedOnThePage(t *tes
 }
 
 func TestAuthorize_RepeatedParameters_OtherParameterIsInvalidRequest(t *testing.T) {
-	client, redirectUri := createTestClientWithRedirect(t)
+	client, redirectURI := createTestClientWithRedirect(t)
 
 	// A session holder is answered at once (#213), so the refusal is on the redirect itself.
 	answer := func(t *testing.T, query url.Values) *url.URL {
 		t.Helper()
-		resp, err := createAuthenticatedHttpClient(t).Get(appConfig.AuthServer.BaseURL + "/auth/authorize/?" + query.Encode())
+		resp, err := createAuthenticatedHTTPClient(t).Get(appConfig.AuthServer.BaseURL + "/auth/authorize/?" + query.Encode())
 		require.NoError(t, err)
 		defer func() { _ = resp.Body.Close() }()
 		require.Equal(t, http.StatusFound, resp.StatusCode)
@@ -119,7 +119,7 @@ func TestAuthorize_RepeatedParameters_OtherParameterIsInvalidRequest(t *testing.
 		{"an identical nonce, with state echoed", ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			query := repeatedParametersQuery(client, redirectUri)
+			query := repeatedParametersQuery(client, redirectURI)
 			second := tc.second
 			if second == "" {
 				second = query.Get("nonce")
@@ -128,7 +128,7 @@ func TestAuthorize_RepeatedParameters_OtherParameterIsInvalidRequest(t *testing.
 
 			location := answer(t, query)
 
-			assert.Equal(t, redirectUri.URI, location.Scheme+"://"+location.Host+location.Path)
+			assert.Equal(t, redirectURI.URI, location.Scheme+"://"+location.Host+location.Path)
 			assert.Equal(t, "invalid_request", location.Query().Get("error"))
 			assert.Equal(t, "The 'nonce' parameter was included more than once.", location.Query().Get("error_description"))
 			assert.Equal(t, query["state"][:1], location.Query()["state"])
@@ -142,7 +142,7 @@ func TestAuthorize_RepeatedParameters_OtherParameterIsInvalidRequest(t *testing.
 		{"an identical state is left out of the redirect", ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			query := repeatedParametersQuery(client, redirectUri)
+			query := repeatedParametersQuery(client, redirectURI)
 			second := tc.second
 			if second == "" {
 				second = query.Get("state")
@@ -160,7 +160,7 @@ func TestAuthorize_RepeatedParameters_OtherParameterIsInvalidRequest(t *testing.
 	// Identical copies used to proceed (#228). One copy of every parameter is the control the rows
 	// above vary from: the session holder's sign-in goes on.
 	t.Run("identical copies of a scope are refused", func(t *testing.T) {
-		query := repeatedParametersQuery(client, redirectUri)
+		query := repeatedParametersQuery(client, redirectURI)
 		query.Add("scope", query.Get("scope"))
 
 		location := answer(t, query)
@@ -171,7 +171,7 @@ func TestAuthorize_RepeatedParameters_OtherParameterIsInvalidRequest(t *testing.
 
 	// Goiabada's own parameter is refused like every other request parameter (#816 decision 3).
 	t.Run("two copies of goiabada_safe_mode are refused", func(t *testing.T) {
-		query := repeatedParametersQuery(client, redirectUri)
+		query := repeatedParametersQuery(client, redirectURI)
 		query.Add("goiabada_safe_mode", "true")
 		query.Add("goiabada_safe_mode", "true")
 
@@ -182,7 +182,7 @@ func TestAuthorize_RepeatedParameters_OtherParameterIsInvalidRequest(t *testing.
 	})
 
 	t.Run("one copy of each goes on", func(t *testing.T) {
-		location := answer(t, repeatedParametersQuery(client, redirectUri))
+		location := answer(t, repeatedParametersQuery(client, redirectURI))
 
 		assert.Equal(t, "/auth/level1completed", location.Path, "the session holder's sign-in goes on: %v", location)
 	})
@@ -200,8 +200,8 @@ func TestToken_RepeatedParameters(t *testing.T) {
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
-	resource := createResourceWithId(t, "repeated-svc-"+fake.LetterN(8))
-	permission := createPermissionWithId(t, resource.ID, "read-"+fake.LetterN(8))
+	resource := createResourceWithID(t, "repeated-svc-"+fake.LetterN(8))
+	permission := createPermissionWithID(t, resource.ID, "read-"+fake.LetterN(8))
 	require.NoError(t, database.CreateClientPermission(context.Background(), nil, &record.ClientPermission{
 		ClientID:     client.ID,
 		PermissionID: permission.ID,
@@ -212,7 +212,7 @@ func TestToken_RepeatedParameters(t *testing.T) {
 		req, err := http.NewRequest(http.MethodPost, appConfig.AuthServer.BaseURL+"/auth/token/", strings.NewReader(form.Encode()))
 		require.NoError(t, err)
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		resp, err := createHttpClient(t).Do(req)
+		resp, err := createHTTPClient(t).Do(req)
 		require.NoError(t, err)
 		defer func() { _ = resp.Body.Close() }()
 		var body map[string]interface{}

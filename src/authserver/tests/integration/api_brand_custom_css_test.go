@@ -130,7 +130,7 @@ func TestAPIBrandCustomCSS_ChangesAreAudited(t *testing.T) {
 	_, created := keepDefaultBrand(t)
 
 	name := brandName("AuditCSS")
-	resp, requestId := sendAdmin(t, accessToken, http.MethodPost, brandsPath, brandBody(map[string]any{
+	resp, requestID := sendAdmin(t, accessToken, http.MethodPost, brandsPath, brandBody(map[string]any{
 		"name": name, "appearance": "light", "theme": "plum", "customCss": writtenCustomCSS}))
 	var answer map[string]any
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&answer))
@@ -138,13 +138,13 @@ func TestAPIBrandCustomCSS_ChangesAreAudited(t *testing.T) {
 	require.Equal(t, http.StatusCreated, resp.StatusCode, "%v", answer)
 	id := int64(answer["brand"].(map[string]any)["id"].(float64))
 	*created = append(*created, id)
-	createdRows := auditRows(t, accessToken, "created_brand", requestId)
+	createdRows := auditRows(t, accessToken, "created_brand", requestID)
 	assert.Equal(t, []map[string]any{{"brand_id": float64(id), "brand_name": name,
 		"custom_css_bytes": float64(len(storedCustomCSS)), "logged_in_user": who}}, createdRows)
 
-	_, _, requestId = brandCall(t, accessToken, http.MethodPut, brandPath(id, ""),
+	_, _, requestID = brandCall(t, accessToken, http.MethodPut, brandPath(id, ""),
 		brandBody(map[string]any{"name": name, "appearance": "dark", "theme": "plum", "customCss": ".x{}"}))
-	updatedRows := auditRows(t, accessToken, "updated_brand", requestId)
+	updatedRows := auditRows(t, accessToken, "updated_brand", requestID)
 	assert.Equal(t, []map[string]any{{"brand_id": float64(id), "brand_name": name, "appearance": "dark",
 		"theme": "plum", "corners": "rounded", "font": "system-ui", "background_fit": "cover",
 		"hide_app_name": false, "custom_css_bytes": float64(4), "logged_in_user": who}}, updatedRows)
@@ -160,7 +160,7 @@ func TestAPIBrandCustomCSS_TheFullStylesheetEndsWithIt(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 	_, created := keepDefaultBrand(t)
 	base := appConfig.AuthServer.BaseURL
-	browser := createHttpClient(t)
+	browser := createHTTPClient(t)
 
 	name := brandName("Served")
 	status, answer, _ := brandCall(t, accessToken, http.MethodPost, brandsPath,

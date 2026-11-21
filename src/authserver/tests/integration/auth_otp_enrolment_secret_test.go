@@ -17,7 +17,7 @@ import (
 // would be a side channel into storage, passing with the page broken, which is what §5 rejects
 // at this seam.
 
-// TestAuthOtp_EnrolmentReloadRendersTheSameSecret reloads /auth/otp part way through enrolment
+// TestAuthOTP_EnrolmentReloadRendersTheSameSecret reloads /auth/otp part way through enrolment
 // and requires the same secret back, then submits a code generated from the FIRST render.
 //
 // That second half is the defect stated as a user meets it. The seed used to live in one pair of
@@ -30,23 +30,23 @@ import (
 // The code is generated before the reload deliberately: generating it afterwards from the first
 // secret would pass even if the reload had replaced the stored seed with the same value by
 // coincidence, and more to the point it would not be the code the user's authenticator holds.
-func TestAuthOtp_EnrolmentReloadRendersTheSameSecret(t *testing.T) {
-	client, redirectUri, user, password, _ := createLevel2MandatoryUser(t, false)
+func TestAuthOTP_EnrolmentReloadRendersTheSameSecret(t *testing.T) {
+	client, redirectURI, user, password, _ := createLevel2MandatoryUser(t, false)
 
-	httpClient, otpPage, otpUrl := startOtpCeremony(t, client, redirectUri, user, password, "")
-	first := getOtpSecretFromEnrollmentPage(t, otpPage)
+	httpClient, otpPage, otpURL := startOTPCeremony(t, client, redirectURI, user, password, "")
+	first := getOTPSecretFromEnrollmentPage(t, otpPage)
 	_ = otpPage.Body.Close()
 	assert.NotEmpty(t, first, "the enrolment page must render a secret, or nothing below means anything")
 
 	// The code the user's authenticator produces from the QR code on the first render.
 	code := otptest.Code(t, first, time.Now())
 
-	reloaded := loadPage(t, httpClient, otpUrl)
-	second := getOtpSecretFromEnrollmentPage(t, reloaded)
+	reloaded := loadPage(t, httpClient, otpURL)
+	second := getOTPSecretFromEnrollmentPage(t, reloaded)
 	assert.Equal(t, first, second,
 		"a reload of /auth/otp must render the secret the user has already scanned, not a fresh one")
 
-	resp := passSetupRecoveryCodes(t, httpClient, authenticateWithOtp(t, httpClient, otpUrl, reloaded, code))
+	resp := passSetupRecoveryCodes(t, httpClient, authenticateWithOTP(t, httpClient, otpURL, reloaded, code))
 	_ = reloaded.Body.Close()
 	assertRedirect(t, resp, "/auth/completed")
 	_ = resp.Body.Close()
@@ -66,7 +66,7 @@ func TestAuthOtp_EnrolmentReloadRendersTheSameSecret(t *testing.T) {
 	assert.Equal(t, strings.ToUpper(first), strings.ToUpper(stored))
 }
 
-// TestAuthOtp_SecondAuthorizeInTheSameBrowserGetsANewSecret is the other half of decision 4: the
+// TestAuthOTP_SecondAuthorizeInTheSameBrowserGetsANewSecret is the other half of decision 4: the
 // seed is bound to its ceremony, and the binding is structural rather than compared.
 //
 // Both ceremonies run in ONE cookie jar, which is what makes the case worth anything. Two
@@ -75,18 +75,18 @@ func TestAuthOtp_EnrolmentReloadRendersTheSameSecret(t *testing.T) {
 // same object across these two requests. A second /auth/authorize mints a new auth context in
 // authflow.Authorization.Run, held beside the first, which keeps its own seed, so the second
 // enrolment page cannot be showing the first ceremony's secret.
-func TestAuthOtp_SecondAuthorizeInTheSameBrowserGetsANewSecret(t *testing.T) {
-	client, redirectUri, user, password, _ := createLevel2MandatoryUser(t, false)
+func TestAuthOTP_SecondAuthorizeInTheSameBrowserGetsANewSecret(t *testing.T) {
+	client, redirectURI, user, password, _ := createLevel2MandatoryUser(t, false)
 
-	httpClient, otpPage, _ := startOtpCeremony(t, client, redirectUri, user, password, "")
-	first := getOtpSecretFromEnrollmentPage(t, otpPage)
+	httpClient, otpPage, _ := startOTPCeremony(t, client, redirectURI, user, password, "")
+	first := getOTPSecretFromEnrollmentPage(t, otpPage)
 	_ = otpPage.Body.Close()
 	assert.NotEmpty(t, first)
 
 	// Same jar, so the first ceremony is still held beside the second. It never reached
 	// /auth/completed, so no session exists and this request runs level 1 again.
-	_, secondPage, _ := startOtpCeremonyOn(t, httpClient, client, redirectUri, user, password, "")
-	second := getOtpSecretFromEnrollmentPage(t, secondPage)
+	_, secondPage, _ := startOTPCeremonyOn(t, httpClient, client, redirectURI, user, password, "")
+	second := getOTPSecretFromEnrollmentPage(t, secondPage)
 	_ = secondPage.Body.Close()
 
 	assert.NotEqual(t, first, second,

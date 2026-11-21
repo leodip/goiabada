@@ -24,7 +24,7 @@ import (
 func TestPublicSettings_CarriesTheDefaultBrandsStylesheet(t *testing.T) {
 	brand := makeDefaultBrand(t, record.BrandAppearanceDark, "plum")
 	base := appConfig.AuthServer.BaseURL
-	browser := createHttpClient(t)
+	browser := createHTTPClient(t)
 
 	resp, err := browser.Get(base + "/api/public/settings")
 	require.NoError(t, err)
@@ -66,7 +66,7 @@ func TestPublicSettings_CarriesTheDefaultBrandsStylesheet(t *testing.T) {
 func TestPublicSettings_CarriesAnAutomaticDefaultBrandAsAuto(t *testing.T) {
 	makeDefaultBrand(t, record.BrandAppearanceAuto, "coconut")
 
-	resp, err := createHttpClient(t).Get(appConfig.AuthServer.BaseURL + "/api/public/settings")
+	resp, err := createHTTPClient(t).Get(appConfig.AuthServer.BaseURL + "/api/public/settings")
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -83,7 +83,7 @@ func TestPublicSettings_CarriesAnAutomaticDefaultBrandAsAuto(t *testing.T) {
 // publicBrand reads the brand /api/public/settings answers: its appearance and stylesheet URL.
 func publicBrand(t *testing.T) (appearance, stylesheetURL string) {
 	t.Helper()
-	resp, err := createHttpClient(t).Get(appConfig.AuthServer.BaseURL + "/api/public/settings")
+	resp, err := createHTTPClient(t).Get(appConfig.AuthServer.BaseURL + "/api/public/settings")
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)

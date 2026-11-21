@@ -26,7 +26,7 @@ func TestToken_Refresh_ConsentRemovedFromAConsentNotRequiredClient(t *testing.T)
 	clientSecret := fake.Password(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	formData := url.Values{
 		"grant_type":    {"authorization_code"},
@@ -34,7 +34,7 @@ func TestToken_Refresh_ConsentRemovedFromAConsentNotRequiredClient(t *testing.T)
 		"redirect_uri":  {code.RedirectURI},
 		"code_verifier": {testCodeVerifier},
 	}
-	data := postToTokenEndpointWithBasicAuth(t, httpClient, destUrl, formData, code.Client.ClientIdentifier, clientSecret)
+	data := postToTokenEndpointWithBasicAuth(t, httpClient, destURL, formData, code.Client.ClientIdentifier, clientSecret)
 	require.NotNil(t, data["refresh_token"])
 	refreshToken := data["refresh_token"].(string)
 
@@ -55,7 +55,7 @@ func TestToken_Refresh_ConsentRemovedFromAConsentNotRequiredClient(t *testing.T)
 		"grant_type":    {"refresh_token"},
 		"refresh_token": {refreshToken},
 	}
-	data = postToTokenEndpointWithBasicAuth(t, httpClient, destUrl, formData, code.Client.ClientIdentifier, clientSecret)
+	data = postToTokenEndpointWithBasicAuth(t, httpClient, destURL, formData, code.Client.ClientIdentifier, clientSecret)
 	require.NotNil(t, data["access_token"])
 	require.NotNil(t, data["refresh_token"])
 	rotatedRefreshToken := data["refresh_token"].(string)
@@ -85,7 +85,7 @@ func TestToken_Refresh_ConsentRemovedFromAConsentNotRequiredClient(t *testing.T)
 		"grant_type":    {"refresh_token"},
 		"refresh_token": {rotatedRefreshToken},
 	}
-	refreshResp := postToTokenEndpointWithBasicAuth(t, httpClient, destUrl, formData, code.Client.ClientIdentifier, clientSecret)
+	refreshResp := postToTokenEndpointWithBasicAuth(t, httpClient, destURL, formData, code.Client.ClientIdentifier, clientSecret)
 
 	assert.Equal(t, "invalid_grant", refreshResp["error"])
 	assert.Equal(t, "This refresh token has been revoked.", refreshResp["error_description"])

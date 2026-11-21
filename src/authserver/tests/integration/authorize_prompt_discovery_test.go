@@ -15,10 +15,10 @@ import (
 // =============================================================================
 
 func TestDiscovery_PromptValuesSupported(t *testing.T) {
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
-	destUrl := appConfig.AuthServer.BaseURL + "/.well-known/openid-configuration"
-	resp, err := httpClient.Get(destUrl)
+	destURL := appConfig.AuthServer.BaseURL + "/.well-known/openid-configuration"
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,10 +53,10 @@ func TestDiscovery_PromptValuesSupported(t *testing.T) {
 }
 
 func TestDiscovery_PromptValuesSupportedIsArray(t *testing.T) {
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
-	destUrl := appConfig.AuthServer.BaseURL + "/.well-known/openid-configuration"
-	resp, err := httpClient.Get(destUrl)
+	destURL := appConfig.AuthServer.BaseURL + "/.well-known/openid-configuration"
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,7 +91,7 @@ func TestDiscovery_PromptValuesSupportedIsArray(t *testing.T) {
 // can tell an absent key from a zero value.
 func fetchDiscoveryFields(t *testing.T) map[string]json.RawMessage {
 	t.Helper()
-	resp, err := createHttpClient(t).Get(appConfig.AuthServer.BaseURL + "/.well-known/openid-configuration")
+	resp, err := createHTTPClient(t).Get(appConfig.AuthServer.BaseURL + "/.well-known/openid-configuration")
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)

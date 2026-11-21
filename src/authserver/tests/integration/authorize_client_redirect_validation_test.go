@@ -16,12 +16,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestAuthorize_ValidateClientAndRedirectURI_ClientIdIsMissing(t *testing.T) {
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/"
+func TestAuthorize_ValidateClientAndRedirectURI_ClientIDIsMissing(t *testing.T) {
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/"
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,11 +39,11 @@ func TestAuthorize_ValidateClientAndRedirectURI_ClientIdIsMissing(t *testing.T) 
 }
 
 func TestAuthorize_ValidateClientAndRedirectURI_ClientDoesNotExist(t *testing.T) {
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=does_not_exist"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=does_not_exist"
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -71,11 +71,11 @@ func TestAuthorize_ValidateClientAndRedirectURI_ClientIsDisabled(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,11 +108,11 @@ func TestAuthorize_ValidateClientAndRedirectURI_TheCodeFlowIsNoLongerAPageAnswer
 		t.Fatal(err)
 	}
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -143,11 +143,11 @@ func TestAuthorize_ValidateClientAndRedirectURI_RedirectURIIsMissing(t *testing.
 		t.Fatal(err)
 	}
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -176,11 +176,11 @@ func TestAuthorize_ValidateClientAndRedirectURI_ClientDoesNotHaveRedirectURI(t *
 		t.Fatal(err)
 	}
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier + "&redirect_uri=" + fake.URL()
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier + "&redirect_uri=" + fake.URL()
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -209,7 +209,7 @@ func TestAuthorize_ValidateClientAndRedirectURI_ClientDoesNotHaveRedirectURI(t *
 // protocol-relative Location that hands the authorization code to evil.example.
 //
 // Asserting the absence of a Location header is the reason this lives at the integration
-// tier rather than in the validator's unit table. createHttpClient sets CheckRedirect to
+// tier rather than in the validator's unit table. createHTTPClient sets CheckRedirect to
 // http.ErrUseLastResponse, so a 302 would be observed here rather than followed, and no
 // request to evil.example is ever attempted by the test itself (#122).
 func TestAuthorize_ValidateClientAndRedirectURI_RedirectURIIsNotAbsolute(t *testing.T) {
@@ -231,12 +231,12 @@ func TestAuthorize_ValidateClientAndRedirectURI_RedirectURIIsNotAbsolute(t *test
 		t.Fatal(err)
 	}
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(nonAbsoluteURI)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -270,11 +270,11 @@ func TestAuthorize_ValidateClientAndRedirectURI_RedirectURIIsNotAbsolute(t *test
 // Go literal comes back, and the message regresses if the handler renders EnglishFallback() instead
 // of Localize(), which no English assertion in this file can see.
 func TestAuthorize_ValidateClientAndRedirectURI_RendersInTheRequestedLocale(t *testing.T) {
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=does_not_exist&ui_locales=pt-BR"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=does_not_exist&ui_locales=pt-BR"
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -328,7 +328,7 @@ func TestAuthorize_ValidateClientAndRedirectURI_StoredPlainHTTPIsRefused(t *test
 			require.NoError(t, database.CreateRedirectURI(context.Background(), nil,
 				&record.RedirectURI{ClientID: client.ID, URI: tc.stored}))
 
-			destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+			destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 				"&redirect_uri=" + url.QueryEscape(tc.stored) +
 				"&response_type=" + url.QueryEscape(tc.responseType) +
 				"&code_challenge_method=S256" +
@@ -337,8 +337,8 @@ func TestAuthorize_ValidateClientAndRedirectURI_StoredPlainHTTPIsRefused(t *test
 				"&state=" + fake.LetterN(8) +
 				"&nonce=" + fake.LetterN(8)
 
-			httpClient := createHttpClient(t)
-			resp, err := httpClient.Get(destUrl)
+			httpClient := createHTTPClient(t)
+			resp, err := httpClient.Get(destURL)
 			require.NoError(t, err)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -378,7 +378,7 @@ func TestAuthorize_ValidateClientAndRedirectURI_StoredLoopbackHTTPStillReceivesT
 			require.NoError(t, database.CreateUser(context.Background(), nil, user))
 
 			requestState := fake.LetterN(8)
-			destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+			destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 				"&redirect_uri=" + url.QueryEscape(stored) +
 				"&response_type=code" +
 				"&code_challenge_method=S256" +
@@ -387,8 +387,8 @@ func TestAuthorize_ValidateClientAndRedirectURI_StoredLoopbackHTTPStillReceivesT
 				"&state=" + requestState +
 				"&nonce=" + fake.LetterN(8)
 
-			httpClient := createHttpClient(t)
-			resp, err := httpClient.Get(destUrl)
+			httpClient := createHTTPClient(t)
+			resp, err := httpClient.Get(destURL)
 			require.NoError(t, err)
 			defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
@@ -420,7 +420,7 @@ func TestAuthorize_ValidateClientAndRedirectURI_StoredLoopbackHTTPStillReceivesT
 			require.NoError(t, err)
 			assert.Equal(t, stored, location.Scheme+"://"+location.Host+location.Path,
 				"the code goes to the stored loopback http redirect URI")
-			code, stateVal := getCodeAndStateFromUrl(t, resp)
+			code, stateVal := getCodeAndStateFromURL(t, resp)
 			assert.NotEmpty(t, code)
 			assert.Equal(t, requestState, stateVal)
 		})

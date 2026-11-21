@@ -96,7 +96,7 @@ func TestAPIUserEmailPut_SendsNoNoticeWithMailOn(t *testing.T) {
 	_ = resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode, "an administrator's change needs no current password")
 
-	requestPasswordReset(t, createHttpClient(t), newEmail)
+	requestPasswordReset(t, createHTTPClient(t), newEmail)
 	require.Len(t, awaitResetLinks(t, newEmail, 1), 1, "the later mail arrived, so mail was on")
 
 	assert.Empty(t, sentTo(t, previous), "the previous address must be sent no notice")
@@ -446,13 +446,13 @@ func TestAPIUserEmailPut_UserNotFound(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
-func TestAPIUserEmailPut_InvalidId(t *testing.T) {
+func TestAPIUserEmailPut_InvalidID(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)
 
 	testCases := []struct {
 		name           string
-		userId         string
+		userID         string
 		expectedStatus int
 	}{
 		{"non-numeric ID", "abc", http.StatusBadRequest},
@@ -468,7 +468,7 @@ func TestAPIUserEmailPut_InvalidId(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + tc.userId + "/email"
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + tc.userID + "/email"
 			resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -502,7 +502,7 @@ func TestAPIUserEmailPut_InvalidRequestBody(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -531,7 +531,7 @@ func TestAPIUserEmailPut_Unauthorized(t *testing.T) {
 	req, err := http.NewRequest("PUT", url, nil)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()

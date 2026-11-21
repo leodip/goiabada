@@ -106,8 +106,8 @@ func TestAPIGroupsSearch_PermissionNotFound(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Use a random large ID that should not exist
-	missingId := int64(fake.Number(9_000_000, 9_999_999))
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/search?annotatePermissionId=" + strconv.FormatInt(missingId, 10)
+	missingID := int64(fake.Number(9_000_000, 9_999_999))
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/search?annotatePermissionId=" + strconv.FormatInt(missingID, 10)
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -124,7 +124,7 @@ func TestAPIGroupsSearch_Unauthorized(t *testing.T) {
 	perm := createPermission(t, resource.ID)
 	u := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/search?annotatePermissionId=" + neturl.QueryEscape(strconv.FormatInt(perm.ID, 10))
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	req, _ := http.NewRequest("GET", u, nil)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)

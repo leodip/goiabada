@@ -167,7 +167,7 @@ func TestAPIUserPasswordPut_UserNotFound(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
-func TestAPIUserPasswordPut_InvalidUserId(t *testing.T) {
+func TestAPIUserPasswordPut_InvalidUserID(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)
 
@@ -287,7 +287,7 @@ func TestAPIUserOTPPut_DisableResetsConsumedStep(t *testing.T) {
 
 	// The same code the enable already consumed. It is accepted only because the admin disable
 	// reset the marker.
-	skipIfOtpCodeOutsideWindow(t, secret, code)
+	skipIfOTPCodeOutsideWindow(t, secret, code)
 	installPendingEnrollmentForTest(t, user.ID, keyURL, time.Now().UTC())
 	status, body = putAccountOTP(t, accessToken, enable)
 	if status != http.StatusOK {

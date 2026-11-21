@@ -29,10 +29,10 @@ type signedInUpToCompleted struct {
 	user         *record.User
 	state        string
 	completedURL string
-	// browserSessionId is the browser session's identifier as /auth/completed will receive it.
+	// browserSessionID is the browser session's identifier as /auth/completed will receive it.
 	// Binding a user session always replaces it, so it is still the browser's afterwards exactly
 	// when nothing was bound.
-	browserSessionId string
+	browserSessionID string
 }
 
 // signInUpToCompleted runs a code ceremony as far as the redirect to /auth/completed. The client
@@ -68,7 +68,7 @@ func signInUpToCompleted(t *testing.T, extraAuthorizeQuery string) *signedInUpTo
 	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.ID) })
 
 	state := fake.LetterN(8)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Get(appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
@@ -101,7 +101,7 @@ func signInUpToCompleted(t *testing.T, extraAuthorizeQuery string) *signedInUpTo
 		user:             user,
 		state:            state,
 		completedURL:     assertRedirect(t, resp, "/auth/completed"),
-		browserSessionId: decodeSessionIdentifier(t, requireSessionCookie(t, httpClient)),
+		browserSessionID: decodeSessionIdentifier(t, requireSessionCookie(t, httpClient)),
 	}
 }
 
@@ -112,22 +112,22 @@ func (c *signedInUpToCompleted) loadCompleted(t *testing.T) (*http.Response, str
 
 	req, err := http.NewRequest(http.MethodGet, c.completedURL, nil)
 	require.NoError(t, err)
-	requestId := "completed-" + fake.LetterN(16)
-	req.Header.Set("X-Request-Id", requestId)
+	requestID := "completed-" + fake.LetterN(16)
+	req.Header.Set("X-Request-Id", requestID)
 	resp, err := c.httpClient.Do(req)
 	require.NoError(t, err)
-	return resp, requestId
+	return resp, requestID
 }
 
 // assertNothingWasBound is the three traces a bound session leaves, each required absent: the
 // session row, the browser session rotated onto it, and the record of its start.
-func (c *signedInUpToCompleted) assertNothingWasBound(t *testing.T, adminToken, requestId string) {
+func (c *signedInUpToCompleted) assertNothingWasBound(t *testing.T, adminToken, requestID string) {
 	t.Helper()
 
 	assert.Empty(t, sessionsThroughAdminAPI(t, adminToken, c.user.ID), "no session row is written")
-	assert.Equal(t, c.browserSessionId, decodeSessionIdentifier(t, requireSessionCookie(t, c.httpClient)),
+	assert.Equal(t, c.browserSessionID, decodeSessionIdentifier(t, requireSessionCookie(t, c.httpClient)),
 		"the browser session is not rotated onto a user session")
-	assert.Empty(t, auditRows(t, adminToken, "started_new_user_session", requestId),
+	assert.Empty(t, auditRows(t, adminToken, "started_new_user_session", requestID),
 		"no session start is recorded")
 }
 
@@ -145,7 +145,7 @@ func TestAuthCompleted_AUserDisabledMidSignInGetsNoSession(t *testing.T) {
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	_ = resp.Body.Close()
 
-	resp, requestId := signIn.loadCompleted(t)
+	resp, requestID := signIn.loadCompleted(t)
 	defer func() { _ = resp.Body.Close() }()
 
 	destination, params := clientAnswer(t, resp, "code")
@@ -156,8 +156,8 @@ func TestAuthCompleted_AUserDisabledMidSignInGetsNoSession(t *testing.T) {
 	assert.Empty(t, params.Get("code"))
 
 	assert.Equal(t, []map[string]any{{"user_id": float64(signIn.user.ID)}},
-		auditRows(t, adminToken, "user_disabled", requestId), "the refusal is recorded, naming the user")
-	signIn.assertNothingWasBound(t, adminToken, requestId)
+		auditRows(t, adminToken, "user_disabled", requestID), "the refusal is recorded, naming the user")
+	signIn.assertNothingWasBound(t, adminToken, requestID)
 }
 
 // A sign-in by someone other than the id_token_hint's user is answered login_required before
@@ -178,7 +178,7 @@ func TestAuthCompleted_AHintMismatchIsRefusedBeforeAnythingIsBound(t *testing.T)
 	require.NotEqual(t, hintCode.User.Subject, signIn.user.Subject,
 		"the hint must name someone other than the user who signs in")
 
-	resp, requestId := signIn.loadCompleted(t)
+	resp, requestID := signIn.loadCompleted(t)
 	defer func() { _ = resp.Body.Close() }()
 
 	destination, params := clientAnswer(t, resp, "code")
@@ -189,7 +189,7 @@ func TestAuthCompleted_AHintMismatchIsRefusedBeforeAnythingIsBound(t *testing.T)
 	assert.Equal(t, signIn.state, params.Get("state"))
 	assert.Empty(t, params.Get("code"))
 
-	signIn.assertNothingWasBound(t, adminToken, requestId)
+	signIn.assertNothingWasBound(t, adminToken, requestID)
 }
 
 // A user whose password an administrator resets between the password step and /auth/completed is
@@ -208,12 +208,12 @@ func TestAuthCompleted_APasswordResetMidSignInRestartsTheSignIn(t *testing.T) {
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	_ = resp.Body.Close()
 
-	resp, requestId := signIn.loadCompleted(t)
+	resp, requestID := signIn.loadCompleted(t)
 	defer func() { _ = resp.Body.Close() }()
 
 	restart := assertRedirect(t, resp, "/auth/level1")
 	assert.NotContains(t, restart, signIn.redirectURI.URI, "the client is told nothing")
-	signIn.assertNothingWasBound(t, adminToken, requestId)
+	signIn.assertNothingWasBound(t, adminToken, requestID)
 
 	// A real restart: the password form again, which takes the new password and goes on to the
 	// consent screen this client requires.

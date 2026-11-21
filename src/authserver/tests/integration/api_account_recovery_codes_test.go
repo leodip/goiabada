@@ -24,10 +24,10 @@ const recoveryCodesURL = "/api/v1/account/otp/recovery-codes"
 
 // enableOTPForRecoveryCodesTest turns two-factor authentication on for the account user through the
 // account API and answers the set the enable created.
-func enableOTPForRecoveryCodesTest(t *testing.T, accessToken string, userId int64) []string {
+func enableOTPForRecoveryCodesTest(t *testing.T, accessToken string, userID int64) []string {
 	t.Helper()
-	setUserPasswordForOTP(t, userId, "Correct1!")
-	resetOTPStateForTest(t, userId)
+	setUserPasswordForOTP(t, userID, "Correct1!")
+	resetOTPStateForTest(t, userID)
 	secret := getOTPEnrollment(t, accessToken).SecretKey
 	status, body := putAccountOTP(t, accessToken, api.UpdateAccountOTPRequest{
 		Enabled: true, Password: "Correct1!", OTPCode: otptest.Code(t, secret, time.Now()),
@@ -37,8 +37,8 @@ func enableOTPForRecoveryCodesTest(t *testing.T, accessToken string, userId int6
 	require.NoError(t, json.Unmarshal([]byte(body), &enabled))
 	require.Len(t, enabled.RecoveryCodes, 10)
 	t.Cleanup(func() {
-		resetOTPStateForTest(t, userId)
-		require.NoError(t, database.DeleteUserRecoveryCodes(context.Background(), nil, userId))
+		resetOTPStateForTest(t, userID)
+		require.NoError(t, database.DeleteUserRecoveryCodes(context.Background(), nil, userID))
 	})
 	return enabled.RecoveryCodes
 }
@@ -67,9 +67,9 @@ func postRecoveryCodes(t *testing.T, accessToken string, password string) (int, 
 
 // claimRecoveryCodeForTest spends one code the way a sign-in does, by its hash, and says whether
 // the set held it unused.
-func claimRecoveryCodeForTest(t *testing.T, userId int64, code string) bool {
+func claimRecoveryCodeForTest(t *testing.T, userID int64, code string) bool {
 	t.Helper()
-	used, err := database.TryUseUserRecoveryCode(context.Background(), nil, userId,
+	used, err := database.TryUseUserRecoveryCode(context.Background(), nil, userID,
 		hashutil.HashString(strings.ReplaceAll(code, "-", "")))
 	require.NoError(t, err)
 	return used
@@ -77,13 +77,13 @@ func claimRecoveryCodeForTest(t *testing.T, userId int64, code string) bool {
 
 func TestAPIAccountRecoveryCodesGet_CountsTheUnusedCodes(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope(t)
-	userId := getAccountUserId(t, accessToken)
-	codes := enableOTPForRecoveryCodesTest(t, accessToken, userId)
+	userID := getAccountUserID(t, accessToken)
+	codes := enableOTPForRecoveryCodesTest(t, accessToken, userID)
 
 	assert.Equal(t, 10, getRecoveryCodesRemaining(t, accessToken), "a new set has ten unused codes")
 
-	require.True(t, claimRecoveryCodeForTest(t, userId, codes[0]))
-	require.True(t, claimRecoveryCodeForTest(t, userId, codes[1]))
+	require.True(t, claimRecoveryCodeForTest(t, userID, codes[0]))
+	require.True(t, claimRecoveryCodeForTest(t, userID, codes[1]))
 	assert.Equal(t, 8, getRecoveryCodesRemaining(t, accessToken), "a used code is not counted")
 
 	resp := makeAPIRequest(t, "GET", appConfig.AuthServer.BaseURL+recoveryCodesURL, accessToken, nil)
@@ -96,13 +96,13 @@ func TestAPIAccountRecoveryCodesGet_CountsTheUnusedCodes(t *testing.T) {
 // did not change (#257 decision 8).
 func TestAPIAccountRecoveryCodesPost_ReplacesTheSet(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope(t)
-	userId := getAccountUserId(t, accessToken)
-	oldCodes := enableOTPForRecoveryCodesTest(t, accessToken, userId)
-	require.True(t, claimRecoveryCodeForTest(t, userId, oldCodes[0]))
+	userID := getAccountUserID(t, accessToken)
+	oldCodes := enableOTPForRecoveryCodesTest(t, accessToken, userID)
+	require.True(t, claimRecoveryCodeForTest(t, userID, oldCodes[0]))
 
-	before, err := database.GetUserByID(context.Background(), nil, userId)
+	before, err := database.GetUserByID(context.Background(), nil, userID)
 	require.NoError(t, err)
-	extra := seedExtraSessionForOTPTest(t, userId)
+	extra := seedExtraSessionForOTPTest(t, userID)
 
 	status, body := postRecoveryCodes(t, accessToken, "Correct1!")
 	require.Equal(t, http.StatusOK, status, string(body))
@@ -115,10 +115,10 @@ func TestAPIAccountRecoveryCodesPost_ReplacesTheSet(t *testing.T) {
 	}
 
 	assert.Equal(t, 10, getRecoveryCodesRemaining(t, accessToken), "the new set is ten unused codes")
-	assert.False(t, claimRecoveryCodeForTest(t, userId, oldCodes[1]), "an unused code of the old set stops working")
-	assert.True(t, claimRecoveryCodeForTest(t, userId, created.RecoveryCodes[3]), "a code of the new set works")
+	assert.False(t, claimRecoveryCodeForTest(t, userID, oldCodes[1]), "an unused code of the old set stops working")
+	assert.True(t, claimRecoveryCodeForTest(t, userID, created.RecoveryCodes[3]), "a code of the new set works")
 
-	after, err := database.GetUserByID(context.Background(), nil, userId)
+	after, err := database.GetUserByID(context.Background(), nil, userID)
 	require.NoError(t, err)
 	assert.Equal(t, before.OTPConfigGeneration, after.OTPConfigGeneration, "a new set moves no generation")
 	assert.True(t, after.OTPEnabled, "the authenticator is left as it is")
@@ -132,8 +132,8 @@ func TestAPIAccountRecoveryCodesPost_ReplacesTheSet(t *testing.T) {
 
 func TestAPIAccountRecoveryCodesPost_WrongPasswordIsRefused(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope(t)
-	userId := getAccountUserId(t, accessToken)
-	codes := enableOTPForRecoveryCodesTest(t, accessToken, userId)
+	userID := getAccountUserID(t, accessToken)
+	codes := enableOTPForRecoveryCodesTest(t, accessToken, userID)
 
 	status, body := postRecoveryCodes(t, accessToken, "WrongPwd!")
 	assert.Equal(t, http.StatusBadRequest, status)
@@ -141,19 +141,19 @@ func TestAPIAccountRecoveryCodesPost_WrongPasswordIsRefused(t *testing.T) {
 	require.NoError(t, json.Unmarshal(body, &errResp))
 	assert.Equal(t, "AUTHENTICATION_FAILED", errResp.ErrorCode)
 	assert.NotContains(t, string(body), "recoveryCodes")
-	assert.True(t, claimRecoveryCodeForTest(t, userId, codes[0]), "the set is left as it was")
+	assert.True(t, claimRecoveryCodeForTest(t, userID, codes[0]), "the set is left as it was")
 }
 
 func TestAPIAccountRecoveryCodesPost_NoAuthenticatorIsRefused(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope(t)
-	userId := getAccountUserId(t, accessToken)
-	setUserPasswordForOTP(t, userId, "Correct1!")
-	resetOTPStateForTest(t, userId)
+	userID := getAccountUserID(t, accessToken)
+	setUserPasswordForOTP(t, userID, "Correct1!")
+	resetOTPStateForTest(t, userID)
 
 	status, body := postRecoveryCodes(t, accessToken, "Correct1!")
 	assert.Equal(t, http.StatusBadRequest, status)
 	var errResp api.ErrorResponse
 	require.NoError(t, json.Unmarshal(body, &errResp))
 	assert.Equal(t, "OTP_NOT_ENABLED", errResp.ErrorCode)
-	assert.Equal(t, 0, unusedRecoveryCodesForTest(t, userId), "no set is created without an authenticator")
+	assert.Equal(t, 0, unusedRecoveryCodesForTest(t, userID), "no set is created without an authenticator")
 }

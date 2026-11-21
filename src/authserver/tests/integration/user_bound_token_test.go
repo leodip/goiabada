@@ -120,7 +120,7 @@ func createImpersonatingClientCredentialsToken(t *testing.T, subject string, per
 	require.NoError(t, err)
 
 	requestedScope := builtin.AuthServerResourceIdentifier + ":" + permissionIdentifier
-	data := postToTokenEndpoint(t, createHttpClient(t), appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
+	data := postToTokenEndpoint(t, createHTTPClient(t), appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
 		"grant_type":    {"client_credentials"},
 		"client_id":     {client.ClientIdentifier},
 		"client_secret": {clientSecret},
@@ -216,7 +216,7 @@ func TestUserBoundToken_ClientCredentialsCannotActAsUser(t *testing.T) {
 		require.NoError(t, err)
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-		resp, err := createHttpClient(t).Do(req)
+		resp, err := createHTTPClient(t).Do(req)
 		require.NoError(t, err)
 		defer func() { _ = resp.Body.Close() }()
 
@@ -238,7 +238,7 @@ func TestUserBoundToken_ClientCredentialsCannotActAsUser(t *testing.T) {
 // than discover; but the guard's whole premise is that claim's universality and nothing
 // else asserts it end to end.
 func TestUserBoundToken_EveryUserTokenPathStillWorks(t *testing.T) {
-	accountEmailUrl := appConfig.AuthServer.BaseURL + "/api/v1/account/email"
+	accountEmailURL := appConfig.AuthServer.BaseURL + "/api/v1/account/email"
 
 	assertEmailChangeSucceeds := func(t *testing.T, accessToken string, user *record.User) {
 		t.Helper()
@@ -248,7 +248,7 @@ func TestUserBoundToken_EveryUserTokenPathStillWorks(t *testing.T) {
 		givePassword(t, user, accountEmailPassword)
 
 		newEmail := strings.ToLower(fake.LetterN(9)) + "@example.com"
-		resp := makeAPIRequest(t, "PUT", accountEmailUrl, accessToken,
+		resp := makeAPIRequest(t, "PUT", accountEmailURL, accessToken,
 			api.UpdateAccountEmailRequest{Email: newEmail, CurrentPassword: accountEmailPassword})
 		defer func() { _ = resp.Body.Close() }()
 
@@ -404,7 +404,7 @@ func ropcTokenResponse(t *testing.T, scope string, beforeGrant func(user *record
 		beforeGrant(user)
 	}
 
-	data := postToTokenEndpoint(t, createHttpClient(t), appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
+	data := postToTokenEndpoint(t, createHTTPClient(t), appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
 		"grant_type":    {"password"},
 		"client_id":     {client.ClientIdentifier},
 		"client_secret": {clientSecret},
@@ -451,7 +451,7 @@ func refreshROPCTokenResponse(t *testing.T, refreshToken string, scope string) (
 	creds, ok := ropcRefreshCredentials[refreshToken]
 	require.True(t, ok, "refresh token should have recorded credentials")
 
-	return refreshWithScope(t, createHttpClient(t), creds.clientIdentifier, creds.clientSecret, refreshToken, scope)
+	return refreshWithScope(t, createHTTPClient(t), creds.clientIdentifier, creds.clientSecret, refreshToken, scope)
 }
 
 // userAccessTokenViaImplicit drives the implicit flow to an access token whose scope is openid.
@@ -476,19 +476,19 @@ func implicitTokenResponse(t *testing.T, responseType string, scope string) (map
 
 	changeSettings(t, func(settings *record.Settings) { settings.ImplicitFlowEnabled = true })
 
-	client, redirectUri := createImplicitFlowClient(t, nil)
+	client, redirectURI := createImplicitFlowClient(t, nil)
 	user, password := createTestUserForImplicit(t)
 	nonce := fake.LetterN(16)
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=" + url.QueryEscape(responseType) +
 		"&scope=" + url.QueryEscape(scope) +
 		"&state=" + fake.LetterN(16) +
 		"&nonce=" + nonce
 
-	httpClient := createHttpClient(t)
-	resp, err := httpClient.Get(destUrl)
+	httpClient := createHTTPClient(t)
+	resp, err := httpClient.Get(destURL)
 	require.NoError(t, err)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 

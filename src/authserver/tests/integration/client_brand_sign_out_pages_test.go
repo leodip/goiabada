@@ -27,7 +27,7 @@ import (
 // the link's query.
 func signOutDeclinedPage(t *testing.T, query url.Values) (*http.Response, url.Values) {
 	t.Helper()
-	browser := createHttpClient(t)
+	browser := createHTTPClient(t)
 
 	consent := loadPage(t, browser, appConfig.AuthServer.BaseURL+"/auth/logout?"+query.Encode())
 	require.Equal(t, http.StatusOK, consent.StatusCode)
@@ -51,7 +51,7 @@ func assertSignOutPagesDrawnIn(t *testing.T, query url.Values, brand *record.Bra
 	t.Helper()
 
 	t.Run("the page asking whether to sign out", func(t *testing.T) {
-		page := loadPage(t, createHttpClient(t), appConfig.AuthServer.BaseURL+"/auth/logout?"+query.Encode())
+		page := loadPage(t, createHTTPClient(t), appConfig.AuthServer.BaseURL+"/auth/logout?"+query.Encode())
 		defer func() { _ = page.Body.Close() }()
 		require.Equal(t, http.StatusOK, page.StatusCode)
 		assertDrawnInBrand(t, page, brand, dataTheme)
@@ -65,14 +65,14 @@ func assertSignOutPagesDrawnIn(t *testing.T, query url.Values, brand *record.Bra
 	})
 
 	t.Run("the signed-out page after it is confirmed", func(t *testing.T) {
-		page := logoutThroughConsentPage(t, createHttpClient(t), query)
+		page := logoutThroughConsentPage(t, createHTTPClient(t), query)
 		defer func() { _ = page.Body.Close() }()
 		require.Equal(t, http.StatusOK, page.StatusCode)
 		assertDrawnInBrand(t, page, brand, dataTheme)
 	})
 }
 
-func TestSignOutPages_ASignOutNamingItsClientByClientIdIsDrawnInTheClientsBrand(t *testing.T) {
+func TestSignOutPages_ASignOutNamingItsClientByClientIDIsDrawnInTheClientsBrand(t *testing.T) {
 	makeDefaultBrand(t, record.BrandAppearanceDark, "plum")
 	client, _ := brandSignInClient(t, record.ACRLevel1)
 	clientBrand := giveClientBrand(t, client, record.BrandAppearanceLight, "avocado")

@@ -20,7 +20,7 @@ import (
 )
 
 func TestToken_ClientCred_ClientSecretBasic_Success(t *testing.T) {
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
@@ -28,9 +28,9 @@ func TestToken_ClientCred_ClientSecretBasic_Success(t *testing.T) {
 
 	// Create resources and permissions with random identifiers
 	resourceIdentifier := "backend-svc-" + fake.LetterN(8)
-	resource := createResourceWithId(t, resourceIdentifier)
+	resource := createResourceWithID(t, resourceIdentifier)
 	permissionIdentifier := "read-data-" + fake.LetterN(8)
-	permission := createPermissionWithId(t, resource.ID, permissionIdentifier)
+	permission := createPermissionWithID(t, resource.ID, permissionIdentifier)
 
 	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
@@ -50,13 +50,13 @@ func TestToken_ClientCred_ClientSecretBasic_Success(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
 	// Use Basic auth - no client_id or client_secret in form body
 	formData := url.Values{
 		"grant_type": {"client_credentials"},
 	}
-	data := postToTokenEndpointWithBasicAuth(t, httpClient, destUrl, formData, client.ClientIdentifier, clientSecret)
+	data := postToTokenEndpointWithBasicAuth(t, httpClient, destURL, formData, client.ClientIdentifier, clientSecret)
 
 	assert.NotNil(t, data["access_token"])
 	assert.Equal(t, "Bearer", data["token_type"])
@@ -68,14 +68,14 @@ func TestToken_ClientCred_ClientSecretBasic_Success(t *testing.T) {
 // client named test-client-x with a generated secret, which holds '-', '.' and '_', arrives as
 // test%2Dclient%2Dx and must still authenticate.
 func TestToken_ClientCred_ClientSecretBasic_FormEncodedCredentials(t *testing.T) {
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	clientSecret := fake.Password(32) + "-._"
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 	require.NoError(t, err)
 
-	resource := createResourceWithId(t, "backend-svc-"+fake.LetterN(8))
-	permission := createPermissionWithId(t, resource.ID, "read-data-"+fake.LetterN(8))
+	resource := createResourceWithID(t, "backend-svc-"+fake.LetterN(8))
+	permission := createPermissionWithID(t, resource.ID, "read-data-"+fake.LetterN(8))
 
 	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
@@ -111,7 +111,7 @@ func TestToken_ClientCred_ClientSecretBasic_FormEncodedCredentials(t *testing.T)
 	formData := url.Values{
 		"grant_type": {"client_credentials"},
 	}
-	data := postToTokenEndpointWithBasicAuth(t, createHttpClient(t), destUrl, formData,
+	data := postToTokenEndpointWithBasicAuth(t, createHTTPClient(t), destURL, formData,
 		escapeAll(client.ClientIdentifier), escapeAll(clientSecret))
 
 	assert.Nil(t, data["error"], "error_description: %v", data["error_description"])
@@ -133,7 +133,7 @@ func TestToken_ClientCred_ClientSecretBasic_SchemeInAnyCase(t *testing.T) {
 		require.NoError(t, err)
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.Header.Set("Authorization", authorization)
-		resp, err := createHttpClient(t).Do(req)
+		resp, err := createHTTPClient(t).Do(req)
 		require.NoError(t, err)
 		defer func() { _ = resp.Body.Close() }()
 		body, err := io.ReadAll(resp.Body)
@@ -159,7 +159,7 @@ func TestToken_ClientCred_ClientSecretBasic_SchemeInAnyCase(t *testing.T) {
 }
 
 func TestToken_ClientCred_ClientSecretBasic_WrongSecret(t *testing.T) {
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
@@ -176,12 +176,12 @@ func TestToken_ClientCred_ClientSecretBasic_WrongSecret(t *testing.T) {
 	err = database.CreateClient(context.Background(), nil, client)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
 	formData := url.Values{
 		"grant_type": {"client_credentials"},
 	}
-	data := postToTokenEndpointWithBasicAuth(t, httpClient, destUrl, formData, client.ClientIdentifier, "wrong_secret")
+	data := postToTokenEndpointWithBasicAuth(t, httpClient, destURL, formData, client.ClientIdentifier, "wrong_secret")
 
 	assert.Equal(t, "invalid_client", data["error"])
 	assert.Equal(t, "Client authentication failed. Please review your client_secret.", data["error_description"])
@@ -192,7 +192,7 @@ func TestToken_ClientCred_ClientSecretBasic_WrongSecret(t *testing.T) {
 // ============================================================================
 
 func TestToken_ClientCred_FlowIsNotEnabled(t *testing.T) {
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
@@ -204,21 +204,21 @@ func TestToken_ClientCred_FlowIsNotEnabled(t *testing.T) {
 	err := database.CreateClient(context.Background(), nil, client)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
 	formData := url.Values{
 		"grant_type":    {"client_credentials"},
 		"client_id":     {client.ClientIdentifier},
 		"client_secret": {fake.Password(32)},
 	}
-	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destURL, formData)
 
 	assert.Equal(t, "unauthorized_client", data["error"])
 	assert.Equal(t, "The client associated with the provided client_id does not support client credentials flow.", data["error_description"])
 }
 
 func TestToken_ClientCred_ClientSecretIsMissing(t *testing.T) {
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
@@ -231,14 +231,14 @@ func TestToken_ClientCred_ClientSecretIsMissing(t *testing.T) {
 	err := database.CreateClient(context.Background(), nil, client)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
 	formData := url.Values{
 		"grant_type": {"client_credentials"},
 		"client_id":  {client.ClientIdentifier},
 		// Intentionally omitting client_secret
 	}
-	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destURL, formData)
 
 	// RFC 6749 Section 5.2: invalid_client for missing client credentials
 	assert.Equal(t, "invalid_client", data["error"])
@@ -246,7 +246,7 @@ func TestToken_ClientCred_ClientSecretIsMissing(t *testing.T) {
 }
 
 func TestToken_ClientCred_ClientAuthFailed(t *testing.T) {
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
@@ -264,21 +264,21 @@ func TestToken_ClientCred_ClientAuthFailed(t *testing.T) {
 	err = database.CreateClient(context.Background(), nil, client)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
 	formData := url.Values{
 		"grant_type":    {"client_credentials"},
 		"client_id":     {client.ClientIdentifier},
 		"client_secret": {"incorrect_secret"}, // Intentionally using an incorrect secret
 	}
-	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destURL, formData)
 
 	assert.Equal(t, "invalid_client", data["error"])
 	assert.Equal(t, "Client authentication failed. Please review your client_secret.", data["error_description"])
 }
 
 func TestToken_ClientCred_InvalidScope(t *testing.T) {
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	// Create a client for testing
 	clientSecret := fake.Password(32)
@@ -299,8 +299,8 @@ func TestToken_ClientCred_InvalidScope(t *testing.T) {
 	// Create a resource and permission for the last test cases
 	resourceIdentifier := "backend-svcA-" + fake.LetterN(8)
 	permissionIdentifier := "read-product-" + fake.LetterN(8)
-	resource := createResourceWithId(t, resourceIdentifier)
-	createPermissionWithId(t, resource.ID, permissionIdentifier)
+	resource := createResourceWithID(t, resourceIdentifier)
+	createPermissionWithID(t, resource.ID, permissionIdentifier)
 
 	testCases := []struct {
 		scope            string
@@ -347,7 +347,7 @@ func TestToken_ClientCred_InvalidScope(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.scope, func(t *testing.T) {
-			httpClient := createHttpClient(t)
+			httpClient := createHTTPClient(t)
 
 			formData := url.Values{
 				"grant_type":    {"client_credentials"},
@@ -355,7 +355,7 @@ func TestToken_ClientCred_InvalidScope(t *testing.T) {
 				"client_secret": {clientSecret},
 				"scope":         {testCase.scope},
 			}
-			data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+			data := postToTokenEndpoint(t, httpClient, destURL, formData)
 
 			assert.Equal(t, testCase.errorCode, data["error"])
 			assert.Equal(t, testCase.errorDescription, data["error_description"])
@@ -398,7 +398,7 @@ func TestToken_ClientCred_NoScopeFromAClientHoldingNothing(t *testing.T) {
 }
 
 func TestToken_ClientCred_NoScopesGiven(t *testing.T) {
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	// Create a client for testing
 	clientSecret := fake.Password(32)
@@ -418,14 +418,14 @@ func TestToken_ClientCred_NoScopesGiven(t *testing.T) {
 
 	// Create resources and permissions with random identifiers
 	resourceAIdentifier := "backend-svcA-" + fake.LetterN(8)
-	resourceA := createResourceWithId(t, resourceAIdentifier)
+	resourceA := createResourceWithID(t, resourceAIdentifier)
 	permissionAIdentifier := "create-product-" + fake.LetterN(8)
-	permissionA := createPermissionWithId(t, resourceA.ID, permissionAIdentifier)
+	permissionA := createPermissionWithID(t, resourceA.ID, permissionAIdentifier)
 
 	resourceBIdentifier := "backend-svcB-" + fake.LetterN(8)
-	resourceB := createResourceWithId(t, resourceBIdentifier)
+	resourceB := createResourceWithID(t, resourceBIdentifier)
 	permissionBIdentifier := "read-info-" + fake.LetterN(8)
-	permissionB := createPermissionWithId(t, resourceB.ID, permissionBIdentifier)
+	permissionB := createPermissionWithID(t, resourceB.ID, permissionBIdentifier)
 
 	// Assign permissions to the client
 	err = database.CreateClientPermission(context.Background(), nil, &record.ClientPermission{
@@ -439,14 +439,14 @@ func TestToken_ClientCred_NoScopesGiven(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
 	formData := url.Values{
 		"grant_type":    {"client_credentials"},
 		"client_id":     {client.ClientIdentifier},
 		"client_secret": {clientSecret},
 	}
-	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destURL, formData)
 
 	// When no scopes are required, it should include all scopes that the client has access to
 	assert.NotNil(t, data["access_token"])
@@ -464,7 +464,7 @@ func TestToken_ClientCred_NoScopesGiven(t *testing.T) {
 }
 
 func TestToken_ClientCred_SpecificScope(t *testing.T) {
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	// Create a client for testing
 	clientSecret := fake.Password(32)
@@ -484,14 +484,14 @@ func TestToken_ClientCred_SpecificScope(t *testing.T) {
 
 	// Create resources and permissions with random identifiers
 	resourceAIdentifier := "backend-svcA-" + fake.LetterN(8)
-	resourceA := createResourceWithId(t, resourceAIdentifier)
+	resourceA := createResourceWithID(t, resourceAIdentifier)
 	permissionAIdentifier := "create-product-" + fake.LetterN(8)
-	permissionA := createPermissionWithId(t, resourceA.ID, permissionAIdentifier)
+	permissionA := createPermissionWithID(t, resourceA.ID, permissionAIdentifier)
 
 	resourceBIdentifier := "backend-svcB-" + fake.LetterN(8)
-	resourceB := createResourceWithId(t, resourceBIdentifier)
+	resourceB := createResourceWithID(t, resourceBIdentifier)
 	permissionBIdentifier := "read-info-" + fake.LetterN(8)
-	permissionB := createPermissionWithId(t, resourceB.ID, permissionBIdentifier)
+	permissionB := createPermissionWithID(t, resourceB.ID, permissionBIdentifier)
 
 	// Assign permissions to the client
 	err = database.CreateClientPermission(context.Background(), nil, &record.ClientPermission{
@@ -505,7 +505,7 @@ func TestToken_ClientCred_SpecificScope(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
 	// Request only one specific scope
 	requestedScope := fmt.Sprintf("%s:%s", resourceAIdentifier, permissionAIdentifier)
@@ -515,7 +515,7 @@ func TestToken_ClientCred_SpecificScope(t *testing.T) {
 		"client_secret": {clientSecret},
 		"scope":         {requestedScope},
 	}
-	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destURL, formData)
 
 	// Verify the response
 	assert.NotNil(t, data["access_token"])
@@ -540,7 +540,7 @@ func TestToken_ClientCred_SpecificScope(t *testing.T) {
 // Both resources deliberately define the SAME permission identifier. The client is
 // granted resource A's permission only.
 func TestToken_ClientCred_CrossResourcePermissionCollision(t *testing.T) {
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
@@ -561,12 +561,12 @@ func TestToken_ClientCred_CrossResourcePermissionCollision(t *testing.T) {
 	sharedPermissionIdentifier := "read-product-" + fake.LetterN(8)
 
 	resourceAIdentifier := "billing-api-" + fake.LetterN(8)
-	resourceA := createResourceWithId(t, resourceAIdentifier)
-	permissionA := createPermissionWithId(t, resourceA.ID, sharedPermissionIdentifier)
+	resourceA := createResourceWithID(t, resourceAIdentifier)
+	permissionA := createPermissionWithID(t, resourceA.ID, sharedPermissionIdentifier)
 
 	resourceBIdentifier := "reports-api-" + fake.LetterN(8)
-	resourceB := createResourceWithId(t, resourceBIdentifier)
-	createPermissionWithId(t, resourceB.ID, sharedPermissionIdentifier)
+	resourceB := createResourceWithID(t, resourceBIdentifier)
+	createPermissionWithID(t, resourceB.ID, sharedPermissionIdentifier)
 
 	// The client holds resource A's permission and nothing else.
 	err = database.CreateClientPermission(context.Background(), nil, &record.ClientPermission{
@@ -581,8 +581,8 @@ func TestToken_ClientCred_CrossResourcePermissionCollision(t *testing.T) {
 	// Denied leg: same permission identifier, different resource. Client credentials
 	// consumes no one-shot resource, so the two legs may run in either order.
 	t.Run("the same identifier on an ungranted resource is denied", func(t *testing.T) {
-		httpClient := createHttpClient(t)
-		data := postToTokenEndpoint(t, httpClient, destUrl, url.Values{
+		httpClient := createHTTPClient(t)
+		data := postToTokenEndpoint(t, httpClient, destURL, url.Values{
 			"grant_type":    {"client_credentials"},
 			"client_id":     {client.ClientIdentifier},
 			"client_secret": {clientSecret},
@@ -599,8 +599,8 @@ func TestToken_ClientCred_CrossResourcePermissionCollision(t *testing.T) {
 	// Granted leg: the positive control. Without it the test above would also pass
 	// against an implementation that rejected everything.
 	t.Run("the granted resource still works", func(t *testing.T) {
-		httpClient := createHttpClient(t)
-		data := postToTokenEndpoint(t, httpClient, destUrl, url.Values{
+		httpClient := createHTTPClient(t)
+		data := postToTokenEndpoint(t, httpClient, destURL, url.Values{
 			"grant_type":    {"client_credentials"},
 			"client_id":     {client.ClientIdentifier},
 			"client_secret": {clientSecret},
@@ -622,7 +622,7 @@ func TestToken_ClientCred_CrossResourcePermissionCollision(t *testing.T) {
 // resource, and authserver:manage is full Admin API access. Before the fix, a client
 // holding <custom>:manage received a token carrying authserver:manage.
 func TestToken_ClientCred_AuthServerScopeNotReachableByCollision(t *testing.T) {
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
@@ -641,8 +641,8 @@ func TestToken_ClientCred_AuthServerScopeNotReachableByCollision(t *testing.T) {
 
 	// A custom resource whose permission identifier collides with the built-in one.
 	customResourceIdentifier := "billing-api-" + fake.LetterN(8)
-	customResource := createResourceWithId(t, customResourceIdentifier)
-	customManage := createPermissionWithId(t, customResource.ID, builtin.ManagePermissionIdentifier)
+	customResource := createResourceWithID(t, customResourceIdentifier)
+	customManage := createPermissionWithID(t, customResource.ID, builtin.ManagePermissionIdentifier)
 
 	err = database.CreateClientPermission(context.Background(), nil, &record.ClientPermission{
 		ClientID:     client.ID,
@@ -671,8 +671,8 @@ func TestToken_ClientCred_AuthServerScopeNotReachableByCollision(t *testing.T) {
 
 	escalatedScope := builtin.AuthServerResourceIdentifier + ":" + builtin.ManagePermissionIdentifier
 
-	httpClient := createHttpClient(t)
-	data := postToTokenEndpoint(t, httpClient, destUrl, url.Values{
+	httpClient := createHTTPClient(t)
+	data := postToTokenEndpoint(t, httpClient, destURL, url.Values{
 		"grant_type":    {"client_credentials"},
 		"client_id":     {client.ClientIdentifier},
 		"client_secret": {clientSecret},
@@ -687,7 +687,7 @@ func TestToken_ClientCred_AuthServerScopeNotReachableByCollision(t *testing.T) {
 
 	// The client's genuine grant is unaffected.
 	genuineScope := fmt.Sprintf("%s:%s", customResourceIdentifier, builtin.ManagePermissionIdentifier)
-	data = postToTokenEndpoint(t, httpClient, destUrl, url.Values{
+	data = postToTokenEndpoint(t, httpClient, destURL, url.Values{
 		"grant_type":    {"client_credentials"},
 		"client_id":     {client.ClientIdentifier},
 		"client_secret": {clientSecret},
@@ -707,7 +707,7 @@ func TestToken_ClientCred_AuthServerScopeNotReachableByCollision(t *testing.T) {
 // issues a token. The single-space request is the control both vary from, and its claim is matched
 // with the real HasScope, the matcher the Admin API middleware uses, over the decoded token.
 func TestToken_ClientCred_ScopeSeparators(t *testing.T) {
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
@@ -725,9 +725,9 @@ func TestToken_ClientCred_ScopeSeparators(t *testing.T) {
 	require.NoError(t, err)
 
 	resourceIdentifier := "billing-api-" + fake.LetterN(8)
-	resource := createResourceWithId(t, resourceIdentifier)
-	readPermission := createPermissionWithId(t, resource.ID, "read-"+fake.LetterN(6))
-	writePermission := createPermissionWithId(t, resource.ID, "write-"+fake.LetterN(6))
+	resource := createResourceWithID(t, resourceIdentifier)
+	readPermission := createPermissionWithID(t, resource.ID, "read-"+fake.LetterN(6))
+	writePermission := createPermissionWithID(t, resource.ID, "write-"+fake.LetterN(6))
 
 	for _, permission := range []*record.Permission{readPermission, writePermission} {
 		err = database.CreateClientPermission(context.Background(), nil, &record.ClientPermission{
@@ -741,7 +741,7 @@ func TestToken_ClientCred_ScopeSeparators(t *testing.T) {
 	writeScope := resourceIdentifier + ":" + writePermission.PermissionIdentifier
 
 	request := func(scope string) map[string]interface{} {
-		return postToTokenEndpoint(t, createHttpClient(t), destUrl, url.Values{
+		return postToTokenEndpoint(t, createHTTPClient(t), destURL, url.Values{
 			"grant_type":    {"client_credentials"},
 			"client_id":     {client.ClientIdentifier},
 			"client_secret": {clientSecret},
@@ -800,7 +800,7 @@ func TestToken_ClientCred_ScopeSeparators(t *testing.T) {
 // Thin on purpose. The character set itself is owned by TestConformErrorDescription in
 // src/core/oauth; what is left for this tier is only that the filter is on the path.
 func TestToken_ClientCred_InvalidScopeWithEmoji_DescriptionIsConformed(t *testing.T) {
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
@@ -817,13 +817,13 @@ func TestToken_ClientCred_InvalidScopeWithEmoji_DescriptionIsConformed(t *testin
 	err = database.CreateClient(context.Background(), nil, client)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
 	formData := url.Values{
 		"grant_type": {"client_credentials"},
 		"scope":      {"emoji💣scope"},
 	}
-	data := postToTokenEndpointWithBasicAuth(t, httpClient, destUrl, formData, client.ClientIdentifier, clientSecret)
+	data := postToTokenEndpointWithBasicAuth(t, httpClient, destURL, formData, client.ClientIdentifier, clientSecret)
 
 	assert.Equal(t, "invalid_scope", data["error"])
 	assert.Equal(t,
@@ -837,7 +837,7 @@ func TestToken_ClientCred_InvalidScopeWithEmoji_DescriptionIsConformed(t *testin
 // The rule's branches are owned by TestTokenLifetimeSeconds in internal/issuance; this shows one
 // of each on the wire.
 func TestToken_ClientCred_TokenLifetime(t *testing.T) {
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	settings, err := database.GetSettingsByID(context.Background(), nil, 1)
 	require.NoError(t, err)
@@ -859,8 +859,8 @@ func TestToken_ClientCred_TokenLifetime(t *testing.T) {
 			clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
 			require.NoError(t, err)
 
-			resource := createResourceWithId(t, "lifetime-svc-"+fake.LetterN(8))
-			permission := createPermissionWithId(t, resource.ID, "read-"+fake.LetterN(8))
+			resource := createResourceWithID(t, "lifetime-svc-"+fake.LetterN(8))
+			permission := createPermissionWithID(t, resource.ID, "read-"+fake.LetterN(8))
 
 			client := &record.Client{
 				ClientIdentifier:         "test-client-" + fake.LetterN(8),
@@ -879,11 +879,11 @@ func TestToken_ClientCred_TokenLifetime(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			httpClient := createHttpClient(t)
+			httpClient := createHTTPClient(t)
 			formData := url.Values{
 				"grant_type": {"client_credentials"},
 			}
-			data := postToTokenEndpointWithBasicAuth(t, httpClient, destUrl, formData, client.ClientIdentifier, clientSecret)
+			data := postToTokenEndpointWithBasicAuth(t, httpClient, destURL, formData, client.ClientIdentifier, clientSecret)
 
 			assert.InDelta(t, float64(tt.expectedLifetime), data["expires_in"], 0)
 

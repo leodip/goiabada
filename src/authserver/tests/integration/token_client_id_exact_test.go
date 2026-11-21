@@ -11,12 +11,12 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// createClientForClientIdComparison registers a client whose identifier is entirely lowercase, so
+// createClientForClientIDComparison registers a client whose identifier is entirely lowercase, so
 // that an upper-cased spelling of it is a different string on every engine rather than a different
 // string on some of them. Created through the data layer, the way token_general_test.go already
 // does, because what is under test is how the token endpoint compares the identifier and not how
 // it was stored.
-func createClientForClientIdComparison(t *testing.T) *record.Client {
+func createClientForClientIDComparison(t *testing.T) *record.Client {
 	t.Helper()
 
 	client := &record.Client{
@@ -31,14 +31,14 @@ func createClientForClientIdComparison(t *testing.T) *record.Client {
 	return client
 }
 
-// assertClientIdResolves is the control every case below runs first, and it is what stops the
+// assertClientIDResolves is the control every case below runs first, and it is what stops the
 // refusal that follows passing because the client was never created. With the identifier spelled
 // exactly as registered the endpoint gets PAST the client lookup and refuses the grant type
 // instead, which is only reachable once a client has been found.
-func assertClientIdResolves(t *testing.T, destUrl, clientIdentifier string) {
+func assertClientIDResolves(t *testing.T, destURL, clientIdentifier string) {
 	t.Helper()
 
-	data := postToTokenEndpoint(t, createHttpClient(t), destUrl, url.Values{
+	data := postToTokenEndpoint(t, createHTTPClient(t), destURL, url.Values{
 		"grant_type": {"invalid_grant_type"},
 		"client_id":  {clientIdentifier},
 	})
@@ -46,7 +46,7 @@ func assertClientIdResolves(t *testing.T, destUrl, clientIdentifier string) {
 		"the exact identifier must get past the client lookup, or the refusals below prove nothing")
 }
 
-// TestToken_ClientIdCaseVariantIsRefused is RFC 6749 section 1.9 at the boundary a client actually
+// TestToken_ClientIDCaseVariantIsRefused is RFC 6749 section 1.9 at the boundary a client actually
 // meets: "Unless otherwise noted, all the protocol parameter names and values are case sensitive",
 // and section 2.2 notes no exception for client_id. A request naming the client in a case it was
 // not registered in therefore names no client.
@@ -55,13 +55,13 @@ func assertClientIdResolves(t *testing.T, destUrl, clientIdentifier string) {
 // answered the other way until migration 000040 moved every string column to a case-sensitive
 // collation, so on those two engines this case is the conformance fix itself being observed, and
 // their result is the check suite's rather than the local sqlite run's (#283).
-func TestToken_ClientIdCaseVariantIsRefused(t *testing.T) {
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
-	client := createClientForClientIdComparison(t)
+func TestToken_ClientIDCaseVariantIsRefused(t *testing.T) {
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
+	client := createClientForClientIDComparison(t)
 
-	assertClientIdResolves(t, destUrl, client.ClientIdentifier)
+	assertClientIDResolves(t, destURL, client.ClientIdentifier)
 
-	data := postToTokenEndpoint(t, createHttpClient(t), destUrl, url.Values{
+	data := postToTokenEndpoint(t, createHTTPClient(t), destURL, url.Values{
 		"grant_type": {"invalid_grant_type"},
 		"client_id":  {strings.ToUpper(client.ClientIdentifier)},
 	})
@@ -69,7 +69,7 @@ func TestToken_ClientIdCaseVariantIsRefused(t *testing.T) {
 	assert.Equal(t, "Client does not exist.", data["error_description"])
 }
 
-// TestToken_ClientIdTrailingSpaceIsRefused is the same property against a fold no collation turns
+// TestToken_ClientIDTrailingSpaceIsRefused is the same property against a fold no collation turns
 // off. SQL Server pads both operands of `=` to equal length, under every collation it has including
 // BIN and BIN2, while DATALENGTH shows the strings differ; so client_id=myapp with a trailing space
 // resolved the client registered as myapp there both before #283 and after the collation change,
@@ -83,13 +83,13 @@ func TestToken_ClientIdCaseVariantIsRefused(t *testing.T) {
 //
 // SQL Server is the only engine on which this case could fail, so its result is the check suite's.
 // Here it holds because SQLite compares the bytes.
-func TestToken_ClientIdTrailingSpaceIsRefused(t *testing.T) {
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
-	client := createClientForClientIdComparison(t)
+func TestToken_ClientIDTrailingSpaceIsRefused(t *testing.T) {
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
+	client := createClientForClientIDComparison(t)
 
-	assertClientIdResolves(t, destUrl, client.ClientIdentifier)
+	assertClientIDResolves(t, destURL, client.ClientIdentifier)
 
-	data := postToTokenEndpoint(t, createHttpClient(t), destUrl, url.Values{
+	data := postToTokenEndpoint(t, createHTTPClient(t), destURL, url.Values{
 		"grant_type": {"invalid_grant_type"},
 		"client_id":  {client.ClientIdentifier + " "},
 	})

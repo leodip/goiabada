@@ -61,13 +61,13 @@ func newDisconnectedUser(t *testing.T, user *record.User) *disconnectedUser {
 }
 
 // assertToldAboutTheUser holds what arrived to one token naming the user and no session, to the
-// disconnected client alone, recorded by the request requestId.
-func (d *disconnectedUser) assertToldAboutTheUser(t *testing.T, requestId string) {
+// disconnected client alone, recorded by the request requestID.
+func (d *disconnectedUser) assertToldAboutTheUser(t *testing.T, requestID string) {
 	t.Helper()
 	posts := d.told.waitFor(t, 1, 10*time.Second)
 	claims := assertLogoutToken(t, posts[0], d.client.ClientIdentifier, d.user.Subject, "")
 
-	row, details := sentLogoutTokenRow(t, requestId, 10*time.Second)
+	row, details := sentLogoutTokenRow(t, requestID, 10*time.Second)
 	assert.Equal(t, map[string]interface{}{
 		"client_id":          float64(d.client.ID),
 		"user_id":            float64(d.user.ID),
@@ -107,11 +107,11 @@ func TestBackchannelLogout_AnAdministratorWithdrawingAConsentTellsTheClient(t *t
 	d := newDisconnectedUser(t, nil)
 	path := "/api/v1/admin/user-consents/" + strconv.FormatInt(d.consent.ID, 10)
 
-	resp, requestId := sendAdminRequest(t, d.adminToken, http.MethodDelete, path, nil)
+	resp, requestID := sendAdminRequest(t, d.adminToken, http.MethodDelete, path, nil)
 	_ = resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
-	d.assertToldAboutTheUser(t, requestId)
+	d.assertToldAboutTheUser(t, requestID)
 	d.assertSessionUntouched(t)
 
 	again, _ := sendAdminRequest(t, d.adminToken, http.MethodDelete, path, nil)
@@ -127,12 +127,12 @@ func TestBackchannelLogout_AUserWithdrawingTheirConsentTellsTheClient(t *testing
 	accessToken, user := getUserAccessTokenWithAccountScope(t)
 	d := newDisconnectedUser(t, user)
 
-	resp, requestId := sendAdminRequest(t, accessToken, http.MethodDelete,
+	resp, requestID := sendAdminRequest(t, accessToken, http.MethodDelete,
 		"/api/v1/account/consents/"+strconv.FormatInt(d.consent.ID, 10), nil)
 	_ = resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
-	d.assertToldAboutTheUser(t, requestId)
+	d.assertToldAboutTheUser(t, requestID)
 	d.assertSessionUntouched(t)
 }
 
@@ -152,14 +152,14 @@ func TestBackchannelLogout_WithdrawingAConsentTellsASidRequiringClientOfEachVali
 	elsewhere := createTestUserSession(t, d.user.ID, fake.UUID())
 	onSession(t, elsewhere, d.other)
 
-	resp, requestId := sendAdminRequest(t, d.adminToken, http.MethodDelete,
+	resp, requestID := sendAdminRequest(t, d.adminToken, http.MethodDelete,
 		"/api/v1/admin/user-consents/"+strconv.FormatInt(d.consent.ID, 10), nil)
 	_ = resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
 	posts := d.told.waitFor(t, 1, 10*time.Second)
 	assertLogoutToken(t, posts[0], d.client.ClientIdentifier, d.user.Subject, d.session.SessionIdentifier)
-	rows := sentLogoutTokenRows(t, requestId, 1, 10*time.Second)
+	rows := sentLogoutTokenRows(t, requestID, 1, 10*time.Second)
 	var details map[string]interface{}
 	require.NoError(t, json.Unmarshal([]byte(rows[0].Details), &details))
 	assert.Equal(t, d.session.SessionIdentifier, details["session_identifier"])
@@ -202,12 +202,12 @@ func TestBackchannelLogout_DisconnectingAConnectedClientTellsIt(t *testing.T) {
 	accessToken, user := getUserAccessTokenWithAccountScope(t)
 	d := newDisconnectedUser(t, user)
 
-	resp, requestId := sendAdminRequest(t, accessToken, http.MethodDelete,
+	resp, requestID := sendAdminRequest(t, accessToken, http.MethodDelete,
 		"/api/v1/account/connected-clients/"+strconv.FormatInt(d.client.ID, 10), nil)
 	_ = resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
-	d.assertToldAboutTheUser(t, requestId)
+	d.assertToldAboutTheUser(t, requestID)
 	d.assertSessionUntouched(t)
 	consent, err := database.GetUserConsentByID(context.Background(), nil, d.consent.ID)
 	require.NoError(t, err)

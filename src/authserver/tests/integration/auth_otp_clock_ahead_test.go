@@ -50,8 +50,8 @@ func assertClockAheadRefused(t *testing.T, resp *http.Response) {
 	assert.Equal(t, clockAheadMessage, strings.TrimSpace(doc.Find(`[role="alert"]`).Text()))
 }
 
-// clockAheadRefusalsFor counts the auth_failed_otp records naming userId with reason clock_ahead.
-func clockAheadRefusalsFor(t *testing.T, adminToken string, userId int64) int {
+// clockAheadRefusalsFor counts the auth_failed_otp records naming userID with reason clock_ahead.
+func clockAheadRefusalsFor(t *testing.T, adminToken string, userID int64) int {
 	t.Helper()
 
 	logs, resp := getAuditLogs(t, adminToken, "auditEvent="+audit.EventAuthFailedOTP+"&size=200")
@@ -62,21 +62,21 @@ func clockAheadRefusalsFor(t *testing.T, adminToken string, userId int64) int {
 	for _, entry := range logs.AuditLogs {
 		var details map[string]any
 		require.NoError(t, json.Unmarshal([]byte(entry.Details), &details))
-		if id, ok := details["user_id"].(float64); ok && int64(id) == userId && details["reason"] == "clock_ahead" {
+		if id, ok := details["user_id"].(float64); ok && int64(id) == userID && details["reason"] == "clock_ahead" {
 			count++
 		}
 	}
 	return count
 }
 
-func TestAuthOtp_ANextStepCodeIsRefusedAsAClockRunningAhead(t *testing.T) {
+func TestAuthOTP_ANextStepCodeIsRefusedAsAClockRunningAhead(t *testing.T) {
 	requireDatabaseAuditLogs(t)
 	adminToken, _ := createAdminClientWithToken(t)
-	client, redirectUri, user, password, otpSecret := createLevel2MandatoryUser(t, true)
+	client, redirectURI, user, password, otpSecret := createLevel2MandatoryUser(t, true)
 
-	httpClient, page, otpUrl := startOtpCeremony(t, client, redirectUri, user, password, "")
+	httpClient, page, otpURL := startOTPCeremony(t, client, redirectURI, user, password, "")
 	for i := 0; i < otpRateBudget+1; i++ {
-		refused := authenticateWithOtp(t, httpClient, otpUrl, page, otptest.NextStepCode(t, otpSecret))
+		refused := authenticateWithOTP(t, httpClient, otpURL, page, otptest.NextStepCode(t, otpSecret))
 		_ = page.Body.Close()
 		assertClockAheadRefused(t, refused)
 		page = refused
@@ -89,25 +89,25 @@ func TestAuthOtp_ANextStepCodeIsRefusedAsAClockRunningAhead(t *testing.T) {
 	assert.Equal(t, otpRateBudget+1, clockAheadRefusalsFor(t, adminToken, user.ID))
 
 	// Past the budget, so this is accepted only because none of the refusals was charged.
-	resp := authenticateWithOtp(t, httpClient, otpUrl, page, otptest.Code(t, otpSecret, time.Now()))
+	resp := authenticateWithOTP(t, httpClient, otpURL, page, otptest.Code(t, otpSecret, time.Now()))
 	_ = page.Body.Close()
 	assertRedirect(t, resp, "/auth/completed")
 	_ = resp.Body.Close()
 }
 
-func TestAuthOtp_ANextStepCodeOnTheSetupFormIsRefusedAsAClockRunningAhead(t *testing.T) {
+func TestAuthOTP_ANextStepCodeOnTheSetupFormIsRefusedAsAClockRunningAhead(t *testing.T) {
 	requireDatabaseAuditLogs(t)
 	adminToken, _ := createAdminClientWithToken(t)
-	client, redirectUri, user, password, _ := createLevel2MandatoryUser(t, false)
+	client, redirectURI, user, password, _ := createLevel2MandatoryUser(t, false)
 
-	httpClient, page, otpUrl := startOtpCeremony(t, client, redirectUri, user, password, "")
-	secret := getOtpSecretFromEnrollmentPage(t, page)
+	httpClient, page, otpURL := startOTPCeremony(t, client, redirectURI, user, password, "")
+	secret := getOTPSecretFromEnrollmentPage(t, page)
 	for i := 0; i < otpRateBudget+1; i++ {
-		refused := authenticateWithOtp(t, httpClient, otpUrl, page, otptest.NextStepCode(t, secret))
+		refused := authenticateWithOTP(t, httpClient, otpURL, page, otptest.NextStepCode(t, secret))
 		_ = page.Body.Close()
 		assertClockAheadRefused(t, refused)
 		// Still the setup form, with the key the user has already scanned.
-		assert.Equal(t, secret, getOtpSecretFromEnrollmentPage(t, refused))
+		assert.Equal(t, secret, getOTPSecretFromEnrollmentPage(t, refused))
 		page = refused
 	}
 
@@ -117,7 +117,7 @@ func TestAuthOtp_ANextStepCodeOnTheSetupFormIsRefusedAsAClockRunningAhead(t *tes
 	assert.Zero(t, stored.LastOTPStep, "and no step was claimed")
 	assert.Equal(t, otpRateBudget+1, clockAheadRefusalsFor(t, adminToken, user.ID))
 
-	resp := passSetupRecoveryCodes(t, httpClient, authenticateWithOtp(t, httpClient, otpUrl, page, otptest.Code(t, secret, time.Now())))
+	resp := passSetupRecoveryCodes(t, httpClient, authenticateWithOTP(t, httpClient, otpURL, page, otptest.Code(t, secret, time.Now())))
 	_ = page.Body.Close()
 	assertRedirect(t, resp, "/auth/completed")
 	_ = resp.Body.Close()
@@ -127,9 +127,9 @@ func TestAPIAccountOTPPut_Enable_ANextStepCodeIsRefusedAsAClockRunningAhead(t *t
 	requireDatabaseAuditLogs(t)
 	adminToken, _ := createAdminClientWithToken(t)
 	accessToken, _ := getUserAccessTokenWithAccountScope(t)
-	userId := getAccountUserId(t, accessToken)
-	setUserPasswordForOTP(t, userId, "Correct1!")
-	resetOTPStateForTest(t, userId)
+	userID := getAccountUserID(t, accessToken)
+	setUserPasswordForOTP(t, userID, "Correct1!")
+	resetOTPStateForTest(t, userID)
 
 	issued := getOTPEnrollment(t, accessToken)
 
@@ -141,9 +141,9 @@ func TestAPIAccountOTPPut_Enable_ANextStepCodeIsRefusedAsAClockRunningAhead(t *t
 	require.NoError(t, json.Unmarshal([]byte(body), &refusal))
 	assert.Equal(t, "OTP_CLOCK_AHEAD", refusal.ErrorCode)
 	assert.Equal(t, clockAheadMessage, refusal.ErrorDescription)
-	assert.Equal(t, 1, clockAheadRefusalsFor(t, adminToken, userId))
+	assert.Equal(t, 1, clockAheadRefusalsFor(t, adminToken, userID))
 
-	stored, err := database.GetUserByID(context.Background(), nil, userId)
+	stored, err := database.GetUserByID(context.Background(), nil, userID)
 	require.NoError(t, err)
 	assert.False(t, stored.OTPEnabled)
 	assert.Zero(t, stored.LastOTPStep, "no step was claimed")

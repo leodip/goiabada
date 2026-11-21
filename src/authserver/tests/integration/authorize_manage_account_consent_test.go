@@ -76,26 +76,26 @@ func newManageAccountConsentFixture(t *testing.T, administrativeScopesAllowed bo
 	user := &record.User{Subject: fake.UUID(), Enabled: true, Email: fake.Email(), PasswordHash: passwordHashed}
 	require.NoError(t, database.CreateUser(context.Background(), nil, user))
 	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.ID) })
-	assignPermissionToUser(t, user.ID, authServerPermissionId(t, builtin.ManageAccountPermissionIdentifier))
+	assignPermissionToUser(t, user.ID, authServerPermissionID(t, builtin.ManageAccountPermissionIdentifier))
 
 	return &manageAccountConsentFixture{
-		client: client, clientSecret: clientSecret, user: user, password: password, browser: createHttpClient(t),
+		client: client, clientSecret: clientSecret, user: user, password: password, browser: createHTTPClient(t),
 	}
 }
 
 // link is an authorization request from the fixture's client for scope and responseType, with
 // extra appended as it is.
 func (f *manageAccountConsentFixture) link(responseType, scope, extra string) string {
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + f.client.ClientIdentifier +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + f.client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(manageAccountRedirectURI) +
 		"&response_type=" + url.QueryEscape(responseType) +
 		"&scope=" + url.QueryEscape(scope) +
 		"&state=" + manageAccountState +
 		"&nonce=" + fake.LetterN(8)
 	if responseType == "code" {
-		destUrl += "&code_challenge_method=S256&code_challenge=" + oauth.GeneratePKCECodeChallenge(testCodeVerifier)
+		destURL += "&code_challenge_method=S256&code_challenge=" + oauth.GeneratePKCECodeChallenge(testCodeVerifier)
 	}
-	return destUrl + extra
+	return destURL + extra
 }
 
 // craftedLink is the issue's link, for responseType.
@@ -136,12 +136,12 @@ func (f *manageAccountConsentFixture) signIn(t *testing.T) {
 	require.Nil(t, consent, "the sign-in leaves no stored consent")
 }
 
-// toCompleted follows destUrl from a signed-in browser through the SSO shortcut to /auth/completed,
+// toCompleted follows destURL from a signed-in browser through the SSO shortcut to /auth/completed,
 // and answers /auth/completed's response.
-func (f *manageAccountConsentFixture) toCompleted(t *testing.T, destUrl string) *http.Response {
+func (f *manageAccountConsentFixture) toCompleted(t *testing.T, destURL string) *http.Response {
 	t.Helper()
 
-	resp, err := f.browser.Get(destUrl)
+	resp, err := f.browser.Get(destURL)
 	require.NoError(t, err)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 	location := assertRedirect(t, resp, "/auth/level1completed")
@@ -151,12 +151,12 @@ func (f *manageAccountConsentFixture) toCompleted(t *testing.T, destUrl string) 
 	return loadPage(t, f.browser, location)
 }
 
-// toConsentScreen follows destUrl from a signed-in browser to the consent screen, and answers its
+// toConsentScreen follows destURL from a signed-in browser to the consent screen, and answers its
 // URL and the rendered page.
-func (f *manageAccountConsentFixture) toConsentScreen(t *testing.T, destUrl string) (string, *http.Response) {
+func (f *manageAccountConsentFixture) toConsentScreen(t *testing.T, destURL string) (string, *http.Response) {
 	t.Helper()
 
-	resp := f.toCompleted(t, destUrl)
+	resp := f.toCompleted(t, destURL)
 	defer func() { _ = resp.Body.Close() }()
 	location := assertRedirect(t, resp, "/auth/consent")
 	page := loadPage(t, f.browser, location)
@@ -164,12 +164,12 @@ func (f *manageAccountConsentFixture) toConsentScreen(t *testing.T, destUrl stri
 	return location, page
 }
 
-// toIssue follows destUrl from a signed-in browser straight through /auth/completed to /auth/issue,
+// toIssue follows destURL from a signed-in browser straight through /auth/completed to /auth/issue,
 // with no consent screen, and answers /auth/issue's response.
-func (f *manageAccountConsentFixture) toIssue(t *testing.T, destUrl string) *http.Response {
+func (f *manageAccountConsentFixture) toIssue(t *testing.T, destURL string) *http.Response {
 	t.Helper()
 
-	resp := f.toCompleted(t, destUrl)
+	resp := f.toCompleted(t, destURL)
 	defer func() { _ = resp.Body.Close() }()
 	location := assertRedirect(t, resp, "/auth/issue")
 	return loadPage(t, f.browser, location)
@@ -207,7 +207,7 @@ func (f *manageAccountConsentFixture) storedConsentScope(t *testing.T) string {
 func (f *manageAccountConsentFixture) redeem(t *testing.T, issueResponse *http.Response) (string, *record.Code) {
 	t.Helper()
 
-	codeVal, state := getCodeAndStateFromUrl(t, issueResponse)
+	codeVal, state := getCodeAndStateFromURL(t, issueResponse)
 	assert.Equal(t, manageAccountState, state)
 	code := loadCodeFromDatabase(t, codeVal)
 	data := postToTokenEndpoint(t, f.browser, appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
@@ -242,7 +242,7 @@ func assertAnswered(t *testing.T, resp *http.Response, errorCode, errorDescripti
 	require.Equal(t, ceremonyRedirectStatus(resp), resp.StatusCode)
 	location := resp.Header.Get("Location")
 	require.True(t, strings.HasPrefix(location, manageAccountRedirectURI+"?"), "answered at the client's callback: %s", location)
-	gotCode, gotDescription, gotState := getErrorFromUrl(t, resp)
+	gotCode, gotDescription, gotState := getErrorFromURL(t, resp)
 	assert.Equal(t, errorCode, gotCode)
 	assert.Equal(t, errorDescription, gotDescription)
 	assert.Equal(t, manageAccountState, gotState)

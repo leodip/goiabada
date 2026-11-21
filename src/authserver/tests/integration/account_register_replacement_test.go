@@ -37,7 +37,7 @@ func TestSelfRegister_WithVerificationADeadRegistrationIsReplaced(t *testing.T) 
 	requireDatabaseAuditLogs(t)
 	setRegSettings(t, true, true, true)
 
-	browser := createHttpClient(t)
+	browser := createHTTPClient(t)
 	loadRegisterPage(t, browser)
 
 	email := registerAddress()
@@ -67,7 +67,7 @@ func TestSelfRegister_WithVerificationADeadRegistrationIsReplaced(t *testing.T) 
 		"the fresh code is issued now")
 
 	// The dead link finds nothing any more.
-	stale := createHttpClient(t)
+	stale := createHTTPClient(t)
 	resp := loadPage(t, stale, deadLink)
 	staleBody := bodyString(t, resp)
 	_ = resp.Body.Close()
@@ -76,9 +76,9 @@ func TestSelfRegister_WithVerificationADeadRegistrationIsReplaced(t *testing.T) 
 
 	// The fresh one completes the registration.
 	cleanURL := followActivationLink(t, browser, freshLink)
-	continuationId := loadActivationForm(t, browser, cleanURL, email)
+	continuationID := loadActivationForm(t, browser, cleanURL, email)
 	const chosenPassword = "Chosen-After-Replacement-1!"
-	activateResp := postActivation(t, browser, cleanURL, chosenPassword, chosenPassword, continuationId)
+	activateResp := postActivation(t, browser, cleanURL, chosenPassword, chosenPassword, continuationID)
 	activationBody := bodyString(t, activateResp)
 	_ = activateResp.Body.Close()
 	assert.Equal(t, http.StatusOK, activateResp.StatusCode)
@@ -98,7 +98,7 @@ func TestSelfRegister_WithVerificationARegistrationJustInsideTheWindowIsKept(t *
 	requireDatabaseAuditLogs(t)
 	setRegSettings(t, true, true, true)
 
-	browser := createHttpClient(t)
+	browser := createHTTPClient(t)
 	loadRegisterPage(t, browser)
 
 	email := registerAddress()
@@ -139,7 +139,7 @@ func TestSelfRegister_WithoutVerificationADeadRegistrationDoesNotTakeTheAddress(
 
 	t.Run("one that can still complete", func(t *testing.T) {
 		email := seedPending(t, 9*time.Minute)
-		httpClient := createHttpClient(t)
+		httpClient := createHTTPClient(t)
 		loadRegisterPage(t, httpClient)
 
 		password := fake.Password(20)
@@ -156,7 +156,7 @@ func TestSelfRegister_WithoutVerificationADeadRegistrationDoesNotTakeTheAddress(
 
 	t.Run("a dead one", func(t *testing.T) {
 		email := seedPending(t, 11*time.Minute)
-		httpClient := createHttpClient(t)
+		httpClient := createHTTPClient(t)
 		loadRegisterPage(t, httpClient)
 
 		password := fake.Password(20)

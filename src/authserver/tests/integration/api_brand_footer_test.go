@@ -171,7 +171,7 @@ func TestAPIBrandFooter_ChangesAreAudited(t *testing.T) {
 	_, created := keepDefaultBrand(t)
 
 	name := brandName("AuditFooter")
-	resp, requestId := sendAdmin(t, accessToken, http.MethodPost, brandsPath, footerBrandBody(name))
+	resp, requestID := sendAdmin(t, accessToken, http.MethodPost, brandsPath, footerBrandBody(name))
 	var answer map[string]any
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&answer))
 	_ = resp.Body.Close()
@@ -183,9 +183,9 @@ func TestAPIBrandFooter_ChangesAreAudited(t *testing.T) {
 		"support_phone":    "+442079460958",
 		"footer_link_urls": []any{"https://acme.example/privacy", "https://status.acme.example", "https://acme.example"},
 		"logged_in_user":   who}},
-		auditRows(t, accessToken, "created_brand", requestId))
+		auditRows(t, accessToken, "created_brand", requestID))
 
-	_, _, requestId = brandCall(t, accessToken, http.MethodPut, brandPath(id, ""),
+	_, _, requestID = brandCall(t, accessToken, http.MethodPut, brandPath(id, ""),
 		brandBody(map[string]any{"name": name, "appearance": "dark", "theme": "plum",
 			"footerLinks":  []any{map[string]any{"url": "https://acme.example/terms", "label": "Terms"}},
 			"supportEmail": "support@acme.example"}))
@@ -193,5 +193,5 @@ func TestAPIBrandFooter_ChangesAreAudited(t *testing.T) {
 		"theme": "plum", "corners": "rounded", "font": "system-ui", "background_fit": "cover",
 		"hide_app_name": false, "support_email": "support@acme.example",
 		"footer_link_urls": []any{"https://acme.example/terms"}, "logged_in_user": who}},
-		auditRows(t, accessToken, "updated_brand", requestId))
+		auditRows(t, accessToken, "updated_brand", requestID))
 }

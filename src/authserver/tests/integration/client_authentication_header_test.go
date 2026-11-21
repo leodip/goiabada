@@ -106,7 +106,7 @@ func postWithAuthorizationFields(t *testing.T, path string, form url.Values, fie
 	for _, field := range fields {
 		req.Header.Add("Authorization", field)
 	}
-	resp, err := createHttpClient(t).Do(req)
+	resp, err := createHTTPClient(t).Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	body, err := io.ReadAll(resp.Body)

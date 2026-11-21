@@ -19,7 +19,7 @@ import (
 // Retry-After (#716 item 2) and DPoP-Nonce (#42 decision 15) to script. The
 // branches are middleware.CORS's own tests; this holds the middleware mounted, with a registered
 // origin read from the real database.
-func TestCors_TheAnswersOnTheWire(t *testing.T) {
+func TestCORS_TheAnswersOnTheWire(t *testing.T) {
 	registered := "https://cors-answers-" + strings.ToLower(fake.LetterN(8)) + ".example.com"
 	unregistered := "https://cors-answers-" + strings.ToLower(fake.LetterN(8)) + ".example.com"
 
@@ -183,7 +183,7 @@ func TestCors_TheAnswersOnTheWire(t *testing.T) {
 				req.Header[name] = values
 			}
 
-			resp, err := createHttpClient(t).Do(req)
+			resp, err := createHTTPClient(t).Do(req)
 			require.NoError(t, err)
 			defer func() { _ = resp.Body.Close() }()
 

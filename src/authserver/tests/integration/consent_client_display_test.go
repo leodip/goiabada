@@ -20,14 +20,14 @@ func TestConsent_ClientDisplay_ShowDisplayName(t *testing.T) {
 		ShowDescription:  false,
 		ShowWebsiteURL:   false,
 		ConsentRequired:  true, // Consent required
-		DefaultAcrLevel:  record.ACRLevel1,
+		DefaultACRLevel:  record.ACRLevel1,
 	})
 
-	redirectUri := &record.RedirectURI{
+	redirectURI := &record.RedirectURI{
 		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
-	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err := database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	require.NoError(t, err)
 
 	// Create user
@@ -45,8 +45,8 @@ func TestConsent_ClientDisplay_ShowDisplayName(t *testing.T) {
 	require.NoError(t, err)
 
 	// Navigate to consent screen
-	httpClient := createHttpClient(t)
-	resp := navigateToConsentScreen(t, httpClient, client, user, password, redirectUri.URI)
+	httpClient := createHTTPClient(t)
+	resp := navigateToConsentScreen(t, httpClient, client, user, password, redirectURI.URI)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Parse HTML
@@ -56,7 +56,7 @@ func TestConsent_ClientDisplay_ShowDisplayName(t *testing.T) {
 	assertClientNameInHTML(t, doc, "My Awesome Application")
 	assertClientLogoInHTML(t, doc, client.ClientIdentifier, false)
 	assertClientDescriptionInHTML(t, doc, "", false)
-	assertClientWebsiteUrlInHTML(t, doc, "", false)
+	assertClientWebsiteURLInHTML(t, doc, "", false)
 }
 
 func TestConsent_ClientDisplay_ShowLogo_WithLogo(t *testing.T) {
@@ -69,14 +69,14 @@ func TestConsent_ClientDisplay_ShowLogo_WithLogo(t *testing.T) {
 		ShowDescription:  false,
 		ShowWebsiteURL:   false,
 		ConsentRequired:  true,
-		DefaultAcrLevel:  record.ACRLevel1,
+		DefaultACRLevel:  record.ACRLevel1,
 	})
 
-	redirectUri := &record.RedirectURI{
+	redirectURI := &record.RedirectURI{
 		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
-	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err := database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	require.NoError(t, err)
 
 	// Create user
@@ -94,8 +94,8 @@ func TestConsent_ClientDisplay_ShowLogo_WithLogo(t *testing.T) {
 	require.NoError(t, err)
 
 	// Navigate to consent screen
-	httpClient := createHttpClient(t)
-	resp := navigateToConsentScreen(t, httpClient, client, user, password, redirectUri.URI)
+	httpClient := createHTTPClient(t)
+	resp := navigateToConsentScreen(t, httpClient, client, user, password, redirectURI.URI)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Parse HTML
@@ -105,7 +105,7 @@ func TestConsent_ClientDisplay_ShowLogo_WithLogo(t *testing.T) {
 	assertClientNameInHTML(t, doc, client.ClientIdentifier)
 	assertClientLogoInHTML(t, doc, client.ClientIdentifier, true)
 	assertClientDescriptionInHTML(t, doc, "", false)
-	assertClientWebsiteUrlInHTML(t, doc, "", false)
+	assertClientWebsiteURLInHTML(t, doc, "", false)
 }
 
 func TestConsent_ClientDisplay_ShowDescription(t *testing.T) {
@@ -118,14 +118,14 @@ func TestConsent_ClientDisplay_ShowDescription(t *testing.T) {
 		ShowDisplayName:  false,
 		ShowWebsiteURL:   false,
 		ConsentRequired:  true,
-		DefaultAcrLevel:  record.ACRLevel1,
+		DefaultACRLevel:  record.ACRLevel1,
 	})
 
-	redirectUri := &record.RedirectURI{
+	redirectURI := &record.RedirectURI{
 		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
-	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err := database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	require.NoError(t, err)
 
 	// Create user
@@ -143,8 +143,8 @@ func TestConsent_ClientDisplay_ShowDescription(t *testing.T) {
 	require.NoError(t, err)
 
 	// Navigate to consent screen
-	httpClient := createHttpClient(t)
-	resp := navigateToConsentScreen(t, httpClient, client, user, password, redirectUri.URI)
+	httpClient := createHTTPClient(t)
+	resp := navigateToConsentScreen(t, httpClient, client, user, password, redirectURI.URI)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Parse HTML
@@ -154,7 +154,7 @@ func TestConsent_ClientDisplay_ShowDescription(t *testing.T) {
 	assertClientNameInHTML(t, doc, client.ClientIdentifier)
 	assertClientLogoInHTML(t, doc, client.ClientIdentifier, false)
 	assertClientDescriptionInHTML(t, doc, "The best app for testing OAuth flows", true)
-	assertClientWebsiteUrlInHTML(t, doc, "", false)
+	assertClientWebsiteURLInHTML(t, doc, "", false)
 }
 
 func TestConsent_ClientDisplay_AllEnabled(t *testing.T) {
@@ -170,14 +170,14 @@ func TestConsent_ClientDisplay_AllEnabled(t *testing.T) {
 		ShowWebsiteURL:   true,
 		UploadLogo:       true,
 		ConsentRequired:  true,
-		DefaultAcrLevel:  record.ACRLevel1,
+		DefaultACRLevel:  record.ACRLevel1,
 	})
 
-	redirectUri := &record.RedirectURI{
+	redirectURI := &record.RedirectURI{
 		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
-	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err := database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	require.NoError(t, err)
 
 	// Create user
@@ -195,8 +195,8 @@ func TestConsent_ClientDisplay_AllEnabled(t *testing.T) {
 	require.NoError(t, err)
 
 	// Navigate to consent screen
-	httpClient := createHttpClient(t)
-	resp := navigateToConsentScreen(t, httpClient, client, user, password, redirectUri.URI)
+	httpClient := createHTTPClient(t)
+	resp := navigateToConsentScreen(t, httpClient, client, user, password, redirectURI.URI)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Parse HTML
@@ -206,14 +206,14 @@ func TestConsent_ClientDisplay_AllEnabled(t *testing.T) {
 	assertClientNameInHTML(t, doc, "My Awesome Application")
 	assertClientLogoInHTML(t, doc, client.ClientIdentifier, true)
 	assertClientDescriptionInHTML(t, doc, "The best app for testing OAuth flows", true)
-	assertClientWebsiteUrlInHTML(t, doc, "https://example.com", true)
+	assertClientWebsiteURLInHTML(t, doc, "https://example.com", true)
 }
 
 func TestConsent_ClientDisplay_AllDisabled(t *testing.T) {
 	// Create client with all display settings disabled
-	clientId := "test-app-" + fake.LetterN(8)
+	clientID := "test-app-" + fake.LetterN(8)
 	client := createClientWithDisplaySettings(t, ClientDisplaySettings{
-		ClientIdentifier: clientId,
+		ClientIdentifier: clientID,
 		DisplayName:      "My Awesome Application",
 		Description:      "The best app for testing OAuth flows",
 		WebsiteURL:       "https://example.com",
@@ -223,14 +223,14 @@ func TestConsent_ClientDisplay_AllDisabled(t *testing.T) {
 		ShowWebsiteURL:   false,
 		UploadLogo:       true, // Logo exists but hidden
 		ConsentRequired:  true,
-		DefaultAcrLevel:  record.ACRLevel1,
+		DefaultACRLevel:  record.ACRLevel1,
 	})
 
-	redirectUri := &record.RedirectURI{
+	redirectURI := &record.RedirectURI{
 		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
-	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err := database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	require.NoError(t, err)
 
 	// Create user
@@ -248,16 +248,16 @@ func TestConsent_ClientDisplay_AllDisabled(t *testing.T) {
 	require.NoError(t, err)
 
 	// Navigate to consent screen
-	httpClient := createHttpClient(t)
-	resp := navigateToConsentScreen(t, httpClient, client, user, password, redirectUri.URI)
+	httpClient := createHTTPClient(t)
+	resp := navigateToConsentScreen(t, httpClient, client, user, password, redirectURI.URI)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Parse HTML
 	doc := parseHTMLResponse(t, resp)
 
 	// Only client identifier should be visible
-	assertClientNameInHTML(t, doc, clientId)
+	assertClientNameInHTML(t, doc, clientID)
 	assertClientLogoInHTML(t, doc, client.ClientIdentifier, false)
 	assertClientDescriptionInHTML(t, doc, "The best app for testing OAuth flows", false)
-	assertClientWebsiteUrlInHTML(t, doc, "https://example.com", false)
+	assertClientWebsiteURLInHTML(t, doc, "https://example.com", false)
 }

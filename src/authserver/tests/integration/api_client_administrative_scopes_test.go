@@ -26,10 +26,10 @@ import (
 // administrativeScopesRoute is the route's pattern, as a refusal records it.
 const administrativeScopesRoute = "/api/v1/admin/clients/{id}/administrative-scopes"
 
-// putAdministrativeScopes sends the switch for clientId with body, under its own request id.
-func putAdministrativeScopes(t *testing.T, accessToken string, clientId int64, body any) (*http.Response, string) {
+// putAdministrativeScopes sends the switch for clientID with body, under its own request id.
+func putAdministrativeScopes(t *testing.T, accessToken string, clientID int64, body any) (*http.Response, string) {
 	t.Helper()
-	return sendAdmin(t, accessToken, http.MethodPut, fmt.Sprintf("/api/v1/admin/clients/%d/administrative-scopes", clientId), body)
+	return sendAdmin(t, accessToken, http.MethodPut, fmt.Sprintf("/api/v1/admin/clients/%d/administrative-scopes", clientID), body)
 }
 
 // switchedClient decodes a 200 from the switch, failing on any other answer.
@@ -46,10 +46,10 @@ func switchedClient(t *testing.T, resp *http.Response) api.ClientResponse {
 
 // allowanceSwitchRows is the updated_client_administrative_scopes rows one request left, details
 // decoded.
-func allowanceSwitchRows(t *testing.T, readerToken, requestId string) []map[string]any {
+func allowanceSwitchRows(t *testing.T, readerToken, requestID string) []map[string]any {
 	t.Helper()
 	logs, resp := getAuditLogs(t, readerToken,
-		"auditEvent=updated_client_administrative_scopes&requestId="+url.QueryEscape(requestId))
+		"auditEvent=updated_client_administrative_scopes&requestId="+url.QueryEscape(requestID))
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	rows := []map[string]any{}
@@ -79,25 +79,25 @@ func TestClientAdministrativeScopes_AManageTokenSwitchesTheAllowance(t *testing.
 	requireDatabaseAuditLogs(t)
 	manageToken, manageCaller := createAdminClientWithToken(t)
 	f := newTargetClient(t)
-	require.False(t, storedClient(t, f.clientId).AdministrativeScopesAllowed, "a new client starts not allowed")
+	require.False(t, storedClient(t, f.clientID).AdministrativeScopesAllowed, "a new client starts not allowed")
 
 	for _, allowed := range []bool{true, false} {
-		resp, requestId := putAdministrativeScopes(t, manageToken, f.clientId, map[string]any{"allowed": allowed})
+		resp, requestID := putAdministrativeScopes(t, manageToken, f.clientID, map[string]any{"allowed": allowed})
 		client := switchedClient(t, resp)
 
-		assert.Equal(t, f.clientId, client.ID)
+		assert.Equal(t, f.clientID, client.ID)
 		assert.Equal(t, allowed, client.AdministrativeScopesAllowed, "the answer is the client as switched")
-		assert.Equal(t, allowed, storedClient(t, f.clientId).AdministrativeScopesAllowed, "the store is switched")
+		assert.Equal(t, allowed, storedClient(t, f.clientID).AdministrativeScopesAllowed, "the store is switched")
 
-		rows := allowanceSwitchRows(t, manageToken, requestId)
+		rows := allowanceSwitchRows(t, manageToken, requestID)
 		require.Len(t, rows, 1, "one updated_client_administrative_scopes row for the switch to %v", allowed)
 		assert.Equal(t, map[string]any{
-			"client_id":         float64(f.clientId),
+			"client_id":         float64(f.clientID),
 			"client_identifier": f.identifier,
 			"allowed":           allowed,
 			"logged_in_user":    manageCaller.ClientIdentifier,
 		}, rows[0])
-		assert.Empty(t, refusalRows(t, manageToken, requestId))
+		assert.Empty(t, refusalRows(t, manageToken, requestID))
 	}
 }
 
@@ -114,25 +114,25 @@ func TestClientAdministrativeScopes_AGranularTokenIsRefused(t *testing.T) {
 		t.Run(fmt.Sprintf("an ordinary client switched to %v", allowed), func(t *testing.T) {
 			f := newTargetClient(t)
 
-			resp, requestId := putAdministrativeScopes(t, granularToken, f.clientId, map[string]any{"allowed": allowed})
+			resp, requestID := putAdministrativeScopes(t, granularToken, f.clientID, map[string]any{"allowed": allowed})
 
-			assertRefusedByTheTargetCeiling(t, resp, requestId, manageToken, caller,
-				targetCeilingWrite{method: http.MethodPut, route: administrativeScopesRoute, kind: "client"}, f.clientId)
-			assert.False(t, storedClient(t, f.clientId).AdministrativeScopesAllowed, "the refused switch wrote nothing")
-			assert.Empty(t, allowanceSwitchRows(t, manageToken, requestId))
+			assertRefusedByTheTargetCeiling(t, resp, requestID, manageToken, caller,
+				targetCeilingWrite{method: http.MethodPut, route: administrativeScopesRoute, kind: "client"}, f.clientID)
+			assert.False(t, storedClient(t, f.clientID).AdministrativeScopesAllowed, "the refused switch wrote nothing")
+			assert.Empty(t, allowanceSwitchRows(t, manageToken, requestID))
 		})
 	}
 
 	t.Run("an allowed client switched off", func(t *testing.T) {
 		f := newTargetClient(t)
-		switchedClient(t, first(putAdministrativeScopes(t, manageToken, f.clientId, map[string]any{"allowed": true})))
+		switchedClient(t, first(putAdministrativeScopes(t, manageToken, f.clientID, map[string]any{"allowed": true})))
 
-		resp, requestId := putAdministrativeScopes(t, granularToken, f.clientId, map[string]any{"allowed": false})
+		resp, requestID := putAdministrativeScopes(t, granularToken, f.clientID, map[string]any{"allowed": false})
 
-		assertRefusedByTheTargetCeiling(t, resp, requestId, manageToken, caller,
-			targetCeilingWrite{method: http.MethodPut, route: administrativeScopesRoute, kind: "client"}, f.clientId)
-		assert.True(t, storedClient(t, f.clientId).AdministrativeScopesAllowed, "the refused switch wrote nothing")
-		assert.Empty(t, allowanceSwitchRows(t, manageToken, requestId))
+		assertRefusedByTheTargetCeiling(t, resp, requestID, manageToken, caller,
+			targetCeilingWrite{method: http.MethodPut, route: administrativeScopesRoute, kind: "client"}, f.clientID)
+		assert.True(t, storedClient(t, f.clientID).AdministrativeScopesAllowed, "the refused switch wrote nothing")
+		assert.Empty(t, allowanceSwitchRows(t, manageToken, requestID))
 	})
 }
 
@@ -145,12 +145,12 @@ func TestClientAdministrativeScopes_AdminReadDoesNotReachTheRoute(t *testing.T) 
 	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.ID) })
 	f := newTargetClient(t)
 
-	resp, requestId := putAdministrativeScopes(t, readToken, f.clientId, map[string]any{"allowed": true})
+	resp, requestID := putAdministrativeScopes(t, readToken, f.clientID, map[string]any{"allowed": true})
 
 	assert.Equal(t, http.StatusForbidden, resp.StatusCode)
 	assert.Equal(t, "INSUFFICIENT_SCOPE", errorCodeOf(t, resp))
-	assert.False(t, storedClient(t, f.clientId).AdministrativeScopesAllowed)
-	assert.Empty(t, refusalRows(t, manageToken, requestId))
+	assert.False(t, storedClient(t, f.clientID).AdministrativeScopesAllowed)
+	assert.Empty(t, refusalRows(t, manageToken, requestID))
 }
 
 // The admin console's client is always allowed: switching it off is refused 400, answering its key,
@@ -160,16 +160,16 @@ func TestClientAdministrativeScopes_TheAdminConsolesClientCannotBeSwitchedOff(t 
 	requireDatabaseAuditLogs(t)
 	manageToken, _ := createAdminClientWithToken(t)
 	console := consoleClient(t)
-	require.True(t, storedClient(t, console.clientId).AdministrativeScopesAllowed, "the seed allows the admin console's client")
+	require.True(t, storedClient(t, console.clientID).AdministrativeScopesAllowed, "the seed allows the admin console's client")
 
-	resp, requestId := putAdministrativeScopes(t, manageToken, console.clientId, map[string]any{"allowed": false})
+	resp, requestID := putAdministrativeScopes(t, manageToken, console.clientID, map[string]any{"allowed": false})
 
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	assert.Equal(t, "handler.client_administrative_scopes.console_always_allowed", errorCodeOf(t, resp))
-	assert.True(t, storedClient(t, console.clientId).AdministrativeScopesAllowed, "the admin console's client stays allowed")
-	assert.Empty(t, allowanceSwitchRows(t, manageToken, requestId))
+	assert.True(t, storedClient(t, console.clientID).AdministrativeScopesAllowed, "the admin console's client stays allowed")
+	assert.Empty(t, allowanceSwitchRows(t, manageToken, requestID))
 
-	client := switchedClient(t, first(putAdministrativeScopes(t, manageToken, console.clientId, map[string]any{"allowed": true})))
+	client := switchedClient(t, first(putAdministrativeScopes(t, manageToken, console.clientID, map[string]any{"allowed": true})))
 	assert.True(t, client.AdministrativeScopesAllowed)
 	assert.True(t, client.IsSystemLevelClient)
 }
@@ -187,22 +187,22 @@ func TestClientAdministrativeScopes_TheRouteAnswersItsOwnFourHundreds(t *testing
 		status int
 		code   string
 	}{
-		{"no allowed field", fmt.Sprintf("/api/v1/admin/clients/%d/administrative-scopes", f.clientId), map[string]any{}, http.StatusBadRequest, "handler.client_administrative_scopes.allowed_required"},
-		{"a null allowed", fmt.Sprintf("/api/v1/admin/clients/%d/administrative-scopes", f.clientId), map[string]any{"allowed": nil}, http.StatusBadRequest, "handler.client_administrative_scopes.allowed_required"},
-		{"a string allowed", fmt.Sprintf("/api/v1/admin/clients/%d/administrative-scopes", f.clientId), map[string]any{"allowed": "true"}, http.StatusBadRequest, "INVALID_REQUEST_BODY"},
-		{"no body", fmt.Sprintf("/api/v1/admin/clients/%d/administrative-scopes", f.clientId), nil, http.StatusBadRequest, "INVALID_REQUEST_BODY"},
+		{"no allowed field", fmt.Sprintf("/api/v1/admin/clients/%d/administrative-scopes", f.clientID), map[string]any{}, http.StatusBadRequest, "handler.client_administrative_scopes.allowed_required"},
+		{"a null allowed", fmt.Sprintf("/api/v1/admin/clients/%d/administrative-scopes", f.clientID), map[string]any{"allowed": nil}, http.StatusBadRequest, "handler.client_administrative_scopes.allowed_required"},
+		{"a string allowed", fmt.Sprintf("/api/v1/admin/clients/%d/administrative-scopes", f.clientID), map[string]any{"allowed": "true"}, http.StatusBadRequest, "INVALID_REQUEST_BODY"},
+		{"no body", fmt.Sprintf("/api/v1/admin/clients/%d/administrative-scopes", f.clientID), nil, http.StatusBadRequest, "INVALID_REQUEST_BODY"},
 		{"an id that is no number", "/api/v1/admin/clients/abc/administrative-scopes", map[string]any{"allowed": true}, http.StatusBadRequest, "VALIDATION_ERROR"},
 		{"a client that does not exist", "/api/v1/admin/clients/999999999/administrative-scopes", map[string]any{"allowed": true}, http.StatusNotFound, "NOT_FOUND"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			resp, requestId := sendAdmin(t, manageToken, http.MethodPut, c.path, c.body)
+			resp, requestID := sendAdmin(t, manageToken, http.MethodPut, c.path, c.body)
 
 			assert.Equal(t, c.status, resp.StatusCode)
 			assert.Equal(t, c.code, errorCodeOf(t, resp))
-			assert.Empty(t, allowanceSwitchRows(t, manageToken, requestId))
+			assert.Empty(t, allowanceSwitchRows(t, manageToken, requestID))
 		})
 	}
-	assert.False(t, storedClient(t, f.clientId).AdministrativeScopesAllowed, "no refused request wrote")
+	assert.False(t, storedClient(t, f.clientID).AdministrativeScopesAllowed, "no refused request wrote")
 }
 
 // An allowed client is an administrator client: once authserver:manage has allowed it, manage-clients
@@ -219,14 +219,14 @@ func TestClientAdministrativeScopes_AnAllowedClientIsAnAdministratorClient(t *te
 		t.Run(route.name, func(t *testing.T) {
 			// It holds no permission at all: the allowance alone makes it an administrator.
 			f := newTargetClient(t)
-			switchedClient(t, first(putAdministrativeScopes(t, manageToken, f.clientId, map[string]any{"allowed": true})))
-			f.ordinaryPermissionId = ordinary
+			switchedClient(t, first(putAdministrativeScopes(t, manageToken, f.clientID, map[string]any{"allowed": true})))
+			f.ordinaryPermissionID = ordinary
 			f.readerToken = manageToken
 			route.prepare(t, f)
 
-			resp, requestId := route.send(t, granularToken, f)
+			resp, requestID := route.send(t, granularToken, f)
 
-			assertClientRefusedByTheTargetCeiling(t, resp, requestId, manageToken, caller, route, f.clientId)
+			assertClientRefusedByTheTargetCeiling(t, resp, requestID, manageToken, caller, route, f.clientID)
 			assert.False(t, route.changed(t, f), "the refused request changed nothing")
 		})
 	}
@@ -237,10 +237,10 @@ func TestClientAdministrativeScopes_AnAllowedClientIsAnAdministratorClient(t *te
 func TestClientAdministrativeScopes_EveryClientResponseCarriesTheAllowanceReadOnly(t *testing.T) {
 	manageToken, _ := createAdminClientWithToken(t)
 	allowed := newTargetClient(t)
-	switchedClient(t, first(putAdministrativeScopes(t, manageToken, allowed.clientId, map[string]any{"allowed": true})))
+	switchedClient(t, first(putAdministrativeScopes(t, manageToken, allowed.clientID, map[string]any{"allowed": true})))
 	notAllowed := newTargetClient(t)
 	console := consoleClient(t)
-	want := map[int64]bool{allowed.clientId: true, notAllowed.clientId: false, console.clientId: true}
+	want := map[int64]bool{allowed.clientID: true, notAllowed.clientID: false, console.clientID: true}
 
 	for id, w := range want {
 		resp, _ := sendAdmin(t, manageToken, http.MethodGet, fmt.Sprintf("/api/v1/admin/clients/%d", id), nil)
@@ -269,7 +269,7 @@ func TestClientAdministrativeScopes_EveryClientResponseCarriesTheAllowanceReadOn
 	}
 	assert.Equal(t, len(want), seen)
 
-	for id, w := range map[int64]bool{allowed.clientId: true, notAllowed.clientId: false} {
+	for id, w := range map[int64]bool{allowed.clientID: true, notAllowed.clientID: false} {
 		stored := storedClient(t, id)
 		resp, _ := sendAdmin(t, manageToken, http.MethodPut, fmt.Sprintf("/api/v1/admin/clients/%d", id), map[string]any{
 			"clientIdentifier": stored.ClientIdentifier, "description": "Saved", "enabled": true,
@@ -291,7 +291,7 @@ func TestClientAdministrativeScopes_TheSwitchDecidesTheAuthorizationEndpointsAns
 	switchedClient(t, first(putAdministrativeScopes(t, manageToken, f.client.ID, map[string]any{"allowed": true})))
 
 	resp := f.signInFrom(t, f.craftedLink("code", ""))
-	codeVal, state := getCodeAndStateFromUrl(t, resp)
+	codeVal, state := getCodeAndStateFromURL(t, resp)
 	_ = resp.Body.Close()
 	assert.Equal(t, administrativeScopeState, state)
 	assert.Equal(t, "openid authserver:manage", loadCodeFromDatabase(t, codeVal).Scope)

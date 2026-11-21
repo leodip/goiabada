@@ -45,7 +45,7 @@ func challengelessCode(t *testing.T, clientSecret string) (*record.Code, string)
 // up to 60 seconds of life left in which anybody holding it can spend it.
 func TestToken_AuthCode_ChallengelessCode_RefusedAfterClientBecomesPublic(t *testing.T) {
 	clientSecret := fake.LetterN(32)
-	code, destUrl := challengelessCode(t, clientSecret)
+	code, destURL := challengelessCode(t, clientSecret)
 
 	client, err := database.GetClientByID(context.Background(), nil, code.ClientID)
 	require.NoError(t, err)
@@ -54,7 +54,7 @@ func TestToken_AuthCode_ChallengelessCode_RefusedAfterClientBecomesPublic(t *tes
 	require.NoError(t, database.UpdateClient(context.Background(), nil, client))
 
 	// No secret and no verifier, which is everything a public client has to present.
-	data := postToTokenEndpoint(t, createHttpClient(t), destUrl, url.Values{
+	data := postToTokenEndpoint(t, createHTTPClient(t), destURL, url.Values{
 		"grant_type":   {"authorization_code"},
 		"client_id":    {code.Client.ClientIdentifier},
 		"code":         {code.Code},
@@ -70,9 +70,9 @@ func TestToken_AuthCode_ChallengelessCode_RefusedAfterClientBecomesPublic(t *tes
 // still works, so the refusal above is about the client being public and not about the code.
 func TestToken_AuthCode_ChallengelessCode_ConfidentialClientStillSucceeds(t *testing.T) {
 	clientSecret := fake.LetterN(32)
-	code, destUrl := challengelessCode(t, clientSecret)
+	code, destURL := challengelessCode(t, clientSecret)
 
-	data := postToTokenEndpoint(t, createHttpClient(t), destUrl, url.Values{
+	data := postToTokenEndpoint(t, createHTTPClient(t), destURL, url.Values{
 		"grant_type":    {"authorization_code"},
 		"client_id":     {code.Client.ClientIdentifier},
 		"client_secret": {clientSecret},
@@ -90,7 +90,7 @@ func TestToken_AuthCode_ChallengelessCode_ConfidentialClientStillSucceeds(t *tes
 // would make a security improvement look like an outage.
 func TestToken_AuthCode_ChallengelessCode_SurvivesTurningPKCEOnForAConfidentialClient(t *testing.T) {
 	clientSecret := fake.LetterN(32)
-	code, destUrl := challengelessCode(t, clientSecret)
+	code, destURL := challengelessCode(t, clientSecret)
 
 	client, err := database.GetClientByID(context.Background(), nil, code.ClientID)
 	require.NoError(t, err)
@@ -98,7 +98,7 @@ func TestToken_AuthCode_ChallengelessCode_SurvivesTurningPKCEOnForAConfidentialC
 	client.PKCERequired = &pkceRequired
 	require.NoError(t, database.UpdateClient(context.Background(), nil, client))
 
-	data := postToTokenEndpoint(t, createHttpClient(t), destUrl, url.Values{
+	data := postToTokenEndpoint(t, createHTTPClient(t), destURL, url.Values{
 		"grant_type":    {"authorization_code"},
 		"client_id":     {code.Client.ClientIdentifier},
 		"client_secret": {clientSecret},

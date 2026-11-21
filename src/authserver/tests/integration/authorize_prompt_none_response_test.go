@@ -15,13 +15,13 @@ import (
 
 func TestPromptNone_Error_QueryModeDefault(t *testing.T) {
 	// No session, prompt=none with default response_mode (query)
-	client, redirectUri := createTestClientAndRedirectURI(t)
-	httpClient := createHttpClient(t)
+	client, redirectURI := createTestClientAndRedirectURI(t)
+	httpClient := createHTTPClient(t)
 
 	requestState := fake.LetterN(8)
 	requestCodeChallenge := randomCodeChallenge()
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -29,7 +29,7 @@ func TestPromptNone_Error_QueryModeDefault(t *testing.T) {
 		"&state=" + requestState +
 		"&prompt=none"
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,13 +54,13 @@ func TestPromptNone_Error_QueryModeDefault(t *testing.T) {
 }
 
 func TestPromptNone_Error_QueryModeExplicit(t *testing.T) {
-	client, redirectUri := createTestClientAndRedirectURI(t)
-	httpClient := createHttpClient(t)
+	client, redirectURI := createTestClientAndRedirectURI(t)
+	httpClient := createHTTPClient(t)
 
 	requestState := fake.LetterN(8)
 	requestCodeChallenge := randomCodeChallenge()
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -69,7 +69,7 @@ func TestPromptNone_Error_QueryModeExplicit(t *testing.T) {
 		"&response_mode=query" +
 		"&prompt=none"
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,13 +92,13 @@ func TestPromptNone_Error_QueryModeExplicit(t *testing.T) {
 }
 
 func TestPromptNone_Error_FragmentMode(t *testing.T) {
-	client, redirectUri := createTestClientAndRedirectURI(t)
-	httpClient := createHttpClient(t)
+	client, redirectURI := createTestClientAndRedirectURI(t)
+	httpClient := createHTTPClient(t)
 
 	requestState := fake.LetterN(8)
 	requestCodeChallenge := randomCodeChallenge()
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -107,7 +107,7 @@ func TestPromptNone_Error_FragmentMode(t *testing.T) {
 		"&response_mode=fragment" +
 		"&prompt=none"
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -137,13 +137,13 @@ func TestPromptNone_Error_FragmentMode(t *testing.T) {
 }
 
 func TestPromptNone_Success_QueryMode(t *testing.T) {
-	httpClient, client, redirectUri, _ := createSessionWithAcrLevel1(t)
+	httpClient, client, redirectURI, _ := createSessionWithACRLevel1(t)
 
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 	requestCodeChallenge := randomCodeChallenge()
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -153,7 +153,7 @@ func TestPromptNone_Success_QueryMode(t *testing.T) {
 		"&response_mode=query" +
 		"&prompt=none"
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -182,13 +182,13 @@ func TestPromptNone_Success_QueryMode(t *testing.T) {
 }
 
 func TestPromptNone_Success_FragmentMode(t *testing.T) {
-	httpClient, client, redirectUri, _ := createSessionWithAcrLevel1(t)
+	httpClient, client, redirectURI, _ := createSessionWithACRLevel1(t)
 
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 	requestCodeChallenge := randomCodeChallenge()
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -198,7 +198,7 @@ func TestPromptNone_Success_FragmentMode(t *testing.T) {
 		"&response_mode=fragment" +
 		"&prompt=none"
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -232,13 +232,13 @@ func TestPromptNone_Success_FragmentMode(t *testing.T) {
 }
 
 func TestPromptNone_Success_FormPostMode(t *testing.T) {
-	httpClient, client, redirectUri, _ := createSessionWithAcrLevel1(t)
+	httpClient, client, redirectURI, _ := createSessionWithACRLevel1(t)
 
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 	requestCodeChallenge := randomCodeChallenge()
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -248,7 +248,7 @@ func TestPromptNone_Success_FormPostMode(t *testing.T) {
 		"&response_mode=form_post" +
 		"&prompt=none"
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -272,13 +272,13 @@ func TestPromptNone_Success_FormPostMode(t *testing.T) {
 }
 
 func TestPromptNone_Error_FormPostMode(t *testing.T) {
-	client, redirectUri := createTestClientAndRedirectURI(t)
-	httpClient := createHttpClient(t)
+	client, redirectURI := createTestClientAndRedirectURI(t)
+	httpClient := createHTTPClient(t)
 
 	requestState := fake.LetterN(8)
 	requestCodeChallenge := randomCodeChallenge()
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -287,7 +287,7 @@ func TestPromptNone_Error_FormPostMode(t *testing.T) {
 		"&response_mode=form_post" +
 		"&prompt=none"
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -310,13 +310,13 @@ func TestPromptNone_Error_FormPostMode(t *testing.T) {
 // =============================================================================
 
 func TestPromptNone_StateEchoedOnError(t *testing.T) {
-	client, redirectUri := createTestClientAndRedirectURI(t)
-	httpClient := createHttpClient(t)
+	client, redirectURI := createTestClientAndRedirectURI(t)
+	httpClient := createHTTPClient(t)
 
 	requestState := "my-custom-state-" + fake.LetterN(16)
 	requestCodeChallenge := randomCodeChallenge()
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -324,26 +324,26 @@ func TestPromptNone_StateEchoedOnError(t *testing.T) {
 		"&state=" + requestState +
 		"&prompt=none"
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	errorCode, _, state := getErrorFromUrl(t, resp)
+	errorCode, _, state := getErrorFromURL(t, resp)
 
 	assert.Equal(t, "login_required", errorCode)
 	assert.Equal(t, requestState, state, "state should be echoed back exactly")
 }
 
 func TestPromptNone_StateEchoedOnSuccess(t *testing.T) {
-	httpClient, client, redirectUri, _ := createSessionWithAcrLevel1(t)
+	httpClient, client, redirectURI, _ := createSessionWithACRLevel1(t)
 
 	requestState := "success-state-" + fake.LetterN(16)
 	requestNonce := fake.LetterN(8)
 	requestCodeChallenge := randomCodeChallenge()
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -352,7 +352,7 @@ func TestPromptNone_StateEchoedOnSuccess(t *testing.T) {
 		"&nonce=" + requestNonce +
 		"&prompt=none"
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -362,27 +362,27 @@ func TestPromptNone_StateEchoedOnSuccess(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
+	codeVal, stateVal := getCodeAndStateFromURL(t, resp)
 
 	assert.NotEmpty(t, codeVal)
 	assert.Equal(t, requestState, stateVal, "state should be echoed back exactly")
 }
 
 func TestPromptNone_NoStateInRequest(t *testing.T) {
-	client, redirectUri := createTestClientAndRedirectURI(t)
-	httpClient := createHttpClient(t)
+	client, redirectURI := createTestClientAndRedirectURI(t)
+	httpClient := createHTTPClient(t)
 
 	requestCodeChallenge := randomCodeChallenge()
 	// No state parameter
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
 		"&scope=" + url.QueryEscape("openid profile") +
 		"&prompt=none"
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -404,13 +404,13 @@ func TestPromptNone_NoStateInRequest(t *testing.T) {
 }
 
 func TestPromptNone_EmptyStateInRequest(t *testing.T) {
-	client, redirectUri := createTestClientAndRedirectURI(t)
-	httpClient := createHttpClient(t)
+	client, redirectURI := createTestClientAndRedirectURI(t)
+	httpClient := createHTTPClient(t)
 
 	requestCodeChallenge := randomCodeChallenge()
 	// Empty state parameter
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -418,7 +418,7 @@ func TestPromptNone_EmptyStateInRequest(t *testing.T) {
 		"&state=" +
 		"&prompt=none"
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -79,7 +79,7 @@ func presentClientSecret(t *testing.T, path string, form url.Values, clientIdent
 	if basic {
 		req.SetBasicAuth(url.QueryEscape(clientIdentifier), url.QueryEscape(secret))
 	}
-	resp, err := createHttpClient(t).Do(req)
+	resp, err := createHTTPClient(t).Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	raw, err := io.ReadAll(resp.Body)
@@ -260,10 +260,10 @@ func TestDCR_AClientSwitchedToPublicAndBackAcceptsBoth(t *testing.T) {
 }
 
 // clientSecretThroughTheAdminAPI is the client's secret, as the admin API's secret route answers it.
-func clientSecretThroughTheAdminAPI(t *testing.T, accessToken string, clientId int64) string {
+func clientSecretThroughTheAdminAPI(t *testing.T, accessToken string, clientID int64) string {
 	t.Helper()
 	resp := makeAPIRequest(t, http.MethodGet,
-		appConfig.AuthServer.BaseURL+"/api/v1/admin/clients/"+strconv.FormatInt(clientId, 10)+"/secret", accessToken, nil)
+		appConfig.AuthServer.BaseURL+"/api/v1/admin/clients/"+strconv.FormatInt(clientID, 10)+"/secret", accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	var secret api.GetClientSecretResponse

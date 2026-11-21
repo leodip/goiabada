@@ -133,19 +133,19 @@ func (f *legalAcceptanceFixture) mustAcceptFor(t *testing.T, prefix, title strin
 	return id, shortName
 }
 
-// versionId answers the id of version n of a document.
-func versionId(t *testing.T, documentId int64, n int) int64 {
+// versionID answers the id of version n of a document.
+func versionID(t *testing.T, documentID int64, n int) int64 {
 	t.Helper()
-	version, err := database.GetLegalDocumentVersion(context.Background(), nil, documentId, n)
+	version, err := database.GetLegalDocumentVersion(context.Background(), nil, documentID, n)
 	require.NoError(t, err)
-	require.NotNil(t, version, "version %d of document %d", n, documentId)
+	require.NotNil(t, version, "version %d of document %d", n, documentID)
 	return version.ID
 }
 
-// acceptedVersionIds answers the version ids the user has accepted, in the order they were stored.
-func acceptedVersionIds(t *testing.T, userId int64) []int64 {
+// acceptedVersionIDs answers the version ids the user has accepted, in the order they were stored.
+func acceptedVersionIDs(t *testing.T, userID int64) []int64 {
 	t.Helper()
-	acceptances, err := database.GetLegalDocumentAcceptancesByUserID(context.Background(), nil, userId)
+	acceptances, err := database.GetLegalDocumentAcceptancesByUserID(context.Background(), nil, userID)
 	require.NoError(t, err)
 	ids := []int64{}
 	for _, acceptance := range acceptances {
@@ -253,7 +253,7 @@ func postStep(t *testing.T, browser *http.Client, stepURL string, page *http.Res
 	t.Helper()
 	doc, _ := readStep(t, page)
 	form := url.Values{}
-	form.Set("ceremonyId", getCeremonyIdFromPage(t, page))
+	form.Set("ceremonyId", getCeremonyIDFromPage(t, page))
 	doc.Find(`form input[type="hidden"][name="shownVersion"]`).Each(func(_ int, s *goquery.Selection) {
 		value, _ := s.Attr("value")
 		form.Add("shownVersion", value)
@@ -339,19 +339,19 @@ func detailNumber(t *testing.T, details map[string]any, key string) int64 {
 func TestLegalAcceptance_ASignInWithADocumentOwedLandsOnTheStepAndAcceptRecordsTheVersion(t *testing.T) {
 	requireDatabaseAuditLogs(t)
 	f := newLegalAcceptanceFixture(t)
-	termsId, terms := f.mustAcceptFor(t, "terms", "Shop terms")
+	termsID, terms := f.mustAcceptFor(t, "terms", "Shop terms")
 	// A notice for the same app is for information, so the step never lists it.
 	publishedForApps(t, f.adminToken, "notice", "Shop notice", "For information.", f.client)
-	browser := createHttpClient(t)
+	browser := createHTTPClient(t)
 
 	page, stepURL := toStep(t, browser, f.signInToCompleted(t, browser))
 	_, documents := readStep(t, page)
-	version1 := strconv.FormatInt(versionId(t, termsId, 1), 10)
-	publicPage := "/legal/" + terms + "?" + url.Values{ceremony.QueryParameter: {getCeremonyIdFromPage(t, page)}}.Encode()
+	version1 := strconv.FormatInt(versionID(t, termsID, 1), 10)
+	publicPage := "/legal/" + terms + "?" + url.Values{ceremony.QueryParameter: {getCeremonyIDFromPage(t, page)}}.Encode()
 	assert.Equal(t, []stepDocument{{title: "Shop terms", href: publicPage, version: version1}}, documents,
 		"the step lists the one must-accept document, unticked, linking its public page, which names the sign-in "+
 			"so the page is drawn in the app's brand (#812)")
-	assert.Empty(t, acceptedVersionIds(t, f.user.ID), "showing the step records nothing")
+	assert.Empty(t, acceptedVersionIDs(t, f.user.ID), "showing the step records nothing")
 
 	started := time.Now().UTC().Add(-time.Second)
 	resp := postStep(t, browser, stepURL, page, []string{version1}, false)
@@ -361,19 +361,19 @@ func TestLegalAcceptance_ASignInWithADocumentOwedLandsOnTheStepAndAcceptRecordsT
 	acceptances, err := database.GetLegalDocumentAcceptancesByUserID(context.Background(), nil, f.user.ID)
 	require.NoError(t, err)
 	require.Len(t, acceptances, 1, "one acceptance, of the version shown")
-	assert.Equal(t, versionId(t, termsId, 1), acceptances[0].LegalDocumentVersionID)
+	assert.Equal(t, versionID(t, termsID, 1), acceptances[0].LegalDocumentVersionID)
 	assertStampedSince(t, acceptances[0].AcceptedAt, started)
 
 	details := latestAuditDetails(t, audit.EventAcceptedLegalDocument)
 	require.NotNil(t, details, "the acceptance is audited")
 	assert.Equal(t, f.user.ID, detailNumber(t, details, "user_id"))
 	assert.Equal(t, f.client.ID, detailNumber(t, details, "client_id"))
-	assert.Equal(t, termsId, detailNumber(t, details, "legal_document_id"))
+	assert.Equal(t, termsID, detailNumber(t, details, "legal_document_id"))
 	assert.Equal(t, terms, details["short_name"])
 	assert.Equal(t, int64(1), detailNumber(t, details, "version"))
 
 	// Accepted once, the next sign-in goes straight on.
-	again := createHttpClient(t)
+	again := createHTTPClient(t)
 	resp = f.signInToCompleted(t, again)
 	f.assertCodeIssued(t, again, resp)
 }
@@ -382,7 +382,7 @@ func TestLegalAcceptance_AnUntickedBoxShowsTheStepAgainAndRecordsNothing(t *test
 	f := newLegalAcceptanceFixture(t)
 	f.mustAcceptFor(t, "first", "First terms")
 	f.mustAcceptFor(t, "second", "Second terms")
-	browser := createHttpClient(t)
+	browser := createHTTPClient(t)
 
 	page, stepURL := toStep(t, browser, f.signInToCompleted(t, browser))
 	_, documents := readStep(t, page)
@@ -397,19 +397,19 @@ func TestLegalAcceptance_AnUntickedBoxShowsTheStepAgainAndRecordsNothing(t *test
 	assert.Equal(t, versionsOf(documents), versionsOf(redrawn), "listing the same documents")
 	assert.True(t, redrawn[0].ticked, "the box ticked stays ticked")
 	assert.False(t, redrawn[1].ticked)
-	assert.Empty(t, acceptedVersionIds(t, f.user.ID), "nothing is recorded")
+	assert.Empty(t, acceptedVersionIDs(t, f.user.ID), "nothing is recorded")
 
 	resp2 := postStep(t, browser, stepURL, resp, versionsOf(redrawn), false)
 	_ = resp.Body.Close()
 	f.assertCodeIssued(t, browser, resp2)
-	assert.Len(t, acceptedVersionIds(t, f.user.ID), 2)
+	assert.Len(t, acceptedVersionIDs(t, f.user.ID), 2)
 }
 
 func TestLegalAcceptance_DeclineAnswersAccessDeniedKeepsTheSessionAndAsksAgain(t *testing.T) {
 	requireDatabaseAuditLogs(t)
 	f := newLegalAcceptanceFixture(t)
 	f.mustAcceptFor(t, "declined", "Terms to decline")
-	browser := createHttpClient(t)
+	browser := createHTTPClient(t)
 
 	page, stepURL := toStep(t, browser, f.signInToCompleted(t, browser))
 	resp := postStep(t, browser, stepURL, page, nil, true)
@@ -420,7 +420,7 @@ func TestLegalAcceptance_DeclineAnswersAccessDeniedKeepsTheSessionAndAsksAgain(t
 	assert.Equal(t, declinedDescription, query.Get("error_description"))
 	assert.Equal(t, legalAcceptanceState, query.Get("state"))
 	assert.Empty(t, query.Get("code"))
-	assert.Empty(t, acceptedVersionIds(t, f.user.ID), "a decline is never stored")
+	assert.Empty(t, acceptedVersionIDs(t, f.user.ID), "a decline is never stored")
 
 	details := latestAuditDetails(t, audit.EventDeclinedLegalDocuments)
 	require.NotNil(t, details, "the decline is audited")
@@ -438,36 +438,36 @@ func TestLegalAcceptance_DeclineAnswersAccessDeniedKeepsTheSessionAndAsksAgain(t
 
 func TestLegalAcceptance_ANewVersionIsAskedAgain(t *testing.T) {
 	f := newLegalAcceptanceFixture(t)
-	termsId, _ := f.mustAcceptFor(t, "versioned", "Versioned terms")
-	browser := createHttpClient(t)
+	termsID, _ := f.mustAcceptFor(t, "versioned", "Versioned terms")
+	browser := createHTTPClient(t)
 
 	page, stepURL := toStep(t, browser, f.signInToCompleted(t, browser))
 	_, documents := readStep(t, page)
 	f.assertCodeIssued(t, browser, postStep(t, browser, stepURL, page, versionsOf(documents), false))
 	_ = page.Body.Close()
 
-	publishOverAPI(t, f.adminToken, termsId, "Versioned terms", "Version 2.")
+	publishOverAPI(t, f.adminToken, termsID, "Versioned terms", "Version 2.")
 	page, stepURL = toStep(t, browser, f.ssoToCompleted(t, browser))
 	_, documents = readStep(t, page)
-	version2 := strconv.FormatInt(versionId(t, termsId, 2), 10)
+	version2 := strconv.FormatInt(versionID(t, termsID, 2), 10)
 	assert.Equal(t, []string{version2}, versionsOf(documents), "the new version is asked")
 
 	// Version 3 is published while the step shows version 2: accepting version 2 shows the step
 	// again with version 3, and records nothing.
-	publishOverAPI(t, f.adminToken, termsId, "Versioned terms", "Version 3.")
+	publishOverAPI(t, f.adminToken, termsID, "Versioned terms", "Version 3.")
 	resp := postStep(t, browser, stepURL, page, []string{version2}, false)
 	_ = page.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode, "the step is shown again")
 	doc, redrawn := readStep(t, resp)
-	version3 := strconv.FormatInt(versionId(t, termsId, 3), 10)
+	version3 := strconv.FormatInt(versionID(t, termsID, 3), 10)
 	assert.Equal(t, []string{version3}, versionsOf(redrawn), "with the version now current")
 	assert.Equal(t, 1, doc.Find("#legal-acceptance-changed").Length(), "saying it changed")
 	assert.Equal(t, 0, doc.Find("#legal-acceptance-error").Length())
-	assert.Equal(t, []int64{versionId(t, termsId, 1)}, acceptedVersionIds(t, f.user.ID), "nothing more is recorded")
+	assert.Equal(t, []int64{versionID(t, termsID, 1)}, acceptedVersionIDs(t, f.user.ID), "nothing more is recorded")
 
 	f.assertCodeIssued(t, browser, postStep(t, browser, stepURL, resp, []string{version3}, false))
 	_ = resp.Body.Close()
-	assert.Equal(t, []int64{versionId(t, termsId, 1), versionId(t, termsId, 3)}, acceptedVersionIds(t, f.user.ID),
+	assert.Equal(t, []int64{versionID(t, termsID, 1), versionID(t, termsID, 3)}, acceptedVersionIDs(t, f.user.ID),
 		"the version accepted is the one shown")
 }
 
@@ -480,7 +480,7 @@ func TestLegalAcceptance_AnAppSpecificDocumentBlocksOnlyItsAppsAndAnAcceptanceCo
 		[]int64{shop.client.ID})
 	require.Equal(t, http.StatusOK, status, "apps: %v", body)
 
-	browser := createHttpClient(t)
+	browser := createHTTPClient(t)
 	blog.assertCodeIssued(t, browser, blog.signInToCompleted(t, browser))
 
 	page, stepURL := toStep(t, browser, shop.ssoToCompleted(t, browser))
@@ -495,7 +495,7 @@ func TestLegalAcceptance_SingleSignOnIsAsked(t *testing.T) {
 	f := newLegalAcceptanceFixture(t)
 	other := newLegalAcceptanceApp(t, f.user, f.password, f.adminToken)
 	f.mustAcceptFor(t, "sso", "Terms over a session")
-	browser := createHttpClient(t)
+	browser := createHTTPClient(t)
 	other.assertCodeIssued(t, browser, other.signInToCompleted(t, browser))
 
 	page, _ := toStep(t, browser, f.ssoToCompleted(t, browser))
@@ -508,7 +508,7 @@ func TestLegalAcceptance_PromptNoneIsAnsweredInteractionRequiredUntilAccepted(t 
 	f := newLegalAcceptanceFixture(t)
 	other := newLegalAcceptanceApp(t, f.user, f.password, f.adminToken)
 	f.mustAcceptFor(t, "silent", "Silent terms")
-	browser := createHttpClient(t)
+	browser := createHTTPClient(t)
 	other.assertCodeIssued(t, browser, other.signInToCompleted(t, browser))
 
 	resp, err := browser.Get(f.link("&prompt=none"))
@@ -547,7 +547,7 @@ func (f *legalAcceptanceFixture) passwordGrant(t *testing.T) (int, map[string]an
 		"password":      {f.password},
 		"scope":         {"openid"},
 	}
-	resp, err := createHttpClient(t).PostForm(appConfig.AuthServer.BaseURL+"/auth/token/", form)
+	resp, err := createHTTPClient(t).PostForm(appConfig.AuthServer.BaseURL+"/auth/token/", form)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	body := map[string]any{}
@@ -566,7 +566,7 @@ func TestLegalAcceptance_ThePasswordGrantIsRefusedUntilTheUserAcceptsInTheBrowse
 	assert.Equal(t, passwordGrantDescription, body["error_description"])
 	assert.Nil(t, body["access_token"])
 
-	browser := createHttpClient(t)
+	browser := createHTTPClient(t)
 	page, stepURL := toStep(t, browser, f.signInToCompleted(t, browser))
 	_, documents := readStep(t, page)
 	f.assertCodeIssued(t, browser, postStep(t, browser, stepURL, page, versionsOf(documents), false))
@@ -579,7 +579,7 @@ func TestLegalAcceptance_ThePasswordGrantIsRefusedUntilTheUserAcceptsInTheBrowse
 
 func TestLegalAcceptance_ARefreshKeepsWorkingWhileADocumentIsOwed(t *testing.T) {
 	f := newLegalAcceptanceFixture(t)
-	browser := createHttpClient(t)
+	browser := createHTTPClient(t)
 	resp := f.signInToCompleted(t, browser)
 	location := assertRedirect(t, resp, "/auth/issue")
 	_ = resp.Body.Close()
@@ -588,7 +588,7 @@ func TestLegalAcceptance_ARefreshKeepsWorkingWhileADocumentIsOwed(t *testing.T) 
 	_ = resp.Body.Close()
 	require.NotEmpty(t, code)
 
-	tokens := postToTokenEndpoint(t, createHttpClient(t), appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
+	tokens := postToTokenEndpoint(t, createHTTPClient(t), appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
 		"grant_type":    {"authorization_code"},
 		"client_id":     {f.client.ClientIdentifier},
 		"client_secret": {f.clientSecret},
@@ -601,7 +601,7 @@ func TestLegalAcceptance_ARefreshKeepsWorkingWhileADocumentIsOwed(t *testing.T) 
 
 	f.mustAcceptFor(t, "refresh", "Terms published after the sign-in")
 
-	refreshed := postToTokenEndpoint(t, createHttpClient(t), appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
+	refreshed := postToTokenEndpoint(t, createHTTPClient(t), appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
 		"grant_type":    {"refresh_token"},
 		"client_id":     {f.client.ClientIdentifier},
 		"client_secret": {f.clientSecret},
@@ -614,7 +614,7 @@ func TestLegalAcceptance_ARefreshKeepsWorkingWhileADocumentIsOwed(t *testing.T) 
 func TestLegalAcceptance_TheAdminConsolesOwnSignInIsNeverAsked(t *testing.T) {
 	adminToken, _ := createAdminClientWithToken(t)
 	user, password := newLegalAcceptanceUser(t)
-	assignPermissionToUser(t, user.ID, authServerPermissionId(t, builtin.ManageAccountPermissionIdentifier))
+	assignPermissionToUser(t, user.ID, authServerPermissionID(t, builtin.ManageAccountPermissionIdentifier))
 
 	// A must-accept document for all apps, the one kind that could reach the admin console's
 	// sign-in, retired before the test ends so no other test's sign-in owes it.
@@ -624,8 +624,8 @@ func TestLegalAcceptance_TheAdminConsolesOwnSignInIsNeverAsked(t *testing.T) {
 	require.Equal(t, http.StatusOK, status, "publish: %v", body)
 	defer retireOverAPI(t, adminToken, id)
 
-	browser := createHttpClient(t)
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize?" + url.Values{
+	browser := createHTTPClient(t)
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize?" + url.Values{
 		"client_id":             {builtin.AdminConsoleClientIdentifier},
 		"redirect_uri":          {appConfig.AdminConsole.BaseURL + "/auth/callback"},
 		"response_mode":         {"form_post"},
@@ -636,7 +636,7 @@ func TestLegalAcceptance_TheAdminConsolesOwnSignInIsNeverAsked(t *testing.T) {
 		"nonce":                 {fake.LetterN(16)},
 		"scope":                 {"openid authserver:manage-account"},
 	}.Encode()
-	resp, err := browser.Get(destUrl)
+	resp, err := browser.Get(destURL)
 	require.NoError(t, err)
 	location := assertRedirect(t, resp, "/auth/level1")
 	_ = resp.Body.Close()
@@ -659,7 +659,7 @@ func TestLegalAcceptance_TheAdminConsolesOwnSignInIsNeverAsked(t *testing.T) {
 	resp = loadPage(t, browser, location)
 	defer func() { _ = resp.Body.Close() }()
 	assertRedirect(t, resp, "/auth/issue")
-	assert.Empty(t, acceptedVersionIds(t, user.ID))
+	assert.Empty(t, acceptedVersionIDs(t, user.ID))
 
 	// The same document is owed on a sign-in to any other app.
 	app := newLegalAcceptanceApp(t, user, password, adminToken)
@@ -674,17 +674,17 @@ func TestLegalAcceptance_TheAdminConsolesOwnSignInIsNeverAsked(t *testing.T) {
 func TestLegalAcceptance_ARetiredDocumentIsAskedOfNobodyUntilItIsRestored(t *testing.T) {
 	f := newLegalAcceptanceFixture(t)
 	owing := f.withUser(newLegalAcceptanceUser(t))
-	termsId, _ := f.mustAcceptFor(t, "retired", "Terms to retire")
+	termsID, _ := f.mustAcceptFor(t, "retired", "Terms to retire")
 
 	// The fixture's user accepts version 1 before the document is retired.
-	accepted := createHttpClient(t)
+	accepted := createHTTPClient(t)
 	f.acceptAll(t, accepted)
 
-	retireOverAPI(t, f.adminToken, termsId)
-	browser := createHttpClient(t)
+	retireOverAPI(t, f.adminToken, termsID)
+	browser := createHTTPClient(t)
 	owing.assertCodeIssued(t, browser, owing.signInToCompleted(t, browser))
 
-	status, body, _ := legalCall(t, f.adminToken, http.MethodPost, legalPath(termsId, "/restore"), nil)
+	status, body, _ := legalCall(t, f.adminToken, http.MethodPost, legalPath(termsID, "/restore"), nil)
 	require.Equal(t, http.StatusOK, status, "restore: %v", body)
 
 	// In effect again at version 1: the user who never accepted it is asked at their next sign-in,
@@ -692,7 +692,7 @@ func TestLegalAcceptance_ARetiredDocumentIsAskedOfNobodyUntilItIsRestored(t *tes
 	page, _ := toStep(t, browser, owing.ssoToCompleted(t, browser))
 	_, documents := readStep(t, page)
 	_ = page.Body.Close()
-	assert.Equal(t, []string{strconv.FormatInt(versionId(t, termsId, 1), 10)}, versionsOf(documents),
+	assert.Equal(t, []string{strconv.FormatInt(versionID(t, termsID, 1), 10)}, versionsOf(documents),
 		"version 1, as it was")
 	f.assertCodeIssued(t, accepted, f.ssoToCompleted(t, accepted))
 }
@@ -705,9 +705,9 @@ func TestLegalAcceptance_ADocumentsAppsChangeWhoIsAskedWithNoNewVersion(t *testi
 	id, _ := shop.mustAcceptFor(t, "gains-an-app", "Terms that gain an app")
 
 	// The fixture's user accepts it on the shop; the forum asks the other user nothing yet.
-	accepted := createHttpClient(t)
+	accepted := createHTTPClient(t)
 	shop.acceptAll(t, accepted)
-	browser := createHttpClient(t)
+	browser := createHTTPClient(t)
 	owingAtForum.assertCodeIssued(t, browser, owingAtForum.signInToCompleted(t, browser))
 
 	// The forum is added, which publishes no new version.

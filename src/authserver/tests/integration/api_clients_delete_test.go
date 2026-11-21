@@ -59,18 +59,18 @@ func TestAPIClientDelete_SystemLevelRejected(t *testing.T) {
 	err := json.NewDecoder(resp.Body).Decode(&listResp)
 	require.NoError(t, err)
 
-	var sysId int64
+	var sysID int64
 	for _, c := range listResp.Clients {
 		if c.ClientIdentifier == "admin-console-client" {
-			sysId = c.ID
+			sysID = c.ID
 			break
 		}
 	}
-	if sysId == 0 {
+	if sysID == 0 {
 		t.Skip("system-level client not found")
 	}
 
-	delURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysId, 10)
+	delURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysID, 10)
 	resp2 := makeAPIRequest(t, "DELETE", delURL, accessToken, nil)
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
@@ -82,8 +82,8 @@ func TestAPIClientDelete_SystemLevelRejected(t *testing.T) {
 	}
 }
 
-// TestAPIClientDelete_NotFoundAndInvalidId covers 404 and 400 branches
-func TestAPIClientDelete_NotFoundAndInvalidId(t *testing.T) {
+// TestAPIClientDelete_NotFoundAndInvalidID covers 404 and 400 branches
+func TestAPIClientDelete_NotFoundAndInvalidID(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Not found
@@ -99,7 +99,7 @@ func TestAPIClientDelete_NotFoundAndInvalidId(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 
 	// Unauthorized
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	req, err := http.NewRequest("DELETE", appConfig.AuthServer.BaseURL+"/api/v1/admin/clients/1", nil)
 	require.NoError(t, err)
 	resp2, err := httpClient.Do(req)

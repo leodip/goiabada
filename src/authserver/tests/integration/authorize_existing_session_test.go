@@ -15,9 +15,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestAuthorize_ExistingAcrLevel1Session_AcrLevel1Request(t *testing.T) {
+func TestAuthorize_ExistingACRLevel1Session_ACRLevel1Request(t *testing.T) {
 	started := time.Now().UTC()
-	httpClient, client, redirectUri, user := createSessionWithAcrLevel1(t)
+	httpClient, client, redirectURI, user := createSessionWithACRLevel1(t)
 
 	userSessions, err := database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	if err != nil {
@@ -32,8 +32,8 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel1Request(t *testing.T) {
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -42,7 +42,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel1Request(t *testing.T) {
 		"&nonce=" + requestNonce +
 		"&acr_values=" + record.ACRLevel1.String()
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,7 +66,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel1Request(t *testing.T) {
 	}
 	userSession2 := userSessions[0]
 
-	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
+	codeVal, stateVal := getCodeAndStateFromURL(t, resp)
 	assert.Equal(t, requestState, stateVal)
 
 	code := loadCodeFromDatabase(t, codeVal)
@@ -77,7 +77,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel1Request(t *testing.T) {
 	assert.Equal(t, requestScope, code.Scope)
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
-	assert.Equal(t, redirectUri.URI, code.RedirectURI)
+	assert.Equal(t, redirectURI.URI, code.RedirectURI)
 	assert.Equal(t, user.ID, code.User.ID)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertStampedSince(t, code.AuthenticatedAt, started)
@@ -91,9 +91,9 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel1Request(t *testing.T) {
 	assert.Greater(t, userSession2.LastAccessed, userSession1.LastAccessed)
 }
 
-func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2OptionalRequest_OtpDisabled(t *testing.T) {
+func TestAuthorize_ExistingACRLevel1Session_ACRLevel2OptionalRequest_OTPDisabled(t *testing.T) {
 	started := time.Now().UTC()
-	httpClient, client, redirectUri, user := createSessionWithAcrLevel1(t)
+	httpClient, client, redirectURI, user := createSessionWithACRLevel1(t)
 
 	user.OTPEnabled = false
 	err := database.UpdateUser(context.Background(), nil, user)
@@ -114,8 +114,8 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2OptionalRequest_OtpDisabled
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -124,7 +124,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2OptionalRequest_OtpDisabled
 		"&nonce=" + requestNonce +
 		"&acr_values=" + record.ACRLevel2Optional.String()
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -152,7 +152,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2OptionalRequest_OtpDisabled
 	}
 	userSession2 := userSessions[0]
 
-	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
+	codeVal, stateVal := getCodeAndStateFromURL(t, resp)
 	assert.Equal(t, requestState, stateVal)
 
 	code := loadCodeFromDatabase(t, codeVal)
@@ -163,7 +163,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2OptionalRequest_OtpDisabled
 	assert.Equal(t, requestScope, code.Scope)
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
-	assert.Equal(t, redirectUri.URI, code.RedirectURI)
+	assert.Equal(t, redirectURI.URI, code.RedirectURI)
 	assert.Equal(t, user.ID, code.User.ID)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertStampedSince(t, code.AuthenticatedAt, started)
@@ -177,9 +177,9 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2OptionalRequest_OtpDisabled
 	assert.Greater(t, userSession2.LastAccessed, userSession1.LastAccessed)
 }
 
-func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2OptionalRequest_OtpEnabled(t *testing.T) {
+func TestAuthorize_ExistingACRLevel1Session_ACRLevel2OptionalRequest_OTPEnabled(t *testing.T) {
 	started := time.Now().UTC()
-	httpClient, client, redirectUri, user := createSessionWithAcrLevel1(t)
+	httpClient, client, redirectURI, user := createSessionWithACRLevel1(t)
 
 	otpSecret := newOTPSecretForTest(t, user.Email)
 
@@ -203,8 +203,8 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2OptionalRequest_OtpEnabled(
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -213,7 +213,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2OptionalRequest_OtpEnabled(
 		"&nonce=" + requestNonce +
 		"&acr_values=" + record.ACRLevel2Optional.String()
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -232,7 +232,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2OptionalRequest_OtpEnabled(
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	otpCode := otptest.Code(t, otpSecret, time.Now())
-	resp = authenticateWithOtp(t, httpClient, redirectLocation, resp, otpCode)
+	resp = authenticateWithOTP(t, httpClient, redirectLocation, resp, otpCode)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
@@ -249,7 +249,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2OptionalRequest_OtpEnabled(
 	}
 	userSession2 := userSessions[0]
 
-	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
+	codeVal, stateVal := getCodeAndStateFromURL(t, resp)
 	assert.Equal(t, requestState, stateVal)
 
 	code := loadCodeFromDatabase(t, codeVal)
@@ -260,7 +260,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2OptionalRequest_OtpEnabled(
 	assert.Equal(t, requestScope, code.Scope)
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
-	assert.Equal(t, redirectUri.URI, code.RedirectURI)
+	assert.Equal(t, redirectURI.URI, code.RedirectURI)
 	assert.Equal(t, user.ID, code.User.ID)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertStampedSince(t, code.AuthenticatedAt, started)
@@ -274,9 +274,9 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2OptionalRequest_OtpEnabled(
 	assert.Greater(t, userSession2.LastAccessed, userSession1.LastAccessed)
 }
 
-func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2MandatoryRequest_OtpDisabled(t *testing.T) {
+func TestAuthorize_ExistingACRLevel1Session_ACRLevel2MandatoryRequest_OTPDisabled(t *testing.T) {
 	started := time.Now().UTC()
-	httpClient, client, redirectUri, user := createSessionWithAcrLevel1(t)
+	httpClient, client, redirectURI, user := createSessionWithACRLevel1(t)
 
 	user.OTPEnabled = false
 	err := database.UpdateUser(context.Background(), nil, user)
@@ -297,8 +297,8 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2MandatoryRequest_OtpDisable
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -307,7 +307,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2MandatoryRequest_OtpDisable
 		"&nonce=" + requestNonce +
 		"&acr_values=" + record.ACRLevel2Mandatory.String()
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -325,9 +325,9 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2MandatoryRequest_OtpDisable
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
-	otpSecret := getOtpSecretFromEnrollmentPage(t, resp)
+	otpSecret := getOTPSecretFromEnrollmentPage(t, resp)
 	otpCode := otptest.Code(t, otpSecret, time.Now())
-	resp = passSetupRecoveryCodes(t, httpClient, authenticateWithOtp(t, httpClient, redirectLocation, resp, otpCode))
+	resp = passSetupRecoveryCodes(t, httpClient, authenticateWithOTP(t, httpClient, redirectLocation, resp, otpCode))
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
@@ -344,7 +344,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2MandatoryRequest_OtpDisable
 	}
 	userSession2 := userSessions[0]
 
-	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
+	codeVal, stateVal := getCodeAndStateFromURL(t, resp)
 	assert.Equal(t, requestState, stateVal)
 
 	code := loadCodeFromDatabase(t, codeVal)
@@ -355,7 +355,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2MandatoryRequest_OtpDisable
 	assert.Equal(t, requestScope, code.Scope)
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
-	assert.Equal(t, redirectUri.URI, code.RedirectURI)
+	assert.Equal(t, redirectURI.URI, code.RedirectURI)
 	assert.Equal(t, user.ID, code.User.ID)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertStampedSince(t, code.AuthenticatedAt, started)
@@ -369,9 +369,9 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2MandatoryRequest_OtpDisable
 	assert.Greater(t, userSession2.LastAccessed, userSession1.LastAccessed)
 }
 
-func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2MandatoryRequest_OtpEnabled(t *testing.T) {
+func TestAuthorize_ExistingACRLevel1Session_ACRLevel2MandatoryRequest_OTPEnabled(t *testing.T) {
 	started := time.Now().UTC()
-	httpClient, client, redirectUri, user := createSessionWithAcrLevel1(t)
+	httpClient, client, redirectURI, user := createSessionWithACRLevel1(t)
 
 	// Enable OTP for the user
 	otpSecret := newOTPSecretForTest(t, user.Email)
@@ -396,8 +396,8 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2MandatoryRequest_OtpEnabled
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -406,7 +406,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2MandatoryRequest_OtpEnabled
 		"&nonce=" + requestNonce +
 		"&acr_values=" + record.ACRLevel2Mandatory.String()
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -425,7 +425,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2MandatoryRequest_OtpEnabled
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	otpCode := otptest.Code(t, otpSecret, time.Now())
-	resp = authenticateWithOtp(t, httpClient, redirectLocation, resp, otpCode)
+	resp = authenticateWithOTP(t, httpClient, redirectLocation, resp, otpCode)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
@@ -442,7 +442,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2MandatoryRequest_OtpEnabled
 	}
 	userSession2 := userSessions[0]
 
-	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
+	codeVal, stateVal := getCodeAndStateFromURL(t, resp)
 	assert.Equal(t, requestState, stateVal)
 
 	code := loadCodeFromDatabase(t, codeVal)
@@ -453,7 +453,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2MandatoryRequest_OtpEnabled
 	assert.Equal(t, requestScope, code.Scope)
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
-	assert.Equal(t, redirectUri.URI, code.RedirectURI)
+	assert.Equal(t, redirectURI.URI, code.RedirectURI)
 	assert.Equal(t, user.ID, code.User.ID)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertStampedSince(t, code.AuthenticatedAt, started)
@@ -467,9 +467,9 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2MandatoryRequest_OtpEnabled
 	assert.Greater(t, userSession2.LastAccessed, userSession1.LastAccessed)
 }
 
-func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel1Request(t *testing.T) {
+func TestAuthorize_ExistingACRLevel2OptionalSession_ACRLevel1Request(t *testing.T) {
 	started := time.Now().UTC()
-	httpClient, client, redirectUri, user := createSessionWithAcrLevel2Optional(t)
+	httpClient, client, redirectURI, user := createSessionWithACRLevel2Optional(t)
 
 	userSessions, err := database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	if err != nil {
@@ -484,8 +484,8 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel1Request(t *testing.
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -494,7 +494,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel1Request(t *testing.
 		"&nonce=" + requestNonce +
 		"&acr_values=" + record.ACRLevel1.String()
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -518,7 +518,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel1Request(t *testing.
 	}
 	userSession2 := userSessions[0]
 
-	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
+	codeVal, stateVal := getCodeAndStateFromURL(t, resp)
 	assert.Equal(t, requestState, stateVal)
 
 	code := loadCodeFromDatabase(t, codeVal)
@@ -529,7 +529,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel1Request(t *testing.
 	assert.Equal(t, requestScope, code.Scope)
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
-	assert.Equal(t, redirectUri.URI, code.RedirectURI)
+	assert.Equal(t, redirectURI.URI, code.RedirectURI)
 	assert.Equal(t, user.ID, code.User.ID)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertStampedSince(t, code.AuthenticatedAt, started)
@@ -543,9 +543,9 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel1Request(t *testing.
 	assert.Greater(t, userSession2.LastAccessed, userSession1.LastAccessed)
 }
 
-func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2OptionalRequest_OtpDisabled(t *testing.T) {
+func TestAuthorize_ExistingACRLevel2OptionalSession_ACRLevel2OptionalRequest_OTPDisabled(t *testing.T) {
 	started := time.Now().UTC()
-	httpClient, client, redirectUri, user := createSessionWithAcrLevel2Optional(t)
+	httpClient, client, redirectURI, user := createSessionWithACRLevel2Optional(t)
 
 	// Ensure OTP is disabled for the user
 	user.OTPEnabled = false
@@ -567,8 +567,8 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2OptionalRequest_Otp
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -577,7 +577,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2OptionalRequest_Otp
 		"&nonce=" + requestNonce +
 		"&acr_values=" + record.ACRLevel2Optional.String()
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -601,7 +601,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2OptionalRequest_Otp
 	}
 	userSession2 := userSessions[0]
 
-	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
+	codeVal, stateVal := getCodeAndStateFromURL(t, resp)
 	assert.Equal(t, requestState, stateVal)
 
 	code := loadCodeFromDatabase(t, codeVal)
@@ -612,7 +612,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2OptionalRequest_Otp
 	assert.Equal(t, requestScope, code.Scope)
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
-	assert.Equal(t, redirectUri.URI, code.RedirectURI)
+	assert.Equal(t, redirectURI.URI, code.RedirectURI)
 	assert.Equal(t, user.ID, code.User.ID)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertStampedSince(t, code.AuthenticatedAt, started)
@@ -626,9 +626,9 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2OptionalRequest_Otp
 	assert.Greater(t, userSession2.LastAccessed, userSession1.LastAccessed)
 }
 
-func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2OptionalRequest_OtpEnabled(t *testing.T) {
+func TestAuthorize_ExistingACRLevel2OptionalSession_ACRLevel2OptionalRequest_OTPEnabled(t *testing.T) {
 	started := time.Now().UTC()
-	httpClient, client, redirectUri, user := createSessionWithAcrLevel2Optional(t)
+	httpClient, client, redirectURI, user := createSessionWithACRLevel2Optional(t)
 
 	// in this test we simulate an existing session where OTP was disabled,
 	// then OTP gets enabled, the user logs in again, and is prompted for OTP
@@ -653,7 +653,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2OptionalRequest_Otp
 	// snapshot is left behind it. Standing in for the enable and disable handlers, which do this
 	// inside their own transactions; these cases are about what the ceremony does with a session
 	// that owes a re-prompt, not about how it came to owe one (#242).
-	advanceOtpConfigGeneration(t, user.ID)
+	advanceOTPConfigGeneration(t, user.ID)
 
 	time.Sleep(200 * time.Millisecond)
 
@@ -662,8 +662,8 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2OptionalRequest_Otp
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -672,7 +672,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2OptionalRequest_Otp
 		"&nonce=" + requestNonce +
 		"&acr_values=" + record.ACRLevel2Optional.String()
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -691,7 +691,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2OptionalRequest_Otp
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	otpCode := otptest.Code(t, otpSecret, time.Now())
-	resp = authenticateWithOtp(t, httpClient, redirectLocation, resp, otpCode)
+	resp = authenticateWithOTP(t, httpClient, redirectLocation, resp, otpCode)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
@@ -708,7 +708,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2OptionalRequest_Otp
 	}
 	userSession2 := userSessions[0]
 
-	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
+	codeVal, stateVal := getCodeAndStateFromURL(t, resp)
 	assert.Equal(t, requestState, stateVal)
 
 	code := loadCodeFromDatabase(t, codeVal)
@@ -719,7 +719,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2OptionalRequest_Otp
 	assert.Equal(t, requestScope, code.Scope)
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
-	assert.Equal(t, redirectUri.URI, code.RedirectURI)
+	assert.Equal(t, redirectURI.URI, code.RedirectURI)
 	assert.Equal(t, user.ID, code.User.ID)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertStampedSince(t, code.AuthenticatedAt, started)
@@ -744,9 +744,9 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2OptionalRequest_Otp
 		"the session must have caught up with the user's counter after answering the OTP prompt")
 }
 
-func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2MandatoryRequest_OtpDisabled(t *testing.T) {
+func TestAuthorize_ExistingACRLevel2OptionalSession_ACRLevel2MandatoryRequest_OTPDisabled(t *testing.T) {
 	started := time.Now().UTC()
-	httpClient, client, redirectUri, user := createSessionWithAcrLevel2Optional(t)
+	httpClient, client, redirectURI, user := createSessionWithACRLevel2Optional(t)
 
 	// Ensure OTP is disabled for the user
 	user.OTPEnabled = false
@@ -768,8 +768,8 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2MandatoryRequest_Ot
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -778,7 +778,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2MandatoryRequest_Ot
 		"&nonce=" + requestNonce +
 		"&acr_values=" + record.ACRLevel2Mandatory.String()
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -796,9 +796,9 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2MandatoryRequest_Ot
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
-	otpSecret := getOtpSecretFromEnrollmentPage(t, resp)
+	otpSecret := getOTPSecretFromEnrollmentPage(t, resp)
 	otpCode := otptest.Code(t, otpSecret, time.Now())
-	resp = passSetupRecoveryCodes(t, httpClient, authenticateWithOtp(t, httpClient, redirectLocation, resp, otpCode))
+	resp = passSetupRecoveryCodes(t, httpClient, authenticateWithOTP(t, httpClient, redirectLocation, resp, otpCode))
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
@@ -815,7 +815,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2MandatoryRequest_Ot
 	}
 	userSession2 := userSessions[0]
 
-	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
+	codeVal, stateVal := getCodeAndStateFromURL(t, resp)
 	assert.Equal(t, requestState, stateVal)
 
 	code := loadCodeFromDatabase(t, codeVal)
@@ -826,7 +826,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2MandatoryRequest_Ot
 	assert.Equal(t, requestScope, code.Scope)
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
-	assert.Equal(t, redirectUri.URI, code.RedirectURI)
+	assert.Equal(t, redirectURI.URI, code.RedirectURI)
 	assert.Equal(t, user.ID, code.User.ID)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertStampedSince(t, code.AuthenticatedAt, started)
@@ -848,9 +848,9 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2MandatoryRequest_Ot
 	assert.NotEmpty(t, updatedUser.OTPSecretEncrypted)
 }
 
-func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2MandatoryRequest_OtpEnabled(t *testing.T) {
+func TestAuthorize_ExistingACRLevel2OptionalSession_ACRLevel2MandatoryRequest_OTPEnabled(t *testing.T) {
 	started := time.Now().UTC()
-	httpClient, client, redirectUri, user := createSessionWithAcrLevel2Optional(t)
+	httpClient, client, redirectURI, user := createSessionWithACRLevel2Optional(t)
 
 	// Ensure OTP is enabled for the user
 	otpSecret := newOTPSecretForTest(t, user.Email)
@@ -875,8 +875,8 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2MandatoryRequest_Ot
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -885,7 +885,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2MandatoryRequest_Ot
 		"&nonce=" + requestNonce +
 		"&acr_values=" + record.ACRLevel2Mandatory.String()
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -904,7 +904,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2MandatoryRequest_Ot
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	otpCode := otptest.Code(t, otpSecret, time.Now())
-	resp = authenticateWithOtp(t, httpClient, redirectLocation, resp, otpCode)
+	resp = authenticateWithOTP(t, httpClient, redirectLocation, resp, otpCode)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
@@ -921,7 +921,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2MandatoryRequest_Ot
 	}
 	userSession2 := userSessions[0]
 
-	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
+	codeVal, stateVal := getCodeAndStateFromURL(t, resp)
 	assert.Equal(t, requestState, stateVal)
 
 	code := loadCodeFromDatabase(t, codeVal)
@@ -932,7 +932,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2MandatoryRequest_Ot
 	assert.Equal(t, requestScope, code.Scope)
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
-	assert.Equal(t, redirectUri.URI, code.RedirectURI)
+	assert.Equal(t, redirectURI.URI, code.RedirectURI)
 	assert.Equal(t, user.ID, code.User.ID)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertStampedSince(t, code.AuthenticatedAt, started)
@@ -956,9 +956,9 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2MandatoryRequest_Ot
 	assert.Equal(t, user.OTPSecretEncrypted, updatedUser.OTPSecretEncrypted)
 }
 
-func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel1Request(t *testing.T) {
+func TestAuthorize_ExistingACRLevel2MandatorySession_ACRLevel1Request(t *testing.T) {
 	started := time.Now().UTC()
-	httpClient, client, redirectUri, user := createSessionWithAcrLevel2Mandatory(t)
+	httpClient, client, redirectURI, user := createSessionWithACRLevel2Mandatory(t)
 
 	userSessions, err := database.GetUserSessionsByUserID(context.Background(), nil, user.ID)
 	if err != nil {
@@ -973,8 +973,8 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel1Request(t *testing
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -983,7 +983,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel1Request(t *testing
 		"&nonce=" + requestNonce +
 		"&acr_values=" + record.ACRLevel1.String()
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1007,7 +1007,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel1Request(t *testing
 	}
 	userSession2 := userSessions[0]
 
-	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
+	codeVal, stateVal := getCodeAndStateFromURL(t, resp)
 	assert.Equal(t, requestState, stateVal)
 
 	code := loadCodeFromDatabase(t, codeVal)
@@ -1018,7 +1018,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel1Request(t *testing
 	assert.Equal(t, requestScope, code.Scope)
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
-	assert.Equal(t, redirectUri.URI, code.RedirectURI)
+	assert.Equal(t, redirectURI.URI, code.RedirectURI)
 	assert.Equal(t, user.ID, code.User.ID)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertStampedSince(t, code.AuthenticatedAt, started)
@@ -1032,9 +1032,9 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel1Request(t *testing
 	assert.Greater(t, userSession2.LastAccessed, userSession1.LastAccessed)
 }
 
-func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2OptionalRequest_OtpDisabled(t *testing.T) {
+func TestAuthorize_ExistingACRLevel2MandatorySession_ACRLevel2OptionalRequest_OTPDisabled(t *testing.T) {
 	started := time.Now().UTC()
-	httpClient, client, redirectUri, user := createSessionWithAcrLevel2Mandatory(t)
+	httpClient, client, redirectURI, user := createSessionWithACRLevel2Mandatory(t)
 
 	// The client's level is a floor that acr_values never lowers (#240), so the request below is at
 	// level 2 optional only once the client is. At the helper's level 3 it was a level 3 request
@@ -1064,8 +1064,8 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2OptionalRequest_Ot
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -1074,7 +1074,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2OptionalRequest_Ot
 		"&nonce=" + requestNonce +
 		"&acr_values=" + record.ACRLevel2Optional.String()
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1104,7 +1104,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2OptionalRequest_Ot
 	}
 	userSession2 := userSessions[0]
 
-	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
+	codeVal, stateVal := getCodeAndStateFromURL(t, resp)
 	assert.Equal(t, requestState, stateVal)
 
 	code := loadCodeFromDatabase(t, codeVal)
@@ -1115,7 +1115,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2OptionalRequest_Ot
 	assert.Equal(t, requestScope, code.Scope)
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
-	assert.Equal(t, redirectUri.URI, code.RedirectURI)
+	assert.Equal(t, redirectURI.URI, code.RedirectURI)
 	assert.Equal(t, user.ID, code.User.ID)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertStampedSince(t, code.AuthenticatedAt, started)
@@ -1138,9 +1138,9 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2OptionalRequest_Ot
 	assert.False(t, updatedUser.OTPEnabled)
 }
 
-func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2OptionalRequest_OtpEnabled(t *testing.T) {
+func TestAuthorize_ExistingACRLevel2MandatorySession_ACRLevel2OptionalRequest_OTPEnabled(t *testing.T) {
 	started := time.Now().UTC()
-	httpClient, client, redirectUri, user := createSessionWithAcrLevel2Mandatory(t)
+	httpClient, client, redirectURI, user := createSessionWithACRLevel2Mandatory(t)
 
 	// As in the OtpDisabled case above: the client's level is a floor acr_values never lowers
 	// (#240), so the request is at level 2 optional only once the client is.
@@ -1168,8 +1168,8 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2OptionalRequest_Ot
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -1178,7 +1178,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2OptionalRequest_Ot
 		"&nonce=" + requestNonce +
 		"&acr_values=" + record.ACRLevel2Optional.String()
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1202,7 +1202,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2OptionalRequest_Ot
 	}
 	userSession2 := userSessions[0]
 
-	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
+	codeVal, stateVal := getCodeAndStateFromURL(t, resp)
 	assert.Equal(t, requestState, stateVal)
 
 	code := loadCodeFromDatabase(t, codeVal)
@@ -1213,7 +1213,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2OptionalRequest_Ot
 	assert.Equal(t, requestScope, code.Scope)
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
-	assert.Equal(t, redirectUri.URI, code.RedirectURI)
+	assert.Equal(t, redirectURI.URI, code.RedirectURI)
 	assert.Equal(t, user.ID, code.User.ID)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertStampedSince(t, code.AuthenticatedAt, started)
@@ -1235,9 +1235,9 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2OptionalRequest_Ot
 	assert.NotEmpty(t, updatedUser.OTPSecretEncrypted)
 }
 
-func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2MandatoryRequest_OtpDisabled(t *testing.T) {
+func TestAuthorize_ExistingACRLevel2MandatorySession_ACRLevel2MandatoryRequest_OTPDisabled(t *testing.T) {
 	started := time.Now().UTC()
-	httpClient, client, redirectUri, user := createSessionWithAcrLevel2Mandatory(t)
+	httpClient, client, redirectURI, user := createSessionWithACRLevel2Mandatory(t)
 
 	// Disable OTP for the user
 	user.OTPEnabled = false
@@ -1266,7 +1266,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2MandatoryRequest_O
 	// snapshot is left behind it. Standing in for the enable and disable handlers, which do this
 	// inside their own transactions; these cases are about what the ceremony does with a session
 	// that owes a re-prompt, not about how it came to owe one (#242).
-	advanceOtpConfigGeneration(t, user.ID)
+	advanceOTPConfigGeneration(t, user.ID)
 
 	time.Sleep(200 * time.Millisecond)
 
@@ -1275,8 +1275,8 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2MandatoryRequest_O
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -1285,7 +1285,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2MandatoryRequest_O
 		"&nonce=" + requestNonce +
 		"&acr_values=" + record.ACRLevel2Mandatory.String()
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1303,9 +1303,9 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2MandatoryRequest_O
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
-	otpSecret := getOtpSecretFromEnrollmentPage(t, resp)
+	otpSecret := getOTPSecretFromEnrollmentPage(t, resp)
 	otpCode := otptest.Code(t, otpSecret, time.Now())
-	resp = passSetupRecoveryCodes(t, httpClient, authenticateWithOtp(t, httpClient, redirectLocation, resp, otpCode))
+	resp = passSetupRecoveryCodes(t, httpClient, authenticateWithOTP(t, httpClient, redirectLocation, resp, otpCode))
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 
 	redirectLocation = assertRedirect(t, resp, "/auth/completed")
@@ -1322,7 +1322,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2MandatoryRequest_O
 	}
 	userSession2 := userSessions[0]
 
-	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
+	codeVal, stateVal := getCodeAndStateFromURL(t, resp)
 	assert.Equal(t, requestState, stateVal)
 
 	code := loadCodeFromDatabase(t, codeVal)
@@ -1333,7 +1333,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2MandatoryRequest_O
 	assert.Equal(t, requestScope, code.Scope)
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
-	assert.Equal(t, redirectUri.URI, code.RedirectURI)
+	assert.Equal(t, redirectURI.URI, code.RedirectURI)
 	assert.Equal(t, user.ID, code.User.ID)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertStampedSince(t, code.AuthenticatedAt, started)
@@ -1355,9 +1355,9 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2MandatoryRequest_O
 	assert.NotEmpty(t, updatedUser.OTPSecretEncrypted)
 }
 
-func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2MandatoryRequest_OtpEnabled(t *testing.T) {
+func TestAuthorize_ExistingACRLevel2MandatorySession_ACRLevel2MandatoryRequest_OTPEnabled(t *testing.T) {
 	started := time.Now().UTC()
-	httpClient, client, redirectUri, user := createSessionWithAcrLevel2Mandatory(t)
+	httpClient, client, redirectURI, user := createSessionWithACRLevel2Mandatory(t)
 
 	// Ensure OTP is enabled for the user
 	if !user.OTPEnabled {
@@ -1377,8 +1377,8 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2MandatoryRequest_O
 	requestNonce := fake.LetterN(8)
 	requestScope := "openid profile email"
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -1387,7 +1387,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2MandatoryRequest_O
 		"&nonce=" + requestNonce +
 		"&acr_values=" + record.ACRLevel2Mandatory.String()
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1411,7 +1411,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2MandatoryRequest_O
 	}
 	userSession2 := userSessions[0]
 
-	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
+	codeVal, stateVal := getCodeAndStateFromURL(t, resp)
 	assert.Equal(t, requestState, stateVal)
 
 	code := loadCodeFromDatabase(t, codeVal)
@@ -1422,7 +1422,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2MandatoryRequest_O
 	assert.Equal(t, requestScope, code.Scope)
 	assert.Equal(t, requestState, code.State)
 	assert.Equal(t, requestNonce, code.Nonce)
-	assert.Equal(t, redirectUri.URI, code.RedirectURI)
+	assert.Equal(t, redirectURI.URI, code.RedirectURI)
 	assert.Equal(t, user.ID, code.User.ID)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertStampedSince(t, code.AuthenticatedAt, started)

@@ -97,7 +97,7 @@ func TestAPIClientTokensPut_ValidationErrors(t *testing.T) {
 	}
 }
 
-func TestAPIClientTokensPut_NotFoundAndInvalidId(t *testing.T) {
+func TestAPIClientTokensPut_NotFoundAndInvalidID(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Not found
@@ -137,20 +137,20 @@ func TestAPIClientTokensPut_SystemLevelClientAllowed(t *testing.T) {
 	err := json.NewDecoder(resp.Body).Decode(&listResp)
 	require.NoError(t, err)
 
-	var sysId int64
+	var sysID int64
 	for _, c := range listResp.Clients {
 		if c.ClientIdentifier == builtin.AdminConsoleClientIdentifier {
-			sysId = c.ID
+			sysID = c.ID
 			break
 		}
 	}
-	if sysId == 0 {
+	if sysID == 0 {
 		t.Skip("system-level client not found")
 	}
 
 	// Every test in this tier shares the console client, and the values below would leave it issuing
 	// one-second tokens, so its settings go back as they were.
-	clientURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysId, 10)
+	clientURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysID, 10)
 	getResp := makeAPIRequest(t, "GET", clientURL, accessToken, nil)
 	defer func() { _ = getResp.Body.Close() }()
 	require.Equal(t, http.StatusOK, getResp.StatusCode)
@@ -188,7 +188,7 @@ func TestAPIClientTokensPut_InvalidRequestBodyAndUnauthorized(t *testing.T) {
 	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()

@@ -33,10 +33,10 @@ func storedLoopbackLogoutTarget() string {
 	return "http://127.0.0.1:8123/after-logout-" + fake.LetterN(8)
 }
 
-func storeSignOutRedirectURI(t *testing.T, clientId int64, uri string) {
+func storeSignOutRedirectURI(t *testing.T, clientID int64, uri string) {
 	t.Helper()
 	require.NoError(t, database.CreatePostLogoutRedirectURI(context.Background(), nil,
-		&record.PostLogoutRedirectURI{ClientID: clientId, URI: uri}))
+		&record.PostLogoutRedirectURI{ClientID: clientID, URI: uri}))
 }
 
 // assertSessionGone asserts the sign-out tore the session down whatever became of the redirect.
@@ -65,7 +65,7 @@ func TestLogout_Hintless_AStoredPlainHTTPTargetIsDeclinedButTheLogoutHappens(t *
 	assertSessionGone(t, grant.sessionIdentifier)
 }
 
-func TestLogout_WithIdTokenHint_AStoredPlainHTTPTargetIsDeclinedButTheLogoutHappens(t *testing.T) {
+func TestLogout_WithIDTokenHint_AStoredPlainHTTPTargetIsDeclinedButTheLogoutHappens(t *testing.T) {
 	grant := createOfflineGrant(t)
 	target := storedPlainHTTPLogoutTarget()
 	storeSignOutRedirectURI(t, grant.client.ID, target)

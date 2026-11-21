@@ -56,13 +56,13 @@ func TestAuthorize_ARefusedRequestLeavesTheSignInInProgress(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			client, redirectUri := createLevel1Client(t, false)
+			client, redirectURI := createLevel1Client(t, false)
 			user, password := createCeremonyUser(t)
-			httpClient := createHttpClient(t)
+			httpClient := createHTTPClient(t)
 
 			requestState := fake.LetterN(16)
-			destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-				"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+			destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+				"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 				"&response_type=code" +
 				"&code_challenge_method=S256" +
 				"&code_challenge=" + randomCodeChallenge() +
@@ -70,17 +70,17 @@ func TestAuthorize_ARefusedRequestLeavesTheSignInInProgress(t *testing.T) {
 				"&state=" + requestState +
 				"&nonce=" + fake.LetterN(8)
 
-			resp := loadPage(t, httpClient, destUrl)
+			resp := loadPage(t, httpClient, destURL)
 			redirectLocation := assertRedirect(t, resp, "/auth/level1")
 			_ = resp.Body.Close()
 
 			resp = loadPage(t, httpClient, redirectLocation)
-			pwdUrl := assertRedirect(t, resp, "/auth/pwd")
+			pwdURL := assertRedirect(t, resp, "/auth/pwd")
 			_ = resp.Body.Close()
 
 			// The password page is read in full now and kept, because the form is posted only after
 			// the malformed request, and what the user posts is what this page rendered.
-			pwdPage := loadPage(t, httpClient, pwdUrl)
+			pwdPage := loadPage(t, httpClient, pwdURL)
 			require.Equal(t, http.StatusOK, pwdPage.StatusCode)
 			pwdBody, err := io.ReadAll(pwdPage.Body)
 			require.NoError(t, err)
@@ -88,12 +88,12 @@ func TestAuthorize_ARefusedRequestLeavesTheSignInInProgress(t *testing.T) {
 			pwdPage.Body = io.NopCloser(bytes.NewReader(pwdBody))
 
 			resp = loadPage(t, httpClient, appConfig.AuthServer.BaseURL+"/auth/authorize/?"+
-				tc.malformed(client.ClientIdentifier, redirectUri.URI))
+				tc.malformed(client.ClientIdentifier, redirectURI.URI))
 			assert.Equal(t, tc.wantStatus, resp.StatusCode)
 			assert.Empty(t, resp.Header.Get("Location"), "the refusal is a page, not a redirect")
 			_ = resp.Body.Close()
 
-			resp = authenticateWithPassword(t, httpClient, pwdUrl, pwdPage, user.Email, password)
+			resp = authenticateWithPassword(t, httpClient, pwdURL, pwdPage, user.Email, password)
 			redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
 			_ = resp.Body.Close()
 
@@ -108,9 +108,9 @@ func TestAuthorize_ARefusedRequestLeavesTheSignInInProgress(t *testing.T) {
 			resp = loadPage(t, httpClient, redirectLocation)
 			defer func() { _ = resp.Body.Close() }()
 			require.Equal(t, http.StatusFound, resp.StatusCode)
-			assert.True(t, strings.HasPrefix(resp.Header.Get("Location"), redirectUri.URI),
+			assert.True(t, strings.HasPrefix(resp.Header.Get("Location"), redirectURI.URI),
 				"the code goes to the first request's client, got %q", resp.Header.Get("Location"))
-			_, state := getCodeAndStateFromUrl(t, resp)
+			_, state := getCodeAndStateFromURL(t, resp)
 			assert.Equal(t, requestState, state)
 		})
 	}
@@ -125,28 +125,28 @@ func TestAuthorize_ARefusedRequestLeavesTheSignInInProgress(t *testing.T) {
 // client receives the code with the first request's state.
 func TestAuthorize_AnErrorAnsweredAtOnceLeavesTheSignInInProgress(t *testing.T) {
 	t.Run("a prompt=none request answered login_required", func(t *testing.T) {
-		client, redirectUri := createLevel1Client(t, false)
+		client, redirectURI := createLevel1Client(t, false)
 		user, password := createCeremonyUser(t)
-		httpClient := createHttpClient(t)
+		httpClient := createHTTPClient(t)
 
 		requestState := fake.LetterN(16)
-		pwdUrl, pwdPage := walkToPasswordPageKept(t, httpClient,
-			authorizeUrlFor(client, redirectUri, "openid profile", requestState))
+		pwdURL, pwdPage := walkToPasswordPageKept(t, httpClient,
+			authorizeURLFor(client, redirectURI, "openid profile", requestState))
 
 		// The same client asking silently from another tab. The browser holds no user session, so
 		// the answer is login_required, at the client's redirect URI.
 		silentState := fake.LetterN(16)
 		resp := loadPage(t, httpClient,
-			authorizeUrlFor(client, redirectUri, "openid", silentState)+"&prompt=none")
+			authorizeURLFor(client, redirectURI, "openid", silentState)+"&prompt=none")
 		require.Equal(t, http.StatusFound, resp.StatusCode)
-		assert.True(t, strings.HasPrefix(resp.Header.Get("Location"), redirectUri.URI),
+		assert.True(t, strings.HasPrefix(resp.Header.Get("Location"), redirectURI.URI),
 			"the refusal goes to the client, got %q", resp.Header.Get("Location"))
-		errorCode, _, state := getErrorFromUrl(t, resp)
+		errorCode, _, state := getErrorFromURL(t, resp)
 		assert.Equal(t, "login_required", errorCode)
 		assert.Equal(t, silentState, state)
 		_ = resp.Body.Close()
 
-		resp = authenticateWithPassword(t, httpClient, pwdUrl, pwdPage, user.Email, password)
+		resp = authenticateWithPassword(t, httpClient, pwdURL, pwdPage, user.Email, password)
 		redirectLocation := assertRedirect(t, resp, "/auth/level1completed")
 		_ = resp.Body.Close()
 
@@ -158,26 +158,26 @@ func TestAuthorize_AnErrorAnsweredAtOnceLeavesTheSignInInProgress(t *testing.T) 
 		redirectLocation = assertRedirect(t, resp, "/auth/issue")
 		_ = resp.Body.Close()
 
-		assertCodeIssuedFor(t, loadPage(t, httpClient, redirectLocation), redirectUri.URI, requestState)
+		assertCodeIssuedFor(t, loadPage(t, httpClient, redirectLocation), redirectURI.URI, requestState)
 	})
 
 	t.Run("an interactive request answered unauthorized_client", func(t *testing.T) {
-		client, redirectUri := createConsentClient(t)
+		client, redirectURI := createConsentClient(t)
 		user, password := createCeremonyUser(t)
-		httpClient := createHttpClient(t)
+		httpClient := createHTTPClient(t)
 
 		// The sign-in reaches the consent screen, by which point /auth/completed has given the browser
 		// a valid user session, so a refused request in this browser is answered at once rather than
 		// deferred until a password is entered (RFC 9700 4.11.2).
 		requestState := fake.LetterN(16)
-		resp := loadPage(t, httpClient, authorizeUrlFor(client, redirectUri, "openid profile", requestState))
+		resp := loadPage(t, httpClient, authorizeURLFor(client, redirectURI, "openid profile", requestState))
 		redirectLocation := assertRedirect(t, resp, "/auth/level1")
 		_ = resp.Body.Close()
 		resp = loadPage(t, httpClient, redirectLocation)
-		pwdUrl := assertRedirect(t, resp, "/auth/pwd")
+		pwdURL := assertRedirect(t, resp, "/auth/pwd")
 		_ = resp.Body.Close()
-		pwdPage := loadPage(t, httpClient, pwdUrl)
-		resp = authenticateWithPassword(t, httpClient, pwdUrl, pwdPage, user.Email, password)
+		pwdPage := loadPage(t, httpClient, pwdURL)
+		resp = authenticateWithPassword(t, httpClient, pwdURL, pwdPage, user.Email, password)
 		_ = pwdPage.Body.Close()
 		redirectLocation = assertRedirect(t, resp, "/auth/level1completed")
 		_ = resp.Body.Close()
@@ -185,9 +185,9 @@ func TestAuthorize_AnErrorAnsweredAtOnceLeavesTheSignInInProgress(t *testing.T) 
 		redirectLocation = assertRedirect(t, resp, "/auth/completed")
 		_ = resp.Body.Close()
 		resp = loadPage(t, httpClient, redirectLocation)
-		consentUrl := assertRedirect(t, resp, "/auth/consent")
+		consentURL := assertRedirect(t, resp, "/auth/consent")
 		_ = resp.Body.Close()
-		consentPage := keptPage(t, loadPage(t, httpClient, consentUrl))
+		consentPage := keptPage(t, loadPage(t, httpClient, consentURL))
 
 		// Another client's request, refused by redirect at once: its code flow is off.
 		disabledClient, _, _ := newCodeFlowDisabledClient(t)
@@ -200,29 +200,29 @@ func TestAuthorize_AnErrorAnsweredAtOnceLeavesTheSignInInProgress(t *testing.T) 
 			resp.Header.Get("Location"))
 		_ = resp.Body.Close()
 
-		resp = postConsent(t, httpClient, consentUrl, consentPage, []int{0, 1})
+		resp = postConsent(t, httpClient, consentURL, consentPage, []int{0, 1})
 		redirectLocation = assertRedirect(t, resp, "/auth/issue")
 		_ = resp.Body.Close()
 
-		assertCodeIssuedFor(t, loadPage(t, httpClient, redirectLocation), redirectUri.URI, requestState)
+		assertCodeIssuedFor(t, loadPage(t, httpClient, redirectLocation), redirectURI.URI, requestState)
 	})
 }
 
-// walkToPasswordPageKept starts the authorization at authorizeUrl and walks it to the password page,
+// walkToPasswordPageKept starts the authorization at authorizeURL and walks it to the password page,
 // returning that page's URL and the page itself read in full, because its form is posted only after
 // another request, and what the user posts is what this page rendered.
-func walkToPasswordPageKept(t *testing.T, httpClient *http.Client, authorizeUrl string) (string, *http.Response) {
+func walkToPasswordPageKept(t *testing.T, httpClient *http.Client, authorizeURL string) (string, *http.Response) {
 	t.Helper()
 
-	resp := loadPage(t, httpClient, authorizeUrl)
+	resp := loadPage(t, httpClient, authorizeURL)
 	redirectLocation := assertRedirect(t, resp, "/auth/level1")
 	_ = resp.Body.Close()
 
 	resp = loadPage(t, httpClient, redirectLocation)
-	pwdUrl := assertRedirect(t, resp, "/auth/pwd")
+	pwdURL := assertRedirect(t, resp, "/auth/pwd")
 	_ = resp.Body.Close()
 
-	return pwdUrl, keptPage(t, loadPage(t, httpClient, pwdUrl))
+	return pwdURL, keptPage(t, loadPage(t, httpClient, pwdURL))
 }
 
 // keptPage reads a 200 page in full and closes its connection, leaving the body readable for the
@@ -247,6 +247,6 @@ func assertCodeIssuedFor(t *testing.T, resp *http.Response, redirectURI string, 
 	require.Equal(t, http.StatusFound, resp.StatusCode)
 	assert.True(t, strings.HasPrefix(resp.Header.Get("Location"), redirectURI),
 		"the code goes to the first request's client, got %q", resp.Header.Get("Location"))
-	_, state := getCodeAndStateFromUrl(t, resp)
+	_, state := getCodeAndStateFromURL(t, resp)
 	assert.Equal(t, wantState, state)
 }

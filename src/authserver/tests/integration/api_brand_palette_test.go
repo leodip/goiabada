@@ -217,7 +217,7 @@ func TestAPIBrandPalette_ChangesAreAudited(t *testing.T) {
 	_, created := keepDefaultBrand(t)
 
 	name := brandName("AuditPalette")
-	resp, requestId := sendAdmin(t, accessToken, http.MethodPost, brandsPath, brandBody(map[string]any{
+	resp, requestID := sendAdmin(t, accessToken, http.MethodPost, brandsPath, brandBody(map[string]any{
 		"name": name, "appearance": "light", "theme": "custom", "palette": map[string]any{"mode": "basic",
 			"light": paletteJSON(paletteMidGrayLight, basicTokens...), "dark": paletteJSON(paletteBlueberryDark, basicTokens...)}}))
 	var answer map[string]any
@@ -226,14 +226,14 @@ func TestAPIBrandPalette_ChangesAreAudited(t *testing.T) {
 	require.Equal(t, http.StatusCreated, resp.StatusCode, "%v", answer)
 	id := int64(answer["brand"].(map[string]any)["id"].(float64))
 	*created = append(*created, id)
-	createdRows := auditRows(t, accessToken, "created_brand", requestId)
+	createdRows := auditRows(t, accessToken, "created_brand", requestID)
 	assert.Equal(t, []map[string]any{{"brand_id": float64(id), "brand_name": name, "theme": "custom",
 		"palette_mode": "basic", "logged_in_user": who}}, createdRows)
 
-	_, _, requestId = brandCall(t, accessToken, http.MethodPut, brandPath(id, ""),
+	_, _, requestID = brandCall(t, accessToken, http.MethodPut, brandPath(id, ""),
 		brandBody(map[string]any{"name": name, "appearance": "dark", "theme": "custom", "palette": map[string]any{"mode": "advanced",
 			"light": paletteJSON(paletteMidGrayLight), "dark": paletteJSON(paletteBlueberryDark)}}))
-	updatedRows := auditRows(t, accessToken, "updated_brand", requestId)
+	updatedRows := auditRows(t, accessToken, "updated_brand", requestID)
 	assert.Equal(t, []map[string]any{{"brand_id": float64(id), "brand_name": name, "appearance": "dark",
 		"theme": "custom", "palette_mode": "advanced", "corners": "rounded", "font": "system-ui", "background_fit": "cover",
 		"hide_app_name": false, "logged_in_user": who}}, updatedRows)

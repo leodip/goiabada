@@ -54,11 +54,11 @@ func retireWhenDone(t *testing.T, id int64) {
 // legalCall sends one admin API request and decodes its JSON answer.
 func legalCall(t *testing.T, accessToken, method, path string, body any) (int, map[string]any, string) {
 	t.Helper()
-	resp, requestId := sendAdmin(t, accessToken, method, path, body)
+	resp, requestID := sendAdmin(t, accessToken, method, path, body)
 	defer func() { _ = resp.Body.Close() }()
 	var answer map[string]any
 	_ = json.NewDecoder(resp.Body).Decode(&answer)
-	return resp.StatusCode, answer, requestId
+	return resp.StatusCode, answer, requestID
 }
 
 // createLegalDocumentOverAPI creates a document and returns its id.
@@ -269,7 +269,7 @@ func TestAPILegalDocuments_PreviewRendersAsThePublishedPageWill(t *testing.T) {
 		"<p><a href=\"\">bad</a> <a href=\"https://tracker.example/p.gif\">pixel</a></p>\n", body["html"])
 }
 
-func TestAPILegalDocuments_NotFoundAndBadIds(t *testing.T) {
+func TestAPILegalDocuments_NotFoundAndBadIDs(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	for _, c := range []struct{ method, path string }{
@@ -360,7 +360,7 @@ func TestAPILegalDocuments_ChangesAreAudited(t *testing.T) {
 	who := caller.ClientIdentifier
 
 	shortName := legalShortName("audit")
-	resp, requestId := sendAdmin(t, accessToken, http.MethodPost, legalDocumentsPath, map[string]any{
+	resp, requestID := sendAdmin(t, accessToken, http.MethodPost, legalDocumentsPath, map[string]any{
 		"kind": "must_accept", "shortName": shortName, "title": "Terms", "markdown": "Text",
 	})
 	var created map[string]any
@@ -370,30 +370,30 @@ func TestAPILegalDocuments_ChangesAreAudited(t *testing.T) {
 	id := int64(created["legalDocument"].(map[string]any)["id"].(float64))
 	retireWhenDone(t, id)
 	assert.Equal(t, []map[string]any{{"legal_document_id": float64(id), "short_name": shortName, "kind": "must_accept", "logged_in_user": who}},
-		auditRows(t, accessToken, "created_legal_document", requestId))
+		auditRows(t, accessToken, "created_legal_document", requestID))
 
 	plain := []map[string]any{{"legal_document_id": float64(id), "short_name": shortName, "logged_in_user": who}}
-	_, _, requestId = legalCall(t, accessToken, http.MethodPut, legalPath(id, "/draft"), map[string]any{"title": "Terms", "markdown": "Text 2"})
-	assert.Equal(t, plain, auditRows(t, accessToken, "updated_legal_document_draft", requestId))
+	_, _, requestID = legalCall(t, accessToken, http.MethodPut, legalPath(id, "/draft"), map[string]any{"title": "Terms", "markdown": "Text 2"})
+	assert.Equal(t, plain, auditRows(t, accessToken, "updated_legal_document_draft", requestID))
 
-	_, _, requestId = legalCall(t, accessToken, http.MethodPost, legalPath(id, "/publish"), nil)
+	_, _, requestID = legalCall(t, accessToken, http.MethodPost, legalPath(id, "/publish"), nil)
 	assert.Equal(t, []map[string]any{{"legal_document_id": float64(id), "short_name": shortName, "version": float64(1), "logged_in_user": who}},
-		auditRows(t, accessToken, "published_legal_document", requestId))
-	assert.Empty(t, auditRows(t, accessToken, "updated_legal_document_draft", requestId), "publishing writes no draft event")
+		auditRows(t, accessToken, "published_legal_document", requestID))
+	assert.Empty(t, auditRows(t, accessToken, "updated_legal_document_draft", requestID), "publishing writes no draft event")
 
-	_, _, requestId = legalCall(t, accessToken, http.MethodPost, legalPath(id, "/retire"), nil)
-	assert.Equal(t, plain, auditRows(t, accessToken, "retired_legal_document", requestId))
-	_, _, requestId = legalCall(t, accessToken, http.MethodPost, legalPath(id, "/restore"), nil)
-	assert.Equal(t, plain, auditRows(t, accessToken, "restored_legal_document", requestId))
+	_, _, requestID = legalCall(t, accessToken, http.MethodPost, legalPath(id, "/retire"), nil)
+	assert.Equal(t, plain, auditRows(t, accessToken, "retired_legal_document", requestID))
+	_, _, requestID = legalCall(t, accessToken, http.MethodPost, legalPath(id, "/restore"), nil)
+	assert.Equal(t, plain, auditRows(t, accessToken, "restored_legal_document", requestID))
 
 	// A refused change writes nothing.
-	status, _, requestId := legalCall(t, accessToken, http.MethodDelete, legalPath(id, ""), nil)
+	status, _, requestID := legalCall(t, accessToken, http.MethodDelete, legalPath(id, ""), nil)
 	require.Equal(t, http.StatusBadRequest, status)
-	assert.Empty(t, auditRows(t, accessToken, "deleted_legal_document", requestId))
+	assert.Empty(t, auditRows(t, accessToken, "deleted_legal_document", requestID))
 
 	draftName := legalShortName("audit-draft")
 	draft := createLegalDocumentOverAPI(t, accessToken, "for_information", draftName, "Privacy", "Text")
-	_, _, requestId = legalCall(t, accessToken, http.MethodDelete, legalPath(draft, ""), nil)
+	_, _, requestID = legalCall(t, accessToken, http.MethodDelete, legalPath(draft, ""), nil)
 	assert.Equal(t, []map[string]any{{"legal_document_id": float64(draft), "short_name": draftName, "logged_in_user": who}},
-		auditRows(t, accessToken, "deleted_legal_document", requestId))
+		auditRows(t, accessToken, "deleted_legal_document", requestID))
 }

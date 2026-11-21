@@ -251,7 +251,7 @@ func TestAPIAccountSessions_UnauthorizedAndScope(t *testing.T) {
 	// No token
 	req, err := http.NewRequest("GET", url, nil)
 	require.NoError(t, err)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -276,12 +276,12 @@ func TestAPIAccountSessions_UnauthorizedAndScope(t *testing.T) {
 	assert.Contains(t, string(body3), "Insufficient scope.")
 }
 
-func TestAPIAccountSessionDelete_UnauthorizedAndInvalidId(t *testing.T) {
+func TestAPIAccountSessionDelete_UnauthorizedAndInvalidID(t *testing.T) {
 	// No token
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/sessions/123"
 	req, err := http.NewRequest("DELETE", url, nil)
 	require.NoError(t, err)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()

@@ -27,15 +27,15 @@ import (
 // ceiling). A row is isCurrent only on the caller's own user, for the client its token was issued
 // to.
 
-func userConnectedClientsPath(userId any) string {
-	return fmt.Sprintf("/api/v1/admin/users/%v/connected-clients", userId)
+func userConnectedClientsPath(userID any) string {
+	return fmt.Sprintf("/api/v1/admin/users/%v/connected-clients", userID)
 }
 
 // listUserConnectedClients is the user's list as accessToken reads it, required to answer 200,
 // keyed by client id, with the raw body.
-func listUserConnectedClients(t *testing.T, accessToken string, userId int64) (map[int64]api.ConnectedClientResponse, string) {
+func listUserConnectedClients(t *testing.T, accessToken string, userID int64) (map[int64]api.ConnectedClientResponse, string) {
 	t.Helper()
-	resp := makeAPIRequest(t, http.MethodGet, appConfig.AuthServer.BaseURL+userConnectedClientsPath(userId), accessToken, nil)
+	resp := makeAPIRequest(t, http.MethodGet, appConfig.AuthServer.BaseURL+userConnectedClientsPath(userID), accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	body, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
@@ -54,16 +54,16 @@ func listUserConnectedClients(t *testing.T, accessToken string, userId int64) (m
 
 // disconnectUser sends the Admin DELETE with path values as given and answers the status, the
 // decoded body and the request id its audit rows carry.
-func disconnectUser(t *testing.T, accessToken string, userId, clientId any) (int, map[string]interface{}, string) {
+func disconnectUser(t *testing.T, accessToken string, userID, clientID any) (int, map[string]interface{}, string) {
 	t.Helper()
-	resp, requestId := sendAdminRequest(t, accessToken, http.MethodDelete,
-		fmt.Sprintf("%s/%v", userConnectedClientsPath(userId), clientId), nil)
+	resp, requestID := sendAdminRequest(t, accessToken, http.MethodDelete,
+		fmt.Sprintf("%s/%v", userConnectedClientsPath(userID), clientID), nil)
 	defer func() { _ = resp.Body.Close() }()
 	body, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
 	var decoded map[string]interface{}
 	require.NoError(t, json.Unmarshal(body, &decoded), "%s", body)
-	return resp.StatusCode, decoded, requestId
+	return resp.StatusCode, decoded, requestID
 }
 
 // TestAPIUserConnectedClients_ListsEveryClientOfTheUser: an administrator's list of a user names
@@ -105,7 +105,7 @@ func TestAPIUserConnectedClients_ListsEveryClientOfTheUser(t *testing.T) {
 			ClientDescription: "Internal billing tool",
 			Consent:           &api.ConnectedClientConsentResponse{ID: hiddenConsent.ID, Scope: "openid email"}},
 	}
-	require.ElementsMatch(t, clientIdsOf(want), clientIdsOf(rows))
+	require.ElementsMatch(t, clientIDsOf(want), clientIDsOf(rows))
 	for id, row := range rows {
 		if id == console.ID {
 			// The console's name is whatever its seeded row shows; the rest is asserted.
@@ -168,18 +168,18 @@ func TestAPIUserConnectedClientDelete_DisconnectsAnAppWithNoConsent(t *testing.T
 	require.NotNil(t, session, "the browser session survives the disconnect")
 
 	rows, _ := listUserConnectedClients(t, adminToken, c.user.ID)
-	assert.NotContains(t, clientIdsOf(rows), c.x.client.ID, "the disconnected app is listed no more")
-	assert.Contains(t, clientIdsOf(rows), c.y.client.ID)
+	assert.NotContains(t, clientIDsOf(rows), c.x.client.ID, "the disconnected app is listed no more")
+	assert.Contains(t, clientIDsOf(rows), c.y.client.ID)
 
 	entries := disconnectedClientEntries(t, c.user.ID, c.x.client.ID)
 	require.Len(t, entries, 1, "the disconnect is recorded once")
 	assert.Equal(t, adminClient.ClientIdentifier, entries[0]["logged_in_user"])
 	assert.Len(t, entries[0]["revoked_refresh_token_jtis"], 1, "the app's one live refresh token")
 
-	status, body, requestId := disconnectUser(t, adminToken, c.user.ID, c.x.client.ID)
+	status, body, requestID := disconnectUser(t, adminToken, c.user.ID, c.x.client.ID)
 	assert.Equal(t, http.StatusNotFound, status, "a repeated disconnect has nothing to end")
 	assert.Equal(t, "NOT_FOUND", body["error_code"])
-	assert.Zero(t, auditRowsOfRequest(t, adminToken, requestId), "a disconnect with nothing to end writes nothing")
+	assert.Zero(t, auditRowsOfRequest(t, adminToken, requestID), "a disconnect with nothing to end writes nothing")
 	assert.Len(t, disconnectedClientEntries(t, c.user.ID, c.x.client.ID), 1)
 
 	again := signInOn(t, c.browser, c.x.signIn, c.user, nil, nil)
@@ -247,23 +247,23 @@ func TestAPIUserConnectedClients_NotFoundAndMalformed(t *testing.T) {
 
 	other := consoleSignInUser(t, "en")
 	app := newConnectedApp(t, "openid")
-	othersGrant := signInOn(t, createHttpClient(t), app.signIn, other, nil, nil)
+	othersGrant := signInOn(t, createHTTPClient(t), app.signIn, other, nil, nil)
 
-	status, body, requestId := disconnectUser(t, adminToken, user.ID, app.client.ID)
+	status, body, requestID := disconnectUser(t, adminToken, user.ID, app.client.ID)
 	assert.Equal(t, http.StatusNotFound, status, "the user holds nothing with the client")
 	assert.Equal(t, "NOT_FOUND", body["error_code"])
-	assert.Zero(t, auditRowsOfRequest(t, adminToken, requestId))
+	assert.Zero(t, auditRowsOfRequest(t, adminToken, requestID))
 	othersRefresh := assertRefreshes(t, app.client.ClientIdentifier, signInRefreshToken(t, othersGrant), app.signIn.secret)
 
-	status, body, requestId = disconnectUser(t, adminToken, 99999999, app.client.ID)
+	status, body, requestID = disconnectUser(t, adminToken, 99999999, app.client.ID)
 	assert.Equal(t, http.StatusNotFound, status, "a user that does not exist")
 	assert.Equal(t, "NOT_FOUND", body["error_code"])
-	assert.Zero(t, auditRowsOfRequest(t, adminToken, requestId))
+	assert.Zero(t, auditRowsOfRequest(t, adminToken, requestID))
 
-	status, body, requestId = disconnectUser(t, adminToken, other.ID, 99999999)
+	status, body, requestID = disconnectUser(t, adminToken, other.ID, 99999999)
 	assert.Equal(t, http.StatusNotFound, status, "a client that does not exist")
 	assert.Equal(t, "NOT_FOUND", body["error_code"])
-	assert.Zero(t, auditRowsOfRequest(t, adminToken, requestId))
+	assert.Zero(t, auditRowsOfRequest(t, adminToken, requestID))
 
 	status, body, _ = disconnectUser(t, adminToken, "not-a-number", app.client.ID)
 	assert.Equal(t, http.StatusBadRequest, status)
@@ -311,7 +311,7 @@ func TestAPIUserConnectedClients_Scopes(t *testing.T) {
 	} {
 		req, err := http.NewRequest(op.method, op.url, nil)
 		require.NoError(t, err)
-		resp, err := createHttpClient(t).Do(req)
+		resp, err := createHTTPClient(t).Do(req)
 		require.NoError(t, err)
 		_ = resp.Body.Close()
 		assert.Equal(t, http.StatusUnauthorized, resp.StatusCode, "%s with no token", op.method)
@@ -373,7 +373,7 @@ func TestAPIUserConnectedClientDelete_EndsTheClientOnEverySessionAndTellsIt(t *t
 	untold := newLogoutReceiver(t, http.StatusOK)
 	require.NoError(t, database.SetClientBackchannelLogout(context.Background(), nil, other.client.ID, untold.uri(), false))
 
-	status, body, requestId := disconnectUser(t, adminToken, first.user.ID, first.client.ID)
+	status, body, requestID := disconnectUser(t, adminToken, first.user.ID, first.client.ID)
 	require.Equal(t, http.StatusOK, status, "%v", body)
 
 	for _, g := range grants {
@@ -404,7 +404,7 @@ func TestAPIUserConnectedClientDelete_EndsTheClientOnEverySessionAndTellsIt(t *t
 
 	posts := told.waitFor(t, 1, 10*time.Second)
 	assertLogoutToken(t, posts[0], first.client.ClientIdentifier, first.user.Subject, "")
-	sentLogoutTokenRow(t, requestId, 10*time.Second)
+	sentLogoutTokenRow(t, requestID, 10*time.Second)
 	// Every delivery has started by now; any further one would have arrived meanwhile.
 	time.Sleep(2 * time.Second)
 	assert.Len(t, told.received(), 1, "the client is told once, about every session of the user")

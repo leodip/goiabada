@@ -73,7 +73,7 @@ func sendBearer(t *testing.T, route bearerRoute, token string) bearerKindRespons
 			strings.NewReader(url.Values{"access_token": {token}}.Encode()))
 		require.NoError(t, err)
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		resp, err = createHttpClient(t).Do(req)
+		resp, err = createHTTPClient(t).Do(req)
 		require.NoError(t, err)
 	} else {
 		resp = makeAPIRequest(t, route.method, appConfig.AuthServer.BaseURL+route.path, token, route.body)
@@ -251,7 +251,7 @@ func TestBearerToken_AccessTokensWithAnAudienceArrayStillPass(t *testing.T) {
 			&record.ClientPermission{ClientID: client.ID, PermissionID: secondPermission.ID}))
 
 		scope := builtin.AuthServerResourceIdentifier + ":" + builtin.ManagePermissionIdentifier + " " + secondScope
-		data := postToTokenEndpoint(t, createHttpClient(t), appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
+		data := postToTokenEndpoint(t, createHTTPClient(t), appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
 			"grant_type":    {"client_credentials"},
 			"client_id":     {client.ClientIdentifier},
 			"client_secret": {clientSecret},
@@ -266,16 +266,16 @@ func TestBearerToken_AccessTokensWithAnAudienceArrayStillPass(t *testing.T) {
 	})
 }
 
-// TestBearerToken_NonIdTokenAsIdTokenHintIsRefused: at /auth/authorize a validly signed token of
+// TestBearerToken_NonIDTokenAsIDTokenHintIsRefused: at /auth/authorize a validly signed token of
 // this server that is not an ID Token is refused as a hint, with the answer an unparseable hint
 // gets. prompt=none from a browser with no session makes the answer immediate: a hint that passes
 // goes on to login_required, a refused one stops at invalid_request.
-func TestBearerToken_NonIdTokenAsIdTokenHintIsRefused(t *testing.T) {
+func TestBearerToken_NonIDTokenAsIDTokenHintIsRefused(t *testing.T) {
 	tokens, code, _, _ := userTokenResponseWithScope(t, "openid", nil)
 
 	authorizeWithHint := func(t *testing.T, hint string) (string, string) {
 		t.Helper()
-		destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + code.Client.ClientIdentifier +
+		destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + code.Client.ClientIdentifier +
 			"&redirect_uri=" + url.QueryEscape(code.RedirectURI) +
 			"&response_type=code" +
 			"&code_challenge_method=S256" +
@@ -285,13 +285,13 @@ func TestBearerToken_NonIdTokenAsIdTokenHintIsRefused(t *testing.T) {
 			"&prompt=none" +
 			"&id_token_hint=" + url.QueryEscape(hint)
 
-		resp, err := createHttpClient(t).Get(destUrl)
+		resp, err := createHTTPClient(t).Get(destURL)
 		require.NoError(t, err)
 		defer func() { _ = resp.Body.Close() }()
 		require.Equal(t, http.StatusFound, resp.StatusCode)
 		require.True(t, strings.HasPrefix(resp.Header.Get("Location"), code.RedirectURI),
 			"answered at the client's redirect_uri: %s", resp.Header.Get("Location"))
-		errorCode, errorDescription, _ := getErrorFromUrl(t, resp)
+		errorCode, errorDescription, _ := getErrorFromURL(t, resp)
 		return errorCode, errorDescription
 	}
 

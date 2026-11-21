@@ -69,7 +69,7 @@ func TestAPIPermissionUsersGet_Success(t *testing.T) {
 	assert.False(t, seen2, "u2 should not be included")
 }
 
-func TestAPIPermissionUsersGet_InvalidPermissionId(t *testing.T) {
+func TestAPIPermissionUsersGet_InvalidPermissionID(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/permissions/invalid/users"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
@@ -82,8 +82,8 @@ func TestAPIPermissionUsersGet_InvalidPermissionId(t *testing.T) {
 
 func TestAPIPermissionUsersGet_PermissionNotFound(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
-	missingId := int64(fake.Number(7_000_000, 7_999_999))
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/permissions/" + strconv.FormatInt(missingId, 10) + "/users"
+	missingID := int64(fake.Number(7_000_000, 7_999_999))
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/permissions/" + strconv.FormatInt(missingID, 10) + "/users"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
@@ -149,7 +149,7 @@ func TestAPIPermissionUsersGet_Unauthorized(t *testing.T) {
 	perm := createPermission(t, res.ID)
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/permissions/" + strconv.FormatInt(perm.ID, 10) + "/users"
 	req, _ := http.NewRequest("GET", url, nil)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()

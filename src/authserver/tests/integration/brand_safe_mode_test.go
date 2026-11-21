@@ -91,7 +91,7 @@ func withSafeMode(t *testing.T, raw string) string {
 // getBody answers the body served at path on the auth server.
 func getBody(t *testing.T, path string) string {
 	t.Helper()
-	resp, err := createHttpClient(t).Get(appConfig.AuthServer.BaseURL + path)
+	resp, err := createHTTPClient(t).Get(appConfig.AuthServer.BaseURL + path)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode, path)
@@ -106,7 +106,7 @@ func TestSafeMode_ASignInAskingForItIsDrawnSafeOnEveryPage(t *testing.T) {
 	client, redirectURI := brandSignInClient(t, record.ACRLevel1)
 	brand := giveClientSafeModeBrand(t, client)
 	user, password := brandSignInUser(t, "")
-	browser := createHttpClient(t)
+	browser := createHTTPClient(t)
 
 	resp := loadPage(t, browser, withSafeMode(t, brandAuthorizeURL(client, redirectURI, "form_post")))
 	resp, _ = brandFollowTo(t, browser, resp, "/auth/level1")
@@ -172,7 +172,7 @@ func TestSafeMode_ASignInAskingForItIsDrawnSafeOnEveryPage(t *testing.T) {
 
 	// Another browser's sign-in, of the same client, is drawn as usual.
 	t.Run("another browser's sign-in", func(t *testing.T) {
-		other := createHttpClient(t)
+		other := createHTTPClient(t)
 		page := loadPage(t, other, brandAuthorizeURL(client, redirectURI, ""))
 		page, _ = brandFollowTo(t, other, page, "/auth/level1")
 		page, _ = brandFollowTo(t, other, page, "/auth/pwd")
@@ -201,13 +201,13 @@ func TestSafeMode_TheAuthorizeRefusalPageIsDrawnSafe(t *testing.T) {
 	client, redirectURI := brandSignInClient(t, record.ACRLevel1)
 	brand := giveClientSafeModeBrand(t, client)
 
-	resp := loadPage(t, createHttpClient(t),
+	resp := loadPage(t, createHTTPClient(t),
 		withSafeMode(t, brandAuthorizeURL(client, "https://elsewhere.example.com/callback", "")))
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	assertDrawnSafe(t, resp, brand)
 
-	asUsual := loadPage(t, createHttpClient(t), brandAuthorizeURL(client, redirectURI, "no-such-mode"))
+	asUsual := loadPage(t, createHTTPClient(t), brandAuthorizeURL(client, redirectURI, "no-such-mode"))
 	defer func() { _ = asUsual.Body.Close() }()
 	require.Equal(t, http.StatusBadRequest, asUsual.StatusCode)
 	assert.Regexp(t, `/stylesheet\.css\?v=`, brandStylesheetLink(t, asUsual))
@@ -221,7 +221,7 @@ func TestSafeMode_ThePublicSettingsCarryTheSafeStylesheets(t *testing.T) {
 	brand.CustomCSS = safeModeCSS
 	makeDefaultBrandOf(t, &brand)
 
-	resp, err := createHttpClient(t).Get(appConfig.AuthServer.BaseURL + "/api/public/settings")
+	resp, err := createHTTPClient(t).Get(appConfig.AuthServer.BaseURL + "/api/public/settings")
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)

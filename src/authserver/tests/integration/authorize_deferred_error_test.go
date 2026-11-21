@@ -69,7 +69,7 @@ func TestAuthorize_Deferred_CookielessRequestIsSentToLogin(t *testing.T) {
 	client, _, _ := newDeferralClient(t)
 
 	// A fresh cookie jar. Nobody is authenticated, which is the whole point.
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
 	resp, err := httpClient.Get(deferralAuthorizeURL(client.ClientIdentifier, ""))
 	require.NoError(t, err)
@@ -97,7 +97,7 @@ func TestAuthorize_Deferred_CookielessRequestIsSentToLogin(t *testing.T) {
 // parameter order and the state encoding part of the assertion.
 func TestAuthorize_Deferred_QueryMode_DeliversAfterLogin(t *testing.T) {
 	client, user, password := newDeferralClient(t)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
 	resp := driveDeferral(t, httpClient,
 		deferralAuthorizeURL(client.ClientIdentifier, "query"), user, password)
@@ -121,7 +121,7 @@ func TestAuthorize_Deferred_QueryMode_DeliversAfterLogin(t *testing.T) {
 // notice if it were not.
 func TestAuthorize_Deferred_FragmentMode_DeliversAfterLogin(t *testing.T) {
 	client, user, password := newDeferralClient(t)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
 	resp := driveDeferral(t, httpClient,
 		deferralAuthorizeURL(client.ClientIdentifier, "fragment"), user, password)
@@ -144,9 +144,9 @@ func TestAuthorize_Deferred_FragmentMode_DeliversAfterLogin(t *testing.T) {
 // and the visitor would be sent round the login again instead of the client being answered (#243).
 func TestAuthorize_Deferred_MalformedMaxAgeDeliversAfterLogin(t *testing.T) {
 	client, user, password := newDeferralClient(t)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(deferralRedirectURI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -155,7 +155,7 @@ func TestAuthorize_Deferred_MalformedMaxAgeDeliversAfterLogin(t *testing.T) {
 		"&scope=openid" +
 		"&max_age=abc"
 
-	resp := driveDeferral(t, httpClient, destUrl, user, password)
+	resp := driveDeferral(t, httpClient, destURL, user, password)
 	defer func() { _ = resp.Body.Close() }()
 
 	require.Equal(t, http.StatusFound, resp.StatusCode)
@@ -178,7 +178,7 @@ func TestAuthorize_Deferred_MalformedMaxAgeDeliversAfterLogin(t *testing.T) {
 // the wire form of the same value.
 func TestAuthorize_Deferred_FormPostMode_DeliversAfterLogin(t *testing.T) {
 	client, user, password := newDeferralClient(t)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
 	resp := driveDeferral(t, httpClient,
 		deferralAuthorizeURL(client.ClientIdentifier, "form_post"), user, password)
@@ -210,7 +210,7 @@ func TestAuthorize_Deferred_NonConformingDescriptionMatchesTheImmediatePath(t *t
 	client, user, password := newDeferralClient(t)
 
 	const emojiScope = "emoji💣scope"
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(deferralRedirectURI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -218,14 +218,14 @@ func TestAuthorize_Deferred_NonConformingDescriptionMatchesTheImmediatePath(t *t
 		"&state=" + url.QueryEscape(deferralState) +
 		"&scope=" + url.QueryEscape(emojiScope)
 
-	deferred := driveDeferral(t, createHttpClient(t), destUrl, user, password)
+	deferred := driveDeferral(t, createHTTPClient(t), destURL, user, password)
 	defer func() { _ = deferred.Body.Close() }()
 	require.Equal(t, http.StatusFound, deferred.StatusCode)
 
 	// The immediate path, for the same client and the same request, from a browser that already
 	// holds a session. The session was minted for a different client, which is fine: it belongs to
 	// the browser.
-	immediateResp, err := createAuthenticatedHttpClient(t).Get(destUrl)
+	immediateResp, err := createAuthenticatedHTTPClient(t).Get(destURL)
 	require.NoError(t, err)
 	defer func() { _ = immediateResp.Body.Close() }()
 	require.Equal(t, http.StatusFound, immediateResp.StatusCode)
@@ -270,7 +270,7 @@ func TestAuthorizePost_Deferred_CookielessRequestIsSentToLogin(t *testing.T) {
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Origin", "https://www.certification.openid.net")
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
@@ -295,7 +295,7 @@ func TestAuthorizePost_Deferred_CookielessRequestIsSentToLogin(t *testing.T) {
 // from outside.
 func TestAuthorize_Deferred_LeavesNoUserSession(t *testing.T) {
 	client, user, password := newDeferralClient(t)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
 	resp := driveDeferral(t, httpClient,
 		deferralAuthorizeURL(client.ClientIdentifier, "query"), user, password)
@@ -323,7 +323,7 @@ func TestAuthorize_Deferred_LeavesNoUserSession(t *testing.T) {
 // already holds a session at once, the same delivery every other redirect answer gets.
 func TestAuthorize_AClientNotAllowedTheCodeFlowIsAnsweredUnauthorizedClientAtOnce(t *testing.T) {
 	client, _, _ := newCodeFlowDisabledClient(t)
-	httpClient := createAuthenticatedHttpClient(t)
+	httpClient := createAuthenticatedHTTPClient(t)
 
 	resp, err := httpClient.Get(codeFlowDisabledAuthorizeURL(client.ClientIdentifier))
 	require.NoError(t, err)
@@ -343,7 +343,7 @@ func TestAuthorize_AClientNotAllowedTheCodeFlowIsAnsweredUnauthorizedClientAtOnc
 func TestAuthorize_AClientNotAllowedTheCodeFlowIsAnsweredUnauthorizedClientAfterThePassword(t *testing.T) {
 	client, user, password := newCodeFlowDisabledClient(t)
 
-	resp := driveDeferral(t, createHttpClient(t),
+	resp := driveDeferral(t, createHTTPClient(t),
 		codeFlowDisabledAuthorizeURL(client.ClientIdentifier), user, password)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -373,7 +373,7 @@ func codeFlowDisabledAuthorizeURL(clientIdentifier string) string {
 // validations pass and the scope is what the client is answered about. responseMode is omitted from
 // the URL when empty, which is the query default.
 func deferralAuthorizeURL(clientIdentifier string, responseMode string) string {
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + clientIdentifier +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + clientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(deferralRedirectURI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -382,9 +382,9 @@ func deferralAuthorizeURL(clientIdentifier string, responseMode string) string {
 		"&scope=not_a_valid_scope"
 
 	if responseMode != "" {
-		destUrl += "&response_mode=" + responseMode
+		destURL += "&response_mode=" + responseMode
 	}
-	return destUrl
+	return destURL
 }
 
 // driveDeferral walks the whole ceremony a deferred error creates: the authorization request that
@@ -394,12 +394,12 @@ func deferralAuthorizeURL(clientIdentifier string, responseMode string) string {
 //
 // Every hop is asserted rather than followed blindly, so a ceremony that goes somewhere unexpected
 // fails at the hop that went wrong instead of at an assertion about a response it never reached.
-func driveDeferral(t *testing.T, httpClient *http.Client, destUrl string,
+func driveDeferral(t *testing.T, httpClient *http.Client, destURL string,
 	user *record.User, password string) *http.Response {
 
 	t.Helper()
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	require.NoError(t, err)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 

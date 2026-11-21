@@ -79,10 +79,10 @@ func TestLegalAcceptance_TheImplicitFlowIsHeldAtTheStepAndAnsweredInTheFragment(
 	f := newLegalAcceptanceFixture(t)
 	implicit := true
 	f.updateFixtureClient(t, func(client *record.Client) { client.ImplicitGrantEnabled = &implicit })
-	termsId, _ := f.mustAcceptFor(t, "implicit", "Implicit terms")
+	termsID, _ := f.mustAcceptFor(t, "implicit", "Implicit terms")
 
 	t.Run("no token before the step, and the tokens on Accept", func(t *testing.T) {
-		browser := createHttpClient(t)
+		browser := createHTTPClient(t)
 		page, stepURL := toStep(t, browser, f.passwordToCompleted(t, browser, f.implicitLink()))
 
 		// Issuance asked for while the step is owed issues nothing to the app.
@@ -93,7 +93,7 @@ func TestLegalAcceptance_TheImplicitFlowIsHeldAtTheStepAndAnsweredInTheFragment(
 		assert.NotContains(t, early.Header.Get("Location"), "access_token", "no token before the step")
 		assert.NotContains(t, early.Header.Get("Location"), "id_token")
 		_ = early.Body.Close()
-		assert.Empty(t, acceptedVersionIds(t, f.user.ID))
+		assert.Empty(t, acceptedVersionIDs(t, f.user.ID))
 
 		_, documents := readStep(t, page)
 		require.Len(t, documents, 1)
@@ -107,13 +107,13 @@ func TestLegalAcceptance_TheImplicitFlowIsHeldAtTheStepAndAnsweredInTheFragment(
 		assert.NotEmpty(t, tokens.Get("access_token"), "the app gets its access token")
 		assert.NotEmpty(t, tokens.Get("id_token"), "and its ID token")
 		assert.Equal(t, legalAcceptanceState, tokens.Get("state"))
-		assert.Equal(t, []int64{versionId(t, termsId, 1)}, acceptedVersionIds(t, f.user.ID))
+		assert.Equal(t, []int64{versionID(t, termsID, 1)}, acceptedVersionIDs(t, f.user.ID))
 	})
 
 	t.Run("Decline answers access_denied in the fragment", func(t *testing.T) {
 		user, password := newLegalAcceptanceUser(t)
 		other := &legalAcceptanceFixture{client: f.client, redirectURI: f.redirectURI, user: user, password: password}
-		browser := createHttpClient(t)
+		browser := createHTTPClient(t)
 		page, stepURL := toStep(t, browser, other.passwordToCompleted(t, browser, other.implicitLink()))
 		resp := postStep(t, browser, stepURL, page, nil, true)
 		_ = page.Body.Close()
@@ -124,33 +124,33 @@ func TestLegalAcceptance_TheImplicitFlowIsHeldAtTheStepAndAnsweredInTheFragment(
 		assert.Equal(t, legalAcceptanceState, answer.Get("state"))
 		assert.Empty(t, answer.Get("access_token"))
 		assert.Empty(t, answer.Get("id_token"))
-		assert.Empty(t, acceptedVersionIds(t, user.ID))
+		assert.Empty(t, acceptedVersionIDs(t, user.ID))
 	})
 }
 
 func TestLegalAcceptance_AnAppThatAsksForConsentShowsItsConsentScreenAfterTheStep(t *testing.T) {
 	f := newLegalAcceptanceFixture(t)
 	f.updateFixtureClient(t, func(client *record.Client) { client.ConsentRequired = true })
-	termsId, _ := f.mustAcceptFor(t, "consented", "Consented terms")
-	browser := createHttpClient(t)
+	termsID, _ := f.mustAcceptFor(t, "consented", "Consented terms")
+	browser := createHTTPClient(t)
 
 	page, stepURL := toStep(t, browser, f.passwordToCompleted(t, browser, f.link("")))
 	_, documents := readStep(t, page)
 	resp := postStep(t, browser, stepURL, page, versionsOf(documents), false)
 	_ = page.Body.Close()
-	assert.Equal(t, []int64{versionId(t, termsId, 1)}, acceptedVersionIds(t, f.user.ID), "accepted before consent")
+	assert.Equal(t, []int64{versionID(t, termsID, 1)}, acceptedVersionIDs(t, f.user.ID), "accepted before consent")
 
 	consentURL := assertRedirect(t, resp, "/auth/consent")
 	_ = resp.Body.Close()
 	consentPage := loadPage(t, browser, consentURL)
 	require.Equal(t, http.StatusOK, consentPage.StatusCode, "the consent screen comes next")
-	ceremonyId := getCeremonyIdFromPage(t, consentPage)
+	ceremonyID := getCeremonyIDFromPage(t, consentPage)
 	_ = consentPage.Body.Close()
 	consents, err := database.GetConsentsByUserID(context.Background(), nil, f.user.ID)
 	require.NoError(t, err)
 	assert.Empty(t, consents, "no consent before the user gives it")
 
-	resp, err = submitConsent(browser, appConfig.AuthServer.BaseURL+consentPathOf(t, consentURL), ceremonyId, []int{0})
+	resp, err = submitConsent(browser, appConfig.AuthServer.BaseURL+consentPathOf(t, consentURL), ceremonyID, []int{0})
 	require.NoError(t, err)
 	f.assertCodeIssued(t, browser, resp)
 }
@@ -165,13 +165,13 @@ func consentPathOf(t *testing.T, location string) string {
 
 func TestRegistrationContinuesSignIn_ThroughAMandatorySecondFactorTheStepAndConsent(t *testing.T) {
 	setRegSettings(t, true, false, false)
-	f, termsId := newRegistrationApp(t)
+	f, termsID := newRegistrationApp(t)
 	f.updateFixtureClient(t, func(client *record.Client) {
 		client.DefaultACRLevel = record.ACRLevel2Mandatory
 		client.ConsentRequired = true
 	})
-	browser := createHttpClient(t)
-	registerURL, ceremonyId := f.createAnAccountLink(t, browser)
+	browser := createHTTPClient(t)
+	registerURL, ceremonyID := f.createAnAccountLink(t, browser)
 
 	email := fake.Email()
 	password := fake.Password(20)
@@ -184,7 +184,7 @@ func TestRegistrationContinuesSignIn_ThroughAMandatorySecondFactorTheStepAndCons
 	_ = resp.Body.Close()
 	next, err := url.Parse(location)
 	require.NoError(t, err)
-	assert.Equal(t, ceremonyId, next.Query().Get(ceremony.QueryParameter), "the sign-in the link named")
+	assert.Equal(t, ceremonyID, next.Query().Get(ceremony.QueryParameter), "the sign-in the link named")
 	resp = loadPage(t, browser, location)
 	location = assertRedirect(t, resp, "/auth/level2")
 	_ = resp.Body.Close()
@@ -194,10 +194,10 @@ func TestRegistrationContinuesSignIn_ThroughAMandatorySecondFactorTheStepAndCons
 
 	// The new user has no authenticator yet: the app's mandatory second factor enrols one.
 	otpPage := loadPage(t, browser, otpURL)
-	secret := getOtpSecretFromEnrollmentPage(t, otpPage)
+	secret := getOTPSecretFromEnrollmentPage(t, otpPage)
 	require.NotEmpty(t, secret, "the second factor is enrolled before the step")
-	assert.Empty(t, acceptedVersionIds(t, user.ID))
-	resp = authenticateWithOtp(t, browser, otpURL, otpPage, otptest.Code(t, secret, time.Now()))
+	assert.Empty(t, acceptedVersionIDs(t, user.ID))
+	resp = authenticateWithOTP(t, browser, otpURL, otpPage, otptest.Code(t, secret, time.Now()))
 	_ = otpPage.Body.Close()
 	// Setting up the authenticator shows its recovery codes before the sign-in goes on.
 	resp = passSetupRecoveryCodes(t, browser, resp)
@@ -212,15 +212,15 @@ func TestRegistrationContinuesSignIn_ThroughAMandatorySecondFactorTheStepAndCons
 	require.Len(t, documents, 1, "the step asks for the app's terms")
 	resp = postStep(t, browser, stepURL, page, versionsOf(documents), false)
 	_ = page.Body.Close()
-	assert.Equal(t, []int64{versionId(t, termsId, 1)}, acceptedVersionIds(t, user.ID), "the sign-in is the new user's")
+	assert.Equal(t, []int64{versionID(t, termsID, 1)}, acceptedVersionIDs(t, user.ID), "the sign-in is the new user's")
 
 	consentURL := assertRedirect(t, resp, "/auth/consent")
 	_ = resp.Body.Close()
 	consentPage := loadPage(t, browser, consentURL)
 	require.Equal(t, http.StatusOK, consentPage.StatusCode)
-	consentCeremonyId := getCeremonyIdFromPage(t, consentPage)
+	consentCeremonyID := getCeremonyIDFromPage(t, consentPage)
 	_ = consentPage.Body.Close()
-	resp, err = submitConsent(browser, appConfig.AuthServer.BaseURL+consentPathOf(t, consentURL), consentCeremonyId, []int{0})
+	resp, err = submitConsent(browser, appConfig.AuthServer.BaseURL+consentPathOf(t, consentURL), consentCeremonyID, []int{0})
 	require.NoError(t, err)
 	location = assertRedirect(t, resp, "/auth/issue")
 	_ = resp.Body.Close()

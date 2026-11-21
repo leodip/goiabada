@@ -23,9 +23,9 @@ import (
 // readRedirectURIs is the client's redirect URI list as the admin API reads it, which is what a
 // save sends as expectedRedirectURIs: the list it loaded. Never nil, so an empty list goes on the
 // wire as [] (#428).
-func readRedirectURIs(t *testing.T, accessToken string, clientId int64) []string {
+func readRedirectURIs(t *testing.T, accessToken string, clientID int64) []string {
 	t.Helper()
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientID, 10)
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -322,26 +322,26 @@ func TestAPIClientRedirectURIsPut_SystemLevelClientAllowed(t *testing.T) {
 	err := json.NewDecoder(resp.Body).Decode(&listResp)
 	require.NoError(t, err)
 
-	var sysId int64
+	var sysID int64
 	for _, c := range listResp.Clients {
 		if c.ClientIdentifier == builtin.AdminConsoleClientIdentifier {
-			sysId = c.ID
+			sysID = c.ID
 			break
 		}
 	}
-	if sysId == 0 {
+	if sysID == 0 {
 		t.Skip("system-level client not found")
 	}
 
 	// Update redirect URIs (should succeed)
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysId, 10) + "/redirect-uris"
-	seeded := readRedirectURIs(t, accessToken, sysId)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysID, 10) + "/redirect-uris"
+	seeded := readRedirectURIs(t, accessToken, sysID)
 
 	// Every test in this tier shares the console client, and the console signs in through the
 	// callback the seed registered, so the list goes back as it was.
 	t.Cleanup(func() {
 		restore := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateClientRedirectURIsRequest{RedirectURIs: seeded,
-			ExpectedRedirectURIs: readRedirectURIs(t, accessToken, sysId)})
+			ExpectedRedirectURIs: readRedirectURIs(t, accessToken, sysID)})
 		defer func() { _ = restore.Body.Close() }()
 		assert.Equal(t, http.StatusOK, restore.StatusCode)
 	})
@@ -454,7 +454,7 @@ func TestAPIClientRedirectURIsPut_DuplicateAndInvalidURLs(t *testing.T) {
 	assert.Equal(t, http.StatusOK, respOK.StatusCode, "valid redirect URIs must still be accepted")
 }
 
-func TestAPIClientRedirectURIsPut_NotFound_InvalidId_InvalidBody_Unauthorized(t *testing.T) {
+func TestAPIClientRedirectURIsPut_NotFound_InvalidID_InvalidBody_Unauthorized(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Not found
@@ -499,7 +499,7 @@ func TestAPIClientRedirectURIsPut_NotFound_InvalidId_InvalidBody_Unauthorized(t 
 	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp3, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp3.Body.Close() }()

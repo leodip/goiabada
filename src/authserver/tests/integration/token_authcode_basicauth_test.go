@@ -18,7 +18,7 @@ func TestToken_AuthCode_ClientSecretBasic_Success(t *testing.T) {
 	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	// Use Basic auth instead of client_secret in form body
 	formData := url.Values{
@@ -28,7 +28,7 @@ func TestToken_AuthCode_ClientSecretBasic_Success(t *testing.T) {
 		"code_verifier": {testCodeVerifier},
 	}
 
-	data := postToTokenEndpointWithBasicAuth(t, httpClient, destUrl, formData, code.Client.ClientIdentifier, clientSecret)
+	data := postToTokenEndpointWithBasicAuth(t, httpClient, destURL, formData, code.Client.ClientIdentifier, clientSecret)
 
 	assert.NotNil(t, data["access_token"])
 	assert.NotNil(t, data["token_type"])
@@ -46,7 +46,7 @@ func TestToken_AuthCode_ClientSecretBasic_WrongSecret(t *testing.T) {
 	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	formData := url.Values{
 		"grant_type":    {"authorization_code"},
@@ -56,7 +56,7 @@ func TestToken_AuthCode_ClientSecretBasic_WrongSecret(t *testing.T) {
 	}
 
 	// Use wrong secret in Basic auth
-	data := postToTokenEndpointWithBasicAuth(t, httpClient, destUrl, formData, code.Client.ClientIdentifier, "wrong_secret")
+	data := postToTokenEndpointWithBasicAuth(t, httpClient, destURL, formData, code.Client.ClientIdentifier, "wrong_secret")
 
 	// RFC 6749 Section 5.2: invalid_client for failed client authentication
 	assert.Equal(t, "invalid_client", data["error"])
@@ -67,7 +67,7 @@ func TestToken_AuthCode_ClientSecretBasic_BothMethodsProvided(t *testing.T) {
 	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	// Provide client_secret in BOTH Basic auth header AND form body
 	formData := url.Values{
@@ -79,7 +79,7 @@ func TestToken_AuthCode_ClientSecretBasic_BothMethodsProvided(t *testing.T) {
 		"client_secret": {clientSecret}, // Also in form body
 	}
 
-	data := postToTokenEndpointWithBasicAuth(t, httpClient, destUrl, formData, code.Client.ClientIdentifier, clientSecret)
+	data := postToTokenEndpointWithBasicAuth(t, httpClient, destURL, formData, code.Client.ClientIdentifier, clientSecret)
 
 	// Should be rejected per RFC 6749
 	assert.Equal(t, "invalid_request", data["error"])

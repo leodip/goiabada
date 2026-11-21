@@ -26,7 +26,7 @@ import (
 // authflow.Authorization.Run never calling SetTargetACRLevel at all, because they call the reader and the
 // writer directly. Only a real ceremony proves the snapshot is taken and carried.
 
-// TestAcrSnapshot_ClientRaisedMidCeremonyDoesNotElevateTheAcr drives a password-only ceremony on a
+// TestACRSnapshot_ClientRaisedMidCeremonyDoesNotElevateTheACR drives a password-only ceremony on a
 // level1 client and raises that client to level2_mandatory in the gap between the step-up decision
 // and the code being stamped.
 //
@@ -39,7 +39,7 @@ import (
 // The raise is applied between two hops the test drives itself, which is why the ceremony is
 // stepped through here rather than run by one of the suite's sign-in helpers: the whole subject of
 // the case is what happens in the gap between them.
-func TestAcrSnapshot_ClientRaisedMidCeremonyDoesNotElevateTheAcr(t *testing.T) {
+func TestACRSnapshot_ClientRaisedMidCeremonyDoesNotElevateTheACR(t *testing.T) {
 	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
@@ -49,11 +49,11 @@ func TestAcrSnapshot_ClientRaisedMidCeremonyDoesNotElevateTheAcr(t *testing.T) {
 	}
 	require.NoError(t, database.CreateClient(context.Background(), nil, client))
 
-	redirectUri := &record.RedirectURI{
+	redirectURI := &record.RedirectURI{
 		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
-	require.NoError(t, database.CreateRedirectURI(context.Background(), nil, redirectUri))
+	require.NoError(t, database.CreateRedirectURI(context.Background(), nil, redirectURI))
 
 	password := fake.Password(10)
 	passwordHashed, err := passwordhash.Hash(password)
@@ -69,10 +69,10 @@ func TestAcrSnapshot_ClientRaisedMidCeremonyDoesNotElevateTheAcr(t *testing.T) {
 	}
 	require.NoError(t, database.CreateUser(context.Background(), nil, user))
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + randomCodeChallenge() +
@@ -80,7 +80,7 @@ func TestAcrSnapshot_ClientRaisedMidCeremonyDoesNotElevateTheAcr(t *testing.T) {
 		"&state=" + fake.LetterN(8) +
 		"&nonce=" + fake.LetterN(8)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	require.NoError(t, err)
 
 	loc := assertRedirect(t, resp, "/auth/level1")
@@ -116,7 +116,7 @@ func TestAcrSnapshot_ClientRaisedMidCeremonyDoesNotElevateTheAcr(t *testing.T) {
 	resp = loadPage(t, httpClient, loc)
 	defer func() { _ = resp.Body.Close() }()
 
-	codeVal, _ := getCodeAndStateFromUrl(t, resp)
+	codeVal, _ := getCodeAndStateFromURL(t, resp)
 	require.NotEmpty(t, codeVal, "the ceremony should still complete; the raise applies to later requests")
 
 	code := loadCodeFromDatabase(t, codeVal)

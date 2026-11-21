@@ -89,7 +89,7 @@ func postToTokenEndpoint(t *testing.T, client *http.Client, url string, formData
 }
 
 // postToTokenEndpointWithBasicAuth sends a POST request to the token endpoint using HTTP Basic authentication
-func postToTokenEndpointWithBasicAuth(t *testing.T, client *http.Client, url string, formData url.Values, clientId, clientSecret string) map[string]interface{} {
+func postToTokenEndpointWithBasicAuth(t *testing.T, client *http.Client, url string, formData url.Values, clientID, clientSecret string) map[string]interface{} {
 	formDataString := formData.Encode()
 	requestBody := strings.NewReader(formDataString)
 	request, err := http.NewRequest("POST", url, requestBody)
@@ -99,7 +99,7 @@ func postToTokenEndpointWithBasicAuth(t *testing.T, client *http.Client, url str
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	request.Header.Set("Referer", url)
 	request.Header.Set("Origin", appConfig.AuthServer.BaseURL)
-	request.SetBasicAuth(clientId, clientSecret)
+	request.SetBasicAuth(clientID, clientSecret)
 
 	resp, err := client.Do(request)
 	if err != nil {
@@ -181,8 +181,8 @@ func createAdminClientWithTokenAndSecret(t *testing.T) (string, *record.Client, 
 	require.NoError(t, err)
 
 	// Get access token using client credentials flow
-	httpClient := createHttpClient(t)
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	httpClient := createHTTPClient(t)
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	formData := url.Values{
 		"grant_type":    {"client_credentials"},
@@ -191,7 +191,7 @@ func createAdminClientWithTokenAndSecret(t *testing.T) (string, *record.Client, 
 		"scope":         {builtin.AuthServerResourceIdentifier + ":" + builtin.ManagePermissionIdentifier},
 	}
 
-	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destURL, formData)
 	accessToken, ok := data["access_token"].(string)
 	assert.True(t, ok, "access_token should be a string")
 	assert.NotEmpty(t, accessToken, "access_token should not be empty")
@@ -222,7 +222,7 @@ func makeAPIRequest(t *testing.T, method, url, accessToken string, body interfac
 		req.Header.Set("Content-Type", "application/json")
 	}
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 

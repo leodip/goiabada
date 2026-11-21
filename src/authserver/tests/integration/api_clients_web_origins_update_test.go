@@ -200,25 +200,25 @@ func TestAPIClientWebOriginsPut_SystemLevelClientAllowed(t *testing.T) {
 	err := json.NewDecoder(resp.Body).Decode(&listResp)
 	require.NoError(t, err)
 
-	var sysId int64
+	var sysID int64
 	for _, c := range listResp.Clients {
 		if c.ClientIdentifier == builtin.AdminConsoleClientIdentifier {
-			sysId = c.ID
+			sysID = c.ID
 			break
 		}
 	}
-	if sysId == 0 {
+	if sysID == 0 {
 		t.Skip("system-level client not found")
 	}
 
 	// Update web origins (should succeed)
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysId, 10) + "/web-origins"
-	seeded := getClientWebOrigins(t, accessToken, sysId)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysID, 10) + "/web-origins"
+	seeded := getClientWebOrigins(t, accessToken, sysID)
 
 	// Every test in this tier shares the console client, so its origins go back as they were.
 	t.Cleanup(func() {
 		restore := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateClientWebOriginsRequest{WebOrigins: seeded,
-			ExpectedWebOrigins: getClientWebOrigins(t, accessToken, sysId)})
+			ExpectedWebOrigins: getClientWebOrigins(t, accessToken, sysID)})
 		defer func() { _ = restore.Body.Close() }()
 		assert.Equal(t, http.StatusOK, restore.StatusCode)
 	})
@@ -315,9 +315,9 @@ func webOriginOfLength(t *testing.T, n int) string {
 }
 
 // getClientWebOrigins reads a client's web origins back through the admin API.
-func getClientWebOrigins(t *testing.T, accessToken string, clientId int64) []string {
+func getClientWebOrigins(t *testing.T, accessToken string, clientID int64) []string {
 	t.Helper()
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientID, 10)
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -442,7 +442,7 @@ func TestAPIClientWebOriginsPut_AnOutdatedLoadedListIsRefused(t *testing.T) {
 		getClientWebOrigins(t, accessToken, client.ID), "the refused save wrote nothing")
 }
 
-func TestAPIClientWebOriginsPut_NotFound_InvalidId_InvalidBody_Unauthorized(t *testing.T) {
+func TestAPIClientWebOriginsPut_NotFound_InvalidID_InvalidBody_Unauthorized(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Not found
@@ -487,7 +487,7 @@ func TestAPIClientWebOriginsPut_NotFound_InvalidId_InvalidBody_Unauthorized(t *t
 	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp3, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp3.Body.Close() }()

@@ -27,20 +27,20 @@ func TestAuthPwd_UILocales_PreservedAcrossFlow(t *testing.T) {
 		DisplayName:      "Test app",
 		ShowDisplayName:  true,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  record.ACRLevel1,
+		DefaultACRLevel:  record.ACRLevel1,
 	})
 
-	redirectUri := &record.RedirectURI{
+	redirectURI := &record.RedirectURI{
 		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
-	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err := database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
 	// Same flow as navigateToPasswordScreen but with ui_locales=pt-BR.
-	resp := navigateToPasswordScreenWithUILocales(t, httpClient, client, redirectUri.URI, "pt-BR")
+	resp := navigateToPasswordScreenWithUILocales(t, httpClient, client, redirectURI.URI, "pt-BR")
 	defer func() { _ = resp.Body.Close() }()
 
 	doc := parseHTMLResponse(t, resp)
@@ -64,19 +64,19 @@ func TestAuthPwd_UILocales_EnglishSaysSignIn(t *testing.T) {
 		DisplayName:      "Test app",
 		ShowDisplayName:  true,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  record.ACRLevel1,
+		DefaultACRLevel:  record.ACRLevel1,
 	})
 
-	redirectUri := &record.RedirectURI{
+	redirectURI := &record.RedirectURI{
 		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
-	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err := database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
-	resp := navigateToPasswordScreenWithUILocales(t, httpClient, client, redirectUri.URI, "en")
+	resp := navigateToPasswordScreenWithUILocales(t, httpClient, client, redirectURI.URI, "en")
 	defer func() { _ = resp.Body.Close() }()
 
 	doc := parseHTMLResponse(t, resp)

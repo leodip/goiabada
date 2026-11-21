@@ -132,12 +132,12 @@ func TestAPIUserOTPPut_TellsTheUserAnAdministratorTurnedItOff(t *testing.T) {
 
 // signInSettingUpAnAuthenticator signs user in at a level 3 client, setting up an authenticator on
 // the code step, and returns the recovery codes the next page shows.
-func signInSettingUpAnAuthenticator(t *testing.T, client *record.Client, redirectUri *record.RedirectURI,
+func signInSettingUpAnAuthenticator(t *testing.T, client *record.Client, redirectURI *record.RedirectURI,
 	user *record.User, password string) []string {
 	t.Helper()
-	httpClient, setupPage, otpUrl := startOtpCeremony(t, client, redirectUri, user, password, "")
-	secret := getOtpSecretFromEnrollmentPage(t, setupPage)
-	accepted := authenticateWithOtp(t, httpClient, otpUrl, setupPage, otptest.Code(t, secret, time.Now()))
+	httpClient, setupPage, otpURL := startOTPCeremony(t, client, redirectURI, user, password, "")
+	secret := getOTPSecretFromEnrollmentPage(t, setupPage)
+	accepted := authenticateWithOTP(t, httpClient, otpURL, setupPage, otptest.Code(t, secret, time.Now()))
 	_ = setupPage.Body.Close()
 	location := assertRedirect(t, accepted, "/auth/recovery-codes")
 	_ = accepted.Body.Close()
@@ -153,15 +153,15 @@ func signInSettingUpAnAuthenticator(t *testing.T, client *record.Client, redirec
 // address verified or not and the locale given.
 func level3NoticeUser(t *testing.T, locale string, verified bool) (*record.Client, *record.RedirectURI, *record.User, string) {
 	t.Helper()
-	client, redirectUri, user, password, _ := createLevel2MandatoryUser(t, false)
+	client, redirectURI, user, password, _ := createLevel2MandatoryUser(t, false)
 	user.Email = plusAddress()
 	user.EmailVerified = verified
 	user.Locale = locale
 	require.NoError(t, database.UpdateUser(context.Background(), nil, user))
-	return client, redirectUri, user, password
+	return client, redirectURI, user, password
 }
 
-func TestOtpCeremony_SettingUpAnAuthenticatorDuringTheSignInTellsTheUser(t *testing.T) {
+func TestOTPCeremony_SettingUpAnAuthenticatorDuringTheSignInTellsTheUser(t *testing.T) {
 	useMailpitSMTP(t)
 
 	for _, tc := range []struct {
@@ -173,9 +173,9 @@ func TestOtpCeremony_SettingUpAnAuthenticatorDuringTheSignInTellsTheUser(t *test
 		{"de", "Die Zwei-Faktor-Authentifizierung wurde eingerichtet", "Dazu wurde ein neuer Satz Wiederherstellungscodes erstellt"},
 	} {
 		t.Run(tc.locale, func(t *testing.T) {
-			client, redirectUri, user, password := level3NoticeUser(t, tc.locale, true)
+			client, redirectURI, user, password := level3NoticeUser(t, tc.locale, true)
 
-			codes := signInSettingUpAnAuthenticator(t, client, redirectUri, user, password)
+			codes := signInSettingUpAnAuthenticator(t, client, redirectURI, user, password)
 
 			messages := awaitMailTo(t, user.Email)
 			require.Len(t, messages, 1, "the account's address is told exactly once")
@@ -191,14 +191,14 @@ func TestOtpCeremony_SettingUpAnAuthenticatorDuringTheSignInTellsTheUser(t *test
 
 // A sign-in that sets up an authenticator for an unverified address tells it nothing, read once a
 // verified user's set-up, made after it, has been told.
-func TestOtpCeremony_SettingUpAnAuthenticatorSendsNothingToAnUnverifiedAddress(t *testing.T) {
+func TestOTPCeremony_SettingUpAnAuthenticatorSendsNothingToAnUnverifiedAddress(t *testing.T) {
 	useMailpitSMTP(t)
 
-	client, redirectUri, unverified, unverifiedPassword := level3NoticeUser(t, "en", false)
-	verifiedClient, verifiedRedirectUri, verified, verifiedPassword := level3NoticeUser(t, "en", true)
+	client, redirectURI, unverified, unverifiedPassword := level3NoticeUser(t, "en", false)
+	verifiedClient, verifiedRedirectURI, verified, verifiedPassword := level3NoticeUser(t, "en", true)
 
-	signInSettingUpAnAuthenticator(t, client, redirectUri, unverified, unverifiedPassword)
-	signInSettingUpAnAuthenticator(t, verifiedClient, verifiedRedirectUri, verified, verifiedPassword)
+	signInSettingUpAnAuthenticator(t, client, redirectURI, unverified, unverifiedPassword)
+	signInSettingUpAnAuthenticator(t, verifiedClient, verifiedRedirectURI, verified, verifiedPassword)
 
 	require.Len(t, awaitMailWithSubject(t, verified.Email, otpEnabledSubjectEn, 1), 1,
 		"the verified user is told, so mail was on")

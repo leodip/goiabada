@@ -39,7 +39,7 @@ const lastAdministratorDescription = "This change would leave no enabled user ho
 func disableOtherAdministrators(t *testing.T) {
 	t.Helper()
 	ctx := context.Background()
-	manage := authServerPermissionId(t, builtin.ManagePermissionIdentifier)
+	manage := authServerPermissionID(t, builtin.ManagePermissionIdentifier)
 
 	holders := map[int64]bool{}
 	direct, _, err := database.GetUsersByPermissionIDPaginated(ctx, nil, manage, 1, 10000)
@@ -62,12 +62,12 @@ func disableOtherAdministrators(t *testing.T) {
 		}
 	}
 
-	for userId := range holders {
-		flipped, flipErr := database.TrySetUserEnabled(ctx, nil, userId, true, false)
+	for userID := range holders {
+		flipped, flipErr := database.TrySetUserEnabled(ctx, nil, userID, true, false)
 		require.NoError(t, flipErr)
 		if flipped {
 			t.Cleanup(func() {
-				_, _ = database.TrySetUserEnabled(context.Background(), nil, userId, false, true)
+				_, _ = database.TrySetUserEnabled(context.Background(), nil, userID, false, true)
 			})
 		}
 	}
@@ -76,8 +76,8 @@ func disableOtherAdministrators(t *testing.T) {
 // lastAdministratorFixture is one administrator, and the group that gives them manage where the
 // write is about a group.
 type lastAdministratorFixture struct {
-	userId  int64
-	groupId int64
+	userID  int64
+	groupID int64
 	manage  int64
 }
 
@@ -92,7 +92,7 @@ func newAdministrator(t *testing.T, manage int64) int64 {
 }
 
 // newAdministratorThroughGroup creates an enabled user holding manage only through a group.
-func newAdministratorThroughGroup(t *testing.T, manage int64) (userId, groupId int64) {
+func newAdministratorThroughGroup(t *testing.T, manage int64) (userID, groupID int64) {
 	t.Helper()
 	user := &record.User{Subject: fake.UUID(), Enabled: true, Email: uniqueEmail("last@administrators.test"), GivenName: "Last"}
 	require.NoError(t, database.CreateUser(context.Background(), nil, user))
@@ -117,24 +117,24 @@ type lastAdministratorWrite struct {
 }
 
 func directAdministrator(t *testing.T, manage int64) lastAdministratorFixture {
-	return lastAdministratorFixture{userId: newAdministrator(t, manage), manage: manage}
+	return lastAdministratorFixture{userID: newAdministrator(t, manage), manage: manage}
 }
 
 func groupAdministrator(t *testing.T, manage int64) lastAdministratorFixture {
-	userId, groupId := newAdministratorThroughGroup(t, manage)
-	return lastAdministratorFixture{userId: userId, groupId: groupId, manage: manage}
+	userID, groupID := newAdministratorThroughGroup(t, manage)
+	return lastAdministratorFixture{userID: userID, groupID: groupID, manage: manage}
 }
 
-func userGone(t *testing.T, userId int64) bool {
+func userGone(t *testing.T, userID int64) bool {
 	t.Helper()
-	user, err := database.GetUserByID(context.Background(), nil, userId)
+	user, err := database.GetUserByID(context.Background(), nil, userID)
 	require.NoError(t, err)
 	return user == nil
 }
 
-func groupGone(t *testing.T, groupId int64) bool {
+func groupGone(t *testing.T, groupID int64) bool {
 	t.Helper()
-	group, err := database.GetGroupByID(context.Background(), nil, groupId)
+	group, err := database.GetGroupByID(context.Background(), nil, groupID)
 	require.NoError(t, err)
 	return group == nil
 }
@@ -145,13 +145,13 @@ var lastAdministratorWrites = []lastAdministratorWrite{
 		prepare: directAdministrator,
 		method:  http.MethodPut,
 		path: func(f lastAdministratorFixture) string {
-			return fmt.Sprintf("/api/v1/admin/users/%d/permissions", f.userId)
+			return fmt.Sprintf("/api/v1/admin/users/%d/permissions", f.userID)
 		},
 		body: func(f lastAdministratorFixture) any {
 			return map[string]any{"permissionIDs": []int64{}, "expectedPermissionIds": []int64{f.manage}}
 		},
 		removed: func(t *testing.T, f lastAdministratorFixture) bool {
-			return len(userPermissionIds(t, f.userId)) == 0
+			return len(userPermissionIDs(t, f.userID)) == 0
 		},
 	},
 	{
@@ -159,25 +159,25 @@ var lastAdministratorWrites = []lastAdministratorWrite{
 		prepare: groupAdministrator,
 		method:  http.MethodPut,
 		path: func(f lastAdministratorFixture) string {
-			return fmt.Sprintf("/api/v1/admin/groups/%d/permissions", f.groupId)
+			return fmt.Sprintf("/api/v1/admin/groups/%d/permissions", f.groupID)
 		},
 		body: func(f lastAdministratorFixture) any {
 			return map[string]any{"permissionIDs": []int64{}, "expectedPermissionIds": []int64{f.manage}}
 		},
 		removed: func(t *testing.T, f lastAdministratorFixture) bool {
-			return len(groupPermissionIds(t, f.groupId)) == 0
+			return len(groupPermissionIDs(t, f.groupID)) == 0
 		},
 	},
 	{
 		name:    "removing a user from the group through the user's groups",
 		prepare: groupAdministrator,
 		method:  http.MethodPut,
-		path:    func(f lastAdministratorFixture) string { return fmt.Sprintf("/api/v1/admin/users/%d/groups", f.userId) },
+		path:    func(f lastAdministratorFixture) string { return fmt.Sprintf("/api/v1/admin/users/%d/groups", f.userID) },
 		body: func(f lastAdministratorFixture) any {
-			return map[string]any{"groupIds": []int64{}, "expectedGroupIds": []int64{f.groupId}}
+			return map[string]any{"groupIds": []int64{}, "expectedGroupIds": []int64{f.groupID}}
 		},
 		removed: func(t *testing.T, f lastAdministratorFixture) bool {
-			return len(userGroupIds(t, f.userId)) == 0
+			return len(userGroupIDs(t, f.userID)) == 0
 		},
 	},
 	{
@@ -185,19 +185,19 @@ var lastAdministratorWrites = []lastAdministratorWrite{
 		prepare: groupAdministrator,
 		method:  http.MethodDelete,
 		path: func(f lastAdministratorFixture) string {
-			return fmt.Sprintf("/api/v1/admin/groups/%d/members/%d", f.groupId, f.userId)
+			return fmt.Sprintf("/api/v1/admin/groups/%d/members/%d", f.groupID, f.userID)
 		},
 		removed: func(t *testing.T, f lastAdministratorFixture) bool {
-			return len(userGroupIds(t, f.userId)) == 0
+			return len(userGroupIDs(t, f.userID)) == 0
 		},
 	},
 	{
 		name:    "deleting the group",
 		prepare: groupAdministrator,
 		method:  http.MethodDelete,
-		path:    func(f lastAdministratorFixture) string { return fmt.Sprintf("/api/v1/admin/groups/%d", f.groupId) },
+		path:    func(f lastAdministratorFixture) string { return fmt.Sprintf("/api/v1/admin/groups/%d", f.groupID) },
 		removed: func(t *testing.T, f lastAdministratorFixture) bool {
-			return groupGone(t, f.groupId)
+			return groupGone(t, f.groupID)
 		},
 	},
 	{
@@ -205,20 +205,20 @@ var lastAdministratorWrites = []lastAdministratorWrite{
 		prepare: directAdministrator,
 		method:  http.MethodPut,
 		path: func(f lastAdministratorFixture) string {
-			return fmt.Sprintf("/api/v1/admin/users/%d/enabled", f.userId)
+			return fmt.Sprintf("/api/v1/admin/users/%d/enabled", f.userID)
 		},
 		body: func(f lastAdministratorFixture) any { return map[string]any{"enabled": false} },
 		removed: func(t *testing.T, f lastAdministratorFixture) bool {
-			return !storedUser(t, f.userId).Enabled
+			return !storedUser(t, f.userID).Enabled
 		},
 	},
 	{
 		name:    "deleting the user",
 		prepare: directAdministrator,
 		method:  http.MethodDelete,
-		path:    func(f lastAdministratorFixture) string { return fmt.Sprintf("/api/v1/admin/users/%d", f.userId) },
+		path:    func(f lastAdministratorFixture) string { return fmt.Sprintf("/api/v1/admin/users/%d", f.userID) },
 		removed: func(t *testing.T, f lastAdministratorFixture) bool {
-			return userGone(t, f.userId)
+			return userGone(t, f.userID)
 		},
 	},
 }
@@ -239,18 +239,18 @@ func sendAdminRequest(t *testing.T, accessToken, method, path string, body any) 
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
-	requestId := "last-admin-" + fake.LetterN(16)
-	req.Header.Set("X-Request-Id", requestId)
+	requestID := "last-admin-" + fake.LetterN(16)
+	req.Header.Set("X-Request-Id", requestID)
 
-	resp, err := createHttpClient(t).Do(req)
+	resp, err := createHTTPClient(t).Do(req)
 	require.NoError(t, err)
-	return resp, requestId
+	return resp, requestID
 }
 
 // auditRowsOfRequest is every audit row one request left, whatever its event.
-func auditRowsOfRequest(t *testing.T, readerToken, requestId string) int {
+func auditRowsOfRequest(t *testing.T, readerToken, requestID string) int {
 	t.Helper()
-	logs, resp := getAuditLogs(t, readerToken, "requestId="+url.QueryEscape(requestId))
+	logs, resp := getAuditLogs(t, readerToken, "requestId="+url.QueryEscape(requestID))
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	return len(logs.AuditLogs)
@@ -259,7 +259,7 @@ func auditRowsOfRequest(t *testing.T, readerToken, requestId string) int {
 func TestLastAdministrator_EachGuardedWriteIsRefusedForTheLastHolder(t *testing.T) {
 	requireDatabaseAuditLogs(t)
 	manageToken, _ := createAdminClientWithToken(t)
-	manage := authServerPermissionId(t, builtin.ManagePermissionIdentifier)
+	manage := authServerPermissionID(t, builtin.ManagePermissionIdentifier)
 
 	for _, write := range lastAdministratorWrites {
 		t.Run(write.name, func(t *testing.T) {
@@ -270,7 +270,7 @@ func TestLastAdministrator_EachGuardedWriteIsRefusedForTheLastHolder(t *testing.
 			if write.body != nil {
 				body = write.body(f)
 			}
-			resp, requestId := sendAdminRequest(t, manageToken, write.method, write.path(f), body)
+			resp, requestID := sendAdminRequest(t, manageToken, write.method, write.path(f), body)
 			defer func() { _ = resp.Body.Close() }()
 
 			assert.Equal(t, http.StatusConflict, resp.StatusCode)
@@ -283,7 +283,7 @@ func TestLastAdministrator_EachGuardedWriteIsRefusedForTheLastHolder(t *testing.
 			assert.Equal(t, lastAdministratorDescription, envelope.ErrorDescription)
 
 			assert.False(t, write.removed(t, f), "the refused write changed nothing")
-			assert.Zero(t, auditRowsOfRequest(t, manageToken, requestId), "a refusal under the guard is not audited")
+			assert.Zero(t, auditRowsOfRequest(t, manageToken, requestID), "a refusal under the guard is not audited")
 		})
 	}
 }
@@ -291,7 +291,7 @@ func TestLastAdministrator_EachGuardedWriteIsRefusedForTheLastHolder(t *testing.
 func TestLastAdministrator_EachGuardedWriteIsAllowedForOneOfTwo(t *testing.T) {
 	requireDatabaseAuditLogs(t)
 	manageToken, _ := createAdminClientWithToken(t)
-	manage := authServerPermissionId(t, builtin.ManagePermissionIdentifier)
+	manage := authServerPermissionID(t, builtin.ManagePermissionIdentifier)
 
 	for _, write := range lastAdministratorWrites {
 		t.Run(write.name, func(t *testing.T) {
@@ -317,14 +317,14 @@ func TestLastAdministrator_EachGuardedWriteIsAllowedForOneOfTwo(t *testing.T) {
 // grant, and a disabled holder is no administrator, so neither keeps nor needs the guard.
 func TestLastAdministrator_ItCountsEnabledHoldersNotGrants(t *testing.T) {
 	manageToken, _ := createAdminClientWithToken(t)
-	manage := authServerPermissionId(t, builtin.ManagePermissionIdentifier)
+	manage := authServerPermissionID(t, builtin.ManagePermissionIdentifier)
 
 	t.Run("revoking the direct grant of a user who keeps manage through a group", func(t *testing.T) {
 		disableOtherAdministrators(t)
-		userId, _ := newAdministratorThroughGroup(t, manage)
-		require.NoError(t, database.CreateUserPermission(context.Background(), nil, &record.UserPermission{UserID: userId, PermissionID: manage}))
+		userID, _ := newAdministratorThroughGroup(t, manage)
+		require.NoError(t, database.CreateUserPermission(context.Background(), nil, &record.UserPermission{UserID: userID, PermissionID: manage}))
 
-		resp, _ := sendAdminRequest(t, manageToken, http.MethodPut, fmt.Sprintf("/api/v1/admin/users/%d/permissions", userId),
+		resp, _ := sendAdminRequest(t, manageToken, http.MethodPut, fmt.Sprintf("/api/v1/admin/users/%d/permissions", userID),
 			map[string]any{"permissionIDs": []int64{}, "expectedPermissionIds": []int64{manage}})
 		respBody, _ := io.ReadAll(resp.Body)
 		_ = resp.Body.Close()

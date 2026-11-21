@@ -126,7 +126,7 @@ func TestAPIClientAuthenticationPut_InvalidSecret_BadChars(t *testing.T) {
 	}
 }
 
-func TestAPIClientAuthenticationPut_NotFoundAndInvalidId(t *testing.T) {
+func TestAPIClientAuthenticationPut_NotFoundAndInvalidID(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Not found

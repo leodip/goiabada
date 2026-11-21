@@ -52,7 +52,7 @@ func postRevoke(t *testing.T, request revokeRequest) revokeAnswer {
 	for name, value := range request.header {
 		req.Header.Set(name, value)
 	}
-	resp, err := createHttpClient(t).Do(req)
+	resp, err := createHTTPClient(t).Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	body, err := io.ReadAll(resp.Body)
@@ -84,7 +84,7 @@ func assertRevokeError(t *testing.T, answer revokeAnswer, status int, code, desc
 // assertRevokedRefreshRefused asserts the token endpoint refuses refreshToken with invalid_grant.
 func assertRevokedRefreshRefused(t *testing.T, clientIdentifier, clientSecret, refreshToken string) {
 	t.Helper()
-	status, body := refreshWithScope(t, createHttpClient(t), clientIdentifier, clientSecret, refreshToken, "")
+	status, body := refreshWithScope(t, createHTTPClient(t), clientIdentifier, clientSecret, refreshToken, "")
 	require.Equal(t, http.StatusBadRequest, status, "%v", body)
 	assert.Equal(t, "invalid_grant", body["error"])
 }
@@ -146,16 +146,16 @@ func TestRevoke_EndsOneGrantAndNothingElse(t *testing.T) {
 	user, err := database.GetUserByID(context.Background(), nil, code.UserID)
 	require.NoError(t, err)
 	setUserPassword(t, user, password)
-	otherHttpClient, otherCode := createAuthCode(t, otherSecret, "openid",
+	otherHTTPClient, otherCode := createAuthCode(t, otherSecret, "openid",
 		authCodeOptions{user: user, userPassword: password})
 	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, otherCode.ClientID) })
-	other := redeemCode(t, otherHttpClient, otherCode, otherSecret)
+	other := redeemCode(t, otherHTTPClient, otherCode, otherSecret)
 
 	revokeAs(t, code.Client.ClientIdentifier, clientSecret, data["refresh_token"].(string))
 
 	assertUserinfoRefusesTheToken(t, data["access_token"].(string))
 	assertUserinfoAdmits(t, other["access_token"].(string), user.Subject)
-	status, body := refreshWithScope(t, otherHttpClient, otherCode.Client.ClientIdentifier, otherSecret,
+	status, body := refreshWithScope(t, otherHTTPClient, otherCode.Client.ClientIdentifier, otherSecret,
 		other["refresh_token"].(string), "")
 	assert.Equal(t, http.StatusOK, status, "the other client's grant is untouched: %v", body)
 }
@@ -167,7 +167,7 @@ func TestRevoke_APublicClientRevokesWithItsIdentifierAlone(t *testing.T) {
 	password := fake.Password(12)
 	client := createROPCClient(t, "", true)
 	user := createROPCUser(t, password)
-	data := postToTokenEndpoint(t, createHttpClient(t), appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
+	data := postToTokenEndpoint(t, createHTTPClient(t), appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
 		"grant_type": {"password"}, "client_id": {client.ClientIdentifier},
 		"username": {user.Email}, "password": {password}, "scope": {"openid"},
 	})
@@ -329,7 +329,7 @@ func TestRevoke_TheClientAuthenticates(t *testing.T) {
 // decision 1): the admin API refuses it at once, though it has not expired, and revoking it again is
 // answered as any invalid token is. Before that, another client's attempt to revoke it is refused and
 // leaves it working.
-func TestRevoke_AClientCredentialsTokenIsRevokedByItsJti(t *testing.T) {
+func TestRevoke_AClientCredentialsTokenIsRevokedByItsJTI(t *testing.T) {
 	accessToken, client, clientSecret := createAdminClientWithTokenAndSecret(t)
 	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 	claims := decodeJWTPayload(t, accessToken)
@@ -360,16 +360,16 @@ func TestRevoke_AClientCredentialsTokenIsRevokedByItsJti(t *testing.T) {
 // An access token of the implicit flow, which has no grant either, is revoked by its jti, by a
 // public client with its client_id alone as a browser app does at sign-out: /userinfo refuses it at
 // once.
-func TestRevoke_AnImplicitFlowTokenIsRevokedByItsJti(t *testing.T) {
+func TestRevoke_AnImplicitFlowTokenIsRevokedByItsJTI(t *testing.T) {
 	enableImplicitFlowGlobally(t)
 	implicitEnabled := true
-	client, redirectUri := createImplicitFlowClient(t, &implicitEnabled)
+	client, redirectURI := createImplicitFlowClient(t, &implicitEnabled)
 	client.IsPublic = true
 	require.NoError(t, database.UpdateClient(context.Background(), nil, client))
 	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 	user, password := createTestUserForImplicit(t)
-	resp := signInToIssue(t, createHttpClient(t),
-		implicitModeAuthorizeURL(client, redirectUri.URI, "token", "", fake.LetterN(12), ""), user, password)
+	resp := signInToIssue(t, createHTTPClient(t),
+		implicitModeAuthorizeURL(client, redirectURI.URI, "token", "", fake.LetterN(12), ""), user, password)
 	_ = resp.Body.Close()
 	require.Equal(t, http.StatusFound, resp.StatusCode)
 	accessToken := getTokensFromFragment(t, resp)["access_token"]
@@ -419,7 +419,7 @@ func TestRevoke_AnswersCORSForRegisteredOriginsAndIsExemptFromCSRF(t *testing.T)
 	req.Header.Set("Origin", registered)
 	req.Header.Set("Access-Control-Request-Method", "POST")
 	req.Header.Set("Access-Control-Request-Headers", "content-type")
-	resp, err := createHttpClient(t).Do(req)
+	resp, err := createHTTPClient(t).Do(req)
 	require.NoError(t, err)
 	_ = resp.Body.Close()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)

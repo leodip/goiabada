@@ -215,14 +215,14 @@ func TestAPIResourcePermissionsPut_SystemResourceRenameBuiltInBlocked(t *testing
 	require.NoError(t, err)
 
 	// Find the "manage" built-in permission
-	var managePermId int64
+	var managePermID int64
 	for _, p := range existingPerms {
 		if p.PermissionIdentifier == builtin.ManagePermissionIdentifier {
-			managePermId = p.ID
+			managePermID = p.ID
 			break
 		}
 	}
-	if managePermId == 0 {
+	if managePermID == 0 {
 		t.Skip("manage permission not found")
 	}
 
@@ -230,7 +230,7 @@ func TestAPIResourcePermissionsPut_SystemResourceRenameBuiltInBlocked(t *testing
 	var permUpserts []api.ResourcePermissionUpsert
 	for _, p := range existingPerms {
 		identifier := p.PermissionIdentifier
-		if p.ID == managePermId {
+		if p.ID == managePermID {
 			identifier = "manage-renamed" // Attempt to rename
 		}
 		permUpserts = append(permUpserts, api.ResourcePermissionUpsert{
@@ -307,22 +307,22 @@ func TestAPIResourcePermissionsPut_SystemResourceDeleteRecreateBuiltInBlocked(t 
 	require.NoError(t, err)
 
 	// Find the "manage" built-in permission
-	var managePermId int64
+	var managePermID int64
 	for _, p := range existingPerms {
 		if p.PermissionIdentifier == builtin.ManagePermissionIdentifier {
-			managePermId = p.ID
+			managePermID = p.ID
 			break
 		}
 	}
-	if managePermId == 0 {
+	if managePermID == 0 {
 		t.Skip("manage permission not found")
 	}
 
-	// Build request that omits the original "manage" row and adds a new one with Id=0
+	// Build request that omits the original "manage" row and adds a new one with ID=0
 	// This attempts to delete the original and recreate with a new DB ID, orphaning FK references
 	var permUpserts []api.ResourcePermissionUpsert
 	for _, p := range existingPerms {
-		if p.ID == managePermId {
+		if p.ID == managePermID {
 			continue // Omit original manage row
 		}
 		permUpserts = append(permUpserts, api.ResourcePermissionUpsert{
@@ -331,7 +331,7 @@ func TestAPIResourcePermissionsPut_SystemResourceDeleteRecreateBuiltInBlocked(t 
 			Description:          p.Description,
 		})
 	}
-	// Add new row with same identifier but Id=0 (new)
+	// Add new row with same identifier but ID=0 (new)
 	permUpserts = append(permUpserts, api.ResourcePermissionUpsert{
 		ID:                   0,
 		PermissionIdentifier: builtin.ManagePermissionIdentifier,
@@ -366,22 +366,22 @@ func TestAPIResourcePermissionsPut_SystemResourceChangeDescriptionAllowed(t *tes
 	require.NoError(t, err)
 
 	// Find the "manage" built-in permission and save original description
-	var managePermId int64
+	var managePermID int64
 	var origDescription string
 	for _, p := range existingPerms {
 		if p.PermissionIdentifier == builtin.ManagePermissionIdentifier {
-			managePermId = p.ID
+			managePermID = p.ID
 			origDescription = p.Description
 			break
 		}
 	}
-	if managePermId == 0 {
+	if managePermID == 0 {
 		t.Skip("manage permission not found")
 	}
 
 	// Restore original description after test
 	defer func() {
-		perm, _ := database.GetPermissionByID(context.Background(), nil, managePermId)
+		perm, _ := database.GetPermissionByID(context.Background(), nil, managePermID)
 		if perm != nil {
 			perm.Description = origDescription
 			_ = database.UpdatePermission(context.Background(), nil, perm)
@@ -392,7 +392,7 @@ func TestAPIResourcePermissionsPut_SystemResourceChangeDescriptionAllowed(t *tes
 	var permUpserts []api.ResourcePermissionUpsert
 	for _, p := range existingPerms {
 		desc := p.Description
-		if p.ID == managePermId {
+		if p.ID == managePermID {
 			desc = "Updated description for manage permission"
 		}
 		permUpserts = append(permUpserts, api.ResourcePermissionUpsert{
@@ -412,7 +412,7 @@ func TestAPIResourcePermissionsPut_SystemResourceChangeDescriptionAllowed(t *tes
 	updatedPerms, err := database.GetPermissionsByResourceID(context.Background(), nil, sysRes.ID)
 	require.NoError(t, err)
 	for _, p := range updatedPerms {
-		if p.ID == managePermId {
+		if p.ID == managePermID {
 			assert.Equal(t, "Updated description for manage permission", p.Description)
 		}
 	}
@@ -421,7 +421,7 @@ func TestAPIResourcePermissionsPut_SystemResourceChangeDescriptionAllowed(t *tes
 // Test that duplicate IDs in request are rejected (prevents built-in permission rename bypass)
 // Attack vector: send two entries with the same built-in permission ID — first with correct
 // identifier (passes validation), second with a renamed identifier (would be applied).
-func TestAPIResourcePermissionsPut_DuplicateIdRejected(t *testing.T) {
+func TestAPIResourcePermissionsPut_DuplicateIDRejected(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	sysRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, builtin.AuthServerResourceIdentifier)
@@ -434,14 +434,14 @@ func TestAPIResourcePermissionsPut_DuplicateIdRejected(t *testing.T) {
 	require.NoError(t, err)
 
 	// Find the "manage" built-in permission
-	var managePermId int64
+	var managePermID int64
 	for _, p := range existingPerms {
 		if p.PermissionIdentifier == builtin.ManagePermissionIdentifier {
-			managePermId = p.ID
+			managePermID = p.ID
 			break
 		}
 	}
-	if managePermId == 0 {
+	if managePermID == 0 {
 		t.Skip("manage permission not found")
 	}
 
@@ -457,7 +457,7 @@ func TestAPIResourcePermissionsPut_DuplicateIdRejected(t *testing.T) {
 	}
 	// Duplicate entry for manage ID with a different identifier
 	permUpserts = append(permUpserts, api.ResourcePermissionUpsert{
-		ID:                   managePermId,
+		ID:                   managePermID,
 		PermissionIdentifier: "manage-renamed",
 		Description:          "Bypass attempt",
 	})
@@ -475,7 +475,7 @@ func TestAPIResourcePermissionsPut_DuplicateIdRejected(t *testing.T) {
 }
 
 // Test that duplicate IDs are also rejected on non-system resources
-func TestAPIResourcePermissionsPut_DuplicateIdNonSystemRejected(t *testing.T) {
+func TestAPIResourcePermissionsPut_DuplicateIDNonSystemRejected(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	resource := createTestResource(t, "perm-put-dupid-"+fake.LetterN(6), "DupId Test")
@@ -510,7 +510,7 @@ func TestAPIResourcePermissionsPut_Unauthorized(t *testing.T) {
 	// No token
 	req, _ := http.NewRequest("PUT", url, strings.NewReader(`{"permissions":[]}`))
 	req.Header.Set("Content-Type", "application/json")
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -524,9 +524,9 @@ func TestAPIResourcePermissionsPut_Unauthorized(t *testing.T) {
 
 // storedPermissionEntries is the resource's stored permissions as the loaded list a caller that
 // read them sends back: every entry's id, identifier and description (#428).
-func storedPermissionEntries(t *testing.T, resourceId int64) []api.ResourcePermissionUpsert {
+func storedPermissionEntries(t *testing.T, resourceID int64) []api.ResourcePermissionUpsert {
 	t.Helper()
-	stored, err := database.GetPermissionsByResourceID(context.Background(), nil, resourceId)
+	stored, err := database.GetPermissionsByResourceID(context.Background(), nil, resourceID)
 	require.NoError(t, err)
 	entries := make([]api.ResourcePermissionUpsert, 0, len(stored))
 	for _, p := range stored {
@@ -677,16 +677,16 @@ func TestAPIResourcePermissionsPut_TheSystemResourceSavedWithTheListTheAPIRead(t
 	require.NoError(t, err)
 	require.NotNil(t, sysRes, "the seed creates the authserver resource")
 
-	var manageId int64
+	var manageID int64
 	var manageDescription string
 	for _, p := range storedPermissionEntries(t, sysRes.ID) {
 		if p.PermissionIdentifier == builtin.ManagePermissionIdentifier {
-			manageId, manageDescription = p.ID, p.Description
+			manageID, manageDescription = p.ID, p.Description
 		}
 	}
-	require.NotZero(t, manageId, "the seed writes the manage permission")
+	require.NotZero(t, manageID, "the seed writes the manage permission")
 	t.Cleanup(func() {
-		perm, _ := database.GetPermissionByID(context.Background(), nil, manageId)
+		perm, _ := database.GetPermissionByID(context.Background(), nil, manageID)
 		if perm != nil {
 			perm.Description = manageDescription
 			_ = database.UpdatePermission(context.Background(), nil, perm)
@@ -716,7 +716,7 @@ func TestAPIResourcePermissionsPut_TheSystemResourceSavedWithTheListTheAPIRead(t
 		edited := make([]api.ResourcePermissionUpsert, len(loaded))
 		copy(edited, loaded)
 		for i := range edited {
-			if edited[i].ID == manageId {
+			if edited[i].ID == manageID {
 				edited[i].Description = "Edited from the system resource's page"
 			}
 		}

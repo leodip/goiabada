@@ -618,7 +618,7 @@ func TestDCR_WellKnown_Metadata(t *testing.T) {
 	t.Run("DCR enabled - registration_endpoint present", func(t *testing.T) {
 		enableDCR(t)
 
-		httpClient := createHttpClient(t)
+		httpClient := createHTTPClient(t)
 		wellKnownURL := appConfig.AuthServer.BaseURL + "/.well-known/openid-configuration"
 
 		resp, fetchErr := httpClient.Get(wellKnownURL)
@@ -639,7 +639,7 @@ func TestDCR_WellKnown_Metadata(t *testing.T) {
 	t.Run("DCR disabled - registration_endpoint absent", func(t *testing.T) {
 		changeSettings(t, func(settings *record.Settings) { settings.DynamicClientRegistrationEnabled = false })
 
-		httpClient := createHttpClient(t)
+		httpClient := createHTTPClient(t)
 		wellKnownURL := appConfig.AuthServer.BaseURL + "/.well-known/openid-configuration"
 
 		resp, err := httpClient.Get(wellKnownURL)
@@ -698,8 +698,8 @@ func TestDCR_MultipleRedirectURIs(t *testing.T) {
 	assert.ElementsMatch(t, reqBody.RedirectURIs, uris)
 }
 
-// TestDCR_ConfidentialClient_DefaultAcrLevel tests that DCR clients get sensible defaults
-func TestDCR_ConfidentialClient_DefaultAcrLevel(t *testing.T) {
+// TestDCR_ConfidentialClient_DefaultACRLevel tests that DCR clients get sensible defaults
+func TestDCR_ConfidentialClient_DefaultACRLevel(t *testing.T) {
 	enableDCR(t)
 
 	reqBody := oidc.DynamicClientRegistrationRequest{
@@ -747,7 +747,7 @@ func makeDCRRequest(t *testing.T, body oidc.DynamicClientRegistrationRequest) *h
 
 	req.Header.Set("Content-Type", "application/json")
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 
@@ -998,7 +998,7 @@ func TestDCR_ARedirectURIOfTheMaximumLengthCompletesTheAuthorizationCodeFlow(t *
 	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 
 	user, password := createCeremonyUser(t)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
 	codeVerifier := fake.LetterN(64)
 	state := fake.LetterN(8)
@@ -1053,7 +1053,7 @@ func TestDCR_ARedirectURIOfTheMaximumLengthCompletesTheAuthorizationCodeFlow(t *
 
 	require.True(t, strings.HasPrefix(page.Header.Get("Location"), redirectURI+"?"),
 		"the code is delivered to the registered 2048-byte redirect URI")
-	codeVal, stateVal := getCodeAndStateFromUrl(t, page)
+	codeVal, stateVal := getCodeAndStateFromURL(t, page)
 	assert.Equal(t, state, stateVal)
 	assert.Equal(t, redirectURI, loadCodeFromDatabase(t, codeVal).RedirectURI,
 		"the code row holds the whole redirect URI")

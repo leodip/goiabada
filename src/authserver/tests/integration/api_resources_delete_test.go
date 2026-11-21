@@ -40,7 +40,7 @@ func TestAPIResourceDelete_Success(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, getResp.StatusCode)
 }
 
-func TestAPIResourceDelete_NotFoundAndInvalidId(t *testing.T) {
+func TestAPIResourceDelete_NotFoundAndInvalidID(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Not found
@@ -97,7 +97,7 @@ func TestAPIResourceDelete_UnauthorizedAndScope(t *testing.T) {
 	// No token
 	req, err := http.NewRequest("DELETE", url, nil)
 	require.NoError(t, err)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()

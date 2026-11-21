@@ -70,7 +70,7 @@ func walkToCode(t *testing.T, browser *http.Client, resp *http.Response, who cer
 			case "/auth/pwd":
 				resp = authenticateWithPassword(t, browser, pageURL, page, who.email, who.password)
 			case "/auth/otp":
-				resp = authenticateWithOtp(t, browser, pageURL, page, otptest.Code(t, who.otpSecret, time.Now()))
+				resp = authenticateWithOTP(t, browser, pageURL, page, otptest.Code(t, who.otpSecret, time.Now()))
 			case "/auth/consent":
 				resp = postConsent(t, browser, pageURL, page, consentIndices(t, page))
 			case "/auth/legal-acceptance":
@@ -111,7 +111,7 @@ func consentIndices(t *testing.T, page *http.Response) []int {
 }
 
 // withDPoPJkt is the authorization request with dpop_jkt set to jkt, or without it when jkt is empty.
-func withDPoPJkt(client *record.Client, redirectUri *record.RedirectURI, jkt string, extra map[string]string) string {
+func withDPoPJkt(client *record.Client, redirectURI *record.RedirectURI, jkt string, extra map[string]string) string {
 	overrides := map[string]string{"scope": "openid profile email"}
 	for name, value := range extra {
 		overrides[name] = value
@@ -119,7 +119,7 @@ func withDPoPJkt(client *record.Client, redirectUri *record.RedirectURI, jkt str
 	if jkt != "" {
 		overrides["dpop_jkt"] = jkt
 	}
-	return authorizeRequest(client, redirectUri, overrides)
+	return authorizeRequest(client, redirectURI, overrides)
 }
 
 // TestDPoPJkt_IsCarriedThroughEveryStepToTheCode signs in along each path the ceremony can take,
@@ -143,9 +143,9 @@ func TestDPoPJkt_IsCarriedThroughEveryStepToTheCode(t *testing.T) {
 		{
 			name: "the password form",
 			run: func(t *testing.T, jkt string) (*record.Code, []string) {
-				client, redirectUri := createTestClientAndRedirectURI(t)
-				browser := createHttpClient(t)
-				resp, err := browser.Get(withDPoPJkt(client, redirectUri, jkt, nil))
+				client, redirectURI := createTestClientAndRedirectURI(t)
+				browser := createHTTPClient(t)
+				resp, err := browser.Get(withDPoPJkt(client, redirectURI, jkt, nil))
 				require.NoError(t, err)
 				return walkToCode(t, browser, resp, newUser(t))
 			},
@@ -154,10 +154,10 @@ func TestDPoPJkt_IsCarriedThroughEveryStepToTheCode(t *testing.T) {
 		{
 			name: "a POST, parked for its GET",
 			run: func(t *testing.T, jkt string) (*record.Code, []string) {
-				client, redirectUri := createTestClientAndRedirectURI(t)
-				parsed, err := url.Parse(withDPoPJkt(client, redirectUri, jkt, nil))
+				client, redirectURI := createTestClientAndRedirectURI(t)
+				parsed, err := url.Parse(withDPoPJkt(client, redirectURI, jkt, nil))
 				require.NoError(t, err)
-				browser := createHttpClient(t)
+				browser := createHTTPClient(t)
 				req, err := http.NewRequest(http.MethodPost, appConfig.AuthServer.BaseURL+"/auth/authorize/",
 					strings.NewReader(parsed.Query().Encode()))
 				require.NoError(t, err)
@@ -172,11 +172,11 @@ func TestDPoPJkt_IsCarriedThroughEveryStepToTheCode(t *testing.T) {
 		{
 			name: "consent",
 			run: func(t *testing.T, jkt string) (*record.Code, []string) {
-				client, redirectUri := createTestClientAndRedirectURI(t)
+				client, redirectURI := createTestClientAndRedirectURI(t)
 				client.ConsentRequired = true
 				require.NoError(t, database.UpdateClient(context.Background(), nil, client))
-				browser := createHttpClient(t)
-				resp, err := browser.Get(withDPoPJkt(client, redirectUri, jkt, nil))
+				browser := createHTTPClient(t)
+				resp, err := browser.Get(withDPoPJkt(client, redirectURI, jkt, nil))
 				require.NoError(t, err)
 				return walkToCode(t, browser, resp, newUser(t))
 			},
@@ -185,9 +185,9 @@ func TestDPoPJkt_IsCarriedThroughEveryStepToTheCode(t *testing.T) {
 		{
 			name: "a one-time code",
 			run: func(t *testing.T, jkt string) (*record.Code, []string) {
-				client, redirectUri, user, password, otpSecret := createLevel2MandatoryUser(t, true)
-				browser := createHttpClient(t)
-				resp, err := browser.Get(withDPoPJkt(client, redirectUri, jkt, nil))
+				client, redirectURI, user, password, otpSecret := createLevel2MandatoryUser(t, true)
+				browser := createHTTPClient(t)
+				resp, err := browser.Get(withDPoPJkt(client, redirectURI, jkt, nil))
 				require.NoError(t, err)
 				return walkToCode(t, browser, resp, ceremonyUser{email: user.Email, password: password, otpSecret: otpSecret})
 			},
@@ -202,7 +202,7 @@ func TestDPoPJkt_IsCarriedThroughEveryStepToTheCode(t *testing.T) {
 				if jkt != "" {
 					extra = "&dpop_jkt=" + url.QueryEscape(jkt)
 				}
-				browser := createHttpClient(t)
+				browser := createHTTPClient(t)
 				resp, err := browser.Get(f.link(extra))
 				require.NoError(t, err)
 				return walkToCode(t, browser, resp, ceremonyUser{email: f.user.Email, password: f.password})
@@ -212,8 +212,8 @@ func TestDPoPJkt_IsCarriedThroughEveryStepToTheCode(t *testing.T) {
 		{
 			name: "the single sign-on shortcut",
 			run: func(t *testing.T, jkt string) (*record.Code, []string) {
-				browser, client, redirectUri, _ := createSessionWithAcrLevel1(t)
-				resp, err := browser.Get(withDPoPJkt(client, redirectUri, jkt, nil))
+				browser, client, redirectURI, _ := createSessionWithACRLevel1(t)
+				resp, err := browser.Get(withDPoPJkt(client, redirectURI, jkt, nil))
 				require.NoError(t, err)
 				return walkToCode(t, browser, resp, ceremonyUser{})
 			},
@@ -221,8 +221,8 @@ func TestDPoPJkt_IsCarriedThroughEveryStepToTheCode(t *testing.T) {
 		{
 			name: "prompt=none",
 			run: func(t *testing.T, jkt string) (*record.Code, []string) {
-				browser, client, redirectUri, _ := createSessionWithAcrLevel1(t)
-				resp, err := browser.Get(withDPoPJkt(client, redirectUri, jkt, map[string]string{"prompt": "none"}))
+				browser, client, redirectURI, _ := createSessionWithACRLevel1(t)
+				resp, err := browser.Get(withDPoPJkt(client, redirectURI, jkt, map[string]string{"prompt": "none"}))
 				require.NoError(t, err)
 				return walkToCode(t, browser, resp, ceremonyUser{})
 			},
@@ -247,7 +247,7 @@ func TestDPoPJkt_AuthorizationRequestRefusals(t *testing.T) {
 	const thumbprint = "NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs" // RFC 7638 section 3.1
 	malformed := "The dpop_jkt parameter is incorrect. It must be the SHA-256 JWK thumbprint of the DPoP key (RFC 7638), " +
 		"base64url-encoded without padding: 43 characters of A-Z, a-z, 0-9, '-' and '_'."
-	client, redirectUri := createTestClientAndRedirectURI(t)
+	client, redirectURI := createTestClientAndRedirectURI(t)
 
 	for name, jkt := range map[string]string{
 		"a spare bit set": thumbprint[:42] + "t",
@@ -262,17 +262,17 @@ func TestDPoPJkt_AuthorizationRequestRefusals(t *testing.T) {
 		"a tab":           thumbprint[:20] + "\t" + thumbprint[21:],
 	} {
 		t.Run(name, func(t *testing.T) {
-			resp := answeredAtOnce(t, authorizeRequest(client, redirectUri, map[string]string{"dpop_jkt": jkt}))
-			errorCode, description, _ := getErrorFromUrl(t, resp)
+			resp := answeredAtOnce(t, authorizeRequest(client, redirectURI, map[string]string{"dpop_jkt": jkt}))
+			errorCode, description, _ := getErrorFromURL(t, resp)
 			assert.Equal(t, "invalid_request", errorCode)
 			assert.Equal(t, malformed, description)
 		})
 	}
 
 	t.Run("sent twice", func(t *testing.T) {
-		resp := answeredAtOnce(t, authorizeRequest(client, redirectUri, map[string]string{"dpop_jkt": thumbprint})+
+		resp := answeredAtOnce(t, authorizeRequest(client, redirectURI, map[string]string{"dpop_jkt": thumbprint})+
 			"&dpop_jkt="+thumbprint)
-		errorCode, description, _ := getErrorFromUrl(t, resp)
+		errorCode, description, _ := getErrorFromURL(t, resp)
 		assert.Equal(t, "invalid_request", errorCode)
 		assert.Equal(t, "The 'dpop_jkt' parameter was included more than once.", description)
 	})
@@ -299,7 +299,7 @@ func TestDPoPJkt_AuthorizationRequestRefusals(t *testing.T) {
 	})
 
 	t.Run("a real thumbprint goes on to the sign-in", func(t *testing.T) {
-		resp, err := createHttpClient(t).Get(authorizeRequest(client, redirectUri, map[string]string{"dpop_jkt": thumbprint}))
+		resp, err := createHTTPClient(t).Get(authorizeRequest(client, redirectURI, map[string]string{"dpop_jkt": thumbprint}))
 		require.NoError(t, err)
 		defer func() { _ = resp.Body.Close() }()
 		assertRedirect(t, resp, "/auth/level1")
@@ -312,10 +312,10 @@ func TestDPoPJkt_ABoundCodeIsRedeemedOnlyByItsKey(t *testing.T) {
 	key, other := dpoptest.RFC7517Key(t), dpoptest.RFC7515Key(t)
 	_, code := createAuthCode(t, fake.LetterN(32), "openid profile", authCodeOptions{isPublic: true, dpopJkt: key.Thumbprint})
 	require.Equal(t, sql.NullString{String: key.Thumbprint, Valid: true}, code.DPoPJkt)
-	clientId := code.Client.ClientIdentifier
+	clientID := code.Client.ClientIdentifier
 	form := url.Values{
 		"grant_type":    {"authorization_code"},
-		"client_id":     {clientId},
+		"client_id":     {clientID},
 		"code":          {code.Code},
 		"redirect_uri":  {code.RedirectURI},
 		"code_verifier": {testCodeVerifier},
@@ -333,25 +333,25 @@ func TestDPoPJkt_ABoundCodeIsRedeemedOnlyByItsKey(t *testing.T) {
 	}
 
 	t.Run("no proof", func(t *testing.T) {
-		resp, body := postWithProof(t, form, clientId, "", "")
+		resp, body := postWithProof(t, form, clientID, "", "")
 		requireRefusedAndUnspent(t, resp, body)
 	})
 	t.Run("a proof by another key", func(t *testing.T) {
-		resp, body := postWithProof(t, form, clientId, "", other.Proof(t, "POST", dpopTokenURL(), time.Now(),
-			nonceForRefresh(t, form, clientId, "", other)))
+		resp, body := postWithProof(t, form, clientID, "", other.Proof(t, "POST", dpopTokenURL(), time.Now(),
+			nonceForRefresh(t, form, clientID, "", other)))
 		requireRefusedAndUnspent(t, resp, body)
 		require.Len(t, resp.Header.Values("DPoP-Nonce"), 1, "the refusal of a DPoP request carries a fresh nonce")
 	})
 	t.Run("then a proof by its key", func(t *testing.T) {
-		body := redeemWithDPoP(t, form, clientId, "", key)
+		body := redeemWithDPoP(t, form, clientID, "", key)
 		assertBoundTo(t, body, key)
 		row, err := database.GetCodeByID(context.Background(), nil, code.ID)
 		require.NoError(t, err)
 		assert.True(t, row.Used, "the code is spent by its key")
 	})
 	t.Run("and once spent, another key is still refused for the binding", func(t *testing.T) {
-		resp, body := postWithProof(t, form, clientId, "", other.Proof(t, "POST", dpopTokenURL(), time.Now(),
-			nonceForRefresh(t, form, clientId, "", other)))
+		resp, body := postWithProof(t, form, clientID, "", other.Proof(t, "POST", dpopTokenURL(), time.Now(),
+			nonceForRefresh(t, form, clientID, "", other)))
 		require.Equal(t, http.StatusBadRequest, resp.StatusCode, "%v", body)
 		assert.Equal(t, boundCodeRefusal, body)
 	})
@@ -363,15 +363,15 @@ func TestDPoPJkt_ABoundCodeIsRedeemedOnlyByItsKey(t *testing.T) {
 func TestDPoPJkt_ConcurrentRedemptionsOfABoundCodeHaveOneWinner(t *testing.T) {
 	key, other := dpoptest.RFC7517Key(t), dpoptest.RFC7515Key(t)
 	_, code := createAuthCode(t, fake.LetterN(32), "openid profile", authCodeOptions{isPublic: true, dpopJkt: key.Thumbprint})
-	clientId := code.Client.ClientIdentifier
+	clientID := code.Client.ClientIdentifier
 	form := url.Values{
 		"grant_type":    {"authorization_code"},
-		"client_id":     {clientId},
+		"client_id":     {clientID},
 		"code":          {code.Code},
 		"redirect_uri":  {code.RedirectURI},
 		"code_verifier": {testCodeVerifier},
 	}
-	nonce := nonceForRefresh(t, form, clientId, "", key)
+	nonce := nonceForRefresh(t, form, clientID, "", key)
 
 	type attempt struct {
 		byKey bool
@@ -392,7 +392,7 @@ func TestDPoPJkt_ConcurrentRedemptionsOfABoundCodeHaveOneWinner(t *testing.T) {
 		err    error
 	}
 	outcomes := make([]outcome, len(attempts))
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	start := make(chan struct{})
 	var wg sync.WaitGroup
 	for i, a := range attempts {

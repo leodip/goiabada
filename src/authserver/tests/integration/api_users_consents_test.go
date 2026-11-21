@@ -143,13 +143,13 @@ func TestAPIUserConsentsGet_UserNotFound(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
-func TestAPIUserConsentsGet_InvalidId(t *testing.T) {
+func TestAPIUserConsentsGet_InvalidID(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)
 
 	testCases := []struct {
 		name           string
-		userId         string
+		userID         string
 		expectedStatus int
 	}{
 		{"non-numeric ID", "abc", http.StatusBadRequest},
@@ -160,7 +160,7 @@ func TestAPIUserConsentsGet_InvalidId(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + tc.userId + "/consents"
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + tc.userID + "/consents"
 			resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -189,7 +189,7 @@ func TestAPIUserConsentsGet_Unauthorized(t *testing.T) {
 	req, err := http.NewRequest("GET", url, nil)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -297,13 +297,13 @@ func TestAPIUserConsentDelete_NotFound(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
-func TestAPIUserConsentDelete_InvalidId(t *testing.T) {
+func TestAPIUserConsentDelete_InvalidID(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)
 
 	testCases := []struct {
 		name           string
-		consentId      string
+		consentID      string
 		expectedStatus int
 	}{
 		{"non-numeric ID", "abc", http.StatusBadRequest},
@@ -313,7 +313,7 @@ func TestAPIUserConsentDelete_InvalidId(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-consents/" + tc.consentId
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-consents/" + tc.consentID
 			resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -354,7 +354,7 @@ func TestAPIUserConsentDelete_Unauthorized(t *testing.T) {
 	req, err := http.NewRequest("DELETE", url, nil)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -432,8 +432,8 @@ func TestAPIUserConsentDelete_WithClientDetails(t *testing.T) {
 	assert.Equal(t, "openid profile email address phone", retrievedConsent.Scope)
 
 	// Now test deleting the consent
-	deleteUrl := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-consents/" + strconv.FormatInt(consent.ID, 10)
-	deleteResp := makeAPIRequest(t, "DELETE", deleteUrl, accessToken, nil)
+	deleteURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-consents/" + strconv.FormatInt(consent.ID, 10)
+	deleteResp := makeAPIRequest(t, "DELETE", deleteURL, accessToken, nil)
 	defer func() { _ = deleteResp.Body.Close() }()
 
 	// Assert: Delete should succeed
@@ -478,10 +478,10 @@ func createTestClient(t *testing.T, identifier string) *record.Client {
 }
 
 // Helper function to create a test user consent
-func createTestUserConsent(t *testing.T, userId int64, clientId int64) *record.UserConsent {
+func createTestUserConsent(t *testing.T, userID int64, clientID int64) *record.UserConsent {
 	consent := &record.UserConsent{
-		ClientID:  clientId,
-		UserID:    userId,
+		ClientID:  clientID,
+		UserID:    userID,
 		Scope:     "openid profile email",
 		GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
 	}

@@ -66,7 +66,7 @@ func newAdministrativeScopeFixture(t *testing.T, allowed bool) *administrativeSc
 		&record.RedirectURI{ClientID: client.ID, URI: administrativeScopeRedirectURI}))
 
 	user, password := newSignInAdministrator(t)
-	return &administrativeScopeFixture{client: client, user: user, password: password, browser: createHttpClient(t)}
+	return &administrativeScopeFixture{client: client, user: user, password: password, browser: createHTTPClient(t)}
 }
 
 // newSignInAdministrator is a user holding authserver:manage, and its password.
@@ -79,23 +79,23 @@ func newSignInAdministrator(t *testing.T) (*record.User, string) {
 	user := &record.User{Subject: fake.UUID(), Enabled: true, Email: fake.Email(), PasswordHash: passwordHashed}
 	require.NoError(t, database.CreateUser(context.Background(), nil, user))
 	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.ID) })
-	assignPermissionToUser(t, user.ID, authServerPermissionId(t, builtin.ManagePermissionIdentifier))
+	assignPermissionToUser(t, user.ID, authServerPermissionID(t, builtin.ManagePermissionIdentifier))
 	return user, password
 }
 
 // craftedLink is the authorization request the issue describes, for responseType, with extra
 // appended as it is.
 func (f *administrativeScopeFixture) craftedLink(responseType string, extra string) string {
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + f.client.ClientIdentifier +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + f.client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(administrativeScopeRedirectURI) +
 		"&response_type=" + url.QueryEscape(responseType) +
 		"&scope=" + url.QueryEscape("openid authserver:manage") +
 		"&state=" + administrativeScopeState +
 		"&nonce=" + fake.LetterN(8)
 	if responseType == "code" {
-		destUrl += "&code_challenge_method=S256&code_challenge=" + oauth.GeneratePKCECodeChallenge(testCodeVerifier)
+		destURL += "&code_challenge_method=S256&code_challenge=" + oauth.GeneratePKCECodeChallenge(testCodeVerifier)
 	}
-	return destUrl + extra
+	return destURL + extra
 }
 
 // signIn gives the browser a valid session, through the same client asking for openid alone, which
@@ -103,11 +103,11 @@ func (f *administrativeScopeFixture) craftedLink(responseType string, extra stri
 func (f *administrativeScopeFixture) signIn(t *testing.T) {
 	t.Helper()
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + f.client.ClientIdentifier +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + f.client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(administrativeScopeRedirectURI) +
 		"&response_type=code&scope=openid&state=sign-in" +
 		"&code_challenge_method=S256&code_challenge=" + oauth.GeneratePKCECodeChallenge(testCodeVerifier)
-	resp := f.signInFrom(t, destUrl)
+	resp := f.signInFrom(t, destURL)
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusFound, resp.StatusCode)
 	require.Contains(t, resp.Header.Get("Location"), "code=", "the sign-in completes with a code")
@@ -115,10 +115,10 @@ func (f *administrativeScopeFixture) signIn(t *testing.T) {
 
 // signInFrom drives a ceremony that needs the password from its authorization request to
 // /auth/issue, and answers /auth/issue's response.
-func (f *administrativeScopeFixture) signInFrom(t *testing.T, destUrl string) *http.Response {
+func (f *administrativeScopeFixture) signInFrom(t *testing.T, destURL string) *http.Response {
 	t.Helper()
 
-	resp, err := f.browser.Get(destUrl)
+	resp, err := f.browser.Get(destURL)
 	require.NoError(t, err)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 	location := assertRedirect(t, resp, "/auth/level1")
@@ -139,10 +139,10 @@ func (f *administrativeScopeFixture) signInFrom(t *testing.T, destUrl string) *h
 	return loadPage(t, f.browser, location)
 }
 
-// get loads destUrl in the fixture's browser without following redirects.
-func (f *administrativeScopeFixture) get(t *testing.T, destUrl string) *http.Response {
+// get loads destURL in the fixture's browser without following redirects.
+func (f *administrativeScopeFixture) get(t *testing.T, destURL string) *http.Response {
 	t.Helper()
-	resp, err := f.browser.Get(destUrl)
+	resp, err := f.browser.Get(destURL)
 	require.NoError(t, err)
 	return resp
 }
@@ -270,7 +270,7 @@ func TestAuthorize_AdministrativeScope_AnAllowedClientGetsTheCode(t *testing.T) 
 	resp := f.signInFrom(t, f.craftedLink("code", ""))
 	defer func() { _ = resp.Body.Close() }()
 
-	codeVal, state := getCodeAndStateFromUrl(t, resp)
+	codeVal, state := getCodeAndStateFromURL(t, resp)
 	assert.Equal(t, administrativeScopeState, state)
 	code := loadCodeFromDatabase(t, codeVal)
 	assert.Equal(t, "openid authserver:manage", code.Scope)
@@ -285,15 +285,15 @@ func TestAuthorize_AdministrativeScope_AnAllowedClientGetsTheCode(t *testing.T) 
 // owed to (#509 decision 2).
 func TestAuthorize_AdministrativeScope_TheAdminConsoleClientSignsInWithNoConsentScreen(t *testing.T) {
 	user, password := newSignInAdministrator(t)
-	assignPermissionToUser(t, user.ID, authServerPermissionId(t, builtin.ManageAccountPermissionIdentifier))
-	browser := createHttpClient(t)
+	assignPermissionToUser(t, user.ID, authServerPermissionID(t, builtin.ManageAccountPermissionIdentifier))
+	browser := createHTTPClient(t)
 	callback := appConfig.AdminConsole.BaseURL + "/auth/callback"
 
 	// The admin console's request, as middleware_jwt.go's buildScopeString and auth_helper.go's
 	// RedirToAuthorize build it.
 	const scope = "authserver:manage authserver:manage-account email openid profile"
 	state := fake.LetterN(16)
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize?" + url.Values{
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize?" + url.Values{
 		"client_id":             {builtin.AdminConsoleClientIdentifier},
 		"redirect_uri":          {callback},
 		"response_mode":         {"form_post"},
@@ -305,7 +305,7 @@ func TestAuthorize_AdministrativeScope_TheAdminConsoleClientSignsInWithNoConsent
 		"scope":                 {scope},
 	}.Encode()
 
-	resp, err := browser.Get(destUrl)
+	resp, err := browser.Get(destURL)
 	require.NoError(t, err)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 	location := assertRedirect(t, resp, "/auth/level1")

@@ -19,11 +19,11 @@ import (
 // Phase 4: Client Configuration Tests
 // =============================================================================
 
-func TestPromptNone_ClientDefaultAcrHigher(t *testing.T) {
+func TestPromptNone_ClientDefaultACRHigher(t *testing.T) {
 	// Create session at level1 using a level1 client
-	httpClient, _, _, _, _ := createSessionWithAcrLevel1AndPassword(t)
+	httpClient, _, _, _, _ := createSessionWithACRLevel1AndPassword(t)
 
-	// Create a different client with DefaultAcrLevel=level2_optional
+	// Create a different client with DefaultACRLevel=level2_optional
 	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
@@ -36,11 +36,11 @@ func TestPromptNone_ClientDefaultAcrHigher(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	redirectUri := &record.RedirectURI{
+	redirectURI := &record.RedirectURI{
 		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,8 +49,8 @@ func TestPromptNone_ClientDefaultAcrHigher(t *testing.T) {
 	requestState := fake.LetterN(8)
 	requestCodeChallenge := randomCodeChallenge()
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -58,7 +58,7 @@ func TestPromptNone_ClientDefaultAcrHigher(t *testing.T) {
 		"&state=" + requestState +
 		"&prompt=none"
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,22 +66,22 @@ func TestPromptNone_ClientDefaultAcrHigher(t *testing.T) {
 
 	assert.Equal(t, http.StatusFound, resp.StatusCode)
 
-	errorCode, _, state := getErrorFromUrl(t, resp)
+	errorCode, _, state := getErrorFromURL(t, resp)
 
 	assert.Equal(t, "interaction_required", errorCode)
 	assert.Equal(t, requestState, state)
 }
 
-func TestPromptNone_ClientDefaultAcrSatisfied(t *testing.T) {
-	// Client with DefaultAcrLevel=level1, session at level1 - should succeed
-	httpClient, client, redirectUri, _ := createSessionWithAcrLevel1(t)
+func TestPromptNone_ClientDefaultACRSatisfied(t *testing.T) {
+	// Client with DefaultACRLevel=level1, session at level1 - should succeed
+	httpClient, client, redirectURI, _ := createSessionWithACRLevel1(t)
 
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 	requestCodeChallenge := randomCodeChallenge()
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -90,7 +90,7 @@ func TestPromptNone_ClientDefaultAcrSatisfied(t *testing.T) {
 		"&nonce=" + requestNonce +
 		"&prompt=none"
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -115,15 +115,15 @@ func TestPromptNone_ClientDefaultAcrSatisfied(t *testing.T) {
 // acr_values=level1 asking for less than the client requires. The floor raises the target back to
 // level2_optional, which the session does not meet, so the request is refused (#240).
 //
-// Not a duplicate of TestPromptNone_ClientDefaultAcrHigher above, which reaches the same
+// Not a duplicate of TestPromptNone_ClientDefaultACRHigher above, which reaches the same
 // interaction_required from the same client and session while sending no acr_values at all. This
 // is the only case proving the floor is applied on the silent path, where
 // authflow.SilentAuthentication reads the target and decides without any UI.
-func TestPromptNone_AcrValuesCannotLowerTheClientFloor(t *testing.T) {
+func TestPromptNone_ACRValuesCannotLowerTheClientFloor(t *testing.T) {
 	// Create session at level1
-	httpClient, _, _, _, _ := createSessionWithAcrLevel1AndPassword(t)
+	httpClient, _, _, _, _ := createSessionWithACRLevel1AndPassword(t)
 
-	// Create client with DefaultAcrLevel=level2_optional
+	// Create client with DefaultACRLevel=level2_optional
 	client := &record.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
@@ -136,11 +136,11 @@ func TestPromptNone_AcrValuesCannotLowerTheClientFloor(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	redirectUri := &record.RedirectURI{
+	redirectURI := &record.RedirectURI{
 		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,8 +151,8 @@ func TestPromptNone_AcrValuesCannotLowerTheClientFloor(t *testing.T) {
 	requestNonce := fake.LetterN(8)
 	requestCodeChallenge := randomCodeChallenge()
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -162,7 +162,7 @@ func TestPromptNone_AcrValuesCannotLowerTheClientFloor(t *testing.T) {
 		"&prompt=none" +
 		"&acr_values=" + record.ACRLevel1.String()
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -170,7 +170,7 @@ func TestPromptNone_AcrValuesCannotLowerTheClientFloor(t *testing.T) {
 
 	assert.Equal(t, http.StatusFound, resp.StatusCode)
 
-	errorCode, _, state := getErrorFromUrl(t, resp)
+	errorCode, _, state := getErrorFromURL(t, resp)
 
 	assert.Equal(t, "interaction_required", errorCode,
 		"acr_values below the client's configured level must not lower the target")
@@ -181,14 +181,14 @@ func TestPromptNone_AcrValuesCannotLowerTheClientFloor(t *testing.T) {
 // Phase 4: Pre-Validation Failure Tests
 // =============================================================================
 
-func TestPromptNone_InvalidRedirectUri(t *testing.T) {
+func TestPromptNone_InvalidRedirectURI(t *testing.T) {
 	client, _ := createTestClientAndRedirectURI(t)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
 	requestState := fake.LetterN(8)
 	requestCodeChallenge := randomCodeChallenge()
 	// Use a redirect_uri that doesn't match the client's registered URIs
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape("https://evil.com/callback") +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -197,7 +197,7 @@ func TestPromptNone_InvalidRedirectUri(t *testing.T) {
 		"&state=" + requestState +
 		"&prompt=none"
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -210,12 +210,12 @@ func TestPromptNone_InvalidRedirectUri(t *testing.T) {
 	assert.Contains(t, body, "error", "should show error page")
 }
 
-func TestPromptNone_InvalidClientId(t *testing.T) {
-	httpClient := createHttpClient(t)
+func TestPromptNone_InvalidClientID(t *testing.T) {
+	httpClient := createHTTPClient(t)
 
 	requestState := fake.LetterN(8)
 	requestCodeChallenge := randomCodeChallenge()
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=nonexistent-client-12345" +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=nonexistent-client-12345" +
 		"&redirect_uri=" + url.QueryEscape("https://example.com/callback") +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -224,7 +224,7 @@ func TestPromptNone_InvalidClientId(t *testing.T) {
 		"&state=" + requestState +
 		"&prompt=none"
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -238,13 +238,13 @@ func TestPromptNone_InvalidClientId(t *testing.T) {
 }
 
 func TestPromptNone_InvalidResponseType(t *testing.T) {
-	client, redirectUri := createTestClientAndRedirectURI(t)
-	httpClient := createHttpClient(t)
+	client, redirectURI := createTestClientAndRedirectURI(t)
+	httpClient := createHTTPClient(t)
 
 	requestState := fake.LetterN(8)
 	requestCodeChallenge := randomCodeChallenge()
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=invalid_type" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -252,7 +252,7 @@ func TestPromptNone_InvalidResponseType(t *testing.T) {
 		"&state=" + requestState +
 		"&prompt=none"
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -260,7 +260,7 @@ func TestPromptNone_InvalidResponseType(t *testing.T) {
 
 	assert.Equal(t, http.StatusFound, resp.StatusCode)
 
-	errorCode, _, state := getErrorFromUrl(t, resp)
+	errorCode, _, state := getErrorFromURL(t, resp)
 
 	assert.Equal(t, "unsupported_response_type", errorCode)
 	assert.Equal(t, requestState, state)
@@ -294,11 +294,11 @@ func TestPromptNone_CodeExchange(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	redirectUri := &record.RedirectURI{
+	redirectURI := &record.RedirectURI{
 		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -320,15 +320,15 @@ func TestPromptNone_CodeExchange(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	codeVerifier := testCodeVerifier
 	codeChallenge := oauth.GeneratePKCECodeChallenge(codeVerifier)
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 
 	// Create session via normal login
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + codeChallenge +
@@ -336,7 +336,7 @@ func TestPromptNone_CodeExchange(t *testing.T) {
 		"&state=" + requestState +
 		"&nonce=" + requestNonce
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -365,7 +365,7 @@ func TestPromptNone_CodeExchange(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	_, _ = getCodeAndStateFromUrl(t, resp)
+	_, _ = getCodeAndStateFromURL(t, resp)
 
 	// Now use prompt=none with proper PKCE
 	codeVerifier2 := testCodeVerifier + "-two"
@@ -373,8 +373,8 @@ func TestPromptNone_CodeExchange(t *testing.T) {
 	requestState2 := fake.LetterN(8)
 	requestNonce2 := "test-nonce-" + fake.LetterN(16)
 
-	destUrl2 := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL2 := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + codeChallenge2 +
@@ -383,7 +383,7 @@ func TestPromptNone_CodeExchange(t *testing.T) {
 		"&nonce=" + requestNonce2 +
 		"&prompt=none"
 
-	resp2, err := httpClient.Get(destUrl2)
+	resp2, err := httpClient.Get(destURL2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -393,7 +393,7 @@ func TestPromptNone_CodeExchange(t *testing.T) {
 	resp2 = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp2.Body.Close() }()
 
-	codeVal, _ := getCodeAndStateFromUrl(t, resp2)
+	codeVal, _ := getCodeAndStateFromURL(t, resp2)
 
 	// Exchange code for tokens
 	tokenEndpoint := appConfig.AuthServer.BaseURL + "/auth/token"
@@ -402,7 +402,7 @@ func TestPromptNone_CodeExchange(t *testing.T) {
 		"client_id":     {client.ClientIdentifier},
 		"client_secret": {clientSecret},
 		"code":          {codeVal},
-		"redirect_uri":  {redirectUri.URI},
+		"redirect_uri":  {redirectURI.URI},
 		"code_verifier": {codeVerifier2},
 	}
 
@@ -447,11 +447,11 @@ func TestPromptNone_SubClaimConsistent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	redirectUri := &record.RedirectURI{
+	redirectURI := &record.RedirectURI{
 		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -473,7 +473,7 @@ func TestPromptNone_SubClaimConsistent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
 	// First login
 	codeVerifier1 := testCodeVerifier + "-one"
@@ -481,8 +481,8 @@ func TestPromptNone_SubClaimConsistent(t *testing.T) {
 	requestState1 := fake.LetterN(8)
 	requestNonce1 := fake.LetterN(8)
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + codeChallenge1 +
@@ -490,7 +490,7 @@ func TestPromptNone_SubClaimConsistent(t *testing.T) {
 		"&state=" + requestState1 +
 		"&nonce=" + requestNonce1
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -519,7 +519,7 @@ func TestPromptNone_SubClaimConsistent(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	codeVal1, _ := getCodeAndStateFromUrl(t, resp)
+	codeVal1, _ := getCodeAndStateFromURL(t, resp)
 
 	tokenEndpoint := appConfig.AuthServer.BaseURL + "/auth/token"
 	form1 := url.Values{
@@ -527,7 +527,7 @@ func TestPromptNone_SubClaimConsistent(t *testing.T) {
 		"client_id":     {client.ClientIdentifier},
 		"client_secret": {clientSecret},
 		"code":          {codeVal1},
-		"redirect_uri":  {redirectUri.URI},
+		"redirect_uri":  {redirectURI.URI},
 		"code_verifier": {codeVerifier1},
 	}
 
@@ -542,8 +542,8 @@ func TestPromptNone_SubClaimConsistent(t *testing.T) {
 	requestState2 := fake.LetterN(8)
 	requestNonce2 := fake.LetterN(8)
 
-	destUrl2 := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL2 := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + codeChallenge2 +
@@ -552,7 +552,7 @@ func TestPromptNone_SubClaimConsistent(t *testing.T) {
 		"&nonce=" + requestNonce2 +
 		"&prompt=none"
 
-	resp2, err := httpClient.Get(destUrl2)
+	resp2, err := httpClient.Get(destURL2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -562,14 +562,14 @@ func TestPromptNone_SubClaimConsistent(t *testing.T) {
 	resp2 = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp2.Body.Close() }()
 
-	codeVal2, _ := getCodeAndStateFromUrl(t, resp2)
+	codeVal2, _ := getCodeAndStateFromURL(t, resp2)
 
 	form2 := url.Values{
 		"grant_type":    {"authorization_code"},
 		"client_id":     {client.ClientIdentifier},
 		"client_secret": {clientSecret},
 		"code":          {codeVal2},
-		"redirect_uri":  {redirectUri.URI},
+		"redirect_uri":  {redirectURI.URI},
 		"code_verifier": {codeVerifier2},
 	}
 
@@ -605,11 +605,11 @@ func TestPromptNone_AuthTimePreservedInToken(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	redirectUri := &record.RedirectURI{
+	redirectURI := &record.RedirectURI{
 		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -631,15 +631,15 @@ func TestPromptNone_AuthTimePreservedInToken(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
 	codeVerifier1 := testCodeVerifier + "-one"
 	codeChallenge1 := oauth.GeneratePKCECodeChallenge(codeVerifier1)
 	requestState1 := fake.LetterN(8)
 	requestNonce1 := fake.LetterN(8)
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + codeChallenge1 +
@@ -647,7 +647,7 @@ func TestPromptNone_AuthTimePreservedInToken(t *testing.T) {
 		"&state=" + requestState1 +
 		"&nonce=" + requestNonce1
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -676,7 +676,7 @@ func TestPromptNone_AuthTimePreservedInToken(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	codeVal1, _ := getCodeAndStateFromUrl(t, resp)
+	codeVal1, _ := getCodeAndStateFromURL(t, resp)
 
 	tokenEndpoint := appConfig.AuthServer.BaseURL + "/auth/token"
 	form1 := url.Values{
@@ -684,7 +684,7 @@ func TestPromptNone_AuthTimePreservedInToken(t *testing.T) {
 		"client_id":     {client.ClientIdentifier},
 		"client_secret": {clientSecret},
 		"code":          {codeVal1},
-		"redirect_uri":  {redirectUri.URI},
+		"redirect_uri":  {redirectURI.URI},
 		"code_verifier": {codeVerifier1},
 	}
 
@@ -701,8 +701,8 @@ func TestPromptNone_AuthTimePreservedInToken(t *testing.T) {
 	requestState2 := fake.LetterN(8)
 	requestNonce2 := fake.LetterN(8)
 
-	destUrl2 := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL2 := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + codeChallenge2 +
@@ -711,7 +711,7 @@ func TestPromptNone_AuthTimePreservedInToken(t *testing.T) {
 		"&nonce=" + requestNonce2 +
 		"&prompt=none"
 
-	resp2, err := httpClient.Get(destUrl2)
+	resp2, err := httpClient.Get(destURL2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -721,14 +721,14 @@ func TestPromptNone_AuthTimePreservedInToken(t *testing.T) {
 	resp2 = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp2.Body.Close() }()
 
-	codeVal2, _ := getCodeAndStateFromUrl(t, resp2)
+	codeVal2, _ := getCodeAndStateFromURL(t, resp2)
 
 	form2 := url.Values{
 		"grant_type":    {"authorization_code"},
 		"client_id":     {client.ClientIdentifier},
 		"client_secret": {clientSecret},
 		"code":          {codeVal2},
-		"redirect_uri":  {redirectUri.URI},
+		"redirect_uri":  {redirectURI.URI},
 		"code_verifier": {codeVerifier2},
 	}
 
@@ -764,11 +764,11 @@ func TestPromptNone_PKCEWrongVerifier(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	redirectUri := &record.RedirectURI{
+	redirectURI := &record.RedirectURI{
 		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -790,7 +790,7 @@ func TestPromptNone_PKCEWrongVerifier(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
 	// Create session
 	codeVerifierSession := testCodeVerifier + "-session"
@@ -798,8 +798,8 @@ func TestPromptNone_PKCEWrongVerifier(t *testing.T) {
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + codeChallengeSession +
@@ -807,7 +807,7 @@ func TestPromptNone_PKCEWrongVerifier(t *testing.T) {
 		"&state=" + requestState +
 		"&nonce=" + requestNonce
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -836,7 +836,7 @@ func TestPromptNone_PKCEWrongVerifier(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	_, _ = getCodeAndStateFromUrl(t, resp)
+	_, _ = getCodeAndStateFromURL(t, resp)
 
 	// prompt=none with PKCE
 	correctVerifier := testCodeVerifier + "-correct"
@@ -844,8 +844,8 @@ func TestPromptNone_PKCEWrongVerifier(t *testing.T) {
 	requestState2 := fake.LetterN(8)
 	requestNonce2 := fake.LetterN(8)
 
-	destUrl2 := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL2 := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + correctChallenge +
@@ -854,7 +854,7 @@ func TestPromptNone_PKCEWrongVerifier(t *testing.T) {
 		"&nonce=" + requestNonce2 +
 		"&prompt=none"
 
-	resp2, err := httpClient.Get(destUrl2)
+	resp2, err := httpClient.Get(destURL2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -864,7 +864,7 @@ func TestPromptNone_PKCEWrongVerifier(t *testing.T) {
 	resp2 = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp2.Body.Close() }()
 
-	codeVal, _ := getCodeAndStateFromUrl(t, resp2)
+	codeVal, _ := getCodeAndStateFromURL(t, resp2)
 
 	// Try to exchange with WRONG verifier
 	tokenEndpoint := appConfig.AuthServer.BaseURL + "/auth/token"
@@ -873,7 +873,7 @@ func TestPromptNone_PKCEWrongVerifier(t *testing.T) {
 		"client_id":     {client.ClientIdentifier},
 		"client_secret": {clientSecret},
 		"code":          {codeVal},
-		"redirect_uri":  {redirectUri.URI},
+		"redirect_uri":  {redirectURI.URI},
 		"code_verifier": {testCodeVerifier + "-wrong"},
 	}
 
@@ -914,11 +914,11 @@ func TestPromptNone_RefreshWithOfflineAccess(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	redirectUri := &record.RedirectURI{
+	redirectURI := &record.RedirectURI{
 		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -952,15 +952,15 @@ func TestPromptNone_RefreshWithOfflineAccess(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	codeVerifier := testCodeVerifier
 	codeChallenge := oauth.GeneratePKCECodeChallenge(codeVerifier)
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 
 	// Create session via normal login with offline_access
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + codeChallenge +
@@ -968,7 +968,7 @@ func TestPromptNone_RefreshWithOfflineAccess(t *testing.T) {
 		"&state=" + requestState +
 		"&nonce=" + requestNonce
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1007,7 +1007,7 @@ func TestPromptNone_RefreshWithOfflineAccess(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	_, _ = getCodeAndStateFromUrl(t, resp)
+	_, _ = getCodeAndStateFromURL(t, resp)
 
 	// Now use prompt=none with offline_access
 	codeVerifier2 := testCodeVerifier + "-two"
@@ -1015,8 +1015,8 @@ func TestPromptNone_RefreshWithOfflineAccess(t *testing.T) {
 	requestState2 := fake.LetterN(8)
 	requestNonce2 := fake.LetterN(8)
 
-	destUrl2 := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL2 := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + codeChallenge2 +
@@ -1025,7 +1025,7 @@ func TestPromptNone_RefreshWithOfflineAccess(t *testing.T) {
 		"&nonce=" + requestNonce2 +
 		"&prompt=none"
 
-	resp2, err := httpClient.Get(destUrl2)
+	resp2, err := httpClient.Get(destURL2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1035,7 +1035,7 @@ func TestPromptNone_RefreshWithOfflineAccess(t *testing.T) {
 	resp2 = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp2.Body.Close() }()
 
-	codeVal, _ := getCodeAndStateFromUrl(t, resp2)
+	codeVal, _ := getCodeAndStateFromURL(t, resp2)
 
 	// Exchange code for tokens
 	tokenEndpoint := appConfig.AuthServer.BaseURL + "/auth/token"
@@ -1044,7 +1044,7 @@ func TestPromptNone_RefreshWithOfflineAccess(t *testing.T) {
 		"client_id":     {client.ClientIdentifier},
 		"client_secret": {clientSecret},
 		"code":          {codeVal},
-		"redirect_uri":  {redirectUri.URI},
+		"redirect_uri":  {redirectURI.URI},
 		"code_verifier": {codeVerifier2},
 	}
 
@@ -1104,11 +1104,11 @@ func TestPromptNone_NoncePreserved(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	redirectUri := &record.RedirectURI{
+	redirectURI := &record.RedirectURI{
 		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1130,14 +1130,14 @@ func TestPromptNone_NoncePreserved(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	codeVerifier := testCodeVerifier
 	codeChallenge := oauth.GeneratePKCECodeChallenge(codeVerifier)
 	requestState := fake.LetterN(8)
 
 	// Create session via normal login
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + codeChallenge +
@@ -1145,7 +1145,7 @@ func TestPromptNone_NoncePreserved(t *testing.T) {
 		"&state=" + requestState +
 		"&nonce=" + fake.LetterN(8)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1174,7 +1174,7 @@ func TestPromptNone_NoncePreserved(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	_, _ = getCodeAndStateFromUrl(t, resp)
+	_, _ = getCodeAndStateFromURL(t, resp)
 
 	// Now use prompt=none with a specific nonce
 	codeVerifier2 := testCodeVerifier + "-two"
@@ -1182,8 +1182,8 @@ func TestPromptNone_NoncePreserved(t *testing.T) {
 	requestState2 := fake.LetterN(8)
 	testNonce := "test-nonce-" + fake.LetterN(16)
 
-	destUrl2 := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL2 := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + codeChallenge2 +
@@ -1192,7 +1192,7 @@ func TestPromptNone_NoncePreserved(t *testing.T) {
 		"&nonce=" + testNonce +
 		"&prompt=none"
 
-	resp2, err := httpClient.Get(destUrl2)
+	resp2, err := httpClient.Get(destURL2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1202,7 +1202,7 @@ func TestPromptNone_NoncePreserved(t *testing.T) {
 	resp2 = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp2.Body.Close() }()
 
-	codeVal, _ := getCodeAndStateFromUrl(t, resp2)
+	codeVal, _ := getCodeAndStateFromURL(t, resp2)
 
 	// Exchange code for tokens
 	tokenEndpoint := appConfig.AuthServer.BaseURL + "/auth/token"
@@ -1211,7 +1211,7 @@ func TestPromptNone_NoncePreserved(t *testing.T) {
 		"client_id":     {client.ClientIdentifier},
 		"client_secret": {clientSecret},
 		"code":          {codeVal},
-		"redirect_uri":  {redirectUri.URI},
+		"redirect_uri":  {redirectURI.URI},
 		"code_verifier": {codeVerifier2},
 	}
 
@@ -1251,11 +1251,11 @@ func TestPromptNone_PKCESupported(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	redirectUri := &record.RedirectURI{
+	redirectURI := &record.RedirectURI{
 		ClientID: client.ID,
 		URI:      "https://example.com/callback",
 	}
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1277,14 +1277,14 @@ func TestPromptNone_PKCESupported(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	codeVerifier := testCodeVerifier + "-initial"
 	codeChallenge := oauth.GeneratePKCECodeChallenge(codeVerifier)
 	requestState := fake.LetterN(8)
 
 	// Create session via normal login
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + codeChallenge +
@@ -1292,7 +1292,7 @@ func TestPromptNone_PKCESupported(t *testing.T) {
 		"&state=" + requestState +
 		"&nonce=" + fake.LetterN(8)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1321,15 +1321,15 @@ func TestPromptNone_PKCESupported(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	_, _ = getCodeAndStateFromUrl(t, resp)
+	_, _ = getCodeAndStateFromURL(t, resp)
 
 	// Now use prompt=none with a NEW PKCE code_challenge/verifier pair
 	pkceVerifier := testCodeVerifier + "-prompt-none"
 	pkceChallenge := oauth.GeneratePKCECodeChallenge(pkceVerifier)
 	requestState2 := fake.LetterN(8)
 
-	destUrl2 := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL2 := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + pkceChallenge +
@@ -1338,7 +1338,7 @@ func TestPromptNone_PKCESupported(t *testing.T) {
 		"&nonce=" + fake.LetterN(8) +
 		"&prompt=none"
 
-	resp2, err := httpClient.Get(destUrl2)
+	resp2, err := httpClient.Get(destURL2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1348,7 +1348,7 @@ func TestPromptNone_PKCESupported(t *testing.T) {
 	resp2 = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp2.Body.Close() }()
 
-	codeVal, _ := getCodeAndStateFromUrl(t, resp2)
+	codeVal, _ := getCodeAndStateFromURL(t, resp2)
 
 	// Exchange code for tokens using the correct PKCE verifier
 	tokenEndpoint := appConfig.AuthServer.BaseURL + "/auth/token"
@@ -1357,7 +1357,7 @@ func TestPromptNone_PKCESupported(t *testing.T) {
 		"client_id":     {client.ClientIdentifier},
 		"client_secret": {clientSecret},
 		"code":          {codeVal},
-		"redirect_uri":  {redirectUri.URI},
+		"redirect_uri":  {redirectURI.URI},
 		"code_verifier": {pkceVerifier},
 	}
 

@@ -53,7 +53,7 @@ type observedDeviceCookie struct {
 // session cookie.
 type deviceBrowser struct {
 	*http.Client
-	requestId string
+	requestID string
 	observed  []observedDeviceCookie
 	sessions  []observedDeviceCookie
 }
@@ -65,7 +65,7 @@ type deviceBrowserTransport struct {
 
 func (d *deviceBrowserTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	req.Header.Set("User-Agent", sameBrowserUserAgent)
-	req.Header.Set("X-Request-Id", d.browser.requestId)
+	req.Header.Set("X-Request-Id", d.browser.requestID)
 	resp, err := d.base.RoundTrip(req)
 	if err != nil {
 		return nil, err
@@ -83,7 +83,7 @@ func (d *deviceBrowserTransport) RoundTrip(req *http.Request) (*http.Response, e
 
 func newDeviceBrowser(t *testing.T) *deviceBrowser {
 	t.Helper()
-	browser := &deviceBrowser{Client: createHttpClient(t)}
+	browser := &deviceBrowser{Client: createHTTPClient(t)}
 	browser.Transport = &deviceBrowserTransport{base: browser.Transport, browser: browser}
 	return browser
 }
@@ -177,7 +177,7 @@ func (f *deviceFixture) signInForTokens(t *testing.T, browser *deviceBrowser) ma
 		GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
 	}))
 
-	browser.requestId = "device-" + fake.LetterN(16)
+	browser.requestID = "device-" + fake.LetterN(16)
 	browser.observed = nil
 	code := signInWithPassword(t, browser.Client,
 		f.authorizeURLFor(deviceAccountScope, oauth.GeneratePKCECodeChallenge(testCodeVerifier)),
@@ -197,11 +197,11 @@ func (f *deviceFixture) signInForTokens(t *testing.T, browser *deviceBrowser) ma
 // returns that id, so the audit rows this sign-in left can be read back by it.
 func (f *deviceFixture) signIn(t *testing.T, browser *deviceBrowser) string {
 	t.Helper()
-	browser.requestId = "device-" + fake.LetterN(16)
+	browser.requestID = "device-" + fake.LetterN(16)
 	browser.observed = nil
 	code := signInWithPassword(t, browser.Client, f.authorizeURL(), f.user.Email, f.password, false, "")
 	require.NotEmpty(t, code, "the sign-in reaches the client with a code")
-	return browser.requestId
+	return browser.requestID
 }
 
 // storedSessions is the user's sessions as the database holds them, device identifiers included,
@@ -292,7 +292,7 @@ func TestDeviceCookie_TwoBrowsersWithOneUserAgentKeepBothSessions(t *testing.T) 
 	first, second := newDeviceBrowser(t), newDeviceBrowser(t)
 
 	f.signIn(t, first)
-	requestId := f.signIn(t, second)
+	requestID := f.signIn(t, second)
 
 	sessions := f.storedSessions(t)
 	require.Len(t, sessions, 2, "both browsers stay signed in")
@@ -303,7 +303,7 @@ func TestDeviceCookie_TwoBrowsersWithOneUserAgentKeepBothSessions(t *testing.T) 
 	assert.NotEqual(t, theDeviceCookieSet(t, second).cookie.Value, deviceCookieIn(t, first.Client).Value,
 		"each browser holds an identifier of its own")
 
-	assert.Empty(t, auditRows(t, f.adminToken, "deleted_user_session", requestId), "the second sign-in removed nothing")
+	assert.Empty(t, auditRows(t, f.adminToken, "deleted_user_session", requestID), "the second sign-in removed nothing")
 	assert.Len(t, sessionsThroughAdminAPI(t, f.adminToken, f.user.ID), 2)
 }
 
@@ -326,7 +326,7 @@ func TestDeviceCookie_ABrowserThatLostItsSessionCookieReplacesItsOwnSession(t *t
 		Name: deviceCookieName(), Value: device, Path: "/", Secure: appConfig.AuthServer.IsCookieSecure(),
 	}})
 
-	requestId := f.signIn(t, after)
+	requestID := f.signIn(t, after)
 
 	set := theDeviceCookieSet(t, after)
 	assert.Equal(t, device, set.cookie.Value, "the browser keeps its identifier")
@@ -342,7 +342,7 @@ func TestDeviceCookie_ABrowserThatLostItsSessionCookieReplacesItsOwnSession(t *t
 		"user_id":         float64(f.user.ID),
 		"logged_in_user":  "",
 		"reason":          "same_device",
-	}}, auditRows(t, f.adminToken, "deleted_user_session", requestId))
+	}}, auditRows(t, f.adminToken, "deleted_user_session", requestID))
 }
 
 // Ending a session, by signing out or through either API, leaves the device cookie as it is: it

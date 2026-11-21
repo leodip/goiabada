@@ -14,13 +14,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func getUserAccessTokenWithAccountScope_Phone(t *testing.T) (string, *record.User) {
+func getUserAccessTokenWithAccountScopePhone(t *testing.T) (string, *record.User) {
 	scope := "openid profile email " + builtin.AuthServerResourceIdentifier + ":" + builtin.ManageAccountPermissionIdentifier
 	return createUserAccessTokenWithScope(t, scope)
 }
 
 func TestAPIAccountPhonePut_Success(t *testing.T) {
-	accessToken, u := getUserAccessTokenWithAccountScope_Phone(t)
+	accessToken, u := getUserAccessTokenWithAccountScopePhone(t)
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/phone"
 	reqBody := api.UpdateAccountPhoneRequest{
@@ -58,7 +58,7 @@ func TestAPIAccountPhonePut_Success(t *testing.T) {
 }
 
 func TestAPIAccountPhonePut_ClearPhone(t *testing.T) {
-	accessToken, u := getUserAccessTokenWithAccountScope_Phone(t)
+	accessToken, u := getUserAccessTokenWithAccountScopePhone(t)
 
 	// First set a phone
 	setURL := appConfig.AuthServer.BaseURL + "/api/v1/account/phone"
@@ -85,7 +85,7 @@ func TestAPIAccountPhonePut_ClearPhone(t *testing.T) {
 }
 
 func TestAPIAccountPhonePut_ValidationErrors(t *testing.T) {
-	accessToken, _ := getUserAccessTokenWithAccountScope_Phone(t)
+	accessToken, _ := getUserAccessTokenWithAccountScopePhone(t)
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/phone"
 
 	// Phone number without country
@@ -143,7 +143,7 @@ func TestAPIAccountPhonePut_UnauthorizedAndScope(t *testing.T) {
 	// No token
 	req, err := http.NewRequest("PUT", url, nil)
 	require.NoError(t, err)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -169,7 +169,7 @@ func TestAPIAccountPhonePut_UnauthorizedAndScope(t *testing.T) {
 }
 
 func TestAPIAccountPhonePut_InvalidRequestBody(t *testing.T) {
-	accessToken, _ := getUserAccessTokenWithAccountScope_Phone(t)
+	accessToken, _ := getUserAccessTokenWithAccountScopePhone(t)
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/phone"
 
 	// Invalid JSON (no body)
@@ -177,7 +177,7 @@ func TestAPIAccountPhonePut_InvalidRequestBody(t *testing.T) {
 	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()

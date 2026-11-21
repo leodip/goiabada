@@ -122,7 +122,7 @@ func TestJWTStructure_ATokenWithALineBreakIsRefusedAsMalformed(t *testing.T) {
 // so the structural check applies to that inner signed token and not to the encrypted envelope. A
 // hint whose inner token carries a line break is refused as the wrong-secret hint is: the End-User
 // is asked, and the redirect is refused. The same hint with the unaltered token still signs out
-// without asking (TestLogout_WithEncryptedIdTokenHint_LogsTheUserOut).
+// without asking (TestLogout_WithEncryptedIDTokenHint_LogsTheUserOut).
 func TestJWTStructure_AnEncryptedHintWithAMalformedInnerTokenIsRefused(t *testing.T) {
 	grant := createOfflineGrant(t)
 	idToken, _ := sessionBoundGrantOnSameSession(t, grant)

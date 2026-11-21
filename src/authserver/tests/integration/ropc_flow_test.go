@@ -48,11 +48,11 @@ func createROPCClientAllowing(t *testing.T, clientSecret string, isPublic bool, 
 	err := database.CreateClient(context.Background(), nil, client)
 	require.NoError(t, err)
 
-	redirectUri := &record.RedirectURI{
+	redirectURI := &record.RedirectURI{
 		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	assert.NoError(t, err)
 
 	return client
@@ -88,8 +88,8 @@ func TestROPC_Success(t *testing.T) {
 	client := createROPCClient(t, "", true) // public client
 	user := createROPCUser(t, password)
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
-	httpClient := createHttpClient(t)
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
+	httpClient := createHTTPClient(t)
 
 	formData := url.Values{
 		"grant_type": {"password"},
@@ -99,7 +99,7 @@ func TestROPC_Success(t *testing.T) {
 		"scope":      {"openid"},
 	}
 
-	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destURL, formData)
 
 	// Verify successful response
 	assert.NotEmpty(t, data["access_token"])
@@ -129,8 +129,8 @@ func TestROPC_ConfidentialClient(t *testing.T) {
 	client := createROPCClient(t, clientSecret, false) // confidential client
 	user := createROPCUser(t, password)
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
-	httpClient := createHttpClient(t)
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
+	httpClient := createHTTPClient(t)
 
 	formData := url.Values{
 		"grant_type":    {"password"},
@@ -141,7 +141,7 @@ func TestROPC_ConfidentialClient(t *testing.T) {
 		"scope":         {"openid"},
 	}
 
-	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destURL, formData)
 
 	// Verify successful response
 	assert.NotEmpty(t, data["access_token"])
@@ -169,8 +169,8 @@ func TestROPC_GlobalDisabled(t *testing.T) {
 	require.NoError(t, err)
 	user := createROPCUser(t, password)
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
-	httpClient := createHttpClient(t)
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
+	httpClient := createHTTPClient(t)
 
 	formData := url.Values{
 		"grant_type": {"password"},
@@ -180,7 +180,7 @@ func TestROPC_GlobalDisabled(t *testing.T) {
 		"scope":      {"openid"},
 	}
 
-	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destURL, formData)
 
 	assert.Equal(t, "unauthorized_client", data["error"])
 	// Error message describes that ROPC is not authorized for this client
@@ -208,8 +208,8 @@ func TestROPC_ClientOverrideDisabled(t *testing.T) {
 	password := fake.Password(12)
 	user := createROPCUser(t, password)
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
-	httpClient := createHttpClient(t)
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
+	httpClient := createHTTPClient(t)
 
 	formData := url.Values{
 		"grant_type": {"password"},
@@ -219,7 +219,7 @@ func TestROPC_ClientOverrideDisabled(t *testing.T) {
 		"scope":      {"openid"},
 	}
 
-	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destURL, formData)
 
 	assert.Equal(t, "unauthorized_client", data["error"])
 	// Error message describes that ROPC is not authorized for this client
@@ -233,8 +233,8 @@ func TestROPC_MissingUsername(t *testing.T) {
 
 	client := createROPCClient(t, "", true)
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
-	httpClient := createHttpClient(t)
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
+	httpClient := createHTTPClient(t)
 
 	formData := url.Values{
 		"grant_type": {"password"},
@@ -243,7 +243,7 @@ func TestROPC_MissingUsername(t *testing.T) {
 		"scope":      {"openid"},
 	}
 
-	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destURL, formData)
 
 	assert.Equal(t, "invalid_request", data["error"])
 	assert.Contains(t, data["error_description"], "username")
@@ -257,8 +257,8 @@ func TestROPC_MissingPassword(t *testing.T) {
 	client := createROPCClient(t, "", true)
 	user := createROPCUser(t, "somepassword")
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
-	httpClient := createHttpClient(t)
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
+	httpClient := createHTTPClient(t)
 
 	formData := url.Values{
 		"grant_type": {"password"},
@@ -267,7 +267,7 @@ func TestROPC_MissingPassword(t *testing.T) {
 		"scope":      {"openid"},
 	}
 
-	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destURL, formData)
 
 	assert.Equal(t, "invalid_request", data["error"])
 	assert.Contains(t, data["error_description"], "password")
@@ -282,8 +282,8 @@ func TestROPC_InvalidCredentials(t *testing.T) {
 	client := createROPCClient(t, "", true)
 	user := createROPCUser(t, password)
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
-	httpClient := createHttpClient(t)
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
+	httpClient := createHTTPClient(t)
 
 	formData := url.Values{
 		"grant_type": {"password"},
@@ -293,7 +293,7 @@ func TestROPC_InvalidCredentials(t *testing.T) {
 		"scope":      {"openid"},
 	}
 
-	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destURL, formData)
 
 	assert.Equal(t, "invalid_grant", data["error"])
 	assert.Contains(t, data["error_description"], "credentials")
@@ -307,8 +307,8 @@ func TestROPC_UserNotFound(t *testing.T) {
 
 	client := createROPCClient(t, "", true)
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
-	httpClient := createHttpClient(t)
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
+	httpClient := createHTTPClient(t)
 
 	formData := url.Values{
 		"grant_type": {"password"},
@@ -318,7 +318,7 @@ func TestROPC_UserNotFound(t *testing.T) {
 		"scope":      {"openid"},
 	}
 
-	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destURL, formData)
 
 	assert.Equal(t, "invalid_grant", data["error"])
 	// For security, same error message as invalid password (doesn't reveal user existence)
@@ -345,8 +345,8 @@ func TestROPC_DisabledUser(t *testing.T) {
 	err = database.CreateUser(context.Background(), nil, user)
 	require.NoError(t, err)
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
-	httpClient := createHttpClient(t)
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
+	httpClient := createHTTPClient(t)
 
 	formData := url.Values{
 		"grant_type": {"password"},
@@ -356,7 +356,7 @@ func TestROPC_DisabledUser(t *testing.T) {
 		"scope":      {"openid"},
 	}
 
-	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destURL, formData)
 
 	assert.Equal(t, "invalid_grant", data["error"])
 	assert.Contains(t, data["error_description"], "disabled")
@@ -371,8 +371,8 @@ func TestROPC_WithOfflineAccess(t *testing.T) {
 	client := createROPCClient(t, "", true)
 	user := createROPCUser(t, password)
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
-	httpClient := createHttpClient(t)
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
+	httpClient := createHTTPClient(t)
 
 	formData := url.Values{
 		"grant_type": {"password"},
@@ -382,7 +382,7 @@ func TestROPC_WithOfflineAccess(t *testing.T) {
 		"scope":      {"openid offline_access"},
 	}
 
-	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destURL, formData)
 
 	// Verify successful response with offline_access
 	assert.NotEmpty(t, data["access_token"])
@@ -407,8 +407,8 @@ func TestROPC_ConfidentialClient_MissingSecret(t *testing.T) {
 	client := createROPCClient(t, clientSecret, false) // confidential client
 	user := createROPCUser(t, password)
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
-	httpClient := createHttpClient(t)
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
+	httpClient := createHTTPClient(t)
 
 	// Don't include client_secret
 	formData := url.Values{
@@ -419,7 +419,7 @@ func TestROPC_ConfidentialClient_MissingSecret(t *testing.T) {
 		"scope":      {"openid"},
 	}
 
-	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destURL, formData)
 
 	// RFC 6749 Section 5.2: invalid_client for missing client credentials
 	assert.Equal(t, "invalid_client", data["error"])
@@ -437,8 +437,8 @@ func TestROPC_ConfidentialClient_InvalidSecret(t *testing.T) {
 	client := createROPCClient(t, clientSecret, false)
 	user := createROPCUser(t, password)
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
-	httpClient := createHttpClient(t)
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
+	httpClient := createHTTPClient(t)
 
 	// Use wrong client_secret
 	formData := url.Values{
@@ -450,7 +450,7 @@ func TestROPC_ConfidentialClient_InvalidSecret(t *testing.T) {
 		"scope":         {"openid"},
 	}
 
-	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destURL, formData)
 
 	assert.Equal(t, "invalid_client", data["error"])
 	// The one wrong-secret text every grant answers; the password grant answered a shorter one
@@ -481,8 +481,8 @@ func TestROPC_UserWith2FAEnabled(t *testing.T) {
 	err = database.CreateUser(context.Background(), nil, user)
 	require.NoError(t, err)
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
-	httpClient := createHttpClient(t)
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
+	httpClient := createHTTPClient(t)
 
 	formData := url.Values{
 		"grant_type": {"password"},
@@ -492,7 +492,7 @@ func TestROPC_UserWith2FAEnabled(t *testing.T) {
 		"scope":      {"openid"},
 	}
 
-	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destURL, formData)
 
 	// Should fail with invalid_grant error explaining 2FA users cannot use ROPC
 	assert.Equal(t, "invalid_grant", data["error"])
@@ -500,11 +500,11 @@ func TestROPC_UserWith2FAEnabled(t *testing.T) {
 	assert.Contains(t, data["error_description"], "authorization code flow")
 }
 
-// TestROPC_ClientAcrLevel2MandatoryRefused pins the refusal of a client whose default ACR level is
+// TestROPC_ClientACRLevel2MandatoryRefused pins the refusal of a client whose default ACR level is
 // level 2 (mandatory), read back from the database, while its authorization code flow is on: the
 // right password gets unauthorized_client and no token. With the code flow off, the level is not
 // applicable and the same client gets its grant (#533).
-func TestROPC_ClientAcrLevel2MandatoryRefused(t *testing.T) {
+func TestROPC_ClientACRLevel2MandatoryRefused(t *testing.T) {
 	changeSettings(t, func(settings *record.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = true })
 
 	password := fake.Password(12)
@@ -515,8 +515,8 @@ func TestROPC_ClientAcrLevel2MandatoryRefused(t *testing.T) {
 	client.DefaultACRLevel = record.ACRLevel2Mandatory
 	require.NoError(t, database.UpdateClient(context.Background(), nil, client))
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
-	httpClient := createHttpClient(t)
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
+	httpClient := createHTTPClient(t)
 
 	formData := url.Values{
 		"grant_type": {"password"},
@@ -526,7 +526,7 @@ func TestROPC_ClientAcrLevel2MandatoryRefused(t *testing.T) {
 		"scope":      {"openid"},
 	}
 
-	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destURL, formData)
 
 	assert.Equal(t, "unauthorized_client", data["error"])
 	assert.Equal(t, "Resource owner password credentials grant is not available for a client whose "+
@@ -537,7 +537,7 @@ func TestROPC_ClientAcrLevel2MandatoryRefused(t *testing.T) {
 	client.AuthorizationCodeEnabled = false
 	require.NoError(t, database.UpdateClient(context.Background(), nil, client))
 
-	data = postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data = postToTokenEndpoint(t, httpClient, destURL, formData)
 
 	assert.NotEmpty(t, data["access_token"], "with the code flow off the level is not applicable: %v", data)
 }
@@ -548,8 +548,8 @@ func TestROPC_WithResourcePermissions(t *testing.T) {
 	changeSettings(t, func(settings *record.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = true })
 
 	// Create resource and permission
-	resource := createResourceWithId(t, "testapi-"+fake.LetterN(8))
-	permission := createPermissionWithId(t, resource.ID, "read")
+	resource := createResourceWithID(t, "testapi-"+fake.LetterN(8))
+	permission := createPermissionWithID(t, resource.ID, "read")
 
 	password := fake.Password(12)
 	client := createROPCClient(t, "", true)
@@ -558,8 +558,8 @@ func TestROPC_WithResourcePermissions(t *testing.T) {
 	// Assign permission to user
 	assignPermissionToUser(t, user.ID, permission.ID)
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
-	httpClient := createHttpClient(t)
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
+	httpClient := createHTTPClient(t)
 
 	formData := url.Values{
 		"grant_type": {"password"},
@@ -569,7 +569,7 @@ func TestROPC_WithResourcePermissions(t *testing.T) {
 		"scope":      {"openid " + resource.ResourceIdentifier + ":" + permission.PermissionIdentifier},
 	}
 
-	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destURL, formData)
 
 	// Verify successful response with resource permission
 	assert.NotEmpty(t, data["access_token"])
@@ -592,7 +592,7 @@ func TestROPC_ExplicitUserinfoScopeIsRefused(t *testing.T) {
 	client := createROPCClient(t, "", true)
 	user := createROPCUser(t, password)
 
-	data := postToTokenEndpoint(t, createHttpClient(t), appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
+	data := postToTokenEndpoint(t, createHTTPClient(t), appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
 		"grant_type": {"password"},
 		"client_id":  {client.ClientIdentifier},
 		"username":   {user.Email},
@@ -605,7 +605,7 @@ func TestROPC_ExplicitUserinfoScopeIsRefused(t *testing.T) {
 	assert.Nil(t, data["access_token"], "a refused request issues no token")
 }
 
-// TestROPC_RefreshToken_OpenIdOnly pins that an ROPC grant of `openid` and nothing else refreshes,
+// TestROPC_RefreshToken_OpenIDOnly pins that an ROPC grant of `openid` and nothing else refreshes,
 // and that the reissued token still reaches /userinfo. It was broken outright once: the refresh
 // token recorded a scope issuance had appended, and the refresh re-checked it against the user's
 // permissions. Nothing is appended since #449, so the reported scope is the grant, and /userinfo
@@ -614,7 +614,7 @@ func TestROPC_ExplicitUserinfoScopeIsRefused(t *testing.T) {
 // `openid` alone is deliberate: it is the normal ROPC request, needs no permission grants, and is
 // exactly the case that failed. A test that also requested a resource scope could pass for the
 // wrong reason if the user happened to hold it.
-func TestROPC_RefreshToken_OpenIdOnly(t *testing.T) {
+func TestROPC_RefreshToken_OpenIDOnly(t *testing.T) {
 	changeSettings(t, func(settings *record.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = true })
 
 	clientSecret := fake.Password(32)
@@ -622,10 +622,10 @@ func TestROPC_RefreshToken_OpenIdOnly(t *testing.T) {
 	client := createROPCClient(t, clientSecret, false)
 	user := createROPCUser(t, password)
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
-	httpClient := createHttpClient(t)
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
+	httpClient := createHTTPClient(t)
 
-	data := postToTokenEndpoint(t, httpClient, destUrl, url.Values{
+	data := postToTokenEndpoint(t, httpClient, destURL, url.Values{
 		"grant_type":    {"password"},
 		"client_id":     {client.ClientIdentifier},
 		"client_secret": {clientSecret},
@@ -640,7 +640,7 @@ func TestROPC_RefreshToken_OpenIdOnly(t *testing.T) {
 
 	// The user holds no permissions at all, which was once enough to make this fail with
 	// invalid_grant.
-	refreshed := postToTokenEndpoint(t, httpClient, destUrl, url.Values{
+	refreshed := postToTokenEndpoint(t, httpClient, destURL, url.Values{
 		"grant_type":    {"refresh_token"},
 		"client_id":     {client.ClientIdentifier},
 		"client_secret": {clientSecret},
@@ -704,10 +704,10 @@ func TestROPC_RefreshToken_StopsWhenROPCDisabled(t *testing.T) {
 			client := createROPCClient(t, clientSecret, false)
 			user := createROPCUser(t, password)
 
-			destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
-			httpClient := createHttpClient(t)
+			destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
+			httpClient := createHTTPClient(t)
 
-			data := postToTokenEndpoint(t, httpClient, destUrl, url.Values{
+			data := postToTokenEndpoint(t, httpClient, destURL, url.Values{
 				"grant_type":    {"password"},
 				"client_id":     {client.ClientIdentifier},
 				"client_secret": {clientSecret},
@@ -727,7 +727,7 @@ func TestROPC_RefreshToken_StopsWhenROPCDisabled(t *testing.T) {
 
 			// Establish that it works while ROPC is on, so the refusal below is attributable to
 			// the switch and to nothing else.
-			refreshed := postToTokenEndpoint(t, httpClient, destUrl, url.Values{
+			refreshed := postToTokenEndpoint(t, httpClient, destURL, url.Values{
 				"grant_type":    {"refresh_token"},
 				"client_id":     {client.ClientIdentifier},
 				"client_secret": {clientSecret},
@@ -739,7 +739,7 @@ func TestROPC_RefreshToken_StopsWhenROPCDisabled(t *testing.T) {
 
 			tc.disable(t, client)
 
-			stopped := postToTokenEndpoint(t, httpClient, destUrl, url.Values{
+			stopped := postToTokenEndpoint(t, httpClient, destURL, url.Values{
 				"grant_type":    {"refresh_token"},
 				"client_id":     {client.ClientIdentifier},
 				"client_secret": {clientSecret},

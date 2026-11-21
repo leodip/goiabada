@@ -114,10 +114,10 @@ func newUserWideApps(t *testing.T, user *record.User) *userWideApps {
 
 // assertToldEverywhere holds what the apps received to decision 3's user-wide shape: one sub-only
 // token to each app that knew the user, a sub+sid token for the valid session to the app requiring
-// sid, and nothing to the apps whose only grant was revoked or expired. requestId is the request
+// sid, and nothing to the apps whose only grant was revoked or expired. requestID is the request
 // that ended the sessions, whose sent_logout_token rows are checked when the audit log is the
 // database.
-func (a *userWideApps) assertToldEverywhere(t *testing.T, requestId string) {
+func (a *userWideApps) assertToldEverywhere(t *testing.T, requestID string) {
 	t.Helper()
 	for _, rc := range []*logoutReceiver{a.onBoth, a.onExpired, a.grantOnly} {
 		posts := rc.waitFor(t, 1, 10*time.Second)
@@ -136,11 +136,11 @@ func (a *userWideApps) assertToldEverywhere(t *testing.T, requestId string) {
 	assert.Empty(t, a.revokedGrant.received(), "a revoked grant is no app that knew the user")
 	assert.Empty(t, a.expiredGrant.received(), "an expired grant is no app that knew the user")
 
-	if requestId == "" {
+	if requestID == "" {
 		return
 	}
 	// One sent_logout_token row per delivery.
-	rows := sentLogoutTokenRows(t, requestId, 4, 10*time.Second)
+	rows := sentLogoutTokenRows(t, requestID, 4, 10*time.Second)
 	sids := map[string]int{}
 	for _, row := range rows {
 		assert.Equal(t, a.user.ID, row.UserID.Int64)
@@ -156,12 +156,12 @@ func (a *userWideApps) assertToldEverywhere(t *testing.T, requestId string) {
 func TestBackchannelLogout_DisablingAUserTellsEveryAppThatKnewThem(t *testing.T) {
 	a := newUserWideApps(t, nil)
 
-	resp, requestId := sendAdminRequest(t, a.adminToken, http.MethodPut,
+	resp, requestID := sendAdminRequest(t, a.adminToken, http.MethodPut,
 		"/api/v1/admin/users/"+strconv.FormatInt(a.user.ID, 10)+"/enabled", api.UpdateUserEnabledRequest{Enabled: false})
 	_ = resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
-	a.assertToldEverywhere(t, requestId)
+	a.assertToldEverywhere(t, requestID)
 }
 
 // TestBackchannelLogout_DisablingADisabledUserTellsNobody: a second disable ends nothing, so it
@@ -221,13 +221,13 @@ func TestBackchannelLogout_DeletingTheirOwnAccountTellsEveryAppThatKnewThem(t *t
 func TestBackchannelLogout_AnAdministratorSettingThePasswordTellsEveryAppThatKnewTheUser(t *testing.T) {
 	a := newUserWideApps(t, nil)
 
-	resp, requestId := sendAdminRequest(t, a.adminToken, http.MethodPut,
+	resp, requestID := sendAdminRequest(t, a.adminToken, http.MethodPut,
 		"/api/v1/admin/users/"+strconv.FormatInt(a.user.ID, 10)+"/password",
 		api.UpdateUserPasswordRequest{NewPassword: fake.Password(20)})
 	_ = resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
-	a.assertToldEverywhere(t, requestId)
+	a.assertToldEverywhere(t, requestID)
 }
 
 // TestBackchannelLogout_APasswordResetTellsEveryAppThatKnewTheUser: the user resets a forgotten

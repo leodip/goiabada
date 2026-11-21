@@ -32,11 +32,11 @@ import (
 
 // flipToPublic runs the admin API's confidential-to-public transition and returns the decoded
 // response body. The status is asserted here so every caller below reads as one line.
-func flipToPublic(t *testing.T, adminToken string, clientId int64) api.UpdateClientResponse {
+func flipToPublic(t *testing.T, adminToken string, clientID int64) api.UpdateClientResponse {
 	t.Helper()
 
 	apiURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" +
-		strconv.FormatInt(clientId, 10) + "/authentication"
+		strconv.FormatInt(clientID, 10) + "/authentication"
 	resp := makeAPIRequest(t, "PUT", apiURL, adminToken, api.UpdateClientAuthenticationRequest{IsPublic: true})
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -48,12 +48,12 @@ func flipToPublic(t *testing.T, adminToken string, clientId int64) api.UpdateCli
 
 // flipToConfidential is the reverse transition, which must NOT revoke. It returns the secret it
 // set, because a confidential client has to present one afterwards.
-func flipToConfidential(t *testing.T, adminToken string, clientId int64) string {
+func flipToConfidential(t *testing.T, adminToken string, clientID int64) string {
 	t.Helper()
 
 	secret := securerandom.String(60)
 	apiURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" +
-		strconv.FormatInt(clientId, 10) + "/authentication"
+		strconv.FormatInt(clientID, 10) + "/authentication"
 	resp := makeAPIRequest(t, "PUT", apiURL, adminToken,
 		api.UpdateClientAuthenticationRequest{IsPublic: false, ClientSecret: secret})
 	defer func() { _ = resp.Body.Close() }()
@@ -94,7 +94,7 @@ func presentRefreshToken(t *testing.T, clientIdentifier, refreshToken, clientSec
 	if clientSecret != "" {
 		form.Set("client_secret", clientSecret)
 	}
-	return postToTokenEndpoint(t, createHttpClient(t), appConfig.AuthServer.BaseURL+"/auth/token/", form)
+	return postToTokenEndpoint(t, createHTTPClient(t), appConfig.AuthServer.BaseURL+"/auth/token/", form)
 }
 
 // requireDatabaseAuditLogs makes the audit_logs table the observable it is supposed to be. The
@@ -237,7 +237,7 @@ func TestAPIClientAuthenticationPut_FlipToPublic_RevokesROPCGrantsToo(t *testing
 	user := createROPCUser(t, password)
 
 	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
-	data := postToTokenEndpoint(t, createHttpClient(t), destURL, url.Values{
+	data := postToTokenEndpoint(t, createHTTPClient(t), destURL, url.Values{
 		"grant_type":    {"password"},
 		"client_id":     {client.ClientIdentifier},
 		"client_secret": {clientSecret},
@@ -365,7 +365,7 @@ func TestAPIClientAuthenticationPut_FlipToPublic_ChildBornAfterTheFlipIsRejected
 	adminToken, _ := createAdminClientWithToken(t)
 	grant := createOfflineGrant(t)
 
-	parentRow, err := database.GetRefreshTokenByJTI(context.Background(), nil, refreshTokenJti(t, grant.refreshToken))
+	parentRow, err := database.GetRefreshTokenByJTI(context.Background(), nil, refreshTokenJTI(t, grant.refreshToken))
 	require.NoError(t, err)
 	require.NotNil(t, parentRow, "the redeemed grant must have a refresh token row")
 
@@ -376,8 +376,8 @@ func TestAPIClientAuthenticationPut_FlipToPublic_ChildBornAfterTheFlipIsRejected
 	childToken, ok := rotated["refresh_token"].(string)
 	require.True(t, ok, "rotation must return a replacement refresh token: %v", rotated)
 
-	childJti := refreshTokenJti(t, childToken)
-	childRow, err := database.GetRefreshTokenByJTI(context.Background(), nil, childJti)
+	childJTI := refreshTokenJTI(t, childToken)
+	childRow, err := database.GetRefreshTokenByJTI(context.Background(), nil, childJTI)
 	require.NoError(t, err)
 	require.NotNil(t, childRow, "the rotated child must have been persisted")
 
@@ -414,7 +414,7 @@ func TestAPIClientAuthenticationPut_FlipToPublic_ChildBornAfterTheFlipIsRejected
 	// marked. Nothing here fabricates a grant: the JWT was minted by the server, the row was
 	// written by rotation, the code was marked by the real PUT above, and the client really is
 	// public now.
-	swept, err := database.GetRefreshTokenByJTI(context.Background(), nil, childJti)
+	swept, err := database.GetRefreshTokenByJTI(context.Background(), nil, childJTI)
 	require.NoError(t, err)
 	require.NotNil(t, swept)
 	require.True(t, swept.Revoked,
@@ -422,7 +422,7 @@ func TestAPIClientAuthenticationPut_FlipToPublic_ChildBornAfterTheFlipIsRejected
 
 	swept.Revoked = false
 	require.NoError(t, database.UpdateRefreshToken(context.Background(), nil, swept))
-	relived, err := database.GetRefreshTokenByJTI(context.Background(), nil, childJti)
+	relived, err := database.GetRefreshTokenByJTI(context.Background(), nil, childJTI)
 	require.NoError(t, err)
 	require.False(t, relived.Revoked, "the child must be live again, or this case proves nothing")
 

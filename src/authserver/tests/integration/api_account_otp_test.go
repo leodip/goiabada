@@ -34,13 +34,13 @@ import (
 //
 // The subject of these tests is the OTP endpoint, so the password is fixture setup and must not
 // have side effects of its own.
-func setUserPasswordForOTP(t *testing.T, userId int64, newPassword string) {
+func setUserPasswordForOTP(t *testing.T, userID int64, newPassword string) {
 	t.Helper()
 
-	user, err := database.GetUserByID(context.Background(), nil, userId)
+	user, err := database.GetUserByID(context.Background(), nil, userID)
 	require.NoError(t, err)
 	if user == nil {
-		t.Fatalf("user %d not found", userId)
+		t.Fatalf("user %d not found", userID)
 	}
 
 	hash, err := passwordhash.Hash(newPassword)
@@ -50,13 +50,13 @@ func setUserPasswordForOTP(t *testing.T, userId int64, newPassword string) {
 	require.NoError(t, err)
 
 	// Verify password persisted and matches
-	u2, err := database.GetUserByID(context.Background(), nil, userId)
+	u2, err := database.GetUserByID(context.Background(), nil, userID)
 	require.NoError(t, err)
 	assert.True(t, passwordhash.Verify(u2.PasswordHash, newPassword), "password hash should match new password")
 }
 
 // helper: get current account user id via profile for a given access token
-func getAccountUserId(t *testing.T, accessToken string) int64 {
+func getAccountUserID(t *testing.T, accessToken string) int64 {
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/profile"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
@@ -85,12 +85,12 @@ func putAccountOTP(t *testing.T, accessToken string, reqBody api.UpdateAccountOT
 	return resp.StatusCode, string(body)
 }
 
-// skipIfOtpCodeOutsideWindow skips when code no longer matches secret at this instant. The reset
+// skipIfOTPCodeOutsideWindow skips when code no longer matches secret at this instant. The reset
 // cases below submit one code across several endpoint calls, and a period boundary crossed
 // mid-test takes that code out of the acceptance window: the enable then fails because the matcher
 // refused the code, not because the marker was never reset. Without this guard such a run reads as
 // a reset regression, which is a case failing for the wrong reason (#111).
-func skipIfOtpCodeOutsideWindow(t *testing.T, secret string, code string) {
+func skipIfOTPCodeOutsideWindow(t *testing.T, secret string, code string) {
 	t.Helper()
 
 	if _, match := otp.MatchStep(code, secret, time.Now().UTC()); match != otp.Matched {
@@ -99,7 +99,7 @@ func skipIfOtpCodeOutsideWindow(t *testing.T, secret string, code string) {
 	}
 }
 
-// wrongOtpCodeFor is six digits that pass the handler's shape checks and that the matcher refuses for
+// wrongOTPCodeFor is six digits that pass the handler's shape checks and that the matcher refuses for
 // this secret at this instant, so a case asserting "That code isn't right" fails only when the handler
 // stops refusing a code it should refuse.
 //
@@ -111,7 +111,7 @@ func skipIfOtpCodeOutsideWindow(t *testing.T, secret string, code string) {
 // step that produces it. Walking the candidates and asking the
 // matcher is what makes the choice hold at any date. Same approach as wrongButWellFormedCode in
 // handler_api_account_otp_test.go.
-func wrongOtpCodeFor(t *testing.T, secret string) string {
+func wrongOTPCodeFor(t *testing.T, secret string) string {
 	t.Helper()
 
 	for _, candidate := range []string{"000000", "111111", "222222"} {
@@ -152,15 +152,15 @@ func getOTPEnrollment(t *testing.T, accessToken string) api.AccountOTPEnrollment
 
 // resetOTPStateForTest returns the account user to "not enrolled, nothing pending". The cases share
 // one user, so a pending enrollment left behind by an earlier case would decide a later one.
-func resetOTPStateForTest(t *testing.T, userId int64) {
+func resetOTPStateForTest(t *testing.T, userID int64) {
 	t.Helper()
 
-	user, err := database.GetUserByID(context.Background(), nil, userId)
+	user, err := database.GetUserByID(context.Background(), nil, userID)
 	assert.NoError(t, err)
 	user.OTPEnabled = false
 	user.OTPSecretEncrypted = nil
 	assert.NoError(t, database.UpdateUser(context.Background(), nil, user))
-	assert.NoError(t, database.ClearPendingOTPEnrollment(context.Background(), nil, userId))
+	assert.NoError(t, database.ClearPendingOTPEnrollment(context.Background(), nil, userID))
 }
 
 // installPendingEnrollmentForTest stages an enrollment as though the server had issued it at
@@ -169,15 +169,15 @@ func resetOTPStateForTest(t *testing.T, userId int64) {
 //
 // It is the only place in this file that writes the pending columns. Every assertion below still
 // observes the endpoints, never the row.
-func installPendingEnrollmentForTest(t *testing.T, userId int64, keyURL string, issuedAt time.Time) {
+func installPendingEnrollmentForTest(t *testing.T, userID int64, keyURL string, issuedAt time.Time) {
 	t.Helper()
 
-	require.NoError(t, database.ClearPendingOTPEnrollment(context.Background(), nil, userId))
+	require.NoError(t, database.ClearPendingOTPEnrollment(context.Background(), nil, userID))
 
 	ciphertext, err := dataCipher.Encrypt(keyURL)
 	require.NoError(t, err)
 
-	installed, err := database.TryInstallPendingOTPEnrollment(context.Background(), nil, userId, ciphertext, issuedAt,
+	installed, err := database.TryInstallPendingOTPEnrollment(context.Background(), nil, userID, ciphertext, issuedAt,
 		time.Now().UTC().Add(time.Hour))
 	require.NoError(t, err)
 	assert.True(t, installed, "the fixture must have installed the pending enrollment")
@@ -208,9 +208,9 @@ func newOTPSecretForTest(t *testing.T, account string) string {
 
 func TestAPIAccountOTPEnrollmentGet_Success(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope(t)
-	userId := getAccountUserId(t, accessToken)
+	userID := getAccountUserID(t, accessToken)
 	// Ensure OTP disabled on the account user
-	u, _ := database.GetUserByID(context.Background(), nil, userId)
+	u, _ := database.GetUserByID(context.Background(), nil, userID)
 	u.OTPEnabled = false
 	_ = database.UpdateUser(context.Background(), nil, u)
 
@@ -233,9 +233,9 @@ func TestAPIAccountOTPEnrollmentGet_Success(t *testing.T) {
 
 func TestAPIAccountOTPEnrollmentGet_AlreadyEnabled(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope(t)
-	userId := getAccountUserId(t, accessToken)
+	userID := getAccountUserID(t, accessToken)
 	// Enable OTP on the account user directly
-	u, _ := database.GetUserByID(context.Background(), nil, userId)
+	u, _ := database.GetUserByID(context.Background(), nil, userID)
 	u.OTPEnabled = true
 	u.OTPSecretEncrypted = encryptOTPSecretForTest(t, "JBSWY3DPEHPK3PXP")
 	_ = database.UpdateUser(context.Background(), nil, u)
@@ -255,7 +255,7 @@ func TestAPIAccountOTPEnrollmentGet_UnauthorizedAndScope(t *testing.T) {
 
 	// No token
 	req, _ := http.NewRequest("GET", url, nil)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -282,15 +282,15 @@ func TestAPIAccountOTPEnrollmentGet_UnauthorizedAndScope(t *testing.T) {
 
 func TestAPIAccountOTPPut_Enable_Success(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope(t)
-	userId := getAccountUserId(t, accessToken)
+	userID := getAccountUserID(t, accessToken)
 	// Set known password and ensure OTP disabled
-	setUserPasswordForOTP(t, userId, "Correct1!")
-	u, _ := database.GetUserByID(context.Background(), nil, userId)
+	setUserPasswordForOTP(t, userID, "Correct1!")
+	u, _ := database.GetUserByID(context.Background(), nil, userID)
 	u.OTPEnabled = false
 	_ = database.UpdateUser(context.Background(), nil, u)
 
 	// The seed comes from the issuing endpoint, which is the only one the PUT will accept.
-	require.NoError(t, database.ClearPendingOTPEnrollment(context.Background(), nil, userId))
+	require.NoError(t, database.ClearPendingOTPEnrollment(context.Background(), nil, userID))
 	secret := getOTPEnrollment(t, accessToken).SecretKey
 	code := otptest.Code(t, secret, time.Now())
 
@@ -313,7 +313,7 @@ func TestAPIAccountOTPPut_Enable_Success(t *testing.T) {
 	assert.True(t, enabled.User.OTPEnabled)
 
 	// Verify DB updated
-	updated, err := database.GetUserByID(context.Background(), nil, userId)
+	updated, err := database.GetUserByID(context.Background(), nil, userID)
 	require.NoError(t, err)
 	assert.True(t, updated.OTPEnabled)
 	decrypted, err := dataCipher.Decrypt(updated.OTPSecretEncrypted)
@@ -326,24 +326,24 @@ func TestAPIAccountOTPPut_Enable_Success(t *testing.T) {
 	for _, code := range enabled.RecoveryCodes {
 		assert.Regexp(t, `^[0-9a-hjkmnp-tv-z]{4}(-[0-9a-hjkmnp-tv-z]{4}){5}$`, code)
 	}
-	assert.Equal(t, 10, unusedRecoveryCodesForTest(t, userId))
-	used, err := database.TryUseUserRecoveryCode(context.Background(), nil, userId,
+	assert.Equal(t, 10, unusedRecoveryCodesForTest(t, userID))
+	used, err := database.TryUseUserRecoveryCode(context.Background(), nil, userID,
 		hashutil.HashString(strings.ReplaceAll(enabled.RecoveryCodes[4], "-", "")))
 	require.NoError(t, err)
 	assert.True(t, used, "a code answered is a code stored, by its SHA-256")
-	assert.Equal(t, 9, unusedRecoveryCodesForTest(t, userId))
+	assert.Equal(t, 9, unusedRecoveryCodesForTest(t, userID))
 }
 
 // unusedRecoveryCodesForTest is how many codes of the user's set are unused.
-func unusedRecoveryCodesForTest(t *testing.T, userId int64) int {
+func unusedRecoveryCodesForTest(t *testing.T, userID int64) int {
 	t.Helper()
-	n, err := database.CountUnusedUserRecoveryCodes(context.Background(), nil, userId)
+	n, err := database.CountUnusedUserRecoveryCodes(context.Background(), nil, userID)
 	require.NoError(t, err)
 	return n
 }
 
 // seedRecoveryCodesForTest gives the user a set of ten codes, as an enable would have.
-func seedRecoveryCodesForTest(t *testing.T, userId int64) {
+func seedRecoveryCodesForTest(t *testing.T, userID int64) {
 	t.Helper()
 	hashes := make([]string, 10)
 	for i := range hashes {
@@ -351,15 +351,15 @@ func seedRecoveryCodesForTest(t *testing.T, userId int64) {
 	}
 	ctx := context.Background()
 	require.NoError(t, database.RunInTransaction(ctx, func(tx *sql.Tx) error {
-		return database.ReplaceUserRecoveryCodes(ctx, tx, userId, hashes)
+		return database.ReplaceUserRecoveryCodes(ctx, tx, userID, hashes)
 	}))
-	require.Equal(t, 10, unusedRecoveryCodesForTest(t, userId))
+	require.Equal(t, 10, unusedRecoveryCodesForTest(t, userID))
 }
 
 func TestAPIAccountOTPPut_Enable_AuthFailed(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope(t)
-	userId := getAccountUserId(t, accessToken)
-	setUserPasswordForOTP(t, userId, "Correct1!")
+	userID := getAccountUserID(t, accessToken)
+	setUserPasswordForOTP(t, userID, "Correct1!")
 
 	reqBody := api.UpdateAccountOTPRequest{
 		Enabled:  true,
@@ -377,8 +377,8 @@ func TestAPIAccountOTPPut_Enable_AuthFailed(t *testing.T) {
 
 func TestAPIAccountOTPPut_Enable_InvalidFormats(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope(t)
-	userId := getAccountUserId(t, accessToken)
-	setUserPasswordForOTP(t, userId, "Correct1!")
+	userID := getAccountUserID(t, accessToken)
+	setUserPasswordForOTP(t, userID, "Correct1!")
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/otp"
 
@@ -398,13 +398,13 @@ func TestAPIAccountOTPPut_Enable_InvalidFormats(t *testing.T) {
 
 func TestAPIAccountOTPPut_Enable_WrongCode(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope(t)
-	userId := getAccountUserId(t, accessToken)
-	setUserPasswordForOTP(t, userId, "Correct1!")
+	userID := getAccountUserID(t, accessToken)
+	setUserPasswordForOTP(t, userID, "Correct1!")
 
 	// A well-formed code that the matcher refuses for the seed the server just issued.
-	resetOTPStateForTest(t, userId)
+	resetOTPStateForTest(t, userID)
 	secret := getOTPEnrollment(t, accessToken).SecretKey
-	reqBody := api.UpdateAccountOTPRequest{Enabled: true, Password: "Correct1!", OTPCode: wrongOtpCodeFor(t, secret)}
+	reqBody := api.UpdateAccountOTPRequest{Enabled: true, Password: "Correct1!", OTPCode: wrongOTPCodeFor(t, secret)}
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/otp"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
@@ -416,15 +416,15 @@ func TestAPIAccountOTPPut_Enable_WrongCode(t *testing.T) {
 
 func TestAPIAccountOTPPut_Disable_Success(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope(t)
-	userId := getAccountUserId(t, accessToken)
-	setUserPasswordForOTP(t, userId, "Correct1!")
+	userID := getAccountUserID(t, accessToken)
+	setUserPasswordForOTP(t, userID, "Correct1!")
 
 	// Pre-enable OTP directly on the account user
-	u, _ := database.GetUserByID(context.Background(), nil, userId)
+	u, _ := database.GetUserByID(context.Background(), nil, userID)
 	u.OTPEnabled = true
 	u.OTPSecretEncrypted = encryptOTPSecretForTest(t, "JBSWY3DPEHPK3PXP")
 	_ = database.UpdateUser(context.Background(), nil, u)
-	seedRecoveryCodesForTest(t, userId)
+	seedRecoveryCodesForTest(t, userID)
 
 	reqBody := api.UpdateAccountOTPRequest{Enabled: false, Password: "Correct1!"}
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/otp"
@@ -435,13 +435,13 @@ func TestAPIAccountOTPPut_Disable_Success(t *testing.T) {
 		t.Fatalf("expected 200, got %d. body: %s", resp.StatusCode, string(body))
 	}
 
-	updated, err := database.GetUserByID(context.Background(), nil, userId)
+	updated, err := database.GetUserByID(context.Background(), nil, userID)
 	require.NoError(t, err)
 	assert.False(t, updated.OTPEnabled)
 	// The seed itself is gone, not merely unreachable. Read through the column that carries it
 	// since migration 000048 dropped users.otp_secret (#98).
 	assert.Empty(t, updated.OTPSecretEncrypted)
-	assert.Equal(t, 0, unusedRecoveryCodesForTest(t, userId), "the recovery codes go with the authenticator")
+	assert.Equal(t, 0, unusedRecoveryCodesForTest(t, userID), "the recovery codes go with the authenticator")
 }
 
 // TestAPIAccountOTPPut_Disable_ResetsConsumedStep is seam 4's pin for #111 decision 4: disabling
@@ -458,8 +458,8 @@ func TestAPIAccountOTPPut_Disable_Success(t *testing.T) {
 // the endpoints broken.
 func TestAPIAccountOTPPut_Disable_ResetsConsumedStep(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope(t)
-	userId := getAccountUserId(t, accessToken)
-	setUserPasswordForOTP(t, userId, "Correct1!")
+	userID := getAccountUserID(t, accessToken)
+	setUserPasswordForOTP(t, userID, "Correct1!")
 
 	// The two enables must use the same secret, or the same code could not match twice and the
 	// case would prove nothing about the marker. A second call to the issuing endpoint would mint
@@ -474,7 +474,7 @@ func TestAPIAccountOTPPut_Disable_ResetsConsumedStep(t *testing.T) {
 		OTPCode:  code,
 	}
 
-	installPendingEnrollmentForTest(t, userId, keyURL, time.Now().UTC())
+	installPendingEnrollmentForTest(t, userID, keyURL, time.Now().UTC())
 	status, body := putAccountOTP(t, accessToken, enable)
 	if status != http.StatusOK {
 		t.Fatalf("expected the first enable to succeed, got %d. body: %s", status, body)
@@ -488,8 +488,8 @@ func TestAPIAccountOTPPut_Disable_ResetsConsumedStep(t *testing.T) {
 	// The same code again. It was consumed by the first enable, so this succeeds only because the
 	// disable reset the marker. The pending enrollment is restaged with the same key, since the
 	// first enable cleared it inside the transaction that established the authenticator.
-	skipIfOtpCodeOutsideWindow(t, secret, code)
-	installPendingEnrollmentForTest(t, userId, keyURL, time.Now().UTC())
+	skipIfOTPCodeOutsideWindow(t, secret, code)
+	installPendingEnrollmentForTest(t, userID, keyURL, time.Now().UTC())
 	status, body = putAccountOTP(t, accessToken, enable)
 	if status != http.StatusOK {
 		t.Fatalf("expected the re-enable with the same code to succeed after the disable reset the "+
@@ -504,10 +504,10 @@ func TestAPIAccountOTPPut_Disable_ResetsConsumedStep(t *testing.T) {
 //
 // Its snapshot is set to the user's current counter, so before the endpoint is called it owes no
 // re-prompt. That is what makes the assertion below meaningful: the row starts out satisfied.
-func seedExtraSessionForOTPTest(t *testing.T, userId int64) *record.UserSession {
+func seedExtraSessionForOTPTest(t *testing.T, userID int64) *record.UserSession {
 	t.Helper()
 
-	current, err := database.GetUserByID(context.Background(), nil, userId)
+	current, err := database.GetUserByID(context.Background(), nil, userID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -526,7 +526,7 @@ func seedExtraSessionForOTPTest(t *testing.T, userId int64) *record.UserSession 
 		DeviceType:          "mobile",
 		DeviceOS:            "Android",
 		OTPConfigGeneration: current.OTPConfigGeneration,
-		UserID:              userId,
+		UserID:              userID,
 	}
 	if err := database.CreateUserSession(context.Background(), nil, session); err != nil {
 		t.Fatal(err)
@@ -541,13 +541,13 @@ func seedExtraSessionForOTPTest(t *testing.T, userId int64) *record.UserSession 
 // The old mechanism could not satisfy this. It set a boolean on the single session named by the
 // caller's own sid claim, so the tests that stood here asked only for "at least one session with
 // the flag set", which is true of a mechanism that reaches exactly one and false of nothing.
-func assertEverySessionOwesAReprompt(t *testing.T, userId int64, atLeast int) {
+func assertEverySessionOwesAReprompt(t *testing.T, userID int64, atLeast int) {
 	t.Helper()
 
-	user, err := database.GetUserByID(context.Background(), nil, userId)
+	user, err := database.GetUserByID(context.Background(), nil, userID)
 	require.NoError(t, err)
 
-	sessions, err := database.GetUserSessionsByUserID(context.Background(), nil, userId)
+	sessions, err := database.GetUserSessionsByUserID(context.Background(), nil, userID)
 	require.NoError(t, err)
 	assert.GreaterOrEqual(t, len(sessions), atLeast,
 		"the fixture must leave at least %d sessions for this to be about reach at all", atLeast)
@@ -559,7 +559,7 @@ func assertEverySessionOwesAReprompt(t *testing.T, userId int64, atLeast int) {
 	}
 }
 
-// TestAPIAccountOTPPut_Enable_AdvancesOtpConfigGeneration covers part 1.2 and part 1.3 of #242 at
+// TestAPIAccountOTPPut_Enable_AdvancesOTPConfigGeneration covers part 1.2 and part 1.3 of #242 at
 // the account API's enable branch.
 //
 // Part 1.2: the advance is one statement against one users row, so every session of that user owes
@@ -569,22 +569,22 @@ func assertEverySessionOwesAReprompt(t *testing.T, userId int64, atLeast int) {
 // Part 1.3: the access token this suite mints carries no sid claim, so the old writer reached NO
 // session at all here. The counter does not consult the claim, and the fact that this case passes
 // with such a token is the whole of that half.
-func TestAPIAccountOTPPut_Enable_AdvancesOtpConfigGeneration(t *testing.T) {
+func TestAPIAccountOTPPut_Enable_AdvancesOTPConfigGeneration(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope(t)
-	userId := getAccountUserId(t, accessToken)
-	setUserPasswordForOTP(t, userId, "Correct1!")
+	userID := getAccountUserID(t, accessToken)
+	setUserPasswordForOTP(t, userID, "Correct1!")
 
 	// Ensure OTP disabled for this account user
-	u, _ := database.GetUserByID(context.Background(), nil, userId)
+	u, _ := database.GetUserByID(context.Background(), nil, userID)
 	u.OTPEnabled = false
 	_ = database.UpdateUser(context.Background(), nil, u)
 
-	before, err := database.GetUserByID(context.Background(), nil, userId)
+	before, err := database.GetUserByID(context.Background(), nil, userID)
 	require.NoError(t, err)
-	extra := seedExtraSessionForOTPTest(t, userId)
+	extra := seedExtraSessionForOTPTest(t, userID)
 
 	// Prepare valid enable request, against the seed the server issues for it
-	require.NoError(t, database.ClearPendingOTPEnrollment(context.Background(), nil, userId))
+	require.NoError(t, database.ClearPendingOTPEnrollment(context.Background(), nil, userID))
 	secret := getOTPEnrollment(t, accessToken).SecretKey
 	code := otptest.Code(t, secret, time.Now())
 	reqBody := api.UpdateAccountOTPRequest{Enabled: true, Password: "Correct1!", OTPCode: code}
@@ -596,12 +596,12 @@ func TestAPIAccountOTPPut_Enable_AdvancesOtpConfigGeneration(t *testing.T) {
 		t.Fatalf("expected 200, got %d. body: %s", resp.StatusCode, string(body))
 	}
 
-	after, err := database.GetUserByID(context.Background(), nil, userId)
+	after, err := database.GetUserByID(context.Background(), nil, userID)
 	require.NoError(t, err)
 	assert.Equal(t, before.OTPConfigGeneration+1, after.OTPConfigGeneration,
 		"enabling an authenticator advances the counter by exactly one")
 
-	assertEverySessionOwesAReprompt(t, userId, 2)
+	assertEverySessionOwesAReprompt(t, userID, 2)
 
 	// Named explicitly as well as covered by the sweep above, because this is the row the
 	// mechanism this replaces could not reach: it was created before the call, its snapshot
@@ -612,23 +612,23 @@ func TestAPIAccountOTPPut_Enable_AdvancesOtpConfigGeneration(t *testing.T) {
 		"the user's other device must owe a re-prompt too")
 }
 
-// TestAPIAccountOTPPut_Disable_AdvancesOtpConfigGeneration is the same property in the disable
+// TestAPIAccountOTPPut_Disable_AdvancesOTPConfigGeneration is the same property in the disable
 // direction, where the stale assertion is the more dangerous one: a session whose amr still reads
 // ["pwd","otp"] is naming an authenticator the user has removed.
-func TestAPIAccountOTPPut_Disable_AdvancesOtpConfigGeneration(t *testing.T) {
+func TestAPIAccountOTPPut_Disable_AdvancesOTPConfigGeneration(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope(t)
-	userId := getAccountUserId(t, accessToken)
-	setUserPasswordForOTP(t, userId, "Correct1!")
+	userID := getAccountUserID(t, accessToken)
+	setUserPasswordForOTP(t, userID, "Correct1!")
 
 	// Pre-enable OTP directly on this account user
-	u, _ := database.GetUserByID(context.Background(), nil, userId)
+	u, _ := database.GetUserByID(context.Background(), nil, userID)
 	u.OTPEnabled = true
 	u.OTPSecretEncrypted = encryptOTPSecretForTest(t, "JBSWY3DPEHPK3PXP")
 	_ = database.UpdateUser(context.Background(), nil, u)
 
-	before, err := database.GetUserByID(context.Background(), nil, userId)
+	before, err := database.GetUserByID(context.Background(), nil, userID)
 	require.NoError(t, err)
-	extra := seedExtraSessionForOTPTest(t, userId)
+	extra := seedExtraSessionForOTPTest(t, userID)
 
 	reqBody := api.UpdateAccountOTPRequest{Enabled: false, Password: "Correct1!"}
 	url := appConfig.AuthServer.BaseURL + "/api/v1/account/otp"
@@ -639,12 +639,12 @@ func TestAPIAccountOTPPut_Disable_AdvancesOtpConfigGeneration(t *testing.T) {
 		t.Fatalf("expected 200, got %d. body: %s", resp.StatusCode, string(body))
 	}
 
-	after, err := database.GetUserByID(context.Background(), nil, userId)
+	after, err := database.GetUserByID(context.Background(), nil, userID)
 	require.NoError(t, err)
 	assert.Equal(t, before.OTPConfigGeneration+1, after.OTPConfigGeneration,
 		"disabling an authenticator advances the counter by exactly one")
 
-	assertEverySessionOwesAReprompt(t, userId, 2)
+	assertEverySessionOwesAReprompt(t, userID, 2)
 
 	reloaded, err := database.GetUserSessionByID(context.Background(), nil, extra.ID)
 	require.NoError(t, err)
@@ -654,11 +654,11 @@ func TestAPIAccountOTPPut_Disable_AdvancesOtpConfigGeneration(t *testing.T) {
 
 func TestAPIAccountOTPPut_Disable_NotEnabled(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope(t)
-	userId := getAccountUserId(t, accessToken)
-	setUserPasswordForOTP(t, userId, "Correct1!")
+	userID := getAccountUserID(t, accessToken)
+	setUserPasswordForOTP(t, userID, "Correct1!")
 
 	// Ensure disabled on the account user
-	u, _ := database.GetUserByID(context.Background(), nil, userId)
+	u, _ := database.GetUserByID(context.Background(), nil, userID)
 	u.OTPEnabled = false
 	_ = database.UpdateUser(context.Background(), nil, u)
 
@@ -677,7 +677,7 @@ func TestAPIAccountOTPPut_UnauthorizedAndScope(t *testing.T) {
 
 	// No token
 	req, _ := http.NewRequest("PUT", url, nil)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -705,8 +705,8 @@ func TestAPIAccountOTPPut_UnauthorizedAndScope(t *testing.T) {
 // the user a different QR code to scan.
 func TestAPIAccountOTPEnrollmentGet_IsIdempotentWhileOnePending(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope(t)
-	userId := getAccountUserId(t, accessToken)
-	resetOTPStateForTest(t, userId)
+	userID := getAccountUserID(t, accessToken)
+	resetOTPStateForTest(t, userID)
 
 	first := getOTPEnrollment(t, accessToken)
 	second := getOTPEnrollment(t, accessToken)
@@ -722,11 +722,11 @@ func TestAPIAccountOTPEnrollmentGet_IsIdempotentWhileOnePending(t *testing.T) {
 // one does not sit on the account forever.
 func TestAPIAccountOTPEnrollmentGet_ReplacesAnExpiredEnrollment(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope(t)
-	userId := getAccountUserId(t, accessToken)
-	resetOTPStateForTest(t, userId)
+	userID := getAccountUserID(t, accessToken)
+	resetOTPStateForTest(t, userID)
 
 	keyURL, staleSecret := newOTPKeyURLForTest(t, "expired@otp.test")
-	installPendingEnrollmentForTest(t, userId, keyURL, time.Now().UTC().Add(-20*time.Minute))
+	installPendingEnrollmentForTest(t, userID, keyURL, time.Now().UTC().Add(-20*time.Minute))
 
 	issued := getOTPEnrollment(t, accessToken)
 	assert.NotEqual(t, staleSecret, issued.SecretKey,
@@ -743,9 +743,9 @@ func TestAPIAccountOTPEnrollmentGet_ReplacesAnExpiredEnrollment(t *testing.T) {
 // is exactly the change this asserts the server enforces.
 func TestAPIAccountOTPPut_Enable_RefusesACallerSuppliedSecret(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope(t)
-	userId := getAccountUserId(t, accessToken)
-	setUserPasswordForOTP(t, userId, "Correct1!")
-	resetOTPStateForTest(t, userId)
+	userID := getAccountUserID(t, accessToken)
+	setUserPasswordForOTP(t, userID, "Correct1!")
+	resetOTPStateForTest(t, userID)
 
 	issued := getOTPEnrollment(t, accessToken)
 	code := otptest.Code(t, issued.SecretKey, time.Now())
@@ -779,9 +779,9 @@ func TestAPIAccountOTPPut_Enable_RefusesACallerSuppliedSecret(t *testing.T) {
 // falling back to anything. A partially migrated or rolled back deployment therefore fails closed.
 func TestAPIAccountOTPPut_Enable_RefusedWithNoPendingEnrollment(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope(t)
-	userId := getAccountUserId(t, accessToken)
-	setUserPasswordForOTP(t, userId, "Correct1!")
-	resetOTPStateForTest(t, userId)
+	userID := getAccountUserID(t, accessToken)
+	setUserPasswordForOTP(t, userID, "Correct1!")
+	resetOTPStateForTest(t, userID)
 
 	// A well-formed code for a secret the server never issued, which is precisely what must not
 	// be enrollable.
@@ -804,12 +804,12 @@ func TestAPIAccountOTPPut_Enable_RefusedWithNoPendingEnrollment(t *testing.T) {
 // An expired enrollment is no enrollment: the same refusal, and the seed cannot be redeemed late.
 func TestAPIAccountOTPPut_Enable_RefusedWithAnExpiredEnrollment(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope(t)
-	userId := getAccountUserId(t, accessToken)
-	setUserPasswordForOTP(t, userId, "Correct1!")
-	resetOTPStateForTest(t, userId)
+	userID := getAccountUserID(t, accessToken)
+	setUserPasswordForOTP(t, userID, "Correct1!")
+	resetOTPStateForTest(t, userID)
 
 	keyURL, secret := newOTPKeyURLForTest(t, "expired-put@otp.test")
-	installPendingEnrollmentForTest(t, userId, keyURL, time.Now().UTC().Add(-20*time.Minute))
+	installPendingEnrollmentForTest(t, userID, keyURL, time.Now().UTC().Add(-20*time.Minute))
 
 	code := otptest.Code(t, secret, time.Now())
 
@@ -836,9 +836,9 @@ func TestAPIAccountOTPPut_Enable_RefusedWithAnExpiredEnrollment(t *testing.T) {
 // *record.User for its email, and no caller of this API has one.
 func TestAPIAccountOTPPut_Enable_EnrolsTheIssuedSeedAndClearsThePending(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope(t)
-	userId := getAccountUserId(t, accessToken)
-	setUserPasswordForOTP(t, userId, "Correct1!")
-	resetOTPStateForTest(t, userId)
+	userID := getAccountUserID(t, accessToken)
+	setUserPasswordForOTP(t, userID, "Correct1!")
+	resetOTPStateForTest(t, userID)
 
 	issued := getOTPEnrollment(t, accessToken)
 	// The previous step's code, so the current step's is left unspent above it for the sign-in below.
@@ -859,13 +859,13 @@ func TestAPIAccountOTPPut_Enable_EnrolsTheIssuedSeedAndClearsThePending(t *testi
 	// TryConsumeUserOTPStep (#111), so resubmitting the spent code would be refused correctly and
 	// would read here as a broken enrollment. The helper also skips, rather than failing, when the
 	// two codes cannot be ordered.
-	user, err := database.GetUserByID(context.Background(), nil, userId)
+	user, err := database.GetUserByID(context.Background(), nil, userID)
 	require.NoError(t, err)
-	ceremonyClient, ceremonyRedirectUri := createLevel2MandatoryClient(t)
+	ceremonyClient, ceremonyRedirectURI := createLevel2MandatoryClient(t)
 
-	httpClient, otpPage, otpUrl := startOtpCeremony(t, ceremonyClient, ceremonyRedirectUri,
+	httpClient, otpPage, otpURL := startOTPCeremony(t, ceremonyClient, ceremonyRedirectURI,
 		user, "Correct1!", "")
-	accepted := authenticateWithOtp(t, httpClient, otpUrl, otpPage,
+	accepted := authenticateWithOTP(t, httpClient, otpURL, otpPage,
 		currentStepCode(t, issued.SecretKey, code))
 	_ = otpPage.Body.Close()
 	assertRedirect(t, accepted, "/auth/completed")

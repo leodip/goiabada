@@ -25,35 +25,35 @@ func createTestClientWithRedirect(t *testing.T) (*record.Client, *record.Redirec
 		t.Fatal(err)
 	}
 
-	redirectUri := &record.RedirectURI{
+	redirectURI := &record.RedirectURI{
 		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
-	if err := database.CreateRedirectURI(context.Background(), nil, redirectUri); err != nil {
+	if err := database.CreateRedirectURI(context.Background(), nil, redirectURI); err != nil {
 		t.Fatal(err)
 	}
 
-	return client, redirectUri
+	return client, redirectURI
 }
 
 func TestAuthorize_RequestParameter_RejectedAsUnsupported(t *testing.T) {
-	client, redirectUri := createTestClientWithRedirect(t)
+	client, redirectURI := createTestClientWithRedirect(t)
 
 	state := fake.LetterN(8)
 
 	params := url.Values{}
 	params.Set("client_id", client.ClientIdentifier)
-	params.Set("redirect_uri", redirectUri.URI)
+	params.Set("redirect_uri", redirectURI.URI)
 	params.Set("response_type", "code")
 	params.Set("scope", "openid")
 	params.Set("state", state)
 	params.Set("request", "some.jwt.value")
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?" + params.Encode()
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?" + params.Encode()
 
-	httpClient := createAuthenticatedHttpClient(t)
+	httpClient := createAuthenticatedHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -71,19 +71,19 @@ func TestAuthorize_RequestParameter_RejectedAsUnsupported(t *testing.T) {
 }
 
 func TestAuthorize_RequestParameter_EmptyValue_RejectedAsUnsupported(t *testing.T) {
-	client, redirectUri := createTestClientWithRedirect(t)
+	client, redirectURI := createTestClientWithRedirect(t)
 
 	params := url.Values{}
 	params.Set("client_id", client.ClientIdentifier)
-	params.Set("redirect_uri", redirectUri.URI)
+	params.Set("redirect_uri", redirectURI.URI)
 	params.Set("response_type", "code")
 	params.Set("scope", "openid")
 	// Encoded form drops the value but keeps the key, so request= still has the key present.
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?" + params.Encode() + "&request="
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?" + params.Encode() + "&request="
 
-	httpClient := createAuthenticatedHttpClient(t)
+	httpClient := createAuthenticatedHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,24 +99,24 @@ func TestAuthorize_RequestParameter_EmptyValue_RejectedAsUnsupported(t *testing.
 	assert.Equal(t, "request_not_supported", redirectLocation.Query().Get("error"))
 }
 
-func TestAuthorize_RequestUriParameter_RejectedAsUnsupported(t *testing.T) {
-	client, redirectUri := createTestClientWithRedirect(t)
+func TestAuthorize_RequestURIParameter_RejectedAsUnsupported(t *testing.T) {
+	client, redirectURI := createTestClientWithRedirect(t)
 
 	state := fake.LetterN(8)
 
 	params := url.Values{}
 	params.Set("client_id", client.ClientIdentifier)
-	params.Set("redirect_uri", redirectUri.URI)
+	params.Set("redirect_uri", redirectURI.URI)
 	params.Set("response_type", "code")
 	params.Set("scope", "openid")
 	params.Set("state", state)
 	params.Set("request_uri", "https://example.com/req.jwt")
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?" + params.Encode()
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?" + params.Encode()
 
-	httpClient := createAuthenticatedHttpClient(t)
+	httpClient := createAuthenticatedHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,11 +134,11 @@ func TestAuthorize_RequestUriParameter_RejectedAsUnsupported(t *testing.T) {
 }
 
 func TestAuthorize_RequestParameter_PostBody_RejectedAsUnsupported(t *testing.T) {
-	client, redirectUri := createTestClientWithRedirect(t)
+	client, redirectURI := createTestClientWithRedirect(t)
 
 	form := url.Values{}
 	form.Set("client_id", client.ClientIdentifier)
-	form.Set("redirect_uri", redirectUri.URI)
+	form.Set("redirect_uri", redirectURI.URI)
 	form.Set("response_type", "code")
 	form.Set("scope", "openid")
 	form.Set("state", fake.LetterN(8))
@@ -153,7 +153,7 @@ func TestAuthorize_RequestParameter_PostBody_RejectedAsUnsupported(t *testing.T)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Origin", "https://www.certification.openid.net")
 
-	httpClient := createAuthenticatedHttpClient(t)
+	httpClient := createAuthenticatedHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
@@ -175,7 +175,7 @@ func TestAuthorize_RequestParameter_PostBody_RejectedAsUnsupported(t *testing.T)
 	assert.Equal(t, "request_not_supported", redirectLocation.Query().Get("error"))
 }
 
-func TestAuthorize_RequestParameter_InvalidClient_RendersErrorUi(t *testing.T) {
+func TestAuthorize_RequestParameter_InvalidClient_RendersErrorUI(t *testing.T) {
 	params := url.Values{}
 	params.Set("client_id", "does_not_exist")
 	params.Set("redirect_uri", "https://example.com")
@@ -183,11 +183,11 @@ func TestAuthorize_RequestParameter_InvalidClient_RendersErrorUi(t *testing.T) {
 	params.Set("scope", "openid")
 	params.Set("request", "some.jwt.value")
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?" + params.Encode()
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?" + params.Encode()
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -207,22 +207,22 @@ func TestAuthorize_RequestParameter_InvalidClient_RendersErrorUi(t *testing.T) {
 
 func TestAuthorize_RequestParameter_RejectedAcrossResponseModes(t *testing.T) {
 	t.Run("query response mode", func(t *testing.T) {
-		client, redirectUri := createTestClientWithRedirect(t)
+		client, redirectURI := createTestClientWithRedirect(t)
 		state := fake.LetterN(8)
 
 		params := url.Values{}
 		params.Set("client_id", client.ClientIdentifier)
-		params.Set("redirect_uri", redirectUri.URI)
+		params.Set("redirect_uri", redirectURI.URI)
 		params.Set("response_type", "code")
 		params.Set("scope", "openid")
 		params.Set("state", state)
 		params.Set("response_mode", "query")
 		params.Set("request", "some.jwt.value")
 
-		destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?" + params.Encode()
+		destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?" + params.Encode()
 
-		httpClient := createAuthenticatedHttpClient(t)
-		resp, err := httpClient.Get(destUrl)
+		httpClient := createAuthenticatedHTTPClient(t)
+		resp, err := httpClient.Get(destURL)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -239,22 +239,22 @@ func TestAuthorize_RequestParameter_RejectedAcrossResponseModes(t *testing.T) {
 	})
 
 	t.Run("fragment response mode", func(t *testing.T) {
-		client, redirectUri := createTestClientWithRedirect(t)
+		client, redirectURI := createTestClientWithRedirect(t)
 		state := fake.LetterN(8)
 
 		params := url.Values{}
 		params.Set("client_id", client.ClientIdentifier)
-		params.Set("redirect_uri", redirectUri.URI)
+		params.Set("redirect_uri", redirectURI.URI)
 		params.Set("response_type", "code")
 		params.Set("scope", "openid")
 		params.Set("state", state)
 		params.Set("response_mode", "fragment")
 		params.Set("request", "some.jwt.value")
 
-		destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?" + params.Encode()
+		destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?" + params.Encode()
 
-		httpClient := createAuthenticatedHttpClient(t)
-		resp, err := httpClient.Get(destUrl)
+		httpClient := createAuthenticatedHTTPClient(t)
+		resp, err := httpClient.Get(destURL)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -273,22 +273,22 @@ func TestAuthorize_RequestParameter_RejectedAcrossResponseModes(t *testing.T) {
 	})
 
 	t.Run("form_post response mode", func(t *testing.T) {
-		client, redirectUri := createTestClientWithRedirect(t)
+		client, redirectURI := createTestClientWithRedirect(t)
 		state := fake.LetterN(8)
 
 		params := url.Values{}
 		params.Set("client_id", client.ClientIdentifier)
-		params.Set("redirect_uri", redirectUri.URI)
+		params.Set("redirect_uri", redirectURI.URI)
 		params.Set("response_type", "code")
 		params.Set("scope", "openid")
 		params.Set("state", state)
 		params.Set("response_mode", "form_post")
 		params.Set("request", "some.jwt.value")
 
-		destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?" + params.Encode()
+		destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?" + params.Encode()
 
-		httpClient := createAuthenticatedHttpClient(t)
-		resp, err := httpClient.Get(destUrl)
+		httpClient := createAuthenticatedHTTPClient(t)
+		resp, err := httpClient.Get(destURL)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -303,33 +303,33 @@ func TestAuthorize_RequestParameter_RejectedAcrossResponseModes(t *testing.T) {
 
 		formAction, exists := doc.Find("form").Attr("action")
 		assert.True(t, exists)
-		assert.Equal(t, redirectUri.URI, formAction)
+		assert.Equal(t, redirectURI.URI, formAction)
 
 		assert.Equal(t, "request_not_supported", doc.Find("input[name='error']").AttrOr("value", ""))
 		assert.Equal(t, state, doc.Find("input[name='state']").AttrOr("value", ""))
 	})
 }
 
-func TestAuthorize_RequestUriParameter_RejectedAcrossResponseModes(t *testing.T) {
+func TestAuthorize_RequestURIParameter_RejectedAcrossResponseModes(t *testing.T) {
 	// One run for request_uri to confirm the second branch behaves the same;
 	// we exercise fragment mode since query is already covered by the
 	// non-matrix request_uri test above.
-	client, redirectUri := createTestClientWithRedirect(t)
+	client, redirectURI := createTestClientWithRedirect(t)
 	state := fake.LetterN(8)
 
 	params := url.Values{}
 	params.Set("client_id", client.ClientIdentifier)
-	params.Set("redirect_uri", redirectUri.URI)
+	params.Set("redirect_uri", redirectURI.URI)
 	params.Set("response_type", "code")
 	params.Set("scope", "openid")
 	params.Set("state", state)
 	params.Set("response_mode", "fragment")
 	params.Set("request_uri", "https://example.com/req.jwt")
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?" + params.Encode()
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?" + params.Encode()
 
-	httpClient := createAuthenticatedHttpClient(t)
-	resp, err := httpClient.Get(destUrl)
+	httpClient := createAuthenticatedHTTPClient(t)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}

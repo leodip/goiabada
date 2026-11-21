@@ -17,9 +17,9 @@ import (
 const adminDeletedSubjectEn = "An administrator deleted your account"
 
 // deleteUserAsAdministrator deletes the user through the admin API and requires the 200.
-func deleteUserAsAdministrator(t *testing.T, accessToken string, userId int64) {
+func deleteUserAsAdministrator(t *testing.T, accessToken string, userID int64) {
 	t.Helper()
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(userId, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(userID, 10)
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 	_ = resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)

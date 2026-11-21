@@ -197,7 +197,7 @@ func TestAPISettingsAuditLogsPut_InvalidBody(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -219,9 +219,9 @@ func TestAPISettingsAuditLogsPut_IsItselfAudited(t *testing.T) {
 
 	before, _, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 1, record.AuditLogFilter{AuditEvent: audit.EventUpdatedAuditLogsSettings})
 	require.NoError(t, err)
-	var lastIdBefore int64
+	var lastIDBefore int64
 	if len(before) > 0 {
-		lastIdBefore = before[0].ID
+		lastIDBefore = before[0].ID
 	}
 
 	url := appConfig.AuthServer.BaseURL + settingsAuditLogsURL
@@ -238,14 +238,14 @@ func TestAPISettingsAuditLogsPut_IsItselfAudited(t *testing.T) {
 	assert.Positive(t, total, "the settings change must be recorded")
 	assert.NotEmpty(t, after)
 	if len(after) > 0 {
-		assert.NotEqual(t, lastIdBefore, after[0].ID, "a new audit entry must have been written")
+		assert.NotEqual(t, lastIDBefore, after[0].ID, "a new audit entry must have been written")
 		assert.Contains(t, after[0].Details, "audit_log_retention_days")
 	}
 }
 
 func TestAPISettingsAuditLogs_UnauthorizedAndScope(t *testing.T) {
 	url := appConfig.AuthServer.BaseURL + settingsAuditLogsURL
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
 	for _, method := range []string{"GET", "PUT"} {
 		t.Run(method+" without a token", func(t *testing.T) {

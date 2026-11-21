@@ -117,7 +117,7 @@ func TestPages_AreDrawnInTheDefaultBrand(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			browser := createHttpClient(t)
+			browser := createHTTPClient(t)
 			resp := tc.load(t, browser)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -149,7 +149,7 @@ func TestPages_AreDrawnInTheDefaultBrand(t *testing.T) {
 func TestPages_AnAutomaticDefaultBrandFollowsTheDevice(t *testing.T) {
 	brand := makeDefaultBrand(t, record.BrandAppearanceAuto, "guava")
 
-	resp := loadPage(t, createHttpClient(t), appConfig.AuthServer.BaseURL+"/no-such-page-"+fake.LetterN(8))
+	resp := loadPage(t, createHTTPClient(t), appConfig.AuthServer.BaseURL+"/no-such-page-"+fake.LetterN(8))
 	defer func() { _ = resp.Body.Close() }()
 
 	head := readBrandedPageHead(t, resp)

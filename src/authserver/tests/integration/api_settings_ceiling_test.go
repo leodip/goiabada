@@ -67,9 +67,9 @@ var settingsCeilingWrites = []settingsCeilingWrite{
 }
 
 // eventRows is how many rows of one event one request left.
-func eventRows(t *testing.T, readerToken, event, requestId string) int {
+func eventRows(t *testing.T, readerToken, event, requestID string) int {
 	t.Helper()
-	logs, resp := getAuditLogs(t, readerToken, "auditEvent="+url.QueryEscape(event)+"&requestId="+url.QueryEscape(requestId))
+	logs, resp := getAuditLogs(t, readerToken, "auditEvent="+url.QueryEscape(event)+"&requestId="+url.QueryEscape(requestID))
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	return len(logs.AuditLogs)
@@ -102,7 +102,7 @@ func TestSettingsCeiling_ManageSettingsCannotChangeTheReservedSettings(t *testin
 		t.Run(write.name, func(t *testing.T) {
 			before := settingsRow(t)
 
-			resp, requestId := sendAdmin(t, granularToken, http.MethodPut, write.route, write.body)
+			resp, requestID := sendAdmin(t, granularToken, http.MethodPut, write.route, write.body)
 			defer func() { _ = resp.Body.Close() }()
 
 			assert.Equal(t, http.StatusForbidden, resp.StatusCode)
@@ -119,9 +119,9 @@ func TestSettingsCeiling_ManageSettingsCannotChangeTheReservedSettings(t *testin
 			assert.Contains(t, challenge, `scope="authserver:manage"`)
 
 			assert.Empty(t, settingsChanges(before, settingsRow(t)), "the refused request changed nothing")
-			assert.Zero(t, eventRows(t, manageToken, write.event, requestId), "no record of a change that was not made")
+			assert.Zero(t, eventRows(t, manageToken, write.event, requestID), "no record of a change that was not made")
 
-			rows := refusalRows(t, manageToken, requestId)
+			rows := refusalRows(t, manageToken, requestID)
 			require.Len(t, rows, 1, "exactly one administrator_change_refused row for the refused request")
 			row := rows[0]
 			assert.Equal(t, caller.ClientIdentifier, row["logged_in_user"], "the caller is the token's sub")
@@ -142,7 +142,7 @@ func TestSettingsCeiling_ManageSettingsStillChangesTheOtherSettings(t *testing.T
 	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.ID) })
 
 	before := settingsRow(t)
-	resp, requestId := sendAdmin(t, granularToken, http.MethodPut, "/api/v1/admin/settings/sessions", api.UpdateSettingsSessionsRequest{
+	resp, requestID := sendAdmin(t, granularToken, http.MethodPut, "/api/v1/admin/settings/sessions", api.UpdateSettingsSessionsRequest{
 		UserSessionIdleTimeoutInSeconds: before.UserSessionIdleTimeoutInSeconds + 60,
 		UserSessionMaxLifetimeInSeconds: before.UserSessionMaxLifetimeInSeconds + 60,
 		MaxUserSessionsPerUser:          &before.MaxUserSessionsPerUser,
@@ -153,7 +153,7 @@ func TestSettingsCeiling_ManageSettingsStillChangesTheOtherSettings(t *testing.T
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode, string(body))
 	assert.Equal(t, before.UserSessionIdleTimeoutInSeconds+60, settingsRow(t).UserSessionIdleTimeoutInSeconds)
-	assert.Empty(t, refusalRows(t, manageToken, requestId))
+	assert.Empty(t, refusalRows(t, manageToken, requestID))
 }
 
 func TestSettingsCeiling_AManageTokenChangesTheReservedSettings(t *testing.T) {
@@ -175,14 +175,14 @@ func TestSettingsCeiling_AManageTokenChangesTheReservedSettings(t *testing.T) {
 			// The row is restored when the subtest ends, so each write changes the one the parent set.
 			before := changeSettings(t, func(settings *record.Settings) { settings.AuditLogsInDatabaseEnabled = true })
 
-			resp, requestId := sendAdmin(t, manageToken, http.MethodPut, write.route, write.body)
+			resp, requestID := sendAdmin(t, manageToken, http.MethodPut, write.route, write.body)
 			body, _ := io.ReadAll(resp.Body)
 			_ = resp.Body.Close()
 
 			assert.Equal(t, http.StatusOK, resp.StatusCode, string(body))
 			assert.NotEmpty(t, settingsChanges(before, settingsRow(t)), "the write changed the settings row")
-			assert.Equal(t, 1, eventRows(t, manageToken, write.event, requestId), "the change is recorded under its own event")
-			assert.Empty(t, refusalRows(t, manageToken, requestId))
+			assert.Equal(t, 1, eventRows(t, manageToken, write.event, requestID), "the change is recorded under its own event")
+			assert.Empty(t, refusalRows(t, manageToken, requestID))
 		})
 	}
 }

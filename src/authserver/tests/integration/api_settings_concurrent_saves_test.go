@@ -40,7 +40,7 @@ type settingsSectionPut struct {
 // sendConcurrently, it reports every failure here rather than from the request goroutines.
 func sendSettingsSavesAtOnce(t *testing.T, accessToken string, saves []settingsSectionPut) []concurrentResult {
 	t.Helper()
-	client := createHttpClient(t)
+	client := createHTTPClient(t)
 	requests := make([]*http.Request, len(saves))
 	for i, save := range saves {
 		encoded, err := json.Marshal(save.body)

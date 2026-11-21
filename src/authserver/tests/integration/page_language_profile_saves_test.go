@@ -51,8 +51,8 @@ func (d *choiceSavedDuringTheRead) GetUserBySubject(ctx context.Context, tx *sql
 	return read, nil
 }
 
-func (d *choiceSavedDuringTheRead) GetUserByID(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error) {
-	read, err := d.Database.GetUserByID(ctx, tx, userId)
+func (d *choiceSavedDuringTheRead) GetUserByID(ctx context.Context, tx *sql.Tx, userID int64) (*record.User, error) {
+	read, err := d.Database.GetUserByID(ctx, tx, userID)
 	require.NoError(d.t, err)
 	d.saveChoiceUnder(ctx, read)
 	return read, nil

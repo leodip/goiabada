@@ -114,9 +114,9 @@ func (f *restartFixture) authorizeURL(scope, state, codeVerifier, acrValues stri
 	return destURL
 }
 
-// signInWithPasswordAndOtp runs a whole level 2 ceremony in the browser, which leaves it holding a
+// signInWithPasswordAndOTP runs a whole level 2 ceremony in the browser, which leaves it holding a
 // session whose methods are "pwd otp". The code it ends with is not redeemed.
-func (f *restartFixture) signInWithPasswordAndOtp(t *testing.T, httpClient *http.Client) {
+func (f *restartFixture) signInWithPasswordAndOTP(t *testing.T, httpClient *http.Client) {
 	t.Helper()
 
 	resp := loadPage(t, httpClient, f.authorizeURL("openid", fake.LetterN(8), fake.LetterN(43),
@@ -137,13 +137,13 @@ func (f *restartFixture) signInWithPasswordAndOtp(t *testing.T, httpClient *http
 	resp = loadPage(t, httpClient, otpURL)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 	otpCode := otptest.Code(t, f.otpSecret, time.Now())
-	resp = authenticateWithOtp(t, httpClient, otpURL, resp, otpCode)
+	resp = authenticateWithOTP(t, httpClient, otpURL, resp, otpCode)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 	resp = loadPage(t, httpClient, assertRedirect(t, resp, "/auth/completed"))
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 	resp = loadPage(t, httpClient, assertRedirect(t, resp, "/auth/issue"))
 	defer func() { _ = resp.Body.Close() }()
-	code, _ := getCodeAndStateFromUrl(t, resp)
+	code, _ := getCodeAndStateFromURL(t, resp)
 	require.NotEmpty(t, code)
 
 	sessions := sessionsThroughAdminAPI(t, f.adminToken, f.user.ID)
@@ -169,7 +169,7 @@ func passwordAfterRestart(t *testing.T, httpClient *http.Client, level1URL, emai
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 	resp = loadPage(t, httpClient, assertRedirect(t, resp, "/auth/issue"))
 	defer func() { _ = resp.Body.Close() }()
-	code, _ := getCodeAndStateFromUrl(t, resp)
+	code, _ := getCodeAndStateFromURL(t, resp)
 	return code
 }
 
@@ -193,11 +193,11 @@ func (f *restartFixture) redeem(t *testing.T, httpClient *http.Client, code, cod
 	return decodeJWTPayload(t, idToken), decodeJWTPayload(t, accessToken)
 }
 
-func sessionsThroughAdminAPI(t *testing.T, adminToken string, userId int64) []api.UserSessionDetailResponse {
+func sessionsThroughAdminAPI(t *testing.T, adminToken string, userID int64) []api.UserSessionDetailResponse {
 	t.Helper()
 
 	resp := makeAPIRequest(t, "GET", appConfig.AuthServer.BaseURL+"/api/v1/admin/users/"+
-		strconv.FormatInt(userId, 10)+"/sessions", adminToken, nil)
+		strconv.FormatInt(userID, 10)+"/sessions", adminToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	var sessions api.GetUserSessionsResponse
@@ -206,10 +206,10 @@ func sessionsThroughAdminAPI(t *testing.T, adminToken string, userId int64) []ap
 }
 
 // endSessionsThroughAdminAPI ends every session the user holds, the way an administrator does.
-func endSessionsThroughAdminAPI(t *testing.T, adminToken string, userId int64) {
+func endSessionsThroughAdminAPI(t *testing.T, adminToken string, userID int64) {
 	t.Helper()
 
-	sessions := sessionsThroughAdminAPI(t, adminToken, userId)
+	sessions := sessionsThroughAdminAPI(t, adminToken, userID)
 	require.NotEmpty(t, sessions, "there must be a session to end")
 	for _, session := range sessions {
 		resp := makeAPIRequest(t, "DELETE", appConfig.AuthServer.BaseURL+"/api/v1/admin/user-sessions/"+
@@ -217,7 +217,7 @@ func endSessionsThroughAdminAPI(t *testing.T, adminToken string, userId int64) {
 		require.Equal(t, http.StatusOK, resp.StatusCode)
 		_ = resp.Body.Close()
 	}
-	require.Empty(t, sessionsThroughAdminAPI(t, adminToken, userId))
+	require.Empty(t, sessionsThroughAdminAPI(t, adminToken, userID))
 }
 
 // assertOnlyPasswordWasEarned is #140's claim, read from both places it reaches: the amr of both
@@ -244,8 +244,8 @@ func (f *restartFixture) assertOnlyPasswordWasEarned(t *testing.T, idClaims, acc
 // ended session survived that restart, so a password alone minted amr ["pwd","otp"] (#140).
 func TestRestartRoute1_TheSecondPassEarnsOnlyWhatItVerified(t *testing.T) {
 	f := newRestartFixture(t, false)
-	httpClient := createHttpClient(t)
-	f.signInWithPasswordAndOtp(t, httpClient)
+	httpClient := createHTTPClient(t)
+	f.signInWithPasswordAndOTP(t, httpClient)
 
 	codeVerifier := fake.LetterN(43)
 	resp := loadPage(t, httpClient, f.authorizeURL("openid", fake.LetterN(8), codeVerifier, ""))
@@ -271,8 +271,8 @@ func TestRestartRoute1_TheSecondPassEarnsOnlyWhatItVerified(t *testing.T) {
 // is ended before /auth/issue, which restarts it (route 2).
 func TestRestartRoute2_TheSecondPassEarnsOnlyWhatItVerified(t *testing.T) {
 	f := newRestartFixture(t, false)
-	httpClient := createHttpClient(t)
-	f.signInWithPasswordAndOtp(t, httpClient)
+	httpClient := createHTTPClient(t)
+	f.signInWithPasswordAndOTP(t, httpClient)
 
 	codeVerifier := fake.LetterN(43)
 	resp := loadPage(t, httpClient, f.authorizeURL("openid", fake.LetterN(8), codeVerifier, ""))
@@ -322,7 +322,7 @@ func TestRestartRoute2_ADifferentPersonGetsTheirOwnScopeAndConsent(t *testing.T)
 	personB, passwordB, _ := createRestartUser(t)
 	assignPermissionToUser(t, personB.ID, permissionB.ID)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	codeVerifier := fake.LetterN(43)
 	resp := loadPage(t, httpClient, f.authorizeURL("openid "+scopeA+" "+scopeB, fake.LetterN(8), codeVerifier, ""))
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
@@ -371,7 +371,7 @@ func TestRestartRoute2_ADifferentPersonGetsTheirOwnScopeAndConsent(t *testing.T)
 	defer func(r *http.Response) { _ = r.Body.Close() }(resp)
 	resp = loadPage(t, httpClient, assertRedirect(t, resp, "/auth/issue"))
 	defer func() { _ = resp.Body.Close() }()
-	code, _ := getCodeAndStateFromUrl(t, resp)
+	code, _ := getCodeAndStateFromURL(t, resp)
 
 	idClaims, accessClaims := f.redeem(t, httpClient, code, codeVerifier)
 	assert.Equal(t, personB.Subject, idClaims["sub"])

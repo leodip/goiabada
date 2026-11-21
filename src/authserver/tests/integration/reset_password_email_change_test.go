@@ -66,18 +66,18 @@ func TestResetPassword_AnEmailChangeRetiresTheLinkMailedToThePreviousAddress(t *
 			user, password, change := tc.account(t)
 			previous := user.Email
 
-			requestPasswordReset(t, createHttpClient(t), previous)
+			requestPasswordReset(t, createHTTPClient(t), previous)
 			link := latestResetLink(t, previous)
 
 			// One browser follows the link before the change and holds the form.
-			early := createHttpClient(t)
+			early := createHTTPClient(t)
 			cleanURL := followResetLink(t, early, link)
-			continuationId := loadResetForm(t, early, cleanURL)
+			continuationID := loadResetForm(t, early, cleanURL)
 
 			change(t, plusAddress())
 
 			// A browser following the link only now is refused at the first hop.
-			late := createHttpClient(t)
+			late := createHTTPClient(t)
 			resp := loadPage(t, late, link)
 			body := bodyString(t, resp)
 			_ = resp.Body.Close()
@@ -92,7 +92,7 @@ func TestResetPassword_AnEmailChangeRetiresTheLinkMailedToThePreviousAddress(t *
 			assert.Contains(t, body, resetCodeInvalidText)
 			assert.NotContains(t, body, `name="password"`)
 
-			resp = postCleanReset(t, early, cleanURL, "N3wP4ss!word", continuationId)
+			resp = postCleanReset(t, early, cleanURL, "N3wP4ss!word", continuationID)
 			body = bodyString(t, resp)
 			_ = resp.Body.Close()
 			assert.Equal(t, http.StatusBadRequest, resp.StatusCode)

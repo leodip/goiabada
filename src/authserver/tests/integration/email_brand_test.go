@@ -91,7 +91,7 @@ func TestEmails_FromASignInsPagesAreDrawnInItsClientsBrand(t *testing.T) {
 	useMailpitSMTP(t)
 	makeDefaultBrand(t, record.BrandAppearanceDark, "plum")
 	client, _, redirectURI := brandedSignInClient(t, record.ACRLevel1)
-	browser := createHttpClient(t)
+	browser := createHTTPClient(t)
 	forgotURL, _ := forgotPasswordLink(t, browser, brandAuthorizeURL(client, redirectURI, ""))
 
 	t.Run("a password reset asked for from the sign-in's forgot password page", func(t *testing.T) {
@@ -193,7 +193,7 @@ func TestEmails_FromASignInInSafeModeAreDrawnSafe(t *testing.T) {
 	makeDefaultBrand(t, record.BrandAppearanceDark, "plum")
 	client, redirectURI := brandSignInClient(t, record.ACRLevel1)
 	giveClientSafeModeBrand(t, client)
-	browser := createHttpClient(t)
+	browser := createHTTPClient(t)
 	forgotURL, _ := forgotPasswordLink(t, browser, withSafeMode(t, brandAuthorizeURL(client, redirectURI, "")))
 
 	user, _ := createResetTestUser(t, plusAddress())

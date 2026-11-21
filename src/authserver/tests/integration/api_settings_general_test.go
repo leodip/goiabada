@@ -402,7 +402,7 @@ func TestAPISettingsGeneral_UnauthorizedAndScope(t *testing.T) {
 	// No token - GET
 	req, err := http.NewRequest("GET", url, nil)
 	require.NoError(t, err)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -572,7 +572,7 @@ func TestAPISettingsGeneralPut_AccountDeletionEnabledIsRequired(t *testing.T) {
 			require.NoError(t, err)
 			req.Header.Set("Authorization", "Bearer "+accessToken)
 			req.Header.Set("Content-Type", "application/json")
-			resp, err := createHttpClient(t).Do(req)
+			resp, err := createHTTPClient(t).Do(req)
 			require.NoError(t, err)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -622,7 +622,7 @@ func TestAPISettingsGeneral_AccountDeletionEnabledIsSavedServedAndPublished(t *t
 		_ = got.Body.Close()
 		assert.Equal(t, enabled, read["accountDeletionEnabled"], "the GET answers %v", enabled)
 
-		public, err := createHttpClient(t).Get(appConfig.AuthServer.BaseURL + "/api/public/settings")
+		public, err := createHTTPClient(t).Get(appConfig.AuthServer.BaseURL + "/api/public/settings")
 		require.NoError(t, err)
 		require.Equal(t, http.StatusOK, public.StatusCode)
 		var published map[string]any

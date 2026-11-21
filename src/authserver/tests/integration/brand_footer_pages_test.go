@@ -131,13 +131,13 @@ func TestPages_TheDefaultBrandsFooterIsDrawnUnderTheCard(t *testing.T) {
 
 	// The public settings carry the same brand's links with every label, and its contact, for the
 	// admin console's pages, whose own client has no brand of its own.
-	browser := createHttpClient(t)
+	browser := createHTTPClient(t)
 	status, settings, _ := getStylesheet(t, browser, base+"/api/public/settings")
 	require.Equal(t, http.StatusOK, status)
 	var published struct {
 		Brand struct {
 			FooterLinks []struct {
-				Url    string            `json:"url"`
+				URL    string            `json:"url"`
 				Label  string            `json:"label"`
 				Labels map[string]string `json:"labels"`
 			} `json:"footerLinks"`
@@ -148,7 +148,7 @@ func TestPages_TheDefaultBrandsFooterIsDrawnUnderTheCard(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal([]byte(settings), &published))
 	require.Len(t, published.Brand.FooterLinks, 3)
-	assert.Equal(t, "https://acme.example/privacy", published.Brand.FooterLinks[0].Url)
+	assert.Equal(t, "https://acme.example/privacy", published.Brand.FooterLinks[0].URL)
 	assert.Equal(t, "Privacy", published.Brand.FooterLinks[0].Label)
 	assert.Equal(t, map[string]string{"en": "Privacy notice", "de": "Datenschutz", "es": "Privacidad",
 		"fr": "Confidentialité", "it": "Riservatezza", "pt-BR": "Privacidade"}, published.Brand.FooterLinks[0].Labels)
@@ -166,7 +166,7 @@ func TestPages_ABrandWithNoFooterDrawsNone(t *testing.T) {
 	status, answer, _ := brandCall(t, accessToken, http.MethodPost, brandPath(id, "/make-default"), nil)
 	require.Equal(t, http.StatusOK, status, "%v", answer)
 
-	resp := loadPage(t, createHttpClient(t), appConfig.AuthServer.BaseURL+"/no-such-page-no-footer")
+	resp := loadPage(t, createHTTPClient(t), appConfig.AuthServer.BaseURL+"/no-such-page-no-footer")
 	defer func() { _ = resp.Body.Close() }()
 
 	assert.Zero(t, readPageFooter(t, resp).footers)

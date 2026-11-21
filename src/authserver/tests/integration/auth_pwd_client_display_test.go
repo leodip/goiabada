@@ -19,20 +19,20 @@ func TestAuthPwd_ClientDisplay_ShowDisplayName_WithValue(t *testing.T) {
 		ShowDescription:  false,
 		ShowWebsiteURL:   false,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  record.ACRLevel1,
+		DefaultACRLevel:  record.ACRLevel1,
 	})
 
 	// Create redirect URI
-	redirectUri := &record.RedirectURI{
+	redirectURI := &record.RedirectURI{
 		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
-	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err := database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	require.NoError(t, err)
 
 	// Navigate to password screen
-	httpClient := createHttpClient(t)
-	resp := navigateToPasswordScreen(t, httpClient, client, redirectUri.URI)
+	httpClient := createHTTPClient(t)
+	resp := navigateToPasswordScreen(t, httpClient, client, redirectURI.URI)
 	defer func() { _ = resp.Body.Close() }()
 
 	// Parse HTML
@@ -44,75 +44,75 @@ func TestAuthPwd_ClientDisplay_ShowDisplayName_WithValue(t *testing.T) {
 	// Assert no logo/description/URL
 	assertClientLogoInHTML(t, doc, client.ClientIdentifier, false)
 	assertClientDescriptionInHTML(t, doc, "", false)
-	assertClientWebsiteUrlInHTML(t, doc, "", false)
+	assertClientWebsiteURLInHTML(t, doc, "", false)
 }
 
 func TestAuthPwd_ClientDisplay_ShowDisplayName_Empty(t *testing.T) {
 	// Create client with display name enabled but empty
-	clientId := "test-app-" + fake.LetterN(8)
+	clientID := "test-app-" + fake.LetterN(8)
 	client := createClientWithDisplaySettings(t, ClientDisplaySettings{
-		ClientIdentifier: clientId,
+		ClientIdentifier: clientID,
 		DisplayName:      "", // Empty display name
 		ShowDisplayName:  true,
 		ShowLogo:         false,
 		ShowDescription:  false,
 		ShowWebsiteURL:   false,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  record.ACRLevel1,
+		DefaultACRLevel:  record.ACRLevel1,
 	})
 
-	redirectUri := &record.RedirectURI{
+	redirectURI := &record.RedirectURI{
 		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
-	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err := database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
-	resp := navigateToPasswordScreen(t, httpClient, client, redirectUri.URI)
+	httpClient := createHTTPClient(t)
+	resp := navigateToPasswordScreen(t, httpClient, client, redirectURI.URI)
 	defer func() { _ = resp.Body.Close() }()
 
 	doc := parseHTMLResponse(t, resp)
 
 	// Should fall back to client identifier
-	assertClientNameInHTML(t, doc, clientId)
+	assertClientNameInHTML(t, doc, clientID)
 	assertClientLogoInHTML(t, doc, client.ClientIdentifier, false)
 	assertClientDescriptionInHTML(t, doc, "", false)
-	assertClientWebsiteUrlInHTML(t, doc, "", false)
+	assertClientWebsiteURLInHTML(t, doc, "", false)
 }
 
 func TestAuthPwd_ClientDisplay_HideDisplayName(t *testing.T) {
 	// Create client with display name set but ShowDisplayName=false
-	clientId := "test-app-" + fake.LetterN(8)
+	clientID := "test-app-" + fake.LetterN(8)
 	client := createClientWithDisplaySettings(t, ClientDisplaySettings{
-		ClientIdentifier: clientId,
+		ClientIdentifier: clientID,
 		DisplayName:      "My Awesome Application",
 		ShowDisplayName:  false, // Hidden
 		ShowLogo:         false,
 		ShowDescription:  false,
 		ShowWebsiteURL:   false,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  record.ACRLevel1,
+		DefaultACRLevel:  record.ACRLevel1,
 	})
 
-	redirectUri := &record.RedirectURI{
+	redirectURI := &record.RedirectURI{
 		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
-	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err := database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
-	resp := navigateToPasswordScreen(t, httpClient, client, redirectUri.URI)
+	httpClient := createHTTPClient(t)
+	resp := navigateToPasswordScreen(t, httpClient, client, redirectURI.URI)
 	defer func() { _ = resp.Body.Close() }()
 
 	doc := parseHTMLResponse(t, resp)
 
 	// Should show client identifier, not display name
-	assertClientNameInHTML(t, doc, clientId)
+	assertClientNameInHTML(t, doc, clientID)
 	assertClientLogoInHTML(t, doc, client.ClientIdentifier, false)
 	assertClientDescriptionInHTML(t, doc, "", false)
-	assertClientWebsiteUrlInHTML(t, doc, "", false)
+	assertClientWebsiteURLInHTML(t, doc, "", false)
 }
 
 func TestAuthPwd_ClientDisplay_ShowLogo_WithLogo(t *testing.T) {
@@ -125,18 +125,18 @@ func TestAuthPwd_ClientDisplay_ShowLogo_WithLogo(t *testing.T) {
 		ShowDescription:  false,
 		ShowWebsiteURL:   false,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  record.ACRLevel1,
+		DefaultACRLevel:  record.ACRLevel1,
 	})
 
-	redirectUri := &record.RedirectURI{
+	redirectURI := &record.RedirectURI{
 		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
-	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err := database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
-	resp := navigateToPasswordScreen(t, httpClient, client, redirectUri.URI)
+	httpClient := createHTTPClient(t)
+	resp := navigateToPasswordScreen(t, httpClient, client, redirectURI.URI)
 	defer func() { _ = resp.Body.Close() }()
 
 	doc := parseHTMLResponse(t, resp)
@@ -145,7 +145,7 @@ func TestAuthPwd_ClientDisplay_ShowLogo_WithLogo(t *testing.T) {
 	assertClientNameInHTML(t, doc, client.ClientIdentifier)
 	assertClientLogoInHTML(t, doc, client.ClientIdentifier, true)
 	assertClientDescriptionInHTML(t, doc, "", false)
-	assertClientWebsiteUrlInHTML(t, doc, "", false)
+	assertClientWebsiteURLInHTML(t, doc, "", false)
 }
 
 func TestAuthPwd_ClientDisplay_ShowLogo_NoLogo(t *testing.T) {
@@ -158,18 +158,18 @@ func TestAuthPwd_ClientDisplay_ShowLogo_NoLogo(t *testing.T) {
 		ShowDescription:  false,
 		ShowWebsiteURL:   false,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  record.ACRLevel1,
+		DefaultACRLevel:  record.ACRLevel1,
 	})
 
-	redirectUri := &record.RedirectURI{
+	redirectURI := &record.RedirectURI{
 		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
-	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err := database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
-	resp := navigateToPasswordScreen(t, httpClient, client, redirectUri.URI)
+	httpClient := createHTTPClient(t)
+	resp := navigateToPasswordScreen(t, httpClient, client, redirectURI.URI)
 	defer func() { _ = resp.Body.Close() }()
 
 	doc := parseHTMLResponse(t, resp)
@@ -178,7 +178,7 @@ func TestAuthPwd_ClientDisplay_ShowLogo_NoLogo(t *testing.T) {
 	assertClientNameInHTML(t, doc, client.ClientIdentifier)
 	assertClientLogoInHTML(t, doc, client.ClientIdentifier, false)
 	assertClientDescriptionInHTML(t, doc, "", false)
-	assertClientWebsiteUrlInHTML(t, doc, "", false)
+	assertClientWebsiteURLInHTML(t, doc, "", false)
 }
 
 func TestAuthPwd_ClientDisplay_HideLogo_WithLogo(t *testing.T) {
@@ -191,18 +191,18 @@ func TestAuthPwd_ClientDisplay_HideLogo_WithLogo(t *testing.T) {
 		ShowDescription:  false,
 		ShowWebsiteURL:   false,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  record.ACRLevel1,
+		DefaultACRLevel:  record.ACRLevel1,
 	})
 
-	redirectUri := &record.RedirectURI{
+	redirectURI := &record.RedirectURI{
 		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
-	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err := database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
-	resp := navigateToPasswordScreen(t, httpClient, client, redirectUri.URI)
+	httpClient := createHTTPClient(t)
+	resp := navigateToPasswordScreen(t, httpClient, client, redirectURI.URI)
 	defer func() { _ = resp.Body.Close() }()
 
 	doc := parseHTMLResponse(t, resp)
@@ -211,7 +211,7 @@ func TestAuthPwd_ClientDisplay_HideLogo_WithLogo(t *testing.T) {
 	assertClientNameInHTML(t, doc, client.ClientIdentifier)
 	assertClientLogoInHTML(t, doc, client.ClientIdentifier, false)
 	assertClientDescriptionInHTML(t, doc, "", false)
-	assertClientWebsiteUrlInHTML(t, doc, "", false)
+	assertClientWebsiteURLInHTML(t, doc, "", false)
 }
 
 func TestAuthPwd_ClientDisplay_ShowDescription_WithValue(t *testing.T) {
@@ -224,18 +224,18 @@ func TestAuthPwd_ClientDisplay_ShowDescription_WithValue(t *testing.T) {
 		ShowDisplayName:  false,
 		ShowWebsiteURL:   false,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  record.ACRLevel1,
+		DefaultACRLevel:  record.ACRLevel1,
 	})
 
-	redirectUri := &record.RedirectURI{
+	redirectURI := &record.RedirectURI{
 		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
-	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err := database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
-	resp := navigateToPasswordScreen(t, httpClient, client, redirectUri.URI)
+	httpClient := createHTTPClient(t)
+	resp := navigateToPasswordScreen(t, httpClient, client, redirectURI.URI)
 	defer func() { _ = resp.Body.Close() }()
 
 	doc := parseHTMLResponse(t, resp)
@@ -244,7 +244,7 @@ func TestAuthPwd_ClientDisplay_ShowDescription_WithValue(t *testing.T) {
 	assertClientNameInHTML(t, doc, client.ClientIdentifier)
 	assertClientLogoInHTML(t, doc, client.ClientIdentifier, false)
 	assertClientDescriptionInHTML(t, doc, "The best app for testing OAuth flows", true)
-	assertClientWebsiteUrlInHTML(t, doc, "", false)
+	assertClientWebsiteURLInHTML(t, doc, "", false)
 }
 
 func TestAuthPwd_ClientDisplay_ShowDescription_Empty(t *testing.T) {
@@ -257,18 +257,18 @@ func TestAuthPwd_ClientDisplay_ShowDescription_Empty(t *testing.T) {
 		ShowDisplayName:  false,
 		ShowWebsiteURL:   false,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  record.ACRLevel1,
+		DefaultACRLevel:  record.ACRLevel1,
 	})
 
-	redirectUri := &record.RedirectURI{
+	redirectURI := &record.RedirectURI{
 		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
-	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err := database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
-	resp := navigateToPasswordScreen(t, httpClient, client, redirectUri.URI)
+	httpClient := createHTTPClient(t)
+	resp := navigateToPasswordScreen(t, httpClient, client, redirectURI.URI)
 	defer func() { _ = resp.Body.Close() }()
 
 	doc := parseHTMLResponse(t, resp)
@@ -277,7 +277,7 @@ func TestAuthPwd_ClientDisplay_ShowDescription_Empty(t *testing.T) {
 	assertClientNameInHTML(t, doc, client.ClientIdentifier)
 	assertClientLogoInHTML(t, doc, client.ClientIdentifier, false)
 	assertClientDescriptionInHTML(t, doc, "", false)
-	assertClientWebsiteUrlInHTML(t, doc, "", false)
+	assertClientWebsiteURLInHTML(t, doc, "", false)
 }
 
 func TestAuthPwd_ClientDisplay_HideDescription(t *testing.T) {
@@ -290,18 +290,18 @@ func TestAuthPwd_ClientDisplay_HideDescription(t *testing.T) {
 		ShowDisplayName:  false,
 		ShowWebsiteURL:   false,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  record.ACRLevel1,
+		DefaultACRLevel:  record.ACRLevel1,
 	})
 
-	redirectUri := &record.RedirectURI{
+	redirectURI := &record.RedirectURI{
 		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
-	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err := database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
-	resp := navigateToPasswordScreen(t, httpClient, client, redirectUri.URI)
+	httpClient := createHTTPClient(t)
+	resp := navigateToPasswordScreen(t, httpClient, client, redirectURI.URI)
 	defer func() { _ = resp.Body.Close() }()
 
 	doc := parseHTMLResponse(t, resp)
@@ -310,10 +310,10 @@ func TestAuthPwd_ClientDisplay_HideDescription(t *testing.T) {
 	assertClientNameInHTML(t, doc, client.ClientIdentifier)
 	assertClientLogoInHTML(t, doc, client.ClientIdentifier, false)
 	assertClientDescriptionInHTML(t, doc, "The best app for testing OAuth flows", false)
-	assertClientWebsiteUrlInHTML(t, doc, "", false)
+	assertClientWebsiteURLInHTML(t, doc, "", false)
 }
 
-func TestAuthPwd_ClientDisplay_ShowWebsiteUrl_WithValue(t *testing.T) {
+func TestAuthPwd_ClientDisplay_ShowWebsiteURL_WithValue(t *testing.T) {
 	// Create client with website URL enabled
 	client := createClientWithDisplaySettings(t, ClientDisplaySettings{
 		ClientIdentifier: "test-app-" + fake.LetterN(8),
@@ -323,18 +323,18 @@ func TestAuthPwd_ClientDisplay_ShowWebsiteUrl_WithValue(t *testing.T) {
 		ShowDisplayName:  false,
 		ShowDescription:  false,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  record.ACRLevel1,
+		DefaultACRLevel:  record.ACRLevel1,
 	})
 
-	redirectUri := &record.RedirectURI{
+	redirectURI := &record.RedirectURI{
 		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
-	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err := database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
-	resp := navigateToPasswordScreen(t, httpClient, client, redirectUri.URI)
+	httpClient := createHTTPClient(t)
+	resp := navigateToPasswordScreen(t, httpClient, client, redirectURI.URI)
 	defer func() { _ = resp.Body.Close() }()
 
 	doc := parseHTMLResponse(t, resp)
@@ -343,10 +343,10 @@ func TestAuthPwd_ClientDisplay_ShowWebsiteUrl_WithValue(t *testing.T) {
 	assertClientNameInHTML(t, doc, client.ClientIdentifier)
 	assertClientLogoInHTML(t, doc, client.ClientIdentifier, false)
 	assertClientDescriptionInHTML(t, doc, "", false)
-	assertClientWebsiteUrlInHTML(t, doc, "https://example.com", true)
+	assertClientWebsiteURLInHTML(t, doc, "https://example.com", true)
 }
 
-func TestAuthPwd_ClientDisplay_ShowWebsiteUrl_Empty(t *testing.T) {
+func TestAuthPwd_ClientDisplay_ShowWebsiteURL_Empty(t *testing.T) {
 	// Create client with website URL enabled but empty
 	client := createClientWithDisplaySettings(t, ClientDisplaySettings{
 		ClientIdentifier: "test-app-" + fake.LetterN(8),
@@ -356,18 +356,18 @@ func TestAuthPwd_ClientDisplay_ShowWebsiteUrl_Empty(t *testing.T) {
 		ShowDisplayName:  false,
 		ShowDescription:  false,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  record.ACRLevel1,
+		DefaultACRLevel:  record.ACRLevel1,
 	})
 
-	redirectUri := &record.RedirectURI{
+	redirectURI := &record.RedirectURI{
 		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
-	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err := database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
-	resp := navigateToPasswordScreen(t, httpClient, client, redirectUri.URI)
+	httpClient := createHTTPClient(t)
+	resp := navigateToPasswordScreen(t, httpClient, client, redirectURI.URI)
 	defer func() { _ = resp.Body.Close() }()
 
 	doc := parseHTMLResponse(t, resp)
@@ -376,10 +376,10 @@ func TestAuthPwd_ClientDisplay_ShowWebsiteUrl_Empty(t *testing.T) {
 	assertClientNameInHTML(t, doc, client.ClientIdentifier)
 	assertClientLogoInHTML(t, doc, client.ClientIdentifier, false)
 	assertClientDescriptionInHTML(t, doc, "", false)
-	assertClientWebsiteUrlInHTML(t, doc, "", false)
+	assertClientWebsiteURLInHTML(t, doc, "", false)
 }
 
-func TestAuthPwd_ClientDisplay_HideWebsiteUrl(t *testing.T) {
+func TestAuthPwd_ClientDisplay_HideWebsiteURL(t *testing.T) {
 	// Create client with website URL set but ShowWebsiteURL=false
 	client := createClientWithDisplaySettings(t, ClientDisplaySettings{
 		ClientIdentifier: "test-app-" + fake.LetterN(8),
@@ -389,18 +389,18 @@ func TestAuthPwd_ClientDisplay_HideWebsiteUrl(t *testing.T) {
 		ShowDisplayName:  false,
 		ShowDescription:  false,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  record.ACRLevel1,
+		DefaultACRLevel:  record.ACRLevel1,
 	})
 
-	redirectUri := &record.RedirectURI{
+	redirectURI := &record.RedirectURI{
 		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
-	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err := database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
-	resp := navigateToPasswordScreen(t, httpClient, client, redirectUri.URI)
+	httpClient := createHTTPClient(t)
+	resp := navigateToPasswordScreen(t, httpClient, client, redirectURI.URI)
 	defer func() { _ = resp.Body.Close() }()
 
 	doc := parseHTMLResponse(t, resp)
@@ -409,7 +409,7 @@ func TestAuthPwd_ClientDisplay_HideWebsiteUrl(t *testing.T) {
 	assertClientNameInHTML(t, doc, client.ClientIdentifier)
 	assertClientLogoInHTML(t, doc, client.ClientIdentifier, false)
 	assertClientDescriptionInHTML(t, doc, "", false)
-	assertClientWebsiteUrlInHTML(t, doc, "https://example.com", false)
+	assertClientWebsiteURLInHTML(t, doc, "https://example.com", false)
 }
 
 func TestAuthPwd_ClientDisplay_AllEnabled(t *testing.T) {
@@ -425,18 +425,18 @@ func TestAuthPwd_ClientDisplay_AllEnabled(t *testing.T) {
 		ShowWebsiteURL:   true,
 		UploadLogo:       true, // Upload logo
 		ConsentRequired:  false,
-		DefaultAcrLevel:  record.ACRLevel1,
+		DefaultACRLevel:  record.ACRLevel1,
 	})
 
-	redirectUri := &record.RedirectURI{
+	redirectURI := &record.RedirectURI{
 		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
-	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err := database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
-	resp := navigateToPasswordScreen(t, httpClient, client, redirectUri.URI)
+	httpClient := createHTTPClient(t)
+	resp := navigateToPasswordScreen(t, httpClient, client, redirectURI.URI)
 	defer func() { _ = resp.Body.Close() }()
 
 	doc := parseHTMLResponse(t, resp)
@@ -445,14 +445,14 @@ func TestAuthPwd_ClientDisplay_AllEnabled(t *testing.T) {
 	assertClientNameInHTML(t, doc, "My Awesome Application")
 	assertClientLogoInHTML(t, doc, client.ClientIdentifier, true)
 	assertClientDescriptionInHTML(t, doc, "The best app for testing OAuth flows", true)
-	assertClientWebsiteUrlInHTML(t, doc, "https://example.com", true)
+	assertClientWebsiteURLInHTML(t, doc, "https://example.com", true)
 }
 
 func TestAuthPwd_ClientDisplay_AllDisabled(t *testing.T) {
 	// Create client with all display settings disabled
-	clientId := "test-app-" + fake.LetterN(8)
+	clientID := "test-app-" + fake.LetterN(8)
 	client := createClientWithDisplaySettings(t, ClientDisplaySettings{
-		ClientIdentifier: clientId,
+		ClientIdentifier: clientID,
 		DisplayName:      "My Awesome Application",
 		Description:      "The best app for testing OAuth flows",
 		WebsiteURL:       "https://example.com",
@@ -462,25 +462,25 @@ func TestAuthPwd_ClientDisplay_AllDisabled(t *testing.T) {
 		ShowWebsiteURL:   false,
 		UploadLogo:       true, // Logo exists but hidden
 		ConsentRequired:  false,
-		DefaultAcrLevel:  record.ACRLevel1,
+		DefaultACRLevel:  record.ACRLevel1,
 	})
 
-	redirectUri := &record.RedirectURI{
+	redirectURI := &record.RedirectURI{
 		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
-	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err := database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
-	resp := navigateToPasswordScreen(t, httpClient, client, redirectUri.URI)
+	httpClient := createHTTPClient(t)
+	resp := navigateToPasswordScreen(t, httpClient, client, redirectURI.URI)
 	defer func() { _ = resp.Body.Close() }()
 
 	doc := parseHTMLResponse(t, resp)
 
 	// Only client identifier should be visible
-	assertClientNameInHTML(t, doc, clientId)
+	assertClientNameInHTML(t, doc, clientID)
 	assertClientLogoInHTML(t, doc, client.ClientIdentifier, false)
 	assertClientDescriptionInHTML(t, doc, "The best app for testing OAuth flows", false)
-	assertClientWebsiteUrlInHTML(t, doc, "https://example.com", false)
+	assertClientWebsiteURLInHTML(t, doc, "https://example.com", false)
 }

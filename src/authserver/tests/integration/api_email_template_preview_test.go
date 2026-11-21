@@ -79,7 +79,7 @@ func TestAPIEmailTemplateSendTest_ReachesTheMailboxAndIsAudited(t *testing.T) {
 	appName := appNameOfSettings(t)
 	to := plusAddress()
 
-	status, body, requestId := emailTemplateCall(t, manageToken, http.MethodPost, emailTemplatesPath+"/verification_code/es/send-test", map[string]any{
+	status, body, requestID := emailTemplateCall(t, manageToken, http.MethodPost, emailTemplatesPath+"/verification_code/es/send-test", map[string]any{
 		"to":      to,
 		"subject": "Tu código de {{app_name}}: {{code}}",
 		"body":    "Hola {{name}}:\n\n{{code}}\n\nCaduca en {{expiry}}.",
@@ -99,7 +99,7 @@ func TestAPIEmailTemplateSendTest_ReachesTheMailboxAndIsAudited(t *testing.T) {
 		"email_digest":   hashutil.HashString(strings.ToLower(to)),
 		"email_template": "verification_code",
 		"language":       "es",
-	}}, auditRows(t, manageToken, "sent_test_email", requestId))
+	}}, auditRows(t, manageToken, "sent_test_email", requestID))
 }
 
 // authserver:manage-settings reads and previews templates but is refused a test send, which is
@@ -116,10 +116,10 @@ func TestAPIEmailTemplateSendTest_TakesManage(t *testing.T) {
 	status, _, _ := emailTemplateCall(t, token, http.MethodPost, emailTemplatesPath+"/welcome/es/preview", text)
 	assert.Equal(t, http.StatusOK, status, "manage-settings previews")
 
-	status, body, requestId := emailTemplateCall(t, token, http.MethodPost, emailTemplatesPath+"/welcome/es/send-test", text)
+	status, body, requestID := emailTemplateCall(t, token, http.MethodPost, emailTemplatesPath+"/welcome/es/send-test", text)
 	assert.Equal(t, http.StatusForbidden, status)
 	assert.Equal(t, "MANAGE_SCOPE_REQUIRED", body["error_code"])
-	rows := refusalRows(t, manageToken, requestId)
+	rows := refusalRows(t, manageToken, requestID)
 	require.Len(t, rows, 1)
 	assert.Equal(t, "settings", rows[0]["ceiling"])
 	assert.Equal(t, "/api/v1/admin/email-templates/{email}/{language}/send-test", rows[0]["route"])
@@ -147,7 +147,7 @@ func TestAPISettingsEmailSendTest_IsAuditedWithTheTestTemplate(t *testing.T) {
 	manageToken, caller := createAdminClientWithToken(t)
 	to := plusAddress()
 
-	resp, requestId := sendAdmin(t, manageToken, http.MethodPost, "/api/v1/admin/settings/email/send-test", api.SendTestEmailRequest{To: to})
+	resp, requestID := sendAdmin(t, manageToken, http.MethodPost, "/api/v1/admin/settings/email/send-test", api.SendTestEmailRequest{To: to})
 	_ = resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
@@ -156,5 +156,5 @@ func TestAPISettingsEmailSendTest_IsAuditedWithTheTestTemplate(t *testing.T) {
 		"email_digest":   hashutil.HashString(strings.ToLower(to)),
 		"email_template": "test",
 		"language":       "en",
-	}}, auditRows(t, manageToken, "sent_test_email", requestId))
+	}}, auditRows(t, manageToken, "sent_test_email", requestID))
 }

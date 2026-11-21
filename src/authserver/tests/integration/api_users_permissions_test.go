@@ -110,7 +110,7 @@ func TestAPIUserPermissionsGet_UserNotFound(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
-func TestAPIUserPermissionsGet_InvalidUserId(t *testing.T) {
+func TestAPIUserPermissionsGet_InvalidUserID(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)
 
@@ -179,7 +179,7 @@ func TestAPIUserPermissionsGet_Unauthorized(t *testing.T) {
 	req, err := http.NewRequest("GET", url, nil)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -232,7 +232,7 @@ func TestAPIUserPermissionsPut_Success(t *testing.T) {
 	// Test: Update user permissions (replace with two different permissions)
 	updateReq := api.UpdateUserPermissionsRequest{
 		PermissionIDs:         []int64{perm2.ID, perm3.ID},
-		ExpectedPermissionIDs: getUserPermissionIds(t, accessToken, testUser.ID),
+		ExpectedPermissionIDs: getUserPermissionIDs(t, accessToken, testUser.ID),
 	}
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.ID, 10) + "/permissions"
@@ -256,14 +256,14 @@ func TestAPIUserPermissionsPut_Success(t *testing.T) {
 	// Assert: Should have exactly 2 permissions (perm2 and perm3)
 	assert.Len(t, testUser.Permissions, 2)
 
-	permIds := make([]int64, len(testUser.Permissions))
+	permIDs := make([]int64, len(testUser.Permissions))
 	for i, perm := range testUser.Permissions {
-		permIds[i] = perm.ID
+		permIDs[i] = perm.ID
 	}
 
-	assert.Contains(t, permIds, perm2.ID)
-	assert.Contains(t, permIds, perm3.ID)
-	assert.NotContains(t, permIds, perm1.ID) // Should be removed
+	assert.Contains(t, permIDs, perm2.ID)
+	assert.Contains(t, permIDs, perm3.ID)
+	assert.NotContains(t, permIDs, perm1.ID) // Should be removed
 }
 
 func TestAPIUserPermissionsPut_RemoveAllPermissions(t *testing.T) {
@@ -301,7 +301,7 @@ func TestAPIUserPermissionsPut_RemoveAllPermissions(t *testing.T) {
 	// Test: Remove all permissions (empty array)
 	updateReq := api.UpdateUserPermissionsRequest{
 		PermissionIDs:         []int64{},
-		ExpectedPermissionIDs: getUserPermissionIds(t, accessToken, testUser.ID),
+		ExpectedPermissionIDs: getUserPermissionIDs(t, accessToken, testUser.ID),
 	}
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.ID, 10) + "/permissions"
@@ -367,7 +367,7 @@ func TestAPIUserPermissionsPut_PermissionNotFound(t *testing.T) {
 	// Test: Update with non-existent permission
 	updateReq := api.UpdateUserPermissionsRequest{
 		PermissionIDs:         []int64{99999},
-		ExpectedPermissionIDs: getUserPermissionIds(t, accessToken, testUser.ID),
+		ExpectedPermissionIDs: getUserPermissionIDs(t, accessToken, testUser.ID),
 	}
 
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.ID, 10) + "/permissions"
@@ -403,7 +403,7 @@ func TestAPIUserPermissionsPut_InvalidRequestBody(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -432,7 +432,7 @@ func TestAPIUserPermissionsPut_Unauthorized(t *testing.T) {
 	req, err := http.NewRequest("PUT", url, nil)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -442,21 +442,21 @@ func TestAPIUserPermissionsPut_Unauthorized(t *testing.T) {
 }
 
 // Helper function to create a user permission
-func createTestUserPermission(t *testing.T, userId, permissionId int64) *record.UserPermission {
+func createTestUserPermission(t *testing.T, userID, permissionID int64) *record.UserPermission {
 	userPermission := &record.UserPermission{
-		UserID:       userId,
-		PermissionID: permissionId,
+		UserID:       userID,
+		PermissionID: permissionID,
 	}
 	err := database.CreateUserPermission(context.Background(), nil, userPermission)
 	assert.NoError(t, err)
 	return userPermission
 }
 
-// getUserPermissionIds reads the user's grants through the API, as a caller does before a save,
+// getUserPermissionIDs reads the user's grants through the API, as a caller does before a save,
 // and returns their ids: the loaded set a save carries (#428).
-func getUserPermissionIds(t *testing.T, accessToken string, userId int64) []int64 {
+func getUserPermissionIDs(t *testing.T, accessToken string, userID int64) []int64 {
 	t.Helper()
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(userId, 10) + "/permissions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(userID, 10) + "/permissions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -507,7 +507,7 @@ func TestAPIUserPermissionsPut_TheLoadedListIsRequired(t *testing.T) {
 			require.NoError(t, json.NewDecoder(resp.Body).Decode(&got))
 			assert.Equal(t, "VALIDATION_ERROR", got["error_code"])
 			assert.Contains(t, got["error_description"], "expectedPermissionIds is required")
-			assert.Empty(t, getUserPermissionIds(t, accessToken, user.ID))
+			assert.Empty(t, getUserPermissionIDs(t, accessToken, user.ID))
 		})
 	}
 }
@@ -528,7 +528,7 @@ func TestAPIUserPermissionsPut_AnOutdatedLoadedListIsRefused(t *testing.T) {
 	createTestUserPermission(t, user.ID, permB.ID)
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(user.ID, 10) + "/permissions"
 
-	loadedByBoth := getUserPermissionIds(t, accessToken, user.ID)
+	loadedByBoth := getUserPermissionIDs(t, accessToken, user.ID)
 
 	first := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateUserPermissionsRequest{
 		PermissionIDs: []int64{permB.ID}, ExpectedPermissionIDs: loadedByBoth})
@@ -544,13 +544,13 @@ func TestAPIUserPermissionsPut_AnOutdatedLoadedListIsRefused(t *testing.T) {
 	assert.Equal(t, "CONCURRENT_UPDATE", body["error_code"])
 	assert.Contains(t, body["error_description"], "reload it")
 
-	assert.Equal(t, []int64{permB.ID}, getUserPermissionIds(t, accessToken, user.ID), "the refused save wrote nothing")
+	assert.Equal(t, []int64{permB.ID}, getUserPermissionIDs(t, accessToken, user.ID), "the refused save wrote nothing")
 }
 
 // A save naming one permission twice grants it once, so a following save without it revokes it
 // entirely. The save used to insert both, and the revocation deleted one of the two rows and left
 // the permission granted, which the read after it would still show (#406).
-func TestAPIUserPermissionsPut_ARepeatedIdIsGrantedOnceAndRevokedWhole(t *testing.T) {
+func TestAPIUserPermissionsPut_ARepeatedIDIsGrantedOnceAndRevokedWhole(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 	user := newPermissionsTestUser(t, "repeated-id")
 	resource := createTestResource(t, "user-perm-repeat-"+fake.UUID()[:8], "User permission repeat resource")
@@ -562,12 +562,12 @@ func TestAPIUserPermissionsPut_ARepeatedIdIsGrantedOnceAndRevokedWhole(t *testin
 		PermissionIDs: []int64{perm.ID, perm.ID}, ExpectedPermissionIDs: []int64{}})
 	defer func() { _ = grant.Body.Close() }()
 	require.Equal(t, http.StatusOK, grant.StatusCode)
-	loaded := getUserPermissionIds(t, accessToken, user.ID)
+	loaded := getUserPermissionIDs(t, accessToken, user.ID)
 	require.Equal(t, []int64{perm.ID}, loaded)
 
 	revoke := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateUserPermissionsRequest{
 		PermissionIDs: []int64{}, ExpectedPermissionIDs: loaded})
 	defer func() { _ = revoke.Body.Close() }()
 	require.Equal(t, http.StatusOK, revoke.StatusCode)
-	assert.Empty(t, getUserPermissionIds(t, accessToken, user.ID), "no copy of the grant is left")
+	assert.Empty(t, getUserPermissionIDs(t, accessToken, user.ID), "no copy of the grant is left")
 }

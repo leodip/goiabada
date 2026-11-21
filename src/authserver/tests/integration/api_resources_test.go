@@ -111,7 +111,7 @@ func TestAPIResourcesGet_Unauthorized(t *testing.T) {
 	req, err := http.NewRequest("GET", url, nil)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -207,7 +207,7 @@ func createClientCredentialsTokenWithScope(t *testing.T, resourceIdentifier, per
 		"scope":         {resourceIdentifier + ":" + permissionIdentifier},
 	}
 	tokenEndpoint := appConfig.AuthServer.BaseURL + "/auth/token/"
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	data := postToTokenEndpoint(t, httpClient, tokenEndpoint, form)
 	accessToken, ok := data["access_token"].(string)
 	assert.True(t, ok)

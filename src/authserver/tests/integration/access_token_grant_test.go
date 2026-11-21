@@ -80,10 +80,10 @@ func TestAccessTokenGrant_ConsentWithdrawnEndsItsAccessTokens(t *testing.T) {
 	user, err := database.GetUserByID(context.Background(), nil, code.UserID)
 	require.NoError(t, err)
 	setUserPassword(t, user, password)
-	otherHttpClient, otherCode := createAuthCode(t, otherSecret, "openid",
+	otherHTTPClient, otherCode := createAuthCode(t, otherSecret, "openid",
 		authCodeOptions{user: user, userPassword: password})
 	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, otherCode.ClientID) })
-	otherToken := redeemCode(t, otherHttpClient, otherCode, otherSecret)["access_token"].(string)
+	otherToken := redeemCode(t, otherHTTPClient, otherCode, otherSecret)["access_token"].(string)
 
 	// The positive control: the token works before the withdrawal.
 	assertUserinfoAdmits(t, accessToken, code.User.Subject)

@@ -22,7 +22,7 @@ func fetchDiscoveryAt(t *testing.T, path, origin string) (*http.Response, []byte
 	if origin != "" {
 		req.Header.Set("Origin", origin)
 	}
-	resp, err := createHttpClient(t).Do(req)
+	resp, err := createHTTPClient(t).Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	body, err := io.ReadAll(resp.Body)

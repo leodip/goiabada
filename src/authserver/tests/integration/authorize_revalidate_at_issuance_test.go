@@ -126,21 +126,21 @@ func parkCeremonyOnConsentScreen(t *testing.T, responseType string, requestScope
 
 	// One HTTP client throughout, so the cookie is shared and this is one browser's ceremony
 	// rather than two.
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
 	state := fake.LetterN(8)
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=" + url.QueryEscape(responseType) +
 		"&scope=" + url.QueryEscape(requestScope) +
 		"&state=" + state +
 		"&nonce=" + fake.LetterN(8)
 	if responseType == "code" {
-		destUrl += "&code_challenge_method=S256" +
+		destURL += "&code_challenge_method=S256" +
 			"&code_challenge=" + oauth.GeneratePKCECodeChallenge(codeVerifier)
 	}
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	require.NoError(t, err)
 
 	redirectLocation := assertRedirect(t, resp, "/auth/level1")
@@ -269,7 +269,7 @@ func TestPermissionRevokedOnConsentScreen_TokenLosesTheScope(t *testing.T) {
 
 	// A narrowed grant is issued rather than refused, which is RFC 6749 section 3.3 and what
 	// /auth/completed's own filter does with the same removal seconds earlier.
-	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
+	codeVal, stateVal := getCodeAndStateFromURL(t, resp)
 	assert.Equal(t, parked.state, stateVal)
 
 	data := postToTokenEndpoint(t, parked.httpClient, appConfig.AuthServer.BaseURL+"/auth/token/",
@@ -451,7 +451,7 @@ func TestPermissionRevokedBeforeConsentSubmission_ConsentRecordNeverHasIt(t *tes
 	resp = loadPage(t, parked.httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
+	codeVal, stateVal := getCodeAndStateFromURL(t, resp)
 	assert.Equal(t, parked.state, stateVal)
 
 	data := postToTokenEndpoint(t, parked.httpClient, appConfig.AuthServer.BaseURL+"/auth/token/",

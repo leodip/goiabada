@@ -51,9 +51,9 @@ func TestAPIAccount_ASubjectWithSurroundingWhitespaceNamesOneUser(t *testing.T) 
 
 		var out api.AccountLogoutRedirectResponse
 		require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
-		logoutUrl, err := url.Parse(out.LogoutURL)
+		logoutURL, err := url.Parse(out.LogoutURL)
 		require.NoError(t, err)
-		hint := logoutUrl.Query().Get("id_token_hint")
+		hint := logoutURL.Query().Get("id_token_hint")
 		require.NotEmpty(t, hint)
 		assert.Equal(t, code.User.Subject, decodeJWTPayload(t, hint)["sub"])
 	})

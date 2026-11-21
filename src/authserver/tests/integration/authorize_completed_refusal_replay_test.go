@@ -43,12 +43,12 @@ func TestAuthCompleted_DisabledUserRefusal_CannotBeReplayed(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	redirectUri := &record.RedirectURI{
+	redirectURI := &record.RedirectURI{
 		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,8 +72,8 @@ func TestAuthCompleted_DisabledUserRefusal_CannotBeReplayed(t *testing.T) {
 	}
 
 	requestState := fake.LetterN(8)
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + randomCodeChallenge() +
@@ -81,9 +81,9 @@ func TestAuthCompleted_DisabledUserRefusal_CannotBeReplayed(t *testing.T) {
 		"&state=" + requestState +
 		"&nonce=" + fake.LetterN(8)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,7 +104,7 @@ func TestAuthCompleted_DisabledUserRefusal_CannotBeReplayed(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func(body io.ReadCloser) { _ = body.Close() }(resp.Body)
 
-	completedUrl := assertRedirect(t, resp, "/auth/completed")
+	completedURL := assertRedirect(t, resp, "/auth/completed")
 
 	// The password has already been accepted, so the account is disabled here rather than up
 	// front: this is the only window in which /auth/completed sees a disabled user. No session
@@ -115,21 +115,21 @@ func TestAuthCompleted_DisabledUserRefusal_CannotBeReplayed(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	resp = loadPage(t, httpClient, completedUrl)
+	resp = loadPage(t, httpClient, completedURL)
 	defer func(body io.ReadCloser) { _ = body.Close() }(resp.Body)
 
 	assert.Equal(t, http.StatusFound, resp.StatusCode)
-	refusalUrl, err := url.Parse(resp.Header.Get("Location"))
+	refusalURL, err := url.Parse(resp.Header.Get("Location"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, "access_denied", refusalUrl.Query().Get("error"))
-	assert.Equal(t, "The user account is disabled.", refusalUrl.Query().Get("error_description"))
-	assert.Equal(t, requestState, refusalUrl.Query().Get("state"))
+	assert.Equal(t, "access_denied", refusalURL.Query().Get("error"))
+	assert.Equal(t, "The user account is disabled.", refusalURL.Query().Get("error_description"))
+	assert.Equal(t, requestState, refusalURL.Query().Get("state"))
 
 	// The refusal ended the ceremony, so the auth context is gone from the browser and the replay
 	// has nothing to resume: it lands on the account profile instead of refusing a second time.
-	resp = loadPage(t, httpClient, completedUrl)
+	resp = loadPage(t, httpClient, completedURL)
 	defer func(body io.ReadCloser) { _ = body.Close() }(resp.Body)
 
 	assert.Equal(t, http.StatusFound, resp.StatusCode)
@@ -156,12 +156,12 @@ func TestAuthCompleted_NoAuthorizedScopesRefusal_CannotBeReplayed(t *testing.T) 
 		t.Fatal(err)
 	}
 
-	redirectUri := &record.RedirectURI{
+	redirectURI := &record.RedirectURI{
 		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -190,17 +190,17 @@ func TestAuthCompleted_NoAuthorizedScopesRefusal_CannotBeReplayed(t *testing.T) 
 	requestScope := resource.ResourceIdentifier + ":" + permission.PermissionIdentifier
 
 	requestState := fake.LetterN(8)
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + randomCodeChallenge() +
 		"&scope=" + url.QueryEscape(requestScope) +
 		"&state=" + requestState
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -221,21 +221,21 @@ func TestAuthCompleted_NoAuthorizedScopesRefusal_CannotBeReplayed(t *testing.T) 
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func(body io.ReadCloser) { _ = body.Close() }(resp.Body)
 
-	completedUrl := assertRedirect(t, resp, "/auth/completed")
-	resp = loadPage(t, httpClient, completedUrl)
+	completedURL := assertRedirect(t, resp, "/auth/completed")
+	resp = loadPage(t, httpClient, completedURL)
 	defer func(body io.ReadCloser) { _ = body.Close() }(resp.Body)
 
 	assert.Equal(t, http.StatusFound, resp.StatusCode)
-	refusalUrl, err := url.Parse(resp.Header.Get("Location"))
+	refusalURL, err := url.Parse(resp.Header.Get("Location"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, "access_denied", refusalUrl.Query().Get("error"))
+	assert.Equal(t, "access_denied", refusalURL.Query().Get("error"))
 	assert.Equal(t, "The user is not authorized to access any of the requested scopes",
-		refusalUrl.Query().Get("error_description"))
-	assert.Equal(t, requestState, refusalUrl.Query().Get("state"))
+		refusalURL.Query().Get("error_description"))
+	assert.Equal(t, requestState, refusalURL.Query().Get("state"))
 
-	resp = loadPage(t, httpClient, completedUrl)
+	resp = loadPage(t, httpClient, completedURL)
 	defer func(body io.ReadCloser) { _ = body.Close() }(resp.Body)
 
 	assert.Equal(t, http.StatusFound, resp.StatusCode)

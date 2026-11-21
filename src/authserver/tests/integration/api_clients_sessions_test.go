@@ -150,12 +150,12 @@ func TestAPIClientSessionsGet_ClientNotFound(t *testing.T) {
 	assert.Equal(t, "Client not found", errResp.ErrorDescription)
 }
 
-func TestAPIClientSessionsGet_InvalidId(t *testing.T) {
+func TestAPIClientSessionsGet_InvalidID(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	cases := []struct {
 		name     string
-		clientId string
+		clientID string
 		expected int
 	}{
 		{"non-numeric", "abc", http.StatusBadRequest},
@@ -163,16 +163,16 @@ func TestAPIClientSessionsGet_InvalidId(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + tc.clientId + "/sessions"
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + tc.clientID + "/sessions"
 			resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 			defer func() { _ = resp.Body.Close() }()
 			assert.Equal(t, tc.expected, resp.StatusCode)
 			var errResp api.ErrorResponse
 			_ = json.NewDecoder(resp.Body).Decode(&errResp)
-			if tc.clientId == "abc" {
+			if tc.clientID == "abc" {
 				assert.Equal(t, "Invalid client ID format", errResp.ErrorDescription)
 			}
-			if tc.clientId == "-1" {
+			if tc.clientID == "-1" {
 				assert.Equal(t, "Client not found", errResp.ErrorDescription)
 			}
 		})
@@ -198,7 +198,7 @@ func TestAPIClientSessionsGet_Unauthorized(t *testing.T) {
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(testClient.ID, 10) + "/sessions"
 	req, err := http.NewRequest("GET", url, nil)
 	require.NoError(t, err)
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -435,8 +435,8 @@ func TestAPIClientSessionsGet_UsersAreNormalizedAndCarryOnlyTheOwnerFields(t *te
 	defer func() { _ = database.DeleteUser(context.Background(), nil, second.ID) }()
 
 	now := time.Now().UTC()
-	for _, userId := range []int64{first.ID, first.ID, second.ID} {
-		session := createTestUserSession(t, userId, fake.UUID())
+	for _, userID := range []int64{first.ID, first.ID, second.ID} {
+		session := createTestUserSession(t, userID, fake.UUID())
 		defer func(id int64) { _ = database.DeleteUserSession(context.Background(), nil, id) }(session.ID)
 
 		err = database.CreateUserSessionClient(context.Background(), nil, &record.UserSessionClient{

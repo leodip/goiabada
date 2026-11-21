@@ -104,7 +104,7 @@ func assertRefusedForMissingChallenge(t *testing.T, client *record.Client, redir
 
 	t.Helper()
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp := driveDeferral(t, httpClient,
 		authorizeURLWithoutChallenge(client.ClientIdentifier, redirectURI), user, password)
 	defer func() { _ = resp.Body.Close() }()

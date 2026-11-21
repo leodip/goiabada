@@ -36,7 +36,7 @@ type concurrentResult struct {
 // goroutine; every failure is returned and reported here instead.
 func sendConcurrently(t *testing.T, n int, method, url, accessToken string, body func(i int) any) []concurrentResult {
 	t.Helper()
-	client := createHttpClient(t)
+	client := createHTTPClient(t)
 	requests := make([]*http.Request, n)
 	for i := range requests {
 		encoded, err := json.Marshal(body(i))
@@ -81,7 +81,7 @@ func sendConcurrently(t *testing.T, n int, method, url, accessToken string, body
 // sent has been, and the count read from Mailpit is exact.
 func TestAPIAccountEmailVerificationSend_ConcurrentSendsMailOneCode(t *testing.T) {
 	useMailpitSMTP(t)
-	accessToken, u := getUserAccessTokenWithAccountScope_EmailVerification(t)
+	accessToken, u := getUserAccessTokenWithAccountScopeEmailVerification(t)
 
 	// A fresh address no other test mails, unverified, with no code ever issued.
 	stored, err := database.GetUserByID(context.Background(), nil, u.ID)

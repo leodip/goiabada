@@ -199,7 +199,7 @@ func TestAPIGroupUpdatePut_NotFound(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
-func TestAPIGroupUpdatePut_InvalidId(t *testing.T) {
+func TestAPIGroupUpdatePut_InvalidID(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)
 
@@ -210,7 +210,7 @@ func TestAPIGroupUpdatePut_InvalidId(t *testing.T) {
 
 	testCases := []struct {
 		name           string
-		groupId        string
+		groupID        string
 		expectedStatus int
 	}{
 		{"non-numeric ID", "abc", http.StatusBadRequest},
@@ -220,7 +220,7 @@ func TestAPIGroupUpdatePut_InvalidId(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + tc.groupId
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + tc.groupID
 			resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -246,7 +246,7 @@ func TestAPIGroupUpdatePut_InvalidRequestBody(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -267,7 +267,7 @@ func TestAPIGroupUpdatePut_Unauthorized(t *testing.T) {
 	req, err := http.NewRequest("PUT", url, nil)
 	require.NoError(t, err)
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -338,7 +338,7 @@ func TestAPIGroupUpdatePut_BooleanFlags(t *testing.T) {
 
 	testCases := []struct {
 		name                 string
-		includeInIdToken     bool
+		includeInIDToken     bool
 		includeInAccessToken bool
 	}{
 		{"both false", false, false},
@@ -352,7 +352,7 @@ func TestAPIGroupUpdatePut_BooleanFlags(t *testing.T) {
 			updateReq := api.UpdateGroupRequest{
 				GroupIdentifier:      testGroup.GroupIdentifier,
 				Description:          "Updated for " + tc.name,
-				IncludeInIDToken:     tc.includeInIdToken,
+				IncludeInIDToken:     tc.includeInIDToken,
 				IncludeInAccessToken: tc.includeInAccessToken,
 			}
 
@@ -369,7 +369,7 @@ func TestAPIGroupUpdatePut_BooleanFlags(t *testing.T) {
 			require.NoError(t, err)
 
 			// Assert: Boolean values should be preserved
-			assert.Equal(t, tc.includeInIdToken, updateResponse.Group.IncludeInIDToken)
+			assert.Equal(t, tc.includeInIDToken, updateResponse.Group.IncludeInIDToken)
 			assert.Equal(t, tc.includeInAccessToken, updateResponse.Group.IncludeInAccessToken)
 		})
 	}

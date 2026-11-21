@@ -75,12 +75,12 @@ func TestBackchannelLogout_ASelfRegisteredClientIsNotSentToAnInternalAddress(t *
 			blockedBefore := sampleValue(t, scrapeMetrics(t), `goiabada_backchannel_logout_deliveries_total{outcome="blocked"}`)
 			reachedBefore := reached.Load()
 
-			resp, requestId := sendAdminRequest(t, accessToken, http.MethodDelete,
+			resp, requestID := sendAdminRequest(t, accessToken, http.MethodDelete,
 				"/api/v1/account/sessions/"+strconv.FormatInt(session.ID, 10), nil)
 			_ = resp.Body.Close()
 			require.Equal(t, http.StatusOK, resp.StatusCode)
 
-			_, details := sentLogoutTokenRow(t, requestId, 10*time.Second)
+			_, details := sentLogoutTokenRow(t, requestID, 10*time.Second)
 			assert.Equal(t, "blocked", details["outcome"])
 			assert.InDelta(t, 1, details["attempts"], 0, "a blocked address is not tried again")
 			assert.InDelta(t, float64(client.ID), details["client_id"], 0)

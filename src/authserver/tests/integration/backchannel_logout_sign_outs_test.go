@@ -197,7 +197,7 @@ func TestBackchannelLogout_ASignInOverTheCapEndingAnExpiredSessionTellsNobody(t 
 
 	f.signIn(t, newDeviceBrowser(t))
 
-	assert.NotContains(t, storedSessionIds(f.storedSessions(t)), expired.ID, "the expired session is the one ended")
+	assert.NotContains(t, storedSessionIDs(f.storedSessions(t)), expired.ID, "the expired session is the one ended")
 	time.Sleep(quietPeriod)
 	assert.Empty(t, rc.received())
 }

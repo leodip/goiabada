@@ -84,8 +84,8 @@ func TestAPIUsersSearch_AnnotatePermission_InvalidParam(t *testing.T) {
 
 func TestAPIUsersSearch_AnnotatePermission_PermissionNotFound(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
-	missingId := int64(fake.Number(8_000_000, 8_999_999))
-	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/search?annotatePermissionId=" + strconv.FormatInt(missingId, 10)
+	missingID := int64(fake.Number(8_000_000, 8_999_999))
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/search?annotatePermissionId=" + strconv.FormatInt(missingID, 10)
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
@@ -98,7 +98,7 @@ func TestAPIUsersSearch_AnnotatePermission_Unauthorized(t *testing.T) {
 	res := createResource(t)
 	perm := createPermission(t, res.ID)
 	u := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/search?annotatePermissionId=" + neturl.QueryEscape(strconv.FormatInt(perm.ID, 10))
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 	req, _ := http.NewRequest("GET", u, nil)
 	resp, err := httpClient.Do(req)
 	require.NoError(t, err)

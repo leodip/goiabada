@@ -24,14 +24,14 @@ import (
 // in the ID token or only available via /userinfo endpoint
 // ============================================================================
 
-func TestToken_IdToken_OIDCClaims_GlobalDisabled(t *testing.T) {
+func TestToken_IDToken_OIDCClaims_GlobalDisabled(t *testing.T) {
 	// Disable the global setting
 	changeSettings(t, func(settings *record.Settings) { settings.IncludeOpenIDConnectClaimsInIDToken = false })
 
 	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCodeWithUserProfile(t, clientSecret, "openid profile email")
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	formData := url.Values{
 		"grant_type":    {"authorization_code"},
@@ -42,7 +42,7 @@ func TestToken_IdToken_OIDCClaims_GlobalDisabled(t *testing.T) {
 		"client_secret": {clientSecret},
 	}
 
-	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destURL, formData)
 
 	// Verify we got tokens
 	assert.NotNil(t, data["access_token"])
@@ -80,8 +80,8 @@ func TestToken_IdToken_OIDCClaims_GlobalDisabled(t *testing.T) {
 
 	// But OIDC scope-based claims SHOULD be available via /userinfo
 	accessToken := data["access_token"].(string)
-	userinfoUrl := appConfig.AuthServer.BaseURL + "/userinfo"
-	req, err := http.NewRequest("GET", userinfoUrl, nil)
+	userinfoURL := appConfig.AuthServer.BaseURL + "/userinfo"
+	req, err := http.NewRequest("GET", userinfoURL, nil)
 	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 
@@ -100,14 +100,14 @@ func TestToken_IdToken_OIDCClaims_GlobalDisabled(t *testing.T) {
 	assert.NotNil(t, userinfo["given_name"], "given_name claim should be available via /userinfo")
 }
 
-func TestToken_IdToken_OIDCClaims_GlobalEnabled(t *testing.T) {
+func TestToken_IDToken_OIDCClaims_GlobalEnabled(t *testing.T) {
 	// Ensure the global setting is enabled
 	changeSettings(t, func(settings *record.Settings) { settings.IncludeOpenIDConnectClaimsInIDToken = true })
 
 	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCodeWithUserProfile(t, clientSecret, "openid profile email")
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	formData := url.Values{
 		"grant_type":    {"authorization_code"},
@@ -118,7 +118,7 @@ func TestToken_IdToken_OIDCClaims_GlobalEnabled(t *testing.T) {
 		"client_secret": {clientSecret},
 	}
 
-	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destURL, formData)
 
 	// Verify we got tokens
 	assert.NotNil(t, data["access_token"])
@@ -144,7 +144,7 @@ func TestToken_IdToken_OIDCClaims_GlobalEnabled(t *testing.T) {
 	assert.NotNil(t, idClaims["middle_name"], "middle_name claim should be in ID token when setting is enabled")
 }
 
-func TestToken_IdToken_OIDCClaims_ClientOverride_On(t *testing.T) {
+func TestToken_IDToken_OIDCClaims_ClientOverride_On(t *testing.T) {
 	// Disable the global setting
 	changeSettings(t, func(settings *record.Settings) { settings.IncludeOpenIDConnectClaimsInIDToken = false })
 
@@ -161,7 +161,7 @@ func TestToken_IdToken_OIDCClaims_ClientOverride_On(t *testing.T) {
 		_ = database.UpdateClient(context.Background(), nil, &code.Client)
 	}()
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	formData := url.Values{
 		"grant_type":    {"authorization_code"},
@@ -172,7 +172,7 @@ func TestToken_IdToken_OIDCClaims_ClientOverride_On(t *testing.T) {
 		"client_secret": {clientSecret},
 	}
 
-	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destURL, formData)
 
 	// Verify we got tokens
 	assert.NotNil(t, data["access_token"])
@@ -189,7 +189,7 @@ func TestToken_IdToken_OIDCClaims_ClientOverride_On(t *testing.T) {
 	assert.NotNil(t, idClaims["given_name"], "given_name claim should be in ID token when client override is 'on'")
 }
 
-func TestToken_IdToken_OIDCClaims_ClientOverride_Off(t *testing.T) {
+func TestToken_IDToken_OIDCClaims_ClientOverride_Off(t *testing.T) {
 	// Enable the global setting
 	changeSettings(t, func(settings *record.Settings) { settings.IncludeOpenIDConnectClaimsInIDToken = true })
 
@@ -206,7 +206,7 @@ func TestToken_IdToken_OIDCClaims_ClientOverride_Off(t *testing.T) {
 		_ = database.UpdateClient(context.Background(), nil, &code.Client)
 	}()
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	formData := url.Values{
 		"grant_type":    {"authorization_code"},
@@ -217,7 +217,7 @@ func TestToken_IdToken_OIDCClaims_ClientOverride_Off(t *testing.T) {
 		"client_secret": {clientSecret},
 	}
 
-	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destURL, formData)
 
 	// Verify we got tokens
 	assert.NotNil(t, data["access_token"])
@@ -254,12 +254,12 @@ func createAuthCodeWithUserProfile(t *testing.T, clientSecret string, scope stri
 		t.Fatal(err)
 	}
 
-	redirectUri := &record.RedirectURI{
+	redirectURI := &record.RedirectURI{
 		ClientID: client.ID,
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -321,8 +321,8 @@ func createAuthCodeWithUserProfile(t *testing.T, clientSecret string, scope stri
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
-		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
 		"&code_challenge=" + requestCodeChallenge +
@@ -330,9 +330,9 @@ func createAuthCodeWithUserProfile(t *testing.T, clientSecret string, scope stri
 		"&state=" + requestState +
 		"&nonce=" + requestNonce
 
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
-	resp, err := httpClient.Get(destUrl)
+	resp, err := httpClient.Get(destURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -365,7 +365,7 @@ func createAuthCodeWithUserProfile(t *testing.T, clientSecret string, scope stri
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	codeVal, stateVal := getCodeAndStateFromUrl(t, resp)
+	codeVal, stateVal := getCodeAndStateFromURL(t, resp)
 	assert.Equal(t, requestState, stateVal)
 
 	code := loadCodeFromDatabase(t, codeVal)

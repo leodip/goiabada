@@ -651,7 +651,7 @@ func TestAPISettingsEmailSendTest_SMTPDisabled(t *testing.T) {
 // Unauthorized scenarios
 func TestAPISettingsEmail_Unauthorized(t *testing.T) {
 	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/email"
-	httpClient := createHttpClient(t)
+	httpClient := createHTTPClient(t)
 
 	// No token - GET
 	req, _ := http.NewRequest("GET", url, nil)

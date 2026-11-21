@@ -46,7 +46,7 @@ func consoleSignInUser(t *testing.T, locale string) *record.User {
 	}
 	require.NoError(t, database.CreateUser(context.Background(), nil, user))
 	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.ID) })
-	assignPermissionToUser(t, user.ID, authServerPermissionId(t, builtin.ManageAccountPermissionIdentifier))
+	assignPermissionToUser(t, user.ID, authServerPermissionID(t, builtin.ManageAccountPermissionIdentifier))
 	return user
 }
 
@@ -64,7 +64,7 @@ func consoleAccessToken(t *testing.T, user *record.User) string {
 
 	redirectURI := appConfig.AdminConsole.BaseURL + "/auth/callback"
 	state := fake.LetterN(16)
-	browser := createHttpClient(t)
+	browser := createHTTPClient(t)
 	resp, err := browser.Get(appConfig.AuthServer.BaseURL + "/auth/authorize?" + url.Values{
 		"client_id":             {builtin.AdminConsoleClientIdentifier},
 		"redirect_uri":          {redirectURI},
@@ -99,7 +99,7 @@ func consoleAccessToken(t *testing.T, user *record.User) string {
 	_ = resp.Body.Close()
 	resp = loadPage(t, browser, location)
 	defer func() { _ = resp.Body.Close() }()
-	code, returnedState := getCodeAndStateFromUrl(t, resp)
+	code, returnedState := getCodeAndStateFromURL(t, resp)
 	require.Equal(t, state, returnedState)
 
 	tokens := postToTokenEndpoint(t, browser, appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
@@ -119,19 +119,19 @@ func consoleAccessToken(t *testing.T, user *record.User) string {
 // with the request id it was sent under.
 func deleteAccount(t *testing.T, accessToken string, body api.DeleteAccountRequest) (int, map[string]any, string) {
 	t.Helper()
-	resp, requestId := sendAdmin(t, accessToken, http.MethodPost, accountDeletionPath, body)
+	resp, requestID := sendAdmin(t, accessToken, http.MethodPost, accountDeletionPath, body)
 	defer func() { _ = resp.Body.Close() }()
 	raw, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
 	var decoded map[string]any
 	require.NoError(t, json.Unmarshal(raw, &decoded), "body: %s", raw)
-	return resp.StatusCode, decoded, requestId
+	return resp.StatusCode, decoded, requestID
 }
 
 // userExists reports whether the user's row is still there.
-func userExists(t *testing.T, userId int64) bool {
+func userExists(t *testing.T, userID int64) bool {
 	t.Helper()
-	user, err := database.GetUserByID(context.Background(), nil, userId)
+	user, err := database.GetUserByID(context.Background(), nil, userID)
 	require.NoError(t, err)
 	return user != nil
 }
@@ -170,7 +170,7 @@ func TestAPIAccountDeletion_DeletesTheAccountWithThePassword(t *testing.T) {
 	user := consoleSignInUser(t, "en")
 	accessToken := consoleAccessToken(t, user)
 
-	status, body, requestId := deleteAccount(t, accessToken, api.DeleteAccountRequest{Password: deletionUserPassword})
+	status, body, requestID := deleteAccount(t, accessToken, api.DeleteAccountRequest{Password: deletionUserPassword})
 
 	require.Equal(t, http.StatusOK, status, "body: %v", body)
 	assert.Equal(t, map[string]any{"success": true}, body)
@@ -180,7 +180,7 @@ func TestAPIAccountDeletion_DeletesTheAccountWithThePassword(t *testing.T) {
 	assert.Empty(t, sessions, "the user is signed out everywhere")
 	assertTokenRefused(t, accessToken)
 	assert.Equal(t, []map[string]any{{"user_id": float64(user.ID), "logged_in_user": user.Subject}},
-		auditRows(t, readerToken, "deleted_own_account", requestId))
+		auditRows(t, readerToken, "deleted_own_account", requestID))
 
 	messages := awaitMailTo(t, user.Email)
 	require.Len(t, messages, 1, "the account's address is told exactly once")
@@ -340,7 +340,7 @@ func TestAPIAccountDeletion_RefusedWhileTheSettingIsOff(t *testing.T) {
 func TestAPIAccountDeletion_TheLastAdministratorIsRefused(t *testing.T) {
 	disableOtherAdministrators(t)
 	user := consoleSignInUser(t, "en")
-	assignPermissionToUser(t, user.ID, authServerPermissionId(t, builtin.ManagePermissionIdentifier))
+	assignPermissionToUser(t, user.ID, authServerPermissionID(t, builtin.ManagePermissionIdentifier))
 	accessToken := consoleAccessToken(t, user)
 
 	for i := 0; i < 6; i++ {
@@ -352,7 +352,7 @@ func TestAPIAccountDeletion_TheLastAdministratorIsRefused(t *testing.T) {
 	}
 	assert.True(t, userExists(t, user.ID))
 
-	newAdministrator(t, authServerPermissionId(t, builtin.ManagePermissionIdentifier))
+	newAdministrator(t, authServerPermissionID(t, builtin.ManagePermissionIdentifier))
 	status, body, _ := deleteAccount(t, accessToken, api.DeleteAccountRequest{Password: deletionUserPassword})
 	require.Equal(t, http.StatusOK, status, "no password attempt was spent on the refusals: %v", body)
 	assert.False(t, userExists(t, user.ID))

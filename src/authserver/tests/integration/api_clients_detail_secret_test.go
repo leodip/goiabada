@@ -50,19 +50,19 @@ func confidentialClient(t *testing.T) (*record.Client, string) {
 	return client, clientSecret
 }
 
-func clientSecretPath(clientId int64) string {
-	return "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10) + "/secret"
+func clientSecretPath(clientID int64) string {
+	return "/api/v1/admin/clients/" + strconv.FormatInt(clientID, 10) + "/secret"
 }
 
 // readClientSecret calls the secret route and decodes its answer when it is a 200.
-func readClientSecret(t *testing.T, accessToken string, clientId int64) (*http.Response, map[string]any, string) {
+func readClientSecret(t *testing.T, accessToken string, clientID int64) (*http.Response, map[string]any, string) {
 	t.Helper()
-	resp, requestId := sendAdmin(t, accessToken, http.MethodGet, clientSecretPath(clientId), nil)
+	resp, requestID := sendAdmin(t, accessToken, http.MethodGet, clientSecretPath(clientID), nil)
 	var body map[string]any
 	if resp.StatusCode == http.StatusOK {
 		require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
 	}
-	return resp, body, requestId
+	return resp, body, requestID
 }
 
 // The detail and the list carry no clientSecret key at all, not merely an empty one.
@@ -115,7 +115,7 @@ func TestAPIClientSecretGet_ReturnsTheDecryptedSecretAndRecordsTheRead(t *testin
 	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, manageClient.ID) })
 	client, clientSecret := confidentialClient(t)
 
-	resp, body, requestId := readClientSecret(t, manageToken, client.ID)
+	resp, body, requestID := readClientSecret(t, manageToken, client.ID)
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	assert.Equal(t, map[string]any{"clientSecret": clientSecret}, body)
@@ -124,7 +124,7 @@ func TestAPIClientSecretGet_ReturnsTheDecryptedSecretAndRecordsTheRead(t *testin
 	// credential-bearing response rather than an error body that happens to be uncacheable.
 	assertNotStorable(t, resp, "the client secret")
 
-	rows := auditRows(t, manageToken, "viewed_client_secret", requestId)
+	rows := auditRows(t, manageToken, "viewed_client_secret", requestID)
 	require.Len(t, rows, 1, "one viewed_client_secret row for the read")
 	assert.Equal(t, map[string]any{
 		"client_id":         float64(client.ID),
@@ -155,10 +155,10 @@ func TestAPIClientSecretGet_AdmitsManageClientsAndManageOnly(t *testing.T) {
 			token, caller := createClientWithGranularScope(t, tc.permission)
 			t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, caller.ID) })
 
-			resp, body, requestId := readClientSecret(t, token, client.ID)
+			resp, body, requestID := readClientSecret(t, token, client.ID)
 			defer func() { _ = resp.Body.Close() }()
 
-			viewed := auditRows(t, manageToken, "viewed_client_secret", requestId)
+			viewed := auditRows(t, manageToken, "viewed_client_secret", requestID)
 			if tc.admitted {
 				require.Equal(t, http.StatusOK, resp.StatusCode)
 				assert.Equal(t, clientSecret, body["clientSecret"])
@@ -184,14 +184,14 @@ func TestAPIClientSecretGet_APublicClientAnswersAnEmptySecret(t *testing.T) {
 	client := createPublicClient(t)
 	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.ID) })
 
-	resp, body, requestId := readClientSecret(t, manageToken, client.ID)
+	resp, body, requestID := readClientSecret(t, manageToken, client.ID)
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	assert.Equal(t, map[string]any{"clientSecret": ""}, body)
-	assert.Empty(t, auditRows(t, manageToken, "viewed_client_secret", requestId))
+	assert.Empty(t, auditRows(t, manageToken, "viewed_client_secret", requestID))
 }
 
-func TestAPIClientSecretGet_AnUnknownOrMalformedIdIsRefused(t *testing.T) {
+func TestAPIClientSecretGet_AnUnknownOrMalformedIDIsRefused(t *testing.T) {
 	manageToken, _ := createAdminClientWithToken(t)
 
 	resp, _, _ := readClientSecret(t, manageToken, 999999999)

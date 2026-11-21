@@ -16,7 +16,7 @@ import (
 func TestToken_AuthCode_MissingCode(t *testing.T) {
 	httpClient, code := createAuthCode(t, fake.LetterN(32), "openid profile email")
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	formData := url.Values{
 		"grant_type":    {"authorization_code"},
@@ -25,7 +25,7 @@ func TestToken_AuthCode_MissingCode(t *testing.T) {
 		"code_verifier": {fake.LetterN(43)},
 	}
 
-	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destURL, formData)
 
 	assert.Equal(t, "invalid_request", data["error"])
 	assert.Equal(t, "Missing required code parameter.", data["error_description"])
@@ -34,7 +34,7 @@ func TestToken_AuthCode_MissingCode(t *testing.T) {
 func TestToken_AuthCode_MissingRedirectURI(t *testing.T) {
 	httpClient, code := createAuthCode(t, fake.LetterN(32), "openid profile email")
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	formData := url.Values{
 		"grant_type":    {"authorization_code"},
@@ -43,7 +43,7 @@ func TestToken_AuthCode_MissingRedirectURI(t *testing.T) {
 		"code_verifier": {fake.LetterN(43)},
 	}
 
-	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destURL, formData)
 
 	assert.Equal(t, "invalid_request", data["error"])
 	assert.Equal(t, "Missing required redirect_uri parameter.", data["error_description"])
@@ -53,7 +53,7 @@ func TestToken_AuthCode_MissingCodeVerifier(t *testing.T) {
 	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	formData := url.Values{
 		"grant_type":    {"authorization_code"},
@@ -63,7 +63,7 @@ func TestToken_AuthCode_MissingCodeVerifier(t *testing.T) {
 		"client_secret": {clientSecret},
 	}
 
-	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destURL, formData)
 
 	assert.Equal(t, "invalid_request", data["error"])
 	assert.Equal(t, "Missing required code_verifier parameter.", data["error_description"])
@@ -72,7 +72,7 @@ func TestToken_AuthCode_MissingCodeVerifier(t *testing.T) {
 func TestToken_AuthCode_ClientDoesNotExist(t *testing.T) {
 	httpClient, code := createAuthCode(t, fake.LetterN(32), "openid profile email")
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	formData := url.Values{
 		"grant_type":    {"authorization_code"},
@@ -82,7 +82,7 @@ func TestToken_AuthCode_ClientDoesNotExist(t *testing.T) {
 		"code_verifier": {fake.LetterN(43)},
 	}
 
-	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destURL, formData)
 
 	assert.Equal(t, "invalid_client", data["error"])
 	assert.Equal(t, "Client does not exist.", data["error_description"])
@@ -91,7 +91,7 @@ func TestToken_AuthCode_ClientDoesNotExist(t *testing.T) {
 func TestToken_AuthCode_CodeIsInvalid(t *testing.T) {
 	httpClient, code := createAuthCode(t, fake.LetterN(32), "openid profile email")
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	formData := url.Values{
 		"grant_type":    {"authorization_code"},
@@ -101,7 +101,7 @@ func TestToken_AuthCode_CodeIsInvalid(t *testing.T) {
 		"code_verifier": {fake.LetterN(43)},
 	}
 
-	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destURL, formData)
 
 	assert.Equal(t, "invalid_grant", data["error"])
 	assert.Equal(t, "Code is invalid.", data["error_description"])
@@ -110,7 +110,7 @@ func TestToken_AuthCode_CodeIsInvalid(t *testing.T) {
 func TestToken_AuthCode_RedirectURIIsInvalid(t *testing.T) {
 	httpClient, code := createAuthCode(t, fake.LetterN(32), "openid profile email")
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	formData := url.Values{
 		"grant_type":    {"authorization_code"},
@@ -120,7 +120,7 @@ func TestToken_AuthCode_RedirectURIIsInvalid(t *testing.T) {
 		"code_verifier": {fake.LetterN(43)},
 	}
 
-	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destURL, formData)
 
 	assert.Equal(t, "invalid_grant", data["error"])
 	assert.Equal(t, "Invalid redirect_uri.", data["error_description"])
@@ -140,7 +140,7 @@ func TestToken_AuthCode_WrongClient(t *testing.T) {
 	err := database.CreateClient(context.Background(), nil, wrongClient)
 	require.NoError(t, err)
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	formData := url.Values{
 		"grant_type":    {"authorization_code"},
@@ -150,7 +150,7 @@ func TestToken_AuthCode_WrongClient(t *testing.T) {
 		"code_verifier": {fake.LetterN(43)},
 	}
 
-	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destURL, formData)
 
 	assert.Equal(t, "invalid_grant", data["error"])
 	assert.Equal(t, "The client_id provided does not match the client_id from code.", data["error_description"])
@@ -164,7 +164,7 @@ func TestToken_AuthCode_ConfidentialClient_NoClientSecret(t *testing.T) {
 	err := database.UpdateClient(context.Background(), nil, &code.Client)
 	require.NoError(t, err)
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	formData := url.Values{
 		"grant_type":    {"authorization_code"},
@@ -174,7 +174,7 @@ func TestToken_AuthCode_ConfidentialClient_NoClientSecret(t *testing.T) {
 		"code_verifier": {fake.LetterN(43)},
 	}
 
-	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destURL, formData)
 
 	// RFC 6749 Section 5.2: invalid_client for missing client credentials
 	assert.Equal(t, "invalid_client", data["error"])
@@ -190,7 +190,7 @@ func TestToken_AuthCode_ConfidentialClient_ClientAuthFailed(t *testing.T) {
 	err := database.UpdateClient(context.Background(), nil, &code.Client)
 	require.NoError(t, err)
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	formData := url.Values{
 		"grant_type":    {"authorization_code"},
@@ -201,7 +201,7 @@ func TestToken_AuthCode_ConfidentialClient_ClientAuthFailed(t *testing.T) {
 		"client_secret": {"incorrect_secret"}, // Provide an incorrect client secret
 	}
 
-	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destURL, formData)
 
 	// RFC 6749 Section 5.2: invalid_client for failed client authentication
 	assert.Equal(t, "invalid_client", data["error"])
@@ -216,7 +216,7 @@ func TestToken_AuthCode_InvalidCodeVerifier(t *testing.T) {
 	err := database.UpdateClient(context.Background(), nil, &code.Client)
 	require.NoError(t, err)
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	formData := url.Values{
 		"grant_type":    {"authorization_code"},
@@ -227,7 +227,7 @@ func TestToken_AuthCode_InvalidCodeVerifier(t *testing.T) {
 		"code_verifier": {testCodeVerifier + "-invalid"}, // Using an invalid code verifier
 	}
 
-	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destURL, formData)
 
 	assert.Equal(t, "invalid_grant", data["error"])
 	assert.Equal(t, "Invalid code_verifier (PKCE).", data["error_description"])
@@ -237,7 +237,7 @@ func TestToken_AuthCode_SuccessPath(t *testing.T) {
 	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	formData := url.Values{
 		"grant_type":    {"authorization_code"},
@@ -248,7 +248,7 @@ func TestToken_AuthCode_SuccessPath(t *testing.T) {
 		"client_secret": {clientSecret},
 	}
 
-	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	data := postToTokenEndpoint(t, httpClient, destURL, formData)
 
 	assert.NotNil(t, data["access_token"])
 	assert.NotNil(t, data["token_type"])
@@ -268,7 +268,7 @@ func TestToken_AuthCode_CodeReuse_ReturnsInvalidGrant(t *testing.T) {
 	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	formData := url.Values{
 		"grant_type":    {"authorization_code"},
@@ -279,11 +279,11 @@ func TestToken_AuthCode_CodeReuse_ReturnsInvalidGrant(t *testing.T) {
 		"client_secret": {clientSecret},
 	}
 
-	first := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	first := postToTokenEndpoint(t, httpClient, destURL, formData)
 	assert.NotNil(t, first["access_token"])
 
 	// Replay the same code.
-	second := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	second := postToTokenEndpoint(t, httpClient, destURL, formData)
 	assert.Equal(t, "invalid_grant", second["error"])
 	assert.Equal(t, "Code is invalid.", second["error_description"])
 
@@ -300,7 +300,7 @@ func TestToken_AuthCode_CodeReuse_RevokesRefreshToken(t *testing.T) {
 	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	formData := url.Values{
 		"grant_type":    {"authorization_code"},
@@ -311,13 +311,13 @@ func TestToken_AuthCode_CodeReuse_RevokesRefreshToken(t *testing.T) {
 		"client_secret": {clientSecret},
 	}
 
-	first := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	first := postToTokenEndpoint(t, httpClient, destURL, formData)
 	refreshToken, ok := first["refresh_token"].(string)
 	assert.True(t, ok)
 	assert.NotEmpty(t, refreshToken)
 
 	// Replay the code to trigger the reuse path.
-	second := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	second := postToTokenEndpoint(t, httpClient, destURL, formData)
 	assert.Equal(t, "invalid_grant", second["error"])
 
 	// The refresh token issued from the reused code must no longer work.
@@ -327,7 +327,7 @@ func TestToken_AuthCode_CodeReuse_RevokesRefreshToken(t *testing.T) {
 		"client_secret": {clientSecret},
 		"refresh_token": {refreshToken},
 	}
-	refreshResp := postToTokenEndpoint(t, httpClient, destUrl, refreshForm)
+	refreshResp := postToTokenEndpoint(t, httpClient, destURL, refreshForm)
 	assert.Equal(t, "invalid_grant", refreshResp["error"])
 }
 
@@ -339,7 +339,7 @@ func TestToken_AuthCode_CodeReuse_AccessTokenNoLongerWorks(t *testing.T) {
 	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	formData := url.Values{
 		"grant_type":    {"authorization_code"},
@@ -350,7 +350,7 @@ func TestToken_AuthCode_CodeReuse_AccessTokenNoLongerWorks(t *testing.T) {
 		"client_secret": {clientSecret},
 	}
 
-	first := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	first := postToTokenEndpoint(t, httpClient, destURL, formData)
 	accessToken, ok := first["access_token"].(string)
 	assert.True(t, ok)
 	assert.NotEmpty(t, accessToken)
@@ -366,7 +366,7 @@ func TestToken_AuthCode_CodeReuse_AccessTokenNoLongerWorks(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	// Replay the code.
-	second := postToTokenEndpoint(t, httpClient, destUrl, formData)
+	second := postToTokenEndpoint(t, httpClient, destURL, formData)
 	assert.Equal(t, "invalid_grant", second["error"])
 
 	// The access token issued from the reused code must now be rejected.
@@ -397,9 +397,9 @@ func TestToken_Refresh_DownScopeSeparators(t *testing.T) {
 	// walk, and the auth code grant returns a refresh token with these scopes anyway.
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
-	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 
-	first := postToTokenEndpoint(t, httpClient, destUrl, url.Values{
+	first := postToTokenEndpoint(t, httpClient, destURL, url.Values{
 		"grant_type":    {"authorization_code"},
 		"client_id":     {code.Client.ClientIdentifier},
 		"code":          {code.Code},
@@ -412,7 +412,7 @@ func TestToken_Refresh_DownScopeSeparators(t *testing.T) {
 	assert.True(t, ok, "expected a refresh token: %v", first)
 
 	refresh := func(scope string) map[string]interface{} {
-		return postToTokenEndpoint(t, httpClient, destUrl, url.Values{
+		return postToTokenEndpoint(t, httpClient, destURL, url.Values{
 			"grant_type":    {"refresh_token"},
 			"client_id":     {code.Client.ClientIdentifier},
 			"client_secret": {clientSecret},
