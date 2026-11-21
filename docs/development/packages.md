@@ -469,7 +469,7 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   `template.HTML` values built from data, which its `trusted_html_lint_test.go` holds (#622
   decision 4)
 - `internal/emailtemplate/` - The emails as email templates: each email's built-in definition, its
-  placeholders and its text in the six built-in languages, and the email format, a small Markdown
+  placeholders and its text in each built-in language, and the email format, a small Markdown
   set with `{{name}}` placeholders, which `Email.Check` checks and `Email.Render` draws in the
   brand's look; the other of the two guarded `template.HTML` values. `render.Renderer.RenderEmail`
   draws it inside the email layout (#818)

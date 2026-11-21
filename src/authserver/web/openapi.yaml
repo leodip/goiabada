@@ -2917,7 +2917,7 @@ paths:
       tags: [Email Templates]
       summary: List email templates
       description: |
-        The 19 emails, each with the status of its six languages: `default` with no edit,
+        The 19 emails, each with the status of each built-in language: `default` with no edit,
         `edited` when its edit is sent, and `invalid` when its edit breaks a rule of the running
         release, so the email is sent with the built-in text of that language.
       operationId: getEmailTemplates
@@ -6398,7 +6398,7 @@ components:
       name: language
       in: path
       required: true
-      description: One of the six built-in languages, written exactly so
+      description: One of the built-in languages, written exactly so
       schema:
         type: string
         enum: [en, de, es, fr, it, pt-BR]
@@ -7084,7 +7084,7 @@ components:
             The language of Goiabada's own pages and emails for the user. Optional: when it is
             left out, the stored page language is kept, so a client that doesn't send it never
             resets it. Empty sets Automatic. Any other value must be exactly the tag of one of
-            Goiabada's six built-in languages: `en`, `pt-BR`, `es`, `fr`, `it` or `de`.
+            Goiabada's built-in languages: `en`, `pt-BR`, `es`, `fr`, `it` or `de`.
 
     UpdateUserEmailRequest:
       type: object
@@ -9788,7 +9788,7 @@ components:
           description: The email's identifier, such as `password_reset_link`.
         languages:
           type: array
-          description: The six built-in languages, English first.
+          description: Each built-in language, English first.
           items:
             $ref: '#/components/schemas/EmailTemplateLanguageStatusResponse'
       required:
@@ -9831,7 +9831,7 @@ components:
             $ref: '#/components/schemas/EmailTemplatePlaceholderResponse'
         languages:
           type: array
-          description: The six built-in languages, English first.
+          description: Each built-in language, English first.
           items:
             $ref: '#/components/schemas/EmailTemplateLanguageResponse'
       required:

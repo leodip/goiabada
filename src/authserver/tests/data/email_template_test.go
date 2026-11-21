@@ -19,7 +19,7 @@ import (
 // replaces the first, also when the two overlap; and a reset removes the row.
 //
 // The data layer stores any identifier it is given: holding one to the 19 emails and a language to
-// the six built-in ones is its caller's. The tests here use an identifier of their own, so they
+// the built-in ones is its caller's. The tests here use an identifier of their own, so they
 // share the tier's database with every other test.
 
 func newEmailTemplateIdentifier() string {

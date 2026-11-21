@@ -110,9 +110,10 @@ func rowOf(t *testing.T, out, email string) string {
 	return row
 }
 
-// The list is the third tab under Email: the nineteen emails in their six groups, each named, with
-// the sentence saying when it is sent, a tag for each edited language and "Needs attention" for an
-// invalid one, and the link to Branding for how they look.
+// The list is the third tab under Email: a sentence above it naming no count of the built-in
+// languages (#668 decision 3), the nineteen emails in their six groups, each named, with the sentence
+// saying when it is sent, a tag for each edited language and "Needs attention" for an invalid one,
+// and the link to Branding for how they look.
 func TestRender_AdminSettingsEmailTemplates(t *testing.T) {
 	out := servePage(t, adminsettingshandlers.HandleEmailTemplatesGet(render.New(web.TemplateFS(), web.StaticFS()),
 		&emailTemplatesAPI{list: allEmailSummaries()}), http.MethodGet, "/admin/settings/email/templates")
@@ -122,6 +123,7 @@ func TestRender_AdminSettingsEmailTemplates(t *testing.T) {
 	assert.Contains(t, out, `<a class="tab-item" href="/admin/settings/email/templates" aria-current="page">Modelos de e-mail</a>`)
 	assert.Contains(t, out, `href="/admin/settings/email" aria-current="page"`, "the sidebar marks Email")
 	assert.Contains(t, out, `<a class="text-link" href="/admin/settings/branding">Ir para Marca</a>`)
+	assert.Contains(t, out, "<p>O que cada e-mail diz, em cada idioma integrado. Um idioma sem edição é enviado com o texto integrado do Goiabada.</p>")
 
 	var headings []string
 	for _, m := range regexp.MustCompile(`<h2 class="panel-title" id="emailGroup-[a-z_]+">([^<]+)</h2>`).FindAllStringSubmatch(out, -1) {
@@ -200,8 +202,8 @@ func signedInWithSMTP() []handlertest.Option {
 	}
 }
 
-// The editor of one language: the email's name and when it is sent, the six languages with the
-// edited ones marked, the editor's text in the fields, escaped, a button for each placeholder, the
+// The editor of one language: the email's name and when it is sent, the languages the API answers
+// with the edited ones marked, the editor's text in the fields, escaped, a button for each placeholder, the
 // required one marked, and the formatting the body takes.
 func TestRender_AdminSettingsEmailTemplate(t *testing.T) {
 	out := serveEditor(t, &emailTemplatesAPI{email: emailTemplate()}, "fr")

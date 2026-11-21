@@ -26,7 +26,7 @@ var (
 	longLabel        = strings.Repeat("é", 38) + "🔒!"
 )
 
-// threeFooterLinks are three links with a label in each of the six built-in languages on each.
+// threeFooterLinks are three links with a label in each built-in language on each.
 func threeFooterLinks() record.BrandFooterLinks {
 	return record.BrandFooterLinks{
 		{

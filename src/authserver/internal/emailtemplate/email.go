@@ -1,6 +1,6 @@
 // Package emailtemplate holds the auth server's emails as email templates (#818): each email's
-// built-in definition, which says the placeholders it offers and holds its text in the six built-in
-// languages, and the format that text is written in, a subject and a body in a small Markdown set
+// built-in definition, which says the placeholders it offers and holds its text in each built-in
+// language, and the format that text is written in, a subject and a body in a small Markdown set
 // with placeholders such as {{name}} and {{link}}, which format.go renders and checks.
 //
 // The email layout, the frame drawn around a body in its brand, stays a template the render package
@@ -55,7 +55,7 @@ type Text struct {
 }
 
 // Email is an email's built-in definition: its identifier, used in API paths, stored rows and audit
-// entries, the placeholders it offers, and its text in each of the six built-in languages.
+// entries, the placeholders it offers, and its text in each built-in language.
 type Email struct {
 	ID           string
 	Placeholders []Placeholder
@@ -96,7 +96,7 @@ type Message struct {
 	HTML    string
 }
 
-// Languages are the six built-in languages every email is written in, as the catalogs built into
+// Languages are the built-in languages every email is written in, as the catalogs built into
 // Goiabada are tagged, English first.
 var Languages = []string{"en", "de", "es", "fr", "it", "pt-BR"}
 
@@ -110,8 +110,8 @@ var languageTags = func() []language.Tag {
 }()
 
 // Language answers the built-in language an email to a recipient reading locale is written in, as an
-// email's copy was chosen before its text moved here (#531): locale is matched against the six
-// languages followed by English, so a regional variant reads its language's text (fr-CA reads fr)
+// email's copy was chosen before its text moved here (#531): locale is matched against the
+// built-in languages followed by English, so a regional variant reads its language's text (fr-CA reads fr)
 // and a language with none reads English. The answer is always one of Languages, by the index the
 // matcher answers rather than the tag it prints, which can come back region-extended.
 func Language(locale string) string {

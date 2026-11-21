@@ -184,7 +184,7 @@ func TestWithPageLanguage_AValueNamingNoCatalogIsAutomatic(t *testing.T) {
 	}
 }
 
-// CatalogTags lists the six catalogs built into Goiabada, English first, and nothing else.
+// CatalogTags lists the catalogs built into Goiabada, English first, and nothing else.
 func TestCatalogTags_ListsTheBuiltInCatalogs(t *testing.T) {
 	assert.Equal(t, []string{"en", "de", "es", "fr", "it", "pt-BR"}, CatalogTags())
 }
@@ -197,7 +197,7 @@ func TestCatalogTags_ReturnsACopy(t *testing.T) {
 	assert.Equal(t, "en", CatalogTags()[0])
 }
 
-// The built-in catalogs are the six compiled in, and a tag names one only when it is spelt exactly as
+// The built-in catalogs are the ones compiled in, and a tag names one only when it is spelt exactly as
 // its catalog is: a page language and a brand's footer link label are both checked against them.
 func TestIsCatalogTag(t *testing.T) {
 	for _, tag := range []string{"en", "de", "es", "fr", "it", "pt-BR"} {

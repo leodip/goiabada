@@ -110,7 +110,7 @@ type FooterLanguage struct {
 	Name string
 }
 
-// brandFooterLanguages are the six built-in languages, in the order the console lists its catalogs,
+// brandFooterLanguages are the built-in languages, in the order the console lists its catalogs,
 // English first (#814 decision 5).
 func brandFooterLanguages() []FooterLanguage {
 	options := render.PageLanguageOptions()

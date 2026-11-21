@@ -21,7 +21,7 @@ func (c *AuthServerClient) emailTemplateURL(email string, language ...string) st
 	return target
 }
 
-// GetEmailTemplates answers every email with the status of each of its six languages, in the order
+// GetEmailTemplates answers every email with the status of each built-in language, in the order
 // Goiabada lists them.
 func (c *AuthServerClient) GetEmailTemplates(ctx context.Context, accessToken string) ([]api.EmailTemplateSummaryResponse, error) {
 	response, err := execute[api.GetEmailTemplatesResponse](ctx, c, accessToken, apiRequest{
