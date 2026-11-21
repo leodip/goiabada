@@ -50,10 +50,14 @@ for f in $FAIL_MV; do [ "$(basename "$src")" != "$f" ] || { echo "mv: injected f
 case "$dst" in "$ASSETS"/*) touch "$STUB/full" ;; esac
 `
 
+// The rm stub matches FAIL_RM's names as patterns, so a test can name the staging folder, whose
+// suffix is random; KILL_RM's sends the script SIGTERM, as an interrupt, before deleting.
 const screenshotsStubRm = `#!/usr/bin/env bash
+set -f
 for arg in "$@"; do
   case "$arg" in -*) continue ;; esac
-  for f in $FAIL_RM; do [ "$(basename "$arg")" != "$f" ] || { echo "rm: injected failure" >&2; exit 1; }; done
+  for f in $KILL_RM; do case "$(basename "$arg")" in $f) kill -TERM "$PPID" ;; esac; done
+  for f in $FAIL_RM; do case "$(basename "$arg")" in $f) echo "rm: injected failure" >&2; exit 1 ;; esac; done
 done
 exec "$REAL_RM" "$@"
 `
@@ -132,7 +136,7 @@ func (f screenshotsFixtureDir) run(t *testing.T, env ...string) screenshotsRun {
 		"PATH="+filepath.Join(f.stub, "bin")+string(os.PathListSeparator)+os.Getenv("PATH"),
 		"TMPDIR="+f.tmp, "STUB="+f.stub, "ASSETS="+f.assets,
 		"REAL_CP="+tools["cp"], "REAL_MV="+tools["mv"], "REAL_RM="+tools["rm"],
-		"FAIL_CP=", "FAIL_MV=", "FAIL_RM=", "FULL_AFTER_RENAME=")
+		"FAIL_CP=", "FAIL_MV=", "FAIL_RM=", "KILL_RM=", "FULL_AFTER_RENAME=")
 	cmd.Env = append(cmd.Env, env...)
 	out, err := cmd.CombinedOutput()
 
@@ -146,8 +150,8 @@ func (f screenshotsFixtureDir) run(t *testing.T, env ...string) screenshotsRun {
 		}
 		require.Regexp(t, `^\.screenshots-[A-Za-z0-9]{6}$`, e.Name(), "a folder among the assets that is not a run's own")
 		run.prepared = append(run.prepared, e.Name())
-		inner, rerr := os.ReadDir(filepath.Join(f.assets, e.Name()))
-		require.NoError(t, rerr)
+		inner, readErr := os.ReadDir(filepath.Join(f.assets, e.Name()))
+		require.NoError(t, readErr)
 		run.assets[screenshotsPrepared] = ""
 		for _, i := range inner {
 			run.assets[screenshotsPrepared+"/"+i.Name()] = readFile(t, filepath.Join(f.assets, e.Name(), i.Name()))
@@ -302,5 +306,37 @@ func TestScreenshotsCommand_ACopyNotDeletedAfterTheReplacementsIsAWarning(t *tes
 	for _, name := range screenshotsFixture {
 		assert.Contains(t, run.out, "screenshots: wrote site/src/assets/"+name)
 	}
+	assert.Empty(t, run.tmp, "the staging folder is left behind")
+}
+
+// The staging folder the run cannot delete, once every image is written, is only reported: the run
+// succeeds and keeps the folder.
+func TestScreenshotsCommand_AStagingFolderNotDeletedAfterTheReplacementsIsAWarning(t *testing.T) {
+	run := runScreenshots(t, screenshotsFixture, screenshotsFixture, screenshotsLines(screenshotsFixture...), fixtureImagesJSON,
+		"FAIL_RM=goiabada-screenshots.*")
+	require.NoError(t, run.err, run.out)
+	assert.Equal(t, screenshotAssets(map[string]string{"screenshot-a.png": "new", "screenshot-b.png": "new", "screenshot-c.png": "new"}), run.assets, run.out)
+	require.Len(t, run.tmp, 1, "the staging folder the run could not delete")
+	assert.Contains(t, run.out, "screenshots: warning: could not delete the staging folder ")
+	assert.Contains(t, run.out, string(filepath.Separator)+run.tmp[0]+"; delete it by hand")
+	assert.NotContains(t, run.out, "screenshots: failed")
+	for _, name := range screenshotsFixture {
+		assert.Contains(t, run.out, "screenshots: wrote site/src/assets/"+name)
+	}
+}
+
+// An interrupt once every image is written does not make the run fail: it exits zero and names the
+// folder of copies it may leave.
+func TestScreenshotsCommand_AnInterruptAfterTheReplacementsIsAWarning(t *testing.T) {
+	run := runScreenshots(t, screenshotsFixture, screenshotsFixture, screenshotsLines(screenshotsFixture...), fixtureImagesJSON,
+		"KILL_RM=screenshot-b.png.old")
+	require.NoError(t, run.err, run.out)
+	want := screenshotAssets(map[string]string{"screenshot-a.png": "new", "screenshot-b.png": "new", "screenshot-c.png": "new"})
+	want[screenshotsPrepared] = ""
+	want[screenshotsPrepared+"/screenshot-c.png.old"] = "committed screenshot-c.png"
+	assert.Equal(t, want, run.assets, run.out)
+	require.Len(t, run.prepared, 1)
+	assert.Contains(t, run.out, "screenshots: warning: stopped while deleting the copies of the committed images, after every image was written; delete site/src/assets/"+run.prepared[0]+" if it is left")
+	assert.NotContains(t, run.out, "screenshots: failed")
 	assert.Empty(t, run.tmp, "the staging folder is left behind")
 }

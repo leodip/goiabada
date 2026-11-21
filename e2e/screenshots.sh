@@ -51,6 +51,7 @@ started=false
 removed=false
 images=()
 preparing=false
+installed=false
 
 # Removes the containers, the network and the volumes of the project, and the capture's container.
 remove_project() {
@@ -65,9 +66,17 @@ server_logs() { "${compose[@]}" logs --no-color --tail 40 authserver adminconsol
 # Leaving, pass or fail, Ctrl-C or SIGTERM, removes what the run started, the replacements it
 # prepared and had not yet used, and its staging folder. A failure names the step, with the servers'
 # last log lines when they had been started.
+# Once every image is replaced the run has succeeded, so nothing after that point, a cleanup step that
+# fails or an interrupt, makes it exit non-zero: a run that does leaves the committed images as they
+# were. The cleanup itself never stops short of the exit.
 finish() {
   local status=$?
   trap - EXIT
+  set +e
+  if [ "$installed" = true ] && [ "$status" -ne 0 ]; then
+    echo "screenshots: warning: stopped while $step, after every image was written; delete site/src/assets/${prepared##*/} if it is left" >&2
+    status=0
+  fi
   if [ "$status" -ne 0 ]; then
     echo "screenshots: failed while $step" >&2
     if [ "$started" = true ] && [ "$removed" = false ]; then
@@ -82,7 +91,8 @@ finish() {
     remove_project || echo "screenshots: could not remove Compose project $project; remove it with: docker compose -p $project down --volumes" >&2
   fi
   if [ "$preparing" = true ]; then discard_prepared; fi
-  rm -rf "$stage"
+  rm -rf "$stage" ||
+    echo "screenshots: warning: could not delete the staging folder $stage; delete it by hand" >&2
   exit "$status"
 }
 trap finish EXIT
@@ -172,6 +182,7 @@ for name in "${images[@]}"; do
   fi
   replaced+=("$name")
 done
+installed=true
 
 step="deleting the copies of the committed images"
 for name in "${images[@]}"; do
