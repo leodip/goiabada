@@ -171,7 +171,7 @@ func HandleEmailTemplatesGet(httpHelper HTTPHelper, apiClient emailTemplatesList
 	}
 }
 
-// emailTemplateReader reads one email with its six languages.
+// emailTemplateReader reads one email with each built-in language.
 type emailTemplateReader interface {
 	GetEmailTemplate(ctx context.Context, accessToken string, email string) (*api.EmailTemplateResponse, error)
 }

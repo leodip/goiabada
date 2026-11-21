@@ -398,7 +398,7 @@
 "adminconsole.email_tabs.templates" = "Modèles d’e-mail"
 
 # The Email templates tab (#818 decision 14): the list of every email and the editor of one.
-"adminconsole.email_templates.list.intro" = "Ce que dit chaque e-mail, dans chacune des six langues intégrées. Une langue sans modification est envoyée avec le texte intégré de Goiabada."
+"adminconsole.email_templates.list.intro" = "Ce que dit chaque e-mail, dans chaque langue intégrée. Une langue sans modification est envoyée avec le texte intégré de Goiabada."
 "adminconsole.email_templates.list.branding_note" = "L’apparence des e-mails, leurs couleurs, leur logo et leur pied de page, suit la marque dans laquelle ils sont affichés."
 "adminconsole.email_templates.list.branding_link" = "Aller à l’image de marque"
 "adminconsole.email_templates.list.col_email" = "E-mail"

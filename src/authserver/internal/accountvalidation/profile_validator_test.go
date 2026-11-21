@@ -975,8 +975,8 @@ func TestValidateProfile_Locale(t *testing.T) {
 }
 
 // The page language is Automatic, "", or exactly the tag of a catalog the server has loaded: the
-// six built in here (#631 decision 3). A tag with no catalog, or one that only matches a catalog,
-// would be stored and change nothing, so it is refused. Left out of the request, it is not checked.
+// built-in ones (#631 decision 3). A tag with no catalog, or one that only matches a catalog, would
+// be stored and change nothing, so it is refused. Left out of the request, it is not checked.
 func TestValidateProfile_PageLanguage(t *testing.T) {
 	validator := NewProfileValidator(datamocks.NewDatabase(t))
 

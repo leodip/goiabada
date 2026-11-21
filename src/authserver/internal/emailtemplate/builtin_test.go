@@ -12,16 +12,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// The six built-in languages, as the catalogs built into Goiabada are tagged.
+// The built-in languages, as the catalogs built into Goiabada are tagged.
 var builtInLanguages = []string{"en", "de", "es", "fr", "it", "pt-BR"}
 
-func TestLanguages_AreTheSixBuiltInOnes(t *testing.T) {
+func TestLanguages_AreTheBuiltInOnes(t *testing.T) {
 	assert.Equal(t, builtInLanguages, Languages)
 	// A catalog built in without email text would leave its readers on English emails.
 	assert.Equal(t, i18n.CatalogTags(), Languages, "the email languages are the built-in catalogs")
 }
 
-// Every built-in email holds its text in the six languages, passes its own rules in each (#818
+// Every built-in email holds its text in each built-in language, passes its own rules in each (#818
 // decision 8), and has a button label exactly when it offers the button (decision 5).
 func TestBuiltIns_EveryTextPassesItsOwnRules(t *testing.T) {
 	require.NotEmpty(t, BuiltIns())
@@ -29,7 +29,7 @@ func TestBuiltIns_EveryTextPassesItsOwnRules(t *testing.T) {
 	for _, email := range BuiltIns() {
 		assert.False(t, seen[email.ID], "%s is defined once", email.ID)
 		seen[email.ID] = true
-		require.Len(t, email.BuiltIn, len(builtInLanguages), "%s is written in the six languages", email.ID)
+		require.Len(t, email.BuiltIn, len(builtInLanguages), "%s is written in each built-in language", email.ID)
 		for _, lang := range builtInLanguages {
 			t.Run(email.ID+"/"+lang, func(t *testing.T) {
 				text, ok := email.BuiltIn[lang]
@@ -181,7 +181,7 @@ func TestExpiryUnits_NameEachCategoryTheLanguagesCountsReach(t *testing.T) {
 	}
 }
 
-// The recipient's language picks one of the six built-in languages as an email's copy was picked
+// The recipient's language picks one of the built-in languages as an email's copy was picked
 // before: a regional variant reads its language's text, and a language with none reads English.
 func TestLanguage_MatchesTheRecipientsLanguage(t *testing.T) {
 	for locale, want := range map[string]string{

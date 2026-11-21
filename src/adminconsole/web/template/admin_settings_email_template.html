@@ -21,8 +21,8 @@
   {{ end }}
 </div>
 
-{{/* The six languages, the one being edited current and each edited or invalid one marked. Leaving
-     for another with changes not saved asks first, in the discardChanges dialog
+{{/* Each built-in language, the one being edited current and each edited or invalid one marked.
+     Leaving for another with changes not saved asks first, in the discardChanges dialog
      (email-template-editor.js). */}}
 <nav class="tab-bar" id="emailTemplateLanguages" aria-label="{{ T $.ctx "adminconsole.email_templates.editor.languages_label" }}" data-discard-dialog="discardChanges" data-discard-title="{{ T $.ctx "adminconsole.email_templates.editor.discard_title" }}" data-discard-body="{{ T $.ctx "adminconsole.email_templates.editor.discard_body" }}">
   {{- range .languages }}

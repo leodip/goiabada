@@ -18,7 +18,7 @@ import (
 var hexColor = regexp.MustCompile(`^#[0-9a-f]{6}$`)
 
 // TestEmails_EveryDefinedEmailIsDrawnInlineAlone holds every built-in email, sent from its definition
-// (#818), in each of the six languages, to what an email client draws (#817): many clients drop a
+// (#818), in each built-in language, to what an email client draws (#817): many clients drop a
 // style sheet, a style element and a class, and none resolves a CSS variable, so an email links no
 // style sheet, holds no style element and no class, and names no variable; its colors are written
 // on the elements, the area behind the card, the card and each link of its body; and its logo is
