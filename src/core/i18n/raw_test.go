@@ -68,3 +68,38 @@ func TestRaw_NoLocalizerOnContextResolvesFromLocaleTag(t *testing.T) {
 	ctx := context.WithValue(context.Background(), ctxKeyLocaleTag, "pt-BR")
 	assert.Equal(t, "Erro", Raw(ctx, "js.error.error_title"))
 }
+
+// A script's counted phrase gets the forms the page's own catalog holds and its other form, and never
+// a form English holds for a category the page's catalog leaves out: the script would choose it over
+// the catalog's own other form, which is not TCount's order.
+func TestRawCounted_HandsOverTheCatalogsOwnFormsAndItsOtherForm(t *testing.T) {
+	b := counted(map[string]map[string]string{
+		"en": {
+			"pairs.one":     "{{count}} pair",
+			"pairs.few":     "{{count}} pairs (en few)",
+			"pairs.other":   "{{count}} pairs",
+			"clients.one":   "{{count}} client",
+			"clients.other": "{{count}} clients",
+		},
+		"pl": {"pairs.one": "{{count}} para", "pairs.many": "{{count}} par", "pairs.other": "{{count}} pary", "pairs.none": "Brak par"},
+	})
+	pl, en := ctxForBundle(b, "pl"), ctxForBundle(b, "en")
+	assert.Equal(t, map[string]string{"pairs.one": "{{count}} para", "pairs.many": "{{count}} par", "pairs.other": "{{count}} pary"},
+		RawCounted(pl, "pairs"), "pl's own forms, its placeholders unexecuted, and neither English's few nor the sentence for nothing")
+	assert.Equal(t, map[string]string{"clients.other": "{{count}} clients"}, RawCounted(pl, "clients"),
+		"pl has no form of the family, so English's other form, by the ordinary fallback")
+	assert.Equal(t, map[string]string{"pairs.one": "{{count}} pair", "pairs.few": "{{count}} pairs (en few)", "pairs.other": "{{count}} pairs"},
+		RawCounted(en, "pairs"))
+	assert.Equal(t, map[string]string{"nothing.other": "nothing.other"}, RawCounted(pl, "nothing"),
+		"a family no catalog has hands over its other form's key, the visible miss Raw answers")
+}
+
+// The built-in catalogs hand over their own one and other forms of the combobox's match count, each
+// with the {{count}} placeholder the script fills, resolved as Raw resolves a locale.
+func TestRawCounted_TheBuiltInCombobox(t *testing.T) {
+	assert.Equal(t, map[string]string{"js.combobox.results.one": "{{count}} résultat", "js.combobox.results.other": "{{count}} résultats"},
+		RawCounted(ctxFor("fr-CA"), "js.combobox.results"))
+	assert.Equal(t, map[string]string{"js.combobox.results.one": "{{count}} resultado", "js.combobox.results.other": "{{count}} resultados"},
+		RawCounted(context.WithValue(context.Background(), ctxKeyLocaleTag, "pt"), "js.combobox.results"),
+		"a context with no translator resolves from its locale tag")
+}

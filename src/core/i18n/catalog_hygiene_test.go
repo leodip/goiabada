@@ -4,6 +4,7 @@ import (
 	"io/fs"
 	"regexp"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -72,17 +73,148 @@ func TestCatalog_TranslationsMatchEnglish(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			translated := loadCatalogFlat(t, name)
 			for key, value := range en {
+				if _, _, ok := countedForm(key); ok {
+					continue // TestCatalog_CountedKeysHaveTheirLanguagesCategories holds the forms.
+				}
 				got, ok := translated[key]
 				if assert.Truef(t, ok, "%s is missing %q", name, key) {
 					assert.Equalf(t, catalogPlaceholders(value), catalogPlaceholders(got), "%s: %q changed placeholders", name, key)
 				}
 			}
 			for key := range translated {
+				if _, _, ok := countedForm(key); ok {
+					continue
+				}
 				_, ok := en[key]
 				assert.Truef(t, ok, "%s has orphan key %q", name, key)
 			}
 		})
 	}
+}
+
+// pluralCategories is the roster of CLDR cardinal categories each built-in language's counted keys
+// carry, one key per category: the categories the pinned golang.org/x/text's rules (CLDR 32) give
+// the language's whole counts, with other, the form a category without its own key renders. A
+// browser's newer rules are not its source, so a language gains no form when they change.
+var pluralCategories = map[string][]string{
+	"de":    {"one", "other"},
+	"en":    {"one", "other"},
+	"es":    {"one", "other"},
+	"fr":    {"one", "other"},
+	"it":    {"one", "other"},
+	"pl":    {"one", "few", "many", "other"},
+	"pt-BR": {"one", "other"},
+}
+
+// countedForm splits a counted key's form, such as "common.since.minute.few", into its family and
+// its CLDR category. A sentence for nothing (".none") is not a plural form, so it is an ordinary key.
+func countedForm(key string) (family, category string, ok bool) {
+	dot := strings.LastIndexByte(key, '.')
+	if dot <= 0 || !slices.Contains([]string{"zero", "one", "two", "few", "many", "other"}, key[dot+1:]) {
+		return "", "", false
+	}
+	return key[:dot], key[dot+1:], true
+}
+
+func TestCountedForm(t *testing.T) {
+	for key, want := range map[string][2]string{
+		"common.since.minute.few":                       {"common.since.minute", "few"},
+		"adminconsole.admin_branding.list.warnings.one": {"adminconsole.admin_branding.list.warnings", "one"},
+		"a.other": {"a", "other"},
+	} {
+		family, category, ok := countedForm(key)
+		assert.Truef(t, ok, "%q is a counted form", key)
+		assert.Equal(t, want, [2]string{family, category})
+	}
+	for _, key := range []string{"adminconsole.account.otp.recovery_codes.remaining.none", "adminconsole.account.profile.gender_other",
+		"other", ".other", "js.combobox.no_matches", "a.others"} {
+		_, _, ok := countedForm(key)
+		assert.Falsef(t, ok, "%q is not a counted form", key)
+	}
+}
+
+// Every counted key carries exactly its language's categories, from the roster above, and every form
+// carries the placeholders of English's other form, so each form writes its count: a one form that
+// spelt a literal "1" would be wrong in a language whose one also covers 21.
+func TestCatalog_CountedKeysHaveTheirLanguagesCategories(t *testing.T) {
+	en := loadCatalogFlat(t, "active.en.toml")
+	families := map[string][]string{} // English's families, to the placeholders of their other forms.
+	for key := range en {
+		if family, _, ok := countedForm(key); ok {
+			other, ok := en[family+".other"]
+			if assert.Truef(t, ok, "active.en.toml: %q has no other form", family) {
+				families[family] = catalogPlaceholders(other)
+			}
+		}
+	}
+	require.NotEmpty(t, families)
+	for _, name := range catalogNames(t) {
+		t.Run(name, func(t *testing.T) {
+			roster, ok := pluralCategories[localeFromCatalogFile(name)]
+			require.Truef(t, ok, "%s's language has no entry in the roster of plural categories", name)
+			got := map[string][]string{}
+			for key, value := range loadCatalogFlat(t, name) {
+				family, category, ok := countedForm(key)
+				if !ok {
+					continue
+				}
+				got[family] = append(got[family], category)
+				if placeholders, ok := families[family]; assert.Truef(t, ok, "%s has orphan counted key %q", name, key) {
+					assert.Equalf(t, placeholders, catalogPlaceholders(value), "%s: %q does not carry the placeholders of English's %s.other", name, key, family)
+				}
+				assert.Falsef(t, scriptFormLacksCount(key, value), "%s: %q, a form the console's script fills, does not spell its count {{count}}", name, key)
+			}
+			for family := range families {
+				slices.Sort(got[family])
+				assert.Equalf(t, sortedCopy(roster), got[family], "%s: %q has the wrong categories for its language", name, family)
+			}
+		})
+	}
+}
+
+// scriptFormLacksCount reports whether key is a counted form the console's script fills, a "js." key,
+// whose value lacks the exact {{count}} that tCount replaces. The script splits on that spelling
+// alone, so a form spelling "{{ count }}" would show the placeholder itself, though its name matches
+// English's.
+func scriptFormLacksCount(key, value string) bool {
+	return strings.HasPrefix(key, "js.") && !strings.Contains(value, "{{count}}")
+}
+
+func TestScriptFormLacksCount(t *testing.T) {
+	assert.False(t, scriptFormLacksCount("js.combobox.results.many", "{{count}} wyników"))
+	assert.True(t, scriptFormLacksCount("js.combobox.results.other", "{{ count }} wyniku"))
+	assert.True(t, scriptFormLacksCount("js.combobox.results.one", "{{.count}} match"))
+	assert.True(t, scriptFormLacksCount("js.combobox.results.one", "one match"))
+	// A form Go renders spells its count {{.count}}, which Go's templates read with or without spaces.
+	assert.False(t, scriptFormLacksCount("common.since.minute.few", "{{ .count }} minuty temu"))
+}
+
+// The roster names every built-in language, with the categories the chooser reaches for its whole
+// counts and other: a category it reaches without a key would render the other form for it.
+func TestCatalog_TheRosterIsTheCategoriesWholeCountsReach(t *testing.T) {
+	var tags []string
+	for _, name := range catalogNames(t) {
+		tags = append(tags, localeFromCatalogFile(name))
+	}
+	slices.Sort(tags)
+	var rostered []string
+	for tag, roster := range pluralCategories {
+		rostered = append(rostered, tag)
+		reached := []string{"other"}
+		for count := 0; count <= 1000; count++ {
+			reached = append(reached, PluralCategory(tag, count))
+		}
+		slices.Sort(reached)
+		assert.Equalf(t, sortedCopy(roster), slices.Compact(reached), "%s's roster", tag)
+	}
+	slices.Sort(rostered)
+	assert.Equal(t, tags, rostered, "the roster names exactly the built-in languages")
+}
+
+func sortedCopy(s []string) []string {
+	c := slices.Clone(s)
+	slices.Sort(c)
+	return c
 }
 
 var catalogPlaceholder = regexp.MustCompile(`{{\s*(\.?[A-Za-z_][A-Za-z0-9_]*)\s*}}`)

@@ -55,7 +55,7 @@ func (h *Renderer) RenderEmail(r *http.Request, email *emailtemplate.Email, valu
 	}
 	ctx := r.Context()
 	if !emailtemplate.SameLanguage(i18n.CatalogTag(ctx), lang) {
-		// lang is one of the six built-in catalogs' tags, so the recipient's language is exactly it.
+		// lang is one of the built-in catalogs' tags, so the recipient's language is exactly it.
 		ctx = i18n.WithRecipientLanguage(ctx, lang, "")
 	}
 	return h.drawEmail(ctx, email, lang, h.textToSend(ctx, email, lang), values, RequestPageBrand(ctx, h.brands))
@@ -72,7 +72,7 @@ func (h *Renderer) RenderEmailSample(r *http.Request, email *emailtemplate.Email
 	if _, ok := email.BuiltIn[lang]; !ok {
 		return emailtemplate.Message{}, errs.Errorf("the email %s has no built-in text in %s", email.ID, lang)
 	}
-	// lang is one of the six built-in catalogs' tags, so the recipient's language is exactly it, and
+	// lang is one of the built-in catalogs' tags, so the recipient's language is exactly it, and
 	// it replaces the caller's page language as an email to a user replaces the sender's.
 	ctx := i18n.WithRecipientLanguage(r.Context(), lang, "")
 	page := DefaultPageBrand(ctx, h.brands)

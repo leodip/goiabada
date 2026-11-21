@@ -75,7 +75,7 @@ func restoreRequestLanguage(ctx context.Context) context.Context {
 	return context.WithValue(ctx, ctxKeyPageLanguage, false)
 }
 
-// CatalogTags returns the tags of the six catalogs built into Goiabada, which are the languages a
+// CatalogTags returns the tags of the catalogs built into Goiabada, which are the languages a
 // user can choose as their page language: English first, then the others in file-name order. The
 // slice is the caller's own.
 func CatalogTags() []string {

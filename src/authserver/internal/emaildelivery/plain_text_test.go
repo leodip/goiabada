@@ -368,7 +368,7 @@ var logoSource = regexp.MustCompile(`<img src="([^"]+)"`)
 // holds written once, the button left out, no logo, and the footer written out.
 func TestSendEmail_EveryBuiltInEmailIsSentWithItsText(t *testing.T) {
 	// Each email is named by its identifier and the language it is written in, every built-in
-	// definition in each of the six languages.
+	// definition in each built-in language.
 	type written struct{ base, lang string }
 	var emails []written
 	for _, email := range emailtemplate.BuiltIns() {

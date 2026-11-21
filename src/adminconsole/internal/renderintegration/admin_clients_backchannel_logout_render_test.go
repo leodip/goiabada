@@ -7,6 +7,7 @@ import (
 
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/adminclienthandlers"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/i18n"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -164,7 +165,7 @@ func TestRender_AdminClientBackchannelLogout_Saved(t *testing.T) {
 // and an untranslated one shows the English sentence.
 func TestRender_AdminClientBackchannelLogout_InEveryLocale(t *testing.T) {
 	leakedKey := regexp.MustCompile(`adminconsole\.[a-z_.]+`)
-	for _, locale := range []string{"en", "de", "es", "fr", "it", "pt-BR"} {
+	for _, locale := range i18n.CatalogTags() {
 		for _, client := range []*api.ClientResponse{
 			{ID: 7, ClientIdentifier: "a-web-app", AuthorizationCodeEnabled: true, BackchannelLogoutURI: "https://app.example.com/bcl"},
 			{ID: 7, ClientIdentifier: "a-service", ClientCredentialsEnabled: true},
@@ -173,8 +174,10 @@ func TestRender_AdminClientBackchannelLogout_InEveryLocale(t *testing.T) {
 			visible := regexp.MustCompile(`(?s)<script.*?</script>`).ReplaceAllString(out, "")
 			assert.Empty(t, leakedKey.FindString(visible), "%s: a catalog key leaked into the page", locale)
 			if locale != "en" {
-				for _, english := range []string{"Back-channel logout URI", "Require the session identifier", "auth server POSTs",
-					"for the authorization code flow and the implicit flow"} {
+				// The field's label is the protocol's name, which a language may keep in English, as
+				// Polish does, so the sentences around it show the translation.
+				for _, english := range []string{"An https address, or plain http on a confidential client an administrator created",
+					"Require the session identifier", "auth server POSTs", "for the authorization code flow and the implicit flow"} {
 					assert.NotContains(t, visible, english, "%s: the tab is translated", locale)
 				}
 			}

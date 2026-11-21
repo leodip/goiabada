@@ -110,7 +110,7 @@ type FooterLanguage struct {
 	Name string
 }
 
-// brandFooterLanguages are the six built-in languages, in the order the console lists its catalogs,
+// brandFooterLanguages are the built-in languages, in the order the console lists its catalogs,
 // English first (#814 decision 5).
 func brandFooterLanguages() []FooterLanguage {
 	options := render.PageLanguageOptions()
@@ -288,31 +288,23 @@ func nameIn(ctx context.Context, names map[string]string, key string) string {
 // brandClientsNote says on a brand's page how many clients are drawn in it, a sentence for none,
 // one and more.
 func brandClientsNote(ctx context.Context, count int) string {
-	return countSentence(ctx, "adminconsole.admin_branding.brand.clients.", count, nil)
+	return countSentence(ctx, "adminconsole.admin_branding.brand.clients", count, nil)
 }
 
 // deleteClientsNote says on the delete confirmation how many clients use the brand and that they
 // will move to the default brand, named, or that no client uses it.
 func deleteClientsNote(ctx context.Context, count int, defaultBrand string) string {
-	return countSentence(ctx, "adminconsole.admin_branding.delete.clients.", count, map[string]any{"defaultBrand": defaultBrand})
+	return countSentence(ctx, "adminconsole.admin_branding.delete.clients", count, map[string]any{"defaultBrand": defaultBrand})
 }
 
-// countSentence is the message under prefix for count: its none form for zero, its one form for
-// one and its other form for more. The plural is chosen by count == 1, as the console's other
-// counted phrases are (render's relative times), which holds for every built-in catalog.
-func countSentence(ctx context.Context, prefix string, count int, args map[string]any) string {
-	form := "other"
-	switch count {
-	case 0:
-		form = "none"
-	case 1:
-		form = "one"
+// countSentence is the counted phrase key for count, with args filling its other values: its none
+// sentence for zero, and otherwise the plural form i18n.TCount chooses for count in the page's
+// language.
+func countSentence(ctx context.Context, key string, count int, args map[string]any) string {
+	if count == 0 {
+		return i18n.T(ctx, key+".none", args)
 	}
-	data := map[string]any{"count": count}
-	for key, value := range args {
-		data[key] = value
-	}
-	return i18n.T(ctx, prefix+form, data)
+	return i18n.TCount(ctx, key, count, args)
 }
 
 func brandRow(ctx context.Context, brand api.BrandResponse) BrandRow {

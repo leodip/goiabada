@@ -720,7 +720,7 @@ type Database interface {
 
 	// Email template edits (#818 decision 7): at most one row for an email and a language, holding
 	// only the fields that differ from the built-in text. The email and the language are matched
-	// exactly; holding them to the 19 emails and the six built-in languages is the caller's.
+	// exactly; holding them to the 19 emails and the built-in languages is the caller's.
 	//
 	// SaveEmailTemplate stores the edit of its email and language in one statement, creating the
 	// row or replacing the fields of the one already there, so of two saves at once the last wins

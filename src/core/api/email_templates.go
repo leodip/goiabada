@@ -1,7 +1,7 @@
 package api
 
 // The admin API's email templates (#818 decision 10), in the settings domain: an administrator's
-// edit of the subject, the button label and the body of one of Goiabada's emails, in one of the six
+// edit of the subject, the button label and the body of one of Goiabada's emails, in one of the
 // built-in languages. One language of one email is the resource that is saved and reset.
 
 // The status of one language of an email template (#818 decision 8): default when it has no edit,
@@ -28,7 +28,7 @@ type EmailTemplateLanguageStatusResponse struct {
 }
 
 // EmailTemplateSummaryResponse is one email as the list gives it: its identifier and the status of
-// each of the six languages, in the order of the built-in languages, English first.
+// each built-in language, in their order, English first.
 type EmailTemplateSummaryResponse struct {
 	ID        string                                `json:"id"`
 	Languages []EmailTemplateLanguageStatusResponse `json:"languages"`
@@ -80,7 +80,7 @@ type EmailTemplateLanguageResponse struct {
 }
 
 // EmailTemplateResponse is one email: the placeholders it offers, whether it has a button, and
-// each of the six languages, English first.
+// each built-in language, English first.
 type EmailTemplateResponse struct {
 	ID           string                             `json:"id"`
 	HasButton    bool                               `json:"hasButton"`

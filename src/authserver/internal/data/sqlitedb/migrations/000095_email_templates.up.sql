@@ -5,7 +5,7 @@
 -- Nothing about whether an edit is valid is stored: that is judged whenever it is read (decision 8).
 --
 -- The six questions a migration answers: (1) all four engines. (2) email_template is the email's
--- fixed identifier, such as password_reset_link, and language one of the six built-in language
+-- fixed identifier, such as password_reset_link, and language one of the built-in language
 -- tags, both ASCII; the three fields are the administrator's text. Every string column is pinned
 -- case-sensitive on MySQL and SQL Server, as every string column is; the subject and the button
 -- label are as wide as their bounds, 200 and 60, and the body is unbounded, as the legal

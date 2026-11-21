@@ -73,6 +73,20 @@ Se l'hai creato tu, non devi fare nulla. Conserva i nuovi codici in un posto sic
 Un saluto,
 {{app_name}}`,
 		},
+		//nolint:misspell // the pl text: "nowe" is Polish, not a misspelling of "now"
+		"pl": {
+			Subject: "Zastąpiono Twoje kody odzyskiwania",
+			Body: `Dzień dobry {{name}},
+
+W ustawieniach Twojego konta w {{app_name}} utworzono nowy zestaw kodów odzyskiwania. Poprzednie kody odzyskiwania już nie działają, niezależnie od tego, czy zostały użyte.
+
+Jeśli to Ty, nie musisz nic robić. Przechowuj nowe kody w bezpiecznym miejscu.
+
+**Jeśli nie, ktoś inny może znać Twoje hasło.** Ustaw nowe hasło za pomocą linku „Nie pamiętasz hasła?” na stronie logowania, a potem zaloguj się i utwórz nowy zestaw kodów odzyskiwania w ustawieniach konta albo skontaktuj się z administratorem.
+
+Pozdrawiamy
+{{app_name}}`,
+		},
 		"pt-BR": {
 			Subject: "Seus códigos de recuperação foram substituídos",
 			Body: `Olá {{name}},

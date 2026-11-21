@@ -14,8 +14,8 @@ const (
 
 // EmailTemplate is an administrator's edit of one email in one language (#818 decision 7).
 // EmailTemplate is the email's identifier, such as password_reset_link, and Language one of the
-// six built-in language tags; there is at most one row for the two. Holding them to the 19 emails
-// and the six languages is the caller's: the data layer stores what it is given.
+// built-in language tags; there is at most one row for the two. Holding them to the 19 emails
+// and the built-in languages is the caller's: the data layer stores what it is given.
 //
 // The row holds only what differs from the built-in text: each of Subject, ButtonLabel and Body is
 // NULL for a field left as the built-in text, so that field follows later releases, and a row has

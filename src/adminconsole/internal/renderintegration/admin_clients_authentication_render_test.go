@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/adminclienthandlers"
+	"github.com/leodip/goiabada/core/i18n"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -104,7 +105,7 @@ func TestRender_AdminClientAuthentication_NamesTheStoredMethodOnARefusedSave(t *
 // the wire.
 func TestRender_AdminClientAuthentication_TheMethodLineIsInEveryLanguage(t *testing.T) {
 	english := map[string]string{"client_secret_basic": heldToBasicSentence, "client_secret_post": heldToPostSentence}
-	for _, locale := range []string{"en", "de", "es", "fr", "it", "pt-BR"} {
+	for _, locale := range i18n.CatalogTags() {
 		for _, held := range []string{"client_secret_basic", "client_secret_post"} {
 			t.Run(locale+"/"+held, func(t *testing.T) {
 				client := adminclienthandlers.ClientAuthentication{ClientID: 7, ClientIdentifier: "dcr_a3f9",

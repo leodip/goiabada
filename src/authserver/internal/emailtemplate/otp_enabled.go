@@ -74,6 +74,20 @@ Se l'hai configurata tu, non devi fare nulla. Conserva i codici di recupero in u
 Un saluto,
 {{app_name}}`,
 		},
+		//nolint:misspell // the pl text: "nowe" is Polish, not a misspelling of "now"
+		"pl": {
+			Subject: "Skonfigurowano uwierzytelnianie dwuskładnikowe",
+			Body: `Dzień dobry {{name}},
+
+Na Twoim koncie w {{app_name}} skonfigurowano uwierzytelnianie dwuskładnikowe. Logowanie do aplikacji, które z niego korzystają, wymaga teraz kodu ze skonfigurowanej aplikacji uwierzytelniającej. Razem z nią utworzono nowy zestaw kodów odzyskiwania, które pozwolą Ci się zalogować, jeśli stracisz tę aplikację.
+
+Jeśli to Ty, nie musisz nic robić. Przechowuj kody odzyskiwania w bezpiecznym miejscu.
+
+**Jeśli nie, ktoś inny może znać Twoje hasło.** Ustaw nowe hasło za pomocą linku „Nie pamiętasz hasła?” na stronie logowania, a potem zaloguj się i sprawdź ustawienia uwierzytelniania dwuskładnikowego albo skontaktuj się z administratorem.
+
+Pozdrawiamy
+{{app_name}}`,
+		},
 		"pt-BR": {
 			Subject: "A autenticação de dois fatores foi configurada",
 			Body: `Olá {{name}},

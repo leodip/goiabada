@@ -67,7 +67,7 @@ type BrandFooterLinkResponse struct {
 // 9): an https: URL with a host and no user name or password, at most 256 characters, and a label,
 // both required. The label, trimmed, is at most 40 characters, without angle brackets, and is drawn
 // in a language the link has no label of its own for. Labels is optional, left out, null or {}, and
-// holds a label by the tag of one of the six built-in languages, under the same bounds; a blank one
+// holds a label by the tag of one of the built-in languages, under the same bounds; a blank one
 // is dropped and any other tag is refused. A BrandFooterLinkResponse sent back as it came is the
 // same link.
 type BrandFooterLink struct {

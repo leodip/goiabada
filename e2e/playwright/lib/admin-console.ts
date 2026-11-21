@@ -235,7 +235,21 @@ export async function idFromListLink(page: Page, listUrl: string, text: string):
   return Number(match[1]);
 }
 
-export type ResourceTab = "settings" | "permissions" | "users-with-permission" | "groups-with-permission" | "delete";
+// The id of the user the users list shows with exactly this email, or undefined when its search
+// shows none, as for an address a test submitted whose account was never created. A list that
+// does not load throws, so a failed lookup is never read as no user.
+export async function userIdIfListed(page: Page, email: string): Promise<number | undefined> {
+  const listUrl = `${env.adminUrl}/admin/users?query=${encodeURIComponent(email)}`;
+  const response = await page.goto(listUrl);
+  if (!response?.ok()) throw new Error(`the users list answered ${response?.status()} for ${email}`);
+  await expect(page).toHaveURL(new RegExp(`^${env.adminUrl}/admin/users\\?`));
+  const table = page.locator("#usersTable");
+  await expect(table.or(page.locator(".empty-state"))).toBeVisible();
+  if ((await table.getByRole("link", { name: email, exact: true }).count()) === 0) return undefined;
+  return idFromListLink(page, listUrl, email);
+}
+
+export type ResourceTab ="settings" | "permissions" | "users-with-permission" | "groups-with-permission" | "delete";
 
 export function resourceUrl(id: number, tab: ResourceTab): string {
   return `${env.adminUrl}/admin/resources/${id}/${tab}`;

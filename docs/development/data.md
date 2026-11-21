@@ -272,7 +272,7 @@ first saves can deadlock each other on MySQL and SQL Server, so the caller saves
 `RunInTransaction`. The record mapping test reads the statement through its `upsert` hook. The data
 layer stores any email and language it is given, refusing only an empty one, one ending in a space
 and one that is not ASCII, which the engines' `=` would fold onto another row; holding them to the
-19 emails and the six built-in languages is the caller's.
+19 emails and the built-in languages is the caller's.
 
 ## Schema golden files
 

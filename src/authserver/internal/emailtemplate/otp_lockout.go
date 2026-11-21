@@ -63,6 +63,17 @@ L'app di autenticazione del tuo account {{app_name}} è stata bloccata dopo trop
 Un saluto,
 {{app_name}}`,
 		},
+		"pl": {
+			Subject: "Zablokowano Twoją aplikację uwierzytelniającą po zbyt wielu błędnych kodach",
+			Body: `Dzień dobry {{name}},
+
+Aplikacja uwierzytelniająca Twojego konta w {{app_name}} została zablokowana, ponieważ podczas logowania wpisano zbyt wiele błędnych kodów z rzędu. Jej kody nie są już akceptowane, nawet poprawne.
+
+**Te kody można było wpisać dopiero po haśle, więc ktoś inny może znać Twoje hasło.** Zaloguj się jednym z kodów odzyskiwania, zmień hasło w ustawieniach konta, a potem wyłącz uwierzytelnianie dwuskładnikowe i skonfiguruj nową aplikację uwierzytelniającą. Jeśli nie masz już kodów odzyskiwania, skontaktuj się z administratorem.
+
+Pozdrawiamy
+{{app_name}}`,
+		},
 		"pt-BR": {
 			Subject: "Seu aplicativo autenticador foi bloqueado após muitos códigos errados",
 			Body: `Olá {{name}},

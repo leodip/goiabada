@@ -335,8 +335,8 @@ the [e2e README](../../e2e/README.md#screenshots) says what it starts and how to
 - **Email templates**: every email is sent from its built-in definition, and has no template file and
   no catalog message (#818). Its definition in `internal/emailtemplate`
   holds its identifier, the placeholders it offers and requires, and its subject, button label and
-  body in the six built-in languages; `render.Renderer.RenderEmail` matches the recipient's language
-  against those six (`emailtemplate.Language`, English for any other), renders the body inside
+  body in each built-in language; `render.Renderer.RenderEmail` matches the recipient's language
+  against those languages (`emailtemplate.Language`, English for any other), renders the body inside
   `layouts/email_layout.html` with the frame above, and writes the subject as the `<title>`. The
   body is a small Markdown set: paragraphs, a single newline as a line break, bold, italic, links,
   bulleted and numbered lists. goldmark parses it with every other parser left out, so a heading, a
@@ -348,9 +348,11 @@ the [e2e README](../../e2e/README.md#screenshots) says what it starts and how to
   labelled with the button label, which is plain text; `{{code}}` alone in its paragraph draws the
   box above, and is text elsewhere. `{{name}}` is
   `emailtemplate.RecipientName`, the address for a user with none, `{{expiry}}` a lifetime in
-  the email's language, and `{{codes_left}}` a number, which the recovery code notice words alike
-  for any count. `Email.Check` gives the refusals: a name the email does not offer, a required
-  one the body does not draw (`{{button}}` does not draw the link), the link or the button in the
+  the email's language, its unit's name the one of the count's plural category, chosen by
+  `i18n.PluralCategory` among a name per category the language's whole counts reach, and
+  `{{codes_left}}` a number, which the recovery code notice words alike for any count.
+  `Email.Check` gives the refusals: a name the email does not offer, a required one the body
+  does not draw (`{{button}}` does not draw the link), the link or the button in the
   subject, the button not alone, a placeholder in a destination, a body with nothing to read
   besides the button, and the limits of a field: a subject blank, past 200 characters or on two
   lines, a button label blank or past 60 (or present on an email with no button), a body past
@@ -361,7 +363,7 @@ the [e2e README](../../e2e/README.md#screenshots) says what it starts and how to
   read) naming the email, the language and the rules broken, never the text. The start logs the
   same warning for each invalid stored edit. Its output is the auth server's second guarded `template.HTML`, which
   `legalmarkdown/trusted_html_lint_test.go` holds. `TestBuiltIns_EveryTextPassesItsOwnRules` holds
-  every built-in text to its email's rules in the six languages, and
+  every built-in text to its email's rules in each built-in language, and
   `TestEmails_EveryDefinedEmailIsDrawnInlineAlone` to the inline rules above. A change to the
   placeholders an email offers or requires can make an administrator's edit of it invalid, so it
   needs a release-notes line. The console's Email templates tab, under Admin, Email, lists the
@@ -477,4 +479,10 @@ the [e2e README](../../e2e/README.md#screenshots) says what it starts and how to
   tense included: a question asked before an action says what will happen ("The key will be
   deleted"), a notice after it what was done, and help about standing behaviour the present.
   Sentence case; a button says what it does ("Save", "New user"); a page title reads "Page – app
-  name". All built-in catalogs change together.
+  name". A phrase with a count is a counted key, one form per CLDR plural category its language's
+  whole counts reach (`<key>.one` and `.other` in English), each carrying the count's placeholder,
+  and `i18n.TCount`, the console's `TCount` template function, chooses the form: nothing tests
+  `count == 1`. Its sentence for zero, `<key>.none`, is the caller's to choose. In the console's
+  script, `tCount` chooses the form by `Intl.PluralRules` for the page's catalog tag, among the
+  forms `JSBootstrap` hands over for a family listed in `jsBootstrapCountedKeys`: those the page's
+  own catalog has, with its other form. All built-in catalogs change together.

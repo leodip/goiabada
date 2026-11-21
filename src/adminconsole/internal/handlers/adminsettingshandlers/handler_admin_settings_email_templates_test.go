@@ -171,9 +171,9 @@ func TestHandleEmailTemplateOpenGet_OpensTheLanguageTheConsoleIsReadIn(t *testin
 // An address naming no email, or no language of the email, is the 404 page.
 func TestHandleEmailTemplateGet_AnUnknownEmailOrLanguageIsNotFound(t *testing.T) {
 	for name, path := range map[string][2]string{
-		"an unknown email":                  {"password_reset", "fr"},
-		"a language that is not one of six": {"password_reset_link", "nl"},
-		"a language tag in another case":    {"password_reset_link", "pt-br"},
+		"an unknown email":                {"password_reset", "fr"},
+		"a language that is not built in": {"password_reset_link", "nl"},
+		"a language tag in another case":  {"password_reset_link", "pt-br"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			httpHelper := handlersmocks.NewHTTPHelper(t)
