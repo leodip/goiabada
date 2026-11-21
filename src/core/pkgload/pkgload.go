@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"slices"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/leodip/goiabada/core/errs"
@@ -113,8 +114,11 @@ var (
 //
 // A package that does not load or does not type-check is an error naming the package and its first
 // error, the first package in import-path order when several fail, because a reading of a
-// half-checked tree misses references. A module the build selects no package of is ErrNoPackages,
-// and a directory the go command cannot load at all is an error naming it.
+// half-checked tree misses references. So is a package that imports a package of its own module
+// that ./... does not match, one in a directory whose name, or a parent's, begins with _ or . or is
+// testdata: the build compiles it, and no guard reading the load would. A module the build selects
+// no package of is ErrNoPackages, and a directory the go command cannot load at all is an error
+// naming it.
 func Load(dir string, build Build) ([]*packages.Package, error) {
 	abs, err := filepath.Abs(dir)
 	if err != nil {
@@ -219,7 +223,50 @@ func load(dir string, build Build) ([]*packages.Package, error) {
 				p.ID, dir, describe(build), p.Errors[0])
 		}
 	}
+	if p, path := unmatchedImport(sorted); p != nil {
+		return nil, errs.Errorf("%s in %s imports %s for %s, a package of %s that ./... does not match, so no guard "+
+			"reads it: the go command skips a directory whose name begins with _ or . or is testdata, and the "+
+			"package belongs in one it reads", p.ID, dir, path, describe(build), p.Module.Path)
+	}
 	return pkgs, nil
+}
+
+// unmatchedImport returns the first package, in the order given, that imports a package of its own
+// module that is not among the packages loaded, and that import's path. A package of a module nested
+// in this one's directory is another module's, which ./... leaves out rightly.
+func unmatchedImport(sorted []*packages.Package) (*packages.Package, string) {
+	loaded := map[string]bool{}
+	for _, p := range sorted {
+		loaded[p.PkgPath] = true
+	}
+	for _, p := range sorted {
+		if p.Module == nil {
+			continue
+		}
+		paths := make([]string, 0, len(p.Imports))
+		for path := range p.Imports {
+			paths = append(paths, path)
+		}
+		sort.Strings(paths)
+		for _, path := range paths {
+			rel, ok := strings.CutPrefix(path, p.Module.Path+"/")
+			if ok && !loaded[path] && !inNestedModule(p.Module.Dir, rel) {
+				return p, path
+			}
+		}
+	}
+	return nil, ""
+}
+
+// inNestedModule reports whether rel, a directory below modDir in forward slashes, belongs to a
+// module nested there: one with a go.mod in rel or in a directory between it and modDir.
+func inNestedModule(modDir, rel string) bool {
+	for d := filepath.Join(modDir, filepath.FromSlash(rel)); d != modDir && len(d) > len(modDir); d = filepath.Dir(d) {
+		if _, err := os.Stat(filepath.Join(d, "go.mod")); err == nil {
+			return true
+		}
+	}
+	return false
 }
 
 // describe names a build in an error: its platform, the release build's tag and cgo, and tests.

@@ -296,6 +296,35 @@ func TestLoad_ADirectoryThatIsNoModuleIsAFailedLoadAndNotAnEmptyOne(t *testing.T
 	assert.Contains(t, err.Error(), filepath.Join(root, "loose"))
 }
 
+// A package of the module in a directory ./... skips, here one whose name begins with _, is still
+// compiled into a package that imports it, so the load refuses it rather than leave it unread.
+func TestLoad_AnImportOfAPackageTheWildcardSkipsIsAnError(t *testing.T) {
+	root := loadable(t, map[string]string{
+		"mod/go.mod":       "module example.test/mod\n",
+		"mod/a/a.go":       "package a\n\nimport \"example.test/mod/_bridge\"\n\nvar _ = bridge.B\n",
+		"mod/_bridge/b.go": "package bridge\n\nconst B = 1\n",
+	})
+	_, err := pkgload.Load(filepath.Join(root, "mod"), pkgload.Build{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "example.test/mod/a in ")
+	assert.Contains(t, err.Error(), "imports example.test/mod/_bridge")
+	assert.NotErrorIs(t, err, pkgload.ErrNoPackages)
+}
+
+// A module nested in the module's directory is another module, which ./... leaves out rightly, so
+// importing it is no error.
+func TestLoad_AnImportOfANestedModuleIsNoError(t *testing.T) {
+	root := loadable(t, map[string]string{
+		"mod/go.mod":     "module example.test/mod\n",
+		"mod/a/a.go":     "package a\n\nimport \"example.test/mod/sub/s\"\n\nvar _ = s.S\n",
+		"mod/sub/go.mod": "module example.test/mod/sub\n",
+		"mod/sub/s/s.go": "package s\n\nconst S = 1\n",
+	})
+	pkgs, err := pkgload.Load(filepath.Join(root, "mod"), pkgload.Build{})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"example.test/mod/a"}, ids(pkgs))
+}
+
 // ---- one load per build ---------------------------------------------------------------------
 
 // A second load of the same build in the same binary is the first one's result: the tree is changed
