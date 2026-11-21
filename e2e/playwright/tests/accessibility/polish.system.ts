@@ -1,5 +1,5 @@
 // Registration is a global setting, so this check runs in the serial system project and restores it.
-import { deleteUser, idFromListLink } from "../../lib/admin-console";
+import { deleteUser, userIdIfListed } from "../../lib/admin-console";
 import { env } from "../../lib/environment";
 import { fitsInPolish } from "../../lib/polish";
 import { expect, test } from "../../lib/fixtures";
@@ -34,9 +34,10 @@ for (const theme of ["light", "dark"] as const) {
         await fitsInPolish(own);
         await own.locator("#password").fill(password);
         await own.locator("#passwordConfirmation").fill(password);
+        // The account exists once this submit commits, so cleanup looks for it however the check after goes.
+        created.push(email);
         await own.getByRole("button", { name: "Utwórz konto", exact: true }).click();
         await expect(own.getByRole("heading", { level: 1 })).toHaveText("Aktywowano konto");
-        created.push(email);
         await fitsInPolish(own);
 
         await page.goto(`${env.adminUrl}/admin/settings/general`);
@@ -47,16 +48,17 @@ for (const theme of ["light", "dark"] as const) {
         await own.locator("#email").fill(secondEmail);
         await own.locator("#password").fill(password);
         await own.locator("#passwordConfirmation").fill(password);
+        created.push(secondEmail);
         await own.getByRole("button", { name: "Utwórz konto", exact: true }).click();
         await expect(own.getByRole("heading", { level: 1 })).toHaveText("Utworzono konto");
-        created.push(secondEmail);
         await fitsInPolish(own);
       });
     } finally {
       await context.close();
+      // A submit that failed before its account was committed leaves no user to delete.
       for (const email of created) {
-        const id = await idFromListLink(page, `${env.adminUrl}/admin/users?query=${encodeURIComponent(email)}`, email);
-        await deleteUser(page, id);
+        const id = await userIdIfListed(page, email);
+        if (id !== undefined) await deleteUser(page, id);
       }
     }
   });

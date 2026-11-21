@@ -9,6 +9,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/fake"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -34,7 +35,8 @@ func threeFooterLinks() record.BrandFooterLinks {
 			Label: "Privacy",
 			Labels: map[string]string{
 				"de": "Datenschutz", "en": "Privacy", "es": "Privacidad",
-				"fr": "Confidentialité", "it": "Riservatezza", "pt-BR": "Privacidade",
+				"fr": "Confidentialité", "it": "Riservatezza", "pl": "Prywatność",
+				"pt-BR": "Privacidade",
 			},
 		},
 		{
@@ -42,7 +44,7 @@ func threeFooterLinks() record.BrandFooterLinks {
 			Label: longLabel,
 			Labels: map[string]string{
 				"de": longLabel, "en": longLabel, "es": longLabel,
-				"fr": longLabel, "it": longLabel, "pt-BR": longLabel,
+				"fr": longLabel, "it": longLabel, "pl": longLabel, "pt-BR": longLabel,
 			},
 		},
 		{
@@ -50,9 +52,21 @@ func threeFooterLinks() record.BrandFooterLinks {
 			Label: "Status & \"uptime\"",
 			Labels: map[string]string{
 				"de": "Status", "en": "Status", "es": "Estado",
-				"fr": "État", "it": "Stato", "pt-BR": "Situação",
+				"fr": "État", "it": "Stato", "pl": "Status", "pt-BR": "Situação",
 			},
 		},
+	}
+}
+
+// The fixture keeps up with the catalogs, so the round trip below covers a label in every
+// built-in language, a new one included.
+func TestBrand_TheFooterFixtureLabelsEachLinkInEachBuiltInLanguage(t *testing.T) {
+	for _, link := range threeFooterLinks() {
+		tags := make([]string, 0, len(link.Labels))
+		for tag := range link.Labels {
+			tags = append(tags, tag)
+		}
+		assert.ElementsMatch(t, i18n.CatalogTags(), tags, "the labels of %s", link.URL)
 	}
 }
 
