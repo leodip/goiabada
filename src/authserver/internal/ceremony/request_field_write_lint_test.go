@@ -417,8 +417,8 @@ func isProductionGoFile(name string) bool {
 // what makes a field reached through another package the same object as the one the rule resolved.
 //
 // A stubbed package's types are invalid, so a context could only hide behind one if a stdlib or
-// third-party function returned it, which none can name. core/guard's stubPackages and the
-// discarded-error lint's importer in internal/server are the twins of the stub half.
+// third-party function returned it, which none can name. The discarded-error lint's importer in
+// internal/server is the twin of the stub half.
 type requestFieldPackages struct {
 	root  string
 	fset  *token.FileSet

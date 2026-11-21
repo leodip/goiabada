@@ -2,6 +2,7 @@ package guard
 
 import (
 	"errors"
+	"go/token"
 	"go/types"
 	"path"
 	"path/filepath"
@@ -195,11 +196,7 @@ func contextValueSitesIn(modRoot string) ([]contextValueFinding, error) {
 	}
 	wg.Wait()
 
-	type position struct {
-		file   string
-		offset int
-	}
-	seen := map[position]bool{}
+	seen := map[token.Position]bool{}
 	var sites []contextValueFinding
 	for i := range builds {
 		if loadErrs[i] != nil && !errors.Is(loadErrs[i], pkgload.ErrNoPackages) {
@@ -212,10 +209,10 @@ func contextValueSitesIn(modRoot string) ([]contextValueFinding, error) {
 					continue
 				}
 				at := p.Fset.Position(ident.Pos())
-				if seen[position{at.Filename, at.Offset}] {
+				if seen[at] {
 					continue
 				}
-				seen[position{at.Filename, at.Offset}] = true
+				seen[at] = true
 				sites = append(sites, contextValueFinding{
 					file: relativeTo(modRoot, at.Filename),
 					line: at.Line,

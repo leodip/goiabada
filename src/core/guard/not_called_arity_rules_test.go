@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -21,13 +22,62 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// notCalledTestifyModules are the modules a fixture importing testify's mock requires: testify
+// itself and the two modules its mock and assert packages import. The go command refuses to load a
+// module whose go.mod leaves out a module one of its packages imports.
+var notCalledTestifyModules = []string{
+	"github.com/stretchr/testify",
+	"github.com/stretchr/objx",
+	"go.yaml.in/yaml/v3",
+}
+
+// requireTestify makes the fixture module at mod require the real testify, at the versions core
+// pins, with core's go.sum beside it. The guard reads testify's own Mock, so a fixture double has
+// to embed that and not a stand-in; the module cache already holds those versions, because core's
+// own tests build with them, so the tree loads offline.
+func requireTestify(t *testing.T, root, mod string) {
+	t.Helper()
+	core := filepath.Join(SourceRoot(t), "core")
+	goMod, err := os.ReadFile(filepath.Join(core, "go.mod"))
+	require.NoError(t, err)
+	versions := map[string]string{}
+	for _, line := range strings.Split(string(goMod), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) == 3 && fields[0] == "require" {
+			fields = fields[1:]
+		}
+		if len(fields) >= 2 {
+			versions[fields[0]] = fields[1]
+		}
+	}
+
+	requires := "\nrequire (\n"
+	for _, path := range notCalledTestifyModules {
+		require.NotEmpty(t, versions[path], "core's go.mod requires no %s", path)
+		requires += "\t" + path + " " + versions[path] + "\n"
+	}
+	modFile := filepath.Join(root, filepath.FromSlash(mod), "go.mod")
+	own, err := os.ReadFile(modFile)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(modFile, append(own, requires+")\n"...), 0o644))
+
+	sum, err := os.ReadFile(filepath.Join(core, "go.sum"))
+	require.NoError(t, err)
+	writeFixture(t, root, mod+"/go.sum", string(sum))
+}
+
 // notCalledFixtureModule writes the module every rule-table case shares: a package of generated
-// doubles, a package that only looks like one, and nothing else. The caller adds the file holding
-// the assertions.
+// doubles, a type with a method spelled like the assertion that is no double, a package named mock
+// that is not testify's, and nothing else. The module requires the real testify. The caller adds
+// the file holding the assertions.
 func notCalledFixtureModule(t *testing.T, root string) {
 	t.Helper()
 
-	writeFixture(t, root, "mod/go.mod", "module example.com/mod\n\ngo 1.24\n")
+	// No go line: makeLoadable writes the toolchain's, which is at least the newest one the modules
+	// testify brings in declare, as core's own go line is.
+	writeFixture(t, root, "mod/go.mod", "module example.com/mod\n")
+	requireTestify(t, root, "mod")
+	makeLoadable(t, root)
 
 	writeFixture(t, root, "mod/doubles/database.go", `package doubles
 
@@ -89,14 +139,28 @@ func (_mock *UserCreator) CreateUser(ctx context.Context, user *User) error {
 
 	writeFixture(t, root, "mod/plain/plain.go", `package plain
 
-// NotADouble embeds nothing of testify's, so the importer never reads this package and a value of
-// this type cannot be resolved at a call site. That is the point: the walk answers from what it
-// read, and says so when it read nothing.
+// NotADouble embeds nothing of testify's and declares a method spelled like the assertion. A call
+// of it is no testify assertion, so it is no site, whatever its arguments.
 type NotADouble struct{}
 
 func New() *NotADouble { return &NotADouble{} }
 
 func (n *NotADouble) Log(a int, b int, c int) {}
+
+func (n *NotADouble) AssertNotCalled(t any, methodName string, arguments ...any) bool {
+	return true
+}
+`)
+
+	writeFixture(t, root, "mod/fakemock/mock.go", `package mock
+
+// Mock is spelled as testify's is, in a package named as testify's is, and is neither. A struct
+// embedding it is written mock.Mock exactly as a generated double is.
+type Mock struct{}
+
+func (m *Mock) AssertNotCalled(t any, methodName string, arguments ...any) bool {
+	return true
+}
 `)
 }
 
@@ -185,16 +249,67 @@ func TestRules(t *testing.T) {
 	// Row 10: a variadic method, whose recorded length is not its parameter count.
 	database.AssertNotCalled(t, "Query", mock.Anything, mock.Anything)
 
-	// Row 11: a receiver whose type this walk never read.
-	other.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+	// Row 11: a method of the name on a type that is no double. Two matchers against a Log of
+	// three would be a finding if the walk matched the spelling.
+	other.AssertNotCalled(t, "Log", mock.Anything, mock.Anything)
+}
+`)
+	writeFixture(t, root, "mod/tests/lookalike_test.go", `package tests
+
+import (
+	"testing"
+
+	"example.com/mod/fakemock"
+)
+
+// lookalike embeds a Mock written mock.Mock, from a package named mock that is not testify's.
+type lookalike struct {
+	mock.Mock
+}
+
+func (l *lookalike) Ping(a int) {}
+
+func TestLookalike(t *testing.T) {
+	// Row 12: the assertion spelled exactly as on a double, through the lookalike's own method.
+	// No matcher against a Ping of one would be a finding if the walk matched the package name.
+	(&lookalike{}).AssertNotCalled(t, "Ping")
+}
+`)
+
+	// Row 13: a test-support helper in a production file of a package that has tests too. The test
+	// build checks that file twice, once with the package's tests, and it is one site.
+	writeFixture(t, root, "mod/support/support.go", `package support
+
+import (
+	"example.com/mod/doubles"
+	mock "github.com/stretchr/testify/mock"
+)
+
+func AssertNoUserCreated(t mock.TestingT, database *doubles.Database) {
+	database.AssertNotCalled(t, "CreateUser", mock.Anything)
+}
+`)
+	writeFixture(t, root, "mod/support/support_test.go", `package support
+
+import (
+	"testing"
+
+	"example.com/mod/doubles"
+)
+
+func TestSupport(t *testing.T) {
+	AssertNoUserCreated(t, doubles.NewDatabase())
 }
 `)
 
 	findings, blocked, sites, err := findNotCalledArity(root, []string{"mod"})
 	require.NoError(t, err)
-	assert.Equal(t, 11, sites, "every assertion is reached, including the four the walk refuses")
+	assert.Equal(t, 11, sites,
+		"every testify assertion is reached once, including the three the walk refuses, and "+
+			"neither call of a method merely spelled like it")
 
 	assert.Equal(t, []string{
+		"CreateUser 1/3 on *doubles.Database",
 		"CreateUser 0/3 on *doubles.Database",
 		"GetUserById 1/3 on *doubles.Database",
 		"CreateUser 2/3 on *doubles.Database",
@@ -202,11 +317,10 @@ func TestRules(t *testing.T) {
 		"CreateUser 1/3 on *doubles.Database",
 	}, notCalledNames(findings))
 
-	require.Len(t, blocked, 4)
+	require.Len(t, blocked, 3)
 	assert.Contains(t, blocked[0].why, "does not declare")
 	assert.Contains(t, blocked[1].why, "string literal")
 	assert.Contains(t, blocked[2].why, "variadic")
-	assert.Contains(t, blocked[3].why, "cannot resolve")
 }
 
 // TestNotCalledArity_AWalkThatReachesNoAssertionIsNotAPass pins the one way this guard stops
@@ -224,17 +338,12 @@ func TestNotCalledArity_AWalkThatReachesNoAssertionIsNotAPass(t *testing.T) {
 	assert.Zero(t, sites, "AssertNotCalledArity turns a zero site count into a t.Fatalf")
 }
 
-// TestNotCalledArity_APackageWithNoAssertionIsNeverTypeChecked keeps the pre-filter meaningful.
-// Reading the text first is what keeps a tree-wide walk affordable, and a directory the filter
-// lets through when it should not is a cost nothing measures.
-func TestNotCalledArity_APackageWithNoAssertionIsNeverTypeChecked(t *testing.T) {
+// TestNotCalledArity_SitesOutsideTheWalkedDirsAreNotHeld keeps the dirs argument meaningful: the
+// module is loaded whole, but only the sites in the directories the caller named are held.
+func TestNotCalledArity_SitesOutsideTheWalkedDirsAreNotHeld(t *testing.T) {
 	root := t.TempDir()
 	notCalledFixtureModule(t, root)
-	writeFixture(t, root, "mod/quiet/quiet.go", `package quiet
-
-func Nothing() int { return 0 }
-`)
-	writeFixture(t, root, "mod/tests/rules_test.go", `package tests
+	writeFixture(t, root, "mod/held/held_test.go", `package held
 
 import (
 	"testing"
@@ -243,22 +352,28 @@ import (
 	mock "github.com/stretchr/testify/mock"
 )
 
-func TestRules(t *testing.T) {
-	database := doubles.NewDatabase()
-	database.AssertNotCalled(t, "CreateUser", mock.Anything, mock.Anything, mock.Anything)
+func TestHeld(t *testing.T) {
+	doubles.NewDatabase().AssertNotCalled(t, "CreateUser", mock.Anything, mock.Anything, mock.Anything)
+}
+`)
+	writeFixture(t, root, "mod/elsewhere/elsewhere_test.go", `package elsewhere
+
+import (
+	"testing"
+
+	"example.com/mod/doubles"
+)
+
+func TestElsewhere(t *testing.T) {
+	doubles.NewDatabase().AssertNotCalled(t, "CreateUser")
 }
 `)
 
-	targets, err := dirsWritingNotCalled(root, []string{"mod"})
+	findings, refused, sites, err := findNotCalledArity(root, []string{"mod/held"})
 	require.NoError(t, err)
-
-	names := make([]string, 0, len(targets))
-	for _, dir := range targets {
-		names = append(names, relativeTo(root, dir))
-	}
-	assert.Equal(t, []string{"mod/tests"}, names,
-		"only the directory that spells the assertion is checked; the doubles and the quiet "+
-			"package are read as text and skipped")
+	assert.Equal(t, 1, sites)
+	assert.Empty(t, notCalledNames(findings), "the vacuous site is outside the walked dirs")
+	assert.Empty(t, refused)
 }
 
 // Seam 2: the reporting half. Everything above asserts on what findNotCalledArity returned, which
@@ -342,11 +457,11 @@ func TestNotCalledArity_TheGuardIsFatalOnAnEmptyWalk(t *testing.T) {
 	assert.Contains(t, report.Fatal, "mod/empty", "the fatal names the dirs that covered nothing")
 }
 
-// TestNotCalledArity_TheGuardReportsAnUnresolvedShape holds the other half of the reporting: a
-// shape the walk cannot answer for is an error of its own rather than a silent narrowing. The
-// shape here is the one the tree actually had -- a helper looping over method names its callers
+// TestNotCalledArity_TheGuardReportsAMethodNamedThroughAVariable holds the other half of the
+// reporting: a shape no walk can hold to an arity is an error of its own rather than a silent
+// narrowing. The shape here is the one the tree actually had -- a helper looping over method names its callers
 // passed, which was vacuous at every one of them and which no arity check could have read.
-func TestNotCalledArity_TheGuardReportsAnUnresolvedShape(t *testing.T) {
+func TestNotCalledArity_TheGuardReportsAMethodNamedThroughAVariable(t *testing.T) {
 	root := t.TempDir()
 	notCalledFixtureModule(t, root)
 	writeFixture(t, root, "mod/tests/rules_test.go", `package tests
@@ -376,6 +491,36 @@ func TestRules(t *testing.T) {
 	require.True(t, report.Failed())
 	assert.Contains(t, report.Text(), "mod/tests/rules_test.go:12")
 	assert.Contains(t, report.Text(), "string literal")
+}
+
+// TestNotCalledArity_TheGuardIsFatalOnAPackageThatDoesNotCompile holds decision 3 of #420. The
+// module is read type-checked, and a package that does not compile leaves its assertions unread,
+// which is a pass nobody sees. The guard stops instead, naming the package.
+func TestNotCalledArity_TheGuardIsFatalOnAPackageThatDoesNotCompile(t *testing.T) {
+	root := t.TempDir()
+	notCalledFixtureModule(t, root)
+	writeFixture(t, root, "mod/tests/rules_test.go", `package tests
+
+import (
+	"testing"
+
+	"example.com/mod/doubles"
+)
+
+func TestRules(t *testing.T) {
+	database := doubles.NewDatabase()
+	database.AssertNotCalled(t, "CreateUser", undeclared)
+}
+`)
+
+	report := Run(func(r Reporter) {
+		assertNotCalledArity(r, root, []string{"mod"})
+	})
+
+	require.True(t, report.Stopped, "a package that does not compile must stop the guard: %s", report.Text())
+	assert.Contains(t, report.Fatal, "example.com/mod/tests")
+	assert.Contains(t, report.Fatal, "undeclared")
+	assert.Contains(t, report.Fatal, "cannot be read until it does")
 }
 
 // Seam 3: the premise. Everything above is consistent with a rule that refuses a shape which is in

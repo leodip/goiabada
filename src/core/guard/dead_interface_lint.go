@@ -117,16 +117,6 @@ type deadInterface struct {
 	name string
 }
 
-// unresolvedShape is something the walk found and cannot answer for. It is reported as a finding
-// because the alternative -- passing over it -- is a guard silently narrowing its own scope. The
-// AssertNotCalled-arity guard reports it; the guards that read type-checked packages through
-// pkgload, where every name resolves, have none.
-type unresolvedShape struct {
-	file string
-	line int
-	why  string
-}
-
 // findDeadInterfaces collects every top-level interface declared under the named subdirectories of
 // root, then searches each declaring package's whole module for a reference that binds to it. It
 // returns the unreferenced declarations and the number of Go files the declaring directories'
@@ -137,22 +127,10 @@ func findDeadInterfaces(root string, dirs []string) ([]deadInterface, int, error
 		return nil, 0, err
 	}
 
-	// Group the declaring directories by the module that owns each, so one module is loaded once
-	// however many of its packages are being guarded.
-	byModule := map[string]map[string]bool{}
-	var order []string
-	for _, dir := range declDirs {
-		modRoot, _, mErr := moduleFor(root, dir)
-		if mErr != nil {
-			return nil, 0, mErr
-		}
-		if byModule[modRoot] == nil {
-			byModule[modRoot] = map[string]bool{}
-			order = append(order, modRoot)
-		}
-		byModule[modRoot][dir] = true
+	order, byModule, err := dirsByModule(root, declDirs)
+	if err != nil {
+		return nil, 0, err
 	}
-	sort.Strings(order)
 
 	var dead []deadInterface
 	files := 0
@@ -217,6 +195,27 @@ func declaringDirs(root string, dirs []string) ([]string, error) {
 	return found, nil
 }
 
+// dirsByModule groups directories by the module that owns each, so a module is loaded once however
+// many of its directories a guard walks. It returns the module roots in order and each one's
+// directories.
+func dirsByModule(root string, dirs []string) ([]string, map[string]map[string]bool, error) {
+	byModule := map[string]map[string]bool{}
+	var order []string
+	for _, dir := range dirs {
+		modRoot, _, err := moduleFor(root, dir)
+		if err != nil {
+			return nil, nil, err
+		}
+		if byModule[modRoot] == nil {
+			byModule[modRoot] = map[string]bool{}
+			order = append(order, modRoot)
+		}
+		byModule[modRoot][dir] = true
+	}
+	sort.Strings(order)
+	return order, byModule, nil
+}
+
 // skippedDir names the directories no Go package this repository builds can live under. They are
 // skipped rather than parsed because a vendored tree would otherwise be searched for references,
 // and a reference from vendored code is not a consumer of anything this repository declares.
@@ -251,12 +250,13 @@ func moduleFor(root, dir string) (modRoot, modPath string, err error) {
 	return "", "", errs.Errorf("no go.mod above %s (searched up to %s)", dir, root)
 }
 
-// interfaceKey is a package-level type by the import path of its package and its name, which is
-// the one identity a declaration keeps across the builds of its package. The test build
+// interfaceKey names a package-level type by the import path of its package and its name, which
+// is the one identity a declaration keeps across the builds of its package. The test build
 // type-checks a package a second time with its internal tests, and a package importing it there
-// binds to that second copy, a different types.Object for the same declaration.
-type interfaceKey struct {
-	pkg, name string
+// binds to that second copy, a different types.Object for the same declaration. A name holds no
+// dot, so the last one in the key ends the path.
+func interfaceKey(pkg, name string) string {
+	return pkg + "." + name
 }
 
 // deadInterfacesIn loads the module rooted at modRoot, collects the top-level interfaces its
@@ -276,8 +276,8 @@ func deadInterfacesIn(root, modRoot string, declDirs map[string]bool) ([]deadInt
 		return nil, 0, err
 	}
 
-	declared := map[interfaceKey]deadInterface{}
-	used := map[interfaceKey]bool{}
+	declared := map[string]deadInterface{}
+	used := map[string]bool{}
 	read := map[string]bool{}
 	for _, p := range pkgs {
 		for _, obj := range p.TypesInfo.Uses {
@@ -285,7 +285,7 @@ func deadInterfacesIn(root, modRoot string, declDirs map[string]bool) ([]deadInt
 			// spelling, and the universe's error and any belong to no package.
 			tn, ok := obj.(*types.TypeName)
 			if ok && tn.Pkg() != nil && tn.Pkg().Scope().Lookup(tn.Name()) == tn {
-				used[interfaceKey{pkg: tn.Pkg().Path(), name: tn.Name()}] = true
+				used[interfaceKey(tn.Pkg().Path(), tn.Name())] = true
 			}
 		}
 
@@ -310,7 +310,7 @@ func deadInterfacesIn(root, modRoot string, declDirs map[string]bool) ([]deadInt
 					if _, ok := ts.Type.(*ast.InterfaceType); !ok {
 						continue
 					}
-					key := interfaceKey{pkg: p.PkgPath, name: ts.Name.Name}
+					key := interfaceKey(p.PkgPath, ts.Name.Name)
 					position := p.Fset.Position(ts.Name.Pos())
 					declared[key] = deadInterface{
 						pkg:  p.PkgPath,
@@ -340,51 +340,4 @@ func relativeTo(root, path string) string {
 		return filepath.ToSlash(path)
 	}
 	return filepath.ToSlash(rel)
-}
-
-// stubPackages is an importer that never reads a package. Every path it is asked for becomes an
-// empty, complete types.Package, which is enough for the two questions the AssertNotCalled-arity
-// guard asks of it -- which object an identifier binds to, and which import path a package name
-// came from -- because both are answered by lexical scoping rather than by anything inside the
-// imported package.
-type stubPackages struct {
-	names map[string]string
-	made  map[string]*types.Package
-}
-
-func newStubPackages() *stubPackages {
-	return &stubPackages{names: map[string]string{}, made: map[string]*types.Package{}}
-}
-
-func (s *stubPackages) Import(path string) (*types.Package, error) {
-	if made, ok := s.made[path]; ok {
-		return made, nil
-	}
-	name, ok := s.names[path]
-	if !ok {
-		name = inventedPackageName(path)
-	}
-	pkg := types.NewPackage(path, name)
-	pkg.MarkComplete()
-	s.made[path] = pkg
-	return pkg, nil
-}
-
-// inventedPackageName guesses the package name of a path this walk has not read, which is the last
-// path element with any version suffix dropped. It is right for almost every package and harmless
-// when it is wrong: a name that does not match only leaves that package's own selectors
-// unresolved, and the guard asks nothing of a package it is not holding.
-func inventedPackageName(path string) string {
-	base := path
-	if i := strings.LastIndex(base, "/"); i >= 0 {
-		base = base[i+1:]
-	}
-	if i := strings.Index(base, "."); i > 0 {
-		base = base[:i]
-	}
-	base = strings.ReplaceAll(base, "-", "")
-	if base == "" {
-		return "p"
-	}
-	return base
 }

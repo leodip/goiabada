@@ -155,11 +155,11 @@ testify `AssertNotCalled` to carrying one matcher per parameter of the method it
 `core/guard.AssertNotCalledArity`. testify matches a recorded call on the method name *and* the
 whole argument list, so `AssertNotCalled(t, "Log")` against a three-parameter `Log` compares lists
 that can never be equal and passes whatever the subject did; the compiler sees a variadic call and
-says nothing. Forty-one such sites shipped, one of them false since #241. The receiver is resolved
-with `go/types` rather than by spelling, because one method name can sit on two doubles at two
-arities (`CreateUser` is 3 on `Database` and 2 on `UserCreator`), and four shapes are reported
-rather than skipped: a method named through anything but a string literal, an unresolvable receiver,
-a name the double does not declare, and a variadic method. It does not widen to `AssertCalled`,
+says nothing. Forty-one such sites shipped, one of them false since #241. A site is a call of
+testify's own method, and the receiver is resolved with `go/types` rather than by spelling, because
+one method name can sit on two doubles at two arities (`CreateUser` is 3 on `Database` and 2 on
+`UserCreator`). Three shapes are reported rather than skipped: a method named through anything but
+a string literal, a name the double does not declare, and a variadic method. It does not widen to `AssertCalled`,
 whose arity mismatch fails loudly, or to `.On(...)`, where a stub matching nothing panics (#421).
 
 ## Core symbol ownership table

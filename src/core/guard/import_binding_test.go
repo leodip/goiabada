@@ -1,9 +1,8 @@
 package guard
 
 // Seam: bindImports, the resolver the call-site guards share -- AssertNoLegacyErrors,
-// AssertSlogConvention, AssertAuditLogContext and AssertRequestPathContext over a call, and
-// AssertNotCalledArity over a struct's embedded field. Each of them asks one question of a
-// selector, "is its left side the package at this path", and each answer is only as good as the
+// AssertSlogConvention, AssertAuditLogContext and AssertRequestPathContext, each over a call. Each
+// of them asks one question of a selector, "is its left side the package at this path", and each answer is only as good as the
 // name the import is read as binding.
 //
 // The rows below are the resolver itself, over source text rather than a tree, because it is a
@@ -148,13 +147,12 @@ import (
 }
 
 // watchedTables is every table bindImports is called with in production, so the two tests below
-// hold all four rather than whichever one was remembered.
+// hold all three rather than whichever one was remembered.
 func watchedTables() map[string]watchedImports {
 	return map[string]watchedImports{
-		"errorsWatchedImports":    errorsWatchedImports,
-		"slogWatchedImports":      slogWatchedImports,
-		"auditWatchedImports":     auditWatchedImports,
-		"notCalledWatchedImports": notCalledWatchedImports,
+		"errorsWatchedImports": errorsWatchedImports,
+		"slogWatchedImports":   slogWatchedImports,
+		"auditWatchedImports":  auditWatchedImports,
 	}
 }
 

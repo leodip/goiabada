@@ -366,10 +366,6 @@ func discardedErrorResolver(file *ast.File, ownPath string, listed map[string][]
 // discardedErrorPackages is the importer the method half type-checks against: each package in
 // source is read from the source root, and every other path is an empty stub. A receiver whose type
 // came through a stub is therefore reported as unresolved rather than guessed at.
-//
-// core/guard's stubPackages, behind the AssertNotCalled-arity guard, is the twin of the stub half.
-// It stays unexported there because exporting it for this one caller would add a core symbol, and
-// an OWNERSHIP.md row, for about twenty lines (#434).
 type discardedErrorPackages struct {
 	root   string
 	source map[string]bool
@@ -429,9 +425,9 @@ func (p *discardedErrorPackages) Import(importPath string) (*types.Package, erro
 // discardedErrorMajorVersion is a module path's major-version element, which is never the name.
 var discardedErrorMajorVersion = regexp.MustCompile(`^v[0-9]+$`)
 
-// discardedErrorPackageName guesses a stubbed path's package name as core/guard's
-// inventedPackageName does, and is as harmless when wrong: a name that does not match only leaves
-// that package's selectors unresolved, and a stub declares nothing to resolve anyway.
+// discardedErrorPackageName guesses a stubbed path's package name from its last element, and is
+// harmless when wrong: a name that does not match only leaves that package's selectors
+// unresolved, and a stub declares nothing to resolve anyway.
 func discardedErrorPackageName(importPath string) string {
 	elems := strings.Split(importPath, "/")
 	base := elems[len(elems)-1]
