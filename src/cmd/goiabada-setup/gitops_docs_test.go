@@ -275,10 +275,13 @@ func buildOverEveryGolden(t *testing.T, guide gitOpsGuide, variables string, cou
 }
 
 // readBy says whether the environment variables page lists variable as read by server, or by both.
+// The variable's row is the first of the page's table rows whose first cell opens with the
+// backticked variable, a prefix since the cell goes on to its flag, default and reader.
 func readBy(variables, variable, server string) bool {
-	for _, line := range strings.Split(variables, "\n") {
-		if strings.HasPrefix(line, "| `"+variable+"`") {
-			return server != "" && (strings.Contains(line, "Read by: "+server) || strings.Contains(line, "Read by: both"))
+	for _, row := range docsreader.Rows(variables) {
+		if strings.HasPrefix(row[0], "`"+variable+"`") {
+			cells := strings.Join(row, " | ")
+			return server != "" && (strings.Contains(cells, "Read by: "+server) || strings.Contains(cells, "Read by: both"))
 		}
 	}
 	return false

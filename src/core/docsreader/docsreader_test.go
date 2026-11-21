@@ -129,6 +129,62 @@ func TestTables_HeadersDelimitersAndDataRows(t *testing.T) {
 	}
 }
 
+// TestTables_EachDataRowSaysItsLine: each data row has the 1-based line of the text it is on,
+// counted past the header and delimiter rows, so a guard reporting page lines does not count them.
+func TestTables_EachDataRowSaysItsLine(t *testing.T) {
+	text := "# Catalog\n" +
+		"\n" +
+		"| metric | type |\n" +
+		"|---|---|\n" +
+		"| `a` | counter |\n" +
+		"| `b` | gauge |\n"
+	tables := Tables(text)
+	if len(tables) != 1 {
+		t.Fatalf("tables %+v", tables)
+	}
+	if got, want := tables[0].Lines, []int{5, 6}; !slices.Equal(got, want) {
+		t.Errorf("lines %v, want %v", got, want)
+	}
+}
+
+// TestTables_ARowOfATableWithNoHeaderSaysItsLine: with no delimiter row every row is a data row,
+// the first included, and each says its own line.
+func TestTables_ARowOfATableWithNoHeaderSaysItsLine(t *testing.T) {
+	tables := Tables("intro\n| `a` | one |\n| `b` | two |\n")
+	if len(tables) != 1 || tables[0].Header != nil {
+		t.Fatalf("tables %+v", tables)
+	}
+	if got, want := tables[0].Lines, []int{2, 3}; !slices.Equal(got, want) {
+		t.Errorf("lines %v, want %v", got, want)
+	}
+}
+
+// TestTables_ARowAfterAFencedBlockSaysItsPageLine: the fenced lines are not rows but are still
+// lines of the text, so a row after a fenced block says the line it is on, not a count of rows.
+func TestTables_ARowAfterAFencedBlockSaysItsPageLine(t *testing.T) {
+	text := "| A |\n" +
+		"|---|\n" +
+		"| a |\n" +
+		"```\n" +
+		"| fenced |\n" +
+		"```\n" +
+		"\n" +
+		"| B |\n" +
+		"|---|\n" +
+		"| b1 |\n" +
+		"| b2 |\n"
+	tables := Tables(text)
+	if len(tables) != 2 {
+		t.Fatalf("%d tables, want 2: %+v", len(tables), tables)
+	}
+	if got, want := tables[0].Lines, []int{3}; !slices.Equal(got, want) {
+		t.Errorf("first table lines %v, want %v", got, want)
+	}
+	if got, want := tables[1].Lines, []int{10, 11}; !slices.Equal(got, want) {
+		t.Errorf("second table lines %v, want %v", got, want)
+	}
+}
+
 // TestTables_AnEscapedPipeStaysInItsCell: a pipe escaped inside a cell does not split it, and a
 // code span keeps its backticks.
 func TestTables_AnEscapedPipeStaysInItsCell(t *testing.T) {
@@ -148,12 +204,12 @@ func TestTables_AnEscapedPipeStaysInItsCell(t *testing.T) {
 	}
 }
 
-// TestRow_EveryBackslashReadsTheCharacterAfterIt: a pipe escaped inside a cell stays in it, a
+// TestCells_EveryBackslashReadsTheCharacterAfterIt: a pipe escaped inside a cell stays in it, a
 // doubled backslash is kept as written — under CommonMark the pipe after it is then a column
 // separator — and any other backslash keeps the character after it, inside a code span or out of
 // one, since a cell is the text it is written as. The empty cell after a closing pipe is not a
 // cell.
-func TestRow_EveryBackslashReadsTheCharacterAfterIt(t *testing.T) {
+func TestCells_EveryBackslashReadsTheCharacterAfterIt(t *testing.T) {
 	for _, row := range []struct {
 		line string
 		want []string
@@ -164,8 +220,8 @@ func TestRow_EveryBackslashReadsTheCharacterAfterIt(t *testing.T) {
 		{`| a | |`, []string{"a", ""}},
 		{"| `C:\\\\dir` | `a\\*b` |", []string{"`C:\\\\dir`", "`a\\*b`"}},
 	} {
-		if got := Row(row.line); !slices.Equal(got, row.want) {
-			t.Errorf("Row(%q) = %q, want %q", row.line, got, row.want)
+		if got := cells(row.line); !slices.Equal(got, row.want) {
+			t.Errorf("cells(%q) = %q, want %q", row.line, got, row.want)
 		}
 	}
 }
@@ -300,7 +356,7 @@ func TestSection_ReadsThePageAndNamesWhatItCannotRead(t *testing.T) {
 func assertTables(t *testing.T, got, want []Table) {
 	t.Helper()
 	if len(got) != len(want) {
-		t.Fatalf("%d tables %q, want %d %q", len(got), got, len(want), want)
+		t.Fatalf("%d tables %+v, want %d %+v", len(got), got, len(want), want)
 	}
 	for i := range want {
 		if !slices.Equal(got[i].Header, want[i].Header) {

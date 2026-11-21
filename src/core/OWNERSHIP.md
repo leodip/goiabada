@@ -347,12 +347,11 @@ command itself and fails on a tree it changed.
 | `core/countries` | `ByAlpha2` | contract | The lookup half of the country table whose other half the admin console uses. Moving it would put one ISO 3166 dataset in two places. |
 | `core/countries` | `Country` | kernel | — |
 | `core/docsreader` | `BlankColumn` | test-support | Test support: compiled into no binary, and the docs tests read a section's names without one table column through it. |
-| `core/docsreader` | `Row` | kernel | — |
-| `core/docsreader` | `Rows` | test-support | Test support: compiled into no binary, and the docs tests of every module read the site's tables through it. |
+| `core/docsreader` | `Rows` | kernel | — |
 | `core/docsreader` | `Section` | kernel | — |
 | `core/docsreader` | `SectionText` | own-package | — |
-| `core/docsreader` | `Table` | test-support | Test support: compiled into no binary, and the docs tests of every module read the site's tables through it. |
-| `core/docsreader` | `Tables` | test-support | Test support: compiled into no binary, and the docs tests of every module read the site's tables through it. |
+| `core/docsreader` | `Table` | own-package | — |
+| `core/docsreader` | `Tables` | kernel | — |
 | `core/errs` | `Errorf` | kernel | — |
 | `core/errs` | `Join` | both-apps | — |
 | `core/errs` | `New` | kernel | — |

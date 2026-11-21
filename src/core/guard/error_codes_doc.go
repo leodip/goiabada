@@ -194,11 +194,11 @@ func readEnglishCatalog(path string) (map[string]string, error) {
 // readErrorCodeDocRows returns every table row keyed by the code in its first cell, as a slice so a
 // duplicated code is visible rather than silently collapsed.
 //
-// A row is a line whose first cell is a single backticked token: that is what distinguishes a code
-// row from the header, the separator and the prose between sections, none of which the document
-// needs marked up any further. A line that looks like a code row but does not have three cells is
-// reported rather than skipped, since a message holding an unescaped pipe would otherwise drop out
-// of the comparison entirely.
+// A code row is a data row, as docsreader reads the document's tables, whose first cell is a single
+// backticked token: that is what distinguishes it from a table's other rows, none of which the
+// document needs marked up any further. A code row that does not have three cells is reported
+// rather than skipped, since a message holding an unescaped pipe would otherwise drop out of the
+// comparison entirely.
 func readErrorCodeDocRows(path string) (map[string][]string, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -206,12 +206,7 @@ func readErrorCodeDocRows(path string) (map[string][]string, error) {
 	}
 
 	rows := make(map[string][]string)
-	for _, line := range strings.Split(string(data), "\n") {
-		line = strings.TrimSpace(line)
-		if !strings.HasPrefix(line, "|") || !strings.HasSuffix(line, "|") {
-			continue
-		}
-		cells := docsreader.Row(line)
+	for _, cells := range docsreader.Rows(string(data)) {
 		code, ok := backtickedCode(cells[0])
 		if !ok {
 			continue

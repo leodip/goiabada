@@ -72,10 +72,12 @@ func Section(root, page, heading string) (string, error) {
 
 // Table is one Markdown table: its header row and the data rows under it, every cell trimmed, its
 // code spans keeping their backticks. A table whose header row no delimiter row follows has no
-// header, and every row of it is a data row.
+// header, and every row of it is a data row. Lines holds, for each data row, the 1-based line of
+// the text Tables read it from, so a guard reporting a page's lines reads the whole page.
 type Table struct {
 	Header []string
 	Rows   [][]string
+	Lines  []int
 }
 
 // Columns returns the cells of every data row in the named columns, in the order headers names
@@ -113,7 +115,7 @@ func (t Table) Columns(headers ...string) ([][]string, error) {
 func Tables(text string) []Table {
 	var tables []Table
 	for _, run := range runs(strings.Split(text, "\n")) {
-		tables = append(tables, classify(run.rows))
+		tables = append(tables, classify(run))
 	}
 	return tables
 }
@@ -211,28 +213,21 @@ func Rows(text string) [][]string {
 	return rows
 }
 
-// Row splits one table row into its cells, the way Tables reads every row of a table: a pipe
-// escaped inside a cell stays in it, any other backslash keeps the character after it, and every
-// cell is trimmed. A guard that walks a page line by line for its own structure, such as one
-// holding a page to a line-numbered catalog, reads each line's cells through it, so the one
-// splitter lives here too (#536).
-func Row(line string) []string {
-	return cells(line)
-}
-
-// classify splits one table's rows into its header and its data rows: the row the first delimiter
-// row follows is the header, and with no delimiter row every row is a data row. Only that one
-// delimiter row is skipped: a row of dashes further down is a data row, as the page renders it.
-func classify(rows [][]string) Table {
-	delimiter := delimiterRow(rows)
+// classify splits one run's rows into its header and its data rows, each data row with the
+// 1-based line it is on: the row the first delimiter row follows is the header, and with no
+// delimiter row every row is a data row. Only that one delimiter row is skipped: a row of dashes
+// further down is a data row, as the page renders it.
+func classify(found run) Table {
+	delimiter := delimiterRow(found.rows)
 	var table Table
-	for i, row := range rows {
+	for i, row := range found.rows {
 		switch i {
 		case delimiter:
 		case delimiter - 1:
 			table.Header = row
 		default:
 			table.Rows = append(table.Rows, row)
+			table.Lines = append(table.Lines, found.lines[i]+1)
 		}
 	}
 	return table

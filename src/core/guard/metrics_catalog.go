@@ -69,6 +69,7 @@ func (f metricsCatalogFinding) String() string {
 const metricsCatalogHeader = "| metric | type | labels | server | meaning |"
 
 var (
+	metricsCatalogColumns = []string{"metric", "type", "labels", "server", "meaning"}
 	metricsCatalogTypes   = []string{"counter", "gauge", "histogram"}
 	metricsCatalogServers = []string{"auth server", "admin console"}
 )
@@ -237,9 +238,11 @@ func catalogLabelFor(label metrics.Label) string {
 	return fmt.Sprintf("`%s`: %s", label.Name(), strings.Join(values, ", "))
 }
 
-// readMetricsCatalog returns the catalog table's rows. A page with no catalog table, or two, and a
-// row that cannot be read are errors rather than findings: a row skipped for its shape would drop
-// out of the comparison entirely.
+// readMetricsCatalog returns the catalog table's rows, the tables read as docsreader reads them:
+// the catalog is a table whose header cells are metricsCatalogColumns, and each of its data rows is
+// reported by its page line. A page with no catalog table, or two, and a row that cannot be read
+// are errors rather than findings: a row skipped for its shape would drop out of the comparison
+// entirely.
 func readMetricsCatalog(path string) ([]catalogRow, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -248,26 +251,18 @@ func readMetricsCatalog(path string) ([]catalogRow, error) {
 
 	var rows []catalogRow
 	tables := 0
-	inTable := false
-	for i, line := range strings.Split(string(data), "\n") {
-		line = strings.TrimSpace(line)
-		if !strings.HasPrefix(line, "|") {
-			inTable = false
+	for _, table := range docsreader.Tables(string(data)) {
+		if !slices.Equal(table.Header, metricsCatalogColumns) {
 			continue
 		}
-		if line == metricsCatalogHeader {
-			tables++
-			inTable = true
-			continue
+		tables++
+		for i, cells := range table.Rows {
+			row, err := parseCatalogRow(path, table.Lines[i], cells)
+			if err != nil {
+				return nil, err
+			}
+			rows = append(rows, row)
 		}
-		if !inTable || strings.HasPrefix(line, "|---") || strings.HasPrefix(line, "| ---") {
-			continue
-		}
-		row, err := parseCatalogRow(path, i+1, line)
-		if err != nil {
-			return nil, err
-		}
-		rows = append(rows, row)
 	}
 
 	switch tables {
@@ -280,8 +275,7 @@ func readMetricsCatalog(path string) ([]catalogRow, error) {
 	}
 }
 
-func parseCatalogRow(path string, lineNo int, line string) (catalogRow, error) {
-	cells := docsreader.Row(line)
+func parseCatalogRow(path string, lineNo int, cells []string) (catalogRow, error) {
 	if len(cells) != 5 {
 		return catalogRow{}, errs.Errorf("%s:%d has %d cells rather than 5; an unescaped | in a cell is the usual cause",
 			path, lineNo, len(cells))
