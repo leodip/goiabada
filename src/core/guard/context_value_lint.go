@@ -180,8 +180,8 @@ func findContextValueSites(
 
 // contextValueSitesIn loads the module rooted at modRoot for every release build and the default
 // build, and returns every site their production files hold, once each however many builds select
-// its file. The loads are independent go command runs, so they run at once; the first error in
-// build order is the one returned. A build that selects no package of the module adds nothing.
+// its file. The loads are requested at once and pkgload runs the go command for one at a time;
+// the first error in build order is the one returned. A build that selects no package of the module adds nothing.
 func contextValueSitesIn(modRoot string) ([]contextValueFinding, error) {
 	builds := append(pkgload.ReleaseBuilds(), pkgload.Build{})
 	loaded := make([][]*packages.Package, len(builds))

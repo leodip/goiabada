@@ -98,11 +98,17 @@ var (
 	loadsMu sync.Mutex
 	// loads holds every load of the process, by build and then by module directory.
 	loads = map[Build]map[string]*loaded{}
+	// goCommandMu lets one load at a time run the go command. Each run already compiles on every
+	// CPU, so a guard's six loads at once multiply the CPU demand by six without finishing sooner,
+	// and on a four-core CI runner with a cold build cache they starve the tests running beside
+	// them, such as the auth server's process tests and their 30 s bound (#420).
+	goCommandMu sync.Mutex
 )
 
 // Load returns every package of the module rooted at dir, type-checked for build, as the go command
 // lists ./... there. A module is loaded at most once for each build in a process: a second call, from
 // whichever guard, returns the first call's packages, or its error, so a caller must not modify them.
+// Calls from several goroutines are safe, and their loads run one at a time.
 //
 // A package that does not load or does not type-check is an error naming the package and its first
 // error, the first package in import-path order when several fail, because a reading of a
@@ -152,7 +158,9 @@ func load(dir string, build Build) ([]*packages.Package, error) {
 		Tests:      build.Tests,
 		Fset:       token.NewFileSet(),
 	}
+	goCommandMu.Lock()
 	pkgs, err := packages.Load(cfg, "./...")
+	goCommandMu.Unlock()
 	if err != nil {
 		return nil, errs.Wrapf(err, "loading the packages of %s for %s", dir, describe(build))
 	}

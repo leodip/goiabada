@@ -657,8 +657,8 @@ type loadedPackage struct {
 }
 
 // loadTree loads every package of the four modules for each build, one slice per build in the
-// order given. The loads are independent go command runs, so they run at once, and the first error
-// in build and then module order is the one returned, whichever finished first. A package whose
+// order given. The loads are requested at once and pkgload runs the go command for one at a time,
+// and the first error in build and then module order is the one returned, whichever finished first. A package whose
 // files are not under the root is the go command's own, a test binary's generated main, and names
 // nothing.
 func loadTree(root string, builds []pkgload.Build) ([][]loadedPackage, error) {

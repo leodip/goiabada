@@ -127,8 +127,8 @@ func findRequestFieldWrites(
 	var walk requestFieldWalk
 	modRoot := filepath.Join(root, filepath.FromSlash(scope))
 
-	// The loads are independent go command runs, so they run at once; the first error in build order
-	// is the one returned. A build that selects no package of the module adds nothing.
+	// The loads are requested at once and pkgload runs the go command for one at a time; the first
+	// error in build order is the one returned. A build that selects no package of the module adds nothing.
 	builds := append(pkgload.ReleaseBuilds(), pkgload.Build{})
 	loaded := make([][]*packages.Package, len(builds))
 	loadErrs := make([]error, len(builds))
