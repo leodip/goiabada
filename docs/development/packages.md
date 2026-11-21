@@ -60,7 +60,7 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   emoji and ITU-T E.164 calling codes, generated into `data_generated.go` from the datahub dataset.
   It replaced `github.com/biter777/countries` and deliberately depends on nothing (#272)
 - There is no `enums/` here: the six auth-server-only enumerations it held went to the domains that
-  own them — `AcrLevel`, `PasswordPolicy`, `ThreeStateSetting` and `KeyState` to
+  own them — `ACRLevel`, `PasswordPolicy`, `ThreeStateSetting` and `KeyState` to
   `authserver/internal/record`, forced there because `internal/data` names them and imports nothing
   above it, `AuthMethod` to `ceremony` and since to `oidc` (#437), `TokenType` to `issuance` and
   `SMTPEncryption` to `emaildelivery` — leaving `Gender` as `core/gender`. A package named for a Go
@@ -531,7 +531,7 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
   client `apiclient.SettingsClient`, until #441
 - `internal/reqctx/` - The two request-scoped values, the signed-in administrator's token set and
   the auth server's public settings, each written by one middleware and read through a typed
-  accessor over an unexported key; an absent value is `ErrNoJwtInfo` or `ErrNoSettings` rather than
+  accessor over an unexported key; an absent value is `ErrNoJWTInfo` or `ErrNoSettings` rather than
   a panic. The twin of the auth server's, and the context-value guard holds the module to it with no
   exemption (#440, #462)
 - `internal/sessionbackend/` - The HTTP backend of `core/sessionstore` over the auth server's

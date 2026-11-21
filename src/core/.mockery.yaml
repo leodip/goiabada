@@ -6,7 +6,7 @@
 # authserver/internal/data; the two middleware mocks, AuthHelper and tokenParser,
 # followed the JWT middleware out of core -- the session half to
 # adminconsole/.mockery.yaml, the bearer half's parser port to authserver's; and the
-# HttpHelper mock authserver/.mockery.yaml used to write into core/handlerhelpers/mocks
+# HTTPHelper mock authserver/.mockery.yaml used to write into core/handlerhelpers/mocks
 # is two mocks now, one per module, because the renderer is two packages (#385).
 filename: "{{.InterfaceName | snakecase}}_mock.go"
 structname: "{{.InterfaceName}}"

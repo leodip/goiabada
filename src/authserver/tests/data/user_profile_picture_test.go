@@ -49,7 +49,7 @@ func TestCreateUserProfilePicture(t *testing.T) {
 		t.Errorf("Expected ID %d, got %d", profilePicture.ID, retrieved.ID)
 	}
 	if retrieved.UserID != profilePicture.UserID {
-		t.Errorf("Expected UserId %d, got %d", profilePicture.UserID, retrieved.UserID)
+		t.Errorf("Expected UserID %d, got %d", profilePicture.UserID, retrieved.UserID)
 	}
 	if retrieved.ContentType != profilePicture.ContentType {
 		t.Errorf("Expected ContentType %s, got %s", profilePicture.ContentType, retrieved.ContentType)
@@ -68,7 +68,7 @@ func TestCreateUserProfilePicture_ZeroUserID(t *testing.T) {
 
 	err := database.CreateUserProfilePicture(context.Background(), nil, profilePicture)
 	if err == nil {
-		t.Error("Expected error when creating profile picture with zero UserId")
+		t.Error("Expected error when creating profile picture with zero UserID")
 	}
 }
 
@@ -134,7 +134,7 @@ func TestGetUserProfilePictureByUserID(t *testing.T) {
 		t.Errorf("Expected ID %d, got %d", profilePicture.ID, retrieved.ID)
 	}
 	if retrieved.UserID != user.ID {
-		t.Errorf("Expected UserId %d, got %d", user.ID, retrieved.UserID)
+		t.Errorf("Expected UserID %d, got %d", user.ID, retrieved.UserID)
 	}
 }
 

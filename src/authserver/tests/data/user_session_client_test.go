@@ -44,7 +44,7 @@ func TestCreateUserSessionClient(t *testing.T) {
 		t.Errorf("Expected UserSessionID %d, got %d", userSessionClient.UserSessionID, retrievedUserSessionClient.UserSessionID)
 	}
 	if retrievedUserSessionClient.ClientID != userSessionClient.ClientID {
-		t.Errorf("Expected ClientId %d, got %d", userSessionClient.ClientID, retrievedUserSessionClient.ClientID)
+		t.Errorf("Expected ClientID %d, got %d", userSessionClient.ClientID, retrievedUserSessionClient.ClientID)
 	}
 	if !retrievedUserSessionClient.Started.Equal(userSessionClient.Started) {
 		t.Errorf("Expected Started %v, got %v", userSessionClient.Started, retrievedUserSessionClient.Started)
@@ -90,7 +90,7 @@ func TestUpdateUserSessionClient(t *testing.T) {
 		t.Errorf("Expected UserSessionID to stay %d, got %d", originalUserSessionClient.UserSessionID, retrievedUserSessionClient.UserSessionID)
 	}
 	if retrievedUserSessionClient.ClientID != originalUserSessionClient.ClientID {
-		t.Errorf("Expected ClientId to stay %d, got %d", originalUserSessionClient.ClientID, retrievedUserSessionClient.ClientID)
+		t.Errorf("Expected ClientID to stay %d, got %d", originalUserSessionClient.ClientID, retrievedUserSessionClient.ClientID)
 	}
 	if !retrievedUserSessionClient.Started.Equal(updatedUserSessionClient.Started) {
 		t.Errorf("Expected Started %v, got %v", updatedUserSessionClient.Started, retrievedUserSessionClient.Started)

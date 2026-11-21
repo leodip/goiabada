@@ -35,7 +35,7 @@ func TestCreateGroupPermission(t *testing.T) {
 
 	// Verify all properties
 	if createdGroupPermission.ID != groupPermission.ID {
-		t.Errorf("Expected Id %d, got %d", groupPermission.ID, createdGroupPermission.ID)
+		t.Errorf("Expected ID %d, got %d", groupPermission.ID, createdGroupPermission.ID)
 	}
 	if createdGroupPermission.GroupID != groupPermission.GroupID {
 		t.Errorf("Expected GroupID %d, got %d", groupPermission.GroupID, createdGroupPermission.GroupID)
@@ -108,7 +108,7 @@ func TestUpdateGroupPermission(t *testing.T) {
 
 	// Verify properties
 	if updatedGroupPermission.ID != groupPermission.ID {
-		t.Errorf("Expected Id %d, got %d", groupPermission.ID, updatedGroupPermission.ID)
+		t.Errorf("Expected ID %d, got %d", groupPermission.ID, updatedGroupPermission.ID)
 	}
 	if updatedGroupPermission.GroupID != group2.ID {
 		t.Errorf("Expected GroupID %d, got %d", group2.ID, updatedGroupPermission.GroupID)
@@ -130,7 +130,7 @@ func TestUpdateGroupPermission(t *testing.T) {
 	invalidGroupPermission := &record.GroupPermission{ID: 0}
 	err = database.UpdateGroupPermission(context.Background(), nil, invalidGroupPermission)
 	if err == nil {
-		t.Error("Expected error when updating group permission with invalid Id")
+		t.Error("Expected error when updating group permission with invalid ID")
 	}
 }
 
@@ -192,7 +192,7 @@ func TestGetGroupPermissionByID(t *testing.T) {
 	}
 
 	if retrievedGroupPermission.ID != groupPermission.ID {
-		t.Errorf("Expected Id %d, got %d", groupPermission.ID, retrievedGroupPermission.ID)
+		t.Errorf("Expected ID %d, got %d", groupPermission.ID, retrievedGroupPermission.ID)
 	}
 	if retrievedGroupPermission.GroupID != groupPermission.GroupID {
 		t.Errorf("Expected GroupID %d, got %d", groupPermission.GroupID, retrievedGroupPermission.GroupID)
@@ -223,7 +223,7 @@ func TestGetGroupPermissionByGroupIDAndPermissionID(t *testing.T) {
 	}
 
 	if retrievedGroupPermission.ID != groupPermission.ID {
-		t.Errorf("Expected Id %d, got %d", groupPermission.ID, retrievedGroupPermission.ID)
+		t.Errorf("Expected ID %d, got %d", groupPermission.ID, retrievedGroupPermission.ID)
 	}
 	if retrievedGroupPermission.GroupID != groupPermission.GroupID {
 		t.Errorf("Expected GroupID %d, got %d", groupPermission.GroupID, retrievedGroupPermission.GroupID)

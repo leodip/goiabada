@@ -9,6 +9,22 @@ sections relevant to the change; [AGENTS.md](../../AGENTS.md) lists the common c
 
 `HandleXxxGet/Post(dependencies...) http.HandlerFunc`
 
+## Go names
+
+An initialism in a Go name is spelled in one case: `UserID`, `redirectURI`, `JWTInfo`, never
+`UserId`. ST1003 holds it in the lint tier, with no directory or file excluded, against the list in
+`.golangci.yml`: staticcheck's 42 and this product's JWT, OTP, ACR, JWKS, JWK, JTI, CSRF, CORS,
+OIDC and AMR. `DPoP` and `PKCE` keep their one spelling. No check reads plurals, test function
+names, receivers or interface method names, so those follow by review: `IDs`, never `Ids`, and
+`TestGetClientByID` like the method it tests.
+
+A name that is stored or sent is declared by a tag or a stored shape, never left to a Go field's
+name, so a respelling cannot change it. JSON fields carry `json` tags (`AuthContext`'s keep the keys
+of sign-ins in flight), and the admin console's session stores `sessionkeys.StoredTokenResponse`,
+whose field names gob writes into the session; its `IdToken` is the one suppression of ST1003. JSON
+keys, columns, routes, form fields and a template's lower-case data-map keys keep the spelling the
+wire has (#482)
+
 ## Audit logging
 
 All security events logged via `auditLogger` (see `authserver/internal/audit/events.go` for event
@@ -32,7 +48,7 @@ walk and the four merged-form accessors it refuses, called from a `credential_re
 each `internal/handlers` package and from `core/httpmw`; each caller owns its own name list, because
 the lists must differ. The auth server's adds the four token-endpoint credentials (`code`,
 `code_verifier`, `refresh_token`, `client_secret`) and `access_token`, which
-`JwtAuthorizationHeaderToContext` in `authserver/internal/middleware` reads lawfully from a form
+`JWTAuthorizationHeaderToContext` in `authserver/internal/middleware` reads lawfully from a form
 body per OIDC Core 1.0 5.3.1; the kernel's is `access_token` alone, and since #385 moved that read
 out of core it refuses the read coming back rather than holding a site. Only `state` is exempt, at
 `/auth/authorize`, which OIDC Core 3.1.2.1 requires the authorization endpoint to accept over GET as
@@ -84,7 +100,7 @@ holds every fetch site to the headers and the `isSessionEnded` test, every one b
 `goToSessionEnded`, and the live check to never calling it. Which of the two kinds of writer a
 handler picks is the only decision it makes about an `apiClient` failure: `HandleAPIError`,
 `HandleAPIErrorWithCallback` and `HandleAPIErrorJSON` turn the auth server's status into the
-console's, and `TestHandlers_ApiClientErrorsReachTheClassifier` refuses a guard that answers one
+console's, and `TestHandlers_APIClientErrorsReachTheClassifier` refuses a guard that answers one
 itself or catches every status as a rejected value (#279). In the auth server the type makes the
 choice: `internal/handlers` declares the page and JSON writers as two ports, `PageRenderer` and
 `JSONWriter`, and hands the token, userinfo, JWKS and discovery endpoints only the second, so a page
@@ -134,7 +150,7 @@ adapters, `bootstrap`), `cleanup`, the developer tools and generators, test supp
 wizard. Each entry is one directory and not its subtree, so a package created anywhere else, beneath
 a listed one included, is checked from its first commit (#442). The plain-record rule admits the
 functions `slogPlainSites` names, each with the reason no context reaches it: the admin console's
-template function `addUrlParam` and the `convertToString` it calls, `core/i18n`'s record in
+template function `addURLParam` and the `convertToString` it calls, `core/i18n`'s record in
 `orEmpty`, written once when its built-in catalogs are first built, and `StaticFS` and `TemplateFS`
 in each application's `web` package. That rule is what refuses a new helper written without a
 context after sloglint has admitted it. `AssertRequestPathContext` and `AssertAuditLogContext` share the same scope, and

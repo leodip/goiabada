@@ -38,7 +38,7 @@ func TestCreateUserGroup(t *testing.T) {
 	}
 
 	if retrievedUserGroup.UserID != userGroup.UserID {
-		t.Errorf("Expected UserId %d, got %d", userGroup.UserID, retrievedUserGroup.UserID)
+		t.Errorf("Expected UserID %d, got %d", userGroup.UserID, retrievedUserGroup.UserID)
 	}
 	if retrievedUserGroup.GroupID != userGroup.GroupID {
 		t.Errorf("Expected GroupID %d, got %d", userGroup.GroupID, retrievedUserGroup.GroupID)
@@ -67,7 +67,7 @@ func TestUpdateUserGroup(t *testing.T) {
 	}
 
 	if updatedUserGroup.UserID != newUser.ID {
-		t.Errorf("Expected UserId %d, got %d", newUser.ID, updatedUserGroup.UserID)
+		t.Errorf("Expected UserID %d, got %d", newUser.ID, updatedUserGroup.UserID)
 	}
 	if updatedUserGroup.GroupID != newGroup.ID {
 		t.Errorf("Expected GroupID %d, got %d", newGroup.ID, updatedUserGroup.GroupID)
@@ -89,7 +89,7 @@ func TestGetUserGroupByID(t *testing.T) {
 		t.Errorf("Expected ID %d, got %d", userGroup.ID, retrievedUserGroup.ID)
 	}
 	if retrievedUserGroup.UserID != userGroup.UserID {
-		t.Errorf("Expected UserId %d, got %d", userGroup.UserID, retrievedUserGroup.UserID)
+		t.Errorf("Expected UserID %d, got %d", userGroup.UserID, retrievedUserGroup.UserID)
 	}
 	if retrievedUserGroup.GroupID != userGroup.GroupID {
 		t.Errorf("Expected GroupID %d, got %d", userGroup.GroupID, retrievedUserGroup.GroupID)
@@ -186,7 +186,7 @@ func TestGetUserGroupByUserIDAndGroupID(t *testing.T) {
 		t.Errorf("Expected ID %d, got %d", userGroup.ID, retrievedUserGroup.ID)
 	}
 	if retrievedUserGroup.UserID != user.ID {
-		t.Errorf("Expected UserId %d, got %d", user.ID, retrievedUserGroup.UserID)
+		t.Errorf("Expected UserID %d, got %d", user.ID, retrievedUserGroup.UserID)
 	}
 	if retrievedUserGroup.GroupID != group.ID {
 		t.Errorf("Expected GroupID %d, got %d", group.ID, retrievedUserGroup.GroupID)

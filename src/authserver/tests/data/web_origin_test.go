@@ -40,7 +40,7 @@ func TestCreateWebOrigin(t *testing.T) {
 		t.Errorf("Expected Origin %s, got %s", webOrigin.Origin, retrievedWebOrigin.Origin)
 	}
 	if retrievedWebOrigin.ClientID != webOrigin.ClientID {
-		t.Errorf("Expected ClientId %d, got %d", webOrigin.ClientID, retrievedWebOrigin.ClientID)
+		t.Errorf("Expected ClientID %d, got %d", webOrigin.ClientID, retrievedWebOrigin.ClientID)
 	}
 }
 

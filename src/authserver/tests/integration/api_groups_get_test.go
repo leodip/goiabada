@@ -203,7 +203,7 @@ func TestAPIGroupsGet_EnhancedResponseStructure(t *testing.T) {
 	assert.NotNil(t, foundGroup, "Enhanced test group should be found")
 
 	// Assert: All enhanced fields should be present and properly typed
-	assert.Positive(t, foundGroup.ID, "Id should be a positive integer")
+	assert.Positive(t, foundGroup.ID, "ID should be a positive integer")
 	assert.Equal(t, "enhanced-test-group", foundGroup.GroupIdentifier)
 	assert.Equal(t, "Enhanced Test Group", foundGroup.Description)
 	assert.True(t, foundGroup.IncludeInIDToken, "IncludeInIDToken should be true")

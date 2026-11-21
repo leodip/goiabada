@@ -150,7 +150,7 @@ func TestRefreshTokenLoadUser(t *testing.T) {
 	}
 
 	if refreshToken.User.ID != refreshToken.UserID.Int64 {
-		t.Errorf("Expected loaded User ID to match UserId, got %d and %d", refreshToken.User.ID, refreshToken.UserID.Int64)
+		t.Errorf("Expected loaded User ID to match UserID, got %d and %d", refreshToken.User.ID, refreshToken.UserID.Int64)
 	}
 
 	// Test loading user for refresh token with nil UserID
@@ -163,7 +163,7 @@ func TestRefreshTokenLoadUser(t *testing.T) {
 
 	err = database.RefreshTokenLoadUser(context.Background(), nil, refreshTokenNoUser)
 	if err != nil {
-		t.Fatalf("Failed to load user for refresh token with nil UserId: %v", err)
+		t.Fatalf("Failed to load user for refresh token with nil UserID: %v", err)
 	}
 }
 
@@ -176,7 +176,7 @@ func TestRefreshTokenLoadClient(t *testing.T) {
 	}
 
 	if refreshToken.Client.ID != refreshToken.ClientID.Int64 {
-		t.Errorf("Expected loaded Client ID to match ClientId, got %d and %d", refreshToken.Client.ID, refreshToken.ClientID.Int64)
+		t.Errorf("Expected loaded Client ID to match ClientID, got %d and %d", refreshToken.Client.ID, refreshToken.ClientID.Int64)
 	}
 
 	// Test loading client for refresh token with nil ClientID
@@ -189,7 +189,7 @@ func TestRefreshTokenLoadClient(t *testing.T) {
 
 	err = database.RefreshTokenLoadClient(context.Background(), nil, refreshTokenNoClient)
 	if err != nil {
-		t.Fatalf("Failed to load client for refresh token with nil ClientId: %v", err)
+		t.Fatalf("Failed to load client for refresh token with nil ClientID: %v", err)
 	}
 }
 
@@ -266,10 +266,10 @@ func compareRefreshTokens(t *testing.T, expected, actual *record.RefreshToken) {
 		t.Errorf("Expected CodeID %v, got %v", expected.CodeID, actual.CodeID)
 	}
 	if actual.UserID != expected.UserID {
-		t.Errorf("Expected UserId %v, got %v", expected.UserID, actual.UserID)
+		t.Errorf("Expected UserID %v, got %v", expected.UserID, actual.UserID)
 	}
 	if actual.ClientID != expected.ClientID {
-		t.Errorf("Expected ClientId %v, got %v", expected.ClientID, actual.ClientID)
+		t.Errorf("Expected ClientID %v, got %v", expected.ClientID, actual.ClientID)
 	}
 	if actual.RefreshTokenJTI != expected.RefreshTokenJTI {
 		t.Errorf("Expected RefreshTokenJTI %s, got %s", expected.RefreshTokenJTI, actual.RefreshTokenJTI)

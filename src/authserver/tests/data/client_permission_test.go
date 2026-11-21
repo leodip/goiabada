@@ -89,7 +89,7 @@ func TestCreateClientPermission(t *testing.T) {
 		t.Fatal("Expected to retrieve created client permission, got nil")
 	}
 	if createdClientPermission.ClientID != client.ID {
-		t.Errorf("Expected ClientId %d, got %d", client.ID, createdClientPermission.ClientID)
+		t.Errorf("Expected ClientID %d, got %d", client.ID, createdClientPermission.ClientID)
 	}
 	if createdClientPermission.PermissionID != permission.ID {
 		t.Errorf("Expected PermissionID %d, got %d", permission.ID, createdClientPermission.PermissionID)
@@ -174,7 +174,7 @@ func TestUpdateClientPermission(t *testing.T) {
 	}
 
 	if updatedClientPermission.ClientID != newClient.ID {
-		t.Errorf("Expected ClientId to be updated to %d, got %d", newClient.ID, updatedClientPermission.ClientID)
+		t.Errorf("Expected ClientID to be updated to %d, got %d", newClient.ID, updatedClientPermission.ClientID)
 	}
 	if updatedClientPermission.PermissionID != newPermission.ID {
 		t.Errorf("Expected PermissionID to be updated to %d, got %d", newPermission.ID, updatedClientPermission.PermissionID)
@@ -247,7 +247,7 @@ func TestGetClientPermissionByID(t *testing.T) {
 		t.Errorf("Expected client permission ID %d, got %d", clientPermission.ID, retrievedClientPermission.ID)
 	}
 	if retrievedClientPermission.ClientID != client.ID {
-		t.Errorf("Expected ClientId %d, got %d", client.ID, retrievedClientPermission.ClientID)
+		t.Errorf("Expected ClientID %d, got %d", client.ID, retrievedClientPermission.ClientID)
 	}
 	if retrievedClientPermission.PermissionID != permission.ID {
 		t.Errorf("Expected PermissionID %d, got %d", permission.ID, retrievedClientPermission.PermissionID)
@@ -326,7 +326,7 @@ func TestGetClientPermissionByClientIDAndPermissionID(t *testing.T) {
 		t.Errorf("Expected client permission ID %d, got %d", clientPermission.ID, retrievedClientPermission.ID)
 	}
 	if retrievedClientPermission.ClientID != client.ID {
-		t.Errorf("Expected ClientId %d, got %d", client.ID, retrievedClientPermission.ClientID)
+		t.Errorf("Expected ClientID %d, got %d", client.ID, retrievedClientPermission.ClientID)
 	}
 	if retrievedClientPermission.PermissionID != permission.ID {
 		t.Errorf("Expected PermissionID %d, got %d", permission.ID, retrievedClientPermission.PermissionID)
@@ -399,7 +399,7 @@ func TestGetClientPermissionsByClientID(t *testing.T) {
 	}
 	for _, cp := range retrievedClientPermissions {
 		if cp.ClientID != client.ID {
-			t.Errorf("Expected ClientId %d, got %d", client.ID, cp.ClientID)
+			t.Errorf("Expected ClientID %d, got %d", client.ID, cp.ClientID)
 		}
 	}
 

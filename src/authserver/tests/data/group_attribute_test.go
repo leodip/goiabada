@@ -123,7 +123,7 @@ func TestGetGroupAttributeByID(t *testing.T) {
 
 	// Check all properties
 	if retrievedGroupAttribute.ID != groupAttribute.ID {
-		t.Errorf("Expected Id %d, got %d", groupAttribute.ID, retrievedGroupAttribute.ID)
+		t.Errorf("Expected ID %d, got %d", groupAttribute.ID, retrievedGroupAttribute.ID)
 	}
 	if retrievedGroupAttribute.GroupID != groupAttribute.GroupID {
 		t.Errorf("Expected GroupID %d, got %d", groupAttribute.GroupID, retrievedGroupAttribute.GroupID)

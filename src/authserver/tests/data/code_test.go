@@ -52,10 +52,10 @@ func TestCreateCode(t *testing.T) {
 
 	// Check all properties
 	if createdCode.ClientID != code.ClientID {
-		t.Errorf("Expected ClientId %d, got %d", code.ClientID, createdCode.ClientID)
+		t.Errorf("Expected ClientID %d, got %d", code.ClientID, createdCode.ClientID)
 	}
 	if createdCode.UserID != code.UserID {
-		t.Errorf("Expected UserId %d, got %d", code.UserID, createdCode.UserID)
+		t.Errorf("Expected UserID %d, got %d", code.UserID, createdCode.UserID)
 	}
 	if createdCode.CodeHash != code.CodeHash {
 		t.Errorf("Expected CodeHash '%s', got '%s'", code.CodeHash, createdCode.CodeHash)
@@ -79,7 +79,7 @@ func TestCreateCode(t *testing.T) {
 		t.Errorf("Expected Nonce '%s', got '%s'", code.Nonce, createdCode.Nonce)
 	}
 	if createdCode.IPAddress != code.IPAddress {
-		t.Errorf("Expected IpAddress '%s', got '%s'", code.IPAddress, createdCode.IPAddress)
+		t.Errorf("Expected IPAddress '%s', got '%s'", code.IPAddress, createdCode.IPAddress)
 	}
 	if createdCode.UserAgent != code.UserAgent {
 		t.Errorf("Expected UserAgent '%s', got '%s'", code.UserAgent, createdCode.UserAgent)
@@ -94,7 +94,7 @@ func TestCreateCode(t *testing.T) {
 		t.Errorf("Expected SessionIdentifier '%s', got '%s'", code.SessionIdentifier, createdCode.SessionIdentifier)
 	}
 	if createdCode.ACRLevel != code.ACRLevel {
-		t.Errorf("Expected AcrLevel '%s', got '%s'", code.ACRLevel, createdCode.ACRLevel)
+		t.Errorf("Expected ACRLevel '%s', got '%s'", code.ACRLevel, createdCode.ACRLevel)
 	}
 	if createdCode.AuthMethods != code.AuthMethods {
 		t.Errorf("Expected AuthMethods '%s', got '%s'", code.AuthMethods, createdCode.AuthMethods)
@@ -206,7 +206,7 @@ func TestUpdateCode(t *testing.T) {
 		t.Errorf("Expected State 'updated_state', got '%s'", updatedCode.State)
 	}
 	if updatedCode.IPAddress != "192.168.1.2" {
-		t.Errorf("Expected IpAddress '192.168.1.2', got '%s'", updatedCode.IPAddress)
+		t.Errorf("Expected IPAddress '192.168.1.2', got '%s'", updatedCode.IPAddress)
 	}
 	if updatedCode.UserAgent != "Updated User Agent" {
 		t.Errorf("Expected UserAgent 'Updated User Agent', got '%s'", updatedCode.UserAgent)
@@ -215,7 +215,7 @@ func TestUpdateCode(t *testing.T) {
 		t.Errorf("Expected ResponseMode 'fragment', got '%s'", updatedCode.ResponseMode)
 	}
 	if updatedCode.ACRLevel != "2" {
-		t.Errorf("Expected AcrLevel '2', got '%s'", updatedCode.ACRLevel)
+		t.Errorf("Expected ACRLevel '2', got '%s'", updatedCode.ACRLevel)
 	}
 	if updatedCode.AuthMethods != "password mfa" {
 		t.Errorf("Expected AuthMethods 'password mfa', got '%s'", updatedCode.AuthMethods)
@@ -323,13 +323,13 @@ func TestGetCodeByID(t *testing.T) {
 
 	// Check all properties
 	if retrievedCode.ID != code.ID {
-		t.Errorf("Expected Id %d, got %d", code.ID, retrievedCode.ID)
+		t.Errorf("Expected ID %d, got %d", code.ID, retrievedCode.ID)
 	}
 	if retrievedCode.ClientID != code.ClientID {
-		t.Errorf("Expected ClientId %d, got %d", code.ClientID, retrievedCode.ClientID)
+		t.Errorf("Expected ClientID %d, got %d", code.ClientID, retrievedCode.ClientID)
 	}
 	if retrievedCode.UserID != code.UserID {
-		t.Errorf("Expected UserId %d, got %d", code.UserID, retrievedCode.UserID)
+		t.Errorf("Expected UserID %d, got %d", code.UserID, retrievedCode.UserID)
 	}
 	if retrievedCode.CodeHash != code.CodeHash {
 		t.Errorf("Expected CodeHash '%s', got '%s'", code.CodeHash, retrievedCode.CodeHash)
@@ -353,7 +353,7 @@ func TestGetCodeByID(t *testing.T) {
 		t.Errorf("Expected Nonce '%s', got '%s'", code.Nonce, retrievedCode.Nonce)
 	}
 	if retrievedCode.IPAddress != code.IPAddress {
-		t.Errorf("Expected IpAddress '%s', got '%s'", code.IPAddress, retrievedCode.IPAddress)
+		t.Errorf("Expected IPAddress '%s', got '%s'", code.IPAddress, retrievedCode.IPAddress)
 	}
 	if retrievedCode.UserAgent != code.UserAgent {
 		t.Errorf("Expected UserAgent '%s', got '%s'", code.UserAgent, retrievedCode.UserAgent)
@@ -368,7 +368,7 @@ func TestGetCodeByID(t *testing.T) {
 		t.Errorf("Expected SessionIdentifier '%s', got '%s'", code.SessionIdentifier, retrievedCode.SessionIdentifier)
 	}
 	if retrievedCode.ACRLevel != code.ACRLevel {
-		t.Errorf("Expected AcrLevel '%s', got '%s'", code.ACRLevel, retrievedCode.ACRLevel)
+		t.Errorf("Expected ACRLevel '%s', got '%s'", code.ACRLevel, retrievedCode.ACRLevel)
 	}
 	if retrievedCode.AuthMethods != code.AuthMethods {
 		t.Errorf("Expected AuthMethods '%s', got '%s'", code.AuthMethods, retrievedCode.AuthMethods)
@@ -407,7 +407,7 @@ func TestCodeLoadClient(t *testing.T) {
 
 	// Check if the client was loaded correctly
 	if code.Client.ID != client.ID {
-		t.Errorf("Expected Client Id %d, got %d", client.ID, code.Client.ID)
+		t.Errorf("Expected Client ID %d, got %d", client.ID, code.Client.ID)
 	}
 	if code.Client.ClientIdentifier != client.ClientIdentifier {
 		t.Errorf("Expected Client Identifier '%s', got '%s'", client.ClientIdentifier, code.Client.ClientIdentifier)
@@ -444,7 +444,7 @@ func TestCodeLoadUser(t *testing.T) {
 
 	// Check if the user was loaded correctly
 	if code.User.ID != user.ID {
-		t.Errorf("Expected User Id %d, got %d", user.ID, code.User.ID)
+		t.Errorf("Expected User ID %d, got %d", user.ID, code.User.ID)
 	}
 	if code.User.Username != user.Username {
 		t.Errorf("Expected Username '%s', got '%s'", user.Username, code.User.Username)
@@ -481,7 +481,7 @@ func TestGetCodeByCodeHash(t *testing.T) {
 
 	// Check if the retrieved code matches the original code
 	if retrievedCode.ID != code.ID {
-		t.Errorf("Expected Code Id %d, got %d", code.ID, retrievedCode.ID)
+		t.Errorf("Expected Code ID %d, got %d", code.ID, retrievedCode.ID)
 	}
 	if retrievedCode.CodeHash != code.CodeHash {
 		t.Errorf("Expected CodeHash '%s', got '%s'", code.CodeHash, retrievedCode.CodeHash)

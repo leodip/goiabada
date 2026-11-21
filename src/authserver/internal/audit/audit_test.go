@@ -305,9 +305,9 @@ func TestLogger_AsksTheSwitchesOncePerEventWithTheCallersValues(t *testing.T) {
 	}
 }
 
-// requestContext is a context carrying the request id under the key chimiddleware.GetReqID
-// reads, which is what a request's context holds once the RequestID middleware at the root of
-// both servers has run.
+// requestContext is a context carrying the request id where requestid.FromContext reads it,
+// which is what a request's context holds once requestid.Middleware at the root of both servers
+// has run.
 func requestContext(id string) context.Context {
 	return requestid.NewContext(context.Background(), id)
 }

@@ -21,7 +21,7 @@ tokens.
 - Supports `response_type=code` with optional `code_challenge` + `code_challenge_method`
 - A change of a client's identifier revokes its unredeemed codes in the rename's transaction (#710
   decision 5). Issuance looks the client up by the identifier the ceremony named with a plain read,
-  then, before inserting the code, reads its row again with `GetClientByIdForShare`: a shared lock
+  then, before inserting the code, reads its row again with `GetClientByIDForShare`: a shared lock
   held to the end of the issuance transaction on MySQL, PostgreSQL and SQL Server, and a plain read
   on SQLite, whose one connection runs one transaction at a time. Either the code commits first and
   the rename's sweep revokes it, or the rename commits first and issuance, finding the identifier
@@ -89,7 +89,7 @@ Every access token, from every grant, is an RFC 9068 JWT access token.
   7638 thumbprint, written by the same step, and its token response says `token_type: DPoP`
   (#42 decisions 2 and 3). Implicit-flow tokens are never bound
 - The authorization code, refresh and password grants add `grant_id`, the identifier the grant's
-  refresh token family shares (`FirstRefreshTokenJti`). The code exchange and the password grant fix
+  refresh token family shares (`FirstRefreshTokenJTI`). The code exchange and the password grant fix
   it, as the first refresh token's jti, before they mint the access token; a refresh copies its
   parent's. The client credentials grant and the implicit flow issue no refresh token and no
   `grant_id`
@@ -162,7 +162,7 @@ Every access token, from every grant, is an RFC 9068 JWT access token.
 
 ### DPoP at the auth server's own resources (RFC 9449 section 7)
 - `/userinfo` and every `/api/v1/*` route take an access token with the `DPoP` scheme as well as
-  Bearer (#42 decision 10). `JwtAuthorizationHeaderToContext` reads the scheme: Bearer in the
+  Bearer (#42 decision 10). `JWTAuthorizationHeaderToContext` reads the scheme: Bearer in the
   header or the form body, DPoP in the header only. A token carrying `cnf.jkt` sent by a Bearer
   method, and a token without it sent with DPoP, are 401 `invalid_token`; a stray `DPoP` header
   beside an unbound Bearer token is ignored.
@@ -323,8 +323,8 @@ A sign-out at `/auth/logout` with a confirmed `id_token_hint` ends the hint's cl
 session and revokes that client's session-bound grants from it (#135 decision 9).
 - Operation: `revocation.EndClientPartTx`, in one transaction under the session's row: the client's
   row deleted, the session too when the client was its last, then
-  `RevokeUnusedCodesBySessionIdentifierAndClientId` and the client's session-bound tokens from the
-  session (`GetSessionBoundRefreshTokensBySessionIdentifierAndClientId`, the tokens whose own
+  `RevokeUnusedCodesBySessionIdentifierAndClientID` and the client's session-bound tokens from the
+  session (`GetSessionBoundRefreshTokensBySessionIdentifierAndClientID`, the tokens whose own
   `session_identifier` is the session's), each family recorded under `client_signed_out` before the
   live ones are revoked. Whether other clients share the session decides only whether it is deleted
 - Untouched: the client's offline tokens (Back-Channel Logout 1.0 section 2.7: they "normally SHOULD
@@ -376,7 +376,7 @@ client's back-channel logout URI (#784).
     (`revocation.LiveUnder` over the settings) is the token endpoint's judgement
   - the credential sites, through `revocation.RevokeUserAuthStateTx`'s `LogoutNotice`, and the
     deletion of a user, through `revocation.UserWideDeliveries` inside the deletion's transaction,
-    under `GetUserByIdForUpdate` and before `DeleteUser` cascades the sessions and grants away. Every
+    under `GetUserByIDForUpdate` and before `DeleteUser` cascades the sessions and grants away. Every
     deletion of a user must call it there
   - a disconnect, which ends no session (#135 decision 3): the client alone, with a `sub`-only
     token, or, when it has `backchannel_logout_session_required`, a `sub`+`sid` token per valid
@@ -388,7 +388,7 @@ client's back-channel logout URI (#784).
 - Two shapes (decision 3). A user-wide end (`LogoutNotice.UserWide`: disabling or deleting the
   user, a password reset, an administrator setting the password) sends one `sub`-only token to each
   app with a URI on any stored session of the user, valid or not, or holding an unrevoked, unexpired
-  refresh token (`GetUsableRefreshTokenClientIdsByUserId`, read before the sweep revokes them); an
+  refresh token (`GetUsableRefreshTokenClientIDsByUserID`, read before the sweep revokes them); an
   app with `backchannel_logout_session_required` gets `sub`+`sid` per valid session instead, and
   nothing for a grant alone. The user's own password change is session-specific: `sub`+`sid` per
   app on each ended valid session, never the kept one. The `recover` command is a user-wide end too
@@ -409,7 +409,7 @@ client's back-channel logout URI (#784).
   code take that session's row first and hold no users row: the subject is read before the
   transaction. A sign-in takes each session it removes after its own writes, and after the user's
   row when it rechecks an OTP claim. A user-wide end and a credential change take the
-  user's row first (the generation increment, or `GetUserByIdForUpdate` for a deletion and the
+  user's row first (the generation increment, or `GetUserByIDForUpdate` for a deletion and the
   administrator's disable), then each of the user's sessions in id order, as the
   [data guide](data.md#transactions) sets out. On MySQL, where at REPEATABLE READ a transaction's
   first ordinary read fixes the snapshot every later one answers, a deletion and the disable make
@@ -467,7 +467,7 @@ exposure.
 - A change of a client's identifier revokes the client's grants in the rename's transaction
   (`revocation.RevokeClientGrantsTx` under `ReasonClientIdentifierChanged`, #710 decision 5), and a
   password grant has no code to mark, so the initial grant writes its first refresh token in a
-  transaction that first reads the client with `GetClientByIdForUpdate`, a locking read that writes
+  transaction that first reads the client with `GetClientByIDForUpdate`, a locking read that writes
   nothing. Either it commits first and the rename's sweep finds the token, or it reads the identifier
   the rename gave and is refused with `ErrPasswordGrantClientRenamed`, answered `invalid_client`
   ("Client does not exist."), nothing issued. `password_grant_rename_ordering_test.go` shows both
@@ -514,7 +514,7 @@ Defined in `src/authserver/internal/record/acr_level.go`:
 - **`urn:goiabada:level2_mandatory`** - Password + OTP required (user must enroll if not already)
 
 Target ACR determined by: the first level in the `acr_values` param of the authorize request, raised
-to `Client.DefaultAcrLevel`, which is a floor `acr_values` never lowers (#240); with no
+to `Client.DefaultACRLevel`, which is a floor `acr_values` never lowers (#240); with no
 `acr_values`, the client's level
 
 ### Auth States (State Machine)
@@ -532,7 +532,7 @@ ceremony's path depends on the target ACR, the session, and `prompt`.
 | `level1_password` | `authflow.SelectLevel1Method` | unconditional |
 | `level1_password_completed` | `authflow.PasswordProof` | a password proven: verified at `/auth/pwd` with the user enabled (`authflow.PasswordSubmission`), or just chosen at registration without verification, at activation or at a password reset, carrying on the sign-in the Create an account or Forgot password? link named while the browser holds it at `level1_password` (`accounthandlers.carryOnSignIn`, #622, #812) |
 | `level1_existing_session` | `authflow.Authorization` | valid session, hint matches, user enabled. The SSO shortcut: password entry is skipped and `/auth/level1completed` accepts this state directly |
-| `requires_level_2` | `authflow.Level1Completion` | target ACR above the owned session's ACR, or above level 1 with no owned session, or the session's `OtpConfigGeneration` differs from the user's and the target is above level 1, or the target is `level2_mandatory` and the user has no authenticator. A ceremony that verified the password itself (`Level1AuthCompleted`) counts no session, so it lands here whenever the target is above level 1 (#537) |
+| `requires_level_2` | `authflow.Level1Completion` | target ACR above the owned session's ACR, or above level 1 with no owned session, or the session's `OTPConfigGeneration` differs from the user's and the target is above level 1, or the target is `level2_mandatory` and the user has no authenticator. A ceremony that verified the password itself (`Level1AuthCompleted`) counts no session, so it lands here whenever the target is above level 1 (#537) |
 | `level2_otp` | `authflow.Level2Selection` | `level2_optional` with OTP enabled, or `level2_mandatory` (enrolment happens at `/auth/otp` if needed) |
 | `level2_recovery_codes` | `authflow.OTPSubmission` | OTP enrolled: the ceremony holds the new authenticator's recovery codes (`RecoveryCodes`) until `/auth/recovery-codes` first renders them; that render takes them off in one conditional write (`ceremony.Store.TakeRecoveryCodes`) and shows only what it took, so a reload or an overlapping load shows them no more (#257) |
 | `authentication_completed` | `authflow.Level1Completion` | no step-up needed |
@@ -557,7 +557,7 @@ the boundary's `beginStep`, which reads the request's settings before anything e
 without them is the 500 page carrying `reqctx.ErrNoSettings`, as it is at `/auth/authorize`, which
 reads them first too), then loads the ceremony and gates its state as below. It first reads, in the
 boundary's `loadAuthContext`, the ceremony the request names, through the one rule
-`ceremony.RequestedId`: the `ceremony` query parameter on a GET, built into every redirect between
+`ceremony.RequestedID`: the `ceremony` query parameter on a GET, built into every redirect between
 steps by `stepRedirect`, and the `ceremonyId` form field on a POST. A browser holding no ceremony at
 all goes to the account page. An id missing, or naming a ceremony the browser does not hold while it
 holds others, gets the "no longer active" page, 400, and the `auth_ceremony_mismatch` audit event,
@@ -687,7 +687,7 @@ same way. `refuseUnaddressableAuthorizeRequest` refuses it after the unsupported
   000062 ended the sessions stored before that, so no write leaves such a session now; the check is
   kept as a second line. Checked apart from the generation, because a `level2_optional` ceremony
   answers a moved generation for such a user by skipping the code and promoting it
-- If the session's `OtpConfigGeneration` differs from the user's → re-auth level2 (user changed OTP
+- If the session's `OTPConfigGeneration` differs from the user's → re-auth level2 (user changed OTP
   settings). This block writes nothing: the obligation is discharged at `/auth/completed`
 - Otherwise → auth completed
 
@@ -701,7 +701,7 @@ same way. `refuseUnaddressableAuthorizeRequest` refuses it after the unsupported
 When user has valid session (`UserSession` in DB + session cookie):
 - Session validated via `usersession.Manager.HasValidUserSession` (checks idle timeout, max
   lifetime, max_age param)
-- If valid → uses existing `AcrLevel` and `AuthMethods` from session
+- If valid → uses existing `ACRLevel` and `AuthMethods` from session
 - May still need level2 re-auth if target ACR higher than session ACR
 - Reuse never lowers a session: `BumpUserSession` only raises its ACR and only adds methods (#537)
 - Every whole-row session write takes the session's row first (`AcquireUserSessionRow`) and reads it
@@ -777,13 +777,13 @@ UserSession (DB)
 ├── Started (for max lifetime check)
 ├── LastAccessed (for idle timeout check)
 ├── AuthMethods ("pwd" or "pwd otp")
-├── AcrLevel ("urn:goiabada:level1" etc.)
+├── ACRLevel ("urn:goiabada:level1" etc.)
 ├── AuthTime (when auth occurred: the last credential, a code's time after a step-up)
 ├── PasswordAuthTime (when the password was last entered; a removal lowers AuthTime to it)
 ├── AuthStateGeneration (snapshot of users.auth_state_generation)
-├── OtpConfigGeneration (snapshot of users.otp_config_generation)
-├── DeviceId (digest of the separate device cookie, for same-browser session replacement)
-└── UserId
+├── OTPConfigGeneration (snapshot of users.otp_config_generation)
+├── DeviceID (digest of the separate device cookie, for same-browser session replacement)
+└── UserID
 ```
 
 ### Session Validity (`record/user_session.go`, `IsValid`)
@@ -794,20 +794,20 @@ Valid if ALL true:
 
 ### ACR Step-Up Logic (`ceremony/step_up.go`)
 One rule, `StepUpOwed`, read by `authflow.Level1Completion` and `authflow.SilentAuthentication`.
-Uses `record.AcrLevel.IsHigherThan()` for comparison (priority: level1=1, level2_optional=2,
+Uses `record.ACRLevel.IsHigherThan()` for comparison (priority: level1=1, level2_optional=2,
 level2_mandatory=3).
 
 **With valid session:**
 - Target ACR higher than session ACR → redirect to level2 (step-up)
 - Target `level2_mandatory` and the user has no authenticator → redirect to level2 to set one up
   (`StepUpAuthenticatorMissing`; `prompt=none` answers "Additional authentication setup required")
-- Session `OtpConfigGeneration` != user's + target requires level2 → re-prompt OTP
+- Session `OTPConfigGeneration` != user's + target requires level2 → re-prompt OTP
 - Otherwise → SSO succeeds, bump session
 
 **Without valid session:**
 - Target > level1 → redirect to level2
 
-### ACR in Token (`auth_context.go:SetAcrLevel`)
+### ACR in Token (`auth_context.go:SetACRLevel`)
 Token ACR = `max(targetACR, sessionACR)`, against the session the ceremony bound to. SSO reuse never
 downgrades within a session. A ceremony that authenticated afresh has just written its target onto
 that session, so its token ACR is the target (#537).
@@ -876,7 +876,7 @@ the reuse arm when it replaces the session's authentication (#537); a step-up le
 
 A ceremony in flight adopted the session's methods before the lowering, so its claim to a code is
 checked against the authenticator it came from (`otpcredential.OTPClaim`):
-`AuthContext.OtpClaimGeneration` is the session's snapshot when it adopted the session, and the
+`AuthContext.OTPClaimGeneration` is the session's snapshot when it adopted the session, and the
 generation the code was checked against or enrolled at when it entered one, and the claim stands
 only while the user's `otp_config_generation` is still that and the user has an authenticator. A
 removal, and a removal followed by a new enrolment, both move it. `/auth/completed` and
@@ -892,7 +892,7 @@ Both readers, `authflow.Level1Completion` and `authflow.SilentAuthentication`, o
 write nothing, so an abandoned ceremony spends no re-prompt. The snapshot is captured onto
 `AuthContext` at `authflow.PasswordSubmission` and on every arm of `authflow.Level2Selection`, and
 promoted once, at `/auth/completed`: `StartNewUserSession` writes it on the create arm, and
-`PromoteUserSessionOtpConfigGeneration` on the reuse arm when the target ACR is above level 1. Both
+`PromoteUserSessionOTPConfigGeneration` on the reuse arm when the target ACR is above level 1. Both
 columns are `dont-update` (#242).
 
 ### Scenario Summary
@@ -912,7 +912,7 @@ columns are `dont-update` (#242).
 - The user's authenticator removed → the session is already lowered to `level2_optional` and `pwd`,
   its `auth_time` the password's, and every later token says so (#542)
 - Session ACR < target ACR → step-up required (prompt for OTP)
-- Session `OtpConfigGeneration` != user's + target requires level2 → re-prompt OTP
+- Session `OTPConfigGeneration` != user's + target requires level2 → re-prompt OTP
 
 **Re-authentication (`prompt=login` over the user's own valid session, #537):**
 - Exactly the fresh login table above, whatever the session held: the same prompts, ACR and AMR

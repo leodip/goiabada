@@ -33,7 +33,7 @@ func TestAll_UniqueIDs(t *testing.T) {
 	seen := make(map[string]bool)
 	for _, l := range All() {
 		if seen[l.ID] {
-			t.Errorf("duplicate Id %q", l.ID)
+			t.Errorf("duplicate ID %q", l.ID)
 		}
 		seen[l.ID] = true
 	}
@@ -42,7 +42,7 @@ func TestAll_UniqueIDs(t *testing.T) {
 func TestAll_NonEmptyFields(t *testing.T) {
 	for i, l := range All() {
 		if l.ID == "" {
-			t.Errorf("entry %d has an empty Id", i)
+			t.Errorf("entry %d has an empty ID", i)
 		}
 		if l.Name == "" {
 			t.Errorf("entry %d (%q) has an empty Name", i, l.ID)
@@ -59,7 +59,7 @@ func TestAll_ParseAsBCP47(t *testing.T) {
 	for _, l := range All() {
 		tag, err := language.Parse(l.ID)
 		if err != nil {
-			t.Errorf("Id %q is not a BCP 47 tag: %v", l.ID, err)
+			t.Errorf("ID %q is not a BCP 47 tag: %v", l.ID, err)
 			continue
 		}
 		if tag.String() != l.ID {

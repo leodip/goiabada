@@ -418,13 +418,13 @@ func assertUserSessionEqual(t *testing.T, expected, actual *record.UserSession) 
 		t.Errorf("Expected AuthMethods %s, got %s", expected.AuthMethods, actual.AuthMethods)
 	}
 	if actual.ACRLevel != expected.ACRLevel {
-		t.Errorf("Expected AcrLevel %s, got %s", expected.ACRLevel, actual.ACRLevel)
+		t.Errorf("Expected ACRLevel %s, got %s", expected.ACRLevel, actual.ACRLevel)
 	}
 	if !actual.AuthTime.Equal(expected.AuthTime) {
 		t.Errorf("Expected AuthTime %v, got %v", expected.AuthTime, actual.AuthTime)
 	}
 	if actual.IPAddress != expected.IPAddress {
-		t.Errorf("Expected IpAddress %s, got %s", expected.IPAddress, actual.IPAddress)
+		t.Errorf("Expected IPAddress %s, got %s", expected.IPAddress, actual.IPAddress)
 	}
 	if actual.DeviceName != expected.DeviceName {
 		t.Errorf("Expected DeviceName %s, got %s", expected.DeviceName, actual.DeviceName)
@@ -447,7 +447,7 @@ func assertUserSessionEqual(t *testing.T, expected, actual *record.UserSession) 
 		t.Errorf("Expected DeviceID %s, got %s", expected.DeviceID, actual.DeviceID)
 	}
 	if actual.UserID != expected.UserID {
-		t.Errorf("Expected UserId %d, got %d", expected.UserID, actual.UserID)
+		t.Errorf("Expected UserID %d, got %d", expected.UserID, actual.UserID)
 	}
 	if !actual.CreatedAt.Valid || actual.CreatedAt.Time.IsZero() {
 		t.Error("Expected CreatedAt to be set")

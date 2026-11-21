@@ -41,10 +41,10 @@ func TestCreateUserConsent(t *testing.T) {
 	}
 
 	if retrievedConsent.UserID != userConsent.UserID {
-		t.Errorf("Expected UserId %d, got %d", userConsent.UserID, retrievedConsent.UserID)
+		t.Errorf("Expected UserID %d, got %d", userConsent.UserID, retrievedConsent.UserID)
 	}
 	if retrievedConsent.ClientID != userConsent.ClientID {
-		t.Errorf("Expected ClientId %d, got %d", userConsent.ClientID, retrievedConsent.ClientID)
+		t.Errorf("Expected ClientID %d, got %d", userConsent.ClientID, retrievedConsent.ClientID)
 	}
 	if retrievedConsent.Scope != userConsent.Scope {
 		t.Errorf("Expected Scope %s, got %s", userConsent.Scope, retrievedConsent.Scope)
@@ -95,10 +95,10 @@ func TestGetUserConsentByID(t *testing.T) {
 		t.Errorf("Expected ID %d, got %d", userConsent.ID, retrievedConsent.ID)
 	}
 	if retrievedConsent.UserID != userConsent.UserID {
-		t.Errorf("Expected UserId %d, got %d", userConsent.UserID, retrievedConsent.UserID)
+		t.Errorf("Expected UserID %d, got %d", userConsent.UserID, retrievedConsent.UserID)
 	}
 	if retrievedConsent.ClientID != userConsent.ClientID {
-		t.Errorf("Expected ClientId %d, got %d", userConsent.ClientID, retrievedConsent.ClientID)
+		t.Errorf("Expected ClientID %d, got %d", userConsent.ClientID, retrievedConsent.ClientID)
 	}
 
 	nonExistentConsent, err := database.GetUserConsentByID(context.Background(), nil, 99999)
@@ -122,10 +122,10 @@ func TestGetConsentByUserIDAndClientID(t *testing.T) {
 		t.Errorf("Expected ID %d, got %d", userConsent.ID, retrievedConsent.ID)
 	}
 	if retrievedConsent.UserID != userConsent.UserID {
-		t.Errorf("Expected UserId %d, got %d", userConsent.UserID, retrievedConsent.UserID)
+		t.Errorf("Expected UserID %d, got %d", userConsent.UserID, retrievedConsent.UserID)
 	}
 	if retrievedConsent.ClientID != userConsent.ClientID {
-		t.Errorf("Expected ClientId %d, got %d", userConsent.ClientID, retrievedConsent.ClientID)
+		t.Errorf("Expected ClientID %d, got %d", userConsent.ClientID, retrievedConsent.ClientID)
 	}
 
 	nonExistentConsent, err := database.GetConsentByUserIDAndClientID(context.Background(), nil, 99999, 99999)
@@ -150,7 +150,7 @@ func TestUserConsentsLoadClients(t *testing.T) {
 
 	for _, consent := range userConsents {
 		if consent.Client.ID != consent.ClientID {
-			t.Errorf("Expected Client.Id %d, got %d", consent.ClientID, consent.Client.ID)
+			t.Errorf("Expected Client.ID %d, got %d", consent.ClientID, consent.Client.ID)
 		}
 	}
 }
@@ -173,7 +173,7 @@ func TestGetConsentsByUserID(t *testing.T) {
 	for _, consent := range consents {
 		consentIDs[consent.ID] = true
 		if consent.UserID != user.ID {
-			t.Errorf("Expected UserId %d, got %d", user.ID, consent.UserID)
+			t.Errorf("Expected UserID %d, got %d", user.ID, consent.UserID)
 		}
 	}
 

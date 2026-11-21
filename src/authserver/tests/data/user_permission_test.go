@@ -40,7 +40,7 @@ func TestCreateUserPermission(t *testing.T) {
 	}
 
 	if retrievedUserPermission.UserID != userPermission.UserID {
-		t.Errorf("Expected UserId %d, got %d", userPermission.UserID, retrievedUserPermission.UserID)
+		t.Errorf("Expected UserID %d, got %d", userPermission.UserID, retrievedUserPermission.UserID)
 	}
 	if retrievedUserPermission.PermissionID != userPermission.PermissionID {
 		t.Errorf("Expected PermissionID %d, got %d", userPermission.PermissionID, retrievedUserPermission.PermissionID)
@@ -75,7 +75,7 @@ func TestUpdateUserPermission(t *testing.T) {
 	}
 
 	if updatedUserPermission.UserID != user.ID {
-		t.Errorf("Expected UserId %d, got %d", user.ID, updatedUserPermission.UserID)
+		t.Errorf("Expected UserID %d, got %d", user.ID, updatedUserPermission.UserID)
 	}
 
 	if updatedUserPermission.PermissionID != permission.ID {
@@ -95,7 +95,7 @@ func TestGetUserPermissionByID(t *testing.T) {
 		t.Errorf("Expected ID %d, got %d", userPermission.ID, retrievedUserPermission.ID)
 	}
 	if retrievedUserPermission.UserID != userPermission.UserID {
-		t.Errorf("Expected UserId %d, got %d", userPermission.UserID, retrievedUserPermission.UserID)
+		t.Errorf("Expected UserID %d, got %d", userPermission.UserID, retrievedUserPermission.UserID)
 	}
 	if retrievedUserPermission.PermissionID != userPermission.PermissionID {
 		t.Errorf("Expected PermissionID %d, got %d", userPermission.PermissionID, retrievedUserPermission.PermissionID)
@@ -188,7 +188,7 @@ func TestGetUserPermissionByUserIDAndPermissionID(t *testing.T) {
 		t.Errorf("Expected ID %d, got %d", userPermission.ID, retrievedUserPermission.ID)
 	}
 	if retrievedUserPermission.UserID != userPermission.UserID {
-		t.Errorf("Expected UserId %d, got %d", userPermission.UserID, retrievedUserPermission.UserID)
+		t.Errorf("Expected UserID %d, got %d", userPermission.UserID, retrievedUserPermission.UserID)
 	}
 	if retrievedUserPermission.PermissionID != userPermission.PermissionID {
 		t.Errorf("Expected PermissionID %d, got %d", userPermission.PermissionID, retrievedUserPermission.PermissionID)

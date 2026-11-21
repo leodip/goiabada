@@ -41,7 +41,7 @@ func TestCreateUserAttribute(t *testing.T) {
 		t.Errorf("Expected IncludeInAccessToken %v, got %v", attr.IncludeInAccessToken, retrievedAttr.IncludeInAccessToken)
 	}
 	if retrievedAttr.UserID != attr.UserID {
-		t.Errorf("Expected UserId %d, got %d", attr.UserID, retrievedAttr.UserID)
+		t.Errorf("Expected UserID %d, got %d", attr.UserID, retrievedAttr.UserID)
 	}
 }
 

@@ -59,7 +59,7 @@ func TestTryConsumeEnrolledUserOTPStep(t *testing.T) {
 			t.Fatalf("the removal must land: removed=%v err=%v", removed, err)
 		}
 		if got := reloadUser(t, read.ID).OTPConfigGeneration; got != read.OTPConfigGeneration {
-			t.Fatalf("OtpConfigGeneration = %d, want %d: the removal alone must not move it", got, read.OTPConfigGeneration)
+			t.Fatalf("OTPConfigGeneration = %d, want %d: the removal alone must not move it", got, read.OTPConfigGeneration)
 		}
 
 		claimed, err := database.TryConsumeEnrolledUserOTPStep(ctx, nil, read.ID, nowStep(), read.OTPConfigGeneration)

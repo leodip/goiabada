@@ -32,7 +32,7 @@ func TestCreateClientLogo(t *testing.T) {
 		t.Errorf("Expected ID %d, got %d", clientLogo.ID, retrieved.ID)
 	}
 	if retrieved.ClientID != clientLogo.ClientID {
-		t.Errorf("Expected ClientId %d, got %d", clientLogo.ClientID, retrieved.ClientID)
+		t.Errorf("Expected ClientID %d, got %d", clientLogo.ClientID, retrieved.ClientID)
 	}
 	if retrieved.ContentType != clientLogo.ContentType {
 		t.Errorf("Expected ContentType %s, got %s", clientLogo.ContentType, retrieved.ContentType)
@@ -51,7 +51,7 @@ func TestCreateClientLogo_ZeroClientID(t *testing.T) {
 
 	err := database.CreateClientLogo(context.Background(), nil, clientLogo)
 	if err == nil {
-		t.Error("Expected error when creating client logo with zero ClientId")
+		t.Error("Expected error when creating client logo with zero ClientID")
 	}
 }
 
@@ -117,7 +117,7 @@ func TestGetClientLogoByClientID(t *testing.T) {
 		t.Errorf("Expected ID %d, got %d", clientLogo.ID, retrieved.ID)
 	}
 	if retrieved.ClientID != client.ID {
-		t.Errorf("Expected ClientId %d, got %d", client.ID, retrieved.ClientID)
+		t.Errorf("Expected ClientID %d, got %d", client.ID, retrieved.ClientID)
 	}
 }
 

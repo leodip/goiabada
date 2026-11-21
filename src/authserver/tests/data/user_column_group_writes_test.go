@@ -228,7 +228,7 @@ func TestColumnGroupWrites_ConcurrentDisablePasswordAndOTPChangesSurvive(t *test
 				t.Error("the save reversed an OTP change made under it")
 			}
 			if after.OTPConfigGeneration != moved.OTPConfigGeneration {
-				t.Errorf("OtpConfigGeneration = %d, want %d", after.OTPConfigGeneration, moved.OTPConfigGeneration)
+				t.Errorf("OTPConfigGeneration = %d, want %d", after.OTPConfigGeneration, moved.OTPConfigGeneration)
 			}
 			if after.AuthStateGeneration != moved.AuthStateGeneration {
 				t.Errorf("AuthStateGeneration = %d, want %d", after.AuthStateGeneration, moved.AuthStateGeneration)

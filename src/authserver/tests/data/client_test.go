@@ -82,7 +82,7 @@ func TestCreateClient(t *testing.T) {
 		t.Errorf("Expected IncludeOpenIDConnectClaimsInIDToken '%s', got '%s'", client.IncludeOpenIDConnectClaimsInIDToken, createdClient.IncludeOpenIDConnectClaimsInIDToken)
 	}
 	if createdClient.DefaultACRLevel != client.DefaultACRLevel {
-		t.Errorf("Expected DefaultAcrLevel %v, got %v", client.DefaultACRLevel, createdClient.DefaultACRLevel)
+		t.Errorf("Expected DefaultACRLevel %v, got %v", client.DefaultACRLevel, createdClient.DefaultACRLevel)
 	}
 	if !createdClient.CreatedAt.Valid || createdClient.CreatedAt.Time.IsZero() {
 		t.Errorf("CreatedAt is not set properly")
@@ -187,7 +187,7 @@ func TestUpdateClient(t *testing.T) {
 		t.Errorf("Expected IncludeOpenIDConnectClaimsInIDToken '%s', got '%s'", updatedClient.IncludeOpenIDConnectClaimsInIDToken, retrievedClient.IncludeOpenIDConnectClaimsInIDToken)
 	}
 	if retrievedClient.DefaultACRLevel != updatedClient.DefaultACRLevel {
-		t.Errorf("Expected DefaultAcrLevel %v, got %v", updatedClient.DefaultACRLevel, retrievedClient.DefaultACRLevel)
+		t.Errorf("Expected DefaultACRLevel %v, got %v", updatedClient.DefaultACRLevel, retrievedClient.DefaultACRLevel)
 	}
 	if !retrievedClient.CreatedAt.Valid || retrievedClient.CreatedAt.Time.IsZero() {
 		t.Errorf("CreatedAt is not set properly")
@@ -255,7 +255,7 @@ func TestGetClientByID(t *testing.T) {
 
 	// Check all properties
 	if retrievedClient.ID != client.ID {
-		t.Errorf("Expected Id %d, got %d", client.ID, retrievedClient.ID)
+		t.Errorf("Expected ID %d, got %d", client.ID, retrievedClient.ID)
 	}
 	if retrievedClient.ClientIdentifier != client.ClientIdentifier {
 		t.Errorf("Expected ClientIdentifier '%s', got '%s'", client.ClientIdentifier, retrievedClient.ClientIdentifier)
@@ -294,7 +294,7 @@ func TestGetClientByID(t *testing.T) {
 		t.Errorf("Expected IncludeOpenIDConnectClaimsInAccessToken '%s', got '%s'", client.IncludeOpenIDConnectClaimsInAccessToken, retrievedClient.IncludeOpenIDConnectClaimsInAccessToken)
 	}
 	if retrievedClient.DefaultACRLevel != client.DefaultACRLevel {
-		t.Errorf("Expected DefaultAcrLevel %v, got %v", client.DefaultACRLevel, retrievedClient.DefaultACRLevel)
+		t.Errorf("Expected DefaultACRLevel %v, got %v", client.DefaultACRLevel, retrievedClient.DefaultACRLevel)
 	}
 	if !retrievedClient.CreatedAt.Valid || retrievedClient.CreatedAt.Time.IsZero() {
 		t.Errorf("CreatedAt is not set properly")
@@ -355,7 +355,7 @@ func TestGetClientByClientIdentifier(t *testing.T) {
 
 	// Check all properties
 	if retrievedClient.ID != client.ID {
-		t.Errorf("Expected Id %d, got %d", client.ID, retrievedClient.ID)
+		t.Errorf("Expected ID %d, got %d", client.ID, retrievedClient.ID)
 	}
 	if retrievedClient.ClientIdentifier != client.ClientIdentifier {
 		t.Errorf("Expected ClientIdentifier '%s', got '%s'", client.ClientIdentifier, retrievedClient.ClientIdentifier)
@@ -394,7 +394,7 @@ func TestGetClientByClientIdentifier(t *testing.T) {
 		t.Errorf("Expected IncludeOpenIDConnectClaimsInAccessToken '%s', got '%s'", client.IncludeOpenIDConnectClaimsInAccessToken, retrievedClient.IncludeOpenIDConnectClaimsInAccessToken)
 	}
 	if retrievedClient.DefaultACRLevel != client.DefaultACRLevel {
-		t.Errorf("Expected DefaultAcrLevel %v, got %v", client.DefaultACRLevel, retrievedClient.DefaultACRLevel)
+		t.Errorf("Expected DefaultACRLevel %v, got %v", client.DefaultACRLevel, retrievedClient.DefaultACRLevel)
 	}
 	if !retrievedClient.CreatedAt.Valid || retrievedClient.CreatedAt.Time.IsZero() {
 		t.Errorf("CreatedAt is not set properly")
@@ -1063,7 +1063,7 @@ func TestGetAllClients(t *testing.T) {
 			t.Errorf("Client %s: Expected IncludeOpenIDConnectClaimsInAccessToken %s, got %s", retrievedClient.ClientIdentifier, createdClient.IncludeOpenIDConnectClaimsInAccessToken, retrievedClient.IncludeOpenIDConnectClaimsInAccessToken)
 		}
 		if retrievedClient.DefaultACRLevel != createdClient.DefaultACRLevel {
-			t.Errorf("Client %s: Expected DefaultAcrLevel %v, got %v", retrievedClient.ClientIdentifier, createdClient.DefaultACRLevel, retrievedClient.DefaultACRLevel)
+			t.Errorf("Client %s: Expected DefaultACRLevel %v, got %v", retrievedClient.ClientIdentifier, createdClient.DefaultACRLevel, retrievedClient.DefaultACRLevel)
 		}
 
 		// Check if CreatedAt and UpdatedAt are set

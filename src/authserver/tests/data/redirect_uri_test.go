@@ -85,7 +85,7 @@ func TestCreateRedirectURI(t *testing.T) {
 		t.Errorf("Expected URI %s, got %s", redirectURI.URI, retrievedRedirectURI.URI)
 	}
 	if retrievedRedirectURI.ClientID != redirectURI.ClientID {
-		t.Errorf("Expected ClientId %d, got %d", redirectURI.ClientID, retrievedRedirectURI.ClientID)
+		t.Errorf("Expected ClientID %d, got %d", redirectURI.ClientID, retrievedRedirectURI.ClientID)
 	}
 }
 

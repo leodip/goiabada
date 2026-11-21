@@ -94,7 +94,7 @@ func TestTryEstablishUserOTP(t *testing.T) {
 			t.Error("the establish put back a password hash replaced under it")
 		}
 		if after.OTPConfigGeneration != moved.OTPConfigGeneration {
-			t.Errorf("OtpConfigGeneration = %d, want %d: the advance is the caller's, in the same transaction",
+			t.Errorf("OTPConfigGeneration = %d, want %d: the advance is the caller's, in the same transaction",
 				after.OTPConfigGeneration, moved.OTPConfigGeneration)
 		}
 	})
@@ -129,7 +129,7 @@ func TestTryEstablishUserOTP(t *testing.T) {
 		after := reloadUser(t, read.ID)
 		compareUsers(t, moved, after)
 		if after.OTPConfigGeneration != moved.OTPConfigGeneration {
-			t.Errorf("OtpConfigGeneration = %d, want %d", after.OTPConfigGeneration, moved.OTPConfigGeneration)
+			t.Errorf("OTPConfigGeneration = %d, want %d", after.OTPConfigGeneration, moved.OTPConfigGeneration)
 		}
 	})
 
@@ -201,7 +201,7 @@ func TestTryRemoveUserOTP(t *testing.T) {
 			t.Error("the removal put back a password hash replaced under it")
 		}
 		if after.OTPConfigGeneration != moved.OTPConfigGeneration {
-			t.Errorf("OtpConfigGeneration = %d, want %d", after.OTPConfigGeneration, moved.OTPConfigGeneration)
+			t.Errorf("OTPConfigGeneration = %d, want %d", after.OTPConfigGeneration, moved.OTPConfigGeneration)
 		}
 	})
 
@@ -296,7 +296,7 @@ func TestOTPCredential_ALostCompareAndSetWritesNothing(t *testing.T) {
 		after := reloadUser(t, read.ID)
 		compareUsers(t, won, after)
 		if after.OTPConfigGeneration != won.OTPConfigGeneration {
-			t.Errorf("OtpConfigGeneration = %d, want %d: a lost enrolment must not advance it",
+			t.Errorf("OTPConfigGeneration = %d, want %d: a lost enrolment must not advance it",
 				after.OTPConfigGeneration, won.OTPConfigGeneration)
 		}
 	})
@@ -339,7 +339,7 @@ func TestOTPCredential_ALostCompareAndSetWritesNothing(t *testing.T) {
 		after := reloadUser(t, read.ID)
 		compareUsers(t, moved, after)
 		if after.OTPConfigGeneration != moved.OTPConfigGeneration {
-			t.Errorf("OtpConfigGeneration = %d, want %d: a lost removal must not advance it",
+			t.Errorf("OTPConfigGeneration = %d, want %d: a lost removal must not advance it",
 				after.OTPConfigGeneration, moved.OTPConfigGeneration)
 		}
 		if after.LastOTPStep != moved.LastOTPStep {

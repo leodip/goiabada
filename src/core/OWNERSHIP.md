@@ -28,7 +28,7 @@ reference graph; three are asserted by a human and each of those needs a note.
 
 `own-package` is here because the table asks two questions at once — does the package belong in
 `core`, and does the symbol belong to the package — and they come apart for a package with
-behaviour. `sessionstore.SessionIdBytes` is the width the store mints an identifier at, inside a
+behaviour. `sessionstore.SessionIDBytes` is the width the store mints an identifier at, inside a
 store both processes depend on; asserting a word for it would record a judgement where the tree
 already has an answer. `reachable` is here for the same reason one step further out:
 `api.RedirectURIResponse` is the element type of `ClientResponse.RedirectURIs`, and outside its
