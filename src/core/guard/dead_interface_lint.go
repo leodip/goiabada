@@ -2,7 +2,6 @@ package guard
 
 import (
 	"go/ast"
-	"go/parser"
 	"go/token"
 	"go/types"
 	"io/fs"
@@ -15,6 +14,7 @@ import (
 
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/internal/refgraph"
+	"github.com/leodip/goiabada/core/pkgload"
 )
 
 // AssertNoDeadInterfaces holds every interface declared under dirs to having at least one
@@ -35,7 +35,14 @@ import (
 // other direction. An unqualified name a local shadows -- EmailSender := 1 in a function body --
 // is not a reference to the type, and neither is pkg.EmailSender at a site where a local value
 // named pkg has shadowed the import. All three are resolved here by asking go/types which object
-// an identifier actually binds to.
+// an identifier actually binds to, and so is a name a dot import brings in, which is a reference
+// like any other.
+//
+// The module is read through pkgload as the test build of the machine the tests run on, so a
+// test file is read like a production one. A reference the walk does not see shows up as a false
+// finding, which is loud, and a test for another platform does not run there anyway (#420). A
+// package anywhere in the module that does not load or type-check is fatal, naming it: its
+// references would go unread, and an interface only it names would be reported dead.
 //
 // What the search excludes is the interface's own declaration and nothing else -- the TypeSpec's
 // name identifier, not the file it sits in. A file-level exclusion would report a live interface
@@ -74,7 +81,7 @@ func AssertNoDeadInterfaces(t *testing.T, dirs ...string) {
 func assertNoDeadInterfaces(r Reporter, root string, dirs []string) {
 	r.Helper()
 
-	dead, blocked, files, err := findDeadInterfaces(root, dirs)
+	dead, files, err := findDeadInterfaces(root, dirs)
 	if err != nil {
 		r.Fatalf("walking %s: %v", root, err)
 	}
@@ -82,12 +89,6 @@ func assertNoDeadInterfaces(r Reporter, root string, dirs []string) {
 	// guarding without anything going red.
 	if files == 0 {
 		r.Fatalf("walked no Go files under %s (dirs: %s)", root, strings.Join(dirs, ", "))
-	}
-
-	// A shape this walk cannot resolve is reported rather than skipped: a false failure gets
-	// investigated, a false pass is a guard that has quietly stopped guarding.
-	for _, b := range blocked {
-		r.Errorf("%s:%d: %s", b.file, b.line, b.why)
 	}
 
 	if len(dead) == 0 {
@@ -117,7 +118,9 @@ type deadInterface struct {
 }
 
 // unresolvedShape is something the walk found and cannot answer for. It is reported as a finding
-// because the alternative -- passing over it -- is a guard silently narrowing its own scope.
+// because the alternative -- passing over it -- is a guard silently narrowing its own scope. The
+// context-value and AssertNotCalled-arity guards report it; this guard reads type-checked
+// packages, where every name resolves, and has none.
 type unresolvedShape struct {
 	file string
 	line int
@@ -126,43 +129,39 @@ type unresolvedShape struct {
 
 // findDeadInterfaces collects every top-level interface declared under the named subdirectories of
 // root, then searches each declaring package's whole module for a reference that binds to it. It
-// returns the unreferenced declarations, the shapes it could not resolve, and the number of Go
-// files it parsed in the declaring directories.
-func findDeadInterfaces(root string, dirs []string) ([]deadInterface, []unresolvedShape, int, error) {
+// returns the unreferenced declarations and the number of Go files the declaring directories'
+// packages hold in the build it read.
+func findDeadInterfaces(root string, dirs []string) ([]deadInterface, int, error) {
 	declDirs, err := declaringDirs(root, dirs)
 	if err != nil {
-		return nil, nil, 0, err
+		return nil, 0, err
 	}
 
-	// Group the declaring directories by the module that owns each, so one module is scanned once
+	// Group the declaring directories by the module that owns each, so one module is loaded once
 	// however many of its packages are being guarded.
-	byModule := map[string]*moduleTarget{}
+	byModule := map[string]map[string]bool{}
 	var order []string
 	for _, dir := range declDirs {
-		modRoot, modPath, mErr := moduleFor(root, dir)
+		modRoot, _, mErr := moduleFor(root, dir)
 		if mErr != nil {
-			return nil, nil, 0, mErr
+			return nil, 0, mErr
 		}
-		target, ok := byModule[modRoot]
-		if !ok {
-			target = &moduleTarget{root: modRoot, path: modPath}
-			byModule[modRoot] = target
+		if byModule[modRoot] == nil {
+			byModule[modRoot] = map[string]bool{}
 			order = append(order, modRoot)
 		}
-		target.declDirs = append(target.declDirs, dir)
+		byModule[modRoot][dir] = true
 	}
 	sort.Strings(order)
 
 	var dead []deadInterface
-	var blocked []unresolvedShape
 	files := 0
 	for _, modRoot := range order {
-		d, b, f, sErr := byModule[modRoot].scan(root)
+		d, f, sErr := deadInterfacesIn(root, modRoot, byModule[modRoot])
 		if sErr != nil {
-			return nil, nil, files, sErr
+			return nil, files, sErr
 		}
 		dead = append(dead, d...)
-		blocked = append(blocked, b...)
 		files += f
 	}
 
@@ -172,13 +171,7 @@ func findDeadInterfaces(root string, dirs []string) ([]deadInterface, []unresolv
 		}
 		return dead[i].line < dead[j].line
 	})
-	sort.Slice(blocked, func(i, j int) bool {
-		if blocked[i].file != blocked[j].file {
-			return blocked[i].file < blocked[j].file
-		}
-		return blocked[i].line < blocked[j].line
-	})
-	return dead, blocked, files, nil
+	return dead, files, nil
 }
 
 // declaringDirs expands dirs into every directory beneath them that holds at least one Go file.
@@ -258,369 +251,85 @@ func moduleFor(root, dir string) (modRoot, modPath string, err error) {
 	return "", "", errs.Errorf("no go.mod above %s (searched up to %s)", dir, root)
 }
 
-// moduleTarget is one module, with the directories inside it whose interfaces are being held.
-type moduleTarget struct {
-	root     string
-	path     string
-	declDirs []string
+// interfaceKey is a package-level type by the import path of its package and its name, which is
+// the one identity a declaration keeps across the builds of its package. The test build
+// type-checks a package a second time with its internal tests, and a package importing it there
+// binds to that second copy, a different types.Object for the same declaration.
+type interfaceKey struct {
+	pkg, name string
 }
 
-// importPathOf gives the import path of a directory inside this module.
-func (m *moduleTarget) importPathOf(dir string) string {
-	rel, err := filepath.Rel(m.root, dir)
-	if err != nil || rel == "." {
-		return m.path
-	}
-	return m.path + "/" + filepath.ToSlash(rel)
-}
-
-// scan type-checks the declaring packages, then every other package in the module that could
-// possibly hold a reference, and reports the declarations nothing bound to.
-func (m *moduleTarget) scan(root string) ([]deadInterface, []unresolvedShape, int, error) {
-	stub := newStubPackages()
-
-	// The stub importer invents a package name from the import path for everything it is asked
-	// for, which is right for almost every package and irrelevant for the rest: a wrong name only
-	// makes an unrelated package's selectors unresolvable, and this walk asks nothing of them. The
-	// declaring packages are the exception, because a selector's base has to bind to one of them
-	// for a cross-package reference to be seen at all, so their real names are read from their own
-	// package clauses first.
-	for _, dir := range m.declDirs {
-		name, err := packageNameIn(dir)
-		if err != nil {
-			return nil, nil, 0, err
-		}
-		if name != "" {
-			stub.names[m.importPathOf(dir)] = name
-		}
+// deadInterfacesIn loads the module rooted at modRoot, collects the top-level interfaces its
+// packages in declDirs declare, and returns those no identifier anywhere in the module binds to,
+// with the number of Go files those packages hold.
+//
+// A reference is an identifier go/types resolved to a package-level type: the object it bound
+// to, not its text, which is what tells handlers.X from tcputils.X and a local spelled X from the
+// type. The declaration's own name cannot count, because go/types records a defining identifier
+// in Defs and never in Uses.
+//
+// A declaration inside a function body is left alone: it is unreachable from outside that body by
+// construction, so "nothing references it" is not a finding about the package's surface.
+func deadInterfacesIn(root, modRoot string, declDirs map[string]bool) ([]deadInterface, int, error) {
+	pkgs, err := pkgload.Load(modRoot, pkgload.Build{Tests: true})
+	if err != nil {
+		return nil, 0, err
 	}
 
-	var decls []declaredInterface
-	var blocked []unresolvedShape
-	files := 0
-	declared := map[string]bool{}
-	isDeclDir := map[string]bool{}
-
-	qualified := map[string]bool{}
-	localUsed := map[types.Object]bool{}
-
-	for _, dir := range m.declDirs {
-		isDeclDir[dir] = true
-		d, b, f, err := m.checkDir(root, dir, stub, true, nil, qualified, localUsed)
-		if err != nil {
-			return nil, nil, files, err
-		}
-		decls = append(decls, d...)
-		blocked = append(blocked, b...)
-		files += f
-	}
-	for _, d := range decls {
-		declared[d.name] = true
-	}
-
-	// Nothing else in the module can hold a reference unless one of its files literally spells a
-	// declared interface's name: Go binds an identifier to a declaration by its text, so a file
-	// that does not carry the text cannot carry the reference. That filter is what keeps a
-	// module-wide walk cheap enough to run in a unit tier.
-	if len(declared) > 0 {
-		others, err := declaringDirs(m.root, nil)
-		if err != nil {
-			return nil, nil, files, err
-		}
-		for _, dir := range others {
-			if isDeclDir[dir] {
-				continue
+	declared := map[interfaceKey]deadInterface{}
+	used := map[interfaceKey]bool{}
+	read := map[string]bool{}
+	for _, p := range pkgs {
+		for _, obj := range p.TypesInfo.Uses {
+			// A type declared in a function body is no package-level declaration, whatever its
+			// spelling, and the universe's error and any belong to no package.
+			tn, ok := obj.(*types.TypeName)
+			if ok && tn.Pkg() != nil && tn.Pkg().Scope().Lookup(tn.Name()) == tn {
+				used[interfaceKey{pkg: tn.Pkg().Path(), name: tn.Name()}] = true
 			}
-			_, b, _, cErr := m.checkDir(root, dir, stub, false, declared, qualified, localUsed)
-			if cErr != nil {
-				return nil, nil, files, cErr
+		}
+
+		// A test binary's generated main has its files outside the module and declares nothing.
+		if len(p.GoFiles) == 0 || !declDirs[filepath.Dir(p.GoFiles[0])] {
+			continue
+		}
+		for _, f := range p.GoFiles {
+			read[f] = true
+		}
+		for _, file := range p.Syntax {
+			for _, decl := range file.Decls {
+				gen, ok := decl.(*ast.GenDecl)
+				if !ok || gen.Tok != token.TYPE {
+					continue
+				}
+				for _, spec := range gen.Specs {
+					ts, ok := spec.(*ast.TypeSpec)
+					if !ok {
+						continue
+					}
+					if _, ok := ts.Type.(*ast.InterfaceType); !ok {
+						continue
+					}
+					key := interfaceKey{pkg: p.PkgPath, name: ts.Name.Name}
+					position := p.Fset.Position(ts.Name.Pos())
+					declared[key] = deadInterface{
+						pkg:  p.PkgPath,
+						file: relativeTo(root, position.Filename),
+						line: position.Line,
+						name: ts.Name.Name,
+					}
+				}
 			}
-			blocked = append(blocked, b...)
 		}
 	}
 
 	var dead []deadInterface
-	for _, d := range decls {
-		if localUsed[d.obj] || qualified[d.pkg+"."+d.name] {
-			continue
-		}
-		dead = append(dead, deadInterface{pkg: d.pkg, file: d.file, line: d.line, name: d.name})
-	}
-	return dead, blocked, files, nil
-}
-
-// declaredInterface is one interface declaration, carrying the go/types object the walk compares
-// same-package references against by pointer identity.
-type declaredInterface struct {
-	pkg  string
-	file string
-	line int
-	name string
-	obj  types.Object
-}
-
-// checkDir parses one directory's Go files, type-checks each package clause in it, and records
-// what it found. When declaring is true every file is parsed and the directory's own interface
-// declarations are collected; otherwise only files carrying a declared interface's spelling are
-// parsed, and only references are recorded.
-//
-// qualified accumulates "<import path>.<Name>" for every selector whose base binds to an import,
-// and localUsed accumulates the objects unqualified identifiers bound to inside a declaring
-// package. Those two maps are the whole answer: a declaration absent from both is dead.
-func (m *moduleTarget) checkDir(
-	root, dir string,
-	stub *stubPackages,
-	declaring bool,
-	declared map[string]bool,
-	qualified map[string]bool,
-	localUsed map[types.Object]bool,
-) ([]declaredInterface, []unresolvedShape, int, error) {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return nil, nil, 0, errs.Wrapf(err, "reading %s", dir)
-	}
-
-	fset := token.NewFileSet()
-	// Grouped by package clause, because a directory holds both foo and foo_test and go/types
-	// checks one package at a time.
-	byPackage := map[string][]*ast.File{}
-	var packageOrder []string
-	var blocked []unresolvedShape
-	files := 0
-
-	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".go") {
-			continue
-		}
-		path := filepath.Join(dir, entry.Name())
-		raw, rErr := os.ReadFile(path)
-		if rErr != nil {
-			return nil, nil, files, errs.Wrapf(rErr, "reading %s", path)
-		}
-		if !declaring && !mentionsAny(raw, declared) {
-			continue
-		}
-		file, pErr := parser.ParseFile(fset, path, raw, parser.SkipObjectResolution)
-		if pErr != nil {
-			// A file that does not parse is a compile error the build tier owns, and reporting it
-			// here would send the reader to the wrong place.
-			continue
-		}
-		if declaring {
-			files++
-		}
-		rel := relativeTo(root, path)
-		blocked = append(blocked, dotImportsIn(file, fset, rel)...)
-		name := file.Name.Name
-		if _, seen := byPackage[name]; !seen {
-			packageOrder = append(packageOrder, name)
-		}
-		byPackage[name] = append(byPackage[name], file)
-	}
-
-	var decls []declaredInterface
-	pkgPath := m.importPathOf(dir)
-	for _, name := range packageOrder {
-		group := byPackage[name]
-		checkPath := pkgPath
-		if strings.HasSuffix(name, "_test") {
-			checkPath = pkgPath + "_test"
-		}
-
-		info := &types.Info{
-			Defs: map[*ast.Ident]types.Object{},
-			Uses: map[*ast.Ident]types.Object{},
-		}
-		conf := types.Config{
-			Importer: stub,
-			// Every import is a stub, so the great majority of what go/types has to say about
-			// these files is that some invented package has no such member. Collecting the errors
-			// and discarding them is what keeps the checker running to the end; what survives is
-			// identifier resolution, which is lexical and needs no import to be correct.
-			Error:                    func(error) {},
-			DisableUnusedImportCheck: true,
-		}
-		// The returned error is the first one Error already saw. The package and the info are
-		// filled in either way, which is the whole point of running in error-tolerant mode.
-		_, _ = conf.Check(checkPath, fset, group, info)
-
-		var groupObjs map[types.Object]bool
-		if declaring {
-			groupObjs = map[types.Object]bool{}
-			for _, file := range group {
-				d, b := interfaceDeclsIn(file, fset, info, root, pkgPath)
-				decls = append(decls, d...)
-				blocked = append(blocked, b...)
-				for _, one := range d {
-					groupObjs[one.obj] = true
-				}
-			}
-		}
-
-		recordReferences(group, info, groupObjs, qualified, localUsed)
-	}
-
-	return decls, blocked, files, nil
-}
-
-// interfaceDeclsIn collects the top-level interface declarations in one file. A declaration inside
-// a function body is left alone: it is unreachable from outside that body by construction, so
-// "nothing references it" is not a finding about the package's surface.
-func interfaceDeclsIn(
-	file *ast.File, fset *token.FileSet, info *types.Info, root, pkgPath string,
-) ([]declaredInterface, []unresolvedShape) {
-	var decls []declaredInterface
-	var blocked []unresolvedShape
-
-	for _, decl := range file.Decls {
-		gen, ok := decl.(*ast.GenDecl)
-		if !ok || gen.Tok != token.TYPE {
-			continue
-		}
-		for _, spec := range gen.Specs {
-			ts, ok := spec.(*ast.TypeSpec)
-			if !ok {
-				continue
-			}
-			if _, ok := ts.Type.(*ast.InterfaceType); !ok {
-				continue
-			}
-			position := fset.Position(ts.Name.Pos())
-			rel := relativeTo(root, position.Filename)
-			obj := info.Defs[ts.Name]
-			if obj == nil {
-				// No object means no identity to compare references against, so every answer
-				// about this declaration would be a guess.
-				blocked = append(blocked, unresolvedShape{
-					file: rel,
-					line: position.Line,
-					why: "the declaration of " + ts.Name.Name + " did not resolve to a type, so " +
-						"nothing can be said about whether anything references it",
-				})
-				continue
-			}
-			decls = append(decls, declaredInterface{
-				pkg:  pkgPath,
-				file: rel,
-				line: position.Line,
-				name: ts.Name.Name,
-				obj:  obj,
-			})
+	for key, d := range declared {
+		if !used[key] {
+			dead = append(dead, d)
 		}
 	}
-	return decls, blocked
-}
-
-// recordReferences walks one checked package and records every reference that binds to something
-// this guard might be holding.
-//
-// Two shapes, and both are answered by the object an identifier actually bound to rather than by
-// the text at the site:
-//
-//   - A selector whose base resolves to a *types.PkgName is a qualified reference, and the import
-//     path comes off the PkgName rather than off the spelling. That is what tells handlers.X from
-//     tcputils.X, and what makes an aliased import count. A base that resolved to anything else --
-//     a local variable wearing the import's name, most often -- is not a reference to the package
-//     at all, so nothing is recorded and the interface stays dead.
-//   - An unqualified identifier that bound to one of this package's own interface declarations.
-//     Identity is against the object, so a local of the same spelling records nothing. The
-//     declaration's own name identifier cannot appear here: go/types puts a defining identifier in
-//     Defs, never in Uses.
-func recordReferences(
-	files []*ast.File,
-	info *types.Info,
-	groupObjs map[types.Object]bool,
-	qualified map[string]bool,
-	localUsed map[types.Object]bool,
-) {
-	for _, file := range files {
-		ast.Inspect(file, func(n ast.Node) bool {
-			sel, ok := n.(*ast.SelectorExpr)
-			if !ok {
-				return true
-			}
-			base, ok := sel.X.(*ast.Ident)
-			if !ok {
-				return true
-			}
-			if pkgName, ok := info.Uses[base].(*types.PkgName); ok {
-				qualified[pkgName.Imported().Path()+"."+sel.Sel.Name] = true
-			}
-			return true
-		})
-	}
-
-	if len(groupObjs) == 0 {
-		return
-	}
-	for _, obj := range info.Uses {
-		if groupObjs[obj] {
-			localUsed[obj] = true
-		}
-	}
-}
-
-// dotImportsIn reports a dot import as an unresolved shape. An unqualified name reaching this file
-// from a dot-imported package binds to a declaration in a package this walk never named, so a file
-// carrying one can neither be shown to reference an interface nor shown not to. There is no dot
-// import anywhere in this tree today, which is why refusing it costs nothing and admitting it
-// silently would cost the guard its meaning.
-func dotImportsIn(file *ast.File, fset *token.FileSet, rel string) []unresolvedShape {
-	var found []unresolvedShape
-	for _, imp := range file.Imports {
-		if imp.Name == nil || imp.Name.Name != "." {
-			continue
-		}
-		found = append(found, unresolvedShape{
-			file: rel,
-			line: fset.Position(imp.Pos()).Line,
-			why: "dot import of " + imp.Path.Value + ": an unqualified reference through a dot " +
-				"import binds to a package this walk cannot name, so interface liveness in this " +
-				"file is unknowable; give the import a name",
-		})
-	}
-	return found
-}
-
-// mentionsAny reports whether the source text carries any of the names, which is the sound
-// pre-filter on parsing: an identifier binds to a declaration by its text, so a file that never
-// spells the name cannot reference it, whatever it imports.
-func mentionsAny(src []byte, names map[string]bool) bool {
-	text := string(src)
-	for name := range names {
-		if strings.Contains(text, name) {
-			return true
-		}
-	}
-	return false
-}
-
-// packageNameIn reads the package clause of the first non-test Go file in dir.
-func packageNameIn(dir string) (string, error) {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return "", errs.Wrapf(err, "reading %s", dir)
-	}
-	names := make([]string, 0, len(entries))
-	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".go") {
-			continue
-		}
-		names = append(names, entry.Name())
-	}
-	sort.Strings(names)
-	fset := token.NewFileSet()
-	for _, name := range names {
-		if strings.HasSuffix(name, "_test.go") {
-			continue
-		}
-		file, pErr := parser.ParseFile(fset, filepath.Join(dir, name), nil, parser.PackageClauseOnly)
-		if pErr != nil {
-			continue
-		}
-		return file.Name.Name, nil
-	}
-	return "", nil
+	return dead, len(read), nil
 }
 
 // relativeTo renders path relative to root with forward slashes, falling back to the path itself
@@ -634,9 +343,10 @@ func relativeTo(root, path string) string {
 }
 
 // stubPackages is an importer that never reads a package. Every path it is asked for becomes an
-// empty, complete types.Package, which is enough for the two questions this guard asks -- which
-// object an identifier binds to, and which import path a package name came from -- because both
-// are answered by lexical scoping rather than by anything inside the imported package.
+// empty, complete types.Package, which is enough for the two questions the context-value and
+// AssertNotCalled-arity guards ask of it -- which object an identifier binds to, and which import
+// path a package name came from -- because both are answered by lexical scoping rather than by
+// anything inside the imported package.
 type stubPackages struct {
 	names map[string]string
 	made  map[string]*types.Package
@@ -663,7 +373,7 @@ func (s *stubPackages) Import(path string) (*types.Package, error) {
 // inventedPackageName guesses the package name of a path this walk has not read, which is the last
 // path element with any version suffix dropped. It is right for almost every package and harmless
 // when it is wrong: a name that does not match only leaves that package's own selectors
-// unresolved, and this guard asks nothing of a package it is not holding.
+// unresolved, and neither guard asks anything of a package it is not holding.
 func inventedPackageName(path string) string {
 	base := path
 	if i := strings.LastIndex(base, "/"); i >= 0 {

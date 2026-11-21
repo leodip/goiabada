@@ -188,9 +188,9 @@ func findNotCalledArity(root string, dirs []string) ([]notCalledFinding, []unres
 }
 
 // dirsWritingNotCalled collects the directories holding at least one Go file that spells the
-// assertion. Reading the text first is the sound pre-filter on type-checking, for the reason
-// mentionsAny carries: a call site is spelled before it is resolved, so a directory whose files
-// never carry the text cannot hold one, and the great majority of this repository is skipped
+// assertion. Reading the text first is the sound pre-filter on type-checking: an identifier binds
+// to a declaration by its text, so a call site is spelled before it is resolved, a directory whose
+// files never carry the text cannot hold one, and the great majority of this repository is skipped
 // without being checked.
 func dirsWritingNotCalled(root string, dirs []string) ([]string, error) {
 	starts := []string{root}
@@ -449,8 +449,8 @@ type repoModule struct {
 }
 
 // mockPackages is the importer the rule type-checks against. Every path but one kind becomes an
-// empty stub, exactly as AssertNoDeadInterfaces' importer does and for the same reason: identifier
-// resolution is lexical and needs no import to be correct.
+// empty stub, exactly as stubPackages makes one and for the same reason: identifier resolution is
+// lexical and needs no import to be correct.
 //
 // The exception is a directory in this repository that declares a testify double, which is read
 // from source. That is the one package whose contents this rule needs, because the arity it holds

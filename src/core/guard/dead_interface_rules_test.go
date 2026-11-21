@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/leodip/goiabada/core/pkgload"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -24,6 +25,13 @@ func writeFixture(t *testing.T, root, rel, src string) {
 	path := filepath.Join(root, filepath.FromSlash(rel))
 	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
 	require.NoError(t, os.WriteFile(path, []byte(src), 0o644))
+}
+
+// makeLoadable makes a fixture tree a set of modules the go command can load, which is how the
+// guard reads it. Every tree it is called on compiles: a package that does not is fatal (#420).
+func makeLoadable(t *testing.T, root string) {
+	t.Helper()
+	require.NoError(t, pkgload.MakeLoadable(root))
 }
 
 // deadNames renders the findings as "<package>.<Name>" so a failure names what was missed rather
@@ -84,6 +92,10 @@ type FromSubpackage interface{ D() }
 // test alike.
 type FromTest interface{ E() }
 
+// FromExternalTest is consumed only from the external test package, which imports the test build
+// of this package rather than the package itself.
+type FromExternalTest interface{ M() }
+
 // ViaAlias is consumed through an import given another name at the call site.
 type ViaAlias interface{ F() }
 
@@ -96,6 +108,16 @@ func shadow() int {
 	return ShadowedLocal
 }
 
+// ShadowedLocalType is spelled inside this package by a type a function body declares, and by
+// nothing else. Both are types of this package, and only one of them is this declaration.
+type ShadowedLocalType interface{ N() }
+
+func shadowType() {
+	type ShadowedLocalType int
+	var x ShadowedLocalType
+	_ = x
+}
+
 // Collides is spelled by a same-named type in a different package and by nothing else. This is the
 // TCPConnectionTester case: a bare-name grep credited it with four references that belonged to
 // another package's type, and the first census called it live.
@@ -103,6 +125,10 @@ type Collides interface{ H() }
 
 // ShadowedImport is spelled in a selector whose base is a local value wearing the import's name.
 type ShadowedImport interface{ I() }
+
+// Plain is no interface, so the guard holds nothing about it. It is what the shadowimport package
+// names through the import, which a package that compiles has to use somewhere.
+func Plain() {}
 `)
 
 	writeFixture(t, root, "mod/handlers/other.go", `package handlers
@@ -113,6 +139,13 @@ func useOtherFile(x OtherFile) { _ = x }
 	writeFixture(t, root, "mod/handlers/handlers_test.go", `package handlers
 
 var fromTest FromTest
+`)
+
+	writeFixture(t, root, "mod/handlers/external_test.go", `package handlers_test
+
+import "example.com/mod/handlers"
+
+var fromExternalTest handlers.FromExternalTest
 `)
 
 	// ---- a package with no interfaces at all, guarded alongside ----------------------------
@@ -151,6 +184,8 @@ func Use(x Collides) { _ = x }
 
 import "example.com/mod/handlers"
 
+var _ = handlers.Plain
+
 type box struct{ ShadowedImport int }
 
 // The selector reads handlers.ShadowedImport, but handlers here is this function's parameter, so
@@ -158,14 +193,16 @@ type box struct{ ShadowedImport int }
 func Use(handlers box) int { return handlers.ShadowedImport }
 `)
 
-	dead, blocked, files, err := findDeadInterfaces(root, []string{"mod/handlers", "mod/nointerfaces"})
+	makeLoadable(t, root)
+
+	dead, files, err := findDeadInterfaces(root, []string{"mod/handlers", "mod/nointerfaces"})
 	require.NoError(t, err)
-	assert.Empty(t, blocked, "no fixture here carries a shape the walk cannot resolve")
-	assert.Equal(t, 4, files, "three files in mod/handlers and one in mod/nointerfaces")
+	assert.Equal(t, 5, files, "four files in mod/handlers and one in mod/nointerfaces")
 
 	assert.ElementsMatch(t, []string{
 		"example.com/mod/handlers.DeadOne",
 		"example.com/mod/handlers.ShadowedLocal",
+		"example.com/mod/handlers.ShadowedLocalType",
 		"example.com/mod/handlers.Collides",
 		"example.com/mod/handlers.ShadowedImport",
 	}, deadNames(dead))
@@ -178,25 +215,24 @@ func TestNoDeadInterfaces_AWalkThatReachesNoFilesIsNotAPass(t *testing.T) {
 	root := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(root, "mod", "empty"), 0o755))
 
-	dead, blocked, files, err := findDeadInterfaces(root, []string{"mod/empty"})
+	dead, files, err := findDeadInterfaces(root, []string{"mod/empty"})
 	require.NoError(t, err)
 	assert.Empty(t, dead)
-	assert.Empty(t, blocked)
 	assert.Zero(t, files, "AssertNoDeadInterfaces turns a zero file count into a t.Fatalf")
 }
 
-// TestNoDeadInterfaces_ADotImportIsReportedRatherThanSkipped covers the walk's one boundary. An
-// unqualified name reaching a file through a dot import binds to a declaration in a package this
-// walk never named, so the honest answer is a finding at the dot import rather than a silent pass
-// on the interface. There is no dot import in the tree today, which is what makes refusing one
-// free.
-func TestNoDeadInterfaces_ADotImportIsReportedRatherThanSkipped(t *testing.T) {
+// TestNoDeadInterfaces_ADotImportIsAnOrdinaryReference holds that a name reaching a file through a
+// dot import is a reference like any other. The type checker binds it to the declaration it names,
+// so an interface used only that way is live (#420).
+func TestNoDeadInterfaces_ADotImportIsAnOrdinaryReference(t *testing.T) {
 	root := t.TempDir()
 
 	writeFixture(t, root, "mod/go.mod", "module example.com/mod\n\ngo 1.24\n")
 	writeFixture(t, root, "mod/handlers/interfaces.go", `package handlers
 
 type DotUsed interface{ A() }
+
+type DotUnused interface{ B() }
 `)
 	writeFixture(t, root, "mod/consumer/consumer.go", `package consumer
 
@@ -204,17 +240,13 @@ import . "example.com/mod/handlers"
 
 func Use(x DotUsed) { _ = x }
 `)
+	makeLoadable(t, root)
 
-	dead, blocked, files, err := findDeadInterfaces(root, []string{"mod/handlers"})
+	dead, files, err := findDeadInterfaces(root, []string{"mod/handlers"})
 	require.NoError(t, err)
 	assert.Equal(t, 1, files)
-
-	require.Len(t, blocked, 1)
-	assert.Equal(t, "mod/consumer/consumer.go", blocked[0].file)
-	assert.Contains(t, blocked[0].why, "dot import")
-
-	// And the interface is still reported, because the walk genuinely cannot show it referenced.
-	assert.Equal(t, []string{"example.com/mod/handlers.DotUsed"}, deadNames(dead))
+	assert.Equal(t, []string{"example.com/mod/handlers.DotUnused"}, deadNames(dead),
+		"the dot-imported name is live and its unnamed neighbour is not")
 }
 
 // TestNoDeadInterfaces_DeclarationsOutsideTheGuardedDirsAreNotHeld keeps the dirs argument
@@ -235,10 +267,10 @@ func use(x Live) { _ = x }
 
 type AlsoDeadButNotGuarded interface{ B() }
 `)
+	makeLoadable(t, root)
 
-	dead, blocked, files, err := findDeadInterfaces(root, []string{"mod/handlers"})
+	dead, files, err := findDeadInterfaces(root, []string{"mod/handlers"})
 	require.NoError(t, err)
-	assert.Empty(t, blocked)
 	assert.Equal(t, 1, files)
 	assert.Empty(t, deadNames(dead))
 }
@@ -257,6 +289,7 @@ func TestNoDeadInterfaces_TheGuardFailsOnADeadInterface(t *testing.T) {
 
 type Abandoned interface{ A() }
 `)
+	makeLoadable(t, root)
 
 	report := Run(func(r Reporter) {
 		assertNoDeadInterfaces(r, root, []string{"mod/handlers"})
@@ -282,6 +315,7 @@ type Consumed interface{ A() }
 
 func use(x Consumed) { _ = x }
 `)
+	makeLoadable(t, root)
 
 	report := Run(func(r Reporter) {
 		assertNoDeadInterfaces(r, root, []string{"mod/handlers"})
@@ -307,29 +341,33 @@ func TestNoDeadInterfaces_TheGuardIsFatalOnAnEmptyWalk(t *testing.T) {
 	assert.Contains(t, report.Fatal, "mod/empty", "the fatal names the dirs that covered nothing")
 }
 
-// TestNoDeadInterfaces_TheGuardReportsAnUnresolvedShape holds the other half of the reporting: a
-// shape the walk cannot answer for is an error of its own rather than a silent narrowing.
-func TestNoDeadInterfaces_TheGuardReportsAnUnresolvedShape(t *testing.T) {
+// TestNoDeadInterfaces_TheGuardIsFatalOnAPackageThatDoesNotCompile holds decision 3 of #420. The
+// module is read type-checked, and a package that does not compile would leave its references
+// unread, so an interface only it names would be reported dead. The guard stops instead, naming the
+// package, even when the package is outside the guarded dirs.
+func TestNoDeadInterfaces_TheGuardIsFatalOnAPackageThatDoesNotCompile(t *testing.T) {
 	root := t.TempDir()
 	writeFixture(t, root, "mod/go.mod", "module example.com/mod\n\ngo 1.24\n")
 	writeFixture(t, root, "mod/handlers/interfaces.go", `package handlers
 
-type Shadowed interface{ A() }
+type Consumed interface{ A() }
 `)
-	writeFixture(t, root, "mod/consumer/consumer.go", `package consumer
+	writeFixture(t, root, "mod/broken/broken.go", `package broken
 
-import . "example.com/mod/handlers"
+import "example.com/mod/handlers"
 
-func Use(x Shadowed) { _ = x }
+var _ handlers.Consumed = undeclared
 `)
+	makeLoadable(t, root)
 
 	report := Run(func(r Reporter) {
 		assertNoDeadInterfaces(r, root, []string{"mod/handlers"})
 	})
 
-	require.True(t, report.Failed())
-	assert.Contains(t, report.Text(), "dot import")
-	assert.Contains(t, report.Text(), "mod/consumer/consumer.go")
-	// And the interface is still reported, because the walk genuinely cannot show it referenced.
-	assert.Contains(t, report.Text(), "example.com/mod/handlers.Shadowed")
+	require.True(t, report.Stopped, "a package that does not compile must stop the guard: %s", report.Text())
+	assert.Contains(t, report.Fatal, "example.com/mod/broken")
+	assert.Contains(t, report.Fatal, "undeclared")
+	assert.Contains(t, report.Fatal, "cannot be read until it does")
+	assert.NotContains(t, report.Text(), "interface declaration(s)",
+		"a half-read module reports no finding")
 }
