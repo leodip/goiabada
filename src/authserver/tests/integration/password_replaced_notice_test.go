@@ -114,7 +114,7 @@ func TestAPIUserPasswordPut_TellsTheUserAnAdministratorChangedIt(t *testing.T) {
 			notice := messages[0]
 			assert.Equal(t, tc.subject, notice.Subject)
 			assert.Contains(t, notice.HTML, tc.advice)
-			assert.NotContains(t, notice.HTML, "href", "the notice carries no link")
+			assertCarriesNoLink(t, notice.HTML)
 			assert.NotContains(t, notice.HTML+notice.Text, password, "the notice carries no password")
 		})
 	}
@@ -192,7 +192,7 @@ func TestResetPassword_TellsTheUserTheirPasswordWasReset(t *testing.T) {
 			require.Len(t, notices, 1, "the account's address is told exactly once")
 			notice := notices[0]
 			assert.Contains(t, notice.HTML, tc.warning)
-			assert.NotContains(t, notice.HTML, "href", "the notice carries no link")
+			assertCarriesNoLink(t, notice.HTML)
 			assert.NotContains(t, notice.HTML+notice.Text, password, "the notice carries no password")
 			assert.Len(t, sentTo(t, email), 2, "the address holds the reset link and the notice, and nothing else")
 		})

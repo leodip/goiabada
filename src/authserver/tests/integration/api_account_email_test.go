@@ -356,7 +356,7 @@ func TestAPIAccountEmailPut_TellsThePreviousAddress(t *testing.T) {
 			assert.Equal(t, tc.subject, notice.Subject)
 			assert.Contains(t, notice.HTML, tc.warning)
 			assert.NotContains(t, strings.ToLower(notice.HTML+notice.Text), newEmail, "the notice must not name the new address")
-			assert.NotContains(t, notice.HTML, "href", "the notice carries no link")
+			assertCarriesNoLink(t, notice.HTML)
 
 			// Read once the notice has arrived, which is when the same job would have sent to the
 			// new address too.

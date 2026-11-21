@@ -63,6 +63,21 @@ nothing, and without the reporting half under test a defect in the five lines th
 the guard across every module with nothing going red -- which is what blinding
 `AssertNoDeadInterfaces` demonstrated on `8883642d` (#333).
 
+## Guards that read code or configuration
+
+A guard that works out what code or a workflow does, such as a route's middleware chain or the
+images a job pulls, reads the forms the repository writes and reports any other form as one it
+cannot read, naming the form to write instead. It is not taught a form the tree does not contain. A
+guard that learns one more form of Go or of the Actions syntax with each review never finishes,
+while one that refuses what it cannot read cannot pass what it misread. #261's OpenAPI status lint
+grew by about 2,450 lines over four passes of review comments, each on a form `routes.go` never
+writes, and none of them changed what it said about the real route table; #867's workflow guards
+went the same way. A Go guard that follows names (variables, receivers, fields, calls) type-checks
+the package and reads `types.Info.Uses` and `Defs`, as the auth server's discarded-error lint in
+`internal/server` does, and never matches a name by its spelling, so shadowing, block scope and
+import aliases need no code of their own. A workflow guard reads the file as YAML through
+`readWorkflowJobs` in `core/guard`, never by matching lines.
+
 ## Styling contract guard
 
 The auth server and admin console unit tiers each run `TestTemplates_KeepTheStylingContract`,

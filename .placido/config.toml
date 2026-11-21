@@ -62,7 +62,7 @@ run   = "$PLACIDO_REPO/.placido/e2e.sh"
 about = "Rebuilds the one shared e2e environment on the VPS from this worktree's src/ and runs the e2e suite against it (e2e/run.sh --source), the rate limiter off, about ten minutes. The rate-limits suite is not part of it: the user runs it by hand, before a release. Placido runs it as the last gate, after the review, and again on a fix of it; do not run it yourself."
 
 [gates]
-slice = ["vet", "unit"]
+slice = ["vet", "unit", "lint"]  # lint too (about 8 seconds), so a finding stops the slice or fix that made it
 final = ["lint", "setup-wizard", "data-sqlite", "integration-sqlite"]
 last  = ["e2e"]   # after the review, before the push: the browser suite against an environment built from the branch
 

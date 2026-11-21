@@ -50,7 +50,7 @@ func TestAPIUserDelete_TellsTheUserAnAdministratorDeletedTheirAccount(t *testing
 			require.Len(t, messages, 1, "the deleted user's address is told exactly once")
 			assert.Equal(t, tc.subject, messages[0].Subject)
 			assert.Contains(t, messages[0].HTML, tc.advice)
-			assert.NotContains(t, messages[0].HTML, "href", "the notice carries no link")
+			assertCarriesNoLink(t, messages[0].HTML)
 		})
 	}
 }

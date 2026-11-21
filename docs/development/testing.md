@@ -49,6 +49,13 @@ copies its bytes for every test after it, because migrating every test's databas
 seconds per test under the race detector. A test whose subject is a migration, or a start that
 migrates, still builds its database from empty.
 
+A migration test seeds rows below head with the helpers in
+`authserver/tests/data/migration_seed_sql_test.go` (`seedUser`, `seedClient` and the rest), which
+name only the columns every version they are used at carries. The repository's `Create*` methods
+write every column of the current record, so the next migration that adds a column breaks a test
+that seeds through them (#499, #510). A write that is what its test tests keeps the ORM, with a
+comment saying so.
+
 A test that sends a DPoP proof builds it with `authserver/internal/dpop/dpoptest`, test support like
 `otptest`: ES256 over RFC 7517's and RFC 7515's published P-256 keys, signed with the standard
 library and importing nothing from `dpop`, each key's `Thumbprint` a literal worked out apart from

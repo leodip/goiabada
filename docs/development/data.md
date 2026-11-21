@@ -44,6 +44,16 @@ the engine aborts a transaction as a deadlock victim, including a deadlock repor
 Keep attempt-local state inside the callback, return failures, and write the response and external
 effects after it succeeds. Audit events describe the committed outcome.
 
+**MySQL snapshots.** Under InnoDB's REPEATABLE READ, a transaction's first ordinary read fixes the
+snapshot that every later ordinary read in it answers. PostgreSQL and SQL Server read at READ
+COMMITTED, each statement seeing what was committed when it began. SQLite in WAL mode keeps a
+transaction's first snapshot too, but its pool has one connection, so no other transaction of the
+server commits while one runs. So a write that must see rows another transaction may commit while it
+runs, such as a sweep, a revocation or a deletion, either makes no ordinary read before it holds its
+lock, or reads those rows with a locking read (a `…ForUpdate` method, or `FOR SHARE` on MySQL). Its
+data test commits the competing row while the write waits, and runs on MySQL (#796, #135). The
+operations below hold this today.
+
 Preserve the row locks that make security decisions atomic:
 
 - A termination takes the session row first: it deletes it, or, for a session whose apps it tells,
@@ -52,20 +62,16 @@ Preserve the row locks that make security decisions atomic:
   transaction, so neither slips past a termination's sweep before its commit (#139), and a sign-in
   adding an app to the session is either read by the termination or finds the session gone (#784).
   The termination reads the apps with `GetCommittedUserSessionClients`, which takes `FOR SHARE` on
-  MySQL: under InnoDB's REPEATABLE READ an ordinary read after the wait answers the snapshot of the
-  transaction's first read, without the app that sign-in added.
+  MySQL, so it sees the app that sign-in added (see "MySQL snapshots" above).
   A credential change and a user's deletion that tell apps take each of the user's session rows
   this way, in id order, after the user's row: the deletion takes it with `GetUserByIdForUpdate`.
 - On MySQL, both deletions of a user, the administrator's and the account's own, and the
-  administrator's disable make no ordinary read before they hold the user's row. Under InnoDB's
-  REPEATABLE READ a transaction's first ordinary read fixes the snapshot every later one answers,
-  and the sessions and refresh tokens they read after the wait must include what a sign-in
-  committed during it (#796).
+  administrator's disable make no ordinary read before they hold the user's row: the sessions and
+  refresh tokens they read after the wait must include what a sign-in committed during it (#796).
   They open with the administrators' lock, `AcquireManagePermissionRow`, whose read of its row is
   `FOR SHARE` on MySQL for this reason, then take the user's row with `GetUserByIdForUpdate` before
-  reading the user's grants. The rule is MySQL's; the other engines' ordinary reads fix no snapshot.
-  On PostgreSQL the disable's lookup also makes it wait for a sign-in inserting a session, which
-  holds a key-share lock on the user's row, so it ends that session too.
+  reading the user's grants. On PostgreSQL the disable's lookup also makes it wait for a sign-in
+  inserting a session, which holds a key-share lock on the user's row, so it ends that session too.
 - A disconnect (`revocation.DisconnectClientTx`) reads the client and the user's sessions before it
   sweeps, which on MySQL fixes the snapshot. So it reads the consent it deletes with
   `GetConsentByUserIdAndClientIdForUpdate`, and `GetRefreshTokensByUserIdAndClientId` is a
